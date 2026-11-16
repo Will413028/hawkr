@@ -10,8 +10,6 @@ import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/layout/app_media_query_policy.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/core/router/redirect_logic.dart';
-import 'package:hawkr_seller/core/session/session_provider.dart'
-    show sessionRestoreErrorProvider;
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
 import 'package:hawkr_seller/features/auth/presentation/auth_controller.dart';
 import 'package:hawkr_seller/features/auth/presentation/auth_screen.dart';
@@ -44,7 +42,9 @@ String? redirectFrom(ProviderContainer container, String location) {
 /// GetSession 回 `acc-1`。
 FakeAuthRepository accountRepo() {
   final repo = FakeAuthRepository();
-  when(() => repo.currentAccountId()).thenAnswer((_) async => 'acc-1');
+  when(
+    () => repo.currentSession(),
+  ).thenAnswer((_) async => const AccountSession(accountId: 'acc-1'));
   return repo;
 }
 
@@ -77,29 +77,6 @@ void main() {
     resetLoginStorage();
   });
 
-  testWidgets('停權訊息顯示一次，重新掛載 AuthScreen 不重播', (tester) async {
-    final c = ProviderContainer();
-    addTearDown(c.dispose);
-    c.read(sessionRestoreErrorProvider.notifier).setMessage('帳號已停權');
-    Widget screen() => UncontrolledProviderScope(
-      container: c,
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        builder: (_, _) => const MaterialApp(home: AuthScreen()),
-      ),
-    );
-    await tester.pumpWidget(screen());
-    await tester.pump();
-    expect(find.text('帳號已停權'), findsOneWidget);
-    expect(c.read(sessionRestoreErrorProvider), isNull);
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpWidget(screen());
-    await tester.pump();
-    expect(find.text('帳號已停權'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('auth route 忽略過期的 message extra', (tester) async {
     final c = ProviderContainer(
       overrides: [appRouterObserversProvider.overrideWithValue([])],
@@ -122,7 +99,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     expect(find.byType(AuthScreen), findsOneWidget);
     expect(find.text('過期停權訊息'), findsNothing);
-    expect(c.read(sessionRestoreErrorProvider), isNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -374,13 +350,13 @@ void main() {
       expect(await controller.signInWith(OAuthProvider.line), isFalse);
 
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
-      verifyNever(() => repo.currentAccountId());
+      verifyNever(() => repo.currentSession());
     },
   );
 
   test('#7 GetSession 暫時失敗 → 保留 session token、冒泡、不寫 session', () async {
     final repo = FakeAuthRepository();
-    when(() => repo.currentAccountId()).thenThrow(
+    when(() => repo.currentSession()).thenThrow(
       AuthRequestException.from(
         ConnectException(Code.internal, 'backend 500'),
         defaults: zhDefaultErrorText,
@@ -402,7 +378,7 @@ void main() {
   test('GetSession 回應缺少帳號時保留 session token', () async {
     final repo = FakeAuthRepository();
     when(
-      () => repo.currentAccountId(),
+      () => repo.currentSession(),
     ).thenThrow(const MalformedAuthResponse('missing account'));
     final auth = FakeAuthSession();
     final c = makeLoginContainer(repo: repo, auth: auth);
@@ -415,7 +391,7 @@ void main() {
 
   test('暫時故障後再次登入重試 GetSession，不重新開啟 OAuth', () async {
     final repo = FakeAuthRepository();
-    when(() => repo.currentAccountId()).thenThrow(
+    when(() => repo.currentSession()).thenThrow(
       AuthRequestException.from(
         ConnectException(Code.unavailable, 'offline'),
         defaults: zhDefaultErrorText,
@@ -427,7 +403,9 @@ void main() {
       c.read(authControllerProvider.notifier).signInWith(OAuthProvider.google),
       throwsA(isA<AuthRequestException>()),
     );
-    when(() => repo.currentAccountId()).thenAnswer((_) async => 'acc-1');
+    when(
+      () => repo.currentSession(),
+    ).thenAnswer((_) async => const AccountSession(accountId: 'acc-1'));
     expect(
       await c
           .read(authControllerProvider.notifier)
@@ -440,7 +418,7 @@ void main() {
   for (final code in [Code.unauthenticated, Code.permissionDenied]) {
     test('GetSession 明確拒絕憑證時結束 session token session', () async {
       final repo = FakeAuthRepository();
-      when(() => repo.currentAccountId()).thenThrow(
+      when(() => repo.currentSession()).thenThrow(
         AuthRequestException.from(
           ConnectException(code, 'invalid'),
           defaults: zhDefaultErrorText,
@@ -495,7 +473,7 @@ void main() {
   ]) {
     test('冷啟動非拒絕失敗保留 session token：$error', () async {
       final repo = FakeAuthRepository();
-      when(() => repo.currentAccountId()).thenThrow(error);
+      when(() => repo.currentSession()).thenThrow(error);
       final auth = FakeAuthSession(signedIn: true);
       final c = makeLoginContainer(repo: repo, auth: auth);
       await c.read(sessionProvider.notifier).initialize();
@@ -522,10 +500,10 @@ void main() {
     expect(prefs.getString('auth_cache_owner'), 'B');
   });
 
-  testWidgets('背景重試停權會結束 session token 並發布伺服器文字', (tester) async {
+  testWidgets('背景重試遭拒會結束 session token', (tester) async {
     final repo = FakeAuthRepository();
     var calls = 0;
-    when(() => repo.currentAccountId()).thenAnswer((_) async {
+    when(() => repo.currentSession()).thenAnswer((_) async {
       throw AuthRequestException.from(
         ConnectException(
           ++calls == 1 ? Code.unavailable : Code.permissionDenied,
@@ -541,7 +519,6 @@ void main() {
     expect(auth.isSignedIn, isTrue);
     await tester.pump(const Duration(milliseconds: 1600));
     expect(auth.isSignedIn, isFalse);
-    expect(c.read(sessionRestoreErrorProvider), '帳號已停權');
     expect(calls, 2);
   });
 
@@ -550,14 +527,14 @@ void main() {
     await _saveCachedEditHistory();
     final repo = FakeAuthRepository();
     var calls = 0;
-    when(() => repo.currentAccountId()).thenAnswer((_) async {
+    when(() => repo.currentSession()).thenAnswer((_) async {
       if (++calls == 1) {
         throw AuthRequestException.from(
           ConnectException(Code.resourceExhausted, 'retry'),
           defaults: zhDefaultErrorText,
         );
       }
-      return 'acc-1';
+      return const AccountSession(accountId: 'acc-1');
     });
     final auth = FakeAuthSession(signedIn: true);
     final c = makeLoginContainer(repo: repo, auth: auth);
@@ -576,7 +553,7 @@ void main() {
     await _saveCachedEditHistory();
     final repo = FakeAuthRepository();
     var calls = 0;
-    when(() => repo.currentAccountId()).thenAnswer((_) async {
+    when(() => repo.currentSession()).thenAnswer((_) async {
       calls++;
       throw AuthRequestException.from(
         ConnectException(Code.resourceExhausted, 'retry'),

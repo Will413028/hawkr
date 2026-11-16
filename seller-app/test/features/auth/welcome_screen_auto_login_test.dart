@@ -73,7 +73,9 @@ void main() {
   }) async {
     final auth = FakeAuthSession(signedIn: authSignedIn);
     final account = FakeAuthRepository();
-    when(() => account.currentAccountId()).thenAnswer((_) async => 'acc-1');
+    when(
+      () => account.currentSession(),
+    ).thenAnswer((_) async => const AccountSession(accountId: 'acc-1'));
     final container = ProviderContainer(
       overrides: [
         authSessionProvider.overrideWith((ref) async => auth),

@@ -14,6 +14,7 @@ import '../../shared/utils/hk_log.dart';
 import '../l10n/ui_locale.dart';
 import '../session/auth_session_provider.dart';
 import '../session/session_provider.dart';
+import 'account_suspended_interceptor.dart';
 import 'app_version_headers.dart';
 
 part 'connect_provider.g.dart';
@@ -77,6 +78,9 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
     auth: sessionAuthInterceptor(ref),
     onSellerSuspended: () =>
         ref.read(sessionProvider.notifier).onSellerSuspendedSignal(),
+    onAccountSuspended: () => unawaited(
+      ref.read(sessionProvider.notifier).onAccountSuspendedSignal(),
+    ),
   ),
 );
 
@@ -86,15 +90,20 @@ List<Interceptor> connectInterceptors({
   Interceptor? auth,
   required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
-}) => appInterceptors(
-  timeout: Duration(milliseconds: F.appFlavor.apiTimeout),
-  report: _captureWithSentry,
-  headers: appConnectHeaders,
-  auth: auth,
-  acceptLanguage: acceptLanguage,
-  onSellerSuspended: onSellerSuspended,
-  log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
-);
+  void Function()? onAccountSuspended,
+}) => [
+  ...appInterceptors(
+    timeout: Duration(milliseconds: F.appFlavor.apiTimeout),
+    report: _captureWithSentry,
+    headers: appConnectHeaders,
+    auth: auth,
+    acceptLanguage: acceptLanguage,
+    onSellerSuspended: onSellerSuspended,
+    log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
+  ),
+  if (onAccountSuspended != null)
+    accountSuspendedInterceptor(onAccountSuspended),
+];
 
 /// 以 identity 的 session token 提供身分；session 失效時登出。
 Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(

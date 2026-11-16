@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart'
+    show PolicyCategory;
 import 'package:hawkr_auth/restore_scheduler.dart';
-import 'package:hawkr_api/transport.dart' show Code;
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/chat/data/chat_repository.dart';
@@ -12,6 +12,7 @@ import 'store_refresh_signal.dart';
 import '../../shared/utils/hk_log.dart';
 import '../networking/dio_provider.dart';
 import '../storage/auth_storage.dart';
+import 'account_restriction.dart';
 import 'auth_session_provider.dart';
 import 'post_login_side_effects.dart';
 import 'session_model.dart';
@@ -43,8 +44,6 @@ class Session extends _$Session {
   /// [logout] 進行中旗標 — 見該方法註解的可重入循環說明。
   bool _loggingOut = false;
   final _restore = RestoreScheduler();
-  set restoreError(String? message) =>
-      ref.read(sessionRestoreErrorProvider.notifier).setMessage(message);
 
   /// App 啟動時以保存的 session token 呼叫 GetSession，取得目前的帳號。
   Future<void> initialize() async {
@@ -59,16 +58,15 @@ class Session extends _$Session {
       }
     }
     if (!ref.mounted || !_restore.isCurrent(generation)) return;
-    restoreError = null;
     try {
-      final accountId = await ref
-          .read(authRepositoryProvider)
-          .currentAccountId();
+      final account = await ref.read(authRepositoryProvider).currentSession();
+      final accountId = account.accountId;
       if (!ref.mounted || !_restore.isCurrent(generation)) return;
       await AuthStorage.restoreAccount(accountId);
       if (!ref.mounted || !_restore.isCurrent(generation)) return;
       final session = SessionModel(accountId: accountId, isLoggedIn: true);
 
+      _applyRestriction(account.restriction);
       state = session;
       _syncToStaticServices();
       await ref.read(postLoginSideEffectsProvider).onSessionRestored();
@@ -77,9 +75,6 @@ class Session extends _$Session {
     } catch (e) {
       if (!ref.mounted || !_restore.isCurrent(generation)) return;
       if (e is AuthRequestException && !e.isTransient) {
-        if (e.code == Code.permissionDenied) {
-          restoreError = e.message;
-        }
         await logout();
       } else {
         retryRestore();
@@ -92,23 +87,18 @@ class Session extends _$Session {
 
   void retryRestore() {
     _restore.retry(
-      request: () => ref.read(authRepositoryProvider).currentAccountId(),
-      onSuccess: (accountId) async {
+      request: () => ref.read(authRepositoryProvider).currentSession(),
+      onSuccess: (account) async {
         final generation = _restore.cancel();
-        await AuthStorage.restoreAccount(accountId);
+        await AuthStorage.restoreAccount(account.accountId);
         if (!ref.mounted || !_restore.isCurrent(generation)) return;
-        state = SessionModel(accountId: accountId, isLoggedIn: true);
+        _applyRestriction(account.restriction);
+        state = SessionModel(accountId: account.accountId, isLoggedIn: true);
         _syncToStaticServices();
         await ref.read(postLoginSideEffectsProvider).onSessionRestored();
       },
       isDenied: (error) => error is AuthRequestException && !error.isTransient,
-      onDenied: (error) async {
-        final rejection = error as AuthRequestException;
-        if (rejection.code == Code.permissionDenied) {
-          restoreError = rejection.message;
-        }
-        await logout();
-      },
+      onDenied: (error) async => logout(),
       onUnavailable: (error) =>
           HKLog.logD('[SessionNotifier] restore skipped: $error'),
     );
@@ -117,9 +107,12 @@ class Session extends _$Session {
   /// 登入 — session token 已保存、GetSession 取得帳號之後寫入 session。店家（`GetMyStore`）由 `currentStoreProvider` 隨帳號讀取
   /// （46 號設計書「賣家能力權限層」§7.2：登入當下就知道店家、onboarding、停權與能力，不等撞 9240）；登入流程等它讀完。
   /// 在那之前 `needsOnboarding` 是 null，router 不導頁；讀取失敗而沒有快照時，router 顯示重試。
-  Future<void> login({required String accountId}) async {
-    restoreError = null;
+  Future<void> login({
+    required String accountId,
+    AccountRestriction? restriction,
+  }) async {
     cancelRestore();
+    _applyRestriction(restriction);
     await AuthStorage.restoreAccount(accountId);
     final session = SessionModel(accountId: accountId, isLoggedIn: true);
 
@@ -128,6 +121,38 @@ class Session extends _$Session {
     ref.read(postLoginSideEffectsProvider).onLogin();
 
     HKLog.logD('[SessionNotifier] Logged in: accountId=$accountId');
+  }
+
+  void _applyRestriction(AccountRestriction? restriction) {
+    final notifier = ref.read(accountRestrictionStateProvider.notifier);
+    if (restriction == null) {
+      notifier.clear();
+    } else {
+      notifier.enter(restriction);
+    }
+  }
+
+  /// 前景請求收到 `ACCOUNT_SUSPENDED`：進入受限狀態（不登出），再以 `GetSession` 補上原因、理由與時間。
+  /// 背景寫入的 `ACCOUNT_SUSPENDED` 不會呼叫這裡（見 `accountSuspendedInterceptor`）。
+  Future<void> onAccountSuspendedSignal() async {
+    if (!state.isLoggedIn) return;
+    final restriction = ref.read(accountRestrictionStateProvider.notifier);
+    if (ref.read(accountRestrictionStateProvider) == null) {
+      restriction.enter(
+        const AccountRestriction(
+          category: PolicyCategory.POLICY_CATEGORY_UNSPECIFIED,
+          reason: '',
+        ),
+      );
+    }
+    try {
+      final account = await ref.read(authRepositoryProvider).currentSession();
+      if (!ref.mounted) return;
+      final detail = account.restriction;
+      if (detail != null) restriction.enter(detail);
+    } catch (e) {
+      HKLog.logW('[SessionNotifier] 讀取停權狀態失敗: $e');
+    }
   }
 
   /// session 中途收到「賣家身分已停權」的即時訊號（REST 的 9240、Connect 的 `SELLER_SUSPENDED`）：要求重讀
@@ -158,6 +183,7 @@ class Session extends _$Session {
       await _signOut();
 
       state = const SessionModel();
+      ref.read(accountRestrictionStateProvider.notifier).clear();
 
       // 停止 polling
       ref.read(chatRepositoryProvider).stopPolling();
@@ -196,12 +222,4 @@ class Session extends _$Session {
     // non-secret identity，以及 chat legacy singleton 的中央 Dio dependency。
     ref.read(chatRepositoryProvider).useHttpClient(ref.read(dioProvider));
   }
-}
-
-@Riverpod(keepAlive: true)
-class SessionRestoreError extends _$SessionRestoreError {
-  @override
-  String? build() => null;
-
-  void setMessage(String? message) => state = message;
 }

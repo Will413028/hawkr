@@ -34,21 +34,21 @@ ErrorDetail _localized(String message) => ErrorDetail(
 );
 
 void main() {
-  group('currentAccountId（GetSession）', () {
+  group('currentSession（GetSession）', () {
     test('回傳不透明的帳號 ID', () async {
       final repo = _repo(
         getSession: () =>
             GetSessionResponse(account: Account(id: 'acc-opaque-1')),
       );
 
-      expect(await repo.currentAccountId(), 'acc-opaque-1');
+      expect((await repo.currentSession()).accountId, 'acc-opaque-1');
     });
 
     test('回應沒有帳號 → MalformedAuthResponse', () async {
       final repo = _repo(getSession: GetSessionResponse.new);
 
       await expectLater(
-        repo.currentAccountId(),
+        repo.currentSession(),
         throwsA(isA<MalformedAuthResponse>()),
       );
     });
@@ -63,7 +63,7 @@ void main() {
       );
 
       await expectLater(
-        repo.currentAccountId(),
+        repo.currentSession(),
         throwsA(
           isA<AuthRequestException>()
               .having((e) => e.code, 'code', Code.permissionDenied)
@@ -79,7 +79,7 @@ void main() {
       );
 
       await expectLater(
-        repo.currentAccountId(),
+        repo.currentSession(),
         throwsA(
           isA<AuthRequestException>().having(
             (e) => e.toString(),
@@ -96,7 +96,7 @@ void main() {
       );
 
       await expectLater(
-        repo.currentAccountId(),
+        repo.currentSession(),
         throwsA(
           isA<AuthRequestException>().having(
             (e) => e.toString(),
@@ -114,7 +114,7 @@ void main() {
       );
 
       await expectLater(
-        repo.currentAccountId(),
+        repo.currentSession(),
         throwsA(
           isA<AuthRequestException>()
               .having((e) => e.noResponse, 'noResponse', isTrue)

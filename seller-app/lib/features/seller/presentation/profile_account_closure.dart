@@ -89,35 +89,13 @@ class _ProfileDeleteAccountSectionState
 
   Future<void> _delete() async {
     if (_busy) return;
-    final confirmed = await showAppConfirmDialog(
+    await confirmAndDeleteAccount(
       context,
-      title: '刪除帳號',
-      message:
-          '刪除後帳號資料會被移除，無法復原。你的商店也會一起關閉，商店與商品不再公開，賣家身分會移除。還有未結訂單時，帳號與商店會在訂單結清後才刪除，期間無法新增收藏與追蹤，商店也不能自行關閉或換店。',
-      confirmText: '確認刪除',
-      confirmTextColor: AppColors.danger,
+      ref,
+      onBusy: (busy) {
+        if (mounted) setState(() => _busy = busy);
+      },
     );
-    if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    final AccountDeletionOutcome outcome;
-    try {
-      outcome = await ref.read(accountDeletionProvider).run();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-    if (!mounted) return;
-    switch (outcome) {
-      case AccountDeleted():
-        FloatingToast.success(context, '帳號已刪除');
-        await ref.read(sessionProvider.notifier).logout();
-        if (!mounted) return;
-        context.go('/auth');
-      case AccountDeletionPending():
-        FloatingToast.success(context, accountPendingOrdersMessage);
-        await ref.read(currentStoreProvider.notifier).refresh();
-      case AccountDeletionFailed(:final message):
-        FloatingToast.error(context, message);
-    }
   }
 
   @override
@@ -139,5 +117,43 @@ class _ProfileDeleteAccountSectionState
         ),
       ),
     );
+  }
+}
+
+/// 確認後刪除帳號並依結果處理（已刪除：登出回登入頁；等待未結訂單：重讀店家；失敗：顯示訊息）。
+/// 設定頁與帳號受限頁共用。[onBusy] 在送出期間通知呼叫端切換忙碌狀態。
+Future<void> confirmAndDeleteAccount(
+  BuildContext context,
+  WidgetRef ref, {
+  required void Function(bool busy) onBusy,
+}) async {
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: '刪除帳號',
+    message:
+        '刪除後帳號資料會被移除，無法復原。你的商店也會一起關閉，商店與商品不再公開，賣家身分會移除。還有未結訂單時，帳號與商店會在訂單結清後才刪除，期間無法新增收藏與追蹤，商店也不能自行關閉或換店。',
+    confirmText: '確認刪除',
+    confirmTextColor: AppColors.danger,
+  );
+  if (!confirmed || !context.mounted) return;
+  onBusy(true);
+  final AccountDeletionOutcome outcome;
+  try {
+    outcome = await ref.read(accountDeletionProvider).run();
+  } finally {
+    onBusy(false);
+  }
+  if (!context.mounted) return;
+  switch (outcome) {
+    case AccountDeleted():
+      FloatingToast.success(context, '帳號已刪除');
+      await ref.read(sessionProvider.notifier).logout();
+      if (!context.mounted) return;
+      context.go('/auth');
+    case AccountDeletionPending():
+      FloatingToast.success(context, accountPendingOrdersMessage);
+      await ref.read(currentStoreProvider.notifier).refresh();
+    case AccountDeletionFailed(:final message):
+      FloatingToast.error(context, message);
   }
 }

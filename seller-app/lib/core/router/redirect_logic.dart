@@ -30,6 +30,7 @@ String? resolveAuthRedirect({
   required String location,
   bool needsForceUpdate = false,
   bool storeUnavailable = false,
+  bool accountRestricted = false,
 }) {
   // App 版本低於後端設定的最低可用版本（`packages/hawkr_app_update/docs/spec.md`）：**先於所有其他
   // 判斷**。未登入者也要被攔——否則會先被導去 /login，在一個後端已宣告不再
@@ -51,6 +52,13 @@ String? resolveAuthRedirect({
   // 未登入：只允許白名單路徑，其餘踢回登入頁。
   if (!isLoggedIn) {
     return isWhitelisted ? null : AuthRoutes.auth;
+  }
+
+  // 帳號被停權：只能待在受限頁（刪除帳號、登出），先於店家狀態判斷；未登入者不受影響。
+  if (accountRestricted) {
+    return location == SellerRoutes.accountRestricted
+        ? null
+        : SellerRoutes.accountRestricted;
   }
 
   // 已登入、GetMyStore 讀取失敗而且沒有上一次的快照：不知道有沒有店家，不能放行進主畫面（fail-closed），

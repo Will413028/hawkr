@@ -8,8 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/analytics/analytics_providers.dart';
-import '../../../core/session/session_provider.dart'
-    show sessionRestoreErrorProvider;
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../seller/data/current_store.dart';
@@ -23,19 +21,6 @@ class AuthScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final displayMessage = ref.watch(sessionRestoreErrorProvider);
-    useEffect(() {
-      if (displayMessage != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!context.mounted) return;
-          FloatingToast.error(context, displayMessage);
-          if (ref.read(sessionRestoreErrorProvider) == displayMessage) {
-            ref.read(sessionRestoreErrorProvider.notifier).setMessage(null);
-          }
-        });
-      }
-      return null;
-    }, [displayMessage]);
     // --- State hooks ---
     final appVersionFuture = useMemoized(fetchAppVersion);
     // 進行中的登入方式；一次只進行一個。
