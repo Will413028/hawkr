@@ -1,9 +1,11 @@
 package audit
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
 )
@@ -38,5 +40,16 @@ func TestResourceNamesAreTruncatedByRunes(t *testing.T) {
 	}
 	if truncateRunes("梨山水蜜桃", model.ResourceNameMaxRunes) != "梨山水蜜桃" {
 		t.Fatal("短的名稱不變")
+	}
+}
+
+// 不合 CHECK 規則的 failure_reason 在到資料庫之前就被擋成 INVALID_COMMAND（驗證發生在任何查詢之前，所以 q 可以是 nil）。
+func TestConfirmRejectsAnIllegalFailureReasonBeforeTheDatabase(t *testing.T) {
+	for _, fr := range []string{"lower", "HAS SPACE", "UNSPECIFIED", "_X", "A__B", "9X"} {
+		_, err := (&Module{}).confirmAudit(context.Background(), nil, model.AuditConfirmInput{Result: model.AuditFailed, FailureReason: fr}, time.Time{})
+		d, ok := model.DelegationDenialOf(err)
+		if !ok || d.Denial != model.DenialInvalidCommand {
+			t.Errorf("%q：%v，預期 INVALID_COMMAND", fr, err)
+		}
 	}
 }

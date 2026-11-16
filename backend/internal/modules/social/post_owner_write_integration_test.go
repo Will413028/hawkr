@@ -69,26 +69,26 @@ func TestSD26ForeignWriteOnPublishedIsDenied(t *testing.T) {
 	pub := f.publishedPost(t, owner, "已發布")
 	draft := f.draft(t, owner)
 	unpub := f.publishedPost(t, owner, "下架")
-	unpub = mustV[social.Post](t)(f.module.UnpublishPost(ctx, f.store(t, owner), unpub.ID, unpub.Version))
+	unpub = mustV[social.Post](t)(f.module.UnpublishPost(ctx, f.store(t, owner), unpub.ID, unpub.Version, nil))
 	gone := f.publishedPost(t, owner, "已刪除")
 	must(t, f.module.DeleteOwnPost(ctx, f.store(t, owner), gone.ID, 0))
 
 	calls := map[string]func(p social.Post) error{
 		"Update": func(p social.Post) error {
-			_, err := f.module.UpdatePost(ctx, o, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: &body})
+			_, err := f.module.UpdatePost(ctx, o, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: &body}, nil)
 			return err
 		},
 		"Publish": func(p social.Post) error {
-			_, err := f.module.PublishPost(ctx, o, p.ID, p.Version)
+			_, err := f.module.PublishPost(ctx, o, p.ID, p.Version, nil)
 			return err
 		},
 		"Unpublish": func(p social.Post) error {
-			_, err := f.module.UnpublishPost(ctx, o, p.ID, p.Version)
+			_, err := f.module.UnpublishPost(ctx, o, p.ID, p.Version, nil)
 			return err
 		},
 		"Delete": func(p social.Post) error { return f.module.DeleteOwnPost(ctx, o, p.ID, 0) },
 		"Schedule": func(p social.Post) error {
-			_, err := f.module.SchedulePost(ctx, o, social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()})
+			_, err := f.module.SchedulePost(ctx, o, social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()}, nil)
 			return err
 		},
 		"CancelSchedule": func(p social.Post) error {

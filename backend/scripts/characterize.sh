@@ -129,7 +129,7 @@ start_bg monolith \
 
 # dev_token <參數…>：以 hawkr dev-token 簽一個 token，印出。
 dev_token() {
-  (clean_env DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" "${LOG_DIR}/hawkr" dev-token "$@")
+  (clean_env DATABASE_URL="$MONOLITH_DB_URL" DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" "${LOG_DIR}/hawkr" dev-token "$@")
 }
 BUYER_TOKEN=$(dev_token)
 ADMIN_TOKEN=$(dev_token -admin -user dev_characterize_admin)

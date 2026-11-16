@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -50,6 +51,7 @@ type fixture struct {
 }
 
 // noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這些測試不建排程，取消沒有東西可取消。
+// 內嵌的 *social.Module 是 nil：這些測試不寫代行貼文，只滿足 delegation.Social 的方法集合，被呼叫就 panic。
 type noSchedules struct{}
 
 func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
@@ -115,7 +117,15 @@ func build(t *testing.T, withSocial bool) *fixture {
 	}
 	f.m = f.newDelegation()
 	events.Subscribe(f.bus, f.m.OnAdminRoleRevoked)
-	events.Subscribe(f.bus, f.m.OnPostPublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostPublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostCreated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUpdated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUnpublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostScheduled)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostPublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUnpublishRepeated)
+	events.Subscribe(f.bus, f.m.OnStoreSuspended)
+	events.Subscribe(f.bus, f.m.OnStoreClosed)
 	return f
 }
 

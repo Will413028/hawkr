@@ -2,11 +2,11 @@
 
 ## 職責
 
-代行營運的授權、工作階段、操作稽核與管理員代行資格。舊 gateway 仍編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫本模組的公開 API。行為規格的唯一來源是 `backend/docs/modules/delegation.md`（業務依據：設計書 56）。
+代行營運的授權、工作階段、操作稽核與管理員代行資格，以及代行 Connect 共用的稽核元件；舊 gateway 經 `internal/legacy/delegationservice` 呼叫本模組。行為規格的唯一來源是 `backend/docs/modules/delegation.md`（業務依據：設計書 56）。
 
 ## 擁有的資料
 
-schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代行資格）、`delegated_operation_sessions`（工作階段，主鍵是 bigint IDENTITY）、`seller_delegation_authorizations`（每店一列的授權）、`delegation_authorization_audit_logs`（授權治理歷史，只追加）、`admin_operation_audit_logs`（兩階段操作稽核）。欄位與語意見 `backend/docs/modules/delegation.md` §2。只存其他模組的 ID，不下跨 schema FK。讀取模型：無。
+schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代行資格）、`delegated_operation_sessions`（工作階段，主鍵是 bigint IDENTITY）、`seller_delegation_authorizations`（每店一列的授權）、`delegation_authorization_audit_logs`（授權治理歷史，只追加）、`admin_operation_audit_logs`（操作稽核）。欄位與語意見 `backend/docs/modules/delegation.md` §2。只存其他模組的 ID，不下跨 schema FK。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -28,11 +28,10 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 - 店家層級授權列一旦存在，即遮蔽全域列。守門：`TestPreflightDenials`。規格：§4。
 - 授權寫入與治理歷史同 transaction；撤回同時撤銷該店進行中的工作階段。守門：`TestAuthorizationAndItsHistoryCommitTogether`、`TestRevokingTheAuthorizationEndsRunningSessions`。規格：§4。
 - 撤回代行資格與撤銷管理員角色在同一個 transaction 撤銷進行中的 session（固定值 `RevokeReason*`）；後台登出是「結束」（`EndDelegationsOfAdmin`，`expires_at` 夾值同 `EndDelegationSession`，憑證立刻失效），不寫 `REVOKED`、不取消排程。守門：`TestDisablingAdminEligibilityRevokesSessionsAtomically`、`TestAdminSignOutEndsItsDelegations`、`TestRoleRevocationAndDelegationRevocationRollBackTogether`。規格：§3「撤銷」。
-- 排程發布（social 擁有排程）的授權失效有四個觸發點，同 transaction 內一律「先取消排程、再鎖或改 delegation 的列」（social 在 delegation 之前鎖）：撤回店家授權（取消 → 鎖授權列）；撤回代行資格、撤銷管理員角色（以 `PendingSchedulerRefs` 求交集 → 取消 → 改列）；治理撤銷單一 session（取消 → 改列）。
-- 上一條的守門：`TestTriggersCancelSchedulesIncludingEndedSessions`、`TestRevokeAndScheduledJobDoNotDeadlock`、`platform/lockorder`。規格：§3、§6。
-- 到點重驗與 `StartDelegation` 共用 `internal/session/authority.go` 的授權述詞，全部不鎖的讀取，session 只擋 `REVOKED`；單段 `SUCCEEDED` 稽核由 `OnPostPublished` 在發布的 transaction 內寫，冪等鍵 `schedule:<排程 ID>`。守門：`TestAuthorityLostByDirectDataChangeCancelsAtRun`、`TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit`。規格：§3、§6。
+- 排程發布（social 擁有排程）的授權失效有四個觸發點：撤回店家授權、撤回代行資格、撤銷管理員角色、治理撤銷單一 session；同 transaction 內一律「先取消排程、再鎖或改 delegation 的列」（social 在 delegation 之前鎖）。守門：`TestTriggersCancelSchedulesIncludingEndedSessions`、`TestRevokeAndScheduledJobDoNotDeadlock`、`platform/lockorder`。規格：§3、§6。
+- 第五個觸發點（A7-D25）：seller 的 `StoreSuspended`、`StoreClosed`、`StorePendingDeletion` 同 transaction 先取消該店的待發布排程、再結束進行中的 session（`EndDelegationsOfStore`，同登出的「結束」）；請求時發現店家不可代行只拒絕。守門：`TestStoreTriggersCancelSchedulesBeforeTouchingSessions`、`TestStoreSuspendedAndClosedEndThatStoresSessions`、`TestStoreNotDelegableAtRequestTimeRejectsWithoutRevoking`。規格：§3。
+- 稽核（兩階段 intent／confirm、代行 Connect 的單段 `SUCCEEDED` 與 `FAILED`、排程發布的重驗與稽核）的不變量在 `internal/audit/AGENTS.md`。代行寫入不由 delegation 開 transaction（A7-D26），`OnPostCreated` 等訂閱者在 social 的 transaction 內寫 `SUCCEEDED`（A7-D27）。
 - 開始代行要有 `delegation.sessions.create` 權限。守門：`TestStartDelegationRequiresTheCreatePermission`。規格：§3。
-- 稽核 intent 是寫入前置；confirm 只從 PENDING 轉移一次，成功且需通知時在同 transaction 發事件。守門：`TestAuditIntentAndConfirm`、`TestConfirmRollsBackWhenTheEventIsNotQueued`。規格：§6。
 - 店家狀態只經 seller 的公開 API 讀取，`Deps.Seller` 必填，句子由 seller 提供。`Deps.Social` 必填（取消排程）。守門：`TestPreflightDenials`。規格：§5。
 
 ## 不負責

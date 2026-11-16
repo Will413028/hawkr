@@ -34,6 +34,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -273,23 +274,23 @@ func New(d Deps) *Module {
 }
 
 // CreatePost 新增貼文；店家要有 CapMarketing。Publish 為真時同一個動作發布（公開要件在這裡驗證）。
-func (m *Module) CreatePost(ctx context.Context, store seller.Store, in CreatePostInput) (Post, error) {
-	return m.post.Create(ctx, store, in)
+func (m *Module) CreatePost(ctx context.Context, store seller.Store, in CreatePostInput, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Create(ctx, store, in, actor)
 }
 
 // UpdatePost 修改貼文（帶讀取時的版本）；店家要有 CapMarketing。
-func (m *Module) UpdatePost(ctx context.Context, store seller.Store, in UpdatePostInput) (Post, error) {
-	return m.post.Update(ctx, store, in)
+func (m *Module) UpdatePost(ctx context.Context, store seller.Store, in UpdatePostInput, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Update(ctx, store, in, actor)
 }
 
 // PublishPost 發布貼文；店家要有 CapMarketing。
-func (m *Module) PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (Post, error) {
-	return m.post.Publish(ctx, store, postID, version)
+func (m *Module) PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Publish(ctx, store, postID, version, actor)
 }
 
 // UnpublishPost 下架貼文；店家要有 CapContentContract。
-func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (Post, error) {
-	return m.post.Unpublish(ctx, store, postID, version)
+func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Unpublish(ctx, store, postID, version, actor)
 }
 
 // DeleteOwnPost 是店主對外的刪除：沒刪到（不存在、已刪除、別家未公開的貼文）回 NotFound，別家已公開的貼文回 PermissionDenied；
@@ -300,8 +301,8 @@ func (m *Module) DeleteOwnPost(ctx context.Context, store seller.Store, postID u
 
 // SchedulePost 排程發布：貼文要是 DRAFT 或 UNPUBLISHED，in.PublishAt 距現在 5 分鐘到 90 天，仍要滿足公開要件；貼文已有待發布的排程時先把它轉 REPLACED。
 // in.By 是發起者：OWNER 的 ref 由伺服器填，DELEGATION 的 ref 由呼叫方給（代行 session 的 ID）；店家要有 CapMarketing。排程與到點的 job 在同一個 transaction 寫入。
-func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput) (ScheduledPost, error) {
-	return m.post.Schedule(ctx, store, in)
+func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput, actor *delegatedactor.Actor) (ScheduledPost, error) {
+	return m.post.Schedule(ctx, store, in, actor)
 }
 
 // CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；version 是讀取時的版本；回傳取消後貼文的新版本（etag）；沒有待發布的排程時什麼都不做（不檢查版本，回傳目前的版本）；店家要有 CapMarketing。

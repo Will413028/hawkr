@@ -224,13 +224,13 @@ func TestOnlyRecordPostViewIsAWriteInSocialPublicService(t *testing.T) {
 	}
 }
 
-// SocialAppService 只有店主的四個讀取方法與作者讀自己處分的兩個方法標 NO_SIDE_EFFECTS（GET）；其餘都是寫入，不得標。
+// SocialAppService 只有店主的五個讀取方法（含 ListPendingSchedules）與作者讀自己處分的兩個方法標 NO_SIDE_EFFECTS（GET）；其餘都是寫入，不得標。
 func TestOnlyOwnerReadsInSocialAppServiceAreNoSideEffects(t *testing.T) {
 	methods := pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 23 {
-		t.Fatalf("SocialAppService 有 %d 支方法，預期 23", methods.Len())
+	if methods.Len() != 25 {
+		t.Fatalf("SocialAppService 有 %d 支方法，預期 25", methods.Len())
 	}
-	reads := map[string]bool{"GetMyPost": true, "ListMyPosts": true, "ListStoreComments": true, "GetStoreSocialSummary": true, "ListMySanctions": true, "ListMyHiddenContent": true}
+	reads := map[string]bool{"GetMyPost": true, "ListMyPosts": true, "ListStoreComments": true, "GetStoreSocialSummary": true, "ListPendingSchedules": true, "ListMySanctions": true, "ListMyHiddenContent": true}
 	seen := 0
 	for i := range methods.Len() {
 		m := methods.Get(i)

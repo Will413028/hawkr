@@ -98,7 +98,7 @@ func suspendedAccess(r *http.Request) suspendedAccessKind {
 		return accessDenied
 	}
 	switch audience {
-	case rpc.AudiencePublic, rpc.AudienceInvitee:
+	case rpc.AudiencePublic, rpc.AudienceInvitee, rpc.AudienceDelegated:
 		return accessGuest
 	case rpc.AudienceApp:
 		if effectOf(r.URL.Path) == EffectWrite {

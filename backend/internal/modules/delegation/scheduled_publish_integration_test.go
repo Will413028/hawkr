@@ -53,7 +53,7 @@ func (f *fixture) draftPost(t *testing.T, storeID int64) social.Post {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := f.realSocial.CreatePost(context.Background(), st, social.CreatePostInput{Body: "代行排程的貼文", ImageToken: fmt.Sprintf("tok-%d", f.next())})
+	p, err := f.realSocial.CreatePost(context.Background(), st, social.CreatePostInput{Body: "代行排程的貼文", ImageToken: fmt.Sprintf("tok-%d", f.next())}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func (f *fixture) scheduledPost(t *testing.T, storeID, sessionID int64, lead tim
 	s, err := f.realSocial.SchedulePost(context.Background(), st, social.SchedulePostInput{
 		PostID: p.ID, Version: p.Version, PublishAt: f.now.Add(lead),
 		By: social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: fmt.Sprint(sessionID)},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

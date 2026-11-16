@@ -28,3 +28,11 @@ type ownPostCursor struct {
 }
 
 func (c ownPostCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// scheduleCursor 是待發布排程清單的 page token 內容：(PublishAt, ID)。
+type scheduleCursor struct {
+	PublishAt time.Time
+	ID        uuid.UUID
+}
+
+func (c scheduleCursor) Valid() bool { return !c.PublishAt.IsZero() && c.ID != uuid.UUID{} }

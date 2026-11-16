@@ -56,6 +56,15 @@ SET last_active_at = CASE
 WHERE credential_hash = sqlc.arg(credential_hash)
 RETURNING *;
 
+-- name: TouchDelegationSessionByID :exec
+-- 代行請求成功之後順延閒置逾時（不回列）。述詞與 TouchDelegationSession 的 CASE 相同：只有進行中的 session 才算活動，已逾時的不會被救回來。
+UPDATE delegation.delegated_operation_sessions
+SET last_active_at = date_trunc('second', sqlc.arg(now)::timestamptz)
+WHERE id = sqlc.arg(id)
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND sqlc.arg(now)::timestamptz < expires_at
+  AND last_active_at > sqlc.arg(idle_since)::timestamptz;
+
 -- name: GetActiveDelegationSessionOfActor :one
 -- preflight 的衝突探測。管理員與店家拆成兩句（OR 會讓兩個 partial unique index 都用不上）。
 SELECT * FROM delegation.delegated_operation_sessions
@@ -143,6 +152,21 @@ SET ended_at = sqlc.arg(now)::timestamptz,
     revision = revision + 1,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE actor_admin_id = sqlc.arg(actor_admin_id)
+  AND status = 'ACTIVE' AND ended_at IS NULL
+  AND sqlc.arg(now)::timestamptz < expires_at
+  AND last_active_at > sqlc.arg(idle_since)::timestamptz
+RETURNING id;
+
+-- name: EndActiveDelegationsOfStore :many
+-- 店家停權或關店（seller 的 StoreSuspended、StoreClosed）：結束這家店進行中的 session（不是撤銷，撤銷只留給治理動作）。ended_at 與 expires_at 的夾值與 EndDelegationSession 相同：推導的狀態
+-- 不看 ended_at，憑證只靠 expires_at 被拉回現在而失效，只寫 ended_at 會讓登出後 credential 仍然有效。
+UPDATE delegation.delegated_operation_sessions
+SET ended_at = sqlc.arg(now)::timestamptz,
+    expires_at = GREATEST(issued_at + INTERVAL '1 second',
+                          LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz))),
+    revision = revision + 1,
+    updated_at = sqlc.arg(now)::timestamptz
+WHERE target_store_id = sqlc.arg(target_store_id)
   AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz

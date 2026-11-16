@@ -47,6 +47,61 @@ INSERT INTO delegation.admin_operation_audit_logs (
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
 
+-- name: InsertSucceededAuditLog :one
+-- 代行互動寫入的單段稽核：與被稽核的寫入同一個 transaction，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段；寫入失敗時 transaction rollback，這一列跟著消失）。
+-- 冪等鍵是呼叫方的 request_id；同一個 session 的同一把鍵已經有列時沒有列回傳（呼叫方讀既有的列判斷是重送還是內容不同）。origin 固定 INTERACTIVE；
+-- confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 為 true 才寫 notified_at。建立類在寫入前還沒有資源 ID，resource_id 為 NULL，由 SetAuditLogOutcome 補上。
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, operation_reason, case_reference,
+    request_id, correlation_id, idempotency_key, payload_hash,
+    resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at, notified_at
+) VALUES (
+    sqlc.arg(id), sqlc.arg(session_id), sqlc.arg(actor_admin_id), sqlc.arg(actor_display_name),
+    sqlc.arg(target_store_id), sqlc.arg(target_seller_account_id), sqlc.arg(target_store_name),
+    'INTERACTIVE', sqlc.arg(capability), sqlc.arg(action), sqlc.arg(resource_type), sqlc.narg(resource_id)::text, sqlc.narg(resource_name),
+    'SUCCEEDED', sqlc.arg(operation_reason), sqlc.narg(case_reference),
+    sqlc.arg(request_id), sqlc.arg(correlation_id), sqlc.arg(idempotency_key)::text, sqlc.arg(payload_hash),
+    sqlc.narg(resource_version_before), sqlc.narg(user_agent),
+    sqlc.arg(risk_level), sqlc.arg(notify_seller)::boolean, sqlc.arg(now)::timestamptz, date_trunc('second', sqlc.arg(now)::timestamptz),
+    CASE WHEN sqlc.arg(notify_seller)::boolean THEN date_trunc('second', sqlc.arg(now)::timestamptz) END
+)
+ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+RETURNING *;
+
+-- name: InsertFailedAuditLog :one
+-- 代行互動請求的失敗紀錄：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。在獨立的 transaction 寫入（被稽核的寫入若已 rollback，這一列仍要留下）。
+-- 直接是 FAILED，沒有冪等鍵（失敗的嘗試不占用 request_id，同一個 request_id 重送仍可成功）；origin 固定 INTERACTIVE；notify_seller 固定 false；
+-- confirmed_at 與 confirm 一樣截秒；failure_reason 是拒絕的代碼或 ErrorReason 的值名（沒有原因是 INTERNAL），新路徑不寫 biz_code。
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, failure_reason, operation_reason, case_reference,
+    request_id, correlation_id, resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at
+) VALUES (
+    sqlc.arg(id), sqlc.arg(session_id), sqlc.arg(actor_admin_id), sqlc.arg(actor_display_name),
+    sqlc.arg(target_store_id), sqlc.arg(target_seller_account_id), sqlc.arg(target_store_name),
+    'INTERACTIVE', sqlc.arg(capability), sqlc.arg(action), sqlc.arg(resource_type), sqlc.narg(resource_id)::text, sqlc.narg(resource_name),
+    'FAILED', sqlc.arg(failure_reason)::text, sqlc.narg(operation_reason), sqlc.narg(case_reference),
+    sqlc.arg(request_id), sqlc.arg(correlation_id), sqlc.narg(resource_version_before), sqlc.narg(user_agent),
+    sqlc.arg(risk_level), false, sqlc.arg(now)::timestamptz, date_trunc('second', sqlc.arg(now)::timestamptz)
+)
+RETURNING *;
+
+-- name: SetAuditLogOutcome :one
+-- 寫入完成後補上稽核列的資源：建立類在這裡才有貼文 ID（已有值的保留），並記下資源名稱與寫入後的版本。只動這一列。
+UPDATE delegation.admin_operation_audit_logs
+SET resource_id = COALESCE(resource_id, sqlc.narg(resource_id)::text),
+    resource_name = COALESCE(sqlc.narg(resource_name), resource_name),
+    resource_version_after = sqlc.narg(resource_version_after)
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
 -- name: GetDelegationAuditLog :one
 SELECT * FROM delegation.admin_operation_audit_logs WHERE id = $1;
 
@@ -73,6 +128,7 @@ SET result = sqlc.arg(result),
     changed_fields = sqlc.narg(changed_fields),
     resource_version_after = sqlc.narg(resource_version_after),
     biz_code = sqlc.narg(biz_code),
+    failure_reason = sqlc.narg(failure_reason),
     confirmed_at = date_trunc('second', sqlc.arg(now)::timestamptz),
     notified_at = CASE
         WHEN sqlc.arg(result)::text = 'SUCCEEDED' AND notify_seller

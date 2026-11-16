@@ -183,7 +183,7 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 		}
 	}
 	// 不公開的貼文不計；清理 job 只刪舊的去重列與 salt，不扣瀏覽數。
-	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}))
+	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}, nil))
 	if mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, draft.ID, anon)) {
 		t.Fatal("草稿不計瀏覽")
 	}

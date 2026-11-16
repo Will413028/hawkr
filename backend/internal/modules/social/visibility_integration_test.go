@@ -60,12 +60,12 @@ func TestSD1SD2PublicReadabilityPredicate(t *testing.T) {
 	scenarios := []scenario{
 		{name: "下架", want: readable{forum: 1},
 			apply: func(t *testing.T, f *fixture, p social.Post, _ social.Comment, _ social.ForumEntry, _ buyerP) {
-				_, err := f.module.UnpublishPost(ctx, f.store(t, p.StoreID), p.ID, p.Version)
+				_, err := f.module.UnpublishPost(ctx, f.store(t, p.StoreID), p.ID, p.Version, nil)
 				must(t, err)
 			},
 			revert: func(t *testing.T, f *fixture, p social.Post, _ social.Comment, _ social.ForumEntry, _ buyerP) {
 				cur := mustV[social.Post](t)(f.module.OwnPost(ctx, p.StoreID, p.ID))
-				_, err := f.module.PublishPost(ctx, f.store(t, p.StoreID), p.ID, cur.Version)
+				_, err := f.module.PublishPost(ctx, f.store(t, p.StoreID), p.ID, cur.Version, nil)
 				must(t, err)
 			}},
 		{name: "貼文刪除", want: readable{forum: 1},
@@ -138,7 +138,7 @@ func TestSD1DraftIsNotPublic(t *testing.T) {
 	ctx := context.Background()
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
-	p := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}))
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}, nil))
 	if p.Status != social.StatusDraft || p.PublishedAt != nil {
 		t.Fatalf("%+v", p)
 	}

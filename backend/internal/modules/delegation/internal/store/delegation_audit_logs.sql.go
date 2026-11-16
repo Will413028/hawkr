@@ -20,13 +20,14 @@ SET result = $1,
     changed_fields = $4,
     resource_version_after = $5,
     biz_code = $6,
-    confirmed_at = date_trunc('second', $7::timestamptz),
+    failure_reason = $7,
+    confirmed_at = date_trunc('second', $8::timestamptz),
     notified_at = CASE
         WHEN $1::text = 'SUCCEEDED' AND notify_seller
-        THEN date_trunc('second', $7::timestamptz)
+        THEN date_trunc('second', $8::timestamptz)
     END
-WHERE id = $8 AND result = 'PENDING'
-RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+WHERE id = $9 AND result = 'PENDING'
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
 `
 
 type ConfirmDelegationAuditLogParams struct {
@@ -36,6 +37,7 @@ type ConfirmDelegationAuditLogParams struct {
 	ChangedFields        []byte
 	ResourceVersionAfter *int64
 	BizCode              *int32
+	FailureReason        *string
 	Now                  time.Time
 	ID                   uuid.UUID
 }
@@ -51,6 +53,7 @@ func (q *Queries) ConfirmDelegationAuditLog(ctx context.Context, arg ConfirmDele
 		arg.ChangedFields,
 		arg.ResourceVersionAfter,
 		arg.BizCode,
+		arg.FailureReason,
 		arg.Now,
 		arg.ID,
 	)
@@ -71,6 +74,7 @@ func (q *Queries) ConfirmDelegationAuditLog(ctx context.Context, arg ConfirmDele
 		&i.ResourceName,
 		&i.Result,
 		&i.BizCode,
+		&i.FailureReason,
 		&i.OperationReason,
 		&i.CaseReference,
 		&i.RequestID,
@@ -176,7 +180,7 @@ func (q *Queries) DelegationAuditSummary(ctx context.Context, arg DelegationAudi
 }
 
 const getDelegationAuditLog = `-- name: GetDelegationAuditLog :one
-SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs WHERE id = $1
+SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs WHERE id = $1
 `
 
 func (q *Queries) GetDelegationAuditLog(ctx context.Context, id uuid.UUID) (DelegationAdminOperationAuditLog, error) {
@@ -198,6 +202,7 @@ func (q *Queries) GetDelegationAuditLog(ctx context.Context, id uuid.UUID) (Dele
 		&i.ResourceName,
 		&i.Result,
 		&i.BizCode,
+		&i.FailureReason,
 		&i.OperationReason,
 		&i.CaseReference,
 		&i.RequestID,
@@ -220,7 +225,7 @@ func (q *Queries) GetDelegationAuditLog(ctx context.Context, id uuid.UUID) (Dele
 }
 
 const getDelegationAuditLogByIdempotencyKey = `-- name: GetDelegationAuditLogByIdempotencyKey :one
-SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs
+SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs
 WHERE session_id = $1 AND idempotency_key = $2
 `
 
@@ -248,6 +253,7 @@ func (q *Queries) GetDelegationAuditLogByIdempotencyKey(ctx context.Context, arg
 		&i.ResourceName,
 		&i.Result,
 		&i.BizCode,
+		&i.FailureReason,
 		&i.OperationReason,
 		&i.CaseReference,
 		&i.RequestID,
@@ -290,7 +296,7 @@ INSERT INTO delegation.admin_operation_audit_logs (
     $23, $24, $25::timestamptz
 )
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
 `
 
 type InsertDelegationAuditLogParams struct {
@@ -369,6 +375,116 @@ func (q *Queries) InsertDelegationAuditLog(ctx context.Context, arg InsertDelega
 		&i.ResourceName,
 		&i.Result,
 		&i.BizCode,
+		&i.FailureReason,
+		&i.OperationReason,
+		&i.CaseReference,
+		&i.RequestID,
+		&i.CorrelationID,
+		&i.IdempotencyKey,
+		&i.PayloadHash,
+		&i.BeforeSnapshot,
+		&i.AfterSnapshot,
+		&i.ChangedFields,
+		&i.ResourceVersionBefore,
+		&i.ResourceVersionAfter,
+		&i.UserAgent,
+		&i.RiskLevel,
+		&i.NotifySeller,
+		&i.NotifiedAt,
+		&i.CreatedAt,
+		&i.ConfirmedAt,
+	)
+	return i, err
+}
+
+const insertFailedAuditLog = `-- name: InsertFailedAuditLog :one
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, failure_reason, operation_reason, case_reference,
+    request_id, correlation_id, resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    'INTERACTIVE', $8, $9, $10, $11::text, $12,
+    'FAILED', $13::text, $14, $15,
+    $16, $17, $18, $19,
+    $20, false, $21::timestamptz, date_trunc('second', $21::timestamptz)
+)
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+`
+
+type InsertFailedAuditLogParams struct {
+	ID                    uuid.UUID
+	SessionID             int64
+	ActorAdminID          int64
+	ActorDisplayName      string
+	TargetStoreID         int64
+	TargetSellerAccountID int64
+	TargetStoreName       string
+	Capability            string
+	Action                string
+	ResourceType          string
+	ResourceID            *string
+	ResourceName          *string
+	FailureReason         string
+	OperationReason       *string
+	CaseReference         *string
+	RequestID             string
+	CorrelationID         string
+	ResourceVersionBefore *int64
+	UserAgent             *string
+	RiskLevel             string
+	Now                   time.Time
+}
+
+// 代行互動請求的失敗紀錄：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。在獨立的 transaction 寫入（被稽核的寫入若已 rollback，這一列仍要留下）。
+// 直接是 FAILED，沒有冪等鍵（失敗的嘗試不占用 request_id，同一個 request_id 重送仍可成功）；origin 固定 INTERACTIVE；notify_seller 固定 false；
+// confirmed_at 與 confirm 一樣截秒；failure_reason 是拒絕的代碼或 ErrorReason 的值名（沒有原因是 INTERNAL），新路徑不寫 biz_code。
+func (q *Queries) InsertFailedAuditLog(ctx context.Context, arg InsertFailedAuditLogParams) (DelegationAdminOperationAuditLog, error) {
+	row := q.db.QueryRow(ctx, insertFailedAuditLog,
+		arg.ID,
+		arg.SessionID,
+		arg.ActorAdminID,
+		arg.ActorDisplayName,
+		arg.TargetStoreID,
+		arg.TargetSellerAccountID,
+		arg.TargetStoreName,
+		arg.Capability,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.FailureReason,
+		arg.OperationReason,
+		arg.CaseReference,
+		arg.RequestID,
+		arg.CorrelationID,
+		arg.ResourceVersionBefore,
+		arg.UserAgent,
+		arg.RiskLevel,
+		arg.Now,
+	)
+	var i DelegationAdminOperationAuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.ActorAdminID,
+		&i.ActorDisplayName,
+		&i.TargetStoreID,
+		&i.TargetSellerAccountID,
+		&i.TargetStoreName,
+		&i.Origin,
+		&i.Capability,
+		&i.Action,
+		&i.ResourceType,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.Result,
+		&i.BizCode,
+		&i.FailureReason,
 		&i.OperationReason,
 		&i.CaseReference,
 		&i.RequestID,
@@ -408,7 +524,7 @@ INSERT INTO delegation.admin_operation_audit_logs (
     CASE WHEN $16::boolean THEN date_trunc('second', $17::timestamptz) END
 )
 ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
 `
 
 type InsertScheduledPublishAuditLogParams struct {
@@ -471,6 +587,124 @@ func (q *Queries) InsertScheduledPublishAuditLog(ctx context.Context, arg Insert
 		&i.ResourceName,
 		&i.Result,
 		&i.BizCode,
+		&i.FailureReason,
+		&i.OperationReason,
+		&i.CaseReference,
+		&i.RequestID,
+		&i.CorrelationID,
+		&i.IdempotencyKey,
+		&i.PayloadHash,
+		&i.BeforeSnapshot,
+		&i.AfterSnapshot,
+		&i.ChangedFields,
+		&i.ResourceVersionBefore,
+		&i.ResourceVersionAfter,
+		&i.UserAgent,
+		&i.RiskLevel,
+		&i.NotifySeller,
+		&i.NotifiedAt,
+		&i.CreatedAt,
+		&i.ConfirmedAt,
+	)
+	return i, err
+}
+
+const insertSucceededAuditLog = `-- name: InsertSucceededAuditLog :one
+INSERT INTO delegation.admin_operation_audit_logs (
+    id, session_id, actor_admin_id, actor_display_name,
+    target_store_id, target_seller_account_id, target_store_name,
+    origin, capability, action, resource_type, resource_id, resource_name,
+    result, operation_reason, case_reference,
+    request_id, correlation_id, idempotency_key, payload_hash,
+    resource_version_before, user_agent,
+    risk_level, notify_seller, created_at, confirmed_at, notified_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    'INTERACTIVE', $8, $9, $10, $11::text, $12,
+    'SUCCEEDED', $13, $14,
+    $15, $16, $17::text, $18,
+    $19, $20,
+    $21, $22::boolean, $23::timestamptz, date_trunc('second', $23::timestamptz),
+    CASE WHEN $22::boolean THEN date_trunc('second', $23::timestamptz) END
+)
+ON CONFLICT (session_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+`
+
+type InsertSucceededAuditLogParams struct {
+	ID                    uuid.UUID
+	SessionID             int64
+	ActorAdminID          int64
+	ActorDisplayName      string
+	TargetStoreID         int64
+	TargetSellerAccountID int64
+	TargetStoreName       string
+	Capability            string
+	Action                string
+	ResourceType          string
+	ResourceID            *string
+	ResourceName          *string
+	OperationReason       *string
+	CaseReference         *string
+	RequestID             string
+	CorrelationID         string
+	IdempotencyKey        string
+	PayloadHash           *string
+	ResourceVersionBefore *int64
+	UserAgent             *string
+	RiskLevel             string
+	NotifySeller          bool
+	Now                   time.Time
+}
+
+// 代行互動寫入的單段稽核：與被稽核的寫入同一個 transaction，直接是 SUCCEEDED（沒有 intent 與 confirm 兩段；寫入失敗時 transaction rollback，這一列跟著消失）。
+// 冪等鍵是呼叫方的 request_id；同一個 session 的同一把鍵已經有列時沒有列回傳（呼叫方讀既有的列判斷是重送還是內容不同）。origin 固定 INTERACTIVE；
+// confirmed_at 與 notified_at 與 confirm 一樣截秒；notify_seller 為 true 才寫 notified_at。建立類在寫入前還沒有資源 ID，resource_id 為 NULL，由 SetAuditLogOutcome 補上。
+func (q *Queries) InsertSucceededAuditLog(ctx context.Context, arg InsertSucceededAuditLogParams) (DelegationAdminOperationAuditLog, error) {
+	row := q.db.QueryRow(ctx, insertSucceededAuditLog,
+		arg.ID,
+		arg.SessionID,
+		arg.ActorAdminID,
+		arg.ActorDisplayName,
+		arg.TargetStoreID,
+		arg.TargetSellerAccountID,
+		arg.TargetStoreName,
+		arg.Capability,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.OperationReason,
+		arg.CaseReference,
+		arg.RequestID,
+		arg.CorrelationID,
+		arg.IdempotencyKey,
+		arg.PayloadHash,
+		arg.ResourceVersionBefore,
+		arg.UserAgent,
+		arg.RiskLevel,
+		arg.NotifySeller,
+		arg.Now,
+	)
+	var i DelegationAdminOperationAuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.ActorAdminID,
+		&i.ActorDisplayName,
+		&i.TargetStoreID,
+		&i.TargetSellerAccountID,
+		&i.TargetStoreName,
+		&i.Origin,
+		&i.Capability,
+		&i.Action,
+		&i.ResourceType,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.Result,
+		&i.BizCode,
+		&i.FailureReason,
 		&i.OperationReason,
 		&i.CaseReference,
 		&i.RequestID,
@@ -520,7 +754,7 @@ func (q *Queries) LatestDelegationAuditReason(ctx context.Context, arg LatestDel
 }
 
 const listDelegationAuditLogs = `-- name: ListDelegationAuditLogs :many
-SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs
+SELECT id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at FROM delegation.admin_operation_audit_logs
 WHERE ($1::bigint IS NULL OR session_id = $1::bigint)
   AND ($2::bigint IS NULL OR actor_admin_id = $2::bigint)
   AND ($3::bigint IS NULL OR target_store_id = $3::bigint)
@@ -584,6 +818,7 @@ func (q *Queries) ListDelegationAuditLogs(ctx context.Context, arg ListDelegatio
 			&i.ResourceName,
 			&i.Result,
 			&i.BizCode,
+			&i.FailureReason,
 			&i.OperationReason,
 			&i.CaseReference,
 			&i.RequestID,
@@ -610,4 +845,67 @@ func (q *Queries) ListDelegationAuditLogs(ctx context.Context, arg ListDelegatio
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAuditLogOutcome = `-- name: SetAuditLogOutcome :one
+UPDATE delegation.admin_operation_audit_logs
+SET resource_id = COALESCE(resource_id, $1::text),
+    resource_name = COALESCE($2, resource_name),
+    resource_version_after = $3
+WHERE id = $4
+RETURNING id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, origin, capability, action, resource_type, resource_id, resource_name, result, biz_code, failure_reason, operation_reason, case_reference, request_id, correlation_id, idempotency_key, payload_hash, before_snapshot, after_snapshot, changed_fields, resource_version_before, resource_version_after, user_agent, risk_level, notify_seller, notified_at, created_at, confirmed_at
+`
+
+type SetAuditLogOutcomeParams struct {
+	ResourceID           *string
+	ResourceName         *string
+	ResourceVersionAfter *int64
+	ID                   uuid.UUID
+}
+
+// 寫入完成後補上稽核列的資源：建立類在這裡才有貼文 ID（已有值的保留），並記下資源名稱與寫入後的版本。只動這一列。
+func (q *Queries) SetAuditLogOutcome(ctx context.Context, arg SetAuditLogOutcomeParams) (DelegationAdminOperationAuditLog, error) {
+	row := q.db.QueryRow(ctx, setAuditLogOutcome,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.ResourceVersionAfter,
+		arg.ID,
+	)
+	var i DelegationAdminOperationAuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.ActorAdminID,
+		&i.ActorDisplayName,
+		&i.TargetStoreID,
+		&i.TargetSellerAccountID,
+		&i.TargetStoreName,
+		&i.Origin,
+		&i.Capability,
+		&i.Action,
+		&i.ResourceType,
+		&i.ResourceID,
+		&i.ResourceName,
+		&i.Result,
+		&i.BizCode,
+		&i.FailureReason,
+		&i.OperationReason,
+		&i.CaseReference,
+		&i.RequestID,
+		&i.CorrelationID,
+		&i.IdempotencyKey,
+		&i.PayloadHash,
+		&i.BeforeSnapshot,
+		&i.AfterSnapshot,
+		&i.ChangedFields,
+		&i.ResourceVersionBefore,
+		&i.ResourceVersionAfter,
+		&i.UserAgent,
+		&i.RiskLevel,
+		&i.NotifySeller,
+		&i.NotifiedAt,
+		&i.CreatedAt,
+		&i.ConfirmedAt,
+	)
+	return i, err
 }

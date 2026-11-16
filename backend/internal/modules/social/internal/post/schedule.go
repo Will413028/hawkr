@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -103,7 +104,7 @@ func (s *Service) scheduledBy(st seller.Store, by model.ScheduledBy) (model.Sche
 
 // Schedule 排程發布：DRAFT 或 UNPUBLISHED 的貼文，publish_at 距現在 5 分鐘到 90 天，仍要滿足公開要件；貼文已有待發布的排程時先把它轉 REPLACED。
 // OWNER 的 ref 由伺服器填店家的帳號 ID（呼叫方給的忽略），DELEGATION 的 ref 由呼叫方給（代行 session 的 ID）。店家要有 CapMarketing。
-func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.SchedulePostInput) (model.ScheduledPost, error) {
+func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.SchedulePostInput, actor *delegatedactor.Actor) (model.ScheduledPost, error) {
 	if err := seller.Authorize(st, seller.CapMarketing); err != nil {
 		return model.ScheduledPost{}, err
 	}
@@ -164,8 +165,10 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 		if err := s.d.Jobs.Enqueue(ctx, PublishScheduledArgs{ScheduleID: out.ID}, &opts); err != nil {
 			return err
 		}
-		posted, err = s.Own(ctx, st.StoreID, row.ID)
-		return err
+		if posted, err = s.Own(ctx, st.StoreID, row.ID); err != nil {
+			return err
+		}
+		return emit(ctx, s.d.Events, model.PostScheduled{PostWritten: s.postWritten(posted.ID, posted.StoreID, posted.Body, posted.Version, actor)}, actor)
 	})
 	if err != nil {
 		return model.ScheduledPost{}, err
@@ -337,7 +340,7 @@ func (s *Service) RunScheduled(ctx context.Context, scheduleID uuid.UUID) error 
 		if err := checkPublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 			return s.resolveCanceled(ctx, q, scheduleID, model.CancelNotPublishable, now, schedule.BumpVersion)
 		}
-		if err := s.publishLocked(ctx, q, row, now, model.OriginScheduled, sc); err != nil {
+		if err := s.publishLocked(ctx, q, row, now, model.OriginScheduled, sc, nil); err != nil {
 			return err
 		}
 		if _, err := q.ResolveSchedule(ctx, store.ResolveScheduleParams{ID: scheduleID, State: string(model.SchedulePublished), Now: &now}); err != nil {

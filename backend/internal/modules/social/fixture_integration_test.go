@@ -335,7 +335,7 @@ func (f *fixture) publishedPost(t *testing.T, storeID int64, body string, tags .
 	t.Helper()
 	p, err := f.module.CreatePost(context.Background(), f.store(t, storeID), social.CreatePostInput{
 		Body: body, ImageToken: fmt.Sprintf("tok-%d", f.next()), Hashtags: tags, Publish: true,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
