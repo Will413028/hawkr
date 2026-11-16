@@ -260,3 +260,50 @@ func ids(ps []social.Post) []string {
 	}
 	return out
 }
+
+// CommentLiked 只在真的新增一列時發一次（帶按讚者與留言作者）：重複按讚、取消讚、取消後再讚（才是新的一列）各自的次數。
+func TestCommentLikedIsPublishedOnlyWhenARowIsInserted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.publishedPost(t, storeID, "貼文")
+	author, fan := f.newBuyer(t), f.newBuyer(t)
+	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(author), social.CommentInput{PostID: p.ID, Body: "留言"}))
+	var mu sync.Mutex
+	var got []social.CommentLiked
+	events.Subscribe(f.bus, func(_ context.Context, e social.CommentLiked) error {
+		mu.Lock()
+		defer mu.Unlock()
+		got = append(got, e)
+		return nil
+	})
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(got)
+	}
+	caller := f.asBuyer(fan)
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); !ok || count() != 1 {
+		t.Fatalf("第一次按讚發一次：added=%v events=%d", ok, count())
+	}
+	mu.Lock()
+	e := got[0]
+	mu.Unlock()
+	if e.CommentID != c.ID || e.PostID != p.ID || e.StoreID != storeID ||
+		e.Actor != (social.Actor{Kind: social.ActorBuyer, ID: fan.BuyerID}) || e.Author != (social.Actor{Kind: social.ActorBuyer, ID: author.BuyerID}) {
+		t.Fatalf("事件內容：%+v", e)
+	}
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); ok || count() != 1 {
+		t.Fatalf("重複按讚不發：added=%v events=%d", ok, count())
+	}
+	if ok := mustV[bool](t)(f.module.UnlikeComment(ctx, caller, c.ID)); !ok || count() != 1 {
+		t.Fatalf("取消讚不發：removed=%v events=%d", ok, count())
+	}
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); !ok || count() != 2 {
+		t.Fatalf("取消後再讚是新的一列，發第二次：added=%v events=%d", ok, count())
+	}
+	if rel := mustV[social.Comment](t)(f.module.CommentForRelay(ctx, c.ID)); rel.Likes != 1 || rel.ID != c.ID || rel.Body != "留言" || rel.Actor.ID != author.BuyerID {
+		t.Fatalf("CommentForRelay 讀到此刻的內容與計數：%+v", rel)
+	}
+}

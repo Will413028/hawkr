@@ -540,6 +540,11 @@ func (m *Module) RecordView(ctx context.Context, c Caller, postID uuid.UUID, v V
 	return m.engage.RecordView(ctx, c, postID, v)
 }
 
+// CommentForRelay 以 ID 讀一則留言此刻的內容與計數（不帶觀看者），只給 legacy relay 補通知 payload 的留言快照，隨 relay 在 A8 刪除；不存在回 NotFound。
+func (m *Module) CommentForRelay(ctx context.Context, id uuid.UUID) (Comment, error) {
+	return m.comment.ForRelay(ctx, id)
+}
+
 // ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證。
 func (m *Module) ContentOwner(ctx context.Context, t Target) (ContentOwner, error) {
 	return m.sanction.Owner(ctx, t)

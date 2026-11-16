@@ -31,7 +31,7 @@ schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒
 ## 不負責
 
 - 檢舉、案件與處置：moderation；social 只存隱藏與警告的紀錄，案件以不透明的 `source_ref` 參照。
-- 推播 relay：尚未在本模組（見 `backend/docs/plans/2026-10-18-a7-social.md`）；代行排程的到點授權由 delegation 實作、`cmd/hawkr` 注入，social 不 import delegation。
+- 推播 relay：在 `internal/legacy/socialrelay`（A7-3，A8 刪除），本模組只發事件與提供 `CommentForRelay`；代行排程的到點授權由 delegation 實作、`cmd/hawkr` 注入，social 不 import delegation。
 - 店家與買家的名稱、頭像：讀取時由 seller、buyer 批次補，social 不存快照。
 
 ## 決策紀錄

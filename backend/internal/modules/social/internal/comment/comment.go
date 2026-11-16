@@ -504,3 +504,18 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, paren
 	}
 	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size)
 }
+
+// ForRelay 以 ID 讀一則留言此刻的內容與計數，不帶觀看者、不套可見性規則（已刪除或被隱藏的也讀得到，由呼叫方決定）；
+// 給 legacy relay 補通知 payload 的留言快照。不存在回 NotFound。
+func (s *Service) ForRelay(ctx context.Context, id uuid.UUID) (model.Comment, error) {
+	row, err := s.q(ctx).GetCommentWithStats(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Comment{}, apperr.NotFound("%s", text.CommentNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.Comment{}, fmt.Errorf("social：讀取留言 %s：%w", id, err)
+	}
+	c := visibleComment(row.SocialComment, row.PostStoreID)
+	c.Likes, c.ReplyCount = row.LikeCount, row.ReplyCount
+	return c, nil
+}

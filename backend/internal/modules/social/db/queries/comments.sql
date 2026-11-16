@@ -30,6 +30,15 @@ FROM social.comments c
 JOIN social.posts p ON p.id = c.post_id
 WHERE c.id = sqlc.arg(id);
 
+-- name: GetCommentWithStats :one
+-- 不帶觀看者的讀取，給 legacy relay 補通知 payload 的留言快照；統計列還沒有時計數是 0。
+SELECT sqlc.embed(c), p.store_id AS post_store_id,
+       COALESCE(s.like_count, 0)::bigint AS like_count, COALESCE(s.reply_count, 0)::bigint AS reply_count
+FROM social.comments c
+JOIN social.posts p ON p.id = c.post_id
+LEFT JOIN social.comment_stats s ON s.comment_id = c.id
+WHERE c.id = sqlc.arg(id);
+
 -- name: UpdateCommentBody :one
 -- 呼叫方已在列鎖之下檢查版本與隱藏。
 UPDATE social.comments SET body = sqlc.arg(body)::text, version = version + 1, updated_at = sqlc.arg(now)

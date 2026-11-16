@@ -17,6 +17,9 @@ type CommentReplied = model.CommentReplied
 // PostLiked 貼文被按讚（只在真的新增一列時發）。
 type PostLiked = model.PostLiked
 
+// CommentLiked 留言被按讚（只在真的新增一列時發，取消讚與重複按讚不發）。
+type CommentLiked = model.CommentLiked
+
 // PostScheduleCanceled 一個待發布的排程被取消（店主取消、被取代、貼文刪除或下架、授權失效、發起者撤銷）；每個被取消的排程各發一次，帶凍結的原因。
 type PostScheduleCanceled = model.PostScheduleCanceled
 

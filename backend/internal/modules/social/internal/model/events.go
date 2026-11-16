@@ -72,6 +72,17 @@ type PostLiked struct {
 	BuyerID    int64
 }
 
+// CommentLiked 留言被按讚（只在真的新增一列時發，並發雙擊與重複按讚不發；取消讚不發）。Actor 是按讚者，Author 是留言作者，StoreID 是貼文所屬的店家。
+type CommentLiked struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	CommentID  uuid.UUID
+	PostID     uuid.UUID
+	StoreID    int64
+	Actor      Actor
+	Author     Actor
+}
+
 // PostWritten 是貼文的建立、修改、下架、排程各自事件共用的欄位（Version 是寫入後的貼文版本，Preview 是內文預覽）。每個成功的寫入呼叫發一次，
 // 店主自己的寫入也發（Actor 為 nil）；Actor 是呼叫方明確傳入的代行者，沒有代行者是 nil。
 type PostWritten struct {

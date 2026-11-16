@@ -99,6 +99,49 @@ func (q *Queries) GetCommentCounts(ctx context.Context, id uuid.UUID) (GetCommen
 	return i, err
 }
 
+const getCommentWithStats = `-- name: GetCommentWithStats :one
+SELECT c.id, c.post_id, c.parent_id, c.reply_to_id, c.actor_kind, c.actor_id, c.body, c.created_at, c.updated_at, c.deleted_at, c.thread_id, c.counted, c.version, c.request_id, c.request_hash, p.store_id AS post_store_id,
+       COALESCE(s.like_count, 0)::bigint AS like_count, COALESCE(s.reply_count, 0)::bigint AS reply_count
+FROM social.comments c
+JOIN social.posts p ON p.id = c.post_id
+LEFT JOIN social.comment_stats s ON s.comment_id = c.id
+WHERE c.id = $1
+`
+
+type GetCommentWithStatsRow struct {
+	SocialComment SocialComment
+	PostStoreID   int64
+	LikeCount     int64
+	ReplyCount    int64
+}
+
+// 不帶觀看者的讀取，給 legacy relay 補通知 payload 的留言快照；統計列還沒有時計數是 0。
+func (q *Queries) GetCommentWithStats(ctx context.Context, id uuid.UUID) (GetCommentWithStatsRow, error) {
+	row := q.db.QueryRow(ctx, getCommentWithStats, id)
+	var i GetCommentWithStatsRow
+	err := row.Scan(
+		&i.SocialComment.ID,
+		&i.SocialComment.PostID,
+		&i.SocialComment.ParentID,
+		&i.SocialComment.ReplyToID,
+		&i.SocialComment.ActorKind,
+		&i.SocialComment.ActorID,
+		&i.SocialComment.Body,
+		&i.SocialComment.CreatedAt,
+		&i.SocialComment.UpdatedAt,
+		&i.SocialComment.DeletedAt,
+		&i.SocialComment.ThreadID,
+		&i.SocialComment.Counted,
+		&i.SocialComment.Version,
+		&i.SocialComment.RequestID,
+		&i.SocialComment.RequestHash,
+		&i.PostStoreID,
+		&i.LikeCount,
+		&i.ReplyCount,
+	)
+	return i, err
+}
+
 const insertComment = `-- name: InsertComment :one
 
 INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
