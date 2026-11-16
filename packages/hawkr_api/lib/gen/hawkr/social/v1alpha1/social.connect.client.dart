@@ -442,7 +442,7 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
   Future<hawkrsocialv1alpha1social.PublishPostResponse> publishPost(
     hawkrsocialv1alpha1social.PublishPostRequest input, {
     connect.Headers? headers,

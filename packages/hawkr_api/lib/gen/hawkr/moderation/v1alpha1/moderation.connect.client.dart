@@ -7,7 +7,7 @@ import "package:connectrpc/connect.dart" as connect;
 import "moderation.pb.dart" as hawkrmoderationv1alpha1moderation;
 import "moderation.connect.spec.dart" as specs;
 
-/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；店家身分不能呼叫（permission_denied）。
+/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 extension type ModerationAppServiceClient (connect.Transport _transport) {
   /// SubmitReport 送出一筆檢舉。對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
   /// 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。

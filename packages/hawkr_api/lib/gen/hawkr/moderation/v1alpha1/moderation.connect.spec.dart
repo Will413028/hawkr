@@ -6,7 +6,7 @@
 import "package:connectrpc/connect.dart" as connect;
 import "moderation.pb.dart" as hawkrmoderationv1alpha1moderation;
 
-/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；店家身分不能呼叫（permission_denied）。
+/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 abstract final class ModerationAppService {
   /// Fully-qualified name of the ModerationAppService service.
   static const name = 'hawkr.moderation.v1alpha1.ModerationAppService';

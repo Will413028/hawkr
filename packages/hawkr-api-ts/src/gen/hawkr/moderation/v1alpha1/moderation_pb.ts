@@ -291,7 +291,7 @@ export const ReportOutcomeSchema: GenEnum<ReportOutcome> = /*@__PURE__*/
   enumDesc(file_hawkr_moderation_v1alpha1_moderation, 1);
 
 /**
- * ModerationAppService 是登入的買家檢舉與讀自己的檢舉；店家身分不能呼叫（permission_denied）。
+ * ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
  *
  * @generated from service hawkr.moderation.v1alpha1.ModerationAppService
  */
