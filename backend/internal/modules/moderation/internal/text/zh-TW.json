@@ -80,10 +80,6 @@
       "message": "這個處置不適用於這種對象",
       "description": "處置種類與對象種類的搭配不合法。"
     },
-    "decide.admin_required": {
-      "message": "管理員必填",
-      "description": "處理案件沒有管理員 ID。"
-    },
     "decide.ban_not_buyer": {
       "message": "作者不是買家，不能停權",
       "description": "停權的對象作者不是買家。"

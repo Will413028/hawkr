@@ -44,11 +44,6 @@ func DecideActionNotForTarget() uitext.Message {
 	return uitext.Message{Text: "這個處置不適用於這種對象", Locale: uitext.ZhTW}
 }
 
-// DecideAdminRequired 是後台員工受眾的模組句子 decide.admin_required（只有 zh-TW）。
-func DecideAdminRequired() uitext.Message {
-	return uitext.Message{Text: "管理員必填", Locale: uitext.ZhTW}
-}
-
 // DecideBanNotBuyer 是後台員工受眾的模組句子 decide.ban_not_buyer（只有 zh-TW）。
 func DecideBanNotBuyer() uitext.Message {
 	return uitext.Message{Text: "作者不是買家，不能停權", Locale: uitext.ZhTW}

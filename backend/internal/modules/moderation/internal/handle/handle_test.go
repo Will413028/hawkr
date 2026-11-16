@@ -31,7 +31,6 @@ func TestValidateViolationShapes(t *testing.T) {
 	bad := map[string]func(*model.DecideInput){
 		"沒有案件":    func(in *model.DecideInput) { in.CaseID = uuid.UUID{} },
 		"版本為零":    func(in *model.DecideInput) { in.Version = 0 },
-		"沒有管理員":   func(in *model.DecideInput) { in.Actor.AdminID = 0 },
 		"沒有處置":    func(in *model.DecideInput) { in.Action = "" },
 		"處置不認得":   func(in *model.DecideInput) { in.Action = "DISMISS" },
 		"沒有類別":    func(in *model.DecideInput) { in.Category = "" },
@@ -58,6 +57,22 @@ func TestValidateViolationShapes(t *testing.T) {
 		mutate(&in)
 		if _, err := Validate(in); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("下架 %s：%v", name, err)
+		}
+	}
+}
+
+// 缺管理員或缺 procedure 名稱是 handler 的接線錯誤，不是使用者能修的輸入：回沒有分類的錯誤。
+func TestValidateWiringErrorsAreUnclassified(t *testing.T) {
+	base := model.DecideInput{CaseID: uuid.NewV7(), Version: 1, Actor: adminaudit.Actor{AdminID: 1, Action: "/test/Decide"}, Decision: model.DecisionNoViolation}
+	for name, mutate := range map[string]func(*model.DecideInput){
+		"沒有管理員":        func(in *model.DecideInput) { in.Actor.AdminID = 0 },
+		"沒有 procedure": func(in *model.DecideInput) { in.Actor.Action = "" },
+	} {
+		in := base
+		mutate(&in)
+		_, err := Validate(in)
+		if err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {
+			t.Errorf("%s：%v", name, err)
 		}
 	}
 }

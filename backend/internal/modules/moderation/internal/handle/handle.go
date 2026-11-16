@@ -61,7 +61,7 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 	case in.Version < 1:
 		return in, apperr.InvalidInputOn([]string{"Version"}, "%s", text.DecideVersionRequired())
 	case in.Actor.AdminID <= 0:
-		return in, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.DecideAdminRequired())
+		return in, errors.New("moderation：處理案件的 Actor.AdminID 不是正數，handler 沒有帶管理員")
 	case in.Actor.Action == "":
 		return in, errors.New("moderation：處理案件的 Actor.Action 空白，handler 沒有帶 procedure 名稱")
 	}
