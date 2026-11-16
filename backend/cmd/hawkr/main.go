@@ -242,8 +242,8 @@ func runServe(ctx context.Context) error {
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule, moderationRetention := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
-	subscribeModeration(bus, moderationRetention)
+	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
+	subscribeModeration(bus, moderationModule.Retention())
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)

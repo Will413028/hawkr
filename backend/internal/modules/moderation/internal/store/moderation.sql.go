@@ -163,12 +163,51 @@ func (q *Queries) CountReportsOfCase(ctx context.Context, caseID uuid.UUID) (int
 	return count, err
 }
 
+const deleteExpiredReportRequestsBatch = `-- name: DeleteExpiredReportRequestsBatch :execrows
+DELETE FROM moderation.report_requests
+WHERE (reporter_buyer_id, request_id) IN (
+    SELECT q.reporter_buyer_id, q.request_id FROM moderation.report_requests q
+    JOIN moderation.reports r ON r.id = q.report_id
+    JOIN moderation.cases c ON c.id = r.case_id
+    WHERE c.closed_at IS NOT NULL AND c.closed_at < $1
+    ORDER BY q.reporter_buyer_id, q.request_id
+    LIMIT $2::int
+)
+`
+
+type DeleteExpiredReportRequestsBatchParams struct {
+	Cutoff  *time.Time
+	MaxRows int32
+}
+
+// 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
+func (q *Queries) DeleteExpiredReportRequestsBatch(ctx context.Context, arg DeleteExpiredReportRequestsBatchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredReportRequestsBatch, arg.Cutoff, arg.MaxRows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteReporterDailyCount = `-- name: DeleteReporterDailyCount :execrows
 DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1
 `
 
 func (q *Queries) DeleteReporterDailyCount(ctx context.Context, reporterBuyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReporterDailyCount, reporterBuyerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteReporterRequests = `-- name: DeleteReporterRequests :execrows
+DELETE FROM moderation.report_requests WHERE reporter_buyer_id = $1
+`
+
+// 檢舉人刪帳（A7-D21）：刪掉他的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+func (q *Queries) DeleteReporterRequests(ctx context.Context, reporterBuyerID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReporterRequests, reporterBuyerID)
 	if err != nil {
 		return 0, err
 	}

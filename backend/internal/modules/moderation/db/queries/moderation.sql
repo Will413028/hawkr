@@ -140,6 +140,22 @@ WHERE id IN (
 -- 檢舉人刪帳（A7-D21）：清掉他全部檢舉的說明；檢舉列與 reporter_buyer_id（假名鍵）留著。
 UPDATE moderation.reports SET description = NULL WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND description IS NOT NULL;
 
+-- name: DeleteReporterRequests :execrows
+-- 檢舉人刪帳（A7-D21）：刪掉他的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+DELETE FROM moderation.report_requests WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id);
+
+-- name: DeleteExpiredReportRequestsBatch :execrows
+-- 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
+DELETE FROM moderation.report_requests
+WHERE (reporter_buyer_id, request_id) IN (
+    SELECT q.reporter_buyer_id, q.request_id FROM moderation.report_requests q
+    JOIN moderation.reports r ON r.id = q.report_id
+    JOIN moderation.cases c ON c.id = r.case_id
+    WHERE c.closed_at IS NOT NULL AND c.closed_at < sqlc.arg(cutoff)
+    ORDER BY q.reporter_buyer_id, q.request_id
+    LIMIT sqlc.arg(max_rows)::int
+);
+
 -- name: DeleteReporterDailyCount :execrows
 DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id);
 

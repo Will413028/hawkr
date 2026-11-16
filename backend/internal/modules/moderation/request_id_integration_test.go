@@ -4,6 +4,7 @@ package moderation
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -191,5 +192,17 @@ func TestRequestIDWithDifferentContentIsRejectedOnTheDedupPathToo(t *testing.T) 
 	_, err := f.module.SubmitReport(context.Background(), SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Fraud, RequestID: &rid})
 	if kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("內容不同要回 InvalidInput：%v", err)
+	}
+}
+
+// 負的頁大小是 InvalidInput，錯誤指到欄位 PageSize（handler 對應到請求的 page_size）。
+func TestMyReportsRejectsANegativePageSizeOnThePageSizeField(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	reporter, _ := f.newBuyer(t)
+	_, err := f.module.MyReports(context.Background(), reporter, nil, -1)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "PageSize" {
+		t.Fatalf("err = %v，預期 InvalidInput 指到 PageSize", err)
 	}
 }

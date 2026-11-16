@@ -106,8 +106,6 @@ type Deps struct {
 	NewID      func() uuid.UUID
 	Now        func() time.Time
 	Logger     *slog.Logger
-	// Retention 是選填的既有保留期組裝：呼叫端另外要用它（訂閱買家事件）時傳進來，模組與呼叫端共用同一個；nil 時模組自己建一個。
-	Retention *Retention
 }
 
 // Module 是 moderation 模組。
@@ -124,10 +122,7 @@ func New(d Deps) *Module {
 	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
-	ret := d.Retention
-	if ret == nil {
-		ret = NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
-	}
+	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
 		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
@@ -209,7 +204,7 @@ func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
 }
 
-// Retention 回傳模組的保留期與檢舉人資料清除（給組裝與測試）。
+// Retention 回傳模組的保留期與檢舉人資料清除（serve 以它訂閱買家的刪除事件；給組裝與測試）。
 func (m *Module) Retention() *Retention { return m.retention }
 
 // PurgeSnapshots 同 Retention.PurgeSnapshots。

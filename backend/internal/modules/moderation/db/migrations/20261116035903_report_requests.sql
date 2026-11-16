@@ -1,5 +1,5 @@
--- Modify "reports" table
-ALTER TABLE "moderation"."reports" DROP CONSTRAINT "reports_request_check", DROP COLUMN "request_id", DROP COLUMN "request_hash";
+-- Create index "reports_reporter_time" to table: "reports"
+CREATE INDEX "reports_reporter_time" ON "moderation"."reports" ("reporter_buyer_id", "created_at" DESC, "id" DESC);
 -- Create "report_requests" table
 CREATE TABLE "moderation"."report_requests" (
   "reporter_buyer_id" bigint NOT NULL,

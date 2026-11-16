@@ -230,8 +230,12 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	ctx := context.Background()
 	reporter, reporterAccount := f.newBuyer(t)
 	bystander, _ := f.newBuyer(t)
-	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "我的說明"}))
-	theirs := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: bystander, Target: commentTarget(w.comment), Category: policy.Spam, Description: "別人的說明"}))
+	mineRID, theirRID := uuid.New(), uuid.New()
+	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "我的說明", RequestID: &mineRID}))
+	theirs := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: bystander, Target: commentTarget(w.comment), Category: policy.Spam, Description: "別人的說明", RequestID: &theirRID}))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id IN ($1, $2)", reporter, bystander); n != 2 {
+		t.Fatalf("送出之後各有一筆冪等紀錄：%d", n)
+	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1", reporter); n != 1 {
 		t.Fatalf("送出之後有每日計數列：%d", n)
 	}
@@ -244,6 +248,39 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND description = '別人的說明'", theirs.Report.ID); n != 1 {
 		t.Fatal("別人的說明不能動")
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter); n != 0 {
+		t.Fatalf("說明的雜湊（request_hash）不能比檢舉人的帳號活得久：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", bystander); n != 1 {
+		t.Fatal("別人的冪等紀錄不能動")
+	}
+}
+
+// A7-D21：冪等紀錄（request_hash 是說明的雜湊）跟說明同一天清（結案滿 184 天）；進行中案件的不清。
+func TestReportRequestsArePurgedWithTheDescriptions(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	other := f.comment(t, w.post.ID, w.author, "另一則")
+	ctx := context.Background()
+	reporter, _ := f.newBuyer(t)
+	closedRID, openRID := uuid.New(), uuid.New()
+	closed := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "已結案的說明", RequestID: &closedRID}))
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(other), Category: policy.Spam, Description: "進行中的說明", RequestID: &openRID}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, AdminID: 9, Decision: DecisionNoViolation}))
+	f.advance(SnapshotRetention - time.Hour)
+	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter); n != 2 {
+		t.Fatalf("未滿保留期冪等紀錄都要留著：%d", n)
+	}
+	f.advance(2 * time.Hour)
+	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE report_id = $1", closed.Report.ID); n != 0 {
+		t.Fatalf("結案滿 184 天的冪等紀錄要清掉：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1 AND request_id = $2", reporter, openRID); n != 1 {
+		t.Fatal("進行中案件的冪等紀錄不能清")
 	}
 }
 

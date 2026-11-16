@@ -26,7 +26,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | `cases_open_by_time` 索引（`opened_at, id` WHERE 進行中） | A7-1e 後台待辦依開案時間 keyset 讀進行中的案件 | 消費者還不存在（預建，沒有量測） | 索引隨第一個讀它的查詢一起建 | 暫留，觸發：A7-1e 的待辦查詢落地時用 `EXPLAIN` 確認有用到；若 A7-1e 改用別的排序鍵就刪 |
 | River 週期 job（`moderation.purge_snapshots`、`moderation.media_sweep`）與分批 500 | 快照與說明要在保留期後清掉、引用同步要有保底掃描 | 成立；seller 的保留清理與 social 的 media 同步是同型 job | 排程 job 分批、冪等 | 照 seller、social 的做法：每日清、啟動跑一次、`UniqueOpts ByPeriod 12h`；media 同步用 `media.RefSyncer` |
 | 證據保全：快照引用的圖片只存 `asset_id`，社群在刪文與店家退場時釋放自己的引用（A7-D21） | 申訴期內要能重現被檢舉的那一版，含圖片 | 成立：不保全的話，作者刪貼文後只剩指向已回收資產的字串 | 保全證據（在引用端 hold，不複製檔案） | 新增：快照以 `(GOVERNANCE_EVIDENCE, 快照 ID)` 在 media 登記引用（借用既有的 ref type，CodeMeta 凍結不新增值），同步 job 寫入、快照刪除時才解除；沒有新的 media API。已知殘餘：新快照的同步 job 還沒跑完、而作者已刪貼文且 GC 已回收時，圖片已經不在（同 media 規格 §7 的方向：一般引用同樣有這個窗口）；買家頭像只存 object key，沒有 asset ID，不在保全範圍，觸發：要保全頭像時由 buyer 提供 asset ID |
-| 檢舉人的說明文字與每日計數無保留期（A7-D21） | 個資最小化（GDPR 5(1)(e)） | 說明是自由文字，可能含個資 | 說明與快照同期清、刪帳時清 | 新增：說明在結案滿 184 天與快照一起清；檢舉人刪帳時（買家刪除事件，同 transaction 訂閱者；沿用 social 的訂閱模式而不是讓 accountdeletion 依賴 moderation）清他全部檢舉（含同帳號歷史身分）的說明與每日計數列，檢舉列與 `reporter_buyer_id`（假名鍵）留著。每日計數列對未刪帳的檢舉人每人一列、有界，不清 |
+| 檢舉人的說明文字與每日計數無保留期（A7-D21） | 個資最小化（GDPR 5(1)(e)） | 說明是自由文字，可能含個資 | 說明與快照同期清、刪帳時清 | 新增：說明在結案滿 184 天與快照一起清；檢舉人刪帳時（買家刪除事件，同 transaction 訂閱者；沿用 social 的訂閱模式而不是讓 accountdeletion 依賴 moderation）清他全部檢舉（含同帳號歷史身分）的說明、冪等紀錄（request_hash 是說明的雜湊）與每日計數列，檢舉列與 `reporter_buyer_id`（假名鍵）留著。每日計數列對未刪帳的檢舉人每人一列、有界，不清 |
 | 髒字詞典（M17） | 預先過濾 | 屬於 social 的寫入路徑（A7-1a 已放在 `platform/textfilter`） | 詞庫有擁有者與後台維護 | 不在本模組：詞庫的擁有者與後台維護是另一個決定，觸發是營運要求新增詞 |
 
 ## 傳輸層的沿用盤點
