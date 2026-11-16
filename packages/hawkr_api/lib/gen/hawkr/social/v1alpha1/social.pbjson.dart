@@ -298,9 +298,20 @@ const Post$json = {
       '8': {},
       '10': 'viewerLiked'
     },
+    {
+      '1': 'takedown_measure_id',
+      '3': 21,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '9': 1,
+      '10': 'takedownMeasureId',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_product_id'},
+    {'1': '_takedown_measure_id'},
   ],
 };
 
@@ -322,7 +333,9 @@ final $typed_data.Uint8List postDescriptor = $convert.base64Decode(
     'RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZVRpbWUS'
     'MQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGBIgASgJQgPgQQRSEGltYWdlU3RhZ2VkVG9rZW4SKgoOaG'
     'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0cxImCgx2aWV3ZXJfbGlrZWQY'
-    'FCABKAhCA+BBA1ILdmlld2VyTGlrZWRCDQoLX3Byb2R1Y3RfaWQ=');
+    'FCABKAhCA+BBA1ILdmlld2VyTGlrZWQSOAoTdGFrZWRvd25fbWVhc3VyZV9pZBgVIAEoCUID4E'
+    'EDSAFSEXRha2Vkb3duTWVhc3VyZUlkiAEBQg0KC19wcm9kdWN0X2lkQhYKFF90YWtlZG93bl9t'
+    'ZWFzdXJlX2lk');
 
 @$core.Deprecated('Use actorDescriptor instead')
 const Actor$json = {
