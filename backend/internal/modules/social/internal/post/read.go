@@ -224,19 +224,19 @@ func (s *Service) ListByHashtag(ctx context.Context, c model.Caller, tag string,
 }
 
 // ListOwn 是店主自己的貼文（含草稿與下架）。status 為空字串不篩選，否則要是 PostStatus 的值。
-func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostStatus, after *model.OwnPostCursor, size int32) (model.OwnPostPage, error) {
+func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostStatus, after *model.CreatedPostCursor, size int32) (model.CreatedPostPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
 	if status != "" && !validStatus(status) {
-		return model.OwnPostPage{}, errInvalidStatus(ctx)
+		return model.CreatedPostPage{}, errInvalidStatus(ctx)
 	}
 	at, id := after.Key()
 	p := store.ListOwnPostsParams{StoreID: storeID, Status: string(status), AfterCreated: at, AfterID: id, MaxRows: size + 1}
 	rows, err := s.q(ctx).ListOwnPosts(ctx, p)
 	if err != nil {
-		return model.OwnPostPage{}, fmt.Errorf("social：列出自己的貼文：%w", err)
+		return model.CreatedPostPage{}, fmt.Errorf("social：列出自己的貼文：%w", err)
 	}
 	rows, more := page(rows, size)
 	pr := make([]postRow, len(rows))
@@ -247,32 +247,32 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 }
 
 // createdPage 把（已截到一頁的）列轉成建立時間排序的一頁：補標籤與下架措施，more 為真時帶下一頁游標。店主清單與後台清單共用。
-func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (model.OwnPostPage, error) {
+func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (model.CreatedPostPage, error) {
 	posts, err := s.withTags(ctx, rows)
 	if err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
 	if err := s.markTakedowns(ctx, posts); err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
-	out := model.OwnPostPage{Posts: posts}
+	out := model.CreatedPostPage{Posts: posts}
 	if more {
 		last := rows[len(rows)-1].post
-		out.Next = &model.OwnPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+		out.Next = &model.CreatedPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
 	return out, nil
 }
 
 // ListAdmin 是後台看的貼文（不含草稿與刪除，每篇帶 TakedownMeasureID）：最新建立的在前；f.TakenDown 為真只列被內容下架的。
-func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.OwnPostCursor, size int32) (model.OwnPostPage, error) {
+func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.CreatedPostCursor, size int32) (model.CreatedPostPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
 	at, id := after.Key()
 	rows, err := s.q(ctx).ListAdminPosts(ctx, store.ListAdminPostsParams{TakenDown: f.TakenDown, AfterCreated: at, AfterID: id, MaxRows: size + 1})
 	if err != nil {
-		return model.OwnPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
+		return model.CreatedPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
 	}
 	rows, more := page(rows, size)
 	pr := make([]postRow, len(rows))

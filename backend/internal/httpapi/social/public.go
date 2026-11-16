@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -551,6 +552,23 @@ func (h *presenter) likedPosts(ctx context.Context, c social.Caller, posts []soc
 	return h.liked(ctx, c.BuyerID, ids)
 }
 
+// imageAndProduct 是貼文的圖與關聯商品欄位，公開、店主與後台三處共用：舊資料的完整網址圖回 Unavailable，沒有圖或商品的欄位不設。
+func imageAndProduct(images rpc.Images, p social.Post) (*commonpb.Image, *string, error) {
+	var img *commonpb.Image
+	if p.ImageKey != "" {
+		if err := rpc.ObjectKey(p.ImageKey); err != nil {
+			return nil, nil, err
+		}
+		img = images.Image(p.ImageKey)
+	}
+	var product *string
+	if p.ProductID != nil {
+		id := rpc.FormatID(*p.ProductID)
+		product = &id
+	}
+	return img, product, nil
+}
+
 func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*pb.Post, error) {
 	postURL, err := h.webOrigin.URL("/feed?post=" + url.QueryEscape(p.ID.String()))
 	if err != nil {
@@ -564,15 +582,8 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	if p.PublishedAt != nil {
 		out.PublishTime = timestamppb.New(*p.PublishedAt)
 	}
-	if p.ImageKey != "" {
-		if err := rpc.ObjectKey(p.ImageKey); err != nil {
-			return nil, err
-		}
-		out.Image = h.images.Image(p.ImageKey)
-	}
-	if p.ProductID != nil {
-		id := rpc.FormatID(*p.ProductID)
-		out.ProductId = &id
+	if out.Image, out.ProductId, err = imageAndProduct(h.images, p); err != nil {
+		return nil, err
 	}
 	for _, t := range p.Hashtags {
 		out.Hashtags = append(out.Hashtags, &pb.Hashtag{Name: t.Name, Display: t.Display})

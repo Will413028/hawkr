@@ -165,13 +165,13 @@ func (h *Delegated) ListStorePosts(ctx context.Context, req *connect.Request[pb.
 		return nil, err
 	}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure, strconv.FormatInt(c.Session.Target.StoreID, 10), string(status))
-	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
+	after, err := rpc.ValidCursor[createdPostCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.OwnPostCursor
+	var cur *social.CreatedPostCursor
 	if after != nil {
-		cur = &social.OwnPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+		cur = &social.CreatedPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
 	}
 	out := &pb.ListStorePostsResponse{}
 	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, st seller.Store) error {
@@ -183,7 +183,7 @@ func (h *Delegated) ListStorePosts(ctx context.Context, req *connect.Request[pb.
 			return err
 		}
 		if page.Next != nil {
-			out.NextPageToken = rpc.TokenFor(scope, ownPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+			out.NextPageToken = rpc.TokenFor(scope, createdPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 		}
 		return nil
 	})

@@ -30,7 +30,7 @@ type Owner interface {
 	CancelPostSchedule(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (int64, error)
 	ListPendingSchedules(ctx context.Context, storeID int64, after *social.ScheduleCursor, size int32) (social.SchedulePage, error)
 	MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (social.Post, error)
-	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
+	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.CreatedPostCursor, size int32) (social.CreatedPostPage, error)
 	ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	StoreSocialSummary(ctx context.Context, store seller.Store) (social.StoreSummary, error)
 }
@@ -58,7 +58,6 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
-// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag、create_time 與 takedown_measure_id（只有店主讀自己的貼文才設）。
 // postState 是店主與後台讀貼文才有的三個欄位：狀態、建立時間與下架措施 ID（沒有被下架是 nil）。
 func postState(post social.Post) (pb.PostStatus, *timestamppb.Timestamp, *string) {
 	var takedown *string
@@ -69,6 +68,7 @@ func postState(post social.Post) (pb.PostStatus, *timestamppb.Timestamp, *string
 	return rpc.EnumToProto[pb.PostStatus](post.Status), timestamppb.New(post.CreatedAt), takedown
 }
 
+// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag、create_time 與 takedown_measure_id（只有店主讀自己的貼文才設）。
 func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
 	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
@@ -217,13 +217,13 @@ func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPos
 		return nil, err
 	}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialAppServiceListMyPostsProcedure, strconv.FormatInt(st.StoreID, 10), string(status))
-	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
+	after, err := rpc.ValidCursor[createdPostCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.OwnPostCursor
+	var cur *social.CreatedPostCursor
 	if after != nil {
-		cur = &social.OwnPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+		cur = &social.CreatedPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
 	}
 	page, err := h.owner.ListMyPosts(ctx, st, status, cur, msg.GetPageSize())
 	if err != nil {
@@ -235,7 +235,7 @@ func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPos
 	}
 	out := &pb.ListMyPostsResponse{Posts: posts}
 	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, ownPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+		out.NextPageToken = rpc.TokenFor(scope, createdPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }

@@ -10,14 +10,13 @@ import (
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
-	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
 // AdminPosts 是後台貼文列表的來源（*social.Module）。
 type AdminPosts interface {
-	ListAdminPosts(ctx context.Context, f social.AdminPostFilter, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error)
+	ListAdminPosts(ctx context.Context, f social.AdminPostFilter, after *social.CreatedPostCursor, size int32) (social.CreatedPostPage, error)
 }
 
 // OpenReportCounts 是貼文在進行中案件裡的檢舉數的來源（*moderation.Module）：沒有進行中檢舉的貼文不在結果裡。
@@ -35,10 +34,13 @@ type Admin struct {
 
 var _ socialv1alpha1connect.SocialAdminServiceHandler = (*Admin)(nil)
 
-// NewAdmin 建立後台的 handler；兩個來源都必填。
+// NewAdmin 建立後台的 handler；貼文與檢舉數的來源、媒體網域（rpc.Images）都必填。
 func NewAdmin(posts AdminPosts, reports OpenReportCounts, images rpc.Images) (*Admin, error) {
 	if posts == nil || reports == nil {
 		return nil, fmt.Errorf("httpapi/social：SocialAdminService 需要貼文與檢舉數的來源")
+	}
+	if images.IsZero() {
+		return nil, fmt.Errorf("httpapi/social：SocialAdminService 需要媒體網域")
 	}
 	return &Admin{posts: posts, reports: reports, images: images}, nil
 }
@@ -47,13 +49,13 @@ func (h *Admin) ListPosts(ctx context.Context, req *connect.Request[adminpb.List
 	msg := req.Msg
 	filter := social.AdminPostFilter{TakenDown: msg.GetTakenDownOnly()}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialAdminServiceListPostsProcedure, fmt.Sprint(filter.TakenDown))
-	after, err := rpc.ValidCursor[ownPostCursor](scope, msg.GetPageToken())
+	after, err := rpc.ValidCursor[createdPostCursor](scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	var cur *social.OwnPostCursor
+	var cur *social.CreatedPostCursor
 	if after != nil {
-		cur = &social.OwnPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
+		cur = &social.CreatedPostCursor{CreatedAt: after.CreatedAt, ID: after.ID}
 	}
 	page, err := h.posts.ListAdminPosts(ctx, filter, cur, msg.GetPageSize())
 	if err != nil {
@@ -80,20 +82,13 @@ func (h *Admin) ListPosts(ctx context.Context, req *connect.Request[adminpb.List
 		if p.PublishedAt != nil {
 			item.PublishTime = timestamppb.New(*p.PublishedAt)
 		}
-		if p.ImageKey != "" {
-			if err := rpc.ObjectKey(p.ImageKey); err != nil {
-				return nil, err
-			}
-			item.Image = h.images.Image(p.ImageKey)
-		}
-		if p.ProductID != nil {
-			id := rpc.FormatID(*p.ProductID)
-			item.ProductId = &id
+		if item.Image, item.ProductId, err = imageAndProduct(h.images, p); err != nil {
+			return nil, err
 		}
 		out.Posts[i] = item
 	}
 	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, ownPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+		out.NextPageToken = rpc.TokenFor(scope, createdPostCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }

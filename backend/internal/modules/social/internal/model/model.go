@@ -149,8 +149,8 @@ type PostCursor struct {
 	ID          uuid.UUID
 }
 
-// OwnPostCursor 是店主清單與後台貼文清單的排序鍵：(CreatedAt, ID) 由大到小。
-type OwnPostCursor struct {
+// CreatedPostCursor 是店主清單與後台貼文清單（兩者共用）的排序鍵：(CreatedAt, ID) 由大到小。
+type CreatedPostCursor struct {
 	CreatedAt time.Time
 	ID        uuid.UUID
 }
@@ -164,10 +164,10 @@ type PostPage struct {
 	Next  *PostCursor
 }
 
-// OwnPostPage 是店主或後台的一頁貼文（按建立時間新到舊）。
-type OwnPostPage struct {
+// CreatedPostPage 是店主清單或後台清單的一頁貼文（按建立時間新到舊）。
+type CreatedPostPage struct {
 	Posts []Post
-	Next  *OwnPostCursor
+	Next  *CreatedPostCursor
 }
 
 // CreatePostInput 是新增貼文。ImageToken 是新上傳的圖的 staged token；Publish 為真時同一個動作發布，公開要件（恰好一張圖、內文

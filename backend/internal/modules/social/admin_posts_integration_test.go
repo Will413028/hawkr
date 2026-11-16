@@ -12,7 +12,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-func adminPostIDs(p social.OwnPostPage) []uuid.UUID {
+func adminPostIDs(p social.CreatedPostPage) []uuid.UUID {
 	out := make([]uuid.UUID, len(p.Posts))
 	for i, post := range p.Posts {
 		out[i] = post.ID
@@ -39,7 +39,7 @@ func TestListAdminPostsFiltersTakenDownAndExcludesDraftsAndDeleted(t *testing.T)
 	must(t, f.module.DeleteOwnPost(ctx, st, gone.ID, gone.Version))
 	measure := td.create(t, storeID, ref(seller.ContentPost, taken.ID))
 
-	all := mustV[social.OwnPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{}, nil, 0))
+	all := mustV[social.CreatedPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{}, nil, 0))
 	if got := adminPostIDs(all); len(got) != 2 || got[0] != plain.ID || got[1] != taken.ID {
 		t.Fatalf("全部 = %v，預期 [正常, 被下架]（不含草稿與已刪除）", got)
 	}
@@ -47,13 +47,13 @@ func TestListAdminPostsFiltersTakenDownAndExcludesDraftsAndDeleted(t *testing.T)
 		t.Fatalf("措施 ID：%v、%v，預期 nil 與 %s", all.Posts[0].TakedownMeasureID, all.Posts[1].TakedownMeasureID, measure)
 	}
 
-	only := mustV[social.OwnPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{TakenDown: true}, nil, 0))
+	only := mustV[social.CreatedPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{TakenDown: true}, nil, 0))
 	if got := adminPostIDs(only); len(got) != 1 || got[0] != taken.ID || *only.Posts[0].TakedownMeasureID != measure {
 		t.Fatalf("只列下架 = %v", got)
 	}
 
 	td.revoke(t, storeID, measure, ref(seller.ContentPost, taken.ID))
-	only = mustV[social.OwnPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{TakenDown: true}, nil, 0))
+	only = mustV[social.CreatedPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{TakenDown: true}, nil, 0))
 	if len(only.Posts) != 0 {
 		t.Fatalf("撤銷後不該再列出：%v", adminPostIDs(only))
 	}
@@ -71,12 +71,12 @@ func TestListAdminPostsKeysetPagingHasNoDuplicatesOrGaps(t *testing.T) {
 		f.advance(time.Minute)
 	}
 	var got []uuid.UUID
-	var cur *social.OwnPostCursor
+	var cur *social.CreatedPostCursor
 	for pages := 0; ; pages++ {
 		if pages > 3 {
 			t.Fatal("分頁沒有結束")
 		}
-		p := mustV[social.OwnPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{}, cur, 1))
+		p := mustV[social.CreatedPostPage](t)(f.module.ListAdminPosts(ctx, social.AdminPostFilter{}, cur, 1))
 		got = append(got, adminPostIDs(p)...)
 		if p.Next == nil {
 			break

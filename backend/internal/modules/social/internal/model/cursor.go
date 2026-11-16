@@ -28,7 +28,7 @@ func (c *PostCursor) Key() (time.Time, uuid.UUID) {
 	return c.PublishedAt, c.ID
 }
 
-func (c *OwnPostCursor) Key() (time.Time, uuid.UUID) {
+func (c *CreatedPostCursor) Key() (time.Time, uuid.UUID) {
 	if c == nil {
 		return DescStart()
 	}

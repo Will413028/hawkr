@@ -182,7 +182,7 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Agent: agents, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Social: noSchedules{}, Now: now, Logger: log}),
 		Legacy:     proxy, LegacyPrefixes: gatewayproxy.Prefixes, Now: now, Logger: log,
 	})

@@ -132,10 +132,10 @@ type fakePosts struct {
 	sched   social.SchedulePostInput
 	actors  map[string]*delegatedactor.Actor
 	status  social.PostStatus
-	after   *social.OwnPostCursor
+	after   *social.CreatedPostCursor
 	store   seller.Store
 	post    social.Post
-	page    social.OwnPostPage
+	page    social.CreatedPostPage
 	pending *social.Schedule
 	publish time.Time
 	err     error
@@ -183,7 +183,7 @@ func (f *fakePosts) MyPost(_ context.Context, st seller.Store, _ uuid.UUID) (soc
 	return f.post, f.err
 }
 
-func (f *fakePosts) ListMyPosts(_ context.Context, st seller.Store, status social.PostStatus, after *social.OwnPostCursor, _ int32) (social.OwnPostPage, error) {
+func (f *fakePosts) ListMyPosts(_ context.Context, st seller.Store, status social.PostStatus, after *social.CreatedPostCursor, _ int32) (social.CreatedPostPage, error) {
 	f.store, f.status, f.after = st, status, after
 	return f.page, f.err
 }
@@ -638,7 +638,7 @@ func TestReplayReadsBackTheFirstResource(t *testing.T) {
 func TestListPassesStatusAndCursorAndPages(t *testing.T) {
 	e := newDelegatedEnv(t, goodSessions())
 	last := social.Post{ID: uuid.New(), StoreID: delegatedStore, Version: 1, Status: social.StatusPublished, CreatedAt: time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)}
-	e.posts.page = social.OwnPostPage{Posts: []social.Post{e.posts.post, last}, Next: &social.OwnPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}}
+	e.posts.page = social.CreatedPostPage{Posts: []social.Post{e.posts.post, last}, Next: &social.CreatedPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}}
 	resp, err := e.client.ListStorePosts(t.Context(), withCredential(&pb.ListStorePostsRequest{Status: pb.PostStatus_POST_STATUS_DRAFT}, goodSession))
 	if err != nil {
 		t.Fatal(err)

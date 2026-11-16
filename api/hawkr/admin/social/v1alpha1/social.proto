@@ -9,8 +9,8 @@ syntax = "proto3";
 package hawkr.admin.social.v1alpha1;
 
 import "google/api/field_behavior.proto";
-import "hawkr/common/v1alpha1/image.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/social/v1alpha1/social.proto";
 
 // SocialAdminService 只有管理員能呼叫。

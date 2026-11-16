@@ -34,10 +34,10 @@ type fakeOwner struct {
 	postID     *uuid.UUID
 	unreplied  bool
 	status     social.PostStatus
-	after      *social.OwnPostCursor
+	after      *social.CreatedPostCursor
 	cafter     *social.CommentCursor
 	post       social.Post
-	page       social.OwnPostPage
+	page       social.CreatedPostPage
 	comments   social.CommentPage
 	summary    social.StoreSummary
 	schedules  social.SchedulePage
@@ -107,7 +107,7 @@ func (f *fakeOwner) MyPost(_ context.Context, st seller.Store, id uuid.UUID) (so
 	return f.current(id, f.post.Version), f.rec("my", st)
 }
 
-func (f *fakeOwner) ListMyPosts(_ context.Context, st seller.Store, status social.PostStatus, after *social.OwnPostCursor, _ int32) (social.OwnPostPage, error) {
+func (f *fakeOwner) ListMyPosts(_ context.Context, st seller.Store, status social.PostStatus, after *social.CreatedPostCursor, _ int32) (social.CreatedPostPage, error) {
 	f.status, f.after = status, after
 	return f.page, f.rec("list", st)
 }
@@ -165,7 +165,7 @@ func TestOwnerSuccessPaths(t *testing.T) {
 		t.Fatal("GetMyPost", err, mp)
 	}
 
-	f.page = social.OwnPostPage{Posts: []social.Post{ownPost(5, social.StatusPublished), ownPost(5, social.StatusUnpublished)}, Next: &social.OwnPostCursor{CreatedAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), ID: uuid.New()}}
+	f.page = social.CreatedPostPage{Posts: []social.Post{ownPost(5, social.StatusPublished), ownPost(5, social.StatusUnpublished)}, Next: &social.CreatedPostCursor{CreatedAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), ID: uuid.New()}}
 	lp, err := e.client.ListMyPosts(ctx, signedIn(&pb.ListMyPostsRequest{Status: pb.PostStatus_POST_STATUS_UNPUBLISHED}))
 	if err != nil || len(lp.Msg.GetPosts()) != 2 || lp.Msg.GetNextPageToken() == "" || f.status != social.StatusUnpublished || f.after != nil {
 		t.Fatal("ListMyPosts", err, lp, f.status)
@@ -520,7 +520,7 @@ func (r *reaching) MyPost(ctx context.Context, st seller.Store, id uuid.UUID) (p
 	return
 }
 
-func (r *reaching) ListMyPosts(ctx context.Context, st seller.Store, s social.PostStatus, a *social.OwnPostCursor, n int32) (p social.OwnPostPage, err error) {
+func (r *reaching) ListMyPosts(ctx context.Context, st seller.Store, s social.PostStatus, a *social.CreatedPostCursor, n int32) (p social.CreatedPostPage, err error) {
 	err = r.run("ListMyPosts", func() (e error) { p, e = r.m.ListMyPosts(ctx, st, s, a, n); return })
 	return
 }
@@ -747,7 +747,7 @@ func TestOwnerListMyPostsRejectsUnknownStatusOnTheStatusField(t *testing.T) {
 func TestOwnerPageTokensAreBoundToTheStore(t *testing.T) {
 	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	f := &fakeOwner{
-		page:     social.OwnPostPage{Posts: []social.Post{ownPost(5, social.StatusDraft)}, Next: &social.OwnPostCursor{CreatedAt: at, ID: uuid.New()}},
+		page:     social.CreatedPostPage{Posts: []social.Post{ownPost(5, social.StatusDraft)}, Next: &social.CreatedPostCursor{CreatedAt: at, ID: uuid.New()}},
 		comments: social.CommentPage{StoreID: 5, Next: &social.CommentCursor{CreatedAt: at, ID: uuid.New()}},
 	}
 	stores := &fakeStores{own: &seller.Store{StoreID: 5}}

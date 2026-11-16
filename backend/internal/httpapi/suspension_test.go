@@ -241,7 +241,7 @@ func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 
 // 宣告表與掛載的顧客 service 一一對應：connectServices 啟動時比對，數量等於掛載的方法數。
 func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 
 // 少一個、多一個、值不合法的宣告都不能啟動。
 func TestCustomerEffectTableMustMatchTheServicesExactly(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}

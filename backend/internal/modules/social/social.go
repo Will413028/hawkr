@@ -92,27 +92,27 @@ type Deps struct {
 }
 
 type (
-	Post            = model.Post
-	PostStatus      = model.PostStatus
-	PostStats       = model.PostStats
-	Hashtag         = model.Hashtag
-	HashtagCount    = model.HashtagCount
-	PostCursor      = model.PostCursor
-	OwnPostCursor   = model.OwnPostCursor
-	PostPage        = model.PostPage
-	OwnPostPage     = model.OwnPostPage
-	AdminPostFilter = model.AdminPostFilter
-	CreatePostInput = model.CreatePostInput
-	UpdatePostInput = model.UpdatePostInput
-	Actor           = model.Actor
-	ActorKind       = model.ActorKind
-	Caller          = model.Caller
-	Comment         = model.Comment
-	CommentState    = model.CommentState
-	CommentCursor   = model.CommentCursor
-	CommentPage     = model.CommentPage
-	CommentInput    = model.CommentInput
-	StoreSummary    = model.StoreSummary
+	Post              = model.Post
+	PostStatus        = model.PostStatus
+	PostStats         = model.PostStats
+	Hashtag           = model.Hashtag
+	HashtagCount      = model.HashtagCount
+	PostCursor        = model.PostCursor
+	CreatedPostCursor = model.CreatedPostCursor
+	PostPage          = model.PostPage
+	CreatedPostPage   = model.CreatedPostPage
+	AdminPostFilter   = model.AdminPostFilter
+	CreatePostInput   = model.CreatePostInput
+	UpdatePostInput   = model.UpdatePostInput
+	Actor             = model.Actor
+	ActorKind         = model.ActorKind
+	Caller            = model.Caller
+	Comment           = model.Comment
+	CommentState      = model.CommentState
+	CommentCursor     = model.CommentCursor
+	CommentPage       = model.CommentPage
+	CommentInput      = model.CommentInput
+	StoreSummary      = model.StoreSummary
 	// 排程發布：Schedule 是一次排程，ScheduledBy 是發起者（種類加發起者擁有格式的不透明 ref），ScheduleAuthorizer 是到點重驗授權的 port。
 	Schedule           = model.Schedule
 	ScheduledPost      = model.ScheduledPost
@@ -372,7 +372,7 @@ func (m *Module) MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (
 }
 
 // ListMyPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選；店家要有 CapContentContract。
-func (m *Module) ListMyPosts(ctx context.Context, store seller.Store, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+func (m *Module) ListMyPosts(ctx context.Context, store seller.Store, status PostStatus, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
 	return m.post.ListMine(ctx, store, status, after, size)
 }
 
@@ -424,12 +424,12 @@ func NormalizeHashtag(raw string) (name string, ok bool) {
 }
 
 // ListOwnPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選。
-func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
 	return m.post.ListOwn(ctx, storeID, status, after, size)
 }
 
 // ListAdminPosts 是後台看的貼文（不含草稿與刪除）：最新建立的在前，每篇帶 TakedownMeasureID；f.TakenDown 為真只列被內容下架的。授權由呼叫端（後台的 interceptor）負責。
-func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
 	return m.post.ListAdmin(ctx, f, after, size)
 }
 

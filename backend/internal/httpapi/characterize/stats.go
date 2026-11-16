@@ -41,3 +41,13 @@ func WebOrigin(t testing.TB) rpc.WebOrigin {
 	}
 	return w
 }
+
+// Images 是 httpapi.Deps.Images 的測試用媒體網域。只給測試 import。
+func Images(t testing.TB) rpc.Images {
+	t.Helper()
+	i, err := rpc.NewImages("https://media.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return i
+}

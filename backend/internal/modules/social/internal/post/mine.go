@@ -18,9 +18,9 @@ func (s *Service) Mine(ctx context.Context, st seller.Store, id uuid.UUID) (mode
 }
 
 // ListMine 是店主自己的貼文（含草稿與下架）：店家要有 model.StoreReadCapability；status 為空字串不篩選。
-func (s *Service) ListMine(ctx context.Context, st seller.Store, status model.PostStatus, after *model.OwnPostCursor, size int32) (model.OwnPostPage, error) {
+func (s *Service) ListMine(ctx context.Context, st seller.Store, status model.PostStatus, after *model.CreatedPostCursor, size int32) (model.CreatedPostPage, error) {
 	if err := seller.Authorize(st, model.StoreReadCapability); err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
 	return s.ListOwn(ctx, st.StoreID, status, after, size)
 }

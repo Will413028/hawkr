@@ -281,7 +281,7 @@ var File_hawkr_admin_social_v1alpha1_social_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_social_v1alpha1_social_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/admin/social/v1alpha1/social.proto\x12\x1bhawkr.admin.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"hawkr/social/v1alpha1/social.proto\"\xd5\x04\n" +
+	"(hawkr/admin/social/v1alpha1/social.proto\x12\x1bhawkr.admin.social.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a\"hawkr/social/v1alpha1/social.proto\"\xd5\x04\n" +
 	"\tAdminPost\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\x17\n" +

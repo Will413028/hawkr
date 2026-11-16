@@ -23,15 +23,15 @@ import (
 )
 
 type fakeAdminPosts struct {
-	page      social.OwnPostPage
+	page      social.CreatedPostPage
 	err       error
 	calls     int
 	gotFilter social.AdminPostFilter
-	gotAfter  *social.OwnPostCursor
+	gotAfter  *social.CreatedPostCursor
 	gotSize   int32
 }
 
-func (f *fakeAdminPosts) ListAdminPosts(_ context.Context, fl social.AdminPostFilter, after *social.OwnPostCursor, size int32) (social.OwnPostPage, error) {
+func (f *fakeAdminPosts) ListAdminPosts(_ context.Context, fl social.AdminPostFilter, after *social.CreatedPostCursor, size int32) (social.CreatedPostPage, error) {
 	f.calls++
 	f.gotFilter, f.gotAfter, f.gotSize = fl, after, size
 	return f.page, f.err
@@ -107,12 +107,12 @@ func TestListPostsComposesPostsMeasureIDsAndOpenReportCounts(t *testing.T) {
 	taken, plain := uuid.New(), uuid.New()
 	measure := uuid.New()
 	productID := int64(55)
-	posts := &fakeAdminPosts{page: social.OwnPostPage{
+	posts := &fakeAdminPosts{page: social.CreatedPostPage{
 		Posts: []social.Post{
 			{ID: taken, StoreID: 7, Body: "下架的", ImageKey: "posts/a.jpg", ProductID: &productID, Status: social.PostStatus("PUBLISHED"), CreatedAt: created, UpdatedAt: created, PublishedAt: &published, TakedownMeasureID: &measure},
 			{ID: plain, StoreID: 8, Body: "正常", Status: social.PostStatus("UNPUBLISHED"), CreatedAt: created, UpdatedAt: created, PublishedAt: &published},
 		},
-		Next: &social.OwnPostCursor{CreatedAt: created, ID: plain},
+		Next: &social.CreatedPostCursor{CreatedAt: created, ID: plain},
 	}}
 	counts := &fakeCounts{counts: map[uuid.UUID]int64{taken: 3}}
 	c := newAdminHandlerEnv(t, posts, counts, false)
@@ -135,7 +135,7 @@ func TestListPostsComposesPostsMeasureIDsAndOpenReportCounts(t *testing.T) {
 		got[0].GetOpenReportCount() != 3 || got[0].GetStatus() != pb.PostStatus_POST_STATUS_PUBLISHED || !got[0].GetPublishTime().AsTime().Equal(published) {
 		t.Fatalf("下架的貼文：%+v", got[0])
 	}
-	if got[0].GetImage().GetUriTemplate() == "" || got[0].GetProductId() != "55" || got[1].Image != nil || got[1].ProductId != nil {
+	if got[0].GetImage().GetUriTemplate() != "https://media.example.test/i/{preset}/posts/a.jpg" || got[0].GetProductId() != "55" || got[1].Image != nil || got[1].ProductId != nil {
 		t.Fatalf("圖片與商品：%+v / %+v", got[0], got[1])
 	}
 	if got[1].TakedownMeasureId != nil || got[1].GetOpenReportCount() != 0 || got[1].GetStatus() != pb.PostStatus_POST_STATUS_UNPUBLISHED {
@@ -165,17 +165,39 @@ func TestNewAdminRequiresBothSources(t *testing.T) {
 	if _, err := NewAdmin(&fakeAdminPosts{}, nil, rpc.Images{}); err == nil {
 		t.Fatal("缺檢舉數來源要失敗")
 	}
+	if _, err := NewAdmin(&fakeAdminPosts{}, &fakeCounts{}, rpc.Images{}); err == nil {
+		t.Fatal("缺媒體網域要失敗")
+	}
+}
+
+func TestListPostsLegacyFullURLImageKeyIsUnavailable(t *testing.T) {
+	page := social.CreatedPostPage{Posts: []social.Post{{ID: uuid.New(), StoreID: 7, ImageKey: "https://old.example.com/a.jpg", Status: social.PostStatus("PUBLISHED"), CreatedAt: time.Now(), UpdatedAt: time.Now()}}}
+	c := newAdminHandlerEnv(t, &fakeAdminPosts{page: page}, &fakeCounts{}, false)
+	_, err := c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{}))
+	if connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("舊資料的完整網址 key：err = %v，預期 UNAVAILABLE", err)
+	}
 }
 
 func TestListPostsSurfacesSourceErrorsInsteadOfZeros(t *testing.T) {
 	boom := errors.New("boom")
-	page := social.OwnPostPage{Posts: []social.Post{{ID: uuid.New(), StoreID: 7, Status: social.PostStatus("PUBLISHED"), CreatedAt: time.Now(), UpdatedAt: time.Now()}}}
-	c := newAdminHandlerEnv(t, &fakeAdminPosts{page: page}, &fakeCounts{err: boom}, false)
-	if _, err := c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{})); err == nil {
-		t.Fatal("檢舉數來源失敗要回錯誤，不是 0")
+	page := social.CreatedPostPage{Posts: []social.Post{{ID: uuid.New(), StoreID: 7, Status: social.PostStatus("PUBLISHED"), CreatedAt: time.Now(), UpdatedAt: time.Now()}}}
+	counts := &fakeCounts{err: boom}
+	c := newAdminHandlerEnv(t, &fakeAdminPosts{page: page}, counts, false)
+	_, err := c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{}))
+	if connect.CodeOf(err) != connect.CodeInternal {
+		t.Fatalf("檢舉數來源失敗：err = %v，預期 INTERNAL，不是 0", err)
 	}
-	c = newAdminHandlerEnv(t, &fakeAdminPosts{err: boom}, &fakeCounts{}, false)
-	if _, err := c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{})); err == nil {
-		t.Fatal("貼文來源失敗要回錯誤")
+	if len(counts.asked) != 1 {
+		t.Fatalf("貼文成功後才問檢舉數：asked = %v", counts.asked)
+	}
+	counts = &fakeCounts{}
+	c = newAdminHandlerEnv(t, &fakeAdminPosts{err: boom}, counts, false)
+	_, err = c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{}))
+	if connect.CodeOf(err) != connect.CodeInternal {
+		t.Fatalf("貼文來源失敗：err = %v，預期 INTERNAL", err)
+	}
+	if counts.asked != nil {
+		t.Fatalf("貼文失敗時不該問檢舉數：%v", counts.asked)
 	}
 }
