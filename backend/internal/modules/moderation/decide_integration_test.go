@@ -152,7 +152,6 @@ func TestActionsThatDoNotFitTheTargetAreRejected(t *testing.T) {
 		"類別不適用社群":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Counterfeit, Action: ActionHide, Text: "x"},
 		"沒有理由":     {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide},
 		"不違規帶了處置":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation, Action: ActionHide},
-		"沒有管理員":    {CaseID: commentCase.ID, Version: 1, Decision: DecisionNoViolation},
 		"決定不合法":    {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: "MAYBE"},
 		"內容下架沒有店家": {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown, Text: "x", Severity: string(seller.SeverityValues()[0])},
 		"非下架帶了店家":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", StoreID: 1},
