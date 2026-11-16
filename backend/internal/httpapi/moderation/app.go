@@ -1,6 +1,6 @@
 // Package moderation 是 ModerationAppService 的 handler：登入的買家送出檢舉與讀自己的檢舉。
 //
-// 檢舉人一律是呼叫者的買家身分（由伺服器推導，請求不帶）；店家身分的呼叫不是買家，回 permission_denied。回應不露案件 ID（A7-D28 第 4 點）。
+// 檢舉人一律是呼叫者的買家身分（由伺服器推導，請求不帶）；管理員等非顧客帳號的身分回 permission_denied。回應不露案件 ID（A7-D28 第 4 點）。
 // 停權的帳號可以讀自己的檢舉、不能送出（動作性質宣告在 internal/httpapi/effects.go）。
 package moderation
 
@@ -14,7 +14,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -46,15 +45,7 @@ var submitPaths = rpc.FieldPaths{
 }
 
 func (h *App) buyerID(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return 0, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
-	}
-	id, err := h.buyers.CurrentBuyerID(ctx, p.ID)
-	if err != nil {
-		return 0, rpc.BuyerInvariant(p.ID, err)
-	}
-	return id, nil
+	return rpc.AccountBuyerID(ctx, h.buyers)
 }
 
 // target 把契約的對象轉成模組的 Target；種類沒給或 ID 的格式不對是呼叫方的錯（invalid_argument，指向 target 的欄位）。
@@ -112,7 +103,7 @@ func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyR
 	}
 	page, err := h.reports.MyReports(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, err
+		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size"})
 	}
 	out := &pb.ListMyReportsResponse{Reports: make([]*pb.ReportRecord, len(page.Items))}
 	for i, it := range page.Items {

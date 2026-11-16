@@ -2,6 +2,7 @@ package moderation
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
@@ -18,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -222,5 +225,34 @@ func TestOutcomeAndTargetEnumsMatchTheModule(t *testing.T) {
 	}
 	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomePending, moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {
 		t.Fatalf("ReportOutcome：%v", m)
+	}
+}
+
+// 模組對頁大小的 InvalidInput 指到請求的 page_size（BadRequest 的欄位路徑）。
+func TestListMyReportsPointsAtPageSizeWhenTheModuleRejectsIt(t *testing.T) {
+	r := &fakeReports{err: apperr.InvalidInputOn([]string{"PageSize"}, "page_size 不能是負數")}
+	e := newEnv(t, r)
+	_, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{PageSize: -1}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("code = %v，err = %v", connect.CodeOf(err), err)
+	}
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatalf("不是 connect 錯誤：%v", err)
+	}
+	var fields []string
+	for _, d := range ce.Details() {
+		v, e := d.Value()
+		if e != nil {
+			t.Fatal(e)
+		}
+		if br, ok := v.(*errdetails.BadRequest); ok {
+			for _, fv := range br.GetFieldViolations() {
+				fields = append(fields, fv.GetField())
+			}
+		}
+	}
+	if len(fields) != 1 || fields[0] != "page_size" {
+		t.Fatalf("BadRequest 的欄位 = %v，預期 [page_size]", fields)
 	}
 }

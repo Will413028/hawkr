@@ -81,15 +81,7 @@ func (h *App) account(ctx context.Context) (social.Caller, error) {
 
 // buyerID 回傳呼叫者的買家 ID，不查店家身分；給只以買家身分讀寫的方法用。規則同 account。
 func (h *App) buyerID(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return 0, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
-	}
-	id, err := h.buyers.CurrentBuyerID(ctx, p.ID)
-	if err != nil {
-		return 0, rpc.BuyerInvariant(p.ID, err)
-	}
-	return id, nil
+	return rpc.AccountBuyerID(ctx, h.buyers)
 }
 
 // optionalUUID 解析選填的 ID；沒設是 nil。
