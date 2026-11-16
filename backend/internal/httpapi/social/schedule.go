@@ -30,7 +30,7 @@ func (h *App) ListPendingSchedules(ctx context.Context, req *connect.Request[pb.
 	}
 	page, err := h.owner.ListPendingSchedules(ctx, st.StoreID, cur, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	out := &pb.ListPendingSchedulesResponse{Schedules: make([]*pb.PostSchedule, len(page.Schedules))}
 	for i, s := range page.Schedules {

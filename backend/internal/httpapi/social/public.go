@@ -200,7 +200,7 @@ func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPost
 		page, err = h.reads.ListFeed(ctx, c, cur, msg.GetPageSize())
 	}
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	posts, err := h.toPosts(ctx, c, page.Posts)
 	if err != nil {
@@ -247,7 +247,7 @@ func (h *Public) ListComments(ctx context.Context, req *connect.Request[pb.ListC
 		page, err = h.reads.ListComments(ctx, c, postID, cur, msg.GetPageSize())
 	}
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	comments, err := h.toComments(ctx, c, page.StoreID, page.Comments)
 	if err != nil {
@@ -312,7 +312,7 @@ func (h *Public) SuggestTrendingTags(ctx context.Context, req *connect.Request[p
 	}
 	tags, err := h.reads.TrendingHashtags(ctx, from, to, msg.GetMaxResults())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "max_results"})
+		return nil, err
 	}
 	return connect.NewResponse(&pb.SuggestTrendingTagsResponse{Tags: toTagCounts(tags)}), nil
 }
@@ -359,7 +359,7 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 		page, err = h.reads.ListForumEntries(ctx, c, storeID, cur, msg.GetPageSize())
 	}
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	entries, err := h.toForumEntries(ctx, c, storeID, page.Entries)
 	if err != nil {

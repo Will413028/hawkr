@@ -42,7 +42,7 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err == nil {
 			resp, err = next(ctx, req)
 		}
-		err = i.finish(ctx, procedure, start, err)
+		err = i.finish(ctx, procedure, start, withRequest(err, req.Any()))
 		if varies {
 			if err != nil {
 				markErrVary(err)

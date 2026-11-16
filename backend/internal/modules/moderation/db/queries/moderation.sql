@@ -148,11 +148,11 @@ DELETE FROM moderation.report_requests WHERE reporter_buyer_id = sqlc.arg(report
 -- 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
 DELETE FROM moderation.report_requests
 WHERE (reporter_buyer_id, request_id) IN (
-    SELECT q.reporter_buyer_id, q.request_id FROM moderation.report_requests q
-    JOIN moderation.reports r ON r.id = q.report_id
-    JOIN moderation.cases c ON c.id = r.case_id
+    SELECT q.reporter_buyer_id, q.request_id
+    FROM moderation.cases c
+    JOIN moderation.reports r ON r.case_id = c.id
+    JOIN moderation.report_requests q ON q.report_id = r.id
     WHERE c.closed_at IS NOT NULL AND c.closed_at < sqlc.arg(cutoff)
-    ORDER BY q.reporter_buyer_id, q.request_id
     LIMIT sqlc.arg(max_rows)::int
 );
 

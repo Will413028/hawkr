@@ -212,9 +212,9 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 	return out, nil
 }
 
-// postBannerTarget 解析貼文 banner 的目標；舊的非 UUID 目標回 false。
+// postBannerTarget 解析貼文 banner 的目標；儲存的目標一律是寫入時的正規形，不是 UUID 的回 false。
 func postBannerTarget(b model.Banner) (uuid.UUID, bool) {
-	id, err := uuid.Parse(strings.TrimSpace(b.Action.Target))
+	id, err := uuid.Parse(b.Action.Target)
 	return id, err == nil
 }
 

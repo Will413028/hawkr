@@ -106,7 +106,7 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	msg := req.Msg
 	size, err := pagination.PageSize(msg.GetPageSize(), defaultPageSize, maxPageSize)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size"})
+		return nil, err
 	}
 	requested, err := requestedKinds(msg.GetKinds())
 	if err != nil {

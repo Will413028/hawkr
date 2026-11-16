@@ -130,7 +130,12 @@ func toConnect(ctx context.Context, err error) converted {
 			if errors.As(err, &fp) {
 				paths = fp.paths
 			}
-			ce, unmapped := fromAppErr(code, ae, paths)
+			var re *requestError
+			var desc protoreflect.MessageDescriptor
+			if errors.As(err, &re) {
+				desc = re.desc
+			}
+			ce, unmapped := fromAppErr(code, ae, paths, desc)
 			return converted{err: ce, unmapped: unmapped}
 		}
 	}
@@ -146,7 +151,7 @@ func toConnect(ctx context.Context, err error) converted {
 	return converted{err: connect.NewError(connect.CodeInternal, errors.New(CommonText(ctx, connect.CodeInternal).Text)), internal: true}
 }
 
-func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths) (*connect.Error, []string) {
+func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request protoreflect.MessageDescriptor) (*connect.Error, []string) {
 	ce := connect.NewError(code, errors.New(ae.Message))
 	if ae.Reason != (apperr.Reason{}) {
 		addDetail(ce, &errdetails.ErrorInfo{Reason: ae.Reason.String(), Domain: errorDomain, Metadata: ae.Metadata})
@@ -161,6 +166,9 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths) (*connect
 	var unmapped []string
 	for _, v := range ae.FieldViolations() {
 		path, ok := paths.path(v.Field)
+		if !ok && v.Field == pageSizeField && request != nil && request.Fields().ByName("page_size") != nil {
+			path, ok = "page_size", true
+		}
 		if !ok {
 			unmapped = append(unmapped, v.Field)
 			continue
@@ -194,8 +202,28 @@ func addDetail(ce *connect.Error, m proto.Message) {
 // （"Reason[2]"）或沒有對應的欄位對應不到，會被當成沒有對應的欄位記錄。
 type FieldPaths map[string]string
 
-// PageSizePaths 是清單 RPC 的 page_size 對應：pagination.PageSize 的錯誤欄位是 "PageSize"。請求欄位不叫 page_size 的清單 handler 自己列對應。
-var PageSizePaths = FieldPaths{"PageSize": "page_size"}
+// pageSizeField 是 pagination.PageSize 的錯誤欄位。請求訊息有 page_size 欄位時，轉換時自動對應到它，handler 不必列對應；
+// 請求欄位不叫 page_size 的清單 handler 自己以 WithFieldPaths 列對應。
+const pageSizeField = "PageSize"
+
+// requestError 讓轉換看得到請求訊息的 descriptor，由 interceptor 在 handler 回錯後附上。
+type requestError struct {
+	err  error
+	desc protoreflect.MessageDescriptor
+}
+
+func (e *requestError) Error() string { return e.err.Error() }
+func (e *requestError) Unwrap() error { return e.err }
+
+func withRequest(err error, req any) error {
+	if err == nil {
+		return nil
+	}
+	if m, ok := req.(proto.Message); ok {
+		return &requestError{err: err, desc: m.ProtoReflect().Descriptor()}
+	}
+	return err
+}
 
 // WithFieldPaths 讓 err 裡的欄位錯誤以 paths 對應到請求的路徑。會回欄位錯誤的模組呼叫，handler 都要
 // 這樣包；對應不到的欄位不放進 BadRequest，interceptor 以 error 等級記錄。

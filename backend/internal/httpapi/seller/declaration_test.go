@@ -87,6 +87,9 @@ type fakeRequest struct {
 
 func (r fakeRequest) Spec() connect.Spec { return connect.Spec{Procedure: r.procedure} }
 
+// Any 回 nil：這些測試不帶請求訊息。
+func (r fakeRequest) Any() any { return nil }
+
 // Header 回空的 header：interceptor 讀 Accept-Language 協商語系。
 func (r fakeRequest) Header() http.Header { return http.Header{} }
 

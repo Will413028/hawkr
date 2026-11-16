@@ -35,7 +35,7 @@ func (h *Public) ListLiveBanners(ctx context.Context, req *connect.Request[conte
 	}
 	page, err := h.m.ListLiveBanners(ctx, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	out := &contentpb.ListLiveBannersResponse{
 		Banners:       make([]*contentpb.Banner, len(page.Banners)),

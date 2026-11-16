@@ -13,7 +13,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
@@ -52,9 +51,9 @@ var updatablePostFields = []string{"body", "image_staged_token", "product_id", "
 // store 回傳呼叫者此刻的店；只有顧客帳號能呼叫（沒有登入由 interceptor 擋），沒有店回 not_found（seller.CurrentStore 的結果）。
 // 能力不在這裡檢查：由模組檢查，宣告見 declarations。
 func (h *App) store(ctx context.Context) (seller.Store, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return seller.Store{}, rpc.Error(connect.CodePermissionDenied, "%s", "需要賣家身分")
+	p, err := rpc.RequireAccount(ctx)
+	if err != nil {
+		return seller.Store{}, err
 	}
 	return h.stores.CurrentStore(ctx, p.ID)
 }
@@ -223,7 +222,7 @@ func (h *App) ListMyPosts(ctx context.Context, req *connect.Request[pb.ListMyPos
 	}
 	page, err := h.owner.ListMyPosts(ctx, st, status, cur, msg.GetPageSize())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	posts, err := h.ownPosts(ctx, st, page.Posts)
 	if err != nil {
@@ -379,7 +378,7 @@ func (h *App) ListStoreComments(ctx context.Context, req *connect.Request[pb.Lis
 	}
 	page, err := h.owner.ListStoreComments(ctx, st, postID, msg.GetUnreplied(), cur, msg.GetPageSize())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	comments, err := h.toComments(ctx, social.Caller{Store: &st}, page.StoreID, page.Comments)
 	if err != nil {

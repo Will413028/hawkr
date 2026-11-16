@@ -20,7 +20,7 @@ import (
 
 var (
 	appealPaths  = rpc.FieldPaths{"MeasureID": "measure_id", "Reason": "reason", "EvidenceTokens[]": "evidence_staged_tokens[]", "ExpectedVersion": "etag"}
-	measurePaths = rpc.FieldPaths{"PageSize": "page_size", "State": "state"}
+	measurePaths = rpc.FieldPaths{"State": "state"}
 )
 
 func (h *App) ListMyMeasures(ctx context.Context, req *connect.Request[pb.ListMyMeasuresRequest]) (*connect.Response[pb.ListMyMeasuresResponse], error) {

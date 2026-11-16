@@ -160,9 +160,9 @@ func TestPublicReadAsksSocialNothingWhenNoBannerTargetsAPost(t *testing.T) {
 	}
 }
 
-func TestPostBannerTargetIgnoresSurroundingWhitespaceInAStoredTarget(t *testing.T) {
+func TestPostBannerTargetParsesTheStoredCanonicalTarget(t *testing.T) {
 	id := uuid.New()
-	got, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: " " + id.String() + "\t"}})
+	got, ok := postBannerTarget(model.Banner{Action: model.BannerAction{Type: model.BannerActionPost, Target: id.String()}})
 	if !ok || got != id {
 		t.Fatalf("postBannerTarget = %v, %v，預期 %v", got, ok, id)
 	}

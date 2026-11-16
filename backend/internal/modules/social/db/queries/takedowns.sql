@@ -56,11 +56,11 @@ SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);
 
 -- name: TakedownMeasuresOfPosts :many
--- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取最早建立的措施：複本的 created_at 是措施建立事件的發生時間（seller.measures.created_at），
--- 同一時間點再以措施 ID 決定先後（確定的順序）。
+-- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同時被多個措施下架時取措施 ID 最小的，措施 ID 是 UUIDv7，最小的就是最早建立的措施。
+-- 不用複本的 created_at 排序：每日對帳補漏重寫複本時會以對帳時間寫入，不是措施的建立時間。
 SELECT DISTINCT ON (post_id) post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[])
-ORDER BY post_id, created_at, measure_id;
+ORDER BY post_id, measure_id;
 
 -- name: DeleteTakedownsOfMeasure :execrows
 DELETE FROM social.content_takedowns WHERE measure_id = sqlc.arg(measure_id);

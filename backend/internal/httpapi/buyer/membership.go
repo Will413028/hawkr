@@ -42,7 +42,7 @@ func (h *App) ListMemberCards(ctx context.Context, req *connect.Request[pb.ListM
 	}
 	pageSize, err := pagination.PageSize(req.Msg.GetPageSize(), 20, 100)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	s := rpc.PageScope(buyerv1alpha1connect.BuyerAppServiceListMemberCardsProcedure, buyerID)
 	after, err := rpc.PageCursor[merchantCursor](s, req.Msg.GetPageToken())
@@ -162,7 +162,7 @@ func (h *App) ListSpendingRecords(ctx context.Context, req *connect.Request[pb.L
 	}
 	pageSize, err := pagination.PageSize(req.Msg.GetPageSize(), 20, 100)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	s := rpc.PageScope(buyerv1alpha1connect.BuyerAppServiceListSpendingRecordsProcedure, buyerID) + "\x00" + strconv.FormatInt(storeID, 10)
 	after, err := rpc.PageCursor[spendingCursor](s, req.Msg.GetPageToken())

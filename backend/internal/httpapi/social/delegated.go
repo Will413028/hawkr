@@ -177,7 +177,7 @@ func (h *Delegated) ListStorePosts(ctx context.Context, req *connect.Request[pb.
 	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, st seller.Store) error {
 		page, err := h.posts.ListMyPosts(ctx, st, status, cur, msg.GetPageSize())
 		if err != nil {
-			return rpc.WithFieldPaths(err, rpc.PageSizePaths)
+			return err
 		}
 		if out.Posts, err = h.ownPosts(ctx, st, page.Posts); err != nil {
 			return err

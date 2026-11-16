@@ -97,7 +97,7 @@ func (h *Governance) ListCaseInquiries(ctx context.Context, req *connect.Request
 	}
 	page, err := h.m.CaseInquiries(ctx, model.CaseInquiryListInput{CaseID: caseID, PageSize: msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	out := &adminpb.ListCaseInquiriesResponse{Inquiries: make([]*adminpb.CaseInquiry, len(page.Items))}
 	for i, item := range page.Items {

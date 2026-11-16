@@ -96,9 +96,9 @@ var (
 
 // callerBuyer 是登入的帳號與它目前的買家；買家不存在是不變量被破壞（存活的帳號都是買家），沒有分類（internal）。
 func (h *Reports) callerBuyer(ctx context.Context) (accountID, buyerID int64, err error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return 0, 0, errNoPrincipal
+	p, err := rpc.RequireAccount(ctx)
+	if err != nil {
+		return 0, 0, err
 	}
 	buyerID, err = h.buyers.CurrentBuyerID(ctx, p.ID)
 	return p.ID, buyerID, rpc.BuyerInvariant(p.ID, err)
@@ -166,7 +166,7 @@ func (h *Reports) ListMyReports(ctx context.Context, req *connect.Request[pb.Lis
 	}
 	page, err := h.m.BuyerReports(ctx, model.BuyerReportListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size"})
+		return nil, err
 	}
 	out := &pb.ListMyReportsResponse{Reports: make([]*pb.MyReport, len(page.Items))}
 	for i, r := range page.Items {

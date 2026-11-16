@@ -148,7 +148,7 @@ func (h *App) ListFavorites(ctx context.Context, req *connect.Request[pb.ListFav
 	}
 	page, err := h.lists().ListFavorites(ctx, model.ListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	cards, err := h.productCards(ctx, buyerID, page.Items, true)
 	if err != nil {
@@ -262,7 +262,7 @@ func (h *App) ListFollows(ctx context.Context, req *connect.Request[pb.ListFollo
 	}
 	page, err := h.lists().ListFollows(ctx, model.ListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	stores, err := h.storeCards(ctx, ids(page.Items))
 	if err != nil {
@@ -337,11 +337,11 @@ func (h *App) FollowStore(ctx context.Context, req *connect.Request[pb.FollowSto
 	if len(public) == 0 {
 		return nil, apperr.NotFound("找不到公開店家")
 	}
-	accountID, err := accountCaller(ctx)
+	account, err := rpc.RequireAccount(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if public[0].AccountID == accountID {
+	if public[0].AccountID == account.ID {
 		return nil, apperr.InvalidInput("不能追蹤自己的店家")
 	}
 	if err := h.lists().Follow(ctx, buyerID, id); err != nil {
@@ -377,7 +377,7 @@ func (h *App) ListVisits(ctx context.Context, req *connect.Request[pb.ListVisits
 	}
 	page, err := h.lists().ListVisits(ctx, model.ListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	cards, err := h.productCards(ctx, buyerID, page.Items, true)
 	if err != nil {
@@ -428,7 +428,7 @@ func (h *App) ListRestockSubscriptions(ctx context.Context, req *connect.Request
 	}
 	page, err := h.lists().ListRestock(ctx, model.RestockListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: (*model.RestockCursor)(after)})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	items := make([]model.Item, len(page.Items))
 	for i, item := range page.Items {

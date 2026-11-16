@@ -99,7 +99,7 @@ func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyR
 	}
 	page, err := h.reports.MyReports(ctx, buyerID, after, req.Msg.GetPageSize())
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size"})
+		return nil, err
 	}
 	out := &pb.ListMyReportsResponse{Reports: make([]*pb.ReportRecord, len(page.Items))}
 	for i, it := range page.Items {

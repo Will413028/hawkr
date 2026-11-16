@@ -83,7 +83,7 @@ func (h *App) ListBlockedBuyers(ctx context.Context, req *connect.Request[pb.Lis
 	}
 	page, err := h.m.ListBlockedBuyers(ctx, model.BlockedBuyerListInput{StoreID: current.StoreID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.PageSizePaths)
+		return nil, err
 	}
 	ids := make([]int64, len(page.Items))
 	for i, item := range page.Items {

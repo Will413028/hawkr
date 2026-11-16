@@ -1,6 +1,7 @@
 package moderation
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -52,12 +53,14 @@ type env struct {
 	r      *fakeReports
 	client moderationv1alpha1connect.ModerationAppServiceClient
 	url    string
+	logs   *bytes.Buffer
 }
 
 // newEnv 掛上真的 Connect handler 與 rpc 的 interceptor；header X-Test-Account 非空時以買家帳號登入，X-Test-Admin 非空時以管理員登入。
 func newEnv(t *testing.T, r *fakeReports) *env {
 	t.Helper()
-	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(NewApp(r, fakeBuyers{}), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
+	logs := &bytes.Buffer{}
+	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(NewApp(r, fakeBuyers{}), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(logs, nil)))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch {
@@ -70,7 +73,7 @@ func newEnv(t *testing.T, r *fakeReports) *env {
 	}))
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return &env{r: r, url: srv.URL, client: moderationv1alpha1connect.NewModerationAppServiceClient(srv.Client(), srv.URL)}
+	return &env{r: r, logs: logs, url: srv.URL, client: moderationv1alpha1connect.NewModerationAppServiceClient(srv.Client(), srv.URL)}
 }
 
 func signedIn[T any](msg *T) *connect.Request[T] {
@@ -255,5 +258,8 @@ func TestListMyReportsPointsAtPageSizeWhenTheModuleRejectsIt(t *testing.T) {
 	}
 	if len(fields) != 1 || fields[0] != "page_size" {
 		t.Fatalf("BadRequest 的欄位 = %v，預期 [page_size]", fields)
+	}
+	if strings.Contains(e.logs.String(), "level=ERROR") {
+		t.Fatalf("欄位已附給 client，不該有 ERROR log：%s", e.logs.String())
 	}
 }
