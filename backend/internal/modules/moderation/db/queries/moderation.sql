@@ -45,11 +45,25 @@ ON CONFLICT (case_id, content_sha256) DO NOTHING;
 SELECT id FROM moderation.case_snapshots WHERE case_id = sqlc.arg(case_id) AND content_sha256 = sqlc.arg(content_sha256);
 
 -- name: InsertReport :one
--- 同一位檢舉人在同一個案件的第二筆什麼都不寫（沒有回傳列）。
-INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at))
-ON CONFLICT (case_id, reporter_buyer_id) DO NOTHING
+-- 同一位檢舉人在同一個案件的第二筆、或同一個 (檢舉人, request_id) 的第二筆，什麼都不寫（沒有回傳列）。
+INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at, request_id, request_hash)
+VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at), sqlc.narg(request_id), sqlc.narg(request_hash))
+ON CONFLICT DO NOTHING
 RETURNING *;
+
+-- name: ReportByRequest :one
+-- 這位檢舉人以這個 request_id 送出的檢舉（不看案件狀態，A7-D28 第 3 點）。
+SELECT * FROM moderation.reports WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND request_id = sqlc.arg(request_id);
+
+-- name: ListReportsOfReporter :many
+-- 檢舉人自己的檢舉，新的在前，帶所屬案件的對象與決定（結果由案件推導）。keyset：(created_at, id) 由大到小。
+SELECT sqlc.embed(r), c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE r.reporter_buyer_id = sqlc.arg(reporter_buyer_id)
+  AND (r.created_at, r.id) < (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT sqlc.arg(max_rows)::int;
 
 -- name: BumpDailyCount :one
 -- 每日上限 20：單一 upsert 原子地換日重算、未達上限才加一；沒有回傳列就是已到上限。DO UPDATE 的 WHERE 讓到上限時不改列。

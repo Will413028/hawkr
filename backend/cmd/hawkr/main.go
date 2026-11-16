@@ -53,6 +53,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -259,11 +260,16 @@ func runServe(ctx context.Context) error {
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
+	moderationModule := moderation.New(moderation.Deps{
+		DB: d, Social: socialModule, Seller: sellerModule, Buyer: buyerModule, Suspension: suspension,
+		Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log,
+	})
 	del := newDelegation(bus, delegationDeps)
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Ready:  d.Ping,
-		Social: socialModule,
+		Ready:      d.Ping,
+		Social:     socialModule,
+		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,
 			Social: socialModule,

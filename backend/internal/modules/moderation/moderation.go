@@ -64,6 +64,12 @@ type (
 	SubmitResult = model.SubmitResult
 	// DecideInput 是處理案件的輸入。
 	DecideInput = model.DecideInput
+	// ReportItem 是檢舉人讀自己檢舉時的一筆。
+	ReportItem = model.ReportItem
+	// ReportCursor 是檢舉清單的排序鍵。
+	ReportCursor = model.ReportCursor
+	// ReportPage 是一頁檢舉。
+	ReportPage = model.ReportPage
 )
 
 const (
@@ -177,8 +183,14 @@ func (r *Retention) PeriodicJobs() []*river.PeriodicJob { return r.svc.PeriodicJ
 
 // SubmitReport 送出一筆檢舉：對象要存在而且公開可讀，不能檢舉自己，每位檢舉人每個台北日最多新增 DailyReportLimit 筆；內容在送出時凍結成快照。
 // 這位檢舉人對這個對象在進行中案件裡已有檢舉時回傳既有的那一筆（Created 為假、不吃額度）；案件結案後可以再檢舉（開新案件）。
+// 帶 RequestID 時，同一位檢舉人的同一個 RequestID 一律回第一次的結果（含案件已結案之後），內容不同回 InvalidInput。
 func (m *Module) SubmitReport(ctx context.Context, in SubmitInput) (SubmitResult, error) {
 	return m.report.Submit(ctx, in)
+}
+
+// MyReports 列出檢舉人自己的檢舉，新到舊（keyset）：對象、類別、說明與由案件推導的結果（進行中、違規、不違規）；不含案件 ID。
+func (m *Module) MyReports(ctx context.Context, buyerID int64, after *ReportCursor, size int32) (ReportPage, error) {
+	return m.report.MyReports(ctx, buyerID, after, size)
 }
 
 // DecideCase 處理案件並結案：違規要帶認定類別、處置種類與給作者的理由，處置（social 的隱藏或警告、停權、seller 的內容下架）與結案在同一個 transaction；
