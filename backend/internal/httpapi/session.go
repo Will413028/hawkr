@@ -139,7 +139,7 @@ func writeUnavailable(w http.ResponseWriter, r *http.Request) {
 }
 
 // writePermissionDenied 回 403，帶模組給使用者的文字，沒有時用共用文案目錄的 PERMISSION_DENIED（語系取自 ctx）；形狀同 writeUnavailable。
-// Connect 的請求另帶錯誤的 reason（apperr.Reason）；gateway 的 envelope 沒有 reason 欄位。
+// 錯誤帶 reason（apperr.Reason）時：Connect 的請求寫進 ErrorInfo，gateway 的 envelope 寫進選填的 reason 欄位（ErrorReason 的名稱字串）；沒有時省略。
 func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
 	var ae *apperr.Error
 	hasText := errors.As(err, &ae) && ae.Message != ""
@@ -155,6 +155,10 @@ func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusForbidden)
-	body, _ := json.Marshal(map[string]any{"code": http.StatusForbidden, "message": ce.Message()})
+	envelope := map[string]any{"code": http.StatusForbidden, "message": ce.Message()}
+	if ae != nil && ae.Reason != (apperr.Reason{}) {
+		envelope["reason"] = ae.Reason.String()
+	}
+	body, _ := json.Marshal(envelope)
 	_, _ = w.Write(body)
 }

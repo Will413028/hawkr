@@ -26,6 +26,7 @@ import (
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 var suspendedSince = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
@@ -232,10 +233,28 @@ func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 		var body struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" || s.Called {
 			t.Fatalf("%s /api/v1：%d %q called=%v，預期 gateway 形狀的 403", m, rec.Code, rec.Body, s.Called)
 		}
+		if body.Reason != "ACCOUNT_SUSPENDED" {
+			t.Fatalf("%s /api/v1：reason=%q，預期 ACCOUNT_SUSPENDED", m, body.Reason)
+		}
+	}
+}
+
+// 沒有業務原因的 403：gateway 形狀的 envelope 不帶 reason 欄位。
+func TestRESTPermissionDeniedWithoutReasonOmitsTheField(t *testing.T) {
+	rec := httptest.NewRecorder()
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/app/orders", http.NoBody)
+	writePermissionDenied(rec, r, apperr.PermissionDenied("無權操作"))
+	var raw map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil || rec.Code != http.StatusForbidden {
+		t.Fatalf("%d %q %v", rec.Code, rec.Body, err)
+	}
+	if _, ok := raw["reason"]; ok {
+		t.Fatalf("沒有 reason 的 403 不該帶欄位：%q", rec.Body)
 	}
 }
 
@@ -338,6 +357,7 @@ func TestSuspendedAccountCannotUpgradeALegacyRESTConnection(t *testing.T) {
 		var body struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" {
 			t.Fatalf("%s：%d %q，預期 gateway 形狀的 403", name, rec.Code, rec.Body)
