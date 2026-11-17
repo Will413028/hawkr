@@ -163,6 +163,13 @@ void main() {
       expect(redirect(SellerRoutes.accountRestricted), isNull);
     });
 
+    test('受限已清除而還在受限頁 → 導回 dashboard', () {
+      expect(
+        redirect(SellerRoutes.accountRestricted, restricted: false),
+        MainRoutes.dashboard,
+      );
+    });
+
     test('沒有受限時不導向受限頁', () {
       expect(
         redirect('/main/dashboard', restricted: false),

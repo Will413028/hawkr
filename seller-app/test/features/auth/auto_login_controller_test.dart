@@ -110,7 +110,7 @@ void main() {
   });
 
   for (final code in [Code.unauthenticated, Code.permissionDenied]) {
-    test('冷啟動 $code 結束 session token', () async {
+    test('冷啟動 $code 結束 session token，permission_denied 保留伺服器訊息', () async {
       final auth = FakeAuthSession(signedIn: true);
       final container = makeContainer(
         auth,
@@ -125,6 +125,10 @@ void main() {
       );
       expect(await check(container), isA<AutoLoginSignedOut>());
       expect(auth.isSignedIn, isFalse);
+      expect(
+        container.read(sessionRestoreErrorProvider),
+        code == Code.permissionDenied ? '帳號已停權' : isNull,
+      );
     });
   }
 

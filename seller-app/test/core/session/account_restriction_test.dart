@@ -1,15 +1,18 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.pb.dart';
-import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
-import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.spec.dart';
-import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/core/networking/account_suspended_interceptor.dart';
+import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/session/account_restriction.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
@@ -136,30 +139,133 @@ void main() {
     });
   });
 
-  group('accountSuspendedInterceptor', () {
-    Future<int> call({
-      required bool background,
-      required bool suspended,
+  group('onAccountSuspendedSignal 核對', () {
+    Future<(ProviderContainer, FakeAuthRepository)> loggedIn(
+      Future<AccountSession> Function() next, {
+      AccountRestriction? initial,
     }) async {
+      final repo = FakeAuthRepository();
+      var first = true;
+      when(() => repo.currentSession()).thenAnswer((_) {
+        if (first) {
+          first = false;
+          return Future.value(
+            AccountSession(accountId: 'acc-1', restriction: initial),
+          );
+        }
+        return next();
+      });
+      when(() => repo.signOut()).thenAnswer((_) async {});
+      final c = makeLoginContainer(
+        repo: repo,
+        auth: FakeAuthSession(signedIn: true),
+      );
+      await c.read(sessionProvider.notifier).initialize();
+      return (c, repo);
+    }
+
+    test('GetSession 回報沒有停權：清除受限狀態', () async {
+      final (c, _) = await loggedIn(
+        () async => const AccountSession(accountId: 'acc-1'),
+        initial: _restriction,
+      );
+      expect(c.read(accountRestrictionStateProvider), isNotNull);
+
+      await c.read(sessionProvider.notifier).onAccountSuspendedSignal();
+
+      expect(c.read(accountRestrictionStateProvider), isNull);
+    });
+
+    test('沒有停權的訊號（例如 REST 的其他 403）不進入受限狀態', () async {
+      final (c, _) = await loggedIn(
+        () async => const AccountSession(accountId: 'acc-1'),
+      );
+
+      await c.read(sessionProvider.notifier).onAccountSuspendedSignal();
+
+      expect(c.read(accountRestrictionStateProvider), isNull);
+    });
+
+    test('登出後才回來的 GetSession 丟棄，不留下受限狀態', () async {
+      final gate = Completer<AccountSession>();
+      final (c, _) = await loggedIn(() => gate.future);
+      final pending = c
+          .read(sessionProvider.notifier)
+          .onAccountSuspendedSignal();
+
+      await c.read(sessionProvider.notifier).logout();
+      gate.complete(
+        const AccountSession(accountId: 'acc-1', restriction: _restriction),
+      );
+      await pending;
+
+      expect(c.read(accountRestrictionStateProvider), isNull);
+      expect(c.read(sessionProvider).isLoggedIn, isFalse);
+    });
+
+    test('換帳號登入後才回來的 GetSession 丟棄', () async {
+      final gate = Completer<AccountSession>();
+      final (c, _) = await loggedIn(() => gate.future);
+      final pending = c
+          .read(sessionProvider.notifier)
+          .onAccountSuspendedSignal();
+
+      await c.read(sessionProvider.notifier).login(accountId: 'acc-2');
+      gate.complete(
+        const AccountSession(accountId: 'acc-1', restriction: _restriction),
+      );
+      await pending;
+
+      expect(c.read(accountRestrictionStateProvider), isNull);
+    });
+
+    test('同時多個訊號只打一次 GetSession，結束後可再核對', () async {
+      final gate = Completer<AccountSession>();
+      final (c, repo) = await loggedIn(() => gate.future);
+      final notifier = c.read(sessionProvider.notifier);
+      clearInteractions(repo);
+
+      final all = <Future<void>>[
+        notifier.onAccountSuspendedSignal(),
+        notifier.onAccountSuspendedSignal(),
+        notifier.onAccountSuspendedSignal(),
+      ];
+      gate.complete(
+        const AccountSession(accountId: 'acc-1', restriction: _restriction),
+      );
+      await Future.wait(all);
+      verify(() => repo.currentSession()).called(1);
+      clearInteractions(repo);
+
+      await notifier.onAccountSuspendedSignal();
+      verify(() => repo.currentSession()).called(1);
+    });
+  });
+
+  group('connectInterceptors 的 ACCOUNT_SUSPENDED', () {
+    Future<int> call({required bool background, required String reason}) async {
       var signals = 0;
-      final failure = suspended
-          ? reasonError(Code.permissionDenied, 'ACCOUNT_SUSPENDED')
-          : reasonError(Code.permissionDenied, 'SELLER_SUSPENDED');
+      final failure = reasonError(Code.permissionDenied, reason);
       final transport = FakeTransportBuilder()
           .unary(
             ContentPublicService.checkAppVersion,
             (req, ctx) => throw failure,
           )
           .unary(
-            SocialPublicService.recordPostView,
+            SellerAppService.refreshMyPaymentAccount,
             (req, ctx) => throw failure,
           )
-          .build(interceptors: [accountSuspendedInterceptor(() => signals++)]);
+          .build(
+            interceptors: connectInterceptors(
+              acceptLanguage: () => 'zh-TW',
+              onAccountSuspended: () => signals++,
+            ),
+          );
       try {
         if (background) {
-          await SocialPublicServiceClient(
+          await SellerAppServiceClient(
             transport,
-          ).recordPostView(RecordPostViewRequest(postId: 'p1'));
+          ).refreshMyPaymentAccount(RefreshMyPaymentAccountRequest());
         } else {
           await ContentPublicServiceClient(
             transport,
@@ -172,15 +278,15 @@ void main() {
     }
 
     test('前景請求收到 ACCOUNT_SUSPENDED 通知一次', () async {
-      expect(await call(background: false, suspended: true), 1);
+      expect(await call(background: false, reason: 'ACCOUNT_SUSPENDED'), 1);
     });
 
-    test('背景寫入收到 ACCOUNT_SUSPENDED 靜默略過', () async {
-      expect(await call(background: true, suspended: true), 0);
+    test('背景寫入（RefreshMyPaymentAccount）收到 ACCOUNT_SUSPENDED 靜默略過', () async {
+      expect(await call(background: true, reason: 'ACCOUNT_SUSPENDED'), 0);
     });
 
     test('其他原因不通知', () async {
-      expect(await call(background: false, suspended: false), 0);
+      expect(await call(background: false, reason: 'SELLER_SUSPENDED'), 0);
     });
   });
 }

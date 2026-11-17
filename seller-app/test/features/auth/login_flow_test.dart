@@ -10,6 +10,8 @@ import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/layout/app_media_query_policy.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/core/router/redirect_logic.dart';
+import 'package:hawkr_seller/core/session/session_provider.dart'
+    show sessionRestoreErrorProvider;
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
 import 'package:hawkr_seller/features/auth/presentation/auth_controller.dart';
 import 'package:hawkr_seller/features/auth/presentation/auth_screen.dart';
@@ -75,6 +77,29 @@ void main() {
   });
   setUp(() {
     resetLoginStorage();
+  });
+
+  testWidgets('冷啟動遭拒的伺服器訊息顯示一次，重新掛載 AuthScreen 不重播', (tester) async {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    c.read(sessionRestoreErrorProvider.notifier).setMessage('帳號已停權');
+    Widget screen() => UncontrolledProviderScope(
+      container: c,
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (_, _) => const MaterialApp(home: AuthScreen()),
+      ),
+    );
+    await tester.pumpWidget(screen());
+    await tester.pump();
+    expect(find.text('帳號已停權'), findsOneWidget);
+    expect(c.read(sessionRestoreErrorProvider), isNull);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(screen());
+    await tester.pump();
+    expect(find.text('帳號已停權'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('auth route 忽略過期的 message extra', (tester) async {
@@ -500,7 +525,7 @@ void main() {
     expect(prefs.getString('auth_cache_owner'), 'B');
   });
 
-  testWidgets('背景重試遭拒會結束 session token', (tester) async {
+  testWidgets('背景重試遭拒會結束 session token 並發布伺服器文字', (tester) async {
     final repo = FakeAuthRepository();
     var calls = 0;
     when(() => repo.currentSession()).thenAnswer((_) async {
@@ -519,6 +544,7 @@ void main() {
     expect(auth.isSignedIn, isTrue);
     await tester.pump(const Duration(milliseconds: 1600));
     expect(auth.isSignedIn, isFalse);
+    expect(c.read(sessionRestoreErrorProvider), '帳號已停權');
     expect(calls, 2);
   });
 

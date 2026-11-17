@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart'
+    show SellerAppService;
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' as auth;
 import 'package:flutter/foundation.dart';
@@ -14,7 +16,6 @@ import '../../shared/utils/hk_log.dart';
 import '../l10n/ui_locale.dart';
 import '../session/auth_session_provider.dart';
 import '../session/session_provider.dart';
-import 'account_suspended_interceptor.dart';
 import 'app_version_headers.dart';
 
 part 'connect_provider.g.dart';
@@ -67,6 +68,12 @@ IdentityAppServiceClient sessionIdentityClient(Ref ref) =>
       ),
     );
 
+/// 使用者沒有主動操作的背景寫入（App 自動呼叫）：帳號停權時收到 `ACCOUNT_SUSPENDED` 靜默略過，不轉到受限頁。
+/// 範圍是這支 App 經 Connect 呼叫、宣告為寫入（`customerEffects`）的 AppService 方法。
+final Set<String> backgroundWriteProcedures = {
+  SellerAppService.refreshMyPaymentAccount.procedure,
+};
+
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
 @Riverpod(keepAlive: true)
@@ -99,10 +106,10 @@ List<Interceptor> connectInterceptors({
     auth: auth,
     acceptLanguage: acceptLanguage,
     onSellerSuspended: onSellerSuspended,
+    onAccountSuspended: onAccountSuspended,
+    accountSuspendedSilent: backgroundWriteProcedures,
     log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
   ),
-  if (onAccountSuspended != null)
-    accountSuspendedInterceptor(onAccountSuspended),
 ];
 
 /// 以 identity 的 session token 提供身分；session 失效時登出。

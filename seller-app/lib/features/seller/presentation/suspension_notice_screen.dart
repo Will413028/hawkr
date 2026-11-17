@@ -16,6 +16,7 @@ import '../../../core/session/my_store.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/icons/app_icon_colors.dart';
 import '../../../shared/icons/app_icons.dart';
+import '../../../shared/widgets/danger_alert_badge.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../data/current_store.dart';
 import '../data/measures.dart';
@@ -233,21 +234,7 @@ class SuspensionNoticeScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 72.w,
-                  height: 72.w,
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerStrong.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    AppIcons.warningAmberRounded,
-                    color: AppIconColors.warning,
-                    size: 40.sp,
-                  ),
-                ),
-              ),
+              const DangerAlertBadge(),
               if (content.subtitle != null) ...[
                 SizedBox(height: 20.h),
                 Text(

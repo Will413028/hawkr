@@ -9,9 +9,8 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/session/account_restriction.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/icons/app_icon_colors.dart';
-import '../../../shared/icons/app_icons.dart';
 import '../../../shared/widgets/hk_button_label.dart';
+import '../../../shared/widgets/danger_alert_badge.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import 'profile_account_closure.dart';
 import 'profile_other_options_card.dart' show ProfileLogoutButton;
@@ -61,21 +60,7 @@ class _AccountRestrictedScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 72.w,
-                  height: 72.w,
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerStrong.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    AppIcons.warningAmberRounded,
-                    color: AppIconColors.warning,
-                    size: 40.sp,
-                  ),
-                ),
-              ),
+              const DangerAlertBadge(),
               SizedBox(height: 20.h),
               Text(
                 accountRestrictedBody,

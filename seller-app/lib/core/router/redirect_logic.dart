@@ -91,7 +91,8 @@ String? resolveAuthRedirect({
 
   // 已登入且已完成 onboarding：停在登入頁時推進主畫面，其餘放行。
   if (location == AuthRoutes.auth ||
-      location == SellerRoutes.storeUnavailable) {
+      location == SellerRoutes.storeUnavailable ||
+      location == SellerRoutes.accountRestricted) {
     return MainRoutes.dashboard;
   }
   return null;

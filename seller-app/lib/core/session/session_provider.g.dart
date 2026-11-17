@@ -76,7 +76,7 @@ final class SessionProvider extends $NotifierProvider<Session, SessionModel> {
   }
 }
 
-String _$sessionHash() => r'35811654ac5133a6da886547af06bd9d136e24fd';
+String _$sessionHash() => r'49a7b3195e6a53cdbb33321020ad6215c573f565';
 
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
@@ -102,6 +102,59 @@ abstract class _$Session extends $Notifier<SessionModel> {
             as $ClassProviderElement<
               AnyNotifier<SessionModel, SessionModel>,
               SessionModel,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(SessionRestoreError)
+final sessionRestoreErrorProvider = SessionRestoreErrorProvider._();
+
+final class SessionRestoreErrorProvider
+    extends $NotifierProvider<SessionRestoreError, String?> {
+  SessionRestoreErrorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sessionRestoreErrorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sessionRestoreErrorHash();
+
+  @$internal
+  @override
+  SessionRestoreError create() => SessionRestoreError();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$sessionRestoreErrorHash() =>
+    r'0a635b8238a27f689cdb1eece5da5f84547e1cac';
+
+abstract class _$SessionRestoreError extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
               Object?,
               Object?
             >;

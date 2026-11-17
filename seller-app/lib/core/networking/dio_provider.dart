@@ -164,6 +164,14 @@ Dio dio(Ref ref) {
   // token 是 Keychain 裡的 opaque token（ADR 2026-10-30-identity-self-hosted-federated-login），不換新：401 代表
   // session 已結束（過期或被撤銷），登出時清除 token，由 router redirect 回到登入頁。
 
+  // 停權的帳號對 REST 的非 GET／HEAD 回 403，envelope 沒有 reason，分不出是停權還是其他拒絕：
+  // 交給 onAccountSuspendedSignal 以 GetSession 核對（沒停權不會進受限狀態）。
+  void handleForbiddenWrite(int? status, RequestOptions options) {
+    if (status != 403) return;
+    if (options.method == 'GET' || options.method == 'HEAD') return;
+    unawaited(ref.read(sessionProvider.notifier).onAccountSuspendedSignal());
+  }
+
   bool shouldLogout(int? status, RequestOptions options) =>
       status == 401 && options.extra[kSkipAuthInterceptorExtra] != true;
 
@@ -171,6 +179,7 @@ Dio dio(Ref ref) {
     InterceptorsWrapper(
       // 處理 validateStatus: (_) => true 的情況（ApiRequestHelper 預設）
       onResponse: (response, handler) async {
+        handleForbiddenWrite(response.statusCode, response.requestOptions);
         if (shouldLogout(response.statusCode, response.requestOptions)) {
           await ref.read(sessionProvider.notifier).logout();
         }
@@ -178,6 +187,7 @@ Dio dio(Ref ref) {
       },
       // 處理預設 validateStatus（Dio 對 401 拋出 DioException）的情況
       onError: (error, handler) async {
+        handleForbiddenWrite(error.response?.statusCode, error.requestOptions);
         if (shouldLogout(error.response?.statusCode, error.requestOptions)) {
           await ref.read(sessionProvider.notifier).logout();
         }
