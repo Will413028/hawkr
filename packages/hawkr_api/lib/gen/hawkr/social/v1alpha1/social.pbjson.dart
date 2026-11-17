@@ -947,6 +947,23 @@ const ListForumEntriesResponse$json = {
       '10': 'entries'
     },
     {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+    {
+      '1': 'viewer_actor',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Actor',
+      '8': {},
+      '10': 'viewerActor'
+    },
+    {
+      '1': 'viewer_can_comment',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanComment'
+    },
   ],
 };
 
@@ -954,7 +971,9 @@ const ListForumEntriesResponse$json = {
 final $typed_data.Uint8List listForumEntriesResponseDescriptor = $convert.base64Decode(
     'ChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USOwoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2'
     'lhbC52MWFscGhhMS5Gb3J1bUVudHJ5UgdlbnRyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
-    'CVINbmV4dFBhZ2VUb2tlbg==');
+    'CVINbmV4dFBhZ2VUb2tlbhJECgx2aWV3ZXJfYWN0b3IYAyABKAsyHC5oYXdrci5zb2NpYWwudj'
+    'FhbHBoYTEuQWN0b3JCA+BBA1ILdmlld2VyQWN0b3ISMQoSdmlld2VyX2Nhbl9jb21tZW50GAQg'
+    'ASgIQgPgQQNSEHZpZXdlckNhbkNvbW1lbnQ=');
 
 @$core.Deprecated('Use recordPostViewRequestDescriptor instead')
 const RecordPostViewRequest$json = {

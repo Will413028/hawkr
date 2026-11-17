@@ -641,11 +641,11 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 			}
 		}
 	})
-	t.Run("空頁不查店家與封鎖", func(t *testing.T) {
+	t.Run("空頁只為觀看者身分查一次封鎖", func(t *testing.T) {
 		stores := &fakeStores{}
 		h := newPublic(t, &fakeReads{}, fakeBuyers{id: 7}, stores)
-		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 0 {
-			t.Errorf("err=%v asked=%v", err, stores.asked)
+		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 1 || len(stores.asked[0]) != 1 || stores.asked[0][0] != 5 {
+			t.Errorf("err=%v asked=%v，預期只問觀看者要不要被店 5 封鎖", err, stores.asked)
 		}
 	})
 	t.Run("格式與 token", func(t *testing.T) {
@@ -815,6 +815,52 @@ func TestPostViewerActorFollowsViewerIdentity(t *testing.T) {
 				t.Fatalf("posts = %d", len(list.Msg.GetPosts()))
 			}
 			check(t, list.Msg.GetPosts()[0])
+		})
+	}
+}
+
+func TestForumListingViewerActorFollowsViewerIdentity(t *testing.T) {
+	own := &seller.Store{StoreID: 9}
+	cases := []struct {
+		name       string
+		guest      bool
+		store      *seller.Store
+		forumShop  int64
+		block      map[int64]bool
+		wantKind   pb.ActorKind
+		wantID     string
+		wantName   string
+		wantCanCmt bool
+	}{
+		{"訪客不設", true, nil, 5, nil, pb.ActorKind_ACTOR_KIND_UNSPECIFIED, "", "", false},
+		{"買家是買家身分", false, nil, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", true},
+		{"被封鎖的買家身分不變但不能留言", false, nil, 5, map[int64]bool{5: true}, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", false},
+		{"店主讀自己店的討論區是店家身分", false, own, 9, nil, pb.ActorKind_ACTOR_KIND_STORE, "9", "shop", true},
+		{"店主讀別家店的討論區是買家身分", false, own, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := t.Context()
+			if !c.guest {
+				ctx = asBuyer(ctx)
+			}
+			// 空的一頁也要帶觀看者身分。
+			h := newPublic(t, &fakeReads{forum: social.ForumPage{}}, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
+			resp, err := h.ListForumEntries(ctx, connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: rpc.FormatID(c.forumShop)}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := resp.Msg.GetViewerActor()
+			if c.wantKind == pb.ActorKind_ACTOR_KIND_UNSPECIFIED {
+				if a != nil {
+					t.Errorf("viewer_actor = %v，預期不設", a)
+				}
+			} else if a.GetKind() != c.wantKind || a.GetId() != c.wantID || a.GetName() != c.wantName {
+				t.Errorf("viewer_actor = %v，預期 kind=%v id=%s name=%s", a, c.wantKind, c.wantID, c.wantName)
+			}
+			if resp.Msg.GetViewerCanComment() != c.wantCanCmt {
+				t.Errorf("viewer_can_comment = %v，預期 %v", resp.Msg.GetViewerCanComment(), c.wantCanCmt)
+			}
 		})
 	}
 }

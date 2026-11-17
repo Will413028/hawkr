@@ -367,10 +367,37 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 		return nil, err
 	}
 	out := &pb.ListForumEntriesResponse{Entries: entries}
+	if out.ViewerActor, out.ViewerCanComment, err = h.forumViewer(ctx, c, storeID); err != nil {
+		return nil, err
+	}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
+}
+
+// forumViewer 是觀看者在店 storeID 討論區留言時的身分與能不能留言，與貼文留言用同一套判斷，不依賴這一頁有沒有可見項目。
+func (h *presenter) forumViewer(ctx context.Context, c social.Caller, storeID int64) (*pb.Actor, bool, error) {
+	var stores postStores
+	var err error
+	switch {
+	case c.OwnsStore(storeID):
+		if stores.cards, err = h.storeCards(ctx, []int64{storeID}); err != nil {
+			return nil, false, err
+		}
+	case c.BuyerID != 0:
+		if stores.buyerDisplay, err = h.buyerDisplays(ctx, []int64{c.BuyerID}); err != nil {
+			return nil, false, err
+		}
+		if stores.blocking, err = h.blockingStores(ctx, c, []int64{storeID}); err != nil {
+			return nil, false, err
+		}
+	}
+	actor, err := h.viewerActor(c, storeID, stores)
+	if err != nil {
+		return nil, false, err
+	}
+	return actor, canComment(c, storeID, stores.blocking), nil
 }
 
 func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {

@@ -467,6 +467,11 @@ message ListForumEntriesRequest {
 message ListForumEntriesResponse {
   repeated ForumEntry entries = 1;
   string next_page_token = 2;
+  // 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  // 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  Actor viewer_actor = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  bool viewer_can_comment = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message RecordPostViewRequest {

@@ -1896,8 +1896,13 @@ type ListForumEntriesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entries       []*ForumEntry          `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
 	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+	// 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+	ViewerActor *Actor `protobuf:"bytes,3,opt,name=viewer_actor,json=viewerActor,proto3" json:"viewer_actor,omitempty"`
+	// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+	ViewerCanComment bool `protobuf:"varint,4,opt,name=viewer_can_comment,json=viewerCanComment,proto3" json:"viewer_can_comment,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ListForumEntriesResponse) Reset() {
@@ -1942,6 +1947,20 @@ func (x *ListForumEntriesResponse) GetNextPageToken() string {
 		return x.NextPageToken
 	}
 	return ""
+}
+
+func (x *ListForumEntriesResponse) GetViewerActor() *Actor {
+	if x != nil {
+		return x.ViewerActor
+	}
+	return nil
+}
+
+func (x *ListForumEntriesResponse) GetViewerCanComment() bool {
+	if x != nil {
+		return x.ViewerCanComment
+	}
+	return false
 }
 
 type RecordPostViewRequest struct {
@@ -5812,10 +5831,12 @@ const file_hawkr_social_v1alpha1_social_proto_rawDesc = "" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12 \n" +
 	"\tparent_id\x18\x04 \x01(\tH\x00R\bparentId\x88\x01\x01B\f\n" +
 	"\n" +
-	"_parent_id\"\x7f\n" +
+	"_parent_id\"\xf8\x01\n" +
 	"\x18ListForumEntriesResponse\x12;\n" +
 	"\aentries\x18\x01 \x03(\v2!.hawkr.social.v1alpha1.ForumEntryR\aentries\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"5\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12D\n" +
+	"\fviewer_actor\x18\x03 \x01(\v2\x1c.hawkr.social.v1alpha1.ActorB\x03\xe0A\x03R\vviewerActor\x121\n" +
+	"\x12viewer_can_comment\x18\x04 \x01(\bB\x03\xe0A\x03R\x10viewerCanComment\"5\n" +
 	"\x15RecordPostViewRequest\x12\x1c\n" +
 	"\apost_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x06postId\"\x18\n" +
 	"\x16RecordPostViewResponse\"0\n" +
@@ -6290,141 +6311,142 @@ var file_hawkr_social_v1alpha1_social_proto_depIdxs = []int32{
 	97,  // 27: hawkr.social.v1alpha1.ForumEntry.create_time:type_name -> google.protobuf.Timestamp
 	97,  // 28: hawkr.social.v1alpha1.ForumEntry.update_time:type_name -> google.protobuf.Timestamp
 	24,  // 29: hawkr.social.v1alpha1.ListForumEntriesResponse.entries:type_name -> hawkr.social.v1alpha1.ForumEntry
-	10,  // 30: hawkr.social.v1alpha1.CreateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
-	10,  // 31: hawkr.social.v1alpha1.UpdateCommentRequest.comment:type_name -> hawkr.social.v1alpha1.Comment
-	100, // 32: hawkr.social.v1alpha1.UpdateCommentRequest.update_mask:type_name -> google.protobuf.FieldMask
-	10,  // 33: hawkr.social.v1alpha1.UpdateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
-	24,  // 34: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
-	24,  // 35: hawkr.social.v1alpha1.UpdateForumEntryRequest.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
-	100, // 36: hawkr.social.v1alpha1.UpdateForumEntryRequest.update_mask:type_name -> google.protobuf.FieldMask
-	24,  // 37: hawkr.social.v1alpha1.UpdateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
-	8,   // 38: hawkr.social.v1alpha1.CreatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 39: hawkr.social.v1alpha1.GetMyPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	2,   // 40: hawkr.social.v1alpha1.ListMyPostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	8,   // 41: hawkr.social.v1alpha1.ListMyPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 42: hawkr.social.v1alpha1.UpdatePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
-	100, // 43: hawkr.social.v1alpha1.UpdatePostRequest.update_mask:type_name -> google.protobuf.FieldMask
-	8,   // 44: hawkr.social.v1alpha1.UpdatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 45: hawkr.social.v1alpha1.PublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 46: hawkr.social.v1alpha1.UnpublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 47: hawkr.social.v1alpha1.SchedulePostRequest.publish_time:type_name -> google.protobuf.Timestamp
-	8,   // 48: hawkr.social.v1alpha1.SchedulePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 49: hawkr.social.v1alpha1.SchedulePostResponse.publish_time:type_name -> google.protobuf.Timestamp
-	6,   // 50: hawkr.social.v1alpha1.ListPendingSchedulesResponse.schedules:type_name -> hawkr.social.v1alpha1.PostSchedule
-	10,  // 51: hawkr.social.v1alpha1.ListStoreCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
-	75,  // 52: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse.post_counts:type_name -> hawkr.social.v1alpha1.PostStatusCount
-	2,   // 53: hawkr.social.v1alpha1.PostStatusCount.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	2,   // 54: hawkr.social.v1alpha1.ListStorePostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
-	8,   // 55: hawkr.social.v1alpha1.ListStorePostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
-	8,   // 56: hawkr.social.v1alpha1.GetStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 57: hawkr.social.v1alpha1.CreateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 58: hawkr.social.v1alpha1.CreateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 59: hawkr.social.v1alpha1.UpdateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 60: hawkr.social.v1alpha1.UpdateStorePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
-	100, // 61: hawkr.social.v1alpha1.UpdateStorePostRequest.update_mask:type_name -> google.protobuf.FieldMask
-	8,   // 62: hawkr.social.v1alpha1.UpdateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 63: hawkr.social.v1alpha1.PublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 64: hawkr.social.v1alpha1.PublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 65: hawkr.social.v1alpha1.UnpublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	8,   // 66: hawkr.social.v1alpha1.UnpublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	76,  // 67: hawkr.social.v1alpha1.ScheduleStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
-	97,  // 68: hawkr.social.v1alpha1.ScheduleStorePostRequest.publish_time:type_name -> google.protobuf.Timestamp
-	8,   // 69: hawkr.social.v1alpha1.ScheduleStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
-	97,  // 70: hawkr.social.v1alpha1.ScheduleStorePostResponse.publish_time:type_name -> google.protobuf.Timestamp
-	93,  // 71: hawkr.social.v1alpha1.ListMySanctionsResponse.sanctions:type_name -> hawkr.social.v1alpha1.Sanction
-	4,   // 72: hawkr.social.v1alpha1.Sanction.kind:type_name -> hawkr.social.v1alpha1.SanctionKind
-	101, // 73: hawkr.social.v1alpha1.Sanction.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	97,  // 74: hawkr.social.v1alpha1.Sanction.create_time:type_name -> google.protobuf.Timestamp
-	96,  // 75: hawkr.social.v1alpha1.ListMyHiddenContentResponse.hidden_contents:type_name -> hawkr.social.v1alpha1.HiddenContent
-	5,   // 76: hawkr.social.v1alpha1.HiddenContent.kind:type_name -> hawkr.social.v1alpha1.HiddenContentKind
-	97,  // 77: hawkr.social.v1alpha1.HiddenContent.create_time:type_name -> google.protobuf.Timestamp
-	101, // 78: hawkr.social.v1alpha1.HiddenContent.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	97,  // 79: hawkr.social.v1alpha1.HiddenContent.hide_time:type_name -> google.protobuf.Timestamp
-	11,  // 80: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
-	13,  // 81: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
-	15,  // 82: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
-	17,  // 83: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
-	19,  // 84: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
-	21,  // 85: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
-	25,  // 86: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
-	27,  // 87: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
-	29,  // 88: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
-	31,  // 89: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
-	33,  // 90: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
-	35,  // 91: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
-	37,  // 92: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
-	39,  // 93: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
-	41,  // 94: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
-	43,  // 95: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
-	45,  // 96: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
-	47,  // 97: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
-	49,  // 98: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
-	51,  // 99: hawkr.social.v1alpha1.SocialAppService.CreatePost:input_type -> hawkr.social.v1alpha1.CreatePostRequest
-	53,  // 100: hawkr.social.v1alpha1.SocialAppService.GetMyPost:input_type -> hawkr.social.v1alpha1.GetMyPostRequest
-	55,  // 101: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:input_type -> hawkr.social.v1alpha1.ListMyPostsRequest
-	57,  // 102: hawkr.social.v1alpha1.SocialAppService.UpdatePost:input_type -> hawkr.social.v1alpha1.UpdatePostRequest
-	59,  // 103: hawkr.social.v1alpha1.SocialAppService.PublishPost:input_type -> hawkr.social.v1alpha1.PublishPostRequest
-	61,  // 104: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:input_type -> hawkr.social.v1alpha1.UnpublishPostRequest
-	63,  // 105: hawkr.social.v1alpha1.SocialAppService.DeletePost:input_type -> hawkr.social.v1alpha1.DeletePostRequest
-	65,  // 106: hawkr.social.v1alpha1.SocialAppService.SchedulePost:input_type -> hawkr.social.v1alpha1.SchedulePostRequest
-	67,  // 107: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:input_type -> hawkr.social.v1alpha1.ListPendingSchedulesRequest
-	69,  // 108: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:input_type -> hawkr.social.v1alpha1.CancelPostScheduleRequest
-	71,  // 109: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:input_type -> hawkr.social.v1alpha1.ListStoreCommentsRequest
-	73,  // 110: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:input_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
-	91,  // 111: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:input_type -> hawkr.social.v1alpha1.ListMySanctionsRequest
-	94,  // 112: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:input_type -> hawkr.social.v1alpha1.ListMyHiddenContentRequest
-	77,  // 113: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:input_type -> hawkr.social.v1alpha1.ListStorePostsRequest
-	79,  // 114: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:input_type -> hawkr.social.v1alpha1.GetStorePostRequest
-	81,  // 115: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:input_type -> hawkr.social.v1alpha1.CreateStorePostRequest
-	83,  // 116: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:input_type -> hawkr.social.v1alpha1.UpdateStorePostRequest
-	85,  // 117: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:input_type -> hawkr.social.v1alpha1.PublishStorePostRequest
-	87,  // 118: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:input_type -> hawkr.social.v1alpha1.UnpublishStorePostRequest
-	89,  // 119: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:input_type -> hawkr.social.v1alpha1.ScheduleStorePostRequest
-	12,  // 120: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
-	14,  // 121: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
-	16,  // 122: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
-	18,  // 123: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
-	20,  // 124: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
-	22,  // 125: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
-	26,  // 126: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
-	28,  // 127: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
-	30,  // 128: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
-	32,  // 129: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
-	34,  // 130: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
-	36,  // 131: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
-	38,  // 132: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
-	40,  // 133: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
-	42,  // 134: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
-	44,  // 135: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
-	46,  // 136: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
-	48,  // 137: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
-	50,  // 138: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
-	52,  // 139: hawkr.social.v1alpha1.SocialAppService.CreatePost:output_type -> hawkr.social.v1alpha1.CreatePostResponse
-	54,  // 140: hawkr.social.v1alpha1.SocialAppService.GetMyPost:output_type -> hawkr.social.v1alpha1.GetMyPostResponse
-	56,  // 141: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:output_type -> hawkr.social.v1alpha1.ListMyPostsResponse
-	58,  // 142: hawkr.social.v1alpha1.SocialAppService.UpdatePost:output_type -> hawkr.social.v1alpha1.UpdatePostResponse
-	60,  // 143: hawkr.social.v1alpha1.SocialAppService.PublishPost:output_type -> hawkr.social.v1alpha1.PublishPostResponse
-	62,  // 144: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:output_type -> hawkr.social.v1alpha1.UnpublishPostResponse
-	64,  // 145: hawkr.social.v1alpha1.SocialAppService.DeletePost:output_type -> hawkr.social.v1alpha1.DeletePostResponse
-	66,  // 146: hawkr.social.v1alpha1.SocialAppService.SchedulePost:output_type -> hawkr.social.v1alpha1.SchedulePostResponse
-	68,  // 147: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:output_type -> hawkr.social.v1alpha1.ListPendingSchedulesResponse
-	70,  // 148: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:output_type -> hawkr.social.v1alpha1.CancelPostScheduleResponse
-	72,  // 149: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:output_type -> hawkr.social.v1alpha1.ListStoreCommentsResponse
-	74,  // 150: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:output_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
-	92,  // 151: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:output_type -> hawkr.social.v1alpha1.ListMySanctionsResponse
-	95,  // 152: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:output_type -> hawkr.social.v1alpha1.ListMyHiddenContentResponse
-	78,  // 153: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:output_type -> hawkr.social.v1alpha1.ListStorePostsResponse
-	80,  // 154: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:output_type -> hawkr.social.v1alpha1.GetStorePostResponse
-	82,  // 155: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:output_type -> hawkr.social.v1alpha1.CreateStorePostResponse
-	84,  // 156: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:output_type -> hawkr.social.v1alpha1.UpdateStorePostResponse
-	86,  // 157: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:output_type -> hawkr.social.v1alpha1.PublishStorePostResponse
-	88,  // 158: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:output_type -> hawkr.social.v1alpha1.UnpublishStorePostResponse
-	90,  // 159: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:output_type -> hawkr.social.v1alpha1.ScheduleStorePostResponse
-	120, // [120:160] is the sub-list for method output_type
-	80,  // [80:120] is the sub-list for method input_type
-	80,  // [80:80] is the sub-list for extension type_name
-	80,  // [80:80] is the sub-list for extension extendee
-	0,   // [0:80] is the sub-list for field type_name
+	9,   // 30: hawkr.social.v1alpha1.ListForumEntriesResponse.viewer_actor:type_name -> hawkr.social.v1alpha1.Actor
+	10,  // 31: hawkr.social.v1alpha1.CreateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
+	10,  // 32: hawkr.social.v1alpha1.UpdateCommentRequest.comment:type_name -> hawkr.social.v1alpha1.Comment
+	100, // 33: hawkr.social.v1alpha1.UpdateCommentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	10,  // 34: hawkr.social.v1alpha1.UpdateCommentResponse.comment:type_name -> hawkr.social.v1alpha1.Comment
+	24,  // 35: hawkr.social.v1alpha1.CreateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	24,  // 36: hawkr.social.v1alpha1.UpdateForumEntryRequest.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	100, // 37: hawkr.social.v1alpha1.UpdateForumEntryRequest.update_mask:type_name -> google.protobuf.FieldMask
+	24,  // 38: hawkr.social.v1alpha1.UpdateForumEntryResponse.entry:type_name -> hawkr.social.v1alpha1.ForumEntry
+	8,   // 39: hawkr.social.v1alpha1.CreatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 40: hawkr.social.v1alpha1.GetMyPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	2,   // 41: hawkr.social.v1alpha1.ListMyPostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
+	8,   // 42: hawkr.social.v1alpha1.ListMyPostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 43: hawkr.social.v1alpha1.UpdatePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
+	100, // 44: hawkr.social.v1alpha1.UpdatePostRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8,   // 45: hawkr.social.v1alpha1.UpdatePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 46: hawkr.social.v1alpha1.PublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 47: hawkr.social.v1alpha1.UnpublishPostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	97,  // 48: hawkr.social.v1alpha1.SchedulePostRequest.publish_time:type_name -> google.protobuf.Timestamp
+	8,   // 49: hawkr.social.v1alpha1.SchedulePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	97,  // 50: hawkr.social.v1alpha1.SchedulePostResponse.publish_time:type_name -> google.protobuf.Timestamp
+	6,   // 51: hawkr.social.v1alpha1.ListPendingSchedulesResponse.schedules:type_name -> hawkr.social.v1alpha1.PostSchedule
+	10,  // 52: hawkr.social.v1alpha1.ListStoreCommentsResponse.comments:type_name -> hawkr.social.v1alpha1.Comment
+	75,  // 53: hawkr.social.v1alpha1.GetStoreSocialSummaryResponse.post_counts:type_name -> hawkr.social.v1alpha1.PostStatusCount
+	2,   // 54: hawkr.social.v1alpha1.PostStatusCount.status:type_name -> hawkr.social.v1alpha1.PostStatus
+	2,   // 55: hawkr.social.v1alpha1.ListStorePostsRequest.status:type_name -> hawkr.social.v1alpha1.PostStatus
+	8,   // 56: hawkr.social.v1alpha1.ListStorePostsResponse.posts:type_name -> hawkr.social.v1alpha1.Post
+	8,   // 57: hawkr.social.v1alpha1.GetStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	76,  // 58: hawkr.social.v1alpha1.CreateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 59: hawkr.social.v1alpha1.CreateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	76,  // 60: hawkr.social.v1alpha1.UpdateStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 61: hawkr.social.v1alpha1.UpdateStorePostRequest.post:type_name -> hawkr.social.v1alpha1.Post
+	100, // 62: hawkr.social.v1alpha1.UpdateStorePostRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8,   // 63: hawkr.social.v1alpha1.UpdateStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	76,  // 64: hawkr.social.v1alpha1.PublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 65: hawkr.social.v1alpha1.PublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	76,  // 66: hawkr.social.v1alpha1.UnpublishStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	8,   // 67: hawkr.social.v1alpha1.UnpublishStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	76,  // 68: hawkr.social.v1alpha1.ScheduleStorePostRequest.operation:type_name -> hawkr.social.v1alpha1.DelegatedOperation
+	97,  // 69: hawkr.social.v1alpha1.ScheduleStorePostRequest.publish_time:type_name -> google.protobuf.Timestamp
+	8,   // 70: hawkr.social.v1alpha1.ScheduleStorePostResponse.post:type_name -> hawkr.social.v1alpha1.Post
+	97,  // 71: hawkr.social.v1alpha1.ScheduleStorePostResponse.publish_time:type_name -> google.protobuf.Timestamp
+	93,  // 72: hawkr.social.v1alpha1.ListMySanctionsResponse.sanctions:type_name -> hawkr.social.v1alpha1.Sanction
+	4,   // 73: hawkr.social.v1alpha1.Sanction.kind:type_name -> hawkr.social.v1alpha1.SanctionKind
+	101, // 74: hawkr.social.v1alpha1.Sanction.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	97,  // 75: hawkr.social.v1alpha1.Sanction.create_time:type_name -> google.protobuf.Timestamp
+	96,  // 76: hawkr.social.v1alpha1.ListMyHiddenContentResponse.hidden_contents:type_name -> hawkr.social.v1alpha1.HiddenContent
+	5,   // 77: hawkr.social.v1alpha1.HiddenContent.kind:type_name -> hawkr.social.v1alpha1.HiddenContentKind
+	97,  // 78: hawkr.social.v1alpha1.HiddenContent.create_time:type_name -> google.protobuf.Timestamp
+	101, // 79: hawkr.social.v1alpha1.HiddenContent.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	97,  // 80: hawkr.social.v1alpha1.HiddenContent.hide_time:type_name -> google.protobuf.Timestamp
+	11,  // 81: hawkr.social.v1alpha1.SocialPublicService.GetPost:input_type -> hawkr.social.v1alpha1.GetPostRequest
+	13,  // 82: hawkr.social.v1alpha1.SocialPublicService.ListPosts:input_type -> hawkr.social.v1alpha1.ListPostsRequest
+	15,  // 83: hawkr.social.v1alpha1.SocialPublicService.ListComments:input_type -> hawkr.social.v1alpha1.ListCommentsRequest
+	17,  // 84: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:input_type -> hawkr.social.v1alpha1.SuggestTrendingPostsRequest
+	19,  // 85: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:input_type -> hawkr.social.v1alpha1.SuggestTagsRequest
+	21,  // 86: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:input_type -> hawkr.social.v1alpha1.SuggestTrendingTagsRequest
+	25,  // 87: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:input_type -> hawkr.social.v1alpha1.ListForumEntriesRequest
+	27,  // 88: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:input_type -> hawkr.social.v1alpha1.RecordPostViewRequest
+	29,  // 89: hawkr.social.v1alpha1.SocialAppService.SharePost:input_type -> hawkr.social.v1alpha1.SharePostRequest
+	31,  // 90: hawkr.social.v1alpha1.SocialAppService.LikePost:input_type -> hawkr.social.v1alpha1.LikePostRequest
+	33,  // 91: hawkr.social.v1alpha1.SocialAppService.UnlikePost:input_type -> hawkr.social.v1alpha1.UnlikePostRequest
+	35,  // 92: hawkr.social.v1alpha1.SocialAppService.LikeComment:input_type -> hawkr.social.v1alpha1.LikeCommentRequest
+	37,  // 93: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:input_type -> hawkr.social.v1alpha1.UnlikeCommentRequest
+	39,  // 94: hawkr.social.v1alpha1.SocialAppService.CreateComment:input_type -> hawkr.social.v1alpha1.CreateCommentRequest
+	41,  // 95: hawkr.social.v1alpha1.SocialAppService.UpdateComment:input_type -> hawkr.social.v1alpha1.UpdateCommentRequest
+	43,  // 96: hawkr.social.v1alpha1.SocialAppService.DeleteComment:input_type -> hawkr.social.v1alpha1.DeleteCommentRequest
+	45,  // 97: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:input_type -> hawkr.social.v1alpha1.CreateForumEntryRequest
+	47,  // 98: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:input_type -> hawkr.social.v1alpha1.UpdateForumEntryRequest
+	49,  // 99: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:input_type -> hawkr.social.v1alpha1.DeleteForumEntryRequest
+	51,  // 100: hawkr.social.v1alpha1.SocialAppService.CreatePost:input_type -> hawkr.social.v1alpha1.CreatePostRequest
+	53,  // 101: hawkr.social.v1alpha1.SocialAppService.GetMyPost:input_type -> hawkr.social.v1alpha1.GetMyPostRequest
+	55,  // 102: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:input_type -> hawkr.social.v1alpha1.ListMyPostsRequest
+	57,  // 103: hawkr.social.v1alpha1.SocialAppService.UpdatePost:input_type -> hawkr.social.v1alpha1.UpdatePostRequest
+	59,  // 104: hawkr.social.v1alpha1.SocialAppService.PublishPost:input_type -> hawkr.social.v1alpha1.PublishPostRequest
+	61,  // 105: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:input_type -> hawkr.social.v1alpha1.UnpublishPostRequest
+	63,  // 106: hawkr.social.v1alpha1.SocialAppService.DeletePost:input_type -> hawkr.social.v1alpha1.DeletePostRequest
+	65,  // 107: hawkr.social.v1alpha1.SocialAppService.SchedulePost:input_type -> hawkr.social.v1alpha1.SchedulePostRequest
+	67,  // 108: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:input_type -> hawkr.social.v1alpha1.ListPendingSchedulesRequest
+	69,  // 109: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:input_type -> hawkr.social.v1alpha1.CancelPostScheduleRequest
+	71,  // 110: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:input_type -> hawkr.social.v1alpha1.ListStoreCommentsRequest
+	73,  // 111: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:input_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryRequest
+	91,  // 112: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:input_type -> hawkr.social.v1alpha1.ListMySanctionsRequest
+	94,  // 113: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:input_type -> hawkr.social.v1alpha1.ListMyHiddenContentRequest
+	77,  // 114: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:input_type -> hawkr.social.v1alpha1.ListStorePostsRequest
+	79,  // 115: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:input_type -> hawkr.social.v1alpha1.GetStorePostRequest
+	81,  // 116: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:input_type -> hawkr.social.v1alpha1.CreateStorePostRequest
+	83,  // 117: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:input_type -> hawkr.social.v1alpha1.UpdateStorePostRequest
+	85,  // 118: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:input_type -> hawkr.social.v1alpha1.PublishStorePostRequest
+	87,  // 119: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:input_type -> hawkr.social.v1alpha1.UnpublishStorePostRequest
+	89,  // 120: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:input_type -> hawkr.social.v1alpha1.ScheduleStorePostRequest
+	12,  // 121: hawkr.social.v1alpha1.SocialPublicService.GetPost:output_type -> hawkr.social.v1alpha1.GetPostResponse
+	14,  // 122: hawkr.social.v1alpha1.SocialPublicService.ListPosts:output_type -> hawkr.social.v1alpha1.ListPostsResponse
+	16,  // 123: hawkr.social.v1alpha1.SocialPublicService.ListComments:output_type -> hawkr.social.v1alpha1.ListCommentsResponse
+	18,  // 124: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingPosts:output_type -> hawkr.social.v1alpha1.SuggestTrendingPostsResponse
+	20,  // 125: hawkr.social.v1alpha1.SocialPublicService.SuggestTags:output_type -> hawkr.social.v1alpha1.SuggestTagsResponse
+	22,  // 126: hawkr.social.v1alpha1.SocialPublicService.SuggestTrendingTags:output_type -> hawkr.social.v1alpha1.SuggestTrendingTagsResponse
+	26,  // 127: hawkr.social.v1alpha1.SocialPublicService.ListForumEntries:output_type -> hawkr.social.v1alpha1.ListForumEntriesResponse
+	28,  // 128: hawkr.social.v1alpha1.SocialPublicService.RecordPostView:output_type -> hawkr.social.v1alpha1.RecordPostViewResponse
+	30,  // 129: hawkr.social.v1alpha1.SocialAppService.SharePost:output_type -> hawkr.social.v1alpha1.SharePostResponse
+	32,  // 130: hawkr.social.v1alpha1.SocialAppService.LikePost:output_type -> hawkr.social.v1alpha1.LikePostResponse
+	34,  // 131: hawkr.social.v1alpha1.SocialAppService.UnlikePost:output_type -> hawkr.social.v1alpha1.UnlikePostResponse
+	36,  // 132: hawkr.social.v1alpha1.SocialAppService.LikeComment:output_type -> hawkr.social.v1alpha1.LikeCommentResponse
+	38,  // 133: hawkr.social.v1alpha1.SocialAppService.UnlikeComment:output_type -> hawkr.social.v1alpha1.UnlikeCommentResponse
+	40,  // 134: hawkr.social.v1alpha1.SocialAppService.CreateComment:output_type -> hawkr.social.v1alpha1.CreateCommentResponse
+	42,  // 135: hawkr.social.v1alpha1.SocialAppService.UpdateComment:output_type -> hawkr.social.v1alpha1.UpdateCommentResponse
+	44,  // 136: hawkr.social.v1alpha1.SocialAppService.DeleteComment:output_type -> hawkr.social.v1alpha1.DeleteCommentResponse
+	46,  // 137: hawkr.social.v1alpha1.SocialAppService.CreateForumEntry:output_type -> hawkr.social.v1alpha1.CreateForumEntryResponse
+	48,  // 138: hawkr.social.v1alpha1.SocialAppService.UpdateForumEntry:output_type -> hawkr.social.v1alpha1.UpdateForumEntryResponse
+	50,  // 139: hawkr.social.v1alpha1.SocialAppService.DeleteForumEntry:output_type -> hawkr.social.v1alpha1.DeleteForumEntryResponse
+	52,  // 140: hawkr.social.v1alpha1.SocialAppService.CreatePost:output_type -> hawkr.social.v1alpha1.CreatePostResponse
+	54,  // 141: hawkr.social.v1alpha1.SocialAppService.GetMyPost:output_type -> hawkr.social.v1alpha1.GetMyPostResponse
+	56,  // 142: hawkr.social.v1alpha1.SocialAppService.ListMyPosts:output_type -> hawkr.social.v1alpha1.ListMyPostsResponse
+	58,  // 143: hawkr.social.v1alpha1.SocialAppService.UpdatePost:output_type -> hawkr.social.v1alpha1.UpdatePostResponse
+	60,  // 144: hawkr.social.v1alpha1.SocialAppService.PublishPost:output_type -> hawkr.social.v1alpha1.PublishPostResponse
+	62,  // 145: hawkr.social.v1alpha1.SocialAppService.UnpublishPost:output_type -> hawkr.social.v1alpha1.UnpublishPostResponse
+	64,  // 146: hawkr.social.v1alpha1.SocialAppService.DeletePost:output_type -> hawkr.social.v1alpha1.DeletePostResponse
+	66,  // 147: hawkr.social.v1alpha1.SocialAppService.SchedulePost:output_type -> hawkr.social.v1alpha1.SchedulePostResponse
+	68,  // 148: hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules:output_type -> hawkr.social.v1alpha1.ListPendingSchedulesResponse
+	70,  // 149: hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule:output_type -> hawkr.social.v1alpha1.CancelPostScheduleResponse
+	72,  // 150: hawkr.social.v1alpha1.SocialAppService.ListStoreComments:output_type -> hawkr.social.v1alpha1.ListStoreCommentsResponse
+	74,  // 151: hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary:output_type -> hawkr.social.v1alpha1.GetStoreSocialSummaryResponse
+	92,  // 152: hawkr.social.v1alpha1.SocialAppService.ListMySanctions:output_type -> hawkr.social.v1alpha1.ListMySanctionsResponse
+	95,  // 153: hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent:output_type -> hawkr.social.v1alpha1.ListMyHiddenContentResponse
+	78,  // 154: hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts:output_type -> hawkr.social.v1alpha1.ListStorePostsResponse
+	80,  // 155: hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost:output_type -> hawkr.social.v1alpha1.GetStorePostResponse
+	82,  // 156: hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost:output_type -> hawkr.social.v1alpha1.CreateStorePostResponse
+	84,  // 157: hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost:output_type -> hawkr.social.v1alpha1.UpdateStorePostResponse
+	86,  // 158: hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost:output_type -> hawkr.social.v1alpha1.PublishStorePostResponse
+	88,  // 159: hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost:output_type -> hawkr.social.v1alpha1.UnpublishStorePostResponse
+	90,  // 160: hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost:output_type -> hawkr.social.v1alpha1.ScheduleStorePostResponse
+	121, // [121:161] is the sub-list for method output_type
+	81,  // [81:121] is the sub-list for method input_type
+	81,  // [81:81] is the sub-list for extension type_name
+	81,  // [81:81] is the sub-list for extension extendee
+	0,   // [0:81] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_social_v1alpha1_social_proto_init() }
