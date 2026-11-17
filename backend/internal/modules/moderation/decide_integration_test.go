@@ -231,6 +231,37 @@ func TestTakedownUsesTheSnapshotStoreAndRecordsTheMeasure(t *testing.T) {
 	}
 }
 
+// 內容已在生效中的下架措施之下（例如後台貼文頁先下架）：DecideCase TAKEDOWN 綁定既有措施並結案，不建第二個措施、不產生新的認定。
+func TestTakedownBindsToTheExistingActiveMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 2 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	existing := mustV[seller.CreateMeasureResult](t)(f.seller.CreateMeasure(context.Background(), seller.CreateMeasureInput{
+		AdminID: 3, StoreID: w.storeID, Kind: seller.MeasureContentTakedown, StatementToSeller: "後台先下架", Note: "貼文頁",
+		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.MisleadingInfo, Severity: seller.Severity(seller.SeverityValues()[0])}},
+		Takedown:  &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentPost, ID: w.post.ID}}},
+	}))
+	in := DecideInput{
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	}
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), in))
+	if d.Case.ClosedAt == nil || d.Case.MeasureID == nil || *d.Case.MeasureID != existing.Measure.ID {
+		t.Fatalf("案件要結案並綁定既有措施 %s：%+v", existing.Measure.ID, d.Case)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("不建第二個措施：%d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 0 {
+		t.Fatalf("不產生新的認定：%d 筆來源檢舉", n)
+	}
+}
+
 // 被檢舉的貼文在決議前已被清除：歸屬以案件快照核對，措施照常建立。
 func TestTakedownAfterThePostIsPurgedStillCreatesTheMeasure(t *testing.T) {
 	t.Parallel()

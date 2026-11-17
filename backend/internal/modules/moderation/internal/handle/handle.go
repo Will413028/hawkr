@@ -291,6 +291,15 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err := CheckTakedownStore(owner, storeID); err != nil {
 		return err
 	}
+	ref := seller.ContentRef{Kind: seller.ContentKind(c.Target.Kind), ID: c.Target.ContentID}
+	// 內容已在生效中的下架措施之下（例如後台貼文頁先下架）：不再建第二個措施（恢復時只撤銷一個、內容仍下架），案件綁定既有措施並結案；
+	// 這個案件的檢舉不另外產生認定（認定隨措施建立，既有措施的處分已經涵蓋這則內容）。
+	if existing, err := s.d.Seller.ActiveTakedownOfContent(ctx, ref); err != nil {
+		return err
+	} else if existing != nil {
+		res.storeID, res.measureID = storeID, existing
+		return nil
+	}
 	// 引用最早的 MaxSourceReports 筆，備註寫真正的檢舉數。檢舉集合在結案的版本比對下才算定案：這之後掛進來的檢舉會讓版本加一，結案回 VersionConflict、處置整個回滾。
 	ids, err := q.ReportIDsOfCase(ctx, store.ReportIDsOfCaseParams{CaseID: c.ID, MaxRows: model.MaxSourceReports})
 	if err != nil {
@@ -309,7 +318,7 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{
 			Category: in.Category, Severity: seller.Severity(in.Severity), SourceModerationReportIDs: ids,
 		}},
-		Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentKind(c.Target.Kind), ID: c.Target.ContentID}}},
+		Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{ref}},
 	})
 	if err != nil {
 		return err
