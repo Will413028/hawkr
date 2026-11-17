@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
@@ -45,6 +46,7 @@ export default function SellerMessageTab({
 	initialData,
 }: SellerMessageTabProps) {
 	const { status } = useAuth();
+	const tFeed = useTranslations("feed.comments");
 	const signedIn = status === "signedIn";
 	const forum = useSellerForum(sellerId, initialData);
 	const [draft, setDraft] = React.useState("");
@@ -94,6 +96,23 @@ export default function SellerMessageTab({
 
 	const cancelReply = () => {
 		setReplyingTo(null);
+	};
+
+	const loadMoreReplies = async (comment: SellerForumComment) => {
+		const id = String(comment.id);
+		if (loadingReplyIds.has(id)) return;
+		setLoadingReplyIds((prev) => new Set(prev).add(id));
+		try {
+			await forum.loadMoreReplies(comment.id);
+		} catch {
+			/* swallow — the button stays so the user can retry */
+		} finally {
+			setLoadingReplyIds((prev) => {
+				const next = new Set(prev);
+				next.delete(id);
+				return next;
+			});
+		}
 	};
 
 	const toggleReplies = async (comment: SellerForumComment) => {
@@ -236,30 +255,43 @@ export default function SellerMessageTab({
 						const expanded = expandedIds.has(idStr);
 						const loadingReplies = loadingReplyIds.has(idStr);
 						const replyCount = comment.replyCount ?? 0;
+						const isPlaceholder = comment.state !== "visible";
 						return (
 							<li
 								key={`c-${idStr}`}
 								data-hk-seller-forum-comment
 								className="grid grid-cols-[44px_1fr] gap-3 p-4 rounded-[14px] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
 							>
-								<Avatar
-									src={comment.avatarKey}
-									name={comment.userName}
-									alt={comment.userName}
-									entity="buyer"
-									className="w-11 h-11 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
-								/>
+								{isPlaceholder ? (
+									<span aria-hidden="true" />
+								) : (
+									<Avatar
+										src={comment.avatarKey}
+										name={comment.userName}
+										alt={comment.userName}
+										entity="buyer"
+										className="w-11 h-11 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
+									/>
+								)}
 								<div className="min-w-0">
 									<header className="flex items-baseline justify-between gap-[10px] mb-1">
-										<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
-											{comment.userName}
-										</strong>
+										{isPlaceholder ? (
+											<span />
+										) : (
+											<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
+												{comment.userName}
+											</strong>
+										)}
 										<time className="text-[length:var(--text-xs)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] whitespace-nowrap">
 											{formatTime(comment.createdAt)}
 										</time>
 									</header>
 									<p className="m-0 text-[0.9375rem] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words">
-										{comment.content}
+										{isPlaceholder
+											? comment.state === "deleted"
+												? tFeed("deleted")
+												: null
+											: comment.content}
 									</p>
 									<div className="flex items-center gap-4 mt-[10px]">
 										{replyCount > 0 ? (
@@ -323,6 +355,22 @@ export default function SellerMessageTab({
 												</li>
 											))}
 										</ul>
+									) : null}
+									{expanded && (comment.repliesNextPageToken ?? "") !== "" ? (
+										<div className="flex justify-center pt-2">
+											<Button
+												type="button"
+												className="h-auto min-w-[160px] p-[10px_24px] rounded-full border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.18))] dark:border-[rgba(245,222,165,0.22)] bg-transparent text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] text-[length:var(--text-sm)] font-semibold cursor-pointer hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.06)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] disabled:opacity-50 disabled:cursor-not-allowed"
+												disabled={loadingReplies}
+												isLoading={loadingReplies}
+												loadingLabel="載入回覆中…"
+												onClick={() => {
+													void loadMoreReplies(comment);
+												}}
+											>
+												載入更多留言
+											</Button>
+										</div>
 									) : null}
 								</div>
 							</li>

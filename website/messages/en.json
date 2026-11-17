@@ -62,7 +62,8 @@
 			"composePlaceholder": "Write a comment…",
 			"replyToName": "Reply to {name}…",
 			"replyPlaceholder": "Write a reply…",
-			"selfAlt": "Me"
+			"selfAlt": "Me",
+			"deleted": "This comment was deleted"
 		}
 	}
 }

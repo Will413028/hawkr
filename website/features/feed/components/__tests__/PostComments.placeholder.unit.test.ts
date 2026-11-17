@@ -90,3 +90,29 @@ describe("placeholder comments carry no actions", () => {
 		},
 	);
 });
+
+describe("deleted placeholder text", () => {
+	it("a deleted comment says it was deleted and a hidden one adds no text", () => {
+		comments.list = [comment("deleted")];
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(PostComments, { postId: "p" }),
+			),
+		);
+		expect(screen.queryByText("此留言已刪除")).not.toBeNull();
+		expect(screen.queryByText("x")).toBeNull();
+		expect(screen.queryByText("u")).toBeNull();
+		cleanup();
+		comments.list = [comment("hidden")];
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(PostComments, { postId: "p" }),
+			),
+		);
+		expect(screen.queryByText("此留言已刪除")).toBeNull();
+	});
+});

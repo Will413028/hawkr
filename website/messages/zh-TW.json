@@ -62,7 +62,8 @@
 			"composePlaceholder": "寫下你的留言…",
 			"replyToName": "回覆 {name}…",
 			"replyPlaceholder": "寫下你的回覆…",
-			"selfAlt": "我"
+			"selfAlt": "我",
+			"deleted": "此留言已刪除"
 		}
 	}
 }

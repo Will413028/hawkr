@@ -386,6 +386,12 @@ export function usePostInteractions(
 
 /* ===== Replies (per-comment thread) ===== */
 
+const EMPTY_REPLY_PAGE: CommentListResult = {
+	records: [],
+	nextPageToken: "",
+	pageSize: 20,
+};
+
 export function useCommentReplies(
 	postId: string | undefined,
 	commentId: string | undefined,
@@ -407,22 +413,57 @@ export function useCommentReplies(
 		queryKey: repliesKey,
 		enabled: Boolean(postId && commentId && open),
 		// placeholderData（非 initialData）：理由同 usePostComments。
-		placeholderData: [] as Comment[],
+		placeholderData: EMPTY_REPLY_PAGE,
 		staleTime: 30_000,
-		queryFn: async ({ signal }) => {
-			if (!postId || !commentId) return [];
-			const r = await fetchCommentReplies(postId, commentId, {
+		queryFn: async ({ signal }): Promise<CommentListResult> => {
+			if (!postId || !commentId) return EMPTY_REPLY_PAGE;
+			return fetchCommentReplies(postId, commentId, {
 				pageSize: 20,
 				parentName,
 				signal,
 			});
-			return r.records;
 		},
 	});
 	const items = React.useMemo(
-		() => repliesQuery.data ?? [],
+		() => repliesQuery.data?.records ?? [],
 		[repliesQuery.data],
 	);
+	const nextPageToken = repliesQuery.data?.nextPageToken ?? "";
+	const queryClient = useQueryClient();
+	const [loadingMore, setLoadingMore] = React.useState(false);
+	const loadMore = React.useCallback(async () => {
+		if (!postId || !commentId || loadingMore || nextPageToken === "") return;
+		setLoadingMore(true);
+		try {
+			const page = await fetchCommentReplies(postId, commentId, {
+				pageSize: 20,
+				pageToken: nextPageToken,
+				parentName,
+			});
+			queryClient.setQueryData<CommentListResult>(repliesKey, (current) => {
+				const base = current ?? EMPTY_REPLY_PAGE;
+				const seen = new Set(base.records.map((r) => String(r.id)));
+				return {
+					...base,
+					records: [
+						...base.records,
+						...page.records.filter((r) => !seen.has(String(r.id))),
+					],
+					nextPageToken: page.nextPageToken,
+				};
+			});
+		} finally {
+			setLoadingMore(false);
+		}
+	}, [
+		postId,
+		commentId,
+		loadingMore,
+		nextPageToken,
+		parentName,
+		queryClient,
+		repliesKey,
+	]);
 	const refetchReplies = repliesQuery.refetch;
 
 	const load = React.useCallback(async () => {
@@ -441,6 +482,9 @@ export function useCommentReplies(
 		items,
 		open,
 		loading: repliesQuery.isLoading,
+		hasMore: nextPageToken !== "",
+		loadingMore,
+		loadMore,
 		expand,
 		collapse,
 		refresh: load,

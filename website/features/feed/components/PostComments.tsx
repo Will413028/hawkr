@@ -672,20 +672,24 @@ function CommentItem({
 			data-comment-anchor={String(comment.id)}
 		>
 			<span className="block w-9 h-9 shrink-0 rounded-full overflow-hidden bg-[var(--hkui-default-100)]">
-				<Avatar
-					src={comment.avatarKey}
-					alt={comment.userName}
-					entity="buyer"
-					className="w-full h-full object-cover"
-					fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
-					fallback="empty"
-				/>
+				{live ? (
+					<Avatar
+						src={comment.avatarKey}
+						alt={comment.userName}
+						entity="buyer"
+						className="w-full h-full object-cover"
+						fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
+						fallback="empty"
+					/>
+				) : null}
 			</span>
 			<div className="flex-1 min-w-0">
 				<header className="flex items-baseline gap-[var(--hkui-space-2)]">
-					<strong className="text-[length:var(--hkui-text-small)] font-semibold">
-						{comment.userName}
-					</strong>
+					{live ? (
+						<strong className="text-[length:var(--hkui-text-small)] font-semibold">
+							{comment.userName}
+						</strong>
+					) : null}
 					<small className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 						{formatTime(comment.createdAt)}
 					</small>
@@ -725,7 +729,11 @@ function CommentItem({
 					</div>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
-						{content}
+						{live
+							? content
+							: comment.state === "deleted"
+								? tFeed("deleted")
+								: null}
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
@@ -851,6 +859,22 @@ function CommentItem({
 								/>
 							))
 						)}
+						{replies.hasMore ? (
+							<li className="list-none">
+								<Button
+									type="button"
+									variant="light"
+									color="primary"
+									size="sm"
+									className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)]"
+									isLoading={replies.loadingMore}
+									loadingLabel="載入回覆中…"
+									onClick={() => void replies.loadMore()}
+								>
+									載入更多
+								</Button>
+							</li>
+						) : null}
 					</ul>
 				)}
 			</div>
