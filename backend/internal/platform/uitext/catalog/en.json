@@ -87,6 +87,9 @@
     "seller.Measure.suspension_ended": {
       "message": "Ended on {end}"
     },
+    "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN": {
+      "message": "Content removal"
+    },
     "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
       "message": "Contact support"
     },

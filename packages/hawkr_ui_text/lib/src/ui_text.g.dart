@@ -187,7 +187,8 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '警告',
 (UiLocale.zhTW || UiLocale.en, 2) => '停權',
 (UiLocale.zhTW || UiLocale.en, 3) => '終止合作',
-(UiLocale.zhTW || UiLocale.en, 4) => '內容下架',
+(UiLocale.zhTW, 4) => '內容下架',
+(UiLocale.en, 4) => 'Content removal',
 _ => null,
 };
 }

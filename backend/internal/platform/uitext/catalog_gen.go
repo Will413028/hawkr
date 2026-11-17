@@ -435,6 +435,12 @@ func (t Text) SellerMeasureBasis(v string) (string, bool) {
 // SellerMeasureKind 是 seller.MeasureKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerMeasureKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "CONTENT_TAKEDOWN":
+			return "Content removal", true
+		}
+	}
 	switch v {
 	case "WARNING":
 		return "警告", true
