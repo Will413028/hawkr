@@ -329,12 +329,6 @@ const LOCAL_TIME_ALLOWLIST: Record<string, LocalTimeBudget> = {
 			"賣家分析的今天/昨天/7d/30d 區間邊界（dayStart/dayEnd/resolveRange）。" +
 			"改邊界會改變統計筆數。待裁決。",
 	},
-	"lib/search/repo.ts": {
-		count: 2,
-		reason:
-			"熱門標籤查詢區間。注意它本身已是混用（本地日相減後取 `toISOString()` 的 UTC 日），" +
-			"要修得連同送給後端的語意一起想清楚。待裁決。",
-	},
 	"lib/seller/shipment.ts": {
 		count: 3,
 		reason:

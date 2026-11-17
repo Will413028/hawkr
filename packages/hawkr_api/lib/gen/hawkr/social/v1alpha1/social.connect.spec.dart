@@ -344,6 +344,16 @@ abstract final class SocialDelegatedService {
   /// Fully-qualified name of the SocialDelegatedService service.
   static const name = 'hawkr.social.v1alpha1.SocialDelegatedService';
 
+  /// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  /// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  static const getStoreSocialSummary = connect.Spec(
+    '/$name/GetStoreSocialSummary',
+    connect.StreamType.unary,
+    hawkrsocialv1alpha1social.SocialDelegatedServiceGetStoreSocialSummaryRequest.new,
+    hawkrsocialv1alpha1social.SocialDelegatedServiceGetStoreSocialSummaryResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
   /// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
   static const listStorePosts = connect.Spec(
     '/$name/ListStorePosts',

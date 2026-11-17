@@ -17,10 +17,10 @@ import { useCarouselAutoplay } from "@/components/shared/useCarouselAutoplay";
 import { usePrefersReducedMotion } from "@/lib/a11y/reduced-motion";
 import { fetchCategoryTree } from "@/lib/api";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchTopWeeklyPosts } from "@/lib/api/posts";
+
 import type { NavItem, NavMegaLink } from "@/lib/content/data";
 import { postCardPresetForMedia, resolveCdnUrl } from "@/lib/media/cdn";
-import { fetchTrendingPostTags } from "@/lib/post-tags/repo";
+import { fetchTrendingPosts, fetchTrendingPostTags } from "@/lib/posts/repo";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchPopularHashtags } from "@/lib/search/repo";
 import type { MegaMenuDynamicLinks } from "./MegaMenu";
@@ -35,7 +35,7 @@ async function fetchMegaMenuDynamicLinks(): Promise<MegaMenuDynamicLinks> {
 	const [tree, hashtags, topPosts] = await Promise.all([
 		fetchCategoryTree().catch(() => []),
 		fetchPopularHashtags({ limit: 5 }).catch(() => []),
-		fetchTopWeeklyPosts(5).catch(() => []),
+		fetchTrendingPosts(5).catch(() => []),
 	]);
 	const categoryLinks: NavMegaLink[] = (
 		Array.isArray(tree) ? (tree as CategoryTreeNode[]) : []

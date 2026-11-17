@@ -407,6 +407,11 @@ func MeasureSourceCaseOtherStore() uitext.Message {
 	return uitext.Message{Text: "案件不是這家店的。", Locale: uitext.ZhTW}
 }
 
+// MeasureTakedownAlreadyActive 是後台員工受眾的模組句子 measure.takedown_already_active（只有 zh-TW）。
+func MeasureTakedownAlreadyActive() uitext.Message {
+	return uitext.Message{Text: "這則內容已經有生效中的下架措施；請在該措施上操作，或先撤銷它。", Locale: uitext.ZhTW}
+}
+
 // MoveSameCategory 是後台員工受眾的模組句子 move.same_category（只有 zh-TW）。
 func MoveSameCategory() uitext.Message {
 	return uitext.Message{Text: "新的平台判定類別和目前相同。", Locale: uitext.ZhTW}

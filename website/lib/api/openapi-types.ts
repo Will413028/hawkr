@@ -43,6 +43,8 @@ export interface PostProductData {
 
 /** matches handler.PostListItemData / handler.MyPostListItemData */
 export interface PostListItem {
+	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
+	etag?: string;
 	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
 	sellerId: string;
@@ -73,8 +75,10 @@ export interface PostListItem {
 	viewCount: number;
 	isLiked: boolean;
 	createdAt: number;
-	hiddenAt?: number; // unix；0/缺 = 未下架（僅 /app/sellers/me/posts 回傳）
+	hiddenAt?: number; // unix；0/缺 = 未下架（僅店主讀自己的貼文時回傳）
 	hiddenReason?: string; // 平台下架原因（同上）
+	/** 下架這則貼文的措施 ID（只對店主；有值就是被平台下架，理由經措施讀）。 */
+	takedownMeasureId?: string;
 	/**
 	 * PostPublishStatus 數字碼字串（4401 未發布／4402 已發布／4403 已下架）。
 	 *
@@ -119,9 +123,12 @@ export interface PostDetail {
  * 發布狀態與平台下架資訊同 `PostListItem` 的同名欄位；只有店主路徑帶它們。
  */
 export interface MyPostDetail extends PostDetail {
+	/** 樂觀鎖版本；修改、發布、下架與刪除時帶回。 */
+	etag?: string;
 	publishStatus?: string;
 	hiddenAt?: number;
 	hiddenReason?: string;
+	takedownMeasureId?: string;
 }
 
 /* ---------- Buyer profile ---------- */

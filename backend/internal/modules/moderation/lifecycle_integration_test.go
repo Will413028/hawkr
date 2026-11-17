@@ -89,7 +89,7 @@ func TestAReportAttachedAfterTheAdminReadMakesTheCloseConflict(t *testing.T) {
 	}
 	in := DecideInput{
 		CaseID: read.ID, Version: read.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		Text: "不實", Severity: string(seller.SeverityValues()[0]),
 	}
 	if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本結案要 VersionConflict：%v", err)
@@ -119,7 +119,7 @@ func TestTakedownNoteCountsEveryReportButCitesTheEarliestTwenty(t *testing.T) {
 	}
 	mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
 		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		Text: "不實", Severity: string(seller.SeverityValues()[0]),
 	}))
 	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 20 {
 		t.Fatalf("引用 %d 筆，預期上限 20", n)
@@ -306,12 +306,11 @@ func TestHideOfDeletedBuyerContentSucceedsWithoutCallingSocial(t *testing.T) {
 	}
 }
 
-// A7-D7 第 10 項：店家的貼文已被刪除時，內容下架仍用快照凍結的作者與店家驗證歸屬，建立認定與措施（對象是已刪除的內容 id）；別家店仍被拒絕。
+// A7-D7 第 10 項：店家的貼文已被刪除時，內容下架仍用快照凍結的作者與店家驗證歸屬，建立認定與措施（對象是已刪除的內容 id）；店家取自快照。
 func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesTheMeasure(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	w := f.world(t)
-	otherStore, _ := f.exposableStore(t)
 	ctx := context.Background()
 	reporter, _ := f.newBuyer(t)
 	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
@@ -323,15 +322,8 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 
 	in := DecideInput{
 		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: otherStore,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}
-	if _, err := f.module.DecideCase(ctx, in); kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("別家店不能對已刪除的內容建立措施：%v", err)
-	}
-	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
-		t.Fatalf("拒絕後留下 %d 個措施", n)
-	}
-	in.StoreID = w.storeID
 	d := mustV[CaseDetail](t)(f.module.DecideCase(ctx, in))
 	if d.Case.ClosedAt == nil {
 		t.Fatalf("案件要結案：%+v", d.Case)

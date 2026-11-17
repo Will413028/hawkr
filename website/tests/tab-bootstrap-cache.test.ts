@@ -141,19 +141,19 @@ test("canonical navbar destinations keep Feed bounded and reuse safe cache entri
 		readFile(searchHashtagNavPath, "utf8"),
 	]);
 
-	assert.match(feed, /AbortSignal\.timeout\(FEED_INITIAL_DEADLINE_MS\)/);
-	assert.match(feed, /fetchPublicPostsTyped\(\{[\s\S]*page: 1,[\s\S]*signal,/);
-	assert.match(feed, /strict: true/);
+	// The /feed seed is the anonymous tagged cache entry (it carries posts:list and its own
+	// upstream timeout); a failed seed is told apart from an empty feed.
+	assert.match(feed, /getCachedPublicPosts\(PAGE_SIZE\)/);
 	assert.match(feed, /initialSeedFailed = true/);
+	assert.doesNotMatch(feed, /fetchPostsPage|fetchPublicPostsTyped/);
 	assert.doesNotMatch(feed, /fetchSellers/);
 	assert.doesNotMatch(feed, /getCachedStrictPublicPostsPage/);
 	assert.match(market, /getCachedProductsFirstPage\(100\)/);
 	assert.match(search, /getCachedHotProducts\(8\)/);
-	assert.match(search, /fetchPublicPostsTyped\(\{ page: 1, pageSize: 8 \}\)/);
+	assert.match(search, /getCachedPublicPosts\(8\)/);
 	// Live, query-aware hashtags (not the cached popular set) — now client-side.
 	assert.match(searchHashtagNav, /searchHashtags\(query\)/);
 	assert.doesNotMatch(searchHashtagNav, /getCachedPopularHashtags/);
-	assert.doesNotMatch(search, /getCachedPublicPosts\(1, 8\)/);
 	assert.doesNotMatch(search, /getCachedPopularHashtags\(10\)/);
 });
 
@@ -187,10 +187,7 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 		handler,
 		/fetchProducts\("", 1, 100, undefined, undefined, \{ strict: true \}\)/,
 	);
-	assert.match(
-		handler,
-		/fetchPublicPostsTyped\(\{ page: 1, pageSize: 8, strict: true \}\)/,
-	);
+	assert.match(handler, /fetchPostsPage\(\{ pageSize: 8, strict: true \}\)/);
 	// Live aggregate keeps the live-commerce revalidate window (the shared
 	// CACHE_TTL model, applied to the `'use cache'` scope with `applyCacheTier`).
 	assert.match(handler, /applyCacheTier\("COMMERCE_LIVE"\)/);
@@ -219,7 +216,7 @@ test("canonical freshness keeps Feed direct and bounded while Market stays share
 		readFile(cachedPath, "utf8"),
 		readFile(headRoutePath, "utf8"),
 	]);
-	assert.match(route, /fetchPublicPostsTyped\(\{[\s\S]*strict: true,/);
+	assert.match(route, /fetchPostsPage\(\{[\s\S]*strict: true,/);
 	assert.match(route, /AbortSignal\.timeout\(FEED_REFRESH_DEADLINE_MS\)/);
 	assert.doesNotMatch(route, /getCachedStrictPublicPostsPage/);
 	assert.match(route, /getCachedStrictProductsPage\(input\.page, 24\)/);

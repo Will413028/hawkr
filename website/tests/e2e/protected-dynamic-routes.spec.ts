@@ -16,6 +16,7 @@ import {
 	mockMyKyc,
 	mockMyStore,
 	setupGatewayMocks,
+	socialMethod,
 } from "./helpers/mock-gateway";
 import { assertNoResidualLoading } from "./helpers/page-stability";
 import { isKnownNonEnforcingConsoleError } from "./helpers/runtime-console";
@@ -889,23 +890,24 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		pathname: `/seller-center/posts/${POST_ID}/edit`,
 		mocks: [
 			{
-				// 編輯頁讀賣家自己的單篇（任何發布狀態），不是公開的 /public/posts。
-				path: `/app/sellers/posts/${POST_ID}`,
-				data: {
-					id: POST_ID,
-					content: "路由測試貼文內容",
-					images: [],
-					products: [],
-					tags: [],
-				},
-			},
-			{
 				path: `/public/sellers/${SELLER_ID}/products`,
 				data: { records: [], total: 0, totalPages: 0 },
 			},
 		],
+		async setup(page) {
+			// 編輯頁讀賣家自己的單篇（任何發布狀態）：SocialAppService.GetMyPost，不是公開的 GetPost。
+			await page.route(socialMethod("SocialAppService", "GetMyPost"), (route) =>
+				fulfillConnect(route, {
+					post: {
+						id: POST_ID,
+						body: "路由測試貼文內容",
+						status: "POST_STATUS_PUBLISHED",
+						etag: "1",
+					},
+				}),
+			);
+		},
 		requiredRequests: [
-			{ method: "GET", path: `/app/sellers/posts/${POST_ID}` },
 			{
 				method: "GET",
 				path: `/public/sellers/${SELLER_ID}/products`,

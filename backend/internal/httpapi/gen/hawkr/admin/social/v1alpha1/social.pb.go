@@ -44,7 +44,7 @@ type AdminPost struct {
 	// 第一次發布的時間；下架後再發布沿用。
 	PublishTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=publish_time,json=publishTime,proto3" json:"publish_time,omitempty"`
 	UpdateTime  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
-	// 下架這篇貼文的內容下架措施 ID（seller 的措施）；沒有被內容下架時不設。同時被多個措施下架時是最早建立的那一個。
+	// 下架這篇貼文的內容下架措施 ID（seller 的措施）；沒有被內容下架時不設。一則內容同時至多一個生效中的內容下架措施。
 	TakedownMeasureId *string `protobuf:"bytes,8,opt,name=takedown_measure_id,json=takedownMeasureId,proto3,oneof" json:"takedown_measure_id,omitempty"`
 	// 這篇貼文在進行中的案件裡的檢舉數；已結案案件的檢舉不算，沒有進行中的案件是 0。
 	OpenReportCount int64 `protobuf:"varint,9,opt,name=open_report_count,json=openReportCount,proto3" json:"open_report_count,omitempty"`

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -29,7 +30,7 @@ func Case(r store.ModerationCase) model.Case {
 	if r.BuyerID != nil {
 		t.BuyerID = *r.BuyerID
 	}
-	c := model.Case{ID: r.ID, Target: t, Version: r.Version, OpenedAt: r.OpenedAt, DecidedByAdmin: r.DecidedByAdminID, ClosedAt: r.ClosedAt}
+	c := model.Case{ID: r.ID, Target: t, Version: r.Version, OpenedAt: r.OpenedAt, DecidedByAdmin: r.DecidedByAdminID, ClosedAt: r.ClosedAt, MeasureID: r.MeasureID}
 	if r.Decision != nil {
 		d := model.Decision(*r.Decision)
 		c.Decision = &d
@@ -68,6 +69,12 @@ func Detail(ctx context.Context, q *store.Queries, id uuid.UUID) (model.CaseDeta
 		return model.CaseDetail{}, err
 	}
 	out := model.CaseDetail{Case: Case(row), Reports: make([]model.Report, 0, len(reports))}
+	out.Case.ReportCount = int64(len(reports))
+	if body, err := q.LatestSnapshotContent(ctx, id); err == nil {
+		out.Case.StoreID = snapshot.StoreOf(body)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return model.CaseDetail{}, err
+	}
 	for _, r := range reports {
 		out.Reports = append(out.Reports, Report(r, row.Decision))
 	}
@@ -118,11 +125,46 @@ func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.Case
 	for i, row := range rows {
 		out.Cases[i] = Case(row)
 	}
+	if err := r.annotate(ctx, q, rows, out.Cases); err != nil {
+		return model.CasePage{}, err
+	}
 	if more {
 		last := rows[len(rows)-1]
 		out.Next = &model.CaseCursor{OpenedAt: last.OpenedAt, ID: last.ID}
 	}
 	return out, nil
+}
+
+// annotate 用兩個查詢補上一頁案件的檢舉數與快照店家（不逐案件查）。
+func (r Reader) annotate(ctx context.Context, q *store.Queries, rows []store.ModerationCase, cases []model.Case) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	counts, err := q.ReportCountsOfCases(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
+	}
+	snaps, err := q.LatestSnapshotContentsOfCases(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("moderation：讀取案件的快照：%w", err)
+	}
+	reports := make(map[uuid.UUID]int64, len(counts))
+	for _, c := range counts {
+		reports[c.CaseID] = c.Reports
+	}
+	stores := make(map[uuid.UUID]*int64, len(snaps))
+	for _, s := range snaps {
+		stores[s.CaseID] = snapshot.StoreOf(s.Content)
+	}
+	for i := range cases {
+		cases[i].ReportCount = reports[cases[i].ID]
+		cases[i].StoreID = stores[cases[i].ID]
+	}
+	return nil
 }
 
 // OpenReportCounts 回每篇貼文在進行中案件裡的檢舉數；只算進行中案件，已結案案件的檢舉不算，沒有進行中檢舉的貼文不在結果裡（讀的人當 0）。

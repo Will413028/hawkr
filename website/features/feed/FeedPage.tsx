@@ -1,10 +1,9 @@
 import type { StoryItem } from "@/features/feed/components/StoryRail";
 import FeedParamController from "@/features/feed/FeedParamController";
+import { getCachedPublicPosts } from "@/lib/api/cached";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped, normalizePost } from "@/lib/api/posts";
 
 const PAGE_SIZE = 12;
-const FEED_INITIAL_DEADLINE_MS = 3_000;
 
 function buildStories(posts: PostListItem[]): StoryItem[] {
 	const seen = new Set<string>();
@@ -31,28 +30,26 @@ function buildStories(posts: PostListItem[]): StoryItem[] {
 
 /**
  * `/feed` (ISR). The server renders the canonical, unscoped page-1 feed — the
- * SEO body — from the shared public transport, reading no request-time input so
- * the route stays statically renderable. All URL params (`?seller` / `?hashtag`
+ * SEO body — from the anonymous cached reader (`getCachedPublicPosts`, tagged
+ * `posts:list` so social's invalidation reaches it), reading no request-time
+ * input so the route stays statically renderable. A signed-in viewer's list
+ * depends on the viewer (blocked stores, `viewer_*`), so `useFeedPosts` drops
+ * this seed and reads page one itself with the viewer's cookie. All URL params (`?seller` / `?hashtag`
  * / `?topic` / `?post`) are read on the client by `FeedParamController`, which
  * re-scopes the feed, shows the topic banner, and opens deep-linked posts — no
  * per-request dynamic server render.
  */
 export default async function FeedPage() {
-	// Bound this canonical seed with a deadline: an intermittent foreground gateway read can otherwise
-	// hold a Flight body open after its 200 headers. A failed seed is explicitly
-	// distinguished from a valid empty feed so the client query retries instead
-	// of persisting a false empty state.
-	const signal = AbortSignal.timeout(FEED_INITIAL_DEADLINE_MS);
+	// A failed seed is explicitly distinguished from a valid empty feed so the
+	// client query retries instead of persisting a false empty state. The cached
+	// reader carries its own upstream timeout.
 	let initialPosts: PostListItem[];
+	let initialNextPageToken = "";
 	let initialSeedFailed = false;
 	try {
-		const { records } = await fetchPublicPostsTyped({
-			page: 1,
-			pageSize: PAGE_SIZE,
-			signal,
-			strict: true,
-		});
-		initialPosts = records.map(normalizePost);
+		const page = await getCachedPublicPosts(PAGE_SIZE);
+		initialPosts = page.records;
+		initialNextPageToken = page.nextPageToken;
 	} catch {
 		initialPosts = [];
 		initialSeedFailed = true;
@@ -64,6 +61,7 @@ export default async function FeedPage() {
 			<section className="hkui-feed-page__main">
 				<FeedParamController
 					initialPosts={initialPosts}
+					initialNextPageToken={initialNextPageToken}
 					stories={stories}
 					pageSize={PAGE_SIZE}
 					initialSeedFailed={initialSeedFailed}

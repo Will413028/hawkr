@@ -5,13 +5,14 @@ import {
 	FavoriteSchema,
 	FollowSchema,
 } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
+import { PostSchema } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { PostListItem } from "../lib/api/openapi-types";
-import { normalizePost } from "../lib/api/posts";
 import { type CartGroupWire, flattenGroups } from "../lib/cart/types";
 import { normalizeConversation } from "../lib/chat/repo";
 import { mapProduct } from "../lib/market/listFilters";
 import { normalizeMemberCard } from "../lib/member-cards/repo";
 import { normalizeOrder } from "../lib/orders/repo";
+import { postToListItem } from "../lib/posts/repo";
 
 const CANONICAL = "https://media.example.com/i/avatar/canonical.png";
 const LEGACY = "https://legacy.example/avatar.png";
@@ -117,42 +118,19 @@ test("merchant logo normalizers use only each endpoint's canonical logo field", 
 		undefined,
 	);
 
-	// 貼文 wire 形狀（全 camelCase，backend#2235；單數 imageKey 已移除，
-	// 只剩 imageKeys/imageUrls 且無圖時為 []）。
-	const postBase = {
-		id: "post-1",
-		sellerId: "seller-1",
-		sellerName: "Canonical Store",
-		content: "",
-		imageKeys: [],
-		imageUrls: [],
-		tags: [],
-		commentCount: 0,
-		likeCount: 0,
-		shareCount: 0,
-		viewCount: 0,
-		isLiked: false,
-		createdAt: 0,
-	};
-	// §231 (#430 D3-S13): the post wire carries `logoKey` (objectKey SSOT) beside
-	// the Gateway-composed `logoUrl`; the canonical field the normalizer reads is
-	// the key, and every other logo-ish alias stays ignored.
-	const post = normalizePost({
-		...postBase,
-		logoKey: ` ${CANONICAL} `,
-		logoUrl: LEGACY,
-		seller_logo_url: LEGACY,
-		sellerLogo: LEGACY,
-	} as PostListItem);
+	// Posts come from the Connect `Post` message: the store's logo is an Image whose
+	// uri_template the mapper copies as-is; a store with no logo maps to "".
+	const post = postToListItem(
+		create(PostSchema, {
+			id: "post-1",
+			store: { id: "seller-1", logo: { uriTemplate: CANONICAL } },
+		}),
+	);
 	assert.equal(post.logoKey, CANONICAL);
 	assert.equal(
-		normalizePost({
-			...postBase,
-			id: "post-2",
-			logoKey: " ",
-			logoUrl: LEGACY,
-			seller_logo_url: LEGACY,
-		} as PostListItem).logoKey,
+		postToListItem(
+			create(PostSchema, { id: "post-2", store: { id: "seller-1" } }),
+		).logoKey,
 		"",
 	);
 

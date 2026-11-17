@@ -270,14 +270,6 @@ export interface DelegatedPostCommands {
 		postId: string | number,
 		meta: DelegatedMutationMeta,
 	): Promise<void>;
-	/**
-	 * 貼文總數（總覽 KPI）：`page_size=1` 的列表，只讀它的 `total`。
-	 *
-	 * `fetchSellerPosts` 回的是 `PostListItem[]`，`total` 在映射時就被丟掉了 ——
-	 * 拿陣列長度當總數會在超過 `page_size` 的店家靜默少報，而畫面上沒有任何東西
-	 * 會告訴你那個數字是截斷的。
-	 */
-	count(): Promise<number>;
 }
 
 export function createDelegatedProductRepo(
@@ -469,6 +461,10 @@ export function mapDelegatedPost(raw: unknown, storeId: string): PostListItem {
 		createdAt: epochSeconds(r.createdAt),
 		...(hiddenAt ? { hiddenAt } : {}),
 		...(str(r.hiddenReason) ? { hiddenReason: String(r.hiddenReason) } : {}),
+		...(str(r.takedownMeasureId)
+			? { takedownMeasureId: String(r.takedownMeasureId) }
+			: {}),
+		...(str(r.version) ? { etag: String(r.version) } : {}),
 		// 草稿與已發布在列表上原本長得一樣（草稿沒有任何標記），而代行者正是靠這個
 		// 列表判斷這家店的經營狀態。上游 backend#2470 一系列補了這一欄。
 		...(str(r.publishStatus) ? { publishStatus: String(r.publishStatus) } : {}),
@@ -508,8 +504,17 @@ export function mapDelegatedPostDetail(
 		createdAt: epochSeconds(r.createdAt),
 		...(hiddenAt ? { hiddenAt } : {}),
 		...(str(r.hiddenReason) ? { hiddenReason: String(r.hiddenReason) } : {}),
+		...(str(r.takedownMeasureId)
+			? { takedownMeasureId: String(r.takedownMeasureId) }
+			: {}),
+		...(str(r.version) ? { etag: String(r.version) } : {}),
 		...(str(r.publishStatus) ? { publishStatus: String(r.publishStatus) } : {}),
 	};
+}
+
+/** 伺服器的動態數（不含已刪除，每個狀態加總）。 */
+function summaryTotal(env: { data?: unknown }): number {
+	return Number(asRecord(env.data).total ?? 0);
 }
 
 export function createDelegatedPostRepo(
@@ -540,7 +545,7 @@ export function createDelegatedPostRepo(
 
 		async fetchSellerPosts(_sellerId, params): Promise<PostListItem[]> {
 			const env = await fetcher<unknown>(
-				`${root}?page=1&page_size=${params?.pageSize ?? 50}`,
+				`${root}?page_size=${params?.pageSize ?? 50}`,
 			);
 			const data = asRecord(env.data);
 			const records = Array.isArray(data.records) ? data.records : [];
@@ -551,7 +556,7 @@ export function createDelegatedPostRepo(
 		async createSellerPost(
 			body,
 			meta,
-		): Promise<{ id?: number; version?: string }> {
+		): Promise<{ id?: string; version?: string }> {
 			const checked = requireMeta(meta, "建立貼文");
 			const env = await fetcher<unknown>(root, {
 				method: "POST",
@@ -568,7 +573,7 @@ export function createDelegatedPostRepo(
 			const data = asRecord(env.data);
 			const postId = mutationResource(data).postId;
 			return {
-				id: postId as unknown as number,
+				id: postId as unknown as string,
 				version: str(data.version),
 			};
 		},
@@ -583,7 +588,9 @@ export function createDelegatedPostRepo(
 						? { stagedTokens: [body.newStagedToken] }
 						: {}),
 					...(body.tags ? { tags: body.tags } : {}),
-					...(body.productId ? { productIds: [String(body.productId)] } : {}),
+					...(body.productId === undefined
+						? {}
+						: { productIds: body.productId ? [String(body.productId)] : [] }),
 				}),
 				idempotencyKey: newIdempotencyKey(),
 			});
@@ -610,9 +617,8 @@ export function createDelegatedPostRepo(
 			return Promise.reject(new DelegatedEndpointMissingError("刪除貼文"));
 		},
 
-		async count(): Promise<number> {
-			const env = await fetcher<unknown>(`${root}?page=1&page_size=1`);
-			return Number(asRecord(env.data).total ?? 0);
+		async fetchPostCount(): Promise<number> {
+			return summaryTotal(await fetcher<unknown>(`${root}/summary`));
 		},
 
 		publish: (postId, meta, schedule) =>

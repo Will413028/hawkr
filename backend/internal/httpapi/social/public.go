@@ -5,6 +5,7 @@ package social
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"slices"
 	"time"
@@ -57,15 +58,44 @@ type Stores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
+// ProductInfo 是貼文帶的商品的顯示資料（舊 product-service 的卡片）。
+type ProductInfo struct {
+	ID       int64
+	StoreID  int64
+	Name     string
+	ImageKey string
+	MinPrice int64
+	MaxPrice int64
+	// Available 是現在可以購買（上架且有庫存）。
+	Available bool
+}
+
+// Products 以一個批次取得商品顯示資料（B4 的 catalog 搬進單體後換成 in-process）；includeInactive 為假時只回上架中的，
+// 缺少的 ID（已刪除或被排除）不在回傳裡。
+type Products interface {
+	Cards(ctx context.Context, ids []int64, includeInactive bool) (map[int64]ProductInfo, error)
+}
+
 // presenter 是 Public 與 App 共用的組裝：呼叫者的身分，與貼文、留言、討論區項目轉成回應所需的顯示資料（店家卡片、買家名稱、封鎖旗標）。
 type presenter struct {
 	buyers    Buyers
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
+	products  Products
+	// ownerView 是店主與代行路徑：貼文帶的商品下架了也補顯示資料（available=false），公開讀取只補上架中的。
+	ownerView bool
 	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
+	log   *slog.Logger
+	// productTimeout 是商品顯示資料批次查詢的時間上限；零值用 productBudget 常數。
+	productTimeout time.Duration
 }
+
+// productBudget 是商品批次查詢（舊 product-service 的 gRPC）在讀取路徑上的時間上限，逾時就降級成 product 不設。
+// 它是貼文列表這條公開熱路徑上的選配欄位，不能拖住整個回應：比店面統計的 statsBudget（300 ms）寬一點，
+// 因為這是一次跨服務的批次查詢，又遠小於 RPC 的預設 15 秒。
+const productBudget = 500 * time.Millisecond
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
 type Views interface {
@@ -83,14 +113,17 @@ type Public struct {
 var _ socialv1alpha1connect.SocialPublicServiceHandler = (*Public)(nil)
 
 // NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值；now 是熱門標籤預設時間窗的終點，nil 時用 time.Now。
-func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
+func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time, log *slog.Logger) (*Public, error) {
+	if log == nil {
+		return nil, fmt.Errorf("httpapi/social：需要 logger")
+	}
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, log: log, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -362,31 +395,90 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	entries, err := h.toForumEntries(ctx, c, storeID, page.Entries)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries)
 	if err != nil {
 		return nil, err
 	}
-	out := &pb.ListForumEntriesResponse{Entries: entries}
+	entries, err := h.toForumEntries(c, viewer, page.Entries)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListForumEntriesResponse{Entries: entries, ViewerActor: actor, ViewerCanComment: viewer.canComment}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }
 
-func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
+// forumViewer 是一次請求內觀看者在店 storeID 討論區的狀態與這一頁作者的顯示資料，全部只查一次：
+// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源），以及批次讀回的店家卡片與買家名稱。
+type forumViewer struct {
+	storeID    int64
+	canComment bool
+	stores     postStores
+}
+
+// forumPageState 讀一頁討論區項目的作者卡片與名稱，並判斷觀看者能不能留言（不是店主時才查一次封鎖）；寫入回應用它，不組觀看者身分。
+func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, error) {
+	return h.loadForumState(ctx, c, storeID, entries, false)
+}
+
+// forumViewerState 在 forumPageState 之外組觀看者在這個討論區留言時的身分，觀看者自己的名稱或卡片併進同一批讀取，不依賴這一頁有沒有可見項目。
+func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, *pb.Actor, error) {
+	viewer, err := h.loadForumState(ctx, c, storeID, entries, true)
+	if err != nil {
+		return forumViewer{}, nil, err
+	}
+	actor, err := h.viewerActor(c, storeID, viewer.stores)
+	if err != nil {
+		return forumViewer{}, nil, err
+	}
+	return viewer, actor, nil
+}
+
+func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, withViewer bool) (forumViewer, error) {
+	var buyerIDs, storeIDs []int64
+	for _, e := range entries {
+		if e.State != social.CommentVisible {
+			continue
+		}
+		switch e.Actor.Kind {
+		case social.ActorBuyer:
+			buyerIDs = append(buyerIDs, e.Actor.ID)
+		case social.ActorStore:
+			storeIDs = append(storeIDs, e.Actor.ID)
+		}
+	}
+	owns := c.OwnsStore(storeID)
+	if withViewer {
+		switch {
+		case owns:
+			storeIDs = append(storeIDs, storeID)
+		case c.BuyerID != 0:
+			buyerIDs = append(buyerIDs, c.BuyerID)
+		}
+	}
+	var stores postStores
+	var err error
+	if stores.cards, err = h.storeCards(ctx, storeIDs); err != nil {
+		return forumViewer{}, err
+	}
+	if stores.buyerDisplay, err = h.buyerDisplays(ctx, buyerIDs); err != nil {
+		return forumViewer{}, err
+	}
+	if !owns {
+		if stores.blocking, err = h.blockingStores(ctx, c, []int64{storeID}); err != nil {
+			return forumViewer{}, err
+		}
+	}
+	return forumViewer{storeID: storeID, canComment: canComment(c, storeID, stores.blocking), stores: stores}, nil
+}
+
+func (h *presenter) toForumEntries(c social.Caller, viewer forumViewer, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
 	if len(entries) == 0 {
 		return []*pb.ForumEntry{}, nil
 	}
-	actors := make([]social.Actor, 0, len(entries))
-	for _, e := range entries {
-		if e.State == social.CommentVisible {
-			actors = append(actors, e.Actor)
-		}
-	}
-	shared, err := h.loadShared(ctx, c, storeID, actors)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	out := make([]*pb.ForumEntry, len(entries))
 	for i, e := range entries {
 		item := &pb.ForumEntry{
@@ -409,27 +501,20 @@ func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID
 		item.Body = e.Body
 		item.IsMine = c.IsAuthor(e.Actor)
 		item.ViewerCanEdit = item.IsMine
-		item.ViewerCanDelete = item.IsMine || c.OwnsStore(storeID)
-		item.ViewerCanReply = shared.replyAllowed
+		item.ViewerCanDelete = item.IsMine || c.OwnsStore(viewer.storeID)
+		item.ViewerCanReply = viewer.canComment
 		item.Etag = rpc.Etag(e.Version)
-		if item.Author, err = h.toActor(e.Actor, shared.display, shared.stores); err != nil {
+		if item.Author, err = h.toActor(e.Actor, viewer.stores); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-// sharedAuthors 是一頁留言共用的顯示資料：作者的買家名稱與店家卡片、觀看者能不能在這個店的貼文或討論區留言。
-type sharedAuthors struct {
-	display      map[int64]buyer.Display
-	stores       postStores
-	replyAllowed bool
-}
-
-// loadShared 批次讀一頁可見留言的作者資料：卡片只取店家作者的，觀看者的封鎖旗標另外取（針對留言所在的店與店家作者，一次查詢）。
-func (h *presenter) loadShared(ctx context.Context, c social.Caller, contextStore int64, actors []social.Actor) (sharedAuthors, error) {
+// loadShared 批次讀一頁可見貼文留言的作者資料：卡片只取店家作者的，買家名稱一次批次讀。
+func (h *presenter) loadShared(ctx context.Context, actors []social.Actor) (postStores, error) {
 	if len(actors) == 0 {
-		return sharedAuthors{}, nil
+		return postStores{}, nil
 	}
 	var buyerIDs, storeIDs []int64
 	for _, a := range actors {
@@ -442,17 +527,13 @@ func (h *presenter) loadShared(ctx context.Context, c social.Caller, contextStor
 	}
 	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
-		return sharedAuthors{}, err
-	}
-	blocking, err := h.blockingStores(ctx, c, []int64{contextStore})
-	if err != nil {
-		return sharedAuthors{}, err
+		return postStores{}, err
 	}
 	display, err := h.buyerDisplays(ctx, buyerIDs)
 	if err != nil {
-		return sharedAuthors{}, err
+		return postStores{}, err
 	}
-	return sharedAuthors{display: display, stores: postStores{cards: cards, blocking: blocking}, replyAllowed: canComment(c, contextStore, blocking)}, nil
+	return postStores{cards: cards, buyerDisplay: display}, nil
 }
 
 func (h *presenter) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
@@ -475,6 +556,9 @@ type postStores struct {
 	cards    map[int64]seller.StoreCard
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
+	products map[int64]ProductInfo
+	// buyerDisplay 是這一頁用到的買家顯示資料（作者，以及觀看者自己的買家身分）。
+	buyerDisplay map[int64]buyer.Display
 }
 
 func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
@@ -518,6 +602,9 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if len(posts) == 0 {
 		return []*pb.Post{}, nil
 	}
+	// 商品查詢與其他補充查詢互不相依：先丟出去同時跑，最後才收。它自己降級，不會回錯誤。
+	productsCh := make(chan map[int64]ProductInfo, 1)
+	go func() { productsCh <- h.postProducts(ctx, posts) }()
 	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
 		return nil, err
@@ -530,7 +617,13 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if err != nil {
 		return nil, err
 	}
-	stores := postStores{cards: cards, blocking: blocking, liked: liked}
+	products := <-productsCh
+	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
+	if c.BuyerID != 0 && slices.ContainsFunc(posts, func(p social.Post) bool { return !c.OwnsStore(p.StoreID) }) {
+		if stores.buyerDisplay, err = h.buyerDisplays(ctx, []int64{c.BuyerID}); err != nil {
+			return nil, err
+		}
+	}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
@@ -538,6 +631,45 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 		}
 	}
 	return out, nil
+}
+
+// postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡，查詢失敗時整批降級；兩者貼文照回，product 不設。
+func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[int64]ProductInfo {
+	var ids []int64
+	for _, p := range posts {
+		if p.ProductID != nil {
+			ids = append(ids, *p.ProductID)
+		}
+	}
+	if ids = uniq(ids); len(ids) == 0 {
+		return nil
+	}
+	budget := h.productTimeout
+	if budget <= 0 {
+		budget = productBudget
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	cards, err := h.products.Cards(ctx, ids, h.ownerView)
+	if err != nil {
+		h.log.WarnContext(ctx, "httpapi/social：商品顯示資料查詢失敗，貼文的 product 不設", "product_count", len(ids), "error", err)
+		return nil
+	}
+	return cards
+}
+
+// toPostProduct 是貼文帶的商品摘要。商品的圖是選配的顯示資料：圖片 key 不合法時只略過圖（記 warn），
+// 不讓整個貼文讀取失敗。
+func (h *presenter) toPostProduct(info ProductInfo) *pb.PostProduct {
+	out := &pb.PostProduct{Id: rpc.FormatID(info.ID), Name: info.Name, MinPrice: info.MinPrice, MaxPrice: info.MaxPrice, Available: info.Available}
+	if info.ImageKey != "" {
+		if err := rpc.ObjectKey(info.ImageKey); err != nil {
+			h.log.Warn("httpapi/social：商品的圖片 key 不合法，product.image 不設", "product_id", info.ID, "error", err)
+			return out
+		}
+		out.Image = h.images.Image(info.ImageKey)
+	}
+	return out
 }
 
 // likedPosts 批次查呼叫者的買家身分讚過 posts 裡的哪幾篇；呼叫者沒有買家身分（訪客、店主）時是空的。
@@ -588,12 +720,31 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	for _, t := range p.Hashtags {
 		out.Hashtags = append(out.Hashtags, &pb.Hashtag{Name: t.Name, Display: t.Display})
 	}
+	if out.ViewerActor, err = h.viewerActor(c, p.StoreID, stores); err != nil {
+		return nil, err
+	}
 	if card, ok := stores.cards[p.StoreID]; ok {
 		if out.Store, err = httpseller.ToStoreCard(h.images, card); err != nil {
 			return nil, err
 		}
 	}
+	if p.ProductID != nil {
+		if info, ok := stores.products[*p.ProductID]; ok {
+			out.Product = h.toPostProduct(info)
+		}
+	}
 	return out, nil
+}
+
+// viewerActor 是觀看者在店 storeID 的貼文留言時的身分，與 canComment 用同一套判斷：此刻的店就是 storeID 時是店家，否則有買家身分時是買家，訪客是 nil。
+func (h *presenter) viewerActor(c social.Caller, storeID int64, stores postStores) (*pb.Actor, error) {
+	switch {
+	case c.OwnsStore(storeID):
+		return h.toActor(social.Actor{Kind: social.ActorStore, ID: storeID}, stores)
+	case c.BuyerID != 0:
+		return h.toActor(social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, stores)
+	}
+	return nil, nil
 }
 
 func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {
@@ -606,7 +757,7 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 			actors = append(actors, m.Actor)
 		}
 	}
-	shared, err := h.loadShared(ctx, c, postStore, actors)
+	shared, err := h.loadShared(ctx, actors)
 	if err != nil {
 		return nil, err
 	}
@@ -637,19 +788,19 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
 		item.ViewerCanReply = c.OwnsStore(postStore)
 		item.Etag = rpc.Etag(m.Version)
-		if item.Author, err = h.toActor(m.Actor, shared.display, shared.stores); err != nil {
+		if item.Author, err = h.toActor(m.Actor, shared); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-func (h *presenter) toActor(a social.Actor, display map[int64]buyer.Display, stores postStores) (*pb.Actor, error) {
+func (h *presenter) toActor(a social.Actor, stores postStores) (*pb.Actor, error) {
 	out := &pb.Actor{Kind: rpc.EnumToProto[pb.ActorKind](a.Kind), Id: rpc.FormatID(a.ID)}
 	var avatar *string
 	switch a.Kind {
 	case social.ActorBuyer:
-		if d, ok := display[a.ID]; ok && !d.Deleted {
+		if d, ok := stores.buyerDisplay[a.ID]; ok && !d.Deleted {
 			out.Name, avatar = d.DisplayName, d.Avatar
 		}
 	case social.ActorStore:

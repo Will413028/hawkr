@@ -108,6 +108,22 @@ INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
 SELECT sqlc.arg(measure_id), (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i]
 FROM generate_series(1, cardinality(sqlc.arg(ids)::uuid[])) AS i;
 
+-- name: ActiveTakedownOfContent :one
+-- 內容目前生效中的內容下架措施（最多一個，measure_contents_one_enforced 保證）；沒有回 no rows。
+SELECT measure_id
+FROM seller.measure_contents
+WHERE content_kind = sqlc.arg(content_kind) AND content_id = sqlc.arg(content_id) AND measure_status = 'ENFORCED';
+
+-- name: ActiveTakedownOfContents :one
+-- 一批內容裡任何一則已有生效中的內容下架措施時回 true（種類與 ID 是平行陣列）。
+SELECT EXISTS (
+    SELECT 1
+    FROM seller.measure_contents c
+    JOIN generate_series(1, cardinality(sqlc.arg(ids)::uuid[])) AS i
+        ON c.content_kind = (sqlc.arg(kinds)::text[])[i] AND c.content_id = (sqlc.arg(ids)::uuid[])[i]
+    WHERE c.measure_status = 'ENFORCED'
+);
+
 -- name: MeasureContents :many
 -- 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
 SELECT measure_id, content_kind, content_id

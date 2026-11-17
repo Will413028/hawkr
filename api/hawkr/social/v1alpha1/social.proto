@@ -297,8 +297,28 @@ message Post {
   // 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
   bool viewer_liked = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
-  // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+  // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
   optional string takedown_measure_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  // 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  // 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  Actor viewer_actor = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
+  // 不影響貼文本身；`product_id` 仍照實回傳。
+  PostProduct product = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// PostProduct 是貼文帶的商品的顯示資料。
+message PostProduct {
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 商品圖，沒有圖時不設。
+  hawkr.common.v1alpha1.Image image = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 規格中最低與最高的價格，新台幣元。
+  int64 min_price = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 現在可以購買；下架或售完時是 false（只有店主讀自己的貼文看得到下架的商品）。
+  bool available = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -463,6 +483,12 @@ message ListForumEntriesRequest {
 message ListForumEntriesResponse {
   repeated ForumEntry entries = 1;
   string next_page_token = 2;
+  // 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  // 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  Actor viewer_actor = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  // 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
+  bool viewer_can_comment = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message RecordPostViewRequest {
@@ -721,6 +747,15 @@ message ListStoreCommentsResponse {
 
 message GetStoreSocialSummaryRequest {}
 
+// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+message SocialDelegatedServiceGetStoreSocialSummaryRequest {}
+
+// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+message SocialDelegatedServiceGetStoreSocialSummaryResponse {
+  repeated PostStatusCount post_counts = 1;
+  int64 scheduled_post_count = 2;
+}
+
 message GetStoreSocialSummaryResponse {
   // 每個貼文狀態一項（DRAFT、PUBLISHED、UNPUBLISHED 都會有，沒有貼文時是 0），不含已刪除的貼文。
   repeated PostStatusCount post_counts = 1;
@@ -744,6 +779,12 @@ message PostStatusCount {
 // 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
 // 成功的讀取不稽核。
 service SocialDelegatedService {
+  // GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  // 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  rpc GetStoreSocialSummary(SocialDelegatedServiceGetStoreSocialSummaryRequest) returns (SocialDelegatedServiceGetStoreSocialSummaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   // ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
   rpc ListStorePosts(ListStorePostsRequest) returns (ListStorePostsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;

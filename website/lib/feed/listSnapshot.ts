@@ -9,6 +9,8 @@ export interface FeedListSnapshot {
 	key: string;
 	posts: PostListItem[];
 	page: number;
+	/** 載入到的最後一頁之後的 page_token；空字串是已到底。 */
+	nextPageToken: string;
 	done: boolean;
 	scrollY: number;
 	activeTab: FeedListSnapshotTab;
@@ -30,6 +32,7 @@ function readStoredFeedListSnapshot(key: string): FeedListSnapshot | null {
 		if (!Array.isArray(snapshot.posts) || snapshot.posts.length === 0) {
 			return null;
 		}
+		if (typeof snapshot.nextPageToken !== "string") return null;
 		if (!["recommend", "follow", "nearby"].includes(snapshot.activeTab)) {
 			return null;
 		}

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ApiClientError, type ApiEnvelope } from "@/lib/api/client";
+import type { ApiEnvelope } from "@/lib/api/client";
 import type { RepoFetcher } from "@/lib/api/delegated";
 import {
 	createDelegatedPostRepo,
 	mapDelegatedPostDetail,
 } from "@/lib/seller-data/delegated-repos";
-import { createSellerPostRepo } from "./repo";
 
 function recordingFetcher(data: unknown) {
 	const seen: Array<{ path: string; method: string }> = [];
@@ -17,58 +16,6 @@ function recordingFetcher(data: unknown) {
 }
 
 describe("seller post detail read", () => {
-	it("reads the owner route and keeps the owner-only fields", async () => {
-		const { seen, fetcher } = recordingFetcher({
-			id: "77",
-			sellerId: "7",
-			sellerName: "店",
-			logoKey: " logo ",
-			content: "草稿",
-			imageKeys: null,
-			tags: ["#a"],
-			products: null,
-			commentCount: 0,
-			likeCount: 0,
-			shareCount: 0,
-			viewCount: 0,
-			isLiked: false,
-			createdAt: 1,
-			publishStatus: "4401",
-			hiddenAt: 1760000000,
-			hiddenReason: "違規",
-		});
-		const detail =
-			await createSellerPostRepo(fetcher).fetchSellerPostDetail("77");
-
-		expect(seen).toEqual([{ path: "/app/sellers/posts/77", method: "GET" }]);
-		expect(detail.logoKey).toBe("logo");
-		expect(detail.imageKeys).toEqual([]);
-		expect(detail.products).toEqual([]);
-		expect(detail.publishStatus).toBe("4401");
-		expect(detail.hiddenAt).toBe(1760000000);
-		expect(detail.hiddenReason).toBe("違規");
-	});
-
-	it("encodes the id and treats an empty body as not found", async () => {
-		const { seen, fetcher } = recordingFetcher(undefined);
-		const error = await createSellerPostRepo(fetcher)
-			.fetchSellerPostDetail("7/../8")
-			.catch((e) => e);
-
-		expect(seen[0]?.path).toBe("/app/sellers/posts/7%2F..%2F8");
-		expect(error).toBeInstanceOf(ApiClientError);
-		expect((error as ApiClientError).status).toBe(404);
-	});
-
-	it("propagates a transport failure", async () => {
-		const fetcher = (async () => {
-			throw new ApiClientError("HTTP 503", 503, 503);
-		}) as RepoFetcher;
-		await expect(
-			createSellerPostRepo(fetcher).fetchSellerPostDetail("77"),
-		).rejects.toMatchObject({ status: 503 });
-	});
-
 	it("the delegated repo reads its own detail route and maps the DTO", async () => {
 		const { seen, fetcher } = recordingFetcher({
 			postId: "88",
@@ -123,5 +70,14 @@ describe("seller post detail read", () => {
 			products: [],
 			createdAt: 0,
 		});
+	});
+});
+
+describe("delegated post count", () => {
+	it("reads the server's summary, not the length of a list page", async () => {
+		const { seen, fetcher } = recordingFetcher({ total: 17 });
+		const count = await createDelegatedPostRepo(fetcher, "9").fetchPostCount();
+		expect(count).toBe(17);
+		expect(seen).toEqual([{ path: "/posts/9/summary", method: "GET" }]);
 	});
 });

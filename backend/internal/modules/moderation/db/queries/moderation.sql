@@ -109,7 +109,7 @@ WHERE r.id = sqlc.arg(id);
 -- 結案是終態：只有進行中而且版本相符的案件轉移成功；回傳 0 列表示已被結掉或版本過期。
 UPDATE moderation.cases
 SET decision = sqlc.arg(decision), decision_category = sqlc.narg(decision_category), decision_action = sqlc.narg(decision_action),
-    decided_by_admin_id = sqlc.arg(admin_id), closed_at = sqlc.arg(closed_at), version = version + 1
+    decided_by_admin_id = sqlc.arg(admin_id), closed_at = sqlc.arg(closed_at), measure_id = sqlc.narg(measure_id), version = version + 1
 WHERE id = sqlc.arg(id) AND closed_at IS NULL AND version = sqlc.arg(version);
 
 -- name: ExpiredSnapshotsBatch :many
@@ -258,3 +258,17 @@ FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE c.target_kind = 'POST' AND c.closed_at IS NULL AND c.content_id = ANY(sqlc.arg(post_ids)::uuid[])
 GROUP BY c.content_id;
+
+-- name: ReportCountsOfCases :many
+-- 一頁案件的檢舉數（一個查詢，不逐案件查）。
+SELECT case_id, count(*)::bigint AS reports
+FROM moderation.reports
+WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[])
+GROUP BY case_id;
+
+-- name: LatestSnapshotContentsOfCases :many
+-- 一頁案件各自最近一份凍結的內容；沒有快照（已過保留期被刪除）的案件沒有列。
+SELECT DISTINCT ON (case_id) case_id, content
+FROM moderation.case_snapshots
+WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[])
+ORDER BY case_id, captured_at DESC, id DESC;

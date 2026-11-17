@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 	fetchHotProducts: vi.fn(),
 	fetchProducts: vi.fn(),
 	fetchRecommendedStores: vi.fn(),
-	fetchPublicPostsTyped: vi.fn(),
+	fetchPostsPage: vi.fn(),
 	fetchCategoryTree: vi.fn(),
 	getCachedHotProducts: vi.fn(),
 	getCachedProductsFirstPage: vi.fn(),
@@ -41,8 +41,8 @@ vi.mock("@/lib/discovery/recommended", () => ({
 	fetchRecommendedStores: mocks.fetchRecommendedStores,
 }));
 
-vi.mock("@/lib/api/posts", () => ({
-	fetchPublicPostsTyped: mocks.fetchPublicPostsTyped,
+vi.mock("@/lib/posts/repo", () => ({
+	fetchPostsPage: mocks.fetchPostsPage,
 }));
 
 vi.mock("@/lib/api/cached", () => ({
@@ -58,7 +58,7 @@ vi.mock("@/lib/api/cached", () => ({
 
 const HOT_PRODUCTS = [{ id: "9002" }];
 const PRODUCTS = { data: { records: [{ id: "9001" }] } };
-const POSTS = { page: 1, pageSize: 8, total: 1, records: [{ id: "8001" }] };
+const POSTS = { pageSize: 8, nextPageToken: "", records: [{ id: "8001" }] };
 const SELLERS = [{ id: "7001", storeCode: "shop7001", name: "店" }];
 const CATEGORY_TREE = [
 	{ id: "5", name: "海鮮", children: [{ id: "206", name: "魚類" }] },
@@ -73,7 +73,7 @@ function stalled(): Promise<never> {
 function primaryResolves(): void {
 	mocks.fetchHotProducts.mockResolvedValue(HOT_PRODUCTS);
 	mocks.fetchProducts.mockResolvedValue(PRODUCTS);
-	mocks.fetchPublicPostsTyped.mockResolvedValue(POSTS);
+	mocks.fetchPostsPage.mockResolvedValue(POSTS);
 	mocks.fetchRecommendedStores.mockResolvedValue(SELLERS);
 	mocks.fetchCategoryTree.mockResolvedValue(CATEGORY_TREE);
 }
@@ -129,7 +129,7 @@ describe("home bootstrap request budget", () => {
 		allStalled([
 			mocks.fetchHotProducts,
 			mocks.fetchProducts,
-			mocks.fetchPublicPostsTyped,
+			mocks.fetchPostsPage,
 			mocks.fetchRecommendedStores,
 			mocks.fetchCategoryTree,
 		]);
@@ -157,7 +157,7 @@ describe("home bootstrap request budget", () => {
 		allStalled([
 			mocks.fetchHotProducts,
 			mocks.fetchProducts,
-			mocks.fetchPublicPostsTyped,
+			mocks.fetchPostsPage,
 			mocks.fetchRecommendedStores,
 			mocks.fetchCategoryTree,
 			mocks.getCachedHotProducts,
@@ -192,7 +192,7 @@ describe("home bootstrap request budget", () => {
 	it("keeps a posts-only outage a labelled 200 so commerce still refreshes", async () => {
 		primaryResolves();
 		cacheResolves();
-		allStalled([mocks.fetchPublicPostsTyped, mocks.getCachedPublicPosts]);
+		allStalled([mocks.fetchPostsPage, mocks.getCachedPublicPosts]);
 
 		const pending = GET();
 		await vi.advanceTimersByTimeAsync(budget.totalMs);

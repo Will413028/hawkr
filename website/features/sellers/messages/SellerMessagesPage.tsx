@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import SellerMessageTab from "@/features/sellers/components/SellerMessageTab";
 import { getCachedSeller } from "@/lib/api/cached";
-import { fetchSellerForum } from "@/lib/seller/forum-repo";
+import { getEnv } from "@/lib/config/env";
+import { fetchSellerForum } from "@/lib/forum/repo";
+import { storeIdOfSeller } from "@/lib/seller/store-id";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -53,10 +55,13 @@ export default async function MessagesPage({ params }: Props) {
 	// Fetch first page on the server so SSR + first paint already have
 	// the comment list. useSellerForum will pick this up via its
 	// `initialData` argument and skip the bootstrap refetch.
-	const initialData = await fetchSellerForum(id, {
-		page: 1,
-		pageSize: FORUM_PAGE_SIZE,
-	}).catch(() => undefined);
+	const storeId = storeIdOfSeller(await getCachedSeller(id));
+	const initialData = storeId
+		? await fetchSellerForum(storeId, {
+				pageSize: FORUM_PAGE_SIZE,
+				signal: AbortSignal.timeout(getEnv().apiTimeoutMs),
+			}).catch(() => undefined)
+		: undefined;
 
 	// Chrome (profile header / banner / shell) lives in the persistent
 	// (storefront) layout — this page renders only the forum column.
@@ -65,7 +70,11 @@ export default async function MessagesPage({ params }: Props) {
 			className="max-w-[720px] mx-auto py-[var(--hkui-space-6,24px)] px-[var(--hkui-space-5,20px)] pb-[var(--hkui-space-12,48px)]"
 			data-hk-page-content-ready="seller-storefront"
 		>
-			<SellerMessageTab sellerId={id} initialData={initialData} />
+			<SellerMessageTab
+				sellerId={storeId}
+				routeId={id}
+				initialData={initialData}
+			/>
 		</section>
 	);
 }

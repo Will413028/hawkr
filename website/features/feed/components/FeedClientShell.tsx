@@ -25,7 +25,7 @@ interface FeedClientShellProps {
 	stories: StoryItem[];
 	initialPosts: PostListItem[];
 	initialPage?: number;
-	initialHasMore?: boolean;
+	initialNextPageToken?: string;
 	pageSize: number;
 	sellerId?: string;
 	hashtag?: string;
@@ -61,7 +61,7 @@ export default function FeedClientShell({
 	stories,
 	initialPosts,
 	initialPage,
-	initialHasMore,
+	initialNextPageToken,
 	pageSize,
 	sellerId,
 	hashtag,
@@ -140,7 +140,7 @@ export default function FeedClientShell({
 					progressiveImages
 					initialPosts={initialPosts}
 					initialPage={initialPage}
-					initialHasMore={initialHasMore}
+					initialNextPageToken={initialNextPageToken}
 					pageSize={pageSize}
 					sellerId={sellerId}
 					hashtag={hashtag}

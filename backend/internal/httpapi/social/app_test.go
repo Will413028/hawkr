@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -149,7 +150,7 @@ func newAppEnvWith(t *testing.T, w *fakeWrites, owner Owner, s *fakeStores) *app
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, images, web)
+	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,5 +359,35 @@ func TestCreateCommentResponseForTheStoreOwner(t *testing.T) {
 	}
 	if w.calls[0].caller.Store == nil || w.calls[0].caller.Store.StoreID != 5 {
 		t.Errorf("呼叫者的店 = %+v", w.calls[0].caller)
+	}
+}
+
+func TestForumWriteResponsesDoNotLookUpTheViewerIdentity(t *testing.T) {
+	images, err := rpc.NewImages("https://media.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	web, err := rpc.NewWebOrigin("https://web.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.New().String()
+	rid = rid[:14] + "4" + rid[15:]
+	var displayIDs [][]int64
+	stores := &fakeStores{}
+	w := &fakeWrites{}
+	h, err := NewApp(w, w, &fakeOwner{}, fakeBuyers{id: 7, displayIDs: &displayIDs}, stores, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := h.CreateForumEntry(asBuyer(t.Context()), connect.NewRequest(&pb.CreateForumEntryRequest{StoreId: "5", Body: "請問", RequestId: rid}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stores.asked) != 1 || stores.cardCalls != 0 || len(displayIDs) != 1 || !slices.Equal(displayIDs[0], []int64{7}) {
+		t.Errorf("asked=%v cardCalls=%d displayIDs=%v，預期封鎖 1 次、卡片 0 次、名稱 1 次且只有作者 7", stores.asked, stores.cardCalls, displayIDs)
+	}
+	if !resp.Msg.GetEntry().GetViewerCanReply() || !resp.Msg.GetEntry().GetIsMine() {
+		t.Errorf("寫入回應 = %v", resp.Msg.GetEntry())
 	}
 }

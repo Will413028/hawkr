@@ -15,7 +15,7 @@ import (
 const attachToCase = `-- name: AttachToCase :one
 UPDATE moderation.cases SET version = version + 1
 WHERE id = $1 AND closed_at IS NULL
-RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 `
 
 // 新檢舉掛進案件：加一版本並鎖住案件列（同一個案件的結案與其他檢舉的掛入都要等這個 transaction 提交）；回傳 0 列就是案件已被結掉。
@@ -34,6 +34,7 @@ func (q *Queries) AttachToCase(ctx context.Context, id uuid.UUID) (ModerationCas
 		&i.DecisionAction,
 		&i.DecidedByAdminID,
 		&i.ClosedAt,
+		&i.MeasureID,
 	)
 	return i, err
 }
@@ -121,8 +122,8 @@ func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID
 const closeCase = `-- name: CloseCase :execrows
 UPDATE moderation.cases
 SET decision = $1, decision_category = $2, decision_action = $3,
-    decided_by_admin_id = $4, closed_at = $5, version = version + 1
-WHERE id = $6 AND closed_at IS NULL AND version = $7
+    decided_by_admin_id = $4, closed_at = $5, measure_id = $6, version = version + 1
+WHERE id = $7 AND closed_at IS NULL AND version = $8
 `
 
 type CloseCaseParams struct {
@@ -131,6 +132,7 @@ type CloseCaseParams struct {
 	DecisionAction   *string
 	AdminID          *int64
 	ClosedAt         *time.Time
+	MeasureID        *uuid.UUID
 	ID               uuid.UUID
 	Version          int64
 }
@@ -143,6 +145,7 @@ func (q *Queries) CloseCase(ctx context.Context, arg CloseCaseParams) (int64, er
 		arg.DecisionAction,
 		arg.AdminID,
 		arg.ClosedAt,
+		arg.MeasureID,
 		arg.ID,
 		arg.Version,
 	)
@@ -304,7 +307,7 @@ func (q *Queries) ExpiredSnapshotsBatch(ctx context.Context, arg ExpiredSnapshot
 }
 
 const getCase = `-- name: GetCase :one
-SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases WHERE id = $1
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id FROM moderation.cases WHERE id = $1
 `
 
 func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, error) {
@@ -322,6 +325,7 @@ func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, er
 		&i.DecisionAction,
 		&i.DecidedByAdminID,
 		&i.ClosedAt,
+		&i.MeasureID,
 	)
 	return i, err
 }
@@ -350,7 +354,7 @@ const insertBuyerCase = `-- name: InsertBuyerCase :one
 INSERT INTO moderation.cases (id, target_kind, buyer_id, opened_at)
 VALUES ($1, 'BUYER', $2, $3)
 ON CONFLICT (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL DO NOTHING
-RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 `
 
 type InsertBuyerCaseParams struct {
@@ -375,6 +379,7 @@ func (q *Queries) InsertBuyerCase(ctx context.Context, arg InsertBuyerCaseParams
 		&i.DecisionAction,
 		&i.DecidedByAdminID,
 		&i.ClosedAt,
+		&i.MeasureID,
 	)
 	return i, err
 }
@@ -383,7 +388,7 @@ const insertContentCase = `-- name: InsertContentCase :one
 INSERT INTO moderation.cases (id, target_kind, content_id, opened_at)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL DO NOTHING
-RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 `
 
 type InsertContentCaseParams struct {
@@ -414,6 +419,7 @@ func (q *Queries) InsertContentCase(ctx context.Context, arg InsertContentCasePa
 		&i.DecisionAction,
 		&i.DecidedByAdminID,
 		&i.ClosedAt,
+		&i.MeasureID,
 	)
 	return i, err
 }
@@ -529,8 +535,41 @@ func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (
 	return content, err
 }
 
+const latestSnapshotContentsOfCases = `-- name: LatestSnapshotContentsOfCases :many
+SELECT DISTINCT ON (case_id) case_id, content
+FROM moderation.case_snapshots
+WHERE case_id = ANY($1::uuid[])
+ORDER BY case_id, captured_at DESC, id DESC
+`
+
+type LatestSnapshotContentsOfCasesRow struct {
+	CaseID  uuid.UUID
+	Content string
+}
+
+// 一頁案件各自最近一份凍結的內容；沒有快照（已過保留期被刪除）的案件沒有列。
+func (q *Queries) LatestSnapshotContentsOfCases(ctx context.Context, caseIds []uuid.UUID) ([]LatestSnapshotContentsOfCasesRow, error) {
+	rows, err := q.db.Query(ctx, latestSnapshotContentsOfCases, caseIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LatestSnapshotContentsOfCasesRow{}
+	for rows.Next() {
+		var i LatestSnapshotContentsOfCasesRow
+		if err := rows.Scan(&i.CaseID, &i.Content); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllCases = `-- name: ListAllCases :many
-SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 FROM moderation.cases
 WHERE ($1::text = '' OR target_kind = $1::text)
   AND (opened_at, id) < ($2::timestamptz, $3::uuid)
@@ -572,6 +611,7 @@ func (q *Queries) ListAllCases(ctx context.Context, arg ListAllCasesParams) ([]M
 			&i.DecisionAction,
 			&i.DecidedByAdminID,
 			&i.ClosedAt,
+			&i.MeasureID,
 		); err != nil {
 			return nil, err
 		}
@@ -584,7 +624,7 @@ func (q *Queries) ListAllCases(ctx context.Context, arg ListAllCasesParams) ([]M
 }
 
 const listClosedCases = `-- name: ListClosedCases :many
-SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 FROM moderation.cases
 WHERE closed_at IS NOT NULL
   AND ($1::text = '' OR target_kind = $1::text)
@@ -627,6 +667,7 @@ func (q *Queries) ListClosedCases(ctx context.Context, arg ListClosedCasesParams
 			&i.DecisionAction,
 			&i.DecidedByAdminID,
 			&i.ClosedAt,
+			&i.MeasureID,
 		); err != nil {
 			return nil, err
 		}
@@ -639,7 +680,7 @@ func (q *Queries) ListClosedCases(ctx context.Context, arg ListClosedCasesParams
 }
 
 const listOpenCases = `-- name: ListOpenCases :many
-SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id
 FROM moderation.cases
 WHERE closed_at IS NULL
   AND ($1::text = '' OR target_kind = $1::text)
@@ -683,6 +724,7 @@ func (q *Queries) ListOpenCases(ctx context.Context, arg ListOpenCasesParams) ([
 			&i.DecisionAction,
 			&i.DecidedByAdminID,
 			&i.ClosedAt,
+			&i.MeasureID,
 		); err != nil {
 			return nil, err
 		}
@@ -783,7 +825,7 @@ func (q *Queries) MarkUnlinked(ctx context.Context, arg MarkUnlinkedParams) erro
 }
 
 const openCaseByTarget = `-- name: OpenCaseByTarget :one
-SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at FROM moderation.cases
+SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id FROM moderation.cases
 WHERE target_kind = $1 AND closed_at IS NULL
   AND (content_id = $2 OR buyer_id = $3)
 `
@@ -810,6 +852,7 @@ func (q *Queries) OpenCaseByTarget(ctx context.Context, arg OpenCaseByTargetPara
 		&i.DecisionAction,
 		&i.DecidedByAdminID,
 		&i.ClosedAt,
+		&i.MeasureID,
 	)
 	return i, err
 }
@@ -912,6 +955,39 @@ func (q *Queries) ReportByRequest(ctx context.Context, arg ReportByRequestParams
 		&i.RequestHash,
 	)
 	return i, err
+}
+
+const reportCountsOfCases = `-- name: ReportCountsOfCases :many
+SELECT case_id, count(*)::bigint AS reports
+FROM moderation.reports
+WHERE case_id = ANY($1::uuid[])
+GROUP BY case_id
+`
+
+type ReportCountsOfCasesRow struct {
+	CaseID  uuid.UUID
+	Reports int64
+}
+
+// 一頁案件的檢舉數（一個查詢，不逐案件查）。
+func (q *Queries) ReportCountsOfCases(ctx context.Context, caseIds []uuid.UUID) ([]ReportCountsOfCasesRow, error) {
+	rows, err := q.db.Query(ctx, reportCountsOfCases, caseIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReportCountsOfCasesRow{}
+	for rows.Next() {
+		var i ReportCountsOfCasesRow
+		if err := rows.Scan(&i.CaseID, &i.Reports); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const reportIDsOfCase = `-- name: ReportIDsOfCase :many

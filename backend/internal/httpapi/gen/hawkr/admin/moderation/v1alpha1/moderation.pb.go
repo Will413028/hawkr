@@ -149,7 +149,7 @@ const (
 	CaseAction_CASE_ACTION_WARN CaseAction = 2
 	// 停權買家帳號；帳號擁有店家時回 FAILED_PRECONDITION。
 	CaseAction_CASE_ACTION_BAN CaseAction = 3
-	// 店家寫的內容的下架措施（貼文、留言、討論區留言）；要帶 store_id 與 severity。
+	// 店家寫的內容的下架措施（貼文、留言、討論區留言）；要帶 severity；店家取自案件的內容快照。
 	CaseAction_CASE_ACTION_TAKEDOWN CaseAction = 4
 )
 
@@ -217,7 +217,13 @@ type Case struct {
 	// 結案時間；進行中不設。
 	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=resolve_time,json=resolveTime,proto3,oneof" json:"resolve_time,omitempty"`
 	// 樂觀鎖版本；DecideCase 必須帶讀到的值。
-	Etag          string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
+	// 案件裡全部檢舉的筆數（進行中與已結案都是該案件的全部）。
+	ReportCount int64 `protobuf:"varint,11,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	// 這個案件的 TAKEDOWN 決定建立的店家措施（seller 的措施 ID）；進行中、沒有下架處置的案件不設。
+	MeasureId *string `protobuf:"bytes,12,opt,name=measure_id,json=measureId,proto3,oneof" json:"measure_id,omitempty"`
+	// 案件內容快照裡凍結的作者店家（過渡期的十進位整數字串）；買家對象、沒有快照（結案滿保留期後被清除）或內容不是店家寫的不設。
+	StoreId       *string `protobuf:"bytes,13,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -318,6 +324,27 @@ func (x *Case) GetResolveTime() *timestamppb.Timestamp {
 func (x *Case) GetEtag() string {
 	if x != nil {
 		return x.Etag
+	}
+	return ""
+}
+
+func (x *Case) GetReportCount() int64 {
+	if x != nil {
+		return x.ReportCount
+	}
+	return 0
+}
+
+func (x *Case) GetMeasureId() string {
+	if x != nil && x.MeasureId != nil {
+		return *x.MeasureId
+	}
+	return ""
+}
+
+func (x *Case) GetStoreId() string {
+	if x != nil && x.StoreId != nil {
+		return *x.StoreId
 	}
 	return ""
 }
@@ -642,8 +669,6 @@ type DecideCaseRequest struct {
 	Action CaseAction `protobuf:"varint,5,opt,name=action,proto3,enum=hawkr.admin.moderation.v1alpha1.CaseAction" json:"action,omitempty"`
 	// 違規必填：給作者的理由，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
 	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	// TAKEDOWN 必填：管理員確認內容所屬的店家（伺服器向 social 核對）。
-	StoreId string `protobuf:"bytes,7,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// TAKEDOWN 必填：認定的嚴重度。
 	Severity      v1alpha12.ViolationSeverity `protobuf:"varint,8,opt,name=severity,proto3,enum=hawkr.seller.v1alpha1.ViolationSeverity" json:"severity,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -722,13 +747,6 @@ func (x *DecideCaseRequest) GetReason() string {
 	return ""
 }
 
-func (x *DecideCaseRequest) GetStoreId() string {
-	if x != nil {
-		return x.StoreId
-	}
-	return ""
-}
-
 func (x *DecideCaseRequest) GetSeverity() v1alpha12.ViolationSeverity {
 	if x != nil {
 		return x.Severity
@@ -792,7 +810,7 @@ var File_hawkr_admin_moderation_v1alpha1_moderation_proto protoreflect.FileDescr
 
 const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xe3\x04\n" +
+	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xf5\x05\n" +
 	"\x04Case\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12D\n" +
 	"\x06target\x18\x02 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x03R\x06target\x12E\n" +
@@ -806,8 +824,14 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"decided_by\x18\b \x01(\tB\x03\xe0A\x03R\tdecidedBy\x12G\n" +
 	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\vresolveTime\x88\x01\x01\x12\x17\n" +
 	"\x04etag\x18\n" +
-	" \x01(\tB\x03\xe0A\x03R\x04etagB\x0f\n" +
-	"\r_resolve_time\"\xa8\x02\n" +
+	" \x01(\tB\x03\xe0A\x03R\x04etag\x12&\n" +
+	"\freport_count\x18\v \x01(\x03B\x03\xe0A\x03R\vreportCount\x12'\n" +
+	"\n" +
+	"measure_id\x18\f \x01(\tB\x03\xe0A\x03H\x01R\tmeasureId\x88\x01\x01\x12#\n" +
+	"\bstore_id\x18\r \x01(\tB\x03\xe0A\x03H\x02R\astoreId\x88\x01\x01B\x0f\n" +
+	"\r_resolve_timeB\r\n" +
+	"\v_measure_idB\v\n" +
+	"\t_store_id\"\xa8\x02\n" +
 	"\n" +
 	"CaseReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12\x1f\n" +
@@ -832,16 +856,15 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"\x93\x01\n" +
 	"\x0fGetCaseResponse\x129\n" +
 	"\x04case\x18\x01 \x01(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x04case\x12E\n" +
-	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports\"\x92\x03\n" +
+	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports\"\x87\x03\n" +
 	"\x11DecideCaseRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\x12N\n" +
 	"\bdecision\x18\x03 \x01(\x0e2-.hawkr.admin.moderation.v1alpha1.CaseDecisionB\x03\xe0A\x02R\bdecision\x12A\n" +
 	"\bcategory\x18\x04 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12C\n" +
 	"\x06action\x18\x05 \x01(\x0e2+.hawkr.admin.moderation.v1alpha1.CaseActionR\x06action\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x19\n" +
-	"\bstore_id\x18\a \x01(\tR\astoreId\x12D\n" +
-	"\bseverity\x18\b \x01(\x0e2(.hawkr.seller.v1alpha1.ViolationSeverityR\bseverity\"\x96\x01\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12D\n" +
+	"\bseverity\x18\b \x01(\x0e2(.hawkr.seller.v1alpha1.ViolationSeverityR\bseverityJ\x04\b\a\x10\bR\bstore_id\"\x96\x01\n" +
 	"\x12DecideCaseResponse\x129\n" +
 	"\x04case\x18\x01 \x01(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x04case\x12E\n" +
 	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports*S\n" +

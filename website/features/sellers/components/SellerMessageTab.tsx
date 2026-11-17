@@ -6,14 +6,17 @@ import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
 import { formatTaipeiDate } from "@/lib/date/taipei";
-import { useSellerForum } from "@/lib/hooks/useSellerForum";
 import type {
 	SellerForumComment,
 	SellerForumListResult,
-} from "@/lib/seller/forum-repo";
+} from "@/lib/forum/repo";
+import { useSellerForum } from "@/lib/hooks/useSellerForum";
 
 interface SellerMessageTabProps {
+	/** store_id: the key of every forum RPC. */
 	sellerId: string;
+	/** The storefront URL segment (store_code), for the login return path. */
+	routeId: string;
 	initialData?: SellerForumListResult;
 }
 
@@ -33,11 +36,12 @@ interface SellerMessageTabProps {
  *     reply lands inside the parent's `replies[]` immediately.
  *
  * Still deferred to later phases:
- *   - Like / edit / delete on each row (phase 4)
+ *   - Edit / delete on each row (phase 4)
  *   - Sticky mobile input, reply-line treatment, date polish (phase 5)
  */
 export default function SellerMessageTab({
 	sellerId,
+	routeId,
 	initialData,
 }: SellerMessageTabProps) {
 	const { status } = useAuth();
@@ -181,7 +185,7 @@ export default function SellerMessageTab({
 				<div className="flex items-center justify-between gap-3 p-[14px_18px] rounded-[14px] bg-[var(--surface-card,rgb(var(--color-ink-800-rgb)/0.04))] dark:bg-[rgba(255,255,255,0.04)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.72)] text-[0.9375rem]">
 					<span>登入後可以留言給這個賣家</span>
 					<Link
-						href={`/login?redirect=${encodeURIComponent(`/sellers/${sellerId}/messages`)}`}
+						href={`/login?redirect=${encodeURIComponent(`/sellers/${routeId}/messages`)}`}
 						hardNavigation
 						className="p-[8px_18px] rounded-full bg-[var(--action-primary,var(--color-ink-800))] dark:bg-[rgba(241,205,112,0.85)] text-[var(--color-neutral-cream)] dark:text-[#2d2010] text-[length:var(--text-sm)] font-bold no-underline hover:brightness-[1.08]"
 					>
@@ -273,7 +277,7 @@ export default function SellerMessageTab({
 												{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
 											</Button>
 										) : null}
-										{signedIn ? (
+										{signedIn && comment.state === "visible" ? (
 											<button
 												type="button"
 												className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"

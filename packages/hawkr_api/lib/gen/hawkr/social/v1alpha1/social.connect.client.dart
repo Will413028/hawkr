@@ -637,6 +637,25 @@ extension type SocialAppServiceClient (connect.Transport _transport) {
 /// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
 /// 成功的讀取不稽核。
 extension type SocialDelegatedServiceClient (connect.Transport _transport) {
+  /// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  /// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  Future<hawkrsocialv1alpha1social.SocialDelegatedServiceGetStoreSocialSummaryResponse> getStoreSocialSummary(
+    hawkrsocialv1alpha1social.SocialDelegatedServiceGetStoreSocialSummaryRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.SocialDelegatedService.getStoreSocialSummary,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
   /// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
   Future<hawkrsocialv1alpha1social.ListStorePostsResponse> listStorePosts(
     hawkrsocialv1alpha1social.ListStorePostsRequest input, {

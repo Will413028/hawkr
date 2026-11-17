@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"uuid"
 
@@ -43,19 +44,22 @@ var _ socialv1alpha1connect.SocialAppServiceHandler = (*App)(nil)
 
 // NewApp 建立登入者互動寫入與店主貼文管理的 handler；webOrigin 與 Public 共用，組回應裡貼文的單篇網址，不可是零值。
 // 能力宣告表（declarations）與 SocialAppService 的方法對不上時回錯誤，不能啟動。
-func NewApp(writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
-	return newApp(declarations, writes, authored, owner, buyers, stores, images, webOrigin)
+func NewApp(writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, log *slog.Logger) (*App, error) {
+	return newApp(declarations, writes, authored, owner, buyers, stores, products, images, webOrigin, log)
 }
 
 // newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
-func newApp(table map[string]declaration, writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*App, error) {
+func newApp(table map[string]declaration, writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, log *slog.Logger) (*App, error) {
+	if log == nil {
+		return nil, fmt.Errorf("httpapi/social：需要 logger")
+	}
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, liked: noViewerLikes}, writes: writes, authored: authored, owner: owner}, nil
+	return &App{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log, liked: noViewerLikes}, writes: writes, authored: authored, owner: owner}, nil
 }
 
 // noViewerLikes 是店主路徑的 liked：店主的回應不帶買家的讚，永遠是空的。
@@ -286,7 +290,11 @@ func (h *App) CreateForumEntry(ctx context.Context, req *connect.Request[pb.Crea
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, createPaths)
 	}
-	entries, err := h.toForumEntries(ctx, c, storeID, []social.ForumEntry{created})
+	viewer, err := h.forumPageState(ctx, c, storeID, []social.ForumEntry{created})
+	if err != nil {
+		return nil, err
+	}
+	entries, err := h.toForumEntries(c, viewer, []social.ForumEntry{created})
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +315,11 @@ func (h *App) UpdateForumEntry(ctx context.Context, req *connect.Request[pb.Upda
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updateEntryPaths)
 	}
-	entries, err := h.toForumEntries(ctx, c, updated.StoreID, []social.ForumEntry{updated})
+	viewer, err := h.forumPageState(ctx, c, updated.StoreID, []social.ForumEntry{updated})
+	if err != nil {
+		return nil, err
+	}
+	entries, err := h.toForumEntries(c, viewer, []social.ForumEntry{updated})
 	if err != nil {
 		return nil, err
 	}

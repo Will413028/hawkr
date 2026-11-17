@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -154,6 +155,9 @@ func TestOwnerSuccessPaths(t *testing.T) {
 	got := cp.Msg.GetPost()
 	if got.GetStatus() != pb.PostStatus_POST_STATUS_DRAFT || got.GetEtag() != "4" || got.GetCreateTime() == nil || got.GetProductId() != "88" || got.GetUrl() == "" || !got.GetViewerCanComment() {
 		t.Errorf("CreatePost 回應 = %v", got)
+	}
+	if a := got.GetViewerActor(); a.GetKind() != pb.ActorKind_ACTOR_KIND_STORE || a.GetId() != "5" {
+		t.Errorf("店主寫入的回應 viewer_actor = %v，預期店家 5", a)
 	}
 	if f.store.StoreID != 5 {
 		t.Errorf("店家由伺服器推導：%+v", f.store)
@@ -417,7 +421,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 	if err := checkDeclarations(declarations, svc); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewApp(&fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, mustImages(t), mustWeb(t)); err != nil {
+	if _, err := NewApp(&fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, mustImages(t), mustWeb(t), slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
 	for procedure := range declarations {
@@ -816,10 +820,10 @@ func TestNewAppRejectsADeclarationTableMissingARow(t *testing.T) {
 		short[k] = v
 	}
 	delete(short, socialv1alpha1connect.SocialAppServiceUpdatePostProcedure)
-	if _, err := newApp(short, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err == nil {
+	if _, err := newApp(short, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("缺一列的宣告表要不能啟動")
 	}
-	if _, err := newApp(declarations, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err != nil {
+	if _, err := newApp(declarations, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
 }

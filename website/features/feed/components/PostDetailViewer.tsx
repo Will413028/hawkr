@@ -8,14 +8,15 @@ import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
 import CommentsBottomSheet from "@/features/feed/components/CommentsBottomSheet";
 import PostComments from "@/features/feed/components/PostComments";
+import PostViewTracker from "@/features/feed/components/PostViewTracker";
 import { zoomOriginCenter, zoomShrinkStyle } from "@/lib/animation/zoom";
 import type { PostDetail, PostListItem } from "@/lib/api/openapi-types";
-import { FALLBACK_POST_IMAGE, sharePost } from "@/lib/api/posts";
 import { useAuth } from "@/lib/auth/context";
 import { useAuthGate } from "@/lib/auth/useAuthGate";
 import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
 import { usePostInteractions } from "@/lib/hooks/useSocial";
 import { buildImageUrl, isGifMedia, ossImageUrl } from "@/lib/media/cdn";
+import { FALLBACK_POST_IMAGE, sharePost } from "@/lib/posts/repo";
 import { sellerPath } from "@/lib/seo/urls";
 import { useAppUiStore } from "@/lib/state/app-ui-store";
 import HashtagText from "./HashtagText";
@@ -311,7 +312,8 @@ function PostPage({
 		// them off the page (lib/auth/context.tsx). Anonymous shares aren't
 		// counted, so skip the API call entirely instead of hardening the 401 path.
 		if (status === "signedIn") {
-			sharePost(post.id);
+			// 分享計數是 best-effort：失敗不影響原生分享或複製連結。
+			void sharePost(post.id).catch(() => undefined);
 		}
 		if (typeof navigator !== "undefined" && navigator.share) {
 			try {
@@ -355,6 +357,7 @@ function PostPage({
 			data-no-media={!hasMedia}
 			ref={pageRef}
 		>
+			{isActive ? <PostViewTracker postId={String(post.id)} /> : null}
 			{hasMedia && (
 				<div className="post-viewer__media">
 					{/* Ambient fill for the letterbox `contain` must leave somewhere.
@@ -843,9 +846,7 @@ export default function PostDetailViewer({
 		mql.addEventListener("change", sync);
 		return () => mql.removeEventListener("change", sync);
 	}, []);
-	const [sheetPostId, setSheetPostId] = React.useState<number | string | null>(
-		null,
-	);
+	const [sheetPostId, setSheetPostId] = React.useState<string | null>(null);
 	const sheetPostIdRef = React.useRef(sheetPostId);
 	sheetPostIdRef.current = sheetPostId;
 
@@ -872,7 +873,7 @@ export default function PostDetailViewer({
 	const handleRequestComments = React.useCallback(
 		(postId: number | string) => {
 			if (isMobile) {
-				setSheetPostId(postId);
+				setSheetPostId(String(postId));
 				return;
 			}
 			if (typeof document === "undefined") return;

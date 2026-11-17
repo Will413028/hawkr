@@ -63,7 +63,7 @@ test("the seller posts tab keeps the page one its own server render fetched", as
 
 	// The page fetches page one for this very seller, then declares that seed as
 	// belonging to the feed's scoped query.
-	assert.match(postsPage, /fetchPublicPostsTyped\(\{[\s\S]*?sellerId: id,/);
+	assert.match(postsPage, /getCachedStorePosts\(\s*storeId,\s*POSTS_PAGE_SIZE/);
 	assert.match(postsPage, /initialPostsMatchQuery/);
 	assert.match(feed, /initialPostsMatchQuery,/);
 	// Trusting a scoped seed stays opt-in: the canonical feed seeds itself, and
@@ -74,7 +74,7 @@ test("the seller posts tab keeps the page one its own server render fetched", as
 	);
 	assert.match(
 		hook,
-		/hasInitialData =\s*restored !== null \|\| \(!initialSeedFailed && seedMatchesQuery\);/,
+		/hasInitialData =\s*restored !== null \|\|\s*\(!initialSeedFailed && seedMatchesQuery && !viewer\);/,
 	);
 	// The skeleton branch this protects is driven by the query's pending state.
 	assert.match(hook, /initialLoading: query\.isPending/);
