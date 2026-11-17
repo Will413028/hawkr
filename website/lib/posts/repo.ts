@@ -6,7 +6,12 @@
 import type { Post } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { imageUri } from "@/lib/media/image";
 import { placeholders } from "@/lib/media/public-assets";
-import type { PostDetail, PostListItem } from "../api/openapi-types";
+import { formatPriceRange } from "@/lib/products/pricing";
+import type {
+	PostDetail,
+	PostListItem,
+	PostProductData,
+} from "../api/openapi-types";
 import {
 	socialAppClient,
 	socialPublicClient,
@@ -27,6 +32,18 @@ export interface PostsPage {
 const toSeconds = (t: { seconds: bigint } | undefined): number =>
 	t ? Number(t.seconds) : 0;
 
+/** 貼文帶的商品摘要（伺服器批次補）→ 卡片與單篇用的商品；商品已刪除、讀不到或下架時是 null。 */
+export function postProductOf(post: Post): PostProductData | null {
+	const product = post.product;
+	if (!product) return null;
+	return {
+		id: product.id,
+		imageKey: imageUri(product.image, "thumb") ?? "",
+		name: product.name,
+		price: formatPriceRange(Number(product.minPrice), Number(product.maxPrice)),
+	};
+}
+
 /** `Post` → 動態卡片用的列表項；缺圖補預設圖，店名缺漏補 Hawkr 選品。 */
 export function postToListItem(post: Post): PostListItem {
 	const image = imageUri(post.image, "card");
@@ -40,8 +57,7 @@ export function postToListItem(post: Post): PostListItem {
 		content: post.body,
 		imageKeys: [image?.trim() || FALLBACK_POST_IMAGE],
 		tags: uniquePostTags(post.hashtags.map((h) => h.display || h.name)),
-		// 貼文只帶商品 ID，卡片上的商品名稱、價格與圖不在貼文裡。
-		product: null,
+		product: postProductOf(post),
 		commentCount: Number(post.commentCount),
 		likeCount: Number(post.likeCount),
 		shareCount: Number(post.shareCount),
@@ -52,8 +68,9 @@ export function postToListItem(post: Post): PostListItem {
 	};
 }
 
-/** `Post` → 單篇貼文；商品只有 ID，沒有商品的名稱與價格。 */
+/** `Post` → 單篇貼文；商品摘要讀不到時 products 是空的，`productId` 仍照實帶回。 */
 export function postToDetail(post: Post): PostDetail & { productId?: string } {
+	const product = postProductOf(post);
 	const image = imageUri(post.image, "detail");
 	const store = post.store;
 	return {
@@ -64,7 +81,7 @@ export function postToDetail(post: Post): PostDetail & { productId?: string } {
 		content: post.body,
 		imageKeys: image ? [image] : [],
 		tags: uniquePostTags(post.hashtags.map((h) => h.display || h.name)),
-		products: [],
+		products: product ? [product] : [],
 		...(post.productId ? { productId: post.productId } : {}),
 		commentCount: Number(post.commentCount),
 		likeCount: Number(post.likeCount),

@@ -1,6 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import { PostSchema } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
+import {
+	PostProductSchema,
+	PostSchema,
+} from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const publicRpc = vi.hoisted(() => ({
@@ -71,9 +74,34 @@ describe("post mapping", () => {
 		});
 	});
 
-	it("the detail has no embedded product, only its id", () => {
+	it("the card and the detail show the server's product summary", () => {
 		const post = wirePost("p-1");
 		post.productId = "88";
+		post.product = create(PostProductSchema, {
+			id: "88",
+			name: "烏龍茶",
+			minPrice: BigInt(1200),
+			maxPrice: BigInt(1500),
+			available: true,
+			image: { uriTemplate: "https://media.example.test/p/88/{preset}.jpg" },
+		});
+		const product = {
+			id: "88",
+			name: "烏龍茶",
+			price: "NT$ 1,200 – 1,500",
+			imageKey: "https://media.example.test/p/88/thumb.jpg",
+		};
+		expect(postToListItem(post).product).toEqual(product);
+		expect(postToDetail(post)).toMatchObject({
+			products: [product],
+			productId: "88",
+		});
+	});
+
+	it("an unavailable product (summary unset) leaves the card without a product but keeps the id", () => {
+		const post = wirePost("p-1");
+		post.productId = "88";
+		expect(postToListItem(post).product).toBeNull();
 		expect(postToDetail(post)).toMatchObject({
 			products: [],
 			productId: "88",

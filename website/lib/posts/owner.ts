@@ -54,10 +54,13 @@ export function ownerDetail(post: Post): MyPostDetail {
 	const publishStatus = publishStatusOf(post.status);
 	return {
 		...detail,
-		// 貼文只帶商品 ID（沒有名稱、價格與圖）；編輯頁用 ID 預選商品。
-		products: post.productId
-			? [{ id: post.productId, imageKey: "", name: "", price: "" }]
-			: [],
+		// 商品摘要讀不到（已刪除）時編輯頁仍以 ID 預選，名稱與價格留空。
+		products:
+			detail.products.length > 0
+				? detail.products
+				: post.productId
+					? [{ id: post.productId, imageKey: "", name: "", price: "" }]
+					: [],
 		...(post.etag ? { etag: post.etag } : {}),
 		...(publishStatus ? { publishStatus } : {}),
 		...(post.takedownMeasureId
