@@ -241,6 +241,7 @@ class Post extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? hashtagInputs,
     $core.bool? viewerLiked,
     $core.String? takedownMeasureId,
+    Actor? viewerActor,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -264,6 +265,7 @@ class Post extends $pb.GeneratedMessage {
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
     if (viewerLiked != null) result.viewerLiked = viewerLiked;
     if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
+    if (viewerActor != null) result.viewerActor = viewerActor;
     return result;
   }
 
@@ -309,6 +311,8 @@ class Post extends $pb.GeneratedMessage {
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
     ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
+    ..aOM<Actor>(22, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -532,6 +536,20 @@ class Post extends $pb.GeneratedMessage {
   $core.bool hasTakedownMeasureId() => $_has(20);
   @$pb.TagNumber(21)
   void clearTakedownMeasureId() => $_clearField(21);
+
+  /// 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  /// 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  /// 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  @$pb.TagNumber(22)
+  Actor get viewerActor => $_getN(21);
+  @$pb.TagNumber(22)
+  set viewerActor(Actor value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasViewerActor() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearViewerActor() => $_clearField(22);
+  @$pb.TagNumber(22)
+  Actor ensureViewerActor() => $_ensure(21);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -2182,10 +2200,14 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   factory ListForumEntriesResponse({
     $core.Iterable<ForumEntry>? entries,
     $core.String? nextPageToken,
+    Actor? viewerActor,
+    $core.bool? viewerCanComment,
   }) {
     final result = ListForumEntriesResponse._();
     if (entries != null) result.entries.addAll(entries);
     if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (viewerCanComment != null) result.viewerCanComment = viewerCanComment;
     return result;
   }
 
@@ -2206,6 +2228,9 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
     ..pPM<ForumEntry>(1, _omitFieldNames ? '' : 'entries',
         subBuilder: ForumEntry.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..aOM<Actor>(3, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOB(4, _omitFieldNames ? '' : 'viewerCanComment')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2244,6 +2269,30 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   $core.bool hasNextPageToken() => $_has(1);
   @$pb.TagNumber(2)
   void clearNextPageToken() => $_clearField(2);
+
+  /// 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  /// 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  @$pb.TagNumber(3)
+  Actor get viewerActor => $_getN(2);
+  @$pb.TagNumber(3)
+  set viewerActor(Actor value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasViewerActor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearViewerActor() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Actor ensureViewerActor() => $_ensure(2);
+
+  /// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  /// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
+  @$pb.TagNumber(4)
+  $core.bool get viewerCanComment => $_getBF(3);
+  @$pb.TagNumber(4)
+  set viewerCanComment($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewerCanComment() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewerCanComment() => $_clearField(4);
 }
 
 class RecordPostViewRequest extends $pb.GeneratedMessage {
