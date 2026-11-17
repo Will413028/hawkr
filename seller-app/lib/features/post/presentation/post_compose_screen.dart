@@ -10,7 +10,6 @@ import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
 import 'dart:io';
 
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/transport.dart' show ConnectException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -216,7 +215,7 @@ class PostComposeScreen extends HookConsumerWidget {
             productId: linkedProductId?.toString(),
             hashtags: PostHashtagExtractor.extractFromText(titleCtrl.text),
           );
-        } on ConnectException catch (error) {
+        } catch (error) {
           if (context.mounted) {
             FloatingToast.error(
               context,

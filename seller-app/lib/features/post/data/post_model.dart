@@ -3,6 +3,8 @@ import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_api/images.dart';
 
+import '../../../shared/utils/product_image_resolver.dart';
+
 part 'post_model.freezed.dart';
 part 'post_model.g.dart';
 
@@ -41,7 +43,7 @@ abstract class Post with _$Post {
     @Default(0) int commentCount,
     @Default(0) int shareCount,
     DateTime? createdAt,
-    Map<String, dynamic>? linkedProduct,
+    PostLinkedProduct? linkedProduct,
     @Default(PostStatus.POST_STATUS_UNSPECIFIED) PostStatus status,
     String? takedownMeasureId,
     DateTime? scheduledPublishAt,
@@ -54,15 +56,39 @@ abstract class Post with _$Post {
   bool get isHidden => takedownMeasureId != null;
 }
 
-Map<String, dynamic>? _linkedProductOf(pb.Post post) {
+/// 貼文關聯的商品（`social.v1alpha1.PostProduct` 的顯示用快照）。[imageKey] 是圖片的完整網址或
+/// objectKey（空字串是沒有圖），顯示前經 `extractPrimaryProductImageUrl`。
+@freezed
+abstract class PostLinkedProduct with _$PostLinkedProduct {
+  const PostLinkedProduct._();
+
+  const factory PostLinkedProduct({
+    required String id,
+    @Default('') String name,
+    @Default(0) int price,
+    @Default('') String imageKey,
+  }) = _PostLinkedProduct;
+
+  /// 商品預覽頁與圖片解析共用的 Map 形狀（只有 `imageKey` 一個圖片欄位）。
+  Map<String, dynamic> toProductMap() => <String, dynamic>{
+    'id': id,
+    'name': name,
+    'price': price,
+    if (imageKey.isNotEmpty) 'imageKey': imageKey,
+  };
+
+  String get imageUrl => extractPrimaryProductImageUrl(toProductMap()) ?? '';
+}
+
+PostLinkedProduct? _linkedProductOf(pb.Post post) {
   if (!post.hasProduct() || post.product.id.isEmpty) return null;
   final product = post.product;
-  return <String, dynamic>{
-    'id': product.id,
-    'name': product.name,
-    'price': product.minPrice.toInt(),
-    if (product.hasImage()) 'imageKey': product.image.uri(ImagePreset.original),
-  };
+  return PostLinkedProduct(
+    id: product.id,
+    name: product.name,
+    price: product.minPrice.toInt(),
+    imageKey: product.hasImage() ? product.image.uri(ImagePreset.original) : '',
+  );
 }
 
 Post postFromProto(pb.Post post) => Post(

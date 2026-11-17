@@ -285,6 +285,23 @@ void main() {
       );
     });
 
+    testWidgets('發布丟出非 Connect 的例外：仍顯示發布失敗', (tester) async {
+      final repo = await _pump(tester, () => [_post(publishStatus: _draft)]);
+      when(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenThrow(StateError('boom'));
+
+      await tester.tap(_publishButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('發布').last);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('發布失敗'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
     testWidgets('取消確認不送出', (tester) async {
       final repo = await _pump(tester, () => [_post(publishStatus: _draft)]);
       await tester.tap(_publishButton);
@@ -539,6 +556,59 @@ void main() {
         ),
       );
       expect(unpublish.onPressed, isNotNull);
+    });
+
+    testWidgets('說明吃掉狀態列高度，下方內容不再重複加一次', (tester) async {
+      Future<(double, double)> measure({required bool suspended}) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        final repo = _Repo();
+        when(
+          () => repo.listMyPosts(),
+        ).thenAnswer((_) async => [_post(publishStatus: _published)]);
+        when(() => repo.listCommentsRaw(any())).thenAnswer((_) async => []);
+        when(() => repo.listCommentReplies(any())).thenAnswer((_) async => []);
+        await tester.pumpWidget(
+          ProviderScope(
+            key: UniqueKey(),
+            overrides: [
+              postRepositoryProvider.overrideWithValue(repo),
+              myStoreSnapshotProvider.overrideWithValue(
+                _store(capabilities: suspended ? suspendedCapabilities : null),
+              ),
+            ],
+            child: ScreenUtilInit(
+              designSize: const Size(390, 844),
+              enableScaleWH: () => false,
+              enableScaleText: () => false,
+              builder: (_, _) => MaterialApp(
+                theme: AppTheme.light,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(padding: const EdgeInsets.only(top: 40)),
+                  child: child!,
+                ),
+                home: const PageHomeFeedScreen(sellerName: '測試店家'),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final body = MediaQuery.paddingOf(tester.element(_publishButton)).top;
+        final notice = find.byKey(
+          const ValueKey('seller-posts-restricted-notice'),
+        );
+        return (body, suspended ? tester.getSize(notice).height : 0.0);
+      }
+
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final (suspendedBodyInset, noticeHeight) = await measure(suspended: true);
+      expect(suspendedBodyInset, 0);
+      expect(noticeHeight, greaterThanOrEqualTo(40));
+      final (normalBodyInset, _) = await measure(suspended: false);
+      expect(normalBodyInset, 40);
     });
 
     testWidgets('有 MARKETING：沒有說明，編輯在', (tester) async {

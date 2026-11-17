@@ -1,4 +1,5 @@
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/shared/widgets/linked_product_card.dart';
 import 'package:hawkr_seller/shared/widgets/optimized_image.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,7 @@ const String _mediaBase = 'http://localhost:8080';
 
 Future<void> _pumpCard(
   WidgetTester tester,
-  Map<String, dynamic> linkedProduct, {
+  PostLinkedProduct linkedProduct, {
   Size size = const Size(414, 896),
   double textScale = 1,
   bool inset = true,
@@ -80,13 +81,15 @@ void main() {
   });
 
   testWidgets('關聯商品圖走後端實際回傳的 imageKey（objectKey）', (tester) async {
-    await _pumpCard(tester, <String, dynamic>{
-      'id': '866542675787809994',
-      'name': '台灣紅豆',
-      'price': '195',
-      'imageKey': _key,
-      'imageUrl': '$_mediaBase/i/original/$_key',
-    });
+    await _pumpCard(
+      tester,
+      const PostLinkedProduct(
+        id: '866542675787809994',
+        name: '台灣紅豆',
+        price: 195,
+        imageKey: _key,
+      ),
+    );
 
     final image = tester.widget<OptimizedNetworkImage>(
       find.byType(OptimizedNetworkImage),
@@ -95,13 +98,14 @@ void main() {
   });
 
   testWidgets('imageKey 為空字串（建立回應的形狀）→ 不渲染圖片元件', (tester) async {
-    await _pumpCard(tester, <String, dynamic>{
-      'id': '866542675787809994',
-      'name': '台灣紅豆',
-      'price': '195',
-      'imageKey': '',
-      'imageUrl': '',
-    });
+    await _pumpCard(
+      tester,
+      const PostLinkedProduct(
+        id: '866542675787809994',
+        name: '台灣紅豆',
+        price: 195,
+      ),
+    );
 
     expect(find.byType(OptimizedNetworkImage), findsNothing);
   });
@@ -111,7 +115,7 @@ void main() {
   ) async {
     await _pumpCard(
       tester,
-      <String, dynamic>{'name': '台灣紅豆', 'price': '195', 'imageKey': ''},
+      const PostLinkedProduct(id: '1', name: '台灣紅豆', price: 195),
       size: const Size(320, 720),
       onTap: () {},
     );
@@ -131,7 +135,7 @@ void main() {
       try {
         await _pumpCard(
           tester,
-          <String, dynamic>{'name': name, 'price': '123456789', 'imageKey': ''},
+          const PostLinkedProduct(id: '1', name: name, price: 123456789),
           size: const Size(320, 720),
           textScale: 1.4,
           inset: false,

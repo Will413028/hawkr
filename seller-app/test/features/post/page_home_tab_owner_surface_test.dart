@@ -1,6 +1,9 @@
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/core/session/my_store.dart';
+import 'package:hawkr_seller/features/seller/data/current_store.dart';
+import '../../support/my_store_fixtures.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
@@ -19,7 +22,11 @@ void main() {
     if (!F.isInitialized) F.init(Flavor.dev);
   });
 
-  Future<List<Object?>> pumpGrid(WidgetTester tester, List<Post> posts) async {
+  Future<List<Object?>> pumpGrid(
+    WidgetTester tester,
+    List<Post> posts, {
+    MyStore? store,
+  }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -53,7 +60,10 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [postRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          postRepositoryProvider.overrideWithValue(repo),
+          if (store != null) myStoreSnapshotProvider.overrideWithValue(store),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
@@ -105,5 +115,29 @@ void main() {
     expect(find.text('7 個讚'), findsOneWidget);
     expect(find.bySemanticsLabel('共 7 個讚'), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('按讚')), findsNothing);
+  });
+
+  testWidgets('沒有 MARKETING：貼文格子上方顯示限制說明，新增貼文入口不在', (tester) async {
+    await pumpGrid(
+      tester,
+      [Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED)],
+      store: MyStore(
+        myStoreResponse(
+          id: '7',
+          storeCode: 'FRESH88',
+          capabilities: suspendedCapabilities,
+          publicListing: publicListingMissing(),
+        ),
+      ),
+    );
+    expect(find.text('店家目前受平台措施限制，貼文只能下架或刪除。'), findsOneWidget);
+    expect(find.text('新增貼文'), findsNothing);
+  });
+
+  testWidgets('有 MARKETING：沒有限制說明', (tester) async {
+    await pumpGrid(tester, [
+      Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED),
+    ]);
+    expect(find.text('店家目前受平台措施限制，貼文只能下架或刪除。'), findsNothing);
   });
 }

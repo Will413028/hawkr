@@ -9,7 +9,6 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/taipei_time.dart';
-import 'package:hawkr_api/transport.dart' show ConnectException;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
@@ -31,7 +30,6 @@ import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_post_card_surface.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/fruit_spinner.dart';
-import '../../../shared/utils/product_image_resolver.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../report/data/report_model.dart';
@@ -41,6 +39,7 @@ import '../data/post_model.dart';
 import '../data/post_publish.dart';
 import '../data/post_repository.dart';
 import 'post_controller.dart';
+import 'widgets/post_restricted_notice.dart';
 import 'widgets/post_status_badge.dart';
 import 'widgets/storefront_tab_glass.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
@@ -168,11 +167,7 @@ class PageHomeFeedScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(postListProvider);
     final share = ref.watch(storeShareProvider);
-    final canMarket =
-        ref
-            .watch(myStoreSnapshotProvider)
-            ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
-        true;
+    final canMarket = ref.watch(canMarketPostsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -183,9 +178,14 @@ class PageHomeFeedScreen extends HookConsumerWidget {
         ),
         child: Column(
           children: [
-            if (!canMarket) const _RestrictedNotice(),
+            if (!canMarket)
+              const PostRestrictedNotice(includeStatusBarInset: true),
             Expanded(
-              child: _buildBody(context, ref, postsAsync, share, canMarket),
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: !canMarket,
+                child: _buildBody(context, ref, postsAsync, share, canMarket),
+              ),
             ),
           ],
         ),
@@ -371,7 +371,7 @@ class _FeedPager extends HookWidget {
                 onProductTap: post.linkedProduct != null
                     ? () => context.push(
                         '/product/preview',
-                        extra: {'product': post.linkedProduct!},
+                        extra: {'product': post.linkedProduct!.toProductMap()},
                       )
                     : null,
               );
@@ -526,8 +526,7 @@ class _PostPage extends HookConsumerWidget {
     final publishing = useState(false);
     final target = postPublishTarget(post.status);
     // 能力還沒讀到（store 為 null）時不下結論，伺服器是最後一道。
-    final canPublish =
-        store?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? true;
+    final canPublish = ref.watch(canMarketPostsProvider);
     final canUnpublish =
         store?.can(SellerCapability.SELLER_CAPABILITY_CONTENT_CONTRACT) ?? true;
 
@@ -559,7 +558,7 @@ class _PostPage extends HookConsumerWidget {
           final error = ref.read(postListProvider).error;
           FloatingToast.error(context, _mutationErrorMessage(error ?? '', ref));
         }
-      } on ConnectException catch (error) {
+      } catch (error) {
         if (context.mounted) {
           final prefix = publish ? '發布失敗' : '下架失敗';
           FloatingToast.error(
@@ -1084,19 +1083,15 @@ class _PostManagementButton extends StatelessWidget {
 
 class _PostLinkedProduct extends StatelessWidget {
   const _PostLinkedProduct({super.key, required this.product, this.onTap});
-  final Map<String, dynamic> product;
+  final PostLinkedProduct product;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final name = product['name']?.toString() ?? '';
+    final name = product.name;
     if (name.isEmpty) return const SizedBox.shrink();
-    // Same seller price and image resolution as LinkedProductCard.
-    final priceRaw = product['price'];
-    final price = priceRaw is num
-        ? priceRaw.toInt()
-        : int.tryParse('${priceRaw ?? ''}') ?? 0;
-    final imageUrl = extractPrimaryProductImageUrl(product) ?? '';
+    final price = product.price;
+    final imageUrl = product.imageUrl;
     return Semantics(
       label: '查看關聯商品 $name',
       button: true,
@@ -2266,25 +2261,4 @@ List<InlineSpan> _buildHashtagSpans(String content, TextStyle baseStyle) {
     spans.add(TextSpan(text: content.substring(last), style: baseStyle));
   }
   return spans;
-}
-
-class _RestrictedNotice extends StatelessWidget {
-  const _RestrictedNotice();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: const ValueKey('seller-posts-restricted-notice'),
-    width: double.infinity,
-    color: AppColors.warningSoft,
-    padding: EdgeInsets.fromLTRB(
-      HkSpace.lg,
-      MediaQuery.paddingOf(context).top + HkSpace.sm,
-      HkSpace.lg,
-      HkSpace.sm,
-    ),
-    child: const Text(
-      kPostRestrictedNotice,
-      style: TextStyle(color: AppColors.warningText),
-    ),
-  );
 }

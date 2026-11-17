@@ -10,7 +10,7 @@ import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
 import 'dart:io';
 
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/transport.dart' show ConnectException;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -51,11 +51,15 @@ class PostEditScreen extends HookConsumerWidget {
 
     final loadingProducts = useState(true);
     final products = useState<List<Map<String, dynamic>>>([]);
-    final selectedProductIndex = useState<int?>(null);
+    final basePost = useState(post);
+    final linkedProductId = useState<String?>(post.linkedProduct?.id);
+    final selectedProductIndex = products.value.indexWhere(
+      (p) => p['id']?.toString() == linkedProductId.value,
+    );
 
     final repo = ref.read(postRepositoryProvider);
 
-    // 初始化：載入商品列表，並預選現有 linkedProduct
+    // 初始化：載入商品列表；關聯商品從 post.linkedProduct 起算，與列表是否載入無關
     useEffect(() {
       Future.microtask(() async {
         final sellerId = ref.read(sellerStoreIdProvider);
@@ -74,18 +78,6 @@ class PostEditScreen extends HookConsumerWidget {
               : <Map<String, dynamic>>[];
           if (context.mounted) {
             products.value = list;
-            // 預選現有關聯商品
-            if (post.linkedProduct != null) {
-              // `PostProductData` 只有 id / name / imageKey / imageUrl / price
-              // （gateway/internal/handler/post.go）；skuId / productId 不存在。
-              final existingId = post.linkedProduct!['id'];
-              if (existingId != null) {
-                final idx = list.indexWhere(
-                  (p) => p['id']?.toString() == existingId.toString(),
-                );
-                if (idx != -1) selectedProductIndex.value = idx;
-              }
-            }
             loadingProducts.value = false;
           }
         } catch (e) {
@@ -166,26 +158,28 @@ class PostEditScreen extends HookConsumerWidget {
           stagedToken = token;
         }
 
-        String? productId;
-        if (selectedProductIndex.value != null &&
-            selectedProductIndex.value! < products.value.length) {
-          final p = products.value[selectedProductIndex.value!];
-          productId = p['id']?.toString();
-        }
-
         try {
           await ref
               .read(postListProvider.notifier)
               .updatePost(
-                post,
+                basePost.value,
                 content: contentCtrl.text.trim(),
                 imageStagedToken: stagedToken,
-                productId: productId,
+                productId: linkedProductId.value,
+                updateProduct: linkedProductId.value != post.linkedProduct?.id,
                 hashtags: PostHashtagExtractor.extractFromText(
                   contentCtrl.text,
                 ),
               );
-        } on ConnectException catch (error) {
+        } catch (error) {
+          final latest = error is ConnectException && error.code == Code.aborted
+              ? ref
+                    .read(postListProvider)
+                    .value
+                    ?.where((p) => p.id == post.id)
+                    .firstOrNull
+              : null;
+          if (latest != null) basePost.value = latest;
           if (context.mounted) {
             FloatingToast.error(
               context,
@@ -382,9 +376,7 @@ class PostEditScreen extends HookConsumerWidget {
       final productImageUrl = product['imageUrl'];
       return GestureDetector(
         onTap: () {
-          selectedProductIndex.value = selectedProductIndex.value == index
-              ? null
-              : index;
+          linkedProductId.value = isSelected ? null : product['id']?.toString();
         },
         child: Container(
           constraints: BoxConstraints(minHeight: 74.h),
@@ -563,7 +555,7 @@ class PostEditScreen extends HookConsumerWidget {
             itemBuilder: (_, i) => buildProductItem(
               products.value[i],
               i,
-              selectedProductIndex.value == i,
+              selectedProductIndex == i,
             ),
           ),
         ],

@@ -6,13 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../config/image_config.dart';
-import '../utils/product_image_resolver.dart';
+import '../../features/post/data/post_model.dart';
 import 'optimized_image.dart';
 
 /// 導購商品連結卡片 (根據 Figma 4075:59542 設計)
 ///
-/// 接受 [linkedProduct] Map，支援 `imageUrl` 和 `image` 兩種圖片欄位名稱。
-/// 若 [linkedProduct] 為 null 或 name 欄位為空，回傳空 Widget。
+/// 顯示 [linkedProduct]；name 為空時回傳空 Widget。
 class LinkedProductCard extends StatelessWidget {
   const LinkedProductCard({
     super.key,
@@ -21,7 +20,7 @@ class LinkedProductCard extends StatelessWidget {
     this.inset = true,
   });
 
-  final Map<String, dynamic> linkedProduct;
+  final PostLinkedProduct linkedProduct;
   final VoidCallback? onTap;
 
   /// Keeps the legacy outer margin and standalone card chrome by default.
@@ -33,14 +32,11 @@ class LinkedProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = linkedProduct['name']?.toString() ?? '';
+    final name = linkedProduct.name;
     if (name.isEmpty) return const SizedBox.shrink();
 
-    final priceRaw = linkedProduct['price'];
-    final price = (priceRaw is num)
-        ? priceRaw.toInt()
-        : int.tryParse('${priceRaw ?? ''}') ?? 0;
-    final imageUrl = extractPrimaryProductImageUrl(linkedProduct) ?? '';
+    final price = linkedProduct.price;
+    final imageUrl = linkedProduct.imageUrl;
     final embedded = !inset;
     final radius = BorderRadius.circular(HkRadius.lg);
     final thumbnailSize = embedded ? HkControl.minTap : 50.0;

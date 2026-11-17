@@ -1,9 +1,23 @@
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
+    show SellerCapability;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Provider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../seller/data/current_store.dart';
 import '../data/post_repository.dart';
 import '../data/post_model.dart';
 
 part 'post_controller.g.dart';
+
+/// 店家有 MARKETING 能力才能建立、修改、發布貼文。能力還沒讀到時不下結論（true），伺服器是最後一道。
+final canMarketPostsProvider = Provider<bool>(
+  (ref) =>
+      ref
+          .watch(myStoreSnapshotProvider)
+          ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
+      true,
+);
 
 @riverpod
 class PostList extends _$PostList {
@@ -53,6 +67,11 @@ class PostList extends _$PostList {
     }
   }
 
+  /// etag 與伺服器不符（aborted）代表列表是舊的：重讀，讓下一次重試帶新的 etag。
+  Future<void> _refreshOnConflict(ConnectException error) async {
+    if (error.code == Code.aborted) await silentRefresh();
+  }
+
   /// 發布或下架。不做樂觀更新：發布狀態是後端算出來的（排程會被一併結束），
   /// 成功後重讀列表，失敗時狀態不變、錯誤交給呼叫端顯示。
   ///
@@ -61,14 +80,18 @@ class PostList extends _$PostList {
   /// （舊列表上的狀態已經不是真的），直到下一次重讀成功。回傳是否重讀成功。
   Future<bool> setPublished(int postId, {required bool publish}) async {
     final repo = ref.read(postRepositoryProvider);
-    final etag = state.value?.where((p) => p.id == postId).firstOrNull?.etag;
-    if (etag == null) {
-      throw StateError('post $postId is not in the loaded list');
-    }
-    if (publish) {
-      await repo.publishPostOrThrow(postId, etag: etag);
-    } else {
-      await repo.unpublishPostOrThrow(postId, etag: etag);
+    final etag =
+        state.value?.where((p) => p.id == postId).firstOrNull?.etag ??
+        (await repo.getMyPost(postId)).etag;
+    try {
+      if (publish) {
+        await repo.publishPostOrThrow(postId, etag: etag);
+      } else {
+        await repo.unpublishPostOrThrow(postId, etag: etag);
+      }
+    } on ConnectException catch (error) {
+      await _refreshOnConflict(error);
+      rethrow;
     }
     try {
       state = AsyncData(await repo.listMyPosts());
@@ -85,20 +108,28 @@ class PostList extends _$PostList {
     required String content,
     String? imageStagedToken,
     String? productId,
+    bool updateProduct = false,
     List<String> hashtags = const [],
   }) async {
-    final updated =
-        (await ref
-                .read(postRepositoryProvider)
-                .updatePost(
-                  post.id,
-                  etag: post.etag,
-                  content: content,
-                  imageStagedToken: imageStagedToken,
-                  productId: productId,
-                  hashtags: hashtags,
-                ))
-            .copyWith(scheduledPublishAt: post.scheduledPublishAt);
+    final Post updated;
+    try {
+      updated =
+          (await ref
+                  .read(postRepositoryProvider)
+                  .updatePost(
+                    post.id,
+                    etag: post.etag,
+                    content: content,
+                    imageStagedToken: imageStagedToken,
+                    productId: productId,
+                    updateProduct: updateProduct,
+                    hashtags: hashtags,
+                  ))
+              .copyWith(scheduledPublishAt: post.scheduledPublishAt);
+    } on ConnectException catch (error) {
+      await _refreshOnConflict(error);
+      rethrow;
+    }
     final prevState = state;
     if (prevState is AsyncData<List<Post>>) {
       state = AsyncData(

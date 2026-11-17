@@ -21,12 +21,12 @@ import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/linked_product_card.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../../seller/data/current_store.dart';
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
-    show SellerCapability;
 import '../../data/post_comments_availability.dart';
 import '../../data/post_model.dart';
 import '../../data/post_repository.dart';
+import '../post_controller.dart';
 import 'hidden_post_badge.dart';
+import 'post_restricted_notice.dart';
 import 'storefront_tab_glass.dart';
 
 /// 社群(首頁) Tab — 貼文九宮格、長按預覽卡、按讚/留言邏輯。
@@ -65,6 +65,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   bool _loadingMorePosts = false;
   bool _hasMorePosts = true;
   String _nextPostsToken = '';
+  Map<int, DateTime> _postSchedules = const {};
 
   final Map<int, int> _postCommentCount = <int, int>{};
   final Set<int> _commentsInitRequested = <int>{};
@@ -148,6 +149,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       setState(() {
         _posts = result.posts;
         _nextPostsToken = result.nextPageToken;
+        _postSchedules = result.schedules;
         _hasMorePosts = result.hasMore;
         _loadingPosts = false;
         _syncCommentNotifiers(result.posts, prune: true);
@@ -167,6 +169,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       final result = await _postRepo.listMyPostsPage(
         pageToken: _nextPostsToken,
         pageSize: _postsPageSize,
+        schedules: _postSchedules,
       );
       if (!mounted) return;
       setState(() {
@@ -205,7 +208,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
         });
   }
 
-  void _showHiddenReasonSheet(BuildContext context, String? reason) {
+  void _showHiddenReasonSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       // 貼文 tab 位於 `StatefulShellRoute` 分支底下，分支 Navigator 在浮動導覽列
@@ -239,9 +242,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                 ),
                 SizedBox(height: 8.h),
                 Text(
-                  reason?.isNotEmpty == true
-                      ? reason!
-                      : '此貼文因違反平台規範已被下架，如有疑問請聯繫客服。',
+                  '此貼文因違反平台規範已被下架，如有疑問請聯繫客服。',
                   style: TextStyle(fontSize: 14.sp, color: AppColors.gray1),
                 ),
               ],
@@ -358,11 +359,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   Widget _homeWithFab() {
     final Widget content = _homeGrid();
     final navigationClearance = sellerFloatingNavigationClearance(context);
-    final canMarket =
-        ref
-            .watch(myStoreSnapshotProvider)
-            ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
-        true;
+    final canMarket = ref.watch(canMarketPostsProvider);
     return Stack(
       children: [
         Positioned.fill(child: content),
@@ -395,6 +392,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   }
 
   Widget _homeGrid() {
+    final canMarket = ref.watch(canMarketPostsProvider);
     return FruitRefreshIndicator(
       onRefresh: widget.onReloadSeller,
       child: NotificationListener<ScrollNotification>(
@@ -404,6 +402,8 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
           slivers: [
             if (widget.outerHandle != null)
               SliverOverlapInjector(handle: widget.outerHandle!),
+            if (!canMarket)
+              const SliverToBoxAdapter(child: PostRestrictedNotice()),
             SliverToBoxAdapter(child: SizedBox(height: 24.h)),
             _buildPostGridSliver(),
             _buildPostGridFooterSliver(),
@@ -508,7 +508,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       child: InkWell(
         borderRadius: borderRadius,
         onTap: hidden
-            ? () => _showHiddenReasonSheet(context, null)
+            ? () => _showHiddenReasonSheet(context)
             : () => _openFullScreenFeedForPost(post),
         onTapDown: (details) => _lastTapDownPosition = details.globalPosition,
         onLongPress: () {

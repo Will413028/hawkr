@@ -9,6 +9,7 @@ import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
+import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 
 PostRepository _repository(FakeTransportBuilder transport) {
@@ -85,12 +86,15 @@ void main() {
     expect(hidden.shareCount, 2);
     expect(hidden.url, 'https://hawkr.example/p/42');
     expect(hidden.imageUrl, 'https://m.test/i/original/posts/a.jpg');
-    expect(hidden.linkedProduct, {
-      'id': '900',
-      'name': '蘋果',
-      'price': 120,
-      'imageKey': 'https://m.test/i/original/p/9.jpg',
-    });
+    expect(
+      hidden.linkedProduct,
+      const PostLinkedProduct(
+        id: '900',
+        name: '蘋果',
+        price: 120,
+        imageKey: 'https://m.test/i/original/p/9.jpg',
+      ),
+    );
     expect(hidden.scheduledPublishAt, isNull);
     final draft = posts.last;
     expect(draft.isHidden, isFalse);
@@ -100,6 +104,7 @@ void main() {
 
   test('listMyPosts follows page tokens to the end', () async {
     final tokens = <String>[];
+    var scheduleReads = 0;
     final repository = _repository(
       FakeTransportBuilder()
           .unary(SocialAppService.listMyPosts, (request, _) {
@@ -111,16 +116,17 @@ void main() {
                   )
                 : pb.ListMyPostsResponse(posts: [_proto(id: '43')]);
           })
-          .unary(
-            SocialAppService.listPendingSchedules,
-            (_, _) => pb.ListPendingSchedulesResponse(),
-          ),
+          .unary(SocialAppService.listPendingSchedules, (_, _) {
+            scheduleReads++;
+            return pb.ListPendingSchedulesResponse();
+          }),
     );
 
     final posts = await repository.listMyPosts();
 
     expect(posts.map((p) => p.id), [42, 43]);
     expect(tokens, ['', 'next']);
+    expect(scheduleReads, 1, reason: 'schedules are read once per list load');
   });
 
   test('publish and unpublish send the post etag', () async {
@@ -177,25 +183,45 @@ void main() {
       content: '新內文',
       imageStagedToken: 'tok',
       productId: '900',
+      updateProduct: true,
       hashtags: const ['#a'],
     );
 
-    expect(requests.first.updateMask.paths, [
-      'body',
-      'product_id',
-      'hashtag_inputs',
-    ]);
+    expect(requests.first.updateMask.paths, ['body', 'hashtag_inputs']);
     expect(requests.first.post.hasProductId(), isFalse);
     expect(requests.last.updateMask.paths, [
       'body',
-      'product_id',
       'hashtag_inputs',
+      'product_id',
       'image_staged_token',
     ]);
     expect(requests.last.post.imageStagedToken, 'tok');
     expect(requests.last.post.productId, '900');
     expect(requests.last.post.etag, 'e1');
   });
+
+  test(
+    'update with updateProduct and no productId clears the product',
+    () async {
+      final requests = <pb.UpdatePostRequest>[];
+      final repository = _repository(
+        FakeTransportBuilder().unary(SocialAppService.updatePost, (request, _) {
+          requests.add(request);
+          return pb.UpdatePostResponse(post: _proto());
+        }),
+      );
+
+      await repository.updatePost(
+        42,
+        etag: 'e1',
+        content: 'x',
+        updateProduct: true,
+      );
+
+      expect(requests.single.updateMask.paths, contains('product_id'));
+      expect(requests.single.post.hasProductId(), isFalse);
+    },
+  );
 
   test('create publishes the new post and delete targets the id', () async {
     final created = <pb.CreatePostRequest>[];

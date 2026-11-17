@@ -41,12 +41,11 @@ Post _postFixture() => Post(
   ).join('\n'),
   likeCount: 1234567,
   commentCount: 654321,
-  linkedProduct: const <String, dynamic>{
-    'id': '866542675787809994',
-    'name': _longProductName,
-    'price': '123456789',
-    'imageKey': '',
-  },
+  linkedProduct: const PostLinkedProduct(
+    id: '866542675787809994',
+    name: _longProductName,
+    price: 123456789,
+  ),
 );
 
 EdgeInsets _safeInsets(Size size) => size.width > size.height

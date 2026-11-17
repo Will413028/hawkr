@@ -27,10 +27,17 @@ PostRepository postRepository(Ref ref) {
 
 /// 貼文分頁查詢結果：這頁的貼文與下一頁的 token（空字串是沒有下一頁）。
 class PostPageResult {
-  const PostPageResult({required this.posts, required this.nextPageToken});
+  const PostPageResult({
+    required this.posts,
+    required this.nextPageToken,
+    this.schedules = const {},
+  });
 
   final List<Post> posts;
   final String nextPageToken;
+
+  /// 這次載入用到的待發布排程；翻下一頁時原樣帶回 `listMyPostsPage(schedules:)`，不再重讀。
+  final Map<int, DateTime> schedules;
 
   bool get hasMore => nextPageToken.isNotEmpty;
 }
@@ -55,33 +62,49 @@ class PostRepository with ApiRequestHelper {
   Future<List<Post>> listMyPosts() async {
     final all = <Post>[];
     var token = '';
+    Map<int, DateTime>? schedules;
     do {
       final page = await listMyPostsPage(
         pageToken: token,
         pageSize: _maxPageSize,
+        schedules: schedules,
       );
+      schedules = page.schedules;
       all.addAll(page.posts);
       token = page.nextPageToken;
     } while (token.isNotEmpty);
     return all;
   }
 
-  /// 自己頁面用：一頁貼文，排程時間已併入。
+  /// 自己頁面用：一頁貼文，排程時間已併入。[schedules] 是同一次載入前一頁拿到的排程
+  /// （[PostPageResult.schedules]）；沒給時與這頁貼文同時讀一次。
   Future<PostPageResult> listMyPostsPage({
     String pageToken = '',
     int pageSize = 20,
+    Map<int, DateTime>? schedules,
   }) async {
-    final response = await _social.listMyPosts(
-      pb.ListMyPostsRequest(pageSize: pageSize, pageToken: pageToken),
-    );
-    final schedules = await _pendingScheduleTimes();
+    final (response, times) = await (
+      _social.listMyPosts(
+        pb.ListMyPostsRequest(pageSize: pageSize, pageToken: pageToken),
+      ),
+      schedules != null ? Future.value(schedules) : _pendingScheduleTimes(),
+    ).wait;
     return PostPageResult(
       posts: [
         for (final post in response.posts)
-          _withSchedule(postFromProto(post), schedules),
+          _withSchedule(postFromProto(post), times),
       ],
       nextPageToken: response.nextPageToken,
+      schedules: times,
     );
+  }
+
+  /// 讀一篇自己的貼文（列表沒有這篇時取得目前的 etag）；排程時間不併入。
+  Future<Post> getMyPost(int postId) async {
+    final response = await _social.getMyPost(
+      pb.GetMyPostRequest(postId: postId.toString()),
+    );
+    return postFromProto(response.post);
   }
 
   Post _withSchedule(Post post, Map<int, DateTime> schedules) =>
@@ -367,23 +390,28 @@ class PostRepository with ApiRequestHelper {
   // ── 貼文更新 ───────────────────────────────────────────
 
   /// 修改貼文內文、商品與標籤；[imageStagedToken] 是 `null` 時保留現有圖片，非 null 時換成該 token
-  /// （空字串是清掉圖）。[productId] 是 `null` 時清掉商品。[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  /// （空字串是清掉圖）。[updateProduct] 為 true 時才改關聯商品，[productId] 是 `null` 即清掉商品；
+  /// 為 false 時 [productId] 被忽略、商品不變。[etag] 與目前版本不符丟 `ConnectException`（aborted）。
   Future<Post> updatePost(
     int postId, {
     required String etag,
     required String content,
     String? imageStagedToken,
     String? productId,
+    bool updateProduct = false,
     List<String> hashtags = const [],
   }) async {
     final post = pb.Post(
       id: postId.toString(),
       etag: etag,
       body: content,
-      productId: productId,
       hashtagInputs: hashtags,
     );
-    final paths = ['body', 'product_id', 'hashtag_inputs'];
+    final paths = ['body', 'hashtag_inputs'];
+    if (updateProduct) {
+      if (productId != null) post.productId = productId;
+      paths.add('product_id');
+    }
     if (imageStagedToken != null) {
       post.imageStagedToken = imageStagedToken;
       paths.add('image_staged_token');
