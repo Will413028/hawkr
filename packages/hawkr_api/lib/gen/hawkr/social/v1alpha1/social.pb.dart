@@ -2284,6 +2284,7 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   Actor ensureViewerActor() => $_ensure(2);
 
   /// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  /// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
   @$pb.TagNumber(4)
   $core.bool get viewerCanComment => $_getBF(3);
   @$pb.TagNumber(4)

@@ -1900,6 +1900,7 @@ type ListForumEntriesResponse struct {
 	// 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
 	ViewerActor *Actor `protobuf:"bytes,3,opt,name=viewer_actor,json=viewerActor,proto3" json:"viewer_actor,omitempty"`
 	// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+	// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
 	ViewerCanComment bool `protobuf:"varint,4,opt,name=viewer_can_comment,json=viewerCanComment,proto3" json:"viewer_can_comment,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
