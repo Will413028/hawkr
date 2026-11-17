@@ -22,7 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫，
+// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫；measure_contents_measure_status_fkey 保留，因為撤銷措施時 measure_status 靠它同步，那是這組測試要驗的不變量，
 // 事件由測試依真實 seller 的形狀發布（seller 自己的規則與真實的建立入口在 seller、httpapi 的測試）。
 type takedowns struct {
 	f *fixture
@@ -34,7 +34,7 @@ func (f *fixture) takedowns(t *testing.T) takedowns {
 	events.Subscribe(f.bus, f.module.OnMeasureRevoked)
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f')
+		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f') AND conname <> 'measure_contents_measure_status_fkey'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return takedowns{f: f}
 }
