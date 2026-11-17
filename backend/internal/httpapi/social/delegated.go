@@ -81,11 +81,11 @@ type Delegated struct {
 var _ socialv1alpha1connect.SocialDelegatedServiceHandler = (*Delegated)(nil)
 
 // NewDelegated 建立 handler；webOrigin 與 App 共用，組回應裡貼文的單篇網址，不可是零值。
-func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*Delegated, error) {
+func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin) (*Delegated, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
-	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, runner: runner, posts: posts}, nil
+	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin}, runner: runner, posts: posts}, nil
 }
 
 // delegatedOperation 解析每個寫入共同的稽核資料：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。

@@ -308,6 +308,15 @@ const Post$json = {
       '10': 'takedownMeasureId',
       '17': true
     },
+    {
+      '1': 'product',
+      '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.PostProduct',
+      '8': {},
+      '10': 'product'
+    },
   ],
   '8': [
     {'1': '_product_id'},
@@ -334,8 +343,37 @@ final $typed_data.Uint8List postDescriptor = $convert.base64Decode(
     'MQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGBIgASgJQgPgQQRSEGltYWdlU3RhZ2VkVG9rZW4SKgoOaG'
     'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0cxImCgx2aWV3ZXJfbGlrZWQY'
     'FCABKAhCA+BBA1ILdmlld2VyTGlrZWQSOAoTdGFrZWRvd25fbWVhc3VyZV9pZBgVIAEoCUID4E'
-    'EDSAFSEXRha2Vkb3duTWVhc3VyZUlkiAEBQg0KC19wcm9kdWN0X2lkQhYKFF90YWtlZG93bl9t'
-    'ZWFzdXJlX2lk');
+    'EDSAFSEXRha2Vkb3duTWVhc3VyZUlkiAEBEkEKB3Byb2R1Y3QYFiABKAsyIi5oYXdrci5zb2Np'
+    'YWwudjFhbHBoYTEuUG9zdFByb2R1Y3RCA+BBA1IHcHJvZHVjdEINCgtfcHJvZHVjdF9pZEIWCh'
+    'RfdGFrZWRvd25fbWVhc3VyZV9pZA==');
+
+@$core.Deprecated('Use postProductDescriptor instead')
+const PostProduct$json = {
+  '1': 'PostProduct',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'name'},
+    {
+      '1': 'image',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.Image',
+      '8': {},
+      '10': 'image'
+    },
+    {'1': 'min_price', '3': 4, '4': 1, '5': 3, '8': {}, '10': 'minPrice'},
+    {'1': 'max_price', '3': 5, '4': 1, '5': 3, '8': {}, '10': 'maxPrice'},
+    {'1': 'available', '3': 6, '4': 1, '5': 8, '8': {}, '10': 'available'},
+  ],
+};
+
+/// Descriptor for `PostProduct`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List postProductDescriptor = $convert.base64Decode(
+    'CgtQb3N0UHJvZHVjdBITCgJpZBgBIAEoCUID4EEDUgJpZBIXCgRuYW1lGAIgASgJQgPgQQNSBG'
+    '5hbWUSNwoFaW1hZ2UYAyABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBA1IF'
+    'aW1hZ2USIAoJbWluX3ByaWNlGAQgASgDQgPgQQNSCG1pblByaWNlEiAKCW1heF9wcmljZRgFIA'
+    'EoA0ID4EEDUghtYXhQcmljZRIhCglhdmFpbGFibGUYBiABKAhCA+BBA1IJYXZhaWxhYmxl');
 
 @$core.Deprecated('Use actorDescriptor instead')
 const Actor$json = {
@@ -2544,6 +2582,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.social.v1alpha1.PostProduct': PostProduct$json,
   '.hawkr.social.v1alpha1.ListPostsRequest': ListPostsRequest$json,
   '.hawkr.social.v1alpha1.ListPostsResponse': ListPostsResponse$json,
   '.hawkr.social.v1alpha1.ListCommentsRequest': ListCommentsRequest$json,
@@ -2785,6 +2824,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.Post': Post$json,
   '.hawkr.common.v1alpha1.StoreCard': $1.StoreCard$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
+  '.hawkr.social.v1alpha1.PostProduct': PostProduct$json,
   '.hawkr.social.v1alpha1.GetMyPostRequest': GetMyPostRequest$json,
   '.hawkr.social.v1alpha1.GetMyPostResponse': GetMyPostResponse$json,
   '.hawkr.social.v1alpha1.ListMyPostsRequest': ListMyPostsRequest$json,
@@ -2953,6 +2993,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.social.v1alpha1.PostProduct': PostProduct$json,
   '.hawkr.social.v1alpha1.GetStorePostRequest': GetStorePostRequest$json,
   '.hawkr.social.v1alpha1.GetStorePostResponse': GetStorePostResponse$json,
   '.hawkr.social.v1alpha1.CreateStorePostRequest': CreateStorePostRequest$json,

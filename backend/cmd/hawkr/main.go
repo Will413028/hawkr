@@ -288,6 +288,7 @@ func runServe(ctx context.Context) error {
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
 		Stats:           stats,
 		DashboardOrders: sellerDashboardOrders{orders},
+		SocialProducts:  socialCards{products},
 		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
 		Deletion:        deletion,
 		Delegation:      del,

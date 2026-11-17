@@ -241,6 +241,7 @@ class Post extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? hashtagInputs,
     $core.bool? viewerLiked,
     $core.String? takedownMeasureId,
+    PostProduct? product,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -264,6 +265,7 @@ class Post extends $pb.GeneratedMessage {
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
     if (viewerLiked != null) result.viewerLiked = viewerLiked;
     if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
+    if (product != null) result.product = product;
     return result;
   }
 
@@ -309,6 +311,8 @@ class Post extends $pb.GeneratedMessage {
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
     ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
+    ..aOM<PostProduct>(22, _omitFieldNames ? '' : 'product',
+        subBuilder: PostProduct.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -532,6 +536,144 @@ class Post extends $pb.GeneratedMessage {
   $core.bool hasTakedownMeasureId() => $_has(20);
   @$pb.TagNumber(21)
   void clearTakedownMeasureId() => $_clearField(21);
+
+  /// `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到或（公開讀取時）已下架時不設，
+  /// 不影響貼文本身；`product_id` 仍照實回傳。
+  @$pb.TagNumber(22)
+  PostProduct get product => $_getN(21);
+  @$pb.TagNumber(22)
+  set product(PostProduct value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasProduct() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearProduct() => $_clearField(22);
+  @$pb.TagNumber(22)
+  PostProduct ensureProduct() => $_ensure(21);
+}
+
+/// PostProduct 是貼文帶的商品的顯示資料。
+class PostProduct extends $pb.GeneratedMessage {
+  factory PostProduct({
+    $core.String? id,
+    $core.String? name,
+    $2.Image? image,
+    $fixnum.Int64? minPrice,
+    $fixnum.Int64? maxPrice,
+    $core.bool? available,
+  }) {
+    final result = PostProduct._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (image != null) result.image = image;
+    if (minPrice != null) result.minPrice = minPrice;
+    if (maxPrice != null) result.maxPrice = maxPrice;
+    if (available != null) result.available = available;
+    return result;
+  }
+
+  PostProduct._();
+
+  factory PostProduct.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostProduct()..mergeFromBuffer(data, registry);
+  factory PostProduct.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostProduct()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostProduct',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PostProduct.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOM<$2.Image>(3, _omitFieldNames ? '' : 'image',
+        subBuilder: $2.Image.$_createMessage)
+    ..aInt64(4, _omitFieldNames ? '' : 'minPrice')
+    ..aInt64(5, _omitFieldNames ? '' : 'maxPrice')
+    ..aOB(6, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostProduct clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostProduct copyWith(void Function(PostProduct) updates) =>
+      super.copyWith((message) => updates(message as PostProduct))
+          as PostProduct;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PostProduct() / PostProduct.new instead')
+  static PostProduct create() => PostProduct._();
+  static $pb.GeneratedMessage $_createMessage() => PostProduct._();
+  @$core.override
+  PostProduct createEmptyInstance() => PostProduct._();
+  @$core.pragma('dart2js:noInline')
+  static PostProduct getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PostProduct>(
+          PostProduct.$_createMessage);
+  static PostProduct? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// 商品圖，沒有圖時不設。
+  @$pb.TagNumber(3)
+  $2.Image get image => $_getN(2);
+  @$pb.TagNumber(3)
+  set image($2.Image value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasImage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearImage() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Image ensureImage() => $_ensure(2);
+
+  /// 規格中最低與最高的價格，新台幣元。
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get minPrice => $_getI64(3);
+  @$pb.TagNumber(4)
+  set minPrice($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMinPrice() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMinPrice() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get maxPrice => $_getI64(4);
+  @$pb.TagNumber(5)
+  set maxPrice($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMaxPrice() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMaxPrice() => $_clearField(5);
+
+  /// 現在可以購買；下架或售完時是 false（只有店主讀自己的貼文看得到下架的商品）。
+  @$pb.TagNumber(6)
+  $core.bool get available => $_getBF(5);
+  @$pb.TagNumber(6)
+  set available($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAvailable() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvailable() => $_clearField(6);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。

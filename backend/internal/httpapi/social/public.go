@@ -57,12 +57,33 @@ type Stores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
+// ProductInfo 是貼文帶的商品的顯示資料（舊 product-service 的卡片）。
+type ProductInfo struct {
+	ID       int64
+	StoreID  int64
+	Name     string
+	ImageKey string
+	MinPrice int64
+	MaxPrice int64
+	// Available 是現在可以購買（上架且有庫存）。
+	Available bool
+}
+
+// Products 以一個批次取得商品顯示資料（B4 的 catalog 搬進單體後換成 in-process）；includeInactive 為假時只回上架中的，
+// 缺少的 ID（已刪除或被排除）不在回傳裡。
+type Products interface {
+	Cards(ctx context.Context, ids []int64, includeInactive bool) (map[int64]ProductInfo, error)
+}
+
 // presenter 是 Public 與 App 共用的組裝：呼叫者的身分，與貼文、留言、討論區項目轉成回應所需的顯示資料（店家卡片、買家名稱、封鎖旗標）。
 type presenter struct {
 	buyers    Buyers
 	stores    Stores
 	images    rpc.Images
 	webOrigin rpc.WebOrigin
+	products  Products
+	// ownerView 是店主與代行路徑：貼文帶的商品下架了也補顯示資料（available=false），公開讀取只補上架中的。
+	ownerView bool
 	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 }
@@ -83,14 +104,14 @@ type Public struct {
 var _ socialv1alpha1connect.SocialPublicServiceHandler = (*Public)(nil)
 
 // NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值；now 是熱門標籤預設時間窗的終點，nil 時用 time.Now。
-func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
+func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -475,6 +496,7 @@ type postStores struct {
 	cards    map[int64]seller.StoreCard
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
+	products map[int64]ProductInfo
 }
 
 func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
@@ -530,12 +552,41 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if err != nil {
 		return nil, err
 	}
-	stores := postStores{cards: cards, blocking: blocking, liked: liked}
+	products, err := h.postProducts(ctx, posts)
+	if err != nil {
+		return nil, err
+	}
+	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
 			return nil, err
 		}
+	}
+	return out, nil
+}
+
+// postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡（貼文照回，product 不設）。
+func (h *presenter) postProducts(ctx context.Context, posts []social.Post) (map[int64]ProductInfo, error) {
+	var ids []int64
+	for _, p := range posts {
+		if p.ProductID != nil {
+			ids = append(ids, *p.ProductID)
+		}
+	}
+	if ids = uniq(ids); len(ids) == 0 {
+		return nil, nil
+	}
+	return h.products.Cards(ctx, ids, h.ownerView)
+}
+
+func (h *presenter) toPostProduct(info ProductInfo) (*pb.PostProduct, error) {
+	out := &pb.PostProduct{Id: rpc.FormatID(info.ID), Name: info.Name, MinPrice: info.MinPrice, MaxPrice: info.MaxPrice, Available: info.Available}
+	if info.ImageKey != "" {
+		if err := rpc.ObjectKey(info.ImageKey); err != nil {
+			return nil, err
+		}
+		out.Image = h.images.Image(info.ImageKey)
 	}
 	return out, nil
 }
@@ -591,6 +642,13 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	if card, ok := stores.cards[p.StoreID]; ok {
 		if out.Store, err = httpseller.ToStoreCard(h.images, card); err != nil {
 			return nil, err
+		}
+	}
+	if p.ProductID != nil {
+		if info, ok := stores.products[*p.ProductID]; ok {
+			if out.Product, err = h.toPostProduct(info); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return out, nil

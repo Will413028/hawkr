@@ -149,7 +149,7 @@ func newAppEnvWith(t *testing.T, w *fakeWrites, owner Owner, s *fakeStores) *app
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, images, web)
+	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, &fakeProducts{}, images, web)
 	if err != nil {
 		t.Fatal(err)
 	}
