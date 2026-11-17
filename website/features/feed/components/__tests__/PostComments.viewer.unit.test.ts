@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PostViewerState } from "@/lib/api/openapi-types";
@@ -276,6 +276,27 @@ describe("block this person (seller center)", () => {
 		expect((screen.getByText("封鎖此人") as HTMLButtonElement).disabled).toBe(
 			true,
 		);
+		resolve({ changed: true });
+		await screen.findByText("已封鎖「買家1」");
+		confirm.mockRestore();
+	});
+
+	it("two clicks in the same tick send one request even before the button re-renders disabled", async () => {
+		state.comments = [comment("1", { viewerCanDelete: true })];
+		let resolve: (v: unknown) => void = () => {};
+		blockBuyerByComment.mockReturnValue(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+		const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+		mount({ viewer: STORE, allowBlockAuthor: true });
+		const button = screen.getByText("封鎖此人") as HTMLButtonElement;
+		act(() => {
+			button.click();
+			button.click();
+		});
+		expect(blockBuyerByComment).toHaveBeenCalledTimes(1);
 		resolve({ changed: true });
 		await screen.findByText("已封鎖「買家1」");
 		confirm.mockRestore();
