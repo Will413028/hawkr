@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../icons/app_icon_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/hk_tokens.dart';
 import 'hk_icon.dart';
@@ -28,7 +29,7 @@ class AccountRestrictedBanner extends StatelessWidget {
                 const HkIcon(
                   HkIconName.warning,
                   size: 20,
-                  color: AppColors.warningText,
+                  color: AppIconColors.warningText,
                 ),
                 const SizedBox(width: HkSpace.sm),
                 Expanded(
@@ -42,7 +43,7 @@ class AccountRestrictedBanner extends StatelessWidget {
                 const HkIcon(
                   HkIconName.chevronRight,
                   size: 20,
-                  color: AppColors.warningText,
+                  color: AppIconColors.warningText,
                 ),
               ],
             ),
