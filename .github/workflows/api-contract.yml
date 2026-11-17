@@ -56,6 +56,11 @@ jobs:
       - name: buf lint
         run: buf lint api
 
+      # 外掛失敗時生成物不動、成功時 out 整個換新（含巢狀 out、沒寫出檔案的 out、交換中斷的還原）。
+      - name: generate.sh 的行為測試
+        if: always()
+        run: bash api/test-generate.sh
+
       - name: googleapis 的版本一致
         if: always()
         run: |

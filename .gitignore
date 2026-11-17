@@ -2,3 +2,7 @@ node_modules/
 
 # Python 的位元組碼快取（scripts/ 的檢查腳本與測試）
 __pycache__/
+
+# api/generate.sh 的暫存與交換目錄（正常結束會清掉；被 kill -9 才會留下）
+.gen-staging.*/
+*.gen-old/
