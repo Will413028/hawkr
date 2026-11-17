@@ -83,12 +83,18 @@ class PostRepository with ApiRequestHelper {
     int pageSize = 20,
     Map<int, DateTime>? schedules,
   }) async {
-    final (response, times) = await (
-      _social.listMyPosts(
-        pb.ListMyPostsRequest(pageSize: pageSize, pageToken: pageToken),
-      ),
-      schedules != null ? Future.value(schedules) : _pendingScheduleTimes(),
-    ).wait;
+    final responseFuture = _social.listMyPosts(
+      pb.ListMyPostsRequest(pageSize: pageSize, pageToken: pageToken),
+    );
+    final timesFuture = schedules != null
+        ? Future.value(schedules)
+        : _pendingScheduleTimes();
+    final results = await Future.wait<Object>([
+      responseFuture,
+      timesFuture,
+    ], eagerError: true);
+    final response = results[0] as pb.ListMyPostsResponse;
+    final times = results[1] as Map<int, DateTime>;
     return PostPageResult(
       posts: [
         for (final post in response.posts)

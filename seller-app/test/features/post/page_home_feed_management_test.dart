@@ -289,7 +289,7 @@ void main() {
       final repo = await _pump(tester, () => [_post(publishStatus: _draft)]);
       when(
         () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
-      ).thenThrow(StateError('boom'));
+      ).thenThrow(Exception('boom'));
 
       await tester.tap(_publishButton);
       await tester.pumpAndSettle();

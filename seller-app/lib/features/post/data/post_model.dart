@@ -56,8 +56,8 @@ abstract class Post with _$Post {
   bool get isHidden => takedownMeasureId != null;
 }
 
-/// 貼文關聯的商品（`social.v1alpha1.PostProduct` 的顯示用快照）。[imageKey] 是圖片的完整網址或
-/// objectKey（空字串是沒有圖），顯示前經 `extractPrimaryProductImageUrl`。
+/// 貼文關聯的商品（`social.v1alpha1.PostProduct` 的顯示用快照）。[imageUrl] 是轉換時解析好的
+/// 圖片完整網址（空字串是沒有圖）。
 @freezed
 abstract class PostLinkedProduct with _$PostLinkedProduct {
   const PostLinkedProduct._();
@@ -66,7 +66,7 @@ abstract class PostLinkedProduct with _$PostLinkedProduct {
     required String id,
     @Default('') String name,
     @Default(0) int price,
-    @Default('') String imageKey,
+    @Default('') String imageUrl,
   }) = _PostLinkedProduct;
 
   /// 商品預覽頁與圖片解析共用的 Map 形狀（只有 `imageKey` 一個圖片欄位）。
@@ -74,10 +74,8 @@ abstract class PostLinkedProduct with _$PostLinkedProduct {
     'id': id,
     'name': name,
     'price': price,
-    if (imageKey.isNotEmpty) 'imageKey': imageKey,
+    if (imageUrl.isNotEmpty) 'imageKey': imageUrl,
   };
-
-  String get imageUrl => extractPrimaryProductImageUrl(toProductMap()) ?? '';
 }
 
 PostLinkedProduct? _linkedProductOf(pb.Post post) {
@@ -87,7 +85,12 @@ PostLinkedProduct? _linkedProductOf(pb.Post post) {
     id: product.id,
     name: product.name,
     price: product.minPrice.toInt(),
-    imageKey: product.hasImage() ? product.image.uri(ImagePreset.original) : '',
+    imageUrl: product.hasImage()
+        ? extractPrimaryProductImageUrl({
+                'imageKey': product.image.uri(ImagePreset.original),
+              }) ??
+              ''
+        : '',
   );
 }
 

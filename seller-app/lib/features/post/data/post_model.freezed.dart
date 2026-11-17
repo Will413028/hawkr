@@ -331,7 +331,7 @@ $PostLinkedProductCopyWith<$Res>? get linkedProduct {
 /// @nodoc
 mixin _$PostLinkedProduct {
 
- String get id; String get name; int get price; String get imageKey;
+ String get id; String get name; int get price; String get imageUrl;
 /// Create a copy of PostLinkedProduct
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -342,16 +342,16 @@ $PostLinkedProductCopyWith<PostLinkedProduct> get copyWith => _$PostLinkedProduc
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostLinkedProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.price, price) || other.price == price)&&(identical(other.imageKey, imageKey) || other.imageKey == imageKey));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostLinkedProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.price, price) || other.price == price)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,name,price,imageKey);
+int get hashCode => Object.hash(runtimeType,id,name,price,imageUrl);
 
 @override
 String toString() {
-  return 'PostLinkedProduct(id: $id, name: $name, price: $price, imageKey: $imageKey)';
+  return 'PostLinkedProduct(id: $id, name: $name, price: $price, imageUrl: $imageUrl)';
 }
 
 
@@ -362,7 +362,7 @@ abstract mixin class $PostLinkedProductCopyWith<$Res>  {
   factory $PostLinkedProductCopyWith(PostLinkedProduct value, $Res Function(PostLinkedProduct) _then) = _$PostLinkedProductCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, int price, String imageKey
+ String id, String name, int price, String imageUrl
 });
 
 
@@ -379,12 +379,12 @@ class _$PostLinkedProductCopyWithImpl<$Res>
 
 /// Create a copy of PostLinkedProduct
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? price = null,Object? imageKey = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? price = null,Object? imageUrl = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,price: null == price ? _self.price : price // ignore: cast_nullable_to_non_nullable
-as int,imageKey: null == imageKey ? _self.imageKey : imageKey // ignore: cast_nullable_to_non_nullable
+as int,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }
@@ -470,10 +470,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  int price,  String imageKey)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  int price,  String imageUrl)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PostLinkedProduct() when $default != null:
-return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
+return $default(_that.id,_that.name,_that.price,_that.imageUrl);case _:
   return orElse();
 
 }
@@ -491,10 +491,10 @@ return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  int price,  String imageKey)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  int price,  String imageUrl)  $default,) {final _that = this;
 switch (_that) {
 case _PostLinkedProduct():
-return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
+return $default(_that.id,_that.name,_that.price,_that.imageUrl);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -511,10 +511,10 @@ return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  int price,  String imageKey)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  int price,  String imageUrl)?  $default,) {final _that = this;
 switch (_that) {
 case _PostLinkedProduct() when $default != null:
-return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
+return $default(_that.id,_that.name,_that.price,_that.imageUrl);case _:
   return null;
 
 }
@@ -526,13 +526,13 @@ return $default(_that.id,_that.name,_that.price,_that.imageKey);case _:
 
 
 class _PostLinkedProduct extends PostLinkedProduct {
-  const _PostLinkedProduct({required this.id, this.name = '', this.price = 0, this.imageKey = ''}): super._();
+  const _PostLinkedProduct({required this.id, this.name = '', this.price = 0, this.imageUrl = ''}): super._();
   
 
 @override final  String id;
 @override@JsonKey() final  String name;
 @override@JsonKey() final  int price;
-@override@JsonKey() final  String imageKey;
+@override@JsonKey() final  String imageUrl;
 
 /// Create a copy of PostLinkedProduct
 /// with the given fields replaced by the non-null parameter values.
@@ -544,16 +544,16 @@ _$PostLinkedProductCopyWith<_PostLinkedProduct> get copyWith => __$PostLinkedPro
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostLinkedProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.price, price) || other.price == price)&&(identical(other.imageKey, imageKey) || other.imageKey == imageKey));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostLinkedProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.price, price) || other.price == price)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,name,price,imageKey);
+int get hashCode => Object.hash(runtimeType,id,name,price,imageUrl);
 
 @override
 String toString() {
-  return 'PostLinkedProduct(id: $id, name: $name, price: $price, imageKey: $imageKey)';
+  return 'PostLinkedProduct(id: $id, name: $name, price: $price, imageUrl: $imageUrl)';
 }
 
 
@@ -564,7 +564,7 @@ abstract mixin class _$PostLinkedProductCopyWith<$Res> implements $PostLinkedPro
   factory _$PostLinkedProductCopyWith(_PostLinkedProduct value, $Res Function(_PostLinkedProduct) _then) = __$PostLinkedProductCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, int price, String imageKey
+ String id, String name, int price, String imageUrl
 });
 
 
@@ -581,12 +581,12 @@ class __$PostLinkedProductCopyWithImpl<$Res>
 
 /// Create a copy of PostLinkedProduct
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? price = null,Object? imageKey = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? price = null,Object? imageUrl = null,}) {
   return _then(_PostLinkedProduct(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,price: null == price ? _self.price : price // ignore: cast_nullable_to_non_nullable
-as int,imageKey: null == imageKey ? _self.imageKey : imageKey // ignore: cast_nullable_to_non_nullable
+as int,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

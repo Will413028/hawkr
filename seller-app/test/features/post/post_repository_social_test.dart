@@ -9,6 +9,7 @@ import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
+import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 
@@ -47,6 +48,10 @@ pb.Post _proto({
     });
 
 void main() {
+  setUpAll(() {
+    if (!F.isInitialized) F.init(Flavor.dev);
+  });
+
   test('maps the proto Post fields the screens show', () async {
     final repository = _repository(
       FakeTransportBuilder()
@@ -92,7 +97,7 @@ void main() {
         id: '900',
         name: '蘋果',
         price: 120,
-        imageKey: 'https://m.test/i/original/p/9.jpg',
+        imageUrl: 'http://localhost:8080/i/original/p/9.jpg',
       ),
     );
     expect(hidden.scheduledPublishAt, isNull);
@@ -127,6 +132,31 @@ void main() {
     expect(posts.map((p) => p.id), [42, 43]);
     expect(tokens, ['', 'next']);
     expect(scheduleReads, 1, reason: 'schedules are read once per list load');
+  });
+
+  test('R2-1 list failure keeps the original ConnectException', () async {
+    final repository = _repository(
+      FakeTransportBuilder()
+          .unary(
+            SocialAppService.listMyPosts,
+            (_, _) => throw ConnectException(Code.unauthenticated, 'login'),
+          )
+          .unary(
+            SocialAppService.listPendingSchedules,
+            (_, _) => pb.ListPendingSchedulesResponse(),
+          ),
+    );
+
+    await expectLater(
+      repository.listMyPostsPage(),
+      throwsA(
+        isA<ConnectException>().having(
+          (e) => e.code,
+          'code',
+          Code.unauthenticated,
+        ),
+      ),
+    );
   });
 
   test('publish and unpublish send the post etag', () async {

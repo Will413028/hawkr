@@ -1,7 +1,10 @@
-import 'dart:typed_data';
+import 'dart:async' show runZonedGuarded;
+import 'dart:convert' show base64Decode;
+import 'dart:io';
 
 import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +22,9 @@ import 'package:hawkr_seller/features/post/presentation/post_controller.dart';
 import 'package:hawkr_seller/features/post/presentation/post_edit_screen.dart';
 import 'package:hawkr_seller/features/product/data/product_repository.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
+import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/utils/floating_toast.dart';
+import 'package:hawkr_seller/shared/widgets/linked_product_card.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -160,7 +165,7 @@ void main() {
           updateProduct: any(named: 'updateProduct'),
           hashtags: any(named: 'hashtags'),
         ),
-      ).thenThrow(StateError('boom'));
+      ).thenThrow(Exception('boom'));
       await _pumpScreen(
         tester,
         repo: repo,
@@ -194,7 +199,7 @@ void main() {
           productId: any(named: 'productId'),
           hashtags: any(named: 'hashtags'),
         ),
-      ).thenThrow(StateError('boom'));
+      ).thenThrow(Exception('boom'));
       await _pumpScreen(
         tester,
         repo: repo,
@@ -238,6 +243,7 @@ void main() {
       when(
         () => repo.listMyPosts(),
       ).thenAnswer((_) async => [_post(etag: etag)]);
+      when(() => repo.getMyPost(42)).thenAnswer((_) async => _post(etag: etag));
       when(
         () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
       ).thenAnswer((invocation) async {
@@ -265,6 +271,7 @@ void main() {
       when(
         () => repo.listMyPosts(),
       ).thenAnswer((_) async => [_post(etag: etag)]);
+      when(() => repo.getMyPost(42)).thenAnswer((_) async => _post(etag: etag));
       when(
         () => repo.updatePost(
           any(),
@@ -325,6 +332,258 @@ void main() {
         isFalse,
       );
       expect(withStore(_store(null)).read(canMarketPostsProvider), isTrue);
+    });
+  });
+
+  group('Round 2', () {
+    final updates = <Map<Symbol, dynamic>>[];
+
+    setUp(updates.clear);
+
+    void stubUpdate(_Repo repo, Future<Post> Function(Invocation) answer) {
+      when(
+        () => repo.updatePost(
+          any(),
+          etag: any(named: 'etag'),
+          content: any(named: 'content'),
+          imageStagedToken: any(named: 'imageStagedToken'),
+          productId: any(named: 'productId'),
+          updateProduct: any(named: 'updateProduct'),
+          hashtags: any(named: 'hashtags'),
+        ),
+      ).thenAnswer((invocation) {
+        updates.add(invocation.namedArguments);
+        return answer(invocation);
+      });
+    }
+
+    Finder contentField() => find.byType(ExtendedTextField);
+
+    Future<void> typeContent(WidgetTester tester, String text) async {
+      await tester.tap(contentField());
+      await tester.pump();
+      tester.testTextInput.enterText(text);
+      await tester.pump();
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(TextButton, '儲存'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('R2-2 aborted：載入伺服器最新內容，第二次儲存不會帶舊文字配新 etag', (tester) async {
+      final repo = _Repo();
+      final post = _post();
+      final latest = post.copyWith(etag: 'e2', content: '別人改過的內容');
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+      when(() => repo.getMyPost(42)).thenAnswer((_) async => latest);
+      var calls = 0;
+      stubUpdate(repo, (_) async {
+        calls++;
+        if (calls == 1) throw ConnectException(Code.aborted, 'stale');
+        return latest;
+      });
+      await _pumpScreen(
+        tester,
+        repo: repo,
+        screen: PostEditScreen(post: post),
+      );
+
+      await typeContent(tester, '我的修改');
+      await save(tester);
+
+      expect(find.textContaining('已在其他地方更新'), findsOneWidget);
+      expect(
+        tester.widget<ExtendedTextField>(contentField()).controller!.text,
+        '別人改過的內容',
+      );
+      await tester.pump(const Duration(seconds: 3));
+
+      await save(tester);
+      expect(updates.map((u) => [u[#etag], u[#content]]), [
+        ['e1', '我的修改'],
+        ['e2', '別人改過的內容'],
+      ]);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('R2-3 商品變更與目前載入的貼文比較', (tester) async {
+      final repo = _Repo();
+      final post = _post();
+      final latest = post.copyWith(etag: 'e2', linkedProduct: _linked);
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+      when(() => repo.getMyPost(42)).thenAnswer((_) async => latest);
+      var calls = 0;
+      stubUpdate(repo, (_) async {
+        calls++;
+        if (calls == 1) throw ConnectException(Code.aborted, 'stale');
+        return latest;
+      });
+      await _pumpScreen(
+        tester,
+        repo: repo,
+        screen: PostEditScreen(post: post),
+        products: const [],
+      );
+
+      await save(tester);
+      await tester.pump(const Duration(seconds: 3));
+      await save(tester);
+
+      expect(
+        [updates.last[#productId], updates.last[#updateProduct]],
+        ['900', false],
+      );
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('R2-4 目前關聯商品不在商品清單也看得到，且可取消關聯', (tester) async {
+      final repo = _Repo();
+      final post = _post(linked: _linked);
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+      stubUpdate(repo, (_) async => post);
+      await _pumpScreen(
+        tester,
+        repo: repo,
+        screen: PostEditScreen(post: post),
+      );
+
+      expect(find.byType(LinkedProductCard), findsOneWidget);
+      expect(find.text('蘋果'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('post-edit-unlink-product')));
+      await tester.pump();
+      expect(find.byType(LinkedProductCard), findsNothing);
+
+      await save(tester);
+      expect(
+        [updates.single[#productId], updates.single[#updateProduct]],
+        [null, true],
+      );
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('R2-7 程式錯誤不變成 toast，儲存鍵恢復可按', (tester) async {
+      final repo = _Repo();
+      final post = _post();
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+      stubUpdate(repo, (_) async => throw StateError('bug'));
+      await _pumpScreen(
+        tester,
+        repo: repo,
+        screen: PostEditScreen(post: post),
+      );
+
+      final errors = <Object>[];
+      await runZonedGuarded(() async {
+        await tester.tap(find.widgetWithText(TextButton, '儲存'));
+        await tester.pumpAndSettle();
+      }, (error, _) => errors.add(error));
+
+      expect(errors.single, isA<StateError>());
+      expect(find.text('ERR-unknown'), findsNothing);
+      final button = find.widgetWithText(TextButton, '儲存');
+      expect(tester.widget<TextButton>(button).onPressed, isNotNull);
+    });
+
+    testWidgets('R2-8 重試儲存不會重新上傳已暫存的圖片', (tester) async {
+      final dir = Directory.systemTemp.createTempSync('post_edit_pick');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/pick.png')
+        ..writeAsBytesSync(
+          base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          ),
+        );
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/image_picker'),
+        (call) async => file.path,
+      );
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/image_picker'),
+          null,
+        ),
+      );
+      final repo = _Repo();
+      final post = _post();
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+      when(
+        () => repo.uploadMedia(
+          sellerId: any(named: 'sellerId'),
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+          mimeType: any(named: 'mimeType'),
+        ),
+      ).thenAnswer((_) async => 'tok');
+      var calls = 0;
+      stubUpdate(repo, (_) async {
+        calls++;
+        if (calls == 1) throw ConnectException(Code.unavailable, 'down');
+        return post;
+      });
+      await _pumpScreen(
+        tester,
+        repo: repo,
+        screen: PostEditScreen(post: post),
+      );
+
+      await tester.runAsync(() async {
+        await tester.tap(find.byIcon(AppIcons.permMediaOutlined));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pumpAndSettle();
+      await save(tester);
+      await tester.pump(const Duration(seconds: 3));
+      await save(tester);
+
+      verify(
+        () => repo.uploadMedia(
+          sellerId: any(named: 'sellerId'),
+          bytes: any(named: 'bytes'),
+          filename: any(named: 'filename'),
+          mimeType: any(named: 'mimeType'),
+        ),
+      ).called(1);
+      expect(updates.map((u) => u[#imageStagedToken]), ['tok', 'tok']);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    test('R2-5 衝突後重讀失敗不被吞掉', () async {
+      final repo = _Repo();
+      when(() => repo.listMyPosts()).thenAnswer((_) async => [_post()]);
+      when(
+        () => repo.getMyPost(42),
+      ).thenAnswer((_) async => throw ConnectException(Code.unavailable, 'x'));
+      when(
+        () => repo.updatePost(
+          any(),
+          etag: any(named: 'etag'),
+          content: any(named: 'content'),
+          imageStagedToken: any(named: 'imageStagedToken'),
+          productId: any(named: 'productId'),
+          updateProduct: any(named: 'updateProduct'),
+          hashtags: any(named: 'hashtags'),
+        ),
+      ).thenAnswer((_) async => throw ConnectException(Code.aborted, 'stale'));
+      final c = ProviderContainer(
+        overrides: [postRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(c.dispose);
+      final posts = await c.read(postListProvider.future);
+
+      await expectLater(
+        c
+            .read(postListProvider.notifier)
+            .updatePost(posts.single, content: 'x'),
+        throwsA(
+          isA<ConnectException>().having(
+            (e) => e.code,
+            'code',
+            Code.unavailable,
+          ),
+        ),
+      );
     });
   });
 }

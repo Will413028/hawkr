@@ -30,6 +30,7 @@ import '../../../config/image_config.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/utils/price_display.dart';
+import '../../../shared/widgets/linked_product_card.dart';
 import '../../../shared/widgets/optimized_image.dart';
 
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -56,6 +57,15 @@ class PostEditScreen extends HookConsumerWidget {
     final selectedProductIndex = products.value.indexWhere(
       (p) => p['id']?.toString() == linkedProductId.value,
     );
+
+    final baseLinked = basePost.value.linkedProduct;
+    final orphanLinkedProduct =
+        !loadingProducts.value &&
+            baseLinked != null &&
+            linkedProductId.value == baseLinked.id &&
+            selectedProductIndex == -1
+        ? baseLinked
+        : null;
 
     final repo = ref.read(postRepositoryProvider);
 
@@ -155,8 +165,9 @@ class PostEditScreen extends HookConsumerWidget {
             if (context.mounted) FloatingToast.error(context, '圖片上傳失敗');
             return;
           }
-          stagedToken = token;
+          newStagedToken.value = token;
         }
+        stagedToken = newStagedToken.value;
 
         try {
           await ref
@@ -166,24 +177,39 @@ class PostEditScreen extends HookConsumerWidget {
                 content: contentCtrl.text.trim(),
                 imageStagedToken: stagedToken,
                 productId: linkedProductId.value,
-                updateProduct: linkedProductId.value != post.linkedProduct?.id,
+                updateProduct:
+                    linkedProductId.value != basePost.value.linkedProduct?.id,
                 hashtags: PostHashtagExtractor.extractFromText(
                   contentCtrl.text,
                 ),
               );
-        } catch (error) {
-          final latest = error is ConnectException && error.code == Code.aborted
+        } catch (error, stackTrace) {
+          rethrowIfProgrammingError(error, stackTrace);
+          final conflict =
+              error is ConnectException && error.code == Code.aborted;
+          final latest = conflict
               ? ref
                     .read(postListProvider)
                     .value
                     ?.where((p) => p.id == post.id)
                     .firstOrNull
               : null;
-          if (latest != null) basePost.value = latest;
+          if (latest != null) {
+            basePost.value = latest;
+            contentCtrl.text = latest.content;
+            linkedProductId.value = latest.linkedProduct?.id;
+            newImageBytes.value = null;
+            newStagedToken.value = null;
+          }
           if (context.mounted) {
             FloatingToast.error(
               context,
-              errorText(error, defaults: ref.read(defaultErrorTextProvider)),
+              latest != null
+                  ? '貼文已在其他地方更新，已載入最新內容，請確認後再儲存'
+                  : errorText(
+                      error,
+                      defaults: ref.read(defaultErrorTextProvider),
+                    ),
             );
           }
           return;
@@ -210,7 +236,7 @@ class PostEditScreen extends HookConsumerWidget {
                 color: AppColors.gray100,
               ),
               clipBehavior: Clip.antiAlias,
-              child: _buildImageContent(newImageBytes.value),
+              child: _buildImageContent(newImageBytes.value, basePost.value),
             ),
             // AI 編輯按鈕
             if (newImageBytes.value != null)
@@ -495,6 +521,38 @@ class PostEditScreen extends HookConsumerWidget {
       );
     }
 
+    Widget buildLinkedProductSection(PostLinkedProduct linked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '目前關聯商品',
+            style: TextStyle(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textEmphasis,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          LinkedProductCard(
+            name: linked.name,
+            price: linked.price,
+            imageUrl: linked.imageUrl,
+            inset: false,
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: const ValueKey('post-edit-unlink-product'),
+              onPressed: () => linkedProductId.value = null,
+              child: const HkButtonLabel('取消關聯'),
+            ),
+          ),
+          SizedBox(height: 8.h),
+        ],
+      );
+    }
+
     Widget buildProductsSection() {
       if (loadingProducts.value) {
         return Column(
@@ -610,7 +668,14 @@ class PostEditScreen extends HookConsumerWidget {
                         ),
                       ],
                     ),
-                    child: buildProductsSection(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (orphanLinkedProduct != null)
+                          buildLinkedProductSection(orphanLinkedProduct),
+                        buildProductsSection(),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(height: 32.h),
@@ -622,7 +687,7 @@ class PostEditScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildImageContent(Uint8List? newBytes) {
+  Widget _buildImageContent(Uint8List? newBytes, Post post) {
     if (newBytes != null) {
       return Image.memory(newBytes, fit: BoxFit.cover, width: double.infinity);
     }

@@ -65,7 +65,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   bool _loadingMorePosts = false;
   bool _hasMorePosts = true;
   String _nextPostsToken = '';
-  Map<int, DateTime> _postSchedules = const {};
 
   final Map<int, int> _postCommentCount = <int, int>{};
   final Set<int> _commentsInitRequested = <int>{};
@@ -149,7 +148,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       setState(() {
         _posts = result.posts;
         _nextPostsToken = result.nextPageToken;
-        _postSchedules = result.schedules;
         _hasMorePosts = result.hasMore;
         _loadingPosts = false;
         _syncCommentNotifiers(result.posts, prune: true);
@@ -169,7 +167,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       final result = await _postRepo.listMyPostsPage(
         pageToken: _nextPostsToken,
         pageSize: _postsPageSize,
-        schedules: _postSchedules,
       );
       if (!mounted) return;
       setState(() {
@@ -619,7 +616,11 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
           ),
         ),
         if (p.linkedProduct case final product?)
-          LinkedProductCard(linkedProduct: product),
+          LinkedProductCard(
+            name: product.name,
+            price: product.price,
+            imageUrl: product.imageUrl,
+          ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
           child: Row(

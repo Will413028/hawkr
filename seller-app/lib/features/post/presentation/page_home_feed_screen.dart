@@ -276,7 +276,8 @@ class PageHomeFeedScreen extends HookConsumerWidget {
     try {
       await ref.read(postListProvider.notifier).deletePost(postId);
       if (context.mounted) FloatingToast.success(context, '已刪除貼文');
-    } catch (e) {
+    } catch (e, st) {
+      rethrowIfProgrammingError(e, st);
       if (context.mounted) {
         FloatingToast.error(context, '刪除失敗：${_mutationErrorMessage(e, ref)}');
       }
@@ -558,7 +559,8 @@ class _PostPage extends HookConsumerWidget {
           final error = ref.read(postListProvider).error;
           FloatingToast.error(context, _mutationErrorMessage(error ?? '', ref));
         }
-      } catch (error) {
+      } catch (error, stackTrace) {
+        rethrowIfProgrammingError(error, stackTrace);
         if (context.mounted) {
           final prefix = publish ? '發布失敗' : '下架失敗';
           FloatingToast.error(

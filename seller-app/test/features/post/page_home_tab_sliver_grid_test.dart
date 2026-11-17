@@ -128,6 +128,70 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('R2-6 each page reads pending schedules again', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final posts = List.generate(
+      60,
+      (index) => pb.Post(id: '${index + 1}', body: '貼文 ${index + 1}'),
+    );
+    var postPages = 0;
+    var scheduleReads = 0;
+    final client = SocialAppServiceClient(
+      FakeTransportBuilder()
+          .unary(SocialAppService.listMyPosts, (request, _) {
+            postPages++;
+            final start = request.pageToken.isEmpty
+                ? 0
+                : int.parse(request.pageToken);
+            final end = (start + request.pageSize).clamp(0, posts.length);
+            return pb.ListMyPostsResponse(
+              posts: posts.sublist(start, end),
+              nextPageToken: end < posts.length ? '$end' : '',
+            );
+          })
+          .unary(SocialAppService.listPendingSchedules, (_, _) {
+            scheduleReads++;
+            return pb.ListPendingSchedulesResponse();
+          })
+          .build(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dioProvider.overrideWithValue(Dio()),
+          socialClientProvider.overrideWithValue(client),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp(
+            home: Scaffold(
+              body: PageHomeTab(
+                sellerName: '測試店家',
+                onReloadSeller: () async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.drag(
+      find.byKey(const PageStorageKey('storefront-post-grid-scroll')),
+      const Offset(0, -2000),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(postPages, greaterThanOrEqualTo(2));
+    expect(scheduleReads, postPages);
+  });
 }
 
 Set<String> _builtPostTiles(WidgetTester tester) {

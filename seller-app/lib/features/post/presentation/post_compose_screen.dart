@@ -215,7 +215,8 @@ class PostComposeScreen extends HookConsumerWidget {
             productId: linkedProductId?.toString(),
             hashtags: PostHashtagExtractor.extractFromText(titleCtrl.text),
           );
-        } catch (error) {
+        } catch (error, stackTrace) {
+          rethrowIfProgrammingError(error, stackTrace);
           if (context.mounted) {
             FloatingToast.error(
               context,

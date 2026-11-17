@@ -28,7 +28,6 @@ import 'shared/widgets/hk_round_action_button.dart';
 import 'shared/widgets/hk_status_badge.dart';
 import 'shared/widgets/fruit_spinner.dart';
 import 'shared/widgets/green_header_bar.dart';
-import 'features/post/data/post_model.dart';
 import 'shared/widgets/linked_product_card.dart';
 import 'shared/widgets/step_indicator.dart';
 
@@ -762,11 +761,8 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
     _section(
       '關聯商品 · LinkedProductCard',
       LinkedProductCard(
-        linkedProduct: const PostLinkedProduct(
-          id: 'catalog',
-          name: '季節鮮採蔬菜箱 · 產地直送綜合組',
-          price: 680,
-        ),
+        name: '季節鮮採蔬菜箱 · 產地直送綜合組',
+        price: 680,
         inset: false,
         onTap: _recordAction,
       ),

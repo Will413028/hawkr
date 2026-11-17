@@ -19,6 +19,11 @@ final canMarketPostsProvider = Provider<bool>(
       true,
 );
 
+/// 使用者面的錯誤提示只處理 `Exception`（網路、`ConnectException`）；`Error`（型別、狀態錯誤）是程式缺陷，原樣往上丟。
+void rethrowIfProgrammingError(Object error, StackTrace stackTrace) {
+  if (error is Error) Error.throwWithStackTrace(error, stackTrace);
+}
+
 @riverpod
 class PostList extends _$PostList {
   final Set<int> _pendingDeletes = <int>{};
@@ -67,9 +72,31 @@ class PostList extends _$PostList {
     }
   }
 
-  /// etag 與伺服器不符（aborted）代表列表是舊的：重讀，讓下一次重試帶新的 etag。
-  Future<void> _refreshOnConflict(ConnectException error) async {
-    if (error.code == Code.aborted) await silentRefresh();
+  /// 向伺服器重讀這一篇並換進列表（排程時間沿用列表上的值）；失敗丟例外，不吞掉。
+  /// 貼文不在已載入的列表時只回傳，不改列表。
+  Future<Post> refreshPost(int postId) async {
+    final latest = await ref.read(postRepositoryProvider).getMyPost(postId);
+    final prevState = state;
+    if (prevState is AsyncData<List<Post>>) {
+      final current = prevState.value;
+      final index = current.indexWhere((p) => p.id == postId);
+      if (index == -1) return latest;
+      final merged = latest.copyWith(
+        scheduledPublishAt: current[index].scheduledPublishAt,
+      );
+      state = AsyncData([
+        for (var i = 0; i < current.length; i++)
+          i == index ? merged : current[i],
+      ]);
+      return merged;
+    }
+    return latest;
+  }
+
+  /// etag 與伺服器不符（aborted）代表手上的貼文是舊的：重讀那一篇，讓下一次重試帶新的 etag。
+  /// 重讀失敗時丟重讀的錯誤。
+  Future<void> _refreshOnConflict(int postId, ConnectException error) async {
+    if (error.code == Code.aborted) await refreshPost(postId);
   }
 
   /// 發布或下架。不做樂觀更新：發布狀態是後端算出來的（排程會被一併結束），
@@ -90,7 +117,7 @@ class PostList extends _$PostList {
         await repo.unpublishPostOrThrow(postId, etag: etag);
       }
     } on ConnectException catch (error) {
-      await _refreshOnConflict(error);
+      await _refreshOnConflict(postId, error);
       rethrow;
     }
     try {
@@ -127,7 +154,7 @@ class PostList extends _$PostList {
                   ))
               .copyWith(scheduledPublishAt: post.scheduledPublishAt);
     } on ConnectException catch (error) {
-      await _refreshOnConflict(error);
+      await _refreshOnConflict(post.id, error);
       rethrow;
     }
     final prevState = state;
