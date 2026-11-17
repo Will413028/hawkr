@@ -32,10 +32,17 @@ class AccountRestriction extends _$AccountRestriction {
   @override
   AccountSuspension? build() => null;
 
-  /// GetSession 的結果：有 `suspension` 就是受限，沒有就解除。
-  void apply(AccountSuspension? suspension) => state = suspension;
+  /// 每次整體改寫狀態（登入、登出、GetSession 結果）就加一；補讀細節的請求回來時，世代變了就丟棄，
+  /// 避免登出後或換帳號後把舊帳號的結果寫回。
+  int _generation = 0;
 
-  void clear() => state = null;
+  /// GetSession 的結果：有 `suspension` 就是受限，沒有就解除。
+  void apply(AccountSuspension? suspension) {
+    _generation++;
+    state = suspension;
+  }
+
+  void clear() => apply(null);
 
   /// 使用者主動的寫入收到 `ACCOUNT_SUSPENDED`：進入受限狀態、請畫面顯示「帳號停權中」的提示，並補讀細節。
   void rejected() {
@@ -46,22 +53,29 @@ class AccountRestriction extends _$AccountRestriction {
 
   /// 舊 REST 的寫入收到 403：回應沒有 reason，不能直接當成停權，以 GetSession 確認，確定停權才同 [rejected]。
   Future<void> confirmRejected() async {
-    final suspension = await _fetch();
-    if (suspension == null || !ref.mounted) return;
-    state = suspension;
-    ref.read(suspendedActionNoticeProvider.notifier).raise();
+    final result = await _fetch();
+    if (result == null) return;
+    state = result.suspension;
+    if (result.suspension != null) {
+      ref.read(suspendedActionNoticeProvider.notifier).raise();
+    }
   }
 
   Future<void> _refresh() async {
-    final suspension = await _fetch();
-    if (suspension == null || !ref.mounted) return;
-    state = suspension;
+    final result = await _fetch();
+    if (result == null) return;
+    state = result.suspension;
   }
 
-  Future<AccountSuspension?> _fetch() async {
+  /// null 是這次沒有讀到（GetSession 失敗，或讀取期間 session 已換）；`suspension` 為 null 的結果是
+  /// 讀到了且沒有停權。
+  Future<({AccountSuspension? suspension})?> _fetch() async {
+    final generation = _generation;
     try {
-      return (await ref.read(authRepositoryProvider).currentAccount())
-          .suspension;
+      final suspension =
+          (await ref.read(authRepositoryProvider).currentAccount()).suspension;
+      if (!ref.mounted || generation != _generation) return null;
+      return (suspension: suspension);
     } catch (error) {
       HKLog.logD('[AccountRestriction] GetSession failed: $error');
       return null;

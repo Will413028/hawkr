@@ -406,7 +406,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             // 使用者主動的寫入被停權擋下時的提示；停權不登出。
             final suspensionAware = SuspendedActionListener(
               navigatorKey: rootNavigatorKey,
-              onViewDetails: () => router.push(AccountRestrictedScreen.path),
+              onViewDetails: () => AccountRestrictedScreen.open(router),
               child: guarded,
             );
             final keyboardDismissible = KeyboardDismissScope(

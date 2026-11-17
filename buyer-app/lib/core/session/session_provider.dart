@@ -45,14 +45,11 @@ class Session extends _$Session {
       account = await ref.read(authRepositoryProvider).currentAccount();
     } catch (error, stack) {
       if (!ref.mounted || !_restore.isCurrent(generation)) return null;
-      if (error is UnauthorizedException) {
+      // 停權的帳號 GetSession 會成功並帶 `suspension`；它丟 ACCOUNT_SUSPENDED 代表拿不到帳號 id，
+      // 建不出受限的 session，與 token 失效同樣處理，避免「訪客加停權橫幅」的狀態。
+      if (error is UnauthorizedException || error is SuspendedException) {
         if (!e2eAuthEnabled) await _clearAuthSession();
       } else {
-        if (error is SuspendedException) {
-          ref
-              .read(accountRestrictionProvider.notifier)
-              .apply(const AccountSuspension.unknown());
-        }
         HKLog.logW('[Session] 帳號暫時無法恢復', error, stack);
         retryRestore();
       }

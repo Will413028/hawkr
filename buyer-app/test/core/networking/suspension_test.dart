@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart' hide Headers, Interceptor;
@@ -31,10 +32,12 @@ class _FakeSession extends Session {
 
 class _Auth extends Fake implements AuthRepository {
   int fetches = 0;
+  Future<AccountSnapshot> Function()? answer;
 
   @override
   Future<AccountSnapshot> currentAccount() async {
     fetches++;
+    if (answer != null) return answer!();
     return const AccountSnapshot(
       accountId: 'acc_01J',
       suspension: AccountSuspension(reason: '多次張貼廣告'),
@@ -111,6 +114,70 @@ void main() {
         .build(interceptors: [suspension]);
     return BuyerAppServiceClient(transport);
   }
+
+  group('restriction state', () {
+    test('GetSession 成功且沒有停權：解除受限狀態', () async {
+      final h = harness();
+      h.auth.answer = () async => const AccountSnapshot(accountId: 'acc_01J');
+      final n = h.c.read(accountRestrictionProvider.notifier)
+        ..apply(const AccountSuspension.unknown());
+
+      await n.confirmRejected();
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 0);
+    });
+
+    test('GetSession 失敗：保留原狀態', () async {
+      final h = harness();
+      h.auth.answer = () async => throw StateError('down');
+      final n = h.c.read(accountRestrictionProvider.notifier)
+        ..apply(const AccountSuspension.unknown());
+
+      await n.confirmRejected();
+
+      expect(h.c.read(accountRestrictionProvider), isNotNull);
+    });
+
+    test('補讀細節期間登出：回來的結果不寫回', () async {
+      final h = harness();
+      final pending = Completer<AccountSnapshot>();
+      h.auth.answer = () => pending.future;
+      final n = h.c.read(accountRestrictionProvider.notifier)..rejected();
+      await Future<void>.delayed(Duration.zero);
+      expect(h.auth.fetches, 1);
+
+      n.clear();
+      pending.complete(
+        const AccountSnapshot(
+          accountId: 'acc_01J',
+          suspension: AccountSuspension(reason: '舊帳號'),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
+    });
+
+    test('補讀細節期間換帳號：不套用前一個帳號的結果', () async {
+      final h = harness();
+      final pending = Completer<AccountSnapshot>();
+      h.auth.answer = () => pending.future;
+      final n = h.c.read(accountRestrictionProvider.notifier)..rejected();
+      await Future<void>.delayed(Duration.zero);
+
+      n.apply(null);
+      pending.complete(
+        const AccountSnapshot(
+          accountId: 'a',
+          suspension: AccountSuspension(reason: 'A'),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
+    });
+  });
 
   group('Connect', () {
     test('使用者主動的寫入收到 ACCOUNT_SUSPENDED：進受限狀態、請求提示、不登出', () async {

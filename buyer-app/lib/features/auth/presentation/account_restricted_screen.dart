@@ -19,6 +19,14 @@ class AccountRestrictedScreen extends ConsumerStatefulWidget {
   const AccountRestrictedScreen({super.key});
 
   static const path = '/account-restricted';
+
+  /// 已經在受限狀態頁就不再疊一層。
+  static void open(GoRouter router) {
+    // RouteMatchList.uri 不含 push 出來的頁面；最上層的路由取 delegate.state。
+    if (router.routerDelegate.state.uri.path == path) return;
+    router.push(path);
+  }
+
   static const browseNotice = '停權期間可以瀏覽，無法下單、留言、按讚、追蹤或修改資料。';
 
   @override

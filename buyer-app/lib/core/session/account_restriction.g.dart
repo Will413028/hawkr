@@ -51,7 +51,7 @@ final class AccountRestrictionProvider
 }
 
 String _$accountRestrictionHash() =>
-    r'949387b4d7a93ed53ec84fc6d8bf338bffacbf76';
+    r'3311b32b4f192050bff03cf483e0f11fceff7738';
 
 /// 受限狀態：null 是沒有停權。進入受限狀態不登出，session 與 token 都保留。
 ///

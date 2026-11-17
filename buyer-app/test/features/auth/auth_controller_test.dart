@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
@@ -10,7 +11,7 @@ import 'package:hawkr_auth/hawkr_auth.dart' show SignInFailed;
 import 'package:hawkr_buyer/features/order/data/receipt_photo_local_service.dart';
 import 'package:hawkr_buyer/features/notification/data/push/background_handler.dart';
 import 'package:hawkr_api/transport.dart'
-    show Code, ConnectException, HeadersExtension;
+    show Code, ConnectException, ErrorDetail, HeadersExtension;
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/storage/auth_storage.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
@@ -139,6 +140,33 @@ void main() {
     expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
     expect(h.c.read(accountRestrictionProvider)?.reason, '多次張貼廣告');
     expect(h.c.read(forceLogoutProvider), isFalse);
+  });
+
+  test('登入時 GetSession 回 ACCOUNT_SUSPENDED：登入失敗，不留 token、沒有 session', () async {
+    final h = harness(
+      getSession: () => throw ConnectException(
+        Code.permissionDenied,
+        'denied',
+        details: [
+          ErrorDetail(
+            'google.rpc.ErrorInfo',
+            (ErrorInfo()
+                  ..reason = 'ACCOUNT_SUSPENDED'
+                  ..domain = 'hawkr')
+                .writeToBuffer(),
+          ),
+        ],
+      ),
+    );
+
+    await expectLater(
+      signIn(h.c, OAuthProvider.google),
+      throwsA(isA<SuspendedException>()),
+    );
+
+    expect(h.auth.isSignedIn, isFalse);
+    expect(h.c.read(sessionProvider).value, isNull);
+    expect(h.c.read(accountRestrictionProvider), isNull);
   });
 
   test('暫時失敗保留 session token，再次登入直接重試 GetSession', () async {

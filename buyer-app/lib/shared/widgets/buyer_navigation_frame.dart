@@ -84,25 +84,27 @@ class BuyerNavigationFrame extends ConsumerWidget {
           // 外層導覽 Scaffold 不參與鍵盤縮放，交給各頁自己的 Scaffold 處理一次，
           // 避免與內層頁面 Scaffold 疊加造成鍵盤 inset 被算兩次（輸入框被頂高）。
           resizeToAvoidBottomInset: false,
-          body: showsBanner
-              ? Column(
-                  children: [
-                    SafeArea(
-                      bottom: false,
-                      child: AccountRestrictedBanner(
-                        onTap: () => router.push(AccountRestrictedScreen.path),
-                      ),
-                    ),
-                    Expanded(
-                      child: MediaQuery.removePadding(
-                        context: context,
-                        removeTop: true,
-                        child: layout,
-                      ),
-                    ),
-                  ],
+          body: Column(
+            children: [
+              // 橫幅的位置固定占第一格（不顯示時收合），頁面子樹的位置不隨橫幅變動而重掛。
+              if (showsBanner)
+                SafeArea(
+                  bottom: false,
+                  child: AccountRestrictedBanner(
+                    onTap: () => AccountRestrictedScreen.open(router),
+                  ),
                 )
-              : layout,
+              else
+                const SizedBox.shrink(),
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeTop: showsBanner,
+                  child: layout,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
