@@ -88,7 +88,14 @@ type presenter struct {
 	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 	log   *slog.Logger
+	// productTimeout 是商品顯示資料批次查詢的時間上限；零值用 productBudget 常數。
+	productTimeout time.Duration
 }
+
+// productBudget 是商品批次查詢（舊 product-service 的 gRPC）在讀取路徑上的時間上限，逾時就降級成 product 不設。
+// 它是貼文列表這條公開熱路徑上的選配欄位，不能拖住整個回應：比店面統計的 statsBudget（300 ms）寬一點，
+// 因為這是一次跨服務的批次查詢，又遠小於 RPC 的預設 15 秒。
+const productBudget = 500 * time.Millisecond
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
 type Views interface {
@@ -545,6 +552,9 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if len(posts) == 0 {
 		return []*pb.Post{}, nil
 	}
+	// 商品查詢與其他補充查詢互不相依：先丟出去同時跑，最後才收。它自己降級，不會回錯誤。
+	productsCh := make(chan map[int64]ProductInfo, 1)
+	go func() { productsCh <- h.postProducts(ctx, posts) }()
 	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
 		return nil, err
@@ -557,7 +567,7 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if err != nil {
 		return nil, err
 	}
-	products := h.postProducts(ctx, posts)
+	products := <-productsCh
 	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
@@ -579,6 +589,12 @@ func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[i
 	if ids = uniq(ids); len(ids) == 0 {
 		return nil
 	}
+	budget := h.productTimeout
+	if budget <= 0 {
+		budget = productBudget
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
 	cards, err := h.products.Cards(ctx, ids, h.ownerView)
 	if err != nil {
 		h.log.WarnContext(ctx, "httpapi/social：商品顯示資料查詢失敗，貼文的 product 不設", "product_count", len(ids), "error", err)
@@ -587,15 +603,18 @@ func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[i
 	return cards
 }
 
-func (h *presenter) toPostProduct(info ProductInfo) (*pb.PostProduct, error) {
+// toPostProduct 是貼文帶的商品摘要。商品的圖是選配的顯示資料：圖片 key 不合法時只略過圖（記 warn），
+// 不讓整個貼文讀取失敗。
+func (h *presenter) toPostProduct(info ProductInfo) *pb.PostProduct {
 	out := &pb.PostProduct{Id: rpc.FormatID(info.ID), Name: info.Name, MinPrice: info.MinPrice, MaxPrice: info.MaxPrice, Available: info.Available}
 	if info.ImageKey != "" {
 		if err := rpc.ObjectKey(info.ImageKey); err != nil {
-			return nil, err
+			h.log.Warn("httpapi/social：商品的圖片 key 不合法，product.image 不設", "product_id", info.ID, "error", err)
+			return out
 		}
 		out.Image = h.images.Image(info.ImageKey)
 	}
-	return out, nil
+	return out
 }
 
 // likedPosts 批次查呼叫者的買家身分讚過 posts 裡的哪幾篇；呼叫者沒有買家身分（訪客、店主）時是空的。
@@ -653,9 +672,7 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	}
 	if p.ProductID != nil {
 		if info, ok := stores.products[*p.ProductID]; ok {
-			if out.Product, err = h.toPostProduct(info); err != nil {
-				return nil, err
-			}
+			out.Product = h.toPostProduct(info)
 		}
 	}
 	return out, nil

@@ -1,13 +1,16 @@
 package social
 
 import (
+	"context"
 	"log/slog"
 	"slices"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -99,5 +102,93 @@ func TestOwnerReadsAskForInactiveProductsToo(t *testing.T) {
 	}
 	if !products.incl[0] || out[0].GetProduct().GetName() != "Hidden" || out[0].GetProduct().GetAvailable() {
 		t.Fatalf("店主讀自己的貼文要補下架的商品（available=false）：%v %v", products.incl, out[0].GetProduct())
+	}
+}
+
+func TestProductWithABadImageKeyKeepsTheSummaryWithoutTheImage(t *testing.T) {
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	products := &fakeProducts{cards: map[int64]ProductInfo{
+		90: {ID: 90, Name: "Tea", ImageKey: "https://legacy.example/p.jpg", MinPrice: 100, MaxPrice: 100, Available: true},
+	}}
+	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
+	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
+	if err != nil {
+		t.Fatalf("商品圖片 key 不合法不能讓讀取失敗：%v", err)
+	}
+	got := resp.Msg.GetPosts()[0].GetProduct()
+	if got.GetName() != "Tea" || got.GetImage() != nil {
+		t.Fatalf("摘要照回、圖不設：%v", got)
+	}
+}
+
+// blockingProducts 只在 ctx 結束時回傳，所以逾時降級的測試不靠牆上時鐘斷言。
+type blockingProducts struct{}
+
+func (blockingProducts) Cards(ctx context.Context, _ []int64, _ bool) (map[int64]ProductInfo, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestProductLookupTimeoutDegradesTheReadToNoProduct(t *testing.T) {
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, blockingProducts{})
+	h.productTimeout = time.Millisecond
+	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
+	if err != nil {
+		t.Fatalf("商品查詢逾時不能讓讀取失敗：%v", err)
+	}
+	if posts := resp.Msg.GetPosts(); len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != "90" {
+		t.Fatalf("逾時降級：%v", posts)
+	}
+}
+
+// rendezvousStores 的 StoreCards 要等商品查詢開始才回：商品查詢排在它後面（序列）就永遠等不到。
+type rendezvousStores struct {
+	fakeStores
+	productsStarted chan struct{}
+	storesStarted   chan struct{}
+	met             bool
+}
+
+func (f *rendezvousStores) StoreCards(ctx context.Context, ids []int64) ([]seller.StoreCard, error) {
+	close(f.storesStarted)
+	select {
+	case <-f.productsStarted:
+		f.met = true
+	case <-time.After(5 * time.Second):
+	}
+	return f.fakeStores.StoreCards(ctx, ids)
+}
+
+type signalingProducts struct {
+	fakeProducts
+	started       chan struct{}
+	storesStarted chan struct{}
+	met           bool
+}
+
+func (f *signalingProducts) Cards(ctx context.Context, ids []int64, incl bool) (map[int64]ProductInfo, error) {
+	close(f.started)
+	select {
+	case <-f.storesStarted:
+		f.met = true
+	case <-time.After(5 * time.Second):
+	}
+	return f.fakeProducts.Cards(ctx, ids, incl)
+}
+
+func TestProductLookupRunsConcurrentlyWithTheOtherEnrichmentLookups(t *testing.T) {
+	started := make(chan struct{})
+	storesStarted := make(chan struct{})
+	stores := &rendezvousStores{productsStarted: started, storesStarted: storesStarted}
+	products := &signalingProducts{started: started, storesStarted: storesStarted}
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &stores.fakeStores, products)
+	h.stores = stores
+	if _, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if !stores.met || !products.met {
+		t.Fatal("商品查詢與店家卡片查詢必須同時進行：兩邊都要在對方進行中就已開始")
 	}
 }
