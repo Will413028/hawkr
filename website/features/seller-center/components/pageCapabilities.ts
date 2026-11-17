@@ -37,6 +37,12 @@ const PAGES: readonly PageRule[] = [
 	{ prefix: "/seller-center/shipments", capability: C.ORDER_FULFILL },
 	{ prefix: "/seller-center/products", capability: C.PRODUCT_MANAGE },
 	{ prefix: "/seller-center/inventory", capability: C.PRODUCT_MANAGE },
+	// 列表頁是下架與刪除的入口（伺服器端掛 CONTENT_CONTRACT，停權時仍開放）；新增與編輯是經營動作，仍要 MARKETING。
+	{
+		prefix: "/seller-center/posts",
+		exact: true,
+		capability: C.CONTENT_CONTRACT,
+	},
 	{ prefix: "/seller-center/posts", capability: C.MARKETING },
 	{ prefix: "/seller-center/coupons", capability: C.MARKETING },
 	{ prefix: "/seller-center/customers", capability: C.MARKETING },
@@ -72,7 +78,13 @@ function matchPage(pathname: string): PageRule | undefined {
 		const matches =
 			pathname === page.prefix ||
 			(!page.exact && pathname.startsWith(`${page.prefix}/`));
-		if (matches && (!best || page.prefix.length > best.prefix.length)) {
+		if (!matches) continue;
+		// 前綴相同時，只比對本頁的規則優先於含子路徑的規則。
+		if (
+			!best ||
+			page.prefix.length > best.prefix.length ||
+			(page.prefix.length === best.prefix.length && page.exact && !best.exact)
+		) {
 			best = page;
 		}
 	}

@@ -5,6 +5,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyPostDetail, PostListItem } from "@/lib/api/openapi-types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
 const fetchSellerPosts = vi.fn();
 const fetchSellerPostDetail = vi.fn();
@@ -94,9 +95,13 @@ function mount() {
 	});
 	return render(
 		React.createElement(
-			QueryClientProvider,
-			{ client },
-			React.createElement(SellerPostsClient),
+			IntlTestWrapper,
+			null,
+			React.createElement(
+				QueryClientProvider,
+				{ client },
+				React.createElement(SellerPostsClient),
+			),
 		),
 	);
 }

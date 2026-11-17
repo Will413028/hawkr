@@ -2,6 +2,7 @@
 
 import { SellerCapability } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
@@ -180,6 +181,9 @@ export default function SellerPostsClient() {
 	// seller-self 快取），不在這裡自己比對 lifecycleStatus —— 兩處各寫一份的話，
 	// 46 §3.6 那條 `suspended_governance` 只會被補進其中一處。
 	const { isSuspended } = useSellerIdentity();
+	const t = useTranslations("seller.posts");
+	// 代行的工作區不是店家自己，限制只對店家自己的賣家中心成立。
+	const writeLocked = !delegated && isSuspended;
 	// 代行下 `useSellerSelf()` 是店面那一支（scope 已換），但工作區的側欄不掛它 ——
 	// 這裡的店家鍵一律優先取工作階段下發的 `ownerStoreId`，才不會因為 storefront.read
 	// 沒核發就整頁不載入。
@@ -327,12 +331,17 @@ export default function SellerPostsClient() {
 					: `已發布 ${items.length} 則動態`
 			}
 			actions={
-				<Button href={composeHref}>
+				<Button href={composeHref} disabled={writeLocked}>
 					<PlusIcon />
 					<span>發布動態</span>
 				</Button>
 			}
 		>
+			{writeLocked && (
+				<p className="seller-posts__notice" role="status">
+					{t("suspendedNotice")}
+				</p>
+			)}
 			{error && (
 				<p className="seller-posts__error" role="alert">
 					{error}
@@ -345,7 +354,9 @@ export default function SellerPostsClient() {
 				) : items.length === 0 ? (
 					<div className="seller-posts__empty">
 						<SellerEmptyState variant="posts" seamless />
-						<Button href={composeHref}>發布第一篇</Button>
+						<Button href={composeHref} disabled={writeLocked}>
+							發布第一篇
+						</Button>
 					</div>
 				) : (
 					<ul className="seller-posts__list">
@@ -464,6 +475,7 @@ export default function SellerPostsClient() {
 											variant="bordered"
 											size="sm"
 											href={`/seller-center/posts/${p.id}/edit`}
+											disabled={writeLocked}
 										>
 											編輯
 										</Button>
@@ -489,7 +501,9 @@ export default function SellerPostsClient() {
 				<div className="seller-mobile-disclosure-list">
 					<div className="seller-card seller-posts__empty">
 						<SellerEmptyState variant="posts" seamless />
-						<Button href={composeHref}>發布第一篇</Button>
+						<Button href={composeHref} disabled={writeLocked}>
+							發布第一篇
+						</Button>
 					</div>
 				</div>
 			) : (
@@ -607,6 +621,7 @@ export default function SellerPostsClient() {
 											variant="bordered"
 											size="sm"
 											href={`/seller-center/posts/${post.id}/edit`}
+											disabled={writeLocked}
 										>
 											編輯
 										</Button>
