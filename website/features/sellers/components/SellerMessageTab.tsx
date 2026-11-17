@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
@@ -12,6 +13,7 @@ import type {
 	SellerForumListResult,
 } from "@/lib/forum/repo";
 import { useSellerForum } from "@/lib/hooks/useSellerForum";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 
 interface SellerMessageTabProps {
 	/** store_id: the key of every forum RPC. */
@@ -60,6 +62,10 @@ export default function SellerMessageTab({
 	const [loadingReplyIds, setLoadingReplyIds] = React.useState<
 		ReadonlySet<string>
 	>(() => new Set());
+	const [replyErrors, setReplyErrors] = React.useState<
+		ReadonlyMap<string, string>
+	>(() => new Map());
+	const defaultErrors = useDefaultErrorText();
 	const composeRef = React.useRef<HTMLTextAreaElement | null>(null);
 
 	const handleSubmit = async (event: React.FormEvent) => {
@@ -102,10 +108,18 @@ export default function SellerMessageTab({
 		const id = String(comment.id);
 		if (loadingReplyIds.has(id)) return;
 		setLoadingReplyIds((prev) => new Set(prev).add(id));
+		setReplyErrors((prev) => {
+			if (!prev.has(id)) return prev;
+			const next = new Map(prev);
+			next.delete(id);
+			return next;
+		});
 		try {
 			await forum.loadMoreReplies(comment.id);
-		} catch {
-			/* swallow — the button stays so the user can retry */
+		} catch (e) {
+			setReplyErrors((prev) =>
+				new Map(prev).set(id, errorText(e, defaultErrors)),
+			);
 		} finally {
 			setLoadingReplyIds((prev) => {
 				const next = new Set(prev);
@@ -355,6 +369,14 @@ export default function SellerMessageTab({
 												</li>
 											))}
 										</ul>
+									) : null}
+									{replyErrors.get(idStr) ? (
+										<p
+											className="p-3 rounded-[var(--radius-md)] bg-[rgba(196,60,60,0.08)] dark:bg-[rgba(196,60,60,0.18)] text-[#8a3a3a] dark:text-[#f5c4c4] text-[length:var(--text-sm)]"
+											role="alert"
+										>
+											{replyErrors.get(idStr)}
+										</p>
 									) : null}
 									{expanded && (comment.repliesNextPageToken ?? "") !== "" ? (
 										<div className="flex justify-center pt-2">

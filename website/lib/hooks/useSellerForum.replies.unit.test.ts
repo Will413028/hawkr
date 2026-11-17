@@ -117,4 +117,35 @@ describe("forum replies paging", () => {
 		});
 		expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(2);
 	});
+
+	it("ignores a second same-tick loadMoreReplies call for one comment", async () => {
+		const { result } = renderHook(() => useSellerForum("7"), {
+			wrapper: wrapper(),
+		});
+		await waitFor(() => expect(result.current.comments).toHaveLength(1));
+		await act(async () => {
+			await result.current.loadReplies("top");
+		});
+		await waitFor(() =>
+			expect(result.current.comments[0].repliesNextPageToken).toBe("more"),
+		);
+		let resolve!: (v: unknown) => void;
+		repo.fetchSellerForumReplies.mockReturnValueOnce(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+		const before = repo.fetchSellerForumReplies.mock.calls.length;
+		let a!: Promise<void>;
+		let b!: Promise<void>;
+		act(() => {
+			a = result.current.loadMoreReplies("top");
+			b = result.current.loadMoreReplies("top");
+		});
+		resolve({ records: [entry("r3")], nextPageToken: "", pageSize: 20 });
+		await act(async () => {
+			await Promise.all([a, b]);
+		});
+		expect(repo.fetchSellerForumReplies.mock.calls.length - before).toBe(1);
+	});
 });

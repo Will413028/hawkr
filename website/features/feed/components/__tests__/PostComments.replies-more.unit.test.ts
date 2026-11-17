@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
 	hasMore: false,
 	loadMore: vi.fn(),
+	error: null as unknown,
 }));
 
 vi.mock("@/lib/auth/context", () => ({
@@ -48,6 +49,7 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 		loading: false,
 		hasMore: state.hasMore,
 		loadingMore: false,
+		loadMoreError: state.error,
 		loadMore: state.loadMore,
 		expand: vi.fn(),
 		collapse: vi.fn(),
@@ -71,6 +73,7 @@ function view() {
 afterEach(() => {
 	cleanup();
 	state.loadMore.mockReset();
+	state.error = null;
 });
 
 describe("reply load more", () => {
@@ -81,6 +84,15 @@ describe("reply load more", () => {
 		cleanup();
 		state.hasMore = true;
 		view();
+		fireEvent.click(screen.getByText("載入更多"));
+		expect(state.loadMore).toHaveBeenCalledTimes(1);
+	});
+
+	it("shows the load-more failure inline as an alert and keeps the button", () => {
+		state.hasMore = true;
+		state.error = new Error("boom");
+		view();
+		expect(screen.getByRole("alert").textContent).toBeTruthy();
 		fireEvent.click(screen.getByText("載入更多"));
 		expect(state.loadMore).toHaveBeenCalledTimes(1);
 	});

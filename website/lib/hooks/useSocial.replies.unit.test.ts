@@ -96,4 +96,68 @@ describe("comment replies paging", () => {
 		});
 		expect(repo.fetchCommentReplies).toHaveBeenCalledTimes(1);
 	});
+
+	it("ignores a second same-tick loadMore call", async () => {
+		repo.fetchCommentReplies.mockResolvedValueOnce({
+			records: [reply("r1")],
+			nextPageToken: "tok",
+			pageSize: 20,
+		});
+		const { result } = renderHook(() => useCommentReplies("p", "c"), {
+			wrapper: wrapper(),
+		});
+		await act(async () => {
+			await result.current.expand();
+		});
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
+		let resolve!: (v: unknown) => void;
+		repo.fetchCommentReplies.mockReturnValueOnce(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+		let a!: Promise<void>;
+		let b!: Promise<void>;
+		act(() => {
+			a = result.current.loadMore();
+			b = result.current.loadMore();
+		});
+		resolve({ records: [reply("r2")], nextPageToken: "", pageSize: 20 });
+		await act(async () => {
+			await Promise.all([a, b]);
+		});
+		expect(repo.fetchCommentReplies).toHaveBeenCalledTimes(2);
+	});
+
+	it("records a loadMore failure without rejecting and allows retry", async () => {
+		repo.fetchCommentReplies.mockResolvedValueOnce({
+			records: [reply("r1")],
+			nextPageToken: "tok",
+			pageSize: 20,
+		});
+		const { result } = renderHook(() => useCommentReplies("p", "c"), {
+			wrapper: wrapper(),
+		});
+		await act(async () => {
+			await result.current.expand();
+		});
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
+		const err = new Error("boom");
+		repo.fetchCommentReplies.mockRejectedValueOnce(err);
+		await act(async () => {
+			await result.current.loadMore();
+		});
+		expect(result.current.loadMoreError).toBe(err);
+		expect(result.current.hasMore).toBe(true);
+		repo.fetchCommentReplies.mockResolvedValueOnce({
+			records: [reply("r2")],
+			nextPageToken: "",
+			pageSize: 20,
+		});
+		await act(async () => {
+			await result.current.loadMore();
+		});
+		expect(result.current.loadMoreError).toBeNull();
+		expect(result.current.items).toHaveLength(2);
+	});
 });

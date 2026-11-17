@@ -1,6 +1,12 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -105,5 +111,19 @@ describe("forum replies load more", () => {
 		fireEvent.click(screen.getByText("30 則回覆 ▼"));
 		fireEvent.click(screen.getByText("載入更多留言"));
 		expect(forum.loadMoreReplies).toHaveBeenCalledWith("top");
+	});
+
+	it("shows a failure inline as an alert without an unhandled rejection and keeps the button", async () => {
+		forum.list = withReplies("tok");
+		forum.loadMoreReplies.mockRejectedValueOnce(new Error("boom"));
+		view();
+		fireEvent.click(screen.getByText("30 則回覆 ▼"));
+		fireEvent.click(screen.getByText("載入更多留言"));
+		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+		expect(screen.getByText("載入更多留言")).toBeTruthy();
+		forum.loadMoreReplies.mockResolvedValueOnce(undefined);
+		fireEvent.click(screen.getByText("載入更多留言"));
+		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+		expect(forum.loadMoreReplies).toHaveBeenCalledTimes(2);
 	});
 });

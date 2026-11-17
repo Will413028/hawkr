@@ -532,6 +532,7 @@ function CommentItem({
 }) {
 	const tComments = useTranslations("seller.comments");
 	const tFeed = useTranslations("feed.comments");
+	const defaultErrors = useDefaultErrorText();
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	// Local mirror of replyCount so it bumps the moment we send a reply
@@ -859,6 +860,14 @@ function CommentItem({
 								/>
 							))
 						)}
+						{replies.loadMoreError ? (
+							<li
+								className="list-none text-[length:var(--hkui-text-tiny)] text-[var(--hkui-danger-700)]"
+								role="alert"
+							>
+								{errorText(replies.loadMoreError, defaultErrors)}
+							</li>
+						) : null}
 						{replies.hasMore ? (
 							<li className="list-none">
 								<Button

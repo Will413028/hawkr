@@ -431,9 +431,14 @@ export function useCommentReplies(
 	const nextPageToken = repliesQuery.data?.nextPageToken ?? "";
 	const queryClient = useQueryClient();
 	const [loadingMore, setLoadingMore] = React.useState(false);
+	const [loadMoreError, setLoadMoreError] = React.useState<unknown>(null);
+	const loadingMoreRef = React.useRef(false);
 	const loadMore = React.useCallback(async () => {
-		if (!postId || !commentId || loadingMore || nextPageToken === "") return;
+		if (!postId || !commentId || nextPageToken === "") return;
+		if (loadingMoreRef.current) return;
+		loadingMoreRef.current = true;
 		setLoadingMore(true);
+		setLoadMoreError(null);
 		try {
 			const page = await fetchCommentReplies(postId, commentId, {
 				pageSize: 20,
@@ -452,18 +457,13 @@ export function useCommentReplies(
 					nextPageToken: page.nextPageToken,
 				};
 			});
+		} catch (err) {
+			setLoadMoreError(err);
 		} finally {
+			loadingMoreRef.current = false;
 			setLoadingMore(false);
 		}
-	}, [
-		postId,
-		commentId,
-		loadingMore,
-		nextPageToken,
-		parentName,
-		queryClient,
-		repliesKey,
-	]);
+	}, [postId, commentId, nextPageToken, parentName, queryClient, repliesKey]);
 	const refetchReplies = repliesQuery.refetch;
 
 	const load = React.useCallback(async () => {
@@ -484,6 +484,7 @@ export function useCommentReplies(
 		loading: repliesQuery.isLoading,
 		hasMore: nextPageToken !== "",
 		loadingMore,
+		loadMoreError,
 		loadMore,
 		expand,
 		collapse,
