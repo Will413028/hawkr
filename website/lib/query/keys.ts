@@ -214,6 +214,8 @@ export const queryKeys = {
 				String(postId),
 				"interactions",
 			] as const,
+		postViewer: (id: QueryIdentity, postId: string | number) =>
+			["feed", ...idPrefix(id), "posts", String(postId), "viewer"] as const,
 		comments: (
 			id: QueryIdentity,
 			postId: string | number,

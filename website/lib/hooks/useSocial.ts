@@ -13,7 +13,7 @@ import {
 	fetchPostComments,
 	setCommentLiked,
 } from "@/lib/comments/repo";
-import { setPostLiked } from "@/lib/posts/repo";
+import { fetchPostViewerState, setPostLiked } from "@/lib/posts/repo";
 import { queryKeys } from "@/lib/query/keys";
 import { errorMessage } from "./queryError";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -255,6 +255,25 @@ export function usePostComments(
 		edited,
 		like,
 	};
+}
+
+/* ===== Post viewer state (who comments, and whether they can) ===== */
+
+/**
+ * 觀看者在這則貼文的留言權限與身分，由伺服器依觀看者算。貼文已經帶著（依觀看者讀的）答案時呼叫端傳
+ * `enabled: false`，不重讀。
+ */
+export function usePostViewerState(
+	postId: string | undefined,
+	enabled: boolean,
+) {
+	const queryIdentity = useQueryIdentity();
+	return useQuery({
+		queryKey: queryKeys.feed.postViewer(queryIdentity, postId ?? ""),
+		enabled: Boolean(postId) && enabled,
+		staleTime: 30_000,
+		queryFn: ({ signal }) => fetchPostViewerState(postId ?? "", signal),
+	});
 }
 
 /* ===== Post like toggle hook ===== */

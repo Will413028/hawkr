@@ -37,7 +37,8 @@
 		"comments": {
 			"blockAction": "Block this person",
 			"blockTitle": "Block “{name}”?",
-			"blockDescription": "Once blocked, this person can no longer comment on or like your posts and forum, or message you. They can still see your public content, and reviews are not affected. You can unblock them anytime in Blocked list."
+			"blockDescription": "Once blocked, this person can no longer comment on or like your posts and forum, or message you. They can still see your public content, and reviews are not affected. You can unblock them anytime in Blocked list.",
+			"blocked": "Blocked “{name}”"
 		}
 	},
 	"order": {},

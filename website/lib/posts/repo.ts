@@ -3,7 +3,10 @@
  * `PostDetail` 的映射。列表是 page_token 分頁，沒有總數也沒有頁碼：結束只看 `nextPageToken` 是不是空字串。
  */
 
-import type { Post } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
+import {
+	ActorKind,
+	type Post,
+} from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { imageUri } from "@/lib/media/image";
 import { placeholders } from "@/lib/media/public-assets";
 import { formatPriceRange } from "@/lib/products/pricing";
@@ -11,6 +14,8 @@ import type {
 	PostDetail,
 	PostListItem,
 	PostProductData,
+	PostViewerActor,
+	PostViewerState,
 } from "../api/openapi-types";
 import {
 	socialAppClient,
@@ -44,6 +49,40 @@ export function postProductOf(post: Post): PostProductData | null {
 	};
 }
 
+function viewerActorOf(post: Post): PostViewerActor | undefined {
+	const actor = post.viewerActor;
+	if (!actor) return undefined;
+	const kind =
+		actor.kind === ActorKind.STORE
+			? "store"
+			: actor.kind === ActorKind.BUYER
+				? "buyer"
+				: undefined;
+	if (!kind) return undefined;
+	const avatarKey = imageUri(actor.avatar, "avatar");
+	return {
+		kind,
+		id: actor.id,
+		...(actor.name?.trim() ? { name: actor.name.trim() } : {}),
+		...(avatarKey ? { avatarKey } : {}),
+	};
+}
+
+/**
+ * 伺服器依觀看者算的留言權限。匿名讀取（訪客，或進了共用快取的讀取）沒有身分也不能留言，與「讀了但不能留言」
+ * 分不出來，所以兩者都沒有時回 undefined（還不知道），由呼叫端用依觀看者的讀取補。
+ */
+export function postViewerOf(post: Post): PostViewerState | undefined {
+	const actor = viewerActorOf(post);
+	if (!actor && !post.viewerCanComment) return undefined;
+	return { canComment: post.viewerCanComment, ...(actor ? { actor } : {}) };
+}
+
+function viewerField(post: Post): { viewer?: PostViewerState } {
+	const viewer = postViewerOf(post);
+	return viewer ? { viewer } : {};
+}
+
 /** `Post` → 動態卡片用的列表項；缺圖補預設圖，店名缺漏補 Hawkr 選品。 */
 export function postToListItem(post: Post): PostListItem {
 	const image = imageUri(post.image, "card");
@@ -65,6 +104,7 @@ export function postToListItem(post: Post): PostListItem {
 		isLiked: post.viewerLiked,
 		createdAt: toSeconds(post.publishTime ?? post.createTime),
 		...(post.etag ? { etag: post.etag } : {}),
+		...viewerField(post),
 	};
 }
 
@@ -89,6 +129,7 @@ export function postToDetail(post: Post): PostDetail & { productId?: string } {
 		viewCount: Number(post.viewCount),
 		isLiked: post.viewerLiked,
 		createdAt: toSeconds(post.publishTime ?? post.createTime),
+		...viewerField(post),
 	};
 }
 
@@ -154,6 +195,20 @@ export async function fetchPostDetailForViewer(
 	const res = await socialViewerClient().getPost({ postId }, { signal });
 	if (!res.post) throw new Error("post missing");
 	return postToDetail(res.post);
+}
+
+/** 觀看者在這則貼文的留言權限與身分（依觀看者讀單篇）；留言框用它決定提示字與要不要出現。 */
+export async function fetchPostViewerState(
+	postId: string,
+	signal?: AbortSignal,
+): Promise<PostViewerState> {
+	const res = await socialViewerClient().getPost({ postId }, { signal });
+	if (!res.post) throw new Error("post missing");
+	const actor = viewerActorOf(res.post);
+	return {
+		canComment: res.post.viewerCanComment,
+		...(actor ? { actor } : {}),
+	};
 }
 
 /**
