@@ -734,7 +734,9 @@ function CommentItem({
 							? content
 							: comment.state === "deleted"
 								? tFeed("deleted")
-								: null}
+								: comment.state === "hidden"
+									? tFeed("hidden")
+									: null}
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">

@@ -91,6 +91,19 @@ describe("forum placeholder", () => {
 	});
 });
 
+describe("forum hidden placeholder", () => {
+	it("a hidden entry shows the hidden text, not the deleted text, with no author and no actions", () => {
+		forum.list = [
+			entry("h", { state: "hidden", content: "", userName: "匿名" }),
+		];
+		view();
+		expect(screen.queryByText("此留言已被隱藏")).not.toBeNull();
+		expect(screen.queryByText("此留言已刪除")).toBeNull();
+		expect(screen.queryByText("匿名")).toBeNull();
+		expect(screen.queryByText("回覆")).toBeNull();
+	});
+});
+
 describe("forum replies load more", () => {
 	const withReplies = (token: string) => [
 		entry("top", {

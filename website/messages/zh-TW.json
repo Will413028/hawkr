@@ -63,7 +63,8 @@
 			"replyToName": "回覆 {name}…",
 			"replyPlaceholder": "寫下你的回覆…",
 			"selfAlt": "我",
-			"deleted": "此留言已刪除"
+			"deleted": "此留言已刪除",
+			"hidden": "此留言已被隱藏"
 		}
 	}
 }

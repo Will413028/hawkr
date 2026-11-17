@@ -92,7 +92,7 @@ describe("placeholder comments carry no actions", () => {
 });
 
 describe("deleted placeholder text", () => {
-	it("a deleted comment says it was deleted and a hidden one adds no text", () => {
+	it("a deleted comment says it was deleted and a hidden one says it was hidden", () => {
 		comments.list = [comment("deleted")];
 		render(
 			React.createElement(
@@ -114,5 +114,6 @@ describe("deleted placeholder text", () => {
 			),
 		);
 		expect(screen.queryByText("此留言已刪除")).toBeNull();
+		expect(screen.queryByText("此留言已被隱藏")).not.toBeNull();
 	});
 });

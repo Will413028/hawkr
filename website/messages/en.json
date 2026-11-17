@@ -63,7 +63,8 @@
 			"replyToName": "Reply to {name}…",
 			"replyPlaceholder": "Write a reply…",
 			"selfAlt": "Me",
-			"deleted": "This comment was deleted"
+			"deleted": "This comment was deleted",
+			"hidden": "This comment was hidden"
 		}
 	}
 }

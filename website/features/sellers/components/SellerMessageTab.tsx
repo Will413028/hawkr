@@ -304,7 +304,9 @@ export default function SellerMessageTab({
 										{isPlaceholder
 											? comment.state === "deleted"
 												? tFeed("deleted")
-												: null
+												: comment.state === "hidden"
+													? tFeed("hidden")
+													: null
 											: comment.content}
 									</p>
 									<div className="flex items-center gap-4 mt-[10px]">
