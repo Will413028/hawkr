@@ -16,7 +16,7 @@ interface Props {
 }
 
 /**
- * 恢復貼文：撤銷下架它的措施，沒有第二個入口（社群模組沒有平台隱藏貼文）。先讀措施的現況與 etag，
+ * 恢復貼文：撤銷下架它的措施（措施可能涵蓋多則內容，對話框列出全部），沒有第二個入口（社群模組沒有平台隱藏貼文）。先讀措施的現況與 etag，
  * 再用既有的撤銷對話框，撤銷原因只能是手動原因。
  */
 export default function RestorePostDialog({
@@ -53,6 +53,19 @@ export default function RestorePostDialog({
 	return (
 		<RevokeMeasureDialog
 			measure={measure}
+			impact={
+				<div role="note" style={{ marginBottom: 16 }}>
+					<p>
+						撤銷這個措施會恢復它涵蓋的全部 {measure.contents.length}{" "}
+						則內容（ID）：
+					</p>
+					<ul>
+						{measure.contents.map((ref) => (
+							<li key={`${ref.kind}-${ref.id}`}>{ref.id}</li>
+						))}
+					</ul>
+				</div>
+			}
 			onClose={onClose}
 			onConfirm={async (reason, revokeFindings) => {
 				await revoke.mutateAsync(buildRevoke(measure, reason, revokeFindings));

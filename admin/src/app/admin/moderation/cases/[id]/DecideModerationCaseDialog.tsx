@@ -12,6 +12,7 @@ import { ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_p
 import { useState } from "react";
 import { GovernanceNoticeBanner } from "@/app/admin/merchants/[id]/GovernanceNotice";
 import { violationSeverityText } from "@/app/admin/merchants/[id]/measure";
+import { VIOLATION_SEVERITY_OPTIONS } from "@/app/admin/merchants/[id]/violation-measure";
 import { Button, Dialog } from "@/components/UI";
 import { connectErrorText } from "@/lib/error-text";
 import { policyCategoryText } from "@/lib/policy-category";
@@ -21,7 +22,6 @@ import {
 	type DecideForm,
 	EMPTY_DECIDE_FORM,
 	REASON_MAX_LENGTH,
-	SEVERITY_OPTIONS,
 	validateDecide,
 } from "../../case-decide";
 import {
@@ -40,7 +40,7 @@ interface Props {
 	) => Promise<void>;
 }
 
-/** 決定案件：決定即結案、不能重開。違規要選處置、類別並寫給作者的理由；下架店家的內容還要填內容所屬的店家與嚴重度。 */
+/** 決定案件：決定即結案、不能重開。違規要選處置、類別並寫給作者的理由；下架店家的內容還要填嚴重度（店家由伺服器依案件快照決定）。 */
 export default function DecideModerationCaseDialog({
 	kase,
 	onClose,
@@ -193,7 +193,7 @@ export default function DecideModerationCaseDialog({
 								}
 							>
 								<option value={ViolationSeverity.UNSPECIFIED}>請選擇</option>
-								{SEVERITY_OPTIONS.map((option) => (
+								{VIOLATION_SEVERITY_OPTIONS.map((option) => (
 									<option key={option} value={option}>
 										{violationSeverityText(option)}
 									</option>

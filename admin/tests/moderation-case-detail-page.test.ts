@@ -45,6 +45,9 @@ import { versionConflict } from "./fixtures/report-fixtures";
  * 決定帶讀到的 etag、版本衝突時重讀；已結案是終態，沒有決定的操作。
  */
 
+const { ToastProvider } = requireFromTest("../src/components/UI/Toast") as {
+	ToastProvider: unknown;
+};
 const Page = requireFromTest("../src/app/admin/moderation/cases/[id]/page")
 	.default as unknown;
 const h = React.createElement;
@@ -117,7 +120,7 @@ function setup(
 
 async function open(transport: Transport) {
 	navigation.params = { id: "case-1" };
-	const m = mount(h(Page), transport);
+	const m = mount(h(ToastProvider, null, h(Page)), transport);
 	await m.render();
 	return m;
 }
@@ -267,4 +270,29 @@ test("版本衝突：重讀案件，對話框留著並說明", async () => {
 	await click("確認決定");
 	await until(() => decides.length === 2, "用新版本重送");
 	assert.equal(decides[1]?.etag, "etag-8");
+});
+
+test("版本衝突後重讀發現案件已結案：對話框消失，衝突說明改用 toast", async () => {
+	let closed = false;
+	const { transport, decides } = setup(
+		() =>
+			closed
+				? kase({ state: CaseState.CLOSED, decision: CaseDecision.NO_VIOLATION })
+				: kase(),
+		() => {
+			closed = true;
+			throw versionConflict("case");
+		},
+	);
+	await open(transport);
+	await click("決定");
+	await pick("moderation-decision", CaseDecision.NO_VIOLATION);
+	await click("確認決定");
+	await until(() => decides.length === 1, "DecideCase 的請求");
+	await until(() => maybeById("moderation-decision") === null, "對話框關閉");
+	await until(
+		() => bodyText().includes("頁面已重新載入"),
+		"衝突說明留在頁面上",
+	);
+	assert.equal(buttonByText("決定"), undefined);
 });

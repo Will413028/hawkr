@@ -15,7 +15,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, Section } from "@/app/admin/governance/DetailBits";
 import { measureStateBadge } from "@/app/admin/merchants/[id]/measure";
-import { Button, StatusBadge } from "@/components/UI";
+import { Button, StatusBadge, useToast } from "@/components/UI";
 import { type ConflictText, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
@@ -45,13 +45,14 @@ function timeText(value: Parameters<typeof timestampDate>[0] | undefined) {
 
 /**
  * 社群檢舉案件詳情：案件與它的全部檢舉（舊到新）。進行中的案件可以決定（帶讀到的 etag；版本衝突時重讀）；
- * 已結案是終態，不顯示決定的操作。
+ * 已結案是終態，不顯示決定的操作。版本衝突時重讀；重讀後案件已結案（對話框隨之消失），衝突說明改用 toast。
  */
 export default function ModerationCaseDetailPage() {
 	const router = useRouter();
 	const params = useParams<{ id: string }>();
 	const id = params.id;
 	const queryClient = useQueryClient();
+	const { showToast } = useToast();
 	const [dialog, setDialog] = useState(false);
 	const detail = useQuery(ModerationAdminService.method.getCase, { id });
 	const decide = useMutation(ModerationAdminService.method.decideCase, {
@@ -111,12 +112,23 @@ export default function ModerationCaseDetailPage() {
 	const handleDecide = async (
 		request: Parameters<typeof decide.mutateAsync>[0],
 	) => {
+		let stillDecidable = true;
 		const result = await runAction(() => decide.mutateAsync(request), {
-			reload: () => detail.refetch(),
+			reload: async () => {
+				const reloaded = await detail.refetch();
+				stillDecidable = !reloaded.data?.case || canDecide(reloaded.data.case);
+			},
 			fallback: DECIDE_FAILED_TEXT,
 			conflictText,
 		});
-		if (!result.ok) throw new Error(result.text);
+		if (!result.ok) {
+			if (result.kind === "conflict" && !stillDecidable) {
+				setDialog(false);
+				showToast(result.text, "warning");
+				return;
+			}
+			throw new Error(result.text);
+		}
 		setDialog(false);
 	};
 

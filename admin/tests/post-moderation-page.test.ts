@@ -91,6 +91,10 @@ function setup() {
 						id: req.id,
 						etag: `etag-of-${req.id}`,
 						canRevoke: true,
+						contents: [
+							{ kind: ContentKind.POST, id: "post-2" },
+							{ kind: ContentKind.COMMENT, id: "comment-77" },
+						],
 					}),
 				};
 			},
@@ -201,6 +205,21 @@ test("恢復：每則貼文撤銷自己的 takedown_measure_id，不是別的措
 	await until(() => revokes.length === 1, "RevokeMeasure 的請求");
 	assert.equal(revokes[0]?.id, "measure-10");
 	assert.equal(revokes[0]?.etag, "etag-of-measure-10");
+});
+
+test("恢復：對話框列出措施涵蓋的全部內容並說明會全部恢復", async () => {
+	const { transport } = setup();
+	await open(transport);
+	const button = rowButton("被下架的貼文", "恢復");
+	assert.ok(button);
+	await clickElement(button);
+	await until(
+		() => document_has("revoke-measure-reason"),
+		"撤銷對話框載入措施",
+	);
+	const text = bodyText();
+	assert.ok(text.includes("全部 2 則內容"));
+	assert.ok(text.includes("post-2") && text.includes("comment-77"));
 });
 
 function document_has(id: string) {

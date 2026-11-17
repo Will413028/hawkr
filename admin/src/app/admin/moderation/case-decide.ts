@@ -9,6 +9,7 @@ import {
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
+import { VIOLATION_SEVERITY_OPTIONS } from "@/app/admin/merchants/[id]/violation-measure";
 import { actionsFor, categoriesFor } from "./moderation-text";
 
 export const REASON_MAX_LENGTH = 500;
@@ -25,13 +26,6 @@ export function canDecide(kase: Case): boolean {
 
 export const TAKEDOWN_NO_STORE_TEXT =
 	"案件沒有內容快照的店家（快照已過保留期或內容不是店家寫的），無法建立下架措施。";
-
-export const SEVERITY_OPTIONS: readonly ViolationSeverity[] = [
-	ViolationSeverity.LOW,
-	ViolationSeverity.MEDIUM,
-	ViolationSeverity.HIGH,
-	ViolationSeverity.CRITICAL,
-];
 
 export interface DecideForm {
 	decision: CaseDecision;
@@ -68,7 +62,8 @@ export function validateDecide(
 	}
 	if (form.action === CaseAction.TAKEDOWN) {
 		if (!kase.storeId) return TAKEDOWN_NO_STORE_TEXT;
-		if (!SEVERITY_OPTIONS.includes(form.severity)) return "請選擇嚴重度。";
+		if (!VIOLATION_SEVERITY_OPTIONS.includes(form.severity))
+			return "請選擇嚴重度。";
 	}
 	return undefined;
 }
