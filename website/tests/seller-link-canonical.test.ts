@@ -307,17 +307,20 @@ test("every StoryRail producer carries the seller store_code", () => {
 });
 
 test("the posts pipeline carries store_code from the wire onto the feed rail", async () => {
-	const { normalizePost } = await import("../lib/api/posts");
-	// normalizePost is a spread, not a whitelist — but that is exactly the kind
-	// of thing a later "tidy up" turns into an explicit field list, silently
-	// dropping the segment again (the favourites normalizer did precisely that).
-	const normalized = normalizePost({
-		id: "post-1",
-		sellerId: STORE_ID,
-		storeCode: STORE_CODE,
-		sellerName: "Store",
-	} as never);
-	assert.equal(normalized.storeCode, STORE_CODE);
+	// The Connect mapper copies the server's StoreCard store_code onto the list item.
+	const { postToListItem } = await import("../lib/posts/repo");
+	const { create } = await import("@bufbuild/protobuf");
+	const { PostSchema } = await import(
+		"@hawkr/api/gen/hawkr/social/v1alpha1/social_pb"
+	);
+	const item = postToListItem(
+		create(PostSchema, {
+			id: "post-1",
+			store: { id: STORE_ID, storeCode: STORE_CODE, name: "Store" },
+		}),
+	);
+	assert.equal(item.sellerId, STORE_ID);
+	assert.equal(item.storeCode, STORE_CODE);
 
 	// FeedPage's buildStories is module-private, so assert the source instead:
 	// it must read store_code, and must not fall back to the seller_id.

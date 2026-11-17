@@ -148,7 +148,7 @@ func writeUnavailable(w http.ResponseWriter, r *http.Request) {
 }
 
 // writePermissionDenied 回 403，帶模組給使用者的文字，沒有時用共用文案目錄的 PERMISSION_DENIED（語系取自 ctx）；形狀同 writeUnavailable。
-// 錯誤帶 reason（apperr.Reason）時，Connect 的請求放進 ErrorInfo，gateway 的 envelope 放進 `reason` 欄位（和 openapi 的錯誤形狀相同）。
+// 錯誤帶 reason（apperr.Reason）時：Connect 的請求寫進 ErrorInfo，gateway 的 envelope 寫進選填的 reason 欄位（ErrorReason 的名稱字串）；沒有時省略。
 func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
 	var ae *apperr.Error
 	hasText := errors.As(err, &ae) && ae.Message != ""

@@ -37182,6 +37182,9 @@ components:
           type: string
         traceId:
           type: string
+        reason:
+          type: string
+          description: 業務原因，值是 hawkr.common.v1alpha1.ErrorReason 的名稱（例如 ACCOUNT_SUSPENDED）；錯誤有業務原因時才出現。
   securitySchemes:
     BearerAuth:
       type: http

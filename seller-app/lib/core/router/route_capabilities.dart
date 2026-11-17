@@ -26,6 +26,7 @@ final Map<String, SellerCapability?> routeCapabilities = {
   AuthRoutes.auth: null,
   AuthRoutes.onboard: null,
   SellerRoutes.suspensionNotice: null,
+  SellerRoutes.accountRestricted: null,
   SellerRoutes.storeUnavailable: null,
   SellerRoutes.forceUpdate: null,
 

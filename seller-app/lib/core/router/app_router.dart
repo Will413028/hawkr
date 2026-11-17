@@ -72,6 +72,8 @@ import '../../features/seller/presentation/suspension_notice_screen.dart';
 import '../../features/settings/presentation/help_center_screen.dart';
 import '../../features/settings/presentation/shipping_settings/shipping_settings_screen.dart';
 import '../../features/wallet/presentation/wallet_screen.dart';
+import '../../features/seller/presentation/account_restricted_screen.dart';
+import '../session/account_restriction.dart';
 import '../../shared/widgets/app_bottom_navigation_bar.dart';
 import '../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../shared/widgets/rich_text_editor.dart';
@@ -163,6 +165,9 @@ class SellerRoutes {
 
   /// 停權公告頁（46 號設計書「賣家能力權限層」§7.2）
   static const suspensionNotice = '/seller/suspension-notice';
+
+  /// 帳號停權時唯一能進的受限頁。
+  static const accountRestricted = '/seller/account-restricted';
 
   /// 措施與申覆列表（停權公告頁的入口）
   static const measures = '/seller/measures';
@@ -421,6 +426,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         location: location,
         needsForceUpdate: needsForceUpdate,
         storeUnavailable: ref.read(storeUnavailableProvider),
+        accountRestricted: ref.read(accountRestrictionStateProvider) != null,
       );
 
       debugPrint(
@@ -987,6 +993,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: SellerRoutes.suspensionNotice,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const SuspensionNoticeScreen(),
+      ),
+      GoRoute(
+        path: SellerRoutes.accountRestricted,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const AccountRestrictedScreen(),
       ),
       GoRoute(
         path: SellerRoutes.storeUnavailable,

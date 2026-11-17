@@ -8,20 +8,15 @@ import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
 import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
-import { formatTaipeiShortDate } from "@/lib/date/taipei";
-import {
-	snapshotToComment,
-	useCommentReplies,
-	usePostComments,
-} from "@/lib/hooks/useSocial";
 import {
 	type Comment,
-	createReply,
+	createComment,
 	deleteComment,
-	toggleCommentLike,
+	setCommentLiked,
 	updateComment,
-} from "@/lib/social/repo";
-import { subscribeCommentEvents } from "@/lib/sse/commentEventBus";
+} from "@/lib/comments/repo";
+import { formatTaipeiShortDate } from "@/lib/date/taipei";
+import { useCommentReplies, usePostComments } from "@/lib/hooks/useSocial";
 import { canDeleteComment, canEditComment } from "./commentPermissions";
 
 function formatTime(unixSeconds: number): string {
@@ -100,7 +95,7 @@ function highlightComment(el: HTMLElement) {
 }
 
 interface PostCommentsProps {
-	postId: number | string;
+	postId: string;
 	/**
 	 * Grant the current viewer post-owner moderation rights — show 刪除 on
 	 * every comment / reply (not just one's own), matching the backend's
@@ -137,9 +132,9 @@ function ReplyComposer({
 	onSent,
 	onCancel,
 }: {
-	postId: number | string;
-	parentId: number | string;
-	replyToId: number | string;
+	postId: string;
+	parentId: string;
+	replyToId: string;
 	replyToName?: string;
 	avatar: ComposerAvatar;
 	onSent: (created: Comment) => void;
@@ -158,21 +153,15 @@ function ReplyComposer({
 		if (!content || submitting) return;
 		setSubmitting(true);
 		try {
-			// `createReply` already returns a normalised `Comment` (the repo
-			// runs the response through `mapServerComment`), so we can hand it
-			// straight to the parent — no optimistic merge needed. Fill in the
-			// replyToName display hint if the backend didn't echo it back.
-			const clientRequestId =
-				typeof crypto !== "undefined" && "randomUUID" in crypto
-					? crypto.randomUUID()
-					: `cri-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-			// 回覆走專屬 replies 端點（parent 在 path），postId/replyToId 為 TSID
-			// 一律以 string 傳；留言身分由伺服器依貼文歸屬決定。
-			const created = await createReply(parentId, {
+			// `createComment` returns a mapped `Comment`, handed straight to the
+			// parent. The server does not echo the replied-to name, so fill in
+			// the display hint from the row being replied to. The reply is
+			// identified by a UUIDv4 request_id so a retry returns the same row.
+			const created = await createComment(postId, {
 				content,
-				postId: postId,
-				replyToId: replyToId,
-				clientRequestId,
+				parentId,
+				replyToId,
+				requestId: crypto.randomUUID(),
 			});
 			setDraft("");
 			onSent({
@@ -260,13 +249,15 @@ function ReplyItem({
 }: {
 	reply: Comment;
 	canModerate: boolean;
-	onRemoved: (id: number | string) => void;
+	onRemoved: (id: string) => void;
 }) {
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
 	// Local content mirror — optimistic edit shows immediately, refresh from
 	// parent list will overwrite if backend differs.
 	const [content, setContent] = React.useState(reply.content);
+	// 修改成功後伺服器換新版本：之後的修改與刪除要帶新的 etag。
+	const [etag, setEtag] = React.useState(reply.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -282,9 +273,10 @@ function ReplyItem({
 		if (editing) editTextareaRef.current?.focus();
 	}, [editing]);
 
-	const canDelete = canDeleteComment(reply.isMine, canModerate);
+	const live = reply.state === "visible";
+	const canDelete = live && canDeleteComment(reply.isMine, canModerate);
 	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(reply.isMine);
+	const canEdit = live && canEditComment(reply.isMine);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -294,7 +286,7 @@ function ReplyItem({
 		setLiked(!wasLiked);
 		setLikeCount((c) => c + (wasLiked ? -1 : 1));
 		try {
-			const r = await toggleCommentLike(reply.id, wasLiked);
+			const r = await setCommentLiked(reply.id, !wasLiked);
 			setLiked(r.liked);
 		} catch {
 			setLiked(wasLiked);
@@ -311,7 +303,7 @@ function ReplyItem({
 		deletePendingRef.current = true;
 		setDeleting(true);
 		try {
-			await deleteComment(reply.id);
+			await deleteComment(reply.id, etag);
 			onRemoved(reply.id);
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "刪除失敗");
@@ -340,7 +332,8 @@ function ReplyItem({
 		}
 		setSavingEdit(true);
 		try {
-			const updated = await updateComment(reply.id, next);
+			const updated = await updateComment(reply.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
 			setEditing(false);
 		} catch (e) {
@@ -428,26 +421,28 @@ function ReplyItem({
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={liked}
-						/* Liked reds come from `text-hk-like`, not `color="danger"` —
+					{live ? (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							aria-pressed={liked}
+							/* Liked reds come from `text-hk-like`, not `color="danger"` —
 						   danger is 柿橘 orange and is the error role. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only: `handleLike` flips the shared heart before
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only: `handleLike` flips the shared heart before
 						   the request and rolls back on failure; `likePendingRef` drops
 						   overlapping taps, so the fill animation is the feedback. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={liked} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{likeCount}</span>
-					</Button>
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
+						>
+							<AppIcon name="heart" fill={liked} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{likeCount}</span>
+						</Button>
+					) : null}
 					{canEdit && !editing && (
 						<button
 							type="button"
@@ -488,16 +483,18 @@ function CommentItem({
 	composerAvatar,
 	onLike,
 	onRemove,
+	onEdited,
 }: {
 	comment: Comment;
-	postId: number | string;
+	postId: string;
 	canModerate: boolean;
 	signedIn: boolean;
 	composerAvatar: ComposerAvatar;
-	onLike: (id: number | string) => Promise<void>;
-	onRemove: (id: number | string) => Promise<void>;
+	onLike: (id: string) => Promise<void>;
+	onRemove: (id: string) => Promise<void>;
+	onEdited: (updated: Comment) => void;
 }) {
-	const replies = useCommentReplies(comment.id);
+	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	// Local mirror of replyCount so it bumps the moment we send a reply
 	// without waiting for the parent list to refetch.
@@ -508,6 +505,7 @@ function CommentItem({
 	const [pendingReplies, setPendingReplies] = React.useState<Comment[]>([]);
 	// Local content mirror — optimistic edit shows immediately
 	const [content, setContent] = React.useState(comment.content);
+	const [etag, setEtag] = React.useState(comment.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -523,43 +521,10 @@ function CommentItem({
 		if (editing) editTextareaRef.current?.focus();
 	}, [editing]);
 
-	/* ── SSE reply inline sync ───────────────────────────────────────────
-	 * `usePostComments` already bumps our `replyCount` on `comment.replied`
-	 * for any post the realtime stream is open on (see
-	 * `useSocial.ts::handleReplied`). It also publishes the reply snapshot
-	 * to the per-postId comment bus so we can splice the new row into our
-	 * thread state without waiting for the user to collapse + re-expand.
-	 * Dedup by id against both the REST-loaded thread (`replies.items`) and
-	 * the local pending mirror — covers all three orderings of
-	 *   (a) own ReplyComposer onSent → SSE echo,
-	 *   (b) SSE echo → own onSent,
-	 *   (c) cross-tab peer reply.
-	 *
-	 * `replies.items` lives in a ref so the bus subscription survives a
-	 * thread expand / refresh (which mutates `items`) without re-binding —
-	 * an in-flight reply event during the resubscribe window would
-	 * otherwise be silently dropped.
-	 */
-	const replyItemsRef = React.useRef(replies.items);
-	replyItemsRef.current = replies.items;
-	React.useEffect(() => {
-		const myCommentId = String(comment.id);
-		return subscribeCommentEvents(postId, (event) => {
-			if (event.kind !== "reply_arrived") return;
-			if (event.parentCommentId !== myCommentId) return;
-			const replyId = event.reply.commentId;
-			setPendingReplies((prev) => {
-				if (prev.some((r) => String(r.id) === replyId)) return prev;
-				if (replyItemsRef.current.some((r) => String(r.id) === replyId))
-					return prev;
-				return [...prev, snapshotToComment(event.reply)];
-			});
-		});
-	}, [postId, comment.id]);
-
-	const canDelete = canDeleteComment(comment.isMine, canModerate);
+	const live = comment.state === "visible";
+	const canDelete = live && canDeleteComment(comment.isMine, canModerate);
 	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(comment.isMine);
+	const canEdit = live && canEditComment(comment.isMine);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -605,8 +570,10 @@ function CommentItem({
 		}
 		setSavingEdit(true);
 		try {
-			const updated = await updateComment(comment.id, next);
+			const updated = await updateComment(comment.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
+			onEdited(updated);
 			setEditing(false);
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "編輯失敗");
@@ -626,11 +593,7 @@ function CommentItem({
 	};
 
 	const handleReplySent = (created: Comment) => {
-		// Dedup: the SSE bus may deliver the same reply (server-echoed) before
-		// REST resolves. Whichever path runs first wins; the second one finds
-		// the id already in pending and short-circuits, so we never double-
-		// insert. Also check `replies.items` for the late-REST case where the
-		// thread was refreshed in the same window.
+		// Dedup against the thread loaded by a refresh in the same window.
 		setPendingReplies((prev) => {
 			const id = String(created.id);
 			if (prev.some((r) => String(r.id) === id)) return prev;
@@ -642,7 +605,7 @@ function CommentItem({
 		if (!replies.open) void replies.expand();
 	};
 
-	const handleReplyRemoved = (replyId: number | string) => {
+	const handleReplyRemoved = (replyId: string) => {
 		setPendingReplies((prev) =>
 			prev.filter((r) => String(r.id) !== String(replyId)),
 		);
@@ -727,24 +690,26 @@ function CommentItem({
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={comment.isLiked === true}
-						/* See the reply row's note — liked red is `text-hk-like`. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only — see the reply row's note above. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{comment.likeCount ?? 0}</span>
-					</Button>
-					{signedIn && !editing && (
+					{live ? (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							aria-pressed={comment.isLiked === true}
+							/* See the reply row's note — liked red is `text-hk-like`. */
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only — see the reply row's note above. */
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
+						>
+							<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{comment.likeCount ?? 0}</span>
+						</Button>
+					) : null}
+					{signedIn && live && !editing && (
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
@@ -978,17 +943,6 @@ export default function PostComments({
 				</p>
 			)}
 
-			{/* The SSE client stops for good on rate-limit/cap (design book
-			    §11.6) — without this banner the list just silently froze. */}
-			{list.streamStatus === "unavailable" && (
-				<p
-					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-2)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-warning-50,rgba(216,180,87,0.14))] text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-small)]"
-					role="status"
-				>
-					即時更新暫停中，重新整理頁面可恢復。
-				</p>
-			)}
-
 			{list.loading && list.comments.length === 0 ? (
 				<p className="my-[var(--hkui-space-4)] text-center text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]">
 					載入中…
@@ -1013,6 +967,7 @@ export default function PostComments({
 							composerAvatar={composerAvatar}
 							onLike={list.like}
 							onRemove={list.remove}
+							onEdited={list.edited}
 						/>
 					))}
 				</ul>

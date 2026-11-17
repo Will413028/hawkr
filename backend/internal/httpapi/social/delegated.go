@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"maps"
 	"strconv"
 	"strings"
@@ -28,13 +29,14 @@ import (
 var DelegatedDeclaration = httpdelegation.Declaration{
 	Service: pb.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService"),
 	Methods: map[string]moddelegation.DelegatedMethod{
-		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure:     postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		socialv1alpha1connect.SocialDelegatedServiceGetStorePostProcedure:       postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
-		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:    writeMethod(social.PostCreated{}),
-		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:    writeMethod(social.PostUpdated{}),
-		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:   writeMethod(social.PostPublished{}),
-		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure: writeMethod(social.PostUnpublished{}),
-		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:  writeMethod(social.PostScheduled{}),
+		socialv1alpha1connect.SocialDelegatedServiceGetStoreSocialSummaryProcedure: postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceListStorePostsProcedure:        postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceGetStorePostProcedure:          postMethod(moddelegation.CapabilityPostsRead, moddelegation.AuditPostRead),
+		socialv1alpha1connect.SocialDelegatedServiceCreateStorePostProcedure:       writeMethod(social.PostCreated{}),
+		socialv1alpha1connect.SocialDelegatedServiceUpdateStorePostProcedure:       writeMethod(social.PostUpdated{}),
+		socialv1alpha1connect.SocialDelegatedServicePublishStorePostProcedure:      writeMethod(social.PostPublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceUnpublishStorePostProcedure:    writeMethod(social.PostUnpublished{}),
+		socialv1alpha1connect.SocialDelegatedServiceScheduleStorePostProcedure:     writeMethod(social.PostScheduled{}),
 	},
 }
 
@@ -80,11 +82,14 @@ type Delegated struct {
 var _ socialv1alpha1connect.SocialDelegatedServiceHandler = (*Delegated)(nil)
 
 // NewDelegated 建立 handler；webOrigin 與 App 共用，組回應裡貼文的單篇網址，不可是零值。
-func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, stores Stores, images rpc.Images, webOrigin rpc.WebOrigin) (*Delegated, error) {
+func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, log *slog.Logger) (*Delegated, error) {
+	if log == nil {
+		return nil, fmt.Errorf("httpapi/social：需要 logger")
+	}
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
-	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, images: images, webOrigin: webOrigin}, runner: runner, posts: posts}, nil
+	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log}, runner: runner, posts: posts}, nil
 }
 
 // delegatedOperation 解析每個寫入共同的稽核資料：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。
@@ -152,6 +157,28 @@ func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.Delegate
 		}
 	}
 	return post, res.Store, res.AuditLogID.String(), publishAt, nil
+}
+
+// GetStoreSocialSummary 與店主的同名方法用同一個查詢（Owner.StoreSocialSummary），店家是 session 綁定的那一家。
+func (h *Delegated) GetStoreSocialSummary(ctx context.Context, _ *connect.Request[pb.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[pb.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	c, err := httpdelegation.CallerFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.SocialDelegatedServiceGetStoreSocialSummaryResponse{}
+	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, st seller.Store) error {
+		s, err := h.posts.StoreSocialSummary(ctx, st)
+		if err != nil {
+			return err
+		}
+		out.ScheduledPostCount = s.Scheduled
+		out.PostCounts = postStatusCounts(s)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(out), nil
 }
 
 func (h *Delegated) ListStorePosts(ctx context.Context, req *connect.Request[pb.ListStorePostsRequest]) (*connect.Response[pb.ListStorePostsResponse], error) {

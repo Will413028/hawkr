@@ -30,9 +30,6 @@
 
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
-import { snapshotToComment } from "../lib/hooks/useSocial";
-import { mapServerComment } from "../lib/social/repo";
-import { normSnapshot } from "../lib/sse/useCommentStream";
 
 /* ------------------------------------- GET /public/products/{id}/reviews */
 
@@ -92,90 +89,4 @@ test("a review carrying only the retired avatar names yields nothing", async () 
 		avatar: "https://cdn/retired-bare.png",
 	});
 	assert.equal(reviews[0].avatarKey, undefined);
-});
-
-/* ------------------------------------------------- post comments (REST) */
-
-// Verbatim `data` of POST /app/posts/{id}/comments — the WRITE response, which
-// used to leak the proto's snake `user_avatar_key` and now matches the read
-// side field-for-field.
-const LIVE_COMMENT_WRITE = {
-	userName: "林小明",
-	avatarKey:
-		"public/buyer_avatar/2623900520/20260719/008b97af-544d-4efb-8bc4-8f11e2b4e027.png",
-	avatarUrl:
-		"https://test-media.example.com/i/original/public/buyer_avatar/2623900520/20260719/008b97af-544d-4efb-8bc4-8f11e2b4e027.png",
-	content: "P4-web 契約驗證留言",
-	id: "7490625865272134330",
-	postId: "7489336321903169790",
-	isMine: false,
-	parentId: "0",
-	replyToId: "0",
-	createdAt: 1785904375,
-	likeCount: 0,
-	role: 1,
-	isLiked: false,
-};
-
-test("post comment avatar reads avatarKey (read and write share one shape)", () => {
-	assert.equal(
-		mapServerComment(LIVE_COMMENT_WRITE).avatarKey,
-		LIVE_COMMENT_WRITE.avatarKey,
-	);
-});
-
-test("a comment carrying only the retired avatar names yields nothing", () => {
-	const { avatarKey, avatarUrl, ...retired } = LIVE_COMMENT_WRITE;
-	assert.equal(
-		mapServerComment({
-			...retired,
-			user_avatar_key: "public/buyer_avatar/2623900520/retired.png",
-			userAvatarKey: "public/buyer_avatar/2623900520/retired.png",
-			userAvatarUrl: "https://cdn/retired.png",
-		}).avatarKey,
-		"",
-	);
-});
-
-/* ------------------------------------------------------- SSE comment stream */
-
-// Verbatim `comment` of a live `comment.created` SSE frame. The SSE channel
-// does NOT pass through the Gateway's URL composition (49 §6.7 S4), so it
-// carries the key ALONE — there is no `avatarUrl` to fall back to, which is
-// exactly why the name has to be right.
-const LIVE_SSE_COMMENT = {
-	commentId: "7490626133670032131",
-	postId: "7490317712170336958",
-	isMine: false,
-	userName: "林小明",
-	avatarKey: "public/buyer_avatar/2623900520/20260719/008b97af.png",
-	role: 1,
-	content: "P4-web SSE 驗證留言",
-	parentId: "0",
-	replyToId: "0",
-	replyToName: "",
-	likeCount: 0,
-	replyCount: 0,
-	createdAt: "2026-08-05T04:33:59Z",
-	updatedAt: "2026-08-05T04:33:59Z",
-};
-
-test("SSE comment snapshot reads avatarKey through to the rendered comment", () => {
-	const snapshot = normSnapshot(LIVE_SSE_COMMENT);
-	assert.equal(snapshot.avatarKey, LIVE_SSE_COMMENT.avatarKey);
-	// …and survives the hop into the shape PostComments renders.
-	assert.equal(
-		snapshotToComment(snapshot).avatarKey,
-		LIVE_SSE_COMMENT.avatarKey,
-	);
-});
-
-test("an SSE snapshot carrying only userAvatar yields nothing", () => {
-	const { avatarKey, ...retired } = LIVE_SSE_COMMENT;
-	const snapshot = normSnapshot({
-		...retired,
-		userAvatar: "public/buyer_avatar/2623900520/retired.png",
-	});
-	assert.equal(snapshot.avatarKey, "");
-	assert.equal(snapshotToComment(snapshot).avatarKey, undefined);
 });

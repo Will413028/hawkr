@@ -412,9 +412,14 @@ func (h *App) GetStoreSocialSummary(ctx context.Context, _ *connect.Request[pb.G
 	if err != nil {
 		return nil, err
 	}
-	out := &pb.GetStoreSocialSummaryResponse{ScheduledPostCount: s.Scheduled}
+	return connect.NewResponse(&pb.GetStoreSocialSummaryResponse{ScheduledPostCount: s.Scheduled, PostCounts: postStatusCounts(s)}), nil
+}
+
+// postStatusCounts 每個貼文狀態一項（沒有貼文是 0），店主與代行共用。
+func postStatusCounts(s social.StoreSummary) []*pb.PostStatusCount {
+	var out []*pb.PostStatusCount
 	for _, status := range social.PostStatusValues() {
-		out.PostCounts = append(out.PostCounts, &pb.PostStatusCount{Status: rpc.EnumToProto[pb.PostStatus](status), Count: s.Posts[status]})
+		out = append(out, &pb.PostStatusCount{Status: rpc.EnumToProto[pb.PostStatus](status), Count: s.Posts[status]})
 	}
-	return connect.NewResponse(out), nil
+	return out
 }

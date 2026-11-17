@@ -14,6 +14,7 @@ import {
 	callDelegatedUpstream,
 	DelegatedUpstreamUnavailableError,
 	delegatedJson,
+	targetStoreIdOf,
 	UPSTREAM_FAILURE,
 } from "../../_upstream";
 
@@ -49,14 +50,6 @@ function readTargetStoreId(body: unknown): string {
 		throw new DelegatedRequestRejectedError("INVALID_BODY", 400);
 	}
 	return numericSegment(storeId);
-}
-
-function targetStoreIdOf(data: unknown): string | null {
-	if (typeof data !== "object" || data === null) return null;
-	const target = (data as { target?: unknown }).target;
-	if (typeof target !== "object" || target === null) return null;
-	const storeId = (target as { storeId?: unknown }).storeId;
-	return typeof storeId === "string" && storeId !== "" ? storeId : null;
 }
 
 export async function POST(request: Request): Promise<Response> {

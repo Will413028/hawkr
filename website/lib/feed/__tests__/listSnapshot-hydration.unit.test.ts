@@ -30,6 +30,7 @@ const snapshot: FeedListSnapshot = {
 		},
 	],
 	page: 1,
+	nextPageToken: "",
 	done: false,
 	scrollY: 640,
 	activeTab: "recommend",

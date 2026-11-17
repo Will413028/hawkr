@@ -21,7 +21,7 @@ export const EMPTY_HOME_BOOTSTRAP: HomeTabBootstrapV1 = {
 	hotProducts: [],
 	products: { data: { records: [] } },
 	recommendedSellers: [],
-	posts: { page: 1, pageSize: 8, total: 0, records: [] },
+	posts: { pageSize: 8, nextPageToken: "", records: [] },
 	categoryGroups: [],
 };
 
@@ -51,7 +51,7 @@ export async function loadHomeRenderBootstrap(): Promise<HomeTabBootstrapV1> {
 			getCachedHotProducts(8),
 			getCachedProductsFirstPage(100),
 			getCachedRecommendedSellers(24),
-			getCachedPublicPosts(1, 8),
+			getCachedPublicPosts(8),
 			getCachedCategoryTree(),
 		]);
 	return {

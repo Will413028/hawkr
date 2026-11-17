@@ -45,3 +45,10 @@ description = "AMEGO 電子發票 API 文件的範例：廠商公開的測試帳
 condition = "AND"
 paths = ['''^backend/docs/第三方整合/AMEGO 電子發票 API 總覽\.md$''']
 rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "代行 BFF 測試的假 Idempotency-Key：固定的 UUIDv4 十六進位測試值，不是機敏資料"
+condition = "AND"
+paths = ['''^website/tests/delegated-bff-routes\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''const KEY_HEX = ''']

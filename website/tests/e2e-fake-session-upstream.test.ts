@@ -8,6 +8,7 @@ import {
 	encodeSessionValue,
 	GET_SESSION_PATH,
 } from "./e2e/helpers/fake-session-upstream";
+import { LIST_POSTS_PATH } from "./e2e/helpers/fake-social-fixtures";
 
 const server = createFakeSessionUpstream();
 let origin = "";
@@ -63,4 +64,45 @@ test("GetSession is unauthenticated without a usable session cookie", async () =
 
 test("every other path closes the connection like an unreachable upstream", async () => {
 	await assert.rejects(fetch(`${origin}/api/v1/anything`));
+});
+
+test("ListPosts answers one fixture store's anonymous posts and refuses every other request", async () => {
+	const list = (message: Record<string, unknown>) =>
+		fetch(
+			`${origin}${LIST_POSTS_PATH}?connect=v1&encoding=json&message=${encodeURIComponent(JSON.stringify(message))}`,
+		);
+	const res = await list({ storeId: "7002" });
+	assert.equal(res.status, 200);
+	const posts = ((await res.json()) as { posts: { store: { id: string } }[] })
+		.posts;
+	assert.deepEqual(
+		posts.map((p) => p.store.id),
+		["7002"],
+	);
+	await assert.rejects(list({}));
+	await assert.rejects(list({ storeId: "2611000002" }));
+});
+
+test("the public seller lookups resolve a fixture store_code or store_id to the same store and refuse other sellers", async () => {
+	const get = async (path: string) => {
+		const res = await fetch(`${origin}/api/v1/public/sellers/${path}`);
+		return {
+			status: res.status,
+			body: (await res.json()) as {
+				data: { storeId?: string; storeCode?: string } | null;
+			},
+		};
+	};
+	for (const key of ["2611000001", "7001"]) {
+		const { status, body } = await get(key);
+		assert.equal(status, 200);
+		assert.deepEqual(body.data, {
+			storeId: "7001",
+			storeCode: "2611000001",
+			name: "店 7001",
+		});
+	}
+	assert.equal((await get("2611000001/stats")).status, 200);
+	assert.equal((await get("2611000001/reviews/stats")).status, 200);
+	await assert.rejects(get("999"));
 });

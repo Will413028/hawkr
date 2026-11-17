@@ -2,6 +2,7 @@ package social
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"testing"
 	"time"
@@ -179,12 +180,37 @@ func (f *fakeStores) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64
 	return f.blocking, nil
 }
 
+// fakeProducts 回 cards 裡有的商品（沒有的就是缺少），記錄每次批次查詢的 ID 與 includeInactive。
+type fakeProducts struct {
+	cards map[int64]ProductInfo
+	asked [][]int64
+	incl  []bool
+	err   error
+}
+
+func (f *fakeProducts) Cards(_ context.Context, ids []int64, includeInactive bool) (map[int64]ProductInfo, error) {
+	f.asked = append(f.asked, ids)
+	f.incl = append(f.incl, includeInactive)
+	out := map[int64]ProductInfo{}
+	for _, id := range ids {
+		if c, ok := f.cards[id]; ok {
+			out[id] = c
+		}
+	}
+	return out, f.err
+}
+
 func newPublic(t *testing.T, r *fakeReads, b fakeBuyers, s *fakeStores) *Public {
 	t.Helper()
 	return newPublicWithViews(t, r, &fakeViews{}, b, s)
 }
 
 func newPublicWithViews(t *testing.T, r *fakeReads, v *fakeViews, b fakeBuyers, s *fakeStores) *Public {
+	t.Helper()
+	return newPublicWithProducts(t, r, v, b, s, &fakeProducts{})
+}
+
+func newPublicWithProducts(t *testing.T, r *fakeReads, v *fakeViews, b fakeBuyers, s *fakeStores, products Products) *Public {
 	t.Helper()
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
@@ -194,7 +220,7 @@ func newPublicWithViews(t *testing.T, r *fakeReads, v *fakeViews, b fakeBuyers, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewPublic(r, v, b, s, images, web, func() time.Time { return trendNow })
+	h, err := NewPublic(r, v, b, s, products, images, web, func() time.Time { return trendNow }, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +293,7 @@ func TestOnlyOwnerReadsInSocialAppServiceAreNoSideEffects(t *testing.T) {
 }
 
 func TestNewPublicRequiresWebOrigin(t *testing.T) {
-	if _, err := NewPublic(&fakeReads{}, &fakeViews{}, fakeBuyers{}, &fakeStores{}, rpc.Images{}, rpc.WebOrigin{}, nil); err == nil {
+	if _, err := NewPublic(&fakeReads{}, &fakeViews{}, fakeBuyers{}, &fakeStores{}, &fakeProducts{}, rpc.Images{}, rpc.WebOrigin{}, nil, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("零值 WebOrigin 應該失敗")
 	}
 }

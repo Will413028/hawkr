@@ -267,7 +267,7 @@ CREATE INDEX hides_forum_entry ON social.hides (forum_entry_id, hidden_at) WHERE
 
 -- 內容下架的複本：seller 擁有措施（seller.measures、measure_contents），social 在同一個 transaction 的訂閱者（MeasureCreated、MeasureRevoked 中的
 -- 內容下架）裡寫一列一個（措施，內容），所以貼文的公開讀取與留言、討論區留言的 counted 旗標只依 social 自己的表求值。與 inactive_authors 同一個形狀，
--- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容可以同時被多個措施下架，所以內容不是主鍵，(措施, 內容) 才是（三個部分唯一索引）；
+-- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），但複本以 (措施, 內容) 為鍵（三個部分唯一索引），撤銷與新措施之間的重送不互相覆蓋；
 -- 每日對帳拿 seller.pub_content_takedowns() 雙向核對。貼文沒有計入旗標，公開讀取的述詞對 post_id 做 NOT EXISTS（visibility.ReadablePosts）；
 -- 貼文底下的留言跟著父貼文，不另寫列。
 CREATE TABLE social.content_takedowns (

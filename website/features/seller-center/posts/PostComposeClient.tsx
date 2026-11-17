@@ -24,14 +24,13 @@ import {
 	normalizeGifUploadFile,
 } from "@/lib/media/gif";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
+import { type PostTagSuggestion, suggestPostTags } from "@/lib/posts/repo";
 import {
 	detectPostTaggingMode,
 	extractPostTags,
 	POST_TAG_LIMIT,
 	type PostTaggingMode,
-	type PostTagSuggestion,
-	suggestPostTags,
-} from "@/lib/post-tags/repo";
+} from "@/lib/posts/tags";
 import { queryKeys } from "@/lib/query/keys";
 import { storeIdOf } from "@/lib/seller/store";
 import {
@@ -87,6 +86,8 @@ export interface PostComposeEditTarget {
 	imageKey?: string;
 	/** Currently linked product id (stringified) to pre-select. */
 	productId?: string;
+	/** 載入時的貼文版本（`MyPostDetail.etag`），儲存時帶回做樂觀鎖。 */
+	etag?: string;
 }
 
 export default function PostComposeClient({
@@ -452,8 +453,9 @@ export default function PostComposeClient({
 						content: trimmed,
 						keepAssetId: keepAssetId,
 						newStagedToken: newStagedToken,
-						productId,
+						productId: selectedProductId,
 						tags,
+						etag: edit.etag,
 					},
 					decision.meta,
 				);

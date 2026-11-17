@@ -6,7 +6,6 @@ import AuthGateWaitModal from "@/components/shared/AuthGateWaitModal";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/ui/Button";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { FALLBACK_POST_IMAGE } from "@/lib/api/posts";
 import { useAuthGate } from "@/lib/auth/useAuthGate";
 import { usePostInteractions } from "@/lib/hooks/useSocial";
 import {
@@ -14,7 +13,8 @@ import {
 	postCardPresetForMedia,
 	resolveCdnUrl,
 } from "@/lib/media/cdn";
-import { normalizePostTag } from "@/lib/post-tags/repo";
+import { FALLBACK_POST_IMAGE } from "@/lib/posts/repo";
+import { normalizePostTag } from "@/lib/posts/tags";
 import { useLoginRequiredOverlay } from "@/lib/state/use-login-required-overlay";
 import HashtagText from "./HashtagText";
 

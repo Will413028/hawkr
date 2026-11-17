@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -143,7 +145,7 @@ func TestActionsThatDoNotFitTheTargetAreRejected(t *testing.T) {
 	commentCase := f.openCase(t, commentTarget(w.comment))
 	_, err := f.module.DecideCase(context.Background(), DecideInput{
 		CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown,
-		Text: "下架", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		Text: "下架", Severity: string(seller.SeverityValues()[0]),
 	})
 	if kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("買家寫的留言不能走內容下架：%v", err)
@@ -153,8 +155,7 @@ func TestActionsThatDoNotFitTheTargetAreRejected(t *testing.T) {
 		"沒有理由":     {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide},
 		"不違規帶了處置":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation, Action: ActionHide},
 		"決定不合法":    {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: "MAYBE"},
-		"內容下架沒有店家": {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionTakedown, Text: "x", Severity: string(seller.SeverityValues()[0])},
-		"非下架帶了店家":  {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", StoreID: 1},
+		"非下架帶了嚴重度": {CaseID: commentCase.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "x", Severity: string(seller.SeverityValues()[0])},
 	} {
 		if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：%v，預期 InvalidInput", name, err)
@@ -187,12 +188,11 @@ func TestBanRefusesAnAccountThatOwnsAStore(t *testing.T) {
 	}
 }
 
-// 店家分支：內容必須屬於管理員指定的店家才建立措施（別家內容不能建立措施）；成功時措施、認定的來源檢舉與結案同一個 transaction，貼文隨之下架。
-func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
+// 店家分支：店家取自案件快照並向 social 核對內容歸屬，案件記下建立的措施；成功時措施、認定的來源檢舉與結案同一個 transaction，貼文隨之下架。
+func TestTakedownUsesTheSnapshotStoreAndRecordsTheMeasure(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	w := f.world(t)
-	otherStore, _ := f.exposableStore(t)
 	var reporters []int64
 	for range 3 {
 		r, _ := f.newBuyer(t)
@@ -206,22 +206,15 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
 		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}
-	wrong := in
-	wrong.StoreID = otherStore
-	if _, err := f.module.DecideCase(context.Background(), wrong); kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("別家內容不能建立措施：%v", err)
-	}
-	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
-		t.Fatalf("拒絕後留下 %d 個措施", n)
-	}
-	if !f.readable(t, social.TargetPost, w.post.ID) {
-		t.Fatal("拒絕後貼文不能下架")
-	}
-	right := in
-	right.StoreID = w.storeID
-	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), right))
-	if d.Case.ClosedAt == nil || len(d.Reports) != 3 {
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), in))
+	if d.Case.ClosedAt == nil || len(d.Reports) != 3 || d.Case.ReportCount != 3 {
 		t.Fatalf("%+v", d)
+	}
+	if d.Case.StoreID == nil || *d.Case.StoreID != w.storeID {
+		t.Fatalf("案件的店家要是快照的店家 %d：%v", w.storeID, d.Case.StoreID)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE id = $1 AND store_id = $2", d.Case.MeasureID, w.storeID); d.Case.MeasureID == nil || n != 1 {
+		t.Fatalf("案件的 measure_id 要指向下架措施：%v", d.Case.MeasureID)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
 		t.Fatalf("內容下架措施 %d 個", n)
@@ -235,6 +228,37 @@ func TestTakedownVerifiesOwnershipThenCreatesTheMeasure(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM adminaudit.records WHERE target_type = 'moderation_case' AND target_id = $1 AND detail->>'action' = 'TAKEDOWN' AND detail->>'store_id' = $2 AND detail->>'severity' = $3",
 		c.ID.String(), strconv.FormatInt(w.storeID, 10), in.Severity); n != 1 {
 		t.Fatalf("下架決定的稽核 detail 要有 store_id 與 severity：%d", n)
+	}
+}
+
+// 內容已在生效中的下架措施之下（例如後台貼文頁先下架）：DecideCase TAKEDOWN 綁定既有措施並結案，不建第二個措施、不產生新的認定。
+func TestTakedownBindsToTheExistingActiveMeasure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 2 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	existing := mustV[seller.CreateMeasureResult](t)(f.seller.CreateMeasure(context.Background(), seller.CreateMeasureInput{
+		AdminID: 3, StoreID: w.storeID, Kind: seller.MeasureContentTakedown, StatementToSeller: "後台先下架", Note: "貼文頁",
+		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.MisleadingInfo, Severity: seller.Severity(seller.SeverityValues()[0])}},
+		Takedown:  &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentPost, ID: w.post.ID}}},
+	}))
+	in := DecideInput{
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	}
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), in))
+	if d.Case.ClosedAt == nil || d.Case.MeasureID == nil || *d.Case.MeasureID != existing.Measure.ID {
+		t.Fatalf("案件要結案並綁定既有措施 %s：%+v", existing.Measure.ID, d.Case)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
+		t.Fatalf("不建第二個措施：%d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 0 {
+		t.Fatalf("不產生新的認定：%d 筆來源檢舉", n)
 	}
 }
 
@@ -262,7 +286,7 @@ l AS (DELETE FROM social.comments WHERE post_id = $1)
 DELETE FROM social.posts WHERE id = $1`, w.post.ID)
 	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
 		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: w.storeID,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}))
 	if d.Case.ClosedAt == nil {
 		t.Fatalf("%+v", d)
@@ -288,7 +312,7 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 		<-start
 		_, decideErr = f.module.DecideCase(context.Background(), DecideInput{
 			CaseID: c.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-			Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+			Text: "不實", Severity: string(seller.SeverityValues()[0]),
 		})
 	}()
 	go func() {
@@ -307,5 +331,25 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 	measures := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID)
 	if closed != (measures == 1) || (decideErr == nil) != closed {
 		t.Fatalf("結案 %v 與措施 %d 個要同進退（decide=%v）", closed, measures, decideErr)
+	}
+}
+
+// 內容還在、案件卻沒有快照：內容下架回「沒有快照無法確認店家」，不是「內容已不存在」。
+func TestTakedownWithoutSnapshotWhileContentExistsSaysSo(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 3 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	f.exec(t, "DELETE FROM moderation.case_snapshots WHERE case_id = $1", c.ID)
+	_, err := f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	})
+	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), text.DecideTakedownSnapshotMissing().Text) {
+		t.Fatalf("%v", err)
 	}
 }

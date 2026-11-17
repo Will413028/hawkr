@@ -1,7 +1,7 @@
 import type { MarketplaceProduct } from "@/lib/api";
-import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
 import type { RecommendedStore } from "@/lib/discovery/recommended";
 import type { CategoryGroup } from "@/lib/market/categoryGroups";
+import type { PostsPage } from "@/lib/posts/repo";
 
 /**
  * Versioned, anonymous DTO for the home tab's first visible snapshot.
@@ -16,7 +16,7 @@ export interface HomeTabBootstrapV1 {
 	hotProducts: MarketplaceProduct[];
 	products: unknown;
 	recommendedSellers: RecommendedStore[];
-	posts: Paginated<PostListItem>;
+	posts: PostsPage;
 	/** lv1 categories with their descendant ids, from `/public/categories/tree`
 	 *  (see `lib/market/categoryGroups`). Empty when the tree was unsupplied —
 	 *  the shelves then show nothing rather than guess. */

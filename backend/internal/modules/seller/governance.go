@@ -697,6 +697,11 @@ func (m *Module) CreateMeasureInTx(ctx context.Context, in CreateMeasureInput) (
 	return m.measure.CreateInTx(ctx, in)
 }
 
+// ActiveTakedownOfContent 回傳內容目前生效中的內容下架措施 ID，沒有回 nil；在 ctx 的 transaction 內讀（沒有就用連線）。
+func (m *Module) ActiveTakedownOfContent(ctx context.Context, ref ContentRef) (*uuid.UUID, error) {
+	return m.measure.ActiveTakedownOfContent(ctx, ref)
+}
+
 // CreateMeasureNote 新增措施的一則內部註記（只新增、不帶版本、不改措施的任何 etag）；措施可以是已撤銷的。
 func (m *Module) CreateMeasureNote(ctx context.Context, in CreateMeasureNoteInput) (GovernanceNote, error) {
 	return m.measure.CreateNote(ctx, in)

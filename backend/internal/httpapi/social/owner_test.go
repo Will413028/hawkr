@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -420,7 +421,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 	if err := checkDeclarations(declarations, svc); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewApp(&fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, mustImages(t), mustWeb(t)); err != nil {
+	if _, err := NewApp(&fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, mustImages(t), mustWeb(t), slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
 	for procedure := range declarations {
@@ -819,10 +820,10 @@ func TestNewAppRejectsADeclarationTableMissingARow(t *testing.T) {
 		short[k] = v
 	}
 	delete(short, socialv1alpha1connect.SocialAppServiceUpdatePostProcedure)
-	if _, err := newApp(short, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err == nil {
+	if _, err := newApp(short, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("缺一列的宣告表要不能啟動")
 	}
-	if _, err := newApp(declarations, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, images, web); err != nil {
+	if _, err := newApp(declarations, &fakeWrites{}, &fakeWrites{}, &fakeOwner{}, fakeBuyers{id: 7}, &fakeStores{}, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
 }

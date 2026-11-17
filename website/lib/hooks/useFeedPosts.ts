@@ -8,7 +8,7 @@ import {
 import * as React from "react";
 import { fetchCanonicalFeedPage } from "@/lib/api/main-tab-pages";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
+import { useAuth } from "@/lib/auth/context";
 import {
 	type FeedHeadPage,
 	feedHeadRequiresReplacement,
@@ -21,11 +21,17 @@ import {
 	MAIN_TAB_FULL_RECONCILE_MS,
 	MAIN_TAB_STALE_MS,
 } from "@/lib/navigation/main-tab-freshness";
+import { fetchPostsPage } from "@/lib/posts/repo";
 import { queryKeys } from "@/lib/query/keys";
 import { readMainTabRuntime } from "@/lib/state/main-tab-freshness-store";
 
 type FeedPostsPage = FeedHeadPage;
-type FeedQueryData = InfiniteData<FeedPostsPage, number>;
+/** 頁碼只是畫面上的計數；真正續讀靠 page_token（伺服器沒有頁碼與總數）。 */
+interface FeedPageParam {
+	page: number;
+	token: string;
+}
+type FeedQueryData = InfiniteData<FeedPostsPage, FeedPageParam>;
 
 interface PendingFeedRefresh {
 	data: FeedQueryData;
@@ -37,9 +43,9 @@ interface PendingFeedRefresh {
 interface UseFeedPostsOptions {
 	initialPosts: PostListItem[];
 	initialPage?: number;
-	/** Overrides the inferred continuation state when the seed is a single
-	 * deep-linked post rather than a complete server page. */
-	initialHasMore?: boolean;
+	/** The page_token after the server-rendered seed page; empty or omitted
+	 * means the seed is the whole list. */
+	initialNextPageToken?: string;
 	pageSize: number;
 	sellerId?: number | string;
 	hashtag?: string;
@@ -52,22 +58,6 @@ interface UseFeedPostsOptions {
 	 * trusted instead of being refetched on the client. */
 	initialPostsMatchQuery?: boolean;
 	restoredSnapshot?: FeedListSnapshot | null;
-}
-
-function hasMoreFromResponse(args: {
-	page: number;
-	pageSize: number;
-	total: number;
-	recordCount: number;
-}) {
-	const { page, pageSize, total, recordCount } = args;
-	if (total > 0) return page * pageSize < total;
-	return recordCount >= pageSize;
-}
-
-function finiteNumber(value: string | number | undefined, fallback: number) {
-	const next = typeof value === "string" ? Number(value) : value;
-	return typeof next === "number" && Number.isFinite(next) ? next : fallback;
 }
 
 function dedupePosts(pages: FeedPostsPage[]) {
@@ -83,14 +73,11 @@ function dedupePosts(pages: FeedPostsPage[]) {
 	return posts;
 }
 
-function feedPagesToReconcile(pages: FeedPostsPage[]): number[] {
+/** 要重新對帳的頁數：1..N，N 是目前載入到的最後一頁（回上一頁還原時整串存成一頁，`page` 記最後一頁）。 */
+function feedPageCountToReconcile(pages: FeedPostsPage[]): number {
 	const onlyPage = pages.length === 1 ? pages[0] : undefined;
-	if (onlyPage && onlyPage.page > 1) {
-		// Back-navigation stores all loaded records as one aggregate snapshot and
-		// keeps the last cursor in `page`. Rebuild 1..N, not only page N.
-		return Array.from({ length: onlyPage.page }, (_, index) => index + 1);
-	}
-	return Array.from(new Set(pages.map((page) => Math.max(1, page.page))));
+	if (onlyPage && onlyPage.page > 1) return onlyPage.page;
+	return Math.max(1, ...pages.map((page) => page.page));
 }
 
 function supersededRefreshError() {
@@ -100,7 +87,7 @@ function supersededRefreshError() {
 export function useFeedPosts({
 	initialPosts,
 	initialPage = 1,
-	initialHasMore,
+	initialNextPageToken = "",
 	pageSize,
 	sellerId,
 	hashtag,
@@ -108,16 +95,22 @@ export function useFeedPosts({
 	initialPostsMatchQuery = false,
 	restoredSnapshot,
 }: UseFeedPostsOptions) {
-	const isCanonical = !sellerId && !hashtag && initialPage === 1;
+	// 同時帶店家與標籤時伺服器不接受（invalid_argument）：店家優先，標籤不套用。
+	const scopedHashtag = sellerId ? undefined : hashtag;
+	const isCanonical = !sellerId && !scopedHashtag && initialPage === 1;
 	const queryClient = useQueryClient();
+	// 登入者的列表依觀看者而定（封鎖的店不出現、viewer_* 欄位），不能用匿名的種子或匿名的共用答案：
+	// 登入後換成自己的 query key，由瀏覽器帶 cookie 重新讀。auth 還沒確定（unknown）先當訪客。
+	const viewer = useAuth().status === "signedIn";
 	const queryKey = React.useMemo(
 		() =>
 			queryKeys.feed.posts({
 				sellerId: sellerId ? String(sellerId) : "",
-				hashtag: hashtag ?? "",
+				hashtag: scopedHashtag ?? "",
 				pageSize,
+				viewer,
 			}),
-		[hashtag, pageSize, sellerId],
+		[pageSize, scopedHashtag, sellerId, viewer],
 	);
 	const queryGeneration = React.useMemo(
 		() => JSON.stringify(queryKey),
@@ -139,14 +132,11 @@ export function useFeedPosts({
 	// back-navigation snapshot still seeds any scope.
 	const seedMatchesQuery = isCanonical || initialPostsMatchQuery;
 	const hasInitialData =
-		restored !== null || (!initialSeedFailed && seedMatchesQuery);
+		restored !== null || (!initialSeedFailed && seedMatchesQuery && !viewer);
 	const seedPage = restored?.page ?? initialPage;
 	const seedPosts = restored?.posts ?? initialPosts;
-	const seedDone =
-		restored?.done ??
-		(initialHasMore === undefined
-			? seedPosts.length < pageSize
-			: !initialHasMore);
+	const seedToken = restored?.nextPageToken ?? initialNextPageToken;
+	const seedDone = restored?.done ?? seedToken === "";
 	const queryGenerationRef = React.useRef(queryGeneration);
 	queryGenerationRef.current = queryGeneration;
 	const freshnessScope = useListFreshnessScope(queryKey);
@@ -163,40 +153,41 @@ export function useFeedPosts({
 	const initialDataUpdatedAt =
 		restored?.savedAt ?? seedTimestampRef.current.updatedAt;
 	const fetchPage = React.useCallback(
-		async (requestedPage: number, signal?: AbortSignal) => {
-			const response = isCanonical
-				? await fetchCanonicalFeedPage(requestedPage, signal)
-				: await fetchPublicPostsTyped({
-						page: requestedPage,
-						pageSize,
-						sellerId,
-						tag: hashtag,
-						signal,
-						strict: true,
-					});
-			const page = finiteNumber(response.page, requestedPage);
-			const responsePageSize = finiteNumber(response.pageSize, pageSize);
-			const total = finiteNumber(response.total, 0);
+		async (requestedPage: number, token: string, signal?: AbortSignal) => {
+			// 匿名的 canonical 第一頁走同源的 tab 路由；登入者與有範圍的查詢由瀏覽器直接讀。
+			const response =
+				isCanonical && !viewer
+					? await fetchCanonicalFeedPage(token, signal)
+					: await fetchPostsPage({
+							pageToken: token,
+							pageSize,
+							storeId: sellerId ? String(sellerId) : undefined,
+							tag: scopedHashtag,
+							signal,
+							strict: true,
+							viewer,
+						});
 			return {
 				records: response.records,
-				page,
-				pageSize: responsePageSize,
-				hasMore: hasMoreFromResponse({
-					page,
-					pageSize: responsePageSize,
-					total,
-					recordCount: response.records.length,
-				}),
+				page: requestedPage,
+				pageSize: response.pageSize,
+				hasMore: response.nextPageToken !== "",
+				nextPageToken: response.nextPageToken,
 			} satisfies FeedPostsPage;
 		},
-		[hashtag, isCanonical, pageSize, sellerId],
+		[isCanonical, pageSize, scopedHashtag, sellerId, viewer],
 	);
 
 	const query = useInfiniteQuery({
 		queryKey,
 		queryFn: ({ pageParam, signal }) =>
-			fetchPage(Number(pageParam) || 1, signal),
-		initialPageParam: seedPage,
+			fetchPage(pageParam.page, pageParam.token, signal),
+		// 第一頁的參數恆是空 token：種子的 token 是它那一頁「之後」的，用來讀或重播會跳過第一頁。
+		// 下一頁的 token 只來自 getNextPageParam。
+		initialPageParam: {
+			page: hasInitialData ? seedPage : initialPage,
+			token: "",
+		} as FeedPageParam,
 		initialData: hasInitialData
 			? {
 					pages: [
@@ -205,14 +196,17 @@ export function useFeedPosts({
 							page: seedPage,
 							pageSize,
 							hasMore: !seedDone,
+							nextPageToken: seedToken,
 						},
 					],
-					pageParams: [seedPage],
+					pageParams: [{ page: seedPage, token: "" }],
 				}
 			: undefined,
 		initialDataUpdatedAt: hasInitialData ? initialDataUpdatedAt : undefined,
 		getNextPageParam: (lastPage) =>
-			lastPage.hasMore ? lastPage.page + 1 : undefined,
+			lastPage.hasMore
+				? { page: lastPage.page + 1, token: lastPage.nextPageToken }
+				: undefined,
 		// Infinite-query refetch replays every loaded page in TanStack v5. Main
 		// tab activation instead reconciles only page 1 below, preserving the
 		// reader's accumulated pages and scroll position.
@@ -276,7 +270,7 @@ export function useFeedPosts({
 				) {
 					return;
 				}
-				const freshPage = await fetchPage(1, signal);
+				const freshPage = await fetchPage(1, "", signal);
 				if (
 					signal.aborted ||
 					queryGenerationRef.current !== expectedGeneration ||
@@ -287,7 +281,7 @@ export function useFeedPosts({
 				}
 				const candidate: FeedQueryData = {
 					pages: [freshPage],
-					pageParams: [freshPage.page],
+					pageParams: [{ page: 1, token: "" }],
 				};
 				const autoApply =
 					!restored && typeof window !== "undefined" && window.scrollY <= 120;
@@ -354,7 +348,10 @@ export function useFeedPosts({
 				const current = queryClient.getQueryData<FeedQueryData>(queryKey);
 				if (!current || current.pages.length === 0) return;
 				const freshPages: FeedPostsPage[] = [];
-				for (const page of feedPagesToReconcile(current.pages)) {
+				// page_token 要用上一頁回的那一個，所以 1..N 依序讀。
+				let token = "";
+				const pageCount = feedPageCountToReconcile(current.pages);
+				for (let page = 1; page <= pageCount; page += 1) {
 					if (
 						signal.aborted ||
 						queryGenerationRef.current !== expectedGeneration ||
@@ -363,7 +360,10 @@ export function useFeedPosts({
 					) {
 						throw signal.reason ?? supersededRefreshError();
 					}
-					freshPages.push(await fetchPage(page, signal));
+					const fresh = await fetchPage(page, token, signal);
+					freshPages.push(fresh);
+					if (!fresh.hasMore) break;
+					token = fresh.nextPageToken;
 				}
 				if (
 					signal.aborted ||
@@ -375,7 +375,11 @@ export function useFeedPosts({
 				}
 				const candidate: FeedQueryData = {
 					pages: freshPages,
-					pageParams: freshPages.map((page) => page.page),
+					pageParams: freshPages.map((fresh, index) => ({
+						page: fresh.page,
+						token:
+							index === 0 ? "" : (freshPages[index - 1]?.nextPageToken ?? ""),
+					})),
 				};
 				const requiresReplacement =
 					current.pages.length !== freshPages.length ||
@@ -481,6 +485,7 @@ export function useFeedPosts({
 	const posts = React.useMemo(() => dedupePosts(pages), [pages]);
 	const lastPage = pages.at(-1);
 	const page = lastPage?.page ?? seedPage;
+	const nextPageToken = lastPage?.nextPageToken ?? seedToken;
 	const refresh = React.useCallback(async () => {
 		const controller = new AbortController();
 		await refreshHead(controller.signal);
@@ -501,6 +506,7 @@ export function useFeedPosts({
 	return {
 		posts,
 		page,
+		nextPageToken,
 		initialLoading: query.isPending,
 		loading: query.isFetchingNextPage,
 		refreshing:

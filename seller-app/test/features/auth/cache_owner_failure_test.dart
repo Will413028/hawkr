@@ -1,3 +1,5 @@
+import 'package:hawkr_seller/features/auth/data/auth_repository.dart'
+    show AccountSession;
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/shared/utils/hk_log.dart';
@@ -57,7 +59,9 @@ void main() {
                 },
               );
           final repo = FakeAuthRepository();
-          when(() => repo.currentAccountId()).thenAnswer((_) async => 'acc-1');
+          when(
+            () => repo.currentSession(),
+          ).thenAnswer((_) async => const AccountSession(accountId: 'acc-1'));
           final c = makeLoginContainer(
             repo: repo,
             auth: FakeAuthSession(signedIn: restore),

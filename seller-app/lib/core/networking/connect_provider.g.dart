@@ -400,4 +400,4 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'bed9087048725f6db03c953192e7828d69226fef';
+    r'4820eee5fe36a3892b936bfbd5cdffacc0c0c6ca';

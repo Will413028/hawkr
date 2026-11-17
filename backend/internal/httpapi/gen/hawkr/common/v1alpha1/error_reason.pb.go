@@ -81,6 +81,10 @@ const (
 	// 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
 	// client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
 	ErrorReason_CONTACT_EMAIL_REQUIRED ErrorReason = 13
+	// 要建立內容下架措施的內容已經有生效中的內容下架措施（搭配 failed_precondition）：一則內容同時只有一個生效中的下架措施，恢復時才不會撤銷一個、
+	// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
+	// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
+	ErrorReason_CONTENT_TAKEDOWN_ACTIVE ErrorReason = 14
 )
 
 // Enum value maps for ErrorReason.
@@ -100,6 +104,7 @@ var (
 		11: "IDENTITY_ALREADY_LINKED",
 		12: "REAUTHENTICATION_REQUIRED",
 		13: "CONTACT_EMAIL_REQUIRED",
+		14: "CONTENT_TAKEDOWN_ACTIVE",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -116,6 +121,7 @@ var (
 		"IDENTITY_ALREADY_LINKED":    11,
 		"REAUTHENTICATION_REQUIRED":  12,
 		"CONTACT_EMAIL_REQUIRED":     13,
+		"CONTENT_TAKEDOWN_ACTIVE":    14,
 	}
 )
 
@@ -150,7 +156,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x84\x03\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa1\x03\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -166,7 +172,8 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x12\x1b\n" +
 	"\x17IDENTITY_ALREADY_LINKED\x10\v\x12\x1d\n" +
 	"\x19REAUTHENTICATION_REQUIRED\x10\f\x12\x1a\n" +
-	"\x16CONTACT_EMAIL_REQUIRED\x10\rB\x82\x02\n" +
+	"\x16CONTACT_EMAIL_REQUIRED\x10\r\x12\x1b\n" +
+	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0eB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

@@ -1,9 +1,14 @@
 import * as Sentry from "@sentry/nextjs";
 import { cacheLife, cacheTag } from "next/cache";
+import { getEnv } from "@/lib/config/env";
 import { fetchRecommendedStores } from "@/lib/discovery/recommended";
 import { defaultLocale } from "@/lib/intl/locales";
 import type { ProductRecord } from "@/lib/market/listFilters";
-import { fetchTrendingPostTags } from "@/lib/post-tags/repo";
+import {
+	fetchPostsPage,
+	fetchTrendingPosts,
+	fetchTrendingPostTags,
+} from "@/lib/posts/repo";
 import { fetchProductReviews } from "@/lib/reviews/repo";
 import { fetchPopularHashtags } from "@/lib/search/repo";
 import { PUBLIC_CACHE_TAGS, productTag, sellerTag } from "@/lib/seo/tags";
@@ -18,7 +23,6 @@ import {
 	fetchSellerReviews,
 	fetchSellerStats,
 } from "./index";
-import { fetchPublicPostsTyped } from "./posts";
 import { prerenderSafe } from "./prerender";
 
 /**
@@ -88,6 +92,11 @@ export const CACHE_TTL = {
 // query: `key` is the fetcher's cache key (which id/page), `endpoint` the
 // public API path it hit. Both ride on the span as searchable attributes.
 type CacheMissMeta = { key?: string[]; endpoint?: string };
+
+/** 上游讀取的逾時：快取 scope 內的抓取一律帶，卡住的上游不能拖住整個渲染。 */
+function upstreamSignal(): AbortSignal {
+	return AbortSignal.timeout(getEnv().apiTimeoutMs);
+}
 
 /** Applies a freshness tier from `CACHE_TTL` to the enclosing `'use cache'` scope. */
 export function applyCacheTier(tier: keyof typeof CACHE_TTL): void {
@@ -426,22 +435,83 @@ export function getCachedRecommendedSellers(limit = 8) {
 	return readRecommendedSellers(limit).then(settled);
 }
 
-async function readPublicPosts(page: number, pageSize: number) {
+/**
+ * 貼文列表只有匿名讀取進共用快取：登入者的列表依觀看者而定（`viewer_*`、買家封鎖的店的貼文不出現），
+ * 一律由瀏覽器帶自己的憑證讀（`fetchPostsPage({ viewer: true })`），不走這些包裝。
+ * 只快取第一頁；後面的頁由 page_token 在瀏覽器逐頁讀。
+ */
+async function readPublicPosts(pageSize: number) {
 	"use cache";
 	cacheTag(PUBLIC_CACHE_TAGS.posts);
 	applyCacheTier("COMMERCE_LIVE");
 	return fillFetch(
 		"public-posts",
-		() => fetchPublicPostsTyped({ page, pageSize, strict: true }),
+		() =>
+			fetchPostsPage({
+				pageSize,
+				strict: true,
+				signal: upstreamSignal(),
+				locale: defaultLocale,
+			}),
 		{
-			key: ["public-posts", String(page), String(pageSize)],
-			endpoint: "/public/posts",
+			key: ["public-posts", String(pageSize)],
+			endpoint: "SocialPublicService/ListPosts",
 		},
 	);
 }
 
-export function getCachedPublicPosts(page = 1, pageSize = 8) {
-	return readPublicPosts(page, pageSize).then(settled);
+export function getCachedPublicPosts(pageSize = 8) {
+	return readPublicPosts(pageSize).then(settled);
+}
+
+async function readStorePosts(storeId: string, pageSize: number) {
+	"use cache";
+	cacheTag(PUBLIC_CACHE_TAGS.posts, sellerTag(storeId));
+	applyCacheTier("COMMERCE_LIVE");
+	return fillFetch(
+		"store-posts",
+		() =>
+			fetchPostsPage({
+				storeId,
+				pageSize,
+				strict: true,
+				signal: upstreamSignal(),
+				locale: defaultLocale,
+			}),
+		{
+			key: ["store-posts", storeId, String(pageSize)],
+			endpoint: "SocialPublicService/ListPosts",
+		},
+	);
+}
+
+/** 店家貼文頁的第一頁（匿名）：掛 `posts:list` 與 `seller:<id>`，social 的失效兩條都到得了。 */
+export function getCachedStorePosts(storeId: string, pageSize = 12) {
+	return readStorePosts(storeId, pageSize).then(settled);
+}
+
+async function readTrendingPosts(count: number) {
+	"use cache";
+	cacheTag(PUBLIC_CACHE_TAGS.posts);
+	applyCacheTier("DISCOVERY");
+	return fillFetch(
+		"trending-posts",
+		() =>
+			fetchTrendingPosts(count, {
+				signal: upstreamSignal(),
+				strict: true,
+				locale: defaultLocale,
+			}),
+		{
+			key: ["trending-posts", String(count)],
+			endpoint: "SocialPublicService/SuggestTrendingPosts",
+		},
+	);
+}
+
+/** 「本週主題」：伺服器的熱度排序（匿名）。 */
+export function getCachedTrendingPosts(count = 5) {
+	return readTrendingPosts(count).then(settled);
 }
 
 async function readCategoryTree() {
@@ -495,16 +565,21 @@ async function readTrendingPostTags(limit: number) {
 	applyCacheTier("DISCOVERY");
 	return fillFetch(
 		"trending-post-tags",
-		() => fetchTrendingPostTags({ limit }),
+		() =>
+			fetchTrendingPostTags({
+				limit,
+				signal: upstreamSignal(),
+				locale: defaultLocale,
+			}),
 		{
 			key: ["trending-post-tags", String(limit)],
-			endpoint: "/public/tags/trending",
+			endpoint: "SocialPublicService/SuggestTrendingTags",
 		},
 	);
 }
 
 /**
- * Trending post tags (`/public/tags/trending`) — the footer's 熱門話題 column,
+ * Trending post tags (`SocialPublicService.SuggestTrendingTags`) — the footer's 熱門話題 column,
  * which renders on every public page. Distinct from `getCachedPopularHashtags`:
  * that one is product hashtags for the megamenu, these are post tags that link
  * into `/feed`. Tagged "posts" because trending-ness is recomputed from post

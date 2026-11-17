@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/shared/Link";
-import { uniquePostTags } from "@/lib/post-tags/repo";
+import { uniquePostTags } from "@/lib/posts/tags";
 
 interface PostTagChipsProps {
 	tags?: readonly string[] | null;

@@ -22,7 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫，
+// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫；measure_contents_measure_status_fkey 保留，因為撤銷措施時 measure_status 靠它同步，那是這組測試要驗的不變量，
 // 事件由測試依真實 seller 的形狀發布（seller 自己的規則與真實的建立入口在 seller、httpapi 的測試）。
 type takedowns struct {
 	f *fixture
@@ -34,7 +34,7 @@ func (f *fixture) takedowns(t *testing.T) takedowns {
 	events.Subscribe(f.bus, f.module.OnMeasureRevoked)
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f')
+		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f') AND conname <> 'measure_contents_measure_status_fkey'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return takedowns{f: f}
 }
@@ -162,32 +162,6 @@ func TestContentTakedownHidesTheContentAndRevokeRestoresItImmediately(t *testing
 		t.Fatalf("撤銷後複本全刪：%d", n)
 	}
 	f.assertStatsMatchTheDataset(t, "撤銷後")
-}
-
-// 同一則內容被兩個措施下架：撤銷其中一個仍然隱藏，兩個都撤銷才回來。
-func TestRevokingOneOfTwoTakedownsKeepsTheContentHidden(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	td := f.takedowns(t)
-	w := f.takedownWorld(t)
-	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID), ref(seller.ContentForumEntry, w.entry.ID)}
-	first, second := td.create(t, w.storeID, refs...), td.create(t, w.storeID, refs...)
-
-	td.revoke(t, w.storeID, first, refs...)
-	if get, feed, _, _ := f.postVisible(t, w.post.ID); get || feed {
-		t.Fatal("還有另一個措施，貼文要維持隱藏")
-	}
-	if got := f.readable(t, w.other.ID, w.storeID); got.comments != 0 || got.forum != 0 {
-		t.Fatalf("還有另一個措施，留言與討論區留言維持隱藏：%+v", got)
-	}
-	f.assertStatsMatchTheDataset(t, "撤銷一個")
-	td.revoke(t, w.storeID, second, refs...)
-	if get, _, _, _ := f.postVisible(t, w.post.ID); !get {
-		t.Fatal("兩個都撤銷，貼文回來")
-	}
-	if got := f.readable(t, w.other.ID, w.storeID); got.comments != 1 || got.forum != 1 {
-		t.Fatalf("兩個都撤銷，內容回來：%+v", got)
-	}
 }
 
 // 建立與撤銷各排入受影響內容的快取失效 job（貼文：貼文 tag；留言：所屬貼文的 tag；討論區留言：店面頁 tag）。
@@ -494,49 +468,4 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	live := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
 	must(t, svc.ApplyMissingTakedowns(ctx, live, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
-}
-
-// 同一篇貼文被兩個措施下架：店主讀到建立時間最早的措施，即使它的 ID 較大；對帳補漏重寫複本後結果不變，補寫的 measure_created_at 是措施的建立時間。
-func TestOwnerReadsTheEarliestCreatedTakedownMeasure(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := setup(t)
-	td := f.takedowns(t)
-	w := f.takedownWorld(t)
-	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID)}
-	t0 := f.clock()
-	// ID 的順序與建立時間相反：idLater 的 ID 較小，但措施較晚建立。
-	idLater, idEarlier := uuid.NewV7(), uuid.NewV7()
-	if idLater.String() >= idEarlier.String() {
-		t.Fatalf("UUIDv7 應遞增：%s、%s", idLater, idEarlier)
-	}
-	later := td.seedAt(t, w.storeID, refs, idLater, t0.Add(time.Hour))
-	earlier := td.seedAt(t, w.storeID, refs, idEarlier, t0)
-	publish := func(id uuid.UUID, createdAt time.Time) {
-		must(t, f.db.InTx(ctx, func(ctx context.Context) error {
-			return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: id, StoreID: w.storeID, OccurredAt: createdAt, Contents: refs})
-		}))
-	}
-	read := func() *uuid.UUID {
-		return mustV[social.Post](t)(f.module.OwnPost(ctx, w.storeID, w.post.ID)).TakedownMeasureID
-	}
-	publish(later, t0.Add(time.Hour))
-	publish(earlier, t0)
-	if got := read(); got == nil || *got != earlier {
-		t.Fatalf("TakedownMeasureID = %v，預期建立時間較早的 %s（ID 較大）", got, earlier)
-	}
-	f.exec(t, "DELETE FROM social.content_takedowns WHERE measure_id = $1", earlier)
-	if got := read(); got == nil || *got != later {
-		t.Fatalf("較早措施的複本漏掉時只剩較晚的 %s：%v", later, got)
-	}
-	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
-	must(t, svc.ApplyMissingTakedowns(ctx, earlier, f.clock().Add(48*time.Hour), []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}}))
-	if got := read(); got == nil || *got != earlier {
-		t.Fatalf("對帳補漏重寫複本後，TakedownMeasureID = %v，預期仍是較早建立的 %s", got, earlier)
-	}
-	var stored time.Time
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT measure_created_at FROM social.content_takedowns WHERE measure_id = $1", earlier).Scan(&stored))
-	if !stored.Equal(t0) {
-		t.Fatalf("對帳補寫的 measure_created_at = %v，預期 seller 措施的建立時間 %v（不是對帳時間）", stored, t0)
-	}
 }

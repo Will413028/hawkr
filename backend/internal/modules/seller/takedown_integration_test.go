@@ -188,24 +188,54 @@ func TestPubContentTakedownsListsOnlyActiveTakedownTargets(t *testing.T) {
 	}
 	first := takedownContents(2)
 	m1 := f.takedown(t, s.StoreID, first)
-	shared := []ContentRef{first[0]}
-	m2 := f.takedown(t, s.StoreID, shared)
 	f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
 	got := list()
-	if len(got) != 2 || got[first[0]] != 2 || got[first[1]] != 1 {
-		t.Fatalf("兩個措施下架同一則內容時各一列：%v", got)
+	if len(got) != 2 || got[first[0]] != 1 || got[first[1]] != 1 {
+		t.Fatalf("兩則內容各一列：%v", got)
 	}
 	_, err := f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m1.ID, ExpectedVersion: m1.Version, AdminID: 7, Reason: RevokeAdminCorrection})
 	must(t, err)
-	got = list()
-	if len(got) != 1 || got[first[0]] != 1 {
-		t.Fatalf("撤銷後只剩另一個措施的對象：%v", got)
-	}
-	_, err = f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m2.ID, ExpectedVersion: m2.Version, AdminID: 7, Reason: RevokeAdminCorrection})
-	must(t, err)
 	if got := list(); len(got) != 0 {
-		t.Fatalf("全部撤銷後是空的：%v", got)
+		t.Fatalf("撤銷後是空的：%v", got)
 	}
+}
+
+// 一則內容同時只有一個生效中的內容下架措施：第二個被拒（含 CreateInTx），撤銷第一個之後可以再建；被拒的建立什麼都不寫。
+func TestSecondActiveTakedownOfTheSameContentIsRejected(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, s := f.open(t)
+	contents := takedownContents(2)
+	m1 := f.takedown(t, s.StoreID, contents)
+	before := f.count(t, "SELECT count(*) FROM seller.measures")
+	overlap := f.takedownFrom(s.StoreID, []ContentRef{takedownContents(1)[0], contents[1]})
+	_, err := f.module.CreateMeasure(ctx, overlap)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContentTakedownActive {
+		t.Fatalf("重疊的下架要回 FailedPrecondition 與 CONTENT_TAKEDOWN_ACTIVE：%v", err)
+	}
+	err = f.db.InTx(ctx, func(ctx context.Context) error {
+		_, err := f.module.CreateMeasureInTx(ctx, overlap)
+		return err
+	})
+	if !errors.As(err, &ae) || ae.Reason != apperr.ReasonContentTakedownActive {
+		t.Fatalf("CreateInTx 同樣被拒：%v", err)
+	}
+	if after := f.count(t, "SELECT count(*) FROM seller.measures"); after != before {
+		t.Fatalf("被拒的建立不留措施：%d -> %d", before, after)
+	}
+	got, err := f.module.ActiveTakedownOfContent(ctx, contents[1])
+	must(t, err)
+	if got == nil || *got != m1.ID {
+		t.Fatalf("ActiveTakedownOfContent %v，預期 %v", got, m1.ID)
+	}
+	_, err = f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m1.ID, ExpectedVersion: m1.Version, AdminID: 7, Reason: RevokeAdminCorrection})
+	must(t, err)
+	if got, err := f.module.ActiveTakedownOfContent(ctx, contents[1]); err != nil || got != nil {
+		t.Fatalf("撤銷後沒有生效中的措施：%v %v", got, err)
+	}
+	f.takedown(t, s.StoreID, contents)
 }
 
 func TestContentTakedownIsReleasedOnlyThroughAppealAndRevokeEventsCarryTheTargets(t *testing.T) {

@@ -37,9 +37,9 @@ class AuthController extends _$AuthController {
     if (!signedIn) return false;
 
     ref.read(sessionProvider.notifier).cancelRestore();
-    final String accountId;
+    final AccountSession account;
     try {
-      accountId = await ref.read(authRepositoryProvider).currentAccountId();
+      account = await ref.read(authRepositoryProvider).currentSession();
     } catch (error) {
       if (error is AuthRequestException && !error.isTransient) {
         try {
@@ -52,7 +52,9 @@ class AuthController extends _$AuthController {
       }
       rethrow;
     }
-    await ref.read(sessionProvider.notifier).login(accountId: accountId);
+    await ref
+        .read(sessionProvider.notifier)
+        .login(accountId: account.accountId, restriction: account.restriction);
     await ref.read(currentStoreProvider.future);
     return true;
   }

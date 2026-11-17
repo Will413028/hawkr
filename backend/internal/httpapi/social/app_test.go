@@ -150,7 +150,7 @@ func newAppEnvWith(t *testing.T, w *fakeWrites, owner Owner, s *fakeStores) *app
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, images, web)
+	h, err := NewApp(w, w, owner, fakeBuyers{id: 7}, s, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestForumWriteResponsesDoNotLookUpTheViewerIdentity(t *testing.T) {
 	var displayIDs [][]int64
 	stores := &fakeStores{}
 	w := &fakeWrites{}
-	h, err := NewApp(w, w, &fakeOwner{}, fakeBuyers{id: 7, displayIDs: &displayIDs}, stores, images, web)
+	h, err := NewApp(w, w, &fakeOwner{}, fakeBuyers{id: 7, displayIDs: &displayIDs}, stores, &fakeProducts{}, images, web, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

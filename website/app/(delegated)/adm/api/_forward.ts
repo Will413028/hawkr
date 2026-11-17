@@ -1,3 +1,5 @@
+import type { Client } from "@connectrpc/connect";
+import type { SocialDelegatedService } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import {
 	getDelegatedCookieName,
 	isSafeOperationCredential,
@@ -9,6 +11,7 @@ import {
 	readIdempotencyKey,
 } from "./_csrf";
 import {
+	callDelegatedConnect,
 	callDelegatedUpstream,
 	type DelegatedUpstreamResult,
 	type DelegatedUpstreamTimeout,
@@ -40,6 +43,9 @@ export { UPSTREAM_FAILURE } from "./_upstream";
 /** TSID 與其他純數字 id（storeId／productId／postId）。 */
 const NUMERIC_ID_PATTERN = /^\d{1,19}$/;
 /** 訂單編號（`HK260728001` 形狀）。 */
+const POST_ID_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 const ORDER_NO_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 /** 媒體 upload session（UUID 或 TSID，兩種都可能）。 */
 const MEDIA_SESSION_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -58,6 +64,11 @@ function segment(value: string, pattern: RegExp): string {
  */
 export function numericSegment(value: string): string {
 	return segment(value, NUMERIC_ID_PATTERN);
+}
+
+/** 社群貼文 ID（UUID，小寫）。 */
+export function postIdSegment(value: string): string {
+	return segment(value, POST_ID_PATTERN);
 }
 
 export function orderNoSegment(value: string): string {
@@ -212,6 +223,108 @@ export async function forwardDelegated(
 				json,
 			}),
 		);
+	} catch (error) {
+		if (error instanceof DelegatedUpstreamUnavailableError) {
+			return delegatedJson(
+				{ code: UPSTREAM_FAILURE },
+				error.timedOut ? 504 : 502,
+			);
+		}
+		throw error;
+	}
+}
+
+/** 瀏覽器請求經檢查後交給 Connect 呼叫組裝器的輸入。 */
+export interface DelegatedConnectInput {
+	json: unknown;
+	query: URLSearchParams;
+	/**
+	 * 瀏覽器的 `Idempotency-Key`，轉成 UUIDv4 的 `request_id`（`adm-` 前綴可有可無，其餘必須是 32 個十六進位字元）；
+	 * 沒帶是 null。BFF 不自己生成：生成的那把每次重送都不同，冪等就只剩名字。
+	 */
+	requestId: string | null;
+}
+
+/** 一次 Connect 呼叫：送出請求並把回應整形成瀏覽器看到的 `data`。 */
+type DelegatedConnectCall = (
+	client: Client<typeof SocialDelegatedService>,
+	options: { headers: Headers; timeoutMs: number },
+) => Promise<unknown>;
+
+export interface DelegatedConnectSpec {
+	method: "GET" | "POST" | "PATCH";
+	timeout: DelegatedUpstreamTimeout;
+	/** 路由的 `:storeId`（已過 `numericSegment`）；轉送點在送出前驗它就是 session 綁定的店。 */
+	storeId: string;
+	/** 與 REST 版相同：未列入的 query key 一律 400。 */
+	query?: readonly string[];
+	/**
+	 * 依輸入組出 Connect 呼叫；輸入不合法就丟 `DelegatedRequestRejectedError`（在送出之前，回 400）。
+	 * 呼叫的 `headers`／`timeoutMs` 由轉送點給。
+	 */
+	build: (input: DelegatedConnectInput) => DelegatedConnectCall;
+}
+
+const IDEMPOTENCY_HEX = /^(?:adm-)?([0-9a-f]{32})$/;
+
+/** `Idempotency-Key`（32 個十六進位字元，UUIDv4 去掉連字號）→ UUIDv4 字串。 */
+function requestIdFromIdempotencyKey(key: string | null): string | null {
+	if (key === null) return null;
+	const m = IDEMPOTENCY_HEX.exec(key);
+	if (!m)
+		throw new DelegatedRequestRejectedError("INVALID_IDEMPOTENCY_KEY", 400);
+	const h = m[1] as string;
+	const id = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+	if (id[14] !== "4" || !"89ab".includes(id[19] as string)) {
+		throw new DelegatedRequestRejectedError("INVALID_IDEMPOTENCY_KEY", 400);
+	}
+	return id;
+}
+
+/**
+ * `forwardDelegated` 的 Connect 版：同一條檢查順序（path 值域 → 保留 header／CSRF → 憑證 → query、body），
+ * 之後經 `_upstream.ts` 的 `callDelegatedConnect` 打單體的 `SocialDelegatedService`，憑證放
+ * `X-HK-Operation-Session`。一支 route 對一個 Connect 方法，不做 catch-all。
+ */
+export async function forwardDelegatedConnect(
+	request: Request,
+	source: DelegatedConnectSpec | (() => DelegatedConnectSpec),
+): Promise<Response> {
+	let spec: DelegatedConnectSpec;
+	let credential: string | null;
+	let call: DelegatedConnectCall;
+	try {
+		spec = typeof source === "function" ? source() : source;
+		assertDelegatedBrowserRequest(request);
+		credential = readOperationCredential(request);
+		if (!credential) {
+			throw new DelegatedRequestRejectedError("CREDENTIAL_MISSING", 401);
+		}
+		// buildQuery 的 allow-list 檢查沿用，但 Connect 呼叫自己讀 query 的值。
+		const search = buildQuery(request, spec.query ?? []);
+		const json =
+			spec.method === "GET" ? undefined : await readJsonBody(request);
+		call = spec.build({
+			json,
+			query: new URLSearchParams(
+				search.startsWith("?") ? search.slice(1) : search,
+			),
+			requestId: requestIdFromIdempotencyKey(readIdempotencyKey(request)),
+		});
+	} catch (error) {
+		if (error instanceof DelegatedRequestRejectedError) return rejection(error);
+		throw error;
+	}
+
+	try {
+		const result = await callDelegatedConnect({
+			call,
+			timeout: spec.timeout,
+			credential,
+			storeId: spec.storeId,
+			visitorIp: getVisitorIp(request),
+		});
+		return respond(result);
 	} catch (error) {
 		if (error instanceof DelegatedUpstreamUnavailableError) {
 			return delegatedJson(

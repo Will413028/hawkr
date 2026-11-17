@@ -101,12 +101,12 @@ func DecideSnapshotMissing() uitext.Message {
 
 // DecideStoreOnlyTakedown 是後台員工受眾的模組句子 decide.store_only_takedown（只有 zh-TW）。
 func DecideStoreOnlyTakedown() uitext.Message {
-	return uitext.Message{Text: "只有內容下架帶店家與嚴重度", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "只有內容下架要填嚴重度", Locale: uitext.ZhTW}
 }
 
-// DecideStoreRequired 是後台員工受眾的模組句子 decide.store_required（只有 zh-TW）。
-func DecideStoreRequired() uitext.Message {
-	return uitext.Message{Text: "內容下架要指定內容所屬的店家", Locale: uitext.ZhTW}
+// DecideTakedownSnapshotMissing 是後台員工受眾的模組句子 decide.takedown_snapshot_missing（只有 zh-TW）。
+func DecideTakedownSnapshotMissing() uitext.Message {
+	return uitext.Message{Text: "案件沒有內容快照，無法確認要下架的店家", Locale: uitext.ZhTW}
 }
 
 // DecideTakedownWrongStore 是後台員工受眾的模組句子 decide.takedown_wrong_store（只有 zh-TW）。

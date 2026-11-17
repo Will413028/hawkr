@@ -5,7 +5,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { checkFavorite, toggleFavorite } from "../favorites/repo";
 import { toggleFollow } from "../follow/repo";
 import { confirmOrderReceipt } from "../orders/repo";
-import { toggleCommentLike } from "../social/repo";
 import { SseClient } from "../sse/client";
 import { AUTH_EXPIRED_EVENT, apiClient, UnauthorizedError } from "./client";
 
@@ -116,8 +115,6 @@ it("strict callers still receive network errors", async () => {
 
 for (const [name, write] of [
 	["confirmOrderReceipt", () => confirmOrderReceipt("123")],
-	["toggleCommentLike POST", () => toggleCommentLike("123", false)],
-	["toggleCommentLike DELETE", () => toggleCommentLike("123", true)],
 ] as const) {
 	it(`${name} rejects network failure even with throwOnHttpError:false`, async () => {
 		fetchMock.mockRejectedValue(new TypeError("offline"));
