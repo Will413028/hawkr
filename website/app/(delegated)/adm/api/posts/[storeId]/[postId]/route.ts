@@ -35,9 +35,10 @@ export async function GET(
 ): Promise<Response> {
 	const { storeId, postId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		const id = postIdSegment(postId);
 		return {
+			storeId: pathStoreId,
 			method: "GET",
 			timeout: "mutation",
 			build: () => async (client, options) => {
@@ -54,9 +55,10 @@ export async function PATCH(
 ): Promise<Response> {
 	const { storeId, postId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		const id = postIdSegment(postId);
 		return {
+			storeId: pathStoreId,
 			method: "PATCH",
 			timeout: "mutation",
 			build: (input) => {

@@ -14,7 +14,7 @@ import {
  * - `GET`  → `SocialDelegatedService.ListStorePosts`（`posts.read`）
  * - `POST` → `SocialDelegatedService.CreateStorePost`（`posts.write`，建立一律是草稿）
  *
- * `:storeId` 只做值域檢查：目標店家是代行 session 綁定的那一家，Connect 請求不帶 store_id。
+ * `:storeId` 先過值域檢查，轉送點在送出前再驗它就是 session 綁定的店（不符 403／9262，不打 Connect）；Connect 請求不帶 store_id。
  * 列表是 page_token 分頁（`page_size`、`page_token`、`status`），沒有頁碼與總數。
  */
 
@@ -28,8 +28,9 @@ export async function GET(
 ): Promise<Response> {
 	const { storeId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		return {
+			storeId: pathStoreId,
 			method: "GET",
 			timeout: "mutation",
 			query: LIST_QUERY,
@@ -54,8 +55,9 @@ export async function POST(
 ): Promise<Response> {
 	const { storeId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		return {
+			storeId: pathStoreId,
 			method: "POST",
 			timeout: "mutation",
 			build: (input) => {

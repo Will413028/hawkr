@@ -25,11 +25,12 @@ export async function POST(
 ): Promise<Response> {
 	const { storeId, postId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		if (!POST_ID.test(postId)) {
 			throw new DelegatedRequestRejectedError("INVALID_PATH_PARAM", 400);
 		}
 		return {
+			storeId: pathStoreId,
 			method: "POST",
 			timeout: "mutation",
 			build: (input) => {

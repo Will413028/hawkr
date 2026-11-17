@@ -856,7 +856,23 @@ function connectContext(route: ConnectCase) {
 	return { params: Promise.resolve(route.params) };
 }
 
+const CURRENT_PATH = "/admin/delegated-operations/current";
+
+/** 轉送點在每次 Connect 呼叫之前讀 session 綁定的店；這是那一次讀取的回應（綁定 `boundStore`）。 */
+function currentReply(boundStore: string): Response {
+	return Response.json({
+		code: 0,
+		message: "success",
+		data: { target: { storeId: boundStore } },
+	});
+}
+
+function isCurrentRead(call: FetchCall): boolean {
+	return call.url.endsWith(CURRENT_PATH);
+}
+
 function connectReply(call: FetchCall, route: ConnectCase): Response {
+	if (isCurrentRead(call)) return currentReply("4");
 	assert.ok(
 		call.url.includes(`/${SERVICE}/${route.procedure}`),
 		`${route.name} → ${call.url}`,
@@ -875,8 +891,13 @@ test("代行貼文的 BFF 打的是 SocialDelegatedService 的 Connect 方法，
 				connectContext(route),
 			);
 			assert.equal(response.status, 200, route.name);
-			assert.equal(stub.calls.length, 1, `${route.name} 應該只打一次上游`);
-			const [call] = stub.calls;
+			assert.equal(
+				stub.calls.length,
+				2,
+				`${route.name} 應該是一次 session 讀取加一次 Connect 呼叫`,
+			);
+			assert.ok(isCurrentRead(stub.calls[0]), route.name);
+			const call = stub.calls[1];
 			assert.ok(
 				call.url.includes(`/${SERVICE}/${route.procedure}`),
 				`${route.name} → ${call.url}`,
@@ -905,7 +926,7 @@ test("代行貼文寫入：Idempotency-Key 轉成 request_id、原因與 etag �
 			connectRequest(route),
 			connectContext(route),
 		);
-		const raw = stub.calls[0].init.body;
+		const raw = stub.calls[1].init.body;
 		// Connect 的 JSON 編碼：請求本文是 JSON 文字的位元組。
 		const text =
 			raw instanceof Uint8Array ? new TextDecoder().decode(raw) : String(raw);
@@ -987,11 +1008,13 @@ test("代行貼文：Connect 的失敗對回瀏覽器認得的業務碼，不透
 		["invalid_argument", 400, 9260],
 	];
 	for (const [connectCode, status, code] of cases) {
-		const stub = stubFetch(() =>
-			Response.json(
-				{ code: connectCode, message: "內部細節 secret-detail" },
-				{ status },
-			),
+		const stub = stubFetch((call) =>
+			isCurrentRead(call)
+				? currentReply("4")
+				: Response.json(
+						{ code: connectCode, message: "內部細節 secret-detail" },
+						{ status },
+					),
 		);
 		try {
 			const response = await (await loadConnectHandler(route))(
@@ -1002,6 +1025,53 @@ test("代行貼文：Connect 的失敗對回瀏覽器認得的業務碼，不透
 			const text = await response.text();
 			assert.equal((JSON.parse(text) as { code: number }).code, code);
 			assert.ok(!text.includes("secret-detail"), "訊息不得透傳");
+		} finally {
+			stub.restore();
+		}
+	}
+});
+
+test("代行貼文：路由的 storeId 不是 session 綁定的店 → 403／9262，而且 Connect 一次都不打", async () => {
+	for (const route of CONNECT_POST_ROUTES) {
+		const handler = await loadConnectHandler(route);
+		const stub = stubFetch((call) => {
+			if (isCurrentRead(call)) return currentReply("9");
+			throw new Error(`${route.name} 在店不符時打了 Connect：${call.url}`);
+		});
+		try {
+			const response = await handler(
+				connectRequest(route),
+				connectContext(route),
+			);
+			assert.equal(response.status, 403, route.name);
+			assert.equal(await codeOf(response), 9262, route.name);
+			assert.equal(stub.calls.length, 1, `${route.name} 只該讀 session`);
+		} finally {
+			stub.restore();
+		}
+	}
+});
+
+test("代行貼文：讀不到 session 綁定的店（已結束或回應不認得）→ 不打 Connect", async () => {
+	const route = CONNECT_POST_ROUTES.find(
+		(r) => r.name === "publish",
+	) as ConnectCase;
+	const replies: Array<[string, Response]> = [
+		["session 已結束", Response.json({ code: 9270 }, { status: 401 })],
+		["沒有 target", Response.json({ code: 0, data: {} })],
+	];
+	for (const [label, reply] of replies) {
+		const stub = stubFetch((call) => {
+			if (isCurrentRead(call)) return reply.clone();
+			throw new Error(`${label}時打了 Connect`);
+		});
+		try {
+			const response = await (await loadConnectHandler(route))(
+				connectRequest(route),
+				connectContext(route),
+			);
+			assert.ok(response.status >= 400, label);
+			assert.equal(stub.calls.length, 1, label);
 		} finally {
 			stub.restore();
 		}

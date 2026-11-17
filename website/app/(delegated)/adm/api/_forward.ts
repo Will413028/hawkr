@@ -246,6 +246,8 @@ type DelegatedConnectCall = (
 export interface DelegatedConnectSpec {
 	method: "GET" | "POST" | "PATCH";
 	timeout: DelegatedUpstreamTimeout;
+	/** 路由的 `:storeId`（已過 `numericSegment`）；轉送點在送出前驗它就是 session 綁定的店。 */
+	storeId: string;
 	/** 與 REST 版相同：未列入的 query key 一律 400。 */
 	query?: readonly string[];
 	/**
@@ -311,6 +313,7 @@ export async function forwardDelegatedConnect(
 			call,
 			timeout: spec.timeout,
 			credential,
+			storeId: spec.storeId,
 			visitorIp: getVisitorIp(request),
 		});
 		return respond(result);

@@ -173,6 +173,13 @@ export function delegatedJson(
 	);
 }
 
+/** `GET /admin/delegated-operations/current` 回應 data 裡的目標店家 ID（工作階段綁定的那一家）；讀不到是 null。 */
+export function targetStoreIdOf(data: unknown): string | null {
+	if (!isRecord(data) || !isRecord(data.target)) return null;
+	const storeId = data.target.storeId;
+	return typeof storeId === "string" && storeId !== "" ? storeId : null;
+}
+
 /**
  * 代行 BFF 對單體 Connect 的呼叫（`SocialDelegatedService`，A7-2d）：憑證是 `X-HK-Operation-Session` 標頭，
  * 與 REST 一樣只在這一支檔案轉送。transport 是 `lib/connect/transport.ts` 的 `publicTransport`（server 端簽
@@ -190,8 +197,31 @@ export async function callDelegatedConnect(request: {
 	) => Promise<unknown>;
 	timeout: DelegatedUpstreamTimeout;
 	credential: string;
+	/**
+	 * 工作區路由的 `:storeId`。Connect 請求沒有 store_id（目標是 session 綁定的店），所以在送出之前先讀 session 的綁定店比對：
+	 * 不符回 403／9262 且不打 Connect（一個停在別家店頁面的分頁不能寫到現在綁定的這一家）；讀不到綁定店（session 已結束、
+	 * 回應不認得）一律不送，原樣回 session 讀取的失敗。
+	 */
+	storeId: string;
 	visitorIp?: string | null;
 }): Promise<DelegatedUpstreamResult> {
+	const current = await callDelegatedUpstream({
+		method: "GET",
+		path: "/admin/delegated-operations/current",
+		timeout: "session",
+		credential: request.credential,
+		visitorIp: request.visitorIp,
+	});
+	if (!current.ok) return current;
+	if (targetStoreIdOf(current.data) !== request.storeId) {
+		return {
+			ok: false,
+			status: 403,
+			code: 9262,
+			data: null,
+			traceId: current.traceId,
+		};
+	}
 	const client = createClient(
 		SocialDelegatedService,
 		publicTransport({

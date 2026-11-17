@@ -14,8 +14,9 @@ export async function GET(
 ): Promise<Response> {
 	const { storeId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
-		numericSegment(storeId);
+		const pathStoreId = numericSegment(storeId);
 		return {
+			storeId: pathStoreId,
 			method: "GET",
 			timeout: "mutation",
 			build: () => async (client, options) =>
