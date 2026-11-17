@@ -25,7 +25,22 @@
 	},
 	"navigation": {},
 	"product": {},
-	"seller": {},
+	"seller": {
+		"posts": {
+			"suspendedNotice": "店家目前受平台措施限制，動態只能下架或刪除。",
+			"commentsNotice": {
+				"storeNotPublic": "店家目前不公開，買家看不到這些留言。",
+				"unpublished": "這則動態已下架，買家看不到這些留言。",
+				"platformTakedown": "這則動態已被平台下架，買家看不到留言。"
+			}
+		},
+		"comments": {
+			"blockAction": "封鎖此人",
+			"blockTitle": "封鎖「{name}」？",
+			"blockDescription": "封鎖後，對方將無法在你的貼文與討論區留言、按讚，也無法傳送訊息給你；對方仍看得到你公開的內容，評價不受影響。你可以隨時在「封鎖名單」解除封鎖。",
+			"blocked": "已封鎖「{name}」"
+		}
+	},
 	"order": {},
 	"home": {
 		"merchants": {
@@ -38,6 +53,18 @@
 			"title": "登入方式",
 			"linked": "已連結",
 			"link": "連結"
+		}
+	},
+	"feed": {
+		"comments": {
+			"composeAsStore": "以「{storeName}」身分留言…",
+			"replyAsStore": "以「{storeName}」身分回覆…",
+			"composePlaceholder": "寫下你的留言…",
+			"replyToName": "回覆 {name}…",
+			"replyPlaceholder": "寫下你的回覆…",
+			"selfAlt": "我",
+			"deleted": "此留言已刪除",
+			"hidden": "此留言已被隱藏"
 		}
 	}
 }

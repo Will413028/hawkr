@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import AppIcon from "@/components/shared/AppIcon";
@@ -7,14 +8,13 @@ import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import HashtagText from "@/features/feed/components/HashtagText";
 import PostComments from "@/features/feed/components/PostComments";
-import { EmptyState } from "@/features/seller-center/components/EmptyState";
 import type { PostListItem } from "@/lib/api/openapi-types";
 import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
 import { postCardPresetForMedia } from "@/lib/media/cdn";
 import { PostPublishStatusBadge } from "./PostDraftBadge";
 import {
-	POST_COMMENTS_UNAVAILABLE_TEXT,
-	postCommentsAvailability,
+	POST_COMMENTS_NOTICE_KEY,
+	postCommentsNotice,
 } from "./postCommentsAvailability";
 import { isPostHidden } from "./postHidden";
 
@@ -23,6 +23,8 @@ interface Props {
 	post: PostListItem | null;
 	/** 店家的 `PUBLIC_LISTING` 是否啟用；不知道（代行、尚未載入）時是 `undefined`。 */
 	storePublic: boolean | undefined;
+	/** 代行的工作區：封鎖用店主自己的賣家身分呼叫，代行者不能用。 */
+	delegated?: boolean;
 	onClose: () => void;
 }
 
@@ -41,17 +43,19 @@ function formatCount(n: number | null | undefined): string {
  * so the seller can read engagement and reply to buyer comments without
  * leaving the seller-center posts page. Reuses the buyer-facing
  * `<PostComments>` for the comment thread; any logged-in user (including
- * the seller themselves) can post a reply through its composer. A post that is
- * not public right now (store not listed, draft or unpublished, platform-hidden)
- * has no readable public thread, so the thread is replaced by the reason.
+ * the seller themselves) can post a reply through its composer. The owner reads
+ * and deletes the thread even when the post is not public right now (store not
+ * listed, unpublished, platform-hidden); a line says why buyers cannot see it.
  */
 export default function SellerPostDetailModal({
 	open,
 	post,
 	storePublic,
+	delegated = false,
 	onClose,
 }: Props) {
 	const [mounted, setMounted] = React.useState(false);
+	const tNotice = useTranslations("seller.posts.commentsNotice");
 
 	const sellerAvatar = post?.logoKey;
 	const sellerName = post?.sellerName || "";
@@ -76,7 +80,7 @@ export default function SellerPostDetailModal({
 	if (!open || !mounted || !post) return null;
 
 	const imageKey = post.imageKeys[0] ?? "";
-	const commentsAvailability = postCommentsAvailability(post, storePublic);
+	const commentsNotice = postCommentsNotice(post, storePublic);
 
 	return createPortal(
 		<div
@@ -185,18 +189,21 @@ export default function SellerPostDetailModal({
 						<p className="px-4 py-3 text-sm text-foreground-soft">(無文字)</p>
 					)}
 
-					{/* canModerate=true: this surface is only opened from the seller's
-					    own posts list, so the viewer is by definition the post owner
-					    and the backend grants DELETE on any comment under their posts
-					    (own comment OR post owner). Lets the seller remove abusive /
-					    off-topic buyer comments and replies. */}
-					{commentsAvailability === "available" ? (
-						<PostComments postId={post.id} canModerate />
-					) : (
-						<EmptyState>
-							{POST_COMMENTS_UNAVAILABLE_TEXT[commentsAvailability]}
-						</EmptyState>
-					)}
+					{commentsNotice ? (
+						<p
+							className="mx-4 mb-1 rounded-xl bg-default-100 p-3 text-sm text-foreground-soft"
+							role="status"
+						>
+							{tNotice(POST_COMMENTS_NOTICE_KEY[commentsNotice])}
+						</p>
+					) : null}
+					{/* 留言權限、留言身分與「封鎖此人」都由伺服器的 viewer_* 欄位決定；
+					    店主不論這則動態公不公開都讀得到、刪得了留言。 */}
+					<PostComments
+						postId={post.id}
+						viewer={post.viewer}
+						allowBlockAuthor={!delegated}
+					/>
 				</aside>
 			</section>
 		</div>,

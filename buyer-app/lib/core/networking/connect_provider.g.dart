@@ -104,19 +104,19 @@ final class ConnectTransportProvider
 String _$connectTransportHash() => r'd6c54218de03a7416f91a265e611afce7bef6c03';
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-/// unauthenticated 時強制登出）。
+/// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
 
 @ProviderFor(connectAuthTransport)
 final connectAuthTransportProvider = ConnectAuthTransportProvider._();
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-/// unauthenticated 時強制登出）。
+/// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
 
 final class ConnectAuthTransportProvider
     extends $FunctionalProvider<Transport, Transport, Transport>
     with $Provider<Transport> {
   /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-  /// unauthenticated 時強制登出）。
+  /// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
   ConnectAuthTransportProvider._()
     : super(
         from: null,
@@ -151,7 +151,7 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'e73926b046b90dfcb11cca2a3e0abe701bffc486';
+    r'f221b4fdb5f49843f9a15562243208786cebb957';
 
 /// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
 /// 或換發失敗就不帶，不中斷呼叫。

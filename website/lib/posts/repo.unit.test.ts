@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+	ActorKind,
 	PostProductSchema,
 	PostSchema,
 } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
@@ -27,6 +28,7 @@ vi.mock("../connect/social", () => ({
 import {
 	FALLBACK_POST_IMAGE,
 	fetchPostsPage,
+	fetchPostViewerState,
 	fetchTrendingPosts,
 	postToDetail,
 	postToListItem,
@@ -71,6 +73,42 @@ describe("post mapping", () => {
 			isLiked: true,
 			createdAt: Date.parse("2026-11-01T00:00:00Z") / 1000,
 			imageKeys: [FALLBACK_POST_IMAGE],
+		});
+	});
+
+	it("carries the server's viewer state, and none for an anonymous read", () => {
+		const anonymous = wirePost("p-1");
+		expect(postToListItem(anonymous).viewer).toBeUndefined();
+		expect(postToDetail(anonymous).viewer).toBeUndefined();
+
+		const asStore = wirePost("p-2");
+		asStore.viewerCanComment = true;
+		asStore.viewerActor = {
+			kind: ActorKind.STORE,
+			id: "7",
+			name: " 小店 ",
+			avatar: { uriTemplate: "https://media.example.test/s/7/{preset}.jpg" },
+		} as never;
+		const viewer = {
+			canComment: true,
+			actor: {
+				kind: "store",
+				id: "7",
+				name: "小店",
+				avatarKey: "https://media.example.test/s/7/avatar.jpg",
+			},
+		};
+		expect(postToListItem(asStore).viewer).toEqual(viewer);
+		expect(postToDetail(asStore).viewer).toEqual(viewer);
+	});
+
+	it("a blocked buyer keeps the identity but cannot comment", () => {
+		const blocked = wirePost("p-3");
+		blocked.viewerCanComment = false;
+		blocked.viewerActor = { kind: ActorKind.BUYER, id: "9" } as never;
+		expect(postToListItem(blocked).viewer).toEqual({
+			canComment: false,
+			actor: { kind: "buyer", id: "9" },
 		});
 	});
 
@@ -181,5 +219,49 @@ describe("single post page and weekly topic", () => {
 			{ signal: undefined },
 		);
 		expect(posts.map((p) => p.id)).toEqual(["low", "high"]);
+	});
+});
+
+describe("fetchPostViewerState", () => {
+	it("reads the single post as the viewer and returns the permission and identity", async () => {
+		const post = wirePost("p-1");
+		post.viewerCanComment = true;
+		post.viewerActor = {
+			kind: ActorKind.STORE,
+			id: "7",
+			name: "小店",
+		} as never;
+		viewerRpc.getPost.mockResolvedValue({ post });
+		await expect(fetchPostViewerState("p-1")).resolves.toEqual({
+			canComment: true,
+			actor: { kind: "store", id: "7", name: "小店" },
+		});
+		expect(viewerRpc.getPost).toHaveBeenCalledWith(
+			{ postId: "p-1" },
+			{ signal: undefined },
+		);
+		expect(publicRpc.listPosts).not.toHaveBeenCalled();
+	});
+
+	it("maps the same fields as the viewer carried on a read post (one mapping)", async () => {
+		const post = wirePost("p-1");
+		post.viewerCanComment = true;
+		post.viewerActor = {
+			kind: ActorKind.BUYER,
+			id: "9",
+			name: "  小明  ",
+		} as never;
+		viewerRpc.getPost.mockResolvedValue({ post });
+		await expect(fetchPostViewerState("p-1")).resolves.toEqual(
+			postToListItem(post).viewer,
+		);
+		expect(postToListItem(post).viewer?.actor?.name).toBe("小明");
+	});
+
+	it("a guest read has nobody commenting", async () => {
+		viewerRpc.getPost.mockResolvedValue({ post: wirePost("p-1") });
+		await expect(fetchPostViewerState("p-1")).resolves.toEqual({
+			canComment: false,
+		});
 	});
 });

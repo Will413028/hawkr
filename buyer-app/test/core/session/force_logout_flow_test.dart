@@ -146,59 +146,6 @@ void main() {
     expect(requestedContinuePath, '/market?sort=latest');
     expect(container.read(forceLogoutProvider), isFalse);
   });
-  testWidgets('停權提醒顯示伺服器訊息', (tester) async {
-    final session = _FakeSession(
-      const SessionModel(userId: 'buyer-1', nickname: 'Buyer'),
-    );
-    final container = ProviderContainer(
-      overrides: [sessionProvider.overrideWith(() => session)],
-    );
-    addTearDown(container.dispose);
-    await container.read(sessionProvider.future);
-    final navigatorKey = GlobalKey<NavigatorState>();
-    String? requestedContinuePath;
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: ScreenUtilInit(
-          designSize: const Size(390, 844),
-          enableScaleWH: () => false,
-          enableScaleText: () => false,
-          builder: (_, __) => MaterialApp(
-            navigatorKey: navigatorKey,
-            builder: (_, child) => ForceLogoutListener(
-              navigatorKey: navigatorKey,
-              currentPath: () => '/market?sort=latest',
-              onLoginRequired: (path) => requestedContinuePath = path,
-              child: child!,
-            ),
-            home: const Scaffold(body: Text('市集')),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container
-        .read(forceLogoutProvider.notifier)
-        .trigger(message: '帳號已停權，請聯絡客服');
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    expect(find.text('需要登入'), findsOneWidget);
-    expect(find.text('帳號已停權，請聯絡客服'), findsOneWidget);
-    expect(find.text('取消'), findsOneWidget);
-    expect(find.text('前往登入'), findsOneWidget);
-    expect(session.logoutCalls, 0);
-
-    await tester.tap(find.text('前往登入'));
-    await tester.pumpAndSettle();
-
-    expect(session.logoutCalls, 1);
-    expect(requestedContinuePath, '/market?sort=latest');
-    expect(container.read(forceLogoutProvider), isFalse);
-  });
 }
 
 class _FakeSession extends Session {

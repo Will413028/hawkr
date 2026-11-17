@@ -1,6 +1,6 @@
 /**
  * Strict TS types projected from 預設模組.openapi.json
- * Source of truth: /public/posts, /app/buyers/me, /app/posts/{id}/*
+ * Source of truth: /app/buyers/me; the social post types are the client-side view models over the Connect `hawkr.social.v1alpha1` messages (`lib/posts/repo.ts`)
  *
  * Naming: every JSON body field is camelCase (backend-payuni#2235 收斂 — 10 檔 §2:
  * URL/Query snake_case, JSON body camelCase). Query-string params are the sole
@@ -41,6 +41,21 @@ export interface PostProductData {
 	price: string;
 }
 
+/** 觀看者在貼文留言時的身分（伺服器依觀看者算）：店主在自己店的貼文是店家，其他有買家身分的人是買家。 */
+export interface PostViewerActor {
+	kind: "buyer" | "store";
+	id: string;
+	/** 讀不到名稱（店家卡片讀不到、買家已刪除）時沒有。 */
+	name?: string;
+	avatarKey?: string;
+}
+
+/** 貼文上依觀看者算的留言權限；匿名讀取的貼文沒有這一組。 */
+export interface PostViewerState {
+	canComment: boolean;
+	actor?: PostViewerActor;
+}
+
 /** matches handler.PostListItemData / handler.MyPostListItemData */
 export interface PostListItem {
 	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
@@ -79,6 +94,8 @@ export interface PostListItem {
 	hiddenReason?: string; // 平台下架原因（同上）
 	/** 下架這則貼文的措施 ID（只對店主；有值就是被平台下架，理由經措施讀）。 */
 	takedownMeasureId?: string;
+	/** 依觀看者的讀取才有（匿名讀取不設）：能不能留言與留言時的身分。 */
+	viewer?: PostViewerState;
 	/**
 	 * PostPublishStatus 數字碼字串（4401 未發布／4402 已發布／4403 已下架）。
 	 *
@@ -116,6 +133,8 @@ export interface PostDetail {
 	viewCount: number;
 	isLiked: boolean;
 	createdAt: number;
+	/** 依觀看者的讀取才有（匿名讀取不設）。 */
+	viewer?: PostViewerState;
 }
 
 /**

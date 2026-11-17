@@ -9,9 +9,6 @@ const comments = vi.hoisted(() => ({ list: [] as unknown[] }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({ status: "signedIn", identity: { nickname: "我" } }),
 }));
-vi.mock("@/components/shared/useSellerIdentity", () => ({
-	useSellerIdentity: () => ({ avatar: null, storeName: "" }),
-}));
 vi.mock("@/lib/hooks/useSocial", () => ({
 	usePostComments: () => ({
 		comments: comments.list,
@@ -26,6 +23,7 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 		edited: vi.fn(),
 		like: vi.fn(),
 	}),
+	usePostViewerState: () => ({ data: { canComment: true } }),
 	useCommentReplies: () => ({
 		items: [],
 		open: false,
@@ -36,6 +34,7 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 	}),
 }));
 
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import PostComments from "../PostComments";
 
 function comment(state: "visible" | "deleted" | "hidden") {
@@ -61,7 +60,11 @@ describe("placeholder comments carry no actions", () => {
 	it("a visible comment offers like, reply, edit and delete", () => {
 		comments.list = [comment("visible")];
 		render(
-			React.createElement(PostComments, { postId: "p", canModerate: true }),
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(PostComments, { postId: "p" }),
+			),
 		);
 		expect(screen.queryByText("回覆")).not.toBeNull();
 		expect(screen.queryByText("編輯")).not.toBeNull();
@@ -74,7 +77,11 @@ describe("placeholder comments carry no actions", () => {
 		(state) => {
 			comments.list = [comment(state)];
 			render(
-				React.createElement(PostComments, { postId: "p", canModerate: true }),
+				React.createElement(
+					IntlTestWrapper,
+					null,
+					React.createElement(PostComments, { postId: "p" }),
+				),
 			);
 			expect(screen.queryByText("回覆")).toBeNull();
 			expect(screen.queryByText("編輯")).toBeNull();
@@ -82,4 +89,31 @@ describe("placeholder comments carry no actions", () => {
 			expect(screen.queryByText("按讚")).toBeNull();
 		},
 	);
+});
+
+describe("deleted placeholder text", () => {
+	it("a deleted comment says it was deleted and a hidden one says it was hidden", () => {
+		comments.list = [comment("deleted")];
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(PostComments, { postId: "p" }),
+			),
+		);
+		expect(screen.queryByText("此留言已刪除")).not.toBeNull();
+		expect(screen.queryByText("x")).toBeNull();
+		expect(screen.queryByText("u")).toBeNull();
+		cleanup();
+		comments.list = [comment("hidden")];
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(PostComments, { postId: "p" }),
+			),
+		);
+		expect(screen.queryByText("此留言已刪除")).toBeNull();
+		expect(screen.queryByText("此留言已被隱藏")).not.toBeNull();
+	});
 });

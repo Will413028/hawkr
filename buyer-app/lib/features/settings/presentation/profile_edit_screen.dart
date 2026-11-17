@@ -31,7 +31,7 @@ import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/oss_image.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../auth/data/account_deletion.dart';
+import '../../auth/presentation/account_deletion_flow.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../media/data/media_repository.dart';
 import 'widgets/profile_edit_widgets.dart';
@@ -569,39 +569,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   Future<void> _confirmAndDeleteAccount() async {
     if (_busy) return;
-    final confirmed = await showCommonDialog(
-      context: context,
-      title: '刪除帳號',
-      content:
-          '刪除後帳號資料會被移除，無法復原。還有未完成的訂單時，帳號會在最後一筆訂單完成後刪除，期間無法新增收藏與追蹤。\n\n若你有開設商店，商店也會一起關閉，商店與商品不再公開，賣家身分會移除。有未結訂單時，帳號與商店會在訂單結清後才刪除，期間商店不能自行關閉或換店。',
-      confirmText: '確認刪除',
-      cancelText: '取消',
-      confirmColor: AppColors.danger,
-      barrierDismissible: true,
+    setState(() => _deleteMessage = null);
+    final message = await confirmAndDeleteAccount(
+      context,
+      ref,
+      onBusy: (busy) => setState(() => _busy = busy),
     );
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _busy = true;
-      _deleteMessage = null;
-    });
-    final AccountDeletionOutcome outcome;
-    try {
-      outcome = await ref.read(accountDeletionProvider).run();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-    if (!mounted) return;
-    switch (outcome) {
-      case AccountDeleted():
-        await ref.read(sessionProvider.notifier).logout();
-        if (!mounted) return;
-        context.go('/');
-      case AccountDeletionPending():
-        setState(() => _deleteMessage = accountPendingOrdersMessage);
-      case AccountDeletionFailed(:final message):
-        setState(() => _deleteMessage = message);
-    }
+    if (mounted && message != null) setState(() => _deleteMessage = message);
   }
 
   void _selectCity(String selected) {

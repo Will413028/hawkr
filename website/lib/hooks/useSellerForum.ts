@@ -27,11 +27,14 @@ interface UseSellerForumResult {
 	refresh: () => Promise<void>;
 	loadMore: () => Promise<void>;
 	loadReplies: (commentId: string) => Promise<SellerForumComment[]>;
+	loadMoreReplies: (commentId: string) => Promise<void>;
 	post: (content: string) => Promise<void>;
 	reply: (commentId: string, content: string) => Promise<void>;
 	update: (commentId: string, content: string) => Promise<void>;
 	remove: (commentId: string) => Promise<void>;
 }
+
+const EMPTY_REPLIES: readonly SellerForumComment[] = [];
 
 function sameId(a: string | undefined, b: string) {
 	return String(a) === String(b);
@@ -197,9 +200,49 @@ export function useSellerForum(
 					...item,
 					// 只讀第一頁回覆；replyCount 是伺服器的總數，不用已載入的筆數覆蓋。
 					replies: result.records,
+					repliesNextPageToken: result.nextPageToken,
 				})),
 			}));
 			return result.records;
+		},
+		[comments, sellerId, setForumData],
+	);
+
+	const loadingRepliesRef = React.useRef<Set<string>>(new Set());
+	const loadMoreReplies = React.useCallback(
+		async (commentId: string) => {
+			if (!sellerId) return;
+			const parent = findComment(comments, commentId);
+			const pageToken = parent?.repliesNextPageToken ?? "";
+			if (pageToken === "") return;
+			const key = String(commentId);
+			if (loadingRepliesRef.current.has(key)) return;
+			loadingRepliesRef.current.add(key);
+			try {
+				const result = await fetchSellerForumReplies(
+					String(sellerId),
+					commentId,
+					{ pageSize: 20, pageToken, parentName: parent?.userName },
+				);
+				setForumData((current) => ({
+					...current,
+					records: replaceComment(current.records, commentId, (item) => {
+						const loaded = item.replies;
+						const base = loaded && loaded.length > 0 ? loaded : EMPTY_REPLIES;
+						const seen = new Set(base.map((r) => String(r.id)));
+						return {
+							...item,
+							replies: [
+								...base,
+								...result.records.filter((r) => !seen.has(String(r.id))),
+							],
+							repliesNextPageToken: result.nextPageToken,
+						};
+					}),
+				}));
+			} finally {
+				loadingRepliesRef.current.delete(key);
+			}
 		},
 		[comments, sellerId, setForumData],
 	);
@@ -379,6 +422,7 @@ export function useSellerForum(
 		refresh,
 		loadMore,
 		loadReplies,
+		loadMoreReplies,
 		post,
 		reply,
 		update,

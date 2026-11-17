@@ -80,3 +80,72 @@ describe("loading replies keeps the server's reply count", () => {
 		expect(result.current.comments[0].replyCount).toBe(45);
 	});
 });
+
+describe("forum replies paging", () => {
+	it("loads the next reply page with the token and appends it", async () => {
+		const { result } = renderHook(() => useSellerForum("7"), {
+			wrapper: wrapper(),
+		});
+		await waitFor(() => expect(result.current.comments).toHaveLength(1));
+		await act(async () => {
+			await result.current.loadReplies("top");
+		});
+		await waitFor(() =>
+			expect(result.current.comments[0].repliesNextPageToken).toBe("more"),
+		);
+		repo.fetchSellerForumReplies.mockResolvedValueOnce({
+			records: [entry("r3")],
+			nextPageToken: "",
+			pageSize: 20,
+		});
+		await act(async () => {
+			await result.current.loadMoreReplies("top");
+		});
+		expect(repo.fetchSellerForumReplies).toHaveBeenLastCalledWith(
+			"7",
+			"top",
+			expect.objectContaining({ pageToken: "more" }),
+		);
+		await waitFor(() =>
+			expect(result.current.comments[0].replies).toHaveLength(3),
+		);
+		const top = result.current.comments[0];
+		expect(top.replies?.map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
+		expect(top.repliesNextPageToken).toBe("");
+		await act(async () => {
+			await result.current.loadMoreReplies("top");
+		});
+		expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(2);
+	});
+
+	it("ignores a second same-tick loadMoreReplies call for one comment", async () => {
+		const { result } = renderHook(() => useSellerForum("7"), {
+			wrapper: wrapper(),
+		});
+		await waitFor(() => expect(result.current.comments).toHaveLength(1));
+		await act(async () => {
+			await result.current.loadReplies("top");
+		});
+		await waitFor(() =>
+			expect(result.current.comments[0].repliesNextPageToken).toBe("more"),
+		);
+		let resolve!: (v: unknown) => void;
+		repo.fetchSellerForumReplies.mockReturnValueOnce(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+		const before = repo.fetchSellerForumReplies.mock.calls.length;
+		let a!: Promise<void>;
+		let b!: Promise<void>;
+		act(() => {
+			a = result.current.loadMoreReplies("top");
+			b = result.current.loadMoreReplies("top");
+		});
+		resolve({ records: [entry("r3")], nextPageToken: "", pageSize: 20 });
+		await act(async () => {
+			await Promise.all([a, b]);
+		});
+		expect(repo.fetchSellerForumReplies.mock.calls.length - before).toBe(1);
+	});
+});

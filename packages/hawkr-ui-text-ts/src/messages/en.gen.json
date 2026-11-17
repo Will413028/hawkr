@@ -98,7 +98,7 @@
     },
     "Measure": {
       "appeal_deadline": "申覆期限：{deadline}",
-      "meta_kind": "措施：{kind}",
+      "meta_kind": "Measure: {kind}",
       "meta_severity": "嚴重程度：{severity}",
       "meta_termination_ground": "事由：{ground}",
       "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
@@ -118,7 +118,7 @@
       "MEASURE_BASIS_VIOLATION": "違規認定"
     },
     "MeasureKind": {
-      "MEASURE_KIND_CONTENT_TAKEDOWN": "內容下架",
+      "MEASURE_KIND_CONTENT_TAKEDOWN": "Content removal",
       "MEASURE_KIND_SUSPENSION": "停權",
       "MEASURE_KIND_TERMINATION": "終止合作",
       "MEASURE_KIND_WARNING": "警告"

@@ -42,6 +42,8 @@ export interface SellerForumComment {
 	/* --- 以下為前端狀態，wire 不帶 --- */
 	rootId?: string | null;
 	replies?: SellerForumComment[];
+	/** 回覆的下一頁憑證；空字串或缺席是沒有下一頁。 */
+	repliesNextPageToken?: string;
 }
 
 export interface SellerForumListResult {

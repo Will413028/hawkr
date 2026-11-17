@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
@@ -9,7 +10,6 @@ import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' show SignInFailed;
 import 'package:hawkr_buyer/features/order/data/receipt_photo_local_service.dart';
 import 'package:hawkr_buyer/features/notification/data/push/background_handler.dart';
-import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/transport.dart'
     show Code, ConnectException, ErrorDetail, HeadersExtension;
 import 'package:hawkr_buyer/config/flavor.dart';
@@ -17,7 +17,9 @@ import 'package:hawkr_buyer/core/storage/auth_storage.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
+import 'package:hawkr_buyer/core/session/account_restriction.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
+import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/features/auth/presentation/auth_controller.dart';
 import 'package:hawkr_buyer/features/notification/data/push/manager.dart';
 import 'package:dio/dio.dart';
@@ -123,34 +125,53 @@ void main() {
     expect(h.c.read(sessionProvider).value, isNull);
   });
 
-  test('GetSession 停權錯誤：清除 session token、往外丟，不寫入帳號', () async {
+  test('GetSession 帶停權狀態：登入成功、進受限狀態，不清 session token、不強制登出', () async {
     final h = harness(
-      getSession: () => throw ConnectException(
-        Code.permissionDenied,
-        'account suspended',
-        details: [
-          ErrorDetail(
-            'google.rpc.LocalizedMessage',
-            (LocalizedMessage()
-                  ..locale = 'zh-TW'
-                  ..message = '帳號已停權')
-                .writeToBuffer(),
-          ),
-        ],
+      getSession: () => GetSessionResponse(
+        account: Account(id: 'acc_01J8Z'),
+        suspension: Suspension(reason: '多次張貼廣告'),
       ),
     );
 
-    await expectLater(
-      signIn(h.c, OAuthProvider.google),
-      throwsA(
-        isA<SuspendedException>().having((e) => e.message, "message", "帳號已停權"),
-      ),
-    );
+    expect(await signIn(h.c, OAuthProvider.google), isTrue);
 
-    expect(h.auth.calls, ['signIn google', 'clear']);
-    expect(h.auth.isSignedIn, isFalse);
-    expect(h.c.read(sessionProvider).value, isNull);
+    expect(h.auth.calls, ['signIn google']);
+    expect(h.auth.isSignedIn, isTrue);
+    expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
+    expect(h.c.read(accountRestrictionProvider)?.reason, '多次張貼廣告');
+    expect(h.c.read(forceLogoutProvider), isFalse);
   });
+
+  test(
+    '登入時 GetSession 回 ACCOUNT_SUSPENDED（伺服器不會這樣回）：走一般失敗，保留 token 等重試、沒有 session',
+    () async {
+      final h = harness(
+        getSession: () => throw ConnectException(
+          Code.permissionDenied,
+          'denied',
+          details: [
+            ErrorDetail(
+              'google.rpc.ErrorInfo',
+              (ErrorInfo()
+                    ..reason = 'ACCOUNT_SUSPENDED'
+                    ..domain = 'hawkr')
+                  .writeToBuffer(),
+            ),
+          ],
+        ),
+      );
+
+      await expectLater(
+        signIn(h.c, OAuthProvider.google),
+        throwsA(isA<ServerException>()),
+      );
+
+      expect(h.auth.isSignedIn, isTrue);
+      expect(h.c.read(sessionProvider).value, isNull);
+      expect(h.c.read(accountRestrictionProvider), isNull);
+      h.c.read(sessionProvider.notifier).cancelRestore();
+    },
+  );
 
   test('暫時失敗保留 session token，再次登入直接重試 GetSession', () async {
     var fail = true;

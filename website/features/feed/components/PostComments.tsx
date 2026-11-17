@@ -1,12 +1,14 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import { gsap } from "gsap";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
-import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
+import type { PostViewerState } from "@/lib/api/openapi-types";
 import { useAuth } from "@/lib/auth/context";
 import {
 	type Comment,
@@ -16,8 +18,21 @@ import {
 	updateComment,
 } from "@/lib/comments/repo";
 import { formatTaipeiShortDate } from "@/lib/date/taipei";
-import { useCommentReplies, usePostComments } from "@/lib/hooks/useSocial";
-import { canDeleteComment, canEditComment } from "./commentPermissions";
+import {
+	useCommentReplies,
+	usePostComments,
+	usePostViewerState,
+} from "@/lib/hooks/useSocial";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { blockBuyerByComment } from "@/lib/seller/block-buyer";
+import {
+	canBlockCommentAuthor,
+	canComposeComment,
+	canDeleteComment,
+	canEditComment,
+	canReplyToComment,
+	storeActorName,
+} from "./commentPermissions";
 
 function formatTime(unixSeconds: number): string {
 	if (!unixSeconds) return "";
@@ -97,13 +112,15 @@ function highlightComment(el: HTMLElement) {
 interface PostCommentsProps {
 	postId: string;
 	/**
-	 * Grant the current viewer post-owner moderation rights — show 刪除 on
-	 * every comment / reply (not just one's own), matching the backend's
-	 * "own comment OR post owner" DELETE permission. Seller-side surfaces
-	 * (e.g. the seller-center post viewer) set this true; buyer surfaces
-	 * leave it false so a buyer can still only remove their own comments.
+	 * 這則貼文依觀看者算的留言權限與身分（`Post.viewer_can_comment`、`viewer_actor`）。貼文已經是依觀看者讀的
+	 * （賣家中心的店主清單）時傳進來；不傳就由元件向伺服器讀單篇。
 	 */
-	canModerate?: boolean;
+	viewer?: PostViewerState;
+	/**
+	 * 賣家中心的留言區：別人寫的、店家能刪的留言多一個「封鎖此人」（呼叫賣家的 `BlockBuyer`）。
+	 * 公開頁不傳：封鎖名單屬於店家的賣家中心。
+	 */
+	allowBlockAuthor?: boolean;
 	/**
 	 * Whether the comment SSE stream should be open for this post. Single-
 	 * post surfaces (bottom sheet, seller post modal) leave the default
@@ -113,9 +130,9 @@ interface PostCommentsProps {
 	active?: boolean;
 }
 
-/** Avatar shown next to a composer (new comment / reply). On the seller
- *  surface this is the store logo so it's clear the reply comes from the
- *  shop; on buyer surfaces it's the member's own avatar. */
+/** Avatar shown next to a composer (new comment / reply). It follows the
+ *  server's `viewer_actor`: the store logo when the viewer comments as the
+ *  shop, otherwise the member's own avatar. */
 type ComposerAvatar = {
 	src?: string | null;
 	alt: string;
@@ -128,6 +145,7 @@ function ReplyComposer({
 	parentId,
 	replyToId,
 	replyToName,
+	placeholder,
 	avatar,
 	onSent,
 	onCancel,
@@ -136,6 +154,8 @@ function ReplyComposer({
 	parentId: string;
 	replyToId: string;
 	replyToName?: string;
+	/** 提示字：店家身分時是「以「店名」身分回覆…」，否則依被回覆者。 */
+	placeholder: string;
 	avatar: ComposerAvatar;
 	onSent: (created: Comment) => void;
 	onCancel: () => void;
@@ -211,7 +231,7 @@ function ReplyComposer({
 					value={draft}
 					onChange={(e) => setDraft(e.target.value)}
 					onKeyDown={onKeyDown}
-					placeholder={replyToName ? `回覆 ${replyToName}…` : "寫下你的回覆…"}
+					placeholder={placeholder}
 					rows={1}
 					maxLength={500}
 				/>
@@ -244,13 +264,16 @@ function ReplyComposer({
  *  no nested replies (we only render one thread level deep). */
 function ReplyItem({
 	reply,
-	canModerate,
 	onRemoved,
+	onBlockAuthor,
+	blockBusy = false,
 }: {
 	reply: Comment;
-	canModerate: boolean;
 	onRemoved: (id: string) => void;
+	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
+	const tComments = useTranslations("seller.comments");
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
 	// Local content mirror — optimistic edit shows immediately, refresh from
@@ -274,9 +297,9 @@ function ReplyItem({
 	}, [editing]);
 
 	const live = reply.state === "visible";
-	const canDelete = live && canDeleteComment(reply.isMine, canModerate);
-	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = live && canEditComment(reply.isMine);
+	const canDelete = live && canDeleteComment(reply);
+	const canEdit = live && canEditComment(reply);
+	const canBlock = live && onBlockAuthor && canBlockCommentAuthor(reply);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -468,6 +491,16 @@ function ReplyItem({
 							刪除
 						</Button>
 					)}
+					{canBlock && !editing && (
+						<button
+							type="button"
+							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
+							disabled={deleting || blockBusy}
+							onClick={() => void onBlockAuthor?.(reply)}
+						>
+							{tComments("blockAction")}
+						</button>
+					)}
 				</footer>
 			</div>
 		</li>
@@ -478,22 +511,28 @@ function ReplyItem({
 function CommentItem({
 	comment,
 	postId,
-	canModerate,
-	signedIn,
+	replyPlaceholder,
 	composerAvatar,
 	onLike,
 	onRemove,
 	onEdited,
+	onBlockAuthor,
+	blockBusy = false,
 }: {
 	comment: Comment;
 	postId: string;
-	canModerate: boolean;
-	signedIn: boolean;
+	/** 店家身分時的回覆提示字；不是店家身分時是 undefined，改用依被回覆者的提示。 */
+	replyPlaceholder?: string;
 	composerAvatar: ComposerAvatar;
 	onLike: (id: string) => Promise<void>;
 	onRemove: (id: string) => Promise<void>;
 	onEdited: (updated: Comment) => void;
+	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
+	const tComments = useTranslations("seller.comments");
+	const tFeed = useTranslations("feed.comments");
+	const defaultErrors = useDefaultErrorText();
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	// Local mirror of replyCount so it bumps the moment we send a reply
@@ -522,9 +561,10 @@ function CommentItem({
 	}, [editing]);
 
 	const live = comment.state === "visible";
-	const canDelete = live && canDeleteComment(comment.isMine, canModerate);
-	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = live && canEditComment(comment.isMine);
+	const canDelete = live && canDeleteComment(comment);
+	const canEdit = live && canEditComment(comment);
+	const canReply = live && canReplyToComment(comment);
+	const canBlock = live && onBlockAuthor && canBlockCommentAuthor(comment);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -633,20 +673,24 @@ function CommentItem({
 			data-comment-anchor={String(comment.id)}
 		>
 			<span className="block w-9 h-9 shrink-0 rounded-full overflow-hidden bg-[var(--hkui-default-100)]">
-				<Avatar
-					src={comment.avatarKey}
-					alt={comment.userName}
-					entity="buyer"
-					className="w-full h-full object-cover"
-					fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
-					fallback="empty"
-				/>
+				{live ? (
+					<Avatar
+						src={comment.avatarKey}
+						alt={comment.userName}
+						entity="buyer"
+						className="w-full h-full object-cover"
+						fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
+						fallback="empty"
+					/>
+				) : null}
 			</span>
 			<div className="flex-1 min-w-0">
 				<header className="flex items-baseline gap-[var(--hkui-space-2)]">
-					<strong className="text-[length:var(--hkui-text-small)] font-semibold">
-						{comment.userName}
-					</strong>
+					{live ? (
+						<strong className="text-[length:var(--hkui-text-small)] font-semibold">
+							{comment.userName}
+						</strong>
+					) : null}
 					<small className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 						{formatTime(comment.createdAt)}
 					</small>
@@ -686,7 +730,13 @@ function CommentItem({
 					</div>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
-						{content}
+						{live
+							? content
+							: comment.state === "deleted"
+								? tFeed("deleted")
+								: comment.state === "hidden"
+									? tFeed("hidden")
+									: null}
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
@@ -709,7 +759,7 @@ function CommentItem({
 							<span>{comment.likeCount ?? 0}</span>
 						</Button>
 					) : null}
-					{signedIn && live && !editing && (
+					{canReply && !editing && (
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
@@ -761,6 +811,16 @@ function CommentItem({
 							刪除
 						</Button>
 					)}
+					{canBlock && !editing && (
+						<button
+							type="button"
+							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
+							disabled={deleting || blockBusy}
+							onClick={() => void onBlockAuthor?.(comment)}
+						>
+							{tComments("blockAction")}
+						</button>
+					)}
 				</footer>
 
 				{replyOpen && (
@@ -769,6 +829,12 @@ function CommentItem({
 						parentId={comment.id}
 						replyToId={comment.id}
 						replyToName={comment.userName}
+						placeholder={
+							replyPlaceholder ??
+							(comment.userName
+								? tFeed("replyToName", { name: comment.userName })
+								: tFeed("replyPlaceholder"))
+						}
 						avatar={composerAvatar}
 						onSent={handleReplySent}
 						onCancel={() => setReplyOpen(false)}
@@ -790,11 +856,36 @@ function CommentItem({
 								<ReplyItem
 									key={r.id}
 									reply={r}
-									canModerate={canModerate}
 									onRemoved={handleReplyRemoved}
+									onBlockAuthor={onBlockAuthor}
+									blockBusy={blockBusy}
 								/>
 							))
 						)}
+						{replies.loadMoreError ? (
+							<li
+								className="list-none text-[length:var(--hkui-text-tiny)] text-[var(--hkui-danger-700)]"
+								role="alert"
+							>
+								{errorText(replies.loadMoreError, defaultErrors)}
+							</li>
+						) : null}
+						{replies.hasMore ? (
+							<li className="list-none">
+								<Button
+									type="button"
+									variant="light"
+									color="primary"
+									size="sm"
+									className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)]"
+									isLoading={replies.loadingMore}
+									loadingLabel="載入回覆中…"
+									onClick={() => void replies.loadMore()}
+								>
+									載入更多
+								</Button>
+							</li>
+						) : null}
 					</ul>
 				)}
 			</div>
@@ -804,13 +895,25 @@ function CommentItem({
 
 export default function PostComments({
 	postId,
-	canModerate = false,
+	viewer: viewerProp,
+	allowBlockAuthor = false,
 	active = true,
 }: PostCommentsProps) {
 	const { status, identity } = useAuth();
 	const signedIn = status === "signedIn";
-	const sellerIdentity = useSellerIdentity();
+	const t = useTranslations("feed.comments");
+	const tSeller = useTranslations("seller.comments");
+	const fetchedViewer = usePostViewerState(
+		postId,
+		signedIn && viewerProp === undefined,
+	);
+	const viewer = viewerProp ?? fetchedViewer.data;
 	const list = usePostComments(postId, { active });
+	const defaultErrors = useDefaultErrorText();
+	const [blockNotice, setBlockNotice] = React.useState<string | null>(null);
+	const [blockError, setBlockError] = React.useState<string | null>(null);
+	const [blocking, setBlocking] = React.useState(false);
+	const blockingRef = React.useRef(false);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const rootRef = React.useRef<HTMLElement | null>(null);
@@ -852,19 +955,54 @@ export default function PostComments({
 		}, 150);
 		return () => window.clearInterval(timer);
 	}, [postId]);
-	// On the seller surface (canModerate) the viewer replies AS the shop, so
-	// the composer shows the store logo; buyer surfaces show the member avatar.
-	const composerAvatar: ComposerAvatar = canModerate
-		? {
-				src: sellerIdentity.avatar,
-				alt: sellerIdentity.storeName || "賣家",
-				entity: "seller",
+	// 留言身分由伺服器的 `viewer_actor` 決定（店主在自己店的貼文是店家），不看現在在哪個畫面。
+	const actor = viewer?.actor;
+	const storeName = storeActorName(viewer);
+	const composerAvatar: ComposerAvatar =
+		actor?.kind === "store"
+			? {
+					src: actor.avatarKey,
+					alt: storeName ?? "",
+					entity: "seller",
+				}
+			: {
+					src: actor?.avatarKey ?? identity?.avatarKey,
+					alt: actor?.name ?? identity?.nickname ?? t("selfAlt"),
+					entity: "buyer",
+				};
+	const commentPlaceholder = storeName
+		? t("composeAsStore", { storeName })
+		: t("composePlaceholder");
+	const replyPlaceholder = storeName
+		? t("replyAsStore", { storeName })
+		: undefined;
+
+	const blockAuthor = React.useCallback(
+		async (comment: Comment) => {
+			const name = comment.userName;
+			if (
+				!window.confirm(
+					`${tSeller("blockTitle", { name })}\n\n${tSeller("blockDescription")}`,
+				)
+			)
+				return;
+			if (blockingRef.current) return;
+			blockingRef.current = true;
+			setBlocking(true);
+			setBlockNotice(null);
+			setBlockError(null);
+			try {
+				await blockBuyerByComment(comment.id);
+				setBlockNotice(tSeller("blocked", { name }));
+			} catch (e) {
+				setBlockError(errorText(e, defaultErrors));
+			} finally {
+				blockingRef.current = false;
+				setBlocking(false);
 			}
-		: {
-				src: identity?.avatarKey,
-				alt: identity?.nickname || "我",
-				entity: "buyer",
-			};
+		},
+		[tSeller, defaultErrors],
+	);
 
 	const submitDraft = async () => {
 		if (!draft.trim() || submitting) return;
@@ -905,7 +1043,43 @@ export default function PostComments({
 				</strong>
 			</header>
 
-			{signedIn && (
+			{blockNotice ? (
+				<p
+					className="mb-[var(--hkui-space-3)] text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]"
+					role="status"
+				>
+					{blockNotice}
+				</p>
+			) : null}
+
+			{blockError ? (
+				<p
+					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
+					role="alert"
+				>
+					{blockError}
+				</p>
+			) : null}
+
+			{viewerProp === undefined && signedIn && fetchedViewer.isError ? (
+				<div
+					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)] flex items-center justify-between gap-[var(--hkui-space-3)]"
+					role="alert"
+				>
+					<span>{errorText(fetchedViewer.error, defaultErrors)}</span>
+					<Button
+						variant="bordered"
+						color="default"
+						size="sm"
+						disabled={fetchedViewer.isFetching}
+						onClick={() => void fetchedViewer.refetch()}
+					>
+						重試
+					</Button>
+				</div>
+			) : null}
+
+			{canComposeComment(signedIn, viewer) && (
 				<form
 					className="flex gap-[var(--hkui-space-3)] items-start mb-[var(--hkui-space-4)]"
 					onSubmit={handleSend}
@@ -916,7 +1090,7 @@ export default function PostComments({
 							value={draft}
 							onChange={(e) => setDraft(e.target.value)}
 							onKeyDown={handleDraftKeyDown}
-							placeholder="寫下你的留言…"
+							placeholder={commentPlaceholder}
 							rows={1}
 							maxLength={500}
 						/>
@@ -962,12 +1136,13 @@ export default function PostComments({
 							key={c.id}
 							comment={c}
 							postId={postId}
-							canModerate={canModerate}
-							signedIn={signedIn}
+							replyPlaceholder={replyPlaceholder}
 							composerAvatar={composerAvatar}
 							onLike={list.like}
 							onRemove={list.remove}
 							onEdited={list.edited}
+							onBlockAuthor={allowBlockAuthor ? blockAuthor : undefined}
+							blockBusy={blocking}
 						/>
 					))}
 				</ul>

@@ -6564,6 +6564,15 @@ button.seller-inventory__stat:focus-visible {
 	font-size: 0.8125rem;
 }
 
+.seller-posts__notice {
+	margin: 0;
+	padding: 10px 14px;
+	border-radius: var(--radius-md);
+	background: var(--hkui-warning-50);
+	color: var(--hkui-warning-700);
+	font-size: 0.8125rem;
+}
+
 .seller-posts__card {
 	padding: 0;
 	overflow: visible;

@@ -176,20 +176,18 @@ export function sellerCanonicalUrl(
  *
  * The bar for adding a surface to the canonical set is unchanged: "already
  * fetched, merely dropped" qualifies; "could fetch it if we paid for a
- * round-trip" does not. `/public/posts/{id}` is the one endpoint still on the
- * wrong side of that line — it makes no seller lookup — and no caller builds a
- * seller href from it today (the post viewer is always fed from a list).
+ * round-trip" does not.
  *
  * Empty when neither key is usable — callers that can be handed a seller-less
  * row must keep their own guard rather than render a link to `/sellers/`.
  *
  * ⚠️ POSTS ARE THE EXCEPTION, AND THEY MUST NOT PASS `fallbackId`. Everywhere
  * above, an absent `store_code` means "this seller has no minted code", and the
- * fallback yields a working 308. On `/public/posts` the gateway fills
- * `store_code` ONLY when `GetSellerBatch` found the seller, so absent means NOT
- * FOUND — `/sellers/{store_id}` then 404s, and the fallback manufactures a dead
- * link out of a value that was telling you not to link at all. `post.go`'s field
- * comment states it directly: 此時前端必須不渲染賣家連結，而不是退回 seller_id.
+ * fallback yields a working 308. On a post's `store` the code is filled ONLY
+ * when the store was found, so absent means NOT FOUND — `/sellers/{store_id}`
+ * then 404s, and the fallback manufactures a dead link out of a value that was
+ * telling you not to link at all: render no seller link instead of falling
+ * back to the store id.
  * `tests/post-seller-link.test.ts` pins the post-facing callers to one argument.
  */
 export function sellerPath(
