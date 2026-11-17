@@ -243,17 +243,18 @@ void main() {
     expect(c.read(forceLogoutProvider), isFalse);
   });
 
-  test('冷啟動 GetSession 回 ACCOUNT_SUSPENDED：清除 token，不留訪客加橫幅', () async {
+  test('冷啟動 GetSession 失敗（含伺服器錯誤）：保留 token，不清除，等重試', () async {
     final auth = FakeAuthSession(signedIn: true);
     final c = containerWith(
       () async => auth,
-      () async => throw const SuspendedException('suspended'),
+      () async => throw const ServerException('伺服器錯誤'),
     );
 
     expect(await c.read(sessionProvider.future), isNull);
-    expect(auth.isSignedIn, isFalse);
-    expect(auth.calls, ['clear']);
+    expect(auth.isSignedIn, isTrue);
+    expect(auth.calls, isEmpty);
     expect(c.read(accountRestrictionProvider), isNull);
+    c.read(sessionProvider.notifier).cancelRestore();
   });
 
   test('登出解除受限狀態', () async {

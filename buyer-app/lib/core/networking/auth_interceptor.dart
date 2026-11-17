@@ -17,7 +17,7 @@ AuthInterceptor authInterceptor(Ref ref) =>
 /// opaque token（ADR `2026-10-30-identity-self-hosted-federated-login.md`），不換新；讀不到 token 時不送出，以連線錯誤結束。
 /// 收到 401 就強制登出（登出時清除 token），回到登入。403 的 envelope 帶 reason `ACCOUNT_SUSPENDED`
 /// 時是停權（A7-D18），進受限狀態並提示，不登出。自己放行非 2xx 回應（`validateStatus`）的呼叫不經過 onError，
-/// 使用者主動的寫入要自己用 [isRestSuspension] 判斷。
+/// 使用者主動的寫入要自己用 [isRestSuspension] 判斷。背景寫入（[isBackgroundRestWrite]）收到停權時靜默。
 class AuthInterceptor extends Interceptor {
   AuthInterceptor(this._sessionToken, this._ref);
 
@@ -50,20 +50,19 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    if (err.response?.statusCode == 401) {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final response = err.response;
+    if (response?.statusCode == 401) {
       _triggerForceLogout();
-    } else if (_isSuspension(err)) {
+    } else if (response != null &&
+        !isBackgroundRestWrite(err.requestOptions) &&
+        await isRestSuspension(response)) {
       _ref.read(accountRestrictionProvider.notifier).rejected();
     }
     handler.next(err);
-  }
-
-  bool _isSuspension(DioException err) {
-    final response = err.response;
-    if (response == null) return false;
-    return isRestSuspensionBody(response.statusCode, response.data) &&
-        _ref.read(sessionProvider).value != null;
   }
 
   void _triggerForceLogout() {

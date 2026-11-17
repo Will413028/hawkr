@@ -49,31 +49,34 @@ void main() {
         .writeToBuffer(),
   );
 
-  test('ACCOUNT_SUSPENDED：SuspendedException，顯示伺服器的文字', () async {
-    final repository = repositoryWith(
-      (_) => throw ConnectException(
-        Code.permissionDenied,
-        'account suspended',
-        details: [
-          suspendedInfo(),
-          ErrorDetail(
-            'google.rpc.LocalizedMessage',
-            (LocalizedMessage()
-                  ..locale = 'zh-TW'
-                  ..message = '帳號已停權')
-                .writeToBuffer(),
-          ),
-        ],
-      ),
-    );
+  test(
+    'ACCOUNT_SUSPENDED（GetSession 不會回，伺服器放行讀取）：一般的 ServerException，顯示伺服器的文字',
+    () async {
+      final repository = repositoryWith(
+        (_) => throw ConnectException(
+          Code.permissionDenied,
+          'account suspended',
+          details: [
+            suspendedInfo(),
+            ErrorDetail(
+              'google.rpc.LocalizedMessage',
+              (LocalizedMessage()
+                    ..locale = 'zh-TW'
+                    ..message = '帳號已停權')
+                  .writeToBuffer(),
+            ),
+          ],
+        ),
+      );
 
-    await expectLater(
-      repository.currentAccount(),
-      throwsA(
-        isA<SuspendedException>().having((e) => e.message, 'message', '帳號已停權'),
-      ),
-    );
-  });
+      await expectLater(
+        repository.currentAccount(),
+        throwsA(
+          isA<ServerException>().having((e) => e.message, 'message', '帳號已停權'),
+        ),
+      );
+    },
+  );
 
   test('其他的 permission_denied 不是停權：ServerException，不顯示開發者訊息', () async {
     final repository = repositoryWith(

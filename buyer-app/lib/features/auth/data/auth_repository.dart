@@ -12,7 +12,6 @@ import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/connect_provider.dart';
-import '../../../core/networking/suspension_signal.dart';
 import '../../../core/session/account_restriction.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../core/exceptions/app_exception.dart';
@@ -97,7 +96,7 @@ class AuthRepository {
   }
 
   /// 呼叫 identity 的方法，錯誤轉成 App 的 [AppException]：沒收到回應是 [NetworkException]，token 無效
-  /// （unauthenticated）是 [UnauthorizedException]，`ACCOUNT_SUSPENDED` 是 [SuspendedException]，其他是 [ServerException]。文字取自伺服器的
+  /// （unauthenticated）是 [UnauthorizedException]，其他是 [ServerException]。文字取自伺服器的
   /// LocalizedMessage，沒有時用該 code 的預設文字。取消當成 internal（見 `errorText`）。
   Future<T> _call<T>(String tag, Future<T> Function() call) async {
     try {
@@ -116,7 +115,6 @@ class AuthRepository {
       if (error.code == Code.unauthenticated) {
         throw UnauthorizedException(message);
       }
-      if (isAccountSuspended(error)) throw SuspendedException(message);
       throw ServerException(message);
     }
   }

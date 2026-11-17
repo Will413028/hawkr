@@ -142,32 +142,36 @@ void main() {
     expect(h.c.read(forceLogoutProvider), isFalse);
   });
 
-  test('登入時 GetSession 回 ACCOUNT_SUSPENDED：登入失敗，不留 token、沒有 session', () async {
-    final h = harness(
-      getSession: () => throw ConnectException(
-        Code.permissionDenied,
-        'denied',
-        details: [
-          ErrorDetail(
-            'google.rpc.ErrorInfo',
-            (ErrorInfo()
-                  ..reason = 'ACCOUNT_SUSPENDED'
-                  ..domain = 'hawkr')
-                .writeToBuffer(),
-          ),
-        ],
-      ),
-    );
+  test(
+    '登入時 GetSession 回 ACCOUNT_SUSPENDED（伺服器不會這樣回）：走一般失敗，保留 token 等重試、沒有 session',
+    () async {
+      final h = harness(
+        getSession: () => throw ConnectException(
+          Code.permissionDenied,
+          'denied',
+          details: [
+            ErrorDetail(
+              'google.rpc.ErrorInfo',
+              (ErrorInfo()
+                    ..reason = 'ACCOUNT_SUSPENDED'
+                    ..domain = 'hawkr')
+                  .writeToBuffer(),
+            ),
+          ],
+        ),
+      );
 
-    await expectLater(
-      signIn(h.c, OAuthProvider.google),
-      throwsA(isA<SuspendedException>()),
-    );
+      await expectLater(
+        signIn(h.c, OAuthProvider.google),
+        throwsA(isA<ServerException>()),
+      );
 
-    expect(h.auth.isSignedIn, isFalse);
-    expect(h.c.read(sessionProvider).value, isNull);
-    expect(h.c.read(accountRestrictionProvider), isNull);
-  });
+      expect(h.auth.isSignedIn, isTrue);
+      expect(h.c.read(sessionProvider).value, isNull);
+      expect(h.c.read(accountRestrictionProvider), isNull);
+      h.c.read(sessionProvider.notifier).cancelRestore();
+    },
+  );
 
   test('暫時失敗保留 session token，再次登入直接重試 GetSession', () async {
     var fail = true;

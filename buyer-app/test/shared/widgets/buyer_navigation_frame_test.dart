@@ -13,6 +13,64 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 void main() {
+  testWidgets('橫幅那一格的 widget 型別固定，不隨停權與否替換', (tester) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final observer = BuyerNavigationObserver();
+    final container = ProviderContainer(
+      overrides: [sessionProvider.overrideWith(_ActiveSession.new)],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      navigatorKey: navigatorKey,
+      initialLocation: '/marketplace',
+      observers: [observer],
+      routes: [
+        GoRoute(path: '/marketplace', builder: (_, _) => const Text('頁')),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => BuyerNavigationFrame(
+            router: router,
+            navigatorKey: navigatorKey,
+            navigationObserver: observer,
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Widget slot() => tester
+        .widget<Column>(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('buyer-global-navigation-frame')),
+                matching: find.byType(Column),
+              )
+              .first,
+        )
+        .children
+        .first;
+    expect(slot(), isA<Visibility>());
+
+    container
+        .read(accountRestrictionProvider.notifier)
+        .apply(const AccountSuspension.unknown());
+    await tester.pumpAndSettle();
+    expect(slot(), isA<Visibility>());
+    expect(find.byType(AccountRestrictedBanner), findsOneWidget);
+
+    container.read(accountRestrictionProvider.notifier).clear();
+    await tester.pumpAndSettle();
+    expect(slot(), isA<Visibility>());
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+  });
+
   testWidgets('global Navbar keeps one element and preserves old visibility', (
     tester,
   ) async {

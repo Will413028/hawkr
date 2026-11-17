@@ -53,7 +53,7 @@ class AuthController extends _$AuthController {
     try {
       account = await ref.read(authRepositoryProvider).currentAccount();
     } catch (error) {
-      if (error is UnauthorizedException || error is SuspendedException) {
+      if (error is UnauthorizedException) {
         try {
           await authSession.clear();
         } catch (clearError, stack) {

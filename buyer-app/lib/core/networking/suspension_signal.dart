@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:hawkr_api/errors.dart';
@@ -15,9 +16,8 @@ bool isAccountSuspended(ConnectException error) {
 }
 
 /// 使用者沒有主動觸發的寫入（背景呼叫）。這些請求收到 `ACCOUNT_SUSPENDED` 時靜默略過：不進受限畫面、不跳提示
-/// （A7-D17）。不在清單內的請求一律視為使用者主動，收到 `ACCOUNT_SUSPENDED` 就進受限狀態並提示。
-///
-/// 新增背景寫入（瀏覽計數、裝置註冊之類）時加在這裡。
+/// （A7-D17）。不在清單內的請求一律視為使用者主動，收到 `ACCOUNT_SUSPENDED` 就進受限狀態並提示。Connect 與舊 REST
+/// 共用這一處分類：新增背景寫入（瀏覽計數、裝置註冊、自動已讀、連線票之類）時加在這裡。
 const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit',
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
@@ -25,6 +25,27 @@ const backgroundConnectProcedures = {
 
 bool isBackgroundConnectProcedure(String procedure) =>
     backgroundConnectProcedures.contains(procedure);
+
+/// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。
+final _backgroundRestWrites = <({String method, RegExp path})>[
+  // 聊天連線票：開聊天與回到前景時自動鑄。
+  (method: 'POST', path: RegExp(r'/app/chat/ws-ticket/?$')),
+  // 進入對話自動標記已讀。
+  (method: 'PATCH', path: RegExp(r'/app/chat/conversations(/[^/]+)?/?$')),
+  // 開啟通知自動標記已讀（read-all 是使用者點的，不在這裡）。
+  (method: 'PATCH', path: RegExp(r'/app/notifications/\d+/read/?$')),
+  // 推播裝置 token 的註冊與註銷。
+  (method: 'POST', path: RegExp(r'/app/notifications/device-token/?$')),
+  (method: 'DELETE', path: RegExp(r'/app/notifications/device-token/?$')),
+];
+
+bool isBackgroundRestWrite(RequestOptions options) {
+  final method = options.method.toUpperCase();
+  final path = options.uri.path;
+  return _backgroundRestWrites.any(
+    (rule) => rule.method == method && rule.path.hasMatch(path),
+  );
+}
 
 /// 舊 gateway 的 REST 停權訊號：403，且 JSON envelope 的 `reason` 是 `ACCOUNT_SUSPENDED`（A7-D18）。停權只擋寫入，
 /// 所以不必看 HTTP method。[data] 是已解碼的 body（Map），或未解碼的 JSON 字串。
@@ -41,15 +62,24 @@ bool isRestSuspensionBody(int? status, Object? data) {
   return body is Map && body['reason'] == ErrorReason.ACCOUNT_SUSPENDED.name;
 }
 
-/// 同 [isRestSuspensionBody]，另外讀得了串流 body（`ResponseType.stream` 的回應，body 是 [ResponseBody]）。
+/// 同 [isRestSuspensionBody]，另外讀得了位元組與串流 body（`ResponseType.bytes`、`ResponseType.stream`）。
+/// 讀串流之後把 body 換成讀過的內容，後面的 interceptor 與呼叫端還能再讀。
 Future<bool> isRestSuspension(Response<dynamic> response) async {
   final status = response.statusCode;
   if (status != 403) return false;
   final data = response.data;
   if (data is ResponseBody) {
     try {
-      final text = await utf8.decodeStream(data.stream);
-      return isRestSuspensionBody(status, text);
+      final bytes = await data.stream.expand((chunk) => chunk).toList();
+      data.stream = Stream.value(Uint8List.fromList(bytes));
+      return isRestSuspensionBody(status, utf8.decode(bytes));
+    } catch (_) {
+      return false;
+    }
+  }
+  if (data is List<int>) {
+    try {
+      return isRestSuspensionBody(status, utf8.decode(data));
     } catch (_) {
       return false;
     }
@@ -68,7 +98,10 @@ class RestSuspensionInterceptor extends Interceptor {
     Response<dynamic> response,
     ResponseInterceptorHandler handler,
   ) async {
-    if (await isRestSuspension(response)) onSuspended();
+    if (!isBackgroundRestWrite(response.requestOptions) &&
+        await isRestSuspension(response)) {
+      onSuspended();
+    }
     handler.next(response);
   }
 }

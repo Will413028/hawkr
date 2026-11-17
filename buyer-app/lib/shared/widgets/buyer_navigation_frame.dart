@@ -86,16 +86,16 @@ class BuyerNavigationFrame extends ConsumerWidget {
           resizeToAvoidBottomInset: false,
           body: Column(
             children: [
-              // 橫幅的位置固定占第一格（不顯示時收合），頁面子樹的位置不隨橫幅變動而重掛。
-              if (showsBanner)
-                SafeArea(
+              // 第一格永遠是同一個 Visibility（不顯示時它自己收合成空），頁面子樹的位置不隨橫幅變動而重掛。
+              Visibility(
+                visible: showsBanner,
+                child: SafeArea(
                   bottom: false,
                   child: AccountRestrictedBanner(
                     onTap: () => AccountRestrictedScreen.open(router),
                   ),
-                )
-              else
-                const SizedBox.shrink(),
+                ),
+              ),
               Expanded(
                 child: MediaQuery.removePadding(
                   context: context,
