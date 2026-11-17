@@ -299,7 +299,7 @@ message Post {
   // 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
   // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
   optional string takedown_measure_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到或（公開讀取時）已下架時不設，
+  // `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
   // 不影響貼文本身；`product_id` 仍照實回傳。
   PostProduct product = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

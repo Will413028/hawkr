@@ -5,6 +5,7 @@ package social
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"slices"
 	"time"
@@ -86,6 +87,7 @@ type presenter struct {
 	ownerView bool
 	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
+	log   *slog.Logger
 }
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
@@ -104,14 +106,17 @@ type Public struct {
 var _ socialv1alpha1connect.SocialPublicServiceHandler = (*Public)(nil)
 
 // NewPublic 建立前台的 handler；webOrigin 組貼文的單篇網址，不可是零值；now 是熱門標籤預設時間窗的終點，nil 時用 time.Now。
-func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time) (*Public, error) {
+func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, now func() time.Time, log *slog.Logger) (*Public, error) {
+	if log == nil {
+		return nil, fmt.Errorf("httpapi/social：需要 logger")
+	}
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, log: log, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -552,10 +557,7 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	if err != nil {
 		return nil, err
 	}
-	products, err := h.postProducts(ctx, posts)
-	if err != nil {
-		return nil, err
-	}
+	products := h.postProducts(ctx, posts)
 	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
@@ -566,8 +568,8 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	return out, nil
 }
 
-// postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡（貼文照回，product 不設）。
-func (h *presenter) postProducts(ctx context.Context, posts []social.Post) (map[int64]ProductInfo, error) {
+// postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡，查詢失敗時整批降級；兩者貼文照回，product 不設。
+func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[int64]ProductInfo {
 	var ids []int64
 	for _, p := range posts {
 		if p.ProductID != nil {
@@ -575,9 +577,14 @@ func (h *presenter) postProducts(ctx context.Context, posts []social.Post) (map[
 		}
 	}
 	if ids = uniq(ids); len(ids) == 0 {
-		return nil, nil
+		return nil
 	}
-	return h.products.Cards(ctx, ids, h.ownerView)
+	cards, err := h.products.Cards(ctx, ids, h.ownerView)
+	if err != nil {
+		h.log.WarnContext(ctx, "httpapi/social：商品顯示資料查詢失敗，貼文的 product 不設", "product_count", len(ids), "error", err)
+		return nil
+	}
+	return cards
 }
 
 func (h *presenter) toPostProduct(info ProductInfo) (*pb.PostProduct, error) {

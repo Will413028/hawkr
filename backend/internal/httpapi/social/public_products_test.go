@@ -1,6 +1,7 @@
 package social
 
 import (
+	"log/slog"
 	"slices"
 	"testing"
 
@@ -75,19 +76,23 @@ func TestPostsWithoutProductsMakeNoProductCall(t *testing.T) {
 	}
 }
 
-func TestProductLookupFailureFailsTheReadAsUnavailable(t *testing.T) {
+func TestProductLookupFailureDegradesTheReadToNoProduct(t *testing.T) {
 	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
 	products := &fakeProducts{err: apperr.Unavailable("product-service down")}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
-	_, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
-	if codeOf(t, err) != connect.CodeUnavailable {
-		t.Fatalf("查詢失敗不能當成商品不存在：%v", err)
+	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
+	if err != nil {
+		t.Fatalf("商品查詢失敗不能讓讀取失敗：%v", err)
+	}
+	posts := resp.Msg.GetPosts()
+	if len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != "90" {
+		t.Fatalf("product 不設、product_id 照實回：%v", posts)
 	}
 }
 
 func TestOwnerReadsAskForInactiveProductsToo(t *testing.T) {
 	products := &fakeProducts{cards: map[int64]ProductInfo{90: {ID: 90, Name: "Hidden", Available: false}}}
-	h := &presenter{buyers: fakeBuyers{}, stores: &fakeStores{}, products: products, ownerView: true, images: mustImages(t), webOrigin: mustWeb(t), liked: noViewerLikes}
+	h := &presenter{buyers: fakeBuyers{}, stores: &fakeStores{}, products: products, ownerView: true, images: mustImages(t), webOrigin: mustWeb(t), liked: noViewerLikes, log: slog.New(slog.DiscardHandler)}
 	out, err := h.toPosts(t.Context(), social.Caller{}, []social.Post{withProduct(post(5), 90)})
 	if err != nil {
 		t.Fatal(err)

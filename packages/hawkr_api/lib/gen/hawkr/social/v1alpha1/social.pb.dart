@@ -537,7 +537,7 @@ class Post extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   void clearTakedownMeasureId() => $_clearField(21);
 
-  /// `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到或（公開讀取時）已下架時不設，
+  /// `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
   /// 不影響貼文本身；`product_id` 仍照實回傳。
   @$pb.TagNumber(22)
   PostProduct get product => $_getN(21);

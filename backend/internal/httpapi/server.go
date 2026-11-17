@@ -303,12 +303,12 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
-	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Now)
+	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Now, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
-	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin)
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	delegatedSocial, err := httpsocial.NewDelegated(deps.Delegation, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin)
+	delegatedSocial, err := httpsocial.NewDelegated(deps.Delegation, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Logger)
 	if err != nil {
 		return nil, err
 	}

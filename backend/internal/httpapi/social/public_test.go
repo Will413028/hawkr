@@ -2,6 +2,7 @@ package social
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 	"uuid"
@@ -204,7 +205,7 @@ func newPublicWithProducts(t *testing.T, r *fakeReads, v *fakeViews, b fakeBuyer
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewPublic(r, v, b, s, products, images, web, func() time.Time { return trendNow })
+	h, err := NewPublic(r, v, b, s, products, images, web, func() time.Time { return trendNow }, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +278,7 @@ func TestOnlyOwnerReadsInSocialAppServiceAreNoSideEffects(t *testing.T) {
 }
 
 func TestNewPublicRequiresWebOrigin(t *testing.T) {
-	if _, err := NewPublic(&fakeReads{}, &fakeViews{}, fakeBuyers{}, &fakeStores{}, &fakeProducts{}, rpc.Images{}, rpc.WebOrigin{}, nil); err == nil {
+	if _, err := NewPublic(&fakeReads{}, &fakeViews{}, fakeBuyers{}, &fakeStores{}, &fakeProducts{}, rpc.Images{}, rpc.WebOrigin{}, nil, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("零值 WebOrigin 應該失敗")
 	}
 }

@@ -247,7 +247,7 @@ func newDelegatedEnv(t *testing.T, sessions map[string]moddelegation.DelegationS
 	p := &fakePosts{post: social.Post{ID: uuid.New(), StoreID: delegatedStore, Body: "內文", Version: 3, Status: social.StatusDraft, CreatedAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)}}
 	logs := &bytes.Buffer{}
 	logger := slog.New(slog.NewJSONHandler(logs, nil))
-	h, err := NewDelegated(r, p, noBuyers{}, delegatedCards{}, &fakeProducts{}, images, web)
+	h, err := NewDelegated(r, p, noBuyers{}, delegatedCards{}, &fakeProducts{}, images, web, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
