@@ -82,7 +82,7 @@ func TestDecodeReadsBackWhatEncodeWrote(t *testing.T) {
 
 func TestStoreOfReadsTheFrozenStoreAuthorOnly(t *testing.T) {
 	store, _ := Encode(Content{Kind: model.TargetPost, AuthorKind: "STORE", AuthorID: 7, StoreID: 7})
-	buyer, _ := Encode(Content{Kind: model.TargetComment, AuthorKind: "BUYER", AuthorID: 7})
+	buyer, _ := Encode(Content{Kind: model.TargetComment, AuthorKind: "BUYER", AuthorID: 7, StoreID: 3})
 	if got := StoreOf(store); got == nil || *got != 7 {
 		t.Fatalf("店家作者 = %v", got)
 	}

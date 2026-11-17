@@ -121,6 +121,7 @@ func TestCheckTakedownStoreUsesTheSnapshotStore(t *testing.T) {
 		"現在的作者不是快照店家": {owner(6, 6), 5},
 		"歸屬不是快照店家":    {owner(5, 6), 5},
 		"快照沒有店家":      {owner(5, 5), 0},
+		"兩邊都沒有店家":     {owner(0, 0), 0},
 		"作者是買家":       {social.ContentOwner{Author: social.Actor{Kind: social.ActorBuyer, ID: 5}, StoreID: 5}, 5},
 	} {
 		if err := CheckTakedownStore(c.o, c.s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
