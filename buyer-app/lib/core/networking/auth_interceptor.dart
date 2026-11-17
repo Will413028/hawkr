@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -17,8 +15,9 @@ AuthInterceptor authInterceptor(Ref ref) =>
 
 /// 登入後的身分：每個請求帶 identity 的 session token（`Authorization: Bearer`，訪客不帶）。token 是 Keychain 裡的
 /// opaque token（ADR `2026-10-30-identity-self-hosted-federated-login.md`），不換新；讀不到 token 時不送出，以連線錯誤結束。
-/// 收到 401 就強制登出（登出時清除 token），回到登入。非 GET 的 403 可能是停權（回應沒有 reason），向 GetSession
-/// 確認後進受限狀態，不登出；背景寫入（[isBackgroundRestPath]）不處理。
+/// 收到 401 就強制登出（登出時清除 token），回到登入。403 的 envelope 帶 reason `ACCOUNT_SUSPENDED`
+/// 時是停權（A7-D18），進受限狀態並提示，不登出。自己放行非 2xx 回應（`validateStatus`）的呼叫不經過 onError，
+/// 使用者主動的寫入要自己用 [isRestSuspension] 判斷。
 class AuthInterceptor extends Interceptor {
   AuthInterceptor(this._sessionToken, this._ref);
 
@@ -54,19 +53,17 @@ class AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (err.response?.statusCode == 401) {
       _triggerForceLogout();
-    } else if (err.response?.statusCode == 403 && _isUserWrite(err)) {
-      unawaited(
-        _ref.read(accountRestrictionProvider.notifier).confirmRejected(),
-      );
+    } else if (_isSuspension(err)) {
+      _ref.read(accountRestrictionProvider.notifier).rejected();
     }
     handler.next(err);
   }
 
-  bool _isUserWrite(DioException err) {
-    final method = err.requestOptions.method.toUpperCase();
-    if (method == 'GET' || method == 'HEAD') return false;
-    if (isBackgroundRestPath(err.requestOptions.path)) return false;
-    return _ref.read(sessionProvider).value != null;
+  bool _isSuspension(DioException err) {
+    final response = err.response;
+    if (response == null) return false;
+    return isRestSuspensionBody(response.statusCode, response.data) &&
+        _ref.read(sessionProvider).value != null;
   }
 
   void _triggerForceLogout() {

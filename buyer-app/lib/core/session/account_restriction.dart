@@ -44,21 +44,11 @@ class AccountRestriction extends _$AccountRestriction {
 
   void clear() => apply(null);
 
-  /// 使用者主動的寫入收到 `ACCOUNT_SUSPENDED`：進入受限狀態、請畫面顯示「帳號停權中」的提示，並補讀細節。
+  /// 使用者主動的寫入（Connect 或舊 REST）收到 `ACCOUNT_SUSPENDED`：進入受限狀態、請畫面顯示「帳號停權中」的提示，並補讀細節。
   void rejected() {
     state ??= const AccountSuspension.unknown();
     ref.read(suspendedActionNoticeProvider.notifier).raise();
     unawaited(_refresh());
-  }
-
-  /// 舊 REST 的寫入收到 403：回應沒有 reason，不能直接當成停權，以 GetSession 確認，確定停權才同 [rejected]。
-  Future<void> confirmRejected() async {
-    final result = await _fetch();
-    if (result == null) return;
-    state = result.suspension;
-    if (result.suspension != null) {
-      ref.read(suspendedActionNoticeProvider.notifier).raise();
-    }
   }
 
   Future<void> _refresh() async {

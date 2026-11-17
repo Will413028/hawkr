@@ -14,6 +14,8 @@ import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/account_restriction.dart';
+import 'package:hawkr_buyer/features/ai_assistant/data/ai_assistant_repository.dart';
+import 'package:hawkr_buyer/features/chat/data/chat_repository.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
@@ -61,9 +63,10 @@ ConnectException _denied({required bool suspended}) => ConnectException(
 );
 
 class _Status implements HttpClientAdapter {
-  _Status(this.status, this.sent);
+  _Status(this.status, this.sent, [this.body]);
 
   final int status;
+  final String? body;
   final List<RequestOptions> sent;
 
   @override
@@ -74,7 +77,7 @@ class _Status implements HttpClientAdapter {
   ) async {
     sent.add(options);
     return ResponseBody.fromString(
-      '{"code":$status,"message":"x"}',
+      body ?? '{"code":$status,"message":"x"}',
       status,
       headers: {
         dio_lib.Headers.contentTypeHeader: [dio_lib.Headers.jsonContentType],
@@ -87,6 +90,7 @@ class _Status implements HttpClientAdapter {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() {
     if (!F.isInitialized) F.init(Flavor.dev);
   });
@@ -119,22 +123,19 @@ void main() {
     test('GetSession 成功且沒有停權：解除受限狀態', () async {
       final h = harness();
       h.auth.answer = () async => const AccountSnapshot(accountId: 'acc_01J');
-      final n = h.c.read(accountRestrictionProvider.notifier)
-        ..apply(const AccountSuspension.unknown());
+      h.c.read(accountRestrictionProvider.notifier).rejected();
 
-      await n.confirmRejected();
+      await Future<void>.delayed(Duration.zero);
 
       expect(h.c.read(accountRestrictionProvider), isNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 0);
     });
 
     test('GetSession 失敗：保留原狀態', () async {
       final h = harness();
       h.auth.answer = () async => throw StateError('down');
-      final n = h.c.read(accountRestrictionProvider.notifier)
-        ..apply(const AccountSuspension.unknown());
+      h.c.read(accountRestrictionProvider.notifier).rejected();
 
-      await n.confirmRejected();
+      await Future<void>.delayed(Duration.zero);
 
       expect(h.c.read(accountRestrictionProvider), isNotNull);
     });
@@ -235,12 +236,13 @@ void main() {
 
   group('Dio（舊 REST）', () {
     Future<({Dio dio, ProviderContainer c, _Auth auth})> dioHarness(
-      int status,
-    ) async {
+      int status, {
+      String body = '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}',
+    }) async {
       final h = harness();
       await h.c.read(sessionProvider.future);
       final dio = h.c.read(dioProvider)
-        ..httpClientAdapter = _Status(status, []);
+        ..httpClientAdapter = _Status(status, [], body);
       return (dio: dio, c: h.c, auth: h.auth);
     }
 
@@ -253,29 +255,126 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     }
 
-    test('非 GET 的 403，GetSession 確認停權：進受限狀態並提示，不登出', () async {
+    test('403 帶 ACCOUNT_SUSPENDED：直接進受限狀態並提示，不登出', () async {
       final h = await dioHarness(HttpStatus.forbidden);
       await send(h.dio, 'POST', '/app/favorites');
 
       expect(h.c.read(accountRestrictionProvider), isNotNull);
       expect(h.c.read(suspendedActionNoticeProvider), 1);
       expect(h.c.read(forceLogoutProvider), isFalse);
+      // 只有 rejected() 補讀細節一次，不再為確認 403 多打一次 GetSession。
+      expect(h.auth.fetches, 1);
     });
 
-    test('背景寫入（裝置 token）的 403：靜默', () async {
-      final h = await dioHarness(HttpStatus.forbidden);
-      await send(h.dio, 'POST', '/app/notifications/device-token');
+    test('403 沒有 reason：不是停權', () async {
+      final h = await dioHarness(
+        HttpStatus.forbidden,
+        body: '{"code":403,"message":"x"}',
+      );
+      await send(h.dio, 'POST', '/app/favorites');
 
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.auth.fetches, 0);
     });
 
-    test('GET 的 403 不是停權（停權不擋讀取）', () async {
-      final h = await dioHarness(HttpStatus.forbidden);
+    test('GET 的 403 沒有 reason：不是停權', () async {
+      final h = await dioHarness(
+        HttpStatus.forbidden,
+        body: '{"code":403,"message":"x"}',
+      );
       await send(h.dio, 'GET', '/app/buyers/me');
 
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.auth.fetches, 0);
+    });
+  });
+
+  group('自己放行非 2xx 的呼叫', () {
+    test('AI 小幫手送出訊息收到 403 ACCOUNT_SUSPENDED：進受限狀態並提示', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final dio = Dio(BaseOptions(baseUrl: 'https://x.test'))
+        ..httpClientAdapter = _Status(
+          403,
+          [],
+          '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}',
+        );
+      final repo = AiAssistantRepository(
+        dio,
+        onSuspended: () =>
+            h.c.read(accountRestrictionProvider.notifier).rejected(),
+      );
+
+      await expectLater(
+        repo.streamChat(message: 'hi').drain<void>(),
+        throwsA(anything),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNotNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 1);
+    });
+
+    test('AI 小幫手的 403 沒有 reason：不是停權', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final dio = Dio(BaseOptions(baseUrl: 'https://x.test'))
+        ..httpClientAdapter = _Status(403, [], '{"code":403,"message":"x"}');
+      final repo = AiAssistantRepository(
+        dio,
+        onSuspended: () =>
+            h.c.read(accountRestrictionProvider.notifier).rejected(),
+      );
+
+      await expectLater(
+        repo.streamChat(message: 'hi').drain<void>(),
+        throwsA(anything),
+      );
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
+    });
+
+    test('聊天連線（ws-ticket）收到 403 ACCOUNT_SUSPENDED：進受限狀態並提示', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final repo = ChatRepository.withDio(
+        sessionToken: () async => 'tok',
+        accountId: () => 'acc_01J',
+        dio: Dio(BaseOptions(validateStatus: (_) => true))
+          ..httpClientAdapter = _Status(
+            403,
+            [],
+            '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}',
+          ),
+        onSuspended: () =>
+            h.c.read(accountRestrictionProvider.notifier).rejected(),
+      );
+      addTearDown(repo.dispose);
+
+      await repo.connect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNotNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 1);
+    });
+
+    test('聊天連線（ws-ticket）收到 403 沒有 reason：不是停權', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final repo = ChatRepository.withDio(
+        sessionToken: () async => 'tok',
+        accountId: () => 'acc_01J',
+        dio: Dio(BaseOptions(validateStatus: (_) => true))
+          ..httpClientAdapter = _Status(403, [], '{"code":403,"message":"x"}'),
+        onSuspended: () =>
+            h.c.read(accountRestrictionProvider.notifier).rejected(),
+      );
+      addTearDown(repo.dispose);
+
+      await repo.connect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
     });
   });
 }
