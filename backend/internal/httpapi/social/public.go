@@ -395,31 +395,90 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	entries, err := h.toForumEntries(ctx, c, storeID, page.Entries)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries)
 	if err != nil {
 		return nil, err
 	}
-	out := &pb.ListForumEntriesResponse{Entries: entries}
+	entries, err := h.toForumEntries(c, viewer, page.Entries)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListForumEntriesResponse{Entries: entries, ViewerActor: actor, ViewerCanComment: viewer.canComment}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }
 
-func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
+// forumViewer 是一次請求內觀看者在店 storeID 討論區的狀態與這一頁作者的顯示資料，全部只查一次：
+// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源），以及批次讀回的店家卡片與買家名稱。
+type forumViewer struct {
+	storeID    int64
+	canComment bool
+	stores     postStores
+}
+
+// forumPageState 讀一頁討論區項目的作者卡片與名稱，並判斷觀看者能不能留言（不是店主時才查一次封鎖）；寫入回應用它，不組觀看者身分。
+func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, error) {
+	return h.loadForumState(ctx, c, storeID, entries, false)
+}
+
+// forumViewerState 在 forumPageState 之外組觀看者在這個討論區留言時的身分，觀看者自己的名稱或卡片併進同一批讀取，不依賴這一頁有沒有可見項目。
+func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, *pb.Actor, error) {
+	viewer, err := h.loadForumState(ctx, c, storeID, entries, true)
+	if err != nil {
+		return forumViewer{}, nil, err
+	}
+	actor, err := h.viewerActor(c, storeID, viewer.stores)
+	if err != nil {
+		return forumViewer{}, nil, err
+	}
+	return viewer, actor, nil
+}
+
+func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, withViewer bool) (forumViewer, error) {
+	var buyerIDs, storeIDs []int64
+	for _, e := range entries {
+		if e.State != social.CommentVisible {
+			continue
+		}
+		switch e.Actor.Kind {
+		case social.ActorBuyer:
+			buyerIDs = append(buyerIDs, e.Actor.ID)
+		case social.ActorStore:
+			storeIDs = append(storeIDs, e.Actor.ID)
+		}
+	}
+	owns := c.OwnsStore(storeID)
+	if withViewer {
+		switch {
+		case owns:
+			storeIDs = append(storeIDs, storeID)
+		case c.BuyerID != 0:
+			buyerIDs = append(buyerIDs, c.BuyerID)
+		}
+	}
+	var stores postStores
+	var err error
+	if stores.cards, err = h.storeCards(ctx, storeIDs); err != nil {
+		return forumViewer{}, err
+	}
+	if stores.buyerDisplay, err = h.buyerDisplays(ctx, buyerIDs); err != nil {
+		return forumViewer{}, err
+	}
+	if !owns {
+		if stores.blocking, err = h.blockingStores(ctx, c, []int64{storeID}); err != nil {
+			return forumViewer{}, err
+		}
+	}
+	return forumViewer{storeID: storeID, canComment: canComment(c, storeID, stores.blocking), stores: stores}, nil
+}
+
+func (h *presenter) toForumEntries(c social.Caller, viewer forumViewer, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
 	if len(entries) == 0 {
 		return []*pb.ForumEntry{}, nil
 	}
-	actors := make([]social.Actor, 0, len(entries))
-	for _, e := range entries {
-		if e.State == social.CommentVisible {
-			actors = append(actors, e.Actor)
-		}
-	}
-	shared, err := h.loadShared(ctx, c, storeID, actors)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	out := make([]*pb.ForumEntry, len(entries))
 	for i, e := range entries {
 		item := &pb.ForumEntry{
@@ -442,27 +501,20 @@ func (h *presenter) toForumEntries(ctx context.Context, c social.Caller, storeID
 		item.Body = e.Body
 		item.IsMine = c.IsAuthor(e.Actor)
 		item.ViewerCanEdit = item.IsMine
-		item.ViewerCanDelete = item.IsMine || c.OwnsStore(storeID)
-		item.ViewerCanReply = shared.replyAllowed
+		item.ViewerCanDelete = item.IsMine || c.OwnsStore(viewer.storeID)
+		item.ViewerCanReply = viewer.canComment
 		item.Etag = rpc.Etag(e.Version)
-		if item.Author, err = h.toActor(e.Actor, shared.display, shared.stores); err != nil {
+		if item.Author, err = h.toActor(e.Actor, viewer.stores); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-// sharedAuthors 是一頁留言共用的顯示資料：作者的買家名稱與店家卡片、觀看者能不能在這個店的貼文或討論區留言。
-type sharedAuthors struct {
-	display      map[int64]buyer.Display
-	stores       postStores
-	replyAllowed bool
-}
-
-// loadShared 批次讀一頁可見留言的作者資料：卡片只取店家作者的，觀看者的封鎖旗標另外取（針對留言所在的店與店家作者，一次查詢）。
-func (h *presenter) loadShared(ctx context.Context, c social.Caller, contextStore int64, actors []social.Actor) (sharedAuthors, error) {
+// loadShared 批次讀一頁可見貼文留言的作者資料：卡片只取店家作者的，買家名稱一次批次讀。
+func (h *presenter) loadShared(ctx context.Context, actors []social.Actor) (postStores, error) {
 	if len(actors) == 0 {
-		return sharedAuthors{}, nil
+		return postStores{}, nil
 	}
 	var buyerIDs, storeIDs []int64
 	for _, a := range actors {
@@ -475,17 +527,13 @@ func (h *presenter) loadShared(ctx context.Context, c social.Caller, contextStor
 	}
 	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
-		return sharedAuthors{}, err
-	}
-	blocking, err := h.blockingStores(ctx, c, []int64{contextStore})
-	if err != nil {
-		return sharedAuthors{}, err
+		return postStores{}, err
 	}
 	display, err := h.buyerDisplays(ctx, buyerIDs)
 	if err != nil {
-		return sharedAuthors{}, err
+		return postStores{}, err
 	}
-	return sharedAuthors{display: display, stores: postStores{cards: cards, blocking: blocking}, replyAllowed: canComment(c, contextStore, blocking)}, nil
+	return postStores{cards: cards, buyerDisplay: display}, nil
 }
 
 func (h *presenter) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[int64]buyer.Display, error) {
@@ -509,6 +557,8 @@ type postStores struct {
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
 	products map[int64]ProductInfo
+	// buyerDisplay 是這一頁用到的買家顯示資料（作者，以及觀看者自己的買家身分）。
+	buyerDisplay map[int64]buyer.Display
 }
 
 func (h *presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]seller.StoreCard, error) {
@@ -569,6 +619,11 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	}
 	products := <-productsCh
 	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
+	if c.BuyerID != 0 && slices.ContainsFunc(posts, func(p social.Post) bool { return !c.OwnsStore(p.StoreID) }) {
+		if stores.buyerDisplay, err = h.buyerDisplays(ctx, []int64{c.BuyerID}); err != nil {
+			return nil, err
+		}
+	}
 	out := make([]*pb.Post, len(posts))
 	for i, p := range posts {
 		if out[i], err = h.toPost(c, p, stores); err != nil {
@@ -665,6 +720,9 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	for _, t := range p.Hashtags {
 		out.Hashtags = append(out.Hashtags, &pb.Hashtag{Name: t.Name, Display: t.Display})
 	}
+	if out.ViewerActor, err = h.viewerActor(c, p.StoreID, stores); err != nil {
+		return nil, err
+	}
 	if card, ok := stores.cards[p.StoreID]; ok {
 		if out.Store, err = httpseller.ToStoreCard(h.images, card); err != nil {
 			return nil, err
@@ -678,6 +736,17 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	return out, nil
 }
 
+// viewerActor 是觀看者在店 storeID 的貼文留言時的身分，與 canComment 用同一套判斷：此刻的店就是 storeID 時是店家，否則有買家身分時是買家，訪客是 nil。
+func (h *presenter) viewerActor(c social.Caller, storeID int64, stores postStores) (*pb.Actor, error) {
+	switch {
+	case c.OwnsStore(storeID):
+		return h.toActor(social.Actor{Kind: social.ActorStore, ID: storeID}, stores)
+	case c.BuyerID != 0:
+		return h.toActor(social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, stores)
+	}
+	return nil, nil
+}
+
 func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore int64, comments []social.Comment) ([]*pb.Comment, error) {
 	if len(comments) == 0 {
 		return []*pb.Comment{}, nil
@@ -688,7 +757,7 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 			actors = append(actors, m.Actor)
 		}
 	}
-	shared, err := h.loadShared(ctx, c, postStore, actors)
+	shared, err := h.loadShared(ctx, actors)
 	if err != nil {
 		return nil, err
 	}
@@ -719,19 +788,19 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
 		item.ViewerCanReply = c.OwnsStore(postStore)
 		item.Etag = rpc.Etag(m.Version)
-		if item.Author, err = h.toActor(m.Actor, shared.display, shared.stores); err != nil {
+		if item.Author, err = h.toActor(m.Actor, shared); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-func (h *presenter) toActor(a social.Actor, display map[int64]buyer.Display, stores postStores) (*pb.Actor, error) {
+func (h *presenter) toActor(a social.Actor, stores postStores) (*pb.Actor, error) {
 	out := &pb.Actor{Kind: rpc.EnumToProto[pb.ActorKind](a.Kind), Id: rpc.FormatID(a.ID)}
 	var avatar *string
 	switch a.Kind {
 	case social.ActorBuyer:
-		if d, ok := display[a.ID]; ok && !d.Deleted {
+		if d, ok := stores.buyerDisplay[a.ID]; ok && !d.Deleted {
 			out.Name, avatar = d.DisplayName, d.Avatar
 		}
 	case social.ActorStore:

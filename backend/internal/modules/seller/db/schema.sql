@@ -717,6 +717,8 @@ CREATE INDEX measures_source ON seller.measures (source_measure_id) WHERE source
 CREATE INDEX measures_source_case ON seller.measures (source_case_id) WHERE source_case_id IS NOT NULL;
 -- 來函導出的措施之一：從主管機關來函建立的措施（任何依據），來函必須指名措施的帳號（模組保證）。另一條是依據的認定引用了來函（finding_authority_orders）。
 CREATE INDEX measures_source_authority_order ON seller.measures (source_authority_order_id) WHERE source_authority_order_id IS NOT NULL;
+-- measure_contents 的 (measure_id, measure_status) 外鍵要引用的目標。
+CREATE UNIQUE INDEX measures_id_status ON seller.measures (id, status);
 CREATE UNIQUE INDEX measures_linked_source ON seller.measures (source_measure_id, account_id) WHERE source_measure_id IS NOT NULL AND status = 'ENFORCED';
 -- 複審到期的收件匣。
 CREATE INDEX measures_review ON seller.measures (review_by) WHERE status = 'ENFORCED' AND basis = 'RISK';
@@ -739,9 +741,14 @@ CREATE TABLE seller.measure_contents (
     measure_id   UUID NOT NULL REFERENCES seller.measures (id),
     content_kind TEXT NOT NULL,
     content_id   UUID NOT NULL,
+    -- measures.status 的複本，由複合外鍵 ON UPDATE CASCADE 隨措施狀態同步（不由程式維護）；唯一索引 measure_contents_one_enforced 靠它保證
+    -- 一則內容同時只有一個生效中的下架措施（生效狀態在 measures，部分唯一索引不能跨表，所以把狀態帶進這張表）。
+    measure_status TEXT NOT NULL DEFAULT 'ENFORCED',
     PRIMARY KEY (measure_id, content_kind, content_id),
+    CONSTRAINT measure_contents_measure_status_fkey FOREIGN KEY (measure_id, measure_status) REFERENCES seller.measures (id, status) ON UPDATE CASCADE,
     CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
 );
+CREATE UNIQUE INDEX measure_contents_one_enforced ON seller.measure_contents (content_kind, content_id) WHERE measure_status = 'ENFORCED';
 
 -- 措施的版本歷史（append-only，SQL:2011 系統版本表的歷史表）：每一版的完整快照（給賣家的理由、結束時間；警告沒有結束時間），
 -- 含目前那一版，記誰、何時寫的（作者是管理員；店家關閉時結束預告終止（條款 21.2）的版本由系統寫入，沒有管理員，system_cause 記原因，比照

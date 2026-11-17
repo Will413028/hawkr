@@ -290,7 +290,11 @@ func (h *App) CreateForumEntry(ctx context.Context, req *connect.Request[pb.Crea
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, createPaths)
 	}
-	entries, err := h.toForumEntries(ctx, c, storeID, []social.ForumEntry{created})
+	viewer, err := h.forumPageState(ctx, c, storeID, []social.ForumEntry{created})
+	if err != nil {
+		return nil, err
+	}
+	entries, err := h.toForumEntries(c, viewer, []social.ForumEntry{created})
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +315,11 @@ func (h *App) UpdateForumEntry(ctx context.Context, req *connect.Request[pb.Upda
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updateEntryPaths)
 	}
-	entries, err := h.toForumEntries(ctx, c, updated.StoreID, []social.ForumEntry{updated})
+	viewer, err := h.forumPageState(ctx, c, updated.StoreID, []social.ForumEntry{updated})
+	if err != nil {
+		return nil, err
+	}
+	entries, err := h.toForumEntries(c, viewer, []social.ForumEntry{updated})
 	if err != nil {
 		return nil, err
 	}

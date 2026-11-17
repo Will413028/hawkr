@@ -100,6 +100,12 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason CONTACT_EMAIL_REQUIRED =
       ErrorReason._(13, _omitEnumNames ? '' : 'CONTACT_EMAIL_REQUIRED');
 
+  /// 要建立內容下架措施的內容已經有生效中的內容下架措施（搭配 failed_precondition）：一則內容同時只有一個生效中的下架措施，恢復時才不會撤銷一個、
+  /// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
+  /// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
+  static const ErrorReason CONTENT_TAKEDOWN_ACTIVE =
+      ErrorReason._(14, _omitEnumNames ? '' : 'CONTENT_TAKEDOWN_ACTIVE');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -115,10 +121,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     IDENTITY_ALREADY_LINKED,
     REAUTHENTICATION_REQUIRED,
     CONTACT_EMAIL_REQUIRED,
+    CONTENT_TAKEDOWN_ACTIVE,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 13);
+      $pb.ProtobufEnum.$_initByValueList(values, 14);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

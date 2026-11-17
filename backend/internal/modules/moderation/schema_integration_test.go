@@ -67,7 +67,7 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 	closed := opened.Add(time.Hour)
 	admin := int64(1)
 	var none *string
-	insert := func(kind string, decision, category, action *string, adminID *int64, closedAt *time.Time) error {
+	insert := func(kind string, decision, category, action *string, adminID *int64, closedAt *time.Time, measureOverride ...bool) error {
 		var contentID *uuid.UUID
 		var buyerID *int64
 		if kind == "BUYER" {
@@ -77,12 +77,36 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 			c := uuid.NewV7()
 			contentID = &c
 		}
+		// 預設照 cases_measure_check 的合法關係帶措施 ID；measureOverride 給 false/true 強制反過來。
+		hasMeasure := action != nil && *action == "TAKEDOWN"
+		if len(measureOverride) > 0 {
+			hasMeasure = measureOverride[0]
+		}
+		var measureID *uuid.UUID
+		if hasMeasure {
+			m := uuid.NewV7()
+			measureID = &m
+		}
 		_, err := f.db.Conn(context.Background()).Exec(context.Background(), `INSERT INTO moderation.cases
-			(id, target_kind, content_id, buyer_id, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, uuid.NewV7(), kind, contentID, buyerID, opened, decision, category, action, adminID, closedAt)
+			(id, target_kind, content_id, buyer_id, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`, uuid.NewV7(), kind, contentID, buyerID, opened, decision, category, action, adminID, closedAt, measureID)
 		return err
 	}
 	violation, noViolation := ptr("VIOLATION"), ptr("NO_VIOLATION")
+	for name, c := range map[string]struct {
+		decision, category, act *string
+		admin                   *int64
+		closedAt                *time.Time
+		measure                 bool
+	}{
+		"下架沒有措施 ID":    {violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN"), &admin, &closed, false},
+		"非下架處置帶了措施 ID": {violation, ptr("SPAM"), ptr("WARN"), &admin, &closed, true},
+		"進行中帶了措施 ID":   {none, none, none, nil, nil, true},
+	} {
+		if err := insert("POST", c.decision, c.category, c.act, c.admin, c.closedAt, c.measure); err == nil {
+			t.Errorf("%s：要被 cases_measure_check 擋下", name)
+		}
+	}
 	for name, c := range map[string]struct {
 		kind                    string
 		decision, category, act *string

@@ -392,6 +392,9 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	if err := s.checkTarget(ctx, q, in, locked); err != nil {
 		return model.CreateMeasureResult{}, err
 	}
+	if err := checkNoActiveTakedown(ctx, q, in); err != nil {
+		return model.CreateMeasureResult{}, err
+	}
 	if in.EndsAt != nil && !in.EndsAt.After(now) {
 		return model.CreateMeasureResult{}, apperr.InvalidInputOn([]string{"EndsAt"}, "結束時間必須晚於現在")
 	}
@@ -491,6 +494,38 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	measure, err := s.readRow(ctx, q, store.SellerMeasure(row), detailAdmin, now)
 	return model.CreateMeasureResult{Measure: measure}, err
+}
+
+// checkNoActiveTakedown 拒絕目標內容已有生效中下架措施的內容下架：stint 鎖已串行同一個帳號的建立，所以這裡是給使用者的明確錯誤；
+// 跨店的並行（內容歸屬不由 seller 驗證）由唯一索引 measure_contents_one_enforced 擋下，錯誤回滾整個建立。
+func checkNoActiveTakedown(ctx context.Context, q *store.Queries, in model.CreateMeasureInput) error {
+	if in.Takedown == nil {
+		return nil
+	}
+	kinds, ids := make([]string, len(in.Takedown.Contents)), make([]uuid.UUID, len(in.Takedown.Contents))
+	for i, c := range in.Takedown.Contents {
+		kinds[i], ids[i] = string(c.Kind), c.ID
+	}
+	taken, err := q.ActiveTakedownOfContents(ctx, store.ActiveTakedownOfContentsParams{Kinds: kinds, Ids: ids})
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperr.FailedPrecondition("%s", text.MeasureTakedownAlreadyActive().Text).WithReason(apperr.ReasonContentTakedownActive)
+	}
+	return nil
+}
+
+// ActiveTakedownOfContent 回傳內容目前生效中的內容下架措施 ID，沒有回 nil（moderation 決定下架時據此綁定既有措施）。
+func (s *Service) ActiveTakedownOfContent(ctx context.Context, ref model.ContentRef) (*uuid.UUID, error) {
+	id, err := store.New(s.d.DB.Conn(ctx)).ActiveTakedownOfContent(ctx, store.ActiveTakedownOfContentParams{ContentKind: string(ref.Kind), ContentID: ref.ID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // requestIDTakenElsewhere 處理插入因 (管理員, request_id) 已存在而落空：stint 鎖串行了同一個帳號的重送，所以走到這裡的是目標在不同帳號的並行請求，

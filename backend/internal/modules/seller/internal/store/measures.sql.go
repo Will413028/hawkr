@@ -99,6 +99,48 @@ func (q *Queries) AccountMeasures(ctx context.Context, arg AccountMeasuresParams
 	return items, nil
 }
 
+const activeTakedownOfContent = `-- name: ActiveTakedownOfContent :one
+SELECT measure_id
+FROM seller.measure_contents
+WHERE content_kind = $1 AND content_id = $2 AND measure_status = 'ENFORCED'
+`
+
+type ActiveTakedownOfContentParams struct {
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+// 內容目前生效中的內容下架措施（最多一個，measure_contents_one_enforced 保證）；沒有回 no rows。
+func (q *Queries) ActiveTakedownOfContent(ctx context.Context, arg ActiveTakedownOfContentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, activeTakedownOfContent, arg.ContentKind, arg.ContentID)
+	var measure_id uuid.UUID
+	err := row.Scan(&measure_id)
+	return measure_id, err
+}
+
+const activeTakedownOfContents = `-- name: ActiveTakedownOfContents :one
+SELECT EXISTS (
+    SELECT 1
+    FROM seller.measure_contents c
+    JOIN generate_series(1, cardinality($1::uuid[])) AS i
+        ON c.content_kind = ($2::text[])[i] AND c.content_id = ($1::uuid[])[i]
+    WHERE c.measure_status = 'ENFORCED'
+)
+`
+
+type ActiveTakedownOfContentsParams struct {
+	Ids   []uuid.UUID
+	Kinds []string
+}
+
+// 一批內容裡任何一則已有生效中的內容下架措施時回 true（種類與 ID 是平行陣列）。
+func (q *Queries) ActiveTakedownOfContents(ctx context.Context, arg ActiveTakedownOfContentsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, activeTakedownOfContents, arg.Ids, arg.Kinds)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const adminMeasures = `-- name: AdminMeasures :many
 SELECT m.id, m.account_id, m.store_id, m.kind, m.basis, m.risk_ground, m.lead_finding_id, m.review_by, m.statement_to_seller, m.starts_at, m.ends_at, m.termination_ground, m.source_measure_id, m.source_case_id, m.status, m.version, m.current_revision, m.request_id, m.request_hash, m.created_by_admin_id, m.created_at, m.updated_at, m.revoked_reason, m.revoked_by_admin_id, m.revoked_at, m.source_authority_order_id
 FROM seller.measures m
@@ -1587,16 +1629,22 @@ WHERE measure_id = ANY($1::uuid[])
 ORDER BY measure_id, content_kind COLLATE "C", content_id
 `
 
+type MeasureContentsRow struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
 // 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
-func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) ([]SellerMeasureContent, error) {
+func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) ([]MeasureContentsRow, error) {
 	rows, err := q.db.Query(ctx, measureContents, measureIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SellerMeasureContent{}
+	items := []MeasureContentsRow{}
 	for rows.Next() {
-		var i SellerMeasureContent
+		var i MeasureContentsRow
 		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}

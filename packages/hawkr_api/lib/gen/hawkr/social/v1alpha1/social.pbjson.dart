@@ -309,8 +309,17 @@ const Post$json = {
       '17': true
     },
     {
-      '1': 'product',
+      '1': 'viewer_actor',
       '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Actor',
+      '8': {},
+      '10': 'viewerActor'
+    },
+    {
+      '1': 'product',
+      '3': 23,
       '4': 1,
       '5': 11,
       '6': '.hawkr.social.v1alpha1.PostProduct',
@@ -343,9 +352,10 @@ final $typed_data.Uint8List postDescriptor = $convert.base64Decode(
     'MQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGBIgASgJQgPgQQRSEGltYWdlU3RhZ2VkVG9rZW4SKgoOaG'
     'FzaHRhZ19pbnB1dHMYEyADKAlCA+BBBFINaGFzaHRhZ0lucHV0cxImCgx2aWV3ZXJfbGlrZWQY'
     'FCABKAhCA+BBA1ILdmlld2VyTGlrZWQSOAoTdGFrZWRvd25fbWVhc3VyZV9pZBgVIAEoCUID4E'
-    'EDSAFSEXRha2Vkb3duTWVhc3VyZUlkiAEBEkEKB3Byb2R1Y3QYFiABKAsyIi5oYXdrci5zb2Np'
-    'YWwudjFhbHBoYTEuUG9zdFByb2R1Y3RCA+BBA1IHcHJvZHVjdEINCgtfcHJvZHVjdF9pZEIWCh'
-    'RfdGFrZWRvd25fbWVhc3VyZV9pZA==');
+    'EDSAFSEXRha2Vkb3duTWVhc3VyZUlkiAEBEkQKDHZpZXdlcl9hY3RvchgWIAEoCzIcLmhhd2ty'
+    'LnNvY2lhbC52MWFscGhhMS5BY3RvckID4EEDUgt2aWV3ZXJBY3RvchJBCgdwcm9kdWN0GBcgAS'
+    'gLMiIuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlBvc3RQcm9kdWN0QgPgQQNSB3Byb2R1Y3RCDQoL'
+    'X3Byb2R1Y3RfaWRCFgoUX3Rha2Vkb3duX21lYXN1cmVfaWQ=');
 
 @$core.Deprecated('Use postProductDescriptor instead')
 const PostProduct$json = {
@@ -975,6 +985,23 @@ const ListForumEntriesResponse$json = {
       '10': 'entries'
     },
     {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+    {
+      '1': 'viewer_actor',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Actor',
+      '8': {},
+      '10': 'viewerActor'
+    },
+    {
+      '1': 'viewer_can_comment',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanComment'
+    },
   ],
 };
 
@@ -982,7 +1009,9 @@ const ListForumEntriesResponse$json = {
 final $typed_data.Uint8List listForumEntriesResponseDescriptor = $convert.base64Decode(
     'ChhMaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2USOwoHZW50cmllcxgBIAMoCzIhLmhhd2tyLnNvY2'
     'lhbC52MWFscGhhMS5Gb3J1bUVudHJ5UgdlbnRyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
-    'CVINbmV4dFBhZ2VUb2tlbg==');
+    'CVINbmV4dFBhZ2VUb2tlbhJECgx2aWV3ZXJfYWN0b3IYAyABKAsyHC5oYXdrci5zb2NpYWwudj'
+    'FhbHBoYTEuQWN0b3JCA+BBA1ILdmlld2VyQWN0b3ISMQoSdmlld2VyX2Nhbl9jb21tZW50GAQg'
+    'ASgIQgPgQQNSEHZpZXdlckNhbkNvbW1lbnQ=');
 
 @$core.Deprecated('Use recordPostViewRequestDescriptor instead')
 const RecordPostViewRequest$json = {
@@ -2582,13 +2611,13 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.social.v1alpha1.Actor': Actor$json,
   '.hawkr.social.v1alpha1.PostProduct': PostProduct$json,
   '.hawkr.social.v1alpha1.ListPostsRequest': ListPostsRequest$json,
   '.hawkr.social.v1alpha1.ListPostsResponse': ListPostsResponse$json,
   '.hawkr.social.v1alpha1.ListCommentsRequest': ListCommentsRequest$json,
   '.hawkr.social.v1alpha1.ListCommentsResponse': ListCommentsResponse$json,
   '.hawkr.social.v1alpha1.Comment': Comment$json,
-  '.hawkr.social.v1alpha1.Actor': Actor$json,
   '.hawkr.social.v1alpha1.SuggestTrendingPostsRequest':
       SuggestTrendingPostsRequest$json,
   '.hawkr.social.v1alpha1.SuggestTrendingPostsResponse':
@@ -2993,6 +3022,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.social.v1alpha1.Hashtag': Hashtag$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.social.v1alpha1.Actor': Actor$json,
   '.hawkr.social.v1alpha1.PostProduct': PostProduct$json,
   '.hawkr.social.v1alpha1.GetStorePostRequest': GetStorePostRequest$json,
   '.hawkr.social.v1alpha1.GetStorePostResponse': GetStorePostResponse$json,

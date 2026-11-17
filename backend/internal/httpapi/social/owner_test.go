@@ -156,6 +156,9 @@ func TestOwnerSuccessPaths(t *testing.T) {
 	if got.GetStatus() != pb.PostStatus_POST_STATUS_DRAFT || got.GetEtag() != "4" || got.GetCreateTime() == nil || got.GetProductId() != "88" || got.GetUrl() == "" || !got.GetViewerCanComment() {
 		t.Errorf("CreatePost 回應 = %v", got)
 	}
+	if a := got.GetViewerActor(); a.GetKind() != pb.ActorKind_ACTOR_KIND_STORE || a.GetId() != "5" {
+		t.Errorf("店主寫入的回應 viewer_actor = %v，預期店家 5", a)
+	}
 	if f.store.StoreID != 5 {
 		t.Errorf("店家由伺服器推導：%+v", f.store)
 	}

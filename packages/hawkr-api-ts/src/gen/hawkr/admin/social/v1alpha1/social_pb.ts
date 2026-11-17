@@ -72,7 +72,7 @@ export type AdminPost = Message<"hawkr.admin.social.v1alpha1.AdminPost"> & {
   updateTime?: Timestamp | undefined;
 
   /**
-   * 下架這篇貼文的內容下架措施 ID（seller 的措施）；沒有被內容下架時不設。同時被多個措施下架時是最早建立的那一個。
+   * 下架這篇貼文的內容下架措施 ID（seller 的措施）；沒有被內容下架時不設。一則內容同時至多一個生效中的內容下架措施。
    *
    * @generated from field: optional string takedown_measure_id = 8;
    */

@@ -60,4 +60,8 @@ enum ErrorReason {
   // 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
   // client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
   CONTACT_EMAIL_REQUIRED = 13;
+  // 要建立內容下架措施的內容已經有生效中的內容下架措施（搭配 failed_precondition）：一則內容同時只有一個生效中的下架措施，恢復時才不會撤銷一個、
+  // 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
+  // AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
+  CONTENT_TAKEDOWN_ACTIVE = 14;
 }

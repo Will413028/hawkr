@@ -241,6 +241,7 @@ class Post extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? hashtagInputs,
     $core.bool? viewerLiked,
     $core.String? takedownMeasureId,
+    Actor? viewerActor,
     PostProduct? product,
   }) {
     final result = Post._();
@@ -265,6 +266,7 @@ class Post extends $pb.GeneratedMessage {
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
     if (viewerLiked != null) result.viewerLiked = viewerLiked;
     if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
+    if (viewerActor != null) result.viewerActor = viewerActor;
     if (product != null) result.product = product;
     return result;
   }
@@ -311,7 +313,9 @@ class Post extends $pb.GeneratedMessage {
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
     ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
     ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
-    ..aOM<PostProduct>(22, _omitFieldNames ? '' : 'product',
+    ..aOM<Actor>(22, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOM<PostProduct>(23, _omitFieldNames ? '' : 'product',
         subBuilder: PostProduct.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -527,7 +531,7 @@ class Post extends $pb.GeneratedMessage {
   void clearViewerLiked() => $_clearField(20);
 
   /// 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
-  /// 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+  /// 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
   @$pb.TagNumber(21)
   $core.String get takedownMeasureId => $_getSZ(20);
   @$pb.TagNumber(21)
@@ -537,18 +541,32 @@ class Post extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   void clearTakedownMeasureId() => $_clearField(21);
 
+  /// 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  /// 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  /// 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  @$pb.TagNumber(22)
+  Actor get viewerActor => $_getN(21);
+  @$pb.TagNumber(22)
+  set viewerActor(Actor value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasViewerActor() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearViewerActor() => $_clearField(22);
+  @$pb.TagNumber(22)
+  Actor ensureViewerActor() => $_ensure(21);
+
   /// `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
   /// 不影響貼文本身；`product_id` 仍照實回傳。
-  @$pb.TagNumber(22)
-  PostProduct get product => $_getN(21);
-  @$pb.TagNumber(22)
-  set product(PostProduct value) => $_setField(22, value);
-  @$pb.TagNumber(22)
-  $core.bool hasProduct() => $_has(21);
-  @$pb.TagNumber(22)
-  void clearProduct() => $_clearField(22);
-  @$pb.TagNumber(22)
-  PostProduct ensureProduct() => $_ensure(21);
+  @$pb.TagNumber(23)
+  PostProduct get product => $_getN(22);
+  @$pb.TagNumber(23)
+  set product(PostProduct value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasProduct() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearProduct() => $_clearField(23);
+  @$pb.TagNumber(23)
+  PostProduct ensureProduct() => $_ensure(22);
 }
 
 /// PostProduct 是貼文帶的商品的顯示資料。
@@ -2324,10 +2342,14 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   factory ListForumEntriesResponse({
     $core.Iterable<ForumEntry>? entries,
     $core.String? nextPageToken,
+    Actor? viewerActor,
+    $core.bool? viewerCanComment,
   }) {
     final result = ListForumEntriesResponse._();
     if (entries != null) result.entries.addAll(entries);
     if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (viewerCanComment != null) result.viewerCanComment = viewerCanComment;
     return result;
   }
 
@@ -2348,6 +2370,9 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
     ..pPM<ForumEntry>(1, _omitFieldNames ? '' : 'entries',
         subBuilder: ForumEntry.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..aOM<Actor>(3, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOB(4, _omitFieldNames ? '' : 'viewerCanComment')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2386,6 +2411,30 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   $core.bool hasNextPageToken() => $_has(1);
   @$pb.TagNumber(2)
   void clearNextPageToken() => $_clearField(2);
+
+  /// 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  /// 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  @$pb.TagNumber(3)
+  Actor get viewerActor => $_getN(2);
+  @$pb.TagNumber(3)
+  set viewerActor(Actor value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasViewerActor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearViewerActor() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Actor ensureViewerActor() => $_ensure(2);
+
+  /// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  /// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
+  @$pb.TagNumber(4)
+  $core.bool get viewerCanComment => $_getBF(3);
+  @$pb.TagNumber(4)
+  set viewerCanComment($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewerCanComment() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewerCanComment() => $_clearField(4);
 }
 
 class RecordPostViewRequest extends $pb.GeneratedMessage {

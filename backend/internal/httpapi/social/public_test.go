@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"testing"
 	"time"
 	"uuid"
@@ -123,11 +124,23 @@ func (f *fakeReads) TopPosts(_ context.Context, _ social.Caller, n int32) ([]soc
 	return f.top, nil
 }
 
-type fakeBuyers struct{ id int64 }
+type fakeBuyers struct {
+	id int64
+	// displayCalls 非 nil 時記錄 BatchDisplay 被呼叫的次數。
+	displayCalls *int
+	// displayIDs 非 nil 時記錄每次 BatchDisplay 收到的 id。
+	displayIDs *[][]int64
+}
 
 func (f fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) { return f.id, nil }
 
-func (fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Display, error) {
+func (f fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Display, error) {
+	if f.displayCalls != nil {
+		*f.displayCalls++
+	}
+	if f.displayIDs != nil {
+		*f.displayIDs = append(*f.displayIDs, slices.Clone(ids))
+	}
 	out := make([]buyer.Display, len(ids))
 	for i, id := range ids {
 		name := "buyer"
@@ -140,6 +153,7 @@ type fakeStores struct {
 	own          *seller.Store
 	blocking     map[int64]bool
 	asked        [][]int64
+	cardCalls    int
 	storeLookups int
 }
 
@@ -152,6 +166,7 @@ func (f *fakeStores) CurrentStore(context.Context, int64) (seller.Store, error) 
 }
 
 func (f *fakeStores) StoreCards(_ context.Context, ids []int64) ([]seller.StoreCard, error) {
+	f.cardCalls++
 	name := "shop"
 	out := make([]seller.StoreCard, len(ids))
 	for i, id := range ids {
@@ -495,8 +510,8 @@ func TestListCommentsFlagsAndPlaceholders(t *testing.T) {
 		if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()})); err != nil || reads.postReads != 0 {
 			t.Fatalf("err=%v PublicPost 讀了 %d 次", err, reads.postReads)
 		}
-		if len(stores.asked) != 1 || len(stores.asked[0]) != 1 || stores.asked[0][0] != 5 {
-			t.Errorf("封鎖旗標只查留言所在的店：%v", stores.asked)
+		if len(stores.asked) != 0 {
+			t.Errorf("留言列表不查封鎖：%v", stores.asked)
 		}
 	})
 	t.Run("空頁與只有佔位項目不查店家與買家", func(t *testing.T) {
@@ -667,11 +682,63 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 			}
 		}
 	})
-	t.Run("空頁不查店家與封鎖", func(t *testing.T) {
+	t.Run("空頁只為觀看者身分查一次封鎖", func(t *testing.T) {
 		stores := &fakeStores{}
 		h := newPublic(t, &fakeReads{}, fakeBuyers{id: 7}, stores)
-		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 0 {
-			t.Errorf("err=%v asked=%v", err, stores.asked)
+		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 1 || len(stores.asked[0]) != 1 || stores.asked[0][0] != 5 {
+			t.Errorf("err=%v asked=%v，預期只問觀看者要不要被店 5 封鎖", err, stores.asked)
+		}
+	})
+	t.Run("非空頁只查一次封鎖，觀看者與作者的名稱併成一次 BatchDisplay，店家作者查卡片，viewer_can_comment 與 viewer_can_reply 同源", func(t *testing.T) {
+		storeAuthored := social.ForumEntry{ID: uuid.New(), StoreID: 5, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorStore, ID: 5}, Body: "s", CreatedAt: now, UpdatedAt: now}
+		mixed := &fakeReads{forum: social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentVisible, 8), entry(5, social.CommentVisible, 9), storeAuthored}}}
+		stores := &fakeStores{blocking: map[int64]bool{5: true}}
+		var displayCalls int
+		var displayIDs [][]int64
+		h := newPublic(t, mixed, fakeBuyers{id: 7, displayCalls: &displayCalls, displayIDs: &displayIDs}, stores)
+		resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(stores.asked) != 1 || stores.cardCalls != 1 || displayCalls != 1 {
+			t.Errorf("asked=%v cardCalls=%d displayCalls=%d，預期封鎖 1 次、卡片 1 次、名稱 1 次", stores.asked, stores.cardCalls, displayCalls)
+		}
+		if len(displayIDs) != 1 || !slices.Equal(uniqSorted(displayIDs[0]), []int64{7, 8, 9}) {
+			t.Errorf("BatchDisplay 收到 %v，預期一次且同時含觀看者 7 與作者 8、9", displayIDs)
+		}
+		if resp.Msg.GetViewerCanComment() || resp.Msg.GetEntries()[0].GetViewerCanReply() {
+			t.Errorf("封鎖時兩者都應是 false：%v %v", resp.Msg.GetViewerCanComment(), resp.Msg.GetEntries()[0].GetViewerCanReply())
+		}
+		if resp.Msg.GetViewerActor().GetKind() != pb.ActorKind_ACTOR_KIND_BUYER {
+			t.Errorf("被封鎖的買家仍有身分：%v", resp.Msg.GetViewerActor())
+		}
+	})
+	t.Run("空頁與全隱藏頁的 viewer_can_comment 取自觀看者而不是頁面內容", func(t *testing.T) {
+		hidden := social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentHidden, 8), entry(5, social.CommentDeleted, 8)}}
+		own := &seller.Store{StoreID: 5}
+		cases := []struct {
+			name  string
+			store *seller.Store
+			block map[int64]bool
+			want  bool
+			asks  int
+		}{
+			{"未被封鎖的買家", nil, nil, true, 1},
+			{"被封鎖的買家", nil, map[int64]bool{5: true}, false, 1},
+			{"店主", own, nil, true, 0},
+		}
+		for pageName, page := range map[string]social.ForumPage{"空頁": {}, "全隱藏頁": hidden} {
+			for _, c := range cases {
+				stores := &fakeStores{own: c.store, blocking: c.block}
+				h := newPublic(t, &fakeReads{forum: page}, fakeBuyers{id: 7}, stores)
+				resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if resp.Msg.GetViewerCanComment() != c.want || len(stores.asked) != c.asks {
+					t.Errorf("%s/%s：viewer_can_comment=%v asked=%v，預期 %v 與 %d 次封鎖查詢", pageName, c.name, resp.Msg.GetViewerCanComment(), stores.asked, c.want, c.asks)
+				}
+			}
 		}
 	})
 	t.Run("格式與 token", func(t *testing.T) {
@@ -787,4 +854,126 @@ func TestRecordPostViewBuildsTheViewer(t *testing.T) {
 			t.Fatalf("err = %v", err)
 		}
 	})
+}
+
+func TestPostViewerActorFollowsViewerIdentity(t *testing.T) {
+	own := &seller.Store{StoreID: 9}
+	cases := []struct {
+		name     string
+		guest    bool
+		store    *seller.Store
+		postShop int64
+		block    map[int64]bool
+		wantKind pb.ActorKind
+		wantID   string
+		wantName string
+	}{
+		{"訪客不設", true, nil, 5, nil, pb.ActorKind_ACTOR_KIND_UNSPECIFIED, "", ""},
+		{"買家是買家身分", false, nil, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+		{"被封鎖的買家身分不變", false, nil, 5, map[int64]bool{5: true}, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+		{"店主讀自己店的貼文是店家身分", false, own, 9, nil, pb.ActorKind_ACTOR_KIND_STORE, "9", "shop"},
+		{"店主讀別家店的貼文是買家身分", false, own, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			check := func(t *testing.T, got *pb.Post) {
+				t.Helper()
+				a := got.GetViewerActor()
+				if c.wantKind == pb.ActorKind_ACTOR_KIND_UNSPECIFIED {
+					if a != nil {
+						t.Errorf("viewer_actor = %v，預期不設", a)
+					}
+					return
+				}
+				if a.GetKind() != c.wantKind || a.GetId() != c.wantID || a.GetName() != c.wantName {
+					t.Errorf("viewer_actor = %v，預期 kind=%v id=%s name=%s", a, c.wantKind, c.wantID, c.wantName)
+				}
+			}
+			p := post(c.postShop)
+			ctx := t.Context()
+			if !c.guest {
+				ctx = asBuyer(ctx)
+			}
+			h := newPublic(t, &fakeReads{post: p, feed: social.PostPage{Posts: []social.Post{p}}}, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
+			single, err := h.GetPost(ctx, connect.NewRequest(&pb.GetPostRequest{PostId: p.ID.String()}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			check(t, single.Msg.GetPost())
+			list, err := h.ListPosts(ctx, connect.NewRequest(&pb.ListPostsRequest{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(list.Msg.GetPosts()) != 1 {
+				t.Fatalf("posts = %d", len(list.Msg.GetPosts()))
+			}
+			check(t, list.Msg.GetPosts()[0])
+		})
+	}
+}
+
+func TestForumListingViewerActorFollowsViewerIdentity(t *testing.T) {
+	own := &seller.Store{StoreID: 9}
+	cases := []struct {
+		name       string
+		guest      bool
+		store      *seller.Store
+		forumShop  int64
+		block      map[int64]bool
+		wantKind   pb.ActorKind
+		wantID     string
+		wantName   string
+		wantCanCmt bool
+	}{
+		{"訪客不設", true, nil, 5, nil, pb.ActorKind_ACTOR_KIND_UNSPECIFIED, "", "", false},
+		{"買家是買家身分", false, nil, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", true},
+		{"被封鎖的買家身分不變但不能留言", false, nil, 5, map[int64]bool{5: true}, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", false},
+		{"店主讀自己店的討論區是店家身分", false, own, 9, nil, pb.ActorKind_ACTOR_KIND_STORE, "9", "shop", true},
+		{"店主讀別家店的討論區是買家身分", false, own, 5, nil, pb.ActorKind_ACTOR_KIND_BUYER, "7", "buyer", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := t.Context()
+			if !c.guest {
+				ctx = asBuyer(ctx)
+			}
+			// 空的一頁也要帶觀看者身分。
+			h := newPublic(t, &fakeReads{forum: social.ForumPage{}}, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
+			resp, err := h.ListForumEntries(ctx, connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: rpc.FormatID(c.forumShop)}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := resp.Msg.GetViewerActor()
+			if c.wantKind == pb.ActorKind_ACTOR_KIND_UNSPECIFIED {
+				if a != nil {
+					t.Errorf("viewer_actor = %v，預期不設", a)
+				}
+			} else if a.GetKind() != c.wantKind || a.GetId() != c.wantID || a.GetName() != c.wantName {
+				t.Errorf("viewer_actor = %v，預期 kind=%v id=%s name=%s", a, c.wantKind, c.wantID, c.wantName)
+			}
+			if resp.Msg.GetViewerCanComment() != c.wantCanCmt {
+				t.Errorf("viewer_can_comment = %v，預期 %v", resp.Msg.GetViewerCanComment(), c.wantCanCmt)
+			}
+		})
+	}
+}
+
+func uniqSorted(ids []int64) []int64 {
+	out := slices.Clone(ids)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func TestListCommentsDoesNotLookUpBlocking(t *testing.T) {
+	p := post(5)
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	c := social.Comment{ID: uuid.New(), PostID: p.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: 8}, Body: "b", CreatedAt: now, UpdatedAt: now}
+	stores := &fakeStores{}
+	h := newPublic(t, &fakeReads{post: p, comments: social.CommentPage{Comments: []social.Comment{c}, StoreID: 5}}, fakeBuyers{id: 7}, stores)
+	if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: p.ID.String()})); err != nil {
+		t.Fatal(err)
+	}
+	if len(stores.asked) != 0 {
+		t.Errorf("留言列表查了封鎖 %v，viewer_can_reply 只看是不是店主，不需要", stores.asked)
+	}
 }
