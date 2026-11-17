@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../core/routing/buyer_navigation_observer.dart';
+import '../../core/session/account_restriction.dart';
+import '../../features/auth/presentation/account_restricted_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../utils/require_login.dart';
+import 'account_restricted_banner.dart';
 import 'buyer_floating_navigation_layout.dart';
 import 'shared_bottom_nav.dart';
 import 'tab_switch_provider.dart';
@@ -33,6 +36,8 @@ class BuyerNavigationFrame extends ConsumerWidget {
         .watch(currentTabProvider)
         .clamp(0, SharedBottomNav.labels.length - 1);
 
+    final restricted = ref.watch(accountRestrictionProvider) != null;
+
     return AnimatedBuilder(
       animation: Listenable.merge([
         router.routeInformationProvider,
@@ -57,24 +62,47 @@ class BuyerNavigationFrame extends ConsumerWidget {
         final showsNavigation =
             routeShowsNavigation && !navigationObserver.hasBlockingRoute;
 
+        // 停權的橫幅在每頁頂端（受限狀態頁本身不放）；橫幅吃掉狀態列的高度，頁面不再留一次。
+        final showsBanner =
+            restricted && uri.path != AccountRestrictedScreen.path;
+        final layout = BuyerFloatingNavigationLayout(
+          page: child!,
+          navigationVisible: showsNavigation,
+          reserveNavigationClearance: routeShowsNavigation,
+          visibilityResetKey: '${uri.toString()}#$currentTab',
+          navigation: SharedBottomNav(
+            key: const ValueKey('buyer-global-bottom-nav'),
+            currentIndex: currentTab,
+            onDestinationRequested: (index) =>
+                _requestDestination(ref, index: index),
+          ),
+        );
+
         return Scaffold(
           key: const ValueKey('buyer-global-navigation-frame'),
           backgroundColor: AppColors.bgPrimary,
           // 外層導覽 Scaffold 不參與鍵盤縮放，交給各頁自己的 Scaffold 處理一次，
           // 避免與內層頁面 Scaffold 疊加造成鍵盤 inset 被算兩次（輸入框被頂高）。
           resizeToAvoidBottomInset: false,
-          body: BuyerFloatingNavigationLayout(
-            page: child!,
-            navigationVisible: showsNavigation,
-            reserveNavigationClearance: routeShowsNavigation,
-            visibilityResetKey: '${uri.toString()}#$currentTab',
-            navigation: SharedBottomNav(
-              key: const ValueKey('buyer-global-bottom-nav'),
-              currentIndex: currentTab,
-              onDestinationRequested: (index) =>
-                  _requestDestination(ref, index: index),
-            ),
-          ),
+          body: showsBanner
+              ? Column(
+                  children: [
+                    SafeArea(
+                      bottom: false,
+                      child: AccountRestrictedBanner(
+                        onTap: () => router.push(AccountRestrictedScreen.path),
+                      ),
+                    ),
+                    Expanded(
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: layout,
+                      ),
+                    ),
+                  ],
+                )
+              : layout,
         );
       },
     );

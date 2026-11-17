@@ -1,5 +1,8 @@
 import 'package:hawkr_buyer/core/routing/buyer_navigation_observer.dart';
+import 'package:hawkr_buyer/core/session/account_restriction.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
+import 'package:hawkr_buyer/features/auth/presentation/account_restricted_screen.dart';
+import 'package:hawkr_buyer/shared/widgets/account_restricted_banner.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/shared/widgets/buyer_navigation_frame.dart';
 import 'package:hawkr_buyer/shared/widgets/shared_bottom_nav.dart';
@@ -366,6 +369,62 @@ void main() {
     );
     expect(shownSlide.offset, Offset.zero);
     expect(find.byType(SharedBottomNav), findsOneWidget);
+  });
+
+  testWidgets('停權：每頁頂端有橫幅，點下去開狀態頁，狀態頁本身不放橫幅', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final observer = BuyerNavigationObserver();
+    final container = ProviderContainer(
+      overrides: [sessionProvider.overrideWith(_ActiveSession.new)],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      navigatorKey: navigatorKey,
+      initialLocation: '/marketplace',
+      observers: [observer],
+      routes: [
+        GoRoute(path: '/marketplace', builder: (_, _) => const Text('市集頁')),
+        GoRoute(
+          path: AccountRestrictedScreen.path,
+          builder: (_, _) => const Text('受限頁'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => BuyerNavigationFrame(
+            router: router,
+            navigatorKey: navigatorKey,
+            navigationObserver: observer,
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+
+    container
+        .read(accountRestrictionProvider.notifier)
+        .apply(const AccountSuspension.unknown());
+    await tester.pumpAndSettle();
+    expect(find.text('帳號已停權，部分功能受限'), findsOneWidget);
+    expect(find.text('市集頁'), findsOneWidget);
+
+    await tester.tap(find.byType(AccountRestrictedBanner));
+    await tester.pumpAndSettle();
+    expect(find.text('受限頁'), findsOneWidget);
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
   });
 }
 

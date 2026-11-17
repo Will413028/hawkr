@@ -20,6 +20,7 @@ import '../features/cart/presentation/widgets/shipping_section.dart';
 import '../features/cart/presentation/widgets/payment_details_section.dart';
 import '../features/cart/presentation/widgets/delivery_notes_section.dart';
 import '../features/cart/presentation/widgets/address_picker_sheet.dart';
+import '../shared/widgets/account_restricted_banner.dart';
 import '../shared/widgets/hk_icon.dart';
 import '../shared/icons/app_icons.dart';
 import '../shared/widgets/hk_empty_state.dart';
@@ -56,7 +57,7 @@ const _searchTerms = <String, String>{
   'chips': 'HkChoiceChip HkSecondaryCtaTabs 篩選 頁籤 單選',
   'cards': 'HkFrostedCardSurface HkPostCardSurface Card 玻璃 貼文',
   'states':
-      'HkBrandLoader HkSkeletonShimmer HkEmptyState LinearProgressIndicator 載入 骨架屏 空狀態 錯誤',
+      'HkBrandLoader HkSkeletonShimmer HkEmptyState AccountRestrictedBanner LinearProgressIndicator 載入 骨架屏 空狀態 停權 橫幅 錯誤',
   'commerce': 'ProductCard QuantityStepper NotificationCountBadge 商品 數量 缺貨 徽章',
   'cart':
       'MerchantGroupCard CartProductTile ShippingSection PaymentDetailsSection DeliveryNotesSection CartCheckoutAction 購物車 地址 配送 結帳',
@@ -282,6 +283,7 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
   String _choice = '全部';
   bool _favorite = false;
   bool _retried = false;
+  bool _bannerTapped = false;
 
   @override
   void dispose() {
@@ -669,6 +671,18 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
         topPadding: HkSpace.sm,
       ),
     ),
+    _example(
+      '停權橫幅',
+      'shared/widgets/account_restricted_banner.dart · AccountRestrictedBanner',
+      AccountRestrictedBanner(
+        onTap: () => setState(() => _bannerTapped = true),
+      ),
+    ),
+    if (_bannerTapped)
+      const Text(
+        '範例已點擊橫幅；正式 App 會開啟「帳號受限」頁。',
+        key: ValueKey('catalog-banner-result'),
+      ),
     _example(
       '錯誤與重試',
       'AppTheme + Text + OutlinedButton · 元件組合範例',

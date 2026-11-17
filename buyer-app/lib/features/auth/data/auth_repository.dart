@@ -12,6 +12,8 @@ import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/connect_provider.dart';
+import '../../../core/networking/suspension_signal.dart';
+import '../../../core/session/account_restriction.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../core/exceptions/app_exception.dart';
 
@@ -23,6 +25,14 @@ AuthRepository authRepository(Ref ref) => AuthRepository(
   BuyerAppServiceClient(ref.watch(connectAuthTransportProvider)),
   defaults: ref.watch(defaultErrorTextProvider),
 );
+
+/// GetSession 的結果。[suspension] 有值就是停權（受限狀態，不登出）。
+class AccountSnapshot {
+  const AccountSnapshot({required this.accountId, this.suspension});
+
+  final String accountId;
+  final AccountSuspension? suspension;
+}
 
 class AuthRepository {
   final IdentityAppServiceClient _identity;
@@ -37,9 +47,9 @@ class AuthRepository {
 
   // ─────────────────── 帳號（IdentityAppService） ───────────────────
 
-  /// 目前登入的帳號 ID（GetSession）。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
-  /// 錯誤轉成 [AppException]：文字取自伺服器的 LocalizedMessage（例如停權）。
-  Future<String> currentAccountId() async {
+  /// 目前登入的帳號（GetSession）：帳號 ID 與停權狀態。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
+  /// 錯誤轉成 [AppException]：文字取自伺服器的 LocalizedMessage。
+  Future<AccountSnapshot> currentAccount() async {
     final res = await _call(
       'getSession',
       () => _identity.getSession(identity.GetSessionRequest()),
@@ -47,7 +57,18 @@ class AuthRepository {
     if (res.account.id.isEmpty) {
       throw const MalformedAuthResponse('GetSession without account id');
     }
-    return res.account.id;
+    return AccountSnapshot(
+      accountId: res.account.id,
+      suspension: res.hasSuspension()
+          ? AccountSuspension(
+              suspendedAt: res.suspension.hasSuspendedAt()
+                  ? res.suspension.suspendedAt.toDateTime()
+                  : null,
+              category: res.suspension.category,
+              reason: res.suspension.reason,
+            )
+          : null,
+    );
   }
 
   /// 登出（SignOut）：在伺服器撤銷目前的 session。session 已經不存在時也成功。
@@ -76,7 +97,7 @@ class AuthRepository {
   }
 
   /// 呼叫 identity 的方法，錯誤轉成 App 的 [AppException]：沒收到回應是 [NetworkException]，token 無效
-  /// （unauthenticated）是 [UnauthorizedException]，其他是 [ServerException]。文字取自伺服器的
+  /// （unauthenticated）是 [UnauthorizedException]，`ACCOUNT_SUSPENDED` 是 [SuspendedException]，其他是 [ServerException]。文字取自伺服器的
   /// LocalizedMessage，沒有時用該 code 的預設文字。取消當成 internal（見 `errorText`）。
   Future<T> _call<T>(String tag, Future<T> Function() call) async {
     try {
@@ -95,7 +116,8 @@ class AuthRepository {
       if (error.code == Code.unauthenticated) {
         throw UnauthorizedException(message);
       }
-      throw SuspendedException(message);
+      if (isAccountSuspended(error)) throw SuspendedException(message);
+      throw ServerException(message);
     }
   }
 

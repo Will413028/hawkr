@@ -36,7 +36,7 @@ final class SessionProvider
   Session create() => Session();
 }
 
-String _$sessionHash() => r'22f12f07db34fb3e66d540e2eec50a44d0decf91';
+String _$sessionHash() => r'c2e91e815937f907fc50d30f31c963838271b1be';
 
 /// 登入的帳號由保存的 session token 與 GetSession 決定。
 

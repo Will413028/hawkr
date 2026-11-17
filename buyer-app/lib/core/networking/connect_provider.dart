@@ -13,10 +13,12 @@ import 'package:sentry_flutter/sentry_flutter.dart' show Sentry;
 import '../../config/flavor.dart';
 import '../../shared/utils/hk_log.dart';
 import '../l10n/ui_locale.dart';
+import '../session/account_restriction.dart';
 import '../session/auth_session_provider.dart';
 import '../session/force_logout_provider.dart';
 import '../session/session_provider.dart';
 import 'app_version_headers.dart';
+import 'suspension_signal.dart';
 
 part 'connect_provider.g.dart';
 
@@ -38,14 +40,14 @@ Transport connectTransport(Ref ref) => apiTransport(
 );
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-/// unauthenticated 時強制登出）。
+/// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
 @Riverpod(keepAlive: true)
 Transport connectAuthTransport(Ref ref) => apiTransport(
   baseUrl: F.appFlavor.gatewayHost,
   httpClient: ref.watch(connectHttpClientProvider),
   interceptors: connectInterceptors(
     acceptLanguage: uiLocaleTag(ref),
-    auth: sessionAuthInterceptor(ref),
+    auth: _chain(suspensionInterceptor(ref), sessionAuthInterceptor(ref)),
   ),
 );
 
@@ -113,6 +115,30 @@ Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(
     ref.read(forceLogoutProvider.notifier).trigger();
   },
 );
+
+/// 收到 `ACCOUNT_SUSPENDED` 時：背景寫入（[isBackgroundConnectProcedure]）靜默略過，其餘視為使用者主動的寫入，
+/// 進受限狀態並提示。錯誤原樣丟出，不登出。
+Interceptor suspensionInterceptor(Ref ref) {
+  return <I extends Object, O extends Object>(next) {
+    return (req) async {
+      try {
+        return await next(req);
+      } catch (raw) {
+        if (isAccountSuspended(ConnectException.from(raw)) &&
+            !isBackgroundConnectProcedure(req.spec.procedure) &&
+            ref.mounted) {
+          ref.read(accountRestrictionProvider.notifier).rejected();
+        }
+        rethrow;
+      }
+    };
+  };
+}
+
+Interceptor _chain(Interceptor outer, Interceptor inner) {
+  return <I extends Object, O extends Object>(next) =>
+      outer<I, O>(inner<I, O>(next));
+}
 
 Interceptor optionalSessionInterceptor(Ref ref) {
   return <I extends Object, O extends Object>(next) {

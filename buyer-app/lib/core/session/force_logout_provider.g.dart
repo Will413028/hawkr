@@ -55,7 +55,7 @@ final class ForceLogoutProvider extends $NotifierProvider<ForceLogout, bool> {
   }
 }
 
-String _$forceLogoutHash() => r'987d1f5e593c4946f5a4adc1bd9ac1d8c9eca352';
+String _$forceLogoutHash() => r'b88a36ebdf8801c31006451ed535bdd78f589d0b';
 
 /// 強制登出提醒旗標。
 ///

@@ -64,11 +64,7 @@ class _ForceLogoutListenerState extends ConsumerState<ForceLogoutListener> {
     }
 
     final continuePath = widget.currentPath();
-    final message = ref.read(forceLogoutProvider.notifier).message;
-    final goLogin = await showLoginRequiredDialog(
-      dialogContext,
-      message: message,
-    );
+    final goLogin = await showLoginRequiredDialog(dialogContext);
     if (!mounted) return;
     // 不論取消或前往登入，失效憑證都必須清除，後續行為與訪客一致。
     await ref.read(sessionProvider.notifier).logout();

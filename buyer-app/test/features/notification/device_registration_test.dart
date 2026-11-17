@@ -21,7 +21,8 @@ const _devicesPath = '/api/v1/app/notifications/device-token';
 
 class _AccountRepository extends Fake implements AuthRepository {
   @override
-  Future<String> currentAccountId() async => 'acc_01J8Z';
+  Future<AccountSnapshot> currentAccount() async =>
+      const AccountSnapshot(accountId: 'acc_01J8Z');
 }
 
 /// 裝置註冊走中央 Dio：憑證只由 auth interceptor 從 session token 帶上，manager 不持有 session token。

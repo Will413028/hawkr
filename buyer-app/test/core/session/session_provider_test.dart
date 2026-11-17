@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
+import 'package:hawkr_buyer/core/session/account_restriction.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
@@ -23,13 +24,15 @@ class _AccountRepository extends Fake implements AuthRepository {
   final Future<BuyerProfile?> Function()? profileAnswer;
 
   final Future<String> Function() answer;
+  AccountSuspension? suspension;
   var signOuts = 0;
 
   @override
   Future<void> signOut() async => signOuts++;
 
   @override
-  Future<String> currentAccountId() => answer();
+  Future<AccountSnapshot> currentAccount() async =>
+      AccountSnapshot(accountId: await answer(), suspension: suspension);
 
   @override
   Future<BuyerProfile?> tryGetProfile() async =>
@@ -52,6 +55,7 @@ void main() {
   ProviderContainer containerWith(
     Future<FakeAuthSession> Function() auth,
     Future<String> Function() account, {
+    AccountSuspension? suspension,
     BuyerProfile? profile = const BuyerProfile(
       id: '1',
       etag: 'v1',
@@ -73,7 +77,7 @@ void main() {
             account,
             profile,
             profileAnswer,
-          ),
+          )..suspension = suspension,
         ),
       ],
     );
@@ -168,15 +172,14 @@ void main() {
     expect(c.read(sessionProvider).value?.userId, 'new-owner');
   });
 
-  test('已排程停權提醒不被後續 401 清空', () {
+  test('強制登出提醒冪等，consume 後重置', () {
     final c = containerWith(() async => FakeAuthSession(), () async => 'acc-1');
     final force = c.read(forceLogoutProvider.notifier);
-    force.trigger(message: '帳號已停權');
     force.trigger();
-    expect(force.message, '帳號已停權');
+    force.trigger();
     expect(c.read(forceLogoutProvider), isTrue);
     force.consume();
-    expect(force.message, isNull);
+    expect(c.read(forceLogoutProvider), isFalse);
   });
 
   test('冷啟動個人資料尚未知時暱稱是 null', () async {
@@ -213,22 +216,44 @@ void main() {
     expect(auth.calls, isEmpty);
   });
 
-  for (final error in [
-    const UnauthorizedException(),
-    const SuspendedException('帳號已停權'),
-  ]) {
-    test('冷啟動拒絕憑證：$error', () async {
-      final auth = FakeAuthSession(signedIn: true);
-      final c = containerWith(() async => auth, () async => throw error);
-      expect(await c.read(sessionProvider.future), isNull);
-      expect(auth.isSignedIn, isFalse);
-      expect(c.read(sessionProvider).hasError, isFalse);
-      if (error is SuspendedException) {
-        expect(c.read(forceLogoutProvider.notifier).message, '帳號已停權');
-        expect(c.read(forceLogoutProvider), isTrue);
-      }
-    });
-  }
+  test('冷啟動拒絕憑證（401）：清除 session token，不進受限狀態', () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final c = containerWith(
+      () async => auth,
+      () async => throw const UnauthorizedException(),
+    );
+    expect(await c.read(sessionProvider.future), isNull);
+    expect(auth.isSignedIn, isFalse);
+    expect(c.read(sessionProvider).hasError, isFalse);
+    expect(c.read(accountRestrictionProvider), isNull);
+  });
+
+  test('冷啟動帳號停權：進受限狀態，維持登入，不清 token、不強制登出', () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final c = containerWith(
+      () async => auth,
+      () async => 'acc-1',
+      suspension: const AccountSuspension(reason: '多次張貼廣告'),
+    );
+    final session = await c.read(sessionProvider.future);
+    expect(session?.userId, 'acc-1');
+    expect(auth.isSignedIn, isTrue);
+    expect(auth.calls, isEmpty);
+    expect(c.read(accountRestrictionProvider)?.reason, '多次張貼廣告');
+    expect(c.read(forceLogoutProvider), isFalse);
+  });
+
+  test('登出解除受限狀態', () async {
+    final c = containerWith(
+      () async => FakeAuthSession(signedIn: true),
+      () async => 'acc-1',
+      suspension: const AccountSuspension(),
+    );
+    await c.read(sessionProvider.future);
+    expect(c.read(accountRestrictionProvider), isNotNull);
+    await c.read(sessionProvider.notifier).logout();
+    expect(c.read(accountRestrictionProvider), isNull);
+  });
 
   test('暫時故障後可重新取得帳號', () async {
     var failed = true;

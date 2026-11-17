@@ -15,6 +15,7 @@ import 'market_route.dart';
 import 'redirect_logic.dart';
 import '../../features/app_update/application/force_update_provider.dart';
 import '../../features/app_update/presentation/force_update_screen.dart';
+import '../../features/auth/presentation/account_restricted_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/home/presentation/main_navigation_screen.dart';
 import '../../features/product/presentation/search_screen.dart';
@@ -108,6 +109,12 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/force-update',
         builder: (_, __) => const ForceUpdateScreen(),
+      ),
+
+      // ── 帳號停權的受限狀態頁（登入後才有內容，沒有停權時回首頁）──
+      GoRoute(
+        path: AccountRestrictedScreen.path,
+        builder: (_, __) => const AccountRestrictedScreen(),
       ),
 
       // ── Auth ──
