@@ -34,6 +34,8 @@ export interface SellerForumComment {
 	createdAt: number;
 	/** 不透明的版本字串；修改與刪除時帶回。 */
 	etag?: string;
+	/** VISIBLE 以外（刪除、隱藏）是佔位項目：沒有作者與內文，不能回覆、修改或刪除。 */
+	state: "visible" | "deleted" | "hidden";
 	viewerCanEdit: boolean;
 	viewerCanDelete: boolean;
 	viewerCanReply: boolean;
@@ -49,7 +51,18 @@ export interface SellerForumListResult {
 	pageSize: number;
 }
 
-function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
+function forumStateOf(state: CommentState): SellerForumComment["state"] {
+	switch (state) {
+		case CommentState.VISIBLE:
+			return "visible";
+		case CommentState.HIDDEN:
+			return "hidden";
+		default:
+			return "deleted";
+	}
+}
+
+export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 	return {
 		id: entry.id,
 		storeId: entry.storeId,
@@ -64,6 +77,7 @@ function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 			? timestampDate(entry.createTime).getTime() / 1000
 			: 0,
 		etag: entry.etag || undefined,
+		state: forumStateOf(entry.state),
 		viewerCanEdit: entry.viewerCanEdit,
 		viewerCanDelete: entry.viewerCanDelete,
 		viewerCanReply: entry.viewerCanReply,

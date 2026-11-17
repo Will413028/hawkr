@@ -44,6 +44,9 @@ const PAGE = {
 beforeEach(() => {
 	cached.getCachedPublicPosts.mockReset().mockResolvedValue(PAGE);
 	cached.getCachedStorePosts.mockReset().mockResolvedValue(PAGE);
+	cached.getCachedSeller
+		.mockReset()
+		.mockResolvedValue({ storeId: "7", storeCode: "shop-code" });
 });
 
 describe("/feed and the store posts tab seed from tagged anonymous entries", () => {
@@ -64,11 +67,20 @@ describe("/feed and the store posts tab seed from tagged anonymous entries", () 
 
 	it("the store posts tab reads page one through getCachedStorePosts for that store", async () => {
 		const tree = await SellerPostsPage({
-			params: Promise.resolve({ locale: "zh-TW", id: "7" }),
+			params: Promise.resolve({ locale: "zh-TW", id: "shop-code" }),
 		});
+		expect(cached.getCachedSeller).toHaveBeenCalledWith("shop-code");
 		expect(cached.getCachedStorePosts).toHaveBeenCalledExactlyOnceWith("7", 12);
 		const feed = find(tree, (el) => "initialPostsMatchQuery" in el.props);
 		expect(feed?.props.initialNextPageToken).toBe("tok");
 		expect(feed?.props.sellerId).toBe("7");
+	});
+
+	it("the store posts tab reads nothing when the seller payload has no store id", async () => {
+		cached.getCachedSeller.mockResolvedValue({ storeCode: "shop-code" });
+		await SellerPostsPage({
+			params: Promise.resolve({ locale: "zh-TW", id: "shop-code" }),
+		});
+		expect(cached.getCachedStorePosts).not.toHaveBeenCalled();
 	});
 });

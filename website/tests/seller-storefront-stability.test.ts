@@ -63,7 +63,7 @@ test("the seller posts tab keeps the page one its own server render fetched", as
 
 	// The page fetches page one for this very seller, then declares that seed as
 	// belonging to the feed's scoped query.
-	assert.match(postsPage, /getCachedStorePosts\(id, POSTS_PAGE_SIZE\)/);
+	assert.match(postsPage, /getCachedStorePosts\(\s*storeId,\s*POSTS_PAGE_SIZE/);
 	assert.match(postsPage, /initialPostsMatchQuery/);
 	assert.match(feed, /initialPostsMatchQuery,/);
 	// Trusting a scoped seed stays opt-in: the canonical feed seeds itself, and

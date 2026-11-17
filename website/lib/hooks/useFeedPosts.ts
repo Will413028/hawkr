@@ -182,11 +182,11 @@ export function useFeedPosts({
 		queryKey,
 		queryFn: ({ pageParam, signal }) =>
 			fetchPage(pageParam.page, pageParam.token, signal),
-		// 沒用上種子（登入者、種子讀取失敗）時從第一頁開始：種子的 token 是它那一頁之後的，
-		// 拿來讀會跳過第一頁。
+		// 第一頁的參數恆是空 token：種子的 token 是它那一頁「之後」的，用來讀或重播會跳過第一頁。
+		// 下一頁的 token 只來自 getNextPageParam。
 		initialPageParam: {
 			page: hasInitialData ? seedPage : initialPage,
-			token: hasInitialData ? seedToken : "",
+			token: "",
 		} as FeedPageParam,
 		initialData: hasInitialData
 			? {
@@ -199,7 +199,7 @@ export function useFeedPosts({
 							nextPageToken: seedToken,
 						},
 					],
-					pageParams: [{ page: seedPage, token: seedToken }],
+					pageParams: [{ page: seedPage, token: "" }],
 				}
 			: undefined,
 		initialDataUpdatedAt: hasInitialData ? initialDataUpdatedAt : undefined,

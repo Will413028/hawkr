@@ -86,6 +86,8 @@ export interface PostComposeEditTarget {
 	imageKey?: string;
 	/** Currently linked product id (stringified) to pre-select. */
 	productId?: string;
+	/** 載入時的貼文版本（`MyPostDetail.etag`），儲存時帶回做樂觀鎖。 */
+	etag?: string;
 }
 
 export default function PostComposeClient({
@@ -451,8 +453,9 @@ export default function PostComposeClient({
 						content: trimmed,
 						keepAssetId: keepAssetId,
 						newStagedToken: newStagedToken,
-						productId,
+						productId: selectedProductId,
 						tags,
+						etag: edit.etag,
 					},
 					decision.meta,
 				);

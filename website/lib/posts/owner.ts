@@ -1,6 +1,7 @@
 /**
  * 店主自己的貼文（SocialAppService 的 owner 方法）：建立、讀、列出、修改、發布、下架、刪除。
- * 寫入帶 etag（樂觀鎖）：呼叫端有就帶，沒有就先讀一次（GetMyPost）取得目前的版本。
+ * 寫入帶 etag（樂觀鎖）：etag 必須是畫面載入時拿到的版本，寫入前不重讀；
+ * 版本已被改過時伺服器回 ABORTED（VERSION_CONFLICT），由呼叫端的錯誤路徑顯示。
  */
 
 import { create } from "@bufbuild/protobuf";
@@ -81,15 +82,15 @@ export interface OwnerUpdateInput {
 	content: string;
 	/** 換新圖時的 staged token；沒帶就沿用目前的圖（update_mask 不含圖片）。 */
 	newStagedToken?: string;
-	productId?: string;
+	/** undefined＝不變；null＝清除商品（product_id 在 update_mask 內但不帶值）。 */
+	productId?: string | null;
 	tags?: string[];
 }
 
 export function createOwnerPostApi(client: OwnerPostClient) {
-	async function currentEtag(id: string): Promise<string> {
-		const res = await client.getMyPost({ postId: id });
-		if (!res.post?.etag) throw new Error("post etag missing");
-		return res.post.etag;
+	function requireEtag(etag: string | undefined): string {
+		if (!etag) throw new Error("post etag missing");
+		return etag;
 	}
 
 	return {
@@ -109,17 +110,19 @@ export function createOwnerPostApi(client: OwnerPostClient) {
 		async update(
 			id: string,
 			body: OwnerUpdateInput,
-			etag?: string,
+			etag: string | undefined,
 		): Promise<void> {
+			const version = requireEtag(etag);
 			const paths = ["body"];
 			if (body.newStagedToken) paths.push("image_staged_token");
+			// null 與 undefined 要分開：進 mask 但不帶值才會清掉商品。
 			if (body.productId !== undefined) paths.push("product_id");
 			if (body.tags) paths.push("hashtag_inputs");
 			await client.updatePost({
 				post: create(PostSchema, {
 					id,
 					body: body.content,
-					etag: etag ?? (await currentEtag(id)),
+					etag: version,
 					imageStagedToken: body.newStagedToken ?? "",
 					...(body.productId ? { productId: body.productId } : {}),
 					hashtagInputs: body.tags ?? [],
@@ -131,9 +134,9 @@ export function createOwnerPostApi(client: OwnerPostClient) {
 		async setPublished(
 			id: string,
 			published: boolean,
-			etag?: string,
+			etag: string | undefined,
 		): Promise<void> {
-			const version = etag ?? (await currentEtag(id));
+			const version = requireEtag(etag);
 			if (published) await client.publishPost({ postId: id, etag: version });
 			else await client.unpublishPost({ postId: id, etag: version });
 		},

@@ -270,14 +270,6 @@ export interface DelegatedPostCommands {
 		postId: string | number,
 		meta: DelegatedMutationMeta,
 	): Promise<void>;
-	/**
-	 * 貼文總數（總覽 KPI）：`page_size=1` 的列表，只讀它的 `total`。
-	 *
-	 * `fetchSellerPosts` 回的是 `PostListItem[]`，`total` 在映射時就被丟掉了 ——
-	 * 拿陣列長度當總數會在超過 `page_size` 的店家靜默少報，而畫面上沒有任何東西
-	 * 會告訴你那個數字是截斷的。
-	 */
-	count(): Promise<number>;
 }
 
 export function createDelegatedProductRepo(
@@ -596,7 +588,9 @@ export function createDelegatedPostRepo(
 						? { stagedTokens: [body.newStagedToken] }
 						: {}),
 					...(body.tags ? { tags: body.tags } : {}),
-					...(body.productId ? { productIds: [String(body.productId)] } : {}),
+					...(body.productId === undefined
+						? {}
+						: { productIds: body.productId ? [String(body.productId)] : [] }),
 				}),
 				idempotencyKey: newIdempotencyKey(),
 			});
@@ -621,10 +615,6 @@ export function createDelegatedPostRepo(
 
 		deleteSellerPost() {
 			return Promise.reject(new DelegatedEndpointMissingError("刪除貼文"));
-		},
-
-		async count(): Promise<number> {
-			return summaryTotal(await fetcher<unknown>(`${root}/summary`));
 		},
 
 		async fetchPostCount(): Promise<number> {

@@ -273,9 +273,10 @@ function ReplyItem({
 		if (editing) editTextareaRef.current?.focus();
 	}, [editing]);
 
-	const canDelete = canDeleteComment(reply.isMine, canModerate);
+	const live = reply.state === "visible";
+	const canDelete = live && canDeleteComment(reply.isMine, canModerate);
 	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(reply.isMine);
+	const canEdit = live && canEditComment(reply.isMine);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -420,26 +421,28 @@ function ReplyItem({
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={liked}
-						/* Liked reds come from `text-hk-like`, not `color="danger"` —
+					{live ? (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							aria-pressed={liked}
+							/* Liked reds come from `text-hk-like`, not `color="danger"` —
 						   danger is 柿橘 orange and is the error role. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only: `handleLike` flips the shared heart before
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only: `handleLike` flips the shared heart before
 						   the request and rolls back on failure; `likePendingRef` drops
 						   overlapping taps, so the fill animation is the feedback. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={liked} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{likeCount}</span>
-					</Button>
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
+						>
+							<AppIcon name="heart" fill={liked} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{likeCount}</span>
+						</Button>
+					) : null}
 					{canEdit && !editing && (
 						<button
 							type="button"
@@ -480,6 +483,7 @@ function CommentItem({
 	composerAvatar,
 	onLike,
 	onRemove,
+	onEdited,
 }: {
 	comment: Comment;
 	postId: string;
@@ -488,6 +492,7 @@ function CommentItem({
 	composerAvatar: ComposerAvatar;
 	onLike: (id: string) => Promise<void>;
 	onRemove: (id: string) => Promise<void>;
+	onEdited: (updated: Comment) => void;
 }) {
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
@@ -516,9 +521,10 @@ function CommentItem({
 		if (editing) editTextareaRef.current?.focus();
 	}, [editing]);
 
-	const canDelete = canDeleteComment(comment.isMine, canModerate);
+	const live = comment.state === "visible";
+	const canDelete = live && canDeleteComment(comment.isMine, canModerate);
 	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(comment.isMine);
+	const canEdit = live && canEditComment(comment.isMine);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -567,6 +573,7 @@ function CommentItem({
 			const updated = await updateComment(comment.id, next, etag ?? "");
 			setEtag(updated.etag);
 			setContent(updated.content || next);
+			onEdited(updated);
 			setEditing(false);
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "編輯失敗");
@@ -683,24 +690,26 @@ function CommentItem({
 					</p>
 				)}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={comment.isLiked === true}
-						/* See the reply row's note — liked red is `text-hk-like`. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only — see the reply row's note above. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{comment.likeCount ?? 0}</span>
-					</Button>
-					{signedIn && !editing && (
+					{live ? (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							aria-pressed={comment.isLiked === true}
+							/* See the reply row's note — liked red is `text-hk-like`. */
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only — see the reply row's note above. */
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
+						>
+							<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{comment.likeCount ?? 0}</span>
+						</Button>
+					) : null}
+					{signedIn && live && !editing && (
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
@@ -958,6 +967,7 @@ export default function PostComments({
 							composerAvatar={composerAvatar}
 							onLike={list.like}
 							onRemove={list.remove}
+							onEdited={list.edited}
 						/>
 					))}
 				</ul>

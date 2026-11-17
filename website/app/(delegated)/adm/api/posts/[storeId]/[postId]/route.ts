@@ -1,5 +1,8 @@
-import { DelegatedRequestRejectedError } from "../../../_csrf";
-import { forwardDelegatedConnect, numericSegment } from "../../../_forward";
+import {
+	forwardDelegatedConnect,
+	numericSegment,
+	postIdSegment,
+} from "../../../_forward";
 import {
 	bodyRecord,
 	etagOf,
@@ -18,16 +21,6 @@ import {
  */
 
 type RouteContext = { params: Promise<{ storeId: string; postId: string }> };
-
-const POST_ID =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-function postIdSegment(value: string): string {
-	if (!POST_ID.test(value)) {
-		throw new DelegatedRequestRejectedError("INVALID_PATH_PARAM", 400);
-	}
-	return value;
-}
 
 export async function GET(
 	request: Request,

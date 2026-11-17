@@ -195,8 +195,8 @@ export function useSellerForum(
 				...current,
 				records: replaceComment(current.records, commentId, (item) => ({
 					...item,
+					// 只讀第一頁回覆；replyCount 是伺服器的總數，不用已載入的筆數覆蓋。
 					replies: result.records,
-					replyCount: result.records.length,
 				})),
 			}));
 			return result.records;
@@ -216,6 +216,7 @@ export function useSellerForum(
 				content: content.trim(),
 				replyCount: 0,
 				createdAt: Math.floor(Date.now() / 1000),
+				state: "visible",
 				viewerCanEdit: false,
 				viewerCanDelete: false,
 				viewerCanReply: false,
@@ -269,6 +270,7 @@ export function useSellerForum(
 				content: content.trim(),
 				replyCount: 0,
 				createdAt: Math.floor(Date.now() / 1000),
+				state: "visible",
 				viewerCanEdit: false,
 				viewerCanDelete: false,
 				viewerCanReply: false,

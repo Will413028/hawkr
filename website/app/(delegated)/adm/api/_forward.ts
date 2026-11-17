@@ -43,6 +43,9 @@ export { UPSTREAM_FAILURE } from "./_upstream";
 /** TSID 與其他純數字 id（storeId／productId／postId）。 */
 const NUMERIC_ID_PATTERN = /^\d{1,19}$/;
 /** 訂單編號（`HK260728001` 形狀）。 */
+const POST_ID_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 const ORDER_NO_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 /** 媒體 upload session（UUID 或 TSID，兩種都可能）。 */
 const MEDIA_SESSION_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -61,6 +64,11 @@ function segment(value: string, pattern: RegExp): string {
  */
 export function numericSegment(value: string): string {
 	return segment(value, NUMERIC_ID_PATTERN);
+}
+
+/** 社群貼文 ID（UUID，小寫）。 */
+export function postIdSegment(value: string): string {
+	return segment(value, POST_ID_PATTERN);
 }
 
 export function orderNoSegment(value: string): string {

@@ -46,14 +46,14 @@ describe("owner post calls", () => {
 		);
 	});
 
-	it("update reads the current etag and masks only what changed", async () => {
+	it("update sends the etag the screen loaded, without re-reading, and masks only what changed", async () => {
 		const { rpc, api } = fakeClient();
-		await api.update("p-1", { content: "新內文" });
-		expect(rpc.getMyPost).toHaveBeenCalledOnce();
+		await api.update("p-1", { content: "新內文" }, "loaded");
+		expect(rpc.getMyPost).not.toHaveBeenCalled();
 		const [req] = rpc.updatePost.mock.calls[0] as unknown as [
 			{ post: { etag: string; body: string }; updateMask: { paths: string[] } },
 		];
-		expect(req.post).toMatchObject({ etag: "cur", body: "新內文" });
+		expect(req.post).toMatchObject({ etag: "loaded", body: "新內文" });
 		expect(req.updateMask.paths).toEqual(["body"]);
 	});
 
@@ -83,16 +83,45 @@ describe("owner post calls", () => {
 
 	it("publish and unpublish are separate calls carrying the etag", async () => {
 		const { rpc, api } = fakeClient();
-		await api.setPublished("p-1", true);
+		await api.setPublished("p-1", true, "loaded");
 		await api.setPublished("p-1", false, "given");
+		expect(rpc.getMyPost).not.toHaveBeenCalled();
 		expect(rpc.publishPost).toHaveBeenCalledExactlyOnceWith({
 			postId: "p-1",
-			etag: "cur",
+			etag: "loaded",
 		});
 		expect(rpc.unpublishPost).toHaveBeenCalledExactlyOnceWith({
 			postId: "p-1",
 			etag: "given",
 		});
+	});
+
+	it("a write without a loaded etag fails instead of fetching a fresh one", async () => {
+		const { rpc, api } = fakeClient();
+		await expect(
+			api.update("p-1", { content: "x" }, undefined),
+		).rejects.toThrow("etag");
+		await expect(api.setPublished("p-1", true, undefined)).rejects.toThrow(
+			"etag",
+		);
+		expect(rpc.getMyPost).not.toHaveBeenCalled();
+		expect(rpc.updatePost).not.toHaveBeenCalled();
+		expect(rpc.publishPost).not.toHaveBeenCalled();
+	});
+
+	it("clearing the product puts product_id in the mask with no value; unchanged leaves it out", async () => {
+		const { rpc, api } = fakeClient();
+		await api.update("p-1", { content: "x", productId: null }, "e");
+		await api.update("p-1", { content: "x" }, "e");
+		const calls = rpc.updatePost.mock.calls as unknown as [
+			{
+				post: { productId: string };
+				updateMask: { paths: string[] };
+			},
+		][];
+		expect(calls[0][0].updateMask.paths).toContain("product_id");
+		expect(calls[0][0].post.productId).toBeUndefined();
+		expect(calls[1][0].updateMask.paths).not.toContain("product_id");
 	});
 
 	it("the count is the server's per-status sum, not a list length", async () => {

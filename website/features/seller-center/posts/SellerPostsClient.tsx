@@ -284,10 +284,13 @@ export default function SellerPostsClient() {
 		mutationFn: ({
 			id,
 			target,
+			etag,
 		}: {
 			id: number | string;
 			target: PostPublishTarget;
-		}) => scope.repos.posts.setSellerPostPublishStatus(id, target),
+			etag?: string;
+		}) =>
+			scope.repos.posts.setSellerPostPublishStatus(id, target, undefined, etag),
 		onMutate: () => setPublishError(null),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: postsKey }),
 		onError: (e) =>
@@ -298,10 +301,11 @@ export default function SellerPostsClient() {
 		id: number | string,
 		target: PostPublishTarget,
 		scheduledPublishAt?: string,
+		etag?: string,
 	) => {
 		if (!window.confirm(postPublishConfirmText(target, !!scheduledPublishAt)))
 			return;
-		publishMutation.mutate({ id, target });
+		publishMutation.mutate({ id, target, etag });
 	};
 	const activePost =
 		activePostId === null
@@ -448,7 +452,12 @@ export default function SellerPostsClient() {
 												publishMutation.variables?.id === p.id
 											}
 											onToggle={(target) =>
-												handleTogglePublish(p.id, target, p.scheduledPublishAt)
+												handleTogglePublish(
+													p.id,
+													target,
+													p.scheduledPublishAt,
+													p.etag,
+												)
 											}
 										/>
 										<Button
@@ -590,6 +599,7 @@ export default function SellerPostsClient() {
 													post.id,
 													target,
 													post.scheduledPublishAt,
+													post.etag,
 												)
 											}
 										/>

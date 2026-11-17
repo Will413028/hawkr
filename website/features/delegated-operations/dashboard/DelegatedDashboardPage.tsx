@@ -257,9 +257,9 @@ export default function DelegatedDashboardPage() {
 /**
  * 貼文總數。
  *
- * 與訂單／商品不同，貼文走自己的 repo 實例而不是 `useSellerDataScope()`：賣家中心
- * 的 `SellerPostRepo` 只回 `PostListItem[]`，`total` 在映射時就沒了（`count()` 是
- * 代行專屬命令）。
+ * 與訂單／商品不同，貼文走自己的 repo 實例而不是 `useSellerDataScope()`：這裡直接以
+ * 目標店家建立代行的貼文 repo，數字是伺服器的各狀態篇數加總（`fetchPostCount`），
+ * 不是列表長度。
  */
 function useDelegatedPostTotal(enabled: boolean): number | null {
 	const { summary } = useDelegatedSession();
@@ -275,7 +275,7 @@ function useDelegatedPostTotal(enabled: boolean): number | null {
 		queryKey: queryKeys.delegated.posts(identity, { kind: "total" }),
 		queryFn: () => {
 			if (!repo) throw new Error("代行貼文資料層尚未就緒（缺少目標店家）");
-			return repo.count();
+			return repo.fetchPostCount();
 		},
 		enabled: enabled && repo !== null,
 	});

@@ -24,7 +24,7 @@ import {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { fieldMask } from "@hawkr/api/proto/field-mask";
 import { ApiClientError, type ApiEnvelope, authedFetch } from "../api/client";
-import type { DelegatedMutationMeta, RepoFetcher } from "../api/delegated";
+import type { DelegatedMutationMeta } from "../api/delegated";
 import type { MyPostDetail, PostListItem } from "../api/openapi-types";
 import {
 	PostPublishStatus,
@@ -834,8 +834,8 @@ export async function deleteSellerCoupon(id: string): Promise<void> {
 /* ===== Seller posts ===== */
 
 /**
- * POST /app/sellers/posts body — 可附一張圖片（stagedToken）與一個商品（productId）。
- * 圖片用 uploadImageFile() 回傳的 `stagedToken`（不是 previewUrl），後端 finalize 後存成貼文圖片。
+ * 建立貼文（`SocialAppService.CreatePost`）的輸入 — 可附一張圖片（stagedToken）與一個商品（productId）。
+ * 圖片用 uploadImageFile() 回傳的 `stagedToken`（不是 previewUrl），伺服器 finalize 後存成貼文圖片。
  */
 export interface CreateSellerPostInput {
 	content: string;
@@ -845,22 +845,25 @@ export interface CreateSellerPostInput {
 }
 
 /**
- * PUT /app/sellers/posts/{id} body — 圖片用 keepAssetId（保留舊圖）或
- * newStagedToken（換新圖）二擇一，與 create 的 stagedToken 契約不同。
+ * 修改貼文（`SocialAppService.UpdatePost`）的輸入 — 沒帶 `newStagedToken` 就沿用目前的圖
+ * （update_mask 不含圖片）；`keepAssetId` 不進任何請求。
  */
 export interface UpdateSellerPostInput {
 	content: string;
 	keepAssetId?: string;
 	newStagedToken?: string;
-	productId?: string;
+	/** undefined＝不變；null＝清除商品。 */
+	productId?: string | null;
 	tags?: string[];
+	/** 畫面載入時的貼文版本（`MyPostDetail.etag`）；自助端的樂觀鎖用，代行端取 `meta.expectedVersion`。 */
+	etag?: string;
 }
 
 /**
  * 賣家對自己的貼文送得出去的兩個目標狀態。
  *
- * **型別上就排除 4401**：`publish` 與 `unpublish` 是兩支各自寫死目標狀態的命令端點
- * （`gateway/internal/handler/post.go:294,313`），沒有第三支能把貼文送回未發布。
+ * **型別上就排除 4401**：`PublishPost` 與 `UnpublishPost` 是兩支各自寫死目標狀態的命令
+ * （`SocialAppService`），沒有第三支能把貼文送回未發布。
  * 值域不對稱是契約本身 —— 宣告成 `PostPublishStatusValue` 會讓「改回未發布」在
  * 編譯期看起來合法，然後在執行期變成一個沒有端點可打的分支。
  */
@@ -887,6 +890,7 @@ export interface SellerPostRepo {
 		body: CreateSellerPostInput,
 		meta?: DelegatedMutationMeta,
 	): Promise<{ id?: string; version?: string }>;
+	/** 自助端的樂觀鎖版本取自 `body.etag`（畫面載入時的值），寫入前不重讀；版本已變時由呼叫端的錯誤路徑顯示。 */
 	updateSellerPost(
 		id: number | string,
 		body: UpdateSellerPostInput,
@@ -895,10 +899,8 @@ export interface SellerPostRepo {
 	/**
 	 * 發布（4402）／下架（4403）。
 	 *
-	 * **沒有 `expectedVersion`**：那是代行路徑的樂觀鎖，用來擋「管理員看到的版本
-	 * 已經被賣家改掉」；賣家對自己的貼文按下發布時沒有第二個寫入者要防，所以
-	 * gateway 的 `updateMyPostPublishStatus` 刻意不收版本（`post.go:325` 的註解）。
-	 * 帶了也沒有欄位裝，只會多一次詳情往返。
+	 * 自助端以第四個參數 `etag`（列表那一列的版本）做樂觀鎖，不在寫入前重讀；
+	 * 代行端的版本在 `meta.expectedVersion`，不看 `etag`。
 	 *
 	 * 目標值域**不含 4401**：兩支端點各自寫死一個目標狀態，沒有第三支能把貼文送回
 	 * 未發布。型別上就排除掉，不靠呼叫端自律。
@@ -907,6 +909,7 @@ export interface SellerPostRepo {
 		id: number | string,
 		target: PostPublishTarget,
 		meta?: DelegatedMutationMeta,
+		etag?: string,
 	): Promise<void>;
 	deleteSellerPost(id: number | string): Promise<void>;
 	/**
@@ -940,16 +943,20 @@ export function createSellerPostRepo(
 		},
 
 		async updateSellerPost(id: number | string, body: UpdateSellerPostInput) {
-			await api().update(String(id), body);
+			const { etag, ...fields } = body;
+			await api().update(String(id), fields, etag);
 		},
 
 		async setSellerPostPublishStatus(
 			id: number | string,
 			target: PostPublishTarget,
+			_meta?: DelegatedMutationMeta,
+			etag?: string,
 		) {
 			await api().setPublished(
 				String(id),
 				target === PostPublishStatus.PUBLISHED,
+				etag,
 			);
 		},
 
@@ -990,7 +997,8 @@ export const updateSellerPost: SellerPostRepo["updateSellerPost"] = (
 ) => sellerPostRepo.updateSellerPost(id, body, meta);
 
 export const setSellerPostPublishStatus: SellerPostRepo["setSellerPostPublishStatus"] =
-	(id, target) => sellerPostRepo.setSellerPostPublishStatus(id, target);
+	(id, target, meta, etag) =>
+		sellerPostRepo.setSellerPostPublishStatus(id, target, meta, etag);
 
 export const deleteSellerPost: SellerPostRepo["deleteSellerPost"] = (id) =>
 	sellerPostRepo.deleteSellerPost(id);

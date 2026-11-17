@@ -1,5 +1,8 @@
-import { DelegatedRequestRejectedError } from "../../../../_csrf";
-import { forwardDelegatedConnect, numericSegment } from "../../../../_forward";
+import {
+	forwardDelegatedConnect,
+	numericSegment,
+	postIdSegment,
+} from "../../../../_forward";
 import {
 	bodyRecord,
 	etagOf,
@@ -11,9 +14,6 @@ import {
 
 type RouteContext = { params: Promise<{ storeId: string; postId: string }> };
 
-const POST_ID =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
 export async function POST(
 	request: Request,
 	context: RouteContext,
@@ -21,9 +21,7 @@ export async function POST(
 	const { storeId, postId } = await context.params;
 	return forwardDelegatedConnect(request, () => {
 		const pathStoreId = numericSegment(storeId);
-		if (!POST_ID.test(postId)) {
-			throw new DelegatedRequestRejectedError("INVALID_PATH_PARAM", 400);
-		}
+		const pathPostId = postIdSegment(postId);
 		return {
 			storeId: pathStoreId,
 			method: "POST",
@@ -34,7 +32,7 @@ export async function POST(
 				const etag = etagOf(body);
 				return async (client, options) => {
 					const message = await client.unpublishStorePost(
-						{ operation, postId, etag },
+						{ operation, postId: pathPostId, etag },
 						options,
 					);
 					return mutationDto(message.post, message.auditLogId);

@@ -128,4 +128,40 @@ describe("feed reads depend on the viewer", () => {
 		);
 		expect(result.current.done).toBe(true);
 	});
+
+	it("a refetch of a seeded list replays page one from the empty token, not the seed's next token", async () => {
+		canonical.fetchCanonicalFeedPage.mockResolvedValue({
+			records: [post("fresh1")],
+			nextPageToken: "t2",
+			pageSize: 12,
+		});
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		const { result } = renderHook(
+			() =>
+				useFeedPosts({
+					initialPosts: [post("seed")],
+					initialNextPageToken: "t2",
+					pageSize: 12,
+				}),
+			{
+				wrapper: ({ children }: { children: React.ReactNode }) =>
+					React.createElement(QueryClientProvider, { client }, children),
+			},
+		);
+		expect(result.current.posts.map((p) => p.id)).toEqual(["seed"]);
+		await client.refetchQueries();
+		await waitFor(() =>
+			expect(result.current.posts.map((p) => p.id)).toEqual(["fresh1"]),
+		);
+		expect(canonical.fetchCanonicalFeedPage).toHaveBeenCalledWith(
+			"",
+			expect.anything(),
+		);
+		expect(canonical.fetchCanonicalFeedPage).not.toHaveBeenCalledWith(
+			"t2",
+			expect.anything(),
+		);
+	});
 });

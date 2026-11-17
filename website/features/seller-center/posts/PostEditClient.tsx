@@ -78,6 +78,7 @@ export default function PostEditClient({ id }: { id: string }) {
 				id: detail.id,
 				content: detail.content,
 				imageKey: detail.imageKeys[0],
+				etag: detail.etag,
 				productId:
 					linkedProductId != null ? String(linkedProductId) : undefined,
 			}}

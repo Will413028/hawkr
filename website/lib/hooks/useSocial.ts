@@ -39,6 +39,8 @@ interface UsePostCommentsResult {
 	loadMore: () => Promise<void>;
 	post: (content: string, opts?: PostCommentOptions) => Promise<void>;
 	remove: (id: string) => Promise<void>;
+	/** 單則留言修改成功後，把新內文與新 etag 寫回快取。 */
+	edited: (updated: Pick<Comment, "id" | "content" | "etag">) => void;
 	like: (id: string) => Promise<void>;
 }
 
@@ -191,6 +193,24 @@ export function usePostComments(
 		[comments, setCommentData],
 	);
 
+	/** 修改成功後伺服器換了新版本：快取裡的 etag 與內文同步，之後的刪除才帶得對。 */
+	const edited = React.useCallback(
+		(updated: Pick<Comment, "id" | "content" | "etag">) =>
+			setCommentData((current) => ({
+				...current,
+				records: current.records.map((c) =>
+					c.id === updated.id
+						? {
+								...c,
+								content: updated.content || c.content,
+								etag: updated.etag,
+							}
+						: c,
+				),
+			})),
+		[setCommentData],
+	);
+
 	const like = React.useCallback(
 		async (id: string) => {
 			const target = comments.find((c) => c.id === id);
@@ -232,6 +252,7 @@ export function usePostComments(
 		loadMore,
 		post,
 		remove,
+		edited,
 		like,
 	};
 }
