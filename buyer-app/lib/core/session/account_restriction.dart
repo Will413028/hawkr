@@ -5,7 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/auth/data/auth_repository.dart';
 import '../../shared/utils/hk_log.dart';
-import 'session_provider.dart';
+import 'auth_session_provider.dart';
 
 part 'account_restriction.g.dart';
 
@@ -46,9 +46,16 @@ class AccountRestriction extends _$AccountRestriction {
   void clear() => apply(null);
 
   /// 使用者主動的寫入（Connect 或舊 REST）收到 `ACCOUNT_SUSPENDED` 的唯一入口：進入受限狀態、請畫面顯示
-  /// 「帳號停權中」的提示，並補讀細節。沒有登入的 session 時忽略（訪客不會被停權；登出後才回來的訊號也不算）。
-  void rejected() {
-    if (ref.read(sessionProvider).value == null) return;
+  /// 「帳號停權中」的提示，並補讀細節。沒有保存 token 時忽略（訪客不會被停權；登出後才回來的訊號也不算）；
+  /// 以保存的 token 判斷而不是已載入的 session，登入與冷啟動還在載入 session 時收到的訊號也算。
+  Future<void> rejected() async {
+    final bool signedIn;
+    try {
+      signedIn = (await ref.read(authSessionProvider.future)).isSignedIn;
+    } catch (_) {
+      return;
+    }
+    if (!ref.mounted || !signedIn) return;
     final generation = ++_generation;
     state ??= const AccountSuspension.unknown();
     ref.read(suspendedActionNoticeProvider.notifier).raise();

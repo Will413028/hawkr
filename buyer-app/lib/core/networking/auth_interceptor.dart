@@ -54,15 +54,21 @@ class AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    final response = err.response;
-    if (response?.statusCode == 401) {
-      _triggerForceLogout();
-    } else if (response != null &&
-        !isBackgroundRestWrite(err.requestOptions) &&
-        await isRestSuspension(response)) {
-      _ref.read(accountRestrictionProvider.notifier).rejected();
+    try {
+      final response = err.response;
+      if (response?.statusCode == 401) {
+        _triggerForceLogout();
+      } else if (response != null &&
+          !isBackgroundRestWrite(err.requestOptions) &&
+          await isRestSuspension(response) &&
+          _ref.mounted) {
+        await _ref.read(accountRestrictionProvider.notifier).rejected();
+      }
+    } catch (_) {
+      // 判斷與狀態更新的失敗不能吞掉原本的請求錯誤。
+    } finally {
+      handler.next(err);
     }
-    handler.next(err);
   }
 
   void _triggerForceLogout() {

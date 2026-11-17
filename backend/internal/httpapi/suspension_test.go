@@ -230,9 +230,6 @@ func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 	if rec, s := callAs(t, h, "suspended", http.MethodDelete, "/api/v1/app/notifications/device-token"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
 		t.Fatalf("DELETE device-token：%d %+v，註銷裝置 token 是收斂動作，停權者放行（A7-D18）", rec.Code, s)
 	}
-	if rec, s := callAs(t, h, "suspended", http.MethodDelete, "/api/v1/app/notifications/device-token/"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
-		t.Fatalf("DELETE device-token/（尾端斜線）：%d %+v，gateway 視為同一路由，預期放行", rec.Code, s)
-	}
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		rec, s := callAs(t, h, "suspended", m, "/api/v1/app/orders")
 		var body struct {
@@ -255,6 +252,7 @@ func TestSuspendedAccountDeviceTokenAllowlistIsNarrow(t *testing.T) {
 		{http.MethodDelete, "/api/v1/app/notifications"},
 		{http.MethodDelete, "/api/v1/app/notifications/device-token/x"},
 		{http.MethodDelete, "/api/v1/app/notifications/device-token//"},
+		{http.MethodDelete, "/api/v1/app/notifications/device-token/"},
 		{http.MethodPost, "/api/v1/app/notifications/device-token/"},
 	} {
 		rec, s := callAs(t, h, "suspended", c.method, c.path)

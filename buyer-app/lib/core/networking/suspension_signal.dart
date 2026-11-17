@@ -26,17 +26,15 @@ const backgroundConnectProcedures = {
 bool isBackgroundConnectProcedure(String procedure) =>
     backgroundConnectProcedures.contains(procedure);
 
-/// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。
+/// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。推播裝置 token 的註冊與註銷不在這裡：
+/// 它們靜默是因為 registrar 自己吞掉非 2xx（`lib/features/notification/data/push/device_registrar.dart`），沒有任何分類器看得到。
 final _backgroundRestWrites = <({String method, RegExp path})>[
   // 聊天連線票：開聊天與回到前景時自動鑄。
   (method: 'POST', path: RegExp(r'/app/chat/ws-ticket/?$')),
   // 進入對話自動標記已讀。
-  (method: 'PATCH', path: RegExp(r'/app/chat/conversations(/[^/]+)?/?$')),
+  (method: 'PATCH', path: RegExp(r'/app/chat/conversations/[^/]+/?$')),
   // 開啟通知自動標記已讀（read-all 是使用者點的，不在這裡）。
   (method: 'PATCH', path: RegExp(r'/app/notifications/\d+/read/?$')),
-  // 推播裝置 token 的註冊與註銷。
-  (method: 'POST', path: RegExp(r'/app/notifications/device-token/?$')),
-  (method: 'DELETE', path: RegExp(r'/app/notifications/device-token/?$')),
 ];
 
 bool isBackgroundRestWrite(RequestOptions options) {

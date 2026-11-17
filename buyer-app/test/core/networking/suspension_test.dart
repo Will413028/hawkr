@@ -38,6 +38,16 @@ class _GuestSession extends Session {
   Future<SessionModel?> build() async => null;
 }
 
+class _LoadingSession extends Session {
+  @override
+  Future<SessionModel?> build() => Completer<SessionModel?>().future;
+}
+
+class _ThrowingRestriction extends AccountRestriction {
+  @override
+  Future<void> rejected() async => throw StateError('boom');
+}
+
 class _Auth extends Fake implements AuthRepository {
   int fetches = 0;
   Future<AccountSnapshot> Function()? answer;
@@ -109,7 +119,7 @@ void main() {
           signedIn ? _FakeSession.new : _GuestSession.new,
         ),
         authSessionProvider.overrideWith(
-          (ref) async => FakeAuthSession(signedIn: true),
+          (ref) async => FakeAuthSession(signedIn: signedIn),
         ),
         authRepositoryProvider.overrideWithValue(auth),
       ],
@@ -232,6 +242,46 @@ void main() {
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.c.read(suspendedActionNoticeProvider), 0);
       expect(h.auth.fetches, 0);
+    });
+
+    test('session 還在載入（登入與冷啟動）時收到訊號：有 token 就進受限狀態並提示', () async {
+      final auth = _Auth();
+      final c = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWith(_LoadingSession.new),
+          authSessionProvider.overrideWith(
+            (ref) async => FakeAuthSession(signedIn: true),
+          ),
+          authRepositoryProvider.overrideWithValue(auth),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.read(sessionProvider);
+      c.read(accountRestrictionProvider.notifier).rejected();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.read(accountRestrictionProvider), isNotNull);
+      expect(c.read(suspendedActionNoticeProvider), 1);
+    });
+
+    test('session 還在載入且沒有 token：忽略', () async {
+      final auth = _Auth();
+      final c = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWith(_LoadingSession.new),
+          authSessionProvider.overrideWith(
+            (ref) async => FakeAuthSession(signedIn: false),
+          ),
+          authRepositoryProvider.overrideWithValue(auth),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.read(sessionProvider);
+      c.read(accountRestrictionProvider.notifier).rejected();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.read(accountRestrictionProvider), isNull);
+      expect(c.read(suspendedActionNoticeProvider), 0);
     });
 
     test('沒有登入時，Connect 與 REST 收到 ACCOUNT_SUSPENDED 也不進受限狀態', () async {
@@ -359,17 +409,51 @@ void main() {
       expect(h.auth.fetches, 0);
     });
 
-    test('背景寫入（開通知自動已讀、裝置 token、對話已讀）收到 ACCOUNT_SUSPENDED：靜默', () async {
+    test('背景寫入（開通知自動已讀、對話已讀）收到 ACCOUNT_SUSPENDED：靜默', () async {
       final h = await dioHarness(HttpStatus.forbidden);
       await send(h.dio, 'PATCH', '/app/notifications/5/read');
-      await send(h.dio, 'POST', '/app/notifications/device-token');
-      await send(h.dio, 'DELETE', '/app/notifications/device-token');
       await send(h.dio, 'PATCH', '/app/chat/conversations/u1');
       await send(h.dio, 'POST', '/app/chat/ws-ticket');
 
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.c.read(suspendedActionNoticeProvider), 0);
       expect(h.auth.fetches, 0);
+    });
+
+    test('使用者點的對話全部已讀（PATCH /app/chat/conversations）是主動寫入：進受限狀態並提示', () async {
+      final h = await dioHarness(HttpStatus.forbidden);
+      await send(h.dio, 'PATCH', '/app/chat/conversations');
+
+      expect(h.c.read(accountRestrictionProvider), isNotNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 1);
+    });
+
+    test('rejected() 拋例外：請求仍以 DioException 結束', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final c = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWith(_FakeSession.new),
+          authSessionProvider.overrideWith(
+            (ref) async => FakeAuthSession(signedIn: true),
+          ),
+          authRepositoryProvider.overrideWithValue(h.auth),
+          accountRestrictionProvider.overrideWith(_ThrowingRestriction.new),
+        ],
+      );
+      addTearDown(c.dispose);
+      await c.read(sessionProvider.future);
+      final dio = c.read(dioProvider)
+        ..httpClientAdapter = _Status(
+          403,
+          [],
+          '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}',
+        );
+
+      await expectLater(
+        dio.post<dynamic>('/app/favorites'),
+        throwsA(isA<DioException>()),
+      );
     });
 
     test('使用者點的全部已讀仍是主動寫入：進受限狀態並提示', () async {
