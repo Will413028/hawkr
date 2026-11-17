@@ -42,11 +42,11 @@ Future<bool> requireLogin(BuildContext context, WidgetRef ref) async {
 }
 
 /// 訪客與失效 session（強制登出）共用的登入提示，確保文案、按鈕與 dismiss 行為一致。
-Future<bool?> showLoginRequiredDialog(BuildContext context, {String? message}) {
+Future<bool?> showLoginRequiredDialog(BuildContext context) {
   return showCommonDialog(
     context: context,
     title: '需要登入',
-    content: message ?? '此操作需要登入後才能繼續，是否前往登入？',
+    content: '此操作需要登入後才能繼續，是否前往登入？',
     confirmText: '前往登入',
     cancelText: '取消',
     barrierDismissible: true,

@@ -37,7 +37,7 @@ python3 -m http.server 7357 --directory build/catalog
 | `inputs` | `AppTheme` 的 TextField / TextFormField | 一般、停用、錯誤、必填驗證 |
 | `chips` | `HkChoiceChip`、`HkSecondaryCtaTabs`、`HkTemperatureTag`、`TemperatureChoiceChip` | 單選切換、選取與未選取、頁籤內容切換、Web 對齊溫層與 48dp 溫層選擇器 |
 | `cards` | `AppTheme` 的 Card、`HkFrostedCardSurface`、`HkPostCardSurface` | 一般內容、霧面玻璃、可點按貼文表面 |
-| `states` | `HkBrandLoader`、`HkSkeletonShimmer`、`HkEmptyState`、LinearProgressIndicator、主題按鈕組合 | 品牌四色與 mono 載入動畫、骨架屏掃光、60% 進度、空搜尋結果、本地錯誤與重試 |
+| `states` | `HkBrandLoader`、`HkSkeletonShimmer`、`HkEmptyState`、`AccountRestrictedBanner`、LinearProgressIndicator、主題按鈕組合 | 品牌四色與 mono 載入動畫、骨架屏掃光、60% 進度、空搜尋結果、停權橫幅（共用 Layout 每頁頂端，點擊開啟受限頁）、本地錯誤與重試 |
 | `commerce` | `QuantityStepper`、`ProductCard`、`NotificationCountBadge` | 1–5 件數量邊界、促銷價、收藏切換、售罄、無圖片 fallback、99+ 徽章 |
 | `cart` | `CartTopBar`、`CartCheckoutAction`、`CartProductTile`、`MerchantGroupCard`、`CartTypography` | 切店與選取、緊湊排列與大字、數量回呼、清選時停用結帳 |
 

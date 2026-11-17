@@ -7,13 +7,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/connect_provider.dart';
+import '../../../core/session/account_restriction.dart';
 
 part 'auth_repository.g.dart';
 
 /// 登入的帳號、登出與刪除帳號：identity 的 `IdentityAppService`（Connect）。登入（換發 session token）見
 /// `identity_gateway.dart`，token 的保存見 `authSessionProvider`。
 ///
-/// [currentAccountId] 失敗一律拋 [AuthRequestException]（給使用者看的文字在 `message`），回應不符
+/// [currentSession] 失敗一律拋 [AuthRequestException]（給使用者看的文字在 `message`），回應不符
 /// 契約時拋 [MalformedAuthResponse]；[deleteAccount] 與 [accountExists] 拋出原本的例外，由刪除流程自己分類。
 class AuthRepository {
   AuthRepository(
@@ -27,15 +28,27 @@ class AuthRepository {
   final IdentityAppServiceClient _sessionClient;
   final DefaultErrorText _defaults;
 
-  /// 目前登入的帳號 ID（GetSession）。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
-  Future<String> currentAccountId() async {
+  /// 目前登入的帳號與停權狀態（GetSession）。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
+  /// 帳號停權時 GetSession 仍成功，`suspension` 有設。
+  Future<AccountSession> currentSession() async {
     final response = await _call(
       () => _sessionClient.getSession(GetSessionRequest()),
     );
     if (response.account.id.isEmpty) {
       throw const MalformedAuthResponse('GetSession: missing account id');
     }
-    return response.account.id;
+    return AccountSession(
+      accountId: response.account.id,
+      restriction: response.hasSuspension()
+          ? AccountRestriction(
+              category: response.suspension.category,
+              reason: response.suspension.reason,
+              suspendedAt: response.suspension.hasSuspendedAt()
+                  ? response.suspension.suspendedAt.toDateTime()
+                  : null,
+            )
+          : null,
+    );
   }
 
   /// 登出（SignOut）：在伺服器撤銷目前的 session。session 已經不存在時也成功。
@@ -80,6 +93,14 @@ AuthRepository authRepository(Ref ref) {
     sessionClient: ref.watch(sessionIdentityClientProvider),
     defaults: ref.watch(defaultErrorTextProvider),
   );
+}
+
+/// GetSession 的結果：帳號 ID，與帳號停權時的受限狀態（沒有停權是 null）。
+class AccountSession {
+  const AccountSession({required this.accountId, this.restriction});
+
+  final String accountId;
+  final AccountRestriction? restriction;
 }
 
 /// 伺服器的回應不符契約時拋出（例如成功卻沒有帳號）。

@@ -88,10 +88,19 @@ const (
 	accessDenied
 )
 
+// pushDevicePath 是舊 gateway 註冊與註銷推播裝置的路徑。
+const pushDevicePath = "/api/v1/app/notifications/device-token"
+
 // suspendedAccess 決定停權的帳號這個請求怎麼處理（A7-D17、A7-D18）。
+//
+// 舊 gateway 的 REST 依 HTTP method（A7-D18），唯一的例外是 `DELETE /api/v1/app/notifications/device-token`：註銷裝置 token
+// 是收斂動作（性質同 SignOut、DeleteAccount，停權者登出與刪帳號時要能停止收到推播），明列放行（gateway 是 gin，尾端斜線是 307 轉址，不是同一路由）；不放寬到所有 DELETE。
 func suspendedAccess(r *http.Request) suspendedAccessKind {
 	audience, connectPath := rpc.AudienceOf(r.URL.Path)
 	if !connectPath {
+		if r.Method == http.MethodDelete && r.URL.Path == pushDevicePath {
+			return accessAllowed
+		}
 		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !asksForUpgrade(r) {
 			return accessAllowed
 		}
@@ -139,7 +148,7 @@ func writeUnavailable(w http.ResponseWriter, r *http.Request) {
 }
 
 // writePermissionDenied 回 403，帶模組給使用者的文字，沒有時用共用文案目錄的 PERMISSION_DENIED（語系取自 ctx）；形狀同 writeUnavailable。
-// Connect 的請求另帶錯誤的 reason（apperr.Reason）；gateway 的 envelope 沒有 reason 欄位。
+// 錯誤帶 reason（apperr.Reason）時：Connect 的請求寫進 ErrorInfo，gateway 的 envelope 寫進選填的 reason 欄位（ErrorReason 的名稱字串）；沒有時省略。
 func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
 	var ae *apperr.Error
 	hasText := errors.As(err, &ae) && ae.Message != ""
@@ -155,6 +164,10 @@ func writePermissionDenied(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusForbidden)
-	body, _ := json.Marshal(map[string]any{"code": http.StatusForbidden, "message": ce.Message()})
+	envelope := map[string]any{"code": http.StatusForbidden, "message": ce.Message()}
+	if ae != nil && ae.Reason != (apperr.Reason{}) {
+		envelope["reason"] = ae.Reason.String()
+	}
+	body, _ := json.Marshal(envelope)
 	_, _ = w.Write(body)
 }

@@ -995,7 +995,11 @@ class ChatRepository with WidgetsBindingObserver {
       data: {
         'messageIds': [messageId],
       },
-      options: Options(validateStatus: (s) => true, headers: headers),
+      options: Options(
+        extra: const {kBackgroundWriteExtra: true},
+        validateStatus: (s) => true,
+        headers: headers,
+      ),
     );
     return (resp.statusCode ?? 0) >= 200 && (resp.statusCode ?? 0) < 300;
   }
@@ -1070,7 +1074,11 @@ class ChatRepository with WidgetsBindingObserver {
 
     final resp = await _httpDio.patch(
       '/api/v1/app/chat/conversations/$conversationId',
-      options: Options(validateStatus: (s) => true, headers: headers),
+      options: Options(
+        extra: const {kBackgroundWriteExtra: true},
+        validateStatus: (s) => true,
+        headers: headers,
+      ),
     );
     return (resp.statusCode ?? 0) >= 200 && (resp.statusCode ?? 0) < 300;
   }
@@ -1085,7 +1093,11 @@ class ChatRepository with WidgetsBindingObserver {
     final resp = await _httpDio.patch(
       '/api/v1/app/chat/conversations',
       data: {'targetId': participantId},
-      options: Options(validateStatus: (s) => true, headers: headers),
+      options: Options(
+        extra: const {kBackgroundWriteExtra: true},
+        validateStatus: (s) => true,
+        headers: headers,
+      ),
     );
     return (resp.statusCode ?? 0) >= 200 && (resp.statusCode ?? 0) < 300;
   }

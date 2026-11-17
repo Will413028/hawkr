@@ -28,6 +28,8 @@ import 'core/routing/buyer_navigation_observer.dart';
 import 'core/session/auth_session_provider.dart';
 import 'package:hawkr_auth/logging.dart';
 import 'core/session/force_logout_listener.dart';
+import 'features/auth/presentation/account_restricted_screen.dart';
+import 'core/session/suspended_action_listener.dart';
 import 'core/session/session_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -401,7 +403,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               },
               child: navigationFramed,
             );
-            final keyboardDismissible = KeyboardDismissScope(child: guarded);
+            // 使用者主動的寫入被停權擋下時的提示；停權不登出。
+            final suspensionAware = SuspendedActionListener(
+              navigatorKey: rootNavigatorKey,
+              onViewDetails: () => AccountRestrictedScreen.open(router),
+              child: guarded,
+            );
+            final keyboardDismissible = KeyboardDismissScope(
+              child: suspensionAware,
+            );
 
             // 非 prod 環境注入 FCM debug 浮動按鈕
             final appSurface = _appStoreScreenshotMode || !F.showFcmDebugOverlay

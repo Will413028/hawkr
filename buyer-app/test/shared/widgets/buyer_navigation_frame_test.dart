@@ -1,5 +1,8 @@
 import 'package:hawkr_buyer/core/routing/buyer_navigation_observer.dart';
+import 'package:hawkr_buyer/core/session/account_restriction.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
+import 'package:hawkr_buyer/features/auth/presentation/account_restricted_screen.dart';
+import 'package:hawkr_buyer/shared/widgets/account_restricted_banner.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/shared/widgets/buyer_navigation_frame.dart';
 import 'package:hawkr_buyer/shared/widgets/shared_bottom_nav.dart';
@@ -10,6 +13,64 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 void main() {
+  testWidgets('橫幅那一格的 widget 型別固定，不隨停權與否替換', (tester) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final observer = BuyerNavigationObserver();
+    final container = ProviderContainer(
+      overrides: [sessionProvider.overrideWith(_ActiveSession.new)],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      navigatorKey: navigatorKey,
+      initialLocation: '/marketplace',
+      observers: [observer],
+      routes: [
+        GoRoute(path: '/marketplace', builder: (_, _) => const Text('頁')),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => BuyerNavigationFrame(
+            router: router,
+            navigatorKey: navigatorKey,
+            navigationObserver: observer,
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Widget slot() => tester
+        .widget<Column>(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('buyer-global-navigation-frame')),
+                matching: find.byType(Column),
+              )
+              .first,
+        )
+        .children
+        .first;
+    expect(slot(), isA<Visibility>());
+
+    container
+        .read(accountRestrictionProvider.notifier)
+        .apply(const AccountSuspension.unknown());
+    await tester.pumpAndSettle();
+    expect(slot(), isA<Visibility>());
+    expect(find.byType(AccountRestrictedBanner), findsOneWidget);
+
+    container.read(accountRestrictionProvider.notifier).clear();
+    await tester.pumpAndSettle();
+    expect(slot(), isA<Visibility>());
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+  });
+
   testWidgets('global Navbar keeps one element and preserves old visibility', (
     tester,
   ) async {
@@ -367,6 +428,140 @@ void main() {
     expect(shownSlide.offset, Offset.zero);
     expect(find.byType(SharedBottomNav), findsOneWidget);
   });
+
+  testWidgets('停權：每頁頂端有橫幅，點下去開狀態頁，狀態頁本身不放橫幅', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final observer = BuyerNavigationObserver();
+    final container = ProviderContainer(
+      overrides: [sessionProvider.overrideWith(_ActiveSession.new)],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      navigatorKey: navigatorKey,
+      initialLocation: '/marketplace',
+      observers: [observer],
+      routes: [
+        GoRoute(path: '/marketplace', builder: (_, _) => const Text('市集頁')),
+        GoRoute(
+          path: AccountRestrictedScreen.path,
+          builder: (_, _) => const Text('受限頁'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => BuyerNavigationFrame(
+            router: router,
+            navigatorKey: navigatorKey,
+            navigationObserver: observer,
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+
+    container
+        .read(accountRestrictionProvider.notifier)
+        .apply(const AccountSuspension.unknown());
+    await tester.pumpAndSettle();
+    expect(find.text('帳號已停權，部分功能受限'), findsOneWidget);
+    expect(find.text('市集頁'), findsOneWidget);
+
+    await tester.tap(find.byType(AccountRestrictedBanner));
+    await tester.pumpAndSettle();
+    expect(find.text('受限頁'), findsOneWidget);
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+  });
+
+  testWidgets('橫幅出現與消失，頁面內的狀態不重掛', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final observer = BuyerNavigationObserver();
+    final container = ProviderContainer(
+      overrides: [sessionProvider.overrideWith(_ActiveSession.new)],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      navigatorKey: navigatorKey,
+      initialLocation: '/marketplace',
+      observers: [observer],
+      routes: [GoRoute(path: '/marketplace', builder: (_, _) => const _Taps())],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => BuyerNavigationFrame(
+            router: router,
+            navigatorKey: navigatorKey,
+            navigationObserver: observer,
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('點我'));
+    await tester.pump();
+    expect(find.text('次數 1'), findsOneWidget);
+
+    container
+        .read(accountRestrictionProvider.notifier)
+        .apply(const AccountSuspension.unknown());
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountRestrictedBanner), findsOneWidget);
+    expect(find.text('次數 1'), findsOneWidget);
+
+    container.read(accountRestrictionProvider.notifier).clear();
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountRestrictedBanner), findsNothing);
+    expect(find.text('次數 1'), findsOneWidget);
+  });
+
+  testWidgets('開啟受限狀態頁：已在該頁時不再疊一層', (tester) async {
+    final router = GoRouter(
+      initialLocation: '/marketplace',
+      routes: [
+        GoRoute(path: '/marketplace', builder: (_, _) => const Text('市集頁')),
+        GoRoute(
+          path: AccountRestrictedScreen.path,
+          builder: (_, _) => const Text('受限頁'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    AccountRestrictedScreen.open(router);
+    await tester.pumpAndSettle();
+    AccountRestrictedScreen.open(router);
+    await tester.pumpAndSettle();
+    expect(find.text('受限頁'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('市集頁'), findsOneWidget);
+  });
 }
 
 Finder _selectedTab(String label) => find.byWidgetPredicate(
@@ -380,4 +575,26 @@ class _ActiveSession extends Session {
   @override
   Future<SessionModel?> build() async =>
       const SessionModel(userId: 'buyer-1', nickname: 'Buyer');
+}
+
+class _Taps extends StatefulWidget {
+  const _Taps();
+
+  @override
+  State<_Taps> createState() => _TapsState();
+}
+
+class _TapsState extends State<_Taps> {
+  int taps = 0;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      TextButton(
+        onPressed: () => setState(() => taps++),
+        child: const Text('點我'),
+      ),
+      Text('次數 $taps'),
+    ],
+  );
 }

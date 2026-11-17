@@ -11,6 +11,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../config/flavor.dart';
 import '../../../core/networking/app_version_headers.dart';
+import '../../../core/networking/suspension_signal.dart';
+import '../../../core/session/account_restriction.dart';
 import '../../../core/session/auth_session_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
@@ -44,15 +46,23 @@ class PresenceEvent {
 }
 
 class ChatRepository with WidgetsBindingObserver {
-  ChatRepository._(this._sessionToken, this._accountId, {Dio? dio})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              validateStatus: (_) => true,
-              headers: {...AppVersionHeaders.headers},
-            ),
-          ) {
+  ChatRepository._(
+    this._sessionToken,
+    this._accountId, {
+    Dio? dio,
+    void Function()? onSuspended,
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               validateStatus: (_) => true,
+               headers: {...AppVersionHeaders.headers},
+             ),
+           ) {
+    // 聊天的 Dio 放行所有狀態碼、不經 AuthInterceptor：停權（403 `ACCOUNT_SUSPENDED`，WS 票與送訊息都會被擋）在這裡判斷。
+    if (onSuspended != null) {
+      _dio.interceptors.add(RestSuspensionInterceptor(onSuspended));
+    }
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -62,7 +72,8 @@ class ChatRepository with WidgetsBindingObserver {
     required Future<String?> Function() sessionToken,
     required String? Function() accountId,
     required Dio dio,
-  }) : this._(sessionToken, accountId, dio: dio);
+    void Function()? onSuspended,
+  }) : this._(sessionToken, accountId, dio: dio, onSuspended: onSuspended);
 
   /// 目前的 session token；訪客回 null。
   final Future<String?> Function() _sessionToken;
@@ -1101,6 +1112,7 @@ ChatRepository chatRepository(Ref ref) {
   final repo = ChatRepository._(
     () => currentSessionToken(ref),
     () => ref.read(sessionProvider).value?.userId,
+    onSuspended: () => ref.read(accountRestrictionProvider.notifier).rejected(),
   );
   ref.onDispose(repo.dispose);
   return repo;

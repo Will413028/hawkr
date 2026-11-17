@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../../core/networking/dio_provider.dart'
-    show kSkipAuthInterceptorExtra;
+    show kBackgroundWriteExtra, kSkipAuthInterceptorExtra;
 import '../../../../shared/utils/hk_log.dart';
 
 const String _devicesPath = '/api/v1/app/notifications/device-token';
@@ -75,7 +75,10 @@ class NotificationDeviceRegistrar implements DeviceRegistrationGateway {
       final response = await _dio.post<dynamic>(
         _devicesPath,
         data: {'token': fcmToken, 'platform': _platform},
-        options: Options(validateStatus: (_) => true),
+        options: Options(
+          extra: const {kBackgroundWriteExtra: true},
+          validateStatus: (_) => true,
+        ),
       );
       final outcome = _outcomeForStatus(response.statusCode);
       if (outcome.isSuccess) {
