@@ -76,7 +76,7 @@ final class SessionProvider extends $NotifierProvider<Session, SessionModel> {
   }
 }
 
-String _$sessionHash() => r'49a7b3195e6a53cdbb33321020ad6215c573f565';
+String _$sessionHash() => r'4a533542358bbb78aaef587fd5354f183d3c229b';
 
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
