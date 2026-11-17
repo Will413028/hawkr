@@ -9,7 +9,9 @@ const state = vi.hoisted(() => ({
 	comments: [] as unknown[],
 	fetched: undefined as unknown,
 	viewerEnabled: [] as boolean[],
+	viewerError: null as unknown,
 }));
+const refetchViewer = vi.hoisted(() => vi.fn());
 const blockBuyerByComment = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/context", () => ({
@@ -35,7 +37,13 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 	}),
 	usePostViewerState: (_postId: string, enabled: boolean) => {
 		state.viewerEnabled.push(enabled);
-		return { data: state.fetched };
+		return {
+			data: state.fetched,
+			isError: state.viewerError !== null,
+			error: state.viewerError,
+			isFetching: false,
+			refetch: refetchViewer,
+		};
 	},
 	useCommentReplies: () => ({
 		items: [],
@@ -88,6 +96,8 @@ beforeEach(() => {
 	state.comments = [];
 	state.fetched = undefined;
 	state.viewerEnabled = [];
+	state.viewerError = null;
+	refetchViewer.mockReset();
 	blockBuyerByComment.mockReset();
 });
 afterEach(cleanup);
@@ -138,6 +148,20 @@ describe("composer", () => {
 		mount();
 		expect(screen.getByPlaceholderText("以「小店」身分留言…")).toBeTruthy();
 		expect(state.viewerEnabled.at(-1)).toBe(true);
+	});
+
+	it("shows an error with a retry when the viewer state cannot be read, and retry refetches", () => {
+		state.viewerError = new Error("boom");
+		mount();
+		expect(screen.getByRole("alert")).toBeTruthy();
+		expect(screen.queryByPlaceholderText(/留言/)).toBeNull();
+		fireEvent.click(screen.getByText("重試"));
+		expect(refetchViewer).toHaveBeenCalledOnce();
+	});
+
+	it("shows no error while the viewer state is merely loading", () => {
+		mount();
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("does not fetch the viewer state when the post already carries it", () => {
@@ -217,6 +241,43 @@ describe("block this person (seller center)", () => {
 		mount({ viewer: STORE, allowBlockAuthor: true });
 		fireEvent.click(screen.getByText("封鎖此人"));
 		expect(blockBuyerByComment).not.toHaveBeenCalled();
+		confirm.mockRestore();
+	});
+
+	it("shows a failed block inline, not through window.alert, and not the raw message", async () => {
+		state.comments = [comment("1", { viewerCanDelete: true })];
+		blockBuyerByComment.mockRejectedValue(new Error("raw backend text"));
+		const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+		const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+		mount({ viewer: STORE, allowBlockAuthor: true });
+		fireEvent.click(screen.getByText("封鎖此人"));
+		const box = await screen.findByRole("alert");
+		expect(box.textContent).not.toContain("raw backend text");
+		expect(box.textContent).not.toBe("");
+		expect(alert).not.toHaveBeenCalled();
+		confirm.mockRestore();
+		alert.mockRestore();
+	});
+
+	it("a second click while the block is in flight sends no second request", async () => {
+		state.comments = [comment("1", { viewerCanDelete: true })];
+		let resolve: (v: unknown) => void = () => {};
+		blockBuyerByComment.mockReturnValue(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+		const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+		mount({ viewer: STORE, allowBlockAuthor: true });
+		const button = screen.getByText("封鎖此人") as HTMLButtonElement;
+		fireEvent.click(button);
+		fireEvent.click(button);
+		expect(blockBuyerByComment).toHaveBeenCalledTimes(1);
+		expect((screen.getByText("封鎖此人") as HTMLButtonElement).disabled).toBe(
+			true,
+		);
+		resolve({ changed: true });
+		await screen.findByText("已封鎖「買家1」");
 		confirm.mockRestore();
 	});
 });

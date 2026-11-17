@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import { gsap } from "gsap";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -22,6 +23,7 @@ import {
 	usePostComments,
 	usePostViewerState,
 } from "@/lib/hooks/useSocial";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { blockBuyerByComment } from "@/lib/seller/block-buyer";
 import {
 	canBlockCommentAuthor,
@@ -264,10 +266,12 @@ function ReplyItem({
 	reply,
 	onRemoved,
 	onBlockAuthor,
+	blockBusy = false,
 }: {
 	reply: Comment;
 	onRemoved: (id: string) => void;
 	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
 	const tComments = useTranslations("seller.comments");
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
@@ -491,7 +495,7 @@ function ReplyItem({
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
-							disabled={deleting}
+							disabled={deleting || blockBusy}
 							onClick={() => void onBlockAuthor?.(reply)}
 						>
 							{tComments("blockAction")}
@@ -513,6 +517,7 @@ function CommentItem({
 	onRemove,
 	onEdited,
 	onBlockAuthor,
+	blockBusy = false,
 }: {
 	comment: Comment;
 	postId: string;
@@ -523,8 +528,10 @@ function CommentItem({
 	onRemove: (id: string) => Promise<void>;
 	onEdited: (updated: Comment) => void;
 	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
 	const tComments = useTranslations("seller.comments");
+	const tFeed = useTranslations("feed.comments");
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	// Local mirror of replyCount so it bumps the moment we send a reply
@@ -797,7 +804,7 @@ function CommentItem({
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
-							disabled={deleting}
+							disabled={deleting || blockBusy}
 							onClick={() => void onBlockAuthor?.(comment)}
 						>
 							{tComments("blockAction")}
@@ -813,7 +820,9 @@ function CommentItem({
 						replyToName={comment.userName}
 						placeholder={
 							replyPlaceholder ??
-							(comment.userName ? `回覆 ${comment.userName}…` : "寫下你的回覆…")
+							(comment.userName
+								? tFeed("replyToName", { name: comment.userName })
+								: tFeed("replyPlaceholder"))
 						}
 						avatar={composerAvatar}
 						onSent={handleReplySent}
@@ -838,6 +847,7 @@ function CommentItem({
 									reply={r}
 									onRemoved={handleReplyRemoved}
 									onBlockAuthor={onBlockAuthor}
+									blockBusy={blockBusy}
 								/>
 							))
 						)}
@@ -864,7 +874,11 @@ export default function PostComments({
 	);
 	const viewer = viewerProp ?? fetchedViewer.data;
 	const list = usePostComments(postId, { active });
+	const defaultErrors = useDefaultErrorText();
 	const [blockNotice, setBlockNotice] = React.useState<string | null>(null);
+	const [blockError, setBlockError] = React.useState<string | null>(null);
+	const [blocking, setBlocking] = React.useState(false);
+	const blockingRef = React.useRef(false);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const rootRef = React.useRef<HTMLElement | null>(null);
@@ -918,12 +932,12 @@ export default function PostComments({
 				}
 			: {
 					src: actor?.avatarKey ?? identity?.avatarKey,
-					alt: actor?.name ?? identity?.nickname ?? "我",
+					alt: actor?.name ?? identity?.nickname ?? t("selfAlt"),
 					entity: "buyer",
 				};
 	const commentPlaceholder = storeName
 		? t("composeAsStore", { storeName })
-		: "寫下你的留言…";
+		: t("composePlaceholder");
 	const replyPlaceholder = storeName
 		? t("replyAsStore", { storeName })
 		: undefined;
@@ -937,15 +951,22 @@ export default function PostComments({
 				)
 			)
 				return;
+			if (blockingRef.current) return;
+			blockingRef.current = true;
+			setBlocking(true);
 			setBlockNotice(null);
+			setBlockError(null);
 			try {
 				await blockBuyerByComment(comment.id);
 				setBlockNotice(tSeller("blocked", { name }));
 			} catch (e) {
-				window.alert(e instanceof Error ? e.message : "封鎖失敗");
+				setBlockError(errorText(e, defaultErrors));
+			} finally {
+				blockingRef.current = false;
+				setBlocking(false);
 			}
 		},
-		[tSeller],
+		[tSeller, defaultErrors],
 	);
 
 	const submitDraft = async () => {
@@ -994,6 +1015,33 @@ export default function PostComments({
 				>
 					{blockNotice}
 				</p>
+			) : null}
+
+			{blockError ? (
+				<p
+					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
+					role="alert"
+				>
+					{blockError}
+				</p>
+			) : null}
+
+			{viewerProp === undefined && signedIn && fetchedViewer.isError ? (
+				<div
+					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)] flex items-center justify-between gap-[var(--hkui-space-3)]"
+					role="alert"
+				>
+					<span>{errorText(fetchedViewer.error, defaultErrors)}</span>
+					<Button
+						variant="bordered"
+						color="default"
+						size="sm"
+						disabled={fetchedViewer.isFetching}
+						onClick={() => void fetchedViewer.refetch()}
+					>
+						重試
+					</Button>
+				</div>
 			) : null}
 
 			{canComposeComment(signedIn, viewer) && (
@@ -1059,6 +1107,7 @@ export default function PostComments({
 							onRemove={list.remove}
 							onEdited={list.edited}
 							onBlockAuthor={allowBlockAuthor ? blockAuthor : undefined}
+							blockBusy={blocking}
 						/>
 					))}
 				</ul>

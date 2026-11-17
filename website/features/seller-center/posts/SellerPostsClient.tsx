@@ -82,6 +82,7 @@ function detailToListItem(d: MyPostDetail): PostListItem {
 		takedownMeasureId: d.takedownMeasureId,
 		publishStatus: d.publishStatus,
 		etag: d.etag,
+		viewer: d.viewer,
 	};
 }
 
@@ -183,7 +184,12 @@ export default function SellerPostsClient() {
 	const { isSuspended } = useSellerIdentity();
 	const t = useTranslations("seller.posts");
 	// 代行的工作區不是店家自己，限制只對店家自己的賣家中心成立。
-	const writeLocked = !delegated && isSuspended;
+	// 新增類動作（發布、編輯）看 MARKETING 能力：頁面對任何有 CONTENT_CONTRACT 的店家開放
+	// （待刪除、被收回行銷能力也進得來），所以不能只看停權。
+	const marketing = capabilityStatus(seller, SellerCapability.MARKETING);
+	const writeLocked =
+		!delegated &&
+		(isSuspended || (marketing !== undefined && !marketing.active));
 	// 代行下 `useSellerSelf()` 是店面那一支（scope 已換），但工作區的側欄不掛它 ——
 	// 這裡的店家鍵一律優先取工作階段下發的 `ownerStoreId`，才不會因為 storefront.read
 	// 沒核發就整頁不載入。
@@ -456,7 +462,7 @@ export default function SellerPostsClient() {
 										<PostPublishControl
 											publishStatus={p.publishStatus}
 											hidden={isPostHidden(p)}
-											suspended={isSuspended}
+											suspended={writeLocked}
 											hasImage={Boolean(p.imageKeys[0])}
 											busy={
 												publishMutation.isPending &&
@@ -602,7 +608,7 @@ export default function SellerPostsClient() {
 										<PostPublishControl
 											publishStatus={post.publishStatus}
 											hidden={isPostHidden(post)}
-											suspended={isSuspended}
+											suspended={writeLocked}
 											hasImage={Boolean(post.imageKeys[0])}
 											busy={
 												publishMutation.isPending &&
@@ -643,6 +649,7 @@ export default function SellerPostsClient() {
 			<SellerPostDetailModal
 				open={activePost !== null}
 				post={activePost}
+				delegated={delegated}
 				storePublic={
 					capabilityStatus(seller, SellerCapability.PUBLIC_LISTING)?.active
 				}

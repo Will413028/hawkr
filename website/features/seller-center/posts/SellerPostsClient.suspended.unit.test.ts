@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { SellerCapability } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import * as React from "react";
@@ -7,7 +8,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PostListItem } from "@/lib/api/openapi-types";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
-const state = vi.hoisted(() => ({ suspended: false, mode: "seller" }));
+const state = vi.hoisted(() => ({
+	suspended: false,
+	mode: "seller",
+	self: null as unknown,
+}));
 const fetchSellerPosts = vi.fn();
 
 vi.mock("@/lib/seller-data/scope", () => ({
@@ -25,7 +30,7 @@ vi.mock("@/lib/seller-data/scope", () => ({
 	}),
 }));
 vi.mock("@/lib/hooks/useSellerSelf", () => ({
-	useSellerSelf: () => ({ data: null, loading: false }),
+	useSellerSelf: () => ({ data: state.self, loading: false }),
 }));
 vi.mock("@/components/shared/useSellerIdentity", () => ({
 	useSellerIdentity: () => ({ isSuspended: state.suspended }),
@@ -75,7 +80,17 @@ vi.mock("./useSellerPostsViewport", () => ({
 	useSellerPostsViewport: () => "desktop",
 }));
 // 發布方向由 PostPublishControl 自己負責（它有自己的測試）；這裡只看列表頁的入口。
-vi.mock("./PostPublishControl", () => ({ default: () => null }));
+vi.mock("./PostPublishControl", () => ({
+	default: (props: { suspended?: boolean }) =>
+		React.createElement(
+			"span",
+			{
+				"data-testid": "publish-control",
+				"data-locked": String(props.suspended),
+			},
+			"publish",
+		),
+}));
 
 import SellerPostsClient from "./SellerPostsClient";
 
@@ -130,6 +145,7 @@ afterEach(() => {
 	fetchSellerPosts.mockReset();
 	state.suspended = false;
 	state.mode = "seller";
+	state.self = null;
 });
 
 describe("seller posts list while the store is restricted", () => {
@@ -143,6 +159,24 @@ describe("seller posts list while the store is restricted", () => {
 		expect(disabledOf("發布動態")).toEqual([true]);
 		expect(disabledOf("編輯")).toEqual([true]);
 		expect(disabledOf("刪除")).toEqual([false]);
+	});
+
+	it("a store whose MARKETING capability is revoked but is not suspended is locked too", async () => {
+		state.self = {
+			store: { id: "7" },
+			capabilities: [
+				{ capability: SellerCapability.MARKETING, active: false, missing: [] },
+			],
+		};
+		fetchSellerPosts.mockResolvedValue([post("1")]);
+		mount();
+		await waitFor(() => screen.getByText("刪除"));
+
+		expect(screen.getByText(NOTICE)).toBeTruthy();
+		expect(disabledOf("發布動態")).toEqual([true]);
+		expect(disabledOf("編輯")).toEqual([true]);
+		expect(disabledOf("刪除")).toEqual([false]);
+		expect(screen.getByTestId("publish-control").dataset.locked).toBe("true");
 	});
 
 	it("an active store gets no notice and enabled entries", async () => {

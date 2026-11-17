@@ -126,6 +126,7 @@ describe("SellerPostsClient deep link", () => {
 			publishStatus: "4402",
 			hiddenAt: 1760000000,
 			hiddenReason: "違規",
+			viewer: { canComment: true, actor: { kind: "store", id: "7" } },
 		};
 		fetchSellerPostDetail.mockResolvedValue(hidden);
 
@@ -140,6 +141,7 @@ describe("SellerPostsClient deep link", () => {
 				publishStatus: "4402",
 				hiddenAt: 1760000000,
 				hiddenReason: "違規",
+				viewer: { canComment: true, actor: { kind: "store", id: "7" } },
 			});
 		});
 		expect(fetchSellerPostDetail).toHaveBeenCalledWith("900");

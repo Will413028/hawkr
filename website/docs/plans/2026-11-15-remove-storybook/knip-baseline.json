@@ -2411,11 +2411,6 @@
 ],
 [
 "exports",
-"lib/search/repo.ts",
-"fetchTrendingHashtags"
-],
-[
-"exports",
 "lib/seller-data/delegated-repos.ts",
 "DELEGATED_BATCH_UNPUBLISH_MAX"
 ],

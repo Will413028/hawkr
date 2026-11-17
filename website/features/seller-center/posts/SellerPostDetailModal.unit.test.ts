@@ -54,6 +54,7 @@ function post(overrides: Partial<PostListItem> = {}): PostListItem {
 function renderModal(
 	p: PostListItem,
 	storePublic: boolean | undefined,
+	delegated = false,
 ): ReturnType<typeof render> {
 	return render(
 		React.createElement(
@@ -63,6 +64,7 @@ function renderModal(
 				open: true,
 				post: p,
 				storePublic,
+				delegated,
 				onClose: () => {},
 			}),
 		),
@@ -126,6 +128,14 @@ describe("SellerPostDetailModal comments", () => {
 		await screen.findByTestId("post-comments");
 		expect(postComments).toHaveBeenCalledWith(
 			expect.objectContaining({ viewer, allowBlockAuthor: true }),
+		);
+	});
+
+	it("does not offer blocking in a delegated workspace", async () => {
+		renderModal(post(), true, true);
+		await screen.findByTestId("post-comments");
+		expect(postComments).toHaveBeenCalledWith(
+			expect.objectContaining({ allowBlockAuthor: false }),
 		);
 	});
 });

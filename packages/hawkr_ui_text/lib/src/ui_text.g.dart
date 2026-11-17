@@ -508,7 +508,8 @@ String? sellerMeasureMetaKind(UiLocale l, {required hawkr_seller_v1alpha1_seller
 final kindText = _sellerMeasureKind(l, kind.value);
 if (kindText == null) return null;
 return switch (l) {
-UiLocale.zhTW || UiLocale.en => '措施：' + kindText,
+UiLocale.zhTW => '措施：' + kindText,
+UiLocale.en => 'Measure: ' + kindText,
 };
 }
 

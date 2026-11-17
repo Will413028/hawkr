@@ -331,6 +331,9 @@ func (t Text) SellerMeasureMetaKind(kind string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	if t.Locale() == EN {
+		return "Measure: " + kindText, true
+	}
 	return "措施：" + kindText, true
 }
 

@@ -1,6 +1,6 @@
 /**
  * Strict TS types projected from 預設模組.openapi.json
- * Source of truth: /public/posts, /app/buyers/me, /app/posts/{id}/*
+ * Source of truth: /app/buyers/me; the social post types are the client-side view models over the Connect `hawkr.social.v1alpha1` messages (`lib/posts/repo.ts`)
  *
  * Naming: every JSON body field is camelCase (backend-payuni#2235 收斂 — 10 檔 §2:
  * URL/Query snake_case, JSON body camelCase). Query-string params are the sole

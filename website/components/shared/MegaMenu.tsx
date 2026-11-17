@@ -39,7 +39,7 @@ export type MegaMenuDynamicLinks = {
 	hashtags?: NavMegaLink[];
 	/** Drives the Hawkr 動態 panel's right-slot "本週主題" carousel
 	 *  (top 5 most-viewed posts of the recent batch). Empty array when
-	 *  /public/posts returned nothing — the slot then renders a tasteful
+	 *  the trending-posts read returned nothing — the slot then renders a tasteful
 	 *  empty state (`<WeeklyTopPostEmpty>`) inviting the buyer into the
 	 *  feed, never fake post copy. */
 	topPosts?: PostListItem[];

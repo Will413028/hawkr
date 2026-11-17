@@ -23,6 +23,8 @@ interface Props {
 	post: PostListItem | null;
 	/** 店家的 `PUBLIC_LISTING` 是否啟用；不知道（代行、尚未載入）時是 `undefined`。 */
 	storePublic: boolean | undefined;
+	/** 代行的工作區：封鎖用店主自己的賣家身分呼叫，代行者不能用。 */
+	delegated?: boolean;
 	onClose: () => void;
 }
 
@@ -49,6 +51,7 @@ export default function SellerPostDetailModal({
 	open,
 	post,
 	storePublic,
+	delegated = false,
 	onClose,
 }: Props) {
 	const [mounted, setMounted] = React.useState(false);
@@ -199,7 +202,7 @@ export default function SellerPostDetailModal({
 					<PostComments
 						postId={post.id}
 						viewer={post.viewer}
-						allowBlockAuthor
+						allowBlockAuthor={!delegated}
 					/>
 				</aside>
 			</section>

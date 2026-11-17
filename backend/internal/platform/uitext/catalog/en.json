@@ -78,6 +78,9 @@
     "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
       "message": "Under review"
     },
+    "seller.Measure.meta_kind": {
+      "message": "Measure: {kind}"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "Suspended (no end date; under periodic review by the platform)"
     },

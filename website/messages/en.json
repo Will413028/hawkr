@@ -58,7 +58,11 @@
 	"feed": {
 		"comments": {
 			"composeAsStore": "Comment as “{storeName}”…",
-			"replyAsStore": "Reply as “{storeName}”…"
+			"replyAsStore": "Reply as “{storeName}”…",
+			"composePlaceholder": "Write a comment…",
+			"replyToName": "Reply to {name}…",
+			"replyPlaceholder": "Write a reply…",
+			"selfAlt": "Me"
 		}
 	}
 }

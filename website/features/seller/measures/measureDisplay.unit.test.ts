@@ -187,8 +187,7 @@ describe("measureMeta", () => {
 		const takedown = measure({ kind: MeasureKind.CONTENT_TAKEDOWN });
 		expect(measureMeta(ut, takedown)).toBe("措施：內容下架");
 		const meta = measureMeta(uiTextFor("en"), takedown);
-		expect(meta).toContain("Content removal");
-		expect(meta).not.toContain("內容下架");
+		expect(meta).toBe("Measure: Content removal");
 	});
 });
 

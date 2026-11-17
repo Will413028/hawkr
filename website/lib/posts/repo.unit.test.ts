@@ -243,6 +243,21 @@ describe("fetchPostViewerState", () => {
 		expect(publicRpc.listPosts).not.toHaveBeenCalled();
 	});
 
+	it("maps the same fields as the viewer carried on a read post (one mapping)", async () => {
+		const post = wirePost("p-1");
+		post.viewerCanComment = true;
+		post.viewerActor = {
+			kind: ActorKind.BUYER,
+			id: "9",
+			name: "  小明  ",
+		} as never;
+		viewerRpc.getPost.mockResolvedValue({ post });
+		await expect(fetchPostViewerState("p-1")).resolves.toEqual(
+			postToListItem(post).viewer,
+		);
+		expect(postToListItem(post).viewer?.actor?.name).toBe("小明");
+	});
+
 	it("a guest read has nobody commenting", async () => {
 		viewerRpc.getPost.mockResolvedValue({ post: wirePost("p-1") });
 		await expect(fetchPostViewerState("p-1")).resolves.toEqual({

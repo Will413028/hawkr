@@ -98,7 +98,7 @@
     },
     "Measure": {
       "appeal_deadline": "申覆期限：{deadline}",
-      "meta_kind": "措施：{kind}",
+      "meta_kind": "Measure: {kind}",
       "meta_severity": "嚴重程度：{severity}",
       "meta_termination_ground": "事由：{ground}",
       "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",

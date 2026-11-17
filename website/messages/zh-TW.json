@@ -58,7 +58,11 @@
 	"feed": {
 		"comments": {
 			"composeAsStore": "以「{storeName}」身分留言…",
-			"replyAsStore": "以「{storeName}」身分回覆…"
+			"replyAsStore": "以「{storeName}」身分回覆…",
+			"composePlaceholder": "寫下你的留言…",
+			"replyToName": "回覆 {name}…",
+			"replyPlaceholder": "寫下你的回覆…",
+			"selfAlt": "我"
 		}
 	}
 }

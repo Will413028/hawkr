@@ -73,8 +73,16 @@ function viewerActorOf(post: Post): PostViewerActor | undefined {
  * 分不出來，所以兩者都沒有時回 undefined（還不知道），由呼叫端用依觀看者的讀取補。
  */
 export function postViewerOf(post: Post): PostViewerState | undefined {
+	if (!viewerKnown(post)) return undefined;
+	return viewerStateOf(post);
+}
+
+function viewerKnown(post: Post): boolean {
+	return Boolean(viewerActorOf(post) || post.viewerCanComment);
+}
+
+function viewerStateOf(post: Post): PostViewerState {
 	const actor = viewerActorOf(post);
-	if (!actor && !post.viewerCanComment) return undefined;
 	return { canComment: post.viewerCanComment, ...(actor ? { actor } : {}) };
 }
 
@@ -204,11 +212,7 @@ export async function fetchPostViewerState(
 ): Promise<PostViewerState> {
 	const res = await socialViewerClient().getPost({ postId }, { signal });
 	if (!res.post) throw new Error("post missing");
-	const actor = viewerActorOf(res.post);
-	return {
-		canComment: res.post.viewerCanComment,
-		...(actor ? { actor } : {}),
-	};
+	return viewerStateOf(res.post);
 }
 
 /**
