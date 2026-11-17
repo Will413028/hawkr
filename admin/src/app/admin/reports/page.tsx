@@ -32,7 +32,14 @@ import {
 } from "../moderation/moderation-text";
 import "@/styles/pages/MerchantManagement.css";
 
-const COLUMNS = ["對象種類", "對象", "狀態", "開案時間", "停留時間"] as const;
+const COLUMNS = [
+	"對象種類",
+	"對象",
+	"檢舉數",
+	"狀態",
+	"開案時間",
+	"停留時間",
+] as const;
 
 /**
  * 社群檢舉案件：一個對象一列，點列進案件詳情處理。篩選是案件狀態（預設進行中）與對象種類，換篩選回第一頁；
@@ -162,6 +169,7 @@ export default function ReportsAdminPage() {
 										</Link>
 									</td>
 									<td>{row.targetId}</td>
+									<td>{row.reportCount}</td>
 									<td>
 										<StatusBadge variant={row.stateVariant}>
 											{row.state}

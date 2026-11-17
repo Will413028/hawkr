@@ -40,6 +40,7 @@ function kase(id: string, patch: MessageInitShape<typeof CaseSchema> = {}) {
 		state: CaseState.OPEN,
 		createTime: timestampFromMs(T0),
 		etag: "e1",
+		reportCount: BigInt(1),
 		...patch,
 	};
 	return create(CaseSchema, init as MessageInitShape<typeof CaseSchema>);
@@ -55,7 +56,9 @@ function setup(pages: Record<string, { ids: string[]; next: string }>) {
 				requests.push(req);
 				const page = pages[req.pageToken] ?? { ids: [], next: "" };
 				return {
-					cases: page.ids.map((id) => kase(id)),
+					cases: page.ids.map((id, i) =>
+						kase(id, { reportCount: BigInt(i + 4) }),
+					),
 					nextPageToken: page.next,
 				};
 			},
@@ -96,7 +99,13 @@ test("一個案件一列：對象種類、對象、狀態；預設只看進行�
 	assert.equal(first?.pageToken, "");
 	const rows = rowTexts();
 	assert.equal(rows.length, 2);
-	assert.deepEqual(rows[0]?.slice(0, 3), ["留言", "content-c1", "進行中"]);
+	assert.deepEqual(rows[0]?.slice(0, 4), ["留言", "content-c1", "4", "進行中"]);
+	assert.equal(rows[1]?.[2], "5");
+	assert.ok(
+		[...dom.window.document.querySelectorAll("thead th")].some(
+			(th) => th.textContent === "檢舉數",
+		),
+	);
 	const link = dom.window.document.querySelector("tbody a");
 	assert.equal(link?.getAttribute("href"), "/admin/moderation/cases/c1");
 	assert.ok(!bodyText().includes("第 2 頁"));

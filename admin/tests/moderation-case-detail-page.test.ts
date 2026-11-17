@@ -12,17 +12,24 @@ import {
 	type DecideCaseRequest,
 	ModerationAdminService,
 } from "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb";
+import { SellerGovernanceAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
+import { MeasureSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import {
 	ReportOutcome,
 	ReportTargetKind,
 } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
-import { ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import {
+	MeasureKind,
+	MeasureState,
+	ViolationSeverity,
+} from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	bodyText,
 	buttonByText,
 	byId,
 	click,
+	dom,
 	maybeById,
 	mount,
 	navigation,
@@ -79,6 +86,7 @@ function setup(
 	onDecide: (req: DecideCaseRequest) => unknown = () => ({}),
 ) {
 	const decides: DecideCaseRequest[] = [];
+	const measureReads: string[] = [];
 	let reads = 0;
 	const transport: Transport = createRouterTransport(({ service }) => {
 		service(ModerationAdminService, {
@@ -91,8 +99,20 @@ function setup(
 				return onDecide(req);
 			},
 		} as never);
+		service(SellerGovernanceAdminService, {
+			getMeasure: (req: { id: string }) => {
+				measureReads.push(req.id);
+				return {
+					measure: create(MeasureSchema, {
+						id: req.id,
+						state: MeasureState.ACTIVE,
+						kind: MeasureKind.CONTENT_TAKEDOWN,
+					}),
+				};
+			},
+		} as never);
 	});
-	return { decides, transport, reads: () => reads };
+	return { decides, measureReads, transport, reads: () => reads };
 }
 
 async function open(transport: Transport) {
@@ -148,10 +168,29 @@ test("違規：留言可選處置，隱藏帶類別與理由；沒填理由不�
 	assert.equal(req?.action, CaseAction.HIDE);
 	assert.equal(req?.category, PolicyCategory.SPAM);
 	assert.equal(req?.reason, "廣告洗版");
-	assert.equal(req?.storeId, "");
 });
 
-test("下架要店家與嚴重度，請求帶進去", async () => {
+test("下架：店家唯讀取自快照，只填嚴重度，請求不帶店家", async () => {
+	const { transport, decides } = setup(() => kase({ storeId: "store-9" }));
+	await open(transport);
+	await click("決定");
+	await pick("moderation-decision", CaseDecision.VIOLATION);
+	await pick("moderation-action", CaseAction.TAKEDOWN);
+	await pick("moderation-category", PolicyCategory.HARASSMENT);
+	await pick("moderation-reason", "騷擾");
+	assert.equal(byId("moderation-store-id").textContent, "store-9");
+	assert.equal(byId("moderation-store-id").tagName, "DIV");
+	await click("確認決定");
+	assert.equal(decides.length, 0);
+	assert.ok(bodyText().includes("請選擇嚴重度"));
+	await pick("moderation-severity", ViolationSeverity.MEDIUM);
+	await click("確認決定");
+	await until(() => decides.length === 1, "DecideCase 的請求");
+	assert.equal(decides[0]?.severity, ViolationSeverity.MEDIUM);
+	assert.ok(!("storeId" in (decides[0] ?? {})));
+});
+
+test("下架：案件沒有快照店家時不送出", async () => {
 	const { transport, decides } = setup(() => kase());
 	await open(transport);
 	await click("決定");
@@ -159,14 +198,38 @@ test("下架要店家與嚴重度，請求帶進去", async () => {
 	await pick("moderation-action", CaseAction.TAKEDOWN);
 	await pick("moderation-category", PolicyCategory.HARASSMENT);
 	await pick("moderation-reason", "騷擾");
-	await click("確認決定");
-	assert.equal(decides.length, 0);
-	await pick("moderation-store-id", "store-9");
 	await pick("moderation-severity", ViolationSeverity.MEDIUM);
 	await click("確認決定");
-	await until(() => decides.length === 1, "DecideCase 的請求");
-	assert.equal(decides[0]?.storeId, "store-9");
-	assert.equal(decides[0]?.severity, ViolationSeverity.MEDIUM);
+	assert.equal(decides.length, 0);
+	assert.ok(bodyText().includes("沒有內容快照的店家"));
+});
+
+test("案件有 measure_id：以它讀措施，顯示目前狀態與措施連結；沒有就不讀", async () => {
+	const withMeasure = setup(() =>
+		kase({
+			state: CaseState.CLOSED,
+			decision: CaseDecision.VIOLATION,
+			action: CaseAction.TAKEDOWN,
+			measureId: "measure-5",
+			reportCount: BigInt(3),
+		}),
+	);
+	await open(withMeasure.transport);
+	await until(() => withMeasure.measureReads.length > 0, "GetMeasure 的請求");
+	assert.deepEqual(withMeasure.measureReads, ["measure-5"]);
+	const link = [...dom.window.document.querySelectorAll("a")].find(
+		(a) => a.getAttribute("href") === "/admin/measures/measure-5",
+	);
+	assert.ok(link);
+	await until(() => bodyText().includes("目前狀態"), "措施區塊");
+	assert.ok(bodyText().includes("檢舉數"));
+});
+
+test("案件沒有 measure_id：不呼叫 GetMeasure", async () => {
+	const none = setup(() => kase());
+	await open(none.transport);
+	assert.deepEqual(none.measureReads, []);
+	assert.ok(!bodyText().includes("下架措施"));
 });
 
 test("已結案是終態：沒有決定的操作，顯示決定結果", async () => {

@@ -48,6 +48,7 @@ export interface CaseRow {
 	id: string;
 	targetKind: string;
 	targetId: string;
+	reportCount: string;
 	state: string;
 	stateVariant: "warning" | "gray";
 	createTime: string;
@@ -64,6 +65,7 @@ export function caseRow(kase: Case, now: Date): CaseRow {
 			kase.target?.kind ?? ReportTargetKind.UNSPECIFIED,
 		),
 		targetId: kase.target?.id ?? "",
+		reportCount: kase.reportCount.toString(),
 		state: caseStateText(kase.state),
 		stateVariant: caseStateVariant(kase.state),
 		createTime: created ? formatDateTimeShort(created) : "-",

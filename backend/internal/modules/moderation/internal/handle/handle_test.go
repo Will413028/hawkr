@@ -7,6 +7,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -20,7 +21,7 @@ func violation(a model.Action) model.DecideInput {
 
 func TestValidateViolationShapes(t *testing.T) {
 	takedown := violation(model.ActionTakedown)
-	takedown.StoreID, takedown.Severity = 5, string(seller.SeverityValues()[0])
+	takedown.Severity = string(seller.SeverityValues()[0])
 	for name, in := range map[string]model.DecideInput{
 		"隱藏": violation(model.ActionHide), "警告": violation(model.ActionWarn), "停權": violation(model.ActionBan), "下架": takedown,
 	} {
@@ -38,7 +39,6 @@ func TestValidateViolationShapes(t *testing.T) {
 		"商品類別":    func(in *model.DecideInput) { in.Category = policy.Counterfeit },
 		"理由空白":    func(in *model.DecideInput) { in.Text = " 　 " },
 		"理由太長":    func(in *model.DecideInput) { in.Text = strings.Repeat("字", model.MaxTextRunes+1) },
-		"隱藏帶了店家":  func(in *model.DecideInput) { in.StoreID = 1 },
 		"隱藏帶了嚴重度": func(in *model.DecideInput) { in.Severity = "LOW" },
 	}
 	for name, mutate := range bad {
@@ -49,7 +49,6 @@ func TestValidateViolationShapes(t *testing.T) {
 		}
 	}
 	for name, mutate := range map[string]func(*model.DecideInput){
-		"沒有店家":   func(in *model.DecideInput) { in.StoreID = 0 },
 		"沒有嚴重度":  func(in *model.DecideInput) { in.Severity = "" },
 		"嚴重度不認得": func(in *model.DecideInput) { in.Severity = "SEVERE" },
 	} {
@@ -86,7 +85,6 @@ func TestValidateNoViolationCarriesNothingElse(t *testing.T) {
 		"類別": func(in *model.DecideInput) { in.Category = policy.Spam },
 		"處置": func(in *model.DecideInput) { in.Action = model.ActionHide },
 		"理由": func(in *model.DecideInput) { in.Text = "x" },
-		"店家": func(in *model.DecideInput) { in.StoreID = 1 },
 	} {
 		in := ok
 		mutate(&in)
@@ -106,5 +104,27 @@ func TestValidateMissingActionIsAWiringErrorNotUserInput(t *testing.T) {
 	in.Actor.Action = ""
 	if _, err := Validate(in); err == nil || apperr.KindOf(err) != apperr.KindInternal {
 		t.Fatalf("沒有 procedure 名稱預期未分類的內部錯誤：%v", err)
+	}
+}
+
+func TestCheckTakedownStoreUsesTheSnapshotStore(t *testing.T) {
+	owner := func(author, store int64) social.ContentOwner {
+		return social.ContentOwner{Author: social.Actor{Kind: social.ActorStore, ID: author}, StoreID: store}
+	}
+	if err := CheckTakedownStore(owner(5, 5), 5); err != nil {
+		t.Fatalf("作者與歸屬都是快照店家：%v", err)
+	}
+	for name, c := range map[string]struct {
+		o social.ContentOwner
+		s int64
+	}{
+		"現在的作者不是快照店家": {owner(6, 6), 5},
+		"歸屬不是快照店家":    {owner(5, 6), 5},
+		"快照沒有店家":      {owner(5, 5), 0},
+		"作者是買家":       {social.ContentOwner{Author: social.Actor{Kind: social.ActorBuyer, ID: 5}, StoreID: 5}, 5},
+	} {
+		if err := CheckTakedownStore(c.o, c.s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Errorf("%s：%v", name, err)
+		}
 	}
 }

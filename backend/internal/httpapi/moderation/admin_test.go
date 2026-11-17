@@ -81,11 +81,11 @@ func TestListCasesPassesFiltersAndMapsTheCasesAndTheNextToken(t *testing.T) {
 	closed := open.Add(time.Hour)
 	id1, id2 := uuid.New(), uuid.New()
 	dec, act, cat := moderation.DecisionViolation, moderation.ActionHide, moderationCategory()
-	admin := int64(9)
+	admin, store, measure := int64(9), int64(12), uuid.New()
 	f := &fakeCases{page: moderation.CasePage{
 		Cases: []moderation.Case{
-			{ID: id1, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 5}, Version: 3, OpenedAt: open},
-			{ID: id2, Target: moderation.Target{Kind: moderation.TargetComment, ContentID: uuid.New()}, Version: 2, OpenedAt: open, Decision: &dec, Action: &act, Category: &cat, DecidedByAdmin: &admin, ClosedAt: &closed},
+			{ID: id1, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 5}, Version: 3, OpenedAt: open, ReportCount: 7},
+			{ID: id2, Target: moderation.Target{Kind: moderation.TargetComment, ContentID: uuid.New()}, Version: 2, OpenedAt: open, Decision: &dec, Action: &act, Category: &cat, DecidedByAdmin: &admin, ClosedAt: &closed, ReportCount: 2, MeasureID: &measure, StoreID: &store},
 		},
 		Next: &moderation.CaseCursor{OpenedAt: open, ID: id2},
 	}}
@@ -104,12 +104,14 @@ func TestListCasesPassesFiltersAndMapsTheCasesAndTheNextToken(t *testing.T) {
 		t.Fatalf("cases = %d", len(got))
 	}
 	if got[0].GetState() != adminpb.CaseState_CASE_STATE_OPEN || got[0].GetTarget().GetId() != "5" || got[0].GetEtag() != "3" ||
-		got[0].GetDecision() != adminpb.CaseDecision_CASE_DECISION_UNSPECIFIED || got[0].ResolveTime != nil || got[0].GetDecidedBy() != "" {
+		got[0].GetDecision() != adminpb.CaseDecision_CASE_DECISION_UNSPECIFIED || got[0].ResolveTime != nil || got[0].GetDecidedBy() != "" ||
+		got[0].GetReportCount() != 7 || got[0].MeasureId != nil || got[0].StoreId != nil {
 		t.Fatalf("進行中的案件：%+v", got[0])
 	}
 	if got[1].GetState() != adminpb.CaseState_CASE_STATE_CLOSED || got[1].GetDecision() != adminpb.CaseDecision_CASE_DECISION_VIOLATION ||
 		got[1].GetAction() != adminpb.CaseAction_CASE_ACTION_HIDE || got[1].GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_SPAM ||
-		got[1].GetDecidedBy() != "9" || !got[1].GetResolveTime().AsTime().Equal(closed) {
+		got[1].GetDecidedBy() != "9" || !got[1].GetResolveTime().AsTime().Equal(closed) ||
+		got[1].GetReportCount() != 2 || got[1].GetMeasureId() != measure.String() || got[1].GetStoreId() != "12" {
 		t.Fatalf("已結案的案件：%+v", got[1])
 	}
 	if res.Msg.GetNextPageToken() == "" {
@@ -155,10 +157,10 @@ func TestListCasesInvalidFilterErrorPointsAtTheRequestField(t *testing.T) {
 }
 
 func TestGetCaseReturnsTheCaseWithItsReports(t *testing.T) {
-	caseID, reportID := uuid.New(), uuid.New()
+	caseID, reportID, measure, store := uuid.New(), uuid.New(), uuid.New(), int64(12)
 	at := time.Date(2026, 11, 1, 3, 0, 0, 0, time.UTC)
 	f := &fakeCases{detail: moderation.CaseDetail{
-		Case: moderation.Case{ID: caseID, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: uuid.New()}, Version: 4, OpenedAt: at},
+		Case: moderation.Case{ID: caseID, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: uuid.New()}, Version: 4, OpenedAt: at, ReportCount: 1, MeasureID: &measure, StoreID: &store},
 		Reports: []moderation.Report{{
 			ID: reportID, CaseID: caseID, ReporterBuyerID: 11, Category: moderationCategory(), Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomePending,
 		}},
@@ -170,7 +172,8 @@ func TestGetCaseReturnsTheCaseWithItsReports(t *testing.T) {
 	}
 	r := res.Msg.GetReports()
 	if f.gotID != caseID || res.Msg.GetCase().GetId() != caseID.String() || len(r) != 1 || r[0].GetReporterId() != "11" || r[0].GetDescription() != "廣告" ||
-		r[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || r[0].GetId() != reportID.String() {
+		r[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || r[0].GetId() != reportID.String() ||
+		res.Msg.GetCase().GetReportCount() != 1 || res.Msg.GetCase().GetMeasureId() != measure.String() || res.Msg.GetCase().GetStoreId() != "12" {
 		t.Fatalf("response = %+v", res.Msg)
 	}
 	_, err = c.GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: "not-a-uuid"}))
@@ -194,14 +197,14 @@ func TestDecideCaseSendsTheAdminProcedureAndTheFieldsToTheModule(t *testing.T) {
 	_, err := c.DecideCase(t.Context(), connect.NewRequest(&adminpb.DecideCaseRequest{
 		Id: caseID.String(), Etag: "4", Decision: adminpb.CaseDecision_CASE_DECISION_VIOLATION,
 		Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Action: adminpb.CaseAction_CASE_ACTION_TAKEDOWN,
-		Reason: "廣告", StoreId: "12", Severity: sellerpb.ViolationSeverity_VIOLATION_SEVERITY_HIGH,
+		Reason: "廣告", Severity: sellerpb.ViolationSeverity_VIOLATION_SEVERITY_HIGH,
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := moderation.DecideInput{
 		CaseID: caseID, Version: 4, Actor: adminaudit.Actor{AdminID: 42, Action: moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure},
-		Decision: moderation.DecisionViolation, Category: moderationCategory(), Action: moderation.ActionTakedown, Text: "廣告", StoreID: 12, Severity: "HIGH",
+		Decision: moderation.DecisionViolation, Category: moderationCategory(), Action: moderation.ActionTakedown, Text: "廣告", Severity: "HIGH",
 	}
 	if len(f.decided) != 1 || f.decided[0] != want {
 		t.Fatalf("decided = %+v\nwant %+v", f.decided, want)
@@ -214,7 +217,6 @@ func TestDecideCaseRequiresTheEtagAndAValidID(t *testing.T) {
 	for name, req := range map[string]*adminpb.DecideCaseRequest{
 		"沒有 etag": {Id: uuid.New().String(), Decision: adminpb.CaseDecision_CASE_DECISION_NO_VIOLATION},
 		"壞的 ID":   {Id: "x", Etag: "1", Decision: adminpb.CaseDecision_CASE_DECISION_NO_VIOLATION},
-		"壞的店家 ID": {Id: uuid.New().String(), Etag: "1", StoreId: "abc", Decision: adminpb.CaseDecision_CASE_DECISION_VIOLATION},
 	} {
 		_, err := c.DecideCase(t.Context(), connect.NewRequest(req))
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {

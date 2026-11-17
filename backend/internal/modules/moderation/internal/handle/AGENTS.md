@@ -8,4 +8,4 @@
 - 內容已被刪除時，警告與停權用快照裡凍結的作者，隱藏與內容下架回 FailedPrecondition（`TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone`）。
 - 後台決定留稽核：`DecideCase` 在結案後同 transaction 呼叫 `adminaudit.Record`（`Actor.Action` 必填，是後台 RPC 的 procedure 名稱，缺漏是接線錯誤、回未分類的 internal error），版本衝突回滾時紀錄跟著消失（`TestDecideWritesTheAdminAuditRecordInTheSameTransaction`）。
 - 處置與結案在同一個 transaction；案件列最後才寫：擁有處分的模組（social、identity、seller）的列都排在 moderation 之前，先呼叫它們、後寫自己的列（`internal/platform/lockorder`）；每次處理只走一條處置路徑。
-- 店家寫的內容只能走內容下架，內容必須經 social 驗證屬於管理員指定的店家；買家不能隱藏或警告店家，店家不能被停權。
+- 店家寫的內容只能走內容下架，店家取自案件的內容快照，內容還在時 social 現在的作者與歸屬必須是同一家店（`CheckTakedownStore`）；建立的措施 ID 同 transaction 寫進 `cases.measure_id`；買家不能隱藏或警告店家，店家不能被停權。

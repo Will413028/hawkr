@@ -7,11 +7,14 @@ import {
 	CaseState,
 	ModerationAdminService,
 } from "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb";
+import { SellerGovernanceAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, Section } from "@/app/admin/governance/DetailBits";
+import { measureStateBadge } from "@/app/admin/merchants/[id]/measure";
 import { Button, StatusBadge } from "@/components/UI";
 import { type ConflictText, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
@@ -55,6 +58,15 @@ export default function ModerationCaseDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 	const kase = detail.data?.case;
+	const measureId = kase?.measureId;
+	const measure = useQuery(
+		SellerGovernanceAdminService.method.getMeasure,
+		{ id: measureId ?? "" },
+		{ enabled: Boolean(measureId) },
+	);
+	const measureState = measure.data?.measure
+		? measureStateBadge(measure.data.measure.state, measure.data.measure.kind)
+		: undefined;
 	const reports = [...(detail.data?.reports ?? [])].sort(
 		(a, b) =>
 			(a.createTime ? timestampMs(a.createTime) : 0) -
@@ -141,6 +153,8 @@ export default function ModerationCaseDetailPage() {
 						{targetKindText(kase.target?.kind ?? 0)}
 					</Field>
 					<Field label="對象">{kase.target?.id ?? "-"}</Field>
+					<Field label="檢舉數">{kase.reportCount.toString()}</Field>
+					{kase.storeId && <Field label="店家">{kase.storeId}</Field>}
 					{kase.state === CaseState.CLOSED && (
 						<>
 							<Field label="決定">{caseDecisionText(kase.decision)}</Field>
@@ -158,6 +172,27 @@ export default function ModerationCaseDetailPage() {
 					)}
 				</div>
 			</Section>
+
+			{measureId && (
+				<Section id="moderation-case-measure" icon="policy" title="下架措施">
+					<div className="info-grid">
+						<Field label="措施">
+							<Link href={`/admin/measures/${measureId}`}>{measureId}</Link>
+						</Field>
+						<Field label="目前狀態">
+							{measure.isLoading ? (
+								"載入中..."
+							) : measureState ? (
+								<StatusBadge variant={measureState.variant}>
+									{measureState.label}
+								</StatusBadge>
+							) : (
+								connectErrorText(measure.error, "措施讀取失敗")
+							)}
+						</Field>
+					</div>
+				</Section>
+			)}
 
 			<Section
 				id="moderation-case-reports"

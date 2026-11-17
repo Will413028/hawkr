@@ -53,3 +53,12 @@ func Encode(c Content) (text string, sum [sha256.Size]byte) {
 	}
 	return string(b), sha256.Sum256(b)
 }
+
+// StoreOf 回傳快照凍結的作者店家：內容不是店家寫的、買家對象或快照無法讀回時是 nil。
+func StoreOf(text string) *int64 {
+	c, err := Decode(text)
+	if err != nil || c.AuthorKind != "STORE" || c.StoreID <= 0 {
+		return nil
+	}
+	return &c.StoreID
+}

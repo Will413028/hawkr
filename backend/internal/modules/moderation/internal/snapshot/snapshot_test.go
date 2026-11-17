@@ -79,3 +79,14 @@ func TestDecodeReadsBackWhatEncodeWrote(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestStoreOfReadsTheFrozenStoreAuthorOnly(t *testing.T) {
+	store, _ := Encode(Content{Kind: model.TargetPost, AuthorKind: "STORE", AuthorID: 7, StoreID: 7})
+	buyer, _ := Encode(Content{Kind: model.TargetComment, AuthorKind: "BUYER", AuthorID: 7})
+	if got := StoreOf(store); got == nil || *got != 7 {
+		t.Fatalf("店家作者 = %v", got)
+	}
+	if StoreOf(buyer) != nil || StoreOf("not json") != nil {
+		t.Fatal("買家作者與壞掉的快照不回店家")
+	}
+}

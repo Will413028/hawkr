@@ -36,7 +36,7 @@ var (
 	listPaths   = rpc.FieldPaths{"State": "state", "TargetKind": "target_kind"}
 	decidePaths = rpc.FieldPaths{
 		"CaseID": "id", "Version": "etag", "Decision": "decision", "Category": "category", "Action": "action",
-		"Text": "reason", "StoreID": "store_id", "Severity": "severity",
+		"Text": "reason", "Severity": "severity",
 	}
 )
 
@@ -90,18 +90,12 @@ func (h *Admin) DecideCase(ctx context.Context, req *connect.Request[adminpb.Dec
 	if err != nil {
 		return nil, err
 	}
-	var storeID int64
-	if msg.GetStoreId() != "" {
-		if storeID, err = rpc.ParseID("store_id", msg.GetStoreId()); err != nil {
-			return nil, err
-		}
-	}
 	d, err := h.cases.DecideCase(ctx, moderation.DecideInput{
 		CaseID: id, Version: version, Actor: adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure},
 		Decision: rpc.EnumFromProto[moderation.Decision](msg.GetDecision()),
 		Category: rpc.EnumFromProto[policy.Category](msg.GetCategory()),
 		Action:   rpc.EnumFromProto[moderation.Action](msg.GetAction()),
-		Text:     msg.GetReason(), StoreID: storeID,
+		Text:     msg.GetReason(),
 		Severity: rpc.EnumFromProto[string](msg.GetSeverity()),
 	})
 	if err != nil {
@@ -112,11 +106,20 @@ func (h *Admin) DecideCase(ctx context.Context, req *connect.Request[adminpb.Dec
 
 func casePB(c moderation.Case) *adminpb.Case {
 	out := &adminpb.Case{
-		Id:         c.ID.String(),
-		Target:     targetPB(c.Target),
-		State:      adminpb.CaseState_CASE_STATE_OPEN,
-		CreateTime: timestamppb.New(c.OpenedAt),
-		Etag:       rpc.Etag(c.Version),
+		Id:          c.ID.String(),
+		Target:      targetPB(c.Target),
+		State:       adminpb.CaseState_CASE_STATE_OPEN,
+		CreateTime:  timestamppb.New(c.OpenedAt),
+		Etag:        rpc.Etag(c.Version),
+		ReportCount: c.ReportCount,
+	}
+	if c.MeasureID != nil {
+		id := c.MeasureID.String()
+		out.MeasureId = &id
+	}
+	if c.StoreID != nil {
+		id := rpc.FormatID(*c.StoreID)
+		out.StoreId = &id
 	}
 	if c.Decision != nil {
 		out.Decision = rpc.EnumToProto[adminpb.CaseDecision](*c.Decision)

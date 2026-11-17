@@ -57,18 +57,26 @@ const takenDown = create(AdminPostSchema, {
 	status: PostStatus.PUBLISHED,
 	takedownMeasureId: "measure-9",
 });
+const takenDownOther = create(AdminPostSchema, {
+	id: "post-3",
+	storeId: "store-3",
+	body: "另一則被下架的貼文",
+	status: PostStatus.PUBLISHED,
+	takedownMeasureId: "measure-10",
+});
 
 function setup() {
 	const creates: CreateMeasureRequest[] = [];
 	const revokes: RevokeMeasureRequest[] = [];
 	const lists: ListPostsRequest[] = [];
+	const gets: string[] = [];
 	const transport: Transport = createRouterTransport(({ service }) => {
 		service(SocialAdminService, {
 			listPosts: (req: ListPostsRequest) => {
 				lists.push(req);
 				return req.pageToken === "t2"
 					? { posts: [normal], nextPageToken: "" }
-					: { posts: [normal, takenDown], nextPageToken: "t2" };
+					: { posts: [normal, takenDown, takenDownOther], nextPageToken: "t2" };
 			},
 		} as never);
 		service(SellerGovernanceAdminService, {
@@ -76,20 +84,23 @@ function setup() {
 				creates.push(req);
 				return {};
 			},
-			getMeasure: () => ({
-				measure: create(MeasureSchema, {
-					id: "measure-9",
-					etag: "m-etag-3",
-					canRevoke: true,
-				}),
-			}),
+			getMeasure: (req: { id: string }) => {
+				gets.push(req.id);
+				return {
+					measure: create(MeasureSchema, {
+						id: req.id,
+						etag: `etag-of-${req.id}`,
+						canRevoke: true,
+					}),
+				};
+			},
 			revokeMeasure: (req: RevokeMeasureRequest) => {
 				revokes.push(req);
 				return {};
 			},
 		} as never);
 	});
-	return { creates, revokes, lists, transport };
+	return { creates, revokes, lists, gets, transport };
 }
 
 async function open(transport: Transport) {
@@ -171,7 +182,25 @@ test("恢復：撤銷 takedown_measure_id 的措施，帶手動原因與 etag", 
 	await until(() => revokes.length === 1, "RevokeMeasure 的請求");
 	assert.equal(revokes[0]?.id, "measure-9");
 	assert.equal(revokes[0]?.reason, AdminRevokeReason.ADMIN_CORRECTION);
-	assert.equal(revokes[0]?.etag, "m-etag-3");
+	assert.equal(revokes[0]?.etag, "etag-of-measure-9");
+});
+
+test("恢復：每則貼文撤銷自己的 takedown_measure_id，不是別的措施", async () => {
+	const { transport, revokes, gets } = setup();
+	await open(transport);
+	const button = rowButton("另一則被下架的貼文", "恢復");
+	assert.ok(button);
+	await clickElement(button);
+	await until(
+		() => document_has("revoke-measure-reason"),
+		"撤銷對話框載入措施",
+	);
+	assert.deepEqual(gets, ["measure-10"]);
+	await pick("revoke-measure-reason", AdminRevokeReason.ADMIN_CORRECTION);
+	await click("確認撤銷");
+	await until(() => revokes.length === 1, "RevokeMeasure 的請求");
+	assert.equal(revokes[0]?.id, "measure-10");
+	assert.equal(revokes[0]?.etag, "etag-of-measure-10");
 });
 
 function document_has(id: string) {

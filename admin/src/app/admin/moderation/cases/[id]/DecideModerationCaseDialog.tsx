@@ -167,22 +167,12 @@ export default function DecideModerationCaseDialog({
 					</select>
 					{takedown && (
 						<>
-							<label
-								className="form-label"
-								htmlFor="moderation-store-id"
-								style={{ marginTop: 16 }}
-							>
-								內容所屬的店家 ID <span className="required">*</span>
-							</label>
-							<input
-								id="moderation-store-id"
-								className="form-control"
-								value={form.storeId}
-								disabled={submitting}
-								onChange={(e) => edit({ storeId: e.target.value })}
-							/>
+							<div className="form-label" style={{ marginTop: 16 }}>
+								內容所屬的店家 ID
+							</div>
+							<div id="moderation-store-id">{kase.storeId ?? "-"}</div>
 							<p className="adm-operation-field-note">
-								伺服器會向社群核對內容確實屬於這家店。
+								取自案件的內容快照；伺服器會向社群核對內容確實屬於這家店。
 							</p>
 							<label
 								className="form-label"

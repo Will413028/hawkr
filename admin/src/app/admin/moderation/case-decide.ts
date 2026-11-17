@@ -23,6 +23,9 @@ export function canDecide(kase: Case): boolean {
 	return kase.state === CaseState.OPEN;
 }
 
+export const TAKEDOWN_NO_STORE_TEXT =
+	"案件沒有內容快照的店家（快照已過保留期或內容不是店家寫的），無法建立下架措施。";
+
 export const SEVERITY_OPTIONS: readonly ViolationSeverity[] = [
 	ViolationSeverity.LOW,
 	ViolationSeverity.MEDIUM,
@@ -35,7 +38,6 @@ export interface DecideForm {
 	action: CaseAction;
 	category: PolicyCategory;
 	reason: string;
-	storeId: string;
 	severity: ViolationSeverity;
 }
 
@@ -44,7 +46,6 @@ export const EMPTY_DECIDE_FORM: DecideForm = {
 	action: CaseAction.UNSPECIFIED,
 	category: 0,
 	reason: "",
-	storeId: "",
 	severity: ViolationSeverity.UNSPECIFIED,
 };
 
@@ -66,15 +67,13 @@ export function validateDecide(
 		return `給作者的理由最多 ${REASON_MAX_LENGTH} 字。`;
 	}
 	if (form.action === CaseAction.TAKEDOWN) {
-		if (trimGoSpace(form.storeId).length === 0) {
-			return "請填寫內容所屬的店家 ID。";
-		}
+		if (!kase.storeId) return TAKEDOWN_NO_STORE_TEXT;
 		if (!SEVERITY_OPTIONS.includes(form.severity)) return "請選擇嚴重度。";
 	}
 	return undefined;
 }
 
-/** DecideCase 的請求：帶讀到的案件的 etag；不違規不帶其他欄位，下架才帶店家與嚴重度。呼叫前須先通過 validateDecide。 */
+/** DecideCase 的請求：帶讀到的案件的 etag；不違規不帶其他欄位，下架才帶嚴重度（店家由伺服器取自案件快照）。呼叫前須先通過 validateDecide。 */
 export function buildDecide(
 	kase: Case,
 	form: DecideForm,
@@ -88,10 +87,6 @@ export function buildDecide(
 		reason: trimGoSpace(form.reason),
 	};
 	return form.action === CaseAction.TAKEDOWN
-		? {
-				...violation,
-				storeId: trimGoSpace(form.storeId),
-				severity: form.severity,
-			}
+		? { ...violation, severity: form.severity }
 		: violation;
 }

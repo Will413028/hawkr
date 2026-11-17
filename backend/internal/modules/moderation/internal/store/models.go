@@ -22,6 +22,7 @@ type ModerationCase struct {
 	DecisionAction   *string
 	DecidedByAdminID *int64
 	ClosedAt         *time.Time
+	MeasureID        *uuid.UUID
 }
 
 type ModerationCaseSnapshot struct {

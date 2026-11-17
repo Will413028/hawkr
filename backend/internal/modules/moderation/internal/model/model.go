@@ -159,6 +159,11 @@ type Case struct {
 	Action         *Action
 	DecidedByAdmin *int64
 	ClosedAt       *time.Time
+	// ReportCount 是案件的全部檢舉數；MeasureID 是 TAKEDOWN 決定建立的 seller 措施；StoreID 是快照凍結的作者店家
+	// （買家對象、沒有快照或內容不是店家寫的是 nil）。
+	ReportCount int64
+	MeasureID   *uuid.UUID
+	StoreID     *int64
 }
 
 // Report 是一筆檢舉；Outcome 由所屬案件推導。
@@ -198,12 +203,11 @@ type DecideInput struct {
 	// Actor 是下決定的管理員與後台 RPC 的 procedure 名稱（handler 組成，platform/adminaudit）；缺漏是接線錯誤，不是使用者的輸入。
 	Actor    adminaudit.Actor
 	Decision Decision
-	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 StoreID（管理員確認的內容所屬店家，
-	// 向 social 核對）與 Severity（認定的嚴重度，字串值 seller.Severity）。
+	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 Severity（認定的嚴重度，
+	// 字串值 seller.Severity）。內容所屬的店家取自案件的內容快照，不由呼叫端帶。
 	Category policy.Category
 	Action   Action
 	Text     string
-	StoreID  int64
 	Severity string
 }
 
