@@ -27,7 +27,11 @@ import {
 import { unknownText } from "@/lib/ui-text";
 import { imageUri } from "@/utils/image";
 import ContentTakedownDialog from "./ContentTakedownDialog";
-import { listPostsRequest, takedownMeasureOf } from "./post-actions";
+import {
+	isTakedownAlreadyActive,
+	listPostsRequest,
+	takedownMeasureOf,
+} from "./post-actions";
 import RestorePostDialog from "./RestorePostDialog";
 import "@/styles/pages/PostManagement.css";
 
@@ -254,7 +258,13 @@ export default function PostManagementPage() {
 					post={dialog.post}
 					onClose={() => setDialog(null)}
 					onConfirm={async (request) => {
-						await createMeasure.mutateAsync(request);
+						try {
+							await createMeasure.mutateAsync(request);
+						} catch (caught) {
+							// 列表重新讀取後會顯示既有的下架；對話框留著顯示伺服器的句子。
+							if (isTakedownAlreadyActive(caught)) refresh();
+							throw caught;
+						}
 						setDialog(null);
 						showToast("已下架貼文", "success");
 						refresh();

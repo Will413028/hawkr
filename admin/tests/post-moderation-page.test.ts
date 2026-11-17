@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { create } from "@bufbuild/protobuf";
-import { createRouterTransport, type Transport } from "@connectrpc/connect";
+import {
+	Code,
+	ConnectError,
+	createRouterTransport,
+	type Transport,
+} from "@connectrpc/connect";
+import {
+	ErrorInfoSchema,
+	LocalizedMessageSchema,
+} from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	AdminRevokeReason,
 	type CreateMeasureRequest,
@@ -65,7 +74,7 @@ const takenDownOther = create(AdminPostSchema, {
 	takedownMeasureId: "measure-10",
 });
 
-function setup() {
+function setup(rejectCreate?: ConnectError) {
 	const creates: CreateMeasureRequest[] = [];
 	const revokes: RevokeMeasureRequest[] = [];
 	const lists: ListPostsRequest[] = [];
@@ -82,6 +91,7 @@ function setup() {
 		service(SellerGovernanceAdminService, {
 			createMeasure: (req: CreateMeasureRequest) => {
 				creates.push(req);
+				if (rejectCreate) throw rejectCreate;
 				return {};
 			},
 			getMeasure: (req: { id: string }) => {
@@ -244,4 +254,37 @@ test("翻頁：下一頁帶回傳的 token，上一頁退回；換篩選回第�
 	await click("已下架");
 	await until(() => lists.at(-1)?.takenDownOnly === true, "只看已下架");
 	assert.equal(lists.at(-1)?.pageToken, "");
+});
+
+test("下架：貼文已有生效中的下架措施時顯示伺服器的句子並重新讀取列表", async () => {
+	const message = "這則內容已經有生效中的下架措施";
+	const { transport, creates, lists } = setup(
+		new ConnectError("active", Code.FailedPrecondition, undefined, [
+			{
+				desc: ErrorInfoSchema,
+				value: {
+					reason: "CONTENT_TAKEDOWN_ACTIVE",
+					domain: "hawkr",
+				},
+			},
+			{
+				desc: LocalizedMessageSchema,
+				value: { locale: "zh-TW", message },
+			},
+		]),
+	);
+	await open(transport);
+	const button = rowButton("正常貼文", "下架");
+	assert.ok(button);
+	await clickElement(button);
+	await pick("takedown-category", PolicyCategory.SPAM);
+	await pick("takedown-severity", ViolationSeverity.LOW);
+	await pick("takedown-statement", "廣告洗版");
+	await pick("takedown-note", "內部說明");
+	const listsBefore = lists.length;
+	await click("確認下架");
+	await until(() => creates.length === 1, "CreateMeasure 的請求");
+	await until(() => bodyText().includes(message), "顯示伺服器的句子");
+	await until(() => lists.length > listsBefore, "重新讀取列表");
+	assert.ok(bodyText().includes("確認下架"));
 });

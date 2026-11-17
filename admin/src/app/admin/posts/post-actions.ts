@@ -1,6 +1,9 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
+import { ConnectError } from "@connectrpc/connect";
+import { classifyError, factsFromError } from "@hawkr/api/connect/errors";
 import type { CreateMeasureRequestSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import type { AdminPost } from "@hawkr/api/gen/hawkr/admin/social/v1alpha1/social_pb";
+import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import {
 	ContentKind,
@@ -102,4 +105,13 @@ export function buildTakedown(
 			},
 		},
 	};
+}
+
+/** 這則貼文已有生效中的下架措施（別的管理員或檢舉案件先下架）：伺服器拒絕建立第二個措施。 */
+export function isTakedownAlreadyActive(caught: unknown): boolean {
+	const decision = classifyError(factsFromError(ConnectError.from(caught)));
+	return (
+		decision.action === "reason" &&
+		decision.reason === ErrorReason.CONTENT_TAKEDOWN_ACTIVE
+	);
 }
