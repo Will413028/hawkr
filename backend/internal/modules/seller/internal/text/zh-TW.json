@@ -461,6 +461,10 @@
       "message": "案件不是這家店的。",
       "description": "建立措施帶的來源案件不是措施的店家的。"
     },
+    "measure.takedown_already_active": {
+      "message": "這則內容已經有生效中的下架措施；請在該措施上操作，或先撤銷它。",
+      "description": "建立內容下架措施：目標內容已有生效中的內容下架措施（ErrorReason CONTENT_TAKEDOWN_ACTIVE，failed_precondition）；後台貼文頁與 moderation 決定共用。"
+    },
     "move.same_category": {
       "message": "新的平台判定類別和目前相同。",
       "description": "移動：新的平台判定類別和通報目前的相同。"
