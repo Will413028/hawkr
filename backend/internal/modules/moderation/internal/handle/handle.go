@@ -31,6 +31,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // SourceRefPrefix 是寫進各處分紀錄的來源參照的前綴，後面接案件 ID；其他模組把它當不透明的字串。
@@ -181,12 +182,13 @@ func ptr[T any](v T) *T { return &v }
 type applied struct {
 	storeID   int64
 	measureID *uuid.UUID
+	frozen    *snapshot.Content
 }
 
 // apply 呼叫擁有處分的模組建立處分。
 func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput, res *applied) error {
 	ref := SourceRefPrefix + c.ID.String()
-	author, owner, err := s.author(ctx, q, c)
+	author, owner, err := s.author(ctx, q, c, res)
 	if err != nil {
 		return err
 	}
@@ -227,7 +229,7 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 
 // author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，
 // 所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；隱藏的目的（內容不可見）已達成，由呼叫端視為成功。
-func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (social.Actor, social.ContentOwner, error) {
+func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, res *applied) (social.Actor, social.ContentOwner, error) {
 	t := c.Target
 	if t.Kind == model.TargetBuyer {
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
@@ -239,7 +241,7 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (s
 	if owner.Exists {
 		return owner.Author, owner, nil
 	}
-	frozen, err := frozenContent(ctx, q, c.ID)
+	frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
 	if err != nil {
 		return social.Actor{}, social.ContentOwner{}, err
 	}
@@ -247,11 +249,19 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (s
 	return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID}, nil
 }
 
-// frozenContent 讀案件最近一份凍結的內容；沒有快照回 FailedPrecondition。
-func frozenContent(ctx context.Context, q *store.Queries, caseID uuid.UUID) (snapshot.Content, error) {
+// snapshotReader 是讀案件快照的查詢（*store.Queries）。
+type snapshotReader interface {
+	LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (string, error)
+}
+
+// frozenContent 讀案件最近一份凍結的內容，一次處理只讀一次；沒有快照回 FailedPrecondition，句子由呼叫端依情境給。
+func (a *applied) frozenContent(ctx context.Context, q snapshotReader, caseID uuid.UUID, missing func() uitext.Message) (snapshot.Content, error) {
+	if a.frozen != nil {
+		return *a.frozen, nil
+	}
 	body, err := q.LatestSnapshotContent(ctx, caseID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return snapshot.Content{}, apperr.FailedPrecondition("%s", text.DecideSnapshotMissing())
+		return snapshot.Content{}, apperr.FailedPrecondition("%s", missing())
 	}
 	if err != nil {
 		return snapshot.Content{}, fmt.Errorf("moderation：讀取案件 %s 的快照：%w", caseID, err)
@@ -260,6 +270,7 @@ func frozenContent(ctx context.Context, q *store.Queries, caseID uuid.UUID) (sna
 	if err != nil {
 		return snapshot.Content{}, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", caseID, err)
 	}
+	a.frozen = &frozen
 	return frozen, nil
 }
 
@@ -272,7 +283,7 @@ func CheckTakedownStore(owner social.ContentOwner, frozenStoreID int64) error {
 }
 
 func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, owner social.ContentOwner, in model.DecideInput, res *applied) error {
-	frozen, err := frozenContent(ctx, q, c.ID)
+	frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideTakedownSnapshotMissing)
 	if err != nil {
 		return err
 	}

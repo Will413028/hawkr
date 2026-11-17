@@ -1,16 +1,22 @@
 package handle
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 func violation(a model.Action) model.DecideInput {
@@ -127,5 +133,46 @@ func TestCheckTakedownStoreUsesTheSnapshotStore(t *testing.T) {
 		if err := CheckTakedownStore(c.o, c.s); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 			t.Errorf("%s：%v", name, err)
 		}
+	}
+}
+
+type fakeSnapshots struct {
+	body  string
+	err   error
+	reads int
+}
+
+func (f *fakeSnapshots) LatestSnapshotContent(context.Context, uuid.UUID) (string, error) {
+	f.reads++
+	return f.body, f.err
+}
+
+func TestFrozenContentMissingSnapshotUsesTheCallersSentence(t *testing.T) {
+	q := &fakeSnapshots{err: pgx.ErrNoRows}
+	for name, missing := range map[string]func() uitext.Message{"decide": text.DecideSnapshotMissing, "takedown": text.DecideTakedownSnapshotMissing} {
+		var res applied
+		_, err := res.frozenContent(context.Background(), q, uuid.New(), missing)
+		want := apperr.FailedPrecondition("%s", missing())
+		if apperr.KindOf(err) != apperr.KindFailedPrecondition || err.Error() != want.Error() {
+			t.Errorf("%s：%v，預期 %v", name, err, want)
+		}
+	}
+	if text.DecideSnapshotMissing().Text == text.DecideTakedownSnapshotMissing().Text {
+		t.Fatal("內容還在時缺快照不能用「內容已不存在」的句子")
+	}
+}
+
+func TestFrozenContentReadsTheSnapshotOncePerDecide(t *testing.T) {
+	body, _ := snapshot.Encode(snapshot.Content{AuthorKind: "STORE", AuthorID: 7, StoreID: 7})
+	q := &fakeSnapshots{body: body}
+	var res applied
+	for range 3 {
+		got, err := res.frozenContent(context.Background(), q, uuid.New(), text.DecideSnapshotMissing)
+		if err != nil || got.StoreID != 7 {
+			t.Fatalf("%+v %v", got, err)
+		}
+	}
+	if q.reads != 1 {
+		t.Fatalf("讀了 %d 次", q.reads)
 	}
 }

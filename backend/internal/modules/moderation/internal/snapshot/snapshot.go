@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
@@ -54,10 +55,10 @@ func Encode(c Content) (text string, sum [sha256.Size]byte) {
 	return string(b), sha256.Sum256(b)
 }
 
-// StoreOf 回傳快照凍結的作者店家：內容不是店家寫的、買家對象或快照無法讀回時是 nil。
+// StoreOf 回傳快照凍結的作者店家（同內容下架的歸屬驗證：作者是店家且作者 ID 就是歸屬店家）：內容不是店家寫的、買家對象或快照無法讀回時是 nil。
 func StoreOf(text string) *int64 {
 	c, err := Decode(text)
-	if err != nil || c.AuthorKind != "STORE" || c.StoreID <= 0 {
+	if err != nil || c.AuthorKind != string(social.ActorStore) || c.StoreID <= 0 || c.AuthorID != c.StoreID {
 		return nil
 	}
 	return &c.StoreID

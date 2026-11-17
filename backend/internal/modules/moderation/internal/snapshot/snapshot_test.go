@@ -90,3 +90,10 @@ func TestStoreOfReadsTheFrozenStoreAuthorOnly(t *testing.T) {
 		t.Fatal("買家作者與壞掉的快照不回店家")
 	}
 }
+
+func TestStoreOfRequiresTheStoreToBeTheAuthor(t *testing.T) {
+	other, _ := Encode(Content{Kind: model.TargetComment, AuthorKind: "STORE", AuthorID: 8, StoreID: 7})
+	if StoreOf(other) != nil {
+		t.Fatal("別家店的留言下的店家作者不算快照店家")
+	}
+}

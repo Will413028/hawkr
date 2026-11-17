@@ -18,7 +18,7 @@ CREATE SCHEMA moderation;
 -- seller（內容下架措施）與 identity（帳號停權），不另建處置紀錄表。處置種類與對象種類的搭配由 cases_action_target_check 擋；作者是買家或店家由寫入端
 -- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功；新檢舉掛進既有案件也加一（同一個 transaction；開案的那筆不加，版本從 1 起），
 -- 所以管理員讀到的檢舉集合不是結案時的集合就會版本衝突。
--- measure_id 是 TAKEDOWN 決定建立的 seller 措施 ID（跨 schema 不建 FK），結案時同一個 UPDATE 寫入；其他處置與進行中的案件是 NULL。
+-- measure_id 是 TAKEDOWN 決定建立的 seller 措施 ID（跨 schema 不建 FK），結案時同一個 UPDATE 寫入；內容下架一定有、其他處置與進行中的案件一定是 NULL（cases_measure_check）。
 -- decision_category 是 platform/policy.Assessable 的值（模組的 TestChecksMatchGo）；買家分支另外限於 CommunityAssessable，由寫入端檢查。
 CREATE TABLE moderation.cases (
     id                  UUID        PRIMARY KEY,
@@ -58,7 +58,7 @@ CREATE TABLE moderation.cases (
         OR (decision_action IN ('WARN', 'BAN') AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'BUYER'))
         OR (decision_action = 'TAKEDOWN' AND target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
     ),
-    CONSTRAINT cases_measure_check CHECK (measure_id IS NULL OR decision_action = 'TAKEDOWN')
+    CONSTRAINT cases_measure_check CHECK ((decision_action IS NOT DISTINCT FROM 'TAKEDOWN') = (measure_id IS NOT NULL))
 );
 -- 一個對象至多一個進行中案件。
 CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;
