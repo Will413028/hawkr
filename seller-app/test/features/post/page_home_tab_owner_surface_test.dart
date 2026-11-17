@@ -1,3 +1,5 @@
+import 'package:hawkr_seller/features/post/data/post_model.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
@@ -17,21 +19,18 @@ void main() {
     if (!F.isInitialized) F.init(Flavor.dev);
   });
 
-  Future<List<Object?>> pumpGrid(
-    WidgetTester tester,
-    List<Map<String, dynamic>> posts,
-  ) async {
+  Future<List<Object?>> pumpGrid(WidgetTester tester, List<Post> posts) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repo = _Repo();
     when(
-      () => repo.listMyPostsRaw(
-        page: any(named: 'page'),
+      () => repo.listMyPostsPage(
+        pageToken: any(named: 'pageToken'),
         pageSize: any(named: 'pageSize'),
       ),
-    ).thenAnswer((_) async => PostPageResult(posts: posts, hasMore: false));
+    ).thenAnswer((_) async => PostPageResult(posts: posts, nextPageToken: ''));
     when(() => repo.listComments(any())).thenAnswer((_) async => []);
     final extras = <Object?>[];
     final router = GoRouter(
@@ -70,8 +69,8 @@ void main() {
 
   testWidgets('點格子帶 postId 開全螢幕頁（前面有被平台下架的貼文也對得上）', (tester) async {
     final extras = await pumpGrid(tester, [
-      {'id': 41, 'contentType': 'text', 'hiddenAt': 1760000000},
-      {'id': 42, 'contentType': 'text', 'publishStatus': '4402'},
+      Post(id: 41, takedownMeasureId: 'measure-1'),
+      Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED),
     ]);
 
     await tester.tap(
@@ -84,22 +83,19 @@ void main() {
   });
 
   testWidgets('平台下架的格子顯示「平台下架」角標', (tester) async {
-    await pumpGrid(tester, [
-      {'id': 41, 'contentType': 'text', 'hiddenAt': 1760000000},
-    ]);
+    await pumpGrid(tester, [Post(id: 41, takedownMeasureId: 'measure-1')]);
     expect(find.text('平台下架'), findsOneWidget);
     expect(find.text('已下架'), findsNothing);
   });
 
   testWidgets('長按預覽卡沒有按讚入口，讚數只顯示', (tester) async {
     await pumpGrid(tester, [
-      {
-        'id': 42,
-        'contentType': 'text',
-        'publishStatus': '4402',
-        'likeCount': 7,
-        'content': '貼文內容',
-      },
+      Post(
+        id: 42,
+        status: PostStatus.POST_STATUS_PUBLISHED,
+        likeCount: 7,
+        content: '貼文內容',
+      ),
     ]);
     await tester.longPress(
       find.byKey(const ValueKey('storefront-post-grid-item-42')),

@@ -1,11 +1,16 @@
 import '../../../features/seller/data/current_store.dart';
+
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/widgets/hk_tap_target.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
+
 import 'dart:io';
+
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/transport.dart' show ConnectException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +21,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'post_controller.dart';
 import 'widgets/post_hashtag_text_form_field.dart';
 import '../../product/data/product_repository.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../data/post_repository.dart';
 import '../data/post_model.dart';
 import '../data/post_hashtag_extractor.dart';
@@ -25,6 +31,7 @@ import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/utils/price_display.dart';
 import '../../../shared/widgets/optimized_image.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class PostEditScreen extends HookConsumerWidget {
@@ -38,7 +45,7 @@ class PostEditScreen extends HookConsumerWidget {
     final contentCtrl = useTextEditingController(text: post.content);
     final submitting = useState(false);
 
-    // 圖片狀態：新圖（bytes）；保留/清除由 post.imageKeys 衍生
+    // 圖片狀態：新圖（bytes）；保留/清除由 post.imageUrl 衍生
     final newImageBytes = useState<Uint8List?>(null);
     final newStagedToken = useState<String?>(null);
 
@@ -140,8 +147,7 @@ class PostEditScreen extends HookConsumerWidget {
       }
       submitting.value = true;
       try {
-        String keepAssetId = '';
-        String stagedToken = '';
+        String? stagedToken;
 
         if (newImageBytes.value != null && newStagedToken.value == null) {
           // 使用者換了新圖，上傳取得 staged token
@@ -158,40 +164,40 @@ class PostEditScreen extends HookConsumerWidget {
             return;
           }
           stagedToken = token;
-        } else if (newImageBytes.value == null && post.imageKeys.isNotEmpty) {
-          // 沒有新圖且原本有圖 → 保留現有圖片。
-          // 判斷來源必須是 [Post.imageKeys]（貼文圖的唯一契約欄位）：
-          // 若改看某個單數顯示欄位，第二次編輯會誤判成「本來就沒圖」而讓
-          // keepAssetId 與 newStagedToken 同時送空 → 後端刪圖（#430 A0）。
-          keepAssetId = 'keep';
         }
-        // newImageBytes == null && imageKeys 為空 → 兩者皆空 → 清除/無圖
 
-        int? productId;
+        String? productId;
         if (selectedProductIndex.value != null &&
             selectedProductIndex.value! < products.value.length) {
           final p = products.value[selectedProductIndex.value!];
-          productId = p['id'] as int?;
+          productId = p['id']?.toString();
         }
 
-        final updated = await ref
-            .read(postListProvider.notifier)
-            .updatePost(
-              post.id,
-              content: contentCtrl.text.trim(),
-              keepAssetId: keepAssetId,
-              newStagedToken: stagedToken,
-              productId: productId,
-              tags: PostHashtagExtractor.extractFromText(contentCtrl.text),
+        try {
+          await ref
+              .read(postListProvider.notifier)
+              .updatePost(
+                post,
+                content: contentCtrl.text.trim(),
+                imageStagedToken: stagedToken,
+                productId: productId,
+                hashtags: PostHashtagExtractor.extractFromText(
+                  contentCtrl.text,
+                ),
+              );
+        } on ConnectException catch (error) {
+          if (context.mounted) {
+            FloatingToast.error(
+              context,
+              errorText(error, defaults: ref.read(defaultErrorTextProvider)),
             );
+          }
+          return;
+        }
 
         if (!context.mounted) return;
-        if (updated != null) {
-          FloatingToast.success(context, '貼文已更新');
-          context.pop(true);
-        } else {
-          FloatingToast.error(context, '儲存失敗，請稍後再試');
-        }
+        FloatingToast.success(context, '貼文已更新');
+        context.pop(true);
       } finally {
         if (context.mounted) submitting.value = false;
       }
@@ -628,9 +634,9 @@ class PostEditScreen extends HookConsumerWidget {
     if (newBytes != null) {
       return Image.memory(newBytes, fit: BoxFit.cover, width: double.infinity);
     }
-    if (post.imageKeys.isNotEmpty) {
+    if (post.hasImage) {
       return OptimizedNetworkImage(
-        imageUrl: post.imageKeys.first,
+        imageUrl: post.imageUrl,
         scene: ImageScene.postImage,
         fit: BoxFit.cover,
         width: double.infinity,

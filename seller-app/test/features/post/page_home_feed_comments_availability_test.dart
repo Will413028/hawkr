@@ -1,6 +1,6 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/core/session/my_store.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
@@ -63,13 +63,14 @@ Future<_Repo> _openComments(
   return repo;
 }
 
-Post _post({String? publishStatus, int? hiddenAt}) => Post(
+Post _post({
+  PostStatus publishStatus = PostStatus.POST_STATUS_UNSPECIFIED,
+  int? hiddenAt,
+}) => Post(
   id: 42,
-  sellerId: 7,
-  contentType: 'IMAGE',
   content: '貼文內容',
-  publishStatus: publishStatus,
-  hiddenAt: hiddenAt,
+  status: publishStatus,
+  takedownMeasureId: hiddenAt == null ? null : 'measure-1',
 );
 
 void main() {
@@ -83,7 +84,7 @@ void main() {
     final repo = await _openComments(
       tester,
       listed: false,
-      post: _post(publishStatus: PostPublishStatus.published.value),
+      post: _post(publishStatus: PostStatus.POST_STATUS_PUBLISHED),
     );
 
     expect(find.text('店家公開後，買家的留言會顯示在這裡。'), findsOneWidget);
@@ -107,8 +108,8 @@ void main() {
   });
 
   for (final status in [
-    PostPublishStatus.draft.value,
-    PostPublishStatus.unpublished.value,
+    PostStatus.POST_STATUS_DRAFT,
+    PostStatus.POST_STATUS_UNPUBLISHED,
   ]) {
     testWidgets('an unpublished post ($status) explains it needs publishing', (
       tester,
@@ -131,7 +132,7 @@ void main() {
       tester,
       listed: true,
       post: _post(
-        publishStatus: PostPublishStatus.published.value,
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
         hiddenAt: 1760000000,
       ),
     );
@@ -147,7 +148,7 @@ void main() {
       tester,
       listed: true,
       post: _post(
-        publishStatus: PostPublishStatus.draft.value,
+        publishStatus: PostStatus.POST_STATUS_DRAFT,
         hiddenAt: 1760000000,
       ),
     );
@@ -162,7 +163,7 @@ void main() {
       tester,
       listed: false,
       post: _post(
-        publishStatus: PostPublishStatus.published.value,
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
         hiddenAt: 1760000000,
       ),
     );
@@ -175,7 +176,7 @@ void main() {
     final repo = await _openComments(
       tester,
       listed: true,
-      post: _post(publishStatus: PostPublishStatus.published.value),
+      post: _post(publishStatus: PostStatus.POST_STATUS_PUBLISHED),
     );
 
     expect(find.text('尚無留言'), findsOneWidget);

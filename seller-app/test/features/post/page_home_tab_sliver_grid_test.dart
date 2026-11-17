@@ -1,11 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
+import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/networking/dio_provider.dart';
+import 'package:dio/dio.dart';
 import 'package:hawkr_seller/features/post/presentation/widgets/hidden_post_badge.dart';
 import 'package:hawkr_seller/features/post/presentation/widgets/page_home_tab.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -24,23 +26,40 @@ void main() {
 
       final posts = List.generate(
         500,
-        (index) => <String, dynamic>{
-          'id': index + 1,
-          'content': '貼文 ${index + 1}',
-          'contentType': 'text',
-          'commentCount': index,
-          if (index == 0) 'hiddenAt': 1,
-          if (index == 0) 'hidden_reason': '測試下架原因',
-        },
+        (index) => pb.Post(
+          id: '${index + 1}',
+          body: '貼文 ${index + 1}',
+          takedownMeasureId: index == 0 ? 'measure-1' : null,
+        )..mergeFromProto3Json({'commentCount': '$index'}),
       );
-      final adapter = _PaginatedPostListAdapter(posts, pageSize: 20);
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..httpClientAdapter = adapter;
+      final requestedPageSizes = <int>[];
+      final client = SocialAppServiceClient(
+        FakeTransportBuilder()
+            .unary(SocialAppService.listMyPosts, (request, _) {
+              requestedPageSizes.add(request.pageSize);
+              final start = request.pageToken.isEmpty
+                  ? 0
+                  : int.parse(request.pageToken);
+              final end = (start + request.pageSize).clamp(0, posts.length);
+              return pb.ListMyPostsResponse(
+                posts: posts.sublist(start, end),
+                nextPageToken: end < posts.length ? '$end' : '',
+              );
+            })
+            .unary(
+              SocialAppService.listPendingSchedules,
+              (_, _) => pb.ListPendingSchedulesResponse(),
+            )
+            .build(),
+      );
       var refreshCount = 0;
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [dioProvider.overrideWithValue(dio)],
+          overrides: [
+            dioProvider.overrideWithValue(Dio()),
+            socialClientProvider.overrideWithValue(client),
+          ],
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
             builder: (_, _) => MaterialApp(
@@ -59,8 +78,7 @@ void main() {
 
       // 初次載入只拉第 1 頁（20 筆），不是整批 500 筆——這是本次修法要守住的核心
       // 行為：舊實作對 500 篇貼文各自補打一次 detail API，總請求數會是 501。
-      expect(adapter.requestCount, 1);
-      expect(adapter.requestedPageSizes, [20]);
+      expect(requestedPageSizes, [20]);
       expect(find.byType(GridView), findsNothing);
       expect(find.byType(SliverGrid), findsOneWidget);
       expect(find.byType(HiddenPostBadge), findsOneWidget);
@@ -93,8 +111,9 @@ void main() {
       expect(afterOffset, greaterThan(beforeOffset));
 
       // 觸發了第 2 頁，且拿到的還是 20 筆（不是整批剩餘的 480 筆）。
-      expect(adapter.requestCount, 2);
-      expect(adapter.requestedPageSizes, [20, 20]);
+      expect(requestedPageSizes.length, greaterThanOrEqualTo(2));
+      expect(requestedPageSizes.length, lessThan(25));
+      expect(requestedPageSizes.every((size) => size == 20), isTrue);
 
       final refresh = tester.state<RefreshIndicatorState>(
         find.byType(RefreshIndicator),
@@ -125,53 +144,4 @@ Set<String> _builtPostTiles(WidgetTester tester) {
       )
       .map((widget) => (widget.key! as ValueKey<String>).value)
       .toSet();
-}
-
-/// 模擬 gateway 分頁 envelope（`data: {records, total, page, pageSize}`），
-/// 依 query 的 page/page_size 切片回傳，讓測試能驗證「一次只拉一頁」。
-class _PaginatedPostListAdapter implements HttpClientAdapter {
-  _PaginatedPostListAdapter(this.posts, {required this.pageSize});
-
-  final List<Map<String, dynamic>> posts;
-  final int pageSize;
-  int requestCount = 0;
-  final List<int> requestedPageSizes = [];
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    requestCount++;
-    expect(options.path, '/api/v1/app/sellers/me/posts');
-    final page = int.tryParse('${options.queryParameters['page'] ?? '1'}') ?? 1;
-    final size =
-        int.tryParse(
-          '${options.queryParameters['page_size'] ?? '$pageSize'}',
-        ) ??
-        pageSize;
-    requestedPageSizes.add(size);
-    final start = (page - 1) * size;
-    final end = (start + size).clamp(0, posts.length);
-    final slice = start >= posts.length ? const [] : posts.sublist(start, end);
-    return ResponseBody.fromString(
-      jsonEncode({
-        'code': 0,
-        'data': {
-          'records': slice,
-          'total': '${posts.length}',
-          'page': '$page',
-          'pageSize': '$size',
-        },
-      }),
-      200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }

@@ -89,6 +89,18 @@ void main() {
     }
   });
 
+  test('停權的店家進得了貼文列表，進不了發文與編輯', () {
+    expect(
+      routeCapabilities[PostRoutes.feed],
+      SellerCapability.SELLER_CAPABILITY_CONTENT_CONTRACT,
+    );
+    final store = suspendedStore();
+    expect(isBlockedByCapabilities(store, PostRoutes.feed), isFalse);
+    expect(isBlockedByCapabilities(store, PostRoutes.compose), isTrue);
+    expect(isBlockedByCapabilities(store, PostRoutes.edit), isTrue);
+    expect(isBlockedByCapabilities(store, PostRoutes.mediaPicker), isTrue);
+  });
+
   test('isRouteAvailable：沒宣告的路由不開放，不需要能力的路由一律開放', () {
     expect(isRouteAvailable('/not/declared', activeCapabilities), isFalse);
     expect(isRouteAvailable(SettingsRoutes.help, const []), isTrue);

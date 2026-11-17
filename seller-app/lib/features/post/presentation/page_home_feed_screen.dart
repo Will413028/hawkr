@@ -1,12 +1,15 @@
 import '../../seller/presentation/seller_store_avatar.dart';
 import '../../../features/seller/data/current_store.dart';
+
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_api/transport.dart' show ConnectException;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
@@ -17,7 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../config/image_config.dart';
-import '../../../core/exceptions/app_exception.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../config/media_image.dart';
@@ -34,7 +37,6 @@ import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../report/data/report_model.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
 import '../data/post_comments_availability.dart';
-import '../data/post_hidden.dart';
 import '../data/post_model.dart';
 import '../data/post_publish.dart';
 import '../data/post_repository.dart';
@@ -45,6 +47,7 @@ import '../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
 
@@ -165,6 +168,11 @@ class PageHomeFeedScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(postListProvider);
     final share = ref.watch(storeShareProvider);
+    final canMarket =
+        ref
+            .watch(myStoreSnapshotProvider)
+            ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
+        true;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -173,28 +181,46 @@ class PageHomeFeedScreen extends HookConsumerWidget {
         value: SystemUiOverlayStyle.dark.copyWith(
           statusBarColor: Colors.transparent,
         ),
-        child: postsAsync.when(
-          // 重讀失敗時 state 帶著舊列表：繼續顯示它，不換成錯誤畫面。
-          skipError: true,
-          data: (posts) {
-            if (posts.isEmpty) return _buildEmptyState();
-            return _FeedPager(
-              posts: posts,
-              initialIndex: initialPostId == null
-                  ? initialIndex.clamp(0, posts.length - 1)
-                  : feedIndexForPost(posts, initialPostId),
-              sellerName: sellerName,
-              share: share,
-              publishDisabled: postsAsync.hasError,
-              onShare: (post) => _onShare(context, ref, post),
-              onEdit: (post) => _onEdit(context, ref, post),
-              onDelete: (post) => _confirmAndDelete(context, ref, post.id),
-            );
-          },
-          loading: () => const Center(child: FruitSpinner(size: 64)),
-          error: (e, _) => Center(child: Text('Error: $e')),
+        child: Column(
+          children: [
+            if (!canMarket) const _RestrictedNotice(),
+            Expanded(
+              child: _buildBody(context, ref, postsAsync, share, canMarket),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<Post>> postsAsync,
+    StoreShare share,
+    bool canMarket,
+  ) {
+    return postsAsync.when(
+      // 重讀失敗時 state 帶著舊列表：繼續顯示它，不換成錯誤畫面。
+      skipError: true,
+      data: (posts) {
+        if (posts.isEmpty) return _buildEmptyState();
+        return _FeedPager(
+          posts: posts,
+          initialIndex: initialPostId == null
+              ? initialIndex.clamp(0, posts.length - 1)
+              : feedIndexForPost(posts, initialPostId),
+          sellerName: sellerName,
+          share: share,
+          publishDisabled: postsAsync.hasError,
+          onShare: (post) => _onShare(context, ref, post),
+          canEdit: canMarket,
+          onEdit: (post) => _onEdit(context, ref, post),
+          onDelete: (post) => _confirmAndDelete(context, ref, post.id),
+        );
+      },
+      loading: () => const Center(child: FruitSpinner(size: 64)),
+      error: (e, _) => Center(child: Text('Error: $e')),
     );
   }
 
@@ -209,15 +235,19 @@ class PageHomeFeedScreen extends HookConsumerWidget {
   }
 
   Future<void> _onShare(BuildContext context, WidgetRef ref, Post post) async {
-    final data = await ref
-        .read(postRepositoryProvider)
-        .getShareUrl(type: 'post', id: post.id.toString());
-    if (!context.mounted) return;
-    if (data == null) {
+    if (post.url.isEmpty) {
       FloatingToast.error(context, kShareFailedMessage);
       return;
     }
-    showShareSheet(context, data);
+    showShareSheet(
+      context,
+      ShareData(
+        title: post.content.split('\n').first,
+        description: '',
+        imageUrl: buildImageUrl(post.imageUrl, ImagePreset.thumb),
+        url: post.url,
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -248,7 +278,7 @@ class PageHomeFeedScreen extends HookConsumerWidget {
       if (context.mounted) FloatingToast.success(context, '已刪除貼文');
     } catch (e) {
       if (context.mounted) {
-        FloatingToast.error(context, '刪除失敗：${_mutationErrorMessage(e)}');
+        FloatingToast.error(context, '刪除失敗：${_mutationErrorMessage(e, ref)}');
       }
     }
   }
@@ -287,6 +317,7 @@ class _FeedPager extends HookWidget {
     required this.share,
     required this.publishDisabled,
     required this.onShare,
+    required this.canEdit,
     required this.onEdit,
     required this.onDelete,
   });
@@ -299,6 +330,7 @@ class _FeedPager extends HookWidget {
   /// 列表重讀失敗後，畫面上的發布狀態不可信：發布與下架停用到下一次重讀成功。
   final bool publishDisabled;
   final void Function(Post post) onShare;
+  final bool canEdit;
   final void Function(Post post) onEdit;
   final void Function(Post post) onDelete;
 
@@ -309,7 +341,7 @@ class _FeedPager extends HookWidget {
       children: [
         Positioned.fill(
           child: _PostPreviewBackdrop(
-            imageSource: posts[initialIndex].imageKeys.firstOrNull ?? '',
+            imageSource: posts[initialIndex].imageUrl,
           ),
         ),
         // 左右切換店舖貼文；說明與留言各自保留可捲動空間。
@@ -334,7 +366,7 @@ class _FeedPager extends HookWidget {
                 shareHint: share is StoreShareDisabled
                     ? kStoreShareDisabledHint
                     : null,
-                onEditTap: () => onEdit(post),
+                onEditTap: canEdit ? () => onEdit(post) : null,
                 onDeleteTap: () => onDelete(post),
                 onProductTap: post.linkedProduct != null
                     ? () => context.push(
@@ -351,9 +383,8 @@ class _FeedPager extends HookWidget {
   }
 }
 
-String _mutationErrorMessage(Object error) {
-  return error is AppException ? error.message : '請稍後再試';
-}
+String _mutationErrorMessage(Object error, WidgetRef ref) =>
+    errorText(error, defaults: ref.read(defaultErrorTextProvider));
 
 // ─── 單篇預覽（對齊 buyer MerchantPostsFeedScreen）──────────────────
 class _PostPage extends HookConsumerWidget {
@@ -374,7 +405,7 @@ class _PostPage extends HookConsumerWidget {
   final bool publishDisabled;
   final VoidCallback? onShareTap;
   final String? shareHint;
-  final VoidCallback onEditTap;
+  final VoidCallback? onEditTap;
   final VoidCallback onDeleteTap;
   final VoidCallback? onProductTap;
 
@@ -391,7 +422,7 @@ class _PostPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // objectKey 直接交給 OptimizedNetworkImage，由 buildImageUrl（唯一組裝入口）
     // 依 postImage 場景組顯示 URL；不要在這裡自行拼域名。
-    final imageSource = post.imageKeys.isEmpty ? '' : post.imageKeys.first;
+    final imageSource = post.imageUrl;
     final dateStr = _formatDate(post.createdAt);
     final statusBadge = postStatusBadgeOf(post);
 
@@ -493,7 +524,7 @@ class _PostPage extends HookConsumerWidget {
     );
     final store = ref.watch(myStoreSnapshotProvider);
     final publishing = useState(false);
-    final target = postPublishTarget(post.publishStatus);
+    final target = postPublishTarget(post.status);
     // 能力還沒讀到（store 為 null）時不下結論，伺服器是最後一道。
     final canPublish =
         store?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? true;
@@ -502,7 +533,7 @@ class _PostPage extends HookConsumerWidget {
 
     Future<void> togglePublish(bool publish) async {
       if (publishing.value) return;
-      if (publish && post.imageKeys.isEmpty) {
+      if (publish && !post.hasImage) {
         FloatingToast.error(
           context,
           '$kPostImageRequiredTitle\n$kPostPublishImageRequiredHint',
@@ -526,12 +557,15 @@ class _PostPage extends HookConsumerWidget {
         if (!refreshed && context.mounted) {
           // 發布或下架已成功，只是重讀列表失敗：不說「失敗」，只交代重讀的原因。
           final error = ref.read(postListProvider).error;
-          FloatingToast.error(context, _mutationErrorMessage(error ?? ''));
+          FloatingToast.error(context, _mutationErrorMessage(error ?? '', ref));
         }
-      } on AppException catch (error) {
+      } on ConnectException catch (error) {
         if (context.mounted) {
           final prefix = publish ? '發布失敗' : '下架失敗';
-          FloatingToast.error(context, '$prefix：${error.message}');
+          FloatingToast.error(
+            context,
+            '$prefix：${_mutationErrorMessage(error, ref)}',
+          );
         }
       } finally {
         if (context.mounted) publishing.value = false;
@@ -839,14 +873,16 @@ class _PostPage extends HookConsumerWidget {
                       right: 12,
                       child: Row(
                         children: [
-                          _PostManagementButton(
-                            key: ValueKey('seller-post-edit-${post.id}'),
-                            label: '編輯貼文',
-                            icon: AppIcons.editSquareOutlined,
-                            color: AppIconColors.active,
-                            onPressed: onEditTap,
-                          ),
-                          const SizedBox(width: HkSpace.sm),
+                          if (onEditTap case final onEdit?) ...[
+                            _PostManagementButton(
+                              key: ValueKey('seller-post-edit-${post.id}'),
+                              label: '編輯貼文',
+                              icon: AppIcons.editSquareOutlined,
+                              color: AppIconColors.active,
+                              onPressed: onEdit,
+                            ),
+                            const SizedBox(width: HkSpace.sm),
+                          ],
                           _PostManagementButton(
                             key: ValueKey('seller-post-delete-${post.id}'),
                             label: '刪除貼文',
@@ -2230,4 +2266,25 @@ List<InlineSpan> _buildHashtagSpans(String content, TextStyle baseStyle) {
     spans.add(TextSpan(text: content.substring(last), style: baseStyle));
   }
   return spans;
+}
+
+class _RestrictedNotice extends StatelessWidget {
+  const _RestrictedNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const ValueKey('seller-posts-restricted-notice'),
+    width: double.infinity,
+    color: AppColors.warningSoft,
+    padding: EdgeInsets.fromLTRB(
+      HkSpace.lg,
+      MediaQuery.paddingOf(context).top + HkSpace.sm,
+      HkSpace.lg,
+      HkSpace.sm,
+    ),
+    child: const Text(
+      kPostRestrictedNotice,
+      style: TextStyle(color: AppColors.warningText),
+    ),
+  );
 }

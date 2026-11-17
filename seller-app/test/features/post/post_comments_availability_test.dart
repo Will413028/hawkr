@@ -1,4 +1,4 @@
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/features/post/data/post_comments_availability.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
@@ -6,11 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 PostCommentsAvailability _of({
   StoreShare share = const StoreShareEnabled('s'),
-  String? publishStatus = '4402',
+  PostStatus publishStatus = PostStatus.POST_STATUS_PUBLISHED,
   bool hidden = false,
 }) => postCommentsAvailability(
   share: share,
-  publishStatus: publishStatus,
+  status: publishStatus,
   hidden: hidden,
 );
 
@@ -22,7 +22,10 @@ void main() {
 
   test('a store that cannot go public wins over the post state', () {
     expect(
-      _of(share: const StoreShareDisabled(), publishStatus: '4401'),
+      _of(
+        share: const StoreShareDisabled(),
+        publishStatus: PostStatus.POST_STATUS_DRAFT,
+      ),
       PostCommentsAvailability.storeNotPublic,
     );
   });
@@ -30,9 +33,9 @@ void main() {
   test('platform-hidden wins over a draft, an unpublished post and a '
       'non-public store', () {
     for (final status in [
-      PostPublishStatus.draft.value,
-      PostPublishStatus.unpublished.value,
-      PostPublishStatus.published.value,
+      PostStatus.POST_STATUS_DRAFT,
+      PostStatus.POST_STATUS_UNPUBLISHED,
+      PostStatus.POST_STATUS_PUBLISHED,
     ]) {
       for (final share in const <StoreShare>[
         StoreShareEnabled('s'),
@@ -47,40 +50,34 @@ void main() {
     }
   });
 
-  test('the Post and map variants use the same hidden rule', () {
+  test('a post with a takedown measure is platform-hidden', () {
     const share = StoreShareEnabled('s');
     final hidden = Post(
       id: 1,
-      sellerId: 7,
-      contentType: 'IMAGE',
       content: 'c',
-      publishStatus: '4401',
-      hiddenAt: 1760000000,
+      status: PostStatus.POST_STATUS_DRAFT,
+      takedownMeasureId: 'measure-1',
     );
     expect(
       postCommentsAvailabilityOfPost(share, hidden),
       PostCommentsAvailability.platformHidden,
     );
     expect(
-      postCommentsAvailabilityOfMap(share, {
-        'publishStatus': '4401',
-        'hiddenAt': 1760000000,
-      }),
-      PostCommentsAvailability.platformHidden,
-    );
-    expect(
-      postCommentsAvailabilityOfPost(share, hidden.copyWith(hiddenAt: null)),
+      postCommentsAvailabilityOfPost(
+        share,
+        hidden.copyWith(takedownMeasureId: null),
+      ),
       PostCommentsAvailability.notPublished,
     );
   });
 
   test('draft and self-unpublished are not published', () {
     expect(
-      _of(publishStatus: PostPublishStatus.draft.value),
+      _of(publishStatus: PostStatus.POST_STATUS_DRAFT),
       PostCommentsAvailability.notPublished,
     );
     expect(
-      _of(publishStatus: PostPublishStatus.unpublished.value),
+      _of(publishStatus: PostStatus.POST_STATUS_UNPUBLISHED),
       PostCommentsAvailability.notPublished,
     );
   });
@@ -94,7 +91,10 @@ void main() {
       _of(share: const StoreShareUnknown()),
       PostCommentsAvailability.available,
     );
-    expect(_of(publishStatus: null), PostCommentsAvailability.available);
+    expect(
+      _of(publishStatus: PostStatus.POST_STATUS_UNSPECIFIED),
+      PostCommentsAvailability.available,
+    );
   });
 
   test('messages are the approved copy', () {

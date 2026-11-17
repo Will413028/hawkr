@@ -30,15 +30,7 @@ void main() {
           {'id': 1, 'isMine': self, 'userName': '測試留言者', 'content': '留言內容'},
         ];
         when(() => repo.listMyPosts()).thenAnswer(
-          (_) async => [
-            Post(
-              id: 42,
-              sellerId: 7,
-              contentType: 'IMAGE',
-              content: '貼文內容',
-              commentCount: 1,
-            ),
-          ],
+          (_) async => [Post(id: 42, content: '貼文內容', commentCount: 1)],
         );
         when(() => repo.listCommentsRaw(42)).thenAnswer((_) async => comments);
         when(() => repo.listCommentReplies(1)).thenAnswer((_) async => []);

@@ -19,12 +19,11 @@ import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/hk_tap_target.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/linked_product_card.dart';
-import '../../../../shared/widgets/post_video_player.dart';
-import '../../../../shared/widgets/post_video_thumbnail.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../../seller/data/current_store.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
+    show SellerCapability;
 import '../../data/post_comments_availability.dart';
-import '../../data/post_hidden.dart';
 import '../../data/post_model.dart';
 import '../../data/post_repository.dart';
 import 'hidden_post_badge.dart';
@@ -61,11 +60,11 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
 
   static const _postsPageSize = 20;
 
-  List<Map<String, dynamic>> _posts = [];
+  List<Post> _posts = [];
   bool _loadingPosts = false;
   bool _loadingMorePosts = false;
   bool _hasMorePosts = true;
-  int _postsPage = 1;
+  String _nextPostsToken = '';
 
   final Map<int, int> _postCommentCount = <int, int>{};
   final Set<int> _commentsInitRequested = <int>{};
@@ -121,20 +120,12 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
 
   /// 同步留言數 notifier；`prune=true`（整頁重置時）才清掉不在新清單裡的 id，
   /// 分頁 append 時只會新增，不能拿「這一頁」當全集去清掉前面頁面的 notifier。
-  void _syncCommentNotifiers(
-    List<Map<String, dynamic>> posts, {
-    required bool prune,
-  }) {
+  void _syncCommentNotifiers(List<Post> posts, {required bool prune}) {
     final Map<int, int> nextCommentCounts = <int, int>{};
     final Set<int> activeIds = <int>{};
     for (final p in posts) {
-      final dynamic rawId = p['id'] ?? p['postId'];
-      final int? postId = (rawId is num)
-          ? rawId.toInt()
-          : int.tryParse('${rawId ?? ''}');
-      if (postId == null) continue;
-      activeIds.add(postId);
-      nextCommentCounts[postId] = postCommentCount(p);
+      activeIds.add(p.id);
+      nextCommentCounts[p.id] = p.commentCount;
     }
     if (prune) _pruneCommentNotifiers(activeIds);
     for (final id in activeIds) {
@@ -152,14 +143,11 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     if (_loadingPosts) return;
     setState(() => _loadingPosts = true);
     try {
-      final result = await _postRepo.listMyPostsRaw(
-        page: 1,
-        pageSize: _postsPageSize,
-      );
+      final result = await _postRepo.listMyPostsPage(pageSize: _postsPageSize);
       if (!mounted) return;
       setState(() {
         _posts = result.posts;
-        _postsPage = 1;
+        _nextPostsToken = result.nextPageToken;
         _hasMorePosts = result.hasMore;
         _loadingPosts = false;
         _syncCommentNotifiers(result.posts, prune: true);
@@ -175,23 +163,20 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   Future<void> _loadMorePosts() async {
     if (_loadingPosts || _loadingMorePosts || !_hasMorePosts) return;
     setState(() => _loadingMorePosts = true);
-    final nextPage = _postsPage + 1;
     try {
-      final result = await _postRepo.listMyPostsRaw(
-        page: nextPage,
+      final result = await _postRepo.listMyPostsPage(
+        pageToken: _nextPostsToken,
         pageSize: _postsPageSize,
       );
       if (!mounted) return;
       setState(() {
         _posts = [..._posts, ...result.posts];
-        _postsPage = nextPage;
+        _nextPostsToken = result.nextPageToken;
         _hasMorePosts = result.hasMore;
         _loadingMorePosts = false;
         _syncCommentNotifiers(result.posts, prune: false);
       });
-      HKLog.logD(
-        '[Home] Loaded more posts, page $nextPage (${_posts.length} total)',
-      );
+      HKLog.logD('[Home] Loaded more posts (${_posts.length} total)');
     } catch (e) {
       HKLog.logD('[Home] Load more posts failed: $e');
       if (mounted) setState(() => _loadingMorePosts = false);
@@ -199,9 +184,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   }
 
   Future<void> _openPostComposer() async {
-    final created = await context.push<Map<String, dynamic>>(
-      '/post/media-picker',
-    );
+    final created = await context.push<bool>('/post/media-picker');
     if (created != null) {
       await _loadPosts();
       if (mounted) {
@@ -210,9 +193,8 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     }
   }
 
-  void _openFullScreenFeedForPost(Map<String, dynamic> post) {
-    final rawId = post['id'] ?? post['postId'];
-    final int? postId = rawId is int ? rawId : int.tryParse('${rawId ?? ''}');
+  void _openFullScreenFeedForPost(Post post) {
+    final postId = post.id;
     context
         .push(
           PostRoutes.feed,
@@ -270,7 +252,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     );
   }
 
-  void _showPostPreviewAt(Offset globalPos, Map<String, dynamic> post) {
+  void _showPostPreviewAt(Offset globalPos, Post post) {
     final size = MediaQuery.of(context).size;
     const double margin = 12;
     double popWidth = size.width - margin * 2;
@@ -359,31 +341,9 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     );
   }
 
-  ImageProvider? _imageFromPost(Map<String, dynamic> p) {
-    // 欄位形狀與收斂順序見 [postImageSources]：詳情與更新端點只回複數欄位，
-    // 只讀單數會整片掉圖。
-    final sources = postImageSources(p);
-    if (sources.isEmpty) return null;
-    return NetworkImage(buildPostImageUrl(sources.first));
-  }
-
-  String? _videoUrlFromPost(Map<String, dynamic> p) {
-    String? url = p['videoUrl']?.toString();
-    if (url == null || url.isEmpty) {
-      url = p['video_url']?.toString();
-    }
-    final dynamic contentAny = p['content'];
-    if ((url == null || url.isEmpty) && contentAny is Map) {
-      url =
-          contentAny['videoUrl']?.toString() ??
-          contentAny['video_url']?.toString();
-    }
-    if (url != null && url.isNotEmpty) {
-      // 影片走 original preset（Worker 不轉換，非圖片檔的唯一合法選項）。
-      final resolved = buildImageUrl(url, ImagePreset.original);
-      return resolved.isEmpty ? null : resolved;
-    }
-    return null;
+  ImageProvider? _imageFromPost(Post p) {
+    if (!p.hasImage) return null;
+    return NetworkImage(buildPostImageUrl(p.imageUrl));
   }
 
   @override
@@ -398,21 +358,27 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   Widget _homeWithFab() {
     final Widget content = _homeGrid();
     final navigationClearance = sellerFloatingNavigationClearance(context);
+    final canMarket =
+        ref
+            .watch(myStoreSnapshotProvider)
+            ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
+        true;
     return Stack(
       children: [
         Positioned.fill(child: content),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: navigationClearance,
-          child: Center(
-            child: StorefrontGlassActionButton(
-              icon: HkIconName.add,
-              label: '新增貼文',
-              onTap: _openPostComposer,
+        if (canMarket)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: navigationClearance,
+            child: Center(
+              child: StorefrontGlassActionButton(
+                icon: HkIconName.add,
+                label: '新增貼文',
+                onTap: _openPostComposer,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -529,11 +495,10 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     );
   }
 
-  Widget _buildPostGridTile(Map<String, dynamic> post) {
+  Widget _buildPostGridTile(Post post) {
     final img = _imageFromPost(post);
-    final ct = post['contentType']?.toString();
-    final hidden = isPostHidden(post);
-    final postId = (post['id'] ?? post['postId'] ?? '').toString();
+    final hidden = post.isHidden;
+    final postId = post.id.toString();
     final borderRadius = BorderRadius.circular(HkRadius.lg);
 
     return Material(
@@ -543,7 +508,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       child: InkWell(
         borderRadius: borderRadius,
         onTap: hidden
-            ? () => _showHiddenReasonSheet(context, hiddenReasonOf(post))
+            ? () => _showHiddenReasonSheet(context, null)
             : () => _openFullScreenFeedForPost(post),
         onTapDown: (details) => _lastTapDownPosition = details.globalPosition,
         onLongPress: () {
@@ -558,7 +523,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _buildPostGridMedia(post, img, ct),
+                _buildPostGridMedia(img),
                 if (hidden) ...[
                   Positioned.fill(
                     child: ColoredBox(
@@ -579,39 +544,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     );
   }
 
-  Widget _buildPostGridMedia(
-    Map<String, dynamic> post,
-    ImageProvider<Object>? image,
-    String? contentType,
-  ) {
-    if (contentType == 'video') {
-      if (image != null) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Image(image: image, fit: BoxFit.cover),
-            _buildVideoBadge(),
-          ],
-        );
-      }
-      final videoUrl = _videoUrlFromPost(post);
-      if (videoUrl != null && videoUrl.isNotEmpty) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            PostVideoThumbnail(url: videoUrl),
-            _buildVideoBadge(),
-          ],
-        );
-      }
-      return const DecoratedBox(
-        decoration: BoxDecoration(color: AppColors.dividerLight),
-        child: Center(
-          child: Icon(AppIcons.videocam, color: AppIconColors.onBrand),
-        ),
-      );
-    }
-
+  Widget _buildPostGridMedia(ImageProvider<Object>? image) {
     if (image == null) {
       return const DecoratedBox(
         decoration: BoxDecoration(color: AppColors.dividerLight),
@@ -626,49 +559,23 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     return Image(image: image, fit: BoxFit.cover);
   }
 
-  Widget _buildVideoBadge() {
-    return Align(
-      alignment: Alignment.bottomRight,
-      child: Padding(
-        padding: EdgeInsets.all(4.w),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.textSecondary,
-            borderRadius: BorderRadius.circular(HkRadius.md),
-          ),
-          padding: EdgeInsets.all(4.w),
-          child: Icon(
-            AppIcons.playArrowRounded,
-            color: AppIconColors.onBrand,
-            size: 16.sp,
-          ),
-        ),
-      ),
-    );
-  }
-
   /// 長按九宮格格子時彈出的預覽卡（[_showPostPreviewAt] 是唯一呼叫端）。
   /// 卡片本身不帶賣家 header——預覽已經在該賣家的頁面內，重複顯示店名沒有意義。
-  Widget _igPostCardFromPost(Map<String, dynamic> p, StoreShare share) {
+  Widget _igPostCardFromPost(Post p, StoreShare share) {
     final img = _imageFromPost(p);
-    final title = p['title']?.toString() ?? '';
-    final ct = p['contentType']?.toString();
-    final content = p['content']?.toString();
-    final postId = (p['id'] is num)
-        ? (p['id'] as num).toInt()
-        : int.tryParse('${p['id'] ?? ''}');
-    // 讚數直接讀列表 payload 的契約鍵，不另打端點（見 [postLikeCount]）；店主不能按自己貼文的讚，只顯示。
-    final int displayLikeCount = postLikeCount(p);
-    final int commentCount = postCommentCount(p);
-    ValueNotifier<int>? commentNotifier;
-    if (postId != null) {
-      final int initialCount = _postCommentCount[postId] ?? commentCount;
-      commentNotifier = _ensureCommentNotifier(postId, initialCount);
-    }
-    final commentsAvailability = postCommentsAvailabilityOfMap(share, p);
+    final content = p.content;
+    final postId = p.id;
+    // 店主不能按自己貼文的讚，只顯示。
+    final int displayLikeCount = p.likeCount;
+    final int commentCount = p.commentCount;
+    final int initialCount = _postCommentCount[postId] ?? commentCount;
+    final ValueNotifier<int> commentNotifier = _ensureCommentNotifier(
+      postId,
+      initialCount,
+    );
+    final commentsAvailability = postCommentsAvailabilityOfPost(share, p);
     final unavailableMessage = commentsAvailability.message;
-    if (postId != null &&
-        unavailableMessage == null &&
+    if (unavailableMessage == null &&
         !_commentsInitRequested.contains(postId)) {
       _commentsInitRequested.add(postId);
       Future.microtask(() async {
@@ -686,52 +593,33 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _openFullScreenFeedForPost(p),
-            child: (ct == 'video')
-                ? (() {
-                    final vurl = _videoUrlFromPost(p);
-                    if (vurl != null) {
-                      return PostVideoPlayer(url: vurl);
-                    }
-                    return Container(
-                      color: AppColors.gray300,
-                      child: Center(
-                        child: Icon(
-                          AppIcons.videocam,
-                          color: AppIconColors.onBrand,
-                          size: 48.sp,
-                        ),
+            child: (img == null
+                ? Container(
+                    color: AppColors.gray300,
+                    child: Center(
+                      child: Icon(
+                        AppIcons.image,
+                        color: AppIconColors.onBrand,
+                        size: 48.sp,
                       ),
-                    );
-                  })()
-                : (img == null
-                      ? Container(
-                          color: AppColors.gray300,
-                          child: Center(
-                            child: Icon(
-                              AppIcons.image,
-                              color: AppIconColors.onBrand,
-                              size: 48.sp,
-                            ),
-                          ),
-                        )
-                      : Image(
-                          image: img,
-                          fit: BoxFit.cover,
-                          frameBuilder: (context, child, frame, wasSync) {
-                            if (wasSync) return child;
-                            return AnimatedOpacity(
-                              opacity: frame == null ? 0 : 1,
-                              duration: const Duration(milliseconds: 250),
-                              child: child,
-                            );
-                          },
-                        )),
+                    ),
+                  )
+                : Image(
+                    image: img,
+                    fit: BoxFit.cover,
+                    frameBuilder: (context, child, frame, wasSync) {
+                      if (wasSync) return child;
+                      return AnimatedOpacity(
+                        opacity: frame == null ? 0 : 1,
+                        duration: const Duration(milliseconds: 250),
+                        child: child,
+                      );
+                    },
+                  )),
           ),
         ),
-        if (p['linkedProduct'] is Map)
-          LinkedProductCard(
-            linkedProduct: Map<String, dynamic>.from(p['linkedProduct'] as Map),
-          ),
+        if (p.linkedProduct case final product?)
+          LinkedProductCard(linkedProduct: product),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
           child: Row(
@@ -739,36 +627,34 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
               _PostPreviewCountAction(count: displayLikeCount, isLike: true),
               SizedBox(width: 24.w),
               _PostPreviewCountAction(
-                count: commentNotifier?.value ?? 0,
+                count: commentNotifier.value,
                 countNotifier: commentNotifier,
-                onTap: postId == null
-                    ? null
-                    : () async {
-                        await showModalBottomSheet(
-                          context: context,
-                          // 同上：分支 Navigator 在浮動導覽列之下，留言輸入列
-                          // 會被蓋住（#132 同型）。
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: AppColors.bgPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(16.r),
-                            ),
-                          ),
-                          builder: (_) => CommentsBottomSheet(
-                            postId: postId,
-                            postRepository: _postRepo,
-                            postOwnerName: widget.sellerName,
-                            unavailableMessage: unavailableMessage,
-                            onCommentCountChanged: (count) {
-                              if (!mounted) return;
-                              _applyCommentCount(postId, count);
-                              setState(() {});
-                            },
-                          ),
-                        );
+                onTap: () async {
+                  await showModalBottomSheet(
+                    context: context,
+                    // 同上：分支 Navigator 在浮動導覽列之下，留言輸入列
+                    // 會被蓋住（#132 同型）。
+                    useRootNavigator: true,
+                    isScrollControlled: true,
+                    backgroundColor: AppColors.bgPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(16.r),
+                      ),
+                    ),
+                    builder: (_) => CommentsBottomSheet(
+                      postId: postId,
+                      postRepository: _postRepo,
+                      postOwnerName: widget.sellerName,
+                      unavailableMessage: unavailableMessage,
+                      onCommentCountChanged: (count) {
+                        if (!mounted) return;
+                        _applyCommentCount(postId, count);
+                        setState(() {});
                       },
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -783,8 +669,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
             ),
           ),
         ),
-        if (title.isNotEmpty ||
-            (ct == 'text' && content != null && content.isNotEmpty)) ...[
+        if (content.isNotEmpty) ...[
           SizedBox(height: 6.h),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 12.w),
@@ -796,9 +681,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                     text: '${widget.sellerName ?? ''} ',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  if (title.isNotEmpty) TextSpan(text: title),
-                  if (ct == 'text' && content != null && content.isNotEmpty)
-                    TextSpan(text: title.isNotEmpty ? ' $content' : content),
+                  TextSpan(text: content),
                 ],
               ),
             ),

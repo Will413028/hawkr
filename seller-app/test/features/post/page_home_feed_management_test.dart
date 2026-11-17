@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
-import 'package:hawkr_seller/core/exceptions/app_exception.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
+import 'package:hawkr_api/transport.dart';
+import '../../support/connect_errors.dart';
 import 'package:hawkr_seller/core/session/my_store.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -24,26 +25,24 @@ import '../../support/my_store_fixtures.dart';
 
 class _Repo extends Mock implements PostRepository {}
 
-final _draft = PostPublishStatus.draft.value;
-final _published = PostPublishStatus.published.value;
-final _unpublished = PostPublishStatus.unpublished.value;
+const _draft = PostStatus.POST_STATUS_DRAFT;
+const _published = PostStatus.POST_STATUS_PUBLISHED;
+const _unpublished = PostStatus.POST_STATUS_UNPUBLISHED;
 
 Post _post({
   int id = 42,
-  String? publishStatus,
+  PostStatus publishStatus = PostStatus.POST_STATUS_UNSPECIFIED,
   int? hiddenAt,
   DateTime? scheduledPublishAt,
   String content = '貼文內容',
-  List<String> imageKeys = const ['posts/a.jpg'],
+  String imageUrl = 'https://m.test/i/original/posts/a.jpg',
 }) => Post(
   id: id,
-  sellerId: 7,
-  contentType: 'IMAGE',
   content: content,
-  imageKeys: imageKeys,
+  imageUrl: imageUrl,
   likeCount: 5,
-  publishStatus: publishStatus,
-  hiddenAt: hiddenAt,
+  status: publishStatus,
+  takedownMeasureId: hiddenAt == null ? null : 'measure-1',
   scheduledPublishAt: scheduledPublishAt,
 );
 
@@ -109,7 +108,7 @@ void main() {
   });
 
   group('status badges', () {
-    for (final (status, hiddenAt, label) in [
+    for (final (status, hiddenAt, label) in <(PostStatus, int?, String)>[
       (_draft, null, '未發布'),
       (_unpublished, null, '已下架'),
       (_published, 1760000000, '平台下架'),
@@ -184,10 +183,10 @@ void main() {
       expect(find.bySemanticsLabel('分享貼文'), findsOneWidget);
     });
 
-    for (final (name, status, hiddenAt) in [
-      ('未發布', '4401', null),
-      ('已下架', '4403', null),
-      ('平台下架', '4402', 1760000000),
+    for (final (name, status, hiddenAt) in <(String, PostStatus, int?)>[
+      ('未發布', _draft, null),
+      ('已下架', _unpublished, null),
+      ('平台下架', _published, 1760000000),
     ]) {
       testWidgets('$name 的貼文不顯示分享', (tester) async {
         await _pump(
@@ -258,7 +257,9 @@ void main() {
     testWidgets('發布：確認後送出、重讀列表，不做樂觀更新', (tester) async {
       var status = _draft;
       final repo = await _pump(tester, () => [_post(publishStatus: status)]);
-      when(() => repo.publishPostOrThrow(42)).thenAnswer((_) async {
+      when(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenAnswer((_) async {
         status = _published;
       });
 
@@ -266,12 +267,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('發布這則貼文？發布後買家會在動態牆看到它。'), findsOneWidget);
       expect(find.text('這則貼文已排程，現在發布會取消排程。'), findsNothing);
-      verifyNever(() => repo.publishPostOrThrow(any()));
+      verifyNever(
+        () => repo.publishPostOrThrow(any(), etag: any(named: 'etag')),
+      );
 
       await tester.tap(find.text('發布').last);
       await tester.pumpAndSettle();
 
-      verify(() => repo.publishPostOrThrow(42)).called(1);
+      verify(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).called(1);
       verify(() => repo.listMyPosts()).called(2);
       expect(find.text('未發布'), findsNothing);
       expect(
@@ -286,7 +291,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
-      verifyNever(() => repo.publishPostOrThrow(any()));
+      verifyNever(
+        () => repo.publishPostOrThrow(any(), etag: any(named: 'etag')),
+      );
     });
 
     testWidgets('有排程的貼文發布確認多一句取消排程', (tester) async {
@@ -308,7 +315,9 @@ void main() {
     testWidgets('下架：確認文案與送出', (tester) async {
       var status = _published;
       final repo = await _pump(tester, () => [_post(publishStatus: status)]);
-      when(() => repo.unpublishPostOrThrow(42)).thenAnswer((_) async {
+      when(
+        () => repo.unpublishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenAnswer((_) async {
         status = _unpublished;
       });
 
@@ -321,14 +330,18 @@ void main() {
       await tester.tap(find.text('下架').last);
       await tester.pumpAndSettle();
 
-      verify(() => repo.unpublishPostOrThrow(42)).called(1);
+      verify(
+        () => repo.unpublishPostOrThrow(42, etag: any(named: 'etag')),
+      ).called(1);
       expect(find.text('已下架'), findsOneWidget);
     });
 
     testWidgets('送出中顯示進行中文字並停用', (tester) async {
       final repo = await _pump(tester, () => [_post(publishStatus: _draft)]);
       final request = Completer<void>();
-      when(() => repo.publishPostOrThrow(42)).thenAnswer((_) => request.future);
+      when(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenAnswer((_) => request.future);
 
       await tester.tap(_publishButton);
       await tester.pumpAndSettle();
@@ -338,7 +351,9 @@ void main() {
         find.descendant(of: _publishButton, matching: find.text('發布中…')),
         findsOneWidget,
       );
-      verify(() => repo.publishPostOrThrow(42)).called(1);
+      verify(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).called(1);
 
       request.complete();
       await tester.pumpAndSettle();
@@ -350,8 +365,10 @@ void main() {
         () => [_post(publishStatus: _published)],
       );
       when(
-        () => repo.unpublishPostOrThrow(42),
-      ).thenThrow(const ClientException(message: '貼文已被平台下架', statusCode: 409));
+        () => repo.unpublishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenThrow(
+        reasonError(Code.failedPrecondition, 'POST_ERROR', message: '貼文已被平台下架'),
+      );
 
       await tester.tap(_publishButton);
       await tester.pumpAndSettle();
@@ -370,18 +387,22 @@ void main() {
 
     testWidgets('發布成功但重讀列表失敗：留著舊列表、不顯示發布失敗、發布與下架停用', (tester) async {
       final repo = await _pump(tester, () => [_post(publishStatus: _draft)]);
-      when(() => repo.publishPostOrThrow(42)).thenAnswer((_) async {});
+      when(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenAnswer((_) async {});
       // 第一次讀（build）成功，發布後重讀失敗。
       when(
         () => repo.listMyPosts(),
-      ).thenThrow(const ClientException(message: '讀取失敗', statusCode: 500));
+      ).thenThrow(reasonError(Code.internal, 'POST_ERROR', message: '讀取失敗'));
 
       await tester.tap(_publishButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('發布').last);
       await tester.pumpAndSettle();
 
-      verify(() => repo.publishPostOrThrow(42)).called(1);
+      verify(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).called(1);
       expect(find.textContaining('發布失敗'), findsNothing);
       expect(find.textContaining('Error:'), findsNothing);
       // 舊列表還在，重讀失敗的原因用既有的 toast 交代。
@@ -392,20 +413,24 @@ void main() {
       expect(tester.widget<OutlinedButton>(_publishOutlined).onPressed, isNull);
       await tester.tap(_publishButton, warnIfMissed: false);
       await tester.pumpAndSettle();
-      verifyNever(() => repo.unpublishPostOrThrow(any()));
+      verifyNever(
+        () => repo.unpublishPostOrThrow(any(), etag: any(named: 'etag')),
+      );
       await tester.pump(const Duration(seconds: 3));
     });
 
     testWidgets('重讀失敗後下一次重讀成功：按鈕依新狀態恢復', (tester) async {
       var status = _draft;
       final repo = await _pump(tester, () => [_post(publishStatus: status)]);
-      when(() => repo.publishPostOrThrow(42)).thenAnswer((_) async {
+      when(
+        () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenAnswer((_) async {
         status = _published;
       });
       var fail = true;
       when(() => repo.listMyPosts()).thenAnswer((_) async {
         if (fail) {
-          throw const ClientException(message: '讀取失敗', statusCode: 500);
+          throw reasonError(Code.internal, 'POST_ERROR', message: '讀取失敗');
         }
         return [_post(publishStatus: status)];
       });
@@ -436,7 +461,7 @@ void main() {
     testWidgets('沒有照片的草稿按發布：顯示提示、不開確認、不送出', (tester) async {
       final repo = await _pump(
         tester,
-        () => [_post(publishStatus: _draft, imageKeys: const [])],
+        () => [_post(publishStatus: _draft, imageUrl: '')],
       );
 
       await tester.tap(_publishButton);
@@ -445,7 +470,9 @@ void main() {
       expect(find.textContaining('請先補上照片'), findsOneWidget);
       expect(find.textContaining('請先編輯貼文並加入至少 1 張照片，再回來發布。'), findsOneWidget);
       expect(find.text(kPostPublishConfirm), findsNothing);
-      verifyNever(() => repo.publishPostOrThrow(any()));
+      verifyNever(
+        () => repo.publishPostOrThrow(any(), etag: any(named: 'etag')),
+      );
       await tester.pump(const Duration(seconds: 3));
     });
 
@@ -460,7 +487,9 @@ void main() {
 
       expect(find.text('已被平台下架，發布後買家仍看不到'), findsOneWidget);
       expect(find.text('發布這則貼文？發布後買家會在動態牆看到它。'), findsNothing);
-      verifyNever(() => repo.publishPostOrThrow(any()));
+      verifyNever(
+        () => repo.publishPostOrThrow(any(), etag: any(named: 'etag')),
+      );
     });
 
     testWidgets('停權（沒有 MARKETING）時沒有發布按鈕', (tester) async {
@@ -482,6 +511,41 @@ void main() {
         find.descendant(of: _publishButton, matching: find.text('下架')),
         findsOneWidget,
       );
+    });
+  });
+
+  group('停權時的貼文列表（C1）', () {
+    const notice = '店家目前受平台措施限制，貼文只能下架或刪除。';
+    final editButton = find.byKey(const ValueKey('seller-post-edit-42'));
+    final deleteButton = find.byKey(const ValueKey('seller-post-delete-42'));
+
+    testWidgets('沒有 MARKETING：顯示說明，編輯與發布不可用，下架與刪除仍可用', (tester) async {
+      await _pump(
+        tester,
+        () => [_post(publishStatus: _published)],
+        store: _store(capabilities: suspendedCapabilities),
+      );
+      expect(find.text(notice), findsOneWidget);
+      expect(editButton, findsNothing);
+      expect(deleteButton, findsOneWidget);
+      expect(
+        find.descendant(of: _publishButton, matching: find.text('下架')),
+        findsOneWidget,
+      );
+      final unpublish = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: _publishButton,
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(unpublish.onPressed, isNotNull);
+    });
+
+    testWidgets('有 MARKETING：沒有說明，編輯在', (tester) async {
+      await _pump(tester, () => [_post(publishStatus: _published)]);
+      expect(find.text(notice), findsNothing);
+      expect(editButton, findsOneWidget);
+      expect(deleteButton, findsOneWidget);
     });
   });
 

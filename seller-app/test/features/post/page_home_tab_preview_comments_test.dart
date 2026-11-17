@@ -1,3 +1,5 @@
+import 'package:hawkr_seller/features/post/data/post_model.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/session/my_store.dart';
@@ -27,7 +29,7 @@ MyStore _store({required bool listed}) => MyStore(
 Future<_Repo> _openPreviewComments(
   WidgetTester tester, {
   required bool listed,
-  required Map<String, dynamic> post,
+  required Post post,
   bool tapComments = true,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
@@ -36,11 +38,11 @@ Future<_Repo> _openPreviewComments(
   addTearDown(tester.view.resetDevicePixelRatio);
   final repo = _Repo();
   when(
-    () => repo.listMyPostsRaw(
-      page: any(named: 'page'),
+    () => repo.listMyPostsPage(
+      pageToken: any(named: 'pageToken'),
       pageSize: any(named: 'pageSize'),
     ),
-  ).thenAnswer((_) async => PostPageResult(posts: [post], hasMore: false));
+  ).thenAnswer((_) async => PostPageResult(posts: [post], nextPageToken: ''));
   when(() => repo.listComments(any())).thenAnswer((_) async => []);
   await tester.pumpWidget(
     ProviderScope(
@@ -85,12 +87,7 @@ void main() {
     final repo = await _openPreviewComments(
       tester,
       listed: true,
-      post: {
-        'id': 42,
-        'content': '貼文內容',
-        'contentType': 'text',
-        'publishStatus': '4401',
-      },
+      post: Post(id: 42, content: '貼文內容', status: PostStatus.POST_STATUS_DRAFT),
     );
 
     expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsOneWidget);
@@ -108,13 +105,12 @@ void main() {
     final repo = await _openPreviewComments(
       tester,
       listed: true,
-      post: {
-        'id': 42,
-        'content': '貼文內容',
-        'contentType': 'text',
-        'publishStatus': '4401',
-        'hiddenAt': 1760000000,
-      },
+      post: Post(
+        id: 42,
+        content: '貼文內容',
+        status: PostStatus.POST_STATUS_DRAFT,
+        takedownMeasureId: 'measure-1',
+      ),
     );
 
     expect(find.text('這則貼文已被平台下架，買家看不到留言。'), findsOneWidget);
@@ -126,13 +122,12 @@ void main() {
     final repo = await _openPreviewComments(
       tester,
       listed: false,
-      post: {
-        'id': 42,
-        'content': '貼文內容',
-        'contentType': 'text',
-        'publishStatus': '4402',
-        'hiddenAt': 1760000000,
-      },
+      post: Post(
+        id: 42,
+        content: '貼文內容',
+        status: PostStatus.POST_STATUS_PUBLISHED,
+        takedownMeasureId: 'measure-1',
+      ),
     );
 
     expect(find.text('這則貼文已被平台下架，買家看不到留言。'), findsOneWidget);
@@ -145,12 +140,11 @@ void main() {
       final repo = await _openPreviewComments(
         tester,
         listed: true,
-        post: {
-          'id': 42,
-          'content': '貼文內容',
-          'contentType': 'text',
-          'publishStatus': '4402',
-        },
+        post: Post(
+          id: 42,
+          content: '貼文內容',
+          status: PostStatus.POST_STATUS_PUBLISHED,
+        ),
         tapComments: false,
       );
 

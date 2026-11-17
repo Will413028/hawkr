@@ -34,18 +34,17 @@ void main() {
             addTearDown(tester.view.resetPhysicalSize);
             final repo = _Repo();
             final pendingComments = Completer<List<Comment>>();
-            when(() => repo.listMyPostsRaw(page: 1, pageSize: 20)).thenAnswer(
+            when(() => repo.listMyPostsPage(pageSize: 20)).thenAnswer(
               (_) async => const PostPageResult(
                 posts: [
-                  {
-                    'id': 42,
-                    'contentType': 'text',
-                    'content': '測試產地直送貼文',
-                    'likeCount': 123456789,
-                    'commentCount': 987654321,
-                  },
+                  Post(
+                    id: 42,
+                    content: '測試產地直送貼文',
+                    likeCount: 123456789,
+                    commentCount: 987654321,
+                  ),
                 ],
-                hasMore: false,
+                nextPageToken: '',
               ),
             );
             when(

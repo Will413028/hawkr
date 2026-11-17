@@ -31,15 +31,7 @@ Future<_Repo> _pumpFeed(
   addTearDown(tester.view.resetPhysicalSize);
   final repo = _Repo();
   when(() => repo.listMyPosts()).thenAnswer(
-    (_) async => [
-      const Post(
-        id: 42,
-        sellerId: 7,
-        contentType: 'TEXT',
-        content: '產地直送',
-        commentCount: 2,
-      ),
-    ],
+    (_) async => [const Post(id: 42, content: '產地直送', commentCount: 2)],
   );
   when(() => repo.listCommentsRaw(42)).thenAnswer(
     (_) async => [

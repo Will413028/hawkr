@@ -251,6 +251,58 @@ final class SellerClientProvider
 
 String _$sellerClientHash() => r'be61a35edbfb961a1af888c45ab11591b268c4a3';
 
+/// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+
+@ProviderFor(socialClient)
+final socialClientProvider = SocialClientProvider._();
+
+/// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+
+final class SocialClientProvider
+    extends
+        $FunctionalProvider<
+          SocialAppServiceClient,
+          SocialAppServiceClient,
+          SocialAppServiceClient
+        >
+    with $Provider<SocialAppServiceClient> {
+  /// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+  SocialClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialAppServiceClient create(Ref ref) {
+    return socialClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialAppServiceClient>(value),
+    );
+  }
+}
+
+String _$socialClientHash() => r'cf9129264e0b4784af3cffc1f7764c352eabc323';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)

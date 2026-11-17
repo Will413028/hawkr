@@ -11,49 +11,30 @@ part of 'post_model.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
 mixin _$Post {
 
-// ignore: invalid_annotation_target
-@JsonKey(readValue: _readId) int get id;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readSellerId) int get sellerId; String get title; String get content; List<String> get tags; String get contentType;// 'TEXT', 'IMAGE', 'VIDEO'
-/// 貼文圖片來源清單（objectKey 優先、URL 次之，見 [_readImageKeys]）。
-/// 顯示前必須過 `buildImageUrl`；「這則貼文有沒有圖」一律以本清單是否為空
-/// 判斷，不要另外從原始 JSON 猜欄位名。
-// ignore: invalid_annotation_target
-@JsonKey(readValue: _readImageKeys) List<String> get imageKeys;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readVideoUrl) String? get videoUrl;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readLikeCount) int get likeCount;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readCommentCount) int get commentCount;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readShareCount) int get shareCount; bool get isUnlocked; int? get unlockPrice;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp) DateTime? get createdAt;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readLinkedProduct) Map<String, dynamic>? get linkedProduct;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readPublishStatus) String? get publishStatus;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readHiddenAt) int? get hiddenAt;// ignore: invalid_annotation_target
-@JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp) DateTime? get scheduledPublishAt;
+ int get id; String get etag; String get content; String get imageUrl; int get likeCount; int get commentCount; int get shareCount; DateTime? get createdAt; Map<String, dynamic>? get linkedProduct; PostStatus get status; String? get takedownMeasureId; DateTime? get scheduledPublishAt; String get url;
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $PostCopyWith<Post> get copyWith => _$PostCopyWithImpl<Post>(this as Post, _$identity);
 
-  /// Serializes this Post to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.title, title) || other.title == title)&&(identical(other.content, content) || other.content == content)&&const DeepCollectionEquality().equals(other.tags, tags)&&(identical(other.contentType, contentType) || other.contentType == contentType)&&const DeepCollectionEquality().equals(other.imageKeys, imageKeys)&&(identical(other.videoUrl, videoUrl) || other.videoUrl == videoUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.isUnlocked, isUnlocked) || other.isUnlocked == isUnlocked)&&(identical(other.unlockPrice, unlockPrice) || other.unlockPrice == unlockPrice)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other.linkedProduct, linkedProduct)&&(identical(other.publishStatus, publishStatus) || other.publishStatus == publishStatus)&&(identical(other.hiddenAt, hiddenAt) || other.hiddenAt == hiddenAt)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other.linkedProduct, linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,id,sellerId,title,content,const DeepCollectionEquality().hash(tags),contentType,const DeepCollectionEquality().hash(imageKeys),videoUrl,likeCount,commentCount,shareCount,isUnlocked,unlockPrice,createdAt,const DeepCollectionEquality().hash(linkedProduct),publishStatus,hiddenAt,scheduledPublishAt);
+int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,createdAt,const DeepCollectionEquality().hash(linkedProduct),status,takedownMeasureId,scheduledPublishAt,url);
 
 @override
 String toString() {
-  return 'Post(id: $id, sellerId: $sellerId, title: $title, content: $content, tags: $tags, contentType: $contentType, imageKeys: $imageKeys, videoUrl: $videoUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, isUnlocked: $isUnlocked, unlockPrice: $unlockPrice, createdAt: $createdAt, linkedProduct: $linkedProduct, publishStatus: $publishStatus, hiddenAt: $hiddenAt, scheduledPublishAt: $scheduledPublishAt)';
+  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
 }
 
 
@@ -64,7 +45,7 @@ abstract mixin class $PostCopyWith<$Res>  {
   factory $PostCopyWith(Post value, $Res Function(Post) _then) = _$PostCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(readValue: _readId) int id,@JsonKey(readValue: _readSellerId) int sellerId, String title, String content, List<String> tags, String contentType,@JsonKey(readValue: _readImageKeys) List<String> imageKeys,@JsonKey(readValue: _readVideoUrl) String? videoUrl,@JsonKey(readValue: _readLikeCount) int likeCount,@JsonKey(readValue: _readCommentCount) int commentCount,@JsonKey(readValue: _readShareCount) int shareCount, bool isUnlocked, int? unlockPrice,@JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp) DateTime? createdAt,@JsonKey(readValue: _readLinkedProduct) Map<String, dynamic>? linkedProduct,@JsonKey(readValue: _readPublishStatus) String? publishStatus,@JsonKey(readValue: _readHiddenAt) int? hiddenAt,@JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp) DateTime? scheduledPublishAt
+ int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, DateTime? createdAt, Map<String, dynamic>? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
 });
 
 
@@ -81,27 +62,22 @@ class _$PostCopyWithImpl<$Res>
 
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? sellerId = null,Object? title = null,Object? content = null,Object? tags = null,Object? contentType = null,Object? imageKeys = null,Object? videoUrl = freezed,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? isUnlocked = null,Object? unlockPrice = freezed,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? publishStatus = freezed,Object? hiddenAt = freezed,Object? scheduledPublishAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as int,sellerId: null == sellerId ? _self.sellerId : sellerId // ignore: cast_nullable_to_non_nullable
-as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as int,etag: null == etag ? _self.etag : etag // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
-as String,tags: null == tags ? _self.tags : tags // ignore: cast_nullable_to_non_nullable
-as List<String>,contentType: null == contentType ? _self.contentType : contentType // ignore: cast_nullable_to_non_nullable
-as String,imageKeys: null == imageKeys ? _self.imageKeys : imageKeys // ignore: cast_nullable_to_non_nullable
-as List<String>,videoUrl: freezed == videoUrl ? _self.videoUrl : videoUrl // ignore: cast_nullable_to_non_nullable
-as String?,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
+as String,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast_nullable_to_non_nullable
+as String,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
 as int,commentCount: null == commentCount ? _self.commentCount : commentCount // ignore: cast_nullable_to_non_nullable
 as int,shareCount: null == shareCount ? _self.shareCount : shareCount // ignore: cast_nullable_to_non_nullable
-as int,isUnlocked: null == isUnlocked ? _self.isUnlocked : isUnlocked // ignore: cast_nullable_to_non_nullable
-as bool,unlockPrice: freezed == unlockPrice ? _self.unlockPrice : unlockPrice // ignore: cast_nullable_to_non_nullable
-as int?,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as int,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,linkedProduct: freezed == linkedProduct ? _self.linkedProduct : linkedProduct // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,publishStatus: freezed == publishStatus ? _self.publishStatus : publishStatus // ignore: cast_nullable_to_non_nullable
-as String?,hiddenAt: freezed == hiddenAt ? _self.hiddenAt : hiddenAt // ignore: cast_nullable_to_non_nullable
-as int?,scheduledPublishAt: freezed == scheduledPublishAt ? _self.scheduledPublishAt : scheduledPublishAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,
+as Map<String, dynamic>?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as PostStatus,takedownMeasureId: freezed == takedownMeasureId ? _self.takedownMeasureId : takedownMeasureId // ignore: cast_nullable_to_non_nullable
+as String?,scheduledPublishAt: freezed == scheduledPublishAt ? _self.scheduledPublishAt : scheduledPublishAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,url: null == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -186,10 +162,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(readValue: _readId)  int id, @JsonKey(readValue: _readSellerId)  int sellerId,  String title,  String content,  List<String> tags,  String contentType, @JsonKey(readValue: _readImageKeys)  List<String> imageKeys, @JsonKey(readValue: _readVideoUrl)  String? videoUrl, @JsonKey(readValue: _readLikeCount)  int likeCount, @JsonKey(readValue: _readCommentCount)  int commentCount, @JsonKey(readValue: _readShareCount)  int shareCount,  bool isUnlocked,  int? unlockPrice, @JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp)  DateTime? createdAt, @JsonKey(readValue: _readLinkedProduct)  Map<String, dynamic>? linkedProduct, @JsonKey(readValue: _readPublishStatus)  String? publishStatus, @JsonKey(readValue: _readHiddenAt)  int? hiddenAt, @JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp)  DateTime? scheduledPublishAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  Map<String, dynamic>? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
-return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_that.contentType,_that.imageKeys,_that.videoUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.isUnlocked,_that.unlockPrice,_that.createdAt,_that.linkedProduct,_that.publishStatus,_that.hiddenAt,_that.scheduledPublishAt);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   return orElse();
 
 }
@@ -207,10 +183,10 @@ return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(readValue: _readId)  int id, @JsonKey(readValue: _readSellerId)  int sellerId,  String title,  String content,  List<String> tags,  String contentType, @JsonKey(readValue: _readImageKeys)  List<String> imageKeys, @JsonKey(readValue: _readVideoUrl)  String? videoUrl, @JsonKey(readValue: _readLikeCount)  int likeCount, @JsonKey(readValue: _readCommentCount)  int commentCount, @JsonKey(readValue: _readShareCount)  int shareCount,  bool isUnlocked,  int? unlockPrice, @JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp)  DateTime? createdAt, @JsonKey(readValue: _readLinkedProduct)  Map<String, dynamic>? linkedProduct, @JsonKey(readValue: _readPublishStatus)  String? publishStatus, @JsonKey(readValue: _readHiddenAt)  int? hiddenAt, @JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp)  DateTime? scheduledPublishAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  Map<String, dynamic>? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)  $default,) {final _that = this;
 switch (_that) {
 case _Post():
-return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_that.contentType,_that.imageKeys,_that.videoUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.isUnlocked,_that.unlockPrice,_that.createdAt,_that.linkedProduct,_that.publishStatus,_that.hiddenAt,_that.scheduledPublishAt);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -227,10 +203,10 @@ return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(readValue: _readId)  int id, @JsonKey(readValue: _readSellerId)  int sellerId,  String title,  String content,  List<String> tags,  String contentType, @JsonKey(readValue: _readImageKeys)  List<String> imageKeys, @JsonKey(readValue: _readVideoUrl)  String? videoUrl, @JsonKey(readValue: _readLikeCount)  int likeCount, @JsonKey(readValue: _readCommentCount)  int commentCount, @JsonKey(readValue: _readShareCount)  int shareCount,  bool isUnlocked,  int? unlockPrice, @JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp)  DateTime? createdAt, @JsonKey(readValue: _readLinkedProduct)  Map<String, dynamic>? linkedProduct, @JsonKey(readValue: _readPublishStatus)  String? publishStatus, @JsonKey(readValue: _readHiddenAt)  int? hiddenAt, @JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp)  DateTime? scheduledPublishAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  Map<String, dynamic>? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
-return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_that.contentType,_that.imageKeys,_that.videoUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.isUnlocked,_that.unlockPrice,_that.createdAt,_that.linkedProduct,_that.publishStatus,_that.hiddenAt,_that.scheduledPublishAt);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   return null;
 
 }
@@ -239,59 +215,22 @@ return $default(_that.id,_that.sellerId,_that.title,_that.content,_that.tags,_th
 }
 
 /// @nodoc
-@JsonSerializable()
 
-class _Post implements Post {
-  const _Post({@JsonKey(readValue: _readId) required this.id, @JsonKey(readValue: _readSellerId) required this.sellerId, this.title = '', this.content = '', final  List<String> tags = const <String>[], this.contentType = 'TEXT', @JsonKey(readValue: _readImageKeys) final  List<String> imageKeys = const <String>[], @JsonKey(readValue: _readVideoUrl) this.videoUrl, @JsonKey(readValue: _readLikeCount) this.likeCount = 0, @JsonKey(readValue: _readCommentCount) this.commentCount = 0, @JsonKey(readValue: _readShareCount) this.shareCount = 0, this.isUnlocked = false, this.unlockPrice, @JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp) this.createdAt, @JsonKey(readValue: _readLinkedProduct) final  Map<String, dynamic>? linkedProduct, @JsonKey(readValue: _readPublishStatus) this.publishStatus, @JsonKey(readValue: _readHiddenAt) this.hiddenAt, @JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp) this.scheduledPublishAt}): _tags = tags,_imageKeys = imageKeys,_linkedProduct = linkedProduct;
-  factory _Post.fromJson(Map<String, dynamic> json) => _$PostFromJson(json);
 
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readId) final  int id;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readSellerId) final  int sellerId;
-@override@JsonKey() final  String title;
+class _Post extends Post {
+  const _Post({required this.id, this.etag = '', this.content = '', this.imageUrl = '', this.likeCount = 0, this.commentCount = 0, this.shareCount = 0, this.createdAt, final  Map<String, dynamic>? linkedProduct, this.status = PostStatus.POST_STATUS_UNSPECIFIED, this.takedownMeasureId, this.scheduledPublishAt, this.url = ''}): _linkedProduct = linkedProduct,super._();
+  
+
+@override final  int id;
+@override@JsonKey() final  String etag;
 @override@JsonKey() final  String content;
- final  List<String> _tags;
-@override@JsonKey() List<String> get tags {
-  if (_tags is EqualUnmodifiableListView) return _tags;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_tags);
-}
-
-@override@JsonKey() final  String contentType;
-// 'TEXT', 'IMAGE', 'VIDEO'
-/// 貼文圖片來源清單（objectKey 優先、URL 次之，見 [_readImageKeys]）。
-/// 顯示前必須過 `buildImageUrl`；「這則貼文有沒有圖」一律以本清單是否為空
-/// 判斷，不要另外從原始 JSON 猜欄位名。
-// ignore: invalid_annotation_target
- final  List<String> _imageKeys;
-// 'TEXT', 'IMAGE', 'VIDEO'
-/// 貼文圖片來源清單（objectKey 優先、URL 次之，見 [_readImageKeys]）。
-/// 顯示前必須過 `buildImageUrl`；「這則貼文有沒有圖」一律以本清單是否為空
-/// 判斷，不要另外從原始 JSON 猜欄位名。
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readImageKeys) List<String> get imageKeys {
-  if (_imageKeys is EqualUnmodifiableListView) return _imageKeys;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_imageKeys);
-}
-
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readVideoUrl) final  String? videoUrl;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readLikeCount) final  int likeCount;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readCommentCount) final  int commentCount;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readShareCount) final  int shareCount;
-@override@JsonKey() final  bool isUnlocked;
-@override final  int? unlockPrice;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp) final  DateTime? createdAt;
-// ignore: invalid_annotation_target
+@override@JsonKey() final  String imageUrl;
+@override@JsonKey() final  int likeCount;
+@override@JsonKey() final  int commentCount;
+@override@JsonKey() final  int shareCount;
+@override final  DateTime? createdAt;
  final  Map<String, dynamic>? _linkedProduct;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readLinkedProduct) Map<String, dynamic>? get linkedProduct {
+@override Map<String, dynamic>? get linkedProduct {
   final value = _linkedProduct;
   if (value == null) return null;
   if (_linkedProduct is EqualUnmodifiableMapView) return _linkedProduct;
@@ -299,12 +238,10 @@ class _Post implements Post {
   return EqualUnmodifiableMapView(value);
 }
 
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readPublishStatus) final  String? publishStatus;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readHiddenAt) final  int? hiddenAt;
-// ignore: invalid_annotation_target
-@override@JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp) final  DateTime? scheduledPublishAt;
+@override@JsonKey() final  PostStatus status;
+@override final  String? takedownMeasureId;
+@override final  DateTime? scheduledPublishAt;
+@override@JsonKey() final  String url;
 
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
@@ -312,23 +249,20 @@ class _Post implements Post {
 @pragma('vm:prefer-inline')
 _$PostCopyWith<_Post> get copyWith => __$PostCopyWithImpl<_Post>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$PostToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.title, title) || other.title == title)&&(identical(other.content, content) || other.content == content)&&const DeepCollectionEquality().equals(other._tags, _tags)&&(identical(other.contentType, contentType) || other.contentType == contentType)&&const DeepCollectionEquality().equals(other._imageKeys, _imageKeys)&&(identical(other.videoUrl, videoUrl) || other.videoUrl == videoUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.isUnlocked, isUnlocked) || other.isUnlocked == isUnlocked)&&(identical(other.unlockPrice, unlockPrice) || other.unlockPrice == unlockPrice)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other._linkedProduct, _linkedProduct)&&(identical(other.publishStatus, publishStatus) || other.publishStatus == publishStatus)&&(identical(other.hiddenAt, hiddenAt) || other.hiddenAt == hiddenAt)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other._linkedProduct, _linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,id,sellerId,title,content,const DeepCollectionEquality().hash(_tags),contentType,const DeepCollectionEquality().hash(_imageKeys),videoUrl,likeCount,commentCount,shareCount,isUnlocked,unlockPrice,createdAt,const DeepCollectionEquality().hash(_linkedProduct),publishStatus,hiddenAt,scheduledPublishAt);
+int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,createdAt,const DeepCollectionEquality().hash(_linkedProduct),status,takedownMeasureId,scheduledPublishAt,url);
 
 @override
 String toString() {
-  return 'Post(id: $id, sellerId: $sellerId, title: $title, content: $content, tags: $tags, contentType: $contentType, imageKeys: $imageKeys, videoUrl: $videoUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, isUnlocked: $isUnlocked, unlockPrice: $unlockPrice, createdAt: $createdAt, linkedProduct: $linkedProduct, publishStatus: $publishStatus, hiddenAt: $hiddenAt, scheduledPublishAt: $scheduledPublishAt)';
+  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
 }
 
 
@@ -339,7 +273,7 @@ abstract mixin class _$PostCopyWith<$Res> implements $PostCopyWith<$Res> {
   factory _$PostCopyWith(_Post value, $Res Function(_Post) _then) = __$PostCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(readValue: _readId) int id,@JsonKey(readValue: _readSellerId) int sellerId, String title, String content, List<String> tags, String contentType,@JsonKey(readValue: _readImageKeys) List<String> imageKeys,@JsonKey(readValue: _readVideoUrl) String? videoUrl,@JsonKey(readValue: _readLikeCount) int likeCount,@JsonKey(readValue: _readCommentCount) int commentCount,@JsonKey(readValue: _readShareCount) int shareCount, bool isUnlocked, int? unlockPrice,@JsonKey(readValue: _readTimestamp, fromJson: _parseTimestamp) DateTime? createdAt,@JsonKey(readValue: _readLinkedProduct) Map<String, dynamic>? linkedProduct,@JsonKey(readValue: _readPublishStatus) String? publishStatus,@JsonKey(readValue: _readHiddenAt) int? hiddenAt,@JsonKey(readValue: _readScheduledPublishAt, fromJson: _parseTimestamp) DateTime? scheduledPublishAt
+ int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, DateTime? createdAt, Map<String, dynamic>? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
 });
 
 
@@ -356,27 +290,22 @@ class __$PostCopyWithImpl<$Res>
 
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? sellerId = null,Object? title = null,Object? content = null,Object? tags = null,Object? contentType = null,Object? imageKeys = null,Object? videoUrl = freezed,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? isUnlocked = null,Object? unlockPrice = freezed,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? publishStatus = freezed,Object? hiddenAt = freezed,Object? scheduledPublishAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
   return _then(_Post(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as int,sellerId: null == sellerId ? _self.sellerId : sellerId // ignore: cast_nullable_to_non_nullable
-as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as int,etag: null == etag ? _self.etag : etag // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
-as String,tags: null == tags ? _self._tags : tags // ignore: cast_nullable_to_non_nullable
-as List<String>,contentType: null == contentType ? _self.contentType : contentType // ignore: cast_nullable_to_non_nullable
-as String,imageKeys: null == imageKeys ? _self._imageKeys : imageKeys // ignore: cast_nullable_to_non_nullable
-as List<String>,videoUrl: freezed == videoUrl ? _self.videoUrl : videoUrl // ignore: cast_nullable_to_non_nullable
-as String?,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
+as String,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast_nullable_to_non_nullable
+as String,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
 as int,commentCount: null == commentCount ? _self.commentCount : commentCount // ignore: cast_nullable_to_non_nullable
 as int,shareCount: null == shareCount ? _self.shareCount : shareCount // ignore: cast_nullable_to_non_nullable
-as int,isUnlocked: null == isUnlocked ? _self.isUnlocked : isUnlocked // ignore: cast_nullable_to_non_nullable
-as bool,unlockPrice: freezed == unlockPrice ? _self.unlockPrice : unlockPrice // ignore: cast_nullable_to_non_nullable
-as int?,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as int,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,linkedProduct: freezed == linkedProduct ? _self._linkedProduct : linkedProduct // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,publishStatus: freezed == publishStatus ? _self.publishStatus : publishStatus // ignore: cast_nullable_to_non_nullable
-as String?,hiddenAt: freezed == hiddenAt ? _self.hiddenAt : hiddenAt // ignore: cast_nullable_to_non_nullable
-as int?,scheduledPublishAt: freezed == scheduledPublishAt ? _self.scheduledPublishAt : scheduledPublishAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,
+as Map<String, dynamic>?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as PostStatus,takedownMeasureId: freezed == takedownMeasureId ? _self.takedownMeasureId : takedownMeasureId // ignore: cast_nullable_to_non_nullable
+as String?,scheduledPublishAt: freezed == scheduledPublishAt ? _self.scheduledPublishAt : scheduledPublishAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,url: null == url ? _self.url : url // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 

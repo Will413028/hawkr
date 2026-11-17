@@ -1,11 +1,16 @@
 import '../../../features/seller/data/current_store.dart';
+
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/widgets/hk_tap_target.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
+
 import 'dart:io';
+
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/transport.dart' show ConnectException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +22,7 @@ import 'package:palette_generator_plus/palette_generator_plus.dart';
 import 'post_controller.dart';
 import 'widgets/post_hashtag_text_form_field.dart';
 import '../../product/data/product_repository.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../data/post_repository.dart';
 import '../data/post_hashtag_extractor.dart';
 import '../data/post_publish.dart';
@@ -28,6 +34,7 @@ import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/utils/price_display.dart';
 import '../../../shared/utils/product_image_resolver.dart';
 import '../../../shared/widgets/optimized_image.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class PostComposeScreen extends HookConsumerWidget {
@@ -202,25 +209,26 @@ class PostComposeScreen extends HookConsumerWidget {
             ? products.value[selectedIndex]['id']
             : null;
 
-        final post = await repo.createPost(
-          sellerId: sellerId,
-          title: titleCtrl.text.trim(),
-          content: titleCtrl.text.trim(),
-          contentType: currentContentType.value,
-          imageUrl: imageUrl,
-          linkedProductId: linkedProductId,
-          tags: PostHashtagExtractor.extractFromText(titleCtrl.text),
-        );
+        try {
+          await repo.createPost(
+            content: titleCtrl.text.trim(),
+            imageStagedToken: imageUrl,
+            productId: linkedProductId?.toString(),
+            hashtags: PostHashtagExtractor.extractFromText(titleCtrl.text),
+          );
+        } on ConnectException catch (error) {
+          if (context.mounted) {
+            FloatingToast.error(
+              context,
+              errorText(error, defaults: ref.read(defaultErrorTextProvider)),
+            );
+          }
+          return;
+        }
 
         if (!context.mounted) return;
-        if (post != null) {
-          ref.invalidate(postListProvider);
-          context.pop(
-            post.toJson(),
-          ); // return Map just in case caller expects Map
-        } else {
-          FloatingToast.error(context, '發文失敗');
-        }
+        ref.invalidate(postListProvider);
+        context.pop(true);
       } finally {
         if (context.mounted) submitting.value = false;
       }

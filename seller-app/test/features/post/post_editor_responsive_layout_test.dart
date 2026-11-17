@@ -77,12 +77,7 @@ void main() {
                     ),
                     home: editing
                         ? const PostEditScreen(
-                            post: Post(
-                              id: 42,
-                              sellerId: 7,
-                              contentType: 'TEXT',
-                              content: '當季產地商品介紹',
-                            ),
+                            post: Post(id: 42, content: '當季產地商品介紹'),
                           )
                         : const PostComposeScreen(contentType: 'image'),
                   ),

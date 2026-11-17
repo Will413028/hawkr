@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../data/post_repository.dart';
 import '../data/post_model.dart';
 
@@ -60,10 +61,14 @@ class PostList extends _$PostList {
   /// （舊列表上的狀態已經不是真的），直到下一次重讀成功。回傳是否重讀成功。
   Future<bool> setPublished(int postId, {required bool publish}) async {
     final repo = ref.read(postRepositoryProvider);
+    final etag = state.value?.where((p) => p.id == postId).firstOrNull?.etag;
+    if (etag == null) {
+      throw StateError('post $postId is not in the loaded list');
+    }
     if (publish) {
-      await repo.publishPostOrThrow(postId);
+      await repo.publishPostOrThrow(postId, etag: etag);
     } else {
-      await repo.unpublishPostOrThrow(postId);
+      await repo.unpublishPostOrThrow(postId, etag: etag);
     }
     try {
       state = AsyncData(await repo.listMyPosts());
@@ -74,32 +79,31 @@ class PostList extends _$PostList {
     }
   }
 
-  Future<Post?> updatePost(
-    int postId, {
+  /// 修改貼文；成功回傳更新後的貼文（排程時間沿用列表上的值），失敗丟 `ConnectException`。
+  Future<Post> updatePost(
+    Post post, {
     required String content,
-    String keepAssetId = '',
-    String newStagedToken = '',
-    int? productId,
-    List<String>? tags,
+    String? imageStagedToken,
+    String? productId,
+    List<String> hashtags = const [],
   }) async {
-    final updated = await ref
-        .read(postRepositoryProvider)
-        .updatePost(
-          postId,
-          content: content,
-          keepAssetId: keepAssetId,
-          newStagedToken: newStagedToken,
-          productId: productId,
-          tags: tags,
-        );
-    if (updated != null) {
-      final prevState = state;
-      if (prevState is AsyncData<List<Post>>) {
-        final newList = prevState.value
-            .map((p) => p.id == postId ? updated : p)
-            .toList();
-        state = AsyncData(newList);
-      }
+    final updated =
+        (await ref
+                .read(postRepositoryProvider)
+                .updatePost(
+                  post.id,
+                  etag: post.etag,
+                  content: content,
+                  imageStagedToken: imageStagedToken,
+                  productId: productId,
+                  hashtags: hashtags,
+                ))
+            .copyWith(scheduledPublishAt: post.scheduledPublishAt);
+    final prevState = state;
+    if (prevState is AsyncData<List<Post>>) {
+      state = AsyncData(
+        prevState.value.map((p) => p.id == post.id ? updated : p).toList(),
+      );
     }
     return updated;
   }
