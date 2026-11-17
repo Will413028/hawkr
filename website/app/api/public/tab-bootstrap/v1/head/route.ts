@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { getCachedStrictProductsPage } from "@/lib/api/cached";
 import { getVisitorIp } from "@/lib/http/visitor-ip";
+import { defaultLocale } from "@/lib/intl/locales";
 import { fetchPostsPage } from "@/lib/posts/repo";
 
 type HeadTab = "feed" | "market";
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
 						pageSize: 12,
 						signal: AbortSignal.timeout(FEED_REFRESH_DEADLINE_MS),
 						strict: true,
+						locale: defaultLocale,
 						// The feed branch reads the gateway directly for this one
 						// visitor, so it is charged to them (backend#2264). The market
 						// branch below is a shared cache entry and stays on the SSR

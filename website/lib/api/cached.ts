@@ -446,7 +446,13 @@ async function readPublicPosts(pageSize: number) {
 	applyCacheTier("COMMERCE_LIVE");
 	return fillFetch(
 		"public-posts",
-		() => fetchPostsPage({ pageSize, strict: true, signal: upstreamSignal() }),
+		() =>
+			fetchPostsPage({
+				pageSize,
+				strict: true,
+				signal: upstreamSignal(),
+				locale: defaultLocale,
+			}),
 		{
 			key: ["public-posts", String(pageSize)],
 			endpoint: "SocialPublicService/ListPosts",
@@ -470,6 +476,7 @@ async function readStorePosts(storeId: string, pageSize: number) {
 				pageSize,
 				strict: true,
 				signal: upstreamSignal(),
+				locale: defaultLocale,
 			}),
 		{
 			key: ["store-posts", storeId, String(pageSize)],
@@ -489,7 +496,12 @@ async function readTrendingPosts(count: number) {
 	applyCacheTier("DISCOVERY");
 	return fillFetch(
 		"trending-posts",
-		() => fetchTrendingPosts(count, { signal: upstreamSignal(), strict: true }),
+		() =>
+			fetchTrendingPosts(count, {
+				signal: upstreamSignal(),
+				strict: true,
+				locale: defaultLocale,
+			}),
 		{
 			key: ["trending-posts", String(count)],
 			endpoint: "SocialPublicService/SuggestTrendingPosts",
@@ -553,7 +565,12 @@ async function readTrendingPostTags(limit: number) {
 	applyCacheTier("DISCOVERY");
 	return fillFetch(
 		"trending-post-tags",
-		() => fetchTrendingPostTags({ limit, signal: upstreamSignal() }),
+		() =>
+			fetchTrendingPostTags({
+				limit,
+				signal: upstreamSignal(),
+				locale: defaultLocale,
+			}),
 		{
 			key: ["trending-post-tags", String(limit)],
 			endpoint: "SocialPublicService/SuggestTrendingTags",

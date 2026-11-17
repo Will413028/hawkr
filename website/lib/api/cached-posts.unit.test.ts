@@ -39,7 +39,11 @@ describe("cached post readers are anonymous and tagged", () => {
 		const [options] = posts.fetchPostsPage.mock.calls[0] as [
 			Record<string, unknown>,
 		];
-		expect(options).toMatchObject({ pageSize: 12, strict: true });
+		expect(options).toMatchObject({
+			pageSize: 12,
+			strict: true,
+			locale: "zh-TW",
+		});
 		expect(options.viewer).toBeUndefined();
 		expect(options.signal).toBeInstanceOf(AbortSignal);
 	});
@@ -53,7 +57,11 @@ describe("cached post readers are anonymous and tagged", () => {
 		const [options] = posts.fetchPostsPage.mock.calls[0] as [
 			Record<string, unknown>,
 		];
-		expect(options).toMatchObject({ storeId: "42", strict: true });
+		expect(options).toMatchObject({
+			storeId: "42",
+			strict: true,
+			locale: "zh-TW",
+		});
 		expect(options.viewer).toBeUndefined();
 	});
 
@@ -62,7 +70,7 @@ describe("cached post readers are anonymous and tagged", () => {
 		expect(cache.cacheTag).toHaveBeenCalledWith(PUBLIC_CACHE_TAGS.posts);
 		expect(posts.fetchTrendingPosts).toHaveBeenCalledWith(
 			5,
-			expect.objectContaining({ strict: true }),
+			expect.objectContaining({ strict: true, locale: "zh-TW" }),
 		);
 	});
 });

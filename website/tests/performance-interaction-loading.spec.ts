@@ -10,6 +10,7 @@ import {
 import {
 	connectRequestMessage,
 	mockGuestSession,
+	socialMethod,
 } from "./e2e/helpers/mock-gateway";
 
 const REPO_ROOT = process.cwd();
@@ -142,7 +143,7 @@ async function installInteractionFixtures(
 	});
 	// social 走 Connect（GET，請求在 `message` query；回應是訊息本身的 protobuf JSON）。
 	await page.route(
-		/\/SocialPublicService\/SuggestTrendingPosts(?:\?|$)/,
+		socialMethod("SocialPublicService", "SuggestTrendingPosts"),
 		(route) => {
 			if (connectRequestMessage(route).maxResults !== 5)
 				return route.fallback();
@@ -151,7 +152,7 @@ async function installInteractionFixtures(
 		},
 	);
 	await page.route(
-		/\/SocialPublicService\/SuggestTrendingTags(?:\?|$)/,
+		socialMethod("SocialPublicService", "SuggestTrendingTags"),
 		(route) => {
 			if (connectRequestMessage(route).maxResults !== 5)
 				return route.fallback();
