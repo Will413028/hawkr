@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -298,5 +300,25 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 	measures := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID)
 	if closed != (measures == 1) || (decideErr == nil) != closed {
 		t.Fatalf("結案 %v 與措施 %d 個要同進退（decide=%v）", closed, measures, decideErr)
+	}
+}
+
+// 內容還在、案件卻沒有快照：內容下架回「沒有快照無法確認店家」，不是「內容已不存在」。
+func TestTakedownWithoutSnapshotWhileContentExistsSaysSo(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for range 3 {
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	f.exec(t, "DELETE FROM moderation.case_snapshots WHERE case_id = $1", c.ID)
+	_, err := f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	})
+	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), text.DecideTakedownSnapshotMissing().Text) {
+		t.Fatalf("%v", err)
 	}
 }
