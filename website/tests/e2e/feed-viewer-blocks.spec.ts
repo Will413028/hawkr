@@ -49,11 +49,17 @@ async function mockBlockingFeed(page: Page): Promise<ListCall[]> {
 	return calls;
 }
 
-async function openAsBuyer(page: Page, url: string): Promise<void> {
+async function openAsBuyer(
+	page: Page,
+	url: string,
+	registerAfterDefaults: () => Promise<void>,
+): Promise<void> {
 	await setupGatewayMocks(page, {
 		identity: { accountId: "42", roles: ["buyer"] },
 		session: "identity",
 	});
+	// Later routes win in Playwright, so the feed mock must follow the defaults.
+	await registerAfterDefaults();
 	await seedStoredActiveRole(page, "buyer");
 	await page.addInitScript((loaderKey) => {
 		sessionStorage.setItem(loaderKey, "1");
@@ -65,8 +71,10 @@ test.describe("feed lists depend on the viewer", { tag: ["@ui"] }, () => {
 	test("a buyer who blocked a store does not see its posts on /feed", async ({
 		page,
 	}) => {
-		const calls = await mockBlockingFeed(page);
-		await openAsBuyer(page, "/feed");
+		let calls: ListCall[] = [];
+		await openAsBuyer(page, "/feed", async () => {
+			calls = await mockBlockingFeed(page);
+		});
 
 		await expect(page.getByText(OTHER_BODY).first()).toBeVisible();
 		await expect(page.getByText(BLOCKED_BODY)).toHaveCount(0);
@@ -79,8 +87,10 @@ test.describe("feed lists depend on the viewer", { tag: ["@ui"] }, () => {
 	test("a signed-in buyer's store-scoped list on /feed hides the blocked store", async ({
 		page,
 	}) => {
-		const calls = await mockBlockingFeed(page);
-		await openAsBuyer(page, `/feed?sellerId=${BLOCKED_STORE.id}`);
+		let calls: ListCall[] = [];
+		await openAsBuyer(page, `/feed?sellerId=${BLOCKED_STORE.id}`, async () => {
+			calls = await mockBlockingFeed(page);
+		});
 
 		await expect
 			.poll(() =>
@@ -108,8 +118,14 @@ test.describe("feed lists depend on the viewer", { tag: ["@ui"] }, () => {
 	test("a signed-in buyer's store posts tab drops the anonymous seed and reads by the store id, not the URL store_code", async ({
 		page,
 	}) => {
-		const calls = await mockBlockingFeed(page);
-		await openAsBuyer(page, `/sellers/${BLOCKED_STORE.storeCode}/posts`);
+		let calls: ListCall[] = [];
+		await openAsBuyer(
+			page,
+			`/sellers/${BLOCKED_STORE.storeCode}/posts`,
+			async () => {
+				calls = await mockBlockingFeed(page);
+			},
+		);
 
 		await expect
 			.poll(() =>
