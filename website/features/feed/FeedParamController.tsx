@@ -5,12 +5,12 @@ import AppIcon from "@/components/shared/AppIcon";
 import FeedClientShell from "@/features/feed/components/FeedClientShell";
 import type { StoryItem } from "@/features/feed/components/StoryRail";
 import type { PostDetail, PostListItem } from "@/lib/api/openapi-types";
+import { feedScopeOf } from "@/lib/feed/scope";
 import { useUrlSearchParams } from "@/lib/hooks/useUrlSearchParams";
 import {
 	FALLBACK_POST_IMAGE,
 	fetchPostDetailForViewer,
 } from "@/lib/posts/repo";
-import { normalizePostTag } from "@/lib/posts/tags";
 
 const TOPIC_LABELS: Record<string, string> = {
 	following: "追蹤店家",
@@ -87,10 +87,7 @@ export default function FeedParamController({
 	initialSeedFailed,
 }: FeedParamControllerProps) {
 	const params = useUrlSearchParams();
-	const sellerId = params.get("sellerId") || params.get("seller") || "";
-	const topic = params.get("topic") || "";
-	const hashtag = normalizePostTag(params.get("hashtag") || "");
-	const postId = params.get("post") || "";
+	const { sellerId, topic, hashtag, postId } = feedScopeOf(params);
 	const topicLabel = topic ? TOPIC_LABELS[topic] : undefined;
 
 	const deepLinkQuery = useQuery<PostListItem | null>({
