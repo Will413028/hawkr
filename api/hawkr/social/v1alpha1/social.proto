@@ -297,7 +297,7 @@ message Post {
   // 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
   bool viewer_liked = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
-  // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+  // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
   optional string takedown_measure_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
   // 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。

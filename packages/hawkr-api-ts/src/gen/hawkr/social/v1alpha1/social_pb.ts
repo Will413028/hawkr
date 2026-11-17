@@ -236,7 +236,7 @@ export type Post = Message<"hawkr.social.v1alpha1.Post"> & {
 
   /**
    * 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
-   * 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。同時被多個措施下架時是最早建立的那一個。
+   * 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
    *
    * @generated from field: optional string takedown_measure_id = 21;
    */
