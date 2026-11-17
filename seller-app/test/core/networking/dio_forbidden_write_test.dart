@@ -21,7 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/auth/support/auth_test_fakes.dart';
 import '../../support/fake_auth_session.dart';
 
-/// 伺服器對停權帳號的 REST 寫入回 403（envelope 沒有 reason）：Dio 以 GetSession 核對，確認停權才進入受限狀態。
+/// 伺服器對停權帳號的 REST 寫入回 403：envelope 的 reason 是 ACCOUNT_SUSPENDED 才進入受限狀態，背景寫入靜默。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -49,6 +49,7 @@ void main() {
 
   (ProviderContainer, Dio, FakeAuthRepository) build({
     required bool suspended,
+    required Map<String, Object?> body,
   }) {
     final repo = FakeAuthRepository();
     when(() => repo.currentSession()).thenAnswer(
@@ -75,7 +76,8 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    final dio = container.read(dioProvider)..httpClientAdapter = _Forbidden();
+    final dio = container.read(dioProvider)
+      ..httpClientAdapter = _Forbidden(body);
     container.read(sessionProvider.notifier).state = const SessionModel(
       accountId: 'acc-1',
       isLoggedIn: true,
@@ -83,21 +85,30 @@ void main() {
     return (container, dio, repo);
   }
 
-  test('寫入的 403（onResponse）：GetSession 回報停權 → 進入受限狀態', () async {
-    final (c, dio, _) = build(suspended: true);
+  const suspendedBody = {
+    'code': 403,
+    'message': 'forbidden',
+    'reason': 'ACCOUNT_SUSPENDED',
+  };
 
-    await dio.post<dynamic>(
-      '/api/v1/x',
-      options: Options(validateStatus: (_) => true),
-    );
-    await pumpEventQueue();
+  test(
+    'REST 403 帶 ACCOUNT_SUSPENDED（onResponse）：立即進入受限，GetSession 補上原因',
+    () async {
+      final (c, dio, _) = build(suspended: true, body: suspendedBody);
 
-    expect(c.read(accountRestrictionStateProvider)?.reason, '原文');
-    expect(c.read(sessionProvider).isLoggedIn, isTrue);
-  });
+      await dio.post<dynamic>(
+        '/api/v1/x',
+        options: Options(validateStatus: (_) => true),
+      );
+      await pumpEventQueue();
 
-  test('寫入的 403（onError）：GetSession 回報停權 → 進入受限狀態，錯誤照常丟出', () async {
-    final (c, dio, _) = build(suspended: true);
+      expect(c.read(accountRestrictionStateProvider)?.reason, '原文');
+      expect(c.read(sessionProvider).isLoggedIn, isTrue);
+    },
+  );
+
+  test('REST 403 帶 ACCOUNT_SUSPENDED（onError）：進入受限狀態，錯誤照常丟出', () async {
+    final (c, dio, _) = build(suspended: true, body: suspendedBody);
 
     await expectLater(
       dio.delete<dynamic>('/api/v1/x'),
@@ -108,8 +119,8 @@ void main() {
     expect(c.read(accountRestrictionStateProvider)?.reason, '原文');
   });
 
-  test('寫入的 403 但 GetSession 沒有停權 → 不進入受限狀態', () async {
-    final (c, dio, repo) = build(suspended: false);
+  test('REST 403 帶 ACCOUNT_SUSPENDED 但 GetSession 沒有停權：仍然受限', () async {
+    final (c, dio, _) = build(suspended: false, body: suspendedBody);
 
     await dio.post<dynamic>(
       '/api/v1/x',
@@ -117,16 +128,66 @@ void main() {
     );
     await pumpEventQueue();
 
-    verify(() => repo.currentSession()).called(1);
+    expect(c.read(accountRestrictionStateProvider), isNotNull);
+  });
+
+  test('沒有 reason 的一般 403：不進入受限，也不打 GetSession', () async {
+    final (c, dio, repo) = build(
+      suspended: true,
+      body: const {'code': 403, 'message': 'forbidden'},
+    );
+
+    await dio.post<dynamic>(
+      '/api/v1/x',
+      options: Options(validateStatus: (_) => true),
+    );
+    await pumpEventQueue();
+
+    verifyNever(() => repo.currentSession());
     expect(c.read(accountRestrictionStateProvider), isNull);
   });
 
-  test('GET 的 403 不核對', () async {
-    final (c, dio, repo) = build(suspended: true);
+  test('其他 reason 的 403：不進入受限', () async {
+    final (c, dio, repo) = build(
+      suspended: true,
+      body: const {'code': 403, 'message': 'x', 'reason': 'SELLER_SUSPENDED'},
+    );
 
-    await dio.get<dynamic>(
+    await dio.post<dynamic>(
       '/api/v1/x',
       options: Options(validateStatus: (_) => true),
+    );
+    await pumpEventQueue();
+
+    verifyNever(() => repo.currentSession());
+    expect(c.read(accountRestrictionStateProvider), isNull);
+  });
+
+  test('背景寫入（kBackgroundWriteExtra）收到 ACCOUNT_SUSPENDED：靜默略過', () async {
+    final (c, dio, repo) = build(suspended: true, body: suspendedBody);
+
+    await dio.post<dynamic>(
+      '/api/v1/x',
+      options: Options(
+        extra: const {kBackgroundWriteExtra: true},
+        validateStatus: (_) => true,
+      ),
+    );
+    await pumpEventQueue();
+
+    verifyNever(() => repo.currentSession());
+    expect(c.read(accountRestrictionStateProvider), isNull);
+  });
+
+  test('登出時的註銷（kSkipAuthInterceptorExtra）收到 ACCOUNT_SUSPENDED：靜默略過', () async {
+    final (c, dio, repo) = build(suspended: true, body: suspendedBody);
+
+    await dio.delete<dynamic>(
+      '/api/v1/x',
+      options: Options(
+        extra: const {kSkipAuthInterceptorExtra: true},
+        validateStatus: (_) => true,
+      ),
     );
     await pumpEventQueue();
 
@@ -136,13 +197,17 @@ void main() {
 }
 
 class _Forbidden implements HttpClientAdapter {
+  _Forbidden(this.body);
+
+  final Map<String, Object?> body;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async => ResponseBody.fromString(
-    jsonEncode({'code': 403, 'message': 'forbidden'}),
+    jsonEncode(body),
     403,
     headers: {
       Headers.contentTypeHeader: [Headers.jsonContentType],

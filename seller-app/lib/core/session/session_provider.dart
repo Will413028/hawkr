@@ -45,12 +45,14 @@ class Session extends _$Session {
   /// [logout] 進行中旗標 — 見該方法註解的可重入循環說明。
   bool _loggingOut = false;
   final _restore = RestoreScheduler();
-  set restoreError(String? message) =>
+
+  /// 寫入全域的 restore 錯誤訊息（`sessionRestoreErrorProvider`）；null 是清除。
+  void _publishRestoreError(String? message) =>
       ref.read(sessionRestoreErrorProvider.notifier).setMessage(message);
 
-  /// 登入、登出各加一；晚到的停權核對回應用它確認仍是同一個登入 session。
+  /// 登入、登出各加一；晚到的停權細節回應用它確認仍是同一個登入 session。
   int _sessionEpoch = 0;
-  Future<void>? _suspensionCheck;
+  Future<void>? _suspensionDetails;
 
   /// App 啟動時以保存的 session token 呼叫 GetSession，取得目前的帳號。
   Future<void> initialize() async {
@@ -65,7 +67,7 @@ class Session extends _$Session {
       }
     }
     if (!ref.mounted || !_restore.isCurrent(generation)) return;
-    restoreError = null;
+    _publishRestoreError(null);
     try {
       final account = await ref.read(authRepositoryProvider).currentSession();
       final accountId = account.accountId;
@@ -84,7 +86,7 @@ class Session extends _$Session {
       if (!ref.mounted || !_restore.isCurrent(generation)) return;
       if (e is AuthRequestException && !e.isTransient) {
         if (e.code == Code.permissionDenied) {
-          restoreError = e.message;
+          _publishRestoreError(e.message);
         }
         await logout();
       } else {
@@ -112,7 +114,7 @@ class Session extends _$Session {
       onDenied: (error) async {
         final rejection = error as AuthRequestException;
         if (rejection.code == Code.permissionDenied) {
-          restoreError = rejection.message;
+          _publishRestoreError(rejection.message);
         }
         await logout();
       },
@@ -129,7 +131,7 @@ class Session extends _$Session {
     AccountRestriction? restriction,
   }) async {
     cancelRestore();
-    restoreError = null;
+    _publishRestoreError(null);
     _sessionEpoch++;
     _applyRestriction(restriction);
     await AuthStorage.restoreAccount(accountId);
@@ -151,43 +153,41 @@ class Session extends _$Session {
     }
   }
 
-  /// 前景請求收到 `ACCOUNT_SUSPENDED`（或 REST 寫入的 403，伺服器沒有 reason 可分辨）：以 `GetSession` 核對（不登出）：回報停權就進入受限狀態並補上原因、理由與時間，
-  /// 回報沒有停權就清除受限狀態；讀不到時以 `ACCOUNT_SUSPENDED` 為準進入受限狀態。進行中的核對只打一次。
-  /// 背景寫入的 `ACCOUNT_SUSPENDED` 不會呼叫這裡（見 `connectAuthTransport` 的靜默清單）。
+  /// 前景請求收到明確的 `ACCOUNT_SUSPENDED`（Connect 的 reason 或 REST envelope 的 reason）：立即進入受限狀態（伺服器剛明確拒絕，
+  /// 不等任何查詢），再以 `GetSession` 補上原因、理由與停權時間；`GetSession` 沒回停權或讀不到都不清除受限狀態。
+  /// 受限狀態只在冷啟動 restore、重新登入、登出時依 `GetSession` 清除。補細節的查詢同時只打一次，不影響其他訊號進入受限。
+  /// 背景寫入的 `ACCOUNT_SUSPENDED` 不會呼叫這裡（見 `backgroundWriteProcedures`、`kBackgroundWriteExtra`）。
   Future<void> onAccountSuspendedSignal() {
     if (!state.isLoggedIn) return Future.value();
-    return _suspensionCheck ??= _checkSuspension().whenComplete(
-      () => _suspensionCheck = null,
+    final restriction = ref.read(accountRestrictionStateProvider.notifier);
+    if (ref.read(accountRestrictionStateProvider) == null) {
+      restriction.enter(
+        const AccountRestriction(
+          category: PolicyCategory.POLICY_CATEGORY_UNSPECIFIED,
+          reason: '',
+        ),
+      );
+    }
+    return _suspensionDetails ??= _fetchSuspensionDetails().whenComplete(
+      () => _suspensionDetails = null,
     );
   }
 
-  Future<void> _checkSuspension() async {
+  /// 回傳是否已過期的檢查：元件已卸載，或登入、登出之後（`_sessionEpoch` 變了）就是過期，晚到的回應要丟棄。
+  bool Function() _expiryCheck() {
     final epoch = _sessionEpoch;
-    final accountId = state.accountId;
-    final restriction = ref.read(accountRestrictionStateProvider.notifier);
+    return () => !ref.mounted || epoch != _sessionEpoch;
+  }
+
+  Future<void> _fetchSuspensionDetails() async {
+    final expired = _expiryCheck();
     try {
       final account = await ref.read(authRepositoryProvider).currentSession();
-      if (!ref.mounted ||
-          epoch != _sessionEpoch ||
-          state.accountId != accountId) {
-        return;
-      }
-      _applyRestriction(account.restriction);
+      if (expired()) return;
+      final restriction = account.restriction;
+      if (restriction != null) _applyRestriction(restriction);
     } catch (e) {
-      HKLog.logW('[SessionNotifier] 讀取停權狀態失敗: $e');
-      if (!ref.mounted ||
-          epoch != _sessionEpoch ||
-          state.accountId != accountId) {
-        return;
-      }
-      if (ref.read(accountRestrictionStateProvider) == null) {
-        restriction.enter(
-          const AccountRestriction(
-            category: PolicyCategory.POLICY_CATEGORY_UNSPECIFIED,
-            reason: '',
-          ),
-        );
-      }
+      HKLog.logW('[SessionNotifier] 讀取停權細節失敗: $e');
     }
   }
 

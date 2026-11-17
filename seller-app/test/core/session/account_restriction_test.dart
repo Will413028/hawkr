@@ -164,26 +164,62 @@ void main() {
       return (c, repo);
     }
 
-    test('GetSession 回報沒有停權：清除受限狀態', () async {
+    test('訊號後 GetSession 回報沒有停權：仍然受限（伺服器剛明確拒絕）', () async {
+      final (c, _) = await loggedIn(
+        () async => const AccountSession(accountId: 'acc-1'),
+      );
+      expect(c.read(accountRestrictionStateProvider), isNull);
+
+      await c.read(sessionProvider.notifier).onAccountSuspendedSignal();
+
+      expect(c.read(accountRestrictionStateProvider), isNotNull);
+    });
+
+    test('訊號立即進入受限，不等 GetSession', () async {
+      final gate = Completer<AccountSession>();
+      final (c, _) = await loggedIn(() => gate.future);
+
+      final pending = c
+          .read(sessionProvider.notifier)
+          .onAccountSuspendedSignal();
+
+      expect(c.read(accountRestrictionStateProvider), isNotNull);
+      gate.complete(
+        const AccountSession(accountId: 'acc-1', restriction: _restriction),
+      );
+      await pending;
+      expect(
+        c.read(accountRestrictionStateProvider)?.reason,
+        _restriction.reason,
+      );
+    });
+
+    test('冷啟動 GetSession 沒有停權：清除受限狀態', () async {
       final (c, _) = await loggedIn(
         () async => const AccountSession(accountId: 'acc-1'),
         initial: _restriction,
       );
       expect(c.read(accountRestrictionStateProvider), isNotNull);
 
-      await c.read(sessionProvider.notifier).onAccountSuspendedSignal();
+      await c.read(sessionProvider.notifier).initialize();
 
       expect(c.read(accountRestrictionStateProvider), isNull);
     });
 
-    test('沒有停權的訊號（例如 REST 的其他 403）不進入受限狀態', () async {
-      final (c, _) = await loggedIn(
-        () async => const AccountSession(accountId: 'acc-1'),
-      );
+    test('進行中的補細節查詢不吃掉後來的訊號：換帳號後的訊號照樣進入受限', () async {
+      final gate = Completer<AccountSession>();
+      final (c, _) = await loggedIn(() => gate.future);
+      final notifier = c.read(sessionProvider.notifier);
+      final first = notifier.onAccountSuspendedSignal();
 
-      await c.read(sessionProvider.notifier).onAccountSuspendedSignal();
-
+      await notifier.login(accountId: 'acc-2');
       expect(c.read(accountRestrictionStateProvider), isNull);
+      final second = notifier.onAccountSuspendedSignal();
+
+      expect(c.read(accountRestrictionStateProvider), isNotNull);
+      gate.complete(const AccountSession(accountId: 'acc-1'));
+      await Future.wait([first, second]);
+      expect(c.read(accountRestrictionStateProvider), isNotNull);
     });
 
     test('登出後才回來的 GetSession 丟棄，不留下受限狀態', () async {
