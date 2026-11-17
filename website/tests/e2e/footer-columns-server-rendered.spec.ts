@@ -22,7 +22,7 @@ import { expect, test } from "@playwright/test";
  * change to that gating.
  */
 
-const FOOTER_ENDPOINTS = ["/categories/tree", "/tags/trending"];
+const FOOTER_ENDPOINTS = ["/categories/tree", "/SuggestTrendingTags"];
 
 test.describe("footer data columns", { tag: ["@ui"] }, () => {
 	test("are read on the server and never fetched from the browser", async ({

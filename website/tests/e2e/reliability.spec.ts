@@ -730,9 +730,16 @@ async function firstSellerId(
 	let lastFailure = "request was not attempted";
 	for (let attempt = 1; attempt <= 3; attempt++) {
 		try {
-			const res = await request.get(
-				`${LOCAL_ORIGIN}/api/v1/public/posts?page=1&pageSize=10`,
-				{ failOnStatusCode: false, timeout: 15_000 },
+			// SocialPublicService.ListPosts over the first-party Connect path
+			// (protobuf JSON: the store card is `posts[].store`, ids are strings).
+			const res = await request.post(
+				`${LOCAL_ORIGIN}/api/connect/hawkr.social.v1alpha1.SocialPublicService/ListPosts`,
+				{
+					data: { pageSize: 10 },
+					headers: { "Content-Type": "application/json" },
+					failOnStatusCode: false,
+					timeout: 15_000,
+				},
 			);
 			if (res.status() >= 500) {
 				lastFailure = `${res.status()} seller fixture`;
@@ -740,16 +747,11 @@ async function firstSellerId(
 			}
 			if (!res.ok()) throw new Error(`${res.status()} seller fixture`);
 			const body = await res.json();
-			const recs: Array<Record<string, unknown>> = body?.data?.records ?? [];
+			const posts: Array<{ store?: { id?: string } }> = body?.posts ?? [];
 			// No public posts is deterministic and legitimate — signal skip.
-			if (recs.length === 0) return null;
-			for (const rec of recs) {
-				// camelCase, matching what `/public/posts` actually emits (`sellerId`
-				// — verified against test-api). The retired `seller_id` /
-				// `seller_account_id` read as undefined for every record, so the loop
-				// fell through all ten and the helper threw "returned no seller id":
-				// a contract rename reported as a missing fixture.
-				const id = rec.sellerId;
+			if (posts.length === 0) return null;
+			for (const post of posts) {
+				const id = post.store?.id;
 				if (id) return String(id);
 			}
 			lastFailure = "seller fixture returned no seller id";

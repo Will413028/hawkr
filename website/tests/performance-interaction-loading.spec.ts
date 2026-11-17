@@ -7,7 +7,10 @@ import {
 	type Route,
 	test,
 } from "@playwright/test";
-import { mockGuestSession } from "./e2e/helpers/mock-gateway";
+import {
+	connectRequestMessage,
+	mockGuestSession,
+} from "./e2e/helpers/mock-gateway";
 
 const REPO_ROOT = process.cwd();
 const CHUNK_ROOT = path.join(REPO_ROOT, ".next/static/chunks");
@@ -137,25 +140,25 @@ async function installInteractionFixtures(
 			records: [{ hashtag: "當季", count: "3" }],
 		});
 	});
-	await page.route(/\/api\/v1\/public\/posts(?:\?|$)/, (route) => {
-		const url = new URL(route.request().url());
-		if (url.searchParams.get("page_size") !== "30") return route.fallback();
-		note("menuPosts", route);
-		return gatewayData(route, {
-			page: 1,
-			pageSize: 30,
-			total: 0,
-			records: [],
-		});
-	});
-	await page.route(/\/api\/v1\/public\/tags\/trending(?:\?|$)/, (route) => {
-		const limit = new URL(route.request().url()).searchParams.get("limit");
-		if (limit !== "5") return route.fallback();
-		note("menuTrending", route);
-		return gatewayData(route, {
-			items: [{ hashtag: "產地", count: "4" }],
-		});
-	});
+	// social 走 Connect（GET，請求在 `message` query；回應是訊息本身的 protobuf JSON）。
+	await page.route(
+		/\/SocialPublicService\/SuggestTrendingPosts(?:\?|$)/,
+		(route) => {
+			if (connectRequestMessage(route).maxResults !== 5)
+				return route.fallback();
+			note("menuPosts", route);
+			return rawData(route, { posts: [] });
+		},
+	);
+	await page.route(
+		/\/SocialPublicService\/SuggestTrendingTags(?:\?|$)/,
+		(route) => {
+			if (connectRequestMessage(route).maxResults !== 5)
+				return route.fallback();
+			note("menuTrending", route);
+			return rawData(route, { tags: [{ name: "產地", postCount: "4" }] });
+		},
+	);
 	// content 走 Connect（gateway 根目錄的 /{service}/{method}，回應是訊息本身的 JSON）。
 	await page.route(
 		/\/ContentPublicService\/ListLiveBanners(?:\?|$)/,
