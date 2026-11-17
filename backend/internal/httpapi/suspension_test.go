@@ -227,14 +227,34 @@ func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 	if rec, _ := callAs(t, h, "suspended", http.MethodHead, "/api/v1/app/orders"); rec.Code != http.StatusOK {
 		t.Fatalf("HEAD /api/v1：%d", rec.Code)
 	}
+	if rec, s := callAs(t, h, "suspended", http.MethodDelete, "/api/v1/app/notifications/device-token"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
+		t.Fatalf("DELETE device-token：%d %+v，註銷裝置 token 是收斂動作，停權者放行（A7-D18）", rec.Code, s)
+	}
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		rec, s := callAs(t, h, "suspended", m, "/api/v1/app/orders")
 		var body struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" || s.Called {
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" || body.Reason != "ACCOUNT_SUSPENDED" || s.Called {
 			t.Fatalf("%s /api/v1：%d %q called=%v，預期 gateway 形狀的 403", m, rec.Code, rec.Body, s.Called)
+		}
+	}
+}
+
+// 裝置 token 的放行只限註銷：同一路徑的註冊與更新、以及其他 DELETE 仍是寫入。
+func TestSuspendedAccountDeviceTokenAllowlistIsNarrow(t *testing.T) {
+	h := suspendedEntry()
+	for _, c := range []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/app/notifications/device-token"},
+		{http.MethodPut, "/api/v1/app/notifications/device-token"},
+		{http.MethodDelete, "/api/v1/app/notifications"},
+		{http.MethodDelete, "/api/v1/app/notifications/device-token/x"},
+	} {
+		rec, s := callAs(t, h, "suspended", c.method, c.path)
+		if rec.Code != http.StatusForbidden || s.Called {
+			t.Errorf("%s %s：%d，預期 403", c.method, c.path, rec.Code)
 		}
 	}
 }
