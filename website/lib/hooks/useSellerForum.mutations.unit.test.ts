@@ -545,20 +545,36 @@ describe("an ordinary refetch in flight when a row is deleted", () => {
 		await waitFor(() =>
 			expect(ids(result.current.forum.comments)).toContain("real"),
 		);
-		repo.deleteSellerForumComment.mockResolvedValue(undefined);
-		await act(async () => {
-			await result.current.forum.remove(
+		const deleting = deferred<void>();
+		repo.deleteSellerForumComment.mockReturnValue(deleting.promise);
+		let removing!: Promise<void>;
+		act(() => {
+			removing = result.current.forum.remove(
 				result.current.forum.comments.find((c) => c.id === "real") as never,
 			);
 		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]),
+		);
 		await act(async () => {
 			staleRefetch.resolve(
 				page([entry("top", { replyCount: 2 }), entry("lonely"), entry("real")]),
 			);
 			await staleRefetch.promise;
 		});
+		const cached = client
+			.getQueryCache()
+			.getAll()
+			.find((q) => q.queryKey[3] === "forum")?.state.data as
+			| { pages: { records: { id: string }[] }[] }
+			| undefined;
+		expect(cached?.pages.flatMap((p) => p.records.map((r) => r.id))).toEqual([
+			"top",
+			"lonely",
+		]);
 		await act(async () => {
-			await result.current.forum.refresh();
+			deleting.resolve();
+			await removing;
 		});
 		await waitFor(() =>
 			expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]),
