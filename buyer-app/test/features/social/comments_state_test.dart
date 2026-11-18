@@ -411,6 +411,82 @@ void main() {
   });
 
   group('讀取與本地寫入交錯、旗標、生命週期', () {
+    test('第一頁在途中新增回覆，快照已含該回覆但回覆未載入：回覆數不重複加', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (_) {
+          if (++calls == 1) {
+            return pb.ListCommentsResponse(
+              comments: [fakeComment('c1', replyCount: 1)],
+            );
+          }
+          return gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_comments.notifier).reload();
+      await _settle();
+      await c
+          .read(_comments.notifier)
+          .create('回覆', parentId: 'c1', replyToId: 'c1');
+      gate.complete(
+        pb.ListCommentsResponse(comments: [fakeComment('c1', replyCount: 2)]),
+      );
+      await reload;
+
+      expect(c.read(_comments).tree.byId['c1']!.replyCount.toInt(), 2);
+    });
+
+    test('第一頁在途中新增回覆，快照不含該回覆：回覆數補上', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (_) {
+          if (++calls == 1) {
+            return pb.ListCommentsResponse(
+              comments: [fakeComment('c1', replyCount: 1)],
+            );
+          }
+          return gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_comments.notifier).reload();
+      await _settle();
+      await c
+          .read(_comments.notifier)
+          .create('回覆', parentId: 'c1', replyToId: 'c1');
+      gate.complete(
+        pb.ListCommentsResponse(comments: [fakeComment('c1', replyCount: 1)]),
+      );
+      await reload;
+
+      expect(c.read(_comments).tree.byId['c1']!.replyCount.toInt(), 2);
+    });
+
+    test('換觀看者後，前一位的讀取晚結束不影響新讀取的寫入紀錄', () async {
+      final oldGate = Completer<pb.ListCommentsResponse>();
+      final newGate = Completer<pb.ListCommentsResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (_) =>
+            ++calls == 1 ? oldGate.future : newGate.future,
+      );
+      final c = await _open(public);
+      _session(c).signIn();
+      await _settle();
+
+      oldGate.complete(pb.ListCommentsResponse(comments: [fakeComment('old')]));
+      await _settle();
+      await c.read(_comments.notifier).create('新留言');
+      newGate.complete(pb.ListCommentsResponse(comments: [fakeComment('a')]));
+      await _settle();
+
+      expect(_rootIds(c), ['a', 'new']);
+    });
     test('分頁在途中重新整理且失敗：分頁旗標不卡住，可再分頁', () async {
       final gate = Completer<pb.ListCommentsResponse>();
       var fail = false;

@@ -114,7 +114,10 @@ class ThreadTree<T> {
   }
 
   /// 新留言：頂層接在最後；回覆接在父項目底下，父項目的回覆數加一。
-  ThreadTree<T> added(T item) {
+  ///
+  /// 重新套用到較新的快照時給 [parentCountFloor]（寫入當下父項目加一後的回覆數）：
+  /// 快照的回覆數已達該值就是已含這則回覆，不再加；沒有就補到該值。不靠已載入的回覆 id 判斷。
+  ThreadTree<T> added(T item, {int? parentCountFloor}) {
     final id = codec.id(item);
     final parentId = codec.parentId(item);
     if (parentId == null) return appendRoots([item]);
@@ -124,10 +127,11 @@ class ThreadTree<T> {
     final isNew = !ids.contains(id);
     if (isNew) ids.add(id);
     if (parent != null && isNew) {
-      nextById[parentId] = codec.withReplyCount(
-        parent,
-        codec.replyCount(parent) + 1,
-      );
+      final count = codec.replyCount(parent);
+      final next = parentCountFloor == null
+          ? count + 1
+          : (count < parentCountFloor ? parentCountFloor : count);
+      nextById[parentId] = codec.withReplyCount(parent, next);
     }
     return _copy(byId: nextById, replyIds: {...replyIds, parentId: ids});
   }

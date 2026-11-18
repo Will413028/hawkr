@@ -28,6 +28,12 @@ abstract interface class ThreadStateView<S, T> {
   S withThread({ThreadPhase? phase, ThreadTree<T>? tree});
 }
 
+class _Read {
+  _Read(this.seq);
+
+  final int seq;
+}
+
 class _Op<T> {
   _Op(this.seq, this.apply);
 
@@ -53,7 +59,7 @@ mixin ThreadNotifier<S extends ThreadStateView<S, T>, T> on ViewerScoped<S, S> {
   int _epoch = 0;
   int _opSeq = 0;
   final List<_Op<T>> _ops = <_Op<T>>[];
-  final List<int> _activeReads = <int>[];
+  final List<_Read> _activeReads = <_Read>[];
   Object? _moreRun;
   final Map<String, Object> _replyRuns = <String, Object>{};
 
@@ -83,20 +89,21 @@ mixin ThreadNotifier<S extends ThreadStateView<S, T>, T> on ViewerScoped<S, S> {
     });
   }
 
-  int _beginRead() {
-    _activeReads.add(_opSeq);
-    return _opSeq;
+  _Read _beginRead() {
+    final read = _Read(_opSeq);
+    _activeReads.add(read);
+    return read;
   }
 
-  void _endRead(int seq) {
-    _activeReads.remove(seq);
+  void _endRead(_Read read) {
+    _activeReads.remove(read);
     if (_activeReads.isEmpty) _ops.clear();
   }
 
-  ThreadTree<T> _reconcile(ThreadTree<T> tree, int seq) {
+  ThreadTree<T> _reconcile(ThreadTree<T> tree, _Read read) {
     var next = tree;
     for (final op in _ops) {
-      if (op.seq > seq) next = op.apply(next);
+      if (op.seq > read.seq) next = op.apply(next);
     }
     return next;
   }
@@ -212,7 +219,13 @@ mixin ThreadNotifier<S extends ThreadStateView<S, T>, T> on ViewerScoped<S, S> {
 
   /// 伺服器已建立的新項目加進樹。
   void applyCreated(T item) {
-    _log((t) => t.added(item));
+    final parentId = state.tree.codec.parentId(item);
+    final parent = parentId == null ? null : state.tree.byId[parentId];
+    final floor =
+        parent == null || state.tree.byId.containsKey(state.tree.codec.id(item))
+        ? null
+        : state.tree.codec.replyCount(parent) + 1;
+    _log((t) => t.added(item, parentCountFloor: floor));
     state = state.withThread(tree: state.tree.added(item));
   }
 
