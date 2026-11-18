@@ -81,6 +81,7 @@ export type UiTextKey =
 	| "seller.Measure.meta_severity"
 	| "seller.Measure.meta_termination_ground"
 	| "seller.Measure.rejection_cooldown_warning"
+	| "seller.Measure.removed_contents_cleared"
 	| "seller.Measure.removed_contents_heading"
 	| "seller.Measure.suspension_active_open"
 	| "seller.Measure.suspension_active_until"
@@ -392,6 +393,11 @@ export function sellerMeasureMetaTerminationGround(a: { ground: TerminationGroun
 /** seller.Measure.rejection_cooldown_warning */
 export function sellerMeasureRejectionCooldownWarning(a: { days: number }): UiMessage {
 	return { key: "seller.Measure.rejection_cooldown_warning", values: { days: a.days } };
+}
+
+/** seller.Measure.removed_contents_cleared */
+export function sellerMeasureRemovedContentsCleared(): UiMessage {
+	return { key: "seller.Measure.removed_contents_cleared" };
 }
 
 /** seller.Measure.removed_contents_heading */

@@ -538,6 +538,14 @@ UiLocale.zhTW || UiLocale.en => '若本次經駁回，將於 ' + days.toString()
 };
 }
 
+/// seller.Measure.removed_contents_cleared
+String sellerMeasureRemovedContentsCleared(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '內容副本已超過保留期限並刪除。',
+UiLocale.en => 'The copy of this content was deleted after the retention period.',
+};
+}
+
 /// seller.Measure.removed_contents_heading
 String sellerMeasureRemovedContentsHeading(UiLocale l) {
 return switch (l) {

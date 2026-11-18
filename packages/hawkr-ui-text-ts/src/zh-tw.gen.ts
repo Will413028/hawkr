@@ -78,6 +78,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"seller.Measure.meta_severity": (v) => "嚴重程度：" + String(v.severity),
 	"seller.Measure.meta_termination_ground": (v) => "事由：" + String(v.ground),
 	"seller.Measure.rejection_cooldown_warning": (v) => "若本次經駁回，將於 " + String(v.days) + " 日內不得再提出解除請求",
+	"seller.Measure.removed_contents_cleared": () => "內容副本已超過保留期限並刪除。",
 	"seller.Measure.removed_contents_heading": () => "下架的內容",
 	"seller.Measure.suspension_active_open": () => "停權中（未定結束時間，平台定期複審）",
 	"seller.Measure.suspension_active_until": (v) => "停權中（至 " + String(v.end) + "）",

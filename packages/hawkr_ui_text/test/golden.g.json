@@ -194,6 +194,8 @@
   {"key":"seller.Measure.rejection_cooldown_warning","fn":"seller.Measure.rejection_cooldown_warning","audience":"default","locale":"en","params":{"days":1},"want":"若本次經駁回，將於 1 日內不得再提出解除請求"},
   {"key":"seller.Measure.rejection_cooldown_warning","fn":"seller.Measure.rejection_cooldown_warning","audience":"default","locale":"en","params":{"days":2},"want":"若本次經駁回，將於 2 日內不得再提出解除請求"},
   {"key":"seller.Measure.rejection_cooldown_warning","fn":"seller.Measure.rejection_cooldown_warning","audience":"default","locale":"en","params":{"days":1234},"want":"若本次經駁回，將於 1234 日內不得再提出解除請求"},
+  {"key":"seller.Measure.removed_contents_cleared","fn":"seller.Measure.removed_contents_cleared","audience":"default","locale":"zh-TW","want":"內容副本已超過保留期限並刪除。"},
+  {"key":"seller.Measure.removed_contents_cleared","fn":"seller.Measure.removed_contents_cleared","audience":"default","locale":"en","want":"The copy of this content was deleted after the retention period."},
   {"key":"seller.Measure.removed_contents_heading","fn":"seller.Measure.removed_contents_heading","audience":"default","locale":"zh-TW","want":"下架的內容"},
   {"key":"seller.Measure.removed_contents_heading","fn":"seller.Measure.removed_contents_heading","audience":"default","locale":"en","want":"Removed content"},
   {"key":"seller.Measure.suspension_active_open","fn":"seller.Measure.suspension_active_open","audience":"default","locale":"zh-TW","want":"停權中（未定結束時間，平台定期複審）"},

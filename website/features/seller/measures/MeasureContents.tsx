@@ -7,6 +7,7 @@ import {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import {
 	sellerContentKind,
+	sellerMeasureRemovedContentsCleared,
 	sellerMeasureRemovedContentsHeading,
 	sellerMeasureViewContentLink,
 } from "@hawkr/ui-text/keys";
@@ -31,8 +32,8 @@ export function contentHref(content: ContentRef): string | undefined {
 }
 
 /**
- * 措施裡被下架的內容，逐則列出種類、摘要、發文時間與連結。快照不在（`CLEARED`）時只列種類：
- * 這個狀態的說明文字還沒有核可的文案。
+ * 措施裡被下架的內容，逐則列出種類、摘要、發文時間與連結。快照已清空（`CLEARED`）時只列種類，
+ * 並以目錄文案說明副本已超過保留期限刪除。
  */
 export function MeasureContents({
 	contents,
@@ -82,6 +83,11 @@ function MeasureContentItem({
 					</time>
 				)}
 			</div>
+			{!captured && (
+				<p className="m-0 text-sm leading-[1.6] text-[var(--hkui-foreground-soft)]">
+					{ut(sellerMeasureRemovedContentsCleared())}
+				</p>
+			)}
 			{captured && content.excerpt && (
 				<p className="m-0 whitespace-pre-wrap break-words text-sm leading-[1.6] text-[var(--hkui-foreground-soft)]">
 					{content.excerpt}

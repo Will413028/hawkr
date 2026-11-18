@@ -362,6 +362,14 @@ func (t Text) SellerMeasureRejectionCooldownWarning(days int) string {
 	return "若本次經駁回，將於 " + strconv.Itoa(days) + " 日內不得再提出解除請求"
 }
 
+// SellerMeasureRemovedContentsCleared 是 seller.Measure.removed_contents_cleared 的文案。
+func (t Text) SellerMeasureRemovedContentsCleared() string {
+	if t.Locale() == EN {
+		return "The copy of this content was deleted after the retention period."
+	}
+	return "內容副本已超過保留期限並刪除。"
+}
+
 // SellerMeasureRemovedContentsHeading 是 seller.Measure.removed_contents_heading 的文案。
 func (t Text) SellerMeasureRemovedContentsHeading() string {
 	if t.Locale() == EN {

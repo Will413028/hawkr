@@ -319,6 +319,10 @@
       },
       "description": "送出前的冷卻警告。days 是整天數，不足一天進位為一天。"
     },
+    "seller.Measure.removed_contents_cleared": {
+      "message": "內容副本已超過保留期限並刪除。",
+      "description": "被下架內容的快照已超過保留期限清空時，取代摘要的說明句。"
+    },
     "seller.Measure.removed_contents_heading": {
       "message": "下架的內容",
       "description": "措施卡片中列出被下架內容的區塊標題。"

@@ -209,6 +209,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return sellerMeasureMetaTerminationGround(l, ground: hawkr_seller_v1alpha1_seller.TerminationGround.valueOf(_n(params['ground']))!);
     case 'seller.Measure.rejection_cooldown_warning':
       return sellerMeasureRejectionCooldownWarning(l, days: (params['days']! as num).toInt());
+    case 'seller.Measure.removed_contents_cleared':
+      return sellerMeasureRemovedContentsCleared(l);
     case 'seller.Measure.removed_contents_heading':
       return sellerMeasureRemovedContentsHeading(l);
     case 'seller.Measure.suspension_active_open':

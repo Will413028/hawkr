@@ -102,6 +102,7 @@
       "meta_severity": "嚴重程度：{severity}",
       "meta_termination_ground": "事由：{ground}",
       "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
+      "removed_contents_cleared": "內容副本已超過保留期限並刪除。",
       "removed_contents_heading": "下架的內容",
       "suspension_active_open": "停權中（未定結束時間，平台定期複審）",
       "suspension_active_until": "停權中（至 {end}）",

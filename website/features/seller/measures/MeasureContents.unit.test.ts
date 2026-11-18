@@ -98,6 +98,7 @@ describe("MeasureContents", () => {
 		expect(screen.getByText("摘要文字")).toBeTruthy();
 		expect(screen.getByText("另一則留言")).toBeTruthy();
 		expect(screen.getAllByText("2026/11/02 14:30")).toHaveLength(2);
+		expect(screen.queryByText("內容副本已超過保留期限並刪除。")).toBeNull();
 		expect(
 			screen
 				.getAllByText("查看貼文")
@@ -129,6 +130,7 @@ describe("MeasureContents", () => {
 			}),
 		);
 		expect(screen.getByText("貼文")).toBeTruthy();
+		expect(screen.getByText("內容副本已超過保留期限並刪除。")).toBeTruthy();
 		expect(screen.queryByText("查看貼文")).toBeNull();
 		expect(document.querySelector("time")).toBeNull();
 	});

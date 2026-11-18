@@ -76,6 +76,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureMetaTerminationGround(goldenEnum(goldenString(c, "ground"), "TERMINATION_GROUND_"))
 	case "seller.Measure.rejection_cooldown_warning":
 		return t.SellerMeasureRejectionCooldownWarning(goldenInt(c, "days")), true
+	case "seller.Measure.removed_contents_cleared":
+		return t.SellerMeasureRemovedContentsCleared(), true
 	case "seller.Measure.removed_contents_heading":
 		return t.SellerMeasureRemovedContentsHeading(), true
 	case "seller.Measure.suspension_active_open":
