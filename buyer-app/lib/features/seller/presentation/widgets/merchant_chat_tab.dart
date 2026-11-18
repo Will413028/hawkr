@@ -6,7 +6,6 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
-import 'package:uuid/uuid.dart';
 import '../../../../core/networking/suspension_signal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,7 +20,9 @@ import '../../../../shared/widgets/hk_frosted_icon_button.dart';
 import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
-import '../../../social/data/social_content_repository.dart';
+import '../../../social/presentation/comments_notifier.dart' show CommentsPhase;
+import '../../../social/presentation/forum_notifier.dart';
+import '../../../social/presentation/write_result.dart';
 import '../../../../core/session/session_provider.dart';
 import '../../../../core/session/viewer_scope.dart';
 import '../../../../shared/widgets/login_to_comment_prompt.dart';
@@ -73,18 +74,15 @@ const _hiddenEntryText = '此留言已被隱藏';
 /// - 編輯、刪除留言（伺服器說可以時，長壓或點 ⋯ 觸發選單；討論區沒有按讚）
 /// - 懶加載子回覆及發言者資料
 ///
-/// 注意：透過 [ref] 參數取得 Riverpod 依賴，保持本 Widget 為純 [StatefulWidget]。
-class MerchantChatTab extends StatefulWidget {
+/// 伺服器狀態在 [forumProvider]；這裡只顯示與發動作。
+class MerchantChatTab extends ConsumerStatefulWidget {
   const MerchantChatTab({
     super.key,
-    this.ref,
     this.merchantId,
     required this.merchantName,
     this.outerHandle,
   });
 
-  /// Riverpod [WidgetRef]，由父層 ConsumerWidget 傳入。
-  final WidgetRef? ref;
   final String? merchantId;
   final String merchantName;
 
@@ -92,56 +90,23 @@ class MerchantChatTab extends StatefulWidget {
   final SliverOverlapAbsorberHandle? outerHandle;
 
   @override
-  State<MerchantChatTab> createState() => _MerchantChatTabState();
+  ConsumerState<MerchantChatTab> createState() => _MerchantChatTabState();
 }
 
-class _MerchantChatTabState extends State<MerchantChatTab>
-    with AutomaticKeepAliveClientMixin, ViewerScopedLoads<MerchantChatTab> {
+class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  List<_CommentNode> _comments = [];
-  bool _loading = true;
-  bool _submitting = false;
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   _CommentNode? _replyTarget;
   _CommentNode? _editingNode;
-  static const Uuid _uuid = Uuid();
 
-  /// 觀看者能不能新增頂層留言（`ListForumEntries` 回應）；回覆與編輯另看項目的 `viewer_can_*`。
-  bool _viewerCanComment = false;
+  String get _storeId => widget.merchantId!;
 
-  /// 觀看者在這家店討論區留言時的身分（`ListForumEntries` 回應）；訪客 null。
-  pb.Actor? _viewerActor;
+  Forum get _notifier => ref.read(forumProvider(_storeId).notifier);
 
-  bool _loadFailed = false;
-
-  // ── 初始化 ────────────────────────────────────────────────────────────────
-
-  @override
-  void initState() {
-    super.initState();
-    watchViewer();
-    _loadComments();
-  }
-
-  @override
-  WidgetRef? get viewerRef => widget.ref;
-
-  /// 登入、登出或換帳號後，`viewer_can_*`、留言身分與整份討論區都屬於另一個觀看者：
-  /// 進行到一半的回覆與編輯一併放掉，先同步清空再重讀；重讀失敗時畫面是錯誤狀態。
-  @override
-  void onViewerChanged() {
-    setState(() {
-      _comments = [];
-      _viewerCanComment = false;
-      _viewerActor = null;
-      _replyTarget = null;
-      _editingNode = null;
-      _inputController.clear();
-    });
-    _loadComments();
-  }
+  ForumState get _forum => ref.read(forumProvider(_storeId));
 
   @override
   void dispose() {
@@ -152,137 +117,67 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
   // ── 資料載入 ──────────────────────────────────────────────────────────────
 
-  SocialContentRepository? get _repo =>
-      widget.ref?.read(socialContentRepositoryProvider);
-
-  Future<void> _loadComments() async {
-    if (widget.merchantId == null || widget.merchantId!.isEmpty) return;
-    final seq = beginLoad();
-    setState(() {
-      _loading = true;
-      _loadFailed = false;
-    });
-    try {
-      final repo = _repo;
-      if (repo == null) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
-      final response = await repo.listForumEntries(widget.merchantId!);
-      if (!isCurrentLoad(seq)) return;
-      final nodes = response.entries.map((e) => _nodeOf(e)).toList();
-      setState(() {
-        _comments = nodes;
-        _viewerCanComment = response.viewerCanComment;
-        _viewerActor = response.hasViewerActor() ? response.viewerActor : null;
-        _loading = false;
-      });
-      for (final node in nodes) {
-        if (node.replyCount > 0 && node.replies.isEmpty) {
-          _loadRepliesFor(node, seq);
-        }
-      }
-    } catch (e) {
-      HKLog.logE('[MerchantChatTab] _loadComments error: $e', e);
-      if (!isCurrentLoad(seq)) return;
-      setState(() {
-        _loading = false;
-        if (_comments.isEmpty) {
-          _loadFailed = true;
-        }
-      });
-      if (mounted && _comments.isNotEmpty) {
-        showCommonSnackBar(context, '載入失敗，請稍後再試');
-      }
+  Future<void> _reload() async {
+    final ok = await _notifier.reload();
+    if (!ok && mounted && _forum.phase == CommentsPhase.ready) {
+      showCommonSnackBar(context, '載入失敗，請稍後再試');
     }
-  }
-
-  Future<void> _loadRepliesFor(_CommentNode node, int seq) async {
-    try {
-      final repo = _repo;
-      if (repo == null) return;
-      final entries = <pb.ForumEntry>[];
-      var token = '';
-      do {
-        final response = await repo.listForumEntries(
-          widget.merchantId!,
-          parentId: node.id,
-          pageToken: token,
-        );
-        entries.addAll(response.entries);
-        token = response.nextPageToken;
-      } while (token.isNotEmpty);
-      if (entries.isEmpty || !isCurrentLoad(seq)) return;
-      final newReplies = entries
-          .map((e) => _nodeOf(e, parentName: node.userName))
-          .toList();
-      setState(() {
-        node.replies
-          ..clear()
-          ..addAll(newReplies);
-      });
-    } catch (_) {}
   }
 
   // ── 互動操作 ──────────────────────────────────────────────────────────────
 
-  void _reportFailure(Object error, String message) {
+  void _reportFailure(Object? error, String message) {
     if (!mounted) return;
     // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
-    if (isAccountSuspendedError(error)) return;
+    if (error != null && isAccountSuspendedError(error)) return;
     showCommonSnackBar(context, message);
   }
 
   Future<void> _submitComment() async {
     final text = _inputController.text.trim();
-    if (_submitting || text.isEmpty || widget.merchantId == null) return;
-    final repo = _repo;
-    if (repo == null) return;
-    setState(() => _submitting = true);
-    try {
-      final target = _replyTarget;
-      await repo.createForumEntry(
-        widget.merchantId!,
-        text,
-        parentId: target == null
-            ? null
-            : (target.entry.hasParentId() ? target.entry.parentId : target.id),
-        replyToId: target?.id,
-        requestId: _uuid.v4(),
-      );
-      if (!mounted) return;
-      _inputController.clear();
-      if (target != null) setState(() => _replyTarget = null);
-      await _loadComments();
-    } catch (e) {
-      HKLog.logE('[MerchantChatTab] _submitComment error: $e', e);
-      _reportFailure(e, '傳送失敗，請稍後再試');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+    if (_forum.submitting || text.isEmpty || widget.merchantId == null) return;
+    final target = _replyTarget;
+    final result = await _notifier.create(
+      text,
+      parentId: target == null
+          ? null
+          : (target.entry.hasParentId() ? target.entry.parentId : target.id),
+      replyToId: target?.id,
+    );
+    if (!mounted) return;
+    switch (result.status) {
+      case WriteStatus.applied:
+        _inputController.clear();
+        if (target != null) setState(() => _replyTarget = null);
+      case WriteStatus.failed:
+        HKLog.logE(
+          '[MerchantChatTab] _submitComment error: ${result.error}',
+          result.error,
+        );
+        _reportFailure(result.error, '傳送失敗，請稍後再試');
+      case WriteStatus.discarded:
+        break;
     }
   }
 
   Future<void> _submitEditedComment() async {
-    if (_submitting || _editingNode == null) return;
+    final editing = _editingNode;
+    if (_forum.submitting || editing == null) return;
     final content = _inputController.text.trim();
     if (content.isEmpty) return;
-    final repo = _repo;
-    if (repo == null) return;
-    setState(() => _submitting = true);
-    try {
-      await repo.updateForumEntry(_editingNode!.entry, content);
-      if (mounted) {
+    final result = await _notifier.edit(editing.entry, content);
+    if (!mounted) return;
+    switch (result.status) {
+      case WriteStatus.applied:
         showCommonSnackBar(context, '留言已更新');
         setState(() {
           _editingNode = null;
           _inputController.clear();
         });
-        await _loadComments();
-      }
-    } catch (e) {
-      _reportFailure(e, '更新失敗，請稍後再試');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+      case WriteStatus.failed:
+        _reportFailure(result.error, '更新失敗，請稍後再試');
+      case WriteStatus.discarded:
+        break;
     }
   }
 
@@ -292,7 +187,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
   });
 
   void _setReplyTarget(_CommentNode? node) {
-    if (_submitting) return;
+    if (_forum.submitting) return;
     setState(() {
       if (_editingNode != null) _inputController.clear();
       _editingNode = null;
@@ -306,7 +201,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
   }
 
   void _onEditComment(_CommentNode node) {
-    if (_submitting) return;
+    if (_forum.submitting) return;
     setState(() {
       _editingNode = node;
       _replyTarget = null;
@@ -338,39 +233,58 @@ class _MerchantChatTabState extends State<MerchantChatTab>
         ],
       ),
     );
-    if (confirm != true) return;
-    try {
-      final repo = _repo;
-      if (repo == null) return;
-      await repo.deleteForumEntry(node.entry);
-      if (mounted) {
+    if (confirm != true || !mounted) return;
+    final result = await _notifier.delete(node.entry);
+    if (!mounted) return;
+    switch (result.status) {
+      case WriteStatus.applied:
         showCommonSnackBar(context, '留言已刪除');
-        _loadComments();
-      }
-    } catch (e) {
-      _reportFailure(e, '刪除失敗，請稍後再試');
+      case WriteStatus.failed:
+        _reportFailure(result.error, '刪除失敗，請稍後再試');
+      case WriteStatus.discarded:
+        break;
     }
   }
 
   // ── 解析工具 ──────────────────────────────────────────────────────────────
 
-  _CommentNode _nodeOf(pb.ForumEntry entry, {String parentName = ''}) {
+  List<_CommentNode> _nodesOf(ForumState forum) => [
+    for (final root in forum.tree.roots)
+      _nodeOf(
+        root,
+        replies: [
+          for (final reply in forum.tree.repliesOf(root.id))
+            _nodeOf(reply, parentName: _nameOf(root)),
+        ],
+      ),
+  ];
+
+  String _nameOf(pb.ForumEntry entry) {
     final author = entry.author;
     final name = entry.hasAuthor() && author.hasName()
         ? author.name.trim()
         : '';
+    return name.isEmpty ? '匿名用戶' : name;
+  }
+
+  _CommentNode _nodeOf(
+    pb.ForumEntry entry, {
+    String parentName = '',
+    List<_CommentNode> replies = const [],
+  }) {
+    final author = entry.author;
     final avatar = entry.hasAuthor() && author.hasAvatar()
         ? author.avatar.uri(ImagePreset.avatar)
         : '';
     return _CommentNode(
       entry: entry,
-      userName: name.isEmpty ? '匿名用戶' : name,
+      userName: _nameOf(entry),
       userAvatar: avatar,
       createdAt: entry.hasCreateTime()
           ? entry.createTime.toDateTime().toLocal()
           : DateTime.now(),
       replyToUserName: parentName,
-      replies: [],
+      replies: replies,
     );
   }
 
@@ -397,13 +311,21 @@ class _MerchantChatTabState extends State<MerchantChatTab>
     if (widget.merchantId == null || widget.merchantId!.isEmpty) {
       return const Center(child: Text('尚未選擇商家'));
     }
+    final forum = ref.watch(forumProvider(_storeId));
+    ref.listen(viewerIdProvider, (_, _) {
+      setState(() {
+        _replyTarget = null;
+        _editingNode = null;
+        _inputController.clear();
+      });
+    });
     return ColoredBox(
       color: AppColors.bgPrimary,
       child: Column(
         children: [
           Expanded(
             child: FruitRefreshIndicator(
-              onRefresh: _loadComments,
+              onRefresh: _reload,
               topOffset: widget.outerHandle?.layoutExtent ?? 0,
               child: CustomScrollView(
                 key: PageStorageKey<String>(
@@ -413,26 +335,26 @@ class _MerchantChatTabState extends State<MerchantChatTab>
                 slivers: [
                   if (widget.outerHandle != null)
                     SliverOverlapInjector(handle: widget.outerHandle!),
-                  _buildCommentListSlivers(),
+                  _buildCommentListSlivers(forum),
                 ],
               ),
             ),
           ),
-          _buildInputBar(),
+          _buildInputBar(forum),
         ],
       ),
     );
   }
 
   /// 留言列表（以 Sliver 形式），依狀態輸出骨架、空狀態或實際列表。
-  Widget _buildCommentListSlivers() {
-    if (_loading) {
+  Widget _buildCommentListSlivers(ForumState forum) {
+    if (forum.phase == CommentsPhase.loading) {
       return const SliverFillRemaining(
         hasScrollBody: false,
         child: TruckLoadingOverlay(message: '載入中...'),
       );
     }
-    if (_loadFailed) {
+    if (forum.phase == CommentsPhase.failed) {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: Column(
@@ -447,14 +369,15 @@ class _MerchantChatTabState extends State<MerchantChatTab>
             ),
             TextButton(
               key: const Key('merchant-comments-load-retry'),
-              onPressed: _loadComments,
+              onPressed: _reload,
               child: const HkButtonLabel('重試'),
             ),
           ],
         ),
       );
     }
-    if (_comments.isEmpty) {
+    final nodes = _nodesOf(forum);
+    if (nodes.isEmpty) {
       return const SliverFillRemaining(
         hasScrollBody: false,
         child: HkEmptyState(
@@ -480,11 +403,12 @@ class _MerchantChatTabState extends State<MerchantChatTab>
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(sideInset, 16, sideInset, 24),
           sliver: SliverList.builder(
-            itemCount: _comments.length,
+            itemCount: nodes.length,
             itemBuilder: (_, index) => _buildCommentItem(
-              _comments[index],
+              nodes[index],
               0,
-              isLast: index == _comments.length - 1,
+              submitting: forum.submitting,
+              isLast: index == nodes.length - 1,
             ),
           ),
         );
@@ -495,6 +419,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
   Widget _buildCommentItem(
     _CommentNode node,
     int depth, {
+    required bool submitting,
     bool isLast = false,
   }) {
     final hasReplies = node.replies.isNotEmpty;
@@ -506,7 +431,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
       formatTimeAgo: _formatTimeAgo,
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
-      actionsEnabled: !_submitting,
+      actionsEnabled: !submitting,
     );
 
     Widget buildAvatar(_CommentNode n) => ClipOval(
@@ -625,11 +550,12 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
   // ── 輸入欄 ────────────────────────────────────────────────────────────────
 
-  Widget _buildInputBar() {
+  Widget _buildInputBar(ForumState forum) {
+    final submitting = forum.submitting;
     final isEditing = _editingNode != null;
     final hintText = isEditing
         ? '編輯留言...'
-        : storeActorHint(_viewerActor, replying: _replyTarget != null) ??
+        : storeActorHint(forum.viewerActor, replying: _replyTarget != null) ??
               (_replyTarget != null
                   ? '回覆 ${_replyTarget!.userName}...'
                   : '留言給這個賣家...');
@@ -644,9 +570,8 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
     final spec = MerchantLayoutSpec.of(context);
     // 新增頂層留言看 viewer_can_comment；回覆與編輯是另一種動作，進入該模式就要有輸入欄。
-    if (!_viewerCanComment && _replyTarget == null && !isEditing) {
-      final session = widget.ref?.read(sessionProvider);
-      if (session != null && isGuestSession(session)) {
+    if (!forum.viewerCanComment && _replyTarget == null && !isEditing) {
+      if (isGuestSession(ref.watch(sessionProvider))) {
         return const LoginToCommentPrompt();
       }
       return const SizedBox.shrink();
@@ -710,7 +635,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
                               button: true,
                               label: isEditing ? '取消編輯' : '取消回覆',
                               child: InkWell(
-                                onTap: _submitting ? null : cancelMode,
+                                onTap: submitting ? null : cancelMode,
                                 customBorder: const CircleBorder(),
                                 child: const SizedBox.square(
                                   dimension: 36,
@@ -737,7 +662,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
                           key: const Key('merchant-comment-input'),
                           controller: _inputController,
                           focusNode: _inputFocusNode,
-                          readOnly: _submitting,
+                          readOnly: submitting,
                           onChanged: (_) => setState(() {}),
                           minLines: 1,
                           maxLines: 4,
@@ -795,12 +720,12 @@ class _MerchantChatTabState extends State<MerchantChatTab>
                           key: const Key('merchant-comment-submit'),
                           label: isEditing ? '儲存留言' : '送出留言',
                           icon: isEditing ? AppIcons.check : AppIcons.send,
-                          onPressed: hasText && !_submitting
+                          onPressed: hasText && !submitting
                               ? (isEditing
                                     ? _submitEditedComment
                                     : _submitComment)
                               : null,
-                          loading: _submitting,
+                          loading: submitting,
                           loadingLabel: isEditing ? '留言儲存中' : '留言傳送中',
                         ),
                       ),

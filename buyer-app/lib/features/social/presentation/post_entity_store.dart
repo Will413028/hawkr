@@ -162,6 +162,16 @@ class PostEntityStore extends _$PostEntityStore with ViewerScoped {
     }
   }
 
+  /// 留言數的本地增減（自己新增或刪除留言之後）；下一次讀到伺服器的值就以伺服器為準。
+  void adjustCommentCount(int postId, int delta) {
+    final base = _base[postId];
+    if (base == null) return;
+    _base[postId] = base.copyWith(
+      commentCount: (base.commentCount + delta).clamp(0, 1 << 30),
+    );
+    _publish(postId);
+  }
+
   void remove(int postId) {
     _cancelEviction(postId);
     _base.remove(postId);

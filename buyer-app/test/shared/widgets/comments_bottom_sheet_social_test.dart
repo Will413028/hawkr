@@ -9,6 +9,8 @@ import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
+import 'package:hawkr_buyer/features/social/data/social_model.dart';
+import 'package:hawkr_buyer/features/social/presentation/post_entity_store.dart';
 import 'package:hawkr_buyer/shared/widgets/comments_bottom_sheet.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -54,6 +56,9 @@ Future<void> _pump(
   addTearDown(container.dispose);
   _container = container;
   await container.read(sessionProvider.future);
+  container.read(postEntityStoreProvider.notifier).seed([
+    Post(id: 101, viewerCanComment: viewerCanComment, viewerActor: viewerActor),
+  ]);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -67,13 +72,8 @@ Future<void> _pump(
             routes: [
               GoRoute(
                 path: '/',
-                builder: (_, _) => Scaffold(
-                  body: CommentsBottomSheet(
-                    postId: '101',
-                    viewerCanComment: viewerCanComment,
-                    viewerActor: viewerActor,
-                  ),
-                ),
+                builder: (_, _) =>
+                    Scaffold(body: CommentsBottomSheet(postId: 101)),
               ),
               GoRoute(
                 path: '/login',

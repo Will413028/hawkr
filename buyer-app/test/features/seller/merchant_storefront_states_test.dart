@@ -91,11 +91,7 @@ void main() {
 
     await pumpStorefront(
       tester,
-      (ref) => MerchantChatTab(
-        ref: ref,
-        merchantId: '2683382637',
-        merchantName: '金湖水產',
-      ),
+      (ref) => MerchantChatTab(merchantId: '2683382637', merchantName: '金湖水產'),
     );
 
     expect(find.byType(HkEmptyState), findsOneWidget);
@@ -115,11 +111,8 @@ void main() {
       try {
         await pumpStorefront(
           tester,
-          (ref) => MerchantChatTab(
-            ref: ref,
-            merchantId: '2683382637',
-            merchantName: '金湖水產',
-          ),
+          (ref) =>
+              MerchantChatTab(merchantId: '2683382637', merchantName: '金湖水產'),
         );
 
         final composer = find.byKey(const Key('merchant-comment-composer'));

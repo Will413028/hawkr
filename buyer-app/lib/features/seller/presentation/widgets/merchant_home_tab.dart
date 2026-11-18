@@ -103,7 +103,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
 
   Future<void> _openCommentSheet(int postId) async {
     if (!mounted) return;
-    final post = ref.read(postEntityStoreProvider).posts[postId];
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -112,11 +111,7 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => CommentsBottomSheet(
-        postId: postId.toString(),
-        viewerCanComment: post?.viewerCanComment ?? false,
-        viewerActor: post?.viewerActor,
-      ),
+      builder: (_) => CommentsBottomSheet(postId: postId),
     );
     if (!mounted) return;
     await ref.read(postEntityStoreProvider.notifier).refresh(postId);

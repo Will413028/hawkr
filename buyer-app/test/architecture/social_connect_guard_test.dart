@@ -44,7 +44,7 @@ void main() {
     expect(source, isNot(contains('is_mine')));
     expect(source, contains('viewerCanDelete'));
     expect(source, contains('viewerCanReply'));
-    expect(source, contains('_viewerCanComment'));
+    expect(source, contains('viewerCanComment'));
   });
 
   test('討論區沒有按讚，也不用 isMine', () {

@@ -75,11 +75,8 @@ Future<void> _pump(
                 path: '/',
                 builder: (_, _) => Scaffold(
                   body: Consumer(
-                    builder: (context, ref, _) => MerchantChatTab(
-                      ref: ref,
-                      merchantId: '7',
-                      merchantName: '南崁王生技',
-                    ),
+                    builder: (context, ref, _) =>
+                        MerchantChatTab(merchantId: '7', merchantName: '南崁王生技'),
                   ),
                 ),
               ),

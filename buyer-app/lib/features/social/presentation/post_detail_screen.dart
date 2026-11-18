@@ -181,11 +181,7 @@ class PostDetailScreen extends HookConsumerWidget {
           showDragHandle: false,
           backgroundColor: Colors.transparent,
           barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
-          builder: (_) => CommentsBottomSheet(
-            postId: postId.toString(),
-            viewerCanComment: post.viewerCanComment,
-            viewerActor: post.viewerActor,
-          ),
+          builder: (_) => CommentsBottomSheet(postId: postId),
         );
         unawaited(ref.read(postEntityStoreProvider.notifier).refresh(postId));
       }

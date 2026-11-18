@@ -448,7 +448,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
                     outerHandle: handle,
                   ),
                   MerchantChatTab(
-                    ref: ref,
                     merchantId: _merchantId,
                     merchantName: _merchantName,
                     outerHandle: handle,

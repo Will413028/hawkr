@@ -276,11 +276,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
         showDragHandle: false,
         backgroundColor: AppColors.neutralBlack.withValues(alpha: 0),
         barrierColor: AppColors.neutralBlack.withValues(alpha: 0.42),
-        builder: (_) => CommentsBottomSheet(
-          postId: post.id.toString(),
-          viewerCanComment: post.viewerCanComment,
-          viewerActor: post.viewerActor,
-        ),
+        builder: (_) => CommentsBottomSheet(postId: post.id),
       );
     }
 

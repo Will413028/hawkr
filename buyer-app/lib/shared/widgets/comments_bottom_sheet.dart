@@ -11,12 +11,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/networking/suspension_signal.dart';
 import '../../core/session/session_provider.dart';
 import '../../core/session/viewer_scope.dart';
-import '../../features/social/data/social_content_repository.dart';
+import '../../features/social/presentation/comments_notifier.dart';
+import '../../features/social/presentation/post_entity.dart';
+import '../../features/social/presentation/write_result.dart';
 import '../utils/require_login.dart';
 import '../utils/store_actor_hint.dart';
 import 'chat_bubble_icon.dart';
@@ -33,51 +34,23 @@ const _deletedCommentText = '此留言已刪除';
 const _hiddenCommentText = '此留言已被隱藏';
 const _anonymousName = '匿名用戶';
 
-/// 貼文的留言。打開與下拉時讀取，不即時推送。留言與回覆直接用生成的 [pb.Comment]；能不能留言、回覆、刪除
-/// 只讀伺服器的 `viewer_can_*`，留言身分讀 `Post.viewer_actor`。
-///
-/// [viewerCanComment]、[viewerActor] 由呼叫端從已持有的 [Post] 帶入；登入狀態在打開後改變時，這裡重讀 `GetPost`
-/// 與留言。
+/// 貼文的留言。打開與下拉時讀取，不即時推送。伺服器狀態在 [commentsProvider]，能不能留言與留言身分讀貼文實體
+/// （[postEntityProvider]）；這裡只顯示與發動作。留言與回覆直接用生成的 [pb.Comment]；能不能回覆、刪除只讀伺服器的
+/// `viewer_can_*`。
 class CommentsBottomSheet extends ConsumerStatefulWidget {
-  const CommentsBottomSheet({
-    super.key,
-    required this.postId,
-    this.viewerCanComment = false,
-    this.viewerActor,
-  });
+  const CommentsBottomSheet({super.key, required this.postId});
 
-  final String postId;
-  final bool viewerCanComment;
-  final pb.Actor? viewerActor;
+  final int postId;
 
   @override
   ConsumerState<CommentsBottomSheet> createState() =>
       _CommentsBottomSheetState();
 }
 
-class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
-    with ViewerScopedLoads<CommentsBottomSheet> {
+class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  static const Uuid _uuid = Uuid();
-
-  final Map<String, List<pb.Comment>> _repliesByParent =
-      <String, List<pb.Comment>>{};
-  final Set<String> _repliesLoading = <String>{};
-
-  final Map<String, int> _commentLikeCounts = <String, int>{};
-  final Set<String> _likedCommentIds = <String>{};
-
-  List<pb.Comment> _comments = <pb.Comment>[];
-  String _nextPageToken = '';
-  bool _loading = true;
-  bool _loadFailed = false;
-  bool _sending = false;
-
-  /// 觀看者在這篇貼文的留言權限與身分；讀不到時不能留言。
-  late bool _viewerCanComment = widget.viewerCanComment;
-  late pb.Actor? _viewerActor = widget.viewerActor;
 
   /// Reddit-style thread 的根留言 ID，新回覆會掛在這個 thread 下。
   String? _replyToCommentId;
@@ -92,31 +65,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
-    watchViewer();
-    _loadComments();
-  }
-
-  @override
-  WidgetRef get viewerRef => ref;
-
-  /// 登入、登出或換帳號後，留言權限、留言身分、各則留言的讚狀態與回覆都屬於另一個觀看者：
-  /// 先同步清掉，再重讀；重讀失敗時畫面是錯誤狀態，不會留著前一位觀看者的旗標。
-  @override
-  void onViewerChanged() {
-    setState(() {
-      _viewerCanComment = false;
-      _viewerActor = null;
-      _comments = <pb.Comment>[];
-      _nextPageToken = '';
-      _repliesByParent.clear();
-      _repliesLoading.clear();
-      _commentLikeCounts.clear();
-      _likedCommentIds.clear();
-      _replyToCommentId = null;
-      _replyToTargetId = null;
-      _replyToName = null;
-    });
-    _loadComments(refreshViewer: true);
   }
 
   @override
@@ -127,161 +75,66 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
     super.dispose();
   }
 
-  SocialContentRepository get _repo =>
-      ref.read(socialContentRepositoryProvider);
+  CommentsState get _state => ref.read(commentsProvider(widget.postId));
 
-  void _remember(pb.Comment comment) {
-    _commentLikeCounts[comment.id] = comment.likeCount.toInt();
-    if (comment.viewerLiked) {
-      _likedCommentIds.add(comment.id);
-    } else {
-      _likedCommentIds.remove(comment.id);
-    }
+  Comments get _notifier => ref.read(commentsProvider(widget.postId).notifier);
+
+  void _clearReplyTarget() {
+    _replyToCommentId = null;
+    _replyToTargetId = null;
+    _replyToName = null;
   }
 
-  Future<({bool canComment, pb.Actor? actor})> _readViewer() async {
-    try {
-      final post = await _repo.getPost(int.parse(widget.postId));
-      return (canComment: post.viewerCanComment, actor: post.viewerActor);
-    } catch (_) {
-      // 貼文不公開時留言仍讀得到，只是不能留言。
-      return (canComment: false, actor: null);
-    }
-  }
-
-  /// 讀第一頁留言；[refreshViewer] 時一併重讀 `GetPost` 的留言權限與身分（觀看者換了、下拉重讀、重試）。
-  Future<void> _loadComments({bool refreshViewer = false}) async {
-    final seq = beginLoad();
-    setState(() {
-      _loading = true;
-      _loadFailed = false;
-      _repliesLoading.clear();
-    });
-    try {
-      final viewerRead = refreshViewer ? _readViewer() : null;
-      final response = await _repo.listComments(widget.postId);
-      final viewer = await viewerRead;
-      if (!isCurrentLoad(seq)) return;
-      setState(() {
-        _comments = response.comments.toList();
-        _nextPageToken = response.nextPageToken;
-        _repliesByParent.clear();
-        _commentLikeCounts.clear();
-        _likedCommentIds.clear();
-        _comments.forEach(_remember);
-        if (viewer != null) {
-          _viewerCanComment = viewer.canComment;
-          _viewerActor = viewer.actor;
-        }
-      });
-    } catch (_) {
-      if (!mounted || !isCurrentLoad(seq)) return;
-      if (_comments.isEmpty) {
-        setState(() => _loadFailed = true);
-      } else {
-        showCommonSnackBar(context, '載入失敗，請稍後再試');
-      }
-    } finally {
-      if (isCurrentLoad(seq)) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadMoreComments() async {
-    if (_nextPageToken.isEmpty) return;
-    final seq = currentLoad;
-    try {
-      final response = await _repo.listComments(
-        widget.postId,
-        pageToken: _nextPageToken,
-      );
-      if (!isCurrentLoad(seq)) return;
-      setState(() {
-        _comments = [..._comments, ...response.comments];
-        _nextPageToken = response.nextPageToken;
-        response.comments.forEach(_remember);
-      });
-    } catch (_) {
-      if (mounted && isCurrentLoad(seq)) {
-        showCommonSnackBar(context, '載入失敗，請稍後再試');
-      }
-    }
-  }
-
-  Future<void> _ensureReplies(String parentId) async {
-    if (_repliesLoading.contains(parentId)) return;
-    final seq = currentLoad;
-    _repliesLoading.add(parentId);
-    try {
-      final all = <pb.Comment>[];
-      var token = '';
-      do {
-        final response = await _repo.listComments(
-          widget.postId,
-          parentId: parentId,
-          pageToken: token,
-        );
-        all.addAll(response.comments);
-        token = response.nextPageToken;
-      } while (token.isNotEmpty);
-      if (!isCurrentLoad(seq)) return;
-      setState(() {
-        _repliesByParent[parentId] = all;
-        all.forEach(_remember);
-      });
-    } catch (_) {
-      if (mounted && isCurrentLoad(seq)) {
-        showCommonSnackBar(context, '載入失敗，請稍後再試');
-      }
-    } finally {
-      if (isCurrentLoad(seq)) _repliesLoading.remove(parentId);
-    }
-  }
-
-  void _reportFailure(Object error, String message) {
+  void _reportFailure(Object? error, String message) {
     if (!mounted) return;
     // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
-    if (isAccountSuspendedError(error)) return;
+    if (error != null && isAccountSuspendedError(error)) return;
     showCommonSnackBar(context, message);
+  }
+
+  Future<void> _reload() async {
+    final ok = await _notifier.reload();
+    if (!ok && mounted && _state.phase == CommentsPhase.ready) {
+      showCommonSnackBar(context, '載入失敗，請稍後再試');
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (!await _notifier.loadMore()) {
+      if (mounted) showCommonSnackBar(context, '載入失敗，請稍後再試');
+    }
+  }
+
+  Future<void> _loadReplies(String parentId) async {
+    if (!await _notifier.loadReplies(parentId)) {
+      if (mounted) showCommonSnackBar(context, '載入失敗，請稍後再試');
+    }
   }
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (_sending || text.isEmpty) return;
+    if (_state.sending || text.isEmpty) return;
     if (!await requireLogin(context, ref)) return;
-    if (!mounted || _sending) return;
-    setState(() => _sending = true);
+    if (!mounted || _state.sending) return;
     final replyCommentId = _replyToCommentId;
     final replyTargetId = _replyToTargetId;
-    try {
-      final isReply = replyCommentId != null;
-      final created = await _repo.createComment(
-        widget.postId,
-        text,
-        parentId: replyCommentId,
-        replyToId: isReply ? (replyTargetId ?? replyCommentId) : null,
-        requestId: _uuid.v4(),
-      );
-      if (!mounted) return;
-      _controller.clear();
-      setState(() {
-        _remember(created);
-        if (isReply) {
-          _repliesByParent[replyCommentId] = [
-            ...?_repliesByParent[replyCommentId],
-            created,
-          ];
-          _replyToCommentId = null;
-          _replyToTargetId = null;
-          _replyToName = null;
-        } else {
-          _comments = [..._comments, created];
-        }
-      });
-      _scheduleScrollToBottom();
-    } catch (e) {
-      _reportFailure(e, '傳送失敗，請稍後再試');
-    } finally {
-      if (mounted) setState(() => _sending = false);
+    final result = await _notifier.create(
+      text,
+      parentId: replyCommentId,
+      replyToId: replyCommentId == null
+          ? null
+          : (replyTargetId ?? replyCommentId),
+    );
+    if (!mounted) return;
+    switch (result.status) {
+      case WriteStatus.applied:
+        _controller.clear();
+        setState(_clearReplyTarget);
+        _scheduleScrollToBottom();
+      case WriteStatus.failed:
+        _reportFailure(result.error, '傳送失敗，請稍後再試');
+      case WriteStatus.discarded:
+        break;
     }
   }
 
@@ -290,7 +143,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
     required String targetCommentId,
     required String targetName,
   }) {
-    if (_sending) return;
+    if (_state.sending) return;
     setState(() {
       _replyToCommentId = rootCommentId;
       _replyToTargetId = targetCommentId;
@@ -300,12 +153,8 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
   }
 
   void _cancelReply() {
-    if (_sending) return;
-    setState(() {
-      _replyToCommentId = null;
-      _replyToTargetId = null;
-      _replyToName = null;
-    });
+    if (_state.sending) return;
+    setState(_clearReplyTarget);
   }
 
   Future<void> _delete(pb.Comment comment) async {
@@ -330,61 +179,10 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
       ),
     );
     if (confirm != true || !mounted) return;
-    try {
-      await _repo.deleteComment(comment);
-      if (!mounted) return;
-      _removeLocally(comment);
-    } catch (e) {
-      _reportFailure(e, '刪除失敗，請稍後再試');
+    final result = await _notifier.delete(comment);
+    if (result.status == WriteStatus.failed) {
+      _reportFailure(result.error, '刪除失敗，請稍後再試');
     }
-  }
-
-  /// 刪除成功後只改被刪的那一則：有回覆的頂層留言變成已刪除的佔位，其餘直接移除；回覆被刪時父留言的回覆數減一，
-  /// 已刪除的父留言底下沒有回覆了就一起移除。其他留言的展開與分頁不動。
-  void _removeLocally(pb.Comment comment) {
-    final id = comment.id;
-    setState(() {
-      _commentLikeCounts.remove(id);
-      _likedCommentIds.remove(id);
-      if (!comment.hasParentId()) {
-        final hasReplies =
-            comment.replyCount > 0 ||
-            (_repliesByParent[id]?.isNotEmpty ?? false);
-        if (hasReplies) {
-          final placeholder = comment.deepCopy()
-            ..state = pb.CommentState.COMMENT_STATE_DELETED
-            ..clearBody()
-            ..clearAuthor()
-            ..viewerCanEdit = false
-            ..viewerCanDelete = false
-            ..viewerCanReply = false;
-          _comments = [for (final c in _comments) c.id == id ? placeholder : c];
-        } else {
-          _comments = _comments.where((c) => c.id != id).toList();
-          _repliesByParent.remove(id);
-        }
-        return;
-      }
-      final parentId = comment.parentId;
-      final remaining = (_repliesByParent[parentId] ?? const <pb.Comment>[])
-          .where((c) => c.id != id)
-          .toList();
-      _repliesByParent[parentId] = remaining;
-      _comments = [
-        for (final c in _comments)
-          if (c.id != parentId)
-            c
-          else if (c.state != pb.CommentState.COMMENT_STATE_VISIBLE &&
-              remaining.isEmpty &&
-              c.replyCount <= 1)
-            ...const <pb.Comment>[]
-          else
-            (c.deepCopy()
-              ..replyCount = c.replyCount > 0
-                  ? c.replyCount - 1
-                  : c.replyCount),
-      ];
-    });
   }
 
   void _scheduleScrollToBottom() {
@@ -401,50 +199,28 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
   Future<void> _toggleLike(pb.Comment comment) async {
     if (!await requireLogin(context, ref)) return;
     if (!mounted) return;
-    final id = comment.id;
-    final bool wasLiked = _likedCommentIds.contains(id);
-    final int currentCount = _commentLikeCounts[id] ?? 0;
-    setState(() {
-      if (wasLiked) {
-        _likedCommentIds.remove(id);
-        _commentLikeCounts[id] = currentCount > 0 ? currentCount - 1 : 0;
-      } else {
-        _likedCommentIds.add(id);
-        _commentLikeCounts[id] = currentCount + 1;
-      }
-    });
-    try {
-      await _repo.setCommentLiked(id, liked: !wasLiked);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        if (wasLiked) {
-          _likedCommentIds.add(id);
-        } else {
-          _likedCommentIds.remove(id);
-        }
-        _commentLikeCounts[id] = currentCount;
-      });
-    }
+    await _notifier.toggleLike(comment.id);
   }
 
-  int get _visibleCommentCount =>
-      _comments.length +
-      _repliesByParent.values.fold<int>(
-        0,
-        (sum, replies) => sum + replies.length,
-      );
-
   /// 以店家身分留言時，輸入框提示帶店名（C2、C3）；其他身分用一般提示。
-  String get _hintText {
+  String _hintText(pb.Actor? viewerActor) {
     final replying = _replyToName != null;
-    return storeActorHint(_viewerActor, replying: replying) ??
+    return storeActorHint(viewerActor, replying: replying) ??
         (replying ? '寫下回覆…' : '參與討論…');
   }
 
   @override
   Widget build(BuildContext context) {
     final guest = isGuestSession(ref.watch(sessionProvider));
+    final comments = ref.watch(commentsProvider(widget.postId));
+    final post = ref.watch(postSnapshotProvider(widget.postId));
+    ref.watch(postEntityProvider(widget.postId));
+    ref.listen(viewerIdProvider, (_, _) {
+      setState(_clearReplyTarget);
+    });
+    final viewerCanComment = post?.viewerCanComment ?? false;
+    final viewerActor = post?.viewerActor;
+    final rootComments = comments.tree.roots;
     return SafeArea(
       top: false,
       child: AnimatedPadding(
@@ -504,7 +280,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                           borderRadius: BorderRadius.circular(HkRadius.pill),
                         ),
                         child: Text(
-                          '$_visibleCommentCount',
+                          '${comments.tree.loadedCount}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -532,11 +308,11 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                 // Comment list
 
                 Expanded(
-                  child: _loading
+                  child: comments.phase == CommentsPhase.loading
                       ? const TruckLoadingOverlay(message: '載入中...')
                       : FruitRefreshIndicator(
-                          onRefresh: () => _loadComments(refreshViewer: true),
-                          child: _loadFailed
+                          onRefresh: _reload,
+                          child: comments.phase == CommentsPhase.failed
                               ? ListView(
                                   controller: _scrollController,
                                   physics:
@@ -546,7 +322,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                     _buildLoadError(),
                                   ],
                                 )
-                              : _comments.isEmpty
+                              : rootComments.isEmpty
                               ? ListView(
                                   controller: _scrollController,
                                   physics:
@@ -569,7 +345,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                       const AlwaysScrollableScrollPhysics(),
                                   padding: EdgeInsets.fromLTRB(0, 8.h, 0, 16.h),
                                   itemBuilder: (context, index) {
-                                    if (index == _comments.length) {
+                                    if (index == rootComments.length) {
                                       return Center(
                                         child: HkTapTarget(
                                           key: const ValueKey(
@@ -578,7 +354,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                           semanticLabel: '載入更多留言',
                                           hint: '載入下一頁留言',
                                           tooltip: '載入更多留言',
-                                          onTap: _loadMoreComments,
+                                          onTap: _loadMore,
                                           child: Text(
                                             '查看更多留言',
                                             style: TextStyle(
@@ -589,21 +365,24 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                         ),
                                       );
                                     }
-                                    return _buildComment(_comments[index]);
+                                    return _buildComment(
+                                      rootComments[index],
+                                      comments,
+                                    );
                                   },
                                   separatorBuilder: (_, __) =>
                                       SizedBox(height: 8.h),
                                   itemCount:
-                                      _comments.length +
-                                      (_nextPageToken.isEmpty ? 0 : 1),
+                                      rootComments.length +
+                                      (comments.nextPageToken.isEmpty ? 0 : 1),
                                 ),
                         ),
                 ),
-                if (_viewerCanComment || guest)
+                if (viewerCanComment || guest)
                   Divider(height: 1, color: AppColors.borderSubtle),
-                if (!_viewerCanComment && guest) const LoginToCommentPrompt(),
+                if (!viewerCanComment && guest) const LoginToCommentPrompt(),
                 // Input area
-                if (_viewerCanComment)
+                if (viewerCanComment)
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -639,7 +418,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                   semanticLabel: '取消回覆',
                                   hint: '清除目前的回覆對象',
                                   tooltip: '取消回覆',
-                                  onTap: _sending ? null : _cancelReply,
+                                  onTap: comments.sending ? null : _cancelReply,
                                   child: Icon(
                                     AppIcons.close,
                                     size: 16.sp,
@@ -677,7 +456,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                     key: const ValueKey('comments-panel-input'),
                                     controller: _controller,
                                     focusNode: _focusNode,
-                                    readOnly: _sending,
+                                    readOnly: comments.sending,
                                     minLines: 1,
                                     maxLines: 4,
                                     textInputAction: TextInputAction.send,
@@ -686,7 +465,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                                       color: AppColors.textPrimary,
                                     ),
                                     decoration: InputDecoration(
-                                      hintText: _hintText,
+                                      hintText: _hintText(viewerActor),
                                       hintStyle: AppTypography.body.copyWith(
                                         color: AppColors.textHint,
                                       ),
@@ -711,18 +490,18 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                               HkFrostedIconButton(
                                 key: const ValueKey('send-comment-action'),
                                 label: _replyToName == null ? '送出留言' : '送出回覆',
-                                semanticHint: _sending
+                                semanticHint: comments.sending
                                     ? '留言傳送中'
                                     : _controller.text.trim().isNotEmpty
                                     ? '送出目前輸入的內容'
                                     : '請先輸入內容',
                                 icon: AppIcons.sendRounded,
                                 onPressed:
-                                    !_sending &&
+                                    !comments.sending &&
                                         _controller.text.trim().isNotEmpty
                                     ? _send
                                     : null,
-                                loading: _sending,
+                                loading: comments.sending,
                                 loadingLabel: '留言傳送中',
                               ),
                             ],
@@ -765,7 +544,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
           SizedBox(height: 12.h),
           TextButton(
             key: const ValueKey('comments-load-retry'),
-            onPressed: () => _loadComments(refreshViewer: true),
+            onPressed: _reload,
             child: const HkButtonLabel('重試'),
           ),
         ],
@@ -786,14 +565,13 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
     _ => null,
   };
 
-  Widget _buildComment(pb.Comment comment) {
+  Widget _buildComment(pb.Comment comment, CommentsState comments) {
     final String commentId = comment.id;
     final String? placeholder = _placeholderText(comment);
     final String author = _authorName(comment);
-    final List<pb.Comment> replies =
-        _repliesByParent[commentId] ?? const <pb.Comment>[];
-    final int likeCount = _commentLikeCounts[commentId] ?? 0;
-    final bool liked = _likedCommentIds.contains(commentId);
+    final List<pb.Comment> replies = comments.tree.repliesOf(commentId);
+    final int likeCount = comment.likeCount.toInt();
+    final bool liked = comment.viewerLiked;
     final int replyCount = comment.replyCount.toInt();
 
     return Padding(
@@ -844,6 +622,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                           SizedBox(height: 4.h),
                           _buildActions(
                             comment,
+                            comments,
                             author: author,
                             rootCommentId: commentId,
                           ),
@@ -867,7 +646,11 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                 child: Column(
                   children: replies
                       .map(
-                        (reply) => _buildReply(reply, rootCommentId: commentId),
+                        (reply) => _buildReply(
+                          reply,
+                          comments,
+                          rootCommentId: commentId,
+                        ),
                       )
                       .toList(),
                 ),
@@ -881,7 +664,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                 semanticLabel: '查看更多 $author 的回覆',
                 hint: '載入尚未顯示的回覆',
                 tooltip: '查看更多回覆',
-                onTap: () => _ensureReplies(commentId),
+                onTap: () => _loadReplies(commentId),
                 child: Text(
                   '查看更多回覆',
                   style: TextStyle(fontSize: 14, color: AppColors.primary),
@@ -895,7 +678,8 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
 
   /// 回覆與刪除的入口：只看伺服器的 `viewer_can_reply`、`viewer_can_delete`。
   Widget _buildActions(
-    pb.Comment comment, {
+    pb.Comment comment,
+    CommentsState comments, {
     required String author,
     required String rootCommentId,
   }) {
@@ -909,7 +693,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
             semanticLabel: '回覆 $author 的留言',
             hint: '開始撰寫回覆',
             tooltip: '回覆',
-            onTap: _sending
+            onTap: comments.sending
                 ? null
                 : () => _beginReply(
                     rootCommentId: rootCommentId,
@@ -936,7 +720,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
             semanticLabel: '刪除 $author 的留言',
             hint: '刪除這則留言',
             tooltip: '刪除留言',
-            onTap: _sending ? null : () => _delete(comment),
+            onTap: comments.sending ? null : () => _delete(comment),
             child: Text(
               '刪除',
               style: TextStyle(fontSize: 14, color: AppColors.danger),
@@ -977,11 +761,15 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
     );
   }
 
-  Widget _buildReply(pb.Comment reply, {required String rootCommentId}) {
+  Widget _buildReply(
+    pb.Comment reply,
+    CommentsState comments, {
+    required String rootCommentId,
+  }) {
     final String? placeholder = _placeholderText(reply);
     final String author = _authorName(reply);
-    final int likeCount = _commentLikeCounts[reply.id] ?? 0;
-    final bool liked = _likedCommentIds.contains(reply.id);
+    final int likeCount = reply.likeCount.toInt();
+    final bool liked = reply.viewerLiked;
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8.h),
@@ -1024,6 +812,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
                       SizedBox(height: 4.h),
                       _buildActions(
                         reply,
+                        comments,
                         author: author,
                         rootCommentId: rootCommentId,
                       ),

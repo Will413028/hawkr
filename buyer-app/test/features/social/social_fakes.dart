@@ -63,6 +63,16 @@ pb.ForumEntry fakeForumEntry(
   etag: 'etag-$id',
 );
 
+pb.Comment _commentWithParent(pb.Comment c, String? parentId) {
+  if (parentId != null) c.parentId = parentId;
+  return c;
+}
+
+pb.ForumEntry _entryWithParent(pb.ForumEntry e, String? parentId) {
+  if (parentId != null) e.parentId = parentId;
+  return e;
+}
+
 pb.Post fakePost({
   String id = '101',
   bool viewerCanComment = true,
@@ -163,7 +173,12 @@ class FakeSocialPublic {
           if (responder != null) return await responder(req);
           final parent = req.hasParentId() ? req.parentId : null;
           return pb.ListCommentsResponse(
-            comments: parent == null ? comments : (replies[parent] ?? []),
+            comments: parent == null
+                ? comments
+                : [
+                    for (final c in replies[parent] ?? <pb.Comment>[])
+                      c.deepCopy()..parentId = parent,
+                  ],
           );
         })
         .unary(SocialPublicService.listForumEntries, (req, _) async {
@@ -175,7 +190,10 @@ class FakeSocialPublic {
           return pb.ListForumEntriesResponse(
             entries: parent == null
                 ? forumEntries
-                : (forumReplies[parent] ?? []),
+                : [
+                    for (final e in forumReplies[parent] ?? <pb.ForumEntry>[])
+                      e.deepCopy()..parentId = parent,
+                  ],
             viewerCanComment: forumViewerCanComment,
             viewerActor: forumViewerActor,
           );
@@ -207,17 +225,25 @@ class FakeSocialApp {
   Completer<void>? pending;
   final List<pb.CreateCommentRequest> created = [];
   final List<pb.DeleteCommentRequest> deleted = [];
+  final List<pb.LikeCommentRequest> commentLikes = [];
+
+  /// 設了就讓刪除留言失敗。
+  ConnectException? deleteError;
   final List<pb.CreateForumEntryRequest> forumCreated = [];
   final List<pb.UpdateForumEntryRequest> forumUpdated = [];
   final List<pb.DeleteForumEntryRequest> forumDeleted = [];
 
   SocialAppServiceClient client() => SocialAppServiceClient(
     FakeTransportBuilder()
-        .unary(SocialAppService.createComment, (req, _) {
+        .unary(SocialAppService.createComment, (req, _) async {
           created.add(req);
+          if (pending != null) await pending!.future;
           if (createError != null) throw createError!;
           return pb.CreateCommentResponse(
-            comment: fakeComment('new', body: req.body),
+            comment: _commentWithParent(
+              fakeComment('new', body: req.body),
+              req.hasParentId() ? req.parentId : null,
+            ),
           );
         })
         .unary(SocialAppService.createForumEntry, (req, _) async {
@@ -225,7 +251,10 @@ class FakeSocialApp {
           if (pending != null) await pending!.future;
           if (createError != null) throw createError!;
           return pb.CreateForumEntryResponse(
-            entry: fakeForumEntry('new', body: req.body),
+            entry: _entryWithParent(
+              fakeForumEntry('new', body: req.body),
+              req.hasParentId() ? req.parentId : null,
+            ),
           );
         })
         .unary(SocialAppService.updateForumEntry, (req, _) async {
@@ -250,9 +279,22 @@ class FakeSocialApp {
           if (likeError != null) throw likeError!;
           return pb.UnlikePostResponse();
         })
-        .unary(SocialAppService.deleteComment, (req, _) {
+        .unary(SocialAppService.deleteComment, (req, _) async {
           deleted.add(req);
+          if (pending != null) await pending!.future;
+          if (deleteError != null) throw deleteError!;
           return pb.DeleteCommentResponse();
+        })
+        .unary(SocialAppService.likeComment, (req, _) async {
+          commentLikes.add(req);
+          if (pending != null) await pending!.future;
+          if (likeError != null) throw likeError!;
+          return pb.LikeCommentResponse();
+        })
+        .unary(SocialAppService.unlikeComment, (req, _) async {
+          if (pending != null) await pending!.future;
+          if (likeError != null) throw likeError!;
+          return pb.UnlikeCommentResponse();
         })
         .build(),
   );

@@ -10,6 +10,9 @@ import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
+import 'package:hawkr_buyer/features/social/data/social_model.dart';
+import 'package:hawkr_buyer/features/social/presentation/comments_notifier.dart';
+import 'package:hawkr_buyer/features/social/presentation/post_entity_store.dart';
 import 'package:hawkr_buyer/shared/widgets/comments_bottom_sheet.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -35,6 +38,9 @@ Future<void> _pump(
   addTearDown(container.dispose);
   _container = container;
   await container.read(sessionProvider.future);
+  container.read(postEntityStoreProvider.notifier).seed([
+    Post(id: 101, viewerCanComment: viewerCanComment),
+  ]);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -48,12 +54,8 @@ Future<void> _pump(
             routes: [
               GoRoute(
                 path: '/',
-                builder: (_, _) => Scaffold(
-                  body: CommentsBottomSheet(
-                    postId: '101',
-                    viewerCanComment: viewerCanComment,
-                  ),
-                ),
+                builder: (_, _) =>
+                    Scaffold(body: CommentsBottomSheet(postId: 101)),
               ),
             ],
           ),
@@ -72,6 +74,7 @@ void main() {
   testWidgets('R2-3 換觀看者後重讀失敗：清掉前一位的留言與權限，顯示錯誤與重試', (tester) async {
     var calls = 0;
     final public = FakeSocialPublic(
+      post: fakePost(viewerCanComment: false),
       commentsResponder: (_) {
         if (++calls > 1) throw ConnectException(Code.unavailable, 'down');
         return pb.ListCommentsResponse(
@@ -221,5 +224,27 @@ void main() {
 
     expect(find.text('舊的第二頁'), findsNothing);
     expect(find.text('新觀看者'), findsOneWidget);
+  });
+
+  testWidgets('R3-5 重讀失敗：留言框與已載入的留言都留著', (tester) async {
+    var fail = false;
+    final public = FakeSocialPublic(
+      commentsResponder: (_) {
+        if (fail) throw ConnectException(Code.unavailable, 'down');
+        return pb.ListCommentsResponse(
+          comments: [fakeComment('c1', body: '已載入的留言')],
+        );
+      },
+    );
+    await _pump(tester, public);
+
+    fail = true;
+    final ok = await _container.read(commentsProvider(101).notifier).reload();
+    await tester.pumpAndSettle();
+
+    expect(ok, isFalse);
+    expect(find.text('已載入的留言'), findsOneWidget);
+    expect(find.byKey(_input), findsOneWidget);
+    expect(find.byKey(const ValueKey('comments-load-error')), findsNothing);
   });
 }
