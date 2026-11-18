@@ -78,7 +78,10 @@ const LOOKUP_TIMEOUT_MS = 1_500;
  * can be trusted; the TTL only bounds how long a mapping survives a seller
  * being closed and re-opened as a new stint.
  */
-const storeCodeMemo = new Map<string, { code: string | null; at: number }>();
+const storeCodeMemo = new Map<
+	string,
+	{ code: string | null; storeId: string | null; at: number }
+>();
 const MEMO_TTL_MS = 30 * 60_000;
 const MEMO_MAX_ENTRIES = 500;
 
@@ -94,8 +97,8 @@ export function __resetSellerStoreCodeMemoForTest(): void {
  * nullable store_code is what forced the old fail-open-on-everything.
  */
 export type SellerLookup =
-	/** The backend answered about this id. `storeCode` is null when it has none. */
-	| { kind: "resolved"; storeCode: string | null }
+	/** The backend answered about this id. `storeCode` and `storeId` are null when it has none. */
+	| { kind: "resolved"; storeCode: string | null; storeId: string | null }
 	/** Settled `404` — nobody holds this id. */
 	| { kind: "absent" }
 	/** No usable answer: 5xx, timeout, socket error, unreadable body. */
@@ -146,6 +149,7 @@ async function fetchSeller(
 	try {
 		const { code, data, message } = await apiClient.public.get<{
 			storeCode?: unknown;
+			storeId?: unknown;
 		} | null>(`/sellers/${id}`, {
 			credentials: "omit",
 			// This lookup is made on behalf of the visitor whose request is being
@@ -182,9 +186,11 @@ async function fetchSeller(
 		// the body verbatim. Reading the retired `store_code` here would make
 		// every storefront look code-less and cost a 308 on every entry.
 		const storeCode = String(data?.storeCode ?? "").trim();
+		const storeId = String(data?.storeId ?? "").trim();
 		return {
 			kind: "resolved",
 			storeCode: /^\d+$/.test(storeCode) ? storeCode : null,
+			storeId: /^[1-9]\d*$/.test(storeId) ? storeId : null,
 		};
 	} catch {
 		// A 5xx (after its retry), a timeout, a socket error, an unreadable body,
@@ -201,7 +207,7 @@ export async function lookupSeller(
 ): Promise<SellerLookup> {
 	const hit = storeCodeMemo.get(id);
 	if (hit && Date.now() - hit.at < MEMO_TTL_MS)
-		return { kind: "resolved", storeCode: hit.code };
+		return { kind: "resolved", storeCode: hit.code, storeId: hit.storeId };
 
 	const result = await fetchSeller(id, visitorIp);
 	// Every RESOLVED answer is memoised, including "this seller exists and has no
@@ -219,7 +225,11 @@ export async function lookupSeller(
 	// into a verdict.
 	if (result.kind === "resolved") {
 		if (storeCodeMemo.size >= MEMO_MAX_ENTRIES) storeCodeMemo.clear();
-		storeCodeMemo.set(id, { code: result.storeCode, at: Date.now() });
+		storeCodeMemo.set(id, {
+			code: result.storeCode,
+			storeId: result.storeId,
+			at: Date.now(),
+		});
 	}
 	return result;
 }

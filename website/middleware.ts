@@ -5,6 +5,10 @@ import { requiredAccessForPath, workspaceOfPath } from "@/lib/auth/redirect";
 import { RETURN_PATH_HEADER } from "@/lib/auth/return-path";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { getEnv } from "@/lib/config/env";
+import {
+	isMissingForumThread,
+	lookupForumThread,
+} from "@/lib/forum/thread-guard";
 import { getVisitorIp } from "@/lib/http/visitor-ip";
 import { type AppLocale, defaultLocale } from "@/lib/intl/locales";
 import {
@@ -197,7 +201,21 @@ async function route(request: NextRequest): Promise<NextResponse> {
 			// page; the explicit status is what the page itself cannot produce here.
 			return notFoundResponse(request);
 		}
-		if (outcome.kind === "pass") return pass(request, pathname, locale);
+		if (outcome.kind === "pass") {
+			// A thread the backend does not hold is a real 404 for the same reason
+			// (the page is prerendered; see lib/forum/thread-guard.ts). The seller
+			// lookup is memoised, so a thread URL adds one thread call at most.
+			const missing = await isMissingForumThread(
+				pathname,
+				async (id) => {
+					const seller = await lookupSeller(id, visitorIp);
+					return seller.kind === "resolved" ? seller.storeId : null;
+				},
+				(storeId, threadId) => lookupForumThread(storeId, threadId, visitorIp),
+			);
+			if (missing) return notFoundResponse(request);
+			return pass(request, pathname, locale);
+		}
 		// clone() keeps the query string (utm_*, ?page=, …) attached to the
 		// canonical path, so a shared deep link survives the redirect intact.
 		const canonicalUrl = request.nextUrl.clone();
