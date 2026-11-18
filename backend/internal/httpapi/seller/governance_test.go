@@ -1227,7 +1227,7 @@ func TestTakedownContentsFlagsPurgedContentAndRejectsMissingOrForeign(t *testing
 	}{
 		"本文已清除":  {social.ContentSnapshot{Exists: true, Purged: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, true, true},
 		"有快照":    {social.ContentSnapshot{Exists: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}, Body: "x", AuthoredAt: snapshotAuthoredAt, PostID: id}, false, true},
-		"不存在":    {social.ContentSnapshot{}, false, false},
+		"不存在":    {social.ContentSnapshot{Exists: false, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, false, false},
 		"別家店的內容": {social.ContentSnapshot{Exists: true, StoreID: 99, Author: social.Actor{Kind: social.ActorStore, ID: 99}}, false, false},
 	} {
 		h := &Governance{snapshots: fixedSnapshot{tc.snap}}
