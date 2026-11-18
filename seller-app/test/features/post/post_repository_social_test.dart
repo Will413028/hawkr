@@ -286,6 +286,7 @@ void main() {
       String id = '5',
       String? parentId,
       CommentState state = CommentState.COMMENT_STATE_VISIBLE,
+      bool canAct = true,
     }) => pb.Comment(
       id: id,
       postId: '42',
@@ -301,8 +302,8 @@ void main() {
       etag: 'ce-$id',
       isMine: false,
       viewerLiked: true,
-      viewerCanDelete: true,
-      viewerCanReply: true,
+      viewerCanDelete: canAct,
+      viewerCanReply: canAct,
       viewerCanEdit: false,
     )..mergeFromProto3Json({'likeCount': '3', 'replyCount': '2'});
 
@@ -317,7 +318,11 @@ void main() {
           return pb.ListCommentsResponse(
             comments: [
               commentProto(),
-              commentProto(id: '6', state: CommentState.COMMENT_STATE_DELETED),
+              commentProto(
+                id: '6',
+                state: CommentState.COMMENT_STATE_DELETED,
+                canAct: false,
+              ),
             ],
           );
         }),
@@ -341,6 +346,10 @@ void main() {
       expect(c.etag, 'ce-5');
       expect(c.placeholderText, isNull);
       expect(list.last.placeholderText, '此留言已刪除');
+      // viewer_can_* 取伺服器的值：沒設的就是 false，不由 client 補。
+      expect(list.last.viewerCanDelete, isFalse);
+      expect(list.last.viewerCanReply, isFalse);
+      expect(list.last.viewerCanEdit, isFalse);
     });
 
     test('lists replies by parent_id and follows next_page_token', () async {
@@ -441,7 +450,12 @@ void main() {
         FakeTransportBuilder()
             .unary(
               SocialPublicService.listForumEntries,
-              (_, _) => pb.ListForumEntriesResponse(entries: [entry]),
+              (_, _) => pb.ListForumEntriesResponse(
+                entries: [
+                  entry,
+                  pb.ForumEntry(id: '4', storeId: '7', etag: 'fe-4'),
+                ],
+              ),
             )
             .unary(SocialAppService.createForumEntry, (request, _) {
               replied.add(request);
@@ -462,9 +476,11 @@ void main() {
       await repository.updateForumEntry('4', etag: 'fe-4', body: '改');
       await repository.deleteForumEntry('4', etag: 'fe-4');
 
-      expect(list.single.viewerCanReply, isTrue);
-      expect(list.single.viewerCanDelete, isFalse);
-      expect(list.single.etag, 'fe-3');
+      expect(list.first.viewerCanReply, isTrue);
+      expect(list.first.viewerCanDelete, isFalse);
+      expect(list.first.etag, 'fe-3');
+      expect(list.last.viewerCanReply, isFalse);
+      expect(list.last.viewerCanDelete, isFalse);
       expect(replied.single.storeId, '7');
       expect(replied.single.parentId, '3');
       expect(updated.single.entry.id, '4');
