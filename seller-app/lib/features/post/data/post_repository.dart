@@ -12,6 +12,7 @@ import '../../../core/networking/dio_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../media/data/media_repository.dart';
+import 'post_comment.dart';
 import 'post_model.dart';
 
 part 'post_repository.g.dart';
@@ -22,6 +23,7 @@ PostRepository postRepository(Ref ref) {
     ref.watch(dioProvider),
     ref,
     ref.watch(socialClientProvider),
+    ref.watch(socialPublicClientProvider),
   );
 }
 
@@ -43,17 +45,17 @@ class PostPageResult {
 }
 
 class PostRepository with ApiRequestHelper {
-  PostRepository(this._dio, this._ref, this._social);
+  PostRepository(this._dio, this._ref, this._social, this._socialPublic);
 
   final Dio _dio;
   final Ref _ref;
   final SocialAppServiceClient _social;
+  final SocialPublicServiceClient _socialPublic;
 
   @override
   Dio get dio => _dio;
 
   // ── Path prefixes ──────────────────────────────────────
-  static const _pub = '/api/v1/public';
   static const _app = '/api/v1/app';
 
   static const _maxPageSize = 50;
@@ -136,17 +138,6 @@ class PostRepository with ApiRequestHelper {
     return times;
   }
 
-  Future<List<Map<String, dynamic>>> listCommentsRaw(int postId) {
-    return _listCommentsRaw(postId);
-  }
-
-  Future<Map<String, dynamic>?> commentOnPostRaw(
-    int postId, {
-    required String content,
-  }) {
-    return _commentOnPostRaw(postId, content: content);
-  }
-
   /// 發布（`CAP_MARKETING`）。[etag] 是讀到該貼文時的版本；失敗丟 `ConnectException`。
   Future<void> publishPostOrThrow(int postId, {required String etag}) async {
     await _social.publishPost(
@@ -207,169 +198,122 @@ class PostRepository with ApiRequestHelper {
     }
   }
 
-  // --- Comment APIs ---
+  // --- 貼文留言（SocialPublicService 讀、SocialAppService 寫） ---
 
-  Future<List<Comment>> listComments(int postId) async {
-    try {
-      final list = await _listCommentsRaw(postId);
-      return list.map((json) => Comment.fromJson(json)).toList();
-    } catch (e) {
-      HKLog.logE('PostRepository.listComments error', e);
-      rethrow;
-    }
+  /// 讀貼文的頂層留言，或 [parentId] 那則頂層留言的回覆；逐頁讀到沒有下一頁。
+  /// 店主讀自己的貼文不受公開狀態限制，所以草稿、下架與店家不公開時也讀得到。
+  Future<List<PostComment>> listComments(int postId, {String? parentId}) async {
+    final all = <PostComment>[];
+    var token = '';
+    do {
+      final response = await _socialPublic.listComments(
+        pb.ListCommentsRequest(
+          postId: postId.toString(),
+          pageSize: _maxPageSize,
+          pageToken: token,
+          parentId: parentId,
+        ),
+      );
+      all.addAll(response.comments.map(PostComment.fromProto));
+      token = response.nextPageToken;
+    } while (token.isNotEmpty);
+    return all;
   }
 
-  Future<List<Map<String, dynamic>>> _listCommentsRaw(int postId) async {
-    try {
-      final result = await apiGet('$_pub/posts/$postId/comments');
-      if (result['code'] == 0) {
-        final data = result['data'];
-        // API returns paginated format: {records: [...], total, page, pageSize}
-        if (data is Map<String, dynamic>) {
-          final records = data['records'];
-          if (records is List) return List<Map<String, dynamic>>.from(records);
-        }
-        // Fallback: direct list
-        if (data is List) return List<Map<String, dynamic>>.from(data);
-      }
-    } catch (_) {}
-    return [];
-  }
-
-  Future<Comment?> commentOnPost(int postId, {required String content}) async {
-    try {
-      final result = await _commentOnPostRaw(postId, content: content);
-      if (result != null) {
-        return Comment.fromJson(result);
-      }
-      return null;
-    } catch (e) {
-      HKLog.logE('PostRepository.commentOnPost error', e);
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>?> _commentOnPostRaw(
+  /// 留言；[parentId] 設了是回覆（只限貼文所屬的店），[replyToId] 是回覆針對的那一則。
+  Future<PostComment> createComment(
     int postId, {
-    required String content,
+    required String body,
+    String? parentId,
+    String? replyToId,
   }) async {
-    final result = await apiPost(
-      '$_app/posts/$postId/comments',
-      body: {'content': content},
+    final response = await _social.createComment(
+      pb.CreateCommentRequest(
+        postId: postId.toString(),
+        body: body,
+        parentId: parentId,
+        replyToId: replyToId,
+      ),
     );
-    if (result['code'] == 0) {
-      return result['data'] as Map<String, dynamic>?;
-    }
-    return null;
+    return PostComment.fromProto(response.comment);
   }
 
-  // ── 評論按讚 ───────────────────────────────────────────
-
-  /// Toggle 留言按讚 — POST /app/posts/comments/{id}/like
-  Future<bool> likeComment(int commentId) async {
-    try {
-      final result = await apiPost('$_app/posts/comments/$commentId/like');
-      if (result['code'] == 0) {
-        return result['data']?['liked'] == true;
-      }
-    } catch (_) {}
-    return false;
+  Future<void> likeComment(String commentId) async {
+    await _social.likeComment(pb.LikeCommentRequest(commentId: commentId));
   }
 
-  // ── 評論回覆 ───────────────────────────────────────────
+  Future<void> unlikeComment(String commentId) async {
+    await _social.unlikeComment(pb.UnlikeCommentRequest(commentId: commentId));
+  }
 
-  Future<Map<String, dynamic>?> replyToComment(
-    int commentId, {
-    required int postId,
-    required String content,
+  /// 刪除留言；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<void> deleteComment(String commentId, {required String etag}) async {
+    await _social.deleteComment(
+      pb.DeleteCommentRequest(commentId: commentId, etag: etag),
+    );
+  }
+
+  // ── 店家討論區 ─────────────────────────────────────────
+
+  /// 讀店家討論區的頂層發言，或 [parentId] 那則的回覆；逐頁讀到沒有下一頁。
+  Future<List<StoreForumEntry>> listForumEntries(
+    String storeId, {
+    String? parentId,
   }) async {
-    final result = await apiPost(
-      '$_app/posts/comments/$commentId/replies',
-      body: {
-        'content': content,
-        'postId': postId.toString(),
-        'replyToId': commentId.toString(),
-        'role': 2,
-      },
-    );
-    if (result['code'] == 0) {
-      return result['data'] as Map<String, dynamic>?;
-    }
-    return null;
+    final all = <StoreForumEntry>[];
+    var token = '';
+    do {
+      final response = await _socialPublic.listForumEntries(
+        pb.ListForumEntriesRequest(
+          storeId: storeId,
+          pageSize: _maxPageSize,
+          pageToken: token,
+          parentId: parentId,
+        ),
+      );
+      all.addAll(response.entries.map(StoreForumEntry.fromProto));
+      token = response.nextPageToken;
+    } while (token.isNotEmpty);
+    return all;
   }
 
-  Future<List<Map<String, dynamic>>> listCommentReplies(int commentId) async {
-    final result = await apiGet('$_pub/posts/comments/$commentId/replies');
-    final data = result['data'];
-    // API returns paginated: {records: [...], total, page, pageSize}
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return List<Map<String, dynamic>>.from(records);
-      // fallback: {replies: [...]}
-      final replies = data['replies'];
-      if (replies is List) return List<Map<String, dynamic>>.from(replies);
-    }
-    if (data is List) return List<Map<String, dynamic>>.from(data);
-    return [];
-  }
-
-  Future<bool> deleteComment(int commentId) async {
-    final result = await apiDelete('$_app/posts/comments/$commentId');
-    return result['code'] == 0;
-  }
-
-  // ── 商家訊息 ───────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> listSellerMessages(String sellerId) async {
-    final result = await apiGet(
-      '/api/v1/public/sellers/$sellerId/forum',
-      queryParams: {'page': '1', 'page_size': '50'},
-    );
-    final data = result['data'];
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return records.cast<Map<String, dynamic>>();
-    }
-    if (data is List) return data.cast<Map<String, dynamic>>();
-    return [];
-  }
-
-  Future<List<Map<String, dynamic>>> listMessageReplies(int messageId) async {
-    final result = await apiGet(
-      '/api/v1/public/sellers/forum/$messageId/replies',
-      queryParams: {'page': '1', 'page_size': '50'},
-    );
-    final data = result['data'];
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return records.cast<Map<String, dynamic>>();
-    }
-    if (data is List) return data.cast<Map<String, dynamic>>();
-    return [];
-  }
-
-  Future<bool> replySellerMessage(int messageId, String content) async {
-    final result = await apiPost(
-      '$_app/sellers/forum/$messageId/reply',
-      body: {'content': content},
-    );
-    return result['code'] == 0;
-  }
-
-  Future<bool> updateSellerReply({
-    required int replyId,
-    required String content,
+  /// 在店家討論區回覆 [parentId]（父項不是頂層時伺服器掛到它所屬的頂層底下）。
+  Future<StoreForumEntry> replyForumEntry(
+    String storeId, {
+    required String parentId,
+    required String body,
   }) async {
-    final result = await apiPut(
-      '$_app/sellers/forum/$replyId',
-      body: {'content': content},
+    final response = await _social.createForumEntry(
+      pb.CreateForumEntryRequest(
+        storeId: storeId,
+        body: body,
+        parentId: parentId,
+      ),
     );
-    return result['code'] == 0;
+    return StoreForumEntry.fromProto(response.entry);
   }
 
-  Future<bool> deleteSellerMessage(int messageId) async {
-    final result = await apiDelete('$_app/sellers/forum/$messageId');
-    return result['code'] == 0;
+  /// 修改自己的發言內文；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<StoreForumEntry> updateForumEntry(
+    String entryId, {
+    required String etag,
+    required String body,
+  }) async {
+    final entry = pb.ForumEntry(id: entryId, etag: etag, body: body);
+    final response = await _social.updateForumEntry(
+      pb.UpdateForumEntryRequest(
+        entry: entry,
+        updateMask: fieldMask(entry, ['body']),
+      ),
+    );
+    return StoreForumEntry.fromProto(response.entry);
+  }
+
+  /// 刪除發言；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<void> deleteForumEntry(String entryId, {required String etag}) async {
+    await _social.deleteForumEntry(
+      pb.DeleteForumEntryRequest(entryId: entryId, etag: etag),
+    );
   }
 
   /// 取得分享連結 — GET /api/v1/app/share_url?type={type}&id={id}

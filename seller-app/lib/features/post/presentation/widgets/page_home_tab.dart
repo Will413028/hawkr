@@ -570,15 +570,25 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       postId,
       initialCount,
     );
-    final commentsAvailability = postCommentsAvailabilityOfPost(share, p);
-    final unavailableMessage = commentsAvailability.message;
-    if (unavailableMessage == null &&
-        !_commentsInitRequested.contains(postId)) {
+    final commentsNotice = postCommentsNoticeOfPost(share, p);
+    if (!_commentsInitRequested.contains(postId)) {
       _commentsInitRequested.add(postId);
       Future.microtask(() async {
-        final list = await _postRepo.listComments(postId);
-        if (!mounted) return;
-        setState(() => _applyCommentCount(postId, list.length));
+        try {
+          final list = await _postRepo.listComments(postId);
+          if (!mounted) return;
+          setState(
+            () => _applyCommentCount(
+              postId,
+              list.fold<int>(
+                0,
+                (sum, c) => sum + (c.isVisible ? 1 : 0) + c.replyCount,
+              ),
+            ),
+          );
+        } catch (_) {
+          // 讀不到時沿用貼文上伺服器給的留言數。
+        }
       });
     }
 
@@ -646,8 +656,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                     builder: (_) => CommentsBottomSheet(
                       postId: postId,
                       postRepository: _postRepo,
-                      postOwnerName: widget.sellerName,
-                      unavailableMessage: unavailableMessage,
+                      notice: commentsNotice?.message,
                       onCommentCountChanged: (count) {
                         if (!mounted) return;
                         _applyCommentCount(postId, count);

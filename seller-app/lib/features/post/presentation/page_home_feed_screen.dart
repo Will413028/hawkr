@@ -34,6 +34,7 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../report/data/report_model.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
+import '../data/post_comment.dart';
 import '../data/post_comments_availability.dart';
 import '../data/post_model.dart';
 import '../data/post_publish.dart';
@@ -41,7 +42,6 @@ import '../data/post_repository.dart';
 import 'post_controller.dart';
 import 'widgets/post_restricted_notice.dart';
 import 'widgets/post_status_badge.dart';
-import 'widgets/storefront_tab_glass.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
@@ -54,98 +54,28 @@ const Color _kGray100 = AppColors.textPrimary;
 const Color _kGray50 = AppColors.textSecondary; // rgba(86,86,86,0.5)
 const Color _kBorder = Color(0x1442493F);
 
-// ─── 留言 VM / 分組（對齊 buyer merchant_posts_feed_screen；資料層走
-// seller API：留言用 parent_id 分組 + listCommentReplies 補齊回覆） ────────
-class _CommentVM {
-  const _CommentVM({
-    required this.id,
-    required this.parentId,
-    required this.isMine,
-    required this.name,
-    required this.avatar,
-    required this.content,
-    required this.createdAt,
-  });
-
-  final int id;
-  final int parentId;
-  final bool isMine;
-  final String name;
-  final String avatar;
-  final String content;
-  final dynamic createdAt;
-
-  static _CommentVM fromRaw(Map<String, dynamic> raw) {
-    int pInt(dynamic v) {
-      if (v is int) return v;
-      if (v is num) return v.toInt();
-      if (v is String) return int.tryParse(v) ?? 0;
-      return 0;
-    }
-
-    String s(dynamic v) => (v ?? '').toString();
-
-    return _CommentVM(
-      id: pInt(raw['id']),
-      parentId: pInt(raw['parentId']),
-      isMine: raw['isMine'] == true,
-      name: s(raw['userName']),
-      // 契約成對回 `avatarKey` + `avatarUrl`（gateway post.go `CommentItem`），
-      // SSOT 是 key。舊欄位 `userAvatarKey` / `userAvatarUrl` / `userAvatar` /
-      // `avatar` 皆已不存在。
-      avatar: s(raw['avatarKey'] ?? raw['avatarUrl']),
-      content: s(raw['content'] ?? raw['comment'] ?? raw['text']),
-      createdAt: raw['createdAt'],
-    );
-  }
-}
-
+// ─── 留言分組：頂層留言加上它的回覆（ListComments 以 parent_id 取回覆） ────────
 class _CommentThread {
   const _CommentThread({required this.parent, required this.replies});
-  final _CommentVM parent;
-  final List<_CommentVM> replies;
+  final PostComment parent;
+  final List<PostComment> replies;
 
-  int get total => 1 + replies.length;
+  /// 可見的留言數：頂層是佔位項目時不算，回覆照算。
+  int get total =>
+      (parent.isVisible ? 1 : 0) + replies.where((r) => r.isVisible).length;
 }
 
 final _postCommentsProvider = FutureProvider.autoDispose
     .family<List<_CommentThread>, int>((ref, postId) async {
       final repo = ref.watch(postRepositoryProvider);
-      final raw = await repo.listCommentsRaw(postId);
-
-      final tops = <_CommentVM>[];
-      final byParent = <int, List<_CommentVM>>{};
-      for (final m in raw) {
-        final c = _CommentVM.fromRaw(m);
-        if (c.parentId > 0) {
-          byParent.putIfAbsent(c.parentId, () => <_CommentVM>[]).add(c);
-        } else {
-          tops.add(c);
-        }
-      }
-
-      // 各 top-level 留言補抓回覆（與主列表 merge、以 id 去重）
-      await Future.wait(
-        tops.map((t) async {
-          try {
-            final items = await repo.listCommentReplies(t.id);
-            final list = byParent.putIfAbsent(t.id, () => <_CommentVM>[]);
-            final seen = list.map((e) => e.id).toSet();
-            for (final m in items) {
-              final r = _CommentVM.fromRaw(m);
-              if (seen.add(r.id)) list.add(r);
-            }
-          } catch (_) {}
-        }),
+      final tops = await repo.listComments(postId);
+      Future<_CommentThread> threadOf(PostComment top) async => _CommentThread(
+        parent: top,
+        replies: top.replyCount > 0
+            ? await repo.listComments(postId, parentId: top.id)
+            : const <PostComment>[],
       );
-
-      return [
-        for (final t in tops)
-          _CommentThread(
-            parent: t,
-            replies: byParent[t.id] ?? const <_CommentVM>[],
-          ),
-      ];
+      return Future.wait(tops.map(threadOf));
     });
 
 /// 賣家店舖貼文管理面：沉浸媒體、可展開說明與固定操作列（數字、留言、分享、發布與下架）。
@@ -430,18 +360,19 @@ class _PostPage extends HookConsumerWidget {
     final commentCtrl = useTextEditingController();
     final commentFocus = useFocusNode();
     final submitting = useState(false);
-    final deletingCommentIds = useRef(<int>{});
-    // 回覆對象：apiParentId 固定掛 top-level 留言（seller API 用 parent_id 串
-    // thread），displayName 顯示被回覆者
+    final deletingCommentIds = useRef(<String>{});
+    // 回覆對象：apiParentId 固定掛頂層留言（以 parent_id 串 thread），
+    // replyToId 是回覆針對的那一則；name 顯示被回覆者
     final replyTarget = useState<_PostReplyTarget?>(null);
     final captionExpanded = useState(false);
     final commentsOpen = useRef(false);
 
-    void setReplyTo(_CommentThread thread, _CommentVM tapped) {
+    void setReplyTo(_CommentThread thread, PostComment tapped) {
       if (submitting.value) return;
       replyTarget.value = (
         apiParentId: thread.parent.id,
-        name: tapped.name.trim().isEmpty ? '匿名' : tapped.name.trim(),
+        replyToId: tapped.id == thread.parent.id ? null : tapped.id,
+        name: tapped.authorName.isEmpty ? '匿名' : tapped.authorName,
         isReplyToReply: tapped.id != thread.parent.id,
       );
       commentFocus.requestFocus();
@@ -467,32 +398,28 @@ class _PostPage extends HookConsumerWidget {
       submitting.value = true;
       try {
         final target = replyTarget.value;
-        Map<String, dynamic>? created;
         if (target != null) {
           // 回覆巢狀留言時補 @name 前綴，讓對象在 thread 內可辨識
           final text = target.isReplyToReply ? '@${target.name} $raw' : raw;
-          created = await ref
+          await ref
               .read(postRepositoryProvider)
-              .replyToComment(
-                target.apiParentId,
-                postId: post.id,
-                content: text,
+              .createComment(
+                post.id,
+                body: text,
+                parentId: target.apiParentId,
+                replyToId: target.replyToId,
               );
         } else {
-          created = await ref
+          await ref
               .read(postRepositoryProvider)
-              .commentOnPostRaw(post.id, content: raw);
+              .createComment(post.id, body: raw);
         }
         if (!context.mounted) return;
-        if (created != null) {
-          commentCtrl.clear();
-          replyTarget.value = null;
-          commentFocus.unfocus();
-          syncCommentCount(1);
-          ref.invalidate(_postCommentsProvider(post.id));
-        } else {
-          FloatingToast.error(context, target != null ? '回覆失敗' : '留言失敗');
-        }
+        commentCtrl.clear();
+        replyTarget.value = null;
+        commentFocus.unfocus();
+        syncCommentCount(1);
+        ref.invalidate(_postCommentsProvider(post.id));
       } catch (e) {
         if (context.mounted) FloatingToast.error(context, '留言失敗');
       } finally {
@@ -500,18 +427,16 @@ class _PostPage extends HookConsumerWidget {
       }
     }
 
-    Future<void> deleteComment(_CommentVM c) async {
+    Future<void> deleteComment(PostComment c) async {
       if (!context.mounted || !deletingCommentIds.value.add(c.id)) return;
       try {
-        final ok = await ref.read(postRepositoryProvider).deleteComment(c.id);
+        await ref
+            .read(postRepositoryProvider)
+            .deleteComment(c.id, etag: c.etag);
         if (!context.mounted) return;
-        if (ok) {
-          FloatingToast.success(context, '已刪除留言');
-          syncCommentCount(-1);
-          ref.invalidate(_postCommentsProvider(post.id));
-        } else {
-          FloatingToast.error(context, '刪除留言失敗');
-        }
+        FloatingToast.success(context, '已刪除留言');
+        syncCommentCount(-1);
+        ref.invalidate(_postCommentsProvider(post.id));
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
       } finally {
@@ -519,7 +444,7 @@ class _PostPage extends HookConsumerWidget {
       }
     }
 
-    final commentsAvailability = postCommentsAvailabilityOfPost(
+    final commentsNotice = postCommentsNoticeOfPost(
       ref.watch(storeShareProvider),
       post,
     );
@@ -590,7 +515,6 @@ class _PostPage extends HookConsumerWidget {
     Future<void> openComments() async {
       if (commentsOpen.value || !context.mounted) return;
       commentsOpen.value = true;
-      final unavailableMessage = commentsAvailability.message;
       final sheet = showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
@@ -606,7 +530,7 @@ class _PostPage extends HookConsumerWidget {
           focusNode: commentFocus,
           submitting: submitting,
           replyTarget: replyTarget,
-          unavailableMessage: unavailableMessage,
+          notice: commentsNotice?.message,
           onReply: setReplyTo,
           onDelete: deleteComment,
           onSubmit: submitComment,
@@ -906,7 +830,8 @@ class _PostPage extends HookConsumerWidget {
 }
 
 typedef _PostReplyTarget = ({
-  int apiParentId,
+  String apiParentId,
+  String? replyToId,
   String name,
   bool isReplyToReply,
 });
@@ -1439,7 +1364,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
     required this.focusNode,
     required this.submitting,
     required this.replyTarget,
-    required this.unavailableMessage,
+    required this.notice,
     required this.onReply,
     required this.onDelete,
     required this.onSubmit,
@@ -1451,19 +1376,17 @@ class _PostCommentsSheet extends HookConsumerWidget {
   final ValueListenable<bool> submitting;
   final ValueListenable<_PostReplyTarget?> replyTarget;
 
-  /// 非 null 時不載入留言、不顯示輸入列，列表區改顯示這段說明；外框不變。
-  final String? unavailableMessage;
-  final void Function(_CommentThread, _CommentVM) onReply;
-  final void Function(_CommentVM) onDelete;
+  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除，不顯示輸入列。
+  final String? notice;
+  final void Function(_CommentThread, PostComment) onReply;
+  final void Function(PostComment) onDelete;
   final Future<void> Function() onSubmit;
   final VoidCallback onCancelReply;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unavailable = unavailableMessage;
-    final commentsAsync = unavailable == null
-        ? ref.watch(_postCommentsProvider(postId))
-        : const AsyncData<List<_CommentThread>>(<_CommentThread>[]);
+    final noticeText = notice;
+    final commentsAsync = ref.watch(_postCommentsProvider(postId));
     final threads = commentsAsync.value ?? const <_CommentThread>[];
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final viewport = MediaQuery.sizeOf(context);
@@ -1511,9 +1434,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        unavailable != null
-                            ? '留言'
-                            : '留言 ${threads.fold<int>(0, (sum, thread) => sum + thread.total)}',
+                        '留言 ${threads.fold<int>(0, (sum, thread) => sum + thread.total)}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -1533,49 +1454,61 @@ class _PostCommentsSheet extends HookConsumerWidget {
             ],
           ),
         );
-        final commentContent = unavailable != null
-            ? Padding(
-                padding: const EdgeInsets.symmetric(vertical: HkSpace.xxl),
-                child: StorefrontGlassEmptyPanel(
-                  icon: HkIconName.chat,
-                  message: unavailable,
+        final commentList = commentsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: FruitSpinner(size: 40)),
+          ),
+          error: (_, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('留言載入失敗'),
+                TextButton(
+                  onPressed: () =>
+                      ref.invalidate(_postCommentsProvider(postId)),
+                  child: const HkButtonLabel('重試'),
                 ),
-              )
-            : commentsAsync.when(
-                loading: () => const Padding(
+              ],
+            ),
+          ),
+          data: (_) => threads.isEmpty
+              ? const Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: FruitSpinner(size: 40)),
-                ),
-                error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('留言載入失敗'),
-                      TextButton(
-                        onPressed: () =>
-                            ref.invalidate(_postCommentsProvider(postId)),
-                        child: const HkButtonLabel('重試'),
+                  child: Center(child: Text('尚無留言')),
+                )
+              : Column(
+                  children: [
+                    for (final thread in threads)
+                      _CommentGroup(
+                        thread: thread,
+                        onReply: (comment) => onReply(thread, comment),
+                        onDelete: onDelete,
                       ),
-                    ],
+                  ],
+                ),
+        );
+        final commentContent = Column(
+          children: [
+            if (noticeText != null)
+              Padding(
+                key: ValueKey('seller-post-comments-notice-$postId'),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    noticeText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-                data: (_) => threads.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: Text('尚無留言')),
-                      )
-                    : Column(
-                        children: [
-                          for (final thread in threads)
-                            _CommentGroup(
-                              thread: thread,
-                              onReply: (comment) => onReply(thread, comment),
-                              onDelete: onDelete,
-                            ),
-                        ],
-                      ),
-              );
+              ),
+            commentList,
+          ],
+        );
         final composer = ValueListenableBuilder<bool>(
           valueListenable: submitting,
           builder: (context, busy, _) =>
@@ -1617,7 +1550,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                             children: [
                               header,
                               commentContent,
-                              if (unavailable == null) composer,
+                              if (noticeText == null) composer,
                             ],
                           ),
                         )
@@ -1634,7 +1567,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                                 child: commentContent,
                               ),
                             ),
-                            if (unavailable == null)
+                            if (noticeText == null)
                               ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxHeight: math.max(48, (height - 72) * 0.62),
@@ -1901,13 +1834,11 @@ class _CommentRow extends ConsumerWidget {
     required this.onDelete,
   });
 
-  final _CommentVM comment;
+  final PostComment comment;
   final String dateStr;
   final bool isReply;
   final VoidCallback onReply;
   final VoidCallback onDelete;
-
-  bool get _isSelf => comment.isMine;
 
   Future<void> _showActionMenu(BuildContext context, WidgetRef ref) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -1919,22 +1850,22 @@ class _CommentRow extends ConsumerWidget {
       ),
       Offset.zero & overlay.size,
     );
-    // 賣家在自己貼文內可管理所有留言 → 一律提供刪除；
-    // 非自己的留言額外提供檢舉（公開留言不帶留言者 id，目前沒有封鎖入口）
+    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉（公開留言不帶留言者 id，目前沒有封鎖入口）
     final v = await showMenu<String>(
       context: context,
       position: position,
       color: AppColors.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       items: [
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Text(
-            '刪除留言',
-            style: TextStyle(fontSize: 16.sp, color: AppColors.error),
+        if (comment.viewerCanDelete)
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: Text(
+              '刪除留言',
+              style: TextStyle(fontSize: 16.sp, color: AppColors.error),
+            ),
           ),
-        ),
-        if (!_isSelf) ...[
+        if (!comment.isMine) ...[
           PopupMenuItem<String>(
             value: 'report',
             child: Text('檢舉留言', style: TextStyle(fontSize: 16.sp)),
@@ -1945,29 +1876,40 @@ class _CommentRow extends ConsumerWidget {
     if (!context.mounted) return;
     if (v == 'delete') onDelete();
     if (v == 'report' && context.mounted) {
-      // 本頁的留言來自 `/public/posts/{id}/comments`（`listCommentsRaw`），
-      // 落在 `cms_comment`——所以是 POST_COMMENT，不是 SELLER_FORUM
-      // （那是賣家頁「迴響」留言板，打到 `cms_seller_forum`）。
+      // 本頁的留言是貼文留言（`listComments`）——所以是 POST_COMMENT，不是 SELLER_FORUM
+      // （那是賣家頁「迴響」討論區）。
       await showReportSheet(
         context,
         ref,
         targetType: ReportTargetType.postComment,
-        targetId: '${comment.id}',
+        targetId: comment.id,
       );
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = comment.name.trim().isEmpty ? '匿名' : comment.name.trim();
+    final name = comment.authorName.isEmpty ? '匿名' : comment.authorName;
     final leftPad = isReply ? 46.w : 10.w;
+    final placeholder = comment.placeholderText;
+    if (placeholder != null) {
+      return Padding(
+        key: ValueKey('seller-post-comment-placeholder-${comment.id}'),
+        padding: EdgeInsets.fromLTRB(leftPad, 8.h, 12.w, 8.h),
+        child: Text(
+          placeholder,
+          style: TextStyle(fontSize: 14.sp, color: _kGray50, height: 20 / 14),
+        ),
+      );
+    }
+    final hasMenu = comment.viewerCanDelete || !comment.isMine;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPad, 8.h, 12.w, 8.h),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CommentAvatar(size: 30.sp, url: comment.avatar),
+          _CommentAvatar(size: 30.sp, url: comment.authorAvatar),
           SizedBox(width: 6.w),
           Expanded(
             child: Column(
@@ -1988,14 +1930,16 @@ class _CommentRow extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 8.w),
-                    Builder(
-                      builder: (innerContext) => HkFrostedIconButton(
-                        label: '留言更多操作',
-                        icon: AppIcons.moreHoriz,
-                        onPressed: () => _showActionMenu(innerContext, ref),
+                    if (hasMenu) ...[
+                      SizedBox(width: 8.w),
+                      Builder(
+                        builder: (innerContext) => HkFrostedIconButton(
+                          label: '留言更多操作',
+                          icon: AppIcons.moreHoriz,
+                          onPressed: () => _showActionMenu(innerContext, ref),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 if (dateStr.isNotEmpty)
@@ -2007,10 +1951,10 @@ class _CommentRow extends ConsumerWidget {
                       height: 20 / 14,
                     ),
                   ),
-                if (comment.content.isNotEmpty) ...[
+                if (comment.body.isNotEmpty) ...[
                   SizedBox(height: 4.h),
                   Text(
-                    comment.content,
+                    comment.body,
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: _kGray100,
@@ -2018,36 +1962,38 @@ class _CommentRow extends ConsumerWidget {
                     ),
                   ),
                 ],
-                SizedBox(height: 6.h),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: 80,
-                    child: HkTapTarget(
-                      semanticLabel: '回覆 $name',
-                      onTap: onReply,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            AppIcons.chatBubbleOutline,
-                            size: 16.sp,
-                            color: _kGray100.withValues(alpha: 0.6),
-                          ),
-                          SizedBox(width: 4.w),
-                          Text(
-                            '回覆',
-                            style: TextStyle(
-                              fontSize: 14.sp,
+                if (comment.viewerCanReply) ...[
+                  SizedBox(height: 6.h),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 80,
+                      child: HkTapTarget(
+                        semanticLabel: '回覆 $name',
+                        onTap: onReply,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              AppIcons.chatBubbleOutline,
+                              size: 16.sp,
                               color: _kGray100.withValues(alpha: 0.6),
-                              height: 18 / 13,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4.w),
+                            Text(
+                              '回覆',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: _kGray100.withValues(alpha: 0.6),
+                                height: 18 / 13,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -2068,14 +2014,14 @@ class _CommentGroup extends StatelessWidget {
   });
 
   final _CommentThread thread;
-  final void Function(_CommentVM) onReply;
-  final void Function(_CommentVM) onDelete;
+  final void Function(PostComment) onReply;
+  final void Function(PostComment) onDelete;
 
   @override
   Widget build(BuildContext context) {
-    Widget rowFor(_CommentVM c, {required bool isReply}) => _CommentRow(
+    Widget rowFor(PostComment c, {required bool isReply}) => _CommentRow(
       comment: c,
-      dateStr: _relativeDate(c.createdAt),
+      dateStr: _relativeDate(c.createTime),
       isReply: isReply,
       onReply: () => onReply(c),
       onDelete: () => onDelete(c),
@@ -2212,24 +2158,7 @@ class _CommentAvatar extends StatelessWidget {
 }
 
 /// 留言用相對時間：剛剛 / N 分鐘前 / N 小時前 / N 天前 / 否則 yyyy/MM/dd
-String _relativeDate(dynamic dateVal) {
-  if (dateVal == null) return '';
-  DateTime? dt;
-  if (dateVal is String) {
-    dt = DateTime.tryParse(dateVal);
-    if (dt == null) {
-      final n = int.tryParse(dateVal);
-      if (n != null) {
-        dt = DateTime.fromMillisecondsSinceEpoch(
-          n < 10000000000 ? n * 1000 : n,
-        );
-      }
-    }
-  }
-  if (dateVal is int) {
-    final ms = dateVal < 10000000000 ? dateVal * 1000 : dateVal;
-    dt = DateTime.fromMillisecondsSinceEpoch(ms);
-  }
+String _relativeDate(DateTime? dt) {
   if (dt == null) return '';
   final diff = DateTime.now().difference(dt);
   if (diff.inSeconds < 60) return '剛剛';

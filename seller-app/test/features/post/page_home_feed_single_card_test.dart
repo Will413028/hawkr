@@ -67,7 +67,7 @@ Future<void> _pumpFeed(
   when(
     () => repository.listMyPosts(),
   ).thenAnswer((_) async => [_postFixture()]);
-  when(() => repository.listCommentsRaw(_postId)).thenAnswer((_) async => []);
+  when(() => repository.listComments(_postId)).thenAnswer((_) async => []);
 
   Widget withMediaQuery(BuildContext context, Widget? child) => MediaQuery(
     data: MediaQuery.of(context).copyWith(

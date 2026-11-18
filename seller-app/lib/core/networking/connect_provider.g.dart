@@ -303,6 +303,62 @@ final class SocialClientProvider
 
 String _$socialClientHash() => r'cf9129264e0b4784af3cffc1f7764c352eabc323';
 
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+
+@ProviderFor(socialPublicClient)
+final socialPublicClientProvider = SocialPublicClientProvider._();
+
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+
+final class SocialPublicClientProvider
+    extends
+        $FunctionalProvider<
+          SocialPublicServiceClient,
+          SocialPublicServiceClient,
+          SocialPublicServiceClient
+        >
+    with $Provider<SocialPublicServiceClient> {
+  /// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+  /// 不受公開狀態限制，伺服器依憑證判斷。
+  SocialPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialPublicServiceClient create(Ref ref) {
+    return socialPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$socialPublicClientHash() =>
+    r'6385043b29b731eb108b73e4cf314ffff63bb9da';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)

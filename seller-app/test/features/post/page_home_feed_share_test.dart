@@ -32,7 +32,7 @@ Future<void> _pump(
   when(
     () => repo.listMyPosts(),
   ).thenAnswer((_) async => [Post(id: 42, content: '貼文內容', url: url)]);
-  when(() => repo.listCommentsRaw(42)).thenAnswer((_) async => []);
+  when(() => repo.listComments(42)).thenAnswer((_) async => []);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

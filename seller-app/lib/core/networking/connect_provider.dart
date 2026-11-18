@@ -56,6 +56,12 @@ SellerAppServiceClient sellerClient(Ref ref) =>
 SocialAppServiceClient socialClient(Ref ref) =>
     SocialAppServiceClient(ref.watch(connectAuthTransportProvider));
 
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+@Riverpod(keepAlive: true)
+SocialPublicServiceClient socialPublicClient(Ref ref) =>
+    SocialPublicServiceClient(ref.watch(connectAuthTransportProvider));
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 @Riverpod(keepAlive: true)
 SellerPublicServiceClient sellerPublicClient(Ref ref) =>

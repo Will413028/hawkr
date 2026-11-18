@@ -69,8 +69,7 @@ Future<_Repo> _pump(
   addTearDown(FloatingToast.dismiss);
   final repo = _Repo();
   when(() => repo.listMyPosts()).thenAnswer((_) async => posts());
-  when(() => repo.listCommentsRaw(any())).thenAnswer((_) async => []);
-  when(() => repo.listCommentReplies(any())).thenAnswer((_) async => []);
+  when(() => repo.listComments(any())).thenAnswer((_) async => []);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -566,8 +565,7 @@ void main() {
         when(
           () => repo.listMyPosts(),
         ).thenAnswer((_) async => [_post(publishStatus: _published)]);
-        when(() => repo.listCommentsRaw(any())).thenAnswer((_) async => []);
-        when(() => repo.listCommentReplies(any())).thenAnswer((_) async => []);
+        when(() => repo.listComments(any())).thenAnswer((_) async => []);
         await tester.pumpWidget(
           ProviderScope(
             key: UniqueKey(),

@@ -39,7 +39,7 @@ void main() {
         ),
       ],
     );
-    when(() => repository.listCommentsRaw(42)).thenAnswer((_) async => []);
+    when(() => repository.listComments(42)).thenAnswer((_) async => []);
     when(
       () => repository.publishPostOrThrow(42, etag: any(named: 'etag')),
     ).thenThrow(

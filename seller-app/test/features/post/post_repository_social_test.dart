@@ -20,6 +20,7 @@ PostRepository _repository(FakeTransportBuilder transport) {
     Dio(),
     container.read(Provider<Ref>((ref) => ref)),
     SocialAppServiceClient(transport.build()),
+    SocialPublicServiceClient(transport.build()),
   );
 }
 
@@ -278,5 +279,199 @@ void main() {
     expect(created.single.publish, isTrue);
     expect(created.single.imageStagedToken, 'tok');
     expect(deleted.single.postId, '42');
+  });
+
+  group('comments and forum over Connect', () {
+    pb.Comment commentProto({
+      String id = '5',
+      String? parentId,
+      CommentState state = CommentState.COMMENT_STATE_VISIBLE,
+    }) => pb.Comment(
+      id: id,
+      postId: '42',
+      parentId: parentId,
+      state: state,
+      author: pb.Actor(
+        kind: ActorKind.ACTOR_KIND_BUYER,
+        id: '9',
+        name: '王小明',
+        avatar: common.Image(uriTemplate: 'https://m.test/i/{preset}/a.jpg'),
+      ),
+      body: '好吃',
+      etag: 'ce-$id',
+      isMine: false,
+      viewerLiked: true,
+      viewerCanDelete: true,
+      viewerCanReply: true,
+      viewerCanEdit: false,
+    )..mergeFromProto3Json({'likeCount': '3', 'replyCount': '2'});
+
+    test('maps the proto Comment, including viewer_can_* and etag', () async {
+      final requests = <pb.ListCommentsRequest>[];
+      final repository = _repository(
+        FakeTransportBuilder().unary(SocialPublicService.listComments, (
+          request,
+          _,
+        ) {
+          requests.add(request);
+          return pb.ListCommentsResponse(
+            comments: [
+              commentProto(),
+              commentProto(id: '6', state: CommentState.COMMENT_STATE_DELETED),
+            ],
+          );
+        }),
+      );
+
+      final list = await repository.listComments(42);
+
+      expect(requests.single.postId, '42');
+      expect(requests.single.hasParentId(), isFalse);
+      final c = list.first;
+      expect(c.id, '5');
+      expect(c.authorName, '王小明');
+      expect(c.authorAvatar, startsWith('https://m.test/i/'));
+      expect(c.body, '好吃');
+      expect(c.likeCount, 3);
+      expect(c.replyCount, 2);
+      expect(c.viewerLiked, isTrue);
+      expect(c.viewerCanDelete, isTrue);
+      expect(c.viewerCanReply, isTrue);
+      expect(c.viewerCanEdit, isFalse);
+      expect(c.etag, 'ce-5');
+      expect(c.placeholderText, isNull);
+      expect(list.last.placeholderText, '此留言已刪除');
+    });
+
+    test('lists replies by parent_id and follows next_page_token', () async {
+      final tokens = <String>[];
+      final repository = _repository(
+        FakeTransportBuilder().unary(SocialPublicService.listComments, (
+          request,
+          _,
+        ) {
+          tokens.add('${request.parentId}|${request.pageToken}');
+          return request.pageToken.isEmpty
+              ? pb.ListCommentsResponse(
+                  comments: [commentProto(id: '7', parentId: '5')],
+                  nextPageToken: 'p2',
+                )
+              : pb.ListCommentsResponse(
+                  comments: [commentProto(id: '8', parentId: '5')],
+                );
+        }),
+      );
+
+      final list = await repository.listComments(42, parentId: '5');
+
+      expect(tokens, ['5|', '5|p2']);
+      expect(list.map((c) => c.id), ['7', '8']);
+      expect(list.first.parentId, '5');
+    });
+
+    test(
+      'create sends parent and reply target; delete sends the etag',
+      () async {
+        final created = <pb.CreateCommentRequest>[];
+        final deleted = <pb.DeleteCommentRequest>[];
+        final repository = _repository(
+          FakeTransportBuilder()
+              .unary(SocialAppService.createComment, (request, _) {
+                created.add(request);
+                return pb.CreateCommentResponse(comment: commentProto(id: '9'));
+              })
+              .unary(SocialAppService.deleteComment, (request, _) {
+                deleted.add(request);
+                return pb.DeleteCommentResponse();
+              }),
+        );
+
+        final c = await repository.createComment(
+          42,
+          body: '謝謝',
+          parentId: '5',
+          replyToId: '7',
+        );
+        await repository.deleteComment('9', etag: 'ce-9');
+
+        expect(c.id, '9');
+        expect(created.single.postId, '42');
+        expect(created.single.parentId, '5');
+        expect(created.single.replyToId, '7');
+        expect(deleted.single.commentId, '9');
+        expect(deleted.single.etag, 'ce-9');
+      },
+    );
+
+    test('like and unlike target the comment id', () async {
+      final liked = <String>[];
+      final repository = _repository(
+        FakeTransportBuilder()
+            .unary(SocialAppService.likeComment, (request, _) {
+              liked.add('like ${request.commentId}');
+              return pb.LikeCommentResponse();
+            })
+            .unary(SocialAppService.unlikeComment, (request, _) {
+              liked.add('unlike ${request.commentId}');
+              return pb.UnlikeCommentResponse();
+            }),
+      );
+
+      await repository.likeComment('5');
+      await repository.unlikeComment('5');
+
+      expect(liked, ['like 5', 'unlike 5']);
+    });
+
+    test('maps the forum entry and sends etag on update and delete', () async {
+      final updated = <pb.UpdateForumEntryRequest>[];
+      final deleted = <pb.DeleteForumEntryRequest>[];
+      final replied = <pb.CreateForumEntryRequest>[];
+      final entry = pb.ForumEntry(
+        id: '3',
+        storeId: '7',
+        state: CommentState.COMMENT_STATE_VISIBLE,
+        body: '請問',
+        etag: 'fe-3',
+        viewerCanReply: true,
+        viewerCanDelete: false,
+        viewerCanEdit: false,
+      );
+      final repository = _repository(
+        FakeTransportBuilder()
+            .unary(
+              SocialPublicService.listForumEntries,
+              (_, _) => pb.ListForumEntriesResponse(entries: [entry]),
+            )
+            .unary(SocialAppService.createForumEntry, (request, _) {
+              replied.add(request);
+              return pb.CreateForumEntryResponse(entry: entry);
+            })
+            .unary(SocialAppService.updateForumEntry, (request, _) {
+              updated.add(request);
+              return pb.UpdateForumEntryResponse(entry: entry);
+            })
+            .unary(SocialAppService.deleteForumEntry, (request, _) {
+              deleted.add(request);
+              return pb.DeleteForumEntryResponse();
+            }),
+      );
+
+      final list = await repository.listForumEntries('7');
+      await repository.replyForumEntry('7', parentId: '3', body: '有貨');
+      await repository.updateForumEntry('4', etag: 'fe-4', body: '改');
+      await repository.deleteForumEntry('4', etag: 'fe-4');
+
+      expect(list.single.viewerCanReply, isTrue);
+      expect(list.single.viewerCanDelete, isFalse);
+      expect(list.single.etag, 'fe-3');
+      expect(replied.single.storeId, '7');
+      expect(replied.single.parentId, '3');
+      expect(updated.single.entry.id, '4');
+      expect(updated.single.entry.etag, 'fe-4');
+      expect(updated.single.updateMask.paths, ['body']);
+      expect(deleted.single.entryId, '4');
+      expect(deleted.single.etag, 'fe-4');
+    });
   });
 }

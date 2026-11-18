@@ -123,6 +123,7 @@ final _postRepositoryProvider = Provider<PostRepository>(
     Dio(),
     ref,
     SocialAppServiceClient(FakeTransportBuilder().build()),
+    SocialPublicServiceClient(FakeTransportBuilder().build()),
   ),
 );
 

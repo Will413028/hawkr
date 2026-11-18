@@ -64,15 +64,15 @@ void main() {
         >[
           (
             file: 'lib/features/post/presentation/page_home_feed_screen.dart',
-            sourceMethod: 'listCommentsRaw',
-            table: 'cms_comment (GET /public/posts/{id}/comments)',
+            sourceMethod: 'listComments',
+            table: '貼文留言（SocialPublicService.ListComments）',
             expected: ReportTargetType.postComment,
             forbidden: ReportTargetType.sellerForum,
           ),
           (
             file: 'lib/features/post/presentation/widgets/page_echo_tab.dart',
-            sourceMethod: 'listSellerMessages',
-            table: 'cms_seller_forum (GET /public/sellers/{id}/forum)',
+            sourceMethod: 'listForumEntries',
+            table: '店家討論區（SocialPublicService.ListForumEntries）',
             expected: ReportTargetType.sellerForum,
             forbidden: ReportTargetType.postComment,
           ),

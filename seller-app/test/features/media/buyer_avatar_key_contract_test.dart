@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:hawkr_seller/features/chat/data/chat_model.dart';
 import 'package:hawkr_seller/features/order/data/after_sale_model.dart';
 import 'package:hawkr_seller/features/order/data/order_model.dart';
-import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 買家頭像欄位收斂契約測試（backend `697c989bd`：九個名字 → `avatarKey`/`avatarUrl`）。
@@ -267,38 +266,6 @@ void main() {
         'buyerAvatarUrl': _avatarUrl,
       });
       expect(c.avatarUrl, isEmpty);
-    });
-  });
-
-  group('貼文留言（讀取與寫入同形狀）', () {
-    test('讀取端點：avatarKey 優先', () {
-      final c = Comment.fromJson(Map<String, dynamic>.from(_postCommentRead));
-      expect(c.avatarKey, _avatarKey);
-      expect(c.author, '王小明');
-    });
-
-    test('寫入端點回應形狀與讀取端一致（含頭像欄成對）', () {
-      expect(_postCommentWrite.containsKey('avatarKey'), isTrue);
-      expect(_postCommentWrite.containsKey('avatarUrl'), isTrue);
-      expect(_postCommentWrite.containsKey('user_avatar_key'), isFalse);
-      final c = Comment.fromJson(Map<String, dynamic>.from(_postCommentWrite));
-      expect(c.id, 7490625711635290314);
-    });
-
-    test('avatarKey 缺席時退回 avatarUrl', () {
-      final c = Comment.fromJson({'id': '1', 'avatarUrl': _avatarUrl});
-      expect(c.avatarKey, _avatarUrl);
-    });
-
-    test('舊名已不再被讀（只給舊名 → 解析為空）', () {
-      final c = Comment.fromJson({
-        'id': '1',
-        'userAvatarKey': _avatarKey,
-        'userAvatarUrl': _avatarUrl,
-        'user_avatar_key': _avatarKey,
-        'userAvatar': _avatarUrl,
-      });
-      expect(c.avatarKey, isEmpty);
     });
   });
 

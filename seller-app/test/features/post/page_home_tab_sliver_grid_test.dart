@@ -59,6 +59,9 @@ void main() {
           overrides: [
             dioProvider.overrideWithValue(Dio()),
             socialClientProvider.overrideWithValue(client),
+            socialPublicClientProvider.overrideWithValue(
+              SocialPublicServiceClient(FakeTransportBuilder().build()),
+            ),
           ],
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
@@ -166,6 +169,9 @@ void main() {
         overrides: [
           dioProvider.overrideWithValue(Dio()),
           socialClientProvider.overrideWithValue(client),
+          socialPublicClientProvider.overrideWithValue(
+            SocialPublicServiceClient(FakeTransportBuilder().build()),
+          ),
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),

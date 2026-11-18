@@ -14,6 +14,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../support/my_store_fixtures.dart';
+import 'post_comment_fixtures.dart';
 
 class _Repo extends Mock implements PostRepository {}
 
@@ -43,7 +44,9 @@ Future<_Repo> _openPreviewComments(
       pageSize: any(named: 'pageSize'),
     ),
   ).thenAnswer((_) async => PostPageResult(posts: [post], nextPageToken: ''));
-  when(() => repo.listComments(any())).thenAnswer((_) async => []);
+  when(
+    () => repo.listComments(any()),
+  ).thenAnswer((_) async => [testComment(body: '買家的留言')]);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -70,7 +73,7 @@ Future<_Repo> _openPreviewComments(
   );
   await tester.pumpAndSettle();
   if (tapComments) {
-    await tester.tap(find.bySemanticsLabel('留言，共 0 則'));
+    await tester.tap(find.bySemanticsLabel(RegExp('^留言，共')));
     await tester.pumpAndSettle();
   }
   return repo;
@@ -81,7 +84,7 @@ void main() {
     if (!F.isInitialized) F.init(Flavor.dev);
   });
 
-  testWidgets('the preview of a draft post does not read public comments', (
+  testWidgets('the preview of a draft post still reads and shows comments', (
     tester,
   ) async {
     final repo = await _openPreviewComments(
@@ -90,14 +93,15 @@ void main() {
       post: Post(id: 42, content: '貼文內容', status: PostStatus.POST_STATUS_DRAFT),
     );
 
-    expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsOneWidget);
-    verifyNever(() => repo.listComments(any()));
+    expect(find.text('這則貼文已下架，買家看不到這些留言。'), findsOneWidget);
+    expect(find.text('買家的留言'), findsOneWidget);
+    verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
     // 外框不變：關閉鍵在，輸入列沒有。
     expect(find.byKey(const ValueKey('comments-sheet-close')), findsOneWidget);
     expect(find.byKey(const ValueKey('send-comment-action')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('comments-sheet-close')));
     await tester.pumpAndSettle();
-    expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsNothing);
+    expect(find.text('這則貼文已下架，買家看不到這些留言。'), findsNothing);
   });
 
   testWidgets('the preview of a draft that is also platform-hidden shows the '
@@ -114,7 +118,8 @@ void main() {
     );
 
     expect(find.text('這則貼文已被平台下架，買家看不到留言。'), findsOneWidget);
-    verifyNever(() => repo.listComments(any()));
+    expect(find.text('買家的留言'), findsOneWidget);
+    verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
   });
 
   testWidgets('the preview of a platform-hidden post in a non-public store '
@@ -131,8 +136,28 @@ void main() {
     );
 
     expect(find.text('這則貼文已被平台下架，買家看不到留言。'), findsOneWidget);
-    verifyNever(() => repo.listComments(any()));
+    expect(find.text('買家的留言'), findsOneWidget);
+    verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
   });
+
+  testWidgets(
+    'the preview of a non-public store shows its notice and comments',
+    (tester) async {
+      final repo = await _openPreviewComments(
+        tester,
+        listed: false,
+        post: Post(
+          id: 42,
+          content: '貼文內容',
+          status: PostStatus.POST_STATUS_PUBLISHED,
+        ),
+      );
+
+      expect(find.text('店家目前不公開，買家看不到這些留言。'), findsOneWidget);
+      expect(find.text('買家的留言'), findsOneWidget);
+      verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
+    },
+  );
 
   testWidgets(
     'the preview of a post in a public store reads its comment count',

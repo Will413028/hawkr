@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
+import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/features/post/presentation/widgets/page_home_tab.dart';
@@ -33,7 +34,7 @@ void main() {
             addTearDown(tester.view.resetDevicePixelRatio);
             addTearDown(tester.view.resetPhysicalSize);
             final repo = _Repo();
-            final pendingComments = Completer<List<Comment>>();
+            final pendingComments = Completer<List<PostComment>>();
             when(() => repo.listMyPostsPage(pageSize: 20)).thenAnswer(
               (_) async => const PostPageResult(
                 posts: [

@@ -4,20 +4,15 @@ import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PostCommentsAvailability _of({
+PostCommentsNotice? _of({
   StoreShare share = const StoreShareEnabled('s'),
   PostStatus publishStatus = PostStatus.POST_STATUS_PUBLISHED,
   bool hidden = false,
-}) => postCommentsAvailability(
-  share: share,
-  status: publishStatus,
-  hidden: hidden,
-);
+}) => postCommentsNotice(share: share, status: publishStatus, hidden: hidden);
 
 void main() {
-  test('a published, visible post of a public store is available', () {
-    expect(_of(), PostCommentsAvailability.available);
-    expect(PostCommentsAvailability.available.message, isNull);
+  test('a published, visible post of a public store has no notice', () {
+    expect(_of(), isNull);
   });
 
   test('a store that cannot go public wins over the post state', () {
@@ -26,7 +21,7 @@ void main() {
         share: const StoreShareDisabled(),
         publishStatus: PostStatus.POST_STATUS_DRAFT,
       ),
-      PostCommentsAvailability.storeNotPublic,
+      PostCommentsNotice.storeNotPublic,
     );
   });
 
@@ -44,7 +39,7 @@ void main() {
       ]) {
         expect(
           _of(share: share, publishStatus: status, hidden: true),
-          PostCommentsAvailability.platformHidden,
+          PostCommentsNotice.platformHidden,
         );
       }
     }
@@ -59,53 +54,38 @@ void main() {
       takedownMeasureId: 'measure-1',
     );
     expect(
-      postCommentsAvailabilityOfPost(share, hidden),
-      PostCommentsAvailability.platformHidden,
+      postCommentsNoticeOfPost(share, hidden),
+      PostCommentsNotice.platformHidden,
     );
     expect(
-      postCommentsAvailabilityOfPost(
-        share,
-        hidden.copyWith(takedownMeasureId: null),
-      ),
-      PostCommentsAvailability.notPublished,
+      postCommentsNoticeOfPost(share, hidden.copyWith(takedownMeasureId: null)),
+      PostCommentsNotice.notPublished,
     );
   });
 
   test('draft and self-unpublished are not published', () {
     expect(
       _of(publishStatus: PostStatus.POST_STATUS_DRAFT),
-      PostCommentsAvailability.notPublished,
+      PostCommentsNotice.notPublished,
     );
     expect(
       _of(publishStatus: PostStatus.POST_STATUS_UNPUBLISHED),
-      PostCommentsAvailability.notPublished,
+      PostCommentsNotice.notPublished,
     );
   });
 
   test('a published post hidden by the platform is platform-hidden', () {
-    expect(_of(hidden: true), PostCommentsAvailability.platformHidden);
+    expect(_of(hidden: true), PostCommentsNotice.platformHidden);
   });
 
   test('an unknown store or missing publish status does not conclude', () {
-    expect(
-      _of(share: const StoreShareUnknown()),
-      PostCommentsAvailability.available,
-    );
-    expect(
-      _of(publishStatus: PostStatus.POST_STATUS_UNSPECIFIED),
-      PostCommentsAvailability.available,
-    );
+    expect(_of(share: const StoreShareUnknown()), isNull);
+    expect(_of(publishStatus: PostStatus.POST_STATUS_UNSPECIFIED), isNull);
   });
 
   test('messages are the approved copy', () {
-    expect(
-      PostCommentsAvailability.storeNotPublic.message,
-      '店家公開後，買家的留言會顯示在這裡。',
-    );
-    expect(PostCommentsAvailability.notPublished.message, '貼文發布後，買家的留言會顯示在這裡。');
-    expect(
-      PostCommentsAvailability.platformHidden.message,
-      '這則貼文已被平台下架，買家看不到留言。',
-    );
+    expect(PostCommentsNotice.storeNotPublic.message, '店家目前不公開，買家看不到這些留言。');
+    expect(PostCommentsNotice.notPublished.message, '這則貼文已下架，買家看不到這些留言。');
+    expect(PostCommentsNotice.platformHidden.message, '這則貼文已被平台下架，買家看不到留言。');
   });
 }

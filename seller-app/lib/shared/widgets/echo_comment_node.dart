@@ -1,32 +1,32 @@
-/// Echo 留言節點資料模型，用於建立樹狀留言結構。
+/// Echo 留言節點資料模型，用於建立樹狀留言結構。權限取伺服器的 `viewer_can_*`。
 class EchoCommentNode {
   EchoCommentNode({
     required this.id,
+    required this.etag,
     required this.isMine,
     required this.userName,
     required this.userAvatar,
     required this.content,
     required this.createdAt,
-    this.likeCount = 0,
-    this.replyCount = 0,
-    this.depth = 0,
-    this.parentId = '',
-    this.rootId = '',
-    this.replyToUserName = '',
+    this.placeholderText,
+    this.viewerCanEdit = false,
+    this.viewerCanDelete = false,
+    this.viewerCanReply = false,
     List<EchoCommentNode>? replies,
   }) : replies = replies ?? [];
 
   final String id;
+  final String etag;
   final bool isMine;
   final String userName;
   final String userAvatar;
   final String content;
-  final DateTime createdAt;
-  final int likeCount;
-  final int replyCount;
-  final int depth;
-  final String parentId;
-  final String rootId;
-  final String replyToUserName;
+  final DateTime? createdAt;
+
+  /// 被刪除或被隱藏的頂層項目顯示的佔位文字；一般項目是 null。
+  final String? placeholderText;
+  final bool viewerCanEdit;
+  final bool viewerCanDelete;
+  final bool viewerCanReply;
   final List<EchoCommentNode> replies;
 }

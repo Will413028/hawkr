@@ -1,0 +1,67 @@
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
+import 'package:hawkr_seller/features/post/data/post_comment.dart';
+
+/// 貼文留言的測試資料。預設是店主讀到買家的可見頂層留言（可刪、可回覆、不可編輯）。
+PostComment testComment({
+  String id = '1',
+  String postId = '42',
+  String? parentId,
+  CommentState state = CommentState.COMMENT_STATE_VISIBLE,
+  String author = '測試留言者',
+  String body = '留言內容',
+  bool isMine = false,
+  bool canDelete = true,
+  bool canReply = true,
+  bool canEdit = false,
+  int replyCount = 0,
+  int likeCount = 0,
+  bool liked = false,
+  String? etag,
+}) => PostComment(
+  id: id,
+  postId: postId,
+  parentId: parentId,
+  state: state,
+  authorName: author,
+  body: body,
+  createTime: DateTime.now().subtract(const Duration(minutes: 5)),
+  likeCount: likeCount,
+  replyCount: replyCount,
+  viewerLiked: liked,
+  isMine: isMine,
+  viewerCanEdit: canEdit,
+  viewerCanDelete: canDelete,
+  viewerCanReply: canReply,
+  etag: etag ?? 'etag-$id',
+);
+
+/// 店家討論區的測試資料。預設是店主讀到買家的可見頂層發言。
+StoreForumEntry testForumEntry({
+  String id = '1',
+  String storeId = '7',
+  String? parentId,
+  CommentState state = CommentState.COMMENT_STATE_VISIBLE,
+  String author = '測試買家',
+  String body = '留言內容',
+  bool isMine = false,
+  bool canDelete = false,
+  bool canReply = true,
+  bool canEdit = false,
+  int replyCount = 0,
+  DateTime? createTime,
+  String? etag,
+}) => StoreForumEntry(
+  id: id,
+  storeId: storeId,
+  parentId: parentId,
+  state: state,
+  authorName: author,
+  body: body,
+  createTime: createTime ?? DateTime.now().subtract(const Duration(minutes: 5)),
+  replyCount: replyCount,
+  isMine: isMine,
+  viewerCanEdit: canEdit,
+  viewerCanDelete: canDelete,
+  viewerCanReply: canReply,
+  etag: etag ?? 'etag-$id',
+);

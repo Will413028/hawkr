@@ -1,16 +1,16 @@
-import '../../features/seller/data/current_store.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
+
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import '../../config/media_image.dart';
+
+import '../../features/post/data/post_comment.dart';
 import '../../features/post/data/post_repository.dart';
-import '../../features/post/presentation/widgets/storefront_tab_glass.dart';
 import '../utils/floating_toast.dart';
 import 'chat_bubble_icon.dart';
 import 'hk_tap_target.dart';
@@ -24,45 +24,30 @@ class CommentsBottomSheet extends HookConsumerWidget {
     super.key,
     required this.postId,
     required this.postRepository,
-    this.postOwnerName,
     this.sellerAvatarBase64,
     this.sellerAvatarUrl,
     this.onCommentCountChanged,
-    this.unavailableMessage,
+    this.notice,
   });
   final int postId;
   final PostRepository postRepository;
-  final String? postOwnerName;
   final String? sellerAvatarBase64;
   final String? sellerAvatarUrl;
   final ValueChanged<int>? onCommentCountChanged;
 
-  /// 非 null 時這則貼文買家看不到，公開的留言讀不到它：不載入留言、不顯示輸入列，
-  /// 列表區改顯示這段說明，外框（拖曳把手、關閉鍵）不變。
-  final String? unavailableMessage;
+  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除，不顯示輸入列。
+  final String? notice;
 
   static ImageProvider? _resolveCommentAvatar(
-    Map<String, dynamic> c, {
-    required String? myHeaderUrl,
+    PostComment c, {
     required String? sellerAvatarBase64,
   }) {
-    // 契約成對回 `avatarKey` + `avatarUrl`（gateway post.go `CommentItem`，
-    // 讀取與寫入端點同形狀），SSOT 是 key。舊欄位 `userAvatarKey` /
-    // `userAvatarUrl` / `user_avatar_key` / `userAvatar` 皆已不存在。
-    final String? avSource = (c['avatarKey'] ?? c['avatarUrl'])?.toString();
-    if (avSource != null && avSource.isNotEmpty) {
-      final String u = buildImageUrl(avSource, ImagePreset.avatar);
-      if (u.startsWith('http')) return NetworkImage(u);
+    if (c.authorAvatar.startsWith('http')) {
+      return NetworkImage(c.authorAvatar);
     }
-    // 是不是自己所發由伺服器的 isMine 決定，藉此決定要不要顯示賣家自己的頭像。
-    final bool isSelf = c['isMine'] == true;
-    if (isSelf &&
-        myHeaderUrl != null &&
-        myHeaderUrl.isNotEmpty &&
-        myHeaderUrl.startsWith('http')) {
-      return NetworkImage(myHeaderUrl);
-    }
-    if (isSelf && sellerAvatarBase64 != null && sellerAvatarBase64.isNotEmpty) {
+    if (c.isMine &&
+        sellerAvatarBase64 != null &&
+        sellerAvatarBase64.isNotEmpty) {
       try {
         return MemoryImage(base64Decode(sellerAvatarBase64));
       } catch (_) {}
@@ -77,17 +62,14 @@ class CommentsBottomSheet extends HookConsumerWidget {
     final scroll = useScrollController();
     final hasText = useState(false);
 
-    final comments = useState<List<Map<String, dynamic>>>(
-      <Map<String, dynamic>>[],
-    );
+    final comments = useState<List<PostComment>>(<PostComment>[]);
     final loading = useState(true);
     final sending = useState(false);
-    final myHeaderUrl = useState<String?>(null);
-    final replyToCommentId = useState<int?>(null);
+    final replyToCommentId = useState<String?>(null);
     final replyToName = useState<String?>(null);
 
-    final repliesByParentRef = useRef(<int, List<Map<String, dynamic>>>{});
-    final repliesLoadingRef = useRef(<int>{});
+    final repliesByParentRef = useRef(<String, List<PostComment>>{});
+    final repliesLoadingRef = useRef(<String>{});
 
     // Listen to text changes for send button opacity
     useEffect(() {
@@ -103,11 +85,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
       if (!context.mounted) return;
       final cb = onCommentCountChanged;
       if (cb == null) return;
-      int total = comments.value.length;
-      for (final list in repliesByParentRef.value.values) {
-        total += list.length;
-      }
-      cb(total);
+      cb(visibleCommentTotal(comments.value, repliesByParentRef.value));
     }
 
     void scheduleScrollToBottom({bool animated = true}) {
@@ -129,33 +107,22 @@ class CommentsBottomSheet extends HookConsumerWidget {
     Future<void> load() async {
       loading.value = true;
       try {
-        final list = await postRepository.listCommentsRaw(postId);
+        final list = await postRepository.listComments(postId);
         if (!context.mounted) return;
         repliesByParentRef.value.clear();
-        final List<Map<String, dynamic>> top = [];
-        for (final c in list) {
-          final rawPid = c['parentId'];
-          final int? pid = (rawPid is num)
-              ? rawPid.toInt()
-              : int.tryParse('${rawPid ?? ''}');
-          if (pid != null && pid > 0) {
-            final l = repliesByParentRef.value[pid] ?? <Map<String, dynamic>>[];
-            l.add(c);
-            repliesByParentRef.value[pid] = l;
-          } else {
-            top.add(c);
-          }
-        }
-        comments.value = top;
+        repliesLoadingRef.value.clear();
+        comments.value = list;
         notifyCommentCount();
         scheduleScrollToBottom(animated: false);
+      } catch (_) {
+        if (context.mounted) FloatingToast.error(context, '留言載入失敗');
       } finally {
         if (context.mounted) loading.value = false;
       }
     }
 
     useEffect(() {
-      if (unavailableMessage == null) load();
+      load();
       return null;
     }, const []);
 
@@ -165,54 +132,24 @@ class CommentsBottomSheet extends HookConsumerWidget {
       final parentId = replyToCommentId.value;
       sending.value = true;
       try {
+        final created = await postRepository.createComment(
+          postId,
+          body: text,
+          parentId: parentId,
+        );
+        if (!context.mounted) return;
+        ctrl.clear();
         if (parentId != null) {
-          final created = await postRepository.replyToComment(
-            parentId,
-            postId: postId,
-            content: text,
-          );
-          if (!context.mounted) return;
-          if (created != null) {
-            created['isMine'] = true;
-            final meName =
-                (postOwnerName != null && postOwnerName!.trim().isNotEmpty)
-                ? postOwnerName!.trim()
-                : (ref.read(myStoreSnapshotProvider)?.storeName ?? '我');
-            created['userName'] = created['userName'] ?? meName;
-            ctrl.clear();
-            final pid = parentId;
-            final list =
-                repliesByParentRef.value[pid] ?? <Map<String, dynamic>>[];
-            repliesByParentRef.value[pid] = [...list, created];
-            replyToCommentId.value = null;
-            replyToName.value = null;
-            comments.value = List.from(comments.value);
-            notifyCommentCount();
-            scheduleScrollToBottom();
-          } else {
-            FloatingToast.error(context, '回覆失敗');
-          }
+          final list = repliesByParentRef.value[parentId] ?? <PostComment>[];
+          repliesByParentRef.value[parentId] = [...list, created];
+          replyToCommentId.value = null;
+          replyToName.value = null;
+          comments.value = List.of(comments.value);
         } else {
-          final created = await postRepository.commentOnPostRaw(
-            postId,
-            content: text,
-          );
-          if (!context.mounted) return;
-          if (created != null) {
-            ctrl.clear();
-            created['isMine'] = true;
-            final meName =
-                (postOwnerName != null && postOwnerName!.trim().isNotEmpty)
-                ? postOwnerName!.trim()
-                : (ref.read(myStoreSnapshotProvider)?.storeName ?? '我');
-            created['userName'] = created['userName'] ?? meName;
-            comments.value = [...comments.value, created];
-            notifyCommentCount();
-            scheduleScrollToBottom();
-          } else {
-            FloatingToast.error(context, '留言失敗');
-          }
+          comments.value = [...comments.value, created];
         }
+        notifyCommentCount();
+        scheduleScrollToBottom();
       } catch (_) {
         if (context.mounted) {
           FloatingToast.error(context, parentId != null ? '回覆失敗' : '留言失敗');
@@ -222,7 +159,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
       }
     }
 
-    void onTapReply(String name, int? parentId) {
+    void onTapReply(String name, String? parentId) {
       if (sending.value) return;
       replyToCommentId.value = parentId;
       replyToName.value = name;
@@ -249,39 +186,39 @@ class CommentsBottomSheet extends HookConsumerWidget {
       );
     }
 
-    Future<bool> deleteComment(int commentId) async {
-      final ok = await postRepository.deleteComment(commentId);
-      if (!context.mounted) return false;
-      if (ok) {
-        final updatedComments = List<Map<String, dynamic>>.from(comments.value);
-        updatedComments.removeWhere((c) {
-          final raw = c['id'];
-          final id = raw is int ? raw : int.tryParse('${raw ?? ''}');
-          return id == commentId;
-        });
-        repliesByParentRef.value.updateAll((pid, list) {
-          list.removeWhere((r) {
-            final raw = r['id'];
-            final id = raw is int ? raw : int.tryParse('${raw ?? ''}');
-            return id == commentId;
-          });
-          return list;
-        });
-        repliesByParentRef.value.removeWhere((_, list) => list.isEmpty);
-        comments.value = updatedComments;
-        notifyCommentCount();
-        await load();
-        if (!context.mounted) return true;
-        try {
-          FloatingToast.success(context, '已刪除留言');
-        } catch (_) {}
-        return true;
-      } else {
-        try {
-          FloatingToast.error(context, '刪除留言失敗');
-        } catch (_) {}
+    Future<bool> deleteComment(PostComment target) async {
+      try {
+        await postRepository.deleteComment(target.id, etag: target.etag);
+      } catch (_) {
+        if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
         return false;
       }
+      if (!context.mounted) return false;
+      await load();
+      if (!context.mounted) return true;
+      FloatingToast.success(context, '已刪除留言');
+      return true;
+    }
+
+    Future<void> toggleLike(PostComment target) async {
+      final liked = !target.viewerLiked;
+      try {
+        if (liked) {
+          await postRepository.likeComment(target.id);
+        } else {
+          await postRepository.unlikeComment(target.id);
+        }
+      } catch (_) {
+        if (context.mounted) FloatingToast.error(context, '操作失敗');
+        return;
+      }
+      if (!context.mounted) return;
+      PostComment swap(PostComment c) =>
+          c.id == target.id ? c.withLiked(liked) : c;
+      comments.value = [for (final c in comments.value) swap(c)];
+      repliesByParentRef.value.updateAll(
+        (_, list) => [for (final r in list) swap(r)],
+      );
     }
 
     Future<bool> showDeleteConfirmationDialog() async {
@@ -393,17 +330,14 @@ class CommentsBottomSheet extends HookConsumerWidget {
       return confirm == true;
     }
 
-    Future<void> confirmAndDeleteComment(int commentId) async {
+    Future<void> confirmAndDeleteComment(PostComment target) async {
       final confirmed = await showDeleteConfirmationDialog();
       if (!confirmed) return;
-      await deleteComment(commentId);
+      await deleteComment(target);
     }
 
-    String resolveDisplayName(Map<String, dynamic> c) {
-      final origName = (c['userName'] ?? '').toString();
-      if (origName.isNotEmpty) return origName;
-      return '用戶';
-    }
+    String resolveDisplayName(PostComment c) =>
+        c.authorName.isEmpty ? '用戶' : c.authorName;
 
     final mq = MediaQuery.of(context);
     final bottom = mq.viewInsets.bottom;
@@ -456,17 +390,20 @@ class CommentsBottomSheet extends HookConsumerWidget {
               ),
 
               // ── Comments list ──
+              if (notice != null)
+                Padding(
+                  key: const ValueKey('comments-sheet-notice'),
+                  padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 8.h),
+                  child: Text(
+                    notice!,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
               Expanded(
-                child: unavailableMessage != null
-                    ? Center(
-                        child: SingleChildScrollView(
-                          child: StorefrontGlassEmptyPanel(
-                            icon: HkIconName.chat,
-                            message: unavailableMessage!,
-                          ),
-                        ),
-                      )
-                    : loading.value
+                child: loading.value
                     ? const TruckLoadingOverlay()
                     : (comments.value.isEmpty
                           ? Center(
@@ -484,108 +421,78 @@ class CommentsBottomSheet extends HookConsumerWidget {
                               itemCount: comments.value.length,
                               itemBuilder: (context, i) {
                                 final c = comments.value[i];
-                                final rawId = c['id'];
-                                final id = rawId is int
-                                    ? rawId
-                                    : int.tryParse('${rawId ?? ''}');
+                                final id = c.id;
 
                                 // Lazy-load replies
-                                if (id != null &&
+                                if (c.replyCount > 0 &&
                                     !repliesByParentRef.value.containsKey(id) &&
                                     !repliesLoadingRef.value.contains(id)) {
                                   repliesLoadingRef.value.add(id);
                                   Future.microtask(() async {
-                                    final items = await postRepository
-                                        .listCommentReplies(id);
-                                    if (!context.mounted) return;
-                                    final existing =
-                                        repliesByParentRef.value[id] ??
-                                        const <Map<String, dynamic>>[];
-                                    final Map<int, Map<String, dynamic>> byId =
-                                        {};
-                                    for (final r in [...existing, ...items]) {
-                                      final rawRid = r['id'];
-                                      final rid = rawRid is int
-                                          ? rawRid
-                                          : int.tryParse('${rawRid ?? ''}');
-                                      if (rid == null) continue;
-                                      byId[rid] = r;
+                                    try {
+                                      final items = await postRepository
+                                          .listComments(postId, parentId: id);
+                                      if (!context.mounted) return;
+                                      repliesByParentRef.value[id] = items;
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      FloatingToast.error(context, '回覆載入失敗');
+                                    } finally {
+                                      repliesLoadingRef.value.remove(id);
                                     }
-                                    repliesByParentRef.value[id] = byId.values
-                                        .toList();
-                                    repliesLoadingRef.value.remove(id);
-                                    comments.value = List.from(comments.value);
+                                    if (!context.mounted) return;
+                                    comments.value = List.of(comments.value);
                                   });
                                 }
 
-                                final replies = (id != null)
-                                    ? (repliesByParentRef.value[id] ??
-                                          const <Map<String, dynamic>>[])
-                                    : const <Map<String, dynamic>>[];
+                                final replies =
+                                    repliesByParentRef.value[id] ??
+                                    const <PostComment>[];
 
                                 return Column(
                                   children: [
                                     // Top-level comment
-                                    _CommentTile(
-                                      comment: c,
-                                      displayName: resolveDisplayName(c),
-                                      avatar: _resolveCommentAvatar(
-                                        c,
-                                        myHeaderUrl: myHeaderUrl.value,
-                                        sellerAvatarBase64: sellerAvatarBase64,
+                                    if (c.placeholderText case final text?)
+                                      _CommentPlaceholder(
+                                        commentId: id,
+                                        text: text,
+                                      )
+                                    else
+                                      _CommentTile(
+                                        comment: c,
+                                        displayName: resolveDisplayName(c),
+                                        avatar: _resolveCommentAvatar(
+                                          c,
+                                          sellerAvatarBase64:
+                                              sellerAvatarBase64,
+                                        ),
+                                        onReply: c.viewerCanReply
+                                            ? () => onTapReply(
+                                                resolveDisplayName(c),
+                                                id,
+                                              )
+                                            : null,
+                                        onLongPress: c.viewerCanDelete
+                                            ? () => confirmAndDeleteComment(c)
+                                            : null,
+                                        onLike: () => toggleLike(c),
                                       ),
-                                      onReply: () =>
-                                          onTapReply(resolveDisplayName(c), id),
-                                      onLongPress: id != null
-                                          ? () => confirmAndDeleteComment(id)
-                                          : null,
-                                      onLike: id != null
-                                          ? () async {
-                                              final liked = await postRepository
-                                                  .likeComment(id);
-                                              if (!context.mounted) return;
-                                              c['liked'] = liked;
-                                              c['likeCount'] =
-                                                  (c['likeCount'] ?? 0) +
-                                                  (liked ? 1 : -1);
-                                              comments.value = List.from(
-                                                comments.value,
-                                              );
-                                            }
-                                          : null,
-                                    ),
                                     // Replies (indented)
-                                    ...replies.map((r) {
-                                      final rid = _parseId(r);
-                                      return _ReplyTile(
+                                    ...replies.map(
+                                      (r) => _ReplyTile(
                                         reply: r,
                                         displayName: resolveDisplayName(r),
                                         avatar: _resolveCommentAvatar(
                                           r,
-                                          myHeaderUrl: myHeaderUrl.value,
                                           sellerAvatarBase64:
                                               sellerAvatarBase64,
                                         ),
-                                        onLongPress: rid != null
-                                            ? () => confirmAndDeleteComment(rid)
+                                        onLongPress: r.viewerCanDelete
+                                            ? () => confirmAndDeleteComment(r)
                                             : null,
-                                        onLike: rid != null
-                                            ? () async {
-                                                final liked =
-                                                    await postRepository
-                                                        .likeComment(rid);
-                                                if (!context.mounted) return;
-                                                r['liked'] = liked;
-                                                r['likeCount'] =
-                                                    (r['likeCount'] ?? 0) +
-                                                    (liked ? 1 : -1);
-                                                comments.value = List.from(
-                                                  comments.value,
-                                                );
-                                              }
-                                            : null,
-                                      );
-                                    }),
+                                        onLike: () => toggleLike(r),
+                                      ),
+                                    ),
                                     // Divider after each comment group
                                     if (i < comments.value.length - 1)
                                       Divider(
@@ -602,7 +509,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
               ),
 
               // ── Input bar ──
-              if (unavailableMessage == null)
+              if (notice == null)
                 SafeArea(
                   top: false,
                   child: Padding(
@@ -725,11 +632,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
       ),
     );
   }
-
-  static int? _parseId(Map<String, dynamic> m) {
-    final raw = m['id'];
-    return raw is int ? raw : int.tryParse('${raw ?? ''}');
-  }
 }
 
 /// Single top-level comment tile matching Figma design.
@@ -743,19 +645,20 @@ class _CommentTile extends StatelessWidget {
     this.onLongPress,
     this.onLike,
   });
-  final Map<String, dynamic> comment;
+  final PostComment comment;
   final String displayName;
   final ImageProvider? avatar;
-  final VoidCallback onReply;
+
+  /// null 時（`viewer_can_reply` 是 false）不顯示回覆鈕。
+  final VoidCallback? onReply;
   final VoidCallback? onLongPress;
   final VoidCallback? onLike;
 
   @override
   Widget build(BuildContext context) {
-    final text = (comment['content'] ?? '').toString();
-    // `likeCount` / `isLiked` 是 wire 欄位；`liked` 是按讚後本地樂觀覆蓋的旗標。
-    final likeCount = (comment['likeCount'] ?? 0);
-    final isLiked = comment['liked'] == true || comment['isLiked'] == true;
+    final text = comment.body;
+    final likeCount = comment.likeCount;
+    final isLiked = comment.viewerLiked;
 
     return GestureDetector(
       onLongPress: onLongPress,
@@ -790,37 +693,39 @@ class _CommentTile extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 4.h),
-                  HkTapTarget(
-                    key: ValueKey('comment-reply-${comment['id']}'),
-                    semanticLabel: '回覆 $displayName 的留言',
-                    hint: '在輸入框撰寫回覆',
-                    tooltip: '回覆',
-                    onTap: onReply,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ChatBubbleIcon(
-                          size: 24.sp,
-                          color: AppIconColors.defaultColor,
-                        ),
-                        SizedBox(width: 6.w),
-                        Text(
-                          '回覆',
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: AppColors.textPrimary,
+                  if (onReply != null) ...[
+                    SizedBox(height: 4.h),
+                    HkTapTarget(
+                      key: ValueKey('comment-reply-${comment.id}'),
+                      semanticLabel: '回覆 $displayName 的留言',
+                      hint: '在輸入框撰寫回覆',
+                      tooltip: '回覆',
+                      onTap: onReply,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ChatBubbleIcon(
+                            size: 24.sp,
+                            color: AppIconColors.defaultColor,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 6.w),
+                          Text(
+                            '回覆',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
             // Heart + count — outline when not liked, filled when liked
             HkTapTarget(
-              key: ValueKey('comment-like-${comment['id']}'),
+              key: ValueKey('comment-like-${comment.id}'),
               semanticLabel: isLiked
                   ? '取消喜歡 $displayName 的留言'
                   : '喜歡 $displayName 的留言',
@@ -864,7 +769,7 @@ class _ReplyTile extends StatelessWidget {
     this.onLongPress,
     this.onLike,
   });
-  final Map<String, dynamic> reply;
+  final PostComment reply;
   final String displayName;
   final ImageProvider? avatar;
   final VoidCallback? onLongPress;
@@ -872,11 +777,9 @@ class _ReplyTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = (reply['content'] ?? '').toString();
-    // 同 _CommentTile：`liked` 為本地樂觀旗標，其餘為 wire 欄位。
-    final likeCount = (reply['likeCount'] ?? 0);
-    final isLiked = reply['liked'] == true || reply['isLiked'] == true;
-    final parentName = reply['replyToName'] ?? '';
+    final text = reply.body;
+    final likeCount = reply.likeCount;
+    final isLiked = reply.viewerLiked;
 
     return GestureDetector(
       onLongPress: onLongPress,
@@ -914,7 +817,7 @@ class _ReplyTile extends StatelessWidget {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    parentName.toString().isNotEmpty ? '@$parentName' : text,
+                    text,
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: AppColors.textPrimary,
@@ -925,7 +828,7 @@ class _ReplyTile extends StatelessWidget {
             ),
             // Heart + count
             HkTapTarget(
-              key: ValueKey('reply-like-${reply['id']}'),
+              key: ValueKey('reply-like-${reply.id}'),
               semanticLabel: isLiked
                   ? '取消喜歡 $displayName 的回覆'
                   : '喜歡 $displayName 的回覆',
@@ -958,6 +861,23 @@ class _ReplyTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 被刪除或被隱藏、只因底下還有可見回覆而留著的頂層留言。
+class _CommentPlaceholder extends StatelessWidget {
+  const _CommentPlaceholder({required this.commentId, required this.text});
+  final String commentId;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: ValueKey('comment-placeholder-$commentId'),
+    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary),
+    ),
+  );
 }
 
 Widget _buildAvatar(ImageProvider? avatar, double size) {
