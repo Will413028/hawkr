@@ -33,7 +33,7 @@ final class PostListProvider
   PostList create() => PostList();
 }
 
-String _$postListHash() => r'e56a2fd4fcbd2502896cc6f2bd912546d70a5102';
+String _$postListHash() => r'78c22ed39a7ec78b0dac353679f1425dcce99161';
 
 abstract class _$PostList extends $AsyncNotifier<List<Post>> {
   FutureOr<List<Post>> build();
