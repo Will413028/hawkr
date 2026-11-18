@@ -186,10 +186,14 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	if err != nil {
 		return model.ForumEntry{}, err
 	}
+	// 討論區可讀可寫是寫入的前置檢查，成功的寫入（含重送命中）就是 true，不再查。
 	if isReplay {
+		replayed.Readable = true
 		return replayed, nil
 	}
-	return visible(created), nil
+	out := visible(created)
+	out.Readable = true
+	return out, nil
 }
 
 // replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
@@ -259,6 +263,11 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 			return fmt.Errorf("social：修改討論區留言 %s：%w", id, err)
 		}
 		updated, err = withStats(ctx, q, visible(row2))
+		if err != nil {
+			return err
+		}
+		// 修改不要求討論區可讀，回應的 viewer_can_reply 要用，所以求值。
+		updated.Readable, err = s.Readable(ctx, c, pre.StoreID, now)
 		return err
 	})
 	if err != nil {
@@ -314,12 +323,19 @@ func toEntry(r reads.EntryRow) model.ForumEntry {
 	return out
 }
 
-func finish(rows []reads.EntryRow, size int32) model.ForumPage {
+// finish 把（可能多取一列的）列轉成一頁，並帶這家店的討論區對呼叫者可不可以讀寫：有列就是（列的查詢帶同一個條件），空頁才查一次。
+func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.EntryRow, size int32, now time.Time) (model.ForumPage, error) {
 	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
-	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows))}
+	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows)), Readable: len(rows) > 0}
+	if len(rows) == 0 {
+		var err error
+		if out.Readable, err = s.Readable(ctx, c, storeID, now); err != nil {
+			return model.ForumPage{}, err
+		}
+	}
 	for i, r := range rows {
 		out.Entries[i] = toEntry(r)
 	}
@@ -327,7 +343,7 @@ func finish(rows []reads.EntryRow, size int32) model.ForumPage {
 		last := rows[len(rows)-1]
 		out.Next = &model.CommentCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
-	return out
+	return out, nil
 }
 
 // ListTopLevel 列出店家討論區的頂層留言（依建立時間由舊到新的 keyset）；店家要可曝光而且觀看者沒有封鎖這家店，否則是空的一頁。
@@ -337,12 +353,13 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, storeID int6
 	if err != nil {
 		return model.ForumPage{}, err
 	}
+	now := s.d.Now().UTC()
 	at, id := after.Key()
-	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListTopLevelForumEntries(storeID, s.d.Now().UTC(), actor.ViewerFor(c, storeID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListTopLevelForumEntries(storeID, now, actor.ViewerFor(c, storeID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：列出討論區留言：%w", err)
 	}
-	return finish(rows, size), nil
+	return s.finish(ctx, c, storeID, rows, size, now)
 }
 
 // ListReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆（父留言可以已刪除或被隱藏，但不能被觀看者的封鎖排除）。
@@ -359,10 +376,11 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, storeID int64
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：讀取討論區留言 %s：%w", parentID, err)
 	}
+	now := s.d.Now().UTC()
 	at, id := after.Key()
-	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(parentID, s.d.Now().UTC(), actor.ViewerFor(c, parent.StoreID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(parentID, now, actor.ViewerFor(c, parent.StoreID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：列出討論區回覆：%w", err)
 	}
-	return finish(rows, size), nil
+	return s.finish(ctx, c, parent.StoreID, rows, size, now)
 }

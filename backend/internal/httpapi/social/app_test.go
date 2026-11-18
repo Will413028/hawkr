@@ -84,19 +84,19 @@ func (f *fakeWrites) CreateComment(_ context.Context, c social.Caller, in social
 		return social.Comment{}, err
 	}
 	at := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
-	return social.Comment{
+	return f.comment(social.Comment{
 		ID: uuid.New(), PostID: in.PostID, ParentID: in.ParentID, ReplyToID: in.ReplyToID, State: social.CommentVisible,
 		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at, Version: 1, StoreID: f.post.StoreID,
-	}, nil
+	}), nil
 }
 
 func (f *fakeWrites) UpdateComment(_ context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.Comment, error) {
 	err := f.rec(writeCall{op: "updateComment", caller: c, id: id, ver: version, body: body})
 	at := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
-	return social.Comment{
+	return f.comment(social.Comment{
 		ID: id, PostID: f.post.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID},
 		Body: body, CreatedAt: at, UpdatedAt: at, Version: version + 1, Likes: 4, ReplyCount: 2, StoreID: f.post.StoreID,
-	}, err
+	}), err
 }
 
 func (f *fakeWrites) DeleteComment(_ context.Context, c social.Caller, id uuid.UUID, version int64) error {
@@ -108,19 +108,19 @@ func (f *fakeWrites) CreateForumEntry(_ context.Context, c social.Caller, in soc
 		return social.ForumEntry{}, err
 	}
 	at := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
-	return social.ForumEntry{
+	return f.entry(social.ForumEntry{
 		ID: uuid.New(), StoreID: in.StoreID, ParentID: in.ParentID, State: social.CommentVisible,
 		Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID}, Body: in.Body, CreatedAt: at, UpdatedAt: at, Version: 1,
-	}, nil
+	}), nil
 }
 
 func (f *fakeWrites) UpdateForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.ForumEntry, error) {
 	err := f.rec(writeCall{op: "updateForum", caller: c, id: id, ver: version, body: body})
 	at := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
-	return social.ForumEntry{
+	return f.entry(social.ForumEntry{
 		ID: id, StoreID: 5, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: c.BuyerID},
 		Body: body, CreatedAt: at, UpdatedAt: at, Version: version + 1, ReplyCount: 3,
-	}, err
+	}), err
 }
 
 func (f *fakeWrites) DeleteForumEntry(_ context.Context, c social.Caller, id uuid.UUID, version int64) error {
@@ -385,8 +385,8 @@ func TestForumWriteResponsesDoNotLookUpTheViewerIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stores.asked) != 1 || stores.cardCalls != 0 || len(displayIDs) != 1 || !slices.Equal(displayIDs[0], []int64{7}) {
-		t.Errorf("asked=%v cardCalls=%d displayIDs=%v，預期封鎖 1 次、卡片 0 次、名稱 1 次且只有作者 7", stores.asked, stores.cardCalls, displayIDs)
+	if len(stores.asked) != 0 || stores.cardCalls != 0 || len(displayIDs) != 1 || !slices.Equal(displayIDs[0], []int64{7}) {
+		t.Errorf("asked=%v cardCalls=%d displayIDs=%v，預期封鎖 0 次（可讀性由模組隨資料回傳）、卡片 0 次、名稱 1 次且只有作者 7", stores.asked, stores.cardCalls, displayIDs)
 	}
 	if !resp.Msg.GetEntry().GetViewerCanReply() || !resp.Msg.GetEntry().GetIsMine() {
 		t.Errorf("寫入回應 = %v", resp.Msg.GetEntry())

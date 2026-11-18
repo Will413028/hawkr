@@ -89,7 +89,7 @@ func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, 
 	if webOrigin.IsZero() {
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
-	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log, postReadable: posts}, runner: runner, posts: posts}, nil
+	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log}, runner: runner, posts: posts}, nil
 }
 
 // delegatedOperation 解析每個寫入共同的稽核資料：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。

@@ -479,11 +479,6 @@ func (m *Module) CreateForumEntry(ctx context.Context, c Caller, in ForumInput) 
 	return m.forum.Create(ctx, c, in)
 }
 
-// ForumReadable 回店 storeID 的討論區對 c 此刻可不可以讀與寫（店家可曝光、買家沒有封鎖這家店；店主以店家身分讀），與 CreateForumEntry 的前置檢查同一個判斷。
-func (m *Module) ForumReadable(ctx context.Context, c Caller, storeID int64) (bool, error) {
-	return m.forum.Readable(ctx, c, storeID, m.now().UTC())
-}
-
 // UpdateForumEntry 修改自己的討論區留言；version 同 UpdateComment；回傳修改後的完整項目。
 func (m *Module) UpdateForumEntry(ctx context.Context, c Caller, id uuid.UUID, version int64, body string) (ForumEntry, error) {
 	return m.forum.Update(ctx, c, id, version, body)

@@ -221,10 +221,14 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	if err != nil {
 		return model.Comment{}, err
 	}
+	// 貼文公開可讀是寫入的前置檢查，成功的寫入（含重送命中）就是 true，不再查。
 	if isReplay {
+		replayed.PostReadable = true
 		return replayed, nil
 	}
-	return visibleComment(created, postStore), nil
+	out := visibleComment(created, postStore)
+	out.PostReadable = true
+	return out, nil
 }
 
 // replay 查 (互動者, request_id)：命中且內容相同回傳那一則（呼叫方補上目前的狀態）；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
@@ -293,7 +297,17 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 			return fmt.Errorf("social：修改留言 %s：%w", id, err)
 		}
 		updated, err = s.withStats(ctx, q, c, visibleComment(row2, row.PostStoreID))
-		return err
+		if err != nil {
+			return err
+		}
+		// 修改不要求貼文公開，只有貼文所屬的店用得到這個旗標（viewer_can_reply），才求值。
+		if c.OwnsStore(row.PostStoreID) {
+			updated.PostReadable, err = reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(row.SocialComment.PostID, now, visibility.Anonymous))
+			if err != nil {
+				return fmt.Errorf("social：讀取貼文 %s：%w", row.SocialComment.PostID, err)
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return model.Comment{}, err
@@ -353,6 +367,8 @@ func toComment(r reads.CommentRow) model.Comment {
 type scope struct {
 	ownerStore int64 // > 0：店主讀取
 	post       store.GetPostRow
+	// readable 是貼文匿名觀看者讀得到：公開讀取由前置檢查保證（觀看者讀得到就是匿名也讀得到），店主讀取才求值一次。
+	readable bool
 }
 
 func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (scope, error) {
@@ -365,7 +381,11 @@ func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (
 		return scope{}, fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
 	}
 	if c.OwnsStore(post.SocialPost.StoreID) {
-		return scope{ownerStore: post.SocialPost.StoreID, post: post}, nil
+		readable, err := s.postIsPublic(ctx, postID, s.d.Now().UTC(), visibility.Anonymous)
+		if err != nil {
+			return scope{}, fmt.Errorf("social：讀取貼文 %s：%w", postID, err)
+		}
+		return scope{ownerStore: post.SocialPost.StoreID, post: post, readable: readable}, nil
 	}
 	ok, err := s.postIsPublic(ctx, postID, s.d.Now().UTC(), actor.ViewerFor(c, post.SocialPost.StoreID))
 	if err != nil {
@@ -374,10 +394,11 @@ func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (
 	if !ok {
 		return scope{}, postNotFound(ctx)
 	}
-	return scope{post: post}, nil
+	return scope{post: post, readable: true}, nil
 }
 
-func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.CommentRow, size int32) (model.CommentPage, error) {
+// finish 把（可能多取一列的）列轉成一頁；readable 是這些留言所屬的貼文之中匿名觀看者讀得到的（nil 時全部不可讀）。
+func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.CommentRow, size int32, readable func(postID uuid.UUID) bool) (model.CommentPage, error) {
 	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
@@ -386,6 +407,7 @@ func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, row
 	ids := make([]uuid.UUID, 0, len(rows))
 	for i, r := range rows {
 		out.Comments[i] = toComment(r)
+		out.Comments[i].PostReadable = readable(r.PostID)
 		if out.Comments[i].State == model.CommentVisible {
 			ids = append(ids, r.ID)
 		}
@@ -433,7 +455,7 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, postID uuid.
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：列出留言：%w", err)
 	}
-	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size)
+	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size, func(uuid.UUID) bool { return sc.readable })
 }
 
 // ListForStore 列出店家所有貼文（任何狀態，不必公開）的頂層留言，依建立時間由舊到新的 keyset；postID 非 nil 時只列那一篇（要是本店未刪除的貼文，否則 NotFound）。
@@ -466,7 +488,35 @@ func (s *Service) ListForStore(ctx context.Context, st seller.Store, postID *uui
 		return model.CommentPage{}, fmt.Errorf("social：列出店家的留言：%w", err)
 	}
 	c := model.Caller{Store: &st}
-	return s.finish(ctx, c, st.StoreID, rows, size)
+	readable, err := s.readablePosts(ctx, rows)
+	if err != nil {
+		return model.CommentPage{}, err
+	}
+	return s.finish(ctx, c, st.StoreID, rows, size, func(id uuid.UUID) bool { return readable[id] })
+}
+
+// readablePosts 是 rows 所屬的貼文之中匿名觀看者讀得到的（一次批次查詢）：店主的留言列表跨多篇貼文，其中可能有草稿與下架的。
+func (s *Service) readablePosts(ctx context.Context, rows []reads.CommentRow) (map[uuid.UUID]bool, error) {
+	seen := map[uuid.UUID]bool{}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		if !seen[r.PostID] {
+			seen[r.PostID] = true
+			ids = append(ids, r.PostID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	found, err := reads.Many[reads.IDRow](ctx, s.d.DB.Conn(ctx), reads.PublicPostIDs(ids, s.d.Now().UTC()))
+	if err != nil {
+		return nil, fmt.Errorf("social：批次讀取貼文的公開可讀性：%w", err)
+	}
+	out := make(map[uuid.UUID]bool, len(found))
+	for _, r := range found {
+		out[r.ID] = true
+	}
+	return out, nil
 }
 
 // ListReplies 列出貼文 postID 的頂層留言 parentID 的回覆（父留言可以已刪除或被隱藏：回覆照常顯示）。
@@ -500,7 +550,7 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, postID, paren
 	if err != nil {
 		return model.CommentPage{}, fmt.Errorf("social：列出回覆：%w", err)
 	}
-	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size)
+	return s.finish(ctx, c, sc.post.SocialPost.StoreID, rows, size, func(uuid.UUID) bool { return sc.readable })
 }
 
 // ForRelay 以 ID 讀一則留言此刻的內容與計數，不帶觀看者、不套可見性規則（已刪除或被隱藏的也讀得到，由呼叫方決定）；

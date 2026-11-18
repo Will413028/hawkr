@@ -54,22 +54,8 @@ func TestOwnerCommentViewerCanReplyRequiresReadablePost(t *testing.T) {
 	if !got[0].GetViewerCanReply() || got[1].GetViewerCanReply() || !got[2].GetViewerCanReply() {
 		t.Errorf("viewer_can_reply = %v %v %v，預期 true false true", got[0].GetViewerCanReply(), got[1].GetViewerCanReply(), got[2].GetViewerCanReply())
 	}
-	if len(f.asked) != 1 || len(f.asked[0]) != 2 {
-		t.Errorf("公開可讀性要批次查一次、貼文去重：%v", f.asked)
-	}
 	if got[0].GetViewerCanDelete() != true || got[1].GetViewerCanDelete() != true {
 		t.Error("刪除不受貼文是否公開影響")
-	}
-}
-
-func TestPublicCommentsOfAnotherStoreDoNotAskReadability(t *testing.T) {
-	r := &fakeReads{comments: social.CommentPage{StoreID: 5, Comments: []social.Comment{{ID: uuid.New(), PostID: uuid.New(), State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: 9}, Body: "x"}}}}
-	h := newPublic(t, r, fakeBuyers{id: 7}, &fakeStores{})
-	if _, err := h.ListComments(asBuyer(t.Context()), connect.NewRequest(&pb.ListCommentsRequest{PostId: uuid.New().String()})); err != nil {
-		t.Fatal(err)
-	}
-	if len(r.asked) != 0 {
-		t.Errorf("買家讀到的貼文本來就公開可讀，不需要再查：%v", r.asked)
 	}
 }
 
@@ -101,12 +87,13 @@ func TestForumViewerHintsFollowForumReadability(t *testing.T) {
 			}
 		})
 	}
-	t.Run("訪客與被店家封鎖的買家不查討論區", func(t *testing.T) {
+	t.Run("被店家封鎖的買家", func(t *testing.T) {
 		r := &fakeReads{}
+		r.forumClosed = true
 		h := newPublic(t, r, fakeBuyers{id: 7}, &fakeStores{blocking: map[int64]bool{5: true}})
 		resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "5"}))
-		if err != nil || resp.Msg.GetViewerCanComment() || r.forumAsked != 0 {
-			t.Errorf("err=%v can=%v asked=%d", err, resp.Msg.GetViewerCanComment(), r.forumAsked)
+		if err != nil || resp.Msg.GetViewerCanComment() {
+			t.Errorf("err=%v can=%v", err, resp.Msg.GetViewerCanComment())
 		}
 	})
 }

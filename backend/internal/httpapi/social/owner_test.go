@@ -57,13 +57,13 @@ func (f *fakeOwner) rec(op string, st seller.Store) error {
 func (f *fakeOwner) current(id uuid.UUID, version int64) social.Post {
 	p := f.post
 	p.ID, p.Version = id, version
-	return p
+	return f.readability.post(p)
 }
 
 func (f *fakeOwner) CreatePost(_ context.Context, st seller.Store, in social.CreatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
 	f.actors = append(f.actors, actor)
 	f.create = in
-	return f.post, f.rec("create", st)
+	return f.readability.post(f.post), f.rec("create", st)
 }
 
 func (f *fakeOwner) UpdatePost(_ context.Context, st seller.Store, in social.UpdatePostInput, actor *delegatedactor.Actor) (social.Post, error) {
@@ -106,17 +106,17 @@ func (f *fakeOwner) ListPendingSchedules(_ context.Context, storeID int64, after
 }
 
 func (f *fakeOwner) MyPost(_ context.Context, st seller.Store, id uuid.UUID) (social.Post, error) {
-	return f.current(id, f.post.Version), f.rec("my", st)
+	return f.readability.post(f.current(id, f.post.Version)), f.rec("my", st)
 }
 
 func (f *fakeOwner) ListMyPosts(_ context.Context, st seller.Store, status social.PostStatus, after *social.CreatedPostCursor, _ int32) (social.CreatedPostPage, error) {
 	f.status, f.after = status, after
-	return f.page, f.rec("list", st)
+	return f.createdPage(f.page), f.rec("list", st)
 }
 
 func (f *fakeOwner) ListStoreComments(_ context.Context, st seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, _ int32) (social.CommentPage, error) {
 	f.postID, f.unreplied, f.cafter = postID, unreplied, after
-	return f.comments, f.rec("comments", st)
+	return f.commentPage(f.comments), f.rec("comments", st)
 }
 
 func (f *fakeOwner) StoreSocialSummary(_ context.Context, st seller.Store) (social.StoreSummary, error) {
@@ -890,9 +890,4 @@ func TestOwnerCancelPostScheduleReturnsTheNextEtagAndRequiresOne(t *testing.T) {
 	if len(f.calls) != 0 {
 		t.Fatalf("請求不合法不該到模組：%v", f.calls)
 	}
-}
-
-// PubliclyReadablePosts 不是宣告表裡的操作（它只回答提示欄位），這裡不經模組。
-func (r *reaching) PubliclyReadablePosts(context.Context, []uuid.UUID) (map[uuid.UUID]bool, error) {
-	return map[uuid.UUID]bool{}, nil
 }

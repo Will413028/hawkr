@@ -43,19 +43,6 @@ type Reads interface {
 	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
 	ListForumEntries(ctx context.Context, c social.Caller, storeID int64, after *social.CommentCursor, size int32) (social.ForumPage, error)
 	ListForumReplies(ctx context.Context, c social.Caller, storeID int64, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
-	PubliclyReadablePosts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error)
-	ForumReadable(ctx context.Context, c social.Caller, storeID int64) (bool, error)
-}
-
-// postReadability 是貼文有沒有公開可讀的來源（*social.Module）：留言與回覆的寫入只對公開可讀的貼文，店主自己的貼文可能不是（草稿、下架），
-// 所以店主的 viewer_can_comment 與 viewer_can_reply 要問它，不自己推導。
-type postReadability interface {
-	PubliclyReadablePosts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error)
-}
-
-// forumReadability 是討論區此刻可不可以讀寫的來源（*social.Module）：與新增討論區留言的前置檢查同一個判斷（店家可曝光、買家沒有封鎖這家店）。
-type forumReadability interface {
-	ForumReadable(ctx context.Context, c social.Caller, storeID int64) (bool, error)
 }
 
 // Buyers 是呼叫者的買家身分與留言作者顯示資料的來源（*buyer.Module）。
@@ -101,9 +88,6 @@ type presenter struct {
 	// liked 查買家讚過哪些貼文，只在呼叫者有買家身分時呼叫；店主路徑（App）給 noViewerLikes。
 	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
 	log   *slog.Logger
-	// postReadable 與 forumReadable 回答寫入前置檢查的「看得到」部分，viewer_can_* 提示與寫入同一個判斷。
-	postReadable  postReadability
-	forumReadable forumReadability
 	// productTimeout 是商品顯示資料批次查詢的時間上限；零值用 productBudget 常數。
 	productTimeout time.Duration
 }
@@ -139,7 +123,7 @@ func NewPublic(reads Reads, views Views, buyers Buyers, stores Stores, products 
 	if now == nil {
 		now = time.Now
 	}
-	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, log: log, liked: reads.PostsLikedBy, postReadable: reads, forumReadable: reads}, reads: reads, views: views, now: now}, nil
+	return &Public{presenter: &presenter{buyers: buyers, stores: stores, products: products, images: images, webOrigin: webOrigin, log: log, liked: reads.PostsLikedBy}, reads: reads, views: views, now: now}, nil
 }
 
 // caller 是請求的呼叫者此刻的兩個身分；訪客（沒有登入、停權帳號與無效 token 都以訪客執行）與管理員是零值。
@@ -411,7 +395,7 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries, page.Readable)
 	if err != nil {
 		return nil, err
 	}
@@ -427,21 +411,21 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 }
 
 // forumViewer 是一次請求內觀看者在店 storeID 討論區的狀態與這一頁作者的顯示資料，全部只查一次：
-// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源），以及批次讀回的店家卡片與買家名稱。
+// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源；討論區可讀可寫由模組隨資料回傳），以及批次讀回的店家卡片與買家名稱。
 type forumViewer struct {
 	storeID    int64
 	canComment bool
 	stores     postStores
 }
 
-// forumPageState 讀一頁討論區項目的作者卡片與名稱，並判斷觀看者能不能留言（不是店主時才查一次封鎖）；寫入回應用它，不組觀看者身分。
-func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, error) {
-	return h.loadForumState(ctx, c, storeID, entries, false)
+// forumPageState 讀一頁討論區項目的作者卡片與名稱，並由模組給的 readable 判斷觀看者能不能留言；寫入回應用它，不組觀看者身分。
+func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable bool) (forumViewer, error) {
+	return h.loadForumState(ctx, c, storeID, entries, readable, false)
 }
 
 // forumViewerState 在 forumPageState 之外組觀看者在這個討論區留言時的身分，觀看者自己的名稱或卡片併進同一批讀取，不依賴這一頁有沒有可見項目。
-func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, *pb.Actor, error) {
-	viewer, err := h.loadForumState(ctx, c, storeID, entries, true)
+func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable bool) (forumViewer, *pb.Actor, error) {
+	viewer, err := h.loadForumState(ctx, c, storeID, entries, readable, true)
 	if err != nil {
 		return forumViewer{}, nil, err
 	}
@@ -452,7 +436,7 @@ func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, store
 	return viewer, actor, nil
 }
 
-func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, withViewer bool) (forumViewer, error) {
+func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable, withViewer bool) (forumViewer, error) {
 	var buyerIDs, storeIDs []int64
 	for _, e := range entries {
 		if e.State != social.CommentVisible {
@@ -482,17 +466,8 @@ func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID
 	if stores.buyerDisplay, err = h.buyerDisplays(ctx, buyerIDs); err != nil {
 		return forumViewer{}, err
 	}
-	if !owns {
-		if stores.blocking, err = h.blockingStores(ctx, c, []int64{storeID}); err != nil {
-			return forumViewer{}, err
-		}
-	}
-	can := canComment(c, storeID, stores.blocking)
-	if can {
-		if can, err = h.forumReadable.ForumReadable(ctx, c, storeID); err != nil {
-			return forumViewer{}, err
-		}
-	}
+	// readable 已含店家可曝光與買家沒有封鎖這家店（與新增留言的前置檢查同一個判斷），這裡只剩身分條件。
+	can := readable && (owns || c.BuyerID != 0)
 	return forumViewer{storeID: storeID, canComment: can, stores: stores}, nil
 }
 
@@ -579,8 +554,6 @@ type postStores struct {
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
 	products map[int64]ProductInfo
-	// ownReadable 是這一頁店主自己的貼文之中公開可讀的（只有店主的貼文可能不是；別人的貼文能讀到就是公開可讀）。
-	ownReadable map[uuid.UUID]bool
 	// buyerDisplay 是這一頁用到的買家顯示資料（作者，以及觀看者自己的買家身分）。
 	buyerDisplay map[int64]buyer.Display
 }
@@ -642,11 +615,7 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 		return nil, err
 	}
 	products := <-productsCh
-	ownReadable, err := h.ownReadablePosts(ctx, c, posts)
-	if err != nil {
-		return nil, err
-	}
-	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products, ownReadable: ownReadable}
+	stores := postStores{cards: cards, blocking: blocking, liked: liked, products: products}
 	if c.BuyerID != 0 && slices.ContainsFunc(posts, func(p social.Post) bool { return !c.OwnsStore(p.StoreID) }) {
 		if stores.buyerDisplay, err = h.buyerDisplays(ctx, []int64{c.BuyerID}); err != nil {
 			return nil, err
@@ -661,26 +630,13 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	return out, nil
 }
 
-// ownReadablePosts 是 posts 之中呼叫者自己的店的貼文裡公開可讀的（一次批次查詢）；沒有店主自己的貼文時不查。
-func (h *presenter) ownReadablePosts(ctx context.Context, c social.Caller, posts []social.Post) (map[uuid.UUID]bool, error) {
-	var ids []uuid.UUID
-	for _, p := range posts {
-		if c.OwnsStore(p.StoreID) {
-			ids = append(ids, p.ID)
-		}
-	}
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	return h.postReadable.PubliclyReadablePosts(ctx, ids)
-}
-
-// postIsCommentable 是觀看者能不能在貼文 p 留言：canComment 的身分條件，而且貼文要公開可讀（寫入的前置檢查；店主自己的貼文以 ownReadable 判斷）。
+// postIsCommentable 是觀看者能不能在貼文 p 留言：canComment 的身分條件，而且貼文要公開可讀（寫入的前置檢查）。
+// 別人的貼文能讀到就是公開可讀；店主自己的貼文可能不是（草稿、下架），由模組隨貼文回傳的 Readable 判斷。
 func postIsCommentable(c social.Caller, p social.Post, stores postStores) bool {
 	if !canComment(c, p.StoreID, stores.blocking) {
 		return false
 	}
-	return !c.OwnsStore(p.StoreID) || stores.ownReadable[p.ID]
+	return !c.OwnsStore(p.StoreID) || p.Readable
 }
 
 // postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡，查詢失敗時整批降級；兩者貼文照回，product 不設。
@@ -811,20 +767,6 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 	if err != nil {
 		return nil, err
 	}
-	var replyable map[uuid.UUID]bool
-	if c.OwnsStore(postStore) {
-		ids := make([]uuid.UUID, 0, len(comments))
-		for _, m := range comments {
-			if m.State == social.CommentVisible && !slices.Contains(ids, m.PostID) {
-				ids = append(ids, m.PostID)
-			}
-		}
-		if len(ids) > 0 {
-			if replyable, err = h.postReadable.PubliclyReadablePosts(ctx, ids); err != nil {
-				return nil, err
-			}
-		}
-	}
 	out := make([]*pb.Comment, len(comments))
 	for i, m := range comments {
 		item := &pb.Comment{
@@ -850,7 +792,7 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.IsMine = c.IsAuthor(m.Actor)
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
-		item.ViewerCanReply = c.OwnsStore(postStore) && replyable[m.PostID]
+		item.ViewerCanReply = c.OwnsStore(postStore) && m.PostReadable
 		item.Etag = rpc.Etag(m.Version)
 		if item.Author, err = h.toActor(m.Actor, shared); err != nil {
 			return nil, err

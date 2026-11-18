@@ -22,28 +22,56 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// readability 是測試用的公開可讀來源：預設全部可讀；unreadable 列出不可讀的貼文，forumClosed 讓討論區不可讀，asked 記下每次查的貼文。
+// readability 是測試用的可讀性：模組隨資料回傳的旗標由它蓋上，預設全部可讀；unreadable 列出不可讀的貼文，forumClosed 讓討論區不可讀。
 type readability struct {
 	unreadable  map[uuid.UUID]bool
 	forumClosed bool
-	asked       [][]uuid.UUID
-	forumAsked  int
 }
 
-func (r *readability) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
-	r.asked = append(r.asked, ids)
-	out := map[uuid.UUID]bool{}
-	for _, id := range ids {
-		if !r.unreadable[id] {
-			out[id] = true
-		}
+func (r *readability) post(p social.Post) social.Post {
+	p.Readable = !r.unreadable[p.ID]
+	return p
+}
+
+func (r *readability) posts(in []social.Post) []social.Post {
+	out := slices.Clone(in)
+	for i := range out {
+		out[i] = r.post(out[i])
 	}
-	return out, nil
+	return out
 }
 
-func (r *readability) ForumReadable(context.Context, social.Caller, int64) (bool, error) {
-	r.forumAsked++
-	return !r.forumClosed, nil
+func (r *readability) postPage(pg social.PostPage) social.PostPage {
+	pg.Posts = r.posts(pg.Posts)
+	return pg
+}
+
+func (r *readability) createdPage(pg social.CreatedPostPage) social.CreatedPostPage {
+	pg.Posts = r.posts(pg.Posts)
+	return pg
+}
+
+func (r *readability) comment(c social.Comment) social.Comment {
+	c.PostReadable = !r.unreadable[c.PostID]
+	return c
+}
+
+func (r *readability) commentPage(pg social.CommentPage) social.CommentPage {
+	pg.Comments = slices.Clone(pg.Comments)
+	for i := range pg.Comments {
+		pg.Comments[i] = r.comment(pg.Comments[i])
+	}
+	return pg
+}
+
+func (r *readability) forumPage(pg social.ForumPage) social.ForumPage {
+	pg.Readable = !r.forumClosed
+	return pg
+}
+
+func (r *readability) entry(e social.ForumEntry) social.ForumEntry {
+	e.Readable = !r.forumClosed
+	return e
 }
 
 type fakeReads struct {
@@ -87,7 +115,7 @@ func (f *fakeReads) PostsLikedBy(_ context.Context, _ int64, ids []uuid.UUID) (m
 
 func (f *fakeReads) ListHashtagPosts(_ context.Context, _ social.Caller, tag string, _ *social.PostCursor, _ int32) (social.PostPage, error) {
 	f.tag = tag
-	return f.tagFeed, nil
+	return f.postPage(f.tagFeed), nil
 }
 
 func (f *fakeReads) SuggestHashtags(_ context.Context, q string, contains bool, limit int32) ([]social.HashtagCount, error) {
@@ -102,7 +130,7 @@ func (f *fakeReads) TrendingHashtags(_ context.Context, from, to time.Time, limi
 
 func (f *fakeReads) ListForumEntries(_ context.Context, _ social.Caller, storeID int64, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
 	f.forumStore = storeID
-	return f.forum, nil
+	return f.forumPage(f.forum), nil
 }
 
 // ListForumReplies 與模組一樣先驗證父留言屬於 storeID：不存在或屬於別家店是 NotFound，不論頁面內容。
@@ -111,28 +139,28 @@ func (f *fakeReads) ListForumReplies(_ context.Context, _ social.Caller, storeID
 	if owner, ok := f.forumParents[parentID]; f.forumParents != nil && (!ok || owner != storeID) {
 		return social.ForumPage{}, apperr.NotFound("entry")
 	}
-	return f.forumReply, nil
+	return f.forumPage(f.forumReply), nil
 }
 
 func (f *fakeReads) PublicPost(_ context.Context, c social.Caller, _ uuid.UUID) (social.Post, error) {
 	f.postReads++
 	f.callers = append(f.callers, c)
-	return f.post, f.postErr
+	return f.readability.post(f.post), f.postErr
 }
 
 func (f *fakeReads) ListFeed(_ context.Context, c social.Caller, _ *social.PostCursor, _ int32) (social.PostPage, error) {
 	f.callers = append(f.callers, c)
-	return f.feed, nil
+	return f.postPage(f.feed), nil
 }
 
 func (f *fakeReads) ListStorePosts(_ context.Context, c social.Caller, storeID int64, _ *social.PostCursor, _ int32) (social.PostPage, error) {
 	f.callers = append(f.callers, c)
 	f.storeID = storeID
-	return f.feed, nil
+	return f.postPage(f.feed), nil
 }
 
 func (f *fakeReads) ListComments(context.Context, social.Caller, uuid.UUID, *social.CommentCursor, int32) (social.CommentPage, error) {
-	return f.comments, f.postErr
+	return f.commentPage(f.comments), f.postErr
 }
 
 // ListReplies 與模組一樣先驗證父留言屬於 postID：不存在或屬於別篇是 NotFound，不論頁面內容。
@@ -141,12 +169,12 @@ func (f *fakeReads) ListReplies(_ context.Context, _ social.Caller, postID, pare
 	if owner, ok := f.commentParents[parentID]; f.commentParents != nil && (!ok || owner != postID) {
 		return social.CommentPage{}, apperr.NotFound("comment")
 	}
-	return f.replies, f.postErr
+	return f.commentPage(f.replies), f.postErr
 }
 
 func (f *fakeReads) TopPosts(_ context.Context, _ social.Caller, n int32) ([]social.Post, error) {
 	f.topN = n
-	return f.top, nil
+	return f.posts(f.top), nil
 }
 
 type fakeBuyers struct {
@@ -670,7 +698,9 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 		}
 	})
 	t.Run("被店家封鎖的買家不能回覆", func(t *testing.T) {
-		h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{blocking: map[int64]bool{5: true}})
+		blocked := *reads
+		blocked.forumClosed = true
+		h := newPublic(t, &blocked, fakeBuyers{id: 7}, &fakeStores{blocking: map[int64]bool{5: true}})
 		resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
 		if err != nil || resp.Msg.GetEntries()[1].GetViewerCanReply() {
 			t.Errorf("err=%v", err)
@@ -707,16 +737,17 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 			}
 		}
 	})
-	t.Run("空頁只為觀看者身分查一次封鎖", func(t *testing.T) {
+	t.Run("空頁不另查封鎖（討論區可讀寫由模組隨資料回傳）", func(t *testing.T) {
 		stores := &fakeStores{}
 		h := newPublic(t, &fakeReads{}, fakeBuyers{id: 7}, stores)
-		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 1 || len(stores.asked[0]) != 1 || stores.asked[0][0] != 5 {
-			t.Errorf("err=%v asked=%v，預期只問觀看者要不要被店 5 封鎖", err, stores.asked)
+		if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id})); err != nil || len(stores.asked) != 0 {
+			t.Errorf("err=%v asked=%v，預期不查封鎖", err, stores.asked)
 		}
 	})
-	t.Run("非空頁只查一次封鎖，觀看者與作者的名稱併成一次 BatchDisplay，店家作者查卡片，viewer_can_comment 與 viewer_can_reply 同源", func(t *testing.T) {
+	t.Run("非空頁不查封鎖，觀看者與作者的名稱併成一次 BatchDisplay，店家作者查卡片，viewer_can_comment 與 viewer_can_reply 同源", func(t *testing.T) {
 		storeAuthored := social.ForumEntry{ID: uuid.New(), StoreID: 5, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorStore, ID: 5}, Body: "s", CreatedAt: now, UpdatedAt: now}
 		mixed := &fakeReads{forum: social.ForumPage{Entries: []social.ForumEntry{entry(5, social.CommentVisible, 8), entry(5, social.CommentVisible, 9), storeAuthored}}}
+		mixed.forumClosed = true
 		stores := &fakeStores{blocking: map[int64]bool{5: true}}
 		var displayCalls int
 		var displayIDs [][]int64
@@ -725,8 +756,8 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(stores.asked) != 1 || stores.cardCalls != 1 || displayCalls != 1 {
-			t.Errorf("asked=%v cardCalls=%d displayCalls=%d，預期封鎖 1 次、卡片 1 次、名稱 1 次", stores.asked, stores.cardCalls, displayCalls)
+		if len(stores.asked) != 0 || stores.cardCalls != 1 || displayCalls != 1 {
+			t.Errorf("asked=%v cardCalls=%d displayCalls=%d，預期封鎖 0 次、卡片 1 次、名稱 1 次", stores.asked, stores.cardCalls, displayCalls)
 		}
 		if len(displayIDs) != 1 || !slices.Equal(uniqSorted(displayIDs[0]), []int64{7, 8, 9}) {
 			t.Errorf("BatchDisplay 收到 %v，預期一次且同時含觀看者 7 與作者 8、9", displayIDs)
@@ -748,14 +779,16 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 			want  bool
 			asks  int
 		}{
-			{"未被封鎖的買家", nil, nil, true, 1},
-			{"被封鎖的買家", nil, map[int64]bool{5: true}, false, 1},
+			{"未被封鎖的買家", nil, nil, true, 0},
+			{"被封鎖的買家", nil, map[int64]bool{5: true}, false, 0},
 			{"店主", own, nil, true, 0},
 		}
 		for pageName, page := range map[string]social.ForumPage{"空頁": {}, "全隱藏頁": hidden} {
 			for _, c := range cases {
 				stores := &fakeStores{own: c.store, blocking: c.block}
-				h := newPublic(t, &fakeReads{forum: page}, fakeBuyers{id: 7}, stores)
+				reads := &fakeReads{forum: page}
+				reads.forumClosed = c.block[5]
+				h := newPublic(t, reads, fakeBuyers{id: 7}, stores)
 				resp, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: id}))
 				if err != nil {
 					t.Fatal(err)
@@ -963,7 +996,9 @@ func TestForumListingViewerActorFollowsViewerIdentity(t *testing.T) {
 				ctx = asBuyer(ctx)
 			}
 			// 空的一頁也要帶觀看者身分。
-			h := newPublic(t, &fakeReads{forum: social.ForumPage{}}, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
+			reads := &fakeReads{forum: social.ForumPage{}}
+			reads.forumClosed = c.block[c.forumShop]
+			h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
 			resp, err := h.ListForumEntries(ctx, connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: rpc.FormatID(c.forumShop)}))
 			if err != nil {
 				t.Fatal(err)
