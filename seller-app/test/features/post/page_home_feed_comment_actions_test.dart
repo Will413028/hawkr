@@ -70,7 +70,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('刪除留言'), findsOneWidget);
           expect(find.text('檢舉留言'), self ? findsNothing : findsOneWidget);
-          expect(find.text('封鎖此人'), findsNothing);
+          expect(find.text('封鎖此人'), self ? findsNothing : findsOneWidget);
         }
 
         await open();
@@ -183,5 +183,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('刪除留言'), findsNothing);
     expect(find.text('檢舉留言'), findsOneWidget);
+    expect(find.text('封鎖此人'), findsNothing);
   });
 }

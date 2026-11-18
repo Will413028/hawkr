@@ -34,6 +34,8 @@ import '../../../shared/widgets/fruit_spinner.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../report/data/report_model.dart';
+import '../../report/data/store_block_rules.dart';
+import '../../report/presentation/widgets/block_actions.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
 import '../data/post_comment.dart';
 import '../data/post_comments_availability.dart';
@@ -1865,6 +1867,11 @@ class _CommentRow extends ConsumerWidget {
   final VoidCallback onReply;
   final VoidCallback onDelete;
 
+  bool get _canBlock => canBlockCommentAuthor(
+    isMine: comment.isMine,
+    viewerCanDelete: comment.viewerCanDelete,
+  );
+
   Future<void> _showActionMenu(BuildContext context, WidgetRef ref) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final box = context.findRenderObject() as RenderBox;
@@ -1875,7 +1882,7 @@ class _CommentRow extends ConsumerWidget {
       ),
       Offset.zero & overlay.size,
     );
-    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉（公開留言不帶留言者 id，目前沒有封鎖入口）
+    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉；別人的留言而伺服器允許刪除時，作者是這家店內容裡的買家，額外提供封鎖
     final v = await showMenu<String>(
       context: context,
       position: position,
@@ -1890,6 +1897,11 @@ class _CommentRow extends ConsumerWidget {
               style: TextStyle(fontSize: 16.sp, color: AppColors.error),
             ),
           ),
+        if (_canBlock)
+          PopupMenuItem<String>(
+            value: 'block',
+            child: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
+          ),
         if (!comment.isMine) ...[
           PopupMenuItem<String>(
             value: 'report',
@@ -1900,6 +1912,14 @@ class _CommentRow extends ConsumerWidget {
     );
     if (!context.mounted) return;
     if (v == 'delete') onDelete();
+    if (v == 'block') {
+      await blockBuyerWithConfirm(
+        context,
+        ref,
+        buyerName: comment.authorName.isEmpty ? '此人' : comment.authorName,
+        commentId: comment.id,
+      );
+    }
     if (v == 'report' && context.mounted) {
       // 本頁的留言是貼文留言（`listComments`）——所以是 POST_COMMENT，不是 SELLER_FORUM
       // （那是賣家頁「迴響」討論區）。

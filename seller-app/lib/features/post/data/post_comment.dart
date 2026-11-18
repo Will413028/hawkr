@@ -117,6 +117,7 @@ class StoreForumEntry {
     this.createTime,
     this.replyCount = 0,
     this.isMine = false,
+    this.authorIsBuyer = false,
     this.viewerCanEdit = false,
     this.viewerCanDelete = false,
     this.viewerCanReply = false,
@@ -135,6 +136,7 @@ class StoreForumEntry {
     createTime: e.hasCreateTime() ? e.createTime.toDateTime() : null,
     replyCount: e.replyCount.toInt(),
     isMine: e.isMine,
+    authorIsBuyer: e.author.kind == ActorKind.ACTOR_KIND_BUYER,
     viewerCanEdit: e.viewerCanEdit,
     viewerCanDelete: e.viewerCanDelete,
     viewerCanReply: e.viewerCanReply,
@@ -152,6 +154,7 @@ class StoreForumEntry {
   final DateTime? createTime;
   final int replyCount;
   final bool isMine;
+  final bool authorIsBuyer;
   final bool viewerCanEdit;
   final bool viewerCanDelete;
   final bool viewerCanReply;

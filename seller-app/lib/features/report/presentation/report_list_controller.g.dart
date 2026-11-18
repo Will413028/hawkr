@@ -59,15 +59,15 @@ abstract class _$MyReportsController extends $AsyncNotifier<MyReportsState> {
   }
 }
 
-/// 封鎖名單 AsyncNotifier（backend-payuni#645）。
+/// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 
 @ProviderFor(BlockListController)
 final blockListControllerProvider = BlockListControllerProvider._();
 
-/// 封鎖名單 AsyncNotifier（backend-payuni#645）。
+/// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 final class BlockListControllerProvider
     extends $AsyncNotifierProvider<BlockListController, BlockListState> {
-  /// 封鎖名單 AsyncNotifier（backend-payuni#645）。
+  /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
   BlockListControllerProvider._()
     : super(
         from: null,
@@ -88,9 +88,9 @@ final class BlockListControllerProvider
 }
 
 String _$blockListControllerHash() =>
-    r'dd4f5738ad3b36ed420e72e0e311291da1bbda97';
+    r'1f3cb9f808d2b1fa1cfdb362baf585e2a99dfff7';
 
-/// 封鎖名單 AsyncNotifier（backend-payuni#645）。
+/// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 
 abstract class _$BlockListController extends $AsyncNotifier<BlockListState> {
   FutureOr<BlockListState> build();

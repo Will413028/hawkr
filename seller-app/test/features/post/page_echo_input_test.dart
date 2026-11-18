@@ -958,4 +958,33 @@ void main() {
       );
     }
   }
+
+  for (final c in [
+    (
+      name: 'buyer author deletable',
+      buyer: true,
+      del: true,
+      mine: false,
+      show: true,
+    ),
+    (name: 'store author', buyer: false, del: true, mine: false, show: false),
+    (name: 'not deletable', buyer: true, del: false, mine: false, show: false),
+  ]) {
+    testWidgets('forum block item: ${c.name}', (tester) async {
+      await _pumpEcho(
+        tester,
+        message: testForumEntry(
+          id: '42',
+          author: '小明',
+          body: '請問何時出貨?',
+          authorIsBuyer: c.buyer,
+          canDelete: c.del,
+        ),
+      );
+      await tester.tap(find.byTooltip('留言更多操作'));
+      await tester.pumpAndSettle();
+      expect(find.text('檢舉留言'), findsOneWidget);
+      expect(find.text('封鎖此人'), c.show ? findsOneWidget : findsNothing);
+    });
+  }
 }

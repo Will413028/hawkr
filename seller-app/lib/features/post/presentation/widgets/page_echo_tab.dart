@@ -21,6 +21,8 @@ import '../../../../shared/widgets/echo_comment_node.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../../report/data/report_model.dart';
+import '../../../report/data/store_block_rules.dart';
+import '../../../report/presentation/widgets/block_actions.dart';
 import '../../../report/presentation/widgets/report_sheet.dart';
 import '../../data/post_comment.dart';
 import '../../data/post_repository.dart';
@@ -125,6 +127,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       content: m.body,
       createdAt: m.createTime,
       placeholderText: m.placeholderText,
+      authorIsBuyer: m.authorIsBuyer,
       viewerCanEdit: m.viewerCanEdit,
       viewerCanDelete: m.viewerCanDelete,
       viewerCanReply: m.viewerCanReply,
@@ -451,7 +454,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     );
   }
 
-  /// 顯示他人留言的操作選單（檢舉，與伺服器允許時的刪除；公開留言不帶留言者 id）
+  /// 顯示他人留言的操作選單（檢舉，與伺服器允許時的刪除、買家作者的封鎖）
   Future<void> _showEchoOtherUserMenu(
     BuildContext context,
     EchoCommentNode node,
@@ -490,6 +493,28 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                 onTap: () {
                   Navigator.pop(ctx);
                   _onEchoDeleteComment(node);
+                },
+              ),
+            if (canBlockForumAuthor(
+              isMine: node.isMine,
+              viewerCanDelete: node.viewerCanDelete,
+              authorIsBuyer: node.authorIsBuyer,
+            ))
+              ListTile(
+                leading: Icon(
+                  AppIcons.blockOutlined,
+                  color: AppIconColors.defaultColor,
+                  size: 22.sp,
+                ),
+                title: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  blockBuyerWithConfirm(
+                    context,
+                    ref,
+                    buyerName: node.userName,
+                    forumEntryId: node.id,
+                  );
                 },
               ),
             ListTile(
@@ -573,7 +598,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   ],
                 ),
               ),
-              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言可檢舉（封鎖入口見上方選單的說明）
+              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言可檢舉，並依規則封鎖
               if (isSelf && (node.viewerCanEdit || node.viewerCanDelete))
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
