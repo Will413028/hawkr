@@ -331,22 +331,15 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	return nil
 }
 
-// measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：本文全文、發文時間、圖片張數與連結目標。
-// 連結依對象種類：討論區留言是店家加討論串，貼文與貼文留言是貼文；凍結的內容缺連結（舊格式）時回錯，不傳半個快照給 seller。
+// measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
+// 這裡只解析凍結的字串 id。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
 func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
-	sn := seller.ContentSnapshot{Body: f.Body, AuthoredAt: f.AuthoredAt, ImageCount: int32(len(f.MediaRefs))} //nolint:gosec // 一則內容的圖片張數遠小於 int32
-	if kind == model.TargetForumEntry {
-		thread, err := uuid.Parse(f.ThreadID)
-		if err != nil {
-			return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
-		}
-		sn.Link = seller.ContentLink{StoreID: storeID, ThreadID: thread}
-		return sn, nil
-	}
-	post, err := uuid.Parse(f.PostID)
-	if err != nil {
+	post, _ := uuid.Parse(f.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
+	thread, _ := uuid.Parse(f.ThreadID) // 同上
+	k := seller.ContentKind(kind)
+	sn := seller.NewContentSnapshot(k, f.Body, f.AuthoredAt, len(f.MediaRefs), storeID, post, thread)
+	if err := seller.ValidateContentSnapshot(k, sn); err != nil {
 		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
 	}
-	sn.Link = seller.ContentLink{PostID: post}
 	return sn, nil
 }

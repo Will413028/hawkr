@@ -462,11 +462,12 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	var contents []model.ContentRef
 	if in.Takedown != nil {
-		for _, c := range sortedContents(in.Takedown.Contents) {
+		sorted := sortedContents(in.Takedown.Contents)
+		for _, c := range sorted {
 			contents = append(contents, c.ContentRef)
-			if err := q.InsertMeasureContent(ctx, insertContentParams(measureID, c)); err != nil {
-				return model.CreateMeasureResult{}, err
-			}
+		}
+		if err := q.InsertMeasureContents(ctx, insertContentsParams(measureID, sorted)); err != nil {
+			return model.CreateMeasureResult{}, err
 		}
 	}
 	if _, err := q.InsertGovernanceNote(ctx, store.InsertGovernanceNoteParams{
@@ -494,28 +495,19 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	return model.CreateMeasureResult{Measure: measure}, err
 }
 
-// insertContentParams 把一個對象展開成 measure_contents 的一列；沒有快照（已清除旗標）的快照欄位留 NULL，狀態是 UNAVAILABLE。
-func insertContentParams(measureID uuid.UUID, c model.TakedownContent) store.InsertMeasureContentParams {
-	p := store.InsertMeasureContentParams{
-		MeasureID: measureID, ContentKind: string(c.Kind), ContentID: c.ID, SnapshotState: string(model.SnapshotUnavailable),
+// insertContentsParams 把全部對象展開成 InsertMeasureContents 的平行陣列；沒有快照（已清除旗標）的對象狀態是 UNAVAILABLE，快照欄位放哨兵值，SQL 轉成 NULL。
+func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent) store.InsertMeasureContentsParams {
+	n := len(contents)
+	p := store.InsertMeasureContentsParams{
+		MeasureID: measureID, Kinds: make([]string, n), Ids: make([]uuid.UUID, n), States: make([]string, n), Bodies: make([]string, n),
+		AuthoredAts: make([]time.Time, n), ImageCounts: make([]int32, n), LinkPostIds: make([]uuid.UUID, n), LinkStoreIds: make([]int64, n), LinkThreadIds: make([]uuid.UUID, n),
 	}
-	sn := c.Snapshot
-	if sn == nil {
-		return p
-	}
-	authoredAt, images := sn.AuthoredAt.UTC(), sn.ImageCount
-	p.SnapshotState, p.SnapshotBody, p.SnapshotAuthoredAt, p.SnapshotImageCount = string(model.SnapshotCaptured), &sn.Body, &authoredAt, &images
-	if sn.Link.PostID != uuid.Nil() {
-		id := sn.Link.PostID
-		p.LinkPostID = &id
-	}
-	if sn.Link.StoreID != 0 {
-		id := sn.Link.StoreID
-		p.LinkStoreID = &id
-	}
-	if sn.Link.ThreadID != uuid.Nil() {
-		id := sn.Link.ThreadID
-		p.LinkThreadID = &id
+	for i, c := range contents {
+		p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotUnavailable)
+		if sn := c.Snapshot; sn != nil {
+			p.States[i], p.Bodies[i], p.AuthoredAts[i], p.ImageCounts[i] = string(model.SnapshotCaptured), sn.Body, sn.AuthoredAt.UTC(), sn.ImageCount
+			p.LinkPostIds[i], p.LinkStoreIds[i], p.LinkThreadIds[i] = sn.Link.PostID, sn.Link.StoreID, sn.Link.ThreadID
+		}
 	}
 	return p
 }

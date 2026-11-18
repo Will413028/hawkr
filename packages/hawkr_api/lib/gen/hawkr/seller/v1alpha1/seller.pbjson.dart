@@ -2262,6 +2262,14 @@ const ContentRef$json = {
       '9': 0,
       '10': 'forumThread'
     },
+    {
+      '1': 'link_available',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'linkAvailable'
+    },
   ],
   '8': [
     {'1': 'link'},
@@ -2277,7 +2285,8 @@ final $typed_data.Uint8List contentRefDescriptor = $convert.base64Decode(
     'b3JlZF90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgxhdXRob3'
     'JlZFRpbWUSHgoHcG9zdF9pZBgGIAEoCUID4EEDSABSBnBvc3RJZBJQCgxmb3J1bV90aHJlYWQY'
     'ByABKAsyJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuRm9ydW1UaHJlYWRMaW5rQgPgQQNIAFILZm'
-    '9ydW1UaHJlYWRCBgoEbGluaw==');
+    '9ydW1UaHJlYWQSKgoObGlua19hdmFpbGFibGUYCCABKAhCA+BBA1INbGlua0F2YWlsYWJsZUIG'
+    'CgRsaW5r');
 
 @$core.Deprecated('Use remediationUnavailabilityDescriptor instead')
 const RemediationUnavailability$json = {

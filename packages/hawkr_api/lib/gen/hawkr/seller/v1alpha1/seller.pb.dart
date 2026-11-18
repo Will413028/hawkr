@@ -5076,6 +5076,7 @@ class ContentRef extends $pb.GeneratedMessage {
     $2.Timestamp? authoredTime,
     $core.String? postId,
     ForumThreadLink? forumThread,
+    $core.bool? linkAvailable,
   }) {
     final result = ContentRef._();
     if (kind != null) result.kind = kind;
@@ -5085,6 +5086,7 @@ class ContentRef extends $pb.GeneratedMessage {
     if (authoredTime != null) result.authoredTime = authoredTime;
     if (postId != null) result.postId = postId;
     if (forumThread != null) result.forumThread = forumThread;
+    if (linkAvailable != null) result.linkAvailable = linkAvailable;
     return result;
   }
 
@@ -5119,6 +5121,7 @@ class ContentRef extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'postId')
     ..aOM<ForumThreadLink>(7, _omitFieldNames ? '' : 'forumThread',
         subBuilder: ForumThreadLink.$_createMessage)
+    ..aOB(8, _omitFieldNames ? '' : 'linkAvailable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5217,6 +5220,16 @@ class ContentRef extends $pb.GeneratedMessage {
   void clearForumThread() => $_clearField(7);
   @$pb.TagNumber(7)
   ForumThreadLink ensureForumThread() => $_ensure(6);
+
+  /// 連結目標此刻還在（貼文沒有刪除、討論串的起始留言沒有刪除）；為 false 時 client 不顯示連結。讀取時才算，快照本身不隨目標刪除而變；沒有連結目標時為 false。
+  @$pb.TagNumber(8)
+  $core.bool get linkAvailable => $_getBF(7);
+  @$pb.TagNumber(8)
+  set linkAvailable($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLinkAvailable() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLinkAvailable() => $_clearField(8);
 }
 
 /// RemediationUnavailability 是賣家此刻不能對措施請求解除的一個原因。與 RequestRemediation 的前置檢查是同一個規則，message 與該方法被拒絕時錯誤的

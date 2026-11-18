@@ -771,8 +771,8 @@ CREATE TABLE seller.measure_contents (
         END
     ))
 );
--- 撤銷後 184 天的清空 job 掃描（只含還留著快照的列）。
-CREATE INDEX measure_contents_captured ON seller.measure_contents (measure_id) WHERE snapshot_state = 'CAPTURED';
+-- 撤銷後 184 天的清空 job 掃描（只含已撤銷、還留著快照的列；measure_status 是措施狀態的複本）。
+CREATE INDEX measure_contents_captured ON seller.measure_contents (measure_id) WHERE snapshot_state = 'CAPTURED' AND measure_status = 'REVOKED';
 CREATE UNIQUE INDEX measure_contents_one_enforced ON seller.measure_contents (content_kind, content_id) WHERE measure_status = 'ENFORCED';
 
 -- 措施的版本歷史（append-only，SQL:2011 系統版本表的歷史表）：每一版的完整快照（給賣家的理由、結束時間；警告沒有結束時間），

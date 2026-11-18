@@ -58,6 +58,7 @@ type App struct {
 	images    rpc.Images
 	dash      Dashboard
 	stats     *StatsSource
+	links     LinkAvailability
 	web       rpc.WebOrigin
 	log       *slog.Logger
 }
@@ -70,10 +71,16 @@ var ErrPaymentsRequired = errors.New("httpapi/seller：需要收款帳戶的來�
 // ErrBlockingRequired 是 NewApp 沒有封鎖入口的來源時的錯誤（內容作者的來源與跨身分規則的身分來源，A7-2e）。
 var ErrBlockingRequired = errors.New("httpapi/seller：封鎖需要內容作者的來源與跨身分規則的身分來源")
 
-// NewApp 建立賣家 handler。blocking 是封鎖入口的來源，必填。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
+// ErrLinksRequired 是 NewApp 沒有內容快照連結的查詢來源時的錯誤（措施的「查看貼文」連結要知道目標還在不在）。
+var ErrLinksRequired = errors.New("httpapi/seller：需要內容快照連結目標是否還在的查詢來源（social 模組）")
+
+// NewApp 建立賣家 handler。links 是措施內容快照的連結目標是否還在的查詢來源（social 模組），必填。blocking 是封鎖入口的來源，必填。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
 // 與前台店面頁（NewPublic）是同一份 *StatsSource（NewStatsSource 建立，nil 回錯誤）。統編的登記資料經模組（Module.LookupBusinessRegistration）。
 // payments 是收款帳戶的來源（payment 模組），nil 回錯誤。web 是網站網域（開通結束的回跳網址由它組），零值回錯誤。log 記錄開通任務讀不到的來源（GetMyOnboarding），nil 時不記錄；與儀表板的 Dashboard.Log 各自獨立。
-func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource, web rpc.WebOrigin, blocking blocks.Sources, log *slog.Logger) (*App, error) {
+func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource, links LinkAvailability, web rpc.WebOrigin, blocking blocks.Sources, log *slog.Logger) (*App, error) {
+	if links == nil {
+		return nil, ErrLinksRequired
+	}
 	if stats == nil {
 		return nil, ErrStatsSourceRequired
 	}
@@ -89,7 +96,7 @@ func NewApp(m Module, payments Payments, followers Followers, images rpc.Images,
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &App{m: m, payments: payments, followers: followers, blocking: blocking, images: images, dash: dash, stats: stats, web: web, log: log}, nil
+	return &App{m: m, payments: payments, followers: followers, blocking: blocking, images: images, dash: dash, stats: stats, links: links, web: web, log: log}, nil
 }
 
 // deref 是可選文字的值：沒有值是空字串（契約以空字串表示沒有填）。

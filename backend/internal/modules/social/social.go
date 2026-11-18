@@ -145,6 +145,8 @@ type (
 	ContentOwner       = model.ContentOwner
 	ContentAuthor      = model.ContentAuthor
 	ContentSnapshot    = model.ContentSnapshot
+	ForumThread        = model.ForumThread
+	LinkAvailability   = model.LinkAvailability
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = stats.TakedownContentError
 	Viewer               = engage.Viewer
@@ -558,6 +560,11 @@ func (m *Module) ContentAuthorFor(ctx context.Context, c Caller, t Target) (Cont
 // ContentSnapshot 回傳內容此刻的歸屬（同 ContentOwner，含是否公開可讀）、本文與媒體參照，給 moderation 在檢舉送出時凍結（唯讀，不鎖）；內容不存在或已刪除回 Exists 為假。
 func (m *Module) ContentSnapshot(ctx context.Context, t Target) (ContentSnapshot, error) {
 	return m.sanction.Snapshot(ctx, t)
+}
+
+// AvailableLinks 回傳一批連結目標（貼文 id、討論串）此刻哪些還在，給後台與賣家讀措施的內容快照時決定要不要顯示連結；每類一個查詢，與目標數無關（唯讀，不鎖，不套可見性規則）。
+func (m *Module) AvailableLinks(ctx context.Context, postIDs []uuid.UUID, threads []ForumThread) (LinkAvailability, error) {
+	return m.sanction.AvailableLinks(ctx, postIDs, threads)
 }
 
 // Hide 隱藏一則買家寫的留言或討論區留言（會在 moderation 的 transaction 內被呼叫）；已有未還原的隱藏時回既有的（冪等）。

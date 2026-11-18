@@ -8,6 +8,7 @@ package measure
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -138,7 +139,7 @@ func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.Se
 		at := index[f.MeasureID]
 		out[at].Findings = append(out[at].Findings, violations[i])
 	}
-	if err := loadContents(ctx, q, out, index); err != nil {
+	if err := loadContents(ctx, q, out, index, level == detailAdmin); err != nil {
 		return nil, err
 	}
 	requests, err := q.RequestsByMeasures(ctx, ids)
@@ -194,8 +195,14 @@ func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.Se
 	return out, nil
 }
 
-// loadContents 載入內容下架措施的對象（其他種類沒有，整批沒有內容下架時不查）。
-func loadContents(ctx context.Context, q *store.Queries, measures []model.Measure, index map[uuid.UUID]int) error {
+type contentKey struct {
+	measureID uuid.UUID
+	ref       model.ContentRef
+}
+
+// loadContents 載入內容下架措施的對象（其他種類沒有，整批沒有內容下架時不查）。只讀摘要（本文的前 ExcerptRunes 個字元由資料庫截出），不把全文讀進清單；
+// fullBody 為真（後台讀單筆措施與寫入的結果）才另查全文。
+func loadContents(ctx context.Context, q *store.Queries, measures []model.Measure, index map[uuid.UUID]int, fullBody bool) error {
 	var ids []uuid.UUID
 	for _, m := range measures {
 		if m.Kind == model.MeasureContentTakedown {
@@ -205,13 +212,34 @@ func loadContents(ctx context.Context, q *store.Queries, measures []model.Measur
 	if len(ids) == 0 {
 		return nil
 	}
-	rows, err := q.MeasureContents(ctx, ids)
+	rows, err := q.MeasureContents(ctx, store.MeasureContentsParams{MeasureIds: ids, ExcerptRunes: model.ExcerptRunes})
 	if err != nil {
 		return err
 	}
+	at := make(map[contentKey]*model.MeasureContent, len(rows))
 	for _, r := range rows {
-		at := index[r.MeasureID]
-		measures[at].Contents = append(measures[at].Contents, contentOf(r))
+		i := index[r.MeasureID]
+		measures[i].Contents = append(measures[i].Contents, contentOf(r))
+	}
+	if !fullBody {
+		return nil
+	}
+	for i := range measures {
+		for j := range measures[i].Contents {
+			c := &measures[i].Contents[j]
+			at[contentKey{measures[i].ID, c.ContentRef}] = c
+		}
+	}
+	bodies, err := q.MeasureContentBodies(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, b := range bodies {
+		c := at[contentKey{b.MeasureID, model.ContentRef{Kind: model.ContentKind(b.ContentKind), ID: b.ContentID}}]
+		if c == nil || c.Snapshot == nil {
+			return fmt.Errorf("seller：措施 %s 的內容 %s 有全文卻沒有對應的快照列", b.MeasureID, b.ContentID)
+		}
+		c.Snapshot.Body, c.FullBody = b.Body, true
 	}
 	return nil
 }
@@ -449,7 +477,8 @@ func contentOf(r store.MeasureContentsRow) model.MeasureContent {
 	if c.State != model.SnapshotCaptured {
 		return c
 	}
-	sn := &model.ContentSnapshot{Body: *r.SnapshotBody, AuthoredAt: *r.SnapshotAuthoredAt, ImageCount: *r.SnapshotImageCount}
+	c.Excerpt = model.ExcerptOf(r.SnapshotExcerpt, r.SnapshotTruncated)
+	sn := &model.ContentSnapshot{AuthoredAt: *r.SnapshotAuthoredAt, ImageCount: *r.SnapshotImageCount}
 	if r.LinkPostID != nil {
 		sn.Link.PostID = *r.LinkPostID
 	}

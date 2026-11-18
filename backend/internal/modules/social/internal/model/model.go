@@ -477,6 +477,18 @@ type ContentSnapshot struct {
 	Purged bool
 }
 
+// ForumThread 是一個討論串的定位：店家加討論串 id。
+type ForumThread struct {
+	StoreID  int64
+	ThreadID uuid.UUID
+}
+
+// LinkAvailability 是一批連結目標此刻還在的哪些：貼文（id）與討論串。查詢的目標不在回傳的 map 裡（或值為假）就是已刪除或不存在。
+type LinkAvailability struct {
+	Posts   map[uuid.UUID]bool
+	Threads map[ForumThread]bool
+}
+
 // RequestHash 是建立輸入的 SHA-256（欄位依固定順序、以長度前綴編碼，不會因串接而混淆）：冪等重送比對「內容是否相同」的唯一定義。
 // 呼叫方傳入正規化後的欄位（內文已去空白），沒有的選填欄位傳 "-"。
 func RequestHash(parts ...string) []byte {

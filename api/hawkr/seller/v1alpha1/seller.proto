@@ -1015,6 +1015,8 @@ message ContentRef {
     string post_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
     ForumThreadLink forum_thread = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
   }
+  // 連結目標此刻還在（貼文沒有刪除、討論串的起始留言沒有刪除）；為 false 時 client 不顯示連結。讀取時才算，快照本身不隨目標刪除而變；沒有連結目標時為 false。
+  bool link_available = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條

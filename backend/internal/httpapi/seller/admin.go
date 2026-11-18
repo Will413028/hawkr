@@ -37,18 +37,19 @@ type Admin struct {
 	m        AdminModule
 	images   rpc.Images
 	payments PaymentReader
+	links    LinkAvailability
 	log      *slog.Logger
 }
 
 var _ sellerv1alpha1connect.SellerAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。措施此刻的狀態由模組算好（Measure.State），handler 沒有時鐘。
-// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），log 記錄讀不到的來源（nil 時不記錄）。
-func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slog.Logger) *Admin {
+// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），links 是店家頁生效中措施的內容快照連結是否還在的查詢來源（沒有時，店家有帶連結的內容下架措施會讀取失敗），log 記錄讀不到的來源（nil 時不記錄）。
+func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, links LinkAvailability, log *slog.Logger) *Admin {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &Admin{m: m, images: images, payments: payments, log: log}
+	return &Admin{m: m, images: images, payments: payments, links: links, log: log}
 }
 
 // 模組輸入的欄位對應到請求的路徑。
@@ -185,8 +186,12 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 	if err != nil {
 		return nil, err
 	}
+	active, err := adminMeasures(ctx, h.links, state.Active)
+	if err != nil {
+		return nil, err
+	}
 	out := &adminpb.GetStoreResponse{
-		Store: store, ActiveMeasures: toAdminMeasures(state.Active),
+		Store: store, ActiveMeasures: active,
 		CanCreateTermination:          len(state.Terminations) > 0,
 		CanCreateMeasure:              len(state.CreateMeasure) == 0,
 		CreateMeasureUnavailabilities: toStoreActionUnavailabilities(state.CreateMeasure, model.StoreActionCreateMeasure),

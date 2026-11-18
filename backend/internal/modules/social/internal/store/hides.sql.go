@@ -12,6 +12,70 @@ import (
 	"uuid"
 )
 
+const availableLinkPosts = `-- name: AvailableLinkPosts :many
+SELECT id FROM social.posts WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
+`
+
+// 一批貼文裡此刻還在（沒有軟刪）的：措施快照的連結只對這些顯示（A7-D29）。唯讀，不鎖，不套可見性規則。
+func (q *Queries) AvailableLinkPosts(ctx context.Context, postIds []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, availableLinkPosts, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const availableLinkThreads = `-- name: AvailableLinkThreads :many
+SELECT e.store_id, e.id AS thread_id
+FROM social.forum_entries e
+JOIN generate_series(1, cardinality($1::bigint[])) AS i
+    ON e.store_id = ($1::bigint[])[i] AND e.id = ($2::uuid[])[i]
+WHERE e.deleted_at IS NULL
+`
+
+type AvailableLinkThreadsParams struct {
+	StoreIds  []int64
+	ThreadIds []uuid.UUID
+}
+
+type AvailableLinkThreadsRow struct {
+	StoreID  int64
+	ThreadID uuid.UUID
+}
+
+// 一批討論串（店家加討論串 id，平行陣列）裡此刻還在的：討論串的起始留言（id 等於 thread_id）存在且沒有軟刪。唯讀，不鎖，不套可見性規則。
+func (q *Queries) AvailableLinkThreads(ctx context.Context, arg AvailableLinkThreadsParams) ([]AvailableLinkThreadsRow, error) {
+	rows, err := q.db.Query(ctx, availableLinkThreads, arg.StoreIds, arg.ThreadIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AvailableLinkThreadsRow{}
+	for rows.Next() {
+		var i AvailableLinkThreadsRow
+		if err := rows.Scan(&i.StoreID, &i.ThreadID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCommentSnapshot = `-- name: GetCommentSnapshot :one
 SELECT actor_kind, actor_id, body, post_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.comments
@@ -43,7 +107,7 @@ func (q *Queries) GetCommentSnapshot(ctx context.Context, id uuid.UUID) (GetComm
 }
 
 const getForumEntrySnapshot = `-- name: GetForumEntrySnapshot :one
-SELECT actor_kind, actor_id, body, store_id, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = $1
 `
@@ -52,7 +116,6 @@ type GetForumEntrySnapshotRow struct {
 	ActorKind  string
 	ActorID    int64
 	Body       *string
-	StoreID    int64
 	ThreadID   uuid.UUID
 	AuthoredAt time.Time
 	ExistsNow  bool
@@ -66,7 +129,6 @@ func (q *Queries) GetForumEntrySnapshot(ctx context.Context, id uuid.UUID) (GetF
 		&i.ActorKind,
 		&i.ActorID,
 		&i.Body,
-		&i.StoreID,
 		&i.ThreadID,
 		&i.AuthoredAt,
 		&i.ExistsNow,

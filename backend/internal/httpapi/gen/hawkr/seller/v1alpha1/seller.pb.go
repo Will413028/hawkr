@@ -5479,7 +5479,9 @@ type ContentRef struct {
 	//
 	//	*ContentRef_PostId
 	//	*ContentRef_ForumThread
-	Link          isContentRef_Link `protobuf_oneof:"link"`
+	Link isContentRef_Link `protobuf_oneof:"link"`
+	// 連結目標此刻還在（貼文沒有刪除、討論串的起始留言沒有刪除）；為 false 時 client 不顯示連結。讀取時才算，快照本身不隨目標刪除而變；沒有連結目標時為 false。
+	LinkAvailable bool `protobuf:"varint,8,opt,name=link_available,json=linkAvailable,proto3" json:"link_available,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5572,6 +5574,13 @@ func (x *ContentRef) GetForumThread() *ForumThreadLink {
 		}
 	}
 	return nil
+}
+
+func (x *ContentRef) GetLinkAvailable() bool {
+	if x != nil {
+		return x.LinkAvailable
+	}
+	return false
 }
 
 type isContentRef_Link interface {
@@ -7865,7 +7874,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\fregistration\x18\x01 \x01(\v2+.hawkr.seller.v1alpha1.BusinessRegistrationR\fregistration\"S\n" +
 	"\x0fForumThreadLink\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x03R\astoreId\x12 \n" +
-	"\tthread_id\x18\x02 \x01(\tB\x03\xe0A\x03R\bthreadId\"\x96\x03\n" +
+	"\tthread_id\x18\x02 \x01(\tB\x03\xe0A\x03R\bthreadId\"\xc2\x03\n" +
 	"\n" +
 	"ContentRef\x12;\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\".hawkr.seller.v1alpha1.ContentKindB\x03\xe0A\x02R\x04kind\x12\x13\n" +
@@ -7874,7 +7883,8 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\aexcerpt\x18\x04 \x01(\tB\x03\xe0A\x03R\aexcerpt\x12D\n" +
 	"\rauthored_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fauthoredTime\x12\x1e\n" +
 	"\apost_id\x18\x06 \x01(\tB\x03\xe0A\x03H\x00R\x06postId\x12P\n" +
-	"\fforum_thread\x18\a \x01(\v2&.hawkr.seller.v1alpha1.ForumThreadLinkB\x03\xe0A\x03H\x00R\vforumThreadB\x06\n" +
+	"\fforum_thread\x18\a \x01(\v2&.hawkr.seller.v1alpha1.ForumThreadLinkB\x03\xe0A\x03H\x00R\vforumThread\x12*\n" +
+	"\x0elink_available\x18\b \x01(\bB\x03\xe0A\x03R\rlinkAvailableB\x06\n" +
 	"\x04link\"\xaa\x01\n" +
 	"\x19RemediationUnavailability\x12P\n" +
 	"\x06reason\x18\x01 \x01(\x0e23.hawkr.seller.v1alpha1.RemediationUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +

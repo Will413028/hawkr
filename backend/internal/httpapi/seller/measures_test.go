@@ -314,14 +314,13 @@ func TestMeasureResponseCarriesTheTakedownContents(t *testing.T) {
 func TestMeasureResponseCarriesTheSnapshotExcerptAuthoredTimeAndLink(t *testing.T) {
 	post, entry, thread := uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
 	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
-	long := strings.Repeat("字", model.ExcerptRunes+1)
 	m := measureFixture()
 	m.Kind = model.MeasureContentTakedown
 	m.Contents = []model.MeasureContent{
-		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured,
-			Snapshot: &model.ContentSnapshot{Body: long, AuthoredAt: at, Link: model.ContentLink{PostID: post}}},
-		{ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: entry}, State: model.SnapshotCaptured,
-			Snapshot: &model.ContentSnapshot{Body: "短", AuthoredAt: at, Link: model.ContentLink{StoreID: 12, ThreadID: thread}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, Excerpt: model.ExcerptOf(strings.Repeat("字", model.ExcerptRunes), true),
+			Snapshot: &model.ContentSnapshot{AuthoredAt: at, Link: model.ContentLink{PostID: post}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: entry}, State: model.SnapshotCaptured, Excerpt: "短",
+			Snapshot: &model.ContentSnapshot{AuthoredAt: at, Link: model.ContentLink{StoreID: 12, ThreadID: thread}}},
 		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotCleared},
 	}
 	got := toMeasure(uitext.ZhTW, m).GetContents()

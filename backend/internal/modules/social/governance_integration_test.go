@@ -197,3 +197,30 @@ func (f *fixture) timeOf(t *testing.T, sql string, args ...any) time.Time {
 	}
 	return at
 }
+
+// AvailableLinks 回報連結目標此刻還在不在：貼文沒有軟刪、討論串的起始留言沒有軟刪；不存在的目標與別家店的討論串都是不在。一批目標每類一個查詢。
+// mutation：AvailableLinkPosts 拿掉 deleted_at IS NULL → 刪除後的貼文仍回在；AvailableLinkThreads 的店家條件拿掉 → 錯店的討論串回在。
+func TestAvailableLinksFollowDeletionOfPostsAndThreads(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	b := f.newBuyer(t)
+	live := f.publishedPost(t, storeID, "還在")
+	gone := f.publishedPost(t, storeID, "會刪")
+	e1 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串一"}))
+	e2 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串二"}))
+	f.exec(t, "UPDATE social.posts SET deleted_at = now() WHERE id = $1", gone.ID)
+	f.exec(t, "UPDATE social.forum_entries SET deleted_at = now() WHERE id = $1", e2.ID)
+	threads := []social.ForumThread{{StoreID: storeID, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e2.ID}, {StoreID: storeID + 999, ThreadID: e1.ID}}
+	got := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, []uuidT{live.ID, gone.ID, uuidNew()}, threads))
+	if !got.Posts[live.ID] || got.Posts[gone.ID] || len(got.Posts) != 1 {
+		t.Errorf("貼文 %v", got.Posts)
+	}
+	if !got.Threads[threads[0]] || got.Threads[threads[1]] || got.Threads[threads[2]] || len(got.Threads) != 1 {
+		t.Errorf("討論串 %v", got.Threads)
+	}
+	if empty := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, nil, nil)); len(empty.Posts)+len(empty.Threads) != 0 {
+		t.Errorf("沒有目標 %v", empty)
+	}
+}

@@ -69,6 +69,7 @@ type Governance struct {
 	m         GovernanceModule
 	images    rpc.Images
 	snapshots ContentSnapshots
+	links     LinkAvailability
 }
 
 // ContentSnapshots 回報一則內容此刻的歸屬與內容快照，給後台在建立內容下架前一次讀取、同時核對歸屬與取得處分依據的內容版本（social.Module 實作）。
@@ -84,6 +85,8 @@ type GovernanceDeps struct {
 	Images rpc.Images
 	// ContentSnapshots 在後台建立內容下架前核對內容歸屬並取得內容快照。
 	ContentSnapshots ContentSnapshots
+	// Links 回報措施內容快照的連結目標還在不在（讀措施時用）。
+	Links LinkAvailability
 }
 
 // NewGovernance 建立後台治理的 handler；Images 給轉報資料裡店家的 logo 與封面。後台直接建立內容下架時，內容須是這家店現存（沒有刪除）的內容，由 handler 向 social 讀取快照核對並取得內容版本；social 的同 transaction 訂閱者另擋別家店的內容。
@@ -94,7 +97,10 @@ func NewGovernance(d GovernanceDeps) (*Governance, error) {
 	if d.ContentSnapshots == nil {
 		return nil, errors.New("seller governance：需要 ContentSnapshots")
 	}
-	return &Governance{m: d.Module, images: d.Images, snapshots: d.ContentSnapshots}, nil
+	if d.Links == nil {
+		return nil, errors.New("seller governance：需要 Links")
+	}
+	return &Governance{m: d.Module, images: d.Images, snapshots: d.ContentSnapshots, links: d.Links}, nil
 }
 
 // 模組輸入的欄位對應到請求的路徑。名稱與請求的頂層欄位同名（snake_case）的欄位由 rpc 自動對應，這裡只列其餘的；空的對應表

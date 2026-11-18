@@ -198,6 +198,36 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 	return out, nil
 }
 
+// AvailableLinks 回傳一批連結目標（貼文 id、討論串）此刻哪些還在（貼文沒有軟刪；討論串的起始留言存在且沒有軟刪）：兩個查詢，與目標數無關；唯讀，不鎖，不套可見性規則。
+// 沒有目標的那一類不查。給措施快照的「查看貼文」連結判斷目標還在不在。
+func (s *Service) AvailableLinks(ctx context.Context, postIDs []uuid.UUID, threads []model.ForumThread) (model.LinkAvailability, error) {
+	out := model.LinkAvailability{Posts: map[uuid.UUID]bool{}, Threads: map[model.ForumThread]bool{}}
+	q := s.q(ctx)
+	if len(postIDs) > 0 {
+		ids, err := q.AvailableLinkPosts(ctx, postIDs)
+		if err != nil {
+			return model.LinkAvailability{}, fmt.Errorf("social：讀取連結的貼文是否存在：%w", err)
+		}
+		for _, id := range ids {
+			out.Posts[id] = true
+		}
+	}
+	if len(threads) > 0 {
+		p := store.AvailableLinkThreadsParams{StoreIds: make([]int64, len(threads)), ThreadIds: make([]uuid.UUID, len(threads))}
+		for i, t := range threads {
+			p.StoreIds[i], p.ThreadIds[i] = t.StoreID, t.ThreadID
+		}
+		rows, err := q.AvailableLinkThreads(ctx, p)
+		if err != nil {
+			return model.LinkAvailability{}, fmt.Errorf("social：讀取連結的討論串是否存在：%w", err)
+		}
+		for _, r := range rows {
+			out.Threads[model.ForumThread{StoreID: r.StoreID, ThreadID: r.ThreadID}] = true
+		}
+	}
+	return out, nil
+}
+
 func deref(s *string) string {
 	if s == nil {
 		return ""

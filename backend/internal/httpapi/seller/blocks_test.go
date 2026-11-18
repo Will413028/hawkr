@@ -87,7 +87,7 @@ func newBlockEnv(t *testing.T) *blockEnv {
 		t.Fatal(err)
 	}
 	src := blocks.Sources{Authors: authors, Identities: blocks.Identities{Buyers: accountsOf{70: 7, 80: 8, 81: 9}, Stores: storesOf{11: 7}}}
-	h, err := NewApp(m, &paymentModule{}, f, images, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}), mustWebOrigin(t), src, nil)
+	h, err := NewApp(m, &paymentModule{}, f, images, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}), fakeLinks{}, mustWebOrigin(t), src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

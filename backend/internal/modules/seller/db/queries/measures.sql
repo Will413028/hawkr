@@ -102,17 +102,21 @@ WITH created AS (
 )
 SELECT * FROM created;
 
--- name: InsertMeasureContent :exec
--- 內容下架措施的一個對象與處分依據的快照（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。
--- 沒有快照的列（UNAVAILABLE）其快照欄位為 NULL；CAPTURED 的連結欄位依種類只填其中一組。
+-- name: InsertMeasureContents :exec
+-- 內容下架措施的全部對象與處分依據的快照，一次寫入（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。參數是平行陣列，同一個索引是同一個對象。
+-- 沒有值的欄位用哨兵傳入再轉 NULL：不是 CAPTURED 的列（UNAVAILABLE）其快照欄位為 NULL；連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
 INSERT INTO seller.measure_contents (
     measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
     link_post_id, link_store_id, link_thread_id
 )
-VALUES (
-    sqlc.arg(measure_id), sqlc.arg(content_kind), sqlc.arg(content_id), sqlc.arg(snapshot_state), sqlc.narg(snapshot_body),
-    sqlc.narg(snapshot_authored_at), sqlc.narg(snapshot_image_count), sqlc.narg(link_post_id), sqlc.narg(link_store_id), sqlc.narg(link_thread_id)
-);
+SELECT sqlc.arg(measure_id)::uuid, (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i], (sqlc.arg(states)::text[])[i],
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(bodies)::text[])[i] END,
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(authored_ats)::timestamptz[])[i] END,
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(image_counts)::int[])[i] END,
+       NULLIF((sqlc.arg(link_post_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
+       NULLIF((sqlc.arg(link_store_ids)::bigint[])[i], 0::bigint),
+       NULLIF((sqlc.arg(link_thread_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)
+FROM generate_series(1, cardinality(sqlc.arg(ids)::uuid[])) AS i;
 
 -- name: ActiveTakedownOfContent :one
 -- 內容目前生效中的內容下架措施（最多一個，measure_contents_one_enforced 保證）；沒有回 no rows。
@@ -131,12 +135,28 @@ SELECT EXISTS (
 );
 
 -- name: MeasureContents :many
--- 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
-SELECT measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
-       link_post_id, link_store_id, link_thread_id
+-- 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。清單與摘要只讀本文的前 excerpt_runes 個字元與「是否更長」，不讀全文（全文見 MeasureContentBodies）；
+-- left 與 char_length 都以字元計（資料庫編碼 UTF8），與 Go 以 rune 計一致。
+SELECT measure_id, content_kind, content_id, snapshot_state,
+       COALESCE(left(snapshot_body, sqlc.arg(excerpt_runes)::int), '')::text AS snapshot_excerpt,
+       COALESCE(char_length(snapshot_body) > sqlc.arg(excerpt_runes)::int, false)::boolean AS snapshot_truncated,
+       snapshot_authored_at, snapshot_image_count, link_post_id, link_store_id, link_thread_id
 FROM seller.measure_contents
 WHERE measure_id = ANY(sqlc.arg(measure_ids)::uuid[])
 ORDER BY measure_id, content_kind COLLATE "C", content_id;
+
+-- name: MeasureContentRefs :many
+-- 一個措施的內容下架對象（只有種類與 ID，給事件用），依種類、ID 排序。
+SELECT content_kind, content_id
+FROM seller.measure_contents
+WHERE measure_id = sqlc.arg(measure_id)
+ORDER BY content_kind COLLATE "C", content_id;
+
+-- name: MeasureContentBodies :many
+-- 一批措施裡有快照的對象的本文全文（只給後台讀單筆措施）。
+SELECT measure_id, content_kind, content_id, snapshot_body::text AS body
+FROM seller.measure_contents
+WHERE measure_id = ANY(sqlc.arg(measure_ids)::uuid[]) AND snapshot_state = 'CAPTURED';
 
 -- name: LinkedMeasureExists :one
 -- 這個帳號是否已有以這筆措施為來源、仍生效的關聯終止（measures_linked_source 的檢查版；呼叫方已鎖住來源與目標帳號）。
@@ -578,7 +598,7 @@ WITH due AS (
     SELECT c.measure_id, c.content_kind, c.content_id
     FROM seller.measure_contents c
     JOIN seller.measures m ON m.id = c.measure_id
-    WHERE c.snapshot_state = 'CAPTURED' AND m.status = 'REVOKED' AND m.revoked_at <= sqlc.arg(cutoff)::timestamptz
+    WHERE c.snapshot_state = 'CAPTURED' AND c.measure_status = 'REVOKED' AND m.revoked_at <= sqlc.arg(cutoff)::timestamptz
     ORDER BY c.measure_id, c.content_kind, c.content_id
     LIMIT sqlc.arg(max_rows)::int
     FOR UPDATE OF c SKIP LOCKED

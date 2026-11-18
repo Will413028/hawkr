@@ -266,6 +266,7 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 		"TerminationGround":              rpc.EnumMismatches[pb.TerminationGround](model.TerminationGroundValues()),
 		"MeasureKind":                    rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
 		"ContentKind":                    rpc.EnumMismatches[pb.ContentKind](model.ContentKindValues()),
+		"ContentSnapshotState":           rpc.EnumMismatches[pb.ContentSnapshotState](model.SnapshotStateValues()),
 		"MeasureBasis":                   rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
 		"MeasureState":                   rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
 		"RevokeReason":                   rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
@@ -1199,10 +1200,11 @@ func TestToLinkedAccountCarriesTheSharedBankAccountFields(t *testing.T) {
 }
 
 func TestNewGovernanceRejectsMissingDeps(t *testing.T) {
-	full := GovernanceDeps{Module: &governanceModule{}, ContentSnapshots: ownsEverything{storeID: 12}}
+	full := GovernanceDeps{Module: &governanceModule{}, ContentSnapshots: ownsEverything{storeID: 12}, Links: fakeLinks{}}
 	for name, mutate := range map[string]func(*GovernanceDeps){
 		"Module":           func(d *GovernanceDeps) { d.Module = nil },
 		"ContentSnapshots": func(d *GovernanceDeps) { d.ContentSnapshots = nil },
+		"Links":            func(d *GovernanceDeps) { d.Links = nil },
 	} {
 		d := full
 		mutate(&d)
@@ -1242,19 +1244,63 @@ func TestTakedownContentsFlagsPurgedContentAndRejectsMissingOrForeign(t *testing
 	}
 }
 
+// 後台建立內容下架時，清單形狀（重複、空、超過上限）先於任何 social 讀取檢查：壞請求不產生讀取。
+// mutation：takedownContents 拿掉開頭的 ValidateContentRefs → 重複的請求仍讀了 social（reads 不為 0）。
+func TestTakedownContentsValidatesShapeBeforeReadingSocial(t *testing.T) {
+	id := uuid.NewV7()
+	var many []model.ContentRef
+	for range model.MaxTakedownContents + 1 {
+		many = append(many, model.ContentRef{Kind: model.ContentPost, ID: uuid.NewV7()})
+	}
+	for name, refs := range map[string][]model.ContentRef{
+		"重複": {{Kind: model.ContentPost, ID: id}, {Kind: model.ContentPost, ID: id}},
+		"空":  nil,
+		"過多": many,
+	} {
+		counting := &countingSnapshots{}
+		h := &Governance{snapshots: counting}
+		if _, err := h.takedownContents(context.Background(), 12, refs); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v", name, err)
+		}
+		if counting.reads != 0 {
+			t.Errorf("%s：壞請求讀了 social %d 次", name, counting.reads)
+		}
+	}
+}
+
+type countingSnapshots struct{ reads int }
+
+func (c *countingSnapshots) ContentSnapshot(context.Context, social.Target) (social.ContentSnapshot, error) {
+	c.reads++
+	return social.ContentSnapshot{}, nil
+}
+
 type fixedSnapshot struct{ snap social.ContentSnapshot }
 
 func (f fixedSnapshot) ContentSnapshot(context.Context, social.Target) (social.ContentSnapshot, error) {
 	return f.snap, nil
 }
 
-// 後台的措施回應帶快照全文（賣家只有摘要）：content_bodies 只含有快照的對象。
+// 後台的措施回應帶快照全文（賣家只有摘要）：content_bodies 只含有快照的對象，且只在載入了全文（讀單筆）時輸出；清單讀取（FullBody 為假）不輸出。
+func TestAdminMeasureListReadOmitsTheFullBodies(t *testing.T) {
+	post := uuid.NewV7()
+	m := riskMeasureFixture()
+	m.Contents = []model.MeasureContent{{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, Excerpt: "摘要",
+		Snapshot: &model.ContentSnapshot{AuthoredAt: snapshotAuthoredAt, Link: model.ContentLink{PostID: post}}}}
+	out := toAdminMeasure(m)
+	if len(out.GetContentBodies()) != 0 || out.GetContents()[0].GetExcerpt() != "摘要" {
+		t.Fatalf("清單不輸出全文：bodies=%v contents=%v", out.GetContentBodies(), out.GetContents())
+	}
+}
+
+// 後台的措施回應帶快照全文（見上）。
 func TestAdminMeasureCarriesTheFullSnapshotBody(t *testing.T) {
 	post := uuid.NewV7()
 	body := strings.Repeat("字", model.ExcerptRunes+30)
 	m := riskMeasureFixture()
 	m.Contents = []model.MeasureContent{
-		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, Snapshot: &model.ContentSnapshot{Body: body, AuthoredAt: snapshotAuthoredAt, ImageCount: 2, Link: model.ContentLink{PostID: post}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, FullBody: true,
+			Excerpt: strings.Repeat("字", model.ExcerptRunes) + "…", Snapshot: &model.ContentSnapshot{Body: body, AuthoredAt: snapshotAuthoredAt, ImageCount: 2, Link: model.ContentLink{PostID: post}}},
 		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotUnavailable},
 	}
 	out := toAdminMeasure(m)

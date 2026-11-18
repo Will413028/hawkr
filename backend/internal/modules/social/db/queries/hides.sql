@@ -76,6 +76,18 @@ WHERE id = sqlc.arg(id);
 
 -- name: GetForumEntrySnapshot :one
 -- 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
-SELECT actor_kind, actor_id, body, store_id, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = sqlc.arg(id);
+
+-- name: AvailableLinkPosts :many
+-- 一批貼文裡此刻還在（沒有軟刪）的：措施快照的連結只對這些顯示（A7-D29）。唯讀，不鎖，不套可見性規則。
+SELECT id FROM social.posts WHERE id = ANY(sqlc.arg(post_ids)::uuid[]) AND deleted_at IS NULL;
+
+-- name: AvailableLinkThreads :many
+-- 一批討論串（店家加討論串 id，平行陣列）裡此刻還在的：討論串的起始留言（id 等於 thread_id）存在且沒有軟刪。唯讀，不鎖，不套可見性規則。
+SELECT e.store_id, e.id AS thread_id
+FROM social.forum_entries e
+JOIN generate_series(1, cardinality(sqlc.arg(store_ids)::bigint[])) AS i
+    ON e.store_id = (sqlc.arg(store_ids)::bigint[])[i] AND e.id = (sqlc.arg(thread_ids)::uuid[])[i]
+WHERE e.deleted_at IS NULL;

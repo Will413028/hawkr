@@ -221,7 +221,7 @@ func TestGetMyOnboardingStartActionNeedsConfiguredPaymentOnboarding(t *testing.T
 // 後台的 GetStoreOnboarding 與賣家端是同一個函式：條件來自店家，後台讀不到草稿所以沒有申請就是「未送出」；讀取失敗只讓該項 UNKNOWN。
 func TestGetStoreOnboardingUsesTheSameDerivation(t *testing.T) {
 	m := &onboardingAdminModule{store: storeWithGate(true, true)}
-	h := NewAdmin(m, rpc.Images{}, &paymentModule{account: payment.Account{Status: payment.StatusEnabled}}, nil)
+	h := NewAdmin(m, rpc.Images{}, &paymentModule{account: payment.Account{Status: payment.StatusEnabled}}, fakeLinks{}, nil)
 	got, err := h.GetStoreOnboarding(adminCtx(1), connect.NewRequest(&adminpb.GetStoreOnboardingRequest{StoreId: "11"}))
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestGetStoreOnboardingUsesTheSameDerivation(t *testing.T) {
 	}
 
 	m = &onboardingAdminModule{store: storeWithGate(false, false), kycErr: errors.New("壞了")}
-	h = NewAdmin(m, rpc.Images{}, nil, nil)
+	h = NewAdmin(m, rpc.Images{}, nil, fakeLinks{}, nil)
 	got, err = h.GetStoreOnboarding(adminCtx(1), connect.NewRequest(&adminpb.GetStoreOnboardingRequest{StoreId: "11"}))
 	if err != nil {
 		t.Fatalf("讀取失敗讓方法失敗：%v", err)
