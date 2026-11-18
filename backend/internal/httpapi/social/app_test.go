@@ -35,6 +35,7 @@ type writeCall struct {
 }
 
 type fakeWrites struct {
+	readability
 	post     social.Post
 	calls    []writeCall
 	err      error

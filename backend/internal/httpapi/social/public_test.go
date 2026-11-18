@@ -22,7 +22,32 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
+// readability 是測試用的公開可讀來源：預設全部可讀；unreadable 列出不可讀的貼文，forumClosed 讓討論區不可讀，asked 記下每次查的貼文。
+type readability struct {
+	unreadable  map[uuid.UUID]bool
+	forumClosed bool
+	asked       [][]uuid.UUID
+	forumAsked  int
+}
+
+func (r *readability) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	r.asked = append(r.asked, ids)
+	out := map[uuid.UUID]bool{}
+	for _, id := range ids {
+		if !r.unreadable[id] {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
+func (r *readability) ForumReadable(context.Context, social.Caller, int64) (bool, error) {
+	r.forumAsked++
+	return !r.forumClosed, nil
+}
+
 type fakeReads struct {
+	readability
 	post     social.Post
 	postErr  error
 	feed     social.PostPage

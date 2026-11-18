@@ -25,6 +25,7 @@ import (
 
 // fakeOwner 記錄店主方法的呼叫並回固定的結果；它不判斷能力與去重，那些是模組的規則（見 TestOwnerDeclarationsMatchTheModuleChecks 與模組的 integration 測試）。
 type fakeOwner struct {
+	readability
 	calls      []string
 	actors     []*delegatedactor.Actor
 	store      seller.Store
@@ -889,4 +890,9 @@ func TestOwnerCancelPostScheduleReturnsTheNextEtagAndRequiresOne(t *testing.T) {
 	if len(f.calls) != 0 {
 		t.Fatalf("請求不合法不該到模組：%v", f.calls)
 	}
+}
+
+// PubliclyReadablePosts 不是宣告表裡的操作（它只回答提示欄位），這裡不經模組。
+func (r *reaching) PubliclyReadablePosts(context.Context, []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return map[uuid.UUID]bool{}, nil
 }

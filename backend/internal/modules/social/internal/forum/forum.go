@@ -85,6 +85,16 @@ func (s *Service) currentOf(ctx context.Context, q *store.Queries, row store.Soc
 	return withStats(ctx, q, out)
 }
 
+// Readable 回店 storeID 的討論區對呼叫者此刻可不可以讀與寫：店家可曝光，而且（買家身分時）沒有封鎖這家店；店主以店家身分讀，不套個人封鎖。
+// 新增留言的前置檢查與 viewer_can_comment 同用這一個判斷。
+func (s *Service) Readable(ctx context.Context, c model.Caller, storeID int64, now time.Time) (bool, error) {
+	ok, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.ForumIsReadable(storeID, now, actor.ViewerFor(c, storeID)))
+	if err != nil {
+		return false, fmt.Errorf("social：讀取店家 %d：%w", storeID, err)
+	}
+	return ok, nil
+}
+
 // Create 在店家的討論區新增留言或回覆。店家要可曝光；互動者依歸屬推導（呼叫者此刻的店是這家店 → STORE，要有 CapMarketing，否則是買家）。
 // 回覆的父一律壓成頂層，reply_to 只接受同一個討論區同一串（父本身或父底下的回覆）、看得到的留言，沒給時是父留言。
 func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInput) (model.ForumEntry, error) {
@@ -106,9 +116,9 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		viewer := actor.ViewerFor(c, in.StoreID)
-		readable, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.ForumIsReadable(in.StoreID, now, viewer))
+		readable, err := s.Readable(ctx, c, in.StoreID, now)
 		if err != nil {
-			return fmt.Errorf("social：讀取店家 %d：%w", in.StoreID, err)
+			return err
 		}
 		if !readable {
 			return apperr.NotFound("%s", text.ForumStoreNotFound(uitext.LocaleFrom(ctx)))

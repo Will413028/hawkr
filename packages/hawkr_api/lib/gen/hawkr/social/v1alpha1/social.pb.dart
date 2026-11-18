@@ -463,8 +463,9 @@ class Post extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearUrl() => $_clearField(13);
 
-  /// 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
-  /// 這是顯示用的提示，寫入時伺服器仍會檢查。
+  /// 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主是 true。
+  /// 貼文要公開可讀（已發布、沒有刪除、沒有被內容下架、店家可曝光）：留言只寫得進公開可讀的貼文，所以店主讀自己店的草稿或已下架的貼文是 false。
+  /// 這是顯示用的提示，寫入時伺服器仍會檢查（與寫入同一個判斷）。
   @$pb.TagNumber(14)
   $core.bool get viewerCanComment => $_getBF(13);
   @$pb.TagNumber(14)
@@ -1040,7 +1041,8 @@ class Comment extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearViewerCanDelete() => $_clearField(15);
 
-  /// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
+  /// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false），
+  /// 而且這篇貼文公開可讀（回覆經 CreateComment，只寫得進公開可讀的貼文；草稿或已下架的貼文是 false）。
   @$pb.TagNumber(16)
   $core.bool get viewerCanReply => $_getBF(15);
   @$pb.TagNumber(16)
@@ -2218,7 +2220,8 @@ class ForumEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearViewerCanDelete() => $_clearField(13);
 
-  /// 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+  /// 觀看者能不能回覆：VISIBLE，而且討論區對觀看者可寫（店家可曝光、觀看者沒有被這家店封鎖；訪客是 false；店主讀自己的討論區在店家可曝光時是 true）。
+  /// 與 ListForumEntriesResponse.viewer_can_comment 同一個判斷。顯示用的提示，寫入時伺服器仍會檢查。
   @$pb.TagNumber(14)
   $core.bool get viewerCanReply => $_getBF(13);
   @$pb.TagNumber(14)
@@ -2425,7 +2428,8 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   Actor ensureViewerActor() => $_ensure(2);
 
-  /// 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  /// 觀看者能不能在這家店的討論區新增頂層留言：討論區要可寫（店家可曝光，與 CreateForumEntry 的前置檢查同一個判斷），而且買家沒有被這家店封鎖或這就是觀看者此刻的店（訪客是 false）。
+  /// 店家不可曝光時店主也是 false。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
   /// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
   @$pb.TagNumber(4)
   $core.bool get viewerCanComment => $_getBF(3);

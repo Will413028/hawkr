@@ -33,6 +33,7 @@ type Owner interface {
 	ListMyPosts(ctx context.Context, store seller.Store, status social.PostStatus, after *social.CreatedPostCursor, size int32) (social.CreatedPostPage, error)
 	ListStoreComments(ctx context.Context, store seller.Store, postID *uuid.UUID, unreplied bool, after *social.CommentCursor, size int32) (social.CommentPage, error)
 	StoreSocialSummary(ctx context.Context, store seller.Store) (social.StoreSummary, error)
+	PubliclyReadablePosts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error)
 }
 
 var (

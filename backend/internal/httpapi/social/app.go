@@ -30,6 +30,7 @@ type Writes interface {
 	CreateForumEntry(ctx context.Context, c social.Caller, in social.ForumInput) (social.ForumEntry, error)
 	UpdateForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version int64, body string) (social.ForumEntry, error)
 	DeleteForumEntry(ctx context.Context, c social.Caller, id uuid.UUID, version int64) error
+	ForumReadable(ctx context.Context, c social.Caller, storeID int64) (bool, error)
 }
 
 // App 實作 SocialAppService。
@@ -59,7 +60,7 @@ func newApp(table map[string]declaration, writes Writes, authored Authored, owne
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log, liked: noViewerLikes}, writes: writes, authored: authored, owner: owner}, nil
+	return &App{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log, liked: noViewerLikes, postReadable: owner, forumReadable: writes}, writes: writes, authored: authored, owner: owner}, nil
 }
 
 // noViewerLikes 是店主路徑的 liked：店主的回應不帶買家的讚，永遠是空的。
