@@ -949,22 +949,43 @@ func TestContentTakedownIsReleasedOnlyThroughAppeal(t *testing.T) {
 
 func TestValidateContentTargetsRules(t *testing.T) {
 	id := func(n byte) uuid.UUID { var u uuid.UUID; u[15] = n; return u }
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	post := func(kind ContentKind, n byte) TakedownContent {
+		return TakedownContent{ContentRef: ContentRef{kind, id(n)}, Snapshot: &ContentSnapshot{Body: "x", AuthoredAt: at, Link: ContentLink{PostID: id(9)}}}
+	}
+	forum := func(n byte) TakedownContent {
+		return TakedownContent{ContentRef: ContentRef{ContentForumEntry, id(n)}, Snapshot: &ContentSnapshot{Body: "x", AuthoredAt: at, Link: ContentLink{StoreID: 7, ThreadID: id(8)}}}
+	}
+	purged := TakedownContent{ContentRef: ContentRef{ContentPost, id(1)}, Purged: true}
+	with := func(c TakedownContent, f func(*TakedownContent)) []TakedownContent {
+		f(&c)
+		return []TakedownContent{c}
+	}
 	tests := []struct {
 		name string
-		in   []ContentRef
+		in   []TakedownContent
 		ok   bool
 	}{
-		{"一則貼文", []ContentRef{{ContentPost, id(1)}}, true},
-		{"三種內容各一", []ContentRef{{ContentPost, id(1)}, {ContentComment, id(2)}, {ContentForumEntry, id(3)}}, true},
-		{"同一個 id 不同種類不算重複", []ContentRef{{ContentPost, id(1)}, {ContentComment, id(1)}}, true},
+		{"一則貼文", []TakedownContent{post(ContentPost, 1)}, true},
+		{"三種內容各一", []TakedownContent{post(ContentPost, 1), post(ContentComment, 2), forum(3)}, true},
+		{"同一個 id 不同種類不算重複", []TakedownContent{post(ContentPost, 1), post(ContentComment, 1)}, true},
+		{"已清除旗標", []TakedownContent{purged}, true},
 		{"空", nil, false},
-		{"重複", []ContentRef{{ContentPost, id(1)}, {ContentPost, id(1)}}, false},
-		{"未知種類", []ContentRef{{"STORE", id(1)}}, false},
-		{"空 ID", []ContentRef{{ContentPost, uuid.Nil()}}, false},
-		{"超過上限", func() []ContentRef {
-			var out []ContentRef
+		{"重複", []TakedownContent{post(ContentPost, 1), post(ContentPost, 1)}, false},
+		{"未知種類", []TakedownContent{post("STORE", 1)}, false},
+		{"空 ID", []TakedownContent{post(ContentPost, 0)}, false},
+		{"沒有快照也沒有旗標", with(purged, func(c *TakedownContent) { c.Purged = false }), false},
+		{"快照與旗標並存", with(post(ContentPost, 1), func(c *TakedownContent) { c.Purged = true }), false},
+		{"沒有發文時間", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.AuthoredAt = time.Time{} }), false},
+		{"圖片張數為負", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.ImageCount = -1 }), false},
+		{"貼文沒有連結", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{} }), false},
+		{"留言連到討論串", with(post(ContentComment, 1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{StoreID: 7, ThreadID: id(8)} }), false},
+		{"討論區留言連到貼文", with(forum(1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{PostID: id(9)} }), false},
+		{"討論區留言缺店家", with(forum(1), func(c *TakedownContent) { c.Snapshot.Link.StoreID = 0 }), false},
+		{"超過上限", func() []TakedownContent {
+			var out []TakedownContent
 			for i := range MaxTakedownContents + 1 {
-				out = append(out, ContentRef{ContentPost, id(byte(i + 1))})
+				out = append(out, post(ContentPost, byte(i+1)))
 			}
 			return out
 		}(), false},
@@ -973,6 +994,22 @@ func TestValidateContentTargetsRules(t *testing.T) {
 		err := ValidateContentTargets("Takedown.Contents", tt.in)
 		if (err == nil) != tt.ok {
 			t.Errorf("%s：%v", tt.name, err)
+		}
+	}
+}
+
+func TestExcerptTruncatesAtRunesAndMarksOnlyWhenLonger(t *testing.T) {
+	exact := strings.Repeat("字", ExcerptRunes)
+	tests := []struct{ name, body, want string }{
+		{"空", "", ""},
+		{"剛好上限不加省略號", exact, exact},
+		{"超過一個字元加省略號", exact + "x", exact + "…"},
+		{"以字元而非位元組計", strings.Repeat("😀", ExcerptRunes+5), strings.Repeat("😀", ExcerptRunes) + "…"},
+		{"短文原樣", "短", "短"},
+	}
+	for _, tt := range tests {
+		if got := (ContentSnapshot{Body: tt.body}).Excerpt(); got != tt.want {
+			t.Errorf("%s：got %q", tt.name, got)
 		}
 	}
 }

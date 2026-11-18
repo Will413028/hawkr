@@ -809,6 +809,42 @@ class ContentKind extends $pb.ProtobufEnum {
   const ContentKind._(super.value, super.name);
 }
 
+/// ContentSnapshotState 是內容下架對象上處分依據快照的狀態。
+class ContentSnapshotState extends $pb.ProtobufEnum {
+  static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_UNSPECIFIED =
+      ContentSnapshotState._(
+          0, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_UNSPECIFIED');
+
+  /// 快照在：excerpt、authored_time 與連結目標都有值。
+  static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_CAPTURED =
+      ContentSnapshotState._(
+          1, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_CAPTURED');
+
+  /// 建立措施時內容已被清除，取不到快照；沒有 excerpt、authored_time 與連結目標。
+  static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_UNAVAILABLE =
+      ContentSnapshotState._(
+          2, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_UNAVAILABLE');
+
+  /// 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
+  static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_CLEARED =
+      ContentSnapshotState._(
+          3, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_CLEARED');
+
+  static const $core.List<ContentSnapshotState> values = <ContentSnapshotState>[
+    CONTENT_SNAPSHOT_STATE_UNSPECIFIED,
+    CONTENT_SNAPSHOT_STATE_CAPTURED,
+    CONTENT_SNAPSHOT_STATE_UNAVAILABLE,
+    CONTENT_SNAPSHOT_STATE_CLEARED,
+  ];
+
+  static final $core.List<ContentSnapshotState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ContentSnapshotState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ContentSnapshotState._(super.value, super.name);
+}
+
 /// MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條
 /// 的外部要求（沒有固定期間時由平台定期複審），CONTRACT 依據契約條款（只配終止合作，無過錯或與認定無關）。
 class MeasureBasis extends $pb.ProtobufEnum {

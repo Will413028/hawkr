@@ -1,0 +1,8 @@
+-- Modify "measure_contents" table
+ALTER TABLE "seller"."measure_contents" ADD CONSTRAINT "measure_contents_link_check" CHECK ((snapshot_state <> 'CAPTURED'::text) OR
+CASE content_kind
+    WHEN 'FORUM_ENTRY'::text THEN ((link_post_id IS NULL) AND (link_store_id IS NOT NULL) AND (link_store_id > 0) AND (link_thread_id IS NOT NULL))
+    ELSE ((link_post_id IS NOT NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL))
+END), ADD CONSTRAINT "measure_contents_snapshot_fields_check" CHECK (((snapshot_state = 'CAPTURED'::text) = ((snapshot_body IS NOT NULL) AND (snapshot_authored_at IS NOT NULL) AND (snapshot_image_count IS NOT NULL))) AND ((snapshot_state = 'CAPTURED'::text) OR ((snapshot_body IS NULL) AND (snapshot_authored_at IS NULL) AND (snapshot_image_count IS NULL) AND (link_post_id IS NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL)))), ADD CONSTRAINT "measure_contents_snapshot_image_count_check" CHECK (snapshot_image_count >= 0), ADD CONSTRAINT "measure_contents_snapshot_state_check" CHECK (snapshot_state = ANY (ARRAY['CAPTURED'::text, 'UNAVAILABLE'::text, 'CLEARED'::text])), ADD COLUMN "snapshot_state" text NOT NULL, ADD COLUMN "snapshot_body" text NULL, ADD COLUMN "snapshot_authored_at" timestamptz NULL, ADD COLUMN "snapshot_image_count" integer NULL, ADD COLUMN "link_post_id" uuid NULL, ADD COLUMN "link_store_id" bigint NULL, ADD COLUMN "link_thread_id" uuid NULL;
+-- Create index "measure_contents_captured" to table: "measure_contents"
+CREATE INDEX "measure_contents_captured" ON "seller"."measure_contents" ("measure_id") WHERE (snapshot_state = 'CAPTURED'::text);

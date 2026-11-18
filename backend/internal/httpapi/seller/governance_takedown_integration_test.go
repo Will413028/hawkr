@@ -145,6 +145,23 @@ func TestContentTakedownThroughConnectWritesAndRemovesTheSocialCopy(t *testing.T
 	if n := f.count(t, "SELECT count(*) FROM social.forum_entries WHERE id = $1 AND NOT counted", c.entry); n != 1 {
 		t.Fatal("討論區留言的旗標要同 transaction 變成不計入")
 	}
+	// 同一次讀取核對歸屬並取得快照：存入本文、發文時間、圖片張數與連結（貼文與留言連貼文，討論區留言連店家加討論串）。
+	mid := created.Msg.GetMeasure().GetId()
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1 AND snapshot_state = 'CAPTURED' AND snapshot_authored_at IS NOT NULL", mid); n != 3 {
+		t.Fatalf("三則內容都存快照：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1 AND content_kind = 'POST' AND snapshot_body = '貼文' AND link_post_id = $2", mid, c.post); n != 1 {
+		t.Fatal("貼文的本文與連結")
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1 AND content_kind = 'COMMENT' AND snapshot_body = '留言' AND link_post_id = $2", mid, c.post); n != 1 {
+		t.Fatal("留言連到所屬貼文")
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1 AND content_kind = 'FORUM_ENTRY' AND snapshot_body = '討論' AND link_store_id = $2 AND link_thread_id = $3", mid, s.StoreID, c.entry); n != 1 {
+		t.Fatal("討論區留言連到店家加討論串")
+	}
+	if got := created.Msg.GetMeasure().GetContentBodies(); len(got) != 3 {
+		t.Fatalf("後台回應帶三則全文：%v", got)
+	}
 	id := uuid.MustParse(created.Msg.GetMeasure().GetId())
 	if _, err := f.module.RevokeMeasure(ctx, seller.RevokeMeasureInput{AdminID: f.adminID, MeasureID: id, ExpectedVersion: 1, Reason: seller.RevokeAdminCorrection}); err != nil {
 		t.Fatal(err)
@@ -172,7 +189,9 @@ func TestContentTakedownRollsBackWithTheCallersTransaction(t *testing.T) {
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
 		if _, err := f.module.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
 			AdminID: f.adminID, StoreID: s.StoreID, Kind: seller.MeasureContentTakedown, StatementToSeller: "內容違規", Note: "內部紀錄", Violation: &finding,
-			Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentPost, ID: c.post}, {Kind: seller.ContentComment, ID: c.comment}}},
+			Takedown: &seller.ContentTakedown{Contents: []seller.TakedownContent{
+				takedownSnapshot(seller.ContentRef{Kind: seller.ContentPost, ID: c.post}), takedownSnapshot(seller.ContentRef{Kind: seller.ContentComment, ID: c.comment}),
+			}},
 		}); err != nil {
 			return err
 		}
@@ -216,7 +235,7 @@ func TestContentTakedownThroughCreateInTxChecksOnlyWhoseContentItIs(t *testing.T
 		return f.db.InTx(ctx, func(ctx context.Context) error {
 			_, err := f.module.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
 				AdminID: f.adminID, StoreID: target.StoreID, Kind: seller.MeasureContentTakedown, StatementToSeller: "內容違規", Note: "內部紀錄", Violation: &finding,
-				Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{ref}},
+				Takedown: &seller.ContentTakedown{Contents: []seller.TakedownContent{takedownSnapshot(ref)}},
 			})
 			return err
 		})
@@ -246,4 +265,13 @@ func TestContentTakedownThroughCreateInTxChecksOnlyWhoseContentItIs(t *testing.T
 	if n := f.count(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
 		t.Fatalf("沒有公開可見的內容，不該有複本：%d", n)
 	}
+}
+
+// takedownSnapshot 給一個內容參照一份格式正確的快照（連結依種類）。
+func takedownSnapshot(ref seller.ContentRef) seller.TakedownContent {
+	sn := &seller.ContentSnapshot{Body: "本文", AuthoredAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Link: seller.ContentLink{PostID: uuid.NewV7()}}
+	if ref.Kind == seller.ContentForumEntry {
+		sn.Link = seller.ContentLink{StoreID: 1, ThreadID: uuid.NewV7()}
+	}
+	return seller.TakedownContent{ContentRef: ref, Snapshot: sn}
 }

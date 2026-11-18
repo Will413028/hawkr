@@ -6,6 +6,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -103,6 +104,24 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
 		t.Fatalf("貼文 %+v", got)
 	}
+	// 發文時間與連結目標：貼文連到自己，留言連到所屬貼文，討論區留言連到店家加討論串（頂層留言的討論串是自己）。
+	postAuthored := f.timeOf(t, "SELECT COALESCE(published_at, created_at) FROM social.posts WHERE id = $1", p.ID)
+	commentAuthored := f.timeOf(t, "SELECT created_at FROM social.comments WHERE id = $1", c.ID)
+	entryAuthored := f.timeOf(t, "SELECT created_at FROM social.forum_entries WHERE id = $1", e.ID)
+	if got := snap(social.TargetPost, p.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(postAuthored) || got.AuthoredAt.IsZero() {
+		t.Fatalf("貼文的連結與發文時間 %+v", got)
+	}
+	if got := snap(social.TargetComment, c.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(commentAuthored) || got.Purged {
+		t.Fatalf("留言的連結與發文時間 %+v", got)
+	}
+	if got := snap(social.TargetForumEntry, e.ID); got.ThreadID != e.ID || got.PostID != (uuidT{}) || got.StoreID != storeID || !got.AuthoredAt.Equal(entryAuthored) || got.Purged {
+		t.Fatalf("討論區留言的連結與發文時間 %+v", got)
+	}
+	// 作者刪帳清除本文後內容還在、本文是 NULL：快照標示已清除（Purged），不是空本文。
+	f.exec(t, "UPDATE social.forum_entries SET body = NULL WHERE id = $1", e.ID)
+	if got := snap(social.TargetForumEntry, e.ID); !got.Exists || !got.Purged || got.Body != "" {
+		t.Fatalf("本文已清除 %+v", got)
+	}
 	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {
 		t.Fatalf("刪除後不存在 %+v", got)
@@ -168,4 +187,13 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	if got := f.jobs.revalidations(); len(got) != 1 || !slices.Equal(got[0], revalidate.StoreTags(st.StoreID, st.StoreCode)) {
 		t.Fatalf("討論區隱藏：%v", got)
 	}
+}
+
+func (f *fixture) timeOf(t *testing.T, sql string, args ...any) time.Time {
+	t.Helper()
+	var at time.Time
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), sql, args...).Scan(&at); err != nil {
+		t.Fatalf("%v\n%s", err, sql)
+	}
+	return at
 }

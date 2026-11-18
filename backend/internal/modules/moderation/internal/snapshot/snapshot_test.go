@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 )
@@ -95,5 +96,31 @@ func TestStoreOfRequiresTheStoreToBeTheAuthor(t *testing.T) {
 	other, _ := Encode(Content{Kind: model.TargetComment, AuthorKind: "STORE", AuthorID: 8, StoreID: 7})
 	if StoreOf(other) != nil {
 		t.Fatal("別家店的留言下的店家作者不算快照店家")
+	}
+}
+
+// 處分依據的發文時間與連結目標一併凍結：寫出再讀回得到同一份（時間以 UTC 微秒為準），改發文時間或連結雜湊就不同。
+func TestEncodeFreezesAuthoredTimeAndLinkTarget(t *testing.T) {
+	at := time.Date(2026, 11, 1, 3, 4, 5, 123456789, time.FixedZone("TST", 8*3600))
+	c := comment("本文")
+	c.AuthoredAt, c.PostID = at, "0190a000-0000-7000-8000-000000000001"
+	text, sum := Encode(c)
+	got, err := Decode(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.AuthoredAt.Equal(at.Truncate(time.Microsecond)) || got.PostID != c.PostID || got.ThreadID != "" {
+		t.Fatalf("讀回 %+v", got)
+	}
+	for name, mutate := range map[string]func(*Content){
+		"發文時間": func(c *Content) { c.AuthoredAt = c.AuthoredAt.Add(time.Second) },
+		"貼文連結": func(c *Content) { c.PostID = "0190a000-0000-7000-8000-000000000002" },
+		"討論串":  func(c *Content) { c.ThreadID = "0190a000-0000-7000-8000-000000000003" },
+	} {
+		d := c
+		mutate(&d)
+		if _, other := Encode(d); other == sum {
+			t.Errorf("%s 不同時雜湊要不同", name)
+		}
 	}
 }

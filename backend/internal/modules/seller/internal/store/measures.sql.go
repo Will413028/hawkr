@@ -806,6 +806,55 @@ func (q *Queries) CaseNotes(ctx context.Context, arg CaseNotesParams) ([]SellerG
 	return items, nil
 }
 
+const clearContentSnapshotsOfStores = `-- name: ClearContentSnapshotsOfStores :execrows
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM seller.measures m
+WHERE m.id = c.measure_id AND m.store_id = ANY($1::bigint[]) AND c.snapshot_state = 'CAPTURED'
+`
+
+// 店家退場（個資清理第二段）時清空這些店家全部措施留著的內容快照，不論措施是否撤銷。
+func (q *Queries) ClearContentSnapshotsOfStores(ctx context.Context, storeIds []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, clearContentSnapshotsOfStores, storeIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const clearExpiredContentSnapshots = `-- name: ClearExpiredContentSnapshots :execrows
+WITH due AS (
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measure_contents c
+    JOIN seller.measures m ON m.id = c.measure_id
+    WHERE c.snapshot_state = 'CAPTURED' AND m.status = 'REVOKED' AND m.revoked_at <= $1::timestamptz
+    ORDER BY c.measure_id, c.content_kind, c.content_id
+    LIMIT $2::int
+    FOR UPDATE OF c SKIP LOCKED
+)
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM due
+WHERE c.measure_id = due.measure_id AND c.content_kind = due.content_kind AND c.content_id = due.content_id
+`
+
+type ClearExpiredContentSnapshotsParams struct {
+	Cutoff  time.Time
+	MaxRows int32
+}
+
+// 撤銷滿保留期的內容下架措施，清空它留著的內容快照（內容下架沒有結束時間，只從 revoked_at 起算；未撤銷的一直保留）。cutoff 是現在減保留期；
+// 一批最多 max_rows 列，鎖住（SKIP LOCKED）再更新，重跑冪等。
+func (q *Queries) ClearExpiredContentSnapshots(ctx context.Context, arg ClearExpiredContentSnapshotsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearExpiredContentSnapshots, arg.Cutoff, arg.MaxRows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeEndedRemediations = `-- name: CloseEndedRemediations :many
 UPDATE seller.measure_requests r
 SET state = 'CLOSED',
@@ -1202,21 +1251,45 @@ func (q *Queries) InsertMeasure(ctx context.Context, arg InsertMeasureParams) (I
 	return i, err
 }
 
-const insertMeasureContents = `-- name: InsertMeasureContents :exec
-INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
-SELECT $1, ($2::text[])[i], ($3::uuid[])[i]
-FROM generate_series(1, cardinality($3::uuid[])) AS i
+const insertMeasureContent = `-- name: InsertMeasureContent :exec
+INSERT INTO seller.measure_contents (
+    measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
+    link_post_id, link_store_id, link_thread_id
+)
+VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10
+)
 `
 
-type InsertMeasureContentsParams struct {
-	MeasureID uuid.UUID
-	Kinds     []string
-	Ids       []uuid.UUID
+type InsertMeasureContentParams struct {
+	MeasureID          uuid.UUID
+	ContentKind        string
+	ContentID          uuid.UUID
+	SnapshotState      string
+	SnapshotBody       *string
+	SnapshotAuthoredAt *time.Time
+	SnapshotImageCount *int32
+	LinkPostID         *uuid.UUID
+	LinkStoreID        *int64
+	LinkThreadID       *uuid.UUID
 }
 
-// 內容下架措施的對象（與 InsertMeasure 同一個 transaction；種類與 ID 是平行陣列，呼叫方已驗證形狀）。
-func (q *Queries) InsertMeasureContents(ctx context.Context, arg InsertMeasureContentsParams) error {
-	_, err := q.db.Exec(ctx, insertMeasureContents, arg.MeasureID, arg.Kinds, arg.Ids)
+// 內容下架措施的一個對象與處分依據的快照（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。
+// 沒有快照的列（UNAVAILABLE）其快照欄位為 NULL；CAPTURED 的連結欄位依種類只填其中一組。
+func (q *Queries) InsertMeasureContent(ctx context.Context, arg InsertMeasureContentParams) error {
+	_, err := q.db.Exec(ctx, insertMeasureContent,
+		arg.MeasureID,
+		arg.ContentKind,
+		arg.ContentID,
+		arg.SnapshotState,
+		arg.SnapshotBody,
+		arg.SnapshotAuthoredAt,
+		arg.SnapshotImageCount,
+		arg.LinkPostID,
+		arg.LinkStoreID,
+		arg.LinkThreadID,
+	)
 	return err
 }
 
@@ -1623,16 +1696,24 @@ func (q *Queries) MeasureByRequest(ctx context.Context, arg MeasureByRequestPara
 }
 
 const measureContents = `-- name: MeasureContents :many
-SELECT measure_id, content_kind, content_id
+SELECT measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
+       link_post_id, link_store_id, link_thread_id
 FROM seller.measure_contents
 WHERE measure_id = ANY($1::uuid[])
 ORDER BY measure_id, content_kind COLLATE "C", content_id
 `
 
 type MeasureContentsRow struct {
-	MeasureID   uuid.UUID
-	ContentKind string
-	ContentID   uuid.UUID
+	MeasureID          uuid.UUID
+	ContentKind        string
+	ContentID          uuid.UUID
+	SnapshotState      string
+	SnapshotBody       *string
+	SnapshotAuthoredAt *time.Time
+	SnapshotImageCount *int32
+	LinkPostID         *uuid.UUID
+	LinkStoreID        *int64
+	LinkThreadID       *uuid.UUID
 }
 
 // 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
@@ -1645,7 +1726,18 @@ func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) (
 	items := []MeasureContentsRow{}
 	for rows.Next() {
 		var i MeasureContentsRow
-		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
+		if err := rows.Scan(
+			&i.MeasureID,
+			&i.ContentKind,
+			&i.ContentID,
+			&i.SnapshotState,
+			&i.SnapshotBody,
+			&i.SnapshotAuthoredAt,
+			&i.SnapshotImageCount,
+			&i.LinkPostID,
+			&i.LinkStoreID,
+			&i.LinkThreadID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

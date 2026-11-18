@@ -2,10 +2,12 @@ package seller
 
 import (
 	"context"
+	"strconv"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"uuid"
 
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
@@ -152,7 +154,7 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 		})
 	}
 	for _, c := range m.Contents {
-		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+		out.Contents = append(out.Contents, toContentRef(c))
 	}
 	if m.Kind.Restrictive() {
 		out.Period = &pb.MeasurePeriod{StartTime: timestamppb.New(m.StartsAt)}
@@ -184,6 +186,25 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 	}
 	if d := m.RejectionCooldown(); d > 0 {
 		out.RejectionCooldown = durationpb.New(d)
+	}
+	return out
+}
+
+// toContentRef 把措施的一個內容對象轉成對外的 ContentRef：快照在時帶摘要（伺服器截斷）、發文時間與連結目標，否則只帶狀態。
+// 賣家與後台共用；後台另以 measure.content_bodies 取得全文。
+func toContentRef(c model.MeasureContent) *pb.ContentRef {
+	out := &pb.ContentRef{
+		Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), SnapshotState: rpc.EnumToProto[pb.ContentSnapshotState](c.State),
+	}
+	sn := c.Snapshot
+	if sn == nil {
+		return out
+	}
+	out.Excerpt, out.AuthoredTime = sn.Excerpt(), timestamppb.New(sn.AuthoredAt)
+	if sn.Link.PostID != uuid.Nil() {
+		out.Link = &pb.ContentRef_PostId{PostId: sn.Link.PostID.String()}
+	} else {
+		out.Link = &pb.ContentRef_ForumThread{ForumThread: &pb.ForumThreadLink{StoreId: strconv.FormatInt(sn.Link.StoreID, 10), ThreadId: sn.Link.ThreadID.String()}}
 	}
 	return out
 }

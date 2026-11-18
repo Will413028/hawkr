@@ -310,7 +310,7 @@ func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Co
 	}
 	return snapshot.Content{
 		Kind: in.Target.Kind, AuthorKind: string(snap.Author.Kind), AuthorID: snap.Author.ID, StoreID: snap.StoreID,
-		Body: snap.Body, MediaRefs: snap.MediaRefs,
+		Body: snap.Body, MediaRefs: snap.MediaRefs, AuthoredAt: snap.AuthoredAt, PostID: uuidString(snap.PostID), ThreadID: uuidString(snap.ThreadID),
 	}, nil
 }
 
@@ -366,4 +366,12 @@ func (s *Service) sameAccount(ctx context.Context, reporterBuyerID int64, author
 		return st.AccountID == reporter, nil
 	}
 	return false, nil
+}
+
+// uuidString 回傳 id 的字串；零值是空字串（快照 JSON 不輸出）。
+func uuidString(id uuid.UUID) string {
+	if id == uuid.Nil() {
+		return ""
+	}
+	return id.String()
 }

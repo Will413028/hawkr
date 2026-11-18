@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -1070,16 +1071,21 @@ func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 // ownsEverything 回報每則內容都存在、是 storeID 這家店寫的。
 type ownsEverything struct{ storeID int64 }
 
-func (o ownsEverything) ContentOwner(context.Context, social.Target) (social.ContentOwner, error) {
-	return social.ContentOwner{Exists: true, Author: social.Actor{Kind: social.ActorStore, ID: o.storeID}, StoreID: o.storeID, Readable: true}, nil
+func (o ownsEverything) ContentSnapshot(_ context.Context, t social.Target) (social.ContentSnapshot, error) {
+	return social.ContentSnapshot{
+		Exists: true, Author: social.Actor{Kind: social.ActorStore, ID: o.storeID}, StoreID: o.storeID, Readable: true,
+		Body: "本文 " + t.ID.String(), AuthoredAt: snapshotAuthoredAt, PostID: t.ID, ThreadID: t.ID, MediaRefs: []string{"a"},
+	}, nil
 }
+
+var snapshotAuthoredAt = time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
 
 // 內容下架的分支：種類與對象交給模組，依據一定是認定；模組的欄位錯誤對應到 content_takedown 的路徑；回應帶對象。
 func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	measure := riskMeasureFixture()
 	measure.Kind, measure.Basis, measure.RiskGround, measure.EndsAt, measure.ReviewBy, measure.State = model.MeasureContentTakedown, model.BasisViolation, nil, nil, nil, model.StateIssued
 	measure.Requests = nil
-	measure.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: uuid.NewV7()}, {Kind: model.ContentForumEntry, ID: uuid.NewV7()}}
+	measure.Contents = []model.MeasureContent{{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: uuid.NewV7()}}, {ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: uuid.NewV7()}}}
 	m := &governanceModule{measure: measure}
 	post, forum := uuid.NewV7(), uuid.NewV7()
 	h := NewTestGovernance(t, m)
@@ -1099,7 +1105,12 @@ func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	}
 	c := m.create
 	if c.Kind != model.MeasureContentTakedown || c.Takedown == nil || c.Termination != nil || c.Risk != nil || c.EndsAt != nil ||
-		!slices.Equal(c.Takedown.Contents, []model.ContentRef{{Kind: model.ContentPost, ID: post}, {Kind: model.ContentForumEntry, ID: forum}}) ||
+		!reflect.DeepEqual(c.Takedown.Contents, []model.TakedownContent{
+			{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, Snapshot: &model.ContentSnapshot{
+				Body: "本文 " + post.String(), AuthoredAt: snapshotAuthoredAt, ImageCount: 1, Link: model.ContentLink{PostID: post}}},
+			{ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: forum}, Snapshot: &model.ContentSnapshot{
+				Body: "本文 " + forum.String(), AuthoredAt: snapshotAuthoredAt, ImageCount: 1, Link: model.ContentLink{StoreID: 12, ThreadID: forum}}},
+		}) ||
 		c.Violation == nil || c.Violation.Finding == nil || c.Violation.Finding.Category != policy.Spam {
 		t.Fatalf("create=%+v takedown=%+v", c, c.Takedown)
 	}
@@ -1188,10 +1199,10 @@ func TestToLinkedAccountCarriesTheSharedBankAccountFields(t *testing.T) {
 }
 
 func TestNewGovernanceRejectsMissingDeps(t *testing.T) {
-	full := GovernanceDeps{Module: &governanceModule{}, ContentOwners: ownsEverything{storeID: 12}}
+	full := GovernanceDeps{Module: &governanceModule{}, ContentSnapshots: ownsEverything{storeID: 12}}
 	for name, mutate := range map[string]func(*GovernanceDeps){
-		"Module":        func(d *GovernanceDeps) { d.Module = nil },
-		"ContentOwners": func(d *GovernanceDeps) { d.ContentOwners = nil },
+		"Module":           func(d *GovernanceDeps) { d.Module = nil },
+		"ContentSnapshots": func(d *GovernanceDeps) { d.ContentSnapshots = nil },
 	} {
 		d := full
 		mutate(&d)
@@ -1201,5 +1212,59 @@ func TestNewGovernanceRejectsMissingDeps(t *testing.T) {
 	}
 	if _, err := NewGovernance(full); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// 內容已清除（本文被作者刪帳清掉）而內容還在時，後台建立內容下架帶「已清除」旗標、不帶快照；已刪除或不是這家店的內容照舊被拒絕。
+// mutation：takedownContents 忽略 Purged 直接帶空本文快照 → 旗標斷言失敗；把 !Exists 檢查拿掉 → 不存在的內容被接受。
+func TestTakedownContentsFlagsPurgedContentAndRejectsMissingOrForeign(t *testing.T) {
+	id := uuid.NewV7()
+	ref := []model.ContentRef{{Kind: model.ContentComment, ID: id}}
+	for name, tc := range map[string]struct {
+		snap   social.ContentSnapshot
+		purged bool
+		ok     bool
+	}{
+		"本文已清除":  {social.ContentSnapshot{Exists: true, Purged: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, true, true},
+		"有快照":    {social.ContentSnapshot{Exists: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}, Body: "x", AuthoredAt: snapshotAuthoredAt, PostID: id}, false, true},
+		"不存在":    {social.ContentSnapshot{}, false, false},
+		"別家店的內容": {social.ContentSnapshot{Exists: true, StoreID: 99, Author: social.Actor{Kind: social.ActorStore, ID: 99}}, false, false},
+	} {
+		h := &Governance{snapshots: fixedSnapshot{tc.snap}}
+		got, err := h.takedownContents(context.Background(), 12, ref)
+		if (err == nil) != tc.ok {
+			t.Errorf("%s：err=%v", name, err)
+			continue
+		}
+		if tc.ok && (got[0].Purged != tc.purged || (got[0].Snapshot == nil) != tc.purged) {
+			t.Errorf("%s：%+v", name, got[0])
+		}
+	}
+}
+
+type fixedSnapshot struct{ snap social.ContentSnapshot }
+
+func (f fixedSnapshot) ContentSnapshot(context.Context, social.Target) (social.ContentSnapshot, error) {
+	return f.snap, nil
+}
+
+// 後台的措施回應帶快照全文（賣家只有摘要）：content_bodies 只含有快照的對象。
+func TestAdminMeasureCarriesTheFullSnapshotBody(t *testing.T) {
+	post := uuid.NewV7()
+	body := strings.Repeat("字", model.ExcerptRunes+30)
+	m := riskMeasureFixture()
+	m.Contents = []model.MeasureContent{
+		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, Snapshot: &model.ContentSnapshot{Body: body, AuthoredAt: snapshotAuthoredAt, ImageCount: 2, Link: model.ContentLink{PostID: post}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotUnavailable},
+	}
+	out := toAdminMeasure(m)
+	if len(out.GetContents()) != 2 || len(out.GetContentBodies()) != 1 {
+		t.Fatalf("contents=%d bodies=%d", len(out.GetContents()), len(out.GetContentBodies()))
+	}
+	if b := out.GetContentBodies()[0]; b.GetId() != post.String() || b.GetBody() != body || b.GetImageCount() != 2 || b.GetKind() != pb.ContentKind_CONTENT_KIND_POST {
+		t.Errorf("body=%v", b)
+	}
+	if ex := out.GetContents()[0].GetExcerpt(); ex != strings.Repeat("字", model.ExcerptRunes)+"…" {
+		t.Errorf("摘要仍是截斷的：%q", ex)
 	}
 }

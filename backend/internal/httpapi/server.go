@@ -368,7 +368,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images, deps.Payment, deps.Logger), opts...))
 	add(sellerconnect.NewSellerPublicServiceHandler(sellerPublic, opts...))
 	add(sellerconnect.NewSellerAppServiceHandler(sellerApp, append(slices.Clone(opts), connect.WithInterceptors(acting))...))
-	governance, err := httpseller.NewGovernance(httpseller.GovernanceDeps{Module: deps.Seller, Images: deps.Images, ContentOwners: deps.Social})
+	governance, err := httpseller.NewGovernance(httpseller.GovernanceDeps{Module: deps.Seller, Images: deps.Images, ContentSnapshots: deps.Social})
 	if err != nil {
 		return nil, err
 	}

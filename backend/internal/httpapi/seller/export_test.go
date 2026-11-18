@@ -26,10 +26,10 @@ func CapabilityStatusOf(t *testing.T, caps []*pb.CapabilityStatus, c pb.SellerCa
 	return nil
 }
 
-// NewTestGovernance 建立測試用的 Governance：Images 是零值，ContentOwners 回報每則內容都是 12 號店寫的現存內容；override 改寫個別相依。
+// NewTestGovernance 建立測試用的 Governance：Images 是零值，ContentSnapshots 回報每則內容都是 12 號店寫的現存內容；override 改寫個別相依。
 func NewTestGovernance(t *testing.T, m GovernanceModule, override ...func(*GovernanceDeps)) *Governance {
 	t.Helper()
-	d := GovernanceDeps{Module: m, ContentOwners: ownsEverything{storeID: 12}}
+	d := GovernanceDeps{Module: m, ContentSnapshots: ownsEverything{storeID: 12}}
 	for _, o := range override {
 		o(&d)
 	}

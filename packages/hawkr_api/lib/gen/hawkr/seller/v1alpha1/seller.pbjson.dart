@@ -398,6 +398,24 @@ final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
     'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
     'UlVNX0VOVFJZEAM=');
 
+@$core.Deprecated('Use contentSnapshotStateDescriptor instead')
+const ContentSnapshotState$json = {
+  '1': 'ContentSnapshotState',
+  '2': [
+    {'1': 'CONTENT_SNAPSHOT_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'CONTENT_SNAPSHOT_STATE_CAPTURED', '2': 1},
+    {'1': 'CONTENT_SNAPSHOT_STATE_UNAVAILABLE', '2': 2},
+    {'1': 'CONTENT_SNAPSHOT_STATE_CLEARED', '2': 3},
+  ],
+};
+
+/// Descriptor for `ContentSnapshotState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contentSnapshotStateDescriptor = $convert.base64Decode(
+    'ChRDb250ZW50U25hcHNob3RTdGF0ZRImCiJDT05URU5UX1NOQVBTSE9UX1NUQVRFX1VOU1BFQ0'
+    'lGSUVEEAASIwofQ09OVEVOVF9TTkFQU0hPVF9TVEFURV9DQVBUVVJFRBABEiYKIkNPTlRFTlRf'
+    'U05BUFNIT1RfU1RBVEVfVU5BVkFJTEFCTEUQAhIiCh5DT05URU5UX1NOQVBTSE9UX1NUQVRFX0'
+    'NMRUFSRUQQAw==');
+
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {
   '1': 'MeasureBasis',
@@ -2186,6 +2204,20 @@ final $typed_data.Uint8List lookupBusinessRegistrationResponseDescriptor =
         'EoCzIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5CdXNpbmVzc1JlZ2lzdHJhdGlvblIMcmVnaXN0'
         'cmF0aW9u');
 
+@$core.Deprecated('Use forumThreadLinkDescriptor instead')
+const ForumThreadLink$json = {
+  '1': 'ForumThreadLink',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {'1': 'thread_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'threadId'},
+  ],
+};
+
+/// Descriptor for `ForumThreadLink`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forumThreadLinkDescriptor = $convert.base64Decode(
+    'Cg9Gb3J1bVRocmVhZExpbmsSHgoIc3RvcmVfaWQYASABKAlCA+BBA1IHc3RvcmVJZBIgCgl0aH'
+    'JlYWRfaWQYAiABKAlCA+BBA1IIdGhyZWFkSWQ=');
+
 @$core.Deprecated('Use contentRefDescriptor instead')
 const ContentRef$json = {
   '1': 'ContentRef',
@@ -2200,13 +2232,52 @@ const ContentRef$json = {
       '10': 'kind'
     },
     {'1': 'id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {
+      '1': 'snapshot_state',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.ContentSnapshotState',
+      '8': {},
+      '10': 'snapshotState'
+    },
+    {'1': 'excerpt', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'excerpt'},
+    {
+      '1': 'authored_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'authoredTime'
+    },
+    {'1': 'post_id', '3': 6, '4': 1, '5': 9, '8': {}, '9': 0, '10': 'postId'},
+    {
+      '1': 'forum_thread',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.ForumThreadLink',
+      '8': {},
+      '9': 0,
+      '10': 'forumThread'
+    },
+  ],
+  '8': [
+    {'1': 'link'},
   ],
 };
 
 /// Descriptor for `ContentRef`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List contentRefDescriptor = $convert.base64Decode(
     'CgpDb250ZW50UmVmEjsKBGtpbmQYASABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ29udG'
-    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZA==');
+    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZBJXCg5zbmFwc2hvdF9zdGF0'
+    'ZRgDIAEoDjIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50U25hcHNob3RTdGF0ZUID4E'
+    'EDUg1zbmFwc2hvdFN0YXRlEh0KB2V4Y2VycHQYBCABKAlCA+BBA1IHZXhjZXJwdBJECg1hdXRo'
+    'b3JlZF90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgxhdXRob3'
+    'JlZFRpbWUSHgoHcG9zdF9pZBgGIAEoCUID4EEDSABSBnBvc3RJZBJQCgxmb3J1bV90aHJlYWQY'
+    'ByABKAsyJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuRm9ydW1UaHJlYWRMaW5rQgPgQQNIAFILZm'
+    '9ydW1UaHJlYWRCBgoEbGluaw==');
 
 @$core.Deprecated('Use remediationUnavailabilityDescriptor instead')
 const RemediationUnavailability$json = {
@@ -3398,6 +3469,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       RemediationUnavailability$json,
   '.hawkr.seller.v1alpha1.AppealUnavailability': AppealUnavailability$json,
   '.hawkr.seller.v1alpha1.ContentRef': ContentRef$json,
+  '.hawkr.seller.v1alpha1.ForumThreadLink': ForumThreadLink$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureRequest': GetMyMeasureRequest$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureResponse': GetMyMeasureResponse$json,
   '.hawkr.seller.v1alpha1.SubmitAppealRequest': SubmitAppealRequest$json,

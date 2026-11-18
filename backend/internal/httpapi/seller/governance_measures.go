@@ -134,7 +134,12 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 		out.Findings = append(out.Findings, toAdminViolation(f))
 	}
 	for _, c := range m.Contents {
-		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+		out.Contents = append(out.Contents, toContentRef(c))
+		if c.Snapshot != nil {
+			out.ContentBodies = append(out.ContentBodies, &adminpb.MeasureContentBody{
+				Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), Body: c.Snapshot.Body, ImageCount: c.Snapshot.ImageCount,
+			})
+		}
 	}
 	for _, r := range m.Revisions {
 		out.Revisions = append(out.Revisions, toRevision(r))
@@ -327,18 +332,19 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		if in.Violation, err = violationBasisFrom(input.ContentTakedown.GetViolation(), "content_takedown.violation"); err != nil {
 			return nil, err
 		}
-		t := &model.ContentTakedown{}
+		refs := make([]model.ContentRef, 0, len(input.ContentTakedown.GetContents()))
 		for i, ref := range input.ContentTakedown.GetContents() {
 			id, err := rpc.ParseUUID(apperr.IndexedField("content_takedown.contents", i)+".id", ref.GetId())
 			if err != nil {
 				return nil, err
 			}
-			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+			refs = append(refs, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
 		}
-		if err := h.verifyTakedownContents(ctx, in.StoreID, t.Contents); err != nil {
+		contents, err := h.takedownContents(ctx, in.StoreID, refs)
+		if err != nil {
 			return nil, err
 		}
-		in.Takedown = t
+		in.Takedown = &model.ContentTakedown{Contents: contents}
 	default:
 		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
@@ -354,22 +360,36 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
 }
 
-// verifyTakedownContents 核對每一則內容現在存在（沒有刪除）、種類相符、作者是這家店；後台處理的是現存的內容，已刪除與不存在的都拒絕。
-func (h *Governance) verifyTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
-	for i, c := range contents {
-		o, err := h.owners.ContentOwner(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
+// takedownContents 核對每一則內容現在存在（沒有刪除）、作者是這家店，並用同一次讀取取得處分依據的內容快照；後台處理的是現存的內容，已刪除與不存在的都拒絕。
+// 內容還在但本文已清除時不帶快照，改以「已清除」旗標表示。種類不符或不存在的內容讀不到快照，同樣拒絕。
+func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs []model.ContentRef) ([]model.TakedownContent, error) {
+	out := make([]model.TakedownContent, 0, len(refs))
+	for i, c := range refs {
+		sn, err := h.snapshots.ContentSnapshot(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if !o.Exists || o.StoreID != storeID || o.Author.Kind != social.ActorStore || o.Author.ID != storeID {
-			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
+		if !sn.Exists || sn.StoreID != storeID || sn.Author.Kind != social.ActorStore || sn.Author.ID != storeID {
+			return nil, rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
 		}
+		t := model.TakedownContent{ContentRef: c}
+		if sn.Purged {
+			t.Purged = true
+		} else {
+			t.Snapshot = &model.ContentSnapshot{Body: sn.Body, AuthoredAt: sn.AuthoredAt, ImageCount: int32(len(sn.MediaRefs))} //nolint:gosec // 一則內容的圖片張數遠小於 int32
+			if c.Kind == model.ContentForumEntry {
+				t.Snapshot.Link = model.ContentLink{StoreID: sn.StoreID, ThreadID: sn.ThreadID}
+			} else {
+				t.Snapshot.Link = model.ContentLink{PostID: sn.PostID}
+			}
+		}
+		out = append(out, t)
 	}
-	return nil
+	return out, nil
 }
 
 // takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。
-func takedownContentError(err error, contents []model.ContentRef) (error, bool) {
+func takedownContentError(err error, contents []model.TakedownContent) (error, bool) {
 	var bad *social.TakedownContentError
 	if !errors.As(err, &bad) {
 		return err, false

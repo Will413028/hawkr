@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -244,7 +245,10 @@ func TestTakedownBindsToTheExistingActiveMeasure(t *testing.T) {
 	existing := mustV[seller.CreateMeasureResult](t)(f.seller.CreateMeasure(context.Background(), seller.CreateMeasureInput{
 		AdminID: 3, StoreID: w.storeID, Kind: seller.MeasureContentTakedown, StatementToSeller: "後台先下架", Note: "貼文頁",
 		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.MisleadingInfo, Severity: seller.Severity(seller.SeverityValues()[0])}},
-		Takedown:  &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentPost, ID: w.post.ID}}},
+		Takedown: &seller.ContentTakedown{Contents: []seller.TakedownContent{{
+			ContentRef: seller.ContentRef{Kind: seller.ContentPost, ID: w.post.ID},
+			Snapshot:   &seller.ContentSnapshot{Body: "後台先下架的本文", AuthoredAt: f.clock(), Link: seller.ContentLink{PostID: w.post.ID}},
+		}}},
 	}))
 	in := DecideInput{
 		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
@@ -293,6 +297,44 @@ DELETE FROM social.posts WHERE id = $1`, w.post.ID)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID); n != 1 {
 		t.Fatalf("內容下架措施 %d 個", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE content_id = $1 AND snapshot_state = 'CAPTURED' AND link_post_id = $1", w.post.ID); n != 1 {
+		t.Fatalf("貼文已清除時措施仍帶案件快照（連結是貼文）：%d", n)
+	}
+}
+
+// 決議下架時措施存的是案件最近一份凍結的內容（檢舉當下的版本），不是決議當下社群的現況，也不是最早那份；存入發文時間、圖片張數與貼文連結。
+// mutation：LatestSnapshotContent 改成 ORDER BY captured_at ASC → 存到第一版本文；改成讀 social 現況 → 存到「決議前再改的本文」。
+func TestTakedownStoresTheLatestCaseSnapshot(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	var c Case
+	for i, body := range []string{"第一版本文", "第二版本文"} {
+		if i > 0 {
+			f.advance(time.Minute)
+		}
+		f.exec(t, "UPDATE social.posts SET body = $1 WHERE id = $2", body, w.post.ID)
+		r, _ := f.newBuyer(t)
+		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
+	}
+	f.advance(time.Minute)
+	f.exec(t, "UPDATE social.posts SET body = '決議前再改的本文' WHERE id = $1", w.post.ID)
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
+	}))
+	if d.Case.MeasureID == nil {
+		t.Fatalf("%+v", d)
+	}
+	var body string
+	var images int
+	var post uuid.UUID
+	var authored time.Time
+	must(t, f.db.Conn(context.Background()).QueryRow(context.Background(),
+		"SELECT snapshot_body, snapshot_image_count, link_post_id, snapshot_authored_at FROM seller.measure_contents WHERE measure_id = $1", *d.Case.MeasureID).Scan(&body, &images, &post, &authored))
+	if body != "第二版本文" || post != w.post.ID || images != 1 || authored.IsZero() {
+		t.Fatalf("措施的快照 body=%q images=%d post=%s authored=%s", body, images, post, authored)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
@@ -121,13 +122,70 @@ func (w *closeEndedWorker) Timeout(*river.Job[CloseEndedArgs]) time.Duration { r
 // AddWorkers 登記 River worker。
 func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &closeEndedWorker{service: s})
+	river.AddWorker(workers, &purgeContentSnapshotsWorker{service: s})
 }
 
-// PeriodicJobs 回傳啟動即執行、每 5 分鐘一次的結案掃描。
+// PeriodicJobs 回傳啟動即執行、每 5 分鐘一次的結案掃描，與啟動即執行、每日一次的過期內容快照清空。
 func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		river.PeriodicInterval(closeEndedInterval),
 		func() (river.JobArgs, *river.InsertOpts) { return CloseEndedArgs{}, nil },
 		&river.PeriodicJobOpts{ID: "seller.measure_close_ended_requests", RunOnStart: true},
+	), river.NewPeriodicJob(
+		river.PeriodicInterval(24*time.Hour),
+		func() (river.JobArgs, *river.InsertOpts) { return PurgeContentSnapshotsArgs{}, nil },
+		&river.PeriodicJobOpts{ID: "seller.purge_content_snapshots", RunOnStart: true},
 	)}
+}
+
+// PurgeContentSnapshotsArgs 是每日清空過期內容快照的 River job。
+type PurgeContentSnapshotsArgs struct{}
+
+// Kind 是 River 的 job 種類。
+func (PurgeContentSnapshotsArgs) Kind() string { return "seller.purge_content_snapshots" }
+
+// InsertOpts 讓同一個時段內的排程與重啟合併。
+func (PurgeContentSnapshotsArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 12 * time.Hour}}
+}
+
+// contentSnapshotBatch 是每個 transaction 清空的列數：分批做，不在一個 statement 持有大量列鎖。
+const contentSnapshotBatch = 500
+
+// PurgeContentSnapshots 清空撤銷滿 model.ContentSnapshotRetention 的內容下架措施留著的內容快照（內容下架沒有結束時間，保留期只從 revoked_at 起算；
+// 未撤銷的一直保留），回傳清空的列數；冪等。
+func (s *Service) PurgeContentSnapshots(ctx context.Context) (int64, error) {
+	cutoff := s.now().UTC().Add(-model.ContentSnapshotRetention)
+	var total int64
+	for {
+		var n int64
+		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			n, err = store.New(s.d.DB.Conn(ctx)).ClearExpiredContentSnapshots(ctx, store.ClearExpiredContentSnapshotsParams{Cutoff: cutoff, MaxRows: contentSnapshotBatch})
+			return err
+		})
+		if err != nil {
+			return total, fmt.Errorf("seller：清空過期的內容快照：%w", err)
+		}
+		total += n
+		if n < contentSnapshotBatch {
+			return total, nil
+		}
+	}
+}
+
+type purgeContentSnapshotsWorker struct {
+	river.WorkerDefaults[PurgeContentSnapshotsArgs]
+	service *Service
+}
+
+// Work 執行清空。
+func (w *purgeContentSnapshotsWorker) Work(ctx context.Context, _ *river.Job[PurgeContentSnapshotsArgs]) error {
+	_, err := w.service.PurgeContentSnapshots(ctx)
+	return err
+}
+
+// Timeout 是一次清空的時間上限。
+func (w *purgeContentSnapshotsWorker) Timeout(*river.Job[PurgeContentSnapshotsArgs]) time.Duration {
+	return 30 * time.Minute
 }

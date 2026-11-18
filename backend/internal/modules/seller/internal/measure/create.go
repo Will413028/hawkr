@@ -235,8 +235,8 @@ func sortedUUIDs(ids []uuid.UUID) []uuid.UUID {
 }
 
 // sortedContents 回傳內容對象依（種類位元組順序、UUID 大端位元組順序）遞增排序的複本，不改動呼叫端的清單；對象是集合，順序沒有意義。
-func sortedContents(refs []model.ContentRef) []model.ContentRef {
-	return slices.SortedFunc(slices.Values(refs), func(a, b model.ContentRef) int {
+func sortedContents(refs []model.TakedownContent) []model.TakedownContent {
+	return slices.SortedFunc(slices.Values(refs), func(a, b model.TakedownContent) int {
 		if c := strings.Compare(string(a.Kind), string(b.Kind)); c != 0 {
 			return c
 		}
@@ -462,13 +462,11 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	var contents []model.ContentRef
 	if in.Takedown != nil {
-		contents = sortedContents(in.Takedown.Contents)
-		kinds, ids := make([]string, len(contents)), make([]uuid.UUID, len(contents))
-		for i, c := range contents {
-			kinds[i], ids[i] = string(c.Kind), c.ID
-		}
-		if err := q.InsertMeasureContents(ctx, store.InsertMeasureContentsParams{MeasureID: measureID, Kinds: kinds, Ids: ids}); err != nil {
-			return model.CreateMeasureResult{}, err
+		for _, c := range sortedContents(in.Takedown.Contents) {
+			contents = append(contents, c.ContentRef)
+			if err := q.InsertMeasureContent(ctx, insertContentParams(measureID, c)); err != nil {
+				return model.CreateMeasureResult{}, err
+			}
 		}
 	}
 	if _, err := q.InsertGovernanceNote(ctx, store.InsertGovernanceNoteParams{
@@ -494,6 +492,32 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	measure, err := s.readRow(ctx, q, store.SellerMeasure(row), detailAdmin, now)
 	return model.CreateMeasureResult{Measure: measure}, err
+}
+
+// insertContentParams 把一個對象展開成 measure_contents 的一列；沒有快照（已清除旗標）的快照欄位留 NULL，狀態是 UNAVAILABLE。
+func insertContentParams(measureID uuid.UUID, c model.TakedownContent) store.InsertMeasureContentParams {
+	p := store.InsertMeasureContentParams{
+		MeasureID: measureID, ContentKind: string(c.Kind), ContentID: c.ID, SnapshotState: string(model.SnapshotUnavailable),
+	}
+	sn := c.Snapshot
+	if sn == nil {
+		return p
+	}
+	authoredAt, images := sn.AuthoredAt.UTC(), sn.ImageCount
+	p.SnapshotState, p.SnapshotBody, p.SnapshotAuthoredAt, p.SnapshotImageCount = string(model.SnapshotCaptured), &sn.Body, &authoredAt, &images
+	if sn.Link.PostID != uuid.Nil() {
+		id := sn.Link.PostID
+		p.LinkPostID = &id
+	}
+	if sn.Link.StoreID != 0 {
+		id := sn.Link.StoreID
+		p.LinkStoreID = &id
+	}
+	if sn.Link.ThreadID != uuid.Nil() {
+		id := sn.Link.ThreadID
+		p.LinkThreadID = &id
+	}
+	return p
 }
 
 // checkNoActiveTakedown 拒絕目標內容已有生效中下架措施的內容下架：stint 鎖已串行同一個帳號的建立，所以這裡是給使用者的明確錯誤；

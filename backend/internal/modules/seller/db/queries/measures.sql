@@ -102,11 +102,17 @@ WITH created AS (
 )
 SELECT * FROM created;
 
--- name: InsertMeasureContents :exec
--- 內容下架措施的對象（與 InsertMeasure 同一個 transaction；種類與 ID 是平行陣列，呼叫方已驗證形狀）。
-INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
-SELECT sqlc.arg(measure_id), (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i]
-FROM generate_series(1, cardinality(sqlc.arg(ids)::uuid[])) AS i;
+-- name: InsertMeasureContent :exec
+-- 內容下架措施的一個對象與處分依據的快照（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。
+-- 沒有快照的列（UNAVAILABLE）其快照欄位為 NULL；CAPTURED 的連結欄位依種類只填其中一組。
+INSERT INTO seller.measure_contents (
+    measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
+    link_post_id, link_store_id, link_thread_id
+)
+VALUES (
+    sqlc.arg(measure_id), sqlc.arg(content_kind), sqlc.arg(content_id), sqlc.arg(snapshot_state), sqlc.narg(snapshot_body),
+    sqlc.narg(snapshot_authored_at), sqlc.narg(snapshot_image_count), sqlc.narg(link_post_id), sqlc.narg(link_store_id), sqlc.narg(link_thread_id)
+);
 
 -- name: ActiveTakedownOfContent :one
 -- 內容目前生效中的內容下架措施（最多一個，measure_contents_one_enforced 保證）；沒有回 no rows。
@@ -126,7 +132,8 @@ SELECT EXISTS (
 
 -- name: MeasureContents :many
 -- 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
-SELECT measure_id, content_kind, content_id
+SELECT measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
+       link_post_id, link_store_id, link_thread_id
 FROM seller.measure_contents
 WHERE measure_id = ANY(sqlc.arg(measure_ids)::uuid[])
 ORDER BY measure_id, content_kind COLLATE "C", content_id;
@@ -563,3 +570,29 @@ WHERE r.request_id = ANY(sqlc.arg(ids)::uuid[]);
 SELECT r.measure_id::uuid AS measure_id, r.start_at::timestamptz AS start_at, r.due_at::timestamptz AS due_at
 FROM seller.review_measure_review(sqlc.arg(at)::timestamptz) r
 WHERE r.measure_id = ANY(sqlc.arg(ids)::uuid[]);
+
+-- name: ClearExpiredContentSnapshots :execrows
+-- 撤銷滿保留期的內容下架措施，清空它留著的內容快照（內容下架沒有結束時間，只從 revoked_at 起算；未撤銷的一直保留）。cutoff 是現在減保留期；
+-- 一批最多 max_rows 列，鎖住（SKIP LOCKED）再更新，重跑冪等。
+WITH due AS (
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measure_contents c
+    JOIN seller.measures m ON m.id = c.measure_id
+    WHERE c.snapshot_state = 'CAPTURED' AND m.status = 'REVOKED' AND m.revoked_at <= sqlc.arg(cutoff)::timestamptz
+    ORDER BY c.measure_id, c.content_kind, c.content_id
+    LIMIT sqlc.arg(max_rows)::int
+    FOR UPDATE OF c SKIP LOCKED
+)
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM due
+WHERE c.measure_id = due.measure_id AND c.content_kind = due.content_kind AND c.content_id = due.content_id;
+
+-- name: ClearContentSnapshotsOfStores :execrows
+-- 店家退場（個資清理第二段）時清空這些店家全部措施留著的內容快照，不論措施是否撤銷。
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM seller.measures m
+WHERE m.id = c.measure_id AND m.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND c.snapshot_state = 'CAPTURED';

@@ -295,7 +295,10 @@ func TestMeasureResponseCarriesTheTakedownContents(t *testing.T) {
 	m := measureFixture()
 	post, comment := uuid.MustParse("0192f1c0-0000-7000-8000-0000000000a1"), uuid.MustParse("0192f1c0-0000-7000-8000-0000000000a2")
 	m.Kind = model.MeasureContentTakedown
-	m.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: post}, {Kind: model.ContentComment, ID: comment}}
+	m.Contents = []model.MeasureContent{
+		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCleared},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: comment}, State: model.SnapshotUnavailable},
+	}
 	got := toMeasure(uitext.ZhTW, m).GetContents()
 	if len(got) != 2 || got[0].GetKind() != pb.ContentKind_CONTENT_KIND_POST || got[0].GetId() != post.String() ||
 		got[1].GetKind() != pb.ContentKind_CONTENT_KIND_COMMENT || got[1].GetId() != comment.String() {
@@ -303,5 +306,36 @@ func TestMeasureResponseCarriesTheTakedownContents(t *testing.T) {
 	}
 	if n := len(toMeasure(uitext.ZhTW, measureFixture()).GetContents()); n != 0 {
 		t.Fatalf("其他種類不帶對象：%d", n)
+	}
+}
+
+// 賣家看到的快照：摘要由伺服器截成前 120 個字元（超過才加「…」）、發文時間與連結目標（貼文 id，或店家加討論串）；不在的快照只帶狀態。
+// mutation：toContentRef 直接輸出全文 → 摘要斷言失敗；連結都輸出成 post_id → 討論區的連結斷言失敗。
+func TestMeasureResponseCarriesTheSnapshotExcerptAuthoredTimeAndLink(t *testing.T) {
+	post, entry, thread := uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
+	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
+	long := strings.Repeat("字", model.ExcerptRunes+1)
+	m := measureFixture()
+	m.Kind = model.MeasureContentTakedown
+	m.Contents = []model.MeasureContent{
+		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured,
+			Snapshot: &model.ContentSnapshot{Body: long, AuthoredAt: at, Link: model.ContentLink{PostID: post}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: entry}, State: model.SnapshotCaptured,
+			Snapshot: &model.ContentSnapshot{Body: "短", AuthoredAt: at, Link: model.ContentLink{StoreID: 12, ThreadID: thread}}},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotCleared},
+	}
+	got := toMeasure(uitext.ZhTW, m).GetContents()
+	if len(got) != 3 {
+		t.Fatalf("contents=%v", got)
+	}
+	if got[0].GetSnapshotState() != pb.ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CAPTURED || got[0].GetExcerpt() != strings.Repeat("字", model.ExcerptRunes)+"…" ||
+		!got[0].GetAuthoredTime().AsTime().Equal(at) || got[0].GetPostId() != post.String() || got[0].GetForumThread() != nil {
+		t.Errorf("貼文 %v", got[0])
+	}
+	if got[1].GetExcerpt() != "短" || got[1].GetPostId() != "" || got[1].GetForumThread().GetStoreId() != "12" || got[1].GetForumThread().GetThreadId() != thread.String() {
+		t.Errorf("討論區留言 %v", got[1])
+	}
+	if got[2].GetSnapshotState() != pb.ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED || got[2].GetExcerpt() != "" || got[2].GetAuthoredTime() != nil || got[2].GetLink() != nil {
+		t.Errorf("已清空的快照只帶狀態 %v", got[2])
 	}
 }

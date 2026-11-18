@@ -64,18 +64,18 @@ LIMIT sqlc.arg(max_rows);
 
 -- name: GetPostSnapshot :one
 -- 給 moderation 凍結檢舉當下的貼文內容：本文與圖片參照（唯讀，不鎖）。
-SELECT store_id, body, image_asset_id, (deleted_at IS NULL)::boolean AS exists_now
+SELECT store_id, body, image_asset_id, COALESCE(published_at, created_at)::timestamptz AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.posts
 WHERE id = sqlc.arg(id);
 
 -- name: GetCommentSnapshot :one
 -- 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, post_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.comments
 WHERE id = sqlc.arg(id);
 
 -- name: GetForumEntrySnapshot :one
 -- 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, store_id, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = sqlc.arg(id);

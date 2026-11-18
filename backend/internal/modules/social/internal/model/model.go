@@ -467,6 +467,14 @@ type ContentSnapshot struct {
 	Readable  bool
 	Body      string
 	MediaRefs []string
+	// AuthoredAt 是作者發文的時間（貼文是發布時間，沒有發布時間時是建立時間；留言與討論區留言是建立時間）。
+	AuthoredAt time.Time
+	// PostID 是貼文與貼文留言連結的貼文；討論區留言是零值。
+	PostID uuid.UUID
+	// ThreadID 是討論區留言所屬的討論串（與 StoreID 組成連結）；貼文與貼文留言是零值。
+	ThreadID uuid.UUID
+	// Purged 在內容還在、但本文已因作者刪帳而清除時為真（留言與討論區留言的 body 是 NULL）：這時 Body 是空字串、不是作者寫的空本文。
+	Purged bool
 }
 
 // RequestHash 是建立輸入的 SHA-256（欄位依固定順序、以長度前綴編碼，不會因串接而混淆）：冪等重送比對「內容是否相同」的唯一定義。

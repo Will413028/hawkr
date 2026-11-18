@@ -58,16 +58,71 @@ type ContentRef struct {
 	ID   uuid.UUID
 }
 
+// SnapshotState 是內容下架對象上處分依據快照的狀態（measure_contents_snapshot_state_check）。
+type SnapshotState string
+
+const (
+	// SnapshotCaptured 快照在：本文、發文時間、圖片張數與連結目標都有值。
+	SnapshotCaptured SnapshotState = "CAPTURED"
+	// SnapshotUnavailable 建立措施時內容已被清除，取不到快照。
+	SnapshotUnavailable SnapshotState = "UNAVAILABLE"
+	// SnapshotCleared 快照已依保留期（撤銷後 184 天）或店家退場清空。
+	SnapshotCleared SnapshotState = "CLEARED"
+)
+
+// ContentLink 是快照內容的連結目標（A7-D29）：貼文與貼文留言連到貼文（PostID），討論區發言連到店家加討論串（StoreID、ThreadID）；兩組二擇一。
+type ContentLink struct {
+	PostID   uuid.UUID
+	StoreID  int64
+	ThreadID uuid.UUID
+}
+
+// ContentSnapshot 是處分依據的內容版本：本文全文、作者發文時間、圖片張數（不存圖片）與連結目標。由建立措施的入口傳入，seller 只驗格式。
+type ContentSnapshot struct {
+	Body       string
+	AuthoredAt time.Time
+	ImageCount int32
+	Link       ContentLink
+}
+
+// ExcerptRunes 是對外摘要的長度上限（Unicode 字元數）。
+const ExcerptRunes = 120
+
+// Excerpt 回傳本文的前 ExcerptRunes 個字元，超過時加「…」；未超過回原文。
+func (c ContentSnapshot) Excerpt() string {
+	r := []rune(c.Body)
+	if len(r) <= ExcerptRunes {
+		return c.Body
+	}
+	return string(r[:ExcerptRunes]) + "…"
+}
+
+// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；內容已清除而取不到快照時 Purged 為真、Snapshot 為 nil（二擇一）。
+type TakedownContent struct {
+	ContentRef
+	Snapshot *ContentSnapshot
+	Purged   bool
+}
+
+// MeasureContent 是已建立措施的一個內容對象：參照、快照狀態，與 State 是 SnapshotCaptured 時的快照。
+type MeasureContent struct {
+	ContentRef
+	State    SnapshotState
+	Snapshot *ContentSnapshot
+}
+
 // MaxTakedownContents 是一個內容下架措施最多的對象數。
 const MaxTakedownContents = 20
 
-// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複。內容屬於哪個店家由呼叫方（moderation）驗證。
-func ValidateContentTargets(field string, refs []ContentRef) error {
-	if n := len(refs); n == 0 || n > MaxTakedownContents {
+// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆帶快照或明確的已清除旗標（二擇一），
+// 快照的發文時間、圖片張數與連結目標格式正確（連結依種類：FORUM_ENTRY 是店家加討論串，其餘是貼文）。內容屬於哪個店家由呼叫方驗證，快照是否屬實由入口保證。
+func ValidateContentTargets(field string, targets []TakedownContent) error {
+	if n := len(targets); n == 0 || n > MaxTakedownContents {
 		return apperr.InvalidInputOn([]string{field}, "內容下架的對象必須是 1 到 %d 則內容", MaxTakedownContents)
 	}
-	seen := make(map[ContentRef]bool, len(refs))
-	for i, r := range refs {
+	seen := make(map[ContentRef]bool, len(targets))
+	for i, t := range targets {
+		r := t.ContentRef
 		at := apperr.IndexedField(field, i)
 		switch {
 		case !r.Kind.Valid():
@@ -76,8 +131,35 @@ func ValidateContentTargets(field string, refs []ContentRef) error {
 			return apperr.InvalidInputOn([]string{at}, "內容 ID 不可為空")
 		case seen[r]:
 			return apperr.InvalidInputOn([]string{at}, "內容不可重複")
+		case t.Purged == (t.Snapshot != nil):
+			return apperr.InvalidInputOn([]string{at}, "內容必須帶快照，或明確標示已清除而沒有快照")
+		}
+		if t.Snapshot != nil {
+			if err := validateSnapshot(at, r.Kind, *t.Snapshot); err != nil {
+				return err
+			}
 		}
 		seen[r] = true
+	}
+	return nil
+}
+
+func validateSnapshot(at string, kind ContentKind, s ContentSnapshot) error {
+	switch {
+	case s.AuthoredAt.IsZero():
+		return apperr.InvalidInputOn([]string{at}, "快照的發文時間不可為空")
+	case s.ImageCount < 0:
+		return apperr.InvalidInputOn([]string{at}, "快照的圖片張數不可為負")
+	}
+	l := s.Link
+	if kind == contentkind.ForumEntry {
+		if l.PostID != uuid.Nil() || l.StoreID <= 0 || l.ThreadID == uuid.Nil() {
+			return apperr.InvalidInputOn([]string{at}, "討論區發言的連結必須是店家加討論串")
+		}
+		return nil
+	}
+	if l.PostID == uuid.Nil() || l.StoreID != 0 || l.ThreadID != uuid.Nil() {
+		return apperr.InvalidInputOn([]string{at}, "貼文與留言的連結必須是貼文")
 	}
 	return nil
 }
@@ -193,6 +275,9 @@ const (
 	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
 	StoreRetention = 4416 * time.Hour
+	// ContentSnapshotRetention 是內容下架措施的內容快照在撤銷後的保留期（申覆期，A7-D29）：revoked_at 起算 184 天清空，未撤銷一直保留。與 AppealWindow、StoreRetention
+	// 同值但是另一個常數：理由不同，一個改了另一個不必跟著改。時數只從這一個常數來。
+	ContentSnapshotRetention = 4416 * time.Hour
 	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（收款開通 ADR D3，Will 2026-10-29；
 	// 參考金流業「關係結束後 5 年」的紀錄保存慣例，法源未確認，上線前與條款一起核對）。用固定時數：1826 天不短於任何連續五個曆年（最多含兩個閏日，1826 天）的長度，
 	// 與 StoreRetention 同一個做法。與 StoreRetention 是不同的常數：理由不同（個資清理對比防詐比對），一個改了另一個不必跟著改。時數只從這一個常數來。
@@ -471,7 +556,7 @@ type Measure struct {
 	StoreName string
 	Findings  []Violation
 	// Contents 是內容下架的對象（measure_contents，依種類、ID 排序）；其他種類沒有。
-	Contents  []ContentRef
+	Contents  []MeasureContent
 	Requests  []MeasureRequest
 	Revisions []MeasureRevision
 	// LinkedAccounts 是與這筆措施的帳號使用同一個身分證明文件或統一編號的其他帳號（身分快照反查）；只有 admin 讀取單筆時載入。
@@ -1140,7 +1225,7 @@ type CreateMeasureInput struct {
 }
 
 // ContentTakedown 是內容下架措施的對象。
-type ContentTakedown struct{ Contents []ContentRef }
+type ContentTakedown struct{ Contents []TakedownContent }
 
 // TerminationBasis 是終止合作的事由與依據：Violation 只有第 21.3 條的事由可以帶（MATERIAL_BREACH 必帶），SourceMeasureID 只有
 // LINKED_ACCOUNT 帶（也必帶）。

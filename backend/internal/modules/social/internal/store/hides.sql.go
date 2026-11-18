@@ -13,16 +13,18 @@ import (
 )
 
 const getCommentSnapshot = `-- name: GetCommentSnapshot :one
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, post_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.comments
 WHERE id = $1
 `
 
 type GetCommentSnapshotRow struct {
-	ActorKind string
-	ActorID   int64
-	Body      *string
-	ExistsNow bool
+	ActorKind  string
+	ActorID    int64
+	Body       *string
+	PostID     uuid.UUID
+	AuthoredAt time.Time
+	ExistsNow  bool
 }
 
 // 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
@@ -33,22 +35,27 @@ func (q *Queries) GetCommentSnapshot(ctx context.Context, id uuid.UUID) (GetComm
 		&i.ActorKind,
 		&i.ActorID,
 		&i.Body,
+		&i.PostID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err
 }
 
 const getForumEntrySnapshot = `-- name: GetForumEntrySnapshot :one
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, store_id, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = $1
 `
 
 type GetForumEntrySnapshotRow struct {
-	ActorKind string
-	ActorID   int64
-	Body      *string
-	ExistsNow bool
+	ActorKind  string
+	ActorID    int64
+	Body       *string
+	StoreID    int64
+	ThreadID   uuid.UUID
+	AuthoredAt time.Time
+	ExistsNow  bool
 }
 
 // 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
@@ -59,13 +66,16 @@ func (q *Queries) GetForumEntrySnapshot(ctx context.Context, id uuid.UUID) (GetF
 		&i.ActorKind,
 		&i.ActorID,
 		&i.Body,
+		&i.StoreID,
+		&i.ThreadID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err
 }
 
 const getPostSnapshot = `-- name: GetPostSnapshot :one
-SELECT store_id, body, image_asset_id, (deleted_at IS NULL)::boolean AS exists_now
+SELECT store_id, body, image_asset_id, COALESCE(published_at, created_at)::timestamptz AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.posts
 WHERE id = $1
 `
@@ -74,6 +84,7 @@ type GetPostSnapshotRow struct {
 	StoreID      int64
 	Body         string
 	ImageAssetID *string
+	AuthoredAt   time.Time
 	ExistsNow    bool
 }
 
@@ -85,6 +96,7 @@ func (q *Queries) GetPostSnapshot(ctx context.Context, id uuid.UUID) (GetPostSna
 		&i.StoreID,
 		&i.Body,
 		&i.ImageAssetID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err

@@ -211,7 +211,7 @@ func loadContents(ctx context.Context, q *store.Queries, measures []model.Measur
 	}
 	for _, r := range rows {
 		at := index[r.MeasureID]
-		measures[at].Contents = append(measures[at].Contents, model.ContentRef{Kind: model.ContentKind(r.ContentKind), ID: r.ContentID})
+		measures[at].Contents = append(measures[at].Contents, contentOf(r))
 	}
 	return nil
 }
@@ -441,4 +441,24 @@ func loadDeadlines(ctx context.Context, q *store.Queries, measures []model.Measu
 		}
 	}
 	return nil
+}
+
+// contentOf 把 measure_contents 的一列轉成 MeasureContent；快照只在狀態是 CAPTURED 時有（欄位的 CHECK 保證其餘欄位非空）。
+func contentOf(r store.MeasureContentsRow) model.MeasureContent {
+	c := model.MeasureContent{ContentRef: model.ContentRef{Kind: model.ContentKind(r.ContentKind), ID: r.ContentID}, State: model.SnapshotState(r.SnapshotState)}
+	if c.State != model.SnapshotCaptured {
+		return c
+	}
+	sn := &model.ContentSnapshot{Body: *r.SnapshotBody, AuthoredAt: *r.SnapshotAuthoredAt, ImageCount: *r.SnapshotImageCount}
+	if r.LinkPostID != nil {
+		sn.Link.PostID = *r.LinkPostID
+	}
+	if r.LinkStoreID != nil {
+		sn.Link.StoreID = *r.LinkStoreID
+	}
+	if r.LinkThreadID != nil {
+		sn.Link.ThreadID = *r.LinkThreadID
+	}
+	c.Snapshot = sn
+	return c
 }
