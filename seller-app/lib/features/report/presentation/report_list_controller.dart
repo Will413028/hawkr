@@ -38,7 +38,7 @@ class MyReportsState {
   }
 }
 
-/// 我的檢舉列表 AsyncNotifier（backend-payuni#645）。
+/// 我的檢舉列表 AsyncNotifier。
 @riverpod
 class MyReportsController extends _$MyReportsController {
   static const int _pageSize = 20;
@@ -65,9 +65,7 @@ class MyReportsController extends _$MyReportsController {
       final next = await build();
       state = AsyncValue.data(next);
     } catch (e) {
-      // 下拉刷新失敗：保留既有清單，不用 AsyncValue.guard 把整頁蓋成
-      // error（review fix，backend-payuni#645）。交由呼叫端 catch 這個
-      // rethrow 顯示 toast，畫面維持在原本的清單上。
+      // 下拉刷新失敗：保留既有清單，不用 AsyncValue.guard 把整頁蓋成 error；交由呼叫端顯示 toast。
       rethrow;
     }
   }
@@ -91,9 +89,7 @@ class MyReportsController extends _$MyReportsController {
         ),
       );
     } catch (e) {
-      // 分頁載入失敗：保留已載入清單，只重置 loading 旗標，避免整頁被
-      // AsyncValue.error 蓋掉（review fix，backend-payuni#645）。
-      // 交由呼叫端（畫面）catch 這個 rethrow 顯示 toast。
+      // 分頁載入失敗：保留已載入清單，只重置 loading 旗標；交由呼叫端顯示 toast。
       state = AsyncValue.data(current.copyWith(isLoadingMore: false));
       rethrow;
     }
@@ -134,11 +130,13 @@ class BlockListState {
 @riverpod
 class BlockListController extends _$BlockListController {
   static const int _pageSize = 20;
+  final Set<String> _unblocked = {};
 
   StoreBlockRepository get _repo => ref.read(storeBlockRepositoryProvider);
 
   @override
   Future<BlockListState> build() async {
+    _unblocked.clear();
     final page = await _repo.list(pageSize: _pageSize);
     return BlockListState(
       blocks: page.items,
@@ -157,7 +155,7 @@ class BlockListController extends _$BlockListController {
     state = AsyncValue.data(next);
   }
 
-  /// 分頁載入失敗時保留已載入清單，只重置 loading 旗標並 rethrow。
+  /// 分頁載入失敗時保留已載入清單，只重置 loading 旗標並 rethrow。結果一律套在最新的 state 上。
   Future<void> loadMore() async {
     final current = state.value;
     if (current == null || current.isLoadingMore || !current.hasMore) return;
@@ -167,24 +165,36 @@ class BlockListController extends _$BlockListController {
         pageToken: current.nextPageToken,
         pageSize: _pageSize,
       );
+      final latest = state.value ?? current;
+      final seen = latest.blocks.map((b) => b.buyerId).toSet();
+      final fresh = <BlockedBuyerItem>[];
+      for (final item in page.items) {
+        if (!_unblocked.contains(item.buyerId) && seen.add(item.buyerId)) {
+          fresh.add(item);
+        }
+      }
       state = AsyncValue.data(
-        current.copyWith(
-          blocks: [...current.blocks, ...page.items],
+        latest.copyWith(
+          blocks: [...latest.blocks, ...fresh],
           nextPageToken: page.nextPageToken,
           isLoadingMore: false,
         ),
       );
     } catch (e) {
-      state = AsyncValue.data(current.copyWith(isLoadingMore: false));
+      final latest = state.value ?? current;
+      state = AsyncValue.data(latest.copyWith(isLoadingMore: false));
       rethrow;
     }
   }
 
-  /// 樂觀移除；失敗時回滾並 rethrow，讓呼叫端顯示錯誤。
+  /// 樂觀移除；失敗時只把這一筆放回最新的清單並 rethrow，讓呼叫端顯示錯誤。
   Future<void> unblock(String buyerId) async {
     final current = state.value;
     if (current == null) return;
-    final previous = current.blocks;
+    final index = current.blocks.indexWhere((b) => b.buyerId == buyerId);
+    if (index < 0) return;
+    final removed = current.blocks[index];
+    _unblocked.add(buyerId);
     state = AsyncValue.data(
       current.copyWith(
         blocks: current.blocks.where((b) => b.buyerId != buyerId).toList(),
@@ -193,7 +203,13 @@ class BlockListController extends _$BlockListController {
     try {
       await _repo.unblock(buyerId);
     } catch (e) {
-      state = AsyncValue.data(current.copyWith(blocks: previous));
+      _unblocked.remove(buyerId);
+      final latest = state.value ?? current;
+      if (!latest.blocks.any((b) => b.buyerId == buyerId)) {
+        final blocks = [...latest.blocks];
+        blocks.insert(index.clamp(0, blocks.length), removed);
+        state = AsyncValue.data(latest.copyWith(blocks: blocks));
+      }
       rethrow;
     }
   }

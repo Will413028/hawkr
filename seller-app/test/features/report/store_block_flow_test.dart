@@ -10,6 +10,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/report/data/store_block_repository.dart';
+import 'package:hawkr_seller/shared/models/buyer_card_info.dart';
 import 'package:hawkr_seller/features/report/presentation/block_list_screen.dart';
 import 'package:hawkr_seller/features/report/presentation/widgets/block_actions.dart';
 
@@ -44,8 +45,9 @@ Future<void> _pump(
 }
 
 class _Host extends ConsumerWidget {
-  const _Host({this.commentId, this.forumEntryId});
+  const _Host({this.commentId, this.forumEntryId, this.name = '小明'});
 
+  final String name;
   final String? commentId;
   final String? forumEntryId;
 
@@ -56,7 +58,7 @@ class _Host extends ConsumerWidget {
         onPressed: () => blockBuyerWithConfirm(
           context,
           ref,
-          buyerName: '小明',
+          buyerName: name,
           commentId: commentId,
           forumEntryId: forumEntryId,
         ),
@@ -169,6 +171,87 @@ void main() {
       ),
     );
     await _pump(tester, transport, const BlockListScreen());
-    expect(find.text('已刪除的帳號'), findsOneWidget);
+    expect(find.text(deletedBuyerLabel), findsOneWidget);
+  });
+
+  testWidgets('blank buyer name uses the shared fallback in title and toast', (
+    tester,
+  ) async {
+    final transport = FakeTransportBuilder().unary(
+      SellerAppService.blockBuyer,
+      (_, _) => pb.BlockBuyerResponse(changed: true),
+    );
+    await _pump(tester, transport, const _Host(commentId: 'c1', name: ''));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.text('封鎖「此人」？'), findsOneWidget);
+    await tester.tap(find.text('封鎖'));
+    await tester.pumpAndSettle();
+    expect(find.text('已封鎖「此人」'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('non-Exception failure still gives an error toast', (
+    tester,
+  ) async {
+    final transport = FakeTransportBuilder().unary(
+      SellerAppService.blockBuyer,
+      (_, _) => throw StateError('boom'),
+    );
+    await _pump(tester, transport, const _Host(commentId: 'c1'));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('封鎖'));
+    await tester.pumpAndSettle();
+    expect(find.text('已封鎖「小明」'), findsNothing);
+    expect(find.text('系統錯誤'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('empty first page with a token loads the next page', (
+    tester,
+  ) async {
+    final tokens = <String>[];
+    final transport = FakeTransportBuilder().unary(
+      SellerAppService.listBlockedBuyers,
+      (request, _) {
+        tokens.add(request.pageToken);
+        return request.pageToken.isEmpty
+            ? pb.ListBlockedBuyersResponse(nextPageToken: 'next')
+            : pb.ListBlockedBuyersResponse(
+                blockedBuyers: [_blocked('b1', '買家1')],
+              );
+      },
+    );
+    await _pump(tester, transport, const BlockListScreen());
+    expect(tokens, ['', 'next']);
+    expect(find.text('買家1'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('seller-block-list-empty-state')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('short first page that does not scroll loads the next page', (
+    tester,
+  ) async {
+    final tokens = <String>[];
+    final transport = FakeTransportBuilder().unary(
+      SellerAppService.listBlockedBuyers,
+      (request, _) {
+        tokens.add(request.pageToken);
+        return request.pageToken.isEmpty
+            ? pb.ListBlockedBuyersResponse(
+                blockedBuyers: [_blocked('b1', '買家1')],
+                nextPageToken: 'next',
+              )
+            : pb.ListBlockedBuyersResponse(
+                blockedBuyers: [_blocked('b2', '買家2')],
+              );
+      },
+    );
+    await _pump(tester, transport, const BlockListScreen());
+    expect(tokens, ['', 'next']);
+    expect(find.text('買家2'), findsOneWidget);
   });
 }

@@ -1867,11 +1867,6 @@ class _CommentRow extends ConsumerWidget {
   final VoidCallback onReply;
   final VoidCallback onDelete;
 
-  bool get _canBlock => canBlockCommentAuthor(
-    isMine: comment.isMine,
-    viewerCanDelete: comment.viewerCanDelete,
-  );
-
   Future<void> _showActionMenu(BuildContext context, WidgetRef ref) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final box = context.findRenderObject() as RenderBox;
@@ -1882,7 +1877,13 @@ class _CommentRow extends ConsumerWidget {
       ),
       Offset.zero & overlay.size,
     );
-    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉；別人的留言而伺服器允許刪除時，作者是這家店內容裡的買家，額外提供封鎖
+    final canBlock = canBlockAuthor(
+      canBlockBuyers: ref.read(canBlockBuyersProvider),
+      isMine: comment.isMine,
+      viewerCanDelete: comment.viewerCanDelete,
+      authorIsBuyer: comment.authorIsBuyer,
+    );
+    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉；買家作者而店家有封鎖能力時額外提供封鎖
     final v = await showMenu<String>(
       context: context,
       position: position,
@@ -1897,7 +1898,7 @@ class _CommentRow extends ConsumerWidget {
               style: TextStyle(fontSize: 16.sp, color: AppColors.error),
             ),
           ),
-        if (_canBlock)
+        if (canBlock)
           PopupMenuItem<String>(
             value: 'block',
             child: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
@@ -1916,7 +1917,7 @@ class _CommentRow extends ConsumerWidget {
       await blockBuyerWithConfirm(
         context,
         ref,
-        buyerName: comment.authorName.isEmpty ? '此人' : comment.authorName,
+        buyerName: comment.authorName,
         commentId: comment.id,
       );
     }

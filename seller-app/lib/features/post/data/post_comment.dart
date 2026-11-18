@@ -31,6 +31,7 @@ class PostComment {
     this.replyCount = 0,
     this.viewerLiked = false,
     this.isMine = false,
+    this.authorIsBuyer = false,
     this.viewerCanEdit = false,
     this.viewerCanDelete = false,
     this.viewerCanReply = false,
@@ -51,6 +52,7 @@ class PostComment {
     replyCount: c.replyCount.toInt(),
     viewerLiked: c.viewerLiked,
     isMine: c.isMine,
+    authorIsBuyer: c.author.kind == ActorKind.ACTOR_KIND_BUYER,
     viewerCanEdit: c.viewerCanEdit,
     viewerCanDelete: c.viewerCanDelete,
     viewerCanReply: c.viewerCanReply,
@@ -70,6 +72,7 @@ class PostComment {
   final int replyCount;
   final bool viewerLiked;
   final bool isMine;
+  final bool authorIsBuyer;
   final bool viewerCanEdit;
   final bool viewerCanDelete;
   final bool viewerCanReply;
@@ -95,6 +98,7 @@ class PostComment {
       replyCount: replyCount,
       viewerLiked: liked,
       isMine: isMine,
+      authorIsBuyer: authorIsBuyer,
       viewerCanEdit: viewerCanEdit,
       viewerCanDelete: viewerCanDelete,
       viewerCanReply: viewerCanReply,

@@ -8,15 +8,15 @@ part of 'report_list_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 我的檢舉列表 AsyncNotifier（backend-payuni#645）。
+/// 我的檢舉列表 AsyncNotifier。
 
 @ProviderFor(MyReportsController)
 final myReportsControllerProvider = MyReportsControllerProvider._();
 
-/// 我的檢舉列表 AsyncNotifier（backend-payuni#645）。
+/// 我的檢舉列表 AsyncNotifier。
 final class MyReportsControllerProvider
     extends $AsyncNotifierProvider<MyReportsController, MyReportsState> {
-  /// 我的檢舉列表 AsyncNotifier（backend-payuni#645）。
+  /// 我的檢舉列表 AsyncNotifier。
   MyReportsControllerProvider._()
     : super(
         from: null,
@@ -39,7 +39,7 @@ final class MyReportsControllerProvider
 String _$myReportsControllerHash() =>
     r'09a8671fe1f48db6e8a34951213a7d111402709e';
 
-/// 我的檢舉列表 AsyncNotifier（backend-payuni#645）。
+/// 我的檢舉列表 AsyncNotifier。
 
 abstract class _$MyReportsController extends $AsyncNotifier<MyReportsState> {
   FutureOr<MyReportsState> build();
@@ -88,7 +88,7 @@ final class BlockListControllerProvider
 }
 
 String _$blockListControllerHash() =>
-    r'1f3cb9f808d2b1fa1cfdb362baf585e2a99dfff7';
+    r'33f88c223c9c239979f83f76e4e0f123872d5ad8';
 
 /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 

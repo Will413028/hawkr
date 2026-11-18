@@ -5,62 +5,60 @@ import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
 
 void main() {
-  group('canBlockCommentAuthor', () {
-    test('others deletable comment can be blocked', () {
-      expect(canBlockCommentAuthor(isMine: false, viewerCanDelete: true), true);
+  group('canBlockAuthor', () {
+    bool rule({
+      bool canBlockBuyers = true,
+      bool isMine = false,
+      bool viewerCanDelete = true,
+      bool authorIsBuyer = true,
+    }) => canBlockAuthor(
+      canBlockBuyers: canBlockBuyers,
+      isMine: isMine,
+      viewerCanDelete: viewerCanDelete,
+      authorIsBuyer: authorIsBuyer,
+    );
+
+    test('buyer author, others, deletable, capable', () {
+      expect(rule(), true);
     });
-    test('own comment cannot', () {
-      expect(canBlockCommentAuthor(isMine: true, viewerCanDelete: true), false);
+    test('store author cannot', () {
+      expect(rule(authorIsBuyer: false), false);
+    });
+    test('own cannot', () {
+      expect(rule(isMine: true), false);
     });
     test('not deletable cannot', () {
-      expect(
-        canBlockCommentAuthor(isMine: false, viewerCanDelete: false),
-        false,
-      );
+      expect(rule(viewerCanDelete: false), false);
+    });
+    test('missing capability cannot', () {
+      expect(rule(canBlockBuyers: false), false);
     });
   });
 
-  group('canBlockForumAuthor', () {
-    test('buyer author, others, deletable', () {
-      expect(
-        canBlockForumAuthor(
-          isMine: false,
-          viewerCanDelete: true,
-          authorIsBuyer: true,
-        ),
-        true,
-      );
+  group('blockTargetName', () {
+    test('uses the one fallback for empty and blank names', () {
+      expect(blockTargetName(''), '此人');
+      expect(blockTargetName('  '), '此人');
+      expect(blockTargetName('小明'), '小明');
     });
-    test('store author cannot', () {
-      expect(
-        canBlockForumAuthor(
-          isMine: false,
-          viewerCanDelete: true,
-          authorIsBuyer: false,
-        ),
-        false,
-      );
-    });
-    test('own entry cannot', () {
-      expect(
-        canBlockForumAuthor(
-          isMine: true,
-          viewerCanDelete: true,
-          authorIsBuyer: true,
-        ),
-        false,
-      );
-    });
-    test('not deletable cannot', () {
-      expect(
-        canBlockForumAuthor(
-          isMine: false,
-          viewerCanDelete: false,
-          authorIsBuyer: true,
-        ),
-        false,
-      );
-    });
+  });
+
+  group('PostComment.fromProto author kind', () {
+    for (final c in [
+      (ActorKind.ACTOR_KIND_BUYER, true),
+      (ActorKind.ACTOR_KIND_STORE, false),
+      (ActorKind.ACTOR_KIND_UNSPECIFIED, false),
+    ]) {
+      test('${c.$1.name} -> authorIsBuyer ${c.$2}', () {
+        final comment = PostComment.fromProto(
+          pb.Comment(
+            id: '1',
+            author: pb.Actor(kind: c.$1),
+          ),
+        );
+        expect(comment.authorIsBuyer, c.$2);
+      });
+    }
   });
 
   group('StoreForumEntry.fromProto author kind', () {

@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
@@ -76,6 +77,7 @@ Future<_MockPostRepository> _pumpEcho(
   StoreForumEntry? message,
   List<StoreForumEntry>? replies,
   bool expectRootText = true,
+  bool canBlock = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -121,6 +123,7 @@ Future<_MockPostRepository> _pumpEcho(
     ProviderScope(
       overrides: [
         postRepositoryProvider.overrideWithValue(repository),
+        canBlockBuyersProvider.overrideWithValue(canBlock),
         if (ownReply && lateStore)
           myStoreSnapshotProvider.overrideWith((ref) => ref.watch(_lateStore))
         else if (ownReply)
@@ -969,6 +972,13 @@ void main() {
     ),
     (name: 'store author', buyer: false, del: true, mine: false, show: false),
     (name: 'not deletable', buyer: true, del: false, mine: false, show: false),
+    (
+      name: 'no content-contract capability',
+      buyer: true,
+      del: true,
+      mine: false,
+      show: false,
+    ),
   ]) {
     testWidgets('forum block item: ${c.name}', (tester) async {
       await _pumpEcho(
@@ -980,6 +990,7 @@ void main() {
           authorIsBuyer: c.buyer,
           canDelete: c.del,
         ),
+        canBlock: c.name != 'no content-contract capability',
       );
       await tester.tap(find.byTooltip('留言更多操作'));
       await tester.pumpAndSettle();

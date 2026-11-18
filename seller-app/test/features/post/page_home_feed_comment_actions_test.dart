@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'post_comment_fixtures.dart';
@@ -44,7 +45,10 @@ void main() {
         ).thenAnswer((_) => response.future);
         await tester.pumpWidget(
           ProviderScope(
-            overrides: [postRepositoryProvider.overrideWithValue(repo)],
+            overrides: [
+              postRepositoryProvider.overrideWithValue(repo),
+              canBlockBuyersProvider.overrideWithValue(true),
+            ],
             child: ScreenUtilInit(
               designSize: const Size(390, 844),
               enableScaleWH: () => false,
@@ -106,7 +110,11 @@ void main() {
     );
   }
 
-  Future<void> openComments(WidgetTester tester, _Repo repo) async {
+  Future<void> openComments(
+    WidgetTester tester,
+    _Repo repo, {
+    bool canBlock = true,
+  }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -116,7 +124,10 @@ void main() {
     ).thenAnswer((_) async => [Post(id: 42, content: '貼文內容', commentCount: 1)]);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [postRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          postRepositoryProvider.overrideWithValue(repo),
+          canBlockBuyersProvider.overrideWithValue(canBlock),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
@@ -185,4 +196,25 @@ void main() {
     expect(find.text('檢舉留言'), findsOneWidget);
     expect(find.text('封鎖此人'), findsNothing);
   });
+
+  for (final c in [
+    (name: 'store author', buyer: false, canBlock: true, show: false),
+    (name: 'buyer author', buyer: true, canBlock: true, show: true),
+    (name: 'no capability', buyer: true, canBlock: false, show: false),
+  ]) {
+    testWidgets('comment block item: ${c.name}', (tester) async {
+      final repo = _Repo();
+      when(
+        () => repo.getMyPost(any()),
+      ).thenAnswer((_) => Completer<Post>().future);
+      when(
+        () => repo.listComments(42),
+      ).thenAnswer((_) async => [testComment(authorIsBuyer: c.buyer)]);
+      await openComments(tester, repo, canBlock: c.canBlock);
+      await tester.tap(find.byTooltip('留言更多操作'));
+      await tester.pumpAndSettle();
+      expect(find.text('檢舉留言'), findsOneWidget);
+      expect(find.text('封鎖此人'), c.show ? findsOneWidget : findsNothing);
+    });
+  }
 }

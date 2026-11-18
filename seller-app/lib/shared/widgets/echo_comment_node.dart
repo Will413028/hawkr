@@ -9,6 +9,7 @@ class EchoCommentNode {
     required this.content,
     required this.createdAt,
     this.placeholderText,
+    this.authorName = '',
     this.authorIsBuyer = false,
     this.viewerCanEdit = false,
     this.viewerCanDelete = false,
@@ -26,6 +27,9 @@ class EchoCommentNode {
 
   /// 被刪除或被隱藏的頂層項目顯示的佔位文字；一般項目是 null。
   final String? placeholderText;
+
+  /// 伺服器給的作者名稱（沒有時是空字串，與顯示用的 [userName] 不同）。
+  final String authorName;
   final bool authorIsBuyer;
   final bool viewerCanEdit;
   final bool viewerCanDelete;

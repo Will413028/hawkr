@@ -13,6 +13,7 @@ import 'package:hawkr_api/errors.dart' show errorText;
 
 import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
+import '../../../shared/widgets/buyer_avatar_widget.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
@@ -21,7 +22,7 @@ import '../data/store_block_repository.dart';
 import 'report_list_controller.dart';
 import 'widgets/block_actions.dart';
 
-/// 封鎖名單頁（backend-payuni#645）。
+/// 封鎖名單頁（`ListBlockedBuyers`、`UnblockBuyer`）。
 class BlockListScreen extends HookConsumerWidget {
   const BlockListScreen({super.key});
 
@@ -30,26 +31,44 @@ class BlockListScreen extends HookConsumerWidget {
     final asyncState = ref.watch(blockListControllerProvider);
     final scrollController = useScrollController();
 
+    void loadMore() {
+      ref.read(blockListControllerProvider.notifier).loadMore().catchError((
+        Object e,
+      ) {
+        if (!context.mounted) return;
+        FloatingToast.error(
+          context,
+          errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+        );
+      });
+    }
+
     useEffect(() {
       void onScroll() {
         if (scrollController.position.pixels >=
             scrollController.position.maxScrollExtent - 200) {
-          // loadMore 失敗只跳 toast、保留既有清單（不整頁切成 error 狀態）
-          ref.read(blockListControllerProvider.notifier).loadMore().catchError((
-            Object e,
-          ) {
-            if (!context.mounted) return;
-            FloatingToast.error(
-              context,
-              errorText(e, defaults: ref.read(defaultErrorTextProvider)),
-            );
-          });
+          loadMore();
         }
       }
 
       scrollController.addListener(onScroll);
       return () => scrollController.removeListener(onScroll);
     }, [scrollController]);
+
+    final loaded = asyncState.value;
+    final blockCount = loaded?.blocks.length ?? 0;
+    final pageToken = loaded?.nextPageToken ?? '';
+    useEffect(() {
+      if (pageToken.isEmpty) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        final fills =
+            !scrollController.hasClients ||
+            scrollController.position.maxScrollExtent <= 0;
+        if (fills) loadMore();
+      });
+      return null;
+    }, [blockCount, pageToken]);
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -72,7 +91,7 @@ class BlockListScreen extends HookConsumerWidget {
                   errorText(e, defaults: ref.read(defaultErrorTextProvider)),
                 );
               }),
-          child: state.blocks.isEmpty
+          child: state.blocks.isEmpty && !state.hasMore
               ? _buildEmptyState()
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -82,7 +101,8 @@ class BlockListScreen extends HookConsumerWidget {
                     vertical: 12.h,
                   ),
                   itemCount:
-                      state.blocks.length + (state.isLoadingMore ? 1 : 0),
+                      state.blocks.length +
+                      (state.isLoadingMore || state.blocks.isEmpty ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == state.blocks.length) {
                       return Padding(
@@ -106,7 +126,7 @@ class BlockListScreen extends HookConsumerWidget {
                           await ref
                               .read(blockListControllerProvider.notifier)
                               .unblock(blocked.buyerId);
-                        } on Exception catch (e) {
+                        } catch (e) {
                           if (!context.mounted) return;
                           FloatingToast.error(
                             context,
@@ -191,7 +211,11 @@ class _BlockedUserRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _BlockedUserAvatar(url: blocked.avatarUrl),
+          BuyerAvatarWidget(
+            size: 36,
+            imageUrl: blocked.avatarUrl,
+            name: blocked.name,
+          ),
           SizedBox(width: 12.w),
           Expanded(
             child: Text(
@@ -218,43 +242,6 @@ class _BlockedUserRow extends StatelessWidget {
             child: const HkButtonLabel('解除封鎖'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BlockedUserAvatar extends StatelessWidget {
-  const _BlockedUserAvatar({this.url});
-
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final u = url;
-    if (u == null || !u.startsWith('http')) return _fallback();
-    return ClipOval(
-      child: Image(
-        image: NetworkImage(u),
-        width: 36.w,
-        height: 36.w,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _fallback(),
-      ),
-    );
-  }
-
-  Widget _fallback() {
-    return Container(
-      width: 36.w,
-      height: 36.w,
-      decoration: const BoxDecoration(
-        color: AppColors.primarySoft,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        AppIcons.personOutline,
-        size: 18.sp,
-        color: AppIconColors.secondary,
       ),
     );
   }

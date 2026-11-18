@@ -127,6 +127,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       content: m.body,
       createdAt: m.createTime,
       placeholderText: m.placeholderText,
+      authorName: m.authorName,
       authorIsBuyer: m.authorIsBuyer,
       viewerCanEdit: m.viewerCanEdit,
       viewerCanDelete: m.viewerCanDelete,
@@ -495,7 +496,8 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   _onEchoDeleteComment(node);
                 },
               ),
-            if (canBlockForumAuthor(
+            if (canBlockAuthor(
+              canBlockBuyers: ref.read(canBlockBuyersProvider),
               isMine: node.isMine,
               viewerCanDelete: node.viewerCanDelete,
               authorIsBuyer: node.authorIsBuyer,
@@ -512,7 +514,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   blockBuyerWithConfirm(
                     context,
                     ref,
-                    buyerName: node.userName,
+                    buyerName: node.authorName,
                     forumEntryId: node.id,
                   );
                 },
