@@ -66,7 +66,7 @@ final class PostFeedControllerProvider
 }
 
 String _$postFeedControllerHash() =>
-    r'2f536ce28cb33bb522422f6fbbdbfa5eb25011e3';
+    r'462226cc50f3c881f5a7c097afcc5a5e6ce8e3f7';
 
 /// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
 ///

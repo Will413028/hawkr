@@ -25,6 +25,7 @@ class PostEntity extends _$PostEntity with ViewerScoped {
   @override
   FutureOr<Post> build(int postId) {
     bindViewer();
+    ref.onDispose(ref.read(postEntityStoreProvider.notifier).retain(postId));
     ref.listen(postEntityStoreProvider.select((s) => s.posts[postId]), (
       _,
       next,
@@ -51,5 +52,7 @@ class PostEntity extends _$PostEntity with ViewerScoped {
 /// 列表項目與預覽卡讀的快照：只看實體存放處已有的貼文，不發請求。
 /// 觀看者換了、存放處清空時是 null，畫面據此收掉；需要補讀的詳情用 [postEntityProvider]。
 @riverpod
-Post? postSnapshot(Ref ref, int postId) =>
-    ref.watch(postEntityStoreProvider.select((s) => s.posts[postId]));
+Post? postSnapshot(Ref ref, int postId) {
+  ref.onDispose(ref.read(postEntityStoreProvider.notifier).retain(postId));
+  return ref.watch(postEntityStoreProvider.select((s) => s.posts[postId]));
+}

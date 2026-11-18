@@ -8,21 +8,27 @@ part of 'post_entity_store.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postEntityProvider` 讀這裡的同一份。
+/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postSnapshotProvider`（列表、預覽卡）與 `postEntityProvider`（詳情）讀這裡的同一份。
 ///
 /// 換觀看者時整份重建清空；讚是集中的 mutation（樂觀、以 id 回滾、世代檢查）。
+/// 實體只在被引用時留著：列表以 [setListed] 登記持有的 id，畫面以 [retain] 監看；
+/// 兩者都沒有之後，等 [postEntityGcTimeProvider] 的時間才移除，期間重新被引用就保留。
 
 @ProviderFor(PostEntityStore)
 final postEntityStoreProvider = PostEntityStoreProvider._();
 
-/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postEntityProvider` 讀這裡的同一份。
+/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postSnapshotProvider`（列表、預覽卡）與 `postEntityProvider`（詳情）讀這裡的同一份。
 ///
 /// 換觀看者時整份重建清空；讚是集中的 mutation（樂觀、以 id 回滾、世代檢查）。
+/// 實體只在被引用時留著：列表以 [setListed] 登記持有的 id，畫面以 [retain] 監看；
+/// 兩者都沒有之後，等 [postEntityGcTimeProvider] 的時間才移除，期間重新被引用就保留。
 final class PostEntityStoreProvider
     extends $NotifierProvider<PostEntityStore, PostEntities> {
-  /// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postEntityProvider` 讀這裡的同一份。
+  /// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postSnapshotProvider`（列表、預覽卡）與 `postEntityProvider`（詳情）讀這裡的同一份。
   ///
   /// 換觀看者時整份重建清空；讚是集中的 mutation（樂觀、以 id 回滾、世代檢查）。
+  /// 實體只在被引用時留著：列表以 [setListed] 登記持有的 id，畫面以 [retain] 監看；
+  /// 兩者都沒有之後，等 [postEntityGcTimeProvider] 的時間才移除，期間重新被引用就保留。
   PostEntityStoreProvider._()
     : super(
         from: null,
@@ -50,11 +56,13 @@ final class PostEntityStoreProvider
   }
 }
 
-String _$postEntityStoreHash() => r'd6e6c9c1cefe34bf07eb646eea895d2fa50be142';
+String _$postEntityStoreHash() => r'b62c9efe51cb6676a122226c436b798215643188';
 
-/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postEntityProvider` 讀這裡的同一份。
+/// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postSnapshotProvider`（列表、預覽卡）與 `postEntityProvider`（詳情）讀這裡的同一份。
 ///
 /// 換觀看者時整份重建清空；讚是集中的 mutation（樂觀、以 id 回滾、世代檢查）。
+/// 實體只在被引用時留著：列表以 [setListed] 登記持有的 id，畫面以 [retain] 監看；
+/// 兩者都沒有之後，等 [postEntityGcTimeProvider] 的時間才移除，期間重新被引用就保留。
 
 abstract class _$PostEntityStore extends $Notifier<PostEntities> {
   PostEntities build();

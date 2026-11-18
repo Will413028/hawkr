@@ -32,10 +32,12 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
     _loadingMore = false;
     bindViewer();
     final scope = beginScope();
+    final store = ref.read(postEntityStoreProvider.notifier);
+    ref.onDispose(() => store.releaseList(this));
     ref.listen(postEntityStoreProvider.select((s) => s.gone), (_, gone) {
       final current = state.value;
       if (current == null || !current.ids.any(gone.contains)) return;
-      state = AsyncData(
+      _publish(
         PostListState(
           ids: current.ids.where((id) => !gone.contains(id)).toList(),
           nextPageToken: current.nextPageToken,
@@ -47,11 +49,15 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
           .read(socialContentRepositoryProvider)
           .listPosts(storeId: merchantId?.toString()),
     );
-    ref.read(postEntityStoreProvider.notifier).seed(page.posts);
-    return PostListState(
-      ids: page.posts.map((p) => p.id).toList(),
-      nextPageToken: page.nextPageToken,
-    );
+    store.seed(page.posts);
+    final ids = page.posts.map((p) => p.id).toList();
+    store.setListed(this, ids);
+    return PostListState(ids: ids, nextPageToken: page.nextPageToken);
+  }
+
+  void _publish(PostListState next) {
+    ref.read(postEntityStoreProvider.notifier).setListed(this, next.ids);
+    state = AsyncData(next);
   }
 
   /// 預先載入下一頁。用於 PageView onPageChanged 距底部 N 篇時呼叫。
@@ -72,7 +78,7 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
       ref.read(postEntityStoreProvider.notifier).seed(page.posts);
       final latest = state.value ?? current;
       final existing = latest.ids.toSet();
-      state = AsyncData(
+      _publish(
         PostListState(
           ids: [
             ...latest.ids,

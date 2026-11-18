@@ -56,7 +56,7 @@ final class PostEntityProvider
   }
 }
 
-String _$postEntityHash() => r'87530242a8c45f590e5286c4c8249c31821d05c9';
+String _$postEntityHash() => r'c3fb8de2e0b9b9602a8f3bc035946236a914b64a';
 
 /// 一則貼文的實體（讚、讚數、留言數、`viewer_*`）。實體存放處已有就直接給，沒有才讀 `GetPost`；
 /// 之後跟著存放處更新，所以列表、詳情、預覽卡讀到的是同一份。
@@ -178,7 +178,7 @@ final class PostSnapshotProvider
   }
 }
 
-String _$postSnapshotHash() => r'2e68503d2bf95144ed51ef13b6fd702e57ce5071';
+String _$postSnapshotHash() => r'7cd6e57a7c1924b75c5df35ba1b58133abceda86';
 
 /// 列表項目與預覽卡讀的快照：只看實體存放處已有的貼文，不發請求。
 /// 觀看者換了、存放處清空時是 null，畫面據此收掉；需要補讀的詳情用 [postEntityProvider]。

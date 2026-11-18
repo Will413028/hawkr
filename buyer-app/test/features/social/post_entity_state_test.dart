@@ -8,6 +8,7 @@ import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
+import 'package:hawkr_buyer/features/social/data/social_model.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_entity.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_entity_store.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_feed_controller.dart';
@@ -22,9 +23,14 @@ pb.Post _post(int id, {bool liked = false, int likes = 0}) => pb.Post(
   likeCount: Int64(likes),
 );
 
+const _gc = Duration(milliseconds: 80);
+
+Future<void> _pastGc() => Future<void>.delayed(_gc * 3);
+
 ProviderContainer _container(FakeSocialPublic public, FakeSocialApp app) {
   final container = ProviderContainer(
     overrides: [
+      postEntityGcTimeProvider.overrideWithValue(_gc),
       socialPublicClientProvider.overrideWithValue(public.client()),
       socialAppClientProvider.overrideWithValue(app.client()),
       sessionProvider.overrideWith(SwitchableSession.new),
@@ -297,6 +303,122 @@ void main() {
       expect(preview.read().value!.likeCount, 4);
       expect(container.read(postEntityStoreProvider).posts[101]!.liked, isTrue);
       expect(container.read(_feed).value!.ids, [101]);
+    });
+  });
+
+  group('實體回收', () {
+    final post = Post(id: 101);
+
+    test('列表持有的實體不回收', () async {
+      final public = FakeSocialPublic(posts: [_post(101)]);
+      final container = _container(public, FakeSocialApp());
+      await container.read(sessionProvider.future);
+      final sub = container.listen(_feed, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(_feed.future);
+
+      await _pastGc();
+
+      expect(container.read(postEntityStoreProvider).posts.keys, [101]);
+    });
+
+    test('有畫面監看的實體不回收，不再被監看之後過了時間才回收', () async {
+      final container = _container(FakeSocialPublic(), FakeSocialApp());
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      store.seed([post]);
+      final sub = container.listen(postSnapshotProvider(101), (_, _) {});
+
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts.keys, [101]);
+
+      sub.close();
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(postEntityStoreProvider).posts.keys, [101]);
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+    });
+
+    test('沒人引用的實體過了時間才回收', () async {
+      final container = _container(FakeSocialPublic(), FakeSocialApp());
+      await container.read(sessionProvider.future);
+      container.read(postEntityStoreProvider.notifier).seed([post]);
+
+      await Future<void>.delayed(_gc ~/ 4);
+      expect(container.read(postEntityStoreProvider).posts.keys, [101]);
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+    });
+
+    test('回收前又被列表持有：保留；列表放掉之後才回收', () async {
+      final container = _container(FakeSocialPublic(), FakeSocialApp());
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      final owner = Object();
+      store.seed([post]);
+      await Future<void>.delayed(_gc ~/ 4);
+      store.setListed(owner, [101]);
+
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts.keys, [101]);
+
+      store.releaseList(owner);
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+    });
+
+    test('換觀看者仍清掉全部實體，含被監看與被列表持有的', () async {
+      final public = FakeSocialPublic(posts: [_post(101)]);
+      final container = _container(public, FakeSocialApp());
+      await container.read(sessionProvider.future);
+      final sub = container.listen(_feed, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(_feed.future);
+      final extra = container.listen(postSnapshotProvider(555), (_, _) {});
+      addTearDown(extra.close);
+      container.read(postEntityStoreProvider.notifier).seed([Post(id: 555)]);
+      expect(container.read(postEntityStoreProvider).posts.keys, [101, 555]);
+
+      public.posts = [_post(202)];
+      _session(container).signIn();
+      await container.read(_feed.future);
+
+      expect(container.read(postEntityStoreProvider).posts.keys, [202]);
+    });
+
+    test('回收後才回來的重讀不把舊實體救回來', () async {
+      final gate = Completer<pb.Post>();
+      final public = FakeSocialPublic(getPostResponder: () => gate.future);
+      final container = _container(public, FakeSocialApp());
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      store.seed([post]);
+
+      final refresh = store.refresh(101);
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+      gate.complete(_post(101, likes: 9));
+      await refresh;
+
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+    });
+
+    test('回收後才失敗的讚不把實體救回來', () async {
+      final app = FakeSocialApp()
+        ..likeGate = Completer<void>()
+        ..likeError = ConnectException(Code.unavailable, 'down');
+      final container = _container(FakeSocialPublic(), app);
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      store.seed([post]);
+
+      final like = store.toggleLike(101);
+      await _pastGc();
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
+      app.likeGate!.complete();
+
+      expect(await like, isFalse);
+      expect(container.read(postEntityStoreProvider).posts, isEmpty);
     });
   });
 }
