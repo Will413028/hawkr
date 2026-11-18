@@ -8,30 +8,27 @@ part of 'post_feed_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+/// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
 ///
-/// 規則：
-/// - 初始 build → 拿第一頁（20 筆），cache 在 state
-/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-/// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+/// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+/// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+/// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
 
 @ProviderFor(PostFeedController)
 final postFeedControllerProvider = PostFeedControllerFamily._();
 
-/// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+/// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
 ///
-/// 規則：
-/// - 初始 build → 拿第一頁（20 筆），cache 在 state
-/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-/// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+/// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+/// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+/// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
 final class PostFeedControllerProvider
-    extends $AsyncNotifierProvider<PostFeedController, List<Post>> {
-  /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+    extends $AsyncNotifierProvider<PostFeedController, PostListState> {
+  /// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
   ///
-  /// 規則：
-  /// - 初始 build → 拿第一頁（20 筆），cache 在 state
-  /// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-  /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+  /// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+  /// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+  /// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
   PostFeedControllerProvider._({
     required PostFeedControllerFamily super.from,
     required int? super.argument,
@@ -69,22 +66,21 @@ final class PostFeedControllerProvider
 }
 
 String _$postFeedControllerHash() =>
-    r'cd086ef2e4eb75f359301c981fcc2b9246229cf9';
+    r'2f536ce28cb33bb522422f6fbbdbfa5eb25011e3';
 
-/// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+/// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
 ///
-/// 規則：
-/// - 初始 build → 拿第一頁（20 筆），cache 在 state
-/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-/// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+/// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+/// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+/// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
 
 final class PostFeedControllerFamily extends $Family
     with
         $ClassFamilyOverride<
           PostFeedController,
-          AsyncValue<List<Post>>,
-          List<Post>,
-          FutureOr<List<Post>>,
+          AsyncValue<PostListState>,
+          PostListState,
+          FutureOr<PostListState>,
           int?
         > {
   PostFeedControllerFamily._()
@@ -96,12 +92,11 @@ final class PostFeedControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+  /// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
   ///
-  /// 規則：
-  /// - 初始 build → 拿第一頁（20 筆），cache 在 state
-  /// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-  /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+  /// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+  /// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+  /// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
 
   PostFeedControllerProvider call({int? merchantId}) =>
       PostFeedControllerProvider._(argument: merchantId, from: this);
@@ -110,27 +105,26 @@ final class PostFeedControllerFamily extends $Family
   String toString() => r'postFeedControllerProvider';
 }
 
-/// 貼文 feed controller，支援 TikTok-style 無限往下滑。
+/// 貼文列表 controller，支援無限往下滑；[merchantId] 為 null 是全平台。
 ///
-/// 規則：
-/// - 初始 build → 拿第一頁（20 筆），cache 在 state
-/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
-/// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
+/// - 初始 build → 拿第一頁，貼文寫入實體存放處，列表只留 id
+/// - [loadMore] → 用目前的 page token 拿下一頁，dedup 後 append；沒有 token 視為已到底
+/// - 重新整理或觀看者換了：build 重跑，之前發出的讀取與分頁回來時被丟棄
 
-abstract class _$PostFeedController extends $AsyncNotifier<List<Post>> {
+abstract class _$PostFeedController extends $AsyncNotifier<PostListState> {
   late final _$args = ref.$arg as int?;
   int? get merchantId => _$args;
 
-  FutureOr<List<Post>> build({int? merchantId});
+  FutureOr<PostListState> build({int? merchantId});
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<List<Post>>, List<Post>>;
+    final ref = this.ref as $Ref<AsyncValue<PostListState>, PostListState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<Post>>, List<Post>>,
-              AsyncValue<List<Post>>,
+              AnyNotifier<AsyncValue<PostListState>, PostListState>,
+              AsyncValue<PostListState>,
               Object?,
               Object?
             >;

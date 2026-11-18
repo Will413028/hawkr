@@ -32,6 +32,8 @@ import '../../moderation/presentation/report_block_action_sheet.dart';
 import '../../product/data/product_repository.dart';
 import '../../product/presentation/merchant_item_detail_screen.dart';
 import '../data/social_model.dart';
+import 'post_entity.dart';
+import 'post_entity_store.dart';
 import 'post_feed_controller.dart';
 import 'post_preview_layout.dart';
 import '../../../shared/utils/price_display.dart';
@@ -51,18 +53,18 @@ bool _hasValidProduct(PostProduct? product) {
 }
 
 int _resolveInitialPostIndex(
-  List<Post> posts, {
+  List<int> postIds, {
   required int initialIndex,
   required String? initialPostId,
 }) {
   final requestedPostId = (initialPostId ?? '').trim();
   if (requestedPostId.isNotEmpty) {
-    final matchedIndex = posts.indexWhere(
-      (post) => post.id.toString() == requestedPostId,
+    final matchedIndex = postIds.indexWhere(
+      (id) => id.toString() == requestedPostId,
     );
     if (matchedIndex >= 0) return matchedIndex;
   }
-  return initialIndex.clamp(0, posts.length - 1);
+  return initialIndex.clamp(0, postIds.length - 1);
 }
 
 class _GsapCardPagePhysics extends PageScrollPhysics {
@@ -109,27 +111,25 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
     );
     final globalPostsAsync = includeGlobalFeed
         ? ref.watch(postFeedControllerProvider())
-        : const AsyncValue<List<Post>>.data(<Post>[]);
+        : const AsyncValue<PostListState>.data(PostListState(ids: <int>[]));
 
-    // Merge 兩個來源
-    final List<Post>? mergedPosts;
+    // Merge 兩個來源（只有 id）
+    final List<int>? mergedPosts;
     if (merchantPostsAsync.hasValue && globalPostsAsync.hasValue) {
-      final merchantPosts = merchantPostsAsync.value!;
-      final globalPosts = globalPostsAsync.value!;
+      final merchantPosts = merchantPostsAsync.value!.ids;
+      final globalPosts = globalPostsAsync.value!.ids;
       if (includeGlobalFeed) {
         if (merchantPosts.length > 1) {
           // 商家還有其他貼文：擺前面 + 全平台其他商家貼文（去重）
-          final seen = merchantPosts.map((p) => p.id).toSet();
-          final others = globalPosts
-              .where((p) => !seen.contains(p.id))
-              .toList();
+          final seen = merchantPosts.toSet();
+          final others = globalPosts.where((id) => !seen.contains(id)).toList();
           mergedPosts = [...merchantPosts, ...others];
         } else {
           // 商家只有 1 篇（即點擊那篇）→ 切成純全平台 feed，不強制置頂。
           // 若全平台 list 沒包含該篇（後端 pagination 未回），把它前置以保證能找到。
           final hasInitial =
               (initialPostId ?? '').isEmpty ||
-              globalPosts.any((p) => p.id.toString() == initialPostId);
+              globalPosts.any((id) => id.toString() == initialPostId);
           mergedPosts = hasInitial
               ? globalPosts
               : [...merchantPosts, ...globalPosts];
@@ -149,7 +149,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       final posts = mergedPosts;
       int target = initialIndex;
       if ((initialPostId ?? '').isNotEmpty) {
-        final idx = posts.indexWhere((p) => p.id.toString() == initialPostId);
+        final idx = posts.indexWhere((id) => id.toString() == initialPostId);
         if (idx >= 0) target = idx;
       }
       if (target < 0) target = 0;
@@ -164,9 +164,10 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       return null;
     }, [mergedPosts == null]);
 
-    // Loading / error 狀態：兩個 async 任一還沒就緒就 loading；任一錯就顯示錯誤。
-    if (merchantPostsAsync.isLoading ||
-        (includeGlobalFeed && globalPostsAsync.isLoading)) {
+    // 有值就先顯示（重讀失敗保留舊資料）；沒有值才看 loading／錯誤。
+    if (mergedPosts == null &&
+        (merchantPostsAsync.isLoading ||
+            (includeGlobalFeed && globalPostsAsync.isLoading))) {
       return Scaffold(
         backgroundColor: AppColors.bgPrimary,
         body: const TruckLoadingOverlay(),
@@ -175,7 +176,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
     final err =
         merchantPostsAsync.error ??
         (includeGlobalFeed ? globalPostsAsync.error : null);
-    if (err != null) {
+    if (mergedPosts == null && err != null) {
       return Scaffold(
         backgroundColor: AppColors.bgPrimary,
         body: _ErrorState(
@@ -190,7 +191,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       );
     }
 
-    final posts = mergedPosts ?? const <Post>[];
+    final posts = mergedPosts ?? const <int>[];
     if (posts.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.bgPrimary,
@@ -204,10 +205,14 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       initialIndex: initialIndex,
       initialPostId: initialPostId,
     );
-    final backdropImageUrl = _toAbsolute(posts[backdropIndex].imageUrl);
+    final backdropImageUrl = _toAbsolute(
+      ref.watch(postSnapshotProvider(posts[backdropIndex]))?.imageUrl,
+    );
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    Future<void> openComments(Post post) async {
+    Future<void> openComments(int postId) async {
+      final post = ref.read(postEntityStoreProvider).posts[postId];
+      if (post == null) return;
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -223,16 +228,9 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       );
     }
 
-    Future<void> toggleLike(Post post) async {
+    Future<void> toggleLike(int postId) async {
       if (!await requireLogin(context, ref)) return;
-      await ref
-          .read(
-            postFeedControllerProvider(
-              // 跨商家貼文使用 global scope，才能更新正確的 feed。
-              merchantId: post.merchantId == mid ? mid : null,
-            ).notifier,
-          )
-          .likePost(post.id);
+      await ref.read(postEntityStoreProvider.notifier).toggleLike(postId);
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -282,10 +280,10 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
                   }
                 },
                 itemBuilder: (_, i) => AnimatedBuilder(
-                  key: ValueKey('post-card-motion-${posts[i].id}'),
+                  key: ValueKey('post-card-motion-${posts[i]}'),
                   animation: pageController,
                   child: _PostPage(
-                    post: posts[i],
+                    postId: posts[i],
                     fallbackMerchantName: merchantName,
                     fallbackMerchantAvatar: merchantAvatar,
                     parentMerchantId: merchantId,
@@ -309,7 +307,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
                       ..setEntry(3, 2, 0.0009)
                       ..rotateY(-signedDistance * 0.035);
                     return Opacity(
-                      key: ValueKey('post-card-depth-${posts[i].id}'),
+                      key: ValueKey('post-card-depth-${posts[i]}'),
                       opacity: 1 - (easedDistance * 0.16),
                       child: Transform.translate(
                         offset: Offset(0, easedDistance * 10),
@@ -336,14 +334,15 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
   Future<void> _shareCurrent(
     BuildContext context,
     WidgetRef ref,
-    Post post,
+    int postId,
   ) async {
-    final postId = post.id.toString();
+    final post = ref.read(postEntityStoreProvider).posts[postId];
+    if (post == null) return;
     final username = (post.merchantName ?? merchantName ?? '').trim();
     final imageUrl = post.imageUrl;
     final data = await ref
         .read(productRepositoryProvider)
-        .getShareUrl(type: 'post', id: postId);
+        .getShareUrl(type: 'post', id: postId.toString());
     if (!context.mounted) return;
     final storeCode = post.storeCode;
     final url =
@@ -369,7 +368,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
 // ─── 單篇貼文（Figma Design 1：image + 商家 + 日期 + 內文 + 留言 + bottom bar） ──
 class _PostPage extends HookConsumerWidget {
   const _PostPage({
-    required this.post,
+    required this.postId,
     required this.parentMerchantId,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -378,7 +377,7 @@ class _PostPage extends HookConsumerWidget {
     this.fallbackMerchantAvatar,
   });
 
-  final Post post;
+  final int postId;
   final String parentMerchantId;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
@@ -388,6 +387,13 @@ class _PostPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final captionExpanded = useState(false);
+    useEffect(() {
+      captionExpanded.value = false;
+      return null;
+    }, [postId]);
+    final post = ref.watch(postSnapshotProvider(postId));
+    if (post == null) return const SizedBox.shrink();
     final imageUrl = _toAbsolute(post.imageUrl);
     final username = (post.merchantName ?? fallbackMerchantName ?? 'Hawkr')
         .trim();
@@ -400,8 +406,6 @@ class _PostPage extends HookConsumerWidget {
         : const Duration(milliseconds: 320);
     final sellerId = post.merchantId?.toString() ?? parentMerchantId;
 
-    final captionExpanded = useState(false);
-
     void handleBack() {
       if (context.canPop()) {
         context.pop();
@@ -409,11 +413,6 @@ class _PostPage extends HookConsumerWidget {
         context.go('/?tab=1');
       }
     }
-
-    useEffect(() {
-      captionExpanded.value = false;
-      return null;
-    }, [post.id]);
 
     return LayoutBuilder(
       builder: (context, constraints) {

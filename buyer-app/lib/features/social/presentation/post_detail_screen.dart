@@ -38,7 +38,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../moderation/data/report_target_type.dart';
 import '../../moderation/presentation/report_block_action_sheet.dart';
-import 'post_detail_controller.dart';
+import 'post_entity.dart';
+import 'post_entity_store.dart';
 import 'post_preview_layout.dart';
 import '../../../shared/utils/price_display.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
@@ -98,7 +99,7 @@ class PostDetailScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(postDetailControllerProvider(postId));
+    final detailAsync = ref.watch(postEntityProvider(postId));
     final captionExpanded = useState(false);
 
     useEffect(() {
@@ -126,141 +127,139 @@ class PostDetailScreen extends HookConsumerWidget {
     }
 
     Widget pageBody;
-    pageBody = detailAsync.when(
-      loading: () => _PostDetailLoading(onClose: closeDetail),
-      error: (error, _) => _PostDetailError(
-        message: error.toString(),
-        onClose: closeDetail,
-        // 找不到不是暫時的失敗，重試只會得到同一個結果。
-        onRetry: error is NotFoundException
-            ? null
-            : () => ref.invalidate(postDetailControllerProvider(postId)),
-      ),
-      data: (state) {
-        final post = state.post;
-        final sellerId =
-            post.merchantId?.toString() ?? merchantId?.trim() ?? '';
-        // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
-        // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
-        final card = sellerId.isEmpty
-            ? null
-            : ref.watch(storeCardProvider(sellerId)).value;
-        final uiLocale = ref.watch(uiLocaleProvider);
-        // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
-        // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
-        final apiName = (post.merchantName ?? '').trim();
-        final routeName = (merchantName ?? '').trim();
-        final displayName = card != null
-            ? card.displayName(uiLocale)
-            : apiName.isNotEmpty
-            ? apiName
-            : routeName.isNotEmpty
-            ? routeName
-            : commonStoreCardClosedStore(uiLocale);
-        final apiAvatar = (post.merchantAvatar ?? '').trim();
-        final displayAvatar = card != null && card.hasLogo()
-            ? card.logoUri
-            : apiAvatar.isNotEmpty
-            ? apiAvatar
-            : (merchantAvatar ?? '').trim();
-        final storeCode = post.storeCode.isNotEmpty
-            ? post.storeCode
-            : (card != null && card.isOpen ? card.storeCode : '');
-        final imageUrl = _toAbsolute(post.imageUrl);
-        final date = _formatDate(post.createdAt);
-
-        Future<void> openComments() async {
-          await showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            showDragHandle: false,
-            backgroundColor: Colors.transparent,
-            barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
-            builder: (_) => CommentsBottomSheet(
-              postId: postId.toString(),
-              viewerCanComment: post.viewerCanComment,
-              viewerActor: post.viewerActor,
-            ),
-          );
-          ref.invalidate(postDetailControllerProvider(postId));
-        }
-
-        Future<void> sharePost() async {
-          final data = await ref
-              .read(productRepositoryProvider)
-              .getShareUrl(type: 'post', id: postId.toString());
-          if (!context.mounted) return;
-          final url =
-              data?['url'] ??
-              (storeCode.isEmpty
+    final entity = detailAsync.value;
+    if (entity == null) {
+      final error = detailAsync.error;
+      pageBody = error == null
+          ? _PostDetailLoading(onClose: closeDetail)
+          : _PostDetailError(
+              message: error.toString(),
+              onClose: closeDetail,
+              // 找不到不是暫時的失敗，重試只會得到同一個結果。
+              onRetry: error is NotFoundException
                   ? null
-                  : AppConstants.shareFallbackUrl(
-                      '/sellers/$storeCode/posts#post-$postId',
-                    ));
-          if (url == null) return;
-          showShareSheet(
-            context,
-            ShareData(
-              title: (data?['title'] ?? displayName).toString(),
-              description: (data?['description'] ?? post.content).toString(),
-              imageUrl: (data?['imageUrl'] ?? imageUrl).toString(),
-              url: url.toString(),
-            ),
-          );
-        }
-
-        return _PostDetailSurface(
-          postId: postId,
-          imageUrl: imageUrl,
-          merchantId: sellerId,
-          merchantName: displayName,
-          merchantAvatar: displayAvatar,
-          date: date,
-          content: post.content,
-          product: post.product,
-          captionExpanded: captionExpanded.value,
-          liked: post.liked,
-          likeCount: post.likeCount,
-          commentCount: post.commentCount,
-          shareCount: post.shareCount,
-          onClose: closeDetail,
-          onMore: () async {
-            if (!await requireLogin(context, ref)) return;
-            if (!context.mounted) return;
-            showReportBlockActionSheet(
-              context,
-              reportTargetType: ReportTargetType.post,
-              reportTargetId: postId.toString(),
-              blockUserId: sellerId.isNotEmpty ? sellerId : null,
-              blockUserLabel: displayName,
+                  : () => ref.invalidate(postEntityProvider(postId)),
             );
-          },
-          onMerchantTap: storeCode.isEmpty
-              ? null
-              : () => context.push('/merchant/$storeCode'),
-          onCaptionToggle: () {
-            captionExpanded.value = !captionExpanded.value;
-          },
-          onLikeTap: () async {
-            if (!await requireLogin(context, ref)) return;
-            await ref
-                .read(postDetailControllerProvider(postId).notifier)
-                .likePost();
-          },
-          onCommentTap: () async {
-            if (!await requireLogin(context, ref)) return;
-            if (!context.mounted) return;
-            await openComments();
-          },
-          onShareTap: sharePost,
-          onRefresh: () async {
-            ref.invalidate(postDetailControllerProvider(postId));
-            await ref.read(postDetailControllerProvider(postId).future);
-          },
+    } else {
+      final post = entity;
+      final sellerId = post.merchantId?.toString() ?? merchantId?.trim() ?? '';
+      // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
+      // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
+      final card = sellerId.isEmpty
+          ? null
+          : ref.watch(storeCardProvider(sellerId)).value;
+      final uiLocale = ref.watch(uiLocaleProvider);
+      // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
+      // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
+      final apiName = (post.merchantName ?? '').trim();
+      final routeName = (merchantName ?? '').trim();
+      final displayName = card != null
+          ? card.displayName(uiLocale)
+          : apiName.isNotEmpty
+          ? apiName
+          : routeName.isNotEmpty
+          ? routeName
+          : commonStoreCardClosedStore(uiLocale);
+      final apiAvatar = (post.merchantAvatar ?? '').trim();
+      final displayAvatar = card != null && card.hasLogo()
+          ? card.logoUri
+          : apiAvatar.isNotEmpty
+          ? apiAvatar
+          : (merchantAvatar ?? '').trim();
+      final storeCode = post.storeCode.isNotEmpty
+          ? post.storeCode
+          : (card != null && card.isOpen ? card.storeCode : '');
+      final imageUrl = _toAbsolute(post.imageUrl);
+      final date = _formatDate(post.createdAt);
+
+      Future<void> openComments() async {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          backgroundColor: Colors.transparent,
+          barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
+          builder: (_) => CommentsBottomSheet(
+            postId: postId.toString(),
+            viewerCanComment: post.viewerCanComment,
+            viewerActor: post.viewerActor,
+          ),
         );
-      },
-    );
+        unawaited(ref.read(postEntityStoreProvider.notifier).refresh(postId));
+      }
+
+      Future<void> sharePost() async {
+        final data = await ref
+            .read(productRepositoryProvider)
+            .getShareUrl(type: 'post', id: postId.toString());
+        if (!context.mounted) return;
+        final url =
+            data?['url'] ??
+            (storeCode.isEmpty
+                ? null
+                : AppConstants.shareFallbackUrl(
+                    '/sellers/$storeCode/posts#post-$postId',
+                  ));
+        if (url == null) return;
+        showShareSheet(
+          context,
+          ShareData(
+            title: (data?['title'] ?? displayName).toString(),
+            description: (data?['description'] ?? post.content).toString(),
+            imageUrl: (data?['imageUrl'] ?? imageUrl).toString(),
+            url: url.toString(),
+          ),
+        );
+      }
+
+      pageBody = _PostDetailSurface(
+        postId: postId,
+        imageUrl: imageUrl,
+        merchantId: sellerId,
+        merchantName: displayName,
+        merchantAvatar: displayAvatar,
+        date: date,
+        content: post.content,
+        product: post.product,
+        captionExpanded: captionExpanded.value,
+        liked: post.liked,
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        shareCount: post.shareCount,
+        onClose: closeDetail,
+        onMore: () async {
+          if (!await requireLogin(context, ref)) return;
+          if (!context.mounted) return;
+          showReportBlockActionSheet(
+            context,
+            reportTargetType: ReportTargetType.post,
+            reportTargetId: postId.toString(),
+            blockUserId: sellerId.isNotEmpty ? sellerId : null,
+            blockUserLabel: displayName,
+          );
+        },
+        onMerchantTap: storeCode.isEmpty
+            ? null
+            : () => context.push('/merchant/$storeCode'),
+        onCaptionToggle: () {
+          captionExpanded.value = !captionExpanded.value;
+        },
+        onLikeTap: () async {
+          if (!await requireLogin(context, ref)) return;
+          await ref.read(postEntityStoreProvider.notifier).toggleLike(postId);
+        },
+        onCommentTap: () async {
+          if (!await requireLogin(context, ref)) return;
+          if (!context.mounted) return;
+          await openComments();
+        },
+        onShareTap: sharePost,
+        onRefresh: () async {
+          await ref.read(postEntityStoreProvider.notifier).refresh(postId);
+        },
+      );
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppColors.glassTopOverlay.copyWith(

@@ -60,15 +60,15 @@ void main() {
     final stale = notifier.loadMore();
     await Future<void>.delayed(Duration.zero);
     container.invalidate(provider);
-    expect((await container.read(provider.future)).map((p) => p.id), [10]);
+    expect((await container.read(provider.future)).ids, [10]);
 
     staleGate.complete();
     await stale;
-    expect(container.read(provider).value!.map((p) => p.id), [10]);
+    expect(container.read(provider).value!.ids, [10]);
 
     await notifier.loadMore();
     expect(tokens.last, 'new-2');
-    expect(container.read(provider).value!.map((p) => p.id), [10, 11]);
+    expect(container.read(provider).value!.ids, [10, 11]);
   });
 
   test('舊一輪的 loadMore 結束時不解除新一輪 loadMore 的進行中旗標', () async {

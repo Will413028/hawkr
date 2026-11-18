@@ -433,7 +433,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
                 physics: const BouncingScrollPhysics(),
                 children: [
                   MerchantHomeTab(
-                    ref: ref,
                     merchantId: _merchantId,
                     merchantName: _merchantName,
                     merchantAvatar: _merchantAvatarPayload,

@@ -83,7 +83,7 @@ void main() {
   ) async {
     await pumpStorefront(
       tester,
-      (ref) => MerchantHomeTab(ref: ref, merchantId: '2683382637'),
+      (_) => MerchantHomeTab(merchantId: '2683382637'),
     );
 
     expect(find.byType(MerchantEmptyState), findsOneWidget);

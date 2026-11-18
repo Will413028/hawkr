@@ -196,6 +196,7 @@ class FakeSocialApp {
   /// 設了就讓貼文的讚與取消讚失敗。
   ConnectException? likeError;
   final List<pb.LikePostRequest> postLikes = [];
+  final List<pb.UnlikePostRequest> postUnlikes = [];
 
   /// 設了就讓貼文的讚卡住，直到測試完成它。
   Completer<void>? likeGate;
@@ -242,6 +243,12 @@ class FakeSocialApp {
           await likeGate?.future;
           if (likeError != null) throw likeError!;
           return pb.LikePostResponse();
+        })
+        .unary(SocialAppService.unlikePost, (req, _) async {
+          postUnlikes.add(req);
+          await likeGate?.future;
+          if (likeError != null) throw likeError!;
+          return pb.UnlikePostResponse();
         })
         .unary(SocialAppService.deleteComment, (req, _) {
           deleted.add(req);
