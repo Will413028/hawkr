@@ -270,7 +270,9 @@ test.describe("public dynamic route browser health", () => {
 
 	for (const entry of DYNAMIC_ROUTE_CATALOG.filter(
 		(candidate) =>
-			candidate.access === "public" && candidate.fixture !== "order-callback",
+			candidate.access === "public" &&
+			candidate.fixture !== "order-callback" &&
+			candidate.fixture !== "seller-thread",
 	)) {
 		test(`${entry.pattern} hard-loads and hydrates`, {
 			tag: ["@contract", "@live"],

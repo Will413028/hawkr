@@ -82,7 +82,11 @@ const PUBLIC_CALLBACK_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
 	(route) => route.fixture === "order-callback",
 );
 const PUBLIC_DATA_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
-	(route) => route.fixture !== "order-callback",
+	(route) =>
+		route.fixture !== "order-callback" && route.fixture !== "seller-thread",
+);
+const PUBLIC_THREAD_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
+	(route) => route.fixture === "seller-thread",
 );
 const CRAWL_SEEDS = [
 	"/",
@@ -638,7 +642,7 @@ test.describe("whole-site route and link contract", () => {
 			}
 		}
 
-		expect(PUBLIC_DYNAMIC_ROUTES).toHaveLength(9);
+		expect(PUBLIC_DYNAMIC_ROUTES).toHaveLength(10);
 		expect(PUBLIC_CALLBACK_DYNAMIC_ROUTES).toHaveLength(2);
 		expect(
 			failures,
@@ -682,6 +686,23 @@ test.describe("whole-site route and link contract", () => {
 			failures,
 			`${PUBLIC_DATA_DYNAMIC_ROUTES.length} data-backed public dynamic routes checked with product ${fixtures.productId} / seller ${fixtures.sellerId}:\n${failures.join("\n")}`,
 		).toEqual([]);
+	});
+
+	test("an unknown seller forum thread answers 404 instead of a document", {
+		tag: ["@contract", "@live"],
+	}, async ({ request }) => {
+		const fixtures = await discoverPublicDynamicFixtures(request);
+		test.skip(
+			fixtures === null,
+			"public catalog legitimately empty (pre-launch prod)",
+		);
+		if (!fixtures) return;
+		expect(PUBLIC_THREAD_DYNAMIC_ROUTES).toHaveLength(1);
+		for (const entry of PUBLIC_THREAD_DYNAMIC_ROUTES) {
+			const route = materializeDynamicRoute(entry, fixtures);
+			const response = await getDocumentWithRetry(request, route);
+			expect(response.status, route).toBe(404);
+		}
 	});
 
 	test("every permanent redirect preserves its destination and query", {
