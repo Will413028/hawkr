@@ -325,17 +325,23 @@ func toEntry(r reads.EntryRow) model.ForumEntry {
 
 // finish 把（可能多取一列的）列轉成一頁，並帶這家店的討論區對呼叫者可不可以讀寫：有列就是（列的查詢帶同一個條件），空頁才查一次。
 func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.EntryRow, size int32, now time.Time) (model.ForumPage, error) {
-	more := len(rows) > int(size)
-	if more {
-		rows = rows[:size]
-	}
-	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows)), Readable: len(rows) > 0}
+	out := pageOf(rows, size)
 	if len(rows) == 0 {
 		var err error
 		if out.Readable, err = s.Readable(ctx, c, storeID, now); err != nil {
 			return model.ForumPage{}, err
 		}
 	}
+	return out, nil
+}
+
+// pageOf 把（可能多取一列的）列轉成一頁；Readable 只在有列時為真，空頁的可讀性由呼叫端決定。
+func pageOf(rows []reads.EntryRow, size int32) model.ForumPage {
+	more := len(rows) > int(size)
+	if more {
+		rows = rows[:size]
+	}
+	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows)), Readable: len(rows) > 0}
 	for i, r := range rows {
 		out.Entries[i] = toEntry(r)
 	}
@@ -343,7 +349,7 @@ func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, row
 		last := rows[len(rows)-1]
 		out.Next = &model.CommentCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
-	return out, nil
+	return out
 }
 
 // ListTopLevel 列出店家討論區的頂層留言（依建立時間由舊到新的 keyset）；店家要可曝光而且觀看者沒有封鎖這家店，否則是空的一頁。
@@ -399,9 +405,12 @@ func (s *Service) GetThread(ctx context.Context, c model.Caller, storeID int64, 
 	if len(rows) == 0 {
 		return model.ForumThreadView{}, entryNotFound(ctx)
 	}
-	replies, err := s.ListReplies(ctx, c, storeID, threadID, nil, size)
+	// 頂層已用同一個可讀條件讀到，所以直接讀回覆：不再重讀父留言，空的回覆頁也不需要可讀性查詢。
+	replyRows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(threadID, now, actor.ViewerFor(c, storeID), reads.CommentPage{Limit: int64(size) + 1}))
 	if err != nil {
-		return model.ForumThreadView{}, err
+		return model.ForumThreadView{}, fmt.Errorf("social：列出討論區回覆：%w", err)
 	}
+	replies := pageOf(replyRows, size)
+	replies.Readable = true
 	return model.ForumThreadView{Top: toEntry(rows[0]), Replies: replies}, nil
 }
