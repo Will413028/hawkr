@@ -123,7 +123,6 @@ func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.Delegat
 // fakePosts 記錄 social 的呼叫與收到的輸入，回固定的結果；沒有覆寫的 Owner 方法被呼叫會 panic。
 type fakePosts struct {
 	Owner
-	read   readability
 	create social.CreatePostInput
 	update social.UpdatePostInput
 	trans  struct {
