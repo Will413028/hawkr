@@ -8,6 +8,10 @@ import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
 import Button from "@/components/ui/Button";
+import {
+	CommentEditor,
+	CommentEntryActions,
+} from "@/features/feed/components/CommentEntryParts";
 import type { PostViewerState } from "@/lib/api/openapi-types";
 import { useAuth } from "@/lib/auth/context";
 import {
@@ -273,7 +277,6 @@ function ReplyItem({
 	onBlockAuthor?: (comment: Comment) => Promise<void>;
 	blockBusy?: boolean;
 }) {
-	const tComments = useTranslations("seller.comments");
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
 	// Local content mirror — optimistic edit shows immediately, refresh from
@@ -290,11 +293,6 @@ function ReplyItem({
 	const [deleting, setDeleting] = React.useState(false);
 	const likePendingRef = React.useRef(false);
 	const deletePendingRef = React.useRef(false);
-	const editTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-
-	React.useEffect(() => {
-		if (editing) editTextareaRef.current?.focus();
-	}, [editing]);
 
 	const live = reply.state === "visible";
 	const canDelete = live && canDeleteComment(reply);
@@ -366,16 +364,6 @@ function ReplyItem({
 		}
 	};
 
-	const onEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			void submitEdit();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			cancelEdit();
-		}
-	};
-
 	return (
 		<li
 			className="flex gap-[var(--hkui-space-2)]"
@@ -401,38 +389,14 @@ function ReplyItem({
 					</small>
 				</header>
 				{editing ? (
-					<div className="flex flex-col gap-[var(--hkui-space-2)] mt-1">
-						<textarea
-							ref={editTextareaRef}
-							className="w-full border border-divider rounded-hkui-md py-2 px-3 bg-content1 min-h-10 resize-none focus:outline-none focus:border-hkui-primary [font-family:inherit] [font-weight:inherit] leading-5 text-[length:var(--hkui-text-small)]"
-							value={editDraft}
-							onChange={(e) => setEditDraft(e.target.value)}
-							onKeyDown={onEditKeyDown}
-							rows={1}
-							maxLength={500}
-						/>
-						<div className="flex gap-[var(--hkui-space-2)] self-end">
-							<Button
-								type="button"
-								variant="bordered"
-								color="default"
-								size="sm"
-								onClick={cancelEdit}
-							>
-								取消
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={!editDraft.trim() || savingEdit}
-								isLoading={savingEdit}
-								loadingLabel="儲存回覆中…"
-								onClick={() => void submitEdit()}
-							>
-								儲存
-							</Button>
-						</div>
-					</div>
+					<CommentEditor
+						draft={editDraft}
+						onDraftChange={setEditDraft}
+						onSubmit={() => void submitEdit()}
+						onCancel={cancelEdit}
+						saving={savingEdit}
+						saveLoadingLabel="儲存回覆中…"
+					/>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
 						{reply.replyToName ? (
@@ -466,40 +430,20 @@ function ReplyItem({
 							<span>{likeCount}</span>
 						</Button>
 					) : null}
-					{canEdit && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
-							disabled={likePendingAction !== null || deleting}
-							onClick={startEdit}
-						>
-							編輯
-						</button>
-					)}
-					{canDelete && !editing && (
-						<Button
-							type="button"
-							variant="light"
-							color="danger"
-							size="sm"
-							className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] font-normal text-[var(--hkui-foreground-soft)]"
-							disabled={likePendingAction !== null}
-							isLoading={deleting}
-							loadingLabel="刪除回覆中…"
-							onClick={() => void handleDelete()}
-						>
-							刪除
-						</Button>
-					)}
-					{canBlock && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
-							disabled={deleting || blockBusy}
-							onClick={() => void onBlockAuthor?.(reply)}
-						>
-							{tComments("blockAction")}
-						</button>
+					{!editing && (
+						<CommentEntryActions
+							canEdit={canEdit}
+							canDelete={canDelete}
+							canBlock={Boolean(canBlock)}
+							editDisabled={likePendingAction !== null || deleting}
+							deleteDisabled={likePendingAction !== null}
+							blockDisabled={deleting || blockBusy}
+							deleting={deleting}
+							deleteLoadingLabel="刪除回覆中…"
+							onEdit={startEdit}
+							onDelete={() => void handleDelete()}
+							onBlock={() => void onBlockAuthor?.(reply)}
+						/>
 					)}
 				</footer>
 			</div>
@@ -530,7 +474,6 @@ function CommentItem({
 	onBlockAuthor?: (comment: Comment) => Promise<void>;
 	blockBusy?: boolean;
 }) {
-	const tComments = useTranslations("seller.comments");
 	const tFeed = useTranslations("feed.comments");
 	const defaultErrors = useDefaultErrorText();
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
@@ -554,11 +497,6 @@ function CommentItem({
 	const [deleting, setDeleting] = React.useState(false);
 	const likePendingRef = React.useRef(false);
 	const deletePendingRef = React.useRef(false);
-	const editTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-
-	React.useEffect(() => {
-		if (editing) editTextareaRef.current?.focus();
-	}, [editing]);
 
 	const live = comment.state === "visible";
 	const canDelete = live && canDeleteComment(comment);
@@ -619,16 +557,6 @@ function CommentItem({
 			window.alert(e instanceof Error ? e.message : "編輯失敗");
 		} finally {
 			setSavingEdit(false);
-		}
-	};
-
-	const onEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			void submitEdit();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			cancelEdit();
 		}
 	};
 
@@ -696,38 +624,14 @@ function CommentItem({
 					</small>
 				</header>
 				{editing ? (
-					<div className="flex flex-col gap-[var(--hkui-space-2)] mt-1">
-						<textarea
-							ref={editTextareaRef}
-							className="w-full border border-divider rounded-hkui-md py-2 px-3 bg-content1 min-h-10 resize-none focus:outline-none focus:border-hkui-primary [font-family:inherit] [font-weight:inherit] leading-5 text-[length:var(--hkui-text-small)]"
-							value={editDraft}
-							onChange={(e) => setEditDraft(e.target.value)}
-							onKeyDown={onEditKeyDown}
-							rows={1}
-							maxLength={500}
-						/>
-						<div className="flex gap-[var(--hkui-space-2)] self-end">
-							<Button
-								type="button"
-								variant="bordered"
-								color="default"
-								size="sm"
-								onClick={cancelEdit}
-							>
-								取消
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={!editDraft.trim() || savingEdit}
-								isLoading={savingEdit}
-								loadingLabel="儲存留言中…"
-								onClick={() => void submitEdit()}
-							>
-								儲存
-							</Button>
-						</div>
-					</div>
+					<CommentEditor
+						draft={editDraft}
+						onDraftChange={setEditDraft}
+						onSubmit={() => void submitEdit()}
+						onCancel={cancelEdit}
+						saving={savingEdit}
+						saveLoadingLabel="儲存留言中…"
+					/>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
 						{live
@@ -786,40 +690,20 @@ function CommentItem({
 							{replies.open ? "收合回覆" : `查看 ${replyCount} 則回覆`}
 						</Button>
 					)}
-					{canEdit && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
-							disabled={likePendingAction !== null || deleting}
-							onClick={startEdit}
-						>
-							編輯
-						</button>
-					)}
-					{canDelete && !editing && (
-						<Button
-							type="button"
-							variant="light"
-							color="danger"
-							size="sm"
-							className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] font-normal text-[var(--hkui-foreground-soft)]"
-							disabled={likePendingAction !== null}
-							isLoading={deleting}
-							loadingLabel="刪除留言中…"
-							onClick={() => void handleDelete()}
-						>
-							刪除
-						</Button>
-					)}
-					{canBlock && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-danger)] hover:bg-[var(--hkui-content2)]"
-							disabled={deleting || blockBusy}
-							onClick={() => void onBlockAuthor?.(comment)}
-						>
-							{tComments("blockAction")}
-						</button>
+					{!editing && (
+						<CommentEntryActions
+							canEdit={canEdit}
+							canDelete={canDelete}
+							canBlock={Boolean(canBlock)}
+							editDisabled={likePendingAction !== null || deleting}
+							deleteDisabled={likePendingAction !== null}
+							blockDisabled={deleting || blockBusy}
+							deleting={deleting}
+							deleteLoadingLabel="刪除留言中…"
+							onEdit={startEdit}
+							onDelete={() => void handleDelete()}
+							onBlock={() => void onBlockAuthor?.(comment)}
+						/>
 					)}
 				</footer>
 

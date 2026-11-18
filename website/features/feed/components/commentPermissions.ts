@@ -8,6 +8,7 @@
 
 import type { PostViewerState } from "@/lib/api/openapi-types";
 import type { Comment } from "@/lib/comments/repo";
+import type { SellerForumComment } from "@/lib/forum/repo";
 
 export function canEditComment(c: Pick<Comment, "viewerCanEdit">): boolean {
 	return c.viewerCanEdit;
@@ -30,6 +31,13 @@ export function canBlockCommentAuthor(
 	c: Pick<Comment, "isMine" | "viewerCanDelete">,
 ): boolean {
 	return !c.isMine && c.viewerCanDelete;
+}
+
+/** 討論區發言：同一條規則，再加上作者必須是買家（店家自己的發言不是封鎖對象）。 */
+export function canBlockForumAuthor(
+	c: Pick<SellerForumComment, "isMine" | "viewerCanDelete" | "authorKind">,
+): boolean {
+	return c.authorKind === "buyer" && canBlockCommentAuthor(c);
 }
 
 /** 留言框要不要出現：登入、而且伺服器說這則貼文觀看者能留言（被這家店封鎖的買家不能）。 */

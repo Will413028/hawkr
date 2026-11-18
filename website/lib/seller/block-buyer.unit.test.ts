@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { blockBuyerByComment } from "./block-buyer";
+import { blockBuyerByComment, blockBuyerByForumEntry } from "./block-buyer";
 
 describe("blockBuyerByComment", () => {
 	it("names the buyer by the comment id and reports whether the state changed", async () => {
@@ -26,5 +26,19 @@ describe("blockBuyerByComment", () => {
 		await expect(
 			blockBuyerByComment("c-3", () => ({ blockBuyer }) as never),
 		).rejects.toThrow("not_found");
+	});
+});
+
+describe("blockBuyerByForumEntry", () => {
+	it("names the buyer by the forum entry id and reports whether the state changed", async () => {
+		const blockBuyer = vi.fn().mockResolvedValue({ changed: true });
+		const result = await blockBuyerByForumEntry(
+			"f-1",
+			() => ({ blockBuyer }) as never,
+		);
+		expect(blockBuyer).toHaveBeenCalledExactlyOnceWith({
+			source: { case: "forumEntryId", value: "f-1" },
+		});
+		expect(result).toEqual({ changed: true });
 	});
 });

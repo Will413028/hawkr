@@ -5,6 +5,7 @@
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+	ActorKind,
 	CommentState,
 	type ForumEntry,
 	ForumEntrySchema,
@@ -28,6 +29,10 @@ export interface SellerForumComment {
 	isMine: boolean;
 	userName: string;
 	avatarKey?: string;
+	/** 作者是買家或店家；佔位項目沒有作者。 */
+	authorKind?: "buyer" | "store";
+	/** 作者的買家或店家 ID（依 authorKind）；佔位項目沒有。 */
+	authorId?: string;
 	content: string;
 	replyCount?: number;
 	/** 建立時間（unix 秒）。 */
@@ -64,6 +69,17 @@ function forumStateOf(state: CommentState): SellerForumComment["state"] {
 	}
 }
 
+function authorKindOf(entry: ForumEntry): SellerForumComment["authorKind"] {
+	switch (entry.author?.kind) {
+		case ActorKind.BUYER:
+			return "buyer";
+		case ActorKind.STORE:
+			return "store";
+		default:
+			return undefined;
+	}
+}
+
 export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 	return {
 		id: entry.id,
@@ -73,6 +89,8 @@ export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 		isMine: entry.isMine,
 		userName: entry.author?.name?.trim() || "匿名",
 		avatarKey: imageUri(entry.author?.avatar, "avatar"),
+		authorKind: authorKindOf(entry),
+		authorId: entry.author?.id || undefined,
 		content: entry.body,
 		replyCount: Number(entry.replyCount),
 		createdAt: entry.createTime
