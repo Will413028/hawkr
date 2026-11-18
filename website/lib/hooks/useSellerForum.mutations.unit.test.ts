@@ -522,8 +522,47 @@ describe("a submission stops being shown once it has landed or been deleted", ()
 		await act(async () => {
 			await result.current.forum.refresh();
 		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]),
+		);
 		expect(result.current.forum.submitted).toEqual([]);
-		expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]);
+	});
+});
+
+describe("an ordinary refetch in flight when a row is deleted", () => {
+	it("cannot bring the deleted row back when its stale response lands later", async () => {
+		const { result } = await mountForum();
+		const staleRefetch = deferred<ReturnType<typeof page>>();
+		repo.createSellerForumComment.mockResolvedValue(entry("real"));
+		repo.fetchSellerForum.mockReturnValueOnce(staleRefetch.promise);
+		repo.fetchSellerForum.mockResolvedValue(
+			page([entry("top", { replyCount: 2 }), entry("lonely")]),
+		);
+		await act(async () => {
+			await result.current.forum.post("新發言");
+		});
+		expect(repo.fetchSellerForum).toHaveBeenCalledTimes(2);
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toContain("real"),
+		);
+		repo.deleteSellerForumComment.mockResolvedValue(undefined);
+		await act(async () => {
+			await result.current.forum.remove(
+				result.current.forum.comments.find((c) => c.id === "real") as never,
+			);
+		});
+		await act(async () => {
+			staleRefetch.resolve(
+				page([entry("top", { replyCount: 2 }), entry("lonely"), entry("real")]),
+			);
+			await staleRefetch.promise;
+		});
+		await act(async () => {
+			await result.current.forum.refresh();
+		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]),
+		);
 	});
 });
 
