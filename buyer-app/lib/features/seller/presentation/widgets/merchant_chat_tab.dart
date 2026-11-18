@@ -749,8 +749,8 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
 /// 單則留言的展示卡片。
 ///
-/// 顯示：使用者名稱、發布時間、回覆對象（若有）、內文、按讚/回覆操作列。
-/// 自己的留言（[_hasMenu]）支援長壓或點 ⋯ 觸發編輯/刪除選單。
+/// 顯示：使用者名稱、發布時間、回覆對象（若有）、內文、回覆操作列（討論區沒有按讚）。
+/// 伺服器說可編輯或刪除時（[_hasMenu]）支援長壓或點 ⋯ 觸發選單。
 class _CommentCard extends StatelessWidget {
   const _CommentCard({
     required this.node,
