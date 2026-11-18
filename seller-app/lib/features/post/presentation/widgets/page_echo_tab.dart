@@ -13,6 +13,7 @@ import '../../../../core/theme/hk_tokens.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/utils/floating_toast.dart';
 import '../../../../config/media_image.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../../shared/widgets/hk_frosted_icon_button.dart';
 import '../../../../shared/widgets/hk_icon.dart';
@@ -731,13 +732,20 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     });
   }
 
-  /// 刪除留言
+  /// 確認後刪除發言。
   Future<void> _onEchoDeleteComment(EchoCommentNode node) async {
-    // 直接刪除，不顯示確認對話框
     final msgId = node.id;
     if (_echoSubmitting || !mounted || _deletingMessageIds.contains(msgId)) {
       return;
     }
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '確定要刪除此留言嗎？',
+      message: '刪除後將無法復原。',
+      confirmText: '刪除',
+      confirmTextColor: AppColors.danger,
+    );
+    if (!confirmed || !mounted || _deletingMessageIds.contains(msgId)) return;
     setState(() => _deletingMessageIds.add(msgId));
     try {
       await ref

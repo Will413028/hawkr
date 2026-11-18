@@ -67,7 +67,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   String _nextPostsToken = '';
 
   final Map<int, int> _postCommentCount = <int, int>{};
-  final Set<int> _commentsInitRequested = <int>{};
   final Map<int, ValueNotifier<int>> _commentCountNotifiers =
       <int, ValueNotifier<int>>{};
 
@@ -571,27 +570,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       initialCount,
     );
     final commentsNotice = postCommentsNoticeOfPost(share, p);
-    if (!_commentsInitRequested.contains(postId)) {
-      _commentsInitRequested.add(postId);
-      Future.microtask(() async {
-        try {
-          final list = await _postRepo.listComments(postId);
-          if (!mounted) return;
-          setState(
-            () => _applyCommentCount(
-              postId,
-              list.fold<int>(
-                0,
-                (sum, c) => sum + (c.isVisible ? 1 : 0) + c.replyCount,
-              ),
-            ),
-          );
-        } catch (_) {
-          // 讀不到時沿用貼文上伺服器給的留言數。
-        }
-      });
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -657,6 +635,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                       postId: postId,
                       postRepository: _postRepo,
                       notice: commentsNotice?.message,
+                      canComment: p.viewerCanComment,
                       onCommentCountChanged: (count) {
                         if (!mounted) return;
                         _applyCommentCount(postId, count);

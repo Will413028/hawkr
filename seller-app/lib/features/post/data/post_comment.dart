@@ -161,18 +161,3 @@ class StoreForumEntry {
 
   String? get placeholderText => commentPlaceholderText(state);
 }
-
-/// 一組頂層留言加上已載入的回覆時，可見留言的總數（佔位項目不算，回覆照算）。
-int visibleCommentTotal(
-  Iterable<PostComment> tops,
-  Map<String, List<PostComment>> repliesByParent,
-) {
-  var total = 0;
-  for (final top in tops) {
-    if (top.isVisible) total++;
-    total += (repliesByParent[top.id] ?? const <PostComment>[])
-        .where((r) => r.isVisible)
-        .length;
-  }
-  return total;
-}

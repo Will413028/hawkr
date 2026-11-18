@@ -618,6 +618,8 @@ void main() {
         await tester.tap(find.byTooltip('留言更多操作').last);
         await tester.pumpAndSettle();
         await tester.tap(find.text('刪除留言'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('刪除'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
       }
@@ -733,6 +735,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('刪除留言'), findsOneWidget);
     expect(find.text('檢舉留言'), findsOneWidget);
+  });
+
+  testWidgets('deleting a forum entry asks first and cancel sends nothing', (
+    tester,
+  ) async {
+    final repository = await _pumpEcho(tester, ownReply: true);
+    await tester.tap(find.byTooltip('留言更多操作').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除留言'));
+    await tester.pumpAndSettle();
+    expect(find.text('確定要刪除此留言嗎？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
+    );
   });
 
   testWidgets('deleted and hidden placeholders show approved text only', (

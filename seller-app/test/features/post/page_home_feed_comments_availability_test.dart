@@ -33,6 +33,7 @@ Future<_Repo> _openComments(
   required bool listed,
   required Post post,
   List<PostComment>? comments,
+  String? replyFailsFor,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -49,6 +50,11 @@ Future<_Repo> _openComments(
       parentId: any(named: 'parentId', that: isNotNull),
     ),
   ).thenAnswer((_) async => const <PostComment>[]);
+  if (replyFailsFor != null) {
+    when(
+      () => repo.listComments(42, parentId: replyFailsFor),
+    ).thenThrow(StateError('offline'));
+  }
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -68,7 +74,7 @@ Future<_Repo> _openComments(
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.bySemanticsLabel('留言，共 0 則'));
+  await tester.tap(find.bySemanticsLabel('留言，共 ${post.commentCount} 則'));
   await tester.pumpAndSettle();
   return repo;
 }
@@ -76,10 +82,14 @@ Future<_Repo> _openComments(
 Post _post({
   PostStatus publishStatus = PostStatus.POST_STATUS_UNSPECIFIED,
   int? hiddenAt,
+  bool viewerCanComment = true,
+  int commentCount = 0,
 }) => Post(
   id: 42,
   content: '貼文內容',
   status: publishStatus,
+  viewerCanComment: viewerCanComment,
+  commentCount: commentCount,
   takedownMeasureId: hiddenAt == null ? null : 'measure-1',
 );
 
@@ -99,7 +109,7 @@ void main() {
     expect(find.byTooltip('留言更多操作'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('seller-post-action-composer-42')),
-      findsNothing,
+      findsOneWidget,
     );
   }
 
@@ -226,5 +236,53 @@ void main() {
     expect(find.text('此留言已刪除'), findsOneWidget);
     expect(find.text('此留言已被隱藏'), findsOneWidget);
     expect(find.byTooltip('留言更多操作'), findsNothing);
+  });
+
+  testWidgets('the composer follows viewer_can_comment, not the notice', (
+    tester,
+  ) async {
+    await _openComments(
+      tester,
+      listed: false,
+      post: _post(
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+        viewerCanComment: false,
+      ),
+    );
+    expect(find.text('店家目前不公開，買家看不到這些留言。'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('seller-post-action-composer-42')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('the sheet title uses the server comment_count', (tester) async {
+    await _openComments(
+      tester,
+      listed: true,
+      post: _post(
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+        commentCount: 5,
+      ),
+    );
+    expect(find.text('留言 5'), findsOneWidget);
+  });
+
+  testWidgets('a failed reply fetch only fails its own thread', (tester) async {
+    final repo = await _openComments(
+      tester,
+      listed: true,
+      post: _post(publishStatus: PostStatus.POST_STATUS_PUBLISHED),
+      comments: [
+        testComment(id: '1', body: '第一則', replyCount: 1),
+        testComment(id: '2', body: '第二則'),
+      ],
+      replyFailsFor: '1',
+    );
+    expect(repo, isNotNull);
+    expect(find.text('第一則'), findsOneWidget);
+    expect(find.text('第二則'), findsOneWidget);
+    expect(find.text('回覆載入失敗'), findsOneWidget);
+    expect(find.text('留言載入失敗'), findsNothing);
   });
 }

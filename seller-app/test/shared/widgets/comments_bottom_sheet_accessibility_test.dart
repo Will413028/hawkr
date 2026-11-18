@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_comment.dart';
+import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/shared/widgets/comments_bottom_sheet.dart';
 import 'package:flutter/material.dart';
@@ -52,7 +53,11 @@ void main() {
           builder: (_, _) => MaterialApp(
             theme: AppTheme.light,
             home: Scaffold(
-              body: CommentsBottomSheet(postId: 42, postRepository: repository),
+              body: CommentsBottomSheet(
+                postId: 42,
+                postRepository: repository,
+                canComment: true,
+              ),
             ),
           ),
         ),
@@ -329,6 +334,88 @@ void main() {
     await tester.pumpAndSettle();
     verify(() => repository.unlikeComment('1')).called(1);
     expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('a double tap on like sends one request', (tester) async {
+    final response = Completer<void>();
+    when(
+      () => repository.likeComment('1'),
+    ).thenAnswer((_) => response.future);
+    await pumpSheet(tester);
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pump();
+    verify(() => repository.likeComment('1')).called(1);
+    verifyNever(() => repository.unlikeComment(any()));
+    response.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a reply created while replies load is kept', (tester) async {
+    final fetch = Completer<List<PostComment>>();
+    when(
+      () => repository.listComments(42, parentId: '1'),
+    ).thenAnswer((_) => fetch.future);
+    when(
+      () => repository.createComment(
+        42,
+        body: any(named: 'body'),
+        parentId: '1',
+      ),
+    ).thenAnswer(
+      (_) async => testComment(id: '9', parentId: '1', body: '我剛送出的回覆'),
+    );
+    await pumpSheet(tester);
+    await tester.tap(find.byKey(const ValueKey('comment-reply-1')));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '我剛送出的回覆');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pump();
+    await tester.pump();
+    fetch.complete([testComment(id: '2', parentId: '1', body: '伺服器的回覆')]);
+    await tester.pumpAndSettle();
+    expect(find.text('伺服器的回覆'), findsOneWidget);
+    expect(find.text('我剛送出的回覆'), findsOneWidget);
+  });
+
+  testWidgets('the count callback reports the server comment_count', (
+    tester,
+  ) async {
+    final counts = <int>[];
+    when(() => repository.getMyPost(42)).thenAnswer(
+      (_) async => const Post(id: 42, commentCount: 6, viewerCanComment: true),
+    );
+    when(
+      () => repository.createComment(42, body: any(named: 'body')),
+    ).thenAnswer((_) async => testComment(id: '8', body: '新留言'));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [postRepositoryProvider.overrideWithValue(repository)],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: CommentsBottomSheet(
+                postId: 42,
+                postRepository: repository,
+                canComment: true,
+                onCommentCountChanged: counts.add,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '新留言');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pumpAndSettle();
+    expect(counts.last, 6);
   });
 
   testWidgets('comment sheet passes all three accessibility guidelines', (

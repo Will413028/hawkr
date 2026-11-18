@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Post {
 
- int get id; String get etag; String get content; String get imageUrl; int get likeCount; int get commentCount; int get shareCount; DateTime? get createdAt; PostLinkedProduct? get linkedProduct; PostStatus get status; String? get takedownMeasureId; DateTime? get scheduledPublishAt; String get url;
+ int get id; String get etag; String get content; String get imageUrl; int get likeCount; int get commentCount; int get shareCount; bool get viewerCanComment; DateTime? get createdAt; PostLinkedProduct? get linkedProduct; PostStatus get status; String? get takedownMeasureId; DateTime? get scheduledPublishAt; String get url;
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $PostCopyWith<Post> get copyWith => _$PostCopyWithImpl<Post>(this as Post, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedProduct, linkedProduct) || other.linkedProduct == linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedProduct, linkedProduct) || other.linkedProduct == linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,createdAt,linkedProduct,status,takedownMeasureId,scheduledPublishAt,url);
+int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,viewerCanComment,createdAt,linkedProduct,status,takedownMeasureId,scheduledPublishAt,url);
 
 @override
 String toString() {
-  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
+  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, viewerCanComment: $viewerCanComment, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $PostCopyWith<$Res>  {
   factory $PostCopyWith(Post value, $Res Function(Post) _then) = _$PostCopyWithImpl;
 @useResult
 $Res call({
- int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, DateTime? createdAt, PostLinkedProduct? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
+ int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, bool viewerCanComment, DateTime? createdAt, PostLinkedProduct? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
 });
 
 
@@ -62,7 +62,7 @@ class _$PostCopyWithImpl<$Res>
 
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? viewerCanComment = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,etag: null == etag ? _self.etag : etag // ignore: cast_nullable_to_non_nullable
@@ -71,7 +71,8 @@ as String,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast
 as String,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
 as int,commentCount: null == commentCount ? _self.commentCount : commentCount // ignore: cast_nullable_to_non_nullable
 as int,shareCount: null == shareCount ? _self.shareCount : shareCount // ignore: cast_nullable_to_non_nullable
-as int,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as int,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
+as bool,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,linkedProduct: freezed == linkedProduct ? _self.linkedProduct : linkedProduct // ignore: cast_nullable_to_non_nullable
 as PostLinkedProduct?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as PostStatus,takedownMeasureId: freezed == takedownMeasureId ? _self.takedownMeasureId : takedownMeasureId // ignore: cast_nullable_to_non_nullable
@@ -174,10 +175,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  bool viewerCanComment,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
-return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewerCanComment,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   return orElse();
 
 }
@@ -195,10 +196,10 @@ return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  bool viewerCanComment,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)  $default,) {final _that = this;
 switch (_that) {
 case _Post():
-return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewerCanComment,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -215,10 +216,10 @@ return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String etag,  String content,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  bool viewerCanComment,  DateTime? createdAt,  PostLinkedProduct? linkedProduct,  PostStatus status,  String? takedownMeasureId,  DateTime? scheduledPublishAt,  String url)?  $default,) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
-return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
+return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewerCanComment,_that.createdAt,_that.linkedProduct,_that.status,_that.takedownMeasureId,_that.scheduledPublishAt,_that.url);case _:
   return null;
 
 }
@@ -230,7 +231,7 @@ return $default(_that.id,_that.etag,_that.content,_that.imageUrl,_that.likeCount
 
 
 class _Post extends Post {
-  const _Post({required this.id, this.etag = '', this.content = '', this.imageUrl = '', this.likeCount = 0, this.commentCount = 0, this.shareCount = 0, this.createdAt, this.linkedProduct, this.status = PostStatus.POST_STATUS_UNSPECIFIED, this.takedownMeasureId, this.scheduledPublishAt, this.url = ''}): super._();
+  const _Post({required this.id, this.etag = '', this.content = '', this.imageUrl = '', this.likeCount = 0, this.commentCount = 0, this.shareCount = 0, this.viewerCanComment = false, this.createdAt, this.linkedProduct, this.status = PostStatus.POST_STATUS_UNSPECIFIED, this.takedownMeasureId, this.scheduledPublishAt, this.url = ''}): super._();
   
 
 @override final  int id;
@@ -240,6 +241,7 @@ class _Post extends Post {
 @override@JsonKey() final  int likeCount;
 @override@JsonKey() final  int commentCount;
 @override@JsonKey() final  int shareCount;
+@override@JsonKey() final  bool viewerCanComment;
 @override final  DateTime? createdAt;
 @override final  PostLinkedProduct? linkedProduct;
 @override@JsonKey() final  PostStatus status;
@@ -257,16 +259,16 @@ _$PostCopyWith<_Post> get copyWith => __$PostCopyWithImpl<_Post>(this, _$identit
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedProduct, linkedProduct) || other.linkedProduct == linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.etag, etag) || other.etag == etag)&&(identical(other.content, content) || other.content == content)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.linkedProduct, linkedProduct) || other.linkedProduct == linkedProduct)&&(identical(other.status, status) || other.status == status)&&(identical(other.takedownMeasureId, takedownMeasureId) || other.takedownMeasureId == takedownMeasureId)&&(identical(other.scheduledPublishAt, scheduledPublishAt) || other.scheduledPublishAt == scheduledPublishAt)&&(identical(other.url, url) || other.url == url));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,createdAt,linkedProduct,status,takedownMeasureId,scheduledPublishAt,url);
+int get hashCode => Object.hash(runtimeType,id,etag,content,imageUrl,likeCount,commentCount,shareCount,viewerCanComment,createdAt,linkedProduct,status,takedownMeasureId,scheduledPublishAt,url);
 
 @override
 String toString() {
-  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
+  return 'Post(id: $id, etag: $etag, content: $content, imageUrl: $imageUrl, likeCount: $likeCount, commentCount: $commentCount, shareCount: $shareCount, viewerCanComment: $viewerCanComment, createdAt: $createdAt, linkedProduct: $linkedProduct, status: $status, takedownMeasureId: $takedownMeasureId, scheduledPublishAt: $scheduledPublishAt, url: $url)';
 }
 
 
@@ -277,7 +279,7 @@ abstract mixin class _$PostCopyWith<$Res> implements $PostCopyWith<$Res> {
   factory _$PostCopyWith(_Post value, $Res Function(_Post) _then) = __$PostCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, DateTime? createdAt, PostLinkedProduct? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
+ int id, String etag, String content, String imageUrl, int likeCount, int commentCount, int shareCount, bool viewerCanComment, DateTime? createdAt, PostLinkedProduct? linkedProduct, PostStatus status, String? takedownMeasureId, DateTime? scheduledPublishAt, String url
 });
 
 
@@ -294,7 +296,7 @@ class __$PostCopyWithImpl<$Res>
 
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? etag = null,Object? content = null,Object? imageUrl = null,Object? likeCount = null,Object? commentCount = null,Object? shareCount = null,Object? viewerCanComment = null,Object? createdAt = freezed,Object? linkedProduct = freezed,Object? status = null,Object? takedownMeasureId = freezed,Object? scheduledPublishAt = freezed,Object? url = null,}) {
   return _then(_Post(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,etag: null == etag ? _self.etag : etag // ignore: cast_nullable_to_non_nullable
@@ -303,7 +305,8 @@ as String,imageUrl: null == imageUrl ? _self.imageUrl : imageUrl // ignore: cast
 as String,likeCount: null == likeCount ? _self.likeCount : likeCount // ignore: cast_nullable_to_non_nullable
 as int,commentCount: null == commentCount ? _self.commentCount : commentCount // ignore: cast_nullable_to_non_nullable
 as int,shareCount: null == shareCount ? _self.shareCount : shareCount // ignore: cast_nullable_to_non_nullable
-as int,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as int,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
+as bool,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,linkedProduct: freezed == linkedProduct ? _self.linkedProduct : linkedProduct // ignore: cast_nullable_to_non_nullable
 as PostLinkedProduct?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as PostStatus,takedownMeasureId: freezed == takedownMeasureId ? _self.takedownMeasureId : takedownMeasureId // ignore: cast_nullable_to_non_nullable

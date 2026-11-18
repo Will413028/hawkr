@@ -22,6 +22,8 @@ final _sheet = find.byKey(_sheetKey);
 Finder get _input =>
     find.descendant(of: _sheet, matching: find.byType(TextField));
 
+int _serverCommentCount = 2;
+
 Future<_Repo> _pumpFeed(
   WidgetTester tester, {
   required Size size,
@@ -32,8 +34,22 @@ Future<_Repo> _pumpFeed(
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
   final repo = _Repo();
+  _serverCommentCount = 2;
+  when(() => repo.getMyPost(42)).thenAnswer(
+    (_) async => Post(
+      id: 42,
+      content: '產地直送',
+      commentCount: _serverCommentCount,
+      viewerCanComment: true,
+    ),
+  );
   when(() => repo.listMyPosts()).thenAnswer(
-    (_) async => [const Post(id: 42, content: '產地直送', commentCount: 2)],
+    (_) async => [const Post(
+        id: 42,
+        content: '產地直送',
+        commentCount: 2,
+        viewerCanComment: true,
+      )],
   );
   when(() => repo.listComments(42)).thenAnswer(
     (_) async => [
@@ -252,6 +268,7 @@ void main() {
       await tester.tap(_input);
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();
+      _serverCommentCount = 3;
       response.complete(testComment(id: '3', parentId: '1'));
       await tester.pumpAndSettle();
       verify(
@@ -290,7 +307,10 @@ void main() {
       // callbacks must increment the refreshed count, not the opening value.
       when(
         () => repo.createComment(42, body: '第二則獨立留言'),
-      ).thenAnswer((_) async => testComment(id: '4'));
+      ).thenAnswer((_) async {
+        _serverCommentCount = 4;
+        return testComment(id: '4');
+      });
       await tester.enterText(_input, '第二則獨立留言');
       await tester.pump();
       final send = find.bySemanticsLabel('送出留言');

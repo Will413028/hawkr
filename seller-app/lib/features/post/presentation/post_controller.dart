@@ -166,6 +166,17 @@ class PostList extends _$PostList {
     return updated;
   }
 
+  /// 從伺服器重讀這篇貼文的 `comment_count`（留言數的唯一來源），失敗時保留現值。
+  Future<int?> refreshCommentCount(int postId) async {
+    try {
+      final fresh = await ref.read(postRepositoryProvider).getMyPost(postId);
+      updateCommentCount(postId, fresh.commentCount);
+      return fresh.commentCount;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void updateCommentCount(int postId, int newCount) {
     final prevState = state;
     if (prevState is AsyncData<List<Post>>) {

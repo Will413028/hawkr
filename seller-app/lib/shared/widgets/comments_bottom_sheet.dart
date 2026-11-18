@@ -2,6 +2,7 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../features/post/data/post_comment.dart';
 import '../../features/post/data/post_repository.dart';
+import '../../features/post/presentation/post_controller.dart';
 import '../utils/floating_toast.dart';
 import 'chat_bubble_icon.dart';
 import 'hk_tap_target.dart';
@@ -28,6 +30,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
     this.sellerAvatarUrl,
     this.onCommentCountChanged,
     this.notice,
+    this.canComment = false,
   });
   final int postId;
   final PostRepository postRepository;
@@ -35,8 +38,11 @@ class CommentsBottomSheet extends HookConsumerWidget {
   final String? sellerAvatarUrl;
   final ValueChanged<int>? onCommentCountChanged;
 
-  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除，不顯示輸入列。
+  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除。
   final String? notice;
+
+  /// 伺服器的 `Post.viewer_can_comment`：true 才顯示輸入列，與 [notice] 無關。
+  final bool canComment;
 
   static ImageProvider? _resolveCommentAvatar(
     PostComment c, {
@@ -85,7 +91,13 @@ class CommentsBottomSheet extends HookConsumerWidget {
       if (!context.mounted) return;
       final cb = onCommentCountChanged;
       if (cb == null) return;
-      cb(visibleCommentTotal(comments.value, repliesByParentRef.value));
+      unawaited(
+        ref.read(postListProvider.notifier).refreshCommentCount(postId).then((
+          count,
+        ) {
+          if (count != null && context.mounted) cb(count);
+        }),
+      );
     }
 
     void scheduleScrollToBottom({bool animated = true}) {
@@ -200,7 +212,22 @@ class CommentsBottomSheet extends HookConsumerWidget {
       return true;
     }
 
-    Future<void> toggleLike(PostComment target) async {
+    final likesInFlight = useRef(<String>{});
+    PostComment? currentOf(String id) {
+      for (final c in comments.value) {
+        if (c.id == id) return c;
+      }
+      for (final list in repliesByParentRef.value.values) {
+        for (final r in list) {
+          if (r.id == id) return r;
+        }
+      }
+      return null;
+    }
+
+    Future<void> toggleLike(PostComment stale) async {
+      if (!likesInFlight.value.add(stale.id)) return;
+      final target = currentOf(stale.id) ?? stale;
       final liked = !target.viewerLiked;
       try {
         if (liked) {
@@ -209,9 +236,11 @@ class CommentsBottomSheet extends HookConsumerWidget {
           await postRepository.unlikeComment(target.id);
         }
       } catch (_) {
+        likesInFlight.value.remove(target.id);
         if (context.mounted) FloatingToast.error(context, '操作失敗');
         return;
       }
+      likesInFlight.value.remove(target.id);
       if (!context.mounted) return;
       PostComment swap(PostComment c) =>
           c.id == target.id ? c.withLiked(liked) : c;
@@ -433,7 +462,16 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                       final items = await postRepository
                                           .listComments(postId, parentId: id);
                                       if (!context.mounted) return;
-                                      repliesByParentRef.value[id] = items;
+                                      final created =
+                                          repliesByParentRef.value[id] ??
+                                          const <PostComment>[];
+                                      final known = {for (final r in items) r.id};
+                                      repliesByParentRef.value[id] = [
+                                        ...items,
+                                        ...created.where(
+                                          (r) => !known.contains(r.id),
+                                        ),
+                                      ];
                                     } catch (_) {
                                       if (!context.mounted) return;
                                       FloatingToast.error(context, '回覆載入失敗');
@@ -509,7 +547,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
               ),
 
               // ── Input bar ──
-              if (notice == null)
+              if (canComment)
                 SafeArea(
                   top: false,
                   child: Padding(

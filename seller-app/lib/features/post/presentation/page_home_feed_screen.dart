@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../seller/presentation/seller_store_avatar.dart';
 import '../../../features/seller/data/current_store.dart';
 
@@ -56,25 +57,39 @@ const Color _kBorder = Color(0x1442493F);
 
 // ─── 留言分組：頂層留言加上它的回覆（ListComments 以 parent_id 取回覆） ────────
 class _CommentThread {
-  const _CommentThread({required this.parent, required this.replies});
+  const _CommentThread({
+    required this.parent,
+    required this.replies,
+    this.repliesFailed = false,
+  });
   final PostComment parent;
   final List<PostComment> replies;
 
-  /// 可見的留言數：頂層是佔位項目時不算，回覆照算。
-  int get total =>
-      (parent.isVisible ? 1 : 0) + replies.where((r) => r.isVisible).length;
+  /// 這串的回覆讀取失敗：只有這串顯示失敗，其餘照常。
+  final bool repliesFailed;
 }
 
 final _postCommentsProvider = FutureProvider.autoDispose
     .family<List<_CommentThread>, int>((ref, postId) async {
       final repo = ref.watch(postRepositoryProvider);
       final tops = await repo.listComments(postId);
-      Future<_CommentThread> threadOf(PostComment top) async => _CommentThread(
-        parent: top,
-        replies: top.replyCount > 0
-            ? await repo.listComments(postId, parentId: top.id)
-            : const <PostComment>[],
-      );
+      Future<_CommentThread> threadOf(PostComment top) async {
+        if (top.replyCount <= 0) {
+          return _CommentThread(parent: top, replies: const <PostComment>[]);
+        }
+        try {
+          return _CommentThread(
+            parent: top,
+            replies: await repo.listComments(postId, parentId: top.id),
+          );
+        } catch (_) {
+          return _CommentThread(
+            parent: top,
+            replies: const <PostComment>[],
+            repliesFailed: true,
+          );
+        }
+      }
       return Future.wait(tops.map(threadOf));
     });
 
@@ -378,19 +393,8 @@ class _PostPage extends HookConsumerWidget {
       commentFocus.requestFocus();
     }
 
-    void syncCommentCount(int delta) {
-      // The sheet keeps these callbacks while the underlying feed rebuilds.
-      // Read the latest count so consecutive successful mutations accumulate.
-      final current = ref
-          .read(postListProvider)
-          .value
-          ?.where((item) => item.id == post.id)
-          .firstOrNull;
-      final next = (current?.commentCount ?? post.commentCount) + delta;
-      ref
-          .read(postListProvider.notifier)
-          .updateCommentCount(post.id, next < 0 ? 0 : next);
-    }
+    Future<void> syncCommentCount() =>
+        ref.read(postListProvider.notifier).refreshCommentCount(post.id);
 
     Future<void> submitComment() async {
       final raw = commentCtrl.text.trim();
@@ -418,7 +422,7 @@ class _PostPage extends HookConsumerWidget {
         commentCtrl.clear();
         replyTarget.value = null;
         commentFocus.unfocus();
-        syncCommentCount(1);
+        unawaited(syncCommentCount());
         ref.invalidate(_postCommentsProvider(post.id));
       } catch (e) {
         if (context.mounted) FloatingToast.error(context, '留言失敗');
@@ -435,7 +439,7 @@ class _PostPage extends HookConsumerWidget {
             .deleteComment(c.id, etag: c.etag);
         if (!context.mounted) return;
         FloatingToast.success(context, '已刪除留言');
-        syncCommentCount(-1);
+        unawaited(syncCommentCount());
         ref.invalidate(_postCommentsProvider(post.id));
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
@@ -531,6 +535,7 @@ class _PostPage extends HookConsumerWidget {
           submitting: submitting,
           replyTarget: replyTarget,
           notice: commentsNotice?.message,
+          canComment: post.viewerCanComment,
           onReply: setReplyTo,
           onDelete: deleteComment,
           onSubmit: submitComment,
@@ -1365,6 +1370,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
     required this.submitting,
     required this.replyTarget,
     required this.notice,
+    required this.canComment,
     required this.onReply,
     required this.onDelete,
     required this.onSubmit,
@@ -1376,8 +1382,11 @@ class _PostCommentsSheet extends HookConsumerWidget {
   final ValueListenable<bool> submitting;
   final ValueListenable<_PostReplyTarget?> replyTarget;
 
-  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除，不顯示輸入列。
+  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除。
   final String? notice;
+
+  /// 伺服器的 `Post.viewer_can_comment`；與 [notice] 無關。
+  final bool canComment;
   final void Function(_CommentThread, PostComment) onReply;
   final void Function(PostComment) onDelete;
   final Future<void> Function() onSubmit;
@@ -1434,7 +1443,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '留言 ${threads.fold<int>(0, (sum, thread) => sum + thread.total)}',
+                        '留言 ${ref.watch(postListProvider).value?.where((p) => p.id == postId).firstOrNull?.commentCount ?? 0}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -1485,6 +1494,8 @@ class _PostCommentsSheet extends HookConsumerWidget {
                         thread: thread,
                         onReply: (comment) => onReply(thread, comment),
                         onDelete: onDelete,
+                        onRetryReplies: () =>
+                            ref.invalidate(_postCommentsProvider(postId)),
                       ),
                   ],
                 ),
@@ -1550,7 +1561,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                             children: [
                               header,
                               commentContent,
-                              if (noticeText == null) composer,
+                              if (canComment) composer,
                             ],
                           ),
                         )
@@ -1567,7 +1578,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                                 child: commentContent,
                               ),
                             ),
-                            if (noticeText == null)
+                            if (canComment)
                               ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxHeight: math.max(48, (height - 72) * 0.62),
@@ -2011,11 +2022,13 @@ class _CommentGroup extends StatelessWidget {
     required this.thread,
     required this.onReply,
     required this.onDelete,
+    required this.onRetryReplies,
   });
 
   final _CommentThread thread;
   final void Function(PostComment) onReply;
   final void Function(PostComment) onDelete;
+  final VoidCallback onRetryReplies;
 
   @override
   Widget build(BuildContext context) {
@@ -2029,6 +2042,27 @@ class _CommentGroup extends StatelessWidget {
 
     final parent = thread.parent;
     final replies = thread.replies;
+    if (thread.repliesFailed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          rowFor(parent, isReply: false),
+          Padding(
+            padding: EdgeInsets.only(left: 46.w),
+            child: Row(
+              children: [
+                const Text('回覆載入失敗'),
+                TextButton(
+                  key: ValueKey('seller-comment-replies-retry-${parent.id}'),
+                  onPressed: onRetryReplies,
+                  child: const HkButtonLabel('重試'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     if (replies.isEmpty) return rowFor(parent, isReply: false);
 
     // 父 avatar 中心 X = 10w (row left pad) + 15.sp (avatar radius)
