@@ -1,69 +1,74 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
+import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 
-import '../../../core/json/tsid_json.dart';
+import '../../seller/data/store_card_display.dart';
 
 part 'social_model.freezed.dart';
-part 'social_model.g.dart';
 
+/// 貼文的呈現模型，由 `hawkr.social.v1alpha1.Post` 轉來（[Post.fromProto]）。
+///
+/// 轉換時丟掉不用的欄位：標籤、更新時間、狀態與 etag（店主才有）、商品的最高價與可購買旗標、`url`
+/// （分享用，4c-3 處理）、`viewer_*` 以外的店家卡片欄位。
 @freezed
 abstract class Post with _$Post {
-  const Post._();
-
   const factory Post({
-    @JsonKey(fromJson: tsidToInt) required int id,
+    required int id,
     @Default('') String content,
-    @JsonKey(name: 'sellerId', fromJson: tsidToIntOrNull) int? merchantId,
-    // 店面網址的路徑段（列表端點由 gateway 從 seller 批次回填；詳情端點沒有）。空字串代表沒有可進的店面。
-    @JsonKey(name: 'storeCode') @Default('') String storeCode,
-    @JsonKey(name: 'sellerName') String? merchantName,
-    @JsonKey(name: 'logoUrl') String? merchantAvatar,
-    // 49 §6.1 成對契約：貼文圖只有複數欄。social 的 posts.image 是單一 TEXT 欄，
-    // 所以現階段恆為 0–1 element；後端無 omitempty，無圖是 `[]` 而非缺欄。
-    @JsonKey(name: 'imageKeys') @Default(<String>[]) List<String> imageKeys,
-    @JsonKey(name: 'imageUrls') @Default(<String>[]) List<String> imageUrls,
-    @JsonKey(name: 'likeCount') @Default(0) int likeCount,
-    @JsonKey(name: 'commentCount') @Default(0) int commentCount,
-    @JsonKey(name: 'shareCount') @Default(0) int shareCount,
-    @JsonKey(name: 'viewCount') @Default(0) int viewCount,
-    @JsonKey(name: 'isLiked') @Default(false) bool liked,
-    @JsonKey(name: 'createdAt') dynamic createdAt,
+    int? merchantId,
+    // 店面網址的路徑段；空字串代表沒有可進的店面。
+    @Default('') String storeCode,
+    String? merchantName,
+    String? merchantAvatar,
+    @Default('') String imageUrl,
+    @Default(0) int likeCount,
+    @Default(0) int commentCount,
+    @Default(0) int shareCount,
+    @Default(0) int viewCount,
+    @Default(false) bool liked,
+    // 第一次發布的時間，epoch 秒；沒有時 null。
+    int? createdAt,
+    // 商品卡片要的 id、name、image、price（最低價）。
     Map<String, dynamic>? product,
+    // 觀看者此刻能不能留言（伺服器算的顯示用提示）。
+    @Default(false) bool viewerCanComment,
+    // 觀看者留言時的身分；訪客 null。
+    pb.Actor? viewerActor,
   }) = _Post;
 
-  factory Post.fromJson(Map<String, dynamic> json) => _$PostFromJson(json);
-
-  /// 封面圖顯示來源。
-  ///
-  /// 舊契約同時吐 `imageKey`/`imageUrl`（單數）與 `imageKeys`/`imageUrls`
-  /// （複數）兩組；貼文編輯讀單數欄回送，複數欄那份就被當成「使用者刪掉了」
-  /// 而清空 DB。單數欄已從後端移除，這裡由複數欄第一個元素導出。
-  ///
-  /// 優先 URL、其次裸 key —— 顯示端 `AppCachedImage(scene)` 走 buildImageUrl
-  /// dual-mode，兩種都吃得下。
-  String get imageUrl {
-    if (imageUrls.isNotEmpty) return imageUrls.first;
-    if (imageKeys.isNotEmpty) return imageKeys.first;
-    return '';
+  factory Post.fromProto(pb.Post post) {
+    final store = post.hasStore() ? post.store : null;
+    final product = post.hasProduct() ? post.product : null;
+    return Post(
+      id: int.parse(post.id),
+      content: post.body,
+      merchantId: store == null ? null : int.tryParse(store.id),
+      storeCode: store?.storeCode ?? '',
+      merchantName: store != null && store.hasName() ? store.name : null,
+      merchantAvatar: store == null || store.logoUri.isEmpty
+          ? null
+          : store.logoUri,
+      imageUrl: post.hasImage() ? post.image.uri(ImagePreset.detail) : '',
+      likeCount: post.likeCount.toInt(),
+      commentCount: post.commentCount.toInt(),
+      shareCount: post.shareCount.toInt(),
+      viewCount: post.viewCount.toInt(),
+      liked: post.viewerLiked,
+      createdAt: post.hasPublishTime()
+          ? post.publishTime.seconds.toInt()
+          : null,
+      product: product == null
+          ? null
+          : {
+              'id': product.id,
+              'name': product.name,
+              'image': product.hasImage()
+                  ? product.image.uri(ImagePreset.card)
+                  : '',
+              'price': product.minPrice.toInt(),
+            },
+      viewerCanComment: post.viewerCanComment,
+      viewerActor: post.hasViewerActor() ? post.viewerActor : null,
+    );
   }
-}
-
-@freezed
-abstract class PostComment with _$PostComment {
-  const factory PostComment({
-    @JsonKey(fromJson: tsidToInt) required int id,
-    required String content,
-    // 伺服器依呼叫者身分算好的「這是不是我的留言」；公開輸出沒有留言者 ID。
-    @JsonKey(name: 'isMine') @Default(false) bool isMine,
-    // REST 留言列表／寫入回應與 SSE comment.created 收斂後同名 userName。
-    @JsonKey(name: 'userName') String? userName,
-    // 49 §6.1 成對契約：留言者頭像顯示 URL（Gateway 組）。
-    @JsonKey(name: 'avatarUrl') String? avatarUrl,
-    @JsonKey(name: 'likeCount') @Default(0) int likeCount,
-    @JsonKey(name: 'isLiked') @Default(false) bool liked,
-    // REST 回 epoch 秒（int），SSE 回 ISO 8601 字串——兩通道型別不同，維持 dynamic。
-    @JsonKey(name: 'createdAt') dynamic createdAt,
-  }) = _PostComment;
-
-  factory PostComment.fromJson(Map<String, dynamic> json) =>
-      _$PostCommentFromJson(json);
 }

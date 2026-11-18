@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -14,6 +15,7 @@ import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
+import 'package:hawkr_buyer/features/social/data/social_content_repository.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_provider.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -103,6 +105,17 @@ class PostDetailScreen extends HookConsumerWidget {
       return null;
     }, [postId]);
 
+    // 貼文讀到之後記一次瀏覽（背景呼叫，失敗不影響畫面）；下拉重讀時 hasValue 不變，不會再記。
+    final loaded = detailAsync.hasValue;
+    useEffect(() {
+      if (loaded) {
+        unawaited(
+          ref.read(socialContentRepositoryProvider).recordPostView(postId),
+        );
+      }
+      return null;
+    }, [postId, loaded]);
+
     void closeDetail() {
       if (context.canPop()) {
         context.pop();
@@ -163,11 +176,7 @@ class PostDetailScreen extends HookConsumerWidget {
             showDragHandle: false,
             backgroundColor: Colors.transparent,
             barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
-            builder: (_) => CommentsBottomSheet(
-              postId: postId.toString(),
-              postOwnerName: displayName,
-              merchantAvatar: displayAvatar.isEmpty ? null : displayAvatar,
-            ),
+            builder: (_) => CommentsBottomSheet(postId: postId.toString()),
           );
           ref.invalidate(postDetailControllerProvider(postId));
         }

@@ -9,6 +9,9 @@ import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as social;
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
@@ -136,6 +139,26 @@ void main() {
         .build(interceptors: [suspension]);
     return BuyerAppServiceClient(transport);
   }
+
+  SocialAppServiceClient socialApp(
+    ProviderContainer c,
+    ConnectException error,
+  ) => SocialAppServiceClient(
+    FakeTransportBuilder()
+        .unary(SocialAppService.createComment, (_, _) => throw error)
+        .unary(SocialAppService.likeComment, (_, _) => throw error)
+        .unary(SocialAppService.createForumEntry, (_, _) => throw error)
+        .build(interceptors: [c.read(_suspension)]),
+  );
+
+  SocialPublicServiceClient socialPublic(
+    ProviderContainer c,
+    ConnectException error,
+  ) => SocialPublicServiceClient(
+    FakeTransportBuilder()
+        .unary(SocialPublicService.recordPostView, (_, _) => throw error)
+        .build(interceptors: [c.read(_suspension)]),
+  );
 
   group('restriction state', () {
     test('GetSession 成功且沒有停權：解除受限狀態', () async {
@@ -348,6 +371,56 @@ void main() {
       expect(h.c.read(suspendedActionNoticeProvider), 0);
       expect(h.auth.fetches, 0);
     });
+
+    test('背景呼叫 RecordPostView 收到 ACCOUNT_SUSPENDED：靜默，不進受限狀態、不提示', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      await expectLater(
+        socialPublic(
+          h.c,
+          _denied(suspended: true),
+        ).recordPostView(social.RecordPostViewRequest(postId: '101')),
+        throwsA(isA<ConnectException>()),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(h.c.read(accountRestrictionProvider), isNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 0);
+    });
+
+    for (final (name, call)
+        in <(String, Future<Object?> Function(SocialAppServiceClient))>[
+          (
+            '留言',
+            (c) => c.createComment(
+              social.CreateCommentRequest(postId: '101', body: 'hi'),
+            ),
+          ),
+          (
+            '留言按讚',
+            (c) => c.likeComment(social.LikeCommentRequest(commentId: 'c1')),
+          ),
+          (
+            '討論區發言',
+            (c) => c.createForumEntry(
+              social.CreateForumEntryRequest(storeId: '7', body: 'hi'),
+            ),
+          ),
+        ]) {
+      test('使用者主動的$name收到 ACCOUNT_SUSPENDED：進受限狀態並提示', () async {
+        final h = harness();
+        await h.c.read(sessionProvider.future);
+        await expectLater(
+          call(socialApp(h.c, _denied(suspended: true))),
+          throwsA(isA<ConnectException>()),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(h.c.read(accountRestrictionProvider), isNotNull);
+        expect(h.c.read(suspendedActionNoticeProvider), 1);
+        expect(h.c.read(forceLogoutProvider), isFalse);
+      });
+    }
 
     test('沒有 ACCOUNT_SUSPENDED 的 permission_denied 不是停權', () async {
       final h = harness();

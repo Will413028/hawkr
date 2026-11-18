@@ -40,6 +40,15 @@ final _retiredEndpointPatterns = <RegExp, String>{
   RegExp(r'/public/recommended'): 'GET /public/recommended',
   RegExp(r'/public/products/\$[\w{}.]+/view'):
       'POST /public/products/{id}/view',
+  // 貼文、留言、討論區已改走 SocialPublicService／SocialAppService（A7-4c-2）。
+  RegExp(r'/public/posts'): 'GET /public/posts…（貼文與留言讀取）',
+  RegExp(r'/app/posts'): 'POST /app/posts…（按讚、留言、回覆）',
+  RegExp(r'/public/sellers/\$[\w{}.]+/posts'): 'GET /public/sellers/{id}/posts',
+  RegExp(r'/public/sellers/\$[\w{}.]+/forum'): 'GET /public/sellers/{id}/forum',
+  RegExp(r'/public/sellers/forum'): 'GET /public/sellers/forum/{id}/replies',
+  RegExp(r'/app/sellers/\$[\w{}.]+/forum'): 'POST /app/sellers/{id}/forum',
+  RegExp(r'/app/sellers/forum'): '/app/sellers/forum/{id}（回覆、修改、刪除）',
+  RegExp(r'/comments/stream'): 'GET /public/posts/{id}/comments/stream（SSE）',
 };
 
 /// 去掉註解，只留下真正會送出請求的程式碼。

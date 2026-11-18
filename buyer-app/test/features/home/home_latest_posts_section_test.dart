@@ -173,5 +173,7 @@ Post _post(int id) => Post(
   merchantName: '南崁王生技長名稱',
   likeCount: 12,
   commentCount: 3,
-  createdAt: '2026-09-10T12:00:00+08:00',
+  createdAt:
+      DateTime.parse('2026-09-10T12:00:00+08:00').millisecondsSinceEpoch ~/
+      1000,
 );

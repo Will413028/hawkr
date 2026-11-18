@@ -208,7 +208,6 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     Future<void> openComments(Post post) async {
-      final username = (post.merchantName ?? merchantName ?? 'Hawkr').trim();
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -216,11 +215,7 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
         showDragHandle: false,
         backgroundColor: AppColors.neutralBlack.withValues(alpha: 0),
         barrierColor: AppColors.neutralBlack.withValues(alpha: 0.42),
-        builder: (_) => CommentsBottomSheet(
-          postId: post.id.toString(),
-          postOwnerName: username,
-          merchantAvatar: post.merchantAvatar ?? merchantAvatar,
-        ),
+        builder: (_) => CommentsBottomSheet(postId: post.id.toString()),
       );
     }
 

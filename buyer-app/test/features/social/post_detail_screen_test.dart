@@ -1,16 +1,16 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
-import 'package:hawkr_buyer/core/networking/dio_provider.dart';
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_detail_screen.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_preview_layout.dart';
 import 'package:hawkr_buyer/shared/widgets/app_cached_image.dart';
-import 'package:dio/dio.dart';
+import 'package:fixnum/fixnum.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart' as common;
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../support/fake_seller_repository.dart';
+import 'social_fakes.dart';
 
 bool _hasSoftTopDivider(Widget widget) {
   if (widget is! DecoratedBox || widget.decoration is! BoxDecoration) {
@@ -32,58 +33,27 @@ bool _hasSoftTopDivider(Widget widget) {
       border.bottom.style == BorderStyle.none;
 }
 
-class _PostDetailAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final body = switch (options.path) {
-      '/public/posts/101' => {
-        'code': 0,
-        'data': {
-          'id': 101,
-          'sellerId': 7,
-          'sellerName': '南畝王生技',
-          'logoUrl': '',
-          'imageUrl': '',
-          'likeCount': 868,
-          'commentCount': 74,
-          'shareCount': 31,
-          'createdAt': '2026-07-05T01:22:00+08:00',
-          'content':
-              '中都農合 x #迷客夏 共同合作小迷豆漿，想跟博恩賀瓏喝一樣的豆漿與豆奶飲品系列嗎？'
-              '快衝去迷客夏購買！全台迷客夏熱銷上市中，這段文字需要超過兩行才會完整顯示。',
-          'products': [
-            {
-              'id': 55,
-              'name': '南畝王生技中都－台灣紅豆',
-              'price': '195',
-              'imageUrl':
-                  'https://test-media.example.com/i/original/public/product/red-bean.webp',
-            },
-          ],
-        },
-      },
-      '/public/posts/101/comments' => {
-        'code': 0,
-        'data': {'records': <Object>[]},
-      },
-      _ => {'code': 0, 'data': <Object>[]},
-    };
-    return ResponseBody.fromString(
-      jsonEncode(body),
-      200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
+FakeSocialPublic _detail() => FakeSocialPublic(
+  post: pb.Post(
+    id: '101',
+    store: StoreCard(id: '7', name: '南畝王生技'),
+    likeCount: Int64(868),
+    commentCount: Int64(74),
+    shareCount: Int64(31),
+    body:
+        '中都農合 x #迷客夏 共同合作小迷豆漿，想跟博恩賀瓏喝一樣的豆漿與豆奶飲品系列嗎？'
+        '快衝去迷客夏購買！全台迷客夏熱銷上市中，這段文字需要超過兩行才會完整顯示。',
+    product: pb.PostProduct(
+      id: '55',
+      name: '南畝王生技中都－台灣紅豆',
+      minPrice: Int64(195),
+      image: common.Image(
+        uriTemplate:
+            'https://test-media.example.com/i/{preset}/public/product/red-bean.webp',
+      ),
+    ),
+  ),
+);
 
 void main() {
   if (!F.isInitialized) F.init(Flavor.dev);
@@ -95,9 +65,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-      ..httpClientAdapter = _PostDetailAdapter();
-    addTearDown(dio.close);
+    final public = _detail();
 
     final router = GoRouter(
       initialLocation: '/social/post/101',
@@ -125,7 +93,7 @@ void main() {
       () => tester.pumpWidget(
         ProviderScope(
           overrides: [
-            dioProvider.overrideWithValue(dio),
+            socialPublicClientProvider.overrideWithValue(public.client()),
             // 詳情端點沒有 storeCode：sellerId 7 經店家卡片換成 nanmu。
             sellerRepositoryProvider.overrideWithValue(
               fakeSellerRepository(
@@ -185,9 +153,11 @@ void main() {
     );
     expect(
       relatedProductImage.imageUrl,
-      'https://test-media.example.com/i/original/public/product/red-bean.webp',
+      'https://test-media.example.com/i/card/public/product/red-bean.webp',
     );
     expect(find.text('進入店舖'), findsOneWidget);
+    // 讀到貼文後記一次瀏覽（RecordPostView），只記一次。
+    expect(public.recordViewCalls, 1);
     final surface = tester.widget<Scaffold>(
       find.byKey(const ValueKey('post-detail-surface')),
     );

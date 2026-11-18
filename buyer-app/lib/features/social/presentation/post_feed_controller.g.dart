@@ -11,8 +11,8 @@ part of 'post_feed_controller.dart';
 /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
 ///
 /// 規則：
-/// - 初始 build → 拿 page 1（20 筆），cache 在 state
-/// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+/// - 初始 build → 拿第一頁（20 筆），cache 在 state
+/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
 /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
 
 @ProviderFor(PostFeedController)
@@ -21,16 +21,16 @@ final postFeedControllerProvider = PostFeedControllerFamily._();
 /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
 ///
 /// 規則：
-/// - 初始 build → 拿 page 1（20 筆），cache 在 state
-/// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+/// - 初始 build → 拿第一頁（20 筆），cache 在 state
+/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
 /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
 final class PostFeedControllerProvider
     extends $AsyncNotifierProvider<PostFeedController, List<Post>> {
   /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
   ///
   /// 規則：
-  /// - 初始 build → 拿 page 1（20 筆），cache 在 state
-  /// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+  /// - 初始 build → 拿第一頁（20 筆），cache 在 state
+  /// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
   /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
   PostFeedControllerProvider._({
     required PostFeedControllerFamily super.from,
@@ -69,13 +69,13 @@ final class PostFeedControllerProvider
 }
 
 String _$postFeedControllerHash() =>
-    r'7d9bb1dac538356c066eb6a8d876067941af6732';
+    r'278803a46c9826a3a69ad7834cf3437c24cf83ca';
 
 /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
 ///
 /// 規則：
-/// - 初始 build → 拿 page 1（20 筆），cache 在 state
-/// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+/// - 初始 build → 拿第一頁（20 筆），cache 在 state
+/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
 /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
 
 final class PostFeedControllerFamily extends $Family
@@ -99,8 +99,8 @@ final class PostFeedControllerFamily extends $Family
   /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
   ///
   /// 規則：
-  /// - 初始 build → 拿 page 1（20 筆），cache 在 state
-  /// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+  /// - 初始 build → 拿第一頁（20 筆），cache 在 state
+  /// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
   /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
 
   PostFeedControllerProvider call({int? merchantId}) =>
@@ -113,8 +113,8 @@ final class PostFeedControllerFamily extends $Family
 /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
 ///
 /// 規則：
-/// - 初始 build → 拿 page 1（20 筆），cache 在 state
-/// - [loadMore] → 拿 page+1，dedup by id 後 append；< pageSize 視為已到底
+/// - 初始 build → 拿第一頁（20 筆），cache 在 state
+/// - [loadMore] → 用上一頁的 page token 拿下一頁，dedup by id 後 append；沒有 token 視為已到底
 /// - [likePost] → optimistic update 直接改 state，不 invalidateSelf 避免重置已載入頁
 
 abstract class _$PostFeedController extends $AsyncNotifier<List<Post>> {

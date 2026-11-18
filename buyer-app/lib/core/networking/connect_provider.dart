@@ -4,6 +4,7 @@ import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' as auth;
 import 'package:flutter/foundation.dart';
@@ -75,6 +76,17 @@ SellerPublicServiceClient sellerPublicClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 SellerPublicServiceClient sellerPublicOptionalAuthClient(Ref ref) =>
     SellerPublicServiceClient(ref.watch(connectOptionalAuthTransportProvider));
+
+/// 貼文、留言與討論區的公開讀取：有 session 時帶 Bearer，伺服器才填 `viewer_*`（讚過、能不能留言與刪除、留言身分）；
+/// 訪客不帶。RecordPostView 也走這裡。
+@Riverpod(keepAlive: true)
+SocialPublicServiceClient socialPublicClient(Ref ref) =>
+    SocialPublicServiceClient(ref.watch(connectOptionalAuthTransportProvider));
+
+/// 按讚、留言與討論區發言的寫入：登入後才能呼叫，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+@Riverpod(keepAlive: true)
+SocialAppServiceClient socialAppClient(Ref ref) =>
+    SocialAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 @Riverpod(keepAlive: true)
 DiscoveryPublicServiceClient discoveryPublicClient(Ref ref) =>

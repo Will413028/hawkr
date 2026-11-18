@@ -1,10 +1,8 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/config/image_config.dart';
-import 'package:hawkr_buyer/core/networking/dio_provider.dart';
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -12,7 +10,11 @@ import 'package:hawkr_buyer/features/social/presentation/merchant_posts_feed_scr
 import 'package:hawkr_buyer/features/social/presentation/post_preview_layout.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/widgets/app_cached_image.dart';
-import 'package:dio/dio.dart';
+import 'package:fixnum/fixnum.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart' as common;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
+import 'social_fakes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,96 +34,70 @@ bool _hasSoftTopDivider(Widget widget) {
       border.bottom.style == BorderStyle.none;
 }
 
-class _SocialFeedAdapter implements HttpClientAdapter {
-  _SocialFeedAdapter({this.withStoreCode = true});
-
-  final bool withStoreCode;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final body = switch (options.path) {
-      '/public/sellers/7/posts' => [
-        {
-          'id': 101,
-          'sellerId': 7,
-          if (withStoreCode) 'storeCode': 'nanmu',
-          'sellerName': '南崁王生技',
-          'logoUrl': '',
-          'imageKeys': ['post/101.jpg'],
-          'imageUrls': ['https://example.test/post.jpg'],
-          'commentCount': 3,
-          'createdAt': '2026-07-05T01:22:00+08:00',
-          'content':
-              '中都農合 x #迷客夏 共同合作小迷豆漿，想跟博恩賀瓏喝一樣的豆漿與豆奶飲品系列嗎？'
-              '快衝去迷客夏購買！全台迷客夏熱銷上市中，這是第三行以後才會看到的完整內文。',
-          'product': {
-            'id': 55,
-            'name': '南崁王生技中都－台灣紅豆',
-            'price': '195',
-            'image': '',
-          },
-        },
-        {
-          'id': 102,
-          'sellerId': 7,
-          'sellerName': '第二篇商家',
-          'logoUrl': '',
-          'imageKeys': ['post/102.jpg'],
-          'imageUrls': ['https://example.test/post-2.jpg'],
-          'commentCount': 0,
-          'createdAt': '2026-07-06T01:22:00+08:00',
-          'content': '第二篇貼文',
-        },
-      ],
-      '/public/posts/101/comments' => {
-        'data': {
-          'records': [
-            {
-              'id': 201,
-              'userId': 'member-1',
-              'userName': 'Cora Chou',
-              'content': '第一層留言',
-              'replyCount': 4,
-              'likeCount': 2,
-              'isLiked': true,
-            },
-            {
-              'id': 202,
-              'parentCommentId': 201,
-              'userId': 'member-2',
-              'userName': '範例生鮮',
-              'content': '這是下方回覆內容',
-              'likeCount': 1,
-            },
-            {
-              'id': 203,
-              'parentId': 202,
-              'userId': 'member-3',
-              'userName': '農友',
-              'content': '回覆回覆仍留在同一討論串',
-            },
-          ],
-        },
-      },
-      _ => {'data': <Object>[]},
-    };
-
-    return ResponseBody.fromString(
-      jsonEncode(body),
-      200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
+FakeSocialPublic _feed({bool withStoreCode = true}) => FakeSocialPublic(
+  comments: [
+    pb.Comment(
+      id: '201',
+      postId: '101',
+      state: pb.CommentState.COMMENT_STATE_VISIBLE,
+      author: pb.Actor(kind: pb.ActorKind.ACTOR_KIND_BUYER, name: 'Cora Chou'),
+      body: '第一層留言',
+      replyCount: Int64(4),
+      likeCount: Int64(2),
+      viewerLiked: true,
+      viewerCanReply: true,
+    ),
+  ],
+  replies: {
+    '201': [
+      pb.Comment(
+        id: '202',
+        postId: '101',
+        parentId: '201',
+        state: pb.CommentState.COMMENT_STATE_VISIBLE,
+        author: pb.Actor(kind: pb.ActorKind.ACTOR_KIND_STORE, name: '範例生鮮'),
+        body: '這是下方回覆內容',
+        likeCount: Int64(1),
+        viewerCanReply: true,
+      ),
+      pb.Comment(
+        id: '203',
+        postId: '101',
+        parentId: '201',
+        replyToId: '202',
+        state: pb.CommentState.COMMENT_STATE_VISIBLE,
+        author: pb.Actor(kind: pb.ActorKind.ACTOR_KIND_BUYER, name: '農友'),
+        body: '回覆回覆仍留在同一討論串',
+      ),
+    ],
+  },
+  posts: [
+    pb.Post(
+      id: '101',
+      store: StoreCard(
+        id: '7',
+        storeCode: withStoreCode ? 'nanmu' : '',
+        name: '南崁王生技',
+      ),
+      image: common.Image(uriTemplate: 'https://example.test/post.jpg'),
+      commentCount: Int64(3),
+      body:
+          '中都農合 x #迷客夏 共同合作小迷豆漿，想跟博恩賀瓏喝一樣的豆漿與豆奶飲品系列嗎？'
+          '快衝去迷客夏購買！全台迷客夏熱銷上市中，這是第三行以後才會看到的完整內文。',
+      product: pb.PostProduct(
+        id: '55',
+        name: '南崁王生技中都－台灣紅豆',
+        minPrice: Int64(195),
+      ),
+    ),
+    pb.Post(
+      id: '102',
+      store: StoreCard(id: '7', name: '第二篇商家'),
+      image: common.Image(uriTemplate: 'https://example.test/post-2.jpg'),
+      body: '第二篇貼文',
+    ),
+  ],
+);
 
 class _GuestSession extends Session {
   @override
@@ -137,9 +113,6 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-      ..httpClientAdapter = _SocialFeedAdapter();
-    addTearDown(dio.close);
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -158,7 +131,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          dioProvider.overrideWithValue(dio),
+          socialPublicClientProvider.overrideWithValue(
+            _feed(withStoreCode: true).client(),
+          ),
           sessionProvider.overrideWith(_GuestSession.new),
         ],
         child: ScreenUtilInit(
@@ -187,14 +162,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-      ..httpClientAdapter = _SocialFeedAdapter(withStoreCode: false);
-    addTearDown(dio.close);
-
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          dioProvider.overrideWithValue(dio),
+          socialPublicClientProvider.overrideWithValue(
+            _feed(withStoreCode: false).client(),
+          ),
           sessionProvider.overrideWith(_GuestSession.new),
         ],
         child: ScreenUtilInit(
@@ -228,14 +201,12 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       final semantics = tester.ensureSemantics();
 
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..httpClientAdapter = _SocialFeedAdapter();
-      addTearDown(dio.close);
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            dioProvider.overrideWithValue(dio),
+            socialPublicClientProvider.overrideWithValue(
+              _feed(withStoreCode: true).client(),
+            ),
             sessionProvider.overrideWith(_GuestSession.new),
           ],
           child: ScreenUtilInit(
@@ -435,6 +406,11 @@ void main() {
 
         expect(find.byKey(const ValueKey('comments-panel')), findsOneWidget);
         expect(find.text('第一層留言'), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('comment-more-replies-201')),
+        );
+        await tester.pump();
+        await tester.pump();
         expect(find.text('這是下方回覆內容'), findsOneWidget);
         expect(find.text('回覆回覆仍留在同一討論串'), findsOneWidget);
 

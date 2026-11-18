@@ -15,12 +15,18 @@ bool isAccountSuspended(ConnectException error) {
       decision.reason == ErrorReason.ACCOUNT_SUSPENDED;
 }
 
+/// [error] 是停權的訊號（給畫面判斷要不要再疊一則失敗訊息；受限狀態與提示由 transport 的 interceptor 處理）。
+bool isAccountSuspendedError(Object error) =>
+    error is ConnectException && isAccountSuspended(error);
+
 /// 使用者沒有主動觸發的寫入（背景呼叫）。這些請求收到 `ACCOUNT_SUSPENDED` 時靜默略過：不進受限畫面、不跳提示
 /// （A7-D17）。不在清單內的請求一律視為使用者主動，收到 `ACCOUNT_SUSPENDED` 就進受限狀態並提示。Connect 與舊 REST
 /// 共用這一處分類：新增背景寫入（瀏覽計數、裝置註冊、自動已讀、連線票之類）時加在這裡。
 const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit',
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
+  // 開貼文詳情自動記一次瀏覽，不是使用者按的。
+  '/hawkr.social.v1alpha1.SocialPublicService/RecordPostView',
 };
 
 bool isBackgroundConnectProcedure(String procedure) =>

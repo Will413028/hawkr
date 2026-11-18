@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
@@ -16,6 +18,7 @@ import 'package:hawkr_buyer/features/social/presentation/merchant_posts_feed_scr
 import 'package:hawkr_buyer/features/social/presentation/post_detail_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
+import '../../features/social/social_fakes.dart';
 import '../../support/fake_seller_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -32,17 +35,17 @@ class _Session extends Session {
       : null;
 }
 
+FakeSocialPublic _social() {
+  final post = pb.Post(
+    id: '101',
+    store: StoreCard(id: '7', name: '測試品牌'),
+    body: '檢查操作',
+  );
+  return FakeSocialPublic(post: post, posts: [post]);
+}
+
 class _Adapter implements HttpClientAdapter {
   final List<RequestOptions> mutations = [];
-  static const post = {
-    'id': 101,
-    'sellerId': 7,
-    'sellerName': '測試品牌',
-    'content': '檢查操作',
-    'imageUrl': '',
-    'imageKeys': <Object>[],
-  };
-
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -51,8 +54,6 @@ class _Adapter implements HttpClientAdapter {
   ) async {
     if (options.method != 'GET') mutations.add(options);
     final Object data = switch (options.path) {
-      '/public/posts/101' => post,
-      '/public/sellers/7/posts' => [post],
       '/public/products/55/reviews' => {
         'records': [
           {
@@ -99,6 +100,7 @@ void main() {
           final container = ProviderContainer(
             overrides: [
               dioProvider.overrideWithValue(dio),
+              socialPublicClientProvider.overrideWithValue(_social().client()),
               connectAuthTransportProvider.overrideWith(
                 (_) => FakeTransportBuilder().build(),
               ),

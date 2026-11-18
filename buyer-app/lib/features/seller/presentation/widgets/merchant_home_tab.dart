@@ -1,7 +1,6 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
-import 'package:dio/dio.dart' show DioException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,7 +11,6 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../../config/flavor.dart';
 import '../../../../config/image_config.dart';
 import '../../../../core/motion/hk_motion_transitions.dart';
-import '../../../../core/networking/dio_provider.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/widgets/comments_bottom_sheet.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
@@ -21,6 +19,8 @@ import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/oss_image.dart';
 import '../../../../shared/widgets/post_video_player.dart';
+import '../../../social/data/social_content_repository.dart';
+import '../../../social/data/social_model.dart';
 import 'merchant_empty_state.dart';
 import 'merchant_layout.dart';
 
@@ -120,58 +120,16 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     }
 
     try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
+      final repo = widget.ref?.read(socialContentRepositoryProvider);
+      if (repo == null) return;
       final mid = int.tryParse(idStr) ?? 0;
-      List<Map<String, dynamic>> list = [];
-
-      if (mid > 0) {
-        try {
-          final resp = await dio.get<Map<String, dynamic>>(
-            '/public/sellers/$mid/posts',
-          );
-          final body = resp.data ?? {};
-          final rawData = body['data'];
-          final List rawList;
-          if (rawData is Map<String, dynamic>) {
-            rawList = (rawData['records'] as List?) ?? [];
-          } else if (rawData is List) {
-            rawList = rawData;
-          } else {
-            rawList = [];
-          }
-          list = rawList
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        } on DioException catch (de) {
-          // 404 表示商家暫無貼文，視為空列表
-          if (de.response?.statusCode != 404) rethrow;
-        }
-      }
-
-      await _hydratePostProducts(dio, list);
+      final posts = mid > 0
+          ? (await repo.listPosts(storeId: idStr)).posts
+          : const <Post>[];
 
       if (mounted) {
         setState(() {
-          _posts = list.map((m) {
-            final id = '${m['id'] ?? m['postId'] ?? ''}';
-            final liked = m['isLiked'] == true;
-            final lc = (m['likeCount'] is num)
-                ? (m['likeCount'] as num).toInt()
-                : 0;
-            final cc = (m['commentCount'] is num)
-                ? (m['commentCount'] as num).toInt()
-                : 0;
-            return {
-              ...m,
-              '_id': id,
-              '_liked': liked,
-              '_likeCount': lc,
-              '_commentCount': cc,
-              '_hydrated': true,
-            };
-          }).toList();
+          _posts = posts.map(_postEntry).toList();
         });
       }
 
@@ -211,41 +169,19 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     }
   }
 
-  /// 針對僅有 id 但無詳細資訊的商品節點，補充抓取商品名稱/圖片/價格。
-  Future<void> _hydratePostProducts(
-    dynamic dio,
-    List<Map<String, dynamic>> records,
-  ) async {
-    if (dio == null) return;
-    final futures = <Future>[];
-    for (final raw in records) {
-      final product = raw['product'];
-      if (product is! Map) continue;
-      final pid = product['id'];
-      final name = (product['name'] ?? '').toString().trim();
-      if (pid == null || pid == 0 || name.isNotEmpty) continue;
-      futures.add(() async {
-        try {
-          final resp = await dio.get<dynamic>('/public/products/$pid');
-          final data = resp.data;
-          if (data is Map) {
-            final inner = data['data'] ?? data;
-            if (inner is Map) {
-              raw['product'] = {
-                ...Map<String, dynamic>.from(product),
-                'name': (inner['name'] ?? '').toString(),
-                // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
-                'image': (inner['imageKey'] ?? inner['imageUrl'] ?? '')
-                    .toString(),
-                'price': (inner['priceMin'] ?? '').toString(),
-              };
-            }
-          }
-        } catch (_) {}
-      }());
-    }
-    if (futures.isNotEmpty) await Future.wait(futures);
-  }
+  /// 格子與預覽卡讀的貼文欄位（`_` 開頭的是畫面狀態：讚過、讚數、留言數）。
+  Map<String, dynamic> _postEntry(Post post) => {
+    'id': post.id.toString(),
+    'content': post.content,
+    'imageUrls': post.imageUrl.isEmpty ? <String>[] : [post.imageUrl],
+    'imageKeys': <String>[],
+    'product': post.product,
+    '_id': post.id.toString(),
+    '_liked': post.liked,
+    '_likeCount': post.likeCount,
+    '_commentCount': post.commentCount,
+    '_hydrated': true,
+  };
 
   // ── 互動操作 ──────────────────────────────────────────────────────────────
 
@@ -263,24 +199,9 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     });
 
     try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
-      final resp = await dio.post<dynamic>('/app/posts/$id/like');
-      if (!mounted) return;
-      final data = resp.data;
-      if (data is Map) {
-        final liked = data['liked'] == true;
-        final likeCount = (data['likeCount'] is num)
-            ? (data['likeCount'] as num).toInt()
-            : nextCount;
-        setState(() {
-          _posts[index] = {
-            ..._posts[index],
-            '_liked': liked,
-            '_likeCount': likeCount,
-          };
-        });
-      }
+      final repo = widget.ref?.read(socialContentRepositoryProvider);
+      if (repo == null) return;
+      await repo.setPostLiked(int.parse(id), liked: nextLiked);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -293,29 +214,18 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     }
   }
 
-  /// 重抓單一貼文的留言數。
-  ///
-  /// 資料來源＝貼文詳情 `GET /public/posts/{id}` 的 `comment_count`；Gateway 沒有
-  /// `/public/posts/{id}/comments/count` 這條路由（`routes_post.go` 只註冊
-  /// `/:id`、`/:id/comments`、`/comments/:id/replies`、`/:id/comments/stream`）。
+  /// 重抓單一貼文的留言數（`GetPost` 的 `comment_count`）。
   Future<void> _refreshCommentCountAt(int index) async {
     if (index < 0 || index >= _posts.length) return;
-    final id = (_posts[index]['_id'] ?? '').toString();
-    if (id.isEmpty) return;
+    final id = int.tryParse((_posts[index]['_id'] ?? '').toString());
+    if (id == null) return;
     try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
-      final resp = await dio.get<dynamic>('/public/posts/$id');
-      final body = resp.data;
-      final detail = (body is Map ? body['data'] : null) ?? body;
-      if (detail is! Map) return;
-      final raw = detail['commentCount'];
-      final commentCnt = raw is num
-          ? raw.toInt()
-          : int.tryParse((raw ?? '').toString()) ?? 0;
+      final repo = widget.ref?.read(socialContentRepositoryProvider);
+      if (repo == null) return;
+      final post = await repo.getPost(id);
       if (!mounted) return;
       setState(() {
-        _posts[index] = {..._posts[index], '_commentCount': commentCnt};
+        _posts[index] = {..._posts[index], '_commentCount': post.commentCount};
       });
     } catch (_) {}
   }
@@ -331,11 +241,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => CommentsBottomSheet(
-        postId: id,
-        postOwnerName: widget.merchantName,
-        merchantAvatar: widget.merchantAvatar,
-      ),
+      builder: (_) => CommentsBottomSheet(postId: id),
     );
     if (!mounted) return;
     final idx = _posts.indexWhere(
