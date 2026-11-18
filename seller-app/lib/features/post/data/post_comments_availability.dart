@@ -3,16 +3,18 @@ import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import '../../seller/data/current_store.dart';
 import 'post_model.dart';
 
-/// 這則貼文買家此刻看不到的原因（店家不能公開、未發布、被平台下架）。
+/// 這則貼文買家此刻看不到的原因（店家不能公開、草稿或已下架、被平台下架）。
 /// 留言一律讀得到也刪得了，不論貼文是否公開；原因只用來在留言列表上方提醒店主買家看不到這些留言。
 enum PostCommentsNotice {
   storeNotPublic,
-  notPublished,
+  draft,
+  unpublished,
   platformHidden;
 
   String get message => switch (this) {
     storeNotPublic => '店家目前不公開，買家看不到這些留言。',
-    notPublished => '這則貼文已下架，買家看不到這些留言。',
+    draft => '貼文發布後，買家的留言會顯示在這裡。',
+    unpublished => '這則貼文已下架，買家看不到這些留言。',
     platformHidden => '這則貼文已被平台下架，買家看不到留言。',
   };
 }
@@ -29,9 +31,10 @@ PostCommentsNotice? postCommentsNotice({
 }) {
   if (hidden) return PostCommentsNotice.platformHidden;
   if (share is StoreShareDisabled) return PostCommentsNotice.storeNotPublic;
+  if (status == PostStatus.POST_STATUS_DRAFT) return PostCommentsNotice.draft;
   if (status != PostStatus.POST_STATUS_UNSPECIFIED &&
       status != PostStatus.POST_STATUS_PUBLISHED) {
-    return PostCommentsNotice.notPublished;
+    return PostCommentsNotice.unpublished;
   }
   return null;
 }

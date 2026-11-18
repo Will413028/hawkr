@@ -98,7 +98,7 @@ void main() {
       ),
     );
 
-    expect(find.text('這則貼文已下架，買家看不到這些留言。'), findsOneWidget);
+    expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsOneWidget);
     expect(find.text('買家的留言'), findsOneWidget);
     verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
     // 輸入列只看伺服器的 viewer_can_comment，不看說明。
@@ -106,7 +106,7 @@ void main() {
     expect(find.byKey(const ValueKey('send-comment-action')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('comments-sheet-close')));
     await tester.pumpAndSettle();
-    expect(find.text('這則貼文已下架，買家看不到這些留言。'), findsNothing);
+    expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsNothing);
   });
 
   testWidgets('the preview of a draft that is also platform-hidden shows the '

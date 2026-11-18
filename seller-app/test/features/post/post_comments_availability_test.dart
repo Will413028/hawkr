@@ -59,18 +59,18 @@ void main() {
     );
     expect(
       postCommentsNoticeOfPost(share, hidden.copyWith(takedownMeasureId: null)),
-      PostCommentsNotice.notPublished,
+      PostCommentsNotice.draft,
     );
   });
 
-  test('draft and self-unpublished are not published', () {
+  test('draft and self-unpublished are told apart', () {
     expect(
       _of(publishStatus: PostStatus.POST_STATUS_DRAFT),
-      PostCommentsNotice.notPublished,
+      PostCommentsNotice.draft,
     );
     expect(
       _of(publishStatus: PostStatus.POST_STATUS_UNPUBLISHED),
-      PostCommentsNotice.notPublished,
+      PostCommentsNotice.unpublished,
     );
   });
 
@@ -85,7 +85,8 @@ void main() {
 
   test('messages are the approved copy', () {
     expect(PostCommentsNotice.storeNotPublic.message, '店家目前不公開，買家看不到這些留言。');
-    expect(PostCommentsNotice.notPublished.message, '這則貼文已下架，買家看不到這些留言。');
+    expect(PostCommentsNotice.draft.message, '貼文發布後，買家的留言會顯示在這裡。');
+    expect(PostCommentsNotice.unpublished.message, '這則貼文已下架，買家看不到這些留言。');
     expect(PostCommentsNotice.platformHidden.message, '這則貼文已被平台下架，買家看不到留言。');
   });
 }

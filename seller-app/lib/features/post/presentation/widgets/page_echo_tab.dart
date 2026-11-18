@@ -451,7 +451,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     );
   }
 
-  /// 顯示他人留言的操作選單（檢舉，與伺服器允許時的刪除；公開留言不帶留言者 id，封鎖入口隨第 2 刀的身分模型另行決定）
+  /// 顯示他人留言的操作選單（檢舉，與伺服器允許時的刪除；公開留言不帶留言者 id）
   Future<void> _showEchoOtherUserMenu(
     BuildContext context,
     EchoCommentNode node,

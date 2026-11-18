@@ -34,8 +34,9 @@ Future<_Repo> _openComments(
   required Post post,
   List<PostComment>? comments,
   String? replyFailsFor,
+  Size size = const Size(390, 844),
 }) async {
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -135,9 +136,9 @@ void main() {
     },
   );
 
-  for (final status in [
-    PostStatus.POST_STATUS_DRAFT,
-    PostStatus.POST_STATUS_UNPUBLISHED,
+  for (final (status, text) in [
+    (PostStatus.POST_STATUS_DRAFT, '貼文發布後，買家的留言會顯示在這裡。'),
+    (PostStatus.POST_STATUS_UNPUBLISHED, '這則貼文已下架，買家看不到這些留言。'),
   ]) {
     testWidgets('an unpublished post ($status) still shows comments', (
       tester,
@@ -148,7 +149,7 @@ void main() {
         post: _post(publishStatus: status),
       );
 
-      await expectCommentsShownWithNotice(tester, repo, '這則貼文已下架，買家看不到這些留言。');
+      await expectCommentsShownWithNotice(tester, repo, text);
     });
   }
 
@@ -255,6 +256,30 @@ void main() {
       findsNothing,
     );
   });
+
+  for (final canComment in [true, false]) {
+    testWidgets('short layout composer follows viewer_can_comment=$canComment', (
+      tester,
+    ) async {
+      await _openComments(
+        tester,
+        listed: true,
+        size: const Size(390, 250),
+        post: _post(
+          publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+          viewerCanComment: canComment,
+        ),
+      );
+      expect(
+        find.byKey(const ValueKey('seller-post-comments-scroll-42')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('seller-post-action-composer-42')),
+        canComment ? findsOneWidget : findsNothing,
+      );
+    });
+  }
 
   testWidgets('the sheet title uses the server comment_count', (tester) async {
     await _openComments(
