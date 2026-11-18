@@ -309,6 +309,9 @@ export const queryKeys = {
 				String(sellerId),
 				params ?? {},
 			] as const,
+		/** 一家店所有討論串頁的快取（`forumThread` 的共同前綴）。 */
+		forumThreads: (id: QueryIdentity, sellerId: string | number) =>
+			["seller", ...idPrefix(id), "forum-thread", String(sellerId)] as const,
 		forumThread: (
 			id: QueryIdentity,
 			sellerId: string | number,

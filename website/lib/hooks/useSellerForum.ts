@@ -157,6 +157,7 @@ export function useSellerForum(
 	sellerId: string | undefined,
 	initialData?: SellerForumListResult,
 	threadId?: string,
+	initialReplies?: SellerForumListResult,
 ): UseSellerForumResult {
 	const { identity } = useAuth();
 	const queryIdentity = useQueryIdentity();
@@ -193,6 +194,31 @@ export function useSellerForum(
 		() => (initialData ? seedPages(initialData) : undefined),
 		[initialData],
 	);
+	// 討論串頁：讀一次 GetForumThread 同時帶回第一頁回覆，放進回覆串的快取，展開時不再讀 ListForumEntries。
+	// 已經載入更多頁的回覆串不被第一頁蓋掉。
+	const seedReplies = React.useCallback(
+		(replies: SellerForumListResult) => {
+			if (!threadId) return;
+			const key = repliesKeyOf(threadId);
+			const current = queryClient.getQueryData<ForumData>(key);
+			if (current && current.pages.length > 1) return;
+			queryClient.setQueryData<ForumData>(key, seedPages(replies));
+		},
+		[threadId, repliesKeyOf, queryClient],
+	);
+	React.useMemo(() => {
+		if (!threadId || !initialReplies) return;
+		if (queryClient.getQueryData(repliesKeyOf(threadId))) return;
+		seedReplies(initialReplies);
+	}, [threadId, initialReplies, queryClient, repliesKeyOf, seedReplies]);
+	// 單一討論串頁與店家討論區列表是兩份快取：任一邊的修改都讓另一邊過期。
+	const invalidateOtherView = React.useCallback(() => {
+		void queryClient.invalidateQueries({
+			queryKey: threadId
+				? queryKeys.seller.forum(queryIdentity, storeId)
+				: queryKeys.seller.forumThreads(queryIdentity, storeId),
+		});
+	}, [queryClient, queryIdentity, storeId, threadId]);
 	const query = useInfiniteQuery({
 		queryKey: forumKey,
 		enabled: Boolean(sellerId),
@@ -206,7 +232,10 @@ export function useSellerForum(
 						pageSize,
 						signal,
 						viewer: true,
-					}).then((thread) => thread.top)
+					}).then((thread) => {
+						seedReplies(thread.replies);
+						return thread.top;
+					})
 				: fetchSellerForum(storeId, {
 						pageToken: pageParam,
 						pageSize,
@@ -292,6 +321,7 @@ export function useSellerForum(
 		},
 		onSettled: () => {
 			void invalidateList(queryClient, forumKey);
+			invalidateOtherView();
 		},
 	});
 	const { mutateAsync: postAsync } = postMutation;
@@ -363,6 +393,7 @@ export function useSellerForum(
 		},
 		onSettled: (_data, _error, v) => {
 			void invalidateList(queryClient, repliesKeyOf(v.threadId));
+			invalidateOtherView();
 		},
 	});
 	const { mutateAsync: replyAsync } = replyMutation;
@@ -462,6 +493,7 @@ export function useSellerForum(
 			if (context) {
 				void invalidateList(queryClient, context.key);
 			}
+			invalidateOtherView();
 		},
 	});
 	const { mutateAsync: updateAsync } = updateMutation;
@@ -536,6 +568,7 @@ export function useSellerForum(
 		},
 		onSettled: (_data, _error, _v, context) => {
 			void invalidateList(queryClient, context?.key ?? forumKey);
+			invalidateOtherView();
 		},
 	});
 	const { mutateAsync: removeAsync } = removeMutation;

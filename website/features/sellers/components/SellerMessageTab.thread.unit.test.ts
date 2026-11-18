@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const forum = vi.hoisted(() => ({
 	list: [] as unknown[],
+	error: null as unknown,
 	replies: {} as Record<string, unknown[]>,
 	hookArgs: [] as unknown[][],
 	repliesAsked: [] as string[],
@@ -32,7 +33,7 @@ vi.mock("@/lib/hooks/useSellerForum", () => ({
 			refreshing: false,
 			loadingMore: false,
 			hasMore: false,
-			error: null,
+			error: forum.error,
 			loadMoreError: null,
 			refresh: vi.fn(),
 			loadMore: vi.fn(),
@@ -63,6 +64,7 @@ vi.mock("@/lib/hooks/useSellerForum", () => ({
 	},
 }));
 
+import { Code, ConnectError } from "@connectrpc/connect";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import SellerMessageTab from "./SellerMessageTab";
 
@@ -82,7 +84,7 @@ function entry(id: string, over: Record<string, unknown> = {}) {
 	};
 }
 
-function view() {
+function view(threadId = "t1") {
 	render(
 		React.createElement(
 			IntlTestWrapper,
@@ -90,7 +92,7 @@ function view() {
 			React.createElement(SellerMessageTab, {
 				sellerId: "7",
 				routeId: "7",
-				threadId: "t1",
+				threadId,
 			}),
 		),
 	);
@@ -98,6 +100,7 @@ function view() {
 
 afterEach(() => {
 	cleanup();
+	forum.error = null;
 	forum.hookArgs = [];
 	forum.repliesAsked = [];
 	forum.post.mockReset();
@@ -140,6 +143,46 @@ describe("single thread page", () => {
 		];
 		view();
 		expect(screen.queryByPlaceholderText("留言給這個賣家…")).toBeNull();
+		expect(document.querySelector("textarea")).toBeNull();
+	});
+
+	it("shows the composer from the anonymous server seed, where viewerCanReply is false", () => {
+		forum.list = [entry("t1", { viewerCanReply: false })];
+		view();
+		expect(screen.queryByPlaceholderText("回覆 alice…")).not.toBeNull();
+	});
+
+	it("matches the thread by its canonical lowercase id", async () => {
+		const id = "0a1b2c3d-0000-4000-8000-00000000abcd";
+		forum.list = [entry(id, { replyCount: 1 })];
+		forum.replies = { [id]: [entry("r1", { content: "reply-body" })] };
+		view(id.toUpperCase());
+		expect(forum.hookArgs[0]?.[2]).toBe(id);
+		expect(forum.repliesAsked).toContain(id);
+		const box = screen.getByPlaceholderText("回覆 alice…");
+		fireEvent.change(box, { target: { value: "hello" } });
+		fireEvent.click(
+			document.querySelector("button[type=submit]") as HTMLButtonElement,
+		);
+		await waitFor(() => expect(forum.reply).toHaveBeenCalledTimes(1));
+		expect(forum.reply.mock.calls[0]?.[0]).toMatchObject({ id });
+	});
+
+	it("a NotFound after a refetch replaces the stale thread with the error state", () => {
+		forum.list = [entry("t1")];
+		forum.error = new ConnectError("gone", Code.NotFound);
+		view();
+		expect(screen.queryByText("body-t1")).toBeNull();
+		expect(document.querySelector("textarea")).toBeNull();
+		expect(screen.queryByText("暫無留言")).toBeNull();
+		expect(screen.queryByText("重新載入")).not.toBeNull();
+	});
+
+	it("an empty thread is the error state, not the store-wide empty state", () => {
+		forum.list = [];
+		view();
+		expect(screen.queryByText("暫無留言")).toBeNull();
+		expect(screen.queryByText("重新載入")).not.toBeNull();
 		expect(document.querySelector("textarea")).toBeNull();
 	});
 });

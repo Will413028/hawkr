@@ -5,6 +5,7 @@ import SellerMessageTab from "@/features/sellers/components/SellerMessageTab";
 import { getCachedSeller } from "@/lib/api/cached";
 import { getEnv } from "@/lib/config/env";
 import { fetchSellerForumThread } from "@/lib/forum/repo";
+import { canonicalThreadId } from "@/lib/forum/thread-id";
 import { storeIdOfSeller } from "@/lib/seller/store-id";
 import { localeFromParam } from "@/lib/seo/metadata";
 import { sellerCanonicalUrl } from "@/lib/seo/urls";
@@ -35,7 +36,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /** 單一討論串（`/sellers/[id]/messages/[threadId]`）：伺服器端讀第一份資料，討論串不存在或讀不到回 404。 */
 export default async function ForumThreadPage({ params }: Props) {
-	const { id, threadId, locale } = await params;
+	const { id, threadId: rawThreadId, locale } = await params;
+	const threadId = canonicalThreadId(rawThreadId);
+	if (!threadId) notFound();
 	const storeId = storeIdOfSeller(await getCachedSeller(id));
 	const thread = storeId
 		? await fetchSellerForumThread(storeId, threadId, {
@@ -58,6 +61,7 @@ export default async function ForumThreadPage({ params }: Props) {
 				routeId={id}
 				threadId={threadId}
 				initialData={thread?.top}
+				initialReplies={thread?.replies}
 			/>
 		</section>
 	);

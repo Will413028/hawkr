@@ -1,5 +1,6 @@
 "use client";
 
+import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -18,6 +19,7 @@ import type {
 	SellerForumComment,
 	SellerForumListResult,
 } from "@/lib/forum/repo";
+import { canonicalThreadId } from "@/lib/forum/thread-id";
 import { useForumReplies, useSellerForum } from "@/lib/hooks/useSellerForum";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { blockBuyerByForumEntry } from "@/lib/seller/block-buyer";
@@ -28,6 +30,8 @@ interface SellerMessageTabProps {
 	/** The storefront URL segment (store_code), for the login return path. */
 	routeId: string;
 	initialData?: SellerForumListResult;
+	/** 單一討論串頁：伺服器端一併讀到的第一頁回覆，放進回覆串的快取。 */
+	initialReplies?: SellerForumListResult;
 	/** 設了是單一討論串頁：只列這一串（頂層項目與回覆），留言框是對這一串回覆。 */
 	threadId?: string;
 }
@@ -46,13 +50,17 @@ export default function SellerMessageTab({
 	sellerId,
 	routeId,
 	initialData,
-	threadId,
+	initialReplies,
+	threadId: rawThreadId,
 }: SellerMessageTabProps) {
+	const threadId = rawThreadId
+		? (canonicalThreadId(rawThreadId) ?? rawThreadId)
+		: undefined;
 	const { status } = useAuth();
 	const tFeed = useTranslations("feed.comments");
 	const tSeller = useTranslations("seller.comments");
 	const signedIn = status === "signedIn";
-	const forum = useSellerForum(sellerId, initialData, threadId);
+	const forum = useSellerForum(sellerId, initialData, threadId, initialReplies);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const [replyingTo, setReplyingTo] = React.useState<SellerForumComment | null>(
@@ -74,11 +82,20 @@ export default function SellerMessageTab({
 	>(() => new Set());
 	const busyRef = React.useRef(false);
 
-	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目（頂層是佔位項目時不能回覆，留言框只在指定回覆對象時出現）。
+	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目。能不能回覆看項目的狀態而不是 `viewerCanReply`：
+	// 伺服器端的第一份資料是匿名讀取，`viewerCanReply` 一律是 false，用它決定會讓登入的買家在第一次繪製時沒有留言框。
+	// 頂層是佔位項目（已刪除或隱藏）時不能回覆，留言框只在指定回覆對象時出現。
 	const threadTop = threadId
-		? forum.comments.find((c) => c.id === threadId && c.viewerCanReply)
+		? forum.comments.find((c) => c.id === threadId && c.state === "visible")
 		: undefined;
 	const target = replyingTo ?? threadTop ?? null;
+	// 單一討論串頁：這串不存在（讀不到、或重讀後 NotFound）時整頁是錯誤狀態，不是店家討論區的「暫無留言」。
+	const threadGone =
+		threadId !== undefined &&
+		!forum.loading &&
+		(forum.comments.length === 0 ||
+			(forum.error != null &&
+				ConnectError.from(forum.error).code === Code.NotFound));
 
 	const saveEntry = (entry: SellerForumComment, next: string) =>
 		forum.update(entry, next);
@@ -190,7 +207,7 @@ export default function SellerMessageTab({
 	return (
 		<section className="flex flex-col gap-5">
 			{signedIn ? (
-				!threadId || target ? (
+				!threadGone && (!threadId || target) ? (
 					<form
 						className="flex flex-col gap-[10px] p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.1))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
 						onSubmit={handleSubmit}
@@ -246,9 +263,14 @@ export default function SellerMessageTab({
 				</div>
 			)}
 
-			{forum.error != null && !forum.loading ? (
+			{(forum.error != null && !forum.loading) || threadGone ? (
 				<CommentErrorBox className="flex items-center justify-between gap-3">
-					<span>{errorText(forum.error, defaultErrors)}</span>
+					<span>
+						{errorText(
+							forum.error ?? new ConnectError("", Code.NotFound),
+							defaultErrors,
+						)}
+					</span>
 					<Button
 						type="button"
 						size="sm"
@@ -297,7 +319,7 @@ export default function SellerMessageTab({
 				<p className="p-[32px_16px] text-center text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)]">
 					載入中…
 				</p>
-			) : forum.comments.length === 0 ? (
+			) : threadGone ? null : forum.comments.length === 0 ? (
 				<div className="p-[32px_16px] text-center text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)]">
 					<p className="m-0 mb-[6px] text-[length:var(--text-base)] font-bold text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
 						暫無留言
