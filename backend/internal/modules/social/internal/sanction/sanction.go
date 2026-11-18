@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/reads"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
@@ -218,7 +217,7 @@ func (s *Service) AvailableLinks(ctx context.Context, postIDs []uuid.UUID, threa
 		for i, t := range threads {
 			ids[i] = t.ThreadID
 		}
-		rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ForumThreadsReadable(ids, s.d.Now().UTC(), visibility.Anonymous))
+		rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ForumThreadsReadable(ids, s.d.Now().UTC()))
 		if err != nil {
 			return model.LinkAvailability{}, fmt.Errorf("social：讀取連結的討論串是否對外可讀：%w", err)
 		}

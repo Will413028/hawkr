@@ -42,9 +42,10 @@ func GetForumThreadTop(storeID int64, threadID uuid.UUID, now time.Time, v visib
 	return topLevelForumEntries(Int64(storeID), now, v, c.T.ID.EQ(UUID(threadID)))
 }
 
-// ForumThreadsReadable 是一批討論串（以頂層留言 id 找）中對觀看者可讀的頂層項目，與 GetForumThreadTop 同一個算式；
-// 呼叫端用回傳列的 store_id 與 id 對回要查的（店家，討論串）配對。
-func ForumThreadsReadable(threadIDs []uuid.UUID, now time.Time, v visibility.Viewer) SelectStatement {
+// ForumThreadsReadable 是一批討論串（以頂層留言 id 找）中對外公開可讀（匿名觀看者）的頂層項目，與 GetForumThreadTop 同一個算式；
+// 觀看者由這裡擁有，呼叫端不需要也不能挑；呼叫端用回傳列的 store_id 與 id 對回要查的（店家，討論串）配對。
+func ForumThreadsReadable(threadIDs []uuid.UUID, now time.Time) SelectStatement {
+	v := visibility.Anonymous
 	c := visibility.ForumEntriesOf("c", v)
 	ids := make([]Expression, len(threadIDs))
 	for i, id := range threadIDs {

@@ -58,8 +58,8 @@ func Registry() []Entry {
 		{Name: "ForumEntryState", Row: StateRow{}, Build: func(visibility.Viewer) Statement { return ForumEntryState(sampleID) }},
 		{Name: "ListTopLevelForumEntries", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListTopLevelForumEntries(7, sampleNow, v, sampleCmt) }},
 		{Name: "GetForumThreadTop", Row: EntryRow{}, Build: func(v visibility.Viewer) Statement { return GetForumThreadTop(7, sampleID, sampleNow, v) }},
-		{Name: "ForumThreadsReadable", Row: EntryRow{}, Build: func(v visibility.Viewer) Statement {
-			return ForumThreadsReadable([]uuid.UUID{sampleID, sampleID2}, sampleNow, v)
+		{Name: "ForumThreadsReadable", Row: EntryRow{}, Build: func(visibility.Viewer) Statement {
+			return ForumThreadsReadable([]uuid.UUID{sampleID, sampleID2}, sampleNow)
 		}},
 		{Name: "ListForumReplies", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListForumReplies(sampleID, sampleNow, v, sampleCmt) }},
 		{Name: "ForumReplyTargetIsReadable", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return ForumReplyTargetIsReadable(sampleID, 7, sampleID3, v) }},
