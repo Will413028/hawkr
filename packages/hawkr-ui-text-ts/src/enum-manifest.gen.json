@@ -393,6 +393,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.ContentSnapshotState",
+      "tsName": "ContentSnapshotState",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.KYCField",
       "tsName": "KYCField",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",

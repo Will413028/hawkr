@@ -362,6 +362,14 @@ func (t Text) SellerMeasureRejectionCooldownWarning(days int) string {
 	return "若本次經駁回，將於 " + strconv.Itoa(days) + " 日內不得再提出解除請求"
 }
 
+// SellerMeasureRemovedContentsHeading 是 seller.Measure.removed_contents_heading 的文案。
+func (t Text) SellerMeasureRemovedContentsHeading() string {
+	if t.Locale() == EN {
+		return "Removed content"
+	}
+	return "下架的內容"
+}
+
 // SellerMeasureSuspensionActiveOpen 是 seller.Measure.suspension_active_open 的文案。
 func (t Text) SellerMeasureSuspensionActiveOpen() string {
 	if t.Locale() == EN {
@@ -419,6 +427,14 @@ func (t Text) SellerMeasureTitleRisk(ground string) (string, bool) {
 // SellerMeasureTitleRiskFallback 是 seller.Measure.title_risk_fallback 的文案。
 func (t Text) SellerMeasureTitleRiskFallback() string {
 	return "風險措施"
+}
+
+// SellerMeasureViewContentLink 是 seller.Measure.view_content_link 的文案。
+func (t Text) SellerMeasureViewContentLink() string {
+	if t.Locale() == EN {
+		return "View post"
+	}
+	return "查看貼文"
 }
 
 // SellerMeasureBasis 是 seller.MeasureBasis 的文案。

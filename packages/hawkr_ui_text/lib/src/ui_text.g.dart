@@ -538,6 +538,14 @@ UiLocale.zhTW || UiLocale.en => '若本次經駁回，將於 ' + days.toString()
 };
 }
 
+/// seller.Measure.removed_contents_heading
+String sellerMeasureRemovedContentsHeading(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '下架的內容',
+UiLocale.en => 'Removed content',
+};
+}
+
 /// seller.Measure.suspension_active_open
 String sellerMeasureSuspensionActiveOpen(UiLocale l) {
 return switch (l) {
@@ -603,6 +611,14 @@ UiLocale.zhTW || UiLocale.en => '風險：' + groundText,
 String sellerMeasureTitleRiskFallback(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '風險措施',
+};
+}
+
+/// seller.Measure.view_content_link
+String sellerMeasureViewContentLink(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '查看貼文',
+UiLocale.en => 'View post',
 };
 }
 

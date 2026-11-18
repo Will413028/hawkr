@@ -141,6 +141,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.ContentSnapshotState",
+      "dartClass": "ContentSnapshotState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.KYCField",
       "dartClass": "KYCField",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
