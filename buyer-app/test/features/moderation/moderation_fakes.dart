@@ -48,6 +48,9 @@ class FakeBuyerApp {
   ConnectException? listStoresError;
   ConnectException? listBuyersError;
 
+  /// 設了之後買家名單的讀取等到它完成才回應。
+  Completer<void>? listBuyersGate;
+
   final List<buyer.BlockStoreRequest> storeBlocks = [];
   final List<buyer.BlockAuthorRequest> authorBlocks = [];
   final List<buyer.UnblockStoreRequest> storeUnblocks = [];
@@ -94,6 +97,7 @@ class FakeBuyerApp {
         })
         .unary(BuyerAppService.listBlockedBuyers, (req, _) async {
           buyerListRequests.add(req);
+          await listBuyersGate?.future;
           if (listBuyersError != null) throw listBuyersError!;
           final i = _pageIndex(req.pageToken);
           return buyer.ListBlockedBuyersResponse(
@@ -125,9 +129,13 @@ class FakeModeration {
     this.reportPages = const [[]],
     this.failFirst = 0,
     this.listError,
+    this.submitError,
   });
 
   List<List<mod.ReportRecord>> reportPages;
+
+  /// 設了就讓每次 `SubmitReport` 都以它失敗。
+  ConnectException? submitError;
   int failFirst;
   ConnectException? listError;
 
@@ -141,6 +149,7 @@ class FakeModeration {
     FakeTransportBuilder()
         .unary(ModerationAppService.submitReport, (req, _) async {
           submitted.add(req);
+          if (submitError != null) throw submitError!;
           if (failFirst > 0) {
             failFirst--;
             throw ConnectException(Code.unavailable, 'offline');

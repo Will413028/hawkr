@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -233,6 +234,33 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('comment-reply-c1')));
     await tester.pump();
     expect(_hint(tester), '寫下回覆…');
+  });
+
+  testWidgets('送出留言進行中，「更多」與回覆、刪除一樣不能點', (tester) async {
+    final public = FakeSocialPublic(
+      comments: [fakeComment('c1', canReply: true)],
+    );
+    final app = FakeSocialApp()..pending = Completer<void>();
+    await _pump(tester, public: public, app: app);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('comments-panel-input')),
+      '送出中',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pump();
+    expect(app.created, hasLength(1));
+
+    await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
+    await tester.pump();
+    expect(find.text('檢舉'), findsNothing);
+
+    app.pending!.complete();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
+    await tester.pumpAndSettle();
+    expect(find.text('檢舉'), findsOneWidget);
   });
 
   testWidgets('回覆：送出 parent_id 與 reply_to_id，留言內容不經過 isMine', (tester) async {

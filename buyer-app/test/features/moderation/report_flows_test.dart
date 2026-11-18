@@ -5,7 +5,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart'
+    show LocalizedMessage;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
+import 'package:hawkr_api/transport.dart'
+    show Code, ConnectException, ErrorDetail;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
@@ -246,6 +250,76 @@ void main() {
       final request = moderation.submitted.single;
       expect(request.category, PolicyCategory.POLICY_CATEGORY_OTHER);
       expect(request.description, '亂發廣告');
+      await tester.pump(const Duration(seconds: 3));
+    });
+  });
+
+  group('社群檢舉的送出細節', () {
+    testWidgets('切離「其他」之後不送說明', (tester) async {
+      final moderation = FakeModeration();
+      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+
+      await _choose(tester, '其他（請說明）');
+      await tester.enterText(find.byType(TextField), '亂發廣告');
+      await tester.pump();
+      await _choose(tester, '垃圾訊息');
+      await _submit(tester);
+
+      final request = moderation.submitted.single;
+      expect(request.category, PolicyCategory.POLICY_CATEGORY_SPAM);
+      expect(request.description, '');
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('說明可寫到 500 字（契約上限），不是 200', (tester) async {
+      final moderation = FakeModeration();
+      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+
+      await _choose(tester, '其他（請說明）');
+      await tester.enterText(find.byType(TextField), '字' * 600);
+      await tester.pump();
+      await _submit(tester);
+
+      expect(moderation.submitted.single.description, '字' * 500);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('伺服器帶 LocalizedMessage 的失敗：顯示伺服器的文字', (tester) async {
+      final moderation = FakeModeration(
+        submitError: ConnectException(
+          Code.resourceExhausted,
+          'quota',
+          details: [
+            ErrorDetail(
+              'google.rpc.LocalizedMessage',
+              (LocalizedMessage()
+                    ..locale = 'zh-TW'
+                    ..message = '今天的檢舉次數已達上限')
+                  .writeToBuffer(),
+            ),
+          ],
+        ),
+      );
+      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+
+      await _choose(tester, '垃圾訊息');
+      await _submit(tester);
+
+      expect(find.text('今天的檢舉次數已達上限'), findsOneWidget);
+      expect(find.text('檢舉失敗，請稍後再試'), findsNothing);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('沒有伺服器文字的失敗（連線問題）：用通用句', (tester) async {
+      final moderation = FakeModeration(
+        submitError: ConnectException(Code.unavailable, 'offline'),
+      );
+      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+
+      await _choose(tester, '垃圾訊息');
+      await _submit(tester);
+
+      expect(find.text('檢舉失敗，請稍後再試'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
     });
   });

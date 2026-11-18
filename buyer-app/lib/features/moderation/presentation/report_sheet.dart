@@ -3,6 +3,8 @@ import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show TextInputFormatter, TextEditingValue, TextSelection;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -11,6 +13,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/server_error_message.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
@@ -19,6 +22,29 @@ import '../data/moderation_repository.dart';
 import '../data/report_target.dart';
 import '../data/report_target_type.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
+
+/// 檢舉說明的上限（`moderation.proto` SubmitReportRequest.description，以 rune 計）。
+const _descriptionMaxRunes = 500;
+
+/// 輸入超過 [max] 個 rune 時截斷（`maxLength` 以字元叢集計，組合字元會讓 rune 數超過它）。
+class _RuneLimitFormatter extends TextInputFormatter {
+  const _RuneLimitFormatter(this.max);
+
+  final int max;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.runes.length <= max) return newValue;
+    final text = String.fromCharCodes(newValue.text.runes.take(max));
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
 
 /// 一個檢舉原因選項：社群對象帶 [category]，聊天與評價（舊 REST）帶 [legacy]。
 class _ReasonOption {
@@ -123,7 +149,9 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
     final selected = _selected!;
     setState(() => _submitting = true);
     try {
-      final detail = _detailCtrl.text.trim();
+      final detail = selected.requiresDescription
+          ? _detailCtrl.text.trim()
+          : '';
       switch (widget.target) {
         case final SocialReportTarget target:
           await ref
@@ -155,7 +183,7 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
       showFloatingToast(
         context,
         widget.target is SocialReportTarget
-            ? '檢舉失敗，請稍後再試'
+            ? serverErrorMessage(e) ?? '檢舉失敗，請稍後再試'
             : e.toString().replaceAll('Exception: ', ''),
         isSuccess: false,
       );
@@ -235,7 +263,10 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
                         child: TextField(
                           controller: _detailCtrl,
                           maxLines: 3,
-                          maxLength: 200,
+                          maxLength: _descriptionMaxRunes,
+                          inputFormatters: [
+                            _RuneLimitFormatter(_descriptionMaxRunes),
+                          ],
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
                             hintText: '請描述原因（必填）',

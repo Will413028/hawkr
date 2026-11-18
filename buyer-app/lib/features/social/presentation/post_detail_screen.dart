@@ -142,7 +142,9 @@ class PostDetailScreen extends HookConsumerWidget {
             );
     } else {
       final post = entity;
-      final sellerId = post.merchantId?.toString() ?? merchantId?.trim() ?? '';
+      final sellerId = post.storeId.isNotEmpty
+          ? post.storeId
+          : merchantId?.trim() ?? '';
       // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
       // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
       final card = sellerId.isEmpty
@@ -227,7 +229,7 @@ class PostDetailScreen extends HookConsumerWidget {
           if (blocked && context.mounted) {
             ref
                 .read(postEntityStoreProvider.notifier)
-                .removeStorePosts(sellerId);
+                .removeStorePosts(sellerId, alsoPostId: postId);
           }
         },
         onMerchantTap: storeCode.isEmpty

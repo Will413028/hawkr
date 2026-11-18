@@ -3,7 +3,6 @@ import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
-import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -13,14 +12,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
-import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/report_labels.dart';
 import 'my_reports_notifier.dart';
 import 'paged_section.dart';
-import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
+import 'paged_section_widgets.dart';
 
 /// 我的檢舉紀錄列表頁（`ListMyReports`，只列社群對象；聊天、評價的檢舉在 A6 前不列）。
 /// 伺服器狀態在 [myReportsProvider]；這裡只顯示與發動作。
@@ -50,37 +48,6 @@ class MyReportsScreen extends ConsumerWidget {
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  /// 讀取失敗狀態——與「真的沒資料」的空狀態分開顯示，避免使用者誤以為
-  /// 沒有檢舉紀錄；提供重試按鈕重新觸發 重試。
-  Widget _buildErrorState(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              AppIcons.errorOutline,
-              color: AppIconColors.danger,
-              size: 48.sp,
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              '載入失敗，請稍後再試',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-            ),
-            SizedBox(height: 12.h),
-            TextButton(
-              onPressed: () => _reload(context, ref),
-              child: const HkButtonLabel('重試'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(myReportsProvider);
@@ -98,7 +65,7 @@ class MyReportsScreen extends ConsumerWidget {
             child: reports.phase == SectionPhase.loading
                 ? const TruckLoadingOverlay(message: '載入中...')
                 : reports.phase == SectionPhase.failed
-                ? _buildErrorState(context, ref)
+                ? PagedErrorState(onRetry: () => _reload(context, ref))
                 : reports.items.isEmpty
                 ? const HkEmptyState(
                     key: ValueKey('my-reports-empty-state'),
@@ -114,22 +81,11 @@ class MyReportsScreen extends ConsumerWidget {
                           reports.items.length + (reports.hasMore ? 1 : 0),
                       itemBuilder: (_, i) {
                         if (i == reports.items.length) {
-                          return reports.loadingMore
-                              ? Center(
-                                  child: SizedBox(
-                                    width: 20.w,
-                                    height: 20.w,
-                                    child: const HkBrandLoader(
-                                      tone: HkBrandLoaderTone.mono,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                )
-                              : TextButton(
-                                  key: const ValueKey('my-reports-more'),
-                                  onPressed: () => _loadMore(context, ref),
-                                  child: const HkButtonLabel('查看更多'),
-                                );
+                          return PagedLoadMoreFooter(
+                            moreKey: const ValueKey('my-reports-more'),
+                            loading: reports.loadingMore,
+                            onMore: () => _loadMore(context, ref),
+                          );
                         }
                         return Padding(
                           padding: EdgeInsets.only(bottom: 16.h),

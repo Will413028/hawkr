@@ -27,6 +27,7 @@ import '../../../moderation/presentation/report_block_action_sheet.dart';
 import '../../../social/presentation/thread_notifier.dart' show ThreadPhase;
 import '../../../social/presentation/thread_tree.dart' show ThreadTree;
 import '../../../social/presentation/forum_notifier.dart';
+import '../../../social/presentation/post_entity_store.dart';
 import '../../../social/presentation/write_result.dart';
 import '../../../../core/session/session_provider.dart';
 import '../../../../core/session/viewer_scope.dart';
@@ -228,7 +229,13 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       blockUserLabel: node.userName,
       blockActionLabel: '封鎖此人',
     );
-    if (blocked && mounted) await _reload();
+    if (!blocked) return;
+    if (node.entry.author.kind == pb.ActorKind.ACTOR_KIND_STORE) {
+      ref
+          .read(postEntityStoreProvider.notifier)
+          .removeStorePosts(node.entry.author.id);
+    }
+    if (mounted) await _reload();
   }
 
   Future<void> _onDeleteComment(_CommentNode node) async {

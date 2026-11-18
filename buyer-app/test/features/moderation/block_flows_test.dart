@@ -306,6 +306,47 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
+    testWidgets('封鎖店家作者：該店已載入的貼文一併移除，其他店不動', (tester) async {
+      final h = await pumpComments(tester, [
+        _comment('c1', author: storeActor('好店')),
+      ]);
+      final posts = h.container.read(postEntityStoreProvider.notifier)
+        ..setListed('test', [201, 202]);
+      posts.seed(const [
+        Post(id: 201, storeId: '7'),
+        Post(id: 202, storeId: '8'),
+      ]);
+
+      await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖此人'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖'));
+      await tester.pumpAndSettle();
+
+      final state = h.container.read(postEntityStoreProvider);
+      expect(state.gone, contains(201));
+      expect(state.gone, isNot(contains(202)));
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('封鎖買家作者：不動任何貼文', (tester) async {
+      final h = await pumpComments(tester, [_comment('c1')]);
+      final posts = h.container.read(postEntityStoreProvider.notifier)
+        ..setListed('test', [201, 202]);
+      posts.seed(const [Post(id: 201, storeId: '7')]);
+
+      await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖此人'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖'));
+      await tester.pumpAndSettle();
+
+      expect(h.container.read(postEntityStoreProvider).gone, isEmpty);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
     testWidgets('自己的留言沒有檢舉與封鎖入口，別人的有', (tester) async {
       await pumpComments(tester, [
         _comment('mine', mine: true),
@@ -375,6 +416,30 @@ void main() {
       expect(request.whichSource(), BlockAuthorRequest_Source.forumEntryId);
       expect(request.forumEntryId, 'e1');
       expect(h.public.listForumCalls, greaterThan(readsBefore));
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('封鎖店家作者：該店已載入的貼文一併移除，其他店不動', (tester) async {
+      final h = await pumpForum(tester, [
+        _entry('e1', author: storeActor('好店')),
+      ]);
+      final posts = h.container.read(postEntityStoreProvider.notifier)
+        ..setListed('test', [201, 202]);
+      posts.seed(const [
+        Post(id: 201, storeId: '7'),
+        Post(id: 202, storeId: '8'),
+      ]);
+
+      await tester.tap(find.byTooltip('檢舉或封鎖'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖此人'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖'));
+      await tester.pumpAndSettle();
+
+      final state = h.container.read(postEntityStoreProvider);
+      expect(state.gone, contains(201));
+      expect(state.gone, isNot(contains(202)));
       await tester.pump(const Duration(seconds: 3));
     });
 
@@ -452,7 +517,7 @@ void main() {
   });
 
   group('貼文實體', () {
-    test('封鎖店家後，該店已載入的貼文標為不可見，其他店的不動', () async {
+    ProviderContainer makeContainer() {
       final container = ProviderContainer(
         overrides: [
           sessionProvider.overrideWith(() => _Session(true)),
@@ -463,12 +528,17 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      return container;
+    }
+
+    test('封鎖店家後，該店已載入的貼文標為不可見，其他店的不動', () async {
+      final container = makeContainer();
       await container.read(sessionProvider.future);
       final store = container.read(postEntityStoreProvider.notifier);
       store.seed(const [
-        Post(id: 1, merchantId: 7),
-        Post(id: 2, merchantId: 7),
-        Post(id: 3, merchantId: 8),
+        Post(id: 1, storeId: '7'),
+        Post(id: 2, storeId: '7'),
+        Post(id: 3, storeId: '8'),
       ]);
 
       store.removeStorePosts('7');
@@ -476,6 +546,39 @@ void main() {
       final state = container.read(postEntityStoreProvider);
       expect(state.gone, {1, 2});
       expect(state.posts.keys, [3]);
+    });
+
+    test('店家 id 不是數字也照字串比對；沒有店家資料的貼文由呼叫端指名一併移除', () async {
+      final container = makeContainer();
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      store.seed(const [
+        Post(id: 1, storeId: 'store-abc'),
+        Post(id: 2, storeId: 'store-abc'),
+        Post(id: 3, storeId: 'other'),
+        Post(id: 4),
+        Post(id: 5),
+      ]);
+
+      store.removeStorePosts('store-abc', alsoPostId: 4);
+
+      final state = container.read(postEntityStoreProvider);
+      expect(state.gone, {1, 2, 4});
+      expect(state.posts.keys, unorderedEquals([3, 5]));
+    });
+
+    test('一次封鎖只發佈一次狀態', () async {
+      final container = makeContainer();
+      await container.read(sessionProvider.future);
+      final store = container.read(postEntityStoreProvider.notifier);
+      store.seed([for (var i = 1; i <= 20; i++) Post(id: i, storeId: '7')]);
+      var publishes = 0;
+      container.listen(postEntityStoreProvider, (_, _) => publishes++);
+
+      store.removeStorePosts('7');
+
+      expect(publishes, 1);
+      expect(container.read(postEntityStoreProvider).gone, hasLength(20));
     });
   });
 }

@@ -62,7 +62,7 @@ final class PostEntityStoreProvider
   }
 }
 
-String _$postEntityStoreHash() => r'bfa370e07f50666027d00feb1a95a17863abd071';
+String _$postEntityStoreHash() => r'd1fa70f9311719467fc30caedf5b055cba0bedeb';
 
 /// 貼文實體的唯一存放處：列表只存 id，畫面透過 `postSnapshotProvider`（列表、預覽卡）與 `postEntityProvider`（詳情）讀這裡的同一份。
 ///

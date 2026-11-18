@@ -3,9 +3,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart'
     show StoreCard;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
-import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
-import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +21,7 @@ import '../../seller/data/store_card_display.dart';
 import '../../social/presentation/write_result.dart';
 import 'blocked_list_notifier.dart';
 import 'paged_section.dart';
+import 'paged_section_widgets.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 已刪除帳號的買家沒有名稱，名單上顯示這句，仍可解除封鎖。
@@ -67,36 +66,6 @@ class BlockedUsersScreen extends ConsumerWidget {
     }
   }
 
-  /// 讀取失敗狀態——與「真的沒資料」的空狀態分開顯示，避免使用者誤以為沒有封鎖任何人；提供重試按鈕。
-  Widget _buildErrorState(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              AppIcons.errorOutline,
-              color: AppIconColors.danger,
-              size: 48.sp,
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              '載入失敗，請稍後再試',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-            ),
-            SizedBox(height: 12.h),
-            TextButton(
-              onPressed: () => _reload(context, ref),
-              child: const HkButtonLabel('重試'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final list = ref.watch(blockedListProvider);
@@ -104,17 +73,13 @@ class BlockedUsersScreen extends ConsumerWidget {
     final locale = ref.watch(uiLocaleProvider);
     final stores = list.stores;
     final buyers = list.buyers;
-    final loading =
-        stores.phase == SectionPhase.loading &&
-        buyers.phase == SectionPhase.loading;
     final failed =
         stores.phase == SectionPhase.failed &&
         buyers.phase == SectionPhase.failed;
-    final empty =
-        stores.phase == SectionPhase.ready &&
-        buyers.phase == SectionPhase.ready &&
-        stores.items.isEmpty &&
-        buyers.items.isEmpty;
+    final anyShown = _hasContent(stores) || _hasContent(buyers);
+    final anyPending = _isPending(stores) || _isPending(buyers);
+    final loading = !anyShown && anyPending;
+    final empty = !anyShown && !anyPending && !failed;
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: Column(
@@ -128,7 +93,7 @@ class BlockedUsersScreen extends ConsumerWidget {
             child: loading
                 ? const TruckLoadingOverlay(message: '載入中...')
                 : failed
-                ? _buildErrorState(context, ref)
+                ? PagedErrorState(onRetry: () => _reload(context, ref))
                 : empty
                 ? const HkEmptyState(
                     key: ValueKey('blocked-users-empty-state'),
@@ -206,6 +171,14 @@ class BlockedUsersScreen extends ConsumerWidget {
     );
   }
 
+  /// 這一段此刻有東西可畫：有項目、讀取失敗（要給重試），或項目都被移走但還有下一頁。
+  static bool _hasContent(PagedSection<Object?> s) =>
+      s.items.isNotEmpty || s.phase == SectionPhase.failed || s.hasMore;
+
+  /// 這一段還沒有任何結果、仍在第一次讀取。
+  static bool _isPending(PagedSection<Object?> s) =>
+      s.phase == SectionPhase.loading && s.items.isEmpty;
+
   /// 一段：標題、項目、「查看更多」；沒有項目也沒有失敗的段不顯示。
   List<Widget> _section<T>(
     BuildContext context, {
@@ -216,12 +189,7 @@ class BlockedUsersScreen extends ConsumerWidget {
     required Future<bool> Function() onMore,
     required Widget Function(T item) row,
   }) {
-    if (section.phase == SectionPhase.loading && section.items.isEmpty) {
-      return const [];
-    }
-    if (section.phase == SectionPhase.ready && section.items.isEmpty) {
-      return const [];
-    }
+    if (!_hasContent(section)) return const [];
     return [
       Padding(
         padding: EdgeInsets.only(bottom: 8.h),
@@ -249,22 +217,11 @@ class BlockedUsersScreen extends ConsumerWidget {
       if (section.hasMore)
         Padding(
           padding: EdgeInsets.only(bottom: 12.h),
-          child: section.loadingMore
-              ? Center(
-                  child: SizedBox(
-                    width: 20.w,
-                    height: 20.w,
-                    child: const HkBrandLoader(
-                      tone: HkBrandLoaderTone.mono,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                )
-              : TextButton(
-                  key: ValueKey('$keyPrefix-more'),
-                  onPressed: () => _loadMore(context, onMore),
-                  child: const HkButtonLabel('查看更多'),
-                ),
+          child: PagedLoadMoreFooter(
+            moreKey: ValueKey('$keyPrefix-more'),
+            loading: section.loadingMore,
+            onMore: () => _loadMore(context, onMore),
+          ),
         ),
     ];
   }

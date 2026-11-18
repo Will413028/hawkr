@@ -22,6 +22,7 @@ import '../../features/social/presentation/comments_notifier.dart';
 import '../../features/social/presentation/thread_notifier.dart'
     show ThreadPhase;
 import '../../features/social/presentation/post_entity.dart';
+import '../../features/social/presentation/post_entity_store.dart';
 import '../../features/social/presentation/write_result.dart';
 import '../utils/require_login.dart';
 import '../utils/store_actor_hint.dart';
@@ -201,7 +202,13 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       blockUserLabel: author,
       blockActionLabel: '封鎖此人',
     );
-    if (blocked && mounted) await _reload();
+    if (!blocked) return;
+    if (comment.author.kind == pb.ActorKind.ACTOR_KIND_STORE) {
+      ref
+          .read(postEntityStoreProvider.notifier)
+          .removeStorePosts(comment.author.id);
+    }
+    if (mounted) await _reload();
   }
 
   void _scheduleScrollToBottom() {
@@ -753,7 +760,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
             semanticLabel: '更多 $author 的留言操作',
             hint: '檢舉或封鎖',
             tooltip: '更多',
-            onTap: () => _reportOrBlock(comment, author),
+            onTap: comments.sending
+                ? null
+                : () => _reportOrBlock(comment, author),
             child: Icon(
               AppIcons.moreHoriz,
               size: 24.sp,

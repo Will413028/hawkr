@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +15,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'moderation_fakes.dart';
 
-Future<void> _pump(WidgetTester tester, FakeBuyerApp app) async {
+Future<void> _pump(
+  WidgetTester tester,
+  FakeBuyerApp app, {
+  bool settle = true,
+}) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
   addTearDown(tester.view.resetPhysicalSize);
@@ -36,7 +42,7 @@ Future<void> _pump(WidgetTester tester, FakeBuyerApp app) async {
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
 }
 
 void main() {
@@ -205,5 +211,47 @@ void main() {
 
     expect(find.text('好店'), findsOneWidget);
     expect(app.buyerListRequests, hasLength(1));
+  });
+
+  testWidgets('解除整頁之後仍有下一頁：不顯示空狀態，保留「查看更多」並可繼續載入', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('1', name: '店一')],
+        [blockedStore('2', name: '店二')],
+      ],
+    );
+    await _pump(tester, app);
+
+    await tester.tap(find.text('解除封鎖'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('店一'), findsNothing);
+    expect(find.text('尚無封鎖的使用者'), findsNothing);
+    expect(find.byKey(const ValueKey('blocked-stores-more')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-more')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('店二'), findsOneWidget);
+  });
+
+  testWidgets('一段已讀完且沒有項目、另一段還在讀取：顯示 loader，不是空白頁', (tester) async {
+    final gate = Completer<void>();
+    final app = FakeBuyerApp(
+      buyerPages: [
+        [blockedBuyer('b1', name: '小明')],
+      ],
+    )..listBuyersGate = gate;
+    await _pump(tester, app, settle: false);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(TruckLoadingOverlay), findsOneWidget);
+    expect(find.byType(HkEmptyState), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('小明'), findsOneWidget);
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
   });
 }

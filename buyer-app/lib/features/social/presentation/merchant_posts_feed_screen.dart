@@ -437,7 +437,7 @@ class _PostPage extends HookConsumerWidget {
     final motionDuration = reduceMotion
         ? Duration.zero
         : const Duration(milliseconds: 320);
-    final sellerId = post.merchantId?.toString() ?? parentMerchantId;
+    final sellerId = post.storeId.isNotEmpty ? post.storeId : parentMerchantId;
 
     void handleBack() {
       if (context.canPop()) {
@@ -610,7 +610,10 @@ class _PostPage extends HookConsumerWidget {
                               if (blocked && context.mounted) {
                                 ref
                                     .read(postEntityStoreProvider.notifier)
-                                    .removeStorePosts(sellerId);
+                                    .removeStorePosts(
+                                      sellerId,
+                                      alsoPostId: post.id,
+                                    );
                               }
                             },
                             icon: AppIcons.moreHoriz,

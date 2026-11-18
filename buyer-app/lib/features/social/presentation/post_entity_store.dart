@@ -180,17 +180,26 @@ class PostEntityStore extends _$PostEntityStore with ViewerScoped {
     state = PostEntities(posts: next, gone: {...state.gone, postId});
   }
 
-  /// 封鎖店家之後：該店已載入的貼文全部標為不可見，列表與詳情據此移除；其他店的貼文不動。
-  void removeStorePosts(String storeId) {
-    final id = int.tryParse(storeId);
-    if (id == null) return;
-    final affected = [
+  /// 封鎖店家之後：該店已載入的貼文全部標為不可見，列表與詳情據此移除；其他店的貼文不動。依店家 ID 字串比對
+  /// （與封鎖送出的 ID 同一個）；[alsoPostId] 是封鎖入口所在的那篇，沒有店家資料時也一併移除。一次發佈。
+  void removeStorePosts(String storeId, {int? alsoPostId}) {
+    if (storeId.isEmpty) return;
+    final affected = <int>{
       for (final post in state.posts.values)
-        if (post.merchantId == id) post.id,
-    ];
-    for (final postId in affected) {
-      remove(postId);
+        if (post.storeId == storeId) post.id,
+      ?alsoPostId,
+    }..removeWhere((id) => !state.posts.containsKey(id));
+    if (affected.isEmpty) return;
+    for (final id in affected) {
+      _cancelEviction(id);
+      _base.remove(id);
+      _intent.remove(id);
     }
+    state = PostEntities(
+      posts: Map<int, Post>.of(state.posts)
+        ..removeWhere((id, _) => affected.contains(id)),
+      gone: {...state.gone, ...affected},
+    );
   }
 
   /// 切換讚；方向取自呼叫當下（含樂觀疊加層）的實體。每次點擊立刻更新疊加層，請求依 id 串行，
