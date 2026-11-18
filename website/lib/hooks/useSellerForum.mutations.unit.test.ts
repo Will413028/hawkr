@@ -528,17 +528,77 @@ describe("a submission stops being shown once it has landed or been deleted", ()
 });
 
 describe("a pending load-more survives submitting", () => {
-	it("posting while the next page is loading keeps that page", async () => {
-		const { result } = await mountForum({ topToken: "t1" });
+	async function startLoadMore() {
+		const hook = await mountForum({ topToken: "t1" });
 		const more = deferred<ReturnType<typeof page>>();
-		repo.fetchSellerForum.mockReturnValue(more.promise);
-		repo.createSellerForumComment.mockResolvedValue(entry("real"));
+		repo.fetchSellerForum.mockReturnValueOnce(more.promise);
+		repo.fetchSellerForum.mockImplementation(never);
 		act(() => {
-			void result.current.forum.loadMore();
+			void hook.result.current.forum.loadMore();
 		});
-		await waitFor(() => expect(result.current.forum.loadingMore).toBe(true));
+		await waitFor(() =>
+			expect(hook.result.current.forum.loadingMore).toBe(true),
+		);
+		return { ...hook, more };
+	}
+
+	it("posting while the next page is loading keeps that page and the new item", async () => {
+		const { result, more } = await startLoadMore();
+		repo.createSellerForumComment.mockResolvedValue(entry("real"));
+		let posting!: Promise<unknown>;
+		act(() => {
+			posting = result.current.forum.post("新發言");
+		});
 		await act(async () => {
-			await result.current.forum.post("新發言");
+			more.resolve(page([entry("p2")]));
+			await more.promise;
+			await posting;
+		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toContain("p2"),
+		);
+		const shown = [
+			...ids(result.current.forum.comments),
+			...result.current.forum.submitted.map((s) => s.entry.id),
+		];
+		expect(shown.some((id) => id === "real" || id.startsWith("tmp-"))).toBe(
+			true,
+		);
+	});
+
+	it("deleting while the next page is loading: the row stays gone after the page arrives", async () => {
+		const { result, more } = await startLoadMore();
+		repo.deleteSellerForumComment.mockResolvedValue(undefined);
+		let removing!: Promise<unknown>;
+		act(() => {
+			removing = result.current.forum.remove(
+				result.current.forum.comments.find((c) => c.id === "lonely") as never,
+			);
+		});
+		await act(async () => {
+			more.resolve(page([entry("p2")]));
+			await more.promise;
+			await removing;
+		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toContain("p2"),
+		);
+		expect(ids(result.current.forum.comments)).not.toContain("lonely");
+	});
+
+	it("replying while the next page is loading: the reply count stays bumped once the page arrives", async () => {
+		const { result, more } = await startLoadMore();
+		const sent = deferred<ReturnType<typeof entry>>();
+		repo.replySellerForumComment.mockReturnValue(sent.promise);
+		let replying!: Promise<unknown>;
+		act(() => {
+			replying = result.current.forum.reply(
+				result.current.forum.comments.find((c) => c.id === "top") as never,
+				"回",
+			);
+		});
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, 0));
 		});
 		await act(async () => {
 			more.resolve(page([entry("p2")]));
@@ -547,6 +607,18 @@ describe("a pending load-more survives submitting", () => {
 		await waitFor(() =>
 			expect(ids(result.current.forum.comments)).toContain("p2"),
 		);
+		await waitFor(() =>
+			expect(
+				result.current.forum.comments.find((c) => c.id === "top")?.replyCount,
+			).toBe(3),
+		);
+		await act(async () => {
+			sent.resolve(entry("rn", { parentId: "top" }));
+			await replying;
+		});
+		expect(
+			result.current.forum.comments.find((c) => c.id === "top")?.replyCount,
+		).toBe(3);
 	});
 });
 

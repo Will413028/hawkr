@@ -164,16 +164,34 @@ function fetchingMore(queryClient: QueryClient, key: QueryKey): boolean {
 	return Boolean(meta?.fetchMore);
 }
 
+function settled(queryClient: QueryClient, key: QueryKey): Promise<void> {
+	return new Promise((resolve) => {
+		const cache = queryClient.getQueryCache();
+		const done = () =>
+			queryClient.getQueryState(key)?.fetchStatus !== "fetching";
+		if (done()) return resolve();
+		const unsubscribe = cache.subscribe(() => {
+			if (!done()) return;
+			unsubscribe();
+			resolve();
+		});
+	});
+}
+
 /**
- * 樂觀更新前取消進行中的讀取，免得舊結果蓋掉樂觀資料。還沒有資料（首次載入）或正在載入更多時不取消：
- * 這兩種情況都不會插入樂觀項目（最後一頁不在已載入的資料裡），取消只會丟掉首頁或使用者要的那一頁。
+ * 樂觀更新前取消進行中的讀取，免得舊結果蓋掉樂觀資料。還沒有資料（首次載入）時不取消：取消只會丟掉首頁。
+ * 載入更多進行中時改為等它結束再回傳：query-core 以載入開始時的頁面快照接上新頁，
+ * 期間對快取的樂觀修改會被蓋掉，取消又會丟掉使用者要的那一頁；等它落地後修改才落在最終資料上。
  */
 export async function cancelListRefetch(
 	queryClient: QueryClient,
 	key: QueryKey,
 ): Promise<void> {
 	if (!queryClient.getQueryState(key)?.data) return;
-	if (fetchingMore(queryClient, key)) return;
+	if (fetchingMore(queryClient, key)) {
+		await settled(queryClient, key);
+		return;
+	}
 	await queryClient.cancelQueries({ queryKey: key });
 }
 

@@ -353,15 +353,24 @@ describe("a pending load-more survives submitting", () => {
 			void result.current.loadMore();
 		});
 		await waitFor(() => expect(result.current.loadingMore).toBe(true));
-		await act(async () => {
-			await result.current.post("新留言");
+		let posting!: Promise<unknown>;
+		act(() => {
+			posting = result.current.post("新留言");
 		});
 		await act(async () => {
 			more.resolve(page([comment("c2")]));
 			await more.promise;
+			await posting;
 		});
 		await waitFor(() =>
 			expect(result.current.comments.map((c) => c.id)).toContain("c2"),
+		);
+		const shown = [
+			...result.current.comments.map((c) => c.id),
+			...result.current.submitted.map((s) => s.comment.id),
+		];
+		expect(shown.some((id) => id === "real" || id.startsWith("tmp-"))).toBe(
+			true,
 		);
 	});
 });
