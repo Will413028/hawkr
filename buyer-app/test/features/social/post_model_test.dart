@@ -53,12 +53,15 @@ void main() {
     expect(post.createdAt, 1783000000);
     expect(post.viewerCanComment, isTrue);
     expect(post.viewerActor?.name, '南崁王');
-    expect(post.product, {
-      'id': '55',
-      'name': '紅豆',
-      'image': 'https://img.test/card/r.jpg',
-      'price': 195,
-    });
+    expect(
+      post.product,
+      const PostProduct(
+        id: '55',
+        name: '紅豆',
+        image: 'https://img.test/card/r.jpg',
+        price: 195,
+      ),
+    );
   });
 
   test('沒有店家、圖片、商品與觀看者時不補假值', () {

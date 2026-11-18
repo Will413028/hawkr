@@ -9,6 +9,9 @@ import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart' show ConnectException;
+import 'package:hawkr_buyer/core/session/session_model.dart';
+import 'package:hawkr_buyer/core/session/session_provider.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// 測試用的社群資料與 fake client。能不能刪除、回覆、留言都由呼叫端明確指定（伺服器的 `viewer_can_*`）。
 pb.Comment fakeComment(
@@ -89,6 +92,9 @@ class FakeSocialPublic {
     this.forumEntries = const [],
     this.forumReplies = const {},
     this.forumViewerCanComment = true,
+    this.forumViewerActor,
+    this.commentsResponder,
+    this.postsResponder,
     this.getPostError,
     this.recordViewError,
   });
@@ -100,6 +106,17 @@ class FakeSocialPublic {
   List<pb.ForumEntry> forumEntries;
   Map<String, List<pb.ForumEntry>> forumReplies;
   bool forumViewerCanComment;
+  pb.Actor? forumViewerActor;
+
+  /// 設了就由它回 `ListComments`（測分頁與失敗）；沒設時依 [comments]、[replies]。
+  pb.ListCommentsResponse Function(pb.ListCommentsRequest request)?
+  commentsResponder;
+
+  /// 設了就由它回 `ListPosts`（測分頁與競態）。
+  Future<pb.ListPostsResponse> Function(pb.ListPostsRequest request)?
+  postsResponder;
+  final List<pb.ListCommentsRequest> listCommentsRequests = [];
+  final List<pb.ListForumEntriesRequest> listForumRequests = [];
   int listForumCalls = 0;
   ConnectException? getPostError;
   ConnectException? recordViewError;
@@ -112,9 +129,11 @@ class FakeSocialPublic {
 
   SocialPublicServiceClient client() => SocialPublicServiceClient(
     FakeTransportBuilder()
-        .unary(SocialPublicService.listPosts, (req, _) {
+        .unary(SocialPublicService.listPosts, (req, _) async {
           listPostsCalls++;
           listPostsRequests.add(req);
+          final responder = postsResponder;
+          if (responder != null) return responder(req);
           return pb.ListPostsResponse(posts: posts);
         })
         .unary(SocialPublicService.getPost, (req, _) {
@@ -124,6 +143,9 @@ class FakeSocialPublic {
         })
         .unary(SocialPublicService.listComments, (req, _) {
           listCommentsCalls++;
+          listCommentsRequests.add(req);
+          final responder = commentsResponder;
+          if (responder != null) return responder(req);
           final parent = req.hasParentId() ? req.parentId : null;
           return pb.ListCommentsResponse(
             comments: parent == null ? comments : (replies[parent] ?? []),
@@ -131,12 +153,14 @@ class FakeSocialPublic {
         })
         .unary(SocialPublicService.listForumEntries, (req, _) {
           listForumCalls++;
+          listForumRequests.add(req);
           final parent = req.hasParentId() ? req.parentId : null;
           return pb.ListForumEntriesResponse(
             entries: parent == null
                 ? forumEntries
                 : (forumReplies[parent] ?? []),
             viewerCanComment: forumViewerCanComment,
+            viewerActor: forumViewerActor,
           );
         })
         .unary(SocialPublicService.recordPostView, (req, _) {
@@ -150,7 +174,11 @@ class FakeSocialPublic {
 
 /// 寫入的 fake；[created] 收到每次 CreateComment 的請求。
 class FakeSocialApp {
-  FakeSocialApp({this.createError});
+  FakeSocialApp({this.createError, this.likeError});
+
+  /// 設了就讓貼文的讚與取消讚失敗。
+  ConnectException? likeError;
+  final List<pb.LikePostRequest> postLikes = [];
 
   ConnectException? createError;
 
@@ -189,10 +217,25 @@ class FakeSocialApp {
           if (pending != null) await pending!.future;
           return pb.DeleteForumEntryResponse();
         })
+        .unary(SocialAppService.likePost, (req, _) {
+          postLikes.add(req);
+          if (likeError != null) throw likeError!;
+          return pb.LikePostResponse();
+        })
         .unary(SocialAppService.deleteComment, (req, _) {
           deleted.add(req);
           return pb.DeleteCommentResponse();
         })
         .build(),
+  );
+}
+
+/// 一開始是訪客，[signIn] 之後換成已登入帳號（測打開畫面後才登入）。
+class SwitchableSession extends Session {
+  @override
+  Future<SessionModel?> build() async => null;
+
+  void signIn() => state = const AsyncData(
+    SessionModel(userId: 'account-3001', nickname: 'Iris'),
   );
 }

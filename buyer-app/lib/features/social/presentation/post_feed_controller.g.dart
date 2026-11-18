@@ -69,7 +69,7 @@ final class PostFeedControllerProvider
 }
 
 String _$postFeedControllerHash() =>
-    r'278803a46c9826a3a69ad7834cf3437c24cf83ca';
+    r'cd086ef2e4eb75f359301c981fcc2b9246229cf9';
 
 /// 貼文 feed controller，支援 TikTok-style 無限往下滑。
 ///

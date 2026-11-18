@@ -41,12 +41,12 @@ const Color _kGray100 = AppColors.textPrimary;
 const Color _kMediaForeground = AppColors.textEmphasis;
 const Color _kMediaMuted = AppColors.textSecondary;
 
-bool _hasValidProduct(Map<String, dynamic>? product) {
+bool _hasValidProduct(PostProduct? product) {
   if (product == null) return false;
-  final name = (product['name'] ?? '').toString().trim();
+  final name = product.name.trim();
   // `"0"` 是後端「無價格」的表達且非空字串 —— 用 isNotEmpty 判斷會讓
   // 「無名稱＋無價格」的商品節點通過，渲染出一張空卡片。
-  final price = PriceDisplay.formatPrice(product['price']);
+  final price = PriceDisplay.formatPrice(product.price);
   return name.isNotEmpty || price.isNotEmpty;
 }
 
@@ -215,7 +215,11 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
         showDragHandle: false,
         backgroundColor: AppColors.neutralBlack.withValues(alpha: 0),
         barrierColor: AppColors.neutralBlack.withValues(alpha: 0.42),
-        builder: (_) => CommentsBottomSheet(postId: post.id.toString()),
+        builder: (_) => CommentsBottomSheet(
+          postId: post.id.toString(),
+          viewerCanComment: post.viewerCanComment,
+          viewerActor: post.viewerActor,
+        ),
       );
     }
 
@@ -1198,16 +1202,16 @@ class _ProductOverlayChip extends StatelessWidget {
     this.merchantName,
   });
 
-  final Map<String, dynamic> product;
+  final PostProduct product;
   final String? merchantId;
   final String? merchantName;
 
   @override
   Widget build(BuildContext context) {
-    final name = (product['name'] ?? '').toString();
+    final name = product.name;
     // 判準走 PriceDisplay：`"0"` = 無價格，不能印成 `NT$ 0`。
-    final price = PriceDisplay.formatPrice(product['price'], prefix: 'NT\$ ');
-    final imageUrl = _toAbsolute((product['image'] ?? '').toString());
+    final price = PriceDisplay.formatPrice(product.price, prefix: 'NT\$ ');
+    final imageUrl = _toAbsolute(product.image);
 
     void openProduct() {
       context.push(
@@ -1216,7 +1220,7 @@ class _ProductOverlayChip extends StatelessWidget {
           title: name,
           imageUrl: imageUrl,
           price: num.tryParse(price),
-          skuId: (product['id'] ?? '').toString(),
+          skuId: product.id,
           merchantName: merchantName,
           merchantId: merchantId,
         ),

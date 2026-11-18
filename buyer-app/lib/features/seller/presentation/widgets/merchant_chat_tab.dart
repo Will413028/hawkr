@@ -13,6 +13,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/utils/hk_log.dart';
+import '../../../../shared/utils/store_actor_hint.dart';
 import '../../../../shared/widgets/chat_bubble_icon.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
@@ -21,6 +22,7 @@ import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../social/data/social_content_repository.dart';
+import '../../../../core/session/session_model.dart';
 import '../../../../core/session/session_provider.dart';
 import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
@@ -109,16 +111,41 @@ class _MerchantChatTabState extends State<MerchantChatTab>
   /// 觀看者能不能新增頂層留言（`ListForumEntries` 回應）；回覆與編輯另看項目的 `viewer_can_*`。
   bool _viewerCanComment = false;
 
+  /// 觀看者在這家店討論區留言時的身分（`ListForumEntries` 回應）；訪客 null。
+  pb.Actor? _viewerActor;
+
+  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
+  int _loadSeq = 0;
+
   // ── 初始化 ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    _sessionSub = widget.ref?.listenManual(sessionProvider, _onSessionChanged);
     _loadComments();
+  }
+
+  /// 登入、登出或換帳號後，`viewer_can_*` 與留言身分都要重讀；進行到一半的回覆與編輯屬於舊身分，一併放掉。
+  void _onSessionChanged(
+    AsyncValue<SessionModel?>? previous,
+    AsyncValue<SessionModel?> next,
+  ) {
+    if (!mounted) return;
+    final changed = previous?.value?.userId != next.value?.userId;
+    setState(() {
+      if (changed) {
+        _replyTarget = null;
+        _editingNode = null;
+        _inputController.clear();
+      }
+    });
+    if (changed) _loadComments();
   }
 
   @override
   void dispose() {
+    _sessionSub?.close();
     _inputController.dispose();
     _inputFocusNode.dispose();
     super.dispose();
@@ -131,6 +158,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
   Future<void> _loadComments() async {
     if (widget.merchantId == null || widget.merchantId!.isEmpty) return;
+    final seq = ++_loadSeq;
     setState(() => _loading = true);
     try {
       final repo = _repo;
@@ -139,11 +167,15 @@ class _MerchantChatTabState extends State<MerchantChatTab>
         return;
       }
       final response = await repo.listForumEntries(widget.merchantId!);
+      if (seq != _loadSeq) return;
       final nodes = response.entries.map((e) => _nodeOf(e)).toList();
       if (mounted) {
         setState(() {
           _comments = nodes;
           _viewerCanComment = response.viewerCanComment;
+          _viewerActor = response.hasViewerActor()
+              ? response.viewerActor
+              : null;
           _loading = false;
         });
       }
@@ -152,7 +184,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
       }
     } catch (e) {
       HKLog.logE('[MerchantChatTab] _loadComments error: $e', e);
-      if (mounted) setState(() => _loading = false);
+      if (mounted && seq == _loadSeq) setState(() => _loading = false);
     }
   }
 
@@ -203,7 +235,10 @@ class _MerchantChatTabState extends State<MerchantChatTab>
       await repo.createForumEntry(
         widget.merchantId!,
         text,
-        parentId: target?.id,
+        parentId: target == null
+            ? null
+            : (target.entry.hasParentId() ? target.entry.parentId : target.id),
+        replyToId: target?.id,
         requestId: _uuid.v4(),
       );
       if (!mounted) return;
@@ -563,9 +598,10 @@ class _MerchantChatTabState extends State<MerchantChatTab>
     final isEditing = _editingNode != null;
     final hintText = isEditing
         ? '編輯留言...'
-        : _replyTarget != null
-        ? '回覆 ${_replyTarget!.userName}...'
-        : '留言給這個賣家...';
+        : storeActorHint(_viewerActor, replying: _replyTarget != null) ??
+              (_replyTarget != null
+                  ? '回覆 ${_replyTarget!.userName}...'
+                  : '留言給這個賣家...');
 
     final hasText = _inputController.text.trim().isNotEmpty;
     final modeLabel = isEditing

@@ -5,13 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../../../config/flavor.dart';
 import '../../../../config/image_config.dart';
 import '../../../../core/motion/hk_motion_transitions.dart';
+import '../../../../core/session/session_model.dart';
+import '../../../../core/session/session_provider.dart';
 import '../../../../shared/utils/hk_log.dart';
+import '../../../../shared/utils/require_login.dart';
 import '../../../../shared/widgets/comments_bottom_sheet.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
@@ -64,11 +68,16 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
   String? _postErr;
   final Map<String, String> _videoThumbCache = <String, String>{};
   bool _initialFetchScheduled = false;
+  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
   final ScrollController _feedScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _sessionSub = widget.ref?.listenManual(sessionProvider, (previous, next) {
+      if (previous?.value?.userId == next.value?.userId) return;
+      if (mounted && _initialFetchScheduled) _fetchPosts();
+    });
     _scheduleInitialFetch();
   }
 
@@ -93,6 +102,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
   @override
   void dispose() {
+    _sessionSub?.close();
     _feedScrollController.dispose();
     super.dispose();
   }
@@ -175,8 +185,9 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     'content': post.content,
     'imageUrls': post.imageUrl.isEmpty ? <String>[] : [post.imageUrl],
     'imageKeys': <String>[],
-    'product': post.product,
     '_id': post.id.toString(),
+    '_viewerCanComment': post.viewerCanComment,
+    '_viewerActor': post.viewerActor,
     '_liked': post.liked,
     '_likeCount': post.likeCount,
     '_commentCount': post.commentCount,
@@ -185,10 +196,11 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
   // ── 互動操作 ──────────────────────────────────────────────────────────────
 
-  Future<void> _toggleLike(int index) async {
+  /// 切換讚並樂觀更新格子；伺服器失敗時還原並回 false。
+  Future<bool> _toggleLike(int index) async {
     final p = _posts[index];
     final id = (p['_id'] ?? '').toString();
-    if (id.isEmpty) return;
+    if (id.isEmpty) return false;
 
     final prevLiked = p['_liked'] == true;
     final prevCount = (p['_likeCount'] is int) ? (p['_likeCount'] as int) : 0;
@@ -200,10 +212,11 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
     try {
       final repo = widget.ref?.read(socialContentRepositoryProvider);
-      if (repo == null) return;
+      if (repo == null) return false;
       await repo.setPostLiked(int.parse(id), liked: nextLiked);
+      return true;
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _posts[index] = {
           ..._posts[index],
@@ -211,6 +224,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
           '_likeCount': prevCount,
         };
       });
+      return false;
     }
   }
 
@@ -233,6 +247,10 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
   Future<void> _openCommentSheet(String postId) async {
     final id = postId.trim();
     if (!mounted || id.isEmpty) return;
+    final entry = _posts.where(
+      (p) => (p['_id'] ?? p['id'] ?? p['postId'] ?? '').toString() == id,
+    );
+    final viewerActor = entry.isEmpty ? null : entry.first['_viewerActor'];
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -241,7 +259,12 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => CommentsBottomSheet(postId: id),
+      builder: (_) => CommentsBottomSheet(
+        postId: id,
+        viewerCanComment:
+            entry.isNotEmpty && entry.first['_viewerCanComment'] == true,
+        viewerActor: viewerActor is pb.Actor ? viewerActor : null,
+      ),
     );
     if (!mounted) return;
     final idx = _posts.indexWhere(
@@ -641,12 +664,21 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
                             liked: dialogLiked,
                             likeCount: dialogLikeCount,
                             commentCount: commentCount,
-                            onLikeToggle: () {
+                            onLikeToggle: () async {
+                              final ref = widget.ref;
+                              if (ref == null) return;
+                              if (!await requireLogin(context, ref)) return;
+                              if (!mounted || !dialogContext.mounted) return;
                               setDialogState(() {
                                 dialogLiked = !dialogLiked;
                                 dialogLikeCount += dialogLiked ? 1 : -1;
                               });
-                              _toggleLike(index);
+                              final ok = await _toggleLike(index);
+                              if (ok || !dialogContext.mounted) return;
+                              setDialogState(() {
+                                dialogLiked = !dialogLiked;
+                                dialogLikeCount += dialogLiked ? 1 : -1;
+                              });
                             },
                             onComment: () {
                               Navigator.of(context).pop();

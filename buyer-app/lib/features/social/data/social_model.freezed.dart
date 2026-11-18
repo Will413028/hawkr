@@ -12,12 +12,278 @@ part of 'social_model.dart';
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
+mixin _$PostProduct {
+
+ String get id; String get name; String get image; int get price;
+/// Create a copy of PostProduct
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PostProductCopyWith<PostProduct> get copyWith => _$PostProductCopyWithImpl<PostProduct>(this as PostProduct, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PostProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.image, image) || other.image == image)&&(identical(other.price, price) || other.price == price));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,id,name,image,price);
+
+@override
+String toString() {
+  return 'PostProduct(id: $id, name: $name, image: $image, price: $price)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PostProductCopyWith<$Res>  {
+  factory $PostProductCopyWith(PostProduct value, $Res Function(PostProduct) _then) = _$PostProductCopyWithImpl;
+@useResult
+$Res call({
+ String id, String name, String image, int price
+});
+
+
+
+
+}
+/// @nodoc
+class _$PostProductCopyWithImpl<$Res>
+    implements $PostProductCopyWith<$Res> {
+  _$PostProductCopyWithImpl(this._self, this._then);
+
+  final PostProduct _self;
+  final $Res Function(PostProduct) _then;
+
+/// Create a copy of PostProduct
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? image = null,Object? price = null,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,image: null == image ? _self.image : image // ignore: cast_nullable_to_non_nullable
+as String,price: null == price ? _self.price : price // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PostProduct].
+extension PostProductPatterns on PostProduct {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PostProduct value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PostProduct() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PostProduct value)  $default,){
+final _that = this;
+switch (_that) {
+case _PostProduct():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PostProduct value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PostProduct() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String image,  int price)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PostProduct() when $default != null:
+return $default(_that.id,_that.name,_that.image,_that.price);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String image,  int price)  $default,) {final _that = this;
+switch (_that) {
+case _PostProduct():
+return $default(_that.id,_that.name,_that.image,_that.price);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String image,  int price)?  $default,) {final _that = this;
+switch (_that) {
+case _PostProduct() when $default != null:
+return $default(_that.id,_that.name,_that.image,_that.price);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _PostProduct implements PostProduct {
+  const _PostProduct({required this.id, required this.name, required this.image, required this.price});
+  
+
+@override final  String id;
+@override final  String name;
+@override final  String image;
+@override final  int price;
+
+/// Create a copy of PostProduct
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PostProductCopyWith<_PostProduct> get copyWith => __$PostProductCopyWithImpl<_PostProduct>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PostProduct&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.image, image) || other.image == image)&&(identical(other.price, price) || other.price == price));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,id,name,image,price);
+
+@override
+String toString() {
+  return 'PostProduct(id: $id, name: $name, image: $image, price: $price)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PostProductCopyWith<$Res> implements $PostProductCopyWith<$Res> {
+  factory _$PostProductCopyWith(_PostProduct value, $Res Function(_PostProduct) _then) = __$PostProductCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String name, String image, int price
+});
+
+
+
+
+}
+/// @nodoc
+class __$PostProductCopyWithImpl<$Res>
+    implements _$PostProductCopyWith<$Res> {
+  __$PostProductCopyWithImpl(this._self, this._then);
+
+  final _PostProduct _self;
+  final $Res Function(_PostProduct) _then;
+
+/// Create a copy of PostProduct
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? image = null,Object? price = null,}) {
+  return _then(_PostProduct(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,image: null == image ? _self.image : image // ignore: cast_nullable_to_non_nullable
+as String,price: null == price ? _self.price : price // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+
+}
+
+/// @nodoc
 mixin _$Post {
 
  int get id; String get content; int? get merchantId;// 店面網址的路徑段；空字串代表沒有可進的店面。
  String get storeCode; String? get merchantName; String? get merchantAvatar; String get imageUrl; int get likeCount; int get commentCount; int get shareCount; int get viewCount; bool get liked;// 第一次發布的時間，epoch 秒；沒有時 null。
  int? get createdAt;// 商品卡片要的 id、name、image、price（最低價）。
- Map<String, dynamic>? get product;// 觀看者此刻能不能留言（伺服器算的顯示用提示）。
+ PostProduct? get product;// 觀看者此刻能不能留言（伺服器算的顯示用提示）。
  bool get viewerCanComment;// 觀看者留言時的身分；訪客 null。
  pb.Actor? get viewerActor;
 /// Create a copy of Post
@@ -30,12 +296,12 @@ $PostCopyWith<Post> get copyWith => _$PostCopyWithImpl<Post>(this as Post, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.content, content) || other.content == content)&&(identical(other.merchantId, merchantId) || other.merchantId == merchantId)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.merchantName, merchantName) || other.merchantName == merchantName)&&(identical(other.merchantAvatar, merchantAvatar) || other.merchantAvatar == merchantAvatar)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewCount, viewCount) || other.viewCount == viewCount)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other.product, product)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.viewerActor, viewerActor) || other.viewerActor == viewerActor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Post&&(identical(other.id, id) || other.id == id)&&(identical(other.content, content) || other.content == content)&&(identical(other.merchantId, merchantId) || other.merchantId == merchantId)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.merchantName, merchantName) || other.merchantName == merchantName)&&(identical(other.merchantAvatar, merchantAvatar) || other.merchantAvatar == merchantAvatar)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewCount, viewCount) || other.viewCount == viewCount)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.product, product) || other.product == product)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.viewerActor, viewerActor) || other.viewerActor == viewerActor));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,content,merchantId,storeCode,merchantName,merchantAvatar,imageUrl,likeCount,commentCount,shareCount,viewCount,liked,createdAt,const DeepCollectionEquality().hash(product),viewerCanComment,viewerActor);
+int get hashCode => Object.hash(runtimeType,id,content,merchantId,storeCode,merchantName,merchantAvatar,imageUrl,likeCount,commentCount,shareCount,viewCount,liked,createdAt,product,viewerCanComment,viewerActor);
 
 @override
 String toString() {
@@ -50,11 +316,11 @@ abstract mixin class $PostCopyWith<$Res>  {
   factory $PostCopyWith(Post value, $Res Function(Post) _then) = _$PostCopyWithImpl;
 @useResult
 $Res call({
- int id, String content, int? merchantId, String storeCode, String? merchantName, String? merchantAvatar, String imageUrl, int likeCount, int commentCount, int shareCount, int viewCount, bool liked, int? createdAt, Map<String, dynamic>? product, bool viewerCanComment, pb.Actor? viewerActor
+ int id, String content, int? merchantId, String storeCode, String? merchantName, String? merchantAvatar, String imageUrl, int likeCount, int commentCount, int shareCount, int viewCount, bool liked, int? createdAt, PostProduct? product, bool viewerCanComment, pb.Actor? viewerActor
 });
 
 
-
+$PostProductCopyWith<$Res>? get product;
 
 }
 /// @nodoc
@@ -83,12 +349,24 @@ as int,viewCount: null == viewCount ? _self.viewCount : viewCount // ignore: cas
 as int,liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
 as bool,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as int?,product: freezed == product ? _self.product : product // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
+as PostProduct?,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
 as bool,viewerActor: freezed == viewerActor ? _self.viewerActor : viewerActor // ignore: cast_nullable_to_non_nullable
 as pb.Actor?,
   ));
 }
+/// Create a copy of Post
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PostProductCopyWith<$Res>? get product {
+    if (_self.product == null) {
+    return null;
+  }
 
+  return $PostProductCopyWith<$Res>(_self.product!, (value) {
+    return _then(_self.copyWith(product: value));
+  });
+}
 }
 
 
@@ -170,7 +448,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  Map<String, dynamic>? product,  bool viewerCanComment,  pb.Actor? viewerActor)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  PostProduct? product,  bool viewerCanComment,  pb.Actor? viewerActor)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
 return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.merchantName,_that.merchantAvatar,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewCount,_that.liked,_that.createdAt,_that.product,_that.viewerCanComment,_that.viewerActor);case _:
@@ -191,7 +469,7 @@ return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.me
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  Map<String, dynamic>? product,  bool viewerCanComment,  pb.Actor? viewerActor)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  PostProduct? product,  bool viewerCanComment,  pb.Actor? viewerActor)  $default,) {final _that = this;
 switch (_that) {
 case _Post():
 return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.merchantName,_that.merchantAvatar,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewCount,_that.liked,_that.createdAt,_that.product,_that.viewerCanComment,_that.viewerActor);case _:
@@ -211,7 +489,7 @@ return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.me
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  Map<String, dynamic>? product,  bool viewerCanComment,  pb.Actor? viewerActor)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String content,  int? merchantId,  String storeCode,  String? merchantName,  String? merchantAvatar,  String imageUrl,  int likeCount,  int commentCount,  int shareCount,  int viewCount,  bool liked,  int? createdAt,  PostProduct? product,  bool viewerCanComment,  pb.Actor? viewerActor)?  $default,) {final _that = this;
 switch (_that) {
 case _Post() when $default != null:
 return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.merchantName,_that.merchantAvatar,_that.imageUrl,_that.likeCount,_that.commentCount,_that.shareCount,_that.viewCount,_that.liked,_that.createdAt,_that.product,_that.viewerCanComment,_that.viewerActor);case _:
@@ -226,7 +504,7 @@ return $default(_that.id,_that.content,_that.merchantId,_that.storeCode,_that.me
 
 
 class _Post implements Post {
-  const _Post({required this.id, this.content = '', this.merchantId, this.storeCode = '', this.merchantName, this.merchantAvatar, this.imageUrl = '', this.likeCount = 0, this.commentCount = 0, this.shareCount = 0, this.viewCount = 0, this.liked = false, this.createdAt, final  Map<String, dynamic>? product, this.viewerCanComment = false, this.viewerActor}): _product = product;
+  const _Post({required this.id, this.content = '', this.merchantId, this.storeCode = '', this.merchantName, this.merchantAvatar, this.imageUrl = '', this.likeCount = 0, this.commentCount = 0, this.shareCount = 0, this.viewCount = 0, this.liked = false, this.createdAt, this.product, this.viewerCanComment = false, this.viewerActor});
   
 
 @override final  int id;
@@ -245,16 +523,7 @@ class _Post implements Post {
 // 第一次發布的時間，epoch 秒；沒有時 null。
 @override final  int? createdAt;
 // 商品卡片要的 id、name、image、price（最低價）。
- final  Map<String, dynamic>? _product;
-// 商品卡片要的 id、name、image、price（最低價）。
-@override Map<String, dynamic>? get product {
-  final value = _product;
-  if (value == null) return null;
-  if (_product is EqualUnmodifiableMapView) return _product;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableMapView(value);
-}
-
+@override final  PostProduct? product;
 // 觀看者此刻能不能留言（伺服器算的顯示用提示）。
 @override@JsonKey() final  bool viewerCanComment;
 // 觀看者留言時的身分；訪客 null。
@@ -270,12 +539,12 @@ _$PostCopyWith<_Post> get copyWith => __$PostCopyWithImpl<_Post>(this, _$identit
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.content, content) || other.content == content)&&(identical(other.merchantId, merchantId) || other.merchantId == merchantId)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.merchantName, merchantName) || other.merchantName == merchantName)&&(identical(other.merchantAvatar, merchantAvatar) || other.merchantAvatar == merchantAvatar)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewCount, viewCount) || other.viewCount == viewCount)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other._product, _product)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.viewerActor, viewerActor) || other.viewerActor == viewerActor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Post&&(identical(other.id, id) || other.id == id)&&(identical(other.content, content) || other.content == content)&&(identical(other.merchantId, merchantId) || other.merchantId == merchantId)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.merchantName, merchantName) || other.merchantName == merchantName)&&(identical(other.merchantAvatar, merchantAvatar) || other.merchantAvatar == merchantAvatar)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.likeCount, likeCount) || other.likeCount == likeCount)&&(identical(other.commentCount, commentCount) || other.commentCount == commentCount)&&(identical(other.shareCount, shareCount) || other.shareCount == shareCount)&&(identical(other.viewCount, viewCount) || other.viewCount == viewCount)&&(identical(other.liked, liked) || other.liked == liked)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.product, product) || other.product == product)&&(identical(other.viewerCanComment, viewerCanComment) || other.viewerCanComment == viewerCanComment)&&(identical(other.viewerActor, viewerActor) || other.viewerActor == viewerActor));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,content,merchantId,storeCode,merchantName,merchantAvatar,imageUrl,likeCount,commentCount,shareCount,viewCount,liked,createdAt,const DeepCollectionEquality().hash(_product),viewerCanComment,viewerActor);
+int get hashCode => Object.hash(runtimeType,id,content,merchantId,storeCode,merchantName,merchantAvatar,imageUrl,likeCount,commentCount,shareCount,viewCount,liked,createdAt,product,viewerCanComment,viewerActor);
 
 @override
 String toString() {
@@ -290,11 +559,11 @@ abstract mixin class _$PostCopyWith<$Res> implements $PostCopyWith<$Res> {
   factory _$PostCopyWith(_Post value, $Res Function(_Post) _then) = __$PostCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String content, int? merchantId, String storeCode, String? merchantName, String? merchantAvatar, String imageUrl, int likeCount, int commentCount, int shareCount, int viewCount, bool liked, int? createdAt, Map<String, dynamic>? product, bool viewerCanComment, pb.Actor? viewerActor
+ int id, String content, int? merchantId, String storeCode, String? merchantName, String? merchantAvatar, String imageUrl, int likeCount, int commentCount, int shareCount, int viewCount, bool liked, int? createdAt, PostProduct? product, bool viewerCanComment, pb.Actor? viewerActor
 });
 
 
-
+@override $PostProductCopyWith<$Res>? get product;
 
 }
 /// @nodoc
@@ -322,14 +591,26 @@ as int,shareCount: null == shareCount ? _self.shareCount : shareCount // ignore:
 as int,viewCount: null == viewCount ? _self.viewCount : viewCount // ignore: cast_nullable_to_non_nullable
 as int,liked: null == liked ? _self.liked : liked // ignore: cast_nullable_to_non_nullable
 as bool,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as int?,product: freezed == product ? _self._product : product // ignore: cast_nullable_to_non_nullable
-as Map<String, dynamic>?,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
+as int?,product: freezed == product ? _self.product : product // ignore: cast_nullable_to_non_nullable
+as PostProduct?,viewerCanComment: null == viewerCanComment ? _self.viewerCanComment : viewerCanComment // ignore: cast_nullable_to_non_nullable
 as bool,viewerActor: freezed == viewerActor ? _self.viewerActor : viewerActor // ignore: cast_nullable_to_non_nullable
 as pb.Actor?,
   ));
 }
 
+/// Create a copy of Post
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PostProductCopyWith<$Res>? get product {
+    if (_self.product == null) {
+    return null;
+  }
 
+  return $PostProductCopyWith<$Res>(_self.product!, (value) {
+    return _then(_self.copyWith(product: value));
+  });
+}
 }
 
 // dart format on

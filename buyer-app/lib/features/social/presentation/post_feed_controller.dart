@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../core/session/session_provider.dart';
 import '../data/social_content_repository.dart';
 import '../data/social_model.dart';
 
@@ -16,12 +17,19 @@ class PostFeedController extends _$PostFeedController {
   bool _hasMore = true;
   bool _loadingMore = false;
 
+  /// 每次重建加一；舊一輪發出的 [loadMore] 回來時對不上就丟掉，不寫 token 也不接到新列表。
+  int _generation = 0;
+
   @override
   Future<List<Post>> build({int? merchantId}) async {
     ref.keepAlive();
     _nextPageToken = '';
-    _hasMore = true;
+    _hasMore = false;
     _loadingMore = false;
+    _generation++;
+    ref.listen(sessionProvider, (previous, next) {
+      if (previous?.value?.userId != next.value?.userId) ref.invalidateSelf();
+    });
     final page = await ref
         .watch(socialContentRepositoryProvider)
         .listPosts(storeId: merchantId?.toString());
@@ -37,6 +45,7 @@ class PostFeedController extends _$PostFeedController {
     final current = state.value;
     if (current == null) return; // 初始尚未載入
     _loadingMore = true;
+    final generation = _generation;
     try {
       final page = await ref
           .read(socialContentRepositoryProvider)
@@ -44,6 +53,7 @@ class PostFeedController extends _$PostFeedController {
             storeId: merchantId?.toString(),
             pageToken: _nextPageToken,
           );
+      if (generation != _generation) return;
       final newPosts = page.posts;
       _nextPageToken = page.nextPageToken;
       _hasMore = page.nextPageToken.isNotEmpty;
@@ -60,7 +70,7 @@ class PostFeedController extends _$PostFeedController {
     } catch (_) {
       // 失敗就先不處理；保留 page token 不變，下次仍可重試
     } finally {
-      _loadingMore = false;
+      if (generation == _generation) _loadingMore = false;
     }
   }
 

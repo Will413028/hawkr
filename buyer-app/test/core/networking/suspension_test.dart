@@ -151,15 +151,6 @@ void main() {
         .build(interceptors: [c.read(_suspension)]),
   );
 
-  SocialPublicServiceClient socialPublic(
-    ProviderContainer c,
-    ConnectException error,
-  ) => SocialPublicServiceClient(
-    FakeTransportBuilder()
-        .unary(SocialPublicService.recordPostView, (_, _) => throw error)
-        .build(interceptors: [c.read(_suspension)]),
-  );
-
   group('restriction state', () {
     test('GetSession 成功且沒有停權：解除受限狀態', () async {
       final h = harness();
@@ -370,22 +361,6 @@ void main() {
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.c.read(suspendedActionNoticeProvider), 0);
       expect(h.auth.fetches, 0);
-    });
-
-    test('背景呼叫 RecordPostView 收到 ACCOUNT_SUSPENDED：靜默，不進受限狀態、不提示', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      await expectLater(
-        socialPublic(
-          h.c,
-          _denied(suspended: true),
-        ).recordPostView(social.RecordPostViewRequest(postId: '101')),
-        throwsA(isA<ConnectException>()),
-      );
-      await Future<void>.delayed(Duration.zero);
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 0);
     });
 
     for (final (name, call)

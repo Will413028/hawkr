@@ -106,6 +106,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('recordPostView 吞掉任何失敗，含 ACCOUNT_SUSPENDED', () async {
+    for (final error in [
+      _suspended(),
+      ConnectException(Code.unavailable, 'down'),
+    ]) {
+      final public = FakeSocialPublic(recordViewError: error);
+      final repo = SocialContentRepository(
+        public.client(),
+        FakeSocialApp().client(),
+      );
+
+      await repo.recordPostView(101);
+
+      expect(public.recordViewCalls, 1);
+    }
+  });
+
   test('伺服器失敗不被當成找不到', () async {
     final public = FakeSocialPublic(
       getPostError: ConnectException(Code.unavailable, 'down'),

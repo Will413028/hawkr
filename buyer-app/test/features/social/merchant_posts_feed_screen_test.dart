@@ -81,6 +81,7 @@ FakeSocialPublic _feed({bool withStoreCode = true}) => FakeSocialPublic(
       ),
       image: common.Image(uriTemplate: 'https://example.test/post.jpg'),
       commentCount: Int64(3),
+      viewerCanComment: true,
       body:
           '中都農合 x #迷客夏 共同合作小迷豆漿，想跟博恩賀瓏喝一樣的豆漿與豆奶飲品系列嗎？'
           '快衝去迷客夏購買！全台迷客夏熱銷上市中，這是第三行以後才會看到的完整內文。',

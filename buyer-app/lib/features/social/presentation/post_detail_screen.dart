@@ -16,6 +16,7 @@ import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
 import 'package:hawkr_buyer/features/social/data/social_content_repository.dart';
+import 'package:hawkr_buyer/features/social/data/social_model.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_provider.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -45,12 +46,12 @@ import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 const _mediaForeground = AppColors.textEmphasis;
 const _mediaMuted = AppColors.textSecondary;
 
-bool _hasValidProduct(Map<String, dynamic>? product) {
+bool _hasValidProduct(PostProduct? product) {
   if (product == null) return false;
-  final name = (product['name'] ?? '').toString().trim();
+  final name = product.name.trim();
   // `"0"` 是後端「無價格」的表達且非空字串 —— 用 isNotEmpty 判斷會讓
   // 「無名稱＋無價格」的商品節點通過，渲染出一張空卡片。
-  final price = PriceDisplay.formatPrice(product['price']);
+  final price = PriceDisplay.formatPrice(product.price);
   return name.isNotEmpty || price.isNotEmpty;
 }
 
@@ -176,7 +177,11 @@ class PostDetailScreen extends HookConsumerWidget {
             showDragHandle: false,
             backgroundColor: Colors.transparent,
             barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
-            builder: (_) => CommentsBottomSheet(postId: postId.toString()),
+            builder: (_) => CommentsBottomSheet(
+              postId: postId.toString(),
+              viewerCanComment: post.viewerCanComment,
+              viewerActor: post.viewerActor,
+            ),
           );
           ref.invalidate(postDetailControllerProvider(postId));
         }
@@ -300,7 +305,7 @@ class _PostDetailSurface extends StatelessWidget {
   final String merchantAvatar;
   final String date;
   final String content;
-  final Map<String, dynamic>? product;
+  final PostProduct? product;
   final bool captionExpanded;
   final bool liked;
   final int likeCount;
@@ -629,7 +634,7 @@ class _PostContentPanel extends StatelessWidget {
   final String merchantAvatar;
   final String date;
   final String content;
-  final Map<String, dynamic>? product;
+  final PostProduct? product;
   final bool captionExpanded;
   final VoidCallback? onMerchantTap;
   final VoidCallback onCaptionToggle;
@@ -928,16 +933,16 @@ class _RelatedProductChip extends StatelessWidget {
     required this.merchantName,
   });
 
-  final Map<String, dynamic> product;
+  final PostProduct product;
   final String merchantId;
   final String merchantName;
 
   @override
   Widget build(BuildContext context) {
-    final name = (product['name'] ?? '').toString().trim();
+    final name = product.name.trim();
     // 判準走 PriceDisplay：`"0"` = 無價格，不能印成 `NT$ 0`。
-    final price = PriceDisplay.formatPrice(product['price'], prefix: 'NT\$ ');
-    final image = _toAbsolute((product['image'] ?? '').toString());
+    final price = PriceDisplay.formatPrice(product.price, prefix: 'NT\$ ');
+    final image = _toAbsolute(product.image);
 
     return Semantics(
       button: true,
@@ -952,7 +957,7 @@ class _RelatedProductChip extends StatelessWidget {
                 title: name,
                 imageUrl: image,
                 price: num.tryParse(price),
-                skuId: (product['id'] ?? '').toString(),
+                skuId: product.id,
                 merchantName: merchantName,
                 merchantId: merchantId,
               ),

@@ -6,6 +6,17 @@ import '../../seller/data/store_card_display.dart';
 
 part 'social_model.freezed.dart';
 
+/// 貼文關聯商品的卡片欄位：id、名稱、圖片（卡片尺寸）、最低價（新台幣整數，0 代表沒有價格）。
+@freezed
+abstract class PostProduct with _$PostProduct {
+  const factory PostProduct({
+    required String id,
+    required String name,
+    required String image,
+    required int price,
+  }) = _PostProduct;
+}
+
 /// 貼文的呈現模型，由 `hawkr.social.v1alpha1.Post` 轉來（[Post.fromProto]）。
 ///
 /// 轉換時丟掉不用的欄位：標籤、更新時間、狀態與 etag（店主才有）、商品的最高價與可購買旗標、`url`
@@ -29,7 +40,7 @@ abstract class Post with _$Post {
     // 第一次發布的時間，epoch 秒；沒有時 null。
     int? createdAt,
     // 商品卡片要的 id、name、image、price（最低價）。
-    Map<String, dynamic>? product,
+    PostProduct? product,
     // 觀看者此刻能不能留言（伺服器算的顯示用提示）。
     @Default(false) bool viewerCanComment,
     // 觀看者留言時的身分；訪客 null。
@@ -59,14 +70,14 @@ abstract class Post with _$Post {
           : null,
       product: product == null
           ? null
-          : {
-              'id': product.id,
-              'name': product.name,
-              'image': product.hasImage()
+          : PostProduct(
+              id: product.id,
+              name: product.name,
+              image: product.hasImage()
                   ? product.image.uri(ImagePreset.card)
                   : '',
-              'price': product.minPrice.toInt(),
-            },
+              price: product.minPrice.toInt(),
+            ),
       viewerCanComment: post.viewerCanComment,
       viewerActor: post.hasViewerActor() ? post.viewerActor : null,
     );

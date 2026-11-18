@@ -14,9 +14,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/networking/suspension_signal.dart';
+import '../../core/session/session_model.dart';
 import '../../core/session/session_provider.dart';
 import '../../features/social/data/social_content_repository.dart';
 import '../utils/require_login.dart';
+import '../utils/store_actor_hint.dart';
 import 'chat_bubble_icon.dart';
 import 'login_to_comment_prompt.dart';
 import 'fruit_refresh_indicator.dart';
@@ -33,10 +35,20 @@ const _anonymousName = '匿名用戶';
 
 /// 貼文的留言。打開與下拉時讀取，不即時推送。留言與回覆直接用生成的 [pb.Comment]；能不能留言、回覆、刪除
 /// 只讀伺服器的 `viewer_can_*`，留言身分讀 `Post.viewer_actor`。
+///
+/// [viewerCanComment]、[viewerActor] 由呼叫端從已持有的 [Post] 帶入；登入狀態在打開後改變時，這裡重讀 `GetPost`
+/// 與留言。
 class CommentsBottomSheet extends ConsumerStatefulWidget {
-  const CommentsBottomSheet({super.key, required this.postId});
+  const CommentsBottomSheet({
+    super.key,
+    required this.postId,
+    this.viewerCanComment = false,
+    this.viewerActor,
+  });
 
   final String postId;
+  final bool viewerCanComment;
+  final pb.Actor? viewerActor;
 
   @override
   ConsumerState<CommentsBottomSheet> createState() =>
@@ -59,11 +71,14 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
   List<pb.Comment> _comments = <pb.Comment>[];
   String _nextPageToken = '';
   bool _loading = true;
+  bool _loadFailed = false;
   bool _sending = false;
+  int _loadSeq = 0;
+  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
 
-  /// 觀看者在這篇貼文的留言權限與身分（`GetPost`）；讀不到時不能留言。
-  bool _viewerCanComment = false;
-  pb.Actor? _viewerActor;
+  /// 觀看者在這篇貼文的留言權限與身分；讀不到時不能留言。
+  late bool _viewerCanComment = widget.viewerCanComment;
+  late pb.Actor? _viewerActor = widget.viewerActor;
 
   /// Reddit-style thread 的根留言 ID，新回覆會掛在這個 thread 下。
   String? _replyToCommentId;
@@ -78,11 +93,28 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
+    _sessionSub = ref.listenManual(sessionProvider, _onSessionChanged);
     _loadComments();
+  }
+
+  /// 登入、登出或換帳號後，留言權限、留言身分與各則留言的讚狀態都屬於另一個觀看者，重讀。
+  void _onSessionChanged(
+    AsyncValue<SessionModel?>? previous,
+    AsyncValue<SessionModel?> next,
+  ) {
+    if (!mounted) return;
+    if (previous?.value?.userId == next.value?.userId) return;
+    setState(() {
+      _replyToCommentId = null;
+      _replyToTargetId = null;
+      _replyToName = null;
+    });
+    _loadComments(refreshViewer: true);
   }
 
   @override
   void dispose() {
+    _sessionSub?.close();
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -103,9 +135,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   Future<void> _loadViewer() async {
     try {
-      final post = await ref
-          .read(socialContentRepositoryProvider)
-          .getPost(int.parse(widget.postId));
+      final post = await _repo.getPost(int.parse(widget.postId));
       _viewerCanComment = post.viewerCanComment;
       _viewerActor = post.viewerActor;
     } catch (_) {
@@ -115,15 +145,19 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     }
   }
 
-  Future<void> _loadComments() async {
-    setState(() => _loading = true);
+  Future<void> _loadComments({bool refreshViewer = false}) async {
+    final seq = ++_loadSeq;
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
     try {
       final results = await Future.wait([
-        _loadViewer(),
+        refreshViewer ? _loadViewer() : Future<void>.value(),
         _repo.listComments(widget.postId),
       ]);
       final response = results[1] as pb.ListCommentsResponse;
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _comments = response.comments.toList();
         _nextPageToken = response.nextPageToken;
@@ -133,10 +167,14 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
         _comments.forEach(_remember);
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _comments = <pb.Comment>[]);
+      if (!mounted || seq != _loadSeq) return;
+      if (_comments.isEmpty) {
+        setState(() => _loadFailed = true);
+      } else {
+        showCommonSnackBar(context, '載入失敗，請稍後再試');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && seq == _loadSeq) setState(() => _loading = false);
     }
   }
 
@@ -281,10 +319,58 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     try {
       await _repo.deleteComment(comment);
       if (!mounted) return;
-      await _loadComments();
+      _removeLocally(comment);
     } catch (e) {
       _reportFailure(e, '刪除失敗，請稍後再試');
     }
+  }
+
+  /// 刪除成功後只改被刪的那一則：有回覆的頂層留言變成已刪除的佔位，其餘直接移除；回覆被刪時父留言的回覆數減一，
+  /// 已刪除的父留言底下沒有回覆了就一起移除。其他留言的展開與分頁不動。
+  void _removeLocally(pb.Comment comment) {
+    final id = comment.id;
+    setState(() {
+      _commentLikeCounts.remove(id);
+      _likedCommentIds.remove(id);
+      if (!comment.hasParentId()) {
+        final hasReplies =
+            comment.replyCount > 0 ||
+            (_repliesByParent[id]?.isNotEmpty ?? false);
+        if (hasReplies) {
+          final placeholder = comment.deepCopy()
+            ..state = pb.CommentState.COMMENT_STATE_DELETED
+            ..clearBody()
+            ..clearAuthor()
+            ..viewerCanEdit = false
+            ..viewerCanDelete = false
+            ..viewerCanReply = false;
+          _comments = [for (final c in _comments) c.id == id ? placeholder : c];
+        } else {
+          _comments = _comments.where((c) => c.id != id).toList();
+          _repliesByParent.remove(id);
+        }
+        return;
+      }
+      final parentId = comment.parentId;
+      final remaining = (_repliesByParent[parentId] ?? const <pb.Comment>[])
+          .where((c) => c.id != id)
+          .toList();
+      _repliesByParent[parentId] = remaining;
+      _comments = [
+        for (final c in _comments)
+          if (c.id != parentId)
+            c
+          else if (c.state != pb.CommentState.COMMENT_STATE_VISIBLE &&
+              remaining.isEmpty &&
+              c.replyCount <= 1)
+            ...const <pb.Comment>[]
+          else
+            (c.deepCopy()
+              ..replyCount = c.replyCount > 0
+                  ? c.replyCount - 1
+                  : c.replyCount),
+      ];
+    });
   }
 
   void _scheduleScrollToBottom() {
@@ -337,19 +423,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   /// 以店家身分留言時，輸入框提示帶店名（C2、C3）；其他身分用一般提示。
   String get _hintText {
-    final actor = _viewerActor;
-    final storeName =
-        actor != null &&
-            actor.kind == pb.ActorKind.ACTOR_KIND_STORE &&
-            actor.hasName() &&
-            actor.name.trim().isNotEmpty
-        ? actor.name.trim()
-        : null;
     final replying = _replyToName != null;
-    if (storeName != null) {
-      return replying ? '以「$storeName」身分回覆…' : '以「$storeName」身分留言…';
-    }
-    return replying ? '寫下回覆…' : '參與討論…';
+    return storeActorHint(_viewerActor, replying: replying) ??
+        (replying ? '寫下回覆…' : '參與討論…');
   }
 
   @override
@@ -446,7 +522,17 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                       ? const TruckLoadingOverlay(message: '載入中...')
                       : FruitRefreshIndicator(
                           onRefresh: _loadComments,
-                          child: _comments.isEmpty
+                          child: _loadFailed
+                              ? ListView(
+                                  controller: _scrollController,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(height: 48.h),
+                                    _buildLoadError(),
+                                  ],
+                                )
+                              : _comments.isEmpty
                               ? ListView(
                                   controller: _scrollController,
                                   physics:
@@ -645,6 +731,32 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
         ? author.name.trim()
         : '';
     return name.isEmpty ? _anonymousName : name;
+  }
+
+  /// 讀取失敗：和「還沒有留言」分開，讓人重試而不是以為沒人留言。
+  Widget _buildLoadError() {
+    return Padding(
+      key: const ValueKey('comments-load-error'),
+      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(AppIcons.errorOutline, color: AppIconColors.danger, size: 48.sp),
+          SizedBox(height: 12.h),
+          Text(
+            '載入失敗，請稍後再試',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+          SizedBox(height: 12.h),
+          TextButton(
+            key: const ValueKey('comments-load-retry'),
+            onPressed: _loadComments,
+            child: const HkButtonLabel('重試'),
+          ),
+        ],
+      ),
+    );
   }
 
   String? _avatarUri(pb.Comment comment) {

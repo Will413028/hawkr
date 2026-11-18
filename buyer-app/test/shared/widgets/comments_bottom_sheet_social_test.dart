@@ -25,11 +25,16 @@ class _ActiveSession extends Session {
       const SessionModel(userId: 'account-3001', nickname: 'Iris');
 }
 
+late ProviderContainer _container;
+
 Future<void> _pump(
   WidgetTester tester, {
   required FakeSocialPublic public,
   FakeSocialApp? app,
   bool guest = false,
+  bool viewerCanComment = true,
+  pb.Actor? viewerActor,
+  bool switchable = false,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -38,11 +43,16 @@ Future<void> _pump(
         (app ?? FakeSocialApp()).client(),
       ),
       sessionProvider.overrideWith(
-        guest ? _GuestSession.new : _ActiveSession.new,
+        switchable
+            ? SwitchableSession.new
+            : guest
+            ? _GuestSession.new
+            : _ActiveSession.new,
       ),
     ],
   );
   addTearDown(container.dispose);
+  _container = container;
   await container.read(sessionProvider.future);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -57,8 +67,13 @@ Future<void> _pump(
             routes: [
               GoRoute(
                 path: '/',
-                builder: (_, _) =>
-                    const Scaffold(body: CommentsBottomSheet(postId: '101')),
+                builder: (_, _) => Scaffold(
+                  body: CommentsBottomSheet(
+                    postId: '101',
+                    viewerCanComment: viewerCanComment,
+                    viewerActor: viewerActor,
+                  ),
+                ),
               ),
               GoRoute(
                 path: '/login',
@@ -94,9 +109,12 @@ void main() {
     expect(find.byKey(const ValueKey('comment-delete-c2')), findsNothing);
   });
 
-  testWidgets('刪除：確認後送出 DeleteComment（帶 etag）並重讀留言', (tester) async {
+  testWidgets('刪除：確認後送出 DeleteComment（帶 etag），只移除那一則，不重讀', (tester) async {
     final public = FakeSocialPublic(
-      comments: [fakeComment('c1', canDelete: true)],
+      comments: [
+        fakeComment('c1', body: '要刪的', canDelete: true),
+        fakeComment('c2', body: '留下的'),
+      ],
     );
     final app = FakeSocialApp();
     await _pump(tester, public: public, app: app);
@@ -109,6 +127,40 @@ void main() {
 
     expect(app.deleted.single.commentId, 'c1');
     expect(app.deleted.single.etag, 'etag-c1');
+    expect(public.listCommentsCalls, 1);
+    expect(find.text('要刪的'), findsNothing);
+    expect(find.text('留下的'), findsOneWidget);
+  });
+
+  testWidgets('刪除有回覆的頂層留言：變成已刪除佔位，已展開的回覆與其他留言不動', (tester) async {
+    final public = FakeSocialPublic(
+      comments: [
+        fakeComment('c1', canDelete: true, replyCount: 1),
+        fakeComment('c2', body: '另一則', replyCount: 1),
+      ],
+      replies: {
+        'c1': [fakeComment('r1', body: 'c1 的回覆')],
+        'c2': [fakeComment('r2', body: 'c2 的回覆')],
+      },
+    );
+    await _pump(tester, public: public, app: FakeSocialApp());
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('comment-more-replies-c2')),
+    );
+    await tester.tap(find.byKey(const ValueKey('comment-more-replies-c2')));
+    await tester.pumpAndSettle();
+    expect(find.text('c2 的回覆'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('comment-delete-c1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('comment-placeholder-c1')),
+      findsOneWidget,
+    );
+    expect(find.text('c2 的回覆'), findsOneWidget);
     expect(public.listCommentsCalls, 2);
   });
 
@@ -126,10 +178,7 @@ void main() {
   });
 
   testWidgets('viewer_can_comment 是 false：沒有留言框', (tester) async {
-    await _pump(
-      tester,
-      public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
-    );
+    await _pump(tester, public: FakeSocialPublic(), viewerCanComment: false);
     expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
   });
 
@@ -137,7 +186,8 @@ void main() {
     await _pump(
       tester,
       guest: true,
-      public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
+      public: FakeSocialPublic(),
+      viewerCanComment: false,
     );
     expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
     expect(find.text('登入後留言'), findsOneWidget);
@@ -151,28 +201,21 @@ void main() {
   testWidgets('已登入但 viewer_can_comment 是 false（被封鎖）：沒有留言框也沒有登入提示', (
     tester,
   ) async {
-    await _pump(
-      tester,
-      public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
-    );
+    await _pump(tester, public: FakeSocialPublic(), viewerCanComment: false);
     expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
     expect(find.text('登入後留言'), findsNothing);
   });
 
   testWidgets('viewer_can_comment 是 true：有留言框', (tester) async {
-    await _pump(
-      tester,
-      public: FakeSocialPublic(post: fakePost(viewerCanComment: true)),
-    );
+    await _pump(tester, public: FakeSocialPublic());
     expect(find.byKey(const ValueKey('comments-panel-input')), findsOneWidget);
   });
 
   testWidgets('以店家身分：留言與回覆的提示帶店名（C2、C3）', (tester) async {
     final public = FakeSocialPublic(
-      post: fakePost(viewerActor: storeActor('好店')),
       comments: [fakeComment('c1', canReply: true)],
     );
-    await _pump(tester, public: public);
+    await _pump(tester, public: public, viewerActor: storeActor('好店'));
 
     expect(_hint(tester), '以「好店」身分留言…');
     await tester.tap(find.byKey(const ValueKey('comment-reply-c1')));
@@ -182,10 +225,9 @@ void main() {
 
   testWidgets('以買家身分：提示不帶店名', (tester) async {
     final public = FakeSocialPublic(
-      post: fakePost(viewerActor: buyerActor('Iris')),
       comments: [fakeComment('c1', canReply: true)],
     );
-    await _pump(tester, public: public);
+    await _pump(tester, public: public, viewerActor: buyerActor('Iris'));
 
     expect(_hint(tester), '參與討論…');
     await tester.tap(find.byKey(const ValueKey('comment-reply-c1')));
@@ -249,14 +291,114 @@ void main() {
     expect(find.byKey(const ValueKey('comment-reply-d')), findsNothing);
   });
 
-  testWidgets('貼文讀不到（不公開）時留言仍讀得到，但不能留言', (tester) async {
+  testWidgets('打開時不另外讀 GetPost：留言權限與身分由呼叫端帶入', (tester) async {
+    final public = FakeSocialPublic(comments: [fakeComment('c1')]);
+    await _pump(tester, public: public, viewerActor: storeActor('好店'));
+
+    expect(public.getPostCalls, 0);
+    expect(find.byKey(const ValueKey('comments-panel-input')), findsOneWidget);
+    expect(_hint(tester), '以「好店」身分留言…');
+  });
+
+  testWidgets('打開後登入：重讀 GetPost 與留言，出現留言框、身分提示與讚狀態', (tester) async {
     final public = FakeSocialPublic(
-      getPostError: ConnectException(Code.notFound, 'gone'),
+      post: fakePost(viewerCanComment: true, viewerActor: buyerActor('Iris')),
       comments: [fakeComment('c1')],
+    );
+    await _pump(
+      tester,
+      public: public,
+      switchable: true,
+      viewerCanComment: false,
+    );
+    expect(find.text('登入後留言'), findsOneWidget);
+    expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
+    expect(public.getPostCalls, 0);
+    expect(public.listCommentsCalls, 1);
+
+    public.comments = [fakeComment('c1').deepCopy()..viewerLiked = true];
+    (_container.read(sessionProvider.notifier) as SwitchableSession).signIn();
+    await tester.pumpAndSettle();
+
+    expect(public.getPostCalls, 1);
+    expect(public.listCommentsCalls, 2);
+    expect(find.byKey(const ValueKey('comments-panel-input')), findsOneWidget);
+    expect(find.text('登入後留言'), findsNothing);
+    expect(_hint(tester), '參與討論…');
+  });
+
+  testWidgets('留言讀取失敗：顯示錯誤與重試，不是「還沒有留言」；重試後讀到', (tester) async {
+    var fail = true;
+    final public = FakeSocialPublic(
+      commentsResponder: (_) {
+        if (fail) throw ConnectException(Code.unavailable, 'down');
+        return pb.ListCommentsResponse(comments: [fakeComment('c1')]);
+      },
     );
     await _pump(tester, public: public);
 
+    expect(find.byKey(const ValueKey('comments-load-error')), findsOneWidget);
+    expect(find.text('載入失敗，請稍後再試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('comments-empty-state')), findsNothing);
+
+    fail = false;
+    await tester.tap(find.byKey(const ValueKey('comments-load-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('comments-load-error')), findsNothing);
     expect(find.text('留言內文'), findsOneWidget);
-    expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
+  });
+
+  testWidgets('「查看更多留言」帶上一頁的 page_token，下一頁接在後面', (tester) async {
+    final public = FakeSocialPublic(
+      commentsResponder: (req) => req.pageToken.isEmpty
+          ? pb.ListCommentsResponse(
+              comments: [fakeComment('c1', body: '第一頁')],
+              nextPageToken: 'page-2',
+            )
+          : pb.ListCommentsResponse(comments: [fakeComment('c2', body: '第二頁')]),
+    );
+    await _pump(tester, public: public);
+    expect(find.text('第二頁'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('comments-load-more')));
+    await tester.pumpAndSettle();
+
+    expect(public.listCommentsRequests.last.pageToken, 'page-2');
+    expect(find.text('第一頁'), findsOneWidget);
+    expect(find.text('第二頁'), findsOneWidget);
+    expect(find.byKey(const ValueKey('comments-load-more')), findsNothing);
+  });
+
+  testWidgets('「查看更多回覆」帶 parent_id 與 page_token，回覆接在後面', (tester) async {
+    final public = FakeSocialPublic(
+      commentsResponder: (req) {
+        if (!req.hasParentId()) {
+          return pb.ListCommentsResponse(
+            comments: [fakeComment('c1', replyCount: 2)],
+          );
+        }
+        return req.pageToken.isEmpty
+            ? pb.ListCommentsResponse(
+                comments: [fakeComment('r1', body: '回覆一')],
+                nextPageToken: 'rp-2',
+              )
+            : pb.ListCommentsResponse(
+                comments: [fakeComment('r2', body: '回覆二')],
+              );
+      },
+    );
+    await _pump(tester, public: public);
+
+    await tester.tap(find.byKey(const ValueKey('comment-more-replies-c1')));
+    await tester.pumpAndSettle();
+
+    final replyRequests = public.listCommentsRequests.where(
+      (r) => r.hasParentId(),
+    );
+    expect(replyRequests.map((r) => r.parentId), everyElement('c1'));
+    expect(replyRequests.map((r) => r.pageToken), ['', 'rp-2']);
+    expect(find.text('回覆一'), findsOneWidget);
+    expect(find.text('回覆二'), findsOneWidget);
   });
 }

@@ -25,8 +25,6 @@ bool isAccountSuspendedError(Object error) =>
 const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit',
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
-  // 開貼文詳情自動記一次瀏覽，不是使用者按的。
-  '/hawkr.social.v1alpha1.SocialPublicService/RecordPostView',
 };
 
 bool isBackgroundConnectProcedure(String procedure) =>

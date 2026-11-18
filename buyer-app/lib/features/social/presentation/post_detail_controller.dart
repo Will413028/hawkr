@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/exceptions/app_exception.dart';
+import '../../../core/session/session_provider.dart';
 import '../data/social_content_repository.dart';
 import '../data/social_model.dart';
 
@@ -20,6 +21,9 @@ Duration? _retryUnlessNotFound(int retryCount, Object error) =>
 class PostDetailController extends _$PostDetailController {
   @override
   Future<PostDetailState> build(int postId) async {
+    ref.listen(sessionProvider, (previous, next) {
+      if (previous?.value?.userId != next.value?.userId) ref.invalidateSelf();
+    });
     final post = await ref
         .watch(socialContentRepositoryProvider)
         .getPost(postId);

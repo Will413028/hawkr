@@ -37,11 +37,14 @@ class _TestSession extends Session {
       : null;
 }
 
+late ProviderContainer _container;
+
 Future<void> _pump(
   WidgetTester tester,
   FakeSocialPublic public, {
   FakeSocialApp? app,
   bool loggedIn = true,
+  bool switchable = false,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -49,10 +52,13 @@ Future<void> _pump(
       socialAppClientProvider.overrideWithValue(
         (app ?? FakeSocialApp()).client(),
       ),
-      sessionProvider.overrideWith(() => _TestSession(loggedIn)),
+      sessionProvider.overrideWith(
+        () => switchable ? SwitchableSession() : _TestSession(loggedIn),
+      ),
     ],
   );
   addTearDown(container.dispose);
+  _container = container;
   await container.read(sessionProvider.future);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -167,8 +173,70 @@ void main() {
     final request = app.forumCreated.single;
     expect(request.storeId, '7');
     expect(request.parentId, 'c-2');
+    expect(request.replyToId, 'c-2');
     expect(request.body, '這是給另一人的回覆');
     expect(request.requestId, isNotEmpty);
+  });
+
+  testWidgets('回覆某則回覆：parent_id 是所屬的頂層項目，reply_to_id 是被回覆的那一則', (tester) async {
+    final app = FakeSocialApp();
+    final public = FakeSocialPublic(
+      forumEntries: [fakeForumEntry('top', canReply: true, replyCount: 1)],
+      forumReplies: {
+        'top': [fakeForumEntry('r-1', canReply: true)..parentId = 'top'],
+      },
+    );
+    await _pump(tester, public, app: app);
+
+    await tester.tap(find.text('回覆').last);
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('merchant-comment-input')),
+      '回給回覆',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('merchant-comment-submit')));
+    await tester.pumpAndSettle();
+
+    final request = app.forumCreated.single;
+    expect(request.parentId, 'top');
+    expect(request.replyToId, 'r-1');
+  });
+
+  testWidgets('以店家身分留言與回覆：輸入框提示帶店名（C2、C3）', (tester) async {
+    final public = FakeSocialPublic(
+      forumViewerActor: storeActor('好店'),
+      forumEntries: [fakeForumEntry('c-2', canReply: true)],
+    );
+    await _pump(tester, public);
+
+    String? hint() => tester
+        .widget<TextField>(find.byKey(const Key('merchant-comment-input')))
+        .decoration
+        ?.hintText;
+    expect(hint(), '以「好店」身分留言…');
+    await tester.tap(find.text('回覆'));
+    await tester.pump();
+    expect(hint(), '以「好店」身分回覆…');
+  });
+
+  testWidgets('打開後登入：重讀討論區，登入提示換成輸入欄', (tester) async {
+    final public = FakeSocialPublic(
+      forumViewerCanComment: false,
+      forumEntries: [fakeForumEntry('c-3')],
+    );
+    await _pump(tester, public, switchable: true);
+    expect(find.text('登入後留言'), findsOneWidget);
+    expect(find.byKey(const Key('merchant-comment-input')), findsNothing);
+    final before = public.listForumCalls;
+
+    public.forumViewerCanComment = true;
+    (_container.read(sessionProvider.notifier) as SwitchableSession).signIn();
+    await tester.pumpAndSettle();
+
+    expect(public.listForumCalls, greaterThan(before));
+    expect(find.text('登入後留言'), findsNothing);
+    expect(find.byKey(const Key('merchant-comment-input')), findsOneWidget);
   });
 
   testWidgets('編輯送出 UpdateForumEntry（帶 etag 與 body 的 update_mask）', (
