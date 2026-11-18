@@ -14,8 +14,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/networking/suspension_signal.dart';
-import '../../core/session/session_model.dart';
 import '../../core/session/session_provider.dart';
+import '../../core/session/viewer_scope.dart';
 import '../../features/social/data/social_content_repository.dart';
 import '../utils/require_login.dart';
 import '../utils/store_actor_hint.dart';
@@ -55,7 +55,8 @@ class CommentsBottomSheet extends ConsumerStatefulWidget {
       _CommentsBottomSheetState();
 }
 
-class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
+class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet>
+    with ViewerScopedLoads<CommentsBottomSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -73,8 +74,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
   bool _loading = true;
   bool _loadFailed = false;
   bool _sending = false;
-  int _loadSeq = 0;
-  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
 
   /// 觀看者在這篇貼文的留言權限與身分；讀不到時不能留言。
   late bool _viewerCanComment = widget.viewerCanComment;
@@ -93,18 +92,26 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
-    _sessionSub = ref.listenManual(sessionProvider, _onSessionChanged);
+    watchViewer();
     _loadComments();
   }
 
-  /// 登入、登出或換帳號後，留言權限、留言身分與各則留言的讚狀態都屬於另一個觀看者，重讀。
-  void _onSessionChanged(
-    AsyncValue<SessionModel?>? previous,
-    AsyncValue<SessionModel?> next,
-  ) {
-    if (!mounted) return;
-    if (previous?.value?.userId == next.value?.userId) return;
+  @override
+  WidgetRef get viewerRef => ref;
+
+  /// 登入、登出或換帳號後，留言權限、留言身分、各則留言的讚狀態與回覆都屬於另一個觀看者：
+  /// 先同步清掉，再重讀；重讀失敗時畫面是錯誤狀態，不會留著前一位觀看者的旗標。
+  @override
+  void onViewerChanged() {
     setState(() {
+      _viewerCanComment = false;
+      _viewerActor = null;
+      _comments = <pb.Comment>[];
+      _nextPageToken = '';
+      _repliesByParent.clear();
+      _repliesLoading.clear();
+      _commentLikeCounts.clear();
+      _likedCommentIds.clear();
       _replyToCommentId = null;
       _replyToTargetId = null;
       _replyToName = null;
@@ -114,7 +121,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   @override
   void dispose() {
-    _sessionSub?.close();
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -133,31 +139,29 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     }
   }
 
-  Future<void> _loadViewer() async {
+  Future<({bool canComment, pb.Actor? actor})> _readViewer() async {
     try {
       final post = await _repo.getPost(int.parse(widget.postId));
-      _viewerCanComment = post.viewerCanComment;
-      _viewerActor = post.viewerActor;
+      return (canComment: post.viewerCanComment, actor: post.viewerActor);
     } catch (_) {
       // 貼文不公開時留言仍讀得到，只是不能留言。
-      _viewerCanComment = false;
-      _viewerActor = null;
+      return (canComment: false, actor: null);
     }
   }
 
+  /// 讀第一頁留言；[refreshViewer] 時一併重讀 `GetPost` 的留言權限與身分（觀看者換了、下拉重讀、重試）。
   Future<void> _loadComments({bool refreshViewer = false}) async {
-    final seq = ++_loadSeq;
+    final seq = beginLoad();
     setState(() {
       _loading = true;
       _loadFailed = false;
+      _repliesLoading.clear();
     });
     try {
-      final results = await Future.wait([
-        refreshViewer ? _loadViewer() : Future<void>.value(),
-        _repo.listComments(widget.postId),
-      ]);
-      final response = results[1] as pb.ListCommentsResponse;
-      if (!mounted || seq != _loadSeq) return;
+      final viewerRead = refreshViewer ? _readViewer() : null;
+      final response = await _repo.listComments(widget.postId);
+      final viewer = await viewerRead;
+      if (!isCurrentLoad(seq)) return;
       setState(() {
         _comments = response.comments.toList();
         _nextPageToken = response.nextPageToken;
@@ -165,39 +169,47 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
         _commentLikeCounts.clear();
         _likedCommentIds.clear();
         _comments.forEach(_remember);
+        if (viewer != null) {
+          _viewerCanComment = viewer.canComment;
+          _viewerActor = viewer.actor;
+        }
       });
     } catch (_) {
-      if (!mounted || seq != _loadSeq) return;
+      if (!mounted || !isCurrentLoad(seq)) return;
       if (_comments.isEmpty) {
         setState(() => _loadFailed = true);
       } else {
         showCommonSnackBar(context, '載入失敗，請稍後再試');
       }
     } finally {
-      if (mounted && seq == _loadSeq) setState(() => _loading = false);
+      if (isCurrentLoad(seq)) setState(() => _loading = false);
     }
   }
 
   Future<void> _loadMoreComments() async {
     if (_nextPageToken.isEmpty) return;
+    final seq = currentLoad;
     try {
       final response = await _repo.listComments(
         widget.postId,
         pageToken: _nextPageToken,
       );
-      if (!mounted) return;
+      if (!isCurrentLoad(seq)) return;
       setState(() {
         _comments = [..._comments, ...response.comments];
         _nextPageToken = response.nextPageToken;
         response.comments.forEach(_remember);
       });
     } catch (_) {
-      if (mounted) showCommonSnackBar(context, '載入失敗，請稍後再試');
+      if (mounted && isCurrentLoad(seq)) {
+        showCommonSnackBar(context, '載入失敗，請稍後再試');
+      }
     }
   }
 
   Future<void> _ensureReplies(String parentId) async {
     if (_repliesLoading.contains(parentId)) return;
+    final seq = currentLoad;
     _repliesLoading.add(parentId);
     try {
       final all = <pb.Comment>[];
@@ -211,15 +223,17 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
         all.addAll(response.comments);
         token = response.nextPageToken;
       } while (token.isNotEmpty);
-      if (!mounted) return;
+      if (!isCurrentLoad(seq)) return;
       setState(() {
         _repliesByParent[parentId] = all;
         all.forEach(_remember);
       });
     } catch (_) {
-      if (mounted) showCommonSnackBar(context, '載入失敗，請稍後再試');
+      if (mounted && isCurrentLoad(seq)) {
+        showCommonSnackBar(context, '載入失敗，請稍後再試');
+      }
     } finally {
-      _repliesLoading.remove(parentId);
+      if (isCurrentLoad(seq)) _repliesLoading.remove(parentId);
     }
   }
 
@@ -521,7 +535,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                   child: _loading
                       ? const TruckLoadingOverlay(message: '載入中...')
                       : FruitRefreshIndicator(
-                          onRefresh: _loadComments,
+                          onRefresh: () => _loadComments(refreshViewer: true),
                           child: _loadFailed
                               ? ListView(
                                   controller: _scrollController,
@@ -751,7 +765,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
           SizedBox(height: 12.h),
           TextButton(
             key: const ValueKey('comments-load-retry'),
-            onPressed: _loadComments,
+            onPressed: () => _loadComments(refreshViewer: true),
             child: const HkButtonLabel('重試'),
           ),
         ],

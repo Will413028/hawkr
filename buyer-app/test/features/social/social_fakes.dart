@@ -94,6 +94,8 @@ class FakeSocialPublic {
     this.forumViewerCanComment = true,
     this.forumViewerActor,
     this.commentsResponder,
+    this.forumResponder,
+    this.getPostResponder,
     this.postsResponder,
     this.getPostError,
     this.recordViewError,
@@ -109,8 +111,17 @@ class FakeSocialPublic {
   pb.Actor? forumViewerActor;
 
   /// 設了就由它回 `ListComments`（測分頁與失敗）；沒設時依 [comments]、[replies]。
-  pb.ListCommentsResponse Function(pb.ListCommentsRequest request)?
+  FutureOr<pb.ListCommentsResponse> Function(pb.ListCommentsRequest request)?
   commentsResponder;
+
+  /// 設了就由它回 `ListForumEntries`，可回 Future 讓測試控制回應順序。
+  FutureOr<pb.ListForumEntriesResponse> Function(
+    pb.ListForumEntriesRequest request,
+  )?
+  forumResponder;
+
+  /// 設了就由它回 `GetPost`，可回 Future 讓測試控制回應順序。
+  FutureOr<pb.Post> Function()? getPostResponder;
 
   /// 設了就由它回 `ListPosts`（測分頁與競態）。
   Future<pb.ListPostsResponse> Function(pb.ListPostsRequest request)?
@@ -136,24 +147,30 @@ class FakeSocialPublic {
           if (responder != null) return responder(req);
           return pb.ListPostsResponse(posts: posts);
         })
-        .unary(SocialPublicService.getPost, (req, _) {
+        .unary(SocialPublicService.getPost, (req, _) async {
           getPostCalls++;
           if (getPostError != null) throw getPostError!;
+          final responder = getPostResponder;
+          if (responder != null) {
+            return pb.GetPostResponse(post: await responder());
+          }
           return pb.GetPostResponse(post: post ?? fakePost());
         })
-        .unary(SocialPublicService.listComments, (req, _) {
+        .unary(SocialPublicService.listComments, (req, _) async {
           listCommentsCalls++;
           listCommentsRequests.add(req);
           final responder = commentsResponder;
-          if (responder != null) return responder(req);
+          if (responder != null) return await responder(req);
           final parent = req.hasParentId() ? req.parentId : null;
           return pb.ListCommentsResponse(
             comments: parent == null ? comments : (replies[parent] ?? []),
           );
         })
-        .unary(SocialPublicService.listForumEntries, (req, _) {
+        .unary(SocialPublicService.listForumEntries, (req, _) async {
           listForumCalls++;
           listForumRequests.add(req);
+          final responder = forumResponder;
+          if (responder != null) return await responder(req);
           final parent = req.hasParentId() ? req.parentId : null;
           return pb.ListForumEntriesResponse(
             entries: parent == null
@@ -179,6 +196,9 @@ class FakeSocialApp {
   /// 設了就讓貼文的讚與取消讚失敗。
   ConnectException? likeError;
   final List<pb.LikePostRequest> postLikes = [];
+
+  /// 設了就讓貼文的讚卡住，直到測試完成它。
+  Completer<void>? likeGate;
 
   ConnectException? createError;
 
@@ -217,8 +237,9 @@ class FakeSocialApp {
           if (pending != null) await pending!.future;
           return pb.DeleteForumEntryResponse();
         })
-        .unary(SocialAppService.likePost, (req, _) {
+        .unary(SocialAppService.likePost, (req, _) async {
           postLikes.add(req);
+          await likeGate?.future;
           if (likeError != null) throw likeError!;
           return pb.LikePostResponse();
         })
@@ -238,4 +259,10 @@ class SwitchableSession extends Session {
   void signIn() => state = const AsyncData(
     SessionModel(userId: 'account-3001', nickname: 'Iris'),
   );
+}
+
+/// 登入後可換成另一個帳號（測觀看者連續變動）。
+extension SwitchSessionUser on SwitchableSession {
+  void switchTo(String userId) =>
+      state = AsyncData(SessionModel(userId: userId, nickname: userId));
 }

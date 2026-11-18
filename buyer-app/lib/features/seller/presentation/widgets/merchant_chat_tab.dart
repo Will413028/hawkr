@@ -22,8 +22,8 @@ import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../social/data/social_content_repository.dart';
-import '../../../../core/session/session_model.dart';
 import '../../../../core/session/session_provider.dart';
+import '../../../../core/session/viewer_scope.dart';
 import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
 
@@ -96,7 +96,7 @@ class MerchantChatTab extends StatefulWidget {
 }
 
 class _MerchantChatTabState extends State<MerchantChatTab>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, ViewerScopedLoads<MerchantChatTab> {
   @override
   bool get wantKeepAlive => true;
   List<_CommentNode> _comments = [];
@@ -114,38 +114,37 @@ class _MerchantChatTabState extends State<MerchantChatTab>
   /// 觀看者在這家店討論區留言時的身分（`ListForumEntries` 回應）；訪客 null。
   pb.Actor? _viewerActor;
 
-  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
-  int _loadSeq = 0;
+  bool _loadFailed = false;
 
   // ── 初始化 ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _sessionSub = widget.ref?.listenManual(sessionProvider, _onSessionChanged);
+    watchViewer();
     _loadComments();
   }
 
-  /// 登入、登出或換帳號後，`viewer_can_*` 與留言身分都要重讀；進行到一半的回覆與編輯屬於舊身分，一併放掉。
-  void _onSessionChanged(
-    AsyncValue<SessionModel?>? previous,
-    AsyncValue<SessionModel?> next,
-  ) {
-    if (!mounted) return;
-    final changed = previous?.value?.userId != next.value?.userId;
+  @override
+  WidgetRef? get viewerRef => widget.ref;
+
+  /// 登入、登出或換帳號後，`viewer_can_*`、留言身分與整份討論區都屬於另一個觀看者：
+  /// 進行到一半的回覆與編輯一併放掉，先同步清空再重讀；重讀失敗時畫面是錯誤狀態。
+  @override
+  void onViewerChanged() {
     setState(() {
-      if (changed) {
-        _replyTarget = null;
-        _editingNode = null;
-        _inputController.clear();
-      }
+      _comments = [];
+      _viewerCanComment = false;
+      _viewerActor = null;
+      _replyTarget = null;
+      _editingNode = null;
+      _inputController.clear();
     });
-    if (changed) _loadComments();
+    _loadComments();
   }
 
   @override
   void dispose() {
-    _sessionSub?.close();
     _inputController.dispose();
     _inputFocusNode.dispose();
     super.dispose();
@@ -158,8 +157,11 @@ class _MerchantChatTabState extends State<MerchantChatTab>
 
   Future<void> _loadComments() async {
     if (widget.merchantId == null || widget.merchantId!.isEmpty) return;
-    final seq = ++_loadSeq;
-    setState(() => _loading = true);
+    final seq = beginLoad();
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
     try {
       final repo = _repo;
       if (repo == null) {
@@ -167,28 +169,35 @@ class _MerchantChatTabState extends State<MerchantChatTab>
         return;
       }
       final response = await repo.listForumEntries(widget.merchantId!);
-      if (seq != _loadSeq) return;
+      if (!isCurrentLoad(seq)) return;
       final nodes = response.entries.map((e) => _nodeOf(e)).toList();
-      if (mounted) {
-        setState(() {
-          _comments = nodes;
-          _viewerCanComment = response.viewerCanComment;
-          _viewerActor = response.hasViewerActor()
-              ? response.viewerActor
-              : null;
-          _loading = false;
-        });
-      }
+      setState(() {
+        _comments = nodes;
+        _viewerCanComment = response.viewerCanComment;
+        _viewerActor = response.hasViewerActor() ? response.viewerActor : null;
+        _loading = false;
+      });
       for (final node in nodes) {
-        if (node.replyCount > 0 && node.replies.isEmpty) _loadRepliesFor(node);
+        if (node.replyCount > 0 && node.replies.isEmpty) {
+          _loadRepliesFor(node, seq);
+        }
       }
     } catch (e) {
       HKLog.logE('[MerchantChatTab] _loadComments error: $e', e);
-      if (mounted && seq == _loadSeq) setState(() => _loading = false);
+      if (!isCurrentLoad(seq)) return;
+      setState(() {
+        _loading = false;
+        if (_comments.isEmpty) {
+          _loadFailed = true;
+        }
+      });
+      if (mounted && _comments.isNotEmpty) {
+        showCommonSnackBar(context, '載入失敗，請稍後再試');
+      }
     }
   }
 
-  Future<void> _loadRepliesFor(_CommentNode node) async {
+  Future<void> _loadRepliesFor(_CommentNode node, int seq) async {
     try {
       final repo = _repo;
       if (repo == null) return;
@@ -203,7 +212,7 @@ class _MerchantChatTabState extends State<MerchantChatTab>
         entries.addAll(response.entries);
         token = response.nextPageToken;
       } while (token.isNotEmpty);
-      if (entries.isEmpty || !mounted) return;
+      if (entries.isEmpty || !isCurrentLoad(seq)) return;
       final newReplies = entries
           .map((e) => _nodeOf(e, parentName: node.userName))
           .toList();
@@ -421,6 +430,28 @@ class _MerchantChatTabState extends State<MerchantChatTab>
       return const SliverFillRemaining(
         hasScrollBody: false,
         child: TruckLoadingOverlay(message: '載入中...'),
+      );
+    }
+    if (_loadFailed) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Column(
+          key: const Key('merchant-comments-load-error'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '載入失敗，請稍後再試',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            ),
+            TextButton(
+              key: const Key('merchant-comments-load-retry'),
+              onPressed: _loadComments,
+              child: const HkButtonLabel('重試'),
+            ),
+          ],
+        ),
       );
     }
     if (_comments.isEmpty) {

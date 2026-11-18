@@ -12,8 +12,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../../config/flavor.dart';
 import '../../../../config/image_config.dart';
 import '../../../../core/motion/hk_motion_transitions.dart';
-import '../../../../core/session/session_model.dart';
-import '../../../../core/session/session_provider.dart';
+import '../../../../core/session/viewer_scope.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/utils/require_login.dart';
 import '../../../../shared/widgets/comments_bottom_sheet.dart';
@@ -60,7 +59,7 @@ class MerchantHomeTab extends StatefulWidget {
 }
 
 class _MerchantHomeTabState extends State<MerchantHomeTab>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, ViewerScopedLoads<MerchantHomeTab> {
   @override
   bool get wantKeepAlive => true;
   List<Map<String, dynamic>> _posts = <Map<String, dynamic>>[];
@@ -68,18 +67,47 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
   String? _postErr;
   final Map<String, String> _videoThumbCache = <String, String>{};
   bool _initialFetchScheduled = false;
-  ProviderSubscription<AsyncValue<SessionModel?>>? _sessionSub;
+  final ValueNotifier<int> _postsRevision = ValueNotifier<int>(0);
+  BuildContext? _previewContext;
   final ScrollController _feedScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _sessionSub = widget.ref?.listenManual(sessionProvider, (previous, next) {
-      if (previous?.value?.userId == next.value?.userId) return;
-      if (mounted && _initialFetchScheduled) _fetchPosts();
-    });
+    watchViewer();
     _scheduleInitialFetch();
   }
+
+  @override
+  WidgetRef? get viewerRef => widget.ref;
+
+  /// 讚狀態與留言權限屬於前一位觀看者：關掉預覽、同步清空格子再重讀。
+  @override
+  void onViewerChanged() {
+    _closePreview();
+    _mutatePosts(() => _posts = <Map<String, dynamic>>[]);
+    if (_initialFetchScheduled) _fetchPosts();
+  }
+
+  /// 改 [_posts] 一律走這裡，開著的預覽卡跟著重畫。
+  void _mutatePosts(VoidCallback change) {
+    setState(() {
+      change();
+      _postsRevision.value++;
+    });
+  }
+
+  void _closePreview() {
+    final context = _previewContext;
+    _previewContext = null;
+    if (context == null || !context.mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null) Navigator.of(context).removeRoute(route);
+  }
+
+  int _indexOfPost(String id) => _posts.indexWhere(
+    (p) => (p['_id'] ?? p['id'] ?? p['postId'] ?? '').toString() == id,
+  );
 
   @override
   void didUpdateWidget(covariant MerchantHomeTab oldWidget) {
@@ -102,7 +130,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
   @override
   void dispose() {
-    _sessionSub?.close();
+    _postsRevision.dispose();
     _feedScrollController.dispose();
     super.dispose();
   }
@@ -122,6 +150,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
   Future<void> _fetchPosts() async {
     final idStr = widget.merchantId?.trim();
     if (idStr == null || idStr.isEmpty) return;
+    final seq = beginLoad();
     if (mounted) {
       setState(() {
         _loadingPosts = true;
@@ -137,32 +166,31 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
           ? (await repo.listPosts(storeId: idStr)).posts
           : const <Post>[];
 
-      if (mounted) {
-        setState(() {
-          _posts = posts.map(_postEntry).toList();
-        });
-      }
+      if (!isCurrentLoad(seq)) return;
+      _mutatePosts(() => _posts = posts.map(_postEntry).toList());
 
       // 預快取首屏圖片
       try {
-        if (mounted && _posts.isNotEmpty) {
+        if (isCurrentLoad(seq) && _posts.isNotEmpty) {
           final int prefetchCount = _posts.length < 9 ? _posts.length : 9;
           for (int i = 0; i < prefetchCount; i++) {
             final u = _firstImageUrlFromPost(_posts[i]);
             if (u.isEmpty) continue;
             final abs = _toAbsolute(u);
             if (abs.isEmpty) continue;
+            if (!mounted) return;
             try {
               await precacheImage(
                 NetworkImage(ImageConfig.urlFor(abs, ImageScene.postImage)),
                 context,
               );
             } catch (_) {}
+            if (!mounted || !isCurrentLoad(seq)) return;
           }
         }
       } catch (_) {}
 
-      if (mounted) {
+      if (isCurrentLoad(seq)) {
         setState(() {
           _loadingPosts = false;
         });
@@ -170,7 +198,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     } catch (e, st) {
       HKLog.logE('_fetchPosts error: $e', e);
       debugPrint('$st');
-      if (mounted) {
+      if (isCurrentLoad(seq)) {
         setState(() {
           _postErr = '載入失敗';
           _loadingPosts = false;
@@ -196,19 +224,22 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
   // ── 互動操作 ──────────────────────────────────────────────────────────────
 
-  /// 切換讚並樂觀更新格子；伺服器失敗時還原並回 false。
-  Future<bool> _toggleLike(int index) async {
+  /// 切換讚並樂觀更新格子；伺服器失敗時還原並回 false。以貼文 id 找，讀目前的狀態；
+  /// 觀看者在途中換了，格子已經重讀，結果不再套用。
+  Future<bool> _toggleLike(String id) async {
+    final index = _indexOfPost(id);
+    if (index < 0) return false;
     final p = _posts[index];
-    final id = (p['_id'] ?? '').toString();
-    if (id.isEmpty) return false;
+    final seq = currentLoad;
 
     final prevLiked = p['_liked'] == true;
     final prevCount = (p['_likeCount'] is int) ? (p['_likeCount'] as int) : 0;
     final nextLiked = !prevLiked;
     final nextCount = (prevCount + (nextLiked ? 1 : -1)).clamp(0, 1 << 30);
-    setState(() {
-      _posts[index] = {...p, '_liked': nextLiked, '_likeCount': nextCount};
-    });
+    _mutatePosts(
+      () =>
+          _posts[index] = {...p, '_liked': nextLiked, '_likeCount': nextCount},
+    );
 
     try {
       final repo = widget.ref?.read(socialContentRepositoryProvider);
@@ -216,31 +247,35 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       await repo.setPostLiked(int.parse(id), liked: nextLiked);
       return true;
     } catch (_) {
-      if (!mounted) return false;
-      setState(() {
-        _posts[index] = {
-          ..._posts[index],
+      if (!isCurrentLoad(seq)) return false;
+      final at = _indexOfPost(id);
+      if (at < 0) return false;
+      _mutatePosts(
+        () => _posts[at] = {
+          ..._posts[at],
           '_liked': prevLiked,
           '_likeCount': prevCount,
-        };
-      });
+        },
+      );
       return false;
     }
   }
 
   /// 重抓單一貼文的留言數（`GetPost` 的 `comment_count`）。
-  Future<void> _refreshCommentCountAt(int index) async {
-    if (index < 0 || index >= _posts.length) return;
-    final id = int.tryParse((_posts[index]['_id'] ?? '').toString());
+  Future<void> _refreshCommentCount(String postId) async {
+    final id = int.tryParse(postId);
     if (id == null) return;
+    final seq = currentLoad;
     try {
       final repo = widget.ref?.read(socialContentRepositoryProvider);
       if (repo == null) return;
       final post = await repo.getPost(id);
-      if (!mounted) return;
-      setState(() {
-        _posts[index] = {..._posts[index], '_commentCount': post.commentCount};
-      });
+      if (!isCurrentLoad(seq)) return;
+      final at = _indexOfPost(postId);
+      if (at < 0) return;
+      _mutatePosts(
+        () => _posts[at] = {..._posts[at], '_commentCount': post.commentCount},
+      );
     } catch (_) {}
   }
 
@@ -267,10 +302,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       ),
     );
     if (!mounted) return;
-    final idx = _posts.indexWhere(
-      (p) => ((p['_id'] ?? p['id'] ?? p['postId'] ?? '').toString() == id),
-    );
-    if (idx >= 0) await _refreshCommentCountAt(idx);
+    await _refreshCommentCount(id);
   }
 
   // ── 圖片 / 影片 URL 萃取工具 ─────────────────────────────────────────────
@@ -607,13 +639,6 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
     final imageUrl = _pickImageUrl(m);
     final String? vUrl = _videoUrlFromPost(m);
-    var dialogLiked = m['_liked'] == true;
-    var dialogLikeCount = (m['_likeCount'] is int)
-        ? (m['_likeCount'] as int)
-        : 0;
-    final commentCount = (m['_commentCount'] is int)
-        ? (m['_commentCount'] as int)
-        : 0;
     final postId = (m['_id'] ?? m['id'] ?? m['postId'] ?? '').toString();
     final mn = widget.merchantName;
     final username = (mn != null && mn.trim().isNotEmpty)
@@ -634,8 +659,20 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
           size.width - panelWidth - 8,
         );
         double top = globalPos.dy.clamp(8.0, size.height - maxHeight - 8) - 10;
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
+        return ValueListenableBuilder<int>(
+          valueListenable: _postsRevision,
+          builder: (dialogContext, _, _) {
+            _previewContext = dialogContext;
+            final at = _indexOfPost(postId);
+            if (at < 0) return const SizedBox.shrink();
+            final live = _posts[at];
+            final liked = live['_liked'] == true;
+            final likeCount = (live['_likeCount'] is int)
+                ? (live['_likeCount'] as int)
+                : 0;
+            final commentCount = (live['_commentCount'] is int)
+                ? (live['_commentCount'] as int)
+                : 0;
             return Stack(
               children: [
                 Positioned(
@@ -654,31 +691,21 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
                         child: Padding(
                           padding: EdgeInsets.only(bottom: 8.h),
                           child: _PostPreviewCard(
-                            index: index,
                             postId: postId,
                             imageUrl: imageUrl,
                             videoUrl: vUrl,
                             caption: content,
                             username: username,
                             merchantAvatar: widget.merchantAvatar,
-                            liked: dialogLiked,
-                            likeCount: dialogLikeCount,
+                            liked: liked,
+                            likeCount: likeCount,
                             commentCount: commentCount,
                             onLikeToggle: () async {
                               final ref = widget.ref;
                               if (ref == null) return;
                               if (!await requireLogin(context, ref)) return;
-                              if (!mounted || !dialogContext.mounted) return;
-                              setDialogState(() {
-                                dialogLiked = !dialogLiked;
-                                dialogLikeCount += dialogLiked ? 1 : -1;
-                              });
-                              final ok = await _toggleLike(index);
-                              if (ok || !dialogContext.mounted) return;
-                              setDialogState(() {
-                                dialogLiked = !dialogLiked;
-                                dialogLikeCount += dialogLiked ? 1 : -1;
-                              });
+                              if (!mounted) return;
+                              await _toggleLike(postId);
                             },
                             onComment: () {
                               Navigator.of(context).pop();
@@ -709,7 +736,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
             beginScale: 0.96,
             child: child,
           ),
-    );
+    ).whenComplete(() => _previewContext = null);
   }
 }
 
@@ -723,7 +750,6 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 /// [liked] 與 [likeCount] 由外層 [StatefulBuilder] 管理以實現對話框內即時更新。
 class _PostPreviewCard extends StatelessWidget {
   const _PostPreviewCard({
-    required this.index,
     required this.postId,
     required this.imageUrl,
     this.videoUrl,
@@ -737,7 +763,6 @@ class _PostPreviewCard extends StatelessWidget {
     required this.onComment,
   });
 
-  final int index;
   final String postId;
   final String imageUrl;
   final String? videoUrl;

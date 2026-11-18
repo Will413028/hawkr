@@ -1,5 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../core/session/session_provider.dart';
+import '../../../core/session/viewer_scope.dart';
 import '../data/social_content_repository.dart';
 import '../data/social_model.dart';
 
@@ -27,9 +27,7 @@ class PostFeedController extends _$PostFeedController {
     _hasMore = false;
     _loadingMore = false;
     _generation++;
-    ref.listen(sessionProvider, (previous, next) {
-      if (previous?.value?.userId != next.value?.userId) ref.invalidateSelf();
-    });
+    ref.watch(viewerIdProvider);
     final page = await ref
         .watch(socialContentRepositoryProvider)
         .listPosts(storeId: merchantId?.toString());
