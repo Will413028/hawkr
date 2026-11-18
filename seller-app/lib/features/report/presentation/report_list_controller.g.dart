@@ -62,7 +62,8 @@ abstract class _$MyReportsController extends $AsyncNotifier<MyReportsState> {
 /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 ///
 /// 每次從第一頁重載（build、refresh、silentRefresh）都換一個世代；跨過重載才回來的 loadMore 結果屬於舊世代，直接丟掉。
-/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束。
+/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束；
+/// 成功的解除再記在 [_unblockedThisGeneration]，擋住重載前發出、之後才回來的分頁帶回舊資料。
 
 @ProviderFor(BlockListController)
 final blockListControllerProvider = BlockListControllerProvider._();
@@ -70,13 +71,15 @@ final blockListControllerProvider = BlockListControllerProvider._();
 /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 ///
 /// 每次從第一頁重載（build、refresh、silentRefresh）都換一個世代；跨過重載才回來的 loadMore 結果屬於舊世代，直接丟掉。
-/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束。
+/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束；
+/// 成功的解除再記在 [_unblockedThisGeneration]，擋住重載前發出、之後才回來的分頁帶回舊資料。
 final class BlockListControllerProvider
     extends $AsyncNotifierProvider<BlockListController, BlockListState> {
   /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
   ///
   /// 每次從第一頁重載（build、refresh、silentRefresh）都換一個世代；跨過重載才回來的 loadMore 結果屬於舊世代，直接丟掉。
-  /// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束。
+  /// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束；
+  /// 成功的解除再記在 [_unblockedThisGeneration]，擋住重載前發出、之後才回來的分頁帶回舊資料。
   BlockListControllerProvider._()
     : super(
         from: null,
@@ -97,12 +100,13 @@ final class BlockListControllerProvider
 }
 
 String _$blockListControllerHash() =>
-    r'2cf4f2c20bc6dbd41e8344f34e2a5de507af8205';
+    r'a7f0029e1061414f2a305e9c6e7b3e9a5d12f3b8';
 
 /// 店家封鎖的買家名單（`ListBlockedBuyers`，keyset 分頁）。
 ///
 /// 每次從第一頁重載（build、refresh、silentRefresh）都換一個世代；跨過重載才回來的 loadMore 結果屬於舊世代，直接丟掉。
-/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束。
+/// 進行中的解除封鎖以 [_pendingUnblock] 記錄，重載與分頁的結果都濾掉這些買家，直到那次 RPC 結束；
+/// 成功的解除再記在 [_unblockedThisGeneration]，擋住重載前發出、之後才回來的分頁帶回舊資料。
 
 abstract class _$BlockListController extends $AsyncNotifier<BlockListState> {
   FutureOr<BlockListState> build();
