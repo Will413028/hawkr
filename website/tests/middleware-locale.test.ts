@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import { NextRequest } from "next/server";
 import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
@@ -486,4 +486,76 @@ test("other storefront routes never ask for a thread", async () => {
 		assert.equal(response.status, 200, path);
 	}
 	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 0);
+});
+
+const THREAD_CALLS = (calls: string[]) =>
+	calls.filter((u) => u.includes("GetForumThread")).length;
+
+test("a present thread is re-asked after 60 s, so a deleted thread 404s promptly", async () => {
+	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+	try {
+		const calls: string[] = [];
+		let gone = false;
+		backend(
+			() =>
+				gone
+					? connectError(404, "not_found")
+					: new Response(JSON.stringify({}), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						}),
+			calls,
+		);
+		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+		assert.equal((await siteMiddleware(request(path))).status, 200);
+		gone = true;
+		mock.timers.tick(59_000);
+		assert.equal((await siteMiddleware(request(path))).status, 200);
+		assert.equal(THREAD_CALLS(calls), 1);
+		mock.timers.tick(2_000);
+		assert.equal((await siteMiddleware(request(path))).status, 404);
+		assert.equal(THREAD_CALLS(calls), 2);
+	} finally {
+		mock.timers.reset();
+	}
+});
+
+test("an absent thread is remembered for a short time, then asked again", async () => {
+	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+	try {
+		const calls: string[] = [];
+		backend(() => connectError(404, "not_found"), calls);
+		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+		for (let i = 0; i < 3; i++) {
+			assert.equal((await siteMiddleware(request(path))).status, 404);
+		}
+		assert.equal(THREAD_CALLS(calls), 1);
+		mock.timers.tick(61_000);
+		assert.equal((await siteMiddleware(request(path))).status, 404);
+		assert.equal(THREAD_CALLS(calls), 2);
+	} finally {
+		mock.timers.reset();
+	}
+});
+
+const LETTER_ID = "0a1b2c3d-0000-4000-8000-00000000abcd";
+
+test("an uppercase thread id is a 308 to the lowercase URL, locale prefix and query kept", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	for (const prefix of ["", "/en"]) {
+		const response = await siteMiddleware(
+			request(
+				`${prefix}/sellers/2600123456/messages/${LETTER_ID.toUpperCase()}?utm_source=x`,
+			),
+		);
+		assert.equal(response.status, 308, prefix);
+		const target = location(response);
+		assert.equal(
+			target?.pathname,
+			`${prefix}/sellers/2600123456/messages/${LETTER_ID}`,
+		);
+		assert.equal(target?.search, "?utm_source=x");
+	}
+	assert.equal(THREAD_CALLS(calls), 0);
 });

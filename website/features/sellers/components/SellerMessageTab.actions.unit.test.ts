@@ -19,6 +19,9 @@ const forum = vi.hoisted(() => ({
 }));
 const blockBuyerByForumEntry = vi.hoisted(() => vi.fn());
 
+vi.mock("@/lib/navigation/use-observed-router", () => ({
+	useObservedRouter: () => ({ replace: vi.fn() }),
+}));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({ status: "signedIn", identity: { nickname: "我" } }),
 }));

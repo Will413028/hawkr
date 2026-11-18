@@ -14,15 +14,19 @@ import { canonicalThreadId } from "./thread-id";
 const THREAD_PATH = /^\/sellers\/([^/]+)\/messages\/([^/]+)\/?$/;
 
 const LOOKUP_TIMEOUT_MS = 1_500;
-const MEMO_TTL_MS = 30 * 60_000;
+/** Short on both sides: a deleted thread must 404 promptly, a created one must stop 404ing promptly. */
+const PRESENT_TTL_MS = 60_000;
+const ABSENT_TTL_MS = 60_000;
 const MEMO_MAX_ENTRIES = 500;
 
-/** Only a thread the backend confirmed is remembered; an absent one is asked again. */
+/** Backend-confirmed answers only (never a timeout or 5xx), each with its own short TTL. */
 const presentMemo = new Map<string, number>();
+const absentMemo = new Map<string, number>();
 
 /** Test-only: drops the per-isolate memo so cases cannot leak into each other. */
 export function __resetForumThreadMemoForTest(): void {
 	presentMemo.clear();
+	absentMemo.clear();
 }
 
 export type ForumThreadLookup =
@@ -46,8 +50,12 @@ export async function lookupForumThread(
 ): Promise<ForumThreadLookup> {
 	const key = `${storeId}:${threadId}`;
 	const at = presentMemo.get(key);
-	if (at !== undefined && Date.now() - at < MEMO_TTL_MS) {
+	if (at !== undefined && Date.now() - at < PRESENT_TTL_MS) {
 		return { kind: "present" };
+	}
+	const missAt = absentMemo.get(key);
+	if (missAt !== undefined && Date.now() - missAt < ABSENT_TTL_MS) {
+		return { kind: "absent" };
 	}
 	try {
 		await socialPublicClient({
@@ -60,13 +68,29 @@ export async function lookupForumThread(
 	} catch (err) {
 		const code = ConnectError.from(err).code;
 		if (code === Code.NotFound || code === Code.InvalidArgument) {
+			if (absentMemo.size >= MEMO_MAX_ENTRIES) absentMemo.clear();
+			absentMemo.set(key, Date.now());
+			presentMemo.delete(key);
 			return { kind: "absent" };
 		}
 		return { kind: "unknown" };
 	}
 	if (presentMemo.size >= MEMO_MAX_ENTRIES) presentMemo.clear();
 	presentMemo.set(key, Date.now());
+	absentMemo.delete(key);
 	return { kind: "present" };
+}
+
+/**
+ * The lowercase canonical path for a thread URL whose id is a UUID in another case, else null
+ * (not a thread path, already canonical, or not a UUID). `middleware.ts` answers it with a 308.
+ */
+export function canonicalThreadPath(pathname: string): string | null {
+	const parsed = parseThreadPath(pathname);
+	if (!parsed) return null;
+	const threadId = canonicalThreadId(parsed.threadId);
+	if (!threadId || threadId === parsed.threadId) return null;
+	return `/sellers/${parsed.sellerId}/messages/${threadId}`;
 }
 
 /**

@@ -6,6 +6,7 @@ import { RETURN_PATH_HEADER } from "@/lib/auth/return-path";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { getEnv } from "@/lib/config/env";
 import {
+	canonicalThreadPath,
 	isMissingForumThread,
 	lookupForumThread,
 } from "@/lib/forum/thread-guard";
@@ -202,6 +203,12 @@ async function route(request: NextRequest): Promise<NextResponse> {
 			return notFoundResponse(request);
 		}
 		if (outcome.kind === "pass") {
+			const threadPath = canonicalThreadPath(pathname);
+			if (threadPath) {
+				const threadUrl = request.nextUrl.clone();
+				threadUrl.pathname = `${prefix}${threadPath}`;
+				return NextResponse.redirect(threadUrl, 308);
+			}
 			// A thread the backend does not hold is a real 404 for the same reason
 			// (the page is prerendered; see lib/forum/thread-guard.ts). The seller
 			// lookup is memoised, so a thread URL adds one thread call at most.

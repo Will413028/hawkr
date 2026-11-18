@@ -19,9 +19,9 @@ import type {
 	SellerForumComment,
 	SellerForumListResult,
 } from "@/lib/forum/repo";
-import { canonicalThreadId } from "@/lib/forum/thread-id";
 import { useForumReplies, useSellerForum } from "@/lib/hooks/useSellerForum";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { blockBuyerByForumEntry } from "@/lib/seller/block-buyer";
 
 interface SellerMessageTabProps {
@@ -30,9 +30,9 @@ interface SellerMessageTabProps {
 	/** The storefront URL segment (store_code), for the login return path. */
 	routeId: string;
 	initialData?: SellerForumListResult;
-	/** 單一討論串頁：伺服器端一併讀到的第一頁回覆，放進回覆串的快取。 */
+	/** 單一討論串頁：伺服器端一併讀到的第一頁回覆（匿名讀取），掛載時由 viewer 讀取取代。 */
 	initialReplies?: SellerForumListResult;
-	/** 設了是單一討論串頁：只列這一串（頂層項目與回覆），留言框是對這一串回覆。 */
+	/** 設了是單一討論串頁（標準寫法的小寫 UUID）：只列這一串（頂層項目與回覆），留言框是對這一串回覆。 */
 	threadId?: string;
 }
 
@@ -51,16 +51,14 @@ export default function SellerMessageTab({
 	routeId,
 	initialData,
 	initialReplies,
-	threadId: rawThreadId,
+	threadId,
 }: SellerMessageTabProps) {
-	const threadId = rawThreadId
-		? (canonicalThreadId(rawThreadId) ?? rawThreadId)
-		: undefined;
+	const router = useObservedRouter("seller_forum_thread");
 	const { status } = useAuth();
 	const tFeed = useTranslations("feed.comments");
 	const tSeller = useTranslations("seller.comments");
 	const signedIn = status === "signedIn";
-	const forum = useSellerForum(sellerId, initialData, threadId, initialReplies);
+	const forum = useSellerForum(sellerId, initialData, threadId);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const [replyingTo, setReplyingTo] = React.useState<SellerForumComment | null>(
@@ -82,20 +80,17 @@ export default function SellerMessageTab({
 	>(() => new Set());
 	const busyRef = React.useRef(false);
 
-	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目。能不能回覆看項目的狀態而不是 `viewerCanReply`：
-	// 伺服器端的第一份資料是匿名讀取，`viewerCanReply` 一律是 false，用它決定會讓登入的買家在第一次繪製時沒有留言框。
-	// 頂層是佔位項目（已刪除或隱藏）時不能回覆，留言框只在指定回覆對象時出現。
+	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目，能不能回覆照伺服器的 `viewerCanReply`
+	// （SSR 的匿名資料在掛載時被 viewer 讀取取代）。頂層是佔位項目時留言框只在指定回覆對象時出現。
 	const threadTop = threadId
-		? forum.comments.find((c) => c.id === threadId && c.state === "visible")
+		? forum.comments.find((c) => c.id === threadId && c.viewerCanReply)
 		: undefined;
 	const target = replyingTo ?? threadTop ?? null;
-	// 單一討論串頁：這串不存在（讀不到、或重讀後 NotFound）時整頁是錯誤狀態，不是店家討論區的「暫無留言」。
+	// 單一討論串頁：只有討論串查詢實際回 NotFound 才是「這串不存在」。
 	const threadGone =
 		threadId !== undefined &&
-		!forum.loading &&
-		(forum.comments.length === 0 ||
-			(forum.error != null &&
-				ConnectError.from(forum.error).code === Code.NotFound));
+		forum.error != null &&
+		ConnectError.from(forum.error).code === Code.NotFound;
 
 	const saveEntry = (entry: SellerForumComment, next: string) =>
 		forum.update(entry, next);
@@ -108,6 +103,13 @@ export default function SellerMessageTab({
 		setActionError(null);
 		try {
 			await forum.remove(entry);
+			if (
+				threadId !== undefined &&
+				entry.id === threadId &&
+				(entry.replyCount ?? 0) === 0
+			) {
+				router.replace(`/sellers/${routeId}/messages`);
+			}
 		} catch (e) {
 			setActionError(errorText(e, defaultErrors));
 		} finally {
@@ -263,14 +265,9 @@ export default function SellerMessageTab({
 				</div>
 			)}
 
-			{(forum.error != null && !forum.loading) || threadGone ? (
+			{forum.error != null && !forum.loading ? (
 				<CommentErrorBox className="flex items-center justify-between gap-3">
-					<span>
-						{errorText(
-							forum.error ?? new ConnectError("", Code.NotFound),
-							defaultErrors,
-						)}
-					</span>
+					<span>{errorText(forum.error, defaultErrors)}</span>
 					<Button
 						type="button"
 						size="sm"
@@ -319,7 +316,13 @@ export default function SellerMessageTab({
 				<p className="p-[32px_16px] text-center text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)]">
 					載入中…
 				</p>
-			) : threadGone ? null : forum.comments.length === 0 ? (
+			) : threadGone ? null : threadId !== undefined &&
+				forum.comments.length === 0 &&
+				forum.error == null ? (
+				<p className="p-[32px_16px] text-center text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)]">
+					載入中…
+				</p>
+			) : forum.comments.length === 0 ? (
 				<div className="p-[32px_16px] text-center text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)]">
 					<p className="m-0 mb-[6px] text-[length:var(--text-base)] font-bold text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
 						暫無留言
@@ -340,6 +343,9 @@ export default function SellerMessageTab({
 							onToggle={toggleReplies}
 							onStartReply={startReply}
 							renderBody={renderBody}
+							initialReplies={
+								comment.id === threadId ? initialReplies : undefined
+							}
 						/>
 					))}
 				</ul>
@@ -391,6 +397,7 @@ function ForumEntryItem({
 	onToggle,
 	onStartReply,
 	renderBody,
+	initialReplies,
 }: {
 	comment: SellerForumComment;
 	sellerId: string;
@@ -399,6 +406,7 @@ function ForumEntryItem({
 	onToggle: (id: string) => void;
 	onStartReply: (target: SellerForumComment) => void;
 	renderBody: RenderBody;
+	initialReplies?: SellerForumListResult;
 }) {
 	const tFeed = useTranslations("feed.comments");
 	const defaultErrors = useDefaultErrorText();
@@ -408,6 +416,7 @@ function ForumEntryItem({
 		idStr,
 		comment.userName,
 		expanded && !comment.optimistic,
+		initialReplies,
 	);
 	const loadingReplies = expanded && replies.loading;
 	const replyCount = comment.replyCount ?? 0;

@@ -18,6 +18,12 @@ const forum = vi.hoisted(() => ({
 	repliesAsked: [] as string[],
 	post: vi.fn(),
 	reply: vi.fn(),
+	remove: vi.fn(),
+	loading: false,
+	replace: vi.fn(),
+}));
+vi.mock("@/lib/navigation/use-observed-router", () => ({
+	useObservedRouter: () => ({ replace: forum.replace }),
 }));
 
 vi.mock("@/lib/auth/context", () => ({
@@ -29,7 +35,7 @@ vi.mock("@/lib/hooks/useSellerForum", () => ({
 		return {
 			comments: forum.list,
 			submitted: [],
-			loading: false,
+			loading: forum.loading,
 			refreshing: false,
 			loadingMore: false,
 			hasMore: false,
@@ -40,7 +46,7 @@ vi.mock("@/lib/hooks/useSellerForum", () => ({
 			post: forum.post,
 			reply: forum.reply,
 			update: vi.fn(),
-			remove: vi.fn(),
+			remove: forum.remove,
 		};
 	},
 	useForumReplies: (
@@ -105,6 +111,9 @@ afterEach(() => {
 	forum.repliesAsked = [];
 	forum.post.mockReset();
 	forum.reply.mockReset();
+	forum.remove.mockReset();
+	forum.replace.mockReset();
+	forum.loading = false;
 });
 
 describe("single thread page", () => {
@@ -146,26 +155,11 @@ describe("single thread page", () => {
 		expect(document.querySelector("textarea")).toBeNull();
 	});
 
-	it("shows the composer from the anonymous server seed, where viewerCanReply is false", () => {
+	it("a viewer the server does not allow to reply (viewerCanReply false) sees no composer", () => {
 		forum.list = [entry("t1", { viewerCanReply: false })];
 		view();
-		expect(screen.queryByPlaceholderText("回覆 alice…")).not.toBeNull();
-	});
-
-	it("matches the thread by its canonical lowercase id", async () => {
-		const id = "0a1b2c3d-0000-4000-8000-00000000abcd";
-		forum.list = [entry(id, { replyCount: 1 })];
-		forum.replies = { [id]: [entry("r1", { content: "reply-body" })] };
-		view(id.toUpperCase());
-		expect(forum.hookArgs[0]?.[2]).toBe(id);
-		expect(forum.repliesAsked).toContain(id);
-		const box = screen.getByPlaceholderText("回覆 alice…");
-		fireEvent.change(box, { target: { value: "hello" } });
-		fireEvent.click(
-			document.querySelector("button[type=submit]") as HTMLButtonElement,
-		);
-		await waitFor(() => expect(forum.reply).toHaveBeenCalledTimes(1));
-		expect(forum.reply.mock.calls[0]?.[0]).toMatchObject({ id });
+		expect(screen.queryByText("body-t1")).not.toBeNull();
+		expect(document.querySelector("textarea")).toBeNull();
 	});
 
 	it("a NotFound after a refetch replaces the stale thread with the error state", () => {
@@ -178,11 +172,43 @@ describe("single thread page", () => {
 		expect(screen.queryByText("重新載入")).not.toBeNull();
 	});
 
-	it("an empty thread is the error state, not the store-wide empty state", () => {
+	it("an empty thread with no error (query not running) is not the store-wide empty state or an error", () => {
 		forum.list = [];
 		view();
 		expect(screen.queryByText("暫無留言")).toBeNull();
+		expect(screen.queryByText("重新載入")).toBeNull();
+		expect(screen.queryByText("載入中…")).not.toBeNull();
+	});
+
+	it("a non-NotFound error keeps the generic error state", () => {
+		forum.list = [];
+		forum.error = new ConnectError("boom", Code.Unavailable);
+		view();
 		expect(screen.queryByText("重新載入")).not.toBeNull();
-		expect(document.querySelector("textarea")).toBeNull();
+	});
+
+	it("deleting your own top entry with no replies goes back to the store messages tab", async () => {
+		forum.list = [entry("t1", { viewerCanDelete: true, replyCount: 0 })];
+		forum.remove.mockResolvedValue(undefined);
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(screen.getByText("刪除"));
+		await waitFor(() => expect(forum.remove).toHaveBeenCalledTimes(1));
+		await waitFor(() =>
+			expect(forum.replace).toHaveBeenCalledWith("/sellers/7/messages"),
+		);
+	});
+
+	it("deleting a reply stays on the thread page", async () => {
+		forum.list = [entry("t1", { replyCount: 1 })];
+		forum.replies = {
+			t1: [entry("r1", { parentId: "t1", viewerCanDelete: true })],
+		};
+		forum.remove.mockResolvedValue(undefined);
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(screen.getByText("刪除"));
+		await waitFor(() => expect(forum.remove).toHaveBeenCalledTimes(1));
+		expect(forum.replace).not.toHaveBeenCalled();
 	});
 });

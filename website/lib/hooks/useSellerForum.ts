@@ -157,7 +157,6 @@ export function useSellerForum(
 	sellerId: string | undefined,
 	initialData?: SellerForumListResult,
 	threadId?: string,
-	initialReplies?: SellerForumListResult,
 ): UseSellerForumResult {
 	const { identity } = useAuth();
 	const queryIdentity = useQueryIdentity();
@@ -194,23 +193,6 @@ export function useSellerForum(
 		() => (initialData ? seedPages(initialData) : undefined),
 		[initialData],
 	);
-	// 討論串頁：讀一次 GetForumThread 同時帶回第一頁回覆，放進回覆串的快取，展開時不再讀 ListForumEntries。
-	// 已經載入更多頁的回覆串不被第一頁蓋掉。
-	const seedReplies = React.useCallback(
-		(replies: SellerForumListResult) => {
-			if (!threadId) return;
-			const key = repliesKeyOf(threadId);
-			const current = queryClient.getQueryData<ForumData>(key);
-			if (current && current.pages.length > 1) return;
-			queryClient.setQueryData<ForumData>(key, seedPages(replies));
-		},
-		[threadId, repliesKeyOf, queryClient],
-	);
-	React.useMemo(() => {
-		if (!threadId || !initialReplies) return;
-		if (queryClient.getQueryData(repliesKeyOf(threadId))) return;
-		seedReplies(initialReplies);
-	}, [threadId, initialReplies, queryClient, repliesKeyOf, seedReplies]);
 	// 單一討論串頁與店家討論區列表是兩份快取：任一邊的修改都讓另一邊過期。
 	const invalidateOtherView = React.useCallback(() => {
 		void queryClient.invalidateQueries({
@@ -226,16 +208,15 @@ export function useSellerForum(
 		getNextPageParam: nextPageParam,
 		// SSR 帶入的真資料才走 initialData；缺席時沒有資料，請求完成前是 loading。
 		initialData: seed,
+		// 討論串頁的 SSR 資料是匿名讀取（沒有 `viewer_can_*`），掛載時一定要用 viewer 重讀。
+		initialDataUpdatedAt: seed && threadId ? 0 : undefined,
 		queryFn: ({ pageParam, signal }) =>
 			threadId
 				? fetchSellerForumThread(storeId, threadId, {
 						pageSize,
 						signal,
 						viewer: true,
-					}).then((thread) => {
-						seedReplies(thread.replies);
-						return thread.top;
-					})
+					}).then((thread) => thread.top)
 				: fetchSellerForum(storeId, {
 						pageToken: pageParam,
 						pageSize,
@@ -612,6 +593,7 @@ export function useForumReplies(
 	threadId: string,
 	parentName: string | undefined,
 	enabled: boolean,
+	initialReplies?: SellerForumListResult,
 ) {
 	const queryIdentity = useQueryIdentity();
 	const storeId = String(sellerId ?? "");
@@ -634,6 +616,9 @@ export function useForumReplies(
 		enabled: Boolean(sellerId) && enabled,
 		initialPageParam: FIRST_PAGE_PARAM,
 		getNextPageParam: nextPageParam,
+		// SSR 的第一頁回覆是匿名讀取：掛載時用 viewer 重讀。
+		initialData: initialReplies ? seedPages(initialReplies) : undefined,
+		initialDataUpdatedAt: initialReplies ? 0 : undefined,
 		queryFn: ({ pageParam, signal }) =>
 			fetchSellerForumReplies(storeId, threadId, {
 				pageSize: REPLY_PAGE_SIZE,

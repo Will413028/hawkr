@@ -405,7 +405,7 @@ func (s *Service) GetThread(ctx context.Context, c model.Caller, storeID int64, 
 	if len(rows) == 0 {
 		return model.ForumThreadView{}, entryNotFound(ctx)
 	}
-	// 頂層已用同一個可讀條件讀到，所以直接讀回覆：不再重讀父留言，空的回覆頁也不需要可讀性查詢。
+	// 頂層讀得到才讀回覆，兩者用同一個可讀條件。
 	replyRows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(threadID, now, actor.ViewerFor(c, storeID), reads.CommentPage{Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumThreadView{}, fmt.Errorf("social：列出討論區回覆：%w", err)

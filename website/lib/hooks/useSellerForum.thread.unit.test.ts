@@ -13,6 +13,7 @@ const repo = vi.hoisted(() => ({
 	fetchSellerForumThread: vi.fn(),
 	createSellerForumComment: vi.fn(),
 	replySellerForumComment: vi.fn(),
+	deleteSellerForumComment: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/context", () => ({ useAuth: () => ({ identity: null }) }));
@@ -62,48 +63,100 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("thread page reply seeding", () => {
-	it("one GetForumThread read serves the first reply page", async () => {
+function deferred<T>() {
+	let resolve!: (v: T) => void;
+	const promise = new Promise<T>((r) => {
+		resolve = r;
+	});
+	return { promise, resolve };
+}
+
+describe("thread page SSR data is anonymous and is replaced by the viewer read", () => {
+	it("shows the seeded replies at once, then the viewer read replaces them", async () => {
+		repo.fetchSellerForumReplies.mockResolvedValue(
+			page([entry("r1", { viewerCanEdit: true })]),
+		);
+		const { result } = renderHook(
+			() => useForumReplies("7", T, "u", true, page([entry("r1")], "next")),
+			{ wrapper },
+		);
+		expect(result.current.items.map((e) => e.viewerCanEdit)).toEqual([false]);
+		await waitFor(() =>
+			expect(result.current.items.map((e) => e.viewerCanEdit)).toEqual([true]),
+		);
+		expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(1);
+	});
+
+	it("re-reads the seeded thread top with the viewer client on mount", async () => {
 		repo.fetchSellerForumThread.mockResolvedValue({
-			top: page([entry(T, { replyCount: 2 })]),
-			replies: page([entry("r1"), entry("r2")], "next"),
+			top: page([entry(T, { viewerCanReply: true })]),
+			replies: page([]),
 		});
 		const { result } = renderHook(
+			() => useSellerForum("7", page([entry(T, { viewerCanReply: false })]), T),
+			{ wrapper },
+		);
+		expect(result.current.comments[0]?.viewerCanReply).toBe(false);
+		await waitFor(() =>
+			expect(result.current.comments[0]?.viewerCanReply).toBe(true),
+		);
+		expect(repo.fetchSellerForumThread).toHaveBeenCalledTimes(1);
+		expect(repo.fetchSellerForumThread.mock.calls[0]?.[2]).toMatchObject({
+			viewer: true,
+		});
+	});
+
+	it("a thread-top refetch landing after a reply delete cannot bring the reply back", async () => {
+		repo.fetchSellerForumReplies.mockResolvedValueOnce(
+			page([entry("r1", { parentId: T }), entry("r2", { parentId: T })]),
+		);
+		const staleTop = deferred<unknown>();
+		repo.fetchSellerForumThread.mockReturnValueOnce(staleTop.promise);
+		repo.deleteSellerForumComment.mockResolvedValue(undefined);
+		const { result } = renderHook(
 			() => {
-				const forum = useSellerForum("7", undefined, T);
+				const forum = useSellerForum(
+					"7",
+					page([entry(T, { replyCount: 2 })]),
+					T,
+				);
 				return {
 					forum,
-					// The page expands the thread's replies once its top entry has rendered.
-					replies: useForumReplies("7", T, "u", forum.comments.length > 0),
+					replies: useForumReplies(
+						"7",
+						T,
+						"u",
+						true,
+						page([entry("r1", { parentId: T }), entry("r2", { parentId: T })]),
+					),
 				};
 			},
 			{ wrapper },
 		);
 		await waitFor(() =>
-			expect(result.current.replies.items.map((e) => e.id)).toEqual([
-				"r1",
-				"r2",
-			]),
+			expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(1),
 		);
-		expect(result.current.replies.hasMore).toBe(true);
-		expect(repo.fetchSellerForumReplies).not.toHaveBeenCalled();
-	});
-
-	it("server-rendered replies seed the reply query without any read", async () => {
-		const { result } = renderHook(
-			() => ({
-				forum: useSellerForum(
-					"7",
-					page([entry(T)]),
-					T,
-					page([entry("r1")], "next"),
-				),
-				replies: useForumReplies("7", T, "u", true),
-			}),
-			{ wrapper },
+		repo.fetchSellerForumReplies.mockResolvedValue(
+			page([entry("r2", { parentId: T })]),
 		);
-		expect(result.current.replies.items.map((e) => e.id)).toEqual(["r1"]);
-		expect(repo.fetchSellerForumReplies).not.toHaveBeenCalled();
+		await act(async () => {
+			await result.current.forum.remove(
+				result.current.replies.items.find((e) => e.id === "r1") as never,
+			);
+		});
+		await act(async () => {
+			staleTop.resolve({
+				top: page([entry(T, { replyCount: 2 })]),
+				replies: page([
+					entry("r1", { parentId: T }),
+					entry("r2", { parentId: T }),
+				]),
+			});
+			await staleTop.promise;
+		});
+		await waitFor(() =>
+			expect(result.current.replies.items.map((e) => e.id)).toEqual(["r2"]),
+		);
 	});
 });
 
