@@ -10,6 +10,9 @@ import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
+import 'package:hawkr_buyer/features/moderation/data/block_target.dart';
+import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
 import 'package:hawkr_buyer/features/moderation/data/report_target_type.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/block_confirm_dialog.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
@@ -176,13 +179,22 @@ void main() {
             final report = tester.widget<ReportSheetWidget>(
               find.byType(ReportSheetWidget),
             );
-            expect(report.targetId, surface == '商品評價' ? 'review-12' : '101');
-            expect(
-              report.targetType,
-              surface == '商品評價'
-                  ? ReportTargetType.review
-                  : ReportTargetType.post,
-            );
+            final reportTarget = report.target;
+            if (surface == '商品評價') {
+              // 評價的檢舉留在舊 REST（A6 前的允許殘留）。
+              expect(reportTarget, isA<LegacyReportTarget>());
+              reportTarget as LegacyReportTarget;
+              expect(reportTarget.id, 'review-12');
+              expect(reportTarget.type, ReportTargetType.review);
+            } else {
+              expect(reportTarget, isA<SocialReportTarget>());
+              reportTarget as SocialReportTarget;
+              expect(reportTarget.id, '101');
+              expect(
+                reportTarget.kind,
+                ReportTargetKind.REPORT_TARGET_KIND_POST,
+              );
+            }
             router.pop();
             await tester.pumpAndSettle();
             await tester.tap(more);
@@ -192,7 +204,15 @@ void main() {
             final block = tester.widget<BlockConfirmDialog>(
               find.byType(BlockConfirmDialog),
             );
-            expect(block.userId, surface == '商品評價' ? 'buyer-9' : '7');
+            final blockTarget = block.target;
+            if (surface == '商品評價') {
+              expect(blockTarget, isA<LegacyBlockTarget>());
+              expect((blockTarget as LegacyBlockTarget).userId, 'buyer-9');
+            } else {
+              expect(blockTarget, isA<StoreBlockTarget>());
+              expect((blockTarget as StoreBlockTarget).storeId, '7');
+              expect(blockTarget.confirmText, blockStoreConfirmText);
+            }
             await tester.tap(find.text('取消'));
             await tester.pumpAndSettle();
             expect(find.byType(BlockConfirmDialog), findsNothing);

@@ -180,6 +180,19 @@ class PostEntityStore extends _$PostEntityStore with ViewerScoped {
     state = PostEntities(posts: next, gone: {...state.gone, postId});
   }
 
+  /// 封鎖店家之後：該店已載入的貼文全部標為不可見，列表與詳情據此移除；其他店的貼文不動。
+  void removeStorePosts(String storeId) {
+    final id = int.tryParse(storeId);
+    if (id == null) return;
+    final affected = [
+      for (final post in state.posts.values)
+        if (post.merchantId == id) post.id,
+    ];
+    for (final postId in affected) {
+      remove(postId);
+    }
+  }
+
   /// 切換讚；方向取自呼叫當下（含樂觀疊加層）的實體。每次點擊立刻更新疊加層，請求依 id 串行，
   /// 最後一次意圖和伺服器狀態不同就再送一次。回傳最後一輪是否成功；途中觀看者換了回 false。
   Future<bool> toggleLike(int postId) {

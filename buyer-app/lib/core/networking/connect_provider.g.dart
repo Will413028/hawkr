@@ -461,6 +461,111 @@ final class SocialAppClientProvider
 
 String _$socialAppClientHash() => r'f8da4bb52e94947a0c9f4e2619a24b9ca47673c8';
 
+/// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+@ProviderFor(buyerAppClient)
+final buyerAppClientProvider = BuyerAppClientProvider._();
+
+/// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+final class BuyerAppClientProvider
+    extends
+        $FunctionalProvider<
+          BuyerAppServiceClient,
+          BuyerAppServiceClient,
+          BuyerAppServiceClient
+        >
+    with $Provider<BuyerAppServiceClient> {
+  /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+  BuyerAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'buyerAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$buyerAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<BuyerAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  BuyerAppServiceClient create(Ref ref) {
+    return buyerAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(BuyerAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<BuyerAppServiceClient>(value),
+    );
+  }
+}
+
+String _$buyerAppClientHash() => r'0843c0945207433da5159c77adbbe14a6cf70806';
+
+/// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+
+@ProviderFor(moderationAppClient)
+final moderationAppClientProvider = ModerationAppClientProvider._();
+
+/// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+
+final class ModerationAppClientProvider
+    extends
+        $FunctionalProvider<
+          ModerationAppServiceClient,
+          ModerationAppServiceClient,
+          ModerationAppServiceClient
+        >
+    with $Provider<ModerationAppServiceClient> {
+  /// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+  ModerationAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'moderationAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$moderationAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ModerationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ModerationAppServiceClient create(Ref ref) {
+    return moderationAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ModerationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ModerationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$moderationAppClientHash() =>
+    r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
+
 @ProviderFor(discoveryPublicClient)
 final discoveryPublicClientProvider = DiscoveryPublicClientProvider._();
 

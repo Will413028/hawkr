@@ -12,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/utils/hk_log.dart';
+import '../../../../shared/utils/require_login.dart';
 import '../../../../shared/utils/store_actor_hint.dart';
 import '../../../../shared/widgets/chat_bubble_icon.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
@@ -20,6 +21,9 @@ import '../../../../shared/widgets/hk_frosted_icon_button.dart';
 import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../moderation/data/block_target.dart';
+import '../../../moderation/data/report_target.dart';
+import '../../../moderation/presentation/report_block_action_sheet.dart';
 import '../../../social/presentation/thread_notifier.dart' show ThreadPhase;
 import '../../../social/presentation/thread_tree.dart' show ThreadTree;
 import '../../../social/presentation/forum_notifier.dart';
@@ -211,6 +215,20 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _inputFocusNode.requestFocus();
     });
+  }
+
+  /// 別人的討論區留言：檢舉，或封鎖作者（買家或店家，依作者身分）。訪客先登入；封鎖成功後重讀討論區。
+  Future<void> _onReportOrBlock(_CommentNode node) async {
+    if (!await requireLogin(context, ref)) return;
+    if (!mounted) return;
+    final blocked = await showReportBlockActionSheet(
+      context,
+      reportTarget: SocialReportTarget.forumEntry(node.entry.id),
+      blockTarget: blockTargetForForumEntry(node.entry),
+      blockUserLabel: node.userName,
+      blockActionLabel: '封鎖此人',
+    );
+    if (blocked && mounted) await _reload();
   }
 
   Future<void> _onDeleteComment(_CommentNode node) async {
@@ -442,6 +460,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       formatTimeAgo: _formatTimeAgo,
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
+      onReportOrBlock: _onReportOrBlock,
       actionsEnabled: !submitting,
     );
 
@@ -767,6 +786,7 @@ class _CommentCard extends StatelessWidget {
     required this.formatTimeAgo,
     required this.onEdit,
     required this.onDelete,
+    required this.onReportOrBlock,
     required this.actionsEnabled,
   });
 
@@ -775,7 +795,11 @@ class _CommentCard extends StatelessWidget {
   final String Function(DateTime) formatTimeAgo;
   final void Function(_CommentNode) onEdit;
   final void Function(_CommentNode) onDelete;
+  final void Function(_CommentNode) onReportOrBlock;
   final bool actionsEnabled;
+
+  /// 別人的、還在顯示的留言才有檢舉與封鎖入口。
+  bool get _canReportOrBlock => !node.isPlaceholder && !node.entry.isMine;
 
   /// 有任何一個選單動作可做：只讀伺服器的 `viewer_can_edit`、`viewer_can_delete`。
   bool get _hasMenu =>
@@ -856,6 +880,16 @@ class _CommentCard extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+                if (_canReportOrBlock) ...[
+                  SizedBox(width: 8.w),
+                  HkFrostedIconButton(
+                    label: '檢舉或封鎖',
+                    icon: AppIcons.moreHoriz,
+                    onPressed: !actionsEnabled
+                        ? null
+                        : () => onReportOrBlock(node),
+                  ),
+                ],
                 if (_hasMenu) ...[
                   SizedBox(width: 8.w),
                   Builder(

@@ -26,6 +26,7 @@ void main() {
       viewerLiked: true,
       viewerCanComment: true,
       viewerActor: storeActor('南崁王'),
+      url: 'https://hawkr.test/sellers/nanmu/posts/101',
       product: pb.PostProduct(
         id: '55',
         name: '紅豆',
@@ -53,6 +54,7 @@ void main() {
     expect(post.createdAt, 1783000000);
     expect(post.viewerCanComment, isTrue);
     expect(post.viewerActor?.name, '南崁王');
+    expect(post.shareUrl, 'https://hawkr.test/sellers/nanmu/posts/101');
     expect(
       post.product,
       const PostProduct(

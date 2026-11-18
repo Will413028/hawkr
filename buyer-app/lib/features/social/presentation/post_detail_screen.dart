@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:hawkr_buyer/shared/widgets/hk_frosted_icon_button.dart';
-import 'package:hawkr_buyer/config/app_constants.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/config/image_config.dart';
 import 'package:hawkr_buyer/config/media_image.dart';
@@ -12,7 +11,6 @@ import 'package:hawkr_buyer/core/extensions/url_extensions.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
-import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
 import 'package:hawkr_buyer/features/social/data/social_content_repository.dart';
@@ -37,7 +35,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../moderation/data/report_target_type.dart';
+import '../../moderation/data/block_target.dart';
+import '../../moderation/data/report_target.dart';
 import '../../moderation/presentation/report_block_action_sheet.dart';
 import 'post_entity.dart';
 import 'post_entity_store.dart';
@@ -186,26 +185,15 @@ class PostDetailScreen extends HookConsumerWidget {
         unawaited(ref.read(postEntityStoreProvider.notifier).refresh(postId));
       }
 
-      Future<void> sharePost() async {
-        final data = await ref
-            .read(productRepositoryProvider)
-            .getShareUrl(type: 'post', id: postId.toString());
-        if (!context.mounted) return;
-        final url =
-            data?['url'] ??
-            (storeCode.isEmpty
-                ? null
-                : AppConstants.shareFallbackUrl(
-                    '/sellers/$storeCode/posts#post-$postId',
-                  ));
-        if (url == null) return;
+      void sharePost() {
+        if (post.shareUrl.isEmpty) return;
         showShareSheet(
           context,
           ShareData(
-            title: (data?['title'] ?? displayName).toString(),
-            description: (data?['description'] ?? post.content).toString(),
-            imageUrl: (data?['imageUrl'] ?? imageUrl).toString(),
-            url: url.toString(),
+            title: displayName,
+            description: post.content,
+            imageUrl: imageUrl,
+            url: post.shareUrl,
           ),
         );
       }
@@ -228,13 +216,19 @@ class PostDetailScreen extends HookConsumerWidget {
         onMore: () async {
           if (!await requireLogin(context, ref)) return;
           if (!context.mounted) return;
-          showReportBlockActionSheet(
+          final blocked = await showReportBlockActionSheet(
             context,
-            reportTargetType: ReportTargetType.post,
-            reportTargetId: postId.toString(),
-            blockUserId: sellerId.isNotEmpty ? sellerId : null,
+            reportTarget: SocialReportTarget.post(postId.toString()),
+            blockTarget: sellerId.isNotEmpty
+                ? StoreBlockTarget(sellerId)
+                : null,
             blockUserLabel: displayName,
           );
+          if (blocked && context.mounted) {
+            ref
+                .read(postEntityStoreProvider.notifier)
+                .removeStorePosts(sellerId);
+          }
         },
         onMerchantTap: storeCode.isEmpty
             ? null

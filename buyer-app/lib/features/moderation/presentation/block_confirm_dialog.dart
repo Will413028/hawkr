@@ -3,21 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../data/block_repository.dart';
+import '../data/block_target.dart';
+import '../data/blocking_repository.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
-/// 封鎖使用者確認彈窗。
-/// 使用：`await showBlockConfirmDialog(context, userId: '123', userLabel: '王小明')`
+/// 封鎖確認彈窗。說明文字與送到哪條 API 都由 [target] 的型別決定：社群對象送 `BuyerAppService`，
+/// 聊天與評價（[LegacyBlockTarget]）送舊 REST。
+/// 使用：`await showBlockConfirmDialog(context, target: const StoreBlockTarget('7'), userLabel: '好店')`
 class BlockConfirmDialog extends ConsumerStatefulWidget {
   const BlockConfirmDialog({
     super.key,
-    required this.userId,
+    required this.target,
     required this.userLabel,
   });
 
-  final String userId;
+  final BlockTarget target;
   final String userLabel;
 
   @override
@@ -30,16 +34,25 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
   Future<void> _confirmBlock() async {
     setState(() => _submitting = true);
     try {
-      await ref.read(blockRepositoryProvider).blockUser(widget.userId);
+      switch (widget.target) {
+        case final SocialBlockTarget target:
+          await ref.read(blockingRepositoryProvider).block(target);
+        case LegacyBlockTarget(:final userId):
+          await ref.read(blockRepositoryProvider).blockUser(userId);
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
       showFloatingToast(context, '已封鎖「${widget.userLabel}」', isSuccess: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
+      if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
-        e.toString().replaceAll('Exception: ', ''),
+        widget.target is SocialBlockTarget
+            ? '封鎖失敗，請稍後再試'
+            : e.toString().replaceAll('Exception: ', ''),
         isSuccess: false,
       );
     }
@@ -59,7 +72,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
         ),
       ),
       content: Text(
-        '封鎖後對方將無法傳送訊息給您，您也無法傳送訊息給對方。可隨時在「封鎖名單」解除。',
+        widget.target.confirmText,
         style: TextStyle(
           fontSize: 14,
           color: AppColors.textSecondary,
@@ -103,11 +116,11 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
 /// 顯示封鎖確認彈窗。回傳 true 表示已成功封鎖。
 Future<bool?> showBlockConfirmDialog(
   BuildContext context, {
-  required String userId,
+  required BlockTarget target,
   required String userLabel,
 }) {
   return showDialog<bool>(
     context: context,
-    builder: (_) => BlockConfirmDialog(userId: userId, userLabel: userLabel),
+    builder: (_) => BlockConfirmDialog(target: target, userLabel: userLabel),
   );
 }

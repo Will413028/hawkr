@@ -12,7 +12,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../config/app_constants.dart';
 import '../../../config/flavor.dart';
 import '../../../config/image_config.dart';
 import '../../../config/media_image.dart';
@@ -27,9 +26,9 @@ import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_post_card_surface.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../moderation/data/report_target_type.dart';
+import '../../moderation/data/block_target.dart';
+import '../../moderation/data/report_target.dart';
 import '../../moderation/presentation/report_block_action_sheet.dart';
-import '../../product/data/product_repository.dart';
 import '../../product/presentation/merchant_item_detail_screen.dart';
 import '../data/social_model.dart';
 import 'post_entity.dart';
@@ -383,35 +382,17 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
     );
   }
 
-  Future<void> _shareCurrent(
-    BuildContext context,
-    WidgetRef ref,
-    int postId,
-  ) async {
+  void _shareCurrent(BuildContext context, WidgetRef ref, int postId) {
     final post = ref.read(postEntityStoreProvider).posts[postId];
-    if (post == null) return;
+    if (post == null || post.shareUrl.isEmpty) return;
     final username = (post.merchantName ?? merchantName ?? '').trim();
-    final imageUrl = post.imageUrl;
-    final data = await ref
-        .read(productRepositoryProvider)
-        .getShareUrl(type: 'post', id: postId.toString());
-    if (!context.mounted) return;
-    final storeCode = post.storeCode;
-    final url =
-        data?['url'] ??
-        (storeCode.isEmpty
-            ? null
-            : AppConstants.shareFallbackUrl(
-                '/sellers/$storeCode/posts#post-$postId',
-              ));
-    if (url == null) return;
     showShareSheet(
       context,
       ShareData(
-        title: (data?['title'] ?? username).toString(),
-        description: (data?['description'] ?? post.content).toString(),
-        imageUrl: (data?['imageUrl'] ?? imageUrl).toString(),
-        url: url.toString(),
+        title: username,
+        description: post.content,
+        imageUrl: post.imageUrl,
+        url: post.shareUrl,
       ),
     );
   }
@@ -616,15 +597,21 @@ class _PostPage extends HookConsumerWidget {
                             onPressed: () async {
                               if (!await requireLogin(context, ref)) return;
                               if (!context.mounted) return;
-                              showReportBlockActionSheet(
+                              final blocked = await showReportBlockActionSheet(
                                 context,
-                                reportTargetType: ReportTargetType.post,
-                                reportTargetId: post.id.toString(),
-                                blockUserId: sellerId.isNotEmpty
-                                    ? sellerId
+                                reportTarget: SocialReportTarget.post(
+                                  post.id.toString(),
+                                ),
+                                blockTarget: sellerId.isNotEmpty
+                                    ? StoreBlockTarget(sellerId)
                                     : null,
                                 blockUserLabel: username,
                               );
+                              if (blocked && context.mounted) {
+                                ref
+                                    .read(postEntityStoreProvider.notifier)
+                                    .removeStorePosts(sellerId);
+                              }
                             },
                             icon: AppIcons.moreHoriz,
                           ),

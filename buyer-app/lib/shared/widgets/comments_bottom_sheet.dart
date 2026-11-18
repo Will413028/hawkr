@@ -15,6 +15,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../core/networking/suspension_signal.dart';
 import '../../core/session/session_provider.dart';
 import '../../core/session/viewer_scope.dart';
+import '../../features/moderation/data/block_target.dart';
+import '../../features/moderation/data/report_target.dart';
+import '../../features/moderation/presentation/report_block_action_sheet.dart';
 import '../../features/social/presentation/comments_notifier.dart';
 import '../../features/social/presentation/thread_notifier.dart'
     show ThreadPhase;
@@ -185,6 +188,20 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     if (result.status == WriteStatus.failed) {
       _reportFailure(result.error, '刪除失敗，請稍後再試');
     }
+  }
+
+  /// 別人的留言：檢舉，或封鎖作者（買家或店家，依作者身分）。訪客先登入；封鎖成功後重讀留言。
+  Future<void> _reportOrBlock(pb.Comment comment, String author) async {
+    if (!await requireLogin(context, ref)) return;
+    if (!mounted) return;
+    final blocked = await showReportBlockActionSheet(
+      context,
+      reportTarget: SocialReportTarget.comment(comment.id),
+      blockTarget: blockTargetForComment(comment),
+      blockUserLabel: author,
+      blockActionLabel: '封鎖此人',
+    );
+    if (blocked && mounted) await _reload();
   }
 
   void _scheduleScrollToBottom() {
@@ -728,6 +745,22 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
               style: TextStyle(fontSize: 14, color: AppColors.danger),
             ),
           ),
+        if (!comment.isMine) ...[
+          if (comment.viewerCanReply || comment.viewerCanDelete)
+            SizedBox(width: 16.w),
+          HkTapTarget(
+            key: ValueKey('comment-more-$id'),
+            semanticLabel: '更多 $author 的留言操作',
+            hint: '檢舉或封鎖',
+            tooltip: '更多',
+            onTap: () => _reportOrBlock(comment, author),
+            child: Icon(
+              AppIcons.moreHoriz,
+              size: 24.sp,
+              color: AppIconColors.defaultColor,
+            ),
+          ),
+        ],
       ],
     );
   }

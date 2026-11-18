@@ -6,40 +6,110 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
-import '../../social/data/social_repository.dart';
+import '../data/legacy_report_repository.dart';
+import '../data/moderation_repository.dart';
+import '../data/report_target.dart';
 import '../data/report_target_type.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
-/// 通用檢舉底部彈窗 — 取代舊版僅支援貼文的 `ReportPostDialog`，支援全部
-/// 6 種 target_type。
-/// 使用：`await showReportSheet(context, targetType: ReportTargetType.post, targetId: '123')`
-class ReportSheetWidget extends ConsumerStatefulWidget {
-  const ReportSheetWidget({
-    super.key,
-    required this.targetType,
-    required this.targetId,
+/// 一個檢舉原因選項：社群對象帶 [category]，聊天與評價（舊 REST）帶 [legacy]。
+class _ReasonOption {
+  const _ReasonOption({
+    required this.label,
+    required this.requiresDescription,
+    this.category,
+    this.legacy,
   });
 
-  final ReportTargetType targetType;
-  final String targetId;
+  final String label;
+
+  /// 選了這項要補說明（「其他」）。
+  final bool requiresDescription;
+  final PolicyCategory? category;
+  final ReportReasonCode? legacy;
+
+  bool sameAs(_ReasonOption other) =>
+      category == other.category && legacy == other.legacy;
+}
+
+/// 一次送出嘗試：內容（原因與說明）沒變的重試帶同一個 request_id，伺服器回第一次的結果；
+/// 內容變了就是新的嘗試，換新的 request_id（同一個 request_id 帶不同內容會被拒絕）。
+class _SubmitAttempt {
+  const _SubmitAttempt(this.category, this.description, this.requestId);
+
+  final PolicyCategory category;
+  final String description;
+  final String requestId;
+}
+
+/// 通用檢舉底部彈窗。社群內容（貼文、留言、討論區留言）送 `ModerationAppService`，
+/// 聊天與評價送舊 `/app/reports`；用哪一條由 [target] 的型別決定。
+/// 使用：`await showReportSheet(context, target: const SocialReportTarget.post('123'))`
+class ReportSheetWidget extends ConsumerStatefulWidget {
+  const ReportSheetWidget({super.key, required this.target});
+
+  final ReportTarget target;
 
   @override
   ConsumerState<ReportSheetWidget> createState() => _ReportSheetWidgetState();
 }
 
 class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
-  ReportReasonCode? _selected;
+  static const _uuid = Uuid();
+
+  _ReasonOption? _selected;
+  _SubmitAttempt? _attempt;
   final TextEditingController _detailCtrl = TextEditingController();
   bool _submitting = false;
 
   bool get _canSubmit {
-    if (_submitting || _selected == null) return false;
-    if (_selected == ReportReasonCode.other) {
+    final selected = _selected;
+    if (_submitting || selected == null) return false;
+    if (selected.requiresDescription) {
       return _detailCtrl.text.trim().isNotEmpty;
     }
     return true;
+  }
+
+  List<_ReasonOption> _options(UiLocale locale) => switch (widget.target) {
+    SocialReportTarget() => [
+      for (final category in communityReportCategories)
+        _socialOption(category, locale),
+    ],
+    LegacyReportTarget(:final type) => [
+      for (final reason in reportReasonsFor(type))
+        _ReasonOption(
+          label: reason.label,
+          requiresDescription: reason == ReportReasonCode.other,
+          legacy: reason,
+        ),
+    ],
+  };
+
+  _ReasonOption _socialOption(PolicyCategory category, UiLocale locale) {
+    return _ReasonOption(
+      label: category.uiText(locale) ?? '',
+      requiresDescription: category == PolicyCategory.POLICY_CATEGORY_OTHER,
+      category: category,
+    );
+  }
+
+  _SubmitAttempt _attemptFor(PolicyCategory category, String description) {
+    final previous = _attempt;
+    if (previous != null &&
+        previous.category == category &&
+        previous.description == description) {
+      return previous;
+    }
+    return _attempt = _SubmitAttempt(category, description, _uuid.v4());
   }
 
   @override
@@ -50,26 +120,43 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    final selected = _selected!;
     setState(() => _submitting = true);
     try {
       final detail = _detailCtrl.text.trim();
-      await ref
-          .read(socialRepositoryProvider)
-          .submitReport(
-            targetType: widget.targetType.value,
-            targetId: widget.targetId,
-            reasonCode: _selected!.code,
-            description: detail.isNotEmpty ? detail : null,
-          );
+      switch (widget.target) {
+        case final SocialReportTarget target:
+          await ref
+              .read(moderationRepositoryProvider)
+              .submitReport(
+                target: target,
+                category: selected.category!,
+                description: detail,
+                requestId: _attemptFor(selected.category!, detail).requestId,
+              );
+        case final LegacyReportTarget target:
+          await ref
+              .read(legacyReportRepositoryProvider)
+              .submitReport(
+                targetType: target.type.value,
+                targetId: target.id,
+                reasonCode: selected.legacy!.code,
+                description: detail.isNotEmpty ? detail : null,
+              );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
       showFloatingToast(context, '舉報成功，我們會盡快審核', isSuccess: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
+      if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
-        e.toString().replaceAll('Exception: ', ''),
+        widget.target is SocialReportTarget
+            ? '檢舉失敗，請稍後再試'
+            : e.toString().replaceAll('Exception: ', ''),
         isSuccess: false,
       );
     }
@@ -77,7 +164,7 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final reasons = reportReasonsFor(widget.targetType);
+    final reasons = _options(ref.watch(uiLocaleProvider));
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -139,10 +226,10 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
                     for (final reason in reasons)
                       _ReasonTile(
                         reason: reason,
-                        selected: _selected == reason,
+                        selected: _selected?.sameAs(reason) ?? false,
                         onTap: () => setState(() => _selected = reason),
                       ),
-                    if (_selected == ReportReasonCode.other)
+                    if (_selected?.requiresDescription ?? false)
                       Padding(
                         padding: EdgeInsets.fromLTRB(12.w, 4.h, 12.w, 8.h),
                         child: TextField(
@@ -225,7 +312,7 @@ class _ReasonTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final ReportReasonCode reason;
+  final _ReasonOption reason;
   final bool selected;
   final VoidCallback onTap;
 
@@ -248,7 +335,10 @@ class _ReasonTile extends StatelessWidget {
             SizedBox(width: 10.w),
             Expanded(
               child: Text(
-                reportReasonOptionLabel(reason),
+                // 「其他」要補說明，選項後面加提示（送出鈕在說明填好前鎖住）。
+                reason.requiresDescription
+                    ? '${reason.label}（請說明）'
+                    : reason.label,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
@@ -268,8 +358,7 @@ class _ReasonTile extends StatelessWidget {
 /// 顯示通用檢舉底部彈窗。回傳 true 表示已成功送出檢舉。
 Future<bool?> showReportSheet(
   BuildContext context, {
-  required ReportTargetType targetType,
-  required String targetId,
+  required ReportTarget target,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -279,7 +368,6 @@ Future<bool?> showReportSheet(
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
     ),
-    builder: (_) =>
-        ReportSheetWidget(targetType: targetType, targetId: targetId),
+    builder: (_) => ReportSheetWidget(target: target),
   );
 }

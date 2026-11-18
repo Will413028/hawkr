@@ -19,8 +19,7 @@ abstract class PostProduct with _$PostProduct {
 
 /// 貼文的呈現模型，由 `hawkr.social.v1alpha1.Post` 轉來（[Post.fromProto]）。
 ///
-/// 轉換時丟掉不用的欄位：標籤、更新時間、狀態與 etag（店主才有）、商品的最高價與可購買旗標、`url`
-/// （分享用，4c-3 處理）、`viewer_*` 以外的店家卡片欄位。
+/// 轉換時丟掉不用的欄位：標籤、更新時間、狀態與 etag（店主才有）、商品的最高價與可購買旗標、`viewer_*` 以外的店家卡片欄位。
 @freezed
 abstract class Post with _$Post {
   const factory Post({
@@ -45,6 +44,8 @@ abstract class Post with _$Post {
     @Default(false) bool viewerCanComment,
     // 觀看者留言時的身分；訪客 null。
     pb.Actor? viewerActor,
+    // 單篇網址（絕對網址，伺服器組，分享用）；沒有時空字串。
+    @Default('') String shareUrl,
   }) = _Post;
 
   factory Post.fromProto(pb.Post post) {
@@ -80,6 +81,7 @@ abstract class Post with _$Post {
             ),
       viewerCanComment: post.viewerCanComment,
       viewerActor: post.hasViewerActor() ? post.viewerActor : null,
+      shareUrl: post.url,
     );
   }
 }

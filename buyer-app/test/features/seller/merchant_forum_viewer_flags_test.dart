@@ -101,8 +101,9 @@ void main() {
   testWidgets('編輯與刪除選單只看 viewer_can_edit、viewer_can_delete', (tester) async {
     await _pump(tester, _forum());
 
-    // 只有 c-1 顯示 ⋯ 選單。
-    expect(find.byIcon(AppIcons.moreHoriz), findsOneWidget);
+    // 只有 c-1 顯示編輯與刪除的 ⋯ 選單；別人的留言另有檢舉與封鎖的 ⋯（c-2、c-3）。
+    expect(find.byTooltip('更多留言操作'), findsOneWidget);
+    expect(find.byTooltip('檢舉或封鎖'), findsNWidgets(3));
     await tester.tap(find.byTooltip('更多留言操作'));
     await tester.pumpAndSettle();
     expect(find.text('編輯留言'), findsOneWidget);

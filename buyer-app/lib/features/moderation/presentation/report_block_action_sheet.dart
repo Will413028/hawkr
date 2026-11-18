@@ -4,25 +4,27 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../data/report_target_type.dart';
+import '../data/block_target.dart';
+import '../data/report_target.dart';
 import 'block_confirm_dialog.dart';
 import 'report_sheet.dart';
+
+enum _SheetAction { report, block }
 
 /// 「⋯」共用觸發選單（bottom sheet + ListTile pattern，對齊聊天室既有的
 /// `showBuyerMessageContextMenu` 風格）。點「檢舉」開 [showReportSheet]，
 /// 點「封鎖此使用者」開 [showBlockConfirmDialog]。
 ///
-/// [blockUserId] 為 null 或空字串時不顯示封鎖選項（例如呼叫端尚未取得對象
-/// userId）。
-Future<void> showReportBlockActionSheet(
+/// [blockTarget] 為 null 時不顯示封鎖選項（例如自己的內容、尚未取得對象）。
+/// 回傳 true 表示這次已成功封鎖，呼叫端據此重讀受影響的社群狀態。
+Future<bool> showReportBlockActionSheet(
   BuildContext context, {
-  required ReportTargetType reportTargetType,
-  required String reportTargetId,
-  String? blockUserId,
+  required ReportTarget reportTarget,
+  BlockTarget? blockTarget,
   String? blockUserLabel,
-}) {
-  final hasBlockTarget = blockUserId != null && blockUserId.isNotEmpty;
-  return showModalBottomSheet(
+  String blockActionLabel = '封鎖此使用者',
+}) async {
+  final action = await showModalBottomSheet<_SheetAction>(
     context: context,
     showDragHandle: false,
     backgroundColor: AppColors.bgCard,
@@ -51,34 +53,35 @@ Future<void> showReportBlockActionSheet(
             ),
             title: Text('檢舉', style: TextStyle(fontSize: 16)),
             onTap: () {
-              Navigator.pop(ctx);
-              showReportSheet(
-                context,
-                targetType: reportTargetType,
-                targetId: reportTargetId,
-              );
+              Navigator.pop(ctx, _SheetAction.report);
             },
           ),
-          if (hasBlockTarget)
+          if (blockTarget != null)
             ListTile(
               leading: Icon(
                 AppIcons.blockOutlined,
                 color: AppIconColors.danger,
                 size: 22.sp,
               ),
-              title: Text('封鎖此使用者', style: TextStyle(fontSize: 16)),
-              onTap: () {
-                Navigator.pop(ctx);
-                showBlockConfirmDialog(
-                  context,
-                  userId: blockUserId,
-                  userLabel: blockUserLabel ?? '此使用者',
-                );
-              },
+              title: Text(blockActionLabel, style: TextStyle(fontSize: 16)),
+              onTap: () => Navigator.pop(ctx, _SheetAction.block),
             ),
           SizedBox(height: 8.h),
         ],
       ),
     ),
   );
+  if (action == null || !context.mounted) return false;
+  switch (action) {
+    case _SheetAction.report:
+      await showReportSheet(context, target: reportTarget);
+      return false;
+    case _SheetAction.block:
+      final blocked = await showBlockConfirmDialog(
+        context,
+        target: blockTarget!,
+        userLabel: blockUserLabel ?? '此使用者',
+      );
+      return blocked ?? false;
+  }
 }

@@ -40,21 +40,29 @@ void main() {
       _read('lib/shared/widgets/comments_bottom_sheet.dart'),
     );
     expect(source, isNot(contains('Map<String, dynamic>')));
-    expect(source, isNot(contains('isMine')));
     expect(source, isNot(contains('is_mine')));
+    expect(
+      RegExp(r'(?<![\w.])isMine\b').hasMatch(source),
+      isFalse,
+      reason: '自己的留言只讀生成訊息的 comment.isMine（伺服器給的，用來隱藏檢舉與封鎖入口），不自己比對或存成欄位',
+    );
     expect(source, contains('viewerCanDelete'));
     expect(source, contains('viewerCanReply'));
     expect(source, contains('viewerCanComment'));
   });
 
-  test('討論區沒有按讚，也不用 isMine', () {
+  test('討論區沒有按讚，擁有權只讀伺服器的 isMine', () {
     final source = _code(
       _read('lib/features/seller/presentation/widgets/merchant_chat_tab.dart'),
     );
     expect(source, isNot(contains('onLike')));
     expect(source, isNot(contains('likeCount')));
     expect(source, isNot(contains('/like')));
-    expect(source, isNot(contains('isMine')));
+    expect(
+      RegExp(r'(?<![\w.])isMine\b').hasMatch(source),
+      isFalse,
+      reason: '自己的留言只讀生成訊息的 entry.isMine（伺服器給的，用來隱藏檢舉與封鎖入口），不自己比對或存成欄位',
+    );
     expect(source, contains('viewerCanEdit'));
     expect(source, contains('viewerCanDelete'));
     expect(source, contains('viewerCanReply'));
@@ -86,13 +94,18 @@ void main() {
     );
   });
 
-  test('social_repository 只剩檢舉（4c-3 處理）', () {
-    final source = _code(
-      _read('lib/features/social/data/social_repository.dart'),
+  test('手寫的社群 repository 已刪除，social 的 data 不碰 Dio', () {
+    expect(
+      File('lib/features/social/data/social_repository.dart').existsSync(),
+      isFalse,
     );
-    final methods = RegExp(
-      r'Future<[\w<>?, ]+>\s+(\w+)\(',
-    ).allMatches(source).map((m) => m.group(1)).toSet();
-    expect(methods, {'submitReport', 'getMyReports'});
+    for (final entity in Directory('lib/features/social/data').listSync()) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      expect(
+        _code(entity.readAsStringSync()),
+        isNot(contains("package:dio/dio.dart")),
+        reason: '${entity.path} 不得再用 Dio',
+      );
+    }
   });
 }
