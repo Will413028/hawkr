@@ -12,6 +12,7 @@ import {
 	deleteSellerForumComment,
 	fetchSellerForum,
 	fetchSellerForumReplies,
+	fetchSellerForumThread,
 	replySellerForumComment,
 	type SellerForumComment,
 	type SellerForumListResult,
@@ -148,9 +149,14 @@ function placeholderOf(target: SellerForumComment): SellerForumComment {
 	};
 }
 
+/**
+ * `threadId` 設了是單一討論串：主列表只有該串的頂層項目（`GetForumThread`），其餘的回覆、修改、刪除照同一套邏輯對這份資料做；
+ * 不設是店家討論區的頂層列表。
+ */
 export function useSellerForum(
 	sellerId: string | undefined,
 	initialData?: SellerForumListResult,
+	threadId?: string,
 ): UseSellerForumResult {
 	const { identity } = useAuth();
 	const queryIdentity = useQueryIdentity();
@@ -159,8 +165,11 @@ export function useSellerForum(
 	const pageSize = initialData?.pageSize ?? 20;
 	const forumParams = React.useMemo(() => ({ pageSize }), [pageSize]);
 	const forumKey = React.useMemo(
-		() => queryKeys.seller.forum(queryIdentity, storeId, forumParams),
-		[queryIdentity, storeId, forumParams],
+		() =>
+			threadId
+				? queryKeys.seller.forumThread(queryIdentity, storeId, threadId)
+				: queryKeys.seller.forum(queryIdentity, storeId, forumParams),
+		[queryIdentity, storeId, forumParams, threadId],
 	);
 	const postKey = React.useMemo(
 		() => queryKeys.seller.forumPostCreate(queryIdentity, storeId),
@@ -192,12 +201,18 @@ export function useSellerForum(
 		// SSR 帶入的真資料才走 initialData；缺席時沒有資料，請求完成前是 loading。
 		initialData: seed,
 		queryFn: ({ pageParam, signal }) =>
-			fetchSellerForum(storeId, {
-				pageToken: pageParam,
-				pageSize,
-				signal,
-				viewer: true,
-			}),
+			threadId
+				? fetchSellerForumThread(storeId, threadId, {
+						pageSize,
+						signal,
+						viewer: true,
+					}).then((thread) => thread.top)
+				: fetchSellerForum(storeId, {
+						pageToken: pageParam,
+						pageSize,
+						signal,
+						viewer: true,
+					}),
 	});
 	const comments = React.useMemo(
 		() => (query.data ? flattenPages(query.data) : EMPTY_ENTRIES),

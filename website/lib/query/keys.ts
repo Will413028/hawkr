@@ -309,6 +309,18 @@ export const queryKeys = {
 				String(sellerId),
 				params ?? {},
 			] as const,
+		forumThread: (
+			id: QueryIdentity,
+			sellerId: string | number,
+			threadId: string | number,
+		) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-thread",
+				String(sellerId),
+				String(threadId),
+			] as const,
 		forumReplies: (
 			id: QueryIdentity,
 			sellerId: string | number,

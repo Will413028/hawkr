@@ -11,6 +11,7 @@ import {
 	ForumEntrySchema,
 } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { fieldMask } from "@hawkr/api/proto/field-mask";
+import type { AppLocale } from "@/lib/intl/locales";
 import {
 	socialAppClient,
 	socialPublicClient,
@@ -119,6 +120,8 @@ export interface FetchForumOptions {
 	signal?: AbortSignal;
 	/** 帶 session cookie 讀（瀏覽器）：伺服器才算得出 `is_mine` 與 `viewer_can_*`；SSR 是匿名讀取。 */
 	viewer?: boolean;
+	/** server 端呼叫必帶路由的語系（`activeLocale()` 只在瀏覽器可用）。 */
+	locale?: AppLocale;
 }
 
 export async function fetchSellerForum(
@@ -140,6 +143,39 @@ export async function fetchSellerForum(
 		.filter((e) => e.state === CommentState.VISIBLE || Number(e.replyCount) > 0)
 		.map(forumEntryFromWire);
 	return { records, nextPageToken: res.nextPageToken, pageSize };
+}
+
+/**
+ * 單一討論串：頂層項目（刪除或隱藏而底下有回覆時是佔位項目）與回覆的第一頁。`top` 是一頁一筆的列表，
+ * 與討論區列表同形，讓同一套快取與修改邏輯處理；`replies.nextPageToken` 交給 `fetchSellerForumReplies` 的 ListForumEntries 續讀。
+ */
+export interface SellerForumThreadResult {
+	top: SellerForumListResult;
+	replies: SellerForumListResult;
+}
+
+export async function fetchSellerForumThread(
+	storeId: string,
+	threadId: string,
+	{ pageSize = 20, signal, viewer = false, locale }: FetchForumOptions = {},
+): Promise<SellerForumThreadResult> {
+	const client = viewer ? socialViewerClient() : socialPublicClient({ locale });
+	const res = await client.getForumThread(
+		{ storeId, threadId, pageSize },
+		{ signal },
+	);
+	if (!res.entry) throw new Error("forum thread entry missing");
+	const top = forumEntryFromWire(res.entry);
+	const replies = withReplyToNames(
+		res.replies
+			.filter((e) => e.state === CommentState.VISIBLE)
+			.map(forumEntryFromWire),
+		top.userName,
+	);
+	return {
+		top: { records: [top], nextPageToken: "", pageSize },
+		replies: { records: replies, nextPageToken: res.nextPageToken, pageSize },
+	};
 }
 
 export async function fetchSellerForumReplies(

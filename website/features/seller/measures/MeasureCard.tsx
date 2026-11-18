@@ -5,6 +5,7 @@ import { Chip } from "@/components/ui/Chip";
 import { type UiText, useUiText } from "@/lib/i18n/ui-text";
 import type { SellerMeasure } from "@/lib/seller/measures";
 import AppealEntry from "./AppealEntry";
+import { MeasureContents } from "./MeasureContents";
 import {
 	measureMeta,
 	measurePeriodText,
@@ -64,6 +65,8 @@ export default function MeasureCard({ measure }: { measure: SellerMeasure }) {
 					{measure.statement}
 				</p>
 			)}
+
+			<MeasureContents contents={measure.contents} />
 
 			{measureNotes(ut, measure).map((note) => (
 				<p

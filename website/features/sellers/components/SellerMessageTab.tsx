@@ -28,6 +28,8 @@ interface SellerMessageTabProps {
 	/** The storefront URL segment (store_code), for the login return path. */
 	routeId: string;
 	initialData?: SellerForumListResult;
+	/** 設了是單一討論串頁：只列這一串（頂層項目與回覆），留言框是對這一串回覆。 */
+	threadId?: string;
 }
 
 /**
@@ -44,19 +46,20 @@ export default function SellerMessageTab({
 	sellerId,
 	routeId,
 	initialData,
+	threadId,
 }: SellerMessageTabProps) {
 	const { status } = useAuth();
 	const tFeed = useTranslations("feed.comments");
 	const tSeller = useTranslations("seller.comments");
 	const signedIn = status === "signedIn";
-	const forum = useSellerForum(sellerId, initialData);
+	const forum = useSellerForum(sellerId, initialData, threadId);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const [replyingTo, setReplyingTo] = React.useState<SellerForumComment | null>(
 		null,
 	);
 	const [expandedIds, setExpandedIds] = React.useState<ReadonlySet<string>>(
-		() => new Set(),
+		() => new Set(threadId ? [threadId] : []),
 	);
 	const defaultErrors = useDefaultErrorText();
 	const composeRef = React.useRef<HTMLTextAreaElement | null>(null);
@@ -70,6 +73,12 @@ export default function SellerMessageTab({
 		ReadonlySet<string>
 	>(() => new Set());
 	const busyRef = React.useRef(false);
+
+	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目（頂層是佔位項目時不能回覆，留言框只在指定回覆對象時出現）。
+	const threadTop = threadId
+		? forum.comments.find((c) => c.id === threadId && c.viewerCanReply)
+		: undefined;
+	const target = replyingTo ?? threadTop ?? null;
 
 	const saveEntry = (entry: SellerForumComment, next: string) =>
 		forum.update(entry, next);
@@ -142,11 +151,11 @@ export default function SellerMessageTab({
 		setSubmitting(true);
 		setActionError(null);
 		try {
-			if (replyingTo) {
-				await forum.reply(replyingTo, content);
+			if (target) {
+				await forum.reply(target, content);
 				// Reveal the thread so the new reply is visible.
-				const threadId = String(replyingTo.parentId ?? replyingTo.id);
-				setExpandedIds((prev) => new Set(prev).add(threadId));
+				const revealId = String(target.parentId ?? target.id);
+				setExpandedIds((prev) => new Set(prev).add(revealId));
 				setReplyingTo(null);
 			} else {
 				await forum.post(content);
@@ -181,52 +190,54 @@ export default function SellerMessageTab({
 	return (
 		<section className="flex flex-col gap-5">
 			{signedIn ? (
-				<form
-					className="flex flex-col gap-[10px] p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.1))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
-					onSubmit={handleSubmit}
-				>
-					{replyingTo ? (
-						<div className="flex items-center justify-between gap-2 p-[8px_14px] rounded-full bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:bg-[rgba(241,205,112,0.12)] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] text-[0.8125rem]">
-							<span>
-								回覆 <strong>@{replyingTo.userName}</strong>
-							</span>
-							<button
-								type="button"
-								className="w-6 h-6 rounded-full border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[length:var(--text-lg)] leading-none cursor-pointer hover:bg-[rgb(var(--color-ink-800-rgb)/0.1)] dark:hover:bg-[rgba(241,205,112,0.14)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)]"
-								onClick={cancelReply}
-								aria-label="取消回覆"
-							>
-								×
-							</button>
-						</div>
-					) : null}
-					<textarea
-						ref={composeRef}
-						className="w-full min-h-[64px] p-[10px_12px] rounded-[var(--radius-md)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.12))] bg-[var(--hkui-background,#fdfcf6)] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.18)] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] font-inherit resize-y focus:outline-none focus:border-[var(--action-primary,var(--color-ink-800))] dark:focus:border-[rgba(241,205,112,0.6)] focus:shadow-[0_0_0_3px_rgb(var(--color-ink-800-rgb)/0.12)] dark:focus:shadow-[0_0_0_3px_rgba(241,205,112,0.18)]"
-						placeholder={
-							replyingTo ? `回覆 ${replyingTo.userName}…` : "留言給這個賣家…"
-						}
-						value={draft}
-						onChange={(event) => setDraft(event.target.value)}
-						rows={2}
-						maxLength={500}
-						disabled={submitting}
-					/>
-					<Button
-						type="submit"
-						className="self-end h-auto min-w-[96px] p-[10px_22px] rounded-full border-0 bg-[var(--action-primary,var(--color-ink-800))] dark:bg-[rgba(241,205,112,0.85)] text-[var(--color-neutral-cream)] dark:text-[#2d2010] text-[0.9375rem] font-bold cursor-pointer transition-[filter] duration-[160ms] hover:not-disabled:brightness-[1.08] disabled:opacity-45 disabled:cursor-not-allowed"
-						disabled={!draft.trim() || submitting}
-						isLoading={submitting}
-						loadingLabel={replyingTo ? "送出回覆中…" : "送出留言中…"}
+				!threadId || target ? (
+					<form
+						className="flex flex-col gap-[10px] p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.1))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
+						onSubmit={handleSubmit}
 					>
-						{replyingTo ? "回覆" : "送出"}
-					</Button>
-				</form>
+						{replyingTo ? (
+							<div className="flex items-center justify-between gap-2 p-[8px_14px] rounded-full bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:bg-[rgba(241,205,112,0.12)] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] text-[0.8125rem]">
+								<span>
+									回覆 <strong>@{replyingTo.userName}</strong>
+								</span>
+								<button
+									type="button"
+									className="w-6 h-6 rounded-full border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[length:var(--text-lg)] leading-none cursor-pointer hover:bg-[rgb(var(--color-ink-800-rgb)/0.1)] dark:hover:bg-[rgba(241,205,112,0.14)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)]"
+									onClick={cancelReply}
+									aria-label="取消回覆"
+								>
+									×
+								</button>
+							</div>
+						) : null}
+						<textarea
+							ref={composeRef}
+							className="w-full min-h-[64px] p-[10px_12px] rounded-[var(--radius-md)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.12))] bg-[var(--hkui-background,#fdfcf6)] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.18)] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] font-inherit resize-y focus:outline-none focus:border-[var(--action-primary,var(--color-ink-800))] dark:focus:border-[rgba(241,205,112,0.6)] focus:shadow-[0_0_0_3px_rgb(var(--color-ink-800-rgb)/0.12)] dark:focus:shadow-[0_0_0_3px_rgba(241,205,112,0.18)]"
+							placeholder={
+								target ? `回覆 ${target.userName}…` : "留言給這個賣家…"
+							}
+							value={draft}
+							onChange={(event) => setDraft(event.target.value)}
+							rows={2}
+							maxLength={500}
+							disabled={submitting}
+						/>
+						<Button
+							type="submit"
+							className="self-end h-auto min-w-[96px] p-[10px_22px] rounded-full border-0 bg-[var(--action-primary,var(--color-ink-800))] dark:bg-[rgba(241,205,112,0.85)] text-[var(--color-neutral-cream)] dark:text-[#2d2010] text-[0.9375rem] font-bold cursor-pointer transition-[filter] duration-[160ms] hover:not-disabled:brightness-[1.08] disabled:opacity-45 disabled:cursor-not-allowed"
+							disabled={!draft.trim() || submitting}
+							isLoading={submitting}
+							loadingLabel={target ? "送出回覆中…" : "送出留言中…"}
+						>
+							{target ? "回覆" : "送出"}
+						</Button>
+					</form>
+				) : null
 			) : status === "unknown" ? null : (
 				<div className="flex items-center justify-between gap-3 p-[14px_18px] rounded-[14px] bg-[var(--surface-card,rgb(var(--color-ink-800-rgb)/0.04))] dark:bg-[rgba(255,255,255,0.04)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.72)] text-[0.9375rem]">
 					<span>登入後可以留言給這個賣家</span>
 					<Link
-						href={`/login?redirect=${encodeURIComponent(`/sellers/${routeId}/messages`)}`}
+						href={`/login?redirect=${encodeURIComponent(`/sellers/${routeId}/messages${threadId ? `/${threadId}` : ""}`)}`}
 						hardNavigation
 						className="p-[8px_18px] rounded-full bg-[var(--action-primary,var(--color-ink-800))] dark:bg-[rgba(241,205,112,0.85)] text-[var(--color-neutral-cream)] dark:text-[#2d2010] text-[length:var(--text-sm)] font-bold no-underline hover:brightness-[1.08]"
 					>
