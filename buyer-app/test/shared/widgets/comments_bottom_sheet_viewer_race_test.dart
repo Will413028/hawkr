@@ -247,4 +247,20 @@ void main() {
     expect(find.byKey(_input), findsOneWidget);
     expect(find.byKey(const ValueKey('comments-load-error')), findsNothing);
   });
+
+  testWidgets('換觀看者後貼文實體重讀：新觀看者的留言權限回來，輸入框出現', (tester) async {
+    final public = FakeSocialPublic(
+      post: fakePost(viewerCanComment: true),
+      comments: [fakeComment('c1')],
+    );
+    await _pump(tester, public, viewerCanComment: false);
+    expect(public.getPostCalls, 0);
+    expect(find.byKey(_input), findsNothing);
+
+    _session.signIn();
+    await tester.pumpAndSettle();
+
+    expect(public.getPostCalls, 1);
+    expect(find.byKey(_input), findsOneWidget);
+  });
 }

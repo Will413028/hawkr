@@ -260,7 +260,10 @@ class FakeSocialApp {
         .unary(SocialAppService.updateForumEntry, (req, _) async {
           forumUpdated.add(req);
           if (pending != null) await pending!.future;
-          return pb.UpdateForumEntryResponse(entry: req.entry);
+          return pb.UpdateForumEntryResponse(
+            entry: fakeForumEntry(req.entry.id, body: req.entry.body)
+              ..etag = 'etag-updated-${req.entry.id}',
+          );
         })
         .unary(SocialAppService.deleteForumEntry, (req, _) async {
           forumDeleted.add(req);

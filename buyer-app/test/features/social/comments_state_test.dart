@@ -8,6 +8,8 @@ import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/features/social/data/social_model.dart';
 import 'package:hawkr_buyer/features/social/presentation/comments_notifier.dart';
+import 'package:hawkr_buyer/features/social/presentation/thread_notifier.dart'
+    show ThreadPhase;
 import 'package:hawkr_buyer/features/social/presentation/post_entity_store.dart';
 import 'package:hawkr_buyer/features/social/presentation/write_result.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -91,7 +93,7 @@ void main() {
 
       expect(_rootIds(c), ['new']);
       expect(c.read(_comments).tree.replyIds, isEmpty);
-      expect(c.read(_comments).phase, CommentsPhase.ready);
+      expect(c.read(_comments).phase, ThreadPhase.ready);
     });
 
     test('R1-2 換觀看者前發出的第一頁晚回來：丟棄', () async {
@@ -121,12 +123,12 @@ void main() {
         },
       );
       final c = await _open(public);
-      expect(c.read(_comments).phase, CommentsPhase.failed);
+      expect(c.read(_comments).phase, ThreadPhase.failed);
 
       fail = false;
       expect(await c.read(_comments.notifier).reload(), isTrue);
 
-      expect(c.read(_comments).phase, CommentsPhase.ready);
+      expect(c.read(_comments).phase, ThreadPhase.ready);
       expect(_rootIds(c), ['c1']);
     });
 
@@ -144,7 +146,7 @@ void main() {
       final ok = await c.read(_comments.notifier).reload();
 
       expect(ok, isFalse);
-      expect(c.read(_comments).phase, CommentsPhase.ready);
+      expect(c.read(_comments).phase, ThreadPhase.ready);
       expect(_rootIds(c), ['c1']);
     });
 
@@ -405,6 +407,143 @@ void main() {
 
       expect((await write).status, WriteStatus.discarded);
       expect(c.read(_comments).tree.byId['c1']!.viewerLiked, isFalse);
+    });
+  });
+
+  group('讀取與本地寫入交錯、旗標、生命週期', () {
+    test('分頁在途中重新整理且失敗：分頁旗標不卡住，可再分頁', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var fail = false;
+      var nextCalls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (req) {
+          if (req.pageToken == 'next') {
+            nextCalls++;
+            return gate.future;
+          }
+          if (fail) throw ConnectException(Code.unavailable, 'down');
+          return pb.ListCommentsResponse(
+            comments: [fakeComment('a')],
+            nextPageToken: 'next',
+          );
+        },
+      );
+      final c = await _open(public);
+
+      final first = c.read(_comments.notifier).loadMore();
+      await _settle();
+      fail = true;
+      expect(await c.read(_comments.notifier).reload(), isFalse);
+      gate.complete(pb.ListCommentsResponse(comments: [fakeComment('late')]));
+      await first;
+      unawaited(c.read(_comments.notifier).loadMore());
+      await _settle();
+
+      expect(nextCalls, 2);
+    });
+
+    test('回覆展開在途中重新整理且失敗：同一則可再展開', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var fail = false;
+      var replyCalls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (req) {
+          if (req.hasParentId()) {
+            replyCalls++;
+            return gate.future;
+          }
+          if (fail) throw ConnectException(Code.unavailable, 'down');
+          return pb.ListCommentsResponse(
+            comments: [fakeComment('c1', replyCount: 2)],
+          );
+        },
+      );
+      final c = await _open(public);
+
+      final first = c.read(_comments.notifier).loadReplies('c1');
+      await _settle();
+      fail = true;
+      await c.read(_comments.notifier).reload();
+      gate.complete(pb.ListCommentsResponse());
+      await first;
+      unawaited(c.read(_comments.notifier).loadReplies('c1'));
+      await _settle();
+
+      expect(replyCalls, 2);
+    });
+
+    test('讀取在途中本地刪除：較早發出的讀取回來不把刪掉的留言帶回來', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (_) {
+          final both = pb.ListCommentsResponse(
+            comments: [fakeComment('c1'), fakeComment('c2')],
+          );
+          return ++calls == 1 ? both : gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_comments.notifier).reload();
+      await _settle();
+      await c
+          .read(_comments.notifier)
+          .delete(c.read(_comments).tree.byId['c1']!);
+      gate.complete(
+        pb.ListCommentsResponse(
+          comments: [fakeComment('c1'), fakeComment('c2')],
+        ),
+      );
+      await reload;
+
+      expect(_rootIds(c), ['c2']);
+    });
+
+    test('讀取在途中本地新增：較早發出的讀取回來不丟掉剛新增的留言', () async {
+      final gate = Completer<pb.ListCommentsResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        commentsResponder: (_) {
+          final one = pb.ListCommentsResponse(comments: [fakeComment('c1')]);
+          return ++calls == 1 ? one : gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_comments.notifier).reload();
+      await _settle();
+      await c.read(_comments.notifier).create('新的');
+      gate.complete(pb.ListCommentsResponse(comments: [fakeComment('c1')]));
+      await reload;
+
+      expect(_rootIds(c), ['c1', 'new']);
+    });
+
+    test('留言寫入在途中關掉留言面板：伺服器已套用的新增與刪除仍調整貼文留言數', () async {
+      for (final delta in [1, -1]) {
+        final app = FakeSocialApp()..pending = Completer<void>();
+        final public = FakeSocialPublic(comments: [fakeComment('c1')]);
+        final c = _container(public, app);
+        await c.read(sessionProvider.future);
+        final sub = c.listen(_comments, (_, _) {});
+        c.listen(postEntityStoreProvider, (_, _) {});
+        await _settle();
+        _seedPost(c);
+
+        final notifier = c.read(_comments.notifier);
+        final write = delta > 0
+            ? notifier.create('x')
+            : notifier.delete(c.read(_comments).tree.byId['c1']!);
+        await _settle();
+        sub.close();
+        await _settle();
+        app.pending!.complete();
+        await write;
+        await _settle();
+
+        expect(_count(c), 5 + delta);
+      }
     });
   });
 }

@@ -20,7 +20,8 @@ import '../../../../shared/widgets/hk_frosted_icon_button.dart';
 import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
-import '../../../social/presentation/comments_notifier.dart' show CommentsPhase;
+import '../../../social/presentation/thread_notifier.dart' show ThreadPhase;
+import '../../../social/presentation/thread_tree.dart' show ThreadTree;
 import '../../../social/presentation/forum_notifier.dart';
 import '../../../social/presentation/write_result.dart';
 import '../../../../core/session/session_provider.dart';
@@ -119,7 +120,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
 
   Future<void> _reload() async {
     final ok = await _notifier.reload();
-    if (!ok && mounted && _forum.phase == CommentsPhase.ready) {
+    if (!ok && mounted && _forum.phase == ThreadPhase.ready) {
       showCommonSnackBar(context, '載入失敗，請稍後再試');
     }
   }
@@ -248,16 +249,26 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
 
   // ── 解析工具 ──────────────────────────────────────────────────────────────
 
-  List<_CommentNode> _nodesOf(ForumState forum) => [
-    for (final root in forum.tree.roots)
-      _nodeOf(
-        root,
-        replies: [
-          for (final reply in forum.tree.repliesOf(root.id))
-            _nodeOf(reply, parentName: _nameOf(root)),
-        ],
-      ),
-  ];
+  ThreadTree<pb.ForumEntry>? _nodesTree;
+  List<_CommentNode> _nodesCache = const [];
+
+  List<_CommentNode> _nodesOf(ForumState forum) {
+    final tree = forum.tree;
+    if (!identical(_nodesTree, tree)) {
+      _nodesTree = tree;
+      _nodesCache = [
+        for (final root in tree.roots)
+          _nodeOf(
+            root,
+            replies: [
+              for (final reply in tree.repliesOf(root.id))
+                _nodeOf(reply, parentName: _nameOf(root)),
+            ],
+          ),
+      ];
+    }
+    return _nodesCache;
+  }
 
   String _nameOf(pb.ForumEntry entry) {
     final author = entry.author;
@@ -348,13 +359,13 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
 
   /// 留言列表（以 Sliver 形式），依狀態輸出骨架、空狀態或實際列表。
   Widget _buildCommentListSlivers(ForumState forum) {
-    if (forum.phase == CommentsPhase.loading) {
+    if (forum.phase == ThreadPhase.loading) {
       return const SliverFillRemaining(
         hasScrollBody: false,
         child: TruckLoadingOverlay(message: '載入中...'),
       );
     }
-    if (forum.phase == CommentsPhase.failed) {
+    if (forum.phase == ThreadPhase.failed) {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: Column(

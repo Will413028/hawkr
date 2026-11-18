@@ -8,20 +8,14 @@ part of 'forum_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-///
-/// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 
 @ProviderFor(Forum)
 final forumProvider = ForumFamily._();
 
-/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-///
-/// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 final class ForumProvider extends $NotifierProvider<Forum, ForumState> {
-  /// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-  ///
-  /// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+  /// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
   ForumProvider._({
     required ForumFamily super.from,
     required String super.argument,
@@ -66,11 +60,9 @@ final class ForumProvider extends $NotifierProvider<Forum, ForumState> {
   }
 }
 
-String _$forumHash() => r'379e2795cb2bb5d6d526b7e294db0da6a0f4bfeb';
+String _$forumHash() => r'52de006b8d31eea24e5bb0929de53b2269d21dd2';
 
-/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-///
-/// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 
 final class ForumFamily extends $Family
     with
@@ -90,9 +82,7 @@ final class ForumFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-  ///
-  /// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+  /// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 
   ForumProvider call(String storeId) =>
       ForumProvider._(argument: storeId, from: this);
@@ -101,9 +91,7 @@ final class ForumFamily extends $Family
   String toString() => r'forumProvider';
 }
 
-/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-///
-/// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 
 abstract class _$Forum extends $Notifier<ForumState> {
   late final _$args = ref.$arg as String;

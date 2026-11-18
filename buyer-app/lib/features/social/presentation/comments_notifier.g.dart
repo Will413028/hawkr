@@ -8,24 +8,24 @@ part of 'comments_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
 ///
-/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-/// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+/// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
 
 @ProviderFor(Comments)
 final commentsProvider = CommentsFamily._();
 
-/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
 ///
-/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-/// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+/// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
 final class CommentsProvider
     extends $NotifierProvider<Comments, CommentsState> {
-  /// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+  /// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
   ///
-  /// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-  /// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+  /// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+  /// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
   CommentsProvider._({
     required CommentsFamily super.from,
     required int super.argument,
@@ -70,12 +70,12 @@ final class CommentsProvider
   }
 }
 
-String _$commentsHash() => r'76117c3a925e62cd0a7164e6730328627ef91b7c';
+String _$commentsHash() => r'b346464b9d11429129c6546bdfa727dc1b7677c3';
 
-/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
 ///
-/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-/// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+/// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
 
 final class CommentsFamily extends $Family
     with
@@ -95,10 +95,10 @@ final class CommentsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+  /// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
   ///
-  /// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-  /// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+  /// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+  /// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
 
   CommentsProvider call(int postId) =>
       CommentsProvider._(argument: postId, from: this);
@@ -107,10 +107,10 @@ final class CommentsFamily extends $Family
   String toString() => r'commentsProvider';
 }
 
-/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組，分頁、回覆展開與寫入都在這裡。
+/// 一則貼文的留言：留言以 id 存一份，回覆以 parentId 分組；讀取、分頁、回覆展開在 [ThreadNotifier]，寫入在這裡。
 ///
-/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重新整理另有一個序號，
-/// 讓整理之前發出的分頁與展開不會蓋掉新讀到的第一頁。重讀失敗保留舊值；留言數的變動寫回貼文實體。
+/// 換觀看者時整份重建清空；每個跨 await 的路徑回來先比對世代，過期就丟棄。重讀失敗保留舊值；
+/// 留言數的變動寫回貼文實體，寫回只看貼文實體自己的世代，不依賴這個 provider 還活著。
 
 abstract class _$Comments extends $Notifier<CommentsState> {
   late final _$args = ref.$arg as int;

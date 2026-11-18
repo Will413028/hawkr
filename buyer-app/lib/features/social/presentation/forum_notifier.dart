@@ -6,22 +6,24 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/session/viewer_scoped_notifier.dart';
 import '../data/social_content_repository.dart';
-import 'comments_notifier.dart' show CommentsPhase;
+import 'thread_notifier.dart';
 import 'thread_tree.dart';
 import 'write_result.dart';
 
 part 'forum_notifier.g.dart';
 
-class ForumState {
+class ForumState implements ThreadStateView<ForumState, pb.ForumEntry> {
   ForumState({
-    this.phase = CommentsPhase.loading,
+    this.phase = ThreadPhase.loading,
     ThreadTree<pb.ForumEntry>? tree,
     this.viewerCanComment = false,
     this.viewerActor,
     this.submitting = false,
   }) : tree = tree ?? ThreadTree<pb.ForumEntry>(forumEntryCodec);
 
-  final CommentsPhase phase;
+  @override
+  final ThreadPhase phase;
+  @override
   final ThreadTree<pb.ForumEntry> tree;
 
   /// 觀看者能不能新增頂層項目（`ListForumEntries` 回應）；回覆與編輯另看項目的 `viewer_can_*`。
@@ -32,7 +34,7 @@ class ForumState {
   final bool submitting;
 
   ForumState copyWith({
-    CommentsPhase? phase,
+    ThreadPhase? phase,
     ThreadTree<pb.ForumEntry>? tree,
     bool? viewerCanComment,
     pb.Actor? viewerActor,
@@ -45,89 +47,63 @@ class ForumState {
     viewerActor: clearViewerActor ? null : (viewerActor ?? this.viewerActor),
     submitting: submitting ?? this.submitting,
   );
+
+  @override
+  ForumState withThread({
+    ThreadPhase? phase,
+    ThreadTree<pb.ForumEntry>? tree,
+  }) => copyWith(phase: phase, tree: tree);
 }
 
-/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組，讀取、回覆展開與寫入都在這裡（沒有按讚）。
-///
-/// 世代與序號規則同 `Comments`：換觀看者整份重建清空，每個 await 回來先比對；重讀失敗保留舊值。
+/// 一家店的討論區：項目以 id 存一份，回覆以 parentId 分組；讀取與回覆展開在 [ThreadNotifier]，寫入在這裡（沒有按讚）。
 @riverpod
-class Forum extends _$Forum with ViewerScoped {
+class Forum extends _$Forum
+    with ViewerScoped, ThreadNotifier<ForumState, pb.ForumEntry> {
   static const _uuid = Uuid();
-
-  int _epoch = 0;
 
   @override
   ForumState build(String storeId) {
     bindViewer();
-    _epoch++;
-    final scope = beginScope();
-    scheduleMicrotask(() {
-      if (scope.isCurrent) unawaited(_load(scope));
-    });
+    startThread();
     return ForumState();
   }
 
   SocialContentRepository get _repo =>
       ref.read(socialContentRepositoryProvider);
 
-  Future<bool> reload() => _load(beginScope());
+  @override
+  bool get autoLoadReplies => true;
 
-  Future<bool> _load(ViewerScope scope) async {
-    final epoch = ++_epoch;
-    if (state.phase == CommentsPhase.failed) {
-      state = state.copyWith(phase: CommentsPhase.loading);
-    }
-    final pb.ListForumEntriesResponse response;
-    try {
-      response = await scope.run(_repo.listForumEntries(storeId));
-    } on StaleScopeException {
-      return true;
-    } catch (_) {
-      if (epoch != _epoch) return true;
-      if (state.phase != CommentsPhase.ready) {
-        state = state.copyWith(phase: CommentsPhase.failed);
-      }
-      return false;
-    }
-    if (epoch != _epoch) return true;
-    state = ForumState(
-      phase: CommentsPhase.ready,
-      tree: ThreadTree<pb.ForumEntry>(
-        forumEntryCodec,
-      ).withRoots(response.entries),
+  @override
+  Future<ThreadPage<pb.ForumEntry>> fetchPage({
+    String? parentId,
+    String pageToken = '',
+  }) async {
+    final response = await _repo.listForumEntries(
+      storeId,
+      parentId: parentId,
+      pageToken: pageToken,
+    );
+    return ThreadPage(response.entries, response.nextPageToken, meta: response);
+  }
+
+  @override
+  ForumState firstPageState(
+    ForumState current,
+    ThreadTree<pb.ForumEntry> tree,
+    ThreadPage<pb.ForumEntry> page,
+  ) {
+    final response = page.meta! as pb.ListForumEntriesResponse;
+    return ForumState(
+      phase: ThreadPhase.ready,
+      tree: tree,
       viewerCanComment: response.viewerCanComment,
       viewerActor: response.hasViewerActor() ? response.viewerActor : null,
-      submitting: state.submitting,
+      submitting: current.submitting,
     );
-    for (final entry in response.entries) {
-      if (entry.replyCount.toInt() > 0) {
-        unawaited(_loadReplies(entry.id, scope, epoch));
-      }
-    }
-    return true;
   }
 
-  Future<void> _loadReplies(
-    String parentId,
-    ViewerScope scope,
-    int epoch,
-  ) async {
-    try {
-      final all = <pb.ForumEntry>[];
-      var token = '';
-      do {
-        final response = await scope.run(
-          _repo.listForumEntries(storeId, parentId: parentId, pageToken: token),
-        );
-        all.addAll(response.entries);
-        token = response.nextPageToken;
-      } while (token.isNotEmpty);
-      if (all.isEmpty || epoch != _epoch) return;
-      state = state.copyWith(tree: state.tree.setReplies(parentId, all));
-    } catch (_) {
-      return;
-    }
-  }
+  Future<bool> reload() => loadFirstPage(beginScope());
 
   /// 新增項目；[parentId] 給了是回覆。成功後加進列表。
   Future<WriteResult> create(
@@ -155,11 +131,12 @@ class Forum extends _$Forum with ViewerScoped {
       state = state.copyWith(submitting: false);
       return WriteResult.failed(e);
     }
-    state = state.copyWith(tree: state.tree.added(created), submitting: false);
+    applyCreated(created);
+    state = state.copyWith(submitting: false);
     return const WriteResult.applied();
   }
 
-  /// 編輯內文：本地先改，失敗只還原這一則；成功後重讀，拿到新的 etag。
+  /// 編輯內文：本地先改，失敗只還原這一則；成功以回應裡的完整項目（含新的 etag）取代。
   Future<WriteResult> edit(pb.ForumEntry entry, String body) async {
     if (state.submitting) return const WriteResult.discarded();
     final current = state.tree.byId[entry.id];
@@ -169,8 +146,9 @@ class Forum extends _$Forum with ViewerScoped {
       tree: state.tree.replaced(current.deepCopy()..body = body),
       submitting: true,
     );
+    final pb.ForumEntry updated;
     try {
-      await scope.run(_repo.updateForumEntry(entry, body));
+      updated = await scope.run(_repo.updateForumEntry(entry, body));
     } on StaleScopeException {
       return const WriteResult.discarded();
     } catch (e) {
@@ -183,23 +161,22 @@ class Forum extends _$Forum with ViewerScoped {
       );
       return WriteResult.failed(e);
     }
+    applyReplaced(updated);
     state = state.copyWith(submitting: false);
-    await _load(scope);
     return const WriteResult.applied();
   }
 
   /// 刪除一則：先在本地套用，失敗只還原這一則；觀看者換了就丟棄。
   Future<WriteResult> delete(pb.ForumEntry entry) async {
-    final removal = state.tree.removed(entry.id);
-    if (removal == null) return const WriteResult.discarded();
+    final deletion = applyDelete(entry.id);
+    if (deletion == null) return const WriteResult.discarded();
     final scope = beginScope();
-    state = state.copyWith(tree: removal.tree);
     try {
       await scope.run(_repo.deleteForumEntry(entry));
     } on StaleScopeException {
       return const WriteResult.discarded();
     } catch (e) {
-      state = state.copyWith(tree: removal.undo(state.tree));
+      rollbackDelete(deletion);
       return WriteResult.failed(e);
     }
     return const WriteResult.applied();

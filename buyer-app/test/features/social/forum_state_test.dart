@@ -6,8 +6,8 @@ import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
-import 'package:hawkr_buyer/features/social/presentation/comments_notifier.dart'
-    show CommentsPhase;
+import 'package:hawkr_buyer/features/social/presentation/thread_notifier.dart'
+    show ThreadPhase;
 import 'package:hawkr_buyer/features/social/presentation/forum_notifier.dart';
 import 'package:hawkr_buyer/features/social/presentation/write_result.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -136,12 +136,12 @@ void main() {
         },
       );
       final c = await _open(public);
-      expect(c.read(_forum).phase, CommentsPhase.failed);
+      expect(c.read(_forum).phase, ThreadPhase.failed);
 
       fail = false;
       await c.read(_forum.notifier).reload();
 
-      expect(c.read(_forum).phase, CommentsPhase.ready);
+      expect(c.read(_forum).phase, ThreadPhase.ready);
       expect(_rootIds(c), ['e1']);
     });
 
@@ -162,7 +162,7 @@ void main() {
       final ok = await c.read(_forum.notifier).reload();
 
       expect(ok, isFalse);
-      expect(c.read(_forum).phase, CommentsPhase.ready);
+      expect(c.read(_forum).phase, ThreadPhase.ready);
       expect(_rootIds(c), ['e1']);
       expect(c.read(_forum).viewerCanComment, isTrue);
     });
@@ -291,6 +291,79 @@ void main() {
 
       expect((await stale).status, WriteStatus.discarded);
       expect(c2.read(_forum).tree.rootIds, ['e1', 'e2']);
+    });
+  });
+
+  group('讀取與本地寫入交錯、編輯', () {
+    test('讀取在途中本地刪除：較早發出的讀取回來不把刪掉的項目帶回來', () async {
+      final gate = Completer<pb.ListForumEntriesResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        forumResponder: (_) {
+          final both = pb.ListForumEntriesResponse(
+            entries: [fakeForumEntry('e1'), fakeForumEntry('e2')],
+          );
+          return ++calls == 1 ? both : gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_forum.notifier).reload();
+      await _settle();
+      await c.read(_forum.notifier).delete(c.read(_forum).tree.byId['e1']!);
+      gate.complete(
+        pb.ListForumEntriesResponse(
+          entries: [fakeForumEntry('e1'), fakeForumEntry('e2')],
+        ),
+      );
+      await reload;
+
+      expect(_rootIds(c), ['e2']);
+    });
+
+    test('讀取在途中本地新增：較早發出的讀取回來不丟掉剛新增的項目', () async {
+      final gate = Completer<pb.ListForumEntriesResponse>();
+      var calls = 0;
+      final public = FakeSocialPublic(
+        forumResponder: (_) {
+          final one = pb.ListForumEntriesResponse(
+            entries: [fakeForumEntry('e1')],
+          );
+          return ++calls == 1 ? one : gate.future;
+        },
+      );
+      final c = await _open(public);
+
+      final reload = c.read(_forum.notifier).reload();
+      await _settle();
+      await c.read(_forum.notifier).create('新的');
+      gate.complete(
+        pb.ListForumEntriesResponse(entries: [fakeForumEntry('e1')]),
+      );
+      await reload;
+
+      expect(_rootIds(c), ['e1', 'new']);
+    });
+
+    test('編輯成功：用回應的新 etag 取代、不重讀、立即可再編輯', () async {
+      final app = FakeSocialApp();
+      final public = FakeSocialPublic(
+        forumEntries: [fakeForumEntry('e1', body: '原文', canEdit: true)],
+      );
+      final c = await _open(public, app: app);
+      final listCalls = public.listForumCalls;
+
+      final first = await c
+          .read(_forum.notifier)
+          .edit(c.read(_forum).tree.byId['e1']!, '一');
+      expect(first.isApplied, isTrue);
+      expect(c.read(_forum).submitting, isFalse);
+      expect(c.read(_forum).tree.byId['e1']!.etag, 'etag-updated-e1');
+      expect(public.listForumCalls, listCalls);
+
+      await c.read(_forum.notifier).edit(c.read(_forum).tree.byId['e1']!, '二');
+
+      expect(app.forumUpdated.last.entry.etag, 'etag-updated-e1');
     });
   });
 }

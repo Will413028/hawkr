@@ -170,14 +170,18 @@ class SocialContentRepository {
     return response.entry;
   }
 
-  Future<void> updateForumEntry(pb.ForumEntry entry, String body) async {
+  Future<pb.ForumEntry> updateForumEntry(
+    pb.ForumEntry entry,
+    String body,
+  ) async {
     final edited = pb.ForumEntry(id: entry.id, etag: entry.etag, body: body);
-    await _app.updateForumEntry(
+    final response = await _app.updateForumEntry(
       pb.UpdateForumEntryRequest(
         entry: edited,
         updateMask: fieldMask(edited, ['body']),
       ),
     );
+    return response.entry;
   }
 
   Future<void> deleteForumEntry(pb.ForumEntry entry) async {

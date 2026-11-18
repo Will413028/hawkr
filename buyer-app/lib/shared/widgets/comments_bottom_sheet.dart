@@ -16,6 +16,8 @@ import '../../core/networking/suspension_signal.dart';
 import '../../core/session/session_provider.dart';
 import '../../core/session/viewer_scope.dart';
 import '../../features/social/presentation/comments_notifier.dart';
+import '../../features/social/presentation/thread_notifier.dart'
+    show ThreadPhase;
 import '../../features/social/presentation/post_entity.dart';
 import '../../features/social/presentation/write_result.dart';
 import '../utils/require_login.dart';
@@ -94,7 +96,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   Future<void> _reload() async {
     final ok = await _notifier.reload();
-    if (!ok && mounted && _state.phase == CommentsPhase.ready) {
+    if (!ok && mounted && _state.phase == ThreadPhase.ready) {
       showCommonSnackBar(context, '載入失敗，請稍後再試');
     }
   }
@@ -308,11 +310,11 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                 // Comment list
 
                 Expanded(
-                  child: comments.phase == CommentsPhase.loading
+                  child: comments.phase == ThreadPhase.loading
                       ? const TruckLoadingOverlay(message: '載入中...')
                       : FruitRefreshIndicator(
                           onRefresh: _reload,
-                          child: comments.phase == CommentsPhase.failed
+                          child: comments.phase == ThreadPhase.failed
                               ? ListView(
                                   controller: _scrollController,
                                   physics:
