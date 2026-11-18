@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
+import 'package:hawkr_buyer/core/session/session_model.dart';
+import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hawkr_buyer/features/seller/presentation/widgets/merchant_chat_tab.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_frosted_icon_button.dart';
@@ -25,10 +28,20 @@ FakeSocialPublic _forum({bool canComment = true}) => FakeSocialPublic(
   ],
 );
 
+class _TestSession extends Session {
+  _TestSession(this.loggedIn);
+  final bool loggedIn;
+  @override
+  Future<SessionModel?> build() async => loggedIn
+      ? const SessionModel(userId: 'account-3001', nickname: 'Iris')
+      : null;
+}
+
 Future<void> _pump(
   WidgetTester tester,
   FakeSocialPublic public, {
   FakeSocialApp? app,
+  bool loggedIn = true,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -36,9 +49,11 @@ Future<void> _pump(
       socialAppClientProvider.overrideWithValue(
         (app ?? FakeSocialApp()).client(),
       ),
+      sessionProvider.overrideWith(() => _TestSession(loggedIn)),
     ],
   );
   addTearDown(container.dispose);
+  await container.read(sessionProvider.future);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -46,16 +61,27 @@ Future<void> _pump(
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, _) => MaterialApp(
+        builder: (_, _) => MaterialApp.router(
           theme: AppTheme.light,
-          home: Scaffold(
-            body: Consumer(
-              builder: (context, ref, _) => MerchantChatTab(
-                ref: ref,
-                merchantId: '7',
-                merchantName: '南崁王生技',
+          routerConfig: GoRouter(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) => Scaffold(
+                  body: Consumer(
+                    builder: (context, ref, _) => MerchantChatTab(
+                      ref: ref,
+                      merchantId: '7',
+                      merchantName: '南崁王生技',
+                    ),
+                  ),
+                ),
               ),
-            ),
+              GoRoute(
+                path: '/login',
+                builder: (_, _) => const Scaffold(body: Text('登入頁')),
+              ),
+            ],
           ),
         ),
       ),
@@ -94,6 +120,25 @@ void main() {
   testWidgets('viewer_can_comment 為 true 時有輸入欄', (tester) async {
     await _pump(tester, _forum());
     expect(find.byKey(const Key('merchant-comment-input')), findsOneWidget);
+  });
+
+  testWidgets('訪客：顯示「登入後留言」，點了經確認後導向登入', (tester) async {
+    await _pump(tester, _forum(canComment: false), loggedIn: false);
+    expect(find.byKey(const Key('merchant-comment-input')), findsNothing);
+    expect(find.text('登入後留言'), findsOneWidget);
+    await tester.tap(find.text('登入後留言'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('前往登入'));
+    await tester.pumpAndSettle();
+    expect(find.text('登入頁'), findsOneWidget);
+  });
+
+  testWidgets('已登入但 viewer_can_comment 為 false（被封鎖）：沒有輸入欄也沒有登入提示', (
+    tester,
+  ) async {
+    await _pump(tester, _forum(canComment: false));
+    expect(find.byKey(const Key('merchant-comment-input')), findsNothing);
+    expect(find.text('登入後留言'), findsNothing);
   });
 
   testWidgets('討論區沒有按讚的控制項', (tester) async {

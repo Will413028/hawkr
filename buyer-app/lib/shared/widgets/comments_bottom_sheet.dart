@@ -14,9 +14,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/networking/suspension_signal.dart';
+import '../../core/session/session_provider.dart';
 import '../../features/social/data/social_content_repository.dart';
 import '../utils/require_login.dart';
 import 'chat_bubble_icon.dart';
+import 'login_to_comment_prompt.dart';
 import 'fruit_refresh_indicator.dart';
 import 'hk_button_label.dart';
 import 'hk_empty_state.dart';
@@ -352,6 +354,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final guest = isGuestSession(ref.watch(sessionProvider));
     return SafeArea(
       top: false,
       child: AnimatedPadding(
@@ -496,8 +499,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                                 ),
                         ),
                 ),
-                if (_viewerCanComment)
+                if (_viewerCanComment || guest)
                   Divider(height: 1, color: AppColors.borderSubtle),
+                if (!_viewerCanComment && guest) const LoginToCommentPrompt(),
                 // Input area
                 if (_viewerCanComment)
                   Column(

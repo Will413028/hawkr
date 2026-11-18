@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/config/flavor.dart';
@@ -13,6 +14,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../features/social/social_fakes.dart';
 
+class _GuestSession extends Session {
+  @override
+  Future<SessionModel?> build() async => null;
+}
+
 class _ActiveSession extends Session {
   @override
   Future<SessionModel?> build() async =>
@@ -23,6 +29,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required FakeSocialPublic public,
   FakeSocialApp? app,
+  bool guest = false,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -30,7 +37,9 @@ Future<void> _pump(
       socialAppClientProvider.overrideWithValue(
         (app ?? FakeSocialApp()).client(),
       ),
-      sessionProvider.overrideWith(_ActiveSession.new),
+      sessionProvider.overrideWith(
+        guest ? _GuestSession.new : _ActiveSession.new,
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -42,9 +51,21 @@ Future<void> _pump(
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, _) => MaterialApp(
+        builder: (_, _) => MaterialApp.router(
           theme: AppTheme.light,
-          home: const Scaffold(body: CommentsBottomSheet(postId: '101')),
+          routerConfig: GoRouter(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) =>
+                    const Scaffold(body: CommentsBottomSheet(postId: '101')),
+              ),
+              GoRoute(
+                path: '/login',
+                builder: (_, _) => const Scaffold(body: Text('登入頁')),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -110,6 +131,32 @@ void main() {
       public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
     );
     expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
+  });
+
+  testWidgets('訪客：顯示「登入後留言」，點了經確認後導向登入', (tester) async {
+    await _pump(
+      tester,
+      guest: true,
+      public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
+    );
+    expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
+    expect(find.text('登入後留言'), findsOneWidget);
+    await tester.tap(find.text('登入後留言'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('前往登入'));
+    await tester.pumpAndSettle();
+    expect(find.text('登入頁'), findsOneWidget);
+  });
+
+  testWidgets('已登入但 viewer_can_comment 是 false（被封鎖）：沒有留言框也沒有登入提示', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      public: FakeSocialPublic(post: fakePost(viewerCanComment: false)),
+    );
+    expect(find.byKey(const ValueKey('comments-panel-input')), findsNothing);
+    expect(find.text('登入後留言'), findsNothing);
   });
 
   testWidgets('viewer_can_comment 是 true：有留言框', (tester) async {

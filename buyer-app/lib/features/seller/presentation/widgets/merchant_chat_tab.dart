@@ -21,6 +21,8 @@ import '../../../../shared/widgets/hk_empty_state.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../social/data/social_content_repository.dart';
+import '../../../../core/session/session_provider.dart';
+import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
 
 // ---------------------------------------------------------------------------
@@ -576,6 +578,10 @@ class _MerchantChatTabState extends State<MerchantChatTab>
     final spec = MerchantLayoutSpec.of(context);
     // 新增頂層留言看 viewer_can_comment；回覆與編輯是另一種動作，進入該模式就要有輸入欄。
     if (!_viewerCanComment && _replyTarget == null && !isEditing) {
+      final session = widget.ref?.read(sessionProvider);
+      if (session != null && isGuestSession(session)) {
+        return const LoginToCommentPrompt();
+      }
       return const SizedBox.shrink();
     }
     return TextFieldTapRegion(
