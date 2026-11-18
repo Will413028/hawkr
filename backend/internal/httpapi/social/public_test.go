@@ -97,6 +97,9 @@ type fakeReads struct {
 	forum      social.ForumPage
 	forumStore int64
 	forumReply social.ForumPage
+	thread     social.ForumThreadView
+	threadErr  error
+	threadAsk  [2]any
 	repliesTo  uuid.UUID
 
 	commentParents map[uuid.UUID]uuid.UUID
@@ -131,6 +134,11 @@ func (f *fakeReads) TrendingHashtags(_ context.Context, from, to time.Time, limi
 func (f *fakeReads) ListForumEntries(_ context.Context, _ social.Caller, storeID int64, _ *social.CommentCursor, _ int32) (social.ForumPage, error) {
 	f.forumStore = storeID
 	return f.forumPage(f.forum), nil
+}
+
+func (f *fakeReads) GetForumThread(_ context.Context, _ social.Caller, storeID int64, threadID uuid.UUID, _ int32) (social.ForumThreadView, error) {
+	f.threadAsk = [2]any{storeID, threadID}
+	return f.thread, f.threadErr
 }
 
 // ListForumReplies 與模組一樣先驗證父留言屬於 storeID：不存在或屬於別家店是 NotFound，不論頁面內容。
@@ -1035,5 +1043,43 @@ func TestListCommentsDoesNotLookUpBlocking(t *testing.T) {
 	}
 	if len(stores.asked) != 0 {
 		t.Errorf("留言列表查了封鎖 %v，viewer_can_reply 只看是不是店主，不需要", stores.asked)
+	}
+}
+
+func TestGetForumThreadMapsTopRepliesAndScopesTheNextToken(t *testing.T) {
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	top := social.ForumEntry{ID: uuid.New(), StoreID: 5, State: social.CommentDeleted, CreatedAt: now, UpdatedAt: now, Body: "leak", ReplyCount: 2}
+	reply := social.ForumEntry{ID: uuid.New(), StoreID: 5, ParentID: &top.ID, State: social.CommentVisible, Actor: social.Actor{Kind: social.ActorBuyer, ID: 7}, Body: "r", CreatedAt: now, UpdatedAt: now}
+	reads := &fakeReads{thread: social.ForumThreadView{Top: top, Replies: social.ForumPage{Entries: []social.ForumEntry{reply}, Next: &social.CommentCursor{CreatedAt: now, ID: reply.ID}}}}
+	h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{})
+	tid := top.ID.String()
+
+	resp, err := h.GetForumThread(asBuyer(t.Context()), connect.NewRequest(&pb.GetForumThreadRequest{StoreId: "5", ThreadId: tid}))
+	if err != nil || reads.threadAsk != [2]any{int64(5), top.ID} {
+		t.Fatalf("err=%v ask=%v", err, reads.threadAsk)
+	}
+	want := &pb.ForumEntry{Id: tid, StoreId: "5", State: pb.CommentState_COMMENT_STATE_DELETED, CreateTime: timestamppb.New(now), ReplyCount: 2}
+	if !proto.Equal(resp.Msg.GetEntry(), want) {
+		t.Errorf("頂層是佔位：%v", resp.Msg.GetEntry())
+	}
+	if r := resp.Msg.GetReplies(); len(r) != 1 || !r[0].GetIsMine() || !r[0].GetViewerCanReply() || !resp.Msg.GetViewerCanComment() {
+		t.Errorf("回覆 = %v", r)
+	}
+	// 下一頁的 token 要能交給 ListForumEntries（同一組 store_id、parent_id）。
+	reads.forumParents = map[uuid.UUID]int64{top.ID: 5}
+	reads.forumReply = social.ForumPage{Entries: []social.ForumEntry{reply}}
+	if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "5", ParentId: &tid, PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Errorf("token 不能用在 ListForumEntries：%v", err)
+	}
+	if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "5", PageToken: resp.Msg.GetNextPageToken()})); err == nil {
+		t.Error("token 不該能用在頂層列表")
+	}
+
+	reads.threadErr = apperr.NotFound("thread")
+	if _, err := h.GetForumThread(t.Context(), connect.NewRequest(&pb.GetForumThreadRequest{StoreId: "5", ThreadId: tid})); codeOf(t, err) != connect.CodeNotFound {
+		t.Errorf("not_found 要透傳：%v", err)
+	}
+	if _, err := h.GetForumThread(t.Context(), connect.NewRequest(&pb.GetForumThreadRequest{StoreId: "5", ThreadId: "x"})); codeOf(t, err) != connect.CodeInvalidArgument {
+		t.Errorf("壞的 thread_id：%v", err)
 	}
 }

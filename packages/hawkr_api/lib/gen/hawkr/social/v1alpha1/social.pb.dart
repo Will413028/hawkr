@@ -2441,6 +2441,207 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   void clearViewerCanComment() => $_clearField(4);
 }
 
+class GetForumThreadRequest extends $pb.GeneratedMessage {
+  factory GetForumThreadRequest({
+    $core.String? storeId,
+    $core.String? threadId,
+    $core.int? pageSize,
+  }) {
+    final result = GetForumThreadRequest._();
+    if (storeId != null) result.storeId = storeId;
+    if (threadId != null) result.threadId = threadId;
+    if (pageSize != null) result.pageSize = pageSize;
+    return result;
+  }
+
+  GetForumThreadRequest._();
+
+  factory GetForumThreadRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadRequest()..mergeFromBuffer(data, registry);
+  factory GetForumThreadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetForumThreadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetForumThreadRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOS(2, _omitFieldNames ? '' : 'threadId')
+    ..aI(3, _omitFieldNames ? '' : 'pageSize')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadRequest copyWith(
+          void Function(GetForumThreadRequest) updates) =>
+      super.copyWith((message) => updates(message as GetForumThreadRequest))
+          as GetForumThreadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetForumThreadRequest() / GetForumThreadRequest.new instead')
+  static GetForumThreadRequest create() => GetForumThreadRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetForumThreadRequest._();
+  @$core.override
+  GetForumThreadRequest createEmptyInstance() => GetForumThreadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetForumThreadRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetForumThreadRequest>(
+          GetForumThreadRequest.$_createMessage);
+  static GetForumThreadRequest? _defaultInstance;
+
+  /// 店家 ID。
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
+  /// 討論串 ID，即頂層留言的 ID。
+  @$pb.TagNumber(2)
+  $core.String get threadId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set threadId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasThreadId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearThreadId() => $_clearField(2);
+
+  /// 回覆第一頁的大小，預設 20，上限 50。
+  @$pb.TagNumber(3)
+  $core.int get pageSize => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set pageSize($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPageSize() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPageSize() => $_clearField(3);
+}
+
+class GetForumThreadResponse extends $pb.GeneratedMessage {
+  factory GetForumThreadResponse({
+    ForumEntry? entry,
+    $core.Iterable<ForumEntry>? replies,
+    $core.String? nextPageToken,
+    Actor? viewerActor,
+    $core.bool? viewerCanComment,
+  }) {
+    final result = GetForumThreadResponse._();
+    if (entry != null) result.entry = entry;
+    if (replies != null) result.replies.addAll(replies);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (viewerCanComment != null) result.viewerCanComment = viewerCanComment;
+    return result;
+  }
+
+  GetForumThreadResponse._();
+
+  factory GetForumThreadResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadResponse()..mergeFromBuffer(data, registry);
+  factory GetForumThreadResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetForumThreadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetForumThreadResponse.$_createMessage)
+    ..aOM<ForumEntry>(1, _omitFieldNames ? '' : 'entry',
+        subBuilder: ForumEntry.$_createMessage)
+    ..pPM<ForumEntry>(2, _omitFieldNames ? '' : 'replies',
+        subBuilder: ForumEntry.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'nextPageToken')
+    ..aOM<Actor>(4, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOB(5, _omitFieldNames ? '' : 'viewerCanComment')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadResponse copyWith(
+          void Function(GetForumThreadResponse) updates) =>
+      super.copyWith((message) => updates(message as GetForumThreadResponse))
+          as GetForumThreadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetForumThreadResponse() / GetForumThreadResponse.new instead')
+  static GetForumThreadResponse create() => GetForumThreadResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetForumThreadResponse._();
+  @$core.override
+  GetForumThreadResponse createEmptyInstance() => GetForumThreadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetForumThreadResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetForumThreadResponse>(
+          GetForumThreadResponse.$_createMessage);
+  static GetForumThreadResponse? _defaultInstance;
+
+  /// 討論串的頂層項目。
+  @$pb.TagNumber(1)
+  ForumEntry get entry => $_getN(0);
+  @$pb.TagNumber(1)
+  set entry(ForumEntry value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEntry() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEntry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ForumEntry ensureEntry() => $_ensure(0);
+
+  /// 回覆的第一頁，依建立時間舊到新。
+  @$pb.TagNumber(2)
+  $pb.PbList<ForumEntry> get replies => $_getList(1);
+
+  /// 還有下一頁時設；只能交給 ListForumEntries（同一組 store_id、parent_id = thread_id）。
+  @$pb.TagNumber(3)
+  $core.String get nextPageToken => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set nextPageToken($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNextPageToken() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNextPageToken() => $_clearField(3);
+
+  /// 同 ListForumEntriesResponse.viewer_actor。
+  @$pb.TagNumber(4)
+  Actor get viewerActor => $_getN(3);
+  @$pb.TagNumber(4)
+  set viewerActor(Actor value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewerActor() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewerActor() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Actor ensureViewerActor() => $_ensure(3);
+
+  /// 同 ListForumEntriesResponse.viewer_can_comment。
+  @$pb.TagNumber(5)
+  $core.bool get viewerCanComment => $_getBF(4);
+  @$pb.TagNumber(5)
+  set viewerCanComment($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasViewerCanComment() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearViewerCanComment() => $_clearField(5);
+}
+
 class RecordPostViewRequest extends $pb.GeneratedMessage {
   factory RecordPostViewRequest({
     $core.String? postId,
@@ -7751,6 +7952,14 @@ class SocialPublicServiceApi {
           $pb.ClientContext? ctx, ListForumEntriesRequest request) =>
       _client.invoke<ListForumEntriesResponse>(ctx, 'SocialPublicService',
           'ListForumEntries', request, ListForumEntriesResponse());
+
+  /// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+  /// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+  /// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+  $async.Future<GetForumThreadResponse> getForumThread(
+          $pb.ClientContext? ctx, GetForumThreadRequest request) =>
+      _client.invoke<GetForumThreadResponse>(ctx, 'SocialPublicService',
+          'GetForumThread', request, GetForumThreadResponse());
 
   /// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
   /// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。

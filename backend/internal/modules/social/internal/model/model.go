@@ -477,6 +477,12 @@ type ContentSnapshot struct {
 	Purged bool
 }
 
+// ForumThreadView 是單一討論串：頂層項目（可以是佔位項目）與回覆的第一頁。
+type ForumThreadView struct {
+	Top     ForumEntry
+	Replies ForumPage
+}
+
 // ForumThread 是一個討論串的定位：店家加討論串 id。
 type ForumThread struct {
 	StoreID  int64

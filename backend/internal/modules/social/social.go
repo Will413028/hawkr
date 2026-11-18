@@ -146,6 +146,7 @@ type (
 	ContentAuthor      = model.ContentAuthor
 	ContentSnapshot    = model.ContentSnapshot
 	ForumThread        = model.ForumThread
+	ForumThreadView    = model.ForumThreadView
 	LinkAvailability   = model.LinkAvailability
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = stats.TakedownContentError
@@ -494,6 +495,12 @@ func (m *Module) DeleteForumEntry(ctx context.Context, c Caller, id uuid.UUID, v
 // ListForumEntries 列出店家討論區的頂層留言（觀看者封鎖了這家店，或與作者任一方向有個人封鎖時，對應的內容不出現；店主讀自己的討論區不套個人封鎖）。
 func (m *Module) ListForumEntries(ctx context.Context, c Caller, storeID int64, after *CommentCursor, size int32) (ForumPage, error) {
 	return m.forum.ListTopLevel(ctx, c, storeID, after, size)
+}
+
+// GetForumThread 讀單一討論串：頂層項目（刪除或隱藏而底下有可見回覆時是佔位項目）與回覆的第一頁；
+// 討論串不存在、不屬於這家店、讀不到（店家不可曝光、被觀看者的封鎖排除、已刪除或隱藏而沒有可見回覆）都是 NotFound。
+func (m *Module) GetForumThread(ctx context.Context, c Caller, storeID int64, threadID uuid.UUID, size int32) (ForumThreadView, error) {
+	return m.forum.GetThread(ctx, c, storeID, threadID, size)
 }
 
 // ListForumReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆；父留言不存在或不屬於該店是 NotFound。

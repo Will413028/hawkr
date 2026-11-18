@@ -1013,6 +1013,72 @@ final $typed_data.Uint8List listForumEntriesResponseDescriptor = $convert.base64
     'FhbHBoYTEuQWN0b3JCA+BBA1ILdmlld2VyQWN0b3ISMQoSdmlld2VyX2Nhbl9jb21tZW50GAQg'
     'ASgIQgPgQQNSEHZpZXdlckNhbkNvbW1lbnQ=');
 
+@$core.Deprecated('Use getForumThreadRequestDescriptor instead')
+const GetForumThreadRequest$json = {
+  '1': 'GetForumThreadRequest',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {'1': 'thread_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'threadId'},
+    {'1': 'page_size', '3': 3, '4': 1, '5': 5, '10': 'pageSize'},
+  ],
+};
+
+/// Descriptor for `GetForumThreadRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getForumThreadRequestDescriptor = $convert.base64Decode(
+    'ChVHZXRGb3J1bVRocmVhZFJlcXVlc3QSHgoIc3RvcmVfaWQYASABKAlCA+BBAlIHc3RvcmVJZB'
+    'IgCgl0aHJlYWRfaWQYAiABKAlCA+BBAlIIdGhyZWFkSWQSGwoJcGFnZV9zaXplGAMgASgFUghw'
+    'YWdlU2l6ZQ==');
+
+@$core.Deprecated('Use getForumThreadResponseDescriptor instead')
+const GetForumThreadResponse$json = {
+  '1': 'GetForumThreadResponse',
+  '2': [
+    {
+      '1': 'entry',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '10': 'entry'
+    },
+    {
+      '1': 'replies',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.ForumEntry',
+      '10': 'replies'
+    },
+    {'1': 'next_page_token', '3': 3, '4': 1, '5': 9, '10': 'nextPageToken'},
+    {
+      '1': 'viewer_actor',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.social.v1alpha1.Actor',
+      '8': {},
+      '10': 'viewerActor'
+    },
+    {
+      '1': 'viewer_can_comment',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'viewerCanComment'
+    },
+  ],
+};
+
+/// Descriptor for `GetForumThreadResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getForumThreadResponseDescriptor = $convert.base64Decode(
+    'ChZHZXRGb3J1bVRocmVhZFJlc3BvbnNlEjcKBWVudHJ5GAEgASgLMiEuaGF3a3Iuc29jaWFsLn'
+    'YxYWxwaGExLkZvcnVtRW50cnlSBWVudHJ5EjsKB3JlcGxpZXMYAiADKAsyIS5oYXdrci5zb2Np'
+    'YWwudjFhbHBoYTEuRm9ydW1FbnRyeVIHcmVwbGllcxImCg9uZXh0X3BhZ2VfdG9rZW4YAyABKA'
+    'lSDW5leHRQYWdlVG9rZW4SRAoMdmlld2VyX2FjdG9yGAQgASgLMhwuaGF3a3Iuc29jaWFsLnYx'
+    'YWxwaGExLkFjdG9yQgPgQQNSC3ZpZXdlckFjdG9yEjEKEnZpZXdlcl9jYW5fY29tbWVudBgFIA'
+    'EoCEID4EEDUhB2aWV3ZXJDYW5Db21tZW50');
+
 @$core.Deprecated('Use recordPostViewRequestDescriptor instead')
 const RecordPostViewRequest$json = {
   '1': 'RecordPostViewRequest',
@@ -2594,6 +2660,12 @@ const $core.Map<$core.String, $core.dynamic> SocialPublicServiceBase$json = {
       '4': {'34': 1},
     },
     {
+      '1': 'GetForumThread',
+      '2': '.hawkr.social.v1alpha1.GetForumThreadRequest',
+      '3': '.hawkr.social.v1alpha1.GetForumThreadResponse',
+      '4': {'34': 1},
+    },
+    {
       '1': 'RecordPostView',
       '2': '.hawkr.social.v1alpha1.RecordPostViewRequest',
       '3': '.hawkr.social.v1alpha1.RecordPostViewResponse'
@@ -2634,6 +2706,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.ListForumEntriesResponse':
       ListForumEntriesResponse$json,
   '.hawkr.social.v1alpha1.ForumEntry': ForumEntry$json,
+  '.hawkr.social.v1alpha1.GetForumThreadRequest': GetForumThreadRequest$json,
+  '.hawkr.social.v1alpha1.GetForumThreadResponse': GetForumThreadResponse$json,
   '.hawkr.social.v1alpha1.RecordPostViewRequest': RecordPostViewRequest$json,
   '.hawkr.social.v1alpha1.RecordPostViewResponse': RecordPostViewResponse$json,
 };
@@ -2654,9 +2728,11 @@ final $typed_data.Uint8List socialPublicServiceDescriptor = $convert.base64Decod
     'FhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1JlcXVlc3QaMi5oYXdrci5zb2NpYWwudjFhbHBo'
     'YTEuU3VnZ2VzdFRyZW5kaW5nVGFnc1Jlc3BvbnNlIgOQAgESeAoQTGlzdEZvcnVtRW50cmllcx'
     'IuLmhhd2tyLnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVxdWVzdBovLmhhd2ty'
-    'LnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2UiA5ACARJtCg5SZWNvcm'
-    'RQb3N0VmlldxIsLmhhd2tyLnNvY2lhbC52MWFscGhhMS5SZWNvcmRQb3N0Vmlld1JlcXVlc3Qa'
-    'LS5oYXdrci5zb2NpYWwudjFhbHBoYTEuUmVjb3JkUG9zdFZpZXdSZXNwb25zZQ==');
+    'LnNvY2lhbC52MWFscGhhMS5MaXN0Rm9ydW1FbnRyaWVzUmVzcG9uc2UiA5ACARJyCg5HZXRGb3'
+    'J1bVRocmVhZBIsLmhhd2tyLnNvY2lhbC52MWFscGhhMS5HZXRGb3J1bVRocmVhZFJlcXVlc3Qa'
+    'LS5oYXdrci5zb2NpYWwudjFhbHBoYTEuR2V0Rm9ydW1UaHJlYWRSZXNwb25zZSIDkAIBEm0KDl'
+    'JlY29yZFBvc3RWaWV3EiwuaGF3a3Iuc29jaWFsLnYxYWxwaGExLlJlY29yZFBvc3RWaWV3UmVx'
+    'dWVzdBotLmhhd2tyLnNvY2lhbC52MWFscGhhMS5SZWNvcmRQb3N0Vmlld1Jlc3BvbnNl');
 
 const $core.Map<$core.String, $core.dynamic> SocialAppServiceBase$json = {
   '1': 'SocialAppService',

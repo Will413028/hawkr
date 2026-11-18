@@ -87,6 +87,7 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTags":          EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags":  EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries":     EffectRead,
+	"/hawkr.social.v1alpha1.SocialPublicService/GetForumThread":       EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
 
 	// ModerationAppService：檢舉是寫入（停權的帳號不能送出）；讀自己的檢舉停權的帳號也可以。

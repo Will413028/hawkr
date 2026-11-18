@@ -43,6 +43,7 @@ type Reads interface {
 	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
 	ListForumEntries(ctx context.Context, c social.Caller, storeID int64, after *social.CommentCursor, size int32) (social.ForumPage, error)
 	ListForumReplies(ctx context.Context, c social.Caller, storeID int64, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
+	GetForumThread(ctx context.Context, c social.Caller, storeID int64, threadID uuid.UUID, size int32) (social.ForumThreadView, error)
 }
 
 // Buyers 是呼叫者的買家身分與留言作者顯示資料的來源（*buyer.Module）。
@@ -406,6 +407,42 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	out := &pb.ListForumEntriesResponse{Entries: entries, ViewerActor: actor, ViewerCanComment: viewer.canComment}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: page.Next.CreatedAt, ID: page.Next.ID})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Public) GetForumThread(ctx context.Context, req *connect.Request[pb.GetForumThreadRequest]) (*connect.Response[pb.GetForumThreadResponse], error) {
+	msg := req.Msg
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
+	if err != nil {
+		return nil, err
+	}
+	threadID, err := rpc.ParseUUID("thread_id", msg.GetThreadId())
+	if err != nil {
+		return nil, err
+	}
+	c, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	view, err := h.reads.GetForumThread(ctx, c, storeID, threadID, msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	// 頂層項目有列就代表討論區對觀看者可讀可寫（列的查詢帶同一個條件）。
+	all := append([]social.ForumEntry{view.Top}, view.Replies.Entries...)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, all, true)
+	if err != nil {
+		return nil, err
+	}
+	items, err := h.toForumEntries(c, viewer, all)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetForumThreadResponse{Entry: items[0], Replies: items[1:], ViewerActor: actor, ViewerCanComment: viewer.canComment}
+	if view.Replies.Next != nil {
+		scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListForumEntriesProcedure, rpc.FormatID(storeID), threadID.String())
+		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: view.Replies.Next.CreatedAt, ID: view.Replies.Next.ID})
 	}
 	return connect.NewResponse(out), nil
 }

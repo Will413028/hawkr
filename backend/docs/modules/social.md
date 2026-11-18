@@ -25,7 +25,8 @@
 
 - 留言與店家討論區都是兩層。互動者 (kind, id) 由伺服器依資源歸屬推導；店家身分只用在自己的貼文與自己的討論區。
 - 作者可編輯自己的內容（已被隱藏的內容不可編輯）；作者或該店可刪除，刪除冪等。
-- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。佔位只有刪除與隱藏，對所有觀看者一致。被內容下架的頂層留言或討論區留言與被隱藏相同：底下有可見回覆時回 state 為 HIDDEN 的佔位項目（不是 DELETED），回覆照常顯示並計入。
+- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。
+- 單一討論串（`GetForumThread`，A7-D29）：讀店 `store_id` 的一則頂層留言與回覆的第一頁，頂層的可見、佔位與封鎖規則同上（`reads.GetForumThreadTop` 與 `ListTopLevelForumEntries` 共用同一個查詢本體），回覆走 `ListForumReplies`；回覆的後續頁用 `ListForumEntries` 帶 `parent_id`，`next_page_token` 以該 RPC 的範圍簽發。頂層沒有列（不存在、別家店、回覆不是討論串、店家讀不到、被封鎖排除、已刪除或隱藏而沒有可見回覆）一律 NotFound，不區分原因。守門：`TestGetForumThreadReturnsOnlyThatThread`、`TestGetForumThreadShowsAPlaceholderForADeletedTopWithVisibleReplies`、`TestGetForumThreadIsNotFoundForOtherStoresMissingAndGoneThreads`。佔位只有刪除與隱藏，對所有觀看者一致。被內容下架的頂層留言或討論區留言與被隱藏相同：底下有可見回覆時回 state 為 HIDDEN 的佔位項目（不是 DELETED），回覆照常顯示並計入。
 - 讚：貼文只有買家（`post_likes (post_id, buyer_id)`），留言與討論區帶 `actor_kind`。瀏覽每日換 salt 去重；分享同一位買家同一篇只算一次。
 - 使用者看得到的錯誤句子都在 `internal/text`（`zh-TW.json`、`en.json`，`make uitext` 生成 `text_gen.go`，不得手改），語系取自 `uitext.LocaleFrom(ctx)`。`apperr.*` 的參數不得有字串字面值，只許 `"%s", text.X(locale)`；商品驗證的 port 回 `ErrProductNotAvailable`／`ErrProductNotOwned`，句子由 social 給。
 

@@ -30,6 +30,20 @@ type EntryRow struct {
 // 規則同 topLevelComments：被封鎖排除的作者，頂層整則不出現，回覆不進「有可見回覆」的判斷。
 func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, pg CommentPage) SelectStatement {
 	c := visibility.ForumEntriesOf("c", v)
+	return topLevelForumEntries(storeID, now, v, afterComment(c.T.CreatedAt, c.T.ID, pg)).
+		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
+		LIMIT(pg.Limit)
+}
+
+// GetForumThreadTop 是店家討論區的一則頂層留言（討論串的頂層項目），與 ListTopLevelForumEntries 同一套可見與佔位規則；
+// 已刪除或被隱藏而底下沒有可見回覆、被觀看者的封鎖排除、或不屬於這家店時沒有列。
+func GetForumThreadTop(storeID int64, threadID uuid.UUID, now time.Time, v visibility.Viewer) SelectStatement {
+	c := visibility.ForumEntriesOf("c", v)
+	return topLevelForumEntries(storeID, now, v, c.T.ID.EQ(UUID(threadID)))
+}
+
+func topLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, extra BoolExpression) SelectStatement {
+	c := visibility.ForumEntriesOf("c", v)
 	r := visibility.ForumEntriesOf("r", v)
 	s := table.ForumEntryStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
@@ -50,10 +64,8 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 			c.T.ParentID.IS_NULL(),
 			visibility.ReadableForum(now, v, Int64(storeID)),
 			visible.OR(hasVisibleReply),
-			afterComment(c.T.CreatedAt, c.T.ID, pg),
-		)).
-		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
-		LIMIT(pg.Limit)
+			extra,
+		))
 }
 
 // ListForumReplies 是頂層討論區留言的回覆（父留言可以是佔位項目，但不能被觀看者的封鎖排除）：自己可見、作者沒被排除、店家可曝光而且觀看者沒有封鎖這家店。

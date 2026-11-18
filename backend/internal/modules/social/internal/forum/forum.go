@@ -384,3 +384,24 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, storeID int64
 	}
 	return s.finish(ctx, c, parent.StoreID, rows, size, now)
 }
+
+// GetThread 讀單一討論串：頂層項目與回覆的第一頁（規則同 ListTopLevel 與 ListReplies，頂層沒有列就是 NotFound）。
+func (s *Service) GetThread(ctx context.Context, c model.Caller, storeID int64, threadID uuid.UUID, size int32) (model.ForumThreadView, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ForumThreadView{}, err
+	}
+	now := s.d.Now().UTC()
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.GetForumThreadTop(storeID, threadID, now, actor.ViewerFor(c, storeID)))
+	if err != nil {
+		return model.ForumThreadView{}, fmt.Errorf("social：讀取討論串 %s：%w", threadID, err)
+	}
+	if len(rows) == 0 {
+		return model.ForumThreadView{}, entryNotFound(ctx)
+	}
+	replies, err := s.ListReplies(ctx, c, storeID, threadID, nil, size)
+	if err != nil {
+		return model.ForumThreadView{}, err
+	}
+	return model.ForumThreadView{Top: toEntry(rows[0]), Replies: replies}, nil
+}
