@@ -73,8 +73,9 @@ void main() {
     var fail = true;
     final public = FakeSocialPublic(
       forumResponder: (_) {
-        if (++calls > 1 && fail)
+        if (++calls > 1 && fail) {
           throw ConnectException(Code.unavailable, 'down');
+        }
         return pb.ListForumEntriesResponse(
           entries: [
             fakeForumEntry(
