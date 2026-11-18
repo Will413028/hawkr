@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
+import 'package:hawkr_seller/features/report/presentation/store_block_capability.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';

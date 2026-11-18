@@ -30,17 +30,30 @@ class BlockListScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncState = ref.watch(blockListControllerProvider);
     final scrollController = useScrollController();
+    final loadError = useState<Object?>(null);
 
     void loadMore() {
-      ref.read(blockListControllerProvider.notifier).loadMore().catchError((
-        Object e,
-      ) {
-        if (!context.mounted) return;
-        FloatingToast.error(
-          context,
-          errorText(e, defaults: ref.read(defaultErrorTextProvider)),
-        );
-      });
+      loadError.value = null;
+      ref
+          .read(blockListControllerProvider.notifier)
+          .loadMore()
+          .then<void>(
+            (_) {},
+            onError: (Object e) {
+              if (!context.mounted) return;
+              final empty =
+                  ref.read(blockListControllerProvider).value?.blocks.isEmpty ??
+                  true;
+              if (empty) {
+                loadError.value = e;
+                return;
+              }
+              FloatingToast.error(
+                context,
+                errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+              );
+            },
+          );
     }
 
     useEffect(() {
@@ -93,6 +106,21 @@ class BlockListScreen extends HookConsumerWidget {
               }),
           child: state.blocks.isEmpty && !state.hasMore
               ? _buildEmptyState()
+              : state.blocks.isEmpty && loadError.value != null
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      height: 420.h,
+                      child: _buildErrorState(
+                        context,
+                        ref,
+                        loadError.value!,
+                        onRetry: loadMore,
+                      ),
+                    ),
+                  ],
+                )
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   controller: scrollController,
@@ -101,8 +129,7 @@ class BlockListScreen extends HookConsumerWidget {
                     vertical: 12.h,
                   ),
                   itemCount:
-                      state.blocks.length +
-                      (state.isLoadingMore || state.blocks.isEmpty ? 1 : 0),
+                      state.blocks.length + (state.isLoadingMore ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == state.blocks.length) {
                       return Padding(
@@ -126,7 +153,7 @@ class BlockListScreen extends HookConsumerWidget {
                           await ref
                               .read(blockListControllerProvider.notifier)
                               .unblock(blocked.buyerId);
-                        } catch (e) {
+                        } on Exception catch (e) {
                           if (!context.mounted) return;
                           FloatingToast.error(
                             context,
@@ -145,7 +172,12 @@ class BlockListScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildErrorState(BuildContext context, WidgetRef ref, Object error) {
+  Widget _buildErrorState(
+    BuildContext context,
+    WidgetRef ref,
+    Object error, {
+    VoidCallback? onRetry,
+  }) {
     final message = errorText(
       error,
       defaults: ref.read(defaultErrorTextProvider),
@@ -163,8 +195,9 @@ class BlockListScreen extends HookConsumerWidget {
           ),
           SizedBox(height: 16.h),
           ElevatedButton(
-            onPressed: () =>
-                ref.read(blockListControllerProvider.notifier).refresh(),
+            onPressed:
+                onRetry ??
+                () => ref.read(blockListControllerProvider.notifier).refresh(),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             child: const HkButtonLabel(
               '重試',

@@ -1,10 +1,21 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_seller/features/report/presentation/store_block_capability.dart';
+import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
 
 void main() {
+  test('canBlockBuyers is true while the store snapshot is not loaded', () {
+    final c = ProviderContainer(
+      overrides: [myStoreSnapshotProvider.overrideWithValue(null)],
+    );
+    addTearDown(c.dispose);
+    expect(c.read(canBlockBuyersProvider), true);
+  });
+
   group('canBlockAuthor', () {
     bool rule({
       bool canBlockBuyers = true,

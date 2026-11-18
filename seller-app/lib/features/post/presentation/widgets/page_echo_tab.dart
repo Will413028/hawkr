@@ -22,6 +22,7 @@ import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../../report/data/report_model.dart';
 import '../../../report/data/store_block_rules.dart';
+import '../../../report/presentation/store_block_capability.dart';
 import '../../../report/presentation/widgets/block_actions.dart';
 import '../../../report/presentation/widgets/report_sheet.dart';
 import '../../data/post_comment.dart';

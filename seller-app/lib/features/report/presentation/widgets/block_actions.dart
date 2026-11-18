@@ -71,7 +71,7 @@ Future<void> blockBuyerWithConfirm(
     }
     if (!context.mounted) return;
     FloatingToast.success(context, '已封鎖「$name」');
-  } catch (e) {
+  } on Exception catch (e) {
     if (!context.mounted) return;
     FloatingToast.error(context, errorText(e, defaults: defaults));
   }

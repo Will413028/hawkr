@@ -18,6 +18,7 @@ class BlockedBuyerItem {
     required this.deleted,
     this.name = '',
     this.avatarUrl,
+    this.createTime,
   });
 
   factory BlockedBuyerItem.fromProto(pb.BlockedBuyer b) {
@@ -27,6 +28,7 @@ class BlockedBuyerItem {
       deleted: buyer.deleted,
       name: buyer.displayName.trim(),
       avatarUrl: buyer.avatarUrl.isEmpty ? null : buyer.avatarUrl,
+      createTime: b.hasCreateTime() ? b.createTime.toDateTime() : null,
     );
   }
 
@@ -34,6 +36,17 @@ class BlockedBuyerItem {
   final bool deleted;
   final String name;
   final String? avatarUrl;
+
+  /// 封鎖時間；清單依它新到舊排序，沒有時視為最舊。
+  final DateTime? createTime;
+
+  /// 清單的 keyset 順序：封鎖時間新到舊，相同時以買家 id 由大到小。小於 0 表示 this 排在 [other] 前面。
+  int compareInList(BlockedBuyerItem other) {
+    final a = createTime?.microsecondsSinceEpoch ?? 0;
+    final b = other.createTime?.microsecondsSinceEpoch ?? 0;
+    if (a != b) return b.compareTo(a);
+    return other.buyerId.compareTo(buyerId);
+  }
 
   /// 顯示名稱：已刪除的買家顯示 [deletedBuyerLabel]，沒有名稱時用「買家」。
   String get displayLabel => deleted

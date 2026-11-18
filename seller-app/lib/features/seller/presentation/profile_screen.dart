@@ -35,7 +35,7 @@ import 'profile_avatar_section.dart' show ProfileAvatarCircle;
 import 'onboarding_progress_card.dart';
 import 'profile_edit_dialog.dart';
 import 'profile_form_widgets.dart';
-import '../../report/data/store_block_rules.dart';
+import '../../report/presentation/store_block_capability.dart';
 import 'profile_account_closure.dart';
 import 'profile_other_options_card.dart';
 import 'seller_certification_gate.dart';

@@ -68,6 +68,15 @@ class _Host extends ConsumerWidget {
   );
 }
 
+class _ThrowingRepo implements StoreBlockRepository {
+  @override
+  Future<void> blockByComment(String commentId) async =>
+      throw StateError('boom');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 pb.BlockedBuyer _blocked(String id, String name, {bool deleted = false}) =>
     pb.BlockedBuyer(
       buyer: pb.BuyerCard(
@@ -191,21 +200,43 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('non-Exception failure still gives an error toast', (
+  testWidgets('non-Exception failure propagates instead of becoming a toast', (
     tester,
   ) async {
-    final transport = FakeTransportBuilder().unary(
-      SellerAppService.blockBuyer,
-      (_, _) => throw StateError('boom'),
+    Future<void>? pending;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storeBlockRepositoryProvider.overrideWithValue(_ThrowingRepo()),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp(
+            theme: AppTheme.light,
+            home: Consumer(
+              builder: (context, ref, _) => Scaffold(
+                body: TextButton(
+                  onPressed: () => pending = blockBuyerWithConfirm(
+                    context,
+                    ref,
+                    buyerName: '小明',
+                    commentId: 'c1',
+                  ),
+                  child: const Text('go'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
-    await _pump(tester, transport, const _Host(commentId: 'c1'));
     await tester.tap(find.text('go'));
+    final result = expectLater(pending!, throwsStateError);
     await tester.pumpAndSettle();
     await tester.tap(find.text('封鎖'));
     await tester.pumpAndSettle();
+    await result;
     expect(find.text('已封鎖「小明」'), findsNothing);
-    expect(find.text('系統錯誤'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('empty first page with a token loads the next page', (

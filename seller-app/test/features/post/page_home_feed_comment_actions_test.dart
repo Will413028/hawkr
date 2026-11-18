@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/features/report/data/store_block_rules.dart';
+import 'package:hawkr_seller/features/report/presentation/store_block_capability.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'post_comment_fixtures.dart';
