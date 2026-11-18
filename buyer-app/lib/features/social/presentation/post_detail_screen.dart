@@ -257,10 +257,10 @@ class PostDetailScreen extends HookConsumerWidget {
         },
         onShareTap: sharePost,
         onRefresh: () async {
-          final ok = await ref
+          final result = await ref
               .read(postEntityStoreProvider.notifier)
               .refresh(postId);
-          if (!ok && context.mounted) {
+          if (result == PostRefreshResult.failed && context.mounted) {
             showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
           }
         },

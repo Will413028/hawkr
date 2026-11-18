@@ -174,6 +174,29 @@ void main() {
   });
 
   group('讚是集中的 mutation', () {
+    test('讚已刪除的貼文：標為不可見、從列表移除，並回 false', () async {
+      final app = FakeSocialApp()
+        ..likeError = ConnectException(Code.notFound, 'gone');
+      final public = FakeSocialPublic(
+        posts: [_post(101, likes: 3), _post(102)],
+      );
+      final container = _container(public, app);
+      await container.read(sessionProvider.future);
+      final sub = container.listen(_feed, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(_feed.future);
+
+      final ok = await container
+          .read(postEntityStoreProvider.notifier)
+          .toggleLike(101);
+
+      expect(ok, isFalse);
+      final entities = container.read(postEntityStoreProvider);
+      expect(entities.gone, contains(101));
+      expect(entities.posts.containsKey(101), isFalse);
+      expect(container.read(_feed).value!.ids, [102]);
+    });
+
     test('R1-5 失敗時以 id 還原讚與讚數，並回 false', () async {
       final app = FakeSocialApp()
         ..likeError = ConnectException(Code.unavailable, 'down');
@@ -265,12 +288,12 @@ void main() {
       final store = container.read(postEntityStoreProvider.notifier);
 
       public.getPostError = ConnectException(Code.unavailable, 'down');
-      expect(await store.refresh(101), isFalse);
+      expect(await store.refresh(101), PostRefreshResult.failed);
       expect(container.read(postEntityStoreProvider).posts[101]!.likeCount, 3);
       expect(container.read(_feed).value!.ids, [101, 102]);
 
       public.getPostError = ConnectException(Code.notFound, 'gone');
-      expect(await store.refresh(101), isFalse);
+      expect(await store.refresh(101), PostRefreshResult.notFound);
       expect(container.read(_feed).value!.ids, [102]);
     });
 

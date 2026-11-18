@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart' as common;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/config/flavor.dart';
@@ -14,7 +12,6 @@ import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
 import 'package:hawkr_buyer/features/seller/presentation/widgets/merchant_home_tab.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_entity_store.dart';
-import 'package:hawkr_buyer/features/social/presentation/post_feed_controller.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -200,107 +197,4 @@ void main() {
     expect(find.text('載入失敗'), findsNothing);
     expect(find.byType(InkWell), findsOneWidget);
   });
-
-  group('首屏圖片預快取', () {
-    /// 視窗很矮：第 9 張（prefetch 的最後一張）在畫面外，不會被格子自己的載入蓋掉。
-    const shortView = Size(390, 150);
-
-    List<pb.Post> page(String prefix) => [
-      for (var i = 0; i < 30; i++)
-        pb.Post(
-          id: '${prefix.codeUnitAt(0) * 100 + i}',
-          body: '貼文',
-          image: common.Image(
-            uriTemplate: 'https://img.test/{preset}/$prefix$i.jpg',
-          ),
-        ),
-    ];
-
-    Future<void> inRecordingHttp(
-      List<Uri> urls,
-      Future<void> Function() body,
-    ) async {
-      PaintingBinding.instance.imageCache
-        ..clear()
-        ..clearLiveImages();
-      debugNetworkImageHttpClientProvider = () => _RecordingHttpClient(urls);
-      try {
-        await body();
-      } finally {
-        debugNetworkImageHttpClientProvider = null;
-      }
-    }
-
-    int hits(List<Uri> urls, String name) =>
-        urls.where((u) => u.path.contains('/$name.jpg')).length;
-
-    testWidgets('F7 重新整理後第一頁換了：預快取新的首屏圖片', (tester) async {
-      final urls = <Uri>[];
-      var calls = 0;
-      final public = FakeSocialPublic(
-        postsResponder: (_) async =>
-            pb.ListPostsResponse(posts: page(calls++ == 0 ? 'a' : 'b')),
-      );
-      await inRecordingHttp(urls, () async {
-        await _pump(
-          tester,
-          public: public,
-          app: FakeSocialApp(),
-          size: shortView,
-        );
-        expect(hits(urls, 'a8'), greaterThan(0));
-        expect(hits(urls, 'b8'), 0);
-
-        _container.invalidate(postFeedControllerProvider(merchantId: 7));
-        await tester.pumpAndSettle();
-
-        expect(hits(urls, 'b8'), greaterThan(0));
-        await tester.pumpWidget(const SizedBox.shrink());
-        _container.dispose();
-      });
-    });
-
-    testWidgets('F7 切到已快取的店家：預快取它的首屏圖片', (tester) async {
-      final urls = <Uri>[];
-      final public = FakeSocialPublic(
-        postsResponder: (req) async =>
-            pb.ListPostsResponse(posts: page(req.storeId == '7' ? 'a' : 'b')),
-      );
-      await inRecordingHttp(urls, () async {
-        await _pump(
-          tester,
-          public: public,
-          app: FakeSocialApp(),
-          size: shortView,
-        );
-        _merchantId.value = '8';
-        await tester.pumpAndSettle();
-        expect(hits(urls, 'b8'), greaterThan(0));
-        final before = hits(urls, 'a8');
-        PaintingBinding.instance.imageCache
-          ..clear()
-          ..clearLiveImages();
-
-        _merchantId.value = '7';
-        await tester.pumpAndSettle();
-
-        expect(hits(urls, 'a8'), greaterThan(before));
-      });
-    });
-  });
-}
-
-class _RecordingHttpClient extends Fake implements HttpClient {
-  _RecordingHttpClient(this.urls);
-
-  final List<Uri> urls;
-
-  @override
-  bool autoUncompress = true;
-
-  @override
-  Future<HttpClientRequest> getUrl(Uri url) {
-    urls.add(url);
-    return Completer<HttpClientRequest>().future;
-  }
 }

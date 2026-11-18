@@ -145,6 +145,23 @@ void main() {
     await expectLater(repo.getPost(101), throwsA(isA<NotFoundException>()));
   });
 
+  test('讚一則已刪除的貼文：NOT_FOUND 轉成 NotFoundException', () async {
+    final repo = SocialContentRepository(
+      FakeSocialPublic().client(),
+      FakeSocialApp(
+        likeError: ConnectException(Code.notFound, 'gone'),
+      ).client(),
+    );
+    await expectLater(
+      repo.setPostLiked(101, liked: true),
+      throwsA(isA<NotFoundException>()),
+    );
+    await expectLater(
+      repo.setPostLiked(101, liked: false),
+      throwsA(isA<NotFoundException>()),
+    );
+  });
+
   Future<void> pullToRefresh(WidgetTester tester) async {
     await tester.fling(
       find.byType(CustomScrollView).first,
@@ -166,6 +183,7 @@ void main() {
 
     expect(find.text('找不到這則貼文'), findsOneWidget);
     expect(find.text('貼文內文'), findsNothing);
+    expect(find.text('載入失敗，請稍後再試'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 3));

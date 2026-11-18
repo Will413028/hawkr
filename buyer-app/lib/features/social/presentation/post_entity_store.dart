@@ -193,6 +193,9 @@ class PostEntityStore extends _$PostEntityStore with ViewerScoped {
           );
         } on StaleScopeException {
           return false;
+        } on NotFoundException {
+          remove(postId);
+          return false;
         } catch (_) {
           _intent.remove(postId);
           _publish(postId);
@@ -230,13 +233,17 @@ class PostEntityStore extends _$PostEntityStore with ViewerScoped {
     return post;
   }
 
-  /// 重讀單一貼文。失敗保留舊值並回 false；只有找不到才當成不可見。
-  Future<bool> refresh(int postId) async {
+  /// 重讀單一貼文。失敗保留舊值；只有找不到才當成不可見。
+  Future<PostRefreshResult> refresh(int postId) async {
     try {
       await fetch(postId);
-      return true;
+      return PostRefreshResult.refreshed;
+    } on NotFoundException {
+      return PostRefreshResult.notFound;
     } catch (_) {
-      return false;
+      return PostRefreshResult.failed;
     }
   }
 }
+
+enum PostRefreshResult { refreshed, notFound, failed }

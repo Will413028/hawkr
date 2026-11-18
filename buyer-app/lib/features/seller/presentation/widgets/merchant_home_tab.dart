@@ -1,7 +1,6 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -62,7 +61,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
   bool get wantKeepAlive => true;
   final Map<String, String> _videoThumbCache = <String, String>{};
   BuildContext? _previewContext;
-  int _prefetchRun = 0;
 
   /// 目前店家的貼文清單 provider；店家 id 不是正整數時沒有清單。
   PostFeedControllerProvider? get _feed {
@@ -71,26 +69,11 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
   }
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final ids = _feed == null ? null : ref.read(_feed!).value?.ids;
-      if (ids != null) _prefetch(ids);
-    });
-  }
-
-  @override
   void didUpdateWidget(covariant MerchantHomeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if ((oldWidget.merchantId?.trim() ?? '') !=
         (widget.merchantId?.trim() ?? '')) {
       _closePreview();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final ids = _feed == null ? null : ref.read(_feed!).value?.ids;
-        if (ids != null) _prefetch(ids);
-      });
     }
   }
 
@@ -113,24 +96,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
       await ref.read(feed.future);
     } catch (_) {
       // 重讀失敗保留舊清單。
-    }
-  }
-
-  /// 預快取首屏圖片。清單換了或又被呼叫時，前一輪就停。
-  Future<void> _prefetch(List<int> ids) async {
-    final run = ++_prefetchRun;
-    final store = ref.read(postEntityStoreProvider);
-    for (final id in ids.take(9)) {
-      final url = _toAbsolute(store.posts[id]?.imageUrl);
-      if (url.isEmpty) continue;
-      if (!mounted) return;
-      try {
-        await precacheImage(
-          NetworkImage(ImageConfig.urlFor(url, ImageScene.postImage)),
-          context,
-        );
-      } catch (_) {}
-      if (!mounted || run != _prefetchRun) return;
     }
   }
 
@@ -207,16 +172,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
       return const Center(child: Text('No merchant'));
     }
     final feed = _feed;
-    if (feed != null) {
-      ref.listen(feed.select((a) => a.value?.ids), (previous, next) {
-        if (next == null) return;
-        if (previous != null &&
-            listEquals(previous.take(9).toList(), next.take(9).toList())) {
-          return;
-        }
-        _prefetch(next);
-      });
-    }
     ref.listen(viewerIdProvider, (_, _) => _closePreview());
     return _buildPostsList(feed);
   }

@@ -78,10 +78,15 @@ class SocialContentRepository {
 
   Future<void> setPostLiked(int postId, {required bool liked}) async {
     final id = postId.toString();
-    if (liked) {
-      await _app.likePost(pb.LikePostRequest(postId: id));
-    } else {
-      await _app.unlikePost(pb.UnlikePostRequest(postId: id));
+    try {
+      if (liked) {
+        await _app.likePost(pb.LikePostRequest(postId: id));
+      } else {
+        await _app.unlikePost(pb.UnlikePostRequest(postId: id));
+      }
+    } on ConnectException catch (e) {
+      if (e.code == Code.notFound) throw const NotFoundException(_postNotFound);
+      rethrow;
     }
   }
 
