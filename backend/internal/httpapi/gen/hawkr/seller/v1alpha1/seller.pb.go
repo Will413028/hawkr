@@ -1187,10 +1187,8 @@ const (
 	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_UNSPECIFIED ContentSnapshotState = 0
 	// 快照在：excerpt、authored_time 與連結目標都有值。
 	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CAPTURED ContentSnapshotState = 1
-	// 建立措施時內容已被清除，取不到快照；沒有 excerpt、authored_time 與連結目標。
-	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_UNAVAILABLE ContentSnapshotState = 2
 	// 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
-	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED ContentSnapshotState = 3
+	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED ContentSnapshotState = 2
 )
 
 // Enum value maps for ContentSnapshotState.
@@ -1198,14 +1196,12 @@ var (
 	ContentSnapshotState_name = map[int32]string{
 		0: "CONTENT_SNAPSHOT_STATE_UNSPECIFIED",
 		1: "CONTENT_SNAPSHOT_STATE_CAPTURED",
-		2: "CONTENT_SNAPSHOT_STATE_UNAVAILABLE",
-		3: "CONTENT_SNAPSHOT_STATE_CLEARED",
+		2: "CONTENT_SNAPSHOT_STATE_CLEARED",
 	}
 	ContentSnapshotState_value = map[string]int32{
 		"CONTENT_SNAPSHOT_STATE_UNSPECIFIED": 0,
 		"CONTENT_SNAPSHOT_STATE_CAPTURED":    1,
-		"CONTENT_SNAPSHOT_STATE_UNAVAILABLE": 2,
-		"CONTENT_SNAPSHOT_STATE_CLEARED":     3,
+		"CONTENT_SNAPSHOT_STATE_CLEARED":     2,
 	}
 )
 
@@ -8168,12 +8164,11 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18CONTENT_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11CONTENT_KIND_POST\x10\x01\x12\x18\n" +
 	"\x14CONTENT_KIND_COMMENT\x10\x02\x12\x1c\n" +
-	"\x18CONTENT_KIND_FORUM_ENTRY\x10\x03*\xaf\x01\n" +
+	"\x18CONTENT_KIND_FORUM_ENTRY\x10\x03*\x87\x01\n" +
 	"\x14ContentSnapshotState\x12&\n" +
 	"\"CONTENT_SNAPSHOT_STATE_UNSPECIFIED\x10\x00\x12#\n" +
-	"\x1fCONTENT_SNAPSHOT_STATE_CAPTURED\x10\x01\x12&\n" +
-	"\"CONTENT_SNAPSHOT_STATE_UNAVAILABLE\x10\x02\x12\"\n" +
-	"\x1eCONTENT_SNAPSHOT_STATE_CLEARED\x10\x03*~\n" +
+	"\x1fCONTENT_SNAPSHOT_STATE_CAPTURED\x10\x01\x12\"\n" +
+	"\x1eCONTENT_SNAPSHOT_STATE_CLEARED\x10\x02*~\n" +
 	"\fMeasureBasis\x12\x1d\n" +
 	"\x19MEASURE_BASIS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17MEASURE_BASIS_VIOLATION\x10\x01\x12\x16\n" +

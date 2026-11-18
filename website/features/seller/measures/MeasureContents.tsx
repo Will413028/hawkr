@@ -31,8 +31,8 @@ export function contentHref(content: ContentRef): string | undefined {
 }
 
 /**
- * 措施裡被下架的內容，逐則列出種類、摘要、發文時間與連結。快照不在（`UNAVAILABLE`、`CLEARED`）時只列種類：
- * 這兩種狀態的說明文字還沒有核可的文案。
+ * 措施裡被下架的內容，逐則列出種類、摘要、發文時間與連結。快照不在（`CLEARED`）時只列種類：
+ * 這個狀態的說明文字還沒有核可的文案。
  */
 export function MeasureContents({
 	contents,

@@ -1217,20 +1217,18 @@ func TestNewGovernanceRejectsMissingDeps(t *testing.T) {
 	}
 }
 
-// 內容已清除（本文被作者刪帳清掉）而內容還在時，後台建立內容下架帶「已清除」旗標、不帶快照；已刪除或不是這家店的內容照舊被拒絕。
-// mutation：takedownContents 忽略 Purged 直接帶空本文快照 → 旗標斷言失敗；把 !Exists 檢查拿掉 → 不存在的內容被接受。
-func TestTakedownContentsFlagsPurgedContentAndRejectsMissingOrForeign(t *testing.T) {
+// 後台建立內容下架一律帶快照；已刪除、不存在或不是這家店的內容被拒絕。
+// mutation：把 !Exists 檢查拿掉 → 不存在的內容被接受；不帶快照 → 快照斷言失敗。
+func TestTakedownContentsCapturesSnapshotAndRejectsMissingOrForeign(t *testing.T) {
 	id := uuid.NewV7()
 	ref := []model.ContentRef{{Kind: model.ContentComment, ID: id}}
 	for name, tc := range map[string]struct {
-		snap   social.ContentSnapshot
-		purged bool
-		ok     bool
+		snap social.ContentSnapshot
+		ok   bool
 	}{
-		"本文已清除":  {social.ContentSnapshot{Exists: true, Purged: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, true, true},
-		"有快照":    {social.ContentSnapshot{Exists: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}, Body: "x", AuthoredAt: snapshotAuthoredAt, PostID: id}, false, true},
-		"不存在":    {social.ContentSnapshot{Exists: false, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, false, false},
-		"別家店的內容": {social.ContentSnapshot{Exists: true, StoreID: 99, Author: social.Actor{Kind: social.ActorStore, ID: 99}}, false, false},
+		"有快照":    {social.ContentSnapshot{Exists: true, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}, Body: "x", AuthoredAt: snapshotAuthoredAt, PostID: id}, true},
+		"不存在":    {social.ContentSnapshot{Exists: false, StoreID: 12, Author: social.Actor{Kind: social.ActorStore, ID: 12}}, false},
+		"別家店的內容": {social.ContentSnapshot{Exists: true, StoreID: 99, Author: social.Actor{Kind: social.ActorStore, ID: 99}}, false},
 	} {
 		h := &Governance{snapshots: fixedSnapshot{tc.snap}}
 		got, err := h.takedownContents(context.Background(), 12, ref)
@@ -1238,7 +1236,7 @@ func TestTakedownContentsFlagsPurgedContentAndRejectsMissingOrForeign(t *testing
 			t.Errorf("%s：err=%v", name, err)
 			continue
 		}
-		if tc.ok && (got[0].Purged != tc.purged || (got[0].Snapshot == nil) != tc.purged) {
+		if tc.ok && got[0].Snapshot == nil {
 			t.Errorf("%s：%+v", name, got[0])
 		}
 	}
@@ -1301,7 +1299,7 @@ func TestAdminMeasureCarriesTheFullSnapshotBody(t *testing.T) {
 	m.Contents = []model.MeasureContent{
 		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCaptured, FullBody: true,
 			Excerpt: strings.Repeat("字", model.ExcerptRunes) + "…", Snapshot: &model.ContentSnapshot{Body: body, AuthoredAt: snapshotAuthoredAt, ImageCount: 2, Link: model.ContentLink{PostID: post}}},
-		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotUnavailable},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: uuid.NewV7()}, State: model.SnapshotCleared},
 	}
 	out := toAdminMeasure(m)
 	if len(out.GetContents()) != 2 || len(out.GetContentBodies()) != 1 {

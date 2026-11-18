@@ -64,15 +64,13 @@ type SnapshotState string
 const (
 	// SnapshotCaptured 快照在：本文、發文時間、圖片張數與連結目標都有值。
 	SnapshotCaptured SnapshotState = "CAPTURED"
-	// SnapshotUnavailable 建立措施時內容已被清除，取不到快照。
-	SnapshotUnavailable SnapshotState = "UNAVAILABLE"
 	// SnapshotCleared 快照已依保留期（撤銷後 184 天）或店家退場清空。
 	SnapshotCleared SnapshotState = "CLEARED"
 )
 
 // SnapshotStateValues 回傳全部快照狀態，與 DB 的 measure_contents_snapshot_state_check 一致。
 func SnapshotStateValues() []SnapshotState {
-	return []SnapshotState{SnapshotCaptured, SnapshotUnavailable, SnapshotCleared}
+	return []SnapshotState{SnapshotCaptured, SnapshotCleared}
 }
 
 // ContentLink 是快照內容的連結目標（A7-D29）：貼文與貼文留言連到貼文（PostID），討論區發言連到店家加討論串（StoreID、ThreadID）；兩組二擇一。
@@ -110,11 +108,10 @@ func ExcerptOf(prefix string, truncated bool) string {
 	return prefix
 }
 
-// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；內容已清除而取不到快照時 Purged 為真、Snapshot 為 nil（二擇一）。
+// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；快照必填。
 type TakedownContent struct {
 	ContentRef
 	Snapshot *ContentSnapshot
-	Purged   bool
 }
 
 // MeasureContent 是已建立措施的一個內容對象：參照、快照狀態，與 State 是 SnapshotCaptured 時的摘要與快照。
@@ -131,7 +128,7 @@ type MeasureContent struct {
 // MaxTakedownContents 是一個內容下架措施最多的對象數。
 const MaxTakedownContents = 20
 
-// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆帶快照或明確的已清除旗標（二擇一），
+// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆都帶快照，
 // 快照的發文時間、圖片張數與連結目標格式正確（連結依種類：FORUM_ENTRY 是店家加討論串，其餘是貼文）。內容屬於哪個店家由呼叫方驗證，快照是否屬實由入口保證。
 func ValidateContentTargets(field string, targets []TakedownContent) error {
 	refs := make([]ContentRef, len(targets))
@@ -143,13 +140,11 @@ func ValidateContentTargets(field string, targets []TakedownContent) error {
 	}
 	for i, t := range targets {
 		at := apperr.IndexedField(field, i)
-		if t.Purged == (t.Snapshot != nil) {
-			return apperr.InvalidInputOn([]string{at}, "內容必須帶快照，或明確標示已清除而沒有快照")
+		if t.Snapshot == nil {
+			return apperr.InvalidInputOn([]string{at}, "內容必須帶快照")
 		}
-		if t.Snapshot != nil {
-			if err := validateSnapshot(at, t.Kind, *t.Snapshot); err != nil {
-				return err
-			}
+		if err := validateSnapshot(at, t.Kind, *t.Snapshot); err != nil {
+			return err
 		}
 	}
 	return nil

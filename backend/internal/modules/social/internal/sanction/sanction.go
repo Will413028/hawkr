@@ -164,7 +164,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if !r.ExistsNow {
 			return model.ContentSnapshot{}, nil
 		}
-		out.Body, out.Purged, out.AuthoredAt, out.PostID = deref(r.Body), r.Body == nil, r.AuthoredAt, r.PostID
+		out.Body, out.AuthoredAt, out.PostID = deref(r.Body), r.AuthoredAt, r.PostID
 	case model.TargetForumEntry:
 		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -176,7 +176,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if !r.ExistsNow {
 			return model.ContentSnapshot{}, nil
 		}
-		out.Body, out.Purged, out.AuthoredAt, out.ThreadID = deref(r.Body), r.Body == nil, r.AuthoredAt, r.ThreadID
+		out.Body, out.AuthoredAt, out.ThreadID = deref(r.Body), r.AuthoredAt, r.ThreadID
 	case model.TargetPost:
 		r, err := q.GetPostSnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {

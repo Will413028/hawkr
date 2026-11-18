@@ -111,16 +111,11 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 	if got := snap(social.TargetPost, p.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(postAuthored) || got.AuthoredAt.IsZero() {
 		t.Fatalf("貼文的連結與發文時間 %+v", got)
 	}
-	if got := snap(social.TargetComment, c.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(commentAuthored) || got.Purged {
+	if got := snap(social.TargetComment, c.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(commentAuthored) {
 		t.Fatalf("留言的連結與發文時間 %+v", got)
 	}
-	if got := snap(social.TargetForumEntry, e.ID); got.ThreadID != e.ID || got.PostID != (uuidT{}) || got.StoreID != storeID || !got.AuthoredAt.Equal(entryAuthored) || got.Purged {
+	if got := snap(social.TargetForumEntry, e.ID); got.ThreadID != e.ID || got.PostID != (uuidT{}) || got.StoreID != storeID || !got.AuthoredAt.Equal(entryAuthored) {
 		t.Fatalf("討論區留言的連結與發文時間 %+v", got)
-	}
-	// 作者刪帳清除本文後內容還在、本文是 NULL：快照標示已清除（Purged），不是空本文。
-	f.exec(t, "UPDATE social.forum_entries SET body = NULL WHERE id = $1", e.ID)
-	if got := snap(social.TargetForumEntry, e.ID); !got.Exists || !got.Purged || got.Body != "" {
-		t.Fatalf("本文已清除 %+v", got)
 	}
 	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {

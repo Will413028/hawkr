@@ -1257,9 +1257,9 @@ INSERT INTO seller.measure_contents (
     link_post_id, link_store_id, link_thread_id
 )
 SELECT $1::uuid, ($2::text[])[i], ($3::uuid[])[i], ($4::text[])[i],
-       CASE WHEN ($4::text[])[i] = 'CAPTURED' THEN ($5::text[])[i] END,
-       CASE WHEN ($4::text[])[i] = 'CAPTURED' THEN ($6::timestamptz[])[i] END,
-       CASE WHEN ($4::text[])[i] = 'CAPTURED' THEN ($7::int[])[i] END,
+       ($5::text[])[i],
+       ($6::timestamptz[])[i],
+       ($7::int[])[i],
        NULLIF(($8::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
        NULLIF(($9::bigint[])[i], 0::bigint),
        NULLIF(($10::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)
@@ -1280,7 +1280,7 @@ type InsertMeasureContentsParams struct {
 }
 
 // 內容下架措施的全部對象與處分依據的快照，一次寫入（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。參數是平行陣列，同一個索引是同一個對象。
-// 沒有值的欄位用哨兵傳入再轉 NULL：不是 CAPTURED 的列（UNAVAILABLE）其快照欄位為 NULL；連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
+// 連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
 func (q *Queries) InsertMeasureContents(ctx context.Context, arg InsertMeasureContentsParams) error {
 	_, err := q.db.Exec(ctx, insertMeasureContents,
 		arg.MeasureID,

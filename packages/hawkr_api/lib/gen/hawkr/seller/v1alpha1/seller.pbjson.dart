@@ -404,17 +404,15 @@ const ContentSnapshotState$json = {
   '2': [
     {'1': 'CONTENT_SNAPSHOT_STATE_UNSPECIFIED', '2': 0},
     {'1': 'CONTENT_SNAPSHOT_STATE_CAPTURED', '2': 1},
-    {'1': 'CONTENT_SNAPSHOT_STATE_UNAVAILABLE', '2': 2},
-    {'1': 'CONTENT_SNAPSHOT_STATE_CLEARED', '2': 3},
+    {'1': 'CONTENT_SNAPSHOT_STATE_CLEARED', '2': 2},
   ],
 };
 
 /// Descriptor for `ContentSnapshotState`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List contentSnapshotStateDescriptor = $convert.base64Decode(
     'ChRDb250ZW50U25hcHNob3RTdGF0ZRImCiJDT05URU5UX1NOQVBTSE9UX1NUQVRFX1VOU1BFQ0'
-    'lGSUVEEAASIwofQ09OVEVOVF9TTkFQU0hPVF9TVEFURV9DQVBUVVJFRBABEiYKIkNPTlRFTlRf'
-    'U05BUFNIT1RfU1RBVEVfVU5BVkFJTEFCTEUQAhIiCh5DT05URU5UX1NOQVBTSE9UX1NUQVRFX0'
-    'NMRUFSRUQQAw==');
+    'lGSUVEEAASIwofQ09OVEVOVF9TTkFQU0hPVF9TVEFURV9DQVBUVVJFRBABEiIKHkNPTlRFTlRf'
+    'U05BUFNIT1RfU1RBVEVfQ0xFQVJFRBAC');
 
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {

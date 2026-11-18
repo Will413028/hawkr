@@ -744,8 +744,7 @@ CREATE TABLE seller.measure_contents (
     -- measures.status 的複本，由複合外鍵 ON UPDATE CASCADE 隨措施狀態同步（不由程式維護）；唯一索引 measure_contents_one_enforced 靠它保證
     -- 一則內容同時只有一個生效中的下架措施（生效狀態在 measures，部分唯一索引不能跨表，所以把狀態帶進這張表）。
     measure_status TEXT NOT NULL DEFAULT 'ENFORCED',
-    -- 處分依據的內容版本（A7-D29，由建立措施的入口傳入、措施擁有）：snapshot_state 是 CAPTURED（四個快照欄位與連結都有值）、UNAVAILABLE（建立時內容已清除，
-    -- 取不到快照；快照欄位全空）或 CLEARED（撤銷滿 184 天或店家退場後清空；快照欄位全空）。不存圖片，只存張數。連結目標：貼文與貼文留言連到貼文（link_post_id），
+    -- 處分依據的內容版本（A7-D29，由建立措施的入口傳入、措施擁有）：snapshot_state 是 CAPTURED（四個快照欄位與連結都有值）或 CLEARED（撤銷滿 184 天或店家退場後清空；快照欄位全空）。不存圖片，只存張數。連結目標：貼文與貼文留言連到貼文（link_post_id），
     -- 討論區發言連到店家加討論串（link_store_id、link_thread_id）。seller 只驗格式，內容是否屬實由入口（social 快照）保證。
     snapshot_state TEXT NOT NULL,
     snapshot_body  TEXT,
@@ -757,7 +756,7 @@ CREATE TABLE seller.measure_contents (
     PRIMARY KEY (measure_id, content_kind, content_id),
     CONSTRAINT measure_contents_measure_status_fkey FOREIGN KEY (measure_id, measure_status) REFERENCES seller.measures (id, status) ON UPDATE CASCADE,
     CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY')),
-    CONSTRAINT measure_contents_snapshot_state_check CHECK (snapshot_state IN ('CAPTURED', 'UNAVAILABLE', 'CLEARED')),
+    CONSTRAINT measure_contents_snapshot_state_check CHECK (snapshot_state IN ('CAPTURED', 'CLEARED')),
     CONSTRAINT measure_contents_snapshot_fields_check CHECK (
         (snapshot_state = 'CAPTURED') = (snapshot_body IS NOT NULL AND snapshot_authored_at IS NOT NULL AND snapshot_image_count IS NOT NULL)
         AND (snapshot_state = 'CAPTURED' OR (snapshot_body IS NULL AND snapshot_authored_at IS NULL AND snapshot_image_count IS NULL

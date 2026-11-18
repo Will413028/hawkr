@@ -297,7 +297,7 @@ func TestMeasureResponseCarriesTheTakedownContents(t *testing.T) {
 	m.Kind = model.MeasureContentTakedown
 	m.Contents = []model.MeasureContent{
 		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, State: model.SnapshotCleared},
-		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: comment}, State: model.SnapshotUnavailable},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: comment}, State: model.SnapshotCleared},
 	}
 	got := toMeasure(uitext.ZhTW, m).GetContents()
 	if len(got) != 2 || got[0].GetKind() != pb.ContentKind_CONTENT_KIND_POST || got[0].GetId() != post.String() ||

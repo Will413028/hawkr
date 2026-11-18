@@ -473,8 +473,6 @@ type ContentSnapshot struct {
 	PostID uuid.UUID
 	// ThreadID 是討論區留言所屬的討論串（與 StoreID 組成連結）；貼文與貼文留言是零值。
 	ThreadID uuid.UUID
-	// Purged 在內容還在、但本文已因作者刪帳而清除時為真（留言與討論區留言的 body 是 NULL）：這時 Body 是空字串、不是作者寫的空本文。
-	Purged bool
 }
 
 // ForumThreadView 是單一討論串：頂層項目（可以是佔位項目）與回覆的第一頁。

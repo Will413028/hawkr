@@ -987,10 +987,8 @@ enum ContentSnapshotState {
   CONTENT_SNAPSHOT_STATE_UNSPECIFIED = 0;
   // 快照在：excerpt、authored_time 與連結目標都有值。
   CONTENT_SNAPSHOT_STATE_CAPTURED = 1;
-  // 建立措施時內容已被清除，取不到快照；沒有 excerpt、authored_time 與連結目標。
-  CONTENT_SNAPSHOT_STATE_UNAVAILABLE = 2;
   // 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
-  CONTENT_SNAPSHOT_STATE_CLEARED = 3;
+  CONTENT_SNAPSHOT_STATE_CLEARED = 2;
 }
 
 // ForumThreadLink 指向一則討論區留言所屬的討論串：店家加討論串 id（不透明的字串）。

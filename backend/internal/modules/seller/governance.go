@@ -200,7 +200,6 @@ const (
 	// MaxTakedownContents 是一個內容下架措施最多的對象數。
 	MaxTakedownContents          = model.MaxTakedownContents
 	SnapshotCaptured             = model.SnapshotCaptured
-	SnapshotUnavailable          = model.SnapshotUnavailable
 	SnapshotCleared              = model.SnapshotCleared
 	ContentPost                  = model.ContentPost
 	ContentComment               = model.ContentComment

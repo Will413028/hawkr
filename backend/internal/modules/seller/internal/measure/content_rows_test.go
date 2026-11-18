@@ -11,14 +11,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// 批次寫入把每個對象放在各陣列的同一個索引：CAPTURED 帶本文、發文時間、張數與連結；UNAVAILABLE 的快照欄位是哨兵（SQL 轉 NULL），連結沒填的一組是零值。
-// mutation：陣列填錯索引（例如 States 用倒序）→ 同一個對象的狀態與本文錯位，斷言失敗；UNAVAILABLE 也寫入本文 → Bodies 斷言失敗。
+// 批次寫入把每個對象放在各陣列的同一個索引：CAPTURED 帶本文、發文時間、張數與連結；連結沒填的一組是零值。
+// mutation：陣列填錯索引（例如 States 用倒序）→ 同一個對象的狀態與本文錯位，斷言失敗。
 func TestInsertContentsParamsKeepsParallelArraysAligned(t *testing.T) {
 	m := ids(1)[0]
 	post, thread := ids(3)[1], ids(3)[2]
 	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.FixedZone("x", 8*3600))
 	in := []model.TakedownContent{
-		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: ids(4)[3]}, Purged: true},
+		{ContentRef: model.ContentRef{Kind: model.ContentComment, ID: ids(4)[3]}, Snapshot: &model.ContentSnapshot{Body: "留言", AuthoredAt: at, ImageCount: 1, Link: model.ContentLink{PostID: post}}},
 		{ContentRef: model.ContentRef{Kind: model.ContentForumEntry, ID: ids(5)[4]}, Snapshot: &model.ContentSnapshot{Body: "討論", AuthoredAt: at, ImageCount: 0, Link: model.ContentLink{StoreID: 12, ThreadID: thread}}},
 		{ContentRef: model.ContentRef{Kind: model.ContentPost, ID: post}, Snapshot: &model.ContentSnapshot{Body: "貼文", AuthoredAt: at, ImageCount: 2, Link: model.ContentLink{PostID: post}}},
 	}
@@ -27,11 +27,11 @@ func TestInsertContentsParamsKeepsParallelArraysAligned(t *testing.T) {
 		MeasureID:   m,
 		Kinds:       []string{"COMMENT", "FORUM_ENTRY", "POST"},
 		Ids:         []uuid.UUID{in[0].ID, in[1].ID, in[2].ID},
-		States:      []string{"UNAVAILABLE", "CAPTURED", "CAPTURED"},
-		Bodies:      []string{"", "討論", "貼文"},
-		AuthoredAts: []time.Time{{}, at.UTC(), at.UTC()},
-		ImageCounts: []int32{0, 0, 2},
-		LinkPostIds: []uuid.UUID{uuid.Nil(), uuid.Nil(), post}, LinkStoreIds: []int64{0, 12, 0}, LinkThreadIds: []uuid.UUID{uuid.Nil(), thread, uuid.Nil()},
+		States:      []string{"CAPTURED", "CAPTURED", "CAPTURED"},
+		Bodies:      []string{"留言", "討論", "貼文"},
+		AuthoredAts: []time.Time{at.UTC(), at.UTC(), at.UTC()},
+		ImageCounts: []int32{1, 0, 2},
+		LinkPostIds: []uuid.UUID{post, uuid.Nil(), post}, LinkStoreIds: []int64{0, 12, 0}, LinkThreadIds: []uuid.UUID{uuid.Nil(), thread, uuid.Nil()},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got  %+v\nwant %+v", got, want)

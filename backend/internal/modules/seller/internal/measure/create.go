@@ -495,7 +495,7 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	return model.CreateMeasureResult{Measure: measure}, err
 }
 
-// insertContentsParams 把全部對象展開成 InsertMeasureContents 的平行陣列；沒有快照（已清除旗標）的對象狀態是 UNAVAILABLE，快照欄位放哨兵值，SQL 轉成 NULL。
+// insertContentsParams 把全部對象展開成 InsertMeasureContents 的平行陣列；每個對象的快照必填，狀態一律是 CAPTURED。
 func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent) store.InsertMeasureContentsParams {
 	n := len(contents)
 	p := store.InsertMeasureContentsParams{
@@ -503,11 +503,10 @@ func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent)
 		AuthoredAts: make([]time.Time, n), ImageCounts: make([]int32, n), LinkPostIds: make([]uuid.UUID, n), LinkStoreIds: make([]int64, n), LinkThreadIds: make([]uuid.UUID, n),
 	}
 	for i, c := range contents {
-		p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotUnavailable)
-		if sn := c.Snapshot; sn != nil {
-			p.States[i], p.Bodies[i], p.AuthoredAts[i], p.ImageCounts[i] = string(model.SnapshotCaptured), sn.Body, sn.AuthoredAt.UTC(), sn.ImageCount
-			p.LinkPostIds[i], p.LinkStoreIds[i], p.LinkThreadIds[i] = sn.Link.PostID, sn.Link.StoreID, sn.Link.ThreadID
-		}
+		sn := c.Snapshot
+		p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotCaptured)
+		p.Bodies[i], p.AuthoredAts[i], p.ImageCounts[i] = sn.Body, sn.AuthoredAt.UTC(), sn.ImageCount
+		p.LinkPostIds[i], p.LinkStoreIds[i], p.LinkThreadIds[i] = sn.Link.PostID, sn.Link.StoreID, sn.Link.ThreadID
 	}
 	return p
 }

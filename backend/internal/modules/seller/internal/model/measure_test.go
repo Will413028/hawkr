@@ -956,7 +956,6 @@ func TestValidateContentTargetsRules(t *testing.T) {
 	forum := func(n byte) TakedownContent {
 		return TakedownContent{ContentRef: ContentRef{ContentForumEntry, id(n)}, Snapshot: &ContentSnapshot{Body: "x", AuthoredAt: at, Link: ContentLink{StoreID: 7, ThreadID: id(8)}}}
 	}
-	purged := TakedownContent{ContentRef: ContentRef{ContentPost, id(1)}, Purged: true}
 	with := func(c TakedownContent, f func(*TakedownContent)) []TakedownContent {
 		f(&c)
 		return []TakedownContent{c}
@@ -969,13 +968,11 @@ func TestValidateContentTargetsRules(t *testing.T) {
 		{"一則貼文", []TakedownContent{post(ContentPost, 1)}, true},
 		{"三種內容各一", []TakedownContent{post(ContentPost, 1), post(ContentComment, 2), forum(3)}, true},
 		{"同一個 id 不同種類不算重複", []TakedownContent{post(ContentPost, 1), post(ContentComment, 1)}, true},
-		{"已清除旗標", []TakedownContent{purged}, true},
 		{"空", nil, false},
 		{"重複", []TakedownContent{post(ContentPost, 1), post(ContentPost, 1)}, false},
 		{"未知種類", []TakedownContent{post("STORE", 1)}, false},
 		{"空 ID", []TakedownContent{post(ContentPost, 0)}, false},
-		{"沒有快照也沒有旗標", with(purged, func(c *TakedownContent) { c.Purged = false }), false},
-		{"快照與旗標並存", with(post(ContentPost, 1), func(c *TakedownContent) { c.Purged = true }), false},
+		{"沒有快照", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot = nil }), false},
 		{"沒有發文時間", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.AuthoredAt = time.Time{} }), false},
 		{"圖片張數為負", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.ImageCount = -1 }), false},
 		{"貼文沒有連結", with(post(ContentPost, 1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{} }), false},
@@ -1065,7 +1062,7 @@ func TestValidateContentRefsChecksShapeWithoutSnapshots(t *testing.T) {
 }
 
 func TestSnapshotStateValuesAreAllValuid(t *testing.T) {
-	if got := SnapshotStateValues(); len(got) != 3 {
+	if got := SnapshotStateValues(); len(got) != 2 {
 		t.Fatalf("%v", got)
 	}
 }

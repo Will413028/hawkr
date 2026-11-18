@@ -104,15 +104,15 @@ SELECT * FROM created;
 
 -- name: InsertMeasureContents :exec
 -- 內容下架措施的全部對象與處分依據的快照，一次寫入（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。參數是平行陣列，同一個索引是同一個對象。
--- 沒有值的欄位用哨兵傳入再轉 NULL：不是 CAPTURED 的列（UNAVAILABLE）其快照欄位為 NULL；連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
+-- 連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
 INSERT INTO seller.measure_contents (
     measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
     link_post_id, link_store_id, link_thread_id
 )
 SELECT sqlc.arg(measure_id)::uuid, (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i], (sqlc.arg(states)::text[])[i],
-       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(bodies)::text[])[i] END,
-       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(authored_ats)::timestamptz[])[i] END,
-       CASE WHEN (sqlc.arg(states)::text[])[i] = 'CAPTURED' THEN (sqlc.arg(image_counts)::int[])[i] END,
+       (sqlc.arg(bodies)::text[])[i],
+       (sqlc.arg(authored_ats)::timestamptz[])[i],
+       (sqlc.arg(image_counts)::int[])[i],
        NULLIF((sqlc.arg(link_post_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
        NULLIF((sqlc.arg(link_store_ids)::bigint[])[i], 0::bigint),
        NULLIF((sqlc.arg(link_thread_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)

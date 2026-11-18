@@ -365,7 +365,7 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 }
 
 // takedownContents 先檢查清單的形狀（筆數、種類、重複；壞請求不讀 social），再核對每一則內容現在存在（沒有刪除）、作者是這家店，並用同一次讀取取得處分依據的內容快照；後台處理的是現存的內容，已刪除與不存在的都拒絕。
-// 內容還在但本文已清除時不帶快照，改以「已清除」旗標表示。種類不符或不存在的內容讀不到快照，同樣拒絕。
+// 種類不符或不存在的內容讀不到快照，同樣拒絕；moderation 一律有案件快照，所以快照必填。
 func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs []model.ContentRef) ([]model.TakedownContent, error) {
 	if err := model.ValidateContentRefs("Takedown.Contents", refs); err != nil {
 		return nil, rpc.WithFieldPaths(err, createTakedownPaths)
@@ -379,12 +379,8 @@ func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs [
 		if !sn.Exists || sn.StoreID != storeID || sn.Author.Kind != social.ActorStore || sn.Author.ID != storeID {
 			return nil, rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
 		}
-		t := model.TakedownContent{ContentRef: c, Purged: sn.Purged}
-		if !sn.Purged {
-			snap := model.NewContentSnapshot(c.Kind, sn.Body, sn.AuthoredAt, len(sn.MediaRefs), sn.StoreID, sn.PostID, sn.ThreadID)
-			t.Snapshot = &snap
-		}
-		out = append(out, t)
+		snap := model.NewContentSnapshot(c.Kind, sn.Body, sn.AuthoredAt, len(sn.MediaRefs), sn.StoreID, sn.PostID, sn.ThreadID)
+		out = append(out, model.TakedownContent{ContentRef: c, Snapshot: &snap})
 	}
 	return out, nil
 }

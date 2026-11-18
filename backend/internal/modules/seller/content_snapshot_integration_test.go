@@ -17,8 +17,8 @@ func sameSnapshot(a, b *ContentSnapshot) bool {
 	return a.Body == b.Body && a.AuthoredAt.Equal(b.AuthoredAt) && a.ImageCount == b.ImageCount && a.Link == b.Link
 }
 
-// 措施存入處分依據的內容快照，讀回時本文全文、發文時間、圖片張數與連結目標都在；取不到快照的內容以旗標存成 UNAVAILABLE、沒有快照欄位。
-// mutation：InsertMeasureContents 少寫 link_thread_id 或 snapshot_body → CHECK 擋下或讀回的欄位不符；旗標對象寫成 CAPTURED → 狀態斷言失敗。
+// 措施存入處分依據的內容快照，讀回時本文全文、發文時間、圖片張數與連結目標都在。
+// mutation：InsertMeasureContents 少寫 link_thread_id 或 snapshot_body → CHECK 擋下或讀回的欄位不符。
 func TestContentTakedownStoresAndReadsBackTheSnapshot(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -28,23 +28,24 @@ func TestContentTakedownStoresAndReadsBackTheSnapshot(t *testing.T) {
 		Body: "貼文全文", AuthoredAt: snapshotAuthored, ImageCount: 1, Link: ContentLink{PostID: postID}}}
 	forum := TakedownContent{ContentRef: ContentRef{Kind: ContentForumEntry, ID: uuid.NewV7()}, Snapshot: &ContentSnapshot{
 		Body: "", AuthoredAt: snapshotAuthored, ImageCount: 0, Link: ContentLink{StoreID: s.StoreID, ThreadID: threadID}}}
-	purged := TakedownContent{ContentRef: ContentRef{Kind: ContentComment, ID: uuid.NewV7()}, Purged: true}
-	m := f.takedownSnapshots(t, s.StoreID, []TakedownContent{post, forum, purged})
+	comment := TakedownContent{ContentRef: ContentRef{Kind: ContentComment, ID: uuid.NewV7()}, Snapshot: &ContentSnapshot{
+		Body: "留言", AuthoredAt: snapshotAuthored, ImageCount: 0, Link: ContentLink{PostID: postID}}}
+	m := f.takedownSnapshots(t, s.StoreID, []TakedownContent{post, forum, comment})
 
 	for _, got := range [][]MeasureContent{m.Contents, f.measureOf(t, m.ID).Contents} {
 		by := map[ContentKind]MeasureContent{}
 		for _, c := range got {
 			by[c.Kind] = c
 		}
-		p, fe, pu := by[ContentPost], by[ContentForumEntry], by[ContentComment]
+		p, fe, co := by[ContentPost], by[ContentForumEntry], by[ContentComment]
 		if p.State != SnapshotCaptured || p.Snapshot == nil || !sameSnapshot(p.Snapshot, post.Snapshot) {
 			t.Errorf("貼文快照 %+v", p)
 		}
 		if fe.State != SnapshotCaptured || fe.Snapshot == nil || !sameSnapshot(fe.Snapshot, forum.Snapshot) {
 			t.Errorf("討論區留言快照（空本文也是有效快照）%+v", fe)
 		}
-		if pu.State != SnapshotUnavailable || pu.Snapshot != nil {
-			t.Errorf("已清除的內容走旗標、沒有快照 %+v", pu)
+		if co.State != SnapshotCaptured || co.Snapshot == nil || !sameSnapshot(co.Snapshot, comment.Snapshot) {
+			t.Errorf("留言快照 %+v", co)
 		}
 	}
 }
