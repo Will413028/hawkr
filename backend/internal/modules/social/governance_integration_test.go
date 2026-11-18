@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
@@ -193,9 +194,11 @@ func (f *fixture) timeOf(t *testing.T, sql string, args ...any) time.Time {
 	return at
 }
 
-// AvailableLinks 回報連結目標此刻還在不在：貼文沒有軟刪、討論串的起始留言沒有軟刪；不存在的目標與別家店的討論串都是不在。一批目標每類一個查詢。
-// mutation：AvailableLinkPosts 拿掉 deleted_at IS NULL → 刪除後的貼文仍回在；AvailableLinkThreads 的店家條件拿掉 → 錯店的討論串回在。
-func TestAvailableLinksFollowDeletionOfPostsAndThreads(t *testing.T) {
+// AvailableLinks 回報賣家此刻點得進去的連結目標：貼文沒有軟刪就算（被下架的貼文賣家中心仍讀得到，所以仍在）；討論串只在對外讀得到時才算（頂層可見，或頂層已刪而底下有可見回覆的佔位項目）；
+// 不存在的目標、別家店的討論串、頂層被刪又沒有可見回覆、頂層被隱藏又沒有可見回覆都是不在。
+// mutation：AvailableLinkPosts 拿掉 deleted_at IS NULL → 刪除後的貼文仍回在；AvailableLinkPosts 加上下架條件 → 被下架的貼文回不在；
+// ForumThreadsReadable 換成只看頂層是否存在 → 頂層已刪沒有回覆的討論串回在；店家條件拿掉 → 錯店的討論串回在。
+func TestAvailableLinksFollowDeletionAndReadabilityOfThreads(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -203,16 +206,20 @@ func TestAvailableLinksFollowDeletionOfPostsAndThreads(t *testing.T) {
 	b := f.newBuyer(t)
 	live := f.publishedPost(t, storeID, "還在")
 	gone := f.publishedPost(t, storeID, "會刪")
+	down := f.publishedPost(t, storeID, "被下架")
+	f.takedowns(t).create(t, storeID, ref(seller.ContentPost, down.ID))
 	e1 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串一"}))
 	e2 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串二"}))
+	e3 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串三"}))
+	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串三的回覆", ParentID: &e3.ID, ReplyToID: &e3.ID}))
 	f.exec(t, "UPDATE social.posts SET deleted_at = now() WHERE id = $1", gone.ID)
-	f.exec(t, "UPDATE social.forum_entries SET deleted_at = now() WHERE id = $1", e2.ID)
-	threads := []social.ForumThread{{StoreID: storeID, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e2.ID}, {StoreID: storeID + 999, ThreadID: e1.ID}}
-	got := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, []uuidT{live.ID, gone.ID, uuidNew()}, threads))
-	if !got.Posts[live.ID] || got.Posts[gone.ID] || len(got.Posts) != 1 {
+	f.exec(t, "UPDATE social.forum_entries SET deleted_at = now() WHERE id IN ($1, $2)", e2.ID, e3.ID)
+	threads := []social.ForumThread{{StoreID: storeID, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e2.ID}, {StoreID: storeID + 999, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e3.ID}}
+	got := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, []uuidT{live.ID, gone.ID, down.ID, uuidNew()}, threads))
+	if !got.Posts[live.ID] || got.Posts[gone.ID] || !got.Posts[down.ID] || len(got.Posts) != 2 {
 		t.Errorf("貼文 %v", got.Posts)
 	}
-	if !got.Threads[threads[0]] || got.Threads[threads[1]] || got.Threads[threads[2]] || len(got.Threads) != 1 {
+	if !got.Threads[threads[0]] || got.Threads[threads[1]] || got.Threads[threads[2]] || !got.Threads[threads[3]] || len(got.Threads) != 2 {
 		t.Errorf("討論串 %v", got.Threads)
 	}
 	if empty := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, nil, nil)); len(empty.Posts)+len(empty.Threads) != 0 {

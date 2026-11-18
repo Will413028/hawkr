@@ -30,7 +30,7 @@ type EntryRow struct {
 // 規則同 topLevelComments：被封鎖排除的作者，頂層整則不出現，回覆不進「有可見回覆」的判斷。
 func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, pg CommentPage) SelectStatement {
 	c := visibility.ForumEntriesOf("c", v)
-	return topLevelForumEntries(storeID, now, v, afterComment(c.T.CreatedAt, c.T.ID, pg)).
+	return topLevelForumEntries(Int64(storeID), now, v, afterComment(c.T.CreatedAt, c.T.ID, pg)).
 		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
 		LIMIT(pg.Limit)
 }
@@ -39,10 +39,21 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 // 已刪除或被隱藏而底下沒有可見回覆、被觀看者的封鎖排除、或不屬於這家店時沒有列。
 func GetForumThreadTop(storeID int64, threadID uuid.UUID, now time.Time, v visibility.Viewer) SelectStatement {
 	c := visibility.ForumEntriesOf("c", v)
-	return topLevelForumEntries(storeID, now, v, c.T.ID.EQ(UUID(threadID)))
+	return topLevelForumEntries(Int64(storeID), now, v, c.T.ID.EQ(UUID(threadID)))
 }
 
-func topLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, extra BoolExpression) SelectStatement {
+// ForumThreadsReadable 是一批討論串（以頂層留言 id 找）中對觀看者可讀的頂層項目，與 GetForumThreadTop 同一個算式；
+// 呼叫端用回傳列的 store_id 與 id 對回要查的（店家，討論串）配對。
+func ForumThreadsReadable(threadIDs []uuid.UUID, now time.Time, v visibility.Viewer) SelectStatement {
+	c := visibility.ForumEntriesOf("c", v)
+	ids := make([]Expression, len(threadIDs))
+	for i, id := range threadIDs {
+		ids[i] = UUID(id)
+	}
+	return topLevelForumEntries(c.T.StoreID, now, v, c.T.ID.IN(ids...))
+}
+
+func topLevelForumEntries(storeID IntegerExpression, now time.Time, v visibility.Viewer, extra BoolExpression) SelectStatement {
 	c := visibility.ForumEntriesOf("c", v)
 	r := visibility.ForumEntriesOf("r", v)
 	s := table.ForumEntryStats.AS("s")
@@ -60,9 +71,9 @@ func topLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, ext
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
-			c.T.StoreID.EQ(Int64(storeID)),
+			c.T.StoreID.EQ(storeID),
 			c.T.ParentID.IS_NULL(),
-			visibility.ReadableForum(now, v, Int64(storeID)),
+			visibility.ReadableForum(now, v, storeID),
 			visible.OR(hasVisibleReply),
 			extra,
 		))

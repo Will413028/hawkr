@@ -16,14 +16,14 @@ import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { optionalText, type UiText, useUiText } from "@/lib/i18n/ui-text";
 
 /**
- * 內容下架對象的連結：貼文與貼文留言連到貼文，討論區留言連到單一討論串頁。目標已不在（`linkAvailable` 為 false）、
+ * 內容下架對象的連結：貼文與貼文留言連到賣家中心自己的貼文（下架中也看得到），討論區留言連到單一討論串頁。賣家點了看不到（`linkAvailable` 為 false，由伺服器依刪除與下架判斷）、
  * 快照不在或沒有連結目標時沒有連結。
  */
 export function contentHref(content: ContentRef): string | undefined {
 	if (!content.linkAvailable) return undefined;
 	switch (content.link.case) {
 		case "postId":
-			return `/feed?post=${encodeURIComponent(content.link.value)}`;
+			return `/seller-center/posts?post=${encodeURIComponent(content.link.value)}`;
 		case "forumThread":
 			return `/sellers/${encodeURIComponent(content.link.value.storeId)}/messages/${encodeURIComponent(content.link.value.threadId)}`;
 		default:

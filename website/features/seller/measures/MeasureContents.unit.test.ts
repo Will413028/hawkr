@@ -47,7 +47,7 @@ function ref(over: Record<string, unknown> = {}): ContentRef {
 
 describe("contentHref", () => {
 	it("貼文連到貼文頁，討論區留言連到單一討論串頁", () => {
-		expect(contentHref(ref())).toBe("/feed?post=p1");
+		expect(contentHref(ref())).toBe("/seller-center/posts?post=p1");
 		expect(
 			contentHref(
 				ref({
@@ -103,7 +103,7 @@ describe("MeasureContents", () => {
 			screen
 				.getAllByText("查看貼文")
 				.map((a) => a.closest("a")?.getAttribute("href")),
-		).toEqual(["/feed?post=p1", "/feed?post=p2"]);
+		).toEqual(["/seller-center/posts?post=p1", "/seller-center/posts?post=p2"]);
 	});
 
 	it("目標已刪除（link_available 為 false）的項目不顯示連結，其餘照列", () => {
