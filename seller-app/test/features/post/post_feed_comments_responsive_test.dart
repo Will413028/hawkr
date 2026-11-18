@@ -42,6 +42,7 @@ Future<_Repo> _pumpFeed(
       ),
     ],
   );
+  when(() => repo.getMyPost(any())).thenAnswer((_) => Completer<Post>().future);
   when(() => repo.listComments(42)).thenAnswer(
     (_) async => [
       testComment(author: '測試留言者', body: '請問本週還能出貨嗎？', replyCount: 1),
@@ -313,7 +314,6 @@ void main() {
       );
       await _closeComments(tester);
       expect(find.bySemanticsLabel('留言，共 4 則'), findsOneWidget);
-      verifyNever(() => repo.getMyPost(any()));
       await tester.pump(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     });

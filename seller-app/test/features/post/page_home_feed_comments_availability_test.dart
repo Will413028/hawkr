@@ -50,6 +50,8 @@ Future<_Repo> _openComments(
   addTearDown(tester.view.resetDevicePixelRatio);
   final repo = _Repo();
   when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+  // 伺服器計數的校正預設不回來；要驗證校正的測試自己覆寫。
+  when(() => repo.getMyPost(any())).thenAnswer((_) => Completer<Post>().future);
   when(
     () => repo.listComments(42),
   ).thenAnswer((_) async => comments ?? [testComment(body: '買家的留言')]);
@@ -86,6 +88,32 @@ Future<_Repo> _openComments(
   await tester.tap(find.bySemanticsLabel('留言，共 ${post.commentCount} 則'));
   await tester.pumpAndSettle();
   return repo;
+}
+
+Future<void> _pumpFeed(WidgetTester tester, _Repo repo) async {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        postRepositoryProvider.overrideWithValue(repo),
+        sellerStoreIdProvider.overrideWithValue('7'),
+        myStoreSnapshotProvider.overrideWithValue(_store(listed: true)),
+      ],
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        enableScaleWH: () => false,
+        enableScaleText: () => false,
+        builder: (_, _) => MaterialApp(
+          theme: AppTheme.light,
+          home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 Post _post({
@@ -371,7 +399,6 @@ void main() {
           commentCount: 5,
         ),
       );
-      verifyNever(() => repo.getMyPost(any()));
       expect(find.text('留言 5'), findsOneWidget);
       final reload = Completer<List<Post>>();
       when(() => repo.listMyPosts()).thenAnswer((_) => reload.future);
@@ -424,7 +451,121 @@ void main() {
     await tester.tap(find.text('刪除留言'));
     await tester.pumpAndSettle();
     expect(find.text('留言 1'), findsOneWidget);
-    verifyNever(() => repo.getMyPost(any()));
     await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('deleting the comment being replied to clears the reply target', (
+    tester,
+  ) async {
+    final repo = await _openComments(
+      tester,
+      listed: true,
+      post: _post(
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+        commentCount: 1,
+      ),
+      comments: [testComment(canDelete: true, canReply: true)],
+    );
+    await tester.tap(find.bySemanticsLabel('回覆 測試留言者'));
+    await tester.pump();
+    expect(find.text('@測試留言者'), findsOneWidget);
+    when(
+      () => repo.deleteComment('1', etag: 'etag-1'),
+    ).thenAnswer((_) async {});
+    final more = find.byTooltip('留言更多操作').first;
+    await tester.ensureVisible(more);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除留言'));
+    await tester.pumpAndSettle();
+    expect(find.text('@測試留言者'), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('the server comment_count corrects the title on open', (
+    tester,
+  ) async {
+    final repo = _Repo();
+    final post = _post(
+      publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+      commentCount: 1,
+    );
+    when(() => repo.getMyPost(any())).thenAnswer(
+      (_) async => _post(
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+        commentCount: 9,
+      ),
+    );
+    when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+    when(() => repo.listComments(42)).thenAnswer((_) async => const []);
+    await _pumpFeed(tester, repo);
+    await tester.tap(find.bySemanticsLabel('留言，共 1 則'));
+    await tester.pumpAndSettle();
+    expect(find.text('留言 9'), findsOneWidget);
+  });
+
+  testWidgets('a comment sent as the page unmounts still adds one', (
+    tester,
+  ) async {
+    final repo = _Repo();
+    final post = _post(
+      publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+      commentCount: 1,
+    );
+    final created = Completer<PostComment>();
+    when(
+      () => repo.getMyPost(any()),
+    ).thenAnswer((_) => Completer<Post>().future);
+    when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
+    when(() => repo.listComments(42)).thenAnswer((_) async => const []);
+    when(
+      () => repo.createComment(42, body: '離開前送出'),
+    ).thenAnswer((_) => created.future);
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final container = ProviderContainer(
+      overrides: [
+        postRepositoryProvider.overrideWithValue(repo),
+        sellerStoreIdProvider.overrideWithValue('7'),
+        myStoreSnapshotProvider.overrideWithValue(_store(listed: true)),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, _) => MaterialApp(
+            theme: AppTheme.light,
+            home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final keep = container.listen(postListProvider, (_, _) {});
+    addTearDown(keep.close);
+    await tester.tap(find.bySemanticsLabel('留言，共 1 則'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('seller-post-comment-input-42')),
+      '離開前送出',
+    );
+    await tester.pump();
+    final send = find.bySemanticsLabel('送出留言');
+    await tester.ensureVisible(send);
+    await tester.tap(send);
+    await tester.pump();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SizedBox()),
+    );
+    created.complete(testComment(id: '7', body: '離開前送出'));
+    await tester.pump();
+    expect(container.read(postListProvider).value!.single.commentCount, 2);
   });
 }

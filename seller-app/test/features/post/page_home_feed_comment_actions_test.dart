@@ -27,10 +27,16 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         final repo = _Repo();
+        when(
+          () => repo.getMyPost(any()),
+        ).thenAnswer((_) => Completer<Post>().future);
         var comments = [testComment(isMine: self)];
         when(() => repo.listMyPosts()).thenAnswer(
           (_) async => [Post(id: 42, content: '貼文內容', commentCount: 1)],
         );
+        when(
+          () => repo.getMyPost(any()),
+        ).thenAnswer((_) => Completer<Post>().future);
         when(() => repo.listComments(42)).thenAnswer((_) async => comments);
         var response = Completer<void>();
         when(
@@ -131,6 +137,9 @@ void main() {
     tester,
   ) async {
     final repo = _Repo();
+    when(
+      () => repo.getMyPost(any()),
+    ).thenAnswer((_) => Completer<Post>().future);
     when(() => repo.listComments(42)).thenAnswer(
       (_) async => [
         testComment(canDelete: false, canReply: false, isMine: true),
@@ -147,6 +156,9 @@ void main() {
   ) async {
     final repo = _Repo();
     when(
+      () => repo.getMyPost(any()),
+    ).thenAnswer((_) => Completer<Post>().future);
+    when(
       () => repo.listComments(42),
     ).thenAnswer((_) async => [testComment(canDelete: true, canReply: true)]);
     await openComments(tester, repo);
@@ -160,6 +172,9 @@ void main() {
     tester,
   ) async {
     final repo = _Repo();
+    when(
+      () => repo.getMyPost(any()),
+    ).thenAnswer((_) => Completer<Post>().future);
     when(
       () => repo.listComments(42),
     ).thenAnswer((_) async => [testComment(canDelete: false)]);

@@ -378,6 +378,26 @@ class _PostPage extends HookConsumerWidget {
       ref.invalidate(_threadRepliesProvider);
     }
 
+    // 校正的流水號：每次本地加減都緊接著發一次校正，所以只有最後發出的校正算數，亂序回來的舊結果丟掉。
+    final reconcileSeq = useRef(0);
+    void adjustCount(int delta) {
+      postList.adjustCommentCount(post.id, delta);
+    }
+
+    // 以伺服器的 comment_count 校正本地加減的漂移（別人的留言與刪除）。postList 由這個 widget 監看而存活；
+    // 不擋畫面，失敗就維持本地值。
+    Future<void> reconcileCount() async {
+      if (!context.mounted) return;
+      final seq = ++reconcileSeq.value;
+      try {
+        final latest = await ref
+            .read(postRepositoryProvider)
+            .getMyPost(post.id);
+        if (!context.mounted || seq != reconcileSeq.value) return;
+        postList.updateCommentCount(post.id, latest.commentCount);
+      } on Exception catch (_) {}
+    }
+
     Future<void> submitComment() async {
       final raw = commentCtrl.text.trim();
       if (raw.isEmpty || submitting.value) return;
@@ -400,11 +420,12 @@ class _PostPage extends HookConsumerWidget {
               .read(postRepositoryProvider)
               .createComment(post.id, body: raw);
         }
+        adjustCount(1);
+        reconcileCount();
         if (!context.mounted) return;
         commentCtrl.clear();
         replyTarget.value = null;
         commentFocus.unfocus();
-        postList.adjustCommentCount(post.id, 1);
         refreshComments();
       } catch (e) {
         if (context.mounted) FloatingToast.error(context, '留言失敗');
@@ -419,9 +440,15 @@ class _PostPage extends HookConsumerWidget {
         await ref
             .read(postRepositoryProvider)
             .deleteComment(c.id, etag: c.etag);
+        adjustCount(-1);
+        reconcileCount();
         if (!context.mounted) return;
         FloatingToast.success(context, '已刪除留言');
-        postList.adjustCommentCount(post.id, -1);
+        final replying = replyTarget.value;
+        if (replying != null &&
+            (replying.apiParentId == c.id || replying.replyToId == c.id)) {
+          replyTarget.value = null;
+        }
         refreshComments();
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
@@ -501,6 +528,7 @@ class _PostPage extends HookConsumerWidget {
     Future<void> openComments() async {
       if (commentsOpen.value || !context.mounted) return;
       commentsOpen.value = true;
+      reconcileCount();
       final sheet = showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,

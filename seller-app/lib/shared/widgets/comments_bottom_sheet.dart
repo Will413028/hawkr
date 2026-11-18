@@ -15,6 +15,7 @@ import '../../features/post/data/post_comment.dart';
 import '../../features/post/data/post_repository.dart';
 import '../utils/floating_toast.dart';
 import 'chat_bubble_icon.dart';
+import 'hk_button_label.dart';
 import 'hk_tap_target.dart';
 import 'hk_frosted_icon_button.dart';
 import 'truck_loading_overlay.dart';
@@ -97,10 +98,27 @@ class CommentsBottomSheet extends HookConsumerWidget {
     }, [ctrl]);
 
     final commentCount = useRef(initialCommentCount);
+    // 校正的流水號：只有最後發出的校正算數，亂序回來的舊結果丟掉。
+    final reconcileSeq = useRef(0);
     void adjustCommentCount(int delta) {
       commentCount.value = math.max(0, commentCount.value + delta);
       onCommentCountChanged?.call(commentCount.value);
     }
+
+    // 以伺服器的 comment_count 校正本地加減的漂移（別人的留言與刪除）。不擋畫面，失敗就維持本地值。
+    // 呼叫端的 onCommentCountChanged 不依賴 provider 存活（見呼叫端），這裡只用注入的 repository。
+    Future<void> reconcileCommentCount() async {
+      final seq = ++reconcileSeq.value;
+      try {
+        final latest = await postRepository.getMyPost(postId);
+        if (!context.mounted || seq != reconcileSeq.value) return;
+        commentCount.value = latest.commentCount;
+        onCommentCountChanged?.call(commentCount.value);
+      } on Exception catch (_) {}
+    }
+
+    // 回覆讀取的世代：load() 重設時加一，重設之前發出的讀取回來後不寫任何狀態。
+    final replyGeneration = useRef(0);
 
     void scheduleScrollToBottom({bool animated = true}) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -123,12 +141,14 @@ class CommentsBottomSheet extends HookConsumerWidget {
       try {
         final list = await postRepository.listComments(postId);
         if (!context.mounted) return;
+        replyGeneration.value++;
         repliesByParentRef.value.clear();
         repliesLoadingRef.value.clear();
         repliesLoadedRef.value.clear();
         repliesFailedRef.value.clear();
         comments.value = list;
         scheduleScrollToBottom(animated: false);
+        reconcileCommentCount();
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '留言載入失敗');
       } finally {
@@ -153,6 +173,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
           parentId: parentId,
         );
         adjustCommentCount(1);
+        reconcileCommentCount();
         if (!context.mounted) return;
         ctrl.clear();
         if (parentId != null) {
@@ -187,8 +208,8 @@ class CommentsBottomSheet extends HookConsumerWidget {
       FocusScope.of(context).requestFocus(focus);
     }
 
-    void cancelReply() {
-      if (sending.value) return;
+    void cancelReply({bool force = false}) {
+      if (sending.value && !force) return;
       final name = replyToName.value;
       final prefix = name == null ? '' : '@$name ';
       final remaining = prefix.isNotEmpty && ctrl.text.startsWith(prefix)
@@ -211,6 +232,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
       }
       adjustCommentCount(-1);
       if (!context.mounted) return false;
+      if (replyToCommentId.value == target.id) cancelReply(force: true);
       await load();
       if (!context.mounted) return true;
       FloatingToast.success(context, '已刪除留言');
@@ -463,11 +485,15 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                     !repliesFailedRef.value.contains(id) &&
                                     !repliesLoadingRef.value.contains(id)) {
                                   repliesLoadingRef.value.add(id);
+                                  final generation = replyGeneration.value;
                                   Future.microtask(() async {
                                     try {
                                       final items = await postRepository
                                           .listComments(postId, parentId: id);
-                                      if (!context.mounted) return;
+                                      if (!context.mounted ||
+                                          generation != replyGeneration.value) {
+                                        return;
+                                      }
                                       final created =
                                           repliesByParentRef.value[id] ??
                                           const <PostComment>[];
@@ -482,13 +508,21 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                       ];
                                       repliesLoadedRef.value.add(id);
                                     } catch (_) {
-                                      if (!context.mounted) return;
+                                      if (!context.mounted ||
+                                          generation != replyGeneration.value) {
+                                        return;
+                                      }
                                       repliesFailedRef.value.add(id);
                                       FloatingToast.error(context, '回覆載入失敗');
                                     } finally {
-                                      repliesLoadingRef.value.remove(id);
+                                      if (generation == replyGeneration.value) {
+                                        repliesLoadingRef.value.remove(id);
+                                      }
                                     }
-                                    if (!context.mounted) return;
+                                    if (!context.mounted ||
+                                        generation != replyGeneration.value) {
+                                      return;
+                                    }
                                     comments.value = List.of(comments.value);
                                   });
                                 }
@@ -524,6 +558,29 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                             ? () => confirmAndDeleteComment(c)
                                             : null,
                                         onLike: () => toggleLike(c),
+                                      ),
+                                    if (repliesFailedRef.value.contains(id))
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 46.w),
+                                        child: Row(
+                                          children: [
+                                            const Text('回覆載入失敗'),
+                                            TextButton(
+                                              key: ValueKey(
+                                                'comments-sheet-replies-retry-$id',
+                                              ),
+                                              onPressed: () {
+                                                repliesFailedRef.value.remove(
+                                                  id,
+                                                );
+                                                comments.value = List.of(
+                                                  comments.value,
+                                                );
+                                              },
+                                              child: const HkButtonLabel('重試'),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     // Replies (indented)
                                     ...replies.map(

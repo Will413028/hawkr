@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
@@ -38,6 +40,7 @@ Future<_Repo> _openPreviewComments(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   final repo = _Repo();
+  when(() => repo.getMyPost(any())).thenAnswer((_) => Completer<Post>().future);
   when(
     () => repo.listMyPostsPage(
       pageToken: any(named: 'pageToken'),
