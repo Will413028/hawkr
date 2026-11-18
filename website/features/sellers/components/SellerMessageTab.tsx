@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import {
 	CommentEditor,
 	CommentEntryActions,
+	CommentErrorBox,
 } from "@/features/feed/components/CommentEntryParts";
 import { canBlockForumAuthor } from "@/features/feed/components/commentPermissions";
 import { useAuth } from "@/lib/auth/context";
@@ -17,7 +18,7 @@ import type {
 	SellerForumComment,
 	SellerForumListResult,
 } from "@/lib/forum/repo";
-import { useSellerForum } from "@/lib/hooks/useSellerForum";
+import { useForumReplies, useSellerForum } from "@/lib/hooks/useSellerForum";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { blockBuyerByForumEntry } from "@/lib/seller/block-buyer";
 
@@ -30,24 +31,14 @@ interface SellerMessageTabProps {
 }
 
 /**
- * Seller forum / message-board tab — phases 2 + 3 combined.
+ * Seller forum / message-board tab.
  *
- * Phase 2 (already shipped):
- *   - Compose (login-gated), top-level list, empty / error / load more.
- *
- * Phase 3 (this update):
- *   - "X 則回覆 ▼" affordance only when replyCount > 0.
- *   - Click expands the comment, lazy-loads `replies[]` via the hook,
- *     re-clicks toggle collapse without refetching.
- *   - "回覆" button per comment puts the compose into reply mode.
- *     A banner above the textarea names the target (with × to cancel);
- *     submit routes through forum.reply(parentId, content). Optimistic
- *     reply lands inside the parent's `replies[]` immediately.
- *
- * Per-row edit / delete / block follow the server's `viewer_can_*` flags.
- *
- * Still deferred to later phases:
- *   - Sticky mobile input, reply-line treatment, date polish (phase 5)
+ * - Compose (login-gated), top-level list with cursor paging, empty / error states.
+ * - Each top-level entry with replies offers "X 則回覆 ▼"; expanding reads its thread
+ *   (`useForumReplies`, cursor paging). "回覆" puts the composer into reply mode.
+ * - Own just-submitted entries whose server copy is not in the loaded pages show under
+ *   the composer (top-level) or at the bottom of the thread (replies), without actions.
+ * - Per-row edit / delete / block follow the server's `viewer_can_*` flags.
  */
 export default function SellerMessageTab({
 	sellerId,
@@ -67,15 +58,12 @@ export default function SellerMessageTab({
 	const [expandedIds, setExpandedIds] = React.useState<ReadonlySet<string>>(
 		() => new Set(),
 	);
-	const [loadingReplyIds, setLoadingReplyIds] = React.useState<
-		ReadonlySet<string>
-	>(() => new Set());
-	const [replyErrors, setReplyErrors] = React.useState<
-		ReadonlyMap<string, string>
-	>(() => new Map());
 	const defaultErrors = useDefaultErrorText();
 	const composeRef = React.useRef<HTMLTextAreaElement | null>(null);
-	const [busyId, setBusyId] = React.useState<string | null>(null);
+	const [busy, setBusy] = React.useState<{
+		id: string;
+		kind: "delete" | "block";
+	} | null>(null);
 	const [blockNotice, setBlockNotice] = React.useState<string | null>(null);
 	const [actionError, setActionError] = React.useState<string | null>(null);
 	const [blockedAuthorIds, setBlockedAuthorIds] = React.useState<
@@ -83,29 +71,22 @@ export default function SellerMessageTab({
 	>(() => new Set());
 	const busyRef = React.useRef(false);
 
-	const saveEntry = async (entry: SellerForumComment, next: string) => {
-		setActionError(null);
-		try {
-			await forum.update(entry.id, next);
-		} catch (e) {
-			setActionError(errorText(e, defaultErrors));
-			throw e;
-		}
-	};
+	const saveEntry = (entry: SellerForumComment, next: string) =>
+		forum.update(entry, next);
 
 	const deleteEntry = async (entry: SellerForumComment, isReply: boolean) => {
 		if (busyRef.current) return;
 		if (!window.confirm(isReply ? "刪除這則回覆？" : "刪除這則留言？")) return;
 		busyRef.current = true;
-		setBusyId(entry.id);
+		setBusy({ id: entry.id, kind: "delete" });
 		setActionError(null);
 		try {
-			await forum.remove(entry.id);
+			await forum.remove(entry);
 		} catch (e) {
 			setActionError(errorText(e, defaultErrors));
 		} finally {
 			busyRef.current = false;
-			setBusyId(null);
+			setBusy(null);
 		}
 	};
 
@@ -119,7 +100,7 @@ export default function SellerMessageTab({
 			return;
 		if (busyRef.current) return;
 		busyRef.current = true;
-		setBusyId(entry.id);
+		setBusy({ id: entry.id, kind: "block" });
 		setBlockNotice(null);
 		setActionError(null);
 		try {
@@ -133,24 +114,16 @@ export default function SellerMessageTab({
 			setActionError(errorText(e, defaultErrors));
 		} finally {
 			busyRef.current = false;
-			setBusyId(null);
+			setBusy(null);
 		}
 	};
 
-	const renderBody = (
-		entry: SellerForumComment,
-		isReply: boolean,
-		view: {
-			text: React.ReactNode;
-			paragraphClassName: string;
-			footerClassName: string;
-			leading?: React.ReactNode;
-		},
-	) => (
+	const renderBody: RenderBody = (entry, isReply, view) => (
 		<ForumEntryBody
 			entry={entry}
 			isReply={isReply}
-			busy={busyId === entry.id}
+			busy={busy?.id === entry.id}
+			deleting={busy?.id === entry.id && busy.kind === "delete"}
 			canBlock={
 				canBlockForumAuthor(entry) &&
 				!(entry.authorId && blockedAuthorIds.has(entry.authorId))
@@ -167,22 +140,20 @@ export default function SellerMessageTab({
 		const content = draft.trim();
 		if (!content || submitting) return;
 		setSubmitting(true);
+		setActionError(null);
 		try {
 			if (replyingTo) {
-				await forum.reply(replyingTo.id, content);
-				// Reveal the parent's replies so the new one is visible.
-				setExpandedIds((prev) => {
-					const next = new Set(prev);
-					next.add(String(replyingTo.id));
-					return next;
-				});
+				await forum.reply(replyingTo, content);
+				// Reveal the thread so the new reply is visible.
+				const threadId = String(replyingTo.parentId ?? replyingTo.id);
+				setExpandedIds((prev) => new Set(prev).add(threadId));
 				setReplyingTo(null);
 			} else {
 				await forum.post(content);
 			}
 			setDraft("");
-		} catch {
-			/* hook surfaces error via forum.error */
+		} catch (e) {
+			setActionError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -198,68 +169,11 @@ export default function SellerMessageTab({
 		setReplyingTo(null);
 	};
 
-	const loadMoreReplies = async (comment: SellerForumComment) => {
-		const id = String(comment.id);
-		if (loadingReplyIds.has(id)) return;
-		setLoadingReplyIds((prev) => new Set(prev).add(id));
-		setReplyErrors((prev) => {
-			if (!prev.has(id)) return prev;
-			const next = new Map(prev);
-			next.delete(id);
-			return next;
-		});
-		try {
-			await forum.loadMoreReplies(comment.id);
-		} catch (e) {
-			setReplyErrors((prev) =>
-				new Map(prev).set(id, errorText(e, defaultErrors)),
-			);
-		} finally {
-			setLoadingReplyIds((prev) => {
-				const next = new Set(prev);
-				next.delete(id);
-				return next;
-			});
-		}
-	};
-
-	const toggleReplies = async (comment: SellerForumComment) => {
-		const id = String(comment.id);
-		const isExpanded = expandedIds.has(id);
-		// Collapse: no refetch, just hide.
-		if (isExpanded) {
-			setExpandedIds((prev) => {
-				const next = new Set(prev);
-				next.delete(id);
-				return next;
-			});
-			return;
-		}
-		// Expand: if replies aren't loaded yet, fetch them. Optimistic
-		// replies count as loaded — the optimistic reply that triggered
-		// "auto-expand" already put a record into `comment.replies`.
-		const needsFetch = !comment.replies || comment.replies.length === 0;
-		if (needsFetch) {
-			setLoadingReplyIds((prev) => {
-				const next = new Set(prev);
-				next.add(id);
-				return next;
-			});
-			try {
-				await forum.loadReplies(comment.id);
-			} catch {
-				/* swallow — user can retry by re-clicking */
-			} finally {
-				setLoadingReplyIds((prev) => {
-					const next = new Set(prev);
-					next.delete(id);
-					return next;
-				});
-			}
-		}
+	const toggleReplies = (id: string) => {
 		setExpandedIds((prev) => {
 			const next = new Set(prev);
-			next.add(id);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
 			return next;
 		});
 	};
@@ -321,12 +235,9 @@ export default function SellerMessageTab({
 				</div>
 			)}
 
-			{forum.error && !forum.loading ? (
-				<div
-					className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
-					role="alert"
-				>
-					<span>{forum.error}</span>
+			{forum.error != null && !forum.loading ? (
+				<CommentErrorBox className="flex items-center justify-between gap-3">
+					<span>{errorText(forum.error, defaultErrors)}</span>
 					<Button
 						type="button"
 						size="sm"
@@ -340,7 +251,7 @@ export default function SellerMessageTab({
 					>
 						重新載入
 					</Button>
-				</div>
+				</CommentErrorBox>
 			) : null}
 
 			{blockNotice ? (
@@ -352,13 +263,23 @@ export default function SellerMessageTab({
 				</p>
 			) : null}
 
-			{actionError ? (
-				<p
-					className="p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
-					role="alert"
-				>
-					{actionError}
-				</p>
+			{actionError ? <CommentErrorBox>{actionError}</CommentErrorBox> : null}
+
+			{forum.submitted.length > 0 ? (
+				<ul className="list-none m-0 p-0 flex flex-col gap-[18px]">
+					{forum.submitted.map(({ key, entry }) => (
+						<ForumEntryItem
+							key={key}
+							comment={entry}
+							sellerId={sellerId}
+							signedIn={signedIn}
+							expanded={false}
+							onToggle={toggleReplies}
+							onStartReply={startReply}
+							renderBody={renderBody}
+						/>
+					))}
+				</ul>
 			) : null}
 
 			{forum.loading && forum.comments.length === 0 ? (
@@ -376,156 +297,26 @@ export default function SellerMessageTab({
 				</div>
 			) : (
 				<ul className="list-none m-0 p-0 flex flex-col gap-[18px]">
-					{forum.comments.map((comment) => {
-						const idStr = String(comment.id);
-						const expanded = expandedIds.has(idStr);
-						const loadingReplies = loadingReplyIds.has(idStr);
-						const replyCount = comment.replyCount ?? 0;
-						const isPlaceholder = comment.state !== "visible";
-						return (
-							<li
-								key={`c-${idStr}`}
-								data-hk-seller-forum-comment
-								className="grid grid-cols-[44px_1fr] gap-3 p-4 rounded-[14px] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
-							>
-								{isPlaceholder ? (
-									<span aria-hidden="true" />
-								) : (
-									<Avatar
-										src={comment.avatarKey}
-										name={comment.userName}
-										alt={comment.userName}
-										entity="buyer"
-										className="w-11 h-11 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
-									/>
-								)}
-								<div className="min-w-0">
-									<header className="flex items-baseline justify-between gap-[10px] mb-1">
-										{isPlaceholder ? (
-											<span />
-										) : (
-											<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
-												{comment.userName}
-											</strong>
-										)}
-										<time className="text-[length:var(--text-xs)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] whitespace-nowrap">
-											{formatTime(comment.createdAt)}
-										</time>
-									</header>
-									{renderBody(comment, false, {
-										text: isPlaceholder
-											? comment.state === "deleted"
-												? tFeed("deleted")
-												: comment.state === "hidden"
-													? tFeed("hidden")
-													: null
-											: comment.content,
-										paragraphClassName:
-											"m-0 text-[0.9375rem] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
-										footerClassName: "flex items-center gap-4 mt-[10px]",
-										leading: (
-											<>
-												{replyCount > 0 ? (
-													<Button
-														type="button"
-														className={`h-auto p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed ${expanded ? "text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0]" : ""}`}
-														onClick={() => {
-															void toggleReplies(comment);
-														}}
-														disabled={loadingReplies}
-														isLoading={loadingReplies}
-														loadingLabel="載入回覆中…"
-														aria-expanded={expanded}
-													>
-														{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
-													</Button>
-												) : null}
-												{signedIn && comment.state === "visible" ? (
-													<button
-														type="button"
-														className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"
-														onClick={() => startReply(comment)}
-													>
-														回覆
-													</button>
-												) : null}
-											</>
-										),
-									})}
-									{expanded && comment.replies && comment.replies.length > 0 ? (
-										<ul className="list-none mt-[14px] pt-[14px] border-t border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:border-t-[rgba(245,222,165,0.14)] flex flex-col gap-[14px]">
-											{comment.replies.map((reply) => (
-												<li
-													key={`r-${reply.id}`}
-													className="grid grid-cols-[32px_1fr] gap-[10px]"
-												>
-													<Avatar
-														src={reply.avatarKey}
-														name={reply.userName}
-														alt={reply.userName}
-														entity="buyer"
-														className="w-8 h-8 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
-													/>
-													<div className="min-w-0">
-														<header className="flex items-baseline justify-between gap-[10px] mb-1">
-															<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
-																{reply.userName}
-															</strong>
-															<time className="text-[length:var(--text-xs)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] whitespace-nowrap">
-																{formatTime(reply.createdAt)}
-															</time>
-														</header>
-														{renderBody(reply, true, {
-															text: (
-																<>
-																	{reply.replyToName &&
-																	reply.replyToName !== comment.userName ? (
-																		<span className="text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0] font-semibold">
-																			@{reply.replyToName}{" "}
-																		</span>
-																	) : null}
-																	{reply.content}
-																</>
-															),
-															paragraphClassName:
-																"m-0 text-[length:var(--text-sm)] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
-															footerClassName: "flex flex-wrap gap-3 mt-1",
-														})}
-													</div>
-												</li>
-											))}
-										</ul>
-									) : null}
-									{replyErrors.get(idStr) ? (
-										<p
-											className="p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
-											role="alert"
-										>
-											{replyErrors.get(idStr)}
-										</p>
-									) : null}
-									{expanded && (comment.repliesNextPageToken ?? "") !== "" ? (
-										<div className="flex justify-center pt-2">
-											<Button
-												type="button"
-												className="h-auto min-w-[160px] p-[10px_24px] rounded-full border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.18))] dark:border-[rgba(245,222,165,0.22)] bg-transparent text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] text-[length:var(--text-sm)] font-semibold cursor-pointer hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.06)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] disabled:opacity-50 disabled:cursor-not-allowed"
-												disabled={loadingReplies}
-												isLoading={loadingReplies}
-												loadingLabel="載入回覆中…"
-												onClick={() => {
-													void loadMoreReplies(comment);
-												}}
-											>
-												載入更多留言
-											</Button>
-										</div>
-									) : null}
-								</div>
-							</li>
-						);
-					})}
+					{forum.comments.map((comment) => (
+						<ForumEntryItem
+							key={comment.optimistic ? comment.id : `c-${comment.id}`}
+							comment={comment}
+							sellerId={sellerId}
+							signedIn={signedIn}
+							expanded={expandedIds.has(String(comment.id))}
+							onToggle={toggleReplies}
+							onStartReply={startReply}
+							renderBody={renderBody}
+						/>
+					))}
 				</ul>
 			)}
+
+			{forum.loadMoreError != null ? (
+				<CommentErrorBox>
+					{errorText(forum.loadMoreError, defaultErrors)}
+				</CommentErrorBox>
+			) : null}
 
 			{forum.hasMore ? (
 				<div className="flex justify-center pt-2">
@@ -544,6 +335,200 @@ export default function SellerMessageTab({
 				</div>
 			) : null}
 		</section>
+	);
+}
+
+type RenderBody = (
+	entry: SellerForumComment,
+	isReply: boolean,
+	view: {
+		text: React.ReactNode;
+		paragraphClassName: string;
+		footerClassName: string;
+		leading?: React.ReactNode;
+	},
+) => React.ReactNode;
+
+/** 一則頂層留言與它的回覆串；回覆串展開時才讀，自己剛送出的回覆接在串的最後。 */
+function ForumEntryItem({
+	comment,
+	sellerId,
+	signedIn,
+	expanded,
+	onToggle,
+	onStartReply,
+	renderBody,
+}: {
+	comment: SellerForumComment;
+	sellerId: string;
+	signedIn: boolean;
+	expanded: boolean;
+	onToggle: (id: string) => void;
+	onStartReply: (target: SellerForumComment) => void;
+	renderBody: RenderBody;
+}) {
+	const tFeed = useTranslations("feed.comments");
+	const defaultErrors = useDefaultErrorText();
+	const idStr = String(comment.id);
+	const replies = useForumReplies(
+		sellerId,
+		idStr,
+		comment.userName,
+		expanded && !comment.optimistic,
+	);
+	const loadingReplies = expanded && replies.loading;
+	const replyCount = comment.replyCount ?? 0;
+	const isPlaceholder = comment.state !== "visible";
+	const replyRows = [
+		...replies.items.map((reply) => ({
+			rowKey: reply.optimistic ? reply.id : `r-${reply.id}`,
+			reply,
+		})),
+		...replies.submitted.map(({ key, entry }) => ({
+			rowKey: key,
+			reply: entry,
+		})),
+	];
+	return (
+		<li
+			data-hk-seller-forum-comment
+			className="grid grid-cols-[44px_1fr] gap-3 p-4 rounded-[14px] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
+		>
+			{isPlaceholder ? (
+				<span aria-hidden="true" />
+			) : (
+				<Avatar
+					src={comment.avatarKey}
+					name={comment.userName}
+					alt={comment.userName}
+					entity="buyer"
+					className="w-11 h-11 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
+				/>
+			)}
+			<div className="min-w-0">
+				<header className="flex items-baseline justify-between gap-[10px] mb-1">
+					{isPlaceholder ? (
+						<span />
+					) : (
+						<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
+							{comment.userName}
+						</strong>
+					)}
+					<time className="text-[length:var(--text-xs)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] whitespace-nowrap">
+						{formatTime(comment.createdAt)}
+					</time>
+				</header>
+				{renderBody(comment, false, {
+					text: isPlaceholder
+						? comment.state === "deleted"
+							? tFeed("deleted")
+							: comment.state === "hidden"
+								? tFeed("hidden")
+								: null
+						: comment.content,
+					paragraphClassName:
+						"m-0 text-[0.9375rem] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
+					footerClassName: "flex items-center gap-4 mt-[10px]",
+					leading: (
+						<>
+							{replyCount > 0 ? (
+								<Button
+									type="button"
+									className={`h-auto p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed ${expanded ? "text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0]" : ""}`}
+									onClick={() => {
+										onToggle(idStr);
+									}}
+									disabled={loadingReplies}
+									isLoading={loadingReplies}
+									loadingLabel="載入回覆中…"
+									aria-expanded={expanded}
+								>
+									{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
+								</Button>
+							) : null}
+							{signedIn &&
+							comment.state === "visible" &&
+							!comment.optimistic ? (
+								<button
+									type="button"
+									className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"
+									onClick={() => onStartReply(comment)}
+								>
+									回覆
+								</button>
+							) : null}
+						</>
+					),
+				})}
+				{expanded && replyRows.length > 0 ? (
+					<ul className="list-none mt-[14px] pt-[14px] border-t border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:border-t-[rgba(245,222,165,0.14)] flex flex-col gap-[14px]">
+						{replyRows.map(({ rowKey, reply }) => (
+							<li key={rowKey} className="grid grid-cols-[32px_1fr] gap-[10px]">
+								<Avatar
+									src={reply.avatarKey}
+									name={reply.userName}
+									alt={reply.userName}
+									entity="buyer"
+									className="w-8 h-8 rounded-full object-cover bg-[var(--hkui-default-200,rgb(var(--color-ink-800-rgb)/0.06))]"
+								/>
+								<div className="min-w-0">
+									<header className="flex items-baseline justify-between gap-[10px] mb-1">
+										<strong className="text-[0.9375rem] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)]">
+											{reply.userName}
+										</strong>
+										<time className="text-[length:var(--text-xs)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] whitespace-nowrap">
+											{formatTime(reply.createdAt)}
+										</time>
+									</header>
+									{renderBody(reply, true, {
+										text: (
+											<>
+												{reply.replyToName &&
+												reply.replyToName !== comment.userName ? (
+													<span className="text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0] font-semibold">
+														@{reply.replyToName}{" "}
+													</span>
+												) : null}
+												{reply.content}
+											</>
+										),
+										paragraphClassName:
+											"m-0 text-[length:var(--text-sm)] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
+										footerClassName: "flex flex-wrap gap-3 mt-1",
+									})}
+								</div>
+							</li>
+						))}
+					</ul>
+				) : null}
+				{expanded && replies.error != null ? (
+					<CommentErrorBox>
+						{errorText(replies.error, defaultErrors)}
+					</CommentErrorBox>
+				) : null}
+				{expanded && replies.loadMoreError != null ? (
+					<CommentErrorBox>
+						{errorText(replies.loadMoreError, defaultErrors)}
+					</CommentErrorBox>
+				) : null}
+				{expanded && replies.hasMore ? (
+					<div className="flex justify-center pt-2">
+						<Button
+							type="button"
+							className="h-auto min-w-[160px] p-[10px_24px] rounded-full border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.18))] dark:border-[rgba(245,222,165,0.22)] bg-transparent text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] text-[length:var(--text-sm)] font-semibold cursor-pointer hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.06)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] disabled:opacity-50 disabled:cursor-not-allowed"
+							disabled={replies.loadingMore}
+							isLoading={replies.loadingMore}
+							loadingLabel="載入回覆中…"
+							onClick={() => {
+								void replies.loadMore();
+							}}
+						>
+							載入更多留言
+						</Button>
+					</div>
+				) : null}
+			</div>
+		</li>
 	);
 }
 
@@ -567,6 +552,7 @@ function ForumEntryBody({
 	entry,
 	isReply,
 	busy,
+	deleting,
 	canBlock,
 	text,
 	paragraphClassName,
@@ -579,6 +565,7 @@ function ForumEntryBody({
 	entry: SellerForumComment;
 	isReply: boolean;
 	busy: boolean;
+	deleting: boolean;
 	canBlock: boolean;
 	text: React.ReactNode;
 	paragraphClassName: string;
@@ -591,18 +578,22 @@ function ForumEntryBody({
 	const [editing, setEditing] = React.useState(false);
 	const [draft, setDraft] = React.useState("");
 	const [saving, setSaving] = React.useState(false);
+	const [editError, setEditError] = React.useState<string | null>(null);
+	const defaultErrors = useDefaultErrorText();
 	const sessionRef = React.useRef(0);
 	const live = entry.state === "visible";
 
 	const startEdit = () => {
 		sessionRef.current += 1;
 		setDraft(entry.content);
+		setEditError(null);
 		setEditing(true);
 	};
 	const cancelEdit = () => {
 		sessionRef.current += 1;
 		setEditing(false);
 		setDraft("");
+		setEditError(null);
 	};
 	const submit = async () => {
 		const next = draft.trim();
@@ -613,11 +604,14 @@ function ForumEntryBody({
 		}
 		const session = sessionRef.current;
 		setSaving(true);
+		setEditError(null);
 		try {
 			await onSave(entry, next);
 			if (sessionRef.current === session) setEditing(false);
-		} catch {
-			/* the parent shows the error; the editor stays open */
+		} catch (e) {
+			if (sessionRef.current === session) {
+				setEditError(errorText(e, defaultErrors));
+			}
 		} finally {
 			setSaving(false);
 		}
@@ -637,6 +631,9 @@ function ForumEntryBody({
 			) : (
 				<p className={paragraphClassName}>{text}</p>
 			)}
+			{editError ? (
+				<CommentErrorBox className="mt-1">{editError}</CommentErrorBox>
+			) : null}
 			<div className={footerClassName}>
 				{leading}
 				{live && !editing ? (
@@ -645,8 +642,9 @@ function ForumEntryBody({
 						canDelete={entry.viewerCanDelete}
 						canBlock={canBlock}
 						editDisabled={busy}
+						deleteDisabled={busy}
 						blockDisabled={busy}
-						deleting={busy}
+						deleting={deleting}
 						deleteLoadingLabel={isReply ? "刪除回覆中…" : "刪除留言中…"}
 						onEdit={startEdit}
 						onDelete={() => void onDelete(entry, isReply)}

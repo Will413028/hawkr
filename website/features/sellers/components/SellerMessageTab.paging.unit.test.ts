@@ -12,7 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const forum = vi.hoisted(() => ({
 	list: [] as unknown[],
-	loadMoreReplies: vi.fn(),
+	replies: {} as Record<
+		string,
+		{ items: unknown[]; hasMore?: boolean; loadMoreError?: unknown }
+	>,
+	loadMore: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/context", () => ({
@@ -21,19 +25,30 @@ vi.mock("@/lib/auth/context", () => ({
 vi.mock("@/lib/hooks/useSellerForum", () => ({
 	useSellerForum: () => ({
 		comments: forum.list,
+		submitted: [],
 		loading: false,
 		refreshing: false,
 		loadingMore: false,
 		hasMore: false,
 		error: null,
+		loadMoreError: null,
 		refresh: vi.fn(),
 		loadMore: vi.fn(),
-		loadReplies: vi.fn(),
-		loadMoreReplies: forum.loadMoreReplies,
 		post: vi.fn(),
 		reply: vi.fn(),
 		update: vi.fn(),
 		remove: vi.fn(),
+	}),
+	useForumReplies: (_store: string, threadId: string) => ({
+		items: forum.replies[threadId]?.items ?? [],
+		submitted: [],
+		loading: false,
+		hasMore: forum.replies[threadId]?.hasMore ?? false,
+		loadingMore: false,
+		error: null,
+		loadMoreError: forum.replies[threadId]?.loadMoreError ?? null,
+		loadMore: forum.loadMore,
+		refresh: vi.fn(),
 	}),
 }));
 
@@ -68,7 +83,8 @@ function view() {
 
 afterEach(() => {
 	cleanup();
-	forum.loadMoreReplies.mockReset();
+	forum.loadMore.mockReset();
+	forum.replies = {};
 });
 
 describe("forum placeholder", () => {
@@ -79,9 +95,9 @@ describe("forum placeholder", () => {
 				content: "",
 				userName: "匿名",
 				replyCount: 1,
-				replies: [entry("r", { content: "reply-body" })],
 			}),
 		];
+		forum.replies = { d: { items: [entry("r", { content: "reply-body" })] } };
 		view();
 		expect(screen.queryByText("此留言已刪除")).not.toBeNull();
 		expect(screen.queryByText("匿名")).toBeNull();
@@ -105,38 +121,35 @@ describe("forum hidden placeholder", () => {
 });
 
 describe("forum replies load more", () => {
-	const withReplies = (token: string) => [
-		entry("top", {
-			replyCount: 30,
-			replies: [entry("r1")],
-			repliesNextPageToken: token,
-		}),
-	];
+	const top = () => [entry("top", { replyCount: 30 })];
 
-	it("shows only with a next token and loads the next page", () => {
-		forum.list = withReplies("");
+	it("shows only when the thread has another page and loads it", () => {
+		forum.list = top();
+		forum.replies = { top: { items: [entry("r1")], hasMore: false } };
 		view();
 		fireEvent.click(screen.getByText("30 則回覆 ▼"));
 		expect(screen.queryByText("載入更多留言")).toBeNull();
 		cleanup();
-		forum.list = withReplies("tok");
+		forum.replies = { top: { items: [entry("r1")], hasMore: true } };
 		view();
 		fireEvent.click(screen.getByText("30 則回覆 ▼"));
 		fireEvent.click(screen.getByText("載入更多留言"));
-		expect(forum.loadMoreReplies).toHaveBeenCalledWith("top");
+		expect(forum.loadMore).toHaveBeenCalledTimes(1);
 	});
 
-	it("shows a failure inline as an alert without an unhandled rejection and keeps the button", async () => {
-		forum.list = withReplies("tok");
-		forum.loadMoreReplies.mockRejectedValueOnce(new Error("boom"));
+	it("shows a load-more failure inline as an alert and keeps the button", async () => {
+		forum.list = top();
+		forum.replies = {
+			top: {
+				items: [entry("r1")],
+				hasMore: true,
+				loadMoreError: new Error("boom"),
+			},
+		};
 		view();
 		fireEvent.click(screen.getByText("30 則回覆 ▼"));
-		fireEvent.click(screen.getByText("載入更多留言"));
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+		expect(screen.getByRole("alert").textContent).not.toContain("boom");
 		expect(screen.getByText("載入更多留言")).toBeTruthy();
-		forum.loadMoreReplies.mockResolvedValueOnce(undefined);
-		fireEvent.click(screen.getByText("載入更多留言"));
-		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-		expect(forum.loadMoreReplies).toHaveBeenCalledTimes(2);
 	});
 });

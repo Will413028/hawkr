@@ -1,5 +1,6 @@
 "use client";
 
+import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
 import { gsap } from "gsap";
 import { useTranslations } from "next-intl";
@@ -11,12 +12,12 @@ import Button from "@/components/ui/Button";
 import {
 	CommentEditor,
 	CommentEntryActions,
+	CommentErrorBox,
 } from "@/features/feed/components/CommentEntryParts";
 import type { PostViewerState } from "@/lib/api/openapi-types";
 import { useAuth } from "@/lib/auth/context";
 import {
 	type Comment,
-	createComment,
 	deleteComment,
 	setCommentLiked,
 	updateComment,
@@ -37,6 +38,10 @@ import {
 	canReplyToComment,
 	storeActorName,
 } from "./commentPermissions";
+
+function isNotFound(error: unknown): boolean {
+	return ConnectError.from(error).code === Code.NotFound;
+}
 
 function formatTime(unixSeconds: number): string {
 	if (!unixSeconds) return "";
@@ -145,27 +150,21 @@ type ComposerAvatar = {
 
 /** Inline reply composer shown under a comment when the viewer taps 回覆. */
 function ReplyComposer({
-	postId,
-	parentId,
-	replyToId,
-	replyToName,
 	placeholder,
 	avatar,
-	onSent,
+	onSubmit,
 	onCancel,
 }: {
-	postId: string;
-	parentId: string;
-	replyToId: string;
-	replyToName?: string;
 	/** 提示字：店家身分時是「以「店名」身分回覆…」，否則依被回覆者。 */
 	placeholder: string;
 	avatar: ComposerAvatar;
-	onSent: (created: Comment) => void;
+	onSubmit: (content: string) => Promise<void>;
 	onCancel: () => void;
 }) {
+	const defaultErrors = useDefaultErrorText();
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
+	const [error, setError] = React.useState<string | null>(null);
 	const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
 	React.useEffect(() => {
@@ -176,22 +175,12 @@ function ReplyComposer({
 		const content = draft.trim();
 		if (!content || submitting) return;
 		setSubmitting(true);
+		setError(null);
 		try {
-			// `createComment` returns a mapped `Comment`, handed straight to the
-			// parent. The server does not echo the replied-to name, so fill in
-			// the display hint from the row being replied to. The reply is
-			// identified by a UUIDv4 request_id so a retry returns the same row.
-			const created = await createComment(postId, {
-				content,
-				parentId,
-				replyToId,
-				requestId: crypto.randomUUID(),
-			});
+			await onSubmit(content);
 			setDraft("");
-			onSent({
-				...created,
-				replyToName: created.replyToName ?? replyToName,
-			});
+		} catch (e) {
+			setError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -239,6 +228,7 @@ function ReplyComposer({
 					rows={1}
 					maxLength={500}
 				/>
+				{error ? <CommentErrorBox>{error}</CommentErrorBox> : null}
 				<div className="flex gap-[var(--hkui-space-2)] self-end">
 					<Button
 						type="button"
@@ -261,6 +251,55 @@ function ReplyComposer({
 				</div>
 			</div>
 		</form>
+	);
+}
+
+/** 送出中或伺服器那份還不在已載入頁的留言與回覆：只顯示，沒有任何操作。 */
+function OptimisticCommentRow({
+	comment,
+	variant,
+}: {
+	comment: Comment;
+	variant: "comment" | "reply";
+}) {
+	const isReply = variant === "reply";
+	return (
+		<li
+			className={`flex ${isReply ? "gap-[var(--hkui-space-2)]" : "gap-[var(--hkui-space-3)]"}`}
+			data-comment-anchor={comment.id}
+			data-comment-optimistic
+		>
+			<span
+				className={`block ${isReply ? "w-7 h-7" : "w-9 h-9"} shrink-0 rounded-full overflow-hidden bg-[var(--hkui-default-100)]`}
+			>
+				<Avatar
+					src={comment.avatarKey}
+					alt={comment.userName}
+					entity="buyer"
+					className="w-full h-full object-cover"
+					fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
+					fallback="empty"
+				/>
+			</span>
+			<div className="flex-1 min-w-0">
+				<header className="flex items-baseline gap-[var(--hkui-space-2)]">
+					<strong className="text-[length:var(--hkui-text-small)] font-semibold">
+						{comment.userName}
+					</strong>
+					<small className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
+						{formatTime(comment.createdAt)}
+					</small>
+				</header>
+				<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
+					{isReply && comment.replyToName ? (
+						<span className="text-[var(--hkui-foreground-soft)] mr-1">
+							@{comment.replyToName}
+						</span>
+					) : null}
+					{comment.content}
+				</p>
+			</div>
+		</li>
 	);
 }
 
@@ -291,6 +330,8 @@ function ReplyItem({
 		"like" | "unlike" | null
 	>(null);
 	const [deleting, setDeleting] = React.useState(false);
+	const [rowError, setRowError] = React.useState<string | null>(null);
+	const defaultErrors = useDefaultErrorText();
 	const likePendingRef = React.useRef(false);
 	const deletePendingRef = React.useRef(false);
 
@@ -323,11 +364,12 @@ function ReplyItem({
 		if (!window.confirm("刪除這則回覆？")) return;
 		deletePendingRef.current = true;
 		setDeleting(true);
+		setRowError(null);
 		try {
 			await deleteComment(reply.id, etag);
 			onRemoved(reply.id);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "刪除失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			deletePendingRef.current = false;
 			setDeleting(false);
@@ -336,12 +378,14 @@ function ReplyItem({
 
 	const startEdit = () => {
 		setEditDraft(content);
+		setRowError(null);
 		setEditing(true);
 	};
 
 	const cancelEdit = () => {
 		setEditing(false);
 		setEditDraft("");
+		setRowError(null);
 	};
 
 	const submitEdit = async () => {
@@ -352,13 +396,14 @@ function ReplyItem({
 			return;
 		}
 		setSavingEdit(true);
+		setRowError(null);
 		try {
 			const updated = await updateComment(reply.id, next, etag ?? "");
 			setEtag(updated.etag);
 			setContent(updated.content || next);
 			setEditing(false);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "編輯失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			setSavingEdit(false);
 		}
@@ -407,6 +452,9 @@ function ReplyItem({
 						{content}
 					</p>
 				)}
+				{rowError ? (
+					<CommentErrorBox className="my-1">{rowError}</CommentErrorBox>
+				) : null}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
 					{live ? (
 						<Button
@@ -478,13 +526,8 @@ function CommentItem({
 	const defaultErrors = useDefaultErrorText();
 	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
-	// Local mirror of replyCount so it bumps the moment we send a reply
-	// without waiting for the parent list to refetch.
-	const [replyCount, setReplyCount] = React.useState(comment.replyCount ?? 0);
-	// Optimistic replies appended after a successful send; useCommentReplies'
-	// internal `items` is updated on refresh / expand, so we keep our own
-	// list to merge with its load.
-	const [pendingReplies, setPendingReplies] = React.useState<Comment[]>([]);
+	const replyCount = comment.replyCount ?? 0;
+	const [rowError, setRowError] = React.useState<string | null>(null);
 	// Local content mirror — optimistic edit shows immediately
 	const [content, setContent] = React.useState(comment.content);
 	const [etag, setEtag] = React.useState(comment.etag);
@@ -521,8 +564,11 @@ function CommentItem({
 		if (!window.confirm("刪除這則留言？")) return;
 		deletePendingRef.current = true;
 		setDeleting(true);
+		setRowError(null);
 		try {
 			await onRemove(comment.id);
+		} catch (e) {
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			deletePendingRef.current = false;
 			setDeleting(false);
@@ -531,12 +577,14 @@ function CommentItem({
 
 	const startEdit = () => {
 		setEditDraft(content);
+		setRowError(null);
 		setEditing(true);
 	};
 
 	const cancelEdit = () => {
 		setEditing(false);
 		setEditDraft("");
+		setRowError(null);
 	};
 
 	const submitEdit = async () => {
@@ -547,6 +595,7 @@ function CommentItem({
 			return;
 		}
 		setSavingEdit(true);
+		setRowError(null);
 		try {
 			const updated = await updateComment(comment.id, next, etag ?? "");
 			setEtag(updated.etag);
@@ -554,46 +603,22 @@ function CommentItem({
 			onEdited(updated);
 			setEditing(false);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "編輯失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			setSavingEdit(false);
 		}
 	};
 
-	const handleReplySent = (created: Comment) => {
-		// Dedup against the thread loaded by a refresh in the same window.
-		setPendingReplies((prev) => {
-			const id = String(created.id);
-			if (prev.some((r) => String(r.id) === id)) return prev;
-			if (replies.items.some((r) => String(r.id) === id)) return prev;
-			return [...prev, created];
+	const sendReply = async (content: string) => {
+		await replies.reply(content, {
+			replyToId: comment.id,
+			replyToName: comment.userName,
+			authorName: composerAvatar.alt,
+			authorAvatar: composerAvatar.src ?? undefined,
 		});
-		setReplyCount((c) => c + 1);
 		setReplyOpen(false);
-		if (!replies.open) void replies.expand();
+		if (!replies.open) replies.expand();
 	};
-
-	const handleReplyRemoved = (replyId: string) => {
-		setPendingReplies((prev) =>
-			prev.filter((r) => String(r.id) !== String(replyId)),
-		);
-		setReplyCount((c) => Math.max(0, c - 1));
-		void replies.refresh();
-	};
-
-	// Merge backend-loaded replies with our optimistic ones, de-duped by id.
-	const mergedReplies = React.useMemo(() => {
-		const seen = new Set<string>();
-		const all: Comment[] = [];
-		for (const r of replies.items) {
-			seen.add(String(r.id));
-			all.push(r);
-		}
-		for (const r of pendingReplies) {
-			if (!seen.has(String(r.id))) all.push(r);
-		}
-		return all;
-	}, [replies.items, pendingReplies]);
 
 	return (
 		<li
@@ -643,6 +668,9 @@ function CommentItem({
 									: null}
 					</p>
 				)}
+				{rowError ? (
+					<CommentErrorBox className="my-1">{rowError}</CommentErrorBox>
+				) : null}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
 					{live ? (
 						<Button
@@ -709,10 +737,6 @@ function CommentItem({
 
 				{replyOpen && (
 					<ReplyComposer
-						postId={postId}
-						parentId={comment.id}
-						replyToId={comment.id}
-						replyToName={comment.userName}
 						placeholder={
 							replyPlaceholder ??
 							(comment.userName
@@ -720,38 +744,47 @@ function CommentItem({
 								: tFeed("replyPlaceholder"))
 						}
 						avatar={composerAvatar}
-						onSent={handleReplySent}
+						onSubmit={sendReply}
 						onCancel={() => setReplyOpen(false)}
 					/>
 				)}
 
 				{replies.open && (
 					<ul className="list-none m-0 mt-[var(--hkui-space-3)] pl-[var(--hkui-space-3)] border-l-2 border-[var(--hkui-divider)] flex flex-col gap-[var(--hkui-space-3)]">
-						{replies.loading && mergedReplies.length === 0 ? (
+						{replies.loading &&
+						replies.items.length === 0 &&
+						replies.submitted.length === 0 ? (
 							<li className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 								載入中…
 							</li>
-						) : mergedReplies.length === 0 ? (
+						) : replies.items.length === 0 && replies.submitted.length === 0 ? (
 							<li className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 								還沒有回覆
 							</li>
 						) : (
-							mergedReplies.map((r) => (
-								<ReplyItem
-									key={r.id}
-									reply={r}
-									onRemoved={handleReplyRemoved}
-									onBlockAuthor={onBlockAuthor}
-									blockBusy={blockBusy}
-								/>
-							))
+							replies.items.map((r) =>
+								r.optimistic ? (
+									<OptimisticCommentRow
+										key={r.id}
+										comment={r}
+										variant="reply"
+									/>
+								) : (
+									<ReplyItem
+										key={r.id}
+										reply={r}
+										onRemoved={replies.removed}
+										onBlockAuthor={onBlockAuthor}
+										blockBusy={blockBusy}
+									/>
+								),
+							)
 						)}
 						{replies.loadMoreError ? (
-							<li
-								className="list-none text-[length:var(--hkui-text-tiny)] text-[var(--hkui-danger-700)]"
-								role="alert"
-							>
-								{errorText(replies.loadMoreError, defaultErrors)}
+							<li className="list-none">
+								<CommentErrorBox>
+									{errorText(replies.loadMoreError, defaultErrors)}
+								</CommentErrorBox>
 							</li>
 						) : null}
 						{replies.hasMore ? (
@@ -770,6 +803,13 @@ function CommentItem({
 								</Button>
 							</li>
 						) : null}
+						{replies.submitted.map(({ key, comment: submitted }) => (
+							<OptimisticCommentRow
+								key={key}
+								comment={submitted}
+								variant="reply"
+							/>
+						))}
 					</ul>
 				)}
 			</div>
@@ -800,6 +840,7 @@ export default function PostComments({
 	const blockingRef = React.useRef(false);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
+	const [submitError, setSubmitError] = React.useState<string | null>(null);
 	const rootRef = React.useRef<HTMLElement | null>(null);
 	const deepLinkDoneRef = React.useRef(false);
 
@@ -891,6 +932,7 @@ export default function PostComments({
 	const submitDraft = async () => {
 		if (!draft.trim() || submitting) return;
 		setSubmitting(true);
+		setSubmitError(null);
 		try {
 			// optimistic 顯示 composer 的名稱與頭像；留言身分由伺服器決定。
 			await list.post(draft, {
@@ -898,6 +940,8 @@ export default function PostComments({
 				authorAvatar: composerAvatar.src ?? undefined,
 			});
 			setDraft("");
+		} catch (e) {
+			setSubmitError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -937,19 +981,13 @@ export default function PostComments({
 			) : null}
 
 			{blockError ? (
-				<p
-					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
-					role="alert"
-				>
+				<CommentErrorBox className="my-[var(--hkui-space-3)]">
 					{blockError}
-				</p>
+				</CommentErrorBox>
 			) : null}
 
 			{viewerProp === undefined && signedIn && fetchedViewer.isError ? (
-				<div
-					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)] flex items-center justify-between gap-[var(--hkui-space-3)]"
-					role="alert"
-				>
+				<CommentErrorBox className="my-[var(--hkui-space-3)] flex items-center justify-between gap-[var(--hkui-space-3)]">
 					<span>{errorText(fetchedViewer.error, defaultErrors)}</span>
 					<Button
 						variant="bordered"
@@ -960,7 +998,7 @@ export default function PostComments({
 					>
 						重試
 					</Button>
-				</div>
+				</CommentErrorBox>
 			) : null}
 
 			{canComposeComment(signedIn, viewer) && (
@@ -992,14 +1030,29 @@ export default function PostComments({
 				</form>
 			)}
 
-			{list.error && !/HTTP\s*404|404|找不到|not\s*found/i.test(list.error) && (
-				<p
-					className="my-[var(--hkui-space-4)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
-					role="alert"
-				>
-					{list.error}
-				</p>
-			)}
+			{submitError ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{submitError}
+				</CommentErrorBox>
+			) : null}
+
+			{list.submitted.length > 0 ? (
+				<ul className="list-none m-0 mb-[var(--hkui-space-4)] p-0 flex flex-col gap-[var(--hkui-space-4)]">
+					{list.submitted.map(({ key, comment }) => (
+						<OptimisticCommentRow
+							key={key}
+							comment={comment}
+							variant="comment"
+						/>
+					))}
+				</ul>
+			) : null}
+
+			{list.error != null && !isNotFound(list.error) ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{errorText(list.error, defaultErrors)}
+				</CommentErrorBox>
+			) : null}
 
 			{list.loading && list.comments.length === 0 ? (
 				<p className="my-[var(--hkui-space-4)] text-center text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]">
@@ -1015,22 +1068,32 @@ export default function PostComments({
 				/>
 			) : (
 				<ul className="list-none m-0 p-0 flex flex-col gap-[var(--hkui-space-4)]">
-					{list.comments.map((c) => (
-						<CommentItem
-							key={c.id}
-							comment={c}
-							postId={postId}
-							replyPlaceholder={replyPlaceholder}
-							composerAvatar={composerAvatar}
-							onLike={list.like}
-							onRemove={list.remove}
-							onEdited={list.edited}
-							onBlockAuthor={allowBlockAuthor ? blockAuthor : undefined}
-							blockBusy={blocking}
-						/>
-					))}
+					{list.comments.map((c) =>
+						c.optimistic ? (
+							<OptimisticCommentRow key={c.id} comment={c} variant="comment" />
+						) : (
+							<CommentItem
+								key={c.id}
+								comment={c}
+								postId={postId}
+								replyPlaceholder={replyPlaceholder}
+								composerAvatar={composerAvatar}
+								onLike={list.like}
+								onRemove={list.remove}
+								onEdited={list.edited}
+								onBlockAuthor={allowBlockAuthor ? blockAuthor : undefined}
+								blockBusy={blocking}
+							/>
+						),
+					)}
 				</ul>
 			)}
+
+			{list.loadMoreError != null ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{errorText(list.loadMoreError, defaultErrors)}
+				</CommentErrorBox>
+			) : null}
 
 			{list.hasMore && (
 				<div className="mt-[var(--hkui-space-4)] flex justify-center">

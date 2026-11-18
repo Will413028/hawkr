@@ -44,11 +44,8 @@ export interface SellerForumComment {
 	viewerCanEdit: boolean;
 	viewerCanDelete: boolean;
 	viewerCanReply: boolean;
-	/* --- 以下為前端狀態，wire 不帶 --- */
-	rootId?: string | null;
-	replies?: SellerForumComment[];
-	/** 回覆的下一頁憑證；空字串或缺席是沒有下一頁。 */
-	repliesNextPageToken?: string;
+	/** 送出中或伺服器那份還不在已載入頁的項目：只顯示，沒有任何操作。 */
+	optimistic?: boolean;
 }
 
 export interface SellerForumListResult {

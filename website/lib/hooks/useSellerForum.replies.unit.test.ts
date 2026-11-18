@@ -20,7 +20,7 @@ vi.mock("./useQueryIdentity", () => ({
 	useQueryIdentity: () => ({ accountId: null }),
 }));
 
-import { useSellerForum } from "./useSellerForum";
+import { useForumReplies, useSellerForum } from "./useSellerForum";
 
 function entry(id: string, over: Partial<SellerForumComment> = {}) {
 	return {
@@ -38,114 +38,126 @@ function entry(id: string, over: Partial<SellerForumComment> = {}) {
 	};
 }
 
-function wrapper() {
-	const client = new QueryClient({
-		defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
-	});
-	return ({ children }: { children: React.ReactNode }) =>
-		React.createElement(QueryClientProvider, { client }, children);
+function page(records: SellerForumComment[], nextPageToken = "") {
+	return { records, nextPageToken, pageSize: 20 };
+}
+
+let client: QueryClient;
+function wrapper({ children }: { children: React.ReactNode }) {
+	return React.createElement(QueryClientProvider, { client }, children);
 }
 
 beforeEach(() => {
-	repo.fetchSellerForum.mockReset().mockResolvedValue({
-		records: [entry("top", { replyCount: 45 })],
-		nextPageToken: "",
-		pageSize: 20,
+	client = new QueryClient({
+		defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 	});
-	repo.fetchSellerForumReplies.mockReset().mockResolvedValue({
-		records: [entry("r1"), entry("r2")],
-		nextPageToken: "more",
-		pageSize: 20,
-	});
+	repo.fetchSellerForum.mockReset();
+	repo.fetchSellerForumReplies.mockReset();
 });
 afterEach(cleanup);
 
-describe("loading replies keeps the server's reply count", () => {
-	it("a first page shorter than the total does not shrink replyCount", async () => {
-		const { result } = renderHook(() => useSellerForum("7"), {
-			wrapper: wrapper(),
-		});
-		await waitFor(() => expect(result.current.comments).toHaveLength(1));
+describe("forum top-level entries page with a cursor and a refetch keeps the loaded pages", () => {
+	function twoPages() {
+		repo.fetchSellerForum.mockImplementation(
+			async (_store: string, opts: { pageToken?: string }) =>
+				opts.pageToken === "t1" ? page([entry("b")]) : page([entry("a")], "t1"),
+		);
+	}
+
+	it("loadMore sends the next token and appends the page", async () => {
+		twoPages();
+		const { result } = renderHook(() => useSellerForum("7"), { wrapper });
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
 		await act(async () => {
-			await result.current.loadReplies("top");
+			await result.current.loadMore();
 		});
-		expect(repo.fetchSellerForumReplies).toHaveBeenCalledWith(
+		expect(repo.fetchSellerForum).toHaveBeenLastCalledWith(
 			"7",
-			"top",
-			expect.anything(),
+			expect.objectContaining({ pageToken: "t1", viewer: true }),
 		);
 		await waitFor(() =>
-			expect(result.current.comments[0].replies).toHaveLength(2),
+			expect(result.current.comments.map((c) => c.id)).toEqual(["a", "b"]),
 		);
-		expect(result.current.comments[0].replyCount).toBe(45);
+		expect(result.current.hasMore).toBe(false);
+	});
+
+	it("refresh refetches every loaded page instead of dropping back to the first", async () => {
+		twoPages();
+		const { result } = renderHook(() => useSellerForum("7"), { wrapper });
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
+		await act(async () => {
+			await result.current.loadMore();
+		});
+		await waitFor(() => expect(result.current.comments).toHaveLength(2));
+		repo.fetchSellerForum.mockClear();
+		await act(async () => {
+			await result.current.refresh();
+		});
+		expect(repo.fetchSellerForum.mock.calls.map((c) => c[1].pageToken)).toEqual(
+			["", "t1"],
+		);
+		await waitFor(() =>
+			expect(result.current.comments.map((c) => c.id)).toEqual(["a", "b"]),
+		);
+	});
+
+	it("seeds the first page from the server render without an initial loading state", () => {
+		repo.fetchSellerForum.mockReturnValue(new Promise(() => undefined));
+		const { result } = renderHook(
+			() => useSellerForum("7", page([entry("seed")])),
+			{ wrapper },
+		);
+		expect(result.current.loading).toBe(false);
+		expect(result.current.comments.map((c) => c.id)).toEqual(["seed"]);
 	});
 });
 
-describe("forum replies paging", () => {
-	it("loads the next reply page with the token and appends it", async () => {
-		const { result } = renderHook(() => useSellerForum("7"), {
-			wrapper: wrapper(),
-		});
-		await waitFor(() => expect(result.current.comments).toHaveLength(1));
-		await act(async () => {
-			await result.current.loadReplies("top");
-		});
-		await waitFor(() =>
-			expect(result.current.comments[0].repliesNextPageToken).toBe("more"),
+describe("forum replies page with a cursor", () => {
+	it("stays idle until enabled, then pages and appends", async () => {
+		repo.fetchSellerForumReplies.mockImplementation(
+			async (_store: string, _thread: string, opts: { pageToken?: string }) =>
+				opts.pageToken === "r2"
+					? page([entry("r3", { parentId: "top" })])
+					: page([entry("r1", { parentId: "top" })], "r2"),
 		);
-		repo.fetchSellerForumReplies.mockResolvedValueOnce({
-			records: [entry("r3")],
-			nextPageToken: "",
-			pageSize: 20,
-		});
+		const { result, rerender } = renderHook(
+			({ enabled }) => useForumReplies("7", "top", "樓主", enabled),
+			{ wrapper, initialProps: { enabled: false } },
+		);
+		expect(repo.fetchSellerForumReplies).not.toHaveBeenCalled();
+		rerender({ enabled: true });
+		await waitFor(() => expect(result.current.items).toHaveLength(1));
+		expect(result.current.hasMore).toBe(true);
 		await act(async () => {
-			await result.current.loadMoreReplies("top");
+			await result.current.loadMore();
 		});
 		expect(repo.fetchSellerForumReplies).toHaveBeenLastCalledWith(
 			"7",
 			"top",
-			expect.objectContaining({ pageToken: "more" }),
+			expect.objectContaining({ pageToken: "r2", parentName: "樓主" }),
 		);
 		await waitFor(() =>
-			expect(result.current.comments[0].replies).toHaveLength(3),
+			expect(result.current.items.map((r) => r.id)).toEqual(["r1", "r3"]),
 		);
-		const top = result.current.comments[0];
-		expect(top.replies?.map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
-		expect(top.repliesNextPageToken).toBe("");
-		await act(async () => {
-			await result.current.loadMoreReplies("top");
-		});
-		expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(2);
+		expect(result.current.hasMore).toBe(false);
 	});
 
-	it("ignores a second same-tick loadMoreReplies call for one comment", async () => {
-		const { result } = renderHook(() => useSellerForum("7"), {
-			wrapper: wrapper(),
-		});
-		await waitFor(() => expect(result.current.comments).toHaveLength(1));
-		await act(async () => {
-			await result.current.loadReplies("top");
-		});
-		await waitFor(() =>
-			expect(result.current.comments[0].repliesNextPageToken).toBe("more"),
+	it("records a loadMore failure without rejecting and keeps the loaded replies", async () => {
+		repo.fetchSellerForumReplies.mockResolvedValueOnce(
+			page([entry("r1", { parentId: "top" })], "r2"),
 		);
-		let resolve!: (v: unknown) => void;
-		repo.fetchSellerForumReplies.mockReturnValueOnce(
-			new Promise((r) => {
-				resolve = r;
-			}),
+		const { result } = renderHook(
+			() => useForumReplies("7", "top", undefined, true),
+			{ wrapper },
 		);
-		const before = repo.fetchSellerForumReplies.mock.calls.length;
-		let a!: Promise<void>;
-		let b!: Promise<void>;
-		act(() => {
-			a = result.current.loadMoreReplies("top");
-			b = result.current.loadMoreReplies("top");
-		});
-		resolve({ records: [entry("r3")], nextPageToken: "", pageSize: 20 });
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
+		const err = new Error("boom");
+		repo.fetchSellerForumReplies.mockRejectedValueOnce(err);
 		await act(async () => {
-			await Promise.all([a, b]);
+			await result.current.loadMore();
 		});
-		expect(repo.fetchSellerForumReplies.mock.calls.length - before).toBe(1);
+		await waitFor(() => expect(result.current.loadMoreError).toBe(err));
+		expect(result.current.items).toHaveLength(1);
+		expect(result.current.hasMore).toBe(true);
 	});
 });

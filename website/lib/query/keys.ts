@@ -242,6 +242,22 @@ export const queryKeys = {
 				"replies",
 				params ?? {},
 			] as const,
+		commentCreate: (id: QueryIdentity, postId: string | number) =>
+			[
+				"feed",
+				...idPrefix(id),
+				"posts",
+				String(postId),
+				"comment-create",
+			] as const,
+		replyCreate: (id: QueryIdentity, commentId: string | number) =>
+			[
+				"feed",
+				...idPrefix(id),
+				"comments",
+				String(commentId),
+				"reply-create",
+			] as const,
 	},
 	seller: {
 		self: (id: QueryIdentity) => ["seller", ...idPrefix(id), "self"] as const,
@@ -292,6 +308,34 @@ export const queryKeys = {
 				"forum",
 				String(sellerId),
 				params ?? {},
+			] as const,
+		forumReplies: (
+			id: QueryIdentity,
+			sellerId: string | number,
+			threadId: string | number,
+			params?: Record<string, unknown>,
+		) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-replies",
+				String(sellerId),
+				String(threadId),
+				params ?? {},
+			] as const,
+		forumPostCreate: (id: QueryIdentity, sellerId: string | number) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-post-create",
+				String(sellerId),
+			] as const,
+		forumReplyCreate: (id: QueryIdentity, sellerId: string | number) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-reply-create",
+				String(sellerId),
 			] as const,
 		shipmentAnomalies: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["seller", ...idPrefix(id), "shipment-anomalies", params ?? {}] as const,

@@ -12,10 +12,12 @@ vi.mock("@/lib/auth/context", () => ({
 vi.mock("@/lib/hooks/useSocial", () => ({
 	usePostComments: () => ({
 		comments: comments.list,
+		submitted: [],
 		loading: false,
 		loadingMore: false,
 		hasMore: false,
 		error: null,
+		loadMoreError: null,
 		refresh: vi.fn(),
 		loadMore: vi.fn(),
 		post: vi.fn(),
@@ -25,6 +27,9 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 	}),
 	usePostViewerState: () => ({ data: { canComment: true } }),
 	useCommentReplies: () => ({
+		submitted: [],
+		reply: vi.fn(),
+		removed: vi.fn(),
 		items: [],
 		open: false,
 		loading: false,

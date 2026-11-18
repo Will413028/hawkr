@@ -12,6 +12,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const forum = vi.hoisted(() => ({
 	list: [] as unknown[],
+	submitted: [] as unknown[],
+	replies: {} as Record<string, unknown[]>,
 	update: vi.fn(),
 	remove: vi.fn(),
 }));
@@ -24,19 +26,30 @@ vi.mock("@/lib/seller/block-buyer", () => ({ blockBuyerByForumEntry }));
 vi.mock("@/lib/hooks/useSellerForum", () => ({
 	useSellerForum: () => ({
 		comments: forum.list,
+		submitted: forum.submitted,
 		loading: false,
 		refreshing: false,
 		loadingMore: false,
 		hasMore: false,
 		error: null,
+		loadMoreError: null,
 		refresh: vi.fn(),
 		loadMore: vi.fn(),
-		loadReplies: vi.fn(),
-		loadMoreReplies: vi.fn(),
 		post: vi.fn(),
 		reply: vi.fn(),
 		update: forum.update,
 		remove: forum.remove,
+	}),
+	useForumReplies: (_store: string, threadId: string) => ({
+		items: forum.replies[threadId] ?? [],
+		submitted: [],
+		loading: false,
+		hasMore: false,
+		loadingMore: false,
+		error: null,
+		loadMoreError: null,
+		loadMore: vi.fn(),
+		refresh: vi.fn(),
 	}),
 }));
 
@@ -76,6 +89,8 @@ afterEach(() => {
 	cleanup();
 	forum.update.mockReset();
 	forum.remove.mockReset();
+	forum.submitted = [];
+	forum.replies = {};
 	blockBuyerByForumEntry.mockReset();
 	vi.restoreAllMocks();
 });
@@ -85,11 +100,11 @@ describe("forum entry actions follow the server flags", () => {
 		forum.list = [
 			entry("a", { viewerCanEdit: true, viewerCanDelete: true }),
 			entry("b"),
-			entry("c", {
-				replyCount: 1,
-				replies: [entry("r", { viewerCanEdit: true, viewerCanDelete: true })],
-			}),
+			entry("c", { replyCount: 1 }),
 		];
+		forum.replies = {
+			c: [entry("r", { viewerCanEdit: true, viewerCanDelete: true })],
+		};
 		view();
 		expect(screen.queryAllByText("編輯")).toHaveLength(1);
 		expect(screen.queryAllByText("刪除")).toHaveLength(1);
@@ -122,7 +137,11 @@ describe("forum entry actions follow the server flags", () => {
 		expect(forum.remove).not.toHaveBeenCalled();
 		confirm.mockReturnValue(true);
 		fireEvent.click(screen.getByText("刪除"));
-		await waitFor(() => expect(forum.remove).toHaveBeenCalledWith("a"));
+		await waitFor(() =>
+			expect(forum.remove).toHaveBeenCalledWith(
+				expect.objectContaining({ id: "a" }),
+			),
+		);
 	});
 
 	it("editing saves the trimmed text by id", async () => {
@@ -135,7 +154,10 @@ describe("forum entry actions follow the server flags", () => {
 		});
 		fireEvent.click(screen.getByText("儲存"));
 		await waitFor(() =>
-			expect(forum.update).toHaveBeenCalledWith("a", "new text"),
+			expect(forum.update).toHaveBeenCalledWith(
+				expect.objectContaining({ id: "a" }),
+				"new text",
+			),
 		);
 	});
 });
@@ -289,5 +311,73 @@ describe("after blocking someone", () => {
 			.map((el) => el.closest("li")?.textContent ?? "");
 		expect(rows).toHaveLength(1);
 		expect(rows[0]).toContain("user-c");
+	});
+});
+
+describe("progress and row-level errors", () => {
+	const deleteButton = () =>
+		screen.getByText("刪除").closest("button") as HTMLButtonElement;
+
+	it("while a block is in progress the delete button is disabled but not in its deleting state", async () => {
+		forum.list = [entry("a", { viewerCanDelete: true })];
+		blockBuyerByForumEntry.mockReturnValue(new Promise(() => undefined));
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(screen.getByText("封鎖此人"));
+		await waitFor(() => expect(deleteButton().disabled).toBe(true));
+		expect(deleteButton().getAttribute("aria-busy")).not.toBe("true");
+	});
+
+	it("while a delete is in progress the delete button is in its deleting state", async () => {
+		forum.list = [entry("a", { viewerCanDelete: true })];
+		forum.remove.mockReturnValue(new Promise(() => undefined));
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(deleteButton());
+		await waitFor(() =>
+			expect(
+				document.querySelector('button[aria-busy="true"]')?.textContent,
+			).toContain("刪除留言中…"),
+		);
+	});
+
+	it("an edit failure shows its error on that row only", async () => {
+		forum.list = [
+			entry("a", { viewerCanEdit: true }),
+			entry("b", { viewerCanEdit: true }),
+		];
+		forum.update.mockRejectedValue(new Error("raw backend text"));
+		view();
+		fireEvent.click(screen.getAllByText("編輯")[0]);
+		fireEvent.change(screen.getByDisplayValue("body-a"), {
+			target: { value: "changed" },
+		});
+		fireEvent.click(screen.getByText("儲存"));
+		const box = await screen.findByRole("alert");
+		expect(box.closest("li")?.textContent).toContain("user-a");
+		expect(box.closest("li")?.textContent).not.toContain("user-b");
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+	});
+});
+
+describe("optimistic entries", () => {
+	it("offer no edit, delete, block or reply, whether in the list or from the submitted state", () => {
+		const optimistic = (id: string) =>
+			entry(id, {
+				optimistic: true,
+				isMine: true,
+				authorKind: "buyer",
+				viewerCanEdit: false,
+				viewerCanDelete: false,
+				viewerCanReply: false,
+			});
+		forum.list = [optimistic("tmp-a")];
+		forum.submitted = [{ key: "tmp-b", entry: optimistic("real-b") }];
+		view();
+		expect(screen.getAllByText("body-tmp-a")).toHaveLength(1);
+		expect(screen.getAllByText("body-real-b")).toHaveLength(1);
+		for (const label of ["編輯", "刪除", "封鎖此人", "回覆"]) {
+			expect(screen.queryAllByText(label)).toHaveLength(0);
+		}
 	});
 });

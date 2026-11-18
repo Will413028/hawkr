@@ -30,10 +30,12 @@ vi.mock("@/lib/seller/block-buyer", () => ({ blockBuyerByComment }));
 vi.mock("@/lib/hooks/useSocial", () => ({
 	usePostComments: () => ({
 		comments: state.comments,
+		submitted: [],
 		loading: false,
 		loadingMore: false,
 		hasMore: false,
 		error: null,
+		loadMoreError: null,
 		refresh: vi.fn(),
 		loadMore: vi.fn(),
 		post: vi.fn(),
@@ -52,6 +54,9 @@ vi.mock("@/lib/hooks/useSocial", () => ({
 		};
 	},
 	useCommentReplies: () => ({
+		submitted: [],
+		reply: vi.fn(),
+		removed: vi.fn(),
 		items: [],
 		open: false,
 		loading: false,

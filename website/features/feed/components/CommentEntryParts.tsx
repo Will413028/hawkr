@@ -72,6 +72,24 @@ export function CommentEditor({
 	);
 }
 
+/** 留言與討論區所有失敗訊息共用的 danger 錯誤框。 */
+export function CommentErrorBox({
+	children,
+	className = "",
+}: {
+	children: React.ReactNode;
+	className?: string;
+}) {
+	return (
+		<div
+			className={`p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)] ${className}`}
+			role="alert"
+		>
+			{children}
+		</div>
+	);
+}
+
 const ACTION_BUTTON =
 	"bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:bg-[var(--hkui-content2)]";
 
