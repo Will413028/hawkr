@@ -50,7 +50,7 @@ func (d takedowns) seedAt(t *testing.T, storeID int64, refs []seller.ContentRef,
 	d.f.exec(t, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)
 		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, createdAt)
 	for _, r := range refs {
-		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id) VALUES ($1, $2, $3)", id, string(r.Kind), r.ID)
+		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id, snapshot_state) VALUES ($1, $2, $3, 'CLEARED')", id, string(r.Kind), r.ID)
 	}
 	return id
 }
