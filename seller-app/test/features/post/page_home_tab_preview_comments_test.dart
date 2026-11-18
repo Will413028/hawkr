@@ -176,4 +176,17 @@ void main() {
       verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
     },
   );
+
+  testWidgets('the preview of a draft post still reads its comment count', (
+    tester,
+  ) async {
+    final repo = await _openPreviewComments(
+      tester,
+      listed: false,
+      post: Post(id: 42, content: '貼文內容', status: PostStatus.POST_STATUS_DRAFT),
+      tapComments: false,
+    );
+
+    verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
+  });
 }
