@@ -55,43 +55,21 @@ const Color _kGray100 = AppColors.textPrimary;
 const Color _kGray50 = AppColors.textSecondary; // rgba(86,86,86,0.5)
 const Color _kBorder = Color(0x1442493F);
 
-// ─── 留言分組：頂層留言加上它的回覆（ListComments 以 parent_id 取回覆） ────────
-class _CommentThread {
-  const _CommentThread({
-    required this.parent,
-    required this.replies,
-    this.repliesFailed = false,
-  });
-  final PostComment parent;
-  final List<PostComment> replies;
-
-  /// 這串的回覆讀取失敗：只有這串顯示失敗，其餘照常。
-  final bool repliesFailed;
-}
-
+// ─── 留言分組：頂層留言，各串的回覆各自讀（ListComments 以 parent_id 取回覆） ────────
 final _postCommentsProvider = FutureProvider.autoDispose
-    .family<List<_CommentThread>, int>((ref, postId) async {
-      final repo = ref.watch(postRepositoryProvider);
-      final tops = await repo.listComments(postId);
-      Future<_CommentThread> threadOf(PostComment top) async {
-        if (top.replyCount <= 0) {
-          return _CommentThread(parent: top, replies: const <PostComment>[]);
-        }
-        try {
-          return _CommentThread(
-            parent: top,
-            replies: await repo.listComments(postId, parentId: top.id),
-          );
-        } catch (_) {
-          return _CommentThread(
-            parent: top,
-            replies: const <PostComment>[],
-            repliesFailed: true,
-          );
-        }
-      }
-      return Future.wait(tops.map(threadOf));
-    });
+    .family<List<PostComment>, int>(
+      (ref, postId) => ref.watch(postRepositoryProvider).listComments(postId),
+      retry: (_, _) => null,
+    );
+
+/// 一串的回覆：每串自己的讀取與失敗狀態，重試只重讀這一串。
+final _threadRepliesProvider = FutureProvider.autoDispose
+    .family<List<PostComment>, ({int postId, String parentId})>(
+      (ref, key) => ref
+          .watch(postRepositoryProvider)
+          .listComments(key.postId, parentId: key.parentId),
+      retry: (_, _) => null,
+    );
 
 /// 賣家店舖貼文管理面：沉浸媒體、可展開說明與固定操作列（數字、留言、分享、發布與下架）。
 ///
@@ -382,19 +360,23 @@ class _PostPage extends HookConsumerWidget {
     final captionExpanded = useState(false);
     final commentsOpen = useRef(false);
 
-    void setReplyTo(_CommentThread thread, PostComment tapped) {
+    void setReplyTo(PostComment parent, PostComment tapped) {
       if (submitting.value) return;
       replyTarget.value = (
-        apiParentId: thread.parent.id,
-        replyToId: tapped.id == thread.parent.id ? null : tapped.id,
+        apiParentId: parent.id,
+        replyToId: tapped.id == parent.id ? null : tapped.id,
         name: tapped.authorName.isEmpty ? '匿名' : tapped.authorName,
-        isReplyToReply: tapped.id != thread.parent.id,
+        isReplyToReply: tapped.id != parent.id,
       );
       commentFocus.requestFocus();
     }
 
-    Future<void> syncCommentCount() =>
-        ref.read(postListProvider.notifier).refreshCommentCount(post.id);
+    // 監看 notifier 讓列表 provider 在這個 widget 存活期間不被釋放，留言數的加減才改得到它。
+    final postList = ref.watch(postListProvider.notifier);
+    void refreshComments() {
+      ref.invalidate(_postCommentsProvider(post.id));
+      ref.invalidate(_threadRepliesProvider);
+    }
 
     Future<void> submitComment() async {
       final raw = commentCtrl.text.trim();
@@ -422,8 +404,8 @@ class _PostPage extends HookConsumerWidget {
         commentCtrl.clear();
         replyTarget.value = null;
         commentFocus.unfocus();
-        unawaited(syncCommentCount());
-        ref.invalidate(_postCommentsProvider(post.id));
+        postList.adjustCommentCount(post.id, 1);
+        refreshComments();
       } catch (e) {
         if (context.mounted) FloatingToast.error(context, '留言失敗');
       } finally {
@@ -439,8 +421,8 @@ class _PostPage extends HookConsumerWidget {
             .deleteComment(c.id, etag: c.etag);
         if (!context.mounted) return;
         FloatingToast.success(context, '已刪除留言');
-        unawaited(syncCommentCount());
-        ref.invalidate(_postCommentsProvider(post.id));
+        postList.adjustCommentCount(post.id, -1);
+        refreshComments();
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
       } finally {
@@ -530,6 +512,7 @@ class _PostPage extends HookConsumerWidget {
         barrierColor: AppColors.neutralBlack.withValues(alpha: 0.42),
         builder: (_) => _PostCommentsSheet(
           postId: post.id,
+          commentCount: post.commentCount,
           controller: commentCtrl,
           focusNode: commentFocus,
           submitting: submitting,
@@ -1365,6 +1348,7 @@ class _PostPublishButton extends StatelessWidget {
 class _PostCommentsSheet extends HookConsumerWidget {
   const _PostCommentsSheet({
     required this.postId,
+    required this.commentCount,
     required this.controller,
     required this.focusNode,
     required this.submitting,
@@ -1377,6 +1361,9 @@ class _PostCommentsSheet extends HookConsumerWidget {
     required this.onCancelReply,
   });
   final int postId;
+
+  /// 標題的留言數在列表還沒讀到（載入中或失敗）時用這個值，不顯示 0。
+  final int commentCount;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueListenable<bool> submitting;
@@ -1387,7 +1374,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
 
   /// 伺服器的 `Post.viewer_can_comment`；與 [notice] 無關。
   final bool canComment;
-  final void Function(_CommentThread, PostComment) onReply;
+  final void Function(PostComment, PostComment) onReply;
   final void Function(PostComment) onDelete;
   final Future<void> Function() onSubmit;
   final VoidCallback onCancelReply;
@@ -1396,7 +1383,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final noticeText = notice;
     final commentsAsync = ref.watch(_postCommentsProvider(postId));
-    final threads = commentsAsync.value ?? const <_CommentThread>[];
+    final threads = commentsAsync.value ?? const <PostComment>[];
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final viewport = MediaQuery.sizeOf(context);
     useEffect(() {
@@ -1443,7 +1430,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '留言 ${ref.watch(postListProvider).value?.where((p) => p.id == postId).firstOrNull?.commentCount ?? 0}',
+                        '留言 ${ref.watch(postListProvider.select((s) => s.value?.where((p) => p.id == postId).firstOrNull?.commentCount)) ?? commentCount}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -1489,13 +1476,12 @@ class _PostCommentsSheet extends HookConsumerWidget {
                 )
               : Column(
                   children: [
-                    for (final thread in threads)
+                    for (final parent in threads)
                       _CommentGroup(
-                        thread: thread,
-                        onReply: (comment) => onReply(thread, comment),
+                        postId: postId,
+                        parent: parent,
+                        onReply: (comment) => onReply(parent, comment),
                         onDelete: onDelete,
-                        onRetryReplies: () =>
-                            ref.invalidate(_postCommentsProvider(postId)),
                       ),
                   ],
                 ),
@@ -2017,21 +2003,21 @@ class _CommentRow extends ConsumerWidget {
 /// Comment group：parent + replies（seller API 以 parent_id 串 thread）
 /// 引導線：parent avatar 中心垂直往下 → 彎弧形連到 reply avatar 邊緣
 /// （對齊 buyer _CommentGroup / _ReplyLinePainter）
-class _CommentGroup extends StatelessWidget {
+class _CommentGroup extends ConsumerWidget {
   const _CommentGroup({
-    required this.thread,
+    required this.postId,
+    required this.parent,
     required this.onReply,
     required this.onDelete,
-    required this.onRetryReplies,
   });
 
-  final _CommentThread thread;
+  final int postId;
+  final PostComment parent;
   final void Function(PostComment) onReply;
   final void Function(PostComment) onDelete;
-  final VoidCallback onRetryReplies;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     Widget rowFor(PostComment c, {required bool isReply}) => _CommentRow(
       comment: c,
       dateStr: _relativeDate(c.createTime),
@@ -2040,9 +2026,15 @@ class _CommentGroup extends StatelessWidget {
       onDelete: () => onDelete(c),
     );
 
-    final parent = thread.parent;
-    final replies = thread.replies;
-    if (thread.repliesFailed) {
+    if (parent.replyCount <= 0) return rowFor(parent, isReply: false);
+    final key = (postId: postId, parentId: parent.id);
+    final repliesAsync = ref.watch(_threadRepliesProvider(key));
+    // 只把網路錯誤（Exception）當成這一串讀取失敗；Error 是程式缺陷，原樣往上丟。
+    final failure = repliesAsync.error;
+    if (failure is Error) {
+      Error.throwWithStackTrace(failure, repliesAsync.stackTrace!);
+    }
+    if (repliesAsync.hasError) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2054,7 +2046,7 @@ class _CommentGroup extends StatelessWidget {
                 const Text('回覆載入失敗'),
                 TextButton(
                   key: ValueKey('seller-comment-replies-retry-${parent.id}'),
-                  onPressed: onRetryReplies,
+                  onPressed: () => ref.invalidate(_threadRepliesProvider(key)),
                   child: const HkButtonLabel('重試'),
                 ),
               ],
@@ -2063,6 +2055,7 @@ class _CommentGroup extends StatelessWidget {
         ],
       );
     }
+    final replies = repliesAsync.value ?? const <PostComment>[];
     if (replies.isEmpty) return rowFor(parent, isReply: false);
 
     // 父 avatar 中心 X = 10w (row left pad) + 15.sp (avatar radius)

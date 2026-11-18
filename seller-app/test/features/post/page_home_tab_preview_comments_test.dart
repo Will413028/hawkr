@@ -180,7 +180,9 @@ void main() {
         tapComments: false,
       );
 
-      verifyNever(() => repo.listComments(any(), parentId: any(named: 'parentId')));
+      verifyNever(
+        () => repo.listComments(any(), parentId: any(named: 'parentId')),
+      );
       expect(find.bySemanticsLabel('留言，共 7 則'), findsOneWidget);
     },
   );

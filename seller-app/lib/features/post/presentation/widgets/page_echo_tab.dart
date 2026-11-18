@@ -745,7 +745,12 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       confirmText: '刪除',
       confirmTextColor: AppColors.danger,
     );
-    if (!confirmed || !mounted || _deletingMessageIds.contains(msgId)) return;
+    if (!confirmed ||
+        !mounted ||
+        _echoSubmitting ||
+        _deletingMessageIds.contains(msgId)) {
+      return;
+    }
     setState(() => _deletingMessageIds.add(msgId));
     try {
       await ref

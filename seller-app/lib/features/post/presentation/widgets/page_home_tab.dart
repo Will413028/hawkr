@@ -634,6 +634,7 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                     builder: (_) => CommentsBottomSheet(
                       postId: postId,
                       postRepository: _postRepo,
+                      initialCommentCount: commentNotifier.value,
                       notice: commentsNotice?.message,
                       canComment: p.viewerCanComment,
                       onCommentCountChanged: (count) {

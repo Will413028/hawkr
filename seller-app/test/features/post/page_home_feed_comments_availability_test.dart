@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
@@ -7,6 +9,7 @@ import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/features/post/presentation/page_home_feed_screen.dart';
+import 'package:hawkr_seller/features/post/presentation/post_controller.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -18,6 +21,10 @@ import '../../support/my_store_fixtures.dart';
 import 'post_comment_fixtures.dart';
 
 class _Repo extends Mock implements PostRepository {}
+
+class _Offline implements Exception {
+  const _Offline();
+}
 
 MyStore _store({required bool listed}) => MyStore(
   myStoreResponse(
@@ -34,6 +41,7 @@ Future<_Repo> _openComments(
   required Post post,
   List<PostComment>? comments,
   String? replyFailsFor,
+  Object replyFailure = const _Offline(),
   Size size = const Size(390, 844),
 }) async {
   tester.view.physicalSize = size;
@@ -54,7 +62,7 @@ Future<_Repo> _openComments(
   if (replyFailsFor != null) {
     when(
       () => repo.listComments(42, parentId: replyFailsFor),
-    ).thenThrow(StateError('offline'));
+    ).thenThrow(replyFailure);
   }
   await tester.pumpWidget(
     ProviderScope(
@@ -258,27 +266,28 @@ void main() {
   });
 
   for (final canComment in [true, false]) {
-    testWidgets('short layout composer follows viewer_can_comment=$canComment', (
-      tester,
-    ) async {
-      await _openComments(
-        tester,
-        listed: true,
-        size: const Size(390, 250),
-        post: _post(
-          publishStatus: PostStatus.POST_STATUS_PUBLISHED,
-          viewerCanComment: canComment,
-        ),
-      );
-      expect(
-        find.byKey(const ValueKey('seller-post-comments-scroll-42')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('seller-post-action-composer-42')),
-        canComment ? findsOneWidget : findsNothing,
-      );
-    });
+    testWidgets(
+      'short layout composer follows viewer_can_comment=$canComment',
+      (tester) async {
+        await _openComments(
+          tester,
+          listed: true,
+          size: const Size(390, 250),
+          post: _post(
+            publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+            viewerCanComment: canComment,
+          ),
+        );
+        expect(
+          find.byKey(const ValueKey('seller-post-comments-scroll-42')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('seller-post-action-composer-42')),
+          canComment ? findsOneWidget : findsNothing,
+        );
+      },
+    );
   }
 
   testWidgets('the sheet title uses the server comment_count', (tester) async {
@@ -309,5 +318,113 @@ void main() {
     expect(find.text('第二則'), findsOneWidget);
     expect(find.text('回覆載入失敗'), findsOneWidget);
     expect(find.text('留言載入失敗'), findsNothing);
+  });
+
+  testWidgets('a programming error in a reply fetch is not swallowed', (
+    tester,
+  ) async {
+    await _openComments(
+      tester,
+      listed: true,
+      post: _post(publishStatus: PostStatus.POST_STATUS_PUBLISHED),
+      comments: [testComment(id: '1', body: '第一則', replyCount: 1)],
+      replyFailsFor: '1',
+      replyFailure: StateError('bug'),
+    );
+    expect(tester.takeException(), isA<StateError>());
+    expect(find.text('回覆載入失敗'), findsNothing);
+  });
+
+  testWidgets('retrying one thread refetches only that thread', (tester) async {
+    final repo = await _openComments(
+      tester,
+      listed: true,
+      post: _post(publishStatus: PostStatus.POST_STATUS_PUBLISHED),
+      comments: [
+        testComment(id: '1', body: '第一則', replyCount: 1),
+        testComment(id: '2', body: '第二則', replyCount: 1),
+      ],
+      replyFailsFor: '1',
+    );
+    when(() => repo.listComments(42, parentId: '1')).thenAnswer(
+      (_) async => [testComment(id: '5', parentId: '1', body: '重試後的回覆')],
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('seller-comment-replies-retry-1')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('重試後的回覆'), findsOneWidget);
+    expect(find.text('回覆載入失敗'), findsNothing);
+    verify(() => repo.listComments(42)).called(1);
+    verify(() => repo.listComments(42, parentId: '2')).called(1);
+    verify(() => repo.listComments(42, parentId: '1')).called(2);
+  });
+
+  testWidgets(
+    'the sheet title keeps the last known count while the list reloads',
+    (tester) async {
+      final repo = await _openComments(
+        tester,
+        listed: true,
+        post: _post(
+          publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+          commentCount: 5,
+        ),
+      );
+      verifyNever(() => repo.getMyPost(any()));
+      expect(find.text('留言 5'), findsOneWidget);
+      final reload = Completer<List<Post>>();
+      when(() => repo.listMyPosts()).thenAnswer((_) => reload.future);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(PageHomeFeedScreen)),
+      );
+      unawaited(container.read(postListProvider.notifier).refresh());
+      await tester.pump();
+      expect(container.read(postListProvider).isLoading, isTrue);
+      expect(find.text('留言 5'), findsOneWidget);
+      expect(find.text('留言 0'), findsNothing);
+      reload.complete([_post(commentCount: 5)]);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('a created or deleted comment adjusts the count locally', (
+    tester,
+  ) async {
+    final repo = await _openComments(
+      tester,
+      listed: true,
+      post: _post(
+        publishStatus: PostStatus.POST_STATUS_PUBLISHED,
+        commentCount: 1,
+      ),
+      comments: [testComment(canDelete: true, canReply: true)],
+    );
+    when(
+      () => repo.createComment(42, body: '新的一則'),
+    ).thenAnswer((_) async => testComment(id: '7', body: '新的一則'));
+    await tester.enterText(
+      find.byKey(const ValueKey('seller-post-comment-input-42')),
+      '新的一則',
+    );
+    await tester.pump();
+    final send = find.bySemanticsLabel('送出留言');
+    await tester.ensureVisible(send);
+    await tester.tap(send);
+    await tester.pumpAndSettle();
+    expect(find.text('留言 2'), findsOneWidget);
+
+    when(
+      () => repo.deleteComment('1', etag: 'etag-1'),
+    ).thenAnswer((_) async {});
+    final more = find.byTooltip('留言更多操作').first;
+    await tester.ensureVisible(more);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除留言'));
+    await tester.pumpAndSettle();
+    expect(find.text('留言 1'), findsOneWidget);
+    verifyNever(() => repo.getMyPost(any()));
+    await tester.pump(const Duration(seconds: 3));
   });
 }

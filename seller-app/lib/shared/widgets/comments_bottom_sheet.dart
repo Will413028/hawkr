@@ -4,6 +4,7 @@ import 'package:hawkr_seller/shared/icons/app_icons.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,7 +13,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../features/post/data/post_comment.dart';
 import '../../features/post/data/post_repository.dart';
-import '../../features/post/presentation/post_controller.dart';
 import '../utils/floating_toast.dart';
 import 'chat_bubble_icon.dart';
 import 'hk_tap_target.dart';
@@ -26,6 +26,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
     super.key,
     required this.postId,
     required this.postRepository,
+    required this.initialCommentCount,
     this.sellerAvatarBase64,
     this.sellerAvatarUrl,
     this.onCommentCountChanged,
@@ -36,6 +37,10 @@ class CommentsBottomSheet extends HookConsumerWidget {
   final PostRepository postRepository;
   final String? sellerAvatarBase64;
   final String? sellerAvatarUrl;
+
+  /// 開啟時這則貼文的 `comment_count`（呼叫端手上的值）；留言與刪除成功時依它加減一，結果交給 [onCommentCountChanged]。
+  /// 伺服器的 `comment_count` 把頂層留言與回覆各算一則，刪除一則留言只讓它少一（底下的回覆仍在），所以每次成功的寫入就是 ±1。
+  final int initialCommentCount;
   final ValueChanged<int>? onCommentCountChanged;
 
   /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除。
@@ -76,6 +81,10 @@ class CommentsBottomSheet extends HookConsumerWidget {
 
     final repliesByParentRef = useRef(<String, List<PostComment>>{});
     final repliesLoadingRef = useRef(<String>{});
+    // 讀取成功過的串；只有讀取成功才算載入，送出回覆不算（先前讀取失敗時，既有的回覆還要讀）。
+    final repliesLoadedRef = useRef(<String>{});
+    // 讀取失敗的串：不在每次重繪時重讀，等下一次送出回覆或重新載入再試。
+    final repliesFailedRef = useRef(<String>{});
 
     // Listen to text changes for send button opacity
     useEffect(() {
@@ -87,17 +96,10 @@ class CommentsBottomSheet extends HookConsumerWidget {
       return () => ctrl.removeListener(listener);
     }, [ctrl]);
 
-    void notifyCommentCount() {
-      if (!context.mounted) return;
-      final cb = onCommentCountChanged;
-      if (cb == null) return;
-      unawaited(
-        ref.read(postListProvider.notifier).refreshCommentCount(postId).then((
-          count,
-        ) {
-          if (count != null && context.mounted) cb(count);
-        }),
-      );
+    final commentCount = useRef(initialCommentCount);
+    void adjustCommentCount(int delta) {
+      commentCount.value = math.max(0, commentCount.value + delta);
+      onCommentCountChanged?.call(commentCount.value);
     }
 
     void scheduleScrollToBottom({bool animated = true}) {
@@ -123,8 +125,9 @@ class CommentsBottomSheet extends HookConsumerWidget {
         if (!context.mounted) return;
         repliesByParentRef.value.clear();
         repliesLoadingRef.value.clear();
+        repliesLoadedRef.value.clear();
+        repliesFailedRef.value.clear();
         comments.value = list;
-        notifyCommentCount();
         scheduleScrollToBottom(animated: false);
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '留言載入失敗');
@@ -149,18 +152,19 @@ class CommentsBottomSheet extends HookConsumerWidget {
           body: text,
           parentId: parentId,
         );
+        adjustCommentCount(1);
         if (!context.mounted) return;
         ctrl.clear();
         if (parentId != null) {
           final list = repliesByParentRef.value[parentId] ?? <PostComment>[];
           repliesByParentRef.value[parentId] = [...list, created];
+          repliesFailedRef.value.remove(parentId);
           replyToCommentId.value = null;
           replyToName.value = null;
           comments.value = List.of(comments.value);
         } else {
           comments.value = [...comments.value, created];
         }
-        notifyCommentCount();
         scheduleScrollToBottom();
       } catch (_) {
         if (context.mounted) {
@@ -205,6 +209,7 @@ class CommentsBottomSheet extends HookConsumerWidget {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
         return false;
       }
+      adjustCommentCount(-1);
       if (!context.mounted) return false;
       await load();
       if (!context.mounted) return true;
@@ -454,7 +459,8 @@ class CommentsBottomSheet extends HookConsumerWidget {
 
                                 // Lazy-load replies
                                 if (c.replyCount > 0 &&
-                                    !repliesByParentRef.value.containsKey(id) &&
+                                    !repliesLoadedRef.value.contains(id) &&
+                                    !repliesFailedRef.value.contains(id) &&
                                     !repliesLoadingRef.value.contains(id)) {
                                   repliesLoadingRef.value.add(id);
                                   Future.microtask(() async {
@@ -465,15 +471,19 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                       final created =
                                           repliesByParentRef.value[id] ??
                                           const <PostComment>[];
-                                      final known = {for (final r in items) r.id};
+                                      final known = {
+                                        for (final r in items) r.id,
+                                      };
                                       repliesByParentRef.value[id] = [
                                         ...items,
                                         ...created.where(
                                           (r) => !known.contains(r.id),
                                         ),
                                       ];
+                                      repliesLoadedRef.value.add(id);
                                     } catch (_) {
                                       if (!context.mounted) return;
+                                      repliesFailedRef.value.add(id);
                                       FloatingToast.error(context, '回覆載入失敗');
                                     } finally {
                                       repliesLoadingRef.value.remove(id);

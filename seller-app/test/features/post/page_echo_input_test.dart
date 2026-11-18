@@ -753,6 +753,44 @@ void main() {
     );
   });
 
+  testWidgets(
+    'a submit that starts while the delete dialog is open blocks it',
+    (tester) async {
+      final repository = await _pumpEcho(tester, ownReply: true);
+      final update = Completer<StoreForumEntry>();
+      when(
+        () => repository.updateForumEntry('99', etag: 'etag-99', body: '改好了'),
+      ).thenAnswer((_) => update.future);
+      await tester.tap(find.byIcon(AppIcons.moreHoriz).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('編輯留言'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '改好了');
+      await tester.pump();
+      await tester.tap(find.byTooltip('留言更多操作').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除留言'));
+      await tester.pumpAndSettle();
+      expect(find.text('確定要刪除此留言嗎？'), findsOneWidget);
+      // 平台的送出事件不經過被對話框蓋住的按鈕。
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pump();
+      verify(
+        () => repository.updateForumEntry('99', etag: 'etag-99', body: '改好了'),
+      ).called(1);
+      await tester.tap(find.text('刪除'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      verifyNever(
+        () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
+      );
+      update.complete(testForumEntry(id: '99', isMine: true));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
+
   testWidgets('deleted and hidden placeholders show approved text only', (
     tester,
   ) async {

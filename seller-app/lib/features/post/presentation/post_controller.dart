@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
@@ -166,15 +168,15 @@ class PostList extends _$PostList {
     return updated;
   }
 
-  /// 從伺服器重讀這篇貼文的 `comment_count`（留言數的唯一來源），失敗時保留現值。
-  Future<int?> refreshCommentCount(int postId) async {
-    try {
-      final fresh = await ref.read(postRepositoryProvider).getMyPost(postId);
-      updateCommentCount(postId, fresh.commentCount);
-      return fresh.commentCount;
-    } catch (_) {
-      return null;
-    }
+  /// 留言或刪除留言成功後把這篇貼文的 `comment_count` 加減 [delta]（不低於 0）：伺服器的計數把頂層留言與回覆各算一則，
+  /// 刪除一則留言只讓它少一。列表還沒載入或貼文不在列表裡時什麼都不做。
+  void adjustCommentCount(int postId, int delta) {
+    final current = state.value
+        ?.where((p) => p.id == postId)
+        .firstOrNull
+        ?.commentCount;
+    if (current == null) return;
+    updateCommentCount(postId, math.max(0, current + delta));
   }
 
   void updateCommentCount(int postId, int newCount) {
