@@ -300,7 +300,7 @@ void main() {
     expect(_hint(tester), '以「好店」身分留言…');
   });
 
-  testWidgets('打開後登入：重讀 GetPost 與留言，出現留言框、身分提示與讚狀態', (tester) async {
+  testWidgets('打開後登入：重讀 GetPost 與留言，出現留言框與身分提示', (tester) async {
     final public = FakeSocialPublic(
       post: fakePost(viewerCanComment: true, viewerActor: buyerActor('Iris')),
       comments: [fakeComment('c1')],
