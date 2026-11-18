@@ -199,6 +199,62 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       );
     }
 
+    if (watchListUnavailable(ref, posts)) {
+      final reloading =
+          merchantPostsAsync.isLoading ||
+          (includeGlobalFeed && globalPostsAsync.isLoading);
+      void close() {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/?tab=1');
+        }
+      }
+
+      return Scaffold(
+        backgroundColor: AppColors.bgPrimary,
+        body: reloading
+            ? const TruckLoadingOverlay()
+            : Stack(
+                children: [
+                  _ErrorState(
+                    key: const ValueKey('post-feed-unavailable'),
+                    message:
+                        (merchantPostsAsync.error ?? globalPostsAsync.error)
+                            ?.toString() ??
+                        '載入失敗',
+                    onRetry: () {
+                      ref.invalidate(
+                        postFeedControllerProvider(merchantId: mid),
+                      );
+                      if (includeGlobalFeed) {
+                        ref.invalidate(postFeedControllerProvider());
+                      }
+                    },
+                  ),
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 12.h, left: 12.w),
+                        child: _CircleIconButton(
+                          key: const ValueKey('post-back-button'),
+                          semanticLabel: '關閉貼文',
+                          onTap: close,
+                          child: const Icon(
+                            AppIcons.close,
+                            size: 30,
+                            color: _kMediaForeground,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      );
+    }
+
     final activeIndex = currentIndex.value.clamp(0, posts.length - 1);
     final backdropIndex = _resolveInitialPostIndex(
       posts,
@@ -1404,7 +1460,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
+  const _ErrorState({super.key, required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
   @override

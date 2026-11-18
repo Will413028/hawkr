@@ -56,3 +56,11 @@ Post? postSnapshot(Ref ref, int postId) {
   ref.onDispose(ref.read(postEntityStoreProvider.notifier).retain(postId));
   return ref.watch(postEntityStoreProvider.select((s) => s.posts[postId]));
 }
+
+/// 列表持有的 id 一個快照都沒有：觀看者換了、存放處清空，列表重建又失敗，留下的是舊 id。
+/// 畫面據此顯示錯誤與重試，不渲染空白頁。
+bool watchListUnavailable(WidgetRef ref, List<int> ids) => ref.watch(
+  postEntityStoreProvider.select(
+    (s) => ids.isNotEmpty && ids.every((id) => !s.posts.containsKey(id)),
+  ),
+);

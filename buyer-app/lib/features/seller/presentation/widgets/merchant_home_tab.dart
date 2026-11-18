@@ -1,6 +1,7 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -61,7 +62,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
   bool get wantKeepAlive => true;
   final Map<String, String> _videoThumbCache = <String, String>{};
   BuildContext? _previewContext;
-  bool _closeScheduled = false;
   int _prefetchRun = 0;
 
   /// 目前店家的貼文清單 provider；店家 id 不是正整數時沒有清單。
@@ -86,24 +86,23 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     if ((oldWidget.merchantId?.trim() ?? '') !=
         (widget.merchantId?.trim() ?? '')) {
       _closePreview();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final ids = _feed == null ? null : ref.read(_feed!).value?.ids;
+        if (ids != null) _prefetch(ids);
+      });
     }
   }
 
-  /// 關掉開著的預覽卡。排到下一個 frame 才移除 route：呼叫當下 navigator 可能正鎖著。
+  /// 關掉開著的預覽卡。
   void _closePreview() {
-    if (_closeScheduled || _previewContext == null) return;
-    _closeScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _closeScheduled = false;
-      final context = _previewContext;
-      _previewContext = null;
-      if (context == null || !context.mounted) return;
-      final route = ModalRoute.of(context);
-      if (route != null && route.isActive) {
-        Navigator.of(context).removeRoute(route);
-      }
-    });
-    WidgetsBinding.instance.ensureVisualUpdate();
+    final context = _previewContext;
+    _previewContext = null;
+    if (context == null || !context.mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && route.isActive) {
+      Navigator.of(context).removeRoute(route);
+    }
   }
 
   Future<void> _refresh() async {
@@ -210,7 +209,12 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     final feed = _feed;
     if (feed != null) {
       ref.listen(feed.select((a) => a.value?.ids), (previous, next) {
-        if (next != null && previous == null) _prefetch(next);
+        if (next == null) return;
+        if (previous != null &&
+            listEquals(previous.take(9).toList(), next.take(9).toList())) {
+          return;
+        }
+        _prefetch(next);
       });
     }
     ref.listen(viewerIdProvider, (_, _) => _closePreview());
@@ -220,6 +224,7 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
   Widget _buildPostsList(PostFeedControllerProvider? feed) {
     final feedState = feed == null ? null : ref.watch(feed);
     final postIds = feedState?.value?.ids ?? const <int>[];
+    final unavailable = watchListUnavailable(ref, postIds);
     final BorderRadius tileRadius = BorderRadius.circular(16);
     final String keySuffix = widget.merchantId ?? 'noid';
 
@@ -270,7 +275,9 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
       ),
     );
 
-    if (feedState != null && !feedState.hasValue && feedState.isLoading) {
+    if (feedState != null &&
+        (!feedState.hasValue || unavailable) &&
+        feedState.isLoading) {
       return wrapInScrollView(
         buildSliverGrid(
           itemCount: 9,
@@ -282,7 +289,9 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
       );
     }
 
-    if (feedState != null && !feedState.hasValue && feedState.hasError) {
+    if (feedState != null &&
+        (!feedState.hasValue || unavailable) &&
+        feedState.hasError) {
       return wrapInScrollView(
         SliverFillRemaining(
           hasScrollBody: false,

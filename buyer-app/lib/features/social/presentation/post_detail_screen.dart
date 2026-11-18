@@ -24,6 +24,7 @@ import 'package:hawkr_buyer/shared/utils/hashtag_spans.dart';
 import 'package:hawkr_buyer/shared/utils/require_login.dart';
 import 'package:hawkr_buyer/shared/widgets/app_cached_image.dart';
 import 'package:hawkr_buyer/shared/widgets/comments_bottom_sheet.dart';
+import 'package:hawkr_buyer/shared/widgets/common_snackbar.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_post_card_surface.dart';
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
@@ -127,9 +128,9 @@ class PostDetailScreen extends HookConsumerWidget {
     }
 
     Widget pageBody;
-    final entity = detailAsync.value;
+    final error = detailAsync.error;
+    final entity = error is NotFoundException ? null : detailAsync.value;
     if (entity == null) {
-      final error = detailAsync.error;
       pageBody = error == null
           ? _PostDetailLoading(onClose: closeDetail)
           : _PostDetailError(
@@ -256,7 +257,12 @@ class PostDetailScreen extends HookConsumerWidget {
         },
         onShareTap: sharePost,
         onRefresh: () async {
-          await ref.read(postEntityStoreProvider.notifier).refresh(postId);
+          final ok = await ref
+              .read(postEntityStoreProvider.notifier)
+              .refresh(postId);
+          if (!ok && context.mounted) {
+            showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+          }
         },
       );
     }

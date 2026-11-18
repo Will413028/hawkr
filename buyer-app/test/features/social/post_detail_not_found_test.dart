@@ -144,4 +144,44 @@ void main() {
     );
     await expectLater(repo.getPost(101), throwsA(isA<NotFoundException>()));
   });
+
+  Future<void> pullToRefresh(WidgetTester tester) async {
+    await tester.fling(
+      find.byType(CustomScrollView).first,
+      const Offset(0, 400),
+      1000,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  testWidgets('F1 已顯示的貼文下拉重讀得到找不到：改顯示找不到，不留舊貼文', (tester) async {
+    final public = FakeSocialPublic(post: fakePost());
+    await _pumpDetail(tester, public);
+    expect(find.text('貼文內文'), findsWidgets);
+
+    public.getPostError = ConnectException(Code.notFound, 'gone');
+    await pullToRefresh(tester);
+
+    expect(find.text('找不到這則貼文'), findsOneWidget);
+    expect(find.text('貼文內文'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('F8 下拉重讀失敗（非找不到）：保留舊貼文並顯示失敗提示', (tester) async {
+    final public = FakeSocialPublic(post: fakePost());
+    await _pumpDetail(tester, public);
+
+    public.getPostError = ConnectException(Code.unavailable, 'down');
+    await pullToRefresh(tester);
+
+    expect(find.text('載入失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('貼文內文'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 3));
+  });
 }

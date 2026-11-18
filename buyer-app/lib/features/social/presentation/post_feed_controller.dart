@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/session/viewer_scoped_notifier.dart';
 import '../data/social_content_repository.dart';
+import '../data/social_model.dart';
 import 'post_entity_store.dart';
 
 part 'post_feed_controller.g.dart';
@@ -32,6 +33,7 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
     _loadingMore = false;
     bindViewer();
     final scope = beginScope();
+    final repository = ref.watch(socialContentRepositoryProvider);
     final store = ref.read(postEntityStoreProvider.notifier);
     ref.onDispose(() => store.releaseList(this));
     ref.listen(postEntityStoreProvider.select((s) => s.gone), (_, gone) {
@@ -45,18 +47,18 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
       );
     });
     final page = await scope.run(
-      ref
-          .read(socialContentRepositoryProvider)
-          .listPosts(storeId: merchantId?.toString()),
+      repository.listPosts(storeId: merchantId?.toString()),
     );
-    store.seed(page.posts);
     final ids = page.posts.map((p) => p.id).toList();
     store.setListed(this, ids);
+    store.seed(page.posts);
     return PostListState(ids: ids, nextPageToken: page.nextPageToken);
   }
 
-  void _publish(PostListState next) {
-    ref.read(postEntityStoreProvider.notifier).setListed(this, next.ids);
+  void _publish(PostListState next, {Iterable<Post> seed = const <Post>[]}) {
+    final store = ref.read(postEntityStoreProvider.notifier);
+    store.setListed(this, next.ids);
+    store.seed(seed);
     state = AsyncData(next);
   }
 
@@ -75,7 +77,6 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
               pageToken: current.nextPageToken,
             ),
       );
-      ref.read(postEntityStoreProvider.notifier).seed(page.posts);
       final latest = state.value ?? current;
       final existing = latest.ids.toSet();
       _publish(
@@ -88,6 +89,7 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
           ],
           nextPageToken: page.nextPageToken,
         ),
+        seed: page.posts,
       );
     } catch (_) {
       // 失敗保留 page token，下次仍可重試；過期的結果也走這裡丟棄。

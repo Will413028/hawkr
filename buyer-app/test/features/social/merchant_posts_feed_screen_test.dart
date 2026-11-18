@@ -14,6 +14,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart' as common;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'social_fakes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -539,4 +540,67 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets('F2 換觀看者後列表重讀失敗：顯示錯誤、重試與返回，不是空白頁；重試後回來', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    var fail = false;
+    final public = FakeSocialPublic(
+      postsResponder: (_) async {
+        if (fail) throw ConnectException(Code.unavailable, 'down');
+        return pb.ListPostsResponse(
+          posts: [pb.Post(id: '101', body: '貼文')],
+        );
+      },
+    );
+    final container = ProviderContainer(
+      retry: (_, _) => null,
+      overrides: [
+        socialPublicClientProvider.overrideWithValue(public.client()),
+        sessionProvider.overrideWith(SwitchableSession.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionProvider.future);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => const MerchantPostsFeedScreen(merchantId: '7'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, _) => MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('post-card-page-view')), findsOneWidget);
+
+    fail = true;
+    (container.read(sessionProvider.notifier) as SwitchableSession).signIn();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('post-feed-unavailable')), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('post-back-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('post-card-page-view')), findsNothing);
+
+    fail = false;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('post-feed-unavailable')), findsNothing);
+    expect(find.byKey(const ValueKey('post-card-page-view')), findsOneWidget);
+  });
 }
