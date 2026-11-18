@@ -21,10 +21,12 @@ import { fetchPostViewerState, setPostLiked } from "@/lib/posts/repo";
 import {
 	addReplyCount,
 	appendToLastPage,
+	cancelListRefetch,
 	dropReplyCount,
 	FIRST_PAGE_PARAM,
 	findItem,
 	flattenPages,
+	invalidateList,
 	type ListData,
 	lastPageLoaded,
 	mapItem,
@@ -32,7 +34,7 @@ import {
 	removeItem,
 } from "@/lib/query/infinite-list";
 import { queryKeys } from "@/lib/query/keys";
-import { useSubmissions } from "@/lib/query/submissions";
+import { useSubmittedItems } from "@/lib/query/submissions";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 /** Options for posting a top-level comment. The server decides the author
@@ -128,25 +130,6 @@ function optimisticComment(
 	};
 }
 
-function useSubmittedComments<V extends Submission>(
-	mutationKey: readonly unknown[],
-	loaded: readonly Comment[],
-	build: (v: V, createdAt: number) => Comment,
-): SubmittedComment[] {
-	const submissions = useSubmissions<V, Comment>(mutationKey);
-	return React.useMemo(() => {
-		const loadedIds = new Set(loaded.map((c) => c.id));
-		return submissions.flatMap((s) => {
-			const key = `tmp-${s.variables.requestId}`;
-			if (loadedIds.has(key) || (s.data && loadedIds.has(s.data.id))) return [];
-			const comment = s.data
-				? { ...s.data, optimistic: true }
-				: build(s.variables, Math.floor(s.submittedAt / 1000));
-			return [{ key, comment }];
-		});
-	}, [submissions, loaded, build]);
-}
-
 export function usePostComments(
 	postId: string | undefined,
 	options: UsePostCommentsOptions = {},
@@ -214,7 +197,7 @@ export function usePostComments(
 				});
 			},
 			onMutate: async (v) => {
-				await queryClient.cancelQueries({ queryKey: commentsKey });
+				await cancelListRefetch(queryClient, commentsKey);
 				const current = queryClient.getQueryData<CommentData>(commentsKey);
 				// 伺服器把新留言放在最後：最後一頁還沒載入時它不在已載入的資料裡。
 				if (!current || !postId || !lastPageLoaded(current)) return {};
@@ -238,7 +221,7 @@ export function usePostComments(
 				if (id) setCommentData((current) => removeItem(current, id));
 			},
 			onSettled: () => {
-				void queryClient.invalidateQueries({ queryKey: commentsKey });
+				void invalidateList(queryClient, commentsKey);
 			},
 		},
 	);
@@ -248,7 +231,15 @@ export function usePostComments(
 			optimisticComment(postId ?? "", v, createdAt),
 		[postId],
 	);
-	const submitted = useSubmittedComments(createKey, comments, buildSubmitted);
+	const submittedItems = useSubmittedItems<Submission, Comment>({
+		mutationKey: createKey,
+		loaded: comments,
+		build: buildSubmitted,
+	});
+	const submitted = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, comment: s.item })),
+		[submittedItems],
+	);
 
 	const { mutateAsync: createAsync } = createMutation;
 	const post = React.useCallback(
@@ -272,7 +263,7 @@ export function usePostComments(
 			setCommentData((current) => removeItem(current, v.id));
 		},
 		onSettled: () => {
-			void queryClient.invalidateQueries({ queryKey: commentsKey });
+			void invalidateList(queryClient, commentsKey);
 		},
 	});
 	const { mutateAsync: deleteAsync } = deleteMutation;
@@ -564,8 +555,8 @@ export function useCommentReplies(
 		},
 		onMutate: async (v) => {
 			await Promise.all([
-				queryClient.cancelQueries({ queryKey: repliesKey }),
-				queryClient.cancelQueries({ queryKey: commentsKey }),
+				cancelListRefetch(queryClient, repliesKey),
+				cancelListRefetch(queryClient, commentsKey),
 			]);
 			const context: ReplyContext = {};
 			const parent = queryClient.getQueryData<CommentData>(commentsKey);
@@ -614,8 +605,7 @@ export function useCommentReplies(
 			}
 		},
 		onSettled: () => {
-			void queryClient.invalidateQueries({ queryKey: repliesKey });
-			void queryClient.invalidateQueries({ queryKey: commentsKey });
+			void invalidateList(queryClient, repliesKey);
 		},
 	});
 	const { mutateAsync: replyAsync } = replyMutation;
@@ -653,24 +643,32 @@ export function useCommentReplies(
 			}),
 		[postId, commentId, parentName],
 	);
-	const submitted = useSubmittedComments(createKey, items, buildSubmitted);
+	const landedReply = React.useCallback(
+		(data: Comment, v: ReplySubmission): Comment => ({
+			...data,
+			replyToName: data.replyToName ?? v.replyToName ?? parentName,
+		}),
+		[parentName],
+	);
+	const submittedItems = useSubmittedItems<ReplySubmission, Comment>({
+		mutationKey: createKey,
+		loaded: items,
+		build: buildSubmitted,
+		landed: landedReply,
+	});
+	const submitted = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, comment: s.item })),
+		[submittedItems],
+	);
 
 	/** 刪除一則回覆成功後：從快取移除並減少所屬留言的回覆數。 */
 	const removed = React.useCallback(
 		(replyId: string) => {
 			setReplyData((current) => removeItem(current, replyId));
 			setCommentData((current) => dropReplyCount(current, commentId ?? ""));
-			void queryClient.invalidateQueries({ queryKey: repliesKey });
-			void queryClient.invalidateQueries({ queryKey: commentsKey });
+			void invalidateList(queryClient, repliesKey);
 		},
-		[
-			setReplyData,
-			setCommentData,
-			commentId,
-			queryClient,
-			repliesKey,
-			commentsKey,
-		],
+		[setReplyData, setCommentData, commentId, queryClient, repliesKey],
 	);
 
 	return {

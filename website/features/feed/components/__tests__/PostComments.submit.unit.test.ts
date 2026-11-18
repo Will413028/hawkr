@@ -267,3 +267,12 @@ describe("reply composer", () => {
 		expect(screen.getByDisplayValue("回覆內容")).toBeTruthy();
 	});
 });
+
+describe("comment count header", () => {
+	it("counts the submitted rows shown outside the list", () => {
+		state.comments = [comment("c1")];
+		state.submitted = [{ key: "tmp-x", comment: optimistic("real-x") }];
+		view();
+		expect(screen.getByText("留言（2）")).toBeTruthy();
+	});
+});

@@ -305,3 +305,63 @@ describe("submitting a comment", () => {
 		);
 	});
 });
+
+describe("a submission stops being shown once it has landed or been deleted", () => {
+	it("post then delete: the row is gone and does not come back from the successful mutation", async () => {
+		repo.createComment.mockResolvedValue(
+			comment("real", { content: "新留言" }),
+		);
+		const { result } = mount();
+		await waitFor(() => expect(result.current.comments).toHaveLength(1));
+		repo.fetchPostComments.mockResolvedValue(
+			page([comment("c1"), comment("real")]),
+		);
+		await act(async () => {
+			await result.current.post("新留言");
+		});
+		await waitFor(() =>
+			expect(result.current.comments.map((c) => c.id)).toContain("real"),
+		);
+		repo.fetchPostComments.mockResolvedValue(page([comment("c1")]));
+		await act(async () => {
+			await result.current.remove("real");
+		});
+		await waitFor(() =>
+			expect(result.current.comments.map((c) => c.id)).toEqual(["c1"]),
+		);
+		await act(async () => {
+			await result.current.refresh();
+		});
+		expect(result.current.submitted).toEqual([]);
+		expect(result.current.comments.map((c) => c.id)).toEqual(["c1"]);
+	});
+});
+
+describe("a pending load-more survives submitting", () => {
+	it("posting while the next page is loading keeps that page", async () => {
+		const more = deferred<ReturnType<typeof page>>();
+		repo.fetchPostComments.mockImplementation(
+			(_postId: string, opts: { pageToken?: string }) =>
+				opts.pageToken === "t1"
+					? more.promise
+					: Promise.resolve(page([comment("c1")], "t1")),
+		);
+		repo.createComment.mockResolvedValue(comment("real"));
+		const { result } = mount();
+		await waitFor(() => expect(result.current.hasMore).toBe(true));
+		act(() => {
+			void result.current.loadMore();
+		});
+		await waitFor(() => expect(result.current.loadingMore).toBe(true));
+		await act(async () => {
+			await result.current.post("新留言");
+		});
+		await act(async () => {
+			more.resolve(page([comment("c2")]));
+			await more.promise;
+		});
+		await waitFor(() =>
+			expect(result.current.comments.map((c) => c.id)).toContain("c2"),
+		);
+	});
+});

@@ -581,7 +581,7 @@ function ForumEntryBody({
 	const [editError, setEditError] = React.useState<string | null>(null);
 	const defaultErrors = useDefaultErrorText();
 	const sessionRef = React.useRef(0);
-	const live = entry.state === "visible";
+	const live = entry.state === "visible" && !entry.optimistic;
 
 	const startEdit = () => {
 		sessionRef.current += 1;

@@ -967,7 +967,7 @@ export default function PostComments({
 		>
 			<header className="flex justify-between items-center mb-[var(--hkui-space-3)]">
 				<strong className="text-[length:var(--hkui-text-medium)]">
-					留言（{list.comments.length}）
+					留言（{list.comments.length + list.submitted.length}）
 				</strong>
 			</header>
 

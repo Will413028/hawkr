@@ -367,9 +367,9 @@ describe("optimistic entries", () => {
 				optimistic: true,
 				isMine: true,
 				authorKind: "buyer",
-				viewerCanEdit: false,
-				viewerCanDelete: false,
-				viewerCanReply: false,
+				viewerCanEdit: true,
+				viewerCanDelete: true,
+				viewerCanReply: true,
 			});
 		forum.list = [optimistic("tmp-a")];
 		forum.submitted = [{ key: "tmp-b", entry: optimistic("real-b") }];

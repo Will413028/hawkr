@@ -287,7 +287,7 @@ describe("submitting a reply", () => {
 		});
 	});
 
-	it("refetches the thread and the comments when the submit settles", async () => {
+	it("refetches only the thread when the submit settles; the parent count stays patched", async () => {
 		const { result } = await openThread();
 		repo.createComment.mockResolvedValue(reply("rn", { parentId: "c1" }));
 		repo.fetchCommentReplies.mockClear();
@@ -296,7 +296,39 @@ describe("submitting a reply", () => {
 			await result.current.thread.reply("新回覆", { replyToId: "c1" });
 		});
 		await waitFor(() => expect(repo.fetchCommentReplies).toHaveBeenCalled());
-		await waitFor(() => expect(repo.fetchPostComments).toHaveBeenCalled());
+		expect(repo.fetchPostComments).not.toHaveBeenCalled();
+		expect(countOf(result.current.list.comments, "c1")).toBe(2);
+	});
+
+	it("keeps the @name on the submitted reply from pending to success", async () => {
+		const { result } = await openThread(
+			undefined,
+			page([reply("r1", { parentId: "c1" })], "more"),
+		);
+		const create = deferred<Comment>();
+		repo.createComment.mockReturnValue(create.promise);
+		act(() => {
+			void result.current.thread.reply("新回覆", {
+				replyToId: "c1",
+				replyToName: "被回覆者",
+			});
+		});
+		await waitFor(() =>
+			expect(result.current.thread.submitted).toHaveLength(1),
+		);
+		expect(result.current.thread.submitted[0].comment.replyToName).toBe(
+			"被回覆者",
+		);
+		await act(async () => {
+			create.resolve(reply("rn", { parentId: "c1" }));
+			await create.promise;
+		});
+		await waitFor(() =>
+			expect(result.current.thread.submitted[0]?.comment.id).toBe("rn"),
+		);
+		expect(result.current.thread.submitted[0].comment.replyToName).toBe(
+			"被回覆者",
+		);
 	});
 });
 

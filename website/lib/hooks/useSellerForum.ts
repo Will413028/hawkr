@@ -20,11 +20,13 @@ import {
 import {
 	addReplyCount,
 	appendToLastPage,
+	cancelListRefetch,
 	dropReplyCount,
 	FIRST_PAGE_PARAM,
 	findItem,
 	flattenPages,
 	type ItemLocation,
+	invalidateList,
 	type ListData,
 	lastPageLoaded,
 	locateItem,
@@ -35,7 +37,7 @@ import {
 	seedPages,
 } from "@/lib/query/infinite-list";
 import { queryKeys } from "@/lib/query/keys";
-import { useSubmissions } from "@/lib/query/submissions";
+import { useSubmittedItems } from "@/lib/query/submissions";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 /** 自己剛送出、伺服器那份還不在已載入頁的項目；`key` 從送出中到成功都不變。 */
@@ -146,31 +148,6 @@ function placeholderOf(target: SellerForumComment): SellerForumComment {
 	};
 }
 
-function useSubmittedEntries<V extends Submission>(
-	mutationKey: readonly unknown[],
-	loaded: readonly SellerForumComment[],
-	accepts: (v: V) => boolean,
-	build: (v: V, createdAt: number) => SellerForumComment,
-): SubmittedEntry[] {
-	const submissions = useSubmissions<V, SellerForumComment>(mutationKey);
-	return React.useMemo(() => {
-		const loadedIds = new Set(loaded.map((e) => e.id));
-		return submissions.flatMap((s) => {
-			if (!accepts(s.variables)) return [];
-			const key = `tmp-${s.variables.requestId}`;
-			if (loadedIds.has(key) || (s.data && loadedIds.has(s.data.id))) return [];
-			const entry = s.data
-				? {
-						...s.data,
-						replyToName: (s.variables as Partial<ReplySubmission>).replyToName,
-						optimistic: true,
-					}
-				: build(s.variables, Math.floor(s.submittedAt / 1000));
-			return [{ key, entry }];
-		});
-	}, [submissions, loaded, accepts, build]);
-}
-
 export function useSellerForum(
 	sellerId: string | undefined,
 	initialData?: SellerForumListResult,
@@ -275,7 +252,7 @@ export function useSellerForum(
 		mutationFn: (v) =>
 			createSellerForumComment(storeId, v.content, v.requestId),
 		onMutate: async (v) => {
-			await queryClient.cancelQueries({ queryKey: forumKey });
+			await cancelListRefetch(queryClient, forumKey);
 			const current = queryClient.getQueryData<ForumData>(forumKey);
 			// 伺服器把新發言放在最後：最後一頁還沒載入時它不在已載入的資料裡。
 			if (!current || !lastPageLoaded(current)) return {};
@@ -299,7 +276,7 @@ export function useSellerForum(
 			if (id) setForumData((current) => removeItem(current, id));
 		},
 		onSettled: () => {
-			void queryClient.invalidateQueries({ queryKey: forumKey });
+			void invalidateList(queryClient, forumKey);
 		},
 	});
 	const { mutateAsync: postAsync } = postMutation;
@@ -322,8 +299,8 @@ export function useSellerForum(
 		onMutate: async (v) => {
 			const repliesKey = repliesKeyOf(v.threadId);
 			await Promise.all([
-				queryClient.cancelQueries({ queryKey: repliesKey }),
-				queryClient.cancelQueries({ queryKey: forumKey }),
+				cancelListRefetch(queryClient, repliesKey),
+				cancelListRefetch(queryClient, forumKey),
 			]);
 			const context: SubmitContext = {};
 			const forum = queryClient.getQueryData<ForumData>(forumKey);
@@ -370,10 +347,7 @@ export function useSellerForum(
 			}
 		},
 		onSettled: (_data, _error, v) => {
-			void queryClient.invalidateQueries({
-				queryKey: repliesKeyOf(v.threadId),
-			});
-			void queryClient.invalidateQueries({ queryKey: forumKey });
+			void invalidateList(queryClient, repliesKeyOf(v.threadId));
 		},
 	});
 	const { mutateAsync: replyAsync } = replyMutation;
@@ -421,11 +395,14 @@ export function useSellerForum(
 			optimisticEntry(storeId, v, createdAt),
 		[storeId],
 	);
-	const submittedPosts = useSubmittedEntries<Submission>(
-		postKey,
-		comments,
-		acceptAll,
-		buildPost,
+	const submittedItems = useSubmittedItems<Submission, SellerForumComment>({
+		mutationKey: postKey,
+		loaded: comments,
+		build: buildPost,
+	});
+	const submittedPosts = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, entry: s.item })),
+		[submittedItems],
 	);
 
 	const updateMutation = useMutation<
@@ -468,7 +445,7 @@ export function useSellerForum(
 		},
 		onSettled: (_data, _error, _v, context) => {
 			if (context) {
-				void queryClient.invalidateQueries({ queryKey: context.key });
+				void invalidateList(queryClient, context.key);
 			}
 		},
 	});
@@ -503,8 +480,8 @@ export function useSellerForum(
 		onMutate: async (v) => {
 			const key = v.parentId ? repliesKeyOf(v.parentId) : forumKey;
 			await Promise.all([
-				queryClient.cancelQueries({ queryKey: key }),
-				queryClient.cancelQueries({ queryKey: forumKey }),
+				cancelListRefetch(queryClient, key),
+				cancelListRefetch(queryClient, forumKey),
 			]);
 			const data = queryClient.getQueryData<ForumData>(key);
 			const row = findItem(data, v.id);
@@ -543,10 +520,7 @@ export function useSellerForum(
 			}
 		},
 		onSettled: (_data, _error, _v, context) => {
-			if (context?.key) {
-				void queryClient.invalidateQueries({ queryKey: context.key });
-			}
-			void queryClient.invalidateQueries({ queryKey: forumKey });
+			void invalidateList(queryClient, context?.key ?? forumKey);
 		},
 	});
 	const { mutateAsync: removeAsync } = removeMutation;
@@ -582,10 +556,6 @@ export function useSellerForum(
 		update,
 		remove,
 	};
-}
-
-function acceptAll(): boolean {
-	return true;
 }
 
 /** 一則頂層留言的回覆串：展開時才讀，分頁與送出的做法與頂層相同。 */
@@ -650,11 +620,25 @@ export function useForumReplies(
 			}),
 		[storeId, parentName],
 	);
-	const submitted = useSubmittedEntries<ReplySubmission>(
-		replyKey,
-		items,
-		accepts,
-		build,
+	const landed = React.useCallback(
+		(data: SellerForumComment, v: ReplySubmission): SellerForumComment => ({
+			...data,
+			replyToName: v.replyToName ?? parentName,
+		}),
+		[parentName],
+	);
+	const submittedItems = useSubmittedItems<ReplySubmission, SellerForumComment>(
+		{
+			mutationKey: replyKey,
+			loaded: items,
+			accepts,
+			build,
+			landed,
+		},
+	);
+	const submitted = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, entry: s.item })),
+		[submittedItems],
 	);
 
 	return {

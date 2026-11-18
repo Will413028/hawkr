@@ -1,4 +1,8 @@
-import type { InfiniteData } from "@tanstack/react-query";
+import type {
+	InfiniteData,
+	QueryClient,
+	QueryKey,
+} from "@tanstack/react-query";
 
 export interface ListPage<T> {
 	records: T[];
@@ -151,4 +155,35 @@ export function dropReplyCount<T extends Counted>(
 		return removeItem(next, id);
 	}
 	return next;
+}
+
+function fetchingMore(queryClient: QueryClient, key: QueryKey): boolean {
+	const state = queryClient.getQueryState(key);
+	if (state?.fetchStatus !== "fetching") return false;
+	const meta = state.fetchMeta as { fetchMore?: unknown } | null;
+	return Boolean(meta?.fetchMore);
+}
+
+/**
+ * 樂觀更新前取消進行中的讀取，免得舊結果蓋掉樂觀資料。還沒有資料（首次載入）或正在載入更多時不取消：
+ * 這兩種情況都不會插入樂觀項目（最後一頁不在已載入的資料裡），取消只會丟掉首頁或使用者要的那一頁。
+ */
+export async function cancelListRefetch(
+	queryClient: QueryClient,
+	key: QueryKey,
+): Promise<void> {
+	if (!queryClient.getQueryState(key)?.data) return;
+	if (fetchingMore(queryClient, key)) return;
+	await queryClient.cancelQueries({ queryKey: key });
+}
+
+/** 載入更多進行中時不打斷它（打斷會丟掉使用者要的那一頁）；沒載入的部分之後的讀取會補上。 */
+export async function invalidateList(
+	queryClient: QueryClient,
+	key: QueryKey,
+): Promise<void> {
+	await queryClient.invalidateQueries(
+		{ queryKey: key },
+		{ cancelRefetch: !fetchingMore(queryClient, key) },
+	);
 }

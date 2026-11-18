@@ -496,3 +496,86 @@ describe("removing an entry follows the ListForumEntries contract", () => {
 		expect(result.current.forum.comments[0].replyCount).toBe(2);
 	});
 });
+
+describe("a submission stops being shown once it has landed or been deleted", () => {
+	it("post then delete: the entry is gone and does not come back from the successful mutation", async () => {
+		const { result } = await mountForum();
+		repo.createSellerForumComment.mockResolvedValue(entry("real"));
+		repo.fetchSellerForum.mockResolvedValue(
+			page([entry("top", { replyCount: 2 }), entry("lonely"), entry("real")]),
+		);
+		await act(async () => {
+			await result.current.forum.post("新發言");
+		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toContain("real"),
+		);
+		repo.deleteSellerForumComment.mockResolvedValue(undefined);
+		repo.fetchSellerForum.mockResolvedValue(
+			page([entry("top", { replyCount: 2 }), entry("lonely")]),
+		);
+		await act(async () => {
+			await result.current.forum.remove(
+				result.current.forum.comments.find((c) => c.id === "real") as never,
+			);
+		});
+		await act(async () => {
+			await result.current.forum.refresh();
+		});
+		expect(result.current.forum.submitted).toEqual([]);
+		expect(ids(result.current.forum.comments)).toEqual(["top", "lonely"]);
+	});
+});
+
+describe("a pending load-more survives submitting", () => {
+	it("posting while the next page is loading keeps that page", async () => {
+		const { result } = await mountForum({ topToken: "t1" });
+		const more = deferred<ReturnType<typeof page>>();
+		repo.fetchSellerForum.mockReturnValue(more.promise);
+		repo.createSellerForumComment.mockResolvedValue(entry("real"));
+		act(() => {
+			void result.current.forum.loadMore();
+		});
+		await waitFor(() => expect(result.current.forum.loadingMore).toBe(true));
+		await act(async () => {
+			await result.current.forum.post("新發言");
+		});
+		await act(async () => {
+			more.resolve(page([entry("p2")]));
+			await more.promise;
+		});
+		await waitFor(() =>
+			expect(ids(result.current.forum.comments)).toContain("p2"),
+		);
+	});
+});
+
+describe("replying does not refetch the parent list", () => {
+	it("settling a reply refetches the thread only", async () => {
+		const { result } = await mountForum();
+		repo.replySellerForumComment.mockResolvedValue(
+			entry("rn", { parentId: "top" }),
+		);
+		repo.fetchSellerForum.mockClear();
+		await act(async () => {
+			await result.current.forum.reply(result.current.forum.comments[0], "回");
+		});
+		await waitFor(() =>
+			expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(2),
+		);
+		expect(repo.fetchSellerForum).not.toHaveBeenCalled();
+	});
+
+	it("settling a reply delete refetches the thread only", async () => {
+		const { result } = await mountForum();
+		repo.deleteSellerForumComment.mockResolvedValue(undefined);
+		repo.fetchSellerForum.mockClear();
+		await act(async () => {
+			await result.current.forum.remove(result.current.thread.items[0]);
+		});
+		await waitFor(() =>
+			expect(repo.fetchSellerForumReplies).toHaveBeenCalledTimes(2),
+		);
+		expect(repo.fetchSellerForum).not.toHaveBeenCalled();
+	});
+});
