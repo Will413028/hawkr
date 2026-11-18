@@ -6,6 +6,10 @@ import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
+import {
+	CommentEditor,
+	CommentEntryActions,
+} from "@/features/feed/components/CommentEntryParts";
 import { canBlockForumAuthor } from "@/features/feed/components/commentPermissions";
 import { useAuth } from "@/lib/auth/context";
 import { formatTaipeiDate } from "@/lib/date/taipei";
@@ -71,32 +75,21 @@ export default function SellerMessageTab({
 	>(() => new Map());
 	const defaultErrors = useDefaultErrorText();
 	const composeRef = React.useRef<HTMLTextAreaElement | null>(null);
-	const [editing, setEditing] = React.useState<{
-		id: string;
-		draft: string;
-	} | null>(null);
-	const [savingEdit, setSavingEdit] = React.useState(false);
 	const [busyId, setBusyId] = React.useState<string | null>(null);
 	const [blockNotice, setBlockNotice] = React.useState<string | null>(null);
-	const [blockError, setBlockError] = React.useState<string | null>(null);
+	const [actionError, setActionError] = React.useState<string | null>(null);
+	const [blockedAuthorIds, setBlockedAuthorIds] = React.useState<
+		ReadonlySet<string>
+	>(() => new Set());
 	const busyRef = React.useRef(false);
 
-	const submitEdit = async (entry: SellerForumComment) => {
-		if (!editing || savingEdit) return;
-		const next = editing.draft.trim();
-		if (!next) return;
-		if (next === entry.content) {
-			setEditing(null);
-			return;
-		}
-		setSavingEdit(true);
+	const saveEntry = async (entry: SellerForumComment, next: string) => {
+		setActionError(null);
 		try {
 			await forum.update(entry.id, next);
-			setEditing(null);
-		} catch {
-			/* hook surfaces error via forum.error */
-		} finally {
-			setSavingEdit(false);
+		} catch (e) {
+			setActionError(errorText(e, defaultErrors));
+			throw e;
 		}
 	};
 
@@ -105,10 +98,11 @@ export default function SellerMessageTab({
 		if (!window.confirm(isReply ? "刪除這則回覆？" : "刪除這則留言？")) return;
 		busyRef.current = true;
 		setBusyId(entry.id);
+		setActionError(null);
 		try {
 			await forum.remove(entry.id);
-		} catch {
-			/* hook surfaces error via forum.error */
+		} catch (e) {
+			setActionError(errorText(e, defaultErrors));
 		} finally {
 			busyRef.current = false;
 			setBusyId(null);
@@ -127,104 +121,46 @@ export default function SellerMessageTab({
 		busyRef.current = true;
 		setBusyId(entry.id);
 		setBlockNotice(null);
-		setBlockError(null);
+		setActionError(null);
 		try {
 			await blockBuyerByForumEntry(entry.id);
 			setBlockNotice(tSeller("blocked", { name }));
+			const authorId = entry.authorId;
+			if (authorId) {
+				setBlockedAuthorIds((prev) => new Set(prev).add(authorId));
+			}
 		} catch (e) {
-			setBlockError(errorText(e, defaultErrors));
+			setActionError(errorText(e, defaultErrors));
 		} finally {
 			busyRef.current = false;
 			setBusyId(null);
 		}
 	};
 
-	const renderEditor = (entry: SellerForumComment) => (
-		<div className="flex flex-col gap-2 mt-1">
-			<textarea
-				className="w-full border border-divider rounded-hkui-md py-2 px-3 bg-content1 min-h-10 resize-none focus:outline-none focus:border-hkui-primary [font-family:inherit] [font-weight:inherit] leading-5 text-[length:var(--hkui-text-small)]"
-				value={editing?.draft ?? ""}
-				onChange={(e) => setEditing({ id: entry.id, draft: e.target.value })}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-						e.preventDefault();
-						void submitEdit(entry);
-					} else if (e.key === "Escape") {
-						e.preventDefault();
-						setEditing(null);
-					}
-				}}
-				rows={1}
-				maxLength={500}
-			/>
-			<div className="flex gap-2 self-end">
-				<Button
-					type="button"
-					variant="bordered"
-					color="default"
-					size="sm"
-					onClick={() => setEditing(null)}
-				>
-					取消
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					disabled={!editing?.draft.trim() || savingEdit}
-					isLoading={savingEdit}
-					loadingLabel="儲存留言中…"
-					onClick={() => void submitEdit(entry)}
-				>
-					儲存
-				</Button>
-			</div>
-		</div>
+	const renderBody = (
+		entry: SellerForumComment,
+		isReply: boolean,
+		view: {
+			text: React.ReactNode;
+			paragraphClassName: string;
+			footerClassName: string;
+			leading?: React.ReactNode;
+		},
+	) => (
+		<ForumEntryBody
+			entry={entry}
+			isReply={isReply}
+			busy={busyId === entry.id}
+			canBlock={
+				canBlockForumAuthor(entry) &&
+				!(entry.authorId && blockedAuthorIds.has(entry.authorId))
+			}
+			onSave={saveEntry}
+			onDelete={deleteEntry}
+			onBlock={blockAuthor}
+			{...view}
+		/>
 	);
-
-	const renderEntryActions = (entry: SellerForumComment, isReply: boolean) => {
-		if (entry.state !== "visible" || editing?.id === entry.id) return null;
-		const busy = busyId === entry.id;
-		const actionClass =
-			"bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:bg-[var(--hkui-content2)]";
-		return (
-			<>
-				{entry.viewerCanEdit ? (
-					<button
-						type="button"
-						className={`${actionClass} hover:text-[var(--hkui-primary)]`}
-						disabled={busy}
-						onClick={() => setEditing({ id: entry.id, draft: entry.content })}
-					>
-						編輯
-					</button>
-				) : null}
-				{entry.viewerCanDelete ? (
-					<Button
-						type="button"
-						variant="light"
-						color="danger"
-						size="sm"
-						className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] font-normal text-[var(--hkui-foreground-soft)]"
-						isLoading={busy}
-						loadingLabel={isReply ? "刪除回覆中…" : "刪除留言中…"}
-						onClick={() => void deleteEntry(entry, isReply)}
-					>
-						刪除
-					</Button>
-				) : null}
-				{canBlockForumAuthor(entry) ? (
-					<button
-						type="button"
-						className={`${actionClass} hover:text-[var(--hkui-danger)]`}
-						disabled={busy}
-						onClick={() => void blockAuthor(entry)}
-					>
-						{tSeller("blockAction")}
-					</button>
-				) : null}
-			</>
-		);
-	};
 
 	const handleSubmit = async (event: React.FormEvent) => {
 		event.preventDefault();
@@ -387,7 +323,7 @@ export default function SellerMessageTab({
 
 			{forum.error && !forum.loading ? (
 				<div
-					className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--text-sm)]"
+					className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
 					role="alert"
 				>
 					<span>{forum.error}</span>
@@ -416,12 +352,12 @@ export default function SellerMessageTab({
 				</p>
 			) : null}
 
-			{blockError ? (
+			{actionError ? (
 				<p
-					className="p-3 rounded-[var(--radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--text-sm)]"
+					className="p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
 					role="alert"
 				>
-					{blockError}
+					{actionError}
 				</p>
 			) : null}
 
@@ -476,46 +412,46 @@ export default function SellerMessageTab({
 											{formatTime(comment.createdAt)}
 										</time>
 									</header>
-									{editing?.id === idStr ? (
-										renderEditor(comment)
-									) : (
-										<p className="m-0 text-[0.9375rem] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words">
-											{isPlaceholder
-												? comment.state === "deleted"
-													? tFeed("deleted")
-													: comment.state === "hidden"
-														? tFeed("hidden")
-														: null
-												: comment.content}
-										</p>
-									)}
-									<div className="flex items-center gap-4 mt-[10px]">
-										{replyCount > 0 ? (
-											<Button
-												type="button"
-												className={`h-auto p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed ${expanded ? "text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0]" : ""}`}
-												onClick={() => {
-													void toggleReplies(comment);
-												}}
-												disabled={loadingReplies}
-												isLoading={loadingReplies}
-												loadingLabel="載入回覆中…"
-												aria-expanded={expanded}
-											>
-												{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
-											</Button>
-										) : null}
-										{signedIn && comment.state === "visible" ? (
-											<button
-												type="button"
-												className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"
-												onClick={() => startReply(comment)}
-											>
-												回覆
-											</button>
-										) : null}
-										{renderEntryActions(comment, false)}
-									</div>
+									{renderBody(comment, false, {
+										text: isPlaceholder
+											? comment.state === "deleted"
+												? tFeed("deleted")
+												: comment.state === "hidden"
+													? tFeed("hidden")
+													: null
+											: comment.content,
+										paragraphClassName:
+											"m-0 text-[0.9375rem] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
+										footerClassName: "flex items-center gap-4 mt-[10px]",
+										leading: (
+											<>
+												{replyCount > 0 ? (
+													<Button
+														type="button"
+														className={`h-auto p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed ${expanded ? "text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0]" : ""}`}
+														onClick={() => {
+															void toggleReplies(comment);
+														}}
+														disabled={loadingReplies}
+														isLoading={loadingReplies}
+														loadingLabel="載入回覆中…"
+														aria-expanded={expanded}
+													>
+														{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
+													</Button>
+												) : null}
+												{signedIn && comment.state === "visible" ? (
+													<button
+														type="button"
+														className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"
+														onClick={() => startReply(comment)}
+													>
+														回覆
+													</button>
+												) : null}
+											</>
+										),
+									})}
 									{expanded && comment.replies && comment.replies.length > 0 ? (
 										<ul className="list-none mt-[14px] pt-[14px] border-t border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.08))] dark:border-t-[rgba(245,222,165,0.14)] flex flex-col gap-[14px]">
 											{comment.replies.map((reply) => (
@@ -539,22 +475,22 @@ export default function SellerMessageTab({
 																{formatTime(reply.createdAt)}
 															</time>
 														</header>
-														{editing?.id === reply.id ? (
-															renderEditor(reply)
-														) : (
-															<p className="m-0 text-[length:var(--text-sm)] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words">
-																{reply.replyToName &&
-																reply.replyToName !== comment.userName ? (
-																	<span className="text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0] font-semibold">
-																		@{reply.replyToName}{" "}
-																	</span>
-																) : null}
-																{reply.content}
-															</p>
-														)}
-														<div className="flex flex-wrap gap-3 mt-1">
-															{renderEntryActions(reply, true)}
-														</div>
+														{renderBody(reply, true, {
+															text: (
+																<>
+																	{reply.replyToName &&
+																	reply.replyToName !== comment.userName ? (
+																		<span className="text-[var(--action-primary,var(--color-ink-800))] dark:text-[#ffeec0] font-semibold">
+																			@{reply.replyToName}{" "}
+																		</span>
+																	) : null}
+																	{reply.content}
+																</>
+															),
+															paragraphClassName:
+																"m-0 text-[length:var(--text-sm)] leading-[1.55] text-[var(--ink-body)] dark:text-[var(--hk-text-strong,#f5e9c3)] whitespace-pre-wrap break-words",
+															footerClassName: "flex flex-wrap gap-3 mt-1",
+														})}
 													</div>
 												</li>
 											))}
@@ -562,7 +498,7 @@ export default function SellerMessageTab({
 									) : null}
 									{replyErrors.get(idStr) ? (
 										<p
-											className="p-3 rounded-[var(--radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--text-sm)]"
+											className="p-3 rounded-[var(--radius-md)] bg-[rgb(var(--color-status-danger-rgb)/0.1)] dark:bg-[rgb(var(--color-status-danger-rgb)/0.18)] text-[var(--hkui-danger-text)] text-[length:var(--text-sm)]"
 											role="alert"
 										>
 											{replyErrors.get(idStr)}
@@ -624,4 +560,100 @@ function formatTime(unixSeconds: number): string {
 	const days = Math.floor(hours / 24);
 	if (days < 7) return `${days} 天前`;
 	return formatTaipeiDate(date);
+}
+
+/** 一則發言的內文、就地編輯與操作列；編輯狀態在每一列自己身上，開著一列不影響其他列。 */
+function ForumEntryBody({
+	entry,
+	isReply,
+	busy,
+	canBlock,
+	text,
+	paragraphClassName,
+	footerClassName,
+	leading,
+	onSave,
+	onDelete,
+	onBlock,
+}: {
+	entry: SellerForumComment;
+	isReply: boolean;
+	busy: boolean;
+	canBlock: boolean;
+	text: React.ReactNode;
+	paragraphClassName: string;
+	footerClassName: string;
+	leading?: React.ReactNode;
+	onSave: (entry: SellerForumComment, next: string) => Promise<void>;
+	onDelete: (entry: SellerForumComment, isReply: boolean) => Promise<void>;
+	onBlock: (entry: SellerForumComment) => Promise<void>;
+}) {
+	const [editing, setEditing] = React.useState(false);
+	const [draft, setDraft] = React.useState("");
+	const [saving, setSaving] = React.useState(false);
+	const sessionRef = React.useRef(0);
+	const live = entry.state === "visible";
+
+	const startEdit = () => {
+		sessionRef.current += 1;
+		setDraft(entry.content);
+		setEditing(true);
+	};
+	const cancelEdit = () => {
+		sessionRef.current += 1;
+		setEditing(false);
+		setDraft("");
+	};
+	const submit = async () => {
+		const next = draft.trim();
+		if (!next || saving) return;
+		if (next === entry.content) {
+			setEditing(false);
+			return;
+		}
+		const session = sessionRef.current;
+		setSaving(true);
+		try {
+			await onSave(entry, next);
+			if (sessionRef.current === session) setEditing(false);
+		} catch {
+			/* the parent shows the error; the editor stays open */
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	return (
+		<>
+			{editing ? (
+				<CommentEditor
+					draft={draft}
+					onDraftChange={setDraft}
+					onSubmit={() => void submit()}
+					onCancel={cancelEdit}
+					saving={saving}
+					saveLoadingLabel={isReply ? "儲存回覆中…" : "儲存留言中…"}
+				/>
+			) : (
+				<p className={paragraphClassName}>{text}</p>
+			)}
+			<div className={footerClassName}>
+				{leading}
+				{live && !editing ? (
+					<CommentEntryActions
+						canEdit={entry.viewerCanEdit}
+						canDelete={entry.viewerCanDelete}
+						canBlock={canBlock}
+						editDisabled={busy}
+						blockDisabled={busy}
+						deleting={busy}
+						deleteLoadingLabel={isReply ? "刪除回覆中…" : "刪除留言中…"}
+						onEdit={startEdit}
+						onDelete={() => void onDelete(entry, isReply)}
+						onBlock={() => void onBlock(entry)}
+					/>
+				) : null}
+			</div>
+		</>
+	);
 }

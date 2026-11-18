@@ -67,6 +67,50 @@ function removeComment(
 		);
 }
 
+/**
+ * 樂觀地刪除一則發言，與 ListForumEntries 的回傳一致：刪除的回覆直接消失並讓所屬留言的回覆數減一；
+ * 刪除底下還有回覆的頂層留言，伺服器留下佔位項目（state 為 DELETED，沒有作者與內文，回覆照舊），
+ * 沒有回覆的才消失。
+ */
+function deleteEntry(
+	items: SellerForumComment[],
+	id: string,
+): SellerForumComment[] {
+	const topIndex = items.findIndex((item) => sameId(item.id, id));
+	if (topIndex >= 0) {
+		const target = items[topIndex];
+		if ((target.replyCount ?? 0) <= 0 && !target.replies?.length) {
+			return items.filter((_, index) => index !== topIndex);
+		}
+		const placeholder: SellerForumComment = {
+			id: target.id,
+			storeId: target.storeId,
+			isMine: false,
+			userName: "",
+			content: "",
+			createdAt: target.createdAt,
+			replyCount: target.replyCount,
+			state: "deleted",
+			viewerCanEdit: false,
+			viewerCanDelete: false,
+			viewerCanReply: false,
+			replies: target.replies,
+			repliesNextPageToken: target.repliesNextPageToken,
+		};
+		return items.map((item, index) =>
+			index === topIndex ? placeholder : item,
+		);
+	}
+	return items.map((item) => {
+		if (!item.replies?.some((r) => sameId(r.id, id))) return item;
+		return {
+			...item,
+			replyCount: Math.max(0, (item.replyCount ?? 1) - 1),
+			replies: item.replies.filter((r) => !sameId(r.id, id)),
+		};
+	});
+}
+
 function findComment(
 	items: SellerForumComment[],
 	id: string,
@@ -373,7 +417,15 @@ export function useSellerForum(
 				);
 				setForumData((current) => ({
 					...current,
-					records: replaceComment(current.records, commentId, () => real),
+					records: replaceComment(current.records, commentId, (item) => ({
+						...item,
+						...real,
+						// 只有前端持有的欄位：伺服器回應沒有它們。
+						replies: item.replies,
+						repliesNextPageToken: item.repliesNextPageToken,
+						rootId: item.rootId,
+						replyToName: item.replyToName,
+					})),
 				}));
 			} catch (err) {
 				if (before) {
@@ -382,9 +434,6 @@ export function useSellerForum(
 						records: replaceComment(current.records, commentId, () => before),
 					}));
 				}
-				// err 目前保證是 truthy 的 Error 實例（api client 只 throw Error 子類），
-				// errorMessage 的 `!error → null` 分支不會在此觸發。
-				setError(errorMessage(err, "編輯失敗"));
 				throw err;
 			}
 		},
@@ -397,15 +446,12 @@ export function useSellerForum(
 			const etag = findComment(comments, commentId)?.etag;
 			setForumData((current) => ({
 				...current,
-				records: removeComment(current.records, commentId),
+				records: deleteEntry(current.records, commentId),
 			}));
 			try {
 				await deleteSellerForumComment(commentId, etag);
 			} catch (err) {
 				setForumData((current) => ({ ...current, records: before }));
-				// err 目前保證是 truthy 的 Error 實例（api client 只 throw Error 子類），
-				// errorMessage 的 `!error → null` 分支不會在此觸發。
-				setError(errorMessage(err, "刪除失敗"));
 				throw err;
 			}
 		},

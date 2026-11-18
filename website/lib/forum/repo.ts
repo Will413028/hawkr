@@ -31,6 +31,8 @@ export interface SellerForumComment {
 	avatarKey?: string;
 	/** 作者是買家或店家；佔位項目沒有作者。 */
 	authorKind?: "buyer" | "store";
+	/** 作者的買家或店家 ID（依 authorKind）；佔位項目沒有。 */
+	authorId?: string;
 	content: string;
 	replyCount?: number;
 	/** 建立時間（unix 秒）。 */
@@ -88,6 +90,7 @@ export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 		userName: entry.author?.name?.trim() || "匿名",
 		avatarKey: imageUri(entry.author?.avatar, "avatar"),
 		authorKind: authorKindOf(entry),
+		authorId: entry.author?.id || undefined,
 		content: entry.body,
 		replyCount: Number(entry.replyCount),
 		createdAt: entry.createTime

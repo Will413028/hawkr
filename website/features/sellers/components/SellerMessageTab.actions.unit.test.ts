@@ -50,6 +50,7 @@ function entry(id: string, over: Record<string, unknown> = {}) {
 		isMine: false,
 		userName: `user-${id}`,
 		authorKind: "buyer",
+		authorId: `buyer-${id}`,
 		content: `body-${id}`,
 		createdAt: 0,
 		etag: `e-${id}`,
@@ -178,5 +179,115 @@ describe("block this person (storefront forum)", () => {
 		const box = await screen.findByRole("alert");
 		expect(box.textContent).not.toContain("raw backend text");
 		expect(box.textContent).not.toBe("");
+	});
+});
+
+describe("edit and delete failures", () => {
+	it("an edit failure shows the localized error, not the raw message, and keeps the editor open", async () => {
+		forum.list = [entry("a", { viewerCanEdit: true })];
+		forum.update.mockRejectedValue(new Error("raw backend text"));
+		view();
+		fireEvent.click(screen.getByText("編輯"));
+		fireEvent.change(screen.getByDisplayValue("body-a"), {
+			target: { value: "changed" },
+		});
+		fireEvent.click(screen.getByText("儲存"));
+		const box = await screen.findByRole("alert");
+		expect(box.textContent).not.toContain("raw backend text");
+		expect(box.textContent).not.toBe("");
+		expect(screen.getByDisplayValue("changed")).toBeTruthy();
+	});
+
+	it("a delete failure shows the localized error, not the raw message", async () => {
+		forum.list = [entry("a", { viewerCanDelete: true })];
+		forum.remove.mockRejectedValue(new Error("raw backend text"));
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(screen.getByText("刪除"));
+		const box = await screen.findByRole("alert");
+		expect(box.textContent).not.toContain("raw backend text");
+		expect(box.textContent).not.toBe("");
+	});
+
+	it("error boxes use the theme-aware danger tokens, no raw colors", async () => {
+		forum.list = [entry("a", { viewerCanDelete: true })];
+		forum.remove.mockRejectedValue(new Error("x"));
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		fireEvent.click(screen.getByText("刪除"));
+		const cls = (await screen.findByRole("alert")).className;
+		expect(cls).toContain("--hkui-danger-text");
+		expect(cls).toContain("dark:");
+		expect(cls).not.toMatch(/#[0-9a-f]{3,6}|rgba\(/i);
+	});
+});
+
+describe("the inline editor", () => {
+	it("focuses its textarea when it opens", () => {
+		forum.list = [entry("a", { viewerCanEdit: true })];
+		view();
+		fireEvent.click(screen.getByText("編輯"));
+		expect(document.activeElement).toBe(screen.getByDisplayValue("body-a"));
+	});
+
+	it("each row keeps its own editor: opening another does not discard an unsaved draft", () => {
+		forum.list = [
+			entry("a", { viewerCanEdit: true }),
+			entry("b", { viewerCanEdit: true }),
+		];
+		view();
+		fireEvent.click(screen.getAllByText("編輯")[0]);
+		fireEvent.change(screen.getByDisplayValue("body-a"), {
+			target: { value: "draft-a" },
+		});
+		fireEvent.click(screen.getByText("編輯"));
+		expect(screen.getByDisplayValue("draft-a")).toBeTruthy();
+		expect(screen.getByDisplayValue("body-b")).toBeTruthy();
+	});
+
+	it("a late success from a cancelled edit does not close the reopened editor", async () => {
+		forum.list = [entry("a", { viewerCanEdit: true })];
+		let resolve: () => void = () => undefined;
+		forum.update.mockReturnValue(
+			new Promise<void>((r) => {
+				resolve = r;
+			}),
+		);
+		view();
+		fireEvent.click(screen.getByText("編輯"));
+		fireEvent.change(screen.getByDisplayValue("body-a"), {
+			target: { value: "first" },
+		});
+		fireEvent.click(screen.getByText("儲存"));
+		fireEvent.click(screen.getByText("取消"));
+		fireEvent.click(screen.getByText("編輯"));
+		fireEvent.change(screen.getByDisplayValue("body-a"), {
+			target: { value: "second" },
+		});
+		resolve();
+		await waitFor(() => expect(forum.update).toHaveBeenCalledTimes(1));
+		await new Promise((r) => setTimeout(r, 0));
+		expect(screen.getByDisplayValue("second")).toBeTruthy();
+	});
+});
+
+describe("after blocking someone", () => {
+	it("their other entries no longer offer the block action; other authors still do", async () => {
+		forum.list = [
+			entry("a", { viewerCanDelete: true, authorId: "same" }),
+			entry("b", { viewerCanDelete: true, authorId: "same" }),
+			entry("c", { viewerCanDelete: true, authorId: "other" }),
+		];
+		blockBuyerByForumEntry.mockResolvedValue({ changed: true });
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		view();
+		expect(screen.getAllByText("封鎖此人")).toHaveLength(3);
+		fireEvent.click(screen.getAllByText("封鎖此人")[0]);
+		await screen.findByText("已封鎖「user-a」");
+		const rows = screen
+			.getAllByText("封鎖此人")
+			.map((el) => el.closest("li")?.textContent ?? "");
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toContain("user-c");
 	});
 });
