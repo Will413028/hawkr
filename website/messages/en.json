@@ -26,6 +26,8 @@
 	"navigation": {},
 	"product": {},
 	"seller": {
+		"notFound": "Seller not found",
+		"messagesTitle": "{name}'s messages",
 		"posts": {
 			"suspendedNotice": "Your store is currently restricted by a platform measure. Posts can only be unpublished or deleted.",
 			"commentsNotice": {

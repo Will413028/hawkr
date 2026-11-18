@@ -26,6 +26,8 @@
 	"navigation": {},
 	"product": {},
 	"seller": {
+		"notFound": "找不到賣家",
+		"messagesTitle": "{name} 的留言",
 		"posts": {
 			"suspendedNotice": "店家目前受平台措施限制，動態只能下架或刪除。",
 			"commentsNotice": {

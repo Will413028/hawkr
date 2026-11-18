@@ -9,6 +9,7 @@ import { canonicalThreadId } from "@/lib/forum/thread-id";
 import { storeIdOfSeller } from "@/lib/seller/store-id";
 import { localeFromParam } from "@/lib/seo/metadata";
 import { sellerCanonicalUrl } from "@/lib/seo/urls";
+import { sellerMessagesText } from "./text";
 
 interface Props {
 	params: Promise<{ locale: string; id: string; threadId: string }>;
@@ -20,7 +21,8 @@ const FORUM_PAGE_SIZE = 20;
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
 	const seller = await getCachedSeller(id);
-	if (!seller) return { title: "找不到賣家" };
+	const text = sellerMessagesText(locale);
+	if (!seller) return { title: text.notFound() };
 	const canonical = sellerCanonicalUrl(
 		seller,
 		id,
@@ -28,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 		"/messages",
 	);
 	return {
-		title: `${seller.name} 的留言`,
+		title: text.title(seller.name),
 		alternates: { canonical },
 		robots: { index: false },
 	};
