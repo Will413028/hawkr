@@ -91,6 +91,20 @@ describe("每個賣家中心路由都宣告了需要的能力", () => {
 	});
 });
 
+describe("封鎖名單頁", () => {
+	it("需要 CONTENT_CONTRACT，沒有這個能力時不開放", () => {
+		expect(capabilityOfPage("/seller-center/blocked-buyers")).toBe(
+			C.CONTENT_CONTRACT,
+		);
+		expect(
+			isPageAvailable(
+				"/seller-center/blocked-buyers",
+				ALL.filter((c) => c !== C.CONTENT_CONTRACT),
+			),
+		).toBe(false);
+	});
+});
+
 describe("isPageAvailable", () => {
 	it("停權時伺服器授予的能力涵蓋的頁面開放", () => {
 		for (const path of [
@@ -99,6 +113,7 @@ describe("isPageAvailable", () => {
 			"/seller-center/notifications",
 			"/seller-center/notifications/preferences",
 			"/seller-center/posts",
+			"/seller-center/blocked-buyers",
 			"/seller-center/suspended",
 			"/seller-center/me",
 			"/seller-center/messages",
