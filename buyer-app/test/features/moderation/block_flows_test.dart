@@ -225,7 +225,7 @@ void main() {
       await _confirmBlock(tester);
       await tester.tap(find.text('封鎖'));
       await tester.pumpAndSettle();
-      expect(find.text('封鎖失敗，請稍後再試'), findsOneWidget);
+      expect(find.text('服務暫時不可用'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();

@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:hawkr_api/errors.dart' show errorText;
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
@@ -31,24 +32,40 @@ const deletedAccountLabel = '已刪除的帳號';
 class BlockedUsersScreen extends ConsumerWidget {
   const BlockedUsersScreen({super.key});
 
+  static Object? _loadError(BlockedListState s) =>
+      s.stores.error ?? s.buyers.error;
+
+  void _toastError(BuildContext context, WidgetRef ref) {
+    final error = _loadError(ref.read(blockedListProvider));
+    if (error != null && isAccountSuspendedError(error)) return;
+    showFloatingToast(context, _errorMessage(ref, error), isSuccess: false);
+  }
+
+  static String _errorMessage(WidgetRef ref, Object? error) => errorText(
+    error ?? StateError('unknown'),
+    defaults: ref.read(defaultErrorTextProvider),
+  );
+
   Future<void> _reload(BuildContext context, WidgetRef ref) async {
     final ok = await ref.read(blockedListProvider.notifier).reload();
     if (!ok && context.mounted) {
-      showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+      _toastError(context, ref);
     }
   }
 
   Future<void> _loadMore(
     BuildContext context,
+    WidgetRef ref,
     Future<bool> Function() load,
   ) async {
     if (!await load() && context.mounted) {
-      showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+      _toastError(context, ref);
     }
   }
 
   Future<void> _unblock(
     BuildContext context,
+    WidgetRef ref,
     Future<WriteResult> Function() run,
   ) async {
     final result = await run();
@@ -59,8 +76,8 @@ class BlockedUsersScreen extends ConsumerWidget {
       case WriteStatus.failed:
         // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
         final error = result.error;
-        if (error != null && isAccountSuspendedError(error)) return;
-        showFloatingToast(context, '解除封鎖失敗，請稍後再試', isSuccess: false);
+        if (error == null || isAccountSuspendedError(error)) return;
+        showFloatingToast(context, _errorMessage(ref, error), isSuccess: false);
       case WriteStatus.discarded:
         break;
     }
@@ -92,7 +109,10 @@ class BlockedUsersScreen extends ConsumerWidget {
             child: loading
                 ? const TruckLoadingOverlay(message: '載入中...')
                 : failed
-                ? PagedErrorState(onRetry: () => _reload(context, ref))
+                ? PagedErrorState(
+                    message: _errorMessage(ref, _loadError(list)),
+                    onRetry: () => _reload(context, ref),
+                  )
                 : empty
                 ? const HkEmptyState(
                     key: ValueKey('blocked-users-empty-state'),
@@ -107,6 +127,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                       children: [
                         ..._section<buyer.BlockedStore>(
                           context,
+                          ref,
                           title: '店家',
                           keyPrefix: 'blocked-stores',
                           section: stores,
@@ -127,6 +148,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                               ),
                               onUnblock: () => _unblock(
                                 context,
+                                ref,
                                 () => notifier.unblockStore(id),
                               ),
                             );
@@ -134,6 +156,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                         ),
                         ..._section<buyer.BlockedBuyer>(
                           context,
+                          ref,
                           title: '買家',
                           keyPrefix: 'blocked-buyers',
                           section: buyers,
@@ -156,6 +179,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                               ),
                               onUnblock: () => _unblock(
                                 context,
+                                ref,
                                 () => notifier.unblockBuyer(id),
                               ),
                             );
@@ -180,7 +204,8 @@ class BlockedUsersScreen extends ConsumerWidget {
 
   /// 一段：標題、項目、「查看更多」；沒有項目也沒有失敗的段不顯示。
   List<Widget> _section<T>(
-    BuildContext context, {
+    BuildContext context,
+    WidgetRef ref, {
     required String title,
     required String keyPrefix,
     required PagedSection<T> section,
@@ -234,7 +259,7 @@ class BlockedUsersScreen extends ConsumerWidget {
           child: PagedLoadMoreFooter(
             moreKey: ValueKey('$keyPrefix-more'),
             loading: section.loadingMore,
-            onMore: () => _loadMore(context, onMore),
+            onMore: () => _loadMore(context, ref, onMore),
           ),
         ),
     ];

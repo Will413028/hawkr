@@ -155,7 +155,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('好店'), findsOneWidget);
-    expect(find.text('解除封鎖失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('服務暫時不可用'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
 
@@ -179,7 +179,7 @@ void main() {
     await _pump(tester, app);
 
     expect(find.byType(HkEmptyState), findsNothing);
-    expect(find.text('載入失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('服務暫時不可用'), findsOneWidget);
 
     app.listStoresError = null;
     app.listBuyersError = null;
@@ -187,7 +187,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('好店'), findsOneWidget);
-    expect(find.text('載入失敗，請稍後再試'), findsNothing);
+    expect(find.text('服務暫時不可用'), findsNothing);
   });
 
   testWidgets('只有一段失敗：另一段照常顯示，失敗那段可單獨重試', (tester) async {

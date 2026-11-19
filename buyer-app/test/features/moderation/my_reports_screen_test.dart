@@ -155,13 +155,13 @@ void main() {
     await _pump(tester, moderation);
 
     expect(find.byType(HkEmptyState), findsNothing);
-    expect(find.text('載入失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('服務暫時不可用'), findsOneWidget);
 
     moderation.listError = null;
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
 
     expect(find.text('貼文'), findsOneWidget);
-    expect(find.text('載入失敗，請稍後再試'), findsNothing);
+    expect(find.text('服務暫時不可用'), findsNothing);
   });
 }

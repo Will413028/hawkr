@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/networking/suspension_signal.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
@@ -24,17 +26,28 @@ import 'paged_section_widgets.dart';
 class MyReportsScreen extends ConsumerWidget {
   const MyReportsScreen({super.key});
 
+  void _toastError(BuildContext context, WidgetRef ref) {
+    final error = ref.read(myReportsProvider).error;
+    if (error != null && isAccountSuspendedError(error)) return;
+    showFloatingToast(context, _errorMessage(ref, error), isSuccess: false);
+  }
+
+  String _errorMessage(WidgetRef ref, Object? error) => errorText(
+    error ?? StateError('unknown'),
+    defaults: ref.read(defaultErrorTextProvider),
+  );
+
   Future<void> _reload(BuildContext context, WidgetRef ref) async {
     final ok = await ref.read(myReportsProvider.notifier).reload();
     if (!ok && context.mounted) {
-      showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+      _toastError(context, ref);
     }
   }
 
   Future<void> _loadMore(BuildContext context, WidgetRef ref) async {
     final ok = await ref.read(myReportsProvider.notifier).loadMore();
     if (!ok && context.mounted) {
-      showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+      _toastError(context, ref);
     }
   }
 
@@ -64,7 +77,10 @@ class MyReportsScreen extends ConsumerWidget {
             child: reports.phase == SectionPhase.loading
                 ? const TruckLoadingOverlay(message: '載入中...')
                 : reports.phase == SectionPhase.failed
-                ? PagedErrorState(onRetry: () => _reload(context, ref))
+                ? PagedErrorState(
+                    message: _errorMessage(ref, reports.error),
+                    onRetry: () => _reload(context, ref),
+                  )
                 : reports.items.isEmpty
                 ? const HkEmptyState(
                     key: ValueKey('my-reports-empty-state'),

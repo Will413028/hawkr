@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
@@ -51,7 +53,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
       showFloatingToast(
         context,
         widget.target is SocialBlockTarget
-            ? '封鎖失敗，請稍後再試'
+            ? errorText(e, defaults: ref.read(defaultErrorTextProvider))
             : e.toString().replaceAll('Exception: ', ''),
         isSuccess: false,
       );

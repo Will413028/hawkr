@@ -9,8 +9,13 @@ import '../../../shared/widgets/hk_button_label.dart';
 
 /// 分頁清單第一次讀取失敗的畫面：與「真的沒資料」的空狀態分開，避免使用者誤以為沒有任何項目；提供重試。
 class PagedErrorState extends StatelessWidget {
-  const PagedErrorState({super.key, required this.onRetry});
+  const PagedErrorState({
+    super.key,
+    required this.message,
+    required this.onRetry,
+  });
 
+  final String message;
   final VoidCallback onRetry;
 
   @override
@@ -28,7 +33,7 @@ class PagedErrorState extends StatelessWidget {
             ),
             SizedBox(height: 12.h),
             Text(
-              '載入失敗，請稍後再試',
+              message,
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
             ),

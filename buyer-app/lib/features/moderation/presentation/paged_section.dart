@@ -18,12 +18,16 @@ class PagedSection<T> {
     this.items = const [],
     this.nextPageToken = '',
     this.loadingMore = false,
+    this.error,
   });
 
   final SectionPhase phase;
   final List<T> items;
   final String nextPageToken;
   final bool loadingMore;
+
+  /// 最近一次讀取失敗的原因；下一次成功就清掉。
+  final Object? error;
 
   bool get hasMore => nextPageToken.isNotEmpty;
 
@@ -32,11 +36,14 @@ class PagedSection<T> {
     List<T>? items,
     String? nextPageToken,
     bool? loadingMore,
+    Object? error,
+    bool clearError = false,
   }) => PagedSection<T>(
     phase: phase ?? this.phase,
     items: items ?? this.items,
     nextPageToken: nextPageToken ?? this.nextPageToken,
     loadingMore: loadingMore ?? this.loadingMore,
+    error: clearError ? null : (error ?? this.error),
   );
 }
 
@@ -80,10 +87,12 @@ class SectionLoader<T> {
       return true;
     } on StaleScopeException {
       return true;
-    } catch (_) {
+    } catch (e) {
       if (epoch != _epoch) return true;
       if (read().phase != SectionPhase.ready) {
-        write(read().copyWith(phase: SectionPhase.failed));
+        write(read().copyWith(phase: SectionPhase.failed, error: e));
+      } else {
+        write(read().copyWith(error: e));
       }
       return false;
     }
@@ -104,14 +113,15 @@ class SectionLoader<T> {
           items: [...read().items, ...page.items],
           nextPageToken: page.nextPageToken,
           loadingMore: false,
+          clearError: true,
         ),
       );
       return true;
     } on StaleScopeException {
       return true;
-    } catch (_) {
+    } catch (e) {
       if (epoch != _epoch) return true;
-      write(read().copyWith(loadingMore: false));
+      write(read().copyWith(loadingMore: false, error: e));
       return false;
     }
   }
