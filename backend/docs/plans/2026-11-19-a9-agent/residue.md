@@ -16,6 +16,7 @@ A9-6 的驗收：第一條指令的輸出等於下方「允許殘留」清單；
 | `backend/api/proto/ai/`、`backend/pkg/proto/ai/`、`backend/services/java/shared/java-proto/src/main/proto/ai/` | A9-6 |
 | `backend/gateway/internal/{grpc/ai_*,grpc/circuit_breaker_stream_interceptor_test.go,handler/ai*,handler/procurement_errors*,procurement/,proxy/agui_golden_test.go,proxy/ai_*}` | A9-6 |
 | `backend/internal/modules/agent/`、`backend/internal/httpapi/agent/`、`backend/internal/httpapi/vendor_portal_test.go`、`backend/internal/legacy/gatewayproxy/vendor_portal_test.go`、`backend/internal/legacy/sellerserver/invites*`、`backend/cmd/hawkr/agent*.go`、`backend/docs/modules/agent.md` | A9-1（A9-D1） |
+| `api/hawkr/agent/v1alpha1/` 與三端生成的 `agent` 目錄、website 的 vendor-portal client 與頁面、`identity.VerifyGoogle` 與 `rpc` 的 invitee 受眾（只有供應商入口使用） | A9-1（A9-D1；盤點時漏列，A9-1a 執行時補） |
 | `seller-app/lib/features/ai_assistant/`、`seller-app/lib/features/product/data/product_listing_chat_repository.dart`、`website/lib/buyer/seller-match-chat*`、`website/lib/seller/ai-listing-chat.ts` | A9-5（A9-D2） |
 
 ## 修改
