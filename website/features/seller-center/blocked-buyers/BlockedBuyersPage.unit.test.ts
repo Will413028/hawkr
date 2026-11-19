@@ -140,7 +140,8 @@ describe("BlockedBuyersPage", () => {
 			.mockResolvedValueOnce(
 				page([blocked("11", "小明"), blocked("12", "小華")]),
 			)
-			.mockResolvedValue(page([blocked("12", "小華")]));
+			// The refetch after the mutation never answers: the row has to leave on the mutation's own result.
+			.mockReturnValue(new Promise(() => {}));
 		rpc.unblockBuyer.mockResolvedValue({ changed: true });
 		render();
 		await screen.findByText("小明");
