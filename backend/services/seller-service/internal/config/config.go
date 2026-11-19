@@ -23,7 +23,6 @@ type Config struct {
 	OrderService           OrderServiceConfig
 	BuyerService           BuyerServiceConfig
 	ReviewService          ReviewServiceConfig
-	SocialService          SocialServiceConfig
 	ProductService         ProductServiceConfig
 	RabbitMQ               RabbitMQConfig
 	Redis                  RedisConfig
@@ -75,11 +74,6 @@ type BuyerServiceConfig struct {
 
 // ReviewServiceConfig holds review service gRPC configuration.
 type ReviewServiceConfig struct {
-	Addr string
-}
-
-// SocialServiceConfig holds social service gRPC configuration.
-type SocialServiceConfig struct {
 	Addr string
 }
 
@@ -213,9 +207,6 @@ func Load() (*Config, error) {
 		},
 		ReviewService: ReviewServiceConfig{
 			Addr: pkgconfig.GetEnvOrDefault("REVIEW_SERVICE_ADDR", "review-service:10033"),
-		},
-		SocialService: SocialServiceConfig{
-			Addr: pkgconfig.GetEnvOrDefault("SOCIAL_SERVICE_ADDR", "social-service:9918"),
 		},
 		ProductService: ProductServiceConfig{
 			Addr: pkgconfig.GetEnvOrDefault("PRODUCT_SERVICE_ADDR", "product-service:9913"),

@@ -245,12 +245,11 @@ func TestSubmit_NoPostNoWebsite_Rejects(t *testing.T) {
 			}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return false, nil }}
 
 	uc := &CertificationUseCase{
 		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
+		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{},
 	}
 	err := uc.Submit(context.Background(), validIndividualSubmitReq())
 	if err == nil {
@@ -270,15 +269,11 @@ func TestSubmit_HasDescriptionAndWebsite_NoPost_Allows(t *testing.T) {
 			}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) {
-		t.Fatal("socialClient must not be called when description+website are both set (short-circuit)")
-		return false, nil
-	}}
 
 	uc := &CertificationUseCase{
 		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
+		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{},
 	}
 	if err := uc.Submit(context.Background(), validIndividualSubmitReq()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -301,12 +296,11 @@ func TestSubmit_WebsiteOnly_NoDescription_NoPost_Rejects(t *testing.T) {
 			}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return false, nil }}
 
 	uc := &CertificationUseCase{
 		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
+		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{},
 	}
 	err := uc.Submit(context.Background(), validIndividualSubmitReq())
 	if err == nil {
@@ -332,12 +326,11 @@ func TestSubmit_WhitespaceDescription_HasWebsite_NoPost_Rejects(t *testing.T) {
 			}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return false, nil }}
 
 	uc := &CertificationUseCase{
 		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
+		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{},
 	}
 	err := uc.Submit(context.Background(), validIndividualSubmitReq())
 	if err == nil {
@@ -345,56 +338,5 @@ func TestSubmit_WhitespaceDescription_HasWebsite_NoPost_Rejects(t *testing.T) {
 	}
 	if pkgerrors.GetCode(err) != pkgerrors.CodePreconditionFailed {
 		t.Errorf("expected CodePreconditionFailed, got %d", pkgerrors.GetCode(err))
-	}
-}
-
-func TestSubmit_HasPost_NoWebsite_Allows(t *testing.T) {
-	now := time.Now()
-	certRepo := newIndividualDraftApp(now)
-	sellerRepo := &mockSellerRepo{
-		GetByAccountIDFn: func(ctx context.Context, accountID int64) (*domain.Seller, error) {
-			return &domain.Seller{
-				AccountID: accountID, StoreID: accountID, StoreName: "測試店", Description: "測試",
-				City: "台北市", District: "信義區", AddressDetail: "信義路五段 1 號",
-				PostalCode: "110", ContactPhone: "0912345678", WebsiteURL: "",
-			}, nil
-		},
-	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return true, nil }}
-
-	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
-		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
-	}
-	if err := uc.Submit(context.Background(), validIndividualSubmitReq()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestSubmit_SocialServiceUnavailable_FailsClosed(t *testing.T) {
-	now := time.Now()
-	certRepo := newIndividualDraftApp(now)
-	sellerRepo := &mockSellerRepo{
-		GetByAccountIDFn: func(ctx context.Context, accountID int64) (*domain.Seller, error) {
-			return &domain.Seller{
-				AccountID: accountID, StoreID: accountID, StoreName: "測試店", Description: "測試",
-				City: "台北市", District: "信義區", AddressDetail: "信義路五段 1 號",
-				PostalCode: "110", ContactPhone: "0912345678", WebsiteURL: "",
-			}, nil
-		},
-	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) {
-		return false, pkgerrors.NewUnavailable("social-service unavailable")
-	}}
-
-	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
-		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: &mockMediaClient{}, txManager: &mockTxManager{}, socialClient: social,
-	}
-	err := uc.Submit(context.Background(), validIndividualSubmitReq())
-	if pkgerrors.GetCode(err) != pkgerrors.CodeUnavailable {
-		t.Fatalf("GetCode(err) = %v, want CodeUnavailable; err=%v", pkgerrors.GetCode(err), err)
 	}
 }

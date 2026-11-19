@@ -35,7 +35,6 @@ type CertificationUseCase struct {
 	outboxRepo    domain.MerchantVerificationOutboxRepository
 	payuniOutcome payuniOutcomeApplier
 	tsid          func() int64
-	socialClient  SocialClient
 }
 
 func NewCertificationUseCase(
@@ -49,7 +48,6 @@ func NewCertificationUseCase(
 	outboxRepo domain.MerchantVerificationOutboxRepository,
 	outcome payuniOutcomeApplier,
 	tsid func() int64,
-	sc SocialClient,
 ) *CertificationUseCase {
 	return &CertificationUseCase{
 		certRepo:      certRepo,
@@ -62,7 +60,6 @@ func NewCertificationUseCase(
 		outboxRepo:    outboxRepo,
 		payuniOutcome: outcome,
 		tsid:          tsid,
-		socialClient:  sc,
 	}
 }
 
@@ -520,14 +517,7 @@ func (u *CertificationUseCase) enforceCertificationPrecondition(ctx context.Cont
 	if domain.MeetsCertificationPrecondition(false, seller.Description, seller.WebsiteURL) {
 		return nil
 	}
-	hasPost, err := u.socialClient.HasPublishedPost(ctx, seller.StoreID)
-	if err != nil {
-		return err
-	}
-	if !hasPost {
-		return errors.NewPreconditionFailed("請先發布一則動態，或同時填寫自我介紹與官方網站網址")
-	}
-	return nil
+	return errors.NewPreconditionFailed("請先同時填寫自我介紹與官方網站網址")
 }
 
 func (u *CertificationUseCase) registerPayuni(

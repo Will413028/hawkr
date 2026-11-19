@@ -373,7 +373,7 @@ func newSellerServerWithCertRepo(sellerRepo domain.SellerRepository, payuniRepo 
 	}
 	sellerUC := usecase.NewSellerUseCase(sellerRepo, payuniRepo, certRepo, &testAccountClient{}, &testMediaClient{}, &config.Config{MediaBaseURL: "https://cdn.test"}, nil, nil, func() int64 { return 99999 }, &testTxManager{}, &testOutboxRepo{}, nil, testStoreCode, nil)
 	payuniUC := usecase.NewPayuniUseCase(payuniRepo, sellerRepo, certRepo, &testAccountClient{}, &testPayuniClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, &testPayuniMerchantProfileUpdateRepo{}, func() int64 { return 99999 })
-	certUC := usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, &testPayuniClient{}, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 }, nil)
+	certUC := usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, &testPayuniClient{}, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 })
 	return &SellerServer{sellerUC: sellerUC, certificationUC: certUC, payuniUC: payuniUC, buyerClient: &testBuyerClient{}, reviewClient: &testReviewClient{}}
 }
 
