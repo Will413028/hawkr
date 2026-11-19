@@ -5,8 +5,7 @@
 // accepted by the seller module and rejected by product-service. Both sides run the
 // same fixture set (§13).
 //
-// The seller module, social-service and the delegation module share this one package —
-// none of them may grow its own copy.
+// The gateway and seller-service share this one package — neither may grow its own copy.
 package delegation
 
 import (
