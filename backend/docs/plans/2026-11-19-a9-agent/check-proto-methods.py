@@ -68,11 +68,13 @@ SERVICE_RE = re.compile(r"\bservice\s+(\w+)\s*(\{|$)")
 RPC_RE = re.compile(r"\brpc\s+(\w+)\s*\(")
 BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+# 引號字串字面值與註解在同一趟掃描：先遇到的先算，字串內的 // 與 /* 不是註解。
+TOKEN_RE = re.compile(r'"(?:\\.|[^"\\\n])*"|/\*.*?\*/|//[^\n]*', re.DOTALL)
 
 
 def strip_comments(text: str) -> str:
-    """去掉區塊與行註解（字串字面值內的 // 與 /* 不處理：proto 的 service 區段沒有）。"""
-    return LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", text))
+    """去掉區塊與行註解；引號字串字面值原樣保留（其中的 // 與 /* 不是註解），但字串內容換成空字串，免得 rpc 字樣被誤計。"""
+    return TOKEN_RE.sub(lambda m: '""' if m.group(0).startswith('"') else "", text)
 
 
 def actual(api: Path) -> dict:

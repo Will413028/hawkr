@@ -154,7 +154,8 @@ type SendAssistantMessageRequest struct {
 	Message   string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	// 附帶的圖片網址；沒有圖時不設。
 	ImageUrl *string `protobuf:"bytes,4,opt,name=image_url,json=imageUrl,proto3,oneof" json:"image_url,omitempty"`
-	// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+	// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，原樣回第一次的回應（turn_id 與 session_id 不變），不開新的一輪；內容不同回 INVALID_ARGUMENT。
+	// 鍵存在 monolith 的記憶體，重啟後遺失：重啟後重送會開新的一輪。
 	ClientRequestId string `protobuf:"bytes,5,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache

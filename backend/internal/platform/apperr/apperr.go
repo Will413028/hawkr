@@ -171,16 +171,16 @@ var ReasonRfqAlreadyAwarded = newReason("RFQ_ALREADY_AWARDED")
 // ReasonAgentMonthlyQuotaExceeded 表示本期的採購額度已用完；搭配 ResourceExhausted，Metadata 的 remaining、resetTime 說明剩餘與重置時間。
 var ReasonAgentMonthlyQuotaExceeded = newReason("AGENT_MONTHLY_QUOTA_EXCEEDED")
 
-// ReasonImageQuotaExceeded 表示本週的 AI 修圖額度已用完；搭配 ResourceExhausted。
+// ReasonImageQuotaExceeded 表示本週的 AI 修圖額度已用完；搭配 ResourceExhausted，Metadata 的 remaining、resetTime 說明剩餘與重置時間。
 var ReasonImageQuotaExceeded = newReason("IMAGE_QUOTA_EXCEEDED")
 
-// ReasonImageSafetyBlocked 表示圖片或提示詞被安全性檢查擋下，重送結果相同；搭配 FailedPrecondition。
+// ReasonImageSafetyBlocked 表示圖片或提示詞被安全性檢查擋下，重送結果相同；搭配 InvalidArgument。
 var ReasonImageSafetyBlocked = newReason("IMAGE_SAFETY_BLOCKED")
 
-// ReasonImageRecitationBlocked 表示圖片涉及著作權複誦而被擋下，重送結果相同；搭配 FailedPrecondition。
+// ReasonImageRecitationBlocked 表示圖片涉及著作權複誦而被擋下，重送結果相同；搭配 InvalidArgument。
 var ReasonImageRecitationBlocked = newReason("IMAGE_RECITATION_BLOCKED")
 
-// ReasonImageNotProduced 表示模型沒有產出圖片，可以重試；搭配 FailedPrecondition。
+// ReasonImageNotProduced 表示模型沒有產出圖片，可以重試；搭配 Unavailable。
 var ReasonImageNotProduced = newReason("IMAGE_NOT_PRODUCED")
 
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、

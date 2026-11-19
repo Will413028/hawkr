@@ -238,9 +238,10 @@ export const ImageAiAppService: GenService<{
   /**
    * TransformImage 以提示詞修一張圖，成功時扣一次本週額度。
    *
-   * 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；failed_precondition 的 reason 是
-   * IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（換圖或改提示詞，不要重試）、IMAGE_NOT_PRODUCED（可以重試）；
-   * 模型供應商無法呼叫回 unavailable。
+   * 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；invalid_argument 的 reason 是
+   * IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（輸入要換：換圖或改提示詞，不要重試）；unavailable 的 reason 是
+   * IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
+   * 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo。
    * 呼叫失敗時額度退回。
    *
    * @generated from rpc hawkr.imageai.v1alpha1.ImageAiAppService.TransformImage

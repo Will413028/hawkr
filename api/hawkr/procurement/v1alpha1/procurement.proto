@@ -11,8 +11,9 @@ syntax = "proto3";
 //
 // 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
 // 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
-// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；CancelRun、UpsertSellerResponseDraft 以 expected_*
-// 版本把關，重送時版本已前進，回 ABORTED 而不重複生效。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；UpsertSellerResponseDraft 以 expected_draft_version
+// 把關，重送時版本已前進，回 ABORTED 而不重複生效；CancelRun 依語意冪等（非終態的 run 被取消，終態的 run 回 OK 並以
+// cancel_disposition 說明結果），不帶版本。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
 //
 // 樂觀並發：expected_* 欄位是讀到的版本，與目前不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，
 // metadata 的 conflictTarget 說是哪一個物件過時（見 ErrorReason.VERSION_CONFLICT）。版本與 hash 一律是不透明的字串。
@@ -222,6 +223,8 @@ enum RunFailureReason {
   RUN_FAILURE_REASON_SEARCH_FAILED = 2;
   // 一輪釐清的處理流程中途出錯。
   RUN_FAILURE_REASON_TURN_PIPELINE_ERROR = 3;
+  // run 超過存活上限（RUN_STATUS_EXPIRED）。買家重送。
+  RUN_FAILURE_REASON_EXPIRED = 4;
 }
 
 // StepStatus 是 run 的一個步驟的狀態。
@@ -499,8 +502,6 @@ message RunSummary {
   // 這個 run 最新事件的 cursor；還沒有事件時是空字串。
   string last_cursor = 4;
   bool terminal = 5;
-  // 取消用的版本（CancelRunRequest.expected_run_version），client 當成不透明的字串。
-  string version = 6;
 }
 
 message OpenConfirmation {
@@ -523,7 +524,7 @@ message PublishedRfq {
   int32 queued_count = 5;
   // 這次發布依據的詢價確認快照（ConfirmRfqSnapshotResponse.confirmed_rfq_snapshot_id）。
   string confirmed_rfq_snapshot_id = 6;
-  // 該快照的 hash，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
+  // 該快照的 hash，與 ConfirmRfqSnapshotResponse.payload_hash 是同一個值，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
   // 讓買家重新載入之後仍能接受報價。
   string rfq_snapshot_hash = 7;
 }
@@ -561,8 +562,8 @@ message SubmitTurnResponse {
   string conversation_id = 2;
   // 這一輪的 run，傳給 WatchRun。
   string run_id = 3;
-  // run 受理時的版本，可直接當 CancelRunRequest.expected_run_version；run 前進之後版本已變，回 ABORTED 時改讀 GetRuntimeSnapshot。
-  string run_version = 4;
+  reserved 4;
+  reserved "run_version";
 }
 
 message GetSnapshotRequest {
@@ -626,8 +627,8 @@ message StartCandidateSearchResponse {
   string run_id = 2;
   RunStatus status = 3;
   string candidate_set_id = 4;
-  // run 受理時的版本，用法同 SubmitTurnResponse.run_version。
-  string run_version = 5;
+  reserved 5;
+  reserved "run_version";
 }
 
 message GetCandidateSearchRequest {
@@ -1062,8 +1063,8 @@ message WatchRunResponse {
 message RunAccepted {
   string run_id = 1;
   string conversation_id = 2;
-  // 受理時的 run 版本，用法同 SubmitTurnResponse.run_version。
-  string run_version = 3;
+  reserved 3;
+  reserved "run_version";
 }
 
 message TextDelta {
@@ -1120,15 +1121,16 @@ message RunStreamError {
 
 message CancelRunRequest {
   string run_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 讀到的 RunSummary.version；不符回 ABORTED，conflictTarget 是 run。
-  string expected_run_version = 2 [(google.api.field_behavior) = REQUIRED];
+  reserved 2;
+  reserved "expected_run_version";
 }
 
 message CancelRunResponse {
   string run_id = 1;
   RunStatus run_status = 2;
   CancelDisposition cancel_disposition = 3;
-  string run_version = 4;
+  reserved 4;
+  reserved "run_version";
 }
 
 // ClarificationResponse 是對 INTERRUPT_KIND_CLARIFICATION 的回覆：選一個選項，或自填描述。兩者至少要有一個。
@@ -1237,7 +1239,8 @@ message GetSellerPublicationResponse {
 
 message UpsertSellerResponseDraftRequest {
   string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 建立第一版時是空字串。
+  // 空字串表示建立第一版；草稿已存在時回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，metadata 的 conflictTarget 是 draft。
+  // 更新時帶讀到的草稿版本，不符同樣回 ABORTED。
   string expected_draft_version = 2;
   SellerQuote draft = 3 [(google.api.field_behavior) = REQUIRED];
 }

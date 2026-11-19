@@ -117,6 +117,7 @@ const RunFailureReason$json = {
     {'1': 'RUN_FAILURE_REASON_WORKER_LOST', '2': 1},
     {'1': 'RUN_FAILURE_REASON_SEARCH_FAILED', '2': 2},
     {'1': 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR', '2': 3},
+    {'1': 'RUN_FAILURE_REASON_EXPIRED', '2': 4},
   ],
 };
 
@@ -125,7 +126,7 @@ final $typed_data.Uint8List runFailureReasonDescriptor = $convert.base64Decode(
     'ChBSdW5GYWlsdXJlUmVhc29uEiIKHlJVTl9GQUlMVVJFX1JFQVNPTl9VTlNQRUNJRklFRBAAEi'
     'IKHlJVTl9GQUlMVVJFX1JFQVNPTl9XT1JLRVJfTE9TVBABEiQKIFJVTl9GQUlMVVJFX1JFQVNP'
     'Tl9TRUFSQ0hfRkFJTEVEEAISKgomUlVOX0ZBSUxVUkVfUkVBU09OX1RVUk5fUElQRUxJTkVfRV'
-    'JST1IQAw==');
+    'JST1IQAxIeChpSVU5fRkFJTFVSRV9SRUFTT05fRVhQSVJFRBAE');
 
 @$core.Deprecated('Use stepStatusDescriptor instead')
 const StepStatus$json = {
@@ -913,7 +914,6 @@ const RunSummary$json = {
     },
     {'1': 'last_cursor', '3': 4, '4': 1, '5': 9, '10': 'lastCursor'},
     {'1': 'terminal', '3': 5, '4': 1, '5': 8, '10': 'terminal'},
-    {'1': 'version', '3': 6, '4': 1, '5': 9, '10': 'version'},
   ],
 };
 
@@ -923,7 +923,7 @@ final $typed_data.Uint8List runSummaryDescriptor = $convert.base64Decode(
     '5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SdW5UeXBlUgdydW5UeXBlEj0KBnN0YXR1cxgD'
     'IAEoDjIlLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlJ1blN0YXR1c1IGc3RhdHVzEh8KC2'
     'xhc3RfY3Vyc29yGAQgASgJUgpsYXN0Q3Vyc29yEhoKCHRlcm1pbmFsGAUgASgIUgh0ZXJtaW5h'
-    'bBIYCgd2ZXJzaW9uGAYgASgJUgd2ZXJzaW9u');
+    'bA==');
 
 @$core.Deprecated('Use openConfirmationDescriptor instead')
 const OpenConfirmation$json = {
@@ -1120,15 +1120,18 @@ const SubmitTurnResponse$json = {
     {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
     {'1': 'conversation_id', '3': 2, '4': 1, '5': 9, '10': 'conversationId'},
     {'1': 'run_id', '3': 3, '4': 1, '5': 9, '10': 'runId'},
-    {'1': 'run_version', '3': 4, '4': 1, '5': 9, '10': 'runVersion'},
   ],
+  '9': [
+    {'1': 4, '2': 5},
+  ],
+  '10': ['run_version'],
 };
 
 /// Descriptor for `SubmitTurnResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List submitTurnResponseDescriptor = $convert.base64Decode(
     'ChJTdWJtaXRUdXJuUmVzcG9uc2USHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEicKD2'
     'NvbnZlcnNhdGlvbl9pZBgCIAEoCVIOY29udmVyc2F0aW9uSWQSFQoGcnVuX2lkGAMgASgJUgVy'
-    'dW5JZBIfCgtydW5fdmVyc2lvbhgEIAEoCVIKcnVuVmVyc2lvbg==');
+    'dW5JZEoECAQQBVILcnVuX3ZlcnNpb24=');
 
 @$core.Deprecated('Use getSnapshotRequestDescriptor instead')
 const GetSnapshotRequest$json = {
@@ -1371,8 +1374,11 @@ const StartCandidateSearchResponse$json = {
       '10': 'status'
     },
     {'1': 'candidate_set_id', '3': 4, '4': 1, '5': 9, '10': 'candidateSetId'},
-    {'1': 'run_version', '3': 5, '4': 1, '5': 9, '10': 'runVersion'},
   ],
+  '9': [
+    {'1': 5, '2': 6},
+  ],
+  '10': ['run_version'],
 };
 
 /// Descriptor for `StartCandidateSearchResponse`. Decode as a `google.protobuf.DescriptorProto`.
@@ -1380,7 +1386,7 @@ final $typed_data.Uint8List startCandidateSearchResponseDescriptor = $convert.ba
     'ChxTdGFydENhbmRpZGF0ZVNlYXJjaFJlc3BvbnNlEh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcX'
     'Vlc3RJZBIVCgZydW5faWQYAiABKAlSBXJ1bklkEj0KBnN0YXR1cxgDIAEoDjIlLmhhd2tyLnBy'
     'b2N1cmVtZW50LnYxYWxwaGExLlJ1blN0YXR1c1IGc3RhdHVzEigKEGNhbmRpZGF0ZV9zZXRfaW'
-    'QYBCABKAlSDmNhbmRpZGF0ZVNldElkEh8KC3J1bl92ZXJzaW9uGAUgASgJUgpydW5WZXJzaW9u');
+    'QYBCABKAlSDmNhbmRpZGF0ZVNldElkSgQIBRAGUgtydW5fdmVyc2lvbg==');
 
 @$core.Deprecated('Use getCandidateSearchRequestDescriptor instead')
 const GetCandidateSearchRequest$json = {
@@ -3123,14 +3129,17 @@ const RunAccepted$json = {
   '2': [
     {'1': 'run_id', '3': 1, '4': 1, '5': 9, '10': 'runId'},
     {'1': 'conversation_id', '3': 2, '4': 1, '5': 9, '10': 'conversationId'},
-    {'1': 'run_version', '3': 3, '4': 1, '5': 9, '10': 'runVersion'},
   ],
+  '9': [
+    {'1': 3, '2': 4},
+  ],
+  '10': ['run_version'],
 };
 
 /// Descriptor for `RunAccepted`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List runAcceptedDescriptor = $convert.base64Decode(
     'CgtSdW5BY2NlcHRlZBIVCgZydW5faWQYASABKAlSBXJ1bklkEicKD2NvbnZlcnNhdGlvbl9pZB'
-    'gCIAEoCVIOY29udmVyc2F0aW9uSWQSHwoLcnVuX3ZlcnNpb24YAyABKAlSCnJ1blZlcnNpb24=');
+    'gCIAEoCVIOY29udmVyc2F0aW9uSWRKBAgDEARSC3J1bl92ZXJzaW9u');
 
 @$core.Deprecated('Use textDeltaDescriptor instead')
 const TextDelta$json = {
@@ -3320,21 +3329,17 @@ const CancelRunRequest$json = {
   '1': 'CancelRunRequest',
   '2': [
     {'1': 'run_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'runId'},
-    {
-      '1': 'expected_run_version',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'expectedRunVersion'
-    },
   ],
+  '9': [
+    {'1': 2, '2': 3},
+  ],
+  '10': ['expected_run_version'],
 };
 
 /// Descriptor for `CancelRunRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List cancelRunRequestDescriptor = $convert.base64Decode(
-    'ChBDYW5jZWxSdW5SZXF1ZXN0EhoKBnJ1bl9pZBgBIAEoCUID4EECUgVydW5JZBI1ChRleHBlY3'
-    'RlZF9ydW5fdmVyc2lvbhgCIAEoCUID4EECUhJleHBlY3RlZFJ1blZlcnNpb24=');
+    'ChBDYW5jZWxSdW5SZXF1ZXN0EhoKBnJ1bl9pZBgBIAEoCUID4EECUgVydW5JZEoECAIQA1IUZX'
+    'hwZWN0ZWRfcnVuX3ZlcnNpb24=');
 
 @$core.Deprecated('Use cancelRunResponseDescriptor instead')
 const CancelRunResponse$json = {
@@ -3357,8 +3362,11 @@ const CancelRunResponse$json = {
       '6': '.hawkr.procurement.v1alpha1.CancelDisposition',
       '10': 'cancelDisposition'
     },
-    {'1': 'run_version', '3': 4, '4': 1, '5': 9, '10': 'runVersion'},
   ],
+  '9': [
+    {'1': 4, '2': 5},
+  ],
+  '10': ['run_version'],
 };
 
 /// Descriptor for `CancelRunResponse`. Decode as a `google.protobuf.DescriptorProto`.
@@ -3366,8 +3374,8 @@ final $typed_data.Uint8List cancelRunResponseDescriptor = $convert.base64Decode(
     'ChFDYW5jZWxSdW5SZXNwb25zZRIVCgZydW5faWQYASABKAlSBXJ1bklkEkQKCnJ1bl9zdGF0dX'
     'MYAiABKA4yJS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SdW5TdGF0dXNSCXJ1blN0YXR1'
     'cxJcChJjYW5jZWxfZGlzcG9zaXRpb24YAyABKA4yLS5oYXdrci5wcm9jdXJlbWVudC52MWFscG'
-    'hhMS5DYW5jZWxEaXNwb3NpdGlvblIRY2FuY2VsRGlzcG9zaXRpb24SHwoLcnVuX3ZlcnNpb24Y'
-    'BCABKAlSCnJ1blZlcnNpb24=');
+    'hhMS5DYW5jZWxEaXNwb3NpdGlvblIRY2FuY2VsRGlzcG9zaXRpb25KBAgEEAVSC3J1bl92ZXJz'
+    'aW9u');
 
 @$core.Deprecated('Use clarificationResponseDescriptor instead')
 const ClarificationResponse$json = {

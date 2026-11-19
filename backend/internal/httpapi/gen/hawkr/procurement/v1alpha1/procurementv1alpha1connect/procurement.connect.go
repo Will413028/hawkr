@@ -13,8 +13,9 @@
 //
 // 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
 // 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
-// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；CancelRun、UpsertSellerResponseDraft 以 expected_*
-// 版本把關，重送時版本已前進，回 ABORTED 而不重複生效。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；UpsertSellerResponseDraft 以 expected_draft_version
+// 把關，重送時版本已前進，回 ABORTED 而不重複生效；CancelRun 依語意冪等（非終態的 run 被取消，終態的 run 回 OK 並以
+// cancel_disposition 說明結果），不帶版本。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
 //
 // 樂觀並發：expected_* 欄位是讀到的版本，與目前不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，
 // metadata 的 conflictTarget 說是哪一個物件過時（見 ErrorReason.VERSION_CONFLICT）。版本與 hash 一律是不透明的字串。

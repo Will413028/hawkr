@@ -158,21 +158,22 @@ class ErrorReason extends $pb.ProtobufEnum {
       ErrorReason._(25, _omitEnumNames ? '' : 'AGENT_MONTHLY_QUOTA_EXCEEDED');
 
   /// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
-  /// 不提供重試；同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，稍後可再試。
+  /// 不提供重試。ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+  /// 同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，帶 RetryInfo，稍後可再試。
   static const ErrorReason IMAGE_QUOTA_EXCEEDED =
       ErrorReason._(26, _omitEnumNames ? '' : 'IMAGE_QUOTA_EXCEEDED');
 
-  /// 圖片或提示詞被安全性檢查擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+  /// 圖片或提示詞被安全性檢查擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
   /// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
   static const ErrorReason IMAGE_SAFETY_BLOCKED =
       ErrorReason._(27, _omitEnumNames ? '' : 'IMAGE_SAFETY_BLOCKED');
 
-  /// 圖片涉及著作權複誦而被擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+  /// 圖片涉及著作權複誦而被擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
   /// client 請使用者換一張圖，不自動重試。額度退回。
   static const ErrorReason IMAGE_RECITATION_BLOCKED =
       ErrorReason._(28, _omitEnumNames ? '' : 'IMAGE_RECITATION_BLOCKED');
 
-  /// 模型沒有產出圖片（搭配 failed_precondition）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+  /// 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
   /// client 可以讓使用者直接重試。額度退回。
   static const ErrorReason IMAGE_NOT_PRODUCED =
       ErrorReason._(29, _omitEnumNames ? '' : 'IMAGE_NOT_PRODUCED');

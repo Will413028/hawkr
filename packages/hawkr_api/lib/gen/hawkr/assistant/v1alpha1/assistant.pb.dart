@@ -130,7 +130,8 @@ class SendAssistantMessageRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearImageUrl() => $_clearField(4);
 
-  /// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  /// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，原樣回第一次的回應（turn_id 與 session_id 不變），不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  /// 鍵存在 monolith 的記憶體，重啟後遺失：重啟後重送會開新的一輪。
   @$pb.TagNumber(5)
   $core.String get clientRequestId => $_getSZ(4);
   @$pb.TagNumber(5)

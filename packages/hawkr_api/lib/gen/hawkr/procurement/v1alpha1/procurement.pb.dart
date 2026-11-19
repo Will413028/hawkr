@@ -1434,7 +1434,6 @@ class RunSummary extends $pb.GeneratedMessage {
     RunStatus? status,
     $core.String? lastCursor,
     $core.bool? terminal,
-    $core.String? version,
   }) {
     final result = RunSummary._();
     if (runId != null) result.runId = runId;
@@ -1442,7 +1441,6 @@ class RunSummary extends $pb.GeneratedMessage {
     if (status != null) result.status = status;
     if (lastCursor != null) result.lastCursor = lastCursor;
     if (terminal != null) result.terminal = terminal;
-    if (version != null) result.version = version;
     return result;
   }
 
@@ -1467,7 +1465,6 @@ class RunSummary extends $pb.GeneratedMessage {
         enumValues: RunStatus.values)
     ..aOS(4, _omitFieldNames ? '' : 'lastCursor')
     ..aOB(5, _omitFieldNames ? '' : 'terminal')
-    ..aOS(6, _omitFieldNames ? '' : 'version')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1535,16 +1532,6 @@ class RunSummary extends $pb.GeneratedMessage {
   $core.bool hasTerminal() => $_has(4);
   @$pb.TagNumber(5)
   void clearTerminal() => $_clearField(5);
-
-  /// 取消用的版本（CancelRunRequest.expected_run_version），client 當成不透明的字串。
-  @$pb.TagNumber(6)
-  $core.String get version => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set version($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasVersion() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearVersion() => $_clearField(6);
 }
 
 class OpenConfirmation extends $pb.GeneratedMessage {
@@ -1778,7 +1765,7 @@ class PublishedRfq extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearConfirmedRfqSnapshotId() => $_clearField(6);
 
-  /// 該快照的 hash，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
+  /// 該快照的 hash，與 ConfirmRfqSnapshotResponse.payload_hash 是同一個值，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
   /// 讓買家重新載入之後仍能接受報價。
   @$pb.TagNumber(7)
   $core.String get rfqSnapshotHash => $_getSZ(6);
@@ -2092,13 +2079,11 @@ class SubmitTurnResponse extends $pb.GeneratedMessage {
     $core.String? requestId,
     $core.String? conversationId,
     $core.String? runId,
-    $core.String? runVersion,
   }) {
     final result = SubmitTurnResponse._();
     if (requestId != null) result.requestId = requestId;
     if (conversationId != null) result.conversationId = conversationId;
     if (runId != null) result.runId = runId;
-    if (runVersion != null) result.runVersion = runVersion;
     return result;
   }
 
@@ -2119,7 +2104,6 @@ class SubmitTurnResponse extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'conversationId')
     ..aOS(3, _omitFieldNames ? '' : 'runId')
-    ..aOS(4, _omitFieldNames ? '' : 'runVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2172,16 +2156,6 @@ class SubmitTurnResponse extends $pb.GeneratedMessage {
   $core.bool hasRunId() => $_has(2);
   @$pb.TagNumber(3)
   void clearRunId() => $_clearField(3);
-
-  /// run 受理時的版本，可直接當 CancelRunRequest.expected_run_version；run 前進之後版本已變，回 ABORTED 時改讀 GetRuntimeSnapshot。
-  @$pb.TagNumber(4)
-  $core.String get runVersion => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set runVersion($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRunVersion() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRunVersion() => $_clearField(4);
 }
 
 class GetSnapshotRequest extends $pb.GeneratedMessage {
@@ -2784,14 +2758,12 @@ class StartCandidateSearchResponse extends $pb.GeneratedMessage {
     $core.String? runId,
     RunStatus? status,
     $core.String? candidateSetId,
-    $core.String? runVersion,
   }) {
     final result = StartCandidateSearchResponse._();
     if (requestId != null) result.requestId = requestId;
     if (runId != null) result.runId = runId;
     if (status != null) result.status = status;
     if (candidateSetId != null) result.candidateSetId = candidateSetId;
-    if (runVersion != null) result.runVersion = runVersion;
     return result;
   }
 
@@ -2814,7 +2786,6 @@ class StartCandidateSearchResponse extends $pb.GeneratedMessage {
     ..aE<RunStatus>(3, _omitFieldNames ? '' : 'status',
         enumValues: RunStatus.values)
     ..aOS(4, _omitFieldNames ? '' : 'candidateSetId')
-    ..aOS(5, _omitFieldNames ? '' : 'runVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2881,16 +2852,6 @@ class StartCandidateSearchResponse extends $pb.GeneratedMessage {
   $core.bool hasCandidateSetId() => $_has(3);
   @$pb.TagNumber(4)
   void clearCandidateSetId() => $_clearField(4);
-
-  /// run 受理時的版本，用法同 SubmitTurnResponse.run_version。
-  @$pb.TagNumber(5)
-  $core.String get runVersion => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set runVersion($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasRunVersion() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearRunVersion() => $_clearField(5);
 }
 
 class GetCandidateSearchRequest extends $pb.GeneratedMessage {
@@ -7727,12 +7688,10 @@ class RunAccepted extends $pb.GeneratedMessage {
   factory RunAccepted({
     $core.String? runId,
     $core.String? conversationId,
-    $core.String? runVersion,
   }) {
     final result = RunAccepted._();
     if (runId != null) result.runId = runId;
     if (conversationId != null) result.conversationId = conversationId;
-    if (runVersion != null) result.runVersion = runVersion;
     return result;
   }
 
@@ -7752,7 +7711,6 @@ class RunAccepted extends $pb.GeneratedMessage {
       createEmptyInstance: RunAccepted.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'runId')
     ..aOS(2, _omitFieldNames ? '' : 'conversationId')
-    ..aOS(3, _omitFieldNames ? '' : 'runVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7794,16 +7752,6 @@ class RunAccepted extends $pb.GeneratedMessage {
   $core.bool hasConversationId() => $_has(1);
   @$pb.TagNumber(2)
   void clearConversationId() => $_clearField(2);
-
-  /// 受理時的 run 版本，用法同 SubmitTurnResponse.run_version。
-  @$pb.TagNumber(3)
-  $core.String get runVersion => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set runVersion($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasRunVersion() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearRunVersion() => $_clearField(3);
 }
 
 class TextDelta extends $pb.GeneratedMessage {
@@ -8390,12 +8338,9 @@ class RunStreamError extends $pb.GeneratedMessage {
 class CancelRunRequest extends $pb.GeneratedMessage {
   factory CancelRunRequest({
     $core.String? runId,
-    $core.String? expectedRunVersion,
   }) {
     final result = CancelRunRequest._();
     if (runId != null) result.runId = runId;
-    if (expectedRunVersion != null)
-      result.expectedRunVersion = expectedRunVersion;
     return result;
   }
 
@@ -8414,7 +8359,6 @@ class CancelRunRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: CancelRunRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'runId')
-    ..aOS(2, _omitFieldNames ? '' : 'expectedRunVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8447,16 +8391,6 @@ class CancelRunRequest extends $pb.GeneratedMessage {
   $core.bool hasRunId() => $_has(0);
   @$pb.TagNumber(1)
   void clearRunId() => $_clearField(1);
-
-  /// 讀到的 RunSummary.version；不符回 ABORTED，conflictTarget 是 run。
-  @$pb.TagNumber(2)
-  $core.String get expectedRunVersion => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set expectedRunVersion($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasExpectedRunVersion() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearExpectedRunVersion() => $_clearField(2);
 }
 
 class CancelRunResponse extends $pb.GeneratedMessage {
@@ -8464,13 +8398,11 @@ class CancelRunResponse extends $pb.GeneratedMessage {
     $core.String? runId,
     RunStatus? runStatus,
     CancelDisposition? cancelDisposition,
-    $core.String? runVersion,
   }) {
     final result = CancelRunResponse._();
     if (runId != null) result.runId = runId;
     if (runStatus != null) result.runStatus = runStatus;
     if (cancelDisposition != null) result.cancelDisposition = cancelDisposition;
-    if (runVersion != null) result.runVersion = runVersion;
     return result;
   }
 
@@ -8493,7 +8425,6 @@ class CancelRunResponse extends $pb.GeneratedMessage {
         enumValues: RunStatus.values)
     ..aE<CancelDisposition>(3, _omitFieldNames ? '' : 'cancelDisposition',
         enumValues: CancelDisposition.values)
-    ..aOS(4, _omitFieldNames ? '' : 'runVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8544,15 +8475,6 @@ class CancelRunResponse extends $pb.GeneratedMessage {
   $core.bool hasCancelDisposition() => $_has(2);
   @$pb.TagNumber(3)
   void clearCancelDisposition() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get runVersion => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set runVersion($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRunVersion() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRunVersion() => $_clearField(4);
 }
 
 /// ClarificationResponse 是對 INTERRUPT_KIND_CLARIFICATION 的回覆：選一個選項，或自填描述。兩者至少要有一個。
@@ -9835,7 +9757,8 @@ class UpsertSellerResponseDraftRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPublicationId() => $_clearField(1);
 
-  /// 建立第一版時是空字串。
+  /// 空字串表示建立第一版；草稿已存在時回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，metadata 的 conflictTarget 是 draft。
+  /// 更新時帶讀到的草稿版本，不符同樣回 ABORTED。
   @$pb.TagNumber(2)
   $core.String get expectedDraftVersion => $_getSZ(1);
   @$pb.TagNumber(2)

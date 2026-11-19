@@ -215,15 +215,20 @@ class RunFailureReason extends $pb.ProtobufEnum {
       RunFailureReason._(
           3, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR');
 
+  /// run 超過存活上限（RUN_STATUS_EXPIRED）。買家重送。
+  static const RunFailureReason RUN_FAILURE_REASON_EXPIRED =
+      RunFailureReason._(4, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_EXPIRED');
+
   static const $core.List<RunFailureReason> values = <RunFailureReason>[
     RUN_FAILURE_REASON_UNSPECIFIED,
     RUN_FAILURE_REASON_WORKER_LOST,
     RUN_FAILURE_REASON_SEARCH_FAILED,
     RUN_FAILURE_REASON_TURN_PIPELINE_ERROR,
+    RUN_FAILURE_REASON_EXPIRED,
   ];
 
   static final $core.List<RunFailureReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static RunFailureReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

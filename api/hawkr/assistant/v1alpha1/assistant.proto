@@ -61,7 +61,8 @@ message SendAssistantMessageRequest {
   string message = 3 [(google.api.field_behavior) = REQUIRED];
   // 附帶的圖片網址；沒有圖時不設。
   optional string image_url = 4;
-  // 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  // 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，原樣回第一次的回應（turn_id 與 session_id 不變），不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  // 鍵存在 monolith 的記憶體，重啟後遺失：重啟後重送會開新的一輪。
   string client_request_id = 5 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.field_info).format = UUID4
