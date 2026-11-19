@@ -1,0 +1,161 @@
+{
+  "default": {
+    "review.already_exists": {
+      "message": "這個商品已經評價過了",
+      "description": "同一個訂單項目已有評價（UNIQUE order_item_id）。"
+    },
+    "review.author_inactive": {
+      "message": "帳號刪除中，無法評價",
+      "description": "買家正在刪除帳號（inactive_authors 有列）時提交評價。"
+    },
+    "review.content_invalid_text": {
+      "message": "評價內容不是有效的文字",
+      "description": "評價內容不是有效的 UTF-8。"
+    },
+    "review.content_too_long": {
+      "message": "評價內容不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "評價內容以字元計超過上限。max 是 model.MaxContentRunes。"
+    },
+    "review.filter_rating_invalid": {
+      "message": "評分篩選必須是 0 到 5",
+      "description": "列表的評分篩選不是 0（不篩）或 1 到 5。"
+    },
+    "review.item_not_in_order": {
+      "message": "這個商品不在該訂單裡",
+      "description": "order_item_id 不屬於該訂單。"
+    },
+    "review.moderation_rejected": {
+      "message": "內容不符社群守則，請修改後再送出",
+      "description": "評價內容或店家回覆命中髒字詞典。"
+    },
+    "review.not_found": {
+      "message": "找不到這則評價",
+      "description": "評價不存在，或對呼叫者不是公開可讀。"
+    },
+    "review.not_replyable": {
+      "message": "這則評價目前不能回覆",
+      "description": "評價已被隱藏或作者已不在營運中，店家不能回覆。"
+    },
+    "review.not_your_review": {
+      "message": "只有被評價的店家能回覆這則評價",
+      "description": "回覆的店家不是這則評價的店家。"
+    },
+    "review.order_item_invalid": {
+      "message": "訂單項目不合法",
+      "description": "order_item_id 不是正整數。"
+    },
+    "review.order_not_found": {
+      "message": "找不到這筆訂單",
+      "description": "訂單不存在（訂單服務明確回報 NOT_FOUND）。"
+    },
+    "review.order_not_reviewable": {
+      "message": "訂單完成後才能評價",
+      "description": "訂單狀態不是已完成（50）。"
+    },
+    "review.order_not_yours": {
+      "message": "這不是你的訂單",
+      "description": "訂單的買家不是提交者。"
+    },
+    "review.order_required": {
+      "message": "訂單編號必填",
+      "description": "order_no 是空的。"
+    },
+    "review.order_unavailable": {
+      "message": "暫時無法確認訂單，請稍後再試",
+      "description": "訂單服務暫時故障或回了不認得的結果（不是訂單不存在）。"
+    },
+    "review.rating_invalid": {
+      "message": "評分必須是 1 到 5",
+      "description": "rating 不在 1 到 5。"
+    },
+    "review.reply_invalid_text": {
+      "message": "回覆不是有效的文字",
+      "description": "回覆內容不是有效的 UTF-8。"
+    },
+    "review.reply_required": {
+      "message": "回覆內容必填",
+      "description": "回覆內容去頭尾空白後是空的。"
+    },
+    "review.reply_too_long": {
+      "message": "回覆不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "回覆內容以字元計超過上限。max 是 model.MaxContentRunes。"
+    },
+    "review.store_ids_invalid": {
+      "message": "店家必須是 1 到 {max} 個正整數",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "批次店家評分的 store_ids 數量不在 1 到上限，或含非正整數。max 是 model.MaxStoreRatingStatsBatch。"
+    },
+    "review.too_many_images": {
+      "message": "附圖最多 {max} 張",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "staged token 數量超過上限。max 是 model.MaxImages。"
+    },
+    "review.window_expired": {
+      "message": "已超過評價期限",
+      "description": "訂單完成已超過評價期限（30 天）。"
+    }
+  },
+  "staff": {
+    "hide.admin_required": {
+      "message": "缺少管理員",
+      "description": "隱藏或還原沒有管理員 ID。"
+    },
+    "hide.category_invalid": {
+      "message": "隱藏理由的類別不能用在評價",
+      "description": "類別不在 policy.CommunityAssessable。"
+    },
+    "hide.not_hidden": {
+      "message": "這則評價目前沒有被隱藏",
+      "description": "還原時沒有未還原的隱藏。"
+    },
+    "hide.reason_too_long": {
+      "message": "理由不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "隱藏理由超過上限。max 是 model.MaxHideReasonRunes。"
+    },
+    "hide.restore_reason": {
+      "message": "還原的原因必填，不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "還原沒有給原因或超過上限。max 是 model.MaxHideReasonRunes。"
+    },
+    "hide.review_not_found": {
+      "message": "找不到這則評價",
+      "description": "隱藏或還原的評價不存在。"
+    },
+    "hide.source_ref_too_long": {
+      "message": "來源參照不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "來源參照超過上限。max 是 model.MaxSourceRefRunes。"
+    }
+  }
+}
