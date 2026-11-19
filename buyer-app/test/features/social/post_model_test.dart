@@ -41,7 +41,7 @@ void main() {
 
     expect(post.id, 101);
     expect(post.content, '內文');
-    expect(post.merchantId, 7);
+    expect(post.storeId, '7');
     expect(post.storeCode, 'nanmu');
     expect(post.merchantName, '南崁王');
     expect(post.merchantAvatar, 'https://img.test/avatar/logo.jpg');
@@ -69,7 +69,7 @@ void main() {
   test('沒有店家、圖片、商品與觀看者時不補假值', () {
     final post = Post.fromProto(pb.Post(id: '9', body: 'x'));
 
-    expect(post.merchantId, isNull);
+    expect(post.storeId, '');
     expect(post.merchantName, isNull);
     expect(post.merchantAvatar, isNull);
     expect(post.storeCode, '');

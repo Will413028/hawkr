@@ -169,7 +169,7 @@ Future<void> _setViewport(WidgetTester tester, double width) async {
 Post _post(int id) => Post(
   id: id,
   content: '這是一段足以在小螢幕換行的商家最新貼文內容 $id',
-  merchantId: 7,
+  storeId: '7',
   merchantName: '南崁王生技長名稱',
   likeCount: 12,
   commentCount: 3,

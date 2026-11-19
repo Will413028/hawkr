@@ -161,15 +161,15 @@ class _HomePostPreviewCard extends StatelessWidget {
   final Post post;
 
   void _open(BuildContext context) {
-    final merchantId = post.merchantId;
-    if (merchantId == null) {
+    final storeId = post.storeId;
+    if (storeId.isEmpty) {
       context.push('/social/post/${post.id}');
       return;
     }
     context.push(
       '/social/posts',
       extra: {
-        'merchantId': merchantId.toString(),
+        'merchantId': storeId,
         'merchantName': post.merchantName,
         'merchantAvatar': post.merchantAvatar,
         'initialPostId': post.id.toString(),

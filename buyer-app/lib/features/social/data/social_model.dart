@@ -25,7 +25,6 @@ abstract class Post with _$Post {
   const factory Post({
     required int id,
     @Default('') String content,
-    int? merchantId,
     // 發文店家的不透明 ID（封鎖、比對用）；沒有店家時空字串。
     @Default('') String storeId,
     // 店面網址的路徑段；空字串代表沒有可進的店面。
@@ -56,7 +55,6 @@ abstract class Post with _$Post {
     return Post(
       id: int.parse(post.id),
       content: post.body,
-      merchantId: store == null ? null : int.tryParse(store.id),
       storeId: store?.id ?? '',
       storeCode: store?.storeCode ?? '',
       merchantName: store != null && store.hasName() ? store.name : null,
