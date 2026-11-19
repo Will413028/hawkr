@@ -275,7 +275,6 @@ CREATE TABLE social.content_takedowns (
     post_id        UUID        REFERENCES social.posts (id),
     comment_id     UUID        REFERENCES social.comments (id),
     forum_entry_id UUID        REFERENCES social.forum_entries (id),
-    measure_created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT content_takedowns_target_check CHECK (num_nonnulls(post_id, comment_id, forum_entry_id) = 1)
 );
 CREATE UNIQUE INDEX content_takedowns_measure_post ON social.content_takedowns (measure_id, post_id) WHERE post_id IS NOT NULL;

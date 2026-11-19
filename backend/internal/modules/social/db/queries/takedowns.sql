@@ -2,12 +2,12 @@
 
 -- name: InsertTakedowns :many
 -- 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
-SELECT sqlc.arg(measure_id)::uuid, p, NULL::uuid, NULL::uuid, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
+SELECT sqlc.arg(measure_id)::uuid, p, NULL::uuid, NULL::uuid FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
 UNION ALL
-SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, c, NULL::uuid, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
+SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, c, NULL::uuid FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
 UNION ALL
-SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(measure_created_at)::timestamptz FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
+SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id;
 
@@ -37,12 +37,11 @@ ORDER BY 1, 2;
 
 -- name: InsertActiveTakedowns :many
 -- 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
        CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
-       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
-       t.measure_created_at
+       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END
 FROM seller.pub_content_takedowns() AS t
 WHERE t.measure_id = sqlc.arg(measure_id)::uuid
   AND ((t.content_kind = 'POST' AND t.content_id = ANY(sqlc.arg(post_ids)::uuid[]))

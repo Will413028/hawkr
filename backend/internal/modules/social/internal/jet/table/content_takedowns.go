@@ -17,11 +17,10 @@ type contentTakedownsTable struct {
 	postgres.Table
 
 	// Columns
-	MeasureID        postgres.ColumnString
-	PostID           postgres.ColumnString
-	CommentID        postgres.ColumnString
-	ForumEntryID     postgres.ColumnString
-	MeasureCreatedAt postgres.ColumnTimestampz
+	MeasureID    postgres.ColumnString
+	PostID       postgres.ColumnString
+	CommentID    postgres.ColumnString
+	ForumEntryID postgres.ColumnString
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -63,25 +62,23 @@ func newContentTakedownsTable(schemaName, tableName, alias string) *ContentTaked
 
 func newContentTakedownsTableImpl(schemaName, tableName, alias string) contentTakedownsTable {
 	var (
-		MeasureIDColumn        = postgres.StringColumn("measure_id")
-		PostIDColumn           = postgres.StringColumn("post_id")
-		CommentIDColumn        = postgres.StringColumn("comment_id")
-		ForumEntryIDColumn     = postgres.StringColumn("forum_entry_id")
-		MeasureCreatedAtColumn = postgres.TimestampzColumn("measure_created_at")
-		allColumns             = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn, MeasureCreatedAtColumn}
-		mutableColumns         = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn, MeasureCreatedAtColumn}
-		defaultColumns         = postgres.ColumnList{}
+		MeasureIDColumn    = postgres.StringColumn("measure_id")
+		PostIDColumn       = postgres.StringColumn("post_id")
+		CommentIDColumn    = postgres.StringColumn("comment_id")
+		ForumEntryIDColumn = postgres.StringColumn("forum_entry_id")
+		allColumns         = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn}
+		mutableColumns     = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn}
+		defaultColumns     = postgres.ColumnList{}
 	)
 
 	return contentTakedownsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		MeasureID:        MeasureIDColumn,
-		PostID:           PostIDColumn,
-		CommentID:        CommentIDColumn,
-		ForumEntryID:     ForumEntryIDColumn,
-		MeasureCreatedAt: MeasureCreatedAtColumn,
+		MeasureID:    MeasureIDColumn,
+		PostID:       PostIDColumn,
+		CommentID:    CommentIDColumn,
+		ForumEntryID: ForumEntryIDColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

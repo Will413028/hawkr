@@ -7,7 +7,6 @@ package store
 
 import (
 	"context"
-	"time"
 
 	"uuid"
 )
@@ -64,23 +63,16 @@ WHERE NOT EXISTS (
 ORDER BY c.measure_id, c.post_id, c.comment_id, c.forum_entry_id
 `
 
-type ExtraTakedownsRow struct {
-	MeasureID    uuid.UUID
-	PostID       *uuid.UUID
-	CommentID    *uuid.UUID
-	ForumEntryID *uuid.UUID
-}
-
 // 複本有、seller 此刻沒有生效中的內容下架（撤銷時訂閱者漏了）：每日對帳刪除。
-func (q *Queries) ExtraTakedowns(ctx context.Context) ([]ExtraTakedownsRow, error) {
+func (q *Queries) ExtraTakedowns(ctx context.Context) ([]SocialContentTakedown, error) {
 	rows, err := q.db.Query(ctx, extraTakedowns)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ExtraTakedownsRow{}
+	items := []SocialContentTakedown{}
 	for rows.Next() {
-		var i ExtraTakedownsRow
+		var i SocialContentTakedown
 		if err := rows.Scan(
 			&i.MeasureID,
 			&i.PostID,
@@ -142,12 +134,11 @@ func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownCont
 }
 
 const insertActiveTakedowns = `-- name: InsertActiveTakedowns :many
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
        CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
-       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
-       t.measure_created_at
+       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END
 FROM seller.pub_content_takedowns() AS t
 WHERE t.measure_id = $1::uuid
   AND ((t.content_kind = 'POST' AND t.content_id = ANY($2::uuid[]))
@@ -198,22 +189,21 @@ func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTak
 
 const insertTakedowns = `-- name: InsertTakedowns :many
 
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
-SELECT $1::uuid, p, NULL::uuid, NULL::uuid, $2::timestamptz FROM unnest($3::uuid[]) AS p
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
+SELECT $1::uuid, p, NULL::uuid, NULL::uuid FROM unnest($2::uuid[]) AS p
 UNION ALL
-SELECT $1::uuid, NULL::uuid, c, NULL::uuid, $2::timestamptz FROM unnest($4::uuid[]) AS c
+SELECT $1::uuid, NULL::uuid, c, NULL::uuid FROM unnest($3::uuid[]) AS c
 UNION ALL
-SELECT $1::uuid, NULL::uuid, NULL::uuid, f, $2::timestamptz FROM unnest($5::uuid[]) AS f
+SELECT $1::uuid, NULL::uuid, NULL::uuid, f FROM unnest($4::uuid[]) AS f
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertTakedownsParams struct {
-	MeasureID        uuid.UUID
-	MeasureCreatedAt time.Time
-	PostIds          []uuid.UUID
-	CommentIds       []uuid.UUID
-	ForumEntryIds    []uuid.UUID
+	MeasureID     uuid.UUID
+	PostIds       []uuid.UUID
+	CommentIds    []uuid.UUID
+	ForumEntryIds []uuid.UUID
 }
 
 type InsertTakedownsRow struct {
@@ -227,7 +217,6 @@ type InsertTakedownsRow struct {
 func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) ([]InsertTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertTakedowns,
 		arg.MeasureID,
-		arg.MeasureCreatedAt,
 		arg.PostIds,
 		arg.CommentIds,
 		arg.ForumEntryIds,
@@ -363,22 +352,16 @@ WHERE NOT EXISTS (
 ORDER BY t.measure_id, t.content_kind, t.content_id
 `
 
-type MissingTakedownsRow struct {
-	MeasureID   uuid.UUID
-	ContentKind string
-	ContentID   uuid.UUID
-}
-
 // seller 發布的「此刻生效中的內容下架」裡，複本還沒有、而且內容在 social 存在的（漂移）：每日對帳補上。內容不存在的略過（插入會違反外鍵）。
-func (q *Queries) MissingTakedowns(ctx context.Context) ([]MissingTakedownsRow, error) {
+func (q *Queries) MissingTakedowns(ctx context.Context) ([]SellerPubContentTakedown, error) {
 	rows, err := q.db.Query(ctx, missingTakedowns)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []MissingTakedownsRow{}
+	items := []SellerPubContentTakedown{}
 	for rows.Next() {
-		var i MissingTakedownsRow
+		var i SellerPubContentTakedown
 		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}

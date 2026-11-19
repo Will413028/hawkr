@@ -27,10 +27,9 @@ type PaymentPubReviewItem struct {
 }
 
 type SellerPubContentTakedown struct {
-	MeasureID        uuid.UUID
-	ContentKind      string
-	ContentID        uuid.UUID
-	MeasureCreatedAt time.Time
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
 }
 
 type SellerPubExposableStore struct {
