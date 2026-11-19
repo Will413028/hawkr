@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted（Will 2026-10-03） |
+| 狀態 | superseded by `2026-11-19-ai-service-monolith-scope.md`（A9-D1：刪站外業者路線與供應商入口，Will 2026-11-19） |
 | 日期 | 2026-10-03 |
 | 影響範圍 | `internal/modules/agent`（vendor portal）、`internal/modules/seller`（prospect 的封存與合併事件）、notification-service（`EnsureVendorPortalInvite`、`MarkVendorPortalInviteSecretDelivered` 的呼叫方）、website（`/vendor/rfq`） |
 | 計畫 | `docs/plans/2026-09-29-a3-buyer-seller.md` 步驟 7d；決定第 6 項 |
