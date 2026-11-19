@@ -51,6 +51,9 @@ class FakeBuyerApp {
   /// 設了之後買家名單的讀取等到它完成才回應。
   Completer<void>? listBuyersGate;
 
+  /// 設了之後店家名單的讀取等到它完成才回應。
+  Completer<void>? listStoresGate;
+
   /// 設了之後封鎖請求等到它完成才回應。
   Completer<void>? blockGate;
 
@@ -93,6 +96,7 @@ class FakeBuyerApp {
         })
         .unary(BuyerAppService.listBlockedStores, (req, _) async {
           storeListRequests.add(req);
+          await listStoresGate?.future;
           if (listStoresError != null) throw listStoresError!;
           final i = _pageIndex(req.pageToken);
           return buyer.ListBlockedStoresResponse(

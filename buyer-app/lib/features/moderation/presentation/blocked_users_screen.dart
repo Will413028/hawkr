@@ -76,10 +76,9 @@ class BlockedUsersScreen extends ConsumerWidget {
     final failed =
         stores.phase == SectionPhase.failed &&
         buyers.phase == SectionPhase.failed;
-    final anyShown = _hasContent(stores) || _hasContent(buyers);
-    final anyPending = _isPending(stores) || _isPending(buyers);
-    final loading = !anyShown && anyPending;
-    final empty = !anyShown && !anyPending && !failed;
+    // 整頁 loader 只在兩段都還沒有任何結果時；之後一段的讀取或重試都在該段就地顯示 loader。
+    final loading = _isPending(stores) && _isPending(buyers);
+    final empty = !_hasContent(stores) && !_hasContent(buyers);
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: Column(
@@ -171,9 +170,9 @@ class BlockedUsersScreen extends ConsumerWidget {
     );
   }
 
-  /// 這一段此刻有東西可畫：有項目、讀取失敗（要給重試），或項目都被移走但還有下一頁。
+  /// 這一段此刻有東西可畫：有項目、讀取中（就地 loader）、讀取失敗（要給重試），或項目都被移走但還有下一頁。
   static bool _hasContent(PagedSection<Object?> s) =>
-      s.items.isNotEmpty || s.phase == SectionPhase.failed || s.hasMore;
+      s.items.isNotEmpty || s.phase != SectionPhase.ready || s.hasMore;
 
   /// 這一段還沒有任何結果、仍在第一次讀取。
   static bool _isPending(PagedSection<Object?> s) =>
@@ -203,6 +202,21 @@ class BlockedUsersScreen extends ConsumerWidget {
           ),
         ),
       ),
+      if (_isPending(section))
+        Padding(
+          padding: EdgeInsets.only(bottom: 12.h),
+          child: Center(
+            key: ValueKey('$keyPrefix-loading'),
+            child: SizedBox(
+              width: 20.w,
+              height: 20.w,
+              child: const HkBrandLoader(
+                tone: HkBrandLoaderTone.mono,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ),
       if (section.phase == SectionPhase.failed)
         TextButton(
           key: ValueKey('$keyPrefix-retry'),

@@ -246,12 +246,63 @@ void main() {
     await _pump(tester, app, settle: false);
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byType(TruckLoadingOverlay), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('blocked-buyers-loading')),
+      findsOneWidget,
+    );
     expect(find.byType(HkEmptyState), findsNothing);
 
     gate.complete();
     await tester.pumpAndSettle();
     expect(find.text('小明'), findsOneWidget);
     expect(find.byType(TruckLoadingOverlay), findsNothing);
+  });
+
+  testWidgets('一段失敗、另一段還在第一次讀取：失敗那段的重試與讀取中那段的 loader 同時在頁面上', (tester) async {
+    final gate = Completer<void>();
+    final app = FakeBuyerApp(
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+    )..listBuyersGate = gate;
+    await _pump(tester, app, settle: false);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('blocked-buyers-loading')),
+      findsOneWidget,
+    );
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+    expect(find.byKey(const ValueKey('blocked-buyers-loading')), findsNothing);
+  });
+
+  testWidgets('單獨重試一段、另一段已讀完且沒有項目：不換成整頁 loader，該段就地顯示 loader', (tester) async {
+    final app = FakeBuyerApp(
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+    );
+    await _pump(tester, app);
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+
+    final gate = Completer<void>();
+    app
+      ..listStoresError = null
+      ..listStoresGate = gate;
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-retry')));
+    await tester.pump();
+
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+    expect(find.byKey(const ValueKey('blocked-stores-title')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('blocked-stores-loading')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(HkEmptyState), findsOneWidget);
   });
 }

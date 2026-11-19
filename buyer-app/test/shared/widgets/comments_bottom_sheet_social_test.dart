@@ -236,7 +236,7 @@ void main() {
     expect(_hint(tester), '寫下回覆…');
   });
 
-  testWidgets('送出留言進行中，「更多」與回覆、刪除一樣不能點', (tester) async {
+  testWidgets('送出留言進行中，「更多」（檢舉與封鎖）仍可開啟', (tester) async {
     final public = FakeSocialPublic(
       comments: [fakeComment('c1', canReply: true)],
     );
@@ -253,14 +253,13 @@ void main() {
     expect(app.created, hasLength(1));
 
     await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
-    await tester.pump();
-    expect(find.text('檢舉'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('檢舉'), findsOneWidget);
 
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pump(const Duration(milliseconds: 500));
     app.pending!.complete();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('comment-more-c1')));
-    await tester.pumpAndSettle();
-    expect(find.text('檢舉'), findsOneWidget);
   });
 
   testWidgets('回覆：送出 parent_id 與 reply_to_id，留言內容不經過 isMine', (tester) async {

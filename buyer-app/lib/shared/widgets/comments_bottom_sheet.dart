@@ -754,9 +754,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
             semanticLabel: '更多 $author 的留言操作',
             hint: '檢舉或封鎖',
             tooltip: '更多',
-            onTap: comments.sending
-                ? null
-                : () => _reportOrBlock(comment, author),
+            onTap: () => _reportOrBlock(comment, author),
             child: Icon(
               AppIcons.moreHoriz,
               size: 24.sp,
