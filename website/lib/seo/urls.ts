@@ -120,26 +120,16 @@ export function sellerCanonicalUrl(
 }
 
 /**
- * Root-relative storefront path for an INTERNAL link (`<Link href>`): the
- * seller's `store_code` when the payload being rendered carries one, otherwise
- * whatever key the caller holds. Omitting `fallbackId` is the preferred call for
- * any payload whose owning service looks the seller up: a missing block should
- * produce no link rather than a slower one.
- *
- * Empty when neither key is usable — callers that can be handed a seller-less
- * row must keep their own guard rather than render a link to `/sellers/`.
- *
- * Posts must not pass `fallbackId`: on a post's `store` the code is filled only
- * when the store was found, so absent means not found and a store_id link would
- * 404. `tests/post-seller-link.test.ts` pins the post-facing callers to one argument.
+ * Root-relative storefront path for an INTERNAL link (`<Link href>`), built from
+ * the seller's `store_code`. Empty when there is none: a store_id is not a
+ * storefront URL segment, so a payload without a code produces no link rather
+ * than one that answers 404. Callers render the seller without a link then.
  */
 export function sellerPath(
 	storeCode: string | number | null | undefined,
-	fallbackId?: string | number | null,
 	tail = "",
 ): string {
-	const segment =
-		String(storeCode ?? "").trim() || String(fallbackId ?? "").trim();
+	const segment = String(storeCode ?? "").trim();
 	if (!segment) return "";
 	return `/sellers/${encodeURIComponent(segment)}${tail}`;
 }
@@ -147,7 +137,6 @@ export function sellerPath(
 /** Root-relative counterpart of sellerCardUrl() for internal links. */
 export function sellerCardPath(
 	storeCode: string | number | null | undefined,
-	fallbackId?: string | number | null,
 ): string {
-	return sellerPath(storeCode, fallbackId, "/card");
+	return sellerPath(storeCode, "/card");
 }

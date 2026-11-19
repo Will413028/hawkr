@@ -292,10 +292,7 @@ const getStoreOk = () =>
 	);
 
 test("a store_code the backend does not hold is a real 404 in every locale, without saying why", async () => {
-	for (const [status, code] of [
-		[404, "not_found"],
-		[400, "invalid_argument"],
-	] as const) {
+	for (const [status, code] of [[404, "not_found"]] as const) {
 		for (const prefix of ["", "/en"]) {
 			__resetStorefrontGuardMemoForTest();
 			const calls: string[] = [];
@@ -315,6 +312,21 @@ test("a store_code the backend does not hold is a real 404 in every locale, with
 				"asks GetStore",
 			);
 		}
+	}
+});
+
+test("an invalid_argument answer from GetStore is unknown, not absent: the storefront passes through", async () => {
+	for (const prefix of ["", "/en"]) {
+		__resetStorefrontGuardMemoForTest();
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ code: "invalid_argument", message: "x" }), {
+				status: 400,
+				headers: { "content-type": "application/json" },
+			})) as typeof fetch;
+		const response = await siteMiddleware(
+			request(`${prefix}/sellers/2600123456/reviews`),
+		);
+		assert.notEqual(response.status, 404, prefix);
 	}
 });
 

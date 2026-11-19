@@ -71,6 +71,18 @@ function numberOrZero(value: unknown): number {
 	return Number.isFinite(n) ? n : 0;
 }
 
+/** 第一個有設定的數字；都沒設是 null（讀不到，不是 0）。 */
+function firstNumber(...values: unknown[]): number | null {
+	for (const value of values) {
+		if (typeof value === "number" && Number.isFinite(value)) return value;
+		if (typeof value === "string" && value.trim() !== "") {
+			const n = Number(value);
+			if (Number.isFinite(n)) return n;
+		}
+	}
+	return null;
+}
+
 function SellerIdentity({
 	location,
 	name,
@@ -84,8 +96,8 @@ function SellerIdentity({
 	name: string;
 	avatarSrc: string;
 	rating: number;
-	totalReviews: number;
-	subscribers: number;
+	totalReviews: number | null;
+	subscribers: number | null;
 	pending: boolean;
 }) {
 	return (
@@ -120,7 +132,7 @@ function SellerIdentity({
 							<strong className="text-hk-ink-950 font-extrabold">
 								{rating.toFixed(1)}
 							</strong>
-							<span>({totalReviews})</span>
+							<span>({totalReviews ?? "—"})</span>
 						</span>
 					) : null}
 					{!pending ? (
@@ -129,7 +141,7 @@ function SellerIdentity({
 								<UsersIcon />
 							</span>
 							<strong className="text-hk-ink-950 font-extrabold">
-								{subscribers}
+								{subscribers ?? "—"}
 							</strong>
 							<span>位訂閱</span>
 						</span>
@@ -169,21 +181,15 @@ export default function ProductSellerIntro({
 		.filter(Boolean)
 		.join(" ");
 
-	// The storefront link is built from the seller's storeCode, not from
-	// `sellerId` (the store_id every product payload carries, and what the
-	// seller/stats reads are keyed by) — see `sellerPath`.
-	//
-	// 三個來源**同名**（backend#2235 之後全 camelCase）：`/public/sellers/{id}`
-	// 經 fetchSeller 正規化成 `storeCode`（lib/seller/repo.ts:112），商品 wire
-	// 內嵌的賣家區塊本來就是 `storeCode`。這裡以前兩種大小寫都讀，註解還寫著
-	// 「detail 是 snake_case」——那個前提已不成立。
+	// The storefront link is built from the seller's storeCode alone (`sellerId`
+	// is the store_id, which is not a storefront URL segment); without a code the
+	// identity renders as plain content.
 	const storefrontHref = sellerPath(
 		firstText(
 			sellerRecord.storeCode,
 			productSellerRecord.storeCode,
 			fallbackRecord.storeCode,
 		),
-		sellerId,
 	);
 
 	// B-238: seller identity uses the canonical display URL. fetchSeller 只吐
@@ -212,13 +218,13 @@ export default function ProductSellerIntro({
 	const rating = numberOrZero(
 		statsRecord.avgRating || sellerRecord.rating || fallbackRecord.rating,
 	);
-	const totalReviews = numberOrZero(
-		statsRecord.totalCount ||
-			sellerRecord.totalReviews ||
-			sellerRecord.reviewCount ||
-			fallbackRecord.totalReviews,
+	const totalReviews = firstNumber(
+		statsRecord.totalCount,
+		sellerRecord.totalReviews,
+		sellerRecord.reviewCount,
+		fallbackRecord.totalReviews,
 	);
-	const subscribers = numberOrZero(followerStats?.followers);
+	const subscribers = firstNumber(followerStats?.followers);
 
 	return (
 		<aside
@@ -228,7 +234,7 @@ export default function ProductSellerIntro({
 			{/* The buyer PDP links identity to the storefront and keeps Chat
 			 * separate. Seller preview renders the same identity as plain content
 			 * and omits Chat so this public-data view cannot initiate a write flow. */}
-			{previewMode ? (
+			{previewMode || !storefrontHref ? (
 				<div className="flex w-full items-center justify-end gap-3 rounded-[14px] text-inherit">
 					<SellerIdentity
 						location={location}

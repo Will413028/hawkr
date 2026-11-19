@@ -34,6 +34,9 @@ const mocks = vi.hoisted(() => ({
 	requestedId: undefined as string | undefined,
 }));
 
+vi.mock("@/lib/hooks/useSellerSelf", () => ({
+	useSellerSelf: () => ({ data: null, loading: false, error: null }),
+}));
 vi.mock("@/lib/hooks/useSellerMeasures", () => ({
 	useSellerMeasure: (id: string) => {
 		mocks.requestedId = id;

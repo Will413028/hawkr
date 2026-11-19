@@ -65,8 +65,8 @@ test("seller card URLs keep the compact public page on the canonical seller key"
 		sellerCardUrl("2685914682", "zh-TW"),
 		"https://example.com/sellers/2685914682/card",
 	);
-	assert.equal(sellerCardPath("2685914682", "42"), "/sellers/2685914682/card");
-	assert.equal(sellerCardPath(undefined, "42"), "/sellers/42/card");
+	assert.equal(sellerCardPath("2685914682"), "/sellers/2685914682/card");
+	assert.equal(sellerCardPath(undefined), "");
 	reset();
 });
 
@@ -102,7 +102,7 @@ test("every URL builder takes the locale of the page it describes", () => {
 	);
 	// root-relative internal links are locale-free: the navigation layer adds the prefix, once
 	assert.equal(sellerPath("9"), "/sellers/9");
-	assert.equal(sellerPath("9", undefined, "/posts"), "/sellers/9/posts");
+	assert.equal(sellerPath("9", "/posts"), "/sellers/9/posts");
 	assert.equal(sellerCardPath("9"), "/sellers/9/card");
 	reset();
 });

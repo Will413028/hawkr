@@ -6,7 +6,11 @@ vi.mock("@/lib/connect/seller-public", () => ({
 	sellerPublicClient: () => client,
 }));
 
-import { fetchPublicStore, isStoreCodeShape } from "./public-store";
+import {
+	fetchPublicStore,
+	isStoreAbsentError,
+	isStoreCodeShape,
+} from "./public-store";
 
 const STORE_CODE = "2662192214";
 
@@ -59,16 +63,21 @@ describe("fetchPublicStore", () => {
 		expect(view).not.toHaveProperty("address");
 	});
 
-	it("not_found and invalid_argument mean no store; other errors are rethrown", async () => {
+	it("only not_found means no store; invalid_argument and other errors are rethrown", async () => {
 		client.getStore.mockRejectedValueOnce(new ConnectError("x", Code.NotFound));
 		await expect(fetchPublicStore(STORE_CODE)).resolves.toBeNull();
 		client.getStore.mockRejectedValueOnce(
 			new ConnectError("x", Code.InvalidArgument),
 		);
-		await expect(fetchPublicStore(STORE_CODE)).resolves.toBeNull();
+		await expect(fetchPublicStore(STORE_CODE)).rejects.toThrow();
 		client.getStore.mockRejectedValueOnce(
 			new ConnectError("x", Code.Unavailable),
 		);
+		await expect(fetchPublicStore(STORE_CODE)).rejects.toThrow();
+	});
+
+	it("throws instead of returning null when a success carries no store id", async () => {
+		client.getStore.mockResolvedValue(response({ id: "" }));
 		await expect(fetchPublicStore(STORE_CODE)).rejects.toThrow();
 	});
 
@@ -85,5 +94,17 @@ describe("isStoreCodeShape", () => {
 		expect(isStoreCodeShape("1")).toBe(true);
 		expect(isStoreCodeShape("9999999999")).toBe(true);
 		expect(isStoreCodeShape("10000000000")).toBe(false);
+	});
+});
+
+describe("isStoreAbsentError", () => {
+	it("is true only for not_found", () => {
+		expect(isStoreAbsentError(new ConnectError("x", Code.NotFound))).toBe(true);
+		expect(
+			isStoreAbsentError(new ConnectError("x", Code.InvalidArgument)),
+		).toBe(false);
+		expect(isStoreAbsentError(new ConnectError("x", Code.Unavailable))).toBe(
+			false,
+		);
 	});
 });

@@ -32,7 +32,6 @@ export interface SellerCardSeller {
 
 interface SellerCardPageProps {
 	seller: SellerCardSeller;
-	sellerId: string;
 }
 
 function sellerLocation(seller: SellerCardSeller): string {
@@ -41,10 +40,7 @@ function sellerLocation(seller: SellerCardSeller): string {
 		.join(" · ");
 }
 
-export default async function SellerCardPage({
-	seller,
-	sellerId,
-}: SellerCardPageProps) {
+export default async function SellerCardPage({ seller }: SellerCardPageProps) {
 	const rawStoreId = String(seller.storeId ?? "").trim();
 	const storeId = /^[1-9]\d*$/.test(rawStoreId) ? rawStoreId : "";
 	const richProducts = storeId
@@ -71,9 +67,9 @@ export default async function SellerCardPage({
 	const prize = seller.prize?.trim() || "";
 	const avatarUrl = seller.logo_url?.trim() || "";
 	const coverUrl = seller.coverImage ? resolveCdnUrl(seller.coverImage) : "";
-	const storefrontHref = sellerPath(seller.storeCode, sellerId);
+	const storefrontHref = sellerPath(seller.storeCode);
 	const avgRating = seller.ratingAverage ?? 0;
-	const totalReviews = seller.reviewCount ?? 0;
+	const totalReviews = seller.reviewCount;
 	const followers = seller.followerCount ?? null;
 	return (
 		<div className="seller-card-page" data-seller-card-ready>
@@ -124,7 +120,9 @@ export default async function SellerCardPage({
 							<span>
 								<AppIcon name="star" size={15} fill />
 								<strong>{avgRating.toFixed(1)}</strong>
-								<small>{totalReviews} 則評價</small>
+								{totalReviews !== undefined ? (
+									<small>{totalReviews} 則評價</small>
+								) : null}
 							</span>
 						) : null}
 						{location ? (

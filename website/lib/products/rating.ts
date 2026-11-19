@@ -40,6 +40,21 @@ export function formatRatingSummary(value: unknown): string {
 	return n == null ? "尚無買家評價" : `評分 ${n.toFixed(1)}`;
 }
 
+/**
+ * 店家評價頁描述裡的評分句（含前導逗號）。評價數或評分讀不到時不寫這句，
+ * 不能把「讀不到」說成「尚無評價」；評價數是 0 才是確實沒有評價。
+ */
+export function storeRatingClause(store: {
+	reviewCount?: number;
+	ratingAverage?: number;
+}): string {
+	if (store.reviewCount === 0) return "，尚無買家評價";
+	if (store.reviewCount === undefined || store.ratingAverage === undefined) {
+		return "";
+	}
+	return `，${formatRatingSummary(store.ratingAverage)}`;
+}
+
 export function parseReviewCount(value: unknown): number {
 	if (value == null) return 0;
 	const n =

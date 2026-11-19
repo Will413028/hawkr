@@ -79,7 +79,7 @@ export default async function Page({ params }: Props) {
 					image: sellerSocialImage(seller),
 				})}
 			/>
-			<SellerCardPage seller={seller} sellerId={id} />
+			<SellerCardPage seller={seller} />
 		</>
 	);
 }

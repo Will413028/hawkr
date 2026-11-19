@@ -173,7 +173,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		return NextResponse.redirect(cleanUrl, 307);
 	}
 
-	// Storefront 404 (#376). It lives here rather than inside the tab pages because
+	// Storefront 404. It lives here rather than inside the tab pages because
 	// those are statically prerendered, and a prerender has no live response to
 	// carry a status: `notFound()` renders the 404 body but still answers 200.
 	// See lib/seller/storefront-guard.ts.
@@ -194,7 +194,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		if (outcome.kind === "not-found") {
 			// A store_code outside `stores_store_code_check`'s range, a store that does
 			// not exist and one that is not publicly visible all answer the same 404
-			// page, without saying which (D1). Rewriting to the app's not-found route
+			// page, without saying which. Rewriting to the app's not-found route
 			// serves the 404 page with the explicit status the page cannot produce here.
 			return notFoundResponse(request);
 		}

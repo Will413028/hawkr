@@ -57,7 +57,7 @@ interface SellerProfileV2Props {
 	tabBasePath?: string;
 }
 
-/** 統計讀不到時顯示的字（B12、10c K19、10d K15）。 */
+/** 統計讀不到時顯示的字。 */
 const UNSET_STAT = "—";
 
 const StarIcon = ({ size = 14 }: { size?: number }) => (
@@ -87,7 +87,8 @@ export function SellerProfileMeta({
 }: {
 	/** null：評分讀不到，顯示「—」；空字串或 0：沒有評分，整段不顯示。 */
 	rating: string | null;
-	totalReviews: number;
+	/** null：評價數讀不到，顯示「—」。 */
+	totalReviews: number | null;
 	location: string;
 	/** null：粉絲數讀不到，顯示「—」。 */
 	subscribers: number | null;
@@ -102,7 +103,7 @@ export function SellerProfileMeta({
 				<span className="hkui-seller-profile__meta-item hkui-seller-profile__meta-item--rating">
 					<StarIcon />
 					<strong>{rating ?? UNSET_STAT}</strong>
-					{ratingUnknown ? null : <span>({totalReviews})</span>}
+					{ratingUnknown ? null : <span>({totalReviews ?? UNSET_STAT})</span>}
 				</span>
 			)}
 			{hasLocation && (
@@ -139,7 +140,7 @@ export function SellerProfileMeta({
 
 interface ProfileStats {
 	rating: string | null;
-	totalReviews: number;
+	totalReviews: number | null;
 	subscribers: number | null;
 }
 
@@ -163,7 +164,7 @@ async function profileStats(
 					: null;
 		return {
 			rating,
-			totalReviews: reviewCount ?? 0,
+			totalReviews: reviewCount ?? null,
 			subscribers: s.followerCount ?? null,
 		};
 	}

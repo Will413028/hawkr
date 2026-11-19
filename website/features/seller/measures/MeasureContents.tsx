@@ -17,15 +17,27 @@ import { optionalText, type UiText, useUiText } from "@/lib/i18n/ui-text";
 
 /**
  * 內容下架對象的連結：貼文與貼文留言連到賣家中心自己的貼文（下架中也看得到），討論區留言連到單一討論串頁。賣家點了看不到（`linkAvailable` 為 false，由伺服器依刪除與下架判斷）、
- * 快照不在或沒有連結目標時沒有連結。
+ * 快照不在或沒有連結目標時沒有連結。討論串頁的網址段是店家的 store_code，只有討論串屬於 `store`（賣家自己的店）時
+ * 才讀得到，否則沒有連結。
  */
-export function contentHref(content: ContentRef): string | undefined {
+export interface OwnStore {
+	id: string;
+	storeCode: string;
+}
+
+export function contentHref(
+	content: ContentRef,
+	store?: OwnStore,
+): string | undefined {
 	if (!content.linkAvailable) return undefined;
 	switch (content.link.case) {
 		case "postId":
 			return `/seller-center/posts?post=${encodeURIComponent(content.link.value)}`;
 		case "forumThread":
-			return `/sellers/${encodeURIComponent(content.link.value.storeId)}/messages/${encodeURIComponent(content.link.value.threadId)}`;
+			if (!store?.storeCode || store.id !== content.link.value.storeId) {
+				return undefined;
+			}
+			return `/sellers/${encodeURIComponent(store.storeCode)}/messages/${encodeURIComponent(content.link.value.threadId)}`;
 		default:
 			return undefined;
 	}
@@ -37,8 +49,10 @@ export function contentHref(content: ContentRef): string | undefined {
  */
 export function MeasureContents({
 	contents,
+	store,
 }: {
 	contents: readonly ContentRef[];
+	store?: OwnStore;
 }) {
 	const ut = useUiText();
 	if (contents.length === 0) return null;
@@ -53,6 +67,7 @@ export function MeasureContents({
 						key={`${content.kind}:${content.id}`}
 						ut={ut}
 						content={content}
+						store={store}
 					/>
 				))}
 			</ul>
@@ -63,13 +78,15 @@ export function MeasureContents({
 function MeasureContentItem({
 	ut,
 	content,
+	store,
 }: {
 	ut: UiText;
 	content: ContentRef;
+	store?: OwnStore;
 }) {
 	const captured = content.snapshotState === ContentSnapshotState.CAPTURED;
 	const kind = optionalText(ut, sellerContentKind(content.kind));
-	const href = captured ? contentHref(content) : undefined;
+	const href = captured ? contentHref(content, store) : undefined;
 	return (
 		<li
 			data-hk-measure-content

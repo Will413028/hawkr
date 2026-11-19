@@ -6,7 +6,7 @@ import {
 	getCachedStore,
 } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
-import { formatRatingSummary } from "@/lib/products/rating";
+import { storeRatingClause } from "@/lib/products/rating";
 import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
@@ -54,11 +54,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const canonical = sellerCanonicalUrl(s, id, pageLocale, "/reviews");
 	return {
 		title: `${s.name} 的買家評價`,
-		description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.ratingAverage)}`,
+		description: `查看 ${s.name} 的買家評價${storeRatingClause(s)}`,
 		alternates: { canonical },
 		openGraph: {
 			title: `${s.name} 的買家評價 | ${siteNameFor(pageLocale)}`,
-			description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.ratingAverage)}`,
+			description: `查看 ${s.name} 的買家評價${storeRatingClause(s)}`,
 			url: canonical,
 			images: socialImages(socialImage),
 		},

@@ -31,14 +31,13 @@ export function isStoreCodeShape(segment: string): boolean {
 	return /^[1-9]\d{0,9}$/.test(segment);
 }
 
-/** `GetStore` 以 not_found 與 invalid_argument 表示這個網址沒有店面。 */
+/** `GetStore` 只以 not_found 表示這個網址沒有店面；其他錯誤（含 invalid_argument）是未知。 */
 export function isStoreAbsentError(err: unknown): boolean {
-	const code = ConnectError.from(err).code;
-	return code === Code.NotFound || code === Code.InvalidArgument;
+	return ConnectError.from(err).code === Code.NotFound;
 }
 
 /**
- * 以網址上的 store_code 讀店面；沒有這家店（不存在、不公開、形狀不對）回 null，其他錯誤照拋，
+ * 以網址上的 store_code 讀店面；沒有這家店（不存在、不公開）或形狀不對回 null，其他錯誤照拋，
  * 讓呼叫端與快取不把一次故障當成「沒有店」。
  */
 export async function fetchPublicStore(
@@ -63,7 +62,7 @@ export async function fetchPublicStore(
 		throw err;
 	}
 	const store = res.store;
-	if (!store?.id) return null;
+	if (!store?.id) throw new Error("GetStore returned a store without id");
 	const town = store.townCode ? townByCode(store.townCode) : undefined;
 	const stats = res.stats;
 	return {
