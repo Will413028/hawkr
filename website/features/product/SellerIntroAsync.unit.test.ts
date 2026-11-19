@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api/cached", () => ({
 	getCachedStoreOrThrow: mocks.getCachedStoreOrThrow,
 }));
+const nav = vi.hoisted(() => ({ rethrow: vi.fn() }));
+vi.mock("next/navigation", () => ({ unstable_rethrow: nav.rethrow }));
 vi.mock("./components/ProductSellerIntro", () => ({ default: () => null }));
 
 import SellerIntroAsync from "./SellerIntroAsync";
@@ -54,6 +56,29 @@ describe("SellerIntroAsync", () => {
 		expect(props.seller).toBeNull();
 		expect(props.sellerStats).toBeNull();
 		expect(props.followerStats).toBeNull();
+	});
+
+	it("rethrows framework control-flow errors instead of treating them as read failures", async () => {
+		const ctl = new Error("NEXT_REDIRECT");
+		mocks.getCachedStoreOrThrow.mockRejectedValue(ctl);
+		nav.rethrow.mockImplementation((e: unknown) => {
+			throw e;
+		});
+		await expect(propsOf({ storeCode: "2662192214" })).rejects.toBe(ctl);
+		nav.rethrow.mockReset();
+	});
+
+	it("does not warn about a failed read during the build phase", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		vi.stubEnv("NEXT_PHASE", "phase-production-build");
+		mocks.getCachedStoreOrThrow.mockRejectedValue(new Error("down"));
+		const props = await propsOf({ storeCode: "2662192214" });
+		expect(warn).not.toHaveBeenCalled();
+		expect((props.productSeller as { storeCode: string }).storeCode).toBe(
+			"2662192214",
+		);
+		vi.unstubAllEnvs();
+		warn.mockRestore();
 	});
 
 	it("drops the embedded store_code when GetStore says the store is not public", async () => {

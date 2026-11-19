@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { getCachedStoreOrThrow } from "@/lib/api/cached";
 import ProductSellerIntro from "./components/ProductSellerIntro";
 
@@ -39,8 +40,11 @@ export default async function SellerIntroAsync({
 		try {
 			store = await getCachedStoreOrThrow(storeCode);
 		} catch (error) {
+			unstable_rethrow(error);
 			readFailed = true;
-			console.warn("[SellerIntroAsync] store read failed", error);
+			if (process.env.NEXT_PHASE !== "phase-production-build") {
+				console.warn("[SellerIntroAsync] store read failed", error);
+			}
 		}
 		// 讀取失敗是暫時的，保留內嵌的 storeCode；讀到「沒有這家店」才拿掉連結的來源。
 		const absent = !readFailed && store === null;

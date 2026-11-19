@@ -1,6 +1,12 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,5 +65,43 @@ describe("ReviewsClient later pages", () => {
 		);
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(screen.getByText("review-list")).toBeTruthy();
+	});
+
+	it("strict mode retries a failed page from the error block", async () => {
+		mocks.fetchSellerReviews.mockImplementationOnce(() => rejectLater());
+		mocks.fetchSellerReviews.mockResolvedValueOnce({
+			records: [],
+			totalPages: 3,
+		});
+		mount(true);
+		await waitFor(() => screen.getByRole("alert"));
+		fireEvent.click(screen.getByRole("button", { name: "重新載入" }));
+		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+		expect(mocks.fetchSellerReviews).toHaveBeenCalledTimes(2);
+		expect(screen.getByText("review-list")).toBeTruthy();
+	});
+
+	it("public mode renders no retry button", async () => {
+		mocks.fetchSellerReviews.mockImplementation(() => rejectLater());
+		mount();
+		await waitFor(() => expect(mocks.fetchSellerReviews).toHaveBeenCalled());
+		expect(screen.queryByRole("button", { name: "重新載入" })).toBeNull();
+	});
+
+	it("wraps the retry button in the reading-control wrapper when given", async () => {
+		mocks.fetchSellerReviews.mockImplementation(() => rejectLater());
+		render(
+			React.createElement(ReviewsClient, {
+				sellerId: "700",
+				statsCard: null,
+				initialReviews: [],
+				initialTotalPages: 3,
+				strict: true,
+				paginationWrapper: (n: React.ReactNode) =>
+					React.createElement("div", { "data-wrap": "1" }, n),
+			}),
+		);
+		const btn = await screen.findByRole("button", { name: "重新載入" });
+		expect(btn.closest("[data-wrap]")).not.toBeNull();
 	});
 });

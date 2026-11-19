@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Pagination from "@/components/shared/Pagination";
+import Button from "@/components/ui/Button";
 import { fetchSellerReviews } from "@/lib/api/index";
 import { useUrlPageParam } from "@/lib/hooks/useUrlPageParam";
 import ReviewList, { type SellerReviewItem } from "./ReviewList";
@@ -36,8 +37,10 @@ export default function ReviewsClient({
 	const [totalPages, setTotalPages] = React.useState(initialTotalPages);
 	const [pending, setPending] = React.useState(false);
 	const [failed, setFailed] = React.useState(false);
+	const [reloadKey, setReloadKey] = React.useState(0);
 
 	React.useEffect(() => {
+		void reloadKey;
 		// Page 1 is already in the server HTML — restore it without a fetch.
 		if (currentPage <= 1) {
 			setReviews(initialReviews);
@@ -65,8 +68,24 @@ export default function ReviewsClient({
 		return () => {
 			active = false;
 		};
-	}, [sellerId, currentPage, initialReviews, initialTotalPages, strict]);
+	}, [
+		sellerId,
+		currentPage,
+		initialReviews,
+		initialTotalPages,
+		strict,
+		reloadKey,
+	]);
 
+	const retryButton = (
+		<Button
+			type="button"
+			color="primary"
+			onClick={() => setReloadKey((value) => value + 1)}
+		>
+			重新載入
+		</Button>
+	);
 	const pagination = (
 		<Pagination
 			current={currentPage}
@@ -80,9 +99,14 @@ export default function ReviewsClient({
 			<div className="glass-card glass-card--lg" style={{ marginTop: 24 }}>
 				{statsCard}
 				{failed ? (
-					<p className="seller-profile__error" role="alert">
-						評價暫時載入不到，請稍後再試。
-					</p>
+					<div>
+						<p className="seller-profile__error" role="alert">
+							評價暫時載入不到，請稍後再試。
+						</p>
+						{strict
+							? (paginationWrapper ?? ((node) => node))(retryButton)
+							: null}
+					</div>
 				) : (
 					<ReviewList reviews={reviews} busy={pending} />
 				)}

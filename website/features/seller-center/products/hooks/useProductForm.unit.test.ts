@@ -75,6 +75,25 @@ describe("useProductForm edit load", () => {
 		expect(result.current.loadStatus).toBe("ready");
 	});
 
+	it("clears the load error once a retry succeeds", async () => {
+		mocks.fetchSellerProductEdit.mockRejectedValueOnce(new Error("down"));
+		const { result } = renderHook(() =>
+			useProductForm({ mode: "edit", productId: "9" }),
+		);
+		await waitFor(() => expect(result.current.loadStatus).toBe("failed"));
+		expect(result.current.errors).toEqual(["down"]);
+		mocks.fetchSellerProductEdit.mockResolvedValueOnce({
+			id: "9",
+			name: "Tea",
+			status: 4003,
+		});
+		await act(async () => {
+			await result.current.reload();
+		});
+		expect(result.current.loadStatus).toBe("ready");
+		expect(result.current.errors).toEqual([]);
+	});
+
 	it("refuses to submit when the product is not found", async () => {
 		mocks.fetchSellerProductEdit.mockResolvedValueOnce(null);
 		const { result } = renderHook(() =>

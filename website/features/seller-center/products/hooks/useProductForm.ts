@@ -117,6 +117,7 @@ export function useProductForm({
 	const loadDraft = React.useCallback(async () => {
 		if (mode !== "edit" || !productId) return;
 		setLoading(true);
+		setErrors([]);
 		try {
 			const p = await fetchSellerProductEdit(productId);
 			if (p) {

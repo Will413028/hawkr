@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
 import type { ProductLoadStatus } from "../hooks/useProductForm";
 
@@ -19,11 +20,17 @@ export default function ProductLoadFailure({
 			>
 				<div className="max-w-sm">
 					<h3 className="m-0 text-lg font-bold text-hk-heading">
-						這頁不在貨架上
+						找不到這個商品
 					</h3>
-					<p className="mb-0 mt-2 text-sm leading-6 text-hk-muted">
-						可能是連結過期，或商品已經下架。
+					<p className="mb-5 mt-2 text-sm leading-6 text-hk-muted">
+						這個商品可能已被刪除，或不屬於你的店家。
 					</p>
+					<Link
+						href="/seller-center/products"
+						className="text-sm font-semibold text-hk-primary"
+					>
+						回到商品列表
+					</Link>
 				</div>
 			</div>
 		);
