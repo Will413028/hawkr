@@ -44,6 +44,8 @@ const PAGES: readonly PageRule[] = [
 		capability: C.CONTENT_CONTRACT,
 	},
 	{ prefix: "/seller-center/posts", capability: C.MARKETING },
+	// 封鎖是保護動作，停權時仍可管理（`ListBlockedBuyers`、`UnblockBuyer` 掛 CONTENT_CONTRACT）。
+	{ prefix: "/seller-center/blocked-buyers", capability: C.CONTENT_CONTRACT },
 	{ prefix: "/seller-center/coupons", capability: C.MARKETING },
 	{ prefix: "/seller-center/customers", capability: C.MARKETING },
 	{ prefix: "/seller-center/ai", capability: C.MARKETING },

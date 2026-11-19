@@ -233,7 +233,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	}
 
 	// /login is never bounced for signed-in visitors (hawkr-website#259): a
-	// session cookie the monolith refuses (suspended or deleted account) would
+	// session cookie the monolith refuses (deleted account) would
 	// loop them away from the login screen. The authoritative check is the
 	// client-side GetSession; LoginPage itself redirects away once it confirms a
 	// live account (see useAuth().isLoggedIn there).

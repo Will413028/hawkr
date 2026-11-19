@@ -14,7 +14,7 @@ import {
 	LogoutRevokeFailedError,
 	SESSION_UNAVAILABLE,
 } from "../api/auth";
-import { AUTH_EXPIRED_EVENT } from "../api/client";
+import { ACCOUNT_SUSPENDED_EVENT, AUTH_EXPIRED_EVENT } from "../api/client";
 import {
 	canUsePerspective,
 	effectiveActiveRole,
@@ -124,9 +124,12 @@ export function AuthProvider({
 		null,
 	);
 	const leaving = React.useRef(false);
+	// 停權事件觸發的重讀還沒有答案時為 true：一次重讀只排一次，答案回來（不論結果）才再接受下一次。
+	const suspensionRefreshPending = React.useRef(false);
 	React.useEffect(() => {
 		let live = true;
 		const adopt = (next: SessionState) => {
+			suspensionRefreshPending.current = false;
 			if (!live || leaving.current) return;
 			setServerSession((current) =>
 				next.status === "unavailable" && current ? current : next,
@@ -286,6 +289,20 @@ export function AuthProvider({
 		window.addEventListener(AUTH_EXPIRED_EVENT, listener);
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
 	}, [leaveDocument]);
+
+	// 帳號停權（受限登入）：使用者主動的寫入被擋，代表這個文件載入後才被停權。重讀一次登入狀態讓橫幅出現，
+	// 不登出、不導頁；重讀進行中重複的事件不再重讀，已經知道停權的文件不需要。
+	React.useEffect(() => {
+		const listener = () => {
+			if (statusRef.current !== "signedIn") return;
+			if (latestIdentity.current?.suspension) return;
+			if (suspensionRefreshPending.current) return;
+			suspensionRefreshPending.current = true;
+			refreshFromServer();
+		};
+		window.addEventListener(ACCOUNT_SUSPENDED_EVENT, listener);
+		return () => window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, listener);
+	}, [refreshFromServer]);
 
 	const peerView = React.useRef({ status, accountId: identity?.accountId });
 	peerView.current = { status, accountId: identity?.accountId };

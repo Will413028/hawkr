@@ -2,11 +2,17 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { markConversationRead } from "../chat/repo";
 import { checkFavorite, toggleFavorite } from "../favorites/repo";
 import { toggleFollow } from "../follow/repo";
 import { confirmOrderReceipt } from "../orders/repo";
 import { SseClient } from "../sse/client";
-import { AUTH_EXPIRED_EVENT, apiClient, UnauthorizedError } from "./client";
+import {
+	ACCOUNT_SUSPENDED_EVENT,
+	AUTH_EXPIRED_EVENT,
+	apiClient,
+	UnauthorizedError,
+} from "./client";
 
 const fetchMock = vi.fn();
 beforeEach(() => {
@@ -170,3 +176,74 @@ for (const [name, read] of [
 		).toBe(true);
 	});
 }
+
+function forbid(body: unknown) {
+	fetchMock.mockImplementation(
+		async () =>
+			new Response(JSON.stringify(body), {
+				status: 403,
+				headers: { "content-type": "application/json" },
+			}),
+	);
+}
+
+it("a REST 403 with reason ACCOUNT_SUSPENDED broadcasts the suspension without an expiry event", async () => {
+	forbid({ code: 403, message: "帳號已停權", reason: "ACCOUNT_SUSPENDED" });
+	const suspended = vi.fn();
+	const expired = vi.fn();
+	window.addEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	window.addEventListener(AUTH_EXPIRED_EVENT, expired);
+	try {
+		await expect(apiClient.authed.post("/private", {})).rejects.toMatchObject({
+			status: 403,
+			reason: "ACCOUNT_SUSPENDED",
+		});
+		expect(suspended).toHaveBeenCalledOnce();
+		expect(expired).not.toHaveBeenCalled();
+	} finally {
+		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+		window.removeEventListener(AUTH_EXPIRED_EVENT, expired);
+	}
+});
+
+it("a REST 403 with another reason does not broadcast the suspension", async () => {
+	forbid({ code: 403, message: "nope", reason: "FORBIDDEN_OTHER" });
+	const suspended = vi.fn();
+	window.addEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	try {
+		await expect(apiClient.authed.post("/private", {})).rejects.toMatchObject({
+			status: 403,
+		});
+		expect(suspended).not.toHaveBeenCalled();
+	} finally {
+		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	}
+});
+
+it("a user REST write with throwOnHttpError false still broadcasts ACCOUNT_SUSPENDED", async () => {
+	forbid({ code: 403, message: "帳號已停權", reason: "ACCOUNT_SUSPENDED" });
+	const suspended = vi.fn();
+	window.addEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	try {
+		await apiClient.authed.post("/private", {
+			throwOnHttpError: false,
+			throwOnEnvelopeError: false,
+		});
+		expect(suspended).toHaveBeenCalledOnce();
+	} finally {
+		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	}
+});
+
+it("the automatic markConversationRead write does not broadcast ACCOUNT_SUSPENDED", async () => {
+	forbid({ code: 403, message: "帳號已停權", reason: "ACCOUNT_SUSPENDED" });
+	const suspended = vi.fn();
+	window.addEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	try {
+		await markConversationRead(7).catch(() => {});
+		expect(fetchMock).toHaveBeenCalledOnce();
+		expect(suspended).not.toHaveBeenCalled();
+	} finally {
+		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
+	}
+});

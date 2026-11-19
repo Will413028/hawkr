@@ -20,7 +20,7 @@ export default function PrivacyPage() {
 			solidCards
 			title="隱私政策"
 			enTitle="Privacy Policy"
-			lastUpdated="2026-11-03"
+			lastUpdated="2026-11-19"
 			description="本站是作品集的示範專案，不收集、不處理真實的個人資料，本頁只用來展示隱私政策的版面。"
 			sections={[
 				{
@@ -36,6 +36,17 @@ export default function PrivacyPage() {
 							<p>{`本節版本：${KYC_PRIVACY_NOTICE.version}`}</p>
 							<LegalBlocks blocks={KYC_PRIVACY_NOTICE.blocks} />
 						</>
+					),
+				},
+				{
+					id: "post-view-statistics",
+					title: "三、貼文瀏覽統計",
+					content: (
+						<p>
+							{
+								"我們會統計貼文的瀏覽次數；未登入的瀏覽只以每日更換的雜湊值去重，不儲存您的 IP 位址或瀏覽器資訊。"
+							}
+						</p>
 					),
 				},
 			]}

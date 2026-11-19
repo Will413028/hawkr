@@ -1,3 +1,5 @@
+import { create } from "@bufbuild/protobuf";
+import { TimestampSchema } from "@bufbuild/protobuf/wkt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.hoisted(() => ({
@@ -20,6 +22,7 @@ vi.mock("@/lib/connect/transport", () => ({
 }));
 
 import { Code, ConnectError } from "@connectrpc/connect";
+import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import {
 	DeleteAccountResponse_DeletionState,
 	LoginProvider,
@@ -47,6 +50,38 @@ describe("GetSession → Identity", () => {
 			account: { id: "8", roles: [Role.SELLER] },
 		});
 		expect(await fetchSession()).toEqual({ accountId: "8", isSeller: true });
+	});
+});
+
+describe("GetSession suspension → Identity.suspension", () => {
+	beforeEach(() => rpc.getSession.mockReset());
+
+	it("carries the suspension time, category and reason", async () => {
+		rpc.getSession.mockResolvedValue({
+			account: { id: "7", roles: [] },
+			suspension: {
+				suspendedAt: create(TimestampSchema, {
+					seconds: BigInt(1_700_000_000),
+				}),
+				category: PolicyCategory.HARASSMENT,
+				reason: "repeated abuse",
+			},
+		});
+		const identity = await fetchSession();
+		expect(identity).toMatchObject({
+			accountId: "7",
+			suspension: {
+				suspendedAt: "2023-11-14T22:13:20.000Z",
+				category: PolicyCategory.HARASSMENT,
+				reason: "repeated abuse",
+			},
+		});
+	});
+
+	it("has no suspension key when the response carries none", async () => {
+		rpc.getSession.mockResolvedValue({ account: { id: "7", roles: [] } });
+		const identity = await fetchSession();
+		expect(identity).not.toHaveProperty("suspension");
 	});
 });
 

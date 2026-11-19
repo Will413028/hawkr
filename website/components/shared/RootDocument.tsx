@@ -6,6 +6,7 @@ import "@/styles/components/product-modal.css";
 import "@/styles/components/ui-kit.css";
 import "@/styles/components/input-field-fx.css";
 import JsonLd from "@/components/seo/JsonLd";
+import AccountSuspensionBanner from "@/components/shared/AccountSuspensionBanner";
 import AppProviders from "@/components/shared/AppProviders";
 import CartSnackbar from "@/components/shared/CartSnackbar";
 import DevRoleSwitcherSlot from "@/components/shared/DevRoleSwitcherSlot";
@@ -207,6 +208,7 @@ export default function RootDocument({
 												>
 													<RoleAwareNavbar />
 												</Suspense>
+												<AccountSuspensionBanner />
 												<main className="page-content">
 													{/* Keep route children outside a root Suspense boundary so
 											    notFound() can set the document HTTP status. The controller

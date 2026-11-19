@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { blockBuyerByComment, blockBuyerByForumEntry } from "./block-buyer";
+import {
+	blockBuyerByComment,
+	blockBuyerByForumEntry,
+	listBlockedBuyers,
+} from "./block-buyer";
 
 describe("blockBuyerByComment", () => {
 	it("names the buyer by the comment id and reports whether the state changed", async () => {
@@ -40,5 +44,23 @@ describe("blockBuyerByForumEntry", () => {
 			source: { case: "forumEntryId", value: "f-1" },
 		});
 		expect(result).toEqual({ changed: true });
+	});
+});
+
+describe("listBlockedBuyers", () => {
+	it("drops an entry without a buyer id: it cannot be unblocked", async () => {
+		const listBlockedBuyers_ = vi.fn().mockResolvedValue({
+			blockedBuyers: [
+				{ buyer: { id: "11", displayName: "小明" } },
+				{ buyer: undefined },
+				{ buyer: { id: "", displayName: "沒有 id" } },
+			],
+			nextPageToken: "",
+		});
+		const page = await listBlockedBuyers(
+			"",
+			() => ({ listBlockedBuyers: listBlockedBuyers_ }) as never,
+		);
+		expect(page.items.map((i) => i.buyerId)).toEqual(["11"]);
 	});
 });

@@ -127,6 +127,7 @@ export const REFRESH_MY_PAYMENT_ACCOUNT_URL = sellerMethod(
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
+export const LIST_BLOCKED_BUYERS_URL = sellerMethod("ListBlockedBuyers");
 export const GET_MY_STORE_OPENING_URL = sellerMethod("GetMyStoreOpening");
 
 /** 健康的店家（營業中、沒有停權）此刻擁有的全部能力（seller.proto 的 SellerCapability）。 */
@@ -1228,6 +1229,11 @@ export async function setupGatewayMocks(
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
+
+	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
+	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
 
 	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);
