@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqoQMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA5iBnByb3RvMw");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqyQUKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVQTEFZX0NVUlNPUl9FWFBJUkVEEA8SFwoTUkVQTEFZX0NVUlNPUl9BSEVBRBAQEhkKFVJFUVVJUkVNRU5UX05PVF9SRUFEWRAREhQKEEFQUFJPVkFMX1BFTkRJTkcQEhIdChlBUFBST1ZBTF9BTFJFQURZX1JFU09MVkVEEBMSEgoOUlVOX05PVF9BQ1RJVkUQFBIYChRSRlFfUkVTUE9OU0VfRVhQSVJFRBAVEhgKFFJGUV9SRUNJUElFTlRfQ0xPU0VEEBYSHwobUkZRX0NIRUNLT1VUX0FMUkVBRFlfQUNUSVZFEBcSFwoTUkZRX0FMUkVBRFlfQVdBUkRFRBAYEiAKHEFHRU5UX01PTlRITFlfUVVPVEFfRVhDRUVERUQQGWIGcHJvdG8z");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -32,7 +32,7 @@ export enum ErrorReason {
    * （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
    * （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
    * client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
-   * `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+   * `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
    *
    * @generated from enum value: VERSION_CONFLICT = 1;
    */
@@ -150,6 +150,88 @@ export enum ErrorReason {
    * @generated from enum value: CONTENT_TAKEDOWN_ACTIVE = 14;
    */
   CONTENT_TAKEDOWN_ACTIVE = 14,
+
+  /**
+   * 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：assistant 與 procurement 的 server streaming
+   * （WatchAssistantTurn、WatchRun）。client 放棄接續，改讀 GetRuntimeSnapshot（助理則重新送出）重建畫面。
+   *
+   * @generated from enum value: REPLAY_CURSOR_EXPIRED = 15;
+   */
+  REPLAY_CURSOR_EXPIRED = 15,
+
+  /**
+   * 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：client 帶了不是伺服器發出的 cursor。處理同 REPLAY_CURSOR_EXPIRED。
+   *
+   * @generated from enum value: REPLAY_CURSOR_AHEAD = 16;
+   */
+  REPLAY_CURSOR_AHEAD = 16,
+
+  /**
+   * 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
+   *
+   * @generated from enum value: REQUIREMENT_NOT_READY = 17;
+   */
+  REQUIREMENT_NOT_READY = 17,
+
+  /**
+   * 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
+   * 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
+   *
+   * @generated from enum value: APPROVAL_PENDING = 18;
+   */
+  APPROVAL_PENDING = 18,
+
+  /**
+   * 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+   *
+   * @generated from enum value: APPROVAL_ALREADY_RESOLVED = 19;
+   */
+  APPROVAL_ALREADY_RESOLVED = 19,
+
+  /**
+   * run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+   *
+   * @generated from enum value: RUN_NOT_ACTIVE = 20;
+   */
+  RUN_NOT_ACTIVE = 20,
+
+  /**
+   * 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
+   *
+   * @generated from enum value: RFQ_RESPONSE_EXPIRED = 21;
+   */
+  RFQ_RESPONSE_EXPIRED = 21,
+
+  /**
+   * 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+   * SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
+   *
+   * @generated from enum value: RFQ_RECIPIENT_CLOSED = 22;
+   */
+  RFQ_RECIPIENT_CLOSED = 22,
+
+  /**
+   * 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
+   * client 引導買家去付款，不是叫他重新接受。
+   *
+   * @generated from enum value: RFQ_CHECKOUT_ALREADY_ACTIVE = 23;
+   */
+  RFQ_CHECKOUT_ALREADY_ACTIVE = 23,
+
+  /**
+   * 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
+   *
+   * @generated from enum value: RFQ_ALREADY_AWARDED = 24;
+   */
+  RFQ_ALREADY_AWARDED = 24,
+
+  /**
+   * 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
+   * ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+   *
+   * @generated from enum value: AGENT_MONTHLY_QUOTA_EXCEEDED = 25;
+   */
+  AGENT_MONTHLY_QUOTA_EXCEEDED = 25,
 }
 
 /**

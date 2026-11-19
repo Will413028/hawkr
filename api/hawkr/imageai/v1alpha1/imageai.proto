@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+// imageai 模組給前台的 API：賣家的 AI 修圖。後台的風格與額度管理在 hawkr.admin.imageai.v1alpha1。
+//
+// 額度是每家店每週的修圖次數：打誰的額度只由呼叫者的店家決定，請求不帶店家 ID。
+package hawkr.imageai.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "hawkr/common/v1alpha1/image.proto";
+
+// ImageAiAppService 是登入的賣家的修圖方法。店家取自呼叫者目前的店家，帳號沒有賣家角色時回 permission_denied。
+service ImageAiAppService {
+  // TransformImage 以提示詞修一張圖，成功時扣一次本週額度。
+  //
+  // 錯誤：額度用完回 resource_exhausted；圖片被安全性檢查擋下、圖片涉及著作權複誦、模型沒有產出圖片回
+  // failed_precondition（LocalizedMessage 說明原因與是否可以重試）；模型供應商無法呼叫回 unavailable。
+  // 呼叫失敗時額度退回。
+  rpc TransformImage(TransformImageRequest) returns (TransformImageResponse);
+
+  // ListAiStyles 列出某個用途的啟用中風格，連同本週的額度使用量。
+  rpc ListAiStyles(ListAiStylesRequest) returns (ListAiStylesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// AiStyleCategory 是風格適用的用途。
+enum AiStyleCategory {
+  AI_STYLE_CATEGORY_UNSPECIFIED = 0;
+  // 商品圖。
+  AI_STYLE_CATEGORY_PRODUCT = 1;
+  // 貼文圖。
+  AI_STYLE_CATEGORY_POST = 2;
+}
+
+// AiStyle 是前台看到的修圖風格。
+message AiStyle {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 風格的識別名稱。
+  string name = 2;
+  // 顯示用的名稱。
+  string label = 3;
+  // 套用這個風格時送給模型的提示詞。
+  string prompt = 4;
+  hawkr.common.v1alpha1.Image thumbnail = 5;
+  // 顯示順序，小的在前。
+  int32 display_order = 6;
+}
+
+message TransformImageRequest {
+  // 原圖的內容。
+  bytes image_data = 1 [(google.api.field_behavior) = REQUIRED];
+  // 原圖的格式，例如 image/jpeg、image/png。
+  string mime_type = 2 [(google.api.field_behavior) = REQUIRED];
+  // 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。
+  string prompt = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message TransformImageResponse {
+  // 修好的圖片內容。
+  bytes image_data = 1;
+  string mime_type = 2;
+  // 這次修圖之後，本週已使用的次數與上限。
+  int32 weekly_usage = 3;
+  int32 weekly_limit = 4;
+}
+
+message ListAiStylesRequest {
+  // 沒有設定時是 AI_STYLE_CATEGORY_PRODUCT；不接受 UNSPECIFIED。
+  optional AiStyleCategory category = 1;
+}
+
+message ListAiStylesResponse {
+  // 沒有選風格時使用的提示詞。
+  string default_prompt = 1;
+  // 本週已使用的次數與上限（呼叫者的店家）。
+  int32 weekly_usage = 2;
+  int32 weekly_limit = 3;
+  // 依 display_order 排列；不分頁：風格由營運維護，數量有限。
+  repeated AiStyle styles = 4;
+}

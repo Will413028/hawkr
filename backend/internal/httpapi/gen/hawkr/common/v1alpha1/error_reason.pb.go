@@ -35,7 +35,7 @@ const (
 	// （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
 	// （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
 	// client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
-	// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+	// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
 	ErrorReason_VERSION_CONFLICT ErrorReason = 1
 	// 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
 	// 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
@@ -85,6 +85,33 @@ const (
 	// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
 	// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
 	ErrorReason_CONTENT_TAKEDOWN_ACTIVE ErrorReason = 14
+	// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：assistant 與 procurement 的 server streaming
+	// （WatchAssistantTurn、WatchRun）。client 放棄接續，改讀 GetRuntimeSnapshot（助理則重新送出）重建畫面。
+	ErrorReason_REPLAY_CURSOR_EXPIRED ErrorReason = 15
+	// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：client 帶了不是伺服器發出的 cursor。處理同 REPLAY_CURSOR_EXPIRED。
+	ErrorReason_REPLAY_CURSOR_AHEAD ErrorReason = 16
+	// 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
+	ErrorReason_REQUIREMENT_NOT_READY ErrorReason = 17
+	// 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
+	// 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
+	ErrorReason_APPROVAL_PENDING ErrorReason = 18
+	// 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+	ErrorReason_APPROVAL_ALREADY_RESOLVED ErrorReason = 19
+	// run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+	ErrorReason_RUN_NOT_ACTIVE ErrorReason = 20
+	// 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
+	ErrorReason_RFQ_RESPONSE_EXPIRED ErrorReason = 21
+	// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+	// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
+	ErrorReason_RFQ_RECIPIENT_CLOSED ErrorReason = 22
+	// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
+	// client 引導買家去付款，不是叫他重新接受。
+	ErrorReason_RFQ_CHECKOUT_ALREADY_ACTIVE ErrorReason = 23
+	// 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
+	ErrorReason_RFQ_ALREADY_AWARDED ErrorReason = 24
+	// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
+	// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 25
 )
 
 // Enum value maps for ErrorReason.
@@ -105,23 +132,45 @@ var (
 		12: "REAUTHENTICATION_REQUIRED",
 		13: "CONTACT_EMAIL_REQUIRED",
 		14: "CONTENT_TAKEDOWN_ACTIVE",
+		15: "REPLAY_CURSOR_EXPIRED",
+		16: "REPLAY_CURSOR_AHEAD",
+		17: "REQUIREMENT_NOT_READY",
+		18: "APPROVAL_PENDING",
+		19: "APPROVAL_ALREADY_RESOLVED",
+		20: "RUN_NOT_ACTIVE",
+		21: "RFQ_RESPONSE_EXPIRED",
+		22: "RFQ_RECIPIENT_CLOSED",
+		23: "RFQ_CHECKOUT_ALREADY_ACTIVE",
+		24: "RFQ_ALREADY_AWARDED",
+		25: "AGENT_MONTHLY_QUOTA_EXCEEDED",
 	}
 	ErrorReason_value = map[string]int32{
-		"ERROR_REASON_UNSPECIFIED":   0,
-		"VERSION_CONFLICT":           1,
-		"SELLER_SUSPENDED":           2,
-		"PROSPECT_MATCH_FOUND":       3,
-		"PROSPECT_TAX_ID_HELD":       4,
-		"AGREEMENT_OUTDATED":         5,
-		"SELLER_REQUIREMENT_MISSING": 6,
-		"STORE_OPENING_SUSPENDED":    7,
-		"STORE_OPENING_TERMINATED":   8,
-		"ACCOUNT_HAS_STORE":          9,
-		"ACCOUNT_SUSPENDED":          10,
-		"IDENTITY_ALREADY_LINKED":    11,
-		"REAUTHENTICATION_REQUIRED":  12,
-		"CONTACT_EMAIL_REQUIRED":     13,
-		"CONTENT_TAKEDOWN_ACTIVE":    14,
+		"ERROR_REASON_UNSPECIFIED":     0,
+		"VERSION_CONFLICT":             1,
+		"SELLER_SUSPENDED":             2,
+		"PROSPECT_MATCH_FOUND":         3,
+		"PROSPECT_TAX_ID_HELD":         4,
+		"AGREEMENT_OUTDATED":           5,
+		"SELLER_REQUIREMENT_MISSING":   6,
+		"STORE_OPENING_SUSPENDED":      7,
+		"STORE_OPENING_TERMINATED":     8,
+		"ACCOUNT_HAS_STORE":            9,
+		"ACCOUNT_SUSPENDED":            10,
+		"IDENTITY_ALREADY_LINKED":      11,
+		"REAUTHENTICATION_REQUIRED":    12,
+		"CONTACT_EMAIL_REQUIRED":       13,
+		"CONTENT_TAKEDOWN_ACTIVE":      14,
+		"REPLAY_CURSOR_EXPIRED":        15,
+		"REPLAY_CURSOR_AHEAD":          16,
+		"REQUIREMENT_NOT_READY":        17,
+		"APPROVAL_PENDING":             18,
+		"APPROVAL_ALREADY_RESOLVED":    19,
+		"RUN_NOT_ACTIVE":               20,
+		"RFQ_RESPONSE_EXPIRED":         21,
+		"RFQ_RECIPIENT_CLOSED":         22,
+		"RFQ_CHECKOUT_ALREADY_ACTIVE":  23,
+		"RFQ_ALREADY_AWARDED":          24,
+		"AGENT_MONTHLY_QUOTA_EXCEEDED": 25,
 	}
 )
 
@@ -156,7 +205,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa1\x03\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xc9\x05\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -173,7 +222,18 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x17IDENTITY_ALREADY_LINKED\x10\v\x12\x1d\n" +
 	"\x19REAUTHENTICATION_REQUIRED\x10\f\x12\x1a\n" +
 	"\x16CONTACT_EMAIL_REQUIRED\x10\r\x12\x1b\n" +
-	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0eB\x82\x02\n" +
+	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0e\x12\x19\n" +
+	"\x15REPLAY_CURSOR_EXPIRED\x10\x0f\x12\x17\n" +
+	"\x13REPLAY_CURSOR_AHEAD\x10\x10\x12\x19\n" +
+	"\x15REQUIREMENT_NOT_READY\x10\x11\x12\x14\n" +
+	"\x10APPROVAL_PENDING\x10\x12\x12\x1d\n" +
+	"\x19APPROVAL_ALREADY_RESOLVED\x10\x13\x12\x12\n" +
+	"\x0eRUN_NOT_ACTIVE\x10\x14\x12\x18\n" +
+	"\x14RFQ_RESPONSE_EXPIRED\x10\x15\x12\x18\n" +
+	"\x14RFQ_RECIPIENT_CLOSED\x10\x16\x12\x1f\n" +
+	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10\x17\x12\x17\n" +
+	"\x13RFQ_ALREADY_AWARDED\x10\x18\x12 \n" +
+	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10\x19B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (
