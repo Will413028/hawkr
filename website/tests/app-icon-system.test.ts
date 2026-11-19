@@ -54,6 +54,7 @@ test("seller navigation draws its icons through SellerSidebarIcon", () => {
 		"wallet",
 		"truck",
 		"shield",
+		"block",
 		"settings",
 		"chat",
 		"notification",

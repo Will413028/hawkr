@@ -105,6 +105,18 @@ describe("封鎖名單頁", () => {
 	});
 });
 
+describe("封鎖名單的側欄入口", () => {
+	it("在「財務與設定」群組，連到封鎖名單頁，頁面能力與頁面本身一致", () => {
+		const group = SELLER_NAV_GROUPS.find((g) => g.heading === "財務與設定");
+		const item = group?.items.find(
+			(i) => i.href === "/seller-center/blocked-buyers",
+		);
+		expect(item?.label).toBe("封鎖名單");
+		expect(isDeclaredPage("/seller-center/blocked-buyers")).toBe(true);
+		expect(capabilityOfPage(item?.href ?? "")).toBe(C.CONTENT_CONTRACT);
+	});
+});
+
 describe("isPageAvailable", () => {
 	it("停權時伺服器授予的能力涵蓋的頁面開放", () => {
 		for (const path of [
