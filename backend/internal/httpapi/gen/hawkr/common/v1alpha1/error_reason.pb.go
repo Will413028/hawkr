@@ -34,8 +34,10 @@ const (
 	// 依據的版本已經過時：修改時帶的 etag 與目前的不符（搭配 aborted），或以 key 建立時那筆已經存在
 	// （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
 	// （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
-	// client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
-	// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
+	// client 不認得時照一般版本衝突處理。
+	// 商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
+	// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+	// 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
 	ErrorReason_VERSION_CONFLICT ErrorReason = 1
 	// 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
 	// 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
@@ -112,6 +114,18 @@ const (
 	// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
 	// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
 	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 25
+	// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
+	// 不提供重試；同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，稍後可再試。
+	ErrorReason_IMAGE_QUOTA_EXCEEDED ErrorReason = 26
+	// 圖片或提示詞被安全性檢查擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+	// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
+	ErrorReason_IMAGE_SAFETY_BLOCKED ErrorReason = 27
+	// 圖片涉及著作權複誦而被擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+	// client 請使用者換一張圖，不自動重試。額度退回。
+	ErrorReason_IMAGE_RECITATION_BLOCKED ErrorReason = 28
+	// 模型沒有產出圖片（搭配 failed_precondition）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+	// client 可以讓使用者直接重試。額度退回。
+	ErrorReason_IMAGE_NOT_PRODUCED ErrorReason = 29
 )
 
 // Enum value maps for ErrorReason.
@@ -143,6 +157,10 @@ var (
 		23: "RFQ_CHECKOUT_ALREADY_ACTIVE",
 		24: "RFQ_ALREADY_AWARDED",
 		25: "AGENT_MONTHLY_QUOTA_EXCEEDED",
+		26: "IMAGE_QUOTA_EXCEEDED",
+		27: "IMAGE_SAFETY_BLOCKED",
+		28: "IMAGE_RECITATION_BLOCKED",
+		29: "IMAGE_NOT_PRODUCED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -171,6 +189,10 @@ var (
 		"RFQ_CHECKOUT_ALREADY_ACTIVE":  23,
 		"RFQ_ALREADY_AWARDED":          24,
 		"AGENT_MONTHLY_QUOTA_EXCEEDED": 25,
+		"IMAGE_QUOTA_EXCEEDED":         26,
+		"IMAGE_SAFETY_BLOCKED":         27,
+		"IMAGE_RECITATION_BLOCKED":     28,
+		"IMAGE_NOT_PRODUCED":           29,
 	}
 )
 
@@ -205,7 +227,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xc9\x05\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xb3\x06\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -233,7 +255,11 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x14RFQ_RECIPIENT_CLOSED\x10\x16\x12\x1f\n" +
 	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10\x17\x12\x17\n" +
 	"\x13RFQ_ALREADY_AWARDED\x10\x18\x12 \n" +
-	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10\x19B\x82\x02\n" +
+	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10\x19\x12\x18\n" +
+	"\x14IMAGE_QUOTA_EXCEEDED\x10\x1a\x12\x18\n" +
+	"\x14IMAGE_SAFETY_BLOCKED\x10\x1b\x12\x1c\n" +
+	"\x18IMAGE_RECITATION_BLOCKED\x10\x1c\x12\x16\n" +
+	"\x12IMAGE_NOT_PRODUCED\x10\x1dB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

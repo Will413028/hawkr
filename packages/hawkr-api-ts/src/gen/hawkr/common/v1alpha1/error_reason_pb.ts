@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqyQUKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVQTEFZX0NVUlNPUl9FWFBJUkVEEA8SFwoTUkVQTEFZX0NVUlNPUl9BSEVBRBAQEhkKFVJFUVVJUkVNRU5UX05PVF9SRUFEWRAREhQKEEFQUFJPVkFMX1BFTkRJTkcQEhIdChlBUFBST1ZBTF9BTFJFQURZX1JFU09MVkVEEBMSEgoOUlVOX05PVF9BQ1RJVkUQFBIYChRSRlFfUkVTUE9OU0VfRVhQSVJFRBAVEhgKFFJGUV9SRUNJUElFTlRfQ0xPU0VEEBYSHwobUkZRX0NIRUNLT1VUX0FMUkVBRFlfQUNUSVZFEBcSFwoTUkZRX0FMUkVBRFlfQVdBUkRFRBAYEiAKHEFHRU5UX01PTlRITFlfUVVPVEFfRVhDRUVERUQQGWIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqswYKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVQTEFZX0NVUlNPUl9FWFBJUkVEEA8SFwoTUkVQTEFZX0NVUlNPUl9BSEVBRBAQEhkKFVJFUVVJUkVNRU5UX05PVF9SRUFEWRAREhQKEEFQUFJPVkFMX1BFTkRJTkcQEhIdChlBUFBST1ZBTF9BTFJFQURZX1JFU09MVkVEEBMSEgoOUlVOX05PVF9BQ1RJVkUQFBIYChRSRlFfUkVTUE9OU0VfRVhQSVJFRBAVEhgKFFJGUV9SRUNJUElFTlRfQ0xPU0VEEBYSHwobUkZRX0NIRUNLT1VUX0FMUkVBRFlfQUNUSVZFEBcSFwoTUkZRX0FMUkVBRFlfQVdBUkRFRBAYEiAKHEFHRU5UX01PTlRITFlfUVVPVEFfRVhDRUVERUQQGRIYChRJTUFHRV9RVU9UQV9FWENFRURFRBAaEhgKFElNQUdFX1NBRkVUWV9CTE9DS0VEEBsSHAoYSU1BR0VfUkVDSVRBVElPTl9CTE9DS0VEEBwSFgoSSU1BR0VfTk9UX1BST0RVQ0VEEB1iBnByb3RvMw");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -31,8 +31,10 @@ export enum ErrorReason {
    * 依據的版本已經過時：修改時帶的 etag 與目前的不符（搭配 aborted），或以 key 建立時那筆已經存在
    * （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
    * （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
-   * client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
-   * `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
+   * client 不認得時照一般版本衝突處理。
+   * 商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
+   * `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+   * 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
    *
    * @generated from enum value: VERSION_CONFLICT = 1;
    */
@@ -232,6 +234,38 @@ export enum ErrorReason {
    * @generated from enum value: AGENT_MONTHLY_QUOTA_EXCEEDED = 25;
    */
   AGENT_MONTHLY_QUOTA_EXCEEDED = 25,
+
+  /**
+   * 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
+   * 不提供重試；同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，稍後可再試。
+   *
+   * @generated from enum value: IMAGE_QUOTA_EXCEEDED = 26;
+   */
+  IMAGE_QUOTA_EXCEEDED = 26,
+
+  /**
+   * 圖片或提示詞被安全性檢查擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+   * client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
+   *
+   * @generated from enum value: IMAGE_SAFETY_BLOCKED = 27;
+   */
+  IMAGE_SAFETY_BLOCKED = 27,
+
+  /**
+   * 圖片涉及著作權複誦而被擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+   * client 請使用者換一張圖，不自動重試。額度退回。
+   *
+   * @generated from enum value: IMAGE_RECITATION_BLOCKED = 28;
+   */
+  IMAGE_RECITATION_BLOCKED = 28,
+
+  /**
+   * 模型沒有產出圖片（搭配 failed_precondition）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+   * client 可以讓使用者直接重試。額度退回。
+   *
+   * @generated from enum value: IMAGE_NOT_PRODUCED = 29;
+   */
+  IMAGE_NOT_PRODUCED = 29,
 }
 
 /**

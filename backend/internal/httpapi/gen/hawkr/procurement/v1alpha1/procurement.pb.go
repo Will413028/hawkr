@@ -14,7 +14,9 @@
 // reason 是 REPLAY_CURSOR_AHEAD。client 兩種都改讀 GetRuntimeSnapshot 重建畫面。
 //
 // 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
-// 內容不同回 INVALID_ARGUMENT。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
+// 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；CancelRun、UpsertSellerResponseDraft 以 expected_*
+// 版本把關，重送時版本已前進，回 ABORTED 而不重複生效。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
 //
 // 樂觀並發：expected_* 欄位是讀到的版本，與目前不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，
 // metadata 的 conflictTarget 說是哪一個物件過時（見 ErrorReason.VERSION_CONFLICT）。版本與 hash 一律是不透明的字串。
@@ -2341,9 +2343,14 @@ type PublishedRfq struct {
 	// 發布的對象數；公開池是 0。
 	RecipientCount int32 `protobuf:"varint,4,opt,name=recipient_count,json=recipientCount,proto3" json:"recipient_count,omitempty"`
 	// 已排入投遞的通知數；公開池是 0。
-	QueuedCount   int32 `protobuf:"varint,5,opt,name=queued_count,json=queuedCount,proto3" json:"queued_count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	QueuedCount int32 `protobuf:"varint,5,opt,name=queued_count,json=queuedCount,proto3" json:"queued_count,omitempty"`
+	// 這次發布依據的詢價確認快照（ConfirmRfqSnapshotResponse.confirmed_rfq_snapshot_id）。
+	ConfirmedRfqSnapshotId string `protobuf:"bytes,6,opt,name=confirmed_rfq_snapshot_id,json=confirmedRfqSnapshotId,proto3" json:"confirmed_rfq_snapshot_id,omitempty"`
+	// 該快照的 hash，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
+	// 讓買家重新載入之後仍能接受報價。
+	RfqSnapshotHash string `protobuf:"bytes,7,opt,name=rfq_snapshot_hash,json=rfqSnapshotHash,proto3" json:"rfq_snapshot_hash,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PublishedRfq) Reset() {
@@ -2409,6 +2416,20 @@ func (x *PublishedRfq) GetQueuedCount() int32 {
 		return x.QueuedCount
 	}
 	return 0
+}
+
+func (x *PublishedRfq) GetConfirmedRfqSnapshotId() string {
+	if x != nil {
+		return x.ConfirmedRfqSnapshotId
+	}
+	return ""
+}
+
+func (x *PublishedRfq) GetRfqSnapshotHash() string {
+	if x != nil {
+		return x.RfqSnapshotHash
+	}
+	return ""
 }
 
 type ConversationMessage struct {
@@ -2631,7 +2652,9 @@ type SubmitTurnResponse struct {
 	RequestId      string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	ConversationId string `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	// 這一輪的 run，傳給 WatchRun。
-	RunId         string `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	RunId string `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// run 受理時的版本，可直接當 CancelRunRequest.expected_run_version；run 前進之後版本已變，回 ABORTED 時改讀 GetRuntimeSnapshot。
+	RunVersion    string `protobuf:"bytes,4,opt,name=run_version,json=runVersion,proto3" json:"run_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2683,6 +2706,13 @@ func (x *SubmitTurnResponse) GetConversationId() string {
 func (x *SubmitTurnResponse) GetRunId() string {
 	if x != nil {
 		return x.RunId
+	}
+	return ""
+}
+
+func (x *SubmitTurnResponse) GetRunVersion() string {
+	if x != nil {
+		return x.RunVersion
 	}
 	return ""
 }
@@ -3059,10 +3089,11 @@ func (x *Candidate) GetStore() *v1alpha1.StoreCard {
 }
 
 type StartCandidateSearchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ClientRequestId string                 `protobuf:"bytes,2,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StartCandidateSearchRequest) Reset() {
@@ -3102,6 +3133,13 @@ func (x *StartCandidateSearchRequest) GetRequestId() string {
 	return ""
 }
 
+func (x *StartCandidateSearchRequest) GetClientRequestId() string {
+	if x != nil {
+		return x.ClientRequestId
+	}
+	return ""
+}
+
 type StartCandidateSearchResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -3109,8 +3147,10 @@ type StartCandidateSearchResponse struct {
 	RunId          string    `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	Status         RunStatus `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.RunStatus" json:"status,omitempty"`
 	CandidateSetId string    `protobuf:"bytes,4,opt,name=candidate_set_id,json=candidateSetId,proto3" json:"candidate_set_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// run 受理時的版本，用法同 SubmitTurnResponse.run_version。
+	RunVersion    string `protobuf:"bytes,5,opt,name=run_version,json=runVersion,proto3" json:"run_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartCandidateSearchResponse) Reset() {
@@ -3167,6 +3207,13 @@ func (x *StartCandidateSearchResponse) GetStatus() RunStatus {
 func (x *StartCandidateSearchResponse) GetCandidateSetId() string {
 	if x != nil {
 		return x.CandidateSetId
+	}
+	return ""
+}
+
+func (x *StartCandidateSearchResponse) GetRunVersion() string {
+	if x != nil {
+		return x.RunVersion
 	}
 	return ""
 }
@@ -3229,7 +3276,7 @@ type GetCandidateSearchResponse struct {
 	RunId          string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	CandidateSetId string                 `protobuf:"bytes,3,opt,name=candidate_set_id,json=candidateSetId,proto3" json:"candidate_set_id,omitempty"`
 	Status         RunStatus              `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.RunStatus" json:"status,omitempty"`
-	// 只在 FAILED 時有值。
+	// 只在 FAILED 與 EXPIRED 時有值。
 	FailureReason RunFailureReason `protobuf:"varint,5,opt,name=failure_reason,json=failureReason,proto3,enum=hawkr.procurement.v1alpha1.RunFailureReason" json:"failure_reason,omitempty"`
 	Candidates    []*Candidate     `protobuf:"bytes,6,rep,name=candidates,proto3" json:"candidates,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -3595,8 +3642,10 @@ type RewindRequest struct {
 	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	SlotKey         SlotKey                `protobuf:"varint,2,opt,name=slot_key,json=slotKey,proto3,enum=hawkr.procurement.v1alpha1.SlotKey" json:"slot_key,omitempty"`
 	ClientRequestId string                 `protobuf:"bytes,3,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// 讀到的需求版本；需求已被改版（別的裝置回答或倒回過）回 ABORTED，reason 是 VERSION_CONFLICT，conflictTarget 是 request_revision。
+	ExpectedRevisionId string `protobuf:"bytes,4,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *RewindRequest) Reset() {
@@ -3646,6 +3695,13 @@ func (x *RewindRequest) GetSlotKey() SlotKey {
 func (x *RewindRequest) GetClientRequestId() string {
 	if x != nil {
 		return x.ClientRequestId
+	}
+	return ""
+}
+
+func (x *RewindRequest) GetExpectedRevisionId() string {
+	if x != nil {
+		return x.ExpectedRevisionId
 	}
 	return ""
 }
@@ -6524,8 +6580,10 @@ type RunAccepted struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RunId          string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 受理時的 run 版本，用法同 SubmitTurnResponse.run_version。
+	RunVersion    string `protobuf:"bytes,3,opt,name=run_version,json=runVersion,proto3" json:"run_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RunAccepted) Reset() {
@@ -6568,6 +6626,13 @@ func (x *RunAccepted) GetRunId() string {
 func (x *RunAccepted) GetConversationId() string {
 	if x != nil {
 		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *RunAccepted) GetRunVersion() string {
+	if x != nil {
+		return x.RunVersion
 	}
 	return ""
 }
@@ -8536,13 +8601,15 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\vexpire_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\n" +
 	"expireTime\x88\x01\x01\x12G\n" +
 	"\bquestion\x18\x04 \x01(\v2+.hawkr.procurement.v1alpha1.ClarifyQuestionR\bquestionB\x0e\n" +
-	"\f_expire_time\"\xda\x01\n" +
+	"\f_expire_time\"\xc1\x02\n" +
 	"\fPublishedRfq\x12%\n" +
 	"\x0epublication_id\x18\x01 \x01(\tR\rpublicationId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12=\n" +
 	"\fpublish_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vpublishTime\x12'\n" +
 	"\x0frecipient_count\x18\x04 \x01(\x05R\x0erecipientCount\x12!\n" +
-	"\fqueued_count\x18\x05 \x01(\x05R\vqueuedCount\"\xd3\x02\n" +
+	"\fqueued_count\x18\x05 \x01(\x05R\vqueuedCount\x129\n" +
+	"\x19confirmed_rfq_snapshot_id\x18\x06 \x01(\tR\x16confirmedRfqSnapshotId\x12*\n" +
+	"\x11rfq_snapshot_hash\x18\a \x01(\tR\x0frfqSnapshotHash\"\xd3\x02\n" +
 	"\x13ConversationMessage\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12@\n" +
 	"\x04role\x18\x02 \x01(\x0e2,.hawkr.procurement.v1alpha1.ConversationRoleR\x04role\x12\x12\n" +
@@ -8561,12 +8628,14 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
 	"\amessage\x18\x02 \x01(\tB\x03\xe0A\x02R\amessage\x127\n" +
-	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"s\n" +
+	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"\x94\x01\n" +
 	"\x12SubmitTurnResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x15\n" +
-	"\x06run_id\x18\x03 \x01(\tR\x05runId\"8\n" +
+	"\x06run_id\x18\x03 \x01(\tR\x05runId\x12\x1f\n" +
+	"\vrun_version\x18\x04 \x01(\tR\n" +
+	"runVersion\"8\n" +
 	"\x12GetSnapshotRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\"\xdb\x05\n" +
@@ -8602,16 +8671,19 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\n" +
 	"facts_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tfactsTime\x12\x1a\n" +
 	"\bselected\x18\a \x01(\bR\bselected\x126\n" +
-	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\"A\n" +
+	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\"z\n" +
 	"\x1bStartCandidateSearchRequest\x12\"\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\"\xbd\x01\n" +
+	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x127\n" +
+	"\x11client_request_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"\xde\x01\n" +
 	"\x1cStartCandidateSearchResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12=\n" +
 	"\x06status\x18\x03 \x01(\x0e2%.hawkr.procurement.v1alpha1.RunStatusR\x06status\x12(\n" +
-	"\x10candidate_set_id\x18\x04 \x01(\tR\x0ecandidateSetId\"[\n" +
+	"\x10candidate_set_id\x18\x04 \x01(\tR\x0ecandidateSetId\x12\x1f\n" +
+	"\vrun_version\x18\x05 \x01(\tR\n" +
+	"runVersion\"[\n" +
 	"\x19GetCandidateSearchRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x12\x1a\n" +
@@ -8649,12 +8721,13 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x14expected_revision_id\x18\a \x01(\tB\x03\xe0A\x02R\x12expectedRevisionId\x127\n" +
 	"\x11client_request_id\x18\b \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"V\n" +
 	"\x14SubmitAnswerResponse\x12>\n" +
-	"\x06result\x18\x01 \x01(\v2&.hawkr.procurement.v1alpha1.TurnResultR\x06result\"\xb1\x01\n" +
+	"\x06result\x18\x01 \x01(\v2&.hawkr.procurement.v1alpha1.TurnResultR\x06result\"\xe8\x01\n" +
 	"\rRewindRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x12C\n" +
 	"\bslot_key\x18\x02 \x01(\x0e2#.hawkr.procurement.v1alpha1.SlotKeyB\x03\xe0A\x02R\aslotKey\x127\n" +
-	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"P\n" +
+	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x125\n" +
+	"\x14expected_revision_id\x18\x04 \x01(\tB\x03\xe0A\x02R\x12expectedRevisionId\"P\n" +
 	"\x0eRewindResponse\x12>\n" +
 	"\x06result\x18\x01 \x01(\v2&.hawkr.procurement.v1alpha1.TurnResultR\x06result\"\xcb\x01\n" +
 	"\x13BuyerRequestedRange\x121\n" +
@@ -8914,10 +8987,12 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\bfinished\x18\n" +
 	" \x01(\v2'.hawkr.procurement.v1alpha1.RunFinishedH\x00R\bfinished\x12B\n" +
 	"\x05error\x18\v \x01(\v2*.hawkr.procurement.v1alpha1.RunStreamErrorH\x00R\x05errorB\a\n" +
-	"\x05event\"M\n" +
+	"\x05event\"n\n" +
 	"\vRunAccepted\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12'\n" +
-	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\x1f\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1f\n" +
+	"\vrun_version\x18\x03 \x01(\tR\n" +
+	"runVersion\"\x1f\n" +
 	"\tTextDelta\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"S\n" +
 	"\tStepEvent\x12\x10\n" +

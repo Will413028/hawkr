@@ -64,30 +64,34 @@ EXPECTED = {
     ],
 }
 
-SERVICE_RE = re.compile(r"^\s*service\s+(\w+)\s*\{")
-RPC_RE = re.compile(r"^\s*rpc\s+(\w+)\s*\(")
+SERVICE_RE = re.compile(r"\bservice\s+(\w+)\s*(\{|$)")
+RPC_RE = re.compile(r"\brpc\s+(\w+)\s*\(")
+BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+
+
+def strip_comments(text: str) -> str:
+    """去掉區塊與行註解（字串字面值內的 // 與 /* 不處理：proto 的 service 區段沒有）。"""
+    return LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", text))
 
 
 def actual(api: Path) -> dict:
-    """{(檔, service): [rpc 名稱]}；檔案缺少時 service 對應空清單。"""
+    """{(檔, service): [rpc 名稱]}；檔案缺少時不產生任何鍵，缺的 rpc 由比對報告。"""
     out = {}
     files = sorted({f for f, _ in EXPECTED})
     for rel in files:
         path = api / rel
         if not path.is_file():
             print(f"缺檔：{rel}")
-            out[(rel, None)] = []
             continue
         current = None
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.lstrip().startswith("//"):
-                continue
-            m = SERVICE_RE.match(line)
+        for line in strip_comments(path.read_text(encoding="utf-8")).splitlines():
+            m = SERVICE_RE.search(line)
             if m:
                 current = m.group(1)
                 out.setdefault((rel, current), [])
                 continue
-            m = RPC_RE.match(line)
+            m = RPC_RE.search(line)
             if m and current:
                 out[(rel, current)].append(m.group(1))
     return out

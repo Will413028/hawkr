@@ -31,12 +31,14 @@ class SendAssistantMessageRequest extends $pb.GeneratedMessage {
     $core.String? sessionId,
     $core.String? message,
     $core.String? imageUrl,
+    $core.String? clientRequestId,
   }) {
     final result = SendAssistantMessageRequest._();
     if (topic != null) result.topic = topic;
     if (sessionId != null) result.sessionId = sessionId;
     if (message != null) result.message = message;
     if (imageUrl != null) result.imageUrl = imageUrl;
+    if (clientRequestId != null) result.clientRequestId = clientRequestId;
     return result;
   }
 
@@ -59,6 +61,7 @@ class SendAssistantMessageRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
     ..aOS(3, _omitFieldNames ? '' : 'message')
     ..aOS(4, _omitFieldNames ? '' : 'imageUrl')
+    ..aOS(5, _omitFieldNames ? '' : 'clientRequestId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -126,6 +129,16 @@ class SendAssistantMessageRequest extends $pb.GeneratedMessage {
   $core.bool hasImageUrl() => $_has(3);
   @$pb.TagNumber(4)
   void clearImageUrl() => $_clearField(4);
+
+  /// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  @$pb.TagNumber(5)
+  $core.String get clientRequestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set clientRequestId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasClientRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearClientRequestId() => $_clearField(5);
 }
 
 class SendAssistantMessageResponse extends $pb.GeneratedMessage {

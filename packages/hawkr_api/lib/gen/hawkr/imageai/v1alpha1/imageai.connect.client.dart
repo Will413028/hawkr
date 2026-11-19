@@ -10,8 +10,9 @@ import "imageai.connect.spec.dart" as specs;
 /// ImageAiAppService 是登入的賣家的修圖方法。店家取自呼叫者目前的店家，帳號沒有賣家角色時回 permission_denied。
 extension type ImageAiAppServiceClient (connect.Transport _transport) {
   /// TransformImage 以提示詞修一張圖，成功時扣一次本週額度。
-  /// 錯誤：額度用完回 resource_exhausted；圖片被安全性檢查擋下、圖片涉及著作權複誦、模型沒有產出圖片回
-  /// failed_precondition（LocalizedMessage 說明原因與是否可以重試）；模型供應商無法呼叫回 unavailable。
+  /// 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；failed_precondition 的 reason 是
+  /// IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（換圖或改提示詞，不要重試）、IMAGE_NOT_PRODUCED（可以重試）；
+  /// 模型供應商無法呼叫回 unavailable。
   /// 呼叫失敗時額度退回。
   Future<hawkrimageaiv1alpha1imageai.TransformImageResponse> transformImage(
     hawkrimageaiv1alpha1imageai.TransformImageRequest input, {

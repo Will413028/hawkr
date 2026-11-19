@@ -153,9 +153,11 @@ type SendAssistantMessageRequest struct {
 	SessionId string `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Message   string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	// 附帶的圖片網址；沒有圖時不設。
-	ImageUrl      *string `protobuf:"bytes,4,opt,name=image_url,json=imageUrl,proto3,oneof" json:"image_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ImageUrl *string `protobuf:"bytes,4,opt,name=image_url,json=imageUrl,proto3,oneof" json:"image_url,omitempty"`
+	// 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+	ClientRequestId string `protobuf:"bytes,5,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SendAssistantMessageRequest) Reset() {
@@ -212,6 +214,13 @@ func (x *SendAssistantMessageRequest) GetMessage() string {
 func (x *SendAssistantMessageRequest) GetImageUrl() string {
 	if x != nil && x.ImageUrl != nil {
 		return *x.ImageUrl
+	}
+	return ""
+}
+
+func (x *SendAssistantMessageRequest) GetClientRequestId() string {
+	if x != nil {
+		return x.ClientRequestId
 	}
 	return ""
 }
@@ -819,13 +828,14 @@ var File_hawkr_assistant_v1alpha1_assistant_proto protoreflect.FileDescriptor
 
 const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\xd0\x01\n" +
+	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\x89\x02\n" +
 	"\x1bSendAssistantMessageRequest\x12C\n" +
 	"\x05topic\x18\x01 \x01(\x0e2(.hawkr.assistant.v1alpha1.AssistantTopicB\x03\xe0A\x02R\x05topic\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1d\n" +
 	"\amessage\x18\x03 \x01(\tB\x03\xe0A\x02R\amessage\x12 \n" +
-	"\timage_url\x18\x04 \x01(\tH\x00R\bimageUrl\x88\x01\x01B\f\n" +
+	"\timage_url\x18\x04 \x01(\tH\x00R\bimageUrl\x88\x01\x01\x127\n" +
+	"\x11client_request_id\x18\x05 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestIdB\f\n" +
 	"\n" +
 	"_image_url\"V\n" +
 	"\x1cSendAssistantMessageResponse\x12\x17\n" +

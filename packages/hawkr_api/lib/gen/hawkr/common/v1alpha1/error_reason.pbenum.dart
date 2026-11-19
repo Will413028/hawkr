@@ -27,8 +27,10 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 依據的版本已經過時：修改時帶的 etag 與目前的不符（搭配 aborted），或以 key 建立時那筆已經存在
   /// （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
   /// （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
-  /// client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
-  /// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
+  /// client 不認得時照一般版本衝突處理。
+  /// 商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
+  /// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+  /// 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
   static const ErrorReason VERSION_CONFLICT =
       ErrorReason._(1, _omitEnumNames ? '' : 'VERSION_CONFLICT');
 
@@ -155,6 +157,26 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason AGENT_MONTHLY_QUOTA_EXCEEDED =
       ErrorReason._(25, _omitEnumNames ? '' : 'AGENT_MONTHLY_QUOTA_EXCEEDED');
 
+  /// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
+  /// 不提供重試；同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，稍後可再試。
+  static const ErrorReason IMAGE_QUOTA_EXCEEDED =
+      ErrorReason._(26, _omitEnumNames ? '' : 'IMAGE_QUOTA_EXCEEDED');
+
+  /// 圖片或提示詞被安全性檢查擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+  /// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
+  static const ErrorReason IMAGE_SAFETY_BLOCKED =
+      ErrorReason._(27, _omitEnumNames ? '' : 'IMAGE_SAFETY_BLOCKED');
+
+  /// 圖片涉及著作權複誦而被擋下（搭配 failed_precondition）：TransformImage。同一份輸入重送結果相同，
+  /// client 請使用者換一張圖，不自動重試。額度退回。
+  static const ErrorReason IMAGE_RECITATION_BLOCKED =
+      ErrorReason._(28, _omitEnumNames ? '' : 'IMAGE_RECITATION_BLOCKED');
+
+  /// 模型沒有產出圖片（搭配 failed_precondition）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+  /// client 可以讓使用者直接重試。額度退回。
+  static const ErrorReason IMAGE_NOT_PRODUCED =
+      ErrorReason._(29, _omitEnumNames ? '' : 'IMAGE_NOT_PRODUCED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -182,10 +204,14 @@ class ErrorReason extends $pb.ProtobufEnum {
     RFQ_CHECKOUT_ALREADY_ACTIVE,
     RFQ_ALREADY_AWARDED,
     AGENT_MONTHLY_QUOTA_EXCEEDED,
+    IMAGE_QUOTA_EXCEEDED,
+    IMAGE_SAFETY_BLOCKED,
+    IMAGE_RECITATION_BLOCKED,
+    IMAGE_NOT_PRODUCED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 25);
+      $pb.ProtobufEnum.$_initByValueList(values, 29);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

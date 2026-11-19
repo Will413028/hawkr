@@ -13,6 +13,7 @@ syntax = "proto3";
 package hawkr.assistant.v1alpha1;
 
 import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/error_reason.proto";
@@ -60,6 +61,11 @@ message SendAssistantMessageRequest {
   string message = 3 [(google.api.field_behavior) = REQUIRED];
   // 附帶的圖片網址；沒有圖時不設。
   optional string image_url = 4;
+  // 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，回第一次的 turn_id，不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  string client_request_id = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 message SendAssistantMessageResponse {

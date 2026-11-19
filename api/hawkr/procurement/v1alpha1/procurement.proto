@@ -10,7 +10,9 @@ syntax = "proto3";
 // reason 是 REPLAY_CURSOR_AHEAD。client 兩種都改讀 GetRuntimeSnapshot 重建畫面。
 //
 // 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
-// 內容不同回 INVALID_ARGUMENT。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
+// 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；CancelRun、UpsertSellerResponseDraft 以 expected_*
+// 版本把關，重送時版本已前進，回 ABORTED 而不重複生效。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
 //
 // 樂觀並發：expected_* 欄位是讀到的版本，與目前不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，
 // metadata 的 conflictTarget 說是哪一個物件過時（見 ErrorReason.VERSION_CONFLICT）。版本與 hash 一律是不透明的字串。
@@ -519,6 +521,11 @@ message PublishedRfq {
   int32 recipient_count = 4;
   // 已排入投遞的通知數；公開池是 0。
   int32 queued_count = 5;
+  // 這次發布依據的詢價確認快照（ConfirmRfqSnapshotResponse.confirmed_rfq_snapshot_id）。
+  string confirmed_rfq_snapshot_id = 6;
+  // 該快照的 hash，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
+  // 讓買家重新載入之後仍能接受報價。
+  string rfq_snapshot_hash = 7;
 }
 
 message ConversationMessage {
@@ -554,6 +561,8 @@ message SubmitTurnResponse {
   string conversation_id = 2;
   // 這一輪的 run，傳給 WatchRun。
   string run_id = 3;
+  // run 受理時的版本，可直接當 CancelRunRequest.expected_run_version；run 前進之後版本已變，回 ABORTED 時改讀 GetRuntimeSnapshot。
+  string run_version = 4;
 }
 
 message GetSnapshotRequest {
@@ -605,6 +614,10 @@ message Candidate {
 
 message StartCandidateSearchRequest {
   string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 message StartCandidateSearchResponse {
@@ -613,6 +626,8 @@ message StartCandidateSearchResponse {
   string run_id = 2;
   RunStatus status = 3;
   string candidate_set_id = 4;
+  // run 受理時的版本，用法同 SubmitTurnResponse.run_version。
+  string run_version = 5;
 }
 
 message GetCandidateSearchRequest {
@@ -625,7 +640,7 @@ message GetCandidateSearchResponse {
   string run_id = 2;
   string candidate_set_id = 3;
   RunStatus status = 4;
-  // 只在 FAILED 時有值。
+  // 只在 FAILED 與 EXPIRED 時有值。
   RunFailureReason failure_reason = 5;
   repeated Candidate candidates = 6;
 }
@@ -673,6 +688,8 @@ message RewindRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.field_info).format = UUID4
   ];
+  // 讀到的需求版本；需求已被改版（別的裝置回答或倒回過）回 ABORTED，reason 是 VERSION_CONFLICT，conflictTarget 是 request_revision。
+  string expected_revision_id = 4 [(google.api.field_behavior) = REQUIRED];
 }
 
 message RewindResponse {
@@ -1045,6 +1062,8 @@ message WatchRunResponse {
 message RunAccepted {
   string run_id = 1;
   string conversation_id = 2;
+  // 受理時的 run 版本，用法同 SubmitTurnResponse.run_version。
+  string run_version = 3;
 }
 
 message TextDelta {

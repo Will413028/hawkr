@@ -79,6 +79,14 @@ const SendAssistantMessageRequest$json = {
       '10': 'imageUrl',
       '17': true
     },
+    {
+      '1': 'client_request_id',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'clientRequestId'
+    },
   ],
   '8': [
     {'1': '_image_url'},
@@ -90,7 +98,8 @@ final $typed_data.Uint8List sendAssistantMessageRequestDescriptor = $convert.bas
     'ChtTZW5kQXNzaXN0YW50TWVzc2FnZVJlcXVlc3QSQwoFdG9waWMYASABKA4yKC5oYXdrci5hc3'
     'Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VG9waWNCA+BBAlIFdG9waWMSHQoKc2Vzc2lvbl9p'
     'ZBgCIAEoCVIJc2Vzc2lvbklkEh0KB21lc3NhZ2UYAyABKAlCA+BBAlIHbWVzc2FnZRIgCglpbW'
-    'FnZV91cmwYBCABKAlIAFIIaW1hZ2VVcmyIAQFCDAoKX2ltYWdlX3VybA==');
+    'FnZV91cmwYBCABKAlIAFIIaW1hZ2VVcmyIAQESNwoRY2xpZW50X3JlcXVlc3RfaWQYBSABKAlC'
+    'C+BBAuKMz9cIAggBUg9jbGllbnRSZXF1ZXN0SWRCDAoKX2ltYWdlX3VybA==');
 
 @$core.Deprecated('Use sendAssistantMessageResponseDescriptor instead')
 const SendAssistantMessageResponse$json = {

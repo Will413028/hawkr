@@ -986,6 +986,14 @@ const PublishedRfq$json = {
     },
     {'1': 'recipient_count', '3': 4, '4': 1, '5': 5, '10': 'recipientCount'},
     {'1': 'queued_count', '3': 5, '4': 1, '5': 5, '10': 'queuedCount'},
+    {
+      '1': 'confirmed_rfq_snapshot_id',
+      '3': 6,
+      '4': 1,
+      '5': 9,
+      '10': 'confirmedRfqSnapshotId'
+    },
+    {'1': 'rfq_snapshot_hash', '3': 7, '4': 1, '5': 9, '10': 'rfqSnapshotHash'},
   ],
 };
 
@@ -994,7 +1002,9 @@ final $typed_data.Uint8List publishedRfqDescriptor = $convert.base64Decode(
     'CgxQdWJsaXNoZWRSZnESJQoOcHVibGljYXRpb25faWQYASABKAlSDXB1YmxpY2F0aW9uSWQSGA'
     'oHdmVyc2lvbhgCIAEoCVIHdmVyc2lvbhI9CgxwdWJsaXNoX3RpbWUYAyABKAsyGi5nb29nbGUu'
     'cHJvdG9idWYuVGltZXN0YW1wUgtwdWJsaXNoVGltZRInCg9yZWNpcGllbnRfY291bnQYBCABKA'
-    'VSDnJlY2lwaWVudENvdW50EiEKDHF1ZXVlZF9jb3VudBgFIAEoBVILcXVldWVkQ291bnQ=');
+    'VSDnJlY2lwaWVudENvdW50EiEKDHF1ZXVlZF9jb3VudBgFIAEoBVILcXVldWVkQ291bnQSOQoZ'
+    'Y29uZmlybWVkX3JmcV9zbmFwc2hvdF9pZBgGIAEoCVIWY29uZmlybWVkUmZxU25hcHNob3RJZB'
+    'IqChFyZnFfc25hcHNob3RfaGFzaBgHIAEoCVIPcmZxU25hcHNob3RIYXNo');
 
 @$core.Deprecated('Use conversationMessageDescriptor instead')
 const ConversationMessage$json = {
@@ -1110,6 +1120,7 @@ const SubmitTurnResponse$json = {
     {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
     {'1': 'conversation_id', '3': 2, '4': 1, '5': 9, '10': 'conversationId'},
     {'1': 'run_id', '3': 3, '4': 1, '5': 9, '10': 'runId'},
+    {'1': 'run_version', '3': 4, '4': 1, '5': 9, '10': 'runVersion'},
   ],
 };
 
@@ -1117,7 +1128,7 @@ const SubmitTurnResponse$json = {
 final $typed_data.Uint8List submitTurnResponseDescriptor = $convert.base64Decode(
     'ChJTdWJtaXRUdXJuUmVzcG9uc2USHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEicKD2'
     'NvbnZlcnNhdGlvbl9pZBgCIAEoCVIOY29udmVyc2F0aW9uSWQSFQoGcnVuX2lkGAMgASgJUgVy'
-    'dW5JZA==');
+    'dW5JZBIfCgtydW5fdmVyc2lvbhgEIAEoCVIKcnVuVmVyc2lvbg==');
 
 @$core.Deprecated('Use getSnapshotRequestDescriptor instead')
 const GetSnapshotRequest$json = {
@@ -1327,6 +1338,14 @@ const StartCandidateSearchRequest$json = {
   '1': 'StartCandidateSearchRequest',
   '2': [
     {'1': 'request_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
+    {
+      '1': 'client_request_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'clientRequestId'
+    },
   ],
 };
 
@@ -1334,7 +1353,8 @@ const StartCandidateSearchRequest$json = {
 final $typed_data.Uint8List startCandidateSearchRequestDescriptor =
     $convert.base64Decode(
         'ChtTdGFydENhbmRpZGF0ZVNlYXJjaFJlcXVlc3QSIgoKcmVxdWVzdF9pZBgBIAEoCUID4EECUg'
-        'lyZXF1ZXN0SWQ=');
+        'lyZXF1ZXN0SWQSNwoRY2xpZW50X3JlcXVlc3RfaWQYAiABKAlCC+BBAuKMz9cIAggBUg9jbGll'
+        'bnRSZXF1ZXN0SWQ=');
 
 @$core.Deprecated('Use startCandidateSearchResponseDescriptor instead')
 const StartCandidateSearchResponse$json = {
@@ -1351,6 +1371,7 @@ const StartCandidateSearchResponse$json = {
       '10': 'status'
     },
     {'1': 'candidate_set_id', '3': 4, '4': 1, '5': 9, '10': 'candidateSetId'},
+    {'1': 'run_version', '3': 5, '4': 1, '5': 9, '10': 'runVersion'},
   ],
 };
 
@@ -1359,7 +1380,7 @@ final $typed_data.Uint8List startCandidateSearchResponseDescriptor = $convert.ba
     'ChxTdGFydENhbmRpZGF0ZVNlYXJjaFJlc3BvbnNlEh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcX'
     'Vlc3RJZBIVCgZydW5faWQYAiABKAlSBXJ1bklkEj0KBnN0YXR1cxgDIAEoDjIlLmhhd2tyLnBy'
     'b2N1cmVtZW50LnYxYWxwaGExLlJ1blN0YXR1c1IGc3RhdHVzEigKEGNhbmRpZGF0ZV9zZXRfaW'
-    'QYBCABKAlSDmNhbmRpZGF0ZVNldElk');
+    'QYBCABKAlSDmNhbmRpZGF0ZVNldElkEh8KC3J1bl92ZXJzaW9uGAUgASgJUgpydW5WZXJzaW9u');
 
 @$core.Deprecated('Use getCandidateSearchRequestDescriptor instead')
 const GetCandidateSearchRequest$json = {
@@ -1551,6 +1572,14 @@ const RewindRequest$json = {
       '8': {},
       '10': 'clientRequestId'
     },
+    {
+      '1': 'expected_revision_id',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'expectedRevisionId'
+    },
   ],
 };
 
@@ -1559,7 +1588,8 @@ final $typed_data.Uint8List rewindRequestDescriptor = $convert.base64Decode(
     'Cg1SZXdpbmRSZXF1ZXN0EiIKCnJlcXVlc3RfaWQYASABKAlCA+BBAlIJcmVxdWVzdElkEkMKCH'
     'Nsb3Rfa2V5GAIgASgOMiMuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuU2xvdEtleUID4EEC'
     'UgdzbG90S2V5EjcKEWNsaWVudF9yZXF1ZXN0X2lkGAMgASgJQgvgQQLijM/XCAIIAVIPY2xpZW'
-    '50UmVxdWVzdElk');
+    '50UmVxdWVzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAQgASgJQgPgQQJSEmV4cGVjdGVk'
+    'UmV2aXNpb25JZA==');
 
 @$core.Deprecated('Use rewindResponseDescriptor instead')
 const RewindResponse$json = {
@@ -3093,13 +3123,14 @@ const RunAccepted$json = {
   '2': [
     {'1': 'run_id', '3': 1, '4': 1, '5': 9, '10': 'runId'},
     {'1': 'conversation_id', '3': 2, '4': 1, '5': 9, '10': 'conversationId'},
+    {'1': 'run_version', '3': 3, '4': 1, '5': 9, '10': 'runVersion'},
   ],
 };
 
 /// Descriptor for `RunAccepted`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List runAcceptedDescriptor = $convert.base64Decode(
     'CgtSdW5BY2NlcHRlZBIVCgZydW5faWQYASABKAlSBXJ1bklkEicKD2NvbnZlcnNhdGlvbl9pZB'
-    'gCIAEoCVIOY29udmVyc2F0aW9uSWQ=');
+    'gCIAEoCVIOY29udmVyc2F0aW9uSWQSHwoLcnVuX3ZlcnNpb24YAyABKAlSCnJ1blZlcnNpb24=');
 
 @$core.Deprecated('Use textDeltaDescriptor instead')
 const TextDelta$json = {
