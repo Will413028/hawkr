@@ -34,15 +34,21 @@ func Migrations() fs.FS {
 
 // Deps 是模組需要的外部依賴，全部在組裝點提供。
 type Deps struct {
-	DB    *db.DB
-	Media media.Media
-	Jobs  jobs.Enqueuer
+	DB *db.DB
+	// Social 回答貼文是不是公開可讀：banner 的貼文目標建立時要公開可讀、讀取時隱藏失效的。組裝點給 *social.Module。
+	Social Social
+	Media  media.Media
+	Jobs   jobs.Enqueuer
 	// NewID 產生實體的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
 	Logger *slog.Logger
 }
+
+// Social 是 content 對 social 的需求（banner 的貼文目標）。
+type Social = banner.Social
+
 type BannerActionType = model.BannerActionType
 type BannerAction = model.BannerAction
 type Banner = model.Banner
@@ -75,9 +81,12 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
+	if d.Social == nil {
+		panic("content：缺 Social")
+	}
 	return &Module{
 		banner: banner.New(banner.Deps{
-			DB: d.DB, Media: d.Media, Jobs: d.Jobs, NewID: d.NewID, Now: d.Now,
+			DB: d.DB, Social: d.Social, Media: d.Media, Jobs: d.Jobs, NewID: d.NewID, Now: d.Now,
 		}),
 		appversion: appversion.New(appversion.Deps{DB: d.DB, Logger: d.Logger}),
 		mediaSync:  mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),

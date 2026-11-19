@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -64,6 +65,20 @@ type (
 	SubmitResult = model.SubmitResult
 	// DecideInput 是處理案件的輸入。
 	DecideInput = model.DecideInput
+	// ReportItem 是檢舉人讀自己檢舉時的一筆。
+	ReportItem = model.ReportItem
+	// ReportCursor 是檢舉清單的排序鍵。
+	ReportCursor = model.ReportCursor
+	// ReportPage 是一頁檢舉。
+	ReportPage = model.ReportPage
+	// CaseState 是案件的狀態篩選。
+	CaseState = model.CaseState
+	// CaseFilter 是列案件的篩選。
+	CaseFilter = model.CaseFilter
+	// CaseCursor 是案件清單的排序鍵。
+	CaseCursor = model.CaseCursor
+	// CasePage 是一頁案件。
+	CasePage = model.CasePage
 )
 
 const (
@@ -80,6 +95,8 @@ const (
 	OutcomePending      = model.OutcomePending
 	OutcomeViolation    = model.OutcomeViolation
 	OutcomeNoViolation  = model.OutcomeNoViolation
+	CaseOpen            = model.CaseOpen
+	CaseClosed          = model.CaseClosed
 	// DailyReportLimit 是每位檢舉人每個台北日最多新增的檢舉數。
 	DailyReportLimit = model.DailyReportLimit
 	// SnapshotRetention 是結案後保留內容快照的期間。
@@ -120,7 +137,7 @@ func New(d Deps) *Module {
 	return &Module{
 		d:         d,
 		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
-		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Now: d.Now}),
+		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
 		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}
@@ -177,12 +194,18 @@ func (r *Retention) PeriodicJobs() []*river.PeriodicJob { return r.svc.PeriodicJ
 
 // SubmitReport 送出一筆檢舉：對象要存在而且公開可讀，不能檢舉自己，每位檢舉人每個台北日最多新增 DailyReportLimit 筆；內容在送出時凍結成快照。
 // 這位檢舉人對這個對象在進行中案件裡已有檢舉時回傳既有的那一筆（Created 為假、不吃額度）；案件結案後可以再檢舉（開新案件）。
+// 帶 RequestID 時，同一位檢舉人的同一個 RequestID 一律回第一次的結果（含案件已結案之後），內容不同回 InvalidInput。
 func (m *Module) SubmitReport(ctx context.Context, in SubmitInput) (SubmitResult, error) {
 	return m.report.Submit(ctx, in)
 }
 
+// MyReports 列出檢舉人自己的檢舉，新到舊（keyset）：對象、類別、說明與由案件推導的結果（進行中、違規、不違規）；不含案件 ID。
+func (m *Module) MyReports(ctx context.Context, buyerID int64, after *ReportCursor, size int32) (ReportPage, error) {
+	return m.report.MyReports(ctx, buyerID, after, size)
+}
+
 // DecideCase 處理案件並結案：違規要帶認定類別、處置種類與給作者的理由，處置（social 的隱藏或警告、停權、seller 的內容下架）與結案在同一個 transaction；
-// 結案是終態。案件已結案或 Version 過期回 VersionConflict，處置整個回滾。
+// 結案是終態；同 transaction 寫一筆後台動作紀錄（Procedure 是動作名稱）。案件已結案或 Version 過期回 VersionConflict，處置整個回滾。
 func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, error) {
 	return m.handle.Decide(ctx, in)
 }
@@ -192,7 +215,17 @@ func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
 }
 
-// Retention 回傳模組的保留期與檢舉人資料清除（給組裝與測試）。
+// Cases 列案件（不含檢舉），開案時間新的在前（keyset）：state 篩進行中或已結案、target kind 篩對象種類，空值是不篩，不合法的值回 InvalidInput。
+func (m *Module) Cases(ctx context.Context, f CaseFilter, after *CaseCursor, size int32) (CasePage, error) {
+	return m.view.Cases(ctx, f, after, size)
+}
+
+// OpenReportCounts 回每篇貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中檢舉的貼文不在結果裡，讀的人當 0。後台貼文列表用。
+func (m *Module) OpenReportCounts(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return m.view.OpenReportCounts(ctx, postIDs)
+}
+
+// Retention 回傳模組的保留期與檢舉人資料清除（serve 以它訂閱買家的刪除事件；給組裝與測試）。
 func (m *Module) Retention() *Retention { return m.retention }
 
 // PurgeSnapshots 同 Retention.PurgeSnapshots。

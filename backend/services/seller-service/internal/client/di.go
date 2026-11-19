@@ -13,7 +13,6 @@ import (
 	payuniclient "github.com/Will413028/hawkr/seller-service/internal/client/payuni"
 	productclient "github.com/Will413028/hawkr/seller-service/internal/client/product"
 	reviewclient "github.com/Will413028/hawkr/seller-service/internal/client/review"
-	socialclient "github.com/Will413028/hawkr/seller-service/internal/client/social"
 	"github.com/Will413028/hawkr/seller-service/internal/config"
 	"github.com/Will413028/hawkr/seller-service/internal/usecase"
 	"go.uber.org/fx"
@@ -28,7 +27,6 @@ var Module = fx.Module("client",
 	fx.Provide(fx.Annotate(orderclient.NewClient, fx.As(new(usecase.OrderClient)), fx.As(new(usecase.ActiveMerchantOrderCountClient)))),
 	fx.Provide(fx.Annotate(buyerclient.NewClient, fx.As(new(usecase.BuyerClient)))),
 	fx.Provide(fx.Annotate(reviewclient.NewClient, fx.As(new(usecase.ReviewClient)))),
-	fx.Provide(fx.Annotate(socialclient.NewClient, fx.As(new(usecase.SocialClient)))),
 	fx.Provide(fx.Annotate(productclient.NewClient, fx.As(new(usecase.ProductClient)))),
 	fx.Provide(provideGeocodeClient),
 )

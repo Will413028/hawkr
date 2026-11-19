@@ -66,14 +66,15 @@ type GovernanceModule interface {
 
 // Governance 是 SellerGovernanceAdminService 的 handler。授權（管理員、每支方法的權限）由 adminauth 的 interceptor 檢查。
 type Governance struct {
-	m      GovernanceModule
-	images rpc.Images
-	owners ContentOwners
+	m         GovernanceModule
+	images    rpc.Images
+	snapshots ContentSnapshots
+	links     LinkAvailability
 }
 
-// ContentOwners 回報一則內容此刻的歸屬，給後台在建立內容下架前核對（social.Module 實作）。
-type ContentOwners interface {
-	ContentOwner(ctx context.Context, t social.Target) (social.ContentOwner, error)
+// ContentSnapshots 回報一則內容此刻的歸屬與內容快照，給後台在建立內容下架前一次讀取、同時核對歸屬與取得處分依據的內容版本（social.Module 實作）。
+type ContentSnapshots interface {
+	ContentSnapshot(ctx context.Context, t social.Target) (social.ContentSnapshot, error)
 }
 
 var _ sellerv1alpha1connect.SellerGovernanceAdminServiceHandler = (*Governance)(nil)
@@ -82,30 +83,36 @@ var _ sellerv1alpha1connect.SellerGovernanceAdminServiceHandler = (*Governance)(
 type GovernanceDeps struct {
 	Module GovernanceModule
 	Images rpc.Images
-	// ContentOwners 在後台建立內容下架前核對內容歸屬。
-	ContentOwners ContentOwners
+	// ContentSnapshots 在後台建立內容下架前核對內容歸屬並取得內容快照。
+	ContentSnapshots ContentSnapshots
+	// Links 回報措施內容快照的連結目標還在不在（讀措施時用）。
+	Links LinkAvailability
 }
 
-// NewGovernance 建立後台治理的 handler；Images 給轉報資料裡店家的 logo 與封面。後台直接建立內容下架時，內容須是這家店現存（沒有刪除）的內容，由 handler 向 social 核對；social 的同 transaction 訂閱者另擋別家店的內容。
+// NewGovernance 建立後台治理的 handler；Images 給轉報資料裡店家的 logo 與封面。後台直接建立內容下架時，內容須是這家店現存（沒有刪除）的內容，由 handler 向 social 讀取快照核對並取得內容版本；social 的同 transaction 訂閱者另擋別家店的內容。
 func NewGovernance(d GovernanceDeps) (*Governance, error) {
 	if d.Module == nil {
 		return nil, errors.New("seller governance：需要 Module")
 	}
-	if d.ContentOwners == nil {
-		return nil, errors.New("seller governance：需要 ContentOwners")
+	if d.ContentSnapshots == nil {
+		return nil, errors.New("seller governance：需要 ContentSnapshots")
 	}
-	return &Governance{m: d.Module, images: d.Images, owners: d.ContentOwners}, nil
+	if d.Links == nil {
+		return nil, errors.New("seller governance：需要 Links")
+	}
+	return &Governance{m: d.Module, images: d.Images, snapshots: d.ContentSnapshots, links: d.Links}, nil
 }
 
-// 模組輸入的欄位對應到請求的路徑。
+// 模組輸入的欄位對應到請求的路徑。名稱與請求的頂層欄位同名（snake_case）的欄位由 rpc 自動對應，這裡只列其餘的；空的對應表
+// 表示全部由自動規則對應。
 var (
-	listReportsPaths       = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "CaseID": "case_id"}
+	listReportsPaths       = rpc.FieldPaths{}
 	triagePaths            = rpc.FieldPaths{"AssessedCategory": "assessed_category", "Target": "target", "ExpectedVersion": "etag"}
 	markSeenPaths          = rpc.FieldPaths{"ExpectedVersion": "etag"}
-	resolvePaths           = rpc.FieldPaths{"Outcome": "outcome", "Note": "note", "ExpectedVersion": "etag"}
-	listCasesPaths         = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "AwaitingSeller": "awaiting_seller"}
-	decideCasePaths        = rpc.FieldPaths{"Decision": "decision", "Note": "note", "ExpectedVersion": "etag"}
-	changeSeverityPaths    = rpc.FieldPaths{"Severity": "severity", "Note": "note", "ExpectedVersion": "etag"}
+	resolvePaths           = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	listCasesPaths         = rpc.FieldPaths{}
+	decideCasePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	changeSeverityPaths    = rpc.FieldPaths{"ExpectedVersion": "etag"}
 	createNotePaths        = rpc.FieldPaths{"Body": "note.body"}
 	createMeasureNotePaths = createNotePaths
 	createWarningPaths     = createMeasurePaths(violationPaths("Violation", "warning.violation"))
@@ -118,15 +125,12 @@ var (
 	})
 	updateMeasurePaths     = rpc.FieldPaths{"StatementToSeller": "measure.statement", "EndsAt": "measure.end_time", "ExpectedVersion": "measure.etag"}
 	endMeasurePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}
-	revokeMeasurePaths     = rpc.FieldPaths{"Reason": "reason", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}
-	scheduleReviewPaths    = rpc.FieldPaths{"ReviewBy": "review_by", "Note": "note", "ExpectedVersion": "etag"}
-	decideAppealPaths      = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}
-	decideRemediationPaths = rpc.FieldPaths{"Reason": "reason", "Outcome": "decision", "ExpectedVersion": "etag"}
-	listMeasuresPaths      = rpc.FieldPaths{
-		"StoreID": "store_id", "AccountID": "account_id", "State": "state", "Basis": "basis", "RequestState": "request_state", "RequestKind": "request_kind",
-		"SourceCaseID": "source_case_id", "SourceReportID": "source_report_id", "SourceAuthorityOrderID": "source_authority_order_id",
-	}
-	listViolationsPaths = rpc.FieldPaths{"StoreID": "store_id", "AccountID": "account_id", "Status": "status"}
+	revokeMeasurePaths     = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	scheduleReviewPaths    = rpc.FieldPaths{"ExpectedVersion": "etag"}
+	decideAppealPaths      = rpc.FieldPaths{"Outcome": "decision", "ExpectedVersion": "etag"}
+	decideRemediationPaths = rpc.FieldPaths{"Outcome": "decision", "ExpectedVersion": "etag"}
+	listMeasuresPaths      = rpc.FieldPaths{}
+	listViolationsPaths    = rpc.FieldPaths{}
 )
 
 // reportEvidenceURI 與 requestEvidenceURI 是佐證的檢視網址（EvidenceReportRoute、EvidenceRequestRoute 的實例）。
@@ -370,7 +374,7 @@ func (h *Governance) GetReport(ctx context.Context, req *connect.Request[adminpb
 }
 
 func (h *Governance) TriageReport(ctx context.Context, req *connect.Request[adminpb.TriageReportRequest]) (*connect.Response[adminpb.TriageReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +402,7 @@ func (h *Governance) TriageReport(ctx context.Context, req *connect.Request[admi
 }
 
 func (h *Governance) MarkReportSupplementsSeen(ctx context.Context, req *connect.Request[adminpb.MarkReportSupplementsSeenRequest]) (*connect.Response[adminpb.MarkReportSupplementsSeenResponse], error) {
-	if _, err := adminFrom(ctx); err != nil {
+	if _, err := rpc.RequireAdmin(ctx); err != nil {
 		return nil, err
 	}
 	msg := req.Msg
@@ -418,7 +422,7 @@ func (h *Governance) MarkReportSupplementsSeen(ctx context.Context, req *connect
 }
 
 func (h *Governance) ResolveReport(ctx context.Context, req *connect.Request[adminpb.ResolveReportRequest]) (*connect.Response[adminpb.ResolveReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +445,7 @@ func (h *Governance) ResolveReport(ctx context.Context, req *connect.Request[adm
 }
 
 func (h *Governance) MoveReport(ctx context.Context, req *connect.Request[adminpb.MoveReportRequest]) (*connect.Response[adminpb.MoveReportResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +519,7 @@ func (h *Governance) GetCase(ctx context.Context, req *connect.Request[adminpb.G
 }
 
 func (h *Governance) DecideCase(ctx context.Context, req *connect.Request[adminpb.DecideCaseRequest]) (*connect.Response[adminpb.DecideCaseResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +542,7 @@ func (h *Governance) DecideCase(ctx context.Context, req *connect.Request[adminp
 }
 
 func (h *Governance) ChangeCaseSeverity(ctx context.Context, req *connect.Request[adminpb.ChangeCaseSeverityRequest]) (*connect.Response[adminpb.ChangeCaseSeverityResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -562,7 +566,7 @@ func (h *Governance) ChangeCaseSeverity(ctx context.Context, req *connect.Reques
 
 // CreateCaseNote 新增案件的內部註記：不帶 etag，也不改案件的任何 etag；severity_change 只由 ChangeCaseSeverity 寫，這裡不採用。
 func (h *Governance) CreateCaseNote(ctx context.Context, req *connect.Request[adminpb.CreateCaseNoteRequest]) (*connect.Response[adminpb.CreateCaseNoteResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

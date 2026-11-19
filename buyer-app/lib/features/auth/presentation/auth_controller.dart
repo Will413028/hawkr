@@ -49,11 +49,11 @@ class AuthController extends _$AuthController {
   /// 登入之後：GetSession 取得帳號、寫入 session。
   Future<void> _completeSignIn(AuthSession authSession) async {
     ref.read(sessionProvider.notifier).cancelRestore();
-    final String accountId;
+    final AccountSnapshot account;
     try {
-      accountId = await ref.read(authRepositoryProvider).currentAccountId();
+      account = await ref.read(authRepositoryProvider).currentAccount();
     } catch (error) {
-      if (error is UnauthorizedException || error is SuspendedException) {
+      if (error is UnauthorizedException) {
         try {
           await authSession.clear();
         } catch (clearError, stack) {
@@ -66,11 +66,13 @@ class AuthController extends _$AuthController {
       }
       rethrow;
     }
-    await _finishSignIn(accountId);
+    await _finishSignIn(account);
   }
 
-  Future<void> _finishSignIn(String accountId) async {
-    await ref.read(sessionProvider.notifier).login(userId: accountId);
+  Future<void> _finishSignIn(AccountSnapshot account) async {
+    await ref
+        .read(sessionProvider.notifier)
+        .login(userId: account.accountId, suspension: account.suspension);
     // GetSession 沒有個人資料，暱稱從 GET /app/buyers/me 讀 — 失敗不影響登入。
     try {
       final nickname = await ref.read(sessionProvider.notifier).fetchNickname();

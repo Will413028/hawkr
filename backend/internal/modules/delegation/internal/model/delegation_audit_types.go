@@ -2,8 +2,12 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 	"uuid"
 )
 
@@ -157,18 +161,20 @@ type ChangedField struct {
 
 // AuditLog 是一列代行稽核。actor 與 target 是寫入當下的快照，不由 session 推導（中途改名時兩者可能不同）。
 type AuditLog struct {
-	ID              uuid.UUID
-	SessionID       int64
-	Actor           DelegationActor
-	Target          DelegationTarget
-	Origin          AuditOrigin
-	Capability      Capability
-	Action          AuditAction
-	ResourceType    AuditResourceType
-	ResourceID      *string
-	ResourceName    *string
-	Result          AuditResult
+	ID           uuid.UUID
+	SessionID    int64
+	Actor        DelegationActor
+	Target       DelegationTarget
+	Origin       AuditOrigin
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	ResourceID   *string
+	ResourceName *string
+	Result       AuditResult
+	// BizCode 只有舊 gateway 的兩段式路徑寫入（過渡邊界）；FailureReason 是 FAILED 列的失敗原因（拒絕的代碼或 ErrorReason 的值名）。
 	BizCode         *int32
+	FailureReason   *string
 	OperationReason *string
 	CaseReference   *string
 	RequestID       string
@@ -234,8 +240,10 @@ type AuditConfirmInput struct {
 	AuditLogID uuid.UUID
 	// Result 是 SUCCEEDED 或 FAILED。
 	Result AuditResult
-	// BizCode 只記在 FAILED 的列；零值表示沒有。
+	// BizCode 只記在 FAILED 的列；零值表示沒有。只有舊 gateway 的轉接層帶（過渡邊界）。
 	BizCode int32
+	// FailureReason 是 FAILED 列的失敗原因（拒絕的代碼或 ErrorReason 的值名）；空值寫 FailureReasonInternal。
+	FailureReason string
 	// ResourceID 是建立類在這裡補上的 ID；nil 保留 intent 寫入的值。
 	ResourceID           *string
 	ResourceVersionAfter *int64
@@ -256,3 +264,73 @@ type ScheduledPublishAuditInput struct {
 func ScheduledPublishIdempotencyKey(scheduleID uuid.UUID) string {
 	return "schedule:" + scheduleID.String()
 }
+
+// OperationAuditInput 是代行互動寫入的單段稽核：與被稽核的寫入同一個 transaction，寫入成功才留下（失敗時一起 rollback）。
+type OperationAuditInput struct {
+	SessionID    int64
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	// ResourceID 是資源自己的 ID；建立類在寫入前沒有，留空，寫入的事件到了由 OperationOutcome.ResourceID 補上。
+	ResourceID            string
+	ResourceName          string
+	ResourceVersionBefore *int64
+	// OperationReason 去除首尾空白後 1–100 字，不得含控制字元。
+	OperationReason string
+	NotifySeller    bool
+	// RequestID 是呼叫方的 request_id（AIP-155）：同時是稽核列的 request_id 與 (session_id, idempotency_key) 的冪等鍵。
+	RequestID     string
+	CorrelationID string
+	UserAgent     string
+	// PayloadHash 綁定冪等鍵與請求內容：同一把鍵、不同內容不是重送。
+	PayloadHash string
+}
+
+// OperationOutcome 是被稽核的寫入完成後補進稽核列的事實。
+type OperationOutcome struct {
+	ResourceID   string
+	ResourceName string
+	// VersionAfter 是資源寫入後的版本；0 表示沒有版本。
+	VersionAfter int64
+}
+
+// FailureAuditInput 是一次失敗的代行請求的稽核：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。Session 是請求當時解析到的
+// session（可能已結束、到期或撤銷：失敗列正是要記下這一種嘗試）。
+type FailureAuditInput struct {
+	Session      DelegationSession
+	Capability   Capability
+	Action       AuditAction
+	ResourceType AuditResourceType
+	// ResourceID 與 ResourceVersionBefore 是請求指向的資源與它的版本；不知道（建立類、尚未解析）留空。
+	ResourceID string
+	// ResourceName 是請求已知的資源名稱（建立類的預覽）；不知道留空。
+	ResourceName          string
+	ResourceVersionBefore *int64
+	// OperationReason 只在值域合法時寫入（1–100 字）；寫入類的請求在驗證前就被拒絕時，理由可能是不合法的值，這時不寫。
+	OperationReason string
+	// RequestID 是呼叫方的 request_id；被拒絕得比解析請求還早（讀取、interceptor 的拒絕）時用請求的 trace ID。
+	RequestID     string
+	CorrelationID string
+	UserAgent     string
+	// Cause 是失敗的原因：failure_reason 取自 FailureReasonOf(Cause)：代行拒絕的代碼、ErrorReason，都沒有則是 INTERNAL。
+	Cause error
+}
+
+// OperationReasonMaxRunes 是操作原因的上限。
+const OperationReasonMaxRunes = 100
+
+// LegalOperationReason 回傳去除首尾空白後的操作原因，與它是否合法（1 到 OperationReasonMaxRunes 字、不含控制字元）。不合法的值不寫進稽核列。
+func LegalOperationReason(raw string) (string, bool) {
+	reason := strings.TrimSpace(raw)
+	if n := utf8.RuneCountInString(reason); n == 0 || n > OperationReasonMaxRunes {
+		return "", false
+	}
+	if strings.ContainsFunc(reason, unicode.IsControl) {
+		return "", false
+	}
+	return reason, true
+}
+
+// ErrOperationKeyTaken 表示 (session, request_id) 的 SUCCEEDED 稽核列已被另一個並行的請求寫下：RecordOperation 回它時沒有寫任何列，
+// 呼叫方要回傳它讓整個 transaction rollback（資源模組的寫入跟著消失），再於 transaction 外重讀那一列收斂為重送。
+var ErrOperationKeyTaken = errors.New("delegation：request_id 已有稽核列")

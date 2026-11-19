@@ -79,13 +79,10 @@ void main() {
     );
     verifyNever(
       () => repo.createPost(
-        sellerId: any(named: 'sellerId'),
-        title: any(named: 'title'),
         content: any(named: 'content'),
-        contentType: any(named: 'contentType'),
-        imageUrl: any(named: 'imageUrl'),
-        linkedProductId: any(named: 'linkedProductId'),
-        tags: any(named: 'tags'),
+        imageStagedToken: any(named: 'imageStagedToken'),
+        productId: any(named: 'productId'),
+        hashtags: any(named: 'hashtags'),
       ),
     );
     await tester.pump(const Duration(seconds: 3));

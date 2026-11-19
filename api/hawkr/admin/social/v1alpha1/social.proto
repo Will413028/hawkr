@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+// social 模組給後台的 API：貼文列表（含內容下架狀態與進行中的檢舉數）。前台的 API 在 hawkr.social.v1alpha1。
+//
+// 貼文是店家的內容，平台沒有「隱藏」貼文的入口：平台下架走 seller 的內容下架措施（決定 A7-D5′），
+// 要解除下架就用這裡給的措施 ID 呼叫 hawkr.admin.seller.v1alpha1 的措施撤銷，不在這個 service。
+// ID 是不透明的字串（貼文與措施是 UUID，店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。
+package hawkr.admin.social.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/social/v1alpha1/social.proto";
+
+// SocialAdminService 只有管理員能呼叫。
+service SocialAdminService {
+  // ListPosts 列出貼文（不含草稿與已刪除的），建立時間新到舊（同時間依貼文 ID 由大到小）；可只列被內容下架的。
+  rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// AdminPost 是後台看到的一篇貼文。
+message AdminPost {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 發文的店家。
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.social.v1alpha1.PostStatus status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次發布的時間；下架後再發布沿用。
+  google.protobuf.Timestamp publish_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 下架這篇貼文的內容下架措施 ID（seller 的措施）；沒有被內容下架時不設。一則內容同時至多一個生效中的內容下架措施。
+  optional string takedown_measure_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這篇貼文在進行中的案件裡的檢舉數；已結案案件的檢舉不算，沒有進行中的案件是 0。
+  int64 open_report_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 貼文的圖片，沒有圖時不設（與 hawkr.social.v1alpha1.Post.image 同形）。
+  hawkr.common.v1alpha1.Image image = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 貼文帶的商品 ID，沒有時不設（與 hawkr.social.v1alpha1.Post.product_id 同形）。
+  optional string product_id = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListPostsRequest {
+  // 每頁筆數：0 用預設值 20，上限 50，負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 為 true 只列被內容下架的貼文；false（未設）列全部。
+  bool taken_down_only = 3;
+}
+
+message ListPostsResponse {
+  repeated AdminPost posts = 1;
+  string next_page_token = 2;
+}

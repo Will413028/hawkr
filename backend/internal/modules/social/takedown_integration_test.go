@@ -11,6 +11,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
@@ -22,7 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫，
+// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫；measure_contents_measure_status_fkey 保留，因為撤銷措施時 measure_status 靠它同步，那是這組測試要驗的不變量，
 // 事件由測試依真實 seller 的形狀發布（seller 自己的規則與真實的建立入口在 seller、httpapi 的測試）。
 type takedowns struct {
 	f *fixture
@@ -34,18 +36,23 @@ func (f *fixture) takedowns(t *testing.T) takedowns {
 	events.Subscribe(f.bus, f.module.OnMeasureRevoked)
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f')
+		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f') AND conname <> 'measure_contents_measure_status_fkey'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return takedowns{f: f}
 }
 
 func (d takedowns) seed(t *testing.T, storeID int64, refs []seller.ContentRef) uuid.UUID {
 	t.Helper()
-	id := uuid.NewV7()
+	return d.seedAt(t, storeID, refs, uuid.NewV7(), d.f.clock())
+}
+
+// seedAt 以指定的 ID 與建立時間寫入 seller 的措施：ID 與建立時間的順序可以相反。
+func (d takedowns) seedAt(t *testing.T, storeID int64, refs []seller.ContentRef, id uuid.UUID, createdAt time.Time) uuid.UUID {
+	t.Helper()
 	d.f.exec(t, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)
-		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, d.f.clock())
+		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, createdAt)
 	for _, r := range refs {
-		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id) VALUES ($1, $2, $3)", id, string(r.Kind), r.ID)
+		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id, snapshot_state) VALUES ($1, $2, $3, 'CLEARED')", id, string(r.Kind), r.ID)
 	}
 	return id
 }
@@ -157,32 +164,6 @@ func TestContentTakedownHidesTheContentAndRevokeRestoresItImmediately(t *testing
 		t.Fatalf("撤銷後複本全刪：%d", n)
 	}
 	f.assertStatsMatchTheDataset(t, "撤銷後")
-}
-
-// 同一則內容被兩個措施下架：撤銷其中一個仍然隱藏，兩個都撤銷才回來。
-func TestRevokingOneOfTwoTakedownsKeepsTheContentHidden(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	td := f.takedowns(t)
-	w := f.takedownWorld(t)
-	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID), ref(seller.ContentForumEntry, w.entry.ID)}
-	first, second := td.create(t, w.storeID, refs...), td.create(t, w.storeID, refs...)
-
-	td.revoke(t, w.storeID, first, refs...)
-	if get, feed, _, _ := f.postVisible(t, w.post.ID); get || feed {
-		t.Fatal("還有另一個措施，貼文要維持隱藏")
-	}
-	if got := f.readable(t, w.other.ID, w.storeID); got.comments != 0 || got.forum != 0 {
-		t.Fatalf("還有另一個措施，留言與討論區留言維持隱藏：%+v", got)
-	}
-	f.assertStatsMatchTheDataset(t, "撤銷一個")
-	td.revoke(t, w.storeID, second, refs...)
-	if get, _, _, _ := f.postVisible(t, w.post.ID); !get {
-		t.Fatal("兩個都撤銷，貼文回來")
-	}
-	if got := f.readable(t, w.other.ID, w.storeID); got.comments != 1 || got.forum != 1 {
-		t.Fatalf("兩個都撤銷，內容回來：%+v", got)
-	}
 }
 
 // 建立與撤銷各排入受影響內容的快取失效 job（貼文：貼文 tag；留言：所屬貼文的 tag；討論區留言：店面頁 tag）。
@@ -335,7 +316,7 @@ func TestTakedownOfPurgedContentSucceedsWithoutReplica(t *testing.T) {
 	f.takedowns(t)
 	w := f.takedownWorld(t)
 	purged := f.publishedPost(t, w.storeID, "已清除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, w.storeID), purged.ID, purged.Version))
 	f.exec(t, `WITH c AS (SELECT id FROM social.comments WHERE post_id = $1),
 a AS (DELETE FROM social.comment_likes WHERE comment_id IN (SELECT id FROM c)),
 b AS (DELETE FROM social.comment_stats WHERE comment_id IN (SELECT id FROM c)),
@@ -389,7 +370,7 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	buyerComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, buyer, social.CommentInput{PostID: w.post.ID, Body: "買家在店家貼文下的留言"}))
 	buyerEntry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, buyer, social.ForumInput{StoreID: w.storeID, Body: "買家的討論"}))
 	foreignDeleted := f.publishedPost(t, otherStore, "別家店已刪除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, otherStore), foreignDeleted.ID, foreignDeleted.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, otherStore), foreignDeleted.ID, foreignDeleted.Version))
 	for name, tc := range map[string]seller.ContentRef{
 		"別家店的貼文":    ref(seller.ContentPost, foreign.ID),
 		"買家的留言":     ref(seller.ContentComment, buyerComment.ID),
@@ -423,7 +404,7 @@ func TestTakedownOfDeletedOwnContentSucceedsWithoutReplica(t *testing.T) {
 	f.takedowns(t)
 	w := f.takedownWorld(t)
 	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
-	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
 	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
 	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID, 0))
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
@@ -489,4 +470,82 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	live := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
 	must(t, svc.ApplyMissingTakedowns(ctx, live, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
+}
+
+// 每則內容至多一列複本（schema 鏡射 seller 的 measure_contents_one_enforced）：同一篇貼文被另一個措施再寫一列時唯一索引擋下，而不是靠讀取端挑一列。
+func TestSecondReplicaRowForTheSameContentViolatesTheUniqueIndex(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.takedownWorld(t)
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, post_id) VALUES ($1, $2)", uuid.NewV7(), w.post.ID)
+	_, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, post_id) VALUES ($1, $2)", uuid.NewV7(), w.post.ID)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "content_takedowns_post" {
+		t.Fatalf("同一篇貼文的第二列該違反 content_takedowns_post：%v", err)
+	}
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, comment_id) VALUES ($1, $2)", uuid.NewV7(), w.comment.ID)
+	if _, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, comment_id) VALUES ($1, $2)", uuid.NewV7(), w.comment.ID); !errors.As(err, &pgErr) || pgErr.ConstraintName != "content_takedowns_comment" {
+		t.Fatalf("同一則留言的第二列該違反 content_takedowns_comment：%v", err)
+	}
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, forum_entry_id) VALUES ($1, $2)", uuid.NewV7(), w.entry.ID)
+	if _, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, forum_entry_id) VALUES ($1, $2)", uuid.NewV7(), w.entry.ID); !errors.As(err, &pgErr) || pgErr.ConstraintName != "content_takedowns_forum_entry" {
+		t.Fatalf("同一則討論區留言的第二列該違反 content_takedowns_forum_entry：%v", err)
+	}
+}
+
+// 對帳補漏與撤銷的競爭：撤銷的 transaction 已經把措施改成 REVOKED 但尚未提交時，補漏等它（seller.pub_lock_content_takedowns 的 FOR SHARE），撤銷提交後補漏讀不到措施，不寫回複本。
+// 補漏是否卡在鎖上由 pg_stat_activity 的 wait_event_type 判斷，不靠時間。
+func TestReconcileInsertWaitsForAnUncommittedRevokeAndWritesNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	td := f.takedowns(t)
+	w := f.takedownWorld(t)
+	id := td.seed(t, w.storeID, []seller.ContentRef{ref(seller.ContentPost, w.post.ID)})
+	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
+
+	revoking, release := make(chan struct{}), make(chan struct{})
+	revokeDone := make(chan error, 1)
+	go func() {
+		revokeDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id); err != nil {
+				return err
+			}
+			close(revoking)
+			<-release
+			return nil
+		})
+	}()
+	select {
+	case <-revoking:
+	case err := <-revokeDone:
+		t.Fatalf("撤銷在持有變更之前就結束了：%v", err)
+	}
+
+	repairDone := make(chan error, 1)
+	go func() {
+		repairDone <- svc.ApplyMissingTakedowns(ctx, id, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}})
+	}()
+	waiting := func() bool {
+		return f.scalar(t, `SELECT count(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%pub_lock_content_takedowns%'`) > 0
+	}
+	for !waiting() {
+		select {
+		case err := <-repairDone:
+			t.Fatalf("補漏沒有等未提交的撤銷就結束了（err=%v）", err)
+		default:
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	close(release)
+	must(t, <-revokeDone)
+	must(t, <-repairDone)
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("撤銷提交後補漏不該寫回複本：%d 列", n)
+	}
+	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
+		t.Fatal("貼文照常可讀")
+	}
 }

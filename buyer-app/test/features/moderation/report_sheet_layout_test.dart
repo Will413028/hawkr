@@ -1,4 +1,4 @@
-import 'package:hawkr_buyer/features/moderation/data/report_target_type.dart';
+import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,16 +16,20 @@ void main() {
         systemTextScale: 2,
         viewPadding: const EdgeInsets.only(top: 24, bottom: 16),
         viewInsets: const EdgeInsets.only(bottom: 260),
+        // 面板讀 provider（語系），底部面板掛在 Navigator 下，所以 ProviderScope 要在 Navigator 之上。
         home: ProviderScope(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) => TextButton(
-                onPressed: () => showReportSheet(
-                  context,
-                  targetType: ReportTargetType.post,
-                  targetId: 'post-1',
+          child: Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => Scaffold(
+                body: Builder(
+                  builder: (context) => TextButton(
+                    onPressed: () => showReportSheet(
+                      context,
+                      target: const SocialReportTarget.post('post-1'),
+                    ),
+                    child: const Text('開啟檢舉'),
+                  ),
                 ),
-                child: const Text('開啟檢舉'),
               ),
             ),
           ),

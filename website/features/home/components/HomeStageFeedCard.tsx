@@ -241,11 +241,10 @@ export default function HomeStageFeedCard({
 				</div>
 				<div className="relative flex min-w-0 flex-col px-6 py-5">
 					{/*
-					 * NO fallback to sellerId here, unlike most sellerPath() callers.
 					 * On a post, an empty `storeCode` does not mean "this seller has
 					 * no code yet" — the gateway sets it only when GetSellerBatch found
 					 * the seller, so empty means NOT FOUND, and `/sellers/{store_id}`
-					 * then 404s instead of 308ing. post.go's field comment says it
+					 * then 404s. post.go's field comment says it
 					 * outright: "此時前端必須不渲染賣家連結，而不是退回 sellerId".
 					 *
 					 * The identity still renders — name and avatar come from

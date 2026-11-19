@@ -21,7 +21,6 @@ type contentTakedownsTable struct {
 	PostID       postgres.ColumnString
 	CommentID    postgres.ColumnString
 	ForumEntryID postgres.ColumnString
-	CreatedAt    postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -67,9 +66,8 @@ func newContentTakedownsTableImpl(schemaName, tableName, alias string) contentTa
 		PostIDColumn       = postgres.StringColumn("post_id")
 		CommentIDColumn    = postgres.StringColumn("comment_id")
 		ForumEntryIDColumn = postgres.StringColumn("forum_entry_id")
-		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
-		allColumns         = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn, CreatedAtColumn}
-		mutableColumns     = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn, CreatedAtColumn}
+		allColumns         = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn}
+		mutableColumns     = postgres.ColumnList{MeasureIDColumn, PostIDColumn, CommentIDColumn, ForumEntryIDColumn}
 		defaultColumns     = postgres.ColumnList{}
 	)
 
@@ -81,7 +79,6 @@ func newContentTakedownsTableImpl(schemaName, tableName, alias string) contentTa
 		PostID:       PostIDColumn,
 		CommentID:    CommentIDColumn,
 		ForumEntryID: ForumEntryIDColumn,
-		CreatedAt:    CreatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

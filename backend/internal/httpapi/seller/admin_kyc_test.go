@@ -172,10 +172,12 @@ func TestApproveKYCUsesTheCallingAdminTheETagAndTheComment(t *testing.T) {
 			t.Fatalf("%s：模組不該被呼叫", name)
 		}
 	}
-	for name, ctx := range map[string]context.Context{"no principal": context.Background(), "customer": rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 1})} {
-		if _, err := h.ApproveKYC(ctx, connect.NewRequest(&adminpb.ApproveKYCRequest{Id: id, Etag: "3.0"})); !errors.Is(err, errNoPrincipal) {
-			t.Fatalf("%s: %v", name, err)
-		}
+	if _, err := h.ApproveKYC(context.Background(), connect.NewRequest(&adminpb.ApproveKYCRequest{Id: id, Etag: "3.0"})); !errors.Is(err, rpc.ErrNoPrincipal) {
+		t.Fatalf("no principal: %v", err)
+	}
+	customer := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 1})
+	if _, err := h.ApproveKYC(customer, connect.NewRequest(&adminpb.ApproveKYCRequest{Id: id, Etag: "3.0"})); err == nil || !strings.Contains(err.Error(), "需要管理員") {
+		t.Fatalf("customer: %v", err)
 	}
 	// 模組的欄位錯誤原樣交回（欄位路徑的對應由 interceptor 套用，integration 測試在線上確認）。
 	m.approveErr = apperr.InvalidInputOn([]string{"Comment"}, "說明太長")
@@ -622,7 +624,7 @@ func TestRequeryKYCRegistrationUsesTheCallingAdmin(t *testing.T) {
 	m.calls = 0
 	_, err = h.RequeryKYCRegistration(adminCtx(42), connect.NewRequest(&adminpb.RequeryKYCRegistrationRequest{Id: "x"}))
 	wantInvalidArgument(t, err)
-	if _, err := h.RequeryKYCRegistration(context.Background(), connect.NewRequest(&adminpb.RequeryKYCRegistrationRequest{Id: m.got.ID.String()})); !errors.Is(err, errNoPrincipal) {
+	if _, err := h.RequeryKYCRegistration(context.Background(), connect.NewRequest(&adminpb.RequeryKYCRegistrationRequest{Id: m.got.ID.String()})); !errors.Is(err, rpc.ErrNoPrincipal) {
 		t.Fatalf("no principal: %v", err)
 	}
 	if m.calls != 0 {

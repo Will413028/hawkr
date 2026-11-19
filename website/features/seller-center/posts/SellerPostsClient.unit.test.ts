@@ -5,6 +5,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyPostDetail, PostListItem } from "@/lib/api/openapi-types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
 const fetchSellerPosts = vi.fn();
 const fetchSellerPostDetail = vi.fn();
@@ -94,9 +95,13 @@ function mount() {
 	});
 	return render(
 		React.createElement(
-			QueryClientProvider,
-			{ client },
-			React.createElement(SellerPostsClient),
+			IntlTestWrapper,
+			null,
+			React.createElement(
+				QueryClientProvider,
+				{ client },
+				React.createElement(SellerPostsClient),
+			),
 		),
 	);
 }
@@ -121,6 +126,7 @@ describe("SellerPostsClient deep link", () => {
 			publishStatus: "4402",
 			hiddenAt: 1760000000,
 			hiddenReason: "違規",
+			viewer: { canComment: true, actor: { kind: "store", id: "7" } },
 		};
 		fetchSellerPostDetail.mockResolvedValue(hidden);
 
@@ -135,6 +141,7 @@ describe("SellerPostsClient deep link", () => {
 				publishStatus: "4402",
 				hiddenAt: 1760000000,
 				hiddenReason: "違規",
+				viewer: { canComment: true, actor: { kind: "store", id: "7" } },
 			});
 		});
 		expect(fetchSellerPostDetail).toHaveBeenCalledWith("900");

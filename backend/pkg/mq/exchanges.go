@@ -59,10 +59,7 @@ const (
 	RoutingKeyPostHiddenByPlatform = "post.hidden_by_platform"
 	RoutingKeyCommentCreated       = "comment.created"
 	RoutingKeyCommentReplied       = "comment.replied"
-	RoutingKeyCommentUpdated       = "comment.updated"
-	RoutingKeyCommentDeleted       = "comment.deleted"
 	RoutingKeyCommentLikeChanged   = "comment.like_changed"
-	RoutingKeyCounterDelta         = "counter.delta"
 	RoutingKeyProductViewed        = "product.viewed"
 
 	RoutingKeyNotificationInboxNew      = "notification.inbox.new"
@@ -101,12 +98,6 @@ const (
 const (
 	QueueSellerReviewCreated = "seller.review.created"
 	QueueSellerReviewHidden  = "seller.review.hidden"
-
-	QueueSocialBuyerDeleted = "social.buyer.deleted"
-
-	QueueSocialSellerDeleted = "social.seller.deleted"
-
-	QueueSocialCounterDelta = "social.counter.delta"
 
 	QueueInvoiceOrderPaid            = "invoice.order.paid"
 	QueueInvoiceOrderRefundFinalized = "invoice.order.refund.finalized"

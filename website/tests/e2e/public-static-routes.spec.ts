@@ -12,6 +12,7 @@ import {
 } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { assertNoResidualLoading } from "./helpers/page-stability";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const LOADER_KEY = "hawkr:initial-loader-seen";
 const PERMANENT_REDIRECT_SOURCES = new Set(
@@ -277,8 +278,7 @@ async function assertPublicStaticRoute(
 	guestState: GuestPageState,
 ) {
 	const runtimeIssues = attachRuntimeMonitors(page, baseURL);
-	const response = await page.goto(route, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, route, {
 		timeout: 25_000,
 	});
 	expect(response, `${route} returned no document response`).toBeTruthy();
@@ -370,7 +370,7 @@ test.describe("canonical public static route browser health", {
 	// static copy (`/terms`, `/privacy`, `/faq`…). Measured, not assumed: with
 	// API_BASE_URL pointed at a closed port, all 21 fail — the shared guest
 	// chrome client-fetches `/public/categories/tree`, `/public/hashtags/popular`,
-	// `/public/tags/trending` and `/public/posts` on every guest-facing document,
+	// `SuggestTrendingTags` and `SuggestTrendingPosts` (Connect) on every guest-facing document,
 	// and this suite counts any same-origin >=400 as a page-health failure. So a
 	// legal page's "does it load cleanly" check is coupled to the shared dev
 	// backend just as tightly as the storefront's. That coupling — UI intent,

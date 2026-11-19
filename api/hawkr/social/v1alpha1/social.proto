@@ -14,17 +14,18 @@ import "google/api/field_info.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
 
 // SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
 service SocialPublicService {
-  // GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  // GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
   // 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
   rpc GetPost(GetPostRequest) returns (GetPostResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+  // ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
   // 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
   // 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
   rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
@@ -59,6 +60,13 @@ service SocialPublicService {
   // （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
   // 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
   rpc ListForumEntries(ListForumEntriesRequest) returns (ListForumEntriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+  // （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+  // 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+  rpc GetForumThread(GetForumThreadRequest) returns (GetForumThreadResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
@@ -124,7 +132,7 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  // CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
   // 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
   rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);
 
@@ -139,18 +147,18 @@ service SocialAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  // UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
   // 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
   rpc UpdatePost(UpdatePostRequest) returns (UpdatePostResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  // PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
   rpc PublishPost(PublishPostRequest) returns (PublishPostResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  // UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   rpc UnpublishPost(UnpublishPostRequest) returns (UnpublishPostResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -160,9 +168,21 @@ service SocialAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  // ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  // 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   rpc SchedulePost(SchedulePostRequest) returns (SchedulePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  // 只讀自己店的排程，店家由伺服器推導。
+  rpc ListPendingSchedules(ListPendingSchedulesRequest) returns (ListPendingSchedulesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  // 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  rpc CancelPostSchedule(CancelPostScheduleRequest) returns (CancelPostScheduleResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
@@ -176,6 +196,17 @@ service SocialAppService {
   // GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
   // 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
   rpc GetStoreSocialSummary(GetStoreSocialSummaryRequest) returns (GetStoreSocialSummaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+  rpc ListMySanctions(ListMySanctionsRequest) returns (ListMySanctionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+  // 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+  rpc ListMyHiddenContent(ListMyHiddenContentRequest) returns (ListMyHiddenContentResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -198,7 +229,7 @@ enum CommentState {
   COMMENT_STATE_HIDDEN = 3;
 }
 
-// PostStatus 是貼文的狀態：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED。只有店主讀自己的貼文時看得到。
+// PostStatus 是貼文的狀態：DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED。只有店主讀自己的貼文與後台貼文列表（hawkr.admin.social.v1alpha1）看得到。
 enum PostStatus {
   POST_STATUS_UNSPECIFIED = 0;
   // 草稿，還沒發布過。
@@ -206,6 +237,27 @@ enum PostStatus {
   POST_STATUS_PUBLISHED = 2;
   // 發布過，被店主下架。
   POST_STATUS_UNPUBLISHED = 3;
+}
+
+// ScheduleKind 是排程的發起者種類。
+enum ScheduleKind {
+  SCHEDULE_KIND_UNSPECIFIED = 0;
+  // 店主自己排的。
+  SCHEDULE_KIND_OWNER = 1;
+  // 平台管理員代行營運時排的。
+  SCHEDULE_KIND_DELEGATION = 2;
+}
+
+// PostSchedule 是一篇貼文待發布的排程。
+message PostSchedule {
+  // 排程的 ID。
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 要發布的貼文。
+  string post_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 發布的時間點。
+  google.protobuf.Timestamp publish_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ScheduleKind scheduled_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Hashtag 是貼文的一個標籤。
@@ -236,8 +288,9 @@ message Post {
   int64 share_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 這篇貼文的單篇網址（絕對網址，由伺服器組，分享用）；client 不自己拼。
   string url = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
-  // 這是顯示用的提示，寫入時伺服器仍會檢查。
+  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主是 true。
+  // 貼文要公開可讀（已發布、沒有刪除、沒有被內容下架、店家可曝光）：留言只寫得進公開可讀的貼文，所以店主讀自己店的草稿或已下架的貼文是 false。
+  // 這是顯示用的提示，寫入時伺服器仍會檢查（與寫入同一個判斷）。
   bool viewer_can_comment = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 貼文的狀態；只有店主讀自己的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）才設，公開讀取不設。
   PostStatus status = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -249,6 +302,31 @@ message Post {
   string image_staged_token = 18 [(google.api.field_behavior) = INPUT_ONLY];
   // 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
   repeated string hashtag_inputs = 19 [(google.api.field_behavior) = INPUT_ONLY];
+  // 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
+  bool viewer_liked = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
+  // 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
+  optional string takedown_measure_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  // 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  // 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  Actor viewer_actor = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
+  // 不影響貼文本身；`product_id` 仍照實回傳。
+  PostProduct product = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// PostProduct 是貼文帶的商品的顯示資料。
+message PostProduct {
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 商品圖，沒有圖時不設。
+  hawkr.common.v1alpha1.Image image = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 規格中最低與最高的價格，新台幣元。
+  int64 min_price = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 現在可以購買；下架或售完時是 false（只有店主讀自己的貼文看得到下架的商品）。
+  bool available = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -285,7 +363,8 @@ message Comment {
   bool viewer_can_edit = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
   bool viewer_can_delete = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
+  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false），
+  // 而且這篇貼文公開可讀（回覆經 CreateComment，只寫得進公開可讀的貼文；草稿或已下架的貼文是 false）。
   bool viewer_can_reply = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
   string etag = 17;
@@ -394,7 +473,8 @@ message ForumEntry {
   bool viewer_can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能刪除：VISIBLE 的自己的留言，或這是自己的店的討論區。
   bool viewer_can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+  // 觀看者能不能回覆：VISIBLE，而且討論區對觀看者可寫（店家可曝光、觀看者沒有被這家店封鎖；訪客是 false；店主讀自己的討論區在店家可曝光時是 true）。
+  // 與 ListForumEntriesResponse.viewer_can_comment 同一個判斷。顯示用的提示，寫入時伺服器仍會檢查。
   bool viewer_can_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
   string etag = 15;
@@ -413,6 +493,35 @@ message ListForumEntriesRequest {
 message ListForumEntriesResponse {
   repeated ForumEntry entries = 1;
   string next_page_token = 2;
+  // 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  // 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  Actor viewer_actor = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 觀看者能不能在這家店的討論區新增頂層留言：討論區要可寫（店家可曝光，與 CreateForumEntry 的前置檢查同一個判斷），而且買家沒有被這家店封鎖或這就是觀看者此刻的店（訪客是 false）。
+  // 店家不可曝光時店主也是 false。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  // 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
+  bool viewer_can_comment = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetForumThreadRequest {
+  // 店家 ID。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 討論串 ID，即頂層留言的 ID。
+  string thread_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 回覆第一頁的大小，預設 20，上限 50。
+  int32 page_size = 3;
+}
+
+message GetForumThreadResponse {
+  // 討論串的頂層項目。
+  ForumEntry entry = 1;
+  // 回覆的第一頁，依建立時間舊到新。
+  repeated ForumEntry replies = 2;
+  // 還有下一頁時設；只能交給 ListForumEntries（同一組 store_id、parent_id = thread_id）。
+  string next_page_token = 3;
+  // 同 ListForumEntriesResponse.viewer_actor。
+  Actor viewer_actor = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 同 ListForumEntriesResponse.viewer_can_comment。
+  bool viewer_can_comment = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message RecordPostViewRequest {
@@ -631,6 +740,29 @@ message SchedulePostResponse {
   google.protobuf.Timestamp publish_time = 2;
 }
 
+message ListPendingSchedulesRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListPendingSchedulesResponse {
+  repeated PostSchedule schedules = 1;
+  string next_page_token = 2;
+}
+
+message CancelPostScheduleRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CancelPostScheduleResponse {
+  // 取消後貼文的 etag。
+  string etag = 1;
+}
+
 message ListStoreCommentsRequest {
   // 預設 20，上限 50。
   int32 page_size = 1;
@@ -648,6 +780,15 @@ message ListStoreCommentsResponse {
 
 message GetStoreSocialSummaryRequest {}
 
+// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+message SocialDelegatedServiceGetStoreSocialSummaryRequest {}
+
+// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+message SocialDelegatedServiceGetStoreSocialSummaryResponse {
+  repeated PostStatusCount post_counts = 1;
+  int64 scheduled_post_count = 2;
+}
+
 message GetStoreSocialSummaryResponse {
   // 每個貼文狀態一項（DRAFT、PUBLISHED、UNPUBLISHED 都會有，沒有貼文時是 0），不含已刪除的貼文。
   repeated PostStatusCount post_counts = 1;
@@ -659,4 +800,233 @@ message GetStoreSocialSummaryResponse {
 message PostStatusCount {
   PostStatus status = 1;
   int64 count = 2;
+}
+
+// SocialDelegatedService 是代行營運中的平台管理員讀寫代行店家的貼文：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。商品與訂單由各自模組的 `<模組>DelegatedService` 在 A10 提供。
+// 回應一律不可快取（private, no-store）。
+//
+// 能力（posts.read、posts.write、posts.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+//
+// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+// 成功的讀取不稽核。
+service SocialDelegatedService {
+  // GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  // 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  rpc GetStoreSocialSummary(SocialDelegatedServiceGetStoreSocialSummaryRequest) returns (SocialDelegatedServiceGetStoreSocialSummaryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+  rpc ListStorePosts(ListStorePostsRequest) returns (ListStorePostsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+  rpc GetStorePost(GetStorePostRequest) returns (GetStorePostResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+  // 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+  rpc CreateStorePost(CreateStorePostRequest) returns (CreateStorePostResponse);
+
+  // UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+  // VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+  rpc UpdateStorePost(UpdateStorePostRequest) returns (UpdateStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc PublishStorePost(PublishStorePostRequest) returns (PublishStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc UnpublishStorePost(UnpublishStorePostRequest) returns (UnpublishStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+  // 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+  rpc ScheduleStorePost(ScheduleStorePostRequest) returns (ScheduleStorePostResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
+message DelegatedOperation {
+  // UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
+  string request_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
+  string operation_reason = 2 [(google.api.field_behavior) = REQUIRED];
+  // 是否在完成後通知店主；不設是通知。
+  optional bool notify_seller = 3;
+}
+
+message ListStorePostsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的貼文；不設（UNSPECIFIED）是全部。page_token 只能用在同一個 status。
+  PostStatus status = 3;
+}
+
+message ListStorePostsResponse {
+  repeated Post posts = 1;
+  string next_page_token = 2;
+}
+
+message GetStorePostRequest {
+  // 貼文 ID。
+  string post_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStorePostResponse {
+  Post post = 1;
+}
+
+message CreateStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
+  string body = 2;
+  // 圖片的 staged token（media 上傳完成後拿到的）。
+  string image_staged_token = 3 [(google.api.field_behavior) = INPUT_ONLY];
+  // 貼文帶的商品 ID；商品要存在、上架中而且屬於這家店。
+  optional string product_id = 4;
+  // 標籤（使用者輸入的樣子，可帶開頭的 #）。
+  repeated string hashtag_inputs = 5;
+}
+
+message CreateStorePostResponse {
+  Post post = 1;
+  // 這次寫入的稽核列 ID（重送時是第一次的）。
+  string audit_log_id = 2;
+}
+
+message UpdateStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
+  Post post = 2 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 3;
+}
+
+message UpdateStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message PublishStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnpublishStorePostResponse {
+  Post post = 1;
+  string audit_log_id = 2;
+}
+
+message ScheduleStorePostRequest {
+  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 貼文 ID。
+  string post_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  // 發布的時間點，距現在 5 分鐘到 90 天。
+  google.protobuf.Timestamp publish_time = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ScheduleStorePostResponse {
+  // 排程後的貼文（含新的 etag）。
+  Post post = 1;
+  // 排定的發布時間。
+  google.protobuf.Timestamp publish_time = 2;
+  string audit_log_id = 3;
+}
+
+// SanctionKind 是社群處分的種類。
+enum SanctionKind {
+  SANCTION_KIND_UNSPECIFIED = 0;
+  // 警告。
+  SANCTION_KIND_WARNING = 1;
+}
+
+// HiddenContentKind 是被隱藏的內容的種類。
+enum HiddenContentKind {
+  HIDDEN_CONTENT_KIND_UNSPECIFIED = 0;
+  HIDDEN_CONTENT_KIND_COMMENT = 1;
+  HIDDEN_CONTENT_KIND_FORUM_ENTRY = 2;
+}
+
+message ListMySanctionsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMySanctionsResponse {
+  repeated Sanction sanctions = 1;
+  string next_page_token = 2;
+}
+
+// Sanction 是買家收到的一筆社群處分。
+message Sanction {
+  string id = 1;
+  SanctionKind kind = 2;
+  // 政策分類；不設表示沒有對應的分類。
+  hawkr.common.v1alpha1.PolicyCategory category = 3;
+  // 給作者看的理由；沒有補充說明時是空字串。
+  string reason = 4;
+  google.protobuf.Timestamp create_time = 5;
+}
+
+message ListMyHiddenContentRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMyHiddenContentResponse {
+  repeated HiddenContent hidden_contents = 1;
+  string next_page_token = 2;
+}
+
+// HiddenContent 是買家被隱藏的一則內容與隱藏的理由。
+message HiddenContent {
+  // 隱藏紀錄的 ID。
+  string id = 1;
+  HiddenContentKind kind = 2;
+  // 留言或討論區留言的 ID。
+  string content_id = 3;
+  // 留言所屬的貼文；討論區留言沒有。
+  optional string post_id = 4;
+  // 內容所屬的店家 ID（過渡期的十進位整數字串）；留言沒有時不設。
+  optional string store_id = 5;
+  // 被隱藏的本文，只有作者讀得到。
+  string body = 6;
+  google.protobuf.Timestamp create_time = 7;
+  hawkr.common.v1alpha1.PolicyCategory category = 8;
+  // 給作者看的理由；沒有補充說明時是空字串。
+  string reason = 9;
+  google.protobuf.Timestamp hide_time = 10;
 }

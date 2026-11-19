@@ -32,6 +32,30 @@ export const AUTH_EXPIRED_EVENT = "hk-auth:expired";
 /** 任何 authed 呼叫收到業務碼 9240（SELLER_SUSPENDED_OPERATION_BLOCKED）時廣播；SellerCenterShell
  * 收到後重讀店家，頁面能否使用由更新後的能力判斷決定。 */
 export const SELLER_SUSPENDED_EVENT = "hk-seller:suspended";
+/** 任何呼叫收到 `ACCOUNT_SUSPENDED`（帳號停權，受限登入）時廣播；AuthProvider 收到後重讀登入狀態，
+ * 讓頁面載入後才被停權的使用者看到橫幅。不登出、不導頁。 */
+export const ACCOUNT_SUSPENDED_EVENT = "hk-account:suspended";
+/** 舊 REST 的 403 body（`{code, message, reason}`）帶的 `reason`，值是 `ErrorReason.ACCOUNT_SUSPENDED` 的名稱。 */
+const ACCOUNT_SUSPENDED_REASON = "ACCOUNT_SUSPENDED";
+
+/**
+ * 使用者沒有主動觸發的舊 REST 寫入（進入對話、開啟通知、聊天連線時自動送出）：停權帳號收到
+ * `ACCOUNT_SUSPENDED` 時靜默略過，不廣播（A7-D17、A7-D18）。與 Connect 的 `BACKGROUND_WRITE_METHODS` 同一個意思，
+ * 形狀對齊 buyer-app 的 `_backgroundRestWrites`；新增自動送出的寫入時加在這裡，其餘寫入都視為使用者主動
+ * （`read-all` 是使用者點的，不在這裡）。
+ */
+const BACKGROUND_REST_WRITES: readonly { method: string; path: RegExp }[] = [
+	{ method: "POST", path: /\/app\/chat\/ws-ticket\/?$/ },
+	{ method: "PATCH", path: /\/app\/chat\/conversations\/[^/]+\/?$/ },
+	{ method: "PATCH", path: /\/app\/notifications\/\d+\/read\/?$/ },
+];
+
+export function isBackgroundRestWrite(method: string, path: string): boolean {
+	const m = method.toUpperCase();
+	return BACKGROUND_REST_WRITES.some(
+		(rule) => rule.method === m && rule.path.test(path),
+	);
+}
 const SELLER_SUSPENDED_CODE = 9240;
 
 export interface ApiEnvelope<T> {
@@ -359,6 +383,14 @@ export function emitSellerSuspended(detail: {
 	window.dispatchEvent(new CustomEvent(SELLER_SUSPENDED_EVENT, { detail }));
 }
 
+export function emitAccountSuspended(detail: {
+	path?: string;
+	message?: string;
+}) {
+	if (typeof window === "undefined") return;
+	window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT, { detail }));
+}
+
 async function dispatch<T>(
 	mode: Mode,
 	path: string,
@@ -570,6 +602,15 @@ async function dispatch<T>(
 				parsed?.message || parsed?.msg || "Unauthorized",
 			);
 		}
+	}
+
+	if (
+		mode === "authed" &&
+		res.status === 403 &&
+		parsed?.reason === ACCOUNT_SUSPENDED_REASON &&
+		!isBackgroundRestWrite(method, endpoint)
+	) {
+		emitAccountSuspended({ path, message: parsed?.message || parsed?.msg });
 	}
 
 	if (opts.throwOnHttpError !== false && !res.ok) {

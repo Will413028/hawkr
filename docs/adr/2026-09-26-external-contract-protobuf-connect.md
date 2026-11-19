@@ -102,15 +102,6 @@ D7 選了 OpenAPI spec-first，比較的對象只有 swag 與「proto 加 grpc-g
 - A6、A9 都保留非 Connect 的串流 → D1 的串流理由只剩少數幾支，重新權衡（生成器與型別的理由仍在）。
 - Cloudflare 驗證顯示 GET RPC 無法有效快取 → 公開讀取改走 vanguard-go 的 REST 路徑（上表 transcoding 的退路），IDL 不動。
 
-## 修訂：D5 的例外，店主讀單篇貼文（2026-10-16，Will 決定）
-
-原決策段保留歷史。D5 的「端點數只准變少」開一類有條件的例外：legacy 服務在它的搬遷步驟之前，為修正可見性缺口而必須補的店主讀取，可以新增一條 REST，並與同一族的路由一起刪除。每一個例外都要以文末修訂登記，不是開放式的例外；目前登記的只有本條 `GET /app/sellers/posts/:id`。
-
-- **起因**：social 的曝光過濾（A3b 步驟 10d 第 3a-② 刀）讓公開的貼文詳情不再回草稿、已下架與被平台下架的貼文，而 website 的貼文編輯頁與賣家中心的深連結一直借用公開詳情。店主沒有別的路徑讀自己的這些貼文，編輯就不可能；沒有可接受的退化狀態（留言與迴響在店家不能公開時可以顯示空狀態，編輯不行）。
-- **例外的內容**：新增 `GET /app/sellers/posts/:id`（`CapMarketing`，與 `ListMyPosts` 同一組）。`maxRESTOperations` 492 → 493。
-- **不選的方案**：店主的 Connect 方法要先設計 social 的 Post 資源，A7 搬遷時整個資源（發布狀態、排程、下架原因、媒體）會重新設計，現在做是丟棄的工作；`ListMyPosts` 加 id 篩選是以 List 冒充 Get；編輯頁從列表快取取資料在重新整理與深連結時失效。
-- **終點與觸發**：A7 的 social 模組提供店主的 Connect Get，這條路由與本例外同時刪除。
-
 ## 來源
 
 - 試點計畫與〈驗證結果〉：`2026-09-25-connect-contract-pilot`（計畫已刪除，見文末修訂）

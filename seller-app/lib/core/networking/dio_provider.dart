@@ -22,6 +22,10 @@ part 'dio_provider.g.dart';
 /// 再發一次同樣的請求，形成自我循環。
 const String kSkipAuthInterceptorExtra = 'skipAuthInterceptor';
 
+/// 標記使用者沒有主動操作的背景寫入（裝置註冊、已讀回報）：帳號停權時收到 `ACCOUNT_SUSPENDED` 靜默略過，不轉到受限頁。
+/// 帶 [kSkipAuthInterceptorExtra] 的請求（登出時的註銷裝置）同樣靜默。
+const String kBackgroundWriteExtra = 'backgroundWrite';
+
 /// Dio instance 的 Riverpod Provider
 ///
 /// 新的 feature repository 應透過 `ref.watch(dioProvider)` 取得 Dio instance，
@@ -164,6 +168,22 @@ Dio dio(Ref ref) {
   // token 是 Keychain 裡的 opaque token（ADR 2026-10-30-identity-self-hosted-federated-login），不換新：401 代表
   // session 已結束（過期或被撤銷），登出時清除 token，由 router redirect 回到登入頁。
 
+  // 停權的帳號對 REST 的非 GET／HEAD 回 403，envelope 的 reason 是 ACCOUNT_SUSPENDED：前景請求進入受限狀態；
+  // 沒有 reason 的 403 是一般拒絕，不觸發任何事。背景寫入靜默。
+  void handleAccountSuspended(
+    int? status,
+    RequestOptions options,
+    dynamic data,
+  ) {
+    if (status != 403) return;
+    if (options.extra[kBackgroundWriteExtra] == true ||
+        options.extra[kSkipAuthInterceptorExtra] == true) {
+      return;
+    }
+    if (restEnvelopeReason(data) != accountSuspendedReason) return;
+    unawaited(ref.read(sessionProvider.notifier).onAccountSuspendedSignal());
+  }
+
   bool shouldLogout(int? status, RequestOptions options) =>
       status == 401 && options.extra[kSkipAuthInterceptorExtra] != true;
 
@@ -171,6 +191,11 @@ Dio dio(Ref ref) {
     InterceptorsWrapper(
       // 處理 validateStatus: (_) => true 的情況（ApiRequestHelper 預設）
       onResponse: (response, handler) async {
+        handleAccountSuspended(
+          response.statusCode,
+          response.requestOptions,
+          response.data,
+        );
         if (shouldLogout(response.statusCode, response.requestOptions)) {
           await ref.read(sessionProvider.notifier).logout();
         }
@@ -178,6 +203,11 @@ Dio dio(Ref ref) {
       },
       // 處理預設 validateStatus（Dio 對 401 拋出 DioException）的情況
       onError: (error, handler) async {
+        handleAccountSuspended(
+          error.response?.statusCode,
+          error.requestOptions,
+          error.response?.data,
+        );
         if (shouldLogout(error.response?.statusCode, error.requestOptions)) {
           await ref.read(sessionProvider.notifier).logout();
         }
@@ -245,23 +275,33 @@ Interceptor sessionTokenInterceptor(Future<String?> Function() sessionToken) {
 /// arrives as bytes. Keeping this normalization in the central interceptor
 /// prevents those protected calls from bypassing the global suspension policy.
 bool isSellerSuspensionPayload(dynamic data) {
-  dynamic payload = data;
-  if (payload is List<int>) {
-    try {
-      payload = jsonDecode(utf8.decode(payload));
-    } catch (_) {
-      return false;
-    }
-  } else if (payload is String) {
-    try {
-      payload = jsonDecode(payload);
-    } catch (_) {
-      return false;
-    }
-  }
-  if (payload is! Map) return false;
+  final payload = _decodeEnvelope(data);
+  if (payload == null) return false;
   return payload['code']?.toString() ==
       SellerSuspensionCode.sellerSuspendedOperationBlocked.toString();
+}
+
+/// REST 的錯誤 envelope 的 `reason`（`ErrorReason` 的名稱字串）；沒有時是 null。
+String? restEnvelopeReason(dynamic data) {
+  final reason = _decodeEnvelope(data)?['reason'];
+  return reason is String ? reason : null;
+}
+
+/// 伺服器回報帳號停權的 `ErrorReason` 名稱。
+const String accountSuspendedReason = 'ACCOUNT_SUSPENDED';
+
+Map? _decodeEnvelope(dynamic data) {
+  dynamic payload = data;
+  try {
+    if (payload is List<int>) {
+      payload = jsonDecode(utf8.decode(payload));
+    } else if (payload is String) {
+      payload = jsonDecode(payload);
+    }
+  } catch (_) {
+    return null;
+  }
+  return payload is Map ? payload : null;
 }
 
 /// 美化 JSON 輸出

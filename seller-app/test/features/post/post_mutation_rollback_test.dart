@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
-import 'package:hawkr_seller/core/exceptions/app_exception.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
+import 'package:hawkr_api/transport.dart';
+import '../../support/connect_errors.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/features/post/presentation/post_controller.dart';
@@ -37,24 +38,30 @@ void main() {
     'publish failure leaves the list unchanged and does not refetch',
     () async {
       when(
-        () => repository.publishPostOrThrow(42),
-      ).thenThrow(const ApiException(code: 9001, message: '目前無法發布'));
+        () => repository.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).thenThrow(
+        reasonError(
+          Code.failedPrecondition,
+          'POST_NOT_PUBLISHABLE',
+          message: '目前無法發布',
+        ),
+      );
       final notifier = container.read(provider.notifier);
 
       await expectLater(
         notifier.setPublished(42, publish: true),
         throwsA(
-          isA<ApiException>().having(
-            (error) => error.message,
-            'message',
-            '目前無法發布',
+          isA<ConnectException>().having(
+            (error) => error.code,
+            'code',
+            Code.failedPrecondition,
           ),
         ),
       );
 
       expect(
-        container.read(provider).requireValue.single.publishStatus,
-        '4401',
+        container.read(provider).requireValue.single.status,
+        PostStatus.POST_STATUS_DRAFT,
       );
       verify(() => repository.listMyPosts()).called(1);
     },
@@ -69,8 +76,8 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(container.read(provider).requireValue, isEmpty);
 
-    request.completeError(const TimeoutException(message: '連線逾時，請稍後再試'));
-    await expectLater(operation, throwsA(isA<TimeoutException>()));
+    request.completeError(ConnectException(Code.deadlineExceeded, 'timeout'));
+    await expectLater(operation, throwsA(isA<ConnectException>()));
 
     expect(container.read(provider).requireValue.single.id, 42);
   });
@@ -80,7 +87,7 @@ void main() {
     () async {
       final request = Completer<void>();
       when(
-        () => repository.publishPostOrThrow(42),
+        () => repository.publishPostOrThrow(42, etag: any(named: 'etag')),
       ).thenAnswer((_) => request.future);
       var listCalls = 0;
       when(() => repository.listMyPosts()).thenAnswer((_) async {
@@ -88,9 +95,7 @@ void main() {
         return [
           listCalls == 1
               ? _post
-              : _post.copyWith(
-                  publishStatus: PostPublishStatus.published.value,
-                ),
+              : _post.copyWith(status: PostStatus.POST_STATUS_PUBLISHED),
         ];
       });
       container.invalidate(provider);
@@ -100,27 +105,39 @@ void main() {
       final operation = notifier.setPublished(42, publish: true);
       await Future<void>.delayed(Duration.zero);
       expect(
-        container.read(provider).requireValue.single.publishStatus,
-        '4401',
+        container.read(provider).requireValue.single.status,
+        PostStatus.POST_STATUS_DRAFT,
         reason: 'no optimistic update while the request is pending',
       );
 
       request.complete();
       await operation;
       expect(
-        container.read(provider).requireValue.single.publishStatus,
-        '4402',
+        container.read(provider).requireValue.single.status,
+        PostStatus.POST_STATUS_PUBLISHED,
       );
-      verify(() => repository.publishPostOrThrow(42)).called(1);
+      verify(
+        () => repository.publishPostOrThrow(42, etag: any(named: 'etag')),
+      ).called(1);
     },
   );
 
   test('unpublish calls the unpublish endpoint', () async {
-    when(() => repository.unpublishPostOrThrow(42)).thenAnswer((_) async {});
+    when(
+      () => repository.unpublishPostOrThrow(42, etag: any(named: 'etag')),
+    ).thenAnswer((_) async {});
     await container.read(provider.notifier).setPublished(42, publish: false);
-    verify(() => repository.unpublishPostOrThrow(42)).called(1);
-    verifyNever(() => repository.publishPostOrThrow(any()));
+    verify(
+      () => repository.unpublishPostOrThrow(42, etag: any(named: 'etag')),
+    ).called(1);
+    verifyNever(
+      () => repository.publishPostOrThrow(any(), etag: any(named: 'etag')),
+    );
   });
 }
 
-const _post = Post(id: 42, sellerId: 7, content: '測試貼文', publishStatus: '4401');
+const _post = Post(
+  id: 42,
+  content: '測試貼文',
+  status: PostStatus.POST_STATUS_DRAFT,
+);

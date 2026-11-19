@@ -7,8 +7,10 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
 import '../hawkr_ui_text.dart' show UiLocale;
 
@@ -76,6 +78,42 @@ _ => null,
 extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreCardStatus {
   /// common.StoreCardStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
+}
+
+String? _moderationReportOutcome(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '審核中',
+(UiLocale.en, 1) => 'Under review',
+(UiLocale.zhTW, 2) => '已處理（違規）',
+(UiLocale.en, 2) => 'Resolved (violation)',
+(UiLocale.zhTW, 3) => '已處理（不違規）',
+(UiLocale.en, 3) => 'Resolved (no violation)',
+_ => null,
+};
+}
+
+extension ModerationReportOutcomeUiText on hawkr_moderation_v1alpha1_moderation.ReportOutcome {
+  /// moderation.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _moderationReportOutcome(l, value);
+}
+
+String? _moderationReportTargetKind(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '貼文',
+(UiLocale.en, 1) => 'Post',
+(UiLocale.zhTW, 2) => '留言',
+(UiLocale.en, 2) => 'Comment',
+(UiLocale.zhTW, 3) => '討論區留言',
+(UiLocale.en, 3) => 'Forum post',
+(UiLocale.zhTW, 4) => '使用者',
+(UiLocale.en, 4) => 'User',
+_ => null,
+};
+}
+
+extension ModerationReportTargetKindUiText on hawkr_moderation_v1alpha1_moderation.ReportTargetKind {
+  /// moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _moderationReportTargetKind(l, value);
 }
 
 String? _paymentPaymentAccountStatus(UiLocale l, int value) {
@@ -187,7 +225,8 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '警告',
 (UiLocale.zhTW || UiLocale.en, 2) => '停權',
 (UiLocale.zhTW || UiLocale.en, 3) => '終止合作',
-(UiLocale.zhTW || UiLocale.en, 4) => '內容下架',
+(UiLocale.zhTW, 4) => '內容下架',
+(UiLocale.en, 4) => 'Content removal',
 _ => null,
 };
 }
@@ -438,6 +477,21 @@ extension SellerViolationSeverityUiText on hawkr_seller_v1alpha1_seller.Violatio
   String? uiText(UiLocale l) => _sellerViolationSeverity(l, value);
 }
 
+String? _socialCommentStatePlaceholder(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 2) => '此留言已刪除',
+(UiLocale.en, 2) => 'This comment was deleted',
+(UiLocale.zhTW, 3) => '此留言已被隱藏',
+(UiLocale.en, 3) => 'This comment was hidden',
+_ => null,
+};
+}
+
+extension SocialCommentStateUiText on hawkr_social_v1alpha1_social.CommentState {
+  /// social.CommentState.placeholder；沒有文字的值回 null。
+  String? placeholder(UiLocale l) => _socialCommentStatePlaceholder(l, value);
+}
+
 /// buyer.Profile.gender_unset
 String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {
@@ -507,7 +561,8 @@ String? sellerMeasureMetaKind(UiLocale l, {required hawkr_seller_v1alpha1_seller
 final kindText = _sellerMeasureKind(l, kind.value);
 if (kindText == null) return null;
 return switch (l) {
-UiLocale.zhTW || UiLocale.en => '措施：' + kindText,
+UiLocale.zhTW => '措施：' + kindText,
+UiLocale.en => 'Measure: ' + kindText,
 };
 }
 
@@ -533,6 +588,22 @@ UiLocale.zhTW || UiLocale.en => '事由：' + groundText,
 String sellerMeasureRejectionCooldownWarning(UiLocale l, {required int days}) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '若本次經駁回，將於 ' + days.toString() + ' 日內不得再提出解除請求',
+};
+}
+
+/// seller.Measure.removed_contents_cleared
+String sellerMeasureRemovedContentsCleared(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '內容副本已超過保留期限並刪除。',
+UiLocale.en => 'The copy of this content was deleted after the retention period.',
+};
+}
+
+/// seller.Measure.removed_contents_heading
+String sellerMeasureRemovedContentsHeading(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '下架的內容',
+UiLocale.en => 'Removed content',
 };
 }
 
@@ -601,6 +672,14 @@ UiLocale.zhTW || UiLocale.en => '風險：' + groundText,
 String sellerMeasureTitleRiskFallback(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '風險措施',
+};
+}
+
+/// seller.Measure.view_content_link
+String sellerMeasureViewContentLink(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '查看貼文',
+UiLocale.en => 'View post',
 };
 }
 

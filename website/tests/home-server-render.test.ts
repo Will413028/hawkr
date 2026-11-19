@@ -63,7 +63,7 @@ test("home page keeps the strict-throw / prerenderSafe freshness contract", asyn
 	assert.match(bootstrap, /getCachedHotProducts\(8\)/);
 	assert.match(bootstrap, /getCachedProductsFirstPage\(100\)/);
 	assert.match(bootstrap, /getCachedRecommendedSellers\(24\)/);
-	assert.match(bootstrap, /getCachedPublicPosts\(1, 8\)/);
+	assert.match(bootstrap, /getCachedPublicPosts\(8\)/);
 	assert.doesNotMatch(bootstrap, /\.catch\(/);
 });
 

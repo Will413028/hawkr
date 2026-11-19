@@ -58,10 +58,26 @@ type Deps struct {
 	Logger   *slog.Logger
 }
 
+// auditor 是 Module 對稽核子領域（*audit.Module）的全部需求：正式與單元測試共用同一個欄位；測試嵌入它、只實作用到的方法，讓不碰資料庫的路徑不需要 audit.Module。
+type auditor interface {
+	LookupOperation(ctx context.Context, in model.OperationAuditInput) (model.AuditLog, bool, error)
+	RecordOperation(ctx context.Context, in model.OperationAuditInput, outcome model.OperationOutcome) error
+	RecordFailure(ctx context.Context, in model.FailureAuditInput) error
+	DelegationAuditLogs(ctx context.Context, f model.AuditLogFilter, p model.DelegationPaging) (model.AuditLogPage, error)
+	RecordDelegationAuditIntent(ctx context.Context, in model.AuditIntentInput) (model.AuditIntent, error)
+	RecordDelegationAuditIntents(ctx context.Context, items []model.AuditIntentInput) ([]model.AuditIntentOutcome, error)
+	ConfirmDelegationAudit(ctx context.Context, in model.AuditConfirmInput) (model.AuditLog, error)
+	ConfirmDelegationAudits(ctx context.Context, items []model.AuditConfirmInput) ([]model.AuditLog, error)
+	RecordScheduledPublish(ctx context.Context, in model.ScheduledPublishAuditInput) error
+}
+
 type Module struct {
-	authorization *authorization.Module
-	audit         *audit.Module
-	session       *session.Module
+	seller               Seller
+	cancelStoreSchedules func(ctx context.Context, storeID int64) error
+	logger               *slog.Logger
+	authorization        *authorization.Module
+	audit                auditor
+	session              *session.Module
 }
 
 // storeStateOf 讀店家此刻的狀態：只有 seller 回 NotFound 時才是找不到（Found 為 false）；已關閉的店家存在，Found 為 true、Closed 為 true。可營運與原因
@@ -70,23 +86,29 @@ type Module struct {
 // 沒有跨服務的「暫時讀不到」），不當成拒絕。
 func storeStateOf(s Seller) func(context.Context, int64) (model.StoreState, error) {
 	return func(ctx context.Context, storeID int64) (model.StoreState, error) {
-		st, err := s.Store(ctx, storeID)
-		switch {
-		case apperr.KindOf(err) == apperr.KindNotFound:
-			return model.StoreState{StoreID: storeID}, nil
-		case err != nil:
-			return model.StoreState{}, err
-		}
-		out := model.StoreState{
-			Found: true, StoreID: st.StoreID, SellerAccountID: st.AccountID, Name: st.StoreName, Closed: st.Status == seller.Closed,
-		}
-		reasons := st.ActionUnavailableReasons(seller.StoreActionDelegate)
-		out.Operable = len(reasons) == 0
-		if !out.Operable {
-			out.UnavailableText = seller.StoreActionUnavailableText(reasons[0], seller.StoreActionDelegate).Text
-		}
-		return out, nil
+		_, out, err := readStore(ctx, s, storeID)
+		return out, err
 	}
+}
+
+// readStore 讀店家與它此刻的可代行狀態（storeStateOf 的語意）；店家本身交給需要它的呼叫方（代行元件把它交給資源模組）。
+func readStore(ctx context.Context, s Seller, storeID int64) (seller.Store, model.StoreState, error) {
+	st, err := s.Store(ctx, storeID)
+	switch {
+	case apperr.KindOf(err) == apperr.KindNotFound:
+		return seller.Store{}, model.StoreState{StoreID: storeID}, nil
+	case err != nil:
+		return seller.Store{}, model.StoreState{}, err
+	}
+	out := model.StoreState{
+		Found: true, StoreID: st.StoreID, SellerAccountID: st.AccountID, Name: st.StoreName, Closed: st.Status == seller.Closed,
+	}
+	reasons := st.ActionUnavailableReasons(seller.StoreActionDelegate)
+	out.Operable = len(reasons) == 0
+	if !out.Operable {
+		out.UnavailableText = seller.StoreActionUnavailableText(reasons[0], seller.StoreActionDelegate).Text
+	}
+	return st, out, nil
 }
 
 func New(d Deps) *Module {
@@ -122,17 +144,22 @@ func New(d Deps) *Module {
 		},
 		Now: d.Now, Logger: d.Logger,
 	})
+	auditModule := audit.New(audit.Deps{
+		DB: d.DB, Events: d.Events, Session: s, NewID: d.NewID, Now: d.Now,
+	})
+	cancelStoreSchedules := func(ctx context.Context, storeID int64) error {
+		_, err := d.Social.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost)
+		return err
+	}
 	return &Module{
-		session: s,
+		cancelStoreSchedules: cancelStoreSchedules,
+		session:              s,
+		audit:                auditModule,
+		seller:               d.Seller,
+		logger:               d.Logger,
 		authorization: authorization.New(authorization.Deps{
 			DB: d.DB, Identity: d.Identity, Session: s, StoreState: storeState, NewID: d.NewID, Now: d.Now,
-			CancelSchedulesOfStore: func(ctx context.Context, storeID int64) error {
-				_, err := d.Social.CancelDelegatedSchedulesOfStore(ctx, storeID, social.CancelAuthorityLost)
-				return err
-			},
-		}),
-		audit: audit.New(audit.Deps{
-			DB: d.DB, Events: d.Events, Session: s, NewID: d.NewID, Now: d.Now,
+			CancelSchedulesOfStore: cancelStoreSchedules,
 		}),
 	}
 }
@@ -303,6 +330,24 @@ const DenialStoreNotDelegable = model.DenialStoreNotDelegable
 const DenialStoreNotOperable = model.DenialStoreNotOperable
 const DenialStoreClosed = model.DenialStoreClosed
 
+// DenialBizCodes 是每一種拒絕的舊業務碼（只服務舊 gateway 的轉接層，過渡邊界）；回傳副本。稽核列存的是 DenialCodes 的代碼。
+func DenialBizCodes() map[DelegationDenial]int32 { return model.DenialBizCodes() }
+
+// DenialCodes 是每一種拒絕寫進稽核列 failure_reason 的代碼；回傳副本。
+func DenialCodes() map[DelegationDenial]string { return model.DenialCodes() }
+
+// DenialOfCode 由 failure_reason 的代碼找回拒絕；不是拒絕的代碼回 false。
+func DenialOfCode(code string) (DelegationDenial, bool) { return model.DenialOfCode(code) }
+
+// OperationReasonMaxRunes 是操作原因的上限；LegalOperationReason 是操作原因的唯一規則（去除首尾空白後 1 到上限字、不含控制字元），傳輸層與稽核寫入共用。
+const OperationReasonMaxRunes = model.OperationReasonMaxRunes
+
+// LegalOperationReason 回傳去除首尾空白後的操作原因，與它是否合法。
+func LegalOperationReason(raw string) (string, bool) { return model.LegalOperationReason(raw) }
+
+// FailureReasonInternal 是沒有原因的失敗寫進 failure_reason 的值。
+const FailureReasonInternal = model.FailureReasonInternal
+
 func DelegationDenialOf(err error) (*DelegationError, bool) { return model.DelegationDenialOf(err) }
 
 func (m *Module) DelegationAuthorizations(ctx context.Context, in ListDelegationAuthorizationsInput) (DelegationAuthorizationPage, error) {
@@ -353,6 +398,11 @@ func (m *Module) ResolveDelegation(ctx context.Context, credential string, activ
 	return m.session.ResolveDelegation(ctx, credential, activity)
 }
 
+// TouchDelegation 在代行請求成功之後順延該 session 的閒置逾時；被拒絕或失敗的請求不呼叫它。
+func (m *Module) TouchDelegation(ctx context.Context, sessionID int64) error {
+	return m.session.TouchDelegation(ctx, sessionID)
+}
+
 func (m *Module) EndDelegation(ctx context.Context, credential string) error {
 	return m.session.EndDelegation(ctx, credential)
 }
@@ -397,9 +447,36 @@ func (m *Module) EndDelegationsOfAdmin(ctx context.Context, adminID int64) error
 	return m.session.EndDelegationsOfAdmin(ctx, adminID)
 }
 
-// OnPostPublished 訂閱 social 的 PostPublished：代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
-// schedule:<排程 ID>，重送不寫第二列）。其他來源的發布（直接發布、店主自己的排程）不屬於代行，略過。組裝點以 events.Subscribe 訂閱。
+// OnStoreSuspended 訂閱 seller 的 StoreSuspended：在停權生效的同一個 transaction 內，先取消該店待發布的代行排程、再結束進行中的代行 session
+// （第五個授權失效的觸發點；結束同後台登出：憑證立刻失效，不寫 REVOKED）。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStoreSuspended(ctx context.Context, e seller.StoreSuspended) error {
+	return m.storeNotDelegable(ctx, e.StoreID)
+}
+
+// OnStoreClosed 訂閱 seller 的 StoreClosed：與 OnStoreSuspended 相同，在關店的同一個 transaction 內處理。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStoreClosed(ctx context.Context, e seller.StoreClosed) error {
+	return m.storeNotDelegable(ctx, e.StoreID)
+}
+
+// OnStorePendingDeletion 訂閱 seller 的 StorePendingDeletion：店家等待刪除不可代行，與 OnStoreSuspended 相同。組裝點以 events.Subscribe 訂閱。
+func (m *Module) OnStorePendingDeletion(ctx context.Context, e seller.StorePendingDeletion) error {
+	return m.storeNotDelegable(ctx, e.StoreID)
+}
+
+// storeNotDelegable 先取消該店待發布的代行排程（鎖 social 的列，必須在改 delegation 的列之前，單體規則 4），再結束進行中的 session。
+func (m *Module) storeNotDelegable(ctx context.Context, storeID int64) error {
+	if err := m.cancelStoreSchedules(ctx, storeID); err != nil {
+		return err
+	}
+	return m.session.EndDelegationsOfStore(ctx, storeID)
+}
+
+// OnPostPublished 訂閱 social 的 PostPublished：事件帶代行者（PublishPost 由代行呼叫）時，依事件種類寫 POST_PUBLISH 的 SUCCEEDED 稽核（同 recordPostWrite）；否則，代行發起的排程到點發布時，在發布的同一個 transaction 內寫一列 SUCCEEDED 的稽核（單段，冪等鍵
+// schedule:<排程 ID>，重送不寫第二列）。其他來源的發布（直接發布、店主自己的排程）不屬於代行，略過。組裝點以 events.SubscribeNamed 與 delegatedactor.AuditHandler 訂閱。
 func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) error {
+	if e.Actor != nil {
+		return m.recordPostWriteBy(ctx, postPublishWrite, e.Actor, e.PostID, e.StoreID, e.Preview, e.Version)
+	}
 	if e.Origin != social.OriginScheduled || e.ScheduledBy.Kind != social.ScheduleByDelegation {
 		return nil
 	}

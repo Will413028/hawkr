@@ -191,3 +191,10 @@ preflight 下發值、稽核 UI、結束摘要與對外說明一致表述。
 脈絡：§2 否決 email 的前提是平台沒有寄信能力、模板表沒有 channel 維度。`pkg/mail` 已存在；ADR `2026-10-05-notification-module.md` 把通知型別改成在程式碼定義，每個型別宣告自己的渠道，`notification_templates` 退場，重開本題的前提成立。
 
 決策：賣家通知是站內訊息，帳號有已驗證 email 時依通知型別另外寄送；寄送清單與平台工作見該 ADR 決策 8，代行完成屬於安全類、會寄 email。「不得對賣家承諾做不到的事」仍成立：用 LINE 登入的帳號可能沒有 email，對外措辭改成「站內訊息；有 email 時另外寄送」，不寫無條件的「站內訊息＋Email」。`pkg/mail` 現有唯一真正寄信的 provider 是舊公司的 Resend 帳號，不得使用，所以新措辭在 A8 的寄信平台工作（新的寄信服務帳號與寄件網域）完成後才生效，之前維持「站內訊息」。原決策段保留歷史。
+
+## 修訂：排程貼文的授權失效與取消（2026-11-19，A7-D22 Will 2026-11-15；A7-D25 Will 2026-11-16）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表 A7-D22、A7-D25 第 3 點。
+
+- 排程貼文屬於店家，存在 `social.post_schedules`，由 social 的排程取代 social-service 的 worker；執行時以不鎖的讀取重驗當下授權，不看 session 是否已結束（A7-D22，修訂 A7-D6：「撤銷時取消」蓋不到已結束的 session）。
+- 店家停權、關店（seller 的 `StoreSuspended`、`StoreClosed`）與等待刪除（`StorePendingDeletion`）成為第五個觸發點，同 transaction 先取消該店的代行排程（`AUTHORITY_LOST`）、再結束進行中的代行 session；請求時發現店家不可代行只拒絕、不撤銷（A7-D25 第 3 點）。第 6 節「貼文被刪除或強制下架時不執行」的兩個終態值與「兩條路徑都要留著」的結論，沿用到新的排程。

@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -87,8 +88,8 @@ func TestAReportAttachedAfterTheAdminReadMakesTheCloseConflict(t *testing.T) {
 		t.Fatalf("掛進同一個案件、版本加一：%+v", later.Case)
 	}
 	in := DecideInput{
-		CaseID: read.ID, Version: read.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		CaseID: read.ID, Version: read.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "不實", Severity: string(seller.SeverityValues()[0]),
 	}
 	if _, err := f.module.DecideCase(context.Background(), in); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本結案要 VersionConflict：%v", err)
@@ -117,8 +118,8 @@ func TestTakedownNoteCountsEveryReportButCitesTheEarliestTwenty(t *testing.T) {
 		c = f.submit(t, r, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	}
 	mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "不實", StoreID: w.storeID, Severity: string(seller.SeverityValues()[0]),
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "不實", Severity: string(seller.SeverityValues()[0]),
 	}))
 	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 20 {
 		t.Fatalf("引用 %d 筆，預期上限 20", n)
@@ -176,7 +177,7 @@ func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
 		t.Fatal("貼文清除之後圖片仍要被快照引用")
 	}
 
-	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, AdminID: 9, Decision: DecisionNoViolation}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	f.advance(SnapshotRetention + time.Hour)
 	if n := mustV[int64](t)(f.module.PurgeSnapshots(ctx)); n != 1 {
 		t.Fatalf("刪了 %d 份快照", n)
@@ -206,7 +207,7 @@ func TestDescriptionsAreClearedWithTheSnapshots(t *testing.T) {
 	reporter, _ := f.newBuyer(t)
 	closed := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "已結案的說明"}))
 	open := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(other), Category: policy.Spam, Description: "進行中的說明"}))
-	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, AdminID: 9, Decision: DecisionNoViolation}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	f.advance(SnapshotRetention - time.Hour)
 	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
 	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE description IS NOT NULL"); n != 2 {
@@ -230,8 +231,12 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	ctx := context.Background()
 	reporter, reporterAccount := f.newBuyer(t)
 	bystander, _ := f.newBuyer(t)
-	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "我的說明"}))
-	theirs := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: bystander, Target: commentTarget(w.comment), Category: policy.Spam, Description: "別人的說明"}))
+	mineRID, theirRID := uuid.New(), uuid.New()
+	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "我的說明", RequestID: &mineRID}))
+	theirs := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: bystander, Target: commentTarget(w.comment), Category: policy.Spam, Description: "別人的說明", RequestID: &theirRID}))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id IN ($1, $2)", reporter, bystander); n != 2 {
+		t.Fatalf("送出之後各有一筆冪等紀錄：%d", n)
+	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1", reporter); n != 1 {
 		t.Fatalf("送出之後有每日計數列：%d", n)
 	}
@@ -244,6 +249,39 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND description = '別人的說明'", theirs.Report.ID); n != 1 {
 		t.Fatal("別人的說明不能動")
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter); n != 0 {
+		t.Fatalf("說明的雜湊（request_hash）不能比檢舉人的帳號活得久：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", bystander); n != 1 {
+		t.Fatal("別人的冪等紀錄不能動")
+	}
+}
+
+// A7-D21：冪等紀錄（request_hash 是說明的雜湊）跟說明同一天清（結案滿 184 天）；進行中案件的不清。
+func TestReportRequestsArePurgedWithTheDescriptions(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	other := f.comment(t, w.post.ID, w.author, "另一則")
+	ctx := context.Background()
+	reporter, _ := f.newBuyer(t)
+	closedRID, openRID := uuid.New(), uuid.New()
+	closed := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "已結案的說明", RequestID: &closedRID}))
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(other), Category: policy.Spam, Description: "進行中的說明", RequestID: &openRID}))
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: closed.Case.ID, Version: closed.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
+	f.advance(SnapshotRetention - time.Hour)
+	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter); n != 2 {
+		t.Fatalf("未滿保留期冪等紀錄都要留著：%d", n)
+	}
+	f.advance(2 * time.Hour)
+	mustV[int64](t)(f.module.PurgeSnapshots(ctx))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE report_id = $1", closed.Report.ID); n != 0 {
+		t.Fatalf("結案滿 184 天的冪等紀錄要清掉：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1 AND request_id = $2", reporter, openRID); n != 1 {
+		t.Fatal("進行中案件的冪等紀錄不能清")
 	}
 }
 
@@ -268,12 +306,11 @@ func TestHideOfDeletedBuyerContentSucceedsWithoutCallingSocial(t *testing.T) {
 	}
 }
 
-// A7-D7 第 10 項：店家的貼文已被刪除時，內容下架仍用快照凍結的作者與店家驗證歸屬，建立認定與措施（對象是已刪除的內容 id）；別家店仍被拒絕。
+// A7-D7 第 10 項：店家的貼文已被刪除時，內容下架仍用快照凍結的作者與店家驗證歸屬，建立認定與措施（對象是已刪除的內容 id）；店家取自快照。
 func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesTheMeasure(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	w := f.world(t)
-	otherStore, _ := f.exposableStore(t)
 	ctx := context.Background()
 	reporter, _ := f.newBuyer(t)
 	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
@@ -281,19 +318,12 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 	if err != nil {
 		t.Fatal(err)
 	}
-	must(t, f.social.DeletePost(ctx, st, w.post.ID, 0))
+	must(t, f.social.DeleteOwnPost(ctx, st, w.post.ID, 0))
 
 	in := DecideInput{
-		CaseID: c.ID, Version: c.Version, AdminID: 9, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
-		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]), StoreID: otherStore,
+		CaseID: c.ID, Version: c.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.MisleadingInfo, Action: ActionTakedown,
+		Text: "貼文含不實資訊", Severity: string(seller.SeverityValues()[0]),
 	}
-	if _, err := f.module.DecideCase(ctx, in); kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("別家店不能對已刪除的內容建立措施：%v", err)
-	}
-	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
-		t.Fatalf("拒絕後留下 %d 個措施", n)
-	}
-	in.StoreID = w.storeID
 	d := mustV[CaseDetail](t)(f.module.DecideCase(ctx, in))
 	if d.Case.ClosedAt == nil {
 		t.Fatalf("案件要結案：%+v", d.Case)

@@ -37,7 +37,6 @@ import { imageUri } from "../lib/media/image";
 import { normalizeMemberCard } from "../lib/member-cards/repo";
 import { normalizeOrder } from "../lib/orders/repo";
 import { restockFromConnect } from "../lib/restock-subscriptions/repo";
-import { normalizeSellerForumList } from "../lib/seller/forum-repo";
 
 /* ------------------------------------------------------------------ orders */
 
@@ -342,41 +341,6 @@ test("chat conversation avatar reads avatarKey, not the URL twin", () => {
 		}).targetAvatar,
 		undefined,
 	);
-});
-
-test("seller forum avatar reads avatarKey; logo/header/avatar are gone", () => {
-	// GET /public/sellers/{id}/forum → records[0], verbatim.
-	const list = normalizeSellerForumList({
-		records: [
-			{
-				id: "7490313091974749192",
-				isMine: false,
-				userName: "林小明",
-				content: "avatar-fix 驗證留言 A",
-				avatarKey: "public/buyer_avatar/2623900520/008b97af.png",
-				avatarUrl:
-					"https://test-media.example.com/i/original/public/buyer_avatar/2623900520/008b97af.png",
-			},
-			{
-				id: "2",
-				isMine: false,
-				userName: "猜欄位",
-				content: "x",
-				logo: "https://cdn/logo.png",
-				header: "https://cdn/header.png",
-				avatar: "https://cdn/avatar.png",
-				// retired by backend#2216 — reading either again turns this red
-				userAvatarKey: "public/buyer_avatar/3/retired.png",
-				userAvatarUrl: "https://cdn/retired.png",
-			},
-		],
-	});
-
-	assert.equal(
-		list.records[0].avatarKey,
-		"public/buyer_avatar/2623900520/008b97af.png",
-	);
-	assert.equal(list.records[1].avatarKey, "");
 });
 
 /* ------------------------------------------- product cards (#430 D4 residual)

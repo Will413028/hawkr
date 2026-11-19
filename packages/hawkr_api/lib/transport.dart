@@ -107,9 +107,11 @@ Interceptor authInterceptor({
   };
 }
 
-/// App 的 interceptor，順序固定：整個呼叫的逾時（涵蓋重試）→ 上報重試之後的結果 → 重試 → 賣家停權 → 身分 → 每次送出都
+/// App 的 interceptor，順序固定：整個呼叫的逾時（涵蓋重試）→ 上報重試之後的結果 → 重試 → 賣家停權 → 帳號停權 → 身分 → 每次送出都
 /// 帶的 header（[headers]）→ `Accept-Language`（[acceptLanguage]，必填：每個 client 都送，App 目前的 UI 語系）→ log（每次送出一行）。[auth] 只給登入後的
 /// service。[onSellerSuspended] 只有賣家的 App 給：分類器認得 `SELLER_SUSPENDED`（D10）時呼叫，錯誤原樣丟出。
+/// [onAccountSuspended] 只有要處理帳號停權的 App 給：登入後的 service 收到 `ACCOUNT_SUSPENDED` 時呼叫，錯誤原樣丟出；
+/// [accountSuspendedSilent] 內的 procedure（背景寫入，使用者沒有主動操作）不呼叫。
 List<Interceptor> appInterceptors({
   required Duration timeout,
   required void Function(ConnectException error, FailureContext context) report,
@@ -117,17 +119,49 @@ List<Interceptor> appInterceptors({
   Interceptor? auth,
   required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
+  void Function()? onAccountSuspended,
+  Set<String> accountSuspendedSilent = const {},
   void Function(String line)? log,
 }) => [
   timeoutInterceptor(timeout),
   reportInterceptor(report),
   retryInterceptor(),
   if (onSellerSuspended != null) sellerSuspendedInterceptor(onSellerSuspended),
+  if (onAccountSuspended != null)
+    accountSuspendedInterceptor(
+      onAccountSuspended,
+      silentProcedures: accountSuspendedSilent,
+    ),
   ?auth,
   headersInterceptor(headers),
   acceptLanguageInterceptor(acceptLanguage),
   if (log != null) logInterceptor(log),
 ];
+
+/// 帳號被停權：`permission_denied` 加上 domain 是 hawkr 的 `ACCOUNT_SUSPENDED` 時呼叫 [onSuspended]，錯誤原樣丟出；
+/// [silentProcedures] 內的 procedure 不呼叫。
+Interceptor accountSuspendedInterceptor(
+  void Function() onSuspended, {
+  Set<String> silentProcedures = const {},
+}) {
+  return <I extends Object, O extends Object>(next) {
+    return (req) async {
+      try {
+        return await next(req);
+      } catch (raw) {
+        final d = classifyError(
+          ErrorFacts.fromException(ConnectException.from(raw)),
+        );
+        if (d.action == ErrorAction.reason &&
+            d.reason == ErrorReason.ACCOUNT_SUSPENDED &&
+            !silentProcedures.contains(req.spec.procedure)) {
+          onSuspended();
+        }
+        rethrow;
+      }
+    };
+  };
+}
 
 /// 賣家身分在 session 中途被停權（D10）：`permission_denied` 加上 domain 是 hawkr 的 `SELLER_SUSPENDED`
 /// 時呼叫 [onSuspended]，錯誤原樣丟出。只轉成狀態，導向停權公告頁由 router 依狀態決定。

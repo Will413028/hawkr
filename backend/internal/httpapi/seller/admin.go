@@ -14,7 +14,6 @@ import (
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
@@ -38,33 +37,25 @@ type Admin struct {
 	m        AdminModule
 	images   rpc.Images
 	payments PaymentReader
+	links    LinkAvailability
 	log      *slog.Logger
 }
 
 var _ sellerv1alpha1connect.SellerAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。措施此刻的狀態由模組算好（Measure.State），handler 沒有時鐘。
-// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），log 記錄讀不到的來源（nil 時不記錄）。
-func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, log *slog.Logger) *Admin {
+// payments 是開通任務讀收款帳戶的來源（GetStoreOnboarding），links 是店家頁生效中措施的內容快照連結是否還在的查詢來源（沒有時，店家有帶連結的內容下架措施會讀取失敗），log 記錄讀不到的來源（nil 時不記錄）。
+func NewAdmin(m AdminModule, images rpc.Images, payments PaymentReader, links LinkAvailability, log *slog.Logger) *Admin {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &Admin{m: m, images: images, payments: payments, log: log}
+	return &Admin{m: m, images: images, payments: payments, links: links, log: log}
 }
 
 // 模組輸入的欄位對應到請求的路徑。
 var (
 	listStoresPaths = rpc.FieldPaths{"Statuses": "status", "KYCStatus": "kyc_status"}
 )
-
-// adminFrom 取出呼叫的管理員；interceptor 已經依 service 名稱擋下非管理員，到這裡沒有是授權鏈壞了。
-func adminFrom(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAdmin {
-		return 0, errNoPrincipal
-	}
-	return p.ID, nil
-}
 
 func (h *Admin) toStore(s model.Store) (*adminpb.Store, error) { return toAdminStore(h.images, s) }
 
@@ -195,8 +186,12 @@ func (h *Admin) GetStore(ctx context.Context, req *connect.Request[adminpb.GetSt
 	if err != nil {
 		return nil, err
 	}
+	active, err := adminMeasures(ctx, h.links, state.Active)
+	if err != nil {
+		return nil, err
+	}
 	out := &adminpb.GetStoreResponse{
-		Store: store, ActiveMeasures: toAdminMeasures(state.Active),
+		Store: store, ActiveMeasures: active,
 		CanCreateTermination:          len(state.Terminations) > 0,
 		CanCreateMeasure:              len(state.CreateMeasure) == 0,
 		CreateMeasureUnavailabilities: toStoreActionUnavailabilities(state.CreateMeasure, model.StoreActionCreateMeasure),

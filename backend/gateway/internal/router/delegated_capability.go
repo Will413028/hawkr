@@ -350,7 +350,7 @@ func revokeForStoreNotOperable(c *gin.Context, deps delegationDeps, session *acc
 //     5821 明訂**不落**稽核，而且順序上也寫不進去——`origin=interactive` 的 intent
 //     前置條件正是「session 有效」，已終止的工作階段連 intent 都會被打回。
 //   - 反向的界線同樣硬：§6.1.14 行 4091 禁止「打一支必然 403 的端點來探測」，因為那會
-//     製造一批 READ ＋ FAILED 的列，把「有人試圖跨店讀取」這個安全訊號淹掉。這四個
+//     製造一批 READ ＋ FAILED 的列，把「有人試圖跨店讀取」這個安全訊號淹掉。這三個
 //     action 存在的唯一理由就是留下那個訊號，多寫一列就是稀釋它一次。
 //
 // 失敗不改變結果：拒絕在判定成立的那一刻就已成立，稽核寫不進去只留 log。把一道正常
@@ -385,7 +385,7 @@ func recordGuardDenial(c *gin.Context, deps delegationDeps, session *accountpb.O
 }
 
 // delegatedFace maps the route's declared capability to the audit row's resource
-// type. The nine capabilities cover exactly the four faces; an unknown token yields
+// type. The six storefront, products and orders capabilities cover exactly the three faces; any other token (posts.* has no delegated route) yields
 // "" and the row is skipped rather than written with a resource_type the CHECK
 // constraint would reject.
 func delegatedFace(cap authz.AdminCapability) string {
@@ -394,8 +394,6 @@ func delegatedFace(cap authz.AdminCapability) string {
 		return "storefront"
 	case authz.AdminCapProductsRead, authz.AdminCapProductsWrite, authz.AdminCapProductsPublish:
 		return "product"
-	case authz.AdminCapPostsRead, authz.AdminCapPostsWrite, authz.AdminCapPostsPublish:
-		return "post"
 	case authz.AdminCapOrdersRead:
 		return "order"
 	default:
@@ -413,8 +411,6 @@ func guardResourceID(c *gin.Context, face string) string {
 	switch face {
 	case "product":
 		return c.Param("product_id")
-	case "post":
-		return c.Param("post_id")
 	case "order":
 		return c.Param("order_no")
 	default:
@@ -422,7 +418,7 @@ func guardResourceID(c *gin.Context, face string) string {
 	}
 }
 
-// requireDelegated is the guard on the 20 delegated resource routes. capability is a
+// requireDelegated is the guard on the 14 delegated resource routes. capability is a
 // REQUIRED parameter, so a new delegated route cannot compile without declaring one
 // — the compile-time half of deny-by-default, with the boot assertion as the backstop.
 //
@@ -526,7 +522,7 @@ func requireDelegatedSessionOnly(deps delegationDeps) gin.HandlerFunc {
 
 // 五個 helper 一律呼叫 middleware.RegisterDelegatedRoute：限流命中時要回代行專用的
 // 9273（§6.1.0 行 2317）而不是裸 429，而限流跑在所有 handler 之前，唯一問得到的問題是
-// 「c.FullPath() 是不是代行路由」。登錄制與 capability 登錄同理由——20 支資源端點掛在
+// 「c.FullPath() 是不是代行路由」。登錄制與 capability 登錄同理由——14 支資源端點掛在
 // /sellers/:store_id/ 這一段，而同一段也可以掛非代行的端點；任何前綴規則都分不出兩者，
 // 會多吃非代行的、或漏吃形狀不符前綴的代行端點，而兩種錯法都靜默（照樣回 429，
 // 只是業務碼不對）。
@@ -560,7 +556,7 @@ func credentialHandle(g *gin.RouterGroup, method, relPath string, h gin.HandlerF
 	g.Handle(method, relPath, h)
 }
 
-// delegatedHandle mounts one of the 20 delegated resource routes: it registers
+// delegatedHandle mounts one of the 14 delegated resource routes: it registers
 // (method, fullPath, cap) in the admin authz registry — declaration and mounting are
 // one act — and prepends requireDelegated(cap).
 func delegatedHandle(g *gin.RouterGroup, method, relPath string, cap authz.AdminCapability, deps delegationDeps, h gin.HandlerFunc) {

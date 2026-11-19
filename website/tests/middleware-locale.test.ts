@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import { NextRequest } from "next/server";
 import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
+import { __resetForumThreadMemoForTest } from "../lib/forum/thread-guard";
 import { __setPublishedLocalesForTest } from "../lib/intl/locales";
-import { __resetSellerStoreCodeMemoForTest } from "../lib/seller/canonical-redirect";
+import { __resetStorefrontGuardMemoForTest } from "../lib/seller/storefront-guard";
 import { siteMiddleware } from "../middleware";
 
 // The prod flavor requires the browser API base on the web origin; a relative base is.
@@ -57,7 +58,8 @@ beforeEach(() => {
 
 afterEach(() => {
 	globalThis.fetch = realFetch;
-	__resetSellerStoreCodeMemoForTest();
+	__resetForumThreadMemoForTest();
+	__resetStorefrontGuardMemoForTest();
 	__setPublishedLocalesForTest(null);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
@@ -281,33 +283,85 @@ test("a malformed storefront id is a 404 in every locale, answered by the middle
 	}
 });
 
-test("a store_id storefront URL is 308'd to its store_code and keeps the locale prefix, tab and query", async () => {
-	globalThis.fetch = (async () =>
-		new Response(
-			JSON.stringify({
-				code: 0,
-				message: "ok",
-				data: { storeCode: "2600123456" },
-			}),
-			{ status: 200, headers: { "content-type": "application/json" } },
-		)) as typeof fetch;
-	for (const [path, to] of [
-		[
-			"/sellers/1234567890123456789/reviews?utm_source=x",
-			"/sellers/2600123456/reviews",
-		],
-		[
-			"/en/sellers/1234567890123456789/reviews?utm_source=x",
-			"/en/sellers/2600123456/reviews",
-		],
-	] as const) {
-		__resetSellerStoreCodeMemoForTest();
-		const response = await siteMiddleware(request(path));
-		assert.equal(response.status, 308, path);
-		const target = location(response);
-		assert.equal(target?.pathname, to, path);
-		assert.equal(target?.search, "?utm_source=x", path);
+const getStoreOk = () =>
+	new Response(
+		JSON.stringify({
+			store: { id: "9", storeCode: "2600123456", storeName: "x" },
+		}),
+		{ status: 200, headers: { "content-type": "application/json" } },
+	);
+
+test("a store_code the backend does not hold is a real 404 in every locale, without saying why", async () => {
+	for (const [status, code] of [[404, "not_found"]] as const) {
+		for (const prefix of ["", "/en"]) {
+			__resetStorefrontGuardMemoForTest();
+			const calls: string[] = [];
+			globalThis.fetch = (async (input: RequestInfo | URL) => {
+				calls.push(input instanceof Request ? input.url : String(input));
+				return new Response(JSON.stringify({ code, message: "x" }), {
+					status,
+					headers: { "content-type": "application/json" },
+				});
+			}) as typeof fetch;
+			const path = `${prefix}/sellers/2600123456/reviews?utm_source=x`;
+			const response = await siteMiddleware(request(path));
+			assert.equal(response.status, 404, `${code} ${path}`);
+			assert.equal(rewrittenTo(response), "/_not-found", path);
+			assert.ok(
+				calls.some((u) => u.includes("SellerPublicService/GetStore")),
+				"asks GetStore",
+			);
+		}
 	}
+});
+
+test("an invalid_argument answer from GetStore is unknown, not absent: the storefront passes through", async () => {
+	for (const prefix of ["", "/en"]) {
+		__resetStorefrontGuardMemoForTest();
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ code: "invalid_argument", message: "x" }), {
+				status: 400,
+				headers: { "content-type": "application/json" },
+			})) as typeof fetch;
+		const response = await siteMiddleware(
+			request(`${prefix}/sellers/2600123456/reviews`),
+		);
+		assert.notEqual(response.status, 404, prefix);
+	}
+});
+
+test("a present store_code storefront passes through with no redirect and keeps its tab and query", async () => {
+	globalThis.fetch = (async () => getStoreOk()) as typeof fetch;
+	for (const path of [
+		"/sellers/2600123456/reviews?utm_source=x",
+		"/en/sellers/2600123456/reviews?utm_source=x",
+	]) {
+		__resetStorefrontGuardMemoForTest();
+		const response = await siteMiddleware(request(path));
+		assert.notEqual(response.status, 308, path);
+		assert.notEqual(response.status, 404, path);
+	}
+});
+
+test("a store_id URL is a 404, not a redirect, and costs no backend call", async () => {
+	let called = 0;
+	globalThis.fetch = (async () => {
+		called++;
+		return getStoreOk();
+	}) as typeof fetch;
+	const response = await siteMiddleware(
+		request("/sellers/7487768729113814280/reviews"),
+	);
+	assert.equal(response.status, 404);
+	assert.equal(called, 0);
+});
+
+test("an outage reading the store is not a 404", async () => {
+	__resetStorefrontGuardMemoForTest();
+	globalThis.fetch = (async () =>
+		new Response("{}", { status: 503 })) as typeof fetch;
+	const response = await siteMiddleware(request("/sellers/2600123456"));
+	assert.notEqual(response.status, 404);
 });
 
 test("the agent-gate cleanup keeps the locale prefix", async () => {
@@ -377,4 +431,176 @@ test("a non-default locale's UGC page answers X-Robots-Tag: noindex on an indexa
 		const response = await siteMiddleware(request(path));
 		assert.equal(response.headers.get("x-robots-tag"), null, path);
 	}
+});
+
+const THREAD_ID = "00000000-0000-4000-8000-000000000001";
+
+/** Backend stand-in: GetStore answers the store, GetForumThread answers `thread`; every call is recorded. */
+function backend(thread: () => Response, calls: string[]) {
+	globalThis.fetch = (async (input: RequestInfo | URL) => {
+		const url = input instanceof Request ? input.url : String(input);
+		calls.push(url);
+		if (url.includes("GetForumThread")) return thread();
+		return getStoreOk();
+	}) as typeof fetch;
+}
+
+const connectError = (status: number, code: string) =>
+	new Response(JSON.stringify({ code, message: "x" }), {
+		status,
+		headers: { "content-type": "application/json" },
+	});
+
+test("a forum thread the backend does not hold is a real 404 in every locale", async () => {
+	for (const code of ["not_found", "invalid_argument"]) {
+		for (const prefix of ["", "/en"]) {
+			__resetStorefrontGuardMemoForTest();
+			__resetForumThreadMemoForTest();
+			const calls: string[] = [];
+			backend(
+				() => connectError(code === "not_found" ? 404 : 400, code),
+				calls,
+			);
+			const path = `${prefix}/sellers/2600123456/messages/${THREAD_ID}`;
+			const response = await siteMiddleware(request(path));
+			assert.equal(response.status, 404, `${code} ${path}`);
+			assert.equal(rewrittenTo(response), "/_not-found", path);
+			const threadCall = calls.find((u) => u.includes("GetForumThread"));
+			assert.ok(threadCall, "asks the backend");
+			assert.match(threadCall, /storeId%22%3A%229%22|storeId=9|"storeId":"9"/);
+		}
+	}
+});
+
+test("a non-UUID thread id is a 404 without asking the backend for the thread", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	const response = await siteMiddleware(
+		request("/sellers/2600123456/messages/not-a-uuid"),
+	);
+	assert.equal(response.status, 404);
+	assert.equal(rewrittenTo(response), "/_not-found");
+	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 0);
+});
+
+test("an existing forum thread passes through, and the answer is memoised", async () => {
+	const calls: string[] = [];
+	backend(
+		() =>
+			new Response(JSON.stringify({}), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		calls,
+	);
+	const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+	for (let i = 0; i < 2; i++) {
+		const response = await siteMiddleware(request(path));
+		assert.equal(response.status, 200);
+		assert.notEqual(rewrittenTo(response), "/_not-found");
+	}
+	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 1);
+});
+
+test("a thread lookup that fails or times out passes through instead of 404", async () => {
+	for (const thread of [
+		() => connectError(503, "unavailable"),
+		() => {
+			throw new TypeError("fetch failed");
+		},
+	]) {
+		__resetStorefrontGuardMemoForTest();
+		__resetForumThreadMemoForTest();
+		backend(thread, []);
+		const response = await siteMiddleware(
+			request(`/sellers/2600123456/messages/${THREAD_ID}`),
+		);
+		assert.equal(response.status, 200);
+		assert.notEqual(rewrittenTo(response), "/_not-found");
+	}
+});
+
+test("other storefront routes never ask for a thread", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	for (const path of [
+		"/sellers/2600123456/messages",
+		"/sellers/2600123456/reviews",
+	]) {
+		const response = await siteMiddleware(request(path));
+		assert.equal(response.status, 200, path);
+	}
+	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 0);
+});
+
+const THREAD_CALLS = (calls: string[]) =>
+	calls.filter((u) => u.includes("GetForumThread")).length;
+
+test("a present thread is re-asked after 60 s, so a deleted thread 404s promptly", async () => {
+	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+	try {
+		const calls: string[] = [];
+		let gone = false;
+		backend(
+			() =>
+				gone
+					? connectError(404, "not_found")
+					: new Response(JSON.stringify({}), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						}),
+			calls,
+		);
+		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+		assert.equal((await siteMiddleware(request(path))).status, 200);
+		gone = true;
+		mock.timers.tick(59_000);
+		assert.equal((await siteMiddleware(request(path))).status, 200);
+		assert.equal(THREAD_CALLS(calls), 1);
+		mock.timers.tick(2_000);
+		assert.equal((await siteMiddleware(request(path))).status, 404);
+		assert.equal(THREAD_CALLS(calls), 2);
+	} finally {
+		mock.timers.reset();
+	}
+});
+
+test("an absent thread is remembered for a short time, then asked again", async () => {
+	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+	try {
+		const calls: string[] = [];
+		backend(() => connectError(404, "not_found"), calls);
+		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+		for (let i = 0; i < 3; i++) {
+			assert.equal((await siteMiddleware(request(path))).status, 404);
+		}
+		assert.equal(THREAD_CALLS(calls), 1);
+		mock.timers.tick(61_000);
+		assert.equal((await siteMiddleware(request(path))).status, 404);
+		assert.equal(THREAD_CALLS(calls), 2);
+	} finally {
+		mock.timers.reset();
+	}
+});
+
+const LETTER_ID = "0a1b2c3d-0000-4000-8000-00000000abcd";
+
+test("an uppercase thread id is a 308 to the lowercase URL, locale prefix and query kept", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	for (const prefix of ["", "/en"]) {
+		const response = await siteMiddleware(
+			request(
+				`${prefix}/sellers/2600123456/messages/${LETTER_ID.toUpperCase()}?utm_source=x`,
+			),
+		);
+		assert.equal(response.status, 308, prefix);
+		const target = location(response);
+		assert.equal(
+			target?.pathname,
+			`${prefix}/sellers/2600123456/messages/${LETTER_ID}`,
+		);
+		assert.equal(target?.search, "?utm_source=x");
+	}
+	assert.equal(THREAD_CALLS(calls), 0);
 });

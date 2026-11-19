@@ -20,7 +20,6 @@ type Holder struct {
 	Payment       *grpcclient.PaymentClient
 	Media         *grpcclient.MediaClient
 	Cart          *grpcclient.CartClient
-	Social        *grpcclient.SocialClient
 	IM            *grpcclient.IMClient
 	Notification  *grpcclient.NotificationClient
 	Shipping      *grpcclient.ShippingClient
@@ -50,7 +49,6 @@ type Holder struct {
 	ProcurementReplaySseEnabled bool
 	SSEHub                      *sse.Hub
 	RealtimeReg                 *realtime.Registry
-	CommentChannel              *realtime.CommentChannel
 	// NotifChannel 以介面型別持有（fx 仍注入 *realtime.NotificationChannel）：
 	// serveSSE 本來就吃 realtime.Channel，介面化後測試才注入得了 spy channel 去
 	// 斷言「訂閱時真正送進 Hub 的 topic 字串」——那正是身分空間錯了會壞掉的地方，

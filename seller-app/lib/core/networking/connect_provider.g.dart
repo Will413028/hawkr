@@ -251,6 +251,114 @@ final class SellerClientProvider
 
 String _$sellerClientHash() => r'be61a35edbfb961a1af888c45ab11591b268c4a3';
 
+/// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+
+@ProviderFor(socialClient)
+final socialClientProvider = SocialClientProvider._();
+
+/// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+
+final class SocialClientProvider
+    extends
+        $FunctionalProvider<
+          SocialAppServiceClient,
+          SocialAppServiceClient,
+          SocialAppServiceClient
+        >
+    with $Provider<SocialAppServiceClient> {
+  /// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+  SocialClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialAppServiceClient create(Ref ref) {
+    return socialClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialAppServiceClient>(value),
+    );
+  }
+}
+
+String _$socialClientHash() => r'cf9129264e0b4784af3cffc1f7764c352eabc323';
+
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+
+@ProviderFor(socialPublicClient)
+final socialPublicClientProvider = SocialPublicClientProvider._();
+
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+
+final class SocialPublicClientProvider
+    extends
+        $FunctionalProvider<
+          SocialPublicServiceClient,
+          SocialPublicServiceClient,
+          SocialPublicServiceClient
+        >
+    with $Provider<SocialPublicServiceClient> {
+  /// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+  /// 不受公開狀態限制，伺服器依憑證判斷。
+  SocialPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialPublicServiceClient create(Ref ref) {
+    return socialPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$socialPublicClientHash() =>
+    r'6385043b29b731eb108b73e4cf314ffff63bb9da';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)
@@ -400,4 +508,4 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'bed9087048725f6db03c953192e7828d69226fef';
+    r'4820eee5fe36a3892b936bfbd5cdffacc0c0c6ca';

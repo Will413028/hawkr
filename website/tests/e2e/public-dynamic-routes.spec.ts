@@ -13,6 +13,7 @@ import {
 import { isGetSessionUrl } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { assertNoResidualLoading } from "./helpers/page-stability";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const LOCAL_ORIGIN = `http://localhost:${process.env.PLAYWRIGHT_PORT || "3000"}`;
 const ERROR_SHELL =
@@ -223,8 +224,7 @@ async function assertRenderedRoute(
 	expectedPathname = route,
 ) {
 	const issues = attachRuntimeMonitors(page);
-	const response = await page.goto(route, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, route, {
 		timeout: 25_000,
 	});
 	expect(response, `${route} returned no document response`).toBeTruthy();
@@ -270,7 +270,9 @@ test.describe("public dynamic route browser health", () => {
 
 	for (const entry of DYNAMIC_ROUTE_CATALOG.filter(
 		(candidate) =>
-			candidate.access === "public" && candidate.fixture !== "order-callback",
+			candidate.access === "public" &&
+			candidate.fixture !== "order-callback" &&
+			candidate.fixture !== "seller-thread",
 	)) {
 		test(`${entry.pattern} hard-loads and hydrates`, {
 			tag: ["@contract", "@live"],
@@ -309,7 +311,7 @@ test.describe("public dynamic route browser health", () => {
 		// suppressing genuine console errors across the route inventory.
 		await installProviderMocks(page);
 		const issues = attachRuntimeMonitors(page);
-		const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+		const response = await gotoStreamed(page, route);
 		expect(response?.status() ?? 0).toBeLessThan(400);
 		await expect(page).toHaveURL(
 			/login\?role=buyer&redirect=%2Faccount%2Forders%2Froute-contract-order/,

@@ -13,9 +13,6 @@ func registerAdminNonManagedRoutes(app, admin *gin.RouterGroup, h *handler.Holde
 	// ------------------------------------------
 	// 管理員操作（admin 群組已含 JWTAuth + requireAdmin）
 	// ------------------------------------------
-	admin.GET("/posts", h.AdminListPosts)
-	admin.PATCH("/posts/:id", h.AdminModeratePost)
-
 	// §10 申訴與平台裁決（Admin） + §5.3.6 人工重試 7-11 退貨列印 + §29 異常列表
 	asAdmin := admin.Group(AdminAfterSalesPath)
 	{

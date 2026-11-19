@@ -48,4 +48,4 @@ final class PostRepositoryProvider
   }
 }
 
-String _$postRepositoryHash() => r'9cc49b6d4a8c9dab52f363cfa7a8952a4939b753';
+String _$postRepositoryHash() => r'52a1f7cc988bda7288a3cd28f54357e6af0d154f';

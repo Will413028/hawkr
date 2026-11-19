@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart'
+    show SellerAppService;
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' as auth;
 import 'package:flutter/foundation.dart';
@@ -48,6 +51,17 @@ IdentityAppServiceClient identityClient(Ref ref) =>
 SellerAppServiceClient sellerClient(Ref ref) =>
     SellerAppServiceClient(ref.watch(connectAuthTransportProvider));
 
+/// 貼文與留言的互動寫入與店主的貼文管理（SocialAppService），登入後呼叫。
+@Riverpod(keepAlive: true)
+SocialAppServiceClient socialClient(Ref ref) =>
+    SocialAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 貼文與留言、店家討論區的讀取（SocialPublicService）。帶登入身分的 transport：店主讀自己的貼文留言與討論區
+/// 不受公開狀態限制，伺服器依憑證判斷。
+@Riverpod(keepAlive: true)
+SocialPublicServiceClient socialPublicClient(Ref ref) =>
+    SocialPublicServiceClient(ref.watch(connectAuthTransportProvider));
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 @Riverpod(keepAlive: true)
 SellerPublicServiceClient sellerPublicClient(Ref ref) =>
@@ -66,6 +80,12 @@ IdentityAppServiceClient sessionIdentityClient(Ref ref) =>
       ),
     );
 
+/// 使用者沒有主動操作的背景寫入（App 自動呼叫）：帳號停權時收到 `ACCOUNT_SUSPENDED` 靜默略過，不轉到受限頁。
+/// 範圍是這支 App 經 Connect 呼叫、宣告為寫入（`customerEffects`）的 AppService 方法。
+final Set<String> backgroundWriteProcedures = {
+  SellerAppService.refreshMyPaymentAccount.procedure,
+};
+
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
 @Riverpod(keepAlive: true)
@@ -77,6 +97,9 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
     auth: sessionAuthInterceptor(ref),
     onSellerSuspended: () =>
         ref.read(sessionProvider.notifier).onSellerSuspendedSignal(),
+    onAccountSuspended: () => unawaited(
+      ref.read(sessionProvider.notifier).onAccountSuspendedSignal(),
+    ),
   ),
 );
 
@@ -86,15 +109,20 @@ List<Interceptor> connectInterceptors({
   Interceptor? auth,
   required String Function() acceptLanguage,
   void Function()? onSellerSuspended,
-}) => appInterceptors(
-  timeout: Duration(milliseconds: F.appFlavor.apiTimeout),
-  report: _captureWithSentry,
-  headers: appConnectHeaders,
-  auth: auth,
-  acceptLanguage: acceptLanguage,
-  onSellerSuspended: onSellerSuspended,
-  log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
-);
+  void Function()? onAccountSuspended,
+}) => [
+  ...appInterceptors(
+    timeout: Duration(milliseconds: F.appFlavor.apiTimeout),
+    report: _captureWithSentry,
+    headers: appConnectHeaders,
+    auth: auth,
+    acceptLanguage: acceptLanguage,
+    onSellerSuspended: onSellerSuspended,
+    onAccountSuspended: onAccountSuspended,
+    accountSuspendedSilent: backgroundWriteProcedures,
+    log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
+  ),
+];
 
 /// 以 identity 的 session token 提供身分；session 失效時登出。
 Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(

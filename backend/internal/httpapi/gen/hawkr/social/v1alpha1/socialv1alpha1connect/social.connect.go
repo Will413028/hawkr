@@ -32,6 +32,8 @@ const (
 	SocialPublicServiceName = "hawkr.social.v1alpha1.SocialPublicService"
 	// SocialAppServiceName is the fully-qualified name of the SocialAppService service.
 	SocialAppServiceName = "hawkr.social.v1alpha1.SocialAppService"
+	// SocialDelegatedServiceName is the fully-qualified name of the SocialDelegatedService service.
+	SocialDelegatedServiceName = "hawkr.social.v1alpha1.SocialDelegatedService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -63,6 +65,9 @@ const (
 	// SocialPublicServiceListForumEntriesProcedure is the fully-qualified name of the
 	// SocialPublicService's ListForumEntries RPC.
 	SocialPublicServiceListForumEntriesProcedure = "/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries"
+	// SocialPublicServiceGetForumThreadProcedure is the fully-qualified name of the
+	// SocialPublicService's GetForumThread RPC.
+	SocialPublicServiceGetForumThreadProcedure = "/hawkr.social.v1alpha1.SocialPublicService/GetForumThread"
 	// SocialPublicServiceRecordPostViewProcedure is the fully-qualified name of the
 	// SocialPublicService's RecordPostView RPC.
 	SocialPublicServiceRecordPostViewProcedure = "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView"
@@ -123,20 +128,56 @@ const (
 	// SocialAppServiceSchedulePostProcedure is the fully-qualified name of the SocialAppService's
 	// SchedulePost RPC.
 	SocialAppServiceSchedulePostProcedure = "/hawkr.social.v1alpha1.SocialAppService/SchedulePost"
+	// SocialAppServiceListPendingSchedulesProcedure is the fully-qualified name of the
+	// SocialAppService's ListPendingSchedules RPC.
+	SocialAppServiceListPendingSchedulesProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListPendingSchedules"
+	// SocialAppServiceCancelPostScheduleProcedure is the fully-qualified name of the SocialAppService's
+	// CancelPostSchedule RPC.
+	SocialAppServiceCancelPostScheduleProcedure = "/hawkr.social.v1alpha1.SocialAppService/CancelPostSchedule"
 	// SocialAppServiceListStoreCommentsProcedure is the fully-qualified name of the SocialAppService's
 	// ListStoreComments RPC.
 	SocialAppServiceListStoreCommentsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListStoreComments"
 	// SocialAppServiceGetStoreSocialSummaryProcedure is the fully-qualified name of the
 	// SocialAppService's GetStoreSocialSummary RPC.
 	SocialAppServiceGetStoreSocialSummaryProcedure = "/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary"
+	// SocialAppServiceListMySanctionsProcedure is the fully-qualified name of the SocialAppService's
+	// ListMySanctions RPC.
+	SocialAppServiceListMySanctionsProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMySanctions"
+	// SocialAppServiceListMyHiddenContentProcedure is the fully-qualified name of the
+	// SocialAppService's ListMyHiddenContent RPC.
+	SocialAppServiceListMyHiddenContentProcedure = "/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent"
+	// SocialDelegatedServiceGetStoreSocialSummaryProcedure is the fully-qualified name of the
+	// SocialDelegatedService's GetStoreSocialSummary RPC.
+	SocialDelegatedServiceGetStoreSocialSummaryProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary"
+	// SocialDelegatedServiceListStorePostsProcedure is the fully-qualified name of the
+	// SocialDelegatedService's ListStorePosts RPC.
+	SocialDelegatedServiceListStorePostsProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts"
+	// SocialDelegatedServiceGetStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's GetStorePost RPC.
+	SocialDelegatedServiceGetStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/GetStorePost"
+	// SocialDelegatedServiceCreateStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's CreateStorePost RPC.
+	SocialDelegatedServiceCreateStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/CreateStorePost"
+	// SocialDelegatedServiceUpdateStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's UpdateStorePost RPC.
+	SocialDelegatedServiceUpdateStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/UpdateStorePost"
+	// SocialDelegatedServicePublishStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's PublishStorePost RPC.
+	SocialDelegatedServicePublishStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost"
+	// SocialDelegatedServiceUnpublishStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's UnpublishStorePost RPC.
+	SocialDelegatedServiceUnpublishStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost"
+	// SocialDelegatedServiceScheduleStorePostProcedure is the fully-qualified name of the
+	// SocialDelegatedService's ScheduleStorePost RPC.
+	SocialDelegatedServiceScheduleStorePostProcedure = "/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost"
 )
 
 // SocialPublicServiceClient is a client for the hawkr.social.v1alpha1.SocialPublicService service.
 type SocialPublicServiceClient interface {
-	// GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+	// GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
 	// 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
 	GetPost(context.Context, *connect.Request[v1alpha1.GetPostRequest]) (*connect.Response[v1alpha1.GetPostResponse], error)
-	// ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+	// ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
 	// 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
 	// 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
 	ListPosts(context.Context, *connect.Request[v1alpha1.ListPostsRequest]) (*connect.Response[v1alpha1.ListPostsResponse], error)
@@ -156,6 +197,10 @@ type SocialPublicServiceClient interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+	// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+	// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+	GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error)
 	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
 	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
 	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
@@ -223,6 +268,13 @@ func NewSocialPublicServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		getForumThread: connect.NewClient[v1alpha1.GetForumThreadRequest, v1alpha1.GetForumThreadResponse](
+			httpClient,
+			baseURL+SocialPublicServiceGetForumThreadProcedure,
+			connect.WithSchema(socialPublicServiceMethods.ByName("GetForumThread")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		recordPostView: connect.NewClient[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse](
 			httpClient,
 			baseURL+SocialPublicServiceRecordPostViewProcedure,
@@ -241,6 +293,7 @@ type socialPublicServiceClient struct {
 	suggestTags          *connect.Client[v1alpha1.SuggestTagsRequest, v1alpha1.SuggestTagsResponse]
 	suggestTrendingTags  *connect.Client[v1alpha1.SuggestTrendingTagsRequest, v1alpha1.SuggestTrendingTagsResponse]
 	listForumEntries     *connect.Client[v1alpha1.ListForumEntriesRequest, v1alpha1.ListForumEntriesResponse]
+	getForumThread       *connect.Client[v1alpha1.GetForumThreadRequest, v1alpha1.GetForumThreadResponse]
 	recordPostView       *connect.Client[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse]
 }
 
@@ -279,6 +332,11 @@ func (c *socialPublicServiceClient) ListForumEntries(ctx context.Context, req *c
 	return c.listForumEntries.CallUnary(ctx, req)
 }
 
+// GetForumThread calls hawkr.social.v1alpha1.SocialPublicService.GetForumThread.
+func (c *socialPublicServiceClient) GetForumThread(ctx context.Context, req *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error) {
+	return c.getForumThread.CallUnary(ctx, req)
+}
+
 // RecordPostView calls hawkr.social.v1alpha1.SocialPublicService.RecordPostView.
 func (c *socialPublicServiceClient) RecordPostView(ctx context.Context, req *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {
 	return c.recordPostView.CallUnary(ctx, req)
@@ -287,10 +345,10 @@ func (c *socialPublicServiceClient) RecordPostView(ctx context.Context, req *con
 // SocialPublicServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialPublicService
 // service.
 type SocialPublicServiceHandler interface {
-	// GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+	// GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
 	// 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
 	GetPost(context.Context, *connect.Request[v1alpha1.GetPostRequest]) (*connect.Response[v1alpha1.GetPostResponse], error)
-	// ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+	// ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
 	// 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
 	// 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
 	ListPosts(context.Context, *connect.Request[v1alpha1.ListPostsRequest]) (*connect.Response[v1alpha1.ListPostsResponse], error)
@@ -310,6 +368,10 @@ type SocialPublicServiceHandler interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+	// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+	// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+	GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error)
 	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
 	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
 	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
@@ -373,6 +435,13 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialPublicServiceGetForumThreadHandler := connect.NewUnaryHandler(
+		SocialPublicServiceGetForumThreadProcedure,
+		svc.GetForumThread,
+		connect.WithSchema(socialPublicServiceMethods.ByName("GetForumThread")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialPublicServiceRecordPostViewHandler := connect.NewUnaryHandler(
 		SocialPublicServiceRecordPostViewProcedure,
 		svc.RecordPostView,
@@ -395,6 +464,8 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 			socialPublicServiceSuggestTrendingTagsHandler.ServeHTTP(w, r)
 		case SocialPublicServiceListForumEntriesProcedure:
 			socialPublicServiceListForumEntriesHandler.ServeHTTP(w, r)
+		case SocialPublicServiceGetForumThreadProcedure:
+			socialPublicServiceGetForumThreadHandler.ServeHTTP(w, r)
 		case SocialPublicServiceRecordPostViewProcedure:
 			socialPublicServiceRecordPostViewHandler.ServeHTTP(w, r)
 		default:
@@ -434,6 +505,10 @@ func (UnimplementedSocialPublicServiceHandler) ListForumEntries(context.Context,
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.ListForumEntries is not implemented"))
 }
 
+func (UnimplementedSocialPublicServiceHandler) GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.GetForumThread is not implemented"))
+}
+
 func (UnimplementedSocialPublicServiceHandler) RecordPostView(context.Context, *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.RecordPostView is not implemented"))
 }
@@ -462,7 +537,7 @@ type SocialAppServiceClient interface {
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
 	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
-	// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+	// CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
 	// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
 	CreatePost(context.Context, *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error)
 	// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
@@ -470,18 +545,24 @@ type SocialAppServiceClient interface {
 	GetMyPost(context.Context, *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error)
 	// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
 	ListMyPosts(context.Context, *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error)
-	// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+	// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
 	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
 	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
-	// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
 	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
-	// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)
 	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
-	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
 	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+	// 只讀自己店的排程，店家由伺服器推導。
+	ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error)
+	// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+	// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+	CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error)
 	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
 	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
 	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
@@ -489,6 +570,11 @@ type SocialAppServiceClient interface {
 	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
 	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
 	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
+	// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+	ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error)
+	// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+	// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+	ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error)
 }
 
 // NewSocialAppServiceClient constructs a client for the hawkr.social.v1alpha1.SocialAppService
@@ -632,6 +718,20 @@ func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
+		listPendingSchedules: connect.NewClient[v1alpha1.ListPendingSchedulesRequest, v1alpha1.ListPendingSchedulesResponse](
+			httpClient,
+			baseURL+SocialAppServiceListPendingSchedulesProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListPendingSchedules")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		cancelPostSchedule: connect.NewClient[v1alpha1.CancelPostScheduleRequest, v1alpha1.CancelPostScheduleResponse](
+			httpClient,
+			baseURL+SocialAppServiceCancelPostScheduleProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("CancelPostSchedule")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
 		listStoreComments: connect.NewClient[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse](
 			httpClient,
 			baseURL+SocialAppServiceListStoreCommentsProcedure,
@@ -643,6 +743,20 @@ func NewSocialAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+SocialAppServiceGetStoreSocialSummaryProcedure,
 			connect.WithSchema(socialAppServiceMethods.ByName("GetStoreSocialSummary")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listMySanctions: connect.NewClient[v1alpha1.ListMySanctionsRequest, v1alpha1.ListMySanctionsResponse](
+			httpClient,
+			baseURL+SocialAppServiceListMySanctionsProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListMySanctions")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listMyHiddenContent: connect.NewClient[v1alpha1.ListMyHiddenContentRequest, v1alpha1.ListMyHiddenContentResponse](
+			httpClient,
+			baseURL+SocialAppServiceListMyHiddenContentProcedure,
+			connect.WithSchema(socialAppServiceMethods.ByName("ListMyHiddenContent")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -670,8 +784,12 @@ type socialAppServiceClient struct {
 	unpublishPost         *connect.Client[v1alpha1.UnpublishPostRequest, v1alpha1.UnpublishPostResponse]
 	deletePost            *connect.Client[v1alpha1.DeletePostRequest, v1alpha1.DeletePostResponse]
 	schedulePost          *connect.Client[v1alpha1.SchedulePostRequest, v1alpha1.SchedulePostResponse]
+	listPendingSchedules  *connect.Client[v1alpha1.ListPendingSchedulesRequest, v1alpha1.ListPendingSchedulesResponse]
+	cancelPostSchedule    *connect.Client[v1alpha1.CancelPostScheduleRequest, v1alpha1.CancelPostScheduleResponse]
 	listStoreComments     *connect.Client[v1alpha1.ListStoreCommentsRequest, v1alpha1.ListStoreCommentsResponse]
 	getStoreSocialSummary *connect.Client[v1alpha1.GetStoreSocialSummaryRequest, v1alpha1.GetStoreSocialSummaryResponse]
+	listMySanctions       *connect.Client[v1alpha1.ListMySanctionsRequest, v1alpha1.ListMySanctionsResponse]
+	listMyHiddenContent   *connect.Client[v1alpha1.ListMyHiddenContentRequest, v1alpha1.ListMyHiddenContentResponse]
 }
 
 // SharePost calls hawkr.social.v1alpha1.SocialAppService.SharePost.
@@ -769,6 +887,16 @@ func (c *socialAppServiceClient) SchedulePost(ctx context.Context, req *connect.
 	return c.schedulePost.CallUnary(ctx, req)
 }
 
+// ListPendingSchedules calls hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules.
+func (c *socialAppServiceClient) ListPendingSchedules(ctx context.Context, req *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error) {
+	return c.listPendingSchedules.CallUnary(ctx, req)
+}
+
+// CancelPostSchedule calls hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule.
+func (c *socialAppServiceClient) CancelPostSchedule(ctx context.Context, req *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error) {
+	return c.cancelPostSchedule.CallUnary(ctx, req)
+}
+
 // ListStoreComments calls hawkr.social.v1alpha1.SocialAppService.ListStoreComments.
 func (c *socialAppServiceClient) ListStoreComments(ctx context.Context, req *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {
 	return c.listStoreComments.CallUnary(ctx, req)
@@ -777,6 +905,16 @@ func (c *socialAppServiceClient) ListStoreComments(ctx context.Context, req *con
 // GetStoreSocialSummary calls hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary.
 func (c *socialAppServiceClient) GetStoreSocialSummary(ctx context.Context, req *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error) {
 	return c.getStoreSocialSummary.CallUnary(ctx, req)
+}
+
+// ListMySanctions calls hawkr.social.v1alpha1.SocialAppService.ListMySanctions.
+func (c *socialAppServiceClient) ListMySanctions(ctx context.Context, req *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error) {
+	return c.listMySanctions.CallUnary(ctx, req)
+}
+
+// ListMyHiddenContent calls hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent.
+func (c *socialAppServiceClient) ListMyHiddenContent(ctx context.Context, req *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error) {
+	return c.listMyHiddenContent.CallUnary(ctx, req)
 }
 
 // SocialAppServiceHandler is an implementation of the hawkr.social.v1alpha1.SocialAppService
@@ -804,7 +942,7 @@ type SocialAppServiceHandler interface {
 	UpdateForumEntry(context.Context, *connect.Request[v1alpha1.UpdateForumEntryRequest]) (*connect.Response[v1alpha1.UpdateForumEntryResponse], error)
 	// DeleteForumEntry 刪除討論區發言：作者，或該店家。已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。
 	DeleteForumEntry(context.Context, *connect.Request[v1alpha1.DeleteForumEntryRequest]) (*connect.Response[v1alpha1.DeleteForumEntryResponse], error)
-	// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+	// CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
 	// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
 	CreatePost(context.Context, *connect.Request[v1alpha1.CreatePostRequest]) (*connect.Response[v1alpha1.CreatePostResponse], error)
 	// GetMyPost 讀呼叫者此刻的店自己的貼文：任何狀態（草稿、已發布、已下架），不含已刪除；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。
@@ -812,18 +950,24 @@ type SocialAppServiceHandler interface {
 	GetMyPost(context.Context, *connect.Request[v1alpha1.GetMyPostRequest]) (*connect.Response[v1alpha1.GetMyPostResponse], error)
 	// ListMyPosts 列出呼叫者此刻的店自己的貼文（含草稿與下架），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。賣家能力 CAP_CONTENT_CONTRACT。
 	ListMyPosts(context.Context, *connect.Request[v1alpha1.ListMyPostsRequest]) (*connect.Response[v1alpha1.ListMyPostsResponse], error)
-	// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+	// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
 	// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
 	UpdatePost(context.Context, *connect.Request[v1alpha1.UpdatePostRequest]) (*connect.Response[v1alpha1.UpdatePostResponse], error)
-	// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+	// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
 	PublishPost(context.Context, *connect.Request[v1alpha1.PublishPostRequest]) (*connect.Response[v1alpha1.PublishPostResponse], error)
-	// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+	// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	UnpublishPost(context.Context, *connect.Request[v1alpha1.UnpublishPostRequest]) (*connect.Response[v1alpha1.UnpublishPostResponse], error)
 	// DeletePost 刪除自己的貼文；已經刪除的也回成功；帶 etag 時與目前版本不符回 aborted 與 VERSION_CONFLICT。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
 	DeletePost(context.Context, *connect.Request[v1alpha1.DeletePostRequest]) (*connect.Response[v1alpha1.DeletePostResponse], error)
-	// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+	// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+	// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
 	SchedulePost(context.Context, *connect.Request[v1alpha1.SchedulePostRequest]) (*connect.Response[v1alpha1.SchedulePostResponse], error)
+	// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+	// 只讀自己店的排程，店家由伺服器推導。
+	ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error)
+	// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+	// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+	CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error)
 	// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
 	// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
 	// 而且底下沒有任何一則仍可見、作者是本店的回覆（已刪除或被隱藏的店家回覆不算回覆）；此時沒有佔位項目。賣家能力 CAP_CONTENT_CONTRACT。
@@ -831,6 +975,11 @@ type SocialAppServiceHandler interface {
 	// GetStoreSocialSummary 是賣家中心的動態數：呼叫者此刻的店的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數。數字由伺服器以資料庫計數，
 	// 不是 client 以列表長度推算。賣家能力 CAP_CONTENT_CONTRACT。
 	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error)
+	// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+	ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error)
+	// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+	// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+	ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error)
 }
 
 // NewSocialAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -970,6 +1119,20 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialAppServiceListPendingSchedulesHandler := connect.NewUnaryHandler(
+		SocialAppServiceListPendingSchedulesProcedure,
+		svc.ListPendingSchedules,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListPendingSchedules")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceCancelPostScheduleHandler := connect.NewUnaryHandler(
+		SocialAppServiceCancelPostScheduleProcedure,
+		svc.CancelPostSchedule,
+		connect.WithSchema(socialAppServiceMethods.ByName("CancelPostSchedule")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialAppServiceListStoreCommentsHandler := connect.NewUnaryHandler(
 		SocialAppServiceListStoreCommentsProcedure,
 		svc.ListStoreComments,
@@ -981,6 +1144,20 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 		SocialAppServiceGetStoreSocialSummaryProcedure,
 		svc.GetStoreSocialSummary,
 		connect.WithSchema(socialAppServiceMethods.ByName("GetStoreSocialSummary")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceListMySanctionsHandler := connect.NewUnaryHandler(
+		SocialAppServiceListMySanctionsProcedure,
+		svc.ListMySanctions,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListMySanctions")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialAppServiceListMyHiddenContentHandler := connect.NewUnaryHandler(
+		SocialAppServiceListMyHiddenContentProcedure,
+		svc.ListMyHiddenContent,
+		connect.WithSchema(socialAppServiceMethods.ByName("ListMyHiddenContent")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -1024,10 +1201,18 @@ func NewSocialAppServiceHandler(svc SocialAppServiceHandler, opts ...connect.Han
 			socialAppServiceDeletePostHandler.ServeHTTP(w, r)
 		case SocialAppServiceSchedulePostProcedure:
 			socialAppServiceSchedulePostHandler.ServeHTTP(w, r)
+		case SocialAppServiceListPendingSchedulesProcedure:
+			socialAppServiceListPendingSchedulesHandler.ServeHTTP(w, r)
+		case SocialAppServiceCancelPostScheduleProcedure:
+			socialAppServiceCancelPostScheduleHandler.ServeHTTP(w, r)
 		case SocialAppServiceListStoreCommentsProcedure:
 			socialAppServiceListStoreCommentsHandler.ServeHTTP(w, r)
 		case SocialAppServiceGetStoreSocialSummaryProcedure:
 			socialAppServiceGetStoreSocialSummaryHandler.ServeHTTP(w, r)
+		case SocialAppServiceListMySanctionsProcedure:
+			socialAppServiceListMySanctionsHandler.ServeHTTP(w, r)
+		case SocialAppServiceListMyHiddenContentProcedure:
+			socialAppServiceListMyHiddenContentHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1113,10 +1298,319 @@ func (UnimplementedSocialAppServiceHandler) SchedulePost(context.Context, *conne
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.SchedulePost is not implemented"))
 }
 
+func (UnimplementedSocialAppServiceHandler) ListPendingSchedules(context.Context, *connect.Request[v1alpha1.ListPendingSchedulesRequest]) (*connect.Response[v1alpha1.ListPendingSchedulesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListPendingSchedules is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) CancelPostSchedule(context.Context, *connect.Request[v1alpha1.CancelPostScheduleRequest]) (*connect.Response[v1alpha1.CancelPostScheduleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.CancelPostSchedule is not implemented"))
+}
+
 func (UnimplementedSocialAppServiceHandler) ListStoreComments(context.Context, *connect.Request[v1alpha1.ListStoreCommentsRequest]) (*connect.Response[v1alpha1.ListStoreCommentsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListStoreComments is not implemented"))
 }
 
 func (UnimplementedSocialAppServiceHandler) GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.GetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.GetStoreSocialSummaryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.GetStoreSocialSummary is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListMySanctions(context.Context, *connect.Request[v1alpha1.ListMySanctionsRequest]) (*connect.Response[v1alpha1.ListMySanctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListMySanctions is not implemented"))
+}
+
+func (UnimplementedSocialAppServiceHandler) ListMyHiddenContent(context.Context, *connect.Request[v1alpha1.ListMyHiddenContentRequest]) (*connect.Response[v1alpha1.ListMyHiddenContentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialAppService.ListMyHiddenContent is not implemented"))
+}
+
+// SocialDelegatedServiceClient is a client for the hawkr.social.v1alpha1.SocialDelegatedService
+// service.
+type SocialDelegatedServiceClient interface {
+	// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+	// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error)
+	// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+	ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error)
+	// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+	GetStorePost(context.Context, *connect.Request[v1alpha1.GetStorePostRequest]) (*connect.Response[v1alpha1.GetStorePostResponse], error)
+	// CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+	CreateStorePost(context.Context, *connect.Request[v1alpha1.CreateStorePostRequest]) (*connect.Response[v1alpha1.CreateStorePostResponse], error)
+	// UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+	// VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+	UpdateStorePost(context.Context, *connect.Request[v1alpha1.UpdateStorePostRequest]) (*connect.Response[v1alpha1.UpdateStorePostResponse], error)
+	// PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+	PublishStorePost(context.Context, *connect.Request[v1alpha1.PublishStorePostRequest]) (*connect.Response[v1alpha1.PublishStorePostResponse], error)
+	// UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+	UnpublishStorePost(context.Context, *connect.Request[v1alpha1.UnpublishStorePostRequest]) (*connect.Response[v1alpha1.UnpublishStorePostResponse], error)
+	// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+	// 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+	ScheduleStorePost(context.Context, *connect.Request[v1alpha1.ScheduleStorePostRequest]) (*connect.Response[v1alpha1.ScheduleStorePostResponse], error)
+}
+
+// NewSocialDelegatedServiceClient constructs a client for the
+// hawkr.social.v1alpha1.SocialDelegatedService service. By default, it uses the Connect protocol
+// with the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed requests. To
+// use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or connect.WithGRPCWeb()
+// options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewSocialDelegatedServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SocialDelegatedServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	socialDelegatedServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService").Methods()
+	return &socialDelegatedServiceClient{
+		getStoreSocialSummary: connect.NewClient[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest, v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceGetStoreSocialSummaryProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStoreSocialSummary")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listStorePosts: connect.NewClient[v1alpha1.ListStorePostsRequest, v1alpha1.ListStorePostsResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceListStorePostsProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("ListStorePosts")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getStorePost: connect.NewClient[v1alpha1.GetStorePostRequest, v1alpha1.GetStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceGetStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStorePost")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		createStorePost: connect.NewClient[v1alpha1.CreateStorePostRequest, v1alpha1.CreateStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceCreateStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("CreateStorePost")),
+			connect.WithClientOptions(opts...),
+		),
+		updateStorePost: connect.NewClient[v1alpha1.UpdateStorePostRequest, v1alpha1.UpdateStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceUpdateStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("UpdateStorePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		publishStorePost: connect.NewClient[v1alpha1.PublishStorePostRequest, v1alpha1.PublishStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServicePublishStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("PublishStorePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unpublishStorePost: connect.NewClient[v1alpha1.UnpublishStorePostRequest, v1alpha1.UnpublishStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceUnpublishStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("UnpublishStorePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		scheduleStorePost: connect.NewClient[v1alpha1.ScheduleStorePostRequest, v1alpha1.ScheduleStorePostResponse](
+			httpClient,
+			baseURL+SocialDelegatedServiceScheduleStorePostProcedure,
+			connect.WithSchema(socialDelegatedServiceMethods.ByName("ScheduleStorePost")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// socialDelegatedServiceClient implements SocialDelegatedServiceClient.
+type socialDelegatedServiceClient struct {
+	getStoreSocialSummary *connect.Client[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest, v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse]
+	listStorePosts        *connect.Client[v1alpha1.ListStorePostsRequest, v1alpha1.ListStorePostsResponse]
+	getStorePost          *connect.Client[v1alpha1.GetStorePostRequest, v1alpha1.GetStorePostResponse]
+	createStorePost       *connect.Client[v1alpha1.CreateStorePostRequest, v1alpha1.CreateStorePostResponse]
+	updateStorePost       *connect.Client[v1alpha1.UpdateStorePostRequest, v1alpha1.UpdateStorePostResponse]
+	publishStorePost      *connect.Client[v1alpha1.PublishStorePostRequest, v1alpha1.PublishStorePostResponse]
+	unpublishStorePost    *connect.Client[v1alpha1.UnpublishStorePostRequest, v1alpha1.UnpublishStorePostResponse]
+	scheduleStorePost     *connect.Client[v1alpha1.ScheduleStorePostRequest, v1alpha1.ScheduleStorePostResponse]
+}
+
+// GetStoreSocialSummary calls hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary.
+func (c *socialDelegatedServiceClient) GetStoreSocialSummary(ctx context.Context, req *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	return c.getStoreSocialSummary.CallUnary(ctx, req)
+}
+
+// ListStorePosts calls hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts.
+func (c *socialDelegatedServiceClient) ListStorePosts(ctx context.Context, req *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error) {
+	return c.listStorePosts.CallUnary(ctx, req)
+}
+
+// GetStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost.
+func (c *socialDelegatedServiceClient) GetStorePost(ctx context.Context, req *connect.Request[v1alpha1.GetStorePostRequest]) (*connect.Response[v1alpha1.GetStorePostResponse], error) {
+	return c.getStorePost.CallUnary(ctx, req)
+}
+
+// CreateStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost.
+func (c *socialDelegatedServiceClient) CreateStorePost(ctx context.Context, req *connect.Request[v1alpha1.CreateStorePostRequest]) (*connect.Response[v1alpha1.CreateStorePostResponse], error) {
+	return c.createStorePost.CallUnary(ctx, req)
+}
+
+// UpdateStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost.
+func (c *socialDelegatedServiceClient) UpdateStorePost(ctx context.Context, req *connect.Request[v1alpha1.UpdateStorePostRequest]) (*connect.Response[v1alpha1.UpdateStorePostResponse], error) {
+	return c.updateStorePost.CallUnary(ctx, req)
+}
+
+// PublishStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost.
+func (c *socialDelegatedServiceClient) PublishStorePost(ctx context.Context, req *connect.Request[v1alpha1.PublishStorePostRequest]) (*connect.Response[v1alpha1.PublishStorePostResponse], error) {
+	return c.publishStorePost.CallUnary(ctx, req)
+}
+
+// UnpublishStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost.
+func (c *socialDelegatedServiceClient) UnpublishStorePost(ctx context.Context, req *connect.Request[v1alpha1.UnpublishStorePostRequest]) (*connect.Response[v1alpha1.UnpublishStorePostResponse], error) {
+	return c.unpublishStorePost.CallUnary(ctx, req)
+}
+
+// ScheduleStorePost calls hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost.
+func (c *socialDelegatedServiceClient) ScheduleStorePost(ctx context.Context, req *connect.Request[v1alpha1.ScheduleStorePostRequest]) (*connect.Response[v1alpha1.ScheduleStorePostResponse], error) {
+	return c.scheduleStorePost.CallUnary(ctx, req)
+}
+
+// SocialDelegatedServiceHandler is an implementation of the
+// hawkr.social.v1alpha1.SocialDelegatedService service.
+type SocialDelegatedServiceHandler interface {
+	// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+	// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+	GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error)
+	// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+	ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error)
+	// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+	GetStorePost(context.Context, *connect.Request[v1alpha1.GetStorePostRequest]) (*connect.Response[v1alpha1.GetStorePostResponse], error)
+	// CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+	CreateStorePost(context.Context, *connect.Request[v1alpha1.CreateStorePostRequest]) (*connect.Response[v1alpha1.CreateStorePostResponse], error)
+	// UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+	// VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+	UpdateStorePost(context.Context, *connect.Request[v1alpha1.UpdateStorePostRequest]) (*connect.Response[v1alpha1.UpdateStorePostResponse], error)
+	// PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+	PublishStorePost(context.Context, *connect.Request[v1alpha1.PublishStorePostRequest]) (*connect.Response[v1alpha1.PublishStorePostResponse], error)
+	// UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+	UnpublishStorePost(context.Context, *connect.Request[v1alpha1.UnpublishStorePostRequest]) (*connect.Response[v1alpha1.UnpublishStorePostResponse], error)
+	// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+	// 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+	ScheduleStorePost(context.Context, *connect.Request[v1alpha1.ScheduleStorePostRequest]) (*connect.Response[v1alpha1.ScheduleStorePostResponse], error)
+}
+
+// NewSocialDelegatedServiceHandler builds an HTTP handler from the service implementation. It
+// returns the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewSocialDelegatedServiceHandler(svc SocialDelegatedServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	socialDelegatedServiceMethods := v1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialDelegatedService").Methods()
+	socialDelegatedServiceGetStoreSocialSummaryHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceGetStoreSocialSummaryProcedure,
+		svc.GetStoreSocialSummary,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStoreSocialSummary")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceListStorePostsHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceListStorePostsProcedure,
+		svc.ListStorePosts,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("ListStorePosts")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceGetStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceGetStorePostProcedure,
+		svc.GetStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("GetStorePost")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceCreateStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceCreateStorePostProcedure,
+		svc.CreateStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("CreateStorePost")),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceUpdateStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceUpdateStorePostProcedure,
+		svc.UpdateStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("UpdateStorePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServicePublishStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServicePublishStorePostProcedure,
+		svc.PublishStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("PublishStorePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceUnpublishStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceUnpublishStorePostProcedure,
+		svc.UnpublishStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("UnpublishStorePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialDelegatedServiceScheduleStorePostHandler := connect.NewUnaryHandler(
+		SocialDelegatedServiceScheduleStorePostProcedure,
+		svc.ScheduleStorePost,
+		connect.WithSchema(socialDelegatedServiceMethods.ByName("ScheduleStorePost")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/hawkr.social.v1alpha1.SocialDelegatedService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case SocialDelegatedServiceGetStoreSocialSummaryProcedure:
+			socialDelegatedServiceGetStoreSocialSummaryHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceListStorePostsProcedure:
+			socialDelegatedServiceListStorePostsHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceGetStorePostProcedure:
+			socialDelegatedServiceGetStorePostHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceCreateStorePostProcedure:
+			socialDelegatedServiceCreateStorePostHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceUpdateStorePostProcedure:
+			socialDelegatedServiceUpdateStorePostHandler.ServeHTTP(w, r)
+		case SocialDelegatedServicePublishStorePostProcedure:
+			socialDelegatedServicePublishStorePostHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceUnpublishStorePostProcedure:
+			socialDelegatedServiceUnpublishStorePostHandler.ServeHTTP(w, r)
+		case SocialDelegatedServiceScheduleStorePostProcedure:
+			socialDelegatedServiceScheduleStorePostHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedSocialDelegatedServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedSocialDelegatedServiceHandler struct{}
+
+func (UnimplementedSocialDelegatedServiceHandler) GetStoreSocialSummary(context.Context, *connect.Request[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryRequest]) (*connect.Response[v1alpha1.SocialDelegatedServiceGetStoreSocialSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.GetStoreSocialSummary is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) ListStorePosts(context.Context, *connect.Request[v1alpha1.ListStorePostsRequest]) (*connect.Response[v1alpha1.ListStorePostsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.ListStorePosts is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) GetStorePost(context.Context, *connect.Request[v1alpha1.GetStorePostRequest]) (*connect.Response[v1alpha1.GetStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.GetStorePost is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) CreateStorePost(context.Context, *connect.Request[v1alpha1.CreateStorePostRequest]) (*connect.Response[v1alpha1.CreateStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.CreateStorePost is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) UpdateStorePost(context.Context, *connect.Request[v1alpha1.UpdateStorePostRequest]) (*connect.Response[v1alpha1.UpdateStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.UpdateStorePost is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) PublishStorePost(context.Context, *connect.Request[v1alpha1.PublishStorePostRequest]) (*connect.Response[v1alpha1.PublishStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.PublishStorePost is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) UnpublishStorePost(context.Context, *connect.Request[v1alpha1.UnpublishStorePostRequest]) (*connect.Response[v1alpha1.UnpublishStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.UnpublishStorePost is not implemented"))
+}
+
+func (UnimplementedSocialDelegatedServiceHandler) ScheduleStorePost(context.Context, *connect.Request[v1alpha1.ScheduleStorePostRequest]) (*connect.Response[v1alpha1.ScheduleStorePostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialDelegatedService.ScheduleStorePost is not implemented"))
 }

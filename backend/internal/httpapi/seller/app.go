@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -39,6 +40,7 @@ type Module interface {
 	AccountMeasure(ctx context.Context, accountID int64, measureID uuid.UUID) (model.Measure, error)
 	SubmitAppeal(context.Context, model.SubmitAppealInput) (model.Measure, error)
 	RequestRemediation(context.Context, model.RequestRemediationInput) (model.Measure, error)
+	blockModule
 }
 
 // Followers 是店家粉絲的來源（buyer 模組擁有追蹤與買家的顯示資料）。
@@ -52,9 +54,11 @@ type App struct {
 	m         Module
 	payments  Payments
 	followers Followers
+	blocking  blocks.Sources
 	images    rpc.Images
 	dash      Dashboard
 	stats     *StatsSource
+	links     LinkAvailability
 	web       rpc.WebOrigin
 	log       *slog.Logger
 }
@@ -64,10 +68,19 @@ var _ sellerv1alpha1connect.SellerAppServiceHandler = (*App)(nil)
 // ErrPaymentsRequired 是 NewApp 沒有收款帳戶來源時的錯誤。
 var ErrPaymentsRequired = errors.New("httpapi/seller：需要收款帳戶的來源（payment 模組）")
 
-// NewApp 建立賣家 handler。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
+// ErrBlockingRequired 是 NewApp 沒有封鎖入口的來源時的錯誤（內容作者的來源與跨身分規則的身分來源，A7-2e）。
+var ErrBlockingRequired = errors.New("httpapi/seller：封鎖需要內容作者的來源與跨身分規則的身分來源")
+
+// ErrLinksRequired 是 NewApp 沒有內容快照連結的查詢來源時的錯誤（措施的「查看貼文」連結要知道目標還在不在）。
+var ErrLinksRequired = errors.New("httpapi/seller：需要內容快照連結目標是否還在的查詢來源（social 模組）")
+
+// NewApp 建立賣家 handler。links 是措施內容快照的連結目標是否還在的查詢來源（social 模組），必填。blocking 是封鎖入口的來源，必填。dash 是儀表板的來源與時鐘，GetMyDashboard 用，三個來源由組裝點提供。stats 是 GetMyStore 的統計來源（粉絲與評價），
 // 與前台店面頁（NewPublic）是同一份 *StatsSource（NewStatsSource 建立，nil 回錯誤）。統編的登記資料經模組（Module.LookupBusinessRegistration）。
 // payments 是收款帳戶的來源（payment 模組），nil 回錯誤。web 是網站網域（開通結束的回跳網址由它組），零值回錯誤。log 記錄開通任務讀不到的來源（GetMyOnboarding），nil 時不記錄；與儀表板的 Dashboard.Log 各自獨立。
-func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource, web rpc.WebOrigin, log *slog.Logger) (*App, error) {
+func NewApp(m Module, payments Payments, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource, links LinkAvailability, web rpc.WebOrigin, blocking blocks.Sources, log *slog.Logger) (*App, error) {
+	if links == nil {
+		return nil, ErrLinksRequired
+	}
 	if stats == nil {
 		return nil, ErrStatsSourceRequired
 	}
@@ -77,10 +90,13 @@ func NewApp(m Module, payments Payments, followers Followers, images rpc.Images,
 	if web.IsZero() {
 		return nil, ErrWebOriginRequired
 	}
+	if !blocking.Complete() {
+		return nil, ErrBlockingRequired
+	}
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &App{m: m, payments: payments, followers: followers, images: images, dash: dash, stats: stats, web: web, log: log}, nil
+	return &App{m: m, payments: payments, followers: followers, blocking: blocking, images: images, dash: dash, stats: stats, links: links, web: web, log: log}, nil
 }
 
 // deref 是可選文字的值：沒有值是空字串（契約以空字串表示沒有填）。

@@ -117,12 +117,11 @@ class _HashtagAutocompletePopoverState
           _loading = false;
         });
       } catch (_) {
-        if (mounted) {
-          setState(() {
-            _items = const [];
-            _loading = false;
-          });
-        }
+        if (!mounted || _lastQuery != p) return;
+        setState(() {
+          _items = const [];
+          _loading = false;
+        });
       }
     }
 

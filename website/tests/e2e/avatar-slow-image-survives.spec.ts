@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 /**
  * Browser-layer guard for the Avatar rewrite — hawkr-website#430 D10.
@@ -137,7 +138,7 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 		// -------------------------------------------------------------- arrange
 		// Land on the home page first: the navigation under test has to be a
 		// client-side one, and `page.goto` is by definition not that.
-		await page.goto("/", { waitUntil: "domcontentloaded" });
+		await gotoStreamed(page, "/");
 		await expect(page.locator(".initial-loader")).toBeHidden({
 			timeout: 60_000,
 		});

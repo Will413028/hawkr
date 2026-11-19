@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-Future<void> _pump(WidgetTester tester) async {
+Future<void> _pump(WidgetTester tester, {bool canManageBlocks = true}) async {
   tester.view.physicalSize = const Size(800, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -17,7 +17,10 @@ Future<void> _pump(WidgetTester tester) async {
         path: '/',
         builder: (_, _) => Scaffold(
           body: SingleChildScrollView(
-            child: ProfileOtherOptionsCard(onShippingTap: () {}),
+            child: ProfileOtherOptionsCard(
+              onShippingTap: () {},
+              canManageBlocks: canManageBlocks,
+            ),
           ),
         ),
       ),
@@ -35,15 +38,13 @@ Future<void> _pump(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('營運設定有「措施與申覆」（附說明與圖示），緊接在「我的檢舉」之後', (tester) async {
+  testWidgets('營運設定有「措施與申覆」（附說明與圖示），在「封鎖名單」之前', (tester) async {
     await _pump(tester);
 
     expect(find.text('措施與申覆'), findsOneWidget);
     expect(find.text('查看平台的措施、期間與申覆進度'), findsOneWidget);
-    final report = tester.getTopLeft(find.text('我的檢舉')).dy;
     final measures = tester.getTopLeft(find.text('措施與申覆')).dy;
     final blocks = tester.getTopLeft(find.text('封鎖名單')).dy;
-    expect(report, lessThan(measures));
     expect(measures, lessThan(blocks));
 
     final row = find.ancestor(
@@ -77,5 +78,11 @@ void main() {
     final node = tester.getSemantics(row);
     expect(node.flagsCollection.isButton, isTrue);
     semantics.dispose();
+  });
+
+  testWidgets('沒有內容契約能力時不顯示「封鎖名單」', (tester) async {
+    await _pump(tester, canManageBlocks: false);
+    expect(find.text('封鎖名單'), findsNothing);
+    expect(find.text('措施與申覆'), findsOneWidget);
   });
 }

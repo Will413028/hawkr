@@ -110,10 +110,7 @@ func (h *Holder) chatWireIdentity(c *gin.Context) (int64, bool) {
 // Neither ErrNoCurrentBuyer nor ErrNoCurrentStore ever errors here — both
 // degrade to (0, nil), "treat as anonymous" — because a read-path
 // personalization lookup must never 403 a page load; only a genuine backend
-// error is returned for the caller to decide how to degrade. The social
-// handlers do not use this: they take buyer_id and store_id separately
-// (socialCaller) and social derives the acting identity from resource
-// ownership.
+// error is returned for the caller to decide how to degrade.
 func (h *Holder) resolveOptionalBuyerID(ctx context.Context, accountID int64, loginRole int) (int64, error) {
 	if accountID == 0 {
 		return accountID, nil

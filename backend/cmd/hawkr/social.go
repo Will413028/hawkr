@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -40,6 +41,21 @@ func (a socialProducts) VerifyProduct(ctx context.Context, productID, storeID in
 		return social.ErrProductNotOwned
 	}
 	return nil
+}
+
+// socialCards 以還在舊服務的 product-service 實作貼文卡片的商品顯示資料 port（B4 的 catalog 搬進單體後換成 in-process）。
+type socialCards struct{ client *productservice.Client }
+
+func (a socialCards) Cards(ctx context.Context, ids []int64, includeInactive bool) (map[int64]httpsocial.ProductInfo, error) {
+	items, err := a.client.Cards(ctx, ids, includeInactive)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]httpsocial.ProductInfo, len(items))
+	for id, item := range items {
+		out[id] = httpsocial.ProductInfo{ID: item.ID, StoreID: item.StoreID, Name: item.Name, ImageKey: item.ImageKey, MinPrice: item.MinPrice, MaxPrice: item.MaxPrice, Available: item.Available}
+	}
+	return out, nil
 }
 
 // noStoreBlocks 是不做買家身分寫入的組裝（social-recount）給 social 的店家封鎖依賴：被呼叫就是接線錯了，回錯誤而不是回「沒有封鎖」。

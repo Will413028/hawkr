@@ -36,6 +36,27 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "Resolved (no violation)"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "Under review"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
+      "message": "Resolved (violation)"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
+      "message": "User"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
+      "message": "Comment"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": {
+      "message": "Forum post"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
+      "message": "Post"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"
     },
@@ -78,6 +99,15 @@
     "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
       "message": "Under review"
     },
+    "seller.Measure.meta_kind": {
+      "message": "Measure: {kind}"
+    },
+    "seller.Measure.removed_contents_cleared": {
+      "message": "The copy of this content was deleted after the retention period."
+    },
+    "seller.Measure.removed_contents_heading": {
+      "message": "Removed content"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "Suspended (no end date; under periodic review by the platform)"
     },
@@ -86,6 +116,12 @@
     },
     "seller.Measure.suspension_ended": {
       "message": "Ended on {end}"
+    },
+    "seller.Measure.view_content_link": {
+      "message": "View post"
+    },
+    "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN": {
+      "message": "Content removal"
     },
     "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
       "message": "Contact support"
@@ -131,6 +167,12 @@
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_DELETED": {
+      "message": "This comment was deleted"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_HIDDEN": {
+      "message": "This comment was hidden"
     }
   }
 }

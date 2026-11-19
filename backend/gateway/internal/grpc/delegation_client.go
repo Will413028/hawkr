@@ -12,7 +12,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
-	socialpb "github.com/Will413028/hawkr/go-pkg/proto/social"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -281,58 +280,6 @@ func (c *ProductClient) BatchUpdateSellerProductStatusForDelegation(ctx context.
 	ctx, cancel := withDeadline(ctx, deadlineMs)
 	defer cancel()
 	return c.client.BatchUpdateSellerProductStatus(ctx, req)
-}
-
-// ==================== social-service ====================
-
-func (c *SocialClient) ListMyPostsForDelegation(ctx context.Context, req *socialpb.ListMyPostsRequest, deadlineMs int) (*socialpb.PostListResponse, error) {
-	if err := requireCapability(req.GetDelegation(), "ContentService.ListMyPosts", pkgdelegation.CapPostsRead); err != nil {
-		return nil, err
-	}
-	ctx, cancel := withDeadline(ctx, deadlineMs)
-	defer cancel()
-	return c.client.ListMyPosts(ctx, req)
-}
-
-// GetPostDetailForDelegation must always carry owner_store_id: GetPost's SQL
-// deliberately does not filter by seller (comments / moderation / hide / detail all
-// share it as an existence query), so without that field Q4 has nothing to compare
-// and a delegated reader could pull any seller's post detail — successfully, and
-// therefore without an audit row.
-func (c *SocialClient) GetPostDetailForDelegation(ctx context.Context, req *socialpb.GetPostDetailRequest, deadlineMs int) (*socialpb.PostDetailResponse, error) {
-	if err := requireCapability(req.GetDelegation(), "ContentService.GetPostDetail", pkgdelegation.CapPostsRead); err != nil {
-		return nil, err
-	}
-	ctx, cancel := withDeadline(ctx, deadlineMs)
-	defer cancel()
-	return c.client.GetPostDetail(ctx, req)
-}
-
-func (c *SocialClient) CreatePostForDelegation(ctx context.Context, req *socialpb.CreatePostRequest, deadlineMs int) (*socialpb.PostResponse, error) {
-	if err := requireCapability(req.GetDelegation(), "ContentService.CreatePost", pkgdelegation.CapPostsWrite); err != nil {
-		return nil, err
-	}
-	ctx, cancel := withDeadline(ctx, deadlineMs)
-	defer cancel()
-	return c.client.CreatePost(ctx, req)
-}
-
-func (c *SocialClient) UpdatePostForDelegation(ctx context.Context, req *socialpb.UpdatePostRequest, deadlineMs int) (*socialpb.PostResponse, error) {
-	if err := requireCapability(req.GetDelegation(), "ContentService.UpdatePost", pkgdelegation.CapPostsWrite); err != nil {
-		return nil, err
-	}
-	ctx, cancel := withDeadline(ctx, deadlineMs)
-	defer cancel()
-	return c.client.UpdatePost(ctx, req)
-}
-
-func (c *SocialClient) UpdateSellerPostStatusForDelegation(ctx context.Context, req *socialpb.UpdateSellerPostStatusRequest, deadlineMs int) (*socialpb.PostResponse, error) {
-	if err := requireCapability(req.GetDelegation(), "ContentService.UpdateSellerPostStatus", pkgdelegation.CapPostsPublish); err != nil {
-		return nil, err
-	}
-	ctx, cancel := withDeadline(ctx, deadlineMs)
-	defer cancel()
-	return c.client.UpdateSellerPostStatus(ctx, req)
 }
 
 // ==================== order-service ====================

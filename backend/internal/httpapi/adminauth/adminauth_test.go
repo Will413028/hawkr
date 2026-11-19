@@ -16,8 +16,10 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
+	socialv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
@@ -63,8 +65,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 81 {
-		t.Fatalf("declarations=%d methods=%d，預期 81", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 85 {
+		t.Fatalf("declarations=%d methods=%d，預期 85", got, want)
 	}
 
 	for procedure := range declarations {
@@ -327,6 +329,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		}
 	}
 	wantAudited := []string{
+		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
@@ -436,5 +439,30 @@ func TestAuditPendingIsFrozenAndOnlyShrinks(t *testing.T) {
 		if d.audit != auditPending {
 			t.Errorf("%s 已經不是 auditPending（%s）：從凍結清單刪掉它，清單只能縮小", p, d.audit)
 		}
+	}
+}
+
+// moderation 的後台方法一個方法對一個權限；決定是寫入，要留後台動作紀錄。
+func TestModerationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
+	for procedure, want := range map[string]struct {
+		perm  adminperm.Permission
+		audit auditMode
+	}{
+		moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:  {adminperm.ModerationCasesList, auditReadOnly},
+		moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:    {adminperm.ModerationCasesGet, auditReadOnly},
+		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure: {adminperm.ModerationCasesDecide, auditAudited},
+	} {
+		d, ok := declarations[procedure]
+		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {
+			t.Errorf("%s 的宣告 = %+v，預期權限 %s、紀錄模式 %s", procedure, d, want.perm, want.audit)
+		}
+	}
+}
+
+// social 的後台方法對應自己的權限；列表是讀取，不留後台動作紀錄。
+func TestSocialAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
+	d, ok := declarations[socialv1alpha1connect.SocialAdminServiceListPostsProcedure]
+	if !ok || d.permission != adminperm.SocialPostsList || d.exemptReason != "" || d.audit != auditReadOnly {
+		t.Errorf("ListPosts 的宣告 = %+v，預期權限 %s、紀錄模式 %s", d, adminperm.SocialPostsList, auditReadOnly)
 	}
 }

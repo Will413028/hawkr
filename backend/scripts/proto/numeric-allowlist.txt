@@ -160,7 +160,7 @@ hawkr.seller.PublicSellerViolation.expires_at_ms
 hawkr.seller.RecommendedSeller.followers
 hawkr.seller.RecommendedSeller.order_count
 hawkr.seller.RecommendedSeller.rating
-# §6.2 #3 exception — internal-only cross-service RPC (im/social → seller), never gateway-exposed;
+# §6.2 #3 exception — internal-only cross-service RPC (im → seller), never gateway-exposed;
 # map value is an account_id kept int64 end-to-end. NOT Track-1 backlog; keep as native numeric.
 hawkr.seller.ResolvePrincipalsResponse.principals
 # §6.2 #3 exception — same internal-only RPC/message as .principals above
@@ -207,48 +207,6 @@ hawkr.seller.StoreVisitorListData.page_size
 hawkr.seller.StoreVisitorListData.total
 hawkr.seller.UnionReportRow.created_at_ms
 hawkr.seller.ValidateSellerResponse.status
-hawkr.social.AdminPostListItem.created_at
-hawkr.social.AdminPostListItem.latest_report_at
-hawkr.social.AdminPostListItem.report_count
-hawkr.social.AdminPostListResponse.page
-hawkr.social.AdminPostListResponse.page_size
-hawkr.social.AdminPostListResponse.total
-hawkr.social.CommentInfo.created_at
-hawkr.social.CommentInfo.like_count
-hawkr.social.CommentInfo.reply_count
-hawkr.social.CommentInfo.actor_kind
-hawkr.social.CommentListResponse.page
-hawkr.social.CommentListResponse.page_size
-hawkr.social.CommentListResponse.total
-hawkr.social.ForumEntryInfo.created_at
-hawkr.social.ForumEntryInfo.reply_count
-# §6.2 #3 exception — never gateway-exposed: actor_kind only drives
-# enrichForumUserInfo's buyer-vs-store lookup routing inside social-service,
-# before the response leaves the service; gateway's toForumRecord (REST DTO)
-# has no actor kind field, so it never crosses into a JSON response.
-hawkr.social.ForumEntryInfo.actor_kind
-hawkr.social.ForumListResponse.page
-hawkr.social.ForumListResponse.page_size
-hawkr.social.ForumListResponse.total
-hawkr.social.PostDetailInfo.comment_count
-hawkr.social.PostDetailInfo.created_at
-hawkr.social.PostDetailInfo.like_count
-hawkr.social.PostDetailInfo.share_count
-hawkr.social.PostDetailInfo.view_count
-hawkr.social.PostListItem.comment_count
-hawkr.social.PostListItem.created_at
-hawkr.social.PostListItem.hidden_at
-hawkr.social.PostListItem.like_count
-hawkr.social.PostListItem.share_count
-hawkr.social.PostListItem.view_count
-hawkr.social.PostListResponse.page
-hawkr.social.PostListResponse.page_size
-hawkr.social.PostListResponse.total
-hawkr.social.Report.create_time_ms
-hawkr.social.Report.resolved_at_ms
-hawkr.social.Report.resolved_by
-hawkr.social.SharePostResponse.share_count
-hawkr.social.UserBlock.create_time_ms
 # §6.2 #3 exception — gateway-exposed StreamEvent oneof member (AIAssistantService
 # SellerChat, BuyerChat, etc. return stream StreamEvent directly; StepEvent is a
 # oneof case). seq is a small sequence number (1-N range), not an ID subject to

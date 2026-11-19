@@ -42,6 +42,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -93,7 +94,7 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := content.New(content.Deps{DB: d, Media: &fakeMedia{}, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	m := content.New(content.Deps{DB: d, Social: noPosts{}, Media: &fakeMedia{}, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +116,7 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{}, Ready: d.Ping, Content: m, Identity: id, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{}, Ready: d.Ping, Content: m, Identity: id, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -645,4 +646,11 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 // ReadSecure 實作 media.Media；這些測試不讀機敏資產。
 func (*fakeMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
 	return media.SecureAsset{}, errors.New("not used")
+}
+
+// noPosts 是沒有任何公開貼文的 social 替身（這裡的 banner 不指向貼文）。
+type noPosts struct{}
+
+func (noPosts) PubliclyReadablePosts(context.Context, []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return map[uuid.UUID]bool{}, nil
 }

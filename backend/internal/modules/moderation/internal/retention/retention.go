@@ -1,5 +1,5 @@
-// Package retention 是檢舉資料的保留期（A7-D20、A7-D21）：結案滿 model.SnapshotRetention 之後由排程 job 刪除內容快照（釋放快照在 media 的圖片引用）並清除檢舉的說明文字；
-// 檢舉人刪帳時（買家的刪除事件，同 transaction）清掉他全部檢舉的說明與每日計數列。檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列
+// Package retention 是檢舉資料的保留期（A7-D20、A7-D21）：結案滿 model.SnapshotRetention 之後由排程 job 刪除內容快照（釋放快照在 media 的圖片引用）並清除檢舉的說明文字與冪等紀錄（request_hash 是說明的雜湊）；
+// 檢舉人刪帳時（買家的刪除事件，同 transaction）清掉他全部檢舉的說明、冪等紀錄與每日計數列。檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列
 // （含 reporter_buyer_id，假名鍵）留著。進行中的案件（沒有結案時間）的快照與說明不清。
 package retention
 
@@ -53,7 +53,7 @@ func (s *Service) Holds() mediaref.Holds { return s.holds }
 // Syncer 是快照圖片引用的同步（測試與營運直接跑一輪用）。
 func (s *Service) Syncer() *media.RefSyncer { return s.syncer }
 
-// PurgeSnapshots 刪除結案超過保留期的案件的快照（釋放圖片引用）並清掉檢舉的說明，回傳刪除的快照數；冪等。
+// PurgeSnapshots 刪除結案超過保留期的案件的快照（釋放圖片引用）並清掉檢舉的說明與冪等紀錄，回傳刪除的快照數；冪等。
 func (s *Service) PurgeSnapshots(ctx context.Context) (int64, error) {
 	cutoff := s.d.Now().UTC().Add(-model.SnapshotRetention)
 	var total int64
@@ -67,18 +67,30 @@ func (s *Service) PurgeSnapshots(ctx context.Context) (int64, error) {
 			break
 		}
 	}
+	if err := s.drain(ctx, "清除過期的檢舉說明", func(q *store.Queries) (int64, error) {
+		return q.ClearExpiredDescriptionsBatch(ctx, store.ClearExpiredDescriptionsBatchParams{Cutoff: &cutoff, MaxRows: batchSize})
+	}); err != nil {
+		return total, err
+	}
+	return total, s.drain(ctx, "刪除過期的檢舉冪等紀錄", func(q *store.Queries) (int64, error) {
+		return q.DeleteExpiredReportRequestsBatch(ctx, store.DeleteExpiredReportRequestsBatchParams{Cutoff: &cutoff, MaxRows: batchSize})
+	})
+}
+
+// drain 反覆在各自的 transaction 內跑 batch，直到一批不滿 batchSize。
+func (s *Service) drain(ctx context.Context, what string, batch func(q *store.Queries) (int64, error)) error {
 	for {
 		var n int64
 		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 			var err error
-			n, err = store.New(s.d.DB.Conn(ctx)).ClearExpiredDescriptionsBatch(ctx, store.ClearExpiredDescriptionsBatchParams{Cutoff: &cutoff, MaxRows: batchSize})
+			n, err = batch(store.New(s.d.DB.Conn(ctx)))
 			return err
 		})
 		if err != nil {
-			return total, fmt.Errorf("moderation：清除過期的檢舉說明：%w", err)
+			return fmt.Errorf("moderation：%s：%w", what, err)
 		}
 		if n < batchSize {
-			return total, nil
+			return nil
 		}
 	}
 }
@@ -109,7 +121,7 @@ func (s *Service) purgeBatch(ctx context.Context, cutoff time.Time) (int64, erro
 	return deleted, nil
 }
 
-// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：清掉這位檢舉人（含同一帳號的歷史身分）全部檢舉的說明與每日計數列；
+// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：清掉這位檢舉人（含同一帳號的歷史身分）全部檢舉的說明、冪等紀錄與每日計數列；
 // 檢舉列與 reporter_buyer_id 留著。冪等。
 func (s *Service) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
 	return s.clearReporter(ctx, e.BuyerID, e.AccountID)
@@ -132,6 +144,9 @@ func (s *Service) clearReporter(ctx context.Context, buyerID, accountID int64) e
 	for _, id := range ids {
 		if _, err := q.ClearReporterDescriptions(ctx, id); err != nil {
 			return fmt.Errorf("moderation：清除檢舉人 %d 的說明：%w", id, err)
+		}
+		if _, err := q.DeleteReporterRequests(ctx, id); err != nil {
+			return fmt.Errorf("moderation：刪除檢舉人 %d 的冪等紀錄：%w", id, err)
 		}
 		if _, err := q.DeleteReporterDailyCount(ctx, id); err != nil {
 			return fmt.Errorf("moderation：刪除檢舉人 %d 的每日計數：%w", id, err)

@@ -1,6 +1,6 @@
 /**
  * Strict TS types projected from 預設模組.openapi.json
- * Source of truth: /public/posts, /app/buyers/me, /app/posts/{id}/*
+ * Source of truth: /app/buyers/me; the social post types are the client-side view models over the Connect `hawkr.social.v1alpha1` messages (`lib/posts/repo.ts`)
  *
  * Naming: every JSON body field is camelCase (backend-payuni#2235 收斂 — 10 檔 §2:
  * URL/Query snake_case, JSON body camelCase). Query-string params are the sole
@@ -28,21 +28,36 @@ export function roleFromAccountType(t?: number | null): Role {
 }
 
 /* ---------- Post (Feed) ---------- */
-/** matches handler.PostProductData */
+/** website view model mapped from the Connect post product message in `lib/posts/repo.ts` */
 export interface PostProductData {
 	// 64-bit TSID（> Number.MAX_SAFE_INTEGER）：api/json.ts 的 preserveBigInts 在
-	// parse 時保字串，後端亦已對貼文 DTO 的 id 加 ,string（gateway PR #967），故
-	// canonical 型別一律 string，避免精度丟失。
+	// parse 時保字串，故 canonical 型別一律 string，避免精度丟失。
 	id: string;
-	/** §231: objectKey SSOT (`PostProductData.ImageKey`); the wire also carries the
-	 *  Gateway-composed `imageUrl` twin, which the UI no longer reads. */
+	/** objectKey of the product image. */
 	imageKey: string;
 	name: string;
 	price: string;
 }
 
-/** matches handler.PostListItemData / handler.MyPostListItemData */
+/** 觀看者在貼文留言時的身分（伺服器依觀看者算）：店主在自己店的貼文是店家，其他有買家身分的人是買家。 */
+export interface PostViewerActor {
+	kind: "buyer" | "store";
+	id: string;
+	/** 讀不到名稱（店家卡片讀不到、買家已刪除）時沒有。 */
+	name?: string;
+	avatarKey?: string;
+}
+
+/** 貼文上依觀看者算的留言權限；匿名讀取的貼文沒有這一組。 */
+export interface PostViewerState {
+	canComment: boolean;
+	actor?: PostViewerActor;
+}
+
+/** website view model of a post list item, mapped from the Connect post message in `lib/posts/repo.ts` */
 export interface PostListItem {
+	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
+	etag?: string;
 	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
 	sellerId: string;
@@ -73,8 +88,12 @@ export interface PostListItem {
 	viewCount: number;
 	isLiked: boolean;
 	createdAt: number;
-	hiddenAt?: number; // unix；0/缺 = 未下架（僅 /app/sellers/me/posts 回傳）
+	hiddenAt?: number; // unix；0/缺 = 未下架（僅店主讀自己的貼文時回傳）
 	hiddenReason?: string; // 平台下架原因（同上）
+	/** 下架這則貼文的措施 ID（只對店主；有值就是被平台下架，理由經措施讀）。 */
+	takedownMeasureId?: string;
+	/** 依觀看者的讀取才有（匿名讀取不設）：能不能留言與留言時的身分。 */
+	viewer?: PostViewerState;
 	/**
 	 * PostPublishStatus 數字碼字串（4401 未發布／4402 已發布／4403 已下架）。
 	 *
@@ -93,7 +112,7 @@ export interface PostListItem {
 	scheduledPublishAt?: string;
 }
 
-/** matches handler.PostDetailData */
+/** website view model of post detail, mapped from the Connect post message in `lib/posts/repo.ts` */
 export interface PostDetail {
 	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
@@ -112,16 +131,21 @@ export interface PostDetail {
 	viewCount: number;
 	isLiked: boolean;
 	createdAt: number;
+	/** 依觀看者的讀取才有（匿名讀取不設）。 */
+	viewer?: PostViewerState;
 }
 
 /**
- * matches handler.MyPostDetailData：店主讀自己的單篇貼文（`/app/sellers/posts/{id}`）。
+ * website view model 的店主視角（`lib/posts/owner.ts` 由 Connect 貼文訊息映射）：店主讀自己的單篇貼文。
  * 發布狀態與平台下架資訊同 `PostListItem` 的同名欄位；只有店主路徑帶它們。
  */
 export interface MyPostDetail extends PostDetail {
+	/** 樂觀鎖版本；修改、發布、下架與刪除時帶回。 */
+	etag?: string;
 	publishStatus?: string;
 	hiddenAt?: number;
 	hiddenReason?: string;
+	takedownMeasureId?: string;
 }
 
 /* ---------- Buyer profile ---------- */

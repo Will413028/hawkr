@@ -2,9 +2,11 @@
 
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import { type UiText, useUiText } from "@/lib/i18n/ui-text";
 import type { SellerMeasure } from "@/lib/seller/measures";
 import AppealEntry from "./AppealEntry";
+import { MeasureContents } from "./MeasureContents";
 import {
 	measureMeta,
 	measurePeriodText,
@@ -27,6 +29,8 @@ export function measureNotes(ut: UiText, measure: SellerMeasure): string[] {
 /** 措施卡片：依據、措施、狀態、平台給賣家的理由與申覆、解除請求入口。列表與詳情頁共用；申覆與解除請求入口連到各自的獨立頁。 */
 export default function MeasureCard({ measure }: { measure: SellerMeasure }) {
 	const ut = useUiText();
+	const { data: myStore } = useSellerSelf();
+	const store = myStore?.store;
 	const chips = measureStatusChips(ut, measure);
 	const meta = measureMeta(ut, measure);
 
@@ -64,6 +68,15 @@ export default function MeasureCard({ measure }: { measure: SellerMeasure }) {
 					{measure.statement}
 				</p>
 			)}
+
+			<MeasureContents
+				contents={measure.contents}
+				store={
+					store?.id && store.storeCode
+						? { id: store.id, storeCode: store.storeCode }
+						: undefined
+				}
+			/>
 
 			{measureNotes(ut, measure).map((note) => (
 				<p

@@ -14,6 +14,16 @@ func CaseClosed() uitext.Message {
 	return uitext.Message{Text: "案件已結案", Locale: uitext.ZhTW}
 }
 
+// CaseListKindInvalid 是後台員工受眾的模組句子 case.list_kind_invalid（只有 zh-TW）。
+func CaseListKindInvalid() uitext.Message {
+	return uitext.Message{Text: "對象種類不合法", Locale: uitext.ZhTW}
+}
+
+// CaseListStateInvalid 是後台員工受眾的模組句子 case.list_state_invalid（只有 zh-TW）。
+func CaseListStateInvalid() uitext.Message {
+	return uitext.Message{Text: "案件狀態不合法", Locale: uitext.ZhTW}
+}
+
 // CaseNotFound 是後台員工受眾的模組句子 case.not_found（只有 zh-TW）。
 func CaseNotFound() uitext.Message {
 	return uitext.Message{Text: "案件不存在", Locale: uitext.ZhTW}
@@ -32,11 +42,6 @@ func DecideActionInvalid() uitext.Message {
 // DecideActionNotForTarget 是後台員工受眾的模組句子 decide.action_not_for_target（只有 zh-TW）。
 func DecideActionNotForTarget() uitext.Message {
 	return uitext.Message{Text: "這個處置不適用於這種對象", Locale: uitext.ZhTW}
-}
-
-// DecideAdminRequired 是後台員工受眾的模組句子 decide.admin_required（只有 zh-TW）。
-func DecideAdminRequired() uitext.Message {
-	return uitext.Message{Text: "管理員必填", Locale: uitext.ZhTW}
 }
 
 // DecideBanNotBuyer 是後台員工受眾的模組句子 decide.ban_not_buyer（只有 zh-TW）。
@@ -96,12 +101,12 @@ func DecideSnapshotMissing() uitext.Message {
 
 // DecideStoreOnlyTakedown 是後台員工受眾的模組句子 decide.store_only_takedown（只有 zh-TW）。
 func DecideStoreOnlyTakedown() uitext.Message {
-	return uitext.Message{Text: "只有內容下架帶店家與嚴重度", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "只有內容下架要填嚴重度", Locale: uitext.ZhTW}
 }
 
-// DecideStoreRequired 是後台員工受眾的模組句子 decide.store_required（只有 zh-TW）。
-func DecideStoreRequired() uitext.Message {
-	return uitext.Message{Text: "內容下架要指定內容所屬的店家", Locale: uitext.ZhTW}
+// DecideTakedownSnapshotMissing 是後台員工受眾的模組句子 decide.takedown_snapshot_missing（只有 zh-TW）。
+func DecideTakedownSnapshotMissing() uitext.Message {
+	return uitext.Message{Text: "案件沒有內容快照，無法確認要下架的店家", Locale: uitext.ZhTW}
 }
 
 // DecideTakedownWrongStore 是後台員工受眾的模組句子 decide.takedown_wrong_store（只有 zh-TW）。
@@ -181,6 +186,15 @@ func ReportReporterRequired(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "Buyer identity required", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "需要買家身分", Locale: uitext.ZhTW}
+}
+
+// ReportRequestIdReused 是模組句子 report.request_id_reused；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportRequestIdReused(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This report differs from the one previously sent with the same request. Please refresh the page and try again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
 }
 
 // ReportSelfBuyer 是模組句子 report.self_buyer；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

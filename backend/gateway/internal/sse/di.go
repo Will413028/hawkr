@@ -28,7 +28,6 @@ func NewHubFromEnv(log *zap.Logger) *Hub {
 	cfg.RingBufferTTL = envDuration("SSE_RING_BUFFER_TTL", cfg.RingBufferTTL)
 	cfg.BatchWindow = envDurationMS("SSE_BATCH_WINDOW_MS", cfg.BatchWindow)
 	cfg.MaxConnPerPod = envInt("SSE_MAX_CONN_PER_POD", cfg.MaxConnPerPod)
-	cfg.MaxConnPerSubject = envInt("SSE_MAX_CONN_PER_SUBJECT", cfg.MaxConnPerSubject)
 	cfg.MaxConnPerUser = envInt("SSE_MAX_CONN_PER_USER", cfg.MaxConnPerUser)
 	// issue #2040：連線最長存活與回收額度視窗。SSE_MAX_CONN_LIFETIME 允許 "0"
 	// 停用（envDuration 對 0 會照收），其餘走一般 time.ParseDuration 格式。

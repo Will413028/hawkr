@@ -60,7 +60,7 @@ func toCaseInquiry(i model.AdminInquiry) *adminpb.CaseInquiry {
 }
 
 func (h *Governance) CreateCaseInquiry(ctx context.Context, req *connect.Request[adminpb.CreateCaseInquiryRequest]) (*connect.Response[adminpb.CreateCaseInquiryResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (h *Governance) ListCaseInquiries(ctx context.Context, req *connect.Request
 }
 
 func (h *Governance) RecordCaseInquiryReply(ctx context.Context, req *connect.Request[adminpb.RecordCaseInquiryReplyRequest]) (*connect.Response[adminpb.RecordCaseInquiryReplyResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (h *Governance) RecordCaseInquiryReply(ctx context.Context, req *connect.Re
 }
 
 func (h *Governance) WithdrawCaseInquiry(ctx context.Context, req *connect.Request[adminpb.WithdrawCaseInquiryRequest]) (*connect.Response[adminpb.WithdrawCaseInquiryResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -75,52 +75,43 @@ func TestDiff_MissingSideRendersEmptyForm(t *testing.T) {
 
 // 建立類沒有 before，所以每一個欄位都走「單側缺鍵」那條路。缺席側渲染成 formatter 的
 // 空形之後，若在場側渲染成同一個字串，這一列講的是「從沒有變成沒有」——它不是變更。
-//
-// dev 三案獨立重現：代行建立一則沒有配圖、沒有關聯商品的貼文，稽核列固定多出
-// imageKeys「0 張 → 0 張」與 productIds「0 項 → 0 項」兩列從未發生的變更。稽核列
-// append-only、寫進去就永遠在那裡，而「沒有假變更列」正是 changed_fields 拿得出來當
-// 證據的前提。
 func TestDiff_CreateDoesNotInventZeroCountChanges(t *testing.T) {
-	// POST_CREATE 的真實形狀：before 是空投影（沒有前身），after 由 handler 把
-	// 集合欄位投影成計數字串。
-	after := Project("post", map[string]any{
-		"content":    "今日現採",
-		"productIds": "0",
-		"imageKeys":  "0",
+	after := Project("product", map[string]any{
+		"name":   "檸檬",
+		"images": "0",
+		"skus":   "0",
 	})
 
 	got := map[string]string{}
-	for _, f := range Diff("post", map[string]any{}, after, nil) {
+	for _, f := range Diff("product", map[string]any{}, after, nil) {
 		got[f.GetField()] = f.GetBefore() + " → " + f.GetAfter()
 	}
-	if len(got) != 1 || got["content"] == "" {
-		t.Fatalf("changed_fields = %v, want 只有 content 一列", got)
+	if len(got) != 1 || got["name"] == "" {
+		t.Fatalf("changed_fields = %v, want 只有 name 一列", got)
 	}
 
-	// 鑑別力：把假變更擋掉不得順手把真變更也擋掉。「從無到有」兩側渲染必然不同。
-	withImages := Project("post", map[string]any{
-		"content":    "今日現採",
-		"productIds": "0",
-		"imageKeys":  "2",
+	withImages := Project("product", map[string]any{
+		"name":   "檸檬",
+		"images": "2",
+		"skus":   "0",
 	})
 	real := map[string]string{}
-	for _, f := range Diff("post", map[string]any{}, withImages, nil) {
+	for _, f := range Diff("product", map[string]any{}, withImages, nil) {
 		real[f.GetField()] = f.GetBefore() + " → " + f.GetAfter()
 	}
-	if real["imageKeys"] != "0 張 → 2 張" {
-		t.Errorf("imageKeys = %q, want \"0 張 → 2 張\" —— 真的掛了兩張圖必須記", real["imageKeys"])
+	if real["images"] != "0 張 → 2 張" {
+		t.Errorf("images = %q, want \"0 張 → 2 張\"", real["images"])
 	}
-	if _, invented := real["productIds"]; invented {
-		t.Errorf("productIds 仍被記成變更：%v", real)
+	if _, invented := real["skus"]; invented {
+		t.Errorf("skus 仍被記成變更：%v", real)
 	}
 }
 
-// 同一個假變更的第二種外殼：Plain／Truncate 的空形是「—」，於是缺席側與空字串側渲染
-// 成同一個「— → —」。貼文的 scheduledPublishAt／publishedAt 在未排程時就是這個形狀。
+// Plain／Truncate 的空形是「—」，於是缺席側與空字串側渲染成同一個「— → —」。
 func TestDiff_MissingSideMatchingEmptyStringIsNotAChange(t *testing.T) {
-	after := map[string]any{"scheduledPublishAt": "", "publishedAt": "", "content": "今日現採"}
-	for _, f := range Diff("post", map[string]any{}, after, nil) {
-		if f.GetField() != "content" {
+	after := map[string]any{"origin": "", "description": "", "name": "檸檬"}
+	for _, f := range Diff("product", map[string]any{}, after, nil) {
+		if f.GetField() != "name" {
 			t.Errorf("%s 被記成 %q → %q，但兩側都是「沒有值」",
 				f.GetField(), f.GetBefore(), f.GetAfter())
 		}
@@ -269,8 +260,7 @@ func TestDiffScopes_OnlyReferenceRegisteredFields(t *testing.T) {
 		resourceType string
 		fields       []string
 	}{
-		"ScopeProductStatus":    {"product", ScopeProductStatus()},
-		"ScopePostPublishState": {"post", ScopePostPublishState()},
+		"ScopeProductStatus": {"product", ScopeProductStatus()},
 	}
 	for name, sc := range scopes {
 		if len(sc.fields) == 0 {
@@ -346,11 +336,9 @@ func TestDiff_UnknownCertificationSegmentSurvivesAlongsideKnownOnes(t *testing.T
 func TestDiff_EveryRegisteredEnumNameResolves(t *testing.T) {
 	// 每個 enum 名給一個該 enum 確實存在的碼值（值取自 pkg/codemeta/labels.go 的生成表）。
 	// 新增 enum 到規則表時這裡要一起加，漏加會在下面轉紅並指名要補什麼。
-	// ⚠️ 探針值寫錯會讓斷言誤報成「switch 缺 case」——本測試第一版就把 PostPublishStatus
-	// 寫成 5002（實際是 4401–4403），於是它報了一個不存在的缺口。探針要照生成表抄。
+	// ⚠️ 探針值寫錯會讓斷言誤報成「switch 缺 case」。探針要照生成表抄。
 	probes := map[string]string{
 		"ProductStatus":         "4004",
-		"PostPublishStatus":     "4402",
 		"OrderStatus":           "10",
 		"DelegationAuditAction": "PRODUCT_UPDATE",
 		"DelegationReasonCode":  "seller_request",

@@ -301,9 +301,17 @@ type SellerMeasure struct {
 }
 
 type SellerMeasureContent struct {
-	MeasureID   uuid.UUID
-	ContentKind string
-	ContentID   uuid.UUID
+	MeasureID          uuid.UUID
+	ContentKind        string
+	ContentID          uuid.UUID
+	MeasureStatus      string
+	SnapshotState      string
+	SnapshotBody       *string
+	SnapshotAuthoredAt *time.Time
+	SnapshotImageCount *int32
+	LinkPostID         *uuid.UUID
+	LinkStoreID        *int64
+	LinkThreadID       *uuid.UUID
 }
 
 type SellerMeasureFinding struct {

@@ -11,13 +11,14 @@ import '../../features/notification/data/push/manager.dart';
 import '../../features/order/data/receipt_photo_repository.dart';
 import '../../shared/utils/hk_log.dart';
 import '../exceptions/app_exception.dart';
-import 'force_logout_provider.dart';
+import 'account_restriction.dart';
 import 'auth_session_provider.dart';
 import 'session_model.dart';
 
 part 'session_provider.g.dart';
 
 /// 是否登入。登入是否仍然有效由伺服器判斷：session 失效（過期或被撤銷）時請求收到 401／unauthenticated，走強制登出。
+/// 停權不是失效：停權的帳號維持登入，進受限狀態（[accountRestrictionProvider]）。
 bool hasUsableSession(SessionModel? session) {
   return session != null && session.userId.isNotEmpty;
 }
@@ -39,18 +40,14 @@ class Session extends _$Session {
         return null;
       }
     }
-    final String accountId;
+    final AccountSnapshot account;
     try {
-      accountId = await ref.read(authRepositoryProvider).currentAccountId();
+      account = await ref.read(authRepositoryProvider).currentAccount();
     } catch (error, stack) {
       if (!ref.mounted || !_restore.isCurrent(generation)) return null;
-      if (error is UnauthorizedException || error is SuspendedException) {
+      // 停權的帳號 GetSession 照樣成功並帶 `suspension`（它是讀取，伺服器放行），不會丟 ACCOUNT_SUSPENDED。
+      if (error is UnauthorizedException) {
         if (!e2eAuthEnabled) await _clearAuthSession();
-        if (error is SuspendedException) {
-          ref
-              .read(forceLogoutProvider.notifier)
-              .trigger(message: error.message);
-        }
       } else {
         HKLog.logW('[Session] 帳號暫時無法恢復', error, stack);
         retryRestore();
@@ -58,10 +55,12 @@ class Session extends _$Session {
       return null;
     }
     if (!ref.mounted || !_restore.isCurrent(generation)) return null;
-    return _restoredSession(accountId);
+    return _restoredSession(account);
   }
 
-  Future<SessionModel> _restoredSession(String accountId) async {
+  Future<SessionModel> _restoredSession(AccountSnapshot account) async {
+    final accountId = account.accountId;
+    ref.read(accountRestrictionProvider.notifier).apply(account.suspension);
     final session = await _prepareSession(accountId);
     unawaited(
       Future<void>(() async {
@@ -83,31 +82,28 @@ class Session extends _$Session {
 
   void cancelRestore() => _restore.cancel();
 
-  void retryRestore({Future<void> Function(String)? onSuccess}) {
+  void retryRestore({Future<void> Function(AccountSnapshot)? onSuccess}) {
     _restore.retry(
-      request: () => ref.read(authRepositoryProvider).currentAccountId(),
+      request: () => ref.read(authRepositoryProvider).currentAccount(),
       onSuccess: onSuccess ?? _restoreAccount,
-      isDenied: (error) =>
-          error is UnauthorizedException || error is SuspendedException,
-      onDenied: (error) async {
-        await logout();
-        if (ref.mounted && error is SuspendedException) {
-          ref
-              .read(forceLogoutProvider.notifier)
-              .trigger(message: error.message);
-        }
-      },
+      isDenied: (error) => error is UnauthorizedException,
+      onDenied: (_) => logout(),
       onUnavailable: (error) => HKLog.logD('[Session] restore skipped: $error'),
     );
   }
 
-  Future<void> _restoreAccount(String accountId) async {
-    state = AsyncData(await _restoredSession(accountId));
+  Future<void> _restoreAccount(AccountSnapshot account) async {
+    state = AsyncData(await _restoredSession(account));
   }
 
   /// 登入完成（session token 已保存、GetSession 取得帳號）之後寫入。
-  Future<void> login({required String userId, String? nickname}) async {
+  Future<void> login({
+    required String userId,
+    String? nickname,
+    AccountSuspension? suspension,
+  }) async {
     cancelRestore();
+    ref.read(accountRestrictionProvider.notifier).apply(suspension);
     state = AsyncData(await _prepareSession(userId, nickname: nickname));
     await _mergeGuestCart();
     await PushNotificationManager.instance.onUserLoggedIn();
@@ -178,6 +174,7 @@ class Session extends _$Session {
       await _clearAuthSession();
     }
     state = const AsyncData(null);
+    ref.read(accountRestrictionProvider.notifier).clear();
     await _invalidateUserScopedCaches();
   }
 

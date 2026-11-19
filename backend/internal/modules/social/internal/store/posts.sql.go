@@ -229,6 +229,75 @@ func (q *Queries) InsertPostHashtag(ctx context.Context, arg InsertPostHashtagPa
 	return err
 }
 
+const listAdminPosts = `-- name: ListAdminPosts :many
+SELECT p.id, p.store_id, p.body, p.image_key, p.image_asset_id, p.product_id, p.status, p.published_at, p.version, p.created_at, p.updated_at, p.deleted_at, p.request_id, p.request_hash, s.post_id, s.like_count, s.comment_count, s.view_count, s.share_count
+FROM social.posts p
+JOIN social.post_stats s ON s.post_id = p.id
+WHERE p.deleted_at IS NULL AND p.status <> 'DRAFT'
+  AND (NOT $1::boolean OR EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.post_id = p.id))
+  AND (p.created_at, p.id) < ($2::timestamptz, $3::uuid)
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $4
+`
+
+type ListAdminPostsParams struct {
+	TakenDown    bool
+	AfterCreated time.Time
+	AfterID      uuid.UUID
+	MaxRows      int32
+}
+
+type ListAdminPostsRow struct {
+	SocialPost     SocialPost
+	SocialPostStat SocialPostStat
+}
+
+// 後台看貼文（不含草稿與刪除）：最新建立的在前。taken_down 為真只列有內容下架複本的貼文，為假不篩選。keyset：(created_at, id) 由大到小。
+func (q *Queries) ListAdminPosts(ctx context.Context, arg ListAdminPostsParams) ([]ListAdminPostsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminPosts,
+		arg.TakenDown,
+		arg.AfterCreated,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdminPostsRow{}
+	for rows.Next() {
+		var i ListAdminPostsRow
+		if err := rows.Scan(
+			&i.SocialPost.ID,
+			&i.SocialPost.StoreID,
+			&i.SocialPost.Body,
+			&i.SocialPost.ImageKey,
+			&i.SocialPost.ImageAssetID,
+			&i.SocialPost.ProductID,
+			&i.SocialPost.Status,
+			&i.SocialPost.PublishedAt,
+			&i.SocialPost.Version,
+			&i.SocialPost.CreatedAt,
+			&i.SocialPost.UpdatedAt,
+			&i.SocialPost.DeletedAt,
+			&i.SocialPost.RequestID,
+			&i.SocialPost.RequestHash,
+			&i.SocialPostStat.PostID,
+			&i.SocialPostStat.LikeCount,
+			&i.SocialPostStat.CommentCount,
+			&i.SocialPostStat.ViewCount,
+			&i.SocialPostStat.ShareCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHashtagsOfPosts = `-- name: ListHashtagsOfPosts :many
 SELECT post_id, position, name, display_name
 FROM social.post_hashtags

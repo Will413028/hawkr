@@ -29,27 +29,23 @@ class _PopObserver extends NavigatorObserver {
 }
 
 const _postId = 42;
-const _sellerId = 7;
 const _longProductName = '南歐王生技中都－台灣紅豆（500G／包）產地限定超長商品名稱';
 const _feed = PageHomeFeedScreen(initialIndex: 0, sellerName: '測試店家');
 
 Post _postFixture() => Post(
   id: _postId,
-  sellerId: _sellerId,
-  contentType: 'IMAGE',
-  imageKeys: const ['public/post/20260911/harvest.GIF?rev=2'],
+  imageUrl: 'public/post/20260911/harvest.GIF?rev=2',
   content: List.filled(
     9,
     '這是一段用來驗證窄螢幕與放大字級的產地長文，展開說明後可閱讀完整內文，互動按鈕仍然保持可用。#產地直送',
   ).join('\n'),
   likeCount: 1234567,
   commentCount: 654321,
-  linkedProduct: const <String, dynamic>{
-    'id': '866542675787809994',
-    'name': _longProductName,
-    'price': '123456789',
-    'imageKey': '',
-  },
+  linkedProduct: const PostLinkedProduct(
+    id: '866542675787809994',
+    name: _longProductName,
+    price: 123456789,
+  ),
 );
 
 EdgeInsets _safeInsets(Size size) => size.width > size.height
@@ -71,7 +67,7 @@ Future<void> _pumpFeed(
   when(
     () => repository.listMyPosts(),
   ).thenAnswer((_) async => [_postFixture()]);
-  when(() => repository.listCommentsRaw(_postId)).thenAnswer((_) async => []);
+  when(() => repository.listComments(_postId)).thenAnswer((_) async => []);
 
   Widget withMediaQuery(BuildContext context, Widget? child) => MediaQuery(
     data: MediaQuery.of(context).copyWith(

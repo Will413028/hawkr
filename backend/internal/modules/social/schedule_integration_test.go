@@ -22,7 +22,7 @@ func (f *fixture) draft(t *testing.T, storeID int64) social.Post {
 	t.Helper()
 	p, err := f.module.CreatePost(context.Background(), f.store(t, storeID), social.CreatePostInput{
 		Body: "排程的貼文", ImageToken: fmt.Sprintf("tok-%d", f.next()),
-	})
+	}, nil)
 	must(t, err)
 	return p
 }
@@ -44,7 +44,7 @@ func (f *fixture) schedule(t *testing.T, storeID int64, p social.Post, lead time
 	t.Helper()
 	s, err := f.module.SchedulePost(context.Background(), f.store(t, storeID), social.SchedulePostInput{
 		PostID: p.ID, Version: f.current(t, storeID, p).Version, PublishAt: f.clock().Add(lead), By: by,
-	})
+	}, nil)
 	must(t, err)
 	return s.Schedule
 }
@@ -128,7 +128,7 @@ func TestManualPublishEmitsDirectOrigin(t *testing.T) {
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
-	_, err := f.module.PublishPost(context.Background(), f.store(t, storeID), p.ID, p.Version)
+	_, err := f.module.PublishPost(context.Background(), f.store(t, storeID), p.ID, p.Version, nil)
 	must(t, err)
 	evs := f.events.publishedEvents()
 	if len(evs) != 1 || evs[0].Origin != social.OriginDirect || evs[0].ScheduleID != (uuid.UUID{}) || evs[0].ScheduledBy != (social.ScheduledBy{}) {
@@ -169,7 +169,7 @@ func TestScheduleBounds(t *testing.T) {
 	st := f.store(t, storeID)
 	version := p.Version
 	try := func(lead time.Duration) error {
-		out, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: version, PublishAt: f.clock().Add(lead), By: f.owner()})
+		out, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: version, PublishAt: f.clock().Add(lead), By: f.owner()}, nil)
 		if err == nil {
 			version = out.PostVersion
 		}
@@ -198,36 +198,36 @@ func TestScheduleStateAndVersionRules(t *testing.T) {
 		return social.SchedulePostInput{PostID: p.ID, Version: version, PublishAt: f.clock().Add(time.Hour), By: f.owner()}
 	}
 	pub := f.publishedPost(t, storeID, "已發布")
-	if _, err := f.module.SchedulePost(ctx, st, in(pub, pub.Version)); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.SchedulePost(ctx, st, in(pub, pub.Version), nil); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("已發布的不能排程：%v", err)
 	}
 	d := f.draft(t, storeID)
-	if _, err := f.module.SchedulePost(ctx, st, in(d, 0)); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.SchedulePost(ctx, st, in(d, 0), nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("要帶版本：%v", err)
 	}
-	if _, err := f.module.SchedulePost(ctx, st, in(d, d.Version+1)); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.SchedulePost(ctx, st, in(d, d.Version+1), nil); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("版本不符：%v", err)
 	}
 	other, _ := f.exposableStore(t)
-	if _, err := f.module.SchedulePost(ctx, f.store(t, other), in(d, d.Version)); kindOf(err) != apperr.KindNotFound {
+	if _, err := f.module.SchedulePost(ctx, f.store(t, other), in(d, d.Version), nil); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別家的貼文：%v", err)
 	}
-	empty := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "沒有圖"}))
-	if _, err := f.module.SchedulePost(ctx, st, in(empty, empty.Version)); kindOf(err) != apperr.KindFailedPrecondition {
+	empty := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "沒有圖"}, nil))
+	if _, err := f.module.SchedulePost(ctx, st, in(empty, empty.Version), nil); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("草稿不完整不能排程：%v", err)
 	}
 	un := f.publishedPost(t, storeID, "要下架")
-	_, err := f.module.UnpublishPost(ctx, st, un.ID, un.Version)
+	_, err := f.module.UnpublishPost(ctx, st, un.ID, un.Version, nil)
 	must(t, err)
 	un = mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, un.ID))
-	must(t, mustErr(f.module.SchedulePost(ctx, st, in(un, un.Version))))
-	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: social.ScheduledBy{Kind: "OTHER", Ref: "x"}}); err == nil {
+	must(t, mustErr(f.module.SchedulePost(ctx, st, in(un, un.Version), nil)))
+	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: social.ScheduledBy{Kind: "OTHER", Ref: "x"}}, nil); err == nil {
 		t.Fatal("不認得的發起者種類要被拒絕")
 	}
-	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: f.delegated(" x")}); err == nil {
+	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: f.delegated(" x")}, nil); err == nil {
 		t.Fatal("代行的 ref 頭尾不能有空白")
 	}
-	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: f.delegated("")}); err == nil {
+	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: d.ID, Version: d.Version, PublishAt: f.clock().Add(time.Hour), By: f.delegated("")}, nil); err == nil {
 		t.Fatal("代行的 ref 不能是空的")
 	}
 }
@@ -270,7 +270,7 @@ func TestManualPublishCancelsTheSchedule(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
-	_, err := f.module.PublishPost(ctx, f.store(t, storeID), p.ID, f.current(t, storeID, p).Version)
+	_, err := f.module.PublishPost(ctx, f.store(t, storeID), p.ID, f.current(t, storeID, p).Version, nil)
 	must(t, err)
 	f.wantSchedule(t, s.ID, "CANCELED", "REPLACED")
 	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].ScheduleID != s.ID || evs[0].Reason != social.CancelReplaced {
@@ -290,7 +290,7 @@ func TestDeleteCancelsTheSchedule(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	f.wantSchedule(t, s.ID, "CANCELED", "DELETED")
 	if evs := f.events.canceledEvents(); len(evs) != 1 || evs[0].Reason != social.CancelDeleted {
 		t.Fatalf("%+v", evs)
@@ -337,7 +337,7 @@ func TestDueScheduleOfATakenDownPostIsCanceledWithoutAskingTheAuthorizer(t *test
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.delegated("sess"))
 	id := uuid.NewV7()
-	f.exec(t, `INSERT INTO social.content_takedowns (measure_id, post_id, created_at) VALUES ($1, $2, $3)`, id, p.ID, f.clock())
+	f.exec(t, `INSERT INTO social.content_takedowns (measure_id, post_id) VALUES ($1, $2)`, id, p.ID)
 	f.advance(time.Hour)
 	must(t, f.module.PublishScheduled(ctx, s.ID))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
@@ -624,25 +624,25 @@ func TestEditingAScheduledPostStillMeetsPublishRequirements(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
 	plain := f.draft(t, storeID)
-	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: plain.ID, Version: plain.Version, Body: ptr(""), ClearImage: true})
+	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: plain.ID, Version: plain.Version, Body: ptr(""), ClearImage: true}, nil)
 	must(t, err)
 
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
 	p = f.current(t, storeID, p)
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文"), ClearImage: true}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文"), ClearImage: true}, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("清掉圖要被拒絕：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("")}); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("")}, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("清空內文要被拒絕：%v", err)
 	}
-	updated := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文")}))
+	updated := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("新內文")}, nil))
 	if updated.Body != "新內文" {
 		t.Fatalf("%+v", updated)
 	}
 	f.wantSchedule(t, s.ID, "PENDING", "")
 	must(t, f.cancelSchedule(t, storeID, p))
-	_, err = f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, Body: ptr(""), ClearImage: true})
+	_, err = f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, Body: ptr(""), ClearImage: true}, nil)
 	must(t, err)
 }
 
@@ -713,7 +713,7 @@ func TestScheduleRollsBackWithTheCallersTransaction(t *testing.T) {
 	f.jobs.reset()
 	rollback := errors.New("rollback")
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		if _, err := f.module.SchedulePost(ctx, f.store(t, storeID), social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()}); err != nil {
+		if _, err := f.module.SchedulePost(ctx, f.store(t, storeID), social.SchedulePostInput{PostID: p.ID, Version: p.Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()}, nil); err != nil {
 			return err
 		}
 		return rollback
@@ -802,13 +802,13 @@ func TestScheduleBumpsThePostVersion(t *testing.T) {
 	if after != before+1 {
 		t.Fatalf("排程遞增版本：%d→%d", before, after)
 	}
-	if _, err := f.module.PublishPost(ctx, st, p.ID, before); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.PublishPost(ctx, st, p.ID, before, nil); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本發布要衝突：%v", err)
 	}
-	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: before, Body: ptr("舊版本的編輯")}); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: before, Body: ptr("舊版本的編輯")}, nil); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本編輯要衝突：%v", err)
 	}
-	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: before, PublishAt: f.clock().Add(2 * time.Hour), By: f.owner()}); kindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.SchedulePost(ctx, st, social.SchedulePostInput{PostID: p.ID, Version: before, PublishAt: f.clock().Add(2 * time.Hour), By: f.owner()}, nil); kindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("舊版本重排要衝突：%v", err)
 	}
 	f.schedule(t, storeID, p, 2*time.Hour, f.owner())
@@ -826,7 +826,7 @@ func TestScheduleRejectsAPostUnderTakedown(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	td.create(t, storeID, ref(seller.ContentPost, p.ID))
-	_, err := f.module.SchedulePost(ctx, f.store(t, storeID), social.SchedulePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()})
+	_, err := f.module.SchedulePost(ctx, f.store(t, storeID), social.SchedulePostInput{PostID: p.ID, Version: f.current(t, storeID, p).Version, PublishAt: f.clock().Add(time.Hour), By: f.owner()}, nil)
 	if kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被下架的貼文不能排程：%v", err)
 	}

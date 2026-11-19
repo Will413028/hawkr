@@ -567,6 +567,65 @@ void main() {
     });
   });
 
+  group('accountSuspendedInterceptor', () {
+    ConnectException denied(String reason) => ConnectException(
+      Code.permissionDenied,
+      'suspended',
+      details: [
+        ErrorDetail(
+          'google.rpc.ErrorInfo',
+          (ErrorInfo()
+                ..reason = reason
+                ..domain = 'hawkr')
+              .writeToBuffer(),
+        ),
+      ],
+    );
+
+    Future<int> run(
+      String reason, {
+      Set<String> silent = const {},
+      bool enabled = true,
+    }) async {
+      var signals = 0;
+      final client = _client(
+        (req, ctx) => throw denied(reason),
+        appInterceptors(
+          acceptLanguage: () => 'zh-TW',
+          timeout: const Duration(seconds: 5),
+          report: (_, __) {},
+          headers: () => const {},
+          onAccountSuspended: enabled ? () => signals++ : null,
+          accountSuspendedSilent: silent,
+        ),
+      );
+      await expectLater(
+        client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        throwsA(isA<ConnectException>()),
+      );
+      return signals;
+    }
+
+    test('ACCOUNT_SUSPENDED：呼叫一次，錯誤原樣丟出', () async {
+      expect(await run('ACCOUNT_SUSPENDED'), 1);
+    });
+
+    test('別的 reason 不呼叫', () async {
+      expect(await run('SELLER_SUSPENDED'), 0);
+    });
+
+    test('silent 內的 procedure 不呼叫', () async {
+      expect(
+        await run('ACCOUNT_SUSPENDED', silent: {_checkAppVersion.procedure}),
+        0,
+      );
+    });
+
+    test('沒給 onAccountSuspended 不加 interceptor', () async {
+      expect(await run('ACCOUNT_SUSPENDED', enabled: false), 0);
+    });
+  });
+
   group('reportInterceptor', () {
     test('伺服器端的失敗上報一次，重送的錯誤原樣丟出', () async {
       final reported = <FailureContext>[];

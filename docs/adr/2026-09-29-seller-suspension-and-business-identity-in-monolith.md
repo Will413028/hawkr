@@ -102,3 +102,10 @@ A3 把 buyer、seller 搬進單體，入口在單體（A2），gateway 只剩還
 - **店主的方法依能力類別宣告**：建立、編輯、發布、排程是 `CapMarketing`；下架、刪除是 `CapContentContract`。店主讀自己的貼文、店家範圍的留言與動態數也宣告 `CapContentContract`：它只要求店家營運中，停權時照樣授予（D3「收縮需要的讀取放行」），店主才看得到要下架或刪除的內容；不用 `CapAccountSelfRead`（它的語意是店家資料與停權狀態），也不用 `CapMarketing`（停權時會擋掉讀取，與 D3 相反）。
 - **共用的方法以「依資源判斷」豁免**：留言與討論區的讚、建立、編輯、刪除，互動者由伺服器依資源歸屬推導，是店家身分時模組才檢查能力，不是則不查，無法靜態宣告，宣告表寫豁免與理由；分享、貼文的讚只有買家身分，寫「只有買家身分」的豁免。雙向對照照舊：豁免也要有理由，方法新增時必須回來決定是能力還是豁免。
 
+## 修訂：帳號停權與店家停權的分界（2026-11-19，A7-D15 Will 2026-10-29；A7-D25 Will 2026-11-16）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表 A7-D15、A7-D25，ADR `2026-10-29-account-suspension-and-moderation`。
+
+- 本 ADR 管的是店家的停權檢查（seller 的能力與措施）。帳號層的停權在 A7-1d′ 起只有一個入口，新模組 `accountsuspension`；「擁有商店的帳號不能被停權」（`ACCOUNT_HAS_STORE`）在那裡執行，帳號停權不對店建立措施，店家停權仍只由 seller 推導。賣家條款定出帳號停權對店的效果時才連帶（A7-D15 觸發）。
+- legacy accountservice 的 `SuspendAccount` 已刪除：它唯一的呼叫者是 social-service（commit `f73429c8`），social-service 在 A7-5 刪除。
+- social 的店家身分入口向 seller 查能力，取代舊 social-service 讀 gRPC metadata 的停權旗標（缺陷 SD25、A7-D3）；店家停權、關店成為代行排程取消的觸發點（A7-D25 第 3 點）。

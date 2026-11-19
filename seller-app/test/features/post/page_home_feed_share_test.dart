@@ -19,21 +19,20 @@ class _Repo extends Mock implements PostRepository {}
 
 const _disabledMessage = '店家公開後才能分享店面連結';
 
-Future<_Repo> _pump(WidgetTester tester, MyStore? store) async {
+Future<void> _pump(
+  WidgetTester tester,
+  MyStore? store, {
+  String url = '',
+}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   final repo = _Repo();
-  when(() => repo.listMyPosts()).thenAnswer(
-    (_) async => [
-      Post(id: 42, sellerId: 7, contentType: 'IMAGE', content: '貼文內容'),
-    ],
-  );
-  when(() => repo.listCommentsRaw(42)).thenAnswer((_) async => []);
   when(
-    () => repo.getShareUrl(type: 'post', id: '42'),
-  ).thenAnswer((_) async => null);
+    () => repo.listMyPosts(),
+  ).thenAnswer((_) async => [Post(id: 42, content: '貼文內容', url: url)]);
+  when(() => repo.listComments(42)).thenAnswer((_) async => []);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -52,7 +51,6 @@ Future<_Repo> _pump(WidgetTester tester, MyStore? store) async {
     ),
   );
   await tester.pumpAndSettle();
-  return repo;
 }
 
 MyStore _store({required bool listed}) => MyStore(
@@ -73,42 +71,30 @@ void main() {
   testWidgets(
     'share is disabled with the hint while the store cannot go public',
     (tester) async {
-      final repo = await _pump(tester, _store(listed: false));
+      await _pump(tester, _store(listed: false));
 
       await tester.tap(find.bySemanticsLabel('分享貼文'));
       await tester.pumpAndSettle();
 
       expect(find.text(_disabledMessage), findsOneWidget);
       expect(find.text('分享'), findsNothing);
-      verifyNever(
-        () => repo.getShareUrl(
-          type: any(named: 'type'),
-          id: any(named: 'id'),
-        ),
-      );
     },
   );
 
   testWidgets(
     'share is disabled without the not-public hint while the store is unknown',
     (tester) async {
-      final repo = await _pump(tester, null);
+      await _pump(tester, null);
 
       await tester.tap(find.bySemanticsLabel('分享貼文'));
       await tester.pumpAndSettle();
 
       expect(find.text(_disabledMessage), findsNothing);
       expect(find.text('分享'), findsNothing);
-      verifyNever(
-        () => repo.getShareUrl(
-          type: any(named: 'type'),
-          id: any(named: 'id'),
-        ),
-      );
     },
   );
 
-  testWidgets('a failed share lookup shows the failure toast and no sheet', (
+  testWidgets('a post without a URL shows the failure toast and no sheet', (
     tester,
   ) async {
     await _pump(tester, _store(listed: true));
@@ -122,20 +108,18 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
-  testWidgets('the server share data is used as returned', (tester) async {
-    final repo = await _pump(tester, _store(listed: true));
-    when(() => repo.getShareUrl(type: 'post', id: '42')).thenAnswer(
-      (_) async => const ShareData(
-        title: '伺服器標題',
-        description: '',
-        imageUrl: '',
-        url: 'https://share.example.test/s/abc',
-      ),
+  testWidgets('the share sheet shows the URL carried by the post', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _store(listed: true),
+      url: 'https://share.example.test/p/42',
     );
 
     await tester.tap(find.bySemanticsLabel('分享貼文'));
     await tester.pumpAndSettle();
 
-    expect(find.text('https://share.example.test/s/abc'), findsOneWidget);
+    expect(find.text('https://share.example.test/p/42'), findsOneWidget);
   });
 }

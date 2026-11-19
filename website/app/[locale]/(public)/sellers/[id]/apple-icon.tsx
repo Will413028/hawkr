@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import { isConfiguredMediaUrl, resolveCdnUrl } from "@/lib/media/cdn";
 
 export const size = { width: 180, height: 180 };
@@ -78,7 +78,7 @@ export default async function Icon({
 	params: Promise<{ id: string }>;
 }) {
 	const { id } = await params;
-	const seller = (await getCachedSeller(id)) as SellerLike;
+	const seller = (await getCachedStore(id)) as SellerLike;
 	const avatar = await loadAvatarDataUri(seller);
 
 	return new ImageResponse(

@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:hawkr_buyer/shared/widgets/hk_frosted_icon_button.dart';
-import 'package:hawkr_buyer/config/app_constants.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/config/image_config.dart';
 import 'package:hawkr_buyer/config/media_image.dart';
@@ -11,9 +11,10 @@ import 'package:hawkr_buyer/core/extensions/url_extensions.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
-import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
+import 'package:hawkr_buyer/features/social/data/social_content_repository.dart';
+import 'package:hawkr_buyer/features/social/data/social_model.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_provider.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -21,6 +22,7 @@ import 'package:hawkr_buyer/shared/utils/hashtag_spans.dart';
 import 'package:hawkr_buyer/shared/utils/require_login.dart';
 import 'package:hawkr_buyer/shared/widgets/app_cached_image.dart';
 import 'package:hawkr_buyer/shared/widgets/comments_bottom_sheet.dart';
+import 'package:hawkr_buyer/shared/widgets/common_snackbar.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_post_card_surface.dart';
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
@@ -33,9 +35,11 @@ import 'package:go_router/go_router.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../moderation/data/report_target_type.dart';
+import '../../moderation/data/block_target.dart';
+import '../../moderation/data/report_target.dart';
 import '../../moderation/presentation/report_block_action_sheet.dart';
-import 'post_detail_controller.dart';
+import 'post_entity.dart';
+import 'post_entity_store.dart';
 import 'post_preview_layout.dart';
 import '../../../shared/utils/price_display.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
@@ -43,12 +47,12 @@ import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 const _mediaForeground = AppColors.textEmphasis;
 const _mediaMuted = AppColors.textSecondary;
 
-bool _hasValidProduct(Map<String, dynamic>? product) {
+bool _hasValidProduct(PostProduct? product) {
   if (product == null) return false;
-  final name = (product['name'] ?? '').toString().trim();
+  final name = product.name.trim();
   // `"0"` 是後端「無價格」的表達且非空字串 —— 用 isNotEmpty 判斷會讓
   // 「無名稱＋無價格」的商品節點通過，渲染出一張空卡片。
-  final price = PriceDisplay.formatPrice(product['price']);
+  final price = PriceDisplay.formatPrice(product.price);
   return name.isNotEmpty || price.isNotEmpty;
 }
 
@@ -95,13 +99,24 @@ class PostDetailScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(postDetailControllerProvider(postId));
+    final detailAsync = ref.watch(postEntityProvider(postId));
     final captionExpanded = useState(false);
 
     useEffect(() {
       captionExpanded.value = false;
       return null;
     }, [postId]);
+
+    // 貼文讀到之後記一次瀏覽（背景呼叫，失敗不影響畫面）；下拉重讀時 hasValue 不變，不會再記。
+    final loaded = detailAsync.hasValue;
+    useEffect(() {
+      if (loaded) {
+        unawaited(
+          ref.read(socialContentRepositoryProvider).recordPostView(postId),
+        );
+      }
+      return null;
+    }, [postId, loaded]);
 
     void closeDetail() {
       if (context.canPop()) {
@@ -112,141 +127,132 @@ class PostDetailScreen extends HookConsumerWidget {
     }
 
     Widget pageBody;
-    pageBody = detailAsync.when(
-      loading: () => _PostDetailLoading(onClose: closeDetail),
-      error: (error, _) => _PostDetailError(
-        message: error.toString(),
-        onClose: closeDetail,
-        // 找不到不是暫時的失敗，重試只會得到同一個結果。
-        onRetry: error is NotFoundException
-            ? null
-            : () => ref.invalidate(postDetailControllerProvider(postId)),
-      ),
-      data: (state) {
-        final post = state.post;
-        final sellerId =
-            post.merchantId?.toString() ?? merchantId?.trim() ?? '';
-        // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
-        // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
-        final card = sellerId.isEmpty
-            ? null
-            : ref.watch(storeCardProvider(sellerId)).value;
-        final uiLocale = ref.watch(uiLocaleProvider);
-        // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
-        // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
-        final apiName = (post.merchantName ?? '').trim();
-        final routeName = (merchantName ?? '').trim();
-        final displayName = card != null
-            ? card.displayName(uiLocale)
-            : apiName.isNotEmpty
-            ? apiName
-            : routeName.isNotEmpty
-            ? routeName
-            : commonStoreCardClosedStore(uiLocale);
-        final apiAvatar = (post.merchantAvatar ?? '').trim();
-        final displayAvatar = card != null && card.hasLogo()
-            ? card.logoUri
-            : apiAvatar.isNotEmpty
-            ? apiAvatar
-            : (merchantAvatar ?? '').trim();
-        final storeCode = post.storeCode.isNotEmpty
-            ? post.storeCode
-            : (card != null && card.isOpen ? card.storeCode : '');
-        final imageUrl = _toAbsolute(post.imageUrl);
-        final date = _formatDate(post.createdAt);
-
-        Future<void> openComments() async {
-          await showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            showDragHandle: false,
-            backgroundColor: Colors.transparent,
-            barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
-            builder: (_) => CommentsBottomSheet(
-              postId: postId.toString(),
-              postOwnerName: displayName,
-              merchantAvatar: displayAvatar.isEmpty ? null : displayAvatar,
-            ),
-          );
-          ref.invalidate(postDetailControllerProvider(postId));
-        }
-
-        Future<void> sharePost() async {
-          final data = await ref
-              .read(productRepositoryProvider)
-              .getShareUrl(type: 'post', id: postId.toString());
-          if (!context.mounted) return;
-          final url =
-              data?['url'] ??
-              (storeCode.isEmpty
+    final error = detailAsync.error;
+    final entity = error is NotFoundException ? null : detailAsync.value;
+    if (entity == null) {
+      pageBody = error == null
+          ? _PostDetailLoading(onClose: closeDetail)
+          : _PostDetailError(
+              message: error.toString(),
+              onClose: closeDetail,
+              // 找不到不是暫時的失敗，重試只會得到同一個結果。
+              onRetry: error is NotFoundException
                   ? null
-                  : AppConstants.shareFallbackUrl(
-                      '/sellers/$storeCode/posts#post-$postId',
-                    ));
-          if (url == null) return;
-          showShareSheet(
-            context,
-            ShareData(
-              title: (data?['title'] ?? displayName).toString(),
-              description: (data?['description'] ?? post.content).toString(),
-              imageUrl: (data?['imageUrl'] ?? imageUrl).toString(),
-              url: url.toString(),
-            ),
-          );
-        }
-
-        return _PostDetailSurface(
-          postId: postId,
-          imageUrl: imageUrl,
-          merchantId: sellerId,
-          merchantName: displayName,
-          merchantAvatar: displayAvatar,
-          date: date,
-          content: post.content,
-          product: post.product,
-          captionExpanded: captionExpanded.value,
-          liked: post.liked,
-          likeCount: post.likeCount,
-          commentCount: post.commentCount,
-          shareCount: post.shareCount,
-          onClose: closeDetail,
-          onMore: () async {
-            if (!await requireLogin(context, ref)) return;
-            if (!context.mounted) return;
-            showReportBlockActionSheet(
-              context,
-              reportTargetType: ReportTargetType.post,
-              reportTargetId: postId.toString(),
-              blockUserId: sellerId.isNotEmpty ? sellerId : null,
-              blockUserLabel: displayName,
+                  : () => ref.invalidate(postEntityProvider(postId)),
             );
-          },
-          onMerchantTap: storeCode.isEmpty
-              ? null
-              : () => context.push('/merchant/$storeCode'),
-          onCaptionToggle: () {
-            captionExpanded.value = !captionExpanded.value;
-          },
-          onLikeTap: () async {
-            if (!await requireLogin(context, ref)) return;
-            await ref
-                .read(postDetailControllerProvider(postId).notifier)
-                .likePost();
-          },
-          onCommentTap: () async {
-            if (!await requireLogin(context, ref)) return;
-            if (!context.mounted) return;
-            await openComments();
-          },
-          onShareTap: sharePost,
-          onRefresh: () async {
-            ref.invalidate(postDetailControllerProvider(postId));
-            await ref.read(postDetailControllerProvider(postId).future);
-          },
+    } else {
+      final post = entity;
+      final sellerId = post.storeId.isNotEmpty
+          ? post.storeId
+          : merchantId?.trim() ?? '';
+      // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
+      // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
+      final card = sellerId.isEmpty
+          ? null
+          : ref.watch(storeCardProvider(sellerId)).value;
+      final uiLocale = ref.watch(uiLocaleProvider);
+      // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
+      // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
+      final apiName = (post.merchantName ?? '').trim();
+      final routeName = (merchantName ?? '').trim();
+      final displayName = card != null
+          ? card.displayName(uiLocale)
+          : apiName.isNotEmpty
+          ? apiName
+          : routeName.isNotEmpty
+          ? routeName
+          : commonStoreCardClosedStore(uiLocale);
+      final apiAvatar = (post.merchantAvatar ?? '').trim();
+      final displayAvatar = card != null && card.hasLogo()
+          ? card.logoUri
+          : apiAvatar.isNotEmpty
+          ? apiAvatar
+          : (merchantAvatar ?? '').trim();
+      final storeCode = post.storeCode.isNotEmpty
+          ? post.storeCode
+          : (card != null && card.isOpen ? card.storeCode : '');
+      final imageUrl = _toAbsolute(post.imageUrl);
+      final date = _formatDate(post.createdAt);
+
+      Future<void> openComments() async {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          backgroundColor: Colors.transparent,
+          barrierColor: AppColors.neutralBlack.withValues(alpha: 0.48),
+          builder: (_) => CommentsBottomSheet(postId: postId),
         );
-      },
-    );
+        unawaited(ref.read(postEntityStoreProvider.notifier).refresh(postId));
+      }
+
+      void sharePost() {
+        if (post.shareUrl.isEmpty) return;
+        showShareSheet(
+          context,
+          ShareData(
+            title: displayName,
+            description: post.content,
+            imageUrl: imageUrl,
+            url: post.shareUrl,
+          ),
+        );
+      }
+
+      pageBody = _PostDetailSurface(
+        postId: postId,
+        imageUrl: imageUrl,
+        merchantId: sellerId,
+        merchantName: displayName,
+        merchantAvatar: displayAvatar,
+        date: date,
+        content: post.content,
+        product: post.product,
+        captionExpanded: captionExpanded.value,
+        liked: post.liked,
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        shareCount: post.shareCount,
+        onClose: closeDetail,
+        onMore: () async {
+          if (!await requireLogin(context, ref)) return;
+          if (!context.mounted) return;
+          await showReportBlockActionSheet(
+            context,
+            reportTarget: SocialReportTarget.post(postId.toString()),
+            blockTarget: sellerId.isNotEmpty
+                ? StoreBlockTarget(sellerId, originPostId: postId)
+                : null,
+            blockUserLabel: displayName,
+          );
+        },
+        onMerchantTap: storeCode.isEmpty
+            ? null
+            : () => context.push('/merchant/$storeCode'),
+        onCaptionToggle: () {
+          captionExpanded.value = !captionExpanded.value;
+        },
+        onLikeTap: () async {
+          if (!await requireLogin(context, ref)) return;
+          await ref.read(postEntityStoreProvider.notifier).toggleLike(postId);
+        },
+        onCommentTap: () async {
+          if (!await requireLogin(context, ref)) return;
+          if (!context.mounted) return;
+          await openComments();
+        },
+        onShareTap: sharePost,
+        onRefresh: () async {
+          final result = await ref
+              .read(postEntityStoreProvider.notifier)
+              .refresh(postId);
+          if (result == PostRefreshResult.failed && context.mounted) {
+            showFloatingToast(context, '載入失敗，請稍後再試', isSuccess: false);
+          }
+        },
+      );
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppColors.glassTopOverlay.copyWith(
@@ -291,7 +297,7 @@ class _PostDetailSurface extends StatelessWidget {
   final String merchantAvatar;
   final String date;
   final String content;
-  final Map<String, dynamic>? product;
+  final PostProduct? product;
   final bool captionExpanded;
   final bool liked;
   final int likeCount;
@@ -620,7 +626,7 @@ class _PostContentPanel extends StatelessWidget {
   final String merchantAvatar;
   final String date;
   final String content;
-  final Map<String, dynamic>? product;
+  final PostProduct? product;
   final bool captionExpanded;
   final VoidCallback? onMerchantTap;
   final VoidCallback onCaptionToggle;
@@ -919,16 +925,16 @@ class _RelatedProductChip extends StatelessWidget {
     required this.merchantName,
   });
 
-  final Map<String, dynamic> product;
+  final PostProduct product;
   final String merchantId;
   final String merchantName;
 
   @override
   Widget build(BuildContext context) {
-    final name = (product['name'] ?? '').toString().trim();
+    final name = product.name.trim();
     // 判準走 PriceDisplay：`"0"` = 無價格，不能印成 `NT$ 0`。
-    final price = PriceDisplay.formatPrice(product['price'], prefix: 'NT\$ ');
-    final image = _toAbsolute((product['image'] ?? '').toString());
+    final price = PriceDisplay.formatPrice(product.price, prefix: 'NT\$ ');
+    final image = _toAbsolute(product.image);
 
     return Semantics(
       button: true,
@@ -943,7 +949,7 @@ class _RelatedProductChip extends StatelessWidget {
                 title: name,
                 imageUrl: image,
                 price: num.tryParse(price),
-                skuId: (product['id'] ?? '').toString(),
+                skuId: product.id,
                 merchantName: merchantName,
                 merchantId: merchantId,
               ),

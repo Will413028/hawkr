@@ -21,6 +21,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import '../features/social/social_fakes.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../support/fake_content_transport.dart';
@@ -40,7 +41,6 @@ class _HermeticAdapter implements HttpClientAdapter {
   static const allowedPaths = {
     '/public/categories/tree',
     '/public/hashtags/popular',
-    '/public/posts',
     '/public/products',
   };
 
@@ -63,9 +63,6 @@ class _HermeticAdapter implements HttpClientAdapter {
     final data = switch (options.path) {
       '/public/categories/tree' => {'data': <Object>[]},
       '/public/hashtags/popular' => {
-        'data': {'records': <Object>[]},
-      },
-      '/public/posts' => {
         'data': {'records': <Object>[]},
       },
       '/public/products' => {
@@ -110,6 +107,9 @@ void main() {
               ),
               connectTransportProvider.overrideWithValue(
                 fakeContentTransport(),
+              ),
+              socialPublicClientProvider.overrideWithValue(
+                FakeSocialPublic().client(),
               ),
               sessionProvider.overrideWith(_GuestSession.new),
               appRouterObserversProvider.overrideWithValue([

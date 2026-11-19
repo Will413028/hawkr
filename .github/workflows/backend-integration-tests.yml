@@ -16,9 +16,11 @@ on:
       - 'backend/services/ai-service/**'
       - 'backend/services/crm-service/**'
       - 'backend/services/notification-service/**'
-      - 'backend/services/social-service/**'
       - 'backend/services/im-service/**'
       - 'backend/services/invoice-service/**'
+      # notification-service 的 TestPublishedRoutesHaveNotificationHandler 讀這兩個檔。
+      - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
+      - 'backend/infra/mq/topology/topology.yaml'
       - '.github/workflows/backend-integration-tests.yml'
   push:
     branches: [main, dev]
@@ -51,8 +53,10 @@ jobs:
             seller-service: ['backend/services/seller-service/**']
             ai-service: ['backend/services/ai-service/**']
             crm-service: ['backend/services/crm-service/**']
-            notification-service: ['backend/services/notification-service/**']
-            social-service: ['backend/services/social-service/**']
+            notification-service:
+              - 'backend/services/notification-service/**'
+              - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
+              - 'backend/infra/mq/topology/topology.yaml'
             im-service: ['backend/services/im-service/**']
             invoice-service: ['backend/services/invoice-service/**']
       # 手動觸發、或動到 pkg／本 workflow 時全跑。
@@ -63,7 +67,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
           set -euo pipefail
-          services='["seller-service","ai-service","crm-service","notification-service","social-service","im-service","invoice-service"]'
+          services='["seller-service","ai-service","crm-service","notification-service","im-service","invoice-service"]'
           if [ "$ALL" = "true" ]; then
             modules=$(jq -c '["pkg"] + map("services/" + .)' <<<"$services")
           else

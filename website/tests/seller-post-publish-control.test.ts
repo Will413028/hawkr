@@ -326,7 +326,7 @@ test("賣家貼文列表的桌機／手機入口都傳入停權、平台下架�
 		"SellerPostsClient 沒有渲染 PostPublishControl ⇒ 端點依舊零 caller",
 	);
 	assert.ok(
-		/suspended=\{isSuspended\}/.test(source),
+		/suspended=\{writeLocked\}/.test(source),
 		"沒把停權旗標傳進去 ⇒ 停權賣家會看到一顆按下去必定 9240 的發布鍵",
 	);
 	assert.ok(
@@ -343,15 +343,18 @@ test("賣家貼文列表的桌機／手機入口都傳入停權、平台下架�
 /** 資料層真的打得到那兩支端點（元件接了 handler、handler 卻沒有出口也是同一個病）。 */
 test("資料層有 publish / unpublish 兩條路徑", () => {
 	const source = readFileSync(
-		new URL("../lib/seller/repo.ts", import.meta.url),
+		new URL("../lib/posts/owner.ts", import.meta.url),
 		"utf8",
 	);
 	assert.ok(
-		/\$\{root\}\/\$\{id\}\/\$\{command\}/.test(source),
-		"repo 沒有組出 /publish|/unpublish 的路徑",
+		/client\.publishPost\(/.test(source) &&
+			/client\.unpublishPost\(/.test(source),
+		"owner 資料層沒有呼叫 PublishPost／UnpublishPost",
 	);
 	assert.ok(
-		/"publish"\s*:\s*"unpublish"/.test(source),
-		"repo 沒有依目標狀態選命令端點",
+		/if \(published\) await client\.publishPost[\s\S]*else await client\.unpublishPost/.test(
+			source,
+		),
+		"owner 資料層沒有依目標狀態選 Publish／Unpublish",
 	);
 });

@@ -1052,9 +1052,9 @@ func TestAuditLogsAndSummary(t *testing.T) {
 		_, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.admin_operation_audit_logs
 			(id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name,
 			 origin, capability, action, resource_type, result, request_id, correlation_id, risk_level, notify_seller,
-			 created_at, confirmed_at, biz_code)
+			 created_at, confirmed_at, biz_code, failure_reason)
 			VALUES ($1, $2, $3, 'x', $4, 0, 'x', 'INTERACTIVE', 'orders.read', $5, 'ORDER', $6, 'r', 'c', 'HIGH', false,
-			        $7, CASE WHEN $6 = 'PENDING' THEN NULL ELSE $7::timestamptz END, CASE WHEN $6 = 'FAILED' THEN 9280 END)`,
+			        $7, CASE WHEN $6 = 'PENDING' THEN NULL ELSE $7::timestamptz END, CASE WHEN $6 = 'FAILED' THEN 9280 END, CASE WHEN $6 = 'FAILED' THEN 'INTERNAL' END)`,
 			uuid.NewV7(), s.Session.ID, admin, testStore, action, result, f.now)
 		return err
 	}

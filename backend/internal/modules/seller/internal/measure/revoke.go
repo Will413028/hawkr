@@ -338,7 +338,7 @@ func (s *Service) publishRevoked(ctx context.Context, q *store.Queries, row stor
 		EventID: uuid.NewV7(), OccurredAt: now, MeasureID: row.ID, StoreID: row.StoreID, AccountID: row.AccountID, Reason: reason,
 	}
 	if row.Kind == string(model.MeasureContentTakedown) {
-		contents, err := q.MeasureContents(ctx, []uuid.UUID{row.ID})
+		contents, err := q.MeasureContentRefs(ctx, row.ID)
 		if err != nil {
 			return err
 		}

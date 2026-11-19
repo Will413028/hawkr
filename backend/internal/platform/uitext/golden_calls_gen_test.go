@@ -52,6 +52,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "moderation.ReportOutcome":
+		return t.ModerationReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
+	case "moderation.ReportTargetKind":
+		return t.ModerationReportTargetKind(goldenEnum(c.Value, "REPORT_TARGET_KIND_"))
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
@@ -76,6 +80,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureMetaTerminationGround(goldenEnum(goldenString(c, "ground"), "TERMINATION_GROUND_"))
 	case "seller.Measure.rejection_cooldown_warning":
 		return t.SellerMeasureRejectionCooldownWarning(goldenInt(c, "days")), true
+	case "seller.Measure.removed_contents_cleared":
+		return t.SellerMeasureRemovedContentsCleared(), true
+	case "seller.Measure.removed_contents_heading":
+		return t.SellerMeasureRemovedContentsHeading(), true
 	case "seller.Measure.suspension_active_open":
 		return t.SellerMeasureSuspensionActiveOpen(), true
 	case "seller.Measure.suspension_active_until":
@@ -94,6 +102,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureTitleRisk(goldenEnum(goldenString(c, "ground"), "RISK_GROUND_"))
 	case "seller.Measure.title_risk_fallback":
 		return t.SellerMeasureTitleRiskFallback(), true
+	case "seller.Measure.view_content_link":
+		return t.SellerMeasureViewContentLink(), true
 	case "seller.MeasureBasis":
 		return t.SellerMeasureBasis(goldenEnum(c.Value, "MEASURE_BASIS_"))
 	case "seller.MeasureKind":
@@ -132,6 +142,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerTerminationGround(goldenEnum(c.Value, "TERMINATION_GROUND_"))
 	case "seller.ViolationSeverity":
 		return t.SellerViolationSeverity(goldenEnum(c.Value, "VIOLATION_SEVERITY_"))
+	case "social.CommentState.placeholder":
+		return t.SocialCommentStatePlaceholder(goldenEnum(c.Value, "COMMENT_STATE_"))
 	}
 	return "", false
 }

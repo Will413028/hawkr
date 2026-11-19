@@ -1,8 +1,30 @@
+import 'dart:math' as math;
+
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
+    show SellerCapability;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Provider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../seller/data/current_store.dart';
 import '../data/post_repository.dart';
 import '../data/post_model.dart';
 
 part 'post_controller.g.dart';
+
+/// 店家有 MARKETING 能力才能建立、修改、發布貼文。能力還沒讀到時不下結論（true），伺服器是最後一道。
+final canMarketPostsProvider = Provider<bool>(
+  (ref) =>
+      ref
+          .watch(myStoreSnapshotProvider)
+          ?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ??
+      true,
+);
+
+/// 使用者面的錯誤提示只處理 `Exception`（網路、`ConnectException`）；`Error`（型別、狀態錯誤）是程式缺陷，原樣往上丟。
+void rethrowIfProgrammingError(Object error, StackTrace stackTrace) {
+  if (error is Error) Error.throwWithStackTrace(error, stackTrace);
+}
 
 @riverpod
 class PostList extends _$PostList {
@@ -52,6 +74,33 @@ class PostList extends _$PostList {
     }
   }
 
+  /// 向伺服器重讀這一篇並換進列表（排程時間沿用列表上的值）；失敗丟例外，不吞掉。
+  /// 貼文不在已載入的列表時只回傳，不改列表。
+  Future<Post> refreshPost(int postId) async {
+    final latest = await ref.read(postRepositoryProvider).getMyPost(postId);
+    final prevState = state;
+    if (prevState is AsyncData<List<Post>>) {
+      final current = prevState.value;
+      final index = current.indexWhere((p) => p.id == postId);
+      if (index == -1) return latest;
+      final merged = latest.copyWith(
+        scheduledPublishAt: current[index].scheduledPublishAt,
+      );
+      state = AsyncData([
+        for (var i = 0; i < current.length; i++)
+          i == index ? merged : current[i],
+      ]);
+      return merged;
+    }
+    return latest;
+  }
+
+  /// etag 與伺服器不符（aborted）代表手上的貼文是舊的：重讀那一篇，讓下一次重試帶新的 etag。
+  /// 重讀失敗時丟重讀的錯誤。
+  Future<void> _refreshOnConflict(int postId, ConnectException error) async {
+    if (error.code == Code.aborted) await refreshPost(postId);
+  }
+
   /// 發布或下架。不做樂觀更新：發布狀態是後端算出來的（排程會被一併結束），
   /// 成功後重讀列表，失敗時狀態不變、錯誤交給呼叫端顯示。
   ///
@@ -60,10 +109,18 @@ class PostList extends _$PostList {
   /// （舊列表上的狀態已經不是真的），直到下一次重讀成功。回傳是否重讀成功。
   Future<bool> setPublished(int postId, {required bool publish}) async {
     final repo = ref.read(postRepositoryProvider);
-    if (publish) {
-      await repo.publishPostOrThrow(postId);
-    } else {
-      await repo.unpublishPostOrThrow(postId);
+    final etag =
+        state.value?.where((p) => p.id == postId).firstOrNull?.etag ??
+        (await repo.getMyPost(postId)).etag;
+    try {
+      if (publish) {
+        await repo.publishPostOrThrow(postId, etag: etag);
+      } else {
+        await repo.unpublishPostOrThrow(postId, etag: etag);
+      }
+    } on ConnectException catch (error) {
+      await _refreshOnConflict(postId, error);
+      rethrow;
     }
     try {
       state = AsyncData(await repo.listMyPosts());
@@ -74,34 +131,52 @@ class PostList extends _$PostList {
     }
   }
 
-  Future<Post?> updatePost(
-    int postId, {
+  /// 修改貼文；成功回傳更新後的貼文（排程時間沿用列表上的值），失敗丟 `ConnectException`。
+  Future<Post> updatePost(
+    Post post, {
     required String content,
-    String keepAssetId = '',
-    String newStagedToken = '',
-    int? productId,
-    List<String>? tags,
+    String? imageStagedToken,
+    String? productId,
+    bool updateProduct = false,
+    List<String> hashtags = const [],
   }) async {
-    final updated = await ref
-        .read(postRepositoryProvider)
-        .updatePost(
-          postId,
-          content: content,
-          keepAssetId: keepAssetId,
-          newStagedToken: newStagedToken,
-          productId: productId,
-          tags: tags,
-        );
-    if (updated != null) {
-      final prevState = state;
-      if (prevState is AsyncData<List<Post>>) {
-        final newList = prevState.value
-            .map((p) => p.id == postId ? updated : p)
-            .toList();
-        state = AsyncData(newList);
-      }
+    final Post updated;
+    try {
+      updated =
+          (await ref
+                  .read(postRepositoryProvider)
+                  .updatePost(
+                    post.id,
+                    etag: post.etag,
+                    content: content,
+                    imageStagedToken: imageStagedToken,
+                    productId: productId,
+                    updateProduct: updateProduct,
+                    hashtags: hashtags,
+                  ))
+              .copyWith(scheduledPublishAt: post.scheduledPublishAt);
+    } on ConnectException catch (error) {
+      await _refreshOnConflict(post.id, error);
+      rethrow;
+    }
+    final prevState = state;
+    if (prevState is AsyncData<List<Post>>) {
+      state = AsyncData(
+        prevState.value.map((p) => p.id == post.id ? updated : p).toList(),
+      );
     }
     return updated;
+  }
+
+  /// 留言或刪除留言成功後把這篇貼文的 `comment_count` 加減 [delta]（不低於 0）：伺服器的計數把頂層留言與回覆各算一則，
+  /// 刪除一則留言只讓它少一。列表還沒載入或貼文不在列表裡時什麼都不做。
+  void adjustCommentCount(int postId, int delta) {
+    final current = state.value
+        ?.where((p) => p.id == postId)
+        .firstOrNull
+        ?.commentCount;
+    if (current == null) return;
+    updateCommentCount(postId, math.max(0, current + delta));
   }
 
   void updateCommentCount(int postId, int newCount) {

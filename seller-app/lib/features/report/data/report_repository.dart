@@ -67,30 +67,4 @@ class ReportRepository with ApiRequestHelper {
       (result['message'] ?? '檢舉送出失敗').toString(),
     );
   }
-
-  /// GET /api/v1/app/reports/me?page=&page_size=
-  Future<List<ReportRecord>> listMyReports({
-    int page = 1,
-    int pageSize = 20,
-  }) async {
-    final result = await apiGet(
-      '$_base/me',
-      queryParams: {'page': '$page', 'page_size': '$pageSize'},
-    );
-    if (result['code'] == 0) {
-      final data = result['data'];
-      final records = data is Map<String, dynamic> ? data['records'] : null;
-      if (records is List) {
-        return records
-            .whereType<Map<String, dynamic>>()
-            .map(ReportRecord.fromJson)
-            .toList();
-      }
-      return [];
-    }
-    throw AppException.fromApiError(
-      result['code'] as int,
-      (result['message'] ?? '取得檢舉紀錄失敗').toString(),
-    );
-  }
 }

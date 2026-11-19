@@ -3,7 +3,6 @@ package reviewqueue
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -106,7 +105,7 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	msg := req.Msg
 	size, err := pagination.PageSize(msg.GetPageSize(), defaultPageSize, maxPageSize)
 	if err != nil {
-		return nil, rpc.WithFieldPaths(err, rpc.FieldPaths{"PageSize": "page_size"})
+		return nil, err
 	}
 	requested, err := requestedKinds(msg.GetKinds())
 	if err != nil {
@@ -119,10 +118,10 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, err
 	}
-	principal, ok := rpc.PrincipalFrom(ctx)
-	if !ok || principal.Kind != identity.PrincipalAdmin {
-		return nil, errors.New("httpapi/reviewqueue：後台的請求沒有管理員，interceptor 沒有掛上")
+	if _, err := rpc.RequireAdmin(ctx); err != nil {
+		return nil, err
 	}
+	principal, _ := rpc.PrincipalFrom(ctx)
 	kinds := h.permittedKinds(principal, requested)
 	out := &adminpb.ListReviewQueueResponse{Items: []*adminpb.ReviewQueueItem{}}
 	if len(kinds) == 0 {

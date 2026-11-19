@@ -88,3 +88,9 @@ ring buffer 只在單一 pod 內，pod 重啟後由 `bufferMiss` 觸發一次性
 | gateway HTTP req/s 與 SSE conn 數的 scale 比 | 明顯不一致（HTTP 平穩但 SSE 暴漲） | 評估獨立（scale 維度不同） |
 | gateway 升級造成 SSE 斷線的使用者反饋 | 反覆出現 | 評估獨立 |
 | 單 pod active conn 接近 5000 cap 的頻率 | 每週 > 1 次告警 | 先提高 cap 或 scale pod，再評估獨立 |
+
+## 修訂：留言 SSE 通道刪除（2026-11-19，A7-D10 Will 2026-10-18）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表 A7-D10 與缺陷 SD20。
+
+社群留言不再走 SSE：social 搬進單體後，一般貼文的留言不即時推，打開或下拉時才拉（A7-D10、Q3）；gateway 的留言 SSE 與其 4 列只給 SSE 的事件在 A7-4e／A7-5 刪除（計畫「事件」「REST」列）。「脈絡」與「決策一」列的留言用途不再成立；扇出若要做，與 A6 的聊天一起設計。通知與賣家工作區訂單狀態等其他 SSE 用途，A7 沒有改動。

@@ -166,6 +166,82 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// ModerationReportOutcome 是 moderation.ReportOutcome 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ModerationReportOutcome(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "PENDING":
+			return "處理中", true
+		case "VIOLATION":
+			return "認定違規", true
+		case "NO_VIOLATION":
+			return "認定不違規", true
+		}
+		return "", false
+	}
+	if t.Locale() == EN {
+		switch v {
+		case "PENDING":
+			return "Under review", true
+		case "VIOLATION":
+			return "Resolved (violation)", true
+		case "NO_VIOLATION":
+			return "Resolved (no violation)", true
+		}
+	}
+	switch v {
+	case "PENDING":
+		return "審核中", true
+	case "VIOLATION":
+		return "已處理（違規）", true
+	case "NO_VIOLATION":
+		return "已處理（不違規）", true
+	}
+	return "", false
+}
+
+// ModerationReportTargetKind 是 moderation.ReportTargetKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ModerationReportTargetKind(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "POST":
+			return "貼文", true
+		case "COMMENT":
+			return "留言", true
+		case "FORUM_ENTRY":
+			return "討論區留言", true
+		case "BUYER":
+			return "買家", true
+		}
+		return "", false
+	}
+	if t.Locale() == EN {
+		switch v {
+		case "POST":
+			return "Post", true
+		case "COMMENT":
+			return "Comment", true
+		case "FORUM_ENTRY":
+			return "Forum post", true
+		case "BUYER":
+			return "User", true
+		}
+	}
+	switch v {
+	case "POST":
+		return "貼文", true
+	case "COMMENT":
+		return "留言", true
+	case "FORUM_ENTRY":
+		return "討論區留言", true
+	case "BUYER":
+		return "使用者", true
+	}
+	return "", false
+}
+
 // PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {
@@ -331,6 +407,9 @@ func (t Text) SellerMeasureMetaKind(kind string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	if t.Locale() == EN {
+		return "Measure: " + kindText, true
+	}
 	return "措施：" + kindText, true
 }
 
@@ -357,6 +436,22 @@ func (t Text) SellerMeasureMetaTerminationGround(ground string) (string, bool) {
 // SellerMeasureRejectionCooldownWarning 是 seller.Measure.rejection_cooldown_warning 的文案。
 func (t Text) SellerMeasureRejectionCooldownWarning(days int) string {
 	return "若本次經駁回，將於 " + strconv.Itoa(days) + " 日內不得再提出解除請求"
+}
+
+// SellerMeasureRemovedContentsCleared 是 seller.Measure.removed_contents_cleared 的文案。
+func (t Text) SellerMeasureRemovedContentsCleared() string {
+	if t.Locale() == EN {
+		return "The copy of this content was deleted after the retention period."
+	}
+	return "內容副本已超過保留期限並刪除。"
+}
+
+// SellerMeasureRemovedContentsHeading 是 seller.Measure.removed_contents_heading 的文案。
+func (t Text) SellerMeasureRemovedContentsHeading() string {
+	if t.Locale() == EN {
+		return "Removed content"
+	}
+	return "下架的內容"
 }
 
 // SellerMeasureSuspensionActiveOpen 是 seller.Measure.suspension_active_open 的文案。
@@ -418,6 +513,14 @@ func (t Text) SellerMeasureTitleRiskFallback() string {
 	return "風險措施"
 }
 
+// SellerMeasureViewContentLink 是 seller.Measure.view_content_link 的文案。
+func (t Text) SellerMeasureViewContentLink() string {
+	if t.Locale() == EN {
+		return "View post"
+	}
+	return "查看貼文"
+}
+
 // SellerMeasureBasis 是 seller.MeasureBasis 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerMeasureBasis(v string) (string, bool) {
@@ -435,6 +538,12 @@ func (t Text) SellerMeasureBasis(v string) (string, bool) {
 // SellerMeasureKind 是 seller.MeasureKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerMeasureKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "CONTENT_TAKEDOWN":
+			return "Content removal", true
+		}
+	}
 	switch v {
 	case "WARNING":
 		return "警告", true
@@ -863,6 +972,26 @@ func (t Text) SellerViolationSeverity(v string) (string, bool) {
 		return "高", true
 	case "CRITICAL":
 		return "嚴重", true
+	}
+	return "", false
+}
+
+// SocialCommentStatePlaceholder 是 social.CommentState.placeholder 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SocialCommentStatePlaceholder(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "DELETED":
+			return "This comment was deleted", true
+		case "HIDDEN":
+			return "This comment was hidden", true
+		}
+	}
+	switch v {
+	case "DELETED":
+		return "此留言已刪除", true
+	case "HIDDEN":
+		return "此留言已被隱藏", true
 	}
 	return "", false
 }

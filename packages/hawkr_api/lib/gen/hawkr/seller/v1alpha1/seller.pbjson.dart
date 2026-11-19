@@ -398,6 +398,22 @@ final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
     'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
     'UlVNX0VOVFJZEAM=');
 
+@$core.Deprecated('Use contentSnapshotStateDescriptor instead')
+const ContentSnapshotState$json = {
+  '1': 'ContentSnapshotState',
+  '2': [
+    {'1': 'CONTENT_SNAPSHOT_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'CONTENT_SNAPSHOT_STATE_CAPTURED', '2': 1},
+    {'1': 'CONTENT_SNAPSHOT_STATE_CLEARED', '2': 2},
+  ],
+};
+
+/// Descriptor for `ContentSnapshotState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contentSnapshotStateDescriptor = $convert.base64Decode(
+    'ChRDb250ZW50U25hcHNob3RTdGF0ZRImCiJDT05URU5UX1NOQVBTSE9UX1NUQVRFX1VOU1BFQ0'
+    'lGSUVEEAASIwofQ09OVEVOVF9TTkFQU0hPVF9TVEFURV9DQVBUVVJFRBABEiIKHkNPTlRFTlRf'
+    'U05BUFNIT1RfU1RBVEVfQ0xFQVJFRBAC');
+
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {
   '1': 'MeasureBasis',
@@ -2186,6 +2202,20 @@ final $typed_data.Uint8List lookupBusinessRegistrationResponseDescriptor =
         'EoCzIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5CdXNpbmVzc1JlZ2lzdHJhdGlvblIMcmVnaXN0'
         'cmF0aW9u');
 
+@$core.Deprecated('Use forumThreadLinkDescriptor instead')
+const ForumThreadLink$json = {
+  '1': 'ForumThreadLink',
+  '2': [
+    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
+    {'1': 'thread_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'threadId'},
+  ],
+};
+
+/// Descriptor for `ForumThreadLink`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forumThreadLinkDescriptor = $convert.base64Decode(
+    'Cg9Gb3J1bVRocmVhZExpbmsSHgoIc3RvcmVfaWQYASABKAlCA+BBA1IHc3RvcmVJZBIgCgl0aH'
+    'JlYWRfaWQYAiABKAlCA+BBA1IIdGhyZWFkSWQ=');
+
 @$core.Deprecated('Use contentRefDescriptor instead')
 const ContentRef$json = {
   '1': 'ContentRef',
@@ -2200,13 +2230,61 @@ const ContentRef$json = {
       '10': 'kind'
     },
     {'1': 'id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {
+      '1': 'snapshot_state',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.ContentSnapshotState',
+      '8': {},
+      '10': 'snapshotState'
+    },
+    {'1': 'excerpt', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'excerpt'},
+    {
+      '1': 'authored_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'authoredTime'
+    },
+    {'1': 'post_id', '3': 6, '4': 1, '5': 9, '8': {}, '9': 0, '10': 'postId'},
+    {
+      '1': 'forum_thread',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.ForumThreadLink',
+      '8': {},
+      '9': 0,
+      '10': 'forumThread'
+    },
+    {
+      '1': 'link_available',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'linkAvailable'
+    },
+  ],
+  '8': [
+    {'1': 'link'},
   ],
 };
 
 /// Descriptor for `ContentRef`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List contentRefDescriptor = $convert.base64Decode(
     'CgpDb250ZW50UmVmEjsKBGtpbmQYASABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ29udG'
-    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZA==');
+    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZBJXCg5zbmFwc2hvdF9zdGF0'
+    'ZRgDIAEoDjIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50U25hcHNob3RTdGF0ZUID4E'
+    'EDUg1zbmFwc2hvdFN0YXRlEh0KB2V4Y2VycHQYBCABKAlCA+BBA1IHZXhjZXJwdBJECg1hdXRo'
+    'b3JlZF90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgxhdXRob3'
+    'JlZFRpbWUSHgoHcG9zdF9pZBgGIAEoCUID4EEDSABSBnBvc3RJZBJQCgxmb3J1bV90aHJlYWQY'
+    'ByABKAsyJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuRm9ydW1UaHJlYWRMaW5rQgPgQQNIAFILZm'
+    '9ydW1UaHJlYWQSKgoObGlua19hdmFpbGFibGUYCCABKAhCA+BBA1INbGlua0F2YWlsYWJsZUIG'
+    'CgRsaW5r');
 
 @$core.Deprecated('Use remediationUnavailabilityDescriptor instead')
 const RemediationUnavailability$json = {
@@ -3034,6 +3112,134 @@ const RecordProductViewResponse$json = {
 final $typed_data.Uint8List recordProductViewResponseDescriptor =
     $convert.base64Decode('ChlSZWNvcmRQcm9kdWN0Vmlld1Jlc3BvbnNl');
 
+@$core.Deprecated('Use blockBuyerRequestDescriptor instead')
+const BlockBuyerRequest$json = {
+  '1': 'BlockBuyerRequest',
+  '2': [
+    {'1': 'comment_id', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'commentId'},
+    {
+      '1': 'forum_entry_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'forumEntryId'
+    },
+  ],
+  '8': [
+    {'1': 'source'},
+  ],
+};
+
+/// Descriptor for `BlockBuyerRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockBuyerRequestDescriptor = $convert.base64Decode(
+    'ChFCbG9ja0J1eWVyUmVxdWVzdBIfCgpjb21tZW50X2lkGAEgASgJSABSCWNvbW1lbnRJZBImCg'
+    '5mb3J1bV9lbnRyeV9pZBgCIAEoCUgAUgxmb3J1bUVudHJ5SWRCCAoGc291cmNl');
+
+@$core.Deprecated('Use blockBuyerResponseDescriptor instead')
+const BlockBuyerResponse$json = {
+  '1': 'BlockBuyerResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `BlockBuyerResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockBuyerResponseDescriptor =
+    $convert.base64Decode(
+        'ChJCbG9ja0J1eWVyUmVzcG9uc2USGAoHY2hhbmdlZBgBIAEoCFIHY2hhbmdlZA==');
+
+@$core.Deprecated('Use unblockBuyerRequestDescriptor instead')
+const UnblockBuyerRequest$json = {
+  '1': 'UnblockBuyerRequest',
+  '2': [
+    {'1': 'buyer_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'buyerId'},
+  ],
+};
+
+/// Descriptor for `UnblockBuyerRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockBuyerRequestDescriptor = $convert.base64Decode(
+    'ChNVbmJsb2NrQnV5ZXJSZXF1ZXN0Eh4KCGJ1eWVyX2lkGAEgASgJQgPgQQJSB2J1eWVySWQ=');
+
+@$core.Deprecated('Use unblockBuyerResponseDescriptor instead')
+const UnblockBuyerResponse$json = {
+  '1': 'UnblockBuyerResponse',
+  '2': [
+    {'1': 'changed', '3': 1, '4': 1, '5': 8, '10': 'changed'},
+  ],
+};
+
+/// Descriptor for `UnblockBuyerResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unblockBuyerResponseDescriptor =
+    $convert.base64Decode(
+        'ChRVbmJsb2NrQnV5ZXJSZXNwb25zZRIYCgdjaGFuZ2VkGAEgASgIUgdjaGFuZ2Vk');
+
+@$core.Deprecated('Use listBlockedBuyersRequestDescriptor instead')
+const ListBlockedBuyersRequest$json = {
+  '1': 'ListBlockedBuyersRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedBuyersRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedBuyersRequestDescriptor =
+    $convert.base64Decode(
+        'ChhMaXN0QmxvY2tlZEJ1eWVyc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZR'
+        'IdCgpwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4=');
+
+@$core.Deprecated('Use listBlockedBuyersResponseDescriptor instead')
+const ListBlockedBuyersResponse$json = {
+  '1': 'ListBlockedBuyersResponse',
+  '2': [
+    {
+      '1': 'blocked_buyers',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.BlockedBuyer',
+      '10': 'blockedBuyers'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListBlockedBuyersResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBlockedBuyersResponseDescriptor = $convert.base64Decode(
+    'ChlMaXN0QmxvY2tlZEJ1eWVyc1Jlc3BvbnNlEkoKDmJsb2NrZWRfYnV5ZXJzGAEgAygLMiMuaG'
+    'F3a3Iuc2VsbGVyLnYxYWxwaGExLkJsb2NrZWRCdXllclINYmxvY2tlZEJ1eWVycxImCg9uZXh0'
+    'X3BhZ2VfdG9rZW4YAiABKAlSDW5leHRQYWdlVG9rZW4=');
+
+@$core.Deprecated('Use blockedBuyerDescriptor instead')
+const BlockedBuyer$json = {
+  '1': 'BlockedBuyer',
+  '2': [
+    {
+      '1': 'buyer',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.BuyerCard',
+      '10': 'buyer'
+    },
+    {
+      '1': 'create_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `BlockedBuyer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockedBuyerDescriptor = $convert.base64Decode(
+    'CgxCbG9ja2VkQnV5ZXISNgoFYnV5ZXIYASABKAsyIC5oYXdrci5zZWxsZXIudjFhbHBoYTEuQn'
+    'V5ZXJDYXJkUgVidXllchI7CgtjcmVhdGVfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5U'
+    'aW1lc3RhbXBSCmNyZWF0ZVRpbWU=');
+
 const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
   '1': 'SellerAppService',
   '2': [
@@ -3153,6 +3359,24 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '2': '.hawkr.seller.v1alpha1.RequestRemediationRequest',
       '3': '.hawkr.seller.v1alpha1.RequestRemediationResponse'
     },
+    {
+      '1': 'BlockBuyer',
+      '2': '.hawkr.seller.v1alpha1.BlockBuyerRequest',
+      '3': '.hawkr.seller.v1alpha1.BlockBuyerResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnblockBuyer',
+      '2': '.hawkr.seller.v1alpha1.UnblockBuyerRequest',
+      '3': '.hawkr.seller.v1alpha1.UnblockBuyerResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'ListBlockedBuyers',
+      '2': '.hawkr.seller.v1alpha1.ListBlockedBuyersRequest',
+      '3': '.hawkr.seller.v1alpha1.ListBlockedBuyersResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -3252,6 +3476,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       RemediationUnavailability$json,
   '.hawkr.seller.v1alpha1.AppealUnavailability': AppealUnavailability$json,
   '.hawkr.seller.v1alpha1.ContentRef': ContentRef$json,
+  '.hawkr.seller.v1alpha1.ForumThreadLink': ForumThreadLink$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureRequest': GetMyMeasureRequest$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureResponse': GetMyMeasureResponse$json,
   '.hawkr.seller.v1alpha1.SubmitAppealRequest': SubmitAppealRequest$json,
@@ -3260,6 +3485,15 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       RequestRemediationRequest$json,
   '.hawkr.seller.v1alpha1.RequestRemediationResponse':
       RequestRemediationResponse$json,
+  '.hawkr.seller.v1alpha1.BlockBuyerRequest': BlockBuyerRequest$json,
+  '.hawkr.seller.v1alpha1.BlockBuyerResponse': BlockBuyerResponse$json,
+  '.hawkr.seller.v1alpha1.UnblockBuyerRequest': UnblockBuyerRequest$json,
+  '.hawkr.seller.v1alpha1.UnblockBuyerResponse': UnblockBuyerResponse$json,
+  '.hawkr.seller.v1alpha1.ListBlockedBuyersRequest':
+      ListBlockedBuyersRequest$json,
+  '.hawkr.seller.v1alpha1.ListBlockedBuyersResponse':
+      ListBlockedBuyersResponse$json,
+  '.hawkr.seller.v1alpha1.BlockedBuyer': BlockedBuyer$json,
 };
 
 /// Descriptor for `SellerAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -3308,7 +3542,14 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     '1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXF1ZXN0Gisu'
     'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVhbFJlc3BvbnNlEnkKElJlcXVlc3RSZW'
     '1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1'
-    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNl');
+    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNlEm'
+    'YKCkJsb2NrQnV5ZXISKC5oYXdrci5zZWxsZXIudjFhbHBoYTEuQmxvY2tCdXllclJlcXVlc3Qa'
+    'KS5oYXdrci5zZWxsZXIudjFhbHBoYTEuQmxvY2tCdXllclJlc3BvbnNlIgOQAgISbAoMVW5ibG'
+    '9ja0J1eWVyEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlVuYmxvY2tCdXllclJlcXVlc3QaKy5o'
+    'YXdrci5zZWxsZXIudjFhbHBoYTEuVW5ibG9ja0J1eWVyUmVzcG9uc2UiA5ACAhJ7ChFMaXN0Qm'
+    'xvY2tlZEJ1eWVycxIvLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0QmxvY2tlZEJ1eWVyc1Jl'
+    'cXVlc3QaMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdEJsb2NrZWRCdXllcnNSZXNwb25zZS'
+    'IDkAIB');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',

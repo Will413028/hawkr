@@ -85,6 +85,16 @@ func (s *Service) currentOf(ctx context.Context, q *store.Queries, row store.Soc
 	return withStats(ctx, q, out)
 }
 
+// Readable 回店 storeID 的討論區對呼叫者此刻可不可以讀與寫：店家可曝光，而且（買家身分時）沒有封鎖這家店；店主以店家身分讀，不套個人封鎖。
+// 新增留言的前置檢查與 viewer_can_comment 同用這一個判斷。
+func (s *Service) Readable(ctx context.Context, c model.Caller, storeID int64, now time.Time) (bool, error) {
+	ok, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.ForumIsReadable(storeID, now, actor.ViewerFor(c, storeID)))
+	if err != nil {
+		return false, fmt.Errorf("social：讀取店家 %d：%w", storeID, err)
+	}
+	return ok, nil
+}
+
 // Create 在店家的討論區新增留言或回覆。店家要可曝光；互動者依歸屬推導（呼叫者此刻的店是這家店 → STORE，要有 CapMarketing，否則是買家）。
 // 回覆的父一律壓成頂層，reply_to 只接受同一個討論區同一串（父本身或父底下的回覆）、看得到的留言，沒給時是父留言。
 func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInput) (model.ForumEntry, error) {
@@ -106,9 +116,9 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		viewer := actor.ViewerFor(c, in.StoreID)
-		readable, err := reads.Flag(ctx, s.d.DB.Conn(ctx), reads.ForumIsReadable(in.StoreID, now, viewer))
+		readable, err := s.Readable(ctx, c, in.StoreID, now)
 		if err != nil {
-			return fmt.Errorf("social：讀取店家 %d：%w", in.StoreID, err)
+			return err
 		}
 		if !readable {
 			return apperr.NotFound("%s", text.ForumStoreNotFound(uitext.LocaleFrom(ctx)))
@@ -176,10 +186,14 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	if err != nil {
 		return model.ForumEntry{}, err
 	}
+	// 討論區可讀可寫是寫入的前置檢查，成功的寫入（含重送命中）就是 true，不再查。
 	if isReplay {
+		replayed.Readable = true
 		return replayed, nil
 	}
-	return visible(created), nil
+	out := visible(created)
+	out.Readable = true
+	return out, nil
 }
 
 // replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
@@ -249,6 +263,11 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 			return fmt.Errorf("social：修改討論區留言 %s：%w", id, err)
 		}
 		updated, err = withStats(ctx, q, visible(row2))
+		if err != nil {
+			return err
+		}
+		// 修改不要求討論區可讀，回應的 viewer_can_reply 要用，所以求值。
+		updated.Readable, err = s.Readable(ctx, c, pre.StoreID, now)
 		return err
 	})
 	if err != nil {
@@ -304,12 +323,25 @@ func toEntry(r reads.EntryRow) model.ForumEntry {
 	return out
 }
 
-func finish(rows []reads.EntryRow, size int32) model.ForumPage {
+// finish 把（可能多取一列的）列轉成一頁，並帶這家店的討論區對呼叫者可不可以讀寫：有列就是（列的查詢帶同一個條件），空頁才查一次。
+func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.EntryRow, size int32, now time.Time) (model.ForumPage, error) {
+	out := pageOf(rows, size)
+	if len(rows) == 0 {
+		var err error
+		if out.Readable, err = s.Readable(ctx, c, storeID, now); err != nil {
+			return model.ForumPage{}, err
+		}
+	}
+	return out, nil
+}
+
+// pageOf 把（可能多取一列的）列轉成一頁；Readable 只在有列時為真，空頁的可讀性由呼叫端決定。
+func pageOf(rows []reads.EntryRow, size int32) model.ForumPage {
 	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
-	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows))}
+	out := model.ForumPage{Entries: make([]model.ForumEntry, len(rows)), Readable: len(rows) > 0}
 	for i, r := range rows {
 		out.Entries[i] = toEntry(r)
 	}
@@ -327,12 +359,13 @@ func (s *Service) ListTopLevel(ctx context.Context, c model.Caller, storeID int6
 	if err != nil {
 		return model.ForumPage{}, err
 	}
+	now := s.d.Now().UTC()
 	at, id := after.Key()
-	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListTopLevelForumEntries(storeID, s.d.Now().UTC(), actor.ViewerFor(c, storeID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListTopLevelForumEntries(storeID, now, actor.ViewerFor(c, storeID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：列出討論區留言：%w", err)
 	}
-	return finish(rows, size), nil
+	return s.finish(ctx, c, storeID, rows, size, now)
 }
 
 // ListReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆（父留言可以已刪除或被隱藏，但不能被觀看者的封鎖排除）。
@@ -349,10 +382,35 @@ func (s *Service) ListReplies(ctx context.Context, c model.Caller, storeID int64
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：讀取討論區留言 %s：%w", parentID, err)
 	}
+	now := s.d.Now().UTC()
 	at, id := after.Key()
-	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(parentID, s.d.Now().UTC(), actor.ViewerFor(c, parent.StoreID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(parentID, now, actor.ViewerFor(c, parent.StoreID), reads.CommentPage{AfterCreated: at, AfterID: id, Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumPage{}, fmt.Errorf("social：列出討論區回覆：%w", err)
 	}
-	return finish(rows, size), nil
+	return s.finish(ctx, c, parent.StoreID, rows, size, now)
+}
+
+// GetThread 讀單一討論串：頂層項目與回覆的第一頁（規則同 ListTopLevel 與 ListReplies，頂層沒有列就是 NotFound）。
+func (s *Service) GetThread(ctx context.Context, c model.Caller, storeID int64, threadID uuid.UUID, size int32) (model.ForumThreadView, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ForumThreadView{}, err
+	}
+	now := s.d.Now().UTC()
+	rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.GetForumThreadTop(storeID, threadID, now, actor.ViewerFor(c, storeID)))
+	if err != nil {
+		return model.ForumThreadView{}, fmt.Errorf("social：讀取討論串 %s：%w", threadID, err)
+	}
+	if len(rows) == 0 {
+		return model.ForumThreadView{}, entryNotFound(ctx)
+	}
+	// 頂層讀得到才讀回覆，兩者用同一個可讀條件。
+	replyRows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(threadID, now, actor.ViewerFor(c, storeID), reads.CommentPage{Limit: int64(size) + 1}))
+	if err != nil {
+		return model.ForumThreadView{}, fmt.Errorf("social：列出討論區回覆：%w", err)
+	}
+	replies := pageOf(replyRows, size)
+	replies.Readable = true
+	return model.ForumThreadView{Top: toEntry(rows[0]), Replies: replies}, nil
 }

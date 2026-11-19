@@ -164,6 +164,34 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "已處理（不違規）",
+      "description": "案件認定不違規。"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "審核中",
+      "description": "案件還在處理中。"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
+      "message": "已處理（違規）",
+      "description": "案件認定違規。"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
+      "message": "使用者",
+      "description": "買家；id 是買家的 ID。"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
+      "message": "留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": {
+      "message": "討論區留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_FORUM_ENTRY）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
+      "message": "貼文",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
@@ -319,6 +347,14 @@
       },
       "description": "送出前的冷卻警告。days 是整天數，不足一天進位為一天。"
     },
+    "seller.Measure.removed_contents_cleared": {
+      "message": "內容副本已超過保留期限並刪除。",
+      "description": "被下架內容的快照已超過保留期限清空時，取代摘要的說明句。"
+    },
+    "seller.Measure.removed_contents_heading": {
+      "message": "下架的內容",
+      "description": "措施卡片中列出被下架內容的區塊標題。"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "停權中（未定結束時間，平台定期複審）",
       "description": "停權生效中、沒有結束時間時的效果行（由平台定期複審，不是永久）。"
@@ -387,6 +423,10 @@
     "seller.Measure.title_risk_fallback": {
       "message": "風險措施",
       "description": "依據是風險類型、但風險類型不認得時的標題。"
+    },
+    "seller.Measure.view_content_link": {
+      "message": "查看貼文",
+      "description": "被下架內容的連結文字（貼文、留言與討論區留言共用）。"
     },
     "seller.MeasureBasis.MEASURE_BASIS_CONTRACT": {
       "message": "契約條款",
@@ -729,9 +769,45 @@
     "seller.ViolationSeverity.VIOLATION_SEVERITY_MEDIUM": {
       "message": "中",
       "description": "ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。（值 VIOLATION_SEVERITY_MEDIUM）"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_DELETED": {
+      "message": "此留言已刪除",
+      "description": "留言列表裡已刪除或被隱藏、只為了接住底下回覆而留下的佔位項目的文字；有內文的留言沒有佔位文字。（值 COMMENT_STATE_DELETED）"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_HIDDEN": {
+      "message": "此留言已被隱藏",
+      "description": "留言列表裡已刪除或被隱藏、只為了接住底下回覆而留下的佔位項目的文字；有內文的留言沒有佔位文字。（值 COMMENT_STATE_HIDDEN）"
     }
   },
   "staff": {
+    "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "認定不違規",
+      "description": "案件認定不違規。\n受眾：後台員工"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "處理中",
+      "description": "案件還在處理中。\n受眾：後台員工"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
+      "message": "認定違規",
+      "description": "案件認定違規。\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
+      "message": "買家",
+      "description": "買家；id 是買家的 ID。\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
+      "message": "留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": {
+      "message": "討論區留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_FORUM_ENTRY）\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
+      "message": "貼文",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）\n受眾：後台員工"
+    },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "已核准",
       "description": "管理員核准。\n受眾：後台員工"
@@ -819,6 +895,14 @@
     },
     "seller.OnboardingTaskId.panel_title": {
       "description": "網頁開通任務面板的標題，只由任務種類決定。"
+    },
+    "social.CommentState.placeholder": {
+      "omit": {
+        "default": [
+          "COMMENT_STATE_VISIBLE"
+        ]
+      },
+      "description": "留言列表裡已刪除或被隱藏、只為了接住底下回覆而留下的佔位項目的文字；有內文的留言沒有佔位文字。"
     }
   }
 }

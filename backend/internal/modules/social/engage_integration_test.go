@@ -183,7 +183,7 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 		}
 	}
 	// 不公開的貼文不計；清理 job 只刪舊的去重列與 salt，不扣瀏覽數。
-	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}))
+	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}, nil))
 	if mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, draft.ID, anon)) {
 		t.Fatal("草稿不計瀏覽")
 	}
@@ -215,7 +215,7 @@ func TestSharesAreDeduplicatedPerBuyer(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Shares != 2 {
 		t.Fatalf("分享數 %d", got.Stats.Shares)
 	}
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), p.ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	if _, err := f.module.RecordShare(ctx, a.BuyerID, p.ID); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("刪除的貼文不能分享：%v", err)
 	}
@@ -244,7 +244,7 @@ func TestTopPostsRanksTheLatestThirtyByViews(t *testing.T) {
 	if len(got) != 3 || got[0].ID != posts[2].ID || got[1].ID != posts[0].ID || got[2].ID != posts[1].ID {
 		t.Fatalf("依瀏覽數、同分較新的在前：%v", ids(got))
 	}
-	must(t, f.module.DeletePost(ctx, f.store(t, storeID), posts[2].ID, 0))
+	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), posts[2].ID, 0))
 	if got := mustV[[]social.Post](t)(f.module.TopPosts(ctx, social.Caller{}, 1)); got[0].ID != posts[0].ID {
 		t.Fatalf("刪除的不算：%v", ids(got))
 	}
@@ -259,4 +259,51 @@ func ids(ps []social.Post) []string {
 		out[i] = p.ID.String()[:8]
 	}
 	return out
+}
+
+// CommentLiked 只在真的新增一列時發一次（帶按讚者與留言作者）：重複按讚、取消讚、取消後再讚（才是新的一列）各自的次數。
+func TestCommentLikedIsPublishedOnlyWhenARowIsInserted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	p := f.publishedPost(t, storeID, "貼文")
+	author, fan := f.newBuyer(t), f.newBuyer(t)
+	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(author), social.CommentInput{PostID: p.ID, Body: "留言"}))
+	var mu sync.Mutex
+	var got []social.CommentLiked
+	events.Subscribe(f.bus, func(_ context.Context, e social.CommentLiked) error {
+		mu.Lock()
+		defer mu.Unlock()
+		got = append(got, e)
+		return nil
+	})
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(got)
+	}
+	caller := f.asBuyer(fan)
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); !ok || count() != 1 {
+		t.Fatalf("第一次按讚發一次：added=%v events=%d", ok, count())
+	}
+	mu.Lock()
+	e := got[0]
+	mu.Unlock()
+	if e.CommentID != c.ID || e.PostID != p.ID || e.StoreID != storeID ||
+		e.Actor != (social.Actor{Kind: social.ActorBuyer, ID: fan.BuyerID}) || e.Author != (social.Actor{Kind: social.ActorBuyer, ID: author.BuyerID}) {
+		t.Fatalf("事件內容：%+v", e)
+	}
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); ok || count() != 1 {
+		t.Fatalf("重複按讚不發：added=%v events=%d", ok, count())
+	}
+	if ok := mustV[bool](t)(f.module.UnlikeComment(ctx, caller, c.ID)); !ok || count() != 1 {
+		t.Fatalf("取消讚不發：removed=%v events=%d", ok, count())
+	}
+	if ok := mustV[bool](t)(f.module.LikeComment(ctx, caller, c.ID)); !ok || count() != 2 {
+		t.Fatalf("取消後再讚是新的一列，發第二次：added=%v events=%d", ok, count())
+	}
+	if rel := mustV[social.Comment](t)(f.module.CommentForRelay(ctx, c.ID)); rel.Likes != 1 || rel.ID != c.ID || rel.Body != "留言" || rel.Actor.ID != author.BuyerID {
+		t.Fatalf("CommentForRelay 讀到此刻的內容與計數：%+v", rel)
+	}
 }

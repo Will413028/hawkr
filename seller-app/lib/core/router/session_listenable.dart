@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/app_update/application/force_update_provider.dart';
 import '../../features/seller/data/current_store.dart';
+import '../session/account_restriction.dart';
 import '../session/session_provider.dart';
 
 /// 橋接 Riverpod provider → ChangeNotifier (GoRouter refreshListenable)
@@ -33,6 +34,7 @@ class SessionChangeNotifier extends ChangeNotifier {
       _ref.listen(needsOnboardingProvider, notifyStore),
       _ref.listen(myStoreSnapshotProvider, notifyStore),
       _ref.listen(storeUnavailableProvider, notifyStore),
+      _ref.listen(accountRestrictionStateProvider, notifyStore),
     ];
     _forceUpdateSub = _ref.listen<CheckAppVersionResponse>(
       forceUpdateGateProvider,

@@ -12,13 +12,29 @@ function compact(relativePath: string) {
 	).replace(/\s+/g, "");
 }
 
-test("隱私政策的生效日是它引用的生成文件中最新的一次修訂", () => {
+test("隱私政策的生效日不早於它引用的生成文件中最新的一次修訂", () => {
 	const privacy = compact("features/legal/pages/PrivacyPage.tsx");
-	// 版本日期取自生成的條款與 KYC 告知（docs/legal 的唯一來源），隱私頁內嵌 KYC 告知，取兩者較新者。
+	// 版本日期取自生成的條款與 KYC 告知（docs/legal 的唯一來源），隱私頁內嵌 KYC 告知，取兩者較新者；
+	// 隱私頁自己的內容（例如貼文瀏覽統計）改動時，生效日可以比這兩份文件更新。
 	const latest = [SELLER_TERMS.version, KYC_PRIVACY_NOTICE.version]
 		.sort()
-		.at(-1);
-	assert.ok(privacy.includes(`lastUpdated="${latest}"`), latest);
+		.at(-1) as string;
+	const match = privacy.match(/lastUpdated="(\d{4}-\d{2}-\d{2})"/);
+	assert.ok(match, "PrivacyPage 要有 lastUpdated");
+	assert.ok(match[1] >= latest, `${match[1]} 早於 ${latest}`);
+});
+
+test("隱私政策有貼文瀏覽統計一節，內文是核可句", () => {
+	const privacy = readFileSync(
+		new URL("../features/legal/pages/PrivacyPage.tsx", import.meta.url),
+		"utf8",
+	);
+	assert.ok(privacy.includes('title: "三、貼文瀏覽統計"'));
+	assert.ok(
+		privacy.includes(
+			"我們會統計貼文的瀏覽次數；未登入的瀏覽只以每日更換的雜湊值去重，不儲存您的 IP 位址或瀏覽器資訊。",
+		),
+	);
 });
 
 test("預告橫幅掛在賣家中心外框、措施與申覆入口掛在帳號總覽", () => {

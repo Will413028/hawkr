@@ -139,6 +139,7 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "social", Dir: social.Migrations()},
 		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()},
+		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 		migrate.Module{Name: "moderation", Dir: Migrations()},
 	))
 	f := &fixture{db: d, now: time.Date(2026, 11, 2, 4, 0, 0, 0, time.UTC)}
@@ -236,7 +237,7 @@ func (f *fixture) post(t *testing.T, storeID int64, body string) social.Post {
 	}
 	p, err := f.social.CreatePost(context.Background(), st, social.CreatePostInput{
 		Body: body, ImageToken: fmt.Sprintf("tok-%d", f.next()), Publish: true,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

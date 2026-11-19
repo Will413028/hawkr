@@ -6,6 +6,7 @@
 package report
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
+	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -100,11 +103,30 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 
 func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
 	q := store.New(s.d.DB.Conn(ctx))
+	var hash []byte
+	if in.RequestID != nil {
+		hash = requestHash(in)
+		// request_id 先於一切（A7-D28 第 3 點）：同一位檢舉人的同一個 request_id 一律回第一次的結果，不看案件現在是進行中還是已結案。
+		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID})
+		switch {
+		case err == nil:
+			if !bytes.Equal(first.RequestHash, hash) {
+				return model.SubmitResult{}, apperr.InvalidInputOn([]string{"RequestID"}, "%s", moderationtext.ReportRequestIdReused(uitext.LocaleFrom(ctx)))
+			}
+			return s.replay(ctx, q, first.ModerationReport)
+		case !errors.Is(err, pgx.ErrNoRows):
+			return model.SubmitResult{}, fmt.Errorf("moderation：查 request_id 的檢舉：%w", err)
+		}
+	}
 	existing, err := q.ExistingOpenReport(ctx, store.ExistingOpenReportParams{
 		TargetKind: string(in.Target.Kind), ContentID: in.Target.ContentIDPtr(), BuyerID: in.Target.BuyerIDPtr(), ReporterBuyerID: in.ReporterBuyerID,
 	})
 	switch {
 	case err == nil:
+		// 併入進行中案件裡已有的那一筆：也記下這個 request_id，結案後同一個 request_id 重送才仍回這一筆。
+		if err := s.recordRequest(ctx, q, in, existing.ID, hash); err != nil {
+			return model.SubmitResult{}, err
+		}
 		return s.replay(ctx, q, existing)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return model.SubmitResult{}, fmt.Errorf("moderation：查既有的檢舉：%w", err)
@@ -170,7 +192,67 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	if err != nil {
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入檢舉：%w", err)
 	}
+	if err := s.recordRequest(ctx, q, in, row.ID, hash); err != nil {
+		return model.SubmitResult{}, err
+	}
 	return model.SubmitResult{Report: view.Report(row, nil), Case: view.Case(attached), Created: true}, nil
+}
+
+// recordRequest 記下 request_id 對應的檢舉（沒帶 request_id 時什麼都不做）。同一個 (檢舉人, request_id) 已被並行的請求記下時回 errRetry：
+// 這一輪的交易整個放棄，重試時從頭讀到對方的紀錄並比對內容雜湊。
+func (s *Service) recordRequest(ctx context.Context, q *store.Queries, in model.SubmitInput, reportID uuid.UUID, hash []byte) error {
+	if in.RequestID == nil {
+		return nil
+	}
+	n, err := q.InsertReportRequest(ctx, store.InsertReportRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID, ReportID: reportID, RequestHash: hash})
+	if err != nil {
+		return fmt.Errorf("moderation：記下 request_id：%w", err)
+	}
+	if n == 0 {
+		return errRetry
+	}
+	return nil
+}
+
+// requestHash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256：同一個 request_id 重送時比對內容是否相同的唯一定義。
+func requestHash(in model.SubmitInput) []byte {
+	id := in.Target.ContentID.String()
+	if in.Target.Kind == model.TargetBuyer {
+		id = fmt.Sprint(in.Target.BuyerID)
+	}
+	return idempotency.Hash("report", string(in.Target.Kind), id, string(in.Category), in.Description)
+}
+
+// MyReports 是檢舉人自己的檢舉，新的在前（keyset，不回總數）；每筆的結果由所屬案件的決定推導。
+func (s *Service) MyReports(ctx context.Context, buyerID int64, after *model.ReportCursor, size int32) (model.ReportPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ReportPage{}, err
+	}
+	at, id := after.Key()
+	rows, err := store.New(s.d.DB.Conn(ctx)).ListReportsOfReporter(ctx, store.ListReportsOfReporterParams{
+		ReporterBuyerID: buyerID, AfterCreated: at, AfterID: id, MaxRows: size + 1,
+	})
+	if err != nil {
+		return model.ReportPage{}, fmt.Errorf("moderation：列出我的檢舉：%w", err)
+	}
+	rows, more := model.TrimPage(rows, size)
+	out := model.ReportPage{Items: make([]model.ReportItem, len(rows))}
+	for i, r := range rows {
+		t := model.Target{Kind: model.TargetKind(r.TargetKind)}
+		if r.ContentID != nil {
+			t.ContentID = *r.ContentID
+		}
+		if r.BuyerID != nil {
+			t.BuyerID = *r.BuyerID
+		}
+		out.Items[i] = model.ReportItem{Report: view.Report(r.ModerationReport, r.Decision), Target: t, ClosedAt: r.ClosedAt}
+	}
+	if more {
+		last := rows[len(rows)-1].ModerationReport
+		out.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+	return out, nil
 }
 
 // replay 回傳既有的檢舉與它的案件。
@@ -228,7 +310,7 @@ func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Co
 	}
 	return snapshot.Content{
 		Kind: in.Target.Kind, AuthorKind: string(snap.Author.Kind), AuthorID: snap.Author.ID, StoreID: snap.StoreID,
-		Body: snap.Body, MediaRefs: snap.MediaRefs,
+		Body: snap.Body, MediaRefs: snap.MediaRefs, AuthoredAt: snap.AuthoredAt, PostID: uuidString(snap.PostID), ThreadID: uuidString(snap.ThreadID),
 	}, nil
 }
 
@@ -284,4 +366,12 @@ func (s *Service) sameAccount(ctx context.Context, reporterBuyerID int64, author
 		return st.AccountID == reporter, nil
 	}
 	return false, nil
+}
+
+// uuidString 回傳 id 的字串；零值是空字串（快照 JSON 不輸出）。
+func uuidString(id uuid.UUID) string {
+	if id == uuid.Nil() {
+		return ""
+	}
+	return id.String()
 }

@@ -94,6 +94,30 @@ function sellerMethod(method: string): RegExp {
 	);
 }
 export const GET_MY_STORE_URL = sellerMethod("GetMyStore");
+
+/**
+ * social 的 Connect 方法（`SocialPublicService`、`SocialAppService`）：同樣打 `/api/connect/{package.Service}/{Method}`，
+ * 讀取方法都是 NO_SIDE_EFFECTS（以 GET 呼叫、請求在 `message` query），寫入是 POST 的 JSON body。
+ * 回應是訊息本身的 protobuf JSON（camelCase、int64 與 enum 是字串／名稱）。
+ */
+export function socialMethod(
+	service: "SocialPublicService" | "SocialAppService",
+	method: string,
+): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.social\\.v1alpha1\\.${service}/${method}(?:\\?|$)`,
+	);
+}
+
+/** Connect 呼叫的請求訊息：GET 在 `message` query，POST 在 JSON body；沒有訊息是空物件。 */
+export function connectRequestMessage(route: Route): Record<string, unknown> {
+	const request = route.request();
+	if (request.method() === "GET") {
+		const raw = new URL(request.url()).searchParams.get("message");
+		return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+	}
+	return (request.postDataJSON() as Record<string, unknown> | null) ?? {};
+}
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
 export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
 export const GET_MY_ONBOARDING_URL = sellerMethod("GetMyOnboarding");
@@ -103,6 +127,7 @@ export const REFRESH_MY_PAYMENT_ACCOUNT_URL = sellerMethod(
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
+export const LIST_BLOCKED_BUYERS_URL = sellerMethod("ListBlockedBuyers");
 export const GET_MY_STORE_OPENING_URL = sellerMethod("GetMyStoreOpening");
 
 /** 健康的店家（營業中、沒有停權）此刻擁有的全部能力（seller.proto 的 SellerCapability）。 */
@@ -1127,6 +1152,32 @@ export interface GatewayMockState {
 }
 
 /**
+ * social 的預設回應（空）：導覽列選單與賣家頁會讀貼文與熱門標籤，沒 mock 的 Connect 呼叫會落到打不通的 API
+ * 變成 502（頁面健康檢查的同源 >=400）。個別 spec 較晚註冊的 mock 會蓋過這裡。
+ */
+async function mockSocialDefaults(page: Page): Promise<void> {
+	const empty: Array<[RegExp, unknown]> = [
+		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
+		[
+			socialMethod("SocialPublicService", "SuggestTrendingPosts"),
+			{ posts: [] },
+		],
+		[socialMethod("SocialPublicService", "SuggestTrendingTags"), { tags: [] }],
+		[socialMethod("SocialPublicService", "SuggestTags"), { tags: [] }],
+		[socialMethod("SocialAppService", "ListMyPosts"), { posts: [] }],
+		[
+			socialMethod("SocialAppService", "GetStoreSocialSummary"),
+			{ postCounts: [], scheduledPostCount: "0" },
+		],
+	];
+	for (const [url, body] of empty) {
+		await page.route(url, (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+}
+
+/**
  * Intercept the server. Route order matters: Playwright runs the LAST-added
  * matching handler first, so the generic /app/** catch-all is registered FIRST
  * and the specific routes AFTER it (they win for exact paths).
@@ -1174,9 +1225,15 @@ export async function setupGatewayMocks(
 	await mockBuyerDefaults(page, identity.accountId);
 	await mockStoreCards(page);
 	await mockMyDashboard(page, {});
+	await mockSocialDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
+
+	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
+	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
 
 	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);

@@ -18,15 +18,133 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
-    as $2;
+    as $0;
 
-import '../../common/v1alpha1/image.pb.dart' as $1;
-import '../../common/v1alpha1/store_card.pb.dart' as $0;
+import '../../common/v1alpha1/image.pb.dart' as $2;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $4;
+import '../../common/v1alpha1/store_card.pb.dart' as $1;
 import 'social.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'social.pbenum.dart';
+
+/// PostSchedule 是一篇貼文待發布的排程。
+class PostSchedule extends $pb.GeneratedMessage {
+  factory PostSchedule({
+    $core.String? id,
+    $core.String? postId,
+    $0.Timestamp? publishTime,
+    ScheduleKind? scheduledBy,
+    $0.Timestamp? createTime,
+  }) {
+    final result = PostSchedule._();
+    if (id != null) result.id = id;
+    if (postId != null) result.postId = postId;
+    if (publishTime != null) result.publishTime = publishTime;
+    if (scheduledBy != null) result.scheduledBy = scheduledBy;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  PostSchedule._();
+
+  factory PostSchedule.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostSchedule()..mergeFromBuffer(data, registry);
+  factory PostSchedule.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostSchedule()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostSchedule',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PostSchedule.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'postId')
+    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aE<ScheduleKind>(4, _omitFieldNames ? '' : 'scheduledBy',
+        enumValues: ScheduleKind.values)
+    ..aOM<$0.Timestamp>(5, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostSchedule clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostSchedule copyWith(void Function(PostSchedule) updates) =>
+      super.copyWith((message) => updates(message as PostSchedule))
+          as PostSchedule;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PostSchedule() / PostSchedule.new instead')
+  static PostSchedule create() => PostSchedule._();
+  static $pb.GeneratedMessage $_createMessage() => PostSchedule._();
+  @$core.override
+  PostSchedule createEmptyInstance() => PostSchedule._();
+  @$core.pragma('dart2js:noInline')
+  static PostSchedule getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PostSchedule>(
+          PostSchedule.$_createMessage);
+  static PostSchedule? _defaultInstance;
+
+  /// 排程的 ID。
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// 要發布的貼文。
+  @$pb.TagNumber(2)
+  $core.String get postId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set postId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPostId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPostId() => $_clearField(2);
+
+  /// 發布的時間點。
+  @$pb.TagNumber(3)
+  $0.Timestamp get publishTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set publishTime($0.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPublishTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPublishTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.Timestamp ensurePublishTime() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  ScheduleKind get scheduledBy => $_getN(3);
+  @$pb.TagNumber(4)
+  set scheduledBy(ScheduleKind value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasScheduledBy() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearScheduledBy() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $0.Timestamp get createTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set createTime($0.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreateTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreateTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $0.Timestamp ensureCreateTime() => $_ensure(4);
+}
 
 /// Hashtag 是貼文的一個標籤。
 class Hashtag extends $pb.GeneratedMessage {
@@ -103,13 +221,13 @@ class Hashtag extends $pb.GeneratedMessage {
 class Post extends $pb.GeneratedMessage {
   factory Post({
     $core.String? id,
-    $0.StoreCard? store,
+    $1.StoreCard? store,
     $core.String? body,
-    $1.Image? image,
+    $2.Image? image,
     $core.String? productId,
     $core.Iterable<Hashtag>? hashtags,
-    $2.Timestamp? publishTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? publishTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? likeCount,
     $fixnum.Int64? commentCount,
     $fixnum.Int64? viewCount,
@@ -118,9 +236,13 @@ class Post extends $pb.GeneratedMessage {
     $core.bool? viewerCanComment,
     PostStatus? status,
     $core.String? etag,
-    $2.Timestamp? createTime,
+    $0.Timestamp? createTime,
     $core.String? imageStagedToken,
     $core.Iterable<$core.String>? hashtagInputs,
+    $core.bool? viewerLiked,
+    $core.String? takedownMeasureId,
+    Actor? viewerActor,
+    PostProduct? product,
   }) {
     final result = Post._();
     if (id != null) result.id = id;
@@ -142,6 +264,10 @@ class Post extends $pb.GeneratedMessage {
     if (createTime != null) result.createTime = createTime;
     if (imageStagedToken != null) result.imageStagedToken = imageStagedToken;
     if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
+    if (viewerLiked != null) result.viewerLiked = viewerLiked;
+    if (takedownMeasureId != null) result.takedownMeasureId = takedownMeasureId;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (product != null) result.product = product;
     return result;
   }
 
@@ -160,18 +286,18 @@ class Post extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: Post.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOM<$0.StoreCard>(2, _omitFieldNames ? '' : 'store',
-        subBuilder: $0.StoreCard.$_createMessage)
+    ..aOM<$1.StoreCard>(2, _omitFieldNames ? '' : 'store',
+        subBuilder: $1.StoreCard.$_createMessage)
     ..aOS(3, _omitFieldNames ? '' : 'body')
-    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'image',
-        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'image',
+        subBuilder: $2.Image.$_createMessage)
     ..aOS(5, _omitFieldNames ? '' : 'productId')
     ..pPM<Hashtag>(6, _omitFieldNames ? '' : 'hashtags',
         subBuilder: Hashtag.$_createMessage)
-    ..aOM<$2.Timestamp>(7, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(7, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(9, _omitFieldNames ? '' : 'likeCount')
     ..aInt64(10, _omitFieldNames ? '' : 'commentCount')
     ..aInt64(11, _omitFieldNames ? '' : 'viewCount')
@@ -181,10 +307,16 @@ class Post extends $pb.GeneratedMessage {
     ..aE<PostStatus>(15, _omitFieldNames ? '' : 'status',
         enumValues: PostStatus.values)
     ..aOS(16, _omitFieldNames ? '' : 'etag')
-    ..aOM<$2.Timestamp>(17, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(17, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aOS(18, _omitFieldNames ? '' : 'imageStagedToken')
     ..pPS(19, _omitFieldNames ? '' : 'hashtagInputs')
+    ..aOB(20, _omitFieldNames ? '' : 'viewerLiked')
+    ..aOS(21, _omitFieldNames ? '' : 'takedownMeasureId')
+    ..aOM<Actor>(22, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOM<PostProduct>(23, _omitFieldNames ? '' : 'product',
+        subBuilder: PostProduct.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -218,15 +350,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 發文的店家。店家卡片讀不到時不設。
   @$pb.TagNumber(2)
-  $0.StoreCard get store => $_getN(1);
+  $1.StoreCard get store => $_getN(1);
   @$pb.TagNumber(2)
-  set store($0.StoreCard value) => $_setField(2, value);
+  set store($1.StoreCard value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasStore() => $_has(1);
   @$pb.TagNumber(2)
   void clearStore() => $_clearField(2);
   @$pb.TagNumber(2)
-  $0.StoreCard ensureStore() => $_ensure(1);
+  $1.StoreCard ensureStore() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.String get body => $_getSZ(2);
@@ -239,15 +371,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 貼文的圖片，沒有圖時不設。
   @$pb.TagNumber(4)
-  $1.Image get image => $_getN(3);
+  $2.Image get image => $_getN(3);
   @$pb.TagNumber(4)
-  set image($1.Image value) => $_setField(4, value);
+  set image($2.Image value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasImage() => $_has(3);
   @$pb.TagNumber(4)
   void clearImage() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Image ensureImage() => $_ensure(3);
+  $2.Image ensureImage() => $_ensure(3);
 
   /// 貼文帶的商品 ID，沒有時不設。
   @$pb.TagNumber(5)
@@ -264,26 +396,26 @@ class Post extends $pb.GeneratedMessage {
 
   /// 第一次發布的時間；下架後再發布沿用。
   @$pb.TagNumber(7)
-  $2.Timestamp get publishTime => $_getN(6);
+  $0.Timestamp get publishTime => $_getN(6);
   @$pb.TagNumber(7)
-  set publishTime($2.Timestamp value) => $_setField(7, value);
+  set publishTime($0.Timestamp value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasPublishTime() => $_has(6);
   @$pb.TagNumber(7)
   void clearPublishTime() => $_clearField(7);
   @$pb.TagNumber(7)
-  $2.Timestamp ensurePublishTime() => $_ensure(6);
+  $0.Timestamp ensurePublishTime() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get updateTime => $_getN(7);
+  $0.Timestamp get updateTime => $_getN(7);
   @$pb.TagNumber(8)
-  set updateTime($2.Timestamp value) => $_setField(8, value);
+  set updateTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasUpdateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearUpdateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureUpdateTime() => $_ensure(7);
+  $0.Timestamp ensureUpdateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
   $fixnum.Int64 get likeCount => $_getI64(8);
@@ -331,8 +463,9 @@ class Post extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearUrl() => $_clearField(13);
 
-  /// 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
-  /// 這是顯示用的提示，寫入時伺服器仍會檢查。
+  /// 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主是 true。
+  /// 貼文要公開可讀（已發布、沒有刪除、沒有被內容下架、店家可曝光）：留言只寫得進公開可讀的貼文，所以店主讀自己店的草稿或已下架的貼文是 false。
+  /// 這是顯示用的提示，寫入時伺服器仍會檢查（與寫入同一個判斷）。
   @$pb.TagNumber(14)
   $core.bool get viewerCanComment => $_getBF(13);
   @$pb.TagNumber(14)
@@ -364,15 +497,15 @@ class Post extends $pb.GeneratedMessage {
 
   /// 建立時間；只有店主讀自己的貼文才設（店主清單依它排序）。
   @$pb.TagNumber(17)
-  $2.Timestamp get createTime => $_getN(16);
+  $0.Timestamp get createTime => $_getN(16);
   @$pb.TagNumber(17)
-  set createTime($2.Timestamp value) => $_setField(17, value);
+  set createTime($0.Timestamp value) => $_setField(17, value);
   @$pb.TagNumber(17)
   $core.bool hasCreateTime() => $_has(16);
   @$pb.TagNumber(17)
   void clearCreateTime() => $_clearField(17);
   @$pb.TagNumber(17)
-  $2.Timestamp ensureCreateTime() => $_ensure(16);
+  $0.Timestamp ensureCreateTime() => $_ensure(16);
 
   /// 換圖：把 media 上傳完成後拿到的 staged token 設在這裡並列進 update_mask；列進 update_mask 而 token 是空字串是清掉圖（已發布或有待發布排程的貼文不能清）。
   @$pb.TagNumber(18)
@@ -387,6 +520,179 @@ class Post extends $pb.GeneratedMessage {
   /// 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；列進 update_mask 是整批取代（空清單是清掉所有標籤），沒有列進去保留原本的標籤。
   @$pb.TagNumber(19)
   $pb.PbList<$core.String> get hashtagInputs => $_getList(18);
+
+  /// 觀看者是否讚過；訪客是 false。店主讀自己店的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）時不是買家身分，一律 false。
+  @$pb.TagNumber(20)
+  $core.bool get viewerLiked => $_getBF(19);
+  @$pb.TagNumber(20)
+  set viewerLiked($core.bool value) => $_setBool(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasViewerLiked() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearViewerLiked() => $_clearField(20);
+
+  /// 下架這篇貼文的內容下架措施 ID（seller 的 `Measure.id`）；貼文沒有被內容下架時不設。只有店主讀自己的貼文才設（後台列表在 AdminPost 另給），公開讀取不設。
+  /// 下架理由不在這裡：用這個 ID 呼叫賣家的 `GetMyMeasure`。一則內容同時至多一個生效中的內容下架措施。
+  @$pb.TagNumber(21)
+  $core.String get takedownMeasureId => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set takedownMeasureId($core.String value) => $_setString(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasTakedownMeasureId() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearTakedownMeasureId() => $_clearField(21);
+
+  /// 觀看者在這篇貼文留言時的身分，與 viewer_can_comment 用同一套觀看者判斷：觀看者此刻的店擁有這篇貼文時是店家（店名、店 logo），
+  /// 否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。
+  /// 名稱與頭像讀不到時（店家卡片讀不到、買家已刪除）只帶 kind 與 id。
+  @$pb.TagNumber(22)
+  Actor get viewerActor => $_getN(21);
+  @$pb.TagNumber(22)
+  set viewerActor(Actor value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasViewerActor() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearViewerActor() => $_clearField(22);
+  @$pb.TagNumber(22)
+  Actor ensureViewerActor() => $_ensure(21);
+
+  /// `product_id` 的商品顯示資料（貼文卡片的商品名稱、價格與圖），讀取時由伺服器批次補。商品已刪除、讀不到、商品查詢失敗（降級，伺服器記 warn）或（公開讀取時）已下架時不設，
+  /// 不影響貼文本身；`product_id` 仍照實回傳。
+  @$pb.TagNumber(23)
+  PostProduct get product => $_getN(22);
+  @$pb.TagNumber(23)
+  set product(PostProduct value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasProduct() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearProduct() => $_clearField(23);
+  @$pb.TagNumber(23)
+  PostProduct ensureProduct() => $_ensure(22);
+}
+
+/// PostProduct 是貼文帶的商品的顯示資料。
+class PostProduct extends $pb.GeneratedMessage {
+  factory PostProduct({
+    $core.String? id,
+    $core.String? name,
+    $2.Image? image,
+    $fixnum.Int64? minPrice,
+    $fixnum.Int64? maxPrice,
+    $core.bool? available,
+  }) {
+    final result = PostProduct._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (image != null) result.image = image;
+    if (minPrice != null) result.minPrice = minPrice;
+    if (maxPrice != null) result.maxPrice = maxPrice;
+    if (available != null) result.available = available;
+    return result;
+  }
+
+  PostProduct._();
+
+  factory PostProduct.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostProduct()..mergeFromBuffer(data, registry);
+  factory PostProduct.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PostProduct()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostProduct',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PostProduct.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOM<$2.Image>(3, _omitFieldNames ? '' : 'image',
+        subBuilder: $2.Image.$_createMessage)
+    ..aInt64(4, _omitFieldNames ? '' : 'minPrice')
+    ..aInt64(5, _omitFieldNames ? '' : 'maxPrice')
+    ..aOB(6, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostProduct clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostProduct copyWith(void Function(PostProduct) updates) =>
+      super.copyWith((message) => updates(message as PostProduct))
+          as PostProduct;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PostProduct() / PostProduct.new instead')
+  static PostProduct create() => PostProduct._();
+  static $pb.GeneratedMessage $_createMessage() => PostProduct._();
+  @$core.override
+  PostProduct createEmptyInstance() => PostProduct._();
+  @$core.pragma('dart2js:noInline')
+  static PostProduct getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PostProduct>(
+          PostProduct.$_createMessage);
+  static PostProduct? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// 商品圖，沒有圖時不設。
+  @$pb.TagNumber(3)
+  $2.Image get image => $_getN(2);
+  @$pb.TagNumber(3)
+  set image($2.Image value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasImage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearImage() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Image ensureImage() => $_ensure(2);
+
+  /// 規格中最低與最高的價格，新台幣元。
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get minPrice => $_getI64(3);
+  @$pb.TagNumber(4)
+  set minPrice($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMinPrice() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMinPrice() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get maxPrice => $_getI64(4);
+  @$pb.TagNumber(5)
+  set maxPrice($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMaxPrice() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMaxPrice() => $_clearField(5);
+
+  /// 現在可以購買；下架或售完時是 false（只有店主讀自己的貼文看得到下架的商品）。
+  @$pb.TagNumber(6)
+  $core.bool get available => $_getBF(5);
+  @$pb.TagNumber(6)
+  set available($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAvailable() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvailable() => $_clearField(6);
 }
 
 /// Actor 是留言的作者，名稱與頭像在讀取時由 buyer、seller 補。
@@ -395,7 +701,7 @@ class Actor extends $pb.GeneratedMessage {
     ActorKind? kind,
     $core.String? id,
     $core.String? name,
-    $1.Image? avatar,
+    $2.Image? avatar,
   }) {
     final result = Actor._();
     if (kind != null) result.kind = kind;
@@ -423,8 +729,8 @@ class Actor extends $pb.GeneratedMessage {
         enumValues: ActorKind.values)
     ..aOS(2, _omitFieldNames ? '' : 'id')
     ..aOS(3, _omitFieldNames ? '' : 'name')
-    ..aOM<$1.Image>(4, _omitFieldNames ? '' : 'avatar',
-        subBuilder: $1.Image.$_createMessage)
+    ..aOM<$2.Image>(4, _omitFieldNames ? '' : 'avatar',
+        subBuilder: $2.Image.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -476,15 +782,15 @@ class Actor extends $pb.GeneratedMessage {
   void clearName() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $1.Image get avatar => $_getN(3);
+  $2.Image get avatar => $_getN(3);
   @$pb.TagNumber(4)
-  set avatar($1.Image value) => $_setField(4, value);
+  set avatar($2.Image value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasAvatar() => $_has(3);
   @$pb.TagNumber(4)
   void clearAvatar() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.Image ensureAvatar() => $_ensure(3);
+  $2.Image ensureAvatar() => $_ensure(3);
 }
 
 /// Comment 是留言列表的一個項目（頂層留言或回覆）。
@@ -497,8 +803,8 @@ class Comment extends $pb.GeneratedMessage {
     CommentState? state,
     Actor? author,
     $core.String? body,
-    $2.Timestamp? createTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? createTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? likeCount,
     $fixnum.Int64? replyCount,
     $core.bool? viewerLiked,
@@ -552,10 +858,10 @@ class Comment extends $pb.GeneratedMessage {
     ..aOM<Actor>(6, _omitFieldNames ? '' : 'author',
         subBuilder: Actor.$_createMessage)
     ..aOS(7, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(10, _omitFieldNames ? '' : 'likeCount')
     ..aInt64(11, _omitFieldNames ? '' : 'replyCount')
     ..aOB(12, _omitFieldNames ? '' : 'viewerLiked')
@@ -656,26 +962,26 @@ class Comment extends $pb.GeneratedMessage {
   void clearBody() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get createTime => $_getN(7);
+  $0.Timestamp get createTime => $_getN(7);
   @$pb.TagNumber(8)
-  set createTime($2.Timestamp value) => $_setField(8, value);
+  set createTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasCreateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearCreateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureCreateTime() => $_ensure(7);
+  $0.Timestamp ensureCreateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  $2.Timestamp get updateTime => $_getN(8);
+  $0.Timestamp get updateTime => $_getN(8);
   @$pb.TagNumber(9)
-  set updateTime($2.Timestamp value) => $_setField(9, value);
+  set updateTime($0.Timestamp value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasUpdateTime() => $_has(8);
   @$pb.TagNumber(9)
   void clearUpdateTime() => $_clearField(9);
   @$pb.TagNumber(9)
-  $2.Timestamp ensureUpdateTime() => $_ensure(8);
+  $0.Timestamp ensureUpdateTime() => $_ensure(8);
 
   @$pb.TagNumber(10)
   $fixnum.Int64 get likeCount => $_getI64(9);
@@ -735,7 +1041,8 @@ class Comment extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearViewerCanDelete() => $_clearField(15);
 
-  /// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
+  /// 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false），
+  /// 而且這篇貼文公開可讀（回覆經 CreateComment，只寫得進公開可讀的貼文；草稿或已下架的貼文是 false）。
   @$pb.TagNumber(16)
   $core.bool get viewerCanReply => $_getBF(15);
   @$pb.TagNumber(16)
@@ -1467,8 +1774,8 @@ class SuggestTagsResponse extends $pb.GeneratedMessage {
 
 class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
   factory SuggestTrendingTagsRequest({
-    $2.Timestamp? startTime,
-    $2.Timestamp? endTime,
+    $0.Timestamp? startTime,
+    $0.Timestamp? endTime,
     $core.int? maxResults,
   }) {
     final result = SuggestTrendingTagsRequest._();
@@ -1492,10 +1799,10 @@ class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: SuggestTrendingTagsRequest.$_createMessage)
-    ..aOM<$2.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(1, _omitFieldNames ? '' : 'startTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'endTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aI(3, _omitFieldNames ? '' : 'maxResults')
     ..hasRequiredFields = false;
 
@@ -1528,27 +1835,27 @@ class SuggestTrendingTagsRequest extends $pb.GeneratedMessage {
 
   /// 時間窗的起點（含）；不設是 end_time 往前 30 天。
   @$pb.TagNumber(1)
-  $2.Timestamp get startTime => $_getN(0);
+  $0.Timestamp get startTime => $_getN(0);
   @$pb.TagNumber(1)
-  set startTime($2.Timestamp value) => $_setField(1, value);
+  set startTime($0.Timestamp value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStartTime() => $_has(0);
   @$pb.TagNumber(1)
   void clearStartTime() => $_clearField(1);
   @$pb.TagNumber(1)
-  $2.Timestamp ensureStartTime() => $_ensure(0);
+  $0.Timestamp ensureStartTime() => $_ensure(0);
 
   /// 時間窗的終點（不含）；不設是現在。
   @$pb.TagNumber(2)
-  $2.Timestamp get endTime => $_getN(1);
+  $0.Timestamp get endTime => $_getN(1);
   @$pb.TagNumber(2)
-  set endTime($2.Timestamp value) => $_setField(2, value);
+  set endTime($0.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasEndTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearEndTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.Timestamp ensureEndTime() => $_ensure(1);
+  $0.Timestamp ensureEndTime() => $_ensure(1);
 
   /// 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
   @$pb.TagNumber(3)
@@ -1700,8 +2007,8 @@ class ForumEntry extends $pb.GeneratedMessage {
     CommentState? state,
     Actor? author,
     $core.String? body,
-    $2.Timestamp? createTime,
-    $2.Timestamp? updateTime,
+    $0.Timestamp? createTime,
+    $0.Timestamp? updateTime,
     $fixnum.Int64? replyCount,
     $core.bool? isMine,
     $core.bool? viewerCanEdit,
@@ -1751,10 +2058,10 @@ class ForumEntry extends $pb.GeneratedMessage {
     ..aOM<Actor>(6, _omitFieldNames ? '' : 'author',
         subBuilder: Actor.$_createMessage)
     ..aOS(7, _omitFieldNames ? '' : 'body')
-    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$2.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(8, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(9, _omitFieldNames ? '' : 'updateTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..aInt64(10, _omitFieldNames ? '' : 'replyCount')
     ..aOB(11, _omitFieldNames ? '' : 'isMine')
     ..aOB(12, _omitFieldNames ? '' : 'viewerCanEdit')
@@ -1853,26 +2160,26 @@ class ForumEntry extends $pb.GeneratedMessage {
   void clearBody() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $2.Timestamp get createTime => $_getN(7);
+  $0.Timestamp get createTime => $_getN(7);
   @$pb.TagNumber(8)
-  set createTime($2.Timestamp value) => $_setField(8, value);
+  set createTime($0.Timestamp value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasCreateTime() => $_has(7);
   @$pb.TagNumber(8)
   void clearCreateTime() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Timestamp ensureCreateTime() => $_ensure(7);
+  $0.Timestamp ensureCreateTime() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  $2.Timestamp get updateTime => $_getN(8);
+  $0.Timestamp get updateTime => $_getN(8);
   @$pb.TagNumber(9)
-  set updateTime($2.Timestamp value) => $_setField(9, value);
+  set updateTime($0.Timestamp value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasUpdateTime() => $_has(8);
   @$pb.TagNumber(9)
   void clearUpdateTime() => $_clearField(9);
   @$pb.TagNumber(9)
-  $2.Timestamp ensureUpdateTime() => $_ensure(8);
+  $0.Timestamp ensureUpdateTime() => $_ensure(8);
 
   @$pb.TagNumber(10)
   $fixnum.Int64 get replyCount => $_getI64(9);
@@ -1913,7 +2220,8 @@ class ForumEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearViewerCanDelete() => $_clearField(13);
 
-  /// 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+  /// 觀看者能不能回覆：VISIBLE，而且討論區對觀看者可寫（店家可曝光、觀看者沒有被這家店封鎖；訪客是 false；店主讀自己的討論區在店家可曝光時是 true）。
+  /// 與 ListForumEntriesResponse.viewer_can_comment 同一個判斷。顯示用的提示，寫入時伺服器仍會檢查。
   @$pb.TagNumber(14)
   $core.bool get viewerCanReply => $_getBF(13);
   @$pb.TagNumber(14)
@@ -2037,10 +2345,14 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   factory ListForumEntriesResponse({
     $core.Iterable<ForumEntry>? entries,
     $core.String? nextPageToken,
+    Actor? viewerActor,
+    $core.bool? viewerCanComment,
   }) {
     final result = ListForumEntriesResponse._();
     if (entries != null) result.entries.addAll(entries);
     if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (viewerCanComment != null) result.viewerCanComment = viewerCanComment;
     return result;
   }
 
@@ -2061,6 +2373,9 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
     ..pPM<ForumEntry>(1, _omitFieldNames ? '' : 'entries',
         subBuilder: ForumEntry.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..aOM<Actor>(3, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOB(4, _omitFieldNames ? '' : 'viewerCanComment')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2099,6 +2414,232 @@ class ListForumEntriesResponse extends $pb.GeneratedMessage {
   $core.bool hasNextPageToken() => $_has(1);
   @$pb.TagNumber(2)
   void clearNextPageToken() => $_clearField(2);
+
+  /// 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
+  /// 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
+  @$pb.TagNumber(3)
+  Actor get viewerActor => $_getN(2);
+  @$pb.TagNumber(3)
+  set viewerActor(Actor value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasViewerActor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearViewerActor() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Actor ensureViewerActor() => $_ensure(2);
+
+  /// 觀看者能不能在這家店的討論區新增頂層留言：討論區要可寫（店家可曝光，與 CreateForumEntry 的前置檢查同一個判斷），而且買家沒有被這家店封鎖或這就是觀看者此刻的店（訪客是 false）。
+  /// 店家不可曝光時店主也是 false。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  /// 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
+  @$pb.TagNumber(4)
+  $core.bool get viewerCanComment => $_getBF(3);
+  @$pb.TagNumber(4)
+  set viewerCanComment($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewerCanComment() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewerCanComment() => $_clearField(4);
+}
+
+class GetForumThreadRequest extends $pb.GeneratedMessage {
+  factory GetForumThreadRequest({
+    $core.String? storeId,
+    $core.String? threadId,
+    $core.int? pageSize,
+  }) {
+    final result = GetForumThreadRequest._();
+    if (storeId != null) result.storeId = storeId;
+    if (threadId != null) result.threadId = threadId;
+    if (pageSize != null) result.pageSize = pageSize;
+    return result;
+  }
+
+  GetForumThreadRequest._();
+
+  factory GetForumThreadRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadRequest()..mergeFromBuffer(data, registry);
+  factory GetForumThreadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetForumThreadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetForumThreadRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOS(2, _omitFieldNames ? '' : 'threadId')
+    ..aI(3, _omitFieldNames ? '' : 'pageSize')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadRequest copyWith(
+          void Function(GetForumThreadRequest) updates) =>
+      super.copyWith((message) => updates(message as GetForumThreadRequest))
+          as GetForumThreadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetForumThreadRequest() / GetForumThreadRequest.new instead')
+  static GetForumThreadRequest create() => GetForumThreadRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetForumThreadRequest._();
+  @$core.override
+  GetForumThreadRequest createEmptyInstance() => GetForumThreadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetForumThreadRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetForumThreadRequest>(
+          GetForumThreadRequest.$_createMessage);
+  static GetForumThreadRequest? _defaultInstance;
+
+  /// 店家 ID。
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
+  /// 討論串 ID，即頂層留言的 ID。
+  @$pb.TagNumber(2)
+  $core.String get threadId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set threadId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasThreadId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearThreadId() => $_clearField(2);
+
+  /// 回覆第一頁的大小，預設 20，上限 50。
+  @$pb.TagNumber(3)
+  $core.int get pageSize => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set pageSize($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPageSize() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPageSize() => $_clearField(3);
+}
+
+class GetForumThreadResponse extends $pb.GeneratedMessage {
+  factory GetForumThreadResponse({
+    ForumEntry? entry,
+    $core.Iterable<ForumEntry>? replies,
+    $core.String? nextPageToken,
+    Actor? viewerActor,
+    $core.bool? viewerCanComment,
+  }) {
+    final result = GetForumThreadResponse._();
+    if (entry != null) result.entry = entry;
+    if (replies != null) result.replies.addAll(replies);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (viewerActor != null) result.viewerActor = viewerActor;
+    if (viewerCanComment != null) result.viewerCanComment = viewerCanComment;
+    return result;
+  }
+
+  GetForumThreadResponse._();
+
+  factory GetForumThreadResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadResponse()..mergeFromBuffer(data, registry);
+  factory GetForumThreadResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetForumThreadResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetForumThreadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetForumThreadResponse.$_createMessage)
+    ..aOM<ForumEntry>(1, _omitFieldNames ? '' : 'entry',
+        subBuilder: ForumEntry.$_createMessage)
+    ..pPM<ForumEntry>(2, _omitFieldNames ? '' : 'replies',
+        subBuilder: ForumEntry.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'nextPageToken')
+    ..aOM<Actor>(4, _omitFieldNames ? '' : 'viewerActor',
+        subBuilder: Actor.$_createMessage)
+    ..aOB(5, _omitFieldNames ? '' : 'viewerCanComment')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetForumThreadResponse copyWith(
+          void Function(GetForumThreadResponse) updates) =>
+      super.copyWith((message) => updates(message as GetForumThreadResponse))
+          as GetForumThreadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetForumThreadResponse() / GetForumThreadResponse.new instead')
+  static GetForumThreadResponse create() => GetForumThreadResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetForumThreadResponse._();
+  @$core.override
+  GetForumThreadResponse createEmptyInstance() => GetForumThreadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetForumThreadResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetForumThreadResponse>(
+          GetForumThreadResponse.$_createMessage);
+  static GetForumThreadResponse? _defaultInstance;
+
+  /// 討論串的頂層項目。
+  @$pb.TagNumber(1)
+  ForumEntry get entry => $_getN(0);
+  @$pb.TagNumber(1)
+  set entry(ForumEntry value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEntry() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEntry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ForumEntry ensureEntry() => $_ensure(0);
+
+  /// 回覆的第一頁，依建立時間舊到新。
+  @$pb.TagNumber(2)
+  $pb.PbList<ForumEntry> get replies => $_getList(1);
+
+  /// 還有下一頁時設；只能交給 ListForumEntries（同一組 store_id、parent_id = thread_id）。
+  @$pb.TagNumber(3)
+  $core.String get nextPageToken => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set nextPageToken($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNextPageToken() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNextPageToken() => $_clearField(3);
+
+  /// 同 ListForumEntriesResponse.viewer_actor。
+  @$pb.TagNumber(4)
+  Actor get viewerActor => $_getN(3);
+  @$pb.TagNumber(4)
+  set viewerActor(Actor value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewerActor() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewerActor() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Actor ensureViewerActor() => $_ensure(3);
+
+  /// 同 ListForumEntriesResponse.viewer_can_comment。
+  @$pb.TagNumber(5)
+  $core.bool get viewerCanComment => $_getBF(4);
+  @$pb.TagNumber(5)
+  set viewerCanComment($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasViewerCanComment() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearViewerCanComment() => $_clearField(5);
 }
 
 class RecordPostViewRequest extends $pb.GeneratedMessage {
@@ -4567,7 +5108,7 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
   factory SchedulePostRequest({
     $core.String? postId,
     $core.String? etag,
-    $2.Timestamp? publishTime,
+    $0.Timestamp? publishTime,
   }) {
     final result = SchedulePostRequest._();
     if (postId != null) result.postId = postId;
@@ -4592,8 +5133,8 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
       createEmptyInstance: SchedulePostRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'postId')
     ..aOS(2, _omitFieldNames ? '' : 'etag')
-    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4641,21 +5182,21 @@ class SchedulePostRequest extends $pb.GeneratedMessage {
 
   /// 發布的時間點，距現在 5 分鐘到 90 天。
   @$pb.TagNumber(3)
-  $2.Timestamp get publishTime => $_getN(2);
+  $0.Timestamp get publishTime => $_getN(2);
   @$pb.TagNumber(3)
-  set publishTime($2.Timestamp value) => $_setField(3, value);
+  set publishTime($0.Timestamp value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasPublishTime() => $_has(2);
   @$pb.TagNumber(3)
   void clearPublishTime() => $_clearField(3);
   @$pb.TagNumber(3)
-  $2.Timestamp ensurePublishTime() => $_ensure(2);
+  $0.Timestamp ensurePublishTime() => $_ensure(2);
 }
 
 class SchedulePostResponse extends $pb.GeneratedMessage {
   factory SchedulePostResponse({
     Post? post,
-    $2.Timestamp? publishTime,
+    $0.Timestamp? publishTime,
   }) {
     final result = SchedulePostResponse._();
     if (post != null) result.post = post;
@@ -4679,8 +5220,8 @@ class SchedulePostResponse extends $pb.GeneratedMessage {
       createEmptyInstance: SchedulePostResponse.$_createMessage)
     ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
         subBuilder: Post.$_createMessage)
-    ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'publishTime',
-        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4720,15 +5261,303 @@ class SchedulePostResponse extends $pb.GeneratedMessage {
 
   /// 排定的發布時間。
   @$pb.TagNumber(2)
-  $2.Timestamp get publishTime => $_getN(1);
+  $0.Timestamp get publishTime => $_getN(1);
   @$pb.TagNumber(2)
-  set publishTime($2.Timestamp value) => $_setField(2, value);
+  set publishTime($0.Timestamp value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasPublishTime() => $_has(1);
   @$pb.TagNumber(2)
   void clearPublishTime() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.Timestamp ensurePublishTime() => $_ensure(1);
+  $0.Timestamp ensurePublishTime() => $_ensure(1);
+}
+
+class ListPendingSchedulesRequest extends $pb.GeneratedMessage {
+  factory ListPendingSchedulesRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListPendingSchedulesRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListPendingSchedulesRequest._();
+
+  factory ListPendingSchedulesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesRequest()..mergeFromBuffer(data, registry);
+  factory ListPendingSchedulesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListPendingSchedulesRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListPendingSchedulesRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesRequest copyWith(
+          void Function(ListPendingSchedulesRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListPendingSchedulesRequest))
+          as ListPendingSchedulesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListPendingSchedulesRequest() / ListPendingSchedulesRequest.new instead')
+  static ListPendingSchedulesRequest create() =>
+      ListPendingSchedulesRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListPendingSchedulesRequest._();
+  @$core.override
+  ListPendingSchedulesRequest createEmptyInstance() =>
+      ListPendingSchedulesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListPendingSchedulesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListPendingSchedulesRequest>(
+          ListPendingSchedulesRequest.$_createMessage);
+  static ListPendingSchedulesRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListPendingSchedulesResponse extends $pb.GeneratedMessage {
+  factory ListPendingSchedulesResponse({
+    $core.Iterable<PostSchedule>? schedules,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListPendingSchedulesResponse._();
+    if (schedules != null) result.schedules.addAll(schedules);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListPendingSchedulesResponse._();
+
+  factory ListPendingSchedulesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesResponse()..mergeFromBuffer(data, registry);
+  factory ListPendingSchedulesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPendingSchedulesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListPendingSchedulesResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListPendingSchedulesResponse.$_createMessage)
+    ..pPM<PostSchedule>(1, _omitFieldNames ? '' : 'schedules',
+        subBuilder: PostSchedule.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPendingSchedulesResponse copyWith(
+          void Function(ListPendingSchedulesResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListPendingSchedulesResponse))
+          as ListPendingSchedulesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListPendingSchedulesResponse() / ListPendingSchedulesResponse.new instead')
+  static ListPendingSchedulesResponse create() =>
+      ListPendingSchedulesResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListPendingSchedulesResponse._();
+  @$core.override
+  ListPendingSchedulesResponse createEmptyInstance() =>
+      ListPendingSchedulesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListPendingSchedulesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListPendingSchedulesResponse>(
+          ListPendingSchedulesResponse.$_createMessage);
+  static ListPendingSchedulesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PostSchedule> get schedules => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class CancelPostScheduleRequest extends $pb.GeneratedMessage {
+  factory CancelPostScheduleRequest({
+    $core.String? postId,
+    $core.String? etag,
+  }) {
+    final result = CancelPostScheduleRequest._();
+    if (postId != null) result.postId = postId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  CancelPostScheduleRequest._();
+
+  factory CancelPostScheduleRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleRequest()..mergeFromBuffer(data, registry);
+  factory CancelPostScheduleRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CancelPostScheduleRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CancelPostScheduleRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleRequest copyWith(
+          void Function(CancelPostScheduleRequest) updates) =>
+      super.copyWith((message) => updates(message as CancelPostScheduleRequest))
+          as CancelPostScheduleRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CancelPostScheduleRequest() / CancelPostScheduleRequest.new instead')
+  static CancelPostScheduleRequest create() => CancelPostScheduleRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CancelPostScheduleRequest._();
+  @$core.override
+  CancelPostScheduleRequest createEmptyInstance() =>
+      CancelPostScheduleRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CancelPostScheduleRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CancelPostScheduleRequest>(
+          CancelPostScheduleRequest.$_createMessage);
+  static CancelPostScheduleRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
+}
+
+class CancelPostScheduleResponse extends $pb.GeneratedMessage {
+  factory CancelPostScheduleResponse({
+    $core.String? etag,
+  }) {
+    final result = CancelPostScheduleResponse._();
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  CancelPostScheduleResponse._();
+
+  factory CancelPostScheduleResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleResponse()..mergeFromBuffer(data, registry);
+  factory CancelPostScheduleResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CancelPostScheduleResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CancelPostScheduleResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CancelPostScheduleResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CancelPostScheduleResponse copyWith(
+          void Function(CancelPostScheduleResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as CancelPostScheduleResponse))
+          as CancelPostScheduleResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CancelPostScheduleResponse() / CancelPostScheduleResponse.new instead')
+  static CancelPostScheduleResponse create() => CancelPostScheduleResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CancelPostScheduleResponse._();
+  @$core.override
+  CancelPostScheduleResponse createEmptyInstance() =>
+      CancelPostScheduleResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CancelPostScheduleResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CancelPostScheduleResponse>(
+          CancelPostScheduleResponse.$_createMessage);
+  static CancelPostScheduleResponse? _defaultInstance;
+
+  /// 取消後貼文的 etag。
+  @$pb.TagNumber(1)
+  $core.String get etag => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set etag($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEtag() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEtag() => $_clearField(1);
 }
 
 class ListStoreCommentsRequest extends $pb.GeneratedMessage {
@@ -4948,6 +5777,149 @@ class GetStoreSocialSummaryRequest extends $pb.GeneratedMessage {
   static GetStoreSocialSummaryRequest? _defaultInstance;
 }
 
+/// SocialDelegatedServiceGetStoreSocialSummaryRequest 沒有欄位：店家由代行 session 決定。
+class SocialDelegatedServiceGetStoreSocialSummaryRequest
+    extends $pb.GeneratedMessage {
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+
+  SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest()
+        ..mergeFromBuffer(data, registry);
+  factory SocialDelegatedServiceGetStoreSocialSummaryRequest.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames
+          ? ''
+          : 'SocialDelegatedServiceGetStoreSocialSummaryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance:
+          SocialDelegatedServiceGetStoreSocialSummaryRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryRequest copyWith(
+          void Function(SocialDelegatedServiceGetStoreSocialSummaryRequest)
+              updates) =>
+      super.copyWith((message) => updates(
+              message as SocialDelegatedServiceGetStoreSocialSummaryRequest))
+          as SocialDelegatedServiceGetStoreSocialSummaryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SocialDelegatedServiceGetStoreSocialSummaryRequest() / SocialDelegatedServiceGetStoreSocialSummaryRequest.new instead')
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest create() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  @$core.override
+  SocialDelegatedServiceGetStoreSocialSummaryRequest createEmptyInstance() =>
+      SocialDelegatedServiceGetStoreSocialSummaryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              SocialDelegatedServiceGetStoreSocialSummaryRequest>(
+          SocialDelegatedServiceGetStoreSocialSummaryRequest.$_createMessage);
+  static SocialDelegatedServiceGetStoreSocialSummaryRequest? _defaultInstance;
+}
+
+/// SocialDelegatedServiceGetStoreSocialSummaryResponse 與 GetStoreSocialSummaryResponse 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）。
+class SocialDelegatedServiceGetStoreSocialSummaryResponse
+    extends $pb.GeneratedMessage {
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse({
+    $core.Iterable<PostStatusCount>? postCounts,
+    $fixnum.Int64? scheduledPostCount,
+  }) {
+    final result = SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+    if (postCounts != null) result.postCounts.addAll(postCounts);
+    if (scheduledPostCount != null)
+      result.scheduledPostCount = scheduledPostCount;
+    return result;
+  }
+
+  SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse()
+        ..mergeFromBuffer(data, registry);
+  factory SocialDelegatedServiceGetStoreSocialSummaryResponse.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames
+          ? ''
+          : 'SocialDelegatedServiceGetStoreSocialSummaryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance:
+          SocialDelegatedServiceGetStoreSocialSummaryResponse.$_createMessage)
+    ..pPM<PostStatusCount>(1, _omitFieldNames ? '' : 'postCounts',
+        subBuilder: PostStatusCount.$_createMessage)
+    ..aInt64(2, _omitFieldNames ? '' : 'scheduledPostCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SocialDelegatedServiceGetStoreSocialSummaryResponse copyWith(
+          void Function(SocialDelegatedServiceGetStoreSocialSummaryResponse)
+              updates) =>
+      super.copyWith((message) => updates(
+              message as SocialDelegatedServiceGetStoreSocialSummaryResponse))
+          as SocialDelegatedServiceGetStoreSocialSummaryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SocialDelegatedServiceGetStoreSocialSummaryResponse() / SocialDelegatedServiceGetStoreSocialSummaryResponse.new instead')
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse create() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  @$core.override
+  SocialDelegatedServiceGetStoreSocialSummaryResponse createEmptyInstance() =>
+      SocialDelegatedServiceGetStoreSocialSummaryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              SocialDelegatedServiceGetStoreSocialSummaryResponse>(
+          SocialDelegatedServiceGetStoreSocialSummaryResponse.$_createMessage);
+  static SocialDelegatedServiceGetStoreSocialSummaryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PostStatusCount> get postCounts => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get scheduledPostCount => $_getI64(1);
+  @$pb.TagNumber(2)
+  set scheduledPostCount($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasScheduledPostCount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearScheduledPostCount() => $_clearField(2);
+}
+
 class GetStoreSocialSummaryResponse extends $pb.GeneratedMessage {
   factory GetStoreSocialSummaryResponse({
     $core.Iterable<PostStatusCount>? postCounts,
@@ -5094,20 +6066,1850 @@ class PostStatusCount extends $pb.GeneratedMessage {
   void clearCount() => $_clearField(2);
 }
 
+/// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
+class DelegatedOperation extends $pb.GeneratedMessage {
+  factory DelegatedOperation({
+    $core.String? requestId,
+    $core.String? operationReason,
+    $core.bool? notifySeller,
+  }) {
+    final result = DelegatedOperation._();
+    if (requestId != null) result.requestId = requestId;
+    if (operationReason != null) result.operationReason = operationReason;
+    if (notifySeller != null) result.notifySeller = notifySeller;
+    return result;
+  }
+
+  DelegatedOperation._();
+
+  factory DelegatedOperation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DelegatedOperation()..mergeFromBuffer(data, registry);
+  factory DelegatedOperation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DelegatedOperation()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DelegatedOperation',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: DelegatedOperation.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'operationReason')
+    ..aOB(3, _omitFieldNames ? '' : 'notifySeller')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DelegatedOperation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DelegatedOperation copyWith(void Function(DelegatedOperation) updates) =>
+      super.copyWith((message) => updates(message as DelegatedOperation))
+          as DelegatedOperation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DelegatedOperation() / DelegatedOperation.new instead')
+  static DelegatedOperation create() => DelegatedOperation._();
+  static $pb.GeneratedMessage $_createMessage() => DelegatedOperation._();
+  @$core.override
+  DelegatedOperation createEmptyInstance() => DelegatedOperation._();
+  @$core.pragma('dart2js:noInline')
+  static DelegatedOperation getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DelegatedOperation>(
+          DelegatedOperation.$_createMessage);
+  static DelegatedOperation? _defaultInstance;
+
+  /// UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  /// 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
+  @$pb.TagNumber(2)
+  $core.String get operationReason => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set operationReason($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOperationReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOperationReason() => $_clearField(2);
+
+  /// 是否在完成後通知店主；不設是通知。
+  @$pb.TagNumber(3)
+  $core.bool get notifySeller => $_getBF(2);
+  @$pb.TagNumber(3)
+  set notifySeller($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNotifySeller() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNotifySeller() => $_clearField(3);
+}
+
+class ListStorePostsRequest extends $pb.GeneratedMessage {
+  factory ListStorePostsRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+    PostStatus? status,
+  }) {
+    final result = ListStorePostsRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  ListStorePostsRequest._();
+
+  factory ListStorePostsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStorePostsRequest()..mergeFromBuffer(data, registry);
+  factory ListStorePostsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStorePostsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListStorePostsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListStorePostsRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..aE<PostStatus>(3, _omitFieldNames ? '' : 'status',
+        enumValues: PostStatus.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStorePostsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStorePostsRequest copyWith(
+          void Function(ListStorePostsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListStorePostsRequest))
+          as ListStorePostsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListStorePostsRequest() / ListStorePostsRequest.new instead')
+  static ListStorePostsRequest create() => ListStorePostsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListStorePostsRequest._();
+  @$core.override
+  ListStorePostsRequest createEmptyInstance() => ListStorePostsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListStorePostsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListStorePostsRequest>(
+          ListStorePostsRequest.$_createMessage);
+  static ListStorePostsRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+
+  /// 只列這個狀態的貼文；不設（UNSPECIFIED）是全部。page_token 只能用在同一個 status。
+  @$pb.TagNumber(3)
+  PostStatus get status => $_getN(2);
+  @$pb.TagNumber(3)
+  set status(PostStatus value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatus() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStatus() => $_clearField(3);
+}
+
+class ListStorePostsResponse extends $pb.GeneratedMessage {
+  factory ListStorePostsResponse({
+    $core.Iterable<Post>? posts,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListStorePostsResponse._();
+    if (posts != null) result.posts.addAll(posts);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListStorePostsResponse._();
+
+  factory ListStorePostsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStorePostsResponse()..mergeFromBuffer(data, registry);
+  factory ListStorePostsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStorePostsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListStorePostsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListStorePostsResponse.$_createMessage)
+    ..pPM<Post>(1, _omitFieldNames ? '' : 'posts',
+        subBuilder: Post.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStorePostsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStorePostsResponse copyWith(
+          void Function(ListStorePostsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListStorePostsResponse))
+          as ListStorePostsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListStorePostsResponse() / ListStorePostsResponse.new instead')
+  static ListStorePostsResponse create() => ListStorePostsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListStorePostsResponse._();
+  @$core.override
+  ListStorePostsResponse createEmptyInstance() => ListStorePostsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListStorePostsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListStorePostsResponse>(
+          ListStorePostsResponse.$_createMessage);
+  static ListStorePostsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<Post> get posts => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class GetStorePostRequest extends $pb.GeneratedMessage {
+  factory GetStorePostRequest({
+    $core.String? postId,
+  }) {
+    final result = GetStorePostRequest._();
+    if (postId != null) result.postId = postId;
+    return result;
+  }
+
+  GetStorePostRequest._();
+
+  factory GetStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStorePostRequest()..mergeFromBuffer(data, registry);
+  factory GetStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetStorePostRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'postId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStorePostRequest copyWith(void Function(GetStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as GetStorePostRequest))
+          as GetStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use GetStorePostRequest() / GetStorePostRequest.new instead')
+  static GetStorePostRequest create() => GetStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetStorePostRequest._();
+  @$core.override
+  GetStorePostRequest createEmptyInstance() => GetStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetStorePostRequest>(
+          GetStorePostRequest.$_createMessage);
+  static GetStorePostRequest? _defaultInstance;
+
+  /// 貼文 ID。
+  @$pb.TagNumber(1)
+  $core.String get postId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set postId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPostId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPostId() => $_clearField(1);
+}
+
+class GetStorePostResponse extends $pb.GeneratedMessage {
+  factory GetStorePostResponse({
+    Post? post,
+  }) {
+    final result = GetStorePostResponse._();
+    if (post != null) result.post = post;
+    return result;
+  }
+
+  GetStorePostResponse._();
+
+  factory GetStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStorePostResponse()..mergeFromBuffer(data, registry);
+  factory GetStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: GetStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStorePostResponse copyWith(void Function(GetStorePostResponse) updates) =>
+      super.copyWith((message) => updates(message as GetStorePostResponse))
+          as GetStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetStorePostResponse() / GetStorePostResponse.new instead')
+  static GetStorePostResponse create() => GetStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetStorePostResponse._();
+  @$core.override
+  GetStorePostResponse createEmptyInstance() => GetStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetStorePostResponse>(
+          GetStorePostResponse.$_createMessage);
+  static GetStorePostResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+}
+
+class CreateStorePostRequest extends $pb.GeneratedMessage {
+  factory CreateStorePostRequest({
+    DelegatedOperation? operation,
+    $core.String? body,
+    $core.String? imageStagedToken,
+    $core.String? productId,
+    $core.Iterable<$core.String>? hashtagInputs,
+  }) {
+    final result = CreateStorePostRequest._();
+    if (operation != null) result.operation = operation;
+    if (body != null) result.body = body;
+    if (imageStagedToken != null) result.imageStagedToken = imageStagedToken;
+    if (productId != null) result.productId = productId;
+    if (hashtagInputs != null) result.hashtagInputs.addAll(hashtagInputs);
+    return result;
+  }
+
+  CreateStorePostRequest._();
+
+  factory CreateStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStorePostRequest()..mergeFromBuffer(data, registry);
+  factory CreateStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateStorePostRequest.$_createMessage)
+    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..aOS(3, _omitFieldNames ? '' : 'imageStagedToken')
+    ..aOS(4, _omitFieldNames ? '' : 'productId')
+    ..pPS(5, _omitFieldNames ? '' : 'hashtagInputs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStorePostRequest copyWith(
+          void Function(CreateStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateStorePostRequest))
+          as CreateStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateStorePostRequest() / CreateStorePostRequest.new instead')
+  static CreateStorePostRequest create() => CreateStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreateStorePostRequest._();
+  @$core.override
+  CreateStorePostRequest createEmptyInstance() => CreateStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateStorePostRequest>(
+          CreateStorePostRequest.$_createMessage);
+  static CreateStorePostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation(DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+
+  /// 圖片的 staged token（media 上傳完成後拿到的）。
+  @$pb.TagNumber(3)
+  $core.String get imageStagedToken => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set imageStagedToken($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasImageStagedToken() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearImageStagedToken() => $_clearField(3);
+
+  /// 貼文帶的商品 ID；商品要存在、上架中而且屬於這家店。
+  @$pb.TagNumber(4)
+  $core.String get productId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set productId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProductId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProductId() => $_clearField(4);
+
+  /// 標籤（使用者輸入的樣子，可帶開頭的 #）。
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.String> get hashtagInputs => $_getList(4);
+}
+
+class CreateStorePostResponse extends $pb.GeneratedMessage {
+  factory CreateStorePostResponse({
+    Post? post,
+    $core.String? auditLogId,
+  }) {
+    final result = CreateStorePostResponse._();
+    if (post != null) result.post = post;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  CreateStorePostResponse._();
+
+  factory CreateStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStorePostResponse()..mergeFromBuffer(data, registry);
+  factory CreateStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: CreateStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStorePostResponse copyWith(
+          void Function(CreateStorePostResponse) updates) =>
+      super.copyWith((message) => updates(message as CreateStorePostResponse))
+          as CreateStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateStorePostResponse() / CreateStorePostResponse.new instead')
+  static CreateStorePostResponse create() => CreateStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CreateStorePostResponse._();
+  @$core.override
+  CreateStorePostResponse createEmptyInstance() => CreateStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreateStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateStorePostResponse>(
+          CreateStorePostResponse.$_createMessage);
+  static CreateStorePostResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+
+  /// 這次寫入的稽核列 ID（重送時是第一次的）。
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class UpdateStorePostRequest extends $pb.GeneratedMessage {
+  factory UpdateStorePostRequest({
+    DelegatedOperation? operation,
+    Post? post,
+    $3.FieldMask? updateMask,
+  }) {
+    final result = UpdateStorePostRequest._();
+    if (operation != null) result.operation = operation;
+    if (post != null) result.post = post;
+    if (updateMask != null) result.updateMask = updateMask;
+    return result;
+  }
+
+  UpdateStorePostRequest._();
+
+  factory UpdateStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStorePostRequest()..mergeFromBuffer(data, registry);
+  factory UpdateStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateStorePostRequest.$_createMessage)
+    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<Post>(2, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOM<$3.FieldMask>(3, _omitFieldNames ? '' : 'updateMask',
+        subBuilder: $3.FieldMask.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStorePostRequest copyWith(
+          void Function(UpdateStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateStorePostRequest))
+          as UpdateStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateStorePostRequest() / UpdateStorePostRequest.new instead')
+  static UpdateStorePostRequest create() => UpdateStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateStorePostRequest._();
+  @$core.override
+  UpdateStorePostRequest createEmptyInstance() => UpdateStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateStorePostRequest>(
+          UpdateStorePostRequest.$_createMessage);
+  static UpdateStorePostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation(DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
+  @$pb.TagNumber(2)
+  Post get post => $_getN(1);
+  @$pb.TagNumber(2)
+  set post(Post value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPost() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPost() => $_clearField(2);
+  @$pb.TagNumber(2)
+  Post ensurePost() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $3.FieldMask get updateMask => $_getN(2);
+  @$pb.TagNumber(3)
+  set updateMask($3.FieldMask value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUpdateMask() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUpdateMask() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $3.FieldMask ensureUpdateMask() => $_ensure(2);
+}
+
+class UpdateStorePostResponse extends $pb.GeneratedMessage {
+  factory UpdateStorePostResponse({
+    Post? post,
+    $core.String? auditLogId,
+  }) {
+    final result = UpdateStorePostResponse._();
+    if (post != null) result.post = post;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  UpdateStorePostResponse._();
+
+  factory UpdateStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStorePostResponse()..mergeFromBuffer(data, registry);
+  factory UpdateStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UpdateStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStorePostResponse copyWith(
+          void Function(UpdateStorePostResponse) updates) =>
+      super.copyWith((message) => updates(message as UpdateStorePostResponse))
+          as UpdateStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateStorePostResponse() / UpdateStorePostResponse.new instead')
+  static UpdateStorePostResponse create() => UpdateStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateStorePostResponse._();
+  @$core.override
+  UpdateStorePostResponse createEmptyInstance() => UpdateStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateStorePostResponse>(
+          UpdateStorePostResponse.$_createMessage);
+  static UpdateStorePostResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class PublishStorePostRequest extends $pb.GeneratedMessage {
+  factory PublishStorePostRequest({
+    DelegatedOperation? operation,
+    $core.String? postId,
+    $core.String? etag,
+  }) {
+    final result = PublishStorePostRequest._();
+    if (operation != null) result.operation = operation;
+    if (postId != null) result.postId = postId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  PublishStorePostRequest._();
+
+  factory PublishStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStorePostRequest()..mergeFromBuffer(data, registry);
+  factory PublishStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PublishStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PublishStorePostRequest.$_createMessage)
+    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'postId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStorePostRequest copyWith(
+          void Function(PublishStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as PublishStorePostRequest))
+          as PublishStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PublishStorePostRequest() / PublishStorePostRequest.new instead')
+  static PublishStorePostRequest create() => PublishStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => PublishStorePostRequest._();
+  @$core.override
+  PublishStorePostRequest createEmptyInstance() => PublishStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PublishStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PublishStorePostRequest>(
+          PublishStorePostRequest.$_createMessage);
+  static PublishStorePostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation(DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 貼文 ID。
+  @$pb.TagNumber(2)
+  $core.String get postId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set postId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPostId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPostId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+}
+
+class PublishStorePostResponse extends $pb.GeneratedMessage {
+  factory PublishStorePostResponse({
+    Post? post,
+    $core.String? auditLogId,
+  }) {
+    final result = PublishStorePostResponse._();
+    if (post != null) result.post = post;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  PublishStorePostResponse._();
+
+  factory PublishStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStorePostResponse()..mergeFromBuffer(data, registry);
+  factory PublishStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PublishStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: PublishStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStorePostResponse copyWith(
+          void Function(PublishStorePostResponse) updates) =>
+      super.copyWith((message) => updates(message as PublishStorePostResponse))
+          as PublishStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PublishStorePostResponse() / PublishStorePostResponse.new instead')
+  static PublishStorePostResponse create() => PublishStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => PublishStorePostResponse._();
+  @$core.override
+  PublishStorePostResponse createEmptyInstance() =>
+      PublishStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static PublishStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PublishStorePostResponse>(
+          PublishStorePostResponse.$_createMessage);
+  static PublishStorePostResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class UnpublishStorePostRequest extends $pb.GeneratedMessage {
+  factory UnpublishStorePostRequest({
+    DelegatedOperation? operation,
+    $core.String? postId,
+    $core.String? etag,
+  }) {
+    final result = UnpublishStorePostRequest._();
+    if (operation != null) result.operation = operation;
+    if (postId != null) result.postId = postId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  UnpublishStorePostRequest._();
+
+  factory UnpublishStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStorePostRequest()..mergeFromBuffer(data, registry);
+  factory UnpublishStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnpublishStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnpublishStorePostRequest.$_createMessage)
+    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'postId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStorePostRequest copyWith(
+          void Function(UnpublishStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as UnpublishStorePostRequest))
+          as UnpublishStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnpublishStorePostRequest() / UnpublishStorePostRequest.new instead')
+  static UnpublishStorePostRequest create() => UnpublishStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UnpublishStorePostRequest._();
+  @$core.override
+  UnpublishStorePostRequest createEmptyInstance() =>
+      UnpublishStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnpublishStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnpublishStorePostRequest>(
+          UnpublishStorePostRequest.$_createMessage);
+  static UnpublishStorePostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation(DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 貼文 ID。
+  @$pb.TagNumber(2)
+  $core.String get postId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set postId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPostId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPostId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+}
+
+class UnpublishStorePostResponse extends $pb.GeneratedMessage {
+  factory UnpublishStorePostResponse({
+    Post? post,
+    $core.String? auditLogId,
+  }) {
+    final result = UnpublishStorePostResponse._();
+    if (post != null) result.post = post;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  UnpublishStorePostResponse._();
+
+  factory UnpublishStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStorePostResponse()..mergeFromBuffer(data, registry);
+  factory UnpublishStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnpublishStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: UnpublishStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStorePostResponse copyWith(
+          void Function(UnpublishStorePostResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as UnpublishStorePostResponse))
+          as UnpublishStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnpublishStorePostResponse() / UnpublishStorePostResponse.new instead')
+  static UnpublishStorePostResponse create() => UnpublishStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UnpublishStorePostResponse._();
+  @$core.override
+  UnpublishStorePostResponse createEmptyInstance() =>
+      UnpublishStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnpublishStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnpublishStorePostResponse>(
+          UnpublishStorePostResponse.$_createMessage);
+  static UnpublishStorePostResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class ScheduleStorePostRequest extends $pb.GeneratedMessage {
+  factory ScheduleStorePostRequest({
+    DelegatedOperation? operation,
+    $core.String? postId,
+    $core.String? etag,
+    $0.Timestamp? publishTime,
+  }) {
+    final result = ScheduleStorePostRequest._();
+    if (operation != null) result.operation = operation;
+    if (postId != null) result.postId = postId;
+    if (etag != null) result.etag = etag;
+    if (publishTime != null) result.publishTime = publishTime;
+    return result;
+  }
+
+  ScheduleStorePostRequest._();
+
+  factory ScheduleStorePostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ScheduleStorePostRequest()..mergeFromBuffer(data, registry);
+  factory ScheduleStorePostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ScheduleStorePostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ScheduleStorePostRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ScheduleStorePostRequest.$_createMessage)
+    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'postId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScheduleStorePostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScheduleStorePostRequest copyWith(
+          void Function(ScheduleStorePostRequest) updates) =>
+      super.copyWith((message) => updates(message as ScheduleStorePostRequest))
+          as ScheduleStorePostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ScheduleStorePostRequest() / ScheduleStorePostRequest.new instead')
+  static ScheduleStorePostRequest create() => ScheduleStorePostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ScheduleStorePostRequest._();
+  @$core.override
+  ScheduleStorePostRequest createEmptyInstance() =>
+      ScheduleStorePostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ScheduleStorePostRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ScheduleStorePostRequest>(
+          ScheduleStorePostRequest.$_createMessage);
+  static ScheduleStorePostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation(DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 貼文 ID。
+  @$pb.TagNumber(2)
+  $core.String get postId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set postId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPostId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPostId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+
+  /// 發布的時間點，距現在 5 分鐘到 90 天。
+  @$pb.TagNumber(4)
+  $0.Timestamp get publishTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set publishTime($0.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPublishTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPublishTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.Timestamp ensurePublishTime() => $_ensure(3);
+}
+
+class ScheduleStorePostResponse extends $pb.GeneratedMessage {
+  factory ScheduleStorePostResponse({
+    Post? post,
+    $0.Timestamp? publishTime,
+    $core.String? auditLogId,
+  }) {
+    final result = ScheduleStorePostResponse._();
+    if (post != null) result.post = post;
+    if (publishTime != null) result.publishTime = publishTime;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  ScheduleStorePostResponse._();
+
+  factory ScheduleStorePostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ScheduleStorePostResponse()..mergeFromBuffer(data, registry);
+  factory ScheduleStorePostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ScheduleStorePostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ScheduleStorePostResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ScheduleStorePostResponse.$_createMessage)
+    ..aOM<Post>(1, _omitFieldNames ? '' : 'post',
+        subBuilder: Post.$_createMessage)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'publishTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScheduleStorePostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScheduleStorePostResponse copyWith(
+          void Function(ScheduleStorePostResponse) updates) =>
+      super.copyWith((message) => updates(message as ScheduleStorePostResponse))
+          as ScheduleStorePostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ScheduleStorePostResponse() / ScheduleStorePostResponse.new instead')
+  static ScheduleStorePostResponse create() => ScheduleStorePostResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ScheduleStorePostResponse._();
+  @$core.override
+  ScheduleStorePostResponse createEmptyInstance() =>
+      ScheduleStorePostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ScheduleStorePostResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ScheduleStorePostResponse>(
+          ScheduleStorePostResponse.$_createMessage);
+  static ScheduleStorePostResponse? _defaultInstance;
+
+  /// 排程後的貼文（含新的 etag）。
+  @$pb.TagNumber(1)
+  Post get post => $_getN(0);
+  @$pb.TagNumber(1)
+  set post(Post value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPost() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Post ensurePost() => $_ensure(0);
+
+  /// 排定的發布時間。
+  @$pb.TagNumber(2)
+  $0.Timestamp get publishTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set publishTime($0.Timestamp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPublishTime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPublishTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $0.Timestamp ensurePublishTime() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.String get auditLogId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set auditLogId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAuditLogId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAuditLogId() => $_clearField(3);
+}
+
+class ListMySanctionsRequest extends $pb.GeneratedMessage {
+  factory ListMySanctionsRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListMySanctionsRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListMySanctionsRequest._();
+
+  factory ListMySanctionsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMySanctionsRequest()..mergeFromBuffer(data, registry);
+  factory ListMySanctionsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMySanctionsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMySanctionsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListMySanctionsRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMySanctionsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMySanctionsRequest copyWith(
+          void Function(ListMySanctionsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListMySanctionsRequest))
+          as ListMySanctionsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMySanctionsRequest() / ListMySanctionsRequest.new instead')
+  static ListMySanctionsRequest create() => ListMySanctionsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListMySanctionsRequest._();
+  @$core.override
+  ListMySanctionsRequest createEmptyInstance() => ListMySanctionsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListMySanctionsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMySanctionsRequest>(
+          ListMySanctionsRequest.$_createMessage);
+  static ListMySanctionsRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListMySanctionsResponse extends $pb.GeneratedMessage {
+  factory ListMySanctionsResponse({
+    $core.Iterable<Sanction>? sanctions,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListMySanctionsResponse._();
+    if (sanctions != null) result.sanctions.addAll(sanctions);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListMySanctionsResponse._();
+
+  factory ListMySanctionsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMySanctionsResponse()..mergeFromBuffer(data, registry);
+  factory ListMySanctionsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMySanctionsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMySanctionsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListMySanctionsResponse.$_createMessage)
+    ..pPM<Sanction>(1, _omitFieldNames ? '' : 'sanctions',
+        subBuilder: Sanction.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMySanctionsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMySanctionsResponse copyWith(
+          void Function(ListMySanctionsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListMySanctionsResponse))
+          as ListMySanctionsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMySanctionsResponse() / ListMySanctionsResponse.new instead')
+  static ListMySanctionsResponse create() => ListMySanctionsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListMySanctionsResponse._();
+  @$core.override
+  ListMySanctionsResponse createEmptyInstance() => ListMySanctionsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListMySanctionsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMySanctionsResponse>(
+          ListMySanctionsResponse.$_createMessage);
+  static ListMySanctionsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<Sanction> get sanctions => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+/// Sanction 是買家收到的一筆社群處分。
+class Sanction extends $pb.GeneratedMessage {
+  factory Sanction({
+    $core.String? id,
+    SanctionKind? kind,
+    $4.PolicyCategory? category,
+    $core.String? reason,
+    $0.Timestamp? createTime,
+  }) {
+    final result = Sanction._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (category != null) result.category = category;
+    if (reason != null) result.reason = reason;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  Sanction._();
+
+  factory Sanction.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Sanction()..mergeFromBuffer(data, registry);
+  factory Sanction.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Sanction()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Sanction',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: Sanction.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<SanctionKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: SanctionKind.values)
+    ..aE<$4.PolicyCategory>(3, _omitFieldNames ? '' : 'category',
+        enumValues: $4.PolicyCategory.values)
+    ..aOS(4, _omitFieldNames ? '' : 'reason')
+    ..aOM<$0.Timestamp>(5, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Sanction clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Sanction copyWith(void Function(Sanction) updates) =>
+      super.copyWith((message) => updates(message as Sanction)) as Sanction;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Sanction() / Sanction.new instead')
+  static Sanction create() => Sanction._();
+  static $pb.GeneratedMessage $_createMessage() => Sanction._();
+  @$core.override
+  Sanction createEmptyInstance() => Sanction._();
+  @$core.pragma('dart2js:noInline')
+  static Sanction getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Sanction>(Sanction.$_createMessage);
+  static Sanction? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  SanctionKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(SanctionKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  /// 政策分類；不設表示沒有對應的分類。
+  @$pb.TagNumber(3)
+  $4.PolicyCategory get category => $_getN(2);
+  @$pb.TagNumber(3)
+  set category($4.PolicyCategory value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCategory() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCategory() => $_clearField(3);
+
+  /// 給作者看的理由；沒有補充說明時是空字串。
+  @$pb.TagNumber(4)
+  $core.String get reason => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set reason($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasReason() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearReason() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $0.Timestamp get createTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set createTime($0.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCreateTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCreateTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $0.Timestamp ensureCreateTime() => $_ensure(4);
+}
+
+class ListMyHiddenContentRequest extends $pb.GeneratedMessage {
+  factory ListMyHiddenContentRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListMyHiddenContentRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListMyHiddenContentRequest._();
+
+  factory ListMyHiddenContentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyHiddenContentRequest()..mergeFromBuffer(data, registry);
+  factory ListMyHiddenContentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyHiddenContentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyHiddenContentRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListMyHiddenContentRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyHiddenContentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyHiddenContentRequest copyWith(
+          void Function(ListMyHiddenContentRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListMyHiddenContentRequest))
+          as ListMyHiddenContentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyHiddenContentRequest() / ListMyHiddenContentRequest.new instead')
+  static ListMyHiddenContentRequest create() => ListMyHiddenContentRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListMyHiddenContentRequest._();
+  @$core.override
+  ListMyHiddenContentRequest createEmptyInstance() =>
+      ListMyHiddenContentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyHiddenContentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyHiddenContentRequest>(
+          ListMyHiddenContentRequest.$_createMessage);
+  static ListMyHiddenContentRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListMyHiddenContentResponse extends $pb.GeneratedMessage {
+  factory ListMyHiddenContentResponse({
+    $core.Iterable<HiddenContent>? hiddenContents,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListMyHiddenContentResponse._();
+    if (hiddenContents != null) result.hiddenContents.addAll(hiddenContents);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListMyHiddenContentResponse._();
+
+  factory ListMyHiddenContentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyHiddenContentResponse()..mergeFromBuffer(data, registry);
+  factory ListMyHiddenContentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyHiddenContentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyHiddenContentResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: ListMyHiddenContentResponse.$_createMessage)
+    ..pPM<HiddenContent>(1, _omitFieldNames ? '' : 'hiddenContents',
+        subBuilder: HiddenContent.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyHiddenContentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyHiddenContentResponse copyWith(
+          void Function(ListMyHiddenContentResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListMyHiddenContentResponse))
+          as ListMyHiddenContentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyHiddenContentResponse() / ListMyHiddenContentResponse.new instead')
+  static ListMyHiddenContentResponse create() =>
+      ListMyHiddenContentResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListMyHiddenContentResponse._();
+  @$core.override
+  ListMyHiddenContentResponse createEmptyInstance() =>
+      ListMyHiddenContentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyHiddenContentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyHiddenContentResponse>(
+          ListMyHiddenContentResponse.$_createMessage);
+  static ListMyHiddenContentResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<HiddenContent> get hiddenContents => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+/// HiddenContent 是買家被隱藏的一則內容與隱藏的理由。
+class HiddenContent extends $pb.GeneratedMessage {
+  factory HiddenContent({
+    $core.String? id,
+    HiddenContentKind? kind,
+    $core.String? contentId,
+    $core.String? postId,
+    $core.String? storeId,
+    $core.String? body,
+    $0.Timestamp? createTime,
+    $4.PolicyCategory? category,
+    $core.String? reason,
+    $0.Timestamp? hideTime,
+  }) {
+    final result = HiddenContent._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (contentId != null) result.contentId = contentId;
+    if (postId != null) result.postId = postId;
+    if (storeId != null) result.storeId = storeId;
+    if (body != null) result.body = body;
+    if (createTime != null) result.createTime = createTime;
+    if (category != null) result.category = category;
+    if (reason != null) result.reason = reason;
+    if (hideTime != null) result.hideTime = hideTime;
+    return result;
+  }
+
+  HiddenContent._();
+
+  factory HiddenContent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HiddenContent()..mergeFromBuffer(data, registry);
+  factory HiddenContent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HiddenContent()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HiddenContent',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
+      createEmptyInstance: HiddenContent.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<HiddenContentKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: HiddenContentKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'contentId')
+    ..aOS(4, _omitFieldNames ? '' : 'postId')
+    ..aOS(5, _omitFieldNames ? '' : 'storeId')
+    ..aOS(6, _omitFieldNames ? '' : 'body')
+    ..aOM<$0.Timestamp>(7, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..aE<$4.PolicyCategory>(8, _omitFieldNames ? '' : 'category',
+        enumValues: $4.PolicyCategory.values)
+    ..aOS(9, _omitFieldNames ? '' : 'reason')
+    ..aOM<$0.Timestamp>(10, _omitFieldNames ? '' : 'hideTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HiddenContent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HiddenContent copyWith(void Function(HiddenContent) updates) =>
+      super.copyWith((message) => updates(message as HiddenContent))
+          as HiddenContent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use HiddenContent() / HiddenContent.new instead')
+  static HiddenContent create() => HiddenContent._();
+  static $pb.GeneratedMessage $_createMessage() => HiddenContent._();
+  @$core.override
+  HiddenContent createEmptyInstance() => HiddenContent._();
+  @$core.pragma('dart2js:noInline')
+  static HiddenContent getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HiddenContent>(
+          HiddenContent.$_createMessage);
+  static HiddenContent? _defaultInstance;
+
+  /// 隱藏紀錄的 ID。
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  HiddenContentKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(HiddenContentKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  /// 留言或討論區留言的 ID。
+  @$pb.TagNumber(3)
+  $core.String get contentId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set contentId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasContentId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearContentId() => $_clearField(3);
+
+  /// 留言所屬的貼文；討論區留言沒有。
+  @$pb.TagNumber(4)
+  $core.String get postId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set postId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPostId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPostId() => $_clearField(4);
+
+  /// 內容所屬的店家 ID（過渡期的十進位整數字串）；留言沒有時不設。
+  @$pb.TagNumber(5)
+  $core.String get storeId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set storeId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStoreId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStoreId() => $_clearField(5);
+
+  /// 被隱藏的本文，只有作者讀得到。
+  @$pb.TagNumber(6)
+  $core.String get body => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set body($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBody() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBody() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $0.Timestamp get createTime => $_getN(6);
+  @$pb.TagNumber(7)
+  set createTime($0.Timestamp value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCreateTime() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCreateTime() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $0.Timestamp ensureCreateTime() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $4.PolicyCategory get category => $_getN(7);
+  @$pb.TagNumber(8)
+  set category($4.PolicyCategory value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCategory() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCategory() => $_clearField(8);
+
+  /// 給作者看的理由；沒有補充說明時是空字串。
+  @$pb.TagNumber(9)
+  $core.String get reason => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set reason($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasReason() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearReason() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $0.Timestamp get hideTime => $_getN(9);
+  @$pb.TagNumber(10)
+  set hideTime($0.Timestamp value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasHideTime() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearHideTime() => $_clearField(10);
+  @$pb.TagNumber(10)
+  $0.Timestamp ensureHideTime() => $_ensure(9);
+}
+
 /// SocialPublicService 是任何人都能讀的貼文與留言，不需要登入。
 class SocialPublicServiceApi {
   final $pb.RpcClient _client;
 
   SocialPublicServiceApi(this._client);
 
-  /// GetPost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
+  /// GetStorePost 讀一篇觀看者可讀的貼文：已發布、沒有被下架或平台隱藏，而且店家不是被觀看者個人封鎖的。其他一律回 not_found，
   /// 不區分原因。店主讀自己店的貼文不套個人封鎖。這個方法不計瀏覽數，瀏覽由 RecordPostView 另外記錄。
   $async.Future<GetPostResponse> getPost(
           $pb.ClientContext? ctx, GetPostRequest request) =>
       _client.invoke<GetPostResponse>(
           ctx, 'SocialPublicService', 'GetPost', request, GetPostResponse());
 
-  /// ListPosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
+  /// ListStorePosts 列出觀看者可讀的貼文，依第一次發布的時間新到舊（同一時間以 ID 排序）。不帶篩選是全站動態牆，帶 store_id 是該店的貼文頁，
   /// 帶 hashtag 是該標籤的貼文頁；兩個篩選不能同時帶（invalid_argument）。
   /// 觀看者個人封鎖的店不出現在動態牆，過濾在分頁之前，所以一頁可以少於 page_size，結束只看 next_page_token。
   $async.Future<ListPostsResponse> listPosts(
@@ -5150,6 +7952,14 @@ class SocialPublicServiceApi {
           $pb.ClientContext? ctx, ListForumEntriesRequest request) =>
       _client.invoke<ListForumEntriesResponse>(ctx, 'SocialPublicService',
           'ListForumEntries', request, ListForumEntriesResponse());
+
+  /// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+  /// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+  /// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+  $async.Future<GetForumThreadResponse> getForumThread(
+          $pb.ClientContext? ctx, GetForumThreadRequest request) =>
+      _client.invoke<GetForumThreadResponse>(ctx, 'SocialPublicService',
+          'GetForumThread', request, GetForumThreadResponse());
 
   /// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
   /// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
@@ -5235,7 +8045,7 @@ class SocialAppServiceApi {
       _client.invoke<DeleteForumEntryResponse>(ctx, 'SocialAppService',
           'DeleteForumEntry', request, DeleteForumEntryResponse());
 
-  /// CreatePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
+  /// CreateStorePost 以呼叫者此刻的店建立貼文（店家由伺服器推導，請求不帶 store_id）。publish 為真時同一個動作發布，公開要件（恰好一張圖、內文必填）在轉為公開時驗證；
   /// 草稿可以不完整。帶 request_id 重送回第一次建立的貼文目前的樣子（狀態與計數是此刻的），不重複建立；內容不同回 invalid_argument。需要賣家能力 CAP_MARKETING。
   $async.Future<CreatePostResponse> createPost(
           $pb.ClientContext? ctx, CreatePostRequest request) =>
@@ -5255,20 +8065,20 @@ class SocialAppServiceApi {
       _client.invoke<ListMyPostsResponse>(ctx, 'SocialAppService',
           'ListMyPosts', request, ListMyPostsResponse());
 
-  /// UpdatePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
+  /// UpdateStorePost 修改自己的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。
   /// 已發布或有待發布排程的貼文被修改後仍要滿足公開要件。需要賣家能力 CAP_MARKETING。
   $async.Future<UpdatePostResponse> updatePost(
           $pb.ClientContext? ctx, UpdatePostRequest request) =>
       _client.invoke<UpdatePostResponse>(
           ctx, 'SocialAppService', 'UpdatePost', request, UpdatePostResponse());
 
-  /// PublishPost 發布草稿或下架的貼文；etag 必填。已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
+  /// PublishPost 發布草稿或下架的貼文；etag 必填。被內容下架的貼文一律回 failed_precondition，已經是已發布也一樣（授權、etag 必填與貼文歸屬的檢查先於下架檢查，下架檢查先於重複發布的冪等與 etag 比對，所以被下架的貼文帶過期的 etag 也是 failed_precondition）；沒被下架而已經是已發布時是冪等的 no-op（不檢查 etag、不改版本）。貼文沒有圖片或內文（不滿足公開要件）回 failed_precondition。需要賣家能力 CAP_MARKETING。
   $async.Future<PublishPostResponse> publishPost(
           $pb.ClientContext? ctx, PublishPostRequest request) =>
       _client.invoke<PublishPostResponse>(ctx, 'SocialAppService',
           'PublishPost', request, PublishPostResponse());
 
-  /// UnpublishPost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
+  /// UnpublishStorePost 下架已發布的貼文；etag 必填。已經下架的是冪等的 no-op；草稿沒有發布過，回 failed_precondition。收縮類動作，店家停權時仍可執行（CAP_CONTENT_CONTRACT）；帳號停權照動作性質擋寫入（ACCOUNT_SUSPENDED）。
   $async.Future<UnpublishPostResponse> unpublishPost(
           $pb.ClientContext? ctx, UnpublishPostRequest request) =>
       _client.invoke<UnpublishPostResponse>(ctx, 'SocialAppService',
@@ -5280,12 +8090,26 @@ class SocialAppServiceApi {
       _client.invoke<DeletePostResponse>(
           ctx, 'SocialAppService', 'DeletePost', request, DeletePostResponse());
 
-  /// SchedulePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
-  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消不在這個 service 的這一版。
+  /// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天，而且貼文要滿足公開要件（沒有圖片或內文回 failed_precondition）；貼文已有待發布的排程時，舊的被取代。etag 必填。
+  /// 需要賣家能力 CAP_MARKETING。排程的讀取與取消見 ListPendingSchedules、CancelPostSchedule。
   $async.Future<SchedulePostResponse> schedulePost(
           $pb.ClientContext? ctx, SchedulePostRequest request) =>
       _client.invoke<SchedulePostResponse>(ctx, 'SocialAppService',
           'SchedulePost', request, SchedulePostResponse());
+
+  /// ListPendingSchedules 列出呼叫者此刻的店待發布的排程（含店主自己排的與代行營運排的），發布時間早的在前（同一時間以 ID 排序）。店主看得到代行排的貼文並能取消（CancelPostSchedule）。
+  /// 只讀自己店的排程，店家由伺服器推導。
+  $async.Future<ListPendingSchedulesResponse> listPendingSchedules(
+          $pb.ClientContext? ctx, ListPendingSchedulesRequest request) =>
+      _client.invoke<ListPendingSchedulesResponse>(ctx, 'SocialAppService',
+          'ListPendingSchedules', request, ListPendingSchedulesResponse());
+
+  /// CancelPostSchedule 店主取消貼文待發布的排程（不分發起者；取消原因記為店主取消）；etag 必填，與目前版本不符回 aborted 與 VERSION_CONFLICT。貼文沒有待發布的排程時什麼都不做（不檢查 etag），回目前的 etag。
+  /// 貼文不是這家店的回 not_found。需要賣家能力 CAP_MARKETING。
+  $async.Future<CancelPostScheduleResponse> cancelPostSchedule(
+          $pb.ClientContext? ctx, CancelPostScheduleRequest request) =>
+      _client.invoke<CancelPostScheduleResponse>(ctx, 'SocialAppService',
+          'CancelPostSchedule', request, CancelPostScheduleResponse());
 
   /// ListStoreComments 列出呼叫者此刻的店所有貼文（含草稿與下架的貼文）的頂層留言，依建立時間舊到新；post_id 選填，設了只列那一篇。
   /// 刪除或隱藏而底下有可見回覆的頂層留言是佔位項目。unreplied 為真時只列「未回覆」的留言：本店貼文上、作者不是本店的頂層留言，沒有刪除、沒有被隱藏，
@@ -5301,6 +8125,91 @@ class SocialAppServiceApi {
           $pb.ClientContext? ctx, GetStoreSocialSummaryRequest request) =>
       _client.invoke<GetStoreSocialSummaryResponse>(ctx, 'SocialAppService',
           'GetStoreSocialSummary', request, GetStoreSocialSummaryResponse());
+
+  /// ListMySanctions 列出呼叫者（買家）收到的社群處分，新到舊：種類、政策分類與理由，作者有權讀自己的處分。停權的帳號也可以呼叫。
+  $async.Future<ListMySanctionsResponse> listMySanctions(
+          $pb.ClientContext? ctx, ListMySanctionsRequest request) =>
+      _client.invoke<ListMySanctionsResponse>(ctx, 'SocialAppService',
+          'ListMySanctions', request, ListMySanctionsResponse());
+
+  /// ListMyHiddenContent 列出呼叫者（買家）被平台隱藏的留言與討論區留言，新隱藏到舊：連同本文與隱藏的政策分類與理由（別人看不到被隱藏的內容）。
+  /// 已還原的隱藏不在名單裡。停權的帳號也可以呼叫。
+  $async.Future<ListMyHiddenContentResponse> listMyHiddenContent(
+          $pb.ClientContext? ctx, ListMyHiddenContentRequest request) =>
+      _client.invoke<ListMyHiddenContentResponse>(ctx, 'SocialAppService',
+          'ListMyHiddenContent', request, ListMyHiddenContentResponse());
+}
+
+/// SocialDelegatedService 是代行營運中的平台管理員讀寫代行店家的貼文：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+/// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。商品與訂單由各自模組的 `<模組>DelegatedService` 在 A10 提供。
+/// 回應一律不可快取（private, no-store）。
+///
+/// 能力（posts.read、posts.write、posts.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+/// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+///
+/// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+/// 成功的讀取不稽核。
+class SocialDelegatedServiceApi {
+  final $pb.RpcClient _client;
+
+  SocialDelegatedServiceApi(this._client);
+
+  /// GetStoreSocialSummary 是代行工作區的動態數：代行店家的貼文依狀態的篇數（已刪除的不算），以及待發布排程的篇數；內容與 SocialAppService.GetStoreSocialSummary 相同，
+  /// 目標店家是 session 綁定的那一家。需要能力 posts.read。
+  $async.Future<SocialDelegatedServiceGetStoreSocialSummaryResponse>
+      getStoreSocialSummary($pb.ClientContext? ctx,
+              SocialDelegatedServiceGetStoreSocialSummaryRequest request) =>
+          _client.invoke<SocialDelegatedServiceGetStoreSocialSummaryResponse>(
+              ctx,
+              'SocialDelegatedService',
+              'GetStoreSocialSummary',
+              request,
+              SocialDelegatedServiceGetStoreSocialSummaryResponse());
+
+  /// ListStorePosts 列出代行店家自己的貼文（含草稿與下架，不含已刪除），依建立時間新到舊（同一時間以 ID 排序）；可依 status 篩選。需要能力 posts.read。
+  $async.Future<ListStorePostsResponse> listStorePosts(
+          $pb.ClientContext? ctx, ListStorePostsRequest request) =>
+      _client.invoke<ListStorePostsResponse>(ctx, 'SocialDelegatedService',
+          'ListStorePosts', request, ListStorePostsResponse());
+
+  /// GetStorePost 讀代行店家的一篇貼文（任何狀態，不含已刪除）；別家的貼文與不存在一樣回 not_found。回應帶 status 與 etag。需要能力 posts.read。
+  $async.Future<GetStorePostResponse> getStorePost(
+          $pb.ClientContext? ctx, GetStorePostRequest request) =>
+      _client.invoke<GetStorePostResponse>(ctx, 'SocialDelegatedService',
+          'GetStorePost', request, GetStorePostResponse());
+
+  /// CreateStorePost 以代行店家建立草稿貼文（建立一律是草稿；要發布再呼叫 PublishStorePost）。同一個 session 以同一個 request_id 重送回第一次建立的貼文目前的樣子，
+  /// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 posts.write。
+  $async.Future<CreateStorePostResponse> createStorePost(
+          $pb.ClientContext? ctx, CreateStorePostRequest request) =>
+      _client.invoke<CreateStorePostResponse>(ctx, 'SocialDelegatedService',
+          'CreateStorePost', request, CreateStorePostResponse());
+
+  /// UpdateStorePost 修改代行店家的貼文（update_mask 列 body、image_staged_token、product_id、hashtag_inputs 的子集）；etag 必填，與目前版本不符回 aborted 與
+  /// VERSION_CONFLICT，不寫入也不留稽核。重送規則同 CreateStorePost。需要能力 posts.write。
+  $async.Future<UpdateStorePostResponse> updateStorePost(
+          $pb.ClientContext? ctx, UpdateStorePostRequest request) =>
+      _client.invoke<UpdateStorePostResponse>(ctx, 'SocialDelegatedService',
+          'UpdateStorePost', request, UpdateStorePostResponse());
+
+  /// PublishStorePost 立即發布草稿或下架的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  $async.Future<PublishStorePostResponse> publishStorePost(
+          $pb.ClientContext? ctx, PublishStorePostRequest request) =>
+      _client.invoke<PublishStorePostResponse>(ctx, 'SocialDelegatedService',
+          'PublishStorePost', request, PublishStorePostResponse());
+
+  /// UnpublishStorePost 下架已發布的貼文；etag 必填。重送規則同 CreateStorePost。需要能力 posts.publish。
+  $async.Future<UnpublishStorePostResponse> unpublishStorePost(
+          $pb.ClientContext? ctx, UnpublishStorePostRequest request) =>
+      _client.invoke<UnpublishStorePostResponse>(ctx, 'SocialDelegatedService',
+          'UnpublishStorePost', request, UnpublishStorePostResponse());
+
+  /// ScheduleStorePost 排程發布：貼文要是草稿或已下架，publish_time 距現在 5 分鐘到 90 天；貼文已有待發布的排程時，舊的被取代。排程屬於店家，session 結束後仍會
+  /// 在到點時重驗授權並發布（授權已撤回則取消）。稽核寫 POST_SCHEDULE，到點發布時另寫一列 POST_PUBLISH。重送規則同 CreateStorePost。需要能力 posts.publish。
+  $async.Future<ScheduleStorePostResponse> scheduleStorePost(
+          $pb.ClientContext? ctx, ScheduleStorePostRequest request) =>
+      _client.invoke<ScheduleStorePostResponse>(ctx, 'SocialDelegatedService',
+          'ScheduleStorePost', request, ScheduleStorePostResponse());
 }
 
 const $core.bool _omitFieldNames =

@@ -48,6 +48,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
+	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -240,8 +241,11 @@ func runServe(ctx context.Context) error {
 	subscribeSellerRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	subscribeSocialRelay(bus, jc)
 	delegationDeps.Social = socialModule
-	subscribeModeration(bus, newModerationRetention(d, buyerModule, med, jc, log))
+	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
+	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
+	subscribeModeration(bus, moderationModule.Retention())
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -258,14 +262,15 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
-	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	del := newDelegation(bus, delegationDeps)
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Ready:  d.Ping,
-		Social: socialModule,
+		Ready:      d.Ping,
+		Social:     socialModule,
+		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,
+			Social: socialModule,
 			Media:  med,
 			Jobs:   jc,
 			NewID:  uuid.NewV7,
@@ -283,6 +288,7 @@ func runServe(ctx context.Context) error {
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
 		Stats:           stats,
 		DashboardOrders: sellerDashboardOrders{orders},
+		SocialProducts:  socialCards{products},
 		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
 		Deletion:        deletion,
 		Delegation:      del,
@@ -308,7 +314,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	legacyMux := http.NewServeMux()
-	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, suspension, log)))
+	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, agentModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
@@ -404,6 +410,7 @@ func runWorker(ctx context.Context) error {
 	subscribeSellerRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	subscribeSocialRelay(bus, jc)
 	delegationDeps.Social = socialModule
 	newDelegation(bus, delegationDeps)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -425,7 +432,7 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
 	subscribeModeration(bus, moderationModule)
-	contentModule := content.New(content.Deps{DB: d, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	contentModule.AddWorkers(workers)
@@ -442,6 +449,7 @@ func runWorker(ctx context.Context) error {
 	river.AddWorker(workers, rabbitmq.NewWorker(pub))
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
+	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)

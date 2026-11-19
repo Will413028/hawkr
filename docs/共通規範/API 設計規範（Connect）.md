@@ -27,6 +27,7 @@
   | `<模組>PublicService` | `hawkr.<模組>.*` | 任何人 | 不需要登入；有帶有效的 token 時 ctx 裡有呼叫者 |
   | `<模組>AppService` | `hawkr.<模組>.*` | 登入的帳號（買家、賣家） | 沒有登入回 `UNAUTHENTICATED`，管理員回 `PERMISSION_DENIED` |
   | `<模組>InviteeService` | `hawkr.<模組>.*` | 兌換了邀請的供應商（沒有帳號） | 不讀顧客身分；憑證是 service 自己的 interceptor 驗證的 cookie，沒有或無效回 `UNAUTHENTICATED`（見下方 vendor portal 的 session） |
+  | `<模組>DelegatedService` | `hawkr.<模組>.*`（擁有資源的模組的 package，例如 `hawkr.social.v1alpha1.SocialDelegatedService`） | 代行營運中的平台管理員（以代行 session 動作，不是顧客也不走後台登入） | 不讀顧客或管理員身分，也不經 adminauth；憑證是請求標頭 `X-HK-Operation-Session` 的代行 session。service 由擁有資源的模組擁有（A7-D25），共用的 interceptor 在 `backend/internal/httpapi/delegation`、每個 service 掛自己的一支並帶自己的宣告表（宣告表在擁有 service 的 httpapi 套件）：以 `delegation.ResolveDelegation` 解析，憑證缺少或無效回 `UNAUTHENTICATED`（不寫稽核列，只記安全 log），session 已到期、結束或撤銷回 `FAILED_PRECONDITION`，session 沒有該方法宣告的代行能力（`posts.read` 等，缺漏或多出都不能啟動）回 `PERMISSION_DENIED`，被拒絕的請求（含讀取）另寫一列 FAILED 稽核；目標店家只來自 session，請求不帶 `store_id`；每個寫入帶 `DelegatedOperation`（`request_id`、操作原因）並在同一個 transaction 寫單段 SUCCEEDED 稽核，寫入的業務失敗另寫 FAILED（ADR `2026-09-27-delegation-module` 「代行 Connect」修訂）；回應一律 `private, no-store`；額度用該類別一般額度（同 App、Admin，單獨計數） |
   | `<模組>AdminService` | `hawkr.admin.<模組>.*` | 管理員 | 沒有登入回 `UNAUTHENTICATED`，帳號回 `PERMISSION_DENIED`；管理員的角色不允許該方法宣告的權限（`backend/internal/httpapi/adminauth`，只有 `GetSession`、`SignOut` 豁免）也回 `PERMISSION_DENIED` |
 
 - 單體是對外的入口（遷移計畫 A2）：登入由 identity 處理（Google、LINE 聯合登入，憑證是 opaque session），入口的中介層以 identity 解析 session token（App 以 `Authorization: Bearer` 帶；web 是同源的 httpOnly cookie `__Host-hk_session`，瀏覽器直接導覽的下載也靠它；兩者都有時以 Bearer 為準，query、`token` header 與其他 scheme 一律不讀；cookie 請求的 CSRF 規則見 ADR D6），把呼叫者放進 ctx（`rpc.PrincipalFrom`）。決策見 ADR `2026-10-30-identity-self-hosted-federated-login.md`。token 無效、逾時或帳號已刪除時以訪客繼續，停權的帳號照樣認證、授權依動作性質（A7-D18），後台的使用者不是允許的帳號時回 `PERMISSION_DENIED`，問不到公鑰或資料庫時回 `UNAVAILABLE`，不當成訪客。帳號與管理員的 ID 各自發號，呼叫者一定連同類型判斷。
@@ -149,7 +150,7 @@
 - details 只用 `google/rpc/error_details.proto` 的標準型別，每種最多一個：
   - `ErrorInfo`：client 需要在同一個 code 底下分支時才帶；`reason` 是 `hawkr.common.<版本>.ErrorReason` 的值名（不加前綴），`domain` 是 `hawkr`，`metadata` 放 client 需要的動態值，key 是 lowerCamelCase，清單的值以逗號連接、由小到大排列（例如 `PROSPECT_MATCH_FOUND` 的 `prospectIds`）。client 依它做事的 reason 只搭配 4xx 的 code。
   - `LocalizedMessage`（`zh-TW`）：伺服器給使用者的文字，只從這裡來。
-  - `BadRequest`：`invalid_argument` 能歸到欄位時，`field` 是請求訊息的 proto 路徑，每個違規帶 `localized_message`。模組以自己輸入的欄位名回報（`apperr` 的 `InvalidInputOn`、`InvalidInputFields`，欄位只能在建立錯誤時給），handler 以 `rpc.WithFieldPaths` 對應到請求的路徑；對應不到的欄位不送出，interceptor 以 error 等級記 log。repeated 欄位裡單一元素的問題，`field` 帶索引（AIP-193，例如 `evidence_staged_tokens[1]`），模組回報 `X[i]`，`FieldPaths` 要明列 repeated 目標，每個 repeated 欄位只列一筆（key `X[]`、value 以 `[]` 結尾，例如 `"EvidenceTokens[]": "evidence_staged_tokens[]"`），沒有明列的索引欄位（單值欄位被回報成 `Reason[2]`）當成對應不到；`CheckFieldPaths` 以 descriptor 驗證帶 `[]` 的每一段都是 repeated 欄位；整個欄位的問題（張數上限）不帶索引（模組回報 `X`），由同一筆 `X[]` 對應（去掉結尾的 `[]`，例如 `evidence_staged_tokens`），不必另列不帶 `[]` 的 key。
+  - `BadRequest`：`invalid_argument` 能歸到欄位時，`field` 是請求訊息的 proto 路徑，每個違規帶 `localized_message`。模組以自己輸入的欄位名回報（`apperr` 的 `InvalidInputOn`、`InvalidInputFields`，欄位只能在建立錯誤時給），欄位名與請求欄位同名時 interceptor 自動對應（不必列）；只有名稱不同時 handler 才以 `rpc.WithFieldPaths` 明列對應，明列的優先於自動對應；對應不到的欄位不送出，interceptor 以 error 等級記 log。repeated 欄位裡單一元素的問題，`field` 帶索引（AIP-193，例如 `evidence_staged_tokens[1]`），模組回報 `X[i]`，`FieldPaths` 要明列 repeated 目標，每個 repeated 欄位只列一筆（key `X[]`、value 以 `[]` 結尾，例如 `"EvidenceTokens[]": "evidence_staged_tokens[]"`），沒有明列的索引欄位（單值欄位被回報成 `Reason[2]`）當成對應不到；`CheckFieldPaths` 以 descriptor 驗證帶 `[]` 的每一段都是 repeated 欄位；整個欄位的問題（張數上限）不帶索引（模組回報 `X`），由同一筆 `X[]` 對應（去掉結尾的 `[]`，例如 `evidence_staged_tokens`），不必另列不帶 `[]` 的 key。
   - `RetryInfo`：伺服器知道多久之後能重試時（入口的限流、驗證碼的冷卻）。
 - `message` 給開發者看，client 不顯示、不解析。trace id 在回應的 `X-Trace-Id` header。
 - 每個錯誤回應有一筆 log：interceptor 記它經手的；connect-go 在 interceptor 之前就回的錯誤（請求無法解碼、超過大小上限）由 HTTP 層的 `rpc.LogUnhandled` 補上。
@@ -182,7 +183,7 @@
   |---|---|
   | `PublicService` 的讀取，不依觀看者，或依觀看者但請求不帶憑證 | `public, no-cache`，加弱 `ETag`；client 與 CDN 每次都向來源確認，沒變時回 304 |
   | `PublicService` 的讀取，依觀看者（handler 讀呼叫者：`viewer_can_*`、`is_mine`、封鎖過濾）而且請求帶憑證（`Authorization: Bearer` 或 session cookie） | `private, no-store`，沒有 `ETag` |
-  | `AppService`、`AdminService`、`InviteeService` 的所有回應 | `private, no-store`；`InviteeService` 的讀取可以用 GET（以 cookie 認證），回應仍不可快取，沒有 `ETag` |
+  | `AppService`、`AdminService`、`InviteeService`、`DelegatedService` 的所有回應 | `private, no-store`；`InviteeService` 的讀取可以用 GET（以 cookie 認證），回應仍不可快取，沒有 `ETag` |
 
   `PublicService` 的 GET 回應一律帶 `Vary: Accept-Encoding, Authorization, Cookie`。每個 Public procedure 在 `httpapi/viewer.go` 的 `publicViewerDependent` 宣告回應是否依觀看者而定，缺宣告、多宣告都不能啟動；不依觀看者的方法（例如 `SuggestTags`、內容、探索）帶 cookie 也照常 `public, no-cache`。依觀看者的方法，判斷依據是請求有沒有帶憑證，不是 handler 有沒有讀到呼叫者：停權帳號與無效 token 以訪客執行，回應仍不得進共享快取。部署前提：Cloudflare 對帶 cookie 或 `Authorization` 的請求設不走快取（CDN 是否依 `Vary` 分開快取未查證），上線計畫驗證。
 

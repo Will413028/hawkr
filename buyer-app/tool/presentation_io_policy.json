@@ -38,20 +38,6 @@
     },
     {
       "rule": "presentation-direct-dio",
-      "path": "lib/features/seller/presentation/widgets/merchant_chat_tab.dart",
-      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
-      "rationale": "Merchant chat tab commands have not yet been moved behind the merchant repository boundary.",
-      "removalCondition": "Remove after chat-tab reads and mutations are controller commands with typed immutable state."
-    },
-    {
-      "rule": "presentation-direct-dio",
-      "path": "lib/features/seller/presentation/widgets/merchant_home_tab.dart",
-      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
-      "rationale": "Merchant home tab still performs legacy seller and post requests directly.",
-      "removalCondition": "Remove after merchant-home data and engagement commands use the merchant repository and controller."
-    },
-    {
-      "rule": "presentation-direct-dio",
       "path": "lib/features/seller/presentation/widgets/merchant_shop_tab.dart",
       "owner": "Buyer architecture maintainers / issue #69 Batch C2",
       "rationale": "Merchant shop tab still owns product and image fallback requests alongside local scroll state.",

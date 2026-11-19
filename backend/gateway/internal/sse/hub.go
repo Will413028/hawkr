@@ -19,7 +19,6 @@ type HubConfig struct {
 	BatchWindow       time.Duration
 	BatchMaxEvents    int
 	MaxConnPerPod     int
-	MaxConnPerSubject int
 	MaxConnPerUser    int
 	HeartbeatInterval time.Duration
 	GCInterval        time.Duration
@@ -52,7 +51,6 @@ func DefaultConfig() HubConfig {
 		BatchWindow:       50 * time.Millisecond,
 		BatchMaxEvents:    100,
 		MaxConnPerPod:     5000,
-		MaxConnPerSubject: 5,
 		MaxConnPerUser:    3,
 		HeartbeatInterval: 30 * time.Second,
 		GCInterval:        60 * time.Second,
@@ -90,9 +88,8 @@ type Hub struct {
 	batches map[string]*batchAggregator // per-topic 50ms batch aggregator
 
 	// Counters maintained outside the main mu to avoid lock contention on hot path。
-	totalConns     atomic.Int64
-	connsBySubject sync.Map // string (rate-limit subject) → *connGroup
-	connsByUID     sync.Map // int64  → *connGroup
+	totalConns atomic.Int64
+	connsByUID sync.Map // int64  → *connGroup
 
 	seqCounter atomic.Int64
 
@@ -100,10 +97,6 @@ type Hub struct {
 	// 回收額度視窗、環形緩衝 TTL）都走它，測試才能在不真的等 8 分鐘的情況
 	// 下驗證回收行為。預設 time.Now。
 	now func() time.Time
-
-	// afterPrepareHook 只給測試：publishAtomic 鎖外準備完、進入鎖內 fanout 之前呼叫，
-	// 讓測試決定性地在兩段之間插入訂閱。
-	afterPrepareHook func()
 }
 
 // NewHub constructs a Hub with the given config.
@@ -139,7 +132,7 @@ func (h *Hub) Start(ctx context.Context) func() {
 }
 
 // Subscribe attaches a Connection to a topic. Enforces caps; returns error
-// if any cap (per-pod / per-subject / per-user) would be exceeded.
+// if any cap (per-pod / per-user; AccountID 0 connections count only against the pod cap) would be exceeded.
 //
 // On success the caller should:
 //  1. write SSE `ready` event (with bufferMiss flag from buffer.Since)
@@ -263,22 +256,6 @@ func (h *Hub) Publish(topic, eventName string, data []byte, channelBatchName str
 func (h *Hub) publishAtomic(topic string, ev BufferedEvent) {
 	frame := buildFrame(ev.EventName, ev.Data, ev.ID)
 
-	// 個人化的解析與序列化放在鎖外：先在鎖內複製這個 topic 的連線，鎖外對每個 variant 只算一次；
-	// 鎖內的 fanout 只做查表。兩次上鎖之間才加入的連線由 personalizedFrames.frameFor 補算（事件還沒解析過就用該連線的 Personalizer 解析，不會漏送）。
-	h.mu.RLock()
-	var snapshot []*Connection
-	if st, ok := h.topics[topic]; ok {
-		snapshot = make([]*Connection, 0, len(st.conns))
-		for c := range st.conns {
-			snapshot = append(snapshot, c)
-		}
-	}
-	h.mu.RUnlock()
-	pf := h.preparePersonalized(topic, ev, snapshot)
-	if h.afterPrepareHook != nil {
-		h.afterPrepareHook()
-	}
-
 	h.mu.Lock()
 	buf, ok := h.buffers[topic]
 	if !ok {
@@ -290,14 +267,7 @@ func (h *Hub) publishAtomic(topic string, ev BufferedEvent) {
 	var slow []*Connection
 	if st, ok := h.topics[topic]; ok {
 		for c := range st.conns {
-			f := frame
-			if c.Personalizer != nil {
-				f = pf.frameFor(c)
-				if f == nil {
-					continue // 個人化失敗：這條連線不送這個事件
-				}
-			}
-			if !c.Send(f) {
+			if !c.Send(frame) {
 				slow = append(slow, c)
 			}
 		}
@@ -311,69 +281,6 @@ func (h *Hub) publishAtomic(topic string, ev BufferedEvent) {
 			zap.String("reason", "send_buffer_full"))
 		h.Unsubscribe(c)
 	}
-}
-
-// personalizedFrames 是一個事件在這個 topic 上依 variant 算好的 frame。
-// 只在 Hub 的 publish 路徑上由單一 goroutine 依序使用（鎖外準備、鎖內查表）。
-type personalizedFrames struct {
-	h        *Hub
-	topic    string
-	ev       BufferedEvent
-	prepared PreparedEvent // nil 且 !failed = 還沒有人準備過（拍快照時 topic 沒有個人化連線）
-	failed   bool          // 解析失敗：個人化的連線一律丟掉這個事件
-	frames   map[string][]byte
-}
-
-// preparePersonalized 在鎖外為快照中的連線準備這個事件。快照之後才加入的連線由 frameFor 補算。
-func (h *Hub) preparePersonalized(topic string, ev BufferedEvent, conns []*Connection) *personalizedFrames {
-	pf := &personalizedFrames{h: h, topic: topic, ev: ev, frames: map[string][]byte{}}
-	for _, c := range conns {
-		if c.Personalizer != nil {
-			pf.frameFor(c)
-		}
-	}
-	return pf
-}
-
-// prepare 用這條連線的 Personalizer 解析事件（同一個 topic 的連線共用同一個 Personalizer）。
-func (pf *personalizedFrames) prepare(c *Connection) {
-	prepared, err := c.Personalizer(pf.ev.EventName, pf.ev.Data)
-	if err != nil {
-		// 只記事件名稱與 id，不記 payload（payload 含內部身分 id）。
-		pf.h.log.Warn("SSE.personalize.failed",
-			zap.String("topic", pf.topic), zap.String("event", pf.ev.EventName), zap.String("eventId", pf.ev.ID), zap.Error(err))
-		pf.failed = true
-		return
-	}
-	pf.prepared = prepared
-}
-
-// frameFor 回傳這條連線的 frame；個人化失敗回 nil（fail closed，不會漏送：
-// 還沒準備過的事件在這裡補算）。
-func (pf *personalizedFrames) frameFor(c *Connection) []byte {
-	if pf.failed {
-		return nil
-	}
-	if pf.prepared == nil {
-		pf.prepare(c)
-		if pf.failed {
-			return nil
-		}
-	}
-	key := pf.prepared.Variant(c.Viewer)
-	if f, ok := pf.frames[key]; ok {
-		return f
-	}
-	data, err := pf.prepared.Render(c.Viewer)
-	if err != nil {
-		pf.h.log.Warn("SSE.personalize.render_failed",
-			zap.String("topic", pf.topic), zap.String("event", pf.ev.EventName), zap.String("eventId", pf.ev.ID), zap.Error(err))
-		pf.frames[key] = nil
-		return nil
-	}
-	f := buildFrame(pf.ev.EventName, data, pf.ev.ID)
-	pf.frames[key] = f
-	return f
 }
 
 // nextEventID generates an SSE event id of the form "<epochMillis>-<seq>".
@@ -472,29 +379,22 @@ func (h *Hub) runGC() {
 }
 
 // ------------------------------------------------------------------------- //
-// Per-Subject / Per-User 佔位。Keep separate from main mu to avoid contention.//
+// Per-User 佔位。Keep separate from main mu to avoid contention.        //
 // ------------------------------------------------------------------------- //
 
 // capKeyOf 回傳這條連線該記在哪個 cap map 的哪個 key、上限多少、超限回什麼錯。
-// 登入者用 accountId、匿名用 `Connection.Subject`（handler 填入
-// middleware.RateLimitSubject 的結果，不是裸 client IP —— 網頁 SSR／CI 一個位址
-// 背後是無限多個人，用位址當 key 會讓 5 條連線的額度被整個網頁共用）；兩者都沒有
-// 就不受 per-key cap 管（僅受 pod cap）。
+// 只有 AccountID > 0 的連線受 per-user cap 管，其餘僅受 pod cap。
 func (h *Hub) capKeyOf(conn *Connection) (m *sync.Map, key any, limit int, capErr error) {
-	switch {
-	case conn.AccountID > 0:
+	if conn.AccountID > 0 {
 		return &h.connsByUID, conn.AccountID, h.cfg.MaxConnPerUser, ErrUserCapReached
-	case conn.Subject != "":
-		return &h.connsBySubject, conn.Subject, h.cfg.MaxConnPerSubject, ErrSubjectCapReached
-	default:
-		return nil, nil, 0, nil
 	}
+	return nil, nil, 0, nil
 }
 
-// ConnCaps 回傳 per-user 與 per-subject 的連線上限，供連線數上限的 429 填
+// ConnCap 回傳 per-user 的連線上限，供連線數上限的 429 填
 // X-RateLimit-Limit。不開放給呼叫端寫入——上限的唯一來源仍是 HubConfig。
-func (h *Hub) ConnCaps() (perUser, perSubject int) {
-	return h.cfg.MaxConnPerUser, h.cfg.MaxConnPerSubject
+func (h *Hub) ConnCap() int {
+	return h.cfg.MaxConnPerUser
 }
 
 // admitToCap 佔一個位子。滿了就嘗試回收最舊的位子（見 capgroup.go 檔頭的
@@ -544,18 +444,9 @@ func (h *Hub) releaseCap(conn *Connection) {
 	}
 }
 
-// CapGroupSize 回傳某個 cap key 目前佔用的位子數（0 = 沒有紀錄）。
-// accountID > 0 查 per-user，否則以 subject 查 per-subject。
-func (h *Hub) CapGroupSize(accountID int64, subject string) int {
-	var (
-		v  any
-		ok bool
-	)
-	if accountID > 0 {
-		v, ok = h.connsByUID.Load(accountID)
-	} else {
-		v, ok = h.connsBySubject.Load(subject)
-	}
+// CapGroupSize 回傳某個 per-user cap key 目前佔用的位子數（0 = 沒有紀錄）。
+func (h *Hub) CapGroupSize(accountID int64) int {
+	v, ok := h.connsByUID.Load(accountID)
 	if !ok {
 		return 0
 	}

@@ -1235,7 +1235,11 @@ func (x *GetSessionResponse) GetAvatar() *v1alpha1.Image {
 type Suspension struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 停權的時間。
-	SuspendedAt   *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=suspended_at,json=suspendedAt,proto3" json:"suspended_at,omitempty"`
+	SuspendedAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=suspended_at,json=suspendedAt,proto3" json:"suspended_at,omitempty"`
+	// 停權的政策分類；讀不到停權紀錄時不設（UNSPECIFIED）。
+	Category v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
+	// 給帳號擁有者看的停權理由；沒有補充說明或讀不到停權紀錄時是空字串。
+	Reason        string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1275,6 +1279,20 @@ func (x *Suspension) GetSuspendedAt() *timestamppb.Timestamp {
 		return x.SuspendedAt
 	}
 	return nil
+}
+
+func (x *Suspension) GetCategory() v1alpha1.PolicyCategory {
+	if x != nil {
+		return x.Category
+	}
+	return v1alpha1.PolicyCategory(0)
+}
+
+func (x *Suspension) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
 }
 
 type DeleteAccountRequest struct {
@@ -1585,7 +1603,7 @@ var File_hawkr_identity_v1alpha1_identity_proto protoreflect.FileDescriptor
 
 const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
-	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"X\n" +
+	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\"X\n" +
 	"\aAccount\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x128\n" +
 	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05roles\"\x1b\n" +
@@ -1643,10 +1661,12 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"suspension\x18\x02 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
 	"suspension\x12&\n" +
 	"\fdisplay_name\x18\x03 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
-	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatar\"P\n" +
+	"\x06avatar\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatar\"\xb5\x01\n" +
 	"\n" +
 	"Suspension\x12B\n" +
-	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"\x16\n" +
+	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\x12F\n" +
+	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\bcategory\x12\x1b\n" +
+	"\x06reason\x18\x03 \x01(\tB\x03\xe0A\x03R\x06reason\"\x16\n" +
 	"\x14DeleteAccountRequest\"\xdb\x01\n" +
 	"\x15DeleteAccountResponse\x12R\n" +
 	"\x05state\x18\x01 \x01(\x0e2<.hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionStateR\x05state\"n\n" +
@@ -1746,6 +1766,7 @@ var file_hawkr_identity_v1alpha1_identity_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),            // 32: google.protobuf.Timestamp
 	(*durationpb.Duration)(nil),              // 33: google.protobuf.Duration
 	(*v1alpha1.Image)(nil),                   // 34: hawkr.common.v1alpha1.Image
+	(v1alpha1.PolicyCategory)(0),             // 35: hawkr.common.v1alpha1.PolicyCategory
 }
 var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	0,  // 0: hawkr.identity.v1alpha1.Account.roles:type_name -> hawkr.identity.v1alpha1.Role
@@ -1765,37 +1786,38 @@ var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	24, // 14: hawkr.identity.v1alpha1.GetSessionResponse.suspension:type_name -> hawkr.identity.v1alpha1.Suspension
 	34, // 15: hawkr.identity.v1alpha1.GetSessionResponse.avatar:type_name -> hawkr.common.v1alpha1.Image
 	32, // 16: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
-	4,  // 17: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
-	3,  // 18: hawkr.identity.v1alpha1.ContactEmail.source:type_name -> hawkr.identity.v1alpha1.ContactEmailSource
-	27, // 19: hawkr.identity.v1alpha1.GetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
-	27, // 20: hawkr.identity.v1alpha1.SetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
-	6,  // 21: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
-	8,  // 22: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
-	22, // 23: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
-	10, // 24: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
-	12, // 25: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
-	14, // 26: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
-	16, // 27: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
-	19, // 28: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
-	25, // 29: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
-	28, // 30: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:input_type -> hawkr.identity.v1alpha1.GetContactEmailRequest
-	30, // 31: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:input_type -> hawkr.identity.v1alpha1.SetContactEmailRequest
-	7,  // 32: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
-	9,  // 33: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
-	23, // 34: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
-	11, // 35: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
-	13, // 36: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
-	15, // 37: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
-	17, // 38: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
-	20, // 39: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
-	26, // 40: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
-	29, // 41: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:output_type -> hawkr.identity.v1alpha1.GetContactEmailResponse
-	31, // 42: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:output_type -> hawkr.identity.v1alpha1.SetContactEmailResponse
-	32, // [32:43] is the sub-list for method output_type
-	21, // [21:32] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	35, // 17: hawkr.identity.v1alpha1.Suspension.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	4,  // 18: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
+	3,  // 19: hawkr.identity.v1alpha1.ContactEmail.source:type_name -> hawkr.identity.v1alpha1.ContactEmailSource
+	27, // 20: hawkr.identity.v1alpha1.GetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
+	27, // 21: hawkr.identity.v1alpha1.SetContactEmailResponse.contact_email:type_name -> hawkr.identity.v1alpha1.ContactEmail
+	6,  // 22: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
+	8,  // 23: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
+	22, // 24: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
+	10, // 25: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
+	12, // 26: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
+	14, // 27: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
+	16, // 28: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+	19, // 29: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
+	25, // 30: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
+	28, // 31: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:input_type -> hawkr.identity.v1alpha1.GetContactEmailRequest
+	30, // 32: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:input_type -> hawkr.identity.v1alpha1.SetContactEmailRequest
+	7,  // 33: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+	9,  // 34: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+	23, // 35: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
+	11, // 36: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
+	13, // 37: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
+	15, // 38: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
+	17, // 39: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+	20, // 40: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
+	26, // 41: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
+	29, // 42: hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail:output_type -> hawkr.identity.v1alpha1.GetContactEmailResponse
+	31, // 43: hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail:output_type -> hawkr.identity.v1alpha1.SetContactEmailResponse
+	33, // [33:44] is the sub-list for method output_type
+	22, // [22:33] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_identity_v1alpha1_identity_proto_init() }

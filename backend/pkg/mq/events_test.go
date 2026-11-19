@@ -6,32 +6,6 @@ import (
 	"testing"
 )
 
-func TestPostCreatedEvent_HasSellerAvatar(t *testing.T) {
-	// 49 §6.3/S3：payload 帶 objectKey（seller_avatar_key），顯示 URL 由消費端組。
-	ev := NewPostCreatedEvent(1, 2, 3, "seller-name", "public/seller_avatars/2.jpg", "preview")
-	if ev.SellerAvatarKey != "public/seller_avatars/2.jpg" {
-		t.Fatalf("SellerAvatarKey = %q, want objectKey", ev.SellerAvatarKey)
-	}
-	if ev.SellerName != "seller-name" {
-		t.Fatalf("SellerName = %q, want seller-name", ev.SellerName)
-	}
-}
-
-func TestPostCreatedEvent_JSONShape(t *testing.T) {
-	ev := NewPostCreatedEvent(1, 7487768729113814280, 3, "seller-name", "public/seller_avatars/2.jpg", "preview")
-	b, err := json.Marshal(ev)
-	if err != nil {
-		t.Fatalf("marshal PostCreatedEvent: %v", err)
-	}
-	got := string(b)
-	if !strings.Contains(got, `"store_id":7487768729113814280`) {
-		t.Errorf("PostCreatedEvent JSON = %s, missing store_id", got)
-	}
-	if strings.Contains(got, "seller_account_id") {
-		t.Errorf("PostCreatedEvent JSON = %s, must not contain legacy key seller_account_id", got)
-	}
-}
-
 func TestSellerLifecycleEvents_JSONShape(t *testing.T) {
 	del := &SellerDeletedEvent{
 		BaseEvent: NewBaseEvent(EventTypeSellerDeleted, "seller-service"),
@@ -117,25 +91,6 @@ func TestBuyerDeletedEvent_JSONShape(t *testing.T) {
 	}
 	if RoutingKeyBuyerDeleted != "buyer.deleted" {
 		t.Errorf("RoutingKeyBuyerDeleted = %q", RoutingKeyBuyerDeleted)
-	}
-}
-
-func TestCounterDeltaEvent_JSONShape(t *testing.T) {
-	ev := NewCounterDeltaEvent("post", 10, "comment_count", 1)
-	if ev.EntityType != "post" || ev.EntityID != 10 || ev.Field != "comment_count" || ev.Delta != 1 {
-		t.Fatalf("unexpected event fields: %+v", ev)
-	}
-	if ev.EventType != EventTypeCounterDelta {
-		t.Fatalf("EventType = %q, want %q", ev.EventType, EventTypeCounterDelta)
-	}
-	b, err := json.Marshal(ev)
-	if err != nil {
-		t.Fatalf("marshal CounterDeltaEvent: %v", err)
-	}
-	for _, want := range []string{`"entityType":"post"`, `"entityId":10`, `"field":"comment_count"`, `"delta":1`} {
-		if !strings.Contains(string(b), want) {
-			t.Errorf("marshaled JSON missing %q, got: %s", want, b)
-		}
 	}
 }
 

@@ -48,7 +48,7 @@ func contractServices(t *testing.T) []string {
 
 func TestEveryServiceInTheContractIsMounted(t *testing.T) {
 	var mounted []string
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import {
 } from "./helpers/mock-gateway";
 import { assertNoResidualLoading } from "./helpers/page-stability";
 import { isKnownNonEnforcingConsoleError } from "./helpers/runtime-console";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const ACTIVE_ROLE_KEY = "hkui:auth:active-role";
 const LOADER_KEY = "hawkr:initial-loader-seen";
@@ -245,8 +246,7 @@ async function assertProtectedRoute(
 ) {
 	const runtimeIssues = attachRuntimeMonitors(page, baseURL);
 	const target = `${route}${ROUTE_QUERY[route] ?? ""}`;
-	const response = await page.goto(target, {
-		waitUntil: "domcontentloaded",
+	const response = await gotoStreamed(page, target, {
 		timeout: 25_000,
 	});
 	expect(response, `${route} returned no document response`).toBeTruthy();
@@ -327,7 +327,7 @@ test.describe("authenticated protected static route smoke", {
 		// ⚠️ 下面的數字是**手寫 pin**，而路由本身是 `discoverAppPageRoutes` 自動掃出來的
 		// ⇒ 新增一個 page.tsx 就會讓它們對不上。改的時候先對帳增減量，
 		// 不要為了讓測試變綠而直接抄失敗訊息的數字。
-		// 賣家工作區 30 條，不含措施頁；措施與申覆列表 /seller/measures 是帳號層級
+		// 賣家工作區 30 條（含封鎖買家頁 /seller-center/blocked-buyers），不含措施頁；措施與申覆列表 /seller/measures 是帳號層級
 		// （登入即可、不分工作區），單獨一條（ACCOUNT_ROUTES）。買家 23 ＋ 賣家 30 ＋ 帳號 1，
 		// 三類合計 54。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
 		// 是動態路由，登記在 dynamic-route-catalog。

@@ -94,7 +94,6 @@ type SocialContentTakedown struct {
 	PostID       *uuid.UUID
 	CommentID    *uuid.UUID
 	ForumEntryID *uuid.UUID
-	CreatedAt    time.Time
 }
 
 type SocialForumEntry struct {

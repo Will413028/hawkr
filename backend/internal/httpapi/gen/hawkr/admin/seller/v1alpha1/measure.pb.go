@@ -779,7 +779,9 @@ type Measure struct {
 	// review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
 	ReviewDeadline *v1alpha1.Deadline `protobuf:"bytes,43,opt,name=review_deadline,json=reviewDeadline,proto3" json:"review_deadline,omitempty"`
 	// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
-	Contents      []*v1alpha11.ContentRef `protobuf:"bytes,44,rep,name=contents,proto3" json:"contents,omitempty"`
+	Contents []*v1alpha11.ContentRef `protobuf:"bytes,44,rep,name=contents,proto3" json:"contents,omitempty"`
+	// contents 裡 snapshot_state 是 CAPTURED 的對象的快照全文與圖片張數（contents 的 excerpt 是截斷的摘要）；依種類、id 排序，只含有快照的對象。
+	ContentBodies []*MeasureContentBody `protobuf:"bytes,45,rep,name=content_bodies,json=contentBodies,proto3" json:"content_bodies,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1122,6 +1124,84 @@ func (x *Measure) GetContents() []*v1alpha11.ContentRef {
 	return nil
 }
 
+func (x *Measure) GetContentBodies() []*MeasureContentBody {
+	if x != nil {
+		return x.ContentBodies
+	}
+	return nil
+}
+
+// MeasureContentBody 是內容下架措施的一個對象在建立措施時凍結的本文全文（後台看全文，賣家只看摘要）。
+type MeasureContentBody struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Kind  v1alpha11.ContentKind  `protobuf:"varint,1,opt,name=kind,proto3,enum=hawkr.seller.v1alpha1.ContentKind" json:"kind,omitempty"`
+	Id    string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	// 本文全文。
+	Body string `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	// 原內容的圖片張數（不存圖片）。
+	ImageCount    int32 `protobuf:"varint,4,opt,name=image_count,json=imageCount,proto3" json:"image_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MeasureContentBody) Reset() {
+	*x = MeasureContentBody{}
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MeasureContentBody) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MeasureContentBody) ProtoMessage() {}
+
+func (x *MeasureContentBody) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MeasureContentBody.ProtoReflect.Descriptor instead.
+func (*MeasureContentBody) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MeasureContentBody) GetKind() v1alpha11.ContentKind {
+	if x != nil {
+		return x.Kind
+	}
+	return v1alpha11.ContentKind(0)
+}
+
+func (x *MeasureContentBody) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MeasureContentBody) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *MeasureContentBody) GetImageCount() int32 {
+	if x != nil {
+		return x.ImageCount
+	}
+	return 0
+}
+
 // MeasureActionUnavailability 是 admin 此刻不能對措施做某個動作（改理由、延長、縮短、結束或撤銷）的一個原因。與對應方法的前置檢查是同一個規則
 // （model/measure.go），message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一份文字（同一個 Go 函式）。
 type MeasureActionUnavailability struct {
@@ -1136,7 +1216,7 @@ type MeasureActionUnavailability struct {
 
 func (x *MeasureActionUnavailability) Reset() {
 	*x = MeasureActionUnavailability{}
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[5]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1148,7 +1228,7 @@ func (x *MeasureActionUnavailability) String() string {
 func (*MeasureActionUnavailability) ProtoMessage() {}
 
 func (x *MeasureActionUnavailability) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[5]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1161,7 +1241,7 @@ func (x *MeasureActionUnavailability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeasureActionUnavailability.ProtoReflect.Descriptor instead.
 func (*MeasureActionUnavailability) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{5}
+	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *MeasureActionUnavailability) GetReason() MeasureActionUnavailableReason {
@@ -1206,7 +1286,7 @@ type LinkedAccount struct {
 
 func (x *LinkedAccount) Reset() {
 	*x = LinkedAccount{}
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[6]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1298,7 @@ func (x *LinkedAccount) String() string {
 func (*LinkedAccount) ProtoMessage() {}
 
 func (x *LinkedAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[6]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1311,7 @@ func (x *LinkedAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkedAccount.ProtoReflect.Descriptor instead.
 func (*LinkedAccount) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{6}
+	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LinkedAccount) GetAccountId() string {
@@ -1315,7 +1395,7 @@ type TerminationOption struct {
 
 func (x *TerminationOption) Reset() {
 	*x = TerminationOption{}
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[7]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1327,7 +1407,7 @@ func (x *TerminationOption) String() string {
 func (*TerminationOption) ProtoMessage() {}
 
 func (x *TerminationOption) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[7]
+	mi := &file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1340,7 +1420,7 @@ func (x *TerminationOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminationOption.ProtoReflect.Descriptor instead.
 func (*TerminationOption) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{7}
+	return file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TerminationOption) GetGround() v1alpha11.TerminationGround {
@@ -1420,7 +1500,7 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	" \x01(\x0e2/.hawkr.seller.v1alpha1.MeasureRequestCloseCauseB\x03\xe0A\x03R\n" +
 	"closeCause\x12B\n" +
 	"\x04kind\x18\v \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindB\x03\xe0A\x03R\x04kind\x12M\n" +
-	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\xb0\x16\n" +
+	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\x8d\x17\n" +
 	"\aMeasure\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
@@ -1475,7 +1555,14 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\x14end_unavailabilities\x18) \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x13endUnavailabilities\x123\n" +
 	"\x13can_revoke_findings\x18* \x01(\bB\x03\xe0A\x03R\x11canRevokeFindings\x12M\n" +
 	"\x0freview_deadline\x18+ \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0ereviewDeadline\x12B\n" +
-	"\bcontents\x18, \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontents\"\xb4\x01\n" +
+	"\bcontents\x18, \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontents\x12[\n" +
+	"\x0econtent_bodies\x18- \x03(\v2/.hawkr.admin.seller.v1alpha1.MeasureContentBodyB\x03\xe0A\x03R\rcontentBodies\"\xa5\x01\n" +
+	"\x12MeasureContentBody\x12;\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\".hawkr.seller.v1alpha1.ContentKindB\x03\xe0A\x03R\x04kind\x12\x13\n" +
+	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x03R\x02id\x12\x17\n" +
+	"\x04body\x18\x03 \x01(\tB\x03\xe0A\x03R\x04body\x12$\n" +
+	"\vimage_count\x18\x04 \x01(\x05B\x03\xe0A\x03R\n" +
+	"imageCount\"\xb4\x01\n" +
 	"\x1bMeasureActionUnavailability\x12X\n" +
 	"\x06reason\x18\x01 \x01(\x0e2;.hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
 	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x9d\x04\n" +
@@ -1534,7 +1621,7 @@ func file_hawkr_admin_seller_v1alpha1_measure_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_admin_seller_v1alpha1_measure_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_hawkr_admin_seller_v1alpha1_measure_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_hawkr_admin_seller_v1alpha1_measure_proto_goTypes = []any{
 	(MeasureRevisionSystemCause)(0),         // 0: hawkr.admin.seller.v1alpha1.MeasureRevisionSystemCause
 	(MeasureActionUnavailableReason)(0),     // 1: hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReason
@@ -1545,84 +1632,88 @@ var file_hawkr_admin_seller_v1alpha1_measure_proto_goTypes = []any{
 	(*MeasureRevision)(nil),                 // 6: hawkr.admin.seller.v1alpha1.MeasureRevision
 	(*MeasureRequest)(nil),                  // 7: hawkr.admin.seller.v1alpha1.MeasureRequest
 	(*Measure)(nil),                         // 8: hawkr.admin.seller.v1alpha1.Measure
-	(*MeasureActionUnavailability)(nil),     // 9: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	(*LinkedAccount)(nil),                   // 10: hawkr.admin.seller.v1alpha1.LinkedAccount
-	(*TerminationOption)(nil),               // 11: hawkr.admin.seller.v1alpha1.TerminationOption
-	(v1alpha1.PolicyCategory)(0),            // 12: hawkr.common.v1alpha1.PolicyCategory
-	(v1alpha11.ViolationSeverity)(0),        // 13: hawkr.seller.v1alpha1.ViolationSeverity
-	(v1alpha11.ViolationStatus)(0),          // 14: hawkr.seller.v1alpha1.ViolationStatus
-	(v1alpha11.RevokeReason)(0),             // 15: hawkr.seller.v1alpha1.RevokeReason
-	(*timestamppb.Timestamp)(nil),           // 16: google.protobuf.Timestamp
-	(v1alpha11.MeasureRequestState)(0),      // 17: hawkr.seller.v1alpha1.MeasureRequestState
-	(v1alpha11.MeasureRequestCloseCause)(0), // 18: hawkr.seller.v1alpha1.MeasureRequestCloseCause
-	(v1alpha11.MeasureRequestKind)(0),       // 19: hawkr.seller.v1alpha1.MeasureRequestKind
-	(*v1alpha1.Deadline)(nil),               // 20: hawkr.common.v1alpha1.Deadline
-	(v1alpha11.MeasureKind)(0),              // 21: hawkr.seller.v1alpha1.MeasureKind
-	(v1alpha11.MeasureBasis)(0),             // 22: hawkr.seller.v1alpha1.MeasureBasis
-	(v1alpha11.RiskGround)(0),               // 23: hawkr.seller.v1alpha1.RiskGround
-	(v1alpha11.MeasureState)(0),             // 24: hawkr.seller.v1alpha1.MeasureState
-	(*v1alpha11.MeasurePeriod)(nil),         // 25: hawkr.seller.v1alpha1.MeasurePeriod
-	(v1alpha11.TerminationGround)(0),        // 26: hawkr.seller.v1alpha1.TerminationGround
-	(*v1alpha11.ContentRef)(nil),            // 27: hawkr.seller.v1alpha1.ContentRef
-	(*errdetails.LocalizedMessage)(nil),     // 28: google.rpc.LocalizedMessage
+	(*MeasureContentBody)(nil),              // 9: hawkr.admin.seller.v1alpha1.MeasureContentBody
+	(*MeasureActionUnavailability)(nil),     // 10: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	(*LinkedAccount)(nil),                   // 11: hawkr.admin.seller.v1alpha1.LinkedAccount
+	(*TerminationOption)(nil),               // 12: hawkr.admin.seller.v1alpha1.TerminationOption
+	(v1alpha1.PolicyCategory)(0),            // 13: hawkr.common.v1alpha1.PolicyCategory
+	(v1alpha11.ViolationSeverity)(0),        // 14: hawkr.seller.v1alpha1.ViolationSeverity
+	(v1alpha11.ViolationStatus)(0),          // 15: hawkr.seller.v1alpha1.ViolationStatus
+	(v1alpha11.RevokeReason)(0),             // 16: hawkr.seller.v1alpha1.RevokeReason
+	(*timestamppb.Timestamp)(nil),           // 17: google.protobuf.Timestamp
+	(v1alpha11.MeasureRequestState)(0),      // 18: hawkr.seller.v1alpha1.MeasureRequestState
+	(v1alpha11.MeasureRequestCloseCause)(0), // 19: hawkr.seller.v1alpha1.MeasureRequestCloseCause
+	(v1alpha11.MeasureRequestKind)(0),       // 20: hawkr.seller.v1alpha1.MeasureRequestKind
+	(*v1alpha1.Deadline)(nil),               // 21: hawkr.common.v1alpha1.Deadline
+	(v1alpha11.MeasureKind)(0),              // 22: hawkr.seller.v1alpha1.MeasureKind
+	(v1alpha11.MeasureBasis)(0),             // 23: hawkr.seller.v1alpha1.MeasureBasis
+	(v1alpha11.RiskGround)(0),               // 24: hawkr.seller.v1alpha1.RiskGround
+	(v1alpha11.MeasureState)(0),             // 25: hawkr.seller.v1alpha1.MeasureState
+	(*v1alpha11.MeasurePeriod)(nil),         // 26: hawkr.seller.v1alpha1.MeasurePeriod
+	(v1alpha11.TerminationGround)(0),        // 27: hawkr.seller.v1alpha1.TerminationGround
+	(*v1alpha11.ContentRef)(nil),            // 28: hawkr.seller.v1alpha1.ContentRef
+	(v1alpha11.ContentKind)(0),              // 29: hawkr.seller.v1alpha1.ContentKind
+	(*errdetails.LocalizedMessage)(nil),     // 30: google.rpc.LocalizedMessage
 }
 var file_hawkr_admin_seller_v1alpha1_measure_proto_depIdxs = []int32{
-	12, // 0: hawkr.admin.seller.v1alpha1.Violation.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	13, // 1: hawkr.admin.seller.v1alpha1.Violation.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	13, // 2: hawkr.admin.seller.v1alpha1.Violation.escalated_from:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	14, // 3: hawkr.admin.seller.v1alpha1.Violation.status:type_name -> hawkr.seller.v1alpha1.ViolationStatus
-	15, // 4: hawkr.admin.seller.v1alpha1.Violation.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
-	16, // 5: hawkr.admin.seller.v1alpha1.Violation.revoke_time:type_name -> google.protobuf.Timestamp
-	16, // 6: hawkr.admin.seller.v1alpha1.Violation.create_time:type_name -> google.protobuf.Timestamp
-	16, // 7: hawkr.admin.seller.v1alpha1.MeasureRevision.end_time:type_name -> google.protobuf.Timestamp
-	16, // 8: hawkr.admin.seller.v1alpha1.MeasureRevision.create_time:type_name -> google.protobuf.Timestamp
+	13, // 0: hawkr.admin.seller.v1alpha1.Violation.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	14, // 1: hawkr.admin.seller.v1alpha1.Violation.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	14, // 2: hawkr.admin.seller.v1alpha1.Violation.escalated_from:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	15, // 3: hawkr.admin.seller.v1alpha1.Violation.status:type_name -> hawkr.seller.v1alpha1.ViolationStatus
+	16, // 4: hawkr.admin.seller.v1alpha1.Violation.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
+	17, // 5: hawkr.admin.seller.v1alpha1.Violation.revoke_time:type_name -> google.protobuf.Timestamp
+	17, // 6: hawkr.admin.seller.v1alpha1.Violation.create_time:type_name -> google.protobuf.Timestamp
+	17, // 7: hawkr.admin.seller.v1alpha1.MeasureRevision.end_time:type_name -> google.protobuf.Timestamp
+	17, // 8: hawkr.admin.seller.v1alpha1.MeasureRevision.create_time:type_name -> google.protobuf.Timestamp
 	0,  // 9: hawkr.admin.seller.v1alpha1.MeasureRevision.system_cause:type_name -> hawkr.admin.seller.v1alpha1.MeasureRevisionSystemCause
-	17, // 10: hawkr.admin.seller.v1alpha1.MeasureRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	16, // 11: hawkr.admin.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
-	16, // 12: hawkr.admin.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
+	18, // 10: hawkr.admin.seller.v1alpha1.MeasureRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
+	17, // 11: hawkr.admin.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
+	17, // 12: hawkr.admin.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
 	4,  // 13: hawkr.admin.seller.v1alpha1.MeasureRequest.evidence:type_name -> hawkr.admin.seller.v1alpha1.Evidence
-	18, // 14: hawkr.admin.seller.v1alpha1.MeasureRequest.close_cause:type_name -> hawkr.seller.v1alpha1.MeasureRequestCloseCause
-	19, // 15: hawkr.admin.seller.v1alpha1.MeasureRequest.kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
-	20, // 16: hawkr.admin.seller.v1alpha1.MeasureRequest.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	21, // 17: hawkr.admin.seller.v1alpha1.Measure.kind:type_name -> hawkr.seller.v1alpha1.MeasureKind
-	22, // 18: hawkr.admin.seller.v1alpha1.Measure.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
+	19, // 14: hawkr.admin.seller.v1alpha1.MeasureRequest.close_cause:type_name -> hawkr.seller.v1alpha1.MeasureRequestCloseCause
+	20, // 15: hawkr.admin.seller.v1alpha1.MeasureRequest.kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
+	21, // 16: hawkr.admin.seller.v1alpha1.MeasureRequest.decide_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	22, // 17: hawkr.admin.seller.v1alpha1.Measure.kind:type_name -> hawkr.seller.v1alpha1.MeasureKind
+	23, // 18: hawkr.admin.seller.v1alpha1.Measure.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
 	5,  // 19: hawkr.admin.seller.v1alpha1.Measure.findings:type_name -> hawkr.admin.seller.v1alpha1.Violation
-	23, // 20: hawkr.admin.seller.v1alpha1.Measure.risk_ground:type_name -> hawkr.seller.v1alpha1.RiskGround
-	16, // 21: hawkr.admin.seller.v1alpha1.Measure.end_time:type_name -> google.protobuf.Timestamp
-	16, // 22: hawkr.admin.seller.v1alpha1.Measure.review_by:type_name -> google.protobuf.Timestamp
-	24, // 23: hawkr.admin.seller.v1alpha1.Measure.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	15, // 24: hawkr.admin.seller.v1alpha1.Measure.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
-	16, // 25: hawkr.admin.seller.v1alpha1.Measure.revoke_time:type_name -> google.protobuf.Timestamp
-	25, // 26: hawkr.admin.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
-	16, // 27: hawkr.admin.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
-	16, // 28: hawkr.admin.seller.v1alpha1.Measure.update_time:type_name -> google.protobuf.Timestamp
+	24, // 20: hawkr.admin.seller.v1alpha1.Measure.risk_ground:type_name -> hawkr.seller.v1alpha1.RiskGround
+	17, // 21: hawkr.admin.seller.v1alpha1.Measure.end_time:type_name -> google.protobuf.Timestamp
+	17, // 22: hawkr.admin.seller.v1alpha1.Measure.review_by:type_name -> google.protobuf.Timestamp
+	25, // 23: hawkr.admin.seller.v1alpha1.Measure.state:type_name -> hawkr.seller.v1alpha1.MeasureState
+	16, // 24: hawkr.admin.seller.v1alpha1.Measure.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
+	17, // 25: hawkr.admin.seller.v1alpha1.Measure.revoke_time:type_name -> google.protobuf.Timestamp
+	26, // 26: hawkr.admin.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
+	17, // 27: hawkr.admin.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
+	17, // 28: hawkr.admin.seller.v1alpha1.Measure.update_time:type_name -> google.protobuf.Timestamp
 	6,  // 29: hawkr.admin.seller.v1alpha1.Measure.revisions:type_name -> hawkr.admin.seller.v1alpha1.MeasureRevision
-	16, // 30: hawkr.admin.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
+	17, // 30: hawkr.admin.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
 	7,  // 31: hawkr.admin.seller.v1alpha1.Measure.requests:type_name -> hawkr.admin.seller.v1alpha1.MeasureRequest
-	26, // 32: hawkr.admin.seller.v1alpha1.Measure.termination_ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	16, // 33: hawkr.admin.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
-	10, // 34: hawkr.admin.seller.v1alpha1.Measure.linked_accounts:type_name -> hawkr.admin.seller.v1alpha1.LinkedAccount
-	9,  // 35: hawkr.admin.seller.v1alpha1.Measure.update_statement_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	9,  // 36: hawkr.admin.seller.v1alpha1.Measure.extend_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	9,  // 37: hawkr.admin.seller.v1alpha1.Measure.shorten_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	9,  // 38: hawkr.admin.seller.v1alpha1.Measure.revoke_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	9,  // 39: hawkr.admin.seller.v1alpha1.Measure.end_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
-	20, // 40: hawkr.admin.seller.v1alpha1.Measure.review_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	27, // 41: hawkr.admin.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
-	1,  // 42: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReason
-	28, // 43: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	2,  // 44: hawkr.admin.seller.v1alpha1.LinkedAccount.matched_identity:type_name -> hawkr.admin.seller.v1alpha1.LinkedIdentity
-	11, // 45: hawkr.admin.seller.v1alpha1.LinkedAccount.termination_option:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
-	16, // 46: hawkr.admin.seller.v1alpha1.LinkedAccount.reviewed_time:type_name -> google.protobuf.Timestamp
-	26, // 47: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	16, // 48: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
-	28, // 49: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
-	3,  // 50: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
-	51, // [51:51] is the sub-list for method output_type
-	51, // [51:51] is the sub-list for method input_type
-	51, // [51:51] is the sub-list for extension type_name
-	51, // [51:51] is the sub-list for extension extendee
-	0,  // [0:51] is the sub-list for field type_name
+	27, // 32: hawkr.admin.seller.v1alpha1.Measure.termination_ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	17, // 33: hawkr.admin.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
+	11, // 34: hawkr.admin.seller.v1alpha1.Measure.linked_accounts:type_name -> hawkr.admin.seller.v1alpha1.LinkedAccount
+	10, // 35: hawkr.admin.seller.v1alpha1.Measure.update_statement_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	10, // 36: hawkr.admin.seller.v1alpha1.Measure.extend_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	10, // 37: hawkr.admin.seller.v1alpha1.Measure.shorten_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	10, // 38: hawkr.admin.seller.v1alpha1.Measure.revoke_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	10, // 39: hawkr.admin.seller.v1alpha1.Measure.end_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
+	21, // 40: hawkr.admin.seller.v1alpha1.Measure.review_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	28, // 41: hawkr.admin.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
+	9,  // 42: hawkr.admin.seller.v1alpha1.Measure.content_bodies:type_name -> hawkr.admin.seller.v1alpha1.MeasureContentBody
+	29, // 43: hawkr.admin.seller.v1alpha1.MeasureContentBody.kind:type_name -> hawkr.seller.v1alpha1.ContentKind
+	1,  // 44: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReason
+	30, // 45: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	2,  // 46: hawkr.admin.seller.v1alpha1.LinkedAccount.matched_identity:type_name -> hawkr.admin.seller.v1alpha1.LinkedIdentity
+	12, // 47: hawkr.admin.seller.v1alpha1.LinkedAccount.termination_option:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
+	17, // 48: hawkr.admin.seller.v1alpha1.LinkedAccount.reviewed_time:type_name -> google.protobuf.Timestamp
+	27, // 49: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	17, // 50: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
+	30, // 51: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
+	3,  // 52: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
+	53, // [53:53] is the sub-list for method output_type
+	53, // [53:53] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_seller_v1alpha1_measure_proto_init() }
@@ -1636,7 +1727,7 @@ func file_hawkr_admin_seller_v1alpha1_measure_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc), len(file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

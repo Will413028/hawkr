@@ -37,36 +37,16 @@ func New(m *delegation.Module, log *slog.Logger) *Server {
 	return &Server{m: m, log: log}
 }
 
-// 舊的業務碼（設計書 56 §6.5.1）。
-const (
-	codeInvalidCommand       = 9260
-	codeAdminSessionRequired = 9261
-	codeSessionNotFound      = 9277
-	codeAuditIntentFailed    = 9279
-)
+// bizCodes 是模組的拒絕對應的業務碼（設計書 56 §6.5.1；表在模組，稽核列的 biz_code 用同一張）。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
+var bizCodes = delegation.DenialBizCodes()
 
-// bizCodes 是模組的拒絕對應的業務碼。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
-var bizCodes = map[delegation.DelegationDenial]int32{
-	delegation.DenialInvalidCommand:             codeInvalidCommand,
-	delegation.DenialAdminRequired:              codeAdminSessionRequired,
-	delegation.DenialCapabilityDenied:           9262,
-	delegation.DenialAuthorizationRevoked:       9264,
-	delegation.DenialStoreNotDelegable:          9265,
-	delegation.DenialStoreClosed:                9265,
-	delegation.DenialIdempotencyKeyReused:       9267,
-	delegation.DenialActorBusy:                  9268,
-	delegation.DenialStoreBusy:                  9269,
-	delegation.DenialSessionExpired:             9270,
-	delegation.DenialSessionRevoked:             9271,
-	delegation.DenialStoreNotOperable:           9272,
-	delegation.DenialCredentialInvalid:          9274,
-	delegation.DenialSessionNotFound:            codeSessionNotFound,
-	delegation.DenialAuditIntentFailed:          codeAuditIntentFailed,
-	delegation.DenialHandoffInvalid:             9282,
-	delegation.DenialAuthorizationAlreadyActive: 9285,
-	delegation.DenialAuthorizationNotFound:      9286,
-	delegation.DenialAdminNotAllowlisted:        9288,
-}
+// 舊的業務碼：與拒絕共用的幾個。
+var (
+	codeInvalidCommand       = bizCodes[delegation.DenialInvalidCommand]
+	codeAdminSessionRequired = bizCodes[delegation.DenialAdminRequired]
+	codeSessionNotFound      = bizCodes[delegation.DenialSessionNotFound]
+	codeAuditIntentFailed    = bizCodes[delegation.DenialAuditIntentFailed]
+)
 
 // reject 把模組的錯誤轉成舊的回應：業務的拒絕回傳 code 與 message（rpcErr 是 nil）；其他錯誤回傳 gRPC 的 internal。
 func (s *Server) reject(ctx context.Context, rpc string, err error) (code int32, msg string, rpcErr error) {

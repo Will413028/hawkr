@@ -179,7 +179,7 @@ func (h *Prospects) ListProspects(ctx context.Context, req *connect.Request[admi
 }
 
 func (h *Prospects) CreateProspect(ctx context.Context, req *connect.Request[adminpb.CreateProspectRequest]) (*connect.Response[adminpb.CreateProspectResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (h *Prospects) GetProspect(ctx context.Context, req *connect.Request[adminp
 // 請求裡，不能先合併再整筆送。可寫的欄位集合取自 proto 的 descriptor（rpc.WritableFields），這裡沒有欄位清單：沒選到的欄位是
 // nil（保留），選到卻沒有值的欄位是清掉；etag 只是版本，不是可寫的資料。
 func (h *Prospects) UpdateProspect(ctx context.Context, req *connect.Request[adminpb.UpdateProspectRequest]) (*connect.Response[adminpb.UpdateProspectResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (h *Prospects) UpdateProspect(ctx context.Context, req *connect.Request[adm
 }
 
 func (h *Prospects) ArchiveProspect(ctx context.Context, req *connect.Request[adminpb.ArchiveProspectRequest]) (*connect.Response[adminpb.ArchiveProspectResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +373,7 @@ func (h *Prospects) ArchiveProspect(ctx context.Context, req *connect.Request[ad
 }
 
 func (h *Prospects) RestoreProspect(ctx context.Context, req *connect.Request[adminpb.RestoreProspectRequest]) (*connect.Response[adminpb.RestoreProspectResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (h *Prospects) RestoreProspect(ctx context.Context, req *connect.Request[ad
 }
 
 func (h *Prospects) MergeProspects(ctx context.Context, req *connect.Request[adminpb.MergeProspectsRequest]) (*connect.Response[adminpb.MergeProspectsResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +432,7 @@ func (h *Prospects) MergeProspects(ctx context.Context, req *connect.Request[adm
 }
 
 func (h *Prospects) ConvertProspect(ctx context.Context, req *connect.Request[adminpb.ConvertProspectRequest]) (*connect.Response[adminpb.ConvertProspectResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +521,7 @@ func (h *Prospects) ListProspectTaxIDMatches(ctx context.Context, req *connect.R
 }
 
 func (h *Prospects) MarkProspectsDistinct(ctx context.Context, req *connect.Request[adminpb.MarkProspectsDistinctRequest]) (*connect.Response[adminpb.MarkProspectsDistinctResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -1,9 +1,9 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
-import 'package:hawkr_api/images.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
+import '../../../shared/models/buyer_card_info.dart';
 
 part 'subscriber_remote_service.g.dart';
 
@@ -47,19 +47,18 @@ class SubscriberRemoteService {
             .where(
               (follower) => follower.hasBuyer() && follower.buyer.id.isNotEmpty,
             )
-            .map(
-              (follower) => SubscriberFollowerDto(
-                buyerId: follower.buyer.id,
+            .map((follower) {
+              final buyer = BuyerCardInfo.fromProto(follower.buyer);
+              return SubscriberFollowerDto(
+                buyerId: buyer.id,
                 subscribedAt: follower.hasCreateTime()
                     ? follower.createTime.toDateTime().toUtc().toIso8601String()
                     : '',
-                displayName: follower.buyer.displayName,
-                avatarUrl: follower.buyer.hasAvatar()
-                    ? follower.buyer.avatar.uri(ImagePreset.avatar)
-                    : '',
-                deleted: follower.buyer.deleted,
-              ),
-            ),
+                displayName: buyer.displayName,
+                avatarUrl: buyer.avatarUrl,
+                deleted: buyer.deleted,
+              );
+            }),
       ),
       nextPageToken: response.nextPageToken,
     );

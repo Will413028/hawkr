@@ -2,7 +2,7 @@
 
 import { AdminRevokeReason } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import type { Measure } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button, Dialog } from "@/components/UI";
 import { connectErrorText } from "@/lib/error-text";
 import { GovernanceNoticeBanner } from "../../merchants/[id]/GovernanceNotice";
@@ -15,6 +15,8 @@ import {
 
 interface RevokeMeasureDialogProps {
 	measure: Measure;
+	/** 撤銷前要讓操作者看到的影響範圍（顯示在原因欄位上方）。 */
+	impact?: ReactNode;
 	onClose: () => void;
 	/** 送出撤銷；reject 時對話框留在原地、保留輸入並就地顯示原因。 */
 	onConfirm: (
@@ -26,6 +28,7 @@ interface RevokeMeasureDialogProps {
 /** 撤銷措施：撤銷原因，以及（伺服器說可以，can_revoke_findings 時）是否一併撤銷認定。 */
 export default function RevokeMeasureDialog({
 	measure,
+	impact,
 	onClose,
 	onConfirm,
 }: RevokeMeasureDialogProps) {
@@ -75,6 +78,7 @@ export default function RevokeMeasureDialog({
 				</>
 			}
 		>
+			{impact}
 			<label className="form-label" htmlFor="revoke-measure-reason">
 				撤銷原因 <span className="required">*</span>
 			</label>

@@ -3,6 +3,7 @@ import Link from "@/components/shared/Link";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import TextScaleControl from "@/components/shared/TextScaleControl";
 import ThemeToggle from "@/components/shared/ThemeToggle";
+import AccountRestrictedSection from "./AccountRestrictedSection";
 import DeleteAccountSection from "./DeleteAccountSection";
 import SignInMethodsSection from "./SignInMethodsSection";
 import { DISPLAY_ROW } from "./settings-row";
@@ -91,6 +92,7 @@ export default function Page() {
 				subtitle="一站管理你的帳號、購物偏好、通知設定。"
 			>
 				<div className="flex flex-col gap-4">
+					<AccountRestrictedSection />
 					<section className="seller-card">
 						<header className="seller-card__head">
 							<h2>顯示</h2>

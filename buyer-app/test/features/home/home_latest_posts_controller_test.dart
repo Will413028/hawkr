@@ -70,4 +70,4 @@ void main() {
 }
 
 Post _post(int id) =>
-    Post(id: id, content: '貼文 $id', merchantId: 7, merchantName: '測試商家');
+    Post(id: id, content: '貼文 $id', storeId: '7', merchantName: '測試商家');

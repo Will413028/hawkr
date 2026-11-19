@@ -147,8 +147,8 @@ func LinkImages(ctx context.Context, client pb.MediaServiceClient, refType, refI
 //
 //   - **寫入路徑**：`PostUseCase.UpdatePost` 在 commit 之後、且這次更新真的動到
 //     `image_asset_id` 的宣告時送出（換圖 keep=[新資產]，清圖 keep=nil）。這是常態路徑。
-//   - **`seller.deleted` handler**：整店退場時分批送出 keepAssetIDs 為 nil 的釋放全部
-//     （`services/social-service/internal/worker/seller_deleted.go`）。軟刪列的引用刻意
+//   - **店家退場**：整店退場時分批送出 keepAssetIDs 為 nil 的釋放全部
+//     （單體的 `internal/modules/social` 訂閱者 `OnStoreRetired` 排清除 job）。軟刪列的引用刻意
 //     保留不釋放（見 cms_post 的 COMMENT ON TABLE），所以「賣家整店退場、圖片不用留」
 //     這條語意只能由這個 handler 自己負責。
 //

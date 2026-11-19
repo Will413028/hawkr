@@ -72,7 +72,63 @@ func (s *Service) Own(ctx context.Context, storeID int64, id uuid.UUID) (model.P
 	if err != nil {
 		return model.Post{}, err
 	}
+	if err := s.markTakedowns(ctx, posts); err != nil {
+		return model.Post{}, err
+	}
+	if err := s.markReadable(ctx, posts); err != nil {
+		return model.Post{}, err
+	}
 	return posts[0], nil
+}
+
+// markReadable 填貼文的 Readable（一次批次查詢，草稿與下架的不查，一定不可讀）；公開讀取的貼文由讀取規則保證可讀，不走這裡，只有店主與後台讀取需要求值。
+func (s *Service) markReadable(ctx context.Context, posts []model.Post) error {
+	ids := make([]uuid.UUID, 0, len(posts))
+	for _, p := range posts {
+		if p.Status == model.StatusPublished {
+			ids = append(ids, p.ID)
+		}
+	}
+	readable, err := s.PublicIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range posts {
+		posts[i].Readable = readable[posts[i].ID]
+	}
+	return nil
+}
+
+// markPublic 標記 posts 都是公開可讀：它們來自帶公開可讀條件的讀取。
+func markPublic(posts []model.Post) {
+	for i := range posts {
+		posts[i].Readable = true
+	}
+}
+
+// markTakedowns 填店主讀自己的貼文與後台列表的 TakedownMeasureID（一次批次查複本 content_takedowns）。
+func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(posts))
+	for i, p := range posts {
+		ids[i] = p.ID
+	}
+	rows, err := s.q(ctx).TakedownMeasuresOfPosts(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("social：讀取貼文的下架措施：%w", err)
+	}
+	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
+	for _, r := range rows {
+		byPost[*r.PostID] = r.MeasureID
+	}
+	for i := range posts {
+		if m, ok := byPost[posts[i].ID]; ok {
+			posts[i].TakedownMeasureID = &m
+		}
+	}
+	return nil
 }
 
 // viewerOf 是公開讀取的觀看者：呼叫者的買家身分；零值是未登入。
@@ -91,7 +147,24 @@ func (s *Service) Public(ctx context.Context, c model.Caller, id uuid.UUID) (mod
 	if err != nil {
 		return model.Post{}, err
 	}
+	markPublic(posts)
 	return posts[0], nil
+}
+
+// PublicIDs 回 ids 之中匿名觀看者讀得到的貼文 ID（規則同 Public，一次查多篇）；不存在或讀不到的不在結果裡。
+func (s *Service) PublicIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	if len(ids) == 0 {
+		return map[uuid.UUID]bool{}, nil
+	}
+	rows, err := reads.Many[reads.IDRow](ctx, s.d.DB.Conn(ctx), reads.PublicPostIDs(ids, s.d.Now().UTC()))
+	if err != nil {
+		return nil, fmt.Errorf("social：批次讀取貼文的公開可讀性：%w", err)
+	}
+	out := make(map[uuid.UUID]bool, len(rows))
+	for _, r := range rows {
+		out[r.ID] = true
+	}
+	return out, nil
 }
 
 // page 把多取一筆的結果切成一頁。
@@ -107,6 +180,7 @@ func (s *Service) feedPage(ctx context.Context, rows []postRow, size int32, more
 	if err != nil {
 		return model.PostPage{}, err
 	}
+	markPublic(posts)
 	out := model.PostPage{Posts: posts}
 	if more {
 		last := rows[len(rows)-1].post
@@ -180,35 +254,65 @@ func (s *Service) ListByHashtag(ctx context.Context, c model.Caller, tag string,
 }
 
 // ListOwn 是店主自己的貼文（含草稿與下架）。status 為空字串不篩選，否則要是 PostStatus 的值。
-func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostStatus, after *model.OwnPostCursor, size int32) (model.OwnPostPage, error) {
+func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostStatus, after *model.CreatedPostCursor, size int32) (model.CreatedPostPage, error) {
 	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
 	if err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
 	if status != "" && !validStatus(status) {
-		return model.OwnPostPage{}, errInvalidStatus(ctx)
+		return model.CreatedPostPage{}, errInvalidStatus(ctx)
 	}
 	at, id := after.Key()
 	p := store.ListOwnPostsParams{StoreID: storeID, Status: string(status), AfterCreated: at, AfterID: id, MaxRows: size + 1}
 	rows, err := s.q(ctx).ListOwnPosts(ctx, p)
 	if err != nil {
-		return model.OwnPostPage{}, fmt.Errorf("social：列出自己的貼文：%w", err)
+		return model.CreatedPostPage{}, fmt.Errorf("social：列出自己的貼文：%w", err)
 	}
 	rows, more := page(rows, size)
 	pr := make([]postRow, len(rows))
 	for i, r := range rows {
 		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
 	}
-	posts, err := s.withTags(ctx, pr)
+	return s.createdPage(ctx, pr, more)
+}
+
+// createdPage 把（已截到一頁的）列轉成建立時間排序的一頁：補標籤與下架措施，more 為真時帶下一頁游標。店主清單與後台清單共用。
+func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (model.CreatedPostPage, error) {
+	posts, err := s.withTags(ctx, rows)
 	if err != nil {
-		return model.OwnPostPage{}, err
+		return model.CreatedPostPage{}, err
 	}
-	out := model.OwnPostPage{Posts: posts}
+	if err := s.markTakedowns(ctx, posts); err != nil {
+		return model.CreatedPostPage{}, err
+	}
+	if err := s.markReadable(ctx, posts); err != nil {
+		return model.CreatedPostPage{}, err
+	}
+	out := model.CreatedPostPage{Posts: posts}
 	if more {
-		last := rows[len(rows)-1].SocialPost
-		out.Next = &model.OwnPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+		last := rows[len(rows)-1].post
+		out.Next = &model.CreatedPostCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
 	return out, nil
+}
+
+// ListAdmin 是後台看的貼文（不含草稿與刪除，每篇帶 TakedownMeasureID）：最新建立的在前；f.TakenDown 為真只列被內容下架的。
+func (s *Service) ListAdmin(ctx context.Context, f model.AdminPostFilter, after *model.CreatedPostCursor, size int32) (model.CreatedPostPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.CreatedPostPage{}, err
+	}
+	at, id := after.Key()
+	rows, err := s.q(ctx).ListAdminPosts(ctx, store.ListAdminPostsParams{TakenDown: f.TakenDown, AfterCreated: at, AfterID: id, MaxRows: size + 1})
+	if err != nil {
+		return model.CreatedPostPage{}, fmt.Errorf("social：後台列出貼文：%w", err)
+	}
+	rows, more := page(rows, size)
+	pr := make([]postRow, len(rows))
+	for i, r := range rows {
+		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
+	}
+	return s.createdPage(ctx, pr, more)
 }
 
 // Top 是「本週主題」：最近發布的 30 篇公開貼文中瀏覽數最高的 n 篇（n 最多 30；同分以發布時間、ID 排），不分頁。
@@ -225,7 +329,12 @@ func (s *Service) Top(ctx context.Context, c model.Caller, n int32) ([]model.Pos
 	for i, r := range rows {
 		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
 	}
-	return s.withTags(ctx, pr)
+	posts, err := s.withTags(ctx, pr)
+	if err != nil {
+		return nil, err
+	}
+	markPublic(posts)
+	return posts, nil
 }
 
 // SuggestHashtags 是標籤的建議（全域彙總，計數不依觀看者與封鎖）：公開貼文上名稱符合的標籤與貼文數（limit 預設 10、上限 20）。contains 為真是「包含」搜尋，否則是前綴。

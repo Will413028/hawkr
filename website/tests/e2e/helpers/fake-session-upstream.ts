@@ -1,12 +1,19 @@
 import http from "node:http";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/session-cookie";
+import {
+	anonymousStorePosts,
+	GET_STORE_PATH,
+	getStoreAnswer,
+	LIST_POSTS_PATH,
+} from "./fake-social-fixtures";
 
 /**
  * The monolith's GetSession for the e2e webServer. The site reads the session on the server (lib/auth/dal.ts),
  * so a browser-side `page.route` never sees that call; the server asks API_BASE_URL instead, and for the e2e
  * that is this process. The answer is derived from the request's own session cookie, which
  * `signInWithSessionCookie` fills with the identity: no per-test state lives here, so parallel workers and
- * retries cannot disturb each other. Every other path closes the socket, like the discarded loopback port it
+ * retries cannot disturb each other. It also answers the server-rendered social reads from `fake-social-fixtures.ts`
+ * (anonymous ListPosts of the fixture stores and their public seller lookups), which a browser-side `page.route` cannot reach. Every other path closes the socket, like the discarded loopback port it
  * replaces, so an unmocked SSR request still fails instead of succeeding quietly.
  */
 
@@ -76,6 +83,46 @@ export function createFakeSessionUpstream(): http.Server {
 		const url = new URL(req.url ?? "/", "http://upstream.invalid");
 		if (url.pathname === "/healthz") {
 			res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+			return;
+		}
+		if (url.pathname.endsWith(LIST_POSTS_PATH)) {
+			let storeId: string | undefined;
+			try {
+				const raw = url.searchParams.get("message");
+				const message = raw ? (JSON.parse(raw) as { storeId?: string }) : {};
+				storeId = message.storeId || undefined;
+			} catch {
+				req.socket.destroy();
+				return;
+			}
+			const posts = anonymousStorePosts(storeId);
+			if (!posts) {
+				req.socket.destroy();
+				return;
+			}
+			res
+				.writeHead(200, { "content-type": "application/json" })
+				.end(JSON.stringify({ posts }));
+			return;
+		}
+		if (url.pathname.endsWith(GET_STORE_PATH)) {
+			let storeCode: string | undefined;
+			try {
+				const raw = url.searchParams.get("message");
+				const message = raw ? (JSON.parse(raw) as { storeCode?: string }) : {};
+				storeCode = message.storeCode || undefined;
+			} catch {
+				req.socket.destroy();
+				return;
+			}
+			const store = getStoreAnswer(storeCode);
+			if (!store) {
+				req.socket.destroy();
+				return;
+			}
+			res
+				.writeHead(store.status, { "content-type": "application/json" })
+				.end(JSON.stringify(store.body));
 			return;
 		}
 		if (!url.pathname.endsWith(GET_SESSION_PATH)) {

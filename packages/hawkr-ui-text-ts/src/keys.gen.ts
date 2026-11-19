@@ -3,8 +3,10 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -51,6 +53,13 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -81,6 +90,8 @@ export type UiTextKey =
 	| "seller.Measure.meta_severity"
 	| "seller.Measure.meta_termination_ground"
 	| "seller.Measure.rejection_cooldown_warning"
+	| "seller.Measure.removed_contents_cleared"
+	| "seller.Measure.removed_contents_heading"
 	| "seller.Measure.suspension_active_open"
 	| "seller.Measure.suspension_active_until"
 	| "seller.Measure.suspension_ended"
@@ -90,6 +101,7 @@ export type UiTextKey =
 	| "seller.Measure.title_fallback"
 	| "seller.Measure.title_risk"
 	| "seller.Measure.title_risk_fallback"
+	| "seller.Measure.view_content_link"
 	| "seller.MeasureBasis.MEASURE_BASIS_CONTRACT"
 	| "seller.MeasureBasis.MEASURE_BASIS_RISK"
 	| "seller.MeasureBasis.MEASURE_BASIS_VIOLATION"
@@ -170,6 +182,8 @@ export type UiTextKey =
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_HIGH"
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_LOW"
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_MEDIUM"
+	| "social.CommentState.placeholder.COMMENT_STATE_DELETED"
+	| "social.CommentState.placeholder.COMMENT_STATE_HIDDEN"
 	;
 
 /** seller.MeasureKind 的值號到值名；ICU select 的分支用值名。 */
@@ -276,6 +290,33 @@ export function commonError(code: Code): UiMessage | undefined {
 /** 不認得的值與 UNSPECIFIED 一律顯示的文字。 */
 export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
+}
+
+const MODERATION_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "moderation.ReportOutcome.REPORT_OUTCOME_PENDING",
+	2: "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION",
+	3: "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
+};
+
+/** moderation.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function moderationReportOutcome(v: ReportOutcome): UiMessage | undefined {
+	const key = MODERATION_REPORT_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST",
+	2: "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT",
+	3: "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY",
+	4: "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER",
+};
+
+/** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function moderationReportTargetKind(v: ReportTargetKind): UiMessage | undefined {
+	const key = MODERATION_REPORT_TARGET_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
 }
 
 const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -392,6 +433,16 @@ export function sellerMeasureRejectionCooldownWarning(a: { days: number }): UiMe
 	return { key: "seller.Measure.rejection_cooldown_warning", values: { days: a.days } };
 }
 
+/** seller.Measure.removed_contents_cleared */
+export function sellerMeasureRemovedContentsCleared(): UiMessage {
+	return { key: "seller.Measure.removed_contents_cleared" };
+}
+
+/** seller.Measure.removed_contents_heading */
+export function sellerMeasureRemovedContentsHeading(): UiMessage {
+	return { key: "seller.Measure.removed_contents_heading" };
+}
+
 /** seller.Measure.suspension_active_open */
 export function sellerMeasureSuspensionActiveOpen(): UiMessage {
 	return { key: "seller.Measure.suspension_active_open" };
@@ -437,6 +488,11 @@ export function sellerMeasureTitleRisk(a: { ground: RiskGround }): UiMessage | u
 /** seller.Measure.title_risk_fallback */
 export function sellerMeasureTitleRiskFallback(): UiMessage {
 	return { key: "seller.Measure.title_risk_fallback" };
+}
+
+/** seller.Measure.view_content_link */
+export function sellerMeasureViewContentLink(): UiMessage {
+	return { key: "seller.Measure.view_content_link" };
 }
 
 const SELLER_MEASURE_BASIS: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -692,6 +748,18 @@ const SELLER_VIOLATION_SEVERITY: Readonly<Partial<Record<number, UiTextKey>>> = 
 /** seller.ViolationSeverity 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function sellerViolationSeverity(v: ViolationSeverity): UiMessage | undefined {
 	const key = SELLER_VIOLATION_SEVERITY[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SOCIAL_COMMENT_STATE_PLACEHOLDER: Readonly<Partial<Record<number, UiTextKey>>> = {
+	2: "social.CommentState.placeholder.COMMENT_STATE_DELETED",
+	3: "social.CommentState.placeholder.COMMENT_STATE_HIDDEN",
+};
+
+/** social.CommentState.placeholder；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function socialCommentStatePlaceholder(v: CommentState): UiMessage | undefined {
+	const key = SOCIAL_COMMENT_STATE_PLACEHOLDER[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

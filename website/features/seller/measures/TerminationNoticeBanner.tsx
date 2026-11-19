@@ -2,6 +2,7 @@
 
 import { MeasureState } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import Link from "@/components/shared/Link";
+import WarningNotice from "@/components/shared/WarningNotice";
 import { useSellerMeasures } from "@/lib/hooks/useSellerMeasures";
 import { useUiText } from "@/lib/i18n/ui-text";
 import { measureHref, terminationNoticeText } from "./measureDisplay";
@@ -9,7 +10,7 @@ import { measureHref, terminationNoticeText } from "./measureDisplay";
 /**
  * 預告終止橫幅（賣家中心外框）：預定生效的終止合作（`ListMyMeasures(state=SCHEDULED)`）每筆一條，連到該措施
  * 的措施頁（申覆入口在那裡）。預告期間帳號不受限制，所以不擋任何頁面；讀取中或失敗不顯示。
- * 沿用站內 warning tone（同 `RealtimeSyncNotice`）。
+ * 樣式是共用的 `WarningNotice`。
  */
 export default function TerminationNoticeBanner() {
 	const ut = useUiText();
@@ -22,16 +23,12 @@ export default function TerminationNoticeBanner() {
 	return (
 		<>
 			{notices.map(({ measure, text }) => (
-				<p
-					key={measure.id}
-					role="status"
-					className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-hkui-md bg-warning-50 px-3.5 py-2.5 text-[0.8125rem] font-semibold text-warning-700 dark:bg-[#a9842c]/26 dark:text-[#d6c27e]"
-				>
+				<WarningNotice key={measure.id}>
 					<span>{text}</span>
 					<Link href={measureHref(measure)} className="font-bold underline">
 						措施與申覆
 					</Link>
-				</p>
+				</WarningNotice>
 			))}
 		</>
 	);

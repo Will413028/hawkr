@@ -24,23 +24,29 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
 	httpagent "github.com/Will413028/hawkr/backend/internal/httpapi/agent"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	adminmoderationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	adminpaymentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	adminreviewqueueconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
+	adminsocialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
+	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -53,6 +59,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -67,9 +74,11 @@ type Deps struct {
 	Content    *content.Module
 	Buyer      *buyer.Module
 	BuyerPorts httpbuyer.Ports
-	Deletion   *accountdeletion.Module
-	Delegation *delegation.Module
-	Discovery  *discovery.Module
+	// SocialProducts 是貼文卡片的商品顯示資料來源（批次）。
+	SocialProducts httpsocial.Products
+	Deletion       *accountdeletion.Module
+	Delegation     *delegation.Module
+	Discovery      *discovery.Module
 	// ReviewQueue 是後台待辦（ReviewQueueAdminService）；時鐘用 Now。
 	ReviewQueue *reviewqueue.Module
 	Identity    *identity.Module
@@ -83,6 +92,8 @@ type Deps struct {
 	Payment *payment.Module
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
+	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
+	Moderation *moderation.Module
 	// Agent 是 vendor portal 的邀請與 session（VendorPortalPublicService、VendorPortalInviteeService）；Google 的 step-up 經 Identity。
 	Agent *agent.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
@@ -157,6 +168,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Buyer == nil {
 		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
+	}
+	if deps.Moderation == nil {
+		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -289,17 +303,25 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
-	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin, deps.Now)
+	socialPublic, err := httpsocial.NewPublic(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Now, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialPublicServiceHandler(socialPublic, opts...))
-	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.Images, deps.WebOrigin)
+	socialApp, err := httpsocial.NewApp(deps.Social, deps.Social, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
-	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats)
+	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Buyer), opts...))
+	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
+	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
+	if err != nil {
+		return nil, err
+	}
+	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
+	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
 	}
@@ -339,14 +361,14 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.WebOrigin, deps.Logger)
+	sellerApp, err := httpseller.NewApp(deps.Seller, deps.Payment, deps.Buyer, deps.Images, dashboard, stats, deps.Social, deps.WebOrigin, blocking, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
-	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images, deps.Payment, deps.Logger), opts...))
+	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images, deps.Payment, deps.Social, deps.Logger), opts...))
 	add(sellerconnect.NewSellerPublicServiceHandler(sellerPublic, opts...))
 	add(sellerconnect.NewSellerAppServiceHandler(sellerApp, append(slices.Clone(opts), connect.WithInterceptors(acting))...))
-	governance, err := httpseller.NewGovernance(httpseller.GovernanceDeps{Module: deps.Seller, Images: deps.Images, ContentOwners: deps.Social})
+	governance, err := httpseller.NewGovernance(httpseller.GovernanceDeps{Module: deps.Seller, Images: deps.Images, ContentSnapshots: deps.Social, Links: deps.Social})
 	if err != nil {
 		return nil, err
 	}
@@ -369,6 +391,17 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(agentv1alpha1connect.NewVendorPortalPublicServiceHandler(httpagent.NewPublic(deps.Agent, deps.Now), opts...))
 	add(agentv1alpha1connect.NewVendorPortalInviteeServiceHandler(httpagent.NewInvitee(deps.Agent, deps.Identity, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(invitee))...))
+	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
+	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
+	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)
+	if err != nil {
+		return nil, err
+	}
+	delegatedSocial, err := httpsocial.NewDelegated(deps.Delegation, deps.Social, deps.Buyer, deps.Seller, deps.SocialProducts, deps.Images, deps.WebOrigin, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(socialv1alpha1connect.NewSocialDelegatedServiceHandler(delegatedSocial, append(slices.Clone(opts), connect.WithInterceptors(socialDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -424,7 +457,7 @@ func checkAdminDeclarations(services []service) error {
 func mount(mux *http.ServeMux, path string, h http.Handler) {
 	audience, ok := rpc.AudienceOf(path)
 	if !ok {
-		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、hawkr.admin.* 的 <模組>AdminService）", path))
+		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、<模組>DelegatedService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
 	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }

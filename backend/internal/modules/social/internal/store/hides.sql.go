@@ -12,17 +12,44 @@ import (
 	"uuid"
 )
 
+const availableLinkPosts = `-- name: AvailableLinkPosts :many
+SELECT id FROM social.posts WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
+`
+
+// 一批貼文裡賣家此刻點得進去的：沒有軟刪就算（下架不擋，賣家中心讀自己的貼文看得到下架的）；措施快照的連結只對這些顯示（A7-D29）。唯讀，不鎖。
+func (q *Queries) AvailableLinkPosts(ctx context.Context, postIds []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, availableLinkPosts, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCommentSnapshot = `-- name: GetCommentSnapshot :one
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, post_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.comments
 WHERE id = $1
 `
 
 type GetCommentSnapshotRow struct {
-	ActorKind string
-	ActorID   int64
-	Body      *string
-	ExistsNow bool
+	ActorKind  string
+	ActorID    int64
+	Body       *string
+	PostID     uuid.UUID
+	AuthoredAt time.Time
+	ExistsNow  bool
 }
 
 // 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
@@ -33,22 +60,26 @@ func (q *Queries) GetCommentSnapshot(ctx context.Context, id uuid.UUID) (GetComm
 		&i.ActorKind,
 		&i.ActorID,
 		&i.Body,
+		&i.PostID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err
 }
 
 const getForumEntrySnapshot = `-- name: GetForumEntrySnapshot :one
-SELECT actor_kind, actor_id, body, (deleted_at IS NULL)::boolean AS exists_now
+SELECT actor_kind, actor_id, body, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = $1
 `
 
 type GetForumEntrySnapshotRow struct {
-	ActorKind string
-	ActorID   int64
-	Body      *string
-	ExistsNow bool
+	ActorKind  string
+	ActorID    int64
+	Body       *string
+	ThreadID   uuid.UUID
+	AuthoredAt time.Time
+	ExistsNow  bool
 }
 
 // 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
@@ -59,13 +90,15 @@ func (q *Queries) GetForumEntrySnapshot(ctx context.Context, id uuid.UUID) (GetF
 		&i.ActorKind,
 		&i.ActorID,
 		&i.Body,
+		&i.ThreadID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err
 }
 
 const getPostSnapshot = `-- name: GetPostSnapshot :one
-SELECT store_id, body, image_asset_id, (deleted_at IS NULL)::boolean AS exists_now
+SELECT store_id, body, image_asset_id, COALESCE(published_at, created_at)::timestamptz AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.posts
 WHERE id = $1
 `
@@ -74,6 +107,7 @@ type GetPostSnapshotRow struct {
 	StoreID      int64
 	Body         string
 	ImageAssetID *string
+	AuthoredAt   time.Time
 	ExistsNow    bool
 }
 
@@ -85,6 +119,7 @@ func (q *Queries) GetPostSnapshot(ctx context.Context, id uuid.UUID) (GetPostSna
 		&i.StoreID,
 		&i.Body,
 		&i.ImageAssetID,
+		&i.AuthoredAt,
 		&i.ExistsNow,
 	)
 	return i, err

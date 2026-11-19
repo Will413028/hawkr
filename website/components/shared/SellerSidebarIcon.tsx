@@ -12,6 +12,7 @@ export type SellerSidebarIconName =
 	| "wallet"
 	| "truck"
 	| "shield"
+	| "block"
 	| "settings"
 	| "chat"
 	| "notification"

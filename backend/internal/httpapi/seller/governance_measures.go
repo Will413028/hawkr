@@ -134,7 +134,12 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 		out.Findings = append(out.Findings, toAdminViolation(f))
 	}
 	for _, c := range m.Contents {
-		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+		out.Contents = append(out.Contents, toContentRef(c))
+		if c.FullBody {
+			out.ContentBodies = append(out.ContentBodies, &adminpb.MeasureContentBody{
+				Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), Body: c.Snapshot.Body, ImageCount: c.Snapshot.ImageCount,
+			})
+		}
 	}
 	for _, r := range m.Revisions {
 		out.Revisions = append(out.Revisions, toRevision(r))
@@ -256,7 +261,7 @@ func violationBasisFrom(msg *adminpb.ViolationBasis, prefix string) (*model.Viol
 // CreateMeasure 的種類就是設定的是哪一支輸入（warning、suspension、termination）：每一支只有自己的欄位，所以轉換時種類與依據、結束時間、複審期限
 // 的對應是由結構保證，不需要跨欄位檢查；各支專屬的規則（停權依據認定必填結束時間、風險必填複審期限、終止事由的條件）由模組驗證。
 func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adminpb.CreateMeasureRequest]) (*connect.Response[adminpb.CreateMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -327,18 +332,19 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		if in.Violation, err = violationBasisFrom(input.ContentTakedown.GetViolation(), "content_takedown.violation"); err != nil {
 			return nil, err
 		}
-		t := &model.ContentTakedown{}
+		refs := make([]model.ContentRef, 0, len(input.ContentTakedown.GetContents()))
 		for i, ref := range input.ContentTakedown.GetContents() {
 			id, err := rpc.ParseUUID(apperr.IndexedField("content_takedown.contents", i)+".id", ref.GetId())
 			if err != nil {
 				return nil, err
 			}
-			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+			refs = append(refs, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
 		}
-		if err := h.verifyTakedownContents(ctx, in.StoreID, t.Contents); err != nil {
+		contents, err := h.takedownContents(ctx, in.StoreID, refs)
+		if err != nil {
 			return nil, err
 		}
-		in.Takedown = t
+		in.Takedown = &model.ContentTakedown{Contents: contents}
 	default:
 		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
@@ -351,25 +357,36 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		}
 		return nil, rpc.WithFieldPaths(err, paths)
 	}
-	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
+	measure, err := adminMeasure(ctx, h.links, result.Measure)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: measure}), nil
 }
 
-// verifyTakedownContents 核對每一則內容現在存在（沒有刪除）、種類相符、作者是這家店；後台處理的是現存的內容，已刪除與不存在的都拒絕。
-func (h *Governance) verifyTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
-	for i, c := range contents {
-		o, err := h.owners.ContentOwner(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
-		if err != nil {
-			return err
-		}
-		if !o.Exists || o.StoreID != storeID || o.Author.Kind != social.ActorStore || o.Author.ID != storeID {
-			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
-		}
+// takedownContents 先檢查清單的形狀（筆數、種類、重複；壞請求不讀 social），再核對每一則內容現在存在（沒有刪除）、作者是這家店，並用同一次讀取取得處分依據的內容快照；後台處理的是現存的內容，已刪除與不存在的都拒絕。
+// 種類不符或不存在的內容讀不到快照，同樣拒絕；moderation 一律有案件快照，所以快照必填。
+func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs []model.ContentRef) ([]model.TakedownContent, error) {
+	if err := model.ValidateContentRefs("Takedown.Contents", refs); err != nil {
+		return nil, rpc.WithFieldPaths(err, createTakedownPaths)
 	}
-	return nil
+	out := make([]model.TakedownContent, 0, len(refs))
+	for i, c := range refs {
+		sn, err := h.snapshots.ContentSnapshot(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
+		if err != nil {
+			return nil, err
+		}
+		if !sn.Exists || sn.StoreID != storeID || sn.Author.Kind != social.ActorStore || sn.Author.ID != storeID {
+			return nil, rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
+		}
+		snap := model.NewContentSnapshot(c.Kind, sn.Body, sn.AuthoredAt, len(sn.MediaRefs), sn.StoreID, sn.PostID, sn.ThreadID)
+		out = append(out, model.TakedownContent{ContentRef: c, Snapshot: &snap})
+	}
+	return out, nil
 }
 
 // takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。
-func takedownContentError(err error, contents []model.ContentRef) (error, bool) {
+func takedownContentError(err error, contents []model.TakedownContent) (error, bool) {
 	var bad *social.TakedownContentError
 	if !errors.As(err, &bad) {
 		return err, false
@@ -391,7 +408,11 @@ func (h *Governance) GetMeasure(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminpb.GetMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.GetMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[adminpb.ListMeasuresRequest]) (*connect.Response[adminpb.ListMeasuresResponse], error) {
@@ -454,7 +475,11 @@ func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, listMeasuresPaths)
 	}
-	out := &adminpb.ListMeasuresResponse{Measures: toAdminMeasures(page.Items)}
+	measures, err := adminMeasures(ctx, h.links, page.Items)
+	if err != nil {
+		return nil, err
+	}
+	out := &adminpb.ListMeasuresResponse{Measures: measures}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
@@ -465,7 +490,7 @@ func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[admi
 // 處理（rpc.ApplyUpdateMask）。合併的基準是目前的措施；end_time 只在合併後與目前不同時才交給模組（警告沒有 end_time，原樣送回不算
 // 修改），mask 列了 end_time 卻沒有值是清除。
 func (h *Governance) UpdateMeasure(ctx context.Context, req *connect.Request[adminpb.UpdateMeasureRequest]) (*connect.Response[adminpb.UpdateMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +523,11 @@ func (h *Governance) UpdateMeasure(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updateMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.UpdateMeasureResponse{Measure: toAdminMeasure(updated)}), nil
+	measure, err := adminMeasure(ctx, h.links, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.UpdateMeasureResponse{Measure: measure}), nil
 }
 
 // sameInstant 比較合併前的結束時間與合併後的時間（兩者都可能不設）。
@@ -510,7 +539,7 @@ func sameInstant(before *time.Time, after *timestamppb.Timestamp) bool {
 }
 
 func (h *Governance) EndMeasure(ctx context.Context, req *connect.Request[adminpb.EndMeasureRequest]) (*connect.Response[adminpb.EndMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -526,11 +555,15 @@ func (h *Governance) EndMeasure(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, endMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.EndMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.EndMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adminpb.RevokeMeasureRequest]) (*connect.Response[adminpb.RevokeMeasureResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -549,11 +582,15 @@ func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, revokeMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.RevokeMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.RevokeMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Request[adminpb.ScheduleMeasureReviewRequest]) (*connect.Response[adminpb.ScheduleMeasureReviewResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -574,11 +611,15 @@ func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, scheduleReviewPaths)
 	}
-	return connect.NewResponse(&adminpb.ScheduleMeasureReviewResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.ScheduleMeasureReviewResponse{Measure: measure}), nil
 }
 
 func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[adminpb.DecideAppealRequest]) (*connect.Response[adminpb.DecideAppealResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -597,11 +638,15 @@ func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, decideAppealPaths)
 	}
-	return connect.NewResponse(&adminpb.DecideAppealResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.DecideAppealResponse{Measure: measure}), nil
 }
 
 func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request[adminpb.DecideRemediationRequest]) (*connect.Response[adminpb.DecideRemediationResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -620,12 +665,16 @@ func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, decideRemediationPaths)
 	}
-	return connect.NewResponse(&adminpb.DecideRemediationResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.DecideRemediationResponse{Measure: measure}), nil
 }
 
 // CreateMeasureNote 新增內部註記：不帶 etag，也不改措施的任何 etag。
 func (h *Governance) CreateMeasureNote(ctx context.Context, req *connect.Request[adminpb.CreateMeasureNoteRequest]) (*connect.Response[adminpb.CreateMeasureNoteResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +765,7 @@ func (h *Governance) ListViolations(ctx context.Context, req *connect.Request[ad
 }
 
 func (h *Governance) MarkLinkedAccountReviewed(ctx context.Context, req *connect.Request[adminpb.MarkLinkedAccountReviewedRequest]) (*connect.Response[adminpb.MarkLinkedAccountReviewedResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

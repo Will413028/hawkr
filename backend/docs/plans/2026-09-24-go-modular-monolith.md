@@ -204,11 +204,11 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **A5 invoice**：先不接手發票快照，等 B8 的 ordering。
   - 機敏檔的後台讀取（A3 計畫 8f-1 留下的終點）：稅籍佐證與發票 PDF 改由 invoice 模組的 `/api/files/admin/invoice/...` 端點提供，網址由擁有者的 Connect 方法回傳，讀取經 `media.Media.ReadSecure`，存取紀錄進 invoice 模組（先寫再讀，寫不進去就不送），admin 的檢視不帶 asset ID。舊 invoice-service 的 admin 發票 PDF 下載目前不記讀取者，搬遷時一併補上。
   - 發票申訴的違規累計交給 seller（Will 2026-10-28，ADR `2026-09-18-invoice-service-architecture.md` 文末修訂）：invoice 搬進單體時刪掉 `seller_tax_profiles` 的 `violation_window_days`、`violation_threshold`、`suspension_days` 三欄與 `recommendation`、`suggestedSuspendDays`（含 proto、openapi、gateway DTO，以及 admin 申訴頁與建立處分對話框對它們的使用）；admin 改為顯示去重後的已確認申訴作為依據，由管理員經 seller 的 `CreateMeasure` 建立認定；決定發票是否新增認定類別（58A X-a、X3）。
-- [ ] **A6 review、im、crm**（緊接 A7，排在 A4、A5、A8 之前：A7 不寫往舊 im／review 的橋（S3），聊天與評價的封鎖、檢舉在 A7-4e 到 A6 的 client 步驟之間本機會失敗，Will 2026-10-18 接受（A7 計畫 Q1）；步驟草案見 `2026-10-18-a7-social/decision-brief.md` §4 的 A6-0 到 A6-7，A6-0 照 A7-0 的格式重做盤點與計畫）
+- [ ] **A6 review、im、crm**（緊接 A7，排在 A4、A5、A8 之前：A7 不寫往舊 im／review 的橋（S3），聊天與評價的封鎖、檢舉在 A7-4e 到 A6 的 client 步驟之間本機會失敗，Will 2026-10-18 接受（A7 計畫 Q1）；步驟、決定與進度在階段計畫 `2026-11-19-a6-review-im-crm.md`，A6-0 完成、決定 A6-D1 到 A6-D8 已拍板（Will 2026-11-19））
   - 封鎖（A7-D2 留下）：聊天與評價的封鎖、檢舉入口改用對話或評價的參照，im、review 以 in-process 呼叫 buyer、seller 的「是否封鎖」模組 API（A7-1b 建好，A7 不做 legacy gRPC）；moderation 加聊天與評價對象（快照、隱藏與還原 in-process）；CRM「黑名單」併入店家封鎖，分頁改名「封鎖名單」或拿掉；店家封鎖後訂單相關聯絡是否例外在這裡設計。完成時刪 `pkg/blocklist`、`pkg/moderation`。
   - A6 自己的橋（不是 S3 造成的）：review relay（給 Java order、product 與 notification）、crm 的 `order.completed`／`aftersales.refund.completed` consumer、coupon legacy client、orderservice 補 3 支方法；刪 legacy `reviewservice`、`crmservice` client（決定簡報 §1.2）。
   - IM 的即時通道依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 決定：預設是 server streaming 收訊息、unary 送出；需要瀏覽器上的雙向即時而保留 WebSocket 時，明列為第二套契約。扇出和 A7 拿掉的留言即時推一起設計（A7-D10）。
-- [ ] **A7 social**（2026-10-17 提前，排在 A6 之前；原本排在 A6 之後只是計畫分段）：步驟、決定與進度都在階段計畫 `2026-10-18-a7-social.md`，本段只記結論。決定：A7-D1 到 A7-D5′ 見 `2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（Will 2026-10-17）；A7-D6 到 A7-D13、S1、S3、Q1–Q6 見 `2026-10-18-a7-social/decision-brief.md`（Will 2026-10-18）。規模：社群 REST 40 條（brief 口徑 42 含 2 條商品 hashtag）加代行貼文 6 條、RPC 34 支、表 10 張、事件 14 列；約 15.5 session【推】。
+- [x] **A7 social**（2026-10-17 提前，排在 A6 之前；原本排在 A6 之後只是計畫分段）：步驟、決定與進度都在階段計畫 `2026-10-18-a7-social.md`，本段只記結論。決定：A7-D1 到 A7-D5′ 見 `2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（Will 2026-10-17）；A7-D6 到 A7-D13、S1、S3、Q1–Q6 見 `2026-10-18-a7-social/decision-brief.md`（Will 2026-10-18）。規模：社群 REST 40 條（brief 口徑 42 含 2 條商品 hashtag）加代行貼文 6 條、RPC 34 支、表 10 張、事件 14 列；約 15.5 session【推】。
   - 新模組 social 與 moderation；封鎖在 buyer（個人）與 seller（店家）；店家內容被平台下架是 seller 的新措施種類「內容下架」；處分紀錄歸執行效果的模組（買家的社群處分在 social）；後台待辦加 moderation 的 `pub_*` 來源。
   - 排程發布歸 social；delegation 撤銷 session 時在同一個 transaction 取消，並以同步訂閱者寫稽核（A7-D6 選 D）。代行貼文 6 條路由在 A7 改走單體 Connect（S1），legacy SocialService 不寫，`api/proto/social`、`pkg/proto/social` 在 A7 收尾刪除。
   - 留言不即時推（A7-D10 不做），gateway 的留言 SSE 刪除；瀏覽數含匿名（每日換 salt 的雜湊去重）；計數同 transaction。
@@ -216,6 +216,31 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 讚與留言的互動者身分：照 ADR `2026-10-17-social-actor-identity.md`（M1 (kind, id)、S2、I3）；`actor_id` 隨 buyer、store 換 uuid 時換型別。
   - content 的 banner 點擊行為（`post`）改成經 social 的公開 API 確認貼文存在，ID 格式同時換成 UUID：依賴表的 content 加上 social，並更新 ADR D2 的表（content 模組 `CARRYOVER.md` 的沿用盤點；現在只檢查非空）。
   - 賣家中心的動態數徽章改由伺服器提供數量：website 現在只從前 50 筆貼文算（`useSellerPosts`），超過就少算（A3 計畫第 4C 刀的決定）。
+  - 完成（2026-11-19）：進度與證據見 A7 計畫 `2026-10-18-a7-social.md` 的進度表，完成定義核對見 `2026-10-18-a7-social/dod-social.md`、`dod-moderation.md`。
+  - A7 延後項（各附觸發條件，自 A7 計畫搬回）：
+  - 聊天與評價的封鎖、檢舉入口改送參照；im、review 改查 buyer、seller 的封鎖；moderation 加聊天與評價對象（隱藏與還原 in-process）；CRM「黑名單」併入店家封鎖；店家封鎖後訂單相關聯絡的例外；刪 `pkg/blocklist`、`pkg/moderation`（`internal/platform/textfilter` 成為唯一的詞典）。觸發：A6（決定簡報 §4 的 A6-0 到 A6-7）。
+  - notification 消費社群事件、刪除 `socialrelay`；作者被隱藏內容與收到警告的推播（Q6）、帳號停權與解除的通知（消費 `accountsuspension` 的事件，帶理由，A7-D17）、依案件決定通知該案每位檢舉人（A7-D20）；封鎖雙方之間不送互動通知的規則從 relay 搬進 notification 建立通知的地方，帶著 A7-3 的同一個測試。觸發：A8。
+  - `socialrelay` 的 `post.created` fan-out 每個追蹤者查兩次封鎖、一次買家資料（每人約三次讀取），而且每個追蹤者一次 `Enqueue`、沒有批次插入（`jobs.Enqueuer` 只有單筆）：追蹤者少時成本可忽略，relay 隨 notification 搬進單體（A8）而刪除。觸發：出現追蹤者超過 1,000 的店家。
+  - notification-service 的自我略過（`template_handler.go` 的 `actorFieldByEventType`）把買家 ID 拿去比店家 ID，兩者編號空間不同，數字相同時正常通知會被誤丟；是舊程式既有的缺陷，A7-3 的 relay 已先以帳號擋下真正的自我通知。notification 搬進單體時改以帳號比對（Will 2026-11-17）。觸發：A8。
+  - 買家處分的完整階梯（有期限的參與限制、次數、90 天累計）的參數與買家對處分的申覆（Q2 (iii)；brief「還不能定的」第 1 項）。觸發：買家條款寫好。
+  - 處分理由的 App 與 website 畫面（Q6：A7 只做 API）。觸發：UI 稿核可。
+  - 店家範圍留言列表（`ListStoreComments` 不指定貼文）跨貼文依 `comments.created_at` 排序，沒有店家層級的索引支撐，延遲隨店家留言總數成長（推論，未量測；A7-2c 審查）。觸發：上線前的效能量測，或單店留言量達到量測顯示列表延遲超標。
+  - 討論區留言的讚（4a-1 拿掉了從未生效的按鈕，Will 2026-11-17）。觸發：產品決定要讓討論區能按讚。
+  - 社群收件匣的 UI 稿。API 在 A7-2 先做，UI 稿在 A7-4 前另外核可，只擋 4a、4d 的收件匣畫面（brief 文案段末）。
+  - 案件改判（moderation 的指令經各模組非手動的撤銷連帶撤銷，另加撤銷原因）。觸發：通報人對處置的申訴（10e R12）。
+  - 軟刪貼文與留言的保留期和清理 job。觸發：隱私權政策訂出保留期。在那之前，買家刪除時只清掉列上的 PII（留言不存作者快照）。
+  - 兩個請求同時下架同一則內容時，後到的撞 `measure_contents_one_enforced` 回未分類的 internal error 而不是 `CONTENT_TAKEDOWN_ACTIVE`（資料一致，只是訊息；A7-4b 審查）。觸發：上線前的錯誤分類盤點。
+  - 後台建立內容下架時逐則讀 social 快照（最多 20 則，形狀檢查在讀取前；批次化要重寫三種內容的 owner 查詢與 reads 守門，A7-4a-2b /code-review）。觸發：上限調高到 20 則以上，或量到後台建立措施的延遲超標。
+  - middleware 的兩份手寫 TTL memo（`lib/seller/canonical-redirect.ts` 的賣家、`lib/forum/thread-guard.ts` 的討論串）抽成共用 helper（A7-4a-2b 設計審查）。觸發：middleware 再加第三份同類 memo，或改其中一份的 TTL／容量規則。
+  - 店家留言頁的頁面說明「查看 {name} 的留言與顧客討論」仍寫死中文、沒有 en（`SellerMessagesPage.tsx`）。觸發：Will 核可 en 文案。
+  - website 預覽的貼文分頁改成唯讀：照原排程留在 10d 第 6 刀（A3 計畫），不併進 A7-4a。
+  - A7-1c 留給 A7-4 的兩項（觸發：A7-4 的賣家端與後台畫面）：後台的類別下拉（`ASSESSABLE_CATEGORIES`）沒有社群的 `SPAM`、`HARASSMENT`、`HATE`，伺服器已接受；店主讀自己的店（`OwnerPosts`、`ListOwnPosts`）仍看得到被下架的貼文且沒有標記。
+  - 單體 revalidate 失敗沒有告警（River worker 的失敗與 discarded job；Loki 規則只看舊的 `revalidate.send.*`）。觸發：單體告警管道建立時或上線前。
+  - #3513 SLA 告警（moderation 待辦列 72 小時期限，無主動告警；Will 2026-11-19 延後）。觸發：單體告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。
+  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是基本設計書 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
+  - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
+  - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
+  - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
 - [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。
   - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
   - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。
@@ -225,6 +250,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
   - 賣家收款開通結果與平台審核結果的通知（ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`、`2026-11-13-seller-platform-review-and-identity-matching.md`，Will 2026-11-02、2026-11-12）：舊的 `merchant.verification.*`（含管理員退回）與 `sellerconsumer` 的 PayUni 審核通知已停發，賣家現在不會收到核准、退回或收款帳戶啟用、需補件、停用的通知。A8 訂閱 seller 的 KYC 審核事件與 payment 的 `PayoutAccountChanged`；email 只寄 identity 已驗證的信箱，自填聯絡信箱要先有驗證碼驗證。收款帳戶的首次啟用時間與補件期限（Stripe `requirements.summary.minimum_deadline`）欄位與期限前提醒在這一刀一起加。
 - [ ] **A9 agent**
+  - 階段計畫：`2026-11-19-a9-agent.md`（盤點、步驟、決定 A9-D1–D11 與進度寫在那裡；本段以下是計畫建立前的原文）。
   - AI 助理與 procurement 的串流（AG-UI，12 支 SSE）：依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 在這一步決定改成 proto 的 server streaming，或保留 AG-UI 的 SSE 並明列為第二套契約（AG-UI 是外部的開放格式）。
   - 採購不再依賴 pricebook（執行計畫 `2026-10-27-ecommerce-scope-cut` 已刪除，ADR `2026-10-27-general-ecommerce-scope-cut.md` D2）：品項只解析到平台分類樹與 LLM 召回，報價只看供應商報的價，沒有行情依據與價格冷熱判斷；`procurement_price_previews` 已刪行情欄位。A9 搬採購時不接 pricebook，也不恢復農產行情。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：
@@ -265,7 +291,11 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
-  - 物流供應商改綠界（`2026-10-24-portfolio-public`（計畫已刪除，見該 ADR 文末修訂）前提；收款開通 ADR D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
+  - 出貨主線改成賣家自寄（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）：設計書 69「商家自有出貨」（`fulfillment_mode = SELLER_MANAGED`）從橫向能力升為唯一上線的出貨方式。賣家回填物流業者與追蹤號碼；出貨狀態由賣家更新或買家確認收貨，逾期未出貨、逾期自動完成與配送異常轉售後由伺服器的狀態機決定。運費只用賣家自訂的固定規則，不做即時報價。
+    - 理由：台灣在地物流商的多賣家模式都要簽約（綠界的平台商 PlatformID 要專案合作開通、物流沒有平台商測試編號；PayUni 代理商 API 要簽約，2026-10-29 決定不簽）；國外的 Shippo Platform Account 要人工開通，EasyPost 開子帳號只能用正式金鑰，兩家都不支援台灣超商。作品集要展示的是出貨單與訂單的狀態機、模組分界與事件，自寄就能完整跑通。
+    - 保留供應商中立的物流 port（建單、取標籤、貨態 webhook 先寫 inbox、以事件 ID 去重），每個賣家帶一個外部帳戶 ID 欄位；作品集只放模擬 adapter，用來跑建單到貨態回傳的流程與測試。真實物流商（綠界的平台商模式等）在決定上線並簽約後才寫 adapter。
+    - 不帶過來：PayUni 物流與 `payuni-webhook-service` 的超商、宅配建單與貨態；超商門市電子地圖、追蹤號碼的自動查詢、即時運費報價。client 上依賴這些的介面在本步一起刪或改成自寄流程（UI 流程改動先取得同意）。
+    - 開工前：盤點設計書 65–70 裡假設平台串接物流商的段落，改寫或刪除；`internal/legacy/sellerserver` 回給 Java 的物流 `MerId` 隨 Java shipping 退場刪除。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`backend/docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `backend/docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
   - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
   - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。

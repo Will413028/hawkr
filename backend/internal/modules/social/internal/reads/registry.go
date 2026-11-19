@@ -36,6 +36,7 @@ func Registry() []Entry {
 	return []Entry{
 		{Name: "GetPublicPost", Row: PostRow{}, Build: func(v visibility.Viewer) Statement { return GetPublicPost(sampleID, sampleNow, v) }},
 		{Name: "PostIsPublic", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return PostIsPublic(sampleID, sampleNow, v) }},
+		{Name: "PublicPostIDs", Row: IDRow{}, Build: func(visibility.Viewer) Statement { return PublicPostIDs([]uuid.UUID{sampleID, sampleID2}, sampleNow) }},
 		{Name: "ListFeedPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListFeedPosts(sampleNow, v, samplePost) }},
 		{Name: "ListStorePublicPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListStorePublicPosts(7, sampleNow, v, samplePost) }},
 		{Name: "ListHashtagPosts", Row: PostRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListHashtagPosts("organic", sampleNow, v, samplePost) }},
@@ -56,12 +57,20 @@ func Registry() []Entry {
 		{Name: "CommentState", Row: StateRow{}, Build: func(visibility.Viewer) Statement { return CommentState(sampleID) }},
 		{Name: "ForumEntryState", Row: StateRow{}, Build: func(visibility.Viewer) Statement { return ForumEntryState(sampleID) }},
 		{Name: "ListTopLevelForumEntries", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListTopLevelForumEntries(7, sampleNow, v, sampleCmt) }},
+		{Name: "GetForumThreadTop", Row: EntryRow{}, Build: func(v visibility.Viewer) Statement { return GetForumThreadTop(7, sampleID, sampleNow, v) }},
+		{Name: "ForumThreadsReadable", Row: EntryRow{}, Build: func(visibility.Viewer) Statement {
+			return ForumThreadsReadable([]uuid.UUID{sampleID, sampleID2}, sampleNow)
+		}},
 		{Name: "ListForumReplies", Row: EntryRow{}, Keyset: true, Build: func(v visibility.Viewer) Statement { return ListForumReplies(sampleID, sampleNow, v, sampleCmt) }},
 		{Name: "ForumReplyTargetIsReadable", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return ForumReplyTargetIsReadable(sampleID, 7, sampleID3, v) }},
 		{Name: "ForumEntryIsHidden", Row: BoolRow{}, Build: func(visibility.Viewer) Statement { return ForumEntryIsHidden(sampleID) }},
 		{Name: "ForumIsReadable", Row: BoolRow{}, Build: func(v visibility.Viewer) Statement { return ForumIsReadable(7, sampleNow, v) }},
 		{Name: "GetCommentOwner", Row: OwnerRow{}, Build: func(visibility.Viewer) Statement { return GetCommentOwner(sampleID, sampleNow) }},
 		{Name: "GetForumEntryOwner", Row: OwnerRow{}, Build: func(visibility.Viewer) Statement { return GetForumEntryOwner(sampleID, sampleNow) }},
+		{Name: "ReadableCommentAuthor", Row: AuthorRow{}, Build: func(v visibility.Viewer) Statement { return ReadableCommentAuthor(sampleID, sampleNow, v.BuyerID) }},
+		{Name: "OwnerCommentAuthor", Row: AuthorRow{}, Build: func(visibility.Viewer) Statement { return OwnerCommentAuthor(sampleID, 7) }},
+		{Name: "ReadableForumEntryAuthor", Row: AuthorRow{}, Build: func(v visibility.Viewer) Statement { return ReadableForumEntryAuthor(sampleID, sampleNow, v.BuyerID) }},
+		{Name: "OwnerForumEntryAuthor", Row: AuthorRow{}, Build: func(visibility.Viewer) Statement { return OwnerForumEntryAuthor(sampleID, 7) }},
 		{Name: "GetPostOwner", Row: PostOwnerRow{}, Build: func(visibility.Viewer) Statement { return GetPostOwner(sampleID, sampleNow) }},
 		{Name: "RecountPostStatsBatch", Row: PostDriftRow{}, Build: func(visibility.Viewer) Statement { return RecountPostStatsBatch(sampleID, sampleID2) }},
 		{Name: "RecountCommentStatsBatch", Row: CommentDriftRow{}, Build: func(visibility.Viewer) Statement { return RecountCommentStatsBatch(sampleID, sampleID2) }},

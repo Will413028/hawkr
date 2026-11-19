@@ -56,6 +56,19 @@
     },
     "unknown": "未知"
   },
+  "moderation": {
+    "ReportOutcome": {
+      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
+      "REPORT_OUTCOME_PENDING": "Under review",
+      "REPORT_OUTCOME_VIOLATION": "Resolved (violation)"
+    },
+    "ReportTargetKind": {
+      "REPORT_TARGET_KIND_BUYER": "User",
+      "REPORT_TARGET_KIND_COMMENT": "Comment",
+      "REPORT_TARGET_KIND_FORUM_ENTRY": "Forum post",
+      "REPORT_TARGET_KIND_POST": "Post"
+    }
+  },
   "payment": {
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Setup needed",
@@ -98,10 +111,12 @@
     },
     "Measure": {
       "appeal_deadline": "申覆期限：{deadline}",
-      "meta_kind": "措施：{kind}",
+      "meta_kind": "Measure: {kind}",
       "meta_severity": "嚴重程度：{severity}",
       "meta_termination_ground": "事由：{ground}",
       "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
+      "removed_contents_cleared": "The copy of this content was deleted after the retention period.",
+      "removed_contents_heading": "Removed content",
       "suspension_active_open": "Suspended (no end date; under periodic review by the platform)",
       "suspension_active_until": "Suspended until {end}",
       "suspension_ended": "Ended on {end}",
@@ -110,7 +125,8 @@
       "termination_notice": "平台已通知將於 {start} 終止合作。在此之前店家照常營業；如有異議，可提出申覆。",
       "title_fallback": "措施紀錄",
       "title_risk": "風險：{ground}",
-      "title_risk_fallback": "風險措施"
+      "title_risk_fallback": "風險措施",
+      "view_content_link": "View post"
     },
     "MeasureBasis": {
       "MEASURE_BASIS_CONTRACT": "契約條款",
@@ -118,7 +134,7 @@
       "MEASURE_BASIS_VIOLATION": "違規認定"
     },
     "MeasureKind": {
-      "MEASURE_KIND_CONTENT_TAKEDOWN": "內容下架",
+      "MEASURE_KIND_CONTENT_TAKEDOWN": "Content removal",
       "MEASURE_KIND_SUSPENSION": "停權",
       "MEASURE_KIND_TERMINATION": "終止合作",
       "MEASURE_KIND_WARNING": "警告"
@@ -232,6 +248,14 @@
       "VIOLATION_SEVERITY_HIGH": "高",
       "VIOLATION_SEVERITY_LOW": "低",
       "VIOLATION_SEVERITY_MEDIUM": "中"
+    }
+  },
+  "social": {
+    "CommentState": {
+      "placeholder": {
+        "COMMENT_STATE_DELETED": "This comment was deleted",
+        "COMMENT_STATE_HIDDEN": "This comment was hidden"
+      }
     }
   }
 }

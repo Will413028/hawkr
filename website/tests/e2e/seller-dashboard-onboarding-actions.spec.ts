@@ -8,6 +8,7 @@ import {
 	mockMyStore,
 	seedStoredActiveRole,
 	setupGatewayMocks,
+	socialMethod,
 } from "./helpers/mock-gateway";
 
 const SELLER_ID = "90010001";
@@ -123,12 +124,8 @@ async function prepareSellerPage(
 		});
 	});
 
-	await page.route("**/api/v1/app/sellers/me/posts?**", (route) => {
-		void route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: { records: [] } }),
-		});
+	await page.route(socialMethod("SocialAppService", "ListMyPosts"), (route) => {
+		void fulfillConnect(route, { posts: [], nextPageToken: "" });
 	});
 
 	const productListRequests: ProductListRequest[] = [];

@@ -97,3 +97,14 @@ FROM social.post_hashtags
 WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[])
 ORDER BY post_id, position;
 
+
+-- name: ListAdminPosts :many
+-- 後台看貼文（不含草稿與刪除）：最新建立的在前。taken_down 為真只列有內容下架複本的貼文，為假不篩選。keyset：(created_at, id) 由大到小。
+SELECT sqlc.embed(p), sqlc.embed(s)
+FROM social.posts p
+JOIN social.post_stats s ON s.post_id = p.id
+WHERE p.deleted_at IS NULL AND p.status <> 'DRAFT'
+  AND (NOT sqlc.arg(taken_down)::boolean OR EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.post_id = p.id))
+  AND (p.created_at, p.id) < (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT sqlc.arg(max_rows);

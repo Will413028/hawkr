@@ -21,10 +21,18 @@ type commentCursor struct {
 
 func (c commentCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
 
-// ownPostCursor 是店主清單的 page token 內容：(CreatedAt, ID)。
-type ownPostCursor struct {
+// createdPostCursor 是店主與後台貼文清單的 page token 內容：(CreatedAt, ID)。
+type createdPostCursor struct {
 	CreatedAt time.Time
 	ID        uuid.UUID
 }
 
-func (c ownPostCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+func (c createdPostCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// scheduleCursor 是待發布排程清單的 page token 內容：(PublishAt, ID)。
+type scheduleCursor struct {
+	PublishAt time.Time
+	ID        uuid.UUID
+}
+
+func (c scheduleCursor) Valid() bool { return !c.PublishAt.IsZero() && c.ID != uuid.UUID{} }

@@ -1,6 +1,27 @@
 {
   "enums": [
     {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseAction",
+      "tsName": "CaseAction",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseDecision",
+      "tsName": "CaseDecision",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.admin.moderation.v1alpha1.CaseState",
+      "tsName": "CaseState",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind",
       "tsName": "ReviewQueueItemKind",
       "tsModule": "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb",
@@ -316,6 +337,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.moderation.v1alpha1.ReportOutcome",
+      "tsName": "ReportOutcome",
+      "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.moderation.v1alpha1.ReportTargetKind",
+      "tsName": "ReportTargetKind",
+      "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "tsName": "EmbeddedOnboardingRuntime",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
@@ -355,6 +390,13 @@
       "tsName": "ContentKind",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.ContentSnapshotState",
+      "tsName": "ContentSnapshotState",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
       "serverOwned": false
     },
     {
@@ -547,8 +589,29 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.social.v1alpha1.HiddenContentKind",
+      "tsName": "HiddenContentKind",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.social.v1alpha1.PostStatus",
       "tsName": "PostStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.SanctionKind",
+      "tsName": "SanctionKind",
+      "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.social.v1alpha1.ScheduleKind",
+      "tsName": "ScheduleKind",
       "tsModule": "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb",
       "inCatalog": false,
       "serverOwned": false

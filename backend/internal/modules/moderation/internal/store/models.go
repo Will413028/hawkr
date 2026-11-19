@@ -22,6 +22,7 @@ type ModerationCase struct {
 	DecisionAction   *string
 	DecidedByAdminID *int64
 	ClosedAt         *time.Time
+	MeasureID        *uuid.UUID
 }
 
 type ModerationCaseSnapshot struct {
@@ -49,6 +50,13 @@ type ModerationReport struct {
 	Description     *string
 	SnapshotID      *uuid.UUID
 	CreatedAt       time.Time
+}
+
+type ModerationReportRequest struct {
+	ReporterBuyerID int64
+	RequestID       uuid.UUID
+	ReportID        uuid.UUID
+	RequestHash     []byte
 }
 
 type ModerationReporterDailyCount struct {

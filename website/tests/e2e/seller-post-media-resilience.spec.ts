@@ -1,15 +1,16 @@
 import { expect, type Page, test } from "@playwright/test";
-import type { PostListItem } from "@/lib/api/openapi-types";
 import {
+	fulfillConnect,
 	type MockStore,
 	mockMyKyc,
 	mockMyStore,
 	seedStoredActiveRole,
 	setupGatewayMocks,
+	socialMethod,
 } from "./helpers/mock-gateway";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const SELLER_ID = "90010001";
-const IMAGE_KEY = "public/post/e2e/seller-post-media.png";
 const IMAGE_BASENAME = "seller-post-media.png";
 const LOADER_KEY = "hawkr:initial-loader-seen";
 
@@ -23,23 +24,23 @@ const SELLER_STORE: MockStore = {
 	storeName: "動態圖片測試商店",
 };
 
-const POST: PostListItem = {
-	id: "9007199254740993",
-	sellerId: SELLER_ID,
-	storeCode: "2609000001",
-	sellerName: SELLER_STORE.storeName ?? "",
-	logoKey: "",
-	content: "E2E 圖片掛載契約",
-	imageKeys: [IMAGE_KEY],
-	tags: [],
-	product: null,
-	commentCount: 2,
-	likeCount: 3,
-	shareCount: 1,
-	viewCount: 12,
-	isLiked: false,
-	createdAt: 1_725_000_000,
-	publishStatus: "4402",
+/** SocialAppService.ListMyPosts 回的 `Post`（protobuf JSON：int64 與 enum 是字串）。 */
+const POST = {
+	id: "5f0c9a52-7a4e-4f0b-8d2e-3b7c2a1d9e11",
+	store: {
+		id: SELLER_ID,
+		storeCode: "2609000001",
+		name: SELLER_STORE.storeName,
+	},
+	body: "E2E 圖片掛載契約",
+	image: { uriTemplate: `https://example.com/{preset}/${IMAGE_BASENAME}` },
+	status: "POST_STATUS_PUBLISHED",
+	publishTime: "2024-08-30T07:20:00Z",
+	likeCount: "3",
+	commentCount: "2",
+	viewCount: "12",
+	shareCount: "1",
+	etag: "1",
 };
 
 async function prepareSellerPosts(
@@ -67,15 +68,16 @@ async function prepareSellerPosts(
 
 	await mockMyStore(page, SELLER_STORE);
 	await mockMyKyc(page, { status: "APPROVED" });
-	await page.route("**/api/v1/app/sellers/me/posts?**", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				code: 0,
-				data: { records: [POST], total: 1, page: 1, pageSize: 50 },
+	await page.route(socialMethod("SocialAppService", "ListMyPosts"), (route) =>
+		fulfillConnect(route, { posts: [POST], nextPageToken: "" }),
+	);
+	await page.route(
+		socialMethod("SocialAppService", "GetStoreSocialSummary"),
+		(route) =>
+			fulfillConnect(route, {
+				postCounts: [{ status: "POST_STATUS_PUBLISHED", count: "1" }],
+				scheduledPostCount: "0",
 			}),
-		}),
 	);
 
 	await page.route(
@@ -106,7 +108,7 @@ async function prepareSellerPosts(
 		sessionStorage.setItem(loaderKey, "1");
 	}, LOADER_KEY);
 
-	await page.goto("/seller-center/posts", { waitUntil: "domcontentloaded" });
+	await gotoStreamed(page, "/seller-center/posts");
 	await expect(
 		page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
 	).toBeAttached();

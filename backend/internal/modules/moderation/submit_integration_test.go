@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -42,7 +43,7 @@ func (f *fixture) submit(t *testing.T, reporter int64, target Target, category p
 func (f *fixture) decideHide(t *testing.T, caseID uuid.UUID, version int64) (CaseDetail, error) {
 	t.Helper()
 	return f.module.DecideCase(context.Background(), DecideInput{
-		CaseID: caseID, Version: version, AdminID: 9, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "垃圾訊息",
+		CaseID: caseID, Version: version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionViolation, Category: policy.Spam, Action: ActionHide, Text: "垃圾訊息",
 	})
 }
 
@@ -96,7 +97,7 @@ func TestNoViolationLeavesTheContentAndDerivesTheOutcome(t *testing.T) {
 	w := f.world(t)
 	reporter, _ := f.newBuyer(t)
 	r := f.submit(t, reporter, commentTarget(w.comment), policy.Harassment)
-	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{CaseID: r.Case.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation}))
+	d := mustV[CaseDetail](t)(f.module.DecideCase(context.Background(), DecideInput{CaseID: r.Case.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
 	if d.Reports[0].Outcome != OutcomeNoViolation || !f.readable(t, social.TargetComment, w.comment.ID) {
 		t.Fatalf("%+v", d)
 	}
@@ -116,7 +117,7 @@ func TestResendReturnsTheExistingReportAndAClosedCaseAllowsANewOne(t *testing.T)
 	if again.Created || again.Report.ID != first.Report.ID || again.Report.Category != policy.Spam || again.Case.ID != first.Case.ID {
 		t.Fatalf("重送要回傳既有的檢舉：%+v", again)
 	}
-	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: first.Case.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation})))
 	next := f.submit(t, reporter, commentTarget(w.comment), policy.Spam)
 	if !next.Created || next.Case.ID == first.Case.ID || next.Report.ID == first.Report.ID {
 		t.Fatalf("結案後要開新案件：%+v", next)
@@ -144,7 +145,7 @@ func TestConcurrentCloseHasExactlyOneWinner(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: c.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation})
+			_, err := f.module.DecideCase(context.Background(), DecideInput{CaseID: c.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation})
 			switch {
 			case err == nil:
 				wins.Add(1)
@@ -281,7 +282,7 @@ func TestSnapshotsArePurgedAfterTheRetentionAndCasesStay(t *testing.T) {
 	reporter, _ := f.newBuyer(t)
 	closedCase := f.submit(t, reporter, commentTarget(w.comment), policy.Spam)
 	openCase := f.submit(t, reporter, commentTarget(other), policy.Spam)
-	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: closedCase.Case.ID, Version: 1, AdminID: 9, Decision: DecisionNoViolation})))
+	must(t, errOf(f.module.DecideCase(context.Background(), DecideInput{CaseID: closedCase.Case.ID, Version: 1, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation})))
 	f.advance(SnapshotRetention - time.Hour)
 	if n := mustV[int64](t)(f.module.PurgeSnapshots(context.Background())); n != 0 {
 		t.Fatalf("未滿保留期不能刪，刪了 %d", n)

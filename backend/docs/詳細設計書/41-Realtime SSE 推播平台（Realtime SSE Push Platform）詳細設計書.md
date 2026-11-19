@@ -1,6 +1,6 @@
 # 41 - Realtime SSE 推播平台（Realtime SSE Push Platform）詳細設計書
 
-> 本文件定義 Gateway 上的 Server-Sent Events（SSE）推播平台架構，包含通用 Hub、MQ Consumer、Channel 註冊契約、Topic 命名規約，以及目前註冊的四個 Channel（留言、通知、賣家工作區、賣家生命週期）。
+> 本文件定義 Gateway 上的 Server-Sent Events（SSE）推播平台架構，包含通用 Hub、MQ Consumer、Channel 註冊契約、Topic 命名規約，以及目前註冊的 Channel（通知、賣家工作區、賣家生命週期）。
 >
 > 後續任何「server 主動推送到 client」的需求（如商品低庫存即時提醒賣家、訂單狀態即時跳動等）皆透過註冊新 Channel 接入本平台，禁止另起新長連線基礎設施。
 
@@ -12,14 +12,14 @@
 
 | 範疇 | 說明 |
 |---|---|
-| 本文件描述 | Gateway 上的 SSE 推播**平台架構**（通用 Hub / MQ Consumer / Channel 註冊機制）＋ 目前註冊的 4 個 Channel：留言（comment，§三）、通知（notification，§四）、賣家工作區（seller_workspace，§四之二）、賣家生命週期（seller_lifecycle，§四之三；side-effect，不推 SSE） |
-| 本文件**不**描述 | 個別業務邏輯（留言 CRUD 見 social-service 既有實作；通知 inbox 與 FCM 推播見 [12 號](12-通知微服務（Notification%20Service）詳細設計書.md) / [13 號](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)） |
+| 本文件描述 | Gateway 上的 SSE 推播**平台架構**（通用 Hub / MQ Consumer / Channel 註冊機制）＋ 目前註冊的 Channel：通知（notification，§四）、賣家工作區（seller_workspace，§四之二）、賣家生命週期（seller_lifecycle，§四之三；side-effect，不推 SSE） |
+| 本文件**不**描述 | 個別業務邏輯（通知 inbox 與 FCM 推播見 [12 號](12-通知微服務（Notification%20Service）詳細設計書.md) / [13 號](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)） |
 | web 通知的唯一推送路徑 | **SSE**。不得存在 30 秒輪詢，也不得把輪詢當 fallback（見 §4.7） |
 | 不取代 | **行動端通知（buyer / seller）維持 FCM**：FCM 已覆蓋背景 banner + 前景 data-only refresh 雙通道，再加 SSE 推送重複度高且耗連線與電量。本平台 notification channel **僅 web 訂閱**。<br/>Chat WebSocket：已存在，雙向、長連、ticket auth，與 SSE 場景互補，不取代。 |
 
 ### 1.2 平台邊界
 
-本平台只承載 **server → client 單向推送**：留言、通知、賣家工作區訂單狀態。
+本平台只承載 **server → client 單向推送**：通知、賣家工作區訂單狀態；留言不即時推送。
 
 | 需求型態 | 走哪裡 |
 |---|---|
@@ -66,22 +66,20 @@ flowchart LR
     end
 
     subgraph "Gateway Pod (n replicas)"
-        H[GET /comments/stream<br/>GET /notifications/stream]
+        H[GET /notifications/stream]
         SSE[SSE Hub<br/>topic→connections<br/>+ ring buffer<br/>+ heartbeat]
         MQ[MQ Consumer<br/>broadcast queue per pod]
-        REG[Channel Registry<br/>comment / notification / ...]
+        REG[Channel Registry<br/>notification / seller_workspace / ...]
     end
 
     subgraph Backends
-        SOC[social-service<br/>Go]
         NOT[notification-service<br/>Go]
-        RMQ[(RabbitMQ<br/>hawkr.content<br/>hawkr.notification)]
+        RMQ[(RabbitMQ<br/>hawkr.notification)]
     end
 
     W & B & S -- SSE long-lived --> H
     H --> SSE
     REG --> SSE
-    SOC -- comment.created/updated<br/>/deleted/replied/like_changed --> RMQ
     NOT -- notification.inbox.new<br/>/unread_changed --> RMQ
     RMQ -- broadcast --> MQ
     MQ -- dispatch by topic --> SSE
@@ -98,7 +96,7 @@ flowchart LR
 | **Channel Registry**（`gateway/internal/realtime/`） | 註冊 channel：routing key → topic resolver → event name mapping | 訂閱管理 |
 | **MQ Consumer**（`gateway/internal/mq/`） | 每 pod auto-delete broadcast queue、收 message → 查 registry → Hub publish | 業務邏輯 |
 | **Stream Handler**（`gateway/internal/handler/post.go` / `notification_inbox.go`） | 解析 path + auth → 計算 topic → 呼叫 Hub.SubscribeAndServe | Hub 內部實作 |
-| **Producer**（social-service / notification-service） | DB commit 後 best-effort publish MQ event | 任何 push 後續邏輯 |
+| **Producer**（notification-service 等） | DB commit 後 best-effort publish MQ event | 任何 push 後續邏輯 |
 
 ### 2.3 Topic 命名規約
 
@@ -106,13 +104,12 @@ flowchart LR
 
 | Channel | Topic pattern | 範例 |
 |---|---|---|
-| comment | `comment:post:{post_id}` | `comment:post:100` |
 | notification | `notification:user:{account_id}` | `notification:user:2001` |
 | （未來範例）低庫存 | `inventory:seller:{seller_id}` | `inventory:seller:1001` |
 
 **規範**：
 - 小寫、英數 + `:` + `_`，禁止 `/` / `.`
-- 三段固定（channel / resource / id）；複合條件以 id 段組合（例：`comment:thread:100_999`）
+- 三段固定（channel / resource / id）；複合條件以 id 段組合
 - topic 字串長度 ≤ 128
 
 ### 2.4 Channel 註冊契約
@@ -121,13 +118,13 @@ flowchart LR
 
 | 方法 | 型別 | 說明 |
 |---|---|---|
-| `Name` | `string` | channel 名稱（如 `"comment"` / `"notification"`） |
-| `RoutingKeys` | `[]string` | 要訂閱的 MQ routing key pattern（如 `["comment.#"]`） |
+| `Name` | `string` | channel 名稱（如 `"notification"`） |
+| `RoutingKeys` | `[]string` | 要訂閱的 MQ routing key pattern |
 | `Exchange` | `string` | 來源 exchange（如 `"hawkr.content"`） |
 | `ResolveTopic` | `func(routingKey, payload) (topic, bool)` | 從 MQ event 解析出要推送到的 SSE topic；回 `("", false)` 代表本則不推送 |
 | `BuildSSEEvent` | `func(routingKey, payload) (eventName, dataBytes, err)` | 將 MQ payload 轉成 SSE event payload；回 `("", nil, nil)` 代表跳過不推送 |
 | `BatchEventName` | `string` | batch 視窗累積 N>1 時的外層事件名；回 `""` 停用本 channel 的 batching（§5.7） |
-| `AuthorizeSubscribe` | `func(ctx, topic, accountID) error` | 訂閱前的 auth check（comment 為匿名 always nil；notification 檢查 JWT 對應 user） |
+| `AuthorizeSubscribe` | `func(ctx, topic, accountID) error` | 訂閱前的 auth check（notification 檢查 JWT 對應 user） |
 
 環形 buffer 大小與 TTL **不是 per-channel 契約**，由 Hub 全域設定（`SSE_RING_BUFFER_SIZE` / `SSE_RING_BUFFER_TTL`，見 §5.3 與 §十五）。
 
@@ -135,7 +132,7 @@ flowchart LR
 
 | 模式 | `ResolveTopic` | `AuthorizeSubscribe` | HTTP endpoint | 例 |
 |---|---|---|---|---|
-| **publish**（推 SSE） | 回得出 topic | 依 channel 規則放行 | 有 | comment、notification、seller_workspace |
+| **publish**（推 SSE） | 回得出 topic | 依 channel 規則放行 | 有 | notification、seller_workspace |
 | **side-effect**（consume-only） | **永遠回 `("", false)`** | **永不放行**（恆回 `ErrForbidden`） | **無** | seller_lifecycle（§四之三） |
 
 side-effect channel 借用本契約只為了取得「gateway 每個 pod 都會收到的 broadcast」這個能力，其副作用寫在 `BuildSSEEvent`／`ResolveTopic` 之外的自有方法內，Hub 不會收到任何事件。
@@ -155,7 +152,7 @@ id: <epochMillis>-<seq>
 **規範**：
 | 欄位 | 規範 |
 |---|---|
-| `event` | 小寫 + `.` 分隔，例：`comment.created`、`notification.new`、`heartbeat`、`ready` |
+| `event` | 小寫 + `.` 分隔，例：`notification.new`、`heartbeat`、`ready` |
 | `data` | UTF-8 JSON 字串，**單行**（內含換行需 escape）；payload schema 由 channel 自訂 |
 | `id` | `<epochMillis>-<seq>` 形式；client 斷線重連時瀏覽器自動帶 `Last-Event-ID` header；server 取得後從 ring buffer replay 大於該 id 的事件 |
 | `retry` | 不主動發送；依瀏覽器預設（多為 3s）+ 客製 fallback 邏輯 |
@@ -169,116 +166,17 @@ id: <epochMillis>-<seq>
 
 ---
 
-## 三、Channel：留言（Comment）
+## 三、Channel：留言（已移除）
 
-### 3.1 業務目的
+gateway 沒有留言 channel：留言不即時推送，viewer 重新整理或重新載入留言列表才看到變更。Registry 現在只註冊 notification、seller_workspace 兩個 publish channel 與 seller_lifecycle 這個 side-effect channel（`gateway/internal/realtime/di.go`），對外沒有 `GET /api/v1/public/posts/{post_id}/comments/stream`。
 
-A 在貼文 P 留言（含建立、修改、刪除、按讚變更）→ 同時在看 P 的所有 viewer（含 A 自己跨 tab / 跨裝置）<1 秒內看到變更，不需手動 refresh。
+原因與取捨：
 
-### 3.2 訂閱粒度
+- 留言與貼文搬進單體的 `social` 模組（`2026-10-18-a7-social.md`）；gateway 的 Registry 沒有任何 channel 綁 `comment.#`，不消費這組 routing key。
+- A7-D10：留言不做即時推送；SSE 事件 id 由 gateway 產生，MQ 重送會拿到新 id，`Last-Event-ID` 無法去重（SD20），所以接受不即時。
+- 因為只有留言 stream 會用到，匿名訂閱、per-subject 連線上限、依連線個人化（`isMine`、`likedByViewer`）與 `clientRequestId` 樂觀更新去重都隨之移除。
 
-**一個 SSE connection 訂閱一個 postId**。
-
-| 場景 | 行為 |
-|---|---|
-| Web：PostDetailViewer snap pager 切換 active post | 切換前 close 舊 connection、open 新 connection |
-| Buyer / Seller App：開 CommentsBottomSheet | 開啟時 connect、關閉 / 切換貼文時 close |
-| Feed 列表滑動經過貼文 | **不**訂閱（避免每滑一格開關 SSE） |
-
-🔴 **不支援單一連線動態訂閱多個 postId**：訂閱粒度恆為「一條連線一個 postId」，切換貼文一律關舊開新。
-
-### 3.3 觸發源（MQ events）
-
-| Routing Key | Exchange | Producer | 用途 |
-|---|---|---|---|
-| `comment.created` | `hawkr.content` | social-service `CommentUseCase.CreateComment`（top-level）| 新增留言 |
-| `comment.replied` | 同上 | 同上（reply 分支） | 回覆留言 |
-| `comment.updated` | 同上 | 同上 `UpdateComment` | 編輯留言 |
-| `comment.deleted` | 同上 | 同上 `DeleteComment` | 刪除留言（soft delete） |
-| `comment.like_changed` | 同上 | 同上 `ToggleLike` | 按讚 / 取消讚數變化 |
-
-#### 3.3.1 Publish 規則(強制)
-
-**Publisher 一律 publish,不論留言者與貼文作者關係。Self-author skip 判斷由下游 consumer 自行決定。**
-
-| 路徑 | publish 規則 |
-|---|---|
-| social-service `CommentUseCase.*` 五個 publish point | 寫入 DB 成功 → 一律 publish 對應 routing key,**禁止**在 publisher 端加「commenter ≠ author」等 gate |
-| notification-service consumer | `template_handler.go` 內依 `event_type` 取出 actor field(`commenterId` / `replierId` / `userId`)比對 target user → 相同 skip 寫 inbox 與 FCM(self-notification 規則屬 notification 業務邏輯) |
-| gateway SSE consumer | 不過濾,所有 event 全推給對應 topic 的 viewer(含留言者自己跨 tab / 跨裝置 — §一.3 設計目標) |
-
-🔴 **publisher 端加 self-skip gate 的後果**:賣家對自家貼文回覆時,**所有** viewer 的 SSE 都收不到該事件(不只賣家自己),直接違反 §一.3 的「同時在看 P 的所有 viewer <1 秒內看到變更」。self-notification 是 notification 端的業務規則,只能在該端過濾。
-
-**禁止**:
-- ❌ publisher 寫 `if post.SellerID != userID` 等 self-skip gate
-- ❌ publisher 寫 `if commenterId == postAuthorId` skip
-- ✅ consumer 自己決定是否根據業務邏輯 skip(notification 端可以;SSE 端不應該)
-
-**Payload 策略：fat event**（payload 直接攜帶完整 `CommentDTO`）
-
-| 決策面 | 採用 |
-|---|---|
-| Gateway 是否需要二次 gRPC 取完整 DTO | **否** — MQ payload 已含完整 `CommentDTO`，gateway 直接 dispatch 給 SSE。🔴 **不得**改成收到 event 後回打 social-service：N 個 gateway pod 會對每一筆 event 各打一次 RPC |
-| payload 大小 | 留言 DTO < 4KB（含 content / 用戶資訊 / counter），單筆 event broadcast 成本可控 |
-| `CommentCreatedEvent` / `CommentRepliedEvent` payload | 含 nested `comment: CommentDTO` ＋ `clientRequestId` ＋ `parentCommentId`；並保留 commenterId／Name／preview 等欄位供 notification consumer 使用 |
-
-**新 event payload schema** 詳見 [§6.1](#61-comment-領域hawkrcontent)。
-
-### 3.4 Topic resolver
-
-```
-ResolveTopic(routingKey, payload) → "comment:post:" + payload.postId
-```
-
-**所有 5 個 routing key** 均解析至同一 topic 規則。
-
-### 3.5 SSE event payload（fat event，無 gRPC 二次查詢）
-
-| SSE event name | 推送觸發 | data 內容（皆由 MQ payload 直接取得） |
-|---|---|---|
-| `comment.created` | `comment.created` MQ event | `{ comment: <完整 CommentDTO，不含 userId，含伺服器依這條連線算的 isMine>, clientRequestId: string? }` |
-| `comment.replied` | `comment.replied` MQ event | 同上 |
-| `comment.updated` | `comment.updated` MQ event | `{ commentId, postId, content, updatedAt }` |
-| `comment.deleted` | `comment.deleted` MQ event | `{ commentId, postId, parentCommentId }` |
-| `comment.like_changed` | `comment.like_changed` MQ event | `{ commentId, postId, likeCount, action: "LIKE"\|"UNLIKE", likedByViewer }`（likedByViewer：按讚者是不是這條連線的買家或店家身分；公開輸出不帶 userId，ADR `2026-10-17-social-actor-identity`） |
-| `comment.batch` | per-topic 50ms 視窗 N > 1 個 event 合併（見 §5.7） | `{ events: [{ event, data }, ...] }` — 每筆元素含原 event name + 原 data |
-
-**fat event 設計**：
-- `CommentCreatedEvent` / `CommentRepliedEvent` MQ payload 直接含 nested `comment: CommentDTO`（social-service publish 時連 DTO 一起塞）
-- Gateway 收 MQ event → 直接 dispatch 給 SSE Hub，**無 gRPC 二次查詢**
-- Trade-off：MQ payload 變大（~3KB / event），broker bandwidth 上升；但避免 social-service 被多 pod 同時打 GetCommentById
-
-### 3.6 Endpoint
-
-| 屬性 | 值 |
-|---|---|
-| Path | `GET /api/v1/public/posts/{post_id}/comments/stream` |
-| Auth | 匿名 OK（與 `/public/posts/{id}/comments` 一致） |
-| Rate limit | per source IP 同時最多 5 條 SSE connection |
-| Topic | `comment:post:{post_id}` |
-| Heartbeat | 每 30s 一次 |
-| Last-Event-ID replay | 支援，最近 200 事件或 5 分鐘 |
-
-### 3.7 與 optimistic update 的 dedup
-
-**問題**：A 自己 POST 留言 → client 樂觀加入「負 ID」留言；SSE 推回真實 commentId → 同一條留言出現兩次。
-
-**解法（雙層 dedup）**：
-
-1. **`clientRequestId` 主 dedup**：A POST `/app/posts/{id}/comments` body 帶 `clientRequestId: <uuid>`；social-service publish event 帶回該 id；client 收到 SSE event 後若 `byClientRequestId.has(id)` → 用 real comment 替換 optimistic。
-2. **`commentId` 次 dedup**：保險邏輯 — 收 SSE event 時若 `comments.find(c => c.id === event.comment.id)` → 略過。
-
-### 3.7.1 重試策略：retry 必須 reuse 同一 clientRequestId
-
-**規範**：client 重試「同筆」失敗 POST 時**必須 reuse 同一個 clientRequestId**，禁止重新生成。
-
-| 場景 | 行為 |
-|---|---|
-| 第一次 POST 網路 timeout → client 重試 | 帶**同**`clientRequestId` |
-| 使用者重複按 send（非自動重試） | UI 應在第一次 POST 期間 disable button；若使用者主動再按等同新留言，**重新生成** clientRequestId |
-| Server 端收到重複 `clientRequestId` | server 端**不做** idempotency check；避免重發由 client 負責 |
-
-🔴 **retry 用新 id 的後果**：`clientRequestId` 是「樂觀更新 → SSE 確認」的 bridge，第二次 POST 的 SSE 回推會被前端當成新留言 append，使用者看到重複顯示。
+重新引入的條件：留言要即時時，改為在 `social` 模組事件上新增 channel，並先重新決定事件 id 與去重方式（SD20）。
 
 ---
 
@@ -538,7 +436,7 @@ gateway/internal/sse/                  通用 Hub（無業務感知）
   stream.go               ServeSSE primitive（header / heartbeat / replay / lifecycle）
   ringbuffer.go           per-topic 環形 buffer + TTL 過期清理
 
-gateway/internal/sse/ 另有 batch.go（批次推送窗口）與 capgroup.go（per-user / per-subject 連線額度）
+gateway/internal/sse/ 另有 batch.go（批次推送窗口）與 capgroup.go（per-user 連線額度）
 
 gateway/internal/realtime/             Channel 註冊
   registry.go                 Channel 註冊統一入口；MQ Consumer 由此查 channel 處理
@@ -637,7 +535,6 @@ sequenceDiagram
 
 | 維度 | 預設上限 | 處理 |
 |---|---|---|
-| per source IP（comment） | 5 | 滿座時回收該 IP 最舊的連線；回收額度用完才回 429 |
 | per accountId（notification） | 3 | 滿座時回收該帳號最舊的連線；回收額度用完才回 429 |
 | per pod 總連線 | 5000 | 超過回 503，client UI 顯示「即時同步不可用，請稍後重試」 |
 | per topic 連線 | 5000 | 同上（避免單一爆款貼文壓垮 pod） |
@@ -675,7 +572,7 @@ SSE 是單向的：server 從頭到尾不從 client 讀任何位元組，**沒�
 
 ### 5.7 Batch 推送（高頻 topic 合併）
 
-**設計目的**：單一爆款貼文 1000 viewer × 10 留言/秒 = 10k push/s 對單 pod 過載；client 連續處理 N 個 DOM mutation 也卡 UI。
+**設計目的**：同一個 topic 在短時間內有多個事件（例如同一位使用者的通知或訂單狀態連續變更）時，逐筆 push 會讓 client 連續處理 N 個 DOM mutation 而卡 UI。
 
 **機制**：per-topic 50ms 視窗合併同 topic 多個 event 成單一 SSE message。
 
@@ -683,12 +580,12 @@ SSE 是單向的：server 從頭到尾不從 client 讀任何位元組，**沒�
 |---|---|
 | 視窗大小 | 50ms（環境變數 `SSE_BATCH_WINDOW_MS` 可調，預設 50） |
 | 觸發合併條件 | 視窗內同 topic 累積 event 數 > 1 |
-| Batch event 名 | `comment.batch`（comment channel）/ `notification.batch`（notification channel） |
-| Batch data 結構 | `{ events: [{ event: "comment.created", data: {...}, id: "..." }, ...] }` 保留每筆原 event name + data + id |
+| Batch event 名 | `notification.batch`（notification 與 seller_workspace 共用，見 `gateway/internal/realtime/`） |
+| Batch data 結構 | `{ events: [{ event: "notification.new", data: {...}, id: "..." }, ...] }` 保留每筆原 event name + data + id |
 | Last-Event-ID 行為 | batch event 自己的 id 用視窗內**最大** event id；replay 時把 batch 整包視為一筆 |
 | Client 處理 | 收 batch → 依 events array 順序逐筆 dispatch 給 reducer |
 
-**單筆 event 場景**：視窗內只 1 個 event 仍走原 event name（`comment.created` 等）**不包 batch**，client 簡單路徑佔多數場景。
+**單筆 event 場景**：視窗內只 1 個 event 仍走原 event name（`notification.new` 等）**不包 batch**，client 簡單路徑佔多數場景。
 
 **啟用條件**：所有 channel 預設啟用 batch；channel 註冊時可指定 `BatchEnabled = false` 跳過（如某 channel 事件本就低頻不需合併）。
 
@@ -701,40 +598,9 @@ SSE 是單向的：server 從頭到尾不從 client 讀任何位元組，**沒�
 
 ## 六、MQ Event 設計
 
-### 6.1 Comment 領域（hawkr.content）
+### 6.1 Comment 領域（已移除）
 
-| Routing Key | Payload Struct（`pkg/mq/events.go`） |
-|---|---|
-| `comment.created` | `CommentCreatedEvent { commentId, postId, commenterId, commenterName, postAuthorId, postAuthorType, contentPreview, parentCommentId, clientRequestId, comment: CommentSnapshot }`（含完整 nested DTO） |
-| `comment.replied` | `CommentRepliedEvent { commentId, postId, replyToUserId, replyToUserType, replierName, contentPreview, parentCommentId, clientRequestId, comment: CommentSnapshot }` |
-| `comment.updated` | `CommentUpdatedEvent { commentId, postId, content, updatedAt }` |
-| `comment.deleted` | `CommentDeletedEvent { commentId, postId, parentCommentId }` |
-| `comment.like_changed` | `CommentLikeChangedEvent { commentId, postId, likeCount, action(LIKE/UNLIKE), userId, commentAuthorId }` |
-
-> 按讚事件的唯一 routing key 是 `comment.like_changed`（涵蓋 LIKE 與 UNLIKE）；notification consumer 只對 `action == "LIKE"` 推播。
-
-**`CommentSnapshot` struct（`pkg/mq/events.go`）**：
-
-對應 `services/social-service/internal/repository/postgres/gen/models.go::CmsComment` 大部分欄位 + proto `CommentInfo`：
-
-| 欄位 | Go 型別 | 對應 |
-|---|---|---|
-| `CommentID` | `int64` | `cms_comment.id` |
-| `PostID` | `int64` | `cms_comment.post_id` |
-| `UserID` | `int64` | `cms_comment.user_id` |
-| `UserName` | `string` | `cms_comment.user_name` |
-| `AvatarKey`（JSON `avatarKey`） | `string` | `cms_comment.user_avatar`（49 §6.7 S4：值為裸 objectKey，前端 `buildImageUrl` 組顯示 URL，發送端不組；欄名對齊對外頭像契約 `avatarKey`，不帶主體前綴） |
-| `Role` | `int32` | `cms_comment.role` (1=buyer, 2=seller) |
-| `Content` | `string` | `cms_comment.content` |
-| `ParentID` | `int64` | `cms_comment.parent_id` (0=top-level) |
-| `ReplyToID` | `int64` | `cms_comment.reply_to_id` |
-| `ReplyToName` | `string` | `cms_comment.reply_to_name` |
-| `LikeCount` | `int32` | `cms_comment.like_count` |
-| `ReplyCount` | `int32` | `cms_comment.reply_count` |
-| `CreatedAt` | `time.Time` | `cms_comment.create_time` |
-| `UpdatedAt` | `time.Time` | `cms_comment.update_time` |
-
-**注意**：不包含 `deleted_at` / `hidden_at` / `hidden_reason`（這些 row 走刪除 / hide 事件，不會出現在 created/replied event）。
+gateway 不再消費 `hawkr.content` 的 `comment.*` routing key，本節原有的 `CommentCreatedEvent` 等 payload 與 `CommentSnapshot` 不再是 SSE 契約（理由見 §三）。留言相關事件的 notification 消費不經 gateway SSE。
 
 ### 6.2 Notification 領域（hawkr.notification）
 
@@ -953,16 +819,14 @@ flowchart LR
 
 ## 八、安全與授權
 
-### 8.1 Comment endpoint：匿名 + per-subject cap
+### 8.1 Notification endpoint：JWT + per-user cap
 
 | 規則 | 實作 |
 |---|---|
-| 不檢 JWT | handler 不掛 `JWTAuth` middleware |
-| Per-subject cap 5 | `Hub.capKeyOf` 以 subject 為 key 計數（`connsBySubject`），滿了先回收最舊的連線讓位，回收額度用完才回 429（帶 `Retry-After` 與 `X-RateLimit-*`，見 [01 號 §3.2.9](01-閘道微服務（Gateway）詳細設計書.md)） |
-| cap key 取得 | `middleware.RateLimitSubject(c)` —— **不是** `c.ClientIP()`。網頁 SSR／CI 一個出口位址背後是無限多個人，用位址當 key 會讓 5 條連線的額度被整個網頁共用（#2264）。裸 `c.ClientIP()` 已由 ruleguard `banClientIPForQuota` 機械禁止 |
+| 檢 JWT | handler 掛 `JWTAuth` middleware，連線的 `AccountID` 取自 JWT |
+| Per-user cap 3 | `Hub.capKeyOf` 以 `AccountID` 為 key 計數（`connsByUID`），滿了先回收最舊的連線讓位，回收額度用完才回 429（帶 `Retry-After` 與 `X-RateLimit-*`，見 [01 號 §3.2.9](01-閘道微服務（Gateway）詳細設計書.md)） |
 | Per-topic cap 5000 | Hub.Subscribe 滿則回 503 |
-| Post 不存在 | handler 接到請求時 → gRPC `social-service.GetPublicPost(postId)` 確認存在 → 不存在回 **404** 且不消耗連線；存在才進 Hub.Subscribe |
-| Post 軟刪除（hidden_by_platform） | 同上 404；既有貼文 lifecycle 規則一致 |
+| Per-pod cap | 超過回 503；`AccountID` 為 0 的連線只受此上限管 |
 
 ### 8.2 Notification endpoint：JWT (cookie 或 Bearer)
 
@@ -1330,7 +1194,6 @@ SSE event comment.batch:
 | `SSE_RING_BUFFER_TTL` | gateway | `5m` | 環形 buffer TTL |
 | `SSE_BATCH_WINDOW_MS` | gateway | `50` | 同 topic 事件合併視窗（毫秒，見 §5.7） |
 | `SSE_MAX_CONN_PER_POD` | gateway | `5000` | per-pod 總連線上限 |
-| `SSE_MAX_CONN_PER_SUBJECT` | gateway | `5` | per-subject（匿名 channel）連線上限。維度是 rate-limit subject（`v:<ip>` / `s:ssr` / `s:ci`，見 [01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)）而非裸 client IP —— 網頁 SSR／CI 一個出口位址背後是無限多個人（#2264） |
 | `SSE_MAX_CONN_PER_USER` | gateway | `3` | per-user（登入 channel）連線上限 |
 | `SSE_MAX_CONN_LIFETIME` | gateway | `8m` | 單條連線在 server 端的最長存活時間，逾時由 GC 主動收掉、client 自行重連。**必須短於中間層的 stream timeout（實測 600s）**，主導權才在 origin；又必須明顯長於 `SSE_RING_BUFFER_TTL` 以免重連時 `bufferMiss` 觸發整頁刷新。`0` = 停用（§5.5.1） |
 | `SSE_EVICT_WINDOW` | gateway | `30s` | 滿座回收的額度視窗；每個 cap key 每窗最多回收 `2 × 該 key 上限` 次，用完回到 429（§5.5.1） |
@@ -1372,7 +1235,7 @@ SSE event comment.batch:
 | MQ event 漏推 | 該筆推送失敗 | best-effort，client refresh 兜底；不引入 outbox |
 | `clientRequestId` dedup miss | 留言出現兩次 | 第二層 `commentId` dedup（§3.7） |
 | 同 routing key 跨 pod 順序不一 | 留言短暫亂序 | client 依 `createdAt` 二分插入 |
-| 匿名 SSE 被爬蟲濫用 | gateway 連線爆 | per-subject cap 5；per-pod cap 5000 |
+| SSE 連線被濫用 | gateway 連線爆 | JWT 才能訂閱；per-user cap 3；per-pod cap 5000 |
 | notification publish 失敗 | 該通知不會 SSE 推送（但 inbox 仍有） | log + 監控告警；下次 client refresh 看得到 |
 | 連線完全失敗使用者看不到資料 | SSE 整段不可用時無 fallback 機制（這是設計決策，不引入 polling） | UI 顯示「即時同步不可用，請重新整理頁面」；reload 後若服務恢復就可繼續；服務真的長時間 down 是更上層運維問題 |
 | Web 通知 SSE 多 tab 重複連線 | 一個帳號 N tab × 1 SSE | per-accountId cap 3；第 4+ tab 不訂閱（見 §9.2 UX 規範）|

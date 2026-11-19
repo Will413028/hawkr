@@ -159,11 +159,10 @@ func TestSubmit_ReleasesIdentityVerificationReferencesAfterCertificationLink(t *
 			return &domain.Seller{
 				AccountID: accountID, StoreID: accountID, StoreName: "測試店", Description: "測試",
 				City: "台北市", District: "信義區", AddressDetail: "信義路五段 1 號",
-				PostalCode: "110", ContactPhone: "0912345678", WebsiteURL: "",
+				PostalCode: "110", ContactPhone: "0912345678", WebsiteURL: "https://my-shop.example.com",
 			}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return true, nil }}
 
 	var linkedRefType string
 	var releasedRefType string
@@ -182,7 +181,7 @@ func TestSubmit_ReleasesIdentityVerificationReferencesAfterCertificationLink(t *
 	uc := &CertificationUseCase{
 		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 		payuniRepo: defaultPayuniRepo(), accountClient: defaultAccountClient(),
-		mediaClient: media, txManager: &mockTxManager{}, socialClient: social,
+		mediaClient: media, txManager: &mockTxManager{},
 	}
 	if err := uc.Submit(context.Background(), validIndividualSubmitReq()); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -104,19 +104,19 @@ final class ConnectTransportProvider
 String _$connectTransportHash() => r'd6c54218de03a7416f91a265e611afce7bef6c03';
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-/// unauthenticated 時強制登出）。
+/// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
 
 @ProviderFor(connectAuthTransport)
 final connectAuthTransportProvider = ConnectAuthTransportProvider._();
 
 /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-/// unauthenticated 時強制登出）。
+/// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
 
 final class ConnectAuthTransportProvider
     extends $FunctionalProvider<Transport, Transport, Transport>
     with $Provider<Transport> {
   /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（同 Dio 的 `AuthInterceptor`：帶 Bearer，
-  /// unauthenticated 時強制登出）。
+  /// unauthenticated 時強制登出）與停權的處理（`ACCOUNT_SUSPENDED` 進受限狀態，不登出）。
   ConnectAuthTransportProvider._()
     : super(
         from: null,
@@ -151,7 +151,7 @@ final class ConnectAuthTransportProvider
 }
 
 String _$connectAuthTransportHash() =>
-    r'e73926b046b90dfcb11cca2a3e0abe701bffc486';
+    r'f221b4fdb5f49843f9a15562243208786cebb957';
 
 /// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
 /// 或換發失敗就不帶，不中斷呼叫。
@@ -352,6 +352,219 @@ final class SellerPublicOptionalAuthClientProvider
 
 String _$sellerPublicOptionalAuthClientHash() =>
     r'4f505af0cb6f075a95f80c461c4f3abf9451d307';
+
+/// 貼文、留言與討論區的公開讀取：有 session 時帶 Bearer，伺服器才填 `viewer_*`（讚過、能不能留言與刪除、留言身分）；
+/// 訪客不帶。RecordPostView 也走這裡。
+
+@ProviderFor(socialPublicClient)
+final socialPublicClientProvider = SocialPublicClientProvider._();
+
+/// 貼文、留言與討論區的公開讀取：有 session 時帶 Bearer，伺服器才填 `viewer_*`（讚過、能不能留言與刪除、留言身分）；
+/// 訪客不帶。RecordPostView 也走這裡。
+
+final class SocialPublicClientProvider
+    extends
+        $FunctionalProvider<
+          SocialPublicServiceClient,
+          SocialPublicServiceClient,
+          SocialPublicServiceClient
+        >
+    with $Provider<SocialPublicServiceClient> {
+  /// 貼文、留言與討論區的公開讀取：有 session 時帶 Bearer，伺服器才填 `viewer_*`（讚過、能不能留言與刪除、留言身分）；
+  /// 訪客不帶。RecordPostView 也走這裡。
+  SocialPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialPublicServiceClient create(Ref ref) {
+    return socialPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$socialPublicClientHash() =>
+    r'cb66caf2cc54005109302040cce95961a21acc8c';
+
+/// 按讚、留言與討論區發言的寫入：登入後才能呼叫，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+@ProviderFor(socialAppClient)
+final socialAppClientProvider = SocialAppClientProvider._();
+
+/// 按讚、留言與討論區發言的寫入：登入後才能呼叫，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+final class SocialAppClientProvider
+    extends
+        $FunctionalProvider<
+          SocialAppServiceClient,
+          SocialAppServiceClient,
+          SocialAppServiceClient
+        >
+    with $Provider<SocialAppServiceClient> {
+  /// 按讚、留言與討論區發言的寫入：登入後才能呼叫，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+  SocialAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'socialAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$socialAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SocialAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SocialAppServiceClient create(Ref ref) {
+    return socialAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SocialAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SocialAppServiceClient>(value),
+    );
+  }
+}
+
+String _$socialAppClientHash() => r'f8da4bb52e94947a0c9f4e2619a24b9ca47673c8';
+
+/// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+@ProviderFor(buyerAppClient)
+final buyerAppClientProvider = BuyerAppClientProvider._();
+
+/// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+
+final class BuyerAppClientProvider
+    extends
+        $FunctionalProvider<
+          BuyerAppServiceClient,
+          BuyerAppServiceClient,
+          BuyerAppServiceClient
+        >
+    with $Provider<BuyerAppServiceClient> {
+  /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
+  BuyerAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'buyerAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$buyerAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<BuyerAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  BuyerAppServiceClient create(Ref ref) {
+    return buyerAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(BuyerAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<BuyerAppServiceClient>(value),
+    );
+  }
+}
+
+String _$buyerAppClientHash() => r'0843c0945207433da5159c77adbbe14a6cf70806';
+
+/// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+
+@ProviderFor(moderationAppClient)
+final moderationAppClientProvider = ModerationAppClientProvider._();
+
+/// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+
+final class ModerationAppClientProvider
+    extends
+        $FunctionalProvider<
+          ModerationAppServiceClient,
+          ModerationAppServiceClient,
+          ModerationAppServiceClient
+        >
+    with $Provider<ModerationAppServiceClient> {
+  /// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
+  ModerationAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'moderationAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$moderationAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ModerationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ModerationAppServiceClient create(Ref ref) {
+    return moderationAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ModerationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ModerationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$moderationAppClientHash() =>
+    r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
 
 @ProviderFor(discoveryPublicClient)
 final discoveryPublicClientProvider = DiscoveryPublicClientProvider._();

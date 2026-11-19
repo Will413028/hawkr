@@ -8,6 +8,10 @@ import {
 	encodeSessionValue,
 	GET_SESSION_PATH,
 } from "./e2e/helpers/fake-session-upstream";
+import {
+	GET_STORE_PATH,
+	LIST_POSTS_PATH,
+} from "./e2e/helpers/fake-social-fixtures";
 
 const server = createFakeSessionUpstream();
 let origin = "";
@@ -63,4 +67,40 @@ test("GetSession is unauthenticated without a usable session cookie", async () =
 
 test("every other path closes the connection like an unreachable upstream", async () => {
 	await assert.rejects(fetch(`${origin}/api/v1/anything`));
+});
+
+test("ListPosts answers one fixture store's anonymous posts and refuses every other request", async () => {
+	const list = (message: Record<string, unknown>) =>
+		fetch(
+			`${origin}${LIST_POSTS_PATH}?connect=v1&encoding=json&message=${encodeURIComponent(JSON.stringify(message))}`,
+		);
+	const res = await list({ storeId: "7002" });
+	assert.equal(res.status, 200);
+	const posts = ((await res.json()) as { posts: { store: { id: string } }[] })
+		.posts;
+	assert.deepEqual(
+		posts.map((p) => p.store.id),
+		["7002"],
+	);
+	await assert.rejects(list({}));
+	await assert.rejects(list({ storeId: "2611000002" }));
+});
+
+test("GetStore resolves a fixture store_code to its store and refuses the store_id and other codes", async () => {
+	const get = (message: Record<string, unknown>) =>
+		fetch(
+			`${origin}${GET_STORE_PATH}?connect=v1&encoding=json&message=${encodeURIComponent(JSON.stringify(message))}`,
+		);
+	const res = await get({ storeCode: "2611000001" });
+	assert.equal(res.status, 200);
+	const body = (await res.json()) as {
+		store: { id: string; storeCode: string; storeName: string };
+	};
+	assert.deepEqual(body.store, {
+		id: "7001",
+		storeCode: "2611000001",
+		storeName: "店 7001",
+	});
+	await assert.rejects(get({ storeCode: "7001" }));
+	await assert.rejects(get({ storeCode: "999" }));
 });

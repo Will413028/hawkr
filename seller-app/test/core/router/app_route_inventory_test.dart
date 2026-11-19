@@ -50,6 +50,10 @@ void main() {
       symbol: 'SellerRoutes.suspensionNotice',
       path: SellerRoutes.suspensionNotice,
     ),
+    (
+      symbol: 'SellerRoutes.accountRestricted',
+      path: SellerRoutes.accountRestricted,
+    ),
     (symbol: 'SellerRoutes.measures', path: SellerRoutes.measures),
     (symbol: 'SellerRoutes.measureRequest', path: SellerRoutes.measureRequest),
     (
@@ -76,7 +80,6 @@ void main() {
       symbol: 'SettingsRoutes.notificationSettings',
       path: SettingsRoutes.notificationSettings,
     ),
-    (symbol: 'SettingsRoutes.myReports', path: SettingsRoutes.myReports),
     (symbol: 'SettingsRoutes.blockList', path: SettingsRoutes.blockList),
     (symbol: 'SettingsRoutes.help', path: SettingsRoutes.help),
     (symbol: 'ToolRoutes.photoEditor', path: ToolRoutes.photoEditor),

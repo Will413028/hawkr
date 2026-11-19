@@ -19,7 +19,7 @@ import (
 
 // 實際掛載的 admin service 與宣告表一一對應：connectServices 啟動時比對，Procedures 的數量就是掛載的方法數。
 func TestMountedAdminServicesMatchTheDeclarations(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestMountedAdminServicesMatchTheDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if len(descriptors) != 8 || methods != len(adminauth.Procedures()) {
+	if len(descriptors) != 10 || methods != len(adminauth.Procedures()) {
 		t.Fatalf("掛載 %d 個 admin service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(adminauth.Procedures()))
 	}
 }
@@ -60,7 +60,7 @@ func TestMountedAdminServiceWithoutDeclarationsIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	real, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	real, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}

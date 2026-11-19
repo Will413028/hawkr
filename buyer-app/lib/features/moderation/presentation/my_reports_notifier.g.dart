@@ -1,0 +1,77 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'my_reports_notifier.dart';
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+
+@ProviderFor(MyReports)
+final myReportsProvider = MyReportsProvider._();
+
+/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+final class MyReportsProvider
+    extends $NotifierProvider<MyReports, PagedSection<pb.ReportRecord>> {
+  /// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+  MyReportsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'myReportsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$myReportsHash();
+
+  @$internal
+  @override
+  MyReports create() => MyReports();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PagedSection<pb.ReportRecord> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PagedSection<pb.ReportRecord>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$myReportsHash() => r'5045d5dc2805247bec5018bf33366cb5f1672132';
+
+/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+
+abstract class _$MyReports extends $Notifier<PagedSection<pb.ReportRecord>> {
+  PagedSection<pb.ReportRecord> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref
+            as $Ref<
+              PagedSection<pb.ReportRecord>,
+              PagedSection<pb.ReportRecord>
+            >;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<
+                PagedSection<pb.ReportRecord>,
+                PagedSection<pb.ReportRecord>
+              >,
+              PagedSection<pb.ReportRecord>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

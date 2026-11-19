@@ -37,8 +37,8 @@ import (
 //
 // ── 掃描範圍的兩個歷史盲區，兩者都已由本檔的推導方式關掉 ────────────────────────
 //
-// ① **client 白名單**：原本只認 `h.Account` 與 `h.Media`，而四類資源端點的 18 個呼叫點
-// 全部走 `h.Social`／`h.Seller`／`h.Product`／`h.Order` —— 也就是說主體完全不在守備範圍
+// ① **client 白名單**：原本只認 `h.Account` 與 `h.Media`，而三類資源端點的呼叫點
+// 全部走 `h.Seller`／`h.Product`／`h.Order` —— 也就是說主體完全不在守備範圍
 // 內。手抄的白名單漏一個 client，就對那個 client 的所有呼叫點靜默失明。現在 client 集合
 // 由 holder.go 的 Holder 型別推導（見 delegationGrpcClientFields），新增 client 自動納管。
 //
@@ -87,8 +87,8 @@ func delegationPackageSources(t *testing.T) []string {
 
 // delegationGrpcClientFields 從 holder.go 推導出 Holder 上所有 gRPC client 欄位名。
 //
-// 為什麼不手寫清單：手寫的那一份漏掉的四個 client（Social／Seller／Product／Order）
-// 承載了四類資源端點的全部 18 個上游呼叫點，而漏掉的症狀是全綠。從型別推導之後，
+// 為什麼不手寫清單：手寫的那一份漏掉的三個 client（Seller／Product／Order）
+// 承載了三類資源端點的全部上游呼叫點，而漏掉的症狀是全綠。從型別推導之後，
 // 「有沒有記得回來加一行」這件事不再是正確性的前提。
 //
 // 判準是欄位型別為 `*grpcclient.XxxClient`：Holder 上的其他欄位（storeid／buyerid
@@ -318,10 +318,10 @@ func TestDelegatedHandlers_UpstreamErrorBranchesRestoreBizCode(t *testing.T) {
 	// 這個下界是 ratchet，也是本閘門的第二個自我量測：比對器一旦失準（Holder 欄位改名、
 	// 呼叫形狀改了、標記判定壞了）最可能的症狀是「一個都沒掃到而全綠」。
 	//
-	// 35 ＝ 本次盤點的實際命中數（Account 15／Product 7／Social 5／Seller 4／Media 2／
-	// Order 2）。下界訂在 30 而不是 35：刪掉幾支代行端點是正常的維護，不該連帶把這支測試
-	// 弄紅；但一次掉超過 5 個就不是「刪了幾支端點」的量級，那是比對器整組失準。
-	const minSites = 30
+	// 28 ＝ 本次盤點的實際命中數。下界訂在 23 而不是 28：刪掉幾支代行端點是正常的維護，
+	// 不該連帶把這支測試弄紅；但一次掉超過 5 個就不是「刪了幾支端點」的量級，那是比對器
+	// 整組失準。
+	const minSites = 23
 	if len(sites) < minSites {
 		t.Fatalf("只掃到 %d 個上游呼叫點（< %d）——比對器八成失準了，此時的綠燈是假的", len(sites), minSites)
 	}

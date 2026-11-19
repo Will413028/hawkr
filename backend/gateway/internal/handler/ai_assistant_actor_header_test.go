@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// mustNotResolveBuyer (used below) is defined in post_test.go — fails the
+// mustNotResolveBuyer (used below) is defined in resolver_helpers_test.go — fails the
 // test if consulted, proving a seller-route call never touches the buyer
 // resolver.
 

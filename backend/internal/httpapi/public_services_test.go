@@ -206,7 +206,7 @@ func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
 func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 	deps := Deps{
 		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "ReviewQueue") {
 		t.Fatalf("沒有 ReviewQueue：err=%v", err)
@@ -217,7 +217,7 @@ func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 func TestNewHandlerRequiresBuyer(t *testing.T) {
 	deps := Deps{
 		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Social: &social.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "Buyer") {

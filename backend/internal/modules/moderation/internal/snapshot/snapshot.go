@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
@@ -22,11 +24,17 @@ type Content struct {
 	MediaRefs   []string         `json:"media_refs"`
 	DisplayName string           `json:"display_name"`
 	Avatar      string           `json:"avatar"`
+	// AuthoredAt 是作者發文的時間，PostID 是貼文與貼文留言連結的貼文，ThreadID 是討論區留言所屬的討論串（與 StoreID 組成連結）：處分依據的內容版本在檢舉當下一併凍結（A7-D29）。
+	// 買家對象與沒有用到的欄位是零值，不出現在 JSON。
+	AuthoredAt time.Time `json:"authored_at,omitzero"`
+	PostID     string    `json:"post_id,omitempty"`
+	ThreadID   string    `json:"thread_id,omitempty"`
 }
 
 // Normalize 回傳正規化後的內容：換行統一成 LF、本文與名稱去頭尾空白（同 trimtext 的集合）、媒體參照排序去重、nil 切片變成空切片。
 func Normalize(c Content) Content {
 	c.Body = trimtext.Trim(strings.ReplaceAll(strings.ReplaceAll(c.Body, "\r\n", "\n"), "\r", "\n"))
+	c.AuthoredAt = c.AuthoredAt.UTC().Truncate(time.Microsecond) // 資料庫的精度；讀回與重算的雜湊一致
 	c.DisplayName = trimtext.Trim(c.DisplayName)
 	c.Avatar = trimtext.Trim(c.Avatar)
 	refs := slices.Clone(c.MediaRefs)
@@ -52,4 +60,13 @@ func Encode(c Content) (text string, sum [sha256.Size]byte) {
 		panic(err) // 只有基本型別的 struct，不可能失敗
 	}
 	return string(b), sha256.Sum256(b)
+}
+
+// StoreOf 回傳快照凍結的作者店家（同內容下架的歸屬驗證：作者是店家且作者 ID 就是歸屬店家）：內容不是店家寫的、買家對象或快照無法讀回時是 nil。
+func StoreOf(text string) *int64 {
+	c, err := Decode(text)
+	if err != nil || c.AuthorKind != string(social.ActorStore) || c.StoreID <= 0 || c.AuthorID != c.StoreID {
+		return nil
+	}
+	return &c.StoreID
 }

@@ -1,205 +1,37 @@
-import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
-import 'package:hawkr_buyer/core/theme/app_colors.dart';
-import 'package:hawkr_buyer/core/theme/app_typography.dart';
-import 'package:hawkr_buyer/features/moderation/data/block_model.dart';
-import 'package:hawkr_buyer/features/moderation/data/block_repository.dart';
-import 'package:hawkr_buyer/features/moderation/presentation/blocked_users_screen.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
+import 'package:hawkr_buyer/core/theme/app_colors.dart';
+import 'package:hawkr_buyer/core/theme/app_typography.dart';
+import 'package:hawkr_buyer/features/moderation/presentation/blocked_users_screen.dart';
+import 'package:hawkr_buyer/shared/widgets/hk_empty_state.dart';
+import 'package:hawkr_buyer/shared/widgets/truck_loading_overlay.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:mocktail/mocktail.dart';
 
-/// 補齊 Task 4 review 指出的缺口：brief Step 9（手動導覽驗證）在無人值守環境
-/// 無法用真實裝置登入操作，改以本測試檔案作為可自動執行、可重現的替代驗證——
-/// 用 mock repository（依 `my_subscription_social_screen_test.dart` 既有慣例）
-/// 實際 pump `BlockedUsersScreen` 並斷言 loading / 有資料 / empty state 三態渲染
-/// 正確，以及解除封鎖成功／失敗與下拉刷新皆如預期運作。
-class _MockBlockRepository extends Mock implements BlockRepository {}
+import 'moderation_fakes.dart';
 
-void main() {
-  late _MockBlockRepository blockRepository;
-
-  setUp(() {
-    blockRepository = _MockBlockRepository();
-  });
-
-  // /app/blocks 只回 id / blocked_id / create_time_ms（見 BlockedUser 契約註解），
-  // 沒有名稱欄位，所以每一列都是「使用者 + id 尾六碼」。
-  testWidgets('有封鎖名單時每列都渲染 id 尾碼標籤與解除封鎖鈕', (tester) async {
-    when(() => blockRepository.getBlockedUsers()).thenAnswer(
-      (_) async => const [
-        BlockedUser(userId: '1001'),
-        BlockedUser(userId: '2002003004'),
-      ],
-    );
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-
-    expect(find.text('封鎖名單'), findsOneWidget);
-    expect(find.text('使用者 1001'), findsOneWidget);
-    expect(find.text('使用者 003004'), findsOneWidget);
-    expect(find.text('解除封鎖'), findsNWidgets(2));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('無封鎖名單時顯示 empty state', (tester) async {
-    when(() => blockRepository.getBlockedUsers()).thenAnswer((_) async => []);
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-
-    expect(find.text('尚無封鎖的使用者'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('載入失敗時顯示錯誤狀態（與真的沒資料的 empty state 區分），並可重試', (tester) async {
-    var callCount = 0;
-    when(() => blockRepository.getBlockedUsers()).thenAnswer((_) {
-      callCount++;
-      if (callCount == 1) throw const ServerException('查詢封鎖名單失敗：伺服器忙碌中');
-      return Future.value(const <BlockedUser>[]);
-    });
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-
-    expect(
-      find.text('尚無封鎖的使用者'),
-      findsNothing,
-      reason: '讀取失敗不應顯示「尚無封鎖的使用者」的空狀態，會誤導使用者以為真的沒有封鎖任何人',
-    );
-    expect(find.text('查詢封鎖名單失敗：伺服器忙碌中'), findsOneWidget);
-    expect(find.text('重試'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text('重試'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('尚無封鎖的使用者'),
-      findsOneWidget,
-      reason: '重試成功且回傳空陣列，才進入真正的 empty state',
-    );
-    expect(find.text('查詢封鎖名單失敗：伺服器忙碌中'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('解除封鎖成功後從清單移除並顯示成功 toast', (tester) async {
-    when(
-      () => blockRepository.getBlockedUsers(),
-    ).thenAnswer((_) async => const [BlockedUser(userId: '1001')]);
-    when(() => blockRepository.unblockUser('1001')).thenAnswer((_) async {});
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-    expect(find.text('使用者 1001'), findsOneWidget);
-
-    await tester.tap(find.text('解除封鎖'));
-    await tester.pump();
-    await tester.pump();
-
-    verify(() => blockRepository.unblockUser('1001')).called(1);
-    expect(find.text('使用者 1001'), findsNothing);
-    expect(find.text('已解除封鎖'), findsOneWidget);
-    expect(find.text('尚無封鎖的使用者'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    // showFloatingToast 用 Future.delayed(2s) 自動收起；測試結束前先讓它跑完，
-    // 否則 flutter_test 會因「Timer 在 widget tree dispose 後仍 pending」判失敗。
-    await tester.pump(const Duration(seconds: 3));
-  });
-
-  testWidgets('解除封鎖失敗時清單不變並顯示錯誤 toast', (tester) async {
-    when(
-      () => blockRepository.getBlockedUsers(),
-    ).thenAnswer((_) async => const [BlockedUser(userId: '1001')]);
-    when(
-      () => blockRepository.unblockUser('1001'),
-    ).thenThrow(const NetworkException());
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-
-    await tester.tap(find.text('解除封鎖'));
-    await tester.pump();
-    await tester.pump();
-
-    expect(find.text('使用者 1001'), findsOneWidget);
-    expect(find.text('網路連線失敗，請稍後再試'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    // showFloatingToast 用 Future.delayed(2s) 自動收起；測試結束前先讓它跑完，
-    // 否則 flutter_test 會因「Timer 在 widget tree dispose 後仍 pending」判失敗。
-    await tester.pump(const Duration(seconds: 3));
-  });
-
-  testWidgets('下拉刷新會重新呼叫 getBlockedUsers()', (tester) async {
-    when(
-      () => blockRepository.getBlockedUsers(),
-    ).thenAnswer((_) async => const [BlockedUser(userId: '1001')]);
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-    verify(() => blockRepository.getBlockedUsers()).called(1);
-
-    await tester.fling(find.text('使用者 1001'), const Offset(0, 300), 1000);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    // mocktail 的 verify() 會消耗已比對過的呼叫紀錄，故第二次 verify 只看
-    // 「上次 verify 之後」新發生的呼叫數，此處應為下拉刷新觸發的 1 次。
-    verify(() => blockRepository.getBlockedUsers()).called(1);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('已有清單時下拉刷新失敗，保留清單並顯示錯誤 toast（不整頁蓋掉）', (tester) async {
-    var callCount = 0;
-    when(() => blockRepository.getBlockedUsers()).thenAnswer((_) {
-      callCount++;
-      if (callCount == 1) {
-        return Future.value(const [BlockedUser(userId: '1001')]);
-      }
-      throw const ServerException('查詢封鎖名單失敗：伺服器忙碌中');
-    });
-
-    await _pumpScreen(tester, blockRepository: blockRepository);
-    expect(find.text('使用者 1001'), findsOneWidget);
-
-    await tester.fling(find.text('使用者 1001'), const Offset(0, 300), 1000);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(
-      find.text('使用者 1001'),
-      findsOneWidget,
-      reason: '刷新失敗不該把已顯示的清單蓋掉，使用者原本看到的資料要保留',
-    );
-    expect(
-      find.text('查詢封鎖名單失敗：伺服器忙碌中'),
-      findsOneWidget,
-      reason: '刷新失敗改用 toast 提示，不是整頁錯誤狀態',
-    );
-    expect(tester.takeException(), isNull);
-
-    // showFloatingToast 用 Future.delayed(2s) 自動收起；測試結束前先讓它跑完，
-    // 否則 flutter_test 會因「Timer 在 widget tree dispose 後仍 pending」判失敗。
-    await tester.pump(const Duration(seconds: 3));
-  });
-}
-
-Future<void> _pumpScreen(
-  WidgetTester tester, {
-  required BlockRepository blockRepository,
+Future<void> _pump(
+  WidgetTester tester,
+  FakeBuyerApp app, {
+  bool settle = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [blockRepositoryProvider.overrideWithValue(blockRepository)],
+      overrides: [buyerAppClientProvider.overrideWithValue(app.client())],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         enableScaleWH: () => false,
         enableScaleText: () => false,
-        builder: (_, __) => MaterialApp(
+        builder: (_, _) => MaterialApp(
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
@@ -210,5 +42,267 @@ Future<void> _pumpScreen(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('單頁兩段：「店家」在「買家」之前，各自列名稱', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('7', name: '好店')],
+      ],
+      buyerPages: [
+        [blockedBuyer('b1', name: '小明')],
+      ],
+    );
+    await _pump(tester, app);
+
+    final storeTitle = find.byKey(const ValueKey('blocked-stores-title'));
+    final buyerTitle = find.byKey(const ValueKey('blocked-buyers-title'));
+    expect(tester.widget<Text>(storeTitle).data, '店家');
+    expect(tester.widget<Text>(buyerTitle).data, '買家');
+    expect(
+      tester.getTopLeft(storeTitle).dy,
+      lessThan(tester.getTopLeft(buyerTitle).dy),
+    );
+    expect(find.text('好店'), findsOneWidget);
+    expect(find.text('小明'), findsOneWidget);
+    expect(app.storeListRequests.single.pageToken, '');
+    expect(app.buyerListRequests.single.pageToken, '');
+  });
+
+  testWidgets('已刪除的買家顯示「已刪除的帳號」，仍可解除封鎖', (tester) async {
+    final app = FakeBuyerApp(
+      buyerPages: [
+        [blockedBuyer('gone-1', name: '殘留的名稱', deleted: true)],
+      ],
+    );
+    await _pump(tester, app);
+
+    expect(find.text('已刪除的帳號'), findsOneWidget);
+    expect(find.text('殘留的名稱'), findsNothing);
+    await tester.tap(find.text('解除封鎖'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(app.buyerUnblocks.single.buyerId, 'gone-1');
+    expect(find.text('已刪除的帳號'), findsNothing);
+    expect(find.text('尚無封鎖的使用者'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('已關閉的店家照樣列出並標示狀態，解除送 UnblockStore', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [
+          blockedStore(
+            '8',
+            name: '歇業的店',
+            status: StoreCardStatus.STORE_CARD_STATUS_CLOSED,
+          ),
+        ],
+      ],
+    );
+    await _pump(tester, app);
+
+    expect(find.text('歇業的店'), findsOneWidget);
+    expect(find.text('已關閉'), findsOneWidget);
+    await tester.tap(find.text('解除封鎖'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(app.storeUnblocks.single.storeId, '8');
+    expect(app.buyerUnblocks, isEmpty);
+    expect(find.text('歇業的店'), findsNothing);
+    expect(find.text('已解除封鎖'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('每段各自分頁：店家「查看更多」只帶店家的 page_token', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('1', name: '店一')],
+        [blockedStore('2', name: '店二')],
+      ],
+      buyerPages: [
+        [blockedBuyer('b1', name: '買家一')],
+      ],
+    );
+    await _pump(tester, app);
+
+    expect(find.text('店二'), findsNothing);
+    expect(find.byKey(const ValueKey('blocked-buyers-more')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-more')));
+    await tester.pumpAndSettle();
+
+    expect(app.storeListRequests.map((r) => r.pageToken), ['', 'page-1']);
+    expect(app.buyerListRequests, hasLength(1));
+    expect(find.text('店二'), findsOneWidget);
+    expect(find.byKey(const ValueKey('blocked-stores-more')), findsNothing);
+  });
+
+  testWidgets('解除封鎖失敗時清單不變並顯示錯誤 toast', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('7', name: '好店')],
+      ],
+      unblockError: ConnectException(Code.unavailable, 'down'),
+    );
+    await _pump(tester, app);
+
+    await tester.tap(find.text('解除封鎖'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('好店'), findsOneWidget);
+    expect(find.text('服務暫時不可用'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('沒有封鎖任何人時顯示空狀態', (tester) async {
+    await _pump(tester, FakeBuyerApp());
+
+    final empty = find.byType(HkEmptyState);
+    expect(empty, findsOneWidget);
+    expect(tester.widget<HkEmptyState>(empty).message, '尚無封鎖的使用者');
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+  });
+
+  testWidgets('兩段都讀取失敗：錯誤狀態與空狀態分開，重試成功後顯示名單', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('7', name: '好店')],
+      ],
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+      listBuyersError: ConnectException(Code.unavailable, 'down'),
+    );
+    await _pump(tester, app);
+
+    expect(find.byType(HkEmptyState), findsNothing);
+    expect(find.text('服務暫時不可用'), findsOneWidget);
+
+    app.listStoresError = null;
+    app.listBuyersError = null;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('好店'), findsOneWidget);
+    expect(find.text('服務暫時不可用'), findsNothing);
+  });
+
+  testWidgets('只有一段失敗：另一段照常顯示，失敗那段可單獨重試', (tester) async {
+    final app = FakeBuyerApp(
+      buyerPages: [
+        [blockedBuyer('b1', name: '小明')],
+      ],
+      storePages: [
+        [blockedStore('7', name: '好店')],
+      ],
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+    );
+    await _pump(tester, app);
+
+    expect(find.text('小明'), findsOneWidget);
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+
+    app.listStoresError = null;
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('好店'), findsOneWidget);
+    expect(app.buyerListRequests, hasLength(1));
+  });
+
+  testWidgets('解除整頁之後仍有下一頁：不顯示空狀態，保留「查看更多」並可繼續載入', (tester) async {
+    final app = FakeBuyerApp(
+      storePages: [
+        [blockedStore('1', name: '店一')],
+        [blockedStore('2', name: '店二')],
+      ],
+    );
+    await _pump(tester, app);
+
+    await tester.tap(find.text('解除封鎖'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('店一'), findsNothing);
+    expect(find.text('尚無封鎖的使用者'), findsNothing);
+    expect(find.byKey(const ValueKey('blocked-stores-more')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-more')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('店二'), findsOneWidget);
+  });
+
+  testWidgets('一段已讀完且沒有項目、另一段還在讀取：顯示 loader，不是空白頁', (tester) async {
+    final gate = Completer<void>();
+    final app = FakeBuyerApp(
+      buyerPages: [
+        [blockedBuyer('b1', name: '小明')],
+      ],
+    )..listBuyersGate = gate;
+    await _pump(tester, app, settle: false);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(
+      find.byKey(const ValueKey('blocked-buyers-loading')),
+      findsOneWidget,
+    );
+    expect(find.byType(HkEmptyState), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('小明'), findsOneWidget);
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+  });
+
+  testWidgets('一段失敗、另一段還在第一次讀取：失敗那段的重試與讀取中那段的 loader 同時在頁面上', (tester) async {
+    final gate = Completer<void>();
+    final app = FakeBuyerApp(
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+    )..listBuyersGate = gate;
+    await _pump(tester, app, settle: false);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('blocked-buyers-loading')),
+      findsOneWidget,
+    );
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+    expect(find.byKey(const ValueKey('blocked-buyers-loading')), findsNothing);
+  });
+
+  testWidgets('單獨重試一段、另一段已讀完且沒有項目：不換成整頁 loader，該段就地顯示 loader', (tester) async {
+    final app = FakeBuyerApp(
+      listStoresError: ConnectException(Code.unavailable, 'down'),
+    );
+    await _pump(tester, app);
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsOneWidget);
+
+    final gate = Completer<void>();
+    app
+      ..listStoresError = null
+      ..listStoresGate = gate;
+    await tester.tap(find.byKey(const ValueKey('blocked-stores-retry')));
+    await tester.pump();
+
+    expect(find.byType(TruckLoadingOverlay), findsNothing);
+    expect(find.byKey(const ValueKey('blocked-stores-title')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('blocked-stores-loading')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('blocked-stores-retry')), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(HkEmptyState), findsOneWidget);
+  });
 }

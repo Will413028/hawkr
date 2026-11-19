@@ -1,7 +1,6 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
-import 'package:dio/dio.dart' show DioException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,8 +11,8 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../../config/flavor.dart';
 import '../../../../config/image_config.dart';
 import '../../../../core/motion/hk_motion_transitions.dart';
-import '../../../../core/networking/dio_provider.dart';
-import '../../../../shared/utils/hk_log.dart';
+import '../../../../core/session/viewer_scope.dart';
+import '../../../../shared/utils/require_login.dart';
 import '../../../../shared/widgets/comments_bottom_sheet.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
@@ -21,6 +20,10 @@ import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/oss_image.dart';
 import '../../../../shared/widgets/post_video_player.dart';
+import '../../../social/data/social_model.dart';
+import '../../../social/presentation/post_entity.dart';
+import '../../../social/presentation/post_entity_store.dart';
+import '../../../social/presentation/post_feed_controller.dart';
 import 'merchant_empty_state.dart';
 import 'merchant_layout.dart';
 
@@ -31,19 +34,16 @@ import 'merchant_layout.dart';
 /// - 長壓單格 → 彈出就地預覽卡（含按讚/留言/分享）
 /// - 雙擊圖片 → 動態愛心動畫並觸發按讚
 ///
-/// 注意：透過 [ref] 參數取得 Riverpod 依賴，保持本 Widget 為純 [StatefulWidget]。
-class MerchantHomeTab extends StatefulWidget {
+/// 貼文清單與每則貼文的實體都在 Riverpod（[postFeedControllerProvider]、[postSnapshotProvider]），本 Widget 只顯示與發動作。
+class MerchantHomeTab extends ConsumerStatefulWidget {
   const MerchantHomeTab({
     super.key,
-    this.ref,
     this.merchantId,
     this.merchantName,
     this.merchantAvatar,
     this.outerHandle,
   });
 
-  /// Riverpod [WidgetRef]，由父層 ConsumerWidget 傳入。
-  final WidgetRef? ref;
   final String? merchantId;
   final String? merchantName;
   final String? merchantAvatar;
@@ -52,277 +52,57 @@ class MerchantHomeTab extends StatefulWidget {
   final SliverOverlapAbsorberHandle? outerHandle;
 
   @override
-  State<MerchantHomeTab> createState() => _MerchantHomeTabState();
+  ConsumerState<MerchantHomeTab> createState() => _MerchantHomeTabState();
 }
 
-class _MerchantHomeTabState extends State<MerchantHomeTab>
+class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  List<Map<String, dynamic>> _posts = <Map<String, dynamic>>[];
-  bool _loadingPosts = false;
-  String? _postErr;
   final Map<String, String> _videoThumbCache = <String, String>{};
-  bool _initialFetchScheduled = false;
-  final ScrollController _feedScrollController = ScrollController();
+  BuildContext? _previewContext;
 
-  @override
-  void initState() {
-    super.initState();
-    _scheduleInitialFetch();
+  /// 目前店家的貼文清單 provider；店家 id 不是正整數時沒有清單。
+  PostFeedControllerProvider? get _feed {
+    final mid = int.tryParse(widget.merchantId?.trim() ?? '') ?? 0;
+    return mid > 0 ? postFeedControllerProvider(merchantId: mid) : null;
   }
 
   @override
   void didUpdateWidget(covariant MerchantHomeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final String oldId = oldWidget.merchantId?.trim() ?? '';
-    final String newId = widget.merchantId?.trim() ?? '';
-    if (newId != oldId) {
-      _initialFetchScheduled = false;
-      if (mounted) {
-        setState(() {
-          _posts = <Map<String, dynamic>>[];
-          _postErr = null;
-        });
-      }
-      _scheduleInitialFetch();
-    } else {
-      _scheduleInitialFetch();
+    if ((oldWidget.merchantId?.trim() ?? '') !=
+        (widget.merchantId?.trim() ?? '')) {
+      _closePreview();
     }
   }
 
-  @override
-  void dispose() {
-    _feedScrollController.dispose();
-    super.dispose();
-  }
-
-  void _scheduleInitialFetch() {
-    final mid = widget.merchantId?.trim();
-    if (mid == null || mid.isEmpty || _initialFetchScheduled) return;
-    _initialFetchScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _fetchPosts();
-    });
-  }
-
-  // ── 資料載入 ──────────────────────────────────────────────────────────────
-
-  Future<void> _fetchPosts() async {
-    final idStr = widget.merchantId?.trim();
-    if (idStr == null || idStr.isEmpty) return;
-    if (mounted) {
-      setState(() {
-        _loadingPosts = true;
-        _postErr = null;
-      });
+  /// 關掉開著的預覽卡。
+  void _closePreview() {
+    final context = _previewContext;
+    _previewContext = null;
+    if (context == null || !context.mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && route.isActive) {
+      Navigator.of(context).removeRoute(route);
     }
+  }
 
+  Future<void> _refresh() async {
+    final feed = _feed;
+    if (feed == null) return;
+    ref.invalidate(feed);
     try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
-      final mid = int.tryParse(idStr) ?? 0;
-      List<Map<String, dynamic>> list = [];
-
-      if (mid > 0) {
-        try {
-          final resp = await dio.get<Map<String, dynamic>>(
-            '/public/sellers/$mid/posts',
-          );
-          final body = resp.data ?? {};
-          final rawData = body['data'];
-          final List rawList;
-          if (rawData is Map<String, dynamic>) {
-            rawList = (rawData['records'] as List?) ?? [];
-          } else if (rawData is List) {
-            rawList = rawData;
-          } else {
-            rawList = [];
-          }
-          list = rawList
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        } on DioException catch (de) {
-          // 404 表示商家暫無貼文，視為空列表
-          if (de.response?.statusCode != 404) rethrow;
-        }
-      }
-
-      await _hydratePostProducts(dio, list);
-
-      if (mounted) {
-        setState(() {
-          _posts = list.map((m) {
-            final id = '${m['id'] ?? m['postId'] ?? ''}';
-            final liked = m['isLiked'] == true;
-            final lc = (m['likeCount'] is num)
-                ? (m['likeCount'] as num).toInt()
-                : 0;
-            final cc = (m['commentCount'] is num)
-                ? (m['commentCount'] as num).toInt()
-                : 0;
-            return {
-              ...m,
-              '_id': id,
-              '_liked': liked,
-              '_likeCount': lc,
-              '_commentCount': cc,
-              '_hydrated': true,
-            };
-          }).toList();
-        });
-      }
-
-      // 預快取首屏圖片
-      try {
-        if (mounted && _posts.isNotEmpty) {
-          final int prefetchCount = _posts.length < 9 ? _posts.length : 9;
-          for (int i = 0; i < prefetchCount; i++) {
-            final u = _firstImageUrlFromPost(_posts[i]);
-            if (u.isEmpty) continue;
-            final abs = _toAbsolute(u);
-            if (abs.isEmpty) continue;
-            try {
-              await precacheImage(
-                NetworkImage(ImageConfig.urlFor(abs, ImageScene.postImage)),
-                context,
-              );
-            } catch (_) {}
-          }
-        }
-      } catch (_) {}
-
-      if (mounted) {
-        setState(() {
-          _loadingPosts = false;
-        });
-      }
-    } catch (e, st) {
-      HKLog.logE('_fetchPosts error: $e', e);
-      debugPrint('$st');
-      if (mounted) {
-        setState(() {
-          _postErr = '載入失敗';
-          _loadingPosts = false;
-        });
-      }
+      await ref.read(feed.future);
+    } catch (_) {
+      // 重讀失敗保留舊清單。
     }
-  }
-
-  /// 針對僅有 id 但無詳細資訊的商品節點，補充抓取商品名稱/圖片/價格。
-  Future<void> _hydratePostProducts(
-    dynamic dio,
-    List<Map<String, dynamic>> records,
-  ) async {
-    if (dio == null) return;
-    final futures = <Future>[];
-    for (final raw in records) {
-      final product = raw['product'];
-      if (product is! Map) continue;
-      final pid = product['id'];
-      final name = (product['name'] ?? '').toString().trim();
-      if (pid == null || pid == 0 || name.isNotEmpty) continue;
-      futures.add(() async {
-        try {
-          final resp = await dio.get<dynamic>('/public/products/$pid');
-          final data = resp.data;
-          if (data is Map) {
-            final inner = data['data'] ?? data;
-            if (inner is Map) {
-              raw['product'] = {
-                ...Map<String, dynamic>.from(product),
-                'name': (inner['name'] ?? '').toString(),
-                // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
-                'image': (inner['imageKey'] ?? inner['imageUrl'] ?? '')
-                    .toString(),
-                'price': (inner['priceMin'] ?? '').toString(),
-              };
-            }
-          }
-        } catch (_) {}
-      }());
-    }
-    if (futures.isNotEmpty) await Future.wait(futures);
   }
 
   // ── 互動操作 ──────────────────────────────────────────────────────────────
 
-  Future<void> _toggleLike(int index) async {
-    final p = _posts[index];
-    final id = (p['_id'] ?? '').toString();
-    if (id.isEmpty) return;
-
-    final prevLiked = p['_liked'] == true;
-    final prevCount = (p['_likeCount'] is int) ? (p['_likeCount'] as int) : 0;
-    final nextLiked = !prevLiked;
-    final nextCount = (prevCount + (nextLiked ? 1 : -1)).clamp(0, 1 << 30);
-    setState(() {
-      _posts[index] = {...p, '_liked': nextLiked, '_likeCount': nextCount};
-    });
-
-    try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
-      final resp = await dio.post<dynamic>('/app/posts/$id/like');
-      if (!mounted) return;
-      final data = resp.data;
-      if (data is Map) {
-        final liked = data['liked'] == true;
-        final likeCount = (data['likeCount'] is num)
-            ? (data['likeCount'] as num).toInt()
-            : nextCount;
-        setState(() {
-          _posts[index] = {
-            ..._posts[index],
-            '_liked': liked,
-            '_likeCount': likeCount,
-          };
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _posts[index] = {
-          ..._posts[index],
-          '_liked': prevLiked,
-          '_likeCount': prevCount,
-        };
-      });
-    }
-  }
-
-  /// 重抓單一貼文的留言數。
-  ///
-  /// 資料來源＝貼文詳情 `GET /public/posts/{id}` 的 `comment_count`；Gateway 沒有
-  /// `/public/posts/{id}/comments/count` 這條路由（`routes_post.go` 只註冊
-  /// `/:id`、`/:id/comments`、`/comments/:id/replies`、`/:id/comments/stream`）。
-  Future<void> _refreshCommentCountAt(int index) async {
-    if (index < 0 || index >= _posts.length) return;
-    final id = (_posts[index]['_id'] ?? '').toString();
-    if (id.isEmpty) return;
-    try {
-      final dio = widget.ref?.read(dioProvider);
-      if (dio == null) return;
-      final resp = await dio.get<dynamic>('/public/posts/$id');
-      final body = resp.data;
-      final detail = (body is Map ? body['data'] : null) ?? body;
-      if (detail is! Map) return;
-      final raw = detail['commentCount'];
-      final commentCnt = raw is num
-          ? raw.toInt()
-          : int.tryParse((raw ?? '').toString()) ?? 0;
-      if (!mounted) return;
-      setState(() {
-        _posts[index] = {..._posts[index], '_commentCount': commentCnt};
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _openCommentSheet(String postId) async {
-    final id = postId.trim();
-    if (!mounted || id.isEmpty) return;
+  Future<void> _openCommentSheet(int postId) async {
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -331,48 +111,22 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => CommentsBottomSheet(
-        postId: id,
-        postOwnerName: widget.merchantName,
-        merchantAvatar: widget.merchantAvatar,
-      ),
+      builder: (_) => CommentsBottomSheet(postId: postId),
     );
     if (!mounted) return;
-    final idx = _posts.indexWhere(
-      (p) => ((p['_id'] ?? p['id'] ?? p['postId'] ?? '').toString() == id),
-    );
-    if (idx >= 0) await _refreshCommentCountAt(idx);
+    await ref.read(postEntityStoreProvider.notifier).refresh(postId);
   }
 
   // ── 圖片 / 影片 URL 萃取工具 ─────────────────────────────────────────────
 
-  /// 貼文封面圖。`PostListItemData` 的圖片欄只有 `imageKeys` / `imageUrls` 兩個
-  /// 陣列（49 §6.1；無圖為 `[]`，欄位一定存在）—— 單數的 `imageKey` / `imageUrl`
-  /// 已從後端移除。key 優先，顯示端 buildImageUrl dual-mode 兩種都吃得下。
-  String _firstImageUrlFromPost(Map<String, dynamic> m) {
-    for (final field in const ['imageKeys', 'imageUrls']) {
-      final value = m[field];
-      if (value is! List) continue;
-      for (final e in value) {
-        final s = (e ?? '').toString().trim();
-        if (s.isNotEmpty) return s;
-      }
-    }
-    return '';
-  }
-
-  /// 同上，但回傳已過 `_toAbsolute` 的顯示值（格狀縮圖用）。
-  String _pickImageUrl(dynamic m) {
-    if (m is! Map) return '';
-    final raw = _firstImageUrlFromPost(Map<String, dynamic>.from(m));
-    return raw.isEmpty ? '' : _toAbsolute(raw);
-  }
+  /// 貼文封面圖的顯示值（已過 `_toAbsolute`）。
+  String _pickImageUrl(Post post) => _toAbsolute(post.imageUrl);
 
   /// 貼文影片。social 的 posts 只存單一圖片欄，**沒有任何影片欄位** ——
   /// 這裡曾對 videoUrl / video / mediaUrl / medias[].url 等十餘個名字做猜測式
   /// 探測，後端一個都不吐，所以它從第一天起就恆為 null。保留函式簽章讓呼叫端
   /// 的影片分支維持原狀（走圖片路徑），等後端真的支援影片時再從這裡接。
-  String? _videoUrlFromPost(dynamic m) => null;
+  String? _videoUrlFromPost(Post post) => null;
 
   Future<String?> _thumbnailForVideo(String videoUrl) async {
     final cached = _videoThumbCache[videoUrl];
@@ -412,10 +166,15 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     if (widget.merchantId == null || widget.merchantId!.isEmpty) {
       return const Center(child: Text('No merchant'));
     }
-    return _buildPostsList();
+    final feed = _feed;
+    ref.listen(viewerIdProvider, (_, _) => _closePreview());
+    return _buildPostsList(feed);
   }
 
-  Widget _buildPostsList() {
+  Widget _buildPostsList(PostFeedControllerProvider? feed) {
+    final feedState = feed == null ? null : ref.watch(feed);
+    final postIds = feedState?.value?.ids ?? const <int>[];
+    final unavailable = watchListUnavailable(ref, postIds);
     final BorderRadius tileRadius = BorderRadius.circular(16);
     final String keySuffix = widget.merchantId ?? 'noid';
 
@@ -454,7 +213,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
     );
 
     Widget wrapInScrollView(Widget sliver) => FruitRefreshIndicator(
-      onRefresh: _fetchPosts,
+      onRefresh: _refresh,
       topOffset: widget.outerHandle?.layoutExtent ?? 0,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -466,7 +225,9 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       ),
     );
 
-    if (_loadingPosts) {
+    if (feedState != null &&
+        (!feedState.hasValue || unavailable) &&
+        feedState.isLoading) {
       return wrapInScrollView(
         buildSliverGrid(
           itemCount: 9,
@@ -478,7 +239,9 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       );
     }
 
-    if (_postErr != null) {
+    if (feedState != null &&
+        (!feedState.hasValue || unavailable) &&
+        feedState.hasError) {
       return wrapInScrollView(
         SliverFillRemaining(
           hasScrollBody: false,
@@ -501,7 +264,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _postErr!,
+                    '載入失敗',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 16,
@@ -510,7 +273,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
                   ),
                   const SizedBox(height: 12),
                   TextButton.icon(
-                    onPressed: _fetchPosts,
+                    onPressed: _refresh,
                     icon: const HkIcon(HkIconName.refresh, size: 18),
                     label: const HkButtonLabel('重新載入'),
                   ),
@@ -522,7 +285,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
       );
     }
 
-    if (_posts.isEmpty) {
+    if (postIds.isEmpty) {
       return wrapInScrollView(
         SliverFillRemaining(
           hasScrollBody: false,
@@ -540,80 +303,85 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
     return wrapInScrollView(
       buildSliverGrid(
-        itemCount: _posts.length,
-        itemBuilder: (_, i) {
-          final m = _posts[i];
-          final imageUrl = _pickImageUrl(m);
-          final title = (m['title'] ?? m['text'] ?? '').toString();
-          final String? vUrl = _videoUrlFromPost(m);
+        itemCount: postIds.length,
+        itemBuilder: (_, i) => Consumer(
+          builder: (context, ref, _) {
+            final postId = postIds[i];
+            final post = ref.watch(postSnapshotProvider(postId));
+            if (post == null) {
+              return ClipRRect(
+                borderRadius: tileRadius,
+                child: Container(color: AppColors.dividerLight),
+              );
+            }
+            final imageUrl = _pickImageUrl(post);
+            final String? vUrl = _videoUrlFromPost(post);
 
-          final Widget tileChild = imageUrl.isNotEmpty
-              ? _StableNetImage(url: imageUrl)
-              : (vUrl != null && vUrl.isNotEmpty)
-              ? FutureBuilder<String?>(
-                  future: _thumbnailForVideo(vUrl),
-                  builder: (_, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return Container(color: AppColors.dividerLight);
-                    }
-                    final p = snap.data;
-                    if (p != null && p.isNotEmpty) {
-                      return Image.asset(
-                        p,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(color: AppColors.dividerLight),
+            final Widget tileChild = imageUrl.isNotEmpty
+                ? _StableNetImage(url: imageUrl)
+                : (vUrl != null && vUrl.isNotEmpty)
+                ? FutureBuilder<String?>(
+                    future: _thumbnailForVideo(vUrl),
+                    builder: (_, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return Container(color: AppColors.dividerLight);
+                      }
+                      final p = snap.data;
+                      if (p != null && p.isNotEmpty) {
+                        return Image.asset(
+                          p,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: AppColors.dividerLight),
+                        );
+                      }
+                      return _emptyTile();
+                    },
+                  )
+                : _emptyTile();
+
+            return GestureDetector(
+              onLongPressStart: (details) =>
+                  _showPostPreviewAt(details.globalPosition, postId),
+              child: ClipRRect(
+                borderRadius: tileRadius,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      final mid = widget.merchantId;
+                      if (mid == null || mid.isEmpty) return;
+                      context.push(
+                        '/social/posts',
+                        extra: {
+                          'merchantId': mid,
+                          'merchantName': widget.merchantName,
+                          'merchantAvatar': widget.merchantAvatar,
+                          'initialIndex': i,
+                          'initialPostId': postId.toString(),
+                        },
                       );
-                    }
-                    return _emptyTile(title);
-                  },
-                )
-              : _emptyTile(title);
-
-          final postId = (m['_id'] ?? m['id'] ?? m['postId'] ?? '').toString();
-          return GestureDetector(
-            onLongPressStart: (details) =>
-                _showPostPreviewAt(details.globalPosition, i),
-            child: ClipRRect(
-              borderRadius: tileRadius,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    final mid = widget.merchantId;
-                    if (mid == null || mid.isEmpty) return;
-                    context.push(
-                      '/social/posts',
-                      extra: {
-                        'merchantId': mid,
-                        'merchantName': widget.merchantName,
-                        'merchantAvatar': widget.merchantAvatar,
-                        'initialIndex': i,
-                        'initialPostId': postId.isNotEmpty ? postId : null,
-                      },
-                    );
-                  },
-                  child: SizedBox.expand(
-                    child: postId.isNotEmpty
-                        ? Hero(
-                            tag: 'post-image-$postId',
-                            // 飛行中用 destination 的 widget，避免 NetworkImage→cached
-                            // 兩種底層 widget 切換導致重新解碼 jank
-                            flightShuttleBuilder: _postImageHeroShuttle,
-                            child: tileChild,
-                          )
-                        : tileChild,
+                    },
+                    child: SizedBox.expand(
+                      child: Hero(
+                        tag: 'post-image-$postId',
+                        // 飛行中用 destination 的 widget，避免 NetworkImage→cached
+                        // 兩種底層 widget 切換導致重新解碼 jank
+                        flightShuttleBuilder: _postImageHeroShuttle,
+                        child: tileChild,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _emptyTile(String title) => Container(
+  Widget _emptyTile() => Container(
     color: AppColors.dividerLight,
     child: Center(
       child: Column(
@@ -624,23 +392,6 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
             color: AppIconColors.onBrand,
             size: 28.sp,
           ),
-          if (title.isNotEmpty) ...[
-            SizedBox(height: 6.h),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.w),
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.bgCard,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     ),
@@ -648,48 +399,12 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 
   // ── 長壓預覽卡 ────────────────────────────────────────────────────────────
 
-  void _showPostPreviewAt(Offset globalPos, int index) {
+  void _showPostPreviewAt(Offset globalPos, int postId) {
     SystemSound.play(SystemSoundType.click);
-    if (index < 0 || index >= _posts.length) return;
-    final m = _posts[index];
-
-    String content = '';
-    final c = m['content'];
-    if (c is String && c.toString().trim().isNotEmpty) {
-      content = c.toString();
-    } else if (c is Map) {
-      for (final k in ['text', 'caption', 'body', 'description', 'content']) {
-        final v = (c[k] ?? '').toString().trim();
-        if (v.isNotEmpty) {
-          content = v;
-          break;
-        }
-      }
-    }
-    if (content.isEmpty) {
-      for (final k in ['text', 'body', 'description', 'caption', 'title']) {
-        final v = (m[k] ?? '').toString().trim();
-        if (v.isNotEmpty) {
-          content = v;
-          break;
-        }
-      }
-    }
-
-    final imageUrl = _pickImageUrl(m);
-    final String? vUrl = _videoUrlFromPost(m);
-    var dialogLiked = m['_liked'] == true;
-    var dialogLikeCount = (m['_likeCount'] is int)
-        ? (m['_likeCount'] as int)
-        : 0;
-    final commentCount = (m['_commentCount'] is int)
-        ? (m['_commentCount'] as int)
-        : 0;
-    final postId = (m['_id'] ?? m['id'] ?? m['postId'] ?? '').toString();
+    final post = ref.read(postEntityStoreProvider).posts[postId];
+    if (post == null) return;
     final mn = widget.merchantName;
-    final username = (mn != null && mn.trim().isNotEmpty)
-        ? mn.trim()
-        : (m['authorName'] ?? m['username'] ?? m['author'] ?? '使用者').toString();
+    final username = (mn != null && mn.trim().isNotEmpty) ? mn.trim() : '使用者';
 
     showGeneralDialog(
       context: context,
@@ -705,8 +420,16 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
           size.width - panelWidth - 8,
         );
         double top = globalPos.dy.clamp(8.0, size.height - maxHeight - 8) - 10;
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
+        return Consumer(
+          builder: (dialogContext, ref, _) {
+            _previewContext = dialogContext;
+            final live = ref.watch(postSnapshotProvider(postId));
+            if (live == null) {
+              _closePreview();
+              return const SizedBox.shrink();
+            }
+            final imageUrl = _pickImageUrl(live);
+            final String? vUrl = _videoUrlFromPost(live);
             return Stack(
               children: [
                 Positioned(
@@ -725,22 +448,21 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
                         child: Padding(
                           padding: EdgeInsets.only(bottom: 8.h),
                           child: _PostPreviewCard(
-                            index: index,
                             postId: postId,
                             imageUrl: imageUrl,
                             videoUrl: vUrl,
-                            caption: content,
+                            caption: live.content,
                             username: username,
                             merchantAvatar: widget.merchantAvatar,
-                            liked: dialogLiked,
-                            likeCount: dialogLikeCount,
-                            commentCount: commentCount,
-                            onLikeToggle: () {
-                              setDialogState(() {
-                                dialogLiked = !dialogLiked;
-                                dialogLikeCount += dialogLiked ? 1 : -1;
-                              });
-                              _toggleLike(index);
+                            liked: live.liked,
+                            likeCount: live.likeCount,
+                            commentCount: live.commentCount,
+                            onLikeToggle: () async {
+                              if (!await requireLogin(context, ref)) return;
+                              if (!mounted) return;
+                              await ref
+                                  .read(postEntityStoreProvider.notifier)
+                                  .toggleLike(postId);
                             },
                             onComment: () {
                               Navigator.of(context).pop();
@@ -771,7 +493,7 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
             beginScale: 0.96,
             child: child,
           ),
-    );
+    ).whenComplete(() => _previewContext = null);
   }
 }
 
@@ -785,7 +507,6 @@ class _MerchantHomeTabState extends State<MerchantHomeTab>
 /// [liked] 與 [likeCount] 由外層 [StatefulBuilder] 管理以實現對話框內即時更新。
 class _PostPreviewCard extends StatelessWidget {
   const _PostPreviewCard({
-    required this.index,
     required this.postId,
     required this.imageUrl,
     this.videoUrl,
@@ -799,8 +520,7 @@ class _PostPreviewCard extends StatelessWidget {
     required this.onComment,
   });
 
-  final int index;
-  final String postId;
+  final int postId;
   final String imageUrl;
   final String? videoUrl;
   final String caption;

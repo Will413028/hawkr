@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，以及讀自己送出過的檢舉（ModerationAppService）。
+//
+// 檢舉送出後只回檢舉 ID 與收件時間，案件（管理員處理的單位）不對外；檢舉的結果由所屬案件的決定推導，不另存逐筆結果。
+// ID 是不透明的字串（貼文、留言、討論區留言與檢舉是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。
+package hawkr.moderation.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
+
+// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
+service ModerationAppService {
+  // SubmitReport 送出一筆檢舉。對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
+  // 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
+  // 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
+  rpc SubmitReport(SubmitReportRequest) returns (SubmitReportResponse);
+
+  // ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// ReportTargetKind 是檢舉對象的種類。
+enum ReportTargetKind {
+  REPORT_TARGET_KIND_UNSPECIFIED = 0;
+  REPORT_TARGET_KIND_POST = 1;
+  REPORT_TARGET_KIND_COMMENT = 2;
+  REPORT_TARGET_KIND_FORUM_ENTRY = 3;
+  // 買家；id 是買家的 ID。
+  REPORT_TARGET_KIND_BUYER = 4;
+}
+
+// ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。
+enum ReportOutcome {
+  REPORT_OUTCOME_UNSPECIFIED = 0;
+  // 案件還在處理中。
+  REPORT_OUTCOME_PENDING = 1;
+  // 案件認定違規。
+  REPORT_OUTCOME_VIOLATION = 2;
+  // 案件認定不違規。
+  REPORT_OUTCOME_NO_VIOLATION = 3;
+}
+
+// ReportTarget 是被檢舉的對象。
+message ReportTarget {
+  ReportTargetKind kind = 1 [(google.api.field_behavior) = REQUIRED];
+  string id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SubmitReportRequest {
+  ReportTarget target = 1 [(google.api.field_behavior) = REQUIRED];
+  // 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
+  hawkr.common.v1alpha1.PolicyCategory category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 選填的說明，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
+  string description = 3;
+  // 選填，UUIDv4（AIP-155）：同一位檢舉人以同一個 request_id 重送回第一次的結果；內容不同回 invalid_argument。
+  string request_id = 4 [(google.api.field_info).format = UUID4];
+}
+
+message SubmitReportResponse {
+  // 檢舉 ID。
+  string report_id = 1;
+  // 收件時間；重送回第一次的時間。
+  google.protobuf.Timestamp create_time = 2;
+}
+
+message ListMyReportsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMyReportsResponse {
+  repeated ReportRecord reports = 1;
+  string next_page_token = 2;
+}
+
+// ReportRecord 是呼叫者送出的一筆檢舉。
+message ReportRecord {
+  string id = 1;
+  ReportTarget target = 2;
+  hawkr.common.v1alpha1.PolicyCategory category = 3;
+  // 送出時的說明；沒有或已超過保留期被清除時是空字串。
+  string description = 4;
+  ReportOutcome outcome = 5;
+  google.protobuf.Timestamp create_time = 6;
+  // 案件結案的時間；處理中不設。
+  optional google.protobuf.Timestamp resolve_time = 7;
+}

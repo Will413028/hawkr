@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -77,8 +78,10 @@ func TestAdminWithoutRolesIsDeniedEverywhereExceptTheExemptions(t *testing.T) {
 		"/hawkr.admin.identity.v1alpha1.IdentityAdminService/SignOut":    true,
 	}
 	procedures := adminauth.Procedures()
-	if len(procedures) != 81 {
-		t.Fatalf("admin 方法 %d 支，預期 81", len(procedures))
+	for procedure := range exempt {
+		if !slices.Contains(procedures, procedure) {
+			t.Fatalf("宣告表沒有豁免的 %s", procedure)
+		}
 	}
 	for _, procedure := range procedures {
 		status, code := f.post(t, procedure, tok)

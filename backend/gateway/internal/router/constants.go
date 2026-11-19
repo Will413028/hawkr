@@ -296,36 +296,6 @@ const (
 	SellersIDPath   = "/sellers/:id"
 	SellersStats    = "/sellers/:id/stats"
 	SellersProducts = "/sellers/:id/products"
-	SellersPosts    = "/sellers/:id/posts"
-	SellersForum    = "/sellers/:id/forum"
-	ForumPath       = "/sellers/forum"
-	ForumIDReplies  = "/:id/replies"
-	ForumIDReply    = "/:id/reply"
-	ForumID         = "/:id"
-)
-
-const (
-	PostsPath       = "/posts"
-	PostsIDPath     = "/posts/:id"
-	PostsComments   = "/posts/:id/comments"
-	PostsLikeCount  = "/posts/:id/like_count"
-	PostsShare      = "/posts/:id/share"
-	PostsLikeStatus = "/posts/:id/like_status"
-
-	// Group 內使用（不含 /posts 前綴，避免雙重嵌套）
-	PostIDRel        = "/:id"
-	PostCommentsRel  = "/:id/comments"
-	PostLikeCountRel = "/:id/like_count"
-	PostShareRel     = "/:id/share"
-	PostLikeRel      = "/:id/like"
-)
-
-// ==================== 評論相關 ====================
-
-const (
-	CommentsPath    = "/comments/:id"
-	CommentsReplies = "/comments/:id/replies"
-	CommentsLike    = "/comments/:id/like"
 )
 
 // ==================== 買家相關（/app/buyers/me）====================
@@ -590,14 +560,6 @@ const (
 	ChatReadReceipts         = "/messages"
 	ChatConversationReceipts = "/conversations/:targetId"
 	ChatAllReceipts          = "/conversations"
-
-	// 商家管理相關（相對路徑，在 /app/sellers 群組內使用）
-	SellerPosts         = "/posts"
-	SellerPostID        = "/posts/:id"
-	SellerPostPublish   = "/posts/:id/publish"
-	SellerPostUnpublish = "/posts/:id/unpublish"
-	SellerPostReports   = "/posts/:id/reports"
-	SellerMePosts       = "/me/posts"
 
 	// Service names
 	ServiceProduct    = "product"

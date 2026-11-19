@@ -694,6 +694,11 @@ func (m *Module) CloseEndedMeasureRequests(ctx context.Context) (int, error) {
 	return m.measure.CloseEndedRequests(ctx)
 }
 
+// PurgeContentSnapshots 清空撤銷滿 ContentSnapshotRetention（184 天）的內容下架措施留著的內容快照，回傳清空的列數；未撤銷的措施不清。它是 seller.purge_content_snapshots job 的內容，給 worker 與測試呼叫；冪等。
+func (m *Module) PurgeContentSnapshots(ctx context.Context) (int64, error) {
+	return m.measure.PurgeContentSnapshots(ctx)
+}
+
 // ReconcileSuspensions 修補停權期間與措施不一致的帳號（只掃描有進行中期間或有未撤銷停權措施的帳號），回傳掃描的帳號數；
 // 它是 seller.reconcile_suspensions job 的內容。
 func (m *Module) ReconcileSuspensions(ctx context.Context) (int, error) {

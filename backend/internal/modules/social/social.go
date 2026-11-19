@@ -34,6 +34,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -91,26 +92,27 @@ type Deps struct {
 }
 
 type (
-	Post            = model.Post
-	PostStatus      = model.PostStatus
-	PostStats       = model.PostStats
-	Hashtag         = model.Hashtag
-	HashtagCount    = model.HashtagCount
-	PostCursor      = model.PostCursor
-	OwnPostCursor   = model.OwnPostCursor
-	PostPage        = model.PostPage
-	OwnPostPage     = model.OwnPostPage
-	CreatePostInput = model.CreatePostInput
-	UpdatePostInput = model.UpdatePostInput
-	Actor           = model.Actor
-	ActorKind       = model.ActorKind
-	Caller          = model.Caller
-	Comment         = model.Comment
-	CommentState    = model.CommentState
-	CommentCursor   = model.CommentCursor
-	CommentPage     = model.CommentPage
-	CommentInput    = model.CommentInput
-	StoreSummary    = model.StoreSummary
+	Post              = model.Post
+	PostStatus        = model.PostStatus
+	PostStats         = model.PostStats
+	Hashtag           = model.Hashtag
+	HashtagCount      = model.HashtagCount
+	PostCursor        = model.PostCursor
+	CreatedPostCursor = model.CreatedPostCursor
+	PostPage          = model.PostPage
+	CreatedPostPage   = model.CreatedPostPage
+	AdminPostFilter   = model.AdminPostFilter
+	CreatePostInput   = model.CreatePostInput
+	UpdatePostInput   = model.UpdatePostInput
+	Actor             = model.Actor
+	ActorKind         = model.ActorKind
+	Caller            = model.Caller
+	Comment           = model.Comment
+	CommentState      = model.CommentState
+	CommentCursor     = model.CommentCursor
+	CommentPage       = model.CommentPage
+	CommentInput      = model.CommentInput
+	StoreSummary      = model.StoreSummary
 	// 排程發布：Schedule 是一次排程，ScheduledBy 是發起者（種類加發起者擁有格式的不透明 ref），ScheduleAuthorizer 是到點重驗授權的 port。
 	Schedule           = model.Schedule
 	ScheduledPost      = model.ScheduledPost
@@ -141,7 +143,11 @@ type (
 	HiddenCursor       = model.HiddenCursor
 	HiddenPage         = model.HiddenPage
 	ContentOwner       = model.ContentOwner
+	ContentAuthor      = model.ContentAuthor
 	ContentSnapshot    = model.ContentSnapshot
+	ForumThread        = model.ForumThread
+	ForumThreadView    = model.ForumThreadView
+	LinkAvailability   = model.LinkAvailability
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = stats.TakedownContentError
 	Viewer               = engage.Viewer
@@ -272,34 +278,35 @@ func New(d Deps) *Module {
 }
 
 // CreatePost 新增貼文；店家要有 CapMarketing。Publish 為真時同一個動作發布（公開要件在這裡驗證）。
-func (m *Module) CreatePost(ctx context.Context, store seller.Store, in CreatePostInput) (Post, error) {
-	return m.post.Create(ctx, store, in)
+func (m *Module) CreatePost(ctx context.Context, store seller.Store, in CreatePostInput, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Create(ctx, store, in, actor)
 }
 
 // UpdatePost 修改貼文（帶讀取時的版本）；店家要有 CapMarketing。
-func (m *Module) UpdatePost(ctx context.Context, store seller.Store, in UpdatePostInput) (Post, error) {
-	return m.post.Update(ctx, store, in)
+func (m *Module) UpdatePost(ctx context.Context, store seller.Store, in UpdatePostInput, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Update(ctx, store, in, actor)
 }
 
 // PublishPost 發布貼文；店家要有 CapMarketing。
-func (m *Module) PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (Post, error) {
-	return m.post.Publish(ctx, store, postID, version)
+func (m *Module) PublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Publish(ctx, store, postID, version, actor)
 }
 
 // UnpublishPost 下架貼文；店家要有 CapContentContract。
-func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) (Post, error) {
-	return m.post.Unpublish(ctx, store, postID, version)
+func (m *Module) UnpublishPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64, actor *delegatedactor.Actor) (Post, error) {
+	return m.post.Unpublish(ctx, store, postID, version, actor)
 }
 
-// DeletePost 軟刪貼文（冪等）；店家要有 CapContentContract。version 為 0 表示不檢查版本。
-func (m *Module) DeletePost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
-	return m.post.Delete(ctx, store, postID, version)
+// DeleteOwnPost 是店主對外的刪除：沒刪到（不存在、已刪除、別家未公開的貼文）回 NotFound，別家已公開的貼文回 PermissionDenied；
+// 店家要有 CapContentContract。version 為 0 表示不檢查版本。
+func (m *Module) DeleteOwnPost(ctx context.Context, store seller.Store, postID uuid.UUID, version int64) error {
+	return m.post.DeleteOwn(ctx, store, postID, version)
 }
 
 // SchedulePost 排程發布：貼文要是 DRAFT 或 UNPUBLISHED，in.PublishAt 距現在 5 分鐘到 90 天，仍要滿足公開要件；貼文已有待發布的排程時先把它轉 REPLACED。
 // in.By 是發起者：OWNER 的 ref 由伺服器填，DELEGATION 的 ref 由呼叫方給（代行 session 的 ID）；店家要有 CapMarketing。排程與到點的 job 在同一個 transaction 寫入。
-func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput) (ScheduledPost, error) {
-	return m.post.Schedule(ctx, store, in)
+func (m *Module) SchedulePost(ctx context.Context, store seller.Store, in SchedulePostInput, actor *delegatedactor.Actor) (ScheduledPost, error) {
+	return m.post.Schedule(ctx, store, in, actor)
 }
 
 // CancelPostSchedule 是店主取消貼文待發布的排程（OWNER_CANCELED）；version 是讀取時的版本；回傳取消後貼文的新版本（etag）；沒有待發布的排程時什麼都不做（不檢查版本，回傳目前的版本）；店家要有 CapMarketing。
@@ -368,7 +375,7 @@ func (m *Module) MyPost(ctx context.Context, store seller.Store, id uuid.UUID) (
 }
 
 // ListMyPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選；店家要有 CapContentContract。
-func (m *Module) ListMyPosts(ctx context.Context, store seller.Store, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+func (m *Module) ListMyPosts(ctx context.Context, store seller.Store, status PostStatus, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
 	return m.post.ListMine(ctx, store, status, after, size)
 }
 
@@ -393,6 +400,11 @@ func (m *Module) PublicPost(ctx context.Context, c Caller, id uuid.UUID) (Post, 
 	return m.post.Public(ctx, c, id)
 }
 
+// PubliclyReadablePosts 回 ids 之中匿名觀看者讀得到的貼文（規則同 PublicPost：已發布、沒有刪除、沒有被內容下架、店家可曝光），一次查多篇；不存在或讀不到的不在結果裡。
+func (m *Module) PubliclyReadablePosts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return m.post.PublicIDs(ctx, ids)
+}
+
 // ListFeed 是動態牆（觀看者可讀的貼文，最新發布的在前；c.BuyerID 封鎖的店不出現，過濾在分頁之前）。
 func (m *Module) ListFeed(ctx context.Context, c Caller, after *PostCursor, size int32) (PostPage, error) {
 	return m.post.ListFeed(ctx, c, after, size)
@@ -415,8 +427,13 @@ func NormalizeHashtag(raw string) (name string, ok bool) {
 }
 
 // ListOwnPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選。
-func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *OwnPostCursor, size int32) (OwnPostPage, error) {
+func (m *Module) ListOwnPosts(ctx context.Context, storeID int64, status PostStatus, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
 	return m.post.ListOwn(ctx, storeID, status, after, size)
+}
+
+// ListAdminPosts 是後台看的貼文（不含草稿與刪除）：最新建立的在前，每篇帶 TakedownMeasureID；f.TakenDown 為真只列被內容下架的。授權由呼叫端（後台的 interceptor）負責。
+func (m *Module) ListAdminPosts(ctx context.Context, f AdminPostFilter, after *CreatedPostCursor, size int32) (CreatedPostPage, error) {
+	return m.post.ListAdmin(ctx, f, after, size)
 }
 
 // TopPosts 是「本週主題」：最近發布的 30 篇觀看者可讀的貼文中瀏覽數最高的 n 篇（n 最多 30，同分以發布時間、ID 排），不分頁。
@@ -480,6 +497,12 @@ func (m *Module) ListForumEntries(ctx context.Context, c Caller, storeID int64, 
 	return m.forum.ListTopLevel(ctx, c, storeID, after, size)
 }
 
+// GetForumThread 讀單一討論串：頂層項目（刪除或隱藏而底下有可見回覆時是佔位項目）與回覆的第一頁；
+// 討論串不存在、不屬於這家店、讀不到（店家不可曝光、被觀看者的封鎖排除、已刪除或隱藏而沒有可見回覆）都是 NotFound。
+func (m *Module) GetForumThread(ctx context.Context, c Caller, storeID int64, threadID uuid.UUID, size int32) (ForumThreadView, error) {
+	return m.forum.GetThread(ctx, c, storeID, threadID, size)
+}
+
 // ListForumReplies 列出店 storeID 的頂層討論區留言 parentID 的回覆；父留言不存在或不屬於該店是 NotFound。
 func (m *Module) ListForumReplies(ctx context.Context, c Caller, storeID int64, parentID uuid.UUID, after *CommentCursor, size int32) (ForumPage, error) {
 	return m.forum.ListReplies(ctx, c, storeID, parentID, after, size)
@@ -526,14 +549,29 @@ func (m *Module) RecordView(ctx context.Context, c Caller, postID uuid.UUID, v V
 	return m.engage.RecordView(ctx, c, postID, v)
 }
 
-// ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證。
+// CommentForRelay 以 ID 讀一則留言此刻的內容與計數（不帶觀看者、不套可見性規則），只給 legacy relay 補通知 payload 的留言快照；不存在回 NotFound。
+func (m *Module) CommentForRelay(ctx context.Context, id uuid.UUID) (Comment, error) {
+	return m.comment.ForRelay(ctx, id)
+}
+
+// ContentOwner 回傳內容的歸屬（存在、作者、所屬店家、是否公開可讀），給 moderation 在建立處分前驗證；legacy relay 也在送出通知前用它的 Exists 與 Readable 確認內容此刻存在且公開可讀。
 func (m *Module) ContentOwner(ctx context.Context, t Target) (ContentOwner, error) {
 	return m.sanction.Owner(ctx, t)
+}
+
+// ContentAuthorFor 回傳讀取者讀得到的留言或討論區留言的作者與所屬店家（從內容封鎖作者）；讀不到回 Found 為假。唯讀，套用與列表相同的觀看者規則。
+func (m *Module) ContentAuthorFor(ctx context.Context, c Caller, t Target) (ContentAuthor, error) {
+	return m.sanction.AuthorFor(ctx, c, t)
 }
 
 // ContentSnapshot 回傳內容此刻的歸屬（同 ContentOwner，含是否公開可讀）、本文與媒體參照，給 moderation 在檢舉送出時凍結（唯讀，不鎖）；內容不存在或已刪除回 Exists 為假。
 func (m *Module) ContentSnapshot(ctx context.Context, t Target) (ContentSnapshot, error) {
 	return m.sanction.Snapshot(ctx, t)
+}
+
+// AvailableLinks 回傳一批連結目標（貼文 id、討論串）此刻哪些還在，給後台與賣家讀措施的內容快照時決定要不要顯示連結；每類一個查詢，與目標數無關（唯讀，不鎖，不套可見性規則）。
+func (m *Module) AvailableLinks(ctx context.Context, postIDs []uuid.UUID, threads []ForumThread) (LinkAvailability, error) {
+	return m.sanction.AvailableLinks(ctx, postIDs, threads)
 }
 
 // Hide 隱藏一則買家寫的留言或討論區留言（會在 moderation 的 transaction 內被呼叫）；已有未還原的隱藏時回既有的（冪等）。

@@ -1,5 +1,5 @@
 # Loki ruler 告警：revalidate cache-bust 全失敗偵測
-# backend (review/seller/product/order/social) 用 pkg/revalidate/client.go
+# backend (review/seller/product/order) 用 pkg/revalidate/client.go
 # fire-and-forget 打 website /api/revalidate。fail-soft（#1189）後，secret 不配對
 # 或 website 打不到 → 靜默 no-op（只 log，不報錯不擋部署）。本規則補回能見度：
 # 某環境「有 error 且零 success」= 全失敗 → 告警。event-driven，平時 both=0 不誤報。
@@ -10,11 +10,11 @@ groups:
       - alert: RevalidateAllFailing
         expr: |
           sum by (environment) (
-            count_over_time({service_name=~"review-service|seller-service|product-service|order-service|social-service"} |= "revalidate.send.error" [15m])
+            count_over_time({service_name=~"review-service|seller-service|product-service|order-service"} |= "revalidate.send.error" [15m])
           ) > 0
           unless
           sum by (environment) (
-            count_over_time({service_name=~"review-service|seller-service|product-service|order-service|social-service"} |= "revalidate.send.success" [15m])
+            count_over_time({service_name=~"review-service|seller-service|product-service|order-service"} |= "revalidate.send.success" [15m])
           ) > 0
         for: 5m
         labels:

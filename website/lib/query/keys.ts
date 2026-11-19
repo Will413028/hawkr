@@ -214,6 +214,8 @@ export const queryKeys = {
 				String(postId),
 				"interactions",
 			] as const,
+		postViewer: (id: QueryIdentity, postId: string | number) =>
+			["feed", ...idPrefix(id), "posts", String(postId), "viewer"] as const,
 		comments: (
 			id: QueryIdentity,
 			postId: string | number,
@@ -239,6 +241,22 @@ export const queryKeys = {
 				String(commentId),
 				"replies",
 				params ?? {},
+			] as const,
+		commentCreate: (id: QueryIdentity, postId: string | number) =>
+			[
+				"feed",
+				...idPrefix(id),
+				"posts",
+				String(postId),
+				"comment-create",
+			] as const,
+		replyCreate: (id: QueryIdentity, commentId: string | number) =>
+			[
+				"feed",
+				...idPrefix(id),
+				"comments",
+				String(commentId),
+				"reply-create",
 			] as const,
 	},
 	seller: {
@@ -291,6 +309,49 @@ export const queryKeys = {
 				String(sellerId),
 				params ?? {},
 			] as const,
+		/** 一家店所有討論串頁的快取（`forumThread` 的共同前綴）。 */
+		forumThreads: (id: QueryIdentity, sellerId: string | number) =>
+			["seller", ...idPrefix(id), "forum-thread", String(sellerId)] as const,
+		forumThread: (
+			id: QueryIdentity,
+			sellerId: string | number,
+			threadId: string | number,
+		) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-thread",
+				String(sellerId),
+				String(threadId),
+			] as const,
+		forumReplies: (
+			id: QueryIdentity,
+			sellerId: string | number,
+			threadId: string | number,
+			params?: Record<string, unknown>,
+		) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-replies",
+				String(sellerId),
+				String(threadId),
+				params ?? {},
+			] as const,
+		forumPostCreate: (id: QueryIdentity, sellerId: string | number) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-post-create",
+				String(sellerId),
+			] as const,
+		forumReplyCreate: (id: QueryIdentity, sellerId: string | number) =>
+			[
+				"seller",
+				...idPrefix(id),
+				"forum-reply-create",
+				String(sellerId),
+			] as const,
 		shipmentAnomalies: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["seller", ...idPrefix(id), "shipment-anomalies", params ?? {}] as const,
 		shipmentAnomalyStats: (id: QueryIdentity) =>
@@ -338,6 +399,9 @@ export const queryKeys = {
 				String(sellerId),
 				params ?? {},
 			] as const,
+		// 店家封鎖的買家（`SellerAppService.ListBlockedBuyers`，見 lib/seller/block-buyer.ts）；封鎖名單頁的 infinite query。
+		blockedBuyers: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "blocked-buyers"] as const,
 		// My measures (Connect `SellerAppService.ListMyMeasures`／`GetMyMeasure`, 見 lib/seller/measures.ts)：措施與申覆頁、
 		// 停權公告。列表用 object slot（`state` 篩選）、單筆用 string slot，讓
 		// `invalidateQueries({queryKey: measures(id)})` 一次命中全部列表與單筆（申覆成功後都要重讀）。

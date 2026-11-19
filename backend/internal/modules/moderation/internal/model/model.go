@@ -7,6 +7,7 @@ import (
 
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -158,6 +159,11 @@ type Case struct {
 	Action         *Action
 	DecidedByAdmin *int64
 	ClosedAt       *time.Time
+	// ReportCount 是案件的全部檢舉數；MeasureID 是 TAKEDOWN 決定建立的 seller 措施；StoreID 是快照凍結的作者店家
+	// （買家對象、沒有快照或內容不是店家寫的是 nil）。
+	ReportCount int64
+	MeasureID   *uuid.UUID
+	StoreID     *int64
 }
 
 // Report 是一筆檢舉；Outcome 由所屬案件推導。
@@ -178,6 +184,9 @@ type SubmitInput struct {
 	Target          Target
 	Category        policy.Category
 	Description     string
+	// RequestID 是選填的冪等鍵（AIP-155）：同一位檢舉人以同一個 RequestID 重送，內容相同一律回傳第一次的檢舉（不看案件現在的狀態、不吃每日額度），
+	// 內容不同是 InvalidInput。
+	RequestID *uuid.UUID
 }
 
 // SubmitResult 是送出檢舉的結果；Created 為假表示這位檢舉人對這個對象在進行中案件裡已經有檢舉，回傳的是既有的那一筆（不吃每日額度）。
@@ -189,16 +198,16 @@ type SubmitResult struct {
 
 // DecideInput 是處理案件的輸入。Version 是管理員讀到的案件版本。
 type DecideInput struct {
-	CaseID   uuid.UUID
-	Version  int64
-	AdminID  int64
+	CaseID  uuid.UUID
+	Version int64
+	// Actor 是下決定的管理員與後台 RPC 的 procedure 名稱（handler 組成，platform/adminaudit）；缺漏是接線錯誤，不是使用者的輸入。
+	Actor    adminaudit.Actor
 	Decision Decision
-	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 StoreID（管理員確認的內容所屬店家，
-	// 向 social 核對）與 Severity（認定的嚴重度，字串值 seller.Severity）。
+	// 以下只有 DecisionViolation 用：認定的類別、處置種類、給作者的理由；店家分支（ActionTakedown）另外要 Severity（認定的嚴重度，
+	// 字串值 seller.Severity）。內容所屬的店家取自案件的內容快照，不由呼叫端帶。
 	Category policy.Category
 	Action   Action
 	Text     string
-	StoreID  int64
 	Severity string
 }
 
@@ -206,4 +215,95 @@ type DecideInput struct {
 type CaseDetail struct {
 	Case    Case
 	Reports []Report
+}
+
+const (
+	// DefaultPageSize 與 MaxPageSize 是檢舉人清單與後台案件清單的每頁筆數。
+	DefaultPageSize int32 = 20
+	MaxPageSize     int32 = 50
+)
+
+// ReportItem 是檢舉人讀自己檢舉時的一筆：檢舉、被檢舉的對象，以及案件結案的時間（進行中是 nil）。結果（Report.Outcome）由案件的決定推導，不存逐筆結果；
+// 不含案件 ID（A7-D28 第 4 點）。
+type ReportItem struct {
+	Report   Report
+	Target   Target
+	ClosedAt *time.Time
+}
+
+// cursorTimeMax 與 cursorIDMax 是 keyset 第一頁的游標參數：由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
+var (
+	cursorTimeMax = time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC)
+	cursorIDMax   = uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+)
+
+// TrimPage 把多讀一筆（size+1）的 keyset 結果截成一頁，more 為真表示還有下一頁。
+func TrimPage[T any](rows []T, size int32) (page []T, more bool) {
+	if len(rows) > int(size) {
+		return rows[:size], true
+	}
+	return rows, false
+}
+
+// ReportCursor 是檢舉清單的排序鍵：(CreatedAt, ID) 由大到小。
+type ReportCursor struct {
+	CreatedAt time.Time
+	ID        uuid.UUID
+}
+
+// Valid 說明 cursor 的內容是否合法（解自 client 回傳的 page token，不可信）。
+func (c ReportCursor) Valid() bool { return !c.CreatedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
+func (c *ReportCursor) Key() (time.Time, uuid.UUID) {
+	if c == nil {
+		return cursorTimeMax, cursorIDMax
+	}
+	return c.CreatedAt, c.ID
+}
+
+// ReportPage 是一頁檢舉；Next 是下一頁的游標（沒有下一頁是 nil）。
+type ReportPage struct {
+	Items []ReportItem
+	Next  *ReportCursor
+}
+
+// CaseState 是案件的狀態篩選：進行中（沒有結案）或已結案。
+type CaseState string
+
+const (
+	CaseOpen   CaseState = "OPEN"
+	CaseClosed CaseState = "CLOSED"
+)
+
+// CaseStates 回傳全部案件狀態。
+func CaseStates() []CaseState { return []CaseState{CaseOpen, CaseClosed} }
+
+// CaseFilter 是列案件的篩選；欄位空值是不篩。
+type CaseFilter struct {
+	State      CaseState
+	TargetKind TargetKind
+}
+
+// CaseCursor 是案件清單的排序鍵：(OpenedAt, ID) 由大到小。
+type CaseCursor struct {
+	OpenedAt time.Time
+	ID       uuid.UUID
+}
+
+// Valid 說明 cursor 的內容是否合法（解自 client 回傳的 page token，不可信）。
+func (c CaseCursor) Valid() bool { return !c.OpenedAt.IsZero() && c.ID != uuid.UUID{} }
+
+// Key 回 SQL 的游標參數；nil（第一頁）回由大到小排序的極值，讓每一頁走同一個 query。
+func (c *CaseCursor) Key() (time.Time, uuid.UUID) {
+	if c == nil {
+		return cursorTimeMax, cursorIDMax
+	}
+	return c.OpenedAt, c.ID
+}
+
+// CasePage 是一頁案件（不含檢舉）；Next 是下一頁的游標（沒有下一頁是 nil）。
+type CasePage struct {
+	Cases []Case
+	Next  *CaseCursor
 }

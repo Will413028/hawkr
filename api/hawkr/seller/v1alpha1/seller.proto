@@ -160,6 +160,23 @@ service SellerAppService {
   // （VERSION_CONFLICT）；提出請求不改變 etag，所以請求已經生效後再送一次（包含重送同一個請求）回 failed_precondition，不寫入。
   // 措施不是生效中、不是 RISK 依據、在冷卻期內、已有待處理的請求，或已撤銷時回 failed_precondition。不要求賣家角色。
   rpc RequestRemediation(RequestRemediationRequest) returns (RequestRemediationResponse);
+
+  // BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
+  // 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
+  // invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
+  rpc BlockBuyer(BlockBuyerRequest) returns (BlockBuyerResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnblockBuyer 解除呼叫者店家對買家的封鎖；沒有封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT。
+  rpc UnblockBuyer(UnblockBuyerRequest) returns (UnblockBuyerResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListBlockedBuyers 列出呼叫者店家封鎖的買家，新到舊。賣家能力 CAP_CONTENT_CONTRACT。
+  rpc ListBlockedBuyers(ListBlockedBuyersRequest) returns (ListBlockedBuyersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 }
 
 // SellerPublicService 是任何人都能讀的店家資料，不需要登入（ADR 2026-10-03-public-store-identity-and-visibility）。
@@ -965,10 +982,39 @@ enum ContentKind {
   CONTENT_KIND_FORUM_ENTRY = 3;
 }
 
-// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。
+// ContentSnapshotState 是內容下架對象上處分依據快照的狀態。
+enum ContentSnapshotState {
+  CONTENT_SNAPSHOT_STATE_UNSPECIFIED = 0;
+  // 快照在：excerpt、authored_time 與連結目標都有值。
+  CONTENT_SNAPSHOT_STATE_CAPTURED = 1;
+  // 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
+  CONTENT_SNAPSHOT_STATE_CLEARED = 2;
+}
+
+// ForumThreadLink 指向一則討論區留言所屬的討論串：店家加討論串 id（不透明的字串）。
+message ForumThreadLink {
+  string store_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string thread_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。建立內容下架時只讀 kind 與 id；後四組欄位是處分依據的內容快照
+// （措施建立時凍結，之後內容再改或刪除都不影響），只在回應輸出。
 message ContentRef {
   ContentKind kind = 1 [(google.api.field_behavior) = REQUIRED];
   string id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 快照的狀態；不是 CAPTURED 時下面的欄位都不設。
+  ContentSnapshotState snapshot_state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 本文摘要：前 120 個 Unicode 字元，超過時加「…」，未超過是原文。後台另見 Measure.content_bodies 的全文。
+  string excerpt = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 作者發文的時間。
+  google.protobuf.Timestamp authored_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 連結目標，二擇一：貼文與貼文留言是貼文 id，討論區留言是店家加討論串。
+  oneof link {
+    string post_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+    ForumThreadLink forum_thread = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+  // 連結目標此刻還在（貼文沒有刪除、討論串的起始留言沒有刪除）；為 false 時 client 不顯示連結。讀取時才算，快照本身不隨目標刪除而變；沒有連結目標時為 false。
+  bool link_available = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條
@@ -1337,3 +1383,44 @@ message RecordProductViewRequest {
 }
 
 message RecordProductViewResponse {}
+
+message BlockBuyerRequest {
+  // 要封鎖的買家所寫的內容。
+  oneof source {
+    // 留言 ID。
+    string comment_id = 1;
+    // 討論區留言 ID。
+    string forum_entry_id = 2;
+  }
+}
+
+message BlockBuyerResponse {
+  // 封鎖的狀態是否因這次呼叫而改變；本來就封鎖時為 false。
+  bool changed = 1;
+}
+
+message UnblockBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnblockBuyerResponse {
+  // 解除是否改變了狀態；本來就沒有封鎖時為 false。
+  bool changed = 1;
+}
+
+message ListBlockedBuyersRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListBlockedBuyersResponse {
+  repeated BlockedBuyer blocked_buyers = 1;
+  string next_page_token = 2;
+}
+
+// BlockedBuyer 是店家封鎖的買家。
+message BlockedBuyer {
+  BuyerCard buyer = 1;
+  google.protobuf.Timestamp create_time = 2;
+}

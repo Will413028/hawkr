@@ -57,7 +57,6 @@ import '../../features/product/presentation/product_setup_media_picker_screen.da
 import '../../features/product/presentation/product_setup_picker/product_setup_picker_screen.dart';
 import '../../features/product/presentation/product_setup_spec_screen.dart';
 import '../../features/report/presentation/block_list_screen.dart';
-import '../../features/report/presentation/my_reports_screen.dart';
 import '../../features/shipment_anomaly/presentation/shipment_anomaly_dashboard_screen.dart';
 import '../../features/seller/presentation/profile_screen.dart';
 import '../../features/seller/presentation/seller_measure_request_form_screen.dart';
@@ -72,6 +71,8 @@ import '../../features/seller/presentation/suspension_notice_screen.dart';
 import '../../features/settings/presentation/help_center_screen.dart';
 import '../../features/settings/presentation/shipping_settings/shipping_settings_screen.dart';
 import '../../features/wallet/presentation/wallet_screen.dart';
+import '../../features/seller/presentation/account_restricted_screen.dart';
+import '../session/account_restriction.dart';
 import '../../shared/widgets/app_bottom_navigation_bar.dart';
 import '../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../shared/widgets/rich_text_editor.dart';
@@ -164,6 +165,9 @@ class SellerRoutes {
   /// 停權公告頁（46 號設計書「賣家能力權限層」§7.2）
   static const suspensionNotice = '/seller/suspension-notice';
 
+  /// 帳號停權時唯一能進的受限頁。
+  static const accountRestricted = '/seller/account-restricted';
+
   /// 措施與申覆列表（停權公告頁的入口）
   static const measures = '/seller/measures';
 
@@ -207,9 +211,6 @@ class SettingsRoutes {
   static const notifications = '/notifications';
   static const notificationSettings = '/notifications/settings';
   static const help = '/settings/help';
-
-  /// 我的檢舉列表（backend-payuni#645）
-  static const myReports = '/reports/me';
 
   /// 封鎖名單（backend-payuni#645）
   static const blockList = '/blocks';
@@ -421,6 +422,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         location: location,
         needsForceUpdate: needsForceUpdate,
         storeUnavailable: ref.read(storeUnavailableProvider),
+        accountRestricted: ref.read(accountRestrictionStateProvider) != null,
       );
 
       debugPrint(
@@ -989,6 +991,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SuspensionNoticeScreen(),
       ),
       GoRoute(
+        path: SellerRoutes.accountRestricted,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const AccountRestrictedScreen(),
+      ),
+      GoRoute(
         path: SellerRoutes.storeUnavailable,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const StoreUnavailableScreen(),
@@ -1058,11 +1065,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: SettingsRoutes.notificationSettings,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const NotificationSettingsScreen(),
-      ),
-      GoRoute(
-        path: SettingsRoutes.myReports,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const MyReportsScreen(),
       ),
       GoRoute(
         path: SettingsRoutes.blockList,

@@ -101,6 +101,45 @@ func (s *Service) Owner(ctx context.Context, t model.Target) (model.ContentOwner
 	return model.ContentOwner{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
 }
 
+// AuthorFor 回傳讀取者 c 讀得到的留言或討論區留言的作者（從內容封鎖作者用，A7-2e）：套用與列表相同的觀看者規則（入口的個人封鎖、
+// 父列沒被排除、容器可讀、內容計入）；c 的店擁有該內容所屬的貼文或討論區時，以店主身分讀（不必公開、不套個人封鎖）。
+// 買家讀取者自己發起的封鎖（封鎖買家、封鎖店）不排除內容，重複封鎖才解析得到同一位作者；對方發起的封鎖照樣排除（不洩漏被封鎖）。
+// 只有店家身分（BuyerID 為 0）的讀取者只走店主查詢，不退成匿名讀取。讀不到回 Found 為假，不是錯誤。
+func (s *Service) AuthorFor(ctx context.Context, c model.Caller, t model.Target) (model.ContentAuthor, error) {
+	if t.Kind != model.TargetComment && t.Kind != model.TargetForumEntry {
+		return model.ContentAuthor{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	now := s.d.Now().UTC()
+	conn := s.d.DB.Conn(ctx)
+	var queries []reads.Stmt
+	comment := t.Kind == model.TargetComment
+	if c.Store != nil {
+		if comment {
+			queries = append(queries, reads.OwnerCommentAuthor(t.ID, c.Store.StoreID))
+		} else {
+			queries = append(queries, reads.OwnerForumEntryAuthor(t.ID, c.Store.StoreID))
+		}
+	}
+	if c.BuyerID > 0 {
+		if comment {
+			queries = append(queries, reads.ReadableCommentAuthor(t.ID, now, c.BuyerID))
+		} else {
+			queries = append(queries, reads.ReadableForumEntryAuthor(t.ID, now, c.BuyerID))
+		}
+	}
+	for _, q := range queries {
+		r, err := reads.One[reads.AuthorRow](ctx, conn, q)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return model.ContentAuthor{}, fmt.Errorf("social：讀取內容的作者 %s：%w", t.ID, err)
+		}
+		return model.ContentAuthor{Found: true, Author: model.Actor{Kind: model.ActorKind(r.ActorKind), ID: r.ActorID}, StoreID: r.StoreID}, nil
+	}
+	return model.ContentAuthor{}, nil
+}
+
 // Snapshot 回傳內容此刻的歸屬（存在、作者、所屬店家、是否公開可讀，同 Owner）、本文與媒體參照（給 moderation 在檢舉送出時凍結）：唯讀，不鎖；內容不存在或已刪除回
 // Exists 為假，不是錯誤。歸屬只查一次（Owner），本文與圖片另用一個查詢讀。
 func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSnapshot, error) {
@@ -125,7 +164,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if !r.ExistsNow {
 			return model.ContentSnapshot{}, nil
 		}
-		out.Body = deref(r.Body)
+		out.Body, out.AuthoredAt, out.PostID = deref(r.Body), r.AuthoredAt, r.PostID
 	case model.TargetForumEntry:
 		r, err := q.GetForumEntrySnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -137,7 +176,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if !r.ExistsNow {
 			return model.ContentSnapshot{}, nil
 		}
-		out.Body = deref(r.Body)
+		out.Body, out.AuthoredAt, out.ThreadID = deref(r.Body), r.AuthoredAt, r.ThreadID
 	case model.TargetPost:
 		r, err := q.GetPostSnapshot(ctx, t.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -149,12 +188,42 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		if !r.ExistsNow {
 			return model.ContentSnapshot{}, nil
 		}
-		out.Body = r.Body
+		out.Body, out.AuthoredAt, out.PostID = r.Body, r.AuthoredAt, t.ID
 		if r.ImageAssetID != nil {
 			out.MediaRefs = append(out.MediaRefs, *r.ImageAssetID)
 		}
 	default:
 		return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())
+	}
+	return out, nil
+}
+
+// AvailableLinks 回傳一批連結目標此刻哪些賣家點得進去：貼文沒有軟刪就算（下架不擋，賣家中心讀自己的貼文）；討論串只在對外讀得到時才算（與 GetThread 同一個算式，觀看者為未登入者：頂層可見，或是佔位項目而底下有可見回覆）。
+// 貼文一個查詢、討論串一個查詢，與目標數無關；沒有目標的那一類不查；唯讀，不鎖。
+func (s *Service) AvailableLinks(ctx context.Context, postIDs []uuid.UUID, threads []model.ForumThread) (model.LinkAvailability, error) {
+	out := model.LinkAvailability{Posts: map[uuid.UUID]bool{}, Threads: map[model.ForumThread]bool{}}
+	q := s.q(ctx)
+	if len(postIDs) > 0 {
+		ids, err := q.AvailableLinkPosts(ctx, postIDs)
+		if err != nil {
+			return model.LinkAvailability{}, fmt.Errorf("social：讀取連結的貼文是否存在：%w", err)
+		}
+		for _, id := range ids {
+			out.Posts[id] = true
+		}
+	}
+	if len(threads) > 0 {
+		ids := make([]uuid.UUID, len(threads))
+		for i, t := range threads {
+			ids[i] = t.ThreadID
+		}
+		rows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ForumThreadsReadable(ids, s.d.Now().UTC()))
+		if err != nil {
+			return model.LinkAvailability{}, fmt.Errorf("social：讀取連結的討論串是否對外可讀：%w", err)
+		}
+		for _, r := range rows {
+			out.Threads[model.ForumThread{StoreID: r.StoreID, ThreadID: r.ID}] = true
+		}
 	}
 	return out, nil
 }

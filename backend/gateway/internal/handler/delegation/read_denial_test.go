@@ -9,7 +9,7 @@ import (
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 )
 
-// 讀取拒絕列是「有人試圖跨店讀取」唯一的痕跡（56 號 §6.5.3 的四個 READ action）。它壞掉的方式全部
+// 讀取拒絕列是「有人試圖跨店讀取」唯一的痕跡（56 號 §6.5.3 的三個 READ action）。它壞掉的方式全部
 // 無聲：成功的讀取本來就不落稽核，這一列若寫錯面、寫錯 capability、或三個 transport 欄位
 // 空著，稽核表看起來仍然完全正常——每一列都合法，只是再也分不出哪一列是攻擊嘗試。
 //
@@ -39,10 +39,10 @@ func TestRecordReadDenialShape(t *testing.T) {
 			// Q3：被拒的正是這個 capability，記它本身（§7.1.3）。
 			name: "帶 capability → 原樣記錄",
 			in: ReadDenial{
-				Session: denialSession(), ResourceType: "post", ResourceID: "88",
-				Capability: authz.AdminCapPostsPublish, BizCode: bizcode.DelegationCapabilityDenied,
+				Session: denialSession(), ResourceType: "product", ResourceID: "77",
+				Capability: authz.AdminCapProductsPublish, BizCode: bizcode.DelegationCapabilityDenied,
 			},
-			wantAction: "POST_READ", wantCapability: "posts.publish",
+			wantAction: "PRODUCT_READ", wantCapability: "products.publish",
 		},
 		{
 			name: "訂單面",
@@ -76,7 +76,7 @@ func TestRecordReadDenialShape(t *testing.T) {
 			}
 			got := stub.intents[0]
 			if got.GetAction() != tc.wantAction {
-				t.Errorf("action = %q，預期 %q（四個 READ action 是拒絕列唯一的合法值）", got.GetAction(), tc.wantAction)
+				t.Errorf("action = %q，預期 %q（三個 READ action 是拒絕列唯一的合法值）", got.GetAction(), tc.wantAction)
 			}
 			if got.GetCapability() != tc.wantCapability {
 				t.Errorf("capability = %q，預期 %q", got.GetCapability(), tc.wantCapability)

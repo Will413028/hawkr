@@ -25,11 +25,13 @@ class ProfileOtherOptionsCard extends StatelessWidget {
     required this.onShippingTap,
     this.shippingGate = ShippingGate.unknown,
     this.notifUnread = 0,
+    this.canManageBlocks = false,
   });
 
   final VoidCallback onShippingTap;
   final ShippingGate shippingGate;
   final int notifUnread;
+  final bool canManageBlocks;
 
   @override
   Widget build(BuildContext context) {
@@ -74,23 +76,18 @@ class ProfileOtherOptionsCard extends StatelessWidget {
         onTap: () => showTextSizeSettingsSheet(context),
       ),
       OptionRow(
-        icon: HkIconName.report,
-        label: '我的檢舉',
-        description: '查看已送出的檢舉紀錄與處理進度',
-        onTap: () => context.push('/reports/me'),
-      ),
-      OptionRow(
         icon: HkIconName.shield,
         label: '措施與申覆',
         description: '查看平台的措施、期間與申覆進度',
         onTap: () => context.push(SellerRoutes.measures),
       ),
-      OptionRow(
-        icon: HkIconName.block,
-        label: '封鎖名單',
-        description: '管理已封鎖的使用者',
-        onTap: () => context.push('/blocks'),
-      ),
+      if (canManageBlocks)
+        OptionRow(
+          icon: HkIconName.block,
+          label: '封鎖名單',
+          description: '管理已封鎖的使用者',
+          onTap: () => context.push('/blocks'),
+        ),
       OptionRow(
         icon: HkIconName.support,
         label: '幫助中心',

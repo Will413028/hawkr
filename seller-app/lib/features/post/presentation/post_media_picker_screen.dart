@@ -4,7 +4,9 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
 import 'package:hawkr_seller/shared/widgets/hk_media_picker_layout.dart';
+
 import '../../../shared/utils/platform_io.dart';
+
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -18,6 +20,7 @@ import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../../photo_editor/presentation/photo_editor_args.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 /// A lightweight in-app media picker similar to Instagram step 1.
@@ -270,7 +273,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
     }
 
     // Open compose; if published, bubble the created result back to caller
-    final created = await context.push<Map<String, dynamic>>(
+    final created = await context.push<bool>(
       '/post/compose',
       extra: {
         'imagePreview': previewBytes,

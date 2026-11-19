@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -83,9 +84,18 @@ func (a *actingFake) ActingStore(_ context.Context, accountID int64, c model.Cap
 type fakeRequest struct {
 	connect.AnyRequest
 	procedure string
+	msg       proto.Message
 }
 
 func (r fakeRequest) Spec() connect.Spec { return connect.Spec{Procedure: r.procedure} }
+
+// Any 回 msg；沒設定時回 nil（這些測試不帶請求訊息）。
+func (r fakeRequest) Any() any {
+	if r.msg == nil {
+		return nil
+	}
+	return r.msg
+}
 
 // Header 回空的 header：interceptor 讀 Accept-Language 協商語系。
 func (r fakeRequest) Header() http.Header { return http.Header{} }

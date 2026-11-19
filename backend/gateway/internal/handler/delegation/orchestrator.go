@@ -330,7 +330,7 @@ func (s Spec) origin() string {
 	return s.Origin
 }
 
-// readDenialAction maps a resource face to its READ denial action. Those four actions
+// readDenialAction maps a resource face to its READ denial action. Those three actions
 // exist for exactly one purpose: leaving a trace when someone tried to read across
 // stores. Losing that trace is the failure mode this function guards.
 func readDenialAction(resourceType string) string {
@@ -339,8 +339,6 @@ func readDenialAction(resourceType string) string {
 		return "STOREFRONT_READ"
 	case "product":
 		return "PRODUCT_READ"
-	case "post":
-		return "POST_READ"
 	case "order":
 		return "ORDER_READ"
 	default:
@@ -356,8 +354,6 @@ func ReadDenialCapability(resourceType string) authz.AdminCapability {
 		return authz.AdminCapStorefrontRead
 	case "product":
 		return authz.AdminCapProductsRead
-	case "post":
-		return authz.AdminCapPostsRead
 	case "order":
 		return authz.AdminCapOrdersRead
 	default:

@@ -132,8 +132,13 @@ func (s *Service) LikeComment(ctx context.Context, c model.Caller, commentID uui
 		if err != nil {
 			return fmt.Errorf("social：留言按讚：%w", err)
 		}
-		added = n == 1
-		return nil
+		if added = n == 1; !added {
+			return nil
+		}
+		return events.Publish(ctx, s.d.Events, model.CommentLiked{
+			EventID: uuid.NewV7(), OccurredAt: now, CommentID: commentID, PostID: target.SocialComment.PostID, StoreID: storeID,
+			Actor: a, Author: model.ActorFrom(target.SocialComment.ActorKind, target.SocialComment.ActorID),
+		})
 	})
 	return added, err
 }

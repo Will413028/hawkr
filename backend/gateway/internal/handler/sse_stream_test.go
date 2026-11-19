@@ -7,22 +7,14 @@ import (
 	"testing"
 
 	"github.com/Will413028/hawkr/gateway/internal/buyerid"
-	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	"github.com/Will413028/hawkr/gateway/internal/realtime"
 	"github.com/Will413028/hawkr/gateway/internal/storeid"
-	socialpb "github.com/Will413028/hawkr/go-pkg/proto/social"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
 )
 
 func setupSSEStreamRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
-	pub := v1.Group("/public/posts")
-	pub.Use(fakeOptionalAuth())
-	{
-		pub.GET("/:id/comments/stream", h.StreamPostComments)
-	}
 	app := v1.Group("/app/notifications")
 	app.Use(fakeOptionalAuth())
 	{
@@ -202,7 +194,7 @@ func TestNotificationChannel_AuthorizeSubscribeRejectsForeignTopic(t *testing.T)
 		},
 		{
 			name:      "別的 channel 的 topic 擋下",
-			topic:     realtime.TopicCommentPost(42),
+			topic:     "other_channel:user:42",
 			accountID: 42,
 			wantErr:   true,
 			reason:    "topic 命名空間不得跨 channel 借用，否則 Hub 上的分流形同虛設",
@@ -219,65 +211,5 @@ func TestNotificationChannel_AuthorizeSubscribeRejectsForeignTopic(t *testing.T)
 				t.Errorf("AuthorizeSubscribe(%q, %d) = %v, want nil —— %s", tt.topic, tt.accountID, err, tt.reason)
 			}
 		})
-	}
-}
-
-// newSSEStreamHolder wires a grandfather BuyerID default per newModerationHolder's
-// convention (existing-behavior-preserving baseline for any test that doesn't
-// override it).
-func newSSEStreamHolder(mc *mockSocialServiceClient) *Holder {
-	return &Holder{
-		Social:  grpcclient.NewSocialClientForTest(mc),
-		BuyerID: buyerGrandfatherResolverForTest(),
-		Store:   noStoreResolverForTest(),
-	}
-}
-
-// TestStreamPostComments_BuyerRoleResolvesCurrentBuyerID 用 GetPostDetail 回傳
-// 「找不到貼文」讓 handler 在觸碰 h.SSEHub（測試未設置，會 nil-panic）之前提早
-// return，藉此單獨驗證 buyer 身分解析邏輯而不需要起 SSE Hub。
-func TestStreamPostComments_BuyerRoleResolvesCurrentBuyerID(t *testing.T) {
-	var captured *socialpb.GetPostDetailRequest
-	mc := &mockSocialServiceClient{
-		GetPostDetailFn: func(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
-			captured = in
-			return &socialpb.PostDetailResponse{Code: 1, Message: "not found"}, nil
-		},
-	}
-	h := newSSEStreamHolder(mc)
-	h.BuyerID = buyerResolverForTest(9999)
-	r := setupSSEStreamRouter(h)
-
-	req := httptest.NewRequest("GET", "/api/v1/public/posts/123/comments/stream", nil)
-	req.Header.Set("X-Account-Id", "42")
-	req.Header.Set("X-Login-Role", "1")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusNotFound)
-	if captured == nil || captured.BuyerId != 9999 {
-		t.Errorf("captured.BuyerId = %v, want 9999 (current buyer_id, not raw account_id 42)", captured)
-	}
-}
-
-func TestStreamPostComments_Anonymous_NoPersonalization(t *testing.T) {
-	var captured *socialpb.GetPostDetailRequest
-	mc := &mockSocialServiceClient{
-		GetPostDetailFn: func(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
-			captured = in
-			return &socialpb.PostDetailResponse{Code: 1, Message: "not found"}, nil
-		},
-	}
-	h := newSSEStreamHolder(mc)
-	h.BuyerID = mustNotResolveBuyer(t)
-	r := setupSSEStreamRouter(h)
-
-	req := httptest.NewRequest("GET", "/api/v1/public/posts/123/comments/stream", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusNotFound)
-	if captured == nil || captured.BuyerId != 0 {
-		t.Errorf("captured.BuyerId = %v, want 0 (anonymous)", captured)
 	}
 }

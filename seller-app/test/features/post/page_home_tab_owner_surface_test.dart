@@ -1,4 +1,9 @@
+import 'package:hawkr_seller/features/post/data/post_model.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/core/session/my_store.dart';
+import 'package:hawkr_seller/features/seller/data/current_store.dart';
+import '../../support/my_store_fixtures.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
@@ -19,19 +24,20 @@ void main() {
 
   Future<List<Object?>> pumpGrid(
     WidgetTester tester,
-    List<Map<String, dynamic>> posts,
-  ) async {
+    List<Post> posts, {
+    MyStore? store,
+  }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repo = _Repo();
     when(
-      () => repo.listMyPostsRaw(
-        page: any(named: 'page'),
+      () => repo.listMyPostsPage(
+        pageToken: any(named: 'pageToken'),
         pageSize: any(named: 'pageSize'),
       ),
-    ).thenAnswer((_) async => PostPageResult(posts: posts, hasMore: false));
+    ).thenAnswer((_) async => PostPageResult(posts: posts, nextPageToken: ''));
     when(() => repo.listComments(any())).thenAnswer((_) async => []);
     final extras = <Object?>[];
     final router = GoRouter(
@@ -54,7 +60,10 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [postRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          postRepositoryProvider.overrideWithValue(repo),
+          if (store != null) myStoreSnapshotProvider.overrideWithValue(store),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
@@ -70,8 +79,8 @@ void main() {
 
   testWidgets('點格子帶 postId 開全螢幕頁（前面有被平台下架的貼文也對得上）', (tester) async {
     final extras = await pumpGrid(tester, [
-      {'id': 41, 'contentType': 'text', 'hiddenAt': 1760000000},
-      {'id': 42, 'contentType': 'text', 'publishStatus': '4402'},
+      Post(id: 41, takedownMeasureId: 'measure-1'),
+      Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED),
     ]);
 
     await tester.tap(
@@ -84,22 +93,19 @@ void main() {
   });
 
   testWidgets('平台下架的格子顯示「平台下架」角標', (tester) async {
-    await pumpGrid(tester, [
-      {'id': 41, 'contentType': 'text', 'hiddenAt': 1760000000},
-    ]);
+    await pumpGrid(tester, [Post(id: 41, takedownMeasureId: 'measure-1')]);
     expect(find.text('平台下架'), findsOneWidget);
     expect(find.text('已下架'), findsNothing);
   });
 
   testWidgets('長按預覽卡沒有按讚入口，讚數只顯示', (tester) async {
     await pumpGrid(tester, [
-      {
-        'id': 42,
-        'contentType': 'text',
-        'publishStatus': '4402',
-        'likeCount': 7,
-        'content': '貼文內容',
-      },
+      Post(
+        id: 42,
+        status: PostStatus.POST_STATUS_PUBLISHED,
+        likeCount: 7,
+        content: '貼文內容',
+      ),
     ]);
     await tester.longPress(
       find.byKey(const ValueKey('storefront-post-grid-item-42')),
@@ -109,5 +115,29 @@ void main() {
     expect(find.text('7 個讚'), findsOneWidget);
     expect(find.bySemanticsLabel('共 7 個讚'), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('按讚')), findsNothing);
+  });
+
+  testWidgets('沒有 MARKETING：貼文格子上方顯示限制說明，新增貼文入口不在', (tester) async {
+    await pumpGrid(
+      tester,
+      [Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED)],
+      store: MyStore(
+        myStoreResponse(
+          id: '7',
+          storeCode: 'FRESH88',
+          capabilities: suspendedCapabilities,
+          publicListing: publicListingMissing(),
+        ),
+      ),
+    );
+    expect(find.text('店家目前受平台措施限制，貼文只能下架或刪除。'), findsOneWidget);
+    expect(find.text('新增貼文'), findsNothing);
+  });
+
+  testWidgets('有 MARKETING：沒有限制說明', (tester) async {
+    await pumpGrid(tester, [
+      Post(id: 42, status: PostStatus.POST_STATUS_PUBLISHED),
+    ]);
+    expect(find.text('店家目前受平台措施限制，貼文只能下架或刪除。'), findsNothing);
   });
 }

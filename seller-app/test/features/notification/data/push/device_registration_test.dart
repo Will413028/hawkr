@@ -2,12 +2,27 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:hawkr_seller/core/networking/dio_provider.dart'
+    show kBackgroundWriteExtra, kSkipAuthInterceptorExtra;
 import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NotificationDeviceRegistrar', () {
+    test('註冊標記為背景寫入、註銷標記為略過登入攔截（停權時兩者都靜默）', () async {
+      final adapter = _StatusAdapter(204);
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
+        ..httpClientAdapter = adapter;
+      final registrar = NotificationDeviceRegistrar(dio, platform: 'ios');
+
+      await registrar.registerDevice(fcmToken: 'device-token');
+      expect(adapter.request?.extra[kBackgroundWriteExtra], isTrue);
+
+      await registrar.removeDevice(fcmToken: 'device-token');
+      expect(adapter.request?.extra[kSkipAuthInterceptorExtra], isTrue);
+    });
+
     test('uses injected auth client and classifies 5xx as retryable', () async {
       const sentinel = 'KNOWN-SECRET-SENTINEL';
       final adapter = _StatusAdapter(503);

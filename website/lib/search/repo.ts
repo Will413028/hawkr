@@ -182,7 +182,7 @@ export async function fetchSuggestions(
 }
 
 /* ============================================================
- *           Trending / search hashtags
+ *           Search hashtags
  *
  * Backend exposes post hashtags through `/public/tags/*`.
  * Product hashtags are a separate namespace (`/public/hashtags/*`) and
@@ -196,51 +196,6 @@ export interface SearchHashtagHit {
 	latestPostAt?: number;
 }
 
-interface TrendingHashtagRecord {
-	hashtag?: string;
-	name?: string;
-	label?: string;
-	count?: string | number;
-	post_count?: string | number;
-	postCount?: string | number;
-	latest_post_at?: number;
-}
-
-function daysWindow(days: number) {
-	const end = new Date();
-	const start = new Date(end);
-	start.setDate(end.getDate() - Math.max(days, 1));
-	const fmt = (date: Date) => date.toISOString().slice(0, 10);
-	return { startFrom: fmt(start), endTo: fmt(end) };
-}
-
-export async function fetchTrendingHashtags(
-	limit = 8,
-	days = 7,
-): Promise<SearchHashtagHit[]> {
-	const { startFrom, endTo } = daysWindow(days);
-	const qs = new URLSearchParams({
-		start_from: startFrom,
-		end_to: endTo,
-		limit: String(limit),
-	});
-	const data = await publicGet<{
-		items?: TrendingHashtagRecord[];
-		records?: TrendingHashtagRecord[];
-	}>(`/public/tags/trending?${qs}`);
-	const records = data?.items ?? data?.records ?? [];
-	return records.flatMap((tag) => {
-		const name = tag.hashtag || tag.name;
-		if (!name) return [];
-		return {
-			name,
-			label: tag.label || `#${name}`,
-			postCount: Number(tag.count ?? tag.post_count ?? tag.postCount ?? 0),
-			latestPostAt: tag.latest_post_at,
-		};
-	});
-}
-
 /* ============================================================
  *           Popular product hashtags
  *
@@ -248,8 +203,7 @@ export async function fetchTrendingHashtags(
  * by distinct listed-product count over an inclusive date range. Used
  * by the Hawkr 市集 megamenu column and the /market/products sidebar —
  * semantics are "most-tagged products", not "most-active posts" (the
- * older /public/tags/trending endpoint covers that case and is still
- * used by the Hawkr 動態 navbar column).
+ * server's SuggestTrendingTags covers that case for the post-side columns).
  * ============================================================ */
 
 export interface PopularHashtagHit {

@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -194,63 +195,69 @@ const (
 	MeasureSuspension                = model.MeasureSuspension
 	MeasureTermination               = model.MeasureTermination
 	MeasureContentTakedown           = model.MeasureContentTakedown
-	ContentPost                      = model.ContentPost
-	ContentComment                   = model.ContentComment
-	ContentForumEntry                = model.ContentForumEntry
-	BasisViolation                   = model.BasisViolation
-	BasisRisk                        = model.BasisRisk
-	BasisContract                    = model.BasisContract
-	GroundNotice                     = model.GroundNotice
-	GroundMaterialBreach             = model.GroundMaterialBreach
-	GroundCeasedBusiness             = model.GroundCeasedBusiness
-	GroundDissolution                = model.GroundDissolution
-	GroundBankruptcy                 = model.GroundBankruptcy
-	GroundLicenseRevoked             = model.GroundLicenseRevoked
-	GroundFoodSafetyIncident         = model.GroundFoodSafetyIncident
-	GroundFraud                      = model.GroundFraud
-	GroundPlatformSecurity           = model.GroundPlatformSecurity
-	GroundOtherSerious               = model.GroundOtherSerious
-	GroundLinkedAccount              = model.GroundLinkedAccount
-	AppealReasonRevoked              = model.AppealReasonRevoked
-	AppealReasonAlreadyAppealed      = model.AppealReasonAlreadyAppealed
-	AppealReasonWindowEnded          = model.AppealReasonWindowEnded
-	AppealReasonRequestPending       = model.AppealReasonRequestPending
-	RevisionStoreClosed              = model.RevisionStoreClosed
-	LinkedUBN                        = model.LinkedUBN
-	LinkedBankAccount                = model.LinkedBankAccount
-	RiskTransaction                  = model.RiskTransaction
-	RiskFoodSafety                   = model.RiskFoodSafety
-	RiskFraud                        = model.RiskFraud
-	RiskPersonalData                 = model.RiskPersonalData
-	RiskInfringement                 = model.RiskInfringement
-	RiskSecurity                     = model.RiskSecurity
-	RiskFulfillment                  = model.RiskFulfillment
-	RiskExternalOrder                = model.RiskExternalOrder
-	MeasureStatusEnforced            = model.MeasureStatusEnforced
-	MeasureStatusRevoked             = model.MeasureStatusRevoked
-	StateIssued                      = model.StateIssued
-	StateActive                      = model.StateActive
-	StateEnded                       = model.StateEnded
-	StateRevoked                     = model.StateRevoked
-	StateScheduled                   = model.StateScheduled
-	RequestKindAppeal                = model.RequestKindAppeal
-	RequestKindRemediation           = model.RequestKindRemediation
-	CloseCauseRevoked                = model.CloseCauseRevoked
-	CloseCauseEnded                  = model.CloseCauseEnded
-	RequestPending                   = model.RequestPending
-	RequestAccepted                  = model.RequestAccepted
-	RequestRejected                  = model.RequestRejected
-	RequestClosed                    = model.RequestClosed
-	ReasonRemediationPending         = model.ReasonRemediationPending
-	ReasonAppealPending              = model.ReasonAppealPending
-	ReasonCooldown                   = model.ReasonCooldown
-	ReasonNotRisk                    = model.ReasonNotRisk
-	ReasonNotActive                  = model.ReasonNotActive
-	MeasureActionUpdateStatement     = model.MeasureActionUpdateStatement
-	MeasureActionExtend              = model.MeasureActionExtend
-	MeasureActionShorten             = model.MeasureActionShorten
-	MeasureActionRevoke              = model.MeasureActionRevoke
-	MeasureActionEnd                 = model.MeasureActionEnd
+	// ExcerptRunes 是對外摘要的長度上限（Unicode 字元數）。
+	ExcerptRunes = model.ExcerptRunes
+	// MaxTakedownContents 是一個內容下架措施最多的對象數。
+	MaxTakedownContents          = model.MaxTakedownContents
+	SnapshotCaptured             = model.SnapshotCaptured
+	SnapshotCleared              = model.SnapshotCleared
+	ContentPost                  = model.ContentPost
+	ContentComment               = model.ContentComment
+	ContentForumEntry            = model.ContentForumEntry
+	BasisViolation               = model.BasisViolation
+	BasisRisk                    = model.BasisRisk
+	BasisContract                = model.BasisContract
+	GroundNotice                 = model.GroundNotice
+	GroundMaterialBreach         = model.GroundMaterialBreach
+	GroundCeasedBusiness         = model.GroundCeasedBusiness
+	GroundDissolution            = model.GroundDissolution
+	GroundBankruptcy             = model.GroundBankruptcy
+	GroundLicenseRevoked         = model.GroundLicenseRevoked
+	GroundFoodSafetyIncident     = model.GroundFoodSafetyIncident
+	GroundFraud                  = model.GroundFraud
+	GroundPlatformSecurity       = model.GroundPlatformSecurity
+	GroundOtherSerious           = model.GroundOtherSerious
+	GroundLinkedAccount          = model.GroundLinkedAccount
+	AppealReasonRevoked          = model.AppealReasonRevoked
+	AppealReasonAlreadyAppealed  = model.AppealReasonAlreadyAppealed
+	AppealReasonWindowEnded      = model.AppealReasonWindowEnded
+	AppealReasonRequestPending   = model.AppealReasonRequestPending
+	RevisionStoreClosed          = model.RevisionStoreClosed
+	LinkedUBN                    = model.LinkedUBN
+	LinkedBankAccount            = model.LinkedBankAccount
+	RiskTransaction              = model.RiskTransaction
+	RiskFoodSafety               = model.RiskFoodSafety
+	RiskFraud                    = model.RiskFraud
+	RiskPersonalData             = model.RiskPersonalData
+	RiskInfringement             = model.RiskInfringement
+	RiskSecurity                 = model.RiskSecurity
+	RiskFulfillment              = model.RiskFulfillment
+	RiskExternalOrder            = model.RiskExternalOrder
+	MeasureStatusEnforced        = model.MeasureStatusEnforced
+	MeasureStatusRevoked         = model.MeasureStatusRevoked
+	StateIssued                  = model.StateIssued
+	StateActive                  = model.StateActive
+	StateEnded                   = model.StateEnded
+	StateRevoked                 = model.StateRevoked
+	StateScheduled               = model.StateScheduled
+	RequestKindAppeal            = model.RequestKindAppeal
+	RequestKindRemediation       = model.RequestKindRemediation
+	CloseCauseRevoked            = model.CloseCauseRevoked
+	CloseCauseEnded              = model.CloseCauseEnded
+	RequestPending               = model.RequestPending
+	RequestAccepted              = model.RequestAccepted
+	RequestRejected              = model.RequestRejected
+	RequestClosed                = model.RequestClosed
+	ReasonRemediationPending     = model.ReasonRemediationPending
+	ReasonAppealPending          = model.ReasonAppealPending
+	ReasonCooldown               = model.ReasonCooldown
+	ReasonNotRisk                = model.ReasonNotRisk
+	ReasonNotActive              = model.ReasonNotActive
+	MeasureActionUpdateStatement = model.MeasureActionUpdateStatement
+	MeasureActionExtend          = model.MeasureActionExtend
+	MeasureActionShorten         = model.MeasureActionShorten
+	MeasureActionRevoke          = model.MeasureActionRevoke
+	MeasureActionEnd             = model.MeasureActionEnd
 	// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（從建立起算）；結果設定之後還要再留 ContactRetentionAfterOutcome。
 	ContactRetention = model.ContactRetention
 	// ContactRetentionAfterOutcome 是匿名檢舉人聯絡欄位在結果設定之後的保留期限。
@@ -332,6 +339,12 @@ func RevokeReasonValues() []RevokeReason { return model.RevokeReasonValues() }
 
 // ManualRevokeReasonValues 回傳管理員撤銷措施時可以選的原因（契約的 AdminRevokeReason）。
 func ManualRevokeReasonValues() []RevokeReason { return model.ManualRevokeReasonValues() }
+
+// ExcerptOf 組出對外摘要：prefix 是本文的前 ExcerptRunes 個字元，truncated 表示本文比它長（超過時加「…」）。
+func ExcerptOf(prefix string, truncated bool) string { return model.ExcerptOf(prefix, truncated) }
+
+// SnapshotStateValues 回傳全部內容快照狀態。
+func SnapshotStateValues() []SnapshotState { return model.SnapshotStateValues() }
 
 // ContentKindValues 回傳全部內容下架的對象種類。
 func ContentKindValues() []ContentKind { return model.ContentKindValues() }
@@ -541,6 +554,16 @@ type (
 	ContentTakedown = model.ContentTakedown
 	// ContentRef 是內容下架措施的一個對象（種類加 social 的列 ID）。
 	ContentRef = model.ContentRef
+	// TakedownContent 是建立內容下架時的一個對象：內容參照加快照，或「已清除、沒有快照」的旗標。
+	TakedownContent = model.TakedownContent
+	// ContentSnapshot 是處分依據的內容版本（本文全文、發文時間、圖片張數、連結目標）。
+	ContentSnapshot = model.ContentSnapshot
+	// MeasureContent 是已建立措施的一個內容對象：參照、快照狀態與（狀態是 SnapshotCaptured 時的）摘要與快照；清單讀取只有摘要，後台讀單筆措施才帶全文（FullBody）。
+	MeasureContent = model.MeasureContent
+	// SnapshotState 是內容對象上快照的狀態。
+	SnapshotState = model.SnapshotState
+	// ContentLink 是快照內容的連結目標（貼文，或店家加討論串）。
+	ContentLink = model.ContentLink
 	// TerminationEffect 是建立終止合作之後措施何時生效（立即或排程）。
 	TerminationEffect = model.TerminationEffect
 	// LinkedAccount 是措施詳情上相同身分的其他帳號。
@@ -695,6 +718,26 @@ func (m *Module) CreateMeasure(ctx context.Context, in CreateMeasureInput) (Crea
 // （冪等由呼叫方的狀態轉移擁有），建立者是 in.AdminID。ctx 沒有 transaction 回錯誤。
 func (m *Module) CreateMeasureInTx(ctx context.Context, in CreateMeasureInput) (CreateMeasureResult, error) {
 	return m.measure.CreateInTx(ctx, in)
+}
+
+// ActiveTakedownOfContent 回傳內容目前生效中的內容下架措施 ID，沒有回 nil；在 ctx 的 transaction 內讀（沒有就用連線）。
+func (m *Module) ActiveTakedownOfContent(ctx context.Context, ref ContentRef) (*uuid.UUID, error) {
+	return m.measure.ActiveTakedownOfContent(ctx, ref)
+}
+
+// NewContentSnapshot 組出處分依據的內容快照（連結依種類選一組、圖片張數取 mediaCount），只組裝不驗證；後台建立與 moderation 兩個入口共用，格式由 ValidateContentSnapshot 與建立措施時的檢查把關。
+func NewContentSnapshot(kind ContentKind, body string, authoredAt time.Time, mediaCount int, storeID int64, postID, threadID uuid.UUID) ContentSnapshot {
+	return model.NewContentSnapshot(kind, body, authoredAt, mediaCount, storeID, postID, threadID)
+}
+
+// ValidateContentSnapshot 檢查一份快照的格式（發文時間、圖片張數、連結依種類）；建立措施時用同一條規則。
+func ValidateContentSnapshot(kind ContentKind, s ContentSnapshot) error {
+	return model.ValidateSnapshot(kind, s)
+}
+
+// ValidateContentRefs 檢查內容下架對象清單的形狀（1 到 MaxTakedownContents 筆、種類合法、ID 不為空、不重複），給入口在讀取內容快照之前先擋壞請求。
+func ValidateContentRefs(field string, refs []ContentRef) error {
+	return model.ValidateContentRefs(field, refs)
 }
 
 // CreateMeasureNote 新增措施的一則內部註記（只新增、不帶版本、不改措施的任何 etag）；措施可以是已撤銷的。

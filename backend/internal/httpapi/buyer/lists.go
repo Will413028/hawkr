@@ -59,7 +59,7 @@ func encodeCursor(scope string, c *model.Cursor) string {
 func (h *App) storeCards(ctx context.Context, storeIDs []int64) (map[int64]*commonpb.StoreCard, error) {
 	cards, err := h.ports.Stores.StoreCards(ctx, storeIDs)
 	if err != nil {
-		return nil, apperr.Unavailable("暫時無法讀取店家")
+		return nil, apperr.WithCause(apperr.Unavailable("暫時無法讀取店家"), err)
 	}
 	out := make(map[int64]*commonpb.StoreCard, len(cards))
 	cardIDs := make([]int64, len(cards))
@@ -337,11 +337,11 @@ func (h *App) FollowStore(ctx context.Context, req *connect.Request[pb.FollowSto
 	if len(public) == 0 {
 		return nil, apperr.NotFound("找不到公開店家")
 	}
-	accountID, err := accountCaller(ctx)
+	account, err := rpc.RequireAccount(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if public[0].AccountID == accountID {
+	if public[0].AccountID == account.ID {
 		return nil, apperr.InvalidInput("不能追蹤自己的店家")
 	}
 	if err := h.lists().Follow(ctx, buyerID, id); err != nil {

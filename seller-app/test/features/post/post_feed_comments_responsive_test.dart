@@ -4,7 +4,9 @@ import 'dart:async';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_model.dart';
+import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
+import 'post_comment_fixtures.dart';
 import 'package:hawkr_seller/features/post/presentation/page_home_feed_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -34,34 +36,26 @@ Future<_Repo> _pumpFeed(
     (_) async => [
       const Post(
         id: 42,
-        sellerId: 7,
-        contentType: 'TEXT',
         content: '產地直送',
         commentCount: 2,
+        viewerCanComment: true,
       ),
     ],
   );
-  when(() => repo.listCommentsRaw(42)).thenAnswer(
+  when(() => repo.getMyPost(any())).thenAnswer((_) => Completer<Post>().future);
+  when(() => repo.listComments(42)).thenAnswer(
     (_) async => [
-      {
-        'id': 1,
-        'isMine': false,
-        'userName': '測試留言者',
-        'content': '請問本週還能出貨嗎？',
-        'createdAt': '2025-01-01T10:30:00Z',
-      },
+      testComment(author: '測試留言者', body: '請問本週還能出貨嗎？', replyCount: 1),
     ],
   );
-  when(() => repo.listCommentReplies(1)).thenAnswer(
+  when(() => repo.listComments(42, parentId: '1')).thenAnswer(
     (_) async => [
-      {
-        'id': 2,
-        'parentId': 1,
-        'isMine': false,
-        'userName': _replyAuthor,
-        'content': '可以，會依訂單順序安排出貨。',
-        'createdAt': '2025-01-02T10:30:00Z',
-      },
+      testComment(
+        id: '2',
+        parentId: '1',
+        author: _replyAuthor,
+        body: '可以，會依訂單順序安排出貨。',
+      ),
     ],
   );
   await tester.pumpWidget(
@@ -233,12 +227,13 @@ void main() {
       expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
       expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
 
-      var response = Completer<Map<String, dynamic>?>();
+      var response = Completer<PostComment>();
       when(
-        () => repo.replyToComment(
-          1,
-          postId: 42,
-          content: '@$_replyAuthor 保留這份草稿',
+        () => repo.createComment(
+          42,
+          body: '@$_replyAuthor 保留這份草稿',
+          parentId: '1',
+          replyToId: '2',
         ),
       ).thenAnswer((_) => response.future);
       // Two platform send events before the disabled field rebuilds still create one request.
@@ -246,10 +241,11 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();
       verify(
-        () => repo.replyToComment(
-          1,
-          postId: 42,
-          content: '@$_replyAuthor 保留這份草稿',
+        () => repo.createComment(
+          42,
+          body: '@$_replyAuthor 保留這份草稿',
+          parentId: '1',
+          replyToId: '2',
         ),
       ).called(1);
       expect(tester.widget<TextField>(_input).enabled, isFalse);
@@ -260,28 +256,35 @@ void main() {
       expect(find.text('@$_replyAuthor'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      response = Completer<Map<String, dynamic>?>();
+      response = Completer<PostComment>();
       await tester.tap(_input);
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();
-      response.complete({'id': 3, 'parentId': 1});
+      response.complete(testComment(id: '3', parentId: '1'));
       await tester.pumpAndSettle();
       verify(
-        () => repo.replyToComment(
-          1,
-          postId: 42,
-          content: '@$_replyAuthor 保留這份草稿',
+        () => repo.createComment(
+          42,
+          body: '@$_replyAuthor 保留這份草稿',
+          parentId: '1',
+          replyToId: '2',
         ),
       ).called(1);
       verifyNever(
-        () => repo.replyToComment(
-          2,
-          postId: any(named: 'postId'),
-          content: any(named: 'content'),
+        () => repo.createComment(
+          any(),
+          body: any(named: 'body'),
+          parentId: '2',
+          replyToId: any(named: 'replyToId'),
         ),
       );
       verifyNever(
-        () => repo.commentOnPostRaw(any(), content: any(named: 'content')),
+        () => repo.createComment(
+          any(),
+          body: any(named: 'body'),
+          parentId: null,
+          replyToId: any(named: 'replyToId'),
+        ),
       );
       expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
       expect(find.text('@$_replyAuthor'), findsNothing);
@@ -294,8 +297,8 @@ void main() {
       // Keep the same modal open for a second successful submission. Its
       // callbacks must increment the refreshed count, not the opening value.
       when(
-        () => repo.commentOnPostRaw(42, content: '第二則獨立留言'),
-      ).thenAnswer((_) async => {'id': 4});
+        () => repo.createComment(42, body: '第二則獨立留言'),
+      ).thenAnswer((_) async => testComment(id: '4'));
       await tester.enterText(_input, '第二則獨立留言');
       await tester.pump();
       final send = find.bySemanticsLabel('送出留言');
@@ -303,7 +306,7 @@ void main() {
       expect(tester.getSize(send).height, greaterThanOrEqualTo(48));
       await tester.tap(send);
       await tester.pumpAndSettle();
-      verify(() => repo.commentOnPostRaw(42, content: '第二則獨立留言')).called(1);
+      verify(() => repo.createComment(42, body: '第二則獨立留言')).called(1);
       expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
       expect(
         find.descendant(of: actions, matching: find.text('4')),

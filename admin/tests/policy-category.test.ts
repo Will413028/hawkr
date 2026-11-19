@@ -4,6 +4,8 @@ import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_cate
 import {
 	ALL_CATEGORIES,
 	ASSESSABLE_CATEGORIES,
+	COMMUNITY_ASSESSABLE_CATEGORIES,
+	CONTENT_TAKEDOWN_CATEGORIES,
 	policyCategoryText,
 	REPORTER_CATEGORIES,
 } from "../src/lib/policy-category";
@@ -92,4 +94,28 @@ test("每個值都有目錄的名稱（術語表的詞），UNSPECIFIED 與不�
 	]);
 	assert.equal(policyCategoryText(PolicyCategory.UNSPECIFIED), "未知");
 	assert.equal(policyCategoryText(99 as PolicyCategory), "未知");
+});
+
+test("內容下架的認定類別：全部除了 OTHER（含社群類別，同伺服器的 policy.Assessable）", () => {
+	assert.deepEqual(
+		[...CONTENT_TAKEDOWN_CATEGORIES].sort((a, b) => a - b),
+		ALL_VALUES.filter((v) => v !== PolicyCategory.OTHER),
+	);
+});
+
+test("社群內容的隱藏、警告與停權可用的類別：明列的 11 個（同伺服器的 policy.CommunityAssessable）", () => {
+	assert.equal(COMMUNITY_ASSESSABLE_CATEGORIES.length, 11);
+	for (const excluded of [
+		PolicyCategory.FOOD_SAFETY,
+		PolicyCategory.PROHIBITED_GOODS,
+		PolicyCategory.UNLICENSED_SALE,
+		PolicyCategory.FAKE_CERTIFICATION,
+		PolicyCategory.COUNTERFEIT,
+		PolicyCategory.OTHER,
+	]) {
+		assert.ok(!COMMUNITY_ASSESSABLE_CATEGORIES.includes(excluded));
+	}
+	for (const community of COMMUNITY) {
+		assert.ok(COMMUNITY_ASSESSABLE_CATEGORIES.includes(community));
+	}
 });

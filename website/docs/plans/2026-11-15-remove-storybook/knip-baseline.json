@@ -2411,11 +2411,6 @@
 ],
 [
 "exports",
-"lib/search/repo.ts",
-"fetchTrendingHashtags"
-],
-[
-"exports",
 "lib/seller-data/delegated-repos.ts",
 "DELEGATED_BATCH_UNPUBLISH_MAX"
 ],
@@ -2438,11 +2433,6 @@
 "exports",
 "lib/seller/ai-image.ts",
 "AI_QUOTA_EXCEEDED_CODE"
-],
-[
-"exports",
-"lib/seller/canonical-redirect.ts",
-"parseSellerPath"
 ],
 [
 "exports",

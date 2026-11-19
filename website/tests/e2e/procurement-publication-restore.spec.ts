@@ -4,6 +4,7 @@ import {
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
 import { publishedPublicationSnapshotFact } from "./helpers/mock-procurement-rfq";
+import { gotoStreamed } from "./helpers/streamed-navigation";
 
 /**
  * A8：已發布的採購成果，在重整之後仍然打得開。
@@ -132,11 +133,9 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 			baseURL ?? "http://localhost:3000",
 		);
 
-		const response = await page.goto(
+		const response = await gotoStreamed(
+			page,
 			`${PROCUREMENT_PATH}?requestId=${REQUEST_ID}`,
-			{
-				waitUntil: "domcontentloaded",
-			},
 		);
 		expect(response?.status()).toBeLessThan(400);
 		await expect(page.locator('[data-assistant-mode="live"]')).toBeVisible();
@@ -167,11 +166,9 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 			baseURL ?? "http://localhost:3000",
 		);
 
-		const response = await page.goto(
+		const response = await gotoStreamed(
+			page,
 			`${PROCUREMENT_PATH}?requestId=${REQUEST_ID}`,
-			{
-				waitUntil: "domcontentloaded",
-			},
 		);
 		expect(response?.status()).toBeLessThan(400);
 		await expect(page.locator('[data-assistant-mode="live"]')).toBeVisible();

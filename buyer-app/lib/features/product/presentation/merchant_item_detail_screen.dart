@@ -47,6 +47,9 @@ import 'widgets/product_image_thumbnail_grid.dart';
 import 'widgets/product_purchase_panel.dart';
 
 import '../../../shared/utils/hk_log.dart';
+import '../../moderation/data/block_target.dart';
+import '../../moderation/data/report_target.dart';
+import '../../moderation/data/report_target_type.dart' show ReportTargetType;
 import '../../moderation/presentation/report_block_action_sheet.dart';
 import '../../../shared/utils/price_display.dart';
 import '../../../shared/utils/require_login.dart';
@@ -2480,10 +2483,12 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
                         if (!mounted) return;
                         await showReportBlockActionSheet(
                           context,
-                          reportTargetType: ReportTargetType.review,
-                          reportTargetId: reviewId,
-                          blockUserId: reviewUserId.isNotEmpty
-                              ? reviewUserId
+                          reportTarget: LegacyReportTarget(
+                            ReportTargetType.review,
+                            reviewId,
+                          ),
+                          blockTarget: reviewUserId.isNotEmpty
+                              ? LegacyBlockTarget(reviewUserId)
                               : null,
                           blockUserLabel: displayName,
                         );

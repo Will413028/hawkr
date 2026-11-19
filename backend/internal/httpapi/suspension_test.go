@@ -26,6 +26,7 @@ import (
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 var suspendedSince = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
@@ -170,7 +171,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 		audience, _ := rpc.AudienceOf(proc)
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		switch {
-		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee:
+		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee || audience == rpc.AudienceDelegated:
 			if rec.Code != http.StatusOK || s.Principal {
 				t.Errorf("%s：%d %+v，預期訪客", proc, rec.Code, s)
 			}
@@ -190,7 +191,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 	h := suspendedEntry()
 	methods := socialv1alpha1.File_hawkr_social_v1alpha1_social_proto.Services().ByName("SocialAppService").Methods()
-	if methods.Len() != 21 {
+	if methods.Len() != 25 {
 		t.Fatalf("SocialAppService 有 %d 支方法", methods.Len())
 	}
 	reads := 0
@@ -208,8 +209,8 @@ func TestSuspendedAccountCannotWriteSocialButViewsAsAGuest(t *testing.T) {
 			t.Errorf("%s：%d %q called=%v，預期 ACCOUNT_SUSPENDED", proc, rec.Code, rec.Body, s.Called)
 		}
 	}
-	if reads != 4 {
-		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 4（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary）", reads)
+	if reads != 7 {
+		t.Errorf("SocialAppService 的讀取方法有 %d 支，預期 7（GetMyPost、ListMyPosts、ListStoreComments、GetStoreSocialSummary、ListPendingSchedules、ListMySanctions、ListMyHiddenContent）", reads)
 	}
 	rec, s := callAs(t, h, "suspended", http.MethodPost, "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView")
 	if rec.Code != http.StatusOK || !s.Called || s.Principal {
@@ -227,21 +228,61 @@ func TestSuspendedAccountOnLegacyRESTIsDecidedByMethod(t *testing.T) {
 	if rec, _ := callAs(t, h, "suspended", http.MethodHead, "/api/v1/app/orders"); rec.Code != http.StatusOK {
 		t.Fatalf("HEAD /api/v1：%d", rec.Code)
 	}
+	if rec, s := callAs(t, h, "suspended", http.MethodDelete, "/api/v1/app/notifications/device-token"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
+		t.Fatalf("DELETE device-token：%d %+v，註銷裝置 token 是收斂動作，停權者放行（A7-D18）", rec.Code, s)
+	}
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		rec, s := callAs(t, h, "suspended", m, "/api/v1/app/orders")
 		var body struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" || s.Called {
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" || body.Reason != "ACCOUNT_SUSPENDED" || s.Called {
 			t.Fatalf("%s /api/v1：%d %q called=%v，預期 gateway 形狀的 403", m, rec.Code, rec.Body, s.Called)
+		}
+		if body.Reason != "ACCOUNT_SUSPENDED" {
+			t.Fatalf("%s /api/v1：reason=%q，預期 ACCOUNT_SUSPENDED", m, body.Reason)
+		}
+	}
+}
+
+// 沒有業務原因的 403：gateway 形狀的 envelope 不帶 reason 欄位。
+func TestRESTPermissionDeniedWithoutReasonOmitsTheField(t *testing.T) {
+	rec := httptest.NewRecorder()
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/app/orders", http.NoBody)
+	writePermissionDenied(rec, r, apperr.PermissionDenied("無權操作"))
+	var raw map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil || rec.Code != http.StatusForbidden {
+		t.Fatalf("%d %q %v", rec.Code, rec.Body, err)
+	}
+	if _, ok := raw["reason"]; ok {
+		t.Fatalf("沒有 reason 的 403 不該帶欄位：%q", rec.Body)
+	}
+}
+
+// 裝置 token 的放行只限註銷：同一路徑的註冊與更新、以及其他 DELETE 仍是寫入。
+func TestSuspendedAccountDeviceTokenAllowlistIsNarrow(t *testing.T) {
+	h := suspendedEntry()
+	for _, c := range []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/app/notifications/device-token"},
+		{http.MethodPut, "/api/v1/app/notifications/device-token"},
+		{http.MethodDelete, "/api/v1/app/notifications"},
+		{http.MethodDelete, "/api/v1/app/notifications/device-token/x"},
+		{http.MethodDelete, "/api/v1/app/notifications/device-token//"},
+		{http.MethodDelete, "/api/v1/app/notifications/device-token/"},
+		{http.MethodPost, "/api/v1/app/notifications/device-token/"},
+	} {
+		rec, s := callAs(t, h, "suspended", c.method, c.path)
+		if rec.Code != http.StatusForbidden || s.Called {
+			t.Errorf("%s %s：%d，預期 403", c.method, c.path, rec.Code)
 		}
 	}
 }
 
 // 宣告表與掛載的顧客 service 一一對應：connectServices 啟動時比對，數量等於掛載的方法數。
 func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,14 +294,14 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 13 {
+	if methods != len(customerEffects) || len(descriptors) != 15 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }
 
 // 少一個、多一個、值不合法的宣告都不能啟動。
 func TestCustomerEffectTableMustMatchTheServicesExactly(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,6 +379,7 @@ func TestSuspendedAccountCannotUpgradeALegacyRESTConnection(t *testing.T) {
 		var body struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" {
 			t.Fatalf("%s：%d %q，預期 gateway 形狀的 403", name, rec.Code, rec.Body)
@@ -385,6 +427,27 @@ func TestSuspendedAccountFoodSafetyReportCarriesNoAccount(t *testing.T) {
 		}
 		if got := m.submitted[0]; got.AccountID != wantAccount || got.StoreID != 12 {
 			t.Fatalf("%s：模組收到 %+v，預期 AccountID=%d", token, got, wantAccount)
+		}
+	}
+}
+
+// 作者讀自己的處分與被隱藏內容的理由（A7-D9）宣告為讀取：停權的帳號可以呼叫，handler 看得到 principal 與停權時間。
+// 封鎖是保護動作（宣告為自助），停權時也放行；名單是讀取。
+func TestSuspendedAccountCanReadItsOwnSanctionsAndManageItsBlocks(t *testing.T) {
+	h := suspendedEntry()
+	for _, proc := range []string{
+		"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions",
+		"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer",
+		"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore",
+	} {
+		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
+		if rec.Code != http.StatusOK || !s.Called || !s.Principal || !s.Suspended || !s.At.Equal(suspendedSince) {
+			t.Fatalf("%s：%d %+v，停權的帳號預期放行、帶 principal 與停權時間", proc, rec.Code, s)
 		}
 	}
 }

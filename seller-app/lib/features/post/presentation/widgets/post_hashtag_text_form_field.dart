@@ -133,7 +133,7 @@ class _PostHashtagTextFormFieldState
   Future<List<HashtagAutocompleteItem>> _search(String prefix) async {
     final items = await ref
         .read(postHashtagRepositoryProvider)
-        .search(prefix: prefix, mode: 'prefix', limit: 10);
+        .search(prefix: prefix, limit: 10);
     return items
         .map(
           (item) =>

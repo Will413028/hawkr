@@ -7,6 +7,7 @@
  * 帳號 ID 與是否賣家由 GetSession 讀取；買家或賣家工作區是 client 的狀態（lib/auth/active-role.ts）。
  */
 
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
 	Code,
 	ConnectError,
@@ -46,11 +47,23 @@ function identityApp(options?: TransportOptions) {
 }
 
 function toIdentity(account: Account, res: GetSessionResponse): Identity {
+	const suspension = res.suspension;
 	return {
 		accountId: account.id,
 		isSeller: account.roles.includes(Role.SELLER),
 		nickname: res.displayName || undefined,
 		avatarKey: imageUri(res.avatar, "avatar"),
+		...(suspension
+			? {
+					suspension: {
+						suspendedAt: suspension.suspendedAt
+							? timestampDate(suspension.suspendedAt).toISOString()
+							: undefined,
+						category: suspension.category,
+						reason: suspension.reason,
+					},
+				}
+			: {}),
 	};
 }
 

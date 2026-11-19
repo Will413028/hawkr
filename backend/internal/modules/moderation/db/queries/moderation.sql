@@ -45,11 +45,34 @@ ON CONFLICT (case_id, content_sha256) DO NOTHING;
 SELECT id FROM moderation.case_snapshots WHERE case_id = sqlc.arg(case_id) AND content_sha256 = sqlc.arg(content_sha256);
 
 -- name: InsertReport :one
--- 同一位檢舉人在同一個案件的第二筆什麼都不寫（沒有回傳列）。
+-- 同一位檢舉人在同一個案件的第二筆，什麼都不寫（沒有回傳列）。
 INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
 VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at))
-ON CONFLICT (case_id, reporter_buyer_id) DO NOTHING
+ON CONFLICT DO NOTHING
 RETURNING *;
+
+-- name: InsertReportRequest :execrows
+-- 記下 (檢舉人, request_id) 對應的檢舉；同一個 (檢舉人, request_id) 已有紀錄時什麼都不寫（回 0 列，呼叫端重試並比對內容）。
+INSERT INTO moderation.report_requests (reporter_buyer_id, request_id, report_id, request_hash)
+VALUES (sqlc.arg(reporter_buyer_id), sqlc.arg(request_id), sqlc.arg(report_id), sqlc.arg(request_hash))
+ON CONFLICT DO NOTHING;
+
+-- name: ReportByRequest :one
+-- 這位檢舉人以這個 request_id 第一次得到的檢舉與當時的內容雜湊（不看案件狀態，A7-D28 第 3 點）。
+SELECT sqlc.embed(r), q.request_hash
+FROM moderation.report_requests q
+JOIN moderation.reports r ON r.id = q.report_id
+WHERE q.reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND q.request_id = sqlc.arg(request_id);
+
+-- name: ListReportsOfReporter :many
+-- 檢舉人自己的檢舉，新的在前，帶所屬案件的對象與決定（結果由案件推導）。keyset：(created_at, id) 由大到小。
+SELECT sqlc.embed(r), c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE r.reporter_buyer_id = sqlc.arg(reporter_buyer_id)
+  AND (r.created_at, r.id) < (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT sqlc.arg(max_rows)::int;
 
 -- name: BumpDailyCount :one
 -- 每日上限 20：單一 upsert 原子地換日重算、未達上限才加一；沒有回傳列就是已到上限。DO UPDATE 的 WHERE 讓到上限時不改列。
@@ -86,7 +109,7 @@ WHERE r.id = sqlc.arg(id);
 -- 結案是終態：只有進行中而且版本相符的案件轉移成功；回傳 0 列表示已被結掉或版本過期。
 UPDATE moderation.cases
 SET decision = sqlc.arg(decision), decision_category = sqlc.narg(decision_category), decision_action = sqlc.narg(decision_action),
-    decided_by_admin_id = sqlc.arg(admin_id), closed_at = sqlc.arg(closed_at), version = version + 1
+    decided_by_admin_id = sqlc.arg(admin_id), closed_at = sqlc.arg(closed_at), measure_id = sqlc.narg(measure_id), version = version + 1
 WHERE id = sqlc.arg(id) AND closed_at IS NULL AND version = sqlc.arg(version);
 
 -- name: ExpiredSnapshotsBatch :many
@@ -116,6 +139,22 @@ WHERE id IN (
 -- name: ClearReporterDescriptions :execrows
 -- 檢舉人刪帳（A7-D21）：清掉他全部檢舉的說明；檢舉列與 reporter_buyer_id（假名鍵）留著。
 UPDATE moderation.reports SET description = NULL WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND description IS NOT NULL;
+
+-- name: DeleteReporterRequests :execrows
+-- 檢舉人刪帳（A7-D21）：刪掉他的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+DELETE FROM moderation.report_requests WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id);
+
+-- name: DeleteExpiredReportRequestsBatch :execrows
+-- 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
+DELETE FROM moderation.report_requests
+WHERE (reporter_buyer_id, request_id) IN (
+    SELECT q.reporter_buyer_id, q.request_id
+    FROM moderation.report_requests q
+    JOIN moderation.reports r ON r.id = q.report_id
+    JOIN moderation.cases c ON c.id = r.case_id
+    WHERE c.closed_at IS NOT NULL AND c.closed_at < sqlc.arg(cutoff)
+    LIMIT sqlc.arg(max_rows)::int
+);
 
 -- name: DeleteReporterDailyCount :execrows
 DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id);
@@ -181,3 +220,55 @@ FROM moderation.media_ref_sync
 WHERE synced_seq < seq AND updated_at < sqlc.arg(idle_before)
 ORDER BY updated_at
 LIMIT sqlc.arg(max_rows);
+
+-- 列案件依狀態分三個查詢：狀態是述詞的常數而不是參數，OPEN 才證明得出 partial index cases_open_by_time 適用（參數化的 catch-all 述詞在 generic plan 下證明不了）。
+-- name: ListOpenCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；進行中的案件；target_kind 空字串不篩。
+SELECT *
+FROM moderation.cases
+WHERE closed_at IS NULL
+  AND (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: ListClosedCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；已結案的案件；target_kind 空字串不篩。
+SELECT *
+FROM moderation.cases
+WHERE closed_at IS NOT NULL
+  AND (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: ListAllCases :many
+-- 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；不分狀態；target_kind 空字串不篩。
+SELECT *
+FROM moderation.cases
+WHERE (sqlc.arg(target_kind)::text = '' OR target_kind = sqlc.arg(target_kind)::text)
+  AND (opened_at, id) < (sqlc.arg(after_opened)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY opened_at DESC, id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: OpenReportCountsOfPosts :many
+-- 貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中案件的貼文沒有列。
+SELECT c.content_id AS post_id, count(*)::bigint AS reports
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE c.target_kind = 'POST' AND c.closed_at IS NULL AND c.content_id = ANY(sqlc.arg(post_ids)::uuid[])
+GROUP BY c.content_id;
+
+-- name: ReportCountsOfCases :many
+-- 一頁案件的檢舉數（一個查詢，不逐案件查）。
+SELECT case_id, count(*)::bigint AS reports
+FROM moderation.reports
+WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[])
+GROUP BY case_id;
+
+-- name: LatestSnapshotContentsOfCases :many
+-- 一頁案件各自最近一份凍結的內容；沒有快照（已過保留期被刪除）的案件沒有列。
+SELECT DISTINCT ON (case_id) case_id, content
+FROM moderation.case_snapshots
+WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[])
+ORDER BY case_id, captured_at DESC, id DESC;

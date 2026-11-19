@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show Tristate;
 
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/features/seller/presentation/widgets/merchant_chat_tab.dart';
@@ -16,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+import '../social/social_fakes.dart';
 
 class _EmptyListAdapter implements HttpClientAdapter {
   @override
@@ -56,7 +59,13 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [dioProvider.overrideWithValue(dio)],
+        overrides: [
+          dioProvider.overrideWithValue(dio),
+          socialPublicClientProvider.overrideWithValue(
+            FakeSocialPublic().client(),
+          ),
+          socialAppClientProvider.overrideWithValue(FakeSocialApp().client()),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           child: Consumer(
@@ -74,7 +83,7 @@ void main() {
   ) async {
     await pumpStorefront(
       tester,
-      (ref) => MerchantHomeTab(ref: ref, merchantId: '2683382637'),
+      (_) => MerchantHomeTab(merchantId: '2683382637'),
     );
 
     expect(find.byType(MerchantEmptyState), findsOneWidget);
@@ -82,11 +91,7 @@ void main() {
 
     await pumpStorefront(
       tester,
-      (ref) => MerchantChatTab(
-        ref: ref,
-        merchantId: '2683382637',
-        merchantName: '金湖水產',
-      ),
+      (ref) => MerchantChatTab(merchantId: '2683382637', merchantName: '金湖水產'),
     );
 
     expect(find.byType(HkEmptyState), findsOneWidget);
@@ -106,11 +111,8 @@ void main() {
       try {
         await pumpStorefront(
           tester,
-          (ref) => MerchantChatTab(
-            ref: ref,
-            merchantId: '2683382637',
-            merchantName: '金湖水產',
-          ),
+          (ref) =>
+              MerchantChatTab(merchantId: '2683382637', merchantName: '金湖水產'),
         );
 
         final composer = find.byKey(const Key('merchant-comment-composer'));

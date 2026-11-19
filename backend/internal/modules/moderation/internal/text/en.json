@@ -18,6 +18,9 @@
     "report.reporter_required": {
       "message": "Buyer identity required"
     },
+    "report.request_id_reused": {
+      "message": "This report differs from the one previously sent with the same request. Please refresh the page and try again."
+    },
     "report.self_buyer": {
       "message": "You cannot report yourself"
     },

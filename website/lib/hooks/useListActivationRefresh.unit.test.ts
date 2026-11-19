@@ -10,9 +10,9 @@ import {
 	fetchCanonicalMarketRecords,
 } from "@/lib/api/main-tab-pages";
 import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
 import { mapProduct, type ProductRecord } from "@/lib/market/listFilters";
 import type { MarketListSnapshot } from "@/lib/market/listSnapshot";
+import { fetchPostsPage } from "@/lib/posts/repo";
 import { queryKeys } from "@/lib/query/keys";
 import { useMainTabFreshnessStore } from "@/lib/state/main-tab-freshness-store";
 import { useFeedPosts } from "./useFeedPosts";
@@ -22,7 +22,10 @@ import {
 } from "./useMarketProducts";
 
 vi.mock("@/lib/api", () => ({ fetchProducts: vi.fn() }));
-vi.mock("@/lib/api/posts", () => ({ fetchPublicPostsTyped: vi.fn() }));
+vi.mock("@/lib/posts/repo", () => ({ fetchPostsPage: vi.fn() }));
+vi.mock("@/lib/auth/context", () => ({
+	useAuth: () => ({ status: "guest" }),
+}));
 vi.mock("@/lib/api/main-tab-pages", () => ({
 	fetchCanonicalFeedPage: vi.fn(),
 	fetchCanonicalMarketRecords: vi.fn(),
@@ -87,8 +90,13 @@ function record(id: string, stock = "12"): ProductRecord {
 	};
 }
 
+/** 第 `page` 頁；page_token 是 `t<下一頁>`，最後一頁（3）是空字串。 */
 function feedPage(records: PostListItem[], page = 1) {
-	return { records, page, pageSize: 1, total: 3 };
+	return {
+		records,
+		pageSize: 1,
+		nextPageToken: page >= 3 ? "" : `t${page + 1}`,
+	};
 }
 
 function seedFeed(
@@ -100,15 +108,31 @@ function seedFeed(
 		sellerId: scope.sellerId ?? "",
 		hashtag: scope.hashtag ?? "",
 		pageSize: 1,
+		viewer: false,
 	});
 	client.setQueryData(
 		key,
 		{
 			pages: [
-				{ records: [post("1")], page: 1, pageSize: 1, hasMore: true },
-				{ records: [post("2")], page: 2, pageSize: 1, hasMore: true },
+				{
+					records: [post("1")],
+					page: 1,
+					pageSize: 1,
+					hasMore: true,
+					nextPageToken: "t2",
+				},
+				{
+					records: [post("2")],
+					page: 2,
+					pageSize: 1,
+					hasMore: true,
+					nextPageToken: "t3",
+				},
 			],
-			pageParams: [1, 2],
+			pageParams: [
+				{ page: 1, token: "" },
+				{ page: 2, token: "t2" },
+			],
 		},
 		{ updatedAt },
 	);
@@ -174,7 +198,7 @@ describe("scoped feed activation", () => {
 			const { client, wrapper } = makeClient();
 			const key = seedFeed(client, scope);
 			const response = deferred<ReturnType<typeof feedPage>>();
-			vi.mocked(fetchPublicPostsTyped).mockReturnValueOnce(response.promise);
+			vi.mocked(fetchPostsPage).mockReturnValueOnce(response.promise);
 			const mount = () =>
 				renderHook(
 					() => useFeedPosts({ initialPosts: [], pageSize: 1, ...scope }),
@@ -186,17 +210,16 @@ describe("scoped feed activation", () => {
 				"2",
 			]);
 			expect(first.result.current.initialLoading).toBe(false);
-			await waitFor(() =>
-				expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1),
-			);
+			await waitFor(() => expect(fetchPostsPage).toHaveBeenCalledTimes(1));
 			for (let index = 0; index < 8; index++) focus();
-			expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
-			expect(fetchPublicPostsTyped).toHaveBeenCalledWith(
+			expect(fetchPostsPage).toHaveBeenCalledTimes(1);
+			expect(fetchPostsPage).toHaveBeenCalledWith(
 				expect.objectContaining({
-					page: 1,
+					pageToken: "",
 					pageSize: 1,
-					sellerId: scope.sellerId,
+					storeId: scope.sellerId,
 					tag: scope.hashtag,
+					viewer: false,
 					signal: expect.any(AbortSignal),
 				}),
 			);
@@ -205,35 +228,42 @@ describe("scoped feed activation", () => {
 				expect(first.result.current.posts[0]?.likeCount).toBe(9),
 			);
 			expect(first.result.current.page).toBe(2);
-			expect(client.getQueryData(key)).toMatchObject({ pageParams: [1, 2] });
+			expect(client.getQueryData(key)).toMatchObject({
+				pageParams: [
+					{ page: 1, token: "" },
+					{ page: 2, token: "t2" },
+				],
+			});
 			expect(window.scrollTo).not.toHaveBeenCalled();
 			expect(fetchCanonicalFeedPage).not.toHaveBeenCalled();
 			first.unmount();
 			const second = mount();
 			await settleMount();
 			expect(second.result.current.posts).toHaveLength(2);
-			expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1);
+			expect(fetchPostsPage).toHaveBeenCalledTimes(1);
 		},
 	);
 
 	it("reconciles the loaded tail after five minutes without an extra head request or polling", async () => {
 		const { client, wrapper } = makeClient();
 		seedFeed(client, { hashtag: "當季" }, now - 301_000);
-		vi.mocked(fetchPublicPostsTyped).mockImplementation(async ({ page } = {}) =>
-			feedPage([post(String(page), 9)], page),
-		);
+		// page_token 鏈：第 1 頁無 token，第 N 頁的 token 是上一頁回的 `t<N>`。
+		vi.mocked(fetchPostsPage).mockImplementation(async ({ pageToken } = {}) => {
+			const page = pageToken ? Number(pageToken.slice(1)) : 1;
+			return feedPage([post(String(page), 9)], page);
+		});
 		const { result } = renderHook(
 			() => useFeedPosts({ initialPosts: [], pageSize: 1, hashtag: "當季" }),
 			{ wrapper },
 		);
 		await waitFor(() => expect(result.current.posts[1]?.likeCount).toBe(9));
 		expect(
-			vi.mocked(fetchPublicPostsTyped).mock.calls.map(([args]) => args?.page),
-		).toEqual([1, 2]);
+			vi.mocked(fetchPostsPage).mock.calls.map(([args]) => args?.pageToken),
+		).toEqual(["", "t2"]);
 		expect(result.current.page).toBe(2);
 		now += 600_000;
 		await settleMount();
-		expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(2);
+		expect(fetchPostsPage).toHaveBeenCalledTimes(2);
 	});
 
 	it("aborts a superseded scope and ignores its late response", async () => {
@@ -241,14 +271,14 @@ describe("scoped feed activation", () => {
 		const oldKey = seedFeed(client, { sellerId: "a" });
 		seedFeed(client, { sellerId: "b" }, now);
 		const response = deferred<ReturnType<typeof feedPage>>();
-		vi.mocked(fetchPublicPostsTyped).mockReturnValueOnce(response.promise);
+		vi.mocked(fetchPostsPage).mockReturnValueOnce(response.promise);
 		const { result, rerender } = renderHook(
 			({ sellerId }) =>
 				useFeedPosts({ initialPosts: [], pageSize: 1, sellerId }),
 			{ wrapper, initialProps: { sellerId: "a" } },
 		);
-		await waitFor(() => expect(fetchPublicPostsTyped).toHaveBeenCalledTimes(1));
-		const signal = vi.mocked(fetchPublicPostsTyped).mock.calls[0]?.[0]?.signal;
+		await waitFor(() => expect(fetchPostsPage).toHaveBeenCalledTimes(1));
+		const signal = vi.mocked(fetchPostsPage).mock.calls[0]?.[0]?.signal;
 		rerender({ sellerId: "b" });
 		expect(signal?.aborted).toBe(true);
 		await act(async () => response.resolve(feedPage([post("late", 99)])));

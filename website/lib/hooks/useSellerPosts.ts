@@ -12,8 +12,9 @@ interface UseSellerPostsResult {
 }
 
 /**
- * Seller's own posts count for the nav badge — shares the same queryKey as
- * SellerPostsClient's list query, so both read one cache entry.
+ * Seller's posts count for the nav badge — the server's count (`GetStoreSocialSummary`; the
+ * delegated workspace reads the delegated variant), not the length of a capped list page.
+ * It has its own query key: the list query's cache entry holds a page, not a count.
  *
  * ⚠️ 店家鍵在代行下**不能**走 `useSellerSelf()`（那支在代行工作區不掛，見
  * `lib/seller-data/scope.tsx`），改由工作階段下發的 `scope.ownerStoreId` 提供。
@@ -26,9 +27,8 @@ export function useSellerPosts(options?: {
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const sellerId = scope.ownerStoreId ?? storeIdOf(seller);
 	const query = useQuery({
-		queryKey: scope.keys.posts(sellerId ?? "none", { pageSize: 50 }),
-		queryFn: () =>
-			scope.repos.posts.fetchSellerPosts(sellerId, { pageSize: 50 }),
+		queryKey: scope.keys.posts(sellerId ?? "none", { kind: "count" }),
+		queryFn: () => scope.repos.posts.fetchPostCount(),
 		enabled:
 			scope.canRead("posts", identity.activeRole === "seller") &&
 			Boolean(sellerId) &&
@@ -37,7 +37,7 @@ export function useSellerPosts(options?: {
 		refetchOnWindowFocus: true,
 	});
 	return {
-		count: query.data?.length ?? 0,
+		count: query.data ?? 0,
 		loading: sellerLoading || query.isLoading,
 	};
 }

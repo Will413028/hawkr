@@ -18,6 +18,7 @@ CREATE SCHEMA moderation;
 -- seller（內容下架措施）與 identity（帳號停權），不另建處置紀錄表。處置種類與對象種類的搭配由 cases_action_target_check 擋；作者是買家或店家由寫入端
 -- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功；新檢舉掛進既有案件也加一（同一個 transaction；開案的那筆不加，版本從 1 起），
 -- 所以管理員讀到的檢舉集合不是結案時的集合就會版本衝突。
+-- measure_id 是 TAKEDOWN 決定建立的 seller 措施 ID（跨 schema 不建 FK），結案時同一個 UPDATE 寫入；內容下架一定有、其他處置與進行中的案件一定是 NULL（cases_measure_check）。
 -- decision_category 是 platform/policy.Assessable 的值（模組的 TestChecksMatchGo）；買家分支另外限於 CommunityAssessable，由寫入端檢查。
 CREATE TABLE moderation.cases (
     id                  UUID        PRIMARY KEY,
@@ -31,6 +32,7 @@ CREATE TABLE moderation.cases (
     decision_action     TEXT,
     decided_by_admin_id BIGINT,
     closed_at           TIMESTAMPTZ,
+    measure_id          UUID,
     CONSTRAINT cases_target_kind_check CHECK (target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'BUYER')),
     CONSTRAINT cases_target_check CHECK (
         (target_kind = 'BUYER' AND buyer_id > 0 AND content_id IS NULL)
@@ -55,13 +57,16 @@ CREATE TABLE moderation.cases (
         OR (decision_action = 'HIDE' AND target_kind IN ('COMMENT', 'FORUM_ENTRY'))
         OR (decision_action IN ('WARN', 'BAN') AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'BUYER'))
         OR (decision_action = 'TAKEDOWN' AND target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
-    )
+    ),
+    CONSTRAINT cases_measure_check CHECK ((decision_action IS NOT DISTINCT FROM 'TAKEDOWN') = (measure_id IS NOT NULL))
 );
 -- 一個對象至多一個進行中案件。
 CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;
 CREATE UNIQUE INDEX cases_one_open_buyer ON moderation.cases (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL;
--- 待辦（A7-1e）依開案時間讀進行中的案件。
+-- 待辦（A7-1e）與後台列進行中案件依開案時間讀進行中的案件。
 CREATE INDEX cases_open_by_time ON moderation.cases (opened_at, id) WHERE closed_at IS NULL;
+-- 後台列案件不分狀態或只看已結案：全表索引，開案時間新的在前。
+CREATE INDEX cases_by_time ON moderation.cases (opened_at DESC, id DESC);
 -- 快照的保留 job 依結案時間找可以清的案件。
 CREATE INDEX cases_closed_by_time ON moderation.cases (closed_at) WHERE closed_at IS NOT NULL;
 
@@ -98,7 +103,21 @@ CREATE TABLE moderation.reports (
     CONSTRAINT reports_description_check CHECK (description IS NULL OR (char_length(description) >= 1 AND char_length(description) <= 500 AND description !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
 CREATE INDEX reports_case_time ON moderation.reports (case_id, created_at, id);
+CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, created_at DESC, id DESC);
 CREATE INDEX reports_snapshot ON moderation.reports (snapshot_id) WHERE snapshot_id IS NOT NULL;
+
+-- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：(檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；
+-- 兩條路徑都記，所以案件結案後同一個 request_id 重送仍回第一次的結果。request_hash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256，重送時比對內容是否相同。
+CREATE TABLE moderation.report_requests (
+    reporter_buyer_id BIGINT NOT NULL,
+    request_id        UUID   NOT NULL,
+    report_id         UUID   NOT NULL REFERENCES moderation.reports (id),
+    request_hash      BYTEA  NOT NULL,
+    PRIMARY KEY (reporter_buyer_id, request_id),
+    CONSTRAINT report_requests_reporter_check CHECK (reporter_buyer_id > 0),
+    CONSTRAINT report_requests_hash_check CHECK (octet_length(request_hash) = 32)
+);
+CREATE INDEX report_requests_report ON moderation.report_requests (report_id);
 
 -- 每位檢舉人每個台北日最多 20 筆：一人一列，day 是台北日（platform/twtime.Day）。送出時單一 upsert 原子地「換日重算、未達上限才加一」，
 -- 沒有先 count 再比較的空窗；upsert 鎖住這一列，同一檢舉人的並行送出自然序列化。

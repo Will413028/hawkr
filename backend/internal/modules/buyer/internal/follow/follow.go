@@ -193,25 +193,6 @@ func (service *Service) Subscribers(ctx context.Context, input model.Subscribers
 	return model.PageOf(result, count), nil
 }
 
-// SubscribersOffset 僅供 legacy social-service 的頁碼契約使用。
-func (service *Service) SubscribersOffset(ctx context.Context, storeID int64, offset, limit int32) ([]model.Item, error) {
-	if err := model.Positive(storeID); err != nil {
-		return nil, err
-	}
-	if offset < 0 || offset > 100000 || limit < 1 || limit > 100 {
-		return nil, apperr.InvalidInput("粉絲分頁超出範圍")
-	}
-	rows, err := store.New(service.deps.DB.Conn(ctx)).SubscribersOffset(ctx, store.SubscribersOffsetParams{StoreID: storeID, PageLimit: limit, PageOffset: offset})
-	if err != nil {
-		return nil, err
-	}
-	items := make([]model.Item, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, model.Item{ID: row.BuyerID, Time: row.CreatedAt})
-	}
-	return items, nil
-}
-
 // SubscriberCounts 批次回傳粉絲數，沒有粉絲的店家為零。
 func (service *Service) SubscriberCounts(ctx context.Context, ids []int64) (map[int64]int64, error) {
 	if err := model.BatchIDs(ids); err != nil {

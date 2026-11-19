@@ -27,8 +27,9 @@ func requires(c seller.Capability) declaration { return declaration{capability: 
 func exempt(reason string) declaration { return declaration{exemptReason: reason} }
 
 const (
-	buyerOnlyReason  = "只有買家身分能做的動作（店家沒有對應的動作），沒有賣家能力可宣告"
-	byResourceReason = "互動者由伺服器依資源歸屬推導（呼叫者此刻的店擁有該貼文或討論區時是店家，否則是買家）；是店家身分時模組才檢查賣家能力（seller.Authorize），不是則不查，所以無法靜態宣告"
+	buyerOnlyReason    = "只有買家身分能做的動作（店家沒有對應的動作），沒有賣家能力可宣告"
+	scheduleListReason = "social.ListPendingSchedules 只以 handler 推導的店家 ID 讀這家店待發布的排程（含代行排的，店主要能看見並取消），模組不檢查賣家能力；取消（CancelPostSchedule）才要 CapMarketing"
+	byResourceReason   = "互動者由伺服器依資源歸屬推導（呼叫者此刻的店擁有該貼文或討論區時是店家，否則是買家）；是店家身分時模組才檢查賣家能力（seller.Authorize），不是則不查，所以無法靜態宣告"
 )
 
 // declarations 是每個 SocialAppService 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應
@@ -41,11 +42,17 @@ var declarations = map[string]declaration{
 	socialv1alpha1connect.SocialAppServicePublishPostProcedure:           requires(seller.CapMarketing),
 	socialv1alpha1connect.SocialAppServiceSchedulePostProcedure:          requires(seller.CapMarketing),
 	socialv1alpha1connect.SocialAppServiceUnpublishPostProcedure:         requires(seller.CapContentContract),
+	socialv1alpha1connect.SocialAppServiceCancelPostScheduleProcedure:    requires(seller.CapMarketing),
+	socialv1alpha1connect.SocialAppServiceListPendingSchedulesProcedure:  exempt(scheduleListReason),
 	socialv1alpha1connect.SocialAppServiceDeletePostProcedure:            requires(seller.CapContentContract),
 	socialv1alpha1connect.SocialAppServiceGetMyPostProcedure:             requires(seller.CapContentContract),
 	socialv1alpha1connect.SocialAppServiceListMyPostsProcedure:           requires(seller.CapContentContract),
 	socialv1alpha1connect.SocialAppServiceListStoreCommentsProcedure:     requires(seller.CapContentContract),
 	socialv1alpha1connect.SocialAppServiceGetStoreSocialSummaryProcedure: requires(seller.CapContentContract),
+
+	// 作者讀自己的處分與被隱藏的內容（A7-D9）：只有買家身分的讀取，停權的帳號也要讀得到（效果宣告 EffectRead，internal/httpapi/effects.go）。
+	socialv1alpha1connect.SocialAppServiceListMySanctionsProcedure:     exempt(buyerOnlyReason),
+	socialv1alpha1connect.SocialAppServiceListMyHiddenContentProcedure: exempt(buyerOnlyReason),
 
 	// 買家與店家共用的方法：依資源判斷。
 	socialv1alpha1connect.SocialAppServiceSharePostProcedure:        exempt(buyerOnlyReason),

@@ -26,6 +26,7 @@ const MATERIAL_SYMBOL_BY_NAME = {
 	"arrow-right": "arrow_forward",
 	"arrow-up": "arrow_upward",
 	bag: "shopping_bag",
+	block: "block",
 	bolt: "bolt",
 	box: "inventory_2",
 	bookmark: "bookmark",

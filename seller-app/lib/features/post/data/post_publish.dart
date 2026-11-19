@@ -1,22 +1,20 @@
-import '../../../core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 
 /// 發布與下架按鈕的方向。一顆按鈕，方向由目前的發布狀態決定：沒有「改回未發布」這個目標
 /// （端點不接受），所以型別上只有這兩個值。
 enum PostPublishTarget { publish, unpublish }
 
-/// 由發布狀態碼推出「按一下」要送的目標；缺值（上游沒給）回 null，呼叫端什麼都不畫：
+/// 由發布狀態推出「按一下」要送的目標；狀態未設（上游沒給）回 null，呼叫端什麼都不畫：
 /// 方向不明的按鈕比沒有按鈕更糟，下架是回不去的。
-PostPublishTarget? postPublishTarget(String? publishStatus) {
-  if (publishStatus == PostPublishStatus.draft.value ||
-      publishStatus == PostPublishStatus.unpublished.value) {
-    return PostPublishTarget.publish;
-  }
-  if (publishStatus == PostPublishStatus.published.value) {
-    return PostPublishTarget.unpublish;
-  }
-  return null;
-}
+PostPublishTarget? postPublishTarget(PostStatus status) => switch (status) {
+  PostStatus.POST_STATUS_DRAFT ||
+  PostStatus.POST_STATUS_UNPUBLISHED => PostPublishTarget.publish,
+  PostStatus.POST_STATUS_PUBLISHED => PostPublishTarget.unpublish,
+  _ => null,
+};
 
+const String kPostDraftLabel = '未發布';
+const String kPostUnpublishedLabel = '已下架';
 const String kPostPublishLabel = '發布';
 const String kPostUnpublishLabel = '下架';
 const String kPostPublishPendingLabel = '發布中…';
@@ -43,3 +41,6 @@ const String kPostPlatformHiddenLabel = '平台下架';
 
 /// 被平台下架的貼文，發布按鈕停用的說明。
 const String kPostPlatformHiddenPublishReason = '已被平台下架，發布後買家仍看不到';
+
+/// 店家受平台措施限制（沒有 MARKETING 能力）時，貼文列表上方的說明。
+const String kPostRestrictedNotice = '店家目前受平台措施限制，貼文只能下架或刪除。';

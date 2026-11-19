@@ -1,6 +1,6 @@
-import '../../../../core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
+
 import '../../../../shared/widgets/hk_status_badge.dart';
-import '../../data/post_hidden.dart';
 import '../../data/post_model.dart';
 import '../../data/post_publish.dart';
 
@@ -22,16 +22,16 @@ PostStatusBadgeData postStatusBadgeOf(Post post) {
       scheduledAt: null,
     );
   }
-  if (post.publishStatus == PostPublishStatus.draft.value) {
+  if (post.status == PostStatus.POST_STATUS_DRAFT) {
     return (
-      label: PostPublishStatus.draft.label,
+      label: kPostDraftLabel,
       tone: HkStatusTone.neutral,
       scheduledAt: post.scheduledPublishAt,
     );
   }
-  if (post.publishStatus == PostPublishStatus.unpublished.value) {
+  if (post.status == PostStatus.POST_STATUS_UNPUBLISHED) {
     return (
-      label: PostPublishStatus.unpublished.label,
+      label: kPostUnpublishedLabel,
       tone: HkStatusTone.warning,
       scheduledAt: null,
     );

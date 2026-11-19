@@ -129,6 +129,11 @@ export const SELLER_NAV_GROUPS: NavGroup[] = [
 				label: "措施與申覆",
 				icon: <SellerSidebarIcon name="shield" />,
 			},
+			{
+				href: "/seller-center/blocked-buyers",
+				label: "封鎖名單",
+				icon: <SellerSidebarIcon name="block" />,
+			},
 		],
 	},
 ];

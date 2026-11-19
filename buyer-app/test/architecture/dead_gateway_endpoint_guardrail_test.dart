@@ -31,15 +31,67 @@ const _deadEndpointFragments = <String, String>{
   '/refund_bank_info': 'POST /app/orders/{order_no}/refund_bank_info',
 };
 
-/// 已改走 Connect 或由用戶端組合、不得再以手寫 REST 呼叫的路由。
-final _retiredEndpointPatterns = <RegExp, String>{
-  RegExp(r'/public/sellers/\$[\w{}.]+/rating'):
-      'GET /public/sellers/{id}/rating',
-  RegExp(r'/public/sellers/\$[\w{}.]+/stats'): 'GET /public/sellers/{id}/stats',
-  RegExp(r'/public/marketplace'): 'GET /public/marketplace',
-  RegExp(r'/public/recommended'): 'GET /public/recommended',
-  RegExp(r'/public/products/\$[\w{}.]+/view'):
-      'POST /public/products/{id}/view',
+/// 允許出現的舊 REST 呼叫（A6 的允許殘留）：路徑 → 理由與上限。上限是該檔允許的命中次數，
+/// 多一次就失敗，所以允許檔裡不能偷偷加第二個呼叫。
+typedef _Allowance = ({String reason, int max});
+
+/// 已改走 Connect 或由用戶端組合、不得再以手寫 REST 呼叫的路由；[allowed] 是這條路由唯一允許出現的檔案。
+class _Retired {
+  const _Retired(this.endpoint, [this.allowed = const {}]);
+
+  final String endpoint;
+  final Map<String, _Allowance> allowed;
+}
+
+final _retiredEndpointPatterns = <RegExp, _Retired>{
+  RegExp(r'/public/sellers/\$[\w{}.]+/rating'): _Retired(
+    'GET /public/sellers/{id}/rating',
+  ),
+  RegExp(r'/public/sellers/\$[\w{}.]+/stats'): _Retired(
+    'GET /public/sellers/{id}/stats',
+  ),
+  RegExp(r'/public/marketplace'): _Retired('GET /public/marketplace'),
+  RegExp(r'/public/recommended'): _Retired('GET /public/recommended'),
+  RegExp(r'/public/products/\$[\w{}.]+/view'): _Retired(
+    'POST /public/products/{id}/view',
+  ),
+  // 貼文、留言、討論區已改走 SocialPublicService／SocialAppService（A7-4c-2）。
+  RegExp(r'/public/posts'): _Retired('GET /public/posts…（貼文與留言讀取）'),
+  RegExp(r'/app/posts'): _Retired('POST /app/posts…（按讚、留言、回覆）'),
+  RegExp(r'/public/sellers/\$[\w{}.]+/posts'): _Retired(
+    'GET /public/sellers/{id}/posts',
+  ),
+  RegExp(r'/public/sellers/\$[\w{}.]+/forum'): _Retired(
+    'GET /public/sellers/{id}/forum',
+  ),
+  RegExp(r'/public/sellers/forum'): _Retired(
+    'GET /public/sellers/forum/{id}/replies',
+  ),
+  RegExp(r'/app/sellers/\$[\w{}.]+/forum'): _Retired(
+    'POST /app/sellers/{id}/forum',
+  ),
+  RegExp(r'/app/sellers/forum'): _Retired('/app/sellers/forum/{id}（回覆、修改、刪除）'),
+  RegExp(r'/comments/stream'): _Retired(
+    'GET /public/posts/{id}/comments/stream（SSE）',
+  ),
+  // 社群的檢舉、封鎖、封鎖名單與貼文分享已改走 ModerationAppService、BuyerAppService 與 `Post.url`（A7-4c-3）。
+  // 聊天與評價的檢舉與封鎖在 A6 搬進 moderation 與 buyer 前仍是舊 REST，只允許出現在下面兩個檔，各一處。
+  RegExp(r'/app/blocks'): _Retired('POST|GET|DELETE /app/blocks…（封鎖與封鎖名單）', {
+    'lib/features/moderation/data/block_repository.dart': (
+      reason: 'A6 允許殘留：聊天與評價入口的封鎖（POST /app/blocks/{userId}）',
+      max: 1,
+    ),
+  }),
+  RegExp(r'/app/reports/me'): _Retired('GET /app/reports/me（我的檢舉）'),
+  RegExp(r'/app/reports(?!/)'): _Retired('POST /app/reports（檢舉）', {
+    'lib/features/moderation/data/legacy_report_repository.dart': (
+      reason: 'A6 允許殘留：聊天訊息與評價的檢舉（POST /app/reports）',
+      max: 1,
+    ),
+  }),
+  RegExp(r"getShareUrl\(\s*type:\s*'post'"): _Retired(
+    "getShareUrl(type: 'post')（貼文分享改用 Post.url）",
+  ),
 };
 
 /// 去掉註解，只留下真正會送出請求的程式碼。
@@ -74,9 +126,15 @@ void main() {
         if (!source.contains(fragment)) return;
         offenders.add('${entity.path} → $endpoint (命中片段: $fragment)');
       });
-      _retiredEndpointPatterns.forEach((pattern, endpoint) {
-        if (!pattern.hasMatch(source)) return;
-        offenders.add('${entity.path} → $endpoint (命中: ${pattern.pattern})');
+      _retiredEndpointPatterns.forEach((pattern, retired) {
+        final hits = pattern.allMatches(source).length;
+        if (hits == 0) return;
+        final allowance = retired.allowed[entity.path];
+        if (allowance != null && hits <= allowance.max) return;
+        offenders.add(
+          '${entity.path} → ${retired.endpoint} (命中: ${pattern.pattern}'
+          '${allowance == null ? '' : '，$hits 次超過允許的 ${allowance.max} 次'})',
+        );
       });
     }
 
@@ -88,5 +146,32 @@ void main() {
           '以下位置呼叫了 Gateway 不存在的路由（會回 404 且錯誤被吞掉）：\n'
           '${offenders.join('\n')}',
     );
+  });
+
+  test('允許殘留的檔案仍存在且仍有該呼叫（清單不留過期項目）', () {
+    _retiredEndpointPatterns.forEach((pattern, retired) {
+      retired.allowed.forEach((path, allowance) {
+        final file = File(path);
+        expect(file.existsSync(), isTrue, reason: '$path 已不存在，從允許清單移除');
+        final hits = pattern.allMatches(
+          _stripComments(file.readAsStringSync()),
+        );
+        expect(
+          hits,
+          isNotEmpty,
+          reason: '$path 已沒有 ${pattern.pattern}，從允許清單移除（${allowance.reason}）',
+        );
+      });
+    });
+  });
+
+  test('guardrail 的允許清單擋得住社群檔案新增 /app/blocks 呼叫', () {
+    final blocks = _retiredEndpointPatterns.entries
+        .firstWhere((e) => e.key.pattern == '/app/blocks')
+        .value;
+    expect(blocks.allowed.keys, [
+      'lib/features/moderation/data/block_repository.dart',
+    ], reason: '只有聊天與評價的封鎖檔可以呼叫 /app/blocks');
+    expect(blocks.allowed.keys.any((p) => p.contains('/social/')), isFalse);
   });
 }

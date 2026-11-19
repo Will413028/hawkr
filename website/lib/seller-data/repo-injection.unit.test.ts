@@ -11,11 +11,7 @@ import {
 	createSellerProductRepo,
 	fetchSellerProducts,
 } from "@/lib/products/seller-repo";
-import {
-	createSellerPostRepo,
-	fetchMyStore,
-	fetchSellerPosts,
-} from "@/lib/seller/repo";
+import { fetchMyStore, fetchSellerPosts } from "@/lib/seller/repo";
 
 /**
  * 賣家資料層的注入接縫（56 號 §4.5 L1053／L1056 上線阻斷項）。
@@ -91,14 +87,14 @@ describe("② 賣家路徑：同一批函式一個都不能 throw", () => {
 			code: 0,
 			data: { records: [] },
 		});
-		// fetchMyStore 走 Connect（`/api/connect/...`），不在這一組的 REST 斷言裡。
+		// fetchMyStore、fetchSellerPosts 走 Connect（`/api/connect/...`），不在這一組的 REST 斷言裡。
 		const restEntryPoints = sellerEntryPoints.filter(
-			([name]) => name !== "fetchMyStore",
+			([name]) => name !== "fetchMyStore" && name !== "fetchSellerPosts",
 		);
-		for (const [, call] of restEntryPoints.slice(0, 3)) {
+		for (const [, call] of restEntryPoints.slice(0, 2)) {
 			await expect(call()).resolves.toBeDefined();
 		}
-		expect(fetchSpy).toHaveBeenCalledTimes(3);
+		expect(fetchSpy).toHaveBeenCalledTimes(2);
 		expect(urls.every((url) => url.includes("/app/"))).toBe(true);
 		expect(urls.some((url) => url.includes("/adm/"))).toBe(false);
 	});
@@ -129,7 +125,7 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 		return { seen, fetcher };
 	}
 
-	it("四支資源工廠都吃得到注入的 root，且不經過賣家傳輸層", async () => {
+	it("三支資源工廠都吃得到注入的 root，且不經過賣家傳輸層", async () => {
 		const { fetchSpy } = stubBrowserFetch();
 		enterDelegated();
 		const { seen, fetcher } = recordingFetcher();
@@ -137,10 +133,6 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 		await createSellerProductRepo(fetcher, {
 			root: "/products",
 		}).fetchSellerProducts({ page: 2, pageSize: 10 });
-		await createSellerPostRepo(fetcher, {
-			root: "/posts",
-			listRoot: "/posts",
-		}).fetchSellerPosts();
 		await createOrderRepo(fetcher, { root: "/orders" }).fetchOrders({});
 		await createMediaUploadRepo(fetcher, { root: "/media/upload_sessions" })
 			.uploadImageFile(
@@ -152,7 +144,6 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 
 		expect(seen.map((call) => call.path)).toEqual([
 			"/products?page=2&page_size=10",
-			"/posts",
 			"/orders?page=1&page_size=20",
 			"/media/upload_sessions",
 		]);

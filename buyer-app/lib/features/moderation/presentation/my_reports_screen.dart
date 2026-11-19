@@ -1,109 +1,69 @@
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
+    as pb;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
-import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../core/exceptions/app_exception.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/networking/suspension_signal.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
-import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../social/data/social_repository.dart';
-import '../data/report_record_model.dart';
-import '../data/report_target_type.dart';
+import 'my_reports_notifier.dart';
+import 'paged_section.dart';
+import 'paged_section_widgets.dart';
 
-/// 我的檢舉紀錄列表頁
-class MyReportsScreen extends ConsumerStatefulWidget {
+/// 我的檢舉紀錄列表頁（`ListMyReports`，只列社群對象；聊天、評價的檢舉在 A6 前不列）。
+/// 伺服器狀態在 [myReportsProvider]；這裡只顯示與發動作。
+class MyReportsScreen extends ConsumerWidget {
   const MyReportsScreen({super.key});
 
-  @override
-  ConsumerState<MyReportsScreen> createState() => _MyReportsScreenState();
-}
-
-class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
-  List<ReportRecord> _reports = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReports();
+  void _toastError(BuildContext context, WidgetRef ref) {
+    final error = ref.read(myReportsProvider).error;
+    if (error != null && isAccountSuspendedError(error)) return;
+    showFloatingToast(context, _errorMessage(ref, error), isSuccess: false);
   }
 
-  Future<void> _loadReports() async {
-    try {
-      final result = await ref.read(socialRepositoryProvider).getMyReports();
-      if (mounted) {
-        setState(() {
-          _reports = result;
-          _isLoading = false;
-          _errorMessage = null;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      final message = e is AppException ? e.message : '載入失敗，請稍後再試';
-      // 已有清單時（下拉刷新失敗）不整頁蓋掉，保留已顯示的資料改用 toast
-      // 提示；只有初次載入（清單還是空的）才用整頁錯誤狀態接管。
-      if (_reports.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = message;
-        });
-      } else {
-        setState(() => _isLoading = false);
-        showFloatingToast(context, message, isSuccess: false);
-      }
+  String _errorMessage(WidgetRef ref, Object? error) => errorText(
+    error ?? StateError('unknown'),
+    defaults: ref.read(defaultErrorTextProvider),
+  );
+
+  Future<void> _reload(BuildContext context, WidgetRef ref) async {
+    final ok = await ref.read(myReportsProvider.notifier).reload();
+    if (!ok && context.mounted) {
+      _toastError(context, ref);
     }
   }
 
-  String _formatTime(int ms) {
-    if (ms <= 0) return '';
-    final local = DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+  Future<void> _loadMore(BuildContext context, WidgetRef ref) async {
+    final ok = await ref.read(myReportsProvider.notifier).loadMore();
+    if (!ok && context.mounted) {
+      _toastError(context, ref);
+    }
+  }
+
+  String _formatTime(pb.ReportRecord r) {
+    if (!r.hasCreateTime()) return '';
+    final local = DateTime.fromMillisecondsSinceEpoch(
+      r.createTime.seconds.toInt() * 1000,
+    ).toLocal();
     return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  /// 讀取失敗狀態——與「真的沒資料」的空狀態分開顯示，避免使用者誤以為
-  /// 沒有檢舉紀錄；提供重試按鈕重新觸發 [_loadReports]。
-  Widget _buildErrorState(String message) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              AppIcons.errorOutline,
-              color: AppIconColors.danger,
-              size: 48.sp,
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-            ),
-            SizedBox(height: 12.h),
-            TextButton(
-              onPressed: _loadReports,
-              child: const HkButtonLabel('重試'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reports = ref.watch(myReportsProvider);
+    final locale = ref.watch(uiLocaleProvider);
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: Column(
@@ -114,11 +74,14 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
             onBack: () => context.pop(),
           ),
           Expanded(
-            child: _isLoading
+            child: reports.phase == SectionPhase.loading
                 ? const TruckLoadingOverlay(message: '載入中...')
-                : _errorMessage != null
-                ? _buildErrorState(_errorMessage!)
-                : _reports.isEmpty
+                : reports.phase == SectionPhase.failed
+                ? PagedErrorState(
+                    message: _errorMessage(ref, reports.error),
+                    onRetry: () => _reload(context, ref),
+                  )
+                : reports.items.isEmpty
                 ? const HkEmptyState(
                     key: ValueKey('my-reports-empty-state'),
                     iconKey: ValueKey('my-reports-empty-state-icon'),
@@ -126,14 +89,24 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
                     message: '尚無檢舉紀錄',
                   )
                 : FruitRefreshIndicator(
-                    onRefresh: _loadReports,
+                    onRefresh: () => _reload(context, ref),
                     child: ListView.builder(
                       padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 20.h),
-                      itemCount: _reports.length,
-                      itemBuilder: (_, i) => Padding(
-                        padding: EdgeInsets.only(bottom: 16.h),
-                        child: _buildReportCard(_reports[i]),
-                      ),
+                      itemCount:
+                          reports.items.length + (reports.hasMore ? 1 : 0),
+                      itemBuilder: (_, i) {
+                        if (i == reports.items.length) {
+                          return PagedLoadMoreFooter(
+                            moreKey: const ValueKey('my-reports-more'),
+                            loading: reports.loadingMore,
+                            onMore: () => _loadMore(context, ref),
+                          );
+                        }
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 16.h),
+                          child: _buildReportCard(reports.items[i], locale),
+                        );
+                      },
                     ),
                   ),
           ),
@@ -142,7 +115,10 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
     );
   }
 
-  Widget _buildReportCard(ReportRecord r) {
+  Widget _buildReportCard(pb.ReportRecord r, UiLocale locale) {
+    final kind = r.target.kind.uiText(locale);
+    final outcome = r.outcome.uiText(locale);
+    final category = r.category.uiText(locale);
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -164,7 +140,7 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  reportTargetTypeLabel(r.targetType),
+                  kind ?? '',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -172,42 +148,45 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
                   ),
                 ),
               ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(999.r),
-                ),
-                child: Text(
-                  reportStatusLabel(r.status),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+              if (outcome != null)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(999.r),
+                  ),
+                  child: Text(
+                    outcome,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
-          SizedBox(height: 6.h),
-          Row(
-            children: [
-              HkIcon(
-                HkIconName.warning,
-                size: 18.sp,
-                color: AppIconColors.warning,
-              ),
-              SizedBox(width: 6.w),
-              Text(
-                '原因：${reportReasonLabel(r.reasonCode)}',
-                style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
-              ),
-            ],
-          ),
-          if ((r.description ?? '').isNotEmpty) ...[
+          if (category != null) ...[
+            SizedBox(height: 6.h),
+            Row(
+              children: [
+                HkIcon(
+                  HkIconName.warning,
+                  size: 18.sp,
+                  color: AppIconColors.warning,
+                ),
+                SizedBox(width: 6.w),
+                Text(
+                  '原因：$category',
+                  style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ],
+          if (r.description.isNotEmpty) ...[
             SizedBox(height: 6.h),
             Text(
-              r.description!,
+              r.description,
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -223,7 +202,7 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
               ),
               SizedBox(width: 6.w),
               Text(
-                _formatTime(r.createTimeMs),
+                _formatTime(r),
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],

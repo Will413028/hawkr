@@ -497,3 +497,70 @@ func TestTransportTextComesFromTheCatalogWithTheResolvedLocale(t *testing.T) {
 		}
 	}
 }
+
+func TestSameNameFieldMapping(t *testing.T) {
+	withPageSize := (&adminpb.ListBannersRequest{}).ProtoReflect().Descriptor()
+	noMatch := (&timestamppb.Timestamp{}).ProtoReflect().Descriptor()
+	pageSize := func() error { return apperr.InvalidInputOn([]string{"PageSize"}, "不合法") }
+	cases := []struct {
+		name     string
+		err      error
+		want     []string
+		unmapped []string
+	}{
+		{"請求有同名欄位：自動對應", &requestError{err: pageSize(), desc: withPageSize}, []string{"page_size"}, nil},
+		{"請求沒有同名欄位：維持沒對應", &requestError{err: pageSize(), desc: noMatch}, nil, []string{"PageSize"}},
+		{"沒有請求訊息：維持沒對應", pageSize(), nil, []string{"PageSize"}},
+		{"明列的對應優先於自動規則", &requestError{err: WithFieldPaths(pageSize(), FieldPaths{"PageSize": "max_results"}), desc: withPageSize}, []string{"max_results"}, nil},
+		{"索引欄位不套用自動規則", &requestError{err: apperr.InvalidInputOn([]string{"PageSize[1]"}, "不合法"), desc: withPageSize}, nil, []string{"PageSize[1]"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := toConnect(context.Background(), c.err)
+			_, _, fields := detailsOf(t, got.err)
+			if fmt.Sprint(fields) != fmt.Sprint(c.want) || fmt.Sprint(got.unmapped) != fmt.Sprint(c.unmapped) {
+				t.Fatalf("欄位 = %v、沒對應到 %v，預期 %v、%v", fields, got.unmapped, c.want, c.unmapped)
+			}
+		})
+	}
+}
+
+func TestSnakeCase(t *testing.T) {
+	for in, want := range map[string]string{"PageSize": "page_size", "RequestID": "request_id", "ID": "id", "StoreID": "store_id", "Body": "body", "OrderNo": "order_no", "URLPath": "url_path"} {
+		if got := snakeCase(in); got != want {
+			t.Errorf("snakeCase(%q) = %q，預期 %q", in, got, want)
+		}
+	}
+}
+
+func TestRequireAccount(t *testing.T) {
+	ctx := context.Background()
+	if _, err := RequireAccount(ctx); !errors.Is(err, ErrNoPrincipal) || !toConnect(ctx, err).internal {
+		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 ErrNoPrincipal（internal）", err)
+	}
+	admin := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
+	_, err := RequireAccount(admin)
+	if connect.CodeOf(toConnect(admin, err).err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "需要顧客帳號") {
+		t.Errorf("管理員：err = %v，預期 PermissionDenied「需要顧客帳號」", err)
+	}
+	acct := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
+	if p, err := RequireAccount(acct); err != nil || p.ID != 7 {
+		t.Errorf("顧客帳號：%+v, %v", p, err)
+	}
+}
+
+func TestRequireAdmin(t *testing.T) {
+	ctx := context.Background()
+	if _, err := RequireAdmin(ctx); !errors.Is(err, ErrNoPrincipal) || !toConnect(ctx, err).internal {
+		t.Errorf("沒有呼叫者：err = %v，預期沒有分類的 ErrNoPrincipal（internal）", err)
+	}
+	acct := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAccount, ID: 7})
+	_, err := RequireAdmin(acct)
+	if connect.CodeOf(toConnect(acct, err).err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "需要管理員") {
+		t.Errorf("顧客帳號：err = %v，預期 PermissionDenied「需要管理員」", err)
+	}
+	admin := WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
+	if id, err := RequireAdmin(admin); err != nil || id != 1 {
+		t.Errorf("管理員：%d, %v", id, err)
+	}
+}

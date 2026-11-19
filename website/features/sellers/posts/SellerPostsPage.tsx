@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import InfiniteFeed from "@/features/feed/components/InfiniteFeed";
-import { getCachedSeller } from "@/lib/api/cached";
-import type { PostListItem } from "@/lib/api/openapi-types";
-import { fetchPublicPostsTyped } from "@/lib/api/posts";
+import { getCachedStore, getCachedStorePosts } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
+import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -14,15 +14,16 @@ import { sellerCanonicalUrl } from "@/lib/seo/urls";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
+	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
+	preview?: boolean;
 }
 
 const POSTS_PAGE_SIZE = 12;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
-	const seller = await getCachedSeller(id);
-	const s = seller;
-	if (!s) return { title: "找不到賣家" };
+	const s = await getCachedStore(id);
+	if (!s) return { title: sellerNotFoundTitle(locale) };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
 	// Middleware already 308s a store_id URL here, but the redirect and this tag
@@ -49,20 +50,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function PostsPage({ params }: Props) {
+export default async function PostsPage({ params, preview = false }: Props) {
 	const { id } = await params;
 
 	// Posts is an infinite-scroll feed with no `?page` pagination UI, so the
 	// first page is the SEO/ISR body and InfiniteFeed loads more in place. The
 	// route therefore reads no request-time input and stays statically renderable.
-	const postsData = await fetchPublicPostsTyped({
-		page: 1,
+	// The first page is the anonymous cached read, tagged `posts:list` and
+	// `seller:<id>`; a signed-in viewer's list differs (blocked stores), so
+	// `useFeedPosts` drops this seed for them and reads with their cookie.
+	const emptyPosts = {
+		records: [],
+		nextPageToken: "",
 		pageSize: POSTS_PAGE_SIZE,
-		sellerId: id,
-	}).catch(prerenderSafe({ records: [], total: 0, totalPages: 0 }));
+	};
+	const storeId = (await resolveStorefront(id, preview))?.storeId ?? "";
+	const postsData = storeId
+		? await getCachedStorePosts(storeId, POSTS_PAGE_SIZE).catch(
+				prerenderSafe(emptyPosts),
+			)
+		: emptyPosts;
 
-	const posts = postsData.records as PostListItem[];
-
+	const posts = postsData.records;
 	// Chrome (profile header / banner / shell) lives in the persistent
 	// (storefront) layout — this page renders only the posts board.
 	return (
@@ -74,8 +83,9 @@ export default async function PostsPage({ params }: Props) {
 				<InfiniteFeed
 					initialPosts={posts}
 					initialPage={1}
+					initialNextPageToken={postsData.nextPageToken}
 					pageSize={POSTS_PAGE_SIZE}
-					sellerId={id}
+					sellerId={storeId}
 					// This page fetched page one for this exact seller, so the feed
 					// keeps that seed. Without the declaration the scoped query would
 					// discard it, refetch page one on the client, and flash a

@@ -4,8 +4,9 @@ import JsonLd from "@/components/seo/JsonLd";
 import SellerCardPage, {
 	type SellerCardSeller,
 } from "@/features/sellers/card/SellerCardPage";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import { sellerStaticParams } from "@/lib/api/static-params";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import { sellerSchema } from "@/lib/seo/jsonld";
 import {
 	localeFromParam,
@@ -36,8 +37,8 @@ function cardDescription(seller: SellerCardSeller): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
-	const seller = (await getCachedSeller(id)) as SellerCardSeller | null;
-	if (!seller) return { title: "找不到賣家" };
+	const seller = (await getCachedStore(id)) as SellerCardSeller | null;
+	if (!seller) return { title: sellerNotFoundTitle(locale) };
 
 	const canonical = sellerCanonicalUrl(
 		seller,
@@ -63,7 +64,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
 	const { id, locale: rawLocale } = await params;
-	const seller = (await getCachedSeller(id)) as SellerCardSeller | null;
+	const seller = (await getCachedStore(id)) as SellerCardSeller | null;
 	if (!seller) notFound();
 
 	const locale = localeFromParam(rawLocale);
@@ -78,7 +79,7 @@ export default async function Page({ params }: Props) {
 					image: sellerSocialImage(seller),
 				})}
 			/>
-			<SellerCardPage seller={seller} sellerId={id} />
+			<SellerCardPage seller={seller} />
 		</>
 	);
 }

@@ -1,10 +1,12 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../social/data/social_content_repository.dart';
 import '../../social/data/social_model.dart';
-import '../../social/data/social_repository.dart';
 
 final homePostPreviewRepositoryProvider = Provider<HomePostPreviewRepository>(
-  (ref) => SocialHomePostPreviewRepository(ref.watch(socialRepositoryProvider)),
+  (ref) => SocialHomePostPreviewRepository(
+    ref.watch(socialContentRepositoryProvider),
+  ),
 );
 
 /// 首頁最新貼文的資料邊界。
@@ -17,11 +19,11 @@ abstract interface class HomePostPreviewRepository {
 class SocialHomePostPreviewRepository implements HomePostPreviewRepository {
   const SocialHomePostPreviewRepository(this._socialRepository);
 
-  final SocialRepository _socialRepository;
+  final SocialContentRepository _socialRepository;
 
   @override
   Future<List<Post>> fetchLatest({required int limit}) async {
-    final posts = await _socialRepository.getPosts(page: 1, pageSize: limit);
-    return List<Post>.unmodifiable(posts.take(limit));
+    final page = await _socialRepository.listPosts(size: limit);
+    return List<Post>.unmodifiable(page.posts.take(limit));
   }
 }

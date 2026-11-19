@@ -111,6 +111,7 @@ func toConfirmInput(m *pb.ConfirmAuditResultRequest) (delegation.AuditConfirmInp
 		AuditLogID:           id,
 		Result:               delegation.AuditResult(m.GetResult()),
 		BizCode:              m.GetBizCode(),
+		FailureReason:        failureReasonOfBizCode(m.GetBizCode()),
 		ResourceID:           optionalString(m.GetResourceId()),
 		ResourceVersionAfter: parseOptionalInt64(m.GetResourceVersionAfter()),
 	}
@@ -361,9 +362,7 @@ func toAuditEntries(logs []delegation.AuditLog) []*pb.AuditLogEntry {
 		e.OperationReason = deref(l.OperationReason)
 		e.IdempotencyKey = deref(l.IdempotencyKey)
 		e.UserAgent = deref(l.UserAgent)
-		if l.BizCode != nil {
-			e.BizCode = *l.BizCode
-		}
+		e.BizCode = bizCodeOfLog(l)
 		if l.ResourceVersionBefore != nil {
 			e.ResourceVersionBefore = strconv.FormatInt(*l.ResourceVersionBefore, 10)
 		}
@@ -383,4 +382,36 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// failureReasonOfBizCode 是舊 gateway 送來的業務碼對應的 failure_reason：拒絕的碼對到拒絕的代碼（9265 是店家不存在；已關閉只在
+// 新路徑），其他（gateway 自己的業務碼）沒有對應的原因，寫 INTERNAL；原始數字另存在 biz_code 欄位，舊讀取照舊回它。
+func failureReasonOfBizCode(code int32) string {
+	if code == 0 {
+		return delegation.FailureReasonInternal
+	}
+	if code == bizCodes[delegation.DenialStoreNotDelegable] {
+		return delegation.DenialStoreNotDelegable.Code()
+	}
+	for d, c := range bizCodes {
+		if c == code && d != delegation.DenialStoreClosed {
+			return d.Code()
+		}
+	}
+	return delegation.FailureReasonInternal
+}
+
+// bizCodeOfLog 是稽核列回給舊 gateway 的業務碼：舊路徑寫的數字原樣回；新路徑的列沒有數字，由 failure_reason 的拒絕代碼對回舊碼
+// （ErrorReason 與 INTERNAL 沒有舊碼，回 0）。
+func bizCodeOfLog(l delegation.AuditLog) int32 {
+	if l.BizCode != nil {
+		return *l.BizCode
+	}
+	if l.FailureReason == nil {
+		return 0
+	}
+	if d, ok := delegation.DenialOfCode(*l.FailureReason); ok {
+		return bizCodes[d]
+	}
+	return 0
 }

@@ -4,6 +4,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -28,6 +29,9 @@ const (
 	AudienceAdmin
 	// AudienceInvitee 是 <模組>InviteeService：兌換了邀請的供應商（沒有帳號），憑證是 service 自己的 cookie，不讀身分。
 	AudienceInvitee
+	// AudienceDelegated 是 <模組>DelegatedService：代行營運中的平台管理員，憑證是請求標頭 X-HK-Operation-Session 的代行 session，由 service 自己的 interceptor
+	// 解析並逐方法檢查能力，不讀顧客或管理員的身分（也不經 adminauth）。
+	AudienceDelegated
 )
 
 func (a Audience) String() string {
@@ -40,6 +44,8 @@ func (a Audience) String() string {
 		return "admin"
 	case AudienceInvitee:
 		return "invitee"
+	case AudienceDelegated:
+		return "delegated"
 	}
 	return "unknown"
 }
@@ -59,6 +65,8 @@ func AudienceOf(procedure string) (Audience, bool) {
 		return AudienceApp, true
 	case strings.HasSuffix(svc, "InviteeService"):
 		return AudienceInvitee, true
+	case strings.HasSuffix(svc, "DelegatedService"):
+		return AudienceDelegated, true
 	case strings.HasSuffix(svc, "PublicService"):
 		return AudiencePublic, true
 	}
@@ -98,7 +106,7 @@ func authorize(ctx context.Context, procedure string) error {
 	if !ok {
 		return Error(connect.CodePermissionDenied, "%s", "這個方法不對外開放")
 	}
-	if audience == AudiencePublic || audience == AudienceInvitee {
+	if audience == AudiencePublic || audience == AudienceInvitee || audience == AudienceDelegated {
 		return nil
 	}
 	p, ok := PrincipalFrom(ctx)
@@ -114,7 +122,7 @@ func authorize(ctx context.Context, procedure string) error {
 		if p.Kind != identity.PrincipalAccount {
 			return userError(connect.CodePermissionDenied, CommonText(ctx, connect.CodePermissionDenied))
 		}
-	case AudiencePublic, AudienceInvitee:
+	case AudiencePublic, AudienceInvitee, AudienceDelegated:
 	}
 	return nil
 }
@@ -135,4 +143,50 @@ func BuyerInvariant(accountID int64, err error) error {
 		return fmt.Errorf("存活的帳號 %d 沒有現任買家（不變量被破壞）", accountID)
 	}
 	return err
+}
+
+// BuyerLookup 把登入的帳號對到買家身分（*buyer.Module）。
+type BuyerLookup interface {
+	CurrentBuyerID(ctx context.Context, accountID int64) (int64, error)
+}
+
+// ErrNoPrincipal 是請求通過了授權卻沒有呼叫者：授權鏈壞了，沒有分類（internal），不是使用者的錯。
+var ErrNoPrincipal = errors.New("httpapi/rpc：ctx 裡沒有呼叫者")
+
+// RequireAccount 回傳呼叫者的顧客帳號身分：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，ctx 裡沒有呼叫者是授權鏈壞了，回沒有分類的 internal；管理員等非帳號身分回 permission_denied）。
+func RequireAccount(ctx context.Context) (identity.Principal, error) {
+	p, ok := PrincipalFrom(ctx)
+	if !ok {
+		return identity.Principal{}, ErrNoPrincipal
+	}
+	if p.Kind != identity.PrincipalAccount {
+		return identity.Principal{}, Error(connect.CodePermissionDenied, "%s", "需要顧客帳號")
+	}
+	return p, nil
+}
+
+// RequireAdmin 回傳呼叫的管理員 ID：只有管理員能呼叫（interceptor 已依 service 名稱擋下非管理員；ctx 裡沒有呼叫者是授權鏈壞了，回沒有分類的 internal；非管理員身分回 permission_denied）。
+func RequireAdmin(ctx context.Context) (int64, error) {
+	p, ok := PrincipalFrom(ctx)
+	if !ok {
+		return 0, ErrNoPrincipal
+	}
+	if p.Kind != identity.PrincipalAdmin {
+		return 0, Error(connect.CodePermissionDenied, "%s", "需要管理員")
+	}
+	return p.ID, nil
+}
+
+// AccountBuyerID 回傳呼叫者的買家 ID：只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員等非帳號身分回 permission_denied）；
+// 存活的帳號查不到買家是不變量被破壞（BuyerInvariant）。
+func AccountBuyerID(ctx context.Context, buyers BuyerLookup) (int64, error) {
+	p, err := RequireAccount(ctx)
+	if err != nil {
+		return 0, err
+	}
+	id, err := buyers.CurrentBuyerID(ctx, p.ID)
+	if err != nil {
+		return 0, BuyerInvariant(p.ID, err)
+	}
+	return id, nil
 }

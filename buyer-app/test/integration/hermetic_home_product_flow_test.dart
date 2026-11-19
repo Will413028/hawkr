@@ -17,6 +17,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import '../features/social/social_fakes.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../support/fake_content_transport.dart';
@@ -52,13 +53,6 @@ class _ControlledHomeAdapter implements HttpClientAdapter {
       throw StateError(
         'Hermetic home test rejected ${options.method} ${options.path}',
       );
-    }
-    if (options.path == '/public/posts') {
-      return _jsonResponse({
-        'code': 0,
-        'data': {'records': <Object>[]},
-        'message': 'success',
-      });
     }
     if (options.path == '/public/products') {
       if (_productResponses.isEmpty) {
@@ -270,6 +264,7 @@ Future<_HomeHarness> _pumpHome(WidgetTester tester) async {
         (_) => throw StateError('Hermetic home test has no live Connect'),
       ),
       connectTransportProvider.overrideWithValue(fakeContentTransport()),
+      socialPublicClientProvider.overrideWithValue(FakeSocialPublic().client()),
       sessionProvider.overrideWith(_GuestSession.new),
     ],
   );

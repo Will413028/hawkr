@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -94,7 +96,8 @@ func TestGRPC_ChatStream_EnforcesServiceAuth(t *testing.T) {
 		err = stream.Send(&pb.ChatStreamRequest{Payload: &pb.ChatStreamRequest_Open{
 			Open: &pb.ChatStreamOpen{UserId: "42", LoginRole: 1},
 		}})
-		if err == nil {
+		// Send 在伺服器已結束 stream 時回 io.EOF，真正的狀態要從 Recv 取得。
+		if err == nil || errors.Is(err, io.EOF) {
 			_, err = stream.Recv()
 		}
 		if status.Code(err) != codes.Unauthenticated {

@@ -26,7 +26,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | `cases_open_by_time` 索引（`opened_at, id` WHERE 進行中） | A7-1e 後台待辦依開案時間 keyset 讀進行中的案件 | 消費者還不存在（預建，沒有量測） | 索引隨第一個讀它的查詢一起建 | 暫留，觸發：A7-1e 的待辦查詢落地時用 `EXPLAIN` 確認有用到；若 A7-1e 改用別的排序鍵就刪 |
 | River 週期 job（`moderation.purge_snapshots`、`moderation.media_sweep`）與分批 500 | 快照與說明要在保留期後清掉、引用同步要有保底掃描 | 成立；seller 的保留清理與 social 的 media 同步是同型 job | 排程 job 分批、冪等 | 照 seller、social 的做法：每日清、啟動跑一次、`UniqueOpts ByPeriod 12h`；media 同步用 `media.RefSyncer` |
 | 證據保全：快照引用的圖片只存 `asset_id`，社群在刪文與店家退場時釋放自己的引用（A7-D21） | 申訴期內要能重現被檢舉的那一版，含圖片 | 成立：不保全的話，作者刪貼文後只剩指向已回收資產的字串 | 保全證據（在引用端 hold，不複製檔案） | 新增：快照以 `(GOVERNANCE_EVIDENCE, 快照 ID)` 在 media 登記引用（借用既有的 ref type，CodeMeta 凍結不新增值），同步 job 寫入、快照刪除時才解除；沒有新的 media API。已知殘餘：新快照的同步 job 還沒跑完、而作者已刪貼文且 GC 已回收時，圖片已經不在（同 media 規格 §7 的方向：一般引用同樣有這個窗口）；買家頭像只存 object key，沒有 asset ID，不在保全範圍，觸發：要保全頭像時由 buyer 提供 asset ID |
-| 檢舉人的說明文字與每日計數無保留期（A7-D21） | 個資最小化（GDPR 5(1)(e)） | 說明是自由文字，可能含個資 | 說明與快照同期清、刪帳時清 | 新增：說明在結案滿 184 天與快照一起清；檢舉人刪帳時（買家刪除事件，同 transaction 訂閱者；沿用 social 的訂閱模式而不是讓 accountdeletion 依賴 moderation）清他全部檢舉（含同帳號歷史身分）的說明與每日計數列，檢舉列與 `reporter_buyer_id`（假名鍵）留著。每日計數列對未刪帳的檢舉人每人一列、有界，不清 |
+| 檢舉人的說明文字與每日計數無保留期（A7-D21） | 個資最小化（GDPR 5(1)(e)） | 說明是自由文字，可能含個資 | 說明與快照同期清、刪帳時清 | 新增：說明在結案滿 184 天與快照一起清；檢舉人刪帳時（買家刪除事件，同 transaction 訂閱者；沿用 social 的訂閱模式而不是讓 accountdeletion 依賴 moderation）清他全部檢舉（含同帳號歷史身分）的說明、冪等紀錄（request_hash 是說明的雜湊）與每日計數列，檢舉列與 `reporter_buyer_id`（假名鍵）留著。每日計數列對未刪帳的檢舉人每人一列、有界，不清 |
 | 髒字詞典（M17） | 預先過濾 | 屬於 social 的寫入路徑（A7-1a 已放在 `platform/textfilter`） | 詞庫有擁有者與後台維護 | 不在本模組：詞庫的擁有者與後台維護是另一個決定，觸發是營運要求新增詞 |
 
 ## 傳輸層的沿用盤點
@@ -37,7 +37,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 |---|---|---|---|---|
 | 檢舉人身分由 gateway 解析 principal，失敗退回原值（M18） | 跨服務時 gateway 才有身分 | 不成立：同一個程序，入口解析 session 後直接帶 buyer_id | 入口認證、模組收已解析的業務鍵 | 改：`SubmitReport` 收 `ReporterBuyerID`，由 A7-2 的 handler 從 session 解析 |
 | 錯誤用 CodeMeta 錯誤碼與字串訊息 | 舊契約 | 不成立：新 API 用 `apperr` 的 kind 與 `ErrorReason` | 結構化錯誤 | 改：`apperr`（InvalidInput、NotFound、FailedPrecondition、ResourceExhausted、VersionConflict）；伺服器句子在模組 `internal/text`（檢舉人受眾 zh-TW、en；管理員受眾只有 zh-TW），語系取自 context，`TestModerationApperrCallsCarryNoSentenceLiterals` 守門 |
-| 列表分頁 page／pageSize 加 `COUNT(*)`（M20） | client 顯示總頁數 | 不成立 | AIP-158 keyset | 後台待辦與案件列表在 A7-1e、A7-2 用 keyset；本步只有單一案件的讀取 |
+| 列表分頁 page／pageSize 加 `COUNT(*)`（M20） | client 顯示總頁數 | 不成立 | AIP-158 keyset | 後台待辦在 A7-1e、案件列表（`Cases`）在 A7-2f-4 用 keyset |
 | 每日 20 筆在入口限流（M24） | 防濫用 | 上限是業務規則，在模組內強制；入口另有一般限流 | 業務上限在資料層原子強制 | 改：上限在模組內單一 upsert 強制，入口限流不負責 |
 
 ## 與 social-service 的差異
@@ -51,3 +51,16 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 處置種類：`HIDE`、`WARN`、`BAN`、`TAKEDOWN`（舊：`HIDE_TARGET`、`WARN_USER`、`BAN_USER`、`DISMISS`）；`DISMISS` 對映案件決定 `NO_VIOLATION`；新增 `TAKEDOWN`（店家的內容走 seller 措施）。
 - 每次處理只有一種處置；同一案件組合多種處置是終態（見規格 §6）。
 - 內容下架的認定引用案件最早的 20 筆檢舉（seller 的上限 `MaxSourceModerationReports`）。
+
+## 公司時期未完成項
+
+legacy-backlog「A7 social」段裡屬於檢舉面的 3 項（A7-5 對照現行程式碼）；#2692（公開單篇不檢查發布狀態）屬 social，見 `social/CARRYOVER.md`。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #1632：`AdminResolve BAN_USER` 用 `report.TargetID` 而不是解析後的 `TargetOwnerID` | 不再成立（SD10）：檢舉帶 `(target_kind, id)`，`BAN` 只接受買家作者，作者由 social 的 `ContentOwner` 解析（內容已刪時用案件快照裡凍結的作者），再由 buyer 的 `AccountIDByBuyerID` 轉帳號後 `Suspend`；不使用檢舉的對象 ID 當帳號；店家作者回 FailedPrecondition | `internal/handle/handle.go:214-222`（BAN 分支）、`:232` `author`；`TestBuyerBranchActionsLeaveRecordsInTheOwningModules`（`decide_integration_test.go:49`）、`TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone`（`lifecycle_integration_test.go:31`）、`TestBanRefusesAnAccountThatOwnsAStore`（`decide_integration_test.go:174`） |
+| #2779：檢舉佐證在 DB commit 結果不明時盲目 Release | 不再成立（A7-D21）：沒有 commit 結果不明時 Release 的路徑。證據是 DB 裡的快照列；media 的保全引用只由同步 job 依快照目前的狀態寫入，`Release` 只被快照過期清除呼叫，且與 `DeleteSnapshots` 在同一個 transaction，commit 失敗就整個回滾、快照與引用都還在 | `internal/mediaref/mediaref.go:75` `Release`，唯一呼叫處 `internal/retention/retention.go:111`（`rg -n 'holds\.Release\|\.Release\(' internal/modules/moderation` 只有這一處）；`TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged`（`lifecycle_integration_test.go:137`）、`TestSnapshotsArePurgedAfterTheRetentionAndCasesStay`（`submit_integration_test.go:277`） |
+| #3513 稽核寫入沒有 logger | 修掉（SD12）：`moderation_actions` 表刪除；後台處置的紀錄由 platform 的 `adminaudit` 在結案的同一個 transaction 寫，寫失敗整個回滾，不再 best-effort 丟棄，有讀取端（營運子命令 `List`），不需要另外的 logger | `internal/handle/handle.go:134,144`（`audit`）；`TestDecideWritesTheAdminAuditRecordInTheSameTransaction`（`list_integration_test.go:163`）、`adminaudit` 的 `TestRecordRollsBackWithTheCallersTransaction` |
+| #3513 整合測試 | 修掉：本模組有 integration 測試（submit、decide、lifecycle、list、schema 等），CI 的 backend-monolith integration job 執行（A7-1d 完成列的 run 43680980602） | `internal/modules/moderation/*_integration_test.go` |
+| #3513 SLA 告警 | 延後（Will 2026-11-19），觸發：單體的告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。原狀：待辦列有期限（`pub_review_items`：開案起 72 小時，到期前 24 小時起算警示窗，`db/objects.sql:16-19`），但沒有主動告警的程式，計畫也沒有決定；A7-D14 只延後「依檢舉數或觸及量提高優先度」，不是告警 | `db/objects.sql:16-19`；計畫 A7-D14 |
+| #3513 字典詞庫 | 延後，有觸發：詞庫不在本模組，擁有者與後台維護是另一個決定，觸發是營運要求新增詞（上方沿用盤點「髒字詞典（M17）」列）；social 側的詞表是過渡內容（`social/CARRYOVER.md` M17） | 本檔沿用盤點 M17 列；`social/CARRYOVER.md` M17 |

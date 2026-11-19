@@ -101,7 +101,7 @@ func (h *Admin) GetKYCApplication(ctx context.Context, req *connect.Request[admi
 
 // ApproveKYC 的身分比對沒有通過時，模組回固定文字的 failed_precondition（不透露欄位或帳號）；這裡原樣交回，不加任何細節。
 func (h *Admin) ApproveKYC(ctx context.Context, req *connect.Request[adminpb.ApproveKYCRequest]) (*connect.Response[adminpb.ApproveKYCResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (h *Admin) ApproveKYC(ctx context.Context, req *connect.Request[adminpb.App
 }
 
 func (h *Admin) RejectKYC(ctx context.Context, req *connect.Request[adminpb.RejectKYCRequest]) (*connect.Response[adminpb.RejectKYCResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func auditScope(procedure string, applicationID uuid.UUID) string {
 
 // RequeryKYCRegistration 排入一次登記資料查詢（回應不等結果），回傳這筆進行中的查詢（帶期限）；這一輪還沒查完的舊查詢被取代。
 func (h *Admin) RequeryKYCRegistration(ctx context.Context, req *connect.Request[adminpb.RequeryKYCRegistrationRequest]) (*connect.Response[adminpb.RequeryKYCRegistrationResponse], error) {
-	adminID, err := adminFrom(ctx)
+	adminID, err := rpc.RequireAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}

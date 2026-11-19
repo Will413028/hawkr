@@ -3,6 +3,7 @@ package buyer
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -11,18 +12,19 @@ import (
 	"google.golang.org/genproto/googleapis/type/date"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	model "github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
 // Module 是買家業務資料的讀寫介面。
 type Module interface {
 	listModule
+	blockModule
 	Profile(context.Context, int64) (model.Profile, error)
 	CurrentBuyerID(context.Context, int64) (int64, error)
 	UpdateProfile(context.Context, model.UpdateProfileInput) (model.Profile, error)
@@ -39,50 +41,41 @@ type App struct {
 	images rpc.Images
 	ports  Ports
 	// stats 是店家卡片評分的組裝（與店面頁同一份 *StatsSource，只用到評價與 logger）。
-	stats *httpseller.StatsSource
+	stats    *httpseller.StatsSource
+	blocking blocks.Sources
 }
 
 var _ buyerv1alpha1connect.BuyerAppServiceHandler = (*App)(nil)
 
 // NewApp 建立買家 handler。stats 是店家卡片評分的組裝（httpseller.NewStatsSource 建立，與店面頁同一份；nil 回錯誤）。
-func NewApp(m Module, images rpc.Images, ports Ports, stats *httpseller.StatsSource) (*App, error) {
+// blocking 是封鎖入口的來源（內容參照解析與跨身分規則，A7-2e），兩個都必填，缺了回錯誤。
+func NewApp(m Module, images rpc.Images, ports Ports, stats *httpseller.StatsSource, blocking blocks.Sources) (*App, error) {
 	if stats == nil {
 		return nil, httpseller.ErrStatsSourceRequired
 	}
-	return &App{m: m, images: images, ports: ports, stats: stats}, nil
+	if !blocking.Complete() {
+		return nil, ErrBlockingRequired
+	}
+	return &App{m: m, images: images, ports: ports, stats: stats, blocking: blocking}, nil
 }
 
-// accountCaller 回傳呼叫者的帳號 ID；只有顧客帳號是買家，管理員與未登入回 permission_denied。
-func accountCaller(ctx context.Context) (int64, error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok || p.Kind != identity.PrincipalAccount {
-		return 0, rpc.Error(connect.CodePermissionDenied, "%s", "需要買家身分")
-	}
-	return p.ID, nil
-}
+// ErrBlockingRequired 是 NewApp 沒有封鎖入口的來源時的錯誤。
+var ErrBlockingRequired = errors.New("httpapi/buyer：封鎖需要內容作者的來源與跨身分規則的身分來源")
 
 // caller 解析呼叫者的 buyer_id：每個帳號都是買家，每個請求只查 buyer_id，不讀 profile 個資。
 func (h *App) caller(ctx context.Context) (int64, error) {
-	accountID, err := accountCaller(ctx)
-	if err != nil {
-		return 0, err
-	}
-	buyerID, err := h.m.CurrentBuyerID(ctx, accountID)
-	if err != nil {
-		return 0, rpc.BuyerInvariant(accountID, err)
-	}
-	return buyerID, nil
+	return rpc.AccountBuyerID(ctx, h.m)
 }
 
 // callerProfile 以一次查詢讀取呼叫者的現任 profile；錯誤語意與 caller 相同。
 func (h *App) callerProfile(ctx context.Context) (model.Profile, error) {
-	accountID, err := accountCaller(ctx)
+	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
 		return model.Profile{}, err
 	}
-	profile, err := h.m.Profile(ctx, accountID)
+	profile, err := h.m.Profile(ctx, p.ID)
 	if err != nil {
-		return model.Profile{}, rpc.BuyerInvariant(accountID, err)
+		return model.Profile{}, rpc.BuyerInvariant(p.ID, err)
 	}
 	return profile, nil
 }

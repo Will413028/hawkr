@@ -38,6 +38,9 @@ func parseOrigin(name, origin, example string) (string, error) {
 	return u.Scheme + "://" + u.Host, nil
 }
 
+// IsZero 回報是不是沒有設定媒體網域的零值。
+func (i Images) IsZero() bool { return i.origin == "" }
+
 // Image 回傳 key 的圖；key 是空字串（沒有圖）時回 nil，欄位就不設。
 func (i Images) Image(key string) *commonpb.Image {
 	if key == "" {

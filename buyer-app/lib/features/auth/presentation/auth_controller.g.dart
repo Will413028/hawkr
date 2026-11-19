@@ -62,7 +62,7 @@ final class AuthControllerProvider
   }
 }
 
-String _$authControllerHash() => r'c9c8509fb547ed373b0c819c682a3b324dab8309';
+String _$authControllerHash() => r'0d6c3a6220cbbd154bf86449bc5266ba83fdf6c1';
 
 /// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。

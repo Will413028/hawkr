@@ -1,0 +1,97 @@
+[
+  {
+    "exchange": "hawkr.account",
+    "routing_key": "account.deleted",
+    "package": "internal/legacy/accountservice"
+  },
+  {
+    "exchange": "hawkr.buyer",
+    "routing_key": "buyer.deleted",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.buyer",
+    "routing_key": "buyer.favorite.added",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.buyer",
+    "routing_key": "buyer.favorite.removed",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "comment.created",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "comment.like_changed",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "comment.replied",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "follow.added",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.created",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.hidden_by_platform",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "post.liked",
+    "package": "internal/legacy/socialrelay"
+  },
+  {
+    "exchange": "hawkr.content",
+    "routing_key": "product.viewed",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.delegation",
+    "routing_key": "delegation.operation.completed",
+    "package": "internal/legacy/delegationservice"
+  },
+  {
+    "exchange": "hawkr.product",
+    "routing_key": "product.restock.target",
+    "package": "internal/legacy/buyerrelay"
+  },
+  {
+    "exchange": "hawkr.seller",
+    "routing_key": "seller.deleted",
+    "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "hawkr.seller",
+    "routing_key": "seller.exposure.changed",
+    "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "hawkr.seller",
+    "routing_key": "seller.profile.changed",
+    "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "hawkr.seller",
+    "routing_key": "seller.suspended",
+    "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "hawkr.seller",
+    "routing_key": "seller.unsuspended",
+    "package": "internal/legacy/sellerrelay"
+  }
+]

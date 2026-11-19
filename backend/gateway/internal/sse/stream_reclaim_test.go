@@ -116,10 +116,10 @@ func waitForSeats(t *testing.T, hub *Hub, uid int64, want int) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if hub.CapGroupSize(uid, "") == want {
+		if hub.CapGroupSize(uid) == want {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("佔位數未收斂到 %d，實際 %d", want, hub.CapGroupSize(uid, ""))
+	t.Fatalf("佔位數未收斂到 %d，實際 %d", want, hub.CapGroupSize(uid))
 }

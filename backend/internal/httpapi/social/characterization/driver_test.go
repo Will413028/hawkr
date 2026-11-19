@@ -1,15 +1,11 @@
 // Package characterization 是 social 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
-// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 social-service；Connect driver
-// 打單體，在 A7-2 加上（連同 connect_test.go 與 monolith_integration_test.go，照 content 的寫法）。本步只跑舊的那一端（scripts/characterize.sh social，build tag gateway）。
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作，只跑在單體：Connect driver（connect_test.go）打單體，由 monolith_integration_test.go 以 httpapi.NewHandler 組出與 production
+// 相同的 handler 執行（build tag integration）。
 //
-// 兩個 driver 的 wire 不同，情境只看業務上的結果：ID 當成不透明的字串、錯誤只比 characterize 的分類。與舊實作
-// 刻意不同的行為（計畫的 SD 編號）寫成共用的情境，舊的一端以 skipOnLegacy 跳過並附 SD 編號，單體的一端照新行為斷言。
-// social-service 刪除時，REST driver、legacy.sh 與 TestLegacy 一起刪除。
-//
-// 本機的舊堆疊沒有 RabbitMQ：留言數、讚數由 counter.delta 非同步更新，在這裡永遠是 0，所以舊的一端不斷言它們；
-// 讚與留言的結果看 liked 旗標與列表內容，分享數與瀏覽數是同步寫入的。
+// 情境只看業務上的結果：ID 當成不透明的字串、錯誤只比 characterize 的分類。與舊實作
+// 刻意不同的行為（計畫的 SD 編號）照新行為斷言。
 package characterization
 
 import (
@@ -82,9 +78,6 @@ type Page[T any] struct {
 // Driver 是情境操作 social 的方式：每個對外操作一個方法，參數與回傳值是業務上的型別（不是 wire 的型別），
 // 錯誤對應到 characterize 的分類。
 type Driver interface {
-	// Legacy 回報這個 driver 打的是舊的 social-service。
-	Legacy() bool
-
 	CreatePost(ctx context.Context, c ch.Caller, in PostInput) (Post, error)
 	UpdatePost(ctx context.Context, c ch.Caller, id string, in PostInput) (Post, error)
 	PublishPost(ctx context.Context, c ch.Caller, id string) error
@@ -123,4 +116,23 @@ type Driver interface {
 
 	SuggestTags(ctx context.Context, c ch.Caller, q string) ([]TagCount, error)
 	TrendingTags(ctx context.Context, c ch.Caller) ([]TagCount, error)
+
+	// 封鎖（A7-2e）。舊的 social-service 的封鎖是雙向的、存在 Redis、聊天與評價共用 userId，與單體的語意刻意不同（SD3、SD15、D2）。
+	//
+	// BlockAuthor 是買家封鎖一則留言的作者（內容參照），回傳封鎖的狀態有沒有改變。
+	BlockAuthor(ctx context.Context, c ch.Caller, commentID string) (bool, error)
+	// BlockStore 是買家從店面頁封鎖店家。
+	BlockStore(ctx context.Context, c ch.Caller, sellerID string) (bool, error)
+	UnblockStore(ctx context.Context, c ch.Caller, sellerID string) (bool, error)
+	// SellerBlockAuthor 是店主以店家身分封鎖一則留言的作者。
+	SellerBlockAuthor(ctx context.Context, c ch.Caller, commentID string) (bool, error)
+	// SellerBlockedBuyers 是店主的封鎖名單；Deleted 表示對方已刪除帳號。
+	SellerBlockedBuyers(ctx context.Context, c ch.Caller) ([]BlockedBuyer, error)
+	SellerUnblockBuyer(ctx context.Context, c ch.Caller, buyerID string) (bool, error)
+}
+
+// BlockedBuyer 是店家封鎖名單的一列。
+type BlockedBuyer struct {
+	BuyerID string
+	Deleted bool
 }

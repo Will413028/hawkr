@@ -27,9 +27,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // SourceRefPrefix 是寫進各處分紀錄的來源參照的前綴，後面接案件 ID；其他模組把它當不透明的字串。
@@ -42,6 +44,7 @@ type Deps struct {
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
+	Audit      *adminaudit.Log
 	Now        func() time.Time
 }
 
@@ -58,13 +61,15 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 		return in, apperr.InvalidInputOn([]string{"CaseID"}, "%s", text.DecideCaseRequired())
 	case in.Version < 1:
 		return in, apperr.InvalidInputOn([]string{"Version"}, "%s", text.DecideVersionRequired())
-	case in.AdminID <= 0:
-		return in, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.DecideAdminRequired())
+	case in.Actor.AdminID <= 0:
+		return in, errors.New("moderation：處理案件的 Actor.AdminID 不是正數，handler 沒有帶管理員")
+	case in.Actor.Action == "":
+		return in, errors.New("moderation：處理案件的 Actor.Action 空白，handler 沒有帶 procedure 名稱")
 	}
 	in.Text = trimtext.Trim(in.Text)
 	switch in.Decision {
 	case model.DecisionNoViolation:
-		if in.Category != "" || in.Action != "" || in.Text != "" || in.StoreID != 0 || in.Severity != "" {
+		if in.Category != "" || in.Action != "" || in.Text != "" || in.Severity != "" {
 			return in, apperr.InvalidInputOn([]string{"Decision"}, "%s", text.DecideNoViolationShape())
 		}
 	case model.DecisionViolation:
@@ -81,13 +86,10 @@ func Validate(in model.DecideInput) (model.DecideInput, error) {
 			return in, apperr.InvalidInputOn([]string{"Text"}, "%s", text.DecideReasonTooLong(text.DecideReasonTooLongArgs{Max: model.MaxTextRunes}))
 		}
 		if in.Action == model.ActionTakedown {
-			if in.StoreID <= 0 {
-				return in, apperr.InvalidInputOn([]string{"StoreID"}, "%s", text.DecideStoreRequired())
-			}
 			if !slices.Contains(seller.SeverityValues(), seller.Severity(in.Severity)) {
 				return in, apperr.InvalidInputOn([]string{"Severity"}, "%s", text.DecideSeverityInvalid())
 			}
-		} else if in.StoreID != 0 || in.Severity != "" {
+		} else if in.Severity != "" {
 			return in, apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideStoreOnlyTakedown())
 		}
 	default:
@@ -104,6 +106,7 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 		return model.CaseDetail{}, err
 	}
 	var out model.CaseDetail
+	var res applied
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		row, err := q.GetCase(ctx, in.CaseID)
@@ -121,11 +124,14 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 			if !in.Action.AllowedOn(c.Target.Kind) {
 				return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionNotForTarget())
 			}
-			if err := s.apply(ctx, q, c, in); err != nil {
+			if err := s.apply(ctx, q, c, in, &res); err != nil {
 				return err
 			}
 		}
-		if err := s.close(ctx, q, in); err != nil {
+		if err := s.close(ctx, q, in, res.measureID); err != nil {
+			return err
+		}
+		if err := s.audit(ctx, c, in, res); err != nil {
 			return err
 		}
 		out, err = view.Detail(ctx, q, in.CaseID)
@@ -134,11 +140,28 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 	return out, err
 }
 
+// audit 在結案的同一個 transaction 寫後台動作紀錄：決定、處置與類別（不放理由文字）。
+func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput, res applied) error {
+	detail := map[string]any{"decision": string(in.Decision), "target_kind": string(c.Target.Kind), "version": in.Version}
+	if in.Decision == model.DecisionViolation {
+		detail["action"] = string(in.Action)
+		detail["category"] = string(in.Category)
+		if in.Action == model.ActionTakedown {
+			detail["store_id"] = res.storeID
+			detail["measure_id"] = res.measureID.String()
+			detail["severity"] = in.Severity
+		}
+	}
+	return s.d.Audit.Record(ctx, adminaudit.Entry{
+		Actor: in.Actor, TargetType: "moderation_case", TargetID: in.CaseID.String(), Detail: detail,
+	})
+}
+
 // close 是最後一步：結案轉移。
-func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput) error {
+func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput, measureID *uuid.UUID) error {
 	now := s.d.Now().UTC()
 	p := store.CloseCaseParams{
-		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.AdminID, ClosedAt: &now,
+		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.Actor.AdminID, ClosedAt: &now, MeasureID: measureID,
 	}
 	if in.Decision == model.DecisionViolation {
 		p.DecisionCategory, p.DecisionAction = ptr(string(in.Category)), ptr(string(in.Action))
@@ -155,10 +178,17 @@ func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideIn
 
 func ptr[T any](v T) *T { return &v }
 
+// applied 是處置的結果：內容下架時快照的店家與建立的措施（其他處置是零值）。
+type applied struct {
+	storeID   int64
+	measureID *uuid.UUID
+	frozen    *snapshot.Content
+}
+
 // apply 呼叫擁有處分的模組建立處分。
-func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput) error {
+func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput, res *applied) error {
 	ref := SourceRefPrefix + c.ID.String()
-	author, owner, err := s.author(ctx, q, c)
+	author, owner, err := s.author(ctx, q, c, res)
 	if err != nil {
 		return err
 	}
@@ -172,14 +202,14 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 		}
 		_, err := s.d.Social.Hide(ctx, social.HideInput{
 			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
-			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.AdminID,
+			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID,
 		})
 		return err
 	case model.ActionWarn:
 		if author.Kind != social.ActorBuyer {
 			return apperr.FailedPrecondition("%s", text.DecideWarnNotBuyer())
 		}
-		_, err := s.d.Social.Warn(ctx, social.WarnInput{BuyerID: author.ID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.AdminID})
+		_, err := s.d.Social.Warn(ctx, social.WarnInput{BuyerID: author.ID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID})
 		return err
 	case model.ActionBan:
 		if author.Kind != social.ActorBuyer {
@@ -192,14 +222,14 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 		_, err = s.d.Suspension.Suspend(ctx, accountID, accountsuspension.Record{Category: in.Category, Reason: in.Text, SourceRef: ref})
 		return err
 	case model.ActionTakedown:
-		return s.takedown(ctx, q, c, owner, in)
+		return s.takedown(ctx, q, c, owner, in, res)
 	}
 	return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 }
 
 // author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，
 // 所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；隱藏的目的（內容不可見）已達成，由呼叫端視為成功。
-func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (social.Actor, social.ContentOwner, error) {
+func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, res *applied) (social.Actor, social.ContentOwner, error) {
 	t := c.Target
 	if t.Kind == model.TargetBuyer {
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
@@ -211,24 +241,64 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case) (s
 	if owner.Exists {
 		return owner.Author, owner, nil
 	}
-	body, err := q.LatestSnapshotContent(ctx, c.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return social.Actor{}, social.ContentOwner{}, apperr.FailedPrecondition("%s", text.DecideSnapshotMissing())
-	}
+	frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
 	if err != nil {
-		return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：讀取案件 %s 的快照：%w", c.ID, err)
-	}
-	frozen, err := snapshot.Decode(body)
-	if err != nil {
-		return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", c.ID, err)
+		return social.Actor{}, social.ContentOwner{}, err
 	}
 	author := social.Actor{Kind: social.ActorKind(frozen.AuthorKind), ID: frozen.AuthorID}
 	return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID}, nil
 }
 
-func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, owner social.ContentOwner, in model.DecideInput) error {
-	if owner.Author.Kind != social.ActorStore || owner.Author.ID != in.StoreID || owner.StoreID != in.StoreID {
+// snapshotReader 是讀案件快照的查詢（*store.Queries）。
+type snapshotReader interface {
+	LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (string, error)
+}
+
+// frozenContent 讀案件最近一份凍結的內容，一次處理只讀一次；沒有快照回 FailedPrecondition，句子由呼叫端依情境給。
+func (a *applied) frozenContent(ctx context.Context, q snapshotReader, caseID uuid.UUID, missing func() uitext.Message) (snapshot.Content, error) {
+	if a.frozen != nil {
+		return *a.frozen, nil
+	}
+	body, err := q.LatestSnapshotContent(ctx, caseID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return snapshot.Content{}, apperr.FailedPrecondition("%s", missing())
+	}
+	if err != nil {
+		return snapshot.Content{}, fmt.Errorf("moderation：讀取案件 %s 的快照：%w", caseID, err)
+	}
+	frozen, err := snapshot.Decode(body)
+	if err != nil {
+		return snapshot.Content{}, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", caseID, err)
+	}
+	a.frozen = &frozen
+	return frozen, nil
+}
+
+// CheckTakedownStore 檢查內容的作者與歸屬都是快照凍結的店家（內容還在時 owner 是 social 現在的答案，已刪除時是快照本身）。
+func CheckTakedownStore(owner social.ContentOwner, frozenStoreID int64) error {
+	if frozenStoreID <= 0 || owner.Author.Kind != social.ActorStore || owner.Author.ID != frozenStoreID || owner.StoreID != frozenStoreID {
 		return apperr.FailedPrecondition("%s", text.DecideTakedownWrongStore())
+	}
+	return nil
+}
+
+func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, owner social.ContentOwner, in model.DecideInput, res *applied) error {
+	frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideTakedownSnapshotMissing)
+	if err != nil {
+		return err
+	}
+	storeID := frozen.StoreID
+	if err := CheckTakedownStore(owner, storeID); err != nil {
+		return err
+	}
+	ref := seller.ContentRef{Kind: seller.ContentKind(c.Target.Kind), ID: c.Target.ContentID}
+	// 內容已在生效中的下架措施之下（例如後台貼文頁先下架）：不再建第二個措施（恢復時只撤銷一個、內容仍下架），案件綁定既有措施並結案；
+	// 這個案件的檢舉不另外產生認定（認定隨措施建立，既有措施的處分已經涵蓋這則內容）。
+	if existing, err := s.d.Seller.ActiveTakedownOfContent(ctx, ref); err != nil {
+		return err
+	} else if existing != nil {
+		res.storeID, res.measureID = storeID, existing
+		return nil
 	}
 	// 引用最早的 MaxSourceReports 筆，備註寫真正的檢舉數。檢舉集合在結案的版本比對下才算定案：這之後掛進來的檢舉會讓版本加一，結案回 VersionConflict、處置整個回滾。
 	ids, err := q.ReportIDsOfCase(ctx, store.ReportIDsOfCaseParams{CaseID: c.ID, MaxRows: model.MaxSourceReports})
@@ -239,16 +309,37 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
-	_, err = s.d.Seller.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
-		AdminID:           in.AdminID,
-		StoreID:           in.StoreID,
+	sn, err := measureSnapshot(c.Target.Kind, storeID, frozen)
+	if err != nil {
+		return err
+	}
+	created, err := s.d.Seller.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
+		AdminID:           in.Actor.AdminID,
+		StoreID:           storeID,
 		Kind:              seller.MeasureContentTakedown,
 		StatementToSeller: in.Text,
 		Note:              "moderation 案件 " + c.ID.String() + "（" + strconv.FormatInt(total, 10) + " 筆來源檢舉）",
 		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{
 			Category: in.Category, Severity: seller.Severity(in.Severity), SourceModerationReportIDs: ids,
 		}},
-		Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{{Kind: seller.ContentKind(c.Target.Kind), ID: c.Target.ContentID}}},
+		Takedown: &seller.ContentTakedown{Contents: []seller.TakedownContent{{ContentRef: ref, Snapshot: &sn}}},
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	res.storeID, res.measureID = storeID, &created.Measure.ID
+	return nil
+}
+
+// measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
+// 這裡只解析凍結的字串 id。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
+func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
+	post, _ := uuid.Parse(f.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
+	thread, _ := uuid.Parse(f.ThreadID) // 同上
+	k := seller.ContentKind(kind)
+	sn := seller.NewContentSnapshot(k, f.Body, f.AuthoredAt, len(f.MediaRefs), storeID, post, thread)
+	if err := seller.ValidateContentSnapshot(k, sn); err != nil {
+		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
+	}
+	return sn, nil
 }

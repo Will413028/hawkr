@@ -268,6 +268,10 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 				return err
 			}
 		}
+		// 內容下架措施留著的內容快照（本文與連結，A7-D29）跟著店家退場清空，不論措施是否撤銷、是否滿 184 天。
+		if _, err := q.ClearContentSnapshotsOfStores(ctx, purged); err != nil {
+			return err
+		}
 		// 入駐同意紀錄的來源 IP 與 User-Agent 是連線紀錄，清掉；種類、版本、時間、帳號與送出保留（審核的事實）。
 		if _, err := q.PurgeAgreementSources(ctx, store.PurgeAgreementSourcesParams{StoreIds: purged, Now: &now}); err != nil {
 			return err

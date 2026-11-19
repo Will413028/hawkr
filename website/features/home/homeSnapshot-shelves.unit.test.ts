@@ -27,7 +27,7 @@ const bootstrap = (
 	hotProducts: [],
 	products: { data: { records } },
 	recommendedSellers: [],
-	posts: { page: 1, pageSize: 8, total: 0, records: [] },
+	posts: { pageSize: 8, nextPageToken: "", records: [] },
 	categoryGroups,
 });
 

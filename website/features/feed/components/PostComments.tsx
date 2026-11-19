@@ -1,28 +1,47 @@
 "use client";
 
+import { Code, ConnectError } from "@connectrpc/connect";
+import { errorText } from "@hawkr/api/connect/errors";
 import { gsap } from "gsap";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
-import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
-import { useAuth } from "@/lib/auth/context";
-import { formatTaipeiShortDate } from "@/lib/date/taipei";
 import {
-	snapshotToComment,
-	useCommentReplies,
-	usePostComments,
-} from "@/lib/hooks/useSocial";
+	CommentEditor,
+	CommentEntryActions,
+	CommentErrorBox,
+} from "@/features/feed/components/CommentEntryParts";
+import type { PostViewerState } from "@/lib/api/openapi-types";
+import { useAuth } from "@/lib/auth/context";
 import {
 	type Comment,
-	createReply,
 	deleteComment,
-	toggleCommentLike,
+	setCommentLiked,
 	updateComment,
-} from "@/lib/social/repo";
-import { subscribeCommentEvents } from "@/lib/sse/commentEventBus";
-import { canDeleteComment, canEditComment } from "./commentPermissions";
+} from "@/lib/comments/repo";
+import { formatTaipeiShortDate } from "@/lib/date/taipei";
+import {
+	useCommentReplies,
+	usePostComments,
+	usePostViewerState,
+} from "@/lib/hooks/useSocial";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { blockBuyerByComment } from "@/lib/seller/block-buyer";
+import {
+	canBlockCommentAuthor,
+	canComposeComment,
+	canDeleteComment,
+	canEditComment,
+	canReplyToComment,
+	storeActorName,
+} from "./commentPermissions";
+
+function isNotFound(error: unknown): boolean {
+	return ConnectError.from(error).code === Code.NotFound;
+}
 
 function formatTime(unixSeconds: number): string {
 	if (!unixSeconds) return "";
@@ -100,15 +119,17 @@ function highlightComment(el: HTMLElement) {
 }
 
 interface PostCommentsProps {
-	postId: number | string;
+	postId: string;
 	/**
-	 * Grant the current viewer post-owner moderation rights — show 刪除 on
-	 * every comment / reply (not just one's own), matching the backend's
-	 * "own comment OR post owner" DELETE permission. Seller-side surfaces
-	 * (e.g. the seller-center post viewer) set this true; buyer surfaces
-	 * leave it false so a buyer can still only remove their own comments.
+	 * 這則貼文依觀看者算的留言權限與身分（`Post.viewer_can_comment`、`viewer_actor`）。貼文已經是依觀看者讀的
+	 * （賣家中心的店主清單）時傳進來；不傳就由元件向伺服器讀單篇。
 	 */
-	canModerate?: boolean;
+	viewer?: PostViewerState;
+	/**
+	 * 賣家中心的留言區：別人寫的、店家能刪的留言多一個「封鎖此人」（呼叫賣家的 `BlockBuyer`）。
+	 * 公開頁不傳：封鎖名單屬於店家的賣家中心。
+	 */
+	allowBlockAuthor?: boolean;
 	/**
 	 * Whether the comment SSE stream should be open for this post. Single-
 	 * post surfaces (bottom sheet, seller post modal) leave the default
@@ -118,9 +139,9 @@ interface PostCommentsProps {
 	active?: boolean;
 }
 
-/** Avatar shown next to a composer (new comment / reply). On the seller
- *  surface this is the store logo so it's clear the reply comes from the
- *  shop; on buyer surfaces it's the member's own avatar. */
+/** Avatar shown next to a composer (new comment / reply). It follows the
+ *  server's `viewer_actor`: the store logo when the viewer comments as the
+ *  shop, otherwise the member's own avatar. */
 type ComposerAvatar = {
 	src?: string | null;
 	alt: string;
@@ -129,24 +150,21 @@ type ComposerAvatar = {
 
 /** Inline reply composer shown under a comment when the viewer taps 回覆. */
 function ReplyComposer({
-	postId,
-	parentId,
-	replyToId,
-	replyToName,
+	placeholder,
 	avatar,
-	onSent,
+	onSubmit,
 	onCancel,
 }: {
-	postId: number | string;
-	parentId: number | string;
-	replyToId: number | string;
-	replyToName?: string;
+	/** 提示字：店家身分時是「以「店名」身分回覆…」，否則依被回覆者。 */
+	placeholder: string;
 	avatar: ComposerAvatar;
-	onSent: (created: Comment) => void;
+	onSubmit: (content: string) => Promise<void>;
 	onCancel: () => void;
 }) {
+	const defaultErrors = useDefaultErrorText();
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
+	const [error, setError] = React.useState<string | null>(null);
 	const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
 	React.useEffect(() => {
@@ -157,28 +175,12 @@ function ReplyComposer({
 		const content = draft.trim();
 		if (!content || submitting) return;
 		setSubmitting(true);
+		setError(null);
 		try {
-			// `createReply` already returns a normalised `Comment` (the repo
-			// runs the response through `mapServerComment`), so we can hand it
-			// straight to the parent — no optimistic merge needed. Fill in the
-			// replyToName display hint if the backend didn't echo it back.
-			const clientRequestId =
-				typeof crypto !== "undefined" && "randomUUID" in crypto
-					? crypto.randomUUID()
-					: `cri-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-			// 回覆走專屬 replies 端點（parent 在 path），postId/replyToId 為 TSID
-			// 一律以 string 傳；留言身分由伺服器依貼文歸屬決定。
-			const created = await createReply(parentId, {
-				content,
-				postId: postId,
-				replyToId: replyToId,
-				clientRequestId,
-			});
+			await onSubmit(content);
 			setDraft("");
-			onSent({
-				...created,
-				replyToName: created.replyToName ?? replyToName,
-			});
+		} catch (e) {
+			setError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -222,10 +224,11 @@ function ReplyComposer({
 					value={draft}
 					onChange={(e) => setDraft(e.target.value)}
 					onKeyDown={onKeyDown}
-					placeholder={replyToName ? `回覆 ${replyToName}…` : "寫下你的回覆…"}
+					placeholder={placeholder}
 					rows={1}
 					maxLength={500}
 				/>
+				{error ? <CommentErrorBox>{error}</CommentErrorBox> : null}
 				<div className="flex gap-[var(--hkui-space-2)] self-end">
 					<Button
 						type="button"
@@ -251,22 +254,75 @@ function ReplyComposer({
 	);
 }
 
+/** 送出中或伺服器那份還不在已載入頁的留言與回覆：只顯示，沒有任何操作。 */
+function OptimisticCommentRow({
+	comment,
+	variant,
+}: {
+	comment: Comment;
+	variant: "comment" | "reply";
+}) {
+	const isReply = variant === "reply";
+	return (
+		<li
+			className={`flex ${isReply ? "gap-[var(--hkui-space-2)]" : "gap-[var(--hkui-space-3)]"}`}
+			data-comment-anchor={comment.id}
+			data-comment-optimistic
+		>
+			<span
+				className={`block ${isReply ? "w-7 h-7" : "w-9 h-9"} shrink-0 rounded-full overflow-hidden bg-[var(--hkui-default-100)]`}
+			>
+				<Avatar
+					src={comment.avatarKey}
+					alt={comment.userName}
+					entity="buyer"
+					className="w-full h-full object-cover"
+					fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
+					fallback="empty"
+				/>
+			</span>
+			<div className="flex-1 min-w-0">
+				<header className="flex items-baseline gap-[var(--hkui-space-2)]">
+					<strong className="text-[length:var(--hkui-text-small)] font-semibold">
+						{comment.userName}
+					</strong>
+					<small className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
+						{formatTime(comment.createdAt)}
+					</small>
+				</header>
+				<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
+					{isReply && comment.replyToName ? (
+						<span className="text-[var(--hkui-foreground-soft)] mr-1">
+							@{comment.replyToName}
+						</span>
+					) : null}
+					{comment.content}
+				</p>
+			</div>
+		</li>
+	);
+}
+
 /** A reply row under a parent comment — same layout as CommentItem but tighter,
  *  no nested replies (we only render one thread level deep). */
 function ReplyItem({
 	reply,
-	canModerate,
 	onRemoved,
+	onBlockAuthor,
+	blockBusy = false,
 }: {
 	reply: Comment;
-	canModerate: boolean;
-	onRemoved: (id: number | string) => void;
+	onRemoved: (id: string) => void;
+	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
 	// Local content mirror — optimistic edit shows immediately, refresh from
 	// parent list will overwrite if backend differs.
 	const [content, setContent] = React.useState(reply.content);
+	// 修改成功後伺服器換新版本：之後的修改與刪除要帶新的 etag。
+	const [etag, setEtag] = React.useState(reply.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -274,17 +330,15 @@ function ReplyItem({
 		"like" | "unlike" | null
 	>(null);
 	const [deleting, setDeleting] = React.useState(false);
+	const [rowError, setRowError] = React.useState<string | null>(null);
+	const defaultErrors = useDefaultErrorText();
 	const likePendingRef = React.useRef(false);
 	const deletePendingRef = React.useRef(false);
-	const editTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
-	React.useEffect(() => {
-		if (editing) editTextareaRef.current?.focus();
-	}, [editing]);
-
-	const canDelete = canDeleteComment(reply.isMine, canModerate);
-	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(reply.isMine);
+	const live = reply.state === "visible";
+	const canDelete = live && canDeleteComment(reply);
+	const canEdit = live && canEditComment(reply);
+	const canBlock = live && onBlockAuthor && canBlockCommentAuthor(reply);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -294,7 +348,7 @@ function ReplyItem({
 		setLiked(!wasLiked);
 		setLikeCount((c) => c + (wasLiked ? -1 : 1));
 		try {
-			const r = await toggleCommentLike(reply.id, wasLiked);
+			const r = await setCommentLiked(reply.id, !wasLiked);
 			setLiked(r.liked);
 		} catch {
 			setLiked(wasLiked);
@@ -310,11 +364,12 @@ function ReplyItem({
 		if (!window.confirm("刪除這則回覆？")) return;
 		deletePendingRef.current = true;
 		setDeleting(true);
+		setRowError(null);
 		try {
-			await deleteComment(reply.id);
+			await deleteComment(reply.id, etag);
 			onRemoved(reply.id);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "刪除失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			deletePendingRef.current = false;
 			setDeleting(false);
@@ -323,12 +378,14 @@ function ReplyItem({
 
 	const startEdit = () => {
 		setEditDraft(content);
+		setRowError(null);
 		setEditing(true);
 	};
 
 	const cancelEdit = () => {
 		setEditing(false);
 		setEditDraft("");
+		setRowError(null);
 	};
 
 	const submitEdit = async () => {
@@ -339,24 +396,16 @@ function ReplyItem({
 			return;
 		}
 		setSavingEdit(true);
+		setRowError(null);
 		try {
-			const updated = await updateComment(reply.id, next);
+			const updated = await updateComment(reply.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
 			setEditing(false);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "編輯失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			setSavingEdit(false);
-		}
-	};
-
-	const onEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			void submitEdit();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			cancelEdit();
 		}
 	};
 
@@ -385,38 +434,14 @@ function ReplyItem({
 					</small>
 				</header>
 				{editing ? (
-					<div className="flex flex-col gap-[var(--hkui-space-2)] mt-1">
-						<textarea
-							ref={editTextareaRef}
-							className="w-full border border-divider rounded-hkui-md py-2 px-3 bg-content1 min-h-10 resize-none focus:outline-none focus:border-hkui-primary [font-family:inherit] [font-weight:inherit] leading-5 text-[length:var(--hkui-text-small)]"
-							value={editDraft}
-							onChange={(e) => setEditDraft(e.target.value)}
-							onKeyDown={onEditKeyDown}
-							rows={1}
-							maxLength={500}
-						/>
-						<div className="flex gap-[var(--hkui-space-2)] self-end">
-							<Button
-								type="button"
-								variant="bordered"
-								color="default"
-								size="sm"
-								onClick={cancelEdit}
-							>
-								取消
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={!editDraft.trim() || savingEdit}
-								isLoading={savingEdit}
-								loadingLabel="儲存回覆中…"
-								onClick={() => void submitEdit()}
-							>
-								儲存
-							</Button>
-						</div>
-					</div>
+					<CommentEditor
+						draft={editDraft}
+						onDraftChange={setEditDraft}
+						onSubmit={() => void submitEdit()}
+						onCancel={cancelEdit}
+						saving={savingEdit}
+						saveLoadingLabel="儲存回覆中…"
+					/>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
 						{reply.replyToName ? (
@@ -427,51 +452,46 @@ function ReplyItem({
 						{content}
 					</p>
 				)}
+				{rowError ? (
+					<CommentErrorBox className="my-1">{rowError}</CommentErrorBox>
+				) : null}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={liked}
-						/* Liked reds come from `text-hk-like`, not `color="danger"` —
-						   danger is 柿橘 orange and is the error role. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only: `handleLike` flips the shared heart before
-						   the request and rolls back on failure; `likePendingRef` drops
-						   overlapping taps, so the fill animation is the feedback. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={liked} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{likeCount}</span>
-					</Button>
-					{canEdit && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
-							disabled={likePendingAction !== null || deleting}
-							onClick={startEdit}
-						>
-							編輯
-						</button>
-					)}
-					{canDelete && !editing && (
+					{live ? (
 						<Button
 							type="button"
 							variant="light"
-							color="danger"
+							color="default"
 							size="sm"
-							className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] font-normal text-[var(--hkui-foreground-soft)]"
-							disabled={likePendingAction !== null}
-							isLoading={deleting}
-							loadingLabel="刪除回覆中…"
-							onClick={() => void handleDelete()}
+							aria-pressed={liked}
+							/* Liked reds come from `text-hk-like`, not `color="danger"` —
+						   danger is 柿橘 orange and is the error role. */
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only: `handleLike` flips the shared heart before
+						   the request and rolls back on failure; `likePendingRef` drops
+						   overlapping taps, so the fill animation is the feedback. */
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
 						>
-							刪除
+							<AppIcon name="heart" fill={liked} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{likeCount}</span>
 						</Button>
+					) : null}
+					{!editing && (
+						<CommentEntryActions
+							canEdit={canEdit}
+							canDelete={canDelete}
+							canBlock={Boolean(canBlock)}
+							editDisabled={likePendingAction !== null || deleting}
+							deleteDisabled={likePendingAction !== null}
+							blockDisabled={deleting || blockBusy}
+							deleting={deleting}
+							deleteLoadingLabel="刪除回覆中…"
+							onEdit={startEdit}
+							onDelete={() => void handleDelete()}
+							onBlock={() => void onBlockAuthor?.(reply)}
+						/>
 					)}
 				</footer>
 			</div>
@@ -483,31 +503,34 @@ function ReplyItem({
 function CommentItem({
 	comment,
 	postId,
-	canModerate,
-	signedIn,
+	replyPlaceholder,
 	composerAvatar,
 	onLike,
 	onRemove,
+	onEdited,
+	onBlockAuthor,
+	blockBusy = false,
 }: {
 	comment: Comment;
-	postId: number | string;
-	canModerate: boolean;
-	signedIn: boolean;
+	postId: string;
+	/** 店家身分時的回覆提示字；不是店家身分時是 undefined，改用依被回覆者的提示。 */
+	replyPlaceholder?: string;
 	composerAvatar: ComposerAvatar;
-	onLike: (id: number | string) => Promise<void>;
-	onRemove: (id: number | string) => Promise<void>;
+	onLike: (id: string) => Promise<void>;
+	onRemove: (id: string) => Promise<void>;
+	onEdited: (updated: Comment) => void;
+	onBlockAuthor?: (comment: Comment) => Promise<void>;
+	blockBusy?: boolean;
 }) {
-	const replies = useCommentReplies(comment.id);
+	const tFeed = useTranslations("feed.comments");
+	const defaultErrors = useDefaultErrorText();
+	const replies = useCommentReplies(postId, comment.id, comment.userName);
 	const [replyOpen, setReplyOpen] = React.useState(false);
-	// Local mirror of replyCount so it bumps the moment we send a reply
-	// without waiting for the parent list to refetch.
-	const [replyCount, setReplyCount] = React.useState(comment.replyCount ?? 0);
-	// Optimistic replies appended after a successful send; useCommentReplies'
-	// internal `items` is updated on refresh / expand, so we keep our own
-	// list to merge with its load.
-	const [pendingReplies, setPendingReplies] = React.useState<Comment[]>([]);
+	const replyCount = comment.replyCount ?? 0;
+	const [rowError, setRowError] = React.useState<string | null>(null);
 	// Local content mirror — optimistic edit shows immediately
 	const [content, setContent] = React.useState(comment.content);
+	const [etag, setEtag] = React.useState(comment.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
 	const [savingEdit, setSavingEdit] = React.useState(false);
@@ -517,49 +540,12 @@ function CommentItem({
 	const [deleting, setDeleting] = React.useState(false);
 	const likePendingRef = React.useRef(false);
 	const deletePendingRef = React.useRef(false);
-	const editTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
-	React.useEffect(() => {
-		if (editing) editTextareaRef.current?.focus();
-	}, [editing]);
-
-	/* ── SSE reply inline sync ───────────────────────────────────────────
-	 * `usePostComments` already bumps our `replyCount` on `comment.replied`
-	 * for any post the realtime stream is open on (see
-	 * `useSocial.ts::handleReplied`). It also publishes the reply snapshot
-	 * to the per-postId comment bus so we can splice the new row into our
-	 * thread state without waiting for the user to collapse + re-expand.
-	 * Dedup by id against both the REST-loaded thread (`replies.items`) and
-	 * the local pending mirror — covers all three orderings of
-	 *   (a) own ReplyComposer onSent → SSE echo,
-	 *   (b) SSE echo → own onSent,
-	 *   (c) cross-tab peer reply.
-	 *
-	 * `replies.items` lives in a ref so the bus subscription survives a
-	 * thread expand / refresh (which mutates `items`) without re-binding —
-	 * an in-flight reply event during the resubscribe window would
-	 * otherwise be silently dropped.
-	 */
-	const replyItemsRef = React.useRef(replies.items);
-	replyItemsRef.current = replies.items;
-	React.useEffect(() => {
-		const myCommentId = String(comment.id);
-		return subscribeCommentEvents(postId, (event) => {
-			if (event.kind !== "reply_arrived") return;
-			if (event.parentCommentId !== myCommentId) return;
-			const replyId = event.reply.commentId;
-			setPendingReplies((prev) => {
-				if (prev.some((r) => String(r.id) === replyId)) return prev;
-				if (replyItemsRef.current.some((r) => String(r.id) === replyId))
-					return prev;
-				return [...prev, snapshotToComment(event.reply)];
-			});
-		});
-	}, [postId, comment.id]);
-
-	const canDelete = canDeleteComment(comment.isMine, canModerate);
-	// 編輯只開放給作者本人 — post owner 可刪不能改別人內容
-	const canEdit = canEditComment(comment.isMine);
+	const live = comment.state === "visible";
+	const canDelete = live && canDeleteComment(comment);
+	const canEdit = live && canEditComment(comment);
+	const canReply = live && canReplyToComment(comment);
+	const canBlock = live && onBlockAuthor && canBlockCommentAuthor(comment);
 
 	const handleLike = async () => {
 		if (likePendingRef.current || deletePendingRef.current) return;
@@ -578,8 +564,11 @@ function CommentItem({
 		if (!window.confirm("刪除這則留言？")) return;
 		deletePendingRef.current = true;
 		setDeleting(true);
+		setRowError(null);
 		try {
 			await onRemove(comment.id);
+		} catch (e) {
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			deletePendingRef.current = false;
 			setDeleting(false);
@@ -588,12 +577,14 @@ function CommentItem({
 
 	const startEdit = () => {
 		setEditDraft(content);
+		setRowError(null);
 		setEditing(true);
 	};
 
 	const cancelEdit = () => {
 		setEditing(false);
 		setEditDraft("");
+		setRowError(null);
 	};
 
 	const submitEdit = async () => {
@@ -604,65 +595,30 @@ function CommentItem({
 			return;
 		}
 		setSavingEdit(true);
+		setRowError(null);
 		try {
-			const updated = await updateComment(comment.id, next);
+			const updated = await updateComment(comment.id, next, etag ?? "");
+			setEtag(updated.etag);
 			setContent(updated.content || next);
+			onEdited(updated);
 			setEditing(false);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "編輯失敗");
+			setRowError(errorText(e, defaultErrors));
 		} finally {
 			setSavingEdit(false);
 		}
 	};
 
-	const onEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-			e.preventDefault();
-			void submitEdit();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			cancelEdit();
-		}
-	};
-
-	const handleReplySent = (created: Comment) => {
-		// Dedup: the SSE bus may deliver the same reply (server-echoed) before
-		// REST resolves. Whichever path runs first wins; the second one finds
-		// the id already in pending and short-circuits, so we never double-
-		// insert. Also check `replies.items` for the late-REST case where the
-		// thread was refreshed in the same window.
-		setPendingReplies((prev) => {
-			const id = String(created.id);
-			if (prev.some((r) => String(r.id) === id)) return prev;
-			if (replies.items.some((r) => String(r.id) === id)) return prev;
-			return [...prev, created];
+	const sendReply = async (content: string) => {
+		await replies.reply(content, {
+			replyToId: comment.id,
+			replyToName: comment.userName,
+			authorName: composerAvatar.alt,
+			authorAvatar: composerAvatar.src ?? undefined,
 		});
-		setReplyCount((c) => c + 1);
 		setReplyOpen(false);
-		if (!replies.open) void replies.expand();
+		if (!replies.open) replies.expand();
 	};
-
-	const handleReplyRemoved = (replyId: number | string) => {
-		setPendingReplies((prev) =>
-			prev.filter((r) => String(r.id) !== String(replyId)),
-		);
-		setReplyCount((c) => Math.max(0, c - 1));
-		void replies.refresh();
-	};
-
-	// Merge backend-loaded replies with our optimistic ones, de-duped by id.
-	const mergedReplies = React.useMemo(() => {
-		const seen = new Set<string>();
-		const all: Comment[] = [];
-		for (const r of replies.items) {
-			seen.add(String(r.id));
-			all.push(r);
-		}
-		for (const r of pendingReplies) {
-			if (!seen.has(String(r.id))) all.push(r);
-		}
-		return all;
-	}, [replies.items, pendingReplies]);
 
 	return (
 		<li
@@ -670,81 +626,72 @@ function CommentItem({
 			data-comment-anchor={String(comment.id)}
 		>
 			<span className="block w-9 h-9 shrink-0 rounded-full overflow-hidden bg-[var(--hkui-default-100)]">
-				<Avatar
-					src={comment.avatarKey}
-					alt={comment.userName}
-					entity="buyer"
-					className="w-full h-full object-cover"
-					fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
-					fallback="empty"
-				/>
+				{live ? (
+					<Avatar
+						src={comment.avatarKey}
+						alt={comment.userName}
+						entity="buyer"
+						className="w-full h-full object-cover"
+						fallbackClassName="block w-full h-full bg-[var(--hkui-primary-100)]"
+						fallback="empty"
+					/>
+				) : null}
 			</span>
 			<div className="flex-1 min-w-0">
 				<header className="flex items-baseline gap-[var(--hkui-space-2)]">
-					<strong className="text-[length:var(--hkui-text-small)] font-semibold">
-						{comment.userName}
-					</strong>
+					{live ? (
+						<strong className="text-[length:var(--hkui-text-small)] font-semibold">
+							{comment.userName}
+						</strong>
+					) : null}
 					<small className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 						{formatTime(comment.createdAt)}
 					</small>
 				</header>
 				{editing ? (
-					<div className="flex flex-col gap-[var(--hkui-space-2)] mt-1">
-						<textarea
-							ref={editTextareaRef}
-							className="w-full border border-divider rounded-hkui-md py-2 px-3 bg-content1 min-h-10 resize-none focus:outline-none focus:border-hkui-primary [font-family:inherit] [font-weight:inherit] leading-5 text-[length:var(--hkui-text-small)]"
-							value={editDraft}
-							onChange={(e) => setEditDraft(e.target.value)}
-							onKeyDown={onEditKeyDown}
-							rows={1}
-							maxLength={500}
-						/>
-						<div className="flex gap-[var(--hkui-space-2)] self-end">
-							<Button
-								type="button"
-								variant="bordered"
-								color="default"
-								size="sm"
-								onClick={cancelEdit}
-							>
-								取消
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={!editDraft.trim() || savingEdit}
-								isLoading={savingEdit}
-								loadingLabel="儲存留言中…"
-								onClick={() => void submitEdit()}
-							>
-								儲存
-							</Button>
-						</div>
-					</div>
+					<CommentEditor
+						draft={editDraft}
+						onDraftChange={setEditDraft}
+						onSubmit={() => void submitEdit()}
+						onCancel={cancelEdit}
+						saving={savingEdit}
+						saveLoadingLabel="儲存留言中…"
+					/>
 				) : (
 					<p className="my-1 text-[length:var(--hkui-text-small)] leading-[var(--hkui-line-medium)] whitespace-pre-wrap break-words">
-						{content}
+						{live
+							? content
+							: comment.state === "deleted"
+								? tFeed("deleted")
+								: comment.state === "hidden"
+									? tFeed("hidden")
+									: null}
 					</p>
 				)}
+				{rowError ? (
+					<CommentErrorBox className="my-1">{rowError}</CommentErrorBox>
+				) : null}
 				<footer className="flex flex-wrap gap-[var(--hkui-space-3)] mt-1">
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						aria-pressed={comment.isLiked === true}
-						/* See the reply row's note — liked red is `text-hk-like`. */
-						className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
-						disabled={deleting}
-						/* Optimistic-only — see the reply row's note above. */
-						aria-busy={likePendingAction !== null || undefined}
-						onClick={() => void handleLike()}
-					>
-						<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
-						<span className="sr-only">按讚</span>
-						<span>{comment.likeCount ?? 0}</span>
-					</Button>
-					{signedIn && !editing && (
+					{live ? (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							aria-pressed={comment.isLiked === true}
+							/* See the reply row's note — liked red is `text-hk-like`. */
+							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
+							disabled={deleting}
+							/* Optimistic-only — see the reply row's note above. */
+							aria-busy={likePendingAction !== null || undefined}
+							onClick={() => void handleLike()}
+						>
+							<AppIcon name="heart" fill={comment.isLiked === true} size={16} />
+							<span className="sr-only">按讚</span>
+							<span>{comment.likeCount ?? 0}</span>
+						</Button>
+					) : null}
+					{canReply && !editing && (
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
@@ -771,65 +718,98 @@ function CommentItem({
 							{replies.open ? "收合回覆" : `查看 ${replyCount} 則回覆`}
 						</Button>
 					)}
-					{canEdit && !editing && (
-						<button
-							type="button"
-							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
-							disabled={likePendingAction !== null || deleting}
-							onClick={startEdit}
-						>
-							編輯
-						</button>
-					)}
-					{canDelete && !editing && (
-						<Button
-							type="button"
-							variant="light"
-							color="danger"
-							size="sm"
-							className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] font-normal text-[var(--hkui-foreground-soft)]"
-							disabled={likePendingAction !== null}
-							isLoading={deleting}
-							loadingLabel="刪除留言中…"
-							onClick={() => void handleDelete()}
-						>
-							刪除
-						</Button>
+					{!editing && (
+						<CommentEntryActions
+							canEdit={canEdit}
+							canDelete={canDelete}
+							canBlock={Boolean(canBlock)}
+							editDisabled={likePendingAction !== null || deleting}
+							deleteDisabled={likePendingAction !== null}
+							blockDisabled={deleting || blockBusy}
+							deleting={deleting}
+							deleteLoadingLabel="刪除留言中…"
+							onEdit={startEdit}
+							onDelete={() => void handleDelete()}
+							onBlock={() => void onBlockAuthor?.(comment)}
+						/>
 					)}
 				</footer>
 
 				{replyOpen && (
 					<ReplyComposer
-						postId={postId}
-						parentId={comment.id}
-						replyToId={comment.id}
-						replyToName={comment.userName}
+						placeholder={
+							replyPlaceholder ??
+							(comment.userName
+								? tFeed("replyToName", { name: comment.userName })
+								: tFeed("replyPlaceholder"))
+						}
 						avatar={composerAvatar}
-						onSent={handleReplySent}
+						onSubmit={sendReply}
 						onCancel={() => setReplyOpen(false)}
 					/>
 				)}
 
 				{replies.open && (
 					<ul className="list-none m-0 mt-[var(--hkui-space-3)] pl-[var(--hkui-space-3)] border-l-2 border-[var(--hkui-divider)] flex flex-col gap-[var(--hkui-space-3)]">
-						{replies.loading && mergedReplies.length === 0 ? (
+						{replies.loading &&
+						replies.items.length === 0 &&
+						replies.submitted.length === 0 ? (
 							<li className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 								載入中…
 							</li>
-						) : mergedReplies.length === 0 ? (
+						) : replies.items.length === 0 && replies.submitted.length === 0 ? (
 							<li className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-soft)]">
 								還沒有回覆
 							</li>
 						) : (
-							mergedReplies.map((r) => (
-								<ReplyItem
-									key={r.id}
-									reply={r}
-									canModerate={canModerate}
-									onRemoved={handleReplyRemoved}
-								/>
-							))
+							replies.items.map((r) =>
+								r.optimistic ? (
+									<OptimisticCommentRow
+										key={r.id}
+										comment={r}
+										variant="reply"
+									/>
+								) : (
+									<ReplyItem
+										key={r.id}
+										reply={r}
+										onRemoved={replies.removed}
+										onBlockAuthor={onBlockAuthor}
+										blockBusy={blockBusy}
+									/>
+								),
+							)
 						)}
+						{replies.loadMoreError ? (
+							<li className="list-none">
+								<CommentErrorBox>
+									{errorText(replies.loadMoreError, defaultErrors)}
+								</CommentErrorBox>
+							</li>
+						) : null}
+						{replies.hasMore ? (
+							<li className="list-none">
+								<Button
+									type="button"
+									variant="light"
+									color="primary"
+									size="sm"
+									className="h-auto min-w-0 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)]"
+									isLoading={replies.loadingMore}
+									loadingLabel="載入回覆中…"
+									onClick={() => void replies.loadMore()}
+								>
+									載入更多
+								</Button>
+							</li>
+						) : null}
+						{replies.submitted.map(({ key, comment: submitted }) => (
+							<OptimisticCommentRow
+								key={key}
+								comment={submitted}
+								variant="reply"
+							/>
+						))}
 					</ul>
 				)}
 			</div>
@@ -839,15 +819,28 @@ function CommentItem({
 
 export default function PostComments({
 	postId,
-	canModerate = false,
+	viewer: viewerProp,
+	allowBlockAuthor = false,
 	active = true,
 }: PostCommentsProps) {
 	const { status, identity } = useAuth();
 	const signedIn = status === "signedIn";
-	const sellerIdentity = useSellerIdentity();
+	const t = useTranslations("feed.comments");
+	const tSeller = useTranslations("seller.comments");
+	const fetchedViewer = usePostViewerState(
+		postId,
+		signedIn && viewerProp === undefined,
+	);
+	const viewer = viewerProp ?? fetchedViewer.data;
 	const list = usePostComments(postId, { active });
+	const defaultErrors = useDefaultErrorText();
+	const [blockNotice, setBlockNotice] = React.useState<string | null>(null);
+	const [blockError, setBlockError] = React.useState<string | null>(null);
+	const [blocking, setBlocking] = React.useState(false);
+	const blockingRef = React.useRef(false);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
+	const [submitError, setSubmitError] = React.useState<string | null>(null);
 	const rootRef = React.useRef<HTMLElement | null>(null);
 	const deepLinkDoneRef = React.useRef(false);
 
@@ -887,23 +880,59 @@ export default function PostComments({
 		}, 150);
 		return () => window.clearInterval(timer);
 	}, [postId]);
-	// On the seller surface (canModerate) the viewer replies AS the shop, so
-	// the composer shows the store logo; buyer surfaces show the member avatar.
-	const composerAvatar: ComposerAvatar = canModerate
-		? {
-				src: sellerIdentity.avatar,
-				alt: sellerIdentity.storeName || "賣家",
-				entity: "seller",
+	// 留言身分由伺服器的 `viewer_actor` 決定（店主在自己店的貼文是店家），不看現在在哪個畫面。
+	const actor = viewer?.actor;
+	const storeName = storeActorName(viewer);
+	const composerAvatar: ComposerAvatar =
+		actor?.kind === "store"
+			? {
+					src: actor.avatarKey,
+					alt: storeName ?? "",
+					entity: "seller",
+				}
+			: {
+					src: actor?.avatarKey ?? identity?.avatarKey,
+					alt: actor?.name ?? identity?.nickname ?? t("selfAlt"),
+					entity: "buyer",
+				};
+	const commentPlaceholder = storeName
+		? t("composeAsStore", { storeName })
+		: t("composePlaceholder");
+	const replyPlaceholder = storeName
+		? t("replyAsStore", { storeName })
+		: undefined;
+
+	const blockAuthor = React.useCallback(
+		async (comment: Comment) => {
+			const name = comment.userName;
+			if (
+				!window.confirm(
+					`${tSeller("blockTitle", { name })}\n\n${tSeller("blockDescription")}`,
+				)
+			)
+				return;
+			if (blockingRef.current) return;
+			blockingRef.current = true;
+			setBlocking(true);
+			setBlockNotice(null);
+			setBlockError(null);
+			try {
+				await blockBuyerByComment(comment.id);
+				setBlockNotice(tSeller("blocked", { name }));
+			} catch (e) {
+				setBlockError(errorText(e, defaultErrors));
+			} finally {
+				blockingRef.current = false;
+				setBlocking(false);
 			}
-		: {
-				src: identity?.avatarKey,
-				alt: identity?.nickname || "我",
-				entity: "buyer",
-			};
+		},
+		[tSeller, defaultErrors],
+	);
 
 	const submitDraft = async () => {
 		if (!draft.trim() || submitting) return;
 		setSubmitting(true);
+		setSubmitError(null);
 		try {
 			// optimistic 顯示 composer 的名稱與頭像；留言身分由伺服器決定。
 			await list.post(draft, {
@@ -911,6 +940,8 @@ export default function PostComments({
 				authorAvatar: composerAvatar.src ?? undefined,
 			});
 			setDraft("");
+		} catch (e) {
+			setSubmitError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -936,11 +967,41 @@ export default function PostComments({
 		>
 			<header className="flex justify-between items-center mb-[var(--hkui-space-3)]">
 				<strong className="text-[length:var(--hkui-text-medium)]">
-					留言（{list.comments.length}）
+					留言（{list.comments.length + list.submitted.length}）
 				</strong>
 			</header>
 
-			{signedIn && (
+			{blockNotice ? (
+				<p
+					className="mb-[var(--hkui-space-3)] text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]"
+					role="status"
+				>
+					{blockNotice}
+				</p>
+			) : null}
+
+			{blockError ? (
+				<CommentErrorBox className="my-[var(--hkui-space-3)]">
+					{blockError}
+				</CommentErrorBox>
+			) : null}
+
+			{viewerProp === undefined && signedIn && fetchedViewer.isError ? (
+				<CommentErrorBox className="my-[var(--hkui-space-3)] flex items-center justify-between gap-[var(--hkui-space-3)]">
+					<span>{errorText(fetchedViewer.error, defaultErrors)}</span>
+					<Button
+						variant="bordered"
+						color="default"
+						size="sm"
+						disabled={fetchedViewer.isFetching}
+						onClick={() => void fetchedViewer.refetch()}
+					>
+						重試
+					</Button>
+				</CommentErrorBox>
+			) : null}
+
+			{canComposeComment(signedIn, viewer) && (
 				<form
 					className="flex gap-[var(--hkui-space-3)] items-start mb-[var(--hkui-space-4)]"
 					onSubmit={handleSend}
@@ -951,7 +1012,7 @@ export default function PostComments({
 							value={draft}
 							onChange={(e) => setDraft(e.target.value)}
 							onKeyDown={handleDraftKeyDown}
-							placeholder="寫下你的留言…"
+							placeholder={commentPlaceholder}
 							rows={1}
 							maxLength={500}
 						/>
@@ -969,25 +1030,29 @@ export default function PostComments({
 				</form>
 			)}
 
-			{list.error && !/HTTP\s*404|404|找不到|not\s*found/i.test(list.error) && (
-				<p
-					className="my-[var(--hkui-space-4)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
-					role="alert"
-				>
-					{list.error}
-				</p>
-			)}
+			{submitError ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{submitError}
+				</CommentErrorBox>
+			) : null}
 
-			{/* The SSE client stops for good on rate-limit/cap (design book
-			    §11.6) — without this banner the list just silently froze. */}
-			{list.streamStatus === "unavailable" && (
-				<p
-					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-2)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-warning-50,rgba(216,180,87,0.14))] text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-small)]"
-					role="status"
-				>
-					即時更新暫停中，重新整理頁面可恢復。
-				</p>
-			)}
+			{list.submitted.length > 0 ? (
+				<ul className="list-none m-0 mb-[var(--hkui-space-4)] p-0 flex flex-col gap-[var(--hkui-space-4)]">
+					{list.submitted.map(({ key, comment }) => (
+						<OptimisticCommentRow
+							key={key}
+							comment={comment}
+							variant="comment"
+						/>
+					))}
+				</ul>
+			) : null}
+
+			{list.error != null && !isNotFound(list.error) ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{errorText(list.error, defaultErrors)}
+				</CommentErrorBox>
+			) : null}
 
 			{list.loading && list.comments.length === 0 ? (
 				<p className="my-[var(--hkui-space-4)] text-center text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]">
@@ -1003,20 +1068,32 @@ export default function PostComments({
 				/>
 			) : (
 				<ul className="list-none m-0 p-0 flex flex-col gap-[var(--hkui-space-4)]">
-					{list.comments.map((c) => (
-						<CommentItem
-							key={c.id}
-							comment={c}
-							postId={postId}
-							canModerate={canModerate}
-							signedIn={signedIn}
-							composerAvatar={composerAvatar}
-							onLike={list.like}
-							onRemove={list.remove}
-						/>
-					))}
+					{list.comments.map((c) =>
+						c.optimistic ? (
+							<OptimisticCommentRow key={c.id} comment={c} variant="comment" />
+						) : (
+							<CommentItem
+								key={c.id}
+								comment={c}
+								postId={postId}
+								replyPlaceholder={replyPlaceholder}
+								composerAvatar={composerAvatar}
+								onLike={list.like}
+								onRemove={list.remove}
+								onEdited={list.edited}
+								onBlockAuthor={allowBlockAuthor ? blockAuthor : undefined}
+								blockBusy={blocking}
+							/>
+						),
+					)}
 				</ul>
 			)}
+
+			{list.loadMoreError != null ? (
+				<CommentErrorBox className="my-[var(--hkui-space-4)]">
+					{errorText(list.loadMoreError, defaultErrors)}
+				</CommentErrorBox>
+			) : null}
 
 			{list.hasMore && (
 				<div className="mt-[var(--hkui-space-4)] flex justify-center">

@@ -34,6 +34,9 @@ const mocks = vi.hoisted(() => ({
 	records: [] as unknown[],
 }));
 
+vi.mock("@/lib/hooks/useSellerSelf", () => ({
+	useSellerSelf: () => ({ data: null, loading: false, error: null }),
+}));
 vi.mock("@/lib/hooks/useSellerMeasures", () => ({
 	useSellerMeasures: () => ({
 		records: mocks.records,

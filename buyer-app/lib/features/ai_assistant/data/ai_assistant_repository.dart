@@ -6,6 +6,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/agui_sse.dart';
 import '../../../core/networking/dio_provider.dart';
+import '../../../core/networking/suspension_signal.dart';
+import '../../../core/session/account_restriction.dart';
 import '../../../shared/utils/amount_utils.dart';
 import 'ai_message_model.dart';
 
@@ -48,8 +50,12 @@ enum BuyerAssistantEndpoint {
 }
 
 class AiAssistantRepository {
-  AiAssistantRepository(this._dio);
+  AiAssistantRepository(this._dio, {void Function()? onSuspended})
+    : _onSuspended = onSuspended;
   final Dio _dio;
+
+  /// 送出訊息被停權擋下（403 `ACCOUNT_SUSPENDED`）時呼叫。
+  final void Function()? _onSuspended;
 
   Stream<AiSseEvent> streamChat({
     BuyerAssistantEndpoint endpoint = BuyerAssistantEndpoint.chat,
@@ -88,6 +94,7 @@ class AiAssistantRepository {
       );
 
       if (response.statusCode != 200) {
+        if (await isRestSuspension(response)) _onSuspended?.call();
         controller.addError(
           Exception('AI service error: ${response.statusCode}'),
         );
@@ -177,5 +184,7 @@ List<AiOrderItem> parseOrderListResult(String jsonStr) {
 }
 
 @riverpod
-AiAssistantRepository aiAssistantRepository(Ref ref) =>
-    AiAssistantRepository(ref.watch(dioProvider));
+AiAssistantRepository aiAssistantRepository(Ref ref) => AiAssistantRepository(
+  ref.watch(dioProvider),
+  onSuspended: () => ref.read(accountRestrictionProvider.notifier).rejected(),
+);

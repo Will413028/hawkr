@@ -30,9 +30,9 @@ interface InfiniteFeedProps {
 	/** Public feed opts in; seller storefronts keep their existing eager policy. */
 	progressiveImages?: boolean;
 	initialPage?: number;
-	/** Explicit continuation state for a deep-linked post. It seeds the viewer
-	 * immediately, then lets its existing near-end loader fetch page 1. */
-	initialHasMore?: boolean;
+	/** The page_token after `initialPosts`; empty or omitted means the seed is
+	 * the whole list (no further page). */
+	initialNextPageToken?: string;
 	pageSize?: number;
 	sellerId?: number | string;
 	hashtag?: string;
@@ -64,7 +64,7 @@ export default function InfiniteFeed({
 	initialPosts,
 	progressiveImages = false,
 	initialPage = 1,
-	initialHasMore,
+	initialNextPageToken,
 	pageSize = 12,
 	sellerId,
 	hashtag,
@@ -87,6 +87,7 @@ export default function InfiniteFeed({
 	const {
 		posts,
 		page,
+		nextPageToken,
 		loading,
 		initialLoading,
 		error,
@@ -100,7 +101,7 @@ export default function InfiniteFeed({
 	} = useFeedPosts({
 		initialPosts,
 		initialPage,
-		initialHasMore,
+		initialNextPageToken,
 		pageSize,
 		sellerId,
 		hashtag,
@@ -159,19 +160,28 @@ export default function InfiniteFeed({
 	const snapshotStateRef = React.useRef({
 		posts,
 		page,
+		nextPageToken,
 		done,
 		activeTab,
 		filterMode,
 	});
-	snapshotStateRef.current = { posts, page, done, activeTab, filterMode };
+	snapshotStateRef.current = {
+		posts,
+		page,
+		nextPageToken,
+		done,
+		activeTab,
+		filterMode,
+	};
 	const saveSnapshot = React.useCallback(() => {
-		const { posts, page, done, activeTab, filterMode } =
+		const { posts, page, nextPageToken, done, activeTab, filterMode } =
 			snapshotStateRef.current;
 		if (typeof window === "undefined" || posts.length === 0) return;
 		saveFeedListSnapshot({
 			key: window.location.pathname + window.location.search,
 			posts,
 			page,
+			nextPageToken,
 			done,
 			scrollY: window.scrollY,
 			activeTab,
