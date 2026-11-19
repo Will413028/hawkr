@@ -13,6 +13,7 @@ syntax = "proto3";
 package hawkr.assistant.v1alpha1;
 
 import "google/api/field_behavior.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/error_reason.proto";
 
@@ -99,6 +100,8 @@ message AssistantToolResult {
   string tool_name = 1;
   // 工具執行失敗；助理仍會接著回覆。
   bool failed = 2;
+  // 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
+  google.protobuf.Struct arguments = 3;
 }
 
 message AssistantFinished {

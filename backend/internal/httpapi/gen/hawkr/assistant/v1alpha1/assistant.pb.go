@@ -22,6 +22,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -499,7 +500,9 @@ type AssistantToolResult struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ToolName string                 `protobuf:"bytes,1,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
 	// 工具執行失敗；助理仍會接著回覆。
-	Failed        bool `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
+	Failed bool `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
+	// 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
+	Arguments     *structpb.Struct `protobuf:"bytes,3,opt,name=arguments,proto3" json:"arguments,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -546,6 +549,13 @@ func (x *AssistantToolResult) GetFailed() bool {
 		return x.Failed
 	}
 	return false
+}
+
+func (x *AssistantToolResult) GetArguments() *structpb.Struct {
+	if x != nil {
+		return x.Arguments
+	}
+	return nil
 }
 
 type AssistantFinished struct {
@@ -809,7 +819,7 @@ var File_hawkr_assistant_v1alpha1_assistant_proto protoreflect.FileDescriptor
 
 const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\xd0\x01\n" +
+	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\xd0\x01\n" +
 	"\x1bSendAssistantMessageRequest\x12C\n" +
 	"\x05topic\x18\x01 \x01(\x0e2(.hawkr.assistant.v1alpha1.AssistantTopicB\x03\xe0A\x02R\x05topic\x12\x1d\n" +
 	"\n" +
@@ -834,10 +844,11 @@ const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\v2..hawkr.assistant.v1alpha1.AssistantStreamErrorH\x00R\x05errorB\a\n" +
 	"\x05event\"(\n" +
 	"\x12AssistantTextDelta\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"J\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"\x81\x01\n" +
 	"\x13AssistantToolResult\x12\x1b\n" +
 	"\ttool_name\x18\x01 \x01(\tR\btoolName\x12\x16\n" +
-	"\x06failed\x18\x02 \x01(\bR\x06failed\"2\n" +
+	"\x06failed\x18\x02 \x01(\bR\x06failed\x125\n" +
+	"\targuments\x18\x03 \x01(\v2\x17.google.protobuf.StructR\targuments\"2\n" +
 	"\x11AssistantFinished\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"\x96\x02\n" +
@@ -903,8 +914,9 @@ var file_hawkr_assistant_v1alpha1_assistant_proto_goTypes = []any{
 	(*GetLatestAssistantSessionResponse)(nil), // 11: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
 	(*AssistantMessage)(nil),                  // 12: hawkr.assistant.v1alpha1.AssistantMessage
 	nil,                                       // 13: hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
-	(v1alpha1.ErrorReason)(0),                 // 14: hawkr.common.v1alpha1.ErrorReason
-	(*timestamppb.Timestamp)(nil),             // 15: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                   // 14: google.protobuf.Struct
+	(v1alpha1.ErrorReason)(0),                 // 15: hawkr.common.v1alpha1.ErrorReason
+	(*timestamppb.Timestamp)(nil),             // 16: google.protobuf.Timestamp
 }
 var file_hawkr_assistant_v1alpha1_assistant_proto_depIdxs = []int32{
 	0,  // 0: hawkr.assistant.v1alpha1.SendAssistantMessageRequest.topic:type_name -> hawkr.assistant.v1alpha1.AssistantTopic
@@ -912,22 +924,23 @@ var file_hawkr_assistant_v1alpha1_assistant_proto_depIdxs = []int32{
 	7,  // 2: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.tool_result:type_name -> hawkr.assistant.v1alpha1.AssistantToolResult
 	8,  // 3: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.finished:type_name -> hawkr.assistant.v1alpha1.AssistantFinished
 	9,  // 4: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.error:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError
-	14, // 5: hawkr.assistant.v1alpha1.AssistantStreamError.reason:type_name -> hawkr.common.v1alpha1.ErrorReason
-	13, // 6: hawkr.assistant.v1alpha1.AssistantStreamError.metadata:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
-	12, // 7: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse.messages:type_name -> hawkr.assistant.v1alpha1.AssistantMessage
-	1,  // 8: hawkr.assistant.v1alpha1.AssistantMessage.role:type_name -> hawkr.assistant.v1alpha1.AssistantMessageRole
-	15, // 9: hawkr.assistant.v1alpha1.AssistantMessage.create_time:type_name -> google.protobuf.Timestamp
-	2,  // 10: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:input_type -> hawkr.assistant.v1alpha1.SendAssistantMessageRequest
-	4,  // 11: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:input_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
-	10, // 12: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:input_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
-	3,  // 13: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:output_type -> hawkr.assistant.v1alpha1.SendAssistantMessageResponse
-	5,  // 14: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:output_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
-	11, // 15: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:output_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
-	13, // [13:16] is the sub-list for method output_type
-	10, // [10:13] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	14, // 5: hawkr.assistant.v1alpha1.AssistantToolResult.arguments:type_name -> google.protobuf.Struct
+	15, // 6: hawkr.assistant.v1alpha1.AssistantStreamError.reason:type_name -> hawkr.common.v1alpha1.ErrorReason
+	13, // 7: hawkr.assistant.v1alpha1.AssistantStreamError.metadata:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
+	12, // 8: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse.messages:type_name -> hawkr.assistant.v1alpha1.AssistantMessage
+	1,  // 9: hawkr.assistant.v1alpha1.AssistantMessage.role:type_name -> hawkr.assistant.v1alpha1.AssistantMessageRole
+	16, // 10: hawkr.assistant.v1alpha1.AssistantMessage.create_time:type_name -> google.protobuf.Timestamp
+	2,  // 11: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:input_type -> hawkr.assistant.v1alpha1.SendAssistantMessageRequest
+	4,  // 12: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:input_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
+	10, // 13: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:input_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
+	3,  // 14: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:output_type -> hawkr.assistant.v1alpha1.SendAssistantMessageResponse
+	5,  // 15: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:output_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
+	11, // 16: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:output_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_assistant_v1alpha1_assistant_proto_init() }

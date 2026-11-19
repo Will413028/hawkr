@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'assistant.pb.dart' as $2;
+import 'assistant.pb.dart' as $3;
 import 'assistant.pbjson.dart';
 
 export 'assistant.pb.dart';
 
 abstract class AssistantAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.SendAssistantMessageResponse> sendAssistantMessage(
-      $pb.ServerContext ctx, $2.SendAssistantMessageRequest request);
-  $async.Future<$2.WatchAssistantTurnResponse> watchAssistantTurn(
-      $pb.ServerContext ctx, $2.WatchAssistantTurnRequest request);
-  $async.Future<$2.GetLatestAssistantSessionResponse> getLatestAssistantSession(
-      $pb.ServerContext ctx, $2.GetLatestAssistantSessionRequest request);
+  $async.Future<$3.SendAssistantMessageResponse> sendAssistantMessage(
+      $pb.ServerContext ctx, $3.SendAssistantMessageRequest request);
+  $async.Future<$3.WatchAssistantTurnResponse> watchAssistantTurn(
+      $pb.ServerContext ctx, $3.WatchAssistantTurnRequest request);
+  $async.Future<$3.GetLatestAssistantSessionResponse> getLatestAssistantSession(
+      $pb.ServerContext ctx, $3.GetLatestAssistantSessionRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'SendAssistantMessage':
-        return $2.SendAssistantMessageRequest();
+        return $3.SendAssistantMessageRequest();
       case 'WatchAssistantTurn':
-        return $2.WatchAssistantTurnRequest();
+        return $3.WatchAssistantTurnRequest();
       case 'GetLatestAssistantSession':
-        return $2.GetLatestAssistantSessionRequest();
+        return $3.GetLatestAssistantSessionRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -46,12 +46,12 @@ abstract class AssistantAppServiceBase extends $pb.GeneratedService {
     switch (methodName) {
       case 'SendAssistantMessage':
         return sendAssistantMessage(
-            ctx, request as $2.SendAssistantMessageRequest);
+            ctx, request as $3.SendAssistantMessageRequest);
       case 'WatchAssistantTurn':
-        return watchAssistantTurn(ctx, request as $2.WatchAssistantTurnRequest);
+        return watchAssistantTurn(ctx, request as $3.WatchAssistantTurnRequest);
       case 'GetLatestAssistantSession':
         return getLatestAssistantSession(
-            ctx, request as $2.GetLatestAssistantSessionRequest);
+            ctx, request as $3.GetLatestAssistantSessionRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

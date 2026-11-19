@@ -15,8 +15,10 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
+import 'package:protobuf/well_known_types/google/protobuf/struct.pbjson.dart'
     as $0;
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
+    as $1;
 
 @$core.Deprecated('Use assistantTopicDescriptor instead')
 const AssistantTopic$json = {
@@ -195,13 +197,22 @@ const AssistantToolResult$json = {
   '2': [
     {'1': 'tool_name', '3': 1, '4': 1, '5': 9, '10': 'toolName'},
     {'1': 'failed', '3': 2, '4': 1, '5': 8, '10': 'failed'},
+    {
+      '1': 'arguments',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Struct',
+      '10': 'arguments'
+    },
   ],
 };
 
 /// Descriptor for `AssistantToolResult`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List assistantToolResultDescriptor = $convert.base64Decode(
     'ChNBc3Npc3RhbnRUb29sUmVzdWx0EhsKCXRvb2xfbmFtZRgBIAEoCVIIdG9vbE5hbWUSFgoGZm'
-    'FpbGVkGAIgASgIUgZmYWlsZWQ=');
+    'FpbGVkGAIgASgIUgZmYWlsZWQSNQoJYXJndW1lbnRzGAMgASgLMhcuZ29vZ2xlLnByb3RvYnVm'
+    'LlN0cnVjdFIJYXJndW1lbnRz');
 
 @$core.Deprecated('Use assistantFinishedDescriptor instead')
 const AssistantFinished$json = {
@@ -365,6 +376,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       WatchAssistantTurnResponse$json,
   '.hawkr.assistant.v1alpha1.AssistantTextDelta': AssistantTextDelta$json,
   '.hawkr.assistant.v1alpha1.AssistantToolResult': AssistantToolResult$json,
+  '.google.protobuf.Struct': $0.Struct$json,
+  '.google.protobuf.Struct.FieldsEntry': $0.Struct_FieldsEntry$json,
+  '.google.protobuf.Value': $0.Value$json,
+  '.google.protobuf.ListValue': $0.ListValue$json,
   '.hawkr.assistant.v1alpha1.AssistantFinished': AssistantFinished$json,
   '.hawkr.assistant.v1alpha1.AssistantStreamError': AssistantStreamError$json,
   '.hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry':
@@ -374,7 +389,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse':
       GetLatestAssistantSessionResponse$json,
   '.hawkr.assistant.v1alpha1.AssistantMessage': AssistantMessage$json,
-  '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.google.protobuf.Timestamp': $1.Timestamp$json,
 };
 
 /// Descriptor for `AssistantAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

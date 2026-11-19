@@ -14,10 +14,11 @@ import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
+import 'package:protobuf/well_known_types/google/protobuf/struct.pb.dart' as $0;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
-    as $0;
+    as $1;
 
-import '../../common/v1alpha1/error_reason.pbenum.dart' as $1;
+import '../../common/v1alpha1/error_reason.pbenum.dart' as $2;
 import 'assistant.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -501,10 +502,12 @@ class AssistantToolResult extends $pb.GeneratedMessage {
   factory AssistantToolResult({
     $core.String? toolName,
     $core.bool? failed,
+    $0.Struct? arguments,
   }) {
     final result = AssistantToolResult._();
     if (toolName != null) result.toolName = toolName;
     if (failed != null) result.failed = failed;
+    if (arguments != null) result.arguments = arguments;
     return result;
   }
 
@@ -524,6 +527,8 @@ class AssistantToolResult extends $pb.GeneratedMessage {
       createEmptyInstance: AssistantToolResult.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'toolName')
     ..aOB(2, _omitFieldNames ? '' : 'failed')
+    ..aOM<$0.Struct>(3, _omitFieldNames ? '' : 'arguments',
+        subBuilder: $0.Struct.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -567,6 +572,18 @@ class AssistantToolResult extends $pb.GeneratedMessage {
   $core.bool hasFailed() => $_has(1);
   @$pb.TagNumber(2)
   void clearFailed() => $_clearField(2);
+
+  /// 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
+  @$pb.TagNumber(3)
+  $0.Struct get arguments => $_getN(2);
+  @$pb.TagNumber(3)
+  set arguments($0.Struct value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasArguments() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearArguments() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.Struct ensureArguments() => $_ensure(2);
 }
 
 class AssistantFinished extends $pb.GeneratedMessage {
@@ -631,7 +648,7 @@ class AssistantFinished extends $pb.GeneratedMessage {
 /// AssistantStreamError 是這一輪的失敗，之後沒有其他事件。
 class AssistantStreamError extends $pb.GeneratedMessage {
   factory AssistantStreamError({
-    $1.ErrorReason? reason,
+    $2.ErrorReason? reason,
     $core.String? localizedMessage,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
@@ -656,8 +673,8 @@ class AssistantStreamError extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.assistant.v1alpha1'),
       createEmptyInstance: AssistantStreamError.$_createMessage)
-    ..aE<$1.ErrorReason>(1, _omitFieldNames ? '' : 'reason',
-        enumValues: $1.ErrorReason.values)
+    ..aE<$2.ErrorReason>(1, _omitFieldNames ? '' : 'reason',
+        enumValues: $2.ErrorReason.values)
     ..aOS(2, _omitFieldNames ? '' : 'localizedMessage')
     ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata',
         entryClassName: 'AssistantStreamError.MetadataEntry',
@@ -690,9 +707,9 @@ class AssistantStreamError extends $pb.GeneratedMessage {
   static AssistantStreamError? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $1.ErrorReason get reason => $_getN(0);
+  $2.ErrorReason get reason => $_getN(0);
   @$pb.TagNumber(1)
-  set reason($1.ErrorReason value) => $_setField(1, value);
+  set reason($2.ErrorReason value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasReason() => $_has(0);
   @$pb.TagNumber(1)
@@ -840,7 +857,7 @@ class AssistantMessage extends $pb.GeneratedMessage {
   factory AssistantMessage({
     AssistantMessageRole? role,
     $core.String? text,
-    $0.Timestamp? createTime,
+    $1.Timestamp? createTime,
   }) {
     final result = AssistantMessage._();
     if (role != null) result.role = role;
@@ -866,8 +883,8 @@ class AssistantMessage extends $pb.GeneratedMessage {
     ..aE<AssistantMessageRole>(1, _omitFieldNames ? '' : 'role',
         enumValues: AssistantMessageRole.values)
     ..aOS(2, _omitFieldNames ? '' : 'text')
-    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'createTime',
-        subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<$1.Timestamp>(3, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $1.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -911,15 +928,15 @@ class AssistantMessage extends $pb.GeneratedMessage {
   void clearText() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $0.Timestamp get createTime => $_getN(2);
+  $1.Timestamp get createTime => $_getN(2);
   @$pb.TagNumber(3)
-  set createTime($0.Timestamp value) => $_setField(3, value);
+  set createTime($1.Timestamp value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasCreateTime() => $_has(2);
   @$pb.TagNumber(3)
   void clearCreateTime() => $_clearField(3);
   @$pb.TagNumber(3)
-  $0.Timestamp ensureCreateTime() => $_ensure(2);
+  $1.Timestamp ensureCreateTime() => $_ensure(2);
 }
 
 /// AssistantAppService 是登入的買家的助理。身分取自 session，帳號沒有買家角色時回 permission_denied。
