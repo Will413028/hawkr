@@ -2,8 +2,8 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { checkFavorite, toggleFavorite } from "../favorites/repo";
 import { markConversationRead } from "../chat/repo";
+import { checkFavorite, toggleFavorite } from "../favorites/repo";
 import { toggleFollow } from "../follow/repo";
 import { confirmOrderReceipt } from "../orders/repo";
 import { SseClient } from "../sse/client";

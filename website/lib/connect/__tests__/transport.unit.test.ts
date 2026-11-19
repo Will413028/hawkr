@@ -492,7 +492,9 @@ describe("suspensionInterceptor: ACCOUNT_SUSPENDED", () => {
 			new ConnectError("nope", Code.PermissionDenied),
 		]) {
 			const emit = vi.fn();
-			const { identity } = clients(err, [suspensionInterceptor(undefined, emit)]);
+			const { identity } = clients(err, [
+				suspensionInterceptor(undefined, emit),
+			]);
 			await expect(identity.getSession({})).rejects.toBeInstanceOf(
 				ConnectError,
 			);
