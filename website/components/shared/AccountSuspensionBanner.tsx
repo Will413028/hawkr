@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "@/components/shared/Link";
 import WarningNotice from "@/components/shared/WarningNotice";
 import { useAuth } from "@/lib/auth/context";
@@ -15,6 +16,7 @@ import { useUiText } from "@/lib/i18n/ui-text";
  */
 export default function AccountSuspensionBanner() {
 	const ut = useUiText();
+	const t = useTranslations("account.suspension");
 	const auth = useAuth();
 	if (auth.status !== "signedIn") return null;
 	const suspension = auth.identity.suspension;
@@ -24,11 +26,11 @@ export default function AccountSuspensionBanner() {
 	return (
 		<div className="px-4 pt-2">
 			<WarningNotice>
-				<span>帳號已停權，部分功能受限</span>
+				<span>{t("bannerTitle")}</span>
 				{category ? <span>{category}</span> : null}
 				{reason ? <span>{reason}</span> : null}
 				<Link href="/account/settings" className="font-bold underline">
-					查看詳情
+					{t("bannerLink")}
 				</Link>
 			</WarningNotice>
 		</div>

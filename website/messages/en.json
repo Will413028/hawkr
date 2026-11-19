@@ -55,6 +55,15 @@
 			"title": "Sign-in methods",
 			"linked": "Linked",
 			"link": "Link"
+		},
+		"suspension": {
+			"bannerTitle": "Your account is suspended; some features are limited",
+			"bannerLink": "View details",
+			"sectionTitle": "Account restricted",
+			"date": "Suspension date",
+			"category": "Category",
+			"reason": "Explanation",
+			"note": "While suspended you can browse, but you cannot place orders, comment, like, follow or edit your data."
 		}
 	},
 	"feed": {

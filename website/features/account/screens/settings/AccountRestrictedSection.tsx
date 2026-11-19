@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth/context";
 import {
 	suspensionCategoryText,
@@ -14,6 +15,7 @@ import { useUiText } from "@/lib/i18n/ui-text";
  */
 export default function AccountRestrictedSection() {
 	const ut = useUiText();
+	const t = useTranslations("account.suspension");
 	const auth = useAuth();
 	if (auth.status !== "signedIn") return null;
 	const suspension = auth.identity.suspension;
@@ -24,31 +26,29 @@ export default function AccountRestrictedSection() {
 	return (
 		<section className="seller-card">
 			<header className="seller-card__head">
-				<h2>帳號受限</h2>
+				<h2>{t("sectionTitle")}</h2>
 			</header>
 			<dl className="m-0 flex flex-col gap-2 text-sm">
 				{date ? (
 					<div className="flex flex-col gap-0.5">
-						<dt className="text-xs text-foreground-soft">停權日期</dt>
+						<dt className="text-xs text-foreground-soft">{t("date")}</dt>
 						<dd className="m-0 font-semibold text-hk-heading">{date}</dd>
 					</div>
 				) : null}
 				{category ? (
 					<div className="flex flex-col gap-0.5">
-						<dt className="text-xs text-foreground-soft">類別</dt>
+						<dt className="text-xs text-foreground-soft">{t("category")}</dt>
 						<dd className="m-0 font-semibold text-hk-heading">{category}</dd>
 					</div>
 				) : null}
 				{reason ? (
 					<div className="flex flex-col gap-0.5">
-						<dt className="text-xs text-foreground-soft">說明</dt>
+						<dt className="text-xs text-foreground-soft">{t("reason")}</dt>
 						<dd className="m-0 font-semibold text-hk-heading">{reason}</dd>
 					</div>
 				) : null}
 			</dl>
-			<p className="m-0 mt-3 text-sm text-foreground-soft">
-				停權期間可以瀏覽，無法下單、留言、按讚、追蹤或修改資料。
-			</p>
+			<p className="m-0 mt-3 text-sm text-foreground-soft">{t("note")}</p>
 		</section>
 	);
 }

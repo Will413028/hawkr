@@ -3,6 +3,7 @@
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { commonPolicyCategory } from "@hawkr/ui-text/keys";
 import { cleanup, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Identity } from "@/lib/auth/storage";
@@ -27,6 +28,7 @@ vi.mock("@/components/shared/Link", () => ({
 }));
 
 import { optionalText, uiTextFor } from "@/lib/i18n/ui-text";
+import { messagesFor } from "@/lib/intl/config";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import AccountSuspensionBanner from "./AccountSuspensionBanner";
 
@@ -99,5 +101,23 @@ describe("AccountSuspensionBanner", () => {
 		const banner = screen.getByRole("status");
 		expect(banner.querySelectorAll("span")).toHaveLength(1);
 		expect(banner.textContent).toBe("帳號已停權，部分功能受限查看詳情");
+	});
+
+	it("shows the English wording under the en locale", () => {
+		mocks.auth = {
+			status: "signedIn",
+			identity: identity({ category: PolicyCategory.UNSPECIFIED, reason: "" }),
+		};
+		render(React.createElement(AccountSuspensionBanner), {
+			wrapper: ({ children }: { children: React.ReactNode }) =>
+				React.createElement(NextIntlClientProvider, {
+					locale: "en",
+					messages: messagesFor("en"),
+					children,
+				}),
+		});
+		expect(screen.getByRole("status").textContent).toBe(
+			"Your account is suspended; some features are limitedView details",
+		);
 	});
 });

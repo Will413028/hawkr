@@ -55,6 +55,15 @@
 			"title": "登入方式",
 			"linked": "已連結",
 			"link": "連結"
+		},
+		"suspension": {
+			"bannerTitle": "帳號已停權，部分功能受限",
+			"bannerLink": "查看詳情",
+			"sectionTitle": "帳號受限",
+			"date": "停權日期",
+			"category": "類別",
+			"reason": "說明",
+			"note": "停權期間可以瀏覽，無法下單、留言、按讚、追蹤或修改資料。"
 		}
 	},
 	"feed": {

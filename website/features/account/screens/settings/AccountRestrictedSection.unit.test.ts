@@ -3,6 +3,7 @@
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { commonPolicyCategory } from "@hawkr/ui-text/keys";
 import { cleanup, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Identity } from "@/lib/auth/storage";
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/context", () => ({ useAuth: () => mocks.auth }));
 
 import { optionalText, uiTextFor } from "@/lib/i18n/ui-text";
+import { messagesFor } from "@/lib/intl/config";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import AccountRestrictedSection from "./AccountRestrictedSection";
 
@@ -77,5 +79,37 @@ describe("AccountRestrictedSection", () => {
 		expect(screen.queryByText("說明")).toBeNull();
 		expect(screen.getByText("停權日期")).toBeTruthy();
 		expect(screen.getByText(SENTENCE)).toBeTruthy();
+	});
+
+	it("shows the English wording under the en locale", () => {
+		mocks.auth = {
+			status: "signedIn",
+			identity: {
+				accountId: "7",
+				isSeller: false,
+				suspension: {
+					suspendedAt: "2026-11-01T00:00:00.000Z",
+					category: PolicyCategory.UNSPECIFIED,
+					reason: "repeated abuse",
+				},
+			},
+		};
+		render(React.createElement(AccountRestrictedSection), {
+			wrapper: ({ children }: { children: React.ReactNode }) =>
+				React.createElement(NextIntlClientProvider, {
+					locale: "en",
+					messages: messagesFor("en"),
+					children,
+				}),
+		});
+		expect(screen.getByRole("heading").textContent).toBe("Account restricted");
+		expect(screen.getByText("Suspension date")).toBeTruthy();
+		expect(screen.getByText("Explanation")).toBeTruthy();
+		expect(screen.queryByText("Category")).toBeNull();
+		expect(
+			screen.getByText(
+				"While suspended you can browse, but you cannot place orders, comment, like, follow or edit your data.",
+			),
+		).toBeTruthy();
 	});
 });
