@@ -475,6 +475,33 @@ describe("AuthProvider on ACCOUNT_SUSPENDED (restricted login)", () => {
 		expect(result.current.status).toBe("signedIn");
 	});
 
+	it("accepts a second suspension event after the first re-read settled with an unchanged identity", async () => {
+		const view = await render(signedIn);
+		await waitFor(() => expect(view.result.current.status).toBe("signedIn"));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		await view.adopt(signedIn);
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).toHaveBeenCalledTimes(2);
+	});
+
+	it("accepts a second suspension event after the first re-read settled as unavailable", async () => {
+		const view = await render(signedIn);
+		await waitFor(() => expect(view.result.current.status).toBe("signedIn"));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		await view.adopt({ status: "unavailable" });
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).toHaveBeenCalledTimes(2);
+	});
+
 	it("does not re-read when the document already knows about the suspension", async () => {
 		const { result } = await render({
 			status: "signedIn",
