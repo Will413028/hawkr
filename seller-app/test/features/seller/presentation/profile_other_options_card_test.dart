@@ -38,15 +38,13 @@ Future<void> _pump(WidgetTester tester, {bool canManageBlocks = true}) async {
 }
 
 void main() {
-  testWidgets('營運設定有「措施與申覆」（附說明與圖示），緊接在「我的檢舉」之後', (tester) async {
+  testWidgets('營運設定有「措施與申覆」（附說明與圖示），在「封鎖名單」之前', (tester) async {
     await _pump(tester);
 
     expect(find.text('措施與申覆'), findsOneWidget);
     expect(find.text('查看平台的措施、期間與申覆進度'), findsOneWidget);
-    final report = tester.getTopLeft(find.text('我的檢舉')).dy;
     final measures = tester.getTopLeft(find.text('措施與申覆')).dy;
     final blocks = tester.getTopLeft(find.text('封鎖名單')).dy;
-    expect(report, lessThan(measures));
     expect(measures, lessThan(blocks));
 
     final row = find.ancestor(
@@ -85,6 +83,6 @@ void main() {
   testWidgets('沒有內容契約能力時不顯示「封鎖名單」', (tester) async {
     await _pump(tester, canManageBlocks: false);
     expect(find.text('封鎖名單'), findsNothing);
-    expect(find.text('我的檢舉'), findsOneWidget);
+    expect(find.text('措施與申覆'), findsOneWidget);
   });
 }

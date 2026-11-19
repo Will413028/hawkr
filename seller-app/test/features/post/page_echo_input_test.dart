@@ -659,25 +659,12 @@ void main() {
     },
   );
 
-  testWidgets('other comment offers report without block or owner actions', (
+  testWidgets('other comment without viewer_can_delete has no more button', (
     tester,
   ) async {
-    final repository = await _pumpEcho(tester);
-    await tester.tap(find.byTooltip('留言更多操作'));
-    await tester.pumpAndSettle();
-    expect(find.text('檢舉留言'), findsOneWidget);
-    expect(find.text('封鎖此人'), findsNothing);
-    expect(find.text('編輯留言'), findsNothing);
-    expect(find.text('刪除留言'), findsNothing);
-    await tester.tap(find.text('檢舉留言'));
-    await tester.pumpAndSettle();
-    expect(find.text('送出檢舉'), findsOneWidget);
-    await tester.tapAt(const Offset(10, 30));
-    await tester.pumpAndSettle();
-    verifyNever(
-      () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
-    );
-    expect(tester.takeException(), isNull);
+    await _pumpEcho(tester);
+    expect(find.byTooltip('留言更多操作'), findsNothing);
+    expect(find.text('檢舉留言'), findsNothing);
   });
 
   testWidgets('forum shows no like control', (tester) async {
@@ -713,13 +700,8 @@ void main() {
     );
     expect(find.text('回覆'), findsNothing);
     // 自己的回覆沒有 viewer_can_edit／viewer_can_delete：沒有編輯與刪除入口。
-    // 買家的頂層留言仍有檢舉入口，所以只剩一顆更多按鈕。
-    expect(find.byTooltip('留言更多操作'), findsOneWidget);
-    await tester.tap(find.byTooltip('留言更多操作'));
-    await tester.pumpAndSettle();
-    expect(find.text('編輯留言'), findsNothing);
-    expect(find.text('刪除留言'), findsNothing);
-    expect(find.text('檢舉留言'), findsOneWidget);
+    // 買家的頂層留言沒有 viewer_can_delete，也沒有任何入口。
+    expect(find.byTooltip('留言更多操作'), findsNothing);
   });
 
   testWidgets('other entry offers delete only when viewer_can_delete', (
@@ -737,7 +719,7 @@ void main() {
     await tester.tap(find.byTooltip('留言更多操作'));
     await tester.pumpAndSettle();
     expect(find.text('刪除留言'), findsOneWidget);
-    expect(find.text('檢舉留言'), findsOneWidget);
+    expect(find.text('檢舉留言'), findsNothing);
   });
 
   testWidgets('deleting a forum entry asks first and cancel sends nothing', (
@@ -992,9 +974,13 @@ void main() {
         ),
         canBlock: c.name != 'no content-contract capability',
       );
+      if (!c.del) {
+        expect(find.byTooltip('留言更多操作'), findsNothing);
+        return;
+      }
       await tester.tap(find.byTooltip('留言更多操作'));
       await tester.pumpAndSettle();
-      expect(find.text('檢舉留言'), findsOneWidget);
+      expect(find.text('檢舉留言'), findsNothing);
       expect(find.text('封鎖此人'), c.show ? findsOneWidget : findsNothing);
     });
   }

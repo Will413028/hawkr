@@ -33,11 +33,9 @@ import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/fruit_spinner.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
-import '../../report/data/report_model.dart';
 import '../../report/data/store_block_rules.dart';
 import '../../report/presentation/store_block_capability.dart';
 import '../../report/presentation/widgets/block_actions.dart';
-import '../../report/presentation/widgets/report_sheet.dart';
 import '../data/post_comment.dart';
 import '../data/post_comments_availability.dart';
 import '../data/post_model.dart';
@@ -1884,7 +1882,7 @@ class _CommentRow extends ConsumerWidget {
       viewerCanDelete: comment.viewerCanDelete,
       authorIsBuyer: comment.authorIsBuyer,
     );
-    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉；買家作者而店家有封鎖能力時額外提供封鎖
+    // 刪除依伺服器的 viewer_can_delete；買家作者而店家有封鎖能力時額外提供封鎖
     final v = await showMenu<String>(
       context: context,
       position: position,
@@ -1904,12 +1902,6 @@ class _CommentRow extends ConsumerWidget {
             value: 'block',
             child: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
           ),
-        if (!comment.isMine) ...[
-          PopupMenuItem<String>(
-            value: 'report',
-            child: Text('檢舉留言', style: TextStyle(fontSize: 16.sp)),
-          ),
-        ],
       ],
     );
     if (!context.mounted) return;
@@ -1920,16 +1912,6 @@ class _CommentRow extends ConsumerWidget {
         ref,
         buyerName: comment.authorName,
         commentId: comment.id,
-      );
-    }
-    if (v == 'report' && context.mounted) {
-      // 本頁的留言是貼文留言（`listComments`）——所以是 POST_COMMENT，不是 SELLER_FORUM
-      // （那是賣家頁「迴響」討論區）。
-      await showReportSheet(
-        context,
-        ref,
-        targetType: ReportTargetType.postComment,
-        targetId: comment.id,
       );
     }
   }
@@ -1949,7 +1931,7 @@ class _CommentRow extends ConsumerWidget {
         ),
       );
     }
-    final hasMenu = comment.viewerCanDelete || !comment.isMine;
+    final hasMenu = comment.viewerCanDelete;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPad, 8.h, 12.w, 8.h),

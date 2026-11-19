@@ -21,11 +21,9 @@ import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/echo_comment_node.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
-import '../../../report/data/report_model.dart';
 import '../../../report/data/store_block_rules.dart';
 import '../../../report/presentation/store_block_capability.dart';
 import '../../../report/presentation/widgets/block_actions.dart';
-import '../../../report/presentation/widgets/report_sheet.dart';
 import '../../data/post_comment.dart';
 import '../../data/post_repository.dart';
 import 'post_card.dart' show showPostActionMenu;
@@ -521,25 +519,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   );
                 },
               ),
-            ListTile(
-              leading: Icon(
-                AppIcons.reportOutlined,
-                color: AppIconColors.defaultColor,
-                size: 22.sp,
-              ),
-              title: Text('檢舉留言', style: TextStyle(fontSize: 16.sp)),
-              onTap: () {
-                Navigator.pop(ctx);
-                // 本頁是店家討論區（`listForumEntries`）——所以是 SELLER_FORUM，
-                // 不是 POST_COMMENT（那是貼文底下的留言）。
-                showReportSheet(
-                  context,
-                  ref,
-                  targetType: ReportTargetType.sellerForum,
-                  targetId: node.id,
-                );
-              },
-            ),
             SizedBox(height: 8.h),
           ],
         ),
@@ -602,7 +581,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   ],
                 ),
               ),
-              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言可檢舉，並依規則封鎖
+              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言依 viewer_can_delete 刪除，並依規則封鎖
               if (isSelf && (node.viewerCanEdit || node.viewerCanDelete))
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
@@ -625,7 +604,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                           ),
                   ),
                 )
-              else if (!isSelf)
+              else if (!isSelf && node.viewerCanDelete)
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
                     label: '留言更多操作',

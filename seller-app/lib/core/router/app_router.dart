@@ -57,7 +57,6 @@ import '../../features/product/presentation/product_setup_media_picker_screen.da
 import '../../features/product/presentation/product_setup_picker/product_setup_picker_screen.dart';
 import '../../features/product/presentation/product_setup_spec_screen.dart';
 import '../../features/report/presentation/block_list_screen.dart';
-import '../../features/report/presentation/my_reports_screen.dart';
 import '../../features/shipment_anomaly/presentation/shipment_anomaly_dashboard_screen.dart';
 import '../../features/seller/presentation/profile_screen.dart';
 import '../../features/seller/presentation/seller_measure_request_form_screen.dart';
@@ -212,9 +211,6 @@ class SettingsRoutes {
   static const notifications = '/notifications';
   static const notificationSettings = '/notifications/settings';
   static const help = '/settings/help';
-
-  /// 我的檢舉列表（backend-payuni#645）
-  static const myReports = '/reports/me';
 
   /// 封鎖名單（backend-payuni#645）
   static const blockList = '/blocks';
@@ -1069,11 +1065,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: SettingsRoutes.notificationSettings,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const NotificationSettingsScreen(),
-      ),
-      GoRoute(
-        path: SettingsRoutes.myReports,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const MyReportsScreen(),
       ),
       GoRoute(
         path: SettingsRoutes.blockList,

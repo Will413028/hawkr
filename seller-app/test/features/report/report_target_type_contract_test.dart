@@ -41,72 +41,18 @@ void main() {
         backendWhitelist,
       );
     });
-
-    test('reportTargetTypeLabel 以 enum 為唯一來源，未知值原樣回傳', () {
-      for (final t in ReportTargetType.values) {
-        expect(reportTargetTypeLabel(t.value), t.label);
-      }
-      expect(reportTargetTypeLabel('SOMETHING_NEW'), 'SOMETHING_NEW');
-    });
   });
 
-  group('檢舉開啟點送出的 target_type 對齊其資料來源端點', () {
-    // (畫面, 該畫面載入留言用的 repository 方法, 該方法打的端點與落表, 應送值, 不得出現的值)
-    final entryPoints =
-        <
-          ({
-            String file,
-            String sourceMethod,
-            String table,
-            ReportTargetType expected,
-            ReportTargetType forbidden,
-          })
-        >[
-          (
-            file: 'lib/features/post/presentation/page_home_feed_screen.dart',
-            sourceMethod: 'listComments',
-            table: '貼文留言（SocialPublicService.ListComments）',
-            expected: ReportTargetType.postComment,
-            forbidden: ReportTargetType.sellerForum,
-          ),
-          (
-            file: 'lib/features/post/presentation/widgets/page_echo_tab.dart',
-            sourceMethod: 'listForumEntries',
-            table: '店家討論區（SocialPublicService.ListForumEntries）',
-            expected: ReportTargetType.sellerForum,
-            forbidden: ReportTargetType.postComment,
-          ),
-        ];
-
-    for (final e in entryPoints) {
-      test('${e.file.split('/').last} → ${e.expected.value}', () {
-        final source = File(e.file).readAsStringSync();
-
-        // 前提：這個畫面確實是從宣稱的那個端點載入留言的。
-        // 若哪天資料來源換了，這條先炸，提醒重新判定 target_type。
-        expect(
-          source.contains(e.sourceMethod),
-          isTrue,
-          reason:
-              '${e.file} 不再呼叫 ${e.sourceMethod}；資料來源變了就要重新判定 '
-              'target_type（本表宣稱它來自 ${e.table}）',
-        );
-
-        expect(
-          source.contains('ReportTargetType.${e.expected.name}'),
-          isTrue,
-          reason:
-              '${e.file} 的檢舉必須送 ${e.expected.value}，'
-              '因為它的內容存在 ${e.table}',
-        );
-
-        expect(
-          source.contains('ReportTargetType.${e.forbidden.name}'),
-          isFalse,
-          reason:
-              '${e.file} 送了 ${e.forbidden.value}，那會讓 admin 裁決打到別張表、'
-              'target_owner_id 落庫成 NULL',
-        );
+  group('檢舉開啟點', () {
+    // 新的 moderation 只收買家檢舉；店主在自己店的內容上用刪除與封鎖。
+    for (final file in [
+      'lib/features/post/presentation/page_home_feed_screen.dart',
+      'lib/features/post/presentation/widgets/page_echo_tab.dart',
+    ]) {
+      test('${file.split('/').last} 不開檢舉', () {
+        final source = File(file).readAsStringSync();
+        expect(source.contains('showReportSheet'), isFalse);
+        expect(source.contains('ReportTargetType.'), isFalse);
       });
     }
 

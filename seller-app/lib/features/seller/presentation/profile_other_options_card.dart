@@ -76,12 +76,6 @@ class ProfileOtherOptionsCard extends StatelessWidget {
         onTap: () => showTextSizeSettingsSheet(context),
       ),
       OptionRow(
-        icon: HkIconName.report,
-        label: '我的檢舉',
-        description: '查看已送出的檢舉紀錄與處理進度',
-        onTap: () => context.push('/reports/me'),
-      ),
-      OptionRow(
         icon: HkIconName.shield,
         label: '措施與申覆',
         description: '查看平台的措施、期間與申覆進度',

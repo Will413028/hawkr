@@ -73,7 +73,7 @@ void main() {
           await tester.tap(more);
           await tester.pumpAndSettle();
           expect(find.text('刪除留言'), findsOneWidget);
-          expect(find.text('檢舉留言'), self ? findsNothing : findsOneWidget);
+          expect(find.text('檢舉留言'), findsNothing);
           expect(find.text('封鎖此人'), self ? findsNothing : findsOneWidget);
         }
 
@@ -179,7 +179,7 @@ void main() {
     expect(find.text('刪除留言'), findsOneWidget);
   });
 
-  testWidgets('other comment without viewer_can_delete offers report only', (
+  testWidgets('other comment without viewer_can_delete has no more button', (
     tester,
   ) async {
     final repo = _Repo();
@@ -190,11 +190,7 @@ void main() {
       () => repo.listComments(42),
     ).thenAnswer((_) async => [testComment(canDelete: false)]);
     await openComments(tester, repo);
-    await tester.tap(find.byTooltip('留言更多操作'));
-    await tester.pumpAndSettle();
-    expect(find.text('刪除留言'), findsNothing);
-    expect(find.text('檢舉留言'), findsOneWidget);
-    expect(find.text('封鎖此人'), findsNothing);
+    expect(find.byTooltip('留言更多操作'), findsNothing);
   });
 
   for (final c in [
@@ -213,7 +209,7 @@ void main() {
       await openComments(tester, repo, canBlock: c.canBlock);
       await tester.tap(find.byTooltip('留言更多操作'));
       await tester.pumpAndSettle();
-      expect(find.text('檢舉留言'), findsOneWidget);
+      expect(find.text('檢舉留言'), findsNothing);
       expect(find.text('封鎖此人'), c.show ? findsOneWidget : findsNothing);
     });
   }

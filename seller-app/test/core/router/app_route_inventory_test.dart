@@ -80,7 +80,6 @@ void main() {
       symbol: 'SettingsRoutes.notificationSettings',
       path: SettingsRoutes.notificationSettings,
     ),
-    (symbol: 'SettingsRoutes.myReports', path: SettingsRoutes.myReports),
     (symbol: 'SettingsRoutes.blockList', path: SettingsRoutes.blockList),
     (symbol: 'SettingsRoutes.help', path: SettingsRoutes.help),
     (symbol: 'ToolRoutes.photoEditor', path: ToolRoutes.photoEditor),
@@ -101,9 +100,9 @@ void main() {
     ),
   ];
 
-  test('all 61 seller routes remain unique and declared', () {
-    expect(routes, hasLength(61));
-    expect(routes.map((route) => route.path).toSet(), hasLength(61));
+  test('all 60 seller routes remain unique and declared', () {
+    expect(routes, hasLength(60));
+    expect(routes.map((route) => route.path).toSet(), hasLength(60));
     expect(routes.every((route) => route.path.startsWith('/')), isTrue);
   });
 

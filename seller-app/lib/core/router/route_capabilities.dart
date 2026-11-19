@@ -83,7 +83,6 @@ final Map<String, SellerCapability?> routeCapabilities = {
   SettingsRoutes.notifications: _notification,
   SettingsRoutes.notificationSettings: _notification,
   SettingsRoutes.help: null,
-  SettingsRoutes.myReports: null,
   SettingsRoutes.blockList: _contentContract,
 
   ToolRoutes.photoEditor: null,
