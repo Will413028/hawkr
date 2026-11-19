@@ -14,7 +14,7 @@ import (
 const (
 	MinRating = 1
 	MaxRating = 5
-	// MaxContentRunes 是評價內容與店家回覆的長度上限，以字元（rune）計（RD2）。
+	// MaxContentRunes 是評價內容與店家回覆的長度上限，以字元（rune）計。
 	MaxContentRunes = 1000
 	// MaxImages 是一則評價的附圖張數上限；DB 以 review_images.position 的範圍保證。
 	MaxImages = 4
@@ -64,7 +64,7 @@ func ReasonOf(err error) Reason {
 	return ""
 }
 
-// ErrOrderNotFound 是 Orders 的實作回報「訂單不存在」的方式；其他錯誤都是暫時性故障或回應不合法（RD9：兩者不得混為一談）。
+// ErrOrderNotFound 是 Orders 的實作回報「訂單不存在」的方式；其他錯誤都是暫時性故障或回應不合法（兩者不得混為一談）。
 var ErrOrderNotFound = errors.New("review：訂單不存在")
 
 // OrderForReview 是評價資格與快照的唯一來源：訂單與它的項目。
@@ -140,7 +140,7 @@ type Filter struct {
 	WithImages bool
 }
 
-// SubmitInput 是提交評價的輸入。price、sku_name、product_id 都取自訂單，不在輸入裡（RD6）。
+// SubmitInput 是提交評價的輸入。price、sku_name、product_id 都取自訂單，不在輸入裡。
 type SubmitInput struct {
 	BuyerID      int64
 	OrderNo      string

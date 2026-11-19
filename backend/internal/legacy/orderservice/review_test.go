@@ -50,6 +50,8 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 	wrongOrder.Data.OrderNo = "N2"
 	longSku := validReviewResponse()
 	longSku.Items[0].SkuName = strings.Repeat("茶", 256)
+	badImage := validReviewResponse()
+	badImage.Items[0].ImageObjectKey = "k/\xff.jpg"
 	cases := []struct {
 		name         string
 		fake         fakeReviewOrders
@@ -64,6 +66,7 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 		{"bad completed_at", fakeReviewOrders{resp: badTime}, false},
 		{"order number differs from request", fakeReviewOrders{resp: wrongOrder}, false},
 		{"sku name too long", fakeReviewOrders{resp: longSku}, false},
+		{"invalid utf8 image key", fakeReviewOrders{resp: badImage}, false},
 		{"item without product", fakeReviewOrders{resp: noProduct}, false},
 	}
 	for _, tc := range cases {
