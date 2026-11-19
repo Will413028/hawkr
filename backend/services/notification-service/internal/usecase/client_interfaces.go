@@ -11,11 +11,7 @@ type BuyerClient interface {
 
 // SellerClient is notification-service's seller-service gRPC client
 // abstraction: ListIDsByAccount enumerates historical store_id surrogates
-// (account-deletion and retired-incarnation cleanup, see notification_inbox.go);
-// EnsureInvite/MarkInviteSecretDelivered proxy the vendor portal invite RPCs
-// for the vendor portal invite email consumer (see worker/vendor_invite.go).
+// (account-deletion and retired-incarnation cleanup, see notification_inbox.go).
 type SellerClient interface {
 	ListIDsByAccount(ctx context.Context, accountID int64) ([]int64, error)
-	EnsureInvite(ctx context.Context, prospectID, rfqRecipientID, expiresAt string) (inviteID, secret, invitedEmail string, err error)
-	MarkInviteSecretDelivered(ctx context.Context, inviteID, secret string) error
 }

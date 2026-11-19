@@ -348,14 +348,6 @@ func (m *mockSellerClient) ListIDsByAccount(ctx context.Context, accountID int64
 	return nil, nil
 }
 
-func (m *mockSellerClient) EnsureInvite(context.Context, string, string, string) (string, string, string, error) {
-	return "", "", "", nil
-}
-
-func (m *mockSellerClient) MarkInviteSecretDelivered(context.Context, string, string) error {
-	return nil
-}
-
 // TestRedactChatNotificationsByAccount_MergesAccountAndBuyerID mirrors
 // im-service's TestRedactDeletedAccount_EnumeratesAllHistoricalBuyerAndStoreIDs
 // (services/im-service/internal/usecase/message_test.go) assertion style: the
