@@ -72,9 +72,7 @@ func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, store
 // 仍可能寫入一次，由下一次對帳的「多」那一步刪除。
 func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content) error {
 	return s.applyTakedowns(ctx, measureID, at, contents, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
-		rows, err := q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams{
-			MeasureID: p.MeasureID, PostIds: p.PostIds, CommentIds: p.CommentIds, ForumEntryIds: p.ForumEntryIds,
-		})
+		rows, err := q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams(p))
 		return insertedOf(rows, func(r store.InsertActiveTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
 }
