@@ -33,7 +33,9 @@ export default function SellerSubscribeButton({
 }: SellerSubscribeButtonProps) {
 	const { status } = useAuth();
 	const setFollowed = useSetFollowedSeller();
-	const { active, toggle, pending } = useSellerSubscription(sellerId);
+	const { active, toggle, pending } = useSellerSubscription(sellerId, {
+		enabled: !previewMode,
+	});
 	const [notice, setNotice] = React.useState<string | null>(null);
 	const lastClickAtRef = React.useRef(0);
 	const loginPayload = React.useMemo(
