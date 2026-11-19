@@ -36,6 +36,27 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "Resolved (no violation)"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "Under review"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
+      "message": "Resolved (violation)"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
+      "message": "User"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
+      "message": "Comment"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": {
+      "message": "Forum post"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
+      "message": "Post"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"
     },

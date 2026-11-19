@@ -88,14 +88,14 @@
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "dartClass": "ReportOutcome",
       "dartLibrary": "package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.moderation.v1alpha1.ReportTargetKind",
       "dartClass": "ReportTargetKind",
       "dartLibrary": "package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

@@ -166,6 +166,58 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// ModerationReportOutcome 是 moderation.ReportOutcome 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ModerationReportOutcome(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PENDING":
+			return "Under review", true
+		case "VIOLATION":
+			return "Resolved (violation)", true
+		case "NO_VIOLATION":
+			return "Resolved (no violation)", true
+		}
+	}
+	switch v {
+	case "PENDING":
+		return "審核中", true
+	case "VIOLATION":
+		return "已處理（違規）", true
+	case "NO_VIOLATION":
+		return "已處理（不違規）", true
+	}
+	return "", false
+}
+
+// ModerationReportTargetKind 是 moderation.ReportTargetKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ModerationReportTargetKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "POST":
+			return "Post", true
+		case "COMMENT":
+			return "Comment", true
+		case "FORUM_ENTRY":
+			return "Forum post", true
+		case "BUYER":
+			return "User", true
+		}
+	}
+	switch v {
+	case "POST":
+		return "貼文", true
+	case "COMMENT":
+		return "留言", true
+	case "FORUM_ENTRY":
+		return "討論區留言", true
+	case "BUYER":
+		return "使用者", true
+	}
+	return "", false
+}
+
 // PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {

@@ -340,14 +340,14 @@
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "tsName": "ReportOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.moderation.v1alpha1.ReportTargetKind",
       "tsName": "ReportTargetKind",
       "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

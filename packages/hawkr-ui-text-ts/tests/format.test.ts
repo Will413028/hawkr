@@ -191,6 +191,6 @@ describe("manifest", () => {
 		).toMatchObject({
 			serverOwned: true,
 		});
-		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(19);
+		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(21);
 	});
 });

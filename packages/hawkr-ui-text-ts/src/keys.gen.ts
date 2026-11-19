@@ -3,6 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
@@ -51,6 +52,13 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
+	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -276,6 +284,33 @@ export function commonError(code: Code): UiMessage | undefined {
 /** 不認得的值與 UNSPECIFIED 一律顯示的文字。 */
 export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
+}
+
+const MODERATION_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "moderation.ReportOutcome.REPORT_OUTCOME_PENDING",
+	2: "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION",
+	3: "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
+};
+
+/** moderation.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function moderationReportOutcome(v: ReportOutcome): UiMessage | undefined {
+	const key = MODERATION_REPORT_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST",
+	2: "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT",
+	3: "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY",
+	4: "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER",
+};
+
+/** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function moderationReportTargetKind(v: ReportTargetKind): UiMessage | undefined {
+	const key = MODERATION_REPORT_TARGET_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
 }
 
 const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {

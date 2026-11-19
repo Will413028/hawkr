@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -92,6 +93,15 @@ const _enumNumber = <String, int>{
 	'POLICY_CATEGORY_SPAM': 14,
 	'POLICY_CATEGORY_UNLICENSED_SALE': 3,
 	'POLICY_CATEGORY_UNSPECIFIED': 0,
+	'REPORT_OUTCOME_NO_VIOLATION': 3,
+	'REPORT_OUTCOME_PENDING': 1,
+	'REPORT_OUTCOME_UNSPECIFIED': 0,
+	'REPORT_OUTCOME_VIOLATION': 2,
+	'REPORT_TARGET_KIND_BUYER': 4,
+	'REPORT_TARGET_KIND_COMMENT': 2,
+	'REPORT_TARGET_KIND_FORUM_ENTRY': 3,
+	'REPORT_TARGET_KIND_POST': 1,
+	'REPORT_TARGET_KIND_UNSPECIFIED': 0,
 	'REQUIREMENT_COLLECTION_PLATFORM': 2,
 	'REQUIREMENT_COLLECTION_PROVIDER': 1,
 	'REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
@@ -185,6 +195,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'moderation.ReportOutcome':
+      return hawkr_moderation_v1alpha1_moderation.ReportOutcome.valueOf(_n(value))!.uiText(l);
+    case 'moderation.ReportTargetKind':
+      return hawkr_moderation_v1alpha1_moderation.ReportTargetKind.valueOf(_n(value))!.uiText(l);
     case 'payment.PaymentAccountStatus':
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
     case 'payment.RequirementCollection':

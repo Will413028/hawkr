@@ -15,7 +15,6 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../data/report_labels.dart';
 import 'my_reports_notifier.dart';
 import 'paged_section.dart';
 import 'paged_section_widgets.dart';
@@ -101,8 +100,8 @@ class MyReportsScreen extends ConsumerWidget {
   }
 
   Widget _buildReportCard(pb.ReportRecord r, UiLocale locale) {
-    final kind = reportTargetKindLabel(r.target.kind);
-    final outcome = reportOutcomeLabel(r.outcome);
+    final kind = r.target.kind.uiText(locale);
+    final outcome = r.outcome.uiText(locale);
     final category = r.category.uiText(locale);
     return Container(
       padding: EdgeInsets.all(16.w),

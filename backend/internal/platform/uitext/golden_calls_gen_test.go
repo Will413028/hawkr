@@ -52,6 +52,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "moderation.ReportOutcome":
+		return t.ModerationReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
+	case "moderation.ReportTargetKind":
+		return t.ModerationReportTargetKind(goldenEnum(c.Value, "REPORT_TARGET_KIND_"))
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":

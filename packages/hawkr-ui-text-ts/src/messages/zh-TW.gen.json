@@ -56,6 +56,19 @@
     },
     "unknown": "未知"
   },
+  "moderation": {
+    "ReportOutcome": {
+      "REPORT_OUTCOME_NO_VIOLATION": "已處理（不違規）",
+      "REPORT_OUTCOME_PENDING": "審核中",
+      "REPORT_OUTCOME_VIOLATION": "已處理（違規）"
+    },
+    "ReportTargetKind": {
+      "REPORT_TARGET_KIND_BUYER": "使用者",
+      "REPORT_TARGET_KIND_COMMENT": "留言",
+      "REPORT_TARGET_KIND_FORUM_ENTRY": "討論區留言",
+      "REPORT_TARGET_KIND_POST": "貼文"
+    }
+  },
   "payment": {
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "待設定",

@@ -56,6 +56,19 @@
     },
     "unknown": "未知"
   },
+  "moderation": {
+    "ReportOutcome": {
+      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
+      "REPORT_OUTCOME_PENDING": "Under review",
+      "REPORT_OUTCOME_VIOLATION": "Resolved (violation)"
+    },
+    "ReportTargetKind": {
+      "REPORT_TARGET_KIND_BUYER": "User",
+      "REPORT_TARGET_KIND_COMMENT": "Comment",
+      "REPORT_TARGET_KIND_FORUM_ENTRY": "Forum post",
+      "REPORT_TARGET_KIND_POST": "Post"
+    }
+  },
   "payment": {
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Setup needed",

@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -95,6 +95,15 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"POLICY_CATEGORY_SPAM": 14,
 	"POLICY_CATEGORY_UNLICENSED_SALE": 3,
 	"POLICY_CATEGORY_UNSPECIFIED": 0,
+	"REPORT_OUTCOME_NO_VIOLATION": 3,
+	"REPORT_OUTCOME_PENDING": 1,
+	"REPORT_OUTCOME_UNSPECIFIED": 0,
+	"REPORT_OUTCOME_VIOLATION": 2,
+	"REPORT_TARGET_KIND_BUYER": 4,
+	"REPORT_TARGET_KIND_COMMENT": 2,
+	"REPORT_TARGET_KIND_FORUM_ENTRY": 3,
+	"REPORT_TARGET_KIND_POST": 1,
+	"REPORT_TARGET_KIND_UNSPECIFIED": 0,
 	"REQUIREMENT_COLLECTION_PLATFORM": 2,
 	"REQUIREMENT_COLLECTION_PROVIDER": 1,
 	"REQUIREMENT_COLLECTION_UNSPECIFIED": 0,
@@ -199,6 +208,12 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "common.unknown": {
 		return commonUnknown();
+	}
+	case "moderation.ReportOutcome": {
+		return moderationReportOutcome(num(c.value));
+	}
+	case "moderation.ReportTargetKind": {
+		return moderationReportTargetKind(num(c.value));
 	}
 	case "payment.PaymentAccountStatus": {
 		return paymentPaymentAccountStatus(num(c.value));

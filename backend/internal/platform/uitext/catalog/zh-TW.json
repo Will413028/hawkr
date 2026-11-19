@@ -164,6 +164,34 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "已處理（不違規）",
+      "description": "案件認定不違規。"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "審核中",
+      "description": "案件還在處理中。"
+    },
+    "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
+      "message": "已處理（違規）",
+      "description": "案件認定違規。"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
+      "message": "使用者",
+      "description": "買家；id 是買家的 ID。"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
+      "message": "留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": {
+      "message": "討論區留言",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_FORUM_ENTRY）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
+      "message": "貼文",
+      "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
