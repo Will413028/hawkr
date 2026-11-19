@@ -34,7 +34,7 @@ func TestCategoryTree(t *testing.T) {
 		}},
 	}}
 	c := &Client{rpc: fakeCategories{resp: resp, seen: &seen}}
-	tree, err := c.CategoryTree(context.Background(), true)
+	tree, err := c.CategoryTree(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,10 +45,7 @@ func TestCategoryTree(t *testing.T) {
 	if child.ID != 11 || child.ParentID != 1 || child.ParentName != "水果" || child.Name != "柑橘" || child.Status != "ACTIVE" {
 		t.Fatalf("child = %+v", child)
 	}
-	if _, err := c.CategoryTree(context.Background(), false); err != nil {
-		t.Fatal(err)
-	}
-	if len(seen) != 2 || seen[0] != "active" || seen[1] != "" {
+	if len(seen) != 1 || seen[0] != "active" {
 		t.Fatalf("status filter = %q", seen)
 	}
 }
@@ -63,7 +60,7 @@ func TestCategoryTreeRejectsBadData(t *testing.T) {
 		"bad parent": {resp: &categorypb.GetCategoryTreeResponse{Categories: []*categorypb.CategoryNode{{Id: "1", ParentId: "p"}}}},
 	} {
 		f.seen = &seen
-		if _, err := (&Client{rpc: f}).CategoryTree(context.Background(), true); err == nil {
+		if _, err := (&Client{rpc: f}).CategoryTree(context.Background()); err == nil {
 			t.Errorf("%s accepted", name)
 		}
 	}
@@ -75,7 +72,7 @@ func TestCategoryTreeRejectsBadData(t *testing.T) {
 		cur = next
 	}
 	f := fakeCategories{resp: &categorypb.GetCategoryTreeResponse{Categories: []*categorypb.CategoryNode{deep}}, seen: &seen}
-	if _, err := (&Client{rpc: f}).CategoryTree(context.Background(), true); err == nil {
+	if _, err := (&Client{rpc: f}).CategoryTree(context.Background()); err == nil {
 		t.Error("over-deep tree accepted")
 	}
 	if _, err := New("", ""); err == nil {

@@ -43,15 +43,11 @@ func New(addr, secret string) (*Client, error) {
 	return &Client{rpc: categoryconnect.NewCategoryServiceClient(grpcclient.HTTPClient(), "http://"+addr, connect.WithGRPC(), connect.WithInterceptors(grpcclient.Signer(secret, nil)))}, nil
 }
 
-// CategoryTree 回傳分類樹；activeOnly 為 true 時只含啟用的分類。根節點的 ParentID 為 0。
-func (c *Client) CategoryTree(ctx context.Context, activeOnly bool) ([]Node, error) {
-	status := ""
-	if activeOnly {
-		status = "active"
-	}
+// CategoryTree 回傳只含啟用分類的分類樹。根節點的 ParentID 為 0。
+func (c *Client) CategoryTree(ctx context.Context) ([]Node, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	resp, err := c.rpc.GetCategoryTree(ctx, connect.NewRequest(&categorypb.GetCategoryTreeRequest{Status: status}))
+	resp, err := c.rpc.GetCategoryTree(ctx, connect.NewRequest(&categorypb.GetCategoryTreeRequest{Status: "active"}))
 	if err != nil {
 		return nil, fmt.Errorf("categoryservice：GetCategoryTree：%w", err)
 	}

@@ -56,3 +56,23 @@ func TestCheckRestrictedImportsFlagsEveryImporterOutsideTheAllowList(t *testing.
 		t.Fatalf("violations = %q allowed = %d", got, allowed)
 	}
 }
+
+func TestLLMClientImportsCoverModelSubpackagesButNotTheInterfacePackage(t *testing.T) {
+	pkgs := []Package{
+		{ImportPath: ModulePath + "/internal/modules/assistant", Imports: []string{
+			"google.golang.org/adk/v2/model",
+			"google.golang.org/adk/v2/model/apigee",
+			"google.golang.org/adk/v2/model/anthropicmodel",
+			"google.golang.org/genai",
+		}},
+	}
+	violations, _ := CheckRestrictedImports(pkgs, LLMClientImports)
+	var got []string
+	for _, v := range violations {
+		got = append(got, v.Import)
+	}
+	want := []string{"google.golang.org/adk/v2/model/anthropicmodel", "google.golang.org/adk/v2/model/apigee"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("violations = %q", got)
+	}
+}

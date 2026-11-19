@@ -8,7 +8,7 @@ import (
 
 // RestrictedImports 規定一組外部套件（含子套件）只能被哪些套件 import。
 type RestrictedImports struct {
-	// Paths 是受限的 import 路徑；路徑本身與它的子套件都算。
+	// Paths 是受限的 import 路徑；路徑本身與它的子套件都算。以 "/" 結尾的只算子套件，不含路徑本身。
 	Paths []string
 	// AllowedPackages 是可以 import 它們的套件（含子套件），以 import 路徑表示。
 	AllowedPackages []string
@@ -21,8 +21,7 @@ type RestrictedImports struct {
 // 其他套件從那裡拿已決定好開通與否的 Model，不自己建 client，也就不會漏掉 provider 的 request quirk 或讓缺金鑰擋住啟動。
 var LLMClientImports = RestrictedImports{
 	Paths: []string{
-		"google.golang.org/adk/v2/model/gemini",
-		"google.golang.org/adk/v2/model/openaimodel",
+		"google.golang.org/adk/v2/model/",
 		"github.com/openai/openai-go/v3",
 	},
 	AllowedPackages: []string{ModulePath + "/internal/platform/llm"},
@@ -30,6 +29,9 @@ var LLMClientImports = RestrictedImports{
 }
 
 func underPath(importPath, root string) bool {
+	if strings.HasSuffix(root, "/") {
+		return strings.HasPrefix(importPath, root)
+	}
 	return importPath == root || strings.HasPrefix(importPath, root+"/")
 }
 

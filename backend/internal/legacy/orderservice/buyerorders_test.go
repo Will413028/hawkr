@@ -55,19 +55,38 @@ func (f fakeBuyerOrders) CreateRfqOrder(_ context.Context, req *connect.Request[
 func TestMyOrders(t *testing.T) {
 	seen := &seenBuyerCalls{}
 	f := fakeBuyerOrders{seen: seen, list: &orderpb.GetMyOrdersResponse{Orders: []*orderpb.OrderSummaryView{
-		{OrderNo: "O1", CreateTime: "1700000000000", Status: "10", TotalActualAmount: "1250", ItemCount: "3", SellerName: "店"},
+		{OrderNo: "O1", CreateTime: "2023-11-14T22:13:20.123Z", Status: "10", TotalActualAmount: "1250", ItemCount: "3", SellerName: "店"},
 	}}}
 	got, err := (&Client{rpc: f}).MyOrders(context.Background(), 7, "10,20", 2, 5)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got=%+v err=%v", got, err)
 	}
 	o := got[0]
-	if o.OrderNo != "O1" || o.Status != "10" || o.Amount != 1250 || o.ItemCount != 3 || o.SellerName != "店" || o.CreateTime.UnixMilli() != 1700000000000 {
+	if o.OrderNo != "O1" || o.Status != "10" || o.Amount != 1250 || o.ItemCount != 3 || o.SellerName != "店" || o.CreateTime.UnixMilli() != 1700000000123 {
 		t.Fatalf("order = %+v", o)
 	}
 	r := seen.list
 	if r.GetBuyerId() != 7 || r.GetStatusFilter() != "10,20" || r.GetPage().GetPage() != "2" || r.GetPage().GetSize() != "5" || seen.header.Get("x-account-id") != "7" {
 		t.Fatalf("request = %v header=%v", r, seen.header)
+	}
+}
+
+func TestOrderTimeAcceptsIsoAndMillisecondFallback(t *testing.T) {
+	for raw, want := range map[string]int64{
+		"2023-11-14T22:13:20Z":        1700000000000,
+		"2023-11-14T22:13:20.123456Z": 1700000000123,
+		"2023-11-15T06:13:20+08:00":   1700000000000,
+		"1700000000000":               1700000000000,
+	} {
+		got, err := orderTime(raw)
+		if err != nil || got.UnixMilli() != want {
+			t.Errorf("orderTime(%q) = %v, %v", raw, got, err)
+		}
+	}
+	for _, raw := range []string{"", "yesterday", "-1", "2023-11-14"} {
+		if _, err := orderTime(raw); err == nil {
+			t.Errorf("orderTime(%q) accepted", raw)
+		}
 	}
 }
 
@@ -105,7 +124,7 @@ func TestMyOrdersRejectsBadData(t *testing.T) {
 func TestBuyerOrderDetail(t *testing.T) {
 	seen := &seenBuyerCalls{}
 	f := fakeBuyerOrders{seen: seen, detail: &orderpb.GetOrderResponse{Data: &orderpb.OrderDetailView{
-		OrderNo: "O1", Status: "20", TotalActualAmount: "900", ShippingFee: "100", CreateTime: "1700000000000",
+		OrderNo: "O1", Status: "20", TotalActualAmount: "900", ShippingFee: "100", CreateTime: "2023-11-14T22:13:20Z",
 		SellerName: "店", ShippingMethod: "3001", ShippingStatus: "S", RecipientName: "收", PaymentMethod: "card",
 	}}}
 	d, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1")
@@ -124,8 +143,12 @@ func TestBuyerOrderDetail(t *testing.T) {
 		t.Fatalf("missing data err = %v", err)
 	}
 	f.detail = &orderpb.GetOrderResponse{Code: 404}
-	if _, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1"); err == nil {
-		t.Fatal("non-zero code accepted")
+	if _, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1"); !errors.Is(err, ErrOrderNotFound) {
+		t.Fatalf("NOT_FOUND code err = %v", err)
+	}
+	f.detail = &orderpb.GetOrderResponse{Code: 500}
+	if _, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1"); err == nil || errors.Is(err, ErrOrderNotFound) {
+		t.Fatalf("other code err = %v", err)
 	}
 	f.detail = &orderpb.GetOrderResponse{Data: &orderpb.OrderDetailView{OrderNo: "O1", TotalActualAmount: "x"}}
 	if _, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1"); err == nil {

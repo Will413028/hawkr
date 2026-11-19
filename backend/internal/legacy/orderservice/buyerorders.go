@@ -62,6 +62,9 @@ type RfqOrderResult struct {
 	Replayed        bool
 }
 
+// codeNotFound 是 Java GrpcResponseCode.NOT_FOUND。
+const codeNotFound = 404
+
 // ErrOrderNotFound 表示 order-service 沒有回傳該買家的這張訂單。
 var ErrOrderNotFound = errors.New("orderservice：查無訂單")
 
@@ -70,7 +73,11 @@ func accountHeader[T any](req *connect.Request[T], buyerID int64) *connect.Reque
 	return req
 }
 
-func unixMilli(raw string) (time.Time, error) {
+// orderTime 解析 order-service 的時間字串：ISO 8601（RFC 3339，含或不含小數秒），舊 adapter 也接受的 Unix 毫秒當後備。
+func orderTime(raw string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return t.UTC(), nil
+	}
 	ms, err := nonnegativeAmount(raw)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("orderservice：時間不合法: %q", raw)
@@ -106,7 +113,7 @@ func (c *Client) MyOrders(ctx context.Context, buyerID int64, statusFilter strin
 		if err != nil {
 			return nil, err
 		}
-		created, err := unixMilli(o.GetCreateTime())
+		created, err := orderTime(o.GetCreateTime())
 		if err != nil {
 			return nil, err
 		}
@@ -130,6 +137,9 @@ func (c *Client) BuyerOrderDetail(ctx context.Context, buyerID int64, orderNo st
 	if err != nil {
 		return BuyerOrderDetail{}, fmt.Errorf("orderservice：GetOrder：%w", err)
 	}
+	if resp.Msg.GetCode() == codeNotFound {
+		return BuyerOrderDetail{}, ErrOrderNotFound
+	}
 	if resp.Msg.GetCode() != 0 {
 		return BuyerOrderDetail{}, fmt.Errorf("orderservice：GetOrder code=%d", resp.Msg.GetCode())
 	}
@@ -145,7 +155,7 @@ func (c *Client) BuyerOrderDetail(ctx context.Context, buyerID int64, orderNo st
 	if err != nil {
 		return BuyerOrderDetail{}, err
 	}
-	created, err := unixMilli(d.GetCreateTime())
+	created, err := orderTime(d.GetCreateTime())
 	if err != nil {
 		return BuyerOrderDetail{}, err
 	}
