@@ -165,3 +165,51 @@ func TestHideRejectsCategoriesThatDoNotApplyToBuyerContent(t *testing.T) {
 		t.Errorf("沒有管理員要被擋：%v", err)
 	}
 }
+
+func TestSubmitRejectsBlankAndDuplicateStagedTokensBeforeAnyCall(t *testing.T) {
+	cases := []struct {
+		name   string
+		tokens []string
+		field  string
+	}{
+		{"blank", []string{"a", "  \t"}, "StagedTokens[1]"},
+		{"empty", []string{""}, "StagedTokens[0]"},
+		{"duplicate", []string{"a", "b", "a"}, "StagedTokens[2]"},
+		{"duplicate after trim", []string{"a", " a "}, "StagedTokens[1]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := &orders{}
+			in := valid()
+			in.StagedTokens = tc.tokens
+			_, err := service(o).Submit(context.Background(), in)
+			var ae *apperr.Error
+			if o.calls != 0 || apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != tc.field {
+				t.Fatalf("calls=%d err=%v", o.calls, err)
+			}
+		})
+	}
+}
+
+func TestHideAndRestoreRejectInvalidUTF8(t *testing.T) {
+	bad := "a\xffb"
+	cases := map[string]func() error{
+		"hide text": func() error {
+			_, err := service(&orders{}).Hide(context.Background(), model.HideInput{Category: "SPAM", AdminID: 1, Text: bad})
+			return err
+		},
+		"hide source ref": func() error {
+			_, err := service(&orders{}).Hide(context.Background(), model.HideInput{Category: "SPAM", AdminID: 1, SourceRef: bad})
+			return err
+		},
+		"restore reason": func() error {
+			_, err := service(&orders{}).Restore(context.Background(), model.RestoreInput{AdminID: 1, Reason: bad})
+			return err
+		},
+	}
+	for name, f := range cases {
+		if err := f(); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s 要回 InvalidInput：%v", name, err)
+		}
+	}
+}

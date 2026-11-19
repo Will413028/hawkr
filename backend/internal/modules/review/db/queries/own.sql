@@ -19,7 +19,7 @@ WHERE review_id = ANY(sqlc.arg(review_ids)::uuid[])
 ORDER BY review_id, position;
 
 -- name: ListMyReviews :many
--- 作者本人：隱藏的評價不給作者（舊行為；作者看自己被隱藏的評價是 A6-4 的申覆題）。keyset：(created_at, id) 由大到小。
+-- 作者本人：隱藏的評價不給作者（舊行為）。keyset：(created_at, id) 由大到小。
 SELECT r.* FROM review.reviews AS r
 WHERE r.buyer_id = sqlc.arg(buyer_id)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)

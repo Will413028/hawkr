@@ -1,4 +1,4 @@
--- 買家刪帳的事實在 review 的複本（schema.sql 的 inactive_authors）：公開可讀的述詞引用它。訂閱者在 A6-1c。
+-- 買家刪帳的事實在 review 的複本（schema.sql 的 inactive_authors）：公開可讀的述詞引用它。
 
 -- name: InsertInactiveAuthor :execrows
 -- 冪等：買家的狀態不會回到營運中，所以只插入不刪除；已經有的列 0 列。

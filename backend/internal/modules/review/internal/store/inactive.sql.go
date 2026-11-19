@@ -22,7 +22,7 @@ type InsertInactiveAuthorParams struct {
 	Since   time.Time
 }
 
-// 買家刪帳的事實在 review 的複本（schema.sql 的 inactive_authors）：公開可讀的述詞引用它。訂閱者在 A6-1c。
+// 買家刪帳的事實在 review 的複本（schema.sql 的 inactive_authors）：公開可讀的述詞引用它。
 // 冪等：買家的狀態不會回到營運中，所以只插入不刪除；已經有的列 0 列。
 func (q *Queries) InsertInactiveAuthor(ctx context.Context, arg InsertInactiveAuthorParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertInactiveAuthor, arg.BuyerID, arg.Since)

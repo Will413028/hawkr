@@ -159,7 +159,7 @@ type ListMyReviewsParams struct {
 	PageSize       int32
 }
 
-// 作者本人：隱藏的評價不給作者（舊行為；作者看自己被隱藏的評價是 A6-4 的申覆題）。keyset：(created_at, id) 由大到小。
+// 作者本人：隱藏的評價不給作者（舊行為）。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListMyReviews(ctx context.Context, arg ListMyReviewsParams) ([]ReviewReview, error) {
 	rows, err := q.db.Query(ctx, listMyReviews,
 		arg.BuyerID,

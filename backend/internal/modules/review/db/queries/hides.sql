@@ -11,6 +11,6 @@ RETURNING *;
 -- name: RestoreHide :one
 -- 還原評價目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 UPDATE review.hides
-SET restored_at = sqlc.arg(now), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
+SET restored_at = GREATEST(sqlc.arg(now)::timestamptz, hidden_at), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
 WHERE review_id = sqlc.arg(review_id) AND restored_at IS NULL
 RETURNING *;

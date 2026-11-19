@@ -60,6 +60,12 @@
     "review.reply_too_long": {
       "message": "The reply cannot exceed {max} characters"
     },
+    "review.staged_token_blank": {
+      "message": "An image reference cannot be blank"
+    },
+    "review.staged_token_duplicate": {
+      "message": "The same image cannot be attached twice"
+    },
     "review.store_ids_invalid": {
       "message": "Provide 1 to {max} positive store IDs"
     },

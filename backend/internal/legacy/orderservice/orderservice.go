@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -173,6 +174,12 @@ var ErrOrderNotFound = errors.New("orderservice：訂單不存在")
 // grpcNotFound 是 GrpcResponseCode.NOT_FOUND（Java common-core）。
 const grpcNotFound = 404
 
+// 評價快照寫進 review.reviews，長度上限與該表的 CHECK 相同（order_no 1..64、sku_name <= 255，以字元計）。
+const (
+	maxReviewOrderNoRunes = 64
+	maxReviewSkuNameRunes = 255
+)
+
 // ReviewOrder 是評價資格與快照的已解析投影：訂單與它的項目。
 type ReviewOrder struct {
 	OrderNo     string
@@ -226,6 +233,12 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 	if data.GetOrderNo() == "" || data.GetStatus() == "" {
 		return ReviewOrder{}, fmt.Errorf("orderservice：訂單號或狀態缺失")
 	}
+	if data.GetOrderNo() != orderNo {
+		return ReviewOrder{}, fmt.Errorf("orderservice：回應的訂單號 %q 不是請求的 %q", data.GetOrderNo(), orderNo)
+	}
+	if utf8.RuneCountInString(data.GetOrderNo()) > maxReviewOrderNoRunes {
+		return ReviewOrder{}, fmt.Errorf("orderservice：訂單號超過 %d 字元", maxReviewOrderNoRunes)
+	}
 	out := ReviewOrder{OrderNo: data.GetOrderNo(), BuyerID: buyerID, StoreID: storeID, Status: data.GetStatus(), CompletedAt: completedAt.UTC(), Items: make([]ReviewOrderItem, 0, len(resp.Msg.GetItems()))}
 	for _, item := range resp.Msg.GetItems() {
 		itemID, err := positiveID(item.GetOrderItemId())
@@ -239,6 +252,9 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 		price, err := nonnegativeAmount(item.GetPrice())
 		if err != nil {
 			return ReviewOrder{}, err
+		}
+		if !utf8.ValidString(item.GetSkuName()) || utf8.RuneCountInString(item.GetSkuName()) > maxReviewSkuNameRunes {
+			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 %d 的規格名稱不合法", itemID)
 		}
 		out.Items = append(out.Items, ReviewOrderItem{OrderItemID: itemID, ProductID: productID, SkuName: item.GetSkuName(), ImageKey: item.GetImageObjectKey(), Price: price})
 	}

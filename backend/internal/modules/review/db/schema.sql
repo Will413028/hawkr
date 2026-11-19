@@ -11,7 +11,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA review;
 
 -- 買家對一個訂單項目的評價（一個 order_item_id 至多一則，UNIQUE 是「已評價過」的最終保證）。評價不可編輯、沒有作者自刪的入口，所以沒有 deleted_at；
--- 買家刪帳時評價被實刪（A6-D6，purge job 在 A6-1c）。ID 是 UUIDv7；buyer_id、store_id、product_id、order_item_id 是外部的業務鍵。
+-- 買家刪帳時評價被實刪（purge job 隨刪帳訂閱者另外接）。ID 是 UUIDv7；buyer_id、store_id、product_id、order_item_id 是外部的業務鍵。
 -- order_no、sku_name、item_image_key、price 是建立當下取自訂單項目的快照（RD6：不收 client 的值），之後不變。content 空就是 NULL。
 CREATE TABLE review.reviews (
     id             UUID        PRIMARY KEY,
@@ -53,6 +53,7 @@ CREATE TABLE review.review_images (
     asset_id   TEXT     NOT NULL,
     object_key TEXT     NOT NULL,
     PRIMARY KEY (review_id, position),
+    CONSTRAINT review_images_asset_key UNIQUE (review_id, asset_id),
     CONSTRAINT review_images_position_check CHECK (position BETWEEN 0 AND 3),
     CONSTRAINT review_images_asset_check CHECK (asset_id <> ''),
     CONSTRAINT review_images_key_check CHECK (object_key <> '')
@@ -86,7 +87,7 @@ CREATE UNIQUE INDEX hides_active_review ON review.hides (review_id) WHERE restor
 CREATE INDEX hides_review ON review.hides (review_id, hidden_at);
 
 -- 不再營運中的買家（刪除中與已關閉）作者的複本：公開可讀的述詞引用它（NOT EXISTS），讓刪帳申請的那個 transaction 起評價就看不到、不計分
--- （A6-D6）。買家的狀態不回到營運中，只插入不刪除，冪等。寫入的訂閱者在 A6-1c。不讀 buyer.pub_inactive_buyers()（它只給每日對帳）。
+-- 。買家的狀態不回到營運中，只插入不刪除，冪等。不讀 buyer.pub_inactive_buyers()（它只給每日對帳）。
 CREATE TABLE review.inactive_authors (
     buyer_id BIGINT      PRIMARY KEY,
     since    TIMESTAMPTZ NOT NULL,

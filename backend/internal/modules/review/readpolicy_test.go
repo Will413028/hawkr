@@ -95,6 +95,9 @@ func TestEveryPublicQueryCarriesThePublicPredicate(t *testing.T) {
 // 公開讀取以外讀 review.reviews 的查詢（寫入路徑、作者本人、診斷）要明列：新增的讀取預設是公開讀取，放在 public.sql 才有述詞的保證。
 var nonPublicReads = map[string]bool{
 	"InsertReview": true, "ListMyReviews": true, "ReplyToReview": true, "GetReviewForDiagnosis": true, "LockReview": true,
+	// review.review_images 的非公開讀寫：附圖只經已過可讀述詞的評價列取（ListReviewImages 的呼叫端傳入的 ID 來自公開或作者本人的列），
+	// ReviewAssets 是媒體同步 job 讀業務列現況，不對外。
+	"InsertReviewImage": true, "ListReviewImages": true, "ReviewAssets": true,
 }
 
 // ReplyToReview 雖然不在 public.sql，仍以公開可讀為回覆的前提。
@@ -102,7 +105,7 @@ var nonPublicWithPredicate = map[string]bool{"ReplyToReview": true}
 
 func TestNonPublicReviewReadsAreListed(t *testing.T) {
 	golden := goldenPredicate(t)
-	reviews := regexp.MustCompile(`review\.reviews\b`)
+	reviews := regexp.MustCompile(`review\.(reviews|review_images)\b`)
 	seen := map[string]bool{}
 	for _, q := range loadQueries(t) {
 		if q.file == "public.sql" || !reviews.MatchString(q.body) {
@@ -110,7 +113,7 @@ func TestNonPublicReviewReadsAreListed(t *testing.T) {
 		}
 		seen[q.name] = true
 		if !nonPublicReads[q.name] {
-			t.Errorf("%s（%s）讀寫 review.reviews 卻不在 public.sql，也不在 nonPublicReads：公開讀取要放進 public.sql", q.name, q.file)
+			t.Errorf("%s（%s）讀寫 review.reviews 或 review.review_images 卻不在 public.sql，也不在 nonPublicReads：公開讀取要放進 public.sql", q.name, q.file)
 		}
 		if nonPublicWithPredicate[q.name] && !strings.Contains(q.body, golden) {
 			t.Errorf("%s 要帶公開可讀述詞", q.name)
@@ -118,7 +121,7 @@ func TestNonPublicReviewReadsAreListed(t *testing.T) {
 	}
 	for name := range nonPublicReads {
 		if !seen[name] {
-			t.Errorf("nonPublicReads 的 %s 已經不存在或不再讀 review.reviews，從名單移除", name)
+			t.Errorf("nonPublicReads 的 %s 已經不存在或不再讀這兩張表，從名單移除", name)
 		}
 	}
 }

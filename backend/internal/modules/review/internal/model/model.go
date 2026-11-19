@@ -20,7 +20,7 @@ const (
 	MaxImages = 4
 	// ReviewWindow 是訂單完成後可以評價的期限。
 	ReviewWindow = 30 * 24 * time.Hour
-	// OrderStatusCompleted 是訂單狀態「已完成」，只有它能評價（A6-D7 (a)）。
+	// OrderStatusCompleted 是訂單狀態「已完成」，只有它能評價。
 	OrderStatusCompleted = "50"
 	// DefaultPageSize 與 MaxPageSize 是列表的預設與上限（AIP-158）。
 	DefaultPageSize = 20
@@ -31,7 +31,7 @@ const (
 	MaxSourceRefRunes        = 200
 )
 
-// Reason 是 review 的業務原因（模組端的常數；對外的 ErrorReason 在 A6-5 以 proto 定案，與 apperr 的分類搭配使用）。
+// Reason 是 review 的業務原因（模組端的常數，與 apperr 的分類搭配使用）。
 type Reason string
 
 const (

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 	"unicode/utf8"
 	"uuid"
@@ -162,6 +163,21 @@ func (s *Service) checkSubmit(l uitext.Locale, in *model.SubmitInput) (string, i
 	if len(in.StagedTokens) > model.MaxImages {
 		return "", 0, apperr.InvalidInputOn([]string{"StagedTokens"}, "%s", text.ReviewTooManyImages(l, text.ReviewTooManyImagesArgs{Max: model.MaxImages}))
 	}
+	tokens := make([]string, len(in.StagedTokens))
+	seen := make(map[string]struct{}, len(tokens))
+	for i, t := range in.StagedTokens {
+		t = strings.TrimSpace(t)
+		field := apperr.IndexedField("StagedTokens", i)
+		if t == "" {
+			return "", 0, apperr.InvalidInputOn([]string{field}, "%s", text.ReviewStagedTokenBlank(l))
+		}
+		if _, dup := seen[t]; dup {
+			return "", 0, apperr.InvalidInputOn([]string{field}, "%s", text.ReviewStagedTokenDuplicate(l))
+		}
+		seen[t] = struct{}{}
+		tokens[i] = t
+	}
+	in.StagedTokens = tokens
 	if !utf8.ValidString(in.Content) {
 		return "", 0, apperr.InvalidInputOn([]string{"Content"}, "%s", text.ReviewContentInvalidText(l))
 	}
@@ -184,7 +200,7 @@ func findItem(items []model.OrderItem, id int64) (model.OrderItem, bool) {
 	return model.OrderItem{}, false
 }
 
-// bust 排入店面頁的快取失效（評價數與評分在店面頁）；必須在 transaction 內呼叫。商品頁的 tag 在 A6-1c 隨 revalidate.ProductTag 加入。
+// bust 排入店面頁的快取失效（評價數與評分在店面頁）；必須在 transaction 內呼叫。
 func (s *Service) bust(ctx context.Context, storeID int64) error {
 	st, err := s.d.Stores.Store(ctx, storeID)
 	switch {
@@ -198,7 +214,7 @@ func (s *Service) bust(ctx context.Context, storeID int64) error {
 }
 
 // Reply 是店家回覆（可覆蓋，每次都重跑詞典）：店家要有 CapMarketing（停權 fail-closed）；擁有權與公開可讀都在 UPDATE 的 WHERE，
-// 0 列時補查分流。不發事件、不排失效（舊行為：回覆不改任何聚合）。
+// 先鎖評價列（與 Hide 序列化），0 列時補查分流。不發事件、不排失效（舊行為：回覆不改任何聚合）。
 func (s *Service) Reply(ctx context.Context, in model.ReplyInput) (model.Review, error) {
 	l := uitext.LocaleFrom(ctx)
 	if err := seller.Authorize(in.Store, seller.CapMarketing); err != nil {
@@ -218,29 +234,40 @@ func (s *Service) Reply(ctx context.Context, in model.ReplyInput) (model.Review,
 		return model.Review{}, model.WithReason(apperr.InvalidInputOn([]string{"Content"}, "%s", text.ReviewModerationRejected(l)), model.ReasonModerationRejected)
 	}
 
-	q := s.q(ctx)
-	now := s.d.Now().UTC()
-	row, err := q.ReplyToReview(ctx, store.ReplyToReviewParams{ID: in.ReviewID, StoreID: in.Store.StoreID, Content: &content, Now: &now})
-	if errors.Is(err, pgx.ErrNoRows) {
-		existing, derr := q.GetReviewForDiagnosis(ctx, in.ReviewID)
-		switch {
-		case errors.Is(derr, pgx.ErrNoRows):
-			return model.Review{}, apperr.NotFound("%s", text.ReviewNotFound(l))
-		case derr != nil:
-			return model.Review{}, derr
-		case existing.StoreID != in.Store.StoreID:
-			return model.Review{}, apperr.PermissionDenied("%s", text.ReviewNotYourReview(l))
+	var out model.Review
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		if _, err := q.LockReview(ctx, in.ReviewID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return apperr.NotFound("%s", text.ReviewNotFound(l))
+			}
+			return err
 		}
-		return model.Review{}, model.WithReason(apperr.FailedPrecondition("%s", text.ReviewNotReplyable(l)), model.ReasonNotReplyable)
-	}
-	if err != nil {
-		return model.Review{}, err
-	}
-	images, err := q.ListReviewImages(ctx, []uuid.UUID{row.ID})
-	if err != nil {
-		return model.Review{}, err
-	}
-	return rows.Review(row, rows.Images(images)[row.ID]), nil
+		now := s.d.Now().UTC()
+		row, err := q.ReplyToReview(ctx, store.ReplyToReviewParams{ID: in.ReviewID, StoreID: in.Store.StoreID, Content: &content, Now: &now})
+		if errors.Is(err, pgx.ErrNoRows) {
+			existing, derr := q.GetReviewForDiagnosis(ctx, in.ReviewID)
+			switch {
+			case errors.Is(derr, pgx.ErrNoRows):
+				return apperr.NotFound("%s", text.ReviewNotFound(l))
+			case derr != nil:
+				return derr
+			case existing.StoreID != in.Store.StoreID:
+				return apperr.PermissionDenied("%s", text.ReviewNotYourReview(l))
+			}
+			return model.WithReason(apperr.FailedPrecondition("%s", text.ReviewNotReplyable(l)), model.ReasonNotReplyable)
+		}
+		if err != nil {
+			return err
+		}
+		images, err := q.ListReviewImages(ctx, []uuid.UUID{row.ID})
+		if err != nil {
+			return err
+		}
+		out = rows.Review(row, rows.Images(images)[row.ID])
+		return nil
+	})
+	return out, err
 }
 
 // Hide 隱藏一則評價（moderation 的 transaction 內呼叫）；已有未還原的隱藏時回既有的那一筆（Created 為假，冪等，不發事件）。
@@ -282,6 +309,9 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 	if in.AdminID <= 0 {
 		return model.Hide{}, apperr.InvalidInputOn([]string{"AdminID"}, "%s", text.HideAdminRequired())
 	}
+	if !utf8.ValidString(in.Reason) {
+		return model.Hide{}, apperr.InvalidInputOn([]string{"Reason"}, "%s", text.HideTextInvalid())
+	}
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > model.MaxHideReasonRunes {
 		return model.Hide{}, apperr.InvalidInputOn([]string{"Reason"}, "%s", text.HideRestoreReason(text.HideRestoreReasonArgs{Max: model.MaxHideReasonRunes}))
 	}
@@ -296,7 +326,7 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		now := s.d.Now().UTC()
-		row, err := q.RestoreHide(ctx, store.RestoreHideParams{ReviewID: in.ReviewID, AdminID: &in.AdminID, Reason: &in.Reason, Now: &now})
+		row, err := q.RestoreHide(ctx, store.RestoreHideParams{ReviewID: in.ReviewID, AdminID: &in.AdminID, Reason: &in.Reason, Now: now})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.FailedPrecondition("%s", text.HideNotHidden())
 		}
@@ -326,6 +356,9 @@ func checkReason(in model.HideInput) error {
 	}
 	if !valid {
 		return apperr.InvalidInputOn([]string{"Category"}, "%s", text.HideCategoryInvalid())
+	}
+	if !utf8.ValidString(in.Text) || !utf8.ValidString(in.SourceRef) {
+		return apperr.InvalidInputOn([]string{"Text"}, "%s", text.HideTextInvalid())
 	}
 	if utf8.RuneCountInString(in.Text) > model.MaxHideReasonRunes {
 		return apperr.InvalidInputOn([]string{"Text"}, "%s", text.HideReasonTooLong(text.HideReasonTooLongArgs{Max: model.MaxHideReasonRunes}))

@@ -59,6 +59,11 @@ func HideSourceRefTooLong(a HideSourceRefTooLongArgs) uitext.Message {
 	return uitext.Message{Text: "來源參照不可超過 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
 }
 
+// HideTextInvalid 是後台員工受眾的模組句子 hide.text_invalid（只有 zh-TW）。
+func HideTextInvalid() uitext.Message {
+	return uitext.Message{Text: "文字不是有效的內容", Locale: uitext.ZhTW}
+}
+
 // ReviewAlreadyExists 是模組句子 review.already_exists；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReviewAlreadyExists(l uitext.Locale) uitext.Message {
 	switch l {
@@ -247,6 +252,24 @@ func ReviewReplyTooLong(l uitext.Locale, a ReviewReplyTooLongArgs) uitext.Messag
 		return uitext.Message{Text: "The reply cannot exceed " + strconv.Itoa(a.Max) + " characters", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "回覆不可超過 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
+}
+
+// ReviewStagedTokenBlank 是模組句子 review.staged_token_blank；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewStagedTokenBlank(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "An image reference cannot be blank", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "附圖不可為空白", Locale: uitext.ZhTW}
+}
+
+// ReviewStagedTokenDuplicate 是模組句子 review.staged_token_duplicate；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewStagedTokenDuplicate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The same image cannot be attached twice", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "附圖不可重複", Locale: uitext.ZhTW}
 }
 
 // ReviewStoreIdsInvalidArgs 是 ReviewStoreIdsInvalid 的參數。

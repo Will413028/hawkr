@@ -197,7 +197,7 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描）。cmd/hawkr 在 A6-1c 接上。
+// AddWorkers 登記 River worker（媒體引用同步與保底掃描）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) { mediaref.AddWorkers(workers, m.mediaSync) }
 
 // PeriodicJobs 回傳保底掃描的排程。

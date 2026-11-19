@@ -456,3 +456,77 @@ func TestListFiltersAndKeysetAcrossTimestamps(t *testing.T) {
 		t.Fatalf("預設頁大小與附圖：%+v", all.Reviews)
 	}
 }
+
+// 同一個 asset 不能在同一則評價出現兩次：服務層擋重複 token，DB 的 UNIQUE (review_id, asset_id) 是後備。
+func TestReviewImageAssetIsUniquePerReview(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	b := f.newBuyer(t)
+	it := f.order(b, storeID, 700)
+	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a", "a"}})
+	if kindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("重複 token 要被擋：%v", err)
+	}
+	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a"}}))
+	_, err = f.db.Conn(ctx).Exec(ctx, "INSERT INTO review.review_images (review_id, position, asset_id, object_key) VALUES ($1, 1, $2, 'y')", r.ID, r.Images[0].AssetID)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "review_images_asset_key" {
+		t.Fatalf("同一 asset 重複要被 UNIQUE 擋下：%v", err)
+	}
+}
+
+// 回覆與隱藏並發：隱藏的 transaction 還沒 commit 時回覆要等它（先鎖評價列），commit 後看得到隱藏，回覆被拒而不是落在已隱藏的評價上。
+func TestReplyWaitsForAConcurrentHide(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	st := f.store(t, storeID)
+
+	replyErr := make(chan error, 1)
+	err := f.db.InTx(ctx, func(txCtx context.Context) error {
+		must[review.Hide](t)(f.module.Hide(txCtx, review.HideInput{ReviewID: r.ID, Category: "SPAM", Text: "廣告", AdminID: 1}))
+		go func() {
+			_, err := f.module.Reply(ctx, review.ReplyInput{Store: st, ReviewID: r.ID, Content: "謝謝"})
+			replyErr <- err
+		}()
+		deadline := time.Now().Add(10 * time.Second)
+		for f.scalar(t, "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()") == 0 {
+			if time.Now().After(deadline) {
+				return errors.New("回覆沒有等隱藏的 transaction")
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-replyErr; review.ReasonOf(err) != review.ReasonNotReplyable {
+		t.Fatalf("並發隱藏後回覆要被拒：%v", err)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM review.reviews WHERE id = $1 AND reply_content IS NOT NULL", r.ID); n != 0 {
+		t.Fatal("回覆不得落在已隱藏的評價上")
+	}
+}
+
+// 時鐘倒退（多個實例的時差）時還原的 restored_at 不得早於 hidden_at（hides_restore_check）。
+func TestRestoreNeverPrecedesHiddenAt(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	h := hide(t, f, r.ID)
+	f.advance(-time.Hour)
+	restored, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判"})
+	if err != nil {
+		t.Fatalf("時鐘倒退不得讓還原失敗：%v", err)
+	}
+	if restored.RestoredAt == nil || restored.RestoredAt.Before(h.HiddenAt) {
+		t.Fatalf("restored_at %v 早於 hidden_at %v", restored.RestoredAt, h.HiddenAt)
+	}
+}

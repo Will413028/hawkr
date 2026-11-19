@@ -3,6 +3,7 @@ package orderservice
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,10 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 	badTime.Data.CompletedAt = "yesterday"
 	noProduct := validReviewResponse()
 	noProduct.Items[0].ProductId = ""
+	wrongOrder := validReviewResponse()
+	wrongOrder.Data.OrderNo = "N2"
+	longSku := validReviewResponse()
+	longSku.Items[0].SkuName = strings.Repeat("茶", 256)
 	cases := []struct {
 		name         string
 		fake         fakeReviewOrders
@@ -57,6 +62,8 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 		{"missing data", fakeReviewOrders{resp: noData}, false},
 		{"bad buyer", fakeReviewOrders{resp: badBuyer}, false},
 		{"bad completed_at", fakeReviewOrders{resp: badTime}, false},
+		{"order number differs from request", fakeReviewOrders{resp: wrongOrder}, false},
+		{"sku name too long", fakeReviewOrders{resp: longSku}, false},
 		{"item without product", fakeReviewOrders{resp: noProduct}, false},
 	}
 	for _, tc := range cases {
@@ -86,5 +93,15 @@ func TestOrderForReviewParsesSnapshot(t *testing.T) {
 	}
 	if len(got.Items) != 2 || got.Items[0] != want[0] || got.Items[1] != want[1] {
 		t.Fatalf("items = %+v", got.Items)
+	}
+}
+
+func TestOrderForReviewRejectsOrderNumberBeyondTheTableLimit(t *testing.T) {
+	long := strings.Repeat("N", 65)
+	resp := validReviewResponse()
+	resp.Data.OrderNo = long
+	_, err := (&Client{rpc: fakeReviewOrders{resp: resp}}).OrderForReview(context.Background(), long)
+	if err == nil || errors.Is(err, ErrOrderNotFound) {
+		t.Fatalf("err = %v", err)
 	}
 }

@@ -61,13 +61,13 @@ func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ReviewH
 
 const restoreHide = `-- name: RestoreHide :one
 UPDATE review.hides
-SET restored_at = $1, restored_by = $2, restore_reason = $3
+SET restored_at = GREATEST($1::timestamptz, hidden_at), restored_by = $2, restore_reason = $3
 WHERE review_id = $4 AND restored_at IS NULL
 RETURNING id, review_id, reason_category, reason_text, source_ref, admin_id, hidden_at, restored_at, restored_by, restore_reason
 `
 
 type RestoreHideParams struct {
-	Now      *time.Time
+	Now      time.Time
 	AdminID  *int64
 	Reason   *string
 	ReviewID uuid.UUID
