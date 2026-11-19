@@ -744,10 +744,34 @@ CREATE TABLE seller.measure_contents (
     -- measures.status 的複本，由複合外鍵 ON UPDATE CASCADE 隨措施狀態同步（不由程式維護）；唯一索引 measure_contents_one_enforced 靠它保證
     -- 一則內容同時只有一個生效中的下架措施（生效狀態在 measures，部分唯一索引不能跨表，所以把狀態帶進這張表）。
     measure_status TEXT NOT NULL DEFAULT 'ENFORCED',
+    -- 處分依據的內容版本（A7-D29，由建立措施的入口傳入、措施擁有）：snapshot_state 是 CAPTURED（四個快照欄位與連結都有值）或 CLEARED（撤銷滿 184 天或店家退場後清空；快照欄位全空）。不存圖片，只存張數。連結目標：貼文與貼文留言連到貼文（link_post_id），
+    -- 討論區發言連到店家加討論串（link_store_id、link_thread_id）。seller 只驗格式，內容是否屬實由入口（social 快照）保證。
+    snapshot_state TEXT NOT NULL,
+    snapshot_body  TEXT,
+    snapshot_authored_at TIMESTAMPTZ,
+    snapshot_image_count INTEGER,
+    link_post_id   UUID,
+    link_store_id  BIGINT,
+    link_thread_id UUID,
     PRIMARY KEY (measure_id, content_kind, content_id),
     CONSTRAINT measure_contents_measure_status_fkey FOREIGN KEY (measure_id, measure_status) REFERENCES seller.measures (id, status) ON UPDATE CASCADE,
-    CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
+    CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY')),
+    CONSTRAINT measure_contents_snapshot_state_check CHECK (snapshot_state IN ('CAPTURED', 'CLEARED')),
+    CONSTRAINT measure_contents_snapshot_fields_check CHECK (
+        (snapshot_state = 'CAPTURED') = (snapshot_body IS NOT NULL AND snapshot_authored_at IS NOT NULL AND snapshot_image_count IS NOT NULL)
+        AND (snapshot_state = 'CAPTURED' OR (snapshot_body IS NULL AND snapshot_authored_at IS NULL AND snapshot_image_count IS NULL
+            AND link_post_id IS NULL AND link_store_id IS NULL AND link_thread_id IS NULL))
+    ),
+    CONSTRAINT measure_contents_snapshot_image_count_check CHECK (snapshot_image_count >= 0),
+    CONSTRAINT measure_contents_link_check CHECK (snapshot_state <> 'CAPTURED' OR (
+        CASE content_kind
+            WHEN 'FORUM_ENTRY' THEN link_post_id IS NULL AND link_store_id IS NOT NULL AND link_store_id > 0 AND link_thread_id IS NOT NULL
+            ELSE link_post_id IS NOT NULL AND link_store_id IS NULL AND link_thread_id IS NULL
+        END
+    ))
 );
+-- 撤銷後 184 天的清空 job 掃描（只含已撤銷、還留著快照的列；measure_status 是措施狀態的複本）。
+CREATE INDEX measure_contents_captured ON seller.measure_contents (measure_id) WHERE snapshot_state = 'CAPTURED' AND measure_status = 'REVOKED';
 CREATE UNIQUE INDEX measure_contents_one_enforced ON seller.measure_contents (content_kind, content_id) WHERE measure_status = 'ENFORCED';
 
 -- 措施的版本歷史（append-only，SQL:2011 系統版本表的歷史表）：每一版的完整快照（給賣家的理由、結束時間；警告沒有結束時間），

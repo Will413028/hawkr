@@ -7,6 +7,7 @@ const _storefrontWrite = SellerCapability.SELLER_CAPABILITY_STOREFRONT_WRITE;
 const _productManage = SellerCapability.SELLER_CAPABILITY_PRODUCT_MANAGE;
 const _orderFulfill = SellerCapability.SELLER_CAPABILITY_ORDER_FULFILL;
 const _marketing = SellerCapability.SELLER_CAPABILITY_MARKETING;
+const _contentContract = SellerCapability.SELLER_CAPABILITY_CONTENT_CONTRACT;
 const _chatRead = SellerCapability.SELLER_CAPABILITY_CHAT_READ;
 const _notification = SellerCapability.SELLER_CAPABILITY_NOTIFICATION;
 const _accountClose = SellerCapability.SELLER_CAPABILITY_ACCOUNT_CLOSE;
@@ -63,7 +64,7 @@ final Map<String, SellerCapability?> routeCapabilities = {
   PostRoutes.mediaPicker: _marketing,
   PostRoutes.compose: _marketing,
   PostRoutes.edit: _marketing,
-  PostRoutes.feed: _marketing,
+  PostRoutes.feed: _contentContract,
 
   SellerRoutes.certificationUpload: _storefrontWrite,
   SellerRoutes.photoTools: null,
@@ -83,7 +84,7 @@ final Map<String, SellerCapability?> routeCapabilities = {
   SettingsRoutes.notificationSettings: _notification,
   SettingsRoutes.help: null,
   SettingsRoutes.myReports: null,
-  SettingsRoutes.blockList: null,
+  SettingsRoutes.blockList: _contentContract,
 
   ToolRoutes.photoEditor: null,
   ToolRoutes.richTextEditor: null,

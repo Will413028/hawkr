@@ -347,6 +347,14 @@
       },
       "description": "送出前的冷卻警告。days 是整天數，不足一天進位為一天。"
     },
+    "seller.Measure.removed_contents_cleared": {
+      "message": "內容副本已超過保留期限並刪除。",
+      "description": "被下架內容的快照已超過保留期限清空時，取代摘要的說明句。"
+    },
+    "seller.Measure.removed_contents_heading": {
+      "message": "下架的內容",
+      "description": "措施卡片中列出被下架內容的區塊標題。"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "停權中（未定結束時間，平台定期複審）",
       "description": "停權生效中、沒有結束時間時的效果行（由平台定期複審，不是永久）。"
@@ -415,6 +423,10 @@
     "seller.Measure.title_risk_fallback": {
       "message": "風險措施",
       "description": "依據是風險類型、但風險類型不認得時的標題。"
+    },
+    "seller.Measure.view_content_link": {
+      "message": "查看貼文",
+      "description": "被下架內容的連結文字（貼文、留言與討論區留言共用）。"
     },
     "seller.MeasureBasis.MEASURE_BASIS_CONTRACT": {
       "message": "契約條款",

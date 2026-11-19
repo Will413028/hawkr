@@ -223,6 +223,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return sellerMeasureMetaTerminationGround(l, ground: hawkr_seller_v1alpha1_seller.TerminationGround.valueOf(_n(params['ground']))!);
     case 'seller.Measure.rejection_cooldown_warning':
       return sellerMeasureRejectionCooldownWarning(l, days: (params['days']! as num).toInt());
+    case 'seller.Measure.removed_contents_cleared':
+      return sellerMeasureRemovedContentsCleared(l);
+    case 'seller.Measure.removed_contents_heading':
+      return sellerMeasureRemovedContentsHeading(l);
     case 'seller.Measure.suspension_active_open':
       return sellerMeasureSuspensionActiveOpen(l);
     case 'seller.Measure.suspension_active_until':
@@ -241,6 +245,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return sellerMeasureTitleRisk(l, ground: hawkr_seller_v1alpha1_seller.RiskGround.valueOf(_n(params['ground']))!);
     case 'seller.Measure.title_risk_fallback':
       return sellerMeasureTitleRiskFallback(l);
+    case 'seller.Measure.view_content_link':
+      return sellerMeasureViewContentLink(l);
     case 'seller.MeasureBasis':
       return hawkr_seller_v1alpha1_seller.MeasureBasis.valueOf(_n(value))!.uiText(l);
     case 'seller.MeasureKind':

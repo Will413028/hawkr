@@ -326,7 +326,7 @@ test("賣家貼文列表的桌機／手機入口都傳入停權、平台下架�
 		"SellerPostsClient 沒有渲染 PostPublishControl ⇒ 端點依舊零 caller",
 	);
 	assert.ok(
-		/suspended=\{isSuspended\}/.test(source),
+		/suspended=\{writeLocked\}/.test(source),
 		"沒把停權旗標傳進去 ⇒ 停權賣家會看到一顆按下去必定 9240 的發布鍵",
 	);
 	assert.ok(

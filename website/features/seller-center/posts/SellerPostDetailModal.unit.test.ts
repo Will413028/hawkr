@@ -5,11 +5,14 @@ import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PostListItem } from "@/lib/api/openapi-types";
 import { PostPublishStatus } from "@/lib/codemeta/enums";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
-const postComments = vi.fn((_props: { postId: string | number }) => null);
+const postComments = vi.fn(
+	(_props: { postId: string | number; [key: string]: unknown }) => null,
+);
 
 vi.mock("@/features/feed/components/PostComments", () => ({
-	default: (props: { postId: string | number }) => {
+	default: (props: { postId: string | number; [key: string]: unknown }) => {
 		postComments(props);
 		return React.createElement("div", { "data-testid": "post-comments" });
 	},
@@ -51,14 +54,20 @@ function post(overrides: Partial<PostListItem> = {}): PostListItem {
 function renderModal(
 	p: PostListItem,
 	storePublic: boolean | undefined,
+	delegated = false,
 ): ReturnType<typeof render> {
 	return render(
-		React.createElement(SellerPostDetailModal, {
-			open: true,
-			post: p,
-			storePublic,
-			onClose: () => {},
-		}),
+		React.createElement(
+			IntlTestWrapper,
+			null,
+			React.createElement(SellerPostDetailModal, {
+				open: true,
+				post: p,
+				storePublic,
+				delegated,
+				onClose: () => {},
+			}),
+		),
 	);
 }
 
@@ -67,60 +76,66 @@ afterEach(() => {
 	postComments.mockClear();
 });
 
+const STORE_NOT_PUBLIC = "店家目前不公開，買家看不到這些留言。";
+const UNPUBLISHED = "這則動態已下架，買家看不到這些留言。";
+const TAKEDOWN = "這則動態已被平台下架，買家看不到留言。";
+
 describe("SellerPostDetailModal comments", () => {
-	it("a store that cannot go public explains it and never mounts the public thread", async () => {
+	it("a store that cannot go public still loads the thread and explains why buyers cannot see it", async () => {
 		renderModal(post(), false);
-		expect(
-			await screen.findByText("店家公開後，買家的留言會顯示在這裡。"),
-		).toBeTruthy();
-		expect(postComments).not.toHaveBeenCalled();
-	});
-
-	for (const publishStatus of [
-		PostPublishStatus.DRAFT,
-		PostPublishStatus.UNPUBLISHED,
-	]) {
-		it(`an unpublished post (${publishStatus}) explains it needs publishing`, async () => {
-			renderModal(post({ publishStatus }), true);
-			expect(
-				await screen.findByText("動態發布後，買家的留言會顯示在這裡。"),
-			).toBeTruthy();
-			expect(postComments).not.toHaveBeenCalled();
-		});
-	}
-
-	it("a platform-hidden post says buyers cannot see comments", async () => {
-		renderModal(post({ hiddenAt: 1760000000 }), true);
-		expect(
-			await screen.findByText("這則動態已被平台下架，買家看不到留言。"),
-		).toBeTruthy();
-		expect(postComments).not.toHaveBeenCalled();
-	});
-
-	it("a draft that is also platform-hidden shows the platform-hidden copy", async () => {
-		renderModal(
-			post({ publishStatus: PostPublishStatus.DRAFT, hiddenAt: 1760000000 }),
-			true,
-		);
-		expect(
-			await screen.findByText("這則動態已被平台下架，買家看不到留言。"),
-		).toBeTruthy();
-		expect(postComments).not.toHaveBeenCalled();
-	});
-
-	it("a platform-hidden post of a non-public store shows the platform-hidden copy", async () => {
-		renderModal(post({ hiddenAt: 1760000000 }), false);
-		expect(
-			await screen.findByText("這則動態已被平台下架，買家看不到留言。"),
-		).toBeTruthy();
-		expect(postComments).not.toHaveBeenCalled();
-	});
-
-	it("a public post mounts the public thread as before", async () => {
-		renderModal(post(), true);
-		expect(await screen.findByTestId("post-comments")).toBeTruthy();
+		expect(await screen.findByText(STORE_NOT_PUBLIC)).toBeTruthy();
 		expect(postComments).toHaveBeenCalledWith(
 			expect.objectContaining({ postId: "42" }),
+		);
+	});
+
+	it("an owner-unpublished post still loads the thread and says it is unpublished", async () => {
+		renderModal(post({ publishStatus: PostPublishStatus.UNPUBLISHED }), true);
+		expect(await screen.findByText(UNPUBLISHED)).toBeTruthy();
+		expect(postComments).toHaveBeenCalledWith(
+			expect.objectContaining({ postId: "42" }),
+		);
+	});
+
+	it("a platform takedown (measure id) still loads the thread and says so", async () => {
+		renderModal(post({ takedownMeasureId: "m-1" }), true);
+		expect(await screen.findByText(TAKEDOWN)).toBeTruthy();
+		expect(postComments).toHaveBeenCalledWith(
+			expect.objectContaining({ postId: "42" }),
+		);
+	});
+
+	it("a takedown of a post in a non-public store shows the takedown line only", async () => {
+		renderModal(post({ takedownMeasureId: "m-1" }), false);
+		expect(await screen.findByText(TAKEDOWN)).toBeTruthy();
+		expect(screen.queryByText(STORE_NOT_PUBLIC)).toBeNull();
+	});
+
+	it("a public published post loads the thread with no notice", async () => {
+		renderModal(post(), true);
+		expect(await screen.findByTestId("post-comments")).toBeTruthy();
+		expect(screen.queryByText(STORE_NOT_PUBLIC)).toBeNull();
+		expect(screen.queryByText(UNPUBLISHED)).toBeNull();
+		expect(screen.queryByText(TAKEDOWN)).toBeNull();
+	});
+
+	it("hands the server's viewer state to the thread and offers blocking", async () => {
+		const viewer = {
+			canComment: true,
+			actor: { kind: "store" as const, id: "7", name: "測試店家" },
+		};
+		renderModal(post({ viewer }), true);
+		await screen.findByTestId("post-comments");
+		expect(postComments).toHaveBeenCalledWith(
+			expect.objectContaining({ viewer, allowBlockAuthor: true }),
+		);
+	});
+
+	it("does not offer blocking in a delegated workspace", async () => {
+		renderModal(post(), true, true);
+		await screen.findByTestId("post-comments");
+		expect(postComments).toHaveBeenCalledWith(
+			expect.objectContaining({ allowBlockAuthor: false }),
 		);
 	});
 });

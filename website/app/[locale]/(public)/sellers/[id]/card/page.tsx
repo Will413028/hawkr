@@ -6,6 +6,7 @@ import SellerCardPage, {
 } from "@/features/sellers/card/SellerCardPage";
 import { getCachedSeller } from "@/lib/api/cached";
 import { sellerStaticParams } from "@/lib/api/static-params";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import { sellerSchema } from "@/lib/seo/jsonld";
 import {
 	localeFromParam,
@@ -37,7 +38,7 @@ function cardDescription(seller: SellerCardSeller): string {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
 	const seller = (await getCachedSeller(id)) as SellerCardSeller | null;
-	if (!seller) return { title: "找不到賣家" };
+	if (!seller) return { title: sellerNotFoundTitle(locale) };
 
 	const canonical = sellerCanonicalUrl(
 		seller,

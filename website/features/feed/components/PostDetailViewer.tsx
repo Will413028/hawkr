@@ -647,7 +647,11 @@ function PostPage({
 				) : null}
 				{showInlineComments ? (
 					<div className="post-viewer__inline-comments">
-						<PostComments postId={post.id} active={commentsActive} />
+						<PostComments
+							postId={post.id}
+							viewer={post.viewer}
+							active={commentsActive}
+						/>
 					</div>
 				) : null}
 			</aside>

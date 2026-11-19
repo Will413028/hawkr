@@ -17,7 +17,7 @@ class _Repo extends Mock implements PostRepository {}
 
 Future<void> _pump(WidgetTester tester, MyStore? store) async {
   final repo = _Repo();
-  when(() => repo.listSellerMessages('7')).thenAnswer((_) async => []);
+  when(() => repo.listForumEntries('7')).thenAnswer((_) async => []);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

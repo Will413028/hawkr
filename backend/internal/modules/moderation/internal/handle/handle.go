@@ -309,6 +309,10 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
+	sn, err := measureSnapshot(c.Target.Kind, storeID, frozen)
+	if err != nil {
+		return err
+	}
 	created, err := s.d.Seller.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
 		AdminID:           in.Actor.AdminID,
 		StoreID:           storeID,
@@ -318,11 +322,24 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{
 			Category: in.Category, Severity: seller.Severity(in.Severity), SourceModerationReportIDs: ids,
 		}},
-		Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{ref}},
+		Takedown: &seller.ContentTakedown{Contents: []seller.TakedownContent{{ContentRef: ref, Snapshot: &sn}}},
 	})
 	if err != nil {
 		return err
 	}
 	res.storeID, res.measureID = storeID, &created.Measure.ID
 	return nil
+}
+
+// measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
+// 這裡只解析凍結的字串 id。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
+func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
+	post, _ := uuid.Parse(f.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
+	thread, _ := uuid.Parse(f.ThreadID) // 同上
+	k := seller.ContentKind(kind)
+	sn := seller.NewContentSnapshot(k, f.Body, f.AuthoredAt, len(f.MediaRefs), storeID, post, thread)
+	if err := seller.ValidateContentSnapshot(k, sn); err != nil {
+		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
+	}
+	return sn, nil
 }

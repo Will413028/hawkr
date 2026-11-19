@@ -235,8 +235,8 @@ func sortedUUIDs(ids []uuid.UUID) []uuid.UUID {
 }
 
 // sortedContents 回傳內容對象依（種類位元組順序、UUID 大端位元組順序）遞增排序的複本，不改動呼叫端的清單；對象是集合，順序沒有意義。
-func sortedContents(refs []model.ContentRef) []model.ContentRef {
-	return slices.SortedFunc(slices.Values(refs), func(a, b model.ContentRef) int {
+func sortedContents(refs []model.TakedownContent) []model.TakedownContent {
+	return slices.SortedFunc(slices.Values(refs), func(a, b model.TakedownContent) int {
 		if c := strings.Compare(string(a.Kind), string(b.Kind)); c != 0 {
 			return c
 		}
@@ -462,12 +462,11 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	var contents []model.ContentRef
 	if in.Takedown != nil {
-		contents = sortedContents(in.Takedown.Contents)
-		kinds, ids := make([]string, len(contents)), make([]uuid.UUID, len(contents))
-		for i, c := range contents {
-			kinds[i], ids[i] = string(c.Kind), c.ID
+		sorted := sortedContents(in.Takedown.Contents)
+		for _, c := range sorted {
+			contents = append(contents, c.ContentRef)
 		}
-		if err := q.InsertMeasureContents(ctx, store.InsertMeasureContentsParams{MeasureID: measureID, Kinds: kinds, Ids: ids}); err != nil {
+		if err := q.InsertMeasureContents(ctx, insertContentsParams(measureID, sorted)); err != nil {
 			return model.CreateMeasureResult{}, err
 		}
 	}
@@ -494,6 +493,22 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	}
 	measure, err := s.readRow(ctx, q, store.SellerMeasure(row), detailAdmin, now)
 	return model.CreateMeasureResult{Measure: measure}, err
+}
+
+// insertContentsParams 把全部對象展開成 InsertMeasureContents 的平行陣列；每個對象的快照必填，狀態一律是 CAPTURED。
+func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent) store.InsertMeasureContentsParams {
+	n := len(contents)
+	p := store.InsertMeasureContentsParams{
+		MeasureID: measureID, Kinds: make([]string, n), Ids: make([]uuid.UUID, n), States: make([]string, n), Bodies: make([]string, n),
+		AuthoredAts: make([]time.Time, n), ImageCounts: make([]int32, n), LinkPostIds: make([]uuid.UUID, n), LinkStoreIds: make([]int64, n), LinkThreadIds: make([]uuid.UUID, n),
+	}
+	for i, c := range contents {
+		sn := c.Snapshot
+		p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotCaptured)
+		p.Bodies[i], p.AuthoredAts[i], p.ImageCounts[i] = sn.Body, sn.AuthoredAt.UTC(), sn.ImageCount
+		p.LinkPostIds[i], p.LinkStoreIds[i], p.LinkThreadIds[i] = sn.Link.PostID, sn.Link.StoreID, sn.Link.ThreadID
+	}
+	return p
 }
 
 // checkNoActiveTakedown 拒絕目標內容已有生效中下架措施的內容下架：stint 鎖已串行同一個帳號的建立，所以這裡是給使用者的明確錯誤；

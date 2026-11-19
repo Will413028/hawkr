@@ -30,6 +30,32 @@ type EntryRow struct {
 // 規則同 topLevelComments：被封鎖排除的作者，頂層整則不出現，回覆不進「有可見回覆」的判斷。
 func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer, pg CommentPage) SelectStatement {
 	c := visibility.ForumEntriesOf("c", v)
+	return topLevelForumEntries(Int64(storeID), now, v, afterComment(c.T.CreatedAt, c.T.ID, pg)).
+		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
+		LIMIT(pg.Limit)
+}
+
+// GetForumThreadTop 是店家討論區的一則頂層留言（討論串的頂層項目），與 ListTopLevelForumEntries 同一套可見與佔位規則；
+// 已刪除或被隱藏而底下沒有可見回覆、被觀看者的封鎖排除、或不屬於這家店時沒有列。
+func GetForumThreadTop(storeID int64, threadID uuid.UUID, now time.Time, v visibility.Viewer) SelectStatement {
+	c := visibility.ForumEntriesOf("c", v)
+	return topLevelForumEntries(Int64(storeID), now, v, c.T.ID.EQ(UUID(threadID)))
+}
+
+// ForumThreadsReadable 是一批討論串（以頂層留言 id 找）中對外公開可讀（匿名觀看者）的頂層項目，與 GetForumThreadTop 同一個算式；
+// 觀看者由這裡擁有，呼叫端不需要也不能挑；呼叫端用回傳列的 store_id 與 id 對回要查的（店家，討論串）配對。
+func ForumThreadsReadable(threadIDs []uuid.UUID, now time.Time) SelectStatement {
+	v := visibility.Anonymous
+	c := visibility.ForumEntriesOf("c", v)
+	ids := make([]Expression, len(threadIDs))
+	for i, id := range threadIDs {
+		ids[i] = UUID(id)
+	}
+	return topLevelForumEntries(c.T.StoreID, now, v, c.T.ID.IN(ids...))
+}
+
+func topLevelForumEntries(storeID IntegerExpression, now time.Time, v visibility.Viewer, extra BoolExpression) SelectStatement {
+	c := visibility.ForumEntriesOf("c", v)
 	r := visibility.ForumEntriesOf("r", v)
 	s := table.ForumEntryStats.AS("s")
 	vis := LATERAL(SELECT(c.Counted().AS("visible"))).AS("v")
@@ -46,14 +72,12 @@ func ListTopLevelForumEntries(storeID int64, now time.Time, v visibility.Viewer,
 	).
 		FROM(c.T.INNER_JOIN(s, s.ForumEntryID.EQ(c.T.ID)).CROSS_JOIN(vis)).
 		WHERE(c.Where(
-			c.T.StoreID.EQ(Int64(storeID)),
+			c.T.StoreID.EQ(storeID),
 			c.T.ParentID.IS_NULL(),
-			visibility.ReadableForum(now, v, Int64(storeID)),
+			visibility.ReadableForum(now, v, storeID),
 			visible.OR(hasVisibleReply),
-			afterComment(c.T.CreatedAt, c.T.ID, pg),
-		)).
-		ORDER_BY(c.T.CreatedAt.ASC(), c.T.ID.ASC()).
-		LIMIT(pg.Limit)
+			extra,
+		))
 }
 
 // ListForumReplies 是頂層討論區留言的回覆（父留言可以是佔位項目，但不能被觀看者的封鎖排除）：自己可見、作者沒被排除、店家可曝光而且觀看者沒有封鎖這家店。

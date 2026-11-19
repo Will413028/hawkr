@@ -122,7 +122,7 @@ function formatTimestamp(ts: Timestamp): string {
 }
 
 /**
- * 措施的期間。警告沒有期間（伺服器不設 `period`）。停權沒有結束時間表示由平台定期複審，不是永久。
+ * 措施的期間。警告沒有期間（伺服器不設 `period`），內容下架不是停權，不顯示停權的期間句。停權沒有結束時間表示由平台定期複審，不是永久。
  * 終止合作是「終止生效：{開始}」（預告終止在預告期間還沒到開始時間）；只有預告終止在店家關閉時才有結束時間，
  * 此時加「合作已於 {結束} 結束」。停權的期間句兩端（網頁與 App）的資訊設計不同，留在 client。
  */
@@ -143,6 +143,7 @@ export function measurePeriodText(
 				: sellerMeasureTerminationEffective({ start }),
 		);
 	}
+	if (m.kind === MeasureKind.CONTENT_TAKEDOWN) return undefined;
 	if (period.endTime) {
 		return `停權期間：${start} 至 ${formatTimestamp(period.endTime)}`;
 	}

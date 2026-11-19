@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import InfiniteFeed from "@/features/feed/components/InfiniteFeed";
 import { getCachedSeller, getCachedStorePosts } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import { storeIdOfSeller } from "@/lib/seller/store-id";
 import {
 	localeFromParam,
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
 	const seller = await getCachedSeller(id);
 	const s = seller;
-	if (!s) return { title: "找不到賣家" };
+	if (!s) return { title: sellerNotFoundTitle(locale) };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
 	// Middleware already 308s a store_id URL here, but the redirect and this tag

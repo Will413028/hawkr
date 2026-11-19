@@ -63,6 +63,13 @@ service SocialPublicService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  // GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+  // （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+  // 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+  rpc GetForumThread(GetForumThreadRequest) returns (GetForumThreadResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   // RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
   // 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
   // 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
@@ -281,8 +288,9 @@ message Post {
   int64 share_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 這篇貼文的單篇網址（絕對網址，由伺服器組，分享用）；client 不自己拼。
   string url = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主讀自己店的貼文是 true。
-  // 這是顯示用的提示，寫入時伺服器仍會檢查。
+  // 觀看者此刻能不能在這篇貼文留言：訪客是 false；買家在這家店沒有被封鎖時是 true；店主是 true。
+  // 貼文要公開可讀（已發布、沒有刪除、沒有被內容下架、店家可曝光）：留言只寫得進公開可讀的貼文，所以店主讀自己店的草稿或已下架的貼文是 false。
+  // 這是顯示用的提示，寫入時伺服器仍會檢查（與寫入同一個判斷）。
   bool viewer_can_comment = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 貼文的狀態；只有店主讀自己的貼文（GetMyPost、ListMyPosts 與店主寫入的回應）才設，公開讀取不設。
   PostStatus status = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -355,7 +363,8 @@ message Comment {
   bool viewer_can_edit = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能刪除：VISIBLE 的自己的留言，或這篇貼文是自己的店的。
   bool viewer_can_delete = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false）。
+  // 觀看者能不能回覆：VISIBLE，而且這篇貼文是觀看者此刻的店的（貼文留言的回覆只限貼文所屬的店，買家一律 false），
+  // 而且這篇貼文公開可讀（回覆經 CreateComment，只寫得進公開可讀的貼文；草稿或已下架的貼文是 false）。
   bool viewer_can_reply = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
   string etag = 17;
@@ -464,7 +473,8 @@ message ForumEntry {
   bool viewer_can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 觀看者能不能刪除：VISIBLE 的自己的留言，或這是自己的店的討論區。
   bool viewer_can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能回覆：VISIBLE，而且觀看者在這家店的討論區沒有被封鎖（訪客是 false；店主讀自己的討論區是 true）。顯示用的提示，寫入時伺服器仍會檢查。
+  // 觀看者能不能回覆：VISIBLE，而且討論區對觀看者可寫（店家可曝光、觀看者沒有被這家店封鎖；訪客是 false；店主讀自己的討論區在店家可曝光時是 true）。
+  // 與 ListForumEntriesResponse.viewer_can_comment 同一個判斷。顯示用的提示，寫入時伺服器仍會檢查。
   bool viewer_can_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 只有 VISIBLE 的項目有；修改與刪除時帶回，client 視為不透明字串。
   string etag = 15;
@@ -486,9 +496,32 @@ message ListForumEntriesResponse {
   // 觀看者在這家店的討論區留言時的身分：觀看者此刻的店就是這家店時是店家（店名、店 logo），否則有買家身分時是買家（顯示名稱、頭像）；訪客不設。
   // 被這家店封鎖的買家仍設（身分不變，只是 viewer_can_comment 是 false）。名稱與頭像讀不到時只帶 kind 與 id。與 ForumEntry.viewer_can_reply 用同一套觀看者判斷。
   Actor viewer_actor = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 觀看者能不能在這家店的討論區新增頂層留言：買家沒有被這家店封鎖，或這就是觀看者此刻的店（訪客是 false）。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
+  // 觀看者能不能在這家店的討論區新增頂層留言：討論區要可寫（店家可曝光，與 CreateForumEntry 的前置檢查同一個判斷），而且買家沒有被這家店封鎖或這就是觀看者此刻的店（訪客是 false）。
+  // 店家不可曝光時店主也是 false。顯示用的提示，寫入時伺服器仍會檢查（店主還要有行銷權限）。
   // 意思是「能不能新增頂層討論區留言」，列回覆（設了 parent_id）時也照樣設、不隨 parent_id 變；單一留言能不能回覆看 ForumEntry.viewer_can_reply。
   bool viewer_can_comment = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetForumThreadRequest {
+  // 店家 ID。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 討論串 ID，即頂層留言的 ID。
+  string thread_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 回覆第一頁的大小，預設 20，上限 50。
+  int32 page_size = 3;
+}
+
+message GetForumThreadResponse {
+  // 討論串的頂層項目。
+  ForumEntry entry = 1;
+  // 回覆的第一頁，依建立時間舊到新。
+  repeated ForumEntry replies = 2;
+  // 還有下一頁時設；只能交給 ListForumEntries（同一組 store_id、parent_id = thread_id）。
+  string next_page_token = 3;
+  // 同 ListForumEntriesResponse.viewer_actor。
+  Actor viewer_actor = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 同 ListForumEntriesResponse.viewer_can_comment。
+  bool viewer_can_comment = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message RecordPostViewRequest {

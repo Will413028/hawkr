@@ -89,6 +89,8 @@ export type UiTextKey =
 	| "seller.Measure.meta_severity"
 	| "seller.Measure.meta_termination_ground"
 	| "seller.Measure.rejection_cooldown_warning"
+	| "seller.Measure.removed_contents_cleared"
+	| "seller.Measure.removed_contents_heading"
 	| "seller.Measure.suspension_active_open"
 	| "seller.Measure.suspension_active_until"
 	| "seller.Measure.suspension_ended"
@@ -98,6 +100,7 @@ export type UiTextKey =
 	| "seller.Measure.title_fallback"
 	| "seller.Measure.title_risk"
 	| "seller.Measure.title_risk_fallback"
+	| "seller.Measure.view_content_link"
 	| "seller.MeasureBasis.MEASURE_BASIS_CONTRACT"
 	| "seller.MeasureBasis.MEASURE_BASIS_RISK"
 	| "seller.MeasureBasis.MEASURE_BASIS_VIOLATION"
@@ -427,6 +430,16 @@ export function sellerMeasureRejectionCooldownWarning(a: { days: number }): UiMe
 	return { key: "seller.Measure.rejection_cooldown_warning", values: { days: a.days } };
 }
 
+/** seller.Measure.removed_contents_cleared */
+export function sellerMeasureRemovedContentsCleared(): UiMessage {
+	return { key: "seller.Measure.removed_contents_cleared" };
+}
+
+/** seller.Measure.removed_contents_heading */
+export function sellerMeasureRemovedContentsHeading(): UiMessage {
+	return { key: "seller.Measure.removed_contents_heading" };
+}
+
 /** seller.Measure.suspension_active_open */
 export function sellerMeasureSuspensionActiveOpen(): UiMessage {
 	return { key: "seller.Measure.suspension_active_open" };
@@ -472,6 +485,11 @@ export function sellerMeasureTitleRisk(a: { ground: RiskGround }): UiMessage | u
 /** seller.Measure.title_risk_fallback */
 export function sellerMeasureTitleRiskFallback(): UiMessage {
 	return { key: "seller.Measure.title_risk_fallback" };
+}
+
+/** seller.Measure.view_content_link */
+export function sellerMeasureViewContentLink(): UiMessage {
+	return { key: "seller.Measure.view_content_link" };
 }
 
 const SELLER_MEASURE_BASIS: Readonly<Partial<Record<number, UiTextKey>>> = {

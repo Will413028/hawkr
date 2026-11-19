@@ -20,6 +20,7 @@ var publicViewerDependent = map[string]bool{
 	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts":            true,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListComments":         true,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries":     true,
+	"/hawkr.social.v1alpha1.SocialPublicService/GetForumThread":       true,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingPosts": true,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTags":          false,
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags":  false,

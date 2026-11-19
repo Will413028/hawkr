@@ -3,6 +3,8 @@ import 'package:hawkr_seller/shared/widgets/linked_product_card.dart';
 import 'package:hawkr_seller/shared/widgets/optimized_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 // fixture 取自 2026-08-05 實打 dev 的 `PostProductData`（貼文列表的單數
@@ -13,7 +15,9 @@ const String _mediaBase = 'http://localhost:8080';
 
 Future<void> _pumpCard(
   WidgetTester tester,
-  Map<String, dynamic> linkedProduct, {
+  String name,
+  int price, {
+  String imageUrl = '',
   Size size = const Size(414, 896),
   double textScale = 1,
   bool inset = true,
@@ -42,7 +46,9 @@ Future<void> _pumpCard(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               LinkedProductCard(
-                linkedProduct: linkedProduct,
+                name: name,
+                price: price,
+                imageUrl: imageUrl,
                 onTap: onTap,
                 inset: inset,
               ),
@@ -75,18 +81,24 @@ bool _hasShadow(WidgetTester tester) {
 }
 
 void main() {
+  test('shared card does not depend on a feature model', () {
+    final source = File(
+      'lib/shared/widgets/linked_product_card.dart',
+    ).readAsStringSync();
+    expect(source, isNot(contains('features/')));
+  });
+
   setUpAll(() {
     if (!F.isInitialized) F.init(Flavor.dev);
   });
 
-  testWidgets('關聯商品圖走後端實際回傳的 imageKey（objectKey）', (tester) async {
-    await _pumpCard(tester, <String, dynamic>{
-      'id': '866542675787809994',
-      'name': '台灣紅豆',
-      'price': '195',
-      'imageKey': _key,
-      'imageUrl': '$_mediaBase/i/original/$_key',
-    });
+  testWidgets('關聯商品圖使用解析好的 imageUrl', (tester) async {
+    await _pumpCard(
+      tester,
+      '台灣紅豆',
+      195,
+      imageUrl: '$_mediaBase/i/original/$_key',
+    );
 
     final image = tester.widget<OptimizedNetworkImage>(
       find.byType(OptimizedNetworkImage),
@@ -94,14 +106,8 @@ void main() {
     expect(image.imageUrl, '$_mediaBase/i/original/$_key');
   });
 
-  testWidgets('imageKey 為空字串（建立回應的形狀）→ 不渲染圖片元件', (tester) async {
-    await _pumpCard(tester, <String, dynamic>{
-      'id': '866542675787809994',
-      'name': '台灣紅豆',
-      'price': '195',
-      'imageKey': '',
-      'imageUrl': '',
-    });
+  testWidgets('imageUrl 為空字串→ 不渲染圖片元件', (tester) async {
+    await _pumpCard(tester, '台灣紅豆', 195);
 
     expect(find.byType(OptimizedNetworkImage), findsNothing);
   });
@@ -111,7 +117,8 @@ void main() {
   ) async {
     await _pumpCard(
       tester,
-      <String, dynamic>{'name': '台灣紅豆', 'price': '195', 'imageKey': ''},
+      '台灣紅豆',
+      195,
       size: const Size(320, 720),
       onTap: () {},
     );
@@ -131,7 +138,8 @@ void main() {
       try {
         await _pumpCard(
           tester,
-          <String, dynamic>{'name': name, 'price': '123456789', 'imageKey': ''},
+          name,
+          123456789,
           size: const Size(320, 720),
           textScale: 1.4,
           inset: false,

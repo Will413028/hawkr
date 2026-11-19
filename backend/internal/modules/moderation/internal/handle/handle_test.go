@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -174,5 +175,25 @@ func TestFrozenContentReadsTheSnapshotOncePerDecide(t *testing.T) {
 	}
 	if q.reads != 1 {
 		t.Fatalf("讀了 %d 次", q.reads)
+	}
+}
+
+// 措施的內容快照取自案件凍結的內容：本文全文、發文時間、圖片張數；連結依種類（討論區留言是店家加討論串，其餘是貼文）；缺連結的舊格式不傳半個快照。
+func TestMeasureSnapshotFromTheFrozenContent(t *testing.T) {
+	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
+	post, thread := uuid.NewV7(), uuid.NewV7()
+	frozen := snapshot.Content{Body: "全文", AuthoredAt: at, MediaRefs: []string{"a", "b"}, PostID: post.String(), ThreadID: thread.String()}
+	got, err := measureSnapshot(model.TargetComment, 12, frozen)
+	if err != nil || got.Body != "全文" || !got.AuthoredAt.Equal(at) || got.ImageCount != 2 || got.Link != (seller.ContentLink{PostID: post}) {
+		t.Fatalf("留言 %+v err=%v", got, err)
+	}
+	got, err = measureSnapshot(model.TargetForumEntry, 12, frozen)
+	if err != nil || got.Link != (seller.ContentLink{StoreID: 12, ThreadID: thread}) {
+		t.Fatalf("討論區留言 %+v err=%v", got, err)
+	}
+	for _, kind := range []model.TargetKind{model.TargetPost, model.TargetComment, model.TargetForumEntry} {
+		if _, err := measureSnapshot(kind, 12, snapshot.Content{Body: "舊格式", AuthoredAt: at}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Errorf("%s 缺連結：%v", kind, err)
+		}
 	}
 }

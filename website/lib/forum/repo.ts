@@ -5,11 +5,13 @@
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+	ActorKind,
 	CommentState,
 	type ForumEntry,
 	ForumEntrySchema,
 } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { fieldMask } from "@hawkr/api/proto/field-mask";
+import type { AppLocale } from "@/lib/intl/locales";
 import {
 	socialAppClient,
 	socialPublicClient,
@@ -28,6 +30,10 @@ export interface SellerForumComment {
 	isMine: boolean;
 	userName: string;
 	avatarKey?: string;
+	/** 作者是買家或店家；佔位項目沒有作者。 */
+	authorKind?: "buyer" | "store";
+	/** 作者的買家或店家 ID（依 authorKind）；佔位項目沒有。 */
+	authorId?: string;
 	content: string;
 	replyCount?: number;
 	/** 建立時間（unix 秒）。 */
@@ -39,9 +45,8 @@ export interface SellerForumComment {
 	viewerCanEdit: boolean;
 	viewerCanDelete: boolean;
 	viewerCanReply: boolean;
-	/* --- 以下為前端狀態，wire 不帶 --- */
-	rootId?: string | null;
-	replies?: SellerForumComment[];
+	/** 送出中或伺服器那份還不在已載入頁的項目：只顯示，沒有任何操作。 */
+	optimistic?: boolean;
 }
 
 export interface SellerForumListResult {
@@ -62,6 +67,17 @@ function forumStateOf(state: CommentState): SellerForumComment["state"] {
 	}
 }
 
+function authorKindOf(entry: ForumEntry): SellerForumComment["authorKind"] {
+	switch (entry.author?.kind) {
+		case ActorKind.BUYER:
+			return "buyer";
+		case ActorKind.STORE:
+			return "store";
+		default:
+			return undefined;
+	}
+}
+
 export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 	return {
 		id: entry.id,
@@ -71,6 +87,8 @@ export function forumEntryFromWire(entry: ForumEntry): SellerForumComment {
 		isMine: entry.isMine,
 		userName: entry.author?.name?.trim() || "匿名",
 		avatarKey: imageUri(entry.author?.avatar, "avatar"),
+		authorKind: authorKindOf(entry),
+		authorId: entry.author?.id || undefined,
 		content: entry.body,
 		replyCount: Number(entry.replyCount),
 		createdAt: entry.createTime
@@ -102,6 +120,8 @@ export interface FetchForumOptions {
 	signal?: AbortSignal;
 	/** 帶 session cookie 讀（瀏覽器）：伺服器才算得出 `is_mine` 與 `viewer_can_*`；SSR 是匿名讀取。 */
 	viewer?: boolean;
+	/** server 端呼叫必帶路由的語系（`activeLocale()` 只在瀏覽器可用）。 */
+	locale?: AppLocale;
 }
 
 export async function fetchSellerForum(
@@ -123,6 +143,39 @@ export async function fetchSellerForum(
 		.filter((e) => e.state === CommentState.VISIBLE || Number(e.replyCount) > 0)
 		.map(forumEntryFromWire);
 	return { records, nextPageToken: res.nextPageToken, pageSize };
+}
+
+/**
+ * 單一討論串：頂層項目（刪除或隱藏而底下有回覆時是佔位項目）與回覆的第一頁。`top` 是一頁一筆的列表，
+ * 與討論區列表同形，讓同一套快取與修改邏輯處理；`replies.nextPageToken` 交給 `fetchSellerForumReplies` 的 ListForumEntries 續讀。
+ */
+export interface SellerForumThreadResult {
+	top: SellerForumListResult;
+	replies: SellerForumListResult;
+}
+
+export async function fetchSellerForumThread(
+	storeId: string,
+	threadId: string,
+	{ pageSize = 20, signal, viewer = false, locale }: FetchForumOptions = {},
+): Promise<SellerForumThreadResult> {
+	const client = viewer ? socialViewerClient() : socialPublicClient({ locale });
+	const res = await client.getForumThread(
+		{ storeId, threadId, pageSize },
+		{ signal },
+	);
+	if (!res.entry) throw new Error("forum thread entry missing");
+	const top = forumEntryFromWire(res.entry);
+	const replies = withReplyToNames(
+		res.replies
+			.filter((e) => e.state === CommentState.VISIBLE)
+			.map(forumEntryFromWire),
+		top.userName,
+	);
+	return {
+		top: { records: [top], nextPageToken: "", pageSize },
+		replies: { records: replies, nextPageToken: res.nextPageToken, pageSize },
+	};
 }
 
 export async function fetchSellerForumReplies(

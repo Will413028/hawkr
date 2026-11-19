@@ -11,7 +11,8 @@ export type DynamicRouteFixture =
 	| "order-callback"
 	| "product"
 	| "seller"
-	| "seller-product";
+	| "seller-product"
+	| "seller-thread";
 
 export interface DynamicRouteCatalogEntry {
 	pattern: string;
@@ -282,6 +283,11 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		fixture: "seller",
 	},
 	{
+		pattern: "/sellers/[id]/messages/[threadId]",
+		access: "public",
+		fixture: "seller-thread",
+	},
+	{
 		pattern: "/sellers/[id]/posts",
 		access: "public",
 		fixture: "seller",
@@ -360,6 +366,14 @@ export function materializeDynamicRoute(
 					"[pid]",
 					requireFixtureId(fixtures, "productId", entry.pattern),
 				);
+			break;
+		// 討論串沒有可從公開 feed 探索的真實 id；用全零 UUID（不存在的串）佔位，
+		// 契約是「回框架 404」，由 site-links.spec.ts 專屬斷言承接，不進
+		// 「真實訪客文件」迴圈。
+		case "seller-thread":
+			route = route
+				.replace("[id]", requireFixtureId(fixtures, "sellerId", entry.pattern))
+				.replace("[threadId]", "00000000-0000-0000-0000-000000000000");
 			break;
 	}
 

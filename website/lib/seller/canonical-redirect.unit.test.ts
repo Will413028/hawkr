@@ -73,7 +73,7 @@ function mockSellerOutage(status: number | null): { calls: string[] } {
 
 /** Shorthand for the injected-lookup cases. */
 const resolved = (storeCode: string | null) =>
-	({ kind: "resolved", storeCode }) as const;
+	({ kind: "resolved", storeCode, storeId: null }) as const;
 
 beforeEach(() => {
 	__resetSellerStoreCodeMemoForTest();

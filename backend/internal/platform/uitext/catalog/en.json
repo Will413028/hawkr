@@ -99,6 +99,15 @@
     "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
       "message": "Under review"
     },
+    "seller.Measure.meta_kind": {
+      "message": "Measure: {kind}"
+    },
+    "seller.Measure.removed_contents_cleared": {
+      "message": "The copy of this content was deleted after the retention period."
+    },
+    "seller.Measure.removed_contents_heading": {
+      "message": "Removed content"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "Suspended (no end date; under periodic review by the platform)"
     },
@@ -107,6 +116,12 @@
     },
     "seller.Measure.suspension_ended": {
       "message": "Ended on {end}"
+    },
+    "seller.Measure.view_content_link": {
+      "message": "View post"
+    },
+    "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN": {
+      "message": "Content removal"
     },
     "seller.OnboardingAction.button.ONBOARDING_ACTION_CONTACT_SUPPORT": {
       "message": "Contact support"

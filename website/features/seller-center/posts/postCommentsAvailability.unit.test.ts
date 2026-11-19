@@ -1,30 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { PostPublishStatus } from "@/lib/codemeta/enums";
-import {
-	POST_COMMENTS_UNAVAILABLE_TEXT,
-	postCommentsAvailability,
-} from "./postCommentsAvailability";
+import { postCommentsNotice } from "./postCommentsAvailability";
 
-describe("postCommentsAvailability", () => {
-	it("a published, visible post of a public store is available", () => {
+describe("postCommentsNotice", () => {
+	it("a published post of a public store needs no notice", () => {
 		expect(
-			postCommentsAvailability(
-				{ publishStatus: PostPublishStatus.PUBLISHED },
-				true,
-			),
-		).toBe("available");
+			postCommentsNotice({ publishStatus: PostPublishStatus.PUBLISHED }, true),
+		).toBeNull();
 	});
 
-	it("a store that cannot go public wins over the post state", () => {
+	it("a store that cannot go public: buyers cannot see the comments", () => {
 		expect(
-			postCommentsAvailability(
-				{ publishStatus: PostPublishStatus.DRAFT },
-				false,
-			),
+			postCommentsNotice({ publishStatus: PostPublishStatus.PUBLISHED }, false),
 		).toBe("store-not-public");
 	});
 
-	it("platform-hidden wins over a draft, an unpublished post and a non-public store", () => {
+	it("an owner-unpublished post says so", () => {
+		expect(
+			postCommentsNotice(
+				{ publishStatus: PostPublishStatus.UNPUBLISHED },
+				true,
+			),
+		).toBe("unpublished");
+	});
+
+	it("a draft was never published and has no comments to explain", () => {
+		expect(
+			postCommentsNotice({ publishStatus: PostPublishStatus.DRAFT }, true),
+		).toBeNull();
+	});
+
+	it("a platform takedown (measure id) wins over every other reason", () => {
 		for (const publishStatus of [
 			PostPublishStatus.DRAFT,
 			PostPublishStatus.UNPUBLISHED,
@@ -32,44 +38,25 @@ describe("postCommentsAvailability", () => {
 		]) {
 			for (const storePublic of [true, false, undefined]) {
 				expect(
-					postCommentsAvailability(
-						{ publishStatus, hiddenAt: 1760000000 },
+					postCommentsNotice(
+						{ publishStatus, takedownMeasureId: "m-1" },
 						storePublic,
 					),
-				).toBe("platform-hidden");
+				).toBe("platform-takedown");
 			}
 		}
 	});
 
-	it("draft and self-unpublished posts are not published", () => {
-		for (const publishStatus of [
-			PostPublishStatus.DRAFT,
-			PostPublishStatus.UNPUBLISHED,
-		]) {
-			expect(postCommentsAvailability({ publishStatus }, true)).toBe(
-				"not-published",
-			);
-		}
-	});
-
-	it("a published post hidden by the platform is platform-hidden", () => {
+	it("a legacy hiddenAt counts as a platform takedown too", () => {
 		expect(
-			postCommentsAvailability(
+			postCommentsNotice(
 				{ publishStatus: PostPublishStatus.PUBLISHED, hiddenAt: 1760000000 },
 				true,
 			),
-		).toBe("platform-hidden");
+		).toBe("platform-takedown");
 	});
 
 	it("an unknown store or a missing publish status does not conclude", () => {
-		expect(postCommentsAvailability({}, undefined)).toBe("available");
-	});
-
-	it("uses the approved copy", () => {
-		expect(POST_COMMENTS_UNAVAILABLE_TEXT).toEqual({
-			"store-not-public": "店家公開後，買家的留言會顯示在這裡。",
-			"not-published": "動態發布後，買家的留言會顯示在這裡。",
-			"platform-hidden": "這則動態已被平台下架，買家看不到留言。",
-		});
+		expect(postCommentsNotice({}, undefined)).toBeNull();
 	});
 });

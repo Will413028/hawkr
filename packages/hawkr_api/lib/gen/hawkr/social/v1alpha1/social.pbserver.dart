@@ -35,6 +35,8 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $5.SuggestTrendingTagsRequest request);
   $async.Future<$5.ListForumEntriesResponse> listForumEntries(
       $pb.ServerContext ctx, $5.ListForumEntriesRequest request);
+  $async.Future<$5.GetForumThreadResponse> getForumThread(
+      $pb.ServerContext ctx, $5.GetForumThreadRequest request);
   $async.Future<$5.RecordPostViewResponse> recordPostView(
       $pb.ServerContext ctx, $5.RecordPostViewRequest request);
 
@@ -54,6 +56,8 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
         return $5.SuggestTrendingTagsRequest();
       case 'ListForumEntries':
         return $5.ListForumEntriesRequest();
+      case 'GetForumThread':
+        return $5.GetForumThreadRequest();
       case 'RecordPostView':
         return $5.RecordPostViewRequest();
       default:
@@ -80,6 +84,8 @@ abstract class SocialPublicServiceBase extends $pb.GeneratedService {
             ctx, request as $5.SuggestTrendingTagsRequest);
       case 'ListForumEntries':
         return listForumEntries(ctx, request as $5.ListForumEntriesRequest);
+      case 'GetForumThread':
+        return getForumThread(ctx, request as $5.GetForumThreadRequest);
       case 'RecordPostView':
         return recordPostView(ctx, request as $5.RecordPostViewRequest);
       default:

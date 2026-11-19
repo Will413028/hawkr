@@ -5,6 +5,8 @@ import 'package:hawkr_seller/features/media/data/media_model.dart';
 import 'package:hawkr_seller/features/media/data/media_repository.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/testing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -117,7 +119,12 @@ void main() {
 }
 
 final _postRepositoryProvider = Provider<PostRepository>(
-  (ref) => PostRepository(Dio(), ref),
+  (ref) => PostRepository(
+    Dio(),
+    ref,
+    SocialAppServiceClient(FakeTransportBuilder().build()),
+    SocialPublicServiceClient(FakeTransportBuilder().build()),
+  ),
 );
 
 ProviderContainer _containerWith(MediaRepository mediaRepository) {

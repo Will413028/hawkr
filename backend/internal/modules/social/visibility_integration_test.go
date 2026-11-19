@@ -38,9 +38,27 @@ func (f *fixture) readable(t *testing.T, postID uuidT, storeID int64) readable {
 	} else if kindOf(err) != apperr.KindNotFound {
 		t.Fatal(err)
 	}
+	// 模組隨資料回傳的旗標（viewer_can_* 的來源）與同一條規則一致：店主讀自己的貼文、店主的留言列表、討論區的列表。
+	if own, err := f.module.OwnPost(ctx, storeID, postID); err == nil && own.Readable != r.post {
+		t.Fatalf("OwnPost.Readable = %v，與 PublicPost 讀得到 = %v 不一致", own.Readable, r.post)
+	} else if err != nil && kindOf(err) != apperr.KindNotFound {
+		t.Fatal(err)
+	}
+	if page, err := f.module.ListStoreComments(ctx, f.store(t, storeID), nil, false, nil, 50); err == nil {
+		for _, c := range page.Comments {
+			if c.PostID == postID && c.PostReadable != r.post {
+				t.Fatalf("ListStoreComments 的 PostReadable = %v，與 PublicPost 讀得到 = %v 不一致", c.PostReadable, r.post)
+			}
+		}
+	} else {
+		t.Fatal(err)
+	}
 	forum, err := f.module.ListForumEntries(ctx, social.Caller{}, storeID, nil, 50)
 	must(t, err)
 	r.forum = len(forum.Entries)
+	if r.forum > 0 && !forum.Readable {
+		t.Fatalf("討論區有 %d 則可讀留言，ForumPage.Readable 卻是 false", r.forum)
+	}
 	feed, err := f.module.ListFeed(ctx, social.Caller{}, nil, 50)
 	must(t, err)
 	for _, p := range feed.Posts {
@@ -313,5 +331,24 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 	}
 	if page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10)); len(page.Comments) != 0 {
 		t.Fatalf("沒有可見的回覆時整則不出現：%+v", page.Comments)
+	}
+}
+
+// 空的討論區頁也要帶這家店的討論區此刻可不可以讀寫（viewer_can_comment 的來源）：可曝光是 true，不可曝光是 false。
+func TestForumPageReadableOnAnEmptyPage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	page, err := f.module.ListForumEntries(ctx, social.Caller{}, storeID, nil, 50)
+	must(t, err)
+	if len(page.Entries) != 0 || !page.Readable {
+		t.Fatalf("可曝光的店的空頁：entries=%d readable=%v，預期 0 與 true", len(page.Entries), page.Readable)
+	}
+	f.setExposable(t, storeID, false)
+	page, err = f.module.ListForumEntries(ctx, social.Caller{}, storeID, nil, 50)
+	must(t, err)
+	if page.Readable {
+		t.Fatal("店家不可曝光的空頁 Readable 應是 false")
 	}
 }

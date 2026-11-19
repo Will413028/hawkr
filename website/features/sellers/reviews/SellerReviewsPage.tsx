@@ -6,6 +6,7 @@ import {
 } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
 import { formatRatingSummary } from "@/lib/products/rating";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
 	const seller = await getCachedSeller(id);
 	const s = seller;
-	if (!s) return { title: "找不到賣家" };
+	if (!s) return { title: sellerNotFoundTitle(locale) };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
 	// Middleware already 308s a store_id URL here, but the redirect and this tag

@@ -122,6 +122,9 @@ type Post struct {
 	Stats     PostStats
 	// TakedownMeasureID 是下架這篇貼文的內容下架措施（seller.measures 的 ID）；沒有被下架是 nil。只有店主讀自己的貼文（Own、ListOwn）與後台列表（ListAdmin）才填，公開讀取不填；理由在 seller，social 不複製。
 	TakedownMeasureID *uuid.UUID
+	// Readable 是匿名觀看者讀得到這篇貼文（規則同 PublicPost）：公開讀取的結果一定是 true，店主與後台讀取由模組批次求值；
+	// 店主此刻能不能留言與回覆要看它。
+	Readable bool
 }
 
 // StoreReadCapability 是店主讀自己店的貼文、留言與動態數所需的賣家能力：收縮類的 CapContentContract（只要求店家營運中，停權時仍授予），
@@ -227,6 +230,8 @@ type Comment struct {
 	HiddenState *HiddenInfo
 	// StoreID 是所屬貼文的店家；只有寫入的回傳會設（列表的店家在 CommentPage.StoreID）。
 	StoreID int64
+	// PostReadable 是所屬貼文匿名觀看者讀得到（規則同 PublicPost），由模組隨留言求值；店主此刻能不能回覆這則留言要看它。
+	PostReadable bool
 }
 
 // HiddenInfo 是作者讀自己被隱藏的內容時看到的理由。
@@ -307,12 +312,16 @@ type ForumEntry struct {
 	UpdatedAt  time.Time
 	Version    int64
 	ReplyCount int64
+	// Readable 只有寫入的回傳會設：寫入者此刻對這家店的討論區可讀可寫（與新增留言的前置檢查同一個判斷）；列表的在 ForumPage.Readable。
+	Readable bool
 }
 
 // ForumPage 是一頁討論區項目。
 type ForumPage struct {
 	Entries []ForumEntry
 	Next    *CommentCursor
+	// Readable 是這家店的討論區對呼叫者此刻可讀可寫（店家可曝光、買家沒有封鎖這家店；店主以店家身分讀）。
+	Readable bool
 }
 
 // TargetKind 是隱藏與還原的對象種類（只收買家寫的留言與討論區留言）；ContentOwner 另外認得 POST。
@@ -458,6 +467,30 @@ type ContentSnapshot struct {
 	Readable  bool
 	Body      string
 	MediaRefs []string
+	// AuthoredAt 是作者發文的時間（貼文是發布時間，沒有發布時間時是建立時間；留言與討論區留言是建立時間）。
+	AuthoredAt time.Time
+	// PostID 是貼文與貼文留言連結的貼文；討論區留言是零值。
+	PostID uuid.UUID
+	// ThreadID 是討論區留言所屬的討論串（與 StoreID 組成連結）；貼文與貼文留言是零值。
+	ThreadID uuid.UUID
+}
+
+// ForumThreadView 是單一討論串：頂層項目（可以是佔位項目）與回覆的第一頁。
+type ForumThreadView struct {
+	Top     ForumEntry
+	Replies ForumPage
+}
+
+// ForumThread 是一個討論串的定位：店家加討論串 id。
+type ForumThread struct {
+	StoreID  int64
+	ThreadID uuid.UUID
+}
+
+// LinkAvailability 是一批連結目標此刻還在的哪些：貼文（id）與討論串。查詢的目標不在回傳的 map 裡（或值為假）就是已刪除或不存在。
+type LinkAvailability struct {
+	Posts   map[uuid.UUID]bool
+	Threads map[ForumThread]bool
 }
 
 // RequestHash 是建立輸入的 SHA-256（欄位依固定順序、以長度前綴編碼，不會因串接而混淆）：冪等重送比對「內容是否相同」的唯一定義。

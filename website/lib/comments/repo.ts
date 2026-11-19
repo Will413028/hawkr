@@ -14,7 +14,7 @@ import { socialAppClient, socialViewerClient } from "../connect/social";
 import { imageUri } from "../media/image";
 
 export interface Comment {
-	/** 留言 ID（UUID 字串）；樂觀寫入的暫時列用 `tmp-` 前綴。 */
+	/** 留言 ID（UUID 字串）；樂觀項目用 `tmp-` 加 request_id。 */
 	id: string;
 	postId: string;
 	parentId?: string | null;
@@ -39,6 +39,8 @@ export interface Comment {
 	viewerCanEdit: boolean;
 	viewerCanDelete: boolean;
 	viewerCanReply: boolean;
+	/** 送出中或伺服器那份還不在已載入頁的項目：只顯示，沒有任何操作。 */
+	optimistic?: boolean;
 }
 
 export interface CommentListResult {

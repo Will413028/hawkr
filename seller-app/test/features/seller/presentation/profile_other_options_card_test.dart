@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-Future<void> _pump(WidgetTester tester) async {
+Future<void> _pump(WidgetTester tester, {bool canManageBlocks = true}) async {
   tester.view.physicalSize = const Size(800, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -17,7 +17,10 @@ Future<void> _pump(WidgetTester tester) async {
         path: '/',
         builder: (_, _) => Scaffold(
           body: SingleChildScrollView(
-            child: ProfileOtherOptionsCard(onShippingTap: () {}),
+            child: ProfileOtherOptionsCard(
+              onShippingTap: () {},
+              canManageBlocks: canManageBlocks,
+            ),
           ),
         ),
       ),
@@ -77,5 +80,11 @@ void main() {
     final node = tester.getSemantics(row);
     expect(node.flagsCollection.isButton, isTrue);
     semantics.dispose();
+  });
+
+  testWidgets('沒有內容契約能力時不顯示「封鎖名單」', (tester) async {
+    await _pump(tester, canManageBlocks: false);
+    expect(find.text('封鎖名單'), findsNothing);
+    expect(find.text('我的檢舉'), findsOneWidget);
   });
 }

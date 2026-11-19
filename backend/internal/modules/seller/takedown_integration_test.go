@@ -26,7 +26,34 @@ func takedownContents(n int) []ContentRef {
 	return out
 }
 
+var snapshotAuthored = time.Date(2026, 11, 1, 3, 4, 5, 123456000, time.UTC)
+
+// withSnapshots 給每個對象一份格式正確的快照（連結依種類）。
+func withSnapshots(refs []ContentRef) []TakedownContent {
+	out := make([]TakedownContent, len(refs))
+	for i, r := range refs {
+		sn := &ContentSnapshot{Body: "本文 " + r.ID.String(), AuthoredAt: snapshotAuthored, ImageCount: 1, Link: ContentLink{PostID: uuid.NewV7()}}
+		if r.Kind == ContentForumEntry {
+			sn.Link = ContentLink{StoreID: 7, ThreadID: uuid.NewV7()}
+		}
+		out[i] = TakedownContent{ContentRef: r, Snapshot: sn}
+	}
+	return out
+}
+
+func refsOf(contents []MeasureContent) []ContentRef {
+	out := make([]ContentRef, len(contents))
+	for i, c := range contents {
+		out[i] = c.ContentRef
+	}
+	return out
+}
+
 func (f *fixture) takedownFrom(storeID int64, contents []ContentRef) CreateMeasureInput {
+	return f.takedownWith(storeID, withSnapshots(contents))
+}
+
+func (f *fixture) takedownWith(storeID int64, contents []TakedownContent) CreateMeasureInput {
 	return CreateMeasureInput{
 		AdminID: 7, StoreID: storeID, Kind: MeasureContentTakedown, StatementToSeller: "貼文含垃圾訊息", Note: "內部紀錄",
 		Violation: &ViolationBasis{Finding: &NewFinding{Category: policy.Spam, Severity: SeverityLow}},
@@ -36,7 +63,12 @@ func (f *fixture) takedownFrom(storeID int64, contents []ContentRef) CreateMeasu
 
 func (f *fixture) takedown(t *testing.T, storeID int64, contents []ContentRef) Measure {
 	t.Helper()
-	r, err := f.module.CreateMeasure(context.Background(), f.takedownFrom(storeID, contents))
+	return f.takedownSnapshots(t, storeID, withSnapshots(contents))
+}
+
+func (f *fixture) takedownSnapshots(t *testing.T, storeID int64, contents []TakedownContent) Measure {
+	t.Helper()
+	r, err := f.module.CreateMeasure(context.Background(), f.takedownWith(storeID, contents))
 	must(t, err)
 	return r.Measure
 }
@@ -62,10 +94,10 @@ func TestCreateContentTakedownStoresTargetsAndDoesNotRestrictTheAccount(t *testi
 	if m.Kind != MeasureContentTakedown || m.Basis != BasisViolation || m.State != StateIssued || m.EndsAt != nil || !m.StartsAt.Equal(m.CreatedAt) {
 		t.Fatalf("措施 %+v", m)
 	}
-	if got := f.measureOf(t, m.ID).Contents; !slices.Equal(got, sortedContents(contents)) {
+	if got := refsOf(f.measureOf(t, m.ID).Contents); !slices.Equal(got, sortedContents(contents)) {
 		t.Fatalf("讀回的對象 %v，預期 %v", got, sortedContents(contents))
 	}
-	if !slices.Equal(m.Contents, sortedContents(contents)) {
+	if !slices.Equal(refsOf(m.Contents), sortedContents(contents)) {
 		t.Fatalf("建立的回應帶對象 %v", m.Contents)
 	}
 	if m.Findings[0].Category != policy.Spam {
@@ -93,13 +125,15 @@ func TestCreateContentTakedownValidates(t *testing.T) {
 	review := f.now.Add(24 * time.Hour)
 	dup := takedownContents(1)
 	for name, mutate := range map[string]func(in *CreateMeasureInput){
-		"沒有對象":    func(in *CreateMeasureInput) { in.Takedown = nil },
-		"對象為空":    func(in *CreateMeasureInput) { in.Takedown.Contents = nil },
-		"對象重複":    func(in *CreateMeasureInput) { in.Takedown.Contents = append(slices.Clone(dup), dup...) },
-		"對象超過上限":  func(in *CreateMeasureInput) { in.Takedown.Contents = takedownContents(21) },
-		"對象種類不合法": func(in *CreateMeasureInput) { in.Takedown.Contents = []ContentRef{{Kind: "STORE", ID: uuid.NewV7()}} },
-		"有結束時間":   func(in *CreateMeasureInput) { in.EndsAt = &ends },
-		"有複審期限":   func(in *CreateMeasureInput) { in.ReviewBy = &review },
+		"沒有對象":   func(in *CreateMeasureInput) { in.Takedown = nil },
+		"對象為空":   func(in *CreateMeasureInput) { in.Takedown.Contents = nil },
+		"對象重複":   func(in *CreateMeasureInput) { in.Takedown.Contents = withSnapshots(append(slices.Clone(dup), dup...)) },
+		"對象超過上限": func(in *CreateMeasureInput) { in.Takedown.Contents = withSnapshots(takedownContents(21)) },
+		"對象種類不合法": func(in *CreateMeasureInput) {
+			in.Takedown.Contents = withSnapshots([]ContentRef{{Kind: "STORE", ID: uuid.NewV7()}})
+		},
+		"有結束時間": func(in *CreateMeasureInput) { in.EndsAt = &ends },
+		"有複審期限": func(in *CreateMeasureInput) { in.ReviewBy = &review },
 		"依據風險類型": func(in *CreateMeasureInput) {
 			in.Violation = nil
 			in.Risk = &RiskBasis{Ground: RiskFraud}
@@ -330,7 +364,7 @@ func TestUpdatingATakedownNeverChangesItsTargets(t *testing.T) {
 	statement := "更新後的理由"
 	updated, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: m.Version, StatementToSeller: &statement})
 	must(t, err)
-	if updated.StatementToSeller != statement || !slices.Equal(updated.Contents, sortedContents(contents)) {
+	if updated.StatementToSeller != statement || !slices.Equal(refsOf(updated.Contents), sortedContents(contents)) {
 		t.Fatalf("%+v", updated)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1", m.ID); n != int64(len(contents)) {

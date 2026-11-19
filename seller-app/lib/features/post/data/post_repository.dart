@@ -1,305 +1,178 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:hawkr_api/field_mask.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/api_request_helper.dart';
+import '../../../core/networking/connect_provider.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../shared/utils/hk_log.dart';
-import '../../../shared/utils/product_image_resolver.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../media/data/media_repository.dart';
+import 'post_comment.dart';
 import 'post_model.dart';
 
 part 'post_repository.g.dart';
 
 @Riverpod(keepAlive: true)
 PostRepository postRepository(Ref ref) {
-  return PostRepository(ref.watch(dioProvider), ref);
+  return PostRepository(
+    ref.watch(dioProvider),
+    ref,
+    ref.watch(socialClientProvider),
+    ref.watch(socialPublicClientProvider),
+  );
 }
 
-/// 貼文分頁查詢結果：這頁的貼文 + 是否還有下一頁（供 caller 決定要不要
-/// 繼續觸發下一次載入，不下載超過目前需要顯示的量）。
+/// 貼文分頁查詢結果：這頁的貼文與下一頁的 token（空字串是沒有下一頁）。
 class PostPageResult {
-  const PostPageResult({required this.posts, required this.hasMore});
+  const PostPageResult({
+    required this.posts,
+    required this.nextPageToken,
+    this.schedules = const {},
+  });
 
-  final List<Map<String, dynamic>> posts;
-  final bool hasMore;
+  final List<Post> posts;
+  final String nextPageToken;
+
+  /// 這次載入用到的待發布排程；翻下一頁時原樣帶回 `listMyPostsPage(schedules:)`，不再重讀。
+  final Map<int, DateTime> schedules;
+
+  bool get hasMore => nextPageToken.isNotEmpty;
 }
 
 class PostRepository with ApiRequestHelper {
-  PostRepository(this._dio, this._ref);
+  PostRepository(this._dio, this._ref, this._social, this._socialPublic);
 
   final Dio _dio;
   final Ref _ref;
+  final SocialAppServiceClient _social;
+  final SocialPublicServiceClient _socialPublic;
 
   @override
   Dio get dio => _dio;
 
   // ── Path prefixes ──────────────────────────────────────
-  static const _pub = '/api/v1/public';
   static const _app = '/api/v1/app';
 
-  int? _parsePostId(dynamic rawId) {
-    if (rawId is int) return rawId;
-    if (rawId is num) return rawId.toInt();
-    if (rawId is String) return int.tryParse(rawId);
-    if (rawId == null) return null;
-    return int.tryParse(rawId.toString());
-  }
+  static const _maxPageSize = 50;
 
-  static String _str(dynamic v) => (v ?? '').toString().trim();
-
-  /// 取第一個非空值（後端「欄位在、值為空字串」的形狀用 `??` 補不到，見
-  /// `_enrichSellerPostJson` 的說明）。
-  static String _firstNonEmpty(List<dynamic> candidates) {
-    for (final c in candidates) {
-      final s = _str(c);
-      if (s.isNotEmpty) return s;
-    }
-    return '';
-  }
-
-  /// 後端關聯商品有**兩種欄位形狀**（2026-08-05 實打 dev 確認，見 `Post._readLinkedProduct`）：
-  /// 列表端點（`/app/sellers/me/posts`）回單數物件
-  /// `product`；詳情 / 建立 / 更新回陣列 `products`。只認 `products` 的話，
-  /// 賣家自己頁面的貼文列表永遠拿不到關聯商品，卡片整個不渲染。
-  List<dynamic>? _rawLinkedProducts(Map<String, dynamic> json) {
-    final products = json['products'];
-    if (products is List && products.isNotEmpty) return products;
-    final single = json['product'];
-    if (single is Map) return <dynamic>[single];
-    final direct = json['linkedProduct'];
-    if (direct is Map) return <dynamic>[direct];
-    return null;
-  }
-
-  Map<String, dynamic> _attachLinkedProduct(Map<String, dynamic> json) {
-    final products = _rawLinkedProducts(json);
-    if (products == null || products.first is! Map) return json;
-    final direct = json['linkedProduct'];
-    return <String, dynamic>{
-      ...json,
-      'linkedProduct': <String, dynamic>{
-        if (direct is Map) ...Map<String, dynamic>.from(direct),
-        ...Map<String, dynamic>.from(products.first as Map),
-      },
-    };
-  }
-
-  Future<Map<String, dynamic>> _enrichSellerPostJson(
-    Map<String, dynamic> source,
-  ) async {
-    var json = Map<String, dynamic>.from(source);
-    final int? postId = _parsePostId(json['id'] ?? json['postId']);
-    if (postId == null) {
-      HKLog.logI(
-        'PostRepository: skip seller post enrichment, id not parseable: ${json['id'] ?? json['postId']}',
-      );
-      return _attachLinkedProduct(json);
-    }
-
-    try {
-      final directLinkedProduct = json['linkedProduct'];
-      final products = _rawLinkedProducts(json);
-      if (products != null && products.isNotEmpty) {
-        final enrichedProducts = await Future.wait(
-          products.map((rawProduct) async {
-            if (rawProduct is! Map) return rawProduct;
-
-            final product = Map<String, dynamic>.from(rawProduct);
-            // `PostProductData` 的欄位只有 id / name / price / imageKey / imageUrl
-            // （實打 dev 確認）。建立與更新回應會給 id、其餘欄位**回空字串**
-            // （不是缺欄位）—— 所以補齊條件一律用「非空」判斷，不能用 `??`
-            // （`'' ?? x` 仍是 `''`，補不到東西）。
-            final String productId = _str(product['id']);
-            final bool hasName = _str(product['name']).isNotEmpty;
-            final bool hasPrice = _str(product['price']).isNotEmpty;
-            final bool hasImage =
-                extractPrimaryProductImageKey(product) != null;
-
-            if (productId.isEmpty || (hasName && hasPrice && hasImage)) {
-              return product;
-            }
-
-            try {
-              final prodDetail = await _getProductDetailRaw(productId);
-              if (prodDetail == null) return product;
-
-              return <String, dynamic>{
-                ...product,
-                'id': productId,
-                'name': _firstNonEmpty([product['name'], prodDetail['name']]),
-                'price': _firstNonEmpty([
-                  product['price'],
-                  prodDetail['priceMin'],
-                  prodDetail['price'],
-                ]),
-                // 回填成後端 `PostProductData` 的欄位名與型別（objectKey，不是 URL；
-                // 49 §6.1 跨層只帶 key），顯示端因此只需要認得同一個欄位。
-                'imageKey': _firstNonEmpty([
-                  product['imageKey'],
-                  extractPrimaryProductImageKey(prodDetail),
-                ]),
-              };
-            } catch (_) {
-              return product;
-            }
-          }),
-        );
-        json['products'] = enrichedProducts;
-        if (enrichedProducts.isNotEmpty && enrichedProducts.first is Map) {
-          json['linkedProduct'] = <String, dynamic>{
-            if (directLinkedProduct is Map)
-              ...Map<String, dynamic>.from(directLinkedProduct),
-            ...Map<String, dynamic>.from(enrichedProducts.first as Map),
-          };
-        }
-      }
-    } catch (e, st) {
-      HKLog.logE(
-        'PostRepository: seller post enrichment failed for $postId',
-        e,
-        st,
-      );
-    }
-
-    return _attachLinkedProduct(json);
-  }
-
-  Future<List<Map<String, dynamic>>> _enrichSellerPostList(
-    List<Map<String, dynamic>> list,
-  ) {
-    return Future.wait(list.map(_enrichSellerPostJson));
-  }
-
-  /// 全螢幕貼文 feed（story-viewer）用：一次回傳登入賣家**全部**貼文（含被平台下架的）
-  /// 供左右滑動瀏覽。後端 page_size 上限 50（見 gateway `maxPostPageSize`），因此逐頁
-  /// 迴圈到 hasMore=false 累積齊全，單次頁面請求數 = ceil(貼文數/50)，不是每篇貼文一次。
+  /// 全螢幕貼文 feed 用：逐頁讀到沒有下一頁，回傳登入賣家**全部**貼文（含草稿、下架與被平台下架的）。
   Future<List<Post>> listMyPosts() async {
-    try {
-      const pageSize = 50;
-      final all = <Map<String, dynamic>>[];
-      var page = 1;
-      while (true) {
-        final raw = await _listMyPostsPage(page: page, pageSize: pageSize);
-        all.addAll(raw.posts);
-        if (!raw.hasMore || raw.posts.isEmpty) break;
-        page++;
-      }
-      final enriched = await _enrichSellerPostList(all);
-      return enriched.map((json) => Post.fromJson(json)).toList();
-    } catch (e) {
-      HKLog.logE('PostRepository.listMyPosts error', e);
-      rethrow;
-    }
+    final all = <Post>[];
+    var token = '';
+    Map<int, DateTime>? schedules;
+    do {
+      final page = await listMyPostsPage(
+        pageToken: token,
+        pageSize: _maxPageSize,
+        schedules: schedules,
+      );
+      schedules = page.schedules;
+      all.addAll(page.posts);
+      token = page.nextPageToken;
+    } while (token.isNotEmpty);
+    return all;
   }
 
-  Future<Map<String, dynamic>?> _getProductDetailRaw(dynamic productId) async {
-    final result = await apiGet('$_app/products/$productId');
-    if (result['code'] == 0 && result['data'] is Map<String, dynamic>) {
-      return result['data'] as Map<String, dynamic>;
-    }
-    return null;
-  }
-
-  /// 自己頁面用：回傳當前登入賣家的貼文（**含被平台下架的**），走 authed
-  /// `/app/sellers/me/posts`（ListMyPosts，預設 status='' → published + hidden）。
-  Future<PostPageResult> listMyPostsRaw({
-    int page = 1,
+  /// 自己頁面用：一頁貼文，排程時間已併入。[schedules] 是同一次載入前一頁拿到的排程
+  /// （[PostPageResult.schedules]）；沒給時與這頁貼文同時讀一次。
+  Future<PostPageResult> listMyPostsPage({
+    String pageToken = '',
     int pageSize = 20,
+    Map<int, DateTime>? schedules,
   }) async {
-    final raw = await _listMyPostsPage(page: page, pageSize: pageSize);
-    final enriched = await _enrichSellerPostList(raw.posts);
-    return PostPageResult(posts: enriched, hasMore: raw.hasMore);
-  }
-
-  Future<PostPageResult> _listMyPostsPage({
-    required int page,
-    required int pageSize,
-  }) async {
-    final result = await apiGet(
-      '$_app/sellers/me/posts',
-      queryParams: {'page': '$page', 'page_size': '$pageSize'},
+    final responseFuture = _social.listMyPosts(
+      pb.ListMyPostsRequest(pageSize: pageSize, pageToken: pageToken),
     );
-    return _parsePostPage(result, page: page, pageSize: pageSize);
+    final timesFuture = schedules != null
+        ? Future.value(schedules)
+        : _pendingScheduleTimes();
+    final results = await Future.wait<Object>([
+      responseFuture,
+      timesFuture,
+    ], eagerError: true);
+    final response = results[0] as pb.ListMyPostsResponse;
+    final times = results[1] as Map<int, DateTime>;
+    return PostPageResult(
+      posts: [
+        for (final post in response.posts)
+          _withSchedule(postFromProto(post), times),
+      ],
+      nextPageToken: response.nextPageToken,
+      schedules: times,
+    );
   }
 
-  /// 解析 gateway 分頁 envelope（`data: {records, total, page, pageSize}`），
-  /// 算出是否還有下一頁；純資料解析，不做 enrichment。
-  PostPageResult _parsePostPage(
-    Map<String, dynamic> result, {
-    required int page,
-    required int pageSize,
-  }) {
-    if (result['code'] != 0) {
-      return const PostPageResult(posts: [], hasMore: false);
-    }
-    final data = result['data'];
-    List<Map<String, dynamic>> posts = const [];
-    int? total;
-    if (data is List) {
-      posts = List<Map<String, dynamic>>.from(data);
-    } else if (data is Map) {
-      final records = data['records'] ?? data['list'];
-      if (records is List) posts = List<Map<String, dynamic>>.from(records);
-      total = int.tryParse('${data['total'] ?? ''}');
-    }
-    final hasMore = total != null
-        ? page * pageSize < total
-        : posts.length >= pageSize;
-    return PostPageResult(posts: posts, hasMore: hasMore);
+  /// 讀一篇自己的貼文（列表沒有這篇時取得目前的 etag）；排程時間不併入。
+  Future<Post> getMyPost(int postId) async {
+    final response = await _social.getMyPost(
+      pb.GetMyPostRequest(postId: postId.toString()),
+    );
+    return postFromProto(response.post);
   }
 
-  Future<List<Map<String, dynamic>>> listCommentsRaw(int postId) {
-    return _listCommentsRaw(postId);
+  Post _withSchedule(Post post, Map<int, DateTime> schedules) =>
+      post.copyWith(scheduledPublishAt: schedules[post.id]);
+
+  Future<Map<int, DateTime>> _pendingScheduleTimes() async {
+    final times = <int, DateTime>{};
+    var token = '';
+    do {
+      final response = await _social.listPendingSchedules(
+        pb.ListPendingSchedulesRequest(
+          pageSize: _maxPageSize,
+          pageToken: token,
+        ),
+      );
+      for (final schedule in response.schedules) {
+        final postId = int.tryParse(schedule.postId);
+        if (postId == null || !schedule.hasPublishTime()) continue;
+        times[postId] = schedule.publishTime.toDateTime();
+      }
+      token = response.nextPageToken;
+    } while (token.isNotEmpty);
+    return times;
   }
 
-  Future<Map<String, dynamic>?> commentOnPostRaw(
-    int postId, {
-    required String content,
-  }) {
-    return _commentOnPostRaw(postId, content: content);
+  /// 發布（`CAP_MARKETING`）。[etag] 是讀到該貼文時的版本；失敗丟 `ConnectException`。
+  Future<void> publishPostOrThrow(int postId, {required String etag}) async {
+    await _social.publishPost(
+      pb.PublishPostRequest(postId: postId.toString(), etag: etag),
+    );
   }
 
-  /// 賣家把自己的貼文轉為已發布（`CapMarketing`）。失敗一律丟 [AppException]。
-  Future<void> publishPostOrThrow(int postId) async {
-    await apiPostOrThrow('$_app/sellers/posts/$postId/publish');
-  }
-
-  /// 賣家把自己已發布的貼文轉為已下架（`CapContentContract`）。失敗一律丟 [AppException]。
-  Future<void> unpublishPostOrThrow(int postId) async {
-    await apiPostOrThrow('$_app/sellers/posts/$postId/unpublish');
+  /// 下架（`CAP_CONTENT_CONTRACT`，店家停權時仍可）。失敗丟 `ConnectException`。
+  Future<void> unpublishPostOrThrow(int postId, {required String etag}) async {
+    await _social.unpublishPost(
+      pb.UnpublishPostRequest(postId: postId.toString(), etag: etag),
+    );
   }
 
   Future<void> deletePost(int postId) async {
-    await apiDeleteOrThrow('$_app/sellers/posts/$postId');
+    await _social.deletePost(pb.DeletePostRequest(postId: postId.toString()));
   }
 
-  Future<Post?> createPost({
-    required String sellerId,
-    required String title,
-    String? content,
-    String? contentType,
-    String? imageUrl,
-    dynamic linkedProductId,
-    List<String>? tags,
+  /// 建立草稿並發布。[imageStagedToken] 是 media 上傳完成後拿到的 token。
+  Future<Post> createPost({
+    required String content,
+    String? imageStagedToken,
+    String? productId,
+    List<String> hashtags = const [],
   }) async {
-    final productId = _str(linkedProductId);
-    final body = <String, dynamic>{
-      if (title.isNotEmpty) 'title': title,
-      'content': content?.isNotEmpty == true ? content : title,
-      'content_type': ?contentType,
-      if (imageUrl != null && imageUrl.isNotEmpty) 'stagedToken': imageUrl,
-      if (productId.isNotEmpty) 'productId': productId,
-      'tags': ?tags,
-    };
-    final result = await apiPost('$_app/sellers/posts', body: body);
-    final data = result['code'] == 0 ? result['data'] : null;
-    if (data is Map<String, dynamic> && data['id'] != null) {
-      return Post.fromJson(data);
-    }
-    return null;
+    final response = await _social.createPost(
+      pb.CreatePostRequest(
+        body: content,
+        imageStagedToken: imageStagedToken,
+        productId: productId,
+        hashtagInputs: hashtags,
+        publish: true,
+      ),
+    );
+    return postFromProto(response.post);
   }
 
   Future<String?> uploadMedia({
@@ -325,169 +198,122 @@ class PostRepository with ApiRequestHelper {
     }
   }
 
-  // --- Comment APIs ---
+  // --- 貼文留言（SocialPublicService 讀、SocialAppService 寫） ---
 
-  Future<List<Comment>> listComments(int postId) async {
-    try {
-      final list = await _listCommentsRaw(postId);
-      return list.map((json) => Comment.fromJson(json)).toList();
-    } catch (e) {
-      HKLog.logE('PostRepository.listComments error', e);
-      rethrow;
-    }
+  /// 讀貼文的頂層留言，或 [parentId] 那則頂層留言的回覆；逐頁讀到沒有下一頁。
+  /// 店主讀自己的貼文不受公開狀態限制，所以草稿、下架與店家不公開時也讀得到。
+  Future<List<PostComment>> listComments(int postId, {String? parentId}) async {
+    final all = <PostComment>[];
+    var token = '';
+    do {
+      final response = await _socialPublic.listComments(
+        pb.ListCommentsRequest(
+          postId: postId.toString(),
+          pageSize: _maxPageSize,
+          pageToken: token,
+          parentId: parentId,
+        ),
+      );
+      all.addAll(response.comments.map(PostComment.fromProto));
+      token = response.nextPageToken;
+    } while (token.isNotEmpty);
+    return all;
   }
 
-  Future<List<Map<String, dynamic>>> _listCommentsRaw(int postId) async {
-    try {
-      final result = await apiGet('$_pub/posts/$postId/comments');
-      if (result['code'] == 0) {
-        final data = result['data'];
-        // API returns paginated format: {records: [...], total, page, pageSize}
-        if (data is Map<String, dynamic>) {
-          final records = data['records'];
-          if (records is List) return List<Map<String, dynamic>>.from(records);
-        }
-        // Fallback: direct list
-        if (data is List) return List<Map<String, dynamic>>.from(data);
-      }
-    } catch (_) {}
-    return [];
-  }
-
-  Future<Comment?> commentOnPost(int postId, {required String content}) async {
-    try {
-      final result = await _commentOnPostRaw(postId, content: content);
-      if (result != null) {
-        return Comment.fromJson(result);
-      }
-      return null;
-    } catch (e) {
-      HKLog.logE('PostRepository.commentOnPost error', e);
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>?> _commentOnPostRaw(
+  /// 留言；[parentId] 設了是回覆（只限貼文所屬的店），[replyToId] 是回覆針對的那一則。
+  Future<PostComment> createComment(
     int postId, {
-    required String content,
+    required String body,
+    String? parentId,
+    String? replyToId,
   }) async {
-    final result = await apiPost(
-      '$_app/posts/$postId/comments',
-      body: {'content': content},
+    final response = await _social.createComment(
+      pb.CreateCommentRequest(
+        postId: postId.toString(),
+        body: body,
+        parentId: parentId,
+        replyToId: replyToId,
+      ),
     );
-    if (result['code'] == 0) {
-      return result['data'] as Map<String, dynamic>?;
-    }
-    return null;
+    return PostComment.fromProto(response.comment);
   }
 
-  // ── 評論按讚 ───────────────────────────────────────────
-
-  /// Toggle 留言按讚 — POST /app/posts/comments/{id}/like
-  Future<bool> likeComment(int commentId) async {
-    try {
-      final result = await apiPost('$_app/posts/comments/$commentId/like');
-      if (result['code'] == 0) {
-        return result['data']?['liked'] == true;
-      }
-    } catch (_) {}
-    return false;
+  Future<void> likeComment(String commentId) async {
+    await _social.likeComment(pb.LikeCommentRequest(commentId: commentId));
   }
 
-  // ── 評論回覆 ───────────────────────────────────────────
+  Future<void> unlikeComment(String commentId) async {
+    await _social.unlikeComment(pb.UnlikeCommentRequest(commentId: commentId));
+  }
 
-  Future<Map<String, dynamic>?> replyToComment(
-    int commentId, {
-    required int postId,
-    required String content,
+  /// 刪除留言；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<void> deleteComment(String commentId, {required String etag}) async {
+    await _social.deleteComment(
+      pb.DeleteCommentRequest(commentId: commentId, etag: etag),
+    );
+  }
+
+  // ── 店家討論區 ─────────────────────────────────────────
+
+  /// 讀店家討論區的頂層發言，或 [parentId] 那則的回覆；逐頁讀到沒有下一頁。
+  Future<List<StoreForumEntry>> listForumEntries(
+    String storeId, {
+    String? parentId,
   }) async {
-    final result = await apiPost(
-      '$_app/posts/comments/$commentId/replies',
-      body: {
-        'content': content,
-        'postId': postId.toString(),
-        'replyToId': commentId.toString(),
-        'role': 2,
-      },
-    );
-    if (result['code'] == 0) {
-      return result['data'] as Map<String, dynamic>?;
-    }
-    return null;
+    final all = <StoreForumEntry>[];
+    var token = '';
+    do {
+      final response = await _socialPublic.listForumEntries(
+        pb.ListForumEntriesRequest(
+          storeId: storeId,
+          pageSize: _maxPageSize,
+          pageToken: token,
+          parentId: parentId,
+        ),
+      );
+      all.addAll(response.entries.map(StoreForumEntry.fromProto));
+      token = response.nextPageToken;
+    } while (token.isNotEmpty);
+    return all;
   }
 
-  Future<List<Map<String, dynamic>>> listCommentReplies(int commentId) async {
-    final result = await apiGet('$_pub/posts/comments/$commentId/replies');
-    final data = result['data'];
-    // API returns paginated: {records: [...], total, page, pageSize}
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return List<Map<String, dynamic>>.from(records);
-      // fallback: {replies: [...]}
-      final replies = data['replies'];
-      if (replies is List) return List<Map<String, dynamic>>.from(replies);
-    }
-    if (data is List) return List<Map<String, dynamic>>.from(data);
-    return [];
-  }
-
-  Future<bool> deleteComment(int commentId) async {
-    final result = await apiDelete('$_app/posts/comments/$commentId');
-    return result['code'] == 0;
-  }
-
-  // ── 商家訊息 ───────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> listSellerMessages(String sellerId) async {
-    final result = await apiGet(
-      '/api/v1/public/sellers/$sellerId/forum',
-      queryParams: {'page': '1', 'page_size': '50'},
-    );
-    final data = result['data'];
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return records.cast<Map<String, dynamic>>();
-    }
-    if (data is List) return data.cast<Map<String, dynamic>>();
-    return [];
-  }
-
-  Future<List<Map<String, dynamic>>> listMessageReplies(int messageId) async {
-    final result = await apiGet(
-      '/api/v1/public/sellers/forum/$messageId/replies',
-      queryParams: {'page': '1', 'page_size': '50'},
-    );
-    final data = result['data'];
-    if (data is Map<String, dynamic>) {
-      final records = data['records'];
-      if (records is List) return records.cast<Map<String, dynamic>>();
-    }
-    if (data is List) return data.cast<Map<String, dynamic>>();
-    return [];
-  }
-
-  Future<bool> replySellerMessage(int messageId, String content) async {
-    final result = await apiPost(
-      '$_app/sellers/forum/$messageId/reply',
-      body: {'content': content},
-    );
-    return result['code'] == 0;
-  }
-
-  Future<bool> updateSellerReply({
-    required int replyId,
-    required String content,
+  /// 在店家討論區回覆 [parentId]（父項不是頂層時伺服器掛到它所屬的頂層底下）。
+  Future<StoreForumEntry> replyForumEntry(
+    String storeId, {
+    required String parentId,
+    required String body,
   }) async {
-    final result = await apiPut(
-      '$_app/sellers/forum/$replyId',
-      body: {'content': content},
+    final response = await _social.createForumEntry(
+      pb.CreateForumEntryRequest(
+        storeId: storeId,
+        body: body,
+        parentId: parentId,
+      ),
     );
-    return result['code'] == 0;
+    return StoreForumEntry.fromProto(response.entry);
   }
 
-  Future<bool> deleteSellerMessage(int messageId) async {
-    final result = await apiDelete('$_app/sellers/forum/$messageId');
-    return result['code'] == 0;
+  /// 修改自己的發言內文；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<StoreForumEntry> updateForumEntry(
+    String entryId, {
+    required String etag,
+    required String body,
+  }) async {
+    final entry = pb.ForumEntry(id: entryId, etag: etag, body: body);
+    final response = await _social.updateForumEntry(
+      pb.UpdateForumEntryRequest(
+        entry: entry,
+        updateMask: fieldMask(entry, ['body']),
+      ),
+    );
+    return StoreForumEntry.fromProto(response.entry);
+  }
+
+  /// 刪除發言；[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<void> deleteForumEntry(String entryId, {required String etag}) async {
+    await _social.deleteForumEntry(
+      pb.DeleteForumEntryRequest(entryId: entryId, etag: etag),
+    );
   }
 
   /// 取得分享連結 — GET /api/v1/app/share_url?type={type}&id={id}
@@ -513,28 +339,36 @@ class PostRepository with ApiRequestHelper {
 
   // ── 貼文更新 ───────────────────────────────────────────
 
-  /// [keepAssetId] 非空表示保留現有圖片；[newStagedToken] 非空表示換新圖；兩者皆空則清除圖片
-  /// （契約鍵 `keepAssetId` / `newStagedToken`，backend PR #2235 起為 camelCase）
-  Future<Post?> updatePost(
+  /// 修改貼文內文、商品與標籤；[imageStagedToken] 是 `null` 時保留現有圖片，非 null 時換成該 token
+  /// （空字串是清掉圖）。[updateProduct] 為 true 時才改關聯商品，[productId] 是 `null` 即清掉商品；
+  /// 為 false 時 [productId] 被忽略、商品不變。[etag] 與目前版本不符丟 `ConnectException`（aborted）。
+  Future<Post> updatePost(
     int postId, {
+    required String etag,
     required String content,
-    String keepAssetId = '',
-    String newStagedToken = '',
-    int? productId,
-    List<String>? tags,
+    String? imageStagedToken,
+    String? productId,
+    bool updateProduct = false,
+    List<String> hashtags = const [],
   }) async {
-    final body = <String, dynamic>{
-      'content': content,
-      'keepAssetId': keepAssetId,
-      'newStagedToken': newStagedToken,
-      if (productId != null) 'productId': productId.toString(),
-      'tags': ?tags,
-    };
-    final result = await apiPut('$_app/sellers/posts/$postId', body: body);
-    final data = result['code'] == 0 ? result['data'] : null;
-    if (data is Map<String, dynamic> && data['id'] != null) {
-      return Post.fromJson(data);
+    final post = pb.Post(
+      id: postId.toString(),
+      etag: etag,
+      body: content,
+      hashtagInputs: hashtags,
+    );
+    final paths = ['body', 'hashtag_inputs'];
+    if (updateProduct) {
+      if (productId != null) post.productId = productId;
+      paths.add('product_id');
     }
-    return null;
+    if (imageStagedToken != null) {
+      post.imageStagedToken = imageStagedToken;
+      paths.add('image_staged_token');
+    }
+    final response = await _social.updatePost(
+      pb.UpdatePostRequest(post: post, updateMask: fieldMask(post, paths)),
+    );
+    return postFromProto(response.post);
   }
 }

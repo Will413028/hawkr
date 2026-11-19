@@ -6,7 +6,9 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
@@ -103,6 +105,19 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
 		t.Fatalf("貼文 %+v", got)
 	}
+	// 發文時間與連結目標：貼文連到自己，留言連到所屬貼文，討論區留言連到店家加討論串（頂層留言的討論串是自己）。
+	postAuthored := f.timeOf(t, "SELECT COALESCE(published_at, created_at) FROM social.posts WHERE id = $1", p.ID)
+	commentAuthored := f.timeOf(t, "SELECT created_at FROM social.comments WHERE id = $1", c.ID)
+	entryAuthored := f.timeOf(t, "SELECT created_at FROM social.forum_entries WHERE id = $1", e.ID)
+	if got := snap(social.TargetPost, p.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(postAuthored) || got.AuthoredAt.IsZero() {
+		t.Fatalf("貼文的連結與發文時間 %+v", got)
+	}
+	if got := snap(social.TargetComment, c.ID); got.PostID != p.ID || got.ThreadID != (uuidT{}) || !got.AuthoredAt.Equal(commentAuthored) {
+		t.Fatalf("留言的連結與發文時間 %+v", got)
+	}
+	if got := snap(social.TargetForumEntry, e.ID); got.ThreadID != e.ID || got.PostID != (uuidT{}) || got.StoreID != storeID || !got.AuthoredAt.Equal(entryAuthored) {
+		t.Fatalf("討論區留言的連結與發文時間 %+v", got)
+	}
 	must(t, f.module.DeleteComment(ctx, f.asBuyer(b), c.ID, 0))
 	if got := snap(social.TargetComment, c.ID); got.Exists || got.Body != "" {
 		t.Fatalf("刪除後不存在 %+v", got)
@@ -167,5 +182,47 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	must(t, err)
 	if got := f.jobs.revalidations(); len(got) != 1 || !slices.Equal(got[0], revalidate.StoreTags(st.StoreID, st.StoreCode)) {
 		t.Fatalf("討論區隱藏：%v", got)
+	}
+}
+
+func (f *fixture) timeOf(t *testing.T, sql string, args ...any) time.Time {
+	t.Helper()
+	var at time.Time
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), sql, args...).Scan(&at); err != nil {
+		t.Fatalf("%v\n%s", err, sql)
+	}
+	return at
+}
+
+// AvailableLinks 回報賣家此刻點得進去的連結目標：貼文沒有軟刪就算（被下架的貼文賣家中心仍讀得到，所以仍在）；討論串只在對外讀得到時才算（頂層可見，或頂層已刪而底下有可見回覆的佔位項目）；
+// 不存在的目標、別家店的討論串、頂層被刪又沒有可見回覆、頂層被隱藏又沒有可見回覆都是不在。
+// mutation：AvailableLinkPosts 拿掉 deleted_at IS NULL → 刪除後的貼文仍回在；AvailableLinkPosts 加上下架條件 → 被下架的貼文回不在；
+// ForumThreadsReadable 換成只看頂層是否存在 → 頂層已刪沒有回覆的討論串回在；店家條件拿掉 → 錯店的討論串回在。
+func TestAvailableLinksFollowDeletionAndReadabilityOfThreads(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	b := f.newBuyer(t)
+	live := f.publishedPost(t, storeID, "還在")
+	gone := f.publishedPost(t, storeID, "會刪")
+	down := f.publishedPost(t, storeID, "被下架")
+	f.takedowns(t).create(t, storeID, ref(seller.ContentPost, down.ID))
+	e1 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串一"}))
+	e2 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串二"}))
+	e3 := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串三"}))
+	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "串三的回覆", ParentID: &e3.ID, ReplyToID: &e3.ID}))
+	f.exec(t, "UPDATE social.posts SET deleted_at = now() WHERE id = $1", gone.ID)
+	f.exec(t, "UPDATE social.forum_entries SET deleted_at = now() WHERE id IN ($1, $2)", e2.ID, e3.ID)
+	threads := []social.ForumThread{{StoreID: storeID, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e2.ID}, {StoreID: storeID + 999, ThreadID: e1.ID}, {StoreID: storeID, ThreadID: e3.ID}}
+	got := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, []uuidT{live.ID, gone.ID, down.ID, uuidNew()}, threads))
+	if !got.Posts[live.ID] || got.Posts[gone.ID] || !got.Posts[down.ID] || len(got.Posts) != 2 {
+		t.Errorf("貼文 %v", got.Posts)
+	}
+	if !got.Threads[threads[0]] || got.Threads[threads[1]] || got.Threads[threads[2]] || !got.Threads[threads[3]] || len(got.Threads) != 2 {
+		t.Errorf("討論串 %v", got.Threads)
+	}
+	if empty := mustV[social.LinkAvailability](t)(f.module.AvailableLinks(ctx, nil, nil)); len(empty.Posts)+len(empty.Threads) != 0 {
+		t.Errorf("沒有目標 %v", empty)
 	}
 }

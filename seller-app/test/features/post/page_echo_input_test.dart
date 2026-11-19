@@ -5,8 +5,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/config/flavor.dart';
+import 'package:hawkr_seller/features/report/presentation/store_block_capability.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
+import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/features/post/presentation/widgets/page_echo_tab.dart';
 import 'package:hawkr_seller/features/seller/data/seller_repository.dart';
@@ -25,6 +28,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/my_store_fixtures.dart';
+import 'post_comment_fixtures.dart';
 
 class _MockPostRepository extends Mock implements PostRepository {}
 
@@ -62,11 +66,6 @@ class _StoreHolder extends Notifier<MyStore?> {
 final _lateStore = NotifierProvider<_StoreHolder, MyStore?>(_StoreHolder.new);
 
 const _captureKey = ValueKey('echo-input-capture');
-const _message = <String, dynamic>{
-  'id': 42,
-  'userName': '小明',
-  'content': '請問何時出貨?',
-};
 
 Future<_MockPostRepository> _pumpEcho(
   WidgetTester tester, {
@@ -75,8 +74,10 @@ Future<_MockPostRepository> _pumpEcho(
   bool ownReply = false,
   bool lateStore = false,
   double textScale = 1,
-  Map<String, dynamic> message = _message,
-  List<Map<String, dynamic>>? replies,
+  StoreForumEntry? message,
+  List<StoreForumEntry>? replies,
+  bool expectRootText = true,
+  bool canBlock = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -90,22 +91,39 @@ Future<_MockPostRepository> _pumpEcho(
 
   final repository = _MockPostRepository();
   final adapter = _RecordingAdapter();
+  final ownReplies =
+      replies ??
+      [
+        if (ownReply)
+          testForumEntry(
+            id: '99',
+            parentId: '42',
+            isMine: true,
+            author: '',
+            body: '原本的回覆',
+            canEdit: true,
+            canDelete: true,
+          ),
+      ];
+  final root =
+      message ??
+      testForumEntry(
+        id: '42',
+        author: '小明',
+        body: '請問何時出貨?',
+        replyCount: ownReplies.length,
+      );
+  when(() => repository.listForumEntries('7')).thenAnswer((_) async => [root]);
   when(
-    () => repository.listSellerMessages('7'),
-  ).thenAnswer((_) async => [message]);
-  when(() => repository.listMessageReplies(42)).thenAnswer(
-    (_) async =>
-        replies ??
-        [
-          if (ownReply) {'id': 99, 'isMine': true, 'content': '原本的回覆'},
-        ],
-  );
+    () => repository.listForumEntries('7', parentId: '42'),
+  ).thenAnswer((_) async => ownReplies);
   _lastAdapter = adapter;
   SharedPreferences.setMockInitialValues({});
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         postRepositoryProvider.overrideWithValue(repository),
+        canBlockBuyersProvider.overrideWithValue(canBlock),
         if (ownReply && lateStore)
           myStoreSnapshotProvider.overrideWith((ref) => ref.watch(_lateStore))
         else if (ownReply)
@@ -147,7 +165,7 @@ Future<_MockPostRepository> _pumpEcho(
   await tester.pumpAndSettle();
   // The production navigation has a 900 ms route-settling timer.
   await tester.pump(const Duration(seconds: 1));
-  expect(find.text(message['content'] as String), findsOneWidget);
+  if (expectRootText) expect(find.text(root.body), findsOneWidget);
   return repository;
 }
 
@@ -293,83 +311,93 @@ void main() {
     },
   );
 
-  for (final throwsOnFailure in [false, true]) {
-    testWidgets(
-      '${throwsOnFailure ? 'exception' : 'rejected reply'} keeps draft and target for one retry',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        try {
-          final repository = await _pumpEcho(tester);
-          var response = Completer<bool>();
-          when(
-            () => repository.replySellerMessage(42, '明天出貨\n謝謝您'),
-          ).thenAnswer((_) => response.future);
+  for (final failure in [
+    StateError('network unavailable'),
+    StateError('aborted'),
+  ]) {
+    testWidgets('${failure.message} keeps draft and target for one retry', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final repository = await _pumpEcho(tester);
+        var response = Completer<StoreForumEntry>();
+        when(
+          () => repository.replyForumEntry(
+            '7',
+            parentId: '42',
+            body: '明天出貨\n謝謝您',
+          ),
+        ).thenAnswer((_) => response.future);
 
-          await tester.tap(find.text('回覆'));
-          await tester.pumpAndSettle();
-          final fieldFinder = find.byType(TextField);
-          await tester.enterText(fieldFinder, ' 明天出貨\n謝謝您 ');
-          await tester.pump();
+        await tester.tap(find.text('回覆'));
+        await tester.pumpAndSettle();
+        final fieldFinder = find.byType(TextField);
+        await tester.enterText(fieldFinder, ' 明天出貨\n謝謝您 ');
+        await tester.pump();
 
-          // The send control belongs to the field's tap region, so pointer-down
-          // must not close the keyboard and move the button before pointer-up.
-          final sendGesture = await tester.startGesture(
-            tester.getCenter(find.byTooltip('送出留言')),
-          );
-          await tester.pump();
-          expect(
-            tester.widget<TextField>(fieldFinder).focusNode!.hasFocus,
-            isTrue,
-          );
-          await sendGesture.up();
-          // Two rapid taps and an IME action can arrive before the next frame.
-          await tester.tap(find.byTooltip('送出留言'));
-          await tester.testTextInput.receiveAction(TextInputAction.send);
-          await tester.pump();
-          verify(
-            () => repository.replySellerMessage(42, '明天出貨\n謝謝您'),
-          ).called(1);
-          expect(find.bySemanticsLabel('留言傳送中'), findsOneWidget);
-          expect(tester.widget<TextField>(fieldFinder).readOnly, isTrue);
-          expect(
-            tester.widget<IconButton>(_iconButton('送出留言')).onPressed,
-            isNull,
-          );
+        // The send control belongs to the field's tap region, so pointer-down
+        // must not close the keyboard and move the button before pointer-up.
+        final sendGesture = await tester.startGesture(
+          tester.getCenter(find.byTooltip('送出留言')),
+        );
+        await tester.pump();
+        expect(
+          tester.widget<TextField>(fieldFinder).focusNode!.hasFocus,
+          isTrue,
+        );
+        await sendGesture.up();
+        // Two rapid taps and an IME action can arrive before the next frame.
+        await tester.tap(find.byTooltip('送出留言'));
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pump();
+        verify(
+          () => repository.replyForumEntry(
+            '7',
+            parentId: '42',
+            body: '明天出貨\n謝謝您',
+          ),
+        ).called(1);
+        expect(find.bySemanticsLabel('留言傳送中'), findsOneWidget);
+        expect(tester.widget<TextField>(fieldFinder).readOnly, isTrue);
+        expect(
+          tester.widget<IconButton>(_iconButton('送出留言')).onPressed,
+          isNull,
+        );
 
-          if (throwsOnFailure) {
-            response.completeError(StateError('network unavailable'));
-          } else {
-            response.complete(false);
-          }
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 350));
-          final failedField = tester.widget<TextField>(fieldFinder);
-          expect(failedField.controller!.text, ' 明天出貨\n謝謝您 ');
-          expect(failedField.readOnly, isFalse);
-          expect(failedField.decoration!.hintText, '回覆 小明...');
-          expect(find.byTooltip('取消回覆'), findsOneWidget);
+        response.completeError(failure);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        final failedField = tester.widget<TextField>(fieldFinder);
+        expect(failedField.controller!.text, ' 明天出貨\n謝謝您 ');
+        expect(failedField.readOnly, isFalse);
+        expect(failedField.decoration!.hintText, '回覆 小明...');
+        expect(find.byTooltip('取消回覆'), findsOneWidget);
 
-          response = Completer<bool>();
-          await tester.tap(find.byTooltip('送出留言'));
-          await tester.pump();
-          verify(
-            () => repository.replySellerMessage(42, '明天出貨\n謝謝您'),
-          ).called(1);
-          response.complete(true);
-          await tester.pumpAndSettle();
-          final sentField = tester.widget<TextField>(fieldFinder);
-          expect(sentField.controller!.text, isEmpty);
-          expect(sentField.readOnly, isTrue);
-          expect(sentField.decoration!.hintText, '請選擇留言回覆');
-          expect(find.byTooltip('取消回覆'), findsNothing);
-          // Let the failure toast's removal timer finish before unmounting.
-          await tester.pump(const Duration(seconds: 3));
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
-        }
-      },
-    );
+        response = Completer<StoreForumEntry>();
+        await tester.tap(find.byTooltip('送出留言'));
+        await tester.pump();
+        verify(
+          () => repository.replyForumEntry(
+            '7',
+            parentId: '42',
+            body: '明天出貨\n謝謝您',
+          ),
+        ).called(1);
+        response.complete(testForumEntry(id: '50', parentId: '42'));
+        await tester.pumpAndSettle();
+        final sentField = tester.widget<TextField>(fieldFinder);
+        expect(sentField.controller!.text, isEmpty);
+        expect(sentField.readOnly, isTrue);
+        expect(sentField.decoration!.hintText, '請選擇留言回覆');
+        expect(find.byTooltip('取消回覆'), findsNothing);
+        // Let the failure toast's removal timer finish before unmounting.
+        await tester.pump(const Duration(seconds: 3));
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
   }
 
   testWidgets('cancelling a reply clears its draft and restores idle state', (
@@ -387,7 +415,13 @@ void main() {
     expect(field.readOnly, isTrue);
     expect(field.focusNode!.hasFocus, isFalse);
     expect(field.decoration!.hintText, '請選擇留言回覆');
-    verifyNever(() => repository.replySellerMessage(any(), any()));
+    verifyNever(
+      () => repository.replyForumEntry(
+        any(),
+        parentId: any(named: 'parentId'),
+        body: any(named: 'body'),
+      ),
+    );
   });
 
   testWidgets(
@@ -399,9 +433,10 @@ void main() {
         size: const Size(320, 568),
         textScale: 1.4,
       );
-      var response = Completer<bool>();
+      var response = Completer<StoreForumEntry>();
       when(
-        () => repository.updateSellerReply(replyId: 99, content: '改為後天出貨'),
+        () =>
+            repository.updateForumEntry('99', etag: 'etag-99', body: '改為後天出貨'),
       ).thenAnswer((_) => response.future);
       Future<void> openEdit() async {
         await tester.tap(find.byIcon(AppIcons.moreHoriz).last);
@@ -432,11 +467,12 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();
       verify(
-        () => repository.updateSellerReply(replyId: 99, content: '改為後天出貨'),
+        () =>
+            repository.updateForumEntry('99', etag: 'etag-99', body: '改為後天出貨'),
       ).called(1);
       expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
       expect(tester.widget<IconButton>(_iconButton('取消編輯')).onPressed, isNull);
-      response.complete(false);
+      response.completeError(StateError('stale'));
       await tester.pump();
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
@@ -444,19 +480,26 @@ void main() {
       );
       expect(find.byTooltip('取消編輯'), findsOneWidget);
 
-      response = Completer<bool>();
+      response = Completer<StoreForumEntry>();
       await tester.tap(find.byTooltip('儲存留言'));
       await tester.pump();
-      response.complete(true);
+      response.complete(testForumEntry(id: '99', isMine: true));
       await tester.pumpAndSettle();
       final field = tester.widget<TextField>(find.byType(TextField));
       expect(field.controller!.text, isEmpty);
       expect(field.readOnly, isTrue);
       expect(field.decoration!.hintText, '請選擇留言回覆');
       verify(
-        () => repository.updateSellerReply(replyId: 99, content: '改為後天出貨'),
+        () =>
+            repository.updateForumEntry('99', etag: 'etag-99', body: '改為後天出貨'),
       ).called(1);
-      verifyNever(() => repository.replySellerMessage(any(), any()));
+      verifyNever(
+        () => repository.replyForumEntry(
+          any(),
+          parentId: any(named: 'parentId'),
+          body: any(named: 'body'),
+        ),
+      );
       await tester.pump(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     },
@@ -467,10 +510,23 @@ void main() {
   ) async {
     await _pumpEcho(
       tester,
-      message: const {..._message, 'isMine': false},
-      replies: const [
-        {'id': 99, 'isMine': true, 'userName': '店家', 'content': '原本的回覆'},
-        {'id': 100, 'isMine': false, 'userName': '小華', 'content': '買家追問'},
+      message: testForumEntry(
+        id: '42',
+        author: '小明',
+        body: '請問何時出貨?',
+        replyCount: 2,
+      ),
+      replies: [
+        testForumEntry(
+          id: '99',
+          parentId: '42',
+          isMine: true,
+          author: '店家',
+          body: '原本的回覆',
+          canEdit: true,
+          canDelete: true,
+        ),
+        testForumEntry(id: '100', parentId: '42', author: '小華', body: '買家追問'),
       ],
     );
 
@@ -522,8 +578,8 @@ void main() {
   ) async {
     final repository = await _pumpEcho(tester, ownReply: true);
     when(
-      () => repository.replySellerMessage(42, '改成回覆'),
-    ).thenAnswer((_) async => true);
+      () => repository.replyForumEntry('7', parentId: '42', body: '改成回覆'),
+    ).thenAnswer((_) async => testForumEntry(id: '51', parentId: '42'));
     await tester.tap(find.byTooltip('留言更多操作').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('編輯留言'));
@@ -537,11 +593,14 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('送出留言'));
     await tester.pumpAndSettle();
-    verify(() => repository.replySellerMessage(42, '改成回覆')).called(1);
+    verify(
+      () => repository.replyForumEntry('7', parentId: '42', body: '改成回覆'),
+    ).called(1);
     verifyNever(
-      () => repository.updateSellerReply(
-        replyId: any(named: 'replyId'),
-        content: any(named: 'content'),
+      () => repository.updateForumEntry(
+        any(),
+        etag: any(named: 'etag'),
+        body: any(named: 'body'),
       ),
     );
   });
@@ -550,9 +609,9 @@ void main() {
     'own delete fails safely then retry clears the removed edit target',
     (tester) async {
       final repository = await _pumpEcho(tester, ownReply: true);
-      var response = Completer<bool>();
+      var response = Completer<void>();
       when(
-        () => repository.deleteSellerMessage(99),
+        () => repository.deleteForumEntry('99', etag: 'etag-99'),
       ).thenAnswer((_) => response.future);
       await tester.tap(find.byTooltip('留言更多操作').last);
       await tester.pumpAndSettle();
@@ -562,6 +621,8 @@ void main() {
         await tester.tap(find.byTooltip('留言更多操作').last);
         await tester.pumpAndSettle();
         await tester.tap(find.text('刪除留言'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('刪除'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
       }
@@ -569,16 +630,20 @@ void main() {
       await delete();
       await tester.tap(find.byTooltip('留言更多操作').last);
       await tester.pump();
-      verify(() => repository.deleteSellerMessage(99)).called(1);
+      verify(
+        () => repository.deleteForumEntry('99', etag: 'etag-99'),
+      ).called(1);
       expect(find.text('刪除留言'), findsNothing);
       response.completeError(StateError('offline'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('取消編輯'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      response = Completer<bool>();
+      response = Completer<void>();
       await delete();
-      when(() => repository.listMessageReplies(42)).thenAnswer((_) async => []);
-      response.complete(true);
+      when(
+        () => repository.listForumEntries('7', parentId: '42'),
+      ).thenAnswer((_) async => []);
+      response.complete();
       await tester.pumpAndSettle();
       expect(find.text('原本的回覆'), findsNothing);
       expect(find.byTooltip('取消編輯'), findsNothing);
@@ -586,7 +651,9 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
         isEmpty,
       );
-      verify(() => repository.deleteSellerMessage(99)).called(1);
+      verify(
+        () => repository.deleteForumEntry('99', etag: 'etag-99'),
+      ).called(1);
       await tester.pump(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     },
@@ -607,8 +674,141 @@ void main() {
     expect(find.text('送出檢舉'), findsOneWidget);
     await tester.tapAt(const Offset(10, 30));
     await tester.pumpAndSettle();
-    verifyNever(() => repository.deleteSellerMessage(any()));
+    verifyNever(
+      () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
+    );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('forum shows no like control', (tester) async {
+    await _pumpEcho(tester, ownReply: true);
+    expect(find.byIcon(AppIcons.favorite), findsNothing);
+    expect(find.byIcon(AppIcons.favoriteBorder), findsNothing);
+    expect(find.textContaining('喜歡'), findsNothing);
+    expect(find.byTooltip('喜歡'), findsNothing);
+  });
+
+  testWidgets('reply, edit and delete follow viewer_can_* (false case)', (
+    tester,
+  ) async {
+    await _pumpEcho(
+      tester,
+      message: testForumEntry(
+        id: '42',
+        author: '小明',
+        body: '請問何時出貨?',
+        canReply: false,
+        replyCount: 1,
+      ),
+      replies: [
+        testForumEntry(
+          id: '99',
+          parentId: '42',
+          isMine: true,
+          author: '店家',
+          body: '原本的回覆',
+          canReply: false,
+        ),
+      ],
+    );
+    expect(find.text('回覆'), findsNothing);
+    // 自己的回覆沒有 viewer_can_edit／viewer_can_delete：沒有編輯與刪除入口。
+    // 買家的頂層留言仍有檢舉入口，所以只剩一顆更多按鈕。
+    expect(find.byTooltip('留言更多操作'), findsOneWidget);
+    await tester.tap(find.byTooltip('留言更多操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯留言'), findsNothing);
+    expect(find.text('刪除留言'), findsNothing);
+    expect(find.text('檢舉留言'), findsOneWidget);
+  });
+
+  testWidgets('other entry offers delete only when viewer_can_delete', (
+    tester,
+  ) async {
+    await _pumpEcho(
+      tester,
+      message: testForumEntry(
+        id: '42',
+        author: '小明',
+        body: '請問何時出貨?',
+        canDelete: true,
+      ),
+    );
+    await tester.tap(find.byTooltip('留言更多操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('刪除留言'), findsOneWidget);
+    expect(find.text('檢舉留言'), findsOneWidget);
+  });
+
+  testWidgets('deleting a forum entry asks first and cancel sends nothing', (
+    tester,
+  ) async {
+    final repository = await _pumpEcho(tester, ownReply: true);
+    await tester.tap(find.byTooltip('留言更多操作').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除留言'));
+    await tester.pumpAndSettle();
+    expect(find.text('確定要刪除此留言嗎？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
+    );
+  });
+
+  testWidgets(
+    'a submit that starts while the delete dialog is open blocks it',
+    (tester) async {
+      final repository = await _pumpEcho(tester, ownReply: true);
+      final update = Completer<StoreForumEntry>();
+      when(
+        () => repository.updateForumEntry('99', etag: 'etag-99', body: '改好了'),
+      ).thenAnswer((_) => update.future);
+      await tester.tap(find.byIcon(AppIcons.moreHoriz).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('編輯留言'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '改好了');
+      await tester.pump();
+      await tester.tap(find.byTooltip('留言更多操作').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除留言'));
+      await tester.pumpAndSettle();
+      expect(find.text('確定要刪除此留言嗎？'), findsOneWidget);
+      // 平台的送出事件不經過被對話框蓋住的按鈕。
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pump();
+      verify(
+        () => repository.updateForumEntry('99', etag: 'etag-99', body: '改好了'),
+      ).called(1);
+      await tester.tap(find.text('刪除'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      verifyNever(
+        () => repository.deleteForumEntry(any(), etag: any(named: 'etag')),
+      );
+      update.complete(testForumEntry(id: '99', isMine: true));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
+
+  testWidgets('deleted and hidden placeholders show approved text only', (
+    tester,
+  ) async {
+    await _pumpEcho(
+      tester,
+      expectRootText: false,
+      message: testForumEntry(
+        id: '42',
+        state: CommentState.COMMENT_STATE_DELETED,
+        replyCount: 1,
+      ),
+      replies: [testForumEntry(id: '99', parentId: '42', body: '還在的回覆')],
+    );
+    expect(find.text('此留言已刪除'), findsOneWidget);
+    expect(find.text('還在的回覆'), findsOneWidget);
   });
 
   for (final fail in [false, true]) {
@@ -616,9 +816,9 @@ void main() {
       'pending echo ${fail ? 'failure' : 'success'} after leaving is safe',
       (tester) async {
         final repository = await _pumpEcho(tester);
-        final response = Completer<bool>();
+        final response = Completer<StoreForumEntry>();
         when(
-          () => repository.replySellerMessage(42, '離頁'),
+          () => repository.replyForumEntry('7', parentId: '42', body: '離頁'),
         ).thenAnswer((_) => response.future);
         await tester.tap(find.text('回覆'));
         await tester.pumpAndSettle();
@@ -629,7 +829,7 @@ void main() {
         if (fail) {
           response.completeError(StateError('offline'));
         } else {
-          response.complete(true);
+          response.complete(testForumEntry(id: '52', parentId: '42'));
         }
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
@@ -646,19 +846,22 @@ void main() {
           tester,
           size: Size(width, 874),
           textScale: scale,
-          message: {
-            ..._message,
-            'userName': '需要完整閱讀的長名稱買家',
-            'createdAt': '2024-01-01T10:00:00+08:00',
-          },
+          message: testForumEntry(
+            id: '42',
+            author: '需要完整閱讀的長名稱買家',
+            body: '請問何時出貨?',
+            replyCount: 2,
+            createTime: DateTime(2024, 1, 1, 10),
+          ),
           replies: [
-            for (final id in [98, 99])
-              {
-                'id': id,
-                'userName': '長名稱回覆使用者$id',
-                'content': '留言回覆內容$id',
-                'createdAt': '2024-01-01T10:00:00+08:00',
-              },
+            for (final id in ['98', '99'])
+              testForumEntry(
+                id: id,
+                parentId: '42',
+                author: '長名稱回覆使用者$id',
+                body: '留言回覆內容$id',
+                createTime: DateTime(2024, 1, 1, 10),
+              ),
           ],
         );
         for (final text in tester.widgetList<Text>(find.text('2024/01/01'))) {
@@ -757,5 +960,42 @@ void main() {
         },
       );
     }
+  }
+
+  for (final c in [
+    (
+      name: 'buyer author deletable',
+      buyer: true,
+      del: true,
+      mine: false,
+      show: true,
+    ),
+    (name: 'store author', buyer: false, del: true, mine: false, show: false),
+    (name: 'not deletable', buyer: true, del: false, mine: false, show: false),
+    (
+      name: 'no content-contract capability',
+      buyer: true,
+      del: true,
+      mine: false,
+      show: false,
+    ),
+  ]) {
+    testWidgets('forum block item: ${c.name}', (tester) async {
+      await _pumpEcho(
+        tester,
+        message: testForumEntry(
+          id: '42',
+          author: '小明',
+          body: '請問何時出貨?',
+          authorIsBuyer: c.buyer,
+          canDelete: c.del,
+        ),
+        canBlock: c.name != 'no content-contract capability',
+      );
+      await tester.tap(find.byTooltip('留言更多操作'));
+      await tester.pumpAndSettle();
+      expect(find.text('檢舉留言'), findsOneWidget);
+      expect(find.text('封鎖此人'), c.show ? findsOneWidget : findsNothing);
+    });
   }
 }

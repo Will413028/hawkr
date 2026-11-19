@@ -16,3 +16,6 @@ export function sellerStaticParams(): { id: string }[] {
 
 /** 格式合法（純數字 TSID）但不存在的 id；`generateStaticParams` 的 sentinel，不是真實資料。 */
 export const SENTINEL_ENTITY_ID = "1";
+
+/** 單一討論串頁 `generateStaticParams` 的 sentinel：格式合法（UUID）但不存在的討論串 id，不是真實資料。 */
+export const SENTINEL_THREAD_ID = "00000000-0000-0000-0000-000000000000";

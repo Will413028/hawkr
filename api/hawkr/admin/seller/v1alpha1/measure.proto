@@ -175,6 +175,18 @@ message Measure {
   hawkr.common.v1alpha1.Deadline review_deadline = 43 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
   repeated hawkr.seller.v1alpha1.ContentRef contents = 44 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // contents 裡 snapshot_state 是 CAPTURED 的對象的快照全文與圖片張數（contents 的 excerpt 是截斷的摘要）；依種類、id 排序，只含有快照的對象。
+  repeated MeasureContentBody content_bodies = 45 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MeasureContentBody 是內容下架措施的一個對象在建立措施時凍結的本文全文（後台看全文，賣家只看摘要）。
+message MeasureContentBody {
+  hawkr.seller.v1alpha1.ContentKind kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 本文全文。
+  string body = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 原內容的圖片張數（不存圖片）。
+  int32 image_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // MeasureActionUnavailability 是 admin 此刻不能對措施做某個動作（改理由、延長、縮短、結束或撤銷）的一個原因。與對應方法的前置檢查是同一個規則

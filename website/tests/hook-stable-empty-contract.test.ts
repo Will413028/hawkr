@@ -42,8 +42,6 @@ const ALLOWED = new Map<string, string[]>([
 			"await updateBuyerAvatar(stagedToken, query.data ?? {});",
 		],
 	],
-	["lib/hooks/useSocial.ts", ["records: [],"]],
-	["lib/hooks/useSellerForum.ts", ["records: [],"]],
 ]);
 
 function withoutMemoCallbacks(source: string): string {

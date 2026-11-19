@@ -383,6 +383,9 @@ func (t Text) SellerMeasureMetaKind(kind string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	if t.Locale() == EN {
+		return "Measure: " + kindText, true
+	}
 	return "措施：" + kindText, true
 }
 
@@ -409,6 +412,22 @@ func (t Text) SellerMeasureMetaTerminationGround(ground string) (string, bool) {
 // SellerMeasureRejectionCooldownWarning 是 seller.Measure.rejection_cooldown_warning 的文案。
 func (t Text) SellerMeasureRejectionCooldownWarning(days int) string {
 	return "若本次經駁回，將於 " + strconv.Itoa(days) + " 日內不得再提出解除請求"
+}
+
+// SellerMeasureRemovedContentsCleared 是 seller.Measure.removed_contents_cleared 的文案。
+func (t Text) SellerMeasureRemovedContentsCleared() string {
+	if t.Locale() == EN {
+		return "The copy of this content was deleted after the retention period."
+	}
+	return "內容副本已超過保留期限並刪除。"
+}
+
+// SellerMeasureRemovedContentsHeading 是 seller.Measure.removed_contents_heading 的文案。
+func (t Text) SellerMeasureRemovedContentsHeading() string {
+	if t.Locale() == EN {
+		return "Removed content"
+	}
+	return "下架的內容"
 }
 
 // SellerMeasureSuspensionActiveOpen 是 seller.Measure.suspension_active_open 的文案。
@@ -470,6 +489,14 @@ func (t Text) SellerMeasureTitleRiskFallback() string {
 	return "風險措施"
 }
 
+// SellerMeasureViewContentLink 是 seller.Measure.view_content_link 的文案。
+func (t Text) SellerMeasureViewContentLink() string {
+	if t.Locale() == EN {
+		return "View post"
+	}
+	return "查看貼文"
+}
+
 // SellerMeasureBasis 是 seller.MeasureBasis 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerMeasureBasis(v string) (string, bool) {
@@ -487,6 +514,12 @@ func (t Text) SellerMeasureBasis(v string) (string, bool) {
 // SellerMeasureKind 是 seller.MeasureKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerMeasureKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "CONTENT_TAKEDOWN":
+			return "Content removal", true
+		}
+	}
 	switch v {
 	case "WARNING":
 		return "警告", true

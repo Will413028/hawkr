@@ -65,6 +65,9 @@ const (
 	// SocialPublicServiceListForumEntriesProcedure is the fully-qualified name of the
 	// SocialPublicService's ListForumEntries RPC.
 	SocialPublicServiceListForumEntriesProcedure = "/hawkr.social.v1alpha1.SocialPublicService/ListForumEntries"
+	// SocialPublicServiceGetForumThreadProcedure is the fully-qualified name of the
+	// SocialPublicService's GetForumThread RPC.
+	SocialPublicServiceGetForumThreadProcedure = "/hawkr.social.v1alpha1.SocialPublicService/GetForumThread"
 	// SocialPublicServiceRecordPostViewProcedure is the fully-qualified name of the
 	// SocialPublicService's RecordPostView RPC.
 	SocialPublicServiceRecordPostViewProcedure = "/hawkr.social.v1alpha1.SocialPublicService/RecordPostView"
@@ -194,6 +197,10 @@ type SocialPublicServiceClient interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+	// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+	// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+	GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error)
 	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
 	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
 	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
@@ -261,6 +268,13 @@ func NewSocialPublicServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		getForumThread: connect.NewClient[v1alpha1.GetForumThreadRequest, v1alpha1.GetForumThreadResponse](
+			httpClient,
+			baseURL+SocialPublicServiceGetForumThreadProcedure,
+			connect.WithSchema(socialPublicServiceMethods.ByName("GetForumThread")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		recordPostView: connect.NewClient[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse](
 			httpClient,
 			baseURL+SocialPublicServiceRecordPostViewProcedure,
@@ -279,6 +293,7 @@ type socialPublicServiceClient struct {
 	suggestTags          *connect.Client[v1alpha1.SuggestTagsRequest, v1alpha1.SuggestTagsResponse]
 	suggestTrendingTags  *connect.Client[v1alpha1.SuggestTrendingTagsRequest, v1alpha1.SuggestTrendingTagsResponse]
 	listForumEntries     *connect.Client[v1alpha1.ListForumEntriesRequest, v1alpha1.ListForumEntriesResponse]
+	getForumThread       *connect.Client[v1alpha1.GetForumThreadRequest, v1alpha1.GetForumThreadResponse]
 	recordPostView       *connect.Client[v1alpha1.RecordPostViewRequest, v1alpha1.RecordPostViewResponse]
 }
 
@@ -317,6 +332,11 @@ func (c *socialPublicServiceClient) ListForumEntries(ctx context.Context, req *c
 	return c.listForumEntries.CallUnary(ctx, req)
 }
 
+// GetForumThread calls hawkr.social.v1alpha1.SocialPublicService.GetForumThread.
+func (c *socialPublicServiceClient) GetForumThread(ctx context.Context, req *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error) {
+	return c.getForumThread.CallUnary(ctx, req)
+}
+
 // RecordPostView calls hawkr.social.v1alpha1.SocialPublicService.RecordPostView.
 func (c *socialPublicServiceClient) RecordPostView(ctx context.Context, req *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {
 	return c.recordPostView.CallUnary(ctx, req)
@@ -348,6 +368,10 @@ type SocialPublicServiceHandler interface {
 	// （只有 id、store_id、create_time、reply_count 與 state）；觀看者封鎖了這家店、或與作者任一方向有個人封鎖時，對應的內容不出現，
 	// 該頁因此可以少於 page_size。店家讀不到時是空的一頁；指定的 parent_id 不屬於這家店回 not_found。
 	ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error)
+	// GetForumThread 讀店家討論區的單一討論串：頂層項目與回覆的第一頁，供「單一討論串」頁與措施的內容連結使用。頂層項目的可見與佔位規則同 ListForumEntries
+	// （刪除或隱藏而底下有可見回覆時是佔位項目）；後續的回覆用 ListForumEntries 帶 store_id、parent_id（討論串 id）與本回應的 next_page_token。
+	// 討論串不存在、不屬於這家店、店家讀不到、被觀看者的封鎖排除，或已刪除或隱藏而沒有可見回覆，都回 not_found。
+	GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error)
 	// RecordPostView 記一次貼文瀏覽，匿名也能呼叫。只計觀看者讀得到的貼文，同一篇、同一個台北日、同一個觀看者只算一次；
 	// 讀不到的貼文與沒有計入的呼叫都回成功，不區分原因。登入者以帳號去重，訪客以來源 IP 與 User-Agent 去重；停權的帳號與無效的憑證以訪客計入。
 	// 店主看自己店的貼文不計。每個來源 IP 有額度，超過回 resource_exhausted 與 RetryInfo。瀏覽是寫入，所以不標 NO_SIDE_EFFECTS，client 以 POST 呼叫；
@@ -411,6 +435,13 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialPublicServiceGetForumThreadHandler := connect.NewUnaryHandler(
+		SocialPublicServiceGetForumThreadProcedure,
+		svc.GetForumThread,
+		connect.WithSchema(socialPublicServiceMethods.ByName("GetForumThread")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialPublicServiceRecordPostViewHandler := connect.NewUnaryHandler(
 		SocialPublicServiceRecordPostViewProcedure,
 		svc.RecordPostView,
@@ -433,6 +464,8 @@ func NewSocialPublicServiceHandler(svc SocialPublicServiceHandler, opts ...conne
 			socialPublicServiceSuggestTrendingTagsHandler.ServeHTTP(w, r)
 		case SocialPublicServiceListForumEntriesProcedure:
 			socialPublicServiceListForumEntriesHandler.ServeHTTP(w, r)
+		case SocialPublicServiceGetForumThreadProcedure:
+			socialPublicServiceGetForumThreadHandler.ServeHTTP(w, r)
 		case SocialPublicServiceRecordPostViewProcedure:
 			socialPublicServiceRecordPostViewHandler.ServeHTTP(w, r)
 		default:
@@ -470,6 +503,10 @@ func (UnimplementedSocialPublicServiceHandler) SuggestTrendingTags(context.Conte
 
 func (UnimplementedSocialPublicServiceHandler) ListForumEntries(context.Context, *connect.Request[v1alpha1.ListForumEntriesRequest]) (*connect.Response[v1alpha1.ListForumEntriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.ListForumEntries is not implemented"))
+}
+
+func (UnimplementedSocialPublicServiceHandler) GetForumThread(context.Context, *connect.Request[v1alpha1.GetForumThreadRequest]) (*connect.Response[v1alpha1.GetForumThreadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.social.v1alpha1.SocialPublicService.GetForumThread is not implemented"))
 }
 
 func (UnimplementedSocialPublicServiceHandler) RecordPostView(context.Context, *connect.Request[v1alpha1.RecordPostViewRequest]) (*connect.Response[v1alpha1.RecordPostViewResponse], error) {

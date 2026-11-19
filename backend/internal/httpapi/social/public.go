@@ -43,6 +43,7 @@ type Reads interface {
 	TrendingHashtags(ctx context.Context, from, to time.Time, limit int32) ([]social.HashtagCount, error)
 	ListForumEntries(ctx context.Context, c social.Caller, storeID int64, after *social.CommentCursor, size int32) (social.ForumPage, error)
 	ListForumReplies(ctx context.Context, c social.Caller, storeID int64, parentID uuid.UUID, after *social.CommentCursor, size int32) (social.ForumPage, error)
+	GetForumThread(ctx context.Context, c social.Caller, storeID int64, threadID uuid.UUID, size int32) (social.ForumThreadView, error)
 }
 
 // Buyers 是呼叫者的買家身分與留言作者顯示資料的來源（*buyer.Module）。
@@ -395,7 +396,7 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, page.Entries, page.Readable)
 	if err != nil {
 		return nil, err
 	}
@@ -410,22 +411,58 @@ func (h *Public) ListForumEntries(ctx context.Context, req *connect.Request[pb.L
 	return connect.NewResponse(out), nil
 }
 
+func (h *Public) GetForumThread(ctx context.Context, req *connect.Request[pb.GetForumThreadRequest]) (*connect.Response[pb.GetForumThreadResponse], error) {
+	msg := req.Msg
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
+	if err != nil {
+		return nil, err
+	}
+	threadID, err := rpc.ParseUUID("thread_id", msg.GetThreadId())
+	if err != nil {
+		return nil, err
+	}
+	c, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	view, err := h.reads.GetForumThread(ctx, c, storeID, threadID, msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	// 頂層項目有列就代表討論區對觀看者可讀可寫（列的查詢帶同一個條件）。
+	all := append([]social.ForumEntry{view.Top}, view.Replies.Entries...)
+	viewer, actor, err := h.forumViewerState(ctx, c, storeID, all, true)
+	if err != nil {
+		return nil, err
+	}
+	items, err := h.toForumEntries(c, viewer, all)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetForumThreadResponse{Entry: items[0], Replies: items[1:], ViewerActor: actor, ViewerCanComment: viewer.canComment}
+	if view.Replies.Next != nil {
+		scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListForumEntriesProcedure, rpc.FormatID(storeID), threadID.String())
+		out.NextPageToken = rpc.TokenFor(scope, commentCursor{CreatedAt: view.Replies.Next.CreatedAt, ID: view.Replies.Next.ID})
+	}
+	return connect.NewResponse(out), nil
+}
+
 // forumViewer 是一次請求內觀看者在店 storeID 討論區的狀態與這一頁作者的顯示資料，全部只查一次：
-// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源），以及批次讀回的店家卡片與買家名稱。
+// 能不能留言（viewer_can_comment 與每列的 viewer_can_reply 同源；討論區可讀可寫由模組隨資料回傳），以及批次讀回的店家卡片與買家名稱。
 type forumViewer struct {
 	storeID    int64
 	canComment bool
 	stores     postStores
 }
 
-// forumPageState 讀一頁討論區項目的作者卡片與名稱，並判斷觀看者能不能留言（不是店主時才查一次封鎖）；寫入回應用它，不組觀看者身分。
-func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, error) {
-	return h.loadForumState(ctx, c, storeID, entries, false)
+// forumPageState 讀一頁討論區項目的作者卡片與名稱，並由模組給的 readable 判斷觀看者能不能留言；寫入回應用它，不組觀看者身分。
+func (h *presenter) forumPageState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable bool) (forumViewer, error) {
+	return h.loadForumState(ctx, c, storeID, entries, readable, false)
 }
 
 // forumViewerState 在 forumPageState 之外組觀看者在這個討論區留言時的身分，觀看者自己的名稱或卡片併進同一批讀取，不依賴這一頁有沒有可見項目。
-func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry) (forumViewer, *pb.Actor, error) {
-	viewer, err := h.loadForumState(ctx, c, storeID, entries, true)
+func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable bool) (forumViewer, *pb.Actor, error) {
+	viewer, err := h.loadForumState(ctx, c, storeID, entries, readable, true)
 	if err != nil {
 		return forumViewer{}, nil, err
 	}
@@ -436,7 +473,7 @@ func (h *presenter) forumViewerState(ctx context.Context, c social.Caller, store
 	return viewer, actor, nil
 }
 
-func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, withViewer bool) (forumViewer, error) {
+func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID int64, entries []social.ForumEntry, readable, withViewer bool) (forumViewer, error) {
 	var buyerIDs, storeIDs []int64
 	for _, e := range entries {
 		if e.State != social.CommentVisible {
@@ -466,12 +503,9 @@ func (h *presenter) loadForumState(ctx context.Context, c social.Caller, storeID
 	if stores.buyerDisplay, err = h.buyerDisplays(ctx, buyerIDs); err != nil {
 		return forumViewer{}, err
 	}
-	if !owns {
-		if stores.blocking, err = h.blockingStores(ctx, c, []int64{storeID}); err != nil {
-			return forumViewer{}, err
-		}
-	}
-	return forumViewer{storeID: storeID, canComment: canComment(c, storeID, stores.blocking), stores: stores}, nil
+	// readable 已含店家可曝光與買家沒有封鎖這家店（與新增留言的前置檢查同一個判斷），這裡只剩身分條件。
+	can := readable && (owns || c.BuyerID != 0)
+	return forumViewer{storeID: storeID, canComment: can, stores: stores}, nil
 }
 
 func (h *presenter) toForumEntries(c social.Caller, viewer forumViewer, entries []social.ForumEntry) ([]*pb.ForumEntry, error) {
@@ -633,6 +667,15 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 	return out, nil
 }
 
+// postIsCommentable 是觀看者能不能在貼文 p 留言：canComment 的身分條件，而且貼文要公開可讀（寫入的前置檢查）。
+// 別人的貼文能讀到就是公開可讀；店主自己的貼文可能不是（草稿、下架），由模組隨貼文回傳的 Readable 判斷。
+func postIsCommentable(c social.Caller, p social.Post, stores postStores) bool {
+	if !canComment(c, p.StoreID, stores.blocking) {
+		return false
+	}
+	return !c.OwnsStore(p.StoreID) || p.Readable
+}
+
 // postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡，查詢失敗時整批降級；兩者貼文照回，product 不設。
 func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[int64]ProductInfo {
 	var ids []int64
@@ -709,7 +752,7 @@ func (h *presenter) toPost(c social.Caller, p social.Post, stores postStores) (*
 	out := &pb.Post{
 		Id: p.ID.String(), Body: p.Body, UpdateTime: timestamppb.New(p.UpdatedAt),
 		LikeCount: p.Stats.Likes, CommentCount: p.Stats.Comments, ViewCount: p.Stats.Views, ShareCount: p.Stats.Shares,
-		Url: postURL, ViewerCanComment: canComment(c, p.StoreID, stores.blocking), ViewerLiked: stores.liked[p.ID],
+		Url: postURL, ViewerCanComment: postIsCommentable(c, p, stores), ViewerLiked: stores.liked[p.ID],
 	}
 	if p.PublishedAt != nil {
 		out.PublishTime = timestamppb.New(*p.PublishedAt)
@@ -786,7 +829,7 @@ func (h *presenter) toComments(ctx context.Context, c social.Caller, postStore i
 		item.IsMine = c.IsAuthor(m.Actor)
 		item.ViewerCanEdit = item.IsMine
 		item.ViewerCanDelete = item.IsMine || c.OwnsStore(postStore)
-		item.ViewerCanReply = c.OwnsStore(postStore)
+		item.ViewerCanReply = c.OwnsStore(postStore) && m.PostReadable
 		item.Etag = rpc.Etag(m.Version)
 		if item.Author, err = h.toActor(m.Actor, shared); err != nil {
 			return nil, err

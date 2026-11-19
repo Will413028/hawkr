@@ -224,7 +224,8 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '警告',
 (UiLocale.zhTW || UiLocale.en, 2) => '停權',
 (UiLocale.zhTW || UiLocale.en, 3) => '終止合作',
-(UiLocale.zhTW || UiLocale.en, 4) => '內容下架',
+(UiLocale.zhTW, 4) => '內容下架',
+(UiLocale.en, 4) => 'Content removal',
 _ => null,
 };
 }
@@ -544,7 +545,8 @@ String? sellerMeasureMetaKind(UiLocale l, {required hawkr_seller_v1alpha1_seller
 final kindText = _sellerMeasureKind(l, kind.value);
 if (kindText == null) return null;
 return switch (l) {
-UiLocale.zhTW || UiLocale.en => '措施：' + kindText,
+UiLocale.zhTW => '措施：' + kindText,
+UiLocale.en => 'Measure: ' + kindText,
 };
 }
 
@@ -570,6 +572,22 @@ UiLocale.zhTW || UiLocale.en => '事由：' + groundText,
 String sellerMeasureRejectionCooldownWarning(UiLocale l, {required int days}) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '若本次經駁回，將於 ' + days.toString() + ' 日內不得再提出解除請求',
+};
+}
+
+/// seller.Measure.removed_contents_cleared
+String sellerMeasureRemovedContentsCleared(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '內容副本已超過保留期限並刪除。',
+UiLocale.en => 'The copy of this content was deleted after the retention period.',
+};
+}
+
+/// seller.Measure.removed_contents_heading
+String sellerMeasureRemovedContentsHeading(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '下架的內容',
+UiLocale.en => 'Removed content',
 };
 }
 
@@ -638,6 +656,14 @@ UiLocale.zhTW || UiLocale.en => '風險：' + groundText,
 String sellerMeasureTitleRiskFallback(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '風險措施',
+};
+}
+
+/// seller.Measure.view_content_link
+String sellerMeasureViewContentLink(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '查看貼文',
+UiLocale.en => 'View post',
 };
 }
 

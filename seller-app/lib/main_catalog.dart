@@ -761,7 +761,8 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
     _section(
       '關聯商品 · LinkedProductCard',
       LinkedProductCard(
-        linkedProduct: const {'name': '季節鮮採蔬菜箱 · 產地直送綜合組', 'price': 680},
+        name: '季節鮮採蔬菜箱 · 產地直送綜合組',
+        price: 680,
         inset: false,
         onTap: _recordAction,
       ),

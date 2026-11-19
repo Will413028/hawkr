@@ -182,6 +182,13 @@ describe("measureMeta", () => {
 			measureMeta(ut, measure({ kind: MeasureKind.UNSPECIFIED })),
 		).toBeUndefined();
 	});
+
+	it("內容下架的名稱取自文案目錄，zh-TW 與 en 各用自己的語系", () => {
+		const takedown = measure({ kind: MeasureKind.CONTENT_TAKEDOWN });
+		expect(measureMeta(ut, takedown)).toBe("措施：內容下架");
+		const meta = measureMeta(uiTextFor("en"), takedown);
+		expect(meta).toBe("Measure: Content removal");
+	});
 });
 
 describe("measurePeriodText", () => {
@@ -189,6 +196,19 @@ describe("measurePeriodText", () => {
 		expect(measurePeriodText(ut, measure({ kind: MeasureKind.WARNING }))).toBe(
 			undefined,
 		);
+	});
+
+	it("內容下架沒有停權的期間句", () => {
+		const period = create(MeasurePeriodSchema, {
+			startTime: at("2026-10-01T02:00:00Z"),
+			endTime: at("2026-10-08T16:30:00Z"),
+		});
+		expect(
+			measurePeriodText(
+				ut,
+				measure({ kind: MeasureKind.CONTENT_TAKEDOWN, period }),
+			),
+		).toBeUndefined();
 	});
 
 	it("有結束時間：以臺北時間顯示起訖", () => {

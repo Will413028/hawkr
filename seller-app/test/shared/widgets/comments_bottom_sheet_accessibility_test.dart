@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
+import 'package:hawkr_seller/features/post/data/post_comment.dart';
+import 'package:hawkr_seller/features/post/data/post_model.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/shared/widgets/comments_bottom_sheet.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../features/post/post_comment_fixtures.dart';
+
 class _MockPostRepository extends Mock implements PostRepository {}
 
 void main() {
@@ -16,25 +21,25 @@ void main() {
 
   setUp(() {
     repository = _MockPostRepository();
-    when(() => repository.listCommentsRaw(42)).thenAnswer(
-      (_) async => <Map<String, dynamic>>[
-        <String, dynamic>{
-          'id': 1,
-          'isMine': false,
-          'userName': '小明',
-          'content': '第一則留言',
-          'likeCount': 2,
-          'liked': false,
-        },
-        <String, dynamic>{
-          'id': 2,
-          'parentId': 1,
-          'isMine': false,
-          'userName': '小華',
-          'content': '第一則回覆',
-          'likeCount': 1,
-          'liked': true,
-        },
+    // 伺服器計數的校正預設不回來；要驗證校正的測試自己覆寫。
+    when(
+      () => repository.getMyPost(any()),
+    ).thenAnswer((_) => Completer<Post>().future);
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(author: '小明', body: '第一則留言', likeCount: 2, replyCount: 1),
+      ],
+    );
+    when(() => repository.listComments(42, parentId: '1')).thenAnswer(
+      (_) async => [
+        testComment(
+          id: '2',
+          parentId: '1',
+          author: '小華',
+          body: '第一則回覆',
+          likeCount: 1,
+          liked: true,
+        ),
       ],
     );
   });
@@ -52,7 +57,12 @@ void main() {
           builder: (_, _) => MaterialApp(
             theme: AppTheme.light,
             home: Scaffold(
-              body: CommentsBottomSheet(postId: 42, postRepository: repository),
+              body: CommentsBottomSheet(
+                postId: 42,
+                postRepository: repository,
+                initialCommentCount: 2,
+                canComment: true,
+              ),
             ),
           ),
         ),
@@ -125,9 +135,9 @@ void main() {
   testWidgets(
     'pending comment send rejects duplicate taps and retains failed draft',
     (tester) async {
-      final response = Completer<Map<String, dynamic>?>();
+      final response = Completer<PostComment>();
       when(
-        () => repository.commentOnPostRaw(42, content: '測試留言'),
+        () => repository.createComment(42, body: '測試留言'),
       ).thenAnswer((_) => response.future);
       await pumpSheet(tester);
       await tester.enterText(find.byType(TextField), '測試留言');
@@ -135,9 +145,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('send-comment-action')));
       await tester.tap(find.byKey(const ValueKey('send-comment-action')));
       await tester.pump();
-      verify(() => repository.commentOnPostRaw(42, content: '測試留言')).called(1);
+      verify(() => repository.createComment(42, body: '測試留言')).called(1);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      response.complete(null);
+      response.completeError(StateError('offline'));
       await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
@@ -152,9 +162,9 @@ void main() {
   testWidgets('pending reply keeps its target and draft until success', (
     tester,
   ) async {
-    final response = Completer<Map<String, dynamic>?>();
+    final response = Completer<PostComment>();
     when(
-      () => repository.replyToComment(1, postId: 42, content: '回覆內容'),
+      () => repository.createComment(42, body: '回覆內容', parentId: '1'),
     ).thenAnswer((_) => response.future);
     await pumpSheet(tester);
     await tester.tap(find.byKey(const ValueKey('comment-reply-1')));
@@ -171,7 +181,7 @@ void main() {
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       '回覆內容',
     );
-    response.complete({'id': 3, 'parentId': 1, 'content': '回覆內容'});
+    response.complete(testComment(id: '3', parentId: '1'));
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
@@ -179,7 +189,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('cancel-comment-reply')), findsNothing);
     verify(
-      () => repository.replyToComment(1, postId: 42, content: '回覆內容'),
+      () => repository.createComment(42, body: '回覆內容', parentId: '1'),
     ).called(1);
     expect(tester.takeException(), isNull);
   });
@@ -188,7 +198,7 @@ void main() {
     tester,
   ) async {
     when(
-      () => repository.commentOnPostRaw(42, content: '網路重試'),
+      () => repository.createComment(42, body: '網路重試'),
     ).thenThrow(StateError('offline'));
     await pumpSheet(tester);
     await tester.enterText(find.byType(TextField), '網路重試');
@@ -208,14 +218,14 @@ void main() {
     testWidgets(
       'closing pending ${replying ? 'reply' : 'comment'} ignores completion',
       (tester) async {
-        final response = Completer<Map<String, dynamic>?>();
+        final response = Completer<PostComment>();
         if (replying) {
           when(
-            () => repository.replyToComment(1, postId: 42, content: '離頁'),
+            () => repository.createComment(42, body: '離頁', parentId: '1'),
           ).thenAnswer((_) => response.future);
         } else {
           when(
-            () => repository.commentOnPostRaw(42, content: '離頁'),
+            () => repository.createComment(42, body: '離頁'),
           ).thenAnswer((_) => response.future);
         }
         await pumpSheet(tester);
@@ -227,12 +237,303 @@ void main() {
         await tester.pump();
         await tester.tap(find.byKey(const ValueKey('send-comment-action')));
         await tester.pumpWidget(const SizedBox.shrink());
-        response.complete({'id': 3, 'content': '離頁'});
+        response.complete(testComment(id: '3'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
     );
   }
+
+  testWidgets('reply control and long-press delete follow viewer_can_*', (
+    tester,
+  ) async {
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '1', canReply: false, canDelete: false),
+        testComment(id: '3', body: '可管理', canReply: true, canDelete: true),
+      ],
+    );
+    when(
+      () => repository.listComments(
+        42,
+        parentId: any(named: 'parentId', that: isNotNull),
+      ),
+    ).thenAnswer((_) async => const <PostComment>[]);
+    when(
+      () => repository.deleteComment('3', etag: 'etag-3'),
+    ).thenAnswer((_) async {});
+    await pumpSheet(tester);
+    expect(find.byKey(const ValueKey('comment-reply-1')), findsNothing);
+    expect(find.byKey(const ValueKey('comment-reply-3')), findsOneWidget);
+
+    await tester.longPress(find.text('留言內容'));
+    await tester.pumpAndSettle();
+    expect(find.text('確定要刪除此留言嗎？\n刪除後將無法復原。'), findsNothing);
+
+    await tester.longPress(find.text('可管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    verify(() => repository.deleteComment('3', etag: 'etag-3')).called(1);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets(
+    'comments load and show the notice even when buyers cannot see them',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: ScreenUtilInit(
+            designSize: const Size(390, 844),
+            builder: (_, _) => MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(
+                body: CommentsBottomSheet(
+                  postId: 42,
+                  postRepository: repository,
+                  initialCommentCount: 2,
+                  notice: '店家目前不公開，買家看不到這些留言。',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('店家目前不公開，買家看不到這些留言。'), findsOneWidget);
+      expect(find.text('第一則留言'), findsOneWidget);
+      expect(find.byKey(const ValueKey('send-comment-action')), findsNothing);
+      verify(() => repository.listComments(42)).called(1);
+    },
+  );
+
+  testWidgets('like toggles by viewer_liked and placeholders show text', (
+    tester,
+  ) async {
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '1', author: '小明', body: '留言', likeCount: 2),
+        testComment(id: '4', state: CommentState.COMMENT_STATE_HIDDEN),
+      ],
+    );
+    when(
+      () => repository.listComments(
+        42,
+        parentId: any(named: 'parentId', that: isNotNull),
+      ),
+    ).thenAnswer((_) async => const <PostComment>[]);
+    when(() => repository.likeComment('1')).thenAnswer((_) async {});
+    await pumpSheet(tester);
+    expect(find.text('此留言已被隱藏'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pumpAndSettle();
+    verify(() => repository.likeComment('1')).called(1);
+    verifyNever(() => repository.unlikeComment(any()));
+    expect(find.text('3'), findsOneWidget);
+    when(() => repository.unlikeComment('1')).thenAnswer((_) async {});
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pumpAndSettle();
+    verify(() => repository.unlikeComment('1')).called(1);
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('a double tap on like sends one request', (tester) async {
+    final response = Completer<void>();
+    when(() => repository.likeComment('1')).thenAnswer((_) => response.future);
+    await pumpSheet(tester);
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('comment-like-1')));
+    await tester.pump();
+    verify(() => repository.likeComment('1')).called(1);
+    verifyNever(() => repository.unlikeComment(any()));
+    response.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a reply created while replies load is kept', (tester) async {
+    final fetch = Completer<List<PostComment>>();
+    when(
+      () => repository.listComments(42, parentId: '1'),
+    ).thenAnswer((_) => fetch.future);
+    when(
+      () => repository.createComment(
+        42,
+        body: any(named: 'body'),
+        parentId: '1',
+      ),
+    ).thenAnswer(
+      (_) async => testComment(id: '9', parentId: '1', body: '我剛送出的回覆'),
+    );
+    await pumpSheet(tester);
+    await tester.tap(find.byKey(const ValueKey('comment-reply-1')));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '我剛送出的回覆');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pump();
+    await tester.pump();
+    fetch.complete([testComment(id: '2', parentId: '1', body: '伺服器的回覆')]);
+    await tester.pumpAndSettle();
+    expect(find.text('伺服器的回覆'), findsOneWidget);
+    expect(find.text('我剛送出的回覆'), findsOneWidget);
+  });
+
+  Future<List<int>> pumpCounting(WidgetTester tester) async {
+    final counts = <int>[];
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: CommentsBottomSheet(
+                postId: 42,
+                postRepository: repository,
+                initialCommentCount: 5,
+                canComment: true,
+                onCommentCountChanged: counts.add,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    return counts;
+  }
+
+  testWidgets('opening reports no count until the server count arrives', (
+    tester,
+  ) async {
+    final counts = await pumpCounting(tester);
+    expect(counts, isEmpty);
+    verify(() => repository.getMyPost(42)).called(1);
+  });
+
+  testWidgets('a created comment or reply adds one to the opening count', (
+    tester,
+  ) async {
+    when(
+      () => repository.createComment(42, body: any(named: 'body')),
+    ).thenAnswer((_) async => testComment(id: '8', body: '新留言'));
+    when(
+      () => repository.createComment(
+        42,
+        body: any(named: 'body'),
+        parentId: '1',
+      ),
+    ).thenAnswer((_) async => testComment(id: '9', parentId: '1', body: '回'));
+    final counts = await pumpCounting(tester);
+    await tester.enterText(find.byType(TextField), '新留言');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pumpAndSettle();
+    expect(counts, [6]);
+    await tester.tap(find.byKey(const ValueKey('comment-reply-1')));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '回');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pumpAndSettle();
+    expect(counts, [6, 7]);
+  });
+
+  testWidgets('a deleted comment takes one off the count', (tester) async {
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '3', body: '可管理', canReply: true, canDelete: true),
+      ],
+    );
+    when(
+      () => repository.listComments(
+        42,
+        parentId: any(named: 'parentId', that: isNotNull),
+      ),
+    ).thenAnswer((_) async => const <PostComment>[]);
+    when(
+      () => repository.deleteComment('3', etag: 'etag-3'),
+    ).thenAnswer((_) async {});
+    final counts = await pumpCounting(tester);
+    await tester.longPress(find.text('可管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    expect(counts, [4]);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('a failed delete leaves the count alone', (tester) async {
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '3', body: '可管理', canReply: true, canDelete: true),
+      ],
+    );
+    when(
+      () => repository.listComments(
+        42,
+        parentId: any(named: 'parentId', that: isNotNull),
+      ),
+    ).thenAnswer((_) async => const <PostComment>[]);
+    when(
+      () => repository.deleteComment('3', etag: 'etag-3'),
+    ).thenThrow(Exception('offline'));
+    final counts = await pumpCounting(tester);
+    await tester.longPress(find.text('可管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    expect(counts, isEmpty);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets(
+    'a reply sent after a failed reply fetch still loads the thread',
+    (tester) async {
+      var attempts = 0;
+      when(() => repository.listComments(42, parentId: '1')).thenAnswer((
+        _,
+      ) async {
+        attempts++;
+        if (attempts == 1) throw Exception('offline');
+        return [testComment(id: '2', parentId: '1', body: '伺服器的回覆')];
+      });
+      when(
+        () => repository.createComment(
+          42,
+          body: any(named: 'body'),
+          parentId: '1',
+        ),
+      ).thenAnswer(
+        (_) async => testComment(id: '9', parentId: '1', body: '我剛送出的回覆'),
+      );
+      await pumpSheet(tester);
+      await tester.pumpAndSettle();
+      expect(attempts, 1);
+      expect(find.text('伺服器的回覆'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('comment-reply-1')));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), '我剛送出的回覆');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+      await tester.pumpAndSettle();
+      expect(attempts, 2);
+      expect(find.text('伺服器的回覆'), findsOneWidget);
+      expect(find.text('我剛送出的回覆'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
 
   testWidgets('comment sheet passes all three accessibility guidelines', (
     tester,
@@ -244,5 +545,127 @@ void main() {
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     semantics.dispose();
+  });
+
+  testWidgets('deleting the comment being replied to clears the reply target', (
+    tester,
+  ) async {
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '3', body: '可管理', canReply: true, canDelete: true),
+      ],
+    );
+    when(
+      () => repository.listComments(
+        42,
+        parentId: any(named: 'parentId', that: isNotNull),
+      ),
+    ).thenAnswer((_) async => const <PostComment>[]);
+    when(
+      () => repository.deleteComment('3', etag: 'etag-3'),
+    ).thenAnswer((_) async {});
+    await pumpSheet(tester);
+    await tester.tap(find.byKey(const ValueKey('comment-reply-3')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('cancel-comment-reply')), findsOneWidget);
+    await tester.longPress(find.text('可管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cancel-comment-reply')), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('a reply fetch started before a reload does not write state', (
+    tester,
+  ) async {
+    final first = Completer<List<PostComment>>();
+    final second = Completer<List<PostComment>>();
+    var calls = 0;
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '1', body: '第一則', replyCount: 1),
+        testComment(id: '3', body: '可管理', canDelete: true),
+      ],
+    );
+    when(
+      () => repository.listComments(42, parentId: '1'),
+    ).thenAnswer((_) => ++calls == 1 ? first.future : second.future);
+    when(
+      () => repository.deleteComment('3', etag: 'etag-3'),
+    ).thenAnswer((_) async {});
+    await pumpSheet(tester);
+    await tester.longPress(find.text('可管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    second.complete([testComment(id: '5', parentId: '1', body: '新的回覆')]);
+    await tester.pumpAndSettle();
+    first.complete([testComment(id: '2', parentId: '1', body: '過時的回覆')]);
+    await tester.pumpAndSettle();
+    expect(find.text('新的回覆'), findsOneWidget);
+    expect(find.text('過時的回覆'), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('a failed thread offers its own retry that refetches only it', (
+    tester,
+  ) async {
+    var attempts = 0;
+    when(() => repository.listComments(42)).thenAnswer(
+      (_) async => [
+        testComment(id: '1', body: '第一則', replyCount: 1),
+        testComment(id: '4', body: '第二則', replyCount: 1),
+      ],
+    );
+    when(() => repository.listComments(42, parentId: '1')).thenAnswer((
+      _,
+    ) async {
+      if (++attempts == 1) throw Exception('offline');
+      return [testComment(id: '2', parentId: '1', body: '重試後的回覆')];
+    });
+    when(() => repository.listComments(42, parentId: '4')).thenAnswer(
+      (_) async => [testComment(id: '6', parentId: '4', body: '另一串')],
+    );
+    await pumpSheet(tester);
+    await tester.pumpAndSettle();
+    final retry = find.byKey(const ValueKey('comments-sheet-replies-retry-1'));
+    expect(retry, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('comments-sheet-replies-retry-4')),
+      findsNothing,
+    );
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(find.text('重試後的回覆'), findsOneWidget);
+    expect(retry, findsNothing);
+    verify(() => repository.listComments(42, parentId: '1')).called(2);
+    verify(() => repository.listComments(42, parentId: '4')).called(1);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('the server count corrects the opening count; stale ones lose', (
+    tester,
+  ) async {
+    final open = Completer<Post>();
+    var calls = 0;
+    when(() => repository.getMyPost(42)).thenAnswer((_) {
+      return ++calls == 1
+          ? open.future
+          : Future.value(const Post(id: 42, content: '', commentCount: 8));
+    });
+    when(
+      () => repository.createComment(42, body: any(named: 'body')),
+    ).thenAnswer((_) async => testComment(id: '8', body: '新留言'));
+    final counts = await pumpCounting(tester);
+    await tester.enterText(find.byType(TextField), '新留言');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-comment-action')));
+    await tester.pumpAndSettle();
+    expect(counts, [6, 8]);
+    open.complete(const Post(id: 42, content: '', commentCount: 3));
+    await tester.pumpAndSettle();
+    expect(counts, [6, 8]);
   });
 }

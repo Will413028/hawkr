@@ -1,21 +1,40 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import * as React from "react";
 import { useAuth } from "@/lib/auth/context";
 import {
 	COMMENT_PAGE_SIZE,
 	type Comment,
-	type CommentListResult,
 	createComment,
 	deleteComment,
 	fetchCommentReplies,
 	fetchPostComments,
 	setCommentLiked,
 } from "@/lib/comments/repo";
-import { setPostLiked } from "@/lib/posts/repo";
+import { fetchPostViewerState, setPostLiked } from "@/lib/posts/repo";
+import {
+	addReplyCount,
+	appendToLastPage,
+	cancelListRefetch,
+	dropReplyCount,
+	FIRST_PAGE_PARAM,
+	findItem,
+	flattenPages,
+	invalidateList,
+	type ListData,
+	lastPageLoaded,
+	mapItem,
+	nextPageParam,
+	removeItem,
+} from "@/lib/query/infinite-list";
 import { queryKeys } from "@/lib/query/keys";
-import { errorMessage } from "./queryError";
+import { useSubmittedItems } from "@/lib/query/submissions";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 /** Options for posting a top-level comment. The server decides the author
@@ -28,13 +47,21 @@ export interface PostCommentOptions {
 	authorAvatar?: string;
 }
 
+/** 自己剛送出、伺服器那份還不在已載入頁的項目；`key` 從送出中到成功都不變。 */
+export interface SubmittedComment {
+	key: string;
+	comment: Comment;
+}
+
 interface UsePostCommentsResult {
 	comments: Comment[];
+	submitted: SubmittedComment[];
 	loading: boolean;
 	loadingMore: boolean;
 	hasMore: boolean;
-	error: string | null;
-	/** 重新讀第一頁：開啟時與下拉更新時呼叫（沒有即時推送）。 */
+	error: unknown;
+	loadMoreError: unknown;
+	/** 重新讀已載入的頁：開啟時與下拉更新時呼叫（沒有即時推送）。 */
 	refresh: () => Promise<void>;
 	loadMore: () => Promise<void>;
 	post: (content: string, opts?: PostCommentOptions) => Promise<void>;
@@ -49,12 +76,58 @@ interface UsePostCommentsOptions {
 	active?: boolean;
 }
 
-function emptyCommentList(pageSize = COMMENT_PAGE_SIZE): CommentListResult {
-	return { records: [], nextPageToken: "", pageSize };
+type CommentData = ListData<Comment>;
+
+const COMMENTS_PARAMS = { pageSize: COMMENT_PAGE_SIZE } as const;
+const REPLY_PAGE_SIZE = 20;
+const REPLIES_PARAMS = { pageSize: REPLY_PAGE_SIZE } as const;
+const EMPTY_COMMENTS: Comment[] = [];
+
+interface Submission {
+	content: string;
+	/** UUIDv4：同一次送出沿用同一個，伺服器回同一則留言而不重複建立。 */
+	requestId: string;
+	authorName: string;
+	authorAvatar?: string;
+}
+
+interface ReplySubmission extends Submission {
+	replyToId: string;
+	replyToName?: string;
+}
+
+interface SubmitContext {
+	optimisticId?: string;
 }
 
 function newRequestId(): string {
 	return crypto.randomUUID();
+}
+
+function optimisticComment(
+	postId: string,
+	v: Submission,
+	createdAt: number,
+	extra: Partial<Comment> = {},
+): Comment {
+	return {
+		id: `tmp-${v.requestId}`,
+		postId,
+		isMine: true,
+		userName: v.authorName,
+		avatarKey: v.authorAvatar,
+		content: v.content,
+		likeCount: 0,
+		replyCount: 0,
+		isLiked: false,
+		createdAt,
+		state: "visible",
+		viewerCanEdit: false,
+		viewerCanDelete: false,
+		viewerCanReply: false,
+		optimistic: true,
+		...extra,
+	};
 }
 
 export function usePostComments(
@@ -65,37 +138,39 @@ export function usePostComments(
 	const { identity } = useAuth();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
-	const commentsParams = React.useMemo(
-		() => ({ pageSize: COMMENT_PAGE_SIZE }),
-		[],
-	);
 	const commentsKey = React.useMemo(
-		() => queryKeys.feed.comments(queryIdentity, postId ?? "", commentsParams),
-		[queryIdentity, postId, commentsParams],
+		() => queryKeys.feed.comments(queryIdentity, postId ?? "", COMMENTS_PARAMS),
+		[queryIdentity, postId],
 	);
-	const commentsQuery = useQuery({
+	const createKey = React.useMemo(
+		() => queryKeys.feed.commentCreate(queryIdentity, postId ?? ""),
+		[queryIdentity, postId],
+	);
+	const query = useInfiniteQuery({
 		queryKey: commentsKey,
 		enabled: Boolean(postId && active),
-		// placeholderData（非 initialData）：staleTime 30s 下 initialData 會被當成
-		// 「剛抓到的新鮮資料」而不在掛載時請求，導致空清單卡 30 秒。
-		placeholderData: emptyCommentList(),
+		initialPageParam: FIRST_PAGE_PARAM,
+		getNextPageParam: nextPageParam,
 		staleTime: 30_000,
 		// 沒有即時推送：每次開啟（掛載）都重新讀，不沿用上次的列表。
 		refetchOnMount: "always",
-		queryFn: ({ signal }) =>
-			fetchPostComments(postId ?? "", { pageSize: COMMENT_PAGE_SIZE, signal }),
+		queryFn: ({ pageParam, signal }) =>
+			fetchPostComments(postId ?? "", {
+				pageToken: pageParam,
+				pageSize: COMMENT_PAGE_SIZE,
+				signal,
+			}),
 	});
-	const [loadingMore, setLoadingMore] = React.useState(false);
-	const [error, setError] = React.useState<string | null>(null);
-	const data = commentsQuery.data ?? emptyCommentList();
-	const comments = data.records;
-	const nextPageToken = data.nextPageToken;
-	const refetchComments = commentsQuery.refetch;
+	const comments = React.useMemo(
+		() => (query.data ? flattenPages(query.data) : EMPTY_COMMENTS),
+		[query.data],
+	);
+	const { refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = query;
 
 	const setCommentData = React.useCallback(
-		(updater: (current: CommentListResult) => CommentListResult) => {
-			queryClient.setQueryData<CommentListResult>(commentsKey, (current) =>
-				updater(current ?? emptyCommentList()),
+		(updater: (current: CommentData) => CommentData) => {
+			queryClient.setQueryData<CommentData>(commentsKey, (current) =>
+				current ? updater(current) : current,
 			);
 		},
 		[commentsKey, queryClient],
@@ -103,111 +178,113 @@ export function usePostComments(
 
 	const refresh = React.useCallback(async () => {
 		if (!postId) return;
-		setError(null);
-		await refetchComments();
-	}, [postId, refetchComments]);
+		await refetch();
+	}, [postId, refetch]);
 
 	const loadMore = React.useCallback(async () => {
-		if (!postId || loadingMore || nextPageToken === "") return;
-		setLoadingMore(true);
-		try {
-			const r = await fetchPostComments(postId, {
-				pageToken: nextPageToken,
-				pageSize: COMMENT_PAGE_SIZE,
-			});
-			setCommentData((current) => ({
-				...r,
-				records: [...current.records, ...r.records],
-			}));
-		} catch (e) {
-			setError(errorMessage(e, "載入更多失敗"));
-		} finally {
-			setLoadingMore(false);
-		}
-	}, [postId, loadingMore, nextPageToken, setCommentData]);
+		if (!postId || !hasNextPage || isFetchingNextPage) return;
+		await fetchNextPage({ cancelRefetch: false });
+	}, [postId, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-	const post = React.useCallback(
-		async (content: string, opts?: PostCommentOptions) => {
-			if (!postId || !content.trim()) return;
-			// 一次送出的重試沿用同一個 request_id（UUIDv4），伺服器回同一則留言而不重複建立。
-			const requestId = newRequestId();
-			const optimistic: Comment = {
-				// 暫時 id：字串前綴避免與真實 ID 撞號。
-				id: `tmp-${requestId}`,
-				postId,
-				isMine: true,
-				// 賣家面以店家身分留言：optimistic 先顯示傳入的店家名／頭像，避免閃一下買家暱稱。
-				userName: opts?.authorName ?? identity?.nickname ?? "我",
-				avatarKey: opts?.authorAvatar ?? identity?.avatarKey,
-				content: content.trim(),
-				likeCount: 0,
-				replyCount: 0,
-				isLiked: false,
-				createdAt: Math.floor(Date.now() / 1000),
-				state: "visible",
-				viewerCanEdit: false,
-				viewerCanDelete: false,
-				viewerCanReply: false,
-			};
-			// 留言依建立時間舊到新排：新留言接在已載入的最後。
-			setCommentData((current) => ({
-				...current,
-				records: [...current.records, optimistic],
-			}));
-			try {
-				const real = await createComment(postId, {
-					content: content.trim(),
-					requestId,
+	const createMutation = useMutation<Comment, Error, Submission, SubmitContext>(
+		{
+			mutationKey: createKey,
+			mutationFn: (v) => {
+				if (!postId) throw new Error("postId missing");
+				return createComment(postId, {
+					content: v.content,
+					requestId: v.requestId,
 				});
-				setCommentData((current) => ({
-					...current,
-					records: current.records.map((c) =>
-						c.id === optimistic.id ? real : c,
-					),
-				}));
-			} catch (e) {
-				setCommentData((current) => ({
-					...current,
-					records: current.records.filter((c) => c.id !== optimistic.id),
-				}));
-				setError(errorMessage(e, "送出留言失敗"));
-				throw e;
-			}
+			},
+			onMutate: async (v) => {
+				await cancelListRefetch(queryClient, commentsKey);
+				const current = queryClient.getQueryData<CommentData>(commentsKey);
+				// 伺服器把新留言放在最後：最後一頁還沒載入時它不在已載入的資料裡。
+				if (!current || !postId || !lastPageLoaded(current)) return {};
+				const optimistic = optimisticComment(
+					postId,
+					v,
+					Math.floor(Date.now() / 1000),
+				);
+				queryClient.setQueryData<CommentData>(
+					commentsKey,
+					appendToLastPage(current, optimistic),
+				);
+				return { optimisticId: optimistic.id };
+			},
+			onSuccess: (real, _v, context) => {
+				const id = context?.optimisticId;
+				if (id) setCommentData((current) => mapItem(current, id, () => real));
+			},
+			onError: (_error, _v, context) => {
+				const id = context?.optimisticId;
+				if (id) setCommentData((current) => removeItem(current, id));
+			},
+			onSettled: () => {
+				void invalidateList(queryClient, commentsKey);
+			},
 		},
-		[postId, identity?.nickname, identity?.avatarKey, setCommentData],
 	);
 
+	const buildSubmitted = React.useCallback(
+		(v: Submission, createdAt: number) =>
+			optimisticComment(postId ?? "", v, createdAt),
+		[postId],
+	);
+	const submittedItems = useSubmittedItems<Submission, Comment>({
+		mutationKey: createKey,
+		loaded: comments,
+		build: buildSubmitted,
+	});
+	const submitted = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, comment: s.item })),
+		[submittedItems],
+	);
+
+	const { mutateAsync: createAsync } = createMutation;
+	const post = React.useCallback(
+		async (content: string, opts?: PostCommentOptions) => {
+			const body = content.trim();
+			if (!postId || !body) return;
+			await createAsync({
+				content: body,
+				requestId: newRequestId(),
+				authorName: opts?.authorName ?? identity?.nickname ?? "我",
+				authorAvatar: opts?.authorAvatar ?? identity?.avatarKey,
+			});
+		},
+		[postId, identity?.nickname, identity?.avatarKey, createAsync],
+	);
+
+	const deleteMutation = useMutation({
+		mutationFn: (v: { id: string; etag?: string }) =>
+			deleteComment(v.id, v.etag),
+		onSuccess: (_data, v) => {
+			setCommentData((current) => removeItem(current, v.id));
+		},
+		onSettled: () => {
+			void invalidateList(queryClient, commentsKey);
+		},
+	});
+	const { mutateAsync: deleteAsync } = deleteMutation;
 	const remove = React.useCallback(
 		async (id: string) => {
-			try {
-				const target = comments.find((c) => c.id === id);
-				await deleteComment(id, target?.etag);
-				setCommentData((current) => ({
-					...current,
-					records: current.records.filter((c) => c.id !== id),
-				}));
-			} catch (e) {
-				setError(errorMessage(e, "刪除失敗"));
-			}
+			const target = comments.find((c) => c.id === id);
+			await deleteAsync({ id, etag: target?.etag });
 		},
-		[comments, setCommentData],
+		[comments, deleteAsync],
 	);
 
 	/** 修改成功後伺服器換了新版本：快取裡的 etag 與內文同步，之後的刪除才帶得對。 */
 	const edited = React.useCallback(
 		(updated: Pick<Comment, "id" | "content" | "etag">) =>
-			setCommentData((current) => ({
-				...current,
-				records: current.records.map((c) =>
-					c.id === updated.id
-						? {
-								...c,
-								content: updated.content || c.content,
-								etag: updated.etag,
-							}
-						: c,
-				),
-			})),
+			setCommentData((current) =>
+				mapItem(current, updated.id, (c) => ({
+					...c,
+					content: updated.content || c.content,
+					etag: updated.etag,
+				})),
+			),
 		[setCommentData],
 	);
 
@@ -216,18 +293,13 @@ export function usePostComments(
 			const target = comments.find((c) => c.id === id);
 			const wasLiked = target?.isLiked === true;
 			const apply = (liked: boolean, delta: number) =>
-				setCommentData((current) => ({
-					...current,
-					records: current.records.map((c) =>
-						c.id === id
-							? {
-									...c,
-									isLiked: liked,
-									likeCount: Math.max(0, (c.likeCount ?? 0) + delta),
-								}
-							: c,
-					),
-				}));
+				setCommentData((current) =>
+					mapItem(current, id, (c) => ({
+						...c,
+						isLiked: liked,
+						likeCount: Math.max(0, (c.likeCount ?? 0) + delta),
+					})),
+				);
 			apply(!wasLiked, wasLiked ? -1 : 1);
 			try {
 				await setCommentLiked(id, !wasLiked);
@@ -240,14 +312,12 @@ export function usePostComments(
 
 	return {
 		comments,
-		loading: commentsQuery.isLoading,
-		loadingMore,
-		hasMore: nextPageToken !== "",
-		error:
-			error ??
-			(commentsQuery.error instanceof Error
-				? commentsQuery.error.message
-				: null),
+		submitted,
+		loading: query.isLoading,
+		loadingMore: isFetchingNextPage,
+		hasMore: hasNextPage,
+		error: query.isFetchNextPageError ? null : query.error,
+		loadMoreError: query.isFetchNextPageError ? query.error : null,
 		refresh,
 		loadMore,
 		post,
@@ -255,6 +325,25 @@ export function usePostComments(
 		edited,
 		like,
 	};
+}
+
+/* ===== Post viewer state (who comments, and whether they can) ===== */
+
+/**
+ * 觀看者在這則貼文的留言權限與身分，由伺服器依觀看者算。貼文已經帶著（依觀看者讀的）答案時呼叫端傳
+ * `enabled: false`，不重讀。
+ */
+export function usePostViewerState(
+	postId: string | undefined,
+	enabled: boolean,
+) {
+	const queryIdentity = useQueryIdentity();
+	return useQuery({
+		queryKey: queryKeys.feed.postViewer(queryIdentity, postId ?? ""),
+		enabled: Boolean(postId) && enabled,
+		staleTime: 30_000,
+		queryFn: ({ signal }) => fetchPostViewerState(postId ?? "", signal),
+	});
 }
 
 /* ===== Post like toggle hook ===== */
@@ -323,39 +412,40 @@ export function usePostInteractions(
 			if (!postId) return Promise.resolve({ liked: interaction.liked });
 			return setPostLiked(postId, nextLiked);
 		},
+		onMutate: async (nextLiked) => {
+			await queryClient.cancelQueries({ queryKey: interactionsKey });
+			setInteraction((current) => ({
+				...current,
+				liked: nextLiked,
+				likeCount: Math.max(0, current.likeCount + (nextLiked ? 1 : -1)),
+			}));
+		},
+		onSuccess: (r) => {
+			setInteraction((current) => ({ ...current, liked: r.liked }));
+		},
+		onError: (_error, nextLiked) => {
+			setInteraction((current) => ({
+				...current,
+				liked: !nextLiked,
+				likeCount: Math.max(0, current.likeCount + (nextLiked ? -1 : 1)),
+			}));
+		},
 	});
+	const { mutateAsync: likeAsync } = likeMutation;
 
 	const toggleLike = React.useCallback(async () => {
 		if (!postId || togglePendingRef.current) return undefined;
 		togglePendingRef.current = true;
-		const before = interaction;
-		const nextLiked = !before.liked;
-		setInteraction((current) => ({
-			...current,
-			liked: nextLiked,
-			likeCount: Math.max(0, current.likeCount + (nextLiked ? 1 : -1)),
-		}));
+		const nextLiked = !interaction.liked;
 		try {
-			const r = await likeMutation.mutateAsync(nextLiked);
-			setInteraction((current) => ({
-				...current,
-				liked: r.liked,
-			}));
+			const r = await likeAsync(nextLiked);
 			return r.liked;
 		} catch {
-			queryClient.setQueryData(interactionsKey, before);
-			return before.liked;
+			return !nextLiked;
 		} finally {
 			togglePendingRef.current = false;
 		}
-	}, [
-		postId,
-		interaction,
-		likeMutation,
-		setInteraction,
-		queryClient,
-		interactionsKey,
-	]);
+	}, [postId, interaction.liked, likeAsync]);
 
 	return {
 		liked: interaction.liked,
@@ -367,63 +457,233 @@ export function usePostInteractions(
 
 /* ===== Replies (per-comment thread) ===== */
 
+interface ReplyContext extends SubmitContext {
+	countBumped?: boolean;
+}
+
 export function useCommentReplies(
 	postId: string | undefined,
 	commentId: string | undefined,
 	parentName?: string,
 ) {
+	const { identity } = useAuth();
 	const queryIdentity = useQueryIdentity();
+	const queryClient = useQueryClient();
 	const [open, setOpen] = React.useState(false);
-	const replyParams = React.useMemo(() => ({ pageSize: 20 }), []);
 	const repliesKey = React.useMemo(
 		() =>
 			queryKeys.feed.commentReplies(
 				queryIdentity,
 				commentId ?? "",
-				replyParams,
+				REPLIES_PARAMS,
 			),
-		[queryIdentity, commentId, replyParams],
+		[queryIdentity, commentId],
 	);
-	const repliesQuery = useQuery({
+	const commentsKey = React.useMemo(
+		() => queryKeys.feed.comments(queryIdentity, postId ?? "", COMMENTS_PARAMS),
+		[queryIdentity, postId],
+	);
+	const createKey = React.useMemo(
+		() => queryKeys.feed.replyCreate(queryIdentity, commentId ?? ""),
+		[queryIdentity, commentId],
+	);
+	const query = useInfiniteQuery({
 		queryKey: repliesKey,
 		enabled: Boolean(postId && commentId && open),
-		// placeholderData（非 initialData）：理由同 usePostComments。
-		placeholderData: [] as Comment[],
+		initialPageParam: FIRST_PAGE_PARAM,
+		getNextPageParam: nextPageParam,
 		staleTime: 30_000,
-		queryFn: async ({ signal }) => {
-			if (!postId || !commentId) return [];
-			const r = await fetchCommentReplies(postId, commentId, {
-				pageSize: 20,
+		queryFn: ({ pageParam, signal }) =>
+			fetchCommentReplies(postId ?? "", commentId ?? "", {
+				pageSize: REPLY_PAGE_SIZE,
+				pageToken: pageParam,
 				parentName,
 				signal,
-			});
-			return r.records;
-		},
+			}),
 	});
 	const items = React.useMemo(
-		() => repliesQuery.data ?? [],
-		[repliesQuery.data],
+		() => (query.data ? flattenPages(query.data) : EMPTY_COMMENTS),
+		[query.data],
 	);
-	const refetchReplies = repliesQuery.refetch;
+	const { refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+
+	const setReplyData = React.useCallback(
+		(updater: (current: CommentData) => CommentData) => {
+			queryClient.setQueryData<CommentData>(repliesKey, (current) =>
+				current ? updater(current) : current,
+			);
+		},
+		[repliesKey, queryClient],
+	);
+	const setCommentData = React.useCallback(
+		(updater: (current: CommentData) => CommentData) => {
+			queryClient.setQueryData<CommentData>(commentsKey, (current) =>
+				current ? updater(current) : current,
+			);
+		},
+		[commentsKey, queryClient],
+	);
+
+	const loadMore = React.useCallback(async () => {
+		if (!hasNextPage || isFetchingNextPage) return;
+		await fetchNextPage({ cancelRefetch: false });
+	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	const load = React.useCallback(async () => {
 		if (!postId || !commentId) return;
-		await refetchReplies();
-	}, [postId, commentId, refetchReplies]);
+		await refetch();
+	}, [postId, commentId, refetch]);
 
-	const expand = React.useCallback(async () => {
-		setOpen(true);
-		if (items.length === 0) await load();
-	}, [items.length, load]);
-
+	const expand = React.useCallback(() => setOpen(true), []);
 	const collapse = React.useCallback(() => setOpen(false), []);
+
+	const replyMutation = useMutation<
+		Comment,
+		Error,
+		ReplySubmission,
+		ReplyContext
+	>({
+		mutationKey: createKey,
+		mutationFn: (v) => {
+			if (!postId || !commentId) throw new Error("commentId missing");
+			return createComment(postId, {
+				content: v.content,
+				parentId: commentId,
+				replyToId: v.replyToId,
+				requestId: v.requestId,
+			});
+		},
+		onMutate: async (v) => {
+			await Promise.all([
+				cancelListRefetch(queryClient, repliesKey),
+				cancelListRefetch(queryClient, commentsKey),
+			]);
+			const context: ReplyContext = {};
+			const parent = queryClient.getQueryData<CommentData>(commentsKey);
+			if (parent && findItem(parent, commentId ?? "")) {
+				setCommentData((current) => addReplyCount(current, commentId ?? "", 1));
+				context.countBumped = true;
+			}
+			const current = queryClient.getQueryData<CommentData>(repliesKey);
+			if (current && postId && lastPageLoaded(current)) {
+				const optimistic = optimisticComment(
+					postId,
+					v,
+					Math.floor(Date.now() / 1000),
+					{
+						parentId: commentId,
+						replyToId: v.replyToId,
+						replyToName: v.replyToName ?? parentName,
+					},
+				);
+				queryClient.setQueryData<CommentData>(
+					repliesKey,
+					appendToLastPage(current, optimistic),
+				);
+				context.optimisticId = optimistic.id;
+			}
+			return context;
+		},
+		onSuccess: (real, v, context) => {
+			const id = context?.optimisticId;
+			if (id) {
+				setReplyData((current) =>
+					mapItem(current, id, () => ({
+						...real,
+						replyToName: real.replyToName ?? v.replyToName ?? parentName,
+					})),
+				);
+			}
+		},
+		onError: (_error, _v, context) => {
+			const id = context?.optimisticId;
+			if (id) setReplyData((current) => removeItem(current, id));
+			if (context?.countBumped) {
+				setCommentData((current) =>
+					addReplyCount(current, commentId ?? "", -1),
+				);
+			}
+		},
+		onSettled: () => {
+			void invalidateList(queryClient, repliesKey);
+		},
+	});
+	const { mutateAsync: replyAsync } = replyMutation;
+
+	const reply = React.useCallback(
+		async (
+			content: string,
+			opts: {
+				replyToId: string;
+				replyToName?: string;
+				authorName?: string;
+				authorAvatar?: string;
+			},
+		) => {
+			const body = content.trim();
+			if (!postId || !commentId || !body) return;
+			await replyAsync({
+				content: body,
+				requestId: newRequestId(),
+				replyToId: opts.replyToId,
+				replyToName: opts.replyToName,
+				authorName: opts.authorName ?? identity?.nickname ?? "我",
+				authorAvatar: opts.authorAvatar ?? identity?.avatarKey,
+			});
+		},
+		[postId, commentId, identity?.nickname, identity?.avatarKey, replyAsync],
+	);
+
+	const buildSubmitted = React.useCallback(
+		(v: ReplySubmission, createdAt: number) =>
+			optimisticComment(postId ?? "", v, createdAt, {
+				parentId: commentId,
+				replyToId: v.replyToId,
+				replyToName: v.replyToName ?? parentName,
+			}),
+		[postId, commentId, parentName],
+	);
+	const landedReply = React.useCallback(
+		(data: Comment, v: ReplySubmission): Comment => ({
+			...data,
+			replyToName: data.replyToName ?? v.replyToName ?? parentName,
+		}),
+		[parentName],
+	);
+	const submittedItems = useSubmittedItems<ReplySubmission, Comment>({
+		mutationKey: createKey,
+		loaded: items,
+		build: buildSubmitted,
+		landed: landedReply,
+	});
+	const submitted = React.useMemo(
+		() => submittedItems.map((s) => ({ key: s.key, comment: s.item })),
+		[submittedItems],
+	);
+
+	/** 刪除一則回覆成功後：從快取移除並減少所屬留言的回覆數。 */
+	const removed = React.useCallback(
+		(replyId: string) => {
+			setReplyData((current) => removeItem(current, replyId));
+			setCommentData((current) => dropReplyCount(current, commentId ?? ""));
+			void invalidateList(queryClient, repliesKey);
+		},
+		[setReplyData, setCommentData, commentId, queryClient, repliesKey],
+	);
 
 	return {
 		items,
+		submitted,
 		open,
-		loading: repliesQuery.isLoading,
+		loading: query.isLoading,
+		hasMore: hasNextPage,
+		loadingMore: isFetchingNextPage,
+		loadMoreError: query.isFetchNextPageError ? query.error : null,
+		loadMore,
 		expand,
 		collapse,
 		refresh: load,
+		reply,
+		removed,
 	};
 }

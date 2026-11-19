@@ -115,6 +115,8 @@
       "meta_severity": "嚴重程度：{severity}",
       "meta_termination_ground": "事由：{ground}",
       "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
+      "removed_contents_cleared": "內容副本已超過保留期限並刪除。",
+      "removed_contents_heading": "下架的內容",
       "suspension_active_open": "停權中（未定結束時間，平台定期複審）",
       "suspension_active_until": "停權中（至 {end}）",
       "suspension_ended": "已於 {end} 結束",
@@ -123,7 +125,8 @@
       "termination_notice": "平台已通知將於 {start} 終止合作。在此之前店家照常營業；如有異議，可提出申覆。",
       "title_fallback": "措施紀錄",
       "title_risk": "風險：{ground}",
-      "title_risk_fallback": "風險措施"
+      "title_risk_fallback": "風險措施",
+      "view_content_link": "查看貼文"
     },
     "MeasureBasis": {
       "MEASURE_BASIS_CONTRACT": "契約條款",

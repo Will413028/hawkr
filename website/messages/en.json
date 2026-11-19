@@ -25,7 +25,24 @@
 	},
 	"navigation": {},
 	"product": {},
-	"seller": {},
+	"seller": {
+		"notFound": "Seller not found",
+		"messagesTitle": "{name}'s messages",
+		"posts": {
+			"suspendedNotice": "Your store is currently restricted by a platform measure. Posts can only be unpublished or deleted.",
+			"commentsNotice": {
+				"storeNotPublic": "Your store is not public right now, so buyers cannot see these comments.",
+				"unpublished": "This post is unpublished, so buyers cannot see these comments.",
+				"platformTakedown": "This post was taken down by the platform, so buyers cannot see its comments."
+			}
+		},
+		"comments": {
+			"blockAction": "Block this person",
+			"blockTitle": "Block “{name}”?",
+			"blockDescription": "Once blocked, this person can no longer comment on or like your posts and forum, or message you. They can still see your public content, and reviews are not affected. You can unblock them anytime in Blocked list.",
+			"blocked": "Blocked “{name}”"
+		}
+	},
 	"order": {},
 	"home": {
 		"merchants": {
@@ -38,6 +55,18 @@
 			"title": "Sign-in methods",
 			"linked": "Linked",
 			"link": "Link"
+		}
+	},
+	"feed": {
+		"comments": {
+			"composeAsStore": "Comment as “{storeName}”…",
+			"replyAsStore": "Reply as “{storeName}”…",
+			"composePlaceholder": "Write a comment…",
+			"replyToName": "Reply to {name}…",
+			"replyPlaceholder": "Write a reply…",
+			"selfAlt": "Me",
+			"deleted": "This comment was deleted",
+			"hidden": "This comment was hidden"
 		}
 	}
 }

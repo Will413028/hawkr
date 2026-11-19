@@ -134,7 +134,12 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 		out.Findings = append(out.Findings, toAdminViolation(f))
 	}
 	for _, c := range m.Contents {
-		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+		out.Contents = append(out.Contents, toContentRef(c))
+		if c.FullBody {
+			out.ContentBodies = append(out.ContentBodies, &adminpb.MeasureContentBody{
+				Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), Body: c.Snapshot.Body, ImageCount: c.Snapshot.ImageCount,
+			})
+		}
 	}
 	for _, r := range m.Revisions {
 		out.Revisions = append(out.Revisions, toRevision(r))
@@ -327,18 +332,19 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		if in.Violation, err = violationBasisFrom(input.ContentTakedown.GetViolation(), "content_takedown.violation"); err != nil {
 			return nil, err
 		}
-		t := &model.ContentTakedown{}
+		refs := make([]model.ContentRef, 0, len(input.ContentTakedown.GetContents()))
 		for i, ref := range input.ContentTakedown.GetContents() {
 			id, err := rpc.ParseUUID(apperr.IndexedField("content_takedown.contents", i)+".id", ref.GetId())
 			if err != nil {
 				return nil, err
 			}
-			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+			refs = append(refs, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
 		}
-		if err := h.verifyTakedownContents(ctx, in.StoreID, t.Contents); err != nil {
+		contents, err := h.takedownContents(ctx, in.StoreID, refs)
+		if err != nil {
 			return nil, err
 		}
-		in.Takedown = t
+		in.Takedown = &model.ContentTakedown{Contents: contents}
 	default:
 		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
@@ -351,25 +357,36 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 		}
 		return nil, rpc.WithFieldPaths(err, paths)
 	}
-	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
+	measure, err := adminMeasure(ctx, h.links, result.Measure)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: measure}), nil
 }
 
-// verifyTakedownContents 核對每一則內容現在存在（沒有刪除）、種類相符、作者是這家店；後台處理的是現存的內容，已刪除與不存在的都拒絕。
-func (h *Governance) verifyTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
-	for i, c := range contents {
-		o, err := h.owners.ContentOwner(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
-		if err != nil {
-			return err
-		}
-		if !o.Exists || o.StoreID != storeID || o.Author.Kind != social.ActorStore || o.Author.ID != storeID {
-			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
-		}
+// takedownContents 先檢查清單的形狀（筆數、種類、重複；壞請求不讀 social），再核對每一則內容現在存在（沒有刪除）、作者是這家店，並用同一次讀取取得處分依據的內容快照；後台處理的是現存的內容，已刪除與不存在的都拒絕。
+// 種類不符或不存在的內容讀不到快照，同樣拒絕；moderation 一律有案件快照，所以快照必填。
+func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs []model.ContentRef) ([]model.TakedownContent, error) {
+	if err := model.ValidateContentRefs("Takedown.Contents", refs); err != nil {
+		return nil, rpc.WithFieldPaths(err, createTakedownPaths)
 	}
-	return nil
+	out := make([]model.TakedownContent, 0, len(refs))
+	for i, c := range refs {
+		sn, err := h.snapshots.ContentSnapshot(ctx, social.Target{Kind: social.TargetKind(c.Kind), ID: c.ID})
+		if err != nil {
+			return nil, err
+		}
+		if !sn.Exists || sn.StoreID != storeID || sn.Author.Kind != social.ActorStore || sn.Author.ID != storeID {
+			return nil, rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths)
+		}
+		snap := model.NewContentSnapshot(c.Kind, sn.Body, sn.AuthoredAt, len(sn.MediaRefs), sn.StoreID, sn.PostID, sn.ThreadID)
+		out = append(out, model.TakedownContent{ContentRef: c, Snapshot: &snap})
+	}
+	return out, nil
 }
 
 // takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。
-func takedownContentError(err error, contents []model.ContentRef) (error, bool) {
+func takedownContentError(err error, contents []model.TakedownContent) (error, bool) {
 	var bad *social.TakedownContentError
 	if !errors.As(err, &bad) {
 		return err, false
@@ -391,7 +408,11 @@ func (h *Governance) GetMeasure(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminpb.GetMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.GetMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[adminpb.ListMeasuresRequest]) (*connect.Response[adminpb.ListMeasuresResponse], error) {
@@ -454,7 +475,11 @@ func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, listMeasuresPaths)
 	}
-	out := &adminpb.ListMeasuresResponse{Measures: toAdminMeasures(page.Items)}
+	measures, err := adminMeasures(ctx, h.links, page.Items)
+	if err != nil {
+		return nil, err
+	}
+	out := &adminpb.ListMeasuresResponse{Measures: measures}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
@@ -498,7 +523,11 @@ func (h *Governance) UpdateMeasure(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, updateMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.UpdateMeasureResponse{Measure: toAdminMeasure(updated)}), nil
+	measure, err := adminMeasure(ctx, h.links, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.UpdateMeasureResponse{Measure: measure}), nil
 }
 
 // sameInstant 比較合併前的結束時間與合併後的時間（兩者都可能不設）。
@@ -526,7 +555,11 @@ func (h *Governance) EndMeasure(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, endMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.EndMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.EndMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adminpb.RevokeMeasureRequest]) (*connect.Response[adminpb.RevokeMeasureResponse], error) {
@@ -549,7 +582,11 @@ func (h *Governance) RevokeMeasure(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, revokeMeasurePaths)
 	}
-	return connect.NewResponse(&adminpb.RevokeMeasureResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.RevokeMeasureResponse{Measure: measure}), nil
 }
 
 func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Request[adminpb.ScheduleMeasureReviewRequest]) (*connect.Response[adminpb.ScheduleMeasureReviewResponse], error) {
@@ -574,7 +611,11 @@ func (h *Governance) ScheduleMeasureReview(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, scheduleReviewPaths)
 	}
-	return connect.NewResponse(&adminpb.ScheduleMeasureReviewResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.ScheduleMeasureReviewResponse{Measure: measure}), nil
 }
 
 func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[adminpb.DecideAppealRequest]) (*connect.Response[adminpb.DecideAppealResponse], error) {
@@ -597,7 +638,11 @@ func (h *Governance) DecideAppeal(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, decideAppealPaths)
 	}
-	return connect.NewResponse(&adminpb.DecideAppealResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.DecideAppealResponse{Measure: measure}), nil
 }
 
 func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request[adminpb.DecideRemediationRequest]) (*connect.Response[adminpb.DecideRemediationResponse], error) {
@@ -620,7 +665,11 @@ func (h *Governance) DecideRemediation(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, decideRemediationPaths)
 	}
-	return connect.NewResponse(&adminpb.DecideRemediationResponse{Measure: toAdminMeasure(m)}), nil
+	measure, err := adminMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.DecideRemediationResponse{Measure: measure}), nil
 }
 
 // CreateMeasureNote 新增內部註記：不帶 etag，也不改措施的任何 etag。

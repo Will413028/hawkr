@@ -75,7 +75,35 @@ func (s *Service) Own(ctx context.Context, storeID int64, id uuid.UUID) (model.P
 	if err := s.markTakedowns(ctx, posts); err != nil {
 		return model.Post{}, err
 	}
+	if err := s.markReadable(ctx, posts); err != nil {
+		return model.Post{}, err
+	}
 	return posts[0], nil
+}
+
+// markReadable 填貼文的 Readable（一次批次查詢，草稿與下架的不查，一定不可讀）；公開讀取的貼文由讀取規則保證可讀，不走這裡，只有店主與後台讀取需要求值。
+func (s *Service) markReadable(ctx context.Context, posts []model.Post) error {
+	ids := make([]uuid.UUID, 0, len(posts))
+	for _, p := range posts {
+		if p.Status == model.StatusPublished {
+			ids = append(ids, p.ID)
+		}
+	}
+	readable, err := s.PublicIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range posts {
+		posts[i].Readable = readable[posts[i].ID]
+	}
+	return nil
+}
+
+// markPublic 標記 posts 都是公開可讀：它們來自帶公開可讀條件的讀取。
+func markPublic(posts []model.Post) {
+	for i := range posts {
+		posts[i].Readable = true
+	}
 }
 
 // markTakedowns 填店主讀自己的貼文與後台列表的 TakedownMeasureID（一次批次查複本 content_takedowns）。
@@ -119,6 +147,7 @@ func (s *Service) Public(ctx context.Context, c model.Caller, id uuid.UUID) (mod
 	if err != nil {
 		return model.Post{}, err
 	}
+	markPublic(posts)
 	return posts[0], nil
 }
 
@@ -151,6 +180,7 @@ func (s *Service) feedPage(ctx context.Context, rows []postRow, size int32, more
 	if err != nil {
 		return model.PostPage{}, err
 	}
+	markPublic(posts)
 	out := model.PostPage{Posts: posts}
 	if more {
 		last := rows[len(rows)-1].post
@@ -255,6 +285,9 @@ func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (m
 	if err := s.markTakedowns(ctx, posts); err != nil {
 		return model.CreatedPostPage{}, err
 	}
+	if err := s.markReadable(ctx, posts); err != nil {
+		return model.CreatedPostPage{}, err
+	}
 	out := model.CreatedPostPage{Posts: posts}
 	if more {
 		last := rows[len(rows)-1].post
@@ -296,7 +329,12 @@ func (s *Service) Top(ctx context.Context, c model.Caller, n int32) ([]model.Pos
 	for i, r := range rows {
 		pr[i] = postRow{r.SocialPost, r.SocialPostStat}
 	}
-	return s.withTags(ctx, pr)
+	posts, err := s.withTags(ctx, pr)
+	if err != nil {
+		return nil, err
+	}
+	markPublic(posts)
+	return posts, nil
 }
 
 // SuggestHashtags 是標籤的建議（全域彙總，計數不依觀看者與封鎖）：公開貼文上名稱符合的標籤與貼文數（limit 預設 10、上限 20）。contains 為真是「包含」搜尋，否則是前綴。

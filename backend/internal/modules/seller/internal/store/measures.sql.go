@@ -806,6 +806,55 @@ func (q *Queries) CaseNotes(ctx context.Context, arg CaseNotesParams) ([]SellerG
 	return items, nil
 }
 
+const clearContentSnapshotsOfStores = `-- name: ClearContentSnapshotsOfStores :execrows
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM seller.measures m
+WHERE m.id = c.measure_id AND m.store_id = ANY($1::bigint[]) AND c.snapshot_state = 'CAPTURED'
+`
+
+// 店家退場（個資清理第二段）時清空這些店家全部措施留著的內容快照，不論措施是否撤銷。
+func (q *Queries) ClearContentSnapshotsOfStores(ctx context.Context, storeIds []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, clearContentSnapshotsOfStores, storeIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const clearExpiredContentSnapshots = `-- name: ClearExpiredContentSnapshots :execrows
+WITH due AS (
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measure_contents c
+    JOIN seller.measures m ON m.id = c.measure_id
+    WHERE c.snapshot_state = 'CAPTURED' AND c.measure_status = 'REVOKED' AND m.revoked_at <= $1::timestamptz
+    ORDER BY c.measure_id, c.content_kind, c.content_id
+    LIMIT $2::int
+    FOR UPDATE OF c SKIP LOCKED
+)
+UPDATE seller.measure_contents c
+SET snapshot_state = 'CLEARED', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL,
+    link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL
+FROM due
+WHERE c.measure_id = due.measure_id AND c.content_kind = due.content_kind AND c.content_id = due.content_id
+`
+
+type ClearExpiredContentSnapshotsParams struct {
+	Cutoff  time.Time
+	MaxRows int32
+}
+
+// 撤銷滿保留期的內容下架措施，清空它留著的內容快照（內容下架沒有結束時間，只從 revoked_at 起算；未撤銷的一直保留）。cutoff 是現在減保留期；
+// 一批最多 max_rows 列，鎖住（SKIP LOCKED）再更新，重跑冪等。
+func (q *Queries) ClearExpiredContentSnapshots(ctx context.Context, arg ClearExpiredContentSnapshotsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearExpiredContentSnapshots, arg.Cutoff, arg.MaxRows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeEndedRemediations = `-- name: CloseEndedRemediations :many
 UPDATE seller.measure_requests r
 SET state = 'CLOSED',
@@ -1203,20 +1252,48 @@ func (q *Queries) InsertMeasure(ctx context.Context, arg InsertMeasureParams) (I
 }
 
 const insertMeasureContents = `-- name: InsertMeasureContents :exec
-INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
-SELECT $1, ($2::text[])[i], ($3::uuid[])[i]
+INSERT INTO seller.measure_contents (
+    measure_id, content_kind, content_id, snapshot_state, snapshot_body, snapshot_authored_at, snapshot_image_count,
+    link_post_id, link_store_id, link_thread_id
+)
+SELECT $1::uuid, ($2::text[])[i], ($3::uuid[])[i], ($4::text[])[i],
+       ($5::text[])[i],
+       ($6::timestamptz[])[i],
+       ($7::int[])[i],
+       NULLIF(($8::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
+       NULLIF(($9::bigint[])[i], 0::bigint),
+       NULLIF(($10::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)
 FROM generate_series(1, cardinality($3::uuid[])) AS i
 `
 
 type InsertMeasureContentsParams struct {
-	MeasureID uuid.UUID
-	Kinds     []string
-	Ids       []uuid.UUID
+	MeasureID     uuid.UUID
+	Kinds         []string
+	Ids           []uuid.UUID
+	States        []string
+	Bodies        []string
+	AuthoredAts   []time.Time
+	ImageCounts   []int32
+	LinkPostIds   []uuid.UUID
+	LinkStoreIds  []int64
+	LinkThreadIds []uuid.UUID
 }
 
-// 內容下架措施的對象（與 InsertMeasure 同一個 transaction；種類與 ID 是平行陣列，呼叫方已驗證形狀）。
+// 內容下架措施的全部對象與處分依據的快照，一次寫入（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。參數是平行陣列，同一個索引是同一個對象。
+// 連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
 func (q *Queries) InsertMeasureContents(ctx context.Context, arg InsertMeasureContentsParams) error {
-	_, err := q.db.Exec(ctx, insertMeasureContents, arg.MeasureID, arg.Kinds, arg.Ids)
+	_, err := q.db.Exec(ctx, insertMeasureContents,
+		arg.MeasureID,
+		arg.Kinds,
+		arg.Ids,
+		arg.States,
+		arg.Bodies,
+		arg.AuthoredAts,
+		arg.ImageCounts,
+		arg.LinkPostIds,
+		arg.LinkStoreIds,
+		arg.LinkThreadIds,
+	)
 	return err
 }
 
@@ -1622,22 +1699,111 @@ func (q *Queries) MeasureByRequest(ctx context.Context, arg MeasureByRequestPara
 	return i, err
 }
 
-const measureContents = `-- name: MeasureContents :many
-SELECT measure_id, content_kind, content_id
+const measureContentBodies = `-- name: MeasureContentBodies :many
+SELECT measure_id, content_kind, content_id, snapshot_body::text AS body
 FROM seller.measure_contents
-WHERE measure_id = ANY($1::uuid[])
-ORDER BY measure_id, content_kind COLLATE "C", content_id
+WHERE measure_id = ANY($1::uuid[]) AND snapshot_state = 'CAPTURED'
 `
 
-type MeasureContentsRow struct {
+type MeasureContentBodiesRow struct {
 	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+	Body        string
+}
+
+// 一批措施裡有快照的對象的本文全文（只給後台讀單筆措施）。
+func (q *Queries) MeasureContentBodies(ctx context.Context, measureIds []uuid.UUID) ([]MeasureContentBodiesRow, error) {
+	rows, err := q.db.Query(ctx, measureContentBodies, measureIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MeasureContentBodiesRow{}
+	for rows.Next() {
+		var i MeasureContentBodiesRow
+		if err := rows.Scan(
+			&i.MeasureID,
+			&i.ContentKind,
+			&i.ContentID,
+			&i.Body,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const measureContentRefs = `-- name: MeasureContentRefs :many
+SELECT content_kind, content_id
+FROM seller.measure_contents
+WHERE measure_id = $1
+ORDER BY content_kind COLLATE "C", content_id
+`
+
+type MeasureContentRefsRow struct {
 	ContentKind string
 	ContentID   uuid.UUID
 }
 
-// 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
-func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) ([]MeasureContentsRow, error) {
-	rows, err := q.db.Query(ctx, measureContents, measureIds)
+// 一個措施的內容下架對象（只有種類與 ID，給事件用），依種類、ID 排序。
+func (q *Queries) MeasureContentRefs(ctx context.Context, measureID uuid.UUID) ([]MeasureContentRefsRow, error) {
+	rows, err := q.db.Query(ctx, measureContentRefs, measureID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MeasureContentRefsRow{}
+	for rows.Next() {
+		var i MeasureContentRefsRow
+		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const measureContents = `-- name: MeasureContents :many
+SELECT measure_id, content_kind, content_id, snapshot_state,
+       COALESCE(left(snapshot_body, $1::int), '')::text AS snapshot_excerpt,
+       COALESCE(char_length(snapshot_body) > $1::int, false)::boolean AS snapshot_truncated,
+       snapshot_authored_at, snapshot_image_count, link_post_id, link_store_id, link_thread_id
+FROM seller.measure_contents
+WHERE measure_id = ANY($2::uuid[])
+ORDER BY measure_id, content_kind COLLATE "C", content_id
+`
+
+type MeasureContentsParams struct {
+	ExcerptRunes int32
+	MeasureIds   []uuid.UUID
+}
+
+type MeasureContentsRow struct {
+	MeasureID          uuid.UUID
+	ContentKind        string
+	ContentID          uuid.UUID
+	SnapshotState      string
+	SnapshotExcerpt    string
+	SnapshotTruncated  bool
+	SnapshotAuthoredAt *time.Time
+	SnapshotImageCount *int32
+	LinkPostID         *uuid.UUID
+	LinkStoreID        *int64
+	LinkThreadID       *uuid.UUID
+}
+
+// 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。清單與摘要只讀本文的前 excerpt_runes 個字元與「是否更長」，不讀全文（全文見 MeasureContentBodies）；
+// left 與 char_length 都以字元計（資料庫編碼 UTF8），與 Go 以 rune 計一致。
+func (q *Queries) MeasureContents(ctx context.Context, arg MeasureContentsParams) ([]MeasureContentsRow, error) {
+	rows, err := q.db.Query(ctx, measureContents, arg.ExcerptRunes, arg.MeasureIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1645,7 +1811,19 @@ func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) (
 	items := []MeasureContentsRow{}
 	for rows.Next() {
 		var i MeasureContentsRow
-		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
+		if err := rows.Scan(
+			&i.MeasureID,
+			&i.ContentKind,
+			&i.ContentID,
+			&i.SnapshotState,
+			&i.SnapshotExcerpt,
+			&i.SnapshotTruncated,
+			&i.SnapshotAuthoredAt,
+			&i.SnapshotImageCount,
+			&i.LinkPostID,
+			&i.LinkStoreID,
+			&i.LinkThreadID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

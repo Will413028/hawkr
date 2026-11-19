@@ -4992,15 +4992,101 @@ class LookupBusinessRegistrationResponse extends $pb.GeneratedMessage {
   BusinessRegistration ensureRegistration() => $_ensure(0);
 }
 
-/// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。
+/// ForumThreadLink 指向一則討論區留言所屬的討論串：店家加討論串 id（不透明的字串）。
+class ForumThreadLink extends $pb.GeneratedMessage {
+  factory ForumThreadLink({
+    $core.String? storeId,
+    $core.String? threadId,
+  }) {
+    final result = ForumThreadLink._();
+    if (storeId != null) result.storeId = storeId;
+    if (threadId != null) result.threadId = threadId;
+    return result;
+  }
+
+  ForumThreadLink._();
+
+  factory ForumThreadLink.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForumThreadLink()..mergeFromBuffer(data, registry);
+  factory ForumThreadLink.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForumThreadLink()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ForumThreadLink',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ForumThreadLink.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'storeId')
+    ..aOS(2, _omitFieldNames ? '' : 'threadId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForumThreadLink clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForumThreadLink copyWith(void Function(ForumThreadLink) updates) =>
+      super.copyWith((message) => updates(message as ForumThreadLink))
+          as ForumThreadLink;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ForumThreadLink() / ForumThreadLink.new instead')
+  static ForumThreadLink create() => ForumThreadLink._();
+  static $pb.GeneratedMessage $_createMessage() => ForumThreadLink._();
+  @$core.override
+  ForumThreadLink createEmptyInstance() => ForumThreadLink._();
+  @$core.pragma('dart2js:noInline')
+  static ForumThreadLink getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ForumThreadLink>(
+          ForumThreadLink.$_createMessage);
+  static ForumThreadLink? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get storeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set storeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStoreId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStoreId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get threadId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set threadId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasThreadId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearThreadId() => $_clearField(2);
+}
+
+enum ContentRef_Link { postId, forumThread, notSet }
+
+/// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。建立內容下架時只讀 kind 與 id；後四組欄位是處分依據的內容快照
+/// （措施建立時凍結，之後內容再改或刪除都不影響），只在回應輸出。
 class ContentRef extends $pb.GeneratedMessage {
   factory ContentRef({
     ContentKind? kind,
     $core.String? id,
+    ContentSnapshotState? snapshotState,
+    $core.String? excerpt,
+    $2.Timestamp? authoredTime,
+    $core.String? postId,
+    ForumThreadLink? forumThread,
+    $core.bool? linkAvailable,
   }) {
     final result = ContentRef._();
     if (kind != null) result.kind = kind;
     if (id != null) result.id = id;
+    if (snapshotState != null) result.snapshotState = snapshotState;
+    if (excerpt != null) result.excerpt = excerpt;
+    if (authoredTime != null) result.authoredTime = authoredTime;
+    if (postId != null) result.postId = postId;
+    if (forumThread != null) result.forumThread = forumThread;
+    if (linkAvailable != null) result.linkAvailable = linkAvailable;
     return result;
   }
 
@@ -5013,14 +5099,29 @@ class ContentRef extends $pb.GeneratedMessage {
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       ContentRef()..mergeFromJson(json, registry);
 
+  static const $core.Map<$core.int, ContentRef_Link> _ContentRef_LinkByTag = {
+    6: ContentRef_Link.postId,
+    7: ContentRef_Link.forumThread,
+    0: ContentRef_Link.notSet
+  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ContentRef',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: ContentRef.$_createMessage)
+    ..oo(0, [6, 7])
     ..aE<ContentKind>(1, _omitFieldNames ? '' : 'kind',
         enumValues: ContentKind.values)
     ..aOS(2, _omitFieldNames ? '' : 'id')
+    ..aE<ContentSnapshotState>(3, _omitFieldNames ? '' : 'snapshotState',
+        enumValues: ContentSnapshotState.values)
+    ..aOS(4, _omitFieldNames ? '' : 'excerpt')
+    ..aOM<$2.Timestamp>(5, _omitFieldNames ? '' : 'authoredTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOS(6, _omitFieldNames ? '' : 'postId')
+    ..aOM<ForumThreadLink>(7, _omitFieldNames ? '' : 'forumThread',
+        subBuilder: ForumThreadLink.$_createMessage)
+    ..aOB(8, _omitFieldNames ? '' : 'linkAvailable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5043,6 +5144,13 @@ class ContentRef extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ContentRef>(ContentRef.$_createMessage);
   static ContentRef? _defaultInstance;
 
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  ContentRef_Link whichLink() => _ContentRef_LinkByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  void clearLink() => $_clearField($_whichOneof(0));
+
   @$pb.TagNumber(1)
   ContentKind get kind => $_getN(0);
   @$pb.TagNumber(1)
@@ -5060,6 +5168,68 @@ class ContentRef extends $pb.GeneratedMessage {
   $core.bool hasId() => $_has(1);
   @$pb.TagNumber(2)
   void clearId() => $_clearField(2);
+
+  /// 快照的狀態；不是 CAPTURED 時下面的欄位都不設。
+  @$pb.TagNumber(3)
+  ContentSnapshotState get snapshotState => $_getN(2);
+  @$pb.TagNumber(3)
+  set snapshotState(ContentSnapshotState value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSnapshotState() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSnapshotState() => $_clearField(3);
+
+  /// 本文摘要：前 120 個 Unicode 字元，超過時加「…」，未超過是原文。後台另見 Measure.content_bodies 的全文。
+  @$pb.TagNumber(4)
+  $core.String get excerpt => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set excerpt($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExcerpt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExcerpt() => $_clearField(4);
+
+  /// 作者發文的時間。
+  @$pb.TagNumber(5)
+  $2.Timestamp get authoredTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set authoredTime($2.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAuthoredTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAuthoredTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $2.Timestamp ensureAuthoredTime() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $core.String get postId => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set postId($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPostId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPostId() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ForumThreadLink get forumThread => $_getN(6);
+  @$pb.TagNumber(7)
+  set forumThread(ForumThreadLink value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasForumThread() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearForumThread() => $_clearField(7);
+  @$pb.TagNumber(7)
+  ForumThreadLink ensureForumThread() => $_ensure(6);
+
+  /// 連結目標此刻還在（貼文沒有刪除、討論串的起始留言沒有刪除）；為 false 時 client 不顯示連結。讀取時才算，快照本身不隨目標刪除而變；沒有連結目標時為 false。
+  @$pb.TagNumber(8)
+  $core.bool get linkAvailable => $_getBF(7);
+  @$pb.TagNumber(8)
+  set linkAvailable($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLinkAvailable() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLinkAvailable() => $_clearField(8);
 }
 
 /// RemediationUnavailability 是賣家此刻不能對措施請求解除的一個原因。與 RequestRemediation 的前置檢查是同一個規則，message 與該方法被拒絕時錯誤的

@@ -1,11 +1,14 @@
+import 'dart:async';
 import '../../seller/presentation/seller_store_avatar.dart';
 import '../../../features/seller/data/current_store.dart';
+
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../config/image_config.dart';
-import '../../../core/exceptions/app_exception.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../config/media_image.dart';
@@ -28,23 +31,26 @@ import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_post_card_surface.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/fruit_spinner.dart';
-import '../../../shared/utils/product_image_resolver.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../report/data/report_model.dart';
+import '../../report/data/store_block_rules.dart';
+import '../../report/presentation/store_block_capability.dart';
+import '../../report/presentation/widgets/block_actions.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
+import '../data/post_comment.dart';
 import '../data/post_comments_availability.dart';
-import '../data/post_hidden.dart';
 import '../data/post_model.dart';
 import '../data/post_publish.dart';
 import '../data/post_repository.dart';
 import 'post_controller.dart';
+import 'widgets/post_restricted_notice.dart';
 import 'widgets/post_status_badge.dart';
-import 'widgets/storefront_tab_glass.dart';
 import '../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
+
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
 
@@ -52,99 +58,21 @@ const Color _kGray100 = AppColors.textPrimary;
 const Color _kGray50 = AppColors.textSecondary; // rgba(86,86,86,0.5)
 const Color _kBorder = Color(0x1442493F);
 
-// ─── 留言 VM / 分組（對齊 buyer merchant_posts_feed_screen；資料層走
-// seller API：留言用 parent_id 分組 + listCommentReplies 補齊回覆） ────────
-class _CommentVM {
-  const _CommentVM({
-    required this.id,
-    required this.parentId,
-    required this.isMine,
-    required this.name,
-    required this.avatar,
-    required this.content,
-    required this.createdAt,
-  });
-
-  final int id;
-  final int parentId;
-  final bool isMine;
-  final String name;
-  final String avatar;
-  final String content;
-  final dynamic createdAt;
-
-  static _CommentVM fromRaw(Map<String, dynamic> raw) {
-    int pInt(dynamic v) {
-      if (v is int) return v;
-      if (v is num) return v.toInt();
-      if (v is String) return int.tryParse(v) ?? 0;
-      return 0;
-    }
-
-    String s(dynamic v) => (v ?? '').toString();
-
-    return _CommentVM(
-      id: pInt(raw['id']),
-      parentId: pInt(raw['parentId']),
-      isMine: raw['isMine'] == true,
-      name: s(raw['userName']),
-      // 契約成對回 `avatarKey` + `avatarUrl`（gateway post.go `CommentItem`），
-      // SSOT 是 key。舊欄位 `userAvatarKey` / `userAvatarUrl` / `userAvatar` /
-      // `avatar` 皆已不存在。
-      avatar: s(raw['avatarKey'] ?? raw['avatarUrl']),
-      content: s(raw['content'] ?? raw['comment'] ?? raw['text']),
-      createdAt: raw['createdAt'],
-    );
-  }
-}
-
-class _CommentThread {
-  const _CommentThread({required this.parent, required this.replies});
-  final _CommentVM parent;
-  final List<_CommentVM> replies;
-
-  int get total => 1 + replies.length;
-}
-
+// ─── 留言分組：頂層留言，各串的回覆各自讀（ListComments 以 parent_id 取回覆） ────────
 final _postCommentsProvider = FutureProvider.autoDispose
-    .family<List<_CommentThread>, int>((ref, postId) async {
-      final repo = ref.watch(postRepositoryProvider);
-      final raw = await repo.listCommentsRaw(postId);
+    .family<List<PostComment>, int>(
+      (ref, postId) => ref.watch(postRepositoryProvider).listComments(postId),
+      retry: (_, _) => null,
+    );
 
-      final tops = <_CommentVM>[];
-      final byParent = <int, List<_CommentVM>>{};
-      for (final m in raw) {
-        final c = _CommentVM.fromRaw(m);
-        if (c.parentId > 0) {
-          byParent.putIfAbsent(c.parentId, () => <_CommentVM>[]).add(c);
-        } else {
-          tops.add(c);
-        }
-      }
-
-      // 各 top-level 留言補抓回覆（與主列表 merge、以 id 去重）
-      await Future.wait(
-        tops.map((t) async {
-          try {
-            final items = await repo.listCommentReplies(t.id);
-            final list = byParent.putIfAbsent(t.id, () => <_CommentVM>[]);
-            final seen = list.map((e) => e.id).toSet();
-            for (final m in items) {
-              final r = _CommentVM.fromRaw(m);
-              if (seen.add(r.id)) list.add(r);
-            }
-          } catch (_) {}
-        }),
-      );
-
-      return [
-        for (final t in tops)
-          _CommentThread(
-            parent: t,
-            replies: byParent[t.id] ?? const <_CommentVM>[],
-          ),
-      ];
-    });
+/// 一串的回覆：每串自己的讀取與失敗狀態，重試只重讀這一串。
+final _threadRepliesProvider = FutureProvider.autoDispose
+    .family<List<PostComment>, ({int postId, String parentId})>(
+      (ref, key) => ref
+          .watch(postRepositoryProvider)
+          .listComments(key.postId, parentId: key.parentId),
+      retry: (_, _) => null,
+    );
 
 /// 賣家店舖貼文管理面：沉浸媒體、可展開說明與固定操作列（數字、留言、分享、發布與下架）。
 ///
@@ -165,6 +93,7 @@ class PageHomeFeedScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(postListProvider);
     final share = ref.watch(storeShareProvider);
+    final canMarket = ref.watch(canMarketPostsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -173,28 +102,51 @@ class PageHomeFeedScreen extends HookConsumerWidget {
         value: SystemUiOverlayStyle.dark.copyWith(
           statusBarColor: Colors.transparent,
         ),
-        child: postsAsync.when(
-          // 重讀失敗時 state 帶著舊列表：繼續顯示它，不換成錯誤畫面。
-          skipError: true,
-          data: (posts) {
-            if (posts.isEmpty) return _buildEmptyState();
-            return _FeedPager(
-              posts: posts,
-              initialIndex: initialPostId == null
-                  ? initialIndex.clamp(0, posts.length - 1)
-                  : feedIndexForPost(posts, initialPostId),
-              sellerName: sellerName,
-              share: share,
-              publishDisabled: postsAsync.hasError,
-              onShare: (post) => _onShare(context, ref, post),
-              onEdit: (post) => _onEdit(context, ref, post),
-              onDelete: (post) => _confirmAndDelete(context, ref, post.id),
-            );
-          },
-          loading: () => const Center(child: FruitSpinner(size: 64)),
-          error: (e, _) => Center(child: Text('Error: $e')),
+        child: Column(
+          children: [
+            if (!canMarket)
+              const PostRestrictedNotice(includeStatusBarInset: true),
+            Expanded(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: !canMarket,
+                child: _buildBody(context, ref, postsAsync, share, canMarket),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<Post>> postsAsync,
+    StoreShare share,
+    bool canMarket,
+  ) {
+    return postsAsync.when(
+      // 重讀失敗時 state 帶著舊列表：繼續顯示它，不換成錯誤畫面。
+      skipError: true,
+      data: (posts) {
+        if (posts.isEmpty) return _buildEmptyState();
+        return _FeedPager(
+          posts: posts,
+          initialIndex: initialPostId == null
+              ? initialIndex.clamp(0, posts.length - 1)
+              : feedIndexForPost(posts, initialPostId),
+          sellerName: sellerName,
+          share: share,
+          publishDisabled: postsAsync.hasError,
+          onShare: (post) => _onShare(context, ref, post),
+          canEdit: canMarket,
+          onEdit: (post) => _onEdit(context, ref, post),
+          onDelete: (post) => _confirmAndDelete(context, ref, post.id),
+        );
+      },
+      loading: () => const Center(child: FruitSpinner(size: 64)),
+      error: (e, _) => Center(child: Text('Error: $e')),
     );
   }
 
@@ -209,15 +161,19 @@ class PageHomeFeedScreen extends HookConsumerWidget {
   }
 
   Future<void> _onShare(BuildContext context, WidgetRef ref, Post post) async {
-    final data = await ref
-        .read(postRepositoryProvider)
-        .getShareUrl(type: 'post', id: post.id.toString());
-    if (!context.mounted) return;
-    if (data == null) {
+    if (post.url.isEmpty) {
       FloatingToast.error(context, kShareFailedMessage);
       return;
     }
-    showShareSheet(context, data);
+    showShareSheet(
+      context,
+      ShareData(
+        title: post.content.split('\n').first,
+        description: '',
+        imageUrl: buildImageUrl(post.imageUrl, ImagePreset.thumb),
+        url: post.url,
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -246,9 +202,10 @@ class PageHomeFeedScreen extends HookConsumerWidget {
     try {
       await ref.read(postListProvider.notifier).deletePost(postId);
       if (context.mounted) FloatingToast.success(context, '已刪除貼文');
-    } catch (e) {
+    } catch (e, st) {
+      rethrowIfProgrammingError(e, st);
       if (context.mounted) {
-        FloatingToast.error(context, '刪除失敗：${_mutationErrorMessage(e)}');
+        FloatingToast.error(context, '刪除失敗：${_mutationErrorMessage(e, ref)}');
       }
     }
   }
@@ -287,6 +244,7 @@ class _FeedPager extends HookWidget {
     required this.share,
     required this.publishDisabled,
     required this.onShare,
+    required this.canEdit,
     required this.onEdit,
     required this.onDelete,
   });
@@ -299,6 +257,7 @@ class _FeedPager extends HookWidget {
   /// 列表重讀失敗後，畫面上的發布狀態不可信：發布與下架停用到下一次重讀成功。
   final bool publishDisabled;
   final void Function(Post post) onShare;
+  final bool canEdit;
   final void Function(Post post) onEdit;
   final void Function(Post post) onDelete;
 
@@ -309,7 +268,7 @@ class _FeedPager extends HookWidget {
       children: [
         Positioned.fill(
           child: _PostPreviewBackdrop(
-            imageSource: posts[initialIndex].imageKeys.firstOrNull ?? '',
+            imageSource: posts[initialIndex].imageUrl,
           ),
         ),
         // 左右切換店舖貼文；說明與留言各自保留可捲動空間。
@@ -334,12 +293,12 @@ class _FeedPager extends HookWidget {
                 shareHint: share is StoreShareDisabled
                     ? kStoreShareDisabledHint
                     : null,
-                onEditTap: () => onEdit(post),
+                onEditTap: canEdit ? () => onEdit(post) : null,
                 onDeleteTap: () => onDelete(post),
                 onProductTap: post.linkedProduct != null
                     ? () => context.push(
                         '/product/preview',
-                        extra: {'product': post.linkedProduct!},
+                        extra: {'product': post.linkedProduct!.toProductMap()},
                       )
                     : null,
               );
@@ -351,9 +310,8 @@ class _FeedPager extends HookWidget {
   }
 }
 
-String _mutationErrorMessage(Object error) {
-  return error is AppException ? error.message : '請稍後再試';
-}
+String _mutationErrorMessage(Object error, WidgetRef ref) =>
+    errorText(error, defaults: ref.read(defaultErrorTextProvider));
 
 // ─── 單篇預覽（對齊 buyer MerchantPostsFeedScreen）──────────────────
 class _PostPage extends HookConsumerWidget {
@@ -374,7 +332,7 @@ class _PostPage extends HookConsumerWidget {
   final bool publishDisabled;
   final VoidCallback? onShareTap;
   final String? shareHint;
-  final VoidCallback onEditTap;
+  final VoidCallback? onEditTap;
   final VoidCallback onDeleteTap;
   final VoidCallback? onProductTap;
 
@@ -391,42 +349,56 @@ class _PostPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // objectKey 直接交給 OptimizedNetworkImage，由 buildImageUrl（唯一組裝入口）
     // 依 postImage 場景組顯示 URL；不要在這裡自行拼域名。
-    final imageSource = post.imageKeys.isEmpty ? '' : post.imageKeys.first;
+    final imageSource = post.imageUrl;
     final dateStr = _formatDate(post.createdAt);
     final statusBadge = postStatusBadgeOf(post);
 
     final commentCtrl = useTextEditingController();
     final commentFocus = useFocusNode();
     final submitting = useState(false);
-    final deletingCommentIds = useRef(<int>{});
-    // 回覆對象：apiParentId 固定掛 top-level 留言（seller API 用 parent_id 串
-    // thread），displayName 顯示被回覆者
+    final deletingCommentIds = useRef(<String>{});
+    // 回覆對象：apiParentId 固定掛頂層留言（以 parent_id 串 thread），
+    // replyToId 是回覆針對的那一則；name 顯示被回覆者
     final replyTarget = useState<_PostReplyTarget?>(null);
     final captionExpanded = useState(false);
     final commentsOpen = useRef(false);
 
-    void setReplyTo(_CommentThread thread, _CommentVM tapped) {
+    void setReplyTo(PostComment parent, PostComment tapped) {
       if (submitting.value) return;
       replyTarget.value = (
-        apiParentId: thread.parent.id,
-        name: tapped.name.trim().isEmpty ? '匿名' : tapped.name.trim(),
-        isReplyToReply: tapped.id != thread.parent.id,
+        apiParentId: parent.id,
+        replyToId: tapped.id == parent.id ? null : tapped.id,
+        name: tapped.authorName.isEmpty ? '匿名' : tapped.authorName,
+        isReplyToReply: tapped.id != parent.id,
       );
       commentFocus.requestFocus();
     }
 
-    void syncCommentCount(int delta) {
-      // The sheet keeps these callbacks while the underlying feed rebuilds.
-      // Read the latest count so consecutive successful mutations accumulate.
-      final current = ref
-          .read(postListProvider)
-          .value
-          ?.where((item) => item.id == post.id)
-          .firstOrNull;
-      final next = (current?.commentCount ?? post.commentCount) + delta;
-      ref
-          .read(postListProvider.notifier)
-          .updateCommentCount(post.id, next < 0 ? 0 : next);
+    // 監看 notifier 讓列表 provider 在這個 widget 存活期間不被釋放，留言數的加減才改得到它。
+    final postList = ref.watch(postListProvider.notifier);
+    void refreshComments() {
+      ref.invalidate(_postCommentsProvider(post.id));
+      ref.invalidate(_threadRepliesProvider);
+    }
+
+    // 校正的流水號：每次本地加減都緊接著發一次校正，所以只有最後發出的校正算數，亂序回來的舊結果丟掉。
+    final reconcileSeq = useRef(0);
+    void adjustCount(int delta) {
+      postList.adjustCommentCount(post.id, delta);
+    }
+
+    // 以伺服器的 comment_count 校正本地加減的漂移（別人的留言與刪除）。postList 由這個 widget 監看而存活；
+    // 不擋畫面，失敗就維持本地值。
+    Future<void> reconcileCount() async {
+      if (!context.mounted) return;
+      final seq = ++reconcileSeq.value;
+      try {
+        final latest = await ref
+            .read(postRepositoryProvider)
+            .getMyPost(post.id);
+        if (!context.mounted || seq != reconcileSeq.value) return;
+        postList.updateCommentCount(post.id, latest.commentCount);
+      } on Exception catch (_) {}
     }
 
     Future<void> submitComment() async {
@@ -435,32 +407,29 @@ class _PostPage extends HookConsumerWidget {
       submitting.value = true;
       try {
         final target = replyTarget.value;
-        Map<String, dynamic>? created;
         if (target != null) {
           // 回覆巢狀留言時補 @name 前綴，讓對象在 thread 內可辨識
           final text = target.isReplyToReply ? '@${target.name} $raw' : raw;
-          created = await ref
+          await ref
               .read(postRepositoryProvider)
-              .replyToComment(
-                target.apiParentId,
-                postId: post.id,
-                content: text,
+              .createComment(
+                post.id,
+                body: text,
+                parentId: target.apiParentId,
+                replyToId: target.replyToId,
               );
         } else {
-          created = await ref
+          await ref
               .read(postRepositoryProvider)
-              .commentOnPostRaw(post.id, content: raw);
+              .createComment(post.id, body: raw);
         }
+        adjustCount(1);
+        reconcileCount();
         if (!context.mounted) return;
-        if (created != null) {
-          commentCtrl.clear();
-          replyTarget.value = null;
-          commentFocus.unfocus();
-          syncCommentCount(1);
-          ref.invalidate(_postCommentsProvider(post.id));
-        } else {
-          FloatingToast.error(context, target != null ? '回覆失敗' : '留言失敗');
-        }
+        commentCtrl.clear();
+        replyTarget.value = null;
+        commentFocus.unfocus();
+        refreshComments();
       } catch (e) {
         if (context.mounted) FloatingToast.error(context, '留言失敗');
       } finally {
@@ -468,18 +437,22 @@ class _PostPage extends HookConsumerWidget {
       }
     }
 
-    Future<void> deleteComment(_CommentVM c) async {
+    Future<void> deleteComment(PostComment c) async {
       if (!context.mounted || !deletingCommentIds.value.add(c.id)) return;
       try {
-        final ok = await ref.read(postRepositoryProvider).deleteComment(c.id);
+        await ref
+            .read(postRepositoryProvider)
+            .deleteComment(c.id, etag: c.etag);
+        adjustCount(-1);
+        reconcileCount();
         if (!context.mounted) return;
-        if (ok) {
-          FloatingToast.success(context, '已刪除留言');
-          syncCommentCount(-1);
-          ref.invalidate(_postCommentsProvider(post.id));
-        } else {
-          FloatingToast.error(context, '刪除留言失敗');
+        FloatingToast.success(context, '已刪除留言');
+        final replying = replyTarget.value;
+        if (replying != null &&
+            (replying.apiParentId == c.id || replying.replyToId == c.id)) {
+          replyTarget.value = null;
         }
+        refreshComments();
       } catch (_) {
         if (context.mounted) FloatingToast.error(context, '刪除留言失敗');
       } finally {
@@ -487,22 +460,21 @@ class _PostPage extends HookConsumerWidget {
       }
     }
 
-    final commentsAvailability = postCommentsAvailabilityOfPost(
+    final commentsNotice = postCommentsNoticeOfPost(
       ref.watch(storeShareProvider),
       post,
     );
     final store = ref.watch(myStoreSnapshotProvider);
     final publishing = useState(false);
-    final target = postPublishTarget(post.publishStatus);
+    final target = postPublishTarget(post.status);
     // 能力還沒讀到（store 為 null）時不下結論，伺服器是最後一道。
-    final canPublish =
-        store?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? true;
+    final canPublish = ref.watch(canMarketPostsProvider);
     final canUnpublish =
         store?.can(SellerCapability.SELLER_CAPABILITY_CONTENT_CONTRACT) ?? true;
 
     Future<void> togglePublish(bool publish) async {
       if (publishing.value) return;
-      if (publish && post.imageKeys.isEmpty) {
+      if (publish && !post.hasImage) {
         FloatingToast.error(
           context,
           '$kPostImageRequiredTitle\n$kPostPublishImageRequiredHint',
@@ -526,12 +498,16 @@ class _PostPage extends HookConsumerWidget {
         if (!refreshed && context.mounted) {
           // 發布或下架已成功，只是重讀列表失敗：不說「失敗」，只交代重讀的原因。
           final error = ref.read(postListProvider).error;
-          FloatingToast.error(context, _mutationErrorMessage(error ?? ''));
+          FloatingToast.error(context, _mutationErrorMessage(error ?? '', ref));
         }
-      } on AppException catch (error) {
+      } catch (error, stackTrace) {
+        rethrowIfProgrammingError(error, stackTrace);
         if (context.mounted) {
           final prefix = publish ? '發布失敗' : '下架失敗';
-          FloatingToast.error(context, '$prefix：${error.message}');
+          FloatingToast.error(
+            context,
+            '$prefix：${_mutationErrorMessage(error, ref)}',
+          );
         }
       } finally {
         if (context.mounted) publishing.value = false;
@@ -555,7 +531,7 @@ class _PostPage extends HookConsumerWidget {
     Future<void> openComments() async {
       if (commentsOpen.value || !context.mounted) return;
       commentsOpen.value = true;
-      final unavailableMessage = commentsAvailability.message;
+      reconcileCount();
       final sheet = showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
@@ -567,11 +543,13 @@ class _PostPage extends HookConsumerWidget {
         barrierColor: AppColors.neutralBlack.withValues(alpha: 0.42),
         builder: (_) => _PostCommentsSheet(
           postId: post.id,
+          commentCount: post.commentCount,
           controller: commentCtrl,
           focusNode: commentFocus,
           submitting: submitting,
           replyTarget: replyTarget,
-          unavailableMessage: unavailableMessage,
+          notice: commentsNotice?.message,
+          canComment: post.viewerCanComment,
           onReply: setReplyTo,
           onDelete: deleteComment,
           onSubmit: submitComment,
@@ -839,14 +817,16 @@ class _PostPage extends HookConsumerWidget {
                       right: 12,
                       child: Row(
                         children: [
-                          _PostManagementButton(
-                            key: ValueKey('seller-post-edit-${post.id}'),
-                            label: '編輯貼文',
-                            icon: AppIcons.editSquareOutlined,
-                            color: AppIconColors.active,
-                            onPressed: onEditTap,
-                          ),
-                          const SizedBox(width: HkSpace.sm),
+                          if (onEditTap case final onEdit?) ...[
+                            _PostManagementButton(
+                              key: ValueKey('seller-post-edit-${post.id}'),
+                              label: '編輯貼文',
+                              icon: AppIcons.editSquareOutlined,
+                              color: AppIconColors.active,
+                              onPressed: onEdit,
+                            ),
+                            const SizedBox(width: HkSpace.sm),
+                          ],
                           _PostManagementButton(
                             key: ValueKey('seller-post-delete-${post.id}'),
                             label: '刪除貼文',
@@ -869,7 +849,8 @@ class _PostPage extends HookConsumerWidget {
 }
 
 typedef _PostReplyTarget = ({
-  int apiParentId,
+  String apiParentId,
+  String? replyToId,
   String name,
   bool isReplyToReply,
 });
@@ -1048,19 +1029,15 @@ class _PostManagementButton extends StatelessWidget {
 
 class _PostLinkedProduct extends StatelessWidget {
   const _PostLinkedProduct({super.key, required this.product, this.onTap});
-  final Map<String, dynamic> product;
+  final PostLinkedProduct product;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final name = product['name']?.toString() ?? '';
+    final name = product.name;
     if (name.isEmpty) return const SizedBox.shrink();
-    // Same seller price and image resolution as LinkedProductCard.
-    final priceRaw = product['price'];
-    final price = priceRaw is num
-        ? priceRaw.toInt()
-        : int.tryParse('${priceRaw ?? ''}') ?? 0;
-    final imageUrl = extractPrimaryProductImageUrl(product) ?? '';
+    final price = product.price;
+    final imageUrl = product.imageUrl;
     return Semantics(
       label: '查看關聯商品 $name',
       button: true,
@@ -1402,36 +1379,42 @@ class _PostPublishButton extends StatelessWidget {
 class _PostCommentsSheet extends HookConsumerWidget {
   const _PostCommentsSheet({
     required this.postId,
+    required this.commentCount,
     required this.controller,
     required this.focusNode,
     required this.submitting,
     required this.replyTarget,
-    required this.unavailableMessage,
+    required this.notice,
+    required this.canComment,
     required this.onReply,
     required this.onDelete,
     required this.onSubmit,
     required this.onCancelReply,
   });
   final int postId;
+
+  /// 標題的留言數在列表還沒讀到（載入中或失敗）時用這個值，不顯示 0。
+  final int commentCount;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueListenable<bool> submitting;
   final ValueListenable<_PostReplyTarget?> replyTarget;
 
-  /// 非 null 時不載入留言、不顯示輸入列，列表區改顯示這段說明；外框不變。
-  final String? unavailableMessage;
-  final void Function(_CommentThread, _CommentVM) onReply;
-  final void Function(_CommentVM) onDelete;
+  /// 非 null 時買家看不到這則貼文的留言：列表上方顯示這段說明，留言照常載入與刪除。
+  final String? notice;
+
+  /// 伺服器的 `Post.viewer_can_comment`；與 [notice] 無關。
+  final bool canComment;
+  final void Function(PostComment, PostComment) onReply;
+  final void Function(PostComment) onDelete;
   final Future<void> Function() onSubmit;
   final VoidCallback onCancelReply;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unavailable = unavailableMessage;
-    final commentsAsync = unavailable == null
-        ? ref.watch(_postCommentsProvider(postId))
-        : const AsyncData<List<_CommentThread>>(<_CommentThread>[]);
-    final threads = commentsAsync.value ?? const <_CommentThread>[];
+    final noticeText = notice;
+    final commentsAsync = ref.watch(_postCommentsProvider(postId));
+    final threads = commentsAsync.value ?? const <PostComment>[];
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final viewport = MediaQuery.sizeOf(context);
     useEffect(() {
@@ -1478,9 +1461,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        unavailable != null
-                            ? '留言'
-                            : '留言 ${threads.fold<int>(0, (sum, thread) => sum + thread.total)}',
+                        '留言 ${ref.watch(postListProvider.select((s) => s.value?.where((p) => p.id == postId).firstOrNull?.commentCount)) ?? commentCount}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -1500,49 +1481,62 @@ class _PostCommentsSheet extends HookConsumerWidget {
             ],
           ),
         );
-        final commentContent = unavailable != null
-            ? Padding(
-                padding: const EdgeInsets.symmetric(vertical: HkSpace.xxl),
-                child: StorefrontGlassEmptyPanel(
-                  icon: HkIconName.chat,
-                  message: unavailable,
+        final commentList = commentsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: FruitSpinner(size: 40)),
+          ),
+          error: (_, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('留言載入失敗'),
+                TextButton(
+                  onPressed: () =>
+                      ref.invalidate(_postCommentsProvider(postId)),
+                  child: const HkButtonLabel('重試'),
                 ),
-              )
-            : commentsAsync.when(
-                loading: () => const Padding(
+              ],
+            ),
+          ),
+          data: (_) => threads.isEmpty
+              ? const Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: FruitSpinner(size: 40)),
-                ),
-                error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('留言載入失敗'),
-                      TextButton(
-                        onPressed: () =>
-                            ref.invalidate(_postCommentsProvider(postId)),
-                        child: const HkButtonLabel('重試'),
+                  child: Center(child: Text('尚無留言')),
+                )
+              : Column(
+                  children: [
+                    for (final parent in threads)
+                      _CommentGroup(
+                        postId: postId,
+                        parent: parent,
+                        onReply: (comment) => onReply(parent, comment),
+                        onDelete: onDelete,
                       ),
-                    ],
+                  ],
+                ),
+        );
+        final commentContent = Column(
+          children: [
+            if (noticeText != null)
+              Padding(
+                key: ValueKey('seller-post-comments-notice-$postId'),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    noticeText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-                data: (_) => threads.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: Text('尚無留言')),
-                      )
-                    : Column(
-                        children: [
-                          for (final thread in threads)
-                            _CommentGroup(
-                              thread: thread,
-                              onReply: (comment) => onReply(thread, comment),
-                              onDelete: onDelete,
-                            ),
-                        ],
-                      ),
-              );
+              ),
+            commentList,
+          ],
+        );
         final composer = ValueListenableBuilder<bool>(
           valueListenable: submitting,
           builder: (context, busy, _) =>
@@ -1584,7 +1578,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                             children: [
                               header,
                               commentContent,
-                              if (unavailable == null) composer,
+                              if (canComment) composer,
                             ],
                           ),
                         )
@@ -1601,7 +1595,7 @@ class _PostCommentsSheet extends HookConsumerWidget {
                                 child: commentContent,
                               ),
                             ),
-                            if (unavailable == null)
+                            if (canComment)
                               ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxHeight: math.max(48, (height - 72) * 0.62),
@@ -1868,13 +1862,11 @@ class _CommentRow extends ConsumerWidget {
     required this.onDelete,
   });
 
-  final _CommentVM comment;
+  final PostComment comment;
   final String dateStr;
   final bool isReply;
   final VoidCallback onReply;
   final VoidCallback onDelete;
-
-  bool get _isSelf => comment.isMine;
 
   Future<void> _showActionMenu(BuildContext context, WidgetRef ref) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -1886,22 +1878,33 @@ class _CommentRow extends ConsumerWidget {
       ),
       Offset.zero & overlay.size,
     );
-    // 賣家在自己貼文內可管理所有留言 → 一律提供刪除；
-    // 非自己的留言額外提供檢舉（公開留言不帶留言者 id，目前沒有封鎖入口）
+    final canBlock = canBlockAuthor(
+      canBlockBuyers: ref.read(canBlockBuyersProvider),
+      isMine: comment.isMine,
+      viewerCanDelete: comment.viewerCanDelete,
+      authorIsBuyer: comment.authorIsBuyer,
+    );
+    // 刪除依伺服器的 viewer_can_delete；非自己的留言額外提供檢舉；買家作者而店家有封鎖能力時額外提供封鎖
     final v = await showMenu<String>(
       context: context,
       position: position,
       color: AppColors.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       items: [
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Text(
-            '刪除留言',
-            style: TextStyle(fontSize: 16.sp, color: AppColors.error),
+        if (comment.viewerCanDelete)
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: Text(
+              '刪除留言',
+              style: TextStyle(fontSize: 16.sp, color: AppColors.error),
+            ),
           ),
-        ),
-        if (!_isSelf) ...[
+        if (canBlock)
+          PopupMenuItem<String>(
+            value: 'block',
+            child: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
+          ),
+        if (!comment.isMine) ...[
           PopupMenuItem<String>(
             value: 'report',
             child: Text('檢舉留言', style: TextStyle(fontSize: 16.sp)),
@@ -1911,30 +1914,49 @@ class _CommentRow extends ConsumerWidget {
     );
     if (!context.mounted) return;
     if (v == 'delete') onDelete();
+    if (v == 'block') {
+      await blockBuyerWithConfirm(
+        context,
+        ref,
+        buyerName: comment.authorName,
+        commentId: comment.id,
+      );
+    }
     if (v == 'report' && context.mounted) {
-      // 本頁的留言來自 `/public/posts/{id}/comments`（`listCommentsRaw`），
-      // 落在 `cms_comment`——所以是 POST_COMMENT，不是 SELLER_FORUM
-      // （那是賣家頁「迴響」留言板，打到 `cms_seller_forum`）。
+      // 本頁的留言是貼文留言（`listComments`）——所以是 POST_COMMENT，不是 SELLER_FORUM
+      // （那是賣家頁「迴響」討論區）。
       await showReportSheet(
         context,
         ref,
         targetType: ReportTargetType.postComment,
-        targetId: '${comment.id}',
+        targetId: comment.id,
       );
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = comment.name.trim().isEmpty ? '匿名' : comment.name.trim();
+    final name = comment.authorName.isEmpty ? '匿名' : comment.authorName;
     final leftPad = isReply ? 46.w : 10.w;
+    final placeholder = comment.placeholderText;
+    if (placeholder != null) {
+      return Padding(
+        key: ValueKey('seller-post-comment-placeholder-${comment.id}'),
+        padding: EdgeInsets.fromLTRB(leftPad, 8.h, 12.w, 8.h),
+        child: Text(
+          placeholder,
+          style: TextStyle(fontSize: 14.sp, color: _kGray50, height: 20 / 14),
+        ),
+      );
+    }
+    final hasMenu = comment.viewerCanDelete || !comment.isMine;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPad, 8.h, 12.w, 8.h),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CommentAvatar(size: 30.sp, url: comment.avatar),
+          _CommentAvatar(size: 30.sp, url: comment.authorAvatar),
           SizedBox(width: 6.w),
           Expanded(
             child: Column(
@@ -1955,14 +1977,16 @@ class _CommentRow extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 8.w),
-                    Builder(
-                      builder: (innerContext) => HkFrostedIconButton(
-                        label: '留言更多操作',
-                        icon: AppIcons.moreHoriz,
-                        onPressed: () => _showActionMenu(innerContext, ref),
+                    if (hasMenu) ...[
+                      SizedBox(width: 8.w),
+                      Builder(
+                        builder: (innerContext) => HkFrostedIconButton(
+                          label: '留言更多操作',
+                          icon: AppIcons.moreHoriz,
+                          onPressed: () => _showActionMenu(innerContext, ref),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 if (dateStr.isNotEmpty)
@@ -1974,10 +1998,10 @@ class _CommentRow extends ConsumerWidget {
                       height: 20 / 14,
                     ),
                   ),
-                if (comment.content.isNotEmpty) ...[
+                if (comment.body.isNotEmpty) ...[
                   SizedBox(height: 4.h),
                   Text(
-                    comment.content,
+                    comment.body,
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: _kGray100,
@@ -1985,36 +2009,38 @@ class _CommentRow extends ConsumerWidget {
                     ),
                   ),
                 ],
-                SizedBox(height: 6.h),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: 80,
-                    child: HkTapTarget(
-                      semanticLabel: '回覆 $name',
-                      onTap: onReply,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            AppIcons.chatBubbleOutline,
-                            size: 16.sp,
-                            color: _kGray100.withValues(alpha: 0.6),
-                          ),
-                          SizedBox(width: 4.w),
-                          Text(
-                            '回覆',
-                            style: TextStyle(
-                              fontSize: 14.sp,
+                if (comment.viewerCanReply) ...[
+                  SizedBox(height: 6.h),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 80,
+                      child: HkTapTarget(
+                        semanticLabel: '回覆 $name',
+                        onTap: onReply,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              AppIcons.chatBubbleOutline,
+                              size: 16.sp,
                               color: _kGray100.withValues(alpha: 0.6),
-                              height: 18 / 13,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4.w),
+                            Text(
+                              '回覆',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: _kGray100.withValues(alpha: 0.6),
+                                height: 18 / 13,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -2027,29 +2053,59 @@ class _CommentRow extends ConsumerWidget {
 /// Comment group：parent + replies（seller API 以 parent_id 串 thread）
 /// 引導線：parent avatar 中心垂直往下 → 彎弧形連到 reply avatar 邊緣
 /// （對齊 buyer _CommentGroup / _ReplyLinePainter）
-class _CommentGroup extends StatelessWidget {
+class _CommentGroup extends ConsumerWidget {
   const _CommentGroup({
-    required this.thread,
+    required this.postId,
+    required this.parent,
     required this.onReply,
     required this.onDelete,
   });
 
-  final _CommentThread thread;
-  final void Function(_CommentVM) onReply;
-  final void Function(_CommentVM) onDelete;
+  final int postId;
+  final PostComment parent;
+  final void Function(PostComment) onReply;
+  final void Function(PostComment) onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    Widget rowFor(_CommentVM c, {required bool isReply}) => _CommentRow(
+  Widget build(BuildContext context, WidgetRef ref) {
+    Widget rowFor(PostComment c, {required bool isReply}) => _CommentRow(
       comment: c,
-      dateStr: _relativeDate(c.createdAt),
+      dateStr: _relativeDate(c.createTime),
       isReply: isReply,
       onReply: () => onReply(c),
       onDelete: () => onDelete(c),
     );
 
-    final parent = thread.parent;
-    final replies = thread.replies;
+    if (parent.replyCount <= 0) return rowFor(parent, isReply: false);
+    final key = (postId: postId, parentId: parent.id);
+    final repliesAsync = ref.watch(_threadRepliesProvider(key));
+    // 只把網路錯誤（Exception）當成這一串讀取失敗；Error 是程式缺陷，原樣往上丟。
+    final failure = repliesAsync.error;
+    if (failure is Error) {
+      Error.throwWithStackTrace(failure, repliesAsync.stackTrace!);
+    }
+    if (repliesAsync.hasError) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          rowFor(parent, isReply: false),
+          Padding(
+            padding: EdgeInsets.only(left: 46.w),
+            child: Row(
+              children: [
+                const Text('回覆載入失敗'),
+                TextButton(
+                  key: ValueKey('seller-comment-replies-retry-${parent.id}'),
+                  onPressed: () => ref.invalidate(_threadRepliesProvider(key)),
+                  child: const HkButtonLabel('重試'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    final replies = repliesAsync.value ?? const <PostComment>[];
     if (replies.isEmpty) return rowFor(parent, isReply: false);
 
     // 父 avatar 中心 X = 10w (row left pad) + 15.sp (avatar radius)
@@ -2179,24 +2235,7 @@ class _CommentAvatar extends StatelessWidget {
 }
 
 /// 留言用相對時間：剛剛 / N 分鐘前 / N 小時前 / N 天前 / 否則 yyyy/MM/dd
-String _relativeDate(dynamic dateVal) {
-  if (dateVal == null) return '';
-  DateTime? dt;
-  if (dateVal is String) {
-    dt = DateTime.tryParse(dateVal);
-    if (dt == null) {
-      final n = int.tryParse(dateVal);
-      if (n != null) {
-        dt = DateTime.fromMillisecondsSinceEpoch(
-          n < 10000000000 ? n * 1000 : n,
-        );
-      }
-    }
-  }
-  if (dateVal is int) {
-    final ms = dateVal < 10000000000 ? dateVal * 1000 : dateVal;
-    dt = DateTime.fromMillisecondsSinceEpoch(ms);
-  }
+String _relativeDate(DateTime? dt) {
   if (dt == null) return '';
   final diff = DateTime.now().difference(dt);
   if (diff.inSeconds < 60) return '剛剛';

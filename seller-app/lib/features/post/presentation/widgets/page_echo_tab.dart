@@ -13,6 +13,7 @@ import '../../../../core/theme/hk_tokens.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/utils/floating_toast.dart';
 import '../../../../config/media_image.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../../shared/widgets/hk_frosted_icon_button.dart';
 import '../../../../shared/widgets/hk_icon.dart';
@@ -20,7 +21,11 @@ import '../../../../shared/widgets/echo_comment_node.dart';
 import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/seller_floating_navigation_layout.dart';
 import '../../../report/data/report_model.dart';
+import '../../../report/data/store_block_rules.dart';
+import '../../../report/presentation/store_block_capability.dart';
+import '../../../report/presentation/widgets/block_actions.dart';
 import '../../../report/presentation/widgets/report_sheet.dart';
+import '../../data/post_comment.dart';
 import '../../data/post_repository.dart';
 import 'post_card.dart' show showPostActionMenu;
 import 'storefront_tab_glass.dart';
@@ -48,15 +53,15 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   @override
   bool get wantKeepAlive => true;
   // Echo data
-  List<Map<String, dynamic>> _echoMessages = [];
+  List<StoreForumEntry> _echoMessages = [];
   List<EchoCommentNode> _echoCommentNodes = [];
   bool _loadingEcho = false;
   bool _echoLoaded = false;
-  final Set<int> _deletingMessageIds = {};
+  final Set<String> _deletingMessageIds = {};
 
   // Reply cache
-  final Map<int, List<Map<String, dynamic>>> _repliesByMessageId = {};
-  final Set<int> _repliesLoading = {};
+  final Map<String, List<StoreForumEntry>> _repliesByMessageId = {};
+  final Set<String> _repliesLoading = {};
 
   // Inline input bar controllers
   final TextEditingController _echoInputCtrl = TextEditingController();
@@ -87,105 +92,53 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     return _echoList();
   }
 
-  /// 將原始留言列表轉換為樹狀節點結構
+  /// 將討論區的頂層發言與已載入的回覆轉換為樹狀節點結構
   List<EchoCommentNode> _buildEchoCommentTree(
-    List<Map<String, dynamic>> messages,
-    Map<int, List<Map<String, dynamic>>> repliesByMessageId,
+    List<StoreForumEntry> messages,
+    Map<String, List<StoreForumEntry>> repliesByMessageId,
   ) {
-    final List<EchoCommentNode> nodes = [];
-
-    for (final m in messages) {
-      final node = _buildEchoNode(m, 0);
-
-      // 添加回覆作為子節點
-      final msgId = int.tryParse((m['id'] ?? '').toString());
-      if (msgId != null && repliesByMessageId.containsKey(msgId)) {
-        final replies = repliesByMessageId[msgId] ?? [];
-        for (final r in replies) {
-          node.replies.add(_buildEchoNode(r, 1, parentName: node.userName));
-        }
-      }
-
-      nodes.add(node);
-    }
-
-    return nodes;
+    return [
+      for (final m in messages)
+        _buildEchoNode(m)
+          ..replies.addAll([
+            for (final r
+                in repliesByMessageId[m.id] ?? const <StoreForumEntry>[])
+              _buildEchoNode(r),
+          ]),
+    ];
   }
 
   /// 建構單個留言節點
-  EchoCommentNode _buildEchoNode(
-    Map<String, dynamic> m,
-    int depth, {
-    String parentName = '',
-  }) {
-    final bool isMine = m['isMine'] == true;
-
-    // 獲取用戶名稱
-    String userName = '';
-    if (isMine) {
-      userName = widget.sellerDisplayName;
-    }
-    if (userName.isEmpty) {
-      final v = m['userName'];
-      if (v != null && v.toString().trim().isNotEmpty) {
-        userName = v.toString().trim();
-      }
-    }
+  EchoCommentNode _buildEchoNode(StoreForumEntry m) {
+    // 自己的發言名稱與頭像讀不到時用店家的快照。
+    var userName = m.authorName;
+    if (userName.isEmpty && m.isMine) userName = widget.sellerDisplayName;
     if (userName.isEmpty) userName = '用戶';
-
-    // 留言本身的 `avatarKey`/`avatarUrl`（gateway seller_forum.go
-    // `ForumCommentItem`，讀取與寫入端點同形狀）是權威來源；賣家自己的回覆沒有時
-    // 用店家快照的 logo。
-    String avatarSource = '';
-    final a = m['avatarKey'] ?? m['avatarUrl'];
-    if (a != null && a.toString().trim().isNotEmpty) {
-      avatarSource = a.toString().trim();
+    var avatar = m.authorAvatar;
+    if (avatar.isEmpty && m.isMine) {
+      final logo = ref.read(myStoreSnapshotProvider)?.logoUrl ?? '';
+      avatar = logo.isEmpty ? '' : buildImageUrl(logo, ImagePreset.avatar);
     }
-    if (avatarSource.isEmpty) {
-      if (isMine) {
-        avatarSource = ref.read(myStoreSnapshotProvider)?.logoUrl ?? '';
-      }
-    }
-    final String userAvatar = avatarSource.isEmpty
-        ? ''
-        : buildImageUrl(avatarSource, ImagePreset.avatar);
-
-    // 解析時間
-    DateTime createdAt = DateTime.now();
-    final timeRaw = m['createdAt'];
-    if (timeRaw != null) {
-      if (timeRaw is int) {
-        // 判斷是秒還是毫秒：10位數是秒，13位數是毫秒
-        if (timeRaw < 10000000000) {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000);
-        } else {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(timeRaw);
-        }
-      } else {
-        try {
-          createdAt = DateTime.parse(timeRaw.toString());
-        } catch (_) {}
-      }
-    }
-
     return EchoCommentNode(
-      id: (m['id'] ?? '').toString(),
-      isMine: isMine,
+      id: m.id,
+      etag: m.etag,
+      isMine: m.isMine,
       userName: userName,
-      userAvatar: userAvatar,
-      content: (m['content'] ?? '').toString(),
-      createdAt: createdAt,
-      // 留言板（`ForumCommentItem`）沒有按讚欄位，likeCount 留預設 0。
-      replyCount: int.tryParse((m['replyCount'] ?? '0').toString()) ?? 0,
-      depth: depth,
-      parentId: (m['parentId'] ?? '').toString(),
-      rootId: (m['replyToId'] ?? '').toString(),
-      replyToUserName: parentName,
+      userAvatar: avatar,
+      content: m.body,
+      createdAt: m.createTime,
+      placeholderText: m.placeholderText,
+      authorName: m.authorName,
+      authorIsBuyer: m.authorIsBuyer,
+      viewerCanEdit: m.viewerCanEdit,
+      viewerCanDelete: m.viewerCanDelete,
+      viewerCanReply: m.viewerCanReply,
     );
   }
 
   /// 格式化時間顯示
-  String _formatEchoTimeAgo(DateTime dt) {
+  String _formatEchoTimeAgo(DateTime? dt) {
+    if (dt == null) return '';
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inHours < 24) {
@@ -222,7 +175,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     try {
       final list = await ref
           .read(postRepositoryProvider)
-          .listSellerMessages(widget.sellerId);
+          .listForumEntries(widget.sellerId);
       if (!mounted) return;
       setState(() {
         _echoMessages = list;
@@ -232,12 +185,8 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
         HKLog.logD('[EchoUI] _loadEchoMessages() loaded count=${list.length}');
       } catch (_) {}
       for (final m in list) {
-        final dynamic idRaw = m['id'];
-        final int? msgId = (idRaw is num)
-            ? idRaw.toInt()
-            : int.tryParse('${idRaw ?? ''}');
-        if (msgId != null && !_repliesLoading.contains(msgId)) {
-          Future.microtask(() => _loadRepliesForMessage(msgId));
+        if (m.replyCount > 0 && !_repliesLoading.contains(m.id)) {
+          Future.microtask(() => _loadRepliesForMessage(m.id));
         }
       }
     } catch (e) {
@@ -257,7 +206,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     }
   }
 
-  Future<void> _loadRepliesForMessage(int messageId) async {
+  Future<void> _loadRepliesForMessage(String messageId) async {
     if (_repliesLoading.contains(messageId)) return;
     _repliesLoading.add(messageId);
     try {
@@ -266,7 +215,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     try {
       final list = await ref
           .read(postRepositoryProvider)
-          .listMessageReplies(messageId);
+          .listForumEntries(widget.sellerId, parentId: messageId);
       if (!mounted) return;
       setState(() {
         _repliesByMessageId[messageId] = list;
@@ -507,7 +456,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     );
   }
 
-  /// 顯示他人留言的操作選單（目前只有檢舉；公開留言不帶留言者 id，封鎖入口隨第 2 刀的身分模型另行決定）
+  /// 顯示他人留言的操作選單（檢舉，與伺服器允許時的刪除、買家作者的封鎖）
   Future<void> _showEchoOtherUserMenu(
     BuildContext context,
     EchoCommentNode node,
@@ -535,6 +484,42 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
               ),
             ),
             SizedBox(height: 12.h),
+            if (node.viewerCanDelete)
+              ListTile(
+                leading: Icon(
+                  AppIcons.deleteOutline,
+                  color: AppIconColors.defaultColor,
+                  size: 22.sp,
+                ),
+                title: Text('刪除留言', style: TextStyle(fontSize: 16.sp)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _onEchoDeleteComment(node);
+                },
+              ),
+            if (canBlockAuthor(
+              canBlockBuyers: ref.read(canBlockBuyersProvider),
+              isMine: node.isMine,
+              viewerCanDelete: node.viewerCanDelete,
+              authorIsBuyer: node.authorIsBuyer,
+            ))
+              ListTile(
+                leading: Icon(
+                  AppIcons.blockOutlined,
+                  color: AppIconColors.defaultColor,
+                  size: 22.sp,
+                ),
+                title: Text('封鎖此人', style: TextStyle(fontSize: 16.sp)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  blockBuyerWithConfirm(
+                    context,
+                    ref,
+                    buyerName: node.authorName,
+                    forumEntryId: node.id,
+                  );
+                },
+              ),
             ListTile(
               leading: Icon(
                 AppIcons.reportOutlined,
@@ -544,10 +529,8 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
               title: Text('檢舉留言', style: TextStyle(fontSize: 16.sp)),
               onTap: () {
                 Navigator.pop(ctx);
-                // 本頁的留言來自 `/public/sellers/{id}/forum`
-                // （`listSellerMessages`），落在 `cms_seller_forum`——
-                // 所以是 SELLER_FORUM，不是 POST_COMMENT（那是貼文底下的留言，
-                // 打到 `cms_comment`）。曾送錯值，admin 端 owner 解析拿到 NULL。
+                // 本頁是店家討論區（`listForumEntries`）——所以是 SELLER_FORUM，
+                // 不是 POST_COMMENT（那是貼文底下的留言）。
                 showReportSheet(
                   context,
                   ref,
@@ -566,6 +549,20 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   /// 建構留言內容（不含頭像）
   Widget _buildEchoCommentContent(EchoCommentNode node, int depth) {
     final isSelf = node.isMine;
+    final placeholder = node.placeholderText;
+    if (placeholder != null) {
+      return Padding(
+        key: ValueKey('echo-placeholder-${node.id}'),
+        padding: EdgeInsets.only(bottom: 12.h),
+        child: Text(
+          placeholder,
+          style: TextStyle(
+            fontSize: 14.sp,
+            color: AppColors.textPrimary.withValues(alpha: 0.5),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h),
@@ -604,15 +601,13 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   ],
                 ),
               ),
-              // 更多按鈕：自己的留言可編輯／刪除；他人留言可檢舉（封鎖入口見上方選單的說明）
-              if (isSelf)
+              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言可檢舉，並依規則封鎖
+              if (isSelf && (node.viewerCanEdit || node.viewerCanDelete))
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
                     label: '留言更多操作',
                     icon: AppIcons.moreHoriz,
-                    loading: _deletingMessageIds.contains(
-                      int.tryParse(node.id),
-                    ),
+                    loading: _deletingMessageIds.contains(node.id),
                     loadingLabel: '正在刪除留言',
                     onPressed: _echoSubmitting
                         ? null
@@ -620,12 +615,16 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                             btnCtx,
                             editLabel: '編輯留言',
                             deleteLabel: '刪除留言',
-                            onEdit: () => _onEchoEditComment(node),
-                            onDelete: () => _onEchoDeleteComment(node),
+                            onEdit: node.viewerCanEdit
+                                ? () => _onEchoEditComment(node)
+                                : null,
+                            onDelete: node.viewerCanDelete
+                                ? () => _onEchoDeleteComment(node)
+                                : null,
                           ),
                   ),
                 )
-              else
+              else if (!isSelf)
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
                     label: '留言更多操作',
@@ -646,35 +645,36 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
             ),
           ),
           SizedBox(height: 4.h),
-          // 回覆按鈕
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _setEchoReplyTarget(node),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: HkControl.minTap,
-                minHeight: HkControl.minTap,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  HkIcon(
-                    HkIconName.chat,
-                    size: 24.sp,
-                    color: AppIconColors.defaultColor,
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    '回覆',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      color: AppColors.textPrimary,
+          // 回覆按鈕（依 viewer_can_reply）
+          if (node.viewerCanReply)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _setEchoReplyTarget(node),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: HkControl.minTap,
+                  minHeight: HkControl.minTap,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    HkIcon(
+                      HkIconName.chat,
+                      size: 24.sp,
+                      color: AppIconColors.defaultColor,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 6.w),
+                    Text(
+                      '回覆',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -682,6 +682,9 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
 
   /// 建構頭像
   Widget _buildEchoAvatar(EchoCommentNode node) {
+    if (node.placeholderText != null) {
+      return const CircleAvatar(radius: 15, backgroundColor: AppColors.gray100);
+    }
     // 如果是自己的留言，使用商家頭像
     final isSelf = node.isMine;
 
@@ -714,8 +717,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
 
   /// 回覆與編輯共用同一個輸入框，避免兩個 composer 重疊、焦點分離。
   void _setEchoReplyTarget(EchoCommentNode node) {
-    if (_echoSubmitting ||
-        _deletingMessageIds.contains(int.tryParse(node.id))) {
+    if (_echoSubmitting || _deletingMessageIds.contains(node.id)) {
       return;
     }
     setState(() {
@@ -729,8 +731,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   }
 
   void _onEchoEditComment(EchoCommentNode node) {
-    if (_echoSubmitting ||
-        _deletingMessageIds.contains(int.tryParse(node.id))) {
+    if (_echoSubmitting || _deletingMessageIds.contains(node.id)) {
       return;
     }
     setState(() {
@@ -759,31 +760,36 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     });
   }
 
-  /// 刪除留言
+  /// 確認後刪除發言。
   Future<void> _onEchoDeleteComment(EchoCommentNode node) async {
-    // 直接刪除，不顯示確認對話框
-    final msgId = int.tryParse(node.id);
-    if (_echoSubmitting ||
+    final msgId = node.id;
+    if (_echoSubmitting || !mounted || _deletingMessageIds.contains(msgId)) {
+      return;
+    }
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: '確定要刪除此留言嗎？',
+      message: '刪除後將無法復原。',
+      confirmText: '刪除',
+      confirmTextColor: AppColors.danger,
+    );
+    if (!confirmed ||
         !mounted ||
-        msgId == null ||
+        _echoSubmitting ||
         _deletingMessageIds.contains(msgId)) {
       return;
     }
     setState(() => _deletingMessageIds.add(msgId));
     try {
-      final done = await ref
+      await ref
           .read(postRepositoryProvider)
-          .deleteSellerMessage(msgId);
+          .deleteForumEntry(msgId, etag: node.etag);
       if (!mounted) return;
-      if (done) {
-        if (_editingNode?.id == node.id || _replyTargetNode?.id == node.id) {
-          _clearEchoComposer();
-        }
-        FloatingToast.success(context, '留言已刪除');
-        await _refreshEcho();
-      } else {
-        FloatingToast.error(context, '刪除失敗');
+      if (_editingNode?.id == node.id || _replyTargetNode?.id == node.id) {
+        _clearEchoComposer();
       }
+      FloatingToast.success(context, '留言已刪除');
+      await _refreshEcho();
     } catch (_) {
       if (mounted) FloatingToast.error(context, '刪除失敗');
     } finally {
@@ -942,24 +948,25 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     final target = _editingNode ?? _replyTargetNode;
     if (text.isEmpty || target == null) return;
     final isEditing = _editingNode != null;
-    final id = int.tryParse(target.id);
-    if (_deletingMessageIds.contains(id)) return;
-    if (id == null) {
-      FloatingToast.error(context, isEditing ? '更新失敗' : '回覆失敗');
-      return;
-    }
+    if (_deletingMessageIds.contains(target.id)) return;
 
     setState(() => _echoSubmitting = true);
     try {
       final repository = ref.read(postRepositoryProvider);
-      final ok = isEditing
-          ? await repository.updateSellerReply(replyId: id, content: text)
-          : await repository.replySellerMessage(id, text);
-      if (!mounted) return;
-      if (!ok) {
-        FloatingToast.error(context, isEditing ? '更新失敗' : '回覆失敗');
-        return;
+      if (isEditing) {
+        await repository.updateForumEntry(
+          target.id,
+          etag: target.etag,
+          body: text,
+        );
+      } else {
+        await repository.replyForumEntry(
+          widget.sellerId,
+          parentId: target.id,
+          body: text,
+        );
       }
+      if (!mounted) return;
       _clearEchoComposer();
       if (isEditing) FloatingToast.success(context, '已更新留言');
       await _refreshEcho();

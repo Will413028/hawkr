@@ -11,6 +11,7 @@ import {
 	socialImages,
 } from "@/lib/seo/metadata";
 import { sellerCanonicalUrl } from "@/lib/seo/urls";
+import { sellerMessagesText } from "./text";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
@@ -22,7 +23,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
 	const seller = await getCachedSeller(id);
 	const s = seller;
-	if (!s) return { title: "找不到賣家" };
+	const text = sellerMessagesText(locale);
+	if (!s) return { title: text.notFound() };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
 	// Middleware already 308s a store_id URL here, but the redirect and this tag
@@ -37,11 +39,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const pageLocale = localeFromParam(locale);
 	const canonical = sellerCanonicalUrl(s, id, pageLocale, "/messages");
 	return {
-		title: `${s.name} 的留言`,
+		title: text.title(s.name),
 		description: `查看 ${s.name} 的留言與顧客討論`,
 		alternates: { canonical },
 		openGraph: {
-			title: `${s.name} 的留言 | ${siteNameFor(pageLocale)}`,
+			title: `${text.title(s.name)} | ${siteNameFor(pageLocale)}`,
 			description: `查看 ${s.name} 的留言與顧客討論`,
 			url: canonical,
 			images: socialImages(socialImage),

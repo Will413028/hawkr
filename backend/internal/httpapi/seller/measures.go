@@ -6,6 +6,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"uuid"
 
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
@@ -44,11 +45,11 @@ func (h *App) ListMyMeasures(ctx context.Context, req *connect.Request[pb.ListMy
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, measurePaths)
 	}
-	l := uitext.LocaleFrom(ctx)
-	out := &pb.ListMyMeasuresResponse{Measures: make([]*pb.Measure, len(page.Items))}
-	for i, m := range page.Items {
-		out.Measures[i] = toMeasure(l, m)
+	measures, err := sellerMeasures(ctx, h.links, page.Items)
+	if err != nil {
+		return nil, err
 	}
+	out := &pb.ListMyMeasuresResponse{Measures: measures}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
@@ -68,7 +69,11 @@ func (h *App) GetMyMeasure(ctx context.Context, req *connect.Request[pb.GetMyMea
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.GetMyMeasureResponse{Measure: toMeasure(uitext.LocaleFrom(ctx), m)}), nil
+	measure, err := sellerMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.GetMyMeasureResponse{Measure: measure}), nil
 }
 
 func (h *App) SubmitAppeal(ctx context.Context, req *connect.Request[pb.SubmitAppealRequest]) (*connect.Response[pb.SubmitAppealResponse], error) {
@@ -90,7 +95,11 @@ func (h *App) SubmitAppeal(ctx context.Context, req *connect.Request[pb.SubmitAp
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, appealPaths)
 	}
-	return connect.NewResponse(&pb.SubmitAppealResponse{Measure: toMeasure(uitext.LocaleFrom(ctx), m)}), nil
+	measure, err := sellerMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.SubmitAppealResponse{Measure: measure}), nil
 }
 
 func (h *App) RequestRemediation(ctx context.Context, req *connect.Request[pb.RequestRemediationRequest]) (*connect.Response[pb.RequestRemediationResponse], error) {
@@ -112,7 +121,11 @@ func (h *App) RequestRemediation(ctx context.Context, req *connect.Request[pb.Re
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, appealPaths)
 	}
-	return connect.NewResponse(&pb.RequestRemediationResponse{Measure: toMeasure(uitext.LocaleFrom(ctx), m)}), nil
+	measure, err := sellerMeasure(ctx, h.links, m)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.RequestRemediationResponse{Measure: measure}), nil
 }
 
 // toRequest 轉成賣家看到的請求（r 是 Measure.EffectiveRequests 的結果，不是儲存值）：不輸出佐證與裁定的管理員。
@@ -152,7 +165,7 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 		})
 	}
 	for _, c := range m.Contents {
-		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+		out.Contents = append(out.Contents, toContentRef(c))
 	}
 	if m.Kind.Restrictive() {
 		out.Period = &pb.MeasurePeriod{StartTime: timestamppb.New(m.StartsAt)}
@@ -184,6 +197,25 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 	}
 	if d := m.RejectionCooldown(); d > 0 {
 		out.RejectionCooldown = durationpb.New(d)
+	}
+	return out
+}
+
+// toContentRef 把措施的一個內容對象轉成對外的 ContentRef：快照在時帶摘要（伺服器截斷）、發文時間與連結目標，否則只帶狀態。
+// 賣家與後台共用；後台另以 measure.content_bodies 取得全文。
+func toContentRef(c model.MeasureContent) *pb.ContentRef {
+	out := &pb.ContentRef{
+		Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), SnapshotState: rpc.EnumToProto[pb.ContentSnapshotState](c.State),
+	}
+	sn := c.Snapshot
+	if sn == nil {
+		return out
+	}
+	out.Excerpt, out.AuthoredTime = c.Excerpt, timestamppb.New(sn.AuthoredAt)
+	if sn.Link.PostID != uuid.Nil() {
+		out.Link = &pb.ContentRef_PostId{PostId: sn.Link.PostID.String()}
+	} else {
+		out.Link = &pb.ContentRef_ForumThread{ForumThread: &pb.ForumThreadLink{StoreId: rpc.FormatID(sn.Link.StoreID), ThreadId: sn.Link.ThreadID.String()}}
 	}
 	return out
 }

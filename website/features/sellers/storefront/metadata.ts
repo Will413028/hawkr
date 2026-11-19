@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCachedSeller } from "@/lib/api/cached";
+import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -20,7 +21,7 @@ export async function generateMetadata({
 	// Bare string, no brand: the root title.template appends it. Currently
 	// unreachable (a missing seller 404s before this renders) — kept correct so
 	// it stays correct if that ever changes.
-	if (!s) return { title: "找不到賣家" };
+	if (!s) return { title: sellerNotFoundTitle(rawLocale) };
 	const locale = localeFromParam(rawLocale);
 	const canonical = sellerCanonicalUrl(s, id, locale);
 	const socialImage = sellerSocialImage(s);
