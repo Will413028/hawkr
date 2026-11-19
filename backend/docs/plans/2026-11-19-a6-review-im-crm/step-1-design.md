@@ -118,7 +118,7 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 1. 輸入驗證：rating 1..5；content `trimtext.Trim` 後 ≤1000 rune（★RD2）；tokens ≤4；`price`、`sku_name`、`product_id` 不在輸入裡（★RD6，舊碼收 client 值）。
 2. `textfilter` 命中 → `MODERATION_REJECTED`（同舊碼，在查訂單之前）。
 3. `Orders.OrderForReview(orderNo)`：NotFound → `NotFound`；其他錯誤 → `Unavailable`（★RD9）。
-4. 狀態不是 `"50"` → `FailedPrecondition`（A6-D7 (a)）；買家不符 → `PermissionDenied`（順序同舊碼：先狀態後擁有者）。
+4. 買家不符 → `NotFound`（與訂單不存在同一個回應，不洩漏別人訂單的存在與狀態；★A6-D10）；狀態不是 `"50"` → `FailedPrecondition`（A6-D7 (a)）。
 5. 超過 `completed_at + 30 天` → `FailedPrecondition`（期限）。
 6. 項目不在訂單 → `InvalidArgument`；`product_id`、`sku_name`、`price`、`item_image_key` 全取訂單項目（★RD6）。
 7. transaction 外 `media.FinalizeList(tokens, RefTypeOrderReview)`。

@@ -201,6 +201,7 @@
 | A6-D7 | (a) 照舊；先評後退款仍計分，延後到 ordering 搬遷 | A6-1 |
 | A6-D8 | CRM 只顯示暱稱與訂單統計 | A6-3 |
 | A6-D9 | 刪帳改由 review、im 訂閱 buyer、seller 的刪除事件，不由 accountdeletion 直接呼叫（Will 2026-11-19，A6-1a 開工審查第 5 項） | A6-1c、A6-2a |
+| A6-D10 | 提交評價先檢查訂單擁有者，不是自己的訂單回 NotFound，不照舊碼先查狀態（Will 2026-11-19，A6-1b code-review 第 4 項） | A6-1b |
 
 ## 基線
 
