@@ -249,5 +249,13 @@
       "VIOLATION_SEVERITY_LOW": "低",
       "VIOLATION_SEVERITY_MEDIUM": "中"
     }
+  },
+  "social": {
+    "CommentState": {
+      "placeholder": {
+        "COMMENT_STATE_DELETED": "This comment was deleted",
+        "COMMENT_STATE_HIDDEN": "This comment was hidden"
+      }
+    }
   }
 }

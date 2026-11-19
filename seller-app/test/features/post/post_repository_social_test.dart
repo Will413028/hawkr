@@ -6,6 +6,7 @@ import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
@@ -344,8 +345,8 @@ void main() {
       expect(c.viewerCanReply, isTrue);
       expect(c.viewerCanEdit, isFalse);
       expect(c.etag, 'ce-5');
-      expect(c.placeholderText, isNull);
-      expect(list.last.placeholderText, '此留言已刪除');
+      expect(c.placeholderTextFor(UiLocale.zhTW), isNull);
+      expect(list.last.placeholderTextFor(UiLocale.zhTW), '此留言已刪除');
       // viewer_can_* 取伺服器的值：沒設的就是 false，不由 client 補。
       expect(list.last.viewerCanDelete, isFalse);
       expect(list.last.viewerCanReply, isFalse);

@@ -8,6 +8,8 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import '../../../../core/l10n/ui_locale.dart';
 import '../../../../core/networking/suspension_signal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -66,9 +68,6 @@ class _CommentNode {
   bool get isPlaceholder =>
       entry.state != pb.CommentState.COMMENT_STATE_VISIBLE;
 }
-
-const _deletedEntryText = '此留言已刪除';
-const _hiddenEntryText = '此留言已被隱藏';
 
 // ---------------------------------------------------------------------------
 // MerchantChatTab
@@ -785,7 +784,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
 ///
 /// 顯示：使用者名稱、發布時間、回覆對象（若有）、內文、回覆操作列（討論區沒有按讚）。
 /// 伺服器說可編輯或刪除時（[_hasMenu]）支援長壓或點 ⋯ 觸發選單。
-class _CommentCard extends StatelessWidget {
+class _CommentCard extends ConsumerWidget {
   const _CommentCard({
     required this.node,
     required this.onReply,
@@ -854,7 +853,7 @@ class _CommentCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onLongPressStart: _hasMenu && actionsEnabled
           ? (details) => _showActionMenu(
@@ -954,11 +953,8 @@ class _CommentCard extends StatelessWidget {
               ),
             // 留言內文
             Text(
-              switch (node.entry.state) {
-                pb.CommentState.COMMENT_STATE_DELETED => _deletedEntryText,
-                pb.CommentState.COMMENT_STATE_HIDDEN => _hiddenEntryText,
-                _ => node.content,
-              },
+              node.entry.state.placeholder(ref.watch(uiLocaleProvider)) ??
+                  node.content,
               style: node.isPlaceholder
                   ? AppTypography.body.copyWith(color: AppColors.textSecondary)
                   : AppTypography.body,

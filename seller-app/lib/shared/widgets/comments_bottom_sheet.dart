@@ -13,6 +13,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../features/post/data/post_comment.dart';
 import '../../features/post/data/post_repository.dart';
+import '../../core/l10n/ui_locale.dart';
 import '../utils/floating_toast.dart';
 import 'chat_bubble_icon.dart';
 import 'hk_button_label.dart';
@@ -534,7 +535,10 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                 return Column(
                                   children: [
                                     // Top-level comment
-                                    if (c.placeholderText case final text?)
+                                    if (c.placeholderTextFor(
+                                          ref.watch(uiLocaleProvider),
+                                        )
+                                        case final text?)
                                       _CommentPlaceholder(
                                         commentId: id,
                                         text: text,

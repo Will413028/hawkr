@@ -10,6 +10,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as h
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
 import '../hawkr_ui_text.dart' show UiLocale;
 
@@ -474,6 +475,21 @@ _ => null,
 extension SellerViolationSeverityUiText on hawkr_seller_v1alpha1_seller.ViolationSeverity {
   /// seller.ViolationSeverity 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _sellerViolationSeverity(l, value);
+}
+
+String? _socialCommentStatePlaceholder(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 2) => '此留言已刪除',
+(UiLocale.en, 2) => 'This comment was deleted',
+(UiLocale.zhTW, 3) => '此留言已被隱藏',
+(UiLocale.en, 3) => 'This comment was hidden',
+_ => null,
+};
+}
+
+extension SocialCommentStateUiText on hawkr_social_v1alpha1_social.CommentState {
+  /// social.CommentState.placeholder；沒有文字的值回 null。
+  String? placeholder(UiLocale l) => _socialCommentStatePlaceholder(l, value);
 }
 
 /// buyer.Profile.gender_unset

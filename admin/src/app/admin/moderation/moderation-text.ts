@@ -5,16 +5,20 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import {
-	ReportOutcome,
+	type ReportOutcome,
 	ReportTargetKind,
 } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
+import {
+	moderationReportOutcome,
+	moderationReportTargetKind,
+} from "@hawkr/ui-text/keys";
 import {
 	COMMUNITY_ASSESSABLE_CATEGORIES,
 	CONTENT_TAKEDOWN_CATEGORIES,
 } from "@/lib/policy-category";
-import { unknownText } from "@/lib/ui-text";
+import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-// 社群檢舉案件的名稱。這些列舉只有 admin 用，不在共用文案目錄裡，所以是 admin 的單端表（UNSPECIFIED 不在表裡）；
+// 社群檢舉案件的名稱。檢舉對象種類與檢舉結果取目錄的後台受眾文字；其餘列舉只有 admin 用，是 admin 的單端表（UNSPECIFIED 不在表裡）；
 // 不認得的值與 UNSPECIFIED 顯示「未知」。
 
 function textOf<E extends number>(
@@ -23,16 +27,6 @@ function textOf<E extends number>(
 ): string {
 	return table[value] ?? unknownText();
 }
-
-const TARGET_KIND_TEXT: Record<
-	Exclude<ReportTargetKind, ReportTargetKind.UNSPECIFIED>,
-	string
-> = {
-	[ReportTargetKind.POST]: "貼文",
-	[ReportTargetKind.COMMENT]: "留言",
-	[ReportTargetKind.FORUM_ENTRY]: "討論區留言",
-	[ReportTargetKind.BUYER]: "買家",
-};
 
 /** 篩選下拉的選項順序：enum 的順序，不含 UNSPECIFIED。 */
 export const TARGET_KIND_OPTIONS: readonly ReportTargetKind[] = [
@@ -43,7 +37,7 @@ export const TARGET_KIND_OPTIONS: readonly ReportTargetKind[] = [
 ];
 
 export function targetKindText(kind: ReportTargetKind): string {
-	return textOf(TARGET_KIND_TEXT, kind);
+	return staffTextOrUnknown(moderationReportTargetKind(kind));
 }
 
 const CASE_STATE_TEXT: Record<
@@ -88,17 +82,8 @@ export function caseActionText(action: CaseAction): string {
 	return textOf(ACTION_TEXT, action);
 }
 
-const OUTCOME_TEXT: Record<
-	Exclude<ReportOutcome, ReportOutcome.UNSPECIFIED>,
-	string
-> = {
-	[ReportOutcome.PENDING]: "處理中",
-	[ReportOutcome.VIOLATION]: "認定違規",
-	[ReportOutcome.NO_VIOLATION]: "認定不違規",
-};
-
 export function reportOutcomeText(outcome: ReportOutcome): string {
-	return textOf(OUTCOME_TEXT, outcome);
+	return staffTextOrUnknown(moderationReportOutcome(outcome));
 }
 
 /** 這種對象可以用的處置（與伺服器的 `Action.AllowedOn` 一致）；作者是買家或店家由伺服器向 social 核對。 */

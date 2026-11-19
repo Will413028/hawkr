@@ -6,6 +6,7 @@ import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -181,6 +182,8 @@ export type UiTextKey =
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_HIGH"
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_LOW"
 	| "seller.ViolationSeverity.VIOLATION_SEVERITY_MEDIUM"
+	| "social.CommentState.placeholder.COMMENT_STATE_DELETED"
+	| "social.CommentState.placeholder.COMMENT_STATE_HIDDEN"
 	;
 
 /** seller.MeasureKind 的值號到值名；ICU select 的分支用值名。 */
@@ -745,6 +748,18 @@ const SELLER_VIOLATION_SEVERITY: Readonly<Partial<Record<number, UiTextKey>>> = 
 /** seller.ViolationSeverity 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function sellerViolationSeverity(v: ViolationSeverity): UiMessage | undefined {
 	const key = SELLER_VIOLATION_SEVERITY[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SOCIAL_COMMENT_STATE_PLACEHOLDER: Readonly<Partial<Record<number, UiTextKey>>> = {
+	2: "social.CommentState.placeholder.COMMENT_STATE_DELETED",
+	3: "social.CommentState.placeholder.COMMENT_STATE_HIDDEN",
+};
+
+/** social.CommentState.placeholder；default 受眾沒有文字的值（omit）、UNSPECIFIED 與不認得的值回 undefined。 */
+export function socialCommentStatePlaceholder(v: CommentState): UiMessage | undefined {
+	const key = SOCIAL_COMMENT_STATE_PLACEHOLDER[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

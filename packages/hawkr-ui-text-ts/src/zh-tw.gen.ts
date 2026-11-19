@@ -212,9 +212,18 @@ return "生效中";
 	"seller.ViolationSeverity.VIOLATION_SEVERITY_MEDIUM": () => "中",
 	"seller.ViolationSeverity.VIOLATION_SEVERITY_HIGH": () => "高",
 	"seller.ViolationSeverity.VIOLATION_SEVERITY_CRITICAL": () => "嚴重",
+	"social.CommentState.placeholder.COMMENT_STATE_DELETED": () => "此留言已刪除",
+	"social.CommentState.placeholder.COMMENT_STATE_HIDDEN": () => "此留言已被隱藏",
 };
 
 const STAFF: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
+	"moderation.ReportOutcome.REPORT_OUTCOME_PENDING": () => "處理中",
+	"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": () => "認定違規",
+	"moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "認定不違規",
+	"moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": () => "貼文",
+	"moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": () => "留言",
+	"moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY": () => "討論區留言",
+	"moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": () => "買家",
 	"seller.KYCStatus.KYC_STATUS_DRAFT": () => "填寫中",
 	"seller.KYCStatus.KYC_STATUS_SUBMITTED": () => "待審核",
 	"seller.KYCStatus.KYC_STATUS_APPROVED": () => "已核准",

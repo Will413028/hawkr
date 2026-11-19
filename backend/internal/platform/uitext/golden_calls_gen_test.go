@@ -142,6 +142,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerTerminationGround(goldenEnum(c.Value, "TERMINATION_GROUND_"))
 	case "seller.ViolationSeverity":
 		return t.SellerViolationSeverity(goldenEnum(c.Value, "VIOLATION_SEVERITY_"))
+	case "social.CommentState.placeholder":
+		return t.SocialCommentStatePlaceholder(goldenEnum(c.Value, "COMMENT_STATE_"))
 	}
 	return "", false
 }

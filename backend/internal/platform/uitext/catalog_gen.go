@@ -169,6 +169,17 @@ func (t Text) CommonUnknown() string {
 // ModerationReportOutcome 是 moderation.ReportOutcome 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) ModerationReportOutcome(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "PENDING":
+			return "處理中", true
+		case "VIOLATION":
+			return "認定違規", true
+		case "NO_VIOLATION":
+			return "認定不違規", true
+		}
+		return "", false
+	}
 	if t.Locale() == EN {
 		switch v {
 		case "PENDING":
@@ -193,6 +204,19 @@ func (t Text) ModerationReportOutcome(v string) (string, bool) {
 // ModerationReportTargetKind 是 moderation.ReportTargetKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) ModerationReportTargetKind(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "POST":
+			return "貼文", true
+		case "COMMENT":
+			return "留言", true
+		case "FORUM_ENTRY":
+			return "討論區留言", true
+		case "BUYER":
+			return "買家", true
+		}
+		return "", false
+	}
 	if t.Locale() == EN {
 		switch v {
 		case "POST":
@@ -948,6 +972,26 @@ func (t Text) SellerViolationSeverity(v string) (string, bool) {
 		return "高", true
 	case "CRITICAL":
 		return "嚴重", true
+	}
+	return "", false
+}
+
+// SocialCommentStatePlaceholder 是 social.CommentState.placeholder 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SocialCommentStatePlaceholder(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "DELETED":
+			return "This comment was deleted", true
+		case "HIDDEN":
+			return "This comment was hidden", true
+		}
+	}
+	switch v {
+	case "DELETED":
+		return "此留言已刪除", true
+	case "HIDDEN":
+		return "此留言已被隱藏", true
 	}
 	return "", false
 }

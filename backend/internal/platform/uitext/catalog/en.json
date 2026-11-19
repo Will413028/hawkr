@@ -167,6 +167,12 @@
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_DELETED": {
+      "message": "This comment was deleted"
+    },
+    "social.CommentState.placeholder.COMMENT_STATE_HIDDEN": {
+      "message": "This comment was hidden"
     }
   }
 }

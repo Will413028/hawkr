@@ -10,6 +10,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../core/theme/hk_tokens.dart';
+import '../../../../core/l10n/ui_locale.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/utils/floating_toast.dart';
 import '../../../../config/media_image.dart';
@@ -127,7 +128,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       userAvatar: avatar,
       content: m.body,
       createdAt: m.createTime,
-      placeholderText: m.placeholderText,
+      placeholderText: m.placeholderTextFor(ref.read(uiLocaleProvider)),
       authorName: m.authorName,
       authorIsBuyer: m.authorIsBuyer,
       viewerCanEdit: m.viewerCanEdit,

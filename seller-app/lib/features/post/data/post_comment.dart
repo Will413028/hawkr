@@ -1,14 +1,12 @@
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart';
 import 'package:hawkr_api/images.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 /// 被刪除或被平台隱藏的頂層項目（底下還有可見回覆時才會出現）顯示的佔位文字；
 /// 其他狀態是 null（顯示內文）。
-String? commentPlaceholderText(CommentState state) => switch (state) {
-  CommentState.COMMENT_STATE_DELETED => '此留言已刪除',
-  CommentState.COMMENT_STATE_HIDDEN => '此留言已被隱藏',
-  _ => null,
-};
+String? commentPlaceholderText(CommentState state, UiLocale locale) =>
+    state.placeholder(locale);
 
 String _authorName(pb.Actor actor) => actor.hasName() ? actor.name.trim() : '';
 
@@ -80,7 +78,8 @@ class PostComment {
 
   bool get isVisible => state == CommentState.COMMENT_STATE_VISIBLE;
 
-  String? get placeholderText => commentPlaceholderText(state);
+  String? placeholderTextFor(UiLocale locale) =>
+      commentPlaceholderText(state, locale);
 
   PostComment withLiked(bool liked) {
     if (liked == viewerLiked) return this;
@@ -166,5 +165,6 @@ class StoreForumEntry {
 
   bool get isVisible => state == CommentState.COMMENT_STATE_VISIBLE;
 
-  String? get placeholderText => commentPlaceholderText(state);
+  String? placeholderTextFor(UiLocale locale) =>
+      commentPlaceholderText(state, locale);
 }

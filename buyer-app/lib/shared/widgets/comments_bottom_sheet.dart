@@ -10,8 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pb.dart' as pb;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../core/l10n/ui_locale.dart';
 import '../../core/networking/suspension_signal.dart';
 import '../../core/session/session_provider.dart';
 import '../../core/session/viewer_scope.dart';
@@ -35,8 +37,6 @@ import 'hk_frosted_icon_button.dart';
 import 'common_snackbar.dart';
 import 'truck_loading_overlay.dart';
 
-const _deletedCommentText = '此留言已刪除';
-const _hiddenCommentText = '此留言已被隱藏';
 const _anonymousName = '匿名用戶';
 
 /// 貼文的留言。打開與下拉時讀取，不即時推送。伺服器狀態在 [commentsProvider]，能不能留言與留言身分讀貼文實體
@@ -579,11 +579,8 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
   }
 
   /// 已刪除或被隱藏的項目（只在底下有可見回覆時出現）只顯示佔位文字，沒有作者與動作。
-  String? _placeholderText(pb.Comment comment) => switch (comment.state) {
-    pb.CommentState.COMMENT_STATE_DELETED => _deletedCommentText,
-    pb.CommentState.COMMENT_STATE_HIDDEN => _hiddenCommentText,
-    _ => null,
-  };
+  String? _placeholderText(pb.Comment comment) =>
+      comment.state.placeholder(ref.watch(uiLocaleProvider));
 
   Widget _buildComment(pb.Comment comment, CommentsState comments) {
     final String commentId = comment.id;

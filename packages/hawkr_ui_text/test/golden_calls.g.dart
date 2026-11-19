@@ -10,10 +10,15 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as h
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
+import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 const _enumNumber = <String, int>{
-  'CONTENT_KIND_COMMENT': 2,
+  'COMMENT_STATE_DELETED': 2,
+	'COMMENT_STATE_HIDDEN': 3,
+	'COMMENT_STATE_UNSPECIFIED': 0,
+	'COMMENT_STATE_VISIBLE': 1,
+	'CONTENT_KIND_COMMENT': 2,
 	'CONTENT_KIND_FORUM_ENTRY': 3,
 	'CONTENT_KIND_POST': 1,
 	'CONTENT_KIND_UNSPECIFIED': 0,
@@ -285,6 +290,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_seller_v1alpha1_seller.TerminationGround.valueOf(_n(value))!.uiText(l);
     case 'seller.ViolationSeverity':
       return hawkr_seller_v1alpha1_seller.ViolationSeverity.valueOf(_n(value))!.uiText(l);
+    case 'social.CommentState.placeholder':
+      return hawkr_social_v1alpha1_social.CommentState.valueOf(_n(value))!.placeholder(l);
   }
   throw ArgumentError('unknown golden fn $fn');
 }

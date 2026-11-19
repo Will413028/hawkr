@@ -1938,7 +1938,7 @@ class _CommentRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final name = comment.authorName.isEmpty ? '匿名' : comment.authorName;
     final leftPad = isReply ? 46.w : 10.w;
-    final placeholder = comment.placeholderText;
+    final placeholder = comment.placeholderTextFor(ref.watch(uiLocaleProvider));
     if (placeholder != null) {
       return Padding(
         key: ValueKey('seller-post-comment-placeholder-${comment.id}'),
