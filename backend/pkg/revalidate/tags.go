@@ -27,7 +27,7 @@ func PostTag(postID int64) string {
 // `^(?:product|seller|post|category|hashtag):[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`
 // (hawkr-website/lib/api/revalidate-request.ts), and a hashtag's canonical
 // name keeps CJK and full-width characters verbatim
-// (social-service/internal/domain/hashtag/normalizer.go Normalize). A name-keyed
+// (internal/modules/social/internal/hashtag Normalize). A name-keyed
 // tag would therefore fail validation for any Chinese hashtag — and the endpoint
 // rejects the *whole* request on one invalid tag, so it would also silently drop
 // the post:<id> tags travelling in the same POST. The id is always ASCII digits.

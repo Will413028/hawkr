@@ -28,14 +28,15 @@ func TestTrendingHashtagsRejectsWindowsAboveTheMaximum(t *testing.T) {
 	}
 }
 
-func TestFirstMeasurePerPostKeepsTheFirstRowInOrder(t *testing.T) {
+func TestMarkTakedownsKeepsTheNewestMeasureOfAPost(t *testing.T) {
 	t.Parallel()
 	p1, p2 := uuid.MustParse("01990000-0000-7000-8000-0000000000a1"), uuid.MustParse("01990000-0000-7000-8000-0000000000a2")
-	m1, m2, m3 := uuid.MustParse("01990000-0000-7000-8000-0000000000c1"), uuid.MustParse("01990000-0000-7000-8000-0000000000c2"), uuid.MustParse("01990000-0000-7000-8000-0000000000c3")
+	older, newer, other := uuid.MustParse("01990000-0000-7000-8000-0000000000c1"), uuid.MustParse("01990000-0000-7000-8000-0000000000c2"), uuid.MustParse("01990000-0000-7000-8000-0000000000c3")
+	// 較新的措施排在後面：結果不依賴列的順序。
 	got := firstMeasurePerPost([]store.TakedownMeasuresOfPostsRow{
-		{PostID: &p1, MeasureID: m1}, {PostID: &p1, MeasureID: m2}, {PostID: &p2, MeasureID: m3},
+		{PostID: &p1, MeasureID: older}, {PostID: &p1, MeasureID: newer}, {PostID: &p2, MeasureID: other},
 	})
-	if len(got) != 2 || got[p1] != m1 || got[p2] != m3 {
-		t.Fatalf("got %v, want first measure per post", got)
+	if len(got) != 2 || got[p1] != newer || got[p2] != other {
+		t.Fatalf("got %v, want newest measure per post", got)
 	}
 }

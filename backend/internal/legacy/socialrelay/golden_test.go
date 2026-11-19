@@ -35,19 +35,42 @@ func goldenKeys(t *testing.T, eventType, routingKey string) []string {
 	return entry.EmittedKeys
 }
 
+func socialServiceGoldenEntries(t *testing.T) []string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "contract", "golden", "event_payload_keys.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden map[string]struct {
+		Publisher string `json:"publisher"`
+	}
+	if err := json.Unmarshal(b, &golden); err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for name, e := range golden {
+		if e.Publisher == "social-service" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // 每個由 relay 送出的 golden event_type 都對著 relay 真正發出的 payload 比對：golden 宣稱的 key 必須都在。
 func TestGoldenEmittedKeysAreSubsetOfRelayedPayload(t *testing.T) {
 	storeActor := social.Actor{Kind: social.ActorStore, ID: 91}
 	buyerActor := social.Actor{Kind: social.ActorBuyer, ID: 301}
-	repliedBy := func(w *Worker, fc *fakeComments, _ *fakeBuyers, _ *fakeStores) []map[string]any {
-		fc.c = social.Comment{
-			ID: commentID, PostID: postID, ParentID: &parentID, ReplyToID: &replyToID, Actor: storeActor,
-			Body: "店家回覆", CreatedAt: createdAt, UpdatedAt: createdAt,
+	repliedBy := func(actor, replyTo social.Actor) func(*Worker, *fakeComments, *fakeBuyers, *fakeStores) []map[string]any {
+		return func(w *Worker, fc *fakeComments, _ *fakeBuyers, _ *fakeStores) []map[string]any {
+			fc.c = social.Comment{
+				ID: commentID, PostID: postID, ParentID: &parentID, ReplyToID: &replyToID, Actor: actor,
+				Body: "回覆", CreatedAt: createdAt, UpdatedAt: createdAt,
+			}
+			return payloads(t, run(t, w, OnCommentReplied, social.CommentReplied{
+				EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID,
+				Actor: actor, ReplyToActor: replyTo, Preview: "回覆預覽",
+			}))
 		}
-		return payloads(t, run(t, w, OnCommentReplied, social.CommentReplied{
-			EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, ParentID: parentID, ReplyToID: replyToID,
-			Actor: storeActor, ReplyToActor: buyerActor, Preview: "回覆預覽",
-		}))
 	}
 	created := func(w *Worker, _ *fakeComments, b *fakeBuyers, s *fakeStores) []map[string]any {
 		return payloads(t, run(t, w, OnCommentCreated, social.CommentCreated{
@@ -65,8 +88,8 @@ func TestGoldenEmittedKeysAreSubsetOfRelayedPayload(t *testing.T) {
 				EventID: eventID, OccurredAt: occurredAt, CommentID: commentID, PostID: postID, StoreID: 91, Actor: storeActor, Author: buyerActor,
 			}))
 		}},
-		{"comment.replied.buyer", "comment.replied", repliedBy},
-		{"comment.replied.seller", "comment.replied", repliedBy},
+		{"comment.replied.buyer", "comment.replied", repliedBy(storeActor, buyerActor)},
+		{"comment.replied.seller", "comment.replied", repliedBy(buyerActor, storeActor)},
 		{"post.created", "post.created", func(w *Worker, _ *fakeComments, b *fakeBuyers, s *fakeStores) []map[string]any {
 			b.pages[0] = buyer.Page{Items: []buyer.Item{{ID: 301}}}
 			return payloads(t, run(t, w, OnPostPublished, social.PostPublished{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91, Preview: "預覽"}))
@@ -78,6 +101,15 @@ func TestGoldenEmittedKeysAreSubsetOfRelayedPayload(t *testing.T) {
 		{"post.liked", "post.liked", func(w *Worker, _ *fakeComments, b *fakeBuyers, s *fakeStores) []map[string]any {
 			return payloads(t, run(t, w, OnPostLiked, social.PostLiked{EventID: eventID, OccurredAt: occurredAt, PostID: postID, StoreID: 91, BuyerID: 301}))
 		}},
+	}
+	covered := map[string]bool{}
+	for _, tc := range cases {
+		covered[tc.golden] = true
+	}
+	for _, name := range socialServiceGoldenEntries(t) {
+		if !covered[name] {
+			t.Errorf("golden 的 social-service 項目 %q 沒有對應的 relay 案例", name)
+		}
 	}
 	for _, tc := range cases {
 		t.Run(tc.golden, func(t *testing.T) {

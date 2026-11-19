@@ -59,8 +59,6 @@ const (
 	RoutingKeyPostHiddenByPlatform = "post.hidden_by_platform"
 	RoutingKeyCommentCreated       = "comment.created"
 	RoutingKeyCommentReplied       = "comment.replied"
-	RoutingKeyCommentUpdated       = "comment.updated"
-	RoutingKeyCommentDeleted       = "comment.deleted"
 	RoutingKeyCommentLikeChanged   = "comment.like_changed"
 	RoutingKeyProductViewed        = "product.viewed"
 

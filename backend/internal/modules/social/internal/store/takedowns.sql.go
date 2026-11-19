@@ -400,7 +400,7 @@ func (q *Queries) TakedownForumStores(ctx context.Context, ids []uuid.UUID) ([]i
 const takedownMeasuresOfPosts = `-- name: TakedownMeasuresOfPosts :many
 SELECT post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY($1::uuid[])
-ORDER BY post_id, measure_id
+ORDER BY post_id, measure_id DESC
 `
 
 type TakedownMeasuresOfPostsRow struct {
@@ -408,7 +408,7 @@ type TakedownMeasuresOfPostsRow struct {
 	MeasureID uuid.UUID
 }
 
-// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），所以一篇貼文至多一列；仍以 post_id、measure_id 排序，讓複本異常時結果確定。
+// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），所以一篇貼文至多一列；對帳補漏與撤銷的競爭可能讓撤銷過的舊措施殘留一列，此時以 measure_id 由大到小排序（措施 ID 是 UUIDv7，最新的最大），讓最新的措施排第一，結果確定。
 func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
 	if err != nil {

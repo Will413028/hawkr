@@ -1,6 +1,7 @@
 package post
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -128,11 +129,11 @@ func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	return nil
 }
 
-// firstMeasurePerPost 依列的順序（SQL 以 post_id、measure_id 排序）每篇貼文留第一個措施，同一篇出現多列時結果是確定的。
+// firstMeasurePerPost 每篇貼文留 measure_id 最大的措施（措施 ID 是 UUIDv7，最大的最新），與列的順序無關；同一篇出現多列只會發生在撤銷過的舊措施殘留時。
 func firstMeasurePerPost(rows []store.TakedownMeasuresOfPostsRow) map[uuid.UUID]uuid.UUID {
 	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
 	for _, r := range rows {
-		if _, seen := byPost[*r.PostID]; !seen {
+		if cur, seen := byPost[*r.PostID]; !seen || bytes.Compare(r.MeasureID[:], cur[:]) > 0 {
 			byPost[*r.PostID] = r.MeasureID
 		}
 	}
