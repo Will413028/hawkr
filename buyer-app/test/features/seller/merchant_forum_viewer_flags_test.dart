@@ -22,9 +22,11 @@ import '../social/social_fakes.dart';
 FakeSocialPublic _forum({bool canComment = true}) => FakeSocialPublic(
   forumViewerCanComment: canComment,
   forumEntries: [
-    fakeForumEntry('c-1', body: '可編輯與刪除的留言', canEdit: true, canDelete: true),
+    fakeForumEntry('c-1', body: '可編輯與刪除的留言', canEdit: true, canDelete: true)
+      ..isMine = true,
     fakeForumEntry('c-2', body: '只能回覆的留言', canReply: true),
     fakeForumEntry('c-3', body: '什麼都不能做的留言'),
+    fakeForumEntry('c-4', body: '店主可刪除的別人留言', canDelete: true),
   ],
 );
 
@@ -101,13 +103,44 @@ void main() {
   testWidgets('編輯與刪除選單只看 viewer_can_edit、viewer_can_delete', (tester) async {
     await _pump(tester, _forum());
 
-    // 只有 c-1 顯示編輯與刪除的 ⋯ 選單；別人的留言另有檢舉與封鎖的 ⋯（c-2、c-3）。
-    expect(find.byTooltip('更多留言操作'), findsOneWidget);
-    expect(find.byTooltip('檢舉或封鎖'), findsNWidgets(3));
-    await tester.tap(find.byTooltip('更多留言操作'));
+    // 自己的 c-1 是編輯與刪除的 ⋯ 選單；別人的 c-2、c-3 只有檢舉與封鎖的 ⋯；
+    // 別人的 c-4 店主能刪，刪除與檢舉、封鎖合成同一個 ⋯（沒有第二顆）。
+    expect(find.byTooltip('更多留言操作'), findsNWidgets(2));
+    expect(find.byTooltip('檢舉或封鎖'), findsNWidgets(2));
+    await tester.tap(find.byTooltip('更多留言操作').first);
     await tester.pumpAndSettle();
     expect(find.text('編輯留言'), findsOneWidget);
     expect(find.text('刪除留言'), findsOneWidget);
+  });
+
+  testWidgets('店主看別人的留言：合成同一個 ⋯，選單有刪除、檢舉、封鎖此人', (tester) async {
+    final app = FakeSocialApp();
+    await _pump(tester, _forum(), app: app);
+
+    await tester.tap(find.byTooltip('更多留言操作').last);
+    await tester.pumpAndSettle();
+    expect(find.text('刪除'), findsOneWidget);
+    expect(find.text('檢舉'), findsOneWidget);
+    expect(find.text('封鎖此人'), findsOneWidget);
+
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+    expect(find.text('確定要刪除這則留言嗎？'), findsOneWidget);
+    await tester.tap(find.text('刪除').last);
+    await tester.pumpAndSettle();
+    expect(app.forumDeleted.single.entryId, 'c-4');
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('不能刪的別人留言：選單只有檢舉與封鎖此人', (tester) async {
+    await _pump(tester, _forum());
+
+    await tester.tap(find.byTooltip('檢舉或封鎖').first);
+    await tester.pumpAndSettle();
+    expect(find.text('刪除'), findsNothing);
+    expect(find.text('檢舉'), findsOneWidget);
+    expect(find.text('封鎖此人'), findsOneWidget);
   });
 
   testWidgets('回覆入口只看 viewer_can_reply', (tester) async {
@@ -243,7 +276,7 @@ void main() {
     final app = FakeSocialApp();
     await _pump(tester, _forum(), app: app);
 
-    await tester.tap(find.byTooltip('更多留言操作'));
+    await tester.tap(find.byTooltip('更多留言操作').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('編輯留言'));
     await tester.pumpAndSettle();
@@ -268,7 +301,7 @@ void main() {
     final app = FakeSocialApp();
     await _pump(tester, _forum(), app: app);
 
-    await tester.tap(find.byTooltip('更多留言操作'));
+    await tester.tap(find.byTooltip('更多留言操作').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('刪除留言'));
     await tester.pumpAndSettle();
@@ -276,7 +309,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(app.forumDeleted, isEmpty);
 
-    await tester.tap(find.byTooltip('更多留言操作'));
+    await tester.tap(find.byTooltip('更多留言操作').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('刪除留言'));
     await tester.pumpAndSettle();

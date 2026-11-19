@@ -9,7 +9,7 @@ import '../data/report_target.dart';
 import 'block_confirm_dialog.dart';
 import 'report_sheet.dart';
 
-enum _SheetAction { report, block }
+enum _SheetAction { delete, report, block }
 
 /// 「⋯」共用觸發選單（bottom sheet + ListTile pattern，對齊聊天室既有的
 /// `showBuyerMessageContextMenu` 風格）。點「檢舉」開 [showReportSheet]，
@@ -17,12 +17,16 @@ enum _SheetAction { report, block }
 ///
 /// [blockTarget] 為 null 時不顯示封鎖選項（例如自己的內容、尚未取得對象）。
 /// 回傳 true 表示這次已成功封鎖，呼叫端據此重讀受影響的社群狀態。
+///
+/// 給了 [onDelete]（觀看者能刪這則別人的內容，例如店主刪討論區留言）時選單第一項是「刪除」，
+/// 選了之後呼叫它；刪除不算封鎖，回傳 false。
 Future<bool> showReportBlockActionSheet(
   BuildContext context, {
   required ReportTarget reportTarget,
   BlockTarget? blockTarget,
   String? blockUserLabel,
   String blockActionLabel = '封鎖此使用者',
+  VoidCallback? onDelete,
 }) async {
   final action = await showModalBottomSheet<_SheetAction>(
     context: context,
@@ -45,6 +49,16 @@ Future<bool> showReportBlockActionSheet(
             ),
           ),
           SizedBox(height: 12.h),
+          if (onDelete != null)
+            ListTile(
+              leading: Icon(
+                AppIcons.deleteOutline,
+                color: AppIconColors.danger,
+                size: 22.sp,
+              ),
+              title: Text('刪除', style: TextStyle(fontSize: 16)),
+              onTap: () => Navigator.pop(ctx, _SheetAction.delete),
+            ),
           ListTile(
             leading: Icon(
               AppIcons.reportOutlined,
@@ -73,6 +87,9 @@ Future<bool> showReportBlockActionSheet(
   );
   if (action == null || !context.mounted) return false;
   switch (action) {
+    case _SheetAction.delete:
+      onDelete?.call();
+      return false;
     case _SheetAction.report:
       await showReportSheet(context, target: reportTarget);
       return false;

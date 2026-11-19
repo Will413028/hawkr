@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -227,6 +229,9 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       blockTarget: blockTargetForForumEntry(node.entry),
       blockUserLabel: node.userName,
       blockActionLabel: '封鎖此人',
+      onDelete: node.entry.viewerCanDelete
+          ? () => unawaited(_onDeleteComment(node))
+          : null,
     );
     if (!blocked) return;
     if (mounted) await _reload();
@@ -802,9 +807,13 @@ class _CommentCard extends StatelessWidget {
   /// 別人的、還在顯示的留言才有檢舉與封鎖入口。
   bool get _canReportOrBlock => !node.isPlaceholder && !node.entry.isMine;
 
-  /// 有任何一個選單動作可做：只讀伺服器的 `viewer_can_edit`、`viewer_can_delete`。
+  /// 別人的留言而觀看者能刪（店主）：刪除併進檢舉與封鎖的同一個 ⋯，不另給第二顆。
+  bool get _mergedMenu => _canReportOrBlock && node.entry.viewerCanDelete;
+
+  /// 自己的留言有編輯或刪除可做：只讀伺服器的 `viewer_can_edit`、`viewer_can_delete`。
   bool get _hasMenu =>
       !node.isPlaceholder &&
+      !_mergedMenu &&
       (node.entry.viewerCanEdit || node.entry.viewerCanDelete);
 
   Future<void> _showActionMenu(
@@ -884,7 +893,7 @@ class _CommentCard extends StatelessWidget {
                 if (_canReportOrBlock) ...[
                   SizedBox(width: 8.w),
                   HkFrostedIconButton(
-                    label: '檢舉或封鎖',
+                    label: _mergedMenu ? '更多留言操作' : '檢舉或封鎖',
                     icon: AppIcons.moreHoriz,
                     onPressed: !actionsEnabled
                         ? null
