@@ -35,10 +35,11 @@ test("預告橫幅與停權橫幅共用 WarningNotice", () => {
 	}
 });
 
-test("兩個 transport 都掛 accountSuspendedInterceptor", () => {
+test("authedTransport 掛 suspensionInterceptor，公開與可選登入的 transport 不掛", () => {
 	const src = readFileSync(
 		new URL("../lib/connect/transport.ts", import.meta.url),
 		"utf8",
 	);
-	assert.equal(src.split("accountSuspendedInterceptor(),").length - 1, 2);
+	assert.equal(src.split("suspensionInterceptor(),").length - 1, 1);
+	assert.doesNotMatch(src, /accountSuspendedInterceptor/);
 });

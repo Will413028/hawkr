@@ -38,7 +38,6 @@ import { activeLocale, setActiveLocale } from "@/lib/intl/active-locale";
 import {
 	__resetConnectReportDedupForTest,
 	acceptLanguageInterceptor,
-	accountSuspendedInterceptor,
 	authExpiredInterceptor,
 	authedTransport,
 	browserTransport,
@@ -49,7 +48,7 @@ import {
 	publicTransport,
 	reportInterceptor,
 	SUPPRESS_AUTH_EXPIRED,
-	sellerSuspendedInterceptor,
+	suspensionInterceptor,
 	vendorPortalTransport,
 } from "../transport";
 
@@ -316,7 +315,7 @@ describe("authExpiredInterceptor", () => {
 	});
 });
 
-describe("sellerSuspendedInterceptor", () => {
+describe("suspensionInterceptor: SELLER_SUSPENDED", () => {
 	function denied(reason: string, domain = "hawkr") {
 		return new ConnectError("suspended", Code.PermissionDenied, undefined, [
 			{ desc: ErrorInfoSchema, value: { reason, domain } },
@@ -351,7 +350,7 @@ describe("sellerSuspendedInterceptor", () => {
 	it("AppService 回 SELLER_SUSPENDED：廣播一次，錯誤原樣丟出", async () => {
 		const emit = vi.fn();
 		const err = denied("SELLER_SUSPENDED");
-		const { app } = services(err, [sellerSuspendedInterceptor(emit)]);
+		const { app } = services(err, [suspensionInterceptor(emit)]);
 		await expect(app.getSession({})).rejects.toMatchObject({
 			code: Code.PermissionDenied,
 			rawMessage: "suspended",
@@ -370,7 +369,7 @@ describe("sellerSuspendedInterceptor", () => {
 			new ConnectError("nope", Code.PermissionDenied),
 		]) {
 			const emit = vi.fn();
-			const { app } = services(err, [sellerSuspendedInterceptor(emit)]);
+			const { app } = services(err, [suspensionInterceptor(emit)]);
 			await expect(app.getSession({})).rejects.toBeInstanceOf(ConnectError);
 			expect(emit).not.toHaveBeenCalled();
 		}
@@ -379,14 +378,14 @@ describe("sellerSuspendedInterceptor", () => {
 	it("公開的 service 不廣播", async () => {
 		const emit = vi.fn();
 		const { pub } = services(denied("SELLER_SUSPENDED"), [
-			sellerSuspendedInterceptor(emit),
+			suspensionInterceptor(emit),
 		]);
 		await expect(pub.listLiveBanners({})).rejects.toBeInstanceOf(ConnectError);
 		expect(emit).not.toHaveBeenCalled();
 	});
 });
 
-describe("accountSuspendedInterceptor", () => {
+describe("suspensionInterceptor: ACCOUNT_SUSPENDED", () => {
 	function denied(reason: string, domain = "hawkr") {
 		return new ConnectError("suspended", Code.PermissionDenied, undefined, [
 			{ desc: ErrorInfoSchema, value: { reason, domain } },
@@ -427,7 +426,7 @@ describe("accountSuspendedInterceptor", () => {
 	it("a user-initiated call gets ACCOUNT_SUSPENDED: broadcast once, error thrown unchanged", async () => {
 		const emit = vi.fn();
 		const { identity } = clients(denied("ACCOUNT_SUSPENDED"), [
-			accountSuspendedInterceptor(emit),
+			suspensionInterceptor(undefined, emit),
 		]);
 		await expect(identity.getSession({})).rejects.toMatchObject({
 			code: Code.PermissionDenied,
@@ -440,26 +439,47 @@ describe("accountSuspendedInterceptor", () => {
 		});
 	});
 
-	it("background writes (RecordPostView, RecordVisit) are skipped silently", async () => {
+	it("the background write RecordVisit is skipped silently", async () => {
 		const emit = vi.fn();
-		const { social, buyer } = clients(denied("ACCOUNT_SUSPENDED"), [
-			accountSuspendedInterceptor(emit),
+		const { buyer } = clients(denied("ACCOUNT_SUSPENDED"), [
+			suspensionInterceptor(undefined, emit),
 		]);
-		await expect(social.recordPostView({ postId: "1" })).rejects.toBeInstanceOf(
-			ConnectError,
-		);
 		await expect(buyer.recordVisit({ productId: "1" })).rejects.toBeInstanceOf(
 			ConnectError,
 		);
 		expect(emit).not.toHaveBeenCalled();
 	});
 
-	it("a background write that fails for another reason behaves as before", async () => {
+	it("a public service never broadcasts (it runs as guest)", async () => {
 		const emit = vi.fn();
-		const { social } = clients(denied("VERSION_CONFLICT"), [
-			accountSuspendedInterceptor(emit),
+		const { social } = clients(denied("ACCOUNT_SUSPENDED"), [
+			suspensionInterceptor(undefined, emit),
 		]);
 		await expect(social.recordPostView({ postId: "1" })).rejects.toBeInstanceOf(
+			ConnectError,
+		);
+		expect(emit).not.toHaveBeenCalled();
+	});
+
+	it("each reason goes to its own emitter, once", async () => {
+		const emitSeller = vi.fn();
+		const emitAccount = vi.fn();
+		const a = clients(denied("ACCOUNT_SUSPENDED"), [
+			suspensionInterceptor(emitSeller, emitAccount),
+		]);
+		await expect(a.identity.getSession({})).rejects.toBeInstanceOf(
+			ConnectError,
+		);
+		expect(emitAccount).toHaveBeenCalledTimes(1);
+		expect(emitSeller).not.toHaveBeenCalled();
+	});
+
+	it("a background write that fails for another reason behaves as before", async () => {
+		const emit = vi.fn();
+		const { buyer } = clients(denied("VERSION_CONFLICT"), [
+			suspensionInterceptor(undefined, emit),
+		]);
+		await expect(buyer.recordVisit({ productId: "1" })).rejects.toBeInstanceOf(
 			ConnectError,
 		);
 		expect(emit).not.toHaveBeenCalled();
@@ -472,7 +492,7 @@ describe("accountSuspendedInterceptor", () => {
 			new ConnectError("nope", Code.PermissionDenied),
 		]) {
 			const emit = vi.fn();
-			const { identity } = clients(err, [accountSuspendedInterceptor(emit)]);
+			const { identity } = clients(err, [suspensionInterceptor(undefined, emit)]);
 			await expect(identity.getSession({})).rejects.toBeInstanceOf(
 				ConnectError,
 			);
