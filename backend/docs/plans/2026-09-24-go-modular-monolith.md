@@ -208,7 +208,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 封鎖（A7-D2 留下）：聊天與評價的封鎖、檢舉入口改用對話或評價的參照，im、review 以 in-process 呼叫 buyer、seller 的「是否封鎖」模組 API（A7-1b 建好，A7 不做 legacy gRPC）；moderation 加聊天與評價對象（快照、隱藏與還原 in-process）；CRM「黑名單」併入店家封鎖，分頁改名「封鎖名單」或拿掉；店家封鎖後訂單相關聯絡是否例外在這裡設計。完成時刪 `pkg/blocklist`、`pkg/moderation`。
   - A6 自己的橋（不是 S3 造成的）：review relay（給 Java order、product 與 notification）、crm 的 `order.completed`／`aftersales.refund.completed` consumer、coupon legacy client、orderservice 補 3 支方法；刪 legacy `reviewservice`、`crmservice` client（決定簡報 §1.2）。
   - IM 的即時通道依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 決定：預設是 server streaming 收訊息、unary 送出；需要瀏覽器上的雙向即時而保留 WebSocket 時，明列為第二套契約。扇出和 A7 拿掉的留言即時推一起設計（A7-D10）。
-- [ ] **A7 social**（2026-10-17 提前，排在 A6 之前；原本排在 A6 之後只是計畫分段）：步驟、決定與進度都在階段計畫 `2026-10-18-a7-social.md`，本段只記結論。決定：A7-D1 到 A7-D5′ 見 `2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（Will 2026-10-17）；A7-D6 到 A7-D13、S1、S3、Q1–Q6 見 `2026-10-18-a7-social/decision-brief.md`（Will 2026-10-18）。規模：社群 REST 40 條（brief 口徑 42 含 2 條商品 hashtag）加代行貼文 6 條、RPC 34 支、表 10 張、事件 14 列；約 15.5 session【推】。
+- [x] **A7 social**（2026-10-17 提前，排在 A6 之前；原本排在 A6 之後只是計畫分段）：步驟、決定與進度都在階段計畫 `2026-10-18-a7-social.md`，本段只記結論。決定：A7-D1 到 A7-D5′ 見 `2026-09-29-a3-buyer-seller/step10d-a7-social-brief.md`（Will 2026-10-17）；A7-D6 到 A7-D13、S1、S3、Q1–Q6 見 `2026-10-18-a7-social/decision-brief.md`（Will 2026-10-18）。規模：社群 REST 40 條（brief 口徑 42 含 2 條商品 hashtag）加代行貼文 6 條、RPC 34 支、表 10 張、事件 14 列；約 15.5 session【推】。
   - 新模組 social 與 moderation；封鎖在 buyer（個人）與 seller（店家）；店家內容被平台下架是 seller 的新措施種類「內容下架」；處分紀錄歸執行效果的模組（買家的社群處分在 social）；後台待辦加 moderation 的 `pub_*` 來源。
   - 排程發布歸 social；delegation 撤銷 session 時在同一個 transaction 取消，並以同步訂閱者寫稽核（A7-D6 選 D）。代行貼文 6 條路由在 A7 改走單體 Connect（S1），legacy SocialService 不寫，`api/proto/social`、`pkg/proto/social` 在 A7 收尾刪除。
   - 留言不即時推（A7-D10 不做），gateway 的留言 SSE 刪除；瀏覽數含匿名（每日換 salt 的雜湊去重）；計數同 transaction。
@@ -216,6 +216,31 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 讚與留言的互動者身分：照 ADR `2026-10-17-social-actor-identity.md`（M1 (kind, id)、S2、I3）；`actor_id` 隨 buyer、store 換 uuid 時換型別。
   - content 的 banner 點擊行為（`post`）改成經 social 的公開 API 確認貼文存在，ID 格式同時換成 UUID：依賴表的 content 加上 social，並更新 ADR D2 的表（content 模組 `CARRYOVER.md` 的沿用盤點；現在只檢查非空）。
   - 賣家中心的動態數徽章改由伺服器提供數量：website 現在只從前 50 筆貼文算（`useSellerPosts`），超過就少算（A3 計畫第 4C 刀的決定）。
+  - 完成（2026-11-19）：進度與證據見 A7 計畫 `2026-10-18-a7-social.md` 的進度表，完成定義核對見 `2026-10-18-a7-social/dod-social.md`、`dod-moderation.md`。
+  - A7 延後項（各附觸發條件，自 A7 計畫搬回）：
+  - 聊天與評價的封鎖、檢舉入口改送參照；im、review 改查 buyer、seller 的封鎖；moderation 加聊天與評價對象（隱藏與還原 in-process）；CRM「黑名單」併入店家封鎖；店家封鎖後訂單相關聯絡的例外；刪 `pkg/blocklist`、`pkg/moderation`（`internal/platform/textfilter` 成為唯一的詞典）。觸發：A6（決定簡報 §4 的 A6-0 到 A6-7）。
+  - notification 消費社群事件、刪除 `socialrelay`；作者被隱藏內容與收到警告的推播（Q6）、帳號停權與解除的通知（消費 `accountsuspension` 的事件，帶理由，A7-D17）、依案件決定通知該案每位檢舉人（A7-D20）；封鎖雙方之間不送互動通知的規則從 relay 搬進 notification 建立通知的地方，帶著 A7-3 的同一個測試。觸發：A8。
+  - `socialrelay` 的 `post.created` fan-out 每個追蹤者查兩次封鎖、一次買家資料（每人約三次讀取），而且每個追蹤者一次 `Enqueue`、沒有批次插入（`jobs.Enqueuer` 只有單筆）：追蹤者少時成本可忽略，relay 隨 notification 搬進單體（A8）而刪除。觸發：出現追蹤者超過 1,000 的店家。
+  - notification-service 的自我略過（`template_handler.go` 的 `actorFieldByEventType`）把買家 ID 拿去比店家 ID，兩者編號空間不同，數字相同時正常通知會被誤丟；是舊程式既有的缺陷，A7-3 的 relay 已先以帳號擋下真正的自我通知。notification 搬進單體時改以帳號比對（Will 2026-11-17）。觸發：A8。
+  - 買家處分的完整階梯（有期限的參與限制、次數、90 天累計）的參數與買家對處分的申覆（Q2 (iii)；brief「還不能定的」第 1 項）。觸發：買家條款寫好。
+  - 處分理由的 App 與 website 畫面（Q6：A7 只做 API）。觸發：UI 稿核可。
+  - 店家範圍留言列表（`ListStoreComments` 不指定貼文）跨貼文依 `comments.created_at` 排序，沒有店家層級的索引支撐，延遲隨店家留言總數成長（推論，未量測；A7-2c 審查）。觸發：上線前的效能量測，或單店留言量達到量測顯示列表延遲超標。
+  - 討論區留言的讚（4a-1 拿掉了從未生效的按鈕，Will 2026-11-17）。觸發：產品決定要讓討論區能按讚。
+  - 社群收件匣的 UI 稿。API 在 A7-2 先做，UI 稿在 A7-4 前另外核可，只擋 4a、4d 的收件匣畫面（brief 文案段末）。
+  - 案件改判（moderation 的指令經各模組非手動的撤銷連帶撤銷，另加撤銷原因）。觸發：通報人對處置的申訴（10e R12）。
+  - 軟刪貼文與留言的保留期和清理 job。觸發：隱私權政策訂出保留期。在那之前，買家刪除時只清掉列上的 PII（留言不存作者快照）。
+  - 兩個請求同時下架同一則內容時，後到的撞 `measure_contents_one_enforced` 回未分類的 internal error 而不是 `CONTENT_TAKEDOWN_ACTIVE`（資料一致，只是訊息；A7-4b 審查）。觸發：上線前的錯誤分類盤點。
+  - 後台建立內容下架時逐則讀 social 快照（最多 20 則，形狀檢查在讀取前；批次化要重寫三種內容的 owner 查詢與 reads 守門，A7-4a-2b /code-review）。觸發：上限調高到 20 則以上，或量到後台建立措施的延遲超標。
+  - middleware 的兩份手寫 TTL memo（`lib/seller/canonical-redirect.ts` 的賣家、`lib/forum/thread-guard.ts` 的討論串）抽成共用 helper（A7-4a-2b 設計審查）。觸發：middleware 再加第三份同類 memo，或改其中一份的 TTL／容量規則。
+  - 店家留言頁的頁面說明「查看 {name} 的留言與顧客討論」仍寫死中文、沒有 en（`SellerMessagesPage.tsx`）。觸發：Will 核可 en 文案。
+  - website 預覽的貼文分頁改成唯讀：照原排程留在 10d 第 6 刀（A3 計畫），不併進 A7-4a。
+  - A7-1c 留給 A7-4 的兩項（觸發：A7-4 的賣家端與後台畫面）：後台的類別下拉（`ASSESSABLE_CATEGORIES`）沒有社群的 `SPAM`、`HARASSMENT`、`HATE`，伺服器已接受；店主讀自己的店（`OwnerPosts`、`ListOwnPosts`）仍看得到被下架的貼文且沒有標記。
+  - 單體 revalidate 失敗沒有告警（River worker 的失敗與 discarded job；Loki 規則只看舊的 `revalidate.send.*`）。觸發：單體告警管道建立時或上線前。
+  - #3513 SLA 告警（moderation 待辦列 72 小時期限，無主動告警；Will 2026-11-19 延後）。觸發：單體告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。
+  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是基本設計書 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
+  - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
+  - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
+  - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
 - [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。
   - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
   - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。

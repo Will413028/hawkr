@@ -2,12 +2,7 @@
 
 依據：主計畫 `backend/docs/plans/2026-09-24-go-modular-monolith.md` 的「模組完成的定義」18 項，順序同該清單。核對日 2026-11-19，分支 `a7-5`。路徑相對 `backend/`。moderation 是新模組：沒有自己的舊服務，來源是 social-service 的檢舉部分，加 seller 通報與 `reviewqueue`。
 
-結果：成立 12、不適用 4、未成立 2。
-
-## 未成立
-
-- 第 3 項（公司時期未完成項）：`internal/modules/moderation/CARRYOVER.md` 已有「公司時期未完成項」表（2026-11-19）：#1632、#2779 不再成立，#3513 的稽核與整合測試修掉、字典詞庫延後有觸發。剩 #3513 的 SLA 告警未處置：待辦列有 72 小時期限，沒有主動告警的程式也沒有決定（A7-D14 只延後優先度提升）。缺：Will 決定做、延後（給觸發）或刪除。
-- 第 13 項（特性測試）：moderation 的對外 endpoint（`ModerationAppService`、`ModerationAdminService`）沒有經 driver 介面的情境：`internal/httpapi/social/characterization/` 只有 `monolith_integration_test.go` 裝配 `Moderation` 模組，沒有檢舉情境（`rg -n -i 'SubmitReport' internal/httpapi/social/characterization` 無結果）。現有覆蓋是 handler 測試 `internal/httpapi/moderation/{app_test,admin_test,admin_integration_test}.go`（24 個 `Test`）加模組 integration。缺：driver 情境，或 Will 確認新模組不需要（舊 REST 側已不存在，雙跑已不可能）。
+結果：成立 13、不適用 5、未成立 0。
 
 ## 逐項
 
@@ -15,7 +10,7 @@
 |---|---|---|---|
 | 1 | 目錄與 `AGENTS.md` | 成立 | `internal/modules/moderation/AGENTS.md` 有職責、擁有的資料、發布的讀取介面、不變量、不負責、決策紀錄 7 段（`rg -n '^## '`）。`make new-module` 是否使用無可重跑證據 |
 | 2 | 沿用盤點 | 成立 | `internal/modules/moderation/CARRYOVER.md` 含「沿用盤點」與第 32 行起「傳輸層的沿用盤點」；`TestEveryMovedModuleHasACarryOverAudit` ok（`cmd/hawkr`） |
-| 3 | 公司時期未完成項 | 未成立 | 見上；只剩 SLA 告警未處置 |
+| 3 | 公司時期未完成項 | 成立 | `internal/modules/moderation/CARRYOVER.md`「公司時期未完成項」表（2026-11-19）：#1632、#2779 不再成立，#3513 的稽核與整合測試修掉、字典詞庫與 SLA 告警延後有觸發（SLA 告警：Will 2026-11-19，觸發見主計畫 A7 延後項） |
 | 4 | 獨立設計審查 | 成立 | 計畫 A7-1d moderation 列：設計審查 8 項（should 4、nit 4，改 6、交 Will 2 → A7-D20）與 5 項（should 3、nit 2，改 3、交 Will 2 → A7-D21）；A7-1e 列獨立 diff 審查 1 項 should；A7-5 完成前審查 2026-11-19（見 `dod-social.md` 第 4 項） |
 | 5 | schema 在 `db/`、arch 與 SQL 檢查 | 成立 | `internal/modules/moderation/db/`（`schema.sql`、`objects.sql`、`pub.sql`、`migrations/20261115033604_moderation_schema.sql`、`20261115120000_moderation_objects.sql`）；`internal/arch` ok；`schema_integration_test.go` 的 `TestChecksMatchGo`、`TestCaseChecksRejectIllegalStates`。案件、檢舉、快照不跨 schema FK（對象以不透明鍵引用） |
 | 6 | 公開 API 依賴不超出 D2 表 | 成立 | `internal/arch/modules.go:37` `"moderation": {"social","seller","buyer","accountsuspension","media"}`；`arch` 測試 ok；`reviewqueue` 的列在第 38 行 |
@@ -25,7 +20,7 @@
 | 10 | 外部 provider（D5） | 不適用 | 沒有外部 provider 呼叫（`dod-social.md` 第 10 項的 `rg` 同時掃 moderation，無結果） |
 | 11 | 代碼值與錯誤碼去向 | 成立 | CARRYOVER 第 19 行（檢舉原因 8 種的 CodeMeta `ReportReasonCode`）與第 39 行（錯誤碼改 `apperr`）；CHECK 與 Go 一致由 `TestChecksMatchGo` 守 |
 | 12 | 測試 | 成立 | 模組內 73 個 `Test` 函式，8 個 integration 檔（`decide_`、`lifecycle_`、`list_`、`open_report_counts_`、`request_id_`、`schema_`、`submit_`、`fixture_`）；CI 證據：計畫 A7-1d、A7-2f 列（A7-2f PR #392 HEAD `4abda157` 16 個 workflow success）。非 Java 改寫 |
-| 13 | 特性測試 | 未成立 | 見上 |
+| 13 | 特性測試 | 不適用（Will 2026-11-19） | 沒有舊服務可比對；只有 Connect driver 時會與 handler 測試（24 個 `Test`）和模組 integration 測試重複 |
 | 14 | 對外 API | 成立 | `api/hawkr/moderation/`；`internal/httpapi/server.go:316-317` 註冊 `ModerationAppService`、`ModerationAdminService`；`api-contract.yml` 守 |
 | 15 | client | 成立 | buyer-app `lib/features/moderation/`（`moderation_repository.dart`、`report_sheet.dart`、`my_reports_*`）、admin 檢舉頁（A7-4b）、seller-app 的 4d-5 移除店主檢舉入口（moderation 只收買家檢舉）；舊 REST 路由與清單端點已於 A7-4e 刪除（`dod-social.md` 第 15 項） |
 | 16 | 刪除舊服務 | 不適用 | moderation 沒有自己的舊服務；來源 social-service 的刪除記在 `dod-social.md` 第 16 項（`3415e293`） |
