@@ -90,7 +90,7 @@ notification.unread_changed,hawkr.notification,notification-service,gateway,gate
 order.cancelled,hawkr.order,order-service,invoice-service,invoice.order.cancelled,record order cancelled for invoice read path,yes,PROJECTION,
 order.cancelled,hawkr.order,order-service,notification-service,notification.order,"push+inbox notification (buyer:visible,buyer:visible,seller:silent)",yes,SIDE_EFFECT,
 order.cancelled,hawkr.order,order-service,product-service,product.order.cancelled,restore stock on cancellation,yes,STATE,
-order.completed,hawkr.order,order-service,ai-service,ai_service.order.completed,update ranking facts,yes,PROJECTION,
+order.completed,hawkr.order,order-service,ai-service,ai_service.order.completed,update ranking facts,yes,PROJECTION,removed: ai-service 的排名事實投影已刪（migration 20261028100000_drop_seller_ranking_facts）
 order.completed,hawkr.order,order-service,buyer-service,buyer.order.completed,complete pending buyer account deletion,yes,STATE,job: 單體的 legacy consumer（queue hawkr.monolith.buyer.order.completed，取代 buyer.order.completed）排 River job 呼叫 accountdeletion.CompletePending，另有每小時對帳；order 搬進單體時改成模組事件
 order.completed,hawkr.order,order-service,crm-service,crm.order.completed,accumulate CRM customer total_spent,yes,PROJECTION,
 order.completed,hawkr.order,order-service,notification-service,notification.order,"silent data push (buyer:silent,seller:silent)",yes,SIDE_EFFECT,
@@ -126,7 +126,7 @@ seller.deleted,hawkr.seller,seller-service,notification-service,notification.sel
 seller.deleted,hawkr.seller,seller-service,pricebook-service,pricebook.seller.deleted,cleanup market-watch data,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,product-service,product.seller.deleted,delist seller products,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,social-service,social.seller.deleted,cleanup seller posts/comments/media,yes,STATE,in-tx-event: social 訂閱 seller 的 OnStoreRetired，同 transaction 只 Enqueue 清除 job（M23，TestStoreRetirementEnqueuesAnIdempotentPurge）
-seller.membership_changed,hawkr.seller,seller-service,ai-service,ai_service.seller.membership_changed,update ranking facts,yes,PROJECTION,
+seller.membership_changed,hawkr.seller,seller-service,ai-service,ai_service.seller.membership_changed,update ranking facts,yes,PROJECTION,removed: ai-service 的排名事實投影已刪（migration 20261028100000_drop_seller_ranking_facts）
 seller.onboarded,hawkr.seller,seller-service,gateway,gateway.sse.<pod> (dynamic),invalidate store resolver cache,yes,PROJECTION,
 seller.profile.changed,hawkr.seller,seller-service,cart-service,cart.seller.profile.changed,evict seller:meta cache,yes,PROJECTION,
 seller.suspended,hawkr.seller,seller-service,coupon-service,coupon.seller.suspended,disable seller coupon templates,yes,STATE,
