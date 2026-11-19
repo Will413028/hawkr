@@ -6,13 +6,9 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// 封鎖的情境（A7-2e）：單體的語意見 A7-1b 與 block-brief.md。舊的 social-service 的封鎖是雙向、存在 Redis、不帶 kind 的 userId，
-// 所以每一條在舊的一端以 skipOnLegacy 跳過並附 SD 編號（SD3 封鎖不擋寫入、SD15 封鎖過濾在分頁之後、D2 店家封鎖只擋寫入）。
+// 封鎖的情境（A7-2e）：單體的語意見 A7-1b 與 block-brief.md。與舊實作刻意不同處見 SD3（封鎖不擋寫入）、SD15（封鎖過濾在分頁之前）、D2（店家封鎖只擋寫入）。
 
 func blockAuthorByCommentReferenceIsIdempotent(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD3、SD15：舊的封鎖是雙向、以 Redis 儲存、userId 不帶 kind，沒有從留言參照封鎖的入口") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))
 	if changed := ch.Must(t, ch.Ret(d.BlockAuthor(ctx, ch.Buyer, c.ID))); !changed {
@@ -36,9 +32,6 @@ func blockAuthorByCommentReferenceIsIdempotent(ctx context.Context, t ch.T, d Dr
 }
 
 func blockByUnreadableCommentIsNotFound(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD3：舊的沒有從留言參照封鎖的入口") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))
 	wantNoError(t, d.DeleteComment(ctx, ch.Buyer2, c.ID), "刪除留言")
@@ -51,9 +44,6 @@ func blockByUnreadableCommentIsNotFound(ctx context.Context, t ch.T, d Driver) {
 }
 
 func d2BuyerBlockingAStoreHidesItsPostsOnlyForTheBlocker(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "D2、SD15：舊的封鎖過濾在分頁之後才做，而且不看 kind") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	if changed := ch.Must(t, ch.Ret(d.BlockStore(ctx, ch.Buyer, p.SellerID))); !changed {
 		t.Errorf("封鎖店家 changed = false")
@@ -76,9 +66,6 @@ func d2BuyerBlockingAStoreHidesItsPostsOnlyForTheBlocker(ctx context.Context, t 
 }
 
 func sd3StoreBlockingABuyerStopsWritesButNotReads(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD3：舊的封鎖不擋寫入") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))
 	ch.Must(t, ch.Ret(d.SellerBlockAuthor(ctx, ch.Seller, c.ID)))
@@ -96,9 +83,6 @@ func sd3StoreBlockingABuyerStopsWritesButNotReads(ctx context.Context, t ch.T, d
 }
 
 func storeBlockListAndUnblock(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD3：舊的沒有店家封鎖名單") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))
 	if changed := ch.Must(t, ch.Ret(d.SellerBlockAuthor(ctx, ch.Seller, c.ID))); !changed {
@@ -112,7 +96,7 @@ func storeBlockListAndUnblock(ctx context.Context, t ch.T, d Driver) {
 		t.Fatalf("封鎖名單是空的")
 	}
 	_, err := d.SellerBlockedBuyers(ctx, ch.Buyer)
-	wantOwnerDenied(t, d, err)
+	wantOwnerDenied(t, err)
 	// 解除之後買家可以再留言。
 	for _, b := range list {
 		if !b.Deleted {

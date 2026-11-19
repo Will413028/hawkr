@@ -10,11 +10,11 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// scenarios 是舊的 social-service 與單體都要通過的 28 條情境（情境清單的出處：A7-0 的介面盤點 interface-inventory.md 的
-// REST 清單，涵蓋貼文、留言、討論區、標籤；檢舉在 A7-1d；封鎖的五條在 A7-2e，舊的一端全部跳過）：每個情境是 func(ctx context.Context, t ch.T, d Driver)，
+// scenarios 是單體要通過的 28 條情境（情境清單的出處：A7-0 的介面盤點 interface-inventory.md 的
+// REST 清單，涵蓋貼文、留言、討論區、標籤；檢舉在 A7-1d；封鎖的五條在 A7-2e）：每個情境是 func(ctx context.Context, t ch.T, d Driver)，
 // 資料庫可能已經有別的資料，所以只看自己建立的那幾筆（標籤與內容帶 ch.Nonce()）。
 //
-// 標 skipOnLegacy 的是計畫的 SD 修正造成的刻意差異：舊的一端跳過並附 SD 編號，單體的一端（A7-2）照新行為斷言。
+// 情境只跑在單體（Connect driver，build tag integration）；與舊實作刻意不同的行為以計畫的 SD 編號標註。
 // 不在這裡的 SD：SD3、SD10、SD12、SD14、SD15、SD21、SD23（A7-1b、A7-1d 的範圍）、SD8、SD9（事件與推播，沒有 REST 面，
 // 由 integration 測試與 A7-3 的 wire 比對）、SD11、SD16、SD24（沒有 REST 面或需要 product-service）、SD17（並發，
 // 由 social 的 integration 測試）、SD20、SD22、SD25（接受，舊碼退場）。
@@ -62,33 +62,13 @@ func init() { imageSeq.Store(time.Now().UnixNano() % 1_000_000_000_000) }
 
 func image() string { return strconv.FormatInt(imageSeq.Add(1), 10) }
 
-// skipOnLegacy 在舊的一端跳過情境：舊實作的行為與計畫的修正不同。回傳 true 時情境直接結束。
-func skipOnLegacy(t ch.T, d Driver, why string) bool {
-	if !d.Legacy() {
-		return false
-	}
-	if s, ok := t.(interface{ Skipf(string, ...any) }); ok {
-		s.Skipf("舊的 social-service 的行為不同：%s", why)
-	}
-	return true
-}
+// absentID 是格式正確但不存在的 ID（UUID；格式不對會先被當成 invalid_argument）。
+func absentID() string { return uuid.NewV4().String() }
 
-// absentID 是格式正確但不存在的 ID：舊的 ID 是整數，單體的 ID 是 UUID，格式不對會先被當成 invalid_argument。
-func absentID(d Driver) string {
-	if d.Legacy() {
-		return "999999999999"
-	}
-	return uuid.NewV4().String()
-}
-
-// wantOwnerDenied 確認店主專屬方法被沒有店的帳號呼叫時的錯誤。SD26：舊的回權限不足；單體依〈API 設計規範（Connect）〉
-// 的防列舉規則回 not_found（資源的存在與否不對無權者洩漏）。
-func wantOwnerDenied(t ch.T, d Driver, err error) {
+// wantOwnerDenied 確認店主專屬方法被沒有店的帳號呼叫時的錯誤：依〈API 設計規範（Connect）〉的防列舉規則回 not_found
+// （SD26：資源的存在與否不對無權者洩漏）。
+func wantOwnerDenied(t ch.T, err error) {
 	t.Helper()
-	if d.Legacy() {
-		ch.WantKind(t, err, ch.ErrPermission)
-		return
-	}
 	ch.WantKind(t, err, ch.ErrNotFound)
 }
 
@@ -195,7 +175,7 @@ func postCreateIsPublic(ctx context.Context, t ch.T, d Driver) {
 func postCreateAuthzAndValidation(ctx context.Context, t ch.T, d Driver) {
 	in := PostInput{Content: "內容 " + ch.Nonce(), Image: image()}
 	_, err := d.CreatePost(ctx, ch.Buyer, in)
-	wantOwnerDenied(t, d, err)
+	wantOwnerDenied(t, err)
 	_, err = d.CreatePost(ctx, ch.Anonymous, in)
 	ch.WantKind(t, err, ch.ErrUnauthenticated)
 	_, err = d.CreatePost(ctx, ch.Seller, PostInput{Content: "   ", Image: image()})
@@ -232,7 +212,7 @@ func postOtherSellerCannotModify(ctx context.Context, t ch.T, d Driver) {
 	wantForeignPublishedDenied(t, d.UnpublishPost(ctx, ch.Seller2, p.ID))
 	wantForeignPublishedDenied(t, d.PublishPost(ctx, ch.Seller2, p.ID))
 	wantForeignPublishedDenied(t, d.DeletePost(ctx, ch.Seller2, p.ID))
-	wantOwnerDenied(t, d, d.DeletePost(ctx, ch.Buyer, p.ID))
+	wantOwnerDenied(t, d.DeletePost(ctx, ch.Buyer, p.ID))
 	mine := ch.Must(t, ch.Ret(d.GetMyPost(ctx, ch.Seller, p.ID)))
 	if mine.Content != p.Content || mine.Status != "PUBLISHED" {
 		t.Errorf("被拒絕的修改不該留下痕跡：%+v", mine)
@@ -358,9 +338,6 @@ func postShare(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd1PublicDetailRequiresPublicPost(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD1：公開單篇不過濾下架與平台隱藏") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.UnpublishPost(ctx, ch.Seller, p.ID), "下架")
 	_, err := d.GetPost(ctx, ch.Anonymous, p.ID)
@@ -375,9 +352,6 @@ func sd1PublicDetailRequiresPublicPost(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd1SD18ViewCountsOncePerViewerPerDay(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD1、SD18：舊的讀取就計數，每次都加一") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.ViewPost(ctx, ch.Buyer, p.ID), "第一次瀏覽")
 	wantNoError(t, d.ViewPost(ctx, ch.Buyer, p.ID), "同一天第二次瀏覽")
@@ -396,9 +370,6 @@ func sd1SD18ViewCountsOncePerViewerPerDay(ctx context.Context, t ch.T, d Driver)
 }
 
 func sd18ShareCountsOncePerBuyer(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD18：舊的每次分享都加一") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	if n := ch.Must(t, ch.Ret(d.Share(ctx, ch.Buyer, p.ID))); n != 1 {
 		t.Errorf("第一次分享後的分享數 = %d", n)
@@ -409,9 +380,6 @@ func sd18ShareCountsOncePerBuyer(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd6EditRejectsBannedWords(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD6：舊的只在建立時檢查髒字詞典，編輯會繞過") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	_, err := d.UpdatePost(ctx, ch.Seller, p.ID, PostInput{Content: "你這個白痴 " + ch.Nonce()})
 	ch.WantKind(t, err, ch.ErrInvalid)
@@ -421,9 +389,6 @@ func sd6EditRejectsBannedWords(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd7HiddenPostCannotBeEdited(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD7：舊的被隱藏的貼文仍能編輯") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	wantNoError(t, d.ModeratePost(ctx, ch.Admin, p.ID, true, "SD7"), "隱藏")
 	_, err := d.UpdatePost(ctx, ch.Seller, p.ID, PostInput{Content: "隱藏後的編輯"})
@@ -462,7 +427,7 @@ func commentCreateListAndValidation(ctx context.Context, t ch.T, d Driver) {
 	ch.WantKind(t, err, ch.ErrInvalid)
 	_, err = d.CreateComment(ctx, ch.Buyer, p.ID, "你這個白痴")
 	ch.WantKind(t, err, ch.ErrInvalid)
-	_, err = d.CreateComment(ctx, ch.Buyer, absentID(d), "留言")
+	_, err = d.CreateComment(ctx, ch.Buyer, absentID(), "留言")
 	ch.WantKind(t, err, ch.ErrNotFound)
 	wantNoError(t, d.DeletePost(ctx, ch.Seller, p.ID), "刪除貼文")
 	_, err = d.CreateComment(ctx, ch.Buyer, p.ID, "已刪貼文的留言")
@@ -559,9 +524,6 @@ func commentLikeToggle(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd2CommentsFollowPostVisibility(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD2：舊的留言列表不看貼文狀態") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, p.ID, "留言 "+ch.Nonce())))
 	wantNoError(t, d.UnpublishPost(ctx, ch.Seller, p.ID), "下架")
@@ -586,25 +548,19 @@ func sd2CommentsFollowPostVisibility(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd4ReplyToMustBeVisibleCommentOfSamePost(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD4：舊的 replyToId 不驗證，可以指向別篇或已刪除的留言") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	other := newPost(ctx, t, d, ch.Seller)
 	top := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, p.ID, "頂層 "+ch.Nonce())))
 	elsewhere := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, other.ID, "別篇 "+ch.Nonce())))
 	gone := ch.Must(t, ch.Ret(d.ReplyComment(ctx, ch.Seller, p.ID, top.ID, "", "會被刪除的回覆 "+ch.Nonce())))
 	wantNoError(t, d.DeleteComment(ctx, ch.Seller, gone.ID), "刪除回覆")
-	for name, target := range map[string]string{"不存在": absentID(d), "別篇的留言": elsewhere.ID, "已刪除的回覆": gone.ID} {
+	for name, target := range map[string]string{"不存在": absentID(), "別篇的留言": elsewhere.ID, "已刪除的回覆": gone.ID} {
 		_, err := d.ReplyComment(ctx, ch.Seller, p.ID, top.ID, target, "回覆 "+ch.Nonce())
 		wantError(t, err, "replyToId 指向"+name)
 	}
 }
 
 func sd5DeletingCommentTwiceCountsOnce(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD5、SD17：舊的留言數由本機沒有的 RabbitMQ 非同步更新，重複刪除會重複扣") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	keep := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, p.ID, "留著 "+ch.Nonce())))
 	gone := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "刪掉 "+ch.Nonce())))
@@ -624,9 +580,6 @@ func sd5DeletingCommentTwiceCountsOnce(ctx context.Context, t ch.T, d Driver) {
 }
 
 func placeholderForUnavailableTopLevelComment(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "A7-1a 設計 §2.3（2026-10-23）：舊的頂層留言刪除時底下的回覆一起不見") {
-		return
-	}
 	p := newPost(ctx, t, d, ch.Seller)
 	top := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, p.ID, "頂層 "+ch.Nonce())))
 	reply := ch.Must(t, ch.Ret(d.ReplyComment(ctx, ch.Seller, p.ID, top.ID, "", "店家回覆 "+ch.Nonce())))
@@ -727,9 +680,6 @@ func hashtagSuggestAndTrending(ctx context.Context, t ch.T, d Driver) {
 }
 
 func sd19TagSearchTreatsWildcardsLiterally(ctx context.Context, t ch.T, d Driver) {
-	if skipOnLegacy(t, d, "SD19：舊的標籤搜尋沒有轉義 LIKE 的萬用字元，% 與 _ 會比對到所有標籤") {
-		return
-	}
 	newPost(ctx, t, d, ch.Seller, "wild"+ch.Nonce())
 	for _, q := range []string{"%", "_"} {
 		tags, err := d.SuggestTags(ctx, ch.Anonymous, q)

@@ -84,8 +84,6 @@ func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller
 	return d
 }
 
-func (d *connectDriver) Legacy() bool { return false }
-
 func (d *connectDriver) of(c ch.Caller) *connectClients { return d.clients[c] }
 
 // pageSize 是 driver 走分頁時每頁的筆數。
