@@ -1315,7 +1315,7 @@ Go 側 CAS 寫法固定為 `UPDATE ... SET <欄位...>, version = version + 1 WH
 |---|---|---|---|
 | **寫入類 mutation** | storefront `PATCH`／`logo`／`cover`；product `create`／`update`／`publish`／`unpublish`／`batch-unpublish`（整批一個理由，不逐項）；post `create`／`update`／`publish`／`unpublish` | **必填** | 9260 / 400 |
 | **PII 揭露** | `GET .../orders/{orderNo}/recipient-contact`（走 query `operation_reason`） | **必填** | 9260 / 400 |
-| **讀取被拒絕而落的稽核列** | §6.5.3 的四個 READ action（`STOREFRONT_READ`／`PRODUCT_READ`／`POST_READ`／`ORDER_READ`，只在 `result='FAILED'` 時產生） | **可空** | `RecordAuditIntentRequest.operation_reason` 傳空字串，稽核表該欄存 `NULL` |
+| **讀取被拒絕而落的稽核列** | §6.5.3 的 READ action（gateway 產生 `STOREFRONT_READ`／`PRODUCT_READ`／`ORDER_READ` 三個；`POST_READ` 由單體的 SocialDelegatedService 產生；都只在 `result='FAILED'` 時產生） | **可空** | `RecordAuditIntentRequest.operation_reason` 傳空字串，稽核表該欄存 `NULL` |
 
 註：第三態存在的唯一理由是：讀取被拒絕時**根本沒有使用者輸入可取**（拒絕發生在 handler 讀 body／query 之前，且讀取端點本來就沒有這個欄位）。除此之外**沒有任何「選填理由」的情境**——不得把任何 mutation 的 `operationReason` 寫成選填。
 
@@ -2912,7 +2912,6 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []C
 func ScopeProductStatus() []string    // {status}
 func ScopeStorefrontLogo() []string   // {logoKey}
 func ScopeStorefrontCover() []string  // {coverKey}
-func ScopePostPublishState() []string // {publishStatus, scheduledPublishAt, publishedAt}
 ```
 
 判定順序（每一步都會影響正確性）：
@@ -3165,7 +3164,7 @@ func ScopePostPublishState() []string // {publishStatus, scheduledPublishAt, pub
 - **不得**新增「查這個模組能不能用」的端點——那個答案 preflight 已經給過了，第二個來源必然有不一致的一天
 - ⚠️ **不得用「打一支必然 403 的端點」來探測**：那會在 `admin_operation_audit_logs` 製造一批
   `STOREFRONT_READ`／`PRODUCT_READ`／`POST_READ`／`ORDER_READ` ＋ `result='FAILED'` 的列，
-  把「有人試圖跨店讀取」這個**安全訊號**淹掉（§6.5.3 四個 READ action 的唯一用途就是留下這個訊號）。
+  把「有人試圖跨店讀取」這個**安全訊號**淹掉（§6.5.3 READ action 的唯一用途就是留下這個訊號）。
   失敗是靜默的——稽核表看起來完全正常、每一列都合法，只是再也分不出哪一列是攻擊嘗試
 
 ##### 渲染集合為什麼大於可操作集合（三條）
@@ -3635,7 +3634,7 @@ func BizStatusData(c *gin.Context, code int32, message string, data interface{})
 代行營運的值域登記在 CodeMeta 的 `錯誤碼.md`（9260~9299）、`業務類型碼.md`（`DelegationReasonCode`）、`內部技術碼.md`（`DelegationAuditAction`、`DelegationEventType`、`DelegationAuthorizationAction`）與 `業務狀態碼.md`（`PostPublishStatus`）。CodeMeta 凍結，不新增值域。稽核動作的 Value 到 Label 對照由 `pkg/codemeta/labels.go` 提供，gateway 與 delegation 模組都查它，不手寫第二份。
 
 
-**四個 READ action 的唯一用途：`result = 'FAILED'` 的讀取拒絕列。**
+**READ action 的唯一用途：`result = 'FAILED'` 的讀取拒絕列。** gateway 的代行只有 storefront／product／order 三個 READ action；貼文的代行由單體的 SocialDelegatedService 服務，`POST_READ` 由它產生。
 
 | | 讀取**成功** | 讀取**被拒絕** |
 |---|---|---|
@@ -3659,7 +3658,7 @@ func BizStatusData(c *gin.Context, code int32, message string, data interface{})
 - **為什麼要有這四個碼**：讀取被拒是安全事件，必須留痕；但稽核表的 `action` 欄有 CHECK 約束，沒有合法值就寫不進去 —— 於是實作者只有兩條路：塞一個寫入類 action（污染「已執行 N 項」的統計，也讓 `PRODUCT_UPDATE` 出現在一次根本沒發生的更新上），或乾脆不記（安全事件消失）。兩條都不能接受
 - **為什麼成功的讀取不記**：代行工作區的每一次分頁、每一次輪詢都是讀取，全記會讓稽核表成長率高一到兩個數量級，而稽核表要回答的問題是「這個管理員動了什麼」，不是「他看了幾次列表」。一般讀取的可觀測性由 §8.2.1 的 access log 承擔
 - `ORDER_PII_REVEAL`（揭露成功）與 `ORDER_READ`（讀取被拒）是**兩個不同的事實**，不得互相取代：前者 `SUCCEEDED` ＋ `high`，後者 `FAILED` ＋ `low`
-- `AUDIT_CORRECTION` 是維運補正列的 action（§12.4 ②），同樣不是代行操作 —— 它與四個 READ 一樣，存在的理由是「這件事必須寫得進稽核表」
+- `AUDIT_CORRECTION` 是維運補正列的 action（§12.4 ②），同樣不是代行操作 —— 它與 READ 類 action 一樣，存在的理由是「這件事必須寫得進稽核表」
 
 ### 6.6 冪等與版本
 
@@ -3824,7 +3823,7 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 >
 > **一般讀取成功不落稽核，被拒絕才落。** 通過 Q1–Q4 的讀取（列表／詳情瀏覽）**不產生稽核列** —— 那是常態操作，寫進去只會把稽核表淹掉，並讓 §9 要求的 `PENDING` 比率與「風險操作 N 項」失去鑑別力。但**被 Q2／Q3 拒絕的讀取必須落一列 `result='FAILED'`**：那不是瀏覽，是「有人拿著一把 credential 去要不屬於他的資料」，屬安全事件。
 >
-> 拒絕列使用 READ 類 action（`STOREFRONT_READ`／`PRODUCT_READ`／`POST_READ`／`ORDER_READ`，見 §6.5.3），這四個 action **只允許出現在 `result='FAILED'` 的列上** —— 它們存在的唯一理由是「被拒絕的讀取也需要一個合法的 `action` 值」，不是為了記錄成功的讀取。
+> 拒絕列使用 READ 類 action（`STOREFRONT_READ`／`PRODUCT_READ`／`POST_READ`／`ORDER_READ`，見 §6.5.3），這些 action **只允許出現在 `result='FAILED'` 的列上** —— 它們存在的唯一理由是「被拒絕的讀取也需要一個合法的 `action` 值」，不是為了記錄成功的讀取。
 >
 > **Q1 拒絕（`expired`／`revoked`）不落稽核**，因為 `RecordAuditIntent(origin=interactive)` 的前置條件正是「session 有效」—— 已終止的工作階段連 intent 都寫不進去。這不是遺漏：session 終止這件事本身已由 `delegated_operation_sessions` 的 `ended_at`／`revoked_at`／`revoke_reason` 留痕，而該列**永不硬刪**（§7.2.4 E3）。
 >

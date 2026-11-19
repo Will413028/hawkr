@@ -132,7 +132,7 @@ func (h *Hub) Start(ctx context.Context) func() {
 }
 
 // Subscribe attaches a Connection to a topic. Enforces caps; returns error
-// if any cap (per-pod / per-subject / per-user) would be exceeded.
+// if any cap (per-pod / per-user; AccountID 0 connections count only against the pod cap) would be exceeded.
 //
 // On success the caller should:
 //  1. write SSE `ready` event (with bufferMiss flag from buffer.Since)

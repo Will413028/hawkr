@@ -445,7 +445,7 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 |---|---|---|
 | 1 | `gateway/internal/middleware/ratelimit.go` 分層配額 | `ratelimit:{tier}:{subject}` |
 | 2 | 同檔 `authFailureKey()` 與其 gate / 計數 | `ratelimit:authfail:{subject}` |
-| 3 | SSE 連線數上限：`gateway/internal/handler/sse_stream.go` 填入 `conn.IP` → `gateway/internal/sse/hub.go` 的 `capKeyOf()` | per-subject 連線數 |
+| 3 | SSE 連線數上限：`gateway/internal/handler/sse_stream.go` 填入 `conn.AccountID`（取自 JWT）→ `gateway/internal/sse/hub.go` 的 `capKeyOf()` | per-user 連線數 |
 | 附 | 同檔 block log sampler `logBlocked()` | 取樣鍵 per-`(reason, subject)` |
 
 **`logBlocked()` 必須同時輸出 `ip` 與 `subject` 兩欄**（取樣鍵用 subject 還不夠——那只影響印幾行，不影響印什麼）：

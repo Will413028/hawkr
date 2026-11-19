@@ -73,6 +73,51 @@ func TestDiff_MissingSideRendersEmptyForm(t *testing.T) {
 	}
 }
 
+// 建立類沒有 before，所以每一個欄位都走「單側缺鍵」那條路。缺席側渲染成 formatter 的
+// 空形之後，若在場側渲染成同一個字串，這一列講的是「從沒有變成沒有」——它不是變更。
+func TestDiff_CreateDoesNotInventZeroCountChanges(t *testing.T) {
+	after := Project("product", map[string]any{
+		"name":   "檸檬",
+		"images": "0",
+		"skus":   "0",
+	})
+
+	got := map[string]string{}
+	for _, f := range Diff("product", map[string]any{}, after, nil) {
+		got[f.GetField()] = f.GetBefore() + " → " + f.GetAfter()
+	}
+	if len(got) != 1 || got["name"] == "" {
+		t.Fatalf("changed_fields = %v, want 只有 name 一列", got)
+	}
+
+	withImages := Project("product", map[string]any{
+		"name":   "檸檬",
+		"images": "2",
+		"skus":   "0",
+	})
+	real := map[string]string{}
+	for _, f := range Diff("product", map[string]any{}, withImages, nil) {
+		real[f.GetField()] = f.GetBefore() + " → " + f.GetAfter()
+	}
+	if real["images"] != "0 張 → 2 張" {
+		t.Errorf("images = %q, want \"0 張 → 2 張\"", real["images"])
+	}
+	if _, invented := real["skus"]; invented {
+		t.Errorf("skus 仍被記成變更：%v", real)
+	}
+}
+
+// Plain／Truncate 的空形是「—」，於是缺席側與空字串側渲染成同一個「— → —」。
+func TestDiff_MissingSideMatchingEmptyStringIsNotAChange(t *testing.T) {
+	after := map[string]any{"origin": "", "description": "", "name": "檸檬"}
+	for _, f := range Diff("product", map[string]any{}, after, nil) {
+		if f.GetField() != "name" {
+			t.Errorf("%s 被記成 %q → %q，但兩側都是「沒有值」",
+				f.GetField(), f.GetBefore(), f.GetAfter())
+		}
+	}
+}
+
 // 反方向同樣要擋：after 缺鍵而 before 是零值時，也是「從沒有變成沒有」。
 func TestDiff_AbsentAfterMatchingZeroBeforeIsNotAChange(t *testing.T) {
 	before := Project("product", map[string]any{"images": "0", "name": "檸檬"})

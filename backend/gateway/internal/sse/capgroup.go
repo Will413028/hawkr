@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// connGroup tracks the live connections sharing one cap key —— 登入使用者是
-// accountId、匿名是 rate-limit subject。它取代了原本的 `sync.Map[key]*atomic.Int64`
+// connGroup tracks the live connections sharing one cap key —— 即 accountId；
+// AccountID 為 0 的連線不進 connGroup，只受 pod cap。它取代了原本的 `sync.Map[key]*atomic.Int64`
 // 純計數器：光有計數沒有連線本身，就沒辦法在額度用完時判斷「佔著位子的那條
 // 還值不值得留」。
 //

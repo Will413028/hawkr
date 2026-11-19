@@ -195,10 +195,7 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []*
 		// 單側缺鍵時，缺席那一側渲染成該 formatter 的空形（qty 是「0 張」、plain 與
 		// truncate 是「—」）。若在場那一側**也**渲染成同一個字串，這一列描述的是「從沒有
 		// 變成沒有」——它不是變更，而它汙染的是不可竄改的稽核列。
-		//
-		// 建立類沒有 before（orchestrator 對 spec.ReadBefore == nil 給空投影），而
-		// PRODUCT_CREATE 走全表比較，於是每建一件沒有圖片的商品都多記一列
-		// images「0 張 → 0 張」。
+		// 建立類沒有 before，因此缺席側與零值或空字串渲染成同一字串時不寫入假的 0→0 列。
 		// 「從無到有」不受影響：after 有內容時兩側渲染必然不同，那一列照樣輸出。
 		//
 		// ⚠️ 兩側都在場時**不得**改用顯示值比較：truncate(60) 會讓只差在第 200 個字的

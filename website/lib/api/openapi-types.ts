@@ -28,14 +28,12 @@ export function roleFromAccountType(t?: number | null): Role {
 }
 
 /* ---------- Post (Feed) ---------- */
-/** matches `hawkr.social.v1alpha1.PostProduct` */
+/** website view model mapped from the Connect post product message in `lib/posts/repo.ts` */
 export interface PostProductData {
 	// 64-bit TSID（> Number.MAX_SAFE_INTEGER）：api/json.ts 的 preserveBigInts 在
-	// parse 時保字串，後端亦已對貼文 DTO 的 id 加 ,string（gateway PR #967），故
-	// canonical 型別一律 string，避免精度丟失。
+	// parse 時保字串，故 canonical 型別一律 string，避免精度丟失。
 	id: string;
-	/** §231: objectKey SSOT (`PostProductData.ImageKey`); the wire also carries the
-	 *  Gateway-composed `imageUrl` twin, which the UI no longer reads. */
+	/** objectKey of the product image. */
 	imageKey: string;
 	name: string;
 	price: string;
@@ -56,7 +54,7 @@ export interface PostViewerState {
 	actor?: PostViewerActor;
 }
 
-/** matches the list-item view of `hawkr.social.v1alpha1.Post` */
+/** website view model of a post list item, mapped from the Connect post message in `lib/posts/repo.ts` */
 export interface PostListItem {
 	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
 	etag?: string;
@@ -114,7 +112,7 @@ export interface PostListItem {
 	scheduledPublishAt?: string;
 }
 
-/** matches the detail view of `hawkr.social.v1alpha1.Post` */
+/** website view model of post detail, mapped from the Connect post message in `lib/posts/repo.ts` */
 export interface PostDetail {
 	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
@@ -138,7 +136,7 @@ export interface PostDetail {
 }
 
 /**
- * matches `hawkr.social.v1alpha1.Post` 的店主視角：店主讀自己的單篇貼文。
+ * website view model 的店主視角（`lib/posts/owner.ts` 由 Connect 貼文訊息映射）：店主讀自己的單篇貼文。
  * 發布狀態與平台下架資訊同 `PostListItem` 的同名欄位；只有店主路徑帶它們。
  */
 export interface MyPostDetail extends PostDetail {

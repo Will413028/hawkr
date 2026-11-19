@@ -1,6 +1,6 @@
 # 41 - Realtime SSE 推播平台（Realtime SSE Push Platform）詳細設計書
 
-> 本文件定義 Gateway 上的 Server-Sent Events（SSE）推播平台架構，包含通用 Hub、MQ Consumer、Channel 註冊契約、Topic 命名規約，以及目前註冊的四個 Channel（留言、通知、賣家工作區、賣家生命週期）。
+> 本文件定義 Gateway 上的 Server-Sent Events（SSE）推播平台架構，包含通用 Hub、MQ Consumer、Channel 註冊契約、Topic 命名規約，以及目前註冊的 Channel（通知、賣家工作區、賣家生命週期）。
 >
 > 後續任何「server 主動推送到 client」的需求（如商品低庫存即時提醒賣家、訂單狀態即時跳動等）皆透過註冊新 Channel 接入本平台，禁止另起新長連線基礎設施。
 
@@ -12,14 +12,14 @@
 
 | 範疇 | 說明 |
 |---|---|
-| 本文件描述 | Gateway 上的 SSE 推播**平台架構**（通用 Hub / MQ Consumer / Channel 註冊機制）＋ 目前註冊的 4 個 Channel：留言（comment，§三）、通知（notification，§四）、賣家工作區（seller_workspace，§四之二）、賣家生命週期（seller_lifecycle，§四之三；side-effect，不推 SSE） |
-| 本文件**不**描述 | 個別業務邏輯（留言 CRUD 見 social-service 既有實作；通知 inbox 與 FCM 推播見 [12 號](12-通知微服務（Notification%20Service）詳細設計書.md) / [13 號](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)） |
+| 本文件描述 | Gateway 上的 SSE 推播**平台架構**（通用 Hub / MQ Consumer / Channel 註冊機制）＋ 目前註冊的 Channel：通知（notification，§四）、賣家工作區（seller_workspace，§四之二）、賣家生命週期（seller_lifecycle，§四之三；side-effect，不推 SSE） |
+| 本文件**不**描述 | 個別業務邏輯（通知 inbox 與 FCM 推播見 [12 號](12-通知微服務（Notification%20Service）詳細設計書.md) / [13 號](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)） |
 | web 通知的唯一推送路徑 | **SSE**。不得存在 30 秒輪詢，也不得把輪詢當 fallback（見 §4.7） |
 | 不取代 | **行動端通知（buyer / seller）維持 FCM**：FCM 已覆蓋背景 banner + 前景 data-only refresh 雙通道，再加 SSE 推送重複度高且耗連線與電量。本平台 notification channel **僅 web 訂閱**。<br/>Chat WebSocket：已存在，雙向、長連、ticket auth，與 SSE 場景互補，不取代。 |
 
 ### 1.2 平台邊界
 
-本平台只承載 **server → client 單向推送**：留言、通知、賣家工作區訂單狀態。
+本平台只承載 **server → client 單向推送**：通知、賣家工作區訂單狀態；留言不即時推送。
 
 | 需求型態 | 走哪裡 |
 |---|---|
@@ -538,7 +538,7 @@ gateway/internal/sse/                  通用 Hub（無業務感知）
   stream.go               ServeSSE primitive（header / heartbeat / replay / lifecycle）
   ringbuffer.go           per-topic 環形 buffer + TTL 過期清理
 
-gateway/internal/sse/ 另有 batch.go（批次推送窗口）與 capgroup.go（per-user / per-subject 連線額度）
+gateway/internal/sse/ 另有 batch.go（批次推送窗口）與 capgroup.go（per-user 連線額度）
 
 gateway/internal/realtime/             Channel 註冊
   registry.go                 Channel 註冊統一入口；MQ Consumer 由此查 channel 處理
@@ -637,7 +637,6 @@ sequenceDiagram
 
 | 維度 | 預設上限 | 處理 |
 |---|---|---|
-| per source IP（comment） | 5 | 滿座時回收該 IP 最舊的連線；回收額度用完才回 429 |
 | per accountId（notification） | 3 | 滿座時回收該帳號最舊的連線；回收額度用完才回 429 |
 | per pod 總連線 | 5000 | 超過回 503，client UI 顯示「即時同步不可用，請稍後重試」 |
 | per topic 連線 | 5000 | 同上（避免單一爆款貼文壓垮 pod） |
@@ -953,16 +952,14 @@ flowchart LR
 
 ## 八、安全與授權
 
-### 8.1 Comment endpoint：匿名 + per-subject cap
+### 8.1 Notification endpoint：JWT + per-user cap
 
 | 規則 | 實作 |
 |---|---|
-| 不檢 JWT | handler 不掛 `JWTAuth` middleware |
-| Per-subject cap 5 | `Hub.capKeyOf` 以 subject 為 key 計數（`connsBySubject`），滿了先回收最舊的連線讓位，回收額度用完才回 429（帶 `Retry-After` 與 `X-RateLimit-*`，見 [01 號 §3.2.9](01-閘道微服務（Gateway）詳細設計書.md)） |
-| cap key 取得 | `middleware.RateLimitSubject(c)` —— **不是** `c.ClientIP()`。網頁 SSR／CI 一個出口位址背後是無限多個人，用位址當 key 會讓 5 條連線的額度被整個網頁共用（#2264）。裸 `c.ClientIP()` 已由 ruleguard `banClientIPForQuota` 機械禁止 |
+| 檢 JWT | handler 掛 `JWTAuth` middleware，連線的 `AccountID` 取自 JWT |
+| Per-user cap 3 | `Hub.capKeyOf` 以 `AccountID` 為 key 計數（`connsByUID`），滿了先回收最舊的連線讓位，回收額度用完才回 429（帶 `Retry-After` 與 `X-RateLimit-*`，見 [01 號 §3.2.9](01-閘道微服務（Gateway）詳細設計書.md)） |
 | Per-topic cap 5000 | Hub.Subscribe 滿則回 503 |
-| Post 不存在 | handler 接到請求時 → gRPC `social-service.GetPublicPost(postId)` 確認存在 → 不存在回 **404** 且不消耗連線；存在才進 Hub.Subscribe |
-| Post 軟刪除（hidden_by_platform） | 同上 404；既有貼文 lifecycle 規則一致 |
+| Per-pod cap | 超過回 503；`AccountID` 為 0 的連線只受此上限管 |
 
 ### 8.2 Notification endpoint：JWT (cookie 或 Bearer)
 
@@ -1371,7 +1368,7 @@ SSE event comment.batch:
 | MQ event 漏推 | 該筆推送失敗 | best-effort，client refresh 兜底；不引入 outbox |
 | `clientRequestId` dedup miss | 留言出現兩次 | 第二層 `commentId` dedup（§3.7） |
 | 同 routing key 跨 pod 順序不一 | 留言短暫亂序 | client 依 `createdAt` 二分插入 |
-| 匿名 SSE 被爬蟲濫用 | gateway 連線爆 | per-subject cap 5；per-pod cap 5000 |
+| SSE 連線被濫用 | gateway 連線爆 | JWT 才能訂閱；per-user cap 3；per-pod cap 5000 |
 | notification publish 失敗 | 該通知不會 SSE 推送（但 inbox 仍有） | log + 監控告警；下次 client refresh 看得到 |
 | 連線完全失敗使用者看不到資料 | SSE 整段不可用時無 fallback 機制（這是設計決策，不引入 polling） | UI 顯示「即時同步不可用，請重新整理頁面」；reload 後若服務恢復就可繼續；服務真的長時間 down 是更上層運維問題 |
 | Web 通知 SSE 多 tab 重複連線 | 一個帳號 N tab × 1 SSE | per-accountId cap 3；第 4+ tab 不訂閱（見 §9.2 UX 規範）|
