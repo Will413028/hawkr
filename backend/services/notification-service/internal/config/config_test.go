@@ -33,7 +33,6 @@ func TestConfig_Validate(t *testing.T) {
 				Password: "pass",
 			},
 			MediaBaseURL: "https://test-media.example.com",
-			VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("expected nil, got %v", err)
@@ -91,20 +90,6 @@ func TestConfig_Validate(t *testing.T) {
 			}
 		}
 	})
-
-	t.Run("missing vendor portal base url", func(t *testing.T) {
-		cfg := &Config{
-			Database:     DatabaseConfig{Host: "host", User: "user", Password: "pass"},
-			MediaBaseURL: "https://test-media.example.com",
-		}
-		err := cfg.Validate()
-		if err == nil {
-			t.Fatal("expected error for missing vendor portal base url")
-		}
-		if !strings.Contains(err.Error(), "VENDOR_PORTAL_BASE_URL") {
-			t.Errorf("error should mention VENDOR_PORTAL_BASE_URL: %v", err)
-		}
-	})
 }
 
 func TestConfig_Validate_ProductionRequiresOTLPMetricsEndpoint(t *testing.T) {
@@ -119,7 +104,6 @@ func TestConfig_Validate_ProductionRequiresOTLPMetricsEndpoint(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		Mail:         MailConfig{Provider: "resend", From: "noreply@example.com", RecipientPolicy: "unrestricted"},
 	}
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OTEL_EXPORTER_OTLP") {
@@ -138,7 +122,6 @@ func TestConfig_Validate_ProductionRequiresResendMailProvider(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://example.com"},
 		Mail:         MailConfig{Provider: "log"},
 	}
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "MAIL_PROVIDER") {
@@ -157,7 +140,6 @@ func TestConfig_Validate_ProductionWithResendMailProviderPasses(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://example.com"},
 		Mail:         MailConfig{Provider: "resend", From: "noreply@example.com", RecipientPolicy: "unrestricted"},
 	}
 	if err := cfg.Validate(); err != nil {
@@ -177,7 +159,6 @@ func TestConfig_Validate_DevelopmentAllowsLogMailProvider(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://test-media.example.com",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		Mail:         MailConfig{Provider: "log"},
 	}
 	if err := cfg.Validate(); err != nil {
@@ -197,7 +178,6 @@ func TestConfig_Validate_DevelopmentAllowsMissingOTLPMetricsEndpoint(t *testing.
 			Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("development without OTLP metrics endpoint error = %v, want nil", err)
@@ -219,7 +199,6 @@ func TestConfig_Validate_NonProductionRejectsUnrestrictedRecipients(t *testing.T
 					Host: "db-host", User: "user", Password: "pass",
 				},
 				MediaBaseURL: "https://media.example",
-				VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 				Mail:         MailConfig{Provider: "resend", From: "noreply@example.com", RecipientPolicy: "unrestricted"},
 			}
 			err := cfg.Validate()
@@ -241,7 +220,6 @@ func TestConfig_Validate_NonProductionAllowsRedirect(t *testing.T) {
 			Host: "db-host", User: "user", Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		Mail: MailConfig{
 			Provider: "resend", From: "noreply@example.com", RecipientPolicy: "redirect", RedirectTo: "willwu@example.com",
 		},
@@ -262,7 +240,6 @@ func TestConfig_Validate_ProductionRequiresUnrestrictedRecipients(t *testing.T) 
 			Host: "db-host", User: "user", Password: "pass",
 		},
 		MediaBaseURL: "https://media.example",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://example.com"},
 		Mail: MailConfig{
 			Provider: "resend", From: "noreply@example.com", RecipientPolicy: "redirect", RedirectTo: "willwu@example.com",
 		},
@@ -282,7 +259,6 @@ func TestConfig_Validate_ResendRequiresMailFrom(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://test-media.example.com",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		Mail:         MailConfig{Provider: "resend", RecipientPolicy: "redirect", RedirectTo: "willwu@example.com"},
 	}
 	err := cfg.Validate()
@@ -304,7 +280,6 @@ func TestConfig_Validate_ResendProviderIsCaseInsensitive(t *testing.T) {
 			Password: "pass",
 		},
 		MediaBaseURL: "https://test-media.example.com",
-		VendorPortal: VendorPortalConfig{BaseURL: "https://web-dev.example.com"},
 		Mail:         MailConfig{Provider: " Resend ", RecipientPolicy: "redirect", RedirectTo: "willwu@example.com"},
 	}
 	err := cfg.Validate()

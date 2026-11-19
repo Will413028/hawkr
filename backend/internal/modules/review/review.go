@@ -35,7 +35,7 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// Orders 是 review 對訂單的唯一依賴；訂單不存在回 ErrOrderNotFound，其他錯誤是暫時性故障（RD9）。
+// Orders 是 review 對訂單的唯一依賴；訂單不存在回 ErrOrderNotFound，其他錯誤是暫時性故障。
 type Orders = model.Orders
 
 // Buyers 是提交時查上傳者帳號的 buyer 公開 API；正式組裝傳 *buyer.Module。

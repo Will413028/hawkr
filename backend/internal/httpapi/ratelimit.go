@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	agentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
@@ -33,9 +32,6 @@ type rateTier struct {
 var (
 	tierPublic  = rateTier{name: "public", visitor: 600, ssr: 12000, ci: 300}
 	tierDefault = rateTier{name: "default", visitor: 300}
-	// tierInvitee 是受邀供應商的 service（InviteeService）的一般額度：憑證是 session cookie（32 bytes 亂數，猜不到），但身分是來源位址，
-	// 所以與 App、Admin 的方法同為每分鐘 300，單獨計數；頁面每開一張 RFQ 讀一次 GetSession，遠低於這個額度。
-	tierInvitee = rateTier{name: "invitee", visitor: 300}
 	// tierProductView 是商品瀏覽打點：匿名、不需要登入、每次都寫入一筆事件，是公開寫入裡最容易被灌的一個，額度比一般的
 	// 公開讀取低（頁面每載入一次送一次；共用位址的人也在額度內）。
 	tierProductView = rateTier{name: "product-view", visitor: 120, ssr: 2400, ci: 60}
@@ -47,13 +43,6 @@ var (
 // 請求；帶有效 session 重新驗證的以帳號計）。一次登入是兩個請求，每分鐘 30 個（約 15 次登入），與 web 的 tierAuth 同一個保守的預設，擋灌 nonce 與
 // 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
 var tierAppLogin = rateTier{name: "app-login", visitor: 30}
-
-// vendor portal 的邀請 secret 是匿名來源猜得到的憑證：預覽與兌換共用同一個級別（同一個 name，每個來源一個計數器，不是各 20 次），
-// 每個來源 5 分鐘 20 次；Google 驗證更窄，每個來源 10 分鐘 10 次。SSR 與 CI 的身分沒有加倍：它們代表很多人，更不能共用額度。
-var (
-	tierVendorPortalInvite = rateTier{name: "vendor-portal-invite", window: 5 * time.Minute, visitor: 20}
-	tierVendorPortalVerify = rateTier{name: "vendor-portal-verify", window: 10 * time.Minute, visitor: 10}
-)
 
 // tierReportSubmit 是匿名食安通報以來源 IP 計數的兩個時間窗（httpseller.ReportSubmitQuotas；登入的通報以帳號在 handler 計數）。
 // 通報只由瀏覽器或 App 送出，SSR 與 CI 的身分沒有加倍。不加 captcha：食安通報是不能被第三方依賴擋住的緊急管道（同一則決策）。
@@ -70,9 +59,6 @@ var procedureTiers = map[string][]rateTier{
 	sellerconnect.SellerPublicServiceRecordProductViewProcedure:            {tierProductView},
 	socialconnect.SocialPublicServiceRecordPostViewProcedure:               {tierPostView},
 	sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure: tierReportSubmit,
-	agentconnect.VendorPortalPublicServicePreviewInviteProcedure:           {tierVendorPortalInvite},
-	agentconnect.VendorPortalPublicServiceExchangeInviteProcedure:          {tierVendorPortalInvite},
-	agentconnect.VendorPortalInviteeServiceVerifySessionProcedure:          {tierVendorPortalVerify},
 	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure:       {tierAppLogin},
 	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:          {tierAppLogin},
 }
@@ -86,8 +72,6 @@ func tiersOf(procedure string) []rateTier {
 	switch audience {
 	case rpc.AudiencePublic:
 		return []rateTier{tierPublic}
-	case rpc.AudienceInvitee:
-		return []rateTier{tierInvitee}
 	case rpc.AudienceApp, rpc.AudienceAdmin, rpc.AudienceDelegated:
 	}
 	return []rateTier{tierDefault}

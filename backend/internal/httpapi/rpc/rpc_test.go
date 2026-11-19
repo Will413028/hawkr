@@ -33,9 +33,7 @@ func TestAudienceFollowsTheServiceName(t *testing.T) {
 		{"/hawkr.content.v1alpha1.ContentPublicService/", AudiencePublic, true},
 		{"/hawkr.ordering.v1alpha1.OrderingAppService/GetOrder", AudienceApp, true},
 		{"/hawkr.admin.content.v1alpha1.ContentAdminService/UpdateBanner", AudienceAdmin, true},
-		{"/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession", AudienceInvitee, true},
-		{"/hawkr.agent.v1alpha1.VendorPortalInviteeService/", AudienceInvitee, true},
-		{"/hawkr.admin.agent.v1alpha1.VendorPortalInviteeService/GetSession", 0, false},
+		{"/hawkr.ordering.v1alpha1.OrderingInviteeService/GetOrder", 0, false},
 		// 後台的 service 不在 hawkr.admin.*，或 hawkr.admin.* 裡放了別的 service：名稱錯了就不掛。
 		{"/hawkr.content.v1alpha1.ContentAdminService/UpdateBanner", 0, false},
 		{"/hawkr.admin.content.v1alpha1.ContentPublicService/ListLiveBanners", 0, false},
@@ -54,7 +52,6 @@ func TestAuthorizeChecksTheCallerAgainstTheAudience(t *testing.T) {
 		public = "/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"
 		app    = "/hawkr.ordering.v1alpha1.OrderingAppService/GetOrder"
 		admin  = "/hawkr.admin.content.v1alpha1.ContentAdminService/GetBanner"
-		invite = "/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession"
 	)
 	buyer := &identity.Principal{Kind: identity.PrincipalAccount, ID: 7}
 	staff := &identity.Principal{Kind: identity.PrincipalAdmin, ID: 7}
@@ -66,8 +63,6 @@ func TestAuthorizeChecksTheCallerAgainstTheAudience(t *testing.T) {
 	}{
 		{"public 不需要身分", public, nil, 0},
 		{"public 帶了身分也通過", public, buyer, 0},
-		{"invitee 不讀身分，憑證在 service 自己的 interceptor", invite, nil, 0},
-		{"invitee 帶了身分也通過", invite, buyer, 0},
 		{"admin 沒有身分", admin, nil, connect.CodeUnauthenticated},
 		{"admin 是買家", admin, buyer, connect.CodePermissionDenied},
 		{"admin 是管理員", admin, staff, 0},

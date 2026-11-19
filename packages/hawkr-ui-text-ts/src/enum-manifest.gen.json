@@ -253,13 +253,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.agent.v1alpha1.SessionVerificationMethod",
-      "tsName": "SessionVerificationMethod",
-      "tsModule": "@hawkr/api/gen/hawkr/agent/v1alpha1/agent_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.buyer.v1alpha1.BuyerStatus",
       "tsName": "BuyerStatus",
       "tsModule": "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb",

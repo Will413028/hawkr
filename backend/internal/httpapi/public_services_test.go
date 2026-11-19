@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
-	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	discoverymod "github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -206,7 +205,7 @@ func TestNewHandlerRequiresDiscoveryAndStats(t *testing.T) {
 func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 	deps := Deps{
 		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "ReviewQueue") {
 		t.Fatalf("沒有 ReviewQueue：err=%v", err)
@@ -217,7 +216,7 @@ func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 func TestNewHandlerRequiresBuyer(t *testing.T) {
 	deps := Deps{
 		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
-		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Social: &social.Module{},
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "Buyer") {

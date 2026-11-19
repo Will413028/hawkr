@@ -8,7 +8,7 @@ import { canonicalThreadId } from "./thread-id";
  *
  * The thread page is statically prerendered, so a missing thread would be served
  * as a 200 soft-404 (`notFound()` inside a prerender cannot set the status; same
- * reason as the storefront decisions in lib/seller/canonical-redirect.ts). A real
+ * reason as the storefront decisions in lib/seller/storefront-guard.ts). A real
  * 404 has to come from the middleware, which asks the backend whether the thread exists.
  */
 const THREAD_PATH = /^\/sellers\/([^/]+)\/messages\/([^/]+)\/?$/;

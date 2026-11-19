@@ -71,7 +71,7 @@ dependencies:
   sentry_dio: ^9.25.0
   rxdart: ^0.28.0 # BehaviorSubject for emit-on-subscribe chat streams (§6.6)
   flutter_hooks: ^0.21.2
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^11.2.0
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
   uuid: ^4.5.1
@@ -87,7 +87,7 @@ dependencies:
 dev_dependencies:
   fixnum: ^1.1.1 # Generated int64 values in Connect contract tests.
   flutter_native_splash: ^2.4.1
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.2
   integration_test:
     sdk: flutter
   flutter_test:

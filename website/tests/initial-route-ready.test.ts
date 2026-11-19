@@ -23,9 +23,6 @@ test("request-time public routes own an explicit initial content handoff", () =>
 	assert.deepEqual(routeContentReadySelectors("/products/not-a-valid-id"), [
 		PRODUCT_CONTENT_READY_SELECTOR,
 	]);
-	assert.deepEqual(routeContentReadySelectors("/sellers/456/products/123"), [
-		PRODUCT_CONTENT_READY_SELECTOR,
-	]);
 
 	for (const pathname of [
 		"/sellers/456",

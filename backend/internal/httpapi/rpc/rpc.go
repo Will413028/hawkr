@@ -27,8 +27,6 @@ const (
 	AudienceApp
 	// AudienceAdmin 是 hawkr.admin.* 的 <模組>AdminService：管理員。
 	AudienceAdmin
-	// AudienceInvitee 是 <模組>InviteeService：兌換了邀請的供應商（沒有帳號），憑證是 service 自己的 cookie，不讀身分。
-	AudienceInvitee
 	// AudienceDelegated 是 <模組>DelegatedService：代行營運中的平台管理員，憑證是請求標頭 X-HK-Operation-Session 的代行 session，由 service 自己的 interceptor
 	// 解析並逐方法檢查能力，不讀顧客或管理員的身分（也不經 adminauth）。
 	AudienceDelegated
@@ -42,8 +40,6 @@ func (a Audience) String() string {
 		return "app"
 	case AudienceAdmin:
 		return "admin"
-	case AudienceInvitee:
-		return "invitee"
 	case AudienceDelegated:
 		return "delegated"
 	}
@@ -63,8 +59,6 @@ func AudienceOf(procedure string) (Audience, bool) {
 		return 0, false
 	case strings.HasSuffix(svc, "AppService"):
 		return AudienceApp, true
-	case strings.HasSuffix(svc, "InviteeService"):
-		return AudienceInvitee, true
 	case strings.HasSuffix(svc, "DelegatedService"):
 		return AudienceDelegated, true
 	case strings.HasSuffix(svc, "PublicService"):
@@ -106,7 +100,7 @@ func authorize(ctx context.Context, procedure string) error {
 	if !ok {
 		return Error(connect.CodePermissionDenied, "%s", "這個方法不對外開放")
 	}
-	if audience == AudiencePublic || audience == AudienceInvitee || audience == AudienceDelegated {
+	if audience == AudiencePublic || audience == AudienceDelegated {
 		return nil
 	}
 	p, ok := PrincipalFrom(ctx)
@@ -122,7 +116,7 @@ func authorize(ctx context.Context, procedure string) error {
 		if p.Kind != identity.PrincipalAccount {
 			return userError(connect.CodePermissionDenied, CommonText(ctx, connect.CodePermissionDenied))
 		}
-	case AudiencePublic, AudienceInvitee, AudienceDelegated:
+	case AudiencePublic, AudienceDelegated:
 	}
 	return nil
 }

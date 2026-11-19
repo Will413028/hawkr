@@ -62,7 +62,7 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// orderNotFound 是訂單不存在與訂單屬於別人的共同回應，呼叫端分不出兩者（A6-D10）。
+// orderNotFound 是訂單不存在與訂單屬於別人的共同回應，呼叫端分不出兩者。
 func orderNotFound(l uitext.Locale) error {
 	return model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
 }

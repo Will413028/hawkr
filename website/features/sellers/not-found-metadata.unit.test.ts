@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cached = vi.hoisted(() => ({
-	getCachedSeller: vi.fn(),
+	getCachedStore: vi.fn(),
 	getCachedSellerReviewStats: vi.fn(),
 	getCachedSellerReviews: vi.fn(),
 	getCachedStorePosts: vi.fn(),
@@ -29,7 +29,7 @@ const cases = [
 	{ locale: "en", missing: "Seller not found" },
 ];
 
-beforeEach(() => cached.getCachedSeller.mockResolvedValue(undefined));
+beforeEach(() => cached.getCachedStore.mockResolvedValue(undefined));
 
 describe.each(Object.entries(pages))("%s not-found title", (_n, gen) => {
 	it.each(cases)("$locale", async (c) => {

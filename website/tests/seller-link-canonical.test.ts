@@ -32,11 +32,9 @@
  * the store name and logo out of the very same response. Zero extra RPC, so
  * they cleared the "already fetched, merely dropped" bar.
  *
- * Those four pass ONLY the code to `sellerPath()` — no fallback id. A payload
+ * Those four pass the code to `sellerPath()`. A payload
  * that reaches them without a code has lost the seller block entirely (service
- * degraded), so the row renders as plain text rather than a link. The fallback
- * that remains in `sellerPath` serves the payloads that carry a seller key but
- * make no lookup at all (recommended-seller rows, legacy cart groups).
+ * degraded), so the row renders as plain text rather than a link.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -57,7 +55,7 @@ import { sellerCanonicalUrl, sellerPath, sellerUrl } from "../lib/seo/urls";
  * a store_id path.
  */
 function canonicalOnly(storeCode: string | undefined): string {
-	return sellerPath(storeCode, undefined);
+	return sellerPath(storeCode);
 }
 
 const STORE_ID = "2636840881";
@@ -193,18 +191,16 @@ test("reference entries take their store link from the store card, not the snaps
 	}
 });
 
-test("sellerPath prefers the store_code and falls back to the key it was given", async () => {
+test("sellerPath is built from the store_code alone and is empty without one", async () => {
 	const { sellerPath } = await import("../lib/seo/urls");
-	assert.equal(sellerPath(STORE_CODE, STORE_ID), `/sellers/${STORE_CODE}`);
-	assert.equal(sellerPath(undefined, STORE_ID), `/sellers/${STORE_ID}`);
-	assert.equal(sellerPath("", STORE_ID), `/sellers/${STORE_ID}`);
-	assert.equal(sellerPath(" ", STORE_ID), `/sellers/${STORE_ID}`);
-	// Numeric keys arrive off the wire as numbers on some payloads.
-	assert.equal(sellerPath(null, 2636840881), `/sellers/${STORE_ID}`);
-	// Neither key usable → empty, so a caller's own guard is what decides
-	// whether a link renders at all (never a link to `/sellers/`).
-	assert.equal(sellerPath(null, undefined), "");
-	assert.equal(sellerPath(undefined, ""), "");
+	assert.equal(sellerPath(STORE_CODE), `/sellers/${STORE_CODE}`);
+	// Numeric codes arrive off the wire as numbers on some payloads.
+	assert.equal(sellerPath(2636840881), `/sellers/${STORE_ID}`);
+	// No code → empty (never a store_id path, which answers 404, and never `/sellers/`).
+	assert.equal(sellerPath(undefined), "");
+	assert.equal(sellerPath(""), "");
+	assert.equal(sellerPath(" "), "");
+	assert.equal(sellerPath(null), "");
 });
 
 test("product list mapping carries the seller store_code to the card", () => {
@@ -455,7 +451,7 @@ test("conversation rows carry the seller store_code the wire now sends", async (
  * undefined, and falls through to the request's own id segment — which is
  * ALREADY the store_code on every request middleware canonicalized. So the bug
  * is invisible exactly as long as the backend is healthy: middleware fails OPEN
- * on a rate limit / 5xx / timeout (`canonical-redirect.ts` → `{kind:"unknown"}`),
+ * on a rate limit / 5xx / timeout (`storefront-guard.ts` → `{kind:"unknown"}`),
  * and on that path the page renders at the store_id URL and self-canonicalizes
  * to the WRONG one.
  *

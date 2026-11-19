@@ -5,24 +5,12 @@ import { fileURLToPath } from "node:url";
 import { sellerPath } from "../lib/seo/urls";
 
 /**
- * Why post cards must not fall back to `sellerId`.
+ * Post cards link the storefront from the post's `storeCode` alone.
  *
- * `sellerPath(code, fallbackId)` is right almost everywhere: a recommended-seller
- * row or a product's seller block can legitimately lack a minted `storeCode`,
- * and `/sellers/{store_id}` 308s to the canonical path — one redirect, not a dead
- * link.
- *
- * Posts invert that. The gateway fills `storeCode` only when `GetSellerBatch`
- * actually found the seller (`marketplace.go`: the assignment sits inside
- * `if info, ok := sellerMap[sellerID]; ok`), so an empty value means NOT FOUND —
- * and `/sellers/{store_id}` then 404s. Passing the fallback turns "do not link
- * this" into a link that is guaranteed to break. `post.go` says so in the field
- * comment; these tests are what stops the sentence from being only a comment.
- *
- * Observed 2026-08-04 in the scheduled contract run (30949696548): two post cards
- * rendered `/sellers/7487659509985814869` and `/sellers/7487329918184193303`,
- * both 404. Their name and avatar came through fine — social-service keeps a
- * denormalised snapshot — so only the link was ever wrong.
+ * The gateway fills `storeCode` only when `GetSellerBatch` actually found the
+ * seller, so an empty value means NOT FOUND: the card renders the seller without
+ * a link. `sellerPath` takes no store_id fallback because `/sellers/{store_id}`
+ * is not a storefront URL and answers 404.
  */
 
 const componentPaths = {
@@ -40,24 +28,13 @@ const componentPaths = {
 	),
 };
 
-test("the fallback really does manufacture the dead link", () => {
-	// Not a strawman: this is exactly what the two components used to do, and it
-	// is why a comment alone was not enough. The function is behaving correctly —
-	// the caller was asking it the wrong question.
-	assert.equal(
-		sellerPath("", "7487659509985814869"),
-		"/sellers/7487659509985814869",
-		"passing a post's sellerId as fallback yields the URL that 404s",
-	);
-	// One argument, and the caller gets a falsy value it can branch on.
+test("sellerPath gives a falsy value without a code", () => {
 	assert.equal(sellerPath(""), "");
 	assert.equal(sellerPath(null), "");
 	assert.equal(sellerPath(undefined), "");
 	// And it still builds the canonical path when a code IS present, so guarding
 	// costs nothing in the normal case.
 	assert.equal(sellerPath("2605576172"), "/sellers/2605576172");
-	// The fallback stays available for every other surface, where it is correct.
-	assert.equal(sellerPath(undefined, "2605576172"), "/sellers/2605576172");
 });
 
 test("post-facing callers pass storeCode alone", async () => {

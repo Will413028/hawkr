@@ -144,7 +144,7 @@ func TestNotificationQueuesExistInTerraformTopology(t *testing.T) {
 // shrink what this service consumes.
 func TestBuildDynamicSubscriptionsIsDerivedFromMap(t *testing.T) {
 	subs := buildDynamicSubscriptions(
-		NewTemplateCache(nil), nil, nil, "https://cdn.example", zap.NewNop(), vendorInviteDeps{})
+		NewTemplateCache(nil), nil, nil, "https://cdn.example", zap.NewNop())
 
 	if len(subs) != len(notificationQueueByExchange) {
 		t.Fatalf("subscription 數 = %d，預期 %d（應與 map 等長，與 cache 內容無關）",

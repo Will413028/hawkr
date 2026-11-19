@@ -162,10 +162,6 @@ const DYNAMIC_ROUTE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 		"/adm/:storeId/:area",
 	],
 	[
-		/^\/sellers\/[^/]+\/products\/[^/]+(?:\/.*)?$/,
-		"/sellers/:sellerId/products/:productId",
-	],
-	[
 		/^\/seller-center\/coupons\/[^/]+(?:\/.*)?$/,
 		"/seller-center/coupons/:couponId",
 	],

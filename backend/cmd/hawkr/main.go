@@ -27,7 +27,6 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi"
-	httpagent "github.com/Will413028/hawkr/backend/internal/httpapi/agent"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -246,13 +245,11 @@ func runServe(ctx context.Context) error {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
 	subscribeModeration(bus, moderationModule.Retention())
-	agentModule := newAgent(d, sellerModule)
-	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
 		return gatewayproxy.Caller{Principal: p}, ok
-	}, httpagent.SessionOf(agentModule), buyerModule, sellerModule, nil, log)
+	}, buyerModule, sellerModule, nil, log)
 	if err != nil {
 		return err
 	}
@@ -283,7 +280,6 @@ func runServe(ctx context.Context) error {
 		Buyer:           buyerModule,
 		Seller:          sellerModule,
 		Payment:         payments,
-		Agent:           agentModule,
 		Discovery:       discoveryModule,
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
 		Stats:           stats,
@@ -316,7 +312,7 @@ func runServe(ctx context.Context) error {
 	legacyMux := http.NewServeMux()
 	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
-	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, agentModule, log)))
+	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 }
@@ -414,8 +410,6 @@ func runWorker(ctx context.Context) error {
 	delegationDeps.Social = socialModule
 	newDelegation(bus, delegationDeps)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
-	agentModule := newAgent(d, sellerModule)
-	subscribeAgent(bus, agentModule)
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	consumer := buyerconsumer.Consumer{
 		Buyer: buyerModule,
@@ -443,7 +437,6 @@ func runWorker(ctx context.Context) error {
 	socialModule.AddWorkers(workers)
 	moderationModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
-	agentModule.AddWorkers(workers)
 	deletion.AddWorkers(workers)
 	consumer.AddWorkers(workers)
 	river.AddWorker(workers, rabbitmq.NewWorker(pub))
@@ -458,7 +451,6 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, socialModule.PeriodicJobs()...)
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
-	periodic = append(periodic, agentModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
 	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
 	if err != nil {

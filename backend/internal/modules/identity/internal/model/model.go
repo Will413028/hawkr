@@ -78,27 +78,10 @@ type AdminVerifier interface {
 	Verify(ctx context.Context, token string) (AdminIdentity, error)
 }
 
-// Identity 是驗證過的 Google ID token 的內容。
-type Identity struct {
-	Subject       string
-	Email         string
-	EmailVerified bool
-	// Nonce 是 token 的 nonce claim，沒有時是空字串；IssuedAt 是 iat，沒有時是零值。
-	Nonce    string
-	IssuedAt time.Time
-}
-
-// IDTokenVerifier 驗證 Google 的 ID token。token 無效時回傳包著 ErrInvalidToken 的錯誤。
-type IDTokenVerifier interface {
-	Verify(ctx context.Context, idToken string) (Identity, error)
-}
-
 // Providers 是外部的 provider。沒有設定的欄位是 nil 或空的。
 type Providers struct {
 	// Admin 是後台的 Access 或本機 dev verifier。
 	Admin AdminVerifier
-	// Google 驗證 vendor portal step-up 的 ID token（單體入口的 VerifySession）；nil 時回 unavailable。
-	Google IDTokenVerifier
 }
 
 // Account 是帳號。存活的帳號都是買家；刪除的帳號只留墓碑：沒有 email 與角色。

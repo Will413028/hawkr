@@ -29,11 +29,6 @@ export const PUBLIC_INITIAL_CONTENT_RULES = [
 		product: true,
 	},
 	{
-		pattern: "^/sellers/[^/]+/products/([^/]+)$",
-		selectors: [PRODUCT_CONTENT_READY_SELECTOR],
-		product: true,
-	},
-	{
 		pattern: "^/sellers/[^/]+(?:/(?:messages|posts|reviews))?$",
 		selectors: [
 			SELLER_PROFILE_READY_SELECTOR,

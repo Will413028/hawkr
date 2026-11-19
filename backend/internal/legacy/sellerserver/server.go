@@ -1,6 +1,5 @@
 // Package sellerserver exposes the SellerService methods still used by legacy services (Java and the late-migrating Go services):
-// the read methods served from the seller module, and the vendor portal invite methods (Ensure and Mark) served from the agent
-// module. The other methods stay Unimplemented.
+// the read methods served from the seller module. The other methods stay Unimplemented.
 package sellerserver
 
 import (
@@ -54,21 +53,20 @@ type Server struct {
 	seller    *seller.Module
 	ratings   Ratings
 	followers Followers
-	invites   Invites
 	log       *slog.Logger
 }
 
 var _ sellerconnect.SellerServiceHandler = (*Server)(nil)
 
-// New 建立 server；ratings、followers 與 invites 是評分、粉絲數與供應商邀請的來源，必填。
-func New(m *seller.Module, ratings Ratings, followers Followers, invites Invites, log *slog.Logger) *Server {
-	if m == nil || ratings == nil || followers == nil || invites == nil {
+// New 建立 server；ratings 與 followers 是評分與粉絲數的來源，必填。
+func New(m *seller.Module, ratings Ratings, followers Followers, log *slog.Logger) *Server {
+	if m == nil || ratings == nil || followers == nil {
 		panic("sellerserver: missing dependency")
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{seller: m, ratings: ratings, followers: followers, invites: invites, log: log}
+	return &Server{seller: m, ratings: ratings, followers: followers, log: log}
 }
 
 // failure 把模組的分類錯誤轉成舊契約的業務碼（NotFound 404、InvalidInput 400、FailedPrecondition 428，與舊 seller-service 相同）；

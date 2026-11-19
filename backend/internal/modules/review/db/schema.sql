@@ -12,7 +12,7 @@ CREATE SCHEMA review;
 
 -- 買家對一個訂單項目的評價（一個 order_item_id 至多一則，UNIQUE 是「已評價過」的最終保證）。評價不可編輯、沒有作者自刪的入口，所以沒有 deleted_at；
 -- 買家刪帳時評價被實刪（purge job 隨刪帳訂閱者另外接）。ID 是 UUIDv7；buyer_id、store_id、product_id、order_item_id 是外部的業務鍵。
--- order_no、sku_name、item_image_key、price 是建立當下取自訂單項目的快照（RD6：不收 client 的值），之後不變。content 空就是 NULL。
+-- order_no、sku_name、item_image_key、price 是建立當下取自訂單項目的快照（不收 client 的值），之後不變。content 空就是 NULL。
 CREATE TABLE review.reviews (
     id             UUID        PRIMARY KEY,
     order_no       TEXT        NOT NULL,
@@ -46,7 +46,7 @@ CREATE INDEX reviews_product ON review.reviews (product_id, created_at DESC, id 
 CREATE INDEX reviews_store ON review.reviews (store_id, created_at DESC, id DESC);
 CREATE INDEX reviews_buyer ON review.reviews (buyer_id, created_at DESC, id DESC);
 
--- 評價的附圖：張數上限由 position 的範圍保證（RD7：不靠截斷）。asset_id 給媒體引用同步，object_key 給顯示。
+-- 評價的附圖：張數上限由 position 的範圍保證（不靠截斷）。asset_id 給媒體引用同步，object_key 給顯示。
 CREATE TABLE review.review_images (
     review_id  UUID     NOT NULL REFERENCES review.reviews (id) ON DELETE CASCADE,
     position   SMALLINT NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE review.review_images (
     CONSTRAINT review_images_key_check CHECK (object_key <> '')
 );
 
--- 評價的隱藏紀錄：理由、來源、還原與稽核在同一處，可以多次隱藏與還原（還原留列不刪，RD3）。只有 review 模組寫。reason_category 是 PolicyCategory 的社群子集
+-- 評價的隱藏紀錄：理由、來源、還原與稽核在同一處，可以多次隱藏與還原（還原留列不刪）。只有 review 模組寫。reason_category 是 PolicyCategory 的社群子集
 -- （platform/policy.CommunityAssessable，與 social.hides 相同；TestHideCategoriesMatchPolicy）；source_ref 是 moderation 的案件的不透明參照。
 -- 同一則評價未還原的隱藏最多一筆（部分唯一索引）。
 CREATE TABLE review.hides (

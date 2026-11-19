@@ -69,7 +69,6 @@ func buildDynamicSubscriptions(
 	inboxUC *usecase.NotificationInboxUseCase,
 	mediaBase string,
 	logger *zap.Logger,
-	vendorInvite vendorInviteDeps,
 ) []mq.Subscription {
 	// Loud, not silent: a template on an exchange with no queue mapped here can
 	// never be delivered. Under passive declare the broker raises nothing — the
@@ -94,9 +93,6 @@ func buildDynamicSubscriptions(
 	subs := make([]mq.Subscription, 0, len(exchanges))
 	for _, ex := range exchanges {
 		handler := newTemplateHandler(cache, sendPush, inboxUC, ex, mediaBase, logger)
-		if ex == mq.ExchangeProcurement {
-			handler = withVendorInvite(handler, newVendorInviteHandler(vendorInvite))
-		}
 		subs = append(subs, mq.Subscription{
 			Exchange:    ex,
 			Queue:       notificationQueueByExchange[ex],

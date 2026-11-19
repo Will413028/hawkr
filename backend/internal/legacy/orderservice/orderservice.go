@@ -168,7 +168,7 @@ func (c *Client) SpendingRecords(ctx context.Context, buyerID, storeID int64, pa
 }
 
 // ErrOrderNotFound 表示 order-service 明確回報訂單不存在（回應內 code 404）。其他失敗（傳輸錯誤、其他 code、不合法的回應）
-// 都不是「不存在」，呼叫端不得當成不存在處理（RD9）。
+// 都不是「不存在」，呼叫端不得當成不存在處理。
 var ErrOrderNotFound = errors.New("orderservice：訂單不存在")
 
 // grpcNotFound 是 GrpcResponseCode.NOT_FOUND（Java common-core）。
@@ -255,6 +255,9 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 		}
 		if !utf8.ValidString(item.GetSkuName()) || utf8.RuneCountInString(item.GetSkuName()) > maxReviewSkuNameRunes {
 			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 %d 的規格名稱不合法", itemID)
+		}
+		if !utf8.ValidString(item.GetImageObjectKey()) {
+			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 %d 的商品圖鍵不合法", itemID)
 		}
 		out.Items = append(out.Items, ReviewOrderItem{OrderItemID: itemID, ProductID: productID, SkuName: item.GetSkuName(), ImageKey: item.GetImageObjectKey(), Price: price})
 	}

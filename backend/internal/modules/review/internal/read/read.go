@@ -145,7 +145,7 @@ func (s *Service) ListMyReviews(ctx context.Context, buyerID int64, after *model
 	return s.page(ctx, list, size)
 }
 
-// GetReview 是單筆讀取：與列表同一個公開可讀述詞（RD10），觀看者規則同列表；不可讀的與不存在的同一個 NotFound，不洩漏存在性。
+// GetReview 是單筆讀取：與列表同一個公開可讀述詞，觀看者規則同列表；不可讀的與不存在的同一個 NotFound，不洩漏存在性。
 func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (model.Review, error) {
 	var r store.ReviewReview
 	var err error

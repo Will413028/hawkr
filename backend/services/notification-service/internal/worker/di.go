@@ -9,8 +9,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/Will413028/hawkr/go-pkg/mail"
-	"github.com/Will413028/hawkr/go-pkg/mail/mailfactory"
 	"github.com/Will413028/hawkr/go-pkg/mq"
 	"github.com/Will413028/hawkr/go-pkg/outbox"
 	"github.com/Will413028/hawkr/notification-service/internal/config"
@@ -43,26 +41,7 @@ func startConsumer(
 		logger.Error("[worker] failed to load template cache at startup", zap.Error(err))
 	}
 
-	mailSender, err := mailfactory.New(mailfactory.Config{
-		Provider:          cfg.Mail.Provider,
-		APIKey:            cfg.Mail.ResendAPIKey,
-		RecipientPolicy:   cfg.Mail.RecipientPolicy,
-		AllowedRecipients: cfg.Mail.AllowedRecipients,
-		RedirectTo:        cfg.Mail.RedirectTo,
-	}, logger)
-	if err != nil {
-		logger.Fatal("[worker] failed to build mail sender", zap.Error(err))
-	}
-	vendorInvite := vendorInviteDeps{
-		Invites:  sellerClient,
-		Mail:     mailSender,
-		From:     mail.Address{Email: cfg.Mail.From, Name: "Hawkr"},
-		BaseURL:  cfg.VendorPortal.BaseURL,
-		MarkSent: sellerClient.MarkInviteSecretDelivered,
-		Logger:   logger,
-	}
-
-	subs := buildDynamicSubscriptions(cache, sendPush, inboxUC, cfg.MediaBaseURL, logger, vendorInvite)
+	subs := buildDynamicSubscriptions(cache, sendPush, inboxUC, cfg.MediaBaseURL, logger)
 	subs = append(subs, staticSubscriptions(inboxUC, logger)...)
 	consumer := mq.NewResilientConsumer(cfg.RabbitMQ.URL, subs, mq.WithOTelMetrics(meterProvider))
 

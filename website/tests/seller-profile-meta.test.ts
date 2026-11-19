@@ -75,3 +75,27 @@ test("seller profile inserts separators only between visible meta items", () => 
 	);
 	assert.match(markup, /台北市 · 信義區/);
 });
+
+test("seller profile meta shows an unset review count as a dash, and a real zero as 0", () => {
+	const unset = renderToStaticMarkup(
+		createElement(SellerProfileMeta, {
+			rating: "4.5",
+			totalReviews: null,
+			location: "",
+			subscribers: 3,
+			websiteUrl: "",
+		}),
+	);
+	assert.match(unset, /<span>\(—\)<\/span>/);
+	assert.doesNotMatch(unset, /<span>\(0\)<\/span>/);
+	const zero = renderToStaticMarkup(
+		createElement(SellerProfileMeta, {
+			rating: "4.5",
+			totalReviews: 0,
+			location: "",
+			subscribers: 3,
+			websiteUrl: "",
+		}),
+	);
+	assert.match(zero, /<span>\(0\)<\/span>/);
+});

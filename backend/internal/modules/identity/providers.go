@@ -1,7 +1,6 @@
 package identity
 
 import (
-	"context"
 	"crypto/rsa"
 	"time"
 
@@ -35,11 +34,6 @@ type (
 
 // NewAppLogin 建立 Google 或 LINE 的 App 登入驗證；cfg.Provider 指定哪一家。
 func NewAppLogin(cfg AppLoginConfig) (*AppLogin, error) { return provider.NewAppLogin(cfg) }
-
-// NewGoogleVerifier 建立 vendor portal step-up 的 Google ID token verifier。
-func NewGoogleVerifier(audiences []string, lifetime ...context.Context) (IDTokenVerifier, error) {
-	return provider.NewGoogleVerifier(audiences, lifetime...)
-}
 
 // NewAccess 建立後台 Access JWT verifier。
 func NewAccess(cfg AccessConfig) (AdminVerifier, error) { return provider.NewAccess(cfg) }

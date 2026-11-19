@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/oidc"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 )
@@ -106,35 +105,5 @@ func TestDevAdminUsesAccessClaims(t *testing.T) {
 	}
 	if _, err := dev.Admins().Verify(context.Background(), noAudience); !errors.Is(err, model.ErrInvalidToken) {
 		t.Fatalf("沒有 audience 的 admin token = %v", err)
-	}
-}
-
-func TestGoogleIssuerVariants(t *testing.T) {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg := googleConfig([]string{"buyer-web"})
-	cfg.PublicKey = &key.PublicKey
-	cfg.JWKSURL = ""
-	v, err := oidc.New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, (&jose.SignerOptions{}).WithType("JWT"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, issuer := range []string{oidc.GoogleIssuer, oidc.GoogleIssuerNoScheme} {
-		raw, err := jwt.Signed(signer).Claims(jwt.Claims{
-			Issuer: issuer, Subject: "google-user", Audience: jwt.Audience{"buyer-web"},
-			Expiry: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-		}).Serialize()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := v.Verify(context.Background(), raw); err != nil {
-			t.Errorf("issuer %q: %v", issuer, err)
-		}
 	}
 }

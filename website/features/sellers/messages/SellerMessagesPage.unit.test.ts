@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cached = vi.hoisted(() => ({ getCachedSeller: vi.fn() }));
+const cached = vi.hoisted(() => ({ getCachedStore: vi.fn() }));
 const forum = vi.hoisted(() => ({ fetchSellerForum: vi.fn() }));
 vi.mock("@/lib/api/cached", () => cached);
 vi.mock("@/lib/forum/repo", () => forum);
@@ -21,7 +21,7 @@ function find(node: unknown): Element | undefined {
 
 beforeEach(() => {
 	forum.fetchSellerForum.mockReset().mockResolvedValue({ comments: [] });
-	cached.getCachedSeller
+	cached.getCachedStore
 		.mockReset()
 		.mockResolvedValue({ storeId: "7", storeCode: "shop-code" });
 });

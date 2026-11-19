@@ -36,10 +36,12 @@ var Dependencies = map[string][]string{
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
 	"moderation":        {"social", "seller", "buyer", "accountsuspension", "media"},      // 社群檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立；快照引用的圖片在 media 登記引用（證據保全）。
 	"reviewqueue":       {"seller", "payment", "moderation"},                              // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
-	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
+	"procurement":       {"ordering", "catalog", "buyer", "seller"},                       // 採購（RFQ）；事件由 notification 訂閱，procurement 不依賴 notification（A9-D3）。
+	"assistant":         {"ordering", "catalog", "buyer"},                                 // 買家助理（A9-D3）。
+	"imageai":           {"seller", "media"},                                              // AI 修圖與配額（A9-D3）。
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
-		"coupon", "aftersales", "review", "im", "social", "agent", "finance", "delegation",
+		"coupon", "aftersales", "review", "im", "social", "procurement", "finance", "delegation",
 	},
 }
 
@@ -58,6 +60,21 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":    {},
 		"text":     {},
 		"write":    {"mediaref", "model", "rows", "store", "text"},
+	}},
+	"imageai": {Packages: map[string][]string{
+		"feature": {},
+		"model":   {},
+		"store":   {},
+	}},
+	"assistant": {Packages: map[string][]string{
+		"feature": {},
+		"model":   {},
+		"store":   {},
+	}},
+	"procurement": {Packages: map[string][]string{
+		"feature": {},
+		"model":   {},
+		"store":   {},
 	}},
 	"moderation": {Packages: map[string][]string{
 		"handle":    {"model", "snapshot", "store", "text", "view"},
@@ -103,7 +120,6 @@ var InternalDependencies = map[string]InternalGraph{
 		"model":   {},
 		"store":   {},
 	}},
-	"agent": {Packages: map[string][]string{"vendorportal": {"model", "store"}, "model": {}, "store": {}}},
 	"accountdeletion": {Packages: map[string][]string{
 		"request": {"model", "store"},
 		"model":   {},
