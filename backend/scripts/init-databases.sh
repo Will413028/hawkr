@@ -95,7 +95,6 @@ DATABASES=(
   "hawkr_aftersales"
   "hawkr_order"
   "hawkr_product"
-  "hawkr_social"
   "hawkr_cart"
   "hawkr_crm"
   "hawkr_review"

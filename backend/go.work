@@ -12,5 +12,4 @@ use (
 	./services/notification-service
 	./services/review-service
 	./services/seller-service
-	./services/social-service
 )

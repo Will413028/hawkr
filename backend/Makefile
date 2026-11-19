@@ -10,8 +10,7 @@ GO_SERVICES := \
 	services/invoice-service \
 	services/notification-service \
 	services/review-service \
-	services/seller-service \
-	services/social-service
+	services/seller-service
 
 # Go services with their own Atlas-managed DB (all GO_SERVICES except gateway, which has none)
 ATLAS_SERVICES := $(filter-out gateway,$(GO_SERVICES))

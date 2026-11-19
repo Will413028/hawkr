@@ -73,8 +73,6 @@ services:
       PRODUCT_SERVICE_PORT: 9912
       ORDER_SERVICE_HOST: order-service
       ORDER_SERVICE_PORT: 9914
-      SOCIAL_SERVICE_HOST: social-service
-      SOCIAL_SERVICE_GRPC_PORT: 9918
       COUPON_SERVICE_HOST: coupon-service
       COUPON_SERVICE_GRPC_PORT: 9951
       REVIEW_SERVICE_HOST: review-service
@@ -864,98 +862,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Social Service (gRPC 9918；final architecture，無 HTTP management port)
-  # ==========================================
-
-  social-service:
-    build:
-      context: .
-      dockerfile: services/social-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/social-service:latest
-    container_name: social-service
-    restart: unless-stopped
-    ports:
-      - "9918:9918"
-    volumes:
-      - ./services/social-service:/app/services/social-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      BUYER_SERVICE_HOST: host.docker.internal
-      BUYER_SERVICE_GRPC_PORT: 9941
-      SELLER_SERVICE_HOST: host.docker.internal
-      SELLER_SERVICE_GRPC_PORT: 9941
-      GRPC_PORT: 9918
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_social
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ — social-service 是 producer（41 號設計書 §6.1 / §6.3）
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
-
-      # OSS
-
-      # Service Discovery
-      ACCOUNT_SERVICE_HOST: host.docker.internal
-      ACCOUNT_SERVICE_GRPC_PORT: 9941
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
-
-      # ── ADM 代行營運：排程貼文發布 worker（56 號設計書 §8.5.1 (B)）──
-      # 全部字面值：這組沒有任何一支是「本機測試會調」的（要調就直接改這裡）。
-      # Config.Validate() 的三條斷言比的是這組彼此之間的不等式，全部吃程式碼預設值時
-      # 三條照樣成立、boot 照樣綠 —— 斷言擋得住「調錯」，擋不住「沒設」，所以要列全。
-      SCHEDULED_POST_PUBLISH_POLL_INTERVAL_SECONDS: 30
-      SCHEDULED_POST_PUBLISH_BATCH_SIZE: 50
-      SCHEDULED_POST_PUBLISH_LEASE_SECONDS: 120
-      SCHEDULED_POST_PUBLISH_MAX_RETRY: 5
-      SCHEDULED_POST_PUBLISH_BACKOFF_BASE_SECONDS: 60
-      SCHEDULED_POST_PUBLISH_BACKOFF_MAX_SECONDS: 1800
-      SCHEDULED_POST_PUBLISH_AUDIT_INTENT_DEADLINE_MS: 800
-      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_DEADLINE_MS: 400
-      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_MAX_ATTEMPTS: 3
-      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_TOTAL_BUDGET_MS: 2000
-      SCHEDULED_POST_PUBLISH_TX_BUDGET_MS: 5000
-      SCHEDULED_POST_PUBLISH_WINDOW_HOURS: 24
-
-      # Dev Configs
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-      TRACING_ENABLED: "true"
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/social-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9918 -service hawkr.social.SocialService"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:

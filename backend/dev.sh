@@ -12,7 +12,7 @@ COMPOSE="docker compose -f $COMPOSE_FILE"
 INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 
 # Go 服務（Air hot-reload，改完自動生效）
-GO_SERVICES=(gateway social-service ai-service im-service review-service crm-service notification-service invoice-service)
+GO_SERVICES=(gateway ai-service im-service review-service crm-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
 JAVA_SERVICES=(payment-service media-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
@@ -627,7 +627,7 @@ cmd_status() {
 #     的方式；就地 apply 需要幫已污染的歷史狀態猜 baseline，等於把污染攤平成「已驗證」。
 #   - Java 服務：Flyway 於服務啟動時自動套用，seed 不代勞、不重放。
 # 全程 fail-loud（無 `|| true` / 錯誤吞噬）：任何一步失敗立即中止並印出真實錯誤。
-GO_SEED_SERVICES=(notification-service ai-service crm-service im-service review-service social-service invoice-service)
+GO_SEED_SERVICES=(notification-service ai-service crm-service im-service review-service invoice-service)
 
 go_seed_db_for() {
   case "$1" in
@@ -636,7 +636,6 @@ go_seed_db_for() {
     crm-service)          echo "hawkr_crm" ;;
     im-service)           echo "hawkr_im" ;;
     review-service)       echo "hawkr_review" ;;
-    social-service)       echo "hawkr_social" ;;
     invoice-service)      echo "hawkr_invoice" ;;
     *) err "go_seed_db_for: 未知服務 $1"; exit 1 ;;
   esac
@@ -785,7 +784,7 @@ cmd_help() {
   ─── 架構說明 ────────────────────────────────────────────────
 
     Go 服務（改 code 自動生效，無需任何操作）：
-      gateway, seller, social, crm,
+      gateway, seller, crm,
       ai, im, review, notification
 
     單體（content 等已搬進的模組，不在 compose 裡）：
