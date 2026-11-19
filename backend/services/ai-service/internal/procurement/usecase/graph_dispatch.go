@@ -300,16 +300,28 @@ func runGraphOutcome(
 	cancelObserver := newRunCancelObserver(runStore, run.ID, in.BuyerID)
 	cancelled := false
 
-	for ev, evErr := range r.Run(ctx, userID, sessionID, msg, agent.RunConfig{}, runOpts...) {
+	// 看到取消時不直接 break：先取消 runCtx 讓 graph 停下，再把 iterator 讀完。
+	// ADK 可能在回報 node 錯誤之前先送出別的 event，直接 break 會讓已經發生的
+	// 故障被蓋成「使用者取消的」。讀完之後，只有因取消而來的 context.Canceled
+	// 才算取消；其他錯誤照實回報成 FAILED。
+	runCtx, stopRun := context.WithCancel(ctx)
+	defer stopRun()
+
+	for ev, evErr := range r.Run(runCtx, userID, sessionID, msg, agent.RunConfig{}, runOpts...) {
 		if evErr != nil {
+			if cancelled && errors.Is(evErr, context.Canceled) && ctx.Err() == nil {
+				continue
+			}
 			runErr = evErr
 			break
 		}
-		// ⚠️ 檢查排在 evErr 之後、處理這個事件之前：已經發生的錯誤是事實，要照
-		// 實回報成 FAILED，不能被一個後到的取消蓋成「使用者取消的」。
+		if cancelled {
+			continue
+		}
 		if cancelObserver.cancelRequested(ctx) {
 			cancelled = true
-			break
+			stopRun()
+			continue
 		}
 		if ev != nil && ev.Actions.StateDelta != nil {
 			// graph_turn_progress accumulates across extract_slots/
