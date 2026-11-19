@@ -14,8 +14,8 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
-	google.golang.org/api v0.310.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b
+	google.golang.org/api v0.311.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261026165753-2ffab32bce7e
 	google.golang.org/grpc v1.85.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -24,7 +24,7 @@ require (
 	cel.dev/expr v0.25.3 // indirect
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.3.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.3.1 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	cloud.google.com/go/firestore v1.24.0 // indirect
 	cloud.google.com/go/iam v1.14.0 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.12.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.7 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.8 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -138,7 +138,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/arch v0.24.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
