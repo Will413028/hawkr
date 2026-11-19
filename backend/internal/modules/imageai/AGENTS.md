@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `imageai`（`db/schema.sql`）：尚未建立表（A9-3 以後隨實作建立）。讀取模型：無。
+目前無 schema，沒有 `db/` 與 migration，登記在 `cmd/hawkr/modules.go` 的 `withoutData`；第一次要存自己的資料時建 schema 與 migration，再移到 `modules()`。讀取模型：無。
 
 ## 發布的讀取介面
 

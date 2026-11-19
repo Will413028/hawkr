@@ -2,16 +2,13 @@ package main
 
 import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
-	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -35,9 +32,6 @@ func modules() []migrate.Module {
 		{Name: "social", Dir: social.Migrations()},
 		{Name: "payment", Dir: payment.Migrations()},
 		{Name: "moderation", Dir: moderation.Migrations()},
-		{Name: "procurement", Dir: procurement.Migrations()},
-		{Name: "assistant", Dir: assistant.Migrations()},
-		{Name: "imageai", Dir: imageai.Migrations()},
 	}
 }
 
@@ -61,4 +55,7 @@ var apiOnly = []string{
 var withoutData = []string{
 	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller、payment 與 moderation 發布的 pub_review_items
 	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
+	"procurement",       // 骨架，表隨 A9-2 建立
+	"assistant",         // 骨架，表隨 A9-3a 建立
+	"imageai",           // 骨架，表隨 A9-4 建立
 }
