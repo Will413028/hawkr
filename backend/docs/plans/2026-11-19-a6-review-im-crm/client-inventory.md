@@ -59,7 +59,7 @@ gateway 上屬於這三組的路由，用來核對 client 有沒有打到不存�
 | `W/lib/chat/repo.ts:277` | `PATCH /app/chat/messages`（`markMessagesRead`） | 逐則已讀 | IM |
 | `W/lib/chat/repo.ts:287` | `PATCH /app/chat/conversations/{targetId}`（`markConversationRead`） | 進入對話自動已讀（背景寫入，`W/lib/api/client.ts:48-49` 在停權時靜默略過） | IM |
 | `W/lib/chat/repo.ts:296` | `PATCH /app/chat/conversations`（`markAllChatRead`） | 全部已讀 | IM |
-| `W/lib/chat/repo.ts:303` | `GET /app/chat/online`（`fetchOnlineUsers`） | **沒有呼叫者**【量：`rg -n fetchOnlineUsers website` 只有定義與 `docs/plans/2026-11-15-remove-storybook/knip-baseline.json:1270`】，gateway 與 openapi 都沒有這條 | 刪除 |
+| `W/lib/chat/repo.ts:303` | `GET /app/chat/online`（`fetchOnlineUsers`） | **沒有呼叫者**【量：`rg -n fetchOnlineUsers website` 只有定義與 `website/docs/plans/2026-11-15-remove-storybook/knip-baseline.json:1270`】，gateway 與 openapi 都沒有這條 | 刪除 |
 | `W/lib/reviews/repo.ts:206` | `GET /public/products/{id}/reviews`（`fetchProductReviews`，`page`、`size`、`rating`） | 商品頁評價（`lib/api/cached.ts:302`、`ProductReviewsPanel.tsx:201`、`StorefrontProductPreviewDrawer.tsx:133`） | review |
 | `W/lib/reviews/repo.ts:291-296` | `GET /app/me/reviews`（`fetchMyReviews`） | 我的評價（`lib/hooks/useMyReviews.ts:72`、`features/account/screens/reviews/ReviewsClient.tsx`） | review |
 | `W/lib/reviews/repo.ts:313` | `POST /app/reviews`（`submitOrderItemReview`） | 送出評價（`features/account/screens/orders/ReviewClient.tsx:156`；先 `uploadImageFile` 傳圖，`REVIEW_PHOTO_LIMIT=4`，`:92`） | review |
