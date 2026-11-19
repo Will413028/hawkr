@@ -42,7 +42,6 @@ export default function Pagination({
 	return (
 		<nav
 			aria-label="分頁"
-			data-storefront-preview-reading-control="true"
 			className="mt-6 max-w-full min-w-0 overflow-x-auto overscroll-x-contain py-4"
 		>
 			<div className="flex w-max min-w-full flex-nowrap items-center justify-center gap-2">

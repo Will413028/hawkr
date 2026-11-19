@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type * as React from "react";
 import type { SellerReviewItem } from "@/features/sellers/reviews/ReviewList";
 import ReviewStatsCard, {
 	type SellerReviewStats,
@@ -8,7 +9,12 @@ import ReviewStatsCard, {
 import ReviewsClient from "@/features/sellers/reviews/ReviewsClient";
 import { fetchSellerReviewStats, fetchSellerReviews } from "@/lib/api/index";
 import { PREVIEW_REVIEWS_UNAVAILABLE } from "@/lib/seller/storefront-preview";
+import PreviewReadingControl from "./PreviewReadingControl";
 import { PreviewPublicOnly, usePreviewStore } from "./PreviewStoreContext";
+
+const wrapPagination = (pagination: React.ReactNode) => (
+	<PreviewReadingControl>{pagination}</PreviewReadingControl>
+);
 
 /** 只在店家能公開時才掛載：讀買家看得到的公開評價與統計。 */
 function PublicReviews() {
@@ -45,6 +51,8 @@ function PublicReviews() {
 			statsCard={<ReviewStatsCard stats={stats} />}
 			initialReviews={reviews.records as SellerReviewItem[]}
 			initialTotalPages={reviews.totalPages}
+			paginationWrapper={wrapPagination}
+			strict
 		/>
 	);
 }

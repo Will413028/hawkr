@@ -38,8 +38,9 @@ export default async function SellerIntroAsync({
 		let readFailed = false;
 		try {
 			store = await getCachedStoreOrThrow(storeCode);
-		} catch {
+		} catch (error) {
 			readFailed = true;
+			console.warn("[SellerIntroAsync] store read failed", error);
 		}
 		// 讀取失敗是暫時的，保留內嵌的 storeCode；讀到「沒有這家店」才拿掉連結的來源。
 		const absent = !readFailed && store === null;

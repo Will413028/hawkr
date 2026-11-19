@@ -22,10 +22,19 @@ interface StorefrontProductPreviewDrawerProps {
 	onClose: () => void;
 }
 
+type ProductReviewsResult = Awaited<
+	ReturnType<typeof fetchProductReviews>
+> | null;
+
 interface LoadedProductPreview {
+	detail: NonNullable<Awaited<ReturnType<typeof fetchSellerProductEdit>>>;
+	reviewsResult: ProductReviewsResult;
+}
+
+interface ProductPreviewView {
 	product: Record<string, unknown>;
 	store: PublicStoreView;
-	reviewsResult: Awaited<ReturnType<typeof fetchProductReviews>> | null;
+	reviewsResult: ProductReviewsResult;
 }
 
 type PreviewLoadState =
@@ -34,7 +43,7 @@ type PreviewLoadState =
 	| { status: "unavailable" }
 	| { status: "error" };
 
-function ProductPreviewDetail({ data }: { data: LoadedProductPreview }) {
+function ProductPreviewDetail({ data }: { data: ProductPreviewView }) {
 	const product = data.product;
 	const { sellerStats, followerStats } = previewStoreStats(data.store);
 	const derived = deriveDetailLayoutProps({
@@ -86,8 +95,6 @@ export default function StorefrontProductPreviewDrawer({
 	onClose,
 }: StorefrontProductPreviewDrawerProps) {
 	const [reloadKey, setReloadKey] = React.useState(0);
-	const storeRef = React.useRef(store);
-	storeRef.current = store;
 	const [loadState, setLoadState] = React.useState<PreviewLoadState>({
 		status: "idle",
 	});
@@ -116,11 +123,7 @@ export default function StorefrontProductPreviewDrawer({
 				if (!active) return;
 				setLoadState({
 					status: "ready",
-					data: {
-						product: previewDetailProduct(detail, storeRef.current),
-						store: storeRef.current,
-						reviewsResult,
-					},
+					data: { detail, reviewsResult },
 				});
 			} catch {
 				if (active) setLoadState({ status: "error" });
@@ -132,9 +135,21 @@ export default function StorefrontProductPreviewDrawer({
 		};
 	}, [productId, reloadKey]);
 
+	const preview = React.useMemo<ProductPreviewView | null>(
+		() =>
+			loadState.status === "ready"
+				? {
+						product: previewDetailProduct(loadState.data.detail, store),
+						store,
+						reviewsResult: loadState.data.reviewsResult,
+					}
+				: null,
+		[loadState, store],
+	);
+
 	const description =
-		loadState.status === "ready"
-			? String(loadState.data.product.name ?? productName ?? "")
+		preview !== null
+			? String(preview.product.name ?? productName ?? "")
 			: productName || "以買家看到的公開資料呈現";
 
 	return (
@@ -153,9 +168,7 @@ export default function StorefrontProductPreviewDrawer({
 			{loadState.status === "loading" || loadState.status === "idle" ? (
 				<DrawerSkeleton rows={5} className="p-6" />
 			) : null}
-			{loadState.status === "ready" ? (
-				<ProductPreviewDetail data={loadState.data} />
-			) : null}
+			{preview ? <ProductPreviewDetail data={preview} /> : null}
 			{loadState.status === "unavailable" ? (
 				<div
 					className="grid min-h-64 place-items-center px-6 py-12 text-center"

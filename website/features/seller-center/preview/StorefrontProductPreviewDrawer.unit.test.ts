@@ -30,16 +30,22 @@ vi.mock("@/components/shared/Drawer", () => ({
 		props.open ? React.createElement("div", null, props.children) : null,
 }));
 vi.mock("@/features/product/ProductDetailLayout", () => ({
-	default: () => null,
+	default: (props: { sellerIntroSlot?: React.ReactNode }) =>
+		props.sellerIntroSlot ?? null,
 }));
 vi.mock("@/features/product/components/ProductSellerIntro", () => ({
-	default: () => null,
+	default: (props: { seller?: { name?: string } }) =>
+		React.createElement("span", null, props.seller?.name),
 }));
 vi.mock("@/features/product/deriveDetailLayoutProps", () => ({
 	deriveDetailLayoutProps: () => ({}),
 }));
 vi.mock("@/lib/seller/storefront-preview", () => ({
-	previewDetailProduct: () => ({ id: "9", name: "x" }),
+	previewDetailProduct: (_detail: unknown, s: { storeName?: string }) => ({
+		id: "9",
+		name: "x",
+		seller: { name: s.storeName },
+	}),
 	previewStoreStats: () => ({ sellerStats: null, followerStats: null }),
 }));
 
@@ -81,6 +87,17 @@ describe("StorefrontProductPreviewDrawer", () => {
 		await waitFor(() => expect(mocks.state.calls).toBe(1));
 		view.rerender(drawer({ ...store }));
 		await new Promise((r) => setTimeout(r, 20));
+		expect(mocks.state.calls).toBe(1);
+	});
+
+	it("shows a renamed store without refetching", async () => {
+		mocks.state.impl = () => Promise.resolve({ id: "9" });
+		const named = { ...store, storeName: "Old" } as PublicStoreView;
+		const view = render(drawer(named));
+		await screen.findByText("Old");
+		view.rerender(drawer({ ...named, storeName: "New" } as PublicStoreView));
+		await screen.findByText("New");
+		expect(screen.queryByText("Old")).toBeNull();
 		expect(mocks.state.calls).toBe(1);
 	});
 });

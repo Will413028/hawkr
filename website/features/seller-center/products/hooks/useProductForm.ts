@@ -61,6 +61,13 @@ export interface UseProductFormResult {
 	mode: "create" | "edit";
 	draft: SellerProductDetail;
 	loading: boolean;
+	/**
+	 * Whether the draft is backed by real data. Edit mode is `ready` only after
+	 * the product loaded; a failed read or a missing product leaves it
+	 * `failed` / `notFound` and `submit` refuses, so an empty draft can never be
+	 * sent as an update.
+	 */
+	loadStatus: ProductLoadStatus;
 	submitting: boolean;
 	/**
 	 * Everything currently blocking a save — empty when there is nothing wrong.
@@ -82,6 +89,8 @@ export interface UseProductFormResult {
 	clearError(): void;
 }
 
+export type ProductLoadStatus = "pending" | "ready" | "failed" | "notFound";
+
 export function useProductForm({
 	mode,
 	productId,
@@ -91,6 +100,9 @@ export function useProductForm({
 	const invalidateSellerProducts = useInvalidateSellerProducts();
 	const [draft, setDraft] = React.useState<SellerProductDetail>(emptyDraft());
 	const [loading, setLoading] = React.useState(mode === "edit");
+	const [loadStatus, setLoadStatus] = React.useState<ProductLoadStatus>(
+		mode === "edit" ? "pending" : "ready",
+	);
 	const [submitting, setSubmitting] = React.useState(false);
 	const [errors, setErrors] = React.useState<string[]>([]);
 	const submitInFlight = React.useRef(false);
@@ -114,8 +126,12 @@ export function useProductForm({
 				} as Parameters<typeof normaliseDraftFromApi>[0]);
 				initialImagesSig.current = gallerySignature(next.images ?? []);
 				setDraft(next);
+				setLoadStatus("ready");
+			} else {
+				setLoadStatus("notFound");
 			}
 		} catch (e) {
+			setLoadStatus((prev) => (prev === "ready" ? prev : "failed"));
 			setErrors([e instanceof Error ? e.message : "載入失敗"]);
 		} finally {
 			setLoading(false);
@@ -167,6 +183,7 @@ export function useProductForm({
 	const submit = React.useCallback(
 		async (action: ShelfSubmitAction): Promise<boolean> => {
 			if (submitInFlight.current) return false;
+			if (mode === "edit" && loadStatus !== "ready") return false;
 			const problems = validateDraft(draft);
 			if (problems.length > 0) {
 				setErrors(problems);
@@ -233,7 +250,15 @@ export function useProductForm({
 				submitInFlight.current = succeeded;
 			}
 		},
-		[draft, mode, onMutated, productId, router, invalidateSellerProducts],
+		[
+			draft,
+			loadStatus,
+			mode,
+			onMutated,
+			productId,
+			router,
+			invalidateSellerProducts,
+		],
 	);
 
 	// 上架商品內容不可改，編輯前必須先下架。status-only，不走 updateProduct。
@@ -262,6 +287,7 @@ export function useProductForm({
 		mode,
 		draft,
 		loading,
+		loadStatus,
 		submitting,
 		errors,
 		update,

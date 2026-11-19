@@ -10,7 +10,12 @@ import {
 	isOnSaleProduct,
 	previewProductRecord,
 } from "@/lib/seller/storefront-preview";
+import PreviewReadingControl from "./PreviewReadingControl";
 import { usePreviewStore } from "./PreviewStoreContext";
+
+const wrapPagination = (pagination: React.ReactNode) => (
+	<PreviewReadingControl>{pagination}</PreviewReadingControl>
+);
 
 export const PREVIEW_PRODUCTS_PAGE_SIZE = 12;
 
@@ -54,6 +59,7 @@ export default function PreviewProductsTab() {
 				totalPages={Math.ceil(data.total / PREVIEW_PRODUCTS_PAGE_SIZE)}
 				onPageChange={setPage}
 				cardPreview
+				paginationWrapper={wrapPagination}
 			/>
 		</>
 	);

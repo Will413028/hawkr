@@ -6,7 +6,6 @@ import AppDownloadBannerV2 from "@/features/seller/components/AppDownloadBannerV
 import SellerPageShell from "@/features/seller/components/SellerPageShell";
 import SellerProfileV2 from "@/features/seller/components/SellerProfileV2";
 import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
-import { isStoreMissing } from "@/lib/seller/store";
 import {
 	storeCanBePublic,
 	storefrontViewOfMyStore,
@@ -64,7 +63,7 @@ export default function SellerStorefrontPreviewFrame({
 }: {
 	children: React.ReactNode;
 }) {
-	const { data, loading, error } = useSellerSelf();
+	const { data, loading } = useSellerSelf();
 	const view = React.useMemo(() => storefrontViewOfMyStore(data), [data]);
 	const canBePublic = storeCanBePublic(data);
 	const store = React.useMemo(
@@ -72,18 +71,12 @@ export default function SellerStorefrontPreviewFrame({
 		[view, canBePublic],
 	);
 
-	const storeMissing = !view && !loading && isStoreMissing(error);
-
 	if (!view || !store) {
 		return (
 			<PreviewStatus
-				loading={loading || storeMissing}
+				loading={loading}
 				message={
-					storeMissing
-						? "正在前往建立賣場頁…"
-						: loading
-							? "正在載入店面預覽…"
-							: "店面預覽暫時載入不到，請稍後再試。"
+					loading ? "正在載入店面預覽…" : "店面預覽暫時載入不到，請稍後再試。"
 				}
 			/>
 		);
@@ -102,9 +95,11 @@ export default function SellerStorefrontPreviewFrame({
 						previewMode
 						tabBasePath={PREVIEW_ROOT}
 					/>
-					<AppDownloadBannerV2
-						deepLink={`hawkr://seller/${view.storeCode || view.storeId}`}
-					/>
+					{view.storeCode ? (
+						<AppDownloadBannerV2
+							deepLink={`hawkr://seller/${view.storeCode}`}
+						/>
+					) : null}
 					<StorefrontPreviewBoundary>{children}</StorefrontPreviewBoundary>
 				</div>
 			</SellerPageShell>

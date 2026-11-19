@@ -72,4 +72,13 @@ describe("SellerIntroAsync", () => {
 			name: "店",
 		});
 	});
+
+	it("logs the swallowed error when the store read fails", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const failure = new Error("down");
+		mocks.getCachedStoreOrThrow.mockRejectedValue(failure);
+		await propsOf({ storeCode: "2662192214" });
+		expect(warn).toHaveBeenCalledWith(expect.any(String), failure);
+		warn.mockRestore();
+	});
 });

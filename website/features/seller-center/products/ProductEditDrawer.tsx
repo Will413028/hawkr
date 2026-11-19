@@ -14,6 +14,7 @@ import ProductFormSections, {
 	LockedOverlay,
 	ProductFormErrors,
 } from "./components/ProductFormSections";
+import ProductLoadFailure from "./components/ProductLoadFailure";
 import { useProductForm } from "./hooks/useProductForm";
 
 /**
@@ -103,7 +104,9 @@ export default function ProductEditDrawer({
 	// The host keys this component by productId, so each open mounts a fresh
 	// form whose `loading` starts true — no need to diff ids to avoid flashing
 	// the previous product.
-	const ready = !!productId && !form.loading;
+	const loadFailed =
+		form.loadStatus === "failed" || form.loadStatus === "notFound";
+	const ready = !!productId && !form.loading && form.loadStatus === "ready";
 	// 上架中(=1)：內容鎖住，需先下架。其餘（草稿/審核/下架）可編輯。
 	const locked = ready && Number(form.draft.status ?? 0) === 1;
 
@@ -178,7 +181,12 @@ export default function ProductEditDrawer({
 			}`}
 			footer={footer}
 		>
-			{!ready ? (
+			{!ready && !form.loading && loadFailed ? (
+				<ProductLoadFailure
+					status={form.loadStatus as "failed" | "notFound"}
+					onRetry={() => void form.reload()}
+				/>
+			) : !ready ? (
 				<DrawerSkeleton />
 			) : (
 				<div className="flex flex-col gap-5">

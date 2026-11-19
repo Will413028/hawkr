@@ -8,6 +8,7 @@ import type { PublicStoreView } from "@/lib/seller/public-store";
 
 vi.mock("./StorefrontProductPreviewDrawer", () => ({ default: () => null }));
 
+import PreviewReadingControl from "./PreviewReadingControl";
 import { PreviewStoreProvider } from "./PreviewStoreContext";
 import StorefrontPreviewBoundary from "./StorefrontPreviewBoundary";
 
@@ -55,14 +56,46 @@ describe("StorefrontPreviewBoundary", () => {
 		expect(subscribe).not.toHaveBeenCalled();
 	});
 
+	it("cancels links nested inside a post trigger but lets the trigger itself run", () => {
+		const open = vi.fn();
+		const linkClick = vi.fn((e: React.MouseEvent) => e.persist());
+		inBoundary(
+			React.createElement(
+				"div",
+				{
+					role: "button",
+					tabIndex: 0,
+					"data-storefront-post-preview-trigger": "true",
+					onClick: open,
+				},
+				React.createElement(
+					"a",
+					{ href: "/feed?hashtag=x", onClick: linkClick },
+					"#x",
+				),
+				React.createElement("span", null, "body"),
+			),
+		);
+		const notPrevented = fireEvent.click(screen.getByText("#x"));
+		expect(notPrevented).toBe(false);
+		expect(linkClick).not.toHaveBeenCalled();
+		expect(open).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button"));
+		expect(open).toHaveBeenCalledTimes(1);
+	});
+
 	it("lets pagination buttons change the page", () => {
 		const onPageChange = vi.fn();
 		inBoundary(
-			React.createElement(Pagination, {
-				current: 1,
-				total: 3,
-				onPageChange,
-			}),
+			React.createElement(
+				PreviewReadingControl,
+				null,
+				React.createElement(Pagination, {
+					current: 1,
+					total: 3,
+					onPageChange,
+				}),
+			),
 		);
 		fireEvent.click(screen.getByLabelText("第 2 頁"));
 		fireEvent.click(screen.getByText("下一頁"));

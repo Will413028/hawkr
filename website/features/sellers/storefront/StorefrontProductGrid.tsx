@@ -37,6 +37,8 @@ interface StorefrontProductGridProps {
 	onPageChange: (page: number) => void;
 	/** 賣家預覽：卡片不渲染收藏與購物車操作，點商品開唯讀抽屜。公開店面不傳。 */
 	cardPreview?: boolean;
+	/** 包住分頁的外殼；賣家預覽用它標出邊界放行的翻頁區。 */
+	paginationWrapper?: (pagination: React.ReactNode) => React.ReactNode;
 }
 
 /** 店面的商品格與分頁；公開店面與賣家預覽共用的呈現。 */
@@ -46,7 +48,15 @@ export default function StorefrontProductGrid({
 	totalPages,
 	onPageChange,
 	cardPreview = false,
+	paginationWrapper,
 }: StorefrontProductGridProps) {
+	const pagination = (
+		<Pagination
+			current={currentPage}
+			total={totalPages}
+			onPageChange={onPageChange}
+		/>
+	);
 	return (
 		<>
 			{items.length > 0 ? (
@@ -79,11 +89,7 @@ export default function StorefrontProductGrid({
 				</div>
 			)}
 
-			<Pagination
-				current={currentPage}
-				total={totalPages}
-				onPageChange={onPageChange}
-			/>
+			{paginationWrapper ? paginationWrapper(pagination) : pagination}
 		</>
 	);
 }
