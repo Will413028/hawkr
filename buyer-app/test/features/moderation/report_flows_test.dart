@@ -181,7 +181,7 @@ void main() {
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
       expect(find.byType(ReportSheetWidget), findsOneWidget);
-      expect(find.text('檢舉失敗，請稍後再試'), findsOneWidget);
+      expect(find.text('服務暫時不可用'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
       await _submit(tester);
 
@@ -284,6 +284,24 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
+    testWidgets('說明的計數與上限以 rune 計，emoji ZWJ 序列不被拆開', (tester) async {
+      final moderation = FakeModeration();
+      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
+
+      await _choose(tester, '其他（請說明）');
+      await tester.enterText(find.byType(TextField), '字' * 3 + family);
+      await tester.pump();
+      expect(find.text('8/500'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '字' * 497 + family);
+      await tester.pump();
+      expect(find.text('497/500'), findsOneWidget);
+      await _submit(tester);
+      expect(moderation.submitted.single.description, '字' * 497);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
     testWidgets('伺服器帶 LocalizedMessage 的失敗：顯示伺服器的文字', (tester) async {
       final moderation = FakeModeration(
         submitError: ConnectException(
@@ -306,7 +324,7 @@ void main() {
       await _submit(tester);
 
       expect(find.text('今天的檢舉次數已達上限'), findsOneWidget);
-      expect(find.text('檢舉失敗，請稍後再試'), findsNothing);
+      expect(find.text('服務暫時不可用'), findsNothing);
       await tester.pump(const Duration(seconds: 3));
     });
 
@@ -319,7 +337,7 @@ void main() {
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
 
-      expect(find.text('檢舉失敗，請稍後再試'), findsOneWidget);
+      expect(find.text('服務暫時不可用'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
     });
   });

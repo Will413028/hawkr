@@ -49,7 +49,11 @@ final class StoreBlockTarget extends SocialBlockTarget {
 
 /// 封鎖一則留言的作者（買家或店家）。
 final class CommentAuthorBlockTarget extends SocialBlockTarget {
-  const CommentAuthorBlockTarget(this.commentId, this.party, {this.authorStoreId});
+  const CommentAuthorBlockTarget(
+    this.commentId,
+    this.party, {
+    this.authorStoreId,
+  });
 
   final String commentId;
   final BlockedPartyKind party;
@@ -107,7 +111,9 @@ BlockedPartyKind? _partyOf(pb.Actor author) => switch (author.kind) {
 SocialBlockTarget? blockTargetForComment(pb.Comment comment) {
   if (comment.isMine || !comment.hasAuthor()) return null;
   final party = _partyOf(comment.author);
-  return party == null ? null : CommentAuthorBlockTarget(
+  return party == null
+      ? null
+      : CommentAuthorBlockTarget(
           comment.id,
           party,
           authorStoreId: comment.author.id,
@@ -118,9 +124,7 @@ SocialBlockTarget? blockTargetForComment(pb.Comment comment) {
 SocialBlockTarget? blockTargetForForumEntry(pb.ForumEntry entry) {
   if (entry.isMine || !entry.hasAuthor()) return null;
   final party = _partyOf(entry.author);
-  return party == null ? null : ForumAuthorBlockTarget(
-          entry.id,
-          party,
-          authorStoreId: entry.author.id,
-        );
+  return party == null
+      ? null
+      : ForumAuthorBlockTarget(entry.id, party, authorStoreId: entry.author.id);
 }
