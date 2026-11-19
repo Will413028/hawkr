@@ -114,4 +114,31 @@ describe("preview posts are structurally read-only", () => {
 		mount([]);
 		expect(screen.getByText("還沒有貼文")).toBeTruthy();
 	});
+
+	it("empty state does not skip a heading level below the page h1", () => {
+		const { container } = render(
+			React.createElement(
+				"div",
+				null,
+				React.createElement("h1", null, "買家視角預覽"),
+				React.createElement(
+					QueryClientProvider,
+					{ client: new QueryClient() },
+					React.createElement(PreviewPostsGrid, {
+						posts: [],
+						hasMore: false,
+						loadingMore: false,
+						onLoadMore: () => undefined,
+					}),
+				),
+			),
+		);
+		const levels = Array.from(
+			container.querySelectorAll("h1,h2,h3,h4,h5,h6"),
+		).map((h) => Number(h.tagName.slice(1)));
+		expect(levels[0]).toBe(1);
+		for (let i = 1; i < levels.length; i++) {
+			expect(levels[i] - levels[i - 1]).toBeLessThanOrEqual(1);
+		}
+	});
 });

@@ -15,7 +15,7 @@ import { usePreviewStore } from "./PreviewStoreContext";
 function PostsEmpty() {
 	return (
 		<div className="seller-posts-empty">
-			<h3>還沒有貼文</h3>
+			<h2>還沒有貼文</h2>
 			<p>等賣家分享新的採收、出貨或食材故事後，這裡會自動更新。</p>
 		</div>
 	);

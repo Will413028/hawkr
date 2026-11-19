@@ -75,7 +75,7 @@ body .page-content:has(.seller-tab-frame) {
 	background: rgba(255, 255, 255, 0.045);
 }
 
-.seller-posts-empty h3 {
+.seller-posts-empty :is(h2, h3) {
 	margin: 0 0 var(--hkui-space-2);
 	color: var(--hkui-foreground);
 	font-size: var(--hkui-text-large);
