@@ -136,3 +136,14 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 **已知取捨**（量測在 `step-1a-perf/README.md`）：jet 的結果欄位在編譯期不檢查（sqlc 會）：改由 `TestRegisteredQueriesDescribeTheirRowStructs` 對測試資料庫 Describe 比對（零列也查得到）；每支 query 的渲染 SQL 有 golden 檔，review 看得到 SQL 的差異。重新評估的觸發：go-jet 12 個月沒有新版本或與 pgx、PG 不相容 → 同一套述詞改用 bob；公開讀取 p95 超過 300 ms → 讀取模型。
 
+
+## 公司時期未完成項
+
+legacy-backlog「A7 social」段的 4 項（A7-5 對照現行程式碼）。#1632、#2779、#3513 屬於檢舉面，結論在 `moderation/CARRYOVER.md` 的同名段落，這裡只留對應。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #2692：`GET /public/posts/{id}` 不檢查發布狀態，未發布的貼文讀得到 | 修掉（SD1）：公開單篇套用公開可讀述詞（已發布、未刪、未被內容下架、店家可曝光），讀不到一律 NotFound；瀏覽數不在讀取裡累加 | `social.go:399` `PublicPost` → `internal/post/read.go:138` `Public`（`reads.GetPublicPost`，無列回 NotFound）；`TestSD1DraftIsNotPublic`（`visibility_integration_test.go:160`，匿名讀草稿與其留言回 NotFound）、`TestSD1SD2PublicReadabilityPredicate`（同檔 74，下架、貼文刪除、店家不可曝光等情境） |
+| #1632：`AdminResolve BAN_USER` 用 `report.TargetID` 而不是解析後的 `TargetOwnerID` | 不再成立（SD10）：結論與依據見 moderation | `moderation/CARRYOVER.md`「公司時期未完成項」 |
+| #2779：檢舉佐證在 DB commit 結果不明時盲目 Release | 不再成立：結論與依據見 moderation | 同上 |
+| #3513：內容檢舉（31 號設計）稽核寫入沒有 logger、SLA 告警、整合測試、字典詞庫待補 | 逐子項處置，見 moderation；其中字典詞庫的 social 側是 `platform/textfilter`，見上方 M17 與「髒字詞典」列 | 同上 |

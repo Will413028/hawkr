@@ -6,7 +6,7 @@
 
 ## 未成立
 
-- 第 3 項（公司時期未完成項）：與 social 同一缺口。`legacy-backlog`「A7 social」段的 #2779（檢舉佐證在 DB commit 結果不明時盲目 Release）與 #3513（31 號內容檢舉稽核寫入沒有 logger、SLA 告警、整合測試、字典詞庫待補）屬於檢舉面，`internal/modules/moderation/CARRYOVER.md` 沒有逐項處置段落。缺：結論與依據。推定對應：#2779 對 A7-D21 的證據保全（CARRYOVER 第 28 行，快照在引用端 hold）；#3513 對 `moderation_actions` 稽核表被刪、處置與結案同 transaction（CARRYOVER 的「審核動作 audit log」列）；未經 Will 確認。
+- 第 3 項（公司時期未完成項）：`internal/modules/moderation/CARRYOVER.md` 已有「公司時期未完成項」表（2026-11-19）：#1632、#2779 不再成立，#3513 的稽核與整合測試修掉、字典詞庫延後有觸發。剩 #3513 的 SLA 告警未處置：待辦列有 72 小時期限，沒有主動告警的程式也沒有決定（A7-D14 只延後優先度提升）。缺：Will 決定做、延後（給觸發）或刪除。
 - 第 13 項（特性測試）：moderation 的對外 endpoint（`ModerationAppService`、`ModerationAdminService`）沒有經 driver 介面的情境：`internal/httpapi/social/characterization/` 只有 `monolith_integration_test.go` 裝配 `Moderation` 模組，沒有檢舉情境（`rg -n -i 'SubmitReport' internal/httpapi/social/characterization` 無結果）。現有覆蓋是 handler 測試 `internal/httpapi/moderation/{app_test,admin_test,admin_integration_test}.go`（24 個 `Test`）加模組 integration。缺：driver 情境，或 Will 確認新模組不需要（舊 REST 側已不存在，雙跑已不可能）。
 
 ## 逐項
@@ -15,12 +15,12 @@
 |---|---|---|---|
 | 1 | 目錄與 `AGENTS.md` | 成立 | `internal/modules/moderation/AGENTS.md` 有職責、擁有的資料、發布的讀取介面、不變量、不負責、決策紀錄 7 段（`rg -n '^## '`）。`make new-module` 是否使用無可重跑證據 |
 | 2 | 沿用盤點 | 成立 | `internal/modules/moderation/CARRYOVER.md` 含「沿用盤點」與第 32 行起「傳輸層的沿用盤點」；`TestEveryMovedModuleHasACarryOverAudit` ok（`cmd/hawkr`） |
-| 3 | 公司時期未完成項 | 未成立 | 見上 |
+| 3 | 公司時期未完成項 | 未成立 | 見上；只剩 SLA 告警未處置 |
 | 4 | 獨立設計審查 | 成立 | 計畫 A7-1d moderation 列：設計審查 8 項（should 4、nit 4，改 6、交 Will 2 → A7-D20）與 5 項（should 3、nit 2，改 3、交 Will 2 → A7-D21）；A7-1e 列獨立 diff 審查 1 項 should；A7-5 完成前審查 2026-11-19（見 `dod-social.md` 第 4 項） |
 | 5 | schema 在 `db/`、arch 與 SQL 檢查 | 成立 | `internal/modules/moderation/db/`（`schema.sql`、`objects.sql`、`pub.sql`、`migrations/20261115033604_moderation_schema.sql`、`20261115120000_moderation_objects.sql`）；`internal/arch` ok；`schema_integration_test.go` 的 `TestChecksMatchGo`、`TestCaseChecksRejectIllegalStates`。案件、檢舉、快照不跨 schema FK（對象以不透明鍵引用） |
 | 6 | 公開 API 依賴不超出 D2 表 | 成立 | `internal/arch/modules.go:37` `"moderation": {"social","seller","buyer","accountsuspension","media"}`；`arch` 測試 ok；`reviewqueue` 的列在第 38 行 |
 | 7 | RPC 去向 | 成立 | 接手 SocialService 的檢舉 RPC，`rpc-servers.csv` 皆已填：`SubmitReport`→`ModerationAppService.SubmitReport`、`ListMyReports`→`ModerationAppService.ListMyReports`、`AdminListReports`→`ModerationAdminService.ListCases`、`AdminGetReport`→`GetCase`、`AdminResolveReport` 與 `AdminModeratePost`→`DecideCase`；`ReportPost`、`AdminReopenReport` 標 `removed` 並註明理由。腳本 exit 0 |
-| 8 | 事件去向 | 不適用 | `events.csv` 沒有 producer 或 consumer 是 moderation 的列（核對用 `rg -n 'moderation' docs/plans/2026-09-24-go-modular-monolith/events.csv`，無結果）；social-service 的事件列歸 social（其 CSV 缺口記在 `dod-social.md` 第 8 項）。未逐一核對舊 social-service 是否有檢舉相關事件列：events.csv 的 14 列中沒有以 report 命名者 |
+| 8 | 事件去向 | 不適用 | `events.csv` 沒有 producer 或 consumer 是 moderation 的列（核對用 `rg -n 'moderation' backend/docs/plans/2026-09-24-go-modular-monolith/events.csv`，無結果）；social-service 的事件列歸 social（其 CSV 缺口記在 `dod-social.md` 第 8 項）。未逐一核對舊 social-service 是否有檢舉相關事件列：events.csv 的 14 列中沒有以 report 命名者 |
 | 9 | 副本去向 | 成立 | `replicas.csv` 的 `reports.target_snapshot` 列：「案件的內容快照由 moderation 在提交時凍結（A7-D14，SD21）」；快照圖片引用 `internal/mediaref` 與 `retired_assets`（A7-D21） |
 | 10 | 外部 provider（D5） | 不適用 | 沒有外部 provider 呼叫（`dod-social.md` 第 10 項的 `rg` 同時掃 moderation，無結果） |
 | 11 | 代碼值與錯誤碼去向 | 成立 | CARRYOVER 第 19 行（檢舉原因 8 種的 CodeMeta `ReportReasonCode`）與第 39 行（錯誤碼改 `apperr`）；CHECK 與 Go 一致由 `TestChecksMatchGo` 守 |

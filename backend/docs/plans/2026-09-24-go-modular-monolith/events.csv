@@ -48,19 +48,19 @@ buyer.deleted,hawkr.buyer,buyer-service,social-service,social.buyer.deleted,clea
 buyer.favorite.added,hawkr.buyer,buyer-service,notification-service,notification.buyer,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 buyer.favorite.added,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.added,sync product favorite count,yes,PROJECTION,
 buyer.favorite.removed,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.removed,sync product favorite count,yes,PROJECTION,
-comment.created,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
-comment.created,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,
-comment.deleted,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
-comment.like_changed,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
-comment.like_changed,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-comment.replied,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
-comment.replied,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,
-comment.updated,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
+comment.created,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）
+comment.created,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,in-tx-event: social.CommentCreated 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
+comment.deleted,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）；pkg/mq 的建構子已於 82369b78 移除，relay 不轉送
+comment.like_changed,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）
+comment.like_changed,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: social.CommentLiked（只送 LIKE） 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
+comment.replied,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）
+comment.replied,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,in-tx-event: social.CommentReplied 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
+comment.updated,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）；pkg/mq 的建構子已於 82369b78 移除，relay 不轉送
 counter.delta,hawkr.content,social-service,social-service,social.counter.delta,apply post/comment counters,yes,PROJECTION,removed: 計數改由 stats 表與 trigger 維護（A7-D11），SD17 接受事件退場
 follow.added,hawkr.content,buyer-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-post.created,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
-post.hidden_by_platform,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-post.liked,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
+post.created,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,in-tx-event: social.PostPublished（發布才發，SD8） 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
+post.hidden_by_platform,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: seller 模組在建立內容下架措施的 transaction 內發布 seller.MeasureCreated，internal/legacy/socialrelay 對措施的每則貼文轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
+post.liked,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: social.PostLiked 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
 product.viewed,hawkr.content,buyer-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 product.viewed,hawkr.content,buyer-service,seller-service,seller.product.viewed,record product view analytics (best-effort),yes,SIDE_EFFECT,
 delegation.operation.completed,hawkr.delegation,account-service,notification-service,notification.delegation,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
@@ -125,7 +125,7 @@ seller.deleted,hawkr.seller,seller-service,im-service,im.seller.deleted,cleanup 
 seller.deleted,hawkr.seller,seller-service,notification-service,notification.seller.deleted,purge seller inbox/devices,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,pricebook-service,pricebook.seller.deleted,cleanup market-watch data,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,product-service,product.seller.deleted,delist seller products,yes,STATE,
-seller.deleted,hawkr.seller,seller-service,social-service,social.seller.deleted,cleanup seller posts/comments/media,yes,STATE,
+seller.deleted,hawkr.seller,seller-service,social-service,social.seller.deleted,cleanup seller posts/comments/media,yes,STATE,in-tx-event: social 訂閱 seller 的 OnStoreRetired，同 transaction 只 Enqueue 清除 job（M23，TestStoreRetirementEnqueuesAnIdempotentPurge）
 seller.membership_changed,hawkr.seller,seller-service,ai-service,ai_service.seller.membership_changed,update ranking facts,yes,PROJECTION,
 seller.onboarded,hawkr.seller,seller-service,gateway,gateway.sse.<pod> (dynamic),invalidate store resolver cache,yes,PROJECTION,
 seller.profile.changed,hawkr.seller,seller-service,cart-service,cart.seller.profile.changed,evict seller:meta cache,yes,PROJECTION,
