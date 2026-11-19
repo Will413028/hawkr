@@ -20,10 +20,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * that second case, re-adding a `store_code` fallback would go unnoticed again.
  */
 
-const cachedMocks = vi.hoisted(() => ({ getCachedSeller: vi.fn() }));
+const cachedMocks = vi.hoisted(() => ({ getCachedStore: vi.fn() }));
 
 vi.mock("@/lib/api/cached", () => ({
-	getCachedSeller: cachedMocks.getCachedSeller,
+	getCachedStore: cachedMocks.getCachedStore,
 	getCachedSellerReviews: vi.fn(),
 	getCachedSellerReviewStats: vi.fn(),
 	CACHE_TTL: {
@@ -77,7 +77,7 @@ const tabs = [
 ];
 
 beforeEach(() => {
-	cachedMocks.getCachedSeller.mockReset();
+	cachedMocks.getCachedStore.mockReset();
 });
 
 /**
@@ -94,7 +94,7 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 	it("canonicalizes on the store_code even when entered by store_id", {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
-		cachedMocks.getCachedSeller.mockResolvedValue({
+		cachedMocks.getCachedStore.mockResolvedValue({
 			// camelCase — `PublicSellerInfo.storeCode` (backend#2235). `fetchSeller`
 			// passes it through unrenamed, so this is verbatim what the route sees.
 			name: "測試",
@@ -121,7 +121,7 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 	it("falls back to the requested id when the seller has no store_code", {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
-		cachedMocks.getCachedSeller.mockResolvedValue({
+		cachedMocks.getCachedStore.mockResolvedValue({
 			name: "測試",
 			rating: 5,
 		});
@@ -142,7 +142,7 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 		// carrying no code at all. Without this the fix is unpinnable: a route
 		// that reads BOTH names satisfies the first case while still depending on
 		// a key the gateway stopped sending.
-		cachedMocks.getCachedSeller.mockResolvedValue({
+		cachedMocks.getCachedStore.mockResolvedValue({
 			name: "測試",
 			store_code: STORE_CODE,
 			rating: 5,
@@ -162,7 +162,7 @@ describe.each(tabs)("$name metadata in the en locale", ({ tail, load }) => {
 	it("is canonical on the /en URL of the same store_code tab", {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
-		cachedMocks.getCachedSeller.mockResolvedValue({
+		cachedMocks.getCachedStore.mockResolvedValue({
 			name: "測試",
 			storeCode: STORE_CODE,
 			rating: 5,

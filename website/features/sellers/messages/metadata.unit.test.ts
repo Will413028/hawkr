@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cached = vi.hoisted(() => ({ getCachedSeller: vi.fn() }));
+const cached = vi.hoisted(() => ({ getCachedStore: vi.fn() }));
 vi.mock("@/lib/api/cached", () => cached);
 vi.mock("@/lib/forum/repo", () => ({}));
 vi.mock("@/features/sellers/components/SellerMessageTab", () => ({
@@ -16,7 +16,7 @@ const cases = [
 	{ locale: "en", title: "小店's messages", missing: "Seller not found" },
 ];
 
-beforeEach(() => cached.getCachedSeller.mockReset());
+beforeEach(() => cached.getCachedStore.mockReset());
 
 describe.each(Object.entries(pages))("%s page metadata", (_n, gen) => {
 	it.each(cases)("$locale title and not-found", async (c) => {
@@ -25,13 +25,13 @@ describe.each(Object.entries(pages))("%s page metadata", (_n, gen) => {
 			id: "shop",
 			threadId: "t",
 		});
-		cached.getCachedSeller.mockResolvedValue({
+		cached.getCachedStore.mockResolvedValue({
 			name: "小店",
 			storeCode: "shop",
 			storeId: "7",
 		});
 		expect((await gen({ params })).title).toBe(c.title);
-		cached.getCachedSeller.mockResolvedValue(undefined);
+		cached.getCachedStore.mockResolvedValue(undefined);
 		expect((await gen({ params })).title).toBe(c.missing);
 	});
 });

@@ -46,22 +46,28 @@ function ref(over: Record<string, unknown> = {}): ContentRef {
 }
 
 describe("contentHref", () => {
-	it("貼文連到貼文頁，討論區留言連到單一討論串頁", () => {
+	const forum = (storeId: string) =>
+		ref({
+			kind: ContentKind.FORUM_ENTRY,
+			link: {
+				case: "forumThread",
+				value: create(ForumThreadLinkSchema, { storeId, threadId: "t-9" }),
+			},
+		});
+
+	it("貼文連到貼文頁，討論區留言以賣家自己店家的 store_code 連到單一討論串頁", () => {
 		expect(contentHref(ref())).toBe("/seller-center/posts?post=p1");
+		expect(contentHref(forum("7"), { id: "7", storeCode: "2662192214" })).toBe(
+			"/sellers/2662192214/messages/t-9",
+		);
+	});
+
+	it("討論串不屬於賣家自己的店，或讀不到 store_code 時沒有連結（不用 store_id 組網址）", () => {
+		expect(contentHref(forum("7"))).toBeUndefined();
 		expect(
-			contentHref(
-				ref({
-					kind: ContentKind.FORUM_ENTRY,
-					link: {
-						case: "forumThread",
-						value: create(ForumThreadLinkSchema, {
-							storeId: "7",
-							threadId: "t-9",
-						}),
-					},
-				}),
-			),
-		).toBe("/sellers/7/messages/t-9");
+			contentHref(forum("7"), { id: "8", storeCode: "2662192214" }),
+		).toBeUndefined();
+		expect(contentHref(forum("7"), { id: "7", storeCode: "" })).toBeUndefined();
 	});
 
 	it("link_available 為 false 或沒有連結目標時沒有連結", () => {

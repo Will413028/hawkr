@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import SellerMessageTab from "@/features/sellers/components/SellerMessageTab";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import { getEnv } from "@/lib/config/env";
 import { fetchSellerForum } from "@/lib/forum/repo";
-import { storeIdOfSeller } from "@/lib/seller/store-id";
+import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -15,14 +15,15 @@ import { sellerMessagesText } from "./text";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
+	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
+	preview?: boolean;
 }
 
 const FORUM_PAGE_SIZE = 20;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
-	const seller = await getCachedSeller(id);
-	const s = seller;
+	const s = await getCachedStore(id);
 	const text = sellerMessagesText(locale);
 	if (!s) return { title: text.notFound() };
 	const socialImage = sellerSocialImage(s);
@@ -51,13 +52,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function MessagesPage({ params }: Props) {
+export default async function MessagesPage({ params, preview = false }: Props) {
 	const { id } = await params;
 
 	// Fetch first page on the server so SSR + first paint already have
 	// the comment list. useSellerForum will pick this up via its
 	// `initialData` argument and skip the bootstrap refetch.
-	const storeId = storeIdOfSeller(await getCachedSeller(id));
+	const storeId = (await resolveStorefront(id, preview))?.storeId ?? "";
 	const initialData = storeId
 		? await fetchSellerForum(storeId, {
 				pageSize: FORUM_PAGE_SIZE,

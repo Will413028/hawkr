@@ -4,7 +4,6 @@ import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import {
 	absoluteUrl,
-	canonicalSellerRedirectTarget,
 	languageAlternates,
 	productUrl,
 	sellerCanonicalUrl,
@@ -66,69 +65,13 @@ test("seller card URLs keep the compact public page on the canonical seller key"
 		sellerCardUrl("2685914682", "zh-TW"),
 		"https://example.com/sellers/2685914682/card",
 	);
-	assert.equal(sellerCardPath("2685914682", "42"), "/sellers/2685914682/card");
-	assert.equal(sellerCardPath(undefined, "42"), "/sellers/42/card");
+	assert.equal(sellerCardPath("2685914682"), "/sellers/2685914682/card");
+	assert.equal(sellerCardPath(undefined), "");
 	reset();
 });
 
 test("absoluteUrl rejects a path missing its leading slash", () => {
 	assert.throws(() => absoluteUrl("faq", "zh-TW"), /must start with/);
-});
-
-test("canonicalSellerRedirectTarget returns null when id already is the store_code", () => {
-	__setEnvForTest(null);
-	__setFlavorForTest("prod");
-	assert.equal(canonicalSellerRedirectTarget("2600123456", "2600123456"), null);
-	reset();
-});
-
-test("canonicalSellerRedirectTarget returns null for the store_code with any tab", () => {
-	__setEnvForTest(null);
-	__setFlavorForTest("prod");
-	assert.equal(
-		canonicalSellerRedirectTarget("2600123456", "2600123456", "/reviews"),
-		null,
-	);
-	reset();
-});
-
-test("canonicalSellerRedirectTarget maps a legacy store_id to a root-relative path", () => {
-	__setEnvForTest(null);
-	__setFlavorForTest("prod");
-	// Root-relative, not absolute: an origin here would throw a localhost or
-	// preview visitor onto the deployed host mid-navigation.
-	assert.equal(
-		canonicalSellerRedirectTarget("1234567890123456789", "2600123456"),
-		"/sellers/2600123456",
-	);
-	reset();
-});
-
-test("canonicalSellerRedirectTarget keeps the tab suffix the visitor asked for", () => {
-	__setEnvForTest(null);
-	__setFlavorForTest("prod");
-	// Dropping the suffix silently returned every deep link to the products tab.
-	for (const tab of ["/reviews", "/posts", "/messages"] as const) {
-		assert.equal(
-			canonicalSellerRedirectTarget("1234567890123456789", "2600123456", tab),
-			`/sellers/2600123456${tab}`,
-		);
-	}
-	reset();
-});
-
-test("canonicalSellerRedirectTarget returns null when store_code is missing", () => {
-	__setEnvForTest(null);
-	__setFlavorForTest("prod");
-	assert.equal(
-		canonicalSellerRedirectTarget("1234567890123456789", undefined),
-		null,
-	);
-	assert.equal(
-		canonicalSellerRedirectTarget("1234567890123456789", undefined, "/posts"),
-		null,
-	);
-	reset();
 });
 
 const origin = () => siteUrl();
@@ -159,7 +102,7 @@ test("every URL builder takes the locale of the page it describes", () => {
 	);
 	// root-relative internal links are locale-free: the navigation layer adds the prefix, once
 	assert.equal(sellerPath("9"), "/sellers/9");
-	assert.equal(sellerPath("9", undefined, "/posts"), "/sellers/9/posts");
+	assert.equal(sellerPath("9", "/posts"), "/sellers/9/posts");
 	assert.equal(sellerCardPath("9"), "/sellers/9/card");
 	reset();
 });

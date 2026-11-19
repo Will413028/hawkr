@@ -42,8 +42,8 @@ test("seller card keeps public URL identity separate from authoritative store AP
 	const rail = source("../features/sellers/card/SellerCardProductRail.tsx");
 
 	assert.match(page, /const rawStoreId = String\(seller\.storeId/);
-	assert.match(page, /getCachedSellerReviewStats\(storeId\)/);
-	assert.match(page, /getCachedSellerStats\(storeId\)/);
+	assert.doesNotMatch(page, /getCachedSellerReviewStats|getCachedSellerStats/);
+	assert.match(page, /seller\.followerCount \?\? null/);
 	assert.match(page, /getCachedSellerStorefrontProducts\(storeId, 1, 8\)/);
 	assert.doesNotMatch(page, /getCachedSeller\w*\(sellerId/);
 	assert.match(page, /followers !== null/);

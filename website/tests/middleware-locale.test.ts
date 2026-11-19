@@ -5,7 +5,7 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { __resetForumThreadMemoForTest } from "../lib/forum/thread-guard";
 import { __setPublishedLocalesForTest } from "../lib/intl/locales";
-import { __resetSellerStoreCodeMemoForTest } from "../lib/seller/canonical-redirect";
+import { __resetStorefrontGuardMemoForTest } from "../lib/seller/storefront-guard";
 import { siteMiddleware } from "../middleware";
 
 // The prod flavor requires the browser API base on the web origin; a relative base is.
@@ -59,7 +59,7 @@ beforeEach(() => {
 afterEach(() => {
 	globalThis.fetch = realFetch;
 	__resetForumThreadMemoForTest();
-	__resetSellerStoreCodeMemoForTest();
+	__resetStorefrontGuardMemoForTest();
 	__setPublishedLocalesForTest(null);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
@@ -283,33 +283,85 @@ test("a malformed storefront id is a 404 in every locale, answered by the middle
 	}
 });
 
-test("a store_id storefront URL is 308'd to its store_code and keeps the locale prefix, tab and query", async () => {
-	globalThis.fetch = (async () =>
-		new Response(
-			JSON.stringify({
-				code: 0,
-				message: "ok",
-				data: { storeCode: "2600123456" },
-			}),
-			{ status: 200, headers: { "content-type": "application/json" } },
-		)) as typeof fetch;
-	for (const [path, to] of [
-		[
-			"/sellers/1234567890123456789/reviews?utm_source=x",
-			"/sellers/2600123456/reviews",
-		],
-		[
-			"/en/sellers/1234567890123456789/reviews?utm_source=x",
-			"/en/sellers/2600123456/reviews",
-		],
-	] as const) {
-		__resetSellerStoreCodeMemoForTest();
-		const response = await siteMiddleware(request(path));
-		assert.equal(response.status, 308, path);
-		const target = location(response);
-		assert.equal(target?.pathname, to, path);
-		assert.equal(target?.search, "?utm_source=x", path);
+const getStoreOk = () =>
+	new Response(
+		JSON.stringify({
+			store: { id: "9", storeCode: "2600123456", storeName: "x" },
+		}),
+		{ status: 200, headers: { "content-type": "application/json" } },
+	);
+
+test("a store_code the backend does not hold is a real 404 in every locale, without saying why", async () => {
+	for (const [status, code] of [[404, "not_found"]] as const) {
+		for (const prefix of ["", "/en"]) {
+			__resetStorefrontGuardMemoForTest();
+			const calls: string[] = [];
+			globalThis.fetch = (async (input: RequestInfo | URL) => {
+				calls.push(input instanceof Request ? input.url : String(input));
+				return new Response(JSON.stringify({ code, message: "x" }), {
+					status,
+					headers: { "content-type": "application/json" },
+				});
+			}) as typeof fetch;
+			const path = `${prefix}/sellers/2600123456/reviews?utm_source=x`;
+			const response = await siteMiddleware(request(path));
+			assert.equal(response.status, 404, `${code} ${path}`);
+			assert.equal(rewrittenTo(response), "/_not-found", path);
+			assert.ok(
+				calls.some((u) => u.includes("SellerPublicService/GetStore")),
+				"asks GetStore",
+			);
+		}
 	}
+});
+
+test("an invalid_argument answer from GetStore is unknown, not absent: the storefront passes through", async () => {
+	for (const prefix of ["", "/en"]) {
+		__resetStorefrontGuardMemoForTest();
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ code: "invalid_argument", message: "x" }), {
+				status: 400,
+				headers: { "content-type": "application/json" },
+			})) as typeof fetch;
+		const response = await siteMiddleware(
+			request(`${prefix}/sellers/2600123456/reviews`),
+		);
+		assert.notEqual(response.status, 404, prefix);
+	}
+});
+
+test("a present store_code storefront passes through with no redirect and keeps its tab and query", async () => {
+	globalThis.fetch = (async () => getStoreOk()) as typeof fetch;
+	for (const path of [
+		"/sellers/2600123456/reviews?utm_source=x",
+		"/en/sellers/2600123456/reviews?utm_source=x",
+	]) {
+		__resetStorefrontGuardMemoForTest();
+		const response = await siteMiddleware(request(path));
+		assert.notEqual(response.status, 308, path);
+		assert.notEqual(response.status, 404, path);
+	}
+});
+
+test("a store_id URL is a 404, not a redirect, and costs no backend call", async () => {
+	let called = 0;
+	globalThis.fetch = (async () => {
+		called++;
+		return getStoreOk();
+	}) as typeof fetch;
+	const response = await siteMiddleware(
+		request("/sellers/7487768729113814280/reviews"),
+	);
+	assert.equal(response.status, 404);
+	assert.equal(called, 0);
+});
+
+test("an outage reading the store is not a 404", async () => {
+	__resetStorefrontGuardMemoForTest();
+	globalThis.fetch = (async () =>
+		new Response("{}", { status: 503 })) as typeof fetch;
+	const response = await siteMiddleware(request("/sellers/2600123456"));
+	assert.notEqual(response.status, 404);
 });
 
 test("the agent-gate cleanup keeps the locale prefix", async () => {
@@ -383,20 +435,13 @@ test("a non-default locale's UGC page answers X-Robots-Tag: noindex on an indexa
 
 const THREAD_ID = "00000000-0000-4000-8000-000000000001";
 
-/** Backend stand-in: the seller read answers `seller`, GetForumThread answers `thread`; every call is recorded. */
+/** Backend stand-in: GetStore answers the store, GetForumThread answers `thread`; every call is recorded. */
 function backend(thread: () => Response, calls: string[]) {
 	globalThis.fetch = (async (input: RequestInfo | URL) => {
 		const url = input instanceof Request ? input.url : String(input);
 		calls.push(url);
 		if (url.includes("GetForumThread")) return thread();
-		return new Response(
-			JSON.stringify({
-				code: 0,
-				message: "ok",
-				data: { storeCode: "2600123456", storeId: "9" },
-			}),
-			{ status: 200, headers: { "content-type": "application/json" } },
-		);
+		return getStoreOk();
 	}) as typeof fetch;
 }
 
@@ -409,7 +454,7 @@ const connectError = (status: number, code: string) =>
 test("a forum thread the backend does not hold is a real 404 in every locale", async () => {
 	for (const code of ["not_found", "invalid_argument"]) {
 		for (const prefix of ["", "/en"]) {
-			__resetSellerStoreCodeMemoForTest();
+			__resetStorefrontGuardMemoForTest();
 			__resetForumThreadMemoForTest();
 			const calls: string[] = [];
 			backend(
@@ -464,7 +509,7 @@ test("a thread lookup that fails or times out passes through instead of 404", as
 			throw new TypeError("fetch failed");
 		},
 	]) {
-		__resetSellerStoreCodeMemoForTest();
+		__resetStorefrontGuardMemoForTest();
 		__resetForumThreadMemoForTest();
 		backend(thread, []);
 		const response = await siteMiddleware(

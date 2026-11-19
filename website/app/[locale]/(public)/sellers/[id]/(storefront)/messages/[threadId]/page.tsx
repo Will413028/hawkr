@@ -1,7 +1,7 @@
 import SellerForumThreadPage, {
 	generateMetadata,
 } from "@/features/sellers/messages/SellerForumThreadPage";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import {
 	SENTINEL_ENTITY_ID,
 	SENTINEL_THREAD_ID,
@@ -19,7 +19,7 @@ export function generateStaticParams() {
 
 export default async function Page(props: Props) {
 	const { id } = await props.params;
-	const seller = await getCachedSeller(id);
+	const seller = await getCachedStore(id);
 	const name = seller?.name ?? "商家";
 	return (
 		<>

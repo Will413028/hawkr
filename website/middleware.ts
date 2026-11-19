@@ -20,9 +20,9 @@ import {
 	splitLocale,
 } from "@/lib/intl/paths";
 import {
-	lookupSeller,
-	resolveSellerRequest,
-} from "@/lib/seller/canonical-redirect";
+	lookupStore,
+	resolveStorefrontRequest,
+} from "@/lib/seller/storefront-guard";
 import {
 	isCanonicalHost,
 	NOINDEX_HEADER_NAME,
@@ -173,63 +173,50 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		return NextResponse.redirect(cleanUrl, 307);
 	}
 
-	// Storefront status decisions (#365). Both live here rather than inside the
-	// tab pages because those are statically prerendered, and a prerender has no
-	// live response to carry a status: a redirect thrown from one ships as a
-	// `<meta http-equiv="refresh">` inside a 200 (two documents for the visitor,
-	// nothing at all for a crawler), and a `notFound()` renders the 404 body but
-	// still answers 200. See lib/seller/canonical-redirect.ts.
+	// Storefront 404. It lives here rather than inside the tab pages because
+	// those are statically prerendered, and a prerender has no live response to
+	// carry a status: `notFound()` renders the 404 body but still answers 200.
+	// See lib/seller/storefront-guard.ts.
 	//
-	// Neither response carries Set-Cookie, which matters: a Set-Cookie keeps
-	// a CDN from caching the entry, so a cookie here would knock the whole
-	// storefront subtree out of the edge HTML cache.
+	// The response carries no Set-Cookie, which matters: a Set-Cookie keeps a CDN
+	// from caching the entry, so a cookie here would knock the whole storefront
+	// subtree out of the edge HTML cache.
 	if (pathname.startsWith("/sellers/")) {
 		// Middleware is one of only two places on this site that can see who the
 		// visitor is (a cached RSC render cannot — `headers()` throws inside
 		// `use cache`), so it is where the storefront lookup gets attributed to
-		// the person it is made for rather than to the site's shared SSR quota
-		// (backend#2264). See `getVisitorIp` for why the address is trustworthy.
+		// the person it is made for rather than to the site's shared SSR quota.
+		// See `getVisitorIp` for why the address is trustworthy.
 		const visitorIp = getVisitorIp(request);
-		const outcome = await resolveSellerRequest(pathname, (id) =>
-			lookupSeller(id, visitorIp),
+		const outcome = await resolveStorefrontRequest(pathname, (storeCode) =>
+			lookupStore(storeCode, visitorIp),
 		);
 		if (outcome.kind === "not-found") {
-			// Two ways to get here. An id outside the backend's key range answers
-			// `400 invalid seller id`, which this subtree renders as a crawler-
-			// visible 500; and an id the backend settles as `404` belongs to no
-			// seller, which the subtree would otherwise serve as a 200 soft-404
-			// (#376). Rewriting to the app's not-found route serves the real 404
-			// page; the explicit status is what the page itself cannot produce here.
+			// A store_code outside `stores_store_code_check`'s range, a store that does
+			// not exist and one that is not publicly visible all answer the same 404
+			// page, without saying which. Rewriting to the app's not-found route
+			// serves the 404 page with the explicit status the page cannot produce here.
 			return notFoundResponse(request);
 		}
-		if (outcome.kind === "pass") {
-			const threadPath = canonicalThreadPath(pathname);
-			if (threadPath) {
-				const threadUrl = request.nextUrl.clone();
-				threadUrl.pathname = `${prefix}${threadPath}`;
-				return NextResponse.redirect(threadUrl, 308);
-			}
-			// A thread the backend does not hold is a real 404 for the same reason
-			// (the page is prerendered; see lib/forum/thread-guard.ts). The seller
-			// lookup is memoised, so a thread URL adds one thread call at most.
-			const missing = await isMissingForumThread(
-				pathname,
-				async (id) => {
-					const seller = await lookupSeller(id, visitorIp);
-					return seller.kind === "resolved" ? seller.storeId : null;
-				},
-				(storeId, threadId) => lookupForumThread(storeId, threadId, visitorIp),
-			);
-			if (missing) return notFoundResponse(request);
-			return pass(request, pathname, locale);
+		const threadPath = canonicalThreadPath(pathname);
+		if (threadPath) {
+			const threadUrl = request.nextUrl.clone();
+			threadUrl.pathname = `${prefix}${threadPath}`;
+			return NextResponse.redirect(threadUrl, 308);
 		}
-		// clone() keeps the query string (utm_*, ?page=, …) attached to the
-		// canonical path, so a shared deep link survives the redirect intact.
-		const canonicalUrl = request.nextUrl.clone();
-		canonicalUrl.pathname = `${prefix}${outcome.path}`;
-		// 308, not 307: the move is permanent (that is the whole point of
-		// consolidating on store_code) and the method must be preserved.
-		return NextResponse.redirect(canonicalUrl, 308);
+		// A thread the backend does not hold is a real 404 for the same reason
+		// (the page is prerendered; see lib/forum/thread-guard.ts). The store lookup
+		// is memoised, so a thread URL adds one thread call at most.
+		const missing = await isMissingForumThread(
+			pathname,
+			async (storeCode) => {
+				const store = await lookupStore(storeCode, visitorIp);
+				return store.kind === "present" ? store.storeId : null;
+			},
+			(storeId, threadId) => lookupForumThread(storeId, threadId, visitorIp),
+		);
+		if (missing) return notFoundResponse(request);
+		return pass(request, pathname, locale);
 	}
 
 	// /login is never bounced for signed-in visitors (hawkr-website#259): a
@@ -272,7 +259,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
  *
  * It was six explicit prefixes until #355. Those cover every path that needs a
  * REDIRECT decision (`requiredAccessForPath` returns non-null for exactly the
- * prefixes in its access table, and `resolveSellerRequest` only looks at
+ * prefixes in its access table, and `resolveStorefrontRequest` only looks at
  * `/sellers/`), so widening the matcher
  * cannot create a redirect that did not exist before — every newly matched path
  * falls through to `NextResponse.next()`. What it does add is the one thing that

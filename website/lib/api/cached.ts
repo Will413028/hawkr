@@ -11,6 +11,7 @@ import {
 } from "@/lib/posts/repo";
 import { fetchProductReviews } from "@/lib/reviews/repo";
 import { fetchPopularHashtags } from "@/lib/search/repo";
+import { fetchPublicStore } from "@/lib/seller/public-store";
 import { PUBLIC_CACHE_TAGS, productTag, sellerTag } from "@/lib/seo/tags";
 import {
 	fetchCategoryTree,
@@ -264,6 +265,35 @@ async function readSeller(id: string) {
  * awaiting caller. */
 export function getCachedSeller(id: string) {
 	return readSeller(id).then(settled).catch(prerenderSafe(null));
+}
+
+async function readStore(storeCode: string) {
+	"use cache";
+	cacheTag(sellerTag(storeCode));
+	applyCacheTier("SELLER_PROFILE");
+	return fillFetch(
+		"store",
+		async () => {
+			const store = await fetchPublicStore(storeCode, {
+				locale: defaultLocale,
+				signal: upstreamSignal(),
+			});
+			if (store) cacheTag(sellerTag(store.storeId));
+			return store;
+		},
+		{
+			key: ["store", storeCode],
+			endpoint: "SellerPublicService/GetStore",
+		},
+	);
+}
+
+/**
+ * 店面頁的店家（`GetStore`，以網址的 store_code 讀）。沒有這家店回 null（可快取）；其他失敗照拋，
+ * 在 prerender 階段以 `prerenderSafe` 降成 null，理由同 `getCachedSeller`。
+ */
+export function getCachedStore(storeCode: string) {
+	return readStore(storeCode).then(settled).catch(prerenderSafe(null));
 }
 
 async function readSellerReviewStats(id: string) {
