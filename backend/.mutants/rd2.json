@@ -1,0 +1,14 @@
+[
+ {
+  "id": "RD2-content-bytes",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "\tif utf8.RuneCountInString(content) > model.MaxContentRunes {\n\t\treturn model.Review{}",
+  "new": "\tif len(content) > model.MaxContentRunes {\n\t\treturn model.Review{}"
+ },
+ {
+  "id": "RD2-submit-bytes",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "\tif utf8.RuneCountInString(content) > model.MaxContentRunes {\n\t\treturn \"\", 0,",
+  "new": "\tif len(content) > model.MaxContentRunes {\n\t\treturn \"\", 0,"
+ }
+]

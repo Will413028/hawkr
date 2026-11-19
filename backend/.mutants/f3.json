@@ -1,0 +1,8 @@
+[
+ {
+  "id": "F3-reply-no-lock",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "\t\tif _, err := q.LockReview(ctx, in.ReviewID); err != nil {\n\t\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\t\treturn apperr.NotFound(\"%s\", text.ReviewNotFound(l))\n\t\t\t}\n\t\t\treturn err\n\t\t}\n\t\tnow := s.d.Now().UTC()\n\t\trow, err := q.ReplyToReview",
+  "new": "\t\tnow := s.d.Now().UTC()\n\t\trow, err := q.ReplyToReview"
+ }
+]

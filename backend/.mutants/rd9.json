@@ -1,0 +1,8 @@
+[
+ {
+  "id": "RD9-submit-all-errors-notfound",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "return model.Review{}, apperr.WithCause(apperr.Unavailable(\"%s\", text.ReviewOrderUnavailable(l)), err)",
+  "new": "return model.Review{}, model.WithReason(apperr.NotFound(\"%s\", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)"
+ }
+]

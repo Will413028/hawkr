@@ -1,0 +1,8 @@
+[
+ {
+  "id": "RD10-single-read-ignores-hides",
+  "path": "backend/internal/modules/review/internal/store/public.sql.go",
+  "old": "  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)\n`\n\nfunc (q *Queries) GetPublicReviewAnonymous",
+  "new": "  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)\n`\n\nfunc (q *Queries) GetPublicReviewAnonymous"
+ }
+]

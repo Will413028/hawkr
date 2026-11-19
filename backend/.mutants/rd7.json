@@ -1,0 +1,8 @@
+[
+ {
+  "id": "RD7-five-images-allowed",
+  "path": "backend/internal/modules/review/internal/model/model.go",
+  "old": "MaxImages = 4\n",
+  "new": "MaxImages = 5\n"
+ }
+]

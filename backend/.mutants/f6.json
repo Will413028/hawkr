@@ -1,0 +1,8 @@
+[
+ {
+  "id": "F6-restore-no-greatest",
+  "path": "backend/internal/modules/review/internal/store/hides.sql.go",
+  "old": "SET restored_at = GREATEST($1::timestamptz, hidden_at), restored_by",
+  "new": "SET restored_at = $1::timestamptz, restored_by"
+ }
+]

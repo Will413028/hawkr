@@ -1,0 +1,8 @@
+[
+ {
+  "id": "RD3-restore-matches-nothing",
+  "path": "backend/internal/modules/review/internal/store/hides.sql.go",
+  "old": "WHERE review_id = $4 AND restored_at IS NULL",
+  "new": "WHERE review_id = $4 AND restored_at IS NULL AND false"
+ }
+]

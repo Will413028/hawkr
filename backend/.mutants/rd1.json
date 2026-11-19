@@ -1,0 +1,14 @@
+[
+ {
+  "id": "RD1-product-viewer-ignored",
+  "path": "backend/internal/modules/review/internal/read/read.go",
+  "old": "\tvar list []store.ReviewReview\n\tif viewerBuyerID > 0 {\n\t\tlist, err = s.q(ctx).ListProductReviewsForViewer",
+  "new": "\tvar list []store.ReviewReview\n\tif false {\n\t\tlist, err = s.q(ctx).ListProductReviewsForViewer"
+ },
+ {
+  "id": "RD1-store-viewer-ignored",
+  "path": "backend/internal/modules/review/internal/read/read.go",
+  "old": "\tvar list []store.ReviewReview\n\tif viewerBuyerID > 0 {\n\t\tlist, err = s.q(ctx).ListStoreReviewsForViewer",
+  "new": "\tvar list []store.ReviewReview\n\tif false {\n\t\tlist, err = s.q(ctx).ListStoreReviewsForViewer"
+ }
+]

@@ -1,0 +1,8 @@
+[
+ {
+  "id": "F2-drop-image-unique",
+  "path": "backend/internal/modules/review/db/migrations/20261119151923_review_image_unique.sql",
+  "old": "ADD CONSTRAINT \"review_images_asset_key\" UNIQUE (\"review_id\", \"asset_id\");",
+  "new": "ADD COLUMN \"mutant_noop\" integer;"
+ }
+]

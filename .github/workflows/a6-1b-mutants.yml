@@ -1,0 +1,42 @@
+name: a6-1b mutants
+
+# Throwaway branch a6-1b-mutants: never merges. One CI run for every DB-level mutation proof.
+
+on:
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+
+jobs:
+  mutants:
+    name: a6-1b mutation proofs
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/.go-version
+          cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-integration-${{ runner.os }}-
+      - name: git identity for red-proof snapshot commits
+        run: |
+          git config --global user.email ci@example.invalid
+          git config --global user.name ci
+      - name: mutation proofs
+        run: bash backend/.mutants/run-all.sh

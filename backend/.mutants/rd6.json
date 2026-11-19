@@ -1,0 +1,14 @@
+[
+ {
+  "id": "RD6-sku-from-request",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "SkuName: item.SkuName, ItemImageKey",
+  "new": "SkuName: in.OrderNo, ItemImageKey"
+ },
+ {
+  "id": "RD6-price-from-request",
+  "path": "backend/internal/modules/review/internal/write/write.go",
+  "old": "Price: item.Price, CreatedAt: now",
+  "new": "Price: int64(in.Rating), CreatedAt: now"
+ }
+]
