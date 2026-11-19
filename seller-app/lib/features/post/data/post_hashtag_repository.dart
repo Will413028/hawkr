@@ -25,7 +25,6 @@ class PostHashtagRepository {
 
   Future<List<PostHashtagSuggestion>> search({
     required String prefix,
-    bool contains = false,
     int limit = 10,
   }) async {
     final trimmed = prefix.trim();
@@ -34,7 +33,6 @@ class PostHashtagRepository {
     final response = await _socialPublic.suggestTags(
       pb.SuggestTagsRequest(
         query: trimmed,
-        contains: contains,
         maxResults: limit,
       ),
     );
