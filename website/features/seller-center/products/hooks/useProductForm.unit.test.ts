@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
 	push: vi.fn(),
 }));
 
-vi.mock("@/lib/products/seller-repo", () => ({
+vi.mock("@/lib/products/seller-repo", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/products/seller-repo")>()),
 	fetchSellerProductEdit: mocks.fetchSellerProductEdit,
 	updateProduct: mocks.updateProduct,
 	createProduct: mocks.createProduct,
@@ -24,7 +25,24 @@ vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => ({ push: mocks.push }),
 }));
 
+import type { SellerProductDetail } from "@/lib/products/seller-repo";
 import { useProductForm } from "./useProductForm";
+
+const VALID = {
+	name: "Tea",
+	category_id: 5,
+	skus: [
+		{
+			sku_name: "",
+			price: "100",
+			stock: 1,
+			weight: "1",
+			length_cm: "1",
+			width_cm: "1",
+			height_cm: "1",
+		},
+	],
+} as unknown as Partial<SellerProductDetail>;
 
 beforeEach(() => {
 	for (const m of Object.values(mocks)) m.mockReset();
@@ -38,6 +56,7 @@ describe("useProductForm edit load", () => {
 			useProductForm({ mode: "edit", productId: "9" }),
 		);
 		await waitFor(() => expect(result.current.loadStatus).toBe("failed"));
+		act(() => result.current.update(VALID));
 		let ok = true;
 		await act(async () => {
 			ok = await result.current.submit("save");
@@ -62,6 +81,7 @@ describe("useProductForm edit load", () => {
 			useProductForm({ mode: "edit", productId: "9" }),
 		);
 		await waitFor(() => expect(result.current.loadStatus).toBe("notFound"));
+		act(() => result.current.update(VALID));
 		let ok = true;
 		await act(async () => {
 			ok = await result.current.submit("publish");
@@ -71,8 +91,14 @@ describe("useProductForm edit load", () => {
 		expect(mocks.updateProductStatus).not.toHaveBeenCalled();
 	});
 
-	it("keeps create mode submittable", () => {
+	it("keeps create mode submittable with the same draft", async () => {
+		mocks.createProduct.mockResolvedValue(undefined);
 		const { result } = renderHook(() => useProductForm({ mode: "create" }));
 		expect(result.current.loadStatus).toBe("ready");
+		act(() => result.current.update(VALID));
+		await act(async () => {
+			await result.current.submit("save");
+		});
+		expect(mocks.createProduct).toHaveBeenCalledTimes(1);
 	});
 });
