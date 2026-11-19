@@ -10,7 +10,7 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 |---|---|---|---|---|
 | ID 方案（M1）：全 TSID BIGINT（Go 端產生），ADK 表用 TEXT | Java 需要認得 ID（舊服務互通） | 否：對 Java 只有 `order_no`、`prospect_id`、`store_id`、`buyer_id` 是外部鍵（`idrefs.csv:19`），run、request、candidate 等自己的實體沒有 Java 消費者【推】 | 自己的實體用 UUIDv7（row-identity ADR）；外部鍵維持 bigint 到最後一個 Java 消費者退場（同 A6 M1） | 實體 UUIDv7；buyer、store、prospect 引用維持 bigint |
 | gRPC 內部服務、method policy、metadata 注入身分（M2） | 兩個進程之間要信任邊界 | 否：單體內 session 就是身分 | 入口層（`internal/httpapi`）從 session 取身分，模組公開 API 收 `buyer.ID`、`store.ID` 參數 | 刪 gRPC 與 metadata；method policy 改為 Connect 層 interceptor 宣告（同 `adminauth`） |
-| ADK v2、GORM session service、pgx（M3）：session、event 持久化在自己 4 張表 | 需要 ADK 的 agent loop 與 AG-UI 事件 | 部分：助理 coordinator 靠 ADK | 狀態機在業務表，agent loop 輕量；若留 ADK，用它的 pgx 原生儲存而非 GORM 第二套 ORM | A9-D5：保留 ADK、session 改 pgx 實作 `session.Service`，以 ADK 的 `RunServiceTests` 當驗收（`spikes.md` §1；A9-2）；GORM 不進單體 |
+| ADK v2、GORM session service、pgx（M3）：session、event 持久化在自己 4 張表 | 需要 ADK 的 agent loop 與 AG-UI 事件 | 部分：助理 coordinator 靠 ADK | 狀態機在業務表，agent loop 輕量；若留 ADK，用它的 pgx 原生儲存而非 GORM 第二套 ORM | A9-D5：保留 ADK、session 改 pgx 實作 `session.Service`，以 ADK 的 `RunServiceTests` 當驗收（`spikes.md` §1；A9-2）；GORM 不進單體。A9-2a 已實作（`internal/adksession`，4 張表，細節見下列各列） |
 | LLM SDK（M4）：Gemini 走 `google.golang.org/genai`；DeepSeek、OpenRouter 走 `openai-go/v3` 的 `/responses`；修圖手寫 HTTP | 需要多 provider 切換 | 部分：只有 `EXTRACTOR_MODEL` 一個開關；登記表 4 個、其中 gemma 是 `:free`（無 SLA）【量】 | 一個 `LLM` port 加 provider adapter；明確的 timeout、retry、budget；修圖也走同一個 port | A9-D10：只搬 Gemini、DeepSeek，不搬 OpenRouter；單一建構點與架構測試（AD5）在 A9-1c 落地，本模組只依賴該 port，不自建 client |
 | 金鑰與設定（M5）：env 讀取（反射加 strict env 警告）；`GEMINI_API_KEY`、`DEEPSEEK_API_KEY`、`OPENROUTER_API_KEY`、`LLM_API_KEY` 等 | 單一進程讀 env | 否：單體有統一設定載入（`cmd/hawkr`） | 設定集中在 composition root；secret 不進 repo | 併入 `cmd/hawkr` 設定；`LLM_API_URL`、`LLM_API_KEY`、`LLM_MODEL` 全 repo 無讀取者，不搬（AD13） |
 | timeout 與 retry（M6）：assistant 30s；SDK 自帶重試關掉 | 外部 provider 要有 deadline | 成立：每個外部呼叫都有 deadline【量】 | 同；加 provider 層熔斷與併發上限 | 保留並集中到 LLM 單一建構點（A9-1c）；timeout 常數與 `observability` 的直方圖 bucket 鏡像要保持同步 |
@@ -19,6 +19,9 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 用 gRPC client 取別的服務資料（M12）：tool 呼叫 buyer 與 ordering | 資料在別的服務 | 部分：buyer 已在單體；ordering 還在 Java | 模組公開 API；未搬的走 `internal/legacy/*` | buyer 換成模組 API；ordering 經 `internal/legacy` 補 client，模組只依賴 port（A9-D11；Q3） |
 | fx 組裝、`pkglogger`（zap）、`syncutil.SafeGo`（M17） | 單進程 DI | 否：單體 composition root 手動接線 | 同單體規則 | 全改成 `cmd/hawkr` 接線；`go-pkg/{identity,tsid,outbox,mq,errors/bizcode,grpcclient}` 換成單體的 `platform` 對應 |
 | bizcode 數字碼加 CodeMeta（M18）：例如 `9703` | 舊 REST 契約 | 否：新契約用 `ErrorReason` | `api/` 的 `ErrorReason` 加 Go 型別 | 全部轉 `ErrorReason`；`procurement_error_reason_registry_test.go` 已有註冊表概念，可沿用【量】 |
+| session 表的 event 欄位（M3 的細部）：舊 GORM 版把 event 拆成約 20 個欄位 | 欄位要能被 SQL 查詢或索引 | 否：assistant 只依 `timestamp`、`id` 排序與篩選，沒有任何查詢讀 event 內容欄位【量，A9-2a 的 query 清單】 | event 整份存 JSON，查詢用的欄位另存 | 整個 `session.Event` 存 `events.event`（JSONB，ADK 公開並測試過的往返編碼），`timestamp`、`id` 另存；ADK 新增 event 欄位不需改 schema |
+| 並行寫入防護（M3 的細部）：GORM 版 `AppendEvent` 比對 session 更新時間，過期就回 stale 錯誤 | 兩個 append 可能同時改同一份 state | 部分：同一對話可能同時有兩輪（重送、雙裝置）；這個防護擋「讀到舊 session 再寫」，但不阻止兩輪交錯寫 event | 寫入端用列鎖與原子合併保證不丟更新；輪次層序列化同一對話的輪次 | 不搬 stale 檢查：`AppendEvent` 鎖 session 列、state 以 jsonb `\|\|` 在 SQL 內合併，並行 append 不丟 key（CI 測試 `TestConcurrentAppendsKeepEveryStateKey`）；同一對話兩輪交錯的 event 序列由輪次執行器（A9-2b）決定是否序列化，不在儲存層擋 |
+| state 的 JSON 往返（M3 的細部）：19 位 TSID 要先轉字串才不被 float64 改寫（舊 `getInt64State` 的註解） | state 經 JSON 存取 | 是：新儲存也是 JSONB，讀回的數字是 float64 | 以字串存大整數 ID | 維持：寫入 state 的 ID 一律字串（`user_id` 本身就是字串）；數字型 state 值只保證 float64 精度 |
 
 ## 傳輸層的沿用盤點
 

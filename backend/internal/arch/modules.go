@@ -58,9 +58,10 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"adksession": {"store"}, // ADK session.Service 的 pgx 實作（A9-D5）
+		"feature":    {},
+		"model":      {},
+		"store":      {},
 	}},
 	"procurement": {Packages: map[string][]string{
 		"feature": {},
