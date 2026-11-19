@@ -9,6 +9,7 @@ import {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render as renderWithoutIntl,
@@ -172,5 +173,51 @@ describe("BlockedBuyersPage", () => {
 		expect(screen.getByText("小明")).toBeTruthy();
 		expect(screen.getByText("小華")).toBeTruthy();
 		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it("unblocking every loaded row while another page exists keeps load more instead of the empty state", async () => {
+		rpc.listBlockedBuyers
+			.mockResolvedValueOnce(page([blocked("11", "小明")], "tok-2"))
+			.mockReturnValue(new Promise(() => {}));
+		rpc.unblockBuyer.mockResolvedValue({ changed: true });
+		render();
+		await screen.findByText("小明");
+		fireEvent.click(screen.getByRole("button", { name: "解除封鎖" }));
+		const dialog = screen.getByRole("dialog");
+		fireEvent.click(within(dialog).getByRole("button", { name: "解除封鎖" }));
+		await waitFor(() => expect(screen.queryByText("小明")).toBeNull());
+		expect(screen.queryByText("尚無封鎖名單")).toBeNull();
+		expect(screen.getByRole("button", { name: "載入更多" })).toBeTruthy();
+	});
+
+	it("activating the confirm button twice in a row sends one unblock", async () => {
+		rpc.listBlockedBuyers.mockResolvedValue(page([blocked("11", "小明")]));
+		rpc.unblockBuyer.mockReturnValue(new Promise(() => {}));
+		render();
+		await screen.findByText("小明");
+		fireEvent.click(screen.getByRole("button", { name: "解除封鎖" }));
+		const confirm = within(screen.getByRole("dialog")).getByRole("button", {
+			name: "解除封鎖",
+		});
+		act(() => {
+			fireEvent.click(confirm);
+			fireEvent.click(confirm);
+		});
+		await waitFor(() => expect(rpc.unblockBuyer).toHaveBeenCalled());
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(rpc.unblockBuyer).toHaveBeenCalledTimes(1);
+	});
+
+	it("labels a deleted buyer with the seller-app wording", async () => {
+		rpc.listBlockedBuyers.mockResolvedValue(
+			page([
+				create(BlockedBuyerSchema, {
+					buyer: { id: "13", deleted: true },
+					createTime: timestampFromDate(new Date("2026-11-01T00:30:00Z")),
+				}),
+			]),
+		);
+		render();
+		expect(await screen.findByText("已刪除帳號")).toBeTruthy();
 	});
 });

@@ -58,15 +58,22 @@ export async function listBlockedBuyers(
 		pageToken,
 	});
 	return {
-		items: res.blockedBuyers.map((blocked) => ({
-			buyerId: blocked.buyer?.id ?? "",
-			deleted: blocked.buyer?.deleted ?? false,
-			name: blocked.buyer?.displayName ?? "",
-			avatarUrl: imageUri(blocked.buyer?.avatar, "avatar"),
-			blockedAt: blocked.createTime
-				? timestampDate(blocked.createTime).toISOString()
-				: undefined,
-		})),
+		// 沒有買家 id 的項目無法解除封鎖，不是可操作的資料。
+		items: res.blockedBuyers.flatMap((blocked) =>
+			blocked.buyer?.id
+				? [
+						{
+							buyerId: blocked.buyer.id,
+							deleted: blocked.buyer.deleted,
+							name: blocked.buyer.displayName,
+							avatarUrl: imageUri(blocked.buyer.avatar, "avatar"),
+							blockedAt: blocked.createTime
+								? timestampDate(blocked.createTime).toISOString()
+								: undefined,
+						},
+					]
+				: [],
+		),
 		nextPageToken: res.nextPageToken,
 	};
 }

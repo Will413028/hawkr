@@ -28,7 +28,7 @@ import {
 	unblockBuyer,
 } from "@/lib/seller/block-buyer";
 
-const DELETED_BUYER_LABEL = "已刪除的帳號";
+const DELETED_BUYER_LABEL = "已刪除帳號";
 const FALLBACK_BUYER_LABEL = "買家";
 
 function buyerLabel(item: BlockedBuyerItem): string {
@@ -78,9 +78,12 @@ export default function BlockedBuyersPage() {
 		},
 	});
 
+	// 連點的第二下在 React 重繪前就到了，`unblock.isPending` 還是舊值；用同步設定的 ref 擋。
+	const unblocking = React.useRef(false);
 	const confirmUnblock = async () => {
 		const target = confirming;
-		if (!target || unblock.isPending) return;
+		if (!target || unblocking.current) return;
+		unblocking.current = true;
 		setRowErrors(({ [target.buyerId]: _cleared, ...rest }) => rest);
 		try {
 			await unblock.mutateAsync(target.buyerId);
@@ -90,6 +93,7 @@ export default function BlockedBuyersPage() {
 				[target.buyerId]: errorText(e, defaults),
 			}));
 		} finally {
+			unblocking.current = false;
 			setConfirming(null);
 		}
 	};
@@ -110,7 +114,7 @@ export default function BlockedBuyersPage() {
 						重試
 					</Button>
 				</Card>
-			) : items.length === 0 ? (
+			) : items.length === 0 && !query.hasNextPage ? (
 				<EmptyStatePanel
 					icon="search"
 					title="尚無封鎖名單"
