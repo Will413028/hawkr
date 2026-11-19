@@ -51,6 +51,9 @@ class FakeBuyerApp {
   /// 設了之後買家名單的讀取等到它完成才回應。
   Completer<void>? listBuyersGate;
 
+  /// 設了之後封鎖請求等到它完成才回應。
+  Completer<void>? blockGate;
+
   final List<buyer.BlockStoreRequest> storeBlocks = [];
   final List<buyer.BlockAuthorRequest> authorBlocks = [];
   final List<buyer.UnblockStoreRequest> storeUnblocks = [];
@@ -68,11 +71,13 @@ class FakeBuyerApp {
     FakeTransportBuilder()
         .unary(BuyerAppService.blockStore, (req, _) async {
           storeBlocks.add(req);
+          await blockGate?.future;
           if (blockError != null) throw blockError!;
           return buyer.BlockStoreResponse(changed: true);
         })
         .unary(BuyerAppService.blockAuthor, (req, _) async {
           authorBlocks.add(req);
+          await blockGate?.future;
           if (blockError != null) throw blockError!;
           return buyer.BlockAuthorResponse(changed: true);
         })

@@ -597,24 +597,19 @@ class _PostPage extends HookConsumerWidget {
                             onPressed: () async {
                               if (!await requireLogin(context, ref)) return;
                               if (!context.mounted) return;
-                              final blocked = await showReportBlockActionSheet(
+                              await showReportBlockActionSheet(
                                 context,
                                 reportTarget: SocialReportTarget.post(
                                   post.id.toString(),
                                 ),
                                 blockTarget: sellerId.isNotEmpty
-                                    ? StoreBlockTarget(sellerId)
+                                    ? StoreBlockTarget(
+                                        sellerId,
+                                        originPostId: post.id,
+                                      )
                                     : null,
                                 blockUserLabel: username,
                               );
-                              if (blocked && context.mounted) {
-                                ref
-                                    .read(postEntityStoreProvider.notifier)
-                                    .removeStorePosts(
-                                      sellerId,
-                                      alsoPostId: post.id,
-                                    );
-                              }
                             },
                             icon: AppIcons.moreHoriz,
                           ),

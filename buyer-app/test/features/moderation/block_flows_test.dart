@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -458,6 +459,79 @@ void main() {
       await pumpForum(tester, [_entry('mine', mine: true)]);
 
       expect(find.byTooltip('檢舉或封鎖'), findsNothing);
+    });
+  });
+
+  group('封鎖等待中畫面已被移除', () {
+    Future<void> hideWhilePending(
+      WidgetTester tester, {
+      required Widget Function() screen,
+      required pb.Actor author,
+      required Finder opener,
+      required bool comments,
+    }) async {
+      final show = ValueNotifier(true);
+      addTearDown(show.dispose);
+      final gate = Completer<void>();
+      final app = FakeBuyerApp()..blockGate = gate;
+      final h = _Harness(
+        buyerApp: app,
+        public: comments
+            ? FakeSocialPublic(comments: [_comment('c1', author: author)])
+            : FakeSocialPublic(forumEntries: [_entry('e1', author: author)]),
+      );
+      await h.pump(
+        tester,
+        ValueListenableBuilder<bool>(
+          valueListenable: show,
+          builder: (_, visible, _) =>
+              visible ? screen() : const SizedBox.shrink(),
+        ),
+      );
+      final posts = h.container.read(postEntityStoreProvider.notifier);
+      posts.setListed('test', [201, 202]);
+      posts.seed(const [
+        Post(id: 201, storeId: '7'),
+        Post(id: 202, storeId: '8'),
+      ]);
+
+      await tester.tap(opener);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖此人'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('封鎖'));
+      await tester.pump();
+      show.value = false;
+      await tester.pump();
+
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final state = h.container.read(postEntityStoreProvider);
+      expect(state.gone, contains(201));
+      expect(state.gone, isNot(contains(202)));
+      await tester.pump(const Duration(seconds: 3));
+    }
+
+    testWidgets('討論區：封鎖等待中畫面被移除，不丟例外且該店貼文已移除', (tester) async {
+      await hideWhilePending(
+        tester,
+        screen: () => MerchantChatTab(merchantId: '7', merchantName: '好店'),
+        author: storeActor('好店'),
+        opener: find.byTooltip('檢舉或封鎖'),
+        comments: false,
+      );
+    });
+
+    testWidgets('留言：封鎖等待中畫面被移除，不丟例外且該店貼文已移除', (tester) async {
+      await hideWhilePending(
+        tester,
+        screen: () => CommentsBottomSheet(postId: 101),
+        author: storeActor('好店'),
+        opener: find.byKey(const ValueKey('comment-more-c1')),
+        comments: true,
+      );
     });
   });
 

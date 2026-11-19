@@ -8,7 +8,7 @@ import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../data/block_repository.dart';
 import '../data/block_target.dart';
-import '../data/blocking_repository.dart';
+import '../data/social_blocker.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 封鎖確認彈窗。說明文字與送到哪條 API 都由 [target] 的型別決定：社群對象送 `BuyerAppService`，
@@ -36,7 +36,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
     try {
       switch (widget.target) {
         case final SocialBlockTarget target:
-          await ref.read(blockingRepositoryProvider).block(target);
+          await ref.read(socialBlockerProvider).block(target);
         case LegacyBlockTarget(:final userId):
           await ref.read(blockRepositoryProvider).blockUser(userId);
       }

@@ -22,7 +22,6 @@ import '../../features/social/presentation/comments_notifier.dart';
 import '../../features/social/presentation/thread_notifier.dart'
     show ThreadPhase;
 import '../../features/social/presentation/post_entity.dart';
-import '../../features/social/presentation/post_entity_store.dart';
 import '../../features/social/presentation/write_result.dart';
 import '../utils/require_login.dart';
 import '../utils/store_actor_hint.dart';
@@ -203,11 +202,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       blockActionLabel: '封鎖此人',
     );
     if (!blocked) return;
-    if (comment.author.kind == pb.ActorKind.ACTOR_KIND_STORE) {
-      ref
-          .read(postEntityStoreProvider.notifier)
-          .removeStorePosts(comment.author.id);
-    }
     if (mounted) await _reload();
   }
 

@@ -23,13 +23,25 @@ sealed class BlockTarget {
 
 sealed class SocialBlockTarget extends BlockTarget {
   const SocialBlockTarget();
+
+  /// 封鎖成功後要移除貼文的店家 ID；封鎖的是買家時為 null。
+  String? get blockedStoreId;
+
+  /// 封鎖入口所在的那篇貼文；該篇沒有店家資料時也一併移除。
+  int? get originPostId => null;
 }
 
 /// 從貼文封鎖發文的店家；[storeId] 是不透明字串。
 final class StoreBlockTarget extends SocialBlockTarget {
-  const StoreBlockTarget(this.storeId);
+  const StoreBlockTarget(this.storeId, {this.originPostId});
 
   final String storeId;
+
+  @override
+  final int? originPostId;
+
+  @override
+  String? get blockedStoreId => storeId;
 
   @override
   String get confirmText => blockStoreConfirmText;
@@ -37,10 +49,17 @@ final class StoreBlockTarget extends SocialBlockTarget {
 
 /// 封鎖一則留言的作者（買家或店家）。
 final class CommentAuthorBlockTarget extends SocialBlockTarget {
-  const CommentAuthorBlockTarget(this.commentId, this.party);
+  const CommentAuthorBlockTarget(this.commentId, this.party, {this.authorStoreId});
 
   final String commentId;
   final BlockedPartyKind party;
+
+  /// 作者是店家時的店家 ID。
+  final String? authorStoreId;
+
+  @override
+  String? get blockedStoreId =>
+      party == BlockedPartyKind.store ? authorStoreId : null;
 
   @override
   String get confirmText => party == BlockedPartyKind.store
@@ -50,10 +69,17 @@ final class CommentAuthorBlockTarget extends SocialBlockTarget {
 
 /// 封鎖一則討論區留言的作者（買家或店家）。
 final class ForumAuthorBlockTarget extends SocialBlockTarget {
-  const ForumAuthorBlockTarget(this.entryId, this.party);
+  const ForumAuthorBlockTarget(this.entryId, this.party, {this.authorStoreId});
 
   final String entryId;
   final BlockedPartyKind party;
+
+  /// 作者是店家時的店家 ID。
+  final String? authorStoreId;
+
+  @override
+  String? get blockedStoreId =>
+      party == BlockedPartyKind.store ? authorStoreId : null;
 
   @override
   String get confirmText => party == BlockedPartyKind.store
@@ -81,12 +107,20 @@ BlockedPartyKind? _partyOf(pb.Actor author) => switch (author.kind) {
 SocialBlockTarget? blockTargetForComment(pb.Comment comment) {
   if (comment.isMine || !comment.hasAuthor()) return null;
   final party = _partyOf(comment.author);
-  return party == null ? null : CommentAuthorBlockTarget(comment.id, party);
+  return party == null ? null : CommentAuthorBlockTarget(
+          comment.id,
+          party,
+          authorStoreId: comment.author.id,
+        );
 }
 
 /// 討論區留言作者可封鎖時的對象；規則同 [blockTargetForComment]。
 SocialBlockTarget? blockTargetForForumEntry(pb.ForumEntry entry) {
   if (entry.isMine || !entry.hasAuthor()) return null;
   final party = _partyOf(entry.author);
-  return party == null ? null : ForumAuthorBlockTarget(entry.id, party);
+  return party == null ? null : ForumAuthorBlockTarget(
+          entry.id,
+          party,
+          authorStoreId: entry.author.id,
+        );
 }

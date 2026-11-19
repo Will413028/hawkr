@@ -218,19 +218,14 @@ class PostDetailScreen extends HookConsumerWidget {
         onMore: () async {
           if (!await requireLogin(context, ref)) return;
           if (!context.mounted) return;
-          final blocked = await showReportBlockActionSheet(
+          await showReportBlockActionSheet(
             context,
             reportTarget: SocialReportTarget.post(postId.toString()),
             blockTarget: sellerId.isNotEmpty
-                ? StoreBlockTarget(sellerId)
+                ? StoreBlockTarget(sellerId, originPostId: postId)
                 : null,
             blockUserLabel: displayName,
           );
-          if (blocked && context.mounted) {
-            ref
-                .read(postEntityStoreProvider.notifier)
-                .removeStorePosts(sellerId, alsoPostId: postId);
-          }
         },
         onMerchantTap: storeCode.isEmpty
             ? null
