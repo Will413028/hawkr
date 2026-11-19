@@ -100,7 +100,7 @@
 | 賣家 meta、stats、prospect 搜尋 | seller | `AIi/client/seller/adapter.go`（`GetSellerStats`、`BatchGetSellerMeta`、`SearchProspects`） | `seller` 已在單體；`seller_prospects` 由 seller 擁有（`M/seller/db`） |
 | 買家 entitlement | buyer | `AIi/client/buyer/adapter.go:58`（`GetBuyerEntitlement`） | `buyer` 模組公開 API |
 | 圖片上傳／引用 | media | `AIi/client/media/client.go`（`FinalizeImages`、`LinkImages`、`ReleaseReferences`） | `media` 已在單體，與寫列同 tx |
-| 供應商邀請與 session | `agent`（單體既有） | `rfq_recipient_id` 屬 ai-service，agent 模組只驗正整數（`M/agent/AGENTS.md`、`backend/docs/modules/agent.md:67`） | 採購進單體後，`agent` 的 `Prospects` port 與採購的接線要定（Q2） |
+| 供應商邀請與 session | `agent`（單體既有） | `rfq_recipient_id` 屬 ai-service，agent 模組只驗正整數（`M/agent/AGENTS.md`、已刪除的 agent 模組規格第 67 行） | 採購進單體後，`agent` 的 `Prospects` port 與採購的接線要定（Q2） |
 | 通知 | notification（舊） | ai-service 經 `procurement.events` exchange 發事件（`events.csv`） | A8 notification 搬遷時要接新事件（Q8） |
 
 ---
