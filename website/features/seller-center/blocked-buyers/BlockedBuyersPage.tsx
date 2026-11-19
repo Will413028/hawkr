@@ -188,7 +188,6 @@ export default function BlockedBuyersPage() {
 								color="default"
 								size="sm"
 								disabled={query.isFetchingNextPage}
-								isLoading={query.isFetchingNextPage}
 								onClick={() => void query.fetchNextPage()}
 							>
 								載入更多
@@ -216,7 +215,7 @@ export default function BlockedBuyersPage() {
 						</Button>
 						<Button
 							onClick={() => void confirmUnblock()}
-							isLoading={unblock.isPending}
+							disabled={unblock.isPending}
 						>
 							解除封鎖
 						</Button>
