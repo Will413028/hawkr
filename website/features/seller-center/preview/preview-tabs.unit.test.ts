@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 	messageTab: vi.fn(),
 	reviewsFetch: vi.fn(),
 	statsFetch: vi.fn(),
+	queryState: { data: undefined as unknown, isError: false },
 }));
 
 vi.mock("@/lib/hooks/useSellerProducts", () => ({
@@ -41,7 +42,7 @@ vi.mock("@/features/sellers/reviews/ReviewsClient", () => ({
 vi.mock("@tanstack/react-query", () => ({
 	useQuery: (options: { queryFn: () => unknown }) => {
 		void options.queryFn();
-		return { data: undefined, isError: false };
+		return { ...mocks.queryState };
 	},
 	useInfiniteQuery: () => ({ data: undefined, isError: false }),
 }));
@@ -85,7 +86,10 @@ function product(
 }
 
 beforeEach(() => {
-	for (const mock of Object.values(mocks)) mock.mockReset();
+	mocks.queryState = { data: undefined, isError: false };
+	for (const mock of Object.values(mocks)) {
+		if (typeof mock === "function") mock.mockReset();
+	}
 });
 
 describe("preview reviews and messages tabs when the store cannot be public", () => {
@@ -106,11 +110,19 @@ describe("preview reviews and messages tabs when the store cannot be public", ()
 
 	it("reads the public sources once the store can be public", () => {
 		renderTab(PreviewReviewsTab, true);
-		expect(mocks.reviewsFetch).toHaveBeenCalledWith("700", 1);
-		expect(mocks.statsFetch).toHaveBeenCalledWith("700");
+		expect(mocks.reviewsFetch).toHaveBeenCalledWith("700", 1, true);
+		expect(mocks.statsFetch).toHaveBeenCalledWith("700", true);
 		const html = renderTab(PreviewMessagesTab, true);
 		expect(mocks.messageTab).toHaveBeenCalledTimes(1);
 		expect(html).not.toContain(PREVIEW_MESSAGES_UNAVAILABLE);
+	});
+});
+
+describe("preview reviews tab outage", () => {
+	it("renders the error state instead of an empty list when the read fails", () => {
+		mocks.queryState = { data: undefined, isError: true };
+		const html = renderTab(PreviewReviewsTab, true);
+		expect(html).toContain("評價暫時載入不到，請稍後再試。");
 	});
 });
 

@@ -1,4 +1,4 @@
-import { getCachedStore } from "@/lib/api/cached";
+import { getCachedStoreOrThrow } from "@/lib/api/cached";
 import ProductSellerIntro from "./components/ProductSellerIntro";
 
 /**
@@ -34,10 +34,10 @@ export default async function SellerIntroAsync({
 		(productSeller as { storeCode?: unknown } | null)?.storeCode ?? "",
 	).trim();
 	if (storeCode) {
-		let store: Awaited<ReturnType<typeof getCachedStore>> = null;
+		let store: Awaited<ReturnType<typeof getCachedStoreOrThrow>> = null;
 		let readFailed = false;
 		try {
-			store = await getCachedStore(storeCode);
+			store = await getCachedStoreOrThrow(storeCode);
 		} catch {
 			readFailed = true;
 		}

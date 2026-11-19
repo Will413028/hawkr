@@ -262,7 +262,15 @@ async function readStore(storeCode: string) {
  * 失敗不會被存成快取項，`prerenderSafe` 只看 NEXT_PHASE／NODE_ENV／錯誤型別，執行期的 5xx 仍會往上拋。
  */
 export function getCachedStore(storeCode: string) {
-	return readStore(storeCode).then(settled).catch(prerenderSafe(null));
+	return getCachedStoreOrThrow(storeCode).catch(prerenderSafe(null));
+}
+
+/**
+ * 同 `getCachedStore`，但不吞失敗：null 只代表 `GetStore` 回 not_found，build、dev 與 4xx 的讀取失敗照拋，
+ * 讓呼叫端分得出「店不存在」與「讀不到」。
+ */
+export function getCachedStoreOrThrow(storeCode: string) {
+	return readStore(storeCode).then(settled);
 }
 
 async function readSellerReviewStats(id: string) {

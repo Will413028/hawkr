@@ -17,9 +17,10 @@ function PublicReviews() {
 		queryKey: ["seller-preview", "reviews", view.storeId],
 		queryFn: async () => {
 			const [reviews, stats] = await Promise.all([
-				fetchSellerReviews(view.storeId, 1),
+				fetchSellerReviews(view.storeId, 1, true),
 				fetchSellerReviewStats(
 					view.storeId,
+					true,
 				) as Promise<SellerReviewStats | null>,
 			]);
 			return { reviews, stats };

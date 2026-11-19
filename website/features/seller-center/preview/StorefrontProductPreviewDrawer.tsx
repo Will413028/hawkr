@@ -86,6 +86,8 @@ export default function StorefrontProductPreviewDrawer({
 	onClose,
 }: StorefrontProductPreviewDrawerProps) {
 	const [reloadKey, setReloadKey] = React.useState(0);
+	const storeRef = React.useRef(store);
+	storeRef.current = store;
 	const [loadState, setLoadState] = React.useState<PreviewLoadState>({
 		status: "idle",
 	});
@@ -115,8 +117,8 @@ export default function StorefrontProductPreviewDrawer({
 				setLoadState({
 					status: "ready",
 					data: {
-						product: previewDetailProduct(detail, store),
-						store,
+						product: previewDetailProduct(detail, storeRef.current),
+						store: storeRef.current,
 						reviewsResult,
 					},
 				});
@@ -128,7 +130,7 @@ export default function StorefrontProductPreviewDrawer({
 		return () => {
 			active = false;
 		};
-	}, [productId, store, reloadKey]);
+	}, [productId, reloadKey]);
 
 	const description =
 		loadState.status === "ready"

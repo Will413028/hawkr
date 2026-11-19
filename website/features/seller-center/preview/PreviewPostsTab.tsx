@@ -76,7 +76,10 @@ export function PreviewPostsGrid({
 				</div>
 			)}
 			{hasMore ? (
-				<div className="hkui-feed-sentinel">
+				<div
+					className="hkui-feed-sentinel"
+					data-storefront-preview-reading-control="true"
+				>
 					<Button
 						variant="bordered"
 						color="primary"

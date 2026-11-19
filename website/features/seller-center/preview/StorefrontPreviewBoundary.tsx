@@ -13,8 +13,10 @@ function interactiveTarget(target: EventTarget | null): Element | null {
 }
 
 function isReadonlyPostPreviewInteraction(target: Element): boolean {
-	return target.matches(
-		'[data-storefront-post-preview-trigger="true"], [data-storefront-post-preview-control="true"]',
+	return (
+		target.closest(
+			'[data-storefront-post-preview-trigger="true"], [data-storefront-post-preview-control="true"], [data-storefront-preview-reading-control="true"]',
+		) !== null
 	);
 }
 

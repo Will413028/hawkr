@@ -12,7 +12,7 @@
  */
 
 import { fetchProducts } from "../api";
-import { apiClient, authedFetch } from "../api/client";
+import { ApiClientError, apiClient, authedFetch } from "../api/client";
 import type { DelegatedMutationMeta, RepoFetcher } from "../api/delegated";
 
 export interface SellerProductListItem {
@@ -361,10 +361,15 @@ export function createSellerProductRepo(
 		async fetchSellerProductEdit(
 			id: number | string,
 		): Promise<SellerProductDetail | null> {
-			const env = await fetcher<SellerProductDetail>(at(id), {
-				throwOnHttpError: false,
-			});
-			return env.data ?? null;
+			try {
+				const env = await fetcher<SellerProductDetail>(at(id));
+				return env.data ?? null;
+			} catch (error) {
+				if (error instanceof ApiClientError && error.status === 404) {
+					return null;
+				}
+				throw error;
+			}
 		},
 
 		async fetchProductSkus(id: number | string): Promise<ProductSku[]> {

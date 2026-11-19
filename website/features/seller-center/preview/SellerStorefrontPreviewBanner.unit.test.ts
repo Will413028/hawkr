@@ -10,7 +10,7 @@ vi.mock("@/components/shared/Link", () => ({
 import SellerStorefrontPreviewBanner from "./SellerStorefrontPreviewBanner";
 
 const PUBLIC_TEXT =
-	"使用正式公開商店資料；預覽期間不會送出訂閱、聊天、收藏、按讚、留言、分享或購買操作。";
+	"以下是買家看到的店面樣子。預覽期間不會送出訂閱、聊天、收藏、按讚、留言、分享或購買操作。";
 const NOT_PUBLIC_TEXT =
 	"你的店家還沒公開，買家目前看不到這個店面。以下是公開後買家會看到的樣子。";
 

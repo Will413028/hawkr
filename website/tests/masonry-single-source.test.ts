@@ -22,7 +22,9 @@ const read = (relative: string) =>
 
 const grid = read("components/shared/MasonryGrid.tsx");
 const marketCss = read("styles/features/market.css");
-const storefront = read("features/sellers/storefront/StorefrontProductGrid.tsx");
+const storefront = read(
+	"features/sellers/storefront/StorefrontProductGrid.tsx",
+);
 
 function fakeComputedStyle(
 	gridTemplateColumns: string,
