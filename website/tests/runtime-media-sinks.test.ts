@@ -88,9 +88,6 @@ test("seller and product metadata never emit raw backend image URLs", () => {
 	);
 	const storefrontMetadata = source("features/sellers/storefront/metadata.ts");
 	const product = source("app/[locale]/(public)/products/[id]/page.tsx");
-	const nestedProduct = source(
-		"app/[locale]/(public)/sellers/[id]/products/[pid]/page.tsx",
-	);
 
 	// The pinned value is the NORMALIZED one, and it reaches og:image through
 	// socialImages() so an imageless seller falls back to the site card instead
@@ -112,7 +109,7 @@ test("seller and product metadata never emit raw backend image URLs", () => {
 	// old pin endorsed a dead fallback. Pin the objectKey SSOT instead — passing
 	// the bare key lets buildImageUrl apply the `detail` preset directly rather
 	// than peeling a `/i/original/` URL back apart first.
-	for (const route of [product, nestedProduct]) {
+	for (const route of [product]) {
 		assert.match(
 			route,
 			/const imgUrl = buildImageUrl\(product\.imageKey, "detail"\);/,

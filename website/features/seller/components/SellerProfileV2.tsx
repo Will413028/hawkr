@@ -29,6 +29,10 @@ import { isExternalWebsiteUrl } from "@/lib/seller/website-url";
  * `websiteUrl` …）直接來自 wire，backend#2235 之後全是 camelCase。
  */
 interface SellerProfileLike {
+	/** `GetStore` 的統計；讀不到的欄位不設，顯示「—」。賣家預覽沒有，改讀舊的統計端點。 */
+	followerCount?: number;
+	reviewCount?: number;
+	ratingAverage?: number;
 	city?: string;
 	coverImage?: string;
 	description?: string;
@@ -45,12 +49,16 @@ interface SellerProfileLike {
 
 interface SellerProfileV2Props {
 	seller: SellerProfileLike | null;
+	/** 網址上的店家段（公開店面是 store_code）；追蹤與統計用 `seller.storeId`。 */
 	sellerId: string;
 	/** Seller-center preview uses the same buyer component but blocks writes. */
 	previewMode?: boolean;
 	/** Keeps storefront tabs inside the preview route instead of public routes. */
 	tabBasePath?: string;
 }
+
+/** 統計讀不到時顯示的字（B12、10c K19、10d K15）。 */
+const UNSET_STAT = "—";
 
 const StarIcon = ({ size = 14 }: { size?: number }) => (
 	<AppIcon name="star" size={size} fill />
@@ -77,21 +85,24 @@ export function SellerProfileMeta({
 	subscribers,
 	websiteUrl,
 }: {
-	rating: string;
+	/** null：評分讀不到，顯示「—」；空字串或 0：沒有評分，整段不顯示。 */
+	rating: string | null;
 	totalReviews: number;
 	location: string;
-	subscribers: number;
+	/** null：粉絲數讀不到，顯示「—」。 */
+	subscribers: number | null;
 	websiteUrl: string;
 }) {
-	const hasRating = Number(rating) > 0;
+	const ratingUnknown = rating === null;
+	const hasRating = ratingUnknown || Number(rating) > 0;
 	const hasLocation = Boolean(location);
 	return (
 		<div className="hkui-seller-profile__meta">
 			{hasRating && (
 				<span className="hkui-seller-profile__meta-item hkui-seller-profile__meta-item--rating">
 					<StarIcon />
-					<strong>{rating}</strong>
-					<span>({totalReviews})</span>
+					<strong>{rating ?? UNSET_STAT}</strong>
+					{ratingUnknown ? null : <span>({totalReviews})</span>}
 				</span>
 			)}
 			{hasLocation && (
@@ -113,7 +124,7 @@ export function SellerProfileMeta({
 			)}
 			<span className="hkui-seller-profile__meta-item hkui-seller-profile__meta-item--users">
 				<UsersIcon />
-				<strong>{subscribers}</strong>
+				<strong>{subscribers ?? UNSET_STAT}</strong>
 				<span>位訂閱</span>
 			</span>
 			{websiteUrl && (
@@ -126,35 +137,68 @@ export function SellerProfileMeta({
 	);
 }
 
+interface ProfileStats {
+	rating: string | null;
+	totalReviews: number;
+	subscribers: number | null;
+}
+
+/**
+ * 店面頁頂部的三項統計。公開店面取 `GetStore` 的 `StoreStats`：欄位沒有設定是讀不到（評分另有
+ * 「沒有評價」的情形，由評價數 0 區分），一律顯示「—」，不當成 0。賣家預覽還沒有店主端點，沿用舊的
+ * 兩支統計讀取，隨預覽改讀 `GetMyStore` 一起退場。
+ */
+async function profileStats(
+	s: SellerProfileLike,
+	storeId: string,
+	previewMode: boolean,
+): Promise<ProfileStats> {
+	if (!previewMode) {
+		const reviewCount = s.reviewCount;
+		const rating =
+			reviewCount === 0
+				? ""
+				: s.ratingAverage !== undefined
+					? s.ratingAverage.toFixed(1)
+					: null;
+		return {
+			rating,
+			totalReviews: reviewCount ?? 0,
+			subscribers: s.followerCount ?? null,
+		};
+	}
+	const [stats, publicStats] = await Promise.all([
+		getCachedSellerReviewStats(storeId).catch(prerenderSafe(null)),
+		getCachedSellerStats(storeId).catch(prerenderSafe(null)),
+	]);
+	const avgRating = stats ? Number(stats.avgRating) || 0 : 0;
+	return {
+		rating:
+			avgRating > 0 ? avgRating.toFixed(1) : Number(s.rating || 0).toFixed(1),
+		totalReviews: stats ? Number(stats.totalCount) || 0 : s.totalReviews || 0,
+		subscribers: publicStats ? Number(publicStats.followers) || 0 : 0,
+	};
+}
+
 export default async function SellerProfileV2({
 	seller,
 	sellerId,
 	previewMode = false,
 	tabBasePath,
 }: SellerProfileV2Props) {
-	// 評價統計與訂閱數分屬兩支公開端點（/reviews/stats 帶 rating/count；
-	// /stats 帶 followers），基本資料那支兩者皆無 — 併發抓、各自走同一顆
-	// seller:<id> 共享快取；任一支掛了退回 0 而不是炸頁。
-	const [stats, publicStats] = await Promise.all([
-		getCachedSellerReviewStats(sellerId).catch(prerenderSafe(null)),
-		getCachedSellerStats(sellerId).catch(prerenderSafe(null)),
-	]);
-
 	const s = seller || {};
+	const storeId =
+		String(s.storeId ?? "").trim() || (previewMode ? sellerId : "");
+	const { rating, totalReviews, subscribers } = await profileStats(
+		s,
+		storeId,
+		previewMode,
+	);
 	const coverSrc = s.coverImage || "";
 	const coverImageSrc = coverSrc ? resolveCdnUrl(coverSrc) : "";
 	const avatarSrc = s.logo_url?.trim() || "";
-	// `fetchSeller` 已把 storeName/sellerName 收斂進 `name`（lib/api/index.ts），
-	// 這裡再讀一次舊 snake 欄只會拿到 undefined。
 	const name = s.name || "商家";
 	const location = sellerProfileLocation(s);
-	const avgRating = stats ? Number(stats.avgRating) || 0 : 0;
-	const rating =
-		avgRating > 0 ? avgRating.toFixed(1) : Number(s.rating || 0).toFixed(1);
-	const totalReviews = stats
-		? Number(stats.totalCount) || 0
-		: s.totalReviews || 0;
-	const subscribers = publicStats ? Number(publicStats.followers) || 0 : 0;
 	const description = s.description || "";
 	const prize = String(s.prize || "").trim();
 	// 明列欄位而不是把整個 loose 物件丟進去：這一頁的來源是 `fetchSeller`
@@ -260,7 +304,7 @@ export default async function SellerProfileV2({
 						className="hkui-seller-profile__cta hkui-seller-profile__cta--ghost hkui-seller-profile__cta--card"
 					/>
 					<SellerSubscribeButton
-						sellerId={sellerId}
+						sellerId={storeId}
 						className="hkui-seller-profile__cta"
 						label="訂閱"
 						activeLabel="已訂閱"

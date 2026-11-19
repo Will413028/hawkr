@@ -7,5 +7,5 @@ export default function Page({
 }: {
 	params: Promise<{ locale: string; id: string }>;
 }) {
-	return <SellerMessagesPage params={params} />;
+	return <SellerMessagesPage params={params} preview />;
 }

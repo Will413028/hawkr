@@ -8,7 +8,10 @@ import {
 	encodeSessionValue,
 	GET_SESSION_PATH,
 } from "./e2e/helpers/fake-session-upstream";
-import { LIST_POSTS_PATH } from "./e2e/helpers/fake-social-fixtures";
+import {
+	GET_STORE_PATH,
+	LIST_POSTS_PATH,
+} from "./e2e/helpers/fake-social-fixtures";
 
 const server = createFakeSessionUpstream();
 let origin = "";
@@ -83,26 +86,21 @@ test("ListPosts answers one fixture store's anonymous posts and refuses every ot
 	await assert.rejects(list({ storeId: "2611000002" }));
 });
 
-test("the public seller lookups resolve a fixture store_code or store_id to the same store and refuse other sellers", async () => {
-	const get = async (path: string) => {
-		const res = await fetch(`${origin}/api/v1/public/sellers/${path}`);
-		return {
-			status: res.status,
-			body: (await res.json()) as {
-				data: { storeId?: string; storeCode?: string } | null;
-			},
-		};
+test("GetStore resolves a fixture store_code to its store and refuses the store_id and other codes", async () => {
+	const get = (message: Record<string, unknown>) =>
+		fetch(
+			`${origin}${GET_STORE_PATH}?connect=v1&encoding=json&message=${encodeURIComponent(JSON.stringify(message))}`,
+		);
+	const res = await get({ storeCode: "2611000001" });
+	assert.equal(res.status, 200);
+	const body = (await res.json()) as {
+		store: { id: string; storeCode: string; storeName: string };
 	};
-	for (const key of ["2611000001", "7001"]) {
-		const { status, body } = await get(key);
-		assert.equal(status, 200);
-		assert.deepEqual(body.data, {
-			storeId: "7001",
-			storeCode: "2611000001",
-			name: "店 7001",
-		});
-	}
-	assert.equal((await get("2611000001/stats")).status, 200);
-	assert.equal((await get("2611000001/reviews/stats")).status, 200);
-	await assert.rejects(get("999"));
+	assert.deepEqual(body.store, {
+		id: "7001",
+		storeCode: "2611000001",
+		storeName: "店 7001",
+	});
+	await assert.rejects(get({ storeCode: "7001" }));
+	await assert.rejects(get({ storeCode: "999" }));
 });

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import InfiniteFeed from "@/features/feed/components/InfiniteFeed";
-import { getCachedSeller, getCachedStorePosts } from "@/lib/api/cached";
+import { getCachedStore, getCachedStorePosts } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
 import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
-import { storeIdOfSeller } from "@/lib/seller/store-id";
+import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -14,14 +14,15 @@ import { sellerCanonicalUrl } from "@/lib/seo/urls";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
+	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
+	preview?: boolean;
 }
 
 const POSTS_PAGE_SIZE = 12;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
-	const seller = await getCachedSeller(id);
-	const s = seller;
+	const s = await getCachedStore(id);
 	if (!s) return { title: sellerNotFoundTitle(locale) };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function PostsPage({ params }: Props) {
+export default async function PostsPage({ params, preview = false }: Props) {
 	const { id } = await params;
 
 	// Posts is an infinite-scroll feed with no `?page` pagination UI, so the
@@ -63,7 +64,7 @@ export default async function PostsPage({ params }: Props) {
 		nextPageToken: "",
 		pageSize: POSTS_PAGE_SIZE,
 	};
-	const storeId = storeIdOfSeller(await getCachedSeller(id));
+	const storeId = (await resolveStorefront(id, preview))?.storeId ?? "";
 	const postsData = storeId
 		? await getCachedStorePosts(storeId, POSTS_PAGE_SIZE).catch(
 				prerenderSafe(emptyPosts),

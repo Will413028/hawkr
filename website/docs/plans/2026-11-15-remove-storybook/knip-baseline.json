@@ -2436,11 +2436,6 @@
 ],
 [
 "exports",
-"lib/seller/canonical-redirect.ts",
-"parseSellerPath"
-],
-[
-"exports",
 "lib/seller/certification-options.ts",
 "TAIWAN_CITIES"
 ],

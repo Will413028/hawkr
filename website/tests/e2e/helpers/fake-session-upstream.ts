@@ -2,8 +2,9 @@ import http from "node:http";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/session-cookie";
 import {
 	anonymousStorePosts,
+	GET_STORE_PATH,
+	getStoreAnswer,
 	LIST_POSTS_PATH,
-	sellerRestAnswer,
 } from "./fake-social-fixtures";
 
 /**
@@ -104,11 +105,24 @@ export function createFakeSessionUpstream(): http.Server {
 				.end(JSON.stringify({ posts }));
 			return;
 		}
-		const seller = sellerRestAnswer(url.pathname);
-		if (seller) {
+		if (url.pathname.endsWith(GET_STORE_PATH)) {
+			let storeCode: string | undefined;
+			try {
+				const raw = url.searchParams.get("message");
+				const message = raw ? (JSON.parse(raw) as { storeCode?: string }) : {};
+				storeCode = message.storeCode || undefined;
+			} catch {
+				req.socket.destroy();
+				return;
+			}
+			const store = getStoreAnswer(storeCode);
+			if (!store) {
+				req.socket.destroy();
+				return;
+			}
 			res
-				.writeHead(seller.status, { "content-type": "application/json" })
-				.end(JSON.stringify(seller.body));
+				.writeHead(store.status, { "content-type": "application/json" })
+				.end(JSON.stringify(store.body));
 			return;
 		}
 		if (!url.pathname.endsWith(GET_SESSION_PATH)) {

@@ -93,8 +93,7 @@ interface ProductData {
 }
 
 export default async function Page({ params }: Props) {
-	// PDP renders as on-demand ISR (traditional model, cacheComponents off), same
-	// as the sister route /sellers/[id]/products/[pid]. Entity reads stay
+	// PDP renders as on-demand ISR (traditional model, cacheComponents off). Entity reads stay
 	// tag-invalidated via `getCachedProduct` / ProductDetailPage; the route-level
 	// ISR entry gives cheap cached renders (no per-request render → no
 	// resume-hang / OOM exposure) and full server-rendered SEO.

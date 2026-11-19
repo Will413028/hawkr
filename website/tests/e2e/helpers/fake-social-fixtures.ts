@@ -1,6 +1,6 @@
 /**
  * The anonymous answers the e2e webServer's upstream gives for the server-rendered reads of the social lists:
- * ListPosts (the first page of /feed and of a store's posts tab) and the public seller lookup that tab resolves its
+ * ListPosts (the first page of /feed and of a store's posts tab) and the GetStore read that tab resolves its
  * store_id from. Browser-side reads are mocked per test with `page.route`; these are what SSR sees, so a spec can
  * tell a server seed from a browser read.
  */
@@ -69,38 +69,27 @@ export function allPosts(storeId: string | undefined) {
 export const LIST_POSTS_PATH =
 	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts";
 
-const SELLER_PATH = /\/public\/sellers\/([^/]+)(\/reviews\/stats|\/stats)?$/;
+export const GET_STORE_PATH =
+	"/hawkr.seller.v1alpha1.SellerPublicService/GetStore";
 
 /**
- * REST answers of the public seller endpoints for the fixture stores, keyed by store_code or store_id; null for any
- * other path or seller, which the upstream refuses like an unreachable one, so no other spec's server-side reads change.
+ * The GetStore answer for a fixture store, keyed by the `store_code` of the storefront URL; null for any other request
+ * or store, which the upstream refuses like an unreachable one, so no other spec's server-side reads change.
  */
-export function sellerRestAnswer(
-	pathname: string,
+export function getStoreAnswer(
+	storeCode: string | undefined,
 ): { status: number; body: unknown } | null {
-	const match = SELLER_PATH.exec(pathname);
-	if (!match) return null;
-	const [, key, suffix] = match;
-	const store = FIXTURE_STORES.find((s) => s.id === key || s.storeCode === key);
+	const store = FIXTURE_STORES.find((s) => s.storeCode === storeCode);
 	if (!store) return null;
-	if (suffix === "/reviews/stats") {
-		return {
-			status: 200,
-			body: { code: 0, message: "ok", data: { avgRating: 0, totalCount: 0 } },
-		};
-	}
-	if (suffix === "/stats") {
-		return {
-			status: 200,
-			body: { code: 0, message: "ok", data: { followers: 0 } },
-		};
-	}
 	return {
 		status: 200,
 		body: {
-			code: 0,
-			message: "ok",
-			data: { storeId: store.id, storeCode: store.storeCode, name: store.name },
+			store: {
+				id: store.id,
+				storeCode: store.storeCode,
+				storeName: store.name,
+			},
+			stats: { followerCount: 0, reviewCount: 0 },
 		},
 	};
 }

@@ -5,8 +5,6 @@ import Link from "@/components/shared/Link";
 import SellerCoverMedia from "@/features/seller/components/SellerCoverMedia";
 import {
 	getCachedSellerProducts,
-	getCachedSellerReviewStats,
-	getCachedSellerStats,
 	getCachedSellerStorefrontProducts,
 } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
@@ -24,10 +22,12 @@ export interface SellerCardSeller {
 	logo_url?: string;
 	name?: string;
 	prize?: string;
-	rating?: number | string;
 	storeCode?: string | number;
 	storeId?: string | number;
-	totalReviews?: number;
+	/** `GetStore` 的統計；沒有設定表示讀不到或沒有評價。 */
+	followerCount?: number;
+	reviewCount?: number;
+	ratingAverage?: number;
 }
 
 interface SellerCardPageProps {
@@ -47,19 +47,11 @@ export default async function SellerCardPage({
 }: SellerCardPageProps) {
 	const rawStoreId = String(seller.storeId ?? "").trim();
 	const storeId = /^[1-9]\d*$/.test(rawStoreId) ? rawStoreId : "";
-	const [reviewStats, publicStats, richProducts] = await Promise.all([
-		storeId
-			? getCachedSellerReviewStats(storeId).catch(prerenderSafe(null))
-			: Promise.resolve(null),
-		storeId
-			? getCachedSellerStats(storeId).catch(prerenderSafe(null))
-			: Promise.resolve(null),
-		storeId
-			? getCachedSellerStorefrontProducts(storeId, 1, 8).catch(
-					prerenderSafe(null),
-				)
-			: Promise.resolve(null),
-	]);
+	const richProducts = storeId
+		? await getCachedSellerStorefrontProducts(storeId, 1, 8).catch(
+				prerenderSafe(null),
+			)
+		: null;
 
 	const leanProducts =
 		storeId && (!richProducts || richProducts.records.length === 0)
@@ -80,19 +72,9 @@ export default async function SellerCardPage({
 	const avatarUrl = seller.logo_url?.trim() || "";
 	const coverUrl = seller.coverImage ? resolveCdnUrl(seller.coverImage) : "";
 	const storefrontHref = sellerPath(seller.storeCode, sellerId);
-	const avgRating = reviewStats
-		? Number(reviewStats.avgRating) || 0
-		: Number(seller.rating) || 0;
-	const totalReviews = reviewStats
-		? Number(reviewStats.totalCount) || 0
-		: Number(seller.totalReviews) || 0;
-	const followerCount = publicStats?.followers;
-	const followers =
-		typeof followerCount === "number" &&
-		Number.isFinite(followerCount) &&
-		followerCount >= 0
-			? followerCount
-			: null;
+	const avgRating = seller.ratingAverage ?? 0;
+	const totalReviews = seller.reviewCount ?? 0;
+	const followers = seller.followerCount ?? null;
 	return (
 		<div className="seller-card-page" data-seller-card-ready>
 			<article className="seller-public-card">

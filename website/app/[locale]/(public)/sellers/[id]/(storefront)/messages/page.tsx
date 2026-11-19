@@ -1,7 +1,7 @@
 import SellerMessagesPage, {
 	generateMetadata,
 } from "@/features/sellers/messages/SellerMessagesPage";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import { sellerStaticParams } from "@/lib/api/static-params";
 
 export { generateMetadata };
@@ -14,7 +14,7 @@ export const generateStaticParams = sellerStaticParams;
 
 export default async function Page(props: Props) {
 	const { id } = await props.params;
-	const seller = await getCachedSeller(id);
+	const seller = await getCachedStore(id);
 	const name = seller?.name ?? "商家";
 	return (
 		<>

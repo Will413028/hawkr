@@ -1,6 +1,6 @@
 import JsonLd from "@/components/seo/JsonLd";
 import { StorefrontPage } from "@/features/sellers/storefront";
-import { getCachedSeller } from "@/lib/api/cached";
+import { getCachedStore } from "@/lib/api/cached";
 import { sellerStaticParams } from "@/lib/api/static-params";
 import { breadcrumbSchema, sellerSchema } from "@/lib/seo/jsonld";
 import {
@@ -15,6 +15,7 @@ export { generateMetadata } from "@/features/sellers/storefront/metadata";
 type SellerLike = SellerSocialImageSource & {
 	name: string;
 	description?: string;
+	storeId?: string;
 };
 
 interface Props {
@@ -26,7 +27,7 @@ export const generateStaticParams = sellerStaticParams;
 export default async function Page({ params }: Props) {
 	const [{ id, locale: rawLocale }, seller] = await Promise.all([
 		params,
-		params.then(({ id: sellerId }) => getCachedSeller(sellerId)),
+		params.then(({ id: sellerId }) => getCachedStore(sellerId)),
 	]);
 	const locale = localeFromParam(rawLocale);
 	const s = seller as SellerLike | null | undefined;
@@ -55,7 +56,7 @@ export default async function Page({ params }: Props) {
 			{/* Keep exactly one semantic heading in the atomic route subtree.
 			    SellerProfileV2 renders the same visible name as a non-heading. */}
 			<h1 className="sr-only">{s?.name ?? "商家"}</h1>
-			<StorefrontPage sellerId={id} />
+			{s?.storeId ? <StorefrontPage sellerId={s.storeId} /> : null}
 		</>
 	);
 }

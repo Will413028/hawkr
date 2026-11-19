@@ -455,7 +455,7 @@ test("conversation rows carry the seller store_code the wire now sends", async (
  * undefined, and falls through to the request's own id segment — which is
  * ALREADY the store_code on every request middleware canonicalized. So the bug
  * is invisible exactly as long as the backend is healthy: middleware fails OPEN
- * on a rate limit / 5xx / timeout (`canonical-redirect.ts` → `{kind:"unknown"}`),
+ * on a rate limit / 5xx / timeout (`storefront-guard.ts` → `{kind:"unknown"}`),
  * and on that path the page renders at the store_id URL and self-canonicalizes
  * to the WRONG one.
  *

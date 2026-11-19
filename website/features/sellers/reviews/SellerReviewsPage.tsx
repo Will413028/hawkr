@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import {
-	getCachedSeller,
 	getCachedSellerReviewStats,
 	getCachedSellerReviews,
+	getCachedStore,
 } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
 import { formatRatingSummary } from "@/lib/products/rating";
 import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
+import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
 	localeFromParam,
 	sellerSocialImage,
@@ -19,6 +21,8 @@ import ReviewsClient from "./ReviewsClient";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
+	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
+	preview?: boolean;
 }
 
 interface SellerReviewStats {
@@ -33,8 +37,7 @@ interface SellerReviewStats {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { id, locale } = await params;
-	const seller = await getCachedSeller(id);
-	const s = seller;
+	const s = await getCachedStore(id);
 	if (!s) return { title: sellerNotFoundTitle(locale) };
 	const socialImage = sellerSocialImage(s);
 	// Self-canonical on the store_code, the same way the storefront index does it.
@@ -51,11 +54,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const canonical = sellerCanonicalUrl(s, id, pageLocale, "/reviews");
 	return {
 		title: `${s.name} 的買家評價`,
-		description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.rating)}`,
+		description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.ratingAverage)}`,
 		alternates: { canonical },
 		openGraph: {
 			title: `${s.name} 的買家評價 | ${siteNameFor(pageLocale)}`,
-			description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.rating)}`,
+			description: `查看 ${s.name} 的買家評價，${formatRatingSummary(s.ratingAverage)}`,
 			url: canonical,
 			images: socialImages(socialImage),
 		},
@@ -75,8 +78,11 @@ function computeRatingPercents(stats: SellerReviewStats): number[] {
 	return counts.map((c) => Math.round((c / total) * 100));
 }
 
-export default async function ReviewsPage({ params }: Props) {
-	const { id } = await params;
+export default async function ReviewsPage({ params, preview = false }: Props) {
+	const { id: routeId } = await params;
+	const resolved = await resolveStorefront(routeId, preview);
+	if (!resolved) notFound();
+	const id = resolved.storeId;
 
 	// The first page is the SEO/ISR body (rendered in server HTML); later pages
 	// are fetched client-side by ReviewsClient off the `?page` URL param, so this
