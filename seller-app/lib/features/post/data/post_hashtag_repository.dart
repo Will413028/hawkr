@@ -31,10 +31,7 @@ class PostHashtagRepository {
     if (trimmed.isEmpty) return const [];
 
     final response = await _socialPublic.suggestTags(
-      pb.SuggestTagsRequest(
-        query: trimmed,
-        maxResults: limit,
-      ),
+      pb.SuggestTagsRequest(query: trimmed, maxResults: limit),
     );
     return response.tags
         .map(PostHashtagSuggestion.fromProto)
