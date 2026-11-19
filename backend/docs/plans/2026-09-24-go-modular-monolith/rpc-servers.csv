@@ -140,7 +140,7 @@ BuyerService,GetSubscriptionList,buyer-service,http: BuyerAppService.ListFollows
 BuyerService,SubscribeSeller,buyer-service,http: BuyerAppService.FollowStore
 BuyerService,UnsubscribeSeller,buyer-service,http: BuyerAppService.UnfollowStore
 BuyerService,CheckSubscription,buyer-service,http: BuyerAppService.CheckFollow
-BuyerService,GetSubscribersList,buyer-service,http: BuyerAppService.ListFollowers；social-service 經 internal/legacy/buyerserver（buyer.SubscribersOffset）
+BuyerService,GetSubscribersList,buyer-service,http: BuyerAppService.ListFollowers；legacy 的 buyer.SubscribersOffset 與 social-service 的呼叫端已於 A7-5 刪除
 BuyerService,GetSubscriberDashboardStats,buyer-service,api: buyer.SubscriberDashboardStats；seller-service 的 GetSellerStats（只讀粉絲總數）經 internal/legacy/buyerserver
 BuyerService,BatchGetSubscriberCounts,buyer-service,api: buyer.SubscriberCounts；seller-service 經 internal/legacy/buyerserver
 BuyerService,GetSavedItems,buyer-service,removed: 收藏中心的合併列表只為舊路由存在；client 改呼叫 ListFavorites、ListFollows
@@ -697,37 +697,37 @@ ShippingService,ListSellerUberDeliveries,shipping-service,
 ShippingService,GetSellerUberDelivery,shipping-service,
 ShippingService,ListUberDeliveriesForAdmin,shipping-service,
 ShippingService,GetUberDeliveryForAdmin,shipping-service,
-SocialService,GetPostList,social-service,
-SocialService,GetPostDetail,social-service,
-SocialService,CreatePost,social-service,
-SocialService,UpdatePost,social-service,
-SocialService,DeletePost,social-service,
-SocialService,UpdateSellerPostStatus,social-service,
-SocialService,TogglePostLike,social-service,
-SocialService,SharePost,social-service,
-SocialService,ReportPost,social-service,
-SocialService,ListMyPosts,social-service,
-SocialService,AdminListPosts,social-service,
-SocialService,AdminModeratePost,social-service,
-SocialService,SearchHashtags,social-service,
-SocialService,GetTrendingHashtags,social-service,
-SocialService,GetCommentList,social-service,
-SocialService,CreateComment,social-service,
-SocialService,UpdateComment,social-service,
-SocialService,DeleteComment,social-service,
-SocialService,ToggleCommentLike,social-service,
-SocialService,GetSellerForum,social-service,
-SocialService,GetForumReplies,social-service,
-SocialService,CreateForumComment,social-service,
-SocialService,ReplyForumComment,social-service,
-SocialService,UpdateForumComment,social-service,
-SocialService,DeleteForumComment,social-service,
-SocialService,SubmitReport,social-service,
-SocialService,ListMyReports,social-service,
-SocialService,BlockUser,social-service,
-SocialService,UnblockUser,social-service,
-SocialService,ListBlocks,social-service,
-SocialService,AdminListReports,social-service,
-SocialService,AdminGetReport,social-service,
-SocialService,AdminResolveReport,social-service,
-SocialService,AdminReopenReport,social-service,
+SocialService,GetPostList,social-service,http: SocialPublicService.ListPosts（可帶店家篩選）
+SocialService,GetPostDetail,social-service,http: SocialPublicService.GetPost 與 SocialAppService.GetMyPost；代行讀取走 SocialDelegatedService.GetStorePost
+SocialService,CreatePost,social-service,http: SocialAppService.CreatePost；代行走 SocialDelegatedService.CreateStorePost
+SocialService,UpdatePost,social-service,http: SocialAppService.UpdatePost；代行走 SocialDelegatedService.UpdateStorePost
+SocialService,DeletePost,social-service,http: SocialAppService.DeletePost
+SocialService,UpdateSellerPostStatus,social-service,http: SocialAppService.PublishPost 與 UnpublishPost（兩個動作能力類別不同）；代行走 SocialDelegatedService.PublishStorePost 與 UnpublishStorePost
+SocialService,TogglePostLike,social-service,http: SocialAppService.LikePost 與 UnlikePost（toggle 改成冪等的 set／unset）
+SocialService,SharePost,social-service,http: SocialAppService.SharePost
+SocialService,ReportPost,social-service,removed: 與 SubmitReport 重複，併入 ModerationAppService.SubmitReport（target=POST，interface-inventory #9）
+SocialService,ListMyPosts,social-service,http: SocialAppService.ListMyPosts
+SocialService,AdminListPosts,social-service,http: SocialAdminService.ListPosts
+SocialService,AdminModeratePost,social-service,http: ModerationAdminService.DecideCase；作者是店家時改成 seller 措施「內容下架」，不再直接隱藏貼文（A7-D5′）
+SocialService,SearchHashtags,social-service,http: SocialPublicService.SuggestTags
+SocialService,GetTrendingHashtags,social-service,http: SocialPublicService.SuggestTrendingTags
+SocialService,GetCommentList,social-service,http: SocialPublicService.ListComments
+SocialService,CreateComment,social-service,http: SocialAppService.CreateComment（回覆帶 parent）
+SocialService,UpdateComment,social-service,http: SocialAppService.UpdateComment
+SocialService,DeleteComment,social-service,http: SocialAppService.DeleteComment
+SocialService,ToggleCommentLike,social-service,http: SocialAppService.LikeComment 與 UnlikeComment
+SocialService,GetSellerForum,social-service,http: SocialPublicService.ListForumEntries
+SocialService,GetForumReplies,social-service,http: SocialPublicService.ListForumEntries（parent 篩選）與 GetForumThread
+SocialService,CreateForumComment,social-service,http: SocialAppService.CreateForumEntry
+SocialService,ReplyForumComment,social-service,http: SocialAppService.CreateForumEntry（帶 parent；回覆只限店家，規則在伺服器）
+SocialService,UpdateForumComment,social-service,http: SocialAppService.UpdateForumEntry
+SocialService,DeleteForumComment,social-service,http: SocialAppService.DeleteForumEntry
+SocialService,SubmitReport,social-service,http: ModerationAppService.SubmitReport（對象是店家時建立 seller 通報，A7-D5′）
+SocialService,ListMyReports,social-service,http: ModerationAppService.ListMyReports
+SocialService,BlockUser,social-service,http: BuyerAppService.BlockAuthor 與 BlockStore；賣家端 SellerAppService.BlockBuyer（A7-D2）
+SocialService,UnblockUser,social-service,http: BuyerAppService.UnblockBuyer 與 UnblockStore；賣家端 SellerAppService.UnblockBuyer
+SocialService,ListBlocks,social-service,http: BuyerAppService.ListBlockedBuyers 與 ListBlockedStores；賣家端 SellerAppService.ListBlockedBuyers
+SocialService,AdminListReports,social-service,http: ModerationAdminService.ListCases
+SocialService,AdminGetReport,social-service,http: ModerationAdminService.GetCase
+SocialService,AdminResolveReport,social-service,http: ModerationAdminService.DecideCase（A7-D14 案件只存決定）
+SocialService,AdminReopenReport,social-service,removed: 案件結案後再檢舉開新案，沒有重開（A7-D28 第 3 點）

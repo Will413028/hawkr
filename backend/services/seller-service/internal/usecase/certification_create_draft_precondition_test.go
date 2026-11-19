@@ -25,7 +25,7 @@ func noExistingCertificationApplication(ctx context.Context, accountID int64) (*
 // satisfiesCertificationPrecondition is a mockSellerRepo.GetByAccountIDFn for
 // CreateDraft tests that don't care about the #1893 gate itself — it always
 // returns a seller with description+website set, so the gate passes without
-// requiring a socialClient mock too.
+// requiring any other setup.
 func satisfiesCertificationPrecondition(ctx context.Context, accountID int64) (*domain.Seller, error) {
 	return &domain.Seller{
 		AccountID: accountID, StoreID: accountID,
@@ -43,10 +43,9 @@ func TestCreateDraft_NoPostNoDescriptionNoWebsite_Rejects(t *testing.T) {
 			return &domain.Seller{AccountID: accountID, StoreID: accountID, Description: "", WebsiteURL: ""}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return false, nil }}
 
 	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo, socialClient: social,
+		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 	}
 	_, err := uc.CreateDraft(context.Background(), &dto.CreateCertificationDraft{AccountID: 100, SellerType: "individual"})
 	if err == nil {
@@ -70,10 +69,9 @@ func TestCreateDraft_WebsiteOnly_NoDescription_NoPost_Rejects(t *testing.T) {
 			return &domain.Seller{AccountID: accountID, StoreID: accountID, Description: "", WebsiteURL: "https://my-shop.example.com"}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return false, nil }}
 
 	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo, socialClient: social,
+		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 	}
 	_, err := uc.CreateDraft(context.Background(), &dto.CreateCertificationDraft{AccountID: 100, SellerType: "individual"})
 	if err == nil {
@@ -81,26 +79,6 @@ func TestCreateDraft_WebsiteOnly_NoDescription_NoPost_Rejects(t *testing.T) {
 	}
 	if pkgerrors.GetCode(err) != pkgerrors.CodePreconditionFailed {
 		t.Errorf("expected CodePreconditionFailed, got %d", pkgerrors.GetCode(err))
-	}
-}
-
-func TestCreateDraft_HasPost_Allows(t *testing.T) {
-	certRepo := &mockCertificationRepo{
-		GetCurrentApplicationFn: noExistingCertificationApplication,
-		CreateApplicationFn:     func(ctx context.Context, app *domain.CertificationApplication) error { return nil },
-	}
-	sellerRepo := &mockSellerRepo{
-		GetByAccountIDFn: func(ctx context.Context, accountID int64) (*domain.Seller, error) {
-			return &domain.Seller{AccountID: accountID, StoreID: accountID, Description: "", WebsiteURL: ""}, nil
-		},
-	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) { return true, nil }}
-
-	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo, socialClient: social,
-	}
-	if _, err := uc.CreateDraft(context.Background(), &dto.CreateCertificationDraft{AccountID: 100, SellerType: "individual"}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -114,13 +92,9 @@ func TestCreateDraft_HasDescriptionAndWebsite_NoPost_Allows(t *testing.T) {
 			return &domain.Seller{AccountID: accountID, StoreID: accountID, Description: "自我介紹", WebsiteURL: "https://my-shop.example.com"}, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) {
-		t.Fatal("socialClient must not be called when description+website are both set (short-circuit)")
-		return false, nil
-	}}
 
 	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo, socialClient: social,
+		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 	}
 	if _, err := uc.CreateDraft(context.Background(), &dto.CreateCertificationDraft{AccountID: 100, SellerType: "individual"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -148,13 +122,9 @@ func TestCreateDraft_ExistingDraft_SkipsPreconditionRecheck(t *testing.T) {
 			return nil, nil
 		},
 	}
-	social := &mockSocialClient{HasPublishedPostFn: func(ctx context.Context, storeID int64) (bool, error) {
-		t.Fatal("socialClient must not be consulted when an existing draft/submitted application is simply returned")
-		return false, nil
-	}}
 
 	uc := &CertificationUseCase{
-		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo, socialClient: social,
+		tsid: func() int64 { return 99999 }, certRepo: certRepo, sellerRepo: sellerRepo,
 	}
 	if _, err := uc.CreateDraft(context.Background(), &dto.CreateCertificationDraft{AccountID: 100, SellerType: "individual"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)

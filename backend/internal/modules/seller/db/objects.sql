@@ -374,14 +374,29 @@ END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、
 -- 沒有結束時間，生效與否只看 status，所以不收 at。給 social 的每日對帳核對它自己的複本 social.content_takedowns 有沒有漏或多（Go 查詢；
--- social 的讀取不 join 它，D-sync）。measure_created_at 是措施的建立時間（measures.created_at），social 以它判定同一則貼文被多個措施下架時哪個最早。
-CREATE TYPE seller.pub_content_takedown AS (measure_id UUID, content_kind TEXT, content_id UUID, measure_created_at TIMESTAMPTZ);
+-- social 的讀取不 join 它，D-sync）。
+CREATE TYPE seller.pub_content_takedown AS (measure_id UUID, content_kind TEXT, content_id UUID);
 
 CREATE FUNCTION seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown
 LANGUAGE sql STABLE
 BEGIN ATOMIC
-    SELECT c.measure_id, c.content_kind, c.content_id, m.created_at
+    SELECT c.measure_id, c.content_kind, c.content_id
     FROM seller.measures m
     JOIN seller.measure_contents c ON c.measure_id = m.id
     WHERE m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN';
+END;
+
+-- 鎖住一個內容下架措施此刻生效中的對象並回傳（VOLATILE：帶鎖的 SELECT 不能在 STABLE 函式裡）。鎖是措施列與它的對象列的 FOR SHARE：撤銷措施的 UPDATE 寫這兩處
+-- （measures.status，與經 measure_status 複合外鍵 ON UPDATE CASCADE 同步的 measure_contents 列），所以撤銷尚未提交時這個呼叫等它，提交後在 READ COMMITTED 下重新評估
+-- 條件、不再回傳已撤銷的列；鎖持有到呼叫方的 transaction 結束，之後才開始的撤銷等呼叫方。給 social 每日對帳補漏在寫複本之前序列化撤銷。
+-- 呼叫方要在鎖自己模組的列之前呼叫它（seller 在 social 之前，platform/lockorder）。
+CREATE FUNCTION seller.pub_lock_content_takedowns(p_measure_id UUID) RETURNS SETOF seller.pub_content_takedown
+LANGUAGE sql VOLATILE
+BEGIN ATOMIC
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measures m
+    JOIN seller.measure_contents c ON c.measure_id = m.id
+    WHERE m.id = p_measure_id AND m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN'
+    ORDER BY c.content_kind, c.content_id
+    FOR SHARE OF m, c;
 END;

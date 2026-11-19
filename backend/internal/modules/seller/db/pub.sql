@@ -52,14 +52,20 @@ AS $$ SELECT * FROM seller.pub_review_item $$;
 
 -- 此刻生效中的內容下架措施的對象，一列是一個（措施，內容）；真實的 pub_content_takedown 是複合型別，宣告成表只為了讓 sqlc 型別化欄位。
 -- 內容下架建立即生效、沒有結束時間，所以不收 at。給 social 每日對帳核對自己的複本（雙向：漏的補、多的刪）；social 的讀取不 join 它。
--- 用法：`SELECT measure_id, content_kind, content_id, measure_created_at FROM seller.pub_content_takedowns()`；measure_created_at 是措施的建立時間。
+-- 用法：`SELECT measure_id, content_kind, content_id FROM seller.pub_content_takedowns()`。
 CREATE TABLE seller.pub_content_takedown (
     measure_id UUID NOT NULL,
     content_kind TEXT NOT NULL,
-    content_id UUID NOT NULL,
-    measure_created_at TIMESTAMPTZ NOT NULL
+    content_id UUID NOT NULL
 );
 
 CREATE FUNCTION seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown
 LANGUAGE sql STABLE
+AS $$ SELECT * FROM seller.pub_content_takedown $$;
+
+-- 鎖住一個內容下架措施此刻生效中的對象並回傳（形狀同 pub_content_takedowns，真實函式是 VOLATILE）：措施列與對象列 FOR SHARE，撤銷措施的 transaction 尚未提交時等它，
+-- 提交後不回傳已撤銷的列；鎖持有到呼叫方的 transaction 結束。給 social 每日對帳補漏在寫複本之前序列化撤銷，呼叫要在 social 自己的列鎖之前（seller 先於 social）。
+-- 用法：`SELECT content_id FROM seller.pub_lock_content_takedowns(sqlc.arg(measure_id)::uuid)`。
+CREATE FUNCTION seller.pub_lock_content_takedowns(p_measure_id UUID) RETURNS SETOF seller.pub_content_takedown
+LANGUAGE sql VOLATILE
 AS $$ SELECT * FROM seller.pub_content_takedown $$;

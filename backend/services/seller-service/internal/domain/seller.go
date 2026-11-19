@@ -77,11 +77,8 @@ func CanManageProducts(sellerStatus SellerStatus) bool {
 	return sellerStatus == SellerStatusActive
 }
 
-func MeetsCertificationPrecondition(hasPublishedPost bool, description, websiteURL string) bool {
-	if strings.TrimSpace(description) != "" && strings.TrimSpace(websiteURL) != "" {
-		return true
-	}
-	return hasPublishedPost
+func MeetsCertificationPrecondition(description, websiteURL string) bool {
+	return strings.TrimSpace(description) != "" && strings.TrimSpace(websiteURL) != ""
 }
 
 func (m *Seller) IsClosed() bool { return m.Status == SellerStatusClosed }

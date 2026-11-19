@@ -157,7 +157,7 @@ func (m *testTxManager) WithTx(ctx context.Context, fn func(ctx context.Context)
 func newCertServer(sellerRepo domain.SellerRepository, certRepo domain.CertificationRepository, payuniRepo domain.PayuniRepository) *SellerServer {
 	sellerUC := usecase.NewSellerUseCase(sellerRepo, payuniRepo, certRepo, &testAccountClient{}, &testMediaClient{}, &config.Config{MediaBaseURL: "https://cdn.test"}, nil, nil, func() int64 { return 99999 }, &testTxManager{}, &testOutboxRepo{}, nil, testStoreCode, nil)
 	payuniUC := usecase.NewPayuniUseCase(payuniRepo, sellerRepo, certRepo, &testAccountClient{}, &testPayuniClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, &testPayuniMerchantProfileUpdateRepo{}, func() int64 { return 99999 })
-	certUC := usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, &testPayuniClient{}, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 }, nil)
+	certUC := usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, &testPayuniClient{}, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 })
 	return &SellerServer{sellerUC: sellerUC, certificationUC: certUC}
 }
 
@@ -428,7 +428,7 @@ func TestGRPC_RefreshPayuniStatus_Success(t *testing.T) {
 	sellerUC := usecase.NewSellerUseCase(sellerRepo, payuniRepo, certRepo, &testAccountClient{}, &testMediaClient{}, &config.Config{MediaBaseURL: "https://cdn.test"}, nil, nil, func() int64 { return 99999 }, &testTxManager{}, &testOutboxRepo{}, nil, nil, nil)
 	payuniUC := usecase.NewPayuniUseCase(payuniRepo, sellerRepo, certRepo, &testAccountClient{}, pc, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, &testPayuniMerchantProfileUpdateRepo{}, func() int64 { return 99999 })
 	srv := &SellerServer{sellerUC: sellerUC, payuniUC: payuniUC,
-		certificationUC: usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, pc, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 }, nil)}
+		certificationUC: usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, pc, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 })}
 	client, cleanup := newTestGRPCClient(t, srv)
 	defer cleanup()
 
@@ -498,7 +498,7 @@ func TestGRPC_RefreshPayuniStatus_ReturnsFreshOverallStatus(t *testing.T) {
 	sellerUC := usecase.NewSellerUseCase(sellerRepo, payuniRepo, certRepo, &testAccountClient{}, &testMediaClient{}, &config.Config{MediaBaseURL: "https://cdn.test"}, nil, nil, func() int64 { return 99999 }, &testTxManager{}, &testOutboxRepo{}, nil, nil, nil)
 	payuniUC := usecase.NewPayuniUseCase(payuniRepo, sellerRepo, certRepo, &testAccountClient{}, pc, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, &testPayuniMerchantProfileUpdateRepo{}, func() int64 { return 99999 })
 	srv := &SellerServer{sellerUC: sellerUC, payuniUC: payuniUC,
-		certificationUC: usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, pc, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 }, nil)}
+		certificationUC: usecase.NewCertificationUseCase(certRepo, sellerRepo, payuniRepo, pc, &testAccountClient{}, &testMediaClient{}, &testTxManager{}, &testMerchantVerificationOutboxRepo{}, payuniUC, func() int64 { return 99999 })}
 	client, cleanup := newTestGRPCClient(t, srv)
 	defer cleanup()
 

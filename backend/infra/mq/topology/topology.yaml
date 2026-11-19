@@ -626,21 +626,3 @@ queues:
   bindings:
   - exchange: hawkr.buyer
     key: buyer.deleted
-- name: social.buyer.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.buyer
-    key: buyer.deleted
-- name: social.seller.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.seller
-    key: seller.deleted
-- name: social.counter.delta
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.content
-    key: counter.delta

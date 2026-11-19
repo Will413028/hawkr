@@ -302,50 +302,7 @@ func (p *Publisher) PublishReviewHidden(ctx context.Context, event *ReviewHidden
 	return p.Publish(ctx, ExchangeReview, RoutingKeyReviewHidden, event)
 }
 
-// ==================== Content Events (Social) ====================
-
-// PublishPostCreated publishes a POST_CREATED event
-func (p *Publisher) PublishPostCreated(ctx context.Context, event *PostCreatedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyPostCreated, event)
-}
-
-// PublishCommentCreated publishes a COMMENT_CREATED event
-func (p *Publisher) PublishCommentCreated(ctx context.Context, event *CommentCreatedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentCreated, event)
-}
-
 // ==================== Marketing Events (Coupon) ====================
-
-// ==================== Post/Comment Interaction Events ====================
-
-func (p *Publisher) PublishPostLiked(ctx context.Context, event *PostLikedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyPostLiked, event)
-}
-
-func (p *Publisher) PublishPostHiddenByPlatform(ctx context.Context, event *PostHiddenByPlatformEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyPostHiddenByPlatform, event)
-}
-
-func (p *Publisher) PublishCommentReplied(ctx context.Context, event *CommentRepliedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentReplied, event)
-}
-
-// 41 號設計書 §6.1：2026-06 新增 3 個 comment realtime event；CommentLikedEvent 直接拔除
-func (p *Publisher) PublishCommentUpdated(ctx context.Context, event *CommentUpdatedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentUpdated, event)
-}
-
-func (p *Publisher) PublishCommentDeleted(ctx context.Context, event *CommentDeletedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentDeleted, event)
-}
-
-func (p *Publisher) PublishCommentLikeChanged(ctx context.Context, event *CommentLikeChangedEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentLikeChanged, event)
-}
-
-func (p *Publisher) PublishCounterDelta(ctx context.Context, event *CounterDeltaEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCounterDelta, event)
-}
 
 // 41 號設計書 §6.2：notification-service 首次成為 producer
 func (p *Publisher) PublishNotificationInboxNew(ctx context.Context, event *NotificationInboxNewEvent) error {

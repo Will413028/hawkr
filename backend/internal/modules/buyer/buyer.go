@@ -394,11 +394,6 @@ func (module *Module) Subscribers(ctx context.Context, input SubscribersInput) (
 	return module.follow.Subscribers(ctx, input)
 }
 
-// SubscribersOffset 僅提供 legacy social-service 的有界頁碼轉接。
-func (module *Module) SubscribersOffset(ctx context.Context, storeID int64, offset, limit int32) ([]Item, error) {
-	return module.follow.SubscribersOffset(ctx, storeID, offset, limit)
-}
-
 // SubscriberCounts 批次回傳粉絲數，沒有粉絲的店家為零；最多 MaxBatchSize 個 ID。
 func (module *Module) SubscriberCounts(ctx context.Context, storeIDs []int64) (map[int64]int64, error) {
 	return module.follow.SubscriberCounts(ctx, storeIDs)

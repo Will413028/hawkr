@@ -36,3 +36,9 @@ W5 之後視角只有兩個用途：入口轉給舊 gateway 時合成 `X-Login-R
 脈絡：「服務名稱本身就表示以哪個身分呼叫」寫成時只有 buyer、seller 兩個模組碰到身分。social 的同一個動作（留言）依資源歸屬決定身分：店主在自己的貼文是店家，在別人的貼文是本人；照服務名稱表示身分，client 要自己判斷「這是我的貼文」才知道打哪個 service，等於 client 在決定身分。專案的命名規則其實是「模組＋對象」（`<模組>AppService` 給登入的帳號用，買家賣家都算）。
 
 決策：`BuyerAppService`、`SellerAppService` 的名稱表示身分，只適用於資源本身分買家與賣家的模組（buyer、seller）。資源被兩種身分共用的模組（social；簡報 D1 提到 A6 的聊天是同一個形狀，到 A6 再決定）用 `<模組>AppService`，身分由伺服器依資源歸屬推導，client 不選；以店家身分動作時由擁有資料的模組推導身分，再向 seller 檢查能力。「Connect 沒有視角、client 不送 `X-Active-Role`」不變。
+
+## 修訂：代行以資源模組的 Delegated service 表達（2026-11-19，A7-D25 Will 2026-11-16）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表 A7-D25。
+
+「Connect 沒有視角、client 不送 `X-Active-Role`」不變。代行（管理員以店家名義操作）的 Connect 方法由擁有資源的模組提供、加 `Delegated` 後綴（`hawkr.social.v1alpha1.SocialDelegatedService`，A10 的商品、訂單各自的 `<模組>DelegatedService`）；「以誰的身分」不由 service 名稱表示，差別在憑證層（代行 session）。上一節的命名規則「模組＋對象」不變，`Delegated` 是代行呼叫者的對象。

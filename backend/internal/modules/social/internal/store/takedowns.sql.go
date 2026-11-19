@@ -7,7 +7,6 @@ package store
 
 import (
 	"context"
-	"time"
 
 	"uuid"
 )
@@ -64,23 +63,16 @@ WHERE NOT EXISTS (
 ORDER BY c.measure_id, c.post_id, c.comment_id, c.forum_entry_id
 `
 
-type ExtraTakedownsRow struct {
-	MeasureID    uuid.UUID
-	PostID       *uuid.UUID
-	CommentID    *uuid.UUID
-	ForumEntryID *uuid.UUID
-}
-
 // 複本有、seller 此刻沒有生效中的內容下架（撤銷時訂閱者漏了）：每日對帳刪除。
-func (q *Queries) ExtraTakedowns(ctx context.Context) ([]ExtraTakedownsRow, error) {
+func (q *Queries) ExtraTakedowns(ctx context.Context) ([]SocialContentTakedown, error) {
 	rows, err := q.db.Query(ctx, extraTakedowns)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ExtraTakedownsRow{}
+	items := []SocialContentTakedown{}
 	for rows.Next() {
-		var i ExtraTakedownsRow
+		var i SocialContentTakedown
 		if err := rows.Scan(
 			&i.MeasureID,
 			&i.PostID,
@@ -142,17 +134,15 @@ func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownCont
 }
 
 const insertActiveTakedowns = `-- name: InsertActiveTakedowns :many
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
 SELECT t.measure_id,
        CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
        CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
-       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
-       t.measure_created_at
-FROM seller.pub_content_takedowns() AS t
-WHERE t.measure_id = $1::uuid
-  AND ((t.content_kind = 'POST' AND t.content_id = ANY($2::uuid[]))
-    OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($3::uuid[]))
-    OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($4::uuid[])))
+       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END
+FROM seller.pub_lock_content_takedowns($1::uuid) AS t
+WHERE (t.content_kind = 'POST' AND t.content_id = ANY($2::uuid[]))
+   OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($3::uuid[]))
+   OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($4::uuid[]))
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id
 `
@@ -170,7 +160,7 @@ type InsertActiveTakedownsRow struct {
 	ForumEntryID *uuid.UUID
 }
 
-// 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過；回傳實際寫入的列。
+// 對帳補漏：只寫此刻仍生效的列（LockActiveTakedownsOfMeasure 已鎖住措施，撤銷的 transaction 要嘛先提交而這裡讀不到，要嘛等補漏提交之後再刪這些列）。冪等：已有的列略過；回傳實際寫入的列。
 func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) ([]InsertActiveTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertActiveTakedowns,
 		arg.MeasureID,
@@ -198,22 +188,21 @@ func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTak
 
 const insertTakedowns = `-- name: InsertTakedowns :many
 
-INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, measure_created_at)
-SELECT $1::uuid, p, NULL::uuid, NULL::uuid, $2::timestamptz FROM unnest($3::uuid[]) AS p
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
+SELECT $1::uuid, p, NULL::uuid, NULL::uuid FROM unnest($2::uuid[]) AS p
 UNION ALL
-SELECT $1::uuid, NULL::uuid, c, NULL::uuid, $2::timestamptz FROM unnest($4::uuid[]) AS c
+SELECT $1::uuid, NULL::uuid, c, NULL::uuid FROM unnest($3::uuid[]) AS c
 UNION ALL
-SELECT $1::uuid, NULL::uuid, NULL::uuid, f, $2::timestamptz FROM unnest($5::uuid[]) AS f
+SELECT $1::uuid, NULL::uuid, NULL::uuid, f FROM unnest($4::uuid[]) AS f
 ON CONFLICT DO NOTHING
 RETURNING post_id, comment_id, forum_entry_id
 `
 
 type InsertTakedownsParams struct {
-	MeasureID        uuid.UUID
-	MeasureCreatedAt time.Time
-	PostIds          []uuid.UUID
-	CommentIds       []uuid.UUID
-	ForumEntryIds    []uuid.UUID
+	MeasureID     uuid.UUID
+	PostIds       []uuid.UUID
+	CommentIds    []uuid.UUID
+	ForumEntryIds []uuid.UUID
 }
 
 type InsertTakedownsRow struct {
@@ -222,12 +211,11 @@ type InsertTakedownsRow struct {
 	ForumEntryID *uuid.UUID
 }
 
-// 內容下架的複本（schema.sql 的 content_takedowns）：訂閱者在 seller 建立與撤銷內容下架措施的同一個 transaction 寫入，每日對帳雙向核對 seller.pub_content_takedowns()。
+// 內容下架的複本（schema.sql 的 content_takedowns）：訂閱者在 seller 建立與撤銷內容下架措施的同一個 transaction 寫入，每日對帳雙向核對 seller.pub_content_takedowns()，補漏經 seller.pub_lock_content_takedowns 與撤銷序列化。
 // 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
 func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) ([]InsertTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertTakedowns,
 		arg.MeasureID,
-		arg.MeasureCreatedAt,
 		arg.PostIds,
 		arg.CommentIds,
 		arg.ForumEntryIds,
@@ -289,6 +277,36 @@ func (q *Queries) InvalidTakedownContents(ctx context.Context, arg InvalidTakedo
 	items := []InvalidTakedownContentsRow{}
 	for rows.Next() {
 		var i InvalidTakedownContentsRow
+		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockActiveTakedownsOfMeasure = `-- name: LockActiveTakedownsOfMeasure :many
+SELECT content_kind, content_id FROM seller.pub_lock_content_takedowns($1::uuid)
+`
+
+type LockActiveTakedownsOfMeasureRow struct {
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+// 對帳補漏的第一句（在鎖 social 自己的列之前，seller 先於 social）：鎖住 seller 措施此刻生效中的對象，撤銷尚未提交時等它、提交後不回傳已撤銷的列；鎖持有到 transaction 結束，補漏寫複本期間撤銷不能進行。
+func (q *Queries) LockActiveTakedownsOfMeasure(ctx context.Context, measureID uuid.UUID) ([]LockActiveTakedownsOfMeasureRow, error) {
+	rows, err := q.db.Query(ctx, lockActiveTakedownsOfMeasure, measureID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockActiveTakedownsOfMeasureRow{}
+	for rows.Next() {
+		var i LockActiveTakedownsOfMeasureRow
 		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}
@@ -363,22 +381,16 @@ WHERE NOT EXISTS (
 ORDER BY t.measure_id, t.content_kind, t.content_id
 `
 
-type MissingTakedownsRow struct {
-	MeasureID   uuid.UUID
-	ContentKind string
-	ContentID   uuid.UUID
-}
-
 // seller 發布的「此刻生效中的內容下架」裡，複本還沒有、而且內容在 social 存在的（漂移）：每日對帳補上。內容不存在的略過（插入會違反外鍵）。
-func (q *Queries) MissingTakedowns(ctx context.Context) ([]MissingTakedownsRow, error) {
+func (q *Queries) MissingTakedowns(ctx context.Context) ([]SellerPubContentTakedown, error) {
 	rows, err := q.db.Query(ctx, missingTakedowns)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []MissingTakedownsRow{}
+	items := []SellerPubContentTakedown{}
 	for rows.Next() {
-		var i MissingTakedownsRow
+		var i SellerPubContentTakedown
 		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
 			return nil, err
 		}
@@ -417,6 +429,7 @@ func (q *Queries) TakedownForumStores(ctx context.Context, ids []uuid.UUID) ([]i
 const takedownMeasuresOfPosts = `-- name: TakedownMeasuresOfPosts :many
 SELECT post_id, measure_id FROM social.content_takedowns
 WHERE post_id = ANY($1::uuid[])
+ORDER BY post_id
 `
 
 type TakedownMeasuresOfPostsRow struct {
@@ -424,7 +437,7 @@ type TakedownMeasuresOfPostsRow struct {
 	MeasureID uuid.UUID
 }
 
-// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），所以一篇貼文至多一列。
+// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：content_takedowns_post 唯一索引保證一篇貼文至多一列。
 func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
 	if err != nil {

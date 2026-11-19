@@ -104,7 +104,6 @@ DB_PASSWORD=<本機 postgres 密碼> ./scripts/init-databases.sh local
 | notification-service | hawkr_notification |
 | review-service | hawkr_review |
 | seller-service | hawkr_seller |
-| social-service | hawkr_social |
 
 現況以 `ls services/*/db/atlas.hcl` 為準。Java 服務不使用 Atlas，schema 由各服務的 Flyway 在啟動時套用。
 

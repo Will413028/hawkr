@@ -51,3 +51,16 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 處置種類：`HIDE`、`WARN`、`BAN`、`TAKEDOWN`（舊：`HIDE_TARGET`、`WARN_USER`、`BAN_USER`、`DISMISS`）；`DISMISS` 對映案件決定 `NO_VIOLATION`；新增 `TAKEDOWN`（店家的內容走 seller 措施）。
 - 每次處理只有一種處置；同一案件組合多種處置是終態（見規格 §6）。
 - 內容下架的認定引用案件最早的 20 筆檢舉（seller 的上限 `MaxSourceModerationReports`）。
+
+## 公司時期未完成項
+
+legacy-backlog「A7 social」段裡屬於檢舉面的 3 項（A7-5 對照現行程式碼）；#2692（公開單篇不檢查發布狀態）屬 social，見 `social/CARRYOVER.md`。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #1632：`AdminResolve BAN_USER` 用 `report.TargetID` 而不是解析後的 `TargetOwnerID` | 不再成立（SD10）：檢舉帶 `(target_kind, id)`，`BAN` 只接受買家作者，作者由 social 的 `ContentOwner` 解析（內容已刪時用案件快照裡凍結的作者），再由 buyer 的 `AccountIDByBuyerID` 轉帳號後 `Suspend`；不使用檢舉的對象 ID 當帳號；店家作者回 FailedPrecondition | `internal/handle/handle.go:214-222`（BAN 分支）、`:232` `author`；`TestBuyerBranchActionsLeaveRecordsInTheOwningModules`（`decide_integration_test.go:49`）、`TestWarnAndBanUseTheFrozenAuthorWhenTheContentIsGone`（`lifecycle_integration_test.go:31`）、`TestBanRefusesAnAccountThatOwnsAStore`（`decide_integration_test.go:174`） |
+| #2779：檢舉佐證在 DB commit 結果不明時盲目 Release | 不再成立（A7-D21）：沒有 commit 結果不明時 Release 的路徑。證據是 DB 裡的快照列；media 的保全引用只由同步 job 依快照目前的狀態寫入，`Release` 只被快照過期清除呼叫，且與 `DeleteSnapshots` 在同一個 transaction，commit 失敗就整個回滾、快照與引用都還在 | `internal/mediaref/mediaref.go:75` `Release`，唯一呼叫處 `internal/retention/retention.go:111`（`rg -n 'holds\.Release\|\.Release\(' internal/modules/moderation` 只有這一處）；`TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged`（`lifecycle_integration_test.go:137`）、`TestSnapshotsArePurgedAfterTheRetentionAndCasesStay`（`submit_integration_test.go:277`） |
+| #3513 稽核寫入沒有 logger | 修掉（SD12）：`moderation_actions` 表刪除；後台處置的紀錄由 platform 的 `adminaudit` 在結案的同一個 transaction 寫，寫失敗整個回滾，不再 best-effort 丟棄，有讀取端（營運子命令 `List`），不需要另外的 logger | `internal/handle/handle.go:134,144`（`audit`）；`TestDecideWritesTheAdminAuditRecordInTheSameTransaction`（`list_integration_test.go:163`）、`adminaudit` 的 `TestRecordRollsBackWithTheCallersTransaction` |
+| #3513 整合測試 | 修掉：本模組有 integration 測試（submit、decide、lifecycle、list、schema 等），CI 的 backend-monolith integration job 執行（A7-1d 完成列的 run 43680980602） | `internal/modules/moderation/*_integration_test.go` |
+| #3513 SLA 告警 | 延後（Will 2026-11-19），觸發：單體的告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。原狀：待辦列有期限（`pub_review_items`：開案起 72 小時，到期前 24 小時起算警示窗，`db/objects.sql:16-19`），但沒有主動告警的程式，計畫也沒有決定；A7-D14 只延後「依檢舉數或觸及量提高優先度」，不是告警 | `db/objects.sql:16-19`；計畫 A7-D14 |
+| #3513 字典詞庫 | 延後，有觸發：詞庫不在本模組，擁有者與後台維護是另一個決定，觸發是營運要求新增詞（上方沿用盤點「髒字詞典（M17）」列）；social 側的詞表是過渡內容（`social/CARRYOVER.md` M17） | 本檔沿用盤點 M17 列；`social/CARRYOVER.md` M17 |

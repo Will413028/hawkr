@@ -11,6 +11,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
@@ -468,4 +470,82 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	live := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
 	must(t, svc.ApplyMissingTakedowns(ctx, live, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
 	f.wantSchedule(t, s.ID, "CANCELED", "TAKEN_DOWN")
+}
+
+// 每則內容至多一列複本（schema 鏡射 seller 的 measure_contents_one_enforced）：同一篇貼文被另一個措施再寫一列時唯一索引擋下，而不是靠讀取端挑一列。
+func TestSecondReplicaRowForTheSameContentViolatesTheUniqueIndex(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.takedownWorld(t)
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, post_id) VALUES ($1, $2)", uuid.NewV7(), w.post.ID)
+	_, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, post_id) VALUES ($1, $2)", uuid.NewV7(), w.post.ID)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "content_takedowns_post" {
+		t.Fatalf("同一篇貼文的第二列該違反 content_takedowns_post：%v", err)
+	}
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, comment_id) VALUES ($1, $2)", uuid.NewV7(), w.comment.ID)
+	if _, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, comment_id) VALUES ($1, $2)", uuid.NewV7(), w.comment.ID); !errors.As(err, &pgErr) || pgErr.ConstraintName != "content_takedowns_comment" {
+		t.Fatalf("同一則留言的第二列該違反 content_takedowns_comment：%v", err)
+	}
+	f.exec(t, "INSERT INTO social.content_takedowns (measure_id, forum_entry_id) VALUES ($1, $2)", uuid.NewV7(), w.entry.ID)
+	if _, err := f.db.Conn(context.Background()).Exec(context.Background(), "INSERT INTO social.content_takedowns (measure_id, forum_entry_id) VALUES ($1, $2)", uuid.NewV7(), w.entry.ID); !errors.As(err, &pgErr) || pgErr.ConstraintName != "content_takedowns_forum_entry" {
+		t.Fatalf("同一則討論區留言的第二列該違反 content_takedowns_forum_entry：%v", err)
+	}
+}
+
+// 對帳補漏與撤銷的競爭：撤銷的 transaction 已經把措施改成 REVOKED 但尚未提交時，補漏等它（seller.pub_lock_content_takedowns 的 FOR SHARE），撤銷提交後補漏讀不到措施，不寫回複本。
+// 補漏是否卡在鎖上由 pg_stat_activity 的 wait_event_type 判斷，不靠時間。
+func TestReconcileInsertWaitsForAnUncommittedRevokeAndWritesNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	td := f.takedowns(t)
+	w := f.takedownWorld(t)
+	id := td.seed(t, w.storeID, []seller.ContentRef{ref(seller.ContentPost, w.post.ID)})
+	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
+
+	revoking, release := make(chan struct{}), make(chan struct{})
+	revokeDone := make(chan error, 1)
+	go func() {
+		revokeDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id); err != nil {
+				return err
+			}
+			close(revoking)
+			<-release
+			return nil
+		})
+	}()
+	select {
+	case <-revoking:
+	case err := <-revokeDone:
+		t.Fatalf("撤銷在持有變更之前就結束了：%v", err)
+	}
+
+	repairDone := make(chan error, 1)
+	go func() {
+		repairDone <- svc.ApplyMissingTakedowns(ctx, id, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}})
+	}()
+	waiting := func() bool {
+		return f.scalar(t, `SELECT count(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%pub_lock_content_takedowns%'`) > 0
+	}
+	for !waiting() {
+		select {
+		case err := <-repairDone:
+			t.Fatalf("補漏沒有等未提交的撤銷就結束了（err=%v）", err)
+		default:
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	close(release)
+	must(t, <-revokeDone)
+	must(t, <-repairDone)
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("撤銷提交後補漏不該寫回複本：%d 列", n)
+	}
+	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
+		t.Fatal("貼文照常可讀")
+	}
 }

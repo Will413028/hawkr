@@ -162,11 +162,4 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("GetSubscribersList", func(t *testing.T) {
-		r, e := s.GetSubscribersList(ctx, connect.NewRequest(&pb.GetSubscribersListRequest{StoreId: 91}))
-		// id 是舊的追蹤列 ID；模組是複合鍵、沒有列 ID，所以不填，不以 buyer_id 冒充。
-		if e != nil || len(r.Msg.GetData()) != 1 || r.Msg.GetData()[0].GetBuyerId() != p.BuyerID || r.Msg.GetData()[0].GetId() != 0 {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
 }

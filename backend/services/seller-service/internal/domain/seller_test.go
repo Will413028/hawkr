@@ -156,24 +156,21 @@ func TestCanManageProducts(t *testing.T) {
 func TestMeetsCertificationPrecondition(t *testing.T) {
 	cases := []struct {
 		name        string
-		hasPost     bool
 		description string
 		websiteURL  string
 		want        bool
 	}{
-		{"has post, no description, no website", true, "", "", true},
-		{"has post overrides everything else", true, "   ", "", true},
-		{"no post, description+website both present", false, "自我介紹", "https://my-shop.example.com", true},
-		{"no post, description only", false, "自我介紹", "", false},
-		{"no post, website only", false, "", "https://my-shop.example.com", false},
-		{"no post, whitespace-only description, has website", false, "   ", "https://my-shop.example.com", false},
-		{"no post, has description, whitespace-only website", false, "自我介紹", "   ", false},
-		{"no post, neither field set", false, "", "", false},
+		{"description+website both present", "自我介紹", "https://my-shop.example.com", true},
+		{"description only", "自我介紹", "", false},
+		{"website only", "", "https://my-shop.example.com", false},
+		{"whitespace-only description, has website", "   ", "https://my-shop.example.com", false},
+		{"has description, whitespace-only website", "自我介紹", "   ", false},
+		{"neither field set", "", "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := MeetsCertificationPrecondition(tc.hasPost, tc.description, tc.websiteURL); got != tc.want {
-				t.Errorf("MeetsCertificationPrecondition(%v, %q, %q) = %v, want %v", tc.hasPost, tc.description, tc.websiteURL, got, tc.want)
+			if got := MeetsCertificationPrecondition(tc.description, tc.websiteURL); got != tc.want {
+				t.Errorf("MeetsCertificationPrecondition(%q, %q) = %v, want %v", tc.description, tc.websiteURL, got, tc.want)
 			}
 		})
 	}

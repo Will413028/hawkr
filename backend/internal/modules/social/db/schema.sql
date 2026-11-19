@@ -267,7 +267,8 @@ CREATE INDEX hides_forum_entry ON social.hides (forum_entry_id, hidden_at) WHERE
 
 -- 內容下架的複本：seller 擁有措施（seller.measures、measure_contents），social 在同一個 transaction 的訂閱者（MeasureCreated、MeasureRevoked 中的
 -- 內容下架）裡寫一列一個（措施，內容），所以貼文的公開讀取與留言、討論區留言的 counted 旗標只依 social 自己的表求值。與 inactive_authors 同一個形狀，
--- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），但複本以 (措施, 內容) 為鍵（三個部分唯一索引），撤銷與新措施之間的重送不互相覆蓋；
+-- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），複本以內容為唯一鍵（三個部分唯一索引，每則內容至多一列）鏡射它：
+-- 撤銷的 transaction 先刪舊措施的列，新措施才可能存在，所以合法路徑不會撞到；對帳補漏與撤銷的競爭由補漏鎖住 seller 的列序列化（seller.pub_lock_content_takedowns）。
 -- 每日對帳拿 seller.pub_content_takedowns() 雙向核對。貼文沒有計入旗標，公開讀取的述詞對 post_id 做 NOT EXISTS（visibility.ReadablePosts）；
 -- 貼文底下的留言跟著父貼文，不另寫列。
 CREATE TABLE social.content_takedowns (
@@ -275,16 +276,15 @@ CREATE TABLE social.content_takedowns (
     post_id        UUID        REFERENCES social.posts (id),
     comment_id     UUID        REFERENCES social.comments (id),
     forum_entry_id UUID        REFERENCES social.forum_entries (id),
-    measure_created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT content_takedowns_target_check CHECK (num_nonnulls(post_id, comment_id, forum_entry_id) = 1)
 );
 CREATE UNIQUE INDEX content_takedowns_measure_post ON social.content_takedowns (measure_id, post_id) WHERE post_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_measure_comment ON social.content_takedowns (measure_id, comment_id) WHERE comment_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_measure_forum_entry ON social.content_takedowns (measure_id, forum_entry_id) WHERE forum_entry_id IS NOT NULL;
--- 讀取與重新求值依內容探測「有沒有下架」，撤銷依措施找列。
-CREATE INDEX content_takedowns_post ON social.content_takedowns (post_id) WHERE post_id IS NOT NULL;
-CREATE INDEX content_takedowns_comment ON social.content_takedowns (comment_id) WHERE comment_id IS NOT NULL;
-CREATE INDEX content_takedowns_forum_entry ON social.content_takedowns (forum_entry_id) WHERE forum_entry_id IS NOT NULL;
+-- 每則內容至多一列，同時是讀取與重新求值依內容探測「有沒有下架」的索引；撤銷依措施找列走上面 (措施, 內容) 的索引。
+CREATE UNIQUE INDEX content_takedowns_post ON social.content_takedowns (post_id) WHERE post_id IS NOT NULL;
+CREATE UNIQUE INDEX content_takedowns_comment ON social.content_takedowns (comment_id) WHERE comment_id IS NOT NULL;
+CREATE UNIQUE INDEX content_takedowns_forum_entry ON social.content_takedowns (forum_entry_id) WHERE forum_entry_id IS NOT NULL;
 
 -- 買家的社群處分紀錄（處分紀錄與效果在同一個模組、同一個 transaction，只有一個寫入者，10e R12）。kind 初始只有 WARNING；之後加限制
 -- 種類只加值與規則（買家條款訂出後）。A7 只有永久效果、沒有到期欄位（A7-D16）。

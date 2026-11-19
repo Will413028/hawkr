@@ -1,6 +1,6 @@
 // Package socialrelay 將 social 與 seller 的模組事件轉成 notification-service 還在消費的社群 RabbitMQ 訊息（notification 還沒搬進單體）。
 //
-// 對應（全部送到 hawkr.content，source 是 social-service，wire 與舊 publisher 的 pkg/mq/events.go 逐欄位相同，差別見 wire_test）：
+// 對應（全部送到 hawkr.content，source 是 social-service，wire 形狀由 wire_test 逐欄位釘住，模板讀的 key 由 golden_test 對照）：
 //
 //	social.PostPublished   → post.created，一個追蹤者一則（觸發點是發布，不是建立草稿）
 //	social.CommentCreated  → comment.created
