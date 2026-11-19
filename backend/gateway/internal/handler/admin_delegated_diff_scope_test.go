@@ -13,14 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	"github.com/Will413028/hawkr/gateway/internal/handler/delegation"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	socialpb "github.com/Will413028/hawkr/go-pkg/proto/social"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 )
@@ -53,7 +51,6 @@ import (
 const (
 	scopeTestStoreID   = "2685914682"
 	scopeTestProductID = "7494590641851072512"
-	scopeTestPostID    = "7494590641851072999"
 )
 
 // ==================== stubs ====================
@@ -176,57 +173,6 @@ func (s *scopeProductStub) BatchUpdateSellerProductStatus(ctx context.Context, i
 	return resp, nil
 }
 
-type scopePostStub struct {
-	socialpb.SocialServiceClient
-}
-
-func fullPostDetail(content, publishStatus, version, publishedAt, scheduledAt string) *socialpb.PostDetailInfo {
-	return &socialpb.PostDetailInfo{
-		Id:                 scopeTestPostID,
-		Version:            version,
-		Content:            content,
-		ImageKeys:          []string{"post1.jpg"},
-		Tags:               []string{"檸檬"},
-		Products:           []*socialpb.PostProduct{{Id: scopeTestProductID}},
-		PublishStatus:      publishStatus,
-		PublishedAt:        publishedAt,
-		ScheduledPublishAt: scheduledAt,
-	}
-}
-
-// publishStateOnlyPostDetail 是**殘缺**的寫入回應：發布狀態變了，內容欄沒回填。
-func publishStateOnlyPostDetail(publishStatus, version, publishedAt, scheduledAt string) *socialpb.PostDetailInfo {
-	d := fullPostDetail("", publishStatus, version, publishedAt, scheduledAt)
-	d.Tags = nil
-	d.ImageKeys = nil
-	d.Products = nil
-	return d
-}
-
-func (s *scopePostStub) GetPostDetail(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
-	return &socialpb.PostDetailResponse{
-		Data: fullPostDetail("今天的檸檬很甜", strconv.Itoa(4401), "3", "", ""),
-	}, nil
-}
-
-func (s *scopePostStub) CreatePost(ctx context.Context, in *socialpb.CreatePostRequest, opts ...grpc.CallOption) (*socialpb.PostResponse, error) {
-	return &socialpb.PostResponse{Data: fullPostDetail(in.GetContent(), strconv.Itoa(4401), "1", "", "")}, nil
-}
-
-func (s *scopePostStub) UpdatePost(ctx context.Context, in *socialpb.UpdatePostRequest, opts ...grpc.CallOption) (*socialpb.PostResponse, error) {
-	return &socialpb.PostResponse{Data: fullPostDetail(in.GetContent(), strconv.Itoa(4401), "4", "", "")}, nil
-}
-
-func (s *scopePostStub) UpdateSellerPostStatus(ctx context.Context, in *socialpb.UpdateSellerPostStatusRequest, opts ...grpc.CallOption) (*socialpb.PostResponse, error) {
-	publishedAt := ""
-	if in.GetTargetStatus() == strconv.Itoa(4402) && in.GetScheduledPublishAt() == "" {
-		publishedAt = "2026-08-16T04:00:00Z"
-	}
-	return &socialpb.PostResponse{
-		Data: publishStateOnlyPostDetail(in.GetTargetStatus(), "4", publishedAt, in.GetScheduledPublishAt()),
-	}, nil
-}
-
 // ==================== router ====================
 
 func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
@@ -237,7 +183,6 @@ func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	h := &Holder{
 		Account: grpcclient.NewAccountDelegationClientForTest(audit),
 		Product: grpcclient.NewProductClientForTest(&scopeProductStub{}),
-		Social:  grpcclient.NewSocialClientForTest(&scopePostStub{}),
 	}
 
 	r := gin.New()
@@ -257,10 +202,6 @@ func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	g.POST(sellers+"/products/:product_id/publish", h.PublishDelegatedProduct)
 	g.POST(sellers+"/products/:product_id/unpublish", h.UnpublishDelegatedProduct)
 	g.POST(sellers+"/products/batch-unpublish", h.BatchUnpublishDelegatedProducts)
-	g.POST(sellers+"/posts", h.CreateDelegatedPost)
-	g.PATCH(sellers+"/posts/:post_id", h.UpdateDelegatedPost)
-	g.POST(sellers+"/posts/:post_id/publish", h.PublishDelegatedPost)
-	g.POST(sellers+"/posts/:post_id/unpublish", h.UnpublishDelegatedPost)
 	return r, audit
 }
 
@@ -310,24 +251,6 @@ func TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope(t *testing.T) {
 			method: http.MethodPatch, path: "/products/" + scopeTestProductID,
 			body: `{"expectedVersion":"12","operationReason":"改名","name":"有機無籽檸檬"}`,
 			want: []string{"name"},
-		},
-		{
-			action: "POST_UPDATE",
-			method: http.MethodPatch, path: "/posts/" + scopeTestPostID,
-			body: `{"expectedVersion":"3","operationReason":"改內容","content":"今天的檸檬更甜"}`,
-			want: []string{"content"},
-		},
-		{
-			action: "POST_PUBLISH",
-			method: http.MethodPost, path: "/posts/" + scopeTestPostID + "/publish",
-			body: `{"expectedVersion":"3","operationReason":"協助發布","publishMode":"immediate"}`,
-			want: []string{"publishStatus", "publishedAt"},
-		},
-		{
-			action: "POST_UNPUBLISH",
-			method: http.MethodPost, path: "/posts/" + scopeTestPostID + "/unpublish",
-			body: `{"expectedVersion":"3","operationReason":"協助下架"}`,
-			want: []string{"publishStatus"},
 		},
 	}
 
@@ -382,13 +305,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 			},
 			omitted: "description（未填，兩側皆為「—」）",
 		},
-		{
-			action: "POST_CREATE", path: "/posts",
-			body: `{"operationReason":"代客發文","content":"今天的檸檬很甜"}`,
-			// 規則表 7 欄扣掉兩個時間欄：立即發布以外的貼文兩者皆空，兩側都是「—」。
-			want:    []string{"content", "tags", "productIds", "imageKeys", "publishStatus"},
-			omitted: "scheduledPublishAt／publishedAt（未排程未發布，兩側皆為「—」）",
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.action, func(t *testing.T) {
@@ -403,27 +319,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 					tc.action, got, tc.want, tc.omitted)
 			}
 		})
-	}
-}
-
-// POST_SCHEDULE 與 POST_PUBLISH 共用同一個 Orchestrate 呼叫點，所以比較範圍相同；
-// 但它寫的是 scheduledPublishAt 而不是 publishedAt —— 範圍少列一欄的話，一次真實的
-// 排程設定就完全不會出現在稽核上。排程時間必須在執行當下計算（下界 now+5min）。
-func TestDelegatedAudit_PostScheduleRecordsTheScheduledTime(t *testing.T) {
-	r, audit := newDelegatedScopeRouter(t)
-	scheduledAt := time.Now().UTC().Add(2 * time.Hour).Truncate(time.Second).Format("2006-01-02T15:04:05Z")
-	w := doDelegatedScopeRequest(r, http.MethodPost, "/posts/"+scopeTestPostID+"/publish",
-		`{"expectedVersion":"3","operationReason":"排程發布","publishMode":"scheduled",`+
-			`"scheduledPublishAt":"`+scheduledAt+`"}`)
-	if w.Code != http.StatusOK {
-		t.Fatalf("HTTP status = %d, want 200; body = %s", w.Code, w.Body.String())
-	}
-	if got, want := audit.intents[0].GetAction(), "POST_SCHEDULE"; got != want {
-		t.Fatalf("action = %q, want %q —— 成功建立的排程是 POST_SCHEDULE 不是 POST_PUBLISH", got, want)
-	}
-	got := changedFieldNames(audit.confirms[0])
-	if !equalStringSets(got, []string{"publishStatus", "scheduledPublishAt"}) {
-		t.Errorf("POST_SCHEDULE 的 changed_fields = %v, want [publishStatus scheduledPublishAt]", got)
 	}
 }
 
@@ -489,11 +384,11 @@ func TestDelegatedOrchestrateCallSites_AllDeclareSnapshotFields(t *testing.T) {
 			return true
 		})
 	}
-	// 反向鑑別力：掃不到呼叫點時上面的迴圈一次都不會執行，整支測試會假綠。9 是
-	// 當下的實際數量（product 4、post 4、order 1；商品上下架兩支各自共用一個呼叫點）。新增端點時這個數字要跟著往上調——那正是提醒
+	// 反向鑑別力：掃不到呼叫點時上面的迴圈一次都不會執行，整支測試會假綠。5 是
+	// 當下的實際數量（product 4、order 1；商品上下架兩支各自共用一個呼叫點）。新增端點時這個數字要跟著往上調——那正是提醒
 	// 你「有一支新的東西要決定比較範圍」的地方。
-	if checked < 9 {
-		t.Errorf("只掃到 %d 個 Orchestrate 呼叫點，少於已知的 9 個 —— AST 錨點可能失效了", checked)
+	if checked < 5 {
+		t.Errorf("只掃到 %d 個 Orchestrate 呼叫點，少於已知的 5 個 —— AST 錨點可能失效了", checked)
 	}
 }
 

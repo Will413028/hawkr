@@ -46,13 +46,6 @@ func TestOrderCheckoutPostReviewDTOs_OutwardJSONKeyIsOperationalKey(t *testing.T
 			wantContain:  []string{`"buyerId":"` + buyerID + `"`, `"storeId":"` + storeID + `"`},
 			wantNotExist: []string{`"buyerAccountId"`, `"sellerAccountId"`},
 		},
-		{
-			// social 的 admin DTO 走 snake_case，正名目標鍵同步為 snake_case。
-			name:         "AdminPostListItemData",
-			v:            AdminPostListItemData{StoreID: storeID},
-			wantContain:  []string{`"storeId":"` + storeID + `"`},
-			wantNotExist: []string{`"seller_account_id"`},
-		},
 	}
 
 	for _, tc := range cases {

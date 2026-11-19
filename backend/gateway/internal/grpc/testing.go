@@ -16,7 +16,6 @@ import (
 	reviewpb "github.com/Will413028/hawkr/go-pkg/proto/review"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
-	socialpb "github.com/Will413028/hawkr/go-pkg/proto/social"
 	"google.golang.org/grpc"
 )
 
@@ -146,13 +145,6 @@ func NewPaymentResponsibilityClientForTest(c paymentpb.FulfillmentResponsibility
 // NewBuyerClientForTest creates a BuyerClient with the given mock proto client.
 func NewBuyerClientForTest(c buyerpb.BuyerServiceClient) *BuyerClient {
 	return &BuyerClient{client: c}
-}
-
-// ==================== Social ====================
-
-// NewSocialClientForTest creates a SocialClient with the given mock proto client.
-func NewSocialClientForTest(c socialpb.SocialServiceClient) *SocialClient {
-	return &SocialClient{client: c}
 }
 
 // ==================== Cart ====================

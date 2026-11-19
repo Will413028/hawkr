@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
 // 三層鎖定的路由禁字斷言只掃**路徑**（§6.1.1 的 10 個禁字）。DTO 層漏掉一個履約或
@@ -71,8 +69,6 @@ func delegatedResponseDTOs() map[string]any {
 	return map[string]any{
 		"DelegatedProductListItem":        DelegatedProductListItem{},
 		"DelegatedProductDetail":          DelegatedProductDetail{},
-		"DelegatedPostListItem":           DelegatedPostListItem{},
-		"DelegatedPostDetail":             DelegatedPostDetail{},
 		"DelegatedOrderListItem":          DelegatedOrderListItem{},
 		"DelegatedOrderDetail":            DelegatedOrderDetail{},
 		"DelegatedAuditLogEntry":          DelegatedAuditLogEntry{},
@@ -380,72 +376,5 @@ func TestDelegatedDTOCatalog_CoversEveryResponseOutlet(t *testing.T) {
 	if len(missing) > 0 {
 		t.Errorf("下列回應型別是代行端點的實際出口，但不在 delegatedResponseDTOs() 清單內，"+
 			"因此禁用欄位契約守不到它們：\n  %s", strings.Join(missing, "\n  "))
-	}
-}
-
-// 代行貼文列表必須帶得出「這則是不是草稿」。
-//
-// 少了它，草稿與已發布在列表上長得一模一樣（草稿沒有任何狀態標記），而代行工作區的
-// 管理員正是靠列表判斷這家店的經營狀態 —— 他會把一則從未發布的草稿當成已上線的貼文。
-// dev 驗收實際踩到：新建的草稿在列表裡沒有 pill，其他 10 則都有「已下架」。
-//
-// 這條在 Gateway 這一層守，因為它跨三層：上游 PostListItem 曾經根本沒有 publish_status
-// （只有 GetPostDetail 的 PostDetailInfo 有），漏了任一層前端就永遠拿到空字串 —— 而空
-// 字串在 UI 上與「沒有這個欄位」無法分辨，兩者都是不畫 pill。
-// 未登錄的發布狀態碼必須原樣穿透，不得變成空字串。
-//
-// 兩支 DTO 的 publishStatusLabel 都是 codemeta.PostPublishStatusLabel 查表的結果，而碼
-// 值是會長的：CodeMeta 新增 4404 而 Gateway 還沒重新生成 labels.go 的那個窗口一定存在
-// （生成檔與後端服務是兩次部署）。此時若查不到就回空字串，前端收到的
-// publishStatusLabel 與「這欄不存在」無法分辨 —— 而它已經有一個真的碼值可以顯示。
-//
-// 原樣回傳是刻意的：畫面上出現「4404」很醜，但看得出發生了什麼、追得到；空白格追不到。
-// ⚠️ labels.go 是 generate.sh 的生成檔（紅線 6），這支測試釘的是它的行為契約，
-// 不是要求誰去改它。
-func TestDelegatedPostPublishStatusLabel_UnknownCodePassesThrough(t *testing.T) {
-	const future = "4404" // 尚未登錄的發布狀態碼
-
-	got := codemeta.PostPublishStatusLabel(future)
-	if got == "" {
-		t.Fatalf("未登錄碼的標籤是空字串 —— 前端分不出「沒這個欄位」與「不認識這個碼」")
-	}
-	if got != future {
-		t.Fatalf("PostPublishStatusLabel(%q) = %q，want %q（原樣穿透）", future, got, future)
-	}
-
-	// 已登錄的碼仍必須翻成中文，否則上面那條會被一個「什麼都原樣回傳」的實作滿足。
-	if l := codemeta.PostPublishStatusLabel("4401"); l != "未發布" {
-		t.Fatalf("PostPublishStatusLabel(\"4401\") = %q, want \"未發布\"", l)
-	}
-}
-
-func TestDelegatedPostListItem_CarriesPublishStatus(t *testing.T) {
-	typ := reflect.TypeOf(DelegatedPostListItem{})
-	want := map[string]bool{"publishStatus": false, "publishStatusLabel": false}
-	for i := range typ.NumField() {
-		name := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
-		if _, ok := want[name]; ok {
-			want[name] = true
-		}
-	}
-	for key, found := range want {
-		if !found {
-			t.Errorf("DelegatedPostListItem 缺少 %q —— 前端分不出草稿與已發布", key)
-		}
-	}
-
-	// 標籤與碼要成對：只給碼等於要前端自己維護第二份 CodeMeta 對照表（那份必然漂移），
-	// 只給標籤則讓前端無法據以分支。詳情頁 DTO 就是兩者都給，列表沿用同一口徑。
-	detail := reflect.TypeOf(DelegatedPostDetail{})
-	for _, key := range []string{"publishStatus", "publishStatusLabel"} {
-		var inDetail bool
-		for i := range detail.NumField() {
-			if strings.Split(detail.Field(i).Tag.Get("json"), ",")[0] == key {
-				inDetail = true
-			}
-		}
-		if !inDetail {
-			t.Errorf("詳情 DTO 少了 %q，列表與詳情的口徑就對不齊了", key)
-		}
 	}
 }

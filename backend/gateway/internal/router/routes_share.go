@@ -7,7 +7,7 @@ import (
 )
 
 // registerShareRoutes 配置分享連結路由
-// GET /api/v1/app/share_url?type={post|product|seller}&id={id}
+// GET /api/v1/app/share_url?type=product&id={id}
 func registerShareRoutes(app *gin.RouterGroup, h *handler.Holder) {
 	app.GET(ShareURLPath, middleware.JWTAuth(), h.GetShareURL)
 }

@@ -1,8 +1,6 @@
 package router
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -75,7 +73,6 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/sellers/me/customers/search-by-tags", authz.CapMarketing},
 	{"GET", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
 	{"PUT", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
-	{"GET", "/api/v1/app/sellers/me/posts", authz.CapMarketing},
 	// Hawkr 幫找 — 賣家確認報價單邀請（doc 55 §5/§7）。承接一筆新生意＝擴張型操作，
 	// 停權賣家不該做得到，所以是 BLOCK 類的 CAP_MARKETING，不是白名單的
 	// CAP_ORDER_CONTRACT（那是「收縮型」，例如取消出貨）。同一個 AI 採購功能的賣家
@@ -94,14 +91,6 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/sellers/me/tags", authz.CapMarketing},
 	{"DELETE", "/api/v1/app/sellers/me/tags/:tagId", authz.CapMarketing},
 	{"PATCH", "/api/v1/app/sellers/me/tags/:tagId", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/posts", authz.CapMarketing},
-	{"DELETE", "/api/v1/app/sellers/posts/:id", authz.CapContentContract},
-	{"PUT", "/api/v1/app/sellers/posts/:id", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/posts/:id", authz.CapMarketing},
-	// 發布＝把內容推向買家（擴張型 → BLOCK）；下架只減不增（收縮型 → 白名單，與同組
-	// 的 DELETE 同級），兩者刻意不同 capability。
-	{"POST", "/api/v1/app/sellers/posts/:id/publish", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/posts/:id/unpublish", authz.CapContentContract},
 	// 賣家市場行情查詢（P6+P7+#2786 categoryId 解析）：8/2 原裁決是唯讀市場資訊、
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進
@@ -281,16 +270,4 @@ func toStr(v any) string {
 		return e.Error()
 	}
 	return ""
-}
-
-// The owner's single-post read is behind JWT authentication: with no
-// credentials it is rejected before the capability check or the handler runs.
-func TestSellerPostDetailRequiresAuthentication(t *testing.T) {
-	r := buildFullRouter(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/sellers/posts/77", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("GET /api/v1/app/sellers/posts/77 with no credentials: status = %d, want 401", w.Code)
-	}
 }

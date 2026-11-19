@@ -11,7 +11,7 @@ import (
 // BufferedEvent is an event persisted in the ring buffer for Last-Event-ID replay.
 type BufferedEvent struct {
 	ID        string // server-assigned event id, format: "<epochMillis>-<seq>"
-	EventName string // SSE event field, e.g. "comment.created"
+	EventName string // SSE event field, e.g. "notification.new"
 	Data      []byte // pre-marshaled SSE data payload (raw JSON)
 	Topic     string
 	CreatedAt time.Time

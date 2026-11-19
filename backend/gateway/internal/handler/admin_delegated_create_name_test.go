@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	socialpb "github.com/Will413028/hawkr/go-pkg/proto/social"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 )
@@ -35,18 +34,6 @@ func (s *createProductStub) CreateProduct(ctx context.Context, in *productpb.Cre
 	}}, nil
 }
 
-type createPostStub struct {
-	socialpb.SocialServiceClient
-}
-
-func (s *createPostStub) CreatePost(ctx context.Context, in *socialpb.CreatePostRequest, opts ...grpc.CallOption) (*socialpb.PostResponse, error) {
-	return &socialpb.PostResponse{Code: 0, Data: &socialpb.PostDetailInfo{
-		Id:      "7494024721080516609",
-		Content: in.GetContent(),
-		Version: "1",
-	}}, nil
-}
-
 func newDelegatedCreateRouter(t *testing.T) (*gin.Engine, *delegationStub) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -55,7 +42,6 @@ func newDelegatedCreateRouter(t *testing.T) (*gin.Engine, *delegationStub) {
 	h := &Holder{
 		Account: grpcclient.NewAccountDelegationClientForTest(audit),
 		Product: grpcclient.NewProductClientForTest(&createProductStub{}),
-		Social:  grpcclient.NewSocialClientForTest(&createPostStub{}),
 	}
 
 	r := gin.New()
@@ -70,7 +56,6 @@ func newDelegatedCreateRouter(t *testing.T) (*gin.Engine, *delegationStub) {
 		c.Next()
 	})
 	g.POST("/sellers/:store_id/products", h.CreateDelegatedProduct)
-	g.POST("/sellers/:store_id/posts", h.CreateDelegatedPost)
 	return r, audit
 }
 
@@ -98,35 +83,5 @@ func TestDelegatedProductCreate_AuditIntentCarriesResourceName(t *testing.T) {
 	}
 	if got := audit.intents[0].GetResourceName(); got != "嘉義布袋鮮蚵" {
 		t.Errorf("intent.resource_name = %q, want 嘉義布袋鮮蚵 —— 空值讓稽核主控台的「目標資源」恆為「—」", got)
-	}
-}
-
-func TestDelegatedPostCreate_AuditIntentCarriesResourceName(t *testing.T) {
-	r, audit := newDelegatedCreateRouter(t)
-
-	postDelegated(t, r, "/api/v1/admin/sellers/2685914682/posts", "ik-post-create-0001",
-		`{"operationReason":"協助新品上稿","content":"本週鮮蚵到貨，產地直送。"}`)
-
-	if len(audit.intents) != 1 {
-		t.Fatalf("RecordAuditIntent 呼叫次數 = %d, want 1", len(audit.intents))
-	}
-	if got := audit.intents[0].GetResourceName(); got != "本週鮮蚵到貨，產地直送。" {
-		t.Errorf("intent.resource_name = %q, want 貼文內容前 60 字", got)
-	}
-}
-
-// 貼文沒有名稱欄位，顯示名是「內容前 60 字」。建立列與之後的編輯列（postResource）
-// 必須用同一條規則，否則同一篇貼文在稽核主控台上看起來是兩個不同的資源。
-func TestDelegatedPostCreate_ResourceNameFollowsSameTruncationAsPostResource(t *testing.T) {
-	r, audit := newDelegatedCreateRouter(t)
-
-	content := strings.Repeat("蚵", 80)
-	postDelegated(t, r, "/api/v1/admin/sellers/2685914682/posts", "ik-post-create-0002",
-		`{"operationReason":"協助上稿","content":"`+content+`"}`)
-
-	got := audit.intents[0].GetResourceName()
-	if want := truncateRunes(content, 60); got != want {
-		t.Errorf("intent.resource_name 長度 = %d 字, want %d 字（與 postResource 同規則）",
-			len([]rune(got)), len([]rune(want)))
 	}
 }

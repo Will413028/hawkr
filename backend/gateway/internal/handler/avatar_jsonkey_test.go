@@ -60,12 +60,6 @@ func TestAvatarDTOs_OutwardJSONKeyIsFlatAvatarKey(t *testing.T) {
 			BuyerAvatarKey: key, BuyerAvatar: url,
 			ItemImageKey: "public/product/1.png", ItemImageURL: url,
 		}, []string{`"productImageKey"`, `"productImageUrl"`}},
-		{"ForumRecord", ForumRecord{
-			UserAvatarKey: key, UserAvatar: url,
-		}, nil},
-		{"commentData", commentData{
-			UserAvatarKey: key, UserAvatar: url,
-		}, nil},
 		// seller_crm 收斂前就已經是 avatarKey/avatarUrl；一併納入
 		// 才能證明「全平台同一個名字」，而不是只證明「我改過的那幾個」。
 		{"BuyerLookupResponse", BuyerLookupResponse{

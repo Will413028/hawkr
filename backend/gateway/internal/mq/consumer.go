@@ -1,8 +1,7 @@
 // Package mq implements gateway-specific RabbitMQ consumer for the SSE platform。
 //
 // Gateway 首次成為 MQ consumer：每個 pod 開一個 auto-delete broadcast queue，
-// bind 多個 routing key（comment.#、notification.inbox.new、notification.unread_changed
-// 等），收到訊息後 dispatch 給 realtime.Registry。
+// bind 多個 routing key（notification.inbox.new、notification.unread_changed 等），收到訊息後 dispatch 給 realtime.Registry。
 //
 // 41 號詳細設計書 §5.0 / §5.6：
 //   - 啟動策略：async goroutine，連線失敗指數退避重連，**不阻塞** HTTP 服務啟動
@@ -162,7 +161,7 @@ func (c *Consumer) runOnce(ctx context.Context) error {
 	}
 
 	// Bind one queue to all configured (exchange, routing key) pairs。
-	// We bind each literal routing key (not "comment.#") because Registry.Dispatch
+	// We bind each literal routing key (not "notification.#") because Registry.Dispatch
 	// does exact-match lookup. Wildcard binds would surface routing keys we
 	// don't know how to handle and add noise to logs。
 	for ex, rks := range c.registry.BindingsByExchange() {

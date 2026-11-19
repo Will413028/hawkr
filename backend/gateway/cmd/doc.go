@@ -80,9 +80,6 @@
 // @tag.name 評論 (Review)
 // @tag.description 商品評論
 //
-// @tag.name 留言 (Comment)
-// @tag.description 貼文留言
-//
 // @tag.name 物流 (Shipping)
 // @tag.description 物流出貨、標籤列印、物流建店、運費試算
 //
@@ -94,12 +91,6 @@
 //
 // @tag.name 商家CRM (Seller CRM)
 // @tag.description 商家客戶管理
-//
-// @tag.name 貼文 (Post)
-// @tag.description 貼文發布與互動
-//
-// @tag.name 討論區 (Forum)
-// @tag.description 商家討論區
 //
 // @tag.name 訂閱 (Subscription)
 // @tag.description 訂閱商家

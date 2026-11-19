@@ -5,12 +5,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Module wires the channel Registry and the concrete channels (comment +
-// notification) for the first release. New channels register here。
+// Module wires the channel Registry and the concrete channels (notification +
+// seller workspace) for the first release. New channels register here。
 var Module = fx.Module("realtime",
 	fx.Provide(
 		NewRegistry,
-		NewCommentChannel,
 		NewNotificationChannel,
 		NewSellerWorkspaceChannel,
 	),
@@ -22,12 +21,10 @@ var Module = fx.Module("realtime",
 // so the registry is fully populated before MQ consumer starts。
 func registerChannels(
 	reg *Registry,
-	cmt *CommentChannel,
 	notif *NotificationChannel,
 	sellerWs *SellerWorkspaceChannel,
 	log *zap.Logger,
 ) {
-	reg.Register(cmt)
 	reg.Register(notif)
 	reg.Register(sellerWs)
 	log.Info("realtime.registry.initialized",

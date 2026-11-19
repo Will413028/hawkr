@@ -68,9 +68,9 @@ func NewRegistry(hub *sse.Hub, log *zap.Logger) *Registry {
 }
 
 // Register adds a channel. Routing keys are matched literally when the MQ
-// consumer dispatches — wildcards in RoutingKeys() (e.g. "comment.#") are
-// for QueueBind, not Dispatch. Resolution of "any comment.*" routing key
-// to the comment channel relies on the consumer giving us the full key and
+// consumer dispatches — wildcards in RoutingKeys() (e.g. "notification.#") are
+// for QueueBind, not Dispatch. Resolution of "any notification.*" routing key
+// to the notification channel relies on the consumer giving us the full key and
 // the channel's ResolveTopic / BuildSSEEvent handling it.
 //
 // Conflict (two channels registering the same exact routing key) is logged
@@ -102,10 +102,10 @@ func (r *Registry) Channels() []Channel {
 // and publishes via Hub. Failures are logged best-effort — never returns
 // error to the MQ consumer (we ack regardless)。
 //
-// Routing key matching is exact. If wildcard binding (e.g. "comment.#")
-// causes the consumer to receive "comment.created", we look up the literal
-// "comment.created" in byRK. Channels must register every concrete routing
-// key they want to dispatch — see comment_channel.go for the canonical list.
+// Routing key matching is exact. If wildcard binding (e.g. "notification.#")
+// causes the consumer to receive "notification.inbox.new", we look up the literal
+// "notification.inbox.new" in byRK. Channels must register every concrete routing
+// key they want to dispatch — see notification_channel.go for the canonical list.
 func (r *Registry) Dispatch(routingKey string, payload []byte) {
 	r.mu.RLock()
 	ch, ok := r.byRK[routingKey]

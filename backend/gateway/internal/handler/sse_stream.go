@@ -1,13 +1,10 @@
-// SSE stream handlers for the realtime push platform (41 號設計書 §12)。
-// 兩個 endpoint：
-//   - GET /api/v1/public/posts/{post_id}/comments/stream — 匿名 + per-subject cap
-//   - GET /api/v1/app/notifications/stream                — JWT + per-user cap（身分為收件匣身分，非 JWT account_id）
+// SSE stream handler for the realtime push platform (41 號設計書 §12)。
+//   - GET /api/v1/app/notifications/stream — JWT + per-user cap（身分為收件匣身分，非 JWT account_id）
 package handler
 
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	"github.com/Will413028/hawkr/gateway/internal/realtime"
@@ -15,51 +12,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/sse"
 	"github.com/gin-gonic/gin"
 )
-
-// StreamPostComments 訂閱單一貼文留言 SSE 流。
-// @Summary      訂閱貼文留言 SSE
-// @Description  Server-Sent Events 推送指定貼文的留言新增 / 編輯 / 刪除 / 按讚變更事件。匿名可訂閱，同一限流身分連線上限 5。瀏覽器原生 EventSource 即可使用；reconnect 時自動帶 Last-Event-ID。本路徑回傳 text/event-stream，Connection 為長連線，不會回 JSON envelope。詳見 §41 設計書 §三 / §12.1。
-// @Tags         留言 (Comment) - Realtime
-// @Produce      text/event-stream
-// @Param        post_id        path    string  true  "貼文 ID"
-// @Param        Last-Event-ID  header  string  false "上次收到的事件 ID，用於斷線重連 replay"
-// @Success      200  "text/event-stream（持續推送 event: ready / comment.* / comment.batch / heartbeat）"
-// @Failure      400  {object}  object{code=int,message=string}  "post_id 無效"
-// @Failure      404  {object}  object{code=int,message=string}  "貼文不存在或已下架"
-// @Failure      429  {object}  object{code=int,message=string}  "同一限流身分連線上限（回應帶 Retry-After / X-RateLimit-*）"
-// @Failure      503  {object}  object{code=int,message=string}  "pod 連線上限或服務不可用"
-// @Router       /public/posts/{post_id}/comments/stream [get]
-func (h *Holder) StreamPostComments(c *gin.Context) {
-	postIDStr := c.Param("id")
-	postID, err := strconv.ParseInt(postIDStr, 10, 64)
-	if err != nil || postID <= 0 {
-		response.BadRequest(c, "invalid post id")
-		return
-	}
-
-	// 404 pre-check (§8.1)：先確認貼文存在；不存在不應消耗 SSE 連線。
-	// 匿名訂閱也允許（OptionalJWTAuth 路徑 / 直接無 JWT），這時 accountID 與兩個業務 id 都是 0。
-	// GetPostDetail proto 的 post_id 已改 string（§4 前端可控 id），故傳原始字串；
-	// topic key 仍以 int64 生成，與 SSE publish 端（social-service）保持一致。
-	// 貼文讚永遠是本人身分，所以預檢的 is_liked 用 buyer_id；連線上限以 account_id 計；
-	// 事件裡的 isMine 依這條連線觀看者此刻的 buyer_id、store_id 在寫出前算。
-	accountID := getOptionalAccountID(c)
-	caller, ok := h.socialCaller(c, accountID)
-	if !ok {
-		return
-	}
-	detail, err := h.Social.GetPostDetail(c.Request.Context(), caller.BuyerID, postIDStr)
-	if err != nil {
-		response.GrpcErr(c, "social", err)
-		return
-	}
-	if detail == nil || detail.Code != 0 || detail.Data == nil {
-		response.NotFound(c, "post not found")
-		return
-	}
-
-	h.serveSSE(c, h.CommentChannel, realtime.TopicCommentPost(postID), accountID, h.CommentChannel.Personalizer(), sse.Viewer{BuyerID: caller.BuyerID, StoreID: caller.StoreID})
-}
 
 // StreamNotifications 訂閱使用者通知 SSE 流（僅 web 端使用，mobile 維持 FCM）。
 // @Summary      訂閱通知 SSE
@@ -89,8 +41,7 @@ func (h *Holder) StreamNotifications(c *gin.Context) {
 	// 賣家是當前 store_id。發布端與訂閱端都固定使用這個 canonical 空間；歷史 retired
 	// stint 不透過 account_id fallback 重新曝光，交由 lifecycle cleanup 處理。
 	//
-	// 解析後的 id 同時當作 serveSSE 的授權主體與 per-user 連線上限鍵，與
-	// StreamPostComments 的既有作法一致（同一條連線的身分只有一個）。
+	// 解析後的 id 同時當作 serveSSE 的授權主體與 per-user 連線上限鍵，（同一條連線的身分只有一個）。
 	//
 	// ⚠️ 授權在下面那兩行就決定完了：topic 與授權主體都出自同一個 streamUserID，
 	// 所以 NotificationChannel.AuthorizeSubscribe 的 topic 比對在這條路徑上恆等。

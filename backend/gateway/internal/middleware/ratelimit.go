@@ -99,15 +99,14 @@ const publicNamespace = "/api/v1/public"
 // low-JWT PayUni callbacks would be wrongly throttled — reconnect storms or
 // same-source-IP callback bursts — under a per-IP request limit.
 var exemptExact = map[string]struct{}{
-	"/api/v1/health":                           {}, // liveness probe
-	"/api/v1/app/chat/ws":                      {}, // IM WebSocket upgrade
-	"/api/v1/app/notifications/stream":         {}, // notification SSE
-	"/api/v1/public/posts/:id/comments/stream": {}, // post comments SSE
-	"/webhook/payuni/notify":                   {}, // PayUni server-to-server callback
-	"/payment/return":                          {}, // PayUni return (GET + POST)
-	"/payment/redirect":                        {}, // WebView payment-page opener
-	"/store_map/return":                        {}, // PayUni CVS map return
-	"/store_map/redirect":                      {}, // WebView CVS-map opener
+	"/api/v1/health":                   {}, // liveness probe
+	"/api/v1/app/chat/ws":              {}, // IM WebSocket upgrade
+	"/api/v1/app/notifications/stream": {}, // notification SSE
+	"/webhook/payuni/notify":           {}, // PayUni server-to-server callback
+	"/payment/return":                  {}, // PayUni return (GET + POST)
+	"/payment/redirect":                {}, // WebView payment-page opener
+	"/store_map/return":                {}, // PayUni CVS map return
+	"/store_map/redirect":              {}, // WebView CVS-map opener
 	"/.well-known/apple-developer-merchantid-domain-association.txt": {},
 }
 

@@ -16,8 +16,7 @@ import (
 // 縮小。這支測試讓 gin 實際註冊的路由與清單一一對上：
 //   - 清單有、路由沒有 → 清單在描述不存在的端點，一律失敗（刪路由時一起刪清單）。
 //   - 路由有、清單沒有 → 新增的 REST 路由，一律失敗；既有的例外登記在 routesNotInSpec。
-//   - 清單的端點數只准變少（maxRESTOperations），新增路由時連同清單一起補也會失敗；例外見 ADR
-//     2026-09-26-external-contract-protobuf-connect 文末修訂（逐條登記，目前只有店主讀單篇貼文）。
+//   - 清單的端點數只准變少（maxRESTOperations），新增路由時連同清單一起補也會失敗。
 //   - 規格的 operationId 必須等於 handler 方法名（首字小寫）：scripts/gateway-json-contract-check.py
 //     的 Check B 靠這個對應找到 handler，對不上的 handler 會被靜默跳過。
 //
@@ -25,7 +24,7 @@ import (
 const specPath = "../../../api/openapi/openapi.yaml"
 
 // maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
-const maxRESTOperations = 419
+const maxRESTOperations = 379
 
 // 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (
@@ -44,19 +43,13 @@ var routesNotInSpec = map[string]string{
 	"GET /api/v1/admin/delegated-operations/current/summary":                    notAnnotatedDelegated,
 	"GET /api/v1/admin/sellers/{}/orders/{}":                                    notAnnotatedDelegated,
 	"GET /api/v1/admin/sellers/{}/orders/{}/recipient-contact":                  notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/posts":                                        notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/posts/{}":                                     notAnnotatedDelegated,
 	"GET /api/v1/admin/sellers/{}/products":                                     notAnnotatedDelegated,
 	"GET /api/v1/admin/sellers/{}/products/{}":                                  notAnnotatedDelegated,
 	"GET /api/v1/admin/sellers/{}/storefront":                                   notAnnotatedDelegated,
-	"PATCH /api/v1/admin/sellers/{}/posts/{}":                                   notAnnotatedDelegated,
 	"PATCH /api/v1/admin/sellers/{}/products/{}":                                notAnnotatedDelegated,
 	"PATCH /api/v1/admin/sellers/{}/storefront":                                 notAnnotatedDelegated,
 	"POST /api/v1/admin/delegated-operations/media/upload_sessions":             notAnnotatedDelegated,
 	"POST /api/v1/admin/delegated-operations/media/upload_sessions/{}/complete": notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/posts":                                       notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/posts/{}/publish":                            notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/posts/{}/unpublish":                          notAnnotatedDelegated,
 	"POST /api/v1/admin/sellers/{}/products":                                    notAnnotatedDelegated,
 	"POST /api/v1/admin/sellers/{}/products/{}/publish":                         notAnnotatedDelegated,
 	"POST /api/v1/admin/sellers/{}/products/{}/unpublish":                       notAnnotatedDelegated,
