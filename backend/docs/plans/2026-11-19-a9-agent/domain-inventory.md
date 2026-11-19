@@ -1,7 +1,7 @@
 # A9-0 盤點（領域、資料、機制切片）：`ai-service` → agent／採購模組
 
 唯讀盤點，快照 `bc2c732c`（worktree `a9-plan`，branch dev），2026-11-19。路徑相對於 `backend/`，`AI=services/ai-service`，`AIi=services/ai-service/internal`，`PR=services/ai-service/internal/procurement`，`M=internal/modules`。
-範本：`docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md`。決策來源：遷移計畫 `docs/plans/2026-09-24-go-modular-monolith.md` 的 A9 條（第 252–256 行）、ADR `docs/adr/2026-10-27-general-ecommerce-scope-cut.md` D2。
+範本：`backend/docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md`。決策來源：遷移計畫 `backend/docs/plans/2026-09-24-go-modular-monolith.md` 的 A9 條（第 252–256 行）、ADR `docs/adr/2026-10-27-general-ecommerce-scope-cut.md` D2。
 標記：【量】＝跑過指令或打開檔案；【推】＝讀程式推論。本檔只盤「領域、資料、機制」；RPC／REST／client 呼叫點是別的切片（但 §0 列出 RPC 數量差異，因為會影響範圍）。
 
 ---
@@ -100,7 +100,7 @@
 | 賣家 meta、stats、prospect 搜尋 | seller | `AIi/client/seller/adapter.go`（`GetSellerStats`、`BatchGetSellerMeta`、`SearchProspects`） | `seller` 已在單體；`seller_prospects` 由 seller 擁有（`M/seller/db`） |
 | 買家 entitlement | buyer | `AIi/client/buyer/adapter.go:58`（`GetBuyerEntitlement`） | `buyer` 模組公開 API |
 | 圖片上傳／引用 | media | `AIi/client/media/client.go`（`FinalizeImages`、`LinkImages`、`ReleaseReferences`） | `media` 已在單體，與寫列同 tx |
-| 供應商邀請與 session | `agent`（單體既有） | `rfq_recipient_id` 屬 ai-service，agent 模組只驗正整數（`M/agent/AGENTS.md`、`docs/modules/agent.md:67`） | 採購進單體後，`agent` 的 `Prospects` port 與採購的接線要定（Q2） |
+| 供應商邀請與 session | `agent`（單體既有） | `rfq_recipient_id` 屬 ai-service，agent 模組只驗正整數（`M/agent/AGENTS.md`、`backend/docs/modules/agent.md:67`） | 採購進單體後，`agent` 的 `Prospects` port 與採購的接線要定（Q2） |
 | 通知 | notification（舊） | ai-service 經 `procurement.events` exchange 發事件（`events.csv`） | A8 notification 搬遷時要接新事件（Q8） |
 
 ---

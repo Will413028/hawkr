@@ -1,5 +1,7 @@
 # A9 決策簡報
 
+**狀態：** D1–D4、D6–D11 照建議已決（Will 2026-11-19）；D5 等 A9-0 spike。
+
 要 Will 拍板的題目。證據在同目錄三份盤點（`domain-inventory.md` 的 Q1–Q13、`interface-inventory.md` §7、`client-inventory.md` §6）。拍板順序依相依：D1、D2 決定範圍，先拍；D3、D4、D6–D10 在範圍內成立，可同批拍；D5 等 A9-0 spike；D11 一併確認。
 
 ## 前提（決定之前要知道的事實）
