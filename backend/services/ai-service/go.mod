@@ -7,7 +7,7 @@ require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/longbridgeapp/opencc v0.3.13
-	github.com/openai/openai-go/v3 v3.91.0
+	github.com/openai/openai-go/v3 v3.95.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/otel v1.47.0
@@ -17,7 +17,7 @@ require (
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.25.0
-	google.golang.org/adk/v2 v2.6.0
+	google.golang.org/adk/v2 v2.7.1
 	google.golang.org/genai v1.77.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
