@@ -385,3 +385,18 @@ BEGIN ATOMIC
     JOIN seller.measure_contents c ON c.measure_id = m.id
     WHERE m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN';
 END;
+
+-- 鎖住一個內容下架措施此刻生效中的對象並回傳（VOLATILE：帶鎖的 SELECT 不能在 STABLE 函式裡）。鎖是措施列與它的對象列的 FOR SHARE：撤銷措施的 UPDATE 寫這兩處
+-- （measures.status，與經 measure_status 複合外鍵 ON UPDATE CASCADE 同步的 measure_contents 列），所以撤銷尚未提交時這個呼叫等它，提交後在 READ COMMITTED 下重新評估
+-- 條件、不再回傳已撤銷的列；鎖持有到呼叫方的 transaction 結束，之後才開始的撤銷等呼叫方。給 social 每日對帳補漏在寫複本之前序列化撤銷。
+-- 呼叫方要在鎖自己模組的列之前呼叫它（seller 在 social 之前，platform/lockorder）。
+CREATE FUNCTION seller.pub_lock_content_takedowns(p_measure_id UUID) RETURNS SETOF seller.pub_content_takedown
+LANGUAGE sql VOLATILE
+BEGIN ATOMIC
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measures m
+    JOIN seller.measure_contents c ON c.measure_id = m.id
+    WHERE m.id = p_measure_id AND m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN'
+    ORDER BY c.content_kind, c.content_id
+    FOR SHARE OF m, c;
+END;

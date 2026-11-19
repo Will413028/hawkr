@@ -1,4 +1,4 @@
-h1:GRvC41CeefSvgXjpM3mgXAKlKXeSXIOvhB41eWcgB30=
+h1:5t0zq8LEporxlGmyMwuYgv18hp9XZAovo2kaDxsIrRs=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -71,3 +71,4 @@ h1:GRvC41CeefSvgXjpM3mgXAKlKXeSXIOvhB41eWcgB30=
 20261118150351_seller_measure_content_snapshots.sql h1:vI+uLbMJifJiPN7wTekZ6tKsC2WkGdzmF9rZ/bccycA=
 20261118161830_seller_drop_snapshot_unavailable.sql h1:PdNjSvJy2fipiCSocnzkNMyi95xtMZ3xohAdikuH4z8=
 20261119100000_seller_pub_content_takedowns_drop_measure_created_at.sql h1:l0SieiQBlFTBcjNFJoTRAY9sGflZqYvG6ffCsmGjGjU=
+20261119130000_seller_pub_lock_content_takedowns.sql h1:a6g9KaUUkPpM0Q8R/Dh7W9V9weGdQDxtLsAynAogOLs=

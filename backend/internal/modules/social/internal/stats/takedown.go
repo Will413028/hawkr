@@ -61,17 +61,22 @@ func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.ent
 func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, storeID int64, at time.Time, contents []Content) error {
 	return s.applyTakedowns(ctx, measureID, at, contents, func(ctx context.Context, set contentSet) (contentSet, error) {
 		return s.checkTakedownOwnership(ctx, storeID, set)
-	}, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
+	}, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
 		rows, err := q.InsertTakedowns(ctx, p)
 		return insertedOf(rows, func(r store.InsertTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
 }
 
 // ApplyMissingTakedowns 是每日對帳的補漏：把 seller 發布的生效中下架裡複本沒有的列補上。不核對歸屬（措施已經生效，內容之後可以被作者刪除）；
-// 寫入的語句自己再看一次 seller.pub_content_takedowns()，所以讀到「缺」的清單之後才被撤銷的措施不會被寫回。撤銷的 transaction 若與這一句同時進行（尚未提交），
-// 仍可能寫入一次，由下一次對帳的「多」那一步刪除。
+// transaction 的第一句鎖住 seller 措施生效中的對象（seller.pub_lock_content_takedowns，seller 先於 social，在鎖貼文列之前）：撤銷尚未提交時等它，提交後寫入的語句讀不到已撤銷的列，
+// 所以讀到「缺」的清單之後才被撤銷的措施不會被寫回；補漏持鎖期間撤銷也等它，撤銷再刪這些列。
 func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content) error {
-	return s.applyTakedowns(ctx, measureID, at, contents, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
+	return s.applyTakedowns(ctx, measureID, at, contents, nil, func(ctx context.Context, q *store.Queries) error {
+		if _, err := q.LockActiveTakedownsOfMeasure(ctx, measureID); err != nil {
+			return fmt.Errorf("social：鎖定措施 %s 生效中的內容下架：%w", measureID, err)
+		}
+		return nil
+	}, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (inserted, error) {
 		rows, err := q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams(p))
 		return insertedOf(rows, func(r store.InsertActiveTakedownsRow) *uuid.UUID { return r.PostID }), err
 	})
@@ -93,8 +98,8 @@ func insertedOf[R any](rows []R, post func(R) *uuid.UUID) inserted {
 	return out
 }
 
-// applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
-func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) (contentSet, error), insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (inserted, error)) error {
+// applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：before（對帳先鎖 seller 的列）、鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
+func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) (contentSet, error), before func(context.Context, *store.Queries) error, insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (inserted, error)) error {
 	set, err := splitContents(contents)
 	if err != nil {
 		return err
@@ -104,6 +109,11 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at ti
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
+		if before != nil {
+			if err := before(ctx, q); err != nil {
+				return err
+			}
+		}
 		if len(set.posts) > 0 {
 			if _, err := q.LockPostsByID(ctx, set.posts); err != nil {
 				return fmt.Errorf("social：鎖定被下架的貼文：%w", err)

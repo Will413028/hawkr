@@ -1,7 +1,6 @@
 package post
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -120,24 +119,16 @@ func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	if err != nil {
 		return fmt.Errorf("social：讀取貼文的下架措施：%w", err)
 	}
-	byPost := firstMeasurePerPost(rows)
+	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
+	for _, r := range rows {
+		byPost[*r.PostID] = r.MeasureID
+	}
 	for i := range posts {
 		if m, ok := byPost[posts[i].ID]; ok {
 			posts[i].TakedownMeasureID = &m
 		}
 	}
 	return nil
-}
-
-// firstMeasurePerPost 每篇貼文留 measure_id 最大的措施（措施 ID 是 UUIDv7，最大的最新），與列的順序無關；同一篇出現多列只會發生在撤銷過的舊措施殘留時。
-func firstMeasurePerPost(rows []store.TakedownMeasuresOfPostsRow) map[uuid.UUID]uuid.UUID {
-	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
-	for _, r := range rows {
-		if cur, seen := byPost[*r.PostID]; !seen || bytes.Compare(r.MeasureID[:], cur[:]) > 0 {
-			byPost[*r.PostID] = r.MeasureID
-		}
-	}
-	return byPost
 }
 
 // viewerOf 是公開讀取的觀看者：呼叫者的買家身分；零值是未登入。
