@@ -13,9 +13,8 @@ import (
 
 // Sentinel errors returned by Subscribe so callers can map to HTTP status。
 var (
-	ErrPodCapReached     = errors.New("sse: pod connection cap reached")
-	ErrSubjectCapReached = errors.New("sse: per-subject connection cap reached")
-	ErrUserCapReached    = errors.New("sse: per-user connection cap reached")
+	ErrPodCapReached  = errors.New("sse: pod connection cap reached")
+	ErrUserCapReached = errors.New("sse: per-user connection cap reached")
 )
 
 // ReadyPayload is the data of the initial `ready` event sent to clients。
@@ -92,10 +91,7 @@ func ServeSSE(
 
 	// 2. replay buffered events (Last-Event-ID > clientLastSeen)。
 	for _, ev := range replay {
-		frame := conn.frameFor(log, ev.EventName, ev.Data, ev.ID)
-		if frame == nil {
-			continue // 個人化失敗：丟掉這個事件，不送內部形狀
-		}
+		frame := buildFrame(ev.EventName, ev.Data, ev.ID)
 		refreshWriteDeadline()
 		if _, err := w.Write(frame); err != nil {
 			return

@@ -169,66 +169,12 @@ func TestHub_Batch_MultiEventMerges(t *testing.T) {
 	}
 }
 
-// TestHub_Caps_PerSubject 驗證 per-subject 上限。
+// TestHub_Caps_PerUser 驗證 per-user 上限。
 //
 // 契約自 issue #2040 起改變：滿座時不再無條件拒絕，而是先嘗試把最舊的位子
 // 回收過來（SSE 沒有存活訊號，被中間層養著的殭屍會永久佔位——理由見
-// capgroup.go 檔頭）。硬上限本身沒有放寬：同時存活數永遠 ≤ MaxConnPerSubject，
-// 且每個視窗的回收額度用完後仍然回 ErrSubjectCapReached。
-func TestHub_Caps_PerSubject(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.MaxConnPerSubject = 2
-	hub := NewHub(cfg, nil)
-
-	mkAnon := func() *Connection {
-		c := newConn(t, "t", "")
-		c.Subject = "v:1.2.3.4"
-		return c
-	}
-
-	c1 := mkAnon()
-	if _, _, err := hub.Subscribe(c1); err != nil {
-		t.Fatalf("c1: %v", err)
-	}
-	c2 := mkAnon()
-	if _, _, err := hub.Subscribe(c2); err != nil {
-		t.Fatalf("c2: %v", err)
-	}
-
-	// 滿座 → 回收最舊的（c1）換位子給 c3。
-	c3 := mkAnon()
-	if _, _, err := hub.Subscribe(c3); err != nil {
-		t.Fatalf("c3 應可回收最舊位子入座，got %v", err)
-	}
-	if !isClosed(c1) {
-		t.Error("c1（最舊）應被回收並關閉")
-	}
-	if got := hub.CapGroupSize(0, "v:1.2.3.4"); got != cfg.MaxConnPerSubject {
-		t.Errorf("佔位數 = %d，want %d（硬上限不得被回收機制放寬）", got, cfg.MaxConnPerSubject)
-	}
-
-	// 把回收額度耗盡後，必須回到原本的 429 行為。
-	remaining := evictBudgetFor(cfg.MaxConnPerSubject) - 1
-	last := c3
-	for i := 0; i < remaining; i++ {
-		c := mkAnon()
-		if _, _, err := hub.Subscribe(c); err != nil {
-			t.Fatalf("額度內第 %d 次回收應成功，got %v", i+2, err)
-		}
-		last = c
-	}
-	if _, _, err := hub.Subscribe(mkAnon()); !errors.Is(err, ErrSubjectCapReached) {
-		t.Errorf("額度用完後 want ErrSubjectCapReached, got %v", err)
-	}
-
-	// 正常釋放（連線自己收工）騰出的位子不吃回收額度，額度已耗盡也照樣可用。
-	hub.Unsubscribe(last)
-	if _, _, err := hub.Subscribe(mkAnon()); err != nil {
-		t.Errorf("正常釋放後入座 want nil, got %v", err)
-	}
-}
-
-// TestHub_Caps_PerUser 驗證 per-user 上限，契約同 TestHub_Caps_PerSubject。
+// capgroup.go 檔頭）。硬上限本身沒有放寬：同時存活數永遠 ≤ MaxConnPerUser，
+// 且每個視窗的回收額度用完後仍然回 ErrUserCapReached。
 func TestHub_Caps_PerUser(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MaxConnPerUser = 1
@@ -253,7 +199,7 @@ func TestHub_Caps_PerUser(t *testing.T) {
 	if !isClosed(c1) {
 		t.Error("c1 應被回收並關閉")
 	}
-	if got := hub.CapGroupSize(42, ""); got != cfg.MaxConnPerUser {
+	if got := hub.CapGroupSize(42); got != cfg.MaxConnPerUser {
 		t.Errorf("佔位數 = %d，want %d", got, cfg.MaxConnPerUser)
 	}
 

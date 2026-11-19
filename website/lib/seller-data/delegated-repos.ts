@@ -600,7 +600,7 @@ export function createDelegatedPostRepo(
 		 * 賣家中心的發布／下架入口在代行工作區不渲染（動作欄整段 `!delegated`），
 		 * 但介面上這一支必須有實作 —— 走的是代行自己的兩支命令端點，共通三欄由
 		 * `requireMeta` 強制。用 reject 佔位會在有人接線的那天變成一個「端點不存在」
-		 * 的謊：`/admin/sellers/{id}/posts/{id}/publish` 一直都在。
+		 * 的謊：`SocialDelegatedService` 的 `PublishStorePost`／`UnpublishStorePost` 一直都在。
 		 *
 		 * ⚠️ 代行的 `/publish` 必填 `expectedVersion`，而它只在 `meta` 裡 —— 列表的
 		 * DTO 不帶版本，所以呼叫端得自己先取得版本再進來，不能拿列表那一列直接送。

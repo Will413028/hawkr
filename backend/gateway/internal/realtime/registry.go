@@ -67,11 +67,9 @@ func NewRegistry(hub *sse.Hub, log *zap.Logger) *Registry {
 	}
 }
 
-// Register adds a channel. Routing keys are matched literally when the MQ
-// consumer dispatches — wildcards in RoutingKeys() (e.g. "notification.#") are
-// for QueueBind, not Dispatch. Resolution of "any notification.*" routing key
-// to the notification channel relies on the consumer giving us the full key and
-// the channel's ResolveTopic / BuildSSEEvent handling it.
+// Register adds a channel. A channel registers the literal routing keys it
+// handles (RoutingKeys()); the MQ consumer binds and dispatches on those exact
+// keys, so there is no wildcard matching.
 //
 // Conflict (two channels registering the same exact routing key) is logged
 // and the later registration wins。

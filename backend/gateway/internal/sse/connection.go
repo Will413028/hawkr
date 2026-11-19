@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // Connection wraps a single SSE client connection.
@@ -25,25 +24,10 @@ type Connection struct {
 
 	// Per-connection metadata for cap enforcement / authorization。
 	//
-	// Subject is the rate-limit subject (middleware.RateLimitSubject): "v:<ip>"
-	// for one human, "s:ssr" / "s:ci" for our own server-side callers. It is
-	// deliberately NOT the peer address — the website's SSR worker and the CI
-	// runner each present one address on behalf of an unbounded number of
-	// people, so an address key lets five of them exhaust the cap for everyone
-	// (#2264, 01 設計書 §3.2.8).
-	Subject string // cap key for anonymous connections; empty = only the pod cap applies
-
-	// AccountID 是這條連線的 cap 分組鍵：登入者的 account_id，0 = anonymous（走 per-subject cap path）。
-	// notification stream 傳的是收件匣身分（buyer_id／store_id），那條路徑的 topic 也用同一個值；
-	// 這個欄位只用來分組（hub.go 的 connsByUID），對 id 空間不敏感。
+	// AccountID 是這條連線的 cap 分組鍵：收件匣身分（buyer_id／store_id），0 = 不受 per-user cap 管（僅受 pod cap）。
+	// topic 也用同一個值；這個欄位只用來分組（hub.go 的 connsByUID），對 id 空間不敏感。
 	// 要判 topic 的身分空間，看 realtime.Topic* 的呼叫點，不要看這裡。
 	AccountID int64
-
-	// Personalizer 與 Viewer：這條連線寫出前的 payload 個人化（即時事件與 replay 都經過）。
-	// nil = 所有連線共用同一份 payload。事件在 Hub 內以共用的內部形狀保存，個人化只改這條連線看到的副本。
-	// 同一個 topic 的連線必須用同一個 Personalizer（同一個 channel），差別只在 Viewer。
-	Personalizer Personalizer
-	Viewer       Viewer
 
 	// ---- 由 Hub 在 Subscribe / teardown 期間維護，外部不得碰（issue #2040）---- //
 
@@ -51,7 +35,7 @@ type Connection struct {
 	// 用途有二：挑最舊的位子回收、以及 GC 迴圈判定超過最長存活時間。
 	subscribedAt time.Time
 
-	// group 是本連線佔位的那個 cap group（per-user 或 per-subject）。
+	// group 是本連線佔位的那個 cap group（per-user）。
 	group *connGroup
 
 	// admitted / releasedOnce 讓「釋放位子」變成每條連線恰好一次。
@@ -74,26 +58,6 @@ func NewConnection(topic string, w http.ResponseWriter, flusher http.Flusher, la
 		lastEventID: lastEventID,
 		closed:      make(chan struct{}),
 	}
-}
-
-// frameFor 組出這條連線要寫出的 SSE frame；個人化失敗時回 nil，呼叫端必須丟掉這個事件（fail closed）。
-// 只用在單條連線的路徑（replay）；即時事件由 Hub 對整個 topic 一次準備、依 variant 共用。
-func (c *Connection) frameFor(log *zap.Logger, eventName string, data []byte, id string) []byte {
-	if c.Personalizer == nil {
-		return buildFrame(eventName, data, id)
-	}
-	prepared, err := c.Personalizer(eventName, data)
-	if err != nil {
-		// 只記事件名稱與 id，不記 payload。
-		log.Warn("SSE.personalize.failed", zap.String("topic", c.Topic), zap.String("event", eventName), zap.String("eventId", id), zap.Error(err))
-		return nil
-	}
-	out, err := prepared.Render(c.Viewer)
-	if err != nil {
-		log.Warn("SSE.personalize.render_failed", zap.String("topic", c.Topic), zap.String("event", eventName), zap.String("eventId", id), zap.Error(err))
-		return nil
-	}
-	return buildFrame(eventName, out, id)
 }
 
 // Send queues an SSE frame for writing. Returns false if the connection's

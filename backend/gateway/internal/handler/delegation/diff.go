@@ -97,32 +97,9 @@ var DelegationDiffRules = map[string]map[string]FieldRule{
 		// （`3701、3702`），不像 hashtags join 的是本來就可讀的標籤名。詳見 §6.1.12。
 		"certifications": {Label: "產品驗證", Formatter: FormatterEnum, Arg: "CertificationType", InSnapshot: true},
 	},
-	"post": {
-		"content":            {Label: "貼文內容", Formatter: FormatterTruncate, Arg: "60", InSnapshot: true},
-		"tags":               {Label: "主題標籤", Formatter: FormatterTruncate, Arg: "60", InSnapshot: true},
-		"productIds":         {Label: "關聯商品", Formatter: FormatterQty, Arg: "項", InSnapshot: true},
-		"imageKeys":          {Label: "貼文圖片", Formatter: FormatterQty, Arg: "張", InSnapshot: true},
-		"publishStatus":      {Label: "發布狀態", Formatter: FormatterEnum, Arg: "PostPublishStatus", InSnapshot: true},
-		"scheduledPublishAt": {Label: "排程發布時間", Formatter: FormatterPlain, InSnapshot: true},
-		"publishedAt":        {Label: "發布時間", Formatter: FormatterPlain, InSnapshot: true},
-	},
 	// order is read-only: ORDER_PII_REVEAL changes no field, so the rule table is
 	// empty and both snapshots carry {"revealedFields":[…]} — never the PII itself.
 	"order": {},
-}
-
-// ReadOnlyFields lists, per resourceType, the projected fields a mutation request
-// must never be able to set. They are silently ignored rather than rejected: a front
-// end that echoes a whole DTO back should not fail the entire write.
-func ReadOnlyFields(resourceType string) []string {
-	switch resourceType {
-	case "product":
-		return []string{"status", "priceMin", "priceMax", "stockQty"}
-	case "post":
-		return []string{"publishStatus", "scheduledPublishAt", "publishedAt"}
-	default:
-		return nil
-	}
 }
 
 // Project produces the before/after snapshot projection. resource is the domain DTO
@@ -154,13 +131,6 @@ func Project(resourceType string, resource map[string]any) map[string]any {
 // 一個呼叫端 append 一次就改掉了其他所有呼叫端的比較範圍，而那個錯誤不會編譯失敗、
 // 不會有測試轉紅，只會讓稽核從那天起少記或多記欄位。
 func ScopeProductStatus() []string { return []string{"status"} }
-
-// ScopePostPublishState is /posts/{id}/publish 與 /unpublish 的比較範圍。三個欄位而
-// 不是一個：一次發布同時寫 publish_status 與 published_at，排程則同時寫
-// scheduled_publish_at —— 少列任何一欄，那一欄的真實變更就不會出現在稽核上。
-func ScopePostPublishState() []string {
-	return []string{"publishStatus", "scheduledPublishAt", "publishedAt"}
-}
 
 // Diff produces changed_fields from two projections.
 //
@@ -227,8 +197,8 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []*
 		// 變成沒有」——它不是變更，而它汙染的是不可竄改的稽核列。
 		//
 		// 建立類沒有 before（orchestrator 對 spec.ReadBefore == nil 給空投影），而
-		// POST_CREATE 走全表比較，於是每建一則沒有配圖、沒有關聯商品的貼文都多記兩列
-		// imageKeys「0 張 → 0 張」與 productIds「0 項 → 0 項」（dev 3 案獨立重現）。
+		// PRODUCT_CREATE 走全表比較，於是每建一件沒有圖片的商品都多記一列
+		// images「0 張 → 0 張」。
 		// 「從無到有」不受影響：after 有內容時兩側渲染必然不同，那一列照樣輸出。
 		//
 		// ⚠️ 兩側都在場時**不得**改用顯示值比較：truncate(60) 會讓只差在第 200 個字的
@@ -363,8 +333,6 @@ func enumLabel(enumName, value string) string {
 	switch enumName {
 	case "ProductStatus":
 		return codemeta.ProductStatusLabel(value)
-	case "PostPublishStatus":
-		return codemeta.PostPublishStatusLabel(value)
 	case "OrderStatus":
 		return codemeta.OrderStatusLabel(value)
 	case "DelegationAuditAction":

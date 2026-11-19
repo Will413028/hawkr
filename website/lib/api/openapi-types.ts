@@ -28,7 +28,7 @@ export function roleFromAccountType(t?: number | null): Role {
 }
 
 /* ---------- Post (Feed) ---------- */
-/** matches handler.PostProductData */
+/** matches `hawkr.social.v1alpha1.PostProduct` */
 export interface PostProductData {
 	// 64-bit TSID（> Number.MAX_SAFE_INTEGER）：api/json.ts 的 preserveBigInts 在
 	// parse 時保字串，後端亦已對貼文 DTO 的 id 加 ,string（gateway PR #967），故
@@ -56,7 +56,7 @@ export interface PostViewerState {
 	actor?: PostViewerActor;
 }
 
-/** matches handler.PostListItemData / handler.MyPostListItemData */
+/** matches the list-item view of `hawkr.social.v1alpha1.Post` */
 export interface PostListItem {
 	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
 	etag?: string;
@@ -114,7 +114,7 @@ export interface PostListItem {
 	scheduledPublishAt?: string;
 }
 
-/** matches handler.PostDetailData */
+/** matches the detail view of `hawkr.social.v1alpha1.Post` */
 export interface PostDetail {
 	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
@@ -138,7 +138,7 @@ export interface PostDetail {
 }
 
 /**
- * matches handler.MyPostDetailData：店主讀自己的單篇貼文（`/app/sellers/posts/{id}`）。
+ * matches `hawkr.social.v1alpha1.Post` 的店主視角：店主讀自己的單篇貼文。
  * 發布狀態與平台下架資訊同 `PostListItem` 的同名欄位；只有店主路徑帶它們。
  */
 export interface MyPostDetail extends PostDetail {

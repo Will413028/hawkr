@@ -1330,7 +1330,6 @@ SSE event comment.batch:
 | `SSE_RING_BUFFER_TTL` | gateway | `5m` | 環形 buffer TTL |
 | `SSE_BATCH_WINDOW_MS` | gateway | `50` | 同 topic 事件合併視窗（毫秒，見 §5.7） |
 | `SSE_MAX_CONN_PER_POD` | gateway | `5000` | per-pod 總連線上限 |
-| `SSE_MAX_CONN_PER_SUBJECT` | gateway | `5` | per-subject（匿名 channel）連線上限。維度是 rate-limit subject（`v:<ip>` / `s:ssr` / `s:ci`，見 [01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)）而非裸 client IP —— 網頁 SSR／CI 一個出口位址背後是無限多個人（#2264） |
 | `SSE_MAX_CONN_PER_USER` | gateway | `3` | per-user（登入 channel）連線上限 |
 | `SSE_MAX_CONN_LIFETIME` | gateway | `8m` | 單條連線在 server 端的最長存活時間，逾時由 GC 主動收掉、client 自行重連。**必須短於中間層的 stream timeout（實測 600s）**，主導權才在 origin；又必須明顯長於 `SSE_RING_BUFFER_TTL` 以免重連時 `bufferMiss` 觸發整頁刷新。`0` = 停用（§5.5.1） |
 | `SSE_EVICT_WINDOW` | gateway | `30s` | 滿座回收的額度視窗；每個 cap key 每窗最多回收 `2 × 該 key 上限` 次，用完回到 429（§5.5.1） |

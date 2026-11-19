@@ -248,8 +248,8 @@ func (h *Holder) GetProductReviews(c *gin.Context) {
 	withImages := c.Query("with_images") == "true"
 	sortBy := c.DefaultQuery("sort_by", "latest")
 
-	// B-135 block filter：viewer 的 CURRENT buyer_id，跟 seller_forum.go
-	// GetSellerForum 同款 resolveOptionalBuyerID pattern。D11：只過濾 list，
+	// B-135 block filter：viewer 的 CURRENT buyer_id，
+	// 走 resolveOptionalBuyerID。D11：只過濾 list，
 	// 不影響 stats 聚合（review-service handler.go 只在 ViewerId!=0 時才過濾列表）。
 	loginRoleRaw, _ := c.Get("loginRole")
 	loginRole, _ := loginRoleRaw.(int)

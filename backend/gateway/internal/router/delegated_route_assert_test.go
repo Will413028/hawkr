@@ -105,7 +105,7 @@ func delegatedAdmHostRoutes() []string {
 // 「登錄 ≡ 掛載」——漏登錄的症狀是那一支端點被節流時回裸 429，前端拿到一個沒登錄的碼，
 // 不會有任何東西轉紅。
 //
-// 前綴式判斷之所以不行也在這裡看得見：20 支資源端點掛在 /sellers/:store_id/ 這一段，
+// 前綴式判斷之所以不行也在這裡看得見：14 支資源端點掛在 /sellers/:store_id/ 這一段，
 // 而同一段也可以掛非代行的端點，前綴規則分不出兩者，所以這裡逐條對照登錄與掛載。
 func TestDelegatedRoutesAreAllRateLimitRegistered(t *testing.T) {
 	gin.SetMode(gin.TestMode)

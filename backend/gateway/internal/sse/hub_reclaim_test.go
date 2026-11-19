@@ -113,7 +113,7 @@ func TestHub_ZombieConnections_DoNotStarveUserCap(t *testing.T) {
 	}
 
 	// cap 仍然名副其實：同時存活的位子數不得超過上限。
-	if got := hub.CapGroupSize(uid, ""); got != cfg.MaxConnPerUser {
+	if got := hub.CapGroupSize(uid); got != cfg.MaxConnPerUser {
 		t.Errorf("per-user 佔位數 = %d，want %d（cap 必須仍然是硬上限）", got, cfg.MaxConnPerUser)
 	}
 	if got := hub.ActiveConnections(); got != int64(cfg.MaxConnPerUser) {
@@ -141,14 +141,14 @@ func TestHub_MaxLifetime_ReclaimsZombiesAndFreesSlot(t *testing.T) {
 		}
 		conns = append(conns, c)
 	}
-	if got := hub.CapGroupSize(uid, ""); got != 3 {
+	if got := hub.CapGroupSize(uid); got != 3 {
 		t.Fatalf("前置：佔位數 = %d，want 3", got)
 	}
 
 	// --- 時間維度 (a)：還沒到上限，GC 不該動任何東西 ---
 	clk.Advance(cfg.MaxConnLifetime - time.Second)
 	hub.runGC()
-	if got := hub.CapGroupSize(uid, ""); got != 3 {
+	if got := hub.CapGroupSize(uid); got != 3 {
 		t.Fatalf("未達 MaxConnLifetime 就被回收：佔位數 = %d，want 3", got)
 	}
 	for i, c := range conns {
@@ -166,7 +166,7 @@ func TestHub_MaxLifetime_ReclaimsZombiesAndFreesSlot(t *testing.T) {
 			t.Errorf("conn %d 超過 MaxConnLifetime 後仍未被回收", i)
 		}
 	}
-	if got := hub.CapGroupSize(uid, ""); got != 0 {
+	if got := hub.CapGroupSize(uid); got != 0 {
 		t.Errorf("回收後佔位數 = %d，want 0（位子沒有真的被釋放）", got)
 	}
 	if got := hub.ActiveConnections(); got != 0 {
@@ -180,7 +180,7 @@ func TestHub_MaxLifetime_ReclaimsZombiesAndFreesSlot(t *testing.T) {
 			t.Fatalf("回收後第 %d 條重用 slot 失敗: %v", i, err)
 		}
 	}
-	if got := hub.CapGroupSize(uid, ""); got != cfg.MaxConnPerUser {
+	if got := hub.CapGroupSize(uid); got != cfg.MaxConnPerUser {
 		t.Errorf("重用後佔位數 = %d，want %d", got, cfg.MaxConnPerUser)
 	}
 }
@@ -236,7 +236,7 @@ func TestHub_EvictBudget_ExhaustedStillRejects(t *testing.T) {
 	}
 
 	// 全程佔位數不得超過 cap。
-	if got := hub.CapGroupSize(uid, ""); got != cfg.MaxConnPerUser {
+	if got := hub.CapGroupSize(uid); got != cfg.MaxConnPerUser {
 		t.Errorf("佔位數 = %d，want %d", got, cfg.MaxConnPerUser)
 	}
 
@@ -280,13 +280,13 @@ func TestHub_EvictedConnection_LateUnsubscribeIsNoop(t *testing.T) {
 	if got := hub.ActiveConnections(); got != before {
 		t.Errorf("遲來的 Unsubscribe 改變了 ActiveConnections：%d → %d", before, got)
 	}
-	if got := hub.CapGroupSize(uid, ""); got != 1 {
+	if got := hub.CapGroupSize(uid); got != 1 {
 		t.Errorf("遲來的 Unsubscribe 動到了佔位數：got %d，want 1（winner 仍在）", got)
 	}
 
 	// winner 正常退出後位子必須真的回到 0。
 	hub.Unsubscribe(winner)
-	if got := hub.CapGroupSize(uid, ""); got != 0 {
+	if got := hub.CapGroupSize(uid); got != 0 {
 		t.Errorf("winner 退出後佔位數 = %d，want 0", got)
 	}
 	if got := hub.ActiveConnections(); got != 0 {
@@ -311,10 +311,10 @@ func TestHub_CapIsPerKey(t *testing.T) {
 	if isClosed(a) || isClosed(b) {
 		t.Error("不同 accountId 之間不該互相回收")
 	}
-	if got := hub.CapGroupSize(1001, ""); got != 1 {
+	if got := hub.CapGroupSize(1001); got != 1 {
 		t.Errorf("uid 1001 佔位數 = %d，want 1", got)
 	}
-	if got := hub.CapGroupSize(1002, ""); got != 1 {
+	if got := hub.CapGroupSize(1002); got != 1 {
 		t.Errorf("uid 1002 佔位數 = %d，want 1", got)
 	}
 }

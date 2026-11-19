@@ -549,7 +549,7 @@ func TestRequireDelegatedRecordsQ2Q3Denial(t *testing.T) {
 			}
 			in := audit.intents[0]
 			if in.GetAction() != "PRODUCT_READ" {
-				t.Errorf("action = %q，預期 PRODUCT_READ（四個 READ action 是拒絕列唯一的合法值）", in.GetAction())
+				t.Errorf("action = %q，預期 PRODUCT_READ（三個 READ action 是拒絕列唯一的合法值）", in.GetAction())
 			}
 			if in.GetResourceType() != "product" || in.GetResourceId() != "77" {
 				t.Errorf("resourceType/resourceId = %q/%q，預期 product/77", in.GetResourceType(), in.GetResourceId())
@@ -606,8 +606,6 @@ func TestGuardDenialFaceMatchesRoute(t *testing.T) {
 			"/g/sellers/2685914682/storefront", "STOREFRONT_READ", "storefront", ""},
 		{"商品", authz.AdminCapProductsPublish, "/sellers/:store_id/products/:product_id/publish",
 			"/g/sellers/2685914682/products/77/publish", "PRODUCT_READ", "product", "77"},
-		{"貼文", authz.AdminCapPostsWrite, "/sellers/:store_id/posts/:post_id",
-			"/g/sellers/2685914682/posts/88", "POST_READ", "post", "88"},
 		// 訂單編號不是數字，delegation 模組的 resourceNameForRow 會把它轉存進
 		// resource_name，那一列因此仍指得回那筆訂單。
 		{"訂單", authz.AdminCapOrdersRead, "/sellers/:store_id/orders/:order_no",

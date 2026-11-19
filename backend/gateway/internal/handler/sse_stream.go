@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	"github.com/Will413028/hawkr/gateway/internal/realtime"
 	"github.com/Will413028/hawkr/gateway/internal/response"
 	"github.com/Will413028/hawkr/gateway/internal/sse"
@@ -41,7 +40,7 @@ func (h *Holder) StreamNotifications(c *gin.Context) {
 	// 賣家是當前 store_id。發布端與訂閱端都固定使用這個 canonical 空間；歷史 retired
 	// stint 不透過 account_id fallback 重新曝光，交由 lifecycle cleanup 處理。
 	//
-	// 解析後的 id 同時當作 serveSSE 的授權主體與 per-user 連線上限鍵，（同一條連線的身分只有一個）。
+	// 解析後的 id 同時當作 serveSSE 的授權主體與 per-user 連線上限鍵（同一條連線的身分只有一個）。
 	//
 	// ⚠️ 授權在下面那兩行就決定完了：topic 與授權主體都出自同一個 streamUserID，
 	// 所以 NotificationChannel.AuthorizeSubscribe 的 topic 比對在這條路徑上恆等。
@@ -58,17 +57,17 @@ func (h *Holder) StreamNotifications(c *gin.Context) {
 	}
 
 	topic := realtime.TopicNotificationUser(streamUserID)
-	h.serveSSE(c, h.NotifChannel, topic, streamUserID, nil, sse.Viewer{})
+	h.serveSSE(c, h.NotifChannel, topic, streamUserID)
 }
 
-// serveSSE is the shared subscribe-and-serve flow for any channel。personalizer 與 viewer 為這條連線專屬的 payload 個人化（nil = 共用）。
+// serveSSE is the shared subscribe-and-serve flow for any channel。
 //  1. AuthorizeSubscribe — Channel-defined。⚠️ topic 與 accountID 都由呼叫端決定，
 //     兩者同源時（StreamNotifications）它只驗得出參數一致，驗不出身分正確——身分的
 //     正確性是呼叫端推導 accountID 時就要保證的事。
 //  2. Hub.Subscribe — cap enforcement
 //  3. ServeSSE — write loop
 //  4. Hub.Unsubscribe in defer
-func (h *Holder) serveSSE(c *gin.Context, ch realtime.Channel, topic string, accountID int64, personalizer sse.Personalizer, viewer sse.Viewer) {
+func (h *Holder) serveSSE(c *gin.Context, ch realtime.Channel, topic string, accountID int64) {
 	if err := ch.AuthorizeSubscribe(c.Request.Context(), topic, accountID); err != nil {
 		response.Forbidden(c, "forbidden")
 		return
@@ -82,34 +81,20 @@ func (h *Holder) serveSSE(c *gin.Context, ch realtime.Channel, topic string, acc
 
 	conn := sse.NewConnection(topic, c.Writer, flusher, c.GetHeader("Last-Event-ID"))
 	conn.AccountID = accountID
-	conn.Personalizer = personalizer
-	conn.Viewer = viewer
-	if accountID == 0 {
-		// Anonymous connections are capped per rate-limit subject, not per peer
-		// address: the website's SSR worker and the CI runner each present one
-		// address for an unbounded number of people, so an address key would let
-		// five of them exhaust the cap for everybody (01 設計書 §3.2.8).
-		conn.Subject, _ = middleware.RateLimitSubject(c)
-	}
 
 	replay, bufferMiss, err := h.SSEHub.Subscribe(conn)
 	if err != nil {
 		switch {
 		case errors.Is(err, sse.ErrPodCapReached):
 			response.ServiceUnavailable(c, "sse pod capacity reached")
-		case errors.Is(err, sse.ErrSubjectCapReached), errors.Is(err, sse.ErrUserCapReached):
+		case errors.Is(err, sse.ErrUserCapReached):
 			// This 429 never passes through the rate-limit middleware — SSE is
 			// tierExempt and the middleware early-returns — so the retry hints
 			// have to be written here. It is also the only 429 with a known
 			// front-end consumer (the web SSE client, which otherwise falls back
 			// to a fixed 8s wait), so skipping it would make the whole
 			// Retry-After change a no-op for real users.
-			perUser, perSubject := h.SSEHub.ConnCaps()
-			connLimit := perSubject
-			if errors.Is(err, sse.ErrUserCapReached) {
-				connLimit = perUser
-			}
-			response.SetRateLimitHeaders(c, connLimit, 0, response.ConnCapRetryAfter)
+			response.SetRateLimitHeaders(c, h.SSEHub.ConnCap(), 0, response.ConnCapRetryAfter)
 			response.Err(c, http.StatusTooManyRequests, http.StatusTooManyRequests, "sse connection cap reached")
 		default:
 			response.Err(c, http.StatusInternalServerError, http.StatusInternalServerError, err.Error())

@@ -83,7 +83,7 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerAddressRoutes(app, h)
 	registerDevRoutes(public, h)
 
-	// ADM 代行營運（56 號）：5 支走 ADM session、20 支走 operation credential。
+	// ADM 代行營運（56 號）：14 支走 ADM session、20 支走 operation credential。
 	registerDelegatedOperationRoutes(admin, adminNoAuth, h)
 
 	// Webhook 模擬器（代理到 payuni-webhook-service，開發測試工具）
