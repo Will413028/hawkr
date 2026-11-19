@@ -67,3 +67,10 @@
 - **停權的店**：停權的店以店家身分在自己的內容上不能留言、回覆、按讚、編輯；可以下架、刪除，並讀取自己的貼文與留言。不退回本人身分。（取代決策段「停權的店在自己的內容上以店家身分動作照舊被擋」：舊寫法只涵蓋留言與回覆，按讚、編輯、刪除沒有分類，而且停權賣家進不了貼文列表，下架與刪除的按鈕按不到。）新增類（`CapMarketing`）擋下，收縮類（`CapContentContract`）放行，被拒回 `SELLER_SUSPENDED`。
 - **封鎖與檢舉處分**：第 2 刀不在舊 social 做，併入 A7。個人封鎖存 buyer 模組、店家封鎖存 seller 模組（簡報 D2）；檢舉與處分由新的 `moderation` 模組負責，對象是店家的處分走 seller 治理的措施（簡報 D5′）。後果段「第 2 刀……排在 3a-② 之後」不再成立，封鎖的過渡行為（以呼叫者此刻推導出的身分 id 比對，不分 kind）維持到 A7 取代它。
 - **脈絡更正**：脈絡段「舊 Java 消費者仍保存 BIGINT 的身分欄，兩份 `social.proto` 必須逐字相同」的後半不成立：Java 沒有呼叫 social（0 個 `.java` 檔，`events.csv` 也沒有 Java 消費 social 事件），所以「兩份 proto 逐字相同」不是外部約束。「ID 在過渡期是各自連號的 bigint」（ADR `2026-09-25` 的過渡規則）仍成立，決策與 (kind, id) 的理由不變。
+
+## 修訂：A7 完成後的終點（2026-11-19，A7-D25 Will 2026-11-16；S1 Will 2026-10-18）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表。
+
+- **legacy 的 SocialService 不寫、刪除**：A7 不實作舊 `SocialService`，`backend/api/proto/social`、`pkg/proto/social`、Java 的 `social.proto` 與 `services/social-service` 在 A7-5 刪除（S1、A7-5「刪除」段）。M1 的 `actor_kind SMALLINT` 過渡寫法隨 social-service 退場，終點是同一條決策的 `actor_kind TEXT CHECK IN ('BUYER','STORE')`。
+- **代行貼文的 service 是 `SocialDelegatedService`**（A7-D25 第 1 點）：由資源模組 social 擁有，不併進 `SocialAppService`；代行與店主的差別在憑證層，身分仍由伺服器依資源歸屬推導，I3 不變。上一節列的三個 service 之外，A7 的社群 API 因此有四個：`SocialPublicService`、`SocialAppService`、`SocialAdminService`、`SocialDelegatedService`。

@@ -127,3 +127,9 @@ gRPC status 分不出它們；而前端 message 一律不透傳 ⇒ 語意只能
 - 代行的授權判定只有一個問答點；任何「在 handler 裡自己判一次」的寫法都是回歸。
 - `/api/v1/admin/**` 這個前綴不再蘊含 `requireAdmin`（見
   `2026-09-18-adm-delegation-workspace-host.md` 的身分邊界一節），因此需要具名白名單的 boot 斷言。
+
+## 修訂：代行貼文改走 Connect 的 SocialDelegatedService（2026-11-19，A7-D25 Will 2026-11-16）
+
+原決策段保留歷史；計畫 `backend/docs/plans/2026-10-18-a7-social.md`「決定」表 S1、A7-D25、A7-D26、A7-D27。
+
+「影響範圍」列的 social 寫入 RPC 不再經 gateway 與 `SocialClient`：代行貼文的 6 條路由在 A7 改走 Connect 的 `SocialDelegatedService`（S1），gateway 的路由與 `admin_delegated_post.go` 隨 A7-4e／A7-5 刪除。代行者由資源模組的寫入方法明確收參數，不經 ctx 隱含傳遞（A7-D27）；稽核由 delegation 同 transaction 訂閱資源模組事件寫入（A7-D26）。身分不冒用賣家的原則（第 1 節）不變。商品、訂單的代行由 A10 沿用同一模型。
