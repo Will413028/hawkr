@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	agentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
@@ -48,13 +47,6 @@ var (
 // 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
 var tierAppLogin = rateTier{name: "app-login", visitor: 30}
 
-// vendor portal 的邀請 secret 是匿名來源猜得到的憑證：預覽與兌換共用同一個級別（同一個 name，每個來源一個計數器，不是各 20 次），
-// 每個來源 5 分鐘 20 次；Google 驗證更窄，每個來源 10 分鐘 10 次。SSR 與 CI 的身分沒有加倍：它們代表很多人，更不能共用額度。
-var (
-	tierVendorPortalInvite = rateTier{name: "vendor-portal-invite", window: 5 * time.Minute, visitor: 20}
-	tierVendorPortalVerify = rateTier{name: "vendor-portal-verify", window: 10 * time.Minute, visitor: 10}
-)
-
 // tierReportSubmit 是匿名食安通報以來源 IP 計數的兩個時間窗（httpseller.ReportSubmitQuotas；登入的通報以帳號在 handler 計數）。
 // 通報只由瀏覽器或 App 送出，SSR 與 CI 的身分沒有加倍。不加 captcha：食安通報是不能被第三方依賴擋住的緊急管道（同一則決策）。
 var tierReportSubmit = func() []rateTier {
@@ -70,9 +62,6 @@ var procedureTiers = map[string][]rateTier{
 	sellerconnect.SellerPublicServiceRecordProductViewProcedure:            {tierProductView},
 	socialconnect.SocialPublicServiceRecordPostViewProcedure:               {tierPostView},
 	sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure: tierReportSubmit,
-	agentconnect.VendorPortalPublicServicePreviewInviteProcedure:           {tierVendorPortalInvite},
-	agentconnect.VendorPortalPublicServiceExchangeInviteProcedure:          {tierVendorPortalInvite},
-	agentconnect.VendorPortalInviteeServiceVerifySessionProcedure:          {tierVendorPortalVerify},
 	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure:       {tierAppLogin},
 	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:          {tierAppLogin},
 }

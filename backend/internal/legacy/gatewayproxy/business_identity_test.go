@@ -157,7 +157,7 @@ func TestForwardBusinessIdentity(t *testing.T) {
 			h, err := New("http://gateway.invalid", func(context.Context) (Caller, bool) {
 				// 入口放進 ctx 的 BuyerID 一律被忽略：forwarder 自己解析。
 				return Caller{Principal: identity.Principal{Kind: kind, ID: 7, Roles: tc.roles}, BuyerID: 999}, !tc.guest
-			}, noVendorSession, buyerLookupFunc(func(_ context.Context, id int64) (int64, error) {
+			}, buyerLookupFunc(func(_ context.Context, id int64) (int64, error) {
 				buyerCalls++
 				if id != 7 {
 					t.Fatalf("account = %d", id)
@@ -239,7 +239,7 @@ func TestForwardedHeaderFollowsTheKYCCondition(t *testing.T) {
 		l := sellerLookupFunc(func(context.Context, int64) (seller.Store, error) { return st, nil })
 		h, err := New("http://gateway.invalid", func(context.Context) (Caller, bool) {
 			return Caller{Principal: identity.Principal{Kind: identity.PrincipalAccount, ID: 7, Roles: []identity.Role{identity.RoleSeller}}}, true
-		}, noVendorSession, buyerLookupFunc(func(context.Context, int64) (int64, error) { return 71, nil }), l, nil, slog.New(slog.DiscardHandler))
+		}, buyerLookupFunc(func(context.Context, int64) (int64, error) { return 71, nil }), l, nil, slog.New(slog.DiscardHandler))
 		if err != nil {
 			t.Fatal(err)
 		}

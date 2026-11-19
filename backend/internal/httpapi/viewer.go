@@ -28,9 +28,6 @@ var publicViewerDependent = map[string]bool{
 
 	"/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport": false,
 
-	"/hawkr.agent.v1alpha1.VendorPortalPublicService/PreviewInvite":  false,
-	"/hawkr.agent.v1alpha1.VendorPortalPublicService/ExchangeInvite": false,
-
 	"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners": false,
 	"/hawkr.content.v1alpha1.ContentPublicService/CheckAppVersion": false,
 

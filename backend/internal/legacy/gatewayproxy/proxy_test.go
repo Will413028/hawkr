@@ -17,16 +17,11 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
 type callerKey struct{}
-
-func noVendorSession(*http.Request, int64) (agent.SessionInfo, bool, error) {
-	return agent.SessionInfo{}, false, nil
-}
 
 func callerOf(ctx context.Context) (Caller, bool) {
 	c, ok := ctx.Value(callerKey{}).(Caller)
@@ -38,7 +33,7 @@ func start(t *testing.T, gateway http.Handler, caller *Caller) *httptest.Server 
 	t.Helper()
 	gw := httptest.NewServer(gateway)
 	t.Cleanup(gw.Close)
-	p, err := New(gw.URL, callerOf, noVendorSession, emptyBusiness{}, emptyBusiness{}, sdktrace.NewTracerProvider(), slog.New(slog.DiscardHandler))
+	p, err := New(gw.URL, callerOf, emptyBusiness{}, emptyBusiness{}, sdktrace.NewTracerProvider(), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +235,7 @@ func TestMultipartBodiesStreamThrough(t *testing.T) {
 }
 
 func TestGatewayDownIsA503(t *testing.T) {
-	p, err := New("http://127.0.0.1:1", callerOf, noVendorSession, emptyBusiness{}, emptyBusiness{}, nil, slog.New(slog.DiscardHandler))
+	p, err := New("http://127.0.0.1:1", callerOf, emptyBusiness{}, emptyBusiness{}, nil, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +247,7 @@ func TestGatewayDownIsA503(t *testing.T) {
 }
 
 func TestNewRejectsABadURL(t *testing.T) {
-	if _, err := New("localhost:9900", callerOf, noVendorSession, emptyBusiness{}, emptyBusiness{}, nil, slog.New(slog.DiscardHandler)); err == nil {
+	if _, err := New("localhost:9900", callerOf, emptyBusiness{}, emptyBusiness{}, nil, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("沒有 scheme 的網址應該失敗")
 	}
 }
@@ -262,4 +257,22 @@ type emptyBusiness struct{}
 func (emptyBusiness) CurrentBuyerID(context.Context, int64) (int64, error) { return 0, nil }
 func (emptyBusiness) CurrentStore(context.Context, int64) (seller.Store, error) {
 	return storeIn(seller.Active), nil
+}
+
+func TestVendorPortalHeadersFromClientsAreNeverForwarded(t *testing.T) {
+	var seen http.Header
+	front := start(t, http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.Header.Clone() }), nil)
+	get(t, front.URL+"/api/v1/public/vendor_portal/rfqs/42/x", map[string]string{
+		"X-Vendor-Portal-Rfq-Recipient-Id": "42",
+		"x-vendor-portal-verified-email":   "attacker@example.com",
+		"X-Other":                          "kept",
+	})
+	for k := range seen {
+		if strings.HasPrefix(strings.ToLower(k), "x-vendor-portal-") {
+			t.Errorf("轉給 gateway 的請求帶著 %s", k)
+		}
+	}
+	if seen.Get("X-Other") != "kept" {
+		t.Errorf("無關的 header 被刪掉：%v", seen)
+	}
 }

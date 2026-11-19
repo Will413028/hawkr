@@ -129,10 +129,6 @@ var customerEffects = map[string]Effect{
 	// SellerReportPublicService
 	"/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport": EffectWrite,
 
-	// VendorPortalPublicService
-	"/hawkr.agent.v1alpha1.VendorPortalPublicService/PreviewInvite":  EffectRead,
-	"/hawkr.agent.v1alpha1.VendorPortalPublicService/ExchangeInvite": EffectWrite,
-
 	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
 	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary": EffectRead,
 	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":        EffectRead,
@@ -142,10 +138,6 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost":      EffectWrite,
 	"/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost":    EffectWrite,
 	"/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost":     EffectWrite,
-
-	// VendorPortalInviteeService
-	"/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession":    EffectRead,
-	"/hawkr.agent.v1alpha1.VendorPortalInviteeService/VerifySession": EffectWrite,
 
 	// ContentPublicService
 	"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners": EffectRead,

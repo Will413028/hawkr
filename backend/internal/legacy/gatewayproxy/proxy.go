@@ -26,7 +26,6 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/accounttype"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerreason"
-	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -50,20 +49,9 @@ const (
 	headerActiveRole         = "X-Active-Role"
 )
 
-// vendor portal 的 header（gateway 讀它們重建供應商 session 的身分，過渡到 A9 把 RFQ 路由改成 Connect 為止）。入口對每個轉發的
-// 請求先刪掉所有以 VendorPortalHeaderPrefix 開頭的 header（不分大小寫），只在 VendorPortalRFQPrefix 底下、路徑的收件人 ID 那張邀請的
-// cookie 是有效 session 而且 session 的收件人就是那個 ID 時設上（路徑沒有合法的 ID、別張邀請的 cookie 都不設）。
-const (
-	VendorPortalHeaderPrefix = "X-Vendor-Portal-"
-	// VendorPortalRFQPrefix 是需要供應商 session 的 gateway 路由。
-	VendorPortalRFQPrefix = "/api/v1/public/vendor_portal/rfqs/"
-
-	HeaderVendorRfqRecipientID     = "X-Vendor-Portal-Rfq-Recipient-Id"
-	HeaderVendorSessionID          = "X-Vendor-Portal-Session-Id"
-	HeaderVendorVerificationMethod = "X-Vendor-Portal-Verification-Method"
-	HeaderVendorVerifiedEmail      = "X-Vendor-Portal-Verified-Email"
-	HeaderVendorVerifiedAt         = "X-Vendor-Portal-Verified-At"
-)
+// vendorPortalHeaderPrefix 是 gateway 的供應商入口讀的 header 前綴。單體不再驗證供應商 session，也就不會設這些 header；
+// gateway 在這些路由刪除之前仍信任它們，所以入口仍要刪掉 client 帶來的（不分大小寫）。
+const vendorPortalHeaderPrefix = "X-Vendor-Portal-"
 
 // 連 gateway 的逾時。SSE 與 WebSocket 會長時間佔著連線，所以不設整體的逾時，只限制連線與等到回應 header 的時間。
 const (
@@ -145,36 +133,15 @@ func capabilitiesHeader(caps []seller.Capability) string {
 	return strings.Join(tokens, ",")
 }
 
-// VendorSessionOf 驗證請求帶的、rfqRecipientID 那張邀請的 vendor portal session（cookie）：有效回 (session, true, nil)；沒有
-// cookie 或 session 不可用回 (零值, false, nil)，gateway 會回 401；其他錯誤（資料庫等）回 error，入口回 503。
-type VendorSessionOf func(r *http.Request, rfqRecipientID int64) (agent.SessionInfo, bool, error)
-
-// vendorRecipientID 解析 VendorPortalRFQPrefix 底下路徑的收件人 ID（路徑的第一段）：只接受正整數的十進位寫法，其他回 false。
-func vendorRecipientID(path string) (int64, bool) {
-	rest, ok := strings.CutPrefix(path, VendorPortalRFQPrefix)
-	if !ok {
-		return 0, false
-	}
-	segment, _, _ := strings.Cut(rest, "/")
-	id, err := strconv.ParseInt(segment, 10, 64)
-	if err != nil || id <= 0 || strconv.FormatInt(id, 10) != segment {
-		return 0, false
-	}
-	return id, true
-}
-
 type forwarder struct {
 	proxy    *httputil.ReverseProxy
 	callerOf CallerOf
-	vendors  VendorSessionOf
 	buyers   BuyerLookup
 	sellers  SellerLookup
 	log      *slog.Logger
 }
 
 type resolvedCallerKey struct{}
-
-type vendorSessionKey struct{}
 
 func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c, ok := f.callerOf(r.Context())
@@ -216,20 +183,6 @@ func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c = Caller{}
 	}
 	ctx := context.WithValue(r.Context(), resolvedCallerKey{}, c)
-	if id, ok := vendorRecipientID(r.URL.Path); ok {
-		info, valid, err := f.vendors(r, id)
-		if err != nil {
-			if r.Context().Err() != nil {
-				return // client 自己斷線
-			}
-			f.log.ErrorContext(r.Context(), "gatewayproxy：驗證 vendor portal session 失敗", "path", r.URL.Path, "error", err)
-			unavailable(w)
-			return
-		}
-		if valid && info.RfqRecipientID == id {
-			ctx = context.WithValue(ctx, vendorSessionKey{}, info)
-		}
-	}
 	f.proxy.ServeHTTP(w, r.WithContext(ctx))
 }
 
@@ -246,9 +199,9 @@ func internalError(w http.ResponseWriter) {
 }
 
 // New 建立轉給 gateway 的 handler。gatewayURL 例如 http://127.0.0.1:9900。
-func New(gatewayURL string, callerOf CallerOf, vendors VendorSessionOf, buyers BuyerLookup, sellers SellerLookup, tp trace.TracerProvider, log *slog.Logger) (http.Handler, error) {
-	if callerOf == nil || vendors == nil {
-		return nil, errors.New("gatewayproxy：需要 CallerOf 與 VendorSessionOf")
+func New(gatewayURL string, callerOf CallerOf, buyers BuyerLookup, sellers SellerLookup, tp trace.TracerProvider, log *slog.Logger) (http.Handler, error) {
+	if callerOf == nil {
+		return nil, errors.New("gatewayproxy：需要 CallerOf")
 	}
 	target, err := url.Parse(gatewayURL)
 	if err != nil || target.Scheme == "" || target.Host == "" {
@@ -269,8 +222,7 @@ func New(gatewayURL string, callerOf CallerOf, vendors VendorSessionOf, buyers B
 			ok := c.Principal.ID > 0
 			StripSessionCredentials(pr.Out.Header)
 			SetIdentity(pr.Out.Header, c, ok)
-			info, valid := pr.In.Context().Value(vendorSessionKey{}).(agent.SessionInfo)
-			SetVendorSession(pr.Out.Header, info, valid)
+			stripVendorPortalHeaders(pr.Out.Header)
 		},
 		// 串流（SSE）逐筆送出。
 		FlushInterval: -1,
@@ -285,7 +237,7 @@ func New(gatewayURL string, callerOf CallerOf, vendors VendorSessionOf, buyers B
 			unavailable(w)
 		},
 	}
-	return &forwarder{proxy: proxy, callerOf: callerOf, vendors: vendors, buyers: buyers, sellers: sellers, log: log}, nil
+	return &forwarder{proxy: proxy, callerOf: callerOf, buyers: buyers, sellers: sellers, log: log}, nil
 }
 
 // SessionCookie 是單體 session cookie 的名稱，必須等於 rpc.SessionCookie（legacy 不依賴 httpapi，httpapi 的 TestGatewayProxyStripsTheSessionCookieName 守住兩者相同）。
@@ -351,22 +303,11 @@ func SetIdentity(h http.Header, c Caller, ok bool) {
 	}
 }
 
-// SetVendorSession 刪掉 h 裡 client 帶來的所有 X-Vendor-Portal-* header（header 名稱不分大小寫），入口驗證過 session 時（ok）
-// 再設上收件人與 session，session 已驗證時加上驗證紀錄；沒有驗證時不設驗證紀錄的三個 header。
-func SetVendorSession(h http.Header, info agent.SessionInfo, ok bool) {
+func stripVendorPortalHeaders(h http.Header) {
+	prefix := strings.ToLower(vendorPortalHeaderPrefix)
 	for k := range h {
-		if strings.HasPrefix(strings.ToLower(k), strings.ToLower(VendorPortalHeaderPrefix)) {
+		if strings.HasPrefix(strings.ToLower(k), prefix) {
 			delete(h, k)
 		}
-	}
-	if !ok {
-		return
-	}
-	h.Set(HeaderVendorRfqRecipientID, strconv.FormatInt(info.RfqRecipientID, 10))
-	h.Set(HeaderVendorSessionID, info.SessionID.String())
-	if v := info.Verification; v != nil {
-		h.Set(HeaderVendorVerificationMethod, string(v.Method))
-		h.Set(HeaderVendorVerifiedEmail, v.Email)
-		h.Set(HeaderVendorVerifiedAt, v.At.UTC().Format(time.RFC3339Nano))
 	}
 }
