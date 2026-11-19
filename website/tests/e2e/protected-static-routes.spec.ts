@@ -50,9 +50,6 @@ const EXPECTED_FINAL_ROUTE: Partial<
 	"/seller-center": {
 		pathname: "/seller-center/dashboard",
 	},
-	"/seller-center/preview": {
-		pathname: `/seller-center/preview/${SELLER_FIXTURE_ID}`,
-	},
 	"/seller-center/shipments/anomalies": {
 		pathname: "/seller-center/orders",
 		search: "?tab=in_transit",
@@ -291,8 +288,8 @@ async function assertProtectedRoute(
 	expect(text, `${route} rendered an error/not-found shell`).not.toMatch(
 		ERROR_SHELL,
 	);
-	if (route === "/seller-center/preview") {
-		expect(text).not.toContain("商店缺少公開識別碼");
+	if (route.startsWith("/seller-center/preview")) {
+		expect(text).not.toContain("店面預覽暫時載入不到");
 	}
 	await assertNoResidualLoading(page, route);
 	await assertRenderedLinksSafe(page, route);
@@ -327,14 +324,14 @@ test.describe("authenticated protected static route smoke", {
 		// ⚠️ 下面的數字是**手寫 pin**，而路由本身是 `discoverAppPageRoutes` 自動掃出來的
 		// ⇒ 新增一個 page.tsx 就會讓它們對不上。改的時候先對帳增減量，
 		// 不要為了讓測試變綠而直接抄失敗訊息的數字。
-		// 賣家工作區 30 條（含封鎖買家頁 /seller-center/blocked-buyers），不含措施頁；措施與申覆列表 /seller/measures 是帳號層級
-		// （登入即可、不分工作區），單獨一條（ACCOUNT_ROUTES）。買家 23 ＋ 賣家 30 ＋ 帳號 1，
-		// 三類合計 54。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
+		// 賣家工作區 33 條（含封鎖買家頁 /seller-center/blocked-buyers、店面預覽四個分頁），不含措施頁；措施與申覆列表 /seller/measures 是帳號層級
+		// （登入即可、不分工作區），單獨一條（ACCOUNT_ROUTES）。買家 23 ＋ 賣家 33 ＋ 帳號 1，
+		// 三類合計 57。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
 		// 是動態路由，登記在 dynamic-route-catalog。
-		expect(ROUTES_BY_ROLE.seller).toHaveLength(30);
+		expect(ROUTES_BY_ROLE.seller).toHaveLength(33);
 		expect(ROUTES_BY_ROLE.seller).not.toContain("/seller-center/measures");
 		expect(ACCOUNT_ROUTES).toEqual(["/seller/measures"]);
-		expect(PROTECTED_STATIC_ROUTES).toHaveLength(54);
+		expect(PROTECTED_STATIC_ROUTES).toHaveLength(57);
 		expect(ROUTES_BY_ROLE.buyer).not.toContain("/account/find-sellers");
 		expect(ROUTES_BY_ROLE.buyer).toContain(
 			"/account/messages/assistant/procurement",
@@ -348,34 +345,9 @@ test.describe("authenticated protected static route smoke", {
 			test(`${role} ${route} renders for the matching single-role account`, async ({
 				page,
 				baseURL,
-				request,
 			}) => {
 				const appBaseURL = baseURL ?? "http://localhost:3000";
 				await prepareAuthenticatedPage(page, appBaseURL, role);
-				// /seller-center/preview redirects into /seller-center/preview/[id],
-				// whose server layout SSR-fetches the *live* public seller record for
-				// SELLER_FIXTURE_ID — a request Playwright cannot intercept. On a
-				// pre-launch prod backend that seller does not exist, so the layout
-				// legitimately notFound()s. Probe the same public endpoint and skip
-				// when the fixture seller is absent; the full render assertion still
-				// runs whenever the record exists (dev).
-				if (route === "/seller-center/preview") {
-					const probe = await request.get(
-						`/api/v1/public/sellers/${SELLER_FIXTURE_ID}`,
-						{ failOnStatusCode: false, timeout: 15_000 },
-					);
-					let sellerPresent = false;
-					if (probe.status() === 200) {
-						const body = (await probe.json().catch(() => null)) as {
-							data?: unknown;
-						} | null;
-						sellerPresent = Boolean(body?.data);
-					}
-					test.skip(
-						!sellerPresent,
-						"public seller storefront fixture absent (pre-launch prod)",
-					);
-				}
 				await assertProtectedRoute(page, route, appBaseURL);
 			});
 		}

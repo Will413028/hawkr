@@ -242,26 +242,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		fixture: "protected-placeholder",
 	},
 	{
-		pattern: "/seller-center/preview/[id]",
-		access: "seller",
-		fixture: "protected-placeholder",
-	},
-	{
-		pattern: "/seller-center/preview/[id]/messages",
-		access: "seller",
-		fixture: "protected-placeholder",
-	},
-	{
-		pattern: "/seller-center/preview/[id]/posts",
-		access: "seller",
-		fixture: "protected-placeholder",
-	},
-	{
-		pattern: "/seller-center/preview/[id]/reviews",
-		access: "seller",
-		fixture: "protected-placeholder",
-	},
-	{
 		pattern: "/seller-center/products/[id]/edit",
 		access: "seller",
 		fixture: "protected-placeholder",

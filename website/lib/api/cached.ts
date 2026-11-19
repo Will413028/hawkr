@@ -18,11 +18,9 @@ import {
 	fetchHotProducts,
 	fetchProducts,
 	fetchPublicProduct,
-	fetchSeller,
 	fetchSellerProducts,
 	fetchSellerReviewStats,
 	fetchSellerReviews,
-	fetchSellerStats,
 } from "./index";
 import { prerenderSafe } from "./prerender";
 
@@ -226,12 +224,6 @@ export async function getCachedSellerReviewStats(id: string) {
 	return settled(await readSellerReviewStats(id));
 }
 
-/** Public seller aggregates (`/public/sellers/{id}/stats`) — the only wire
- *  that carries `followers`; the base seller payload has no subscriber field. */
-export async function getCachedSellerStats(id: string) {
-	return settled(await readSellerStats(id));
-}
-
 async function readProduct(id: string) {
 	"use cache";
 	cacheTag(productTag(id));
@@ -240,31 +232,6 @@ async function readProduct(id: string) {
 		key: ["product", id],
 		endpoint: "/public/products/{id}",
 	});
-}
-
-async function readSeller(id: string) {
-	"use cache";
-	cacheTag(sellerTag(id));
-	applyCacheTier("SELLER_PROFILE");
-	return fillFetch("seller", () => fetchSeller(id, true), {
-		key: ["seller", id],
-		endpoint: "/public/sellers/{id}",
-	});
-}
-
-/** Every known caller immediately did `.catch(prerenderSafe(null))` — a
- * "not found" seller (invalid id, or the `generateStaticParams` sentinel) must
- * never be fatal to a prerender. Catching here instead of at each of the ~10
- * call sites means a caller can't ship without it (a missed `.catch` at one
- * such site took down the entire `next build` export when the seller-not-found
- * response moved off plain HTTP 404 — see backend SELLER_NOT_FOUND/9233).
- *
- * The `.catch` sits OUTSIDE the cached read so a failure is never stored as the
- * entry; `prerenderSafe` is a pure function of NEXT_PHASE / NODE_ENV / error
- * type (lib/api/prerender.ts), so a runtime 5xx still rethrows into every
- * awaiting caller. */
-export function getCachedSeller(id: string) {
-	return readSeller(id).then(settled).catch(prerenderSafe(null));
 }
 
 async function readStore(storeCode: string) {
@@ -290,7 +257,9 @@ async function readStore(storeCode: string) {
 
 /**
  * 店面頁的店家（`GetStore`，以網址的 store_code 讀）。沒有這家店回 null（可快取）；其他失敗照拋，
- * 在 prerender 階段以 `prerenderSafe` 降成 null，理由同 `getCachedSeller`。
+ * 在 prerender 階段以 `prerenderSafe` 降成 null：
+ * 沒有這家店（不存在的網址、`generateStaticParams` 的 sentinel）不能讓 prerender 失敗；`.catch` 放在快取讀取之外，
+ * 失敗不會被存成快取項，`prerenderSafe` 只看 NEXT_PHASE／NODE_ENV／錯誤型別，執行期的 5xx 仍會往上拋。
  */
 export function getCachedStore(storeCode: string) {
 	return readStore(storeCode).then(settled).catch(prerenderSafe(null));
@@ -308,16 +277,6 @@ async function readSellerReviewStats(id: string) {
 			endpoint: "/public/sellers/{id}/reviews/stats",
 		},
 	);
-}
-
-async function readSellerStats(id: string) {
-	"use cache";
-	cacheTag(sellerTag(id));
-	applyCacheTier("SELLER_PROFILE");
-	return fillFetch("seller-stats", () => fetchSellerStats(id), {
-		key: ["seller-stats", id],
-		endpoint: "/public/sellers/{id}/stats",
-	});
 }
 
 async function readProductReviews(id: string, page: number, pageSize: number) {

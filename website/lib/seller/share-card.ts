@@ -5,13 +5,13 @@ import { sellerCardUrl } from "@/lib/seo/urls";
 /**
  * 名片卡的輸入。兩個呼叫點的來源形狀不同，所以這裡只收「已經對映好」的欄位，
  * 呼叫端各自負責換名（見 SellerProfileV2 / SellerShareCardPreview）：
- *   - 公開賣家頁：`fetchSeller` 的前端顯示契約（`logo_url` → `logoUrl`）
+ *   - 公開賣家頁：`PublicStoreView` 的顯示欄位（`logo_url` → `logoUrl`）
  *   - 賣家後台：`GetMyStore` 的店家與表單（圖片是 `imageUri` 組好的網址）
  */
 export interface SellerShareSource {
 	storeId?: number | string | null;
 	city?: string | null;
-	/** Public seller wire → `coverKey` (objectKey SSOT, via fetchSeller). */
+	/** Public store cover objectKey (`PublicStoreView.coverImage`). */
 	coverImage?: string | null;
 	/** Seller-center cover display URL. resolveCdnUrl eats both. */
 	coverUrl?: string | null;

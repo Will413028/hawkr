@@ -63,8 +63,47 @@ export async function fetchPublicStore(
 	}
 	const store = res.store;
 	if (!store?.id) throw new Error("GetStore returned a store without id");
+	return storeViewOf(
+		{
+			id: store.id,
+			storeCode: store.storeCode,
+			storeName: store.storeName,
+			description: store.description,
+			prize: store.prize,
+			websiteUrl: store.websiteUrl,
+			logo: store.logo,
+			coverImage: store.coverImage,
+			townCode: store.townCode,
+		},
+		res.stats,
+	);
+}
+
+/** `PublicStore` 與店主端 `Store` 共有的欄位；兩邊的 town code 住在不同欄位，由呼叫端取出。 */
+export interface StoreViewFields {
+	id: string;
+	storeCode: string;
+	storeName: string;
+	description: string;
+	prize: string;
+	websiteUrl: string;
+	logo: Parameters<typeof imageUri>[0];
+	coverImage: Parameters<typeof imageUri>[0];
+	townCode: string;
+}
+
+/** 店家欄位與統計 → 店面頁元件用的形狀；統計欄位沒設就不帶，呈現層顯示「—」。 */
+export function storeViewOf(
+	store: StoreViewFields,
+	stats:
+		| {
+				followerCount?: number;
+				reviewCount?: number;
+				ratingAverage?: number;
+		  }
+		| undefined,
+): PublicStoreView {
 	const town = store.townCode ? townByCode(store.townCode) : undefined;
-	const stats = res.stats;
 	return {
 		storeId: store.id,
 		storeCode: store.storeCode,

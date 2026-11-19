@@ -192,9 +192,8 @@ export default function ProductSellerIntro({
 		),
 	);
 
-	// Seller identity uses the canonical display URL. fetchSeller 只吐
-	// `logoUrl`（非顯示用的 logoKey/logo/avatar 已在那裡被刪掉），商品 wire 的
-	// 內嵌賣家區塊也是 `logoUrl`。
+	// Seller identity uses the canonical display URL: `logoUrl`, on both the store
+	// view and the product wire's embedded seller block.
 	const avatarSrc = firstText(
 		sellerRecord.logoUrl,
 		productSellerRecord.logoUrl,

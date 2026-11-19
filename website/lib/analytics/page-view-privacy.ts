@@ -126,6 +126,9 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/seller-center/posts",
 	"/seller-center/posts/new",
 	"/seller-center/preview",
+	"/seller-center/preview/messages",
+	"/seller-center/preview/posts",
+	"/seller-center/preview/reviews",
 	"/seller-center/products",
 	"/seller-center/products/new",
 	"/seller-center/shipments/anomalies",
@@ -184,10 +187,6 @@ const DYNAMIC_ROUTE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 		"/seller/measures/:measureId/remediation",
 	],
 	[/^\/seller\/measures\/[^/]+$/, "/seller/measures/:measureId"],
-	[
-		/^\/seller-center\/preview\/[^/]+(?:\/.*)?$/,
-		"/seller-center/preview/:sellerId",
-	],
 	[
 		/^\/seller-center\/products\/[^/]+(?:\/.*)?$/,
 		"/seller-center/products/:productId",

@@ -15,8 +15,6 @@ import { sellerMessagesText } from "./text";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
-	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
-	preview?: boolean;
 }
 
 const FORUM_PAGE_SIZE = 20;
@@ -52,13 +50,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function MessagesPage({ params, preview = false }: Props) {
+export default async function MessagesPage({ params }: Props) {
 	const { id } = await params;
 
 	// Fetch first page on the server so SSR + first paint already have
 	// the comment list. useSellerForum will pick this up via its
 	// `initialData` argument and skip the bootstrap refetch.
-	const storeId = (await resolveStorefront(id, preview))?.storeId ?? "";
+	const storeId = (await resolveStorefront(id))?.storeId ?? "";
 	const initialData = storeId
 		? await fetchSellerForum(storeId, {
 				pageSize: FORUM_PAGE_SIZE,

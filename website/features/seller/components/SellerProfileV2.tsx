@@ -14,22 +14,16 @@ import SellerShareButton from "@/features/seller/components/SellerShareButton";
 import SellerSubscribeButton from "@/features/seller/components/SellerSubscribeButton";
 import SellerWebsiteLink from "@/features/seller/components/SellerWebsiteLink";
 import { resolveSellerChatTargetId } from "@/features/seller/components/seller-chat-guard";
-import {
-	getCachedSellerReviewStats,
-	getCachedSellerStats,
-} from "@/lib/api/cached";
-import { prerenderSafe } from "@/lib/api/prerender";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { buildSellerShareCardData } from "@/lib/seller/share-card";
 import { isExternalWebsiteUrl } from "@/lib/seller/website-url";
 
 /**
- * `fetchSeller` 的回傳（lib/api/index.ts）。`coverImage` / `logo_url` /
- * `name` 是那一層組出來的**前端顯示契約**；其餘（`storeId` / `storeCode` /
- * `websiteUrl` …）直接來自 wire，backend#2235 之後全是 camelCase。
+ * 店面頂部讀的店家：`PublicStoreView`（`lib/seller/public-store.ts`）。`coverImage` / `logo_url` 是已組好的
+ * 顯示欄位；統計欄位讀不到時不設。
  */
 interface SellerProfileLike {
-	/** `GetStore` 的統計；讀不到的欄位不設，顯示「—」。賣家預覽沒有，改讀舊的統計端點。 */
+	/** `StoreStats`；讀不到的欄位不設，顯示「—」。 */
 	followerCount?: number;
 	reviewCount?: number;
 	ratingAverage?: number;
@@ -40,10 +34,8 @@ interface SellerProfileLike {
 	logo_url?: string;
 	name?: string;
 	prize?: string;
-	rating?: number | string;
 	storeId?: string;
 	storeCode?: string;
-	totalReviews?: number;
 	websiteUrl?: string;
 }
 
@@ -51,9 +43,9 @@ interface SellerProfileV2Props {
 	seller: SellerProfileLike | null;
 	/** 網址上的店家段（公開店面是 store_code）；追蹤與統計用 `seller.storeId`。 */
 	sellerId: string;
-	/** Seller-center preview uses the same buyer component but blocks writes. */
+	/** 賣家預覽：聊天與訂閱按鈕只呈現、不送出。 */
 	previewMode?: boolean;
-	/** Keeps storefront tabs inside the preview route instead of public routes. */
+	/** 賣家預覽的分頁留在預覽路由，不跳到公開店面。 */
 	tabBasePath?: string;
 }
 
@@ -145,56 +137,33 @@ interface ProfileStats {
 }
 
 /**
- * 店面頁頂部的三項統計。公開店面取 `GetStore` 的 `StoreStats`：欄位沒有設定是讀不到（評分另有
- * 「沒有評價」的情形，由評價數 0 區分），一律顯示「—」，不當成 0。賣家預覽還沒有店主端點，沿用舊的
- * 兩支統計讀取，隨預覽改讀 `GetMyStore` 一起退場。
+ * 店面頁頂部的三項統計。取 `StoreStats`（公開店面是 `GetStore`，賣家預覽是 `GetMyStore`）：欄位沒有設定是
+ * 讀不到（評分另有「沒有評價」的情形，由評價數 0 區分），一律顯示「—」，不當成 0。
  */
-async function profileStats(
-	s: SellerProfileLike,
-	storeId: string,
-	previewMode: boolean,
-): Promise<ProfileStats> {
-	if (!previewMode) {
-		const reviewCount = s.reviewCount;
-		const rating =
-			reviewCount === 0
-				? ""
-				: s.ratingAverage !== undefined
-					? s.ratingAverage.toFixed(1)
-					: null;
-		return {
-			rating,
-			totalReviews: reviewCount ?? null,
-			subscribers: s.followerCount ?? null,
-		};
-	}
-	const [stats, publicStats] = await Promise.all([
-		getCachedSellerReviewStats(storeId).catch(prerenderSafe(null)),
-		getCachedSellerStats(storeId).catch(prerenderSafe(null)),
-	]);
-	const avgRating = stats ? Number(stats.avgRating) || 0 : 0;
+function profileStats(s: SellerProfileLike): ProfileStats {
+	const reviewCount = s.reviewCount;
+	const rating =
+		reviewCount === 0
+			? ""
+			: s.ratingAverage !== undefined
+				? s.ratingAverage.toFixed(1)
+				: null;
 	return {
-		rating:
-			avgRating > 0 ? avgRating.toFixed(1) : Number(s.rating || 0).toFixed(1),
-		totalReviews: stats ? Number(stats.totalCount) || 0 : s.totalReviews || 0,
-		subscribers: publicStats ? Number(publicStats.followers) || 0 : 0,
+		rating,
+		totalReviews: reviewCount ?? null,
+		subscribers: s.followerCount ?? null,
 	};
 }
 
-export default async function SellerProfileV2({
+export default function SellerProfileV2({
 	seller,
 	sellerId,
 	previewMode = false,
 	tabBasePath,
 }: SellerProfileV2Props) {
 	const s = seller || {};
-	const storeId =
-		String(s.storeId ?? "").trim() || (previewMode ? sellerId : "");
-	const { rating, totalReviews, subscribers } = await profileStats(
-		s,
-		storeId,
-		previewMode,
-	);
+	const storeId = String(s.storeId ?? "").trim();
+	const { rating, totalReviews, subscribers } = profileStats(s);
 	const coverSrc = s.coverImage || "";
 	const coverImageSrc = coverSrc ? resolveCdnUrl(coverSrc) : "";
 	const avatarSrc = s.logo_url?.trim() || "";
@@ -202,9 +171,9 @@ export default async function SellerProfileV2({
 	const location = sellerProfileLocation(s);
 	const description = s.description || "";
 	const prize = String(s.prize || "").trim();
-	// 明列欄位而不是把整個 loose 物件丟進去：這一頁的來源是 `fetchSeller`
-	// （前端顯示契約 `logo_url`），seller-center 那張卡的來源是 `GetMyStore`
-	// 的店家（圖片經 `imageUri` 組成 `logoUrl`）。兩邊形狀不同，讓對映在呼叫點看得見。
+	// 明列欄位而不是把整個物件丟進去：這一頁的來源是 `PublicStoreView`（顯示欄位 `logo_url`），
+	// seller-center 那張卡的來源是 `GetMyStore` 的店家（圖片經 `imageUri` 組成 `logoUrl`）。
+	// 兩邊形狀不同，讓對映在呼叫點看得見。
 	const shareCard = buildSellerShareCardData(
 		sellerId,
 		{

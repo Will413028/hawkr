@@ -1,3 +1,4 @@
+import { PostStatus } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { describe, expect, it, vi } from "vitest";
 import { createOwnerPostApi, type OwnerPostClient } from "./owner";
 
@@ -129,5 +130,20 @@ describe("owner post calls", () => {
 		expect(await api.count()).toBe(8);
 		expect(rpc.getStoreSocialSummary).toHaveBeenCalledOnce();
 		expect(rpc.listMyPosts).not.toHaveBeenCalled();
+	});
+
+	it("listPublished asks only for published posts and carries the page token", async () => {
+		const { rpc, api } = fakeClient();
+		rpc.listMyPosts.mockResolvedValueOnce({
+			posts: [],
+			nextPageToken: "t2",
+		} as never);
+		const out = await api.listPublished(12, "t1");
+		expect(rpc.listMyPosts).toHaveBeenCalledWith({
+			pageSize: 12,
+			pageToken: "t1",
+			status: PostStatus.PUBLISHED,
+		});
+		expect(out).toEqual({ items: [], nextPageToken: "t2" });
 	});
 });

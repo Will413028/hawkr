@@ -100,7 +100,7 @@ test("商店預覽只收合賣家提示，買家實際看到的內容仍維持�
 		"features/seller-center/preview/SellerStorefrontPreviewBanner.tsx",
 	);
 	const layout = source(
-		"app/[locale]/(seller)/seller-center/preview/[id]/layout.tsx",
+		"features/seller-center/preview/SellerStorefrontPreviewFrame.tsx",
 	);
 	assert.match(banner, /seller-mobile-disclosure-desktop/);
 	assert.match(banner, /<SellerMobileDisclosureList/);

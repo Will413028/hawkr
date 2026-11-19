@@ -95,8 +95,7 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
 		cachedMocks.getCachedStore.mockResolvedValue({
-			// camelCase — `PublicSellerInfo.storeCode` (backend#2235). `fetchSeller`
-			// passes it through unrenamed, so this is verbatim what the route sees.
+			// camelCase `storeCode`, verbatim what the route sees.
 			name: "測試",
 			storeCode: STORE_CODE,
 			rating: 5,

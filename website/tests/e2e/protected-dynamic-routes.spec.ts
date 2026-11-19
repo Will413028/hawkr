@@ -965,13 +965,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 	},
 ];
 
-const SSR_PREVIEW_PATTERNS = new Set([
-	"/seller-center/preview/[id]",
-	"/seller-center/preview/[id]/messages",
-	"/seller-center/preview/[id]/posts",
-	"/seller-center/preview/[id]/reviews",
-]);
-
 const ERROR_SHELL =
 	/Application error|Internal Server Error|NEXT_NOT_FOUND|This page could not be found|糟糕，火箭偏離了航道|暫時迷航|這頁不在貨架上|找不到訂單|找不到售後案件|載入動態失敗/i;
 
@@ -1237,8 +1230,7 @@ test.describe("authenticated protected dynamic route smoke", {
 				// 帳號層級的頁面（`account`）不在這份清單：e2e 的 mock 沒有建立這類帳號的工作階段
 				// （見 helpers/mock-gateway.ts），登入後的畫面由 SellerMeasureRequestPage 的元件測試承接，
 				// 訪客導頁由 site-links 斷言。
-				entry.access !== "account" &&
-				!SSR_PREVIEW_PATTERNS.has(entry.pattern),
+				entry.access !== "account",
 		).map(({ access, pattern }) => ({ role: access, pattern }));
 		const covered = ROUTE_CASES.map(({ role, pattern }) => ({ role, pattern }));
 		expect(covered).toHaveLength(19);

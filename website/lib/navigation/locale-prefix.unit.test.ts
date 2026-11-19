@@ -53,7 +53,7 @@ const ROUTES = [
 	"/account/messages/assistant/procurement",
 	"/seller-center",
 	"/seller-center/orders",
-	"/seller-center/preview/3",
+	"/seller-center/preview/posts",
 	"/seller-center/messages/4",
 	"/seller/onboarding",
 	"/seller/measures/1",

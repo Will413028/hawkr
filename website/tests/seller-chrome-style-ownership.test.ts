@@ -329,13 +329,15 @@ test("public storefront and seller preview keep the server profile owner", () =>
 		/import "@\/styles\/features\/seller-profile\.css";/,
 	);
 
-	for (const layoutPath of [
-		"app/[locale]/(public)/sellers/[id]/(storefront)/layout.tsx",
-		"app/[locale]/(seller)/seller-center/preview/[id]/layout.tsx",
-	]) {
+	// 公開店面的 layout 是 server component；賣家預覽的外框是 client component（資料讀 GetMyStore），
+	// 兩邊都用同一個 SellerProfileV2。
+	for (const [layoutPath, isClient] of [
+		["app/[locale]/(public)/sellers/[id]/(storefront)/layout.tsx", false],
+		["features/seller-center/preview/SellerStorefrontPreviewFrame.tsx", true],
+	] as const) {
 		assert.equal(statSync(join(ROOT, layoutPath)).isFile(), true);
 		const layout = source(layoutPath);
-		assert.doesNotMatch(layout, /^"use client";/m, layoutPath);
+		assert.equal(/^"use client";/m.test(layout), isClient, layoutPath);
 		assert.match(
 			layout,
 			/import SellerProfileV2 from "@\/features\/seller\/components\/SellerProfileV2";/,

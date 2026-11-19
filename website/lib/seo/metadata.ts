@@ -120,7 +120,7 @@ function rootSocialImage(alt: string) {
 
 /** The seller media fields that can stand in for a store's share picture. */
 export interface SellerSocialImageSource {
-	/** Store cover objectKey (`coverKey` on the wire — see lib/api `fetchSeller`). */
+	/** Store cover objectKey (`PublicStoreView.coverImage`). */
 	coverImage?: string | null;
 	/** Store logo objectKey (`logoUrl` on the wire, normalised to `logo_url`). */
 	logo_url?: string | null;

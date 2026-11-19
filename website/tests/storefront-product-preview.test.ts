@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-	productIdFromStorefrontPreviewHref,
-	sellerIdFromPreviewProduct,
-} from "../features/seller-center/preview/storefrontProductPreview";
+import { productIdFromStorefrontPreviewHref } from "../features/seller-center/preview/storefrontProductPreview";
 
 test("storefront preview accepts only canonical numeric public product hrefs", () => {
 	assert.equal(productIdFromStorefrontPreviewHref("/products/500"), "500");
@@ -29,21 +26,4 @@ test("storefront preview accepts only canonical numeric public product hrefs", (
 			href ?? "null",
 		);
 	}
-});
-
-test("storefront preview resolves and validates seller ids from public product DTOs", () => {
-	assert.equal(
-		sellerIdFromPreviewProduct({ seller: { storeId: "2683638500" } }),
-		"2683638500",
-	);
-	assert.equal(
-		sellerIdFromPreviewProduct({ seller: { storeId: 2683638500 } }),
-		"2683638500",
-	);
-	assert.equal(
-		sellerIdFromPreviewProduct({ sellerAccountId: "2683638501" }),
-		"2683638501",
-	);
-	assert.equal(sellerIdFromPreviewProduct({ storeId: "not-an-id" }), null);
-	assert.equal(sellerIdFromPreviewProduct(null), null);
 });

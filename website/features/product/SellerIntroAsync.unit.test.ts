@@ -53,4 +53,21 @@ describe("SellerIntroAsync", () => {
 		expect(props.sellerStats).toBeNull();
 		expect(props.followerStats).toBeNull();
 	});
+
+	it("drops the embedded store_code when GetStore says the store is not public", async () => {
+		mocks.getCachedStore.mockResolvedValue(null);
+		const props = await propsOf({ storeCode: "2662192214", name: "未公開店" });
+		expect(props.seller).toBeNull();
+		expect(props.productSeller).toEqual({ name: "未公開店" });
+		expect(props.productSeller).not.toHaveProperty("storeCode");
+	});
+
+	it("keeps the embedded store_code when the store read merely fails", async () => {
+		mocks.getCachedStore.mockRejectedValue(new Error("down"));
+		const props = await propsOf({ storeCode: "2662192214", name: "店" });
+		expect(props.productSeller).toEqual({
+			storeCode: "2662192214",
+			name: "店",
+		});
+	});
 });

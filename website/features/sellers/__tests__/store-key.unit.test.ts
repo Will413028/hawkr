@@ -10,7 +10,6 @@ const STORE_CODE = "2662192214";
 
 const cached = vi.hoisted(() => ({
 	getCachedStore: vi.fn(),
-	getCachedSeller: vi.fn(),
 	getCachedSellerReviews: vi.fn(),
 	getCachedSellerReviewStats: vi.fn(),
 	getCachedStorePosts: vi.fn(),
@@ -128,24 +127,5 @@ describe("public storefront reads use the GetStore store id, never the URL store
 		);
 		await expect(Page({ params })).rejects.toThrow();
 		expect(cached.getCachedSellerReviews).not.toHaveBeenCalled();
-	});
-});
-
-describe("seller preview keeps its store_id URL segment on the legacy read", () => {
-	it("reviews tab with preview reads getCachedSeller, not GetStore", async () => {
-		cached.getCachedSeller.mockResolvedValue({ storeId: "42" });
-		const { default: Page } = await import(
-			"@/features/sellers/reviews/SellerReviewsPage"
-		);
-		await Page({
-			params: Promise.resolve({ locale: "zh-TW", id: "42" }),
-			preview: true,
-		});
-		expect(cached.getCachedSeller).toHaveBeenCalledWith("42");
-		expect(cached.getCachedStore).not.toHaveBeenCalled();
-		expect(cached.getCachedSellerReviews).toHaveBeenCalledWith(
-			"42",
-			expect.anything(),
-		);
 	});
 });

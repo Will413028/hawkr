@@ -13,7 +13,6 @@ const RUN_SMOKE = process.env.RUN_SELLER_PREVIEW_SSR_SMOKE === "1";
 const CONFIGURED_API_BASE =
 	process.env.SELLER_PREVIEW_SSR_API_BASE_URL?.replace(/\/$/, "");
 const CONFIGURED_SELLER_ID = process.env.SELLER_PREVIEW_SSR_SELLER_ID;
-const CONFIGURED_SELLER_NAME = process.env.SELLER_PREVIEW_SSR_SELLER_NAME;
 const ERROR_SHELL =
 	/Application error|Internal Server Error|NEXT_NOT_FOUND|This page could not be found|糟糕，火箭偏離了航道|暫時迷航|這頁不在貨架上/i;
 
@@ -58,12 +57,9 @@ function jsonResponse(data: unknown): string {
 	return JSON.stringify({ code: 0, data });
 }
 
-function startApiStub(sellerId: string, seenRequests: string[]): Server {
+function startApiStub(sellerId: string): Server {
 	return createServer((request, response) => {
 		const url = new URL(request.url ?? "/", "http://127.0.0.1");
-		seenRequests.push(
-			`${request.method ?? "GET"} ${url.pathname}${url.search}`,
-		);
 
 		const sellerRoot = `/api/v1/public/sellers/${sellerId}`;
 		let data: unknown;
@@ -146,10 +142,12 @@ async function installBrowserApiStub(
 	page: Page,
 	appOrigin: string,
 	sellerId: string,
+	seenRequests: string[],
 ) {
 	await page.route("**/api/v1/**", async (route) => {
 		const request = route.request();
 		const pathname = new URL(request.url()).pathname;
+		seenRequests.push(pathname);
 		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
@@ -158,6 +156,18 @@ async function installBrowserApiStub(
 				"access-control-allow-origin": appOrigin,
 			},
 			body: jsonResponse(browserStubPayload(pathname, sellerId)),
+		});
+	});
+	await page.route(/SocialAppService\/ListMyPosts(?:\?|$)/, async (route) => {
+		seenRequests.push("SocialAppService/ListMyPosts");
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			headers: {
+				"access-control-allow-credentials": "true",
+				"access-control-allow-origin": appOrigin,
+			},
+			body: JSON.stringify({ posts: [] }),
 		});
 	});
 	// ⚠️ 店家必須是完成新手引導的：否則 `useSellerIdentity` 判定 setupIncomplete →
@@ -343,11 +353,8 @@ test("production Next serves all four seller preview routes and the read-only gu
 		);
 	}
 	const sellerId = CONFIGURED_SELLER_ID ?? `98${Date.now()}`;
-	const sellerName = CONFIGURED_SELLER_NAME ?? "SSR Stub 商店";
 	const seenRequests: string[] = [];
-	const apiServer = CONFIGURED_API_BASE
-		? null
-		: startApiStub(sellerId, seenRequests);
+	const apiServer = CONFIGURED_API_BASE ? null : startApiStub(sellerId);
 	const apiPort = apiServer ? await listen(apiServer) : null;
 	const apiBase = CONFIGURED_API_BASE ?? `http://127.0.0.1:${apiPort}/api/v1`;
 	const appPort = await reservePort();
@@ -383,25 +390,14 @@ test("production Next serves all four seller preview routes and the read-only gu
 
 	await waitForNext(origin, child, () => childOutput);
 
-	// Document-level reachability + route-tree check. Deliberately NOT a claim
-	// that these routes are server-rendered — they are not, and should not be.
-	// `/seller-center/*` sits behind `ZoneGate` and `WorkspaceAlign`
-	// (components/shared/WorkspaceAlign.tsx): the stored workspace is browser-only
-	// state, so the document the server renders carries the workspace skeleton and
-	// the seller workspace never emits its contents for a document request. That is
-	// the correct design, so "SSR renders the preview" is not a property this app
-	// has and not one this test asserts.
-	//
-	// Concretely: strip every <script> from these responses and the remaining
-	// DOM is just the initial-loader shell — no 買家視角預覽, no seller-tab-frame,
-	// no data-storefront-preview-readonly. The strings matched below live in the
-	// serialised RSC flight payload, which is all this loop claims: the
-	// production runtime answered, and it produced this route's layout tree.
-	//
-	// The read-only guarantee that actually matters is asserted against a live
-	// browser below.
+	// Document-level reachability check only. `/seller-center/*` sits behind `ZoneGate` and
+	// `WorkspaceAlign` (components/shared/WorkspaceAlign.tsx): the stored workspace is browser-only
+	// state, and the preview reads its store with the signed-in session on the client, so the
+	// document the server renders is the workspace skeleton. "SSR renders the preview" is not a
+	// property this app has and not one this test asserts; the read-only guarantee is asserted
+	// against a live browser below.
 	for (const { suffix } of ROUTES) {
-		const pathname = `/seller-center/preview/${sellerId}${suffix}`;
+		const pathname = `/seller-center/preview${suffix}`;
 		const response = await fetch(`${origin}${pathname}`, {
 			headers: {
 				accept: "text/html",
@@ -410,7 +406,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 			redirect: "manual",
 			signal: AbortSignal.timeout(20_000),
 		});
-		const flight = await response.text();
+		const html = await response.text();
 
 		assert.equal(response.status, 200, `${pathname}\n${childOutput}`);
 		assert.match(
@@ -418,16 +414,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 			/^text\/html\b/,
 			pathname,
 		);
-		assert.match(
-			flight,
-			/買家視角預覽/,
-			`${pathname} flight payload carries no preview layout tree`,
-		);
-		assert(
-			flight.includes(sellerName),
-			`${pathname} flight payload never resolved the seller: ${sellerName}`,
-		);
-		assert.doesNotMatch(flight, ERROR_SHELL, pathname);
+		assert.doesNotMatch(html, ERROR_SHELL, pathname);
 	}
 
 	// System Chrome by default (#281). This was the only launch call in the repo
@@ -446,7 +433,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 	const browser = await chromium.launch({ headless: true, channel });
 	context.after(() => browser.close());
 	for (const { suffix, marker } of ROUTES) {
-		const pathname = `/seller-center/preview/${sellerId}${suffix}`;
+		const pathname = `/seller-center/preview${suffix}`;
 		const page = await browser.newPage();
 		const runtimeIssues: string[] = [];
 		page.on("pageerror", (error) => {
@@ -457,7 +444,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 				runtimeIssues.push(`console.error: ${message.text()}`);
 			}
 		});
-		await installBrowserApiStub(page, origin, sellerId);
+		await installBrowserApiStub(page, origin, sellerId, seenRequests);
 		await page
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: origin }]);
@@ -514,7 +501,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 		);
 
 		for (const tabSuffix of ["", "/posts", "/messages", "/reviews"]) {
-			const href = `/seller-center/preview/${sellerId}${tabSuffix}`;
+			const href = `/seller-center/preview${tabSuffix}`;
 			const tab = page.locator(`a[role="tab"][href="${href}"]`);
 			await tab.waitFor({ state: "visible", timeout: 10_000 });
 			assert.equal(
@@ -529,24 +516,26 @@ test("production Next serves all four seller preview routes and the read-only gu
 		await page.close();
 	}
 
-	if (!CONFIGURED_API_BASE) {
-		const seenPaths = new Set(
-			seenRequests.map((entry) => entry.split(" ")[1]?.split("?")[0]),
+	// The stubbed store can be public: the preview reads the owner's own sources for products and
+	// posts, and the public sources only for the reviews and forum tabs.
+	const seen = new Set(seenRequests);
+	const root = `/api/v1/public/sellers/${sellerId}`;
+	for (const expected of [
+		"/api/v1/app/products",
+		"SocialAppService/ListMyPosts",
+		`${root}/reviews`,
+		`${root}/reviews/stats`,
+		`${root}/forum`,
+	]) {
+		assert(
+			seen.has(expected),
+			`the preview never requested ${expected}\nSeen:\n${seenRequests.join("\n")}`,
 		);
-		for (const expectedPath of [
-			`/api/v1/public/sellers/${sellerId}`,
-			`/api/v1/public/sellers/${sellerId}/products`,
-			`/api/v1/public/sellers/${sellerId}/posts`,
-			`/api/v1/public/sellers/${sellerId}/forum`,
-			`/api/v1/public/sellers/${sellerId}/reviews`,
-			`/api/v1/public/sellers/${sellerId}/reviews/stats`,
-			`/api/v1/public/sellers/${sellerId}/stats`,
-			"/api/v1/public/products",
-		]) {
-			assert(
-				seenPaths.has(expectedPath),
-				`SSR never requested ${expectedPath}\nSeen:\n${seenRequests.join("\n")}`,
-			);
-		}
+	}
+	for (const forbidden of [`${root}`, `${root}/products`, `${root}/posts`]) {
+		assert(
+			!seen.has(forbidden),
+			`the preview read the public ${forbidden} instead of the owner's own source`,
+		);
 	}
 });

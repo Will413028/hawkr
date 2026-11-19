@@ -42,18 +42,18 @@ test("public support pages retain the active seller workspace footer", () => {
 test("seller storefront preview uses the buyer footer", () => {
 	assert.equal(footerPerspectiveForPathname("/seller-center/preview"), "buyer");
 	assert.equal(
-		footerPerspectiveForPathname("/seller-center/preview/123", "seller"),
+		footerPerspectiveForPathname("/seller-center/preview/reviews", "seller"),
 		"buyer",
 	);
 	assert.equal(
-		footerPerspectiveForPathname("/seller-center/preview/123/posts"),
+		footerPerspectiveForPathname("/seller-center/preview/posts"),
 		"buyer",
 	);
 });
 
 test("similar route prefixes do not inherit seller chrome", () => {
 	assert.equal(
-		footerPerspectiveForPathname("/seller-center-preview/123"),
+		footerPerspectiveForPathname("/seller-center-preview/posts"),
 		"buyer",
 	);
 });
