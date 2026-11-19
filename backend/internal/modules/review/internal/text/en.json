@@ -1,0 +1,76 @@
+{
+  "default": {
+    "review.already_exists": {
+      "message": "You have already reviewed this item"
+    },
+    "review.author_inactive": {
+      "message": "Your account is being deleted, so you cannot post reviews"
+    },
+    "review.content_invalid_text": {
+      "message": "The review is not valid text"
+    },
+    "review.content_too_long": {
+      "message": "The review cannot exceed {max} characters"
+    },
+    "review.filter_rating_invalid": {
+      "message": "The rating filter must be 0 to 5"
+    },
+    "review.item_not_in_order": {
+      "message": "This item is not part of the order"
+    },
+    "review.moderation_rejected": {
+      "message": "The content does not meet the community rules. Please edit it and try again"
+    },
+    "review.not_found": {
+      "message": "We could not find this review"
+    },
+    "review.not_replyable": {
+      "message": "This review cannot be replied to right now"
+    },
+    "review.not_your_review": {
+      "message": "Only the reviewed store can reply to this review"
+    },
+    "review.order_item_invalid": {
+      "message": "The order item is invalid"
+    },
+    "review.order_not_found": {
+      "message": "We could not find this order"
+    },
+    "review.order_not_reviewable": {
+      "message": "You can review an order after it is completed"
+    },
+    "review.order_required": {
+      "message": "The order number is required"
+    },
+    "review.order_unavailable": {
+      "message": "We could not check the order right now. Please try again later"
+    },
+    "review.rating_invalid": {
+      "message": "The rating must be 1 to 5"
+    },
+    "review.reply_invalid_text": {
+      "message": "The reply is not valid text"
+    },
+    "review.reply_required": {
+      "message": "The reply is required"
+    },
+    "review.reply_too_long": {
+      "message": "The reply cannot exceed {max} characters"
+    },
+    "review.staged_token_blank": {
+      "message": "An image reference cannot be blank"
+    },
+    "review.staged_token_duplicate": {
+      "message": "The same image cannot be attached twice"
+    },
+    "review.store_ids_invalid": {
+      "message": "Provide 1 to {max} positive store IDs"
+    },
+    "review.too_many_images": {
+      "message": "You can attach at most {max} images"
+    },
+    "review.window_expired": {
+      "message": "The review period has ended"
+    }
+  }
+}

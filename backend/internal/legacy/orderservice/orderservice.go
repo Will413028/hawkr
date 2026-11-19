@@ -3,11 +3,13 @@ package orderservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -161,6 +163,103 @@ func (c *Client) SpendingRecords(ctx context.Context, buyerID, storeID int64, pa
 			return SpendingPage{}, err
 		}
 		out.Records = append(out.Records, SpendingRecord{OrderNo: record.GetOrderNo(), OrderTime: time.UnixMilli(milliseconds).UTC(), Amount: amount, Refunded: refund, CouponApplied: discount > 0})
+	}
+	return out, nil
+}
+
+// ErrOrderNotFound 表示 order-service 明確回報訂單不存在（回應內 code 404）。其他失敗（傳輸錯誤、其他 code、不合法的回應）
+// 都不是「不存在」，呼叫端不得當成不存在處理。
+var ErrOrderNotFound = errors.New("orderservice：訂單不存在")
+
+// grpcNotFound 是 GrpcResponseCode.NOT_FOUND（Java common-core）。
+const grpcNotFound = 404
+
+// 評價快照寫進 review.reviews，長度上限與該表的 CHECK 相同（order_no 1..64、sku_name <= 255，以字元計）。
+const (
+	maxReviewOrderNoRunes = 64
+	maxReviewSkuNameRunes = 255
+)
+
+// ReviewOrder 是評價資格與快照的已解析投影：訂單與它的項目。
+type ReviewOrder struct {
+	OrderNo     string
+	BuyerID     int64
+	StoreID     int64
+	Status      string
+	CompletedAt time.Time
+	Items       []ReviewOrderItem
+}
+
+// ReviewOrderItem 是訂單項目的已解析投影；ImageKey 為空表示沒有商品圖。
+type ReviewOrderItem struct {
+	OrderItemID int64
+	ProductID   int64
+	SkuName     string
+	ImageKey    string
+	Price       int64
+}
+
+// OrderForReview 回傳訂單的評價資格與項目快照。訂單不存在回 ErrOrderNotFound；傳輸錯誤、其他 code 與任何不合法的欄位都回一般錯誤
+// （fail-closed，不推定為不存在）。
+func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrder, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	resp, err := c.rpc.GetOrderForReview(ctx, connect.NewRequest(&orderpb.GetOrderForReviewRequest{OrderNo: orderNo}))
+	if err != nil {
+		return ReviewOrder{}, fmt.Errorf("orderservice：GetOrderForReview：%w", err)
+	}
+	switch code := resp.Msg.GetCode(); {
+	case code == grpcNotFound:
+		return ReviewOrder{}, ErrOrderNotFound
+	case code != 0:
+		return ReviewOrder{}, fmt.Errorf("orderservice：GetOrderForReview code=%d", code)
+	}
+	data := resp.Msg.GetData()
+	if data == nil {
+		return ReviewOrder{}, fmt.Errorf("orderservice：GetOrderForReview 缺少 data")
+	}
+	buyerID, err := positiveID(data.GetBuyerId())
+	if err != nil {
+		return ReviewOrder{}, fmt.Errorf("orderservice：買家 ID 不合法: %q", data.GetBuyerId())
+	}
+	storeID, err := positiveID(data.GetStoreId())
+	if err != nil {
+		return ReviewOrder{}, err
+	}
+	completedAt, err := time.Parse(time.RFC3339Nano, data.GetCompletedAt())
+	if err != nil {
+		return ReviewOrder{}, fmt.Errorf("orderservice：完成時間不合法: %q", data.GetCompletedAt())
+	}
+	if data.GetOrderNo() == "" || data.GetStatus() == "" {
+		return ReviewOrder{}, fmt.Errorf("orderservice：訂單號或狀態缺失")
+	}
+	if data.GetOrderNo() != orderNo {
+		return ReviewOrder{}, fmt.Errorf("orderservice：回應的訂單號 %q 不是請求的 %q", data.GetOrderNo(), orderNo)
+	}
+	if utf8.RuneCountInString(data.GetOrderNo()) > maxReviewOrderNoRunes {
+		return ReviewOrder{}, fmt.Errorf("orderservice：訂單號超過 %d 字元", maxReviewOrderNoRunes)
+	}
+	out := ReviewOrder{OrderNo: data.GetOrderNo(), BuyerID: buyerID, StoreID: storeID, Status: data.GetStatus(), CompletedAt: completedAt.UTC(), Items: make([]ReviewOrderItem, 0, len(resp.Msg.GetItems()))}
+	for _, item := range resp.Msg.GetItems() {
+		itemID, err := positiveID(item.GetOrderItemId())
+		if err != nil {
+			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 ID 不合法: %q", item.GetOrderItemId())
+		}
+		productID, err := positiveID(item.GetProductId())
+		if err != nil {
+			return ReviewOrder{}, fmt.Errorf("orderservice：商品 ID 不合法: %q", item.GetProductId())
+		}
+		price, err := nonnegativeAmount(item.GetPrice())
+		if err != nil {
+			return ReviewOrder{}, err
+		}
+		if !utf8.ValidString(item.GetSkuName()) || utf8.RuneCountInString(item.GetSkuName()) > maxReviewSkuNameRunes {
+			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 %d 的規格名稱不合法", itemID)
+		}
+		if !utf8.ValidString(item.GetImageObjectKey()) {
+			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 %d 的商品圖鍵不合法", itemID)
+		}
+		out.Items = append(out.Items, ReviewOrderItem{OrderItemID: itemID, ProductID: productID, SkuName: item.GetSkuName(), ImageKey: item.GetImageObjectKey(), Price: price})
 	}
 	return out, nil
 }

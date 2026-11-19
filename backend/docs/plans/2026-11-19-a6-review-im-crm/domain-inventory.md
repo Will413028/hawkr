@@ -1,7 +1,7 @@
 # A6-0 盤點（領域、資料、機制切片）：`review-service`、`im-service`、`crm-service` → review／im／crm 模組
 
 唯讀盤點，快照 `94796248`，2026-11-19。路徑相對於 `backend/`，`RV=services/review-service`、`IM=services/im-service`、`CR=services/crm-service`，`X/internal` 簡寫 `RVi`、`IMi`、`CRi`，`G=gateway/internal`，`M=internal/modules`。
-決策來源：遷移計畫 `docs/plans/2026-09-24-go-modular-monolith.md` 的 A6 條（第 207–222 行）、`docs/plans/2026-10-18-a7-social/decision-brief.md` §1.2、§4（A6-0 到 A6-7 草案）。A7 的格式前例：`docs/plans/2026-10-18-a7-social/domain-inventory.md`。
+決策來源：遷移計畫 `backend/docs/plans/2026-09-24-go-modular-monolith.md` 的 A6 條（第 207–222 行）、`backend/docs/plans/2026-10-18-a7-social/decision-brief.md` §1.2、§4（A6-0 到 A6-7 草案）。A7 的格式前例：`backend/docs/plans/2026-10-18-a7-social/domain-inventory.md`。
 標記：【量】＝打開檔案或跑過指令；【推】＝讀程式推論；【猜】＝估計。本檔只盤「領域、資料、機制」；RPC／REST／client 呼叫點是別的切片。
 
 ---
@@ -10,7 +10,7 @@
 
 - 7 張表（review 1、im 2、crm 4；`rg -c 'CREATE TABLE' X/db/schema/*.sql` = 1／2／4【量】），35 支 migration（7／12／16，`ls X/db/migrations/*.sql | wc -l`【量】），0 個 extension，68 個 sqlc 查詢（15／28／25，`cat X/db/queries/*.sql | grep -c '^-- name:'`【量】）。全部沒有跨表 FK，唯一例外是 `crm_customer_tags.tag_id REFERENCES crm_tags ON DELETE CASCADE`（`CR/db/schema/schema.sql:39`【量】）。
 - 去向（建議）：`review` 1 張（`order_item_reviews`）；`im` 2 張（`conversations`、`messages`）；`crm` 4 張（`crm_customers`、`crm_tags`、`crm_customer_tags`、`crm_customer_ledger`），其中 `crm_customers.customer_type = 'blocklist'` 是一個沒人讀的標籤（見 CD1、Q2）。依賴表早已預留三列：`review→ordering,catalog,buyer,seller,media`、`im→ordering,buyer,seller,media`、`crm→ordering,coupon,buyer,identity`（`internal/arch/modules.go:28-30`【量】）；**`crm` 沒有 `seller`、`im` 與 `review` 沒有 `moderation`／`identity`**，Q2、Q6 要動這張表。
-- 對外面：review 9 支 RPC、im 13 支（含 `ChatStream`）、crm 14 支，其中 crm 的 `GetSellerStats`、`GetSellerDashboardGrowth` 已 removed（`docs/plans/2026-09-24-go-modular-monolith/rpc-servers.csv:233-234`、`:537-545`、`:260-272`、`:223-236`【量】）。REST（由 `api/openapi/openapi.yaml` 的 path 與 method 計【量】）：評價 9 條 operation（`/app/reviews`、`/app/reviews/{id}`、`/app/me/reviews`、`/app/sellers/me/reviews`、`…/stats`、`/app/sellers/reviews/{id}/reply`、`/public/products/{id}/reviews`、`/public/sellers/{id}/reviews`、`…/stats`）；聊天 9 條（`conversations` get＋patch、`conversations/{targetId}`、`history/{targetId}`、`messages` post＋patch、`unread`、`ws`、`ws-ticket`）；CRM 17 條（`customers*`、`tags*`）。
+- 對外面：review 9 支 RPC、im 13 支（含 `ChatStream`）、crm 14 支，其中 crm 的 `GetSellerStats`、`GetSellerDashboardGrowth` 已 removed（`backend/docs/plans/2026-09-24-go-modular-monolith/rpc-servers.csv:233-234`、`:537-545`、`:260-272`、`:223-236`【量】）。REST（由 `api/openapi/openapi.yaml` 的 path 與 method 計【量】）：評價 9 條 operation（`/app/reviews`、`/app/reviews/{id}`、`/app/me/reviews`、`/app/sellers/me/reviews`、`…/stats`、`/app/sellers/reviews/{id}/reply`、`/public/products/{id}/reviews`、`/public/sellers/{id}/reviews`、`…/stats`）；聊天 9 條（`conversations` get＋patch、`conversations/{targetId}`、`history/{targetId}`、`messages` post＋patch、`unread`、`ws`、`ws-ticket`）；CRM 17 條（`customers*`、`tags*`）。
 - 事件：`events.csv` 中 review 當生產者 6 列（`review.created` 4 個消費者、`review.hidden` 2 個）；im 當生產者 1 列（`chat.message.sent`）、當消費者 4 列；crm 當消費者 3 列、不生產（`awk -F, '$3=="review-service"' events.csv | wc -l` = 6；`$3=="im-service"` = 1、`$4=="im-service"` = 4；`$4=="crm-service"` = 3【量】）。
 - **最重要的發現**（細節見 §6）：
   1. **平台「隱藏聊天訊息」漏在對話列表**：`HideMessage` 只標 `messages.hidden_at`，讀訊息時用 `TombstoneContent` 遮蔽，但對話列表的 `last_message_content` 與推播預覽不遮蔽，被隱藏的違規內容仍出現在對話列表（ID1）。
@@ -244,7 +244,7 @@
 **量**（【量】；路徑相對 `backend/`，在 `/Users/will/second-brain/.projects/personal/hawkr/backend` 下執行）：
 - `git rev-parse --short HEAD`（`94796248`，在 `services/` 下執行）。
 - 表、migration、查詢數：`rg -c 'CREATE TABLE' services/{review,im,crm}-service/db/schema/*.sql`；`ls services/<x>-service/db/migrations/*.sql | wc -l`（7／12／16）；`cat services/<x>-service/db/queries/*.sql | grep -c '^-- name:'`（15／28／25）；`rg -c 'REFERENCES' services/crm-service/db/schema/*.sql`（1）。
-- 事件與 RPC：`rg -i '<service>' docs/plans/2026-09-24-go-modular-monolith/events.csv`、`rpc-servers.csv`、`rpc-calls.csv`、`replicas.csv`、`idrefs.csv`、`db-tables.csv`、`external-systems.csv`。
+- 事件與 RPC：`rg -i '<service>' backend/docs/plans/2026-09-24-go-modular-monolith/events.csv`、`rpc-servers.csv`、`rpc-calls.csv`、`replicas.csv`、`idrefs.csv`、`db-tables.csv`、`external-systems.csv`。
 - REST 數量：以 python 解析 `api/openapi/openapi.yaml` 的 path 與 method，篩 `/chat/`、`/reviews`、`/me/reviews`、`/sellers/me/(customers|tags)`（評價 9、聊天 9、CRM 17 條 operation）。
 - 型別與用量：`rg -o --no-filename 'bizcode\.[A-Za-z]+|codemeta\.[A-Za-z]+' services/<x>-service/internal services/<x>-service/db -g '*.go' -g '!*_test.go' -g '!**/gen/**' | sort | uniq -c`；`rg -n 'rdb|redis' -i services/{im,review,crm}-service/internal -g '*.go' -g '!*_test.go' -g '!**/gen/**'`；`rg -n 'blocklist' -i services/crm-service gateway/internal -g '*.go' …`；`rg -n 'TombstoneContent|LastMessageContent' services/im-service/internal …`。
 - 單體現況：`rg -n 'IsBlocked|Blocked\(' internal/modules/buyer/*.go internal/modules/seller/*.go`；`sed` 讀 `internal/modules/{buyer/buyer.go,seller/blocks.go,moderation/internal/model/model.go,moderation/CARRYOVER.md}`、`internal/arch/modules.go`、`cmd/hawkr/{main,discovery,seller}.go`、`internal/legacy/{reviewservice,crmservice,orderservice}`。
