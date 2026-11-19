@@ -59,7 +59,7 @@ func TestClerkEnvironmentIsNotRead(t *testing.T) {
 			if c.providers.Admin == nil {
 				t.Error("DEV_AUTH_KEY_FILE 的後台 dev 登入被 CLERK_ 的設定關掉")
 			}
-			if c.providers.Google != nil || len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
+			if len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
 				t.Errorf("CLERK_ 的設定啟用了其他登入：%+v", c)
 			}
 		})
@@ -122,7 +122,7 @@ func TestAppleEnvironmentIsNotRead(t *testing.T) {
 			if c.providers.Admin == nil {
 				t.Error("DEV_AUTH_KEY_FILE 的後台 dev 登入被 APPLE_ 的設定關掉")
 			}
-			if c.providers.Google != nil || len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
+			if len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
 				t.Errorf("APPLE_ 的設定啟用了其他登入：%+v", c)
 			}
 		})

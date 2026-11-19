@@ -13,7 +13,7 @@
 ```
 app/                        # Next.js App Router；買家與賣家頁面在 app/[locale]/（語系是 URL 第一段，見「多語系路由」），
                             #   route groups：(public) 公開頁、(commerce) 購物、(account) 買家帳號、(auth) 認證、
-                            #   (seller) 賣家中心、(content) 內容頁，另有 vendor、hawkr-agent-rfq-*；
+                            #   (seller) 賣家中心、(content) 內容頁，另有 hawkr-agent-rfq-*；
                             #   不本地化的在 app/ 根：api/、(delegated)（代行工作區，只有 zh-TW，自己的根 layout）、
                             #   (canary)、(commerce)/store-map/return、robots/sitemap/icon 等 metadata 檔、global-error、global-not-found
 components/                 # 共用 React 元件（shared/RootDocument.tsx 是整份 HTML 文件，根 layout 都用它）

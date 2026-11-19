@@ -25,8 +25,7 @@ type Config struct {
 	BuyerServiceGRPCAddr  string
 	SellerServiceGRPCAddr string
 
-	Mail         MailConfig
-	VendorPortal VendorPortalConfig
+	Mail MailConfig
 }
 
 // MailConfig holds the pkg/mail provider configuration for the vendor portal
@@ -42,12 +41,6 @@ type MailConfig struct {
 	RecipientPolicy   string
 	AllowedRecipients []string
 	RedirectTo        string
-}
-
-// VendorPortalConfig holds the base URL used to build vendor portal invite
-// links (see worker/vendor_invite.go).
-type VendorPortalConfig struct {
-	BaseURL string
 }
 
 // DatabaseConfig holds database configuration.
@@ -123,11 +116,6 @@ func Load() (*Config, error) {
 			AllowedRecipients: guard.ParseAllowed(pkgconfig.GetEnvOrDefault("MAIL_ALLOWED_RECIPIENTS", "")),
 			RedirectTo:        strings.TrimSpace(pkgconfig.GetEnvOrDefault("MAIL_REDIRECT_TO", "")),
 		},
-		// 無預設值，缺值由 Validate() fail-fast：組出的邀請連結指到 dev 或 prod 站是逐環境
-		// 決定，猜錯值等於寄出一封連到錯環境的信。
-		VendorPortal: VendorPortalConfig{
-			BaseURL: pkgconfig.GetEnvOrDefault("VENDOR_PORTAL_BASE_URL", ""),
-		},
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -153,9 +141,6 @@ func (c *Config) Validate() error {
 	// prod 一律 media，不做新舊相容也不猜域名——漏設就啟動失敗，不允許靜默吐出死連結。
 	if c.MediaBaseURL == "" {
 		missing = append(missing, "MEDIA_BASE_URL")
-	}
-	if c.VendorPortal.BaseURL == "" {
-		missing = append(missing, "VENDOR_PORTAL_BASE_URL")
 	}
 	provider := strings.ToLower(strings.TrimSpace(c.Mail.Provider))
 	if provider == "resend" && strings.TrimSpace(c.Mail.From) == "" {

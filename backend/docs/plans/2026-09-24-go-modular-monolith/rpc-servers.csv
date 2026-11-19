@@ -10,14 +10,14 @@ AIAssistantService,SellerChat,ai-service,
 AIAssistantService,SellerOrders,ai-service,
 AIAssistantService,SellerInventory,ai-service,
 AIAssistantService,SellerPayment,ai-service,
-AIAssistantService,SellerPrice,ai-service,
+AIAssistantService,SellerPrice,ai-service,removed: 隨 pricebook 刪除（0fca1761）
 AIAssistantService,SellerProductListingChat,ai-service,
 AIAssistantService,SellerProductAutofill,ai-service,
 AIAssistantService,SellerLatestSession,ai-service,
 AIAssistantService,BuyerOrders,ai-service,
 AIAssistantService,BuyerTracking,ai-service,
 AIAssistantService,BuyerReturnPolicy,ai-service,
-AIAssistantService,BuyerSeasonal,ai-service,
+AIAssistantService,BuyerSeasonal,ai-service,removed: 隨 pricebook 刪除（0fca1761）
 AIAssistantService,BuyerSellerMatch,ai-service,
 AIAssistantService,BuyerChat,ai-service,
 AIAssistantService,BuyerLatestSession,ai-service,
@@ -635,12 +635,12 @@ SellerService,AdminUpdateSellerProspectMedia,seller-service,
 SellerService,AdminListProspectTaxIdMatches,seller-service,
 SellerService,AdminCreateProspectInvite,seller-service,
 SellerService,AdminRevokeProspectInvite,seller-service,
-SellerService,EnsureVendorPortalInvite,seller-service,api: agent.EnsureInvite（只對進行中的 prospect，ADR 2026-10-03-vendor-portal-invite-scoped-access）；notification 經 `internal/legacy/sellerserver` 的 legacy adapter（A3b 步驟 9b）
-SellerService,MarkVendorPortalInviteSecretDelivered,seller-service,api: agent.MarkInviteDelivered（帶寄出的 secret，過時不生效）；notification 經 `internal/legacy/sellerserver` 的 legacy adapter（A3b 步驟 9b），request 加 secret
-SellerService,ExchangeVendorPortalInvite,seller-service,removed: 無舊 gRPC 呼叫者，由單體的 VendorPortalPublicService 提供（agent.ExchangeInvite）；legacy 的實作已刪
-SellerService,ValidateVendorPortalSession,seller-service,removed: 無舊 gRPC 呼叫者，由單體入口直接呼叫 agent.ValidateSession；legacy 的實作已刪
-SellerService,StepUpVendorPortalSession,seller-service,removed: 無舊 gRPC 呼叫者，由單體 VendorPortalInviteeService.VerifySession（Google token 經 identity.VerifyGoogle 驗證）提供；legacy 的實作已刪
-SellerService,PreviewVendorPortalInvite,seller-service,removed: 無舊 gRPC 呼叫者，由單體 VendorPortalPublicService 提供（agent.PreviewInvite）；legacy 的實作已刪
+SellerService,EnsureVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
+SellerService,MarkVendorPortalInviteSecretDelivered,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
+SellerService,ExchangeVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
+SellerService,ValidateVendorPortalSession,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
+SellerService,StepUpVendorPortalSession,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
+SellerService,PreviewVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
 ShippingService,PrintCvsLabel,shipping-service,
 ShippingService,BatchPrintCvsLabel,shipping-service,
 ShippingService,GenerateHomeLabelPdf,shipping-service,

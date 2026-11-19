@@ -37,6 +37,6 @@ test("navbar stays out of request-time root streaming boundaries", async () => {
 test("seller message metadata remains prerender-safe without a dynamic root", async () => {
 	const source = await readFile(sellerMessagesPath, "utf8");
 
-	assert.match(source, /getCachedSeller\(id\)/);
+	assert.match(source, /getCachedStore\(id\)/);
 	assert.doesNotMatch(source, /fetchSeller\(id\)/);
 });

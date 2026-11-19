@@ -347,7 +347,7 @@ test("篩選：所有種類送空陣列、單選送一個；換篩選回第一�
 	);
 	await click("下一頁 ");
 	await until(() => requests.at(-1)?.pageToken === "t2", "第二頁");
-	assert.match(bodyText(), /第 2 頁/u);
+	await until(() => /第 2 頁/u.test(bodyText()), "第 2 頁的頁碼");
 	await React.act(async () => {
 		setValue(select, String(ReviewQueueItemKind.KYC_APPLICATION));
 	});
@@ -359,7 +359,7 @@ test("篩選：所有種類送空陣列、單選送一個；換篩選回第一�
 	assert.deepEqual(requests.at(-1)?.kinds, [
 		ReviewQueueItemKind.KYC_APPLICATION,
 	]);
-	assert.match(bodyText(), /第 1 頁/u);
+	await until(() => /第 1 頁/u.test(bodyText()), "第 1 頁的頁碼");
 	await React.act(async () => {
 		setValue(select, "");
 	});

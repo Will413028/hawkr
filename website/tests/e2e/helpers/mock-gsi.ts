@@ -9,7 +9,7 @@ declare global {
 	}
 }
 
-/** Stub window.google.accounts.id so GIS buttons (the vendor portal's step-up) emit a test idToken. */
+/** Stub window.google.accounts.id so GIS buttons emit a test idToken. */
 export async function installProviderMocks(
 	page: Page,
 	idToken = "test-id-token",

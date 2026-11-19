@@ -189,40 +189,41 @@ test("a path that only looks like an asset is judged like any other unknown path
 
 /**
  * The matcher went from six literal prefixes to a site-wide pattern, so the
- * redirects that lived behind those prefixes have to be shown still working —
+ * decisions that lived behind those prefixes have to be shown still working —
  * and shown working THROUGH the new wrapper, since every response now passes
  * through it on its way out.
  *
- * The storefront 308 is the one that cannot be exercised against dev today:
- * every seller there has `store_code == store_id`, so the backend never asks
- * for a redirect. Stubbing the lookup at the network boundary is what makes the
- * branch reachable at all.
+ * The storefront 404 needs a backend that says "no such store"; stubbing GetStore
+ * at the network boundary is what makes the branch reachable.
  */
 async function middlewareFor(
 	pathname: string,
 	host: string,
-	storeCode: string | null,
+	storeExists: boolean,
 ) {
 	applyLaunchedProdEnv();
 	const realFetch = globalThis.fetch;
 	globalThis.fetch = (async (input: RequestInfo | URL) => {
 		const url = String(input instanceof Request ? input.url : input);
-		if (!url.includes("/sellers/")) return realFetch(input as RequestInfo);
-		return new Response(
-			JSON.stringify({
-				code: 0,
-				message: "success",
-				data: { storeCode },
-			}),
-			{ status: 200, headers: { "content-type": "application/json" } },
-		);
+		if (!url.includes("SellerPublicService/GetStore")) {
+			return realFetch(input as RequestInfo);
+		}
+		return storeExists
+			? new Response(
+					JSON.stringify({ store: { id: "9", storeCode: "2600000001" } }),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				)
+			: new Response(JSON.stringify({ code: "not_found", message: "x" }), {
+					status: 404,
+					headers: { "content-type": "application/json" },
+				});
 	}) as typeof fetch;
 	try {
 		const { siteMiddleware } = await import("../middleware");
-		const { __resetSellerStoreCodeMemoForTest } = await import(
-			"../lib/seller/canonical-redirect"
+		const { __resetStorefrontGuardMemoForTest } = await import(
+			"../lib/seller/storefront-guard"
 		);
-		__resetSellerStoreCodeMemoForTest();
+		__resetStorefrontGuardMemoForTest();
 		return await siteMiddleware(
 			new NextRequest(`https://${host}${pathname}`, { headers: { host } }),
 		);
@@ -232,17 +233,13 @@ async function middlewareFor(
 	}
 }
 
-test("the storefront canonical 308 still fires, and carries the host verdict", async () => {
+test("the storefront 404 still fires, and carries the host verdict", async () => {
 	const response = await middlewareFor(
-		"/sellers/2685914682/reviews",
-		PREVIEW_HOST,
-		"2600000001",
-	);
-	assert.equal(response.status, 308);
-	assert.equal(
-		new URL(response.headers.get("location") as string).pathname,
 		"/sellers/2600000001/reviews",
+		PREVIEW_HOST,
+		false,
 	);
+	assert.equal(response.status, 404);
 	assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 });
 

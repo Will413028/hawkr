@@ -88,16 +88,6 @@ const SELLER_STORE: MockStore = {
 	storeName: "路由測試商店",
 };
 
-const PUBLIC_SELLER = {
-	storeId: SELLER_ID,
-	name: "路由測試商店",
-	storeName: "路由測試商店",
-	sellerName: "路由測試賣家",
-	description: "路由測試商店介紹",
-	coverKey: "",
-	coverUrl: "",
-};
-
 const ORDER_FIXTURE = {
 	orderNo: ORDER_NO,
 	storeId: SELLER_ID,
@@ -451,10 +441,7 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "buyer",
 		url: `/account/messages/${SELLER_ID}`,
 		pathname: `/account/messages/${SELLER_ID}`,
-		mocks: [
-			...chatMocks(SELLER_ID, "路由測試賣家"),
-			{ path: `/public/sellers/${SELLER_ID}`, data: PUBLIC_SELLER },
-		],
+		mocks: [...chatMocks(SELLER_ID, "路由測試賣家")],
 		requiredRequests: [
 			{ method: "GET", path: "/app/chat/conversations" },
 			{ method: "GET", path: `/app/chat/history/${SELLER_ID}` },

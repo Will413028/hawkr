@@ -1,13 +1,6 @@
 {
   "enums": [
     {
-      "name": "hawkr.agent.v1alpha1.SessionVerificationMethod",
-      "dartClass": "SessionVerificationMethod",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/agent/v1alpha1/agent.pbenum.dart",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.buyer.v1alpha1.BuyerStatus",
       "dartClass": "BuyerStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart",

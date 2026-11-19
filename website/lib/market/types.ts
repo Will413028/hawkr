@@ -6,9 +6,9 @@ export interface MarketProductItem {
 	/** Seller avatar/logo URL (raw backend path; resolved via <Avatar>). */
 	sellerAvatar?: string;
 	sellerId?: string;
-	/** Seller's canonical path segment (`store_code`), when the source wire
-	 *  carries one. Feeds `sellerPath()` so the card links the canonical
-	 *  storefront URL instead of eating a 308 on every tap (#365). */
+	/** Seller's storefront path segment (`store_code`), when the source wire
+	 *  carries one. Feeds `sellerPath()`; without it the card shows the seller
+	 *  without a link. */
 	sellerStoreCode?: string;
 	origin: string;
 	price: string;

@@ -116,12 +116,11 @@ const (
 	procGetProfile      = "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile"
 	procAddFavorite     = "/hawkr.buyer.v1alpha1.BuyerAppService/AddFavorite"
 	procSubmitFoodSafe  = "/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport"
-	procInviteeSession  = "/hawkr.agent.v1alpha1.VendorPortalInviteeService/GetSession"
 	procListLiveBanners = "/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"
 )
 
 // 停權的帳號：讀取與自助放行（principal 與停權時間都在 ctx）；寫入回 permission_denied 與 ACCOUNT_SUSPENDED，handler 不被呼叫；
-// 公開與受邀供應商的 service 以訪客執行（ctx 沒有 principal）。
+// 公開的 service 以訪客執行（ctx 沒有 principal）。
 func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 	h := suspendedEntry()
 	for _, proc := range []string{procGetSession, procGetProfile, procDeleteAccount} {
@@ -137,7 +136,7 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 			t.Fatalf("%s：%d code=%q reason=%q called=%v，預期 403 permission_denied ACCOUNT_SUSPENDED", proc, rec.Code, code, reason, s.Called)
 		}
 	}
-	for _, proc := range []string{procSubmitFoodSafe, procListLiveBanners, procInviteeSession} {
+	for _, proc := range []string{procSubmitFoodSafe, procListLiveBanners} {
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		if rec.Code != http.StatusOK || s.Principal || s.Suspended {
 			t.Fatalf("%s：%d %+v，預期以訪客執行（ctx 沒有 principal）", proc, rec.Code, s)
@@ -171,7 +170,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 		audience, _ := rpc.AudienceOf(proc)
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		switch {
-		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee || audience == rpc.AudienceDelegated:
+		case audience == rpc.AudiencePublic || audience == rpc.AudienceDelegated:
 			if rec.Code != http.StatusOK || s.Principal {
 				t.Errorf("%s：%d %+v，預期訪客", proc, rec.Code, s)
 			}
@@ -294,7 +293,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 15 {
+	if methods != len(customerEffects) || len(descriptors) != 13 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }

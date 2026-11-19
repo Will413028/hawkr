@@ -35,7 +35,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
-	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
@@ -303,14 +302,14 @@ func setupWeb(t *testing.T) *webFixture {
 	proxy, err := gatewayproxy.New(gw.URL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
 		return gatewayproxy.Caller{Principal: p}, ok
-	}, func(*http.Request, int64) (agent.SessionInfo, bool, error) { return agent.SessionInfo{}, false, nil }, noBusiness{}, noBusiness{}, nil, log)
+	}, noBusiness{}, noBusiness{}, nil, log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Buyer: buyers, Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin, AppLogin: appLogin, Now: clock.Now,
 		Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t),
-		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
+		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
 		Delegation: del, Origins: []string{webOrigin}, ClientIP: httpapi.ClientIP{Header: "X-Test-Client-IP"}, Logger: log,
 	})
 	if err != nil {

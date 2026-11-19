@@ -107,7 +107,6 @@ type Deps struct {
 	DB       *db.DB
 	Sessions *session.Service
 	Admin    model.AdminVerifier
-	Google   model.IDTokenVerifier
 	Now      func() time.Time
 	Logger   *slog.Logger
 }

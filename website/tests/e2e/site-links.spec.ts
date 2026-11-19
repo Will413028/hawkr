@@ -274,10 +274,7 @@ function publicDocumentFailure(
 	if (FRAMEWORK_NOT_FOUND.test(response.body)) {
 		return `${response.status} ${route} rendered the framework not-found document`;
 	}
-	if (
-		(entry.fixture === "product" || entry.fixture === "seller-product") &&
-		response.body.includes("商品已下架")
-	) {
+	if (entry.fixture === "product" && response.body.includes("商品已下架")) {
 		return `${response.status} ${route} rendered the unavailable-product shell`;
 	}
 	return null;
@@ -731,48 +728,6 @@ test.describe("whole-site route and link contract", () => {
 		}
 		expect(PERMANENT_REDIRECTS.length).toBeGreaterThan(0);
 		expect(failures).toEqual([]);
-	});
-
-	/**
-	 * The storefront consolidation itself, on the wire. It cannot ride along in
-	 * the document checks above (those enter canonically, by design), and it is
-	 * the one part of the mechanism that no unit test can see: the tab pages are
-	 * statically prerendered, so a redirect thrown from a page ships as a
-	 * `<meta http-equiv="refresh">` inside a 200 — a status that satisfies every
-	 * browser-level assertion while telling crawlers nothing. Asserting the
-	 * status line is what distinguishes the two.
-	 */
-	test("a store_id storefront url is consolidated onto its store_code", {
-		tag: ["@contract", "@live"],
-	}, async ({ request }) => {
-		const fixtures = await discoverPublicDynamicFixtures(request);
-		test.skip(
-			fixtures === null,
-			"public catalog legitimately empty (pre-launch prod)",
-		);
-		if (!fixtures) return;
-		const storeId = fixtures.sellerStoreId ?? fixtures.sellerId;
-		const response = await request.get(
-			`/sellers/${storeId}/reviews?route_contract=1`,
-			{ failOnStatusCode: false, maxRedirects: 0 },
-		);
-
-		// A seller whose feed key IS its canonical segment has nothing to be sent
-		// to; it must serve its document rather than redirect to itself.
-		if (storeId === fixtures.sellerId) {
-			expect(
-				response.status(),
-				`/sellers/${storeId}/reviews is already canonical and must not redirect`,
-			).toBe(200);
-			return;
-		}
-
-		const location = response.headers().location ?? "";
-		const target = new URL(location, "http://route-contract.local");
-		expect(
-			`${response.status()} ${target.pathname}?${target.searchParams.toString()}`,
-			`/sellers/${storeId}/reviews must 308 to its store_code with the query intact`,
-		).toBe(`308 /sellers/${fixtures.sellerId}/reviews?route_contract=1`);
 	});
 
 	test("every rendered internal link reaches a valid document", {

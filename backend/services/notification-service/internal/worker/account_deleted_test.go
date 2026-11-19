@@ -74,14 +74,6 @@ func (f *fakeSellerClient) ListIDsByAccount(ctx context.Context, accountID int64
 	return nil, nil
 }
 
-func (f *fakeSellerClient) EnsureInvite(context.Context, string, string, string) (string, string, string, error) {
-	return "", "", "", nil
-}
-
-func (f *fakeSellerClient) MarkInviteSecretDelivered(context.Context, string, string) error {
-	return nil
-}
-
 func validBuyerDeletedEvent(accountID, buyerID int64) []byte {
 	b, _ := json.Marshal(mq.BuyerDeletedEvent{
 		BaseEvent: mq.BaseEvent{EventType: mq.EventTypeBuyerDeleted},

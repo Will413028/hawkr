@@ -40,9 +40,7 @@ type webClient struct{ id, secret string }
 //   - CF_ACCESS_TEAM_DOMAIN、CF_ACCESS_ADMIN_AUD：後台的 Access team domain 與 application AUD tag。
 //   - DEV_AUTH_KEY_FILE：本機開發的 dev token 的 RSA 私鑰（make dev-key 產生）；設定時另外接受它簽的後台 token，不能與
 //     Cloudflare Access 同時設定。
-//   - GOOGLE_CLIENT_IDS：vendor portal step-up 的 Google ID token 驗證（VendorPortalInviteeService.VerifySession）。
-//   - GOOGLE_WEB_CLIENT_ID、GOOGLE_WEB_CLIENT_SECRET：web 登入（/api/auth/google/*）的 Google OAuth client（authorization code ＋ PKCE），與
-//     GOOGLE_CLIENT_IDS（vendor portal step-up 驗 ID token 的 aud）無關；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
+//   - GOOGLE_WEB_CLIENT_ID、GOOGLE_WEB_CLIENT_SECRET：web 登入（/api/auth/google/*）的 Google OAuth client（authorization code ＋ PKCE）；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
 //     LINE_CHANNEL_SECRET：web 登入（/api/auth/line/*）的 LINE Login channel，同樣整組選填；LINE 的 web ID token 以 channel secret 驗（HS256）。
 //     redirect URI 是 PUBLIC_WEB_ORIGIN 加 /api/auth/{google,line}/callback，要登記在各家的 console。
 func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
@@ -68,13 +66,6 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 				c.providers.Admin = dev.Admins()
 			}
 		}
-	}
-	if ids := e.List("GOOGLE_CLIENT_IDS"); len(ids) > 0 {
-		v, err := identity.NewGoogleVerifier(ids, ctx)
-		if err != nil {
-			e.Fail("GOOGLE_CLIENT_IDS：%v", err)
-		}
-		c.providers.Google = v
 	}
 	c.webLogin = map[identity.Provider]webClient{}
 	for _, w := range []struct {

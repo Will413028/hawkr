@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
@@ -21,7 +20,6 @@ import (
 	"github.com/riverqueue/river"
 
 	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/seller"
-	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -86,17 +84,6 @@ func (f fakeFollowers) SubscriberCounts(_ context.Context, ids []int64) (map[int
 		out[id] = f.counts[id]
 	}
 	return out, nil
-}
-
-// noInvites 是不使用邀請方法的測試用的 Invites。
-type noInvites struct{}
-
-func (noInvites) EnsureInvite(context.Context, agent.EnsureInviteInput) (agent.IssuedInvite, error) {
-	return agent.IssuedInvite{}, errors.New("noInvites")
-}
-
-func (noInvites) MarkInviteDelivered(context.Context, uuid.UUID, string) error {
-	return errors.New("noInvites")
 }
 
 // slowRatings 永遠不回答，直到 ctx 結束；記下它收到的 ctx 有沒有期限、是不是因期限到了才結束。
@@ -257,7 +244,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(m, fakeRatings{stats: map[int64]RatingStats{exposed.StoreID: {Count: 3, Average: 4.7727272727}}}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, noInvites{}, log)
+	s := New(m, fakeRatings{stats: map[int64]RatingStats{exposed.StoreID: {Count: 3, Average: 4.7727272727}}}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, log)
 	sid := func(v int64) string { return strconv.FormatInt(v, 10) }
 
 	t.Run("GetSeller", func(t *testing.T) {
@@ -302,7 +289,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	t.Run("GetSeller rating 是 best-effort", func(t *testing.T) {
 		slowSeen := &ratingCall{}
 		for name, ratings := range map[string]Ratings{"失敗": fakeRatings{err: errors.New("review down")}, "逾時": slowRatings{seen: slowSeen}} {
-			r, e := New(m, ratings, fakeFollowers{}, noInvites{}, log).GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: exposed.StoreID}))
+			r, e := New(m, ratings, fakeFollowers{}, log).GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: exposed.StoreID}))
 			if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetStoreId() != sid(exposed.StoreID) || r.Msg.GetData().GetRating() != 0 {
 				t.Fatalf("%s：%v %v", name, r, e)
 			}
@@ -319,7 +306,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if r.Msg.GetData()[1].GetRating() != 0 {
 			t.Fatalf("rating=%v", r.Msg.GetData()[1].GetRating())
 		}
-		failing, e := New(m, fakeRatings{err: errors.New("review down")}, fakeFollowers{}, noInvites{}, log).GetSellerBatch(ctx, connect.NewRequest(&pb.GetSellerBatchRequest{StoreIds: []int64{exposed.StoreID}}))
+		failing, e := New(m, fakeRatings{err: errors.New("review down")}, fakeFollowers{}, log).GetSellerBatch(ctx, connect.NewRequest(&pb.GetSellerBatchRequest{StoreIds: []int64{exposed.StoreID}}))
 		if e != nil || len(failing.Msg.GetData()) != 1 {
 			t.Fatalf("%v %v", failing, e)
 		}
@@ -464,20 +451,20 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 		// 逐欄降級：評價讀不到，粉絲數照填；粉絲數讀不到，評價照填。
-		noRatings := New(m, fakeRatings{err: errors.New("review down")}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, noInvites{}, log)
+		noRatings := New(m, fakeRatings{err: errors.New("review down")}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, log)
 		r, e = noRatings.GetSellerStats(ctx, connect.NewRequest(&pb.GetSellerStatsRequest{StoreId: exposed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetFollowers() != 5 || r.Msg.GetData().GetRating() != 0 || r.Msg.GetData().GetReviewCount() != 0 {
 			t.Fatalf("評價失敗：%v %v", r, e)
 		}
 		// 評價逾時（slowRatings 不回答，只有期限能結束它）：粉絲數照填，評價欄位留 0。
 		slowSeen := &ratingCall{}
-		slow := New(m, slowRatings{seen: slowSeen}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, noInvites{}, log)
+		slow := New(m, slowRatings{seen: slowSeen}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, log)
 		r, e = slow.GetSellerStats(ctx, connect.NewRequest(&pb.GetSellerStatsRequest{StoreId: exposed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetFollowers() != 5 || r.Msg.GetData().GetRating() != 0 || r.Msg.GetData().GetReviewCount() != 0 {
 			t.Fatalf("評價逾時：%v %v", r, e)
 		}
 		slowSeen.check(t, "GetSellerStats")
-		noFollowers := New(m, fakeRatings{stats: map[int64]RatingStats{exposed.StoreID: {Count: 3, Average: 4.5}}}, fakeFollowers{err: errors.New("buyer down")}, noInvites{}, log)
+		noFollowers := New(m, fakeRatings{stats: map[int64]RatingStats{exposed.StoreID: {Count: 3, Average: 4.5}}}, fakeFollowers{err: errors.New("buyer down")}, log)
 		r, e = noFollowers.GetSellerStats(ctx, connect.NewRequest(&pb.GetSellerStatsRequest{StoreId: exposed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetFollowers() != 0 || r.Msg.GetData().GetRating() != 4.5 || r.Msg.GetData().GetReviewCount() != 3 {
 			t.Fatalf("粉絲數失敗：%v %v", r, e)

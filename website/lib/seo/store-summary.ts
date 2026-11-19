@@ -17,6 +17,7 @@
 
 import type { AppLocale } from "@/lib/intl/locales";
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
+import type { PublicStoreView } from "@/lib/seller/public-store";
 import { siteNameFor } from "@/lib/seo/metadata";
 import {
 	codePointLength,
@@ -35,6 +36,31 @@ export interface StoreSeoSource {
 	town?: string | null;
 	ratingAverage?: unknown;
 	reviewCount?: unknown;
+}
+
+/**
+ * `GetStore` 的店家（`PublicStore` 加 `StoreStats`，鄉鎮代碼已經 `@hawkr/twaddr/lookup` 轉成縣市與鄉鎮名）
+ * 轉成 SEO 的輸入；統計沒有設定就不寫進描述。
+ */
+export function storeSeoSource(
+	store: Pick<
+		PublicStoreView,
+		| "name"
+		| "description"
+		| "city"
+		| "district"
+		| "ratingAverage"
+		| "reviewCount"
+	>,
+): StoreSeoSource {
+	return {
+		name: store.name,
+		description: store.description,
+		county: store.city,
+		town: store.district,
+		ratingAverage: store.ratingAverage,
+		reviewCount: store.reviewCount,
+	};
 }
 
 function clean(value: string | null | undefined): string {

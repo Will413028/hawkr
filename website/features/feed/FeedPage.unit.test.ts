@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const cached = vi.hoisted(() => ({
 	getCachedPublicPosts: vi.fn(),
 	getCachedStorePosts: vi.fn(),
-	getCachedSeller: vi.fn(),
+	getCachedStore: vi.fn(),
 }));
 vi.mock("@/lib/api/cached", () => cached);
 vi.mock("@/features/feed/FeedParamController", () => ({
@@ -44,7 +44,7 @@ const PAGE = {
 beforeEach(() => {
 	cached.getCachedPublicPosts.mockReset().mockResolvedValue(PAGE);
 	cached.getCachedStorePosts.mockReset().mockResolvedValue(PAGE);
-	cached.getCachedSeller
+	cached.getCachedStore
 		.mockReset()
 		.mockResolvedValue({ storeId: "7", storeCode: "shop-code" });
 });
@@ -69,7 +69,7 @@ describe("/feed and the store posts tab seed from tagged anonymous entries", () 
 		const tree = await SellerPostsPage({
 			params: Promise.resolve({ locale: "zh-TW", id: "shop-code" }),
 		});
-		expect(cached.getCachedSeller).toHaveBeenCalledWith("shop-code");
+		expect(cached.getCachedStore).toHaveBeenCalledWith("shop-code");
 		expect(cached.getCachedStorePosts).toHaveBeenCalledExactlyOnceWith("7", 12);
 		const feed = find(tree, (el) => "initialPostsMatchQuery" in el.props);
 		expect(feed?.props.initialNextPageToken).toBe("tok");
@@ -77,7 +77,7 @@ describe("/feed and the store posts tab seed from tagged anonymous entries", () 
 	});
 
 	it("the store posts tab reads nothing when the seller payload has no store id", async () => {
-		cached.getCachedSeller.mockResolvedValue({ storeCode: "shop-code" });
+		cached.getCachedStore.mockResolvedValue({ storeCode: "shop-code" });
 		await SellerPostsPage({
 			params: Promise.resolve({ locale: "zh-TW", id: "shop-code" }),
 		});

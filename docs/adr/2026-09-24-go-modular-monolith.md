@@ -394,3 +394,17 @@
 ## 修訂：productimport 刪除（2026-11-15，Will 決定；ADR `2026-10-27-general-ecommerce-scope-cut` 文末的 2026-11-15 修訂）
 
 模組表的 `productimport` 列取消，不搬進單體；主計畫的 B5 標為已移除。product-import-service 與只服務它的 product、media RPC、資料表與 MQ 拓撲一併刪除。
+
+## 修訂：agent 模組刪除，改為 procurement、assistant、imageai（2026-11-19，Will 決定 A9-D1、A9-D3；計畫 `backend/docs/plans/2026-11-19-a9-agent.md`）
+
+模組表的 `agent` 列取消：A9-D1 刪除站外業者路線（供應商入口的邀請與 session、`VendorPortalPublicService`、`VendorPortalInviteeService`），單體不再有 `agent` 模組；ai-service 依 A9-D3 拆成三個模組。
+
+| 模組 | 來源 | 依賴 |
+|---|---|---|
+| procurement | ai-service 的採購（RFQ）與賣家報價 | ordering, catalog, buyer, seller |
+| assistant | ai-service 的買家助理 | ordering, catalog, buyer |
+| imageai | ai-service 的 AI 修圖、配額與後台風格管理 | seller, media |
+
+- 依賴表的方向：`notification` 是訂閱發布方事件的一方，所以 `notification` 依賴 `procurement`（`procurement.*` 事件由 procurement 發布、notification 訂閱），`procurement` 不依賴 `notification`。A9 決定簡報 A9-D3 把 notification 列在 procurement 的依賴裡，與表的語意相反，照表的語意修正；`notification` 列的 `agent` 換成 `procurement`。
+- 全域鎖順序 `platform/lockorder` 的 `Modules` 把三個新模組排在 `discovery` 之後、`delegation` 之前，每個都在它依賴的模組之後。
+- `pricebook` 在 2026-10-28 的修訂已從依賴拿掉，本修訂不恢復。
