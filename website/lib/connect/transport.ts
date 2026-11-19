@@ -24,15 +24,14 @@ import { getEnv } from "@/lib/config/env";
 import { activeLocale } from "@/lib/intl/active-locale";
 import type { AppLocale } from "@/lib/intl/locales";
 
-// 對外 API（Protobuf＋Connect）的 transport，三種（前兩種與 lib/api/client.ts 的兩種模式相同）：
+// 對外 API（Protobuf＋Connect）的 transport，兩種（與 lib/api/client.ts 的兩種模式相同）：
 // - publicTransport：公開讀取。不帶 cookie、server 端簽 origin-auth（backend#2264）；瀏覽器的 HTTP 快取以
 //   條件請求重新驗證（公開讀取是 `public, no-cache` 加 ETag）。
 // - authedTransport：帶同源的 session cookie（`__Host-hk_session`，HttpOnly，ADR 2026-10-30-identity-self-hosted-federated-login；不帶 Authorization）。
 //   瀏覽器不快取、不帶 X-Active-Role（Connect 不讀工作區，只有舊 REST 帶它）、*AppService 回 unauthenticated 時發 AUTH_EXPIRED_EVENT、代行工作區內直接拋錯。
-// - vendorPortalTransport：供應商入口，邀請範圍的 cookie 憑證，與顧客的 session cookie 無關（見該函式的說明）。
-// 三者都有逾時、5xx 上報 Sentry 與錯誤模型 D7 的重試。入口在單體：CSRF 看 Sec-Fetch-Site／Origin，不需要
+// 兩者都有逾時、5xx 上報 Sentry 與錯誤模型 D7 的重試。入口在單體：CSRF 看 Sec-Fetch-Site／Origin，不需要
 // X-Requested-With（〈API 設計規範（Connect）〉§二）。
-// 三者也都送單一值的 `Accept-Language`（UI 語系，見 acceptLanguageInterceptor）。
+// 兩者也都送單一值的 `Accept-Language`（UI 語系，見 acceptLanguageInterceptor）。
 
 /**
  * 瀏覽器打 Connect 的第一方路徑，每個環境都一樣：瀏覽器只跟自己的 origin 說話（lib/config/env.ts 的
@@ -197,41 +196,6 @@ export function authedTransport(opts: TransportOptions = {}): Transport {
 			],
 		}),
 	);
-}
-
-/**
- * 供應商入口（VendorPortalPublicService、VendorPortalInviteeService）的 transport，兩個 service 共用。
- * 獨立存在，因為它們的憑證是邀請範圍的 session cookie（`__Host-hk_vp_<rfq_recipient_id>`，ExchangeInvite
- * 以 Set-Cookie 發、HttpOnly，JS 讀不到），與顧客的 session cookie 無關：
- * - publicTransport 以 `credentials: "omit"` 送出，Set-Cookie 落不了地、cookie 也送不出去；
- * - authedTransport 會在 unauthenticated 時發 AUTH_EXPIRED_EVENT，把供應商的 session 失效誤報成買家登入過期。
- * 所以這裡 `credentials: "include"`（同源走 /api/connect，cookie 隨請求送出）、不發 AUTH_EXPIRED_EVENT，瀏覽器不快取。
- * 供應商憑證的規則只定義在這裡：沒有標 NO_SIDE_EFFECTS 的方法（PreviewInvite、ExchangeInvite、
- * VerifySession）一律 POST，憑證在訊息裡不進 URL；NO_SIDE_EFFECTS 的讀取（GetSession）以 GET 呼叫
- * （API 設計規範（Connect）§三），收件人 ID 在 query。
- *
- * 重試沿用 retryInterceptor：它只重送「方法標了 idempotency_level 或請求帶 request_id」的呼叫（API 設計規範
- * （Connect）的 client 規則）。所以 GetSession 可以重試；ExchangeInvite、VerifySession 沒有標，不會自動
- * 重送（ExchangeInvite 每次可能發新的 session；transport.unit.test.ts 鎖住）。
- */
-export function vendorPortalTransport(opts: TransportOptions = {}): Transport {
-	const isBrowser = typeof window !== "undefined";
-	return createConnectTransport({
-		baseUrl: connectBaseUrl(isBrowser),
-		useHttpGet: true,
-		defaultTimeoutMs: getEnv().apiTimeoutMs,
-		fetch: (input, init) =>
-			fetch(input, {
-				...init,
-				credentials: "include",
-				...(isBrowser ? { cache: "no-store" as const } : {}),
-			}),
-		interceptors: [
-			languageInterceptor(opts),
-			reportInterceptor(sentryCapture("public")),
-			retryInterceptor({ server: !isBrowser }),
-		],
-	});
 }
 
 /**

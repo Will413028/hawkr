@@ -22,9 +22,9 @@ const (
 
 func (e Effect) valid() bool { return e == EffectRead || e == EffectWrite || e == EffectSelfService }
 
-// customerEffects 宣告每個顧客 service（*AppService、*PublicService、*InviteeService，不含 admin）的每個 procedure 的動作性質，
+// customerEffects 宣告每個顧客 service（*AppService、*PublicService，不含 admin）的每個 procedure 的動作性質，
 // 由 withSession 執行；key 是 procedure（/<service 全名>/<方法>）。與賣家的能力宣告（店家的狀態）是不同的關注點，不合併。
-// 公開與受邀供應商的 service 對停權的帳號一律以訪客執行，宣告仍要誠實標示方法的性質。
+// 公開的 service 對停權的帳號一律以訪客執行，宣告仍要誠實標示方法的性質。
 // 新增 procedure 必須在這裡宣告，缺宣告、多宣告都不能啟動（checkCustomerEffects）。
 var customerEffects = map[string]Effect{
 	// BuyerAppService

@@ -51,10 +51,6 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/seller/pricing",
 	"/terms",
 	"/user-policy",
-	// 站外業者的邀請信落地頁（#2539 E1）。匿名可達是刻意的——收到邀請的人正好
-	// 就是沒有平台帳號的人。沒有 fragment 裡的 secret 時它只顯示「連結無效」，
-	// 不呼叫任何端點，也不帶任何買家或賣家資料。
-	"/vendor/rfq",
 ] as const;
 
 /**

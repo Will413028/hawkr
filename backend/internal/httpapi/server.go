@@ -441,7 +441,7 @@ func checkAdminDeclarations(services []service) error {
 func mount(mux *http.ServeMux, path string, h http.Handler) {
 	audience, ok := rpc.AudienceOf(path)
 	if !ok {
-		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>InviteeService、<模組>DelegatedService、hawkr.admin.* 的 <模組>AdminService）", path))
+		panic(fmt.Sprintf("httpapi：%s 不符合 service 的命名規則（<模組>PublicService、<模組>AppService、<模組>DelegatedService、hawkr.admin.* 的 <模組>AdminService）", path))
 	}
 	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }

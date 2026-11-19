@@ -40,7 +40,7 @@ func Migrations() fs.FS {
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	// Providers 是外部的 Access 與 Google；沒有設定的欄位是 nil，對應的功能回 unavailable。
+	// Providers 是外部的 Access；沒有設定的欄位是 nil，對應的功能回 unavailable。
 	Providers Providers
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
@@ -67,9 +67,6 @@ type AdminVerifier = model.AdminVerifier
 
 // Identity 是驗證過的 Google ID token 資料。
 type Identity = model.Identity
-
-// IDTokenVerifier 驗證 Google 的 ID token。
-type IDTokenVerifier = model.IDTokenVerifier
 
 // Providers 是模組的外部身分 provider。
 type Providers = model.Providers
@@ -242,7 +239,7 @@ func New(d Deps) *Module {
 		admin:   admin.New(admin.Deps{DB: d.DB, Events: d.Events, Now: d.Now, Logger: d.Logger}),
 		auth: auth.New(auth.Deps{
 			DB: d.DB, Sessions: sess, Admin: d.Providers.Admin,
-			Google: d.Providers.Google, Now: d.Now, Logger: d.Logger,
+			Now: d.Now, Logger: d.Logger,
 		}),
 	}
 }
@@ -440,13 +437,6 @@ func (m *Module) DevNewSession(ctx context.Context) (int64, string, error) {
 	}
 	tok, err := m.DevSession(ctx, id)
 	return id, tok, err
-}
-
-// VerifyGoogle 驗證 vendor portal step-up 的 Google ID token，不登入或寫入；單體入口的 VerifySession 呼叫它。token 的 nonce 必須等於
-// wantNonce（必填，空字串是程式錯誤，回沒有分類的錯誤），iat 不得早於 10 分鐘前。回傳的 Identity 帶 EmailVerified，這裡不強制它：
-// 以 email 授權的呼叫方必須自己檢查。無效 token、nonce 不符與 token 太舊回 KindUnauthenticated；未設定 provider 或讀不到公鑰回 KindUnavailable。
-func (m *Module) VerifyGoogle(ctx context.Context, idToken, wantNonce string) (Identity, error) {
-	return m.auth.VerifyGoogle(ctx, idToken, wantNonce)
 }
 
 // PeriodicJobs 回傳本模組的排程 job；目前沒有。

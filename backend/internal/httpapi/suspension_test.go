@@ -170,7 +170,7 @@ func TestEveryDeclaredProcedureBehavesAsDeclaredForASuspendedAccount(t *testing.
 		audience, _ := rpc.AudienceOf(proc)
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		switch {
-		case audience == rpc.AudiencePublic || audience == rpc.AudienceInvitee || audience == rpc.AudienceDelegated:
+		case audience == rpc.AudiencePublic || audience == rpc.AudienceDelegated:
 			if rec.Code != http.StatusOK || s.Principal {
 				t.Errorf("%s：%d %+v，預期訪客", proc, rec.Code, s)
 			}

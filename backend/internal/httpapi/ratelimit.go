@@ -32,9 +32,6 @@ type rateTier struct {
 var (
 	tierPublic  = rateTier{name: "public", visitor: 600, ssr: 12000, ci: 300}
 	tierDefault = rateTier{name: "default", visitor: 300}
-	// tierInvitee 是受邀供應商的 service（InviteeService）的一般額度：憑證是 session cookie（32 bytes 亂數，猜不到），但身分是來源位址，
-	// 所以與 App、Admin 的方法同為每分鐘 300，單獨計數；頁面每開一張 RFQ 讀一次 GetSession，遠低於這個額度。
-	tierInvitee = rateTier{name: "invitee", visitor: 300}
 	// tierProductView 是商品瀏覽打點：匿名、不需要登入、每次都寫入一筆事件，是公開寫入裡最容易被灌的一個，額度比一般的
 	// 公開讀取低（頁面每載入一次送一次；共用位址的人也在額度內）。
 	tierProductView = rateTier{name: "product-view", visitor: 120, ssr: 2400, ci: 60}
@@ -75,8 +72,6 @@ func tiersOf(procedure string) []rateTier {
 	switch audience {
 	case rpc.AudiencePublic:
 		return []rateTier{tierPublic}
-	case rpc.AudienceInvitee:
-		return []rateTier{tierInvitee}
 	case rpc.AudienceApp, rpc.AudienceAdmin, rpc.AudienceDelegated:
 	}
 	return []rateTier{tierDefault}
