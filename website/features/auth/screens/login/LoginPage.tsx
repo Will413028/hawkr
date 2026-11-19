@@ -128,7 +128,7 @@ function LoginPageContent({
 	const showBrowserGuide = requiresBrowserGuide && browserGuideOpen;
 
 	// middleware.ts never bounces /login (hawkr-website#259): a session cookie
-	// the monolith refuses (suspended/deleted account) would otherwise
+	// the monolith refuses (deleted account) would otherwise
 	// loop the visitor away from this form. The AUTHORITATIVE check happens here
 	// — once the signed-in account resolves to a real identity, leave
 	// immediately. Hard nav (not router.replace): matches the provider-return redirect's

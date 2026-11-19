@@ -39,7 +39,7 @@ vi.mock("@/lib/navigation/document-location", () => ({
 }));
 
 import { LogoutRevokeFailedError } from "@/lib/api/auth";
-import { AUTH_EXPIRED_EVENT } from "@/lib/api/client";
+import { ACCOUNT_SUSPENDED_EVENT, AUTH_EXPIRED_EVENT } from "@/lib/api/client";
 import { messagesFor } from "@/lib/intl/config";
 import { ACTIVE_ROLE_STORAGE_KEY } from "../active-role";
 import { AuthProvider, useAuth } from "../context";
@@ -458,6 +458,46 @@ it("identity comes only from the server: no client profile fetch, and the React 
 	expect(result.current.identity).toEqual(buyer);
 	expect(result.current.identity?.nickname).toBeUndefined();
 	expect(buyerRpc.getProfile).not.toHaveBeenCalled();
+});
+
+describe("AuthProvider on ACCOUNT_SUSPENDED (restricted login)", () => {
+	it("re-reads the session once, without signing out or leaving the document", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(api.logout).not.toHaveBeenCalled();
+		expect(nav.commit).not.toHaveBeenCalled();
+		expect(nav.reload).not.toHaveBeenCalled();
+		expect(result.current.status).toBe("signedIn");
+	});
+
+	it("does not re-read when the document already knows about the suspension", async () => {
+		const { result } = await render({
+			status: "signedIn",
+			identity: {
+				...buyer,
+				suspension: { category: 0, reason: "" },
+			},
+		});
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).not.toHaveBeenCalled();
+	});
+
+	it("a guest has nothing to re-read", async () => {
+		const { result } = await render(guest);
+		await waitFor(() => expect(result.current.status).toBe("guest"));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT));
+		});
+		expect(router.refresh).not.toHaveBeenCalled();
+	});
 });
 
 describe("AuthProvider retries an unavailable session", () => {

@@ -32,6 +32,11 @@ export const AUTH_EXPIRED_EVENT = "hk-auth:expired";
 /** 任何 authed 呼叫收到業務碼 9240（SELLER_SUSPENDED_OPERATION_BLOCKED）時廣播；SellerCenterShell
  * 收到後重讀店家，頁面能否使用由更新後的能力判斷決定。 */
 export const SELLER_SUSPENDED_EVENT = "hk-seller:suspended";
+/** 任何呼叫收到 `ACCOUNT_SUSPENDED`（帳號停權，受限登入）時廣播；AuthProvider 收到後重讀登入狀態，
+ * 讓頁面載入後才被停權的使用者看到橫幅。不登出、不導頁。 */
+export const ACCOUNT_SUSPENDED_EVENT = "hk-account:suspended";
+/** 舊 REST 的 403 body（`{code, message, reason}`）帶的 `reason`，值是 `ErrorReason.ACCOUNT_SUSPENDED` 的名稱。 */
+const ACCOUNT_SUSPENDED_REASON = "ACCOUNT_SUSPENDED";
 const SELLER_SUSPENDED_CODE = 9240;
 
 export interface ApiEnvelope<T> {
@@ -359,6 +364,14 @@ export function emitSellerSuspended(detail: {
 	window.dispatchEvent(new CustomEvent(SELLER_SUSPENDED_EVENT, { detail }));
 }
 
+export function emitAccountSuspended(detail: {
+	path?: string;
+	message?: string;
+}) {
+	if (typeof window === "undefined") return;
+	window.dispatchEvent(new CustomEvent(ACCOUNT_SUSPENDED_EVENT, { detail }));
+}
+
 async function dispatch<T>(
 	mode: Mode,
 	path: string,
@@ -577,6 +590,13 @@ async function dispatch<T>(
 		// envelope-code 分支——收斂點統一放這裡才不會漏判 9240。
 		if (mode === "authed" && parsed?.code === SELLER_SUSPENDED_CODE) {
 			emitSellerSuspended({ path, message: parsed?.message || parsed?.msg });
+		}
+		if (
+			mode === "authed" &&
+			res.status === 403 &&
+			parsed?.reason === ACCOUNT_SUSPENDED_REASON
+		) {
+			emitAccountSuspended({ path, message: parsed?.message || parsed?.msg });
 		}
 		const error = new ApiClientError(
 			parsed?.message || parsed?.msg || `HTTP ${res.status}`,

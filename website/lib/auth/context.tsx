@@ -14,7 +14,7 @@ import {
 	LogoutRevokeFailedError,
 	SESSION_UNAVAILABLE,
 } from "../api/auth";
-import { AUTH_EXPIRED_EVENT } from "../api/client";
+import { ACCOUNT_SUSPENDED_EVENT, AUTH_EXPIRED_EVENT } from "../api/client";
 import {
 	canUsePerspective,
 	effectiveActiveRole,
@@ -286,6 +286,25 @@ export function AuthProvider({
 		window.addEventListener(AUTH_EXPIRED_EVENT, listener);
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
 	}, [leaveDocument]);
+
+	// 帳號停權（受限登入）：使用者主動的寫入被擋，代表這個文件載入後才被停權。重讀一次登入狀態讓橫幅出現，
+	// 不登出、不導頁；答案換新之前重複的事件不再重讀，已經知道停權的文件不需要。
+	const suspensionRefreshPending = React.useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: identity 換新代表重讀的答案到了
+	React.useEffect(() => {
+		suspensionRefreshPending.current = false;
+	}, [identity]);
+	React.useEffect(() => {
+		const listener = () => {
+			if (statusRef.current !== "signedIn") return;
+			if (latestIdentity.current?.suspension) return;
+			if (suspensionRefreshPending.current) return;
+			suspensionRefreshPending.current = true;
+			refreshFromServer();
+		};
+		window.addEventListener(ACCOUNT_SUSPENDED_EVENT, listener);
+		return () => window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, listener);
+	}, [refreshFromServer]);
 
 	const peerView = React.useRef({ status, accountId: identity?.accountId });
 	peerView.current = { status, accountId: identity?.accountId };

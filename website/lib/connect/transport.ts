@@ -10,7 +10,11 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { classifyError, factsFromError } from "@hawkr/api/connect/errors";
 import { retryInterceptor } from "@hawkr/api/connect/retry";
 import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
-import { AUTH_EXPIRED_EVENT, emitSellerSuspended } from "@/lib/api/client";
+import {
+	AUTH_EXPIRED_EVENT,
+	emitAccountSuspended,
+	emitSellerSuspended,
+} from "@/lib/api/client";
 import {
 	DelegatedRuntimeTransportError,
 	isDelegatedRuntime,
@@ -153,6 +157,7 @@ export function optionalAuthTransport(
 		interceptors: [
 			languageInterceptor(opts),
 			reportInterceptor(),
+			accountSuspendedInterceptor(),
 			retryInterceptor({ server: !isBrowser }),
 		],
 	});
@@ -188,6 +193,7 @@ export function authedTransport(opts: TransportOptions = {}): Transport {
 				reportInterceptor(sentryCapture("authed")),
 				authExpiredInterceptor(),
 				sellerSuspendedInterceptor(),
+				accountSuspendedInterceptor(),
 				retryInterceptor({ server: !isBrowser }),
 			],
 		}),
@@ -340,6 +346,53 @@ export function sellerSuspendedInterceptor(
 						path: `/${req.service.typeName}/${req.method.name}`,
 						message: d.message ?? err.rawMessage,
 					});
+				}
+			}
+			throw raw;
+		}
+	};
+}
+
+/**
+ * 使用者沒有主動觸發的寫入（頁面載入或瀏覽時自動送出）：停權帳號收到 `ACCOUNT_SUSPENDED` 時靜默略過，
+ * 不廣播、不轉到受限畫面（A7-D17、A7-D18）。key 是 `<service typeName>/<method name>`；
+ * 新增自動觸發的寫入時加在這裡，其餘寫入都視為使用者主動。
+ */
+export const BACKGROUND_WRITE_METHODS: ReadonlySet<string> = new Set([
+	"hawkr.social.v1alpha1.SocialPublicService/RecordPostView",
+	"hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit",
+]);
+
+/**
+ * 回 `permission_denied` 加 reason `ACCOUNT_SUSPENDED`：帳號被停權（受限登入，停權者仍能登入、瀏覽與刪除帳號）。
+ * 使用者主動的寫入廣播一次，AuthProvider 收到後重讀登入狀態，頁面載入後才被停權的使用者因此看到橫幅；
+ * 背景寫入（`BACKGROUND_WRITE_METHODS`）不廣播。兩者都不登出、不導頁，錯誤原樣丟出（呼叫端用 `errorText` 顯示）。
+ */
+export function accountSuspendedInterceptor(
+	emit: (detail: {
+		path: string;
+		message: string;
+	}) => void = emitAccountSuspended,
+): Interceptor {
+	return (next) => async (req) => {
+		try {
+			return await next(req);
+		} catch (raw) {
+			const err = ConnectError.from(raw);
+			const path = `/${req.service.typeName}/${req.method.name}`;
+			if (
+				!BACKGROUND_WRITE_METHODS.has(
+					`${req.service.typeName}/${req.method.name}`,
+				)
+			) {
+				const d = classifyError(
+					factsFromError(err, req.method, req.stream ? undefined : req.message),
+				);
+				if (
+					d.action === "reason" &&
+					d.reason === ErrorReason.ACCOUNT_SUSPENDED
+				) {
+					emit({ path, message: d.message ?? err.rawMessage });
 				}
 			}
 			throw raw;
