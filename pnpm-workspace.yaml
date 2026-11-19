@@ -85,17 +85,6 @@ overrides:
   # 無安全 advisory，純為滿足發佈年齡規則。
   # REMOVE-WHEN: requesters-demand >=5.4.1
   "@sentry/webpack-plugin": 5.3.0
-  # GHSA-r28c-9q8g-f849 + GHSA-fxqj-rqcc-2cmp: attacker-controlled
-  # sourceMappingURL reads arbitrary .map files when `from` is unset. The
-  # second advisory is the incomplete-fix follow-up; patched >=8.5.23.
-  # next 16.3.2 now pins the safe version 8.5.23 exactly. Other requesters still
-  # admit older vulnerable releases, so this workspace-wide security floor stays.
-  # Pinned to 8.5.32: vite declares `^8.5.30`, and 8.5.32 is the newest release
-  # at least two weeks old. It is above Next's exact 8.5.23 pin, so the overshoot
-  # stays explicit.
-  # EXCEEDS-UPSTREAM: next — the override pin is above its exact 8.5.23 pin
-  # REMOVE-WHEN: requesters-demand >=8.5.23
-  postcss: 8.5.32
   # GHSA-rgw5-rvv9-x895 (supersedes GHSA-mh99-v99m-4gvg / GHSA-3jxr-9vmj-r5cp):
   # DoS via unbounded intermediate arrays. Only the 5.x line is affected, and
   # minimatch 3.x/8.x still legitimately sit on 1.x/2.x — so this is scoped to
