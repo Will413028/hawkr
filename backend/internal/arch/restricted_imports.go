@@ -16,13 +16,13 @@ type RestrictedImports struct {
 	Why string
 }
 
-// LLMClientImports 守住單一 LLM client 建構點：各 provider 的 SDK 與 ADK 的 model 實作只有 internal/platform/llm 能 import，
+// LLMClientImports 守住單一 LLM client 建構點：ADK 的 model 實作與 openai SDK 只有 internal/platform/llm 能 import（genai 的型別如 Content、Part
+// 是 ADK agent、runner、tool 的介面，各處可以 import，建構 client 的 genai.NewClient 由 LLMClientCalls 守），
 // 其他套件從那裡拿已決定好開通與否的 Model，不自己建 client，也就不會漏掉 provider 的 request quirk 或讓缺金鑰擋住啟動。
 var LLMClientImports = RestrictedImports{
 	Paths: []string{
 		"google.golang.org/adk/v2/model/gemini",
 		"google.golang.org/adk/v2/model/openaimodel",
-		"google.golang.org/genai",
 		"github.com/openai/openai-go/v3",
 	},
 	AllowedPackages: []string{ModulePath + "/internal/platform/llm"},
