@@ -62,13 +62,6 @@ SELECT store_id, count(*)::bigint AS count
 FROM buyer.seller_subscriptions
 WHERE store_id = ANY($1::bigint[]) GROUP BY store_id;
 
--- name: SubscribersOffset :many
-SELECT buyer_id, created_at
-FROM buyer.seller_subscriptions
-WHERE store_id = @store_id
-ORDER BY created_at DESC, buyer_id DESC
-LIMIT @page_limit OFFSET @page_offset;
-
 -- name: SubscriberStats :many
 -- 店家的粉絲總數，以及每個時間窗 [window_start, window_end) 內新增的追蹤數（以追蹤時間計）。一句查詢：總數與各窗來自同一個
 -- snapshot，結果依窗的順序（window_index 從 1 起）。
