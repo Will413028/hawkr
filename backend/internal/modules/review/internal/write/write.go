@@ -62,7 +62,12 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單資格（唯一的快照來源）→ 買家是否仍營運 → 期限 → 項目 → transaction 外轉正圖片 →
+// orderNotFound 是訂單不存在與訂單屬於別人的共同回應，呼叫端分不出兩者（A6-D10）。
+func orderNotFound(l uitext.Locale) error {
+	return model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
+}
+
+// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運 → 期限 → 項目 → transaction 外轉正圖片 →
 // transaction 內寫列、排媒體同步與快取失效、發事件。
 func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Review, error) {
 	l := uitext.LocaleFrom(ctx)
@@ -74,15 +79,15 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	order, err := s.d.Orders.OrderForReview(ctx, in.OrderNo)
 	switch {
 	case errors.Is(err, model.ErrOrderNotFound):
-		return model.Review{}, model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
+		return model.Review{}, orderNotFound(l)
 	case err != nil:
 		return model.Review{}, apperr.WithCause(apperr.Unavailable("%s", text.ReviewOrderUnavailable(l)), err)
 	}
+	if order.BuyerID != in.BuyerID {
+		return model.Review{}, orderNotFound(l)
+	}
 	if order.Status != model.OrderStatusCompleted {
 		return model.Review{}, model.WithReason(apperr.FailedPrecondition("%s", text.ReviewOrderNotReviewable(l)), model.ReasonOrderNotReviewable)
-	}
-	if order.BuyerID != in.BuyerID {
-		return model.Review{}, apperr.PermissionDenied("%s", text.ReviewOrderNotYours(l))
 	}
 	inactive, err := s.q(ctx).IsInactiveAuthor(ctx, in.BuyerID)
 	if err != nil {

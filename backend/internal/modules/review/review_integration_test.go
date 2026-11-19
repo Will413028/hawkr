@@ -337,7 +337,7 @@ func TestSubmitRules(t *testing.T) {
 
 	other := f.newBuyer(t)
 	it2 := f.order(b, storeID, 700)
-	if _, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: other.BuyerID, OrderNo: it2.orderNo, OrderItemID: it2.itemID, Rating: 5}); kindOf(err) != apperr.KindPermissionDenied {
+	if _, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: other.BuyerID, OrderNo: it2.orderNo, OrderItemID: it2.itemID, Rating: 5}); kindOf(err) != apperr.KindNotFound || review.ReasonOf(err) != review.ReasonOrderNotFound {
 		t.Fatalf("別人的訂單：%v", err)
 	}
 	if _, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it2.orderNo, OrderItemID: it2.itemID + 999, Rating: 5}); kindOf(err) != apperr.KindInvalidInput {

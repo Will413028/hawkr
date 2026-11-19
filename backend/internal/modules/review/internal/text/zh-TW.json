@@ -57,10 +57,6 @@
       "message": "訂單完成後才能評價",
       "description": "訂單狀態不是已完成（50）。"
     },
-    "review.order_not_yours": {
-      "message": "這不是你的訂單",
-      "description": "訂單的買家不是提交者。"
-    },
     "review.order_required": {
       "message": "訂單編號必填",
       "description": "order_no 是空的。"

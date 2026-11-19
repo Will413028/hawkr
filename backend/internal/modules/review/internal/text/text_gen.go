@@ -186,15 +186,6 @@ func ReviewOrderNotReviewable(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "訂單完成後才能評價", Locale: uitext.ZhTW}
 }
 
-// ReviewOrderNotYours 是模組句子 review.order_not_yours；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReviewOrderNotYours(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "This is not your order", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "這不是你的訂單", Locale: uitext.ZhTW}
-}
-
 // ReviewOrderRequired 是模組句子 review.order_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReviewOrderRequired(l uitext.Locale) uitext.Message {
 	switch l {

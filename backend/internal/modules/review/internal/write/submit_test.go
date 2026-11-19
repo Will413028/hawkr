@@ -96,23 +96,34 @@ func TestSubmitSeparatesOrderNotFoundFromUnavailable(t *testing.T) {
 	}
 }
 
-func TestSubmitChecksStatusThenOwnerThenWindowOrderMatchesLegacy(t *testing.T) {
+// A6-D10：擁有者先於狀態檢查，別人的訂單（不論狀態）與不存在的訂單回應一致。
+func TestSubmitForeignOrderIsIndistinguishableFromAbsent(t *testing.T) {
 	completed := now.Add(-time.Hour)
-	order := model.OrderForReview{OrderNo: "N1", BuyerID: 11, StoreID: 22, Status: "50", CompletedAt: completed, Items: []model.OrderItem{{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", Price: 100}}}
+	order := model.OrderForReview{OrderNo: "N1", BuyerID: 99, StoreID: 22, Status: "50", CompletedAt: completed, Items: []model.OrderItem{{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", Price: 100}}}
+
+	_, absent := service(&orders{err: model.ErrOrderNotFound}).Submit(context.Background(), valid())
 
 	notDone := order
 	notDone.Status = "40"
-	notDone.BuyerID = 99 // 狀態與擁有者都不符：舊碼先檢查狀態
 	_, err := service(&orders{order: notDone}).Submit(context.Background(), valid())
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || model.ReasonOf(err) != model.ReasonOrderNotReviewable {
-		t.Fatalf("狀態不是 50：%v", err)
+	if apperr.KindOf(err) != apperr.KindNotFound || model.ReasonOf(err) != model.ReasonOrderNotFound {
+		t.Fatalf("別人且未完成的訂單要是 NotFound：%v", err)
 	}
 
-	other := order
-	other.BuyerID = 99
-	_, err = service(&orders{order: other}).Submit(context.Background(), valid())
-	if apperr.KindOf(err) != apperr.KindPermissionDenied {
-		t.Fatalf("不是買家的訂單：%v", err)
+	_, err = service(&orders{order: order}).Submit(context.Background(), valid())
+	if apperr.KindOf(err) != apperr.KindNotFound || model.ReasonOf(err) != model.ReasonOrderNotFound {
+		t.Fatalf("別人且已完成的訂單要是 NotFound：%v", err)
+	}
+	if err.Error() != absent.Error() || apperr.KindOf(err) != apperr.KindOf(absent) || model.ReasonOf(err) != model.ReasonOf(absent) {
+		t.Fatalf("要與不存在的訂單一致：%v vs %v", err, absent)
+	}
+
+	own := order
+	own.BuyerID = 11
+	own.Status = "40"
+	_, err = service(&orders{order: own}).Submit(context.Background(), valid())
+	if apperr.KindOf(err) != apperr.KindFailedPrecondition || model.ReasonOf(err) != model.ReasonOrderNotReviewable {
+		t.Fatalf("自己的未完成訂單：%v", err)
 	}
 }
 

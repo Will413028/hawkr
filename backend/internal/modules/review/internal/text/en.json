@@ -39,9 +39,6 @@
     "review.order_not_reviewable": {
       "message": "You can review an order after it is completed"
     },
-    "review.order_not_yours": {
-      "message": "This is not your order"
-    },
     "review.order_required": {
       "message": "The order number is required"
     },
