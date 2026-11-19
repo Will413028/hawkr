@@ -49,8 +49,7 @@ const (
 	headerActiveRole         = "X-Active-Role"
 )
 
-// vendorPortalHeaderPrefix 是 gateway 的供應商入口讀的 header 前綴。單體不再驗證供應商 session，也就不會設這些 header；
-// gateway 在這些路由刪除之前仍信任它們，所以入口仍要刪掉 client 帶來的（不分大小寫）。
+// vendorPortalHeaderPrefix 是 gateway 的供應商入口路由信任的 header 前綴；單體入口一律刪掉 client 帶來的這類 header（不分大小寫）。
 const vendorPortalHeaderPrefix = "X-Vendor-Portal-"
 
 // 連 gateway 的逾時。SSE 與 WebSocket 會長時間佔著連線，所以不設整體的逾時，只限制連線與等到回應 header 的時間。

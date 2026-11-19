@@ -78,16 +78,6 @@ type AdminVerifier interface {
 	Verify(ctx context.Context, token string) (AdminIdentity, error)
 }
 
-// Identity 是驗證過的 Google ID token 的內容。
-type Identity struct {
-	Subject       string
-	Email         string
-	EmailVerified bool
-	// Nonce 是 token 的 nonce claim，沒有時是空字串；IssuedAt 是 iat，沒有時是零值。
-	Nonce    string
-	IssuedAt time.Time
-}
-
 // Providers 是外部的 provider。沒有設定的欄位是 nil 或空的。
 type Providers struct {
 	// Admin 是後台的 Access 或本機 dev verifier。

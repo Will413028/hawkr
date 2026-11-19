@@ -121,3 +121,7 @@ vendor portal 讓沒有帳號的供應商從採購詢價（RFQ）的邀請信進
 ## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `2026-10-27-ecommerce-scope-cut` 步驟 6，計畫已刪除，見 `2026-10-27-general-ecommerce-scope-cut` 文末修訂）
 
 邀請信內容那一條提到的「Pricebook 參考區間」不存在：pricebook 已刪除，報價只看供應商報的價，信件與 preview 都沒有參考區間。
+
+## 修訂：由 A9-D1 取代（2026-11-19，Will 決定 A9-D1；ADR `2026-11-19-ai-service-monolith-scope`、`2026-09-24-go-modular-monolith` 同日修訂）
+
+本 ADR 被取代：A9-D1 刪除站外業者路線，單體不再有供應商入口的邀請、session 與 `VendorPortalPublicService`、`VendorPortalInviteeService`，`internal/modules/agent` 不存在。單體端在 A9-1a 刪除；gateway 與 ai-service 端在 A9-6 刪除。上文的決策只作歷史紀錄，不再是現行規則。

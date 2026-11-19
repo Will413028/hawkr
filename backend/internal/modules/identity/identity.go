@@ -65,9 +65,6 @@ type AdminIdentity = model.AdminIdentity
 // AdminVerifier 驗證後台 Access 或 dev token。
 type AdminVerifier = model.AdminVerifier
 
-// Identity 是驗證過的 Google ID token 資料。
-type Identity = model.Identity
-
 // Providers 是模組的外部身分 provider。
 type Providers = model.Providers
 
