@@ -1,6 +1,6 @@
 // Package accountservice 是遷移期的暫時轉接：單體替舊服務提供 account-service 的 gRPC（AccountService），讓還沒搬進
-// 單體的呼叫方（seller、social、crm、coupon 與 gateway）照舊呼叫，實作是 identity 模組。呼叫方都搬進單體
-// （遷移計畫 A3、A6、A7、B7，以及 gateway 刪除）之後刪除。
+// 單體的呼叫方（seller、crm、coupon 與 gateway）照舊呼叫，實作是 identity 模組。呼叫方都搬進單體
+// （遷移計畫 A3、A6、B7，以及 gateway 刪除）之後刪除。
 //
 // 只實作仍有呼叫方的方法（遷移計畫的 rpc-calls.csv）；其餘由 Unimplemented 回 unimplemented。業務錯誤照舊放在回應的
 // code（舊的 go-pkg/errors：400、404），不是 gRPC 的 status：呼叫方是這樣判斷的。服務間的 HMAC 簽章不驗：legacy 的
@@ -16,10 +16,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/accounttype"
 	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/account"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
-	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 // 舊的業務碼（go-pkg/errors）。
@@ -28,24 +26,18 @@ const (
 	codeNotFound     = 404
 )
 
-// Suspender 是停權的入口（accountsuspension.Module）。
-type Suspender interface {
-	Suspend(ctx context.Context, accountID int64, rec accountsuspension.Record) (accountsuspension.Suspension, error)
-}
-
 // Server 實作 AccountService 的子集。
 type Server struct {
 	accountconnect.UnimplementedAccountServiceHandler
-	m         *identity.Module
-	suspender Suspender
-	log       *slog.Logger
+	m   *identity.Module
+	log *slog.Logger
 }
 
 var _ accountconnect.AccountServiceHandler = (*Server)(nil)
 
 // New 建立 server。
-func New(m *identity.Module, suspender Suspender, log *slog.Logger) *Server {
-	return &Server{m: m, suspender: suspender, log: log}
+func New(m *identity.Module, log *slog.Logger) *Server {
+	return &Server{m: m, log: log}
 }
 
 // businessCode 把模組的錯誤轉成舊的業務碼；沒有分類的錯誤回 error（gRPC 的 internal）。
@@ -145,21 +137,4 @@ func (s *Server) RemoveRole(ctx context.Context, req *connect.Request[pb.RemoveR
 		return connect.NewResponse(&pb.RemoveRoleResponse{Code: code, Message: msg}), nil
 	}
 	return connect.NewResponse(&pb.RemoveRoleResponse{}), nil
-}
-
-// SuspendAccount 是 social 的 BAN_USER：舊的實作在錯誤時回 gRPC 的錯誤（沒有業務碼），這裡照舊。理由類別一律是 OTHER，舊的
-// reason 字串是說明。
-func (s *Server) SuspendAccount(ctx context.Context, req *connect.Request[pb.SuspendAccountRequest]) (*connect.Response[pb.SuspendAccountResponse], error) {
-	_, err := s.suspender.Suspend(ctx, req.Msg.GetAccountId(), accountsuspension.Record{Category: policy.Other, Reason: req.Msg.GetReason()})
-	if err != nil {
-		if k := apperr.KindOf(err); k == apperr.KindNotFound {
-			return nil, connect.NewError(connect.CodeNotFound, err)
-		} else if k == apperr.KindFailedPrecondition {
-			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
-		} else if k == apperr.KindInvalidInput {
-			return nil, connect.NewError(connect.CodeInvalidArgument, err)
-		}
-		return nil, err
-	}
-	return connect.NewResponse(&pb.SuspendAccountResponse{Success: true}), nil
 }

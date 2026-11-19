@@ -314,7 +314,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	legacyMux := http.NewServeMux()
-	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, suspension, log)))
+	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, agentModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
