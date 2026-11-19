@@ -185,8 +185,8 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		// Middleware is one of only two places on this site that can see who the
 		// visitor is (a cached RSC render cannot — `headers()` throws inside
 		// `use cache`), so it is where the storefront lookup gets attributed to
-		// the person it is made for rather than to the site's shared SSR quota
-		// (backend#2264). See `getVisitorIp` for why the address is trustworthy.
+		// the person it is made for rather than to the site's shared SSR quota.
+		// See `getVisitorIp` for why the address is trustworthy.
 		const visitorIp = getVisitorIp(request);
 		const outcome = await resolveStorefrontRequest(pathname, (storeCode) =>
 			lookupStore(storeCode, visitorIp),

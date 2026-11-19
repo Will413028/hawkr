@@ -5,9 +5,9 @@ import { isStoreAbsentError, isStoreCodeShape } from "./public-store";
 /**
  * 店面網址的 request 判斷，給 `middleware.ts`：`/sellers/{store_code}` 底下的頁面是靜態預渲染，
  * 預渲染的回應沒有地方放狀態碼，頁面裡的 `notFound()` 會回 404 內容卻是 200，所以真正的 404 只能由
- * middleware 決定。店面不存在、不公開（`GetStore` 回 not_found，兩者回應相同）與網址段形狀不對
- * （`stores_store_code_check` 之外，GetStore 回 invalid_argument）都是 404，頁面不透露原因；
- * 其餘錯誤（5xx、逾時、連線失敗）不是「沒有這家店」，放行讓頁面自己渲染。
+ * middleware 決定。只有 `GetStore` 回 not_found（店面不存在或不公開，兩者回應相同）
+ * 才是 404，頁面不透露原因；invalid_argument 與其餘錯誤（5xx、逾時、連線失敗）都不是「沒有這家店」，
+ * 屬於不明，放行讓頁面自己渲染。
  */
 
 const STORE_PATH = /^\/sellers\/([^/]+)(\/.*)?$/;

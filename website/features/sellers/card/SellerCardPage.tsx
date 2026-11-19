@@ -120,9 +120,7 @@ export default async function SellerCardPage({ seller }: SellerCardPageProps) {
 							<span>
 								<AppIcon name="star" size={15} fill />
 								<strong>{avgRating.toFixed(1)}</strong>
-								{totalReviews !== undefined ? (
-									<small>{totalReviews} 則評價</small>
-								) : null}
+								<small>{totalReviews ?? "—"} 則評價</small>
 							</span>
 						) : null}
 						{location ? (

@@ -29,10 +29,10 @@ async function html(seller: Record<string, unknown>): Promise<string> {
 }
 
 describe("SellerCardPage stats", () => {
-	it("hides the review count segment when reviewCount is unset, like the rating", async () => {
+	it("renders an em dash review count when reviewCount is unset", async () => {
 		const out = await html({ ratingAverage: 4.5 });
 		expect(out).toContain("4.5");
-		expect(out).not.toContain("則評價");
+		expect(out).toContain("— 則評價");
 	});
 
 	it("shows the review count when it is set", async () => {

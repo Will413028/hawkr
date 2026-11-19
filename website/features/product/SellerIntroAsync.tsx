@@ -1,6 +1,4 @@
 import { getCachedStore } from "@/lib/api/cached";
-import { imageUri } from "@/lib/media/image";
-import { fetchStoreCards } from "@/lib/seller/fetchStoreCards";
 import ProductSellerIntro from "./components/ProductSellerIntro";
 
 /**
@@ -8,10 +6,9 @@ import ProductSellerIntro from "./components/ProductSellerIntro";
  * instantly from the product payload's embedded `seller` block (see the
  * <Suspense> fallback in ProductDetailPage); only the rating / review-count /
  * subscriber numbers need a store read, which gates this component. The read is
- * `GetStore` by the block's store_code; a block without a code is resolved by
- * `BatchGetStores` on the store id, which also supplies the code for the link
- * but carries no follower count. Keeping it here pulls that upstream round-trip
- * off the page's critical TTFB path.
+ * `GetStore` by the block's store_code; a block without a code has no storefront
+ * link and its stats stay unset. Keeping the read here pulls that upstream
+ * round-trip off the page's critical TTFB path.
  */
 export default async function SellerIntroAsync({
 	sellerId,
@@ -45,27 +42,11 @@ export default async function SellerIntroAsync({
 			/>
 		);
 	}
-	const card = await fetchStoreCards([sellerId])
-		.then((cards) => cards.get(sellerId) ?? null)
-		.catch(() => null);
 	return (
 		<ProductSellerIntro
 			sellerId={sellerId}
-			seller={
-				card
-					? {
-							storeCode: card.storeCode,
-							name: card.name,
-							logoUrl: imageUri(card.logo, "avatar") ?? "",
-							reviewCount: card.reviewCount,
-						}
-					: null
-			}
-			sellerStats={
-				card?.ratingAverage !== undefined && card.reviewCount !== undefined
-					? { avgRating: card.ratingAverage, totalCount: card.reviewCount }
-					: null
-			}
+			seller={null}
+			sellerStats={null}
 			followerStats={null}
 			productSeller={productSeller}
 		/>
