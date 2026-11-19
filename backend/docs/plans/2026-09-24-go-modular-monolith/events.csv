@@ -44,7 +44,7 @@ buyer.deleted,hawkr.buyer,buyer-service,coupon-service,coupon.buyer.deleted,clea
 buyer.deleted,hawkr.buyer,buyer-service,crm-service,crm.buyer.deleted,cleanup CRM buyer data,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buyer chat data,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,notification-service,notification.buyer.deleted,purge buyer inbox/devices,yes,STATE,
-buyer.deleted,hawkr.buyer,buyer-service,social-service,social.buyer.deleted,cleanup buyer posts/comments,yes,STATE,
+buyer.deleted,hawkr.buyer,buyer-service,social-service,social.buyer.deleted,cleanup buyer posts/comments,yes,STATE,in-tx-event: social 訂閱 buyer.BuyerDeletionRequested 與 BuyerDeleted，同 transaction 記 inactive_authors 並 Enqueue 清除 job（A7-D11）
 buyer.favorite.added,hawkr.buyer,buyer-service,notification-service,notification.buyer,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 buyer.favorite.added,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.added,sync product favorite count,yes,PROJECTION,
 buyer.favorite.removed,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.removed,sync product favorite count,yes,PROJECTION,
@@ -56,7 +56,7 @@ comment.like_changed,hawkr.content,social-service,notification-service,notificat
 comment.replied,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
 comment.replied,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,
 comment.updated,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
-counter.delta,hawkr.content,social-service,social-service,social.counter.delta,apply post/comment counters,yes,PROJECTION,
+counter.delta,hawkr.content,social-service,social-service,social.counter.delta,apply post/comment counters,yes,PROJECTION,removed: 計數改由 stats 表與 trigger 維護（A7-D11），SD17 接受事件退場
 follow.added,hawkr.content,buyer-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 post.created,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
 post.hidden_by_platform,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
