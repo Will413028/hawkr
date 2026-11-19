@@ -343,10 +343,6 @@ func (p *Publisher) PublishCommentLikeChanged(ctx context.Context, event *Commen
 	return p.Publish(ctx, ExchangeContent, RoutingKeyCommentLikeChanged, event)
 }
 
-func (p *Publisher) PublishCounterDelta(ctx context.Context, event *CounterDeltaEvent) error {
-	return p.Publish(ctx, ExchangeContent, RoutingKeyCounterDelta, event)
-}
-
 // 41 號設計書 §6.2：notification-service 首次成為 producer
 func (p *Publisher) PublishNotificationInboxNew(ctx context.Context, event *NotificationInboxNewEvent) error {
 	return p.Publish(ctx, ExchangeNotification, RoutingKeyNotificationInboxNew, event)

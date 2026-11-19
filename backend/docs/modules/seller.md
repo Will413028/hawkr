@@ -461,7 +461,7 @@
 
 - `seller.pub_exposable_stores(at timestamptz) RETURNS SETOF seller.pub_exposable_store (store_id bigint)`：`at` 這一刻可以公開曝光的店家，曝光規則唯一的家（ADR `2026-09-24-go-modular-monolith` 文末修訂的曝光規則段）。`at` 由呼叫方以請求的 clock 傳入，不用 `now()`；函式會被內聯（沒有 Function Scan），join 時每家店對 measures 的讀取是以帳號為鍵的索引探測。上層用法：`EXISTS (SELECT 1 FROM seller.pub_exposable_stores(sqlc.arg(now)::timestamptz) e WHERE e.store_id = p.store_id)`。`store_exposures`、`StoreExposureChanged` 與 15 分鐘對帳只為行程外的 legacy 消費者保留，消費者搬進單體後刪除。
 
-- `seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown (measure_id, content_kind, content_id, measure_created_at)`（`measure_created_at` 是措施的建立時間）：此刻生效中（未撤銷）的內容下架措施的對象，一列一個（措施，內容）；不收 `at`，因為下架建立即生效、沒有結束時間。給 social 每日對帳核對自己的複本，social 的讀取不 join 它（規格 `social.md` §4）。部分索引 `measures_active_takedown` 服務它。`TestPubContentTakedownsListsOnlyActiveTakedownTargets` 鎖住它。
+- `seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown (measure_id, content_kind, content_id)`：此刻生效中（未撤銷）的內容下架措施的對象，一列一個（措施，內容）；同一則內容同時至多一個生效中的下架措施（唯一索引 `measure_contents_one_enforced`），所以一則內容至多一列；不收 `at`，因為下架建立即生效、沒有結束時間。給 social 每日對帳核對自己的複本，social 的讀取不 join 它（規格 `social.md` §4）。部分索引 `measures_active_takedown` 服務它。`TestPubContentTakedownsListsOnlyActiveTakedownTargets` 鎖住它。
 
 - `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻營運要處理的全部待辦（10 種，都有期限），是 10 支 `review_<種類>(at)` 的 `UNION ALL`，成員、開始與期限的規則只在那些函式。`reviewqueue` 模組讀它排序分頁（`due_at, start_at, kind, item_id` 的 keyset），沒有排序保證；`at` 由呼叫方傳入。`TestPubReviewItemsIsTheUnionOfTheReviewFunctions` 鎖住它等於逐支函式的集合。
 

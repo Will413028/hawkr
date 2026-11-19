@@ -235,4 +235,8 @@ func TestUnimplementedMethods(t *testing.T) {
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
 		t.Fatalf("GoogleOAuth = %v", err)
 	}
+	_, err = f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{}))
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
+		t.Fatalf("SuspendAccount = %v", err)
+	}
 }

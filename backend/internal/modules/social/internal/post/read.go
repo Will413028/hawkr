@@ -119,16 +119,24 @@ func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	if err != nil {
 		return fmt.Errorf("social：讀取貼文的下架措施：%w", err)
 	}
-	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
-	for _, r := range rows {
-		byPost[*r.PostID] = r.MeasureID
-	}
+	byPost := firstMeasurePerPost(rows)
 	for i := range posts {
 		if m, ok := byPost[posts[i].ID]; ok {
 			posts[i].TakedownMeasureID = &m
 		}
 	}
 	return nil
+}
+
+// firstMeasurePerPost 依列的順序（SQL 以 post_id、measure_id 排序）每篇貼文留第一個措施，同一篇出現多列時結果是確定的。
+func firstMeasurePerPost(rows []store.TakedownMeasuresOfPostsRow) map[uuid.UUID]uuid.UUID {
+	byPost := make(map[uuid.UUID]uuid.UUID, len(rows))
+	for _, r := range rows {
+		if _, seen := byPost[*r.PostID]; !seen {
+			byPost[*r.PostID] = r.MeasureID
+		}
+	}
+	return byPost
 }
 
 // viewerOf 是公開讀取的觀看者：呼叫者的買家身分；零值是未登入。

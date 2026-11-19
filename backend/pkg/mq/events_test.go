@@ -120,25 +120,6 @@ func TestBuyerDeletedEvent_JSONShape(t *testing.T) {
 	}
 }
 
-func TestCounterDeltaEvent_JSONShape(t *testing.T) {
-	ev := NewCounterDeltaEvent("post", 10, "comment_count", 1)
-	if ev.EntityType != "post" || ev.EntityID != 10 || ev.Field != "comment_count" || ev.Delta != 1 {
-		t.Fatalf("unexpected event fields: %+v", ev)
-	}
-	if ev.EventType != EventTypeCounterDelta {
-		t.Fatalf("EventType = %q, want %q", ev.EventType, EventTypeCounterDelta)
-	}
-	b, err := json.Marshal(ev)
-	if err != nil {
-		t.Fatalf("marshal CounterDeltaEvent: %v", err)
-	}
-	for _, want := range []string{`"entityType":"post"`, `"entityId":10`, `"field":"comment_count"`, `"delta":1`} {
-		if !strings.Contains(string(b), want) {
-			t.Errorf("marshaled JSON missing %q, got: %s", want, b)
-		}
-	}
-}
-
 func TestBaseEvent_WireKeyIsSnakeCaseEventType(t *testing.T) {
 	b, err := json.Marshal(NewBaseEvent(EventTypeAccountDeleted, "test"))
 	if err != nil {

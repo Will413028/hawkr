@@ -124,7 +124,7 @@ func (u *CertificationUseCase) CreateDraft(ctx context.Context, req *dto.CreateC
 	if err != nil {
 		return nil, fmt.Errorf("load seller: %w", err)
 	}
-	if err := u.enforceCertificationPrecondition(ctx, seller); err != nil {
+	if err := u.enforceCertificationPrecondition(seller); err != nil {
 		return nil, err
 	}
 
@@ -457,7 +457,7 @@ func (u *CertificationUseCase) Submit(ctx context.Context, req *dto.SubmitApplic
 		return errors.NewUnavailable("帳號資訊暫時無法取得，請稍後再試")
 	}
 
-	if err := u.enforceCertificationPrecondition(ctx, seller); err != nil {
+	if err := u.enforceCertificationPrecondition(seller); err != nil {
 		return err
 	}
 
@@ -513,8 +513,8 @@ func (u *CertificationUseCase) Submit(ctx context.Context, req *dto.SubmitApplic
 	return nil
 }
 
-func (u *CertificationUseCase) enforceCertificationPrecondition(ctx context.Context, seller *domain.Seller) error {
-	if domain.MeetsCertificationPrecondition(false, seller.Description, seller.WebsiteURL) {
+func (u *CertificationUseCase) enforceCertificationPrecondition(seller *domain.Seller) error {
+	if domain.MeetsCertificationPrecondition(seller.Description, seller.WebsiteURL) {
 		return nil
 	}
 	return errors.NewPreconditionFailed("請先同時填寫自我介紹與官方網站網址")

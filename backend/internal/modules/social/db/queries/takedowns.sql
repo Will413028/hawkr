@@ -55,9 +55,10 @@ SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);
 
 -- name: TakedownMeasuresOfPosts :many
--- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），所以一篇貼文至多一列。
+-- 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），所以一篇貼文至多一列；仍以 post_id、measure_id 排序，讓複本異常時結果確定。
 SELECT post_id, measure_id FROM social.content_takedowns
-WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[]);
+WHERE post_id = ANY(sqlc.arg(post_ids)::uuid[])
+ORDER BY post_id, measure_id;
 
 -- name: DeleteTakedownsOfMeasure :execrows
 DELETE FROM social.content_takedowns WHERE measure_id = sqlc.arg(measure_id);

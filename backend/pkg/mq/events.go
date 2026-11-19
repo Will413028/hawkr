@@ -38,7 +38,6 @@ const (
 	EventTypeCommentUpdated       EventType = "COMMENT_UPDATED"
 	EventTypeCommentDeleted       EventType = "COMMENT_DELETED"
 	EventTypeCommentLikeChanged   EventType = "COMMENT_LIKE_CHANGED"
-	EventTypeCounterDelta         EventType = "COUNTER_DELTA"
 
 	EventTypeNotificationInboxNew      EventType = "NOTIFICATION_INBOX_NEW"
 	EventTypeNotificationUnreadChanged EventType = "NOTIFICATION_UNREAD_CHANGED"
@@ -372,24 +371,6 @@ func NewCommentLikeChangedEvent(
 		LikerPrincipalID:     likerPrincipalID,
 		LikerName:            likerName,
 		CommentAuthorType:    commentAuthorType,
-	}
-}
-
-type CounterDeltaEvent struct {
-	BaseEvent
-	EntityType string `json:"entityType"`
-	EntityID   int64  `json:"entityId"`
-	Field      string `json:"field"`
-	Delta      int32  `json:"delta"`
-}
-
-func NewCounterDeltaEvent(entityType string, entityID int64, field string, delta int32) *CounterDeltaEvent {
-	return &CounterDeltaEvent{
-		BaseEvent:  NewBaseEvent(EventTypeCounterDelta, "social-service"),
-		EntityType: entityType,
-		EntityID:   entityID,
-		Field:      field,
-		Delta:      delta,
 	}
 }
 
