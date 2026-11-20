@@ -8,7 +8,6 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	crmpb "github.com/Will413028/hawkr/go-pkg/proto/crm"
-	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 )
@@ -58,59 +57,6 @@ func TestSellerShape_GetCustomerStats_BizCodePreserved(t *testing.T) {
 	body := parseJSON(t, w.Body)
 	// Biz code preserved verbatim — must NOT be mapped to 0.
 	assertCode(t, body, 4040)
-	if _, ok := body["message"]; !ok {
-		t.Errorf("missing 'message'; body=%v", body)
-	}
-	if _, ok := body["msg"]; ok {
-		t.Errorf("legacy 'msg' still present; body=%v", body)
-	}
-}
-
-// TestSellerShape_GetSellerInfo_Success asserts the typed-SellerResponse success
-// path emits "message" (not "msg") with data.
-func TestSellerShape_GetSellerInfo_Success(t *testing.T) {
-	mock := &mockSellerServiceClient{
-		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
-			return &sellerpb.SellerResponse{Code: 0, Data: &sellerpb.SellerInfo{AccountId: in.AccountId, Name: "Shop"}}, nil
-		},
-	}
-	h := &Holder{Seller: grpcclient.NewSellerClientForTest(mock)}
-
-	r := gin.New()
-	r.GET("/public/sellers/:id", h.GetSellerInfo)
-
-	req, _ := http.NewRequest("GET", "/public/sellers/123", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	assertCode(t, body, 0)
-	if _, ok := body["message"]; !ok {
-		t.Errorf("missing 'message'; body=%v", body)
-	}
-	if _, ok := body["msg"]; ok {
-		t.Errorf("legacy 'msg' still present; body=%v", body)
-	}
-	if _, ok := body["data"]; !ok {
-		t.Errorf("missing 'data'; body=%v", body)
-	}
-}
-
-// TestSellerShape_GetSellerInfo_InvalidID asserts the validation-error path
-// emits "message" (not "msg") and HTTP 400.
-func TestSellerShape_GetSellerInfo_InvalidID(t *testing.T) {
-	h := &Holder{}
-	r := gin.New()
-	r.GET("/public/sellers/:id", h.GetSellerInfo)
-
-	req, _ := http.NewRequest("GET", "/public/sellers/abc", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusBadRequest)
-	body := parseJSON(t, w.Body)
-	assertCode(t, body, 400)
 	if _, ok := body["message"]; !ok {
 		t.Errorf("missing 'message'; body=%v", body)
 	}

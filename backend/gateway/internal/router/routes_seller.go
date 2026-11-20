@@ -18,8 +18,6 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	pubSellers := public.Group(SellersPath)
 	pubSellers.Use(middleware.OptionalJWTAuth())
 	{
-		pubSellers.GET("/:id", h.GetSellerInfo)
-		pubSellers.GET("/:id/stats", h.GetSellerStats)
 		pubSellers.GET("/:id/products", h.GetSellerProducts)
 		pubSellers.GET("/:id/reviews", h.GetPublicSellerReviews)
 		pubSellers.GET("/:id/reviews/stats", h.GetPublicSellerReviewStats)

@@ -23473,50 +23473,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/sellers/{id}:
-    get:
-      operationId: getSellerInfo
-      summary: 取得商家資訊（公開）
-      description: 取得店面的公開資訊。僅回營業面欄位；店主個人資料（email／手機／生日／性別）與街道級地址不在此端點暴露。
-      tags:
-      - Seller
-      parameters:
-      - name: id
-        in: path
-        description: 店家 ID（store_id）
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-                  data:
-                    $ref: '#/components/schemas/PublicSellerInfo'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/public/sellers/{id}/products:
     get:
       operationId: getSellerProducts
@@ -23697,44 +23653,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 店家不存在或此刻不可曝光
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/sellers/{id}/stats:
-    get:
-      operationId: getSellerStats
-      summary: 取得商家統計資料
-      description: 取得商家的商品數、訂單數、銷售額等統計資料
-      tags:
-      - Seller
-      parameters:
-      - name: id
-        in: path
-        description: 店家 ID（store_id）
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-                  data:
-                    $ref: '#/components/schemas/SellerStats'
-        '400':
-          description: Bad Request
           content:
             application/json:
               schema:
@@ -31509,47 +31427,6 @@ components:
           description: 反正規化欄位（02 §3.2 / §5.14；本期新增）
         updatedAt:
           type: string
-    PublicSellerInfo:
-      type: object
-      properties:
-        city:
-          type: string
-          description: city / district 是「店舖地區顯示」——公開面地址精度到此為止，不含街道。
-        coverKey:
-          type: string
-          description: 商家封面 objectKey（SSOT；49 §6.1）
-        coverUrl:
-          type: string
-          description: 商家封面顯示 URL（Gateway 組）
-        description:
-          type: string
-        district:
-          type: string
-        logoKey:
-          type: string
-          description: 商家 logo objectKey（SSOT；49 §6.1）
-        logoUrl:
-          type: string
-          description: 商家 logo 顯示 URL（Gateway 組）
-        overallCertificationStatus:
-          type: string
-        prize:
-          type: string
-        rating:
-          type: number
-        sellerName:
-          type: string
-          description: '== storeName（seller 模組 toResponse: Nickname = StoreName）'
-        sellerType:
-          type: string
-        storeCode:
-          type: string
-        storeId:
-          type: string
-        storeName:
-          type: string
-        websiteUrl:
-          type: string
     PublicSellerReviewItem:
       type: object
       properties:
@@ -33055,21 +32932,6 @@ components:
           type: string
         widthCm:
           type: string
-    SellerStats:
-      type: object
-      properties:
-        followers:
-          type: integer
-        rating:
-          type: number
-        storeId:
-          type: string
-        totalOrders:
-          type: integer
-        totalProducts:
-          type: integer
-        totalSales:
-          type: number
     SellerTaxIdentity:
       type: object
       properties:

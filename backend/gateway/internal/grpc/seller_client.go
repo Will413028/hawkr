@@ -71,13 +71,6 @@ func (c *SellerClient) GetSellerByStoreID(ctx context.Context, storeID int64) (*
 	return c.client.GetSeller(ctx, &pb.GetSellerRequest{StoreId: storeID})
 }
 
-// GetSellerStatsByStoreID：② public /sellers/:id/stats|rating PK 變體。
-func (c *SellerClient) GetSellerStatsByStoreID(ctx context.Context, storeID int64) (*pb.SellerStatsResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	return c.client.GetSellerStats(ctx, &pb.GetSellerStatsRequest{StoreId: storeID})
-}
-
 // GetSellerBatch gets seller info for multiple store IDs.
 func (c *SellerClient) GetSellerBatch(ctx context.Context, storeIDs []int64) (*pb.SellerBatchResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -96,20 +89,6 @@ func (c *SellerClient) BatchGetSellerMeta(ctx context.Context, storeIDs []int64)
 }
 
 // ==================== Delete ====================
-
-// ==================== Store Visitors ====================
-
-// RecordStoreVisit records a buyer visiting a seller's store page (fire-and-forget 呼叫，錯誤可忽略)
-func (c *SellerClient) RecordStoreVisit(ctx context.Context, storeID, visitorBuyerID int64) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	_, err := c.client.RecordStoreVisit(ctx, &pb.RecordStoreVisitRequest{
-		StoreId:        storeID,
-		VisitorBuyerId: visitorBuyerID,
-	})
-	return err
-}
 
 // ==================== Recommended Sellers ====================
 
