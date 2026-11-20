@@ -414,6 +414,17 @@ export const queryKeys = {
 		// 開店頁問「有沒有措施」的一筆查詢（`ListMyMeasures` pageSize 1）；object slot 與單筆的 string slot 不會撞。
 		measureExists: (id: QueryIdentity) =>
 			["seller", ...idPrefix(id), "measures", { exists: true }] as const,
+		// My inquiries (Connect `SellerAppService.ListMyInquiries`／`GetMyInquiry`, 見 lib/seller/inquiries.ts)：詢問頁與導覽徽章。
+		// 列表用 object slot（`state` 篩選）、單筆用 string slot，回覆成功後一次 invalidate `inquiries(id)` 全部重讀。
+		inquiries: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "inquiries"] as const,
+		inquiryList: (id: QueryIdentity, params: { state: number }) =>
+			["seller", ...idPrefix(id), "inquiries", params] as const,
+		inquiry: (id: QueryIdentity, inquiryId: string) =>
+			["seller", ...idPrefix(id), "inquiries", inquiryId] as const,
+		// 導覽徽章的待回覆數（`ListMyInquiries` pageSize 1 的 `pending_reply_count`）。
+		inquiryPending: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "inquiries", { pending: true }] as const,
 		// ── 58 號電子發票賣家面（58A §B-2.2 (4)(b)）─────────────────────────
 		// 全部帶 `idPrefix(id)`：漏掉就是跨帳號快取污染，而且 `invalidateQueries`
 		// 找不到 family ⇒ mutation 之後畫面不更新（§B-2.0 T18）。

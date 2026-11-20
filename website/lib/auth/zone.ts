@@ -16,7 +16,7 @@ export type ZoneDecision =
 	| { kind: "redirect"; href: string; locale: AppLocale };
 
 /**
- * 受保護區（`/account`、`/checkout`、`/seller-center`、`/seller/measures`）
+ * 受保護區（`/account`、`/checkout`、`/seller-center`、`/seller/measures`、`/seller/inquiries`）
  * 的存取判定，只看帳號層級：伺服器知道的是「有沒有登入、帳號有沒有賣家角色」；買家或賣家工作區是 client 的
  * 狀態（`lib/auth/active-role.ts`），不在這裡判斷。授權的唯一執行點仍是單體（`withSession`），這裡只決定導向。
  *

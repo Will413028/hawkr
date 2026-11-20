@@ -30,7 +30,7 @@ const ACCESS_RULES: ReadonlyArray<{
 		access: "seller",
 		prefixes: ["/seller-center"],
 	},
-	{ access: "account", prefixes: ["/seller/measures"] },
+	{ access: "account", prefixes: ["/seller/measures", "/seller/inquiries"] },
 ];
 
 export function roleLabel(slot: RoleSlot) {

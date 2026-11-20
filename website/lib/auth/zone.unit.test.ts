@@ -33,6 +33,11 @@ describe("decideZone: who may open a protected zone", () => {
 			"/seller/measures/9",
 			"/login?redirect=%2Fseller%2Fmeasures%2F9",
 		],
+		[
+			"account",
+			"/seller/inquiries/9",
+			"/login?redirect=%2Fseller%2Finquiries%2F9",
+		],
 	])(
 		"a guest on %s zone %s goes to the login page the middleware would use",
 		(required, returnPath, href) => {

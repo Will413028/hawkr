@@ -41,6 +41,80 @@
 			"blockTitle": "Block “{name}”?",
 			"blockDescription": "Once blocked, this person can no longer comment on or like your posts and forum, or message you. They can still see your public content, and reviews are not affected. You can unblock them anytime in Blocked list.",
 			"blocked": "Blocked “{name}”"
+		},
+		"inquiries": {
+			"title": "Case inquiries",
+			"subtitle": "See the questions the platform has about a case and reply. Please reply by the deadline.",
+			"pendingSummary": "{count, plural, one {# inquiry is} other {# inquiries are}} waiting for your reply",
+			"filterLabel": "Inquiry status",
+			"filter": {
+				"all": "All",
+				"open": "Awaiting reply",
+				"replied": "Replied",
+				"withdrawn": "Withdrawn"
+			},
+			"kind": {
+				"records": "Provide records",
+				"explanation": "Explain"
+			},
+			"state": {
+				"open": "Awaiting reply",
+				"replied": "Replied",
+				"withdrawn": "Withdrawn"
+			},
+			"channel": {
+				"phone": "Phone",
+				"email": "Email",
+				"messaging": "Messaging app",
+				"other": "Other",
+				"sellerCenter": "Seller Center"
+			},
+			"createdAt": "Sent {time}",
+			"deadline": {
+				"due": "Reply by {time}",
+				"overdue": "Reply was due {time} and is overdue; replying now still counts",
+				"overdueChip": "Overdue"
+			},
+			"empty": {
+				"title": "No inquiries",
+				"description": "When the platform has a question about a case, it appears here."
+			},
+			"viewAndReply": "View and reply",
+			"viewDetail": "View details",
+			"backToList": "All inquiries",
+			"detailTitle": "Case inquiry",
+			"messageHeading": "The platform's inquiry",
+			"notFound": {
+				"title": "Inquiry not found",
+				"description": "This inquiry does not exist or does not belong to this account."
+			},
+			"loadFailed": {
+				"title": "Could not load the inquiry"
+			},
+			"retry": "Retry",
+			"withdrawn": "The platform withdrew this inquiry. No reply is needed.",
+			"withdrawnAt": "The platform withdrew this inquiry on {time}. No reply is needed.",
+			"reply": {
+				"heading": "Your reply",
+				"bodyLabel": "Reply",
+				"bodyPlaceholder": "Explain or provide what the platform asked for.",
+				"tooLong": "The reply is too long. Shorten it and try again",
+				"evidenceLabel": "Attachments (optional)",
+				"evidenceHint": "Attachments are sensitive files. Only the platform can see them after you send, and you will not see them here again.",
+				"submit": "Send reply",
+				"submitting": "Sending reply…",
+				"submitted": "Reply sent",
+				"closed": "This inquiry can no longer be replied to. The latest status is loaded",
+				"viaSellerCenter": "You replied in Seller Center",
+				"offSystem": "The platform recorded your reply made outside the system ({channel})",
+				"receivedAt": "Reply received {time}",
+				"attachmentCount": "{count, plural, one {# attachment} other {# attachments}}"
+			},
+			"error": {
+				"title": "Something went wrong loading case inquiries",
+				"description": "This page did not load. Your account data is safe. Try again, or go back to case inquiries.",
+				"home": "Back to case inquiries"
+			}
 		}
 	},
 	"order": {},
