@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -156,13 +157,17 @@ func TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource(t *t
 	// 追蹤 tool 查的狀態集合（D16 第 1 點）：已建物流單、配送中、待取貨、物流異常、已送達、配送失敗未退款。
 	wantTracking := map[string]string{"20": "待出貨", "30": "配送中", "32": "待取貨", "35": "物流異常", "40": "已送達", "54": "配送失敗未退款（終態）"}
 	gotTracking := strings.Split(trackingStatuses, ",")
-	if len(gotTracking) != len(wantTracking) {
-		t.Errorf("trackingStatuses = %q，要正好是 %v", trackingStatuses, wantTracking)
-	}
-	for _, code := range gotTracking {
-		if label, ok := wantTracking[code]; !ok || want[code] != label {
+	slices.Sort(gotTracking)
+	wantCodes := make([]string, 0, len(wantTracking))
+	for code, label := range wantTracking {
+		wantCodes = append(wantCodes, code)
+		if want[code] != label {
 			t.Errorf("trackingStatuses 的 %s：CodeMeta 是 %q，預期 %q", code, want[code], label)
 		}
+	}
+	slices.Sort(wantCodes)
+	if !slices.Equal(gotTracking, wantCodes) {
+		t.Errorf("trackingStatuses = %q（排序後 %v），要正好是 %v", trackingStatuses, gotTracking, wantCodes)
 	}
 }
 

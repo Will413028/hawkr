@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/buyeragent"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // quietLLM 等到 ctx 結束就停止迭代，不回錯誤：模擬一個遇到取消時安靜收工的模型。
@@ -357,26 +358,72 @@ func TestStreamEndingWithPartialChunksOnlyDoesNotRace(t *testing.T) {
 	}
 }
 
-// execute 自己的 recover：agent 之外的程式（這裡是緩衝寫入時取時鐘）panic 也以失敗事件結束並釋放對話。
+// hookLLM 在每次呼叫模型前回報這是第幾次呼叫。
+type hookLLM struct {
+	adkmodel.LLM
+	n      atomic.Int32
+	onCall func(n int)
+}
+
+func (h *hookLLM) GenerateContent(ctx context.Context, req *adkmodel.LLMRequest, stream bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	h.onCall(int(h.n.Add(1)))
+	return h.LLM.GenerateContent(ctx, req, stream)
+}
+
+// execute 自己的 recover：agent 之外的程式 panic 也以失敗事件結束並釋放對話。
+// panic 的位置由測試指定：模型第二次被呼叫（tool 已完成）之後，execute 的事件寫入取時鐘時 panic 一次；不依賴取時鐘的次數。
+// 不能放在 tool 或 observer 裡：tool 跑在 ADK 的另一個 goroutine，execute 的 recover 接不到，整個測試程序會掛掉。
 func TestPanicInTheExecutorItselfEndsTheTurnAsAnErrorAndReleasesTheSession(t *testing.T) {
-	var calls atomic.Int32
-	now := func() time.Time {
-		if calls.Add(1) == 2 { // 第 1 次是登記時的清理，第 2 次是第一個 text 事件寫入
-			panic("clock exploded")
+	scripted := &scriptedLLM{script: []scriptedCall{
+		{Chunks: []chunk{{FunctionCall: &chunkCall{Name: "get_my_orders", Args: map[string]any{"date_range": "all"}}}}},
+		{Chunks: []chunk{{Text: "好"}}},
+		{Chunks: []chunk{{Text: "好"}}},
+	}}
+	var toolDone, fired atomic.Bool
+	llm := &hookLLM{LLM: scripted, onCall: func(n int) {
+		if n == 2 {
+			toolDone.Store(true)
 		}
-		return time.Now()
-	}
-	e := newExecutor(t, textLLM("好"), &fakeOrders{}, func(c *Config) { c.Now = now })
-	ref, err := submitChat(t, e, "", "你好")
+	}}
+	e := newExecutor(t, llm, sampleOrders(), func(c *Config) {
+		c.Now = func() time.Time {
+			if toolDone.Load() && fired.CompareAndSwap(false, true) {
+				panic("clock exploded after the tool finished")
+			}
+			return time.Now()
+		}
+	})
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, Message: "查我的訂單"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.wg.Wait() // 先等這一輪結束：Watch 也會取時鐘，不能讓它搶到會 panic 的那一次
+	e.wg.Wait()
 	evs := collect(t, e, buyer, ref.TurnID, "")
 	if last := evs[len(evs)-1]; last.Kind != model.EventError {
 		t.Fatalf("executor panic 要以 error 結束：%+v", evs)
 	}
-	if _, err := submitChat(t, e, ref.SessionID, "再問"); err != nil {
+	if !fired.Load() {
+		t.Fatal("時鐘沒有 panic，測試沒有打到 execute 的 recover")
+	}
+	if _, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, SessionID: ref.SessionID, Message: "再問"}); err != nil {
 		t.Fatalf("panic 後對話要已釋放：%v", err)
+	}
+}
+
+// 退貨政策的事件寫入失敗：writeReturnPolicy 回 false（緩衝已終止時的寫入），submitReturnPolicy 因此在登記前就回錯，不留輪次。
+// 以真實的 Submit 無法讓緩衝在登記前寫滿（容量下限 2 剛好容得下兩個事件），所以只測 helper 的回傳，登記順序由 submitReturnPolicy 的結構保證。
+func TestReturnPolicyWriteFailureIsReportedBeforeAnyTurnIsRegistered(t *testing.T) {
+	buf := newBuffer(2)
+	buf.append(model.Event{Kind: model.EventFinished}, time.Now())
+	if writeReturnPolicy(buf, "", uitext.ZhTW, time.Now()) {
+		t.Fatal("緩衝已終止，寫入要回 false")
+	}
+	e := newExecutor(t, textLLM("好"), &fakeOrders{}, func(c *Config) { c.BufferCapacity = 2 })
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicReturnPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evs := collect(t, e, buyer, ref.TurnID, ""); len(evs) != 2 || evs[1].Kind != model.EventFinished {
+		t.Fatalf("容量 2 也要寫得進文案與終止事件：%+v", evs)
 	}
 }

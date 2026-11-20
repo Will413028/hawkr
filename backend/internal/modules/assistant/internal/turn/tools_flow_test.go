@@ -1,8 +1,11 @@
 package turn
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -340,5 +343,109 @@ func TestTrackingSucceedsWithANoteCodeWhenSomePackageDetailsCannotBeLoaded(t *te
 	}
 	if tr := toolResults(evs); len(tr) != 1 || !tr[0].ToolSucceeded {
 		t.Fatalf("部分失敗的 tool_result 要是成功：%+v", evs)
+	}
+}
+
+// 全部失敗一律 upstream_unavailable，不看哪一筆最後失敗；順序兩種都測。已不存在的訂單不改變結論。
+func TestTrackingAllFailingIsUpstreamUnavailableWhateverTheCausesAndTheirOrder(t *testing.T) {
+	gone := fmt.Errorf("adapter：%w", buyeragent.ErrOrderNotFound)
+	boom := errors.New("timeout")
+	for name, errs := range map[string][2]error{"notfound-last": {boom, gone}, "notfound-first": {gone, boom}, "all-gone": {gone, gone}} {
+		t.Run(name, func(t *testing.T) {
+			orders := &fakeOrders{
+				orders:     []buyeragent.Order{{OrderNo: "A", Status: "30"}, {OrderNo: "B", Status: "20"}},
+				detailErrs: map[string]error{"A": errs[0], "B": errs[1]},
+			}
+			llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("抱歉")}}
+			resp, _ := trackResponse(t, llm, orders)
+			if resp["error"] != "upstream_unavailable" || len(resp) != 1 {
+				t.Fatalf("要回 upstream_unavailable：%v", resp)
+			}
+		})
+	}
+}
+
+// 已不存在的訂單靜默略過，不觸發 some_packages_unavailable；上游錯誤才觸發。
+func TestTrackingDropsGoneOrdersSilentlyButNotesUpstreamFailures(t *testing.T) {
+	base := func(errB error) *fakeOrders {
+		return &fakeOrders{
+			orders:     []buyeragent.Order{{OrderNo: "A", Status: "30"}, {OrderNo: "B", Status: "20"}},
+			details:    map[string]buyeragent.OrderDetail{"A": {OrderNo: "A", Status: "30"}},
+			detailErrs: map[string]error{"B": errB},
+		}
+	}
+	llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+	resp, _ := trackResponse(t, llm, base(fmt.Errorf("adapter：%w", buyeragent.ErrOrderNotFound)))
+	if pkgs, _ := resp["packages"].([]any); len(pkgs) != 1 {
+		t.Fatalf("package 要剩 1 筆：%v", resp)
+	}
+	if _, has := resp["note"]; has {
+		t.Fatalf("只有已不存在的訂單時不帶 note：%v", resp)
+	}
+	llm = &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+	resp, _ = trackResponse(t, llm, base(errors.New("timeout")))
+	if resp["note"] != "some_packages_unavailable" {
+		t.Fatalf("上游錯誤要帶 note：%v", resp)
+	}
+}
+
+// 滿頁（等於一次查的筆數）時帶 more_packages_not_shown；不滿頁不帶；兩種但書可同時出現。
+func TestTrackingNotesWhenThePageIsFull(t *testing.T) {
+	mk := func(n int, failLast bool) *fakeOrders {
+		o := &fakeOrders{details: map[string]buyeragent.OrderDetail{}, detailErrs: map[string]error{}}
+		for i := range n {
+			no := fmt.Sprintf("O%d", i)
+			o.orders = append(o.orders, buyeragent.Order{OrderNo: no, Status: "30"})
+			o.details[no] = buyeragent.OrderDetail{OrderNo: no, Status: "30"}
+		}
+		if failLast {
+			o.detailErrs[fmt.Sprintf("O%d", n-1)] = errors.New("timeout")
+		}
+		return o
+	}
+	cases := []struct {
+		n        int
+		failLast bool
+		want     any
+	}{{10, false, "more_packages_not_shown"}, {9, false, nil}, {10, true, "some_packages_unavailable,more_packages_not_shown"}}
+	for _, c := range cases {
+		llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+		resp, _ := trackResponse(t, llm, mk(c.n, c.failLast))
+		if resp["note"] != c.want {
+			t.Fatalf("n=%d failLast=%v：note = %v，要 %v", c.n, c.failLast, resp["note"], c.want)
+		}
+	}
+}
+
+// 日誌方案：全部失敗只由 guardedTool 記一次（合併的原因，含訂單號）；部分失敗逐筆記（含訂單號與 tool 名稱）。
+func TestTrackingLogsEachUpstreamCauseExactlyOnceWithOrderNoAndToolName(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	all := &fakeOrders{
+		orders:     []buyeragent.Order{{OrderNo: "A1", Status: "30"}, {OrderNo: "B2", Status: "20"}},
+		detailErrs: map[string]error{"A1": errors.New("causeA"), "B2": errors.New("causeB")},
+	}
+	llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("抱歉")}}
+	trackResponse(t, llm, all)
+	if n := strings.Count(buf.String(), "causeA"); n != 1 {
+		t.Fatalf("全部失敗時每個原因只記一次，causeA 出現 %d 次：\n%s", n, buf.String())
+	}
+	if !strings.Contains(buf.String(), "A1") || !strings.Contains(buf.String(), "track_my_package") {
+		t.Fatalf("log 要含訂單號與 tool 名稱：\n%s", buf.String())
+	}
+
+	buf.Reset()
+	part := &fakeOrders{
+		orders:     []buyeragent.Order{{OrderNo: "A1", Status: "30"}, {OrderNo: "B2", Status: "20"}},
+		details:    map[string]buyeragent.OrderDetail{"A1": {OrderNo: "A1", Status: "30"}},
+		detailErrs: map[string]error{"B2": errors.New("causeB")},
+	}
+	llm = &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+	trackResponse(t, llm, part)
+	if n := strings.Count(buf.String(), "causeB"); n != 1 || !strings.Contains(buf.String(), "B2") || !strings.Contains(buf.String(), "track_my_package") {
+		t.Fatalf("部分失敗要逐筆記一次（含訂單號與 tool 名稱），causeB %d 次：\n%s", n, buf.String())
 	}
 }

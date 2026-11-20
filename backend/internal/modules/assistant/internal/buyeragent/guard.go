@@ -31,6 +31,8 @@ const (
 	noteNoPackages = "no_packages_in_transit"
 	// noteSomePackagesUnavailable：有部分包裹的詳情查不到，回的清單不完整。
 	noteSomePackagesUnavailable = "some_packages_unavailable"
+	// noteMorePackagesNotShown：追蹤中的包裹超過一頁，只回了第一頁。
+	noteMorePackagesNotShown = "more_packages_not_shown"
 )
 
 // toolError 是 tool 回給模型的錯誤：Error() 只有代碼。cause 是真正的原因，只進 log，不給模型。

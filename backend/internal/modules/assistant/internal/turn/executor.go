@@ -144,13 +144,18 @@ func (e *Executor) sweepLocked(now time.Time) {
 
 // register 登記一輪並回它的 ID：隨機 UUID（ADK 的 platform.NewUUID），輪次 ID 同時要買家相符才能訂閱，不是憑證。
 func (e *Executor) register(ctx context.Context, buyerID int64) (string, *turnState) {
-	id := platform.NewUUID(ctx)
 	t := &turnState{buyerID: buyerID, buf: newBuffer(e.cfg.BufferCapacity)}
+	return e.install(ctx, t), t
+}
+
+// install 登記一輪並回輪次 ID。
+func (e *Executor) install(ctx context.Context, t *turnState) string {
+	id := platform.NewUUID(ctx)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.sweepLocked(e.cfg.Now())
 	e.turns[id] = t
-	return id, t
+	return id
 }
 
 // Submit 受理一則訊息：驗證、解析（或建立）對話、佔用對話，然後在背景跑 agent，立刻回輪次 ID。
@@ -262,14 +267,19 @@ func (e *Executor) release(key string) {
 }
 
 func (e *Executor) submitReturnPolicy(ctx context.Context, in SubmitInput, loc uitext.Locale) (Ref, error) {
-	turnID, t := e.register(ctx, in.BuyerID)
-	body := text.ReturnPolicyTitle(loc).Text + "\n\n" + text.ReturnPolicyFacts(loc).Text + "\n\n" + text.ReturnPolicyClosing(loc).Text
-	now := e.cfg.Now()
-	// 照搬：固定文案不建 session，finished 帶的是請求的 session_id（可為空）。
-	if !t.buf.append(model.Event{Kind: model.EventText, Text: body}, now) || !t.buf.append(model.Event{Kind: model.EventFinished, SessionID: in.SessionID}, now) {
+	// 事件先寫進還沒登記的緩衝，寫成功才登記：失敗時沒有輪次留在 e.turns（沒有對話佔用，固定文案不建 session）。
+	buf := newBuffer(e.cfg.BufferCapacity)
+	if !writeReturnPolicy(buf, in.SessionID, loc, e.cfg.Now()) {
 		return Ref{}, errors.New("assistant：退貨政策事件寫入緩衝失敗")
 	}
+	turnID := e.install(ctx, &turnState{buyerID: in.BuyerID, buf: buf})
 	return Ref{TurnID: turnID, SessionID: in.SessionID}, nil
+}
+
+// writeReturnPolicy 把固定文案與終止事件寫進緩衝；任何一次寫入失敗回 false。照搬：固定文案不建 session，finished 帶的是請求的 session_id（可為空）。
+func writeReturnPolicy(buf *buffer, sessionID string, loc uitext.Locale, now time.Time) bool {
+	body := text.ReturnPolicyTitle(loc).Text + "\n\n" + text.ReturnPolicyFacts(loc).Text + "\n\n" + text.ReturnPolicyClosing(loc).Text
+	return buf.append(model.Event{Kind: model.EventText, Text: body}, now) && buf.append(model.Event{Kind: model.EventFinished, SessionID: sessionID}, now)
 }
 
 // execute 跑 agent 並回這一輪的終止事件；panic 也以失敗事件回傳。

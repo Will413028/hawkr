@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
@@ -63,7 +64,7 @@ type trackingItem struct {
 }
 
 type trackingOutput struct {
-	// Note 是不帶語言的代碼（noteNoPackages、noteSomePackagesUnavailable），模型依買家的語言轉述。
+	// Note 是不帶語言的代碼（noteNoPackages、noteSomePackagesUnavailable、noteMorePackagesNotShown），多個以逗號分隔，模型依買家的語言轉述。
 	Note     string         `json:"note,omitempty"`
 	Packages []trackingItem `json:"packages"`
 }
@@ -162,10 +163,15 @@ func (d Deps) orderDetailTool() (*guardedTool, error) {
 		})
 }
 
+// trackingPageSize 是追蹤 tool 一次查的包裹數。舊 order-service 的列表只有 status filter 與分頁，沒有「排除已送達」之類的條件
+// （legacy/orderservice/buyerorders.go MyOrders：只有 statusFilter、page、pageSize），每多一頁就多 N 次詳情查詢；
+// 所以只查第一頁，滿頁時以 noteMorePackagesNotShown 告訴模型清單可能不完整，不在這裡翻頁。
+const trackingPageSize = 10
+
 func (d Deps) trackingTool() (*guardedTool, error) {
 	return newTool(d, model.ToolTrackMyPackage, "track_my_package", "查詢買家包裹的物流狀態",
 		func(ctx context.Context, buyerID int64, _ trackingInput) (trackingOutput, error) {
-			orders, err := d.Orders.MyOrders(ctx, buyerID, trackingStatuses, 1, 10)
+			orders, err := d.Orders.MyOrders(ctx, buyerID, trackingStatuses, 1, trackingPageSize)
 			if err != nil {
 				return trackingOutput{}, upstream(err)
 			}
@@ -173,14 +179,17 @@ func (d Deps) trackingTool() (*guardedTool, error) {
 				return trackingOutput{Note: noteNoPackages}, nil
 			}
 			packages := make([]trackingItem, 0, len(orders))
-			var lastErr error
-			failed := 0
+			// 詳情失敗的原因：訂單已不存在（ErrOrderNotFound）靜默略過；其餘是上游問題。
+			var upstreamFailures []error
+			gone := 0
 			for _, o := range orders {
 				detail, err := d.Orders.OrderDetail(ctx, buyerID, o.OrderNo)
 				if err != nil {
-					failed++
-					lastErr = err
-					slog.WarnContext(ctx, "assistant：包裹詳情查詢失敗", "error", err)
+					if errors.Is(err, ErrOrderNotFound) {
+						gone++
+					} else {
+						upstreamFailures = append(upstreamFailures, fmt.Errorf("訂單 %s：%w", o.OrderNo, err))
+					}
 					continue
 				}
 				packages = append(packages, trackingItem{
@@ -188,13 +197,26 @@ func (d Deps) trackingTool() (*guardedTool, error) {
 					ShippingStatus: detail.ShippingStatus, SellerName: detail.SellerName, Amount: detail.Amount,
 				})
 			}
-			if failed == len(orders) {
-				return trackingOutput{}, upstream(lastErr)
+			if len(packages) == 0 {
+				// 全部失敗一律 upstream_unavailable，不看最後一筆是什麼錯誤；原因合併成一個 error，由 guardedTool 記一次 log
+				// （這條路徑不另外逐筆記 log，避免同一批原因記兩次）。
+				if gone > 0 {
+					upstreamFailures = append(upstreamFailures, fmt.Errorf("另有 %d 筆訂單已不存在：%w", gone, ErrOrderNotFound))
+				}
+				return trackingOutput{}, toolFail(codeUpstreamUnavailable, errors.Join(upstreamFailures...))
 			}
-			if failed > 0 {
-				return trackingOutput{Note: noteSomePackagesUnavailable, Packages: packages}, nil
+			// 部分失敗：逐筆記 log（含訂單號與 tool 名稱），因為 guardedTool 只會在整體失敗時記。
+			for _, err := range upstreamFailures {
+				slog.WarnContext(ctx, "assistant：包裹詳情查詢失敗", "tool", "track_my_package", "error", err)
 			}
-			return trackingOutput{Packages: packages}, nil
+			var notes []string
+			if len(upstreamFailures) > 0 {
+				notes = append(notes, noteSomePackagesUnavailable)
+			}
+			if len(orders) == trackingPageSize {
+				notes = append(notes, noteMorePackagesNotShown)
+			}
+			return trackingOutput{Note: strings.Join(notes, ","), Packages: packages}, nil
 		})
 }
 
