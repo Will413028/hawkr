@@ -1,11 +1,5 @@
 {
   "default": {
-    "default_message.orders": {
-      "message": "Check my orders"
-    },
-    "default_message.tracking": {
-      "message": "Check my package status"
-    },
     "return_policy.closing": {
       "message": "Would you like help requesting a return?"
     },

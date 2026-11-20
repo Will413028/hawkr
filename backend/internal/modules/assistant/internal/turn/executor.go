@@ -7,6 +7,8 @@ package turn
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"iter"
@@ -67,6 +69,8 @@ type SubmitInput struct {
 	SessionID string // 空字串表示開新的對話
 	Message   string
 	ImageURL  string // 空字串表示沒有圖
+	// RequestID 是冪等鍵（client_request_id）；空字串表示不做冪等。範圍是同一位買家，見 Submit。
+	RequestID string
 }
 
 // Ref 是受理後的結果。
@@ -92,6 +96,16 @@ type Executor struct {
 	closed bool
 	turns  map[string]*turnState
 	active map[string]struct{} // A9-D14：進行中的對話，鍵是 buyerID/sessionID
+	idem   map[string]*idemEntry
+}
+
+// idemEntry 是一個冪等鍵的紀錄：請求內容的雜湊與第一次受理的結果。ready 關閉後 ok、ref 才可讀；
+// ok 為 false 表示第一次受理失敗（紀錄已移除，等待者自己重試）。
+type idemEntry struct {
+	hash  [sha256.Size]byte
+	ready chan struct{}
+	ok    bool
+	ref   Ref
 }
 
 // New 建立執行器。
@@ -111,7 +125,7 @@ func New(cfg Config) *Executor {
 		cfg.Timeout = DefaultTimeout
 	}
 	base, cancel := context.WithCancel(context.Background())
-	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}}
+	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}, idem: map[string]*idemEntry{}}
 }
 
 // Shutdown 取消所有進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
@@ -140,6 +154,11 @@ func (e *Executor) sweepLocked(now time.Time) {
 			delete(e.turns, id)
 		}
 	}
+	for k, ent := range e.idem {
+		if ent.ok && e.turns[ent.ref.TurnID] == nil {
+			delete(e.idem, k)
+		}
+	}
 }
 
 // register 登記一輪並回它的 ID：隨機 UUID（ADK 的 platform.NewUUID），輪次 ID 同時要買家相符才能訂閱，不是憑證。
@@ -159,10 +178,82 @@ func (e *Executor) install(ctx context.Context, t *turnState) string {
 }
 
 // Submit 受理一則訊息：驗證、解析（或建立）對話、佔用對話，然後在背景跑 agent，立刻回輪次 ID。
+//
+// 冪等（A9-D17 修訂）：in.RequestID 非空時，鍵是（買家，RequestID）。同一個鍵、同樣的內容再送，原樣回第一次的
+// Ref（不開新的一輪，也不看對話是否已有一輪進行中）；同一個鍵、內容不同回 ErrIdempotencyMismatch。紀錄與該輪
+// 的保留期一起存活、一起清除（輪次被清掉後鍵就失效）。第一次受理失敗的不留紀錄，重送當作新請求；
+// 第一次還在受理中時，重送等它的結果。
 func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	if _, ok := db.TxFrom(ctx); ok {
 		return Ref{}, model.ErrOuterTx
 	}
+	if in.RequestID == "" {
+		return e.submit(ctx, in)
+	}
+	key := strconv.FormatInt(in.BuyerID, 10) + "/" + in.RequestID
+	hash := inputHash(in)
+	for {
+		e.mu.Lock()
+		e.sweepLocked(e.cfg.Now())
+		ent, found := e.idem[key]
+		if !found {
+			ent = &idemEntry{hash: hash, ready: make(chan struct{})}
+			e.idem[key] = ent
+			e.mu.Unlock()
+			return e.submitOwning(ctx, in, key, ent)
+		}
+		e.mu.Unlock()
+		if ent.hash != hash {
+			return Ref{}, model.ErrIdempotencyMismatch
+		}
+		select {
+		case <-ent.ready:
+		case <-ctx.Done():
+			return Ref{}, ctx.Err()
+		}
+		if ent.ok {
+			return ent.ref, nil
+		}
+	}
+}
+
+// submitOwning 受理第一次的請求並結算它的冪等紀錄；panic 也要關閉 ready，等待者才不會卡住。
+func (e *Executor) submitOwning(ctx context.Context, in SubmitInput, key string, ent *idemEntry) (ref Ref, err error) {
+	succeeded := false
+	defer func() {
+		e.mu.Lock()
+		if succeeded {
+			ent.ref, ent.ok = ref, true
+		} else {
+			delete(e.idem, key)
+		}
+		close(ent.ready)
+		e.mu.Unlock()
+	}()
+	ref, err = e.submit(ctx, in)
+	succeeded = err == nil
+	return ref, err
+}
+
+// inputHash 是請求內容的雜湊（不含 RequestID）：每個欄位前加長度，避免欄位邊界混淆。
+func inputHash(in SubmitInput) [sha256.Size]byte {
+	h := sha256.New()
+	write := func(s string) {
+		var n [8]byte
+		binary.BigEndian.PutUint64(n[:], uint64(len(s)))
+		h.Write(n[:])
+		h.Write([]byte(s))
+	}
+	write(strconv.Itoa(int(in.Topic)))
+	write(in.SessionID)
+	write(in.Message)
+	write(in.ImageURL)
+	var out [sha256.Size]byte
+	copy(out[:], h.Sum(nil))
+	return out
+}
+
+func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	if !in.Topic.Valid() {
 		return Ref{}, model.ErrInvalidTopic
 	}
@@ -180,15 +271,7 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	message := in.Message
 	if message == "" {
-		// 照搬：按鈕入口沒填訊息時用預設訊息；一般問答沒有預設。疑似已不會發生：proto 把 message 標為必填。
-		switch in.Topic {
-		case model.TopicOrders:
-			message = text.DefaultMessageOrders(loc).Text
-		case model.TopicTracking:
-			message = text.DefaultMessageTracking(loc).Text
-		case model.TopicReturnPolicy, model.TopicChat:
-			return Ref{}, model.ErrMessageRequired
-		}
+		return Ref{}, model.ErrMessageRequired
 	}
 	userID := strconv.FormatInt(in.BuyerID, 10)
 

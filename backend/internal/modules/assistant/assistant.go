@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/adksession"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/buyeragent"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/feature"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/history"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -77,8 +78,16 @@ func (m *Module) WatchTurn(ctx context.Context, buyerID int64, turnID, cursor st
 	return m.turns.Watch(ctx, buyerID, turnID, cursor)
 }
 
+// LatestSession 回買家最近一次對話與它的文字訊息（時間由舊到新）；沒有對話時 SessionID 是空字串。只讀呼叫者自己的對話。
+func (m *Module) LatestSession(ctx context.Context, buyerID int64) (History, error) {
+	return history.Latest(ctx, m.sessions, buyerID)
+}
+
 // OrderReader 是買家助理讀訂單的 port。
 type OrderReader = buyeragent.Orders
+
+// ErrOrderNotFound 是 OrderReader.OrderDetail 在訂單不存在或不屬於該買家時要回的錯誤（以 %w 包住自己的錯誤）。
+var ErrOrderNotFound = buyeragent.ErrOrderNotFound
 
 // BuyerOrder 與 BuyerOrderDetail 是 OrderReader 回傳的訂單。
 type (
@@ -93,6 +102,19 @@ type (
 	TurnEvent       = model.Event
 )
 
+// History、Message、Role 是 LatestSession 的結果。
+type (
+	History = model.History
+	Message = model.Message
+	Role    = model.Role
+)
+
+// 發言者。
+const (
+	RoleUser      = model.RoleUser
+	RoleAssistant = model.RoleAssistant
+)
+
 // Topic 是訊息的主題。
 type Topic = model.Topic
 
@@ -102,6 +124,16 @@ const (
 	TopicTracking     = model.TopicTracking
 	TopicReturnPolicy = model.TopicReturnPolicy
 	TopicChat         = model.TopicChat
+)
+
+// Tool 是助理使用的工具（tool_result 事件帶它）。
+type Tool = model.Tool
+
+// 工具。
+const (
+	ToolGetMyOrders         = model.ToolGetMyOrders
+	ToolGetBuyerOrderDetail = model.ToolGetBuyerOrderDetail
+	ToolTrackMyPackage      = model.ToolTrackMyPackage
 )
 
 // 事件種類與失敗種類。
@@ -124,15 +156,16 @@ const (
 	FailureInterrupted = model.FailureInterrupted
 )
 
-// 模組錯誤（A9-2c 的 handler 對應到 Connect code 與 ErrorReason）。
+// 模組錯誤（internal/httpapi/assistant 對應到 Connect code 與 ErrorReason）。
 var (
-	ErrInvalidTopic    = model.ErrInvalidTopic
-	ErrMessageRequired = model.ErrMessageRequired
-	ErrSessionNotFound = model.ErrSessionNotFound
-	ErrSessionCreate   = model.ErrSessionCreate
-	ErrTurnInProgress  = model.ErrTurnInProgress
-	ErrTurnNotFound    = model.ErrTurnNotFound
-	ErrCursorAhead     = model.ErrCursorAhead
-	ErrOuterTx         = model.ErrOuterTx
-	ErrShuttingDown    = model.ErrShuttingDown
+	ErrInvalidTopic        = model.ErrInvalidTopic
+	ErrMessageRequired     = model.ErrMessageRequired
+	ErrSessionNotFound     = model.ErrSessionNotFound
+	ErrSessionCreate       = model.ErrSessionCreate
+	ErrTurnInProgress      = model.ErrTurnInProgress
+	ErrTurnNotFound        = model.ErrTurnNotFound
+	ErrCursorAhead         = model.ErrCursorAhead
+	ErrOuterTx             = model.ErrOuterTx
+	ErrShuttingDown        = model.ErrShuttingDown
+	ErrIdempotencyMismatch = model.ErrIdempotencyMismatch
 )

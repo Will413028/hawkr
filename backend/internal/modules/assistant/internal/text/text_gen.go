@@ -7,24 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// DefaultMessageOrders 是模組句子 default_message.orders；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func DefaultMessageOrders(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Check my orders", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "查詢我的訂單", Locale: uitext.ZhTW}
-}
-
-// DefaultMessageTracking 是模組句子 default_message.tracking；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func DefaultMessageTracking(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Check my package status", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "查詢包裹狀態", Locale: uitext.ZhTW}
-}
-
 // ReturnPolicyClosing 是模組句子 return_policy.closing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReturnPolicyClosing(l uitext.Locale) uitext.Message {
 	switch l {

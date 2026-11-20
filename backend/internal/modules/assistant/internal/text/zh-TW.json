@@ -1,13 +1,5 @@
 {
   "default": {
-    "default_message.orders": {
-      "message": "查詢我的訂單",
-      "description": "買家按鈕入口「訂單」沒有填訊息時，代送出的訊息（會出現在對話紀錄裡）。"
-    },
-    "default_message.tracking": {
-      "message": "查詢包裹狀態",
-      "description": "買家按鈕入口「物流」沒有填訊息時，代送出的訊息（會出現在對話紀錄裡）。"
-    },
     "return_policy.closing": {
       "message": "需要我協助您申請退貨嗎？",
       "description": "退貨政策固定回覆的結尾引導句。"

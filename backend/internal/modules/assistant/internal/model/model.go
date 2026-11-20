@@ -1,6 +1,9 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Topic 是一則訊息要助理處理的主題。零值不是合法主題。
 type Topic int
@@ -81,11 +84,11 @@ type Event struct {
 	Message string
 }
 
-// 模組層的錯誤，由 A9-2c 的 handler 對應到 Connect 的 code 與 ErrorReason。
+// 模組層的錯誤，由 internal/httpapi/assistant 對應到 Connect 的 code 與 ErrorReason。
 var (
 	// ErrInvalidTopic 是主題不是合法值。
 	ErrInvalidTopic = errors.New("assistant：主題不合法")
-	// ErrMessageRequired 是訊息是空字串，而且該主題沒有預設訊息。
+	// ErrMessageRequired 是訊息是空字串（退貨政策除外，它是固定文案）；入口層（handler）先驗必填，這是模組自己的防線。
 	ErrMessageRequired = errors.New("assistant：訊息必填")
 	// ErrSessionNotFound 是帶了 session ID 但該買家沒有這個對話。
 	ErrSessionNotFound = errors.New("assistant：找不到對話")
@@ -97,8 +100,33 @@ var (
 	ErrTurnNotFound = errors.New("assistant：找不到這一輪")
 	// ErrCursorAhead 是 cursor 超前於最新事件，或不是伺服器發出的值；對外 REPLAY_CURSOR_AHEAD。
 	ErrCursorAhead = errors.New("assistant：cursor 超前")
+	// ErrIdempotencyMismatch 是同一個冪等鍵（client_request_id）帶了不同的內容；對外 INVALID_ARGUMENT。
+	ErrIdempotencyMismatch = errors.New("assistant：同一個 client_request_id 的內容不同")
 	// ErrShuttingDown 是執行器已 Shutdown，不再受理新的一輪。
 	ErrShuttingDown = errors.New("assistant：服務關閉中，不受理新的一輪")
 	// ErrOuterTx 是在已有 transaction 的 ctx 上送出：輪次會在背景執行並寫 session，不得綁在呼叫者的 transaction 上。
 	ErrOuterTx = errors.New("assistant：送出不能開在 transaction 內")
 )
+
+// Role 是對話中一則訊息的發言者。
+type Role int
+
+const (
+	// RoleUser 是買家。
+	RoleUser Role = iota + 1
+	// RoleAssistant 是助理。
+	RoleAssistant
+)
+
+// Message 是對話歷史中的一則文字訊息。
+type Message struct {
+	Role Role
+	Text string
+	Time time.Time
+}
+
+// History 是買家最近一次對話與它的訊息（時間由舊到新）；沒有對話時 SessionID 是空字串。
+type History struct {
+	SessionID string
+	Messages  []Message
+}

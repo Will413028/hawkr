@@ -1,12 +1,12 @@
 # assistant 模組行為規格
 
-本文是單體 `assistant` 模組行為的唯一來源：買家助理的對話：買家與助理的跨輪對話、串流回應與續傳。目前實作到 agent、tool 與輪次執行（A9-2b）；Connect handler 與掛載在 A9-2c。
+本文是單體 `assistant` 模組行為的唯一來源：買家助理的對話：買家與助理的跨輪對話、串流回應與續傳。目前實作到 agent、tool、輪次執行（A9-2b）與 Connect handler、冪等、掛載（A9-2c）。
 
 ## 1. 範圍與公開介面
 
 - 來源是 ai-service；搬遷計畫與決定見 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）。
 - 依賴：ordering、catalog、buyer。
-- 公開介面（A9-2b）：`SubmitTurn`、`WatchTurn`、`Shutdown`；handler（A9-2c）呼叫這三個方法，proto 到錯誤碼的對應見第 3 節。
+- 公開介面：`SubmitTurn`、`WatchTurn`、`LatestSession`、`Shutdown`；handler（`internal/httpapi/assistant`）呼叫它們，proto 到錯誤碼的對應見第 3 節。
 - 舊行為的 characterization fixture 在 `docs/plans/2026-11-19-a9-agent/fixtures/assistant/`（A9-2a 以替身 LLM 錄自舊 ai-service 的買家路徑；每份含輸入、替身回應、假 tool 後端資料、實際送出的事件序列）。
 
 ## 2. Session 儲存（A9-D5）
@@ -52,12 +52,18 @@
 
 **事件緩衝（A9-D15 第 5 點）**：每輪一個只增不減的緩衝，上限 `DefaultBufferCapacity`（4096，含終止事件）個事件，序號從 1 起，cursor 是序號的十進位字串；不覆蓋舊事件，所以沒有「cursor 過期」。最後一格保留給終止事件：一般事件寫滿時，這一輪被中止（取消 runner、記 log），以 `error` 終止（已有文字是 `FailureInterrupted`，否則 `FailureNoOutput`），佔用照常在終止事件之前釋放（`TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession`、`TestBufferNeverOverwritesAndKeepsTheLastSlotForTheTerminalEvent`）。切片隨事件增長，不預先配置。輪次結束後保留 `DefaultRetention`（10 分鐘）供續看，超過時下一次送出或訂閱時清掉。`WatchTurn`：輪次不存在、已清掉或不屬於該買家回 `ErrTurnNotFound`；cursor 超前最新事件或不是非負整數回 `ErrCursorAhead`。迭代器在終止事件後結束；ctx 結束（handler 的 100 秒）時正常結束。
 
-**對外對應（A9-2c 實作）**：`ErrTurnInProgress` → `FAILED_PRECONDITION` + `ASSISTANT_TURN_IN_PROGRESS`；`ErrCursorAhead` → `FAILED_PRECONDITION` + `REPLAY_CURSOR_AHEAD`；`ErrShuttingDown` → `UNAVAILABLE`；`ErrTurnNotFound`、`ErrSessionNotFound` → `NOT_FOUND`；`ErrMessageRequired`、`ErrInvalidTopic` → `INVALID_ARGUMENT`；`ErrSessionCreate` → `INTERNAL`。`error` 事件的 `ErrorReason` 未決（見 CARRYOVER 的待決）。
+**對外對應（A9-2c）**：`ErrTurnInProgress` → `FAILED_PRECONDITION` + `ASSISTANT_TURN_IN_PROGRESS`；`ErrCursorAhead` → `FAILED_PRECONDITION` + `REPLAY_CURSOR_AHEAD`；`ErrShuttingDown` → `UNAVAILABLE`；`ErrTurnNotFound`（含已超過保留期被清除，A9-D17 修訂）、`ErrSessionNotFound` → `NOT_FOUND`；`ErrMessageRequired`、`ErrInvalidTopic`、`ErrIdempotencyMismatch` → `INVALID_ARGUMENT`；`ErrSessionCreate`、`ErrOuterTx` → `INTERNAL`。`error` 事件的 reason 一律 `ASSISTANT_TURN_FAILED`（`FailureKind` 只進 log）。
+
+**冪等（`client_request_id`，A9-D17 修訂）**：鍵是（買家，`client_request_id`），存請求內容（主題、對話、訊息、圖片網址）的雜湊與 `(turn_id, session_id)`，與該輪的保留期（10 分鐘）一起清除；同鍵同內容回放第一次的結果，不看對話是否進行中、不開新的一輪；同鍵不同內容 `INVALID_ARGUMENT`；第一次受理失敗不留紀錄；同時送出同一個鍵的請求等第一個的結果。存在記憶體，重啟後遺失。
+
+**串流窗口**：`WatchAssistantTurn` 每條最長 100 秒就正常結束（無錯誤、無終止事件），client 以最後的 cursor 接續；收到 `finished` 或 `error` 事件才是這一輪結束。
+
+**最近對話**：`GetLatestAssistantSession` 列呼叫者（`user_id` = 買家 ID）的 session，取最後更新時間最新的一筆，回整段歷史中有文字的事件（tool 呼叫與回應、thought 不外流）。
 
 **身分範圍**：每支 tool 自己驗：session state 的 `buyer_id` 必須等於這一輪的買家，否則 tool 回 `forbidden`（內部 `ErrBuyerScope`），不呼叫訂單服務。agent 與 tool 為每一輪重新建構，包裝層在 tool 完成時經回呼寫 `tool_result` 事件。
 
 **不在 transaction 內**：輪次執行不開 transaction，也不接受在 transaction 內的 ctx；session 寫入由 `adksession` 在最上層開。
 
-**驗收**：`internal/turn` 的 characterization 測試鎖舊 ai-service 的行為（比對 fixture 的事件種類與順序、文字串接、經觀察點取得的 tool 名稱與參數、結束或錯誤、LLM 請求的路由、使用者文字、回給 LLM 的 tool 結果）；回給 LLM 的 tool 結果有 6 份 fixture 是 A9-D15 的刻意偏離（狀態標籤改代碼、下游錯誤文字改代碼、追蹤查詢狀態），每份在測試的 `fedBackDeviations` 與 `statusRemap` 寫理由，其餘必須逐字相同；跳過 `latest_session_*`（A9-2c）。
+**驗收**：`internal/turn` 的 characterization 測試鎖舊 ai-service 的行為（比對 fixture 的事件種類與順序、文字串接、經觀察點取得的 tool 名稱與參數、結束或錯誤、LLM 請求的路由、使用者文字、回給 LLM 的 tool 結果）；回給 LLM 的 tool 結果有 6 份 fixture 是 A9-D15 的刻意偏離（狀態標籤改代碼、下游錯誤文字改代碼、追蹤查詢狀態），每份在測試的 `fedBackDeviations` 與 `statusRemap` 寫理由，其餘必須逐字相同；`latest_session_*` 兩份由 `internal/history` 的測試比對。
 
-**A9-2c 交接（訂單 port 的錯誤轉換）**：`buyeragent.Orders` 的實作在 composition root（`cmd/hawkr`）以訂單服務 client 組成；adapter 必須把 `orderservice.ErrOrderNotFound` 轉成 `buyeragent.ErrOrderNotFound`（以 `%w` 包住原錯誤），並有測試守住——否則「查無訂單」會被當成 `upstream_unavailable` 給模型。A9-2c 接線時完成並補測試。
+**訂單 port 的錯誤轉換（A9-2c 已完成）**：`buyeragent.Orders` 的實作在 composition root（`cmd/hawkr/assistant.go`）以訂單服務 client 組成，把 `orderservice.ErrOrderNotFound` 轉成 `assistant.ErrOrderNotFound`（以 `%w` 包住原錯誤），`cmd/hawkr/assistant_test.go` 守住——否則「查無訂單」會被當成 `upstream_unavailable` 給模型。

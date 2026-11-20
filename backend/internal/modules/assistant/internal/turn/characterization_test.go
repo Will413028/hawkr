@@ -91,10 +91,18 @@ type observed struct {
 	HistoryContents       int              `json:"history_contents"`
 }
 
-// skippedFixtures 是屬於 A9-2c（handler 層）的 fixture：它們驗的是 RPC 的回應，不是輪次事件。
+// skippedFixtures 是驗 RPC 回應、不是輪次事件的 fixture（A9-2c 的 GetLatestAssistantSession，在 internal/history 比對）。
 var skippedFixtures = map[string]string{
-	"latest_session_after_chat": "BuyerLatestSession 是 A9-2c 的 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器",
-	"latest_session_empty":      "BuyerLatestSession 是 A9-2c 的 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器",
+	"latest_session_after_chat": "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
+	"latest_session_empty":      "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
+}
+
+// recordedDefaultMessages 是舊服務按鈕端點在空訊息時代填的預設訊息（orders_happy_path、tracking_partial_detail_failure 的錄製以它送出）。
+// 新服務不再有預設訊息（A9-D17）：入口層對空訊息回 INVALID_ARGUMENT，這兩份 fixture 在測試裡補回當時的文字，輪次與 LLM 請求的比對維持不變。
+// 退貨政策不看訊息，不在表內。
+var recordedDefaultMessages = map[string]string{
+	"BuyerOrders":   "查詢我的訂單",
+	"BuyerTracking": "查詢包裹狀態",
 }
 
 var toolIDs = map[string]model.Tool{
@@ -353,7 +361,11 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				}
 			})
 			ctx := uitext.WithLocale(context.Background(), uitext.ZhTW)
-			ref, err := e.Submit(ctx, SubmitInput{BuyerID: f.Input.BuyerID, Topic: topicOf(t, f.Input.RPC), Message: f.Input.Message, ImageURL: f.Input.ImageURL})
+			message := f.Input.Message
+			if message == "" {
+				message = recordedDefaultMessages[f.Input.RPC]
+			}
+			ref, err := e.Submit(ctx, SubmitInput{BuyerID: f.Input.BuyerID, Topic: topicOf(t, f.Input.RPC), Message: message, ImageURL: f.Input.ImageURL})
 
 			switch f.RPC.StatusCode {
 			case "InvalidArgument":
