@@ -149,6 +149,8 @@ type Conversation struct {
 	Unread        int64
 	LastMessageAt time.Time
 	Preview       Preview
+	// PeerReadSeq 是對方的已讀游標：seq 不大於它的訊息，對方已讀。
+	PeerReadSeq int64
 }
 
 // Cursor 是對話列表的 keyset 游標：上一頁最後一列的 (LastMessageAt, ID)。
@@ -167,7 +169,18 @@ type ConversationPage struct {
 type MessagePage struct {
 	Items   []Message
 	HasMore bool
+	// PeerReadSeq 是這個對話裡對方的已讀游標（讀取當下）。
+	PeerReadSeq int64
 }
+
+// PresenceState 是一個對話的對方是否在線。刻意沒有任何時間欄位：不提供最後上線時間。
+type PresenceState struct {
+	ConversationID uuid.UUID
+	Online         bool
+}
+
+// MaxPresenceConversations 是一次查詢在線狀態的對話數上限。
+const MaxPresenceConversations = 50
 
 // SendInput 是送出的輸入。給 ConversationID 時對話以 ID 授權；首則訊息改給 CounterpartID（買家寄時是 store_id，店家寄時是 buyer_id）。
 type SendInput struct {
@@ -217,7 +230,7 @@ type Hide struct {
 	Created    bool
 }
 
-// MessageSent 在訊息寫入成功的 transaction 內發布；relay 與 2b 的 hub 訂閱它。
+// MessageSent 在訊息寫入成功的 transaction 內發布；relay 訂閱它；即時通道不訂它，通知在 write 內直接發。
 type MessageSent struct {
 	EventID        uuid.UUID
 	OccurredAt     time.Time

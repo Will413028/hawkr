@@ -24,6 +24,9 @@
     "im.moderation_rejected": {
       "message": "The content does not meet community guidelines; please edit and resend"
     },
+    "im.presence_too_many": {
+      "message": "Too many conversations were requested"
+    },
     "im.receiver_deleted": {
       "message": "The recipient's account has been deleted"
     },
@@ -39,6 +42,9 @@
     "im.store_closed": {
       "message": "This store is closed and messages cannot be sent"
     },
+    "im.stream_limit": {
+      "message": "Too many chat streams are open for this account; close one and try again"
+    },
     "im.text_invalid": {
       "message": "The message is not valid text"
     },
@@ -47,6 +53,9 @@
     },
     "im.text_too_long": {
       "message": "The message cannot exceed {max} characters"
+    },
+    "im.too_many_cursors": {
+      "message": "Too many conversation cursors were provided"
     },
     "im.type_unsupported": {
       "message": "Unsupported message type"

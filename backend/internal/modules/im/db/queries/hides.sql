@@ -1,7 +1,9 @@
 -- 訊息的隱藏紀錄（可多次隱藏與還原）。可見性只由 im 寫；呼叫者是 moderation 的 transaction，先鎖訊息列（LockMessage）。
 
 -- name: LockMessage :one
-SELECT id, conversation_id FROM im.messages WHERE id = sqlc.arg(id) FOR NO KEY UPDATE;
+SELECT m.id, m.conversation_id, c.buyer_id, c.store_id, m.seq FROM im.messages AS m
+JOIN im.conversations AS c ON c.id = m.conversation_id
+WHERE m.id = sqlc.arg(id) FOR NO KEY UPDATE OF m;
 
 -- name: InsertHide :one
 -- 同一則訊息已經有未還原的隱藏時回既有的那一列（冪等）；回傳的 id 等於傳入的 id 才是新增。

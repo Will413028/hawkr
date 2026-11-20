@@ -114,3 +114,15 @@ CREATE TABLE im.retired_assets (
     PRIMARY KEY (ref_type, ref_id, asset_id)
 );
 CREATE INDEX retired_assets_retired_at ON im.retired_assets (retired_at);
+
+-- 串流的存活標記：每條訂閱一列，同時是 presence 的來源與每個 Party 並行串流數的全域計數。UNLOGGED：可重建的短暫狀態，崩潰後清空等於所有人離線。
+-- expires_at 一律由資料庫 now() 計算與比較（多個進程寫與讀，不經任何進程時鐘）；表裡沒有最後上線時間。
+CREATE UNLOGGED TABLE im.presence_streams (
+    stream_id  UUID        PRIMARY KEY,
+    kind       TEXT        NOT NULL,
+    party_id   BIGINT      NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT presence_streams_kind_check CHECK (kind IN ('BUYER', 'STORE')),
+    CONSTRAINT presence_streams_party_check CHECK (party_id > 0)
+);
+CREATE INDEX presence_streams_party ON im.presence_streams (kind, party_id, expires_at);

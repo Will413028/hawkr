@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
@@ -83,7 +84,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		}
 		now := s.d.Now().UTC()
 		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
-			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender), Now: now,
+			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender),
 		})
 		if err != nil {
 			return err
@@ -108,6 +109,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 			EventID: s.d.NewID(), OccurredAt: now, ConversationID: seq.ID, MessageID: msgID, Seq: seq.LastSeq,
 			SenderKind: sender, BuyerID: t.buyerID, StoreID: t.store.StoreID,
 		}); err != nil {
+			return err
+		}
+		if err := q.Notify(ctx, live.Message(seq.ID, t.buyerID, t.store.StoreID, seq.LastSeq).Encode()); err != nil {
 			return err
 		}
 		out = rows.Message(rows.MessageRow{
