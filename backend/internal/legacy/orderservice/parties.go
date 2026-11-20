@@ -77,3 +77,25 @@ func (c *Client) HasOrderBetween(ctx context.Context, buyerID, storeID int64) (b
 	}
 	return true, resp.Msg.GetLatestOrderNo(), nil
 }
+
+// openOrderStatuses 是「進行中」的訂單狀態：訂單未完成。有活躍售後的訂單不會離開 40（自動完成反查售後、確認收貨被進行中的 case 擋下，
+// 50 不可再發起售後），所以售後不必另查。
+var openOrderStatuses = map[string]bool{"10": true, "20": true, "30": true, "32": true, "35": true, "40": true}
+
+// OpenOrderBetween 回報買家與店家之間最近一筆有關聯的訂單是否進行中（狀態 10、20、30、32、35、40）。
+// 已知看不到「最近一筆已結案、較舊的一筆還在配送」，錯的方向是多擋；任何查詢錯誤（含訂單查無、買家或店家與訂單不符）都回錯誤，
+// 呼叫端一律擋（fail-closed）。
+func (c *Client) OpenOrderBetween(ctx context.Context, buyerID, storeID int64) (bool, error) {
+	has, orderNo, err := c.HasOrderBetween(ctx, buyerID, storeID)
+	if err != nil || !has {
+		return false, err
+	}
+	p, err := c.OrderParties(ctx, orderNo)
+	if err != nil {
+		return false, err
+	}
+	if p.BuyerID != buyerID || p.StoreID != storeID {
+		return false, fmt.Errorf("orderservice：訂單 %s 的買家 %d、店家 %d 不是查詢的 %d、%d", orderNo, p.BuyerID, p.StoreID, buyerID, storeID)
+	}
+	return openOrderStatuses[p.Status], nil
+}

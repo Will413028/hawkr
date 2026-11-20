@@ -34,7 +34,7 @@ const (
 // Valid 回報 k 是不是已知的一方；空字串不是。
 func (k PartyKind) Valid() bool { return k == PartyBuyer || k == PartyStore }
 
-// MessageType 是訊息類型。2a 只有文字與圖片；卡片隨 A6-5 的契約加。
+// MessageType 是訊息類型。2a 只有文字與圖片；卡片隨對外契約加。
 type MessageType string
 
 const (
@@ -72,7 +72,7 @@ func (p Party) Authorize() error {
 	return nil
 }
 
-// Reason 是 im 的業務原因（Go 端的常數，與 apperr 的分類搭配使用；A6-5 加進 proto 的 ErrorReason）。
+// Reason 是 im 的業務原因（Go 端的常數，與 apperr 的分類搭配使用；對外的 ErrorReason 由 proto 定義）。
 type Reason string
 
 const (
@@ -179,12 +179,13 @@ type SendInput struct {
 	StagedToken    string
 }
 
-// RelayMessage 是 relay 組推播 payload 要的原始資料：不套可見性，Hidden 與 Erased 讓呼叫端決定要不要送。
+// RelayMessage 是 relay 組推播 payload 要的原始資料：不套可見性，Hidden、Erased 與 ReceiverInactive（收件人身分已刪除或退場）讓呼叫端決定要不要送。
 type RelayMessage struct {
 	Message
-	BuyerID int64
-	StoreID int64
-	Preview Preview
+	BuyerID          int64
+	StoreID          int64
+	ReceiverInactive bool
+	Preview          Preview
 }
 
 // HideInput 是隱藏的輸入；Category 是 policy.CommunityAssessable 的值。

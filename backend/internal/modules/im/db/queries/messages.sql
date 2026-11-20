@@ -27,10 +27,15 @@ ORDER BY m.seq
 LIMIT sqlc.arg(max_rows);
 
 -- name: GetMessageForRelay :one
--- relay 讀單則訊息與它的對話：不套可見性，Hidden 與 erased_at 讓呼叫端決定要不要送。
+-- relay 讀單則訊息與它的對話：不套可見性，Hidden、erased_at 與收件人是否已刪除讓呼叫端決定要不要送。
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL)::boolean AS hidden,
+       EXISTS (
+           SELECT 1 FROM im.inactive_parties AS ip
+           WHERE (m.sender_kind = 'BUYER' AND ip.kind = 'STORE' AND ip.party_id = c.store_id)
+              OR (m.sender_kind = 'STORE' AND ip.kind = 'BUYER' AND ip.party_id = c.buyer_id)
+       ) AS receiver_inactive
 FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL

@@ -1,6 +1,5 @@
 -- im 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
+-- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引。
 --
 -- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
 -- 表一律寫完整名稱（im.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
@@ -59,9 +58,8 @@ CREATE TABLE im.messages (
         OR (erased_at IS NOT NULL AND content IS NULL AND image_asset_id IS NULL AND image_object_key IS NULL)
     )
 );
-CREATE INDEX messages_conversation_seq ON im.messages (conversation_id, seq DESC);
 
--- 訊息的隱藏紀錄（A6-4 的 moderation 用），形狀同 review.hides、social.hides：可多次隱藏與還原（還原留列），同一則訊息未還原的隱藏至多一筆。
+-- 訊息的隱藏紀錄（moderation 用），形狀同 review.hides、social.hides：可多次隱藏與還原（還原留列），同一則訊息未還原的隱藏至多一筆。
 CREATE TABLE im.hides (
     id              UUID        PRIMARY KEY,
     message_id      UUID        NOT NULL REFERENCES im.messages (id) ON DELETE CASCADE,

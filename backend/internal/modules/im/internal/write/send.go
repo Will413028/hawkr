@@ -3,6 +3,7 @@ package write
 import (
 	"context"
 	"errors"
+	"strings"
 	"unicode/utf8"
 	"uuid"
 
@@ -29,7 +30,7 @@ type target struct {
 }
 
 // Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
-// transaction 內持寄件人的鎖、重查雙方是否已刪除、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
+// transaction 內依固定順序持雙方的 advisory lock、重查雙方是否已刪除、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
@@ -60,10 +61,13 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		sender, receiver := in.Sender.Kind, counterpart(in.Sender.Kind)
-		if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(sender), PartyID: in.Sender.ID()}); err != nil {
-			return err
+		// 兩方都持 advisory lock：Deactivate 一次只持一個身分的鎖，鎖序固定（買家先於店家，即 kind 字串序）所以不會死結。
+		for _, k := range []model.PartyKind{model.PartyBuyer, model.PartyStore} {
+			if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(k), PartyID: partyID(k, t)}); err != nil {
+				return err
+			}
 		}
-		inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(sender), PartyID: in.Sender.ID()})
+		inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(sender), PartyID: partyID(sender, t)})
 		if err != nil {
 			return err
 		}
@@ -136,7 +140,7 @@ func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, erro
 	}
 	switch in.Type {
 	case model.TypeText:
-		if !utf8.ValidString(in.Text) {
+		if !utf8.ValidString(in.Text) || strings.ContainsRune(in.Text, 0) {
 			return "", apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImTextInvalid(l))
 		}
 		body := trimtext.Trim(in.Text)
@@ -161,7 +165,7 @@ func unavailable(l uitext.Locale, cause error) error {
 	return apperr.WithCause(apperr.Unavailable("%s", text.ImIdentityUnavailable(l)), cause)
 }
 
-// resolve 解析對話與對方（A6-D1 之外不信 client 的寄件人）：給 ConversationID 時以對話授權，寄件人不是該對話的一方回 NotFound；
+// resolve 解析對話與對方（不信 client 的寄件人）：給 ConversationID 時以對話授權，寄件人不是該對話的一方回 NotFound；
 // 首則訊息用 CounterpartID，並確認對方存在。同一人（買家的帳號等於店家的帳號）在這裡擋。回傳買家的 account_id（上傳者與同一人判斷用）。
 func (s *Service) resolve(ctx context.Context, l uitext.Locale, in model.SendInput) (target, int64, error) {
 	var buyerID, storeID int64
@@ -256,7 +260,7 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		return unavailable(l, err)
 	}
 
-	// G3 封鎖：任一方向都擋；有進行中的訂單或售後時放行（A6-D1）。
+	// G3 封鎖：任一方向都擋；有進行中的訂單或售後時放行。
 	blocked, err := s.d.Buyers.IsBlockingStore(ctx, t.buyerID, t.store.StoreID)
 	if err != nil {
 		return unavailable(l, err)
@@ -276,7 +280,7 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		}
 	}
 
-	// G4 收件人已刪除。
+	// G4 收件人已刪除：transaction 外的這次檢查只是優化，讓已刪除的收件人不必先跑一次媒體 Finalize；正確性由 transaction 內持鎖後的重查保證。
 	receiver := counterpart(sender.Kind)
 	gone, err := s.inactive(ctx, receiver, partyID(receiver, t))
 	if err != nil {

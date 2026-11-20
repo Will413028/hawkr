@@ -10,7 +10,6 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -44,12 +43,7 @@ func (imTestStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error
 
 type imNoOrders struct{}
 
-func (imNoOrders) HasOrderBetween(context.Context, int64, int64) (bool, string, error) {
-	return false, "", nil
-}
-func (imNoOrders) OrderParties(context.Context, string) (orderservice.OrderParties, error) {
-	return orderservice.OrderParties{}, nil
-}
+func (imNoOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
 
 // 刪帳時機（A6-D14 W4 (ii)）：newIM 只訂 BuyerDeleted。發 BuyerDeletionRequested 之後買家仍能送出、訊息不被抹除、沒有複本與抹除 job；
 // BuyerDeleted 之後才寫複本、排抹除 job、擋送出，抹除 job 跑完才抹除。這是正式組裝（newIM）的測試：加訂 BuyerDeletionRequested 時它失敗。

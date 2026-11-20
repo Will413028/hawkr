@@ -55,12 +55,13 @@ type ErasePartyArgs struct {
 // Kind 是 River 的 job 種類。
 func (ErasePartyArgs) Kind() string { return "im.erase_party" }
 
-// InsertOpts 讓同一個身分還沒開始的 job 合併：唯一鍵是 (PartyKind, PartyID)，不含執行中的狀態（job 可重跑），
-// 執行中又排入的那一次排在它後面，不會被略過。身分進入刪除之後沒有新訊息：Send 在 transaction 內持 LockParty 再查 inactive_parties，
+// InsertOpts 讓同一個身分還沒開始的 job 合併：唯一鍵是 (PartyKind, PartyID)，含執行中的狀態（River 要求 available、pending、running、scheduled 都在內）：執行中又排入的那一次併入它：
+// 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。身分進入刪除之後沒有新訊息：Send 在 transaction 內持 LockParty 再查 inactive_parties，
 // 與 Deactivate 串行，所以抹除 job 看不到之後才送出的訊息。
 func (ErasePartyArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRetryable, rivertype.JobStateScheduled,
+		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
+		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
 	}}}
 }
 
@@ -199,9 +200,9 @@ type SweepArgs struct{}
 // Kind 是 River 的 job 種類。
 func (SweepArgs) Kind() string { return "im.erase_sweep" }
 
-// InsertOpts 讓同時只有一個掃描排隊。
+// InsertOpts 以 SweepInterval 為唯一性的時間窗：同一個週期內的排程與重啟合併，窗過了就能再排。
 func (SweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByArgs: true}}
+	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByPeriod: SweepInterval}}
 }
 
 type sweepWorker struct {

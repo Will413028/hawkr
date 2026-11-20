@@ -106,3 +106,42 @@ func TestHasOrderBetween(t *testing.T) {
 		t.Fatal("buyer 0 要回錯誤")
 	}
 }
+
+func TestOpenOrderBetween(t *testing.T) {
+	between := &orderpb.HasOrderBetweenResponse{HasOrder: true, LatestOrderNo: "N1"}
+	withStatus := func(status string) fakeParties {
+		return fakeParties{between: between, afterSales: afterSalesResponse(func(v *orderpb.OrderAfterSalesView) { v.Status = status })}
+	}
+	cases := []struct {
+		name    string
+		fake    fakeParties
+		want    bool
+		wantErr bool
+	}{
+		{"no order", fakeParties{between: &orderpb.HasOrderBetweenResponse{}}, false, false},
+		{"between error", fakeParties{err: errors.New("boom")}, false, true},
+		{"order not found is an error, not closed", fakeParties{between: between, afterSales: &orderpb.GetOrderForAfterSalesResponse{Code: 404}}, false, true},
+		{"other buyer", fakeParties{between: between, afterSales: afterSalesResponse(func(v *orderpb.OrderAfterSalesView) { v.BuyerId = "12" })}, false, true},
+		{"other store", fakeParties{between: between, afterSales: afterSalesResponse(func(v *orderpb.OrderAfterSalesView) { v.StoreId = "23" })}, false, true},
+		{"completed", withStatus("50"), false, false},
+		{"partial refund", withStatus("60"), false, false},
+		{"cancelled", withStatus("80"), false, false},
+		{"unknown status", withStatus("99"), false, false},
+	}
+	for _, status := range []string{"10", "20", "30", "32", "35", "40"} {
+		cases = append(cases, struct {
+			name    string
+			fake    fakeParties
+			want    bool
+			wantErr bool
+		}{"open " + status, withStatus(status), true, false})
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := (&Client{rpc: tc.fake}).OpenOrderBetween(context.Background(), 11, 22)
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("got=%v err=%v", got, err)
+			}
+		})
+	}
+}

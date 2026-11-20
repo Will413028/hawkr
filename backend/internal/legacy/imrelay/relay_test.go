@@ -191,6 +191,7 @@ func TestTerminalMessagesAreNotRelayed(t *testing.T) {
 	cases := map[string]func(*fixture){
 		"erased":                            func(f *fixture) { f.messages.msg.Erased = true },
 		"hidden":                            func(f *fixture) { f.messages.msg.Hidden = true },
+		"receiver inactive":                 func(f *fixture) { f.messages.msg.ReceiverInactive = true },
 		"gone":                              func(f *fixture) { f.messages.err = apperr.NotFound("gone") },
 		"store gone for buyer-sent message": func(f *fixture) { f.stores.err = apperr.NotFound("gone") },
 	}

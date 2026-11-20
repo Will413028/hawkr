@@ -186,14 +186,14 @@ func (m *Module) MessageForRelay(ctx context.Context, id uuid.UUID) (RelayMessag
 }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把這個 buyer_id 記進 inactive_parties、排 im.erase_party job，
-// 不在這裡改訊息列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家（A6-D14 W4）。
+// 不在這裡改訊息列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
 // 鎖的順序 identity → buyer → seller → im：accountdeletion 在派發事件之前先鎖完買家與店家。
 func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
 	return m.purge.Deactivate(ctx, PartyBuyer, e.BuyerID, e.OccurredAt)
 }
 
 // OnStoreRetired 是店家退場時同 transaction 的訂閱者：把這個 store_id 記進 inactive_parties、排 im.erase_party job。
-// 只抹店家身分寄出的訊息；同一個帳號的買家身分由 OnBuyerDeleted 負責（ID3）。
+// 只抹店家身分寄出的訊息；同一個帳號的買家身分由 OnBuyerDeleted 負責。
 func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
 	return m.purge.Deactivate(ctx, PartyStore, e.StoreID, e.OccurredAt)
 }

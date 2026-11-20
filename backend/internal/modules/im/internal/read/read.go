@@ -152,7 +152,7 @@ func (s *Service) UnreadTotal(ctx context.Context, p model.Party) (int64, error)
 func (s *Service) MessageForRelay(ctx context.Context, id uuid.UUID) (model.RelayMessage, error) {
 	r, err := s.q(ctx).GetMessageForRelay(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.RelayMessage{}, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
+		return model.RelayMessage{}, apperr.NotFound("%s", text.ImMessageNotFound(uitext.LocaleFrom(ctx)))
 	}
 	if err != nil {
 		return model.RelayMessage{}, err
@@ -162,7 +162,7 @@ func (s *Service) MessageForRelay(ctx context.Context, id uuid.UUID) (model.Rela
 		ImageAssetID: r.ImageAssetID, ImageObjectKey: r.ImageObjectKey, CreatedAt: r.CreatedAt, ErasedAt: r.ErasedAt, Hidden: r.Hidden,
 	})
 	return model.RelayMessage{
-		Message: m, BuyerID: r.BuyerID, StoreID: r.StoreID,
+		Message: m, BuyerID: r.BuyerID, StoreID: r.StoreID, ReceiverInactive: r.ReceiverInactive,
 		Preview: rows.PreviewOf(r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden),
 	}, nil
 }

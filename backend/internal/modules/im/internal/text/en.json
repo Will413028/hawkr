@@ -18,6 +18,9 @@
     "im.image_token_required": {
       "message": "Please upload an image first"
     },
+    "im.message_not_found": {
+      "message": "Message not found"
+    },
     "im.moderation_rejected": {
       "message": "The content does not meet community guidelines; please edit and resend"
     },

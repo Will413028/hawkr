@@ -5,11 +5,11 @@
 //	im.MessageSent → chat.message.sent
 //
 // 與舊 im-service 的差異只有兩個值：conversation_id 從房名 b<id>_s<id> 變成對話 UUID，message_id 從 TSID 十進位字串變成訊息 UUID
-// （wire 型別都還是 string；設計書 step-2a-design.md §9 第 5 項）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
+// （wire 型別都還是 string）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
 // 是店家時送店家的 account_id。
 //
-// 這個 package 只在測試中啟用：舊 im-service 在 A6-6e 前仍是聊天唯一的寫入者與發送者，cmd/hawkr 不訂閱事件也不登記 worker
-// （並行期單一生效者，計畫不變量）；A6-6e 刪路由的同一個變更才接上。隨 A8（notification 搬進單體）刪除。
+// 這個 package 只在測試中啟用：舊 im-service 仍是聊天唯一的寫入者與發送者，cmd/hawkr 不訂閱事件也不登記 worker
+// （同一時間只能有一個生效的 producer）；舊路由移除時才接上。notification 搬進單體後刪除。
 package imrelay
 
 import (
@@ -35,7 +35,7 @@ const (
 	keySent    = "chat.message.sent"
 	// previewMaxRunes 是舊 PreviewMaxLength：超過時截斷並加上 "..."。
 	previewMaxRunes = 100
-	// 推播預覽的過渡句子：共用文案目錄目前沒有聊天條目，A6-5、A6-6 加了之後改取同一批（CARRYOVER 的過渡物，退場點 A8）。
+	// 推播預覽的過渡句子：共用文案目錄沒有聊天條目，有了之後改取同一批（見 im 的 CARRYOVER）。
 	imagePreview = "傳送了一張圖片"
 )
 
@@ -121,7 +121,7 @@ type chatMessageSent struct {
 	SentAt         string `json:"sent_at"`
 }
 
-// messageSent 在 job 執行當下讀訊息現況組 payload：訊息已被抹除或隱藏（或已不存在）時不送，推播不能帶出已抹除的內容。
+// messageSent 在 job 執行當下讀訊息現況組 payload：訊息已被抹除或隱藏、收件人身分已刪除或退場（或訊息已不存在）時不送，推播不能帶出已抹除的內容。
 // 查詢失敗（買家、店家）回錯誤讓 River 重試；查不到（刪帳的買家、不存在的店家）的名稱與頭像送空字串（舊碼同樣降級）。
 func (w *Worker) messageSent(ctx context.Context, a MessageSentArgs) error {
 	id, err := uuid.Parse(a.MessageID)
@@ -135,8 +135,8 @@ func (w *Worker) messageSent(ctx context.Context, a MessageSentArgs) error {
 	if err != nil {
 		return err
 	}
-	if m.Hidden || m.Erased {
-		return nil
+	if m.Hidden || m.Erased || m.ReceiverInactive {
+		return nil // 收件人身分已刪除或退場：沒有人可通知
 	}
 
 	store, storeFound, err := w.store(ctx, m.StoreID)

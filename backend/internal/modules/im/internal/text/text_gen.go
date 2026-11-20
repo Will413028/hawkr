@@ -118,6 +118,15 @@ func ImImageTokenRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "請先上傳圖片", Locale: uitext.ZhTW}
 }
 
+// ImMessageNotFound 是模組句子 im.message_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImMessageNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Message not found", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這則訊息", Locale: uitext.ZhTW}
+}
+
 // ImModerationRejected 是模組句子 im.moderation_rejected；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ImModerationRejected(l uitext.Locale) uitext.Message {
 	switch l {

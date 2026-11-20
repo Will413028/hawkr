@@ -24,6 +24,10 @@
       "message": "請先上傳圖片",
       "description": "圖片訊息沒有 staged token。"
     },
+    "im.message_not_found": {
+      "message": "找不到這則訊息",
+      "description": "訊息不存在（relay 讀單則訊息）。"
+    },
     "im.moderation_rejected": {
       "message": "內容不符社群守則，請修改後再送出",
       "description": "文字訊息命中髒字詞典。"

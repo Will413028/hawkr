@@ -25,7 +25,7 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// imrelay 還沒有執行者（A6-6e 才接進 cmd/hawkr），所以它的正確性在這裡用真的 im 模組與真的資料庫第一次跑起來：終態、失敗路徑與重試。
+// imrelay 還沒有執行者（還沒接進 cmd/hawkr），所以它的正確性在這裡用真的 im 模組與真的資料庫第一次跑起來：終態、失敗路徑與重試。
 
 type imBuyers struct{}
 

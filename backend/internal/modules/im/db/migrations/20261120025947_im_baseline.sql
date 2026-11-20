@@ -75,8 +75,6 @@ CREATE TABLE "im"."messages" (
   CONSTRAINT "messages_shape_check" CHECK (((erased_at IS NULL) AND (((message_type = 'TEXT'::text) AND (content IS NOT NULL) AND (image_asset_id IS NULL) AND (image_object_key IS NULL)) OR ((message_type = 'IMAGE'::text) AND (content IS NULL) AND (image_asset_id IS NOT NULL) AND (image_object_key IS NOT NULL)))) OR ((erased_at IS NOT NULL) AND (content IS NULL) AND (image_asset_id IS NULL) AND (image_object_key IS NULL))),
   CONSTRAINT "messages_type_check" CHECK (message_type = ANY (ARRAY['TEXT'::text, 'IMAGE'::text]))
 );
--- Create index "messages_conversation_seq" to table: "messages"
-CREATE INDEX "messages_conversation_seq" ON "im"."messages" ("conversation_id", "seq" DESC);
 -- Create "hides" table
 CREATE TABLE "im"."hides" (
   "id" uuid NOT NULL,

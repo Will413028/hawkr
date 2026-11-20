@@ -32,6 +32,9 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 停權賣家的訂單綁定（`order_no`、`order_binding_verified_at`，client 帶 `order_no`、`NOT IN (0,80)`、綁定永久有效） | 停權時仍可為進行中的訂單聯絡 | 成立，但判準太寬（已完成與已退款也算） | 停權只保留履約必要的溝通 | 改（W1 (c)、W2 (i)）：G1 與 G3 共用一個「進行中」判定，每次送出時查，不存綁定欄位；以 `legacy/orderservice` 的 `HasOrderBetween` 取最近一筆再以 `OrderParties` 看狀態 ∈ {10,20,30,32,35,40}。已知看不到「最近一筆已結案、較舊的一筆還在配送」，錯的方向是多擋；退場點 B8（ordering 搬遷時 port 換成精確的 in-process 查詢） |
 | 卡片訊息：client 帶任意 JSON，預覽取 `extra["preview"]`，詞典只查文字 | 聊天裡引用商品或訂單 | 成立，但沒有形狀的欄位繞過詞典 | 卡片是伺服器擁有的參照，顯示內容由平台依參照組出 | 不搬（W6 (b)）：`message_type` 只有 `TEXT`、`IMAGE`；卡片連同形狀在 A6-5 定 proto 時以往前的 migration 加 |
 | `chat.message.sent` 的 `content_preview` 中文句子（「傳送了一張圖片」等） | 推播要有預覽文字 | 成立 | 共用文案目錄 | 過渡物：共用文案目錄目前沒有聊天條目（量：`rg -n "chat\|Chat\|訊息\|圖片" backend/internal/platform/uitext/catalog/zh-TW.json` 只命中社群檢舉的「垃圾訊息」），句子暫放 `legacy/imrelay`；A6-5、A6-6 為 client 加聊天預覽的目錄條目時改取同一批；退場點 A8（relay 刪除） |
+| `LockParty`：送出與 `Deactivate` 之間的互斥（舊碼沒有；舊 `account:deleted` 標記無鎖） | 送出的寫入與「身分進入刪除」要有先後，否則抹除 job 看不到之後才 commit 的訊息 | 成立 | 同一個身分的狀態變更與依賴它的寫入以鎖串行 | 新增：`pg_advisory_xact_lock`（`im.party:<kind>:<id>`），不用列鎖，因為 `Send` 在送出前沒有鎖買家或店家的列（鎖列要多鎖別的模組的表，也會與 accountdeletion 的 identity → buyer → seller 鎖序互相牽動）；不進 `lockorder`，因為它只在 im 自己的 transaction 內取、沒有跨模組的持鎖次序。`Send` 依固定順序（買家先於店家）鎖雙方再重查 `inactive_parties`，`Deactivate` 一次只鎖一個，所以不會死結；前提：`Send` 不先持買家或店家的列鎖，改了要重看 |
+| `im.erase_sweep` 每 15 分鐘的保底掃描 | job 用完 `MaxAttempts` 被丟棄後，身分仍在 `inactive_parties` 又還有未抹除的訊息 | 成立 | 週期性對帳補排 | 新增：唯一性以 `SweepInterval` 為時間窗（預設的 ByState 含 completed，會讓掃描被擋約一天）；抹除本身冪等可重跑 |
+| `im.hides` 訊息隱藏紀錄 | 隱藏要可多次、可還原，並且能追溯 | 成立 | 形狀同 `review.hides`、`social.hides`：還原留列、同一則訊息未還原的隱藏至多一筆 | 新增：本模組只有資料與讀取（`Hidden`），隱藏與還原的決定由 moderation 呼叫 `Hide`／`Restore` |
 
 ## 傳輸層的沿用盤點
 
@@ -57,4 +60,4 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 - 列表不因封鎖隱藏對話。
 - `chat.message.sent` 的 `conversation_id`、`message_id` 是 UUID 字串。
 
-`legacy/imrelay` 的 `typedWorker`、`baseEvent` 與其他舊 relay 的同名機制刻意重複（relay 是暫時的，隨 A8 刪除），不抽共用。
+`legacy/imrelay` 的 `typedWorker`、`baseEvent` 與其他舊 relay 的同名機制刻意重複（relay 是暫時的，notification 搬進單體後刪除），不抽共用。

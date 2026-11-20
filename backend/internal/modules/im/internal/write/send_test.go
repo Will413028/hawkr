@@ -307,7 +307,7 @@ func TestClosedGuard(t *testing.T) {
 	})
 }
 
-// 店家寄首則訊息放行（A6-D14 W5）。
+// 店家寄首則訊息放行。
 func TestStoreMayStartAConversation(t *testing.T) {
 	f := newFixture()
 	if err := f.check(model.PartyStore, nil); err != nil {
@@ -376,6 +376,7 @@ func TestInputValidation(t *testing.T) {
 		"blank text":           func(in *model.SendInput) { in.Text = " \n\t" },
 		"too long":             func(in *model.SendInput) { in.Text = strings.Repeat("字", model.MaxTextRunes+1) },
 		"invalid utf8":         func(in *model.SendInput) { in.Text = "a\xffb" },
+		"nul byte":             func(in *model.SendInput) { in.Text = "a\x00b" },
 		"image no token":       func(in *model.SendInput) { in.Type, in.Text, in.StagedToken = model.TypeImage, "", "  " },
 		"no counterpart":       func(in *model.SendInput) { in.CounterpartID = 0 },
 		"negative counterpart": func(in *model.SendInput) { in.CounterpartID = -1 },
