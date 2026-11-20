@@ -330,6 +330,33 @@ func InquiryRequestIdReused() uitext.Message {
 	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
 }
 
+// InquirySellerReplyBodyLength 是模組句子 inquiry.seller_reply.body_length；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyBodyLength(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your reply must be 1 to 4000 characters.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "回覆內容必須是 1 到 4000 字。", Locale: uitext.ZhTW}
+}
+
+// InquirySellerReplyUnavailableReplied 是模組句子 inquiry.seller_reply.unavailable.replied；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyUnavailableReplied(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This inquiry has already been replied to and cannot be replied to again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆詢問已經回覆過，不能再回覆。", Locale: uitext.ZhTW}
+}
+
+// InquirySellerReplyUnavailableWithdrawn 是模組句子 inquiry.seller_reply.unavailable.withdrawn；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyUnavailableWithdrawn(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This inquiry has been withdrawn, so no reply is needed.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆詢問已撤回，不需要回覆。", Locale: uitext.ZhTW}
+}
+
 // InquiryUnavailableReplied 是後台員工受眾的模組句子 inquiry.unavailable.replied（只有 zh-TW）。
 func InquiryUnavailableReplied() uitext.Message {
 	return uitext.Message{Text: "這筆詢問已記下回覆。", Locale: uitext.ZhTW}

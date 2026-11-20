@@ -869,6 +869,8 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		return insert(c.ID, s.StoreID, 1, "now() + interval '1 day'", extraColumns, extraValues)
 	}
 	replyColumns := ", reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id"
+	sellerReplyColumns := replyColumns + ", replied_by_account_id"
+	accountReplyColumns := ", reply_body, reply_channel, reply_received_at, reply_recorded_at, replied_by_account_id"
 	withdrawColumns := ", withdrawn_at, withdrawn_by_admin_id, withdraw_cause"
 	for _, v := range []struct{ name, constraint, sql string }{
 		{"店家不是案件的店家", "case_inquiries_case_fkey", insert(c.ID, other.StoreID, 1, "now() + interval '1 day'", "", "")},
@@ -889,6 +891,13 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		{"撤回原因不認得", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now(), 1, 'OTHER'")},
 		{"撤回的管理員是 0", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now(), 0, 'ADMIN'")},
 		{"撤回早於建立", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now() - interval '1 day', 1, 'ADMIN'")},
+		// 回覆的作者二選一：管理員記下（管道是系統外的管道）或賣家在賣家中心回覆（管道是 SELLER_CENTER）。
+		{"賣家中心的回覆沒有帳號", "case_inquiries_reply_check", valid(replyColumns, ", 'x', 'SELLER_CENTER', now(), now(), 1")},
+		{"賣家中心的回覆同時有管理員與帳號", "case_inquiries_reply_check", valid(sellerReplyColumns, ", 'x', 'SELLER_CENTER', now(), now(), 1, 5")},
+		{"管理員記下的回覆同時有帳號", "case_inquiries_reply_check", valid(sellerReplyColumns, ", 'x', 'PHONE', now(), now(), 1, 5")},
+		{"系統外管道的回覆由帳號作者", "case_inquiries_reply_check", valid(accountReplyColumns, ", 'x', 'PHONE', now(), now(), 5")},
+		{"賣家中心的帳號是 0", "case_inquiries_reply_check", valid(accountReplyColumns, ", 'x', 'SELLER_CENTER', now(), now(), 0")},
+		{"只有回覆的帳號", "case_inquiries_reply_check", valid(", replied_by_account_id", ", 5")},
 		{"回覆與撤回同時存在", "case_inquiries_terminal_check", valid(replyColumns+withdrawColumns, ", 'x', 'PHONE', now(), now(), 1, now(), 1, 'ADMIN'")},
 		{"同一個案件第二筆還沒結束的詢問", "case_inquiries_one_open", insert(busy.ID, other.StoreID, 1, "now() + interval '1 day'", "", "")},
 		// 附件：位置、資產、外鍵與主鍵。

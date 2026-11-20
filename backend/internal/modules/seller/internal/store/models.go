@@ -131,6 +131,7 @@ type SellerCaseInquiry struct {
 	ReplyReceivedAt        *time.Time
 	ReplyRecordedAt        *time.Time
 	ReplyRecordedByAdminID *int64
+	RepliedByAccountID     *int64
 	WithdrawnAt            *time.Time
 	WithdrawnByAdminID     *int64
 	WithdrawCause          *string

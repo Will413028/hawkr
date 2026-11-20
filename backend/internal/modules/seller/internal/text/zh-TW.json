@@ -16,6 +16,18 @@
       "message": "終止合作的申覆期限已過",
       "description": "申覆不可用：終止合作的申覆期間已結束（APPEAL_WINDOW_ENDED）；期限本身另以「申覆期限」顯示。"
     },
+    "inquiry.seller_reply.body_length": {
+      "message": "回覆內容必須是 1 到 4000 字。",
+      "description": "賣家回覆詢問：回覆內容去掉前後空白後不是 1 到 4000 字。"
+    },
+    "inquiry.seller_reply.unavailable.replied": {
+      "message": "這筆詢問已經回覆過，不能再回覆。",
+      "description": "賣家回覆詢問：詢問已有回覆（賣家自己的或管理員記下的）；一則詢問只有一次回覆，要補資料由平台另開詢問。"
+    },
+    "inquiry.seller_reply.unavailable.withdrawn": {
+      "message": "這筆詢問已撤回，不需要回覆。",
+      "description": "賣家回覆詢問：詢問已被管理員撤回或因案件結案而撤回。"
+    },
     "kyc.edit_unavailable.approved": {
       "message": "商家認證已通過，不需要修改或重新送出。",
       "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請已核准。"
