@@ -140,8 +140,9 @@ test("詢問區塊：固定說明、空狀態、每筆一張卡（{種類}・{�
 	assert.match(bodyText(), /詢問賣家/u);
 	assert.match(
 		bodyText(),
-		/這裡只記下詢問；賣家端的畫面上線前，系統不會通知賣家，請另外聯絡賣家。詢問只寫你轉述的內容，不要附上通報原文或通報人的資料。/u,
+		/詢問只寫你轉述的內容，不要附上通報原文或通報人的資料。/u,
 	);
+	assert.doesNotMatch(bodyText(), /賣家端的畫面上線前/u);
 	assert.match(bodyText(), /還沒有詢問/u);
 	assert.ok(buttonByText("詢問賣家"), "頁首按鈕");
 
@@ -243,6 +244,34 @@ test("已回覆的卡：管道、收到的時間、記下、內容與附件連�
 		"不是後台檔案路徑的網址不給連結，只顯示名稱",
 	);
 	assert.match(bodyText(), /附件 2/u);
+});
+
+test("賣家在賣家中心的回覆：管道是賣家中心，顯示回覆的帳號，不顯示管理員記下的欄位", async () => {
+	await openPage(
+		transportWith({
+			getCase: () => ({ case: kase({}) }),
+			listCaseInquiries: () => ({
+				inquiries: [
+					inquiry({
+						state: CaseInquiryState.REPLIED,
+						reply: {
+							body: "我們已補上進貨單",
+							channel: CaseInquiryReplyChannel.SELLER_CENTER,
+							receiveTime: ts(T0),
+							recordTime: ts(T0),
+							repliedByAccountId: "3301",
+							evidence: [],
+						},
+					}),
+				],
+			}),
+		}),
+	);
+	assert.match(bodyText(), /賣家中心/u);
+	assert.match(bodyText(), /回覆的帳號/u);
+	assert.match(bodyText(), /帳號 3301/u);
+	assert.match(bodyText(), /我們已補上進貨單/u);
+	assert.doesNotMatch(bodyText(), /記下/u);
 });
 
 test("詢問讀取失敗：只影響詢問區塊，顯示失敗句與重試；重試成功後列出", async () => {
@@ -527,10 +556,8 @@ test("記下回覆與撤回：已記過／已撤回時顯示橫幅（這次沒�
 	);
 	await click("撤回");
 	assert.match(bodyText(), /撤回詢問/u);
-	assert.match(
-		bodyText(),
-		/撤回之後賣家不必再回覆。賣家端的畫面上線前，請另外告知賣家。/u,
-	);
+	assert.match(bodyText(), /撤回之後賣家不必再回覆。/u);
+	assert.doesNotMatch(bodyText(), /賣家端的畫面上線前/u);
 	await submit("撤回");
 	await until(() => bodyText().includes("這筆詢問先前已撤回。"), "已撤回橫幅");
 });

@@ -55,9 +55,10 @@ const CHANNEL_TEXT: Record<
 	[CaseInquiryReplyChannel.EMAIL]: "Email",
 	[CaseInquiryReplyChannel.MESSAGING]: "通訊軟體",
 	[CaseInquiryReplyChannel.OTHER]: "其他",
+	[CaseInquiryReplyChannel.SELLER_CENTER]: "賣家中心",
 };
 
-/** 回覆管道的選項，順序同契約。 */
+/** 管理員記下系統外回覆時可選的管道，順序同契約；賣家中心是賣家自己回覆的管道，不在選項裡。 */
 export const INQUIRY_CHANNEL_OPTIONS: readonly Exclude<
 	CaseInquiryReplyChannel,
 	CaseInquiryReplyChannel.UNSPECIFIED
