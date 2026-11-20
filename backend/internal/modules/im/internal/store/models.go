@@ -61,6 +61,13 @@ type ImMessage struct {
 	ErasedAt       *time.Time
 }
 
+type ImPresenceStream struct {
+	StreamID  uuid.UUID
+	Kind      string
+	PartyID   int64
+	ExpiresAt time.Time
+}
+
 type ImRetiredAsset struct {
 	RefType    string
 	RefID      string

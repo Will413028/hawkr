@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 	"unicode/utf8"
 	"uuid"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
@@ -70,38 +72,79 @@ func New(d Deps) *Service {
 	return s
 }
 
+// inTx 開 im 的寫入 transaction 並設時間上限（model.WriteTxTimeout）；ctx 已在外層 transaction 內時加入它，上限由外層決定，不覆寫。
+func (s *Service) inTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	_, nested := db.TxFrom(ctx)
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if !nested {
+			ms := strconv.FormatInt(model.WriteTxTimeout.Milliseconds(), 10)
+			if _, err := s.d.DB.Conn(ctx).Exec(ctx,
+				`SELECT set_config('statement_timeout', $1, true), set_config('idle_in_transaction_session_timeout', $1, true), set_config('transaction_timeout', $1, true)`, ms); err != nil {
+				return err
+			}
+		}
+		return fn(ctx)
+	})
+}
+
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
 // MarkRead 把呼叫者這一方在對話的已讀游標推到 uptoSeq：只前進不後退，也不超過 last_seq。對話不屬於呼叫者回 NotFound。
+// 游標真的前進時在同一個 transaction 發 NOTIFY（r）；冪等重送不發。
 func (s *Service) MarkRead(ctx context.Context, conversationID uuid.UUID, p model.Party, uptoSeq int64) error {
 	l := uitext.LocaleFrom(ctx)
 	if err := p.Authorize(); err != nil {
 		return err
 	}
-	var err error
-	if p.Kind == model.PartyBuyer {
-		_, err = s.q(ctx).MarkReadBuyer(ctx, store.MarkReadBuyerParams{UptoSeq: uptoSeq, ID: conversationID, BuyerID: p.BuyerID})
-	} else {
-		_, err = s.q(ctx).MarkReadStore(ctx, store.MarkReadStoreParams{UptoSeq: uptoSeq, ID: conversationID, StoreID: p.Store.StoreID})
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.NotFound("%s", text.ImConversationNotFound(l))
-	}
-	return err
+	return s.inTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		var buyerID, storeID, readSeq int64
+		var advanced bool
+		var side string
+		var err error
+		if p.Kind == model.PartyBuyer {
+			var r store.MarkReadBuyerRow
+			r, err = q.MarkReadBuyer(ctx, store.MarkReadBuyerParams{UptoSeq: uptoSeq, ID: conversationID, BuyerID: p.BuyerID})
+			buyerID, storeID, readSeq, advanced, side = r.BuyerID, r.StoreID, r.ReadSeq, r.Advanced, live.SideBuyer
+		} else {
+			var r store.MarkReadStoreRow
+			r, err = q.MarkReadStore(ctx, store.MarkReadStoreParams{UptoSeq: uptoSeq, ID: conversationID, StoreID: p.Store.StoreID})
+			buyerID, storeID, readSeq, advanced, side = r.BuyerID, r.StoreID, r.ReadSeq, r.Advanced, live.SideStore
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("%s", text.ImConversationNotFound(l))
+		}
+		if err != nil {
+			return err
+		}
+		if !advanced {
+			return nil
+		}
+		return q.Notify(ctx, live.Read(conversationID, buyerID, storeID, readSeq, side).Encode())
+	})
 }
 
-// MarkAllRead 把呼叫者這一方的全部對話標成已讀。
+// MarkAllRead 把呼叫者這一方的全部對話標成已讀。有對話被改動時只發一個 NOTIFY（u，只帶這一方），不逐對話發，也不通知對方。
 func (s *Service) MarkAllRead(ctx context.Context, p model.Party) error {
 	if err := p.Authorize(); err != nil {
 		return err
 	}
-	var err error
-	if p.Kind == model.PartyBuyer {
-		_, err = s.q(ctx).MarkAllReadBuyer(ctx, p.BuyerID)
-	} else {
-		_, err = s.q(ctx).MarkAllReadStore(ctx, p.Store.StoreID)
-	}
-	return err
+	return s.inTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		var n int64
+		var err error
+		payload := live.ReadBatch(p.BuyerID, 0)
+		if p.Kind == model.PartyBuyer {
+			n, err = q.MarkAllReadBuyer(ctx, p.BuyerID)
+		} else {
+			payload = live.ReadBatch(0, p.Store.StoreID)
+			n, err = q.MarkAllReadStore(ctx, p.Store.StoreID)
+		}
+		if err != nil || n == 0 {
+			return err
+		}
+		return q.Notify(ctx, payload.Encode())
+	})
 }
 
 // Hide 隱藏一則訊息（moderation 的 transaction 內呼叫）；已有未還原的隱藏時回既有的那一筆（Created 為假，冪等）。
@@ -112,9 +155,10 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 		return model.Hide{}, err
 	}
 	var out model.Hide
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if _, err := q.LockMessage(ctx, in.MessageID); err != nil {
+		msg, err := q.LockMessage(ctx, in.MessageID)
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return apperr.NotFound("%s", text.HideMessageNotFound())
 			}
@@ -128,7 +172,10 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 			return err
 		}
 		out = rows.Hide(row, row.ID == id)
-		return nil
+		if row.ID != id {
+			return nil
+		}
+		return q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode())
 	})
 	return out, err
 }
@@ -146,9 +193,10 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 		return model.Hide{}, apperr.InvalidInputOn([]string{"Reason"}, "%s", text.HideRestoreReason(text.HideRestoreReasonArgs{Max: model.MaxHideReasonRunes}))
 	}
 	var out model.Hide
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if _, err := q.LockMessage(ctx, in.MessageID); err != nil {
+		msg, err := q.LockMessage(ctx, in.MessageID)
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return apperr.NotFound("%s", text.HideMessageNotFound())
 			}
@@ -162,7 +210,7 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		out = rows.Hide(row, false)
-		return nil
+		return q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode())
 	})
 	return out, err
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
@@ -58,7 +59,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	}
 
 	var out model.Message
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err = s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		sender, receiver := in.Sender.Kind, counterpart(in.Sender.Kind)
 		// 兩方都持 advisory lock：Deactivate 一次只持一個身分的鎖，鎖序固定（買家先於店家，即 kind 字串序）所以不會死結。
@@ -81,13 +82,13 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		if inactive {
 			return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
 		}
-		now := s.d.Now().UTC()
 		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
-			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender), Now: now,
+			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender),
 		})
 		if err != nil {
 			return err
 		}
+		now := seq.LastMessageAt.UTC()
 		msgID := s.d.NewID()
 		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), MessageType: string(in.Type), Now: now}
 		if in.Type == model.TypeText {
@@ -108,6 +109,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 			EventID: s.d.NewID(), OccurredAt: now, ConversationID: seq.ID, MessageID: msgID, Seq: seq.LastSeq,
 			SenderKind: sender, BuyerID: t.buyerID, StoreID: t.store.StoreID,
 		}); err != nil {
+			return err
+		}
+		if err := q.Notify(ctx, live.Message(seq.ID, t.buyerID, t.store.StoreID, seq.LastSeq).Encode()); err != nil {
 			return err
 		}
 		out = rows.Message(rows.MessageRow{

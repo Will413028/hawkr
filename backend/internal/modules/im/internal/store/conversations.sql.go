@@ -12,6 +12,71 @@ import (
 	"uuid"
 )
 
+const activeConversationIDsBuyer = `-- name: ActiveConversationIDsBuyer :many
+SELECT id FROM im.conversations
+WHERE buyer_id = $1 AND last_message_at > $2::timestamptz
+LIMIT $3::bigint
+`
+
+type ActiveConversationIDsBuyerParams struct {
+	BuyerID int64
+	Since   time.Time
+	MaxRows int64
+}
+
+// 監聽重連後的補洞：這個買家在 since（資料庫時間）之後有新訊息的對話，最多 max_rows 筆。
+func (q *Queries) ActiveConversationIDsBuyer(ctx context.Context, arg ActiveConversationIDsBuyerParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, activeConversationIDsBuyer, arg.BuyerID, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const activeConversationIDsStore = `-- name: ActiveConversationIDsStore :many
+SELECT id FROM im.conversations
+WHERE store_id = $1 AND last_message_at > $2::timestamptz
+LIMIT $3::bigint
+`
+
+type ActiveConversationIDsStoreParams struct {
+	StoreID int64
+	Since   time.Time
+	MaxRows int64
+}
+
+func (q *Queries) ActiveConversationIDsStore(ctx context.Context, arg ActiveConversationIDsStoreParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, activeConversationIDsStore, arg.StoreID, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const allocateSeq = `-- name: AllocateSeq :one
 
 INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, buyer_last_read_seq, store_last_read_seq, last_message_at, created_at)
@@ -19,14 +84,14 @@ VALUES (
     $1, $2, $3, 1,
     CASE WHEN $4::text = 'BUYER' THEN 1 ELSE 0 END,
     CASE WHEN $4::text = 'STORE' THEN 1 ELSE 0 END,
-    $5, $5
+    clock_timestamp(), now()
 )
 ON CONFLICT (buyer_id, store_id) DO UPDATE
 SET last_seq = im.conversations.last_seq + 1,
     buyer_last_read_seq = CASE WHEN $4::text = 'BUYER' THEN im.conversations.last_seq + 1 ELSE im.conversations.buyer_last_read_seq END,
     store_last_read_seq = CASE WHEN $4::text = 'STORE' THEN im.conversations.last_seq + 1 ELSE im.conversations.store_last_read_seq END,
-    last_message_at = EXCLUDED.last_message_at
-RETURNING id, last_seq, (xmax = 0) AS created
+    last_message_at = GREATEST(im.conversations.last_message_at, clock_timestamp())
+RETURNING id, last_seq, (xmax = 0) AS created, last_message_at
 `
 
 type AllocateSeqParams struct {
@@ -34,29 +99,46 @@ type AllocateSeqParams struct {
 	BuyerID    int64
 	StoreID    int64
 	SenderKind string
-	Now        time.Time
 }
 
 type AllocateSeqRow struct {
-	ID      uuid.UUID
-	LastSeq int64
-	Created bool
+	ID            uuid.UUID
+	LastSeq       int64
+	Created       bool
+	LastMessageAt time.Time
 }
 
 // 對話列：建立、配發 seq、已讀游標、列表與未讀。
 // 同一句 SQL 建立對話（還不存在時）、配發 seq，並把寄件人那一方的已讀游標推到新的 seq。並行送出在 ON CONFLICT 的列鎖上排隊，
-// 所以 seq 連續而且不重複；SET 右側讀的是更新前的列。
+// 所以 seq 連續而且不重複；SET 右側讀的是更新前的列。last_message_at 只由資料庫的 clock_timestamp() 寫入（取更新前的值與它的較大者，
+// 所以不會倒退），並回傳給呼叫者當這則訊息的時間：監聽重連的補洞以資料庫時間比較，訊息的 created_at 與事件時間用同一個值。
 func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (AllocateSeqRow, error) {
 	row := q.db.QueryRow(ctx, allocateSeq,
 		arg.NewID,
 		arg.BuyerID,
 		arg.StoreID,
 		arg.SenderKind,
-		arg.Now,
 	)
 	var i AllocateSeqRow
-	err := row.Scan(&i.ID, &i.LastSeq, &i.Created)
+	err := row.Scan(
+		&i.ID,
+		&i.LastSeq,
+		&i.Created,
+		&i.LastMessageAt,
+	)
 	return i, err
+}
+
+const databaseNow = `-- name: DatabaseNow :one
+SELECT clock_timestamp()::timestamptz
+`
+
+// 監聽迴圈啟動時讀一次資料庫時間當作第一個補洞起點。用 clock_timestamp()：存活確認的 SELECT now() 是測試與維運辨認監聽連線的字首。
+func (q *Queries) DatabaseNow(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, databaseNow)
+	var column_1 time.Time
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getConversation = `-- name: GetConversation :one
@@ -80,7 +162,7 @@ func (q *Queries) GetConversation(ctx context.Context, id uuid.UUID) (ImConversa
 }
 
 const listConversationsBuyer = `-- name: ListConversationsBuyer :many
-SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.buyer_last_read_seq AS read_seq, c.last_message_at,
+SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.buyer_last_read_seq AS read_seq, c.store_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
        (h.id IS NOT NULL)::boolean AS hidden
 FROM im.conversations AS c
@@ -105,6 +187,7 @@ type ListConversationsBuyerRow struct {
 	StoreID       int64
 	LastSeq       int64
 	ReadSeq       int64
+	PeerReadSeq   int64
 	LastMessageAt time.Time
 	MessageID     uuid.UUID
 	SenderKind    string
@@ -135,6 +218,7 @@ func (q *Queries) ListConversationsBuyer(ctx context.Context, arg ListConversati
 			&i.StoreID,
 			&i.LastSeq,
 			&i.ReadSeq,
+			&i.PeerReadSeq,
 			&i.LastMessageAt,
 			&i.MessageID,
 			&i.SenderKind,
@@ -154,7 +238,7 @@ func (q *Queries) ListConversationsBuyer(ctx context.Context, arg ListConversati
 }
 
 const listConversationsStore = `-- name: ListConversationsStore :many
-SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.last_message_at,
+SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.buyer_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
        (h.id IS NOT NULL)::boolean AS hidden
 FROM im.conversations AS c
@@ -179,6 +263,7 @@ type ListConversationsStoreRow struct {
 	StoreID       int64
 	LastSeq       int64
 	ReadSeq       int64
+	PeerReadSeq   int64
 	LastMessageAt time.Time
 	MessageID     uuid.UUID
 	SenderKind    string
@@ -208,6 +293,7 @@ func (q *Queries) ListConversationsStore(ctx context.Context, arg ListConversati
 			&i.StoreID,
 			&i.LastSeq,
 			&i.ReadSeq,
+			&i.PeerReadSeq,
 			&i.LastMessageAt,
 			&i.MessageID,
 			&i.SenderKind,
@@ -253,10 +339,17 @@ func (q *Queries) MarkAllReadStore(ctx context.Context, storeID int64) (int64, e
 }
 
 const markReadBuyer = `-- name: MarkReadBuyer :one
-UPDATE im.conversations
-SET buyer_last_read_seq = GREATEST(buyer_last_read_seq, LEAST($1::bigint, last_seq))
-WHERE id = $2 AND buyer_id = $3
-RETURNING buyer_last_read_seq AS read_seq, last_seq
+WITH prev AS (
+    SELECT o.id, o.buyer_last_read_seq AS read_seq FROM im.conversations AS o
+    WHERE o.id = $2 AND o.buyer_id = $3
+    FOR UPDATE
+)
+UPDATE im.conversations AS c
+SET buyer_last_read_seq = GREATEST(c.buyer_last_read_seq, LEAST($1::bigint, c.last_seq))
+FROM prev
+WHERE c.id = prev.id
+RETURNING c.buyer_last_read_seq AS read_seq, c.last_seq, c.buyer_id, c.store_id,
+          (c.buyer_last_read_seq > prev.read_seq)::boolean AS advanced
 `
 
 type MarkReadBuyerParams struct {
@@ -266,23 +359,40 @@ type MarkReadBuyerParams struct {
 }
 
 type MarkReadBuyerRow struct {
-	ReadSeq int64
-	LastSeq int64
+	ReadSeq  int64
+	LastSeq  int64
+	BuyerID  int64
+	StoreID  int64
+	Advanced bool
 }
 
-// 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。
+// 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：先 FOR UPDATE 鎖住並讀出
+// 更新前的值（並行的 MarkRead 在這裡排隊，拿到的是對方提交後的值），再與它比較，所以同一次前進只會有一個呼叫者得到 advanced。
 func (q *Queries) MarkReadBuyer(ctx context.Context, arg MarkReadBuyerParams) (MarkReadBuyerRow, error) {
 	row := q.db.QueryRow(ctx, markReadBuyer, arg.UptoSeq, arg.ID, arg.BuyerID)
 	var i MarkReadBuyerRow
-	err := row.Scan(&i.ReadSeq, &i.LastSeq)
+	err := row.Scan(
+		&i.ReadSeq,
+		&i.LastSeq,
+		&i.BuyerID,
+		&i.StoreID,
+		&i.Advanced,
+	)
 	return i, err
 }
 
 const markReadStore = `-- name: MarkReadStore :one
-UPDATE im.conversations
-SET store_last_read_seq = GREATEST(store_last_read_seq, LEAST($1::bigint, last_seq))
-WHERE id = $2 AND store_id = $3
-RETURNING store_last_read_seq AS read_seq, last_seq
+WITH prev AS (
+    SELECT o.id, o.store_last_read_seq AS read_seq FROM im.conversations AS o
+    WHERE o.id = $2 AND o.store_id = $3
+    FOR UPDATE
+)
+UPDATE im.conversations AS c
+SET store_last_read_seq = GREATEST(c.store_last_read_seq, LEAST($1::bigint, c.last_seq))
+FROM prev
+WHERE c.id = prev.id
+RETURNING c.store_last_read_seq AS read_seq, c.last_seq, c.buyer_id, c.store_id,
+          (c.store_last_read_seq > prev.read_seq)::boolean AS advanced
 `
 
 type MarkReadStoreParams struct {
@@ -292,14 +402,23 @@ type MarkReadStoreParams struct {
 }
 
 type MarkReadStoreRow struct {
-	ReadSeq int64
-	LastSeq int64
+	ReadSeq  int64
+	LastSeq  int64
+	BuyerID  int64
+	StoreID  int64
+	Advanced bool
 }
 
 func (q *Queries) MarkReadStore(ctx context.Context, arg MarkReadStoreParams) (MarkReadStoreRow, error) {
 	row := q.db.QueryRow(ctx, markReadStore, arg.UptoSeq, arg.ID, arg.StoreID)
 	var i MarkReadStoreRow
-	err := row.Scan(&i.ReadSeq, &i.LastSeq)
+	err := row.Scan(
+		&i.ReadSeq,
+		&i.LastSeq,
+		&i.BuyerID,
+		&i.StoreID,
+		&i.Advanced,
+	)
 	return i, err
 }
 

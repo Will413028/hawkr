@@ -18,8 +18,22 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Deps 是讀取路徑的依賴。
-type Deps struct{ DB *db.DB }
+// Buyers 是在線狀態判定用到的 buyer 公開 API；正式組裝傳 *buyer.Module。
+type Buyers interface {
+	IsBlockingStore(ctx context.Context, buyerID, storeID int64) (bool, error)
+}
+
+// Stores 是在線狀態判定用到的 seller 公開 API；正式組裝傳 *seller.Module。
+type Stores interface {
+	StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
+}
+
+// Deps 是讀取路徑的依賴；Buyers、Stores 只有 Presence 用。
+type Deps struct {
+	DB     *db.DB
+	Buyers Buyers
+	Stores Stores
+}
 
 // Service 是讀取路徑的 use case。
 type Service struct{ d Deps }
@@ -76,7 +90,7 @@ func (s *Service) ListConversations(ctx context.Context, p model.Party, after *m
 			return model.ConversationPage{}, err
 		}
 		for _, r := range rs {
-			items = append(items, conversation(r.ID, r.BuyerID, r.StoreID, r.LastSeq, r.ReadSeq, r.LastMessageAt, r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden))
+			items = append(items, conversation(r.ID, r.BuyerID, r.StoreID, r.LastSeq, r.ReadSeq, r.LastMessageAt, r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden, r.PeerReadSeq))
 		}
 	} else {
 		rs, err := s.q(ctx).ListConversationsStore(ctx, store.ListConversationsStoreParams{StoreID: p.Store.StoreID, AfterAt: afterAt, AfterID: afterID, MaxRows: n + 1})
@@ -84,7 +98,7 @@ func (s *Service) ListConversations(ctx context.Context, p model.Party, after *m
 			return model.ConversationPage{}, err
 		}
 		for _, r := range rs {
-			items = append(items, conversation(r.ID, r.BuyerID, r.StoreID, r.LastSeq, r.ReadSeq, r.LastMessageAt, r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden))
+			items = append(items, conversation(r.ID, r.BuyerID, r.StoreID, r.LastSeq, r.ReadSeq, r.LastMessageAt, r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden, r.PeerReadSeq))
 		}
 	}
 	page := model.ConversationPage{Items: items}
@@ -96,16 +110,17 @@ func (s *Service) ListConversations(ctx context.Context, p model.Party, after *m
 	return page, nil
 }
 
-func conversation(id uuid.UUID, buyerID, storeID, lastSeq, readSeq int64, at time.Time, senderKind, msgType string, content *string, erasedAt *time.Time, hidden bool) model.Conversation {
+func conversation(id uuid.UUID, buyerID, storeID, lastSeq, readSeq int64, at time.Time, senderKind, msgType string, content *string, erasedAt *time.Time, hidden bool, peerReadSeq int64) model.Conversation {
 	return model.Conversation{
 		ID: id, BuyerID: buyerID, StoreID: storeID, LastSeq: lastSeq, Unread: lastSeq - readSeq, LastMessageAt: at,
-		Preview: rows.PreviewOf(senderKind, msgType, content, erasedAt, hidden),
+		Preview: rows.PreviewOf(senderKind, msgType, content, erasedAt, hidden), PeerReadSeq: peerReadSeq,
 	}
 }
 
 // ListMessages 是對話裡 seq 小於 beforeSeq 的訊息（新的在前；beforeSeq 為 0 從最新開始），以 seq 做 keyset，不回總數。
 func (s *Service) ListMessages(ctx context.Context, conversationID uuid.UUID, p model.Party, beforeSeq int64, size int32) (model.MessagePage, error) {
-	if _, err := s.authorized(ctx, conversationID, p); err != nil {
+	c, err := s.authorized(ctx, conversationID, p)
+	if err != nil {
 		return model.MessagePage{}, err
 	}
 	n := pageSize(size)
@@ -113,13 +128,13 @@ func (s *Service) ListMessages(ctx context.Context, conversationID uuid.UUID, p 
 	if err != nil {
 		return model.MessagePage{}, err
 	}
-	items := rows.Before(rs)
-	return page(items, n), nil
+	return withPeer(page(rows.Before(rs), n), c, p), nil
 }
 
-// MessagesAfter 是對話裡 seq 大於 afterSeq 的訊息（舊的在前），給 2b 的斷線補洞。
+// MessagesAfter 是對話裡 seq 大於 afterSeq 的訊息（舊的在前），給串流的斷線補洞。
 func (s *Service) MessagesAfter(ctx context.Context, conversationID uuid.UUID, p model.Party, afterSeq int64, size int32) (model.MessagePage, error) {
-	if _, err := s.authorized(ctx, conversationID, p); err != nil {
+	c, err := s.authorized(ctx, conversationID, p)
+	if err != nil {
 		return model.MessagePage{}, err
 	}
 	n := pageSize(size)
@@ -127,7 +142,16 @@ func (s *Service) MessagesAfter(ctx context.Context, conversationID uuid.UUID, p
 	if err != nil {
 		return model.MessagePage{}, err
 	}
-	return page(rows.After(rs), n), nil
+	return withPeer(page(rows.After(rs), n), c, p), nil
+}
+
+// withPeer 填入對方的已讀游標。
+func withPeer(pg model.MessagePage, c store.ImConversation, p model.Party) model.MessagePage {
+	pg.PeerReadSeq = c.StoreLastReadSeq
+	if p.Kind == model.PartyStore {
+		pg.PeerReadSeq = c.BuyerLastReadSeq
+	}
+	return pg
 }
 
 func page(items []model.Message, n int32) model.MessagePage {
@@ -165,4 +189,64 @@ func (s *Service) MessageForRelay(ctx context.Context, id uuid.UUID) (model.Rela
 		Message: m, BuyerID: r.BuyerID, StoreID: r.StoreID, ReceiverInactive: r.ReceiverInactive,
 		Preview: rows.PreviewOf(r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden),
 	}, nil
+}
+
+// ActiveSince 是 p 這一方在 since（資料庫時間）之後有新訊息的對話，最多 limit 個；給監聽重連後的補洞。
+func (s *Service) ActiveSince(ctx context.Context, p model.Party, since time.Time, limit int) ([]uuid.UUID, error) {
+	if err := p.Authorize(); err != nil {
+		return nil, err
+	}
+	if p.Kind == model.PartyBuyer {
+		return s.q(ctx).ActiveConversationIDsBuyer(ctx, store.ActiveConversationIDsBuyerParams{BuyerID: p.BuyerID, Since: since, MaxRows: int64(limit)})
+	}
+	return s.q(ctx).ActiveConversationIDsStore(ctx, store.ActiveConversationIDsStoreParams{StoreID: p.Store.StoreID, Since: since, MaxRows: int64(limit)})
+}
+
+// Presence 回報呼叫者的每個對話的對方是否在線。授權單位是共有的對話：任何一個對話不屬於呼叫者，整個呼叫回 NotFound，
+// 呼叫者無法用任意 ID 探測任意人。對方已刪帳或退場、任一方向有封鎖都回離線，與對方真的離線不可區分；封鎖查詢失敗回錯誤，不放行。
+func (s *Service) Presence(ctx context.Context, p model.Party, conversationIDs []uuid.UUID) ([]model.PresenceState, error) {
+	if err := p.Authorize(); err != nil {
+		return nil, err
+	}
+	if len(conversationIDs) > model.MaxPresenceConversations {
+		return nil, apperr.InvalidInputOn([]string{"ConversationIDs"}, "%s", text.ImPresenceTooMany(uitext.LocaleFrom(ctx)))
+	}
+	convs := make([]store.ImConversation, len(conversationIDs))
+	for i, id := range conversationIDs {
+		c, err := s.authorized(ctx, id, p)
+		if err != nil {
+			return nil, err
+		}
+		convs[i] = c
+	}
+	out := make([]model.PresenceState, len(convs))
+	for i, c := range convs {
+		online, err := s.peerOnline(ctx, p, c)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = model.PresenceState{ConversationID: c.ID, Online: online}
+	}
+	return out, nil
+}
+
+func (s *Service) peerOnline(ctx context.Context, p model.Party, c store.ImConversation) (bool, error) {
+	peerKind, peerID := string(model.PartyStore), c.StoreID
+	if p.Kind == model.PartyStore {
+		peerKind, peerID = string(model.PartyBuyer), c.BuyerID
+	}
+	q := s.q(ctx)
+	inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: peerKind, PartyID: peerID})
+	if err != nil || inactive {
+		return false, err
+	}
+	blocking, err := s.d.Buyers.IsBlockingStore(ctx, c.BuyerID, c.StoreID)
+	if err != nil || blocking {
+		return false, err
+	}
+	blocked, err := s.d.Stores.StoreBlocksBuyer(ctx, c.StoreID, c.BuyerID)
+	if err != nil || blocked {
+		return false, err
+	}
+	return q.IsPartyOnline(ctx, store.IsPartyOnlineParams{Kind: peerKind, PartyID: peerID})
 }

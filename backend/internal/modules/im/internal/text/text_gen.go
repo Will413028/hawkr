@@ -136,6 +136,15 @@ func ImModerationRejected(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "內容不符社群守則，請修改後再送出", Locale: uitext.ZhTW}
 }
 
+// ImPresenceTooMany 是模組句子 im.presence_too_many；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImPresenceTooMany(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Too many conversations were requested", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "一次查詢的對話過多", Locale: uitext.ZhTW}
+}
+
 // ImReceiverDeleted 是模組句子 im.receiver_deleted；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ImReceiverDeleted(l uitext.Locale) uitext.Message {
 	switch l {
@@ -181,6 +190,15 @@ func ImStoreClosed(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "這家店已停止營業，無法傳送訊息", Locale: uitext.ZhTW}
 }
 
+// ImStreamLimit 是模組句子 im.stream_limit；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImStreamLimit(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Too many chat streams are open for this account; close one and try again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "此帳號開啟的聊天連線過多，請關閉其中一條後再試", Locale: uitext.ZhTW}
+}
+
 // ImTextInvalid 是模組句子 im.text_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ImTextInvalid(l uitext.Locale) uitext.Message {
 	switch l {
@@ -211,6 +229,15 @@ func ImTextTooLong(l uitext.Locale, a ImTextTooLongArgs) uitext.Message {
 		return uitext.Message{Text: "The message cannot exceed " + strconv.Itoa(a.Max) + " characters", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "訊息內容不可超過 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
+}
+
+// ImTooManyCursors 是模組句子 im.too_many_cursors；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImTooManyCursors(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Too many conversation cursors were provided", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "提供的對話游標過多", Locale: uitext.ZhTW}
 }
 
 // ImTypeUnsupported 是模組句子 im.type_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

@@ -2,11 +2,11 @@
 
 ## 職責
 
-買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。給 httpapi、moderation（呼叫 `Hide`／`Restore`）、即時通道（訂閱 `MessageSent`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`；沒有對外入口；`cmd/hawkr` 只接刪帳與退場的訂閱者與 worker。
+買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。以及即時通道（LISTEN/NOTIFY、訂閱、在線狀態）。給 httpapi、moderation（呼叫 `Hide`／`Restore`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`、`step-2b-design.md`；沒有對外入口；`cmd/hawkr` 只接刪帳與退場的訂閱者與 worker（`Run` 與串流 handler 之後接）。
 
 ## 擁有的資料
 
-schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id)`、`last_seq`、兩個已讀游標）、`messages`（`seq`）、`hides`、`inactive_parties`（刪帳者、退場店家的複本）、`media_ref_sync`、`retired_assets`。讀取模型：無。
+schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id)`、`last_seq`、兩個已讀游標）、`messages`（`seq`）、`hides`、`inactive_parties`（刪帳者、退場店家的複本）、`presence_streams`（UNLOGGED：每條串流一列，是在線狀態的來源與每個 Party 並行串流數的全域計數）、`media_ref_sync`、`retired_assets`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -15,7 +15,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 `Orders`、`Buyers`、`Stores` port。
-- `internal/write`（送出與守門、已讀、隱藏、還原）、`internal/read`（列表、訊息、未讀、relay 讀取）、`internal/rows`（列轉對外型別、墓碑與預覽推導）、`internal/mediaref`（媒體引用同步，照 review）、`internal/purge`（刪帳與退場的訂閱者邏輯與抹除 job）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
+- `internal/write`（送出與守門、已讀、隱藏、還原）、`internal/read`（列表、訊息、未讀、relay 讀取）、`internal/rows`（列轉對外型別、墓碑與預覽推導）、`internal/mediaref`（媒體引用同步，照 review）、`internal/live`（即時通道：通知、LISTEN 連線、Hub、訂閱者、存活標記與其清理 job）、`internal/purge`（刪帳與退場的訂閱者邏輯、抹除 job 與保底掃描）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 訂單由 `Orders` port 取（`cmd/hawkr/im.go` 以 `legacy/orderservice` 實作，ordering 搬進單體後換）；`Buyers`、`Stores` 傳 `*buyer.Module`、`*seller.Module`。
 
@@ -29,10 +29,15 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 - 刪帳與退場：`OnBuyerDeleted`、`OnStoreRetired` 同 transaction 只寫 `inactive_parties`、排 `im.erase_party`（以身分為唯一鍵，ByState 含 Running，River 要求 available、pending、running、scheduled 都在內）；只抹該身分寄出的訊息（不依帳號列舉）；不訂 `BuyerDeletionRequested`、不訂 identity 事件。job 依 id 升序每批 200，保留列、清空內容與圖片並記退場資產、排媒體同步，可重跑；`im.erase_sweep` 每 15 分鐘補排。
 - 儲存的代碼是 UPPER_SNAKE（`BUYER`、`STORE`、`TEXT`、`IMAGE`）；`message_type` 只有 `TEXT`、`IMAGE`，卡片隨對外契約加。
 - 媒體引用只由同步 job 寫；本步的 transaction 內不呼叫 provider。
+- 即時通知（頻道 `im_events`）由 `write` 在寫入的同一個 transaction 內 `pg_notify`，不經 `events.Publish`；payload 只有業務鍵與 seq。訂閱者的內容一律經 `MessagesAfter` 讀取（授權在讀取），通知只是提示，漏掉的靠游標補洞。
+- LISTEN 連線必須是直連或 session 模式的 Postgres，不能經 transaction pooling：`Deps.ListenConnConfig` 指向專用連線，nil 時以主連線池的設定另開，不從池借；不在執行期偵測。
+- Hub 的 `partyKey` 含 kind；扇出只合併待處理訊號、永不阻塞，超過上限回 `Resync`。每個 Party 的全域並行串流上限在 `Subscribe` 的 transaction 內以 advisory lock 數 `presence_streams`，寫入失敗讓 `Subscribe` 失敗。
+- `presence_streams.expires_at` 與 `conversations.last_message_at` 只由資料庫時鐘產生與比較（查詢參數沒有時間型別）。在線狀態沒有最後上線時間，以共有對話授權，任一方向封鎖回離線。
+- 串流只讀：停權與封鎖不結束串流，只有關店由 `Subscription.Revalidate` 結束；heartbeat、壽命、寫入 deadline、重驗節奏屬串流傳輸 helper，不在模組。
 
 ## 不負責
 
-即時通道、hub、presence、停權時強制斷線；Connect 與 handler、對外錯誤原因的 proto；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；換掉舊 im-service 與接上 `legacy/imrelay`（relay 只在測試啟用）。
+停權時強制斷線；串流傳輸 helper（heartbeat、最長壽命、寫入 deadline、重驗節奏）；Connect 與 handler、對外錯誤原因的 proto；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；換掉舊 im-service 與接上 `legacy/imrelay`（relay 只在測試啟用）。
 
 ## 決策紀錄
 

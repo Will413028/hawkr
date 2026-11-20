@@ -8,12 +8,15 @@ import (
 	"embed"
 	"io/fs"
 	"log/slog"
+	"slices"
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/purge"
@@ -61,7 +64,15 @@ type Deps struct {
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
 	Logger *slog.Logger
+	// ListenConnConfig 是即時通道專用的 LISTEN 連線設定，必須指向直連或 session 模式的 Postgres，不能經 transaction pooling。
+	// 為 nil 時以主連線池的設定建立專用連線，此時主連線同樣受這個限制。
+	ListenConnConfig *pgx.ConnConfig
+	// Live 調整即時通道的常數與計時（零值欄位用預設）；NewID、Logger 沒給時用上面的。
+	Live LiveConfig
 }
+
+// LiveConfig 是即時通道的設定。
+type LiveConfig = live.Config
 
 type (
 	Party            = model.Party
@@ -81,6 +92,14 @@ type (
 	Hide             = model.Hide
 	MessageSent      = model.MessageSent
 	Reason           = model.Reason
+	PresenceState    = model.PresenceState
+
+	// Subscription 是一個 Party 的一條拉取式事件流（Next、Revalidate、Close）。
+	Subscription = live.Subscription
+	Event        = live.Event
+	EventKind    = live.EventKind
+	Ended        = live.Ended
+	EndReason    = live.EndReason
 )
 
 const (
@@ -101,7 +120,21 @@ const (
 	ReasonChatBlocked           = model.ReasonChatBlocked
 	ReasonReceiverDeleted       = model.ReasonReceiverDeleted
 	ReasonModerationRejected    = model.ReasonModerationRejected
+
+	MaxPresenceConversations = model.MaxPresenceConversations
+
+	EventReady    = live.EventReady
+	EventMessage  = live.EventMessage
+	EventUnread   = live.EventUnread
+	EventPeerRead = live.EventPeerRead
+	EventResync   = live.EventResync
+
+	EndShutdown        = live.EndShutdown
+	EndLostEligibility = live.EndLostEligibility
 )
+
+// ErrClosed 是呼叫者自己 Close（或 Subscribe 的 ctx 取消）之後 Subscription.Next 的回應。
+var ErrClosed = live.ErrClosed
 
 // ErasePartyArgs 是抹除 job 的參數（job 種類 im.erase_party）。
 type ErasePartyArgs = purge.ErasePartyArgs
@@ -115,6 +148,9 @@ type Module struct {
 	read      *read.Service
 	mediaSync *media.RefSyncer
 	purge     *purge.Service
+	hub       *live.Hub
+	listenCfg *pgx.ConnConfig
+	pool      *db.DB
 }
 
 // New 建立模組。
@@ -128,12 +164,21 @@ func New(d Deps) *Module {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
+	rd := read.New(read.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores})
+	lc := d.Live
+	if lc.NewID == nil {
+		lc.NewID = d.NewID
+	}
+	if lc.Logger == nil {
+		lc.Logger = d.Logger
+	}
 	return &Module{
+		hub: live.NewHub(rd, live.DBStreams{DB: d.DB}, lc), listenCfg: d.ListenConnConfig, pool: d.DB,
 		write: write.New(write.Deps{
 			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		read:      read.New(read.Deps{DB: d.DB}),
+		read:      rd,
 		purge:     purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, NewID: d.NewID, Now: d.Now, Logger: d.Logger}),
 		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
 	}
@@ -185,6 +230,27 @@ func (m *Module) MessageForRelay(ctx context.Context, id uuid.UUID) (RelayMessag
 	return m.read.MessageForRelay(ctx, id)
 }
 
+// Subscribe 為 Party 開一條即時事件流：先登記（同時執行每個 Party 全域並行上限，超過回 ResourceExhausted）再讀 Cursors 的補洞，
+// 之後以拉取式的 Next 交出業務事件。身分由呼叫者（httpapi 從 session 解析）決定；Cursors 裡不屬於這個 Party 的對話靜默忽略。
+// 店家要有 CapChatRead（關店後沒有）；Cursors 超過 MaxCursors 回 InvalidInput。
+func (m *Module) Subscribe(ctx context.Context, p Party, cursors map[uuid.UUID]int64) (*Subscription, error) {
+	return m.hub.Subscribe(ctx, p, cursors)
+}
+
+// Run 持有 LISTEN 專用連線與存活標記的延長批次，直到 ctx 結束；結束時所有訂閱以 Shutdown 結束。連線來自 Deps.ListenConnConfig。
+func (m *Module) Run(ctx context.Context) error {
+	cfg := m.listenCfg
+	if cfg == nil {
+		cfg = m.pool.Pool().Config().ConnConfig
+	}
+	return m.hub.Run(ctx, live.DialPG(cfg))
+}
+
+// Presence 回報呼叫者的對話的對方是否在線；沒有最後上線時間。對話不屬於呼叫者回 NotFound，一次最多 MaxPresenceConversations 個。
+func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.UUID) ([]PresenceState, error) {
+	return m.read.Presence(ctx, p, conversationIDs)
+}
+
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把這個 buyer_id 記進 inactive_parties、排 im.erase_party job，
 // 不在這裡改訊息列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
 // 鎖的順序 identity → buyer → seller → im：accountdeletion 在派發事件之前先鎖完買家與店家。
@@ -214,13 +280,14 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描、抹除與其保底掃描）。由 cmd/hawkr 接上。
+// AddWorkers 登記 River worker（媒體引用同步與保底掃描、抹除與其保底掃描、存活標記清理）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
+	live.AddWorkers(workers, live.DBStreams{DB: m.pool})
 }
 
-// PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除）。
+// PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除、存活標記清理）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	return append(mediaref.PeriodicJobs(), purge.PeriodicJobs()...)
+	return slices.Concat(mediaref.PeriodicJobs(), purge.PeriodicJobs(), live.PeriodicJobs())
 }

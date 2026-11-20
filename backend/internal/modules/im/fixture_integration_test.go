@@ -83,6 +83,7 @@ type buyers struct {
 	mu       sync.Mutex
 	accounts map[int64]int64
 	blocking bool
+	blockErr error
 }
 
 func (b *buyers) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {
@@ -101,7 +102,7 @@ func (b *buyers) ProfileByBuyerID(context.Context, int64) (buyer.Profile, error)
 func (b *buyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.blocking, nil
+	return b.blocking, b.blockErr
 }
 
 // stores 是 im 的 Stores port 的替身：店家預設是營運中、沒有停權，帳號是 2000 + store_id。
@@ -110,6 +111,8 @@ type stores struct {
 	byID  map[int64]seller.Store
 	err   error
 	block bool
+	// blockErr 讓 StoreBlocksBuyer 回錯誤。
+	blockErr error
 }
 
 func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
@@ -127,7 +130,7 @@ func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
 func (s *stores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.block, nil
+	return s.block, s.blockErr
 }
 
 func activeStore(id, account int64) seller.Store {

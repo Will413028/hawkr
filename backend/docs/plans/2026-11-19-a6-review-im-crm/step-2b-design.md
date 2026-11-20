@@ -158,7 +158,7 @@ func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.U
 
 - 每個進程一條專用連線，**不從連線池借**：借走一條長期不歸還的連線會永遠減少池容量，也會被池的 `MaxConnLifetime`、健康檢查回收；專用連線不受影響。代價是多佔資料庫一條連線（每進程一條，要算進 `max_connections`）。T16 斷言 listener 運行時 `Pool().Stat().AcquiredConns()` 沒有增加（`db_integration_test.go:184` 的同一個斷言方式）。
 - **不變量（寫進 `im/AGENTS.md`）：LISTEN 連線必須是直連或 session 模式的 PG，不能經 transaction pooling（§0.4）。** 做法是明確設定而不是偵測：`Deps.ListenConnConfig *pgx.ConnConfig` 指向專用的直連連線字串（A6-5 的 `cmd/hawkr` 從獨立的環境變數讀入）；為 nil 時由 `pgx.ConnectConfig` 以主 DSN（`pool.Config().ConnConfig.Copy()`）建立，此時主 DSN 同樣受上述不變量約束，部署文件記載。不在執行期以 `SHOW` 或 LISTEN 往返推測連線型態：那種偵測無法在 CI 證明（CI 的資料庫沒有 pooler），寫了也只是未被測試的程式。違反不變量的症狀是收不到通知，由 T2 在部署前的 smoke 與 §14 的部署確認項目承擔。
-- `Run` 的迴圈：連線 → `LISTEN im_events` → `WaitForNotification(ctx)` 迴圈把 payload 交給扇出（§3.3）；連線出錯（`WaitForNotification` 回錯、`LISTEN` 失敗）→ 關連線，以指數退避加 jitter（0.5 秒起、上限 30 秒）重連。每 10 秒在同一條連線上以 `SELECT now()` 記下「最後確認存活的資料庫時間」`lastOK`（同時讓死連線在 10 秒內被偵測）。**重連成功後**對所有訂閱發一個內部的 `epoch` 訊號，並帶 `lastOK`（§4.4）。重連與退避是手寫的，沒有用 `jackc/pgxlisten`：見 H26。連線期間沒有人會收到的通知（斷線區間內的 `NOTIFY`）永遠不會補送，PG 不保留【推】。
+- `Run` 的迴圈：連線 → `LISTEN im_events` → `WaitForNotification(ctx)` 迴圈把 payload 交給扇出（§3.3）；連線出錯（`WaitForNotification` 回錯、`LISTEN` 失敗）→ 關連線，以指數退避加 jitter（0.5 秒起、上限 30 秒）重連。每 10 秒在同一條連線上以 `SELECT now()` 記下「最後確認存活的資料庫時間」`lastOK`（同時讓死連線在 10 秒內被偵測）。**每次連線成功後**（含第一次）對所有訂閱發一個內部的 `epoch` 訊號，並帶 `lastOK`（§4.4）；第一次連線的 `lastOK` 是 `Run` 啟動時、第一次撥號之前經連線池讀到的資料庫時間（讀不到就退避重試，成功前不撥號），所以在第一次 LISTEN 成功之前就開的串流也會補洞。重連與退避是手寫的，沒有用 `jackc/pgxlisten`：見 H26。連線期間沒有人會收到的通知（斷線區間內的 `NOTIFY`）永遠不會補送，PG 不保留【推】。
 
 ### 3.2 為什麼斷線不是問題
 
@@ -200,13 +200,16 @@ func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.U
 
 ### 4.4 監聽連線中斷後的復原
 
-`Run` 重連成功後對每個 `sub` 呼叫 `sub.epoch(lastOK)`：(1) 對 `delivered` 裡的每個對話視為有訊號（`pending[c] = {minQ: delivered[c]+1, maxQ: ∞}`，`Next` 時以 `base = delivered[c]` 讀到最新）；(2) 對**不在** `delivered` 的對話，只對中斷期間有訊息的那些交出 `Resync{conversation}`，而不是 `Resync{all}`：`im.conversations` 有 `last_message_at TIMESTAMPTZ NOT NULL`（`im/db/schema.sql:22`），並有 `(buyer_id, last_message_at DESC, id DESC)`、`(store_id, …)` 兩個索引（`schema.sql:31-32`），每次送出由 `AllocateSeq` 的 upsert 寫入（`queries/conversations.sql:6,17`）。`epoch` 以 Party 的那一方查 `WHERE <buyer_id|store_id> = $id AND last_message_at > $lastOK`，結果不在 `delivered` 的對話各交一個 `Resync{conversation}`（一次一個索引範圍掃描，筆數有 MaxPending 上限，超過就 `Resync{all}`）。`lastOK` 是監聽連線最後一次確認存活的**資料庫**時間（§3.1），兩邊都是資料庫時間：2b 把 `AllocateSeq` upsert 寫 `last_message_at` 的值從注入的 `Now` 改成資料庫 `now()`（§8），與 H25 同一原則，不需要 skew，也不假設主機跑 NTP。`last_message_at` 只在新訊息時前進；中斷期間只有可見度或已讀游標改變、而且不在 `delivered` 的對話，client 沒有該對話的游標、本來就會在打開時重新取，不需要 Resync。這解掉了「每次監聽重連，所有訂閱者同時收到 `Resync{all}` 並同時打 `ListConversations`」的重連風暴。重連期間 `Subscribe` 仍可呼叫：它先登記、再讀補洞，與 §4.2 命題 2 相同。epoch 的讀取量 ≤ 訂閱數 ×（`delivered` 對話數次 `MessagesAfter` ＋ 一次索引掃描），每次走 `(conversation_id, seq)` 唯一索引【推】；沒有量。
+`Run` 每次連線成功後對每個 `sub` 呼叫 `sub.epoch(lastOK)`：(1) 對 `delivered` 裡的每個對話視為有訊號（`pending[c] = {minQ: delivered[c]+1, maxQ: ∞}`，`Next` 時以 `base = delivered[c]` 讀到最新），**並各交一個 `Resync{conversation}`**：中斷期間的隱藏、還原與對方已讀的 NOTIFY 漏掉了，那些變化不經 seq 游標補得回來，client 依 §4.5 重取該對話（訊息補讀與 Resync 同時存在，client 以 seq 去重）；(2) 對**不在** `delivered` 的對話，只對中斷期間有訊息的那些交出 `Resync{conversation}`，而不是 `Resync{all}`：`im.conversations` 有 `last_message_at TIMESTAMPTZ NOT NULL`（`im/db/schema.sql:22`），並有 `(buyer_id, last_message_at DESC, id DESC)`、`(store_id, …)` 兩個索引（`schema.sql:31-32`），每次送出由 `AllocateSeq` 的 upsert 寫入（`queries/conversations.sql:6,17`）。`epoch` 以 Party 的那一方查 `WHERE <buyer_id|store_id> = $id AND last_message_at > $lastOK`，結果不在 `delivered` 的對話各交一個 `Resync{conversation}`（一次一個索引範圍掃描，筆數有 MaxPending 上限，超過就 `Resync{all}`）。`lastOK` 是監聽連線最後一次確認存活的**資料庫**時間（§3.1），兩邊都是資料庫時間：2b 把 `AllocateSeq` upsert 寫 `last_message_at` 的值從注入的 `Now` 改成資料庫 `now()`（§8），與 H25 同一原則，不需要 skew，也不假設主機跑 NTP。`last_message_at` 只在新訊息時前進；中斷期間只有可見度或已讀游標改變、而且不在 `delivered` 的對話，client 沒有該對話的游標、本來就會在打開時重新取，不需要 Resync；在 `delivered` 裡的對話一律 Resync（上述 (1)）。這解掉了「每次監聽重連，所有訂閱者同時收到 `Resync{all}` 並同時打 `ListConversations`」的重連風暴。重連期間 `Subscribe` 仍可呼叫：它先登記、再讀補洞，與 §4.2 命題 2 相同。epoch 的讀取量 ≤ 訂閱數 ×（`delivered` 對話數次 `MessagesAfter` ＋ 一次索引掃描），每次走 `(conversation_id, seq)` 唯一索引【推】；沒有量。
+
+**時間比較的界線（A6-D17）**：`last_message_at` 由 `GREATEST(舊值, clock_timestamp())` 寫入（不倒退，且就是這則訊息的 `created_at` 與 `MessageSent.OccurredAt`，`AllocateSeq` 回傳同一個值）。寫入 transaction 開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at`（語句時間）可能小於 `lastOK`，補洞以 `last_message_at > lastOK` 會漏掉它。補法有兩半，共用 `model` 的同一組常數：(1) im 自己開的每個寫入 transaction（`write` 的 Send、Hide、Restore、MarkRead、MarkAllRead，經 `Service.inTx` 一個 helper）一開始就 `SET LOCAL statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout`，值都是 `model.WriteTxTimeout`（5 秒；Postgres 18 支援 `transaction_timeout`），所以開始早於某時刻的寫入最晚在 `WriteTxTimeout` 內提交或中止；(2) `Hub.epoch` 以 `lastOK - model.RecoveryMargin` 當補洞起點，`RecoveryMargin = WriteTxTimeout + ClockSkew`。`ClockSkew`（2 秒）吸收兩件事：`BEGIN` 到 `SET LOCAL` 生效之間的延遲（`transaction_timeout` 從設定時起算），以及存活確認的 `now()`（語句開始時間）與 `last_message_at` 的 `clock_timestamp()` 之間的差。`purge` 的抹除與 `Sweep` 不寫 `last_message_at`，不在界線內。
+外層 transaction：`inTx` 在 ctx 已有外層 transaction 時加入它而不 `SET LOCAL`，上限由外層決定，原因是 `SET LOCAL` 會覆寫外層（如 moderation 經 `InTx` 呼叫 `Hide`）的逾時，可能放寬外層自己設的較緊上限，或把外層較長的合法流程截成 5 秒。這代表巢狀的 `Send` 沒有 im 的界線；目前沒有 im 以外的模組巢狀呼叫 `Send`（只有測試），之後若有，呼叫端要自己為那個 transaction 設不超過 `WriteTxTimeout` 的上限（觸發條件記在 `CARRYOVER.md`）。
 
 ### 4.5 client 契約（給 A6-5、A6-6）
 
 - 串流開啟時帶 `cursors`（最近活動的對話 ≤ MaxCursors＝50；舊 sync 一幀 20 個，`client.go:128-130`，那是「draft value」，這裡也是估計值，上限可調）；收到的訊息帶對話 ID 與 seq；**client 以 seq 是否連續判斷缺口**，缺口時用 unary 的 `MessagesAfter`／`ListMessages` 補。這個契約讓伺服器不需要知道 client 有沒有收到。
 - `Ready` 事件標出補洞結束（取代舊的每房間 `sync_done`，`client.go:170-185`）。
-- `Resync` 事件＝「請重新取列表與缺口」，client 不需要區分原因。
+- `Resync` 事件＝「請重新取列表與缺口」，client 不需要區分原因；`Resync{conversation}` 要重取該對話的訊息（含隱藏狀態）與對方已讀游標，`Resync{all}` 重取列表與所有開著的對話。同一個對話的 Resync 可能與補洞的訊息事件一起到，client 以 seq 去重，不假設事件順序。
 - sender 的其他裝置也會收到自己寄出的訊息（兩個 Party 都收到 `m`，§6）；送出的那一台以 `Send` 回傳的訊息 ID 去重。這是行為改變：舊碼只推收件人（`message.go:625-638`），寄件人的其他裝置要等下次列表。
 
 ## 5. 授權與結束
@@ -445,6 +448,11 @@ integration 測試用 `pg.NewDB`／`testdb.Server.NewURL`（CI 跑，本機不�
 | M24 | `Hide`／`Restore` 不發 `v` | T5 |
 | M25 | `mark` 把同一對話的 `q` 以 max 合併、`Next` 以 `maxQ - 1` 為 `base`（合併丟訊息） | T19 |
 | M26 | `epoch` 對不在 `delivered` 的對話一律交 `Resync{all}`（不查 `last_message_at`） | T3b |
+| M28 | `epoch` 不對 `delivered` 的對話交 `Resync{conversation}`（只補讀訊息） | 中斷期間隱藏與已讀的整合測試（`TestListenerReconnectResyncsDeliveredConversationsWithHiddenAndReadChanges`）、單元 `TestEpochReadsFromCursorsAndResyncsDeliveredAndActiveUnknownConversations` |
+| M29 | `listenLoop` 不讀啟動時的資料庫時間（初始 `lastOK` 為零值、第一次連線不發 `epoch`） | `TestStreamOpenedBeforeTheFirstListenReceivesLaterCommits`、單元 `TestFirstConnectionEpochCarriesTheStartupDatabaseTime` |
+| M30 | `ExtendPresenceStreams` 改回只 UPDATE（不補回被清掉的列） | `TestPresenceExtendReinsertsSweptRows` |
+| M31 | `MarkRead` 的 `advanced` 改回與語句快照比較（拿掉 `FOR UPDATE` 的 CTE） | `TestConcurrentMarkReadNotifiesOnce` |
+| M32 | `Subscribe` 把 `stopCtx` 的指派移到登記進 `h.subs` 之後、不持 `s.mu` | 單元 `TestSubscribeWithConcurrentlyCancelledContextHasNoRace`（`go test -race`） |
 | M27 | presence 的 `expires_at` 或 `last_message_at` 以進程時鐘寫入／比較 | T20（靜態守門：sqlc 生成的 presence 與 `AllocateSeq` 查詢參數裡沒有時間型別參數，`expires_at`、`last_message_at` 只由 SQL 的 `now()` 產生） |
 
 ## 12. 本檔提議的計畫修改
@@ -535,3 +543,19 @@ integration 測試用 `pg.NewDB`／`testdb.Server.NewURL`（CI 跑，本機不�
 | 11 | M27 可能沒有測試會失敗 | nit | 改：T20 靜態守門 |
 
 findings 11 (blocking 0)：fixed 10、recorded 1、raised 0、rejected 0。
+
+## 16. 實作與本設計的差異（8526c9b8 與修正輪）
+
+讓設計書與程式一致；每一項都是已經在程式裡的決定。
+
+1. `internal/arch/modules.go` 的 `InternalDependencies` 登記 `live`（依賴 `model`、`store`、`text`）與 `write` 對 `live` 的依賴（§8 沒有列）。
+2. `MarkAllRead` 的 SQL 是 `:execrows`，回傳被改動的對話數，`n == 0` 不發 `u`（§6.2 的「有對話被改動才發」）。
+3. 新增 uitext 句子：`ImTooManyCursors`、`ImStreamLimit`、`ImPresenceTooMany`（模組的 `internal/text`，zh-TW 與 en）。
+4. `Subscription.Revalidate` 回傳 `error`：失去資格時回 `*Ended{LostEligibility}`，Party 不是這條訂閱的身分回一般錯誤（§5.2 只寫「結束」）。
+5. `AllocateSeq` 回傳它寫的 `last_message_at`（`clock_timestamp()`，與舊值取大者），`Send` 用同一個值當 `messages.created_at` 與 `MessageSent.OccurredAt`；`Deps.Now` 不再用於送出的訊息時間（Hide、Restore 與媒體同步仍用）。
+6. `MarkRead` 的 `advanced` 以 `FOR UPDATE` 的 CTE 鎖住並讀出更新前的值再比較，不再讀語句快照。
+7. `Streams` 介面：`Extend` 收 `[]Stream`（id、kind、party）並以 upsert 補回被清掉的列；新增 `DatabaseNow`（`Run` 啟動時讀一次，§3.1）與 `DBStreams.Sweep`。存活標記清理（`im.presence_sweep`）從 `purge` 搬到 `live`，有自己的 `PresenceSweepInterval`。upsert 的代價：訂閱剛被 `Close` 刪列、同時延長批次正在寫入時，列可能被補回並存活到過期（最長 `PresenceTTL`）。
+8. 串流並行上限的 advisory lock 鍵是 `im.streams:<kind>:<id>`，與送出的 `im.party:` 鎖不同命名空間。
+9. `epoch` 對 `delivered` 的對話交 `Resync{conversation}`（§4.4）；第一次連線也發 `epoch`（§3.1）。
+10. 授權在訂閱讀取路徑的單一呼叫點是 `internal/read/read.go` 的 `MessagesAfter` 裡的 `s.authorized(...)`（M6 的改壞點）。
+11. im 寫入 transaction 設時間上限，`epoch` 的補洞起點往回放同一常數加時鐘誤差（§4.4，A6-D17）；巢狀在外層 transaction 內時不覆寫外層的上限。

@@ -221,9 +221,11 @@ func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return time
 
 // PeriodicJobs 回傳啟動即執行、每 SweepInterval 的抹除保底掃描。
 func PeriodicJobs() []*river.PeriodicJob {
-	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(SweepInterval),
-		func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
-		&river.PeriodicJobOpts{ID: "im.erase_sweep", RunOnStart: true},
-	)}
+	return []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(SweepInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "im.erase_sweep", RunOnStart: true},
+		),
+	}
 }

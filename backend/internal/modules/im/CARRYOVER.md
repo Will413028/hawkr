@@ -2,7 +2,7 @@
 
 <!-- 決策紀錄：不放進 AGENTS.md，因為 AGENTS.md 每次在這個目錄工作都會載入。模組現行的規則寫在 AGENTS.md。 -->
 
-來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md` §2 的 M 列（只列與 im 有關的）與 §6.2 的 ID 列；實作設計 `step-2a-design.md` v1，Will 的決定 A6-D14（W1–W6）。本檔對應 A6-2a1（資料與送出、已讀、刪帳與退場的抹除、`legacy/imrelay`）；即時通道、presence、強制斷線在 A6-2b，Connect 與 handler 在 A6-5，隱藏的決定在 A6-4。
+來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md` §2 的 M 列（只列與 im 有關的）與 §6.2 的 ID 列；實作設計 `step-2a-design.md` v1，Will 的決定 A6-D14（W1–W6）。本檔對應 A6-2a1（資料與送出、已讀、刪帳與退場的抹除、`legacy/imrelay`）；即時通道與 presence 在 A6-2b（見〈即時通道的沿用盤點〉），Connect 與 handler 在 A6-5，隱藏的決定在 A6-4。
 
 ## 沿用盤點
 
@@ -35,6 +35,57 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | `LockParty`：送出與 `Deactivate` 之間的互斥（舊碼沒有；舊 `account:deleted` 標記無鎖） | 送出的寫入與「身分進入刪除」要有先後，否則抹除 job 看不到之後才 commit 的訊息 | 成立 | 同一個身分的狀態變更與依賴它的寫入以鎖串行 | 新增：`pg_advisory_xact_lock`（`im.party:<kind>:<id>`），不用列鎖，因為 `Send` 在送出前沒有鎖買家或店家的列（鎖列要多鎖別的模組的表，也會與 accountdeletion 的 identity → buyer → seller 鎖序互相牽動）；不進 `lockorder`，因為它只在 im 自己的 transaction 內取、沒有跨模組的持鎖次序。`Send` 依固定順序（買家先於店家）鎖雙方再重查 `inactive_parties`，`Deactivate` 一次只鎖一個，所以不會死結；前提：`Send` 不先持買家或店家的列鎖，改了要重看 |
 | `im.erase_sweep` 每 15 分鐘的保底掃描 | job 用完 `MaxAttempts` 被丟棄後，身分仍在 `inactive_parties` 又還有未抹除的訊息 | 成立 | 週期性對帳補排 | 新增：唯一性以 `SweepInterval` 為時間窗（預設的 ByState 含 completed，會讓掃描被擋約一天）；抹除本身冪等可重跑 |
 | `im.hides` 訊息隱藏紀錄 | 隱藏要可多次、可還原，並且能追溯 | 成立 | 形狀同 `review.hides`、`social.hides`：還原留列、同一則訊息未還原的隱藏至多一筆 | 新增：本模組只有資料與讀取（`Hidden`），隱藏與還原的決定由 moderation 呼叫 `Hide`／`Restore` |
+
+## 即時通道的沿用盤點
+
+來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2b-design.md` §9（H1–H26）、決定 A6-D15、A6-D16。舊機制的出處是該設計書重新讀 im-service 原始碼的行號。
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| H1 `MessageHub` 三張 map、三個 channel、單 goroutine `Run` | 進程內要找到某個身分的連線 | 成立，但 register channel 與單一事件迴圈不需要 | 進程內「Party → 訂閱者」的表，跨進程交給資料庫 | 重寫：`live.Hub`（map＋RWMutex，鍵含 kind） |
+| H2 推送在 commit 後、transaction 外，直接寫連線 channel | 新訊息要即時到 | 成立；但單進程記憶體推送在多進程下收不到 | 同 transaction 發通知，資料庫保證 commit 後才送達，內容從資料庫讀 | 取代：`write` 內 `pg_notify`＋`MessagesAfter` |
+| H3 每連線 256 格緩衝，滿了丟 | 慢消費者不能拖住別人 | 成立 | 不緩衝內容；合併待處理訊號 | 取代：`pending` 以對話合併，超過上限 `Resync{all}` |
+| H4 `Broadcast`、`BroadcastExcept`、`ConnectionCount` | 有呼叫端 | 不成立 | 沒有呼叫端就不存在 | 刪除 |
+| H5 `SendToUser(Role)` 按 userID＋loginRole 找連線 | 買家與店家身分要分開 | 成立 | 按 (kind, id) 找 | 取代：`partyKey`（ID6） |
+| H6 WS 與推播雙軌送達，靠 `seq_id` 去重 | 串流不是送達保證 | 成立 | 推播另走，去重靠 seq 與訊息 ID | 保留原則：推播仍由 `legacy/imrelay` |
+| H7 presence 在 hub 記憶體、`lastSeen` | 多進程要看到全體 | 不成立：多進程只看到連在自己身上的人 | 共享狀態＋過期 | 取代：`im.presence_streams`，不保存最後上線時間（A6-D5） |
+| H8 `presence_sub` 幀，任何人可訂任何人 | 在線狀態只給有對話的對方 | 成立（舊碼無授權＝ID2） | 以共有對話授權的讀取 | 取代：`Presence`，不是共有對話整個 NotFound |
+| H9 presence 帶 `lastSeenAt` | A6-D5 不給最後上線時間 | 不成立 | 不給 | 刪除（型別沒有時間欄位） |
+| H10 `typing` 與限流 | A6-D15 不做打字中 | 不成立 | — | 刪除 |
+| H11 `read_receipt` 轉送幀、不落庫 | 對方要看到已讀 | 成立 | 已讀游標落庫、由游標推導 | 取代：`PeerRead`（`r` 通知）；批次已讀不推給對方 |
+| H12 `ping`／`pong`、client 30 秒無 frame 判半開 | 長連線要偵測半開 | 成立 | 伺服器閒置時送 heartbeat | 不在模組：A6-5 的串流傳輸 helper |
+| H13 `sync` 幀：20 房間、每 actor 5 次限流、無權限回空 | 斷線後補洞 | 成立 | 開串流時帶游標 | 取代：`Subscribe` 的 `Cursors`（≤50）；無權限靜默忽略保留 |
+| H14 每房間 `sync_done` | 知道補洞結束 | 成立 | 一個結束標記 | 取代：`Ready` |
+| H15 `unread_changed` 推送 | client 要即時總未讀 | 成立 | 狀態改變後讀一次總數 | 保留語意：`Unread` 事件，每輪最多算一次 |
+| H16 `seller.suspended` 強制斷線 | 停權者不能續傳 | 不成立：串流只讀，送出是 unary 由 G1 逐則擋 | 只讀串流不需要斷線 | 刪除；只有關店由 `Revalidate` 結束 |
+| H17 連線身分來自第一幀、im-service 不驗 | 身分要可信 | 成立（舊碼不驗） | 身分只從 session 來 | 取代：`Party`（ID6） |
+| H19 每帳號 10 條並行連線，進程內 map | 擋單一帳號耗盡資源 | 成立；多進程下進程內計數失效 | 以共享狀態計數 | 取代：數 `presence_streams`，advisory lock 序列化，fail-closed |
+| H21 Redis（封鎖、刪帳標記、限流） | — | 不成立 | — | 刪除：2b 沒有 Redis 依賴 |
+| H22 推送幀帶發送者名稱與頭像 | 畫面要顯示 | 成立 | 事件只帶業務鍵，顯示資料由 httpapi 補 | 取代：`Event` 不帶名稱頭像 |
+| H25（新）presence 過期用哪個時鐘 | 多進程共享的過期判定 | 成立 | 單一時間來源 | 資料庫 `now()`；測試以 SQL 改 `expires_at` |
+| H26（新）LISTEN 連線手寫重連與退避 | 斷線自動恢復，並在重連成功時發 epoch | 成立 | `jackc/pgxlisten` | 手寫（約 60 行）：epoch 需要 `lastOK` 與重連掛點；新依賴要 Will 同意，要採用只換 `live/listener.go` |
+| H27（新）presence 延長補回被清掉的列 | 資料庫重啟後 UNLOGGED 表是空的、被清理掉的串流仍在跑 | 成立 | 只 UPDATE 的延長會讓這些串流不被計數、不顯示在線 | 取代：延長以 upsert 補回；`Close` 與延長的競爭最多讓列多活一個 `PresenceTTL` |
+
+## 即時通道的待決與重新評估觸發
+
+常數（`internal/live` 的 `Config` 預設與 `PresenceSweepInterval`）都是估計值，不是量測值；下表是各自重新評估的觸發條件。門檻是起始估計，量到資料後以量測值取代。
+
+| 項目 | 現值 | 重新評估的觸發 |
+|---|---|---|
+| `MaxStreamsPerParty` | 10 | 一週內 `Subscribe` 回 ResourceExhausted 的次數超過 `Subscribe` 總數的 1%，或單一帳號同時開啟的裝置數的 p95 超過 10 |
+| `MaxCursors` | 50 | client 回報有超過 5% 的串流開啟時有超過 50 個最近活動的對話 |
+| `MaxBacklog` | 200 | 因補洞超過 `MaxBacklog` 而交出的 `Resync{conversation}` 超過重連次數的 1% |
+| `MaxPending` | 500 | 因 `pending` 溢出而交出的 `Resync{all}` 每天超過訂閱數的 0.1% |
+| `MaxDelivered` | 1000 | 每條訂閱的 `delivered` 表在量測下占進程記憶體的比例超過 5%，或被修剪造成的重讀占補洞讀取的 10% 以上 |
+| `PresenceTTL`、`PresenceBeat` | 60 秒、20 秒 | 日誌「延長串流存活標記失敗」每進程每小時超過一次，或 presence 讀到離線但串流仍在的回報 |
+| `AliveEvery` | 10 秒 | 量到死連線偵測時間超過 10 秒的案例，或監聽迴圈的存活確認占資料庫查詢量的 1% 以上 |
+| `BackoffBase`、`BackoffMax` | 0.5 秒、30 秒 | 一小時內單一進程重連超過 20 次，或資料庫維護中重連請求造成連線數告警 |
+| `PresenceSweepInterval` | 15 分鐘 | `im.presence_streams` 的列數超過同時在線串流數的 10 倍 |
+
+| 待決 | 為什麼不在本步做 | 觸發 |
+|---|---|---|
+| 監聽重連補洞的時間界線：`ActiveSince` 以 `lastOK - margin` 比較，margin 是「im 寫入 transaction 最長開多久」 | 開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at` 可能小於 `lastOK` 而漏掉 | 已解（A6-D17）：im 自己開的寫入 transaction 經 `write` 的 `inTx` 設 `statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout` 為 `model.WriteTxTimeout`，`Hub.epoch` 起點為 `lastOK - model.RecoveryMargin`（`WriteTxTimeout + ClockSkew`，兩者同源）；巢狀在外層 transaction 時不覆寫外層的上限 | 有 im 以外的模組在自己的 transaction 內巢狀呼叫 `Send`（該 transaction 要自設不超過 `WriteTxTimeout` 的上限）；或 `WriteTxTimeout` 要調大（`RecoveryMargin` 自動跟著，補洞讀取範圍變大）；或 Postgres 降到 17 以下（沒有 `transaction_timeout`） |
+| `Presence` 一個對話約 5 次循序的資料庫往返（授權、封鎖、對方身分、在線） | 目前沒有 handler 呼叫，批次化要看實際的呼叫形狀 | A6-5 開始：接 `Presence` handler 時改成一次查詢完成授權與在線 |
 
 ## 傳輸層的沿用盤點
 

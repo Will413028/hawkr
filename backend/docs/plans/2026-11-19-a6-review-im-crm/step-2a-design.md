@@ -39,7 +39,7 @@
 | E4 | 未讀 | `last_seq - <自己這一方>_last_read_seq`，兩個游標都在對話列上，沒有 participants 表（§1.2） | 計畫「預設」；開工 design-review 第 1 項 |
 | E5 | 分頁 | 訊息以 `seq` 做 keyset；對話列表以 `(last_message_at DESC, id DESC)` 做 keyset；都不回總數 | 計畫「預設」；ID9 |
 | E6 | 送出守門 | 停權 → 停業 → 封鎖，封鎖有 A6-D1 例外，查詢失敗一律回錯誤（§3） | 計畫 A6-2a；A6-D1；ID5 |
-| E7 | 事件 | 送出在同一個 transaction 發 `MessageSent`；relay 與 2b 的 hub 都訂閱它 | 單體規則 4；ID7 |
+| E7 | 事件 | 送出在同一個 transaction 發 `MessageSent`；relay 訂閱它（2b 的即時通道不訂事件，改在同一個 transaction 發 `NOTIFY`，A6-D15） | 單體規則 4；ID7 |
 | E8 | 媒體 | 照 review 與 social 的 `mediaref`：transaction 外 `Finalize`，transaction 內寫列並排同步 job；抹除時記退場、排同步 | `M/modules/review/internal/purge/purge.go:161-173`；ID8 |
 | E9 | 刪帳 | 訂閱 buyer、seller 的事件（A6-D9），在同一個 transaction 內只寫複本並排抹除 job，其他照 A6-1c（§4） | A6-D9、A6-D13 |
 | E10 | 詞典 | `M/platform/textfilter` | 計畫範圍 |
@@ -232,7 +232,7 @@ type Orders interface {
    1. `LockParty(sender)`（advisory，§4.3）；查 `inactive_parties`：寄件人已在 → FailedPrecondition；收件人已在 → `RECEIVER_DELETED`。
    2. `AllocateSeq`（§2）：建立或鎖住對話列、配發 seq，同一句推進寄件人那一方的已讀游標（★，§1.2）。
    3. 插入訊息；圖片排媒體同步 job。
-   4. `events.Publish(MessageSent{EventID, OccurredAt, ConversationID, MessageID, Seq, SenderKind, BuyerID, StoreID})`。relay（§6）與 2b 的 hub 都訂閱它；同一個 transaction 讓「訊息寫進去了」與「事件排進去了」一起成立或一起不成立（ID7）。
+   4. `events.Publish(MessageSent{EventID, OccurredAt, ConversationID, MessageID, Seq, SenderKind, BuyerID, StoreID})`。relay（§6）訂閱它（2b 的即時通道不訂事件，見 A6-D15 與 `step-2b-design.md` §2.2）；同一個 transaction 讓「訊息寫進去了」與「事件排進去了」一起成立或一起不成立（ID7）。
 6. 回傳 `Message`（含 seq）。
 
 - 舊碼對話 upsert 與未讀的錯誤只記 log 或直接丟棄（`message.go:563-565,577-581`）；新碼全部在同一個 transaction 內，任一步失敗整筆回滾。
