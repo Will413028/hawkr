@@ -48,7 +48,7 @@
 | SQL 只碰自己的 schema；跨模組篩選 join 擁有者的 `pub_*` | review 列表的封鎖過濾 join `buyer.pub_blocked_*`；A6-D2 選 (ii) 時 CRM 的封鎖標示 join seller 的 `pub_*`（crm 依賴加 seller） |
 | Connect 讀取標 `NO_SIDE_EFFECTS`（ADR 09-26 D3） | `MarkRead` 不能放在讀取方法裡 |
 | A8 之前 notification-service 收到的 `chat.message.sent`、評價事件 wire 欄位與語意不變；Java order、product 收到的評價事件形狀不變 | A6-1 的 `reviewrelay`、A6-2 的 `imrelay`（`interface-inventory.md` §2） |
-| 單體是單一進程（im 的扇出 in-memory 成立的前提，ID4） | A6-2 的 streaming hub；水平擴展是延後項的觸發條件 |
+| 即時推送只在訊息 commit 後送達：送出在同一個 transaction 發 Postgres `NOTIFY`（只帶對話 ID 與 seq），串流收到後以 `MessagesAfter` 讀 DB（A6-D15） | im 的 `Send`、`Hide`／`Restore`（預覽變更）；2b 的 LISTEN 連線與訂閱表；斷線補洞與推送共用同一條讀取路徑 |
 | 並行期單一生效者：舊服務在 gateway 後面處理流量到 A6-6e；模組的 relay 與 legacy consumer 只在測試中啟用，A6-6e 刪路由的同一個變更才在 `cmd/hawkr` 接上，避免重複發事件或與舊 crm-service 搶 queue | `reviewrelay`、`imrelay`、crm 的 `order.completed`／`aftersales.refund.completed` consumer 的註冊點；A6-6e 驗收檢查舊服務已從 compose 移除 |
 | 刪帳的接線：review、im 訂閱 buyer、seller 的刪除事件（同 tx，只寫刪帳者複本與排清除 job，單體規則 4；social 前例 `social.go:625-638`）；accountdeletion 不認識 review、im，依賴表不加（Will 2026-11-19，A6-D9） | review、im 的 `OnBuyerDeletionRequested`／`OnBuyerDeleted` 等訂閱者與 `inactive_authors` 類複本；`cmd/hawkr` 的事件註冊 |
 
@@ -73,12 +73,10 @@
 - 舊服務不再改；舊資料不搬。
 - 沒有呼叫端的 RPC（`BroadcastMessage`、`IsUserOnline`、`GetConnectionStats`、`DisconnectUser` 等）不搬。
 - CRM 投影不重新設計成讀時聚合（資料在 Java ordering，Q7 的建議；ordering 搬遷時退場）。
-- 不做跨進程扇出（單一進程，見不變量）。
 
 **延後**（收尾時搬回主計畫）：
 - 評分聚合改由 review 發布 `pub_*`、catalog 與 seller 讀取，刪 Java 的全量覆寫副本。觸發：catalog 搬遷。
 - CRM 投影改讀 ordering 的 `pub_*`。觸發：ordering 搬遷。
-- im 跨進程扇出（`LISTEN/NOTIFY` 或 broker）。觸發：單體要水平擴展。
 - notification 消費 review、im 事件、刪 relay。觸發：A8。
 - 先評價、後全額退款的評價不計分（A6-D7 (a)）。觸發：ordering 搬遷。
 
@@ -101,7 +99,7 @@
 | ID1 隱藏訊息仍在預覽 | 修：同 tx 更新對話預覽＋回歸測試 | A6-2、A6-4 |
 | ID2 presence 無授權 | 修（A6-D5）：只對有對話的對方、不給最後上線時間＋回歸測試 | A6-2 |
 | ID3 刪除事件以帳號為單位抹除 | 修：依身分抹除；帳號刪除才全抹＋回歸測試（開工先確認能否只刪單一身分） | A6-2 |
-| ID4 hub 只在本進程 | 接受：單一進程是不變量；跨進程是延後項 | A6-2 |
+| ID4 hub 只在本進程 | 修（A6-D15）：改 Postgres LISTEN/NOTIFY，多進程也成立 | A6-2b |
 | ID5 停業查詢失敗放行 | 修：in-process 查 seller，失敗回錯誤 | A6-2 |
 | ID6 以 target_id 猜房 | 修：從 session 取身分、以對話 ID 授權＋回歸測試 | A6-2 |
 | ID7 背景 goroutine 發布 | 修：同 tx outbox（relay） | A6-2 |
@@ -151,7 +149,7 @@
 拆 2a、2b：
 
 - **2a 資料與送出**，照 A6-1 拆成兩個 session：**2a0** 設計書 `2026-11-19-a6-review-im-crm/step-2a-design.md` 與開工 design-review；**2a1**（2a0 完成，決定見 A6-D14）實作與完成前 design-review。內容：schema（UUIDv7、`seq`、`last_read_seq`）、送出守門（停權→停業→封鎖，含 A6-D1 的例外）、`orderservice` 的 `OrderParties`、`HasOrderBetween` 與組合兩者的 `OpenOrderBetween`（A6-D14 W1 (c)）、帳號與身分刪除的抹除（ID3，訂閱 `buyer.BuyerDeleted`、`seller.StoreRetired`）、`imrelay`、buyer、seller 事件改 in-process 訂閱（不訂 identity，設計書 §9）。
-- **2b 即時通道**：依 A6-D3；hub 單進程扇出；presence 依 A6-D5。
+- **2b 即時通道**，照 2a 拆兩個 session：**2b0** 設計書 `2026-11-19-a6-review-im-crm/step-2b-design.md` 與開工 design-review；**2b1**（2b0 完成）實作與完成前 design-review。內容：依 A6-D3 server streaming 收；commit 後推送依 A6-D15（LISTEN/NOTIFY）；presence 依 A6-D5，以 unary 輪詢（A6-D16）；不做打字中（A6-D15）；只有關店讓模組結束串流，停權與封鎖不結束，session 失效、帳號刪除由 A6-5 的串流 helper 定期重驗結束（A6-D16 W4）。心跳、壽命、寫入期限歸 A6-5 的 helper。
 - 刪帳：ID3 依身分抹除；依 A6-D9 訂閱 buyer、seller 的刪除事件（同 tx 只寫複本與排抹除 job），lockorder integration 測試涵蓋 im。
 - 消費端：gateway `G/handler/chat.go`、`gatewayproxy` 的 WebSocket 轉發；notification-service 的 `chat.message.sent`。
 - 驗收：守門的表格測試（每種封鎖方向 × 有無訂單）；streaming 斷線以游標補洞的 integration；ID 各回歸測試的 mutation。
@@ -189,7 +187,7 @@
 
 ## 決定
 
-全部已決（Will 2026-11-19）：D7 選 (a)，其他照 `decision-brief.md` 的建議；D9 在 A6-1a 開工審查時追加。
+全部已決（Will 2026-11-19；D9 起逐題附日期）：D7 選 (a)，其他照 `decision-brief.md` 的建議；D9 在 A6-1a 開工審查時追加。
 
 | 題 | 結論 | 用在 |
 |---|---|---|
@@ -206,6 +204,8 @@
 | A6-D11 | 店家評分統計的讀取（discovery、seller 的 `StoreRatingStats`）留在舊 review-service 到 A6-6e，與刪路由同一個變更才換成 review 模組並刪 `legacy/reviewservice`：A6-6e 前評價仍寫進舊服務，提早換會讓評分讀到空表，違反「並行期單一生效者」（Will 2026-11-20，A6-1c 開工） | A6-1c、A6-6e |
 | A6-D12 | `review.purge_author` 每批刪除後，同 tx 對該批涉及的 (店, 商品) 發 `ReviewAggregateChanged`；刪帳當下的 `ReviewAuthorDeactivated` 保留。理由：purge 先於 relay 跑完時 relay 列不到目標，Java 聚合會停在舊值；每批工作量有上限，不違反設計審查第 9 項（Will 2026-11-20，A6-1c 實作發現） | A6-1c |
 | A6-D13 | 刪帳的評分重算只走 purge 每批的 `ReviewAggregateChanged`（A6-D12），刪除 `ReviewAuthorDeactivated` 與 relay 的逐組展開，取代設計審查第 9 項的單一事件：purge job 與訂閱者同 tx 排入、可立即執行，兩條路徑延遲同級，留兩條只會每組重送（Will 2026-11-20，A6-1c 完成前 design-review 第 1 項）。purge 另加週期掃描補排失敗的 job（第 2 項） | A6-1c |
+| A6-D15 | 即時推送走 Postgres LISTEN/NOTIFY（送出同 tx 發 `NOTIFY`，commit 後才送達；串流以 `MessagesAfter` 讀 DB），不在 `platform/events` 加 commit 後掛點，取代「hub 單進程扇出」與 ID4 的接受；不做打字中，A6-6 刪三端的打字中（Will 2026-11-20，A6-2b 開工） | A6-2b、A6-6 |
+| A6-D16 | A6-2b 設計書 §13 W1–W5 全照建議：NOTIFY payload 加帶 buyer_id、store_id 路由鍵，內容不經通知（W1 (ii)）；presence 以 unary 輪詢（W2 (a)）；任一方向封鎖即對被封鎖方顯示離線（W3 (i)）；停權、封鎖不結束串流，只有關店由模組結束，session 失效與帳號刪除由 A6-5 helper 重驗結束（W4 (i)）；保留已讀指示，`MarkAllRead` 不逐對話推給對方（W5 (i)）（Will 2026-11-20） | A6-2b1、A6-5 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -232,3 +232,4 @@
 | A6-1c 刪帳、媒體同步、reviewrelay | 完成（2026-11-20） | 本機 build、vet（含 integration tag）、`go test ./...`、`make lint-monolith`、`make sqlc` 無 drift；CI run 44649008948 四個 job 全綠（含 testcontainers integration）；mutation：CI run 44650114789 共 12 個 mutant 皆 killed（作者鎖兩側、Submit 交易內重查、排 purge、每批 `ReviewAggregateChanged`、purge 刪除、三處 `inactive_authors` 過濾、relay 送出 job 唯一、保底掃描兩個）；審查：`/code-review` 1 輪＋diff 審查 2 輪 findings 9 (blocking 0)，fixed 8、rejected 1；完成前 design-review findings 4 (blocking 0)，fixed 2（第 1 項 A6-D13 Will 決定）、recorded 1、rejected 1 | 鎖序 mutant 沒做（改動不是單一檢查）；評分讀取仍走舊 review-service（A6-D11，A6-6e 換）；social 的 purge 同樣缺保底掃描，未改 |
 | A6-2a0 im 資料與送出的設計 | 完成（2026-11-20）：設計書 `step-2a-design.md`，W1–W6 已決（A6-D14） | 開工 design-review 2 輪：findings 9 (blocking 0)，fixed 7、raised 1（W6）、rejected 1；處理對照在設計書 §11 | 無程式、無測試（設計步驟） |
 | A6-2a1 im 資料與送出的實作 | 完成（2026-11-20，PR #411）：im 模組 schema、送出守門、抹除（訂 `BuyerDeleted`、`StoreRetired`；W4 前提已核對：等待刪除的帳號仍可登入）、`imrelay`（未接線，A6-6e）、`orderservice.OpenOrderBetween`；順帶修 review purge 的 River 唯一性（缺 Running、掃描被已完成列擋住）與 `review.hidden` 的通知 allowlist；與設計書不同處記在設計書 §12 | 完成前 design-review 7 項 (blocking 0)：fixed 5、raised 1（`mediaref` 第 7 份，待 Will）、rejected 1（較舊訂單多擋，W1 (c) 已接受）；code-review 8 項 (important 2)：fixed 8；mutation §8 15 項＋修正輪 6 項 | 已跑：`go build`、`go vet -tags integration`、`go test ./...`、`make lint-monolith`、CI 全部 job（含 testcontainers integration）；未跑：無 |
+| A6-2b0 即時通道的設計 | 完成（2026-11-20）：設計書 `step-2b-design.md`；A6-D15（Will 開工時決定）、W1–W5 已決（A6-D16） | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 1、raised 0、rejected 0；處理對照在設計書 §15 | 無程式、無測試（設計步驟） |
