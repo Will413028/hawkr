@@ -241,6 +241,7 @@ func runServe(ctx context.Context) error {
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)
+	newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
@@ -407,6 +408,7 @@ func runWorker(ctx context.Context) error {
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)
+	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	delegationDeps.Social = socialModule
 	newDelegation(bus, delegationDeps)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -435,6 +437,7 @@ func runWorker(ctx context.Context) error {
 	payments.AddWorkers(workers)
 	box.AddWorkers(workers)
 	socialModule.AddWorkers(workers)
+	reviewModule.AddWorkers(workers)
 	moderationModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
 	deletion.AddWorkers(workers)
@@ -449,6 +452,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, payments.PeriodicJobs()...)
 	periodic = append(periodic, box.PeriodicJobs()...)
 	periodic = append(periodic, socialModule.PeriodicJobs()...)
+	periodic = append(periodic, reviewModule.PeriodicJobs()...)
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)

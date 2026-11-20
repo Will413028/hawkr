@@ -2,7 +2,7 @@
 
 <!-- 決策紀錄：不放進 AGENTS.md，因為 AGENTS.md 每次在這個目錄工作都會載入。模組現行的規則寫在 AGENTS.md。 -->
 
-來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md` §2 的 M 列（只列與 review 有關的）與 §6.1 的 RD 列；實作設計 `step-1-design.md` v2。本檔對應 A6-1b 的程式；A6-1c 才做的項目在「決定」欄寫明。
+來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/domain-inventory.md` §2 的 M 列（只列與 review 有關的）與 §6.1 的 RD 列；實作設計 `step-1-design.md` v2。本檔對應 A6-1b、A6-1c 的程式；A6-1c 以後才做的項目在「決定」欄寫明。
 
 ## 沿用盤點
 
@@ -13,10 +13,10 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | M1 評價 ID 是 TSID bigint（`usecase/review_usecase.go:190`） | Java 或別的服務拿評價 ID 當鍵 | 不成立：Java 不呼叫評價實體，只有 `order_item_id`、`order_no` 是外部鍵；`review.created` 的 `review_id` 只進推播 data，四端都沒有讀 | 實體主鍵用應用層產生的 UUIDv7（row-identity ADR） | 改：`reviews.id` 是 UUIDv7；`buyer_id`、`store_id`、`product_id`、`order_item_id` 維持 bigint（外部業務鍵）。relay 事件的 `review_id` 送 0（設計書 §9 第 2 項，A6-1c 實作） |
 | M4 Redis（封鎖的 `block:out:`／`block:in:` 讀取；啟動連不上只警告、封鎖 fail-open） | review 需要即時的封鎖資料 | 不成立：封鎖在 buyer 的 DB，單體同一個資料庫 | 同庫用擁有者發布的唯讀函式，在 SQL 述詞內過濾，失敗就整個查詢失敗（fail-closed） | 改：`buyer.pub_blocked_buyers()`、`buyer.pub_blocked_stores()` 內聯進公開查詢的述詞；刪除 Redis 依賴。review 沒有其他 Redis key |
 | M5 `product_id DEFAULT 0`、`store_id DEFAULT 0` 哨兵 | 舊資料沒有商品 ID 的評價 | 不成立：系統從未上線，訂單項目一定有商品 | NOT NULL ＋ CHECK > 0，不用哨兵 | 改：`product_id`、`store_id` 是 `NOT NULL CHECK > 0`；訂單項目沒有商品 ID 時 legacy 轉接回錯誤而不是 0（`orderservice.OrderForReview`）。`item_image_key` 沒有圖是 NULL＋CHECK 非空，不用空字串哨兵 |
-| M6 媒體引用：提交時 `FinalizeAndLink`（先 link 後插入，插入失敗不回滾）、評價從不釋放 | media 呼叫與業務列寫入要一致 | 不成立：媒體呼叫不得在 DB transaction 內（單體規則 5）；失敗時留下孤兒 link | 與 social 同：transaction 外 `Finalize`，transaction 內寫列＋同步版本＋排同步 job，同步 job 依業務列現況 Link／Unlink | 改：`mediaref`（照 social）與 `media_ref_sync`、`retired_assets`；提交失敗時沒有任何 link。釋放（刪帳 purge、RD4）與同步 worker 的接線在 A6-1c（`AddWorkers`、`PeriodicJobs` 已提供，尚未接進 `cmd/hawkr`） |
-| M8 MQ 消費者（review 沒有消費者） | 刪帳等外部事件要驅動 review | 成立（新增需求 A6-D6：買家刪帳要刪評價） | 同一資料庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：訂閱 `buyer.BuyerDeletionRequested`／`BuyerDeleted`，只寫 `inactive_authors` 並排 purge job；訂閱者與 purge 在 A6-1c。表與述詞現在就在，所以刪帳者的評價一寫進 `inactive_authors` 就不公開、不計分 |
+| M6 媒體引用：提交時 `FinalizeAndLink`（先 link 後插入，插入失敗不回滾）、評價從不釋放 | media 呼叫與業務列寫入要一致 | 不成立：媒體呼叫不得在 DB transaction 內（單體規則 5）；失敗時留下孤兒 link | 與 social 同：transaction 外 `Finalize`，transaction 內寫列＋同步版本＋排同步 job，同步 job 依業務列現況 Link／Unlink | 改：`mediaref`（照 social）與 `media_ref_sync`、`retired_assets`；提交失敗時沒有任何 link。刪帳 purge 的釋放（RD4）在每批的 transaction 內記退場資產並排同步；同步 worker 與保底掃描已接進 `cmd/hawkr` 的 worker（`newReview`） |
+| M8 MQ 消費者（review 沒有消費者） | 刪帳等外部事件要驅動 review | 成立（新增需求 A6-D6：買家刪帳要刪評價） | 同一資料庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：訂閱 `buyer.BuyerDeletionRequested`／`BuyerDeleted`，只寫 `inactive_authors` 並排 purge job；訂閱者（`OnBuyerDeletionRequested`／`OnBuyerDeleted`，`cmd/hawkr` 的 `newReview` 在 serve 與 worker 訂閱）與 `review.purge_author` job（`internal/purge`，依 id 升序每批 200、可重跑）已在 A6-1c。刪帳者的評價一寫進 `inactive_authors` 就不公開、不計分；第一次寫入時發一個 `ReviewAuthorDeactivated` |
 | M9 買家名稱與頭像讀時由 gateway 補，註銷旗標 `BuyerDeleted` | 評價列表要顯示買家 | 成立（顯示需要），但不能存快照（個資） | 讀時批次補，已刪帳回旗標不回名稱 | 沿用：模組不存買家快照；`buyer.BatchDisplay` 由 httpapi 在 A6-5 補 |
-| M10 快取失效：commit 之後 best-effort 的 `BustAsync`，店家 tag 另用一次 RPC 解 `store_code` | 評分與評價數變動後 website 快取要失效 | 成立，但 commit 後 best-effort 會在崩潰時漏失效 | 寫入同 transaction 排 job（transactional outbox），tag 由 seller API 取 | 改：提交、隱藏、還原在同 transaction 排 `revalidate` job（`seller.Store.StoreCode` 取代 `ResolveStoreCode`）。**商品 tag 尚未加入**：`revalidate.ProductTag` 在 A6-1c，現在只送店家的兩個 tag（`write.bust` 是唯一的組 tag 處） |
+| M10 快取失效：commit 之後 best-effort 的 `BustAsync`，店家 tag 另用一次 RPC 解 `store_code` | 評分與評價數變動後 website 快取要失效 | 成立，但 commit 後 best-effort 會在崩潰時漏失效 | 寫入同 transaction 排 job（transactional outbox），tag 由 seller API 取 | 改：提交、隱藏、還原在同 transaction 排 `revalidate` job（`seller.Store.StoreCode` 取代 `ResolveStoreCode`）。商品 tag（`revalidate.ProductTag`，與舊 `pkg/revalidate/tags.go` 同字串）與店家的兩個 tag 在同一個 job（`write.bust` 組 tag；刪帳清除的每批在 `purge.bust` 組） |
 | M11 事件：fat event、無 outbox（`review.created`、`review.hidden` 帶統計與暱稱） | Java order、product、notification 依賴舊 wire | 成立（A6-1c 前 Java 仍消費） | 模組事件只帶領域鍵，relay 在 transaction 外組 wire payload | 改：模組事件 `ReviewCreated`、`ReviewAggregateChanged` 只帶領域鍵、同 transaction 發布；wire 形狀由 A6-1c 的 `legacy/reviewrelay` 維持。重複隱藏不再重發（只有狀態真的改變才發） |
 | M12 封鎖過濾在 handler 層、分頁之後，只有商品評論列表（RD1） | 過濾要在分頁前、所有公開入口一致 | 不成立 | 過濾進 SQL 述詞，keyset 之前 | 改：匿名與有觀看者各一支查詢，列表、單筆都帶；統計不過濾；店家封鎖買家不影響（A6-D4） |
 | M13 詞典過濾 `pkg/moderation.Check` | 髒字詞典只有一份 | 不成立：單體有 `platform/textfilter` | 唯一詞典 | 改：提交與每次回覆都跑 `platform/textfilter`（回覆覆蓋也跑，沿用舊行為）；提交在查訂單之前（同舊碼） |

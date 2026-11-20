@@ -13,9 +13,11 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/write"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -64,25 +66,27 @@ type Deps struct {
 }
 
 type (
-	Review                 = model.Review
-	Image                  = model.Image
-	Reply                  = model.Reply
-	Cursor                 = model.Cursor
-	Page                   = model.Page
-	Filter                 = model.Filter
-	SubmitInput            = model.SubmitInput
-	ReplyInput             = model.ReplyInput
-	HideInput              = model.HideInput
-	RestoreInput           = model.RestoreInput
-	Hide                   = model.Hide
-	ProductStats           = model.ProductStats
-	StoreStats             = model.StoreStats
-	StoreRating            = model.StoreRating
-	OrderForReview         = model.OrderForReview
-	OrderItem              = model.OrderItem
-	Reason                 = model.Reason
-	ReviewCreated          = model.ReviewCreated
-	ReviewAggregateChanged = model.ReviewAggregateChanged
+	Review                  = model.Review
+	Image                   = model.Image
+	Reply                   = model.Reply
+	Cursor                  = model.Cursor
+	Page                    = model.Page
+	Filter                  = model.Filter
+	SubmitInput             = model.SubmitInput
+	ReplyInput              = model.ReplyInput
+	HideInput               = model.HideInput
+	RestoreInput            = model.RestoreInput
+	Hide                    = model.Hide
+	ProductStats            = model.ProductStats
+	StoreStats              = model.StoreStats
+	StoreRating             = model.StoreRating
+	OrderForReview          = model.OrderForReview
+	OrderItem               = model.OrderItem
+	Reason                  = model.Reason
+	ReviewCreated           = model.ReviewCreated
+	ReviewAggregateChanged  = model.ReviewAggregateChanged
+	ReviewAuthorDeactivated = model.ReviewAuthorDeactivated
+	Target                  = model.Target
 )
 
 const (
@@ -108,6 +112,7 @@ type Module struct {
 	write     *write.Service
 	read      *read.Service
 	mediaSync *media.RefSyncer
+	purge     *purge.Service
 }
 
 // New 建立模組。
@@ -126,7 +131,10 @@ func New(d Deps) *Module {
 			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		read:      read.New(read.Deps{DB: d.DB}),
+		read: read.New(read.Deps{DB: d.DB}),
+		purge: purge.New(purge.Deps{
+			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
+		}),
 		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
 	}
 }
@@ -197,8 +205,40 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描）。由 cmd/hawkr 接上。
-func (m *Module) AddWorkers(workers *river.Workers) { mediaref.AddWorkers(workers, m.mediaSync) }
+// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把買家記進 inactive_authors
+// （評價從這個 transaction 起不可讀、不計分）、排 review.purge_author job，第一次寫入時發一個 ReviewAuthorDeactivated。不在這裡刪列：
+// 刪帳者的評價筆數沒有上限。鎖的順序 identity → buyer → seller → review：accountdeletion 在派發事件之前先鎖完買家與店家。
+func (m *Module) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
+	return m.purge.Deactivate(ctx, e.BuyerID, e.OccurredAt)
+}
+
+// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（冪等）。沒有開啟中的訂單時買家直接關閉，只發這個
+// 事件、沒有 BuyerDeletionRequested，所以兩個事件都要訂。
+func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
+	return m.purge.Deactivate(ctx, e.BuyerID, e.OccurredAt)
+}
+
+// PurgeAuthor 刪除買家的評價（分批，冪等）。它是 review.purge_author job 的內容，給 worker 與測試呼叫。
+func (m *Module) PurgeAuthor(ctx context.Context, buyerID int64) error {
+	return m.purge.Purge(ctx, buyerID)
+}
+
+// AuthorTargets 列出買家評過的 (店, 商品)（含隱藏的、含刪帳中尚未清除的）。給 ReviewAuthorDeactivated 的消費端在 transaction 外
+// 逐組重算聚合；清除完成後是空的。
+func (m *Module) AuthorTargets(ctx context.Context, buyerID int64) ([]Target, error) {
+	return m.purge.Targets(ctx, buyerID)
+}
+
+// ReviewForRelay 讀單則評價的原始列，不套公開可讀述詞（事件的 payload 要這則評價現在的內容）；已清除的是 NotFound。
+func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (Review, error) {
+	return m.read.ReviewForRelay(ctx, id)
+}
+
+// AddWorkers 登記 River worker（媒體引用同步與保底掃描、刪帳清除）。由 cmd/hawkr 接上。
+func (m *Module) AddWorkers(workers *river.Workers) {
+	mediaref.AddWorkers(workers, m.mediaSync)
+	purge.AddWorkers(workers, m.purge)
+}
 
 // PeriodicJobs 回傳保底掃描的排程。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob { return mediaref.PeriodicJobs() }

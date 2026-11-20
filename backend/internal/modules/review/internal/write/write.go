@@ -143,7 +143,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 				return err
 			}
 		}
-		if err := s.bust(ctx, order.StoreID); err != nil {
+		if err := s.bust(ctx, order.StoreID, item.ProductID); err != nil {
 			return err
 		}
 		if err := events.Publish(ctx, s.d.Events, model.ReviewCreated{EventID: s.d.NewID(), OccurredAt: now, ReviewID: id, StoreID: order.StoreID, ProductID: item.ProductID}); err != nil {
@@ -205,12 +205,12 @@ func findItem(items []model.OrderItem, id int64) (model.OrderItem, bool) {
 	return model.OrderItem{}, false
 }
 
-// bust 排入店面頁的快取失效（評價數與評分在店面頁）；必須在 transaction 內呼叫。
-func (s *Service) bust(ctx context.Context, storeID int64) error {
+// bust 排入店面頁與商品頁的快取失效（評價數與評分在這兩頁）；必須在 transaction 內呼叫。
+func (s *Service) bust(ctx context.Context, storeID, productID int64) error {
 	st, err := s.d.Stores.Store(ctx, storeID)
 	switch {
 	case err == nil:
-		return s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: revalidate.StoreTags(st.StoreID, st.StoreCode)}, nil)
+		return s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: append(revalidate.StoreTags(st.StoreID, st.StoreCode), revalidate.ProductTag(productID))}, nil)
 	case apperr.KindOf(err) == apperr.KindNotFound:
 		return nil
 	default:
@@ -345,7 +345,7 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 }
 
 func (s *Service) aggregateChanged(ctx context.Context, storeID, productID int64, now time.Time) error {
-	if err := s.bust(ctx, storeID); err != nil {
+	if err := s.bust(ctx, storeID, productID); err != nil {
 		return err
 	}
 	return events.Publish(ctx, s.d.Events, model.ReviewAggregateChanged{EventID: s.d.NewID(), OccurredAt: now, StoreID: storeID, ProductID: productID})

@@ -55,6 +55,7 @@ var InternalDependencies = map[string]InternalGraph{
 	"review": {Packages: map[string][]string{
 		"mediaref": {"store"},
 		"model":    {},
+		"purge":    {"mediaref", "model", "rows", "store"},
 		"read":     {"model", "rows", "store", "text"},
 		"rows":     {"model", "store"},
 		"store":    {},

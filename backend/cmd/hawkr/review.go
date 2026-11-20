@@ -3,10 +3,33 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
+
+// newReview 組裝 review 模組並訂閱買家的刪除事件（單體規則 4 的原子狀態變更：同 transaction 記 inactive_authors、排清除 job、發
+// ReviewAuthorDeactivated）。serve 與 worker 都要呼叫：serve 的刪帳申請與 worker 的 CompletePending 都會發買家事件，worker 另外執行
+// 它的 job（媒體引用同步、刪帳清除）。review 的 relay（reviewrelay）與事件訂閱不在這裡接：舊服務在 A6-6e 前仍是評價唯一的寫入者，
+// 並行期只能有一個生效的 producer。
+func newReview(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers *seller.Module, med media.Media, orders reviewOrderClient, log *slog.Logger) *review.Module {
+	m := review.New(review.Deps{
+		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, Orders: reviewOrders{orders},
+		NewID: uuid.NewV7, Now: time.Now, Logger: log,
+	})
+	events.Subscribe(bus, m.OnBuyerDeletionRequested)
+	events.Subscribe(bus, m.OnBuyerDeleted)
+	return m
+}
 
 // reviewOrders 以還在舊服務的 order-service 實作 review 的訂單 port（ordering 搬進單體後換成 in-process）：訂單不存在回 review.ErrOrderNotFound，
 // 其他錯誤原樣回傳（review 轉成 Unavailable，不當成不存在）。

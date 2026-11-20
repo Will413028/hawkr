@@ -2,7 +2,7 @@
 
 ## 職責
 
-訂單項目的買家評價：提交（訂單資格與快照取自訂單）、店家回覆、平台隱藏與還原、公開與作者與店家的讀取、評價統計。給 httpapi（A6-5）、moderation（A6-4，呼叫 `Hide`／`Restore`）、discovery 與 seller 的店家評分（`StoreRatingStats`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-1-design.md`；A6-1b 只有模組本體，沒有對外入口。
+訂單項目的買家評價：提交（訂單資格與快照取自訂單）、店家回覆、平台隱藏與還原、公開與作者與店家的讀取、評價統計。給 httpapi（A6-5）、moderation（A6-4，呼叫 `Hide`／`Restore`）、discovery 與 seller 的店家評分（`StoreRatingStats`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-1-design.md`；沒有對外入口（A6-5 才加）；`cmd/hawkr` 只接刪帳訂閱者與 worker。
 
 ## 擁有的資料
 
@@ -15,7 +15,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與 `Orders` port。
-- `internal/write`（提交、回覆、隱藏、還原）、`internal/read`（列表、單筆、統計）、`internal/rows`（列轉對外型別）、`internal/mediaref`（媒體引用同步，照 social）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
+- `internal/write`（提交、回覆、隱藏、還原）、`internal/read`（列表、單筆、統計）、`internal/rows`（列轉對外型別）、`internal/mediaref`（媒體引用同步，照 social）、`internal/purge`（刪帳的訂閱者邏輯與清除 job）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 訂單由 `Orders` port 取（`cmd/hawkr/review.go` 以 `legacy/orderservice` 實作，ordering 搬進單體後換）；`Buyers`（查上傳者帳號）與 `Stores`（取 `store_code`）傳 `*buyer.Module`、`*seller.Module`。
 
@@ -28,11 +28,12 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 - 訂單不是提交者的，回與不存在相同的 NotFound（A6-D10，先於狀態檢查）；只有訂單狀態 50 能評價，期限 30 天；`Orders` 回 `ErrOrderNotFound` 才是 NotFound，其他錯誤一律 Unavailable。
 - `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 發 `ReviewAggregateChanged` 並排快取失效；重複隱藏不發事件。
 - 媒體引用只由同步 job 寫；transaction 內只寫業務列、同步版本並排 job，不呼叫 media。
+- 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 在同 transaction 只寫 `inactive_authors`（`ON CONFLICT DO NOTHING`）、排 `review.purge_author`（以買家為唯一鍵），第一次寫入時發一個 `ReviewAuthorDeactivated`，不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批記退場資產、排媒體同步與 `revalidate`，可重跑。守門：`TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows`、`TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
 - 本步的 transaction 內不呼叫 provider；`Submit` 撞唯一鍵用 `ON CONFLICT DO NOTHING`，不 catch 23505。
 
 ## 不負責
 
-買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；刪帳訂閱者與 purge、`revalidate.ProductTag`、`reviewrelay`、換掉 `legacy/reviewservice`（A6-1c）；Connect 與 handler（A6-5）；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
+買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；換掉 `legacy/reviewservice`（A6-6e，A6-D11）；`legacy/reviewrelay` 只在測試啟用，A6-6e 才接進 `cmd/hawkr`；Connect 與 handler（A6-5）；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
 
 ## 決策紀錄
 

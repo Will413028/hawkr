@@ -147,3 +147,12 @@ func TestPostTagIsAnEntityTagWebsiteAccepts(t *testing.T) {
 		t.Errorf("%q 不符合 website 的 ENTITY_TAG（revalidate-request.ts）", tag)
 	}
 }
+
+// ProductTag 與舊 pkg/revalidate 的 ProductTag 同字串，website 的失效 key 不變。
+func TestProductTagIsTheLegacyString(t *testing.T) {
+	for id, want := range map[int64]string{1: "product:1", 700: "product:700", 9007199254740993: "product:9007199254740993"} {
+		if got := ProductTag(id); got != want {
+			t.Errorf("ProductTag(%d) = %q，預期 %q", id, got, want)
+		}
+	}
+}

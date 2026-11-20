@@ -108,11 +108,12 @@ type fixture struct {
 	media   *media.Fake
 	orders  *orders
 
-	mu      sync.Mutex
-	now     time.Time
-	ids     atomic.Int64
-	created []review.ReviewCreated
-	changed []review.ReviewAggregateChanged
+	mu          sync.Mutex
+	now         time.Time
+	ids         atomic.Int64
+	created     []review.ReviewCreated
+	changed     []review.ReviewAggregateChanged
+	deactivated []review.ReviewAuthorDeactivated
 }
 
 func (f *fixture) clock() time.Time {
@@ -156,6 +157,12 @@ func setup(t *testing.T) *fixture {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.changed = append(f.changed, e)
+		return nil
+	})
+	events.Subscribe(f.bus, func(_ context.Context, e review.ReviewAuthorDeactivated) error {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.deactivated = append(f.deactivated, e)
 		return nil
 	})
 	f.exec(t, `DO $$ DECLARE r record; BEGIN

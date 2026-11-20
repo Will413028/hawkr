@@ -167,6 +167,22 @@ func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int
 	return rows.Review(r, rows.Images(imgs)[id]), nil
 }
 
+// ReviewForRelay 讀單則評價的原始列（relay 組事件 payload 用，不套公開可讀述詞）；列不存在（已清除）是 NotFound。
+func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.Review, error) {
+	r, err := s.q(ctx).GetReviewByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Review{}, apperr.NotFound("%s", text.ReviewNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.Review{}, err
+	}
+	imgs, err := s.q(ctx).ListReviewImages(ctx, []uuid.UUID{id})
+	if err != nil {
+		return model.Review{}, err
+	}
+	return rows.Review(r, rows.Images(imgs)[id]), nil
+}
+
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。
 func (s *Service) ProductStats(ctx context.Context, productID int64) (model.ProductStats, error) {
 	r, err := s.q(ctx).ProductStats(ctx, productID)
