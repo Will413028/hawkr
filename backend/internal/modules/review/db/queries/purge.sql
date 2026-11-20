@@ -13,11 +13,12 @@ FOR NO KEY UPDATE;
 -- 附圖列由 review_images 的 ON DELETE CASCADE 一起刪。
 DELETE FROM review.reviews WHERE id = ANY(sqlc.arg(ids)::uuid[]);
 
--- name: ListBuyerReviewTargets :many
--- 買家評過的 (店, 商品)，含已隱藏的：這些聚合都要重送。
-SELECT DISTINCT store_id, product_id FROM review.reviews
-WHERE buyer_id = sqlc.arg(buyer_id)
-ORDER BY store_id, product_id;
+-- name: ListInactiveAuthorsWithReviews :many
+-- 清除的保底掃描：已在 inactive_authors 但仍有評價列的買家，由小到大，最多 max_rows 位。
+SELECT ia.buyer_id FROM review.inactive_authors AS ia
+WHERE EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ia.buyer_id)
+ORDER BY ia.buyer_id
+LIMIT sqlc.arg(max_rows);
 
 -- name: GetReviewByID :one
 -- relay 讀單則評價（建立事件的 payload）：不過濾可見性，不存在才是沒有列。

@@ -4,15 +4,14 @@
 //
 //	review.ReviewCreated            → review.created
 //	review.ReviewAggregateChanged   → review.hidden（隱藏或還原）
-//	review.ReviewAuthorDeactivated  → 作者評過的每組 (店, 商品) 各排一個 ReviewAggregateChanged 的 job → 各一則 review.hidden
 //
-// 兩個事件的 review_id 一律是 0：新評價的 ID 是 UUIDv7，舊 wire 是 int64；讀它的只有 notification 模板放進推播 data 的 reviewId，
+// 兩種訊息的 review_id 一律是 0：新評價的 ID 是 UUIDv7，舊 wire 是 int64；讀它的只有 notification 模板放進推播 data 的 reviewId，
 // 四端都沒有讀（設計書 step-1-design.md §9 第 2 項）。
 //
 // 統計（avg_rating、total_count、product_avg_rating、product_review_count）都在 job 執行時讀現況重算，不在寫入的 transaction 內算好存進
 // job：消費者（Java product）是全量覆寫，最後一個執行的 job 送的是它執行當下的最新值，任何執行順序最後都收斂到正確值（設計書 §4.2；
-// 兩個 job 並行時先讀的較晚送達，是 RD8 接受的殘留，不帶版本）。刪帳者作者的評價在進入刪帳的 transaction 起就不計分，
-// ReviewAuthorDeactivated 的 job 逐組送出重算後的聚合，Java 的聚合在刪帳當下更新，不等清除。
+// 兩個 job 並行時先讀的較晚送達，是 RD8 接受的殘留，不帶版本）。刪帳者的評價在進入刪帳的 transaction 起就不計分，
+// review.purge_author 每批刪除時發的 ReviewAggregateChanged 逐組送出重算後的聚合（A6-D12、A6-D13）。
 //
 // 這個 package 只在測試中啟用：舊服務在 A6-6e 前仍是評價唯一的寫入者與發送者，cmd/hawkr 不訂閱事件也不登記 worker（並行期單一生效者，
 // 計畫不變量）；A6-6e 刪路由的同一個變更才接上。隨 notification、catalog、ordering 搬進單體而刪除。
@@ -20,7 +19,6 @@ package reviewrelay
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -60,12 +58,6 @@ type ReviewAggregateChangedArgs struct {
 	ProductID int64 `json:"product_id"`
 }
 
-// ReviewAuthorDeactivatedArgs 轉成作者評過的每組 (店, 商品) 各一則 review.hidden。
-type ReviewAuthorDeactivatedArgs struct {
-	eventFields
-	BuyerID int64 `json:"buyer_id"`
-}
-
 func (ReviewCreatedArgs) Kind() string          { return "legacy.review_created" }
 func (ReviewAggregateChangedArgs) Kind() string { return "legacy.review_aggregate_changed" }
 
@@ -73,7 +65,6 @@ func (ReviewAggregateChangedArgs) Kind() string { return "legacy.review_aggregat
 func (ReviewAggregateChangedArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
 }
-func (ReviewAuthorDeactivatedArgs) Kind() string { return "legacy.review_author_deactivated" }
 
 func fields(id fmt.Stringer, at time.Time) eventFields {
 	return eventFields{EventID: id.String(), Occurred: at}
@@ -92,18 +83,11 @@ func OnReviewAggregateChanged(q jobs.Enqueuer) func(context.Context, review.Revi
 	}
 }
 
-func OnReviewAuthorDeactivated(q jobs.Enqueuer) func(context.Context, review.ReviewAuthorDeactivated) error {
-	return func(ctx context.Context, e review.ReviewAuthorDeactivated) error {
-		return q.Enqueue(ctx, ReviewAuthorDeactivatedArgs{fields(e.EventID, e.OccurredAt), e.BuyerID}, nil)
-	}
-}
-
 // Reviews 是 relay 讀評價的 port；*review.Module 實作它。
 type Reviews interface {
 	ReviewForRelay(ctx context.Context, id uuid.UUID) (review.RelayReview, error)
 	ProductStats(ctx context.Context, productID int64) (review.ProductStats, error)
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
-	AuthorTargets(ctx context.Context, buyerID int64) ([]review.Target, error)
 }
 
 // Buyers 是 relay 補暱稱與頭像的 port；*buyer.Module 實作它。
@@ -145,7 +129,6 @@ func (w *typedWorker[T]) Work(ctx context.Context, job *river.Job[T]) error {
 func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[ReviewCreatedArgs]{work: w.reviewCreated})
 	river.AddWorker(workers, &typedWorker[ReviewAggregateChangedArgs]{work: w.reviewAggregateChanged})
-	river.AddWorker(workers, &typedWorker[ReviewAuthorDeactivatedArgs]{work: w.reviewAuthorDeactivated})
 }
 
 // baseEvent 是舊 pkg/mq 的 BaseEvent：timestamp 是 time.Time 的 JSON（RFC3339Nano、UTC），version 固定 "1.0"；
@@ -196,17 +179,6 @@ type reviewHidden struct {
 	ProductReviewCount int64   `json:"product_review_count"`
 }
 
-// derivedID 是一個事件對多則訊息時，每則訊息自己的穩定 event_id（版本 8 的 UUID，由事件 ID 與 key 雜湊而來）：
-// PublishArgs 以 event_id 做 unique，重試與重複排入只會有一則。
-func derivedID(eventID, key string) string {
-	sum := sha256.Sum256([]byte(eventID + "/" + key))
-	var u uuid.UUID
-	copy(u[:], sum[:16])
-	u[6] = u[6]&0x0f | 0x80
-	u[8] = u[8]&0x3f | 0x80
-	return u.String()
-}
-
 // enqueuePublish 不在 transaction 內排入（relay 要讀 review、buyer、seller）；relay job 在排入後失敗而重試時，PublishArgs 以 event_id 做的
 // unique 讓同一則事件只有一個送出的 job。
 func (w *Worker) enqueuePublish(ctx context.Context, eventID, exchange, key string, payload any) error {
@@ -239,24 +211,6 @@ func (w *Worker) reviewAggregateChanged(ctx context.Context, a ReviewAggregateCh
 		return err
 	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeReview, "review.hidden", p)
-}
-
-// reviewAuthorDeactivated 在 transaction 外列出作者評過的 (店, 商品)，每組排一個 ReviewAggregateChangedArgs job（逐組各自在 25 秒內重算與送出，
-// 不在一個 job 裡跑完全部）；每組的 event_id 由事件 ID 與 (店, 商品) 衍生，job 重試與重複排入最後只有一則 review.hidden（PublishArgs 以
-// event_id 做 unique）。review.purge_author 已經刪完這位作者的評價時沒有任何組可列，這時不送。
-func (w *Worker) reviewAuthorDeactivated(ctx context.Context, a ReviewAuthorDeactivatedArgs) error {
-	targets, err := w.Reviews.AuthorTargets(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	for _, t := range targets {
-		id := derivedID(a.EventID, fmt.Sprintf("%d/%d", t.StoreID, t.ProductID))
-		job := ReviewAggregateChangedArgs{eventFields: eventFields{EventID: id, Occurred: a.Occurred}, StoreID: t.StoreID, ProductID: t.ProductID}
-		if err := w.Jobs.Enqueue(ctx, job, nil); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (w *Worker) reviewCreated(ctx context.Context, a ReviewCreatedArgs) error {

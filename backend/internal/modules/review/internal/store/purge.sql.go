@@ -68,31 +68,27 @@ func (q *Queries) IsReviewPublic(ctx context.Context, id uuid.UUID) (bool, error
 	return exists, err
 }
 
-const listBuyerReviewTargets = `-- name: ListBuyerReviewTargets :many
-SELECT DISTINCT store_id, product_id FROM review.reviews
-WHERE buyer_id = $1
-ORDER BY store_id, product_id
+const listInactiveAuthorsWithReviews = `-- name: ListInactiveAuthorsWithReviews :many
+SELECT ia.buyer_id FROM review.inactive_authors AS ia
+WHERE EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ia.buyer_id)
+ORDER BY ia.buyer_id
+LIMIT $1
 `
 
-type ListBuyerReviewTargetsRow struct {
-	StoreID   int64
-	ProductID int64
-}
-
-// 買家評過的 (店, 商品)，含已隱藏的：這些聚合都要重送。
-func (q *Queries) ListBuyerReviewTargets(ctx context.Context, buyerID int64) ([]ListBuyerReviewTargetsRow, error) {
-	rows, err := q.db.Query(ctx, listBuyerReviewTargets, buyerID)
+// 清除的保底掃描：已在 inactive_authors 但仍有評價列的買家，由小到大，最多 max_rows 位。
+func (q *Queries) ListInactiveAuthorsWithReviews(ctx context.Context, maxRows int32) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listInactiveAuthorsWithReviews, maxRows)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListBuyerReviewTargetsRow{}
+	items := []int64{}
 	for rows.Next() {
-		var i ListBuyerReviewTargetsRow
-		if err := rows.Scan(&i.StoreID, &i.ProductID); err != nil {
+		var buyer_id int64
+		if err := rows.Scan(&buyer_id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, buyer_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -229,14 +229,6 @@ type ReviewAggregateChanged struct {
 	ProductID  int64
 }
 
-// ReviewAuthorDeactivated 在作者進入刪帳（第一次寫入 inactive_authors）的 transaction 內發布一次；訂閱者的工作量固定，
-// 作者評過的 (店, 商品) 由消費端在 transaction 外用 AuthorTargets 列出。
-type ReviewAuthorDeactivated struct {
-	EventID    uuid.UUID
-	OccurredAt time.Time
-	BuyerID    int64
-}
-
 // Target 是一組 (店, 商品)：評價聚合的單位。
 type Target struct {
 	StoreID   int64

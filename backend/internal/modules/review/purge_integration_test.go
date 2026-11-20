@@ -65,13 +65,10 @@ func TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows(t *testing.T) {
 	if f.jobs.count("review.purge_author") != 1 {
 		t.Fatalf("排一個清除 job：%v", f.jobs.kinds())
 	}
-	if len(f.deactivated) != 1 || f.deactivated[0].BuyerID != leaving.BuyerID {
-		t.Fatalf("發一個 ReviewAuthorDeactivated：%+v", f.deactivated)
-	}
 }
 
-// 兩個事件都訂：先申請後關閉，或直接關閉，複本只插入一次、事件只發一次。
-func TestDeactivationSubscribersInsertOnceAndPublishOnce(t *testing.T) {
+// 兩個事件都訂：先申請後關閉，或直接關閉，複本只插入一次。
+func TestDeactivationSubscribersInsertOnce(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -86,9 +83,6 @@ func TestDeactivationSubscribersInsertOnceAndPublishOnce(t *testing.T) {
 	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 1 {
 		t.Fatalf("複本一列：%d", n)
 	}
-	if len(f.deactivated) != 1 {
-		t.Fatalf("事件只發一次：%+v", f.deactivated)
-	}
 
 	direct := f.newBuyer(t)
 	err = f.db.InTx(ctx, func(ctx context.Context) error {
@@ -97,8 +91,8 @@ func TestDeactivationSubscribersInsertOnceAndPublishOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(f.deactivated) != 2 || f.deactivated[1].BuyerID != direct.BuyerID {
-		t.Fatalf("直接關閉也發：%+v", f.deactivated)
+	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", direct.BuyerID); n != 1 {
+		t.Fatalf("直接關閉也寫複本：%d", n)
 	}
 	if f.jobs.count("review.purge_author") != 3 {
 		t.Fatalf("每次訂閱都排清除 job（River 以買家合併）：%v", f.jobs.kinds())
@@ -181,30 +175,38 @@ func TestPurgeLoopsOverBatches(t *testing.T) {
 	}
 }
 
-// AuthorTargets 列出買家評過的 (店, 商品)（去重、含隱藏的）；清除後是空的。
-func TestAuthorTargetsListsDistinctPairsUntilPurged(t *testing.T) {
+// 保底掃描：在 inactive_authors 又還有評價列、而且沒有排隊中的清除 job 的買家補排一個；沒有評價列的買家與還在營運的買家都不排。
+func TestSweepPurgeEnqueuesOnlyInactiveAuthorsWithReviewsLeft(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	s1, s2 := f.exposableStore(t), f.exposableStore(t)
-	b := f.newBuyer(t)
-	f.submit(t, b, s1, 700, 5, "")
-	f.submit(t, b, s1, 700, 4, "")
-	hidden := f.submit(t, b, s2, 800, 3, "")
-	if _, err := f.module.Hide(ctx, review.HideInput{ReviewID: hidden.ID, Category: "SPAM", Text: "x", AdminID: 1}); err != nil {
+	storeID := f.exposableStore(t)
+	stuck, drained, active := f.newBuyer(t), f.newBuyer(t), f.newBuyer(t)
+	f.submit(t, stuck, storeID, 700, 5, "")
+	f.submit(t, active, storeID, 700, 4, "")
+	f.requestDeletion(t, stuck)
+	f.requestDeletion(t, drained)
+	f.jobs.reset()
+
+	n, err := f.module.SweepPurge(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
-	got := must[[]review.Target](t)(f.module.AuthorTargets(ctx, b.BuyerID))
-	want := []review.Target{{StoreID: s1, ProductID: 700}, {StoreID: s2, ProductID: 800}}
-	if !slices.Equal(got, want) {
-		t.Fatalf("targets = %v，預期 %v", got, want)
+	if n != 1 || f.jobs.count("review.purge_author") != 1 {
+		t.Fatalf("只補排有評價列的刪帳者：n=%d %v", n, f.jobs.kinds())
 	}
-	f.requestDeletion(t, b)
-	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
+
+	f.jobs.reset()
+	if err := f.module.PurgeAuthor(ctx, stuck.BuyerID); err != nil {
 		t.Fatal(err)
 	}
-	if got := must[[]review.Target](t)(f.module.AuthorTargets(ctx, b.BuyerID)); len(got) != 0 {
-		t.Fatalf("清除後沒有：%v", got)
+	f.jobs.reset()
+	n, err = f.module.SweepPurge(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 || f.jobs.count("review.purge_author") != 0 {
+		t.Fatalf("清除完成後不再排：n=%d %v", n, f.jobs.kinds())
 	}
 }
 

@@ -1,5 +1,5 @@
 // Package purge 是買家刪帳的評價清除。可見性在 job 跑之前已經改好：訂閱者在買家刪帳的 transaction 內把他記進 inactive_authors
-// （公開可讀的述詞與統計都排除他），只排一個 job 並發一個 ReviewAuthorDeactivated，transaction 內的工作量固定（單體規則 4）；
+// （公開可讀的述詞與統計都排除他），只排一個 job，transaction 內的工作量固定（單體規則 4）；
 // 實際刪列由 job 依 id 升序分批做（刪帳者的評價筆數沒有上限）。job 冪等：述詞是「買家還有評價列」，重跑只處理剩下的。
 package purge
 
@@ -29,6 +29,12 @@ import (
 
 // batchSize 是每一批刪除的評價數。
 const batchSize = 200
+
+// sweepBatch 是保底掃描每次最多補排的買家數。
+const sweepBatch = 100
+
+// SweepInterval 是保底掃描的間隔。
+const SweepInterval = 15 * time.Minute
 
 // Stores 是讀店家（取 store_code 組快取失效的 tag）的 seller 公開 API。
 type Stores interface {
@@ -71,8 +77,8 @@ func (PurgeAuthorArgs) InsertOpts() river.InsertOpts {
 	}}}
 }
 
-// Deactivate 是買家刪帳時同 transaction 的原子狀態變更：記進 inactive_authors、排清除 job，第一次寫入時發一個 ReviewAuthorDeactivated。
-// 先持作者的 advisory lock，與 Submit 的 insert transaction 串行。冪等：重複呼叫（申請與關閉兩個事件）不重發事件；清除 job 以買家為唯一鍵合併。必須在 transaction 內。
+// Deactivate 是買家刪帳時同 transaction 的原子狀態變更：記進 inactive_authors、排清除 job。
+// 先持作者的 advisory lock，與 Submit 的 insert transaction 串行。冪等：重複呼叫（申請與關閉兩個事件）；清除 job 以買家為唯一鍵合併。必須在 transaction 內。
 func (s *Service) Deactivate(ctx context.Context, buyerID int64, at time.Time) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return fmt.Errorf("review：Deactivate 必須在 transaction 內")
@@ -80,31 +86,30 @@ func (s *Service) Deactivate(ctx context.Context, buyerID int64, at time.Time) e
 	if err := s.q(ctx).LockAuthor(ctx, buyerID); err != nil {
 		return err
 	}
-	n, err := s.q(ctx).InsertInactiveAuthor(ctx, store.InsertInactiveAuthorParams{BuyerID: buyerID, Since: at.UTC()})
-	if err != nil {
+	if _, err := s.q(ctx).InsertInactiveAuthor(ctx, store.InsertInactiveAuthorParams{BuyerID: buyerID, Since: at.UTC()}); err != nil {
 		return err
 	}
-	opts := PurgeAuthorArgs{}.InsertOpts()
-	if err := s.d.Jobs.Enqueue(ctx, PurgeAuthorArgs{BuyerID: buyerID}, &opts); err != nil {
-		return err
-	}
-	if n == 0 {
-		return nil
-	}
-	return events.Publish(ctx, s.d.Events, model.ReviewAuthorDeactivated{EventID: s.d.NewID(), OccurredAt: at.UTC(), BuyerID: buyerID})
+	return s.enqueuePurge(ctx, buyerID)
 }
 
-// Targets 列出買家評過的 (店, 商品)（含隱藏的），給 relay 在 transaction 外逐組重送聚合。
-func (s *Service) Targets(ctx context.Context, buyerID int64) ([]model.Target, error) {
-	list, err := s.q(ctx).ListBuyerReviewTargets(ctx, buyerID)
+func (s *Service) enqueuePurge(ctx context.Context, buyerID int64) error {
+	opts := PurgeAuthorArgs{}.InsertOpts()
+	return s.d.Jobs.Enqueue(ctx, PurgeAuthorArgs{BuyerID: buyerID}, &opts)
+}
+
+// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家仍在 inactive_authors 又還有評價列；
+// 這裡每次最多補排 sweepBatch 位的清除 job，同一位買家還沒開始的 job 由唯一鍵合併。回傳這次檢查到的買家數。
+func (s *Service) Sweep(ctx context.Context) (int, error) {
+	ids, err := s.q(ctx).ListInactiveAuthorsWithReviews(ctx, sweepBatch)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	out := make([]model.Target, len(list))
-	for i, r := range list {
-		out[i] = model.Target{StoreID: r.StoreID, ProductID: r.ProductID}
+	for _, id := range ids {
+		if err := s.enqueuePurge(ctx, id); err != nil {
+			return 0, err
+		}
 	}
-	return out, nil
+	return len(ids), nil
 }
 
 // Purge 刪除買家的評價：依 id 升序分批，每批一個 transaction，內含刪列（附圖 CASCADE）、釋放的圖記成退場並排媒體同步、排快取失效。
@@ -225,4 +230,41 @@ func (w *worker) Work(ctx context.Context, job *river.Job[PurgeAuthorArgs]) erro
 func (w *worker) Timeout(*river.Job[PurgeAuthorArgs]) time.Duration { return 5 * time.Minute }
 
 // AddWorkers 登記清除的 River worker。
-func AddWorkers(workers *river.Workers, s *Service) { river.AddWorker(workers, &worker{svc: s}) }
+func AddWorkers(workers *river.Workers, s *Service) {
+	river.AddWorker(workers, &worker{svc: s})
+	river.AddWorker(workers, &sweepWorker{svc: s})
+}
+
+// SweepArgs 是清除的保底掃描。
+type SweepArgs struct{}
+
+// Kind 是 River 的 job 種類。
+func (SweepArgs) Kind() string { return "review.purge_sweep" }
+
+// InsertOpts 讓同時只有一個掃描排隊。
+func (SweepArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByArgs: true}}
+}
+
+type sweepWorker struct {
+	river.WorkerDefaults[SweepArgs]
+	svc *Service
+}
+
+// Work 執行保底掃描。
+func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[SweepArgs]) error {
+	_, err := w.svc.Sweep(ctx)
+	return err
+}
+
+// Timeout 是一次掃描的時間上限。
+func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return time.Minute }
+
+// PeriodicJobs 回傳啟動即執行、每 SweepInterval 的清除保底掃描。
+func PeriodicJobs() []*river.PeriodicJob {
+	return []*river.PeriodicJob{river.NewPeriodicJob(
+		river.PeriodicInterval(SweepInterval),
+		func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
+		&river.PeriodicJobOpts{ID: "review.purge_sweep", RunOnStart: true},
+	)}
+}

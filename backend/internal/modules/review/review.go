@@ -66,28 +66,27 @@ type Deps struct {
 }
 
 type (
-	Review                  = model.Review
-	RelayReview             = model.RelayReview
-	Image                   = model.Image
-	Reply                   = model.Reply
-	Cursor                  = model.Cursor
-	Page                    = model.Page
-	Filter                  = model.Filter
-	SubmitInput             = model.SubmitInput
-	ReplyInput              = model.ReplyInput
-	HideInput               = model.HideInput
-	RestoreInput            = model.RestoreInput
-	Hide                    = model.Hide
-	ProductStats            = model.ProductStats
-	StoreStats              = model.StoreStats
-	StoreRating             = model.StoreRating
-	OrderForReview          = model.OrderForReview
-	OrderItem               = model.OrderItem
-	Reason                  = model.Reason
-	ReviewCreated           = model.ReviewCreated
-	ReviewAggregateChanged  = model.ReviewAggregateChanged
-	ReviewAuthorDeactivated = model.ReviewAuthorDeactivated
-	Target                  = model.Target
+	Review                 = model.Review
+	RelayReview            = model.RelayReview
+	Image                  = model.Image
+	Reply                  = model.Reply
+	Cursor                 = model.Cursor
+	Page                   = model.Page
+	Filter                 = model.Filter
+	SubmitInput            = model.SubmitInput
+	ReplyInput             = model.ReplyInput
+	HideInput              = model.HideInput
+	RestoreInput           = model.RestoreInput
+	Hide                   = model.Hide
+	ProductStats           = model.ProductStats
+	StoreStats             = model.StoreStats
+	StoreRating            = model.StoreRating
+	OrderForReview         = model.OrderForReview
+	OrderItem              = model.OrderItem
+	Reason                 = model.Reason
+	ReviewCreated          = model.ReviewCreated
+	ReviewAggregateChanged = model.ReviewAggregateChanged
+	Target                 = model.Target
 )
 
 const (
@@ -206,8 +205,11 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
+// SweepPurge 補排仍在 inactive_authors 又還有評價列的買家的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
+func (m *Module) SweepPurge(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
+
 // OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把買家記進 inactive_authors
-// （評價從這個 transaction 起不可讀、不計分）、排 review.purge_author job，第一次寫入時發一個 ReviewAuthorDeactivated。不在這裡刪列：
+// （評價從這個 transaction 起不可讀、不計分）、排 review.purge_author job。不在這裡刪列：
 // 刪帳者的評價筆數沒有上限。鎖的順序 identity → buyer → seller → review：accountdeletion 在派發事件之前先鎖完買家與店家。
 func (m *Module) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
 	return m.purge.Deactivate(ctx, e.BuyerID, e.OccurredAt)
@@ -224,12 +226,6 @@ func (m *Module) PurgeAuthor(ctx context.Context, buyerID int64) error {
 	return m.purge.Purge(ctx, buyerID)
 }
 
-// AuthorTargets 列出買家評過的 (店, 商品)（含隱藏的、含刪帳中尚未清除的）。給 ReviewAuthorDeactivated 的消費端在 transaction 外
-// 逐組重算聚合；清除完成後是空的。
-func (m *Module) AuthorTargets(ctx context.Context, buyerID int64) ([]Target, error) {
-	return m.purge.Targets(ctx, buyerID)
-}
-
 // ReviewForRelay 讀單則評價的原始列，不套公開可讀述詞（事件的 payload 要這則評價現在的內容），Public 是現在是否公開可讀；已清除的是 NotFound。
 func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (RelayReview, error) {
 	return m.read.ReviewForRelay(ctx, id)
@@ -241,5 +237,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	purge.AddWorkers(workers, m.purge)
 }
 
-// PeriodicJobs 回傳保底掃描的排程。
-func (m *Module) PeriodicJobs() []*river.PeriodicJob { return mediaref.PeriodicJobs() }
+// PeriodicJobs 回傳保底掃描的排程（媒體引用、刪帳清除）。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob {
+	return append(mediaref.PeriodicJobs(), purge.PeriodicJobs()...)
+}

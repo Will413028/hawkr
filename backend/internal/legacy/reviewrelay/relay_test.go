@@ -3,7 +3,6 @@ package reviewrelay
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"testing"
 	"time"
 	"uuid"
@@ -61,7 +60,6 @@ type fakeReviews struct {
 	gone    bool
 	product map[int64]review.ProductStats
 	store   map[int64]review.StoreStats
-	targets []review.Target
 }
 
 func (f *fakeReviews) ReviewForRelay(context.Context, uuid.UUID) (review.RelayReview, error) {
@@ -77,10 +75,6 @@ func (f *fakeReviews) ProductStats(_ context.Context, id int64) (review.ProductS
 
 func (f *fakeReviews) StoreStats(_ context.Context, id int64) (review.StoreStats, error) {
 	return f.store[id], nil
-}
-
-func (f *fakeReviews) AuthorTargets(context.Context, int64) ([]review.Target, error) {
-	return f.targets, nil
 }
 
 type fakeBuyers struct{ display map[int64]buyer.Display }
@@ -166,8 +160,6 @@ func work(w *Worker, args river.JobArgs) error {
 		return w.reviewCreated(ctx, a)
 	case ReviewAggregateChangedArgs:
 		return w.reviewAggregateChanged(ctx, a)
-	case ReviewAuthorDeactivatedArgs:
-		return w.reviewAuthorDeactivated(ctx, a)
 	}
 	panic("unknown job args")
 }
@@ -233,25 +225,6 @@ func TestReviewCreatedSkipsAReviewThatIsNoLongerPublic(t *testing.T) {
 	}
 }
 
-// 刪帳不在一個 job 裡跑完全部：每組各排一個 job，job 數等於組數。
-func TestAuthorDeactivatedFansOutOneJobPerPair(t *testing.T) {
-	w, r, _, _ := newFixture()
-	r.targets = []review.Target{{StoreID: 91, ProductID: 700}, {StoreID: 92, ProductID: 800}}
-	q := &recordingJobs{}
-	w.Jobs = q
-	if err := w.reviewAuthorDeactivated(context.Background(), ReviewAuthorDeactivatedArgs{eventFields{eventID.String(), occurredAt}, 301}); err != nil {
-		t.Fatal(err)
-	}
-	if len(q.args) != 2 || len(q.published()) != 0 {
-		t.Fatalf("要排兩個扇出 job、不直接送：%+v", q.args)
-	}
-	for _, a := range q.args {
-		if _, ok := a.(ReviewAggregateChangedArgs); !ok {
-			t.Fatalf("job 種類 = %T", a)
-		}
-	}
-}
-
 // 刪帳的買家沒有暱稱與頭像；店家查不到時 notify_seller_account_id 是 0。
 func TestReviewCreatedForDeletedBuyerAndMissingStore(t *testing.T) {
 	w, _, b, s := newFixture()
@@ -305,72 +278,8 @@ func TestZeroAggregatesAreStillNumbers(t *testing.T) {
 	}
 }
 
-// 刪帳：作者評過的每組 (店, 商品) 各送一則 review.hidden，event_id 彼此不同、由事件 ID 衍生且穩定。
-func TestAuthorDeactivatedSendsOneHiddenPerPair(t *testing.T) {
-	w, r, _, _ := newFixture()
-	r.targets = []review.Target{{StoreID: 91, ProductID: 700}, {StoreID: 91, ProductID: 701}, {StoreID: 92, ProductID: 800}}
-	r.product[701] = review.ProductStats{Count: 2, Average: 3.5}
-	event := review.ReviewAuthorDeactivated{EventID: eventID, OccurredAt: occurredAt, BuyerID: 301}
-	first := run(t, w, OnReviewAuthorDeactivated, event)
-	if len(first) != 3 {
-		t.Fatalf("三組送三則：%d", len(first))
-	}
-	seen := map[string]bool{}
-	var pairs [][2]float64
-	for _, p := range first {
-		if p.RoutingKey != "review.hidden" || p.Exchange != "hawkr.review" || seen[p.EventID] || p.EventID == eventID.String() {
-			t.Fatalf("每則自己的 event_id：%+v", p)
-		}
-		seen[p.EventID] = true
-		m := body(t, p)
-		if m["event_id"] != p.EventID {
-			t.Errorf("PublishArgs.EventID 要等於 body 的 event_id：%v vs %s", m["event_id"], p.EventID)
-		}
-		pairs = append(pairs, [2]float64{m["store_id"].(float64), m["product_id"].(float64)})
-		if m["review_id"] != float64(0) {
-			t.Errorf("review_id = %v", m["review_id"])
-		}
-	}
-	if !slices.Equal(pairs, [][2]float64{{91, 700}, {91, 701}, {92, 800}}) {
-		t.Fatalf("pairs = %v", pairs)
-	}
-	second := run(t, w, OnReviewAuthorDeactivated, event)
-	for i := range first {
-		if first[i].EventID != second[i].EventID {
-			t.Fatalf("重跑的 event_id 要穩定：%s vs %s", first[i].EventID, second[i].EventID)
-		}
-	}
-}
-
-// 清除已經跑完時沒有任何組可列：不送，也不是錯誤。
-func TestAuthorDeactivatedWithNothingLeftSendsNothing(t *testing.T) {
-	w, _, _, _ := newFixture()
-	if got := run(t, w, OnReviewAuthorDeactivated, review.ReviewAuthorDeactivated{EventID: eventID, OccurredAt: occurredAt, BuyerID: 301}); len(got) != 0 {
-		t.Fatalf("published = %+v", got)
-	}
-}
-
-// 扇出的 job 以衍生的 event_id 做 unique：同一組重排得到同一個 event_id，且 job 帶 ByArgs 唯一性。
-func TestFanOutJobsAreUniqueByDerivedEventID(t *testing.T) {
-	w, r, _, _ := newFixture()
-	r.targets = []review.Target{{StoreID: 91, ProductID: 700}, {StoreID: 92, ProductID: 800}}
-	q := &recordingJobs{}
-	w.Jobs = q
-	args := ReviewAuthorDeactivatedArgs{eventFields{eventID.String(), occurredAt}, 301}
-	for i := 0; i < 2; i++ {
-		if err := w.reviewAuthorDeactivated(context.Background(), args); err != nil {
-			t.Fatal(err)
-		}
-	}
-	first, rerun := q.args[:2], q.args[2:]
-	for i := range first {
-		if first[i].(ReviewAggregateChangedArgs) != rerun[i].(ReviewAggregateChangedArgs) {
-			t.Fatalf("重排的參數要相同才會被 unique 合併：%+v vs %+v", first[i], rerun[i])
-		}
-	}
-	if first[0].(ReviewAggregateChangedArgs).EventID == first[1].(ReviewAggregateChangedArgs).EventID {
-		t.Fatal("不同組的 event_id 要不同")
-	}
+// ReviewAggregateChanged 的 job 以整組參數做 unique：父 job 重試重排同一組時只留一個。
+func TestAggregateChangedJobIsUniqueByArgs(t *testing.T) {
 	if o := (ReviewAggregateChangedArgs{}).InsertOpts(); !o.UniqueOpts.ByArgs {
 		t.Fatal("ReviewAggregateChangedArgs 要以參數做 unique")
 	}

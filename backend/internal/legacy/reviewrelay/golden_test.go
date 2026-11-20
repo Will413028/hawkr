@@ -111,9 +111,4 @@ func TestProductStatsConsumerContract(t *testing.T) {
 		r.product = map[int64]review.ProductStats{}
 		check(t, body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700})[0]), 0, 0)
 	})
-	t.Run("author deactivated", func(t *testing.T) {
-		w, r, _, _ := newFixture()
-		r.targets = []review.Target{{StoreID: 91, ProductID: 700}}
-		check(t, body(t, run(t, w, OnReviewAuthorDeactivated, review.ReviewAuthorDeactivated{EventID: eventID, OccurredAt: occurredAt, BuyerID: 301})[0]), 4.9, 30)
-	})
 }
