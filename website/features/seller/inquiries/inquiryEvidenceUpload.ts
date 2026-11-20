@@ -5,7 +5,7 @@ import { uploadSecureDocument } from "@/lib/media/secure-upload";
 export const INQUIRY_EVIDENCE_DOC_TYPE = "inquiry_evidence";
 
 /**
- * 回覆附件走機敏上傳（契約的 `evidence_staged_tokens` 只接受機敏資產）。機敏資產沒有公開網址，縮圖用本機的 object URL。
+ * 回覆附件走機敏上傳（契約的 `evidence_staged_tokens` 只接受機敏資產）。機敏資產沒有公開網址，縮圖用本機的 object URL，由回覆表單在照片移除與卸載時釋放。
  */
 export const uploadInquiryEvidence: PhotoUpload = async (file, onProgress) => {
 	const result = await uploadSecureDocument(

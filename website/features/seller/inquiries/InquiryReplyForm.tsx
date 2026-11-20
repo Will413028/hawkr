@@ -36,6 +36,8 @@ export default function InquiryReplyForm({
 	const adoptInquiry = useAdoptInquiry();
 	const [body, setBody] = React.useState("");
 	const [photos, setPhotos] = React.useState<StagedPhoto[]>([]);
+	const [uploading, setUploading] = React.useState(false);
+	const photosRef = React.useRef<StagedPhoto[]>([]);
 	const [busy, setBusy] = React.useState(false);
 	const [notice, setNotice] = React.useState<string | null>(null);
 	const [bodyError, setBodyError] = React.useState<string | null>(null);
@@ -44,9 +46,27 @@ export default function InquiryReplyForm({
 		{},
 	);
 
+	React.useEffect(
+		() => () => {
+			for (const photo of photosRef.current)
+				URL.revokeObjectURL(photo.previewUrl);
+		},
+		[],
+	);
+
+	const changePhotos = (next: StagedPhoto[]) => {
+		for (const photo of photosRef.current) {
+			if (!next.includes(photo)) URL.revokeObjectURL(photo.previewUrl);
+		}
+		photosRef.current = next;
+		setPhotos(next);
+		setEvidenceError(null);
+	};
+
 	const draft = replyDraftState({
 		body,
 		hasFailedPhoto: photos.some((photo) => itemErrors[photo.token]),
+		uploading,
 		busy,
 	});
 
@@ -127,10 +147,8 @@ export default function InquiryReplyForm({
 
 			<AfterSalePhotoUploader
 				value={photos}
-				onChange={(next) => {
-					setPhotos(next);
-					setEvidenceError(null);
-				}}
+				onChange={changePhotos}
+				onUploadingChange={setUploading}
 				max={inquiry.replyAttachmentMax}
 				disabled={busy}
 				label={t("reply.evidenceLabel")}

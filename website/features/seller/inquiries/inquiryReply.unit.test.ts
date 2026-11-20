@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { INQUIRY_REPLY_MAX_LENGTH } from "@/lib/seller/inquiries";
 import { itemErrorsByToken, replyDraftState } from "./inquiryReply";
 
-const base = { hasFailedPhoto: false, busy: false };
+const base = { hasFailedPhoto: false, uploading: false, busy: false };
 
 describe("replyDraftState", () => {
 	it("空白與只有空白不能送出", () => {
@@ -36,6 +36,17 @@ describe("replyDraftState", () => {
 		expect(replyDraftState({ ...base, body: "好", busy: true }).canSubmit).toBe(
 			false,
 		);
+	});
+});
+
+describe("replyDraftState 附件上傳中", () => {
+	it("附件還在上傳時不能送出，上傳完才可以", () => {
+		expect(
+			replyDraftState({ ...base, body: "好", uploading: true }).canSubmit,
+		).toBe(false);
+		expect(
+			replyDraftState({ ...base, body: "好", uploading: false }).canSubmit,
+		).toBe(true);
 	});
 });
 

@@ -9,11 +9,12 @@ export interface ReplyDraftState {
 
 /**
  * 回覆表單的送出條件：內文去掉頭尾空白後有字、不超過上限（以 rune 計，與伺服器同一個算法），沒有上傳失敗的附件，
- * 且不在送出中。附件張數的上限由伺服器給（`replyAttachmentMax`），由上傳元件限制。
+ * 沒有附件還在上傳（送出會漏掉它，詢問又只能回覆一次），且不在送出中。附件張數的上限由伺服器給（`replyAttachmentMax`），由上傳元件限制。
  */
 export function replyDraftState(input: {
 	body: string;
 	hasFailedPhoto: boolean;
+	uploading: boolean;
 	busy: boolean;
 }): ReplyDraftState {
 	const length = goTrimmedRuneCount(input.body);
@@ -21,7 +22,12 @@ export function replyDraftState(input: {
 	return {
 		length,
 		tooLong,
-		canSubmit: length > 0 && !tooLong && !input.hasFailedPhoto && !input.busy,
+		canSubmit:
+			length > 0 &&
+			!tooLong &&
+			!input.hasFailedPhoto &&
+			!input.uploading &&
+			!input.busy,
 	};
 }
 
