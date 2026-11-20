@@ -150,7 +150,7 @@
 
 拆 2a、2b：
 
-- **2a 資料與送出**，照 A6-1 拆成兩個 session：**2a0** 設計書 `2026-11-19-a6-review-im-crm/step-2a-design.md` 與開工 design-review；**2a1**（2a0 完成，決定見 A6-D14）實作與完成前 design-review。內容：schema（UUIDv7、`seq`、`last_read_seq`）、送出守門（停權→停業→封鎖，含 A6-D1 的例外）、`orderservice.GetOrderForAfterSales`、`HasOrderBetween`、帳號與身分刪除的抹除（ID3）、`imrelay`、buyer／seller／identity 事件改 in-process 訂閱。
+- **2a 資料與送出**，照 A6-1 拆成兩個 session：**2a0** 設計書 `2026-11-19-a6-review-im-crm/step-2a-design.md` 與開工 design-review；**2a1**（2a0 完成，決定見 A6-D14）實作與完成前 design-review。內容：schema（UUIDv7、`seq`、`last_read_seq`）、送出守門（停權→停業→封鎖，含 A6-D1 的例外）、`orderservice` 的 `OrderParties`、`HasOrderBetween` 與組合兩者的 `OpenOrderBetween`（A6-D14 W1 (c)）、帳號與身分刪除的抹除（ID3，訂閱 `buyer.BuyerDeleted`、`seller.StoreRetired`）、`imrelay`、buyer、seller 事件改 in-process 訂閱（不訂 identity，設計書 §9）。
 - **2b 即時通道**：依 A6-D3；hub 單進程扇出；presence 依 A6-D5。
 - 刪帳：ID3 依身分抹除；依 A6-D9 訂閱 buyer、seller 的刪除事件（同 tx 只寫複本與排抹除 job），lockorder integration 測試涵蓋 im。
 - 消費端：gateway `G/handler/chat.go`、`gatewayproxy` 的 WebSocket 轉發；notification-service 的 `chat.message.sent`。
