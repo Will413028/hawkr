@@ -51,6 +51,39 @@ class AssistantTopic extends $pb.ProtobufEnum {
   const AssistantTopic._(super.value, super.name);
 }
 
+/// AssistantTool 是助理在回覆途中使用的工具；顯示文字在共用文案目錄。
+class AssistantTool extends $pb.ProtobufEnum {
+  static const AssistantTool ASSISTANT_TOOL_UNSPECIFIED =
+      AssistantTool._(0, _omitEnumNames ? '' : 'ASSISTANT_TOOL_UNSPECIFIED');
+
+  /// 查詢我的訂單清單。
+  static const AssistantTool ASSISTANT_TOOL_GET_MY_ORDERS =
+      AssistantTool._(1, _omitEnumNames ? '' : 'ASSISTANT_TOOL_GET_MY_ORDERS');
+
+  /// 查詢單筆訂單的詳情。
+  static const AssistantTool ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL =
+      AssistantTool._(
+          2, _omitEnumNames ? '' : 'ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL');
+
+  /// 查詢配送中包裹的物流狀態。
+  static const AssistantTool ASSISTANT_TOOL_TRACK_MY_PACKAGE = AssistantTool._(
+      3, _omitEnumNames ? '' : 'ASSISTANT_TOOL_TRACK_MY_PACKAGE');
+
+  static const $core.List<AssistantTool> values = <AssistantTool>[
+    ASSISTANT_TOOL_UNSPECIFIED,
+    ASSISTANT_TOOL_GET_MY_ORDERS,
+    ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL,
+    ASSISTANT_TOOL_TRACK_MY_PACKAGE,
+  ];
+
+  static final $core.List<AssistantTool?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static AssistantTool? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AssistantTool._(super.value, super.name);
+}
+
 /// AssistantMessageRole 是對話中一則訊息的發言者。
 class AssistantMessageRole extends $pb.ProtobufEnum {
   static const AssistantMessageRole ASSISTANT_MESSAGE_ROLE_UNSPECIFIED =

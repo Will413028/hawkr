@@ -1,4 +1,10 @@
 [
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_GET_MY_ORDERS","audience":"default","locale":"zh-TW","want":"正在查詢你的訂單"},
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_GET_MY_ORDERS","audience":"default","locale":"en","want":"Looking up your orders"},
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL","audience":"default","locale":"zh-TW","want":"正在查詢訂單詳情"},
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL","audience":"default","locale":"en","want":"Looking up the order details"},
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_TRACK_MY_PACKAGE","audience":"default","locale":"zh-TW","want":"正在查詢包裹物流"},
+  {"key":"assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE","fn":"assistant.AssistantTool","value":"ASSISTANT_TOOL_TRACK_MY_PACKAGE","audience":"default","locale":"en","want":"Checking your package tracking"},
   {"key":"buyer.Gender.GENDER_MALE","fn":"buyer.Gender","value":"GENDER_MALE","audience":"default","locale":"zh-TW","want":"男性"},
   {"key":"buyer.Gender.GENDER_MALE","fn":"buyer.Gender","value":"GENDER_MALE","audience":"default","locale":"en","want":"Male"},
   {"key":"buyer.Gender.GENDER_FEMALE","fn":"buyer.Gender","value":"GENDER_FEMALE","audience":"default","locale":"zh-TW","want":"女性"},

@@ -5,6 +5,30 @@ package uitext
 
 import "strconv"
 
+// AssistantAssistantTool 是 assistant.AssistantTool 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) AssistantAssistantTool(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "GET_MY_ORDERS":
+			return "Looking up your orders", true
+		case "GET_BUYER_ORDER_DETAIL":
+			return "Looking up the order details", true
+		case "TRACK_MY_PACKAGE":
+			return "Checking your package tracking", true
+		}
+	}
+	switch v {
+	case "GET_MY_ORDERS":
+		return "正在查詢你的訂單", true
+	case "GET_BUYER_ORDER_DETAIL":
+		return "正在查詢訂單詳情", true
+	case "TRACK_MY_PACKAGE":
+		return "正在查詢包裹物流", true
+	}
+	return "", false
+}
+
 // BuyerGender 是 buyer.Gender 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) BuyerGender(v string) (string, bool) {

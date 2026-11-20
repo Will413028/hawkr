@@ -260,6 +260,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.assistant.v1alpha1.AssistantTool",
+      "tsName": "AssistantTool",
+      "tsModule": "@hawkr/api/gen/hawkr/assistant/v1alpha1/assistant_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.assistant.v1alpha1.AssistantTopic",
       "tsName": "AssistantTopic",
       "tsModule": "@hawkr/api/gen/hawkr/assistant/v1alpha1/assistant_pb",

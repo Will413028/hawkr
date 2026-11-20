@@ -4,6 +4,7 @@
 // ignore_for_file: unnecessary_parenthesis, unused_import
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as hawkr_assistant_v1alpha1_assistant;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
@@ -14,7 +15,11 @@ import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 const _enumNumber = <String, int>{
-  'COMMENT_STATE_DELETED': 2,
+  'ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL': 2,
+	'ASSISTANT_TOOL_GET_MY_ORDERS': 1,
+	'ASSISTANT_TOOL_TRACK_MY_PACKAGE': 3,
+	'ASSISTANT_TOOL_UNSPECIFIED': 0,
+	'COMMENT_STATE_DELETED': 2,
 	'COMMENT_STATE_HIDDEN': 3,
 	'COMMENT_STATE_UNSPECIFIED': 0,
 	'COMMENT_STATE_VISIBLE': 1,
@@ -186,6 +191,8 @@ int _n(Object? name) => _enumNumber[name]!;
 /// 呼叫 fn 對應的生成函式；null 表示「沒有文字」。
 String? goldenText(String fn, String value, Map<String, Object?> params, UiLocale l) {
   switch (fn) {
+    case 'assistant.AssistantTool':
+      return hawkr_assistant_v1alpha1_assistant.AssistantTool.valueOf(_n(value))!.uiText(l);
     case 'buyer.Gender':
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n(value))!.uiText(l);
     case 'buyer.Profile.gender_unset':

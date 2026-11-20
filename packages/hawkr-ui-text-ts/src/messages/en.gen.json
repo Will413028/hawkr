@@ -1,4 +1,11 @@
 {
+  "assistant": {
+    "AssistantTool": {
+      "ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": "Looking up the order details",
+      "ASSISTANT_TOOL_GET_MY_ORDERS": "Looking up your orders",
+      "ASSISTANT_TOOL_TRACK_MY_PACKAGE": "Checking your package tracking"
+    }
+  },
   "buyer": {
     "Gender": {
       "GENDER_FEMALE": "Female",

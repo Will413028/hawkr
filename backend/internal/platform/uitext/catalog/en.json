@@ -1,5 +1,14 @@
 {
   "default": {
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": {
+      "message": "Looking up the order details"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": {
+      "message": "Looking up your orders"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": {
+      "message": "Checking your package tracking"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "Female"
     },

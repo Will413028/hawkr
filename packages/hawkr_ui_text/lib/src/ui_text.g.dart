@@ -4,6 +4,7 @@
 // ignore_for_file: unnecessary_parenthesis, unused_import, prefer_single_quotes, unnecessary_string_interpolations
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as hawkr_assistant_v1alpha1_assistant;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
@@ -13,6 +14,23 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
 import '../hawkr_ui_text.dart' show UiLocale;
+
+String? _assistantAssistantTool(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '正在查詢你的訂單',
+(UiLocale.en, 1) => 'Looking up your orders',
+(UiLocale.zhTW, 2) => '正在查詢訂單詳情',
+(UiLocale.en, 2) => 'Looking up the order details',
+(UiLocale.zhTW, 3) => '正在查詢包裹物流',
+(UiLocale.en, 3) => 'Checking your package tracking',
+_ => null,
+};
+}
+
+extension AssistantAssistantToolUiText on hawkr_assistant_v1alpha1_assistant.AssistantTool {
+  /// assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _assistantAssistantTool(l, value);
+}
 
 String? _buyerGender(UiLocale l, int value) {
 return switch ((l, value)) {

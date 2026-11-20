@@ -15,10 +15,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'package:protobuf/well_known_types/google/protobuf/struct.pbjson.dart'
-    as $0;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
-    as $1;
+    as $0;
 
 @$core.Deprecated('Use assistantTopicDescriptor instead')
 const AssistantTopic$json = {
@@ -38,6 +36,23 @@ final $typed_data.Uint8List assistantTopicDescriptor = $convert.base64Decode(
     'NJU1RBTlRfVE9QSUNfT1JERVJTEAESHAoYQVNTSVNUQU5UX1RPUElDX1RSQUNLSU5HEAISIQod'
     'QVNTSVNUQU5UX1RPUElDX1JFVFVSTl9QT0xJQ1kQAxIYChRBU1NJU1RBTlRfVE9QSUNfQ0hBVB'
     'AE');
+
+@$core.Deprecated('Use assistantToolDescriptor instead')
+const AssistantTool$json = {
+  '1': 'AssistantTool',
+  '2': [
+    {'1': 'ASSISTANT_TOOL_UNSPECIFIED', '2': 0},
+    {'1': 'ASSISTANT_TOOL_GET_MY_ORDERS', '2': 1},
+    {'1': 'ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL', '2': 2},
+    {'1': 'ASSISTANT_TOOL_TRACK_MY_PACKAGE', '2': 3},
+  ],
+};
+
+/// Descriptor for `AssistantTool`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List assistantToolDescriptor = $convert.base64Decode(
+    'Cg1Bc3Npc3RhbnRUb29sEh4KGkFTU0lTVEFOVF9UT09MX1VOU1BFQ0lGSUVEEAASIAocQVNTSV'
+    'NUQU5UX1RPT0xfR0VUX01ZX09SREVSUxABEikKJUFTU0lTVEFOVF9UT09MX0dFVF9CVVlFUl9P'
+    'UkRFUl9ERVRBSUwQAhIjCh9BU1NJU1RBTlRfVE9PTF9UUkFDS19NWV9QQUNLQUdFEAM=');
 
 @$core.Deprecated('Use assistantMessageRoleDescriptor instead')
 const AssistantMessageRole$json = {
@@ -204,24 +219,23 @@ final $typed_data.Uint8List assistantTextDeltaDescriptor = $convert
 const AssistantToolResult$json = {
   '1': 'AssistantToolResult',
   '2': [
-    {'1': 'tool_name', '3': 1, '4': 1, '5': 9, '10': 'toolName'},
-    {'1': 'failed', '3': 2, '4': 1, '5': 8, '10': 'failed'},
     {
-      '1': 'arguments',
-      '3': 3,
+      '1': 'tool',
+      '3': 1,
       '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Struct',
-      '10': 'arguments'
+      '5': 14,
+      '6': '.hawkr.assistant.v1alpha1.AssistantTool',
+      '10': 'tool'
     },
+    {'1': 'succeeded', '3': 2, '4': 1, '5': 8, '10': 'succeeded'},
   ],
 };
 
 /// Descriptor for `AssistantToolResult`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List assistantToolResultDescriptor = $convert.base64Decode(
-    'ChNBc3Npc3RhbnRUb29sUmVzdWx0EhsKCXRvb2xfbmFtZRgBIAEoCVIIdG9vbE5hbWUSFgoGZm'
-    'FpbGVkGAIgASgIUgZmYWlsZWQSNQoJYXJndW1lbnRzGAMgASgLMhcuZ29vZ2xlLnByb3RvYnVm'
-    'LlN0cnVjdFIJYXJndW1lbnRz');
+    'ChNBc3Npc3RhbnRUb29sUmVzdWx0EjsKBHRvb2wYASABKA4yJy5oYXdrci5hc3Npc3RhbnQudj'
+    'FhbHBoYTEuQXNzaXN0YW50VG9vbFIEdG9vbBIcCglzdWNjZWVkZWQYAiABKAhSCXN1Y2NlZWRl'
+    'ZA==');
 
 @$core.Deprecated('Use assistantFinishedDescriptor instead')
 const AssistantFinished$json = {
@@ -385,10 +399,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       WatchAssistantTurnResponse$json,
   '.hawkr.assistant.v1alpha1.AssistantTextDelta': AssistantTextDelta$json,
   '.hawkr.assistant.v1alpha1.AssistantToolResult': AssistantToolResult$json,
-  '.google.protobuf.Struct': $0.Struct$json,
-  '.google.protobuf.Struct.FieldsEntry': $0.Struct_FieldsEntry$json,
-  '.google.protobuf.Value': $0.Value$json,
-  '.google.protobuf.ListValue': $0.ListValue$json,
   '.hawkr.assistant.v1alpha1.AssistantFinished': AssistantFinished$json,
   '.hawkr.assistant.v1alpha1.AssistantStreamError': AssistantStreamError$json,
   '.hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry':
@@ -398,7 +408,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse':
       GetLatestAssistantSessionResponse$json,
   '.hawkr.assistant.v1alpha1.AssistantMessage': AssistantMessage$json,
-  '.google.protobuf.Timestamp': $1.Timestamp$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
 };
 
 /// Descriptor for `AssistantAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

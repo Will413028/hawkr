@@ -11,9 +11,9 @@
 // （Vercel 的外部 rewrite 上限），client 以最後收到的 cursor 重新訂閱接續，不漏不重。
 // 串流結束時沒有收到 finished 或 error 事件，就是被截斷，要接續；收到了就是這一輪結束。
 //
-// 事件暫存在單體的記憶體裡（每輪一個環形緩衝）：輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，
-// client 重新送出；cursor 早於緩衝的起點回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_EXPIRED，
-// 超前於最新事件也回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
+// 事件暫存在單體的記憶體裡（每輪一個只增不減的緩衝，有事件數上限；超過上限這一輪以 error 事件結束）：
+// 輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，client 重新送出；緩衝從不覆蓋舊事件，所以沒有「cursor 過期」；
+// cursor 超前於最新事件（或不是伺服器發的值）回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
 
 package assistantv1alpha1
 
@@ -22,7 +22,6 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -96,6 +95,62 @@ func (AssistantTopic) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP(), []int{0}
 }
 
+// AssistantTool 是助理在回覆途中使用的工具；顯示文字在共用文案目錄。
+type AssistantTool int32
+
+const (
+	AssistantTool_ASSISTANT_TOOL_UNSPECIFIED AssistantTool = 0
+	// 查詢我的訂單清單。
+	AssistantTool_ASSISTANT_TOOL_GET_MY_ORDERS AssistantTool = 1
+	// 查詢單筆訂單的詳情。
+	AssistantTool_ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL AssistantTool = 2
+	// 查詢配送中包裹的物流狀態。
+	AssistantTool_ASSISTANT_TOOL_TRACK_MY_PACKAGE AssistantTool = 3
+)
+
+// Enum value maps for AssistantTool.
+var (
+	AssistantTool_name = map[int32]string{
+		0: "ASSISTANT_TOOL_UNSPECIFIED",
+		1: "ASSISTANT_TOOL_GET_MY_ORDERS",
+		2: "ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL",
+		3: "ASSISTANT_TOOL_TRACK_MY_PACKAGE",
+	}
+	AssistantTool_value = map[string]int32{
+		"ASSISTANT_TOOL_UNSPECIFIED":            0,
+		"ASSISTANT_TOOL_GET_MY_ORDERS":          1,
+		"ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": 2,
+		"ASSISTANT_TOOL_TRACK_MY_PACKAGE":       3,
+	}
+)
+
+func (x AssistantTool) Enum() *AssistantTool {
+	p := new(AssistantTool)
+	*p = x
+	return p
+}
+
+func (x AssistantTool) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistantTool) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[1].Descriptor()
+}
+
+func (AssistantTool) Type() protoreflect.EnumType {
+	return &file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[1]
+}
+
+func (x AssistantTool) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistantTool.Descriptor instead.
+func (AssistantTool) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP(), []int{1}
+}
+
 // AssistantMessageRole 是對話中一則訊息的發言者。
 type AssistantMessageRole int32
 
@@ -130,11 +185,11 @@ func (x AssistantMessageRole) String() string {
 }
 
 func (AssistantMessageRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[1].Descriptor()
+	return file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[2].Descriptor()
 }
 
 func (AssistantMessageRole) Type() protoreflect.EnumType {
-	return &file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[1]
+	return &file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes[2]
 }
 
 func (x AssistantMessageRole) Number() protoreflect.EnumNumber {
@@ -143,7 +198,7 @@ func (x AssistantMessageRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AssistantMessageRole.Descriptor instead.
 func (AssistantMessageRole) EnumDescriptor() ([]byte, []int) {
-	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP(), []int{1}
+	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP(), []int{2}
 }
 
 type SendAssistantMessageRequest struct {
@@ -505,14 +560,13 @@ func (x *AssistantTextDelta) GetText() string {
 	return ""
 }
 
-// AssistantToolResult 說明助理呼叫了哪個工具，以及它有沒有成功；工具的回傳內容不對外。
+// AssistantToolResult 說明助理使用了哪個工具，以及它有沒有成功；工具的參數與回傳內容不對外。
 type AssistantToolResult struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	ToolName string                 `protobuf:"bytes,1,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
-	// 工具執行失敗；助理仍會接著回覆。
-	Failed bool `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
-	// 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
-	Arguments     *structpb.Struct `protobuf:"bytes,3,opt,name=arguments,proto3" json:"arguments,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 使用的工具；一定是具體的值（不會是 UNSPECIFIED）。
+	Tool AssistantTool `protobuf:"varint,1,opt,name=tool,proto3,enum=hawkr.assistant.v1alpha1.AssistantTool" json:"tool,omitempty"`
+	// 工具成功執行。false 時助理仍會接著回覆。
+	Succeeded     bool `protobuf:"varint,2,opt,name=succeeded,proto3" json:"succeeded,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -547,25 +601,18 @@ func (*AssistantToolResult) Descriptor() ([]byte, []int) {
 	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *AssistantToolResult) GetToolName() string {
+func (x *AssistantToolResult) GetTool() AssistantTool {
 	if x != nil {
-		return x.ToolName
+		return x.Tool
 	}
-	return ""
+	return AssistantTool_ASSISTANT_TOOL_UNSPECIFIED
 }
 
-func (x *AssistantToolResult) GetFailed() bool {
+func (x *AssistantToolResult) GetSucceeded() bool {
 	if x != nil {
-		return x.Failed
+		return x.Succeeded
 	}
 	return false
-}
-
-func (x *AssistantToolResult) GetArguments() *structpb.Struct {
-	if x != nil {
-		return x.Arguments
-	}
-	return nil
 }
 
 type AssistantFinished struct {
@@ -829,7 +876,7 @@ var File_hawkr_assistant_v1alpha1_assistant_proto protoreflect.FileDescriptor
 
 const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\x89\x02\n" +
+	"(hawkr/assistant/v1alpha1/assistant.proto\x12\x18hawkr.assistant.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\"\x89\x02\n" +
 	"\x1bSendAssistantMessageRequest\x12C\n" +
 	"\x05topic\x18\x01 \x01(\x0e2(.hawkr.assistant.v1alpha1.AssistantTopicB\x03\xe0A\x02R\x05topic\x12\x1d\n" +
 	"\n" +
@@ -855,11 +902,10 @@ const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\v2..hawkr.assistant.v1alpha1.AssistantStreamErrorH\x00R\x05errorB\a\n" +
 	"\x05event\"(\n" +
 	"\x12AssistantTextDelta\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"\x81\x01\n" +
-	"\x13AssistantToolResult\x12\x1b\n" +
-	"\ttool_name\x18\x01 \x01(\tR\btoolName\x12\x16\n" +
-	"\x06failed\x18\x02 \x01(\bR\x06failed\x125\n" +
-	"\targuments\x18\x03 \x01(\v2\x17.google.protobuf.StructR\targuments\"2\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"p\n" +
+	"\x13AssistantToolResult\x12;\n" +
+	"\x04tool\x18\x01 \x01(\x0e2'.hawkr.assistant.v1alpha1.AssistantToolR\x04tool\x12\x1c\n" +
+	"\tsucceeded\x18\x02 \x01(\bR\tsucceeded\"2\n" +
 	"\x11AssistantFinished\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"\x96\x02\n" +
@@ -885,7 +931,12 @@ const file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc = "" +
 	"\x16ASSISTANT_TOPIC_ORDERS\x10\x01\x12\x1c\n" +
 	"\x18ASSISTANT_TOPIC_TRACKING\x10\x02\x12!\n" +
 	"\x1dASSISTANT_TOPIC_RETURN_POLICY\x10\x03\x12\x18\n" +
-	"\x14ASSISTANT_TOPIC_CHAT\x10\x04*\x85\x01\n" +
+	"\x14ASSISTANT_TOPIC_CHAT\x10\x04*\xa1\x01\n" +
+	"\rAssistantTool\x12\x1e\n" +
+	"\x1aASSISTANT_TOOL_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cASSISTANT_TOOL_GET_MY_ORDERS\x10\x01\x12)\n" +
+	"%ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL\x10\x02\x12#\n" +
+	"\x1fASSISTANT_TOOL_TRACK_MY_PACKAGE\x10\x03*\x85\x01\n" +
 	"\x14AssistantMessageRole\x12&\n" +
 	"\"ASSISTANT_MESSAGE_ROLE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bASSISTANT_MESSAGE_ROLE_USER\x10\x01\x12$\n" +
@@ -908,45 +959,45 @@ func file_hawkr_assistant_v1alpha1_assistant_proto_rawDescGZIP() []byte {
 	return file_hawkr_assistant_v1alpha1_assistant_proto_rawDescData
 }
 
-var file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_hawkr_assistant_v1alpha1_assistant_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_hawkr_assistant_v1alpha1_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_hawkr_assistant_v1alpha1_assistant_proto_goTypes = []any{
 	(AssistantTopic)(0),                       // 0: hawkr.assistant.v1alpha1.AssistantTopic
-	(AssistantMessageRole)(0),                 // 1: hawkr.assistant.v1alpha1.AssistantMessageRole
-	(*SendAssistantMessageRequest)(nil),       // 2: hawkr.assistant.v1alpha1.SendAssistantMessageRequest
-	(*SendAssistantMessageResponse)(nil),      // 3: hawkr.assistant.v1alpha1.SendAssistantMessageResponse
-	(*WatchAssistantTurnRequest)(nil),         // 4: hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
-	(*WatchAssistantTurnResponse)(nil),        // 5: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
-	(*AssistantTextDelta)(nil),                // 6: hawkr.assistant.v1alpha1.AssistantTextDelta
-	(*AssistantToolResult)(nil),               // 7: hawkr.assistant.v1alpha1.AssistantToolResult
-	(*AssistantFinished)(nil),                 // 8: hawkr.assistant.v1alpha1.AssistantFinished
-	(*AssistantStreamError)(nil),              // 9: hawkr.assistant.v1alpha1.AssistantStreamError
-	(*GetLatestAssistantSessionRequest)(nil),  // 10: hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
-	(*GetLatestAssistantSessionResponse)(nil), // 11: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
-	(*AssistantMessage)(nil),                  // 12: hawkr.assistant.v1alpha1.AssistantMessage
-	nil,                                       // 13: hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
-	(*structpb.Struct)(nil),                   // 14: google.protobuf.Struct
+	(AssistantTool)(0),                        // 1: hawkr.assistant.v1alpha1.AssistantTool
+	(AssistantMessageRole)(0),                 // 2: hawkr.assistant.v1alpha1.AssistantMessageRole
+	(*SendAssistantMessageRequest)(nil),       // 3: hawkr.assistant.v1alpha1.SendAssistantMessageRequest
+	(*SendAssistantMessageResponse)(nil),      // 4: hawkr.assistant.v1alpha1.SendAssistantMessageResponse
+	(*WatchAssistantTurnRequest)(nil),         // 5: hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
+	(*WatchAssistantTurnResponse)(nil),        // 6: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
+	(*AssistantTextDelta)(nil),                // 7: hawkr.assistant.v1alpha1.AssistantTextDelta
+	(*AssistantToolResult)(nil),               // 8: hawkr.assistant.v1alpha1.AssistantToolResult
+	(*AssistantFinished)(nil),                 // 9: hawkr.assistant.v1alpha1.AssistantFinished
+	(*AssistantStreamError)(nil),              // 10: hawkr.assistant.v1alpha1.AssistantStreamError
+	(*GetLatestAssistantSessionRequest)(nil),  // 11: hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
+	(*GetLatestAssistantSessionResponse)(nil), // 12: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
+	(*AssistantMessage)(nil),                  // 13: hawkr.assistant.v1alpha1.AssistantMessage
+	nil,                                       // 14: hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
 	(v1alpha1.ErrorReason)(0),                 // 15: hawkr.common.v1alpha1.ErrorReason
 	(*timestamppb.Timestamp)(nil),             // 16: google.protobuf.Timestamp
 }
 var file_hawkr_assistant_v1alpha1_assistant_proto_depIdxs = []int32{
 	0,  // 0: hawkr.assistant.v1alpha1.SendAssistantMessageRequest.topic:type_name -> hawkr.assistant.v1alpha1.AssistantTopic
-	6,  // 1: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.text:type_name -> hawkr.assistant.v1alpha1.AssistantTextDelta
-	7,  // 2: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.tool_result:type_name -> hawkr.assistant.v1alpha1.AssistantToolResult
-	8,  // 3: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.finished:type_name -> hawkr.assistant.v1alpha1.AssistantFinished
-	9,  // 4: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.error:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError
-	14, // 5: hawkr.assistant.v1alpha1.AssistantToolResult.arguments:type_name -> google.protobuf.Struct
+	7,  // 1: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.text:type_name -> hawkr.assistant.v1alpha1.AssistantTextDelta
+	8,  // 2: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.tool_result:type_name -> hawkr.assistant.v1alpha1.AssistantToolResult
+	9,  // 3: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.finished:type_name -> hawkr.assistant.v1alpha1.AssistantFinished
+	10, // 4: hawkr.assistant.v1alpha1.WatchAssistantTurnResponse.error:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError
+	1,  // 5: hawkr.assistant.v1alpha1.AssistantToolResult.tool:type_name -> hawkr.assistant.v1alpha1.AssistantTool
 	15, // 6: hawkr.assistant.v1alpha1.AssistantStreamError.reason:type_name -> hawkr.common.v1alpha1.ErrorReason
-	13, // 7: hawkr.assistant.v1alpha1.AssistantStreamError.metadata:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
-	12, // 8: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse.messages:type_name -> hawkr.assistant.v1alpha1.AssistantMessage
-	1,  // 9: hawkr.assistant.v1alpha1.AssistantMessage.role:type_name -> hawkr.assistant.v1alpha1.AssistantMessageRole
+	14, // 7: hawkr.assistant.v1alpha1.AssistantStreamError.metadata:type_name -> hawkr.assistant.v1alpha1.AssistantStreamError.MetadataEntry
+	13, // 8: hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse.messages:type_name -> hawkr.assistant.v1alpha1.AssistantMessage
+	2,  // 9: hawkr.assistant.v1alpha1.AssistantMessage.role:type_name -> hawkr.assistant.v1alpha1.AssistantMessageRole
 	16, // 10: hawkr.assistant.v1alpha1.AssistantMessage.create_time:type_name -> google.protobuf.Timestamp
-	2,  // 11: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:input_type -> hawkr.assistant.v1alpha1.SendAssistantMessageRequest
-	4,  // 12: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:input_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
-	10, // 13: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:input_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
-	3,  // 14: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:output_type -> hawkr.assistant.v1alpha1.SendAssistantMessageResponse
-	5,  // 15: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:output_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
-	11, // 16: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:output_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
+	3,  // 11: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:input_type -> hawkr.assistant.v1alpha1.SendAssistantMessageRequest
+	5,  // 12: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:input_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnRequest
+	11, // 13: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:input_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionRequest
+	4,  // 14: hawkr.assistant.v1alpha1.AssistantAppService.SendAssistantMessage:output_type -> hawkr.assistant.v1alpha1.SendAssistantMessageResponse
+	6,  // 15: hawkr.assistant.v1alpha1.AssistantAppService.WatchAssistantTurn:output_type -> hawkr.assistant.v1alpha1.WatchAssistantTurnResponse
+	12, // 16: hawkr.assistant.v1alpha1.AssistantAppService.GetLatestAssistantSession:output_type -> hawkr.assistant.v1alpha1.GetLatestAssistantSessionResponse
 	14, // [14:17] is the sub-list for method output_type
 	11, // [11:14] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
@@ -971,7 +1022,7 @@ func file_hawkr_assistant_v1alpha1_assistant_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc), len(file_hawkr_assistant_v1alpha1_assistant_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,

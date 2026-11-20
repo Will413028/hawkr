@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { assistantAssistantTool, buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -15,6 +15,10 @@ export interface GoldenCase {
 }
 
 const ENUM_NUMBER: Readonly<Record<string, number>> = {
+	"ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": 2,
+	"ASSISTANT_TOOL_GET_MY_ORDERS": 1,
+	"ASSISTANT_TOOL_TRACK_MY_PACKAGE": 3,
+	"ASSISTANT_TOOL_UNSPECIFIED": 0,
 	"COMMENT_STATE_DELETED": 2,
 	"COMMENT_STATE_HIDDEN": 3,
 	"COMMENT_STATE_UNSPECIFIED": 0,
@@ -192,6 +196,9 @@ function num(name: string | number | undefined): number {
 export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	const p = c.params ?? {};
 	switch (c.fn) {
+	case "assistant.AssistantTool": {
+		return assistantAssistantTool(num(c.value));
+	}
 	case "buyer.Gender": {
 		return buyerGender(num(c.value));
 	}

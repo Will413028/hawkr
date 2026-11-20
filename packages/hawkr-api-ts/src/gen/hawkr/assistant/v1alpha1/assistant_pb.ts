@@ -9,25 +9,25 @@
 // （Vercel 的外部 rewrite 上限），client 以最後收到的 cursor 重新訂閱接續，不漏不重。
 // 串流結束時沒有收到 finished 或 error 事件，就是被截斷，要接續；收到了就是這一輪結束。
 //
-// 事件暫存在單體的記憶體裡（每輪一個環形緩衝）：輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，
-// client 重新送出；cursor 早於緩衝的起點回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_EXPIRED，
-// 超前於最新事件也回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
+// 事件暫存在單體的記憶體裡（每輪一個只增不減的緩衝，有事件數上限；超過上限這一輪以 error 事件結束）：
+// 輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，client 重新送出；緩衝從不覆蓋舊事件，所以沒有「cursor 過期」；
+// cursor 超前於最新事件（或不是伺服器發的值）回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
 import { file_google_api_field_info } from "../../../google/api/field_info_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { ErrorReason } from "../../common/v1alpha1/error_reason_pb";
 import { file_hawkr_common_v1alpha1_error_reason } from "../../common/v1alpha1/error_reason_pb";
-import type { JsonObject, Message } from "@bufbuild/protobuf";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/assistant/v1alpha1/assistant.proto.
  */
 export const file_hawkr_assistant_v1alpha1_assistant: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9hc3Npc3RhbnQvdjFhbHBoYTEvYXNzaXN0YW50LnByb3RvEhhoYXdrci5hc3Npc3RhbnQudjFhbHBoYTEi0wEKG1NlbmRBc3Npc3RhbnRNZXNzYWdlUmVxdWVzdBI8CgV0b3BpYxgBIAEoDjIoLmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5Bc3Npc3RhbnRUb3BpY0ID4EECEhIKCnNlc3Npb25faWQYAiABKAkSFAoHbWVzc2FnZRgDIAEoCUID4EECEhYKCWltYWdlX3VybBgEIAEoCUgAiAEBEiYKEWNsaWVudF9yZXF1ZXN0X2lkGAUgASgJQgvgQQLijM/XCAIIAUIMCgpfaW1hZ2VfdXJsIkMKHFNlbmRBc3Npc3RhbnRNZXNzYWdlUmVzcG9uc2USDwoHdHVybl9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJIkEKGVdhdGNoQXNzaXN0YW50VHVyblJlcXVlc3QSFAoHdHVybl9pZBgBIAEoCUID4EECEg4KBmN1cnNvchgCIAEoCSK7AgoaV2F0Y2hBc3Npc3RhbnRUdXJuUmVzcG9uc2USDgoGY3Vyc29yGAEgASgJEjwKBHRleHQYAiABKAsyLC5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VGV4dERlbHRhSAASRAoLdG9vbF9yZXN1bHQYAyABKAsyLS5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VG9vbFJlc3VsdEgAEj8KCGZpbmlzaGVkGAQgASgLMisuaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLkFzc2lzdGFudEZpbmlzaGVkSAASPwoFZXJyb3IYBSABKAsyLi5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50U3RyZWFtRXJyb3JIAEIHCgVldmVudCIiChJBc3Npc3RhbnRUZXh0RGVsdGESDAoEdGV4dBgBIAEoCSJkChNBc3Npc3RhbnRUb29sUmVzdWx0EhEKCXRvb2xfbmFtZRgBIAEoCRIOCgZmYWlsZWQYAiABKAgSKgoJYXJndW1lbnRzGAMgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdCInChFBc3Npc3RhbnRGaW5pc2hlZBISCgpzZXNzaW9uX2lkGAEgASgJIuYBChRBc3Npc3RhbnRTdHJlYW1FcnJvchIyCgZyZWFzb24YASABKA4yIi5oYXdrci5jb21tb24udjFhbHBoYTEuRXJyb3JSZWFzb24SGQoRbG9jYWxpemVkX21lc3NhZ2UYAiABKAkSTgoIbWV0YWRhdGEYAyADKAsyPC5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50U3RyZWFtRXJyb3IuTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiIgogR2V0TGF0ZXN0QXNzaXN0YW50U2Vzc2lvblJlcXVlc3QidQohR2V0TGF0ZXN0QXNzaXN0YW50U2Vzc2lvblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSPAoIbWVzc2FnZXMYAiADKAsyKi5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50TWVzc2FnZSKUAQoQQXNzaXN0YW50TWVzc2FnZRI8CgRyb2xlGAEgASgOMi4uaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLkFzc2lzdGFudE1lc3NhZ2VSb2xlEgwKBHRleHQYAiABKAkSNAoLY3JlYXRlX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMqqAEKDkFzc2lzdGFudFRvcGljEh8KG0FTU0lTVEFOVF9UT1BJQ19VTlNQRUNJRklFRBAAEhoKFkFTU0lTVEFOVF9UT1BJQ19PUkRFUlMQARIcChhBU1NJU1RBTlRfVE9QSUNfVFJBQ0tJTkcQAhIhCh1BU1NJU1RBTlRfVE9QSUNfUkVUVVJOX1BPTElDWRADEhgKFEFTU0lTVEFOVF9UT1BJQ19DSEFUEAQqhQEKFEFzc2lzdGFudE1lc3NhZ2VSb2xlEiYKIkFTU0lTVEFOVF9NRVNTQUdFX1JPTEVfVU5TUEVDSUZJRUQQABIfChtBU1NJU1RBTlRfTUVTU0FHRV9ST0xFX1VTRVIQARIkCiBBU1NJU1RBTlRfTUVTU0FHRV9ST0xFX0FTU0lTVEFOVBACMr0DChNBc3Npc3RhbnRBcHBTZXJ2aWNlEoUBChRTZW5kQXNzaXN0YW50TWVzc2FnZRI1Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5TZW5kQXNzaXN0YW50TWVzc2FnZVJlcXVlc3QaNi5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuU2VuZEFzc2lzdGFudE1lc3NhZ2VSZXNwb25zZRKBAQoSV2F0Y2hBc3Npc3RhbnRUdXJuEjMuaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLldhdGNoQXNzaXN0YW50VHVyblJlcXVlc3QaNC5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuV2F0Y2hBc3Npc3RhbnRUdXJuUmVzcG9uc2UwARKZAQoZR2V0TGF0ZXN0QXNzaXN0YW50U2Vzc2lvbhI6Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5HZXRMYXRlc3RBc3Npc3RhbnRTZXNzaW9uUmVxdWVzdBo7Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5HZXRMYXRlc3RBc3Npc3RhbnRTZXNzaW9uUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_struct, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_error_reason]);
+  fileDesc("CihoYXdrci9hc3Npc3RhbnQvdjFhbHBoYTEvYXNzaXN0YW50LnByb3RvEhhoYXdrci5hc3Npc3RhbnQudjFhbHBoYTEi0wEKG1NlbmRBc3Npc3RhbnRNZXNzYWdlUmVxdWVzdBI8CgV0b3BpYxgBIAEoDjIoLmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5Bc3Npc3RhbnRUb3BpY0ID4EECEhIKCnNlc3Npb25faWQYAiABKAkSFAoHbWVzc2FnZRgDIAEoCUID4EECEhYKCWltYWdlX3VybBgEIAEoCUgAiAEBEiYKEWNsaWVudF9yZXF1ZXN0X2lkGAUgASgJQgvgQQLijM/XCAIIAUIMCgpfaW1hZ2VfdXJsIkMKHFNlbmRBc3Npc3RhbnRNZXNzYWdlUmVzcG9uc2USDwoHdHVybl9pZBgBIAEoCRISCgpzZXNzaW9uX2lkGAIgASgJIkEKGVdhdGNoQXNzaXN0YW50VHVyblJlcXVlc3QSFAoHdHVybl9pZBgBIAEoCUID4EECEg4KBmN1cnNvchgCIAEoCSK7AgoaV2F0Y2hBc3Npc3RhbnRUdXJuUmVzcG9uc2USDgoGY3Vyc29yGAEgASgJEjwKBHRleHQYAiABKAsyLC5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VGV4dERlbHRhSAASRAoLdG9vbF9yZXN1bHQYAyABKAsyLS5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VG9vbFJlc3VsdEgAEj8KCGZpbmlzaGVkGAQgASgLMisuaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLkFzc2lzdGFudEZpbmlzaGVkSAASPwoFZXJyb3IYBSABKAsyLi5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50U3RyZWFtRXJyb3JIAEIHCgVldmVudCIiChJBc3Npc3RhbnRUZXh0RGVsdGESDAoEdGV4dBgBIAEoCSJfChNBc3Npc3RhbnRUb29sUmVzdWx0EjUKBHRvb2wYASABKA4yJy5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuQXNzaXN0YW50VG9vbBIRCglzdWNjZWVkZWQYAiABKAgiJwoRQXNzaXN0YW50RmluaXNoZWQSEgoKc2Vzc2lvbl9pZBgBIAEoCSLmAQoUQXNzaXN0YW50U3RyZWFtRXJyb3ISMgoGcmVhc29uGAEgASgOMiIuaGF3a3IuY29tbW9uLnYxYWxwaGExLkVycm9yUmVhc29uEhkKEWxvY2FsaXplZF9tZXNzYWdlGAIgASgJEk4KCG1ldGFkYXRhGAMgAygLMjwuaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLkFzc2lzdGFudFN0cmVhbUVycm9yLk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIiIKIEdldExhdGVzdEFzc2lzdGFudFNlc3Npb25SZXF1ZXN0InUKIUdldExhdGVzdEFzc2lzdGFudFNlc3Npb25SZXNwb25zZRISCgpzZXNzaW9uX2lkGAEgASgJEjwKCG1lc3NhZ2VzGAIgAygLMiouaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLkFzc2lzdGFudE1lc3NhZ2UilAEKEEFzc2lzdGFudE1lc3NhZ2USPAoEcm9sZRgBIAEoDjIuLmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5Bc3Npc3RhbnRNZXNzYWdlUm9sZRIMCgR0ZXh0GAIgASgJEjQKC2NyZWF0ZV90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDKqgBCg5Bc3Npc3RhbnRUb3BpYxIfChtBU1NJU1RBTlRfVE9QSUNfVU5TUEVDSUZJRUQQABIaChZBU1NJU1RBTlRfVE9QSUNfT1JERVJTEAESHAoYQVNTSVNUQU5UX1RPUElDX1RSQUNLSU5HEAISIQodQVNTSVNUQU5UX1RPUElDX1JFVFVSTl9QT0xJQ1kQAxIYChRBU1NJU1RBTlRfVE9QSUNfQ0hBVBAEKqEBCg1Bc3Npc3RhbnRUb29sEh4KGkFTU0lTVEFOVF9UT09MX1VOU1BFQ0lGSUVEEAASIAocQVNTSVNUQU5UX1RPT0xfR0VUX01ZX09SREVSUxABEikKJUFTU0lTVEFOVF9UT09MX0dFVF9CVVlFUl9PUkRFUl9ERVRBSUwQAhIjCh9BU1NJU1RBTlRfVE9PTF9UUkFDS19NWV9QQUNLQUdFEAMqhQEKFEFzc2lzdGFudE1lc3NhZ2VSb2xlEiYKIkFTU0lTVEFOVF9NRVNTQUdFX1JPTEVfVU5TUEVDSUZJRUQQABIfChtBU1NJU1RBTlRfTUVTU0FHRV9ST0xFX1VTRVIQARIkCiBBU1NJU1RBTlRfTUVTU0FHRV9ST0xFX0FTU0lTVEFOVBACMr0DChNBc3Npc3RhbnRBcHBTZXJ2aWNlEoUBChRTZW5kQXNzaXN0YW50TWVzc2FnZRI1Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5TZW5kQXNzaXN0YW50TWVzc2FnZVJlcXVlc3QaNi5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuU2VuZEFzc2lzdGFudE1lc3NhZ2VSZXNwb25zZRKBAQoSV2F0Y2hBc3Npc3RhbnRUdXJuEjMuaGF3a3IuYXNzaXN0YW50LnYxYWxwaGExLldhdGNoQXNzaXN0YW50VHVyblJlcXVlc3QaNC5oYXdrci5hc3Npc3RhbnQudjFhbHBoYTEuV2F0Y2hBc3Npc3RhbnRUdXJuUmVzcG9uc2UwARKZAQoZR2V0TGF0ZXN0QXNzaXN0YW50U2Vzc2lvbhI6Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5HZXRMYXRlc3RBc3Npc3RhbnRTZXNzaW9uUmVxdWVzdBo7Lmhhd2tyLmFzc2lzdGFudC52MWFscGhhMS5HZXRMYXRlc3RBc3Npc3RhbnRTZXNzaW9uUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_error_reason]);
 
 /**
  * @generated from message hawkr.assistant.v1alpha1.SendAssistantMessageRequest
@@ -199,29 +199,24 @@ export const AssistantTextDeltaSchema: GenMessage<AssistantTextDelta> = /*@__PUR
   messageDesc(file_hawkr_assistant_v1alpha1_assistant, 4);
 
 /**
- * AssistantToolResult 說明助理呼叫了哪個工具，以及它有沒有成功；工具的回傳內容不對外。
+ * AssistantToolResult 說明助理使用了哪個工具，以及它有沒有成功；工具的參數與回傳內容不對外。
  *
  * @generated from message hawkr.assistant.v1alpha1.AssistantToolResult
  */
 export type AssistantToolResult = Message<"hawkr.assistant.v1alpha1.AssistantToolResult"> & {
   /**
-   * @generated from field: string tool_name = 1;
+   * 使用的工具；一定是具體的值（不會是 UNSPECIFIED）。
+   *
+   * @generated from field: hawkr.assistant.v1alpha1.AssistantTool tool = 1;
    */
-  toolName: string;
+  tool: AssistantTool;
 
   /**
-   * 工具執行失敗；助理仍會接著回覆。
+   * 工具成功執行。false 時助理仍會接著回覆。
    *
-   * @generated from field: bool failed = 2;
+   * @generated from field: bool succeeded = 2;
    */
-  failed: boolean;
-
-  /**
-   * 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
-   *
-   * @generated from field: google.protobuf.Struct arguments = 3;
-   */
-  arguments?: JsonObject | undefined;
+  succeeded: boolean;
 };
 
 /**
@@ -394,6 +389,45 @@ export const AssistantTopicSchema: GenEnum<AssistantTopic> = /*@__PURE__*/
   enumDesc(file_hawkr_assistant_v1alpha1_assistant, 0);
 
 /**
+ * AssistantTool 是助理在回覆途中使用的工具；顯示文字在共用文案目錄。
+ *
+ * @generated from enum hawkr.assistant.v1alpha1.AssistantTool
+ */
+export enum AssistantTool {
+  /**
+   * @generated from enum value: ASSISTANT_TOOL_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 查詢我的訂單清單。
+   *
+   * @generated from enum value: ASSISTANT_TOOL_GET_MY_ORDERS = 1;
+   */
+  GET_MY_ORDERS = 1,
+
+  /**
+   * 查詢單筆訂單的詳情。
+   *
+   * @generated from enum value: ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL = 2;
+   */
+  GET_BUYER_ORDER_DETAIL = 2,
+
+  /**
+   * 查詢配送中包裹的物流狀態。
+   *
+   * @generated from enum value: ASSISTANT_TOOL_TRACK_MY_PACKAGE = 3;
+   */
+  TRACK_MY_PACKAGE = 3,
+}
+
+/**
+ * Describes the enum hawkr.assistant.v1alpha1.AssistantTool.
+ */
+export const AssistantToolSchema: GenEnum<AssistantTool> = /*@__PURE__*/
+  enumDesc(file_hawkr_assistant_v1alpha1_assistant, 1);
+
+/**
  * AssistantMessageRole 是對話中一則訊息的發言者。
  *
  * @generated from enum hawkr.assistant.v1alpha1.AssistantMessageRole
@@ -419,7 +453,7 @@ export enum AssistantMessageRole {
  * Describes the enum hawkr.assistant.v1alpha1.AssistantMessageRole.
  */
 export const AssistantMessageRoleSchema: GenEnum<AssistantMessageRole> = /*@__PURE__*/
-  enumDesc(file_hawkr_assistant_v1alpha1_assistant, 1);
+  enumDesc(file_hawkr_assistant_v1alpha1_assistant, 2);
 
 /**
  * AssistantAppService 是登入的買家的助理。身分取自 session，帳號沒有買家角色時回 permission_denied。

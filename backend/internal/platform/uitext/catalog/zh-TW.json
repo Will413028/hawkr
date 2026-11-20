@@ -1,5 +1,17 @@
 {
   "default": {
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": {
+      "message": "正在查詢訂單詳情",
+      "description": "查詢單筆訂單的詳情。"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": {
+      "message": "正在查詢你的訂單",
+      "description": "查詢我的訂單清單。"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": {
+      "message": "正在查詢包裹物流",
+      "description": "查詢配送中包裹的物流狀態。"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "女性",
       "description": "Gender 是買家自填的性別。（值 GENDER_FEMALE）"

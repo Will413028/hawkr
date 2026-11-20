@@ -7,6 +7,9 @@ type Values = Readonly<Record<string, string | number>>;
 type Formatter = (v: Values) => string;
 
 const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
+	"assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": () => "正在查詢你的訂單",
+	"assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": () => "正在查詢訂單詳情",
+	"assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": () => "正在查詢包裹物流",
 	"buyer.Gender.GENDER_MALE": () => "男性",
 	"buyer.Gender.GENDER_FEMALE": () => "女性",
 	"buyer.Gender.GENDER_OTHER": () => "其他",

@@ -7,14 +7,13 @@ syntax = "proto3";
 // （Vercel 的外部 rewrite 上限），client 以最後收到的 cursor 重新訂閱接續，不漏不重。
 // 串流結束時沒有收到 finished 或 error 事件，就是被截斷，要接續；收到了就是這一輪結束。
 //
-// 事件暫存在單體的記憶體裡（每輪一個環形緩衝）：輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，
-// client 重新送出；cursor 早於緩衝的起點回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_EXPIRED，
-// 超前於最新事件也回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
+// 事件暫存在單體的記憶體裡（每輪一個只增不減的緩衝，有事件數上限；超過上限這一輪以 error 事件結束）：
+// 輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，client 重新送出；緩衝從不覆蓋舊事件，所以沒有「cursor 過期」；
+// cursor 超前於最新事件（或不是伺服器發的值）回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
 package hawkr.assistant.v1alpha1;
 
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/error_reason.proto";
 
@@ -45,6 +44,17 @@ enum AssistantTopic {
   ASSISTANT_TOPIC_RETURN_POLICY = 3;
   // 一般問答。
   ASSISTANT_TOPIC_CHAT = 4;
+}
+
+// AssistantTool 是助理在回覆途中使用的工具；顯示文字在共用文案目錄。
+enum AssistantTool {
+  ASSISTANT_TOOL_UNSPECIFIED = 0;
+  // 查詢我的訂單清單。
+  ASSISTANT_TOOL_GET_MY_ORDERS = 1;
+  // 查詢單筆訂單的詳情。
+  ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL = 2;
+  // 查詢配送中包裹的物流狀態。
+  ASSISTANT_TOOL_TRACK_MY_PACKAGE = 3;
 }
 
 // AssistantMessageRole 是對話中一則訊息的發言者。
@@ -102,13 +112,12 @@ message AssistantTextDelta {
   string text = 1;
 }
 
-// AssistantToolResult 說明助理呼叫了哪個工具，以及它有沒有成功；工具的回傳內容不對外。
+// AssistantToolResult 說明助理使用了哪個工具，以及它有沒有成功；工具的參數與回傳內容不對外。
 message AssistantToolResult {
-  string tool_name = 1;
-  // 工具執行失敗；助理仍會接著回覆。
-  bool failed = 2;
-  // 助理呼叫工具時帶的參數（物件，鍵是工具的參數名）；沒有參數時不設。
-  google.protobuf.Struct arguments = 3;
+  // 使用的工具；一定是具體的值（不會是 UNSPECIFIED）。
+  AssistantTool tool = 1;
+  // 工具成功執行。false 時助理仍會接著回覆。
+  bool succeeded = 2;
 }
 
 message AssistantFinished {

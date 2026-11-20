@@ -9,9 +9,9 @@
 // （Vercel 的外部 rewrite 上限），client 以最後收到的 cursor 重新訂閱接續，不漏不重。
 // 串流結束時沒有收到 finished 或 error 事件，就是被截斷，要接續；收到了就是這一輪結束。
 //
-// 事件暫存在單體的記憶體裡（每輪一個環形緩衝）：輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，
-// client 重新送出；cursor 早於緩衝的起點回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_EXPIRED，
-// 超前於最新事件也回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
+// 事件暫存在單體的記憶體裡（每輪一個只增不減的緩衝，有事件數上限；超過上限這一輪以 error 事件結束）：
+// 輪次 ID 不存在（含單體重啟後）回 NOT_FOUND，client 重新送出；緩衝從不覆蓋舊事件，所以沒有「cursor 過期」；
+// cursor 超前於最新事件（或不是伺服器發的值）回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
 package assistantv1alpha1connect
 
 import (

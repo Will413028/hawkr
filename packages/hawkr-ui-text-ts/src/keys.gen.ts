@@ -1,5 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
+import type { AssistantTool } from "@hawkr/api/gen/hawkr/assistant/v1alpha1/assistant_pb";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
@@ -12,6 +13,9 @@ import type { UiMessage } from "./message";
 export type { DefaultErrorText, UiMessage } from "./message";
 
 export type UiTextKey =
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE"
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
@@ -199,6 +203,19 @@ export const SELLER_MEASURE_REQUEST_KIND_NAME: Readonly<Record<number, string>> 
 	1: "MEASURE_REQUEST_KIND_APPEAL",
 	2: "MEASURE_REQUEST_KIND_REMEDIATION",
 };
+
+const ASSISTANT_ASSISTANT_TOOL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS",
+	2: "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL",
+	3: "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE",
+};
+
+/** assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function assistantAssistantTool(v: AssistantTool): UiMessage | undefined {
+	const key = ASSISTANT_ASSISTANT_TOOL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
 
 const BUYER_GENDER: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "buyer.Gender.GENDER_MALE",
