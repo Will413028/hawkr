@@ -12,6 +12,7 @@ import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../data/inquiry_display.dart';
 import '../../settings/presentation/text_size_settings_sheet.dart';
 import 'widgets/option_row.dart';
 
@@ -25,12 +26,16 @@ class ProfileOtherOptionsCard extends StatelessWidget {
     required this.onShippingTap,
     this.shippingGate = ShippingGate.unknown,
     this.notifUnread = 0,
+    this.pendingInquiries = 0,
     this.canManageBlocks = false,
   });
 
   final VoidCallback onShippingTap;
   final ShippingGate shippingGate;
   final int notifUnread;
+
+  /// 待回覆的平台詢問數（伺服器算的 `pending_reply_count`）。
+  final int pendingInquiries;
   final bool canManageBlocks;
 
   @override
@@ -80,6 +85,13 @@ class ProfileOtherOptionsCard extends StatelessWidget {
         label: '措施與申覆',
         description: '查看平台的措施、期間與申覆進度',
         onTap: () => context.push(SellerRoutes.measures),
+      ),
+      OptionRow(
+        icon: HkIconName.document,
+        label: '平台詢問',
+        description: pendingInquiryDescription(pendingInquiries),
+        badgeCount: pendingInquiries,
+        onTap: () => context.push(SellerRoutes.inquiries),
       ),
       if (canManageBlocks)
         OptionRow(
