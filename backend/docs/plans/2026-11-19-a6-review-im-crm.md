@@ -178,6 +178,7 @@
 
 - 驗收：各端 CI 等價檢查；e2e 推到 CI；6e 接上 relay 與 consumer 後，以 backend-e2e-verify 擷取 `reviewrelay`、`imrelay` 的 RabbitMQ wire 與 crm consumer 的入帳；封鎖與檢舉按鈕以單體實打（backend-e2e-verify）。
 - UI：封鎖名單分頁改名或拿掉（A6-D2）先取得同意。
+- 6a 必做：website 公開店面評價第 2 頁之後遇到伺服器錯誤顯示成空清單（`fetchSellerReviews` 的 softFail，A3 步驟 10d 第 6 刀 design-review 記下）；改讀 review 模組的 Connect 時，讀取失敗要和「沒有評價」分開呈現，附一個讀取失敗時不顯示空清單的測試。
 
 ### A6-7 收尾（被擋於：A6-6）
 
