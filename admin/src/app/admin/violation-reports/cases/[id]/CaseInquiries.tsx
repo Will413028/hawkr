@@ -2,6 +2,7 @@
 
 import {
 	type CaseInquiry,
+	type CaseInquiryReply,
 	CaseInquiryState,
 	CaseInquiryWithdrawCause,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/case_inquiry_pb";
@@ -24,11 +25,16 @@ import type { CaseInquiriesRead } from "../../use-case-inquiries";
 
 /** I2：區塊頂端的固定說明（3cd D′7 的句子照 rb R4）。 */
 export const INQUIRY_SECTION_NOTE =
-	"這裡只記下詢問；賣家端的畫面上線前，系統不會通知賣家，請另外聯絡賣家。詢問只寫你轉述的內容，不要附上通報原文或通報人的資料。";
+	"詢問只寫你轉述的內容，不要附上通報原文或通報人的資料。";
 
 /** 詢問的卡片標頭：「{種類}・{狀態}」（I5）。 */
 export function inquiryHeadingText(inquiry: CaseInquiry): string {
 	return `${inquiryKindText(inquiry.kind)}・${inquiryStateText(inquiry.state)}`;
+}
+
+/** 回覆的帳號（賣家在賣家中心回覆）：「帳號 {account ID}」；管理員記下的回覆沒有。 */
+export function inquiryReplierText(reply: CaseInquiryReply): string {
+	return `帳號 ${reply.repliedByAccountId}`;
 }
 
 /** 撤回的一句（I12）：「已於 {時間} 撤回（{原因}）」。 */
@@ -102,9 +108,13 @@ function InquiryCard({
 					<>
 						<Field label="管道">{inquiryChannelText(reply.channel)}</Field>
 						<Field label="收到的時間">{timeText(reply.receiveTime)}</Field>
-						<Field label="記下">
-							{actorTimeText(reply.recordedByAdminId, reply.recordTime)}
-						</Field>
+						{reply.repliedByAccountId ? (
+							<Field label="回覆的帳號">{inquiryReplierText(reply)}</Field>
+						) : (
+							<Field label="記下">
+								{actorTimeText(reply.recordedByAdminId, reply.recordTime)}
+							</Field>
+						)}
 						<Field label="回覆" fullWidth>
 							<span style={{ whiteSpace: "pre-wrap" }}>{reply.body}</span>
 						</Field>

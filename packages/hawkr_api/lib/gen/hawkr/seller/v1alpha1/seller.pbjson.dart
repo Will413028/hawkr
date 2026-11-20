@@ -24,9 +24,10 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
 
 import '../../../google/rpc/error_details.pbjson.dart' as $3;
 import '../../../google/type/date.pbjson.dart' as $5;
+import '../../common/v1alpha1/deadline.pbjson.dart' as $7;
 import '../../common/v1alpha1/image.pbjson.dart' as $1;
 import '../../common/v1alpha1/postal_address.pbjson.dart' as $0;
-import '../../common/v1alpha1/store_card.pbjson.dart' as $7;
+import '../../common/v1alpha1/store_card.pbjson.dart' as $8;
 
 @$core.Deprecated('Use agreementKindDescriptor instead')
 const AgreementKind$json = {
@@ -598,6 +599,59 @@ final $typed_data.Uint8List measureRequestCloseCauseDescriptor = $convert.base64
     'ChhNZWFzdXJlUmVxdWVzdENsb3NlQ2F1c2USKwonTUVBU1VSRV9SRVFVRVNUX0NMT1NFX0NBVV'
     'NFX1VOU1BFQ0lGSUVEEAASJwojTUVBU1VSRV9SRVFVRVNUX0NMT1NFX0NBVVNFX1JFVk9LRUQQ'
     'ARIlCiFNRUFTVVJFX1JFUVVFU1RfQ0xPU0VfQ0FVU0VfRU5ERUQQAg==');
+
+@$core.Deprecated('Use inquiryKindDescriptor instead')
+const InquiryKind$json = {
+  '1': 'InquiryKind',
+  '2': [
+    {'1': 'INQUIRY_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'INQUIRY_KIND_RECORDS', '2': 1},
+    {'1': 'INQUIRY_KIND_EXPLANATION', '2': 2},
+  ],
+};
+
+/// Descriptor for `InquiryKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List inquiryKindDescriptor = $convert.base64Decode(
+    'CgtJbnF1aXJ5S2luZBIcChhJTlFVSVJZX0tJTkRfVU5TUEVDSUZJRUQQABIYChRJTlFVSVJZX0'
+    'tJTkRfUkVDT1JEUxABEhwKGElOUVVJUllfS0lORF9FWFBMQU5BVElPThAC');
+
+@$core.Deprecated('Use inquiryStateDescriptor instead')
+const InquiryState$json = {
+  '1': 'InquiryState',
+  '2': [
+    {'1': 'INQUIRY_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'INQUIRY_STATE_OPEN', '2': 1},
+    {'1': 'INQUIRY_STATE_REPLIED', '2': 2},
+    {'1': 'INQUIRY_STATE_WITHDRAWN', '2': 3},
+  ],
+};
+
+/// Descriptor for `InquiryState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List inquiryStateDescriptor = $convert.base64Decode(
+    'CgxJbnF1aXJ5U3RhdGUSHQoZSU5RVUlSWV9TVEFURV9VTlNQRUNJRklFRBAAEhYKEklOUVVJUl'
+    'lfU1RBVEVfT1BFThABEhkKFUlOUVVJUllfU1RBVEVfUkVQTElFRBACEhsKF0lOUVVJUllfU1RB'
+    'VEVfV0lUSERSQVdOEAM=');
+
+@$core.Deprecated('Use inquiryReplyChannelDescriptor instead')
+const InquiryReplyChannel$json = {
+  '1': 'InquiryReplyChannel',
+  '2': [
+    {'1': 'INQUIRY_REPLY_CHANNEL_UNSPECIFIED', '2': 0},
+    {'1': 'INQUIRY_REPLY_CHANNEL_PHONE', '2': 1},
+    {'1': 'INQUIRY_REPLY_CHANNEL_EMAIL', '2': 2},
+    {'1': 'INQUIRY_REPLY_CHANNEL_MESSAGING', '2': 3},
+    {'1': 'INQUIRY_REPLY_CHANNEL_OTHER', '2': 4},
+    {'1': 'INQUIRY_REPLY_CHANNEL_SELLER_CENTER', '2': 5},
+  ],
+};
+
+/// Descriptor for `InquiryReplyChannel`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List inquiryReplyChannelDescriptor = $convert.base64Decode(
+    'ChNJbnF1aXJ5UmVwbHlDaGFubmVsEiUKIUlOUVVJUllfUkVQTFlfQ0hBTk5FTF9VTlNQRUNJRk'
+    'lFRBAAEh8KG0lOUVVJUllfUkVQTFlfQ0hBTk5FTF9QSE9ORRABEh8KG0lOUVVJUllfUkVQTFlf'
+    'Q0hBTk5FTF9FTUFJTBACEiMKH0lOUVVJUllfUkVQTFlfQ0hBTk5FTF9NRVNTQUdJTkcQAxIfCh'
+    'tJTlFVSVJZX1JFUExZX0NIQU5ORUxfT1RIRVIQBBInCiNJTlFVSVJZX1JFUExZX0NIQU5ORUxf'
+    'U0VMTEVSX0NFTlRFUhAF');
 
 @$core.Deprecated('Use agreementAcceptanceDescriptor instead')
 const AgreementAcceptance$json = {
@@ -2852,6 +2906,262 @@ final $typed_data.Uint8List requestRemediationResponseDescriptor =
         'ChpSZXF1ZXN0UmVtZWRpYXRpb25SZXNwb25zZRI4CgdtZWFzdXJlGAEgASgLMh4uaGF3a3Iuc2'
         'VsbGVyLnYxYWxwaGExLk1lYXN1cmVSB21lYXN1cmU=');
 
+@$core.Deprecated('Use inquiryDescriptor instead')
+const Inquiry$json = {
+  '1': 'Inquiry',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.InquiryKind',
+      '8': {},
+      '10': 'kind'
+    },
+    {'1': 'message', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'message'},
+    {
+      '1': 'create_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'createTime'
+    },
+    {
+      '1': 'state',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.InquiryState',
+      '8': {},
+      '10': 'state'
+    },
+    {
+      '1': 'reply_deadline',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.Deadline',
+      '8': {},
+      '10': 'replyDeadline'
+    },
+    {
+      '1': 'reply',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.InquiryReply',
+      '8': {},
+      '10': 'reply'
+    },
+    {
+      '1': 'withdraw_time',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'withdrawTime'
+    },
+    {'1': 'can_reply', '3': 9, '4': 1, '5': 8, '8': {}, '10': 'canReply'},
+    {
+      '1': 'reply_attachment_max',
+      '3': 10,
+      '4': 1,
+      '5': 5,
+      '8': {},
+      '10': 'replyAttachmentMax'
+    },
+  ],
+};
+
+/// Descriptor for `Inquiry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List inquiryDescriptor = $convert.base64Decode(
+    'CgdJbnF1aXJ5EhMKAmlkGAEgASgJQgPgQQhSAmlkEjsKBGtpbmQYAiABKA4yIi5oYXdrci5zZW'
+    'xsZXIudjFhbHBoYTEuSW5xdWlyeUtpbmRCA+BBA1IEa2luZBIdCgdtZXNzYWdlGAMgASgJQgPg'
+    'QQNSB21lc3NhZ2USQAoLY3JlYXRlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZX'
+    'N0YW1wQgPgQQNSCmNyZWF0ZVRpbWUSPgoFc3RhdGUYBSABKA4yIy5oYXdrci5zZWxsZXIudjFh'
+    'bHBoYTEuSW5xdWlyeVN0YXRlQgPgQQNSBXN0YXRlEksKDnJlcGx5X2RlYWRsaW5lGAYgASgLMh'
+    '8uaGF3a3IuY29tbW9uLnYxYWxwaGExLkRlYWRsaW5lQgPgQQNSDXJlcGx5RGVhZGxpbmUSPgoF'
+    'cmVwbHkYByABKAsyIy5oYXdrci5zZWxsZXIudjFhbHBoYTEuSW5xdWlyeVJlcGx5QgPgQQNSBX'
+    'JlcGx5EkQKDXdpdGhkcmF3X3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1w'
+    'QgPgQQNSDHdpdGhkcmF3VGltZRIgCgljYW5fcmVwbHkYCSABKAhCA+BBA1IIY2FuUmVwbHkSNQ'
+    'oUcmVwbHlfYXR0YWNobWVudF9tYXgYCiABKAVCA+BBA1IScmVwbHlBdHRhY2htZW50TWF4');
+
+@$core.Deprecated('Use inquiryReplyDescriptor instead')
+const InquiryReply$json = {
+  '1': 'InquiryReply',
+  '2': [
+    {'1': 'body', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'channel',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.InquiryReplyChannel',
+      '8': {},
+      '10': 'channel'
+    },
+    {
+      '1': 'receive_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'receiveTime'
+    },
+    {
+      '1': 'attachment_count',
+      '3': 4,
+      '4': 1,
+      '5': 5,
+      '8': {},
+      '10': 'attachmentCount'
+    },
+  ],
+};
+
+/// Descriptor for `InquiryReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List inquiryReplyDescriptor = $convert.base64Decode(
+    'CgxJbnF1aXJ5UmVwbHkSFwoEYm9keRgBIAEoCUID4EEDUgRib2R5EkkKB2NoYW5uZWwYAiABKA'
+    '4yKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuSW5xdWlyeVJlcGx5Q2hhbm5lbEID4EEDUgdjaGFu'
+    'bmVsEkIKDHJlY2VpdmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+'
+    'BBA1ILcmVjZWl2ZVRpbWUSLgoQYXR0YWNobWVudF9jb3VudBgEIAEoBUID4EEDUg9hdHRhY2ht'
+    'ZW50Q291bnQ=');
+
+@$core.Deprecated('Use listMyInquiriesRequestDescriptor instead')
+const ListMyInquiriesRequest$json = {
+  '1': 'ListMyInquiriesRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+    {
+      '1': 'state',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.InquiryState',
+      '10': 'state'
+    },
+  ],
+};
+
+/// Descriptor for `ListMyInquiriesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyInquiriesRequestDescriptor = $convert.base64Decode(
+    'ChZMaXN0TXlJbnF1aXJpZXNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoBVIIcGFnZVNpemUSHQ'
+    'oKcGFnZV90b2tlbhgCIAEoCVIJcGFnZVRva2VuEjkKBXN0YXRlGAMgASgOMiMuaGF3a3Iuc2Vs'
+    'bGVyLnYxYWxwaGExLklucXVpcnlTdGF0ZVIFc3RhdGU=');
+
+@$core.Deprecated('Use listMyInquiriesResponseDescriptor instead')
+const ListMyInquiriesResponse$json = {
+  '1': 'ListMyInquiriesResponse',
+  '2': [
+    {
+      '1': 'inquiries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.Inquiry',
+      '10': 'inquiries'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+    {
+      '1': 'pending_reply_count',
+      '3': 3,
+      '4': 1,
+      '5': 5,
+      '10': 'pendingReplyCount'
+    },
+  ],
+};
+
+/// Descriptor for `ListMyInquiriesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyInquiriesResponseDescriptor = $convert.base64Decode(
+    'ChdMaXN0TXlJbnF1aXJpZXNSZXNwb25zZRI8CglpbnF1aXJpZXMYASADKAsyHi5oYXdrci5zZW'
+    'xsZXIudjFhbHBoYTEuSW5xdWlyeVIJaW5xdWlyaWVzEiYKD25leHRfcGFnZV90b2tlbhgCIAEo'
+    'CVINbmV4dFBhZ2VUb2tlbhIuChNwZW5kaW5nX3JlcGx5X2NvdW50GAMgASgFUhFwZW5kaW5nUm'
+    'VwbHlDb3VudA==');
+
+@$core.Deprecated('Use getMyInquiryRequestDescriptor instead')
+const GetMyInquiryRequest$json = {
+  '1': 'GetMyInquiryRequest',
+  '2': [
+    {'1': 'inquiry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'inquiryId'},
+  ],
+};
+
+/// Descriptor for `GetMyInquiryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyInquiryRequestDescriptor = $convert.base64Decode(
+    'ChNHZXRNeUlucXVpcnlSZXF1ZXN0EiIKCmlucXVpcnlfaWQYASABKAlCA+BBAlIJaW5xdWlyeU'
+    'lk');
+
+@$core.Deprecated('Use getMyInquiryResponseDescriptor instead')
+const GetMyInquiryResponse$json = {
+  '1': 'GetMyInquiryResponse',
+  '2': [
+    {
+      '1': 'inquiry',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.Inquiry',
+      '10': 'inquiry'
+    },
+  ],
+};
+
+/// Descriptor for `GetMyInquiryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyInquiryResponseDescriptor = $convert.base64Decode(
+    'ChRHZXRNeUlucXVpcnlSZXNwb25zZRI4CgdpbnF1aXJ5GAEgASgLMh4uaGF3a3Iuc2VsbGVyLn'
+    'YxYWxwaGExLklucXVpcnlSB2lucXVpcnk=');
+
+@$core.Deprecated('Use replyToInquiryRequestDescriptor instead')
+const ReplyToInquiryRequest$json = {
+  '1': 'ReplyToInquiryRequest',
+  '2': [
+    {'1': 'inquiry_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'inquiryId'},
+    {'1': 'body', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {
+      '1': 'evidence_staged_tokens',
+      '3': 3,
+      '4': 3,
+      '5': 9,
+      '10': 'evidenceStagedTokens'
+    },
+  ],
+};
+
+/// Descriptor for `ReplyToInquiryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List replyToInquiryRequestDescriptor = $convert.base64Decode(
+    'ChVSZXBseVRvSW5xdWlyeVJlcXVlc3QSIgoKaW5xdWlyeV9pZBgBIAEoCUID4EECUglpbnF1aX'
+    'J5SWQSFwoEYm9keRgCIAEoCUID4EECUgRib2R5EjQKFmV2aWRlbmNlX3N0YWdlZF90b2tlbnMY'
+    'AyADKAlSFGV2aWRlbmNlU3RhZ2VkVG9rZW5z');
+
+@$core.Deprecated('Use replyToInquiryResponseDescriptor instead')
+const ReplyToInquiryResponse$json = {
+  '1': 'ReplyToInquiryResponse',
+  '2': [
+    {
+      '1': 'inquiry',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.Inquiry',
+      '10': 'inquiry'
+    },
+  ],
+};
+
+/// Descriptor for `ReplyToInquiryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List replyToInquiryResponseDescriptor =
+    $convert.base64Decode(
+        'ChZSZXBseVRvSW5xdWlyeVJlc3BvbnNlEjgKB2lucXVpcnkYASABKAsyHi5oYXdrci5zZWxsZX'
+        'IudjFhbHBoYTEuSW5xdWlyeVIHaW5xdWlyeQ==');
+
 @$core.Deprecated('Use publicStoreDescriptor instead')
 const PublicStore$json = {
   '1': 'PublicStore',
@@ -3360,6 +3670,23 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '3': '.hawkr.seller.v1alpha1.RequestRemediationResponse'
     },
     {
+      '1': 'ListMyInquiries',
+      '2': '.hawkr.seller.v1alpha1.ListMyInquiriesRequest',
+      '3': '.hawkr.seller.v1alpha1.ListMyInquiriesResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'GetMyInquiry',
+      '2': '.hawkr.seller.v1alpha1.GetMyInquiryRequest',
+      '3': '.hawkr.seller.v1alpha1.GetMyInquiryResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ReplyToInquiry',
+      '2': '.hawkr.seller.v1alpha1.ReplyToInquiryRequest',
+      '3': '.hawkr.seller.v1alpha1.ReplyToInquiryResponse'
+    },
+    {
       '1': 'BlockBuyer',
       '2': '.hawkr.seller.v1alpha1.BlockBuyerRequest',
       '3': '.hawkr.seller.v1alpha1.BlockBuyerResponse',
@@ -3485,6 +3812,16 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       RequestRemediationRequest$json,
   '.hawkr.seller.v1alpha1.RequestRemediationResponse':
       RequestRemediationResponse$json,
+  '.hawkr.seller.v1alpha1.ListMyInquiriesRequest': ListMyInquiriesRequest$json,
+  '.hawkr.seller.v1alpha1.ListMyInquiriesResponse':
+      ListMyInquiriesResponse$json,
+  '.hawkr.seller.v1alpha1.Inquiry': Inquiry$json,
+  '.hawkr.common.v1alpha1.Deadline': $7.Deadline$json,
+  '.hawkr.seller.v1alpha1.InquiryReply': InquiryReply$json,
+  '.hawkr.seller.v1alpha1.GetMyInquiryRequest': GetMyInquiryRequest$json,
+  '.hawkr.seller.v1alpha1.GetMyInquiryResponse': GetMyInquiryResponse$json,
+  '.hawkr.seller.v1alpha1.ReplyToInquiryRequest': ReplyToInquiryRequest$json,
+  '.hawkr.seller.v1alpha1.ReplyToInquiryResponse': ReplyToInquiryResponse$json,
   '.hawkr.seller.v1alpha1.BlockBuyerRequest': BlockBuyerRequest$json,
   '.hawkr.seller.v1alpha1.BlockBuyerResponse': BlockBuyerResponse$json,
   '.hawkr.seller.v1alpha1.UnblockBuyerRequest': UnblockBuyerRequest$json,
@@ -3542,14 +3879,20 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     '1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXF1ZXN0Gisu'
     'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVhbFJlc3BvbnNlEnkKElJlcXVlc3RSZW'
     '1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1'
-    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNlEm'
-    'YKCkJsb2NrQnV5ZXISKC5oYXdrci5zZWxsZXIudjFhbHBoYTEuQmxvY2tCdXllclJlcXVlc3Qa'
-    'KS5oYXdrci5zZWxsZXIudjFhbHBoYTEuQmxvY2tCdXllclJlc3BvbnNlIgOQAgISbAoMVW5ibG'
-    '9ja0J1eWVyEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlVuYmxvY2tCdXllclJlcXVlc3QaKy5o'
-    'YXdrci5zZWxsZXIudjFhbHBoYTEuVW5ibG9ja0J1eWVyUmVzcG9uc2UiA5ACAhJ7ChFMaXN0Qm'
-    'xvY2tlZEJ1eWVycxIvLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0QmxvY2tlZEJ1eWVyc1Jl'
-    'cXVlc3QaMC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdEJsb2NrZWRCdXllcnNSZXNwb25zZS'
-    'IDkAIB');
+    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNlEn'
+    'UKD0xpc3RNeUlucXVpcmllcxItLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlJbnF1aXJp'
+    'ZXNSZXF1ZXN0Gi4uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeUlucXVpcmllc1Jlc3Bvbn'
+    'NlIgOQAgESbAoMR2V0TXlJbnF1aXJ5EiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15SW5x'
+    'dWlyeVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlJbnF1aXJ5UmVzcG9uc2'
+    'UiA5ACARJtCg5SZXBseVRvSW5xdWlyeRIsLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBseVRv'
+    'SW5xdWlyeVJlcXVlc3QaLS5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVwbHlUb0lucXVpcnlSZX'
+    'Nwb25zZRJmCgpCbG9ja0J1eWVyEiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJsb2NrQnV5ZXJS'
+    'ZXF1ZXN0GikuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJsb2NrQnV5ZXJSZXNwb25zZSIDkAICEm'
+    'wKDFVuYmxvY2tCdXllchIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5VbmJsb2NrQnV5ZXJSZXF1'
+    'ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlVuYmxvY2tCdXllclJlc3BvbnNlIgOQAgISew'
+    'oRTGlzdEJsb2NrZWRCdXllcnMSLy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdEJsb2NrZWRC'
+    'dXllcnNSZXF1ZXN0GjAuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RCbG9ja2VkQnV5ZXJzUm'
+    'VzcG9uc2UiA5ACAQ==');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',
@@ -3599,7 +3942,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.ListStoresResponse': ListStoresResponse$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresRequest': BatchGetStoresRequest$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresResponse': BatchGetStoresResponse$json,
-  '.hawkr.common.v1alpha1.StoreCard': $7.StoreCard$json,
+  '.hawkr.common.v1alpha1.StoreCard': $8.StoreCard$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsRequest':
       GetSellerAgreementsRequest$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsResponse':

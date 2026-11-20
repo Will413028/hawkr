@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -27,6 +27,19 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"GENDER_MALE": 1,
 	"GENDER_OTHER": 3,
 	"GENDER_UNSPECIFIED": 0,
+	"INQUIRY_KIND_EXPLANATION": 2,
+	"INQUIRY_KIND_RECORDS": 1,
+	"INQUIRY_KIND_UNSPECIFIED": 0,
+	"INQUIRY_REPLY_CHANNEL_EMAIL": 2,
+	"INQUIRY_REPLY_CHANNEL_MESSAGING": 3,
+	"INQUIRY_REPLY_CHANNEL_OTHER": 4,
+	"INQUIRY_REPLY_CHANNEL_PHONE": 1,
+	"INQUIRY_REPLY_CHANNEL_SELLER_CENTER": 5,
+	"INQUIRY_REPLY_CHANNEL_UNSPECIFIED": 0,
+	"INQUIRY_STATE_OPEN": 1,
+	"INQUIRY_STATE_REPLIED": 2,
+	"INQUIRY_STATE_UNSPECIFIED": 0,
+	"INQUIRY_STATE_WITHDRAWN": 3,
 	"KYC_FIELD_BUSINESS_COMPANY_ADDRESS": 8,
 	"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": 7,
 	"KYC_FIELD_BUSINESS_COMPANY_NAME": 3,
@@ -227,6 +240,15 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num(c.value));
+	}
+	case "seller.InquiryKind": {
+		return sellerInquiryKind(num(c.value));
+	}
+	case "seller.InquiryReplyChannel": {
+		return sellerInquiryReplyChannel(num(c.value));
+	}
+	case "seller.InquiryState": {
+		return sellerInquiryState(num(c.value));
 	}
 	case "seller.KYCApplication.decide_time": {
 		return sellerKYCApplicationDecideTime({ time: p.time as string });

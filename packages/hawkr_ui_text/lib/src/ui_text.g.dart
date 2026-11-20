@@ -166,6 +166,59 @@ extension SellerContentKindUiText on hawkr_seller_v1alpha1_seller.ContentKind {
   String? uiText(UiLocale l) => _sellerContentKind(l, value);
 }
 
+String? _sellerInquiryKind(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '提供紀錄',
+(UiLocale.en, 1) => 'Provide records',
+(UiLocale.zhTW, 2) => '請說明',
+(UiLocale.en, 2) => 'Provide an explanation',
+_ => null,
+};
+}
+
+extension SellerInquiryKindUiText on hawkr_seller_v1alpha1_seller.InquiryKind {
+  /// seller.InquiryKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryKind(l, value);
+}
+
+String? _sellerInquiryReplyChannel(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '電話',
+(UiLocale.en, 1) => 'Phone',
+(UiLocale.zhTW, 2) => '電子信箱',
+(UiLocale.en, 2) => 'Email',
+(UiLocale.zhTW, 3) => '通訊軟體',
+(UiLocale.en, 3) => 'Messaging app',
+(UiLocale.zhTW, 4) => '其他管道',
+(UiLocale.en, 4) => 'Other',
+(UiLocale.zhTW, 5) => '賣家中心',
+(UiLocale.en, 5) => 'Seller Center',
+_ => null,
+};
+}
+
+extension SellerInquiryReplyChannelUiText on hawkr_seller_v1alpha1_seller.InquiryReplyChannel {
+  /// seller.InquiryReplyChannel 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryReplyChannel(l, value);
+}
+
+String? _sellerInquiryState(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '待回覆',
+(UiLocale.en, 1) => 'Awaiting reply',
+(UiLocale.zhTW, 2) => '已回覆',
+(UiLocale.en, 2) => 'Replied',
+(UiLocale.zhTW, 3) => '已撤回',
+(UiLocale.en, 3) => 'Withdrawn',
+_ => null,
+};
+}
+
+extension SellerInquiryStateUiText on hawkr_seller_v1alpha1_seller.InquiryState {
+  /// seller.InquiryState 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryState(l, value);
+}
+
 String? _sellerKYCField(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '主要商品類型',

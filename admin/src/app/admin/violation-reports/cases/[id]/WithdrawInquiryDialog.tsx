@@ -14,7 +14,7 @@ interface WithdrawInquiryDialogProps {
 	onConfirm: (inquiryId: string) => Promise<void>;
 }
 
-/** 撤回詢問（J12、J13）：撤回之後賣家不必再回覆；賣家端的畫面上線前，要另外告知賣家。 */
+/** 撤回詢問（J12、J13）：撤回之後賣家不必再回覆。 */
 export default function WithdrawInquiryDialog({
 	inquiry,
 	onClose,
@@ -53,7 +53,7 @@ export default function WithdrawInquiryDialog({
 			}
 		>
 			<p className="adm-operation-field-note" id="withdraw-inquiry-note">
-				撤回之後賣家不必再回覆。賣家端的畫面上線前，請另外告知賣家。
+				撤回之後賣家不必再回覆。
 			</p>
 			<GovernanceNoticeBanner
 				notice={error ? { tone: "error", text: error } : null}

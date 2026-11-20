@@ -5,7 +5,7 @@ import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
-import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { UiMessage } from "./message";
 
@@ -70,6 +70,16 @@ export type UiTextKey =
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
+	| "seller.InquiryKind.INQUIRY_KIND_EXPLANATION"
+	| "seller.InquiryKind.INQUIRY_KIND_RECORDS"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER"
+	| "seller.InquiryState.INQUIRY_STATE_OPEN"
+	| "seller.InquiryState.INQUIRY_STATE_REPLIED"
+	| "seller.InquiryState.INQUIRY_STATE_WITHDRAWN"
 	| "seller.KYCApplication.decide_time"
 	| "seller.KYCApplication.submit_time"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS"
@@ -355,6 +365,46 @@ const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 /** seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function sellerContentKind(v: ContentKind): UiMessage | undefined {
 	const key = SELLER_CONTENT_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryKind.INQUIRY_KIND_RECORDS",
+	2: "seller.InquiryKind.INQUIRY_KIND_EXPLANATION",
+};
+
+/** seller.InquiryKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryKind(v: InquiryKind): UiMessage | undefined {
+	const key = SELLER_INQUIRY_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_REPLY_CHANNEL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE",
+	2: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL",
+	3: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING",
+	4: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER",
+	5: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER",
+};
+
+/** seller.InquiryReplyChannel 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryReplyChannel(v: InquiryReplyChannel): UiMessage | undefined {
+	const key = SELLER_INQUIRY_REPLY_CHANNEL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_STATE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryState.INQUIRY_STATE_OPEN",
+	2: "seller.InquiryState.INQUIRY_STATE_REPLIED",
+	3: "seller.InquiryState.INQUIRY_STATE_WITHDRAWN",
+};
+
+/** seller.InquiryState 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryState(v: InquiryState): UiMessage | undefined {
+	const key = SELLER_INQUIRY_STATE[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

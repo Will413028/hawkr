@@ -308,6 +308,82 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 	return "", false
 }
 
+// SellerInquiryKind 是 seller.InquiryKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "RECORDS":
+			return "Provide records", true
+		case "EXPLANATION":
+			return "Provide an explanation", true
+		}
+	}
+	switch v {
+	case "RECORDS":
+		return "提供紀錄", true
+	case "EXPLANATION":
+		return "請說明", true
+	}
+	return "", false
+}
+
+// SellerInquiryReplyChannel 是 seller.InquiryReplyChannel 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryReplyChannel(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PHONE":
+			return "Phone", true
+		case "EMAIL":
+			return "Email", true
+		case "MESSAGING":
+			return "Messaging app", true
+		case "OTHER":
+			return "Other", true
+		case "SELLER_CENTER":
+			return "Seller Center", true
+		}
+	}
+	switch v {
+	case "PHONE":
+		return "電話", true
+	case "EMAIL":
+		return "電子信箱", true
+	case "MESSAGING":
+		return "通訊軟體", true
+	case "OTHER":
+		return "其他管道", true
+	case "SELLER_CENTER":
+		return "賣家中心", true
+	}
+	return "", false
+}
+
+// SellerInquiryState 是 seller.InquiryState 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryState(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "OPEN":
+			return "Awaiting reply", true
+		case "REPLIED":
+			return "Replied", true
+		case "WITHDRAWN":
+			return "Withdrawn", true
+		}
+	}
+	switch v {
+	case "OPEN":
+		return "待回覆", true
+	case "REPLIED":
+		return "已回覆", true
+	case "WITHDRAWN":
+		return "已撤回", true
+	}
+	return "", false
+}
+
 // SellerKYCApplicationDecideTime 是 seller.KYCApplication.decide_time 的文案。
 func (t Text) SellerKYCApplicationDecideTime(time string) string {
 	if t.Locale() == EN {

@@ -88,7 +88,15 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceSubmitAppealProcedure:   exempt(appealReason),
 
 	sellerv1alpha1connect.SellerAppServiceRequestRemediationProcedure: exempt(appealReason),
+
+	// 詢問以帳號為範圍：案件與詢問在店家關閉後仍在，開放中的詢問必須還能讀與回覆（案件結案時系統撤回），所以不要求賣家角色或店家營運中；
+	// 帳號的歸屬由模組以 account ID 檢查，別人的詢問回 not_found。
+	sellerv1alpha1connect.SellerAppServiceListMyInquiriesProcedure: exempt(inquiryReason),
+	sellerv1alpha1connect.SellerAppServiceGetMyInquiryProcedure:    exempt(inquiryReason),
+	sellerv1alpha1connect.SellerAppServiceReplyToInquiryProcedure:  exempt(inquiryReason),
 }
+
+const inquiryReason = "詢問以帳號為範圍，店家關閉後開放中的詢問仍必須能讀與回覆"
 
 const appealReason = "措施、申覆與解除請求以帳號為範圍，所有店家都已關閉的帳號仍受措施、必須還能申覆與請求解除"
 

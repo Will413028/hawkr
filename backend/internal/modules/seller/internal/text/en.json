@@ -12,6 +12,15 @@
     "appeal.unavailable.window_ended": {
       "message": "The appeal period for this termination has ended."
     },
+    "inquiry.seller_reply.body_length": {
+      "message": "Your reply must be 1 to 4000 characters."
+    },
+    "inquiry.seller_reply.unavailable.replied": {
+      "message": "This inquiry has already been replied to and cannot be replied to again."
+    },
+    "inquiry.seller_reply.unavailable.withdrawn": {
+      "message": "This inquiry has been withdrawn, so no reply is needed."
+    },
     "kyc.edit_unavailable.approved": {
       "message": "Your seller verification is approved, so you do not need to edit or resubmit it."
     },

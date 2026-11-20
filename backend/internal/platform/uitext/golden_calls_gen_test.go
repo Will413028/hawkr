@@ -62,6 +62,12 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
+	case "seller.InquiryKind":
+		return t.SellerInquiryKind(goldenEnum(c.Value, "INQUIRY_KIND_"))
+	case "seller.InquiryReplyChannel":
+		return t.SellerInquiryReplyChannel(goldenEnum(c.Value, "INQUIRY_REPLY_CHANNEL_"))
+	case "seller.InquiryState":
+		return t.SellerInquiryState(goldenEnum(c.Value, "INQUIRY_STATE_"))
 	case "seller.KYCApplication.decide_time":
 		return t.SellerKYCApplicationDecideTime(goldenString(c, "time")), true
 	case "seller.KYCApplication.submit_time":

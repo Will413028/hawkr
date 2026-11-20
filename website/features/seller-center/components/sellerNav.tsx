@@ -18,7 +18,8 @@ export type NavBadgeKey =
 	| "inventory"
 	| "messages"
 	| "notifications"
-	| "posts";
+	| "posts"
+	| "inquiries";
 
 export type NavBadgeMap = Partial<Record<NavBadgeKey, number>>;
 
@@ -128,6 +129,12 @@ export const SELLER_NAV_GROUPS: NavGroup[] = [
 				href: "/seller/measures",
 				label: "措施與申覆",
 				icon: <SellerSidebarIcon name="shield" />,
+			},
+			{
+				href: "/seller/inquiries",
+				label: "平台詢問",
+				icon: <SellerSidebarIcon name="paper" />,
+				badgeKey: "inquiries",
 			},
 			{
 				href: "/seller-center/blocked-buyers",

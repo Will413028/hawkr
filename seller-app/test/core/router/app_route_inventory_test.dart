@@ -56,6 +56,9 @@ void main() {
     ),
     (symbol: 'SellerRoutes.measures', path: SellerRoutes.measures),
     (symbol: 'SellerRoutes.measureRequest', path: SellerRoutes.measureRequest),
+    (symbol: 'SellerRoutes.inquiries', path: SellerRoutes.inquiries),
+    (symbol: 'SellerRoutes.inquiryDetail', path: SellerRoutes.inquiryDetail),
+    (symbol: 'SellerRoutes.inquiryReply', path: SellerRoutes.inquiryReply),
     (
       symbol: 'SellerRoutes.storeUnavailable',
       path: SellerRoutes.storeUnavailable,
@@ -100,9 +103,9 @@ void main() {
     ),
   ];
 
-  test('all 60 seller routes remain unique and declared', () {
-    expect(routes, hasLength(60));
-    expect(routes.map((route) => route.path).toSet(), hasLength(60));
+  test('all 63 seller routes remain unique and declared', () {
+    expect(routes, hasLength(63));
+    expect(routes.map((route) => route.path).toSet(), hasLength(63));
     expect(routes.every((route) => route.path.startsWith('/')), isTrue);
   });
 

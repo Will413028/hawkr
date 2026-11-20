@@ -12,8 +12,82 @@ import (
 	"uuid"
 )
 
+const accountCaseInquiries = `-- name: AccountCaseInquiries :many
+SELECT i.id, i.case_id, i.store_id, i.kind, i.message, i.created_at, i.created_by_admin_id, i.due_at, i.request_id, i.request_hash, i.reply_body, i.reply_channel, i.reply_received_at, i.reply_recorded_at, i.reply_recorded_by_admin_id, i.replied_by_account_id, i.withdrawn_at, i.withdrawn_by_admin_id, i.withdraw_cause
+FROM seller.case_inquiries i
+JOIN seller.stores s ON s.store_id = i.store_id
+WHERE s.account_id = $1
+  AND (
+    $2::text IS NULL OR
+    ($2::text = 'OPEN' AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL) OR
+    ($2::text = 'REPLIED' AND i.reply_received_at IS NOT NULL) OR
+    ($2::text = 'WITHDRAWN' AND i.withdrawn_at IS NOT NULL)
+  )
+  AND (
+    $3::timestamptz IS NULL OR
+    (i.created_at, i.id) < ($3::timestamptz, $4::uuid)
+  )
+ORDER BY i.created_at DESC, i.id DESC
+LIMIT $5
+`
+
+type AccountCaseInquiriesParams struct {
+	AccountID      int64
+	State          *string
+	AfterCreatedAt *time.Time
+	AfterID        *uuid.UUID
+	PageSize       int32
+}
+
+// 賣家帳號全部店家上的詢問，新到舊（keyset）。state 篩選此刻的狀態（OPEN／REPLIED／WITHDRAWN，與 model.CaseInquiry.State 同一個定義），NULL 不篩。
+func (q *Queries) AccountCaseInquiries(ctx context.Context, arg AccountCaseInquiriesParams) ([]SellerCaseInquiry, error) {
+	rows, err := q.db.Query(ctx, accountCaseInquiries,
+		arg.AccountID,
+		arg.State,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SellerCaseInquiry{}
+	for rows.Next() {
+		var i SellerCaseInquiry
+		if err := rows.Scan(
+			&i.ID,
+			&i.CaseID,
+			&i.StoreID,
+			&i.Kind,
+			&i.Message,
+			&i.CreatedAt,
+			&i.CreatedByAdminID,
+			&i.DueAt,
+			&i.RequestID,
+			&i.RequestHash,
+			&i.ReplyBody,
+			&i.ReplyChannel,
+			&i.ReplyReceivedAt,
+			&i.ReplyRecordedAt,
+			&i.ReplyRecordedByAdminID,
+			&i.RepliedByAccountID,
+			&i.WithdrawnAt,
+			&i.WithdrawnByAdminID,
+			&i.WithdrawCause,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const caseInquiries = `-- name: CaseInquiries :many
-SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 FROM seller.case_inquiries
 WHERE case_id = $1
   AND (
@@ -62,6 +136,7 @@ func (q *Queries) CaseInquiries(ctx context.Context, arg CaseInquiriesParams) ([
 			&i.ReplyReceivedAt,
 			&i.ReplyRecordedAt,
 			&i.ReplyRecordedByAdminID,
+			&i.RepliedByAccountID,
 			&i.WithdrawnAt,
 			&i.WithdrawnByAdminID,
 			&i.WithdrawCause,
@@ -77,7 +152,7 @@ func (q *Queries) CaseInquiries(ctx context.Context, arg CaseInquiriesParams) ([
 }
 
 const caseInquiryByID = `-- name: CaseInquiryByID :one
-SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 FROM seller.case_inquiries
 WHERE id = $1
 `
@@ -101,6 +176,7 @@ func (q *Queries) CaseInquiryByID(ctx context.Context, id uuid.UUID) (SellerCase
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,
@@ -109,7 +185,7 @@ func (q *Queries) CaseInquiryByID(ctx context.Context, id uuid.UUID) (SellerCase
 }
 
 const caseInquiryByRequest = `-- name: CaseInquiryByRequest :one
-SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 FROM seller.case_inquiries
 WHERE created_by_admin_id = $1 AND request_id = $2
 `
@@ -139,6 +215,7 @@ func (q *Queries) CaseInquiryByRequest(ctx context.Context, arg CaseInquiryByReq
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,
@@ -179,11 +256,26 @@ func (q *Queries) CaseInquiryEvidence(ctx context.Context, inquiryIds []uuid.UUI
 	return items, nil
 }
 
+const countAccountOpenCaseInquiries = `-- name: CountAccountOpenCaseInquiries :one
+SELECT count(*)::int
+FROM seller.case_inquiries i
+JOIN seller.stores s ON s.store_id = i.store_id
+WHERE s.account_id = $1 AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL
+`
+
+// 賣家帳號待回覆的詢問數（還沒回覆也沒撤回；逾期仍算）。
+func (q *Queries) CountAccountOpenCaseInquiries(ctx context.Context, accountID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, countAccountOpenCaseInquiries, accountID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const insertCaseInquiry = `-- name: InsertCaseInquiry :one
 INSERT INTO seller.case_inquiries (id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (created_by_admin_id, request_id) DO NOTHING
-RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 `
 
 type InsertCaseInquiryParams struct {
@@ -231,6 +323,7 @@ func (q *Queries) InsertCaseInquiry(ctx context.Context, arg InsertCaseInquiryPa
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,
@@ -286,7 +379,7 @@ func (q *Queries) InsertInquiryEvidenceAccess(ctx context.Context, arg InsertInq
 }
 
 const lockCaseInquiry = `-- name: LockCaseInquiry :one
-SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+SELECT id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 FROM seller.case_inquiries
 WHERE id = $1
 FOR UPDATE
@@ -312,6 +405,7 @@ func (q *Queries) LockCaseInquiry(ctx context.Context, id uuid.UUID) (SellerCase
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,
@@ -359,7 +453,7 @@ SET reply_body = $1::text,
     reply_recorded_at = $4::timestamptz,
     reply_recorded_by_admin_id = $5::bigint
 WHERE id = $6 AND reply_received_at IS NULL AND withdrawn_at IS NULL
-RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 `
 
 type RecordCaseInquiryReplyParams struct {
@@ -398,6 +492,58 @@ func (q *Queries) RecordCaseInquiryReply(ctx context.Context, arg RecordCaseInqu
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
+		&i.WithdrawnAt,
+		&i.WithdrawnByAdminID,
+		&i.WithdrawCause,
+	)
+	return i, err
+}
+
+const replyCaseInquiryBySeller = `-- name: ReplyCaseInquiryBySeller :one
+UPDATE seller.case_inquiries
+SET reply_body = $1::text,
+    reply_channel = 'SELLER_CENTER',
+    reply_received_at = $2::timestamptz,
+    reply_recorded_at = $2::timestamptz,
+    replied_by_account_id = $3::bigint
+WHERE id = $4 AND reply_received_at IS NULL AND withdrawn_at IS NULL
+RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+`
+
+type ReplyCaseInquiryBySellerParams struct {
+	Body      string
+	Now       time.Time
+	AccountID int64
+	ID        uuid.UUID
+}
+
+// 賣家在賣家中心回覆；只在還沒結束時寫入，否則 0 列。收到與記下是同一個時刻。
+func (q *Queries) ReplyCaseInquiryBySeller(ctx context.Context, arg ReplyCaseInquiryBySellerParams) (SellerCaseInquiry, error) {
+	row := q.db.QueryRow(ctx, replyCaseInquiryBySeller,
+		arg.Body,
+		arg.Now,
+		arg.AccountID,
+		arg.ID,
+	)
+	var i SellerCaseInquiry
+	err := row.Scan(
+		&i.ID,
+		&i.CaseID,
+		&i.StoreID,
+		&i.Kind,
+		&i.Message,
+		&i.CreatedAt,
+		&i.CreatedByAdminID,
+		&i.DueAt,
+		&i.RequestID,
+		&i.RequestHash,
+		&i.ReplyBody,
+		&i.ReplyChannel,
+		&i.ReplyReceivedAt,
+		&i.ReplyRecordedAt,
+		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,
@@ -411,7 +557,7 @@ SET withdrawn_at = $1::timestamptz,
     withdrawn_by_admin_id = $2::bigint,
     withdraw_cause = 'ADMIN'
 WHERE id = $3 AND reply_received_at IS NULL AND withdrawn_at IS NULL
-RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
+RETURNING id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at, request_id, request_hash, reply_body, reply_channel, reply_received_at, reply_recorded_at, reply_recorded_by_admin_id, replied_by_account_id, withdrawn_at, withdrawn_by_admin_id, withdraw_cause
 `
 
 type WithdrawCaseInquiryParams struct {
@@ -440,6 +586,7 @@ func (q *Queries) WithdrawCaseInquiry(ctx context.Context, arg WithdrawCaseInqui
 		&i.ReplyReceivedAt,
 		&i.ReplyRecordedAt,
 		&i.ReplyRecordedByAdminID,
+		&i.RepliedByAccountID,
 		&i.WithdrawnAt,
 		&i.WithdrawnByAdminID,
 		&i.WithdrawCause,

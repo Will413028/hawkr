@@ -1257,5 +1257,106 @@ class MeasureRequestCloseCause extends $pb.ProtobufEnum {
   const MeasureRequestCloseCause._(super.value, super.name);
 }
 
+/// InquiryKind 是平台要賣家做的事。
+class InquiryKind extends $pb.ProtobufEnum {
+  static const InquiryKind INQUIRY_KIND_UNSPECIFIED =
+      InquiryKind._(0, _omitEnumNames ? '' : 'INQUIRY_KIND_UNSPECIFIED');
+
+  /// 提供紀錄：賣家合作條款第 11.3 條的來源、批次、效期、進出貨及流向。
+  static const InquiryKind INQUIRY_KIND_RECORDS =
+      InquiryKind._(1, _omitEnumNames ? '' : 'INQUIRY_KIND_RECORDS');
+
+  /// 請說明。
+  static const InquiryKind INQUIRY_KIND_EXPLANATION =
+      InquiryKind._(2, _omitEnumNames ? '' : 'INQUIRY_KIND_EXPLANATION');
+
+  static const $core.List<InquiryKind> values = <InquiryKind>[
+    INQUIRY_KIND_UNSPECIFIED,
+    INQUIRY_KIND_RECORDS,
+    INQUIRY_KIND_EXPLANATION,
+  ];
+
+  static final $core.List<InquiryKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static InquiryKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const InquiryKind._(super.value, super.name);
+}
+
+/// InquiryState 由伺服器推導（不儲存）。逾期不是狀態：OPEN 而且現在晚於 reply_deadline.due_time。
+class InquiryState extends $pb.ProtobufEnum {
+  static const InquiryState INQUIRY_STATE_UNSPECIFIED =
+      InquiryState._(0, _omitEnumNames ? '' : 'INQUIRY_STATE_UNSPECIFIED');
+
+  /// 等賣家回覆。
+  static const InquiryState INQUIRY_STATE_OPEN =
+      InquiryState._(1, _omitEnumNames ? '' : 'INQUIRY_STATE_OPEN');
+
+  /// 已回覆（終態）。
+  static const InquiryState INQUIRY_STATE_REPLIED =
+      InquiryState._(2, _omitEnumNames ? '' : 'INQUIRY_STATE_REPLIED');
+
+  /// 已撤回（終態）：賣家不必再回覆。
+  static const InquiryState INQUIRY_STATE_WITHDRAWN =
+      InquiryState._(3, _omitEnumNames ? '' : 'INQUIRY_STATE_WITHDRAWN');
+
+  static const $core.List<InquiryState> values = <InquiryState>[
+    INQUIRY_STATE_UNSPECIFIED,
+    INQUIRY_STATE_OPEN,
+    INQUIRY_STATE_REPLIED,
+    INQUIRY_STATE_WITHDRAWN,
+  ];
+
+  static final $core.List<InquiryState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static InquiryState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const InquiryState._(super.value, super.name);
+}
+
+/// InquiryReplyChannel 是回覆怎麼收到的。
+class InquiryReplyChannel extends $pb.ProtobufEnum {
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_UNSPECIFIED =
+      InquiryReplyChannel._(
+          0, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_UNSPECIFIED');
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_PHONE =
+      InquiryReplyChannel._(
+          1, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_PHONE');
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_EMAIL =
+      InquiryReplyChannel._(
+          2, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_EMAIL');
+
+  /// 通訊軟體。
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_MESSAGING =
+      InquiryReplyChannel._(
+          3, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_MESSAGING');
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_OTHER =
+      InquiryReplyChannel._(
+          4, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_OTHER');
+
+  /// 賣家在賣家中心回覆。
+  static const InquiryReplyChannel INQUIRY_REPLY_CHANNEL_SELLER_CENTER =
+      InquiryReplyChannel._(
+          5, _omitEnumNames ? '' : 'INQUIRY_REPLY_CHANNEL_SELLER_CENTER');
+
+  static const $core.List<InquiryReplyChannel> values = <InquiryReplyChannel>[
+    INQUIRY_REPLY_CHANNEL_UNSPECIFIED,
+    INQUIRY_REPLY_CHANNEL_PHONE,
+    INQUIRY_REPLY_CHANNEL_EMAIL,
+    INQUIRY_REPLY_CHANNEL_MESSAGING,
+    INQUIRY_REPLY_CHANNEL_OTHER,
+    INQUIRY_REPLY_CHANNEL_SELLER_CENTER,
+  ];
+
+  static final $core.List<InquiryReplyChannel?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static InquiryReplyChannel? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const InquiryReplyChannel._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

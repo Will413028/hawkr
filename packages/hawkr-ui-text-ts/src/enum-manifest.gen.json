@@ -393,6 +393,27 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.InquiryKind",
+      "tsName": "InquiryKind",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.InquiryReplyChannel",
+      "tsName": "InquiryReplyChannel",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.InquiryState",
+      "tsName": "InquiryState",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.KYCField",
       "tsName": "KYCField",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",

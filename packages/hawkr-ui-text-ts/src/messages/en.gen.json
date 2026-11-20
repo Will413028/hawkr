@@ -88,6 +88,22 @@
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
       "CONTENT_KIND_POST": "貼文"
     },
+    "InquiryKind": {
+      "INQUIRY_KIND_EXPLANATION": "Provide an explanation",
+      "INQUIRY_KIND_RECORDS": "Provide records"
+    },
+    "InquiryReplyChannel": {
+      "INQUIRY_REPLY_CHANNEL_EMAIL": "Email",
+      "INQUIRY_REPLY_CHANNEL_MESSAGING": "Messaging app",
+      "INQUIRY_REPLY_CHANNEL_OTHER": "Other",
+      "INQUIRY_REPLY_CHANNEL_PHONE": "Phone",
+      "INQUIRY_REPLY_CHANNEL_SELLER_CENTER": "Seller Center"
+    },
+    "InquiryState": {
+      "INQUIRY_STATE_OPEN": "Awaiting reply",
+      "INQUIRY_STATE_REPLIED": "Replied",
+      "INQUIRY_STATE_WITHDRAWN": "Withdrawn"
+    },
     "KYCApplication": {
       "decide_time": "Approved at: {time}",
       "submit_time": "Submitted at: {time}"

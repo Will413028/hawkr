@@ -8,8 +8,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 案件的詢問（step10e-reports-brief R4；設計 step10e-3cb-design §3.1）：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆
-// 還沒結束的詢問（DB 的 case_inquiries_one_open）。回覆在 3c-b 只由管理員記下（系統外收到）。處理狀態（InquiryState）與可以做的動作（Availability）由事實推導，不存。
+// 案件的詢問：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆
+// 還沒結束的詢問（DB 的 case_inquiries_one_open）。回覆有兩個來源：管理員記下系統外收到的（電話、信箱等管道），或賣家自己在賣家中心回覆（管道是 SELLER_CENTER）。處理狀態（InquiryState）與可以做的動作（Availability）由事實推導，不存。
 
 // InquiryKind 是平台要賣家做的事；值與 DB 的 case_inquiries_kind_check、契約的 CaseInquiryKind 一致。
 type InquiryKind string
@@ -34,10 +34,17 @@ const (
 	InquiryChannelEmail     InquiryReplyChannel = "EMAIL"
 	InquiryChannelMessaging InquiryReplyChannel = "MESSAGING"
 	InquiryChannelOther     InquiryReplyChannel = "OTHER"
+	// InquiryChannelSellerCenter 是賣家在賣家中心回覆；只有賣家的回覆用它（管理員記下的回覆不能選）。
+	InquiryChannelSellerCenter InquiryReplyChannel = "SELLER_CENTER"
 )
 
 // InquiryReplyChannelValues 回傳全部管道，順序固定。
 func InquiryReplyChannelValues() []InquiryReplyChannel {
+	return []InquiryReplyChannel{InquiryChannelPhone, InquiryChannelEmail, InquiryChannelMessaging, InquiryChannelOther, InquiryChannelSellerCenter}
+}
+
+// AdminRecordableChannels 是管理員記下系統外收到的回覆時可以選的管道（不含 SELLER_CENTER）。
+func AdminRecordableChannels() []InquiryReplyChannel {
 	return []InquiryReplyChannel{InquiryChannelPhone, InquiryChannelEmail, InquiryChannelMessaging, InquiryChannelOther}
 }
 
@@ -98,13 +105,15 @@ type CaseInquiry struct {
 	Withdrawn        *InquiryWithdrawal
 }
 
-// InquiryReply 是管理員記下的賣家回覆（系統外收到）。ReceivedAt 是收到的時間，RecordedAt 是記進系統的時間（不早於收到）；案件的「待決定」從收到的時間重新起算。
+// InquiryReply 是賣家的回覆：管理員記下的系統外回覆（RecordedByAdminID 有值），或賣家在賣家中心的回覆（RepliedByAccountID 有值，管道是 SELLER_CENTER），二選一。
+// ReceivedAt 是收到的時間，RecordedAt 是記進系統的時間（不早於收到；賣家中心的回覆兩者相同）；案件的「待決定」從收到的時間重新起算。
 type InquiryReply struct {
-	Body              string
-	Channel           InquiryReplyChannel
-	ReceivedAt        time.Time
-	RecordedAt        time.Time
-	RecordedByAdminID int64
+	Body               string
+	Channel            InquiryReplyChannel
+	ReceivedAt         time.Time
+	RecordedAt         time.Time
+	RecordedByAdminID  int64
+	RepliedByAccountID int64
 	// Evidence 是附件（機敏檔）；Position 是連號，從 0 起。只在讀取詢問時載入。
 	Evidence []Evidence
 }
@@ -176,6 +185,37 @@ func (i CaseInquiry) Availability() InquiryAvailability {
 		a.Withdraw = []InquiryBlock{InquiryBlockReplied}
 	}
 	return a
+}
+
+// SellerInquiry 是賣家看到的一筆詢問：詢問本身（不含管理員 ID 與案件資訊，由 handler 只取賣家看得到的欄位）、此刻能不能回覆，以及回覆的附件數
+// （賣家不讀回自己上傳的附件，與申覆佐證相同）。
+type SellerInquiry struct {
+	CaseInquiry
+	CanReply        bool
+	AttachmentCount int
+}
+
+// AccountInquiryListInput 是賣家帳號的詢問清單輸入；State 為 nil 不篩。
+type AccountInquiryListInput struct {
+	AccountID int64
+	PageSize  int32
+	State     *InquiryState
+	After     *InquiryCursor
+}
+
+// SellerInquiryPage 是一頁賣家的詢問，新到舊；PendingReplyCount 是帳號全部店家上還沒回覆也沒撤回的詢問數（不受篩選與分頁影響）。
+type SellerInquiryPage struct {
+	Items             []SellerInquiry
+	Next              *InquiryCursor
+	PendingReplyCount int32
+}
+
+// ReplyToInquiryInput 是賣家回覆詢問的輸入；AccountID 是回覆者，也是附件的上傳者。
+type ReplyToInquiryInput struct {
+	AccountID      int64
+	InquiryID      uuid.UUID
+	Body           string
+	EvidenceTokens []string
 }
 
 // AdminInquiry 是後台看到的一筆詢問：詢問本身加上此刻可以做的動作。

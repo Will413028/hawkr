@@ -349,7 +349,7 @@ CREATE INDEX report_case_moves_from ON seller.report_case_moves (from_case_id, m
 CREATE INDEX report_case_moves_to ON seller.report_case_moves (to_case_id, moved_at, id);
 
 -- 詢問（rb R4）：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆還沒結束的。
--- 回覆在 3c-b 只由管理員記下（系統外收到）；10f 加賣家在賣家中心的回覆（channel = SELLER_CENTER、replied_by_account_id）。
+-- 回覆有兩種作者：管理員記下系統外收到的（reply_recorded_by_admin_id，管道是 PHONE／EMAIL／MESSAGING／OTHER），或賣家在賣家中心回覆（replied_by_account_id，管道是 SELLER_CENTER）；CHECK 保證二選一。
 -- 回覆放在詢問列上而不是另一張表：一筆詢問一則回覆，一列一個事實，CHECK 直接保證「回覆與撤回互斥」；10f 改成多則回覆時才拆表（觸發：賣家要能補交）。
 -- store_id 是案件店家的複本，由複合外鍵保證相等：附件的 media 引用與 10f 賣家端「這是不是我的店」的授權都要它，不必 join 案件（先例 measures.account_id）。
 CREATE TABLE seller.case_inquiries (
@@ -368,6 +368,7 @@ CREATE TABLE seller.case_inquiries (
     reply_received_at          TIMESTAMPTZ,
     reply_recorded_at          TIMESTAMPTZ,
     reply_recorded_by_admin_id BIGINT,
+    replied_by_account_id      BIGINT,
     withdrawn_at               TIMESTAMPTZ,
     withdrawn_by_admin_id      BIGINT,
     withdraw_cause             TEXT,
@@ -380,9 +381,13 @@ CREATE TABLE seller.case_inquiries (
     CONSTRAINT case_inquiries_request_key UNIQUE (created_by_admin_id, request_id),
     -- 回覆欄位全有或全無；整個式子要是 TRUE（IS TRUE），理由同 cases_close_check。
     CONSTRAINT case_inquiries_reply_check CHECK ((
-        (reply_body IS NULL AND reply_channel IS NULL AND reply_received_at IS NULL AND reply_recorded_at IS NULL AND reply_recorded_by_admin_id IS NULL) OR
-        (char_length(reply_body) >= 1 AND char_length(reply_body) <= 4000 AND reply_channel IN ('PHONE', 'EMAIL', 'MESSAGING', 'OTHER')
-         AND reply_received_at >= created_at AND reply_recorded_at >= reply_received_at AND reply_recorded_by_admin_id > 0)
+        (reply_body IS NULL AND reply_channel IS NULL AND reply_received_at IS NULL AND reply_recorded_at IS NULL
+         AND reply_recorded_by_admin_id IS NULL AND replied_by_account_id IS NULL) OR
+        (char_length(reply_body) >= 1 AND char_length(reply_body) <= 4000
+         AND reply_received_at >= created_at AND reply_recorded_at >= reply_received_at AND (
+            (reply_channel IN ('PHONE', 'EMAIL', 'MESSAGING', 'OTHER') AND reply_recorded_by_admin_id > 0 AND replied_by_account_id IS NULL) OR
+            (reply_channel = 'SELLER_CENTER' AND replied_by_account_id > 0 AND reply_recorded_by_admin_id IS NULL)
+         ))
     ) IS TRUE),
     CONSTRAINT case_inquiries_withdraw_check CHECK ((
         (withdrawn_at IS NULL AND withdrawn_by_admin_id IS NULL AND withdraw_cause IS NULL) OR

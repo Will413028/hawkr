@@ -29,6 +29,14 @@ func caseInquiryEvidenceURI(inquiryID uuid.UUID, position int) string {
 	return "/api/files/admin/seller/case_inquiries/" + inquiryID.String() + "/evidence/" + strconv.Itoa(position)
 }
 
+// optionalID 是可能不存在的 ID（0 表示沒有）：沒有時是空字串，契約裡對應的欄位不設。
+func optionalID(id int64) string {
+	if id == 0 {
+		return ""
+	}
+	return rpc.FormatID(id)
+}
+
 // toCaseInquiry 把後台看到的詢問轉成契約：期限只在還沒結束時輸出（義務還在時才輸出）；can_* 取自同一個 Availability（不輸出原因）；
 // 回覆附件的上限是模組的 MaxEvidence（RecordCaseInquiryReply 驗證的同一個值）。
 func toCaseInquiry(i model.AdminInquiry) *adminpb.CaseInquiry {
@@ -47,7 +55,7 @@ func toCaseInquiry(i model.AdminInquiry) *adminpb.CaseInquiry {
 	if r := i.Reply; r != nil {
 		out.Reply = &adminpb.CaseInquiryReply{
 			Body: r.Body, Channel: rpc.EnumToProto[adminpb.CaseInquiryReplyChannel](r.Channel),
-			ReceiveTime: timestamppb.New(r.ReceivedAt), RecordTime: timestamppb.New(r.RecordedAt), RecordedByAdminId: rpc.FormatID(r.RecordedByAdminID),
+			ReceiveTime: timestamppb.New(r.ReceivedAt), RecordTime: timestamppb.New(r.RecordedAt), RecordedByAdminId: optionalID(r.RecordedByAdminID), RepliedByAccountId: optionalID(r.RepliedByAccountID),
 			Evidence: toEvidence(len(r.Evidence), func(n int) string { return caseInquiryEvidenceURI(i.ID, n) }),
 		}
 	}

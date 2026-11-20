@@ -24,11 +24,12 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
 
 import '../../../google/rpc/error_details.pb.dart' as $3;
 import '../../../google/type/date.pb.dart' as $5;
+import '../../common/v1alpha1/deadline.pb.dart' as $7;
 import '../../common/v1alpha1/image.pb.dart' as $1;
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $9;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $10;
 import '../../common/v1alpha1/postal_address.pb.dart' as $0;
-import '../../common/v1alpha1/store_card.pb.dart' as $7;
-import '../../payment/v1alpha1/payment.pbenum.dart' as $8;
+import '../../common/v1alpha1/store_card.pb.dart' as $8;
+import '../../payment/v1alpha1/payment.pbenum.dart' as $9;
 import 'seller.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -3759,7 +3760,7 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
 /// PaymentAccount 是賣家看到的收款帳戶。
 class PaymentAccount extends $pb.GeneratedMessage {
   factory PaymentAccount({
-    $8.PaymentAccountStatus? status,
+    $9.PaymentAccountStatus? status,
     $core.bool? payoutsActive,
     $2.Timestamp? fetchTime,
   }) {
@@ -3784,8 +3785,8 @@ class PaymentAccount extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: PaymentAccount.$_createMessage)
-    ..aE<$8.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
-        enumValues: $8.PaymentAccountStatus.values)
+    ..aE<$9.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: $9.PaymentAccountStatus.values)
     ..aOB(2, _omitFieldNames ? '' : 'payoutsActive')
     ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'fetchTime',
         subBuilder: $2.Timestamp.$_createMessage)
@@ -3814,9 +3815,9 @@ class PaymentAccount extends $pb.GeneratedMessage {
   static PaymentAccount? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $8.PaymentAccountStatus get status => $_getN(0);
+  $9.PaymentAccountStatus get status => $_getN(0);
   @$pb.TagNumber(1)
-  set status($8.PaymentAccountStatus value) => $_setField(1, value);
+  set status($9.PaymentAccountStatus value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
@@ -3962,7 +3963,7 @@ class GetMyPaymentAccountResponse extends $pb.GeneratedMessage {
 class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionRequest({
     OnboardingReturnDestination? destination,
-    $core.Iterable<$8.EmbeddedOnboardingRuntime>? embeddedRuntimes,
+    $core.Iterable<$9.EmbeddedOnboardingRuntime>? embeddedRuntimes,
   }) {
     final result = CreatePaymentOnboardingSessionRequest._();
     if (destination != null) result.destination = destination;
@@ -3989,11 +3990,11 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           CreatePaymentOnboardingSessionRequest.$_createMessage)
     ..aE<OnboardingReturnDestination>(1, _omitFieldNames ? '' : 'destination',
         enumValues: OnboardingReturnDestination.values)
-    ..pc<$8.EmbeddedOnboardingRuntime>(
+    ..pc<$9.EmbeddedOnboardingRuntime>(
         2, _omitFieldNames ? '' : 'embeddedRuntimes', $pb.PbFieldType.KE,
-        valueOf: $8.EmbeddedOnboardingRuntime.valueOf,
-        enumValues: $8.EmbeddedOnboardingRuntime.values,
-        defaultEnumValue: $8
+        valueOf: $9.EmbeddedOnboardingRuntime.valueOf,
+        enumValues: $9.EmbeddedOnboardingRuntime.values,
+        defaultEnumValue: $9
             .EmbeddedOnboardingRuntime.EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED)
     ..hasRequiredFields = false;
 
@@ -4039,7 +4040,7 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
 
   /// 呼叫端能承載的內嵌執行環境；空表示不能內嵌（一律拿託管連結）。不認得的值與 UNSPECIFIED 忽略。
   @$pb.TagNumber(2)
-  $pb.PbList<$8.EmbeddedOnboardingRuntime> get embeddedRuntimes => $_getList(1);
+  $pb.PbList<$9.EmbeddedOnboardingRuntime> get embeddedRuntimes => $_getList(1);
 }
 
 enum CreatePaymentOnboardingSessionResponse_Session { hosted, embedded, notSet }
@@ -5397,7 +5398,7 @@ class AppealUnavailability extends $pb.GeneratedMessage {
 class MeasureFinding extends $pb.GeneratedMessage {
   factory MeasureFinding({
     $core.String? id,
-    $9.PolicyCategory? category,
+    $10.PolicyCategory? category,
     ViolationSeverity? severity,
     $2.Timestamp? createTime,
   }) {
@@ -5424,8 +5425,8 @@ class MeasureFinding extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: MeasureFinding.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aE<$9.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
-        enumValues: $9.PolicyCategory.values)
+    ..aE<$10.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $10.PolicyCategory.values)
     ..aE<ViolationSeverity>(3, _omitFieldNames ? '' : 'severity',
         enumValues: ViolationSeverity.values)
     ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
@@ -5465,9 +5466,9 @@ class MeasureFinding extends $pb.GeneratedMessage {
 
   /// 認定的類別：政策分類中平台判定與認定可用的值（不含 OTHER）。
   @$pb.TagNumber(2)
-  $9.PolicyCategory get category => $_getN(1);
+  $10.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set category($9.PolicyCategory value) => $_setField(2, value);
+  set category($10.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)
@@ -6649,6 +6650,725 @@ class RequestRemediationResponse extends $pb.GeneratedMessage {
   Measure ensureMeasure() => $_ensure(0);
 }
 
+/// Inquiry 是賣家看到的詢問：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回。只帶管理員轉述的說明，不含案件、通報原文、佐證與管理員身分。
+class Inquiry extends $pb.GeneratedMessage {
+  factory Inquiry({
+    $core.String? id,
+    InquiryKind? kind,
+    $core.String? message,
+    $2.Timestamp? createTime,
+    InquiryState? state,
+    $7.Deadline? replyDeadline,
+    InquiryReply? reply,
+    $2.Timestamp? withdrawTime,
+    $core.bool? canReply,
+    $core.int? replyAttachmentMax,
+  }) {
+    final result = Inquiry._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (message != null) result.message = message;
+    if (createTime != null) result.createTime = createTime;
+    if (state != null) result.state = state;
+    if (replyDeadline != null) result.replyDeadline = replyDeadline;
+    if (reply != null) result.reply = reply;
+    if (withdrawTime != null) result.withdrawTime = withdrawTime;
+    if (canReply != null) result.canReply = canReply;
+    if (replyAttachmentMax != null)
+      result.replyAttachmentMax = replyAttachmentMax;
+    return result;
+  }
+
+  Inquiry._();
+
+  factory Inquiry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Inquiry()..mergeFromBuffer(data, registry);
+  factory Inquiry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Inquiry()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Inquiry',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: Inquiry.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<InquiryKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: InquiryKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'message')
+    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aE<InquiryState>(5, _omitFieldNames ? '' : 'state',
+        enumValues: InquiryState.values)
+    ..aOM<$7.Deadline>(6, _omitFieldNames ? '' : 'replyDeadline',
+        subBuilder: $7.Deadline.$_createMessage)
+    ..aOM<InquiryReply>(7, _omitFieldNames ? '' : 'reply',
+        subBuilder: InquiryReply.$_createMessage)
+    ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'withdrawTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOB(9, _omitFieldNames ? '' : 'canReply')
+    ..aI(10, _omitFieldNames ? '' : 'replyAttachmentMax')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Inquiry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Inquiry copyWith(void Function(Inquiry) updates) =>
+      super.copyWith((message) => updates(message as Inquiry)) as Inquiry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Inquiry() / Inquiry.new instead')
+  static Inquiry create() => Inquiry._();
+  static $pb.GeneratedMessage $_createMessage() => Inquiry._();
+  @$core.override
+  Inquiry createEmptyInstance() => Inquiry._();
+  @$core.pragma('dart2js:noInline')
+  static Inquiry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Inquiry>(Inquiry.$_createMessage);
+  static Inquiry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  InquiryKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(InquiryKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  /// 平台給賣家的說明。
+  @$pb.TagNumber(3)
+  $core.String get message => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set message($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMessage() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $2.Timestamp get createTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set createTime($2.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCreateTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCreateTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $2.Timestamp ensureCreateTime() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  InquiryState get state => $_getN(4);
+  @$pb.TagNumber(5)
+  set state(InquiryState value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasState() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearState() => $_clearField(5);
+
+  /// 回覆期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的。逾期後仍可回覆。
+  @$pb.TagNumber(6)
+  $7.Deadline get replyDeadline => $_getN(5);
+  @$pb.TagNumber(6)
+  set replyDeadline($7.Deadline value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasReplyDeadline() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearReplyDeadline() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $7.Deadline ensureReplyDeadline() => $_ensure(5);
+
+  /// 只在 REPLIED 時設。
+  @$pb.TagNumber(7)
+  InquiryReply get reply => $_getN(6);
+  @$pb.TagNumber(7)
+  set reply(InquiryReply value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasReply() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearReply() => $_clearField(7);
+  @$pb.TagNumber(7)
+  InquiryReply ensureReply() => $_ensure(6);
+
+  /// 只在 WITHDRAWN 時設。
+  @$pb.TagNumber(8)
+  $2.Timestamp get withdrawTime => $_getN(7);
+  @$pb.TagNumber(8)
+  set withdrawTime($2.Timestamp value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasWithdrawTime() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearWithdrawTime() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $2.Timestamp ensureWithdrawTime() => $_ensure(7);
+
+  /// 賣家此刻能不能回覆（state 是 OPEN）；由伺服器判斷，與 ReplyToInquiry 的前置檢查是同一個規則，client 不自己從 state 推導。
+  @$pb.TagNumber(9)
+  $core.bool get canReply => $_getBF(8);
+  @$pb.TagNumber(9)
+  set canReply($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasCanReply() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearCanReply() => $_clearField(9);
+
+  /// 回覆時最多可以帶的附件數（伺服器的上限，ReplyToInquiry 的 evidence_staged_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
+  @$pb.TagNumber(10)
+  $core.int get replyAttachmentMax => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set replyAttachmentMax($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasReplyAttachmentMax() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearReplyAttachmentMax() => $_clearField(10);
+}
+
+/// InquiryReply 是詢問的回覆：賣家在賣家中心回覆的，或管理員記下系統外收到的（電話、電子信箱等）。
+class InquiryReply extends $pb.GeneratedMessage {
+  factory InquiryReply({
+    $core.String? body,
+    InquiryReplyChannel? channel,
+    $2.Timestamp? receiveTime,
+    $core.int? attachmentCount,
+  }) {
+    final result = InquiryReply._();
+    if (body != null) result.body = body;
+    if (channel != null) result.channel = channel;
+    if (receiveTime != null) result.receiveTime = receiveTime;
+    if (attachmentCount != null) result.attachmentCount = attachmentCount;
+    return result;
+  }
+
+  InquiryReply._();
+
+  factory InquiryReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      InquiryReply()..mergeFromBuffer(data, registry);
+  factory InquiryReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      InquiryReply()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'InquiryReply',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: InquiryReply.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'body')
+    ..aE<InquiryReplyChannel>(2, _omitFieldNames ? '' : 'channel',
+        enumValues: InquiryReplyChannel.values)
+    ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'receiveTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aI(4, _omitFieldNames ? '' : 'attachmentCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InquiryReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InquiryReply copyWith(void Function(InquiryReply) updates) =>
+      super.copyWith((message) => updates(message as InquiryReply))
+          as InquiryReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use InquiryReply() / InquiryReply.new instead')
+  static InquiryReply create() => InquiryReply._();
+  static $pb.GeneratedMessage $_createMessage() => InquiryReply._();
+  @$core.override
+  InquiryReply createEmptyInstance() => InquiryReply._();
+  @$core.pragma('dart2js:noInline')
+  static InquiryReply getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<InquiryReply>(
+          InquiryReply.$_createMessage);
+  static InquiryReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get body => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set body($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBody() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBody() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  InquiryReplyChannel get channel => $_getN(1);
+  @$pb.TagNumber(2)
+  set channel(InquiryReplyChannel value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChannel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChannel() => $_clearField(2);
+
+  /// 收到的時間；賣家在賣家中心回覆時是送出的時間。
+  @$pb.TagNumber(3)
+  $2.Timestamp get receiveTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set receiveTime($2.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReceiveTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReceiveTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.Timestamp ensureReceiveTime() => $_ensure(2);
+
+  /// 附件數量；附件是機敏檔，賣家不讀回。
+  @$pb.TagNumber(4)
+  $core.int get attachmentCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set attachmentCount($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAttachmentCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAttachmentCount() => $_clearField(4);
+}
+
+class ListMyInquiriesRequest extends $pb.GeneratedMessage {
+  factory ListMyInquiriesRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+    InquiryState? state,
+  }) {
+    final result = ListMyInquiriesRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  ListMyInquiriesRequest._();
+
+  factory ListMyInquiriesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyInquiriesRequest()..mergeFromBuffer(data, registry);
+  factory ListMyInquiriesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyInquiriesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyInquiriesRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ListMyInquiriesRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..aE<InquiryState>(3, _omitFieldNames ? '' : 'state',
+        enumValues: InquiryState.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyInquiriesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyInquiriesRequest copyWith(
+          void Function(ListMyInquiriesRequest) updates) =>
+      super.copyWith((message) => updates(message as ListMyInquiriesRequest))
+          as ListMyInquiriesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyInquiriesRequest() / ListMyInquiriesRequest.new instead')
+  static ListMyInquiriesRequest create() => ListMyInquiriesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListMyInquiriesRequest._();
+  @$core.override
+  ListMyInquiriesRequest createEmptyInstance() => ListMyInquiriesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyInquiriesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyInquiriesRequest>(
+          ListMyInquiriesRequest.$_createMessage);
+  static ListMyInquiriesRequest? _defaultInstance;
+
+  /// 預設 50，上限 100。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+
+  /// 只列此刻是這個狀態的詢問；UNSPECIFIED 不篩。
+  @$pb.TagNumber(3)
+  InquiryState get state => $_getN(2);
+  @$pb.TagNumber(3)
+  set state(InquiryState value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasState() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearState() => $_clearField(3);
+}
+
+class ListMyInquiriesResponse extends $pb.GeneratedMessage {
+  factory ListMyInquiriesResponse({
+    $core.Iterable<Inquiry>? inquiries,
+    $core.String? nextPageToken,
+    $core.int? pendingReplyCount,
+  }) {
+    final result = ListMyInquiriesResponse._();
+    if (inquiries != null) result.inquiries.addAll(inquiries);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    if (pendingReplyCount != null) result.pendingReplyCount = pendingReplyCount;
+    return result;
+  }
+
+  ListMyInquiriesResponse._();
+
+  factory ListMyInquiriesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyInquiriesResponse()..mergeFromBuffer(data, registry);
+  factory ListMyInquiriesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyInquiriesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyInquiriesResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ListMyInquiriesResponse.$_createMessage)
+    ..pPM<Inquiry>(1, _omitFieldNames ? '' : 'inquiries',
+        subBuilder: Inquiry.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..aI(3, _omitFieldNames ? '' : 'pendingReplyCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyInquiriesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyInquiriesResponse copyWith(
+          void Function(ListMyInquiriesResponse) updates) =>
+      super.copyWith((message) => updates(message as ListMyInquiriesResponse))
+          as ListMyInquiriesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyInquiriesResponse() / ListMyInquiriesResponse.new instead')
+  static ListMyInquiriesResponse create() => ListMyInquiriesResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListMyInquiriesResponse._();
+  @$core.override
+  ListMyInquiriesResponse createEmptyInstance() => ListMyInquiriesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyInquiriesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyInquiriesResponse>(
+          ListMyInquiriesResponse.$_createMessage);
+  static ListMyInquiriesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<Inquiry> get inquiries => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+
+  /// 帳號全部店家上待回覆（OPEN，逾期仍算）的詢問數，不受篩選與分頁影響。
+  @$pb.TagNumber(3)
+  $core.int get pendingReplyCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set pendingReplyCount($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPendingReplyCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPendingReplyCount() => $_clearField(3);
+}
+
+class GetMyInquiryRequest extends $pb.GeneratedMessage {
+  factory GetMyInquiryRequest({
+    $core.String? inquiryId,
+  }) {
+    final result = GetMyInquiryRequest._();
+    if (inquiryId != null) result.inquiryId = inquiryId;
+    return result;
+  }
+
+  GetMyInquiryRequest._();
+
+  factory GetMyInquiryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyInquiryRequest()..mergeFromBuffer(data, registry);
+  factory GetMyInquiryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyInquiryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyInquiryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyInquiryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'inquiryId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyInquiryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyInquiryRequest copyWith(void Function(GetMyInquiryRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMyInquiryRequest))
+          as GetMyInquiryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use GetMyInquiryRequest() / GetMyInquiryRequest.new instead')
+  static GetMyInquiryRequest create() => GetMyInquiryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetMyInquiryRequest._();
+  @$core.override
+  GetMyInquiryRequest createEmptyInstance() => GetMyInquiryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyInquiryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyInquiryRequest>(
+          GetMyInquiryRequest.$_createMessage);
+  static GetMyInquiryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get inquiryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set inquiryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInquiryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInquiryId() => $_clearField(1);
+}
+
+class GetMyInquiryResponse extends $pb.GeneratedMessage {
+  factory GetMyInquiryResponse({
+    Inquiry? inquiry,
+  }) {
+    final result = GetMyInquiryResponse._();
+    if (inquiry != null) result.inquiry = inquiry;
+    return result;
+  }
+
+  GetMyInquiryResponse._();
+
+  factory GetMyInquiryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyInquiryResponse()..mergeFromBuffer(data, registry);
+  factory GetMyInquiryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyInquiryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyInquiryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyInquiryResponse.$_createMessage)
+    ..aOM<Inquiry>(1, _omitFieldNames ? '' : 'inquiry',
+        subBuilder: Inquiry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyInquiryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyInquiryResponse copyWith(void Function(GetMyInquiryResponse) updates) =>
+      super.copyWith((message) => updates(message as GetMyInquiryResponse))
+          as GetMyInquiryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyInquiryResponse() / GetMyInquiryResponse.new instead')
+  static GetMyInquiryResponse create() => GetMyInquiryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetMyInquiryResponse._();
+  @$core.override
+  GetMyInquiryResponse createEmptyInstance() => GetMyInquiryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyInquiryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyInquiryResponse>(
+          GetMyInquiryResponse.$_createMessage);
+  static GetMyInquiryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Inquiry get inquiry => $_getN(0);
+  @$pb.TagNumber(1)
+  set inquiry(Inquiry value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInquiry() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInquiry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Inquiry ensureInquiry() => $_ensure(0);
+}
+
+class ReplyToInquiryRequest extends $pb.GeneratedMessage {
+  factory ReplyToInquiryRequest({
+    $core.String? inquiryId,
+    $core.String? body,
+    $core.Iterable<$core.String>? evidenceStagedTokens,
+  }) {
+    final result = ReplyToInquiryRequest._();
+    if (inquiryId != null) result.inquiryId = inquiryId;
+    if (body != null) result.body = body;
+    if (evidenceStagedTokens != null)
+      result.evidenceStagedTokens.addAll(evidenceStagedTokens);
+    return result;
+  }
+
+  ReplyToInquiryRequest._();
+
+  factory ReplyToInquiryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReplyToInquiryRequest()..mergeFromBuffer(data, registry);
+  factory ReplyToInquiryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReplyToInquiryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReplyToInquiryRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ReplyToInquiryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'inquiryId')
+    ..aOS(2, _omitFieldNames ? '' : 'body')
+    ..pPS(3, _omitFieldNames ? '' : 'evidenceStagedTokens')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReplyToInquiryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReplyToInquiryRequest copyWith(
+          void Function(ReplyToInquiryRequest) updates) =>
+      super.copyWith((message) => updates(message as ReplyToInquiryRequest))
+          as ReplyToInquiryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ReplyToInquiryRequest() / ReplyToInquiryRequest.new instead')
+  static ReplyToInquiryRequest create() => ReplyToInquiryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ReplyToInquiryRequest._();
+  @$core.override
+  ReplyToInquiryRequest createEmptyInstance() => ReplyToInquiryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ReplyToInquiryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReplyToInquiryRequest>(
+          ReplyToInquiryRequest.$_createMessage);
+  static ReplyToInquiryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get inquiryId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set inquiryId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInquiryId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInquiryId() => $_clearField(1);
+
+  /// 回覆內容，1 到 4000 字。
+  @$pb.TagNumber(2)
+  $core.String get body => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set body($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBody() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBody() => $_clearField(2);
+
+  /// 附件的 staged token（機敏上傳），最多 5 份。
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get evidenceStagedTokens => $_getList(2);
+}
+
+class ReplyToInquiryResponse extends $pb.GeneratedMessage {
+  factory ReplyToInquiryResponse({
+    Inquiry? inquiry,
+  }) {
+    final result = ReplyToInquiryResponse._();
+    if (inquiry != null) result.inquiry = inquiry;
+    return result;
+  }
+
+  ReplyToInquiryResponse._();
+
+  factory ReplyToInquiryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReplyToInquiryResponse()..mergeFromBuffer(data, registry);
+  factory ReplyToInquiryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReplyToInquiryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReplyToInquiryResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ReplyToInquiryResponse.$_createMessage)
+    ..aOM<Inquiry>(1, _omitFieldNames ? '' : 'inquiry',
+        subBuilder: Inquiry.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReplyToInquiryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReplyToInquiryResponse copyWith(
+          void Function(ReplyToInquiryResponse) updates) =>
+      super.copyWith((message) => updates(message as ReplyToInquiryResponse))
+          as ReplyToInquiryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ReplyToInquiryResponse() / ReplyToInquiryResponse.new instead')
+  static ReplyToInquiryResponse create() => ReplyToInquiryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ReplyToInquiryResponse._();
+  @$core.override
+  ReplyToInquiryResponse createEmptyInstance() => ReplyToInquiryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ReplyToInquiryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReplyToInquiryResponse>(
+          ReplyToInquiryResponse.$_createMessage);
+  static ReplyToInquiryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Inquiry get inquiry => $_getN(0);
+  @$pb.TagNumber(1)
+  set inquiry(Inquiry value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInquiry() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInquiry() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Inquiry ensureInquiry() => $_ensure(0);
+}
+
 /// PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位。
 class PublicStore extends $pb.GeneratedMessage {
   factory PublicStore({
@@ -7249,7 +7969,7 @@ class BatchGetStoresRequest extends $pb.GeneratedMessage {
 
 class BatchGetStoresResponse extends $pb.GeneratedMessage {
   factory BatchGetStoresResponse({
-    $core.Iterable<$7.StoreCard>? stores,
+    $core.Iterable<$8.StoreCard>? stores,
   }) {
     final result = BatchGetStoresResponse._();
     if (stores != null) result.stores.addAll(stores);
@@ -7270,8 +7990,8 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BatchGetStoresResponse.$_createMessage)
-    ..pPM<$7.StoreCard>(1, _omitFieldNames ? '' : 'stores',
-        subBuilder: $7.StoreCard.$_createMessage)
+    ..pPM<$8.StoreCard>(1, _omitFieldNames ? '' : 'stores',
+        subBuilder: $8.StoreCard.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7299,7 +8019,7 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
   static BatchGetStoresResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<$7.StoreCard> get stores => $_getList(0);
+  $pb.PbList<$8.StoreCard> get stores => $_getList(0);
 }
 
 class GetSellerAgreementsRequest extends $pb.GeneratedMessage {
@@ -8205,6 +8925,28 @@ class SellerAppServiceApi {
           $pb.ClientContext? ctx, RequestRemediationRequest request) =>
       _client.invoke<RequestRemediationResponse>(ctx, 'SellerAppService',
           'RequestRemediation', request, RequestRemediationResponse());
+
+  /// ListMyInquiries 列出平台對呼叫者帳號所有店家發的詢問（案件上的提供紀錄或請說明），新到舊，含等回覆、已回覆（含管理員記下的系統外回覆）與已撤回（唯讀）。
+  /// 以帳號為範圍，不要求賣家角色或店家營運中：店家關閉後詢問開放中仍可回覆。state 篩選此刻的狀態；UNSPECIFIED 不篩。pending_reply_count 是帳號待回覆
+  /// （OPEN，逾期仍算）的總數，不受篩選與分頁影響，給導覽列徽章用（要只取數字時 page_size 取 1）。詢問只帶管理員轉述的說明，不含通報原文、佐證與檢舉人。
+  $async.Future<ListMyInquiriesResponse> listMyInquiries(
+          $pb.ClientContext? ctx, ListMyInquiriesRequest request) =>
+      _client.invoke<ListMyInquiriesResponse>(ctx, 'SellerAppService',
+          'ListMyInquiries', request, ListMyInquiriesResponse());
+
+  /// GetMyInquiry 回傳呼叫者帳號的一筆詢問。不屬於這個帳號的詢問與不存在的詢問都回 not_found。
+  $async.Future<GetMyInquiryResponse> getMyInquiry(
+          $pb.ClientContext? ctx, GetMyInquiryRequest request) =>
+      _client.invoke<GetMyInquiryResponse>(ctx, 'SellerAppService',
+          'GetMyInquiry', request, GetMyInquiryResponse());
+
+  /// ReplyToInquiry 回覆自己店家的詢問（內容加最多 5 份附件），回覆之後詢問結束；一則詢問一次回覆，要補資料由平台另發詢問。已回覆（含管理員記下的）與
+  /// 已撤回回 failed_precondition，重送同一個請求也一樣（不寫入）。逾期後仍可回覆，直到撤回或案件結案。不屬於這個帳號的詢問回 not_found。
+  /// 附件是機敏檔（先以機敏上傳取得 staged token），回覆之後賣家不讀回已上傳的附件，只看得到數量。不要求賣家角色。
+  $async.Future<ReplyToInquiryResponse> replyToInquiry(
+          $pb.ClientContext? ctx, ReplyToInquiryRequest request) =>
+      _client.invoke<ReplyToInquiryResponse>(ctx, 'SellerAppService',
+          'ReplyToInquiry', request, ReplyToInquiryResponse());
 
   /// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
   /// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回

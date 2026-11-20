@@ -45,6 +45,10 @@ test("詢問的名稱：種類、狀態、管道、撤回原因逐字；UNSPECIF
 		"通訊軟體",
 		"其他",
 	]);
+	assert.equal(
+		inquiryChannelText(CaseInquiryReplyChannel.SELLER_CENTER),
+		"賣家中心",
+	);
 	assert.deepEqual(
 		[CaseInquiryWithdrawCause.ADMIN, CaseInquiryWithdrawCause.CASE_CLOSED].map(
 			inquiryWithdrawCauseText,

@@ -1806,6 +1806,175 @@ func (MeasureRequestCloseCause) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{27}
 }
 
+// InquiryKind 是平台要賣家做的事。
+type InquiryKind int32
+
+const (
+	InquiryKind_INQUIRY_KIND_UNSPECIFIED InquiryKind = 0
+	// 提供紀錄：賣家合作條款第 11.3 條的來源、批次、效期、進出貨及流向。
+	InquiryKind_INQUIRY_KIND_RECORDS InquiryKind = 1
+	// 請說明。
+	InquiryKind_INQUIRY_KIND_EXPLANATION InquiryKind = 2
+)
+
+// Enum value maps for InquiryKind.
+var (
+	InquiryKind_name = map[int32]string{
+		0: "INQUIRY_KIND_UNSPECIFIED",
+		1: "INQUIRY_KIND_RECORDS",
+		2: "INQUIRY_KIND_EXPLANATION",
+	}
+	InquiryKind_value = map[string]int32{
+		"INQUIRY_KIND_UNSPECIFIED": 0,
+		"INQUIRY_KIND_RECORDS":     1,
+		"INQUIRY_KIND_EXPLANATION": 2,
+	}
+)
+
+func (x InquiryKind) Enum() *InquiryKind {
+	p := new(InquiryKind)
+	*p = x
+	return p
+}
+
+func (x InquiryKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InquiryKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_seller_v1alpha1_seller_proto_enumTypes[28].Descriptor()
+}
+
+func (InquiryKind) Type() protoreflect.EnumType {
+	return &file_hawkr_seller_v1alpha1_seller_proto_enumTypes[28]
+}
+
+func (x InquiryKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InquiryKind.Descriptor instead.
+func (InquiryKind) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{28}
+}
+
+// InquiryState 由伺服器推導（不儲存）。逾期不是狀態：OPEN 而且現在晚於 reply_deadline.due_time。
+type InquiryState int32
+
+const (
+	InquiryState_INQUIRY_STATE_UNSPECIFIED InquiryState = 0
+	// 等賣家回覆。
+	InquiryState_INQUIRY_STATE_OPEN InquiryState = 1
+	// 已回覆（終態）。
+	InquiryState_INQUIRY_STATE_REPLIED InquiryState = 2
+	// 已撤回（終態）：賣家不必再回覆。
+	InquiryState_INQUIRY_STATE_WITHDRAWN InquiryState = 3
+)
+
+// Enum value maps for InquiryState.
+var (
+	InquiryState_name = map[int32]string{
+		0: "INQUIRY_STATE_UNSPECIFIED",
+		1: "INQUIRY_STATE_OPEN",
+		2: "INQUIRY_STATE_REPLIED",
+		3: "INQUIRY_STATE_WITHDRAWN",
+	}
+	InquiryState_value = map[string]int32{
+		"INQUIRY_STATE_UNSPECIFIED": 0,
+		"INQUIRY_STATE_OPEN":        1,
+		"INQUIRY_STATE_REPLIED":     2,
+		"INQUIRY_STATE_WITHDRAWN":   3,
+	}
+)
+
+func (x InquiryState) Enum() *InquiryState {
+	p := new(InquiryState)
+	*p = x
+	return p
+}
+
+func (x InquiryState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InquiryState) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_seller_v1alpha1_seller_proto_enumTypes[29].Descriptor()
+}
+
+func (InquiryState) Type() protoreflect.EnumType {
+	return &file_hawkr_seller_v1alpha1_seller_proto_enumTypes[29]
+}
+
+func (x InquiryState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InquiryState.Descriptor instead.
+func (InquiryState) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{29}
+}
+
+// InquiryReplyChannel 是回覆怎麼收到的。
+type InquiryReplyChannel int32
+
+const (
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_UNSPECIFIED InquiryReplyChannel = 0
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_PHONE       InquiryReplyChannel = 1
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_EMAIL       InquiryReplyChannel = 2
+	// 通訊軟體。
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_MESSAGING InquiryReplyChannel = 3
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_OTHER     InquiryReplyChannel = 4
+	// 賣家在賣家中心回覆。
+	InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_SELLER_CENTER InquiryReplyChannel = 5
+)
+
+// Enum value maps for InquiryReplyChannel.
+var (
+	InquiryReplyChannel_name = map[int32]string{
+		0: "INQUIRY_REPLY_CHANNEL_UNSPECIFIED",
+		1: "INQUIRY_REPLY_CHANNEL_PHONE",
+		2: "INQUIRY_REPLY_CHANNEL_EMAIL",
+		3: "INQUIRY_REPLY_CHANNEL_MESSAGING",
+		4: "INQUIRY_REPLY_CHANNEL_OTHER",
+		5: "INQUIRY_REPLY_CHANNEL_SELLER_CENTER",
+	}
+	InquiryReplyChannel_value = map[string]int32{
+		"INQUIRY_REPLY_CHANNEL_UNSPECIFIED":   0,
+		"INQUIRY_REPLY_CHANNEL_PHONE":         1,
+		"INQUIRY_REPLY_CHANNEL_EMAIL":         2,
+		"INQUIRY_REPLY_CHANNEL_MESSAGING":     3,
+		"INQUIRY_REPLY_CHANNEL_OTHER":         4,
+		"INQUIRY_REPLY_CHANNEL_SELLER_CENTER": 5,
+	}
+)
+
+func (x InquiryReplyChannel) Enum() *InquiryReplyChannel {
+	p := new(InquiryReplyChannel)
+	*p = x
+	return p
+}
+
+func (x InquiryReplyChannel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InquiryReplyChannel) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_seller_v1alpha1_seller_proto_enumTypes[30].Descriptor()
+}
+
+func (InquiryReplyChannel) Type() protoreflect.EnumType {
+	return &file_hawkr_seller_v1alpha1_seller_proto_enumTypes[30]
+}
+
+func (x InquiryReplyChannel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InquiryReplyChannel.Descriptor instead.
+func (InquiryReplyChannel) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{30}
+}
+
 // AgreementAcceptance 是賣家對一份文件的同意：client 送回它顯示給賣家的版本，伺服器核對後記錄。
 type AgreementAcceptance struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -6601,6 +6770,517 @@ func (x *RequestRemediationResponse) GetMeasure() *Measure {
 	return nil
 }
 
+// Inquiry 是賣家看到的詢問：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回。只帶管理員轉述的說明，不含案件、通報原文、佐證與管理員身分。
+type Inquiry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind  InquiryKind            `protobuf:"varint,2,opt,name=kind,proto3,enum=hawkr.seller.v1alpha1.InquiryKind" json:"kind,omitempty"`
+	// 平台給賣家的說明。
+	Message    string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	State      InquiryState           `protobuf:"varint,5,opt,name=state,proto3,enum=hawkr.seller.v1alpha1.InquiryState" json:"state,omitempty"`
+	// 回覆期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的。逾期後仍可回覆。
+	ReplyDeadline *v1alpha1.Deadline `protobuf:"bytes,6,opt,name=reply_deadline,json=replyDeadline,proto3" json:"reply_deadline,omitempty"`
+	// 只在 REPLIED 時設。
+	Reply *InquiryReply `protobuf:"bytes,7,opt,name=reply,proto3" json:"reply,omitempty"`
+	// 只在 WITHDRAWN 時設。
+	WithdrawTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=withdraw_time,json=withdrawTime,proto3" json:"withdraw_time,omitempty"`
+	// 賣家此刻能不能回覆（state 是 OPEN）；由伺服器判斷，與 ReplyToInquiry 的前置檢查是同一個規則，client 不自己從 state 推導。
+	CanReply bool `protobuf:"varint,9,opt,name=can_reply,json=canReply,proto3" json:"can_reply,omitempty"`
+	// 回覆時最多可以帶的附件數（伺服器的上限，ReplyToInquiry 的 evidence_staged_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
+	ReplyAttachmentMax int32 `protobuf:"varint,10,opt,name=reply_attachment_max,json=replyAttachmentMax,proto3" json:"reply_attachment_max,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *Inquiry) Reset() {
+	*x = Inquiry{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Inquiry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Inquiry) ProtoMessage() {}
+
+func (x *Inquiry) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Inquiry.ProtoReflect.Descriptor instead.
+func (*Inquiry) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *Inquiry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Inquiry) GetKind() InquiryKind {
+	if x != nil {
+		return x.Kind
+	}
+	return InquiryKind_INQUIRY_KIND_UNSPECIFIED
+}
+
+func (x *Inquiry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *Inquiry) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Inquiry) GetState() InquiryState {
+	if x != nil {
+		return x.State
+	}
+	return InquiryState_INQUIRY_STATE_UNSPECIFIED
+}
+
+func (x *Inquiry) GetReplyDeadline() *v1alpha1.Deadline {
+	if x != nil {
+		return x.ReplyDeadline
+	}
+	return nil
+}
+
+func (x *Inquiry) GetReply() *InquiryReply {
+	if x != nil {
+		return x.Reply
+	}
+	return nil
+}
+
+func (x *Inquiry) GetWithdrawTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.WithdrawTime
+	}
+	return nil
+}
+
+func (x *Inquiry) GetCanReply() bool {
+	if x != nil {
+		return x.CanReply
+	}
+	return false
+}
+
+func (x *Inquiry) GetReplyAttachmentMax() int32 {
+	if x != nil {
+		return x.ReplyAttachmentMax
+	}
+	return 0
+}
+
+// InquiryReply 是詢問的回覆：賣家在賣家中心回覆的，或管理員記下系統外收到的（電話、電子信箱等）。
+type InquiryReply struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Body    string                 `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
+	Channel InquiryReplyChannel    `protobuf:"varint,2,opt,name=channel,proto3,enum=hawkr.seller.v1alpha1.InquiryReplyChannel" json:"channel,omitempty"`
+	// 收到的時間；賣家在賣家中心回覆時是送出的時間。
+	ReceiveTime *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=receive_time,json=receiveTime,proto3" json:"receive_time,omitempty"`
+	// 附件數量；附件是機敏檔，賣家不讀回。
+	AttachmentCount int32 `protobuf:"varint,4,opt,name=attachment_count,json=attachmentCount,proto3" json:"attachment_count,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *InquiryReply) Reset() {
+	*x = InquiryReply{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InquiryReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InquiryReply) ProtoMessage() {}
+
+func (x *InquiryReply) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InquiryReply.ProtoReflect.Descriptor instead.
+func (*InquiryReply) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *InquiryReply) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *InquiryReply) GetChannel() InquiryReplyChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return InquiryReplyChannel_INQUIRY_REPLY_CHANNEL_UNSPECIFIED
+}
+
+func (x *InquiryReply) GetReceiveTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReceiveTime
+	}
+	return nil
+}
+
+func (x *InquiryReply) GetAttachmentCount() int32 {
+	if x != nil {
+		return x.AttachmentCount
+	}
+	return 0
+}
+
+type ListMyInquiriesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 50，上限 100。
+	PageSize  int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// 只列此刻是這個狀態的詢問；UNSPECIFIED 不篩。
+	State         InquiryState `protobuf:"varint,3,opt,name=state,proto3,enum=hawkr.seller.v1alpha1.InquiryState" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyInquiriesRequest) Reset() {
+	*x = ListMyInquiriesRequest{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyInquiriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyInquiriesRequest) ProtoMessage() {}
+
+func (x *ListMyInquiriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyInquiriesRequest.ProtoReflect.Descriptor instead.
+func (*ListMyInquiriesRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *ListMyInquiriesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListMyInquiriesRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListMyInquiriesRequest) GetState() InquiryState {
+	if x != nil {
+		return x.State
+	}
+	return InquiryState_INQUIRY_STATE_UNSPECIFIED
+}
+
+type ListMyInquiriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Inquiries     []*Inquiry             `protobuf:"bytes,1,rep,name=inquiries,proto3" json:"inquiries,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	// 帳號全部店家上待回覆（OPEN，逾期仍算）的詢問數，不受篩選與分頁影響。
+	PendingReplyCount int32 `protobuf:"varint,3,opt,name=pending_reply_count,json=pendingReplyCount,proto3" json:"pending_reply_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListMyInquiriesResponse) Reset() {
+	*x = ListMyInquiriesResponse{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyInquiriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyInquiriesResponse) ProtoMessage() {}
+
+func (x *ListMyInquiriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyInquiriesResponse.ProtoReflect.Descriptor instead.
+func (*ListMyInquiriesResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *ListMyInquiriesResponse) GetInquiries() []*Inquiry {
+	if x != nil {
+		return x.Inquiries
+	}
+	return nil
+}
+
+func (x *ListMyInquiriesResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+func (x *ListMyInquiriesResponse) GetPendingReplyCount() int32 {
+	if x != nil {
+		return x.PendingReplyCount
+	}
+	return 0
+}
+
+type GetMyInquiryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InquiryId     string                 `protobuf:"bytes,1,opt,name=inquiry_id,json=inquiryId,proto3" json:"inquiry_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyInquiryRequest) Reset() {
+	*x = GetMyInquiryRequest{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyInquiryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyInquiryRequest) ProtoMessage() {}
+
+func (x *GetMyInquiryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyInquiryRequest.ProtoReflect.Descriptor instead.
+func (*GetMyInquiryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *GetMyInquiryRequest) GetInquiryId() string {
+	if x != nil {
+		return x.InquiryId
+	}
+	return ""
+}
+
+type GetMyInquiryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Inquiry       *Inquiry               `protobuf:"bytes,1,opt,name=inquiry,proto3" json:"inquiry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyInquiryResponse) Reset() {
+	*x = GetMyInquiryResponse{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyInquiryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyInquiryResponse) ProtoMessage() {}
+
+func (x *GetMyInquiryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyInquiryResponse.ProtoReflect.Descriptor instead.
+func (*GetMyInquiryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *GetMyInquiryResponse) GetInquiry() *Inquiry {
+	if x != nil {
+		return x.Inquiry
+	}
+	return nil
+}
+
+type ReplyToInquiryRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	InquiryId string                 `protobuf:"bytes,1,opt,name=inquiry_id,json=inquiryId,proto3" json:"inquiry_id,omitempty"`
+	// 回覆內容，1 到 4000 字。
+	Body string `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"`
+	// 附件的 staged token（機敏上傳），最多 5 份。
+	EvidenceStagedTokens []string `protobuf:"bytes,3,rep,name=evidence_staged_tokens,json=evidenceStagedTokens,proto3" json:"evidence_staged_tokens,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ReplyToInquiryRequest) Reset() {
+	*x = ReplyToInquiryRequest{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyToInquiryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyToInquiryRequest) ProtoMessage() {}
+
+func (x *ReplyToInquiryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyToInquiryRequest.ProtoReflect.Descriptor instead.
+func (*ReplyToInquiryRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *ReplyToInquiryRequest) GetInquiryId() string {
+	if x != nil {
+		return x.InquiryId
+	}
+	return ""
+}
+
+func (x *ReplyToInquiryRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ReplyToInquiryRequest) GetEvidenceStagedTokens() []string {
+	if x != nil {
+		return x.EvidenceStagedTokens
+	}
+	return nil
+}
+
+type ReplyToInquiryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Inquiry       *Inquiry               `protobuf:"bytes,1,opt,name=inquiry,proto3" json:"inquiry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplyToInquiryResponse) Reset() {
+	*x = ReplyToInquiryResponse{}
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyToInquiryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyToInquiryResponse) ProtoMessage() {}
+
+func (x *ReplyToInquiryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyToInquiryResponse.ProtoReflect.Descriptor instead.
+func (*ReplyToInquiryResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *ReplyToInquiryResponse) GetInquiry() *Inquiry {
+	if x != nil {
+		return x.Inquiry
+	}
+	return nil
+}
+
 // PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位。
 type PublicStore struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -6630,7 +7310,7 @@ type PublicStore struct {
 
 func (x *PublicStore) Reset() {
 	*x = PublicStore{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[76]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6642,7 +7322,7 @@ func (x *PublicStore) String() string {
 func (*PublicStore) ProtoMessage() {}
 
 func (x *PublicStore) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[76]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6655,7 +7335,7 @@ func (x *PublicStore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicStore.ProtoReflect.Descriptor instead.
 func (*PublicStore) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{76}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *PublicStore) GetId() string {
@@ -6743,7 +7423,7 @@ type StoreStats struct {
 
 func (x *StoreStats) Reset() {
 	*x = StoreStats{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[77]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6755,7 +7435,7 @@ func (x *StoreStats) String() string {
 func (*StoreStats) ProtoMessage() {}
 
 func (x *StoreStats) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[77]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6768,7 +7448,7 @@ func (x *StoreStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreStats.ProtoReflect.Descriptor instead.
 func (*StoreStats) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{77}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *StoreStats) GetFollowerCount() int32 {
@@ -6802,7 +7482,7 @@ type GetStoreRequest struct {
 
 func (x *GetStoreRequest) Reset() {
 	*x = GetStoreRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[78]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6814,7 +7494,7 @@ func (x *GetStoreRequest) String() string {
 func (*GetStoreRequest) ProtoMessage() {}
 
 func (x *GetStoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[78]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6827,7 +7507,7 @@ func (x *GetStoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStoreRequest.ProtoReflect.Descriptor instead.
 func (*GetStoreRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{78}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *GetStoreRequest) GetStoreCode() string {
@@ -6847,7 +7527,7 @@ type GetStoreResponse struct {
 
 func (x *GetStoreResponse) Reset() {
 	*x = GetStoreResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[79]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6859,7 +7539,7 @@ func (x *GetStoreResponse) String() string {
 func (*GetStoreResponse) ProtoMessage() {}
 
 func (x *GetStoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[79]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6872,7 +7552,7 @@ func (x *GetStoreResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStoreResponse.ProtoReflect.Descriptor instead.
 func (*GetStoreResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{79}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *GetStoreResponse) GetStore() *PublicStore {
@@ -6900,7 +7580,7 @@ type ListStoresRequest struct {
 
 func (x *ListStoresRequest) Reset() {
 	*x = ListStoresRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[80]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6912,7 +7592,7 @@ func (x *ListStoresRequest) String() string {
 func (*ListStoresRequest) ProtoMessage() {}
 
 func (x *ListStoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[80]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6925,7 +7605,7 @@ func (x *ListStoresRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStoresRequest.ProtoReflect.Descriptor instead.
 func (*ListStoresRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{80}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ListStoresRequest) GetPageSize() int32 {
@@ -6953,7 +7633,7 @@ type ListStoresResponse struct {
 
 func (x *ListStoresResponse) Reset() {
 	*x = ListStoresResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[81]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6965,7 +7645,7 @@ func (x *ListStoresResponse) String() string {
 func (*ListStoresResponse) ProtoMessage() {}
 
 func (x *ListStoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[81]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6978,7 +7658,7 @@ func (x *ListStoresResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStoresResponse.ProtoReflect.Descriptor instead.
 func (*ListStoresResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{81}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *ListStoresResponse) GetStores() []*PublicStore {
@@ -7005,7 +7685,7 @@ type BatchGetStoresRequest struct {
 
 func (x *BatchGetStoresRequest) Reset() {
 	*x = BatchGetStoresRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[82]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7017,7 +7697,7 @@ func (x *BatchGetStoresRequest) String() string {
 func (*BatchGetStoresRequest) ProtoMessage() {}
 
 func (x *BatchGetStoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[82]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7030,7 +7710,7 @@ func (x *BatchGetStoresRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGetStoresRequest.ProtoReflect.Descriptor instead.
 func (*BatchGetStoresRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{82}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *BatchGetStoresRequest) GetIds() []string {
@@ -7049,7 +7729,7 @@ type BatchGetStoresResponse struct {
 
 func (x *BatchGetStoresResponse) Reset() {
 	*x = BatchGetStoresResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[83]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7061,7 +7741,7 @@ func (x *BatchGetStoresResponse) String() string {
 func (*BatchGetStoresResponse) ProtoMessage() {}
 
 func (x *BatchGetStoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[83]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7074,7 +7754,7 @@ func (x *BatchGetStoresResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGetStoresResponse.ProtoReflect.Descriptor instead.
 func (*BatchGetStoresResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{83}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *BatchGetStoresResponse) GetStores() []*v1alpha1.StoreCard {
@@ -7092,7 +7772,7 @@ type GetSellerAgreementsRequest struct {
 
 func (x *GetSellerAgreementsRequest) Reset() {
 	*x = GetSellerAgreementsRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[84]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7104,7 +7784,7 @@ func (x *GetSellerAgreementsRequest) String() string {
 func (*GetSellerAgreementsRequest) ProtoMessage() {}
 
 func (x *GetSellerAgreementsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[84]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7117,7 +7797,7 @@ func (x *GetSellerAgreementsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerAgreementsRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerAgreementsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{84}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{92}
 }
 
 type GetSellerAgreementsResponse struct {
@@ -7130,7 +7810,7 @@ type GetSellerAgreementsResponse struct {
 
 func (x *GetSellerAgreementsResponse) Reset() {
 	*x = GetSellerAgreementsResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[85]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7142,7 +7822,7 @@ func (x *GetSellerAgreementsResponse) String() string {
 func (*GetSellerAgreementsResponse) ProtoMessage() {}
 
 func (x *GetSellerAgreementsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[85]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7155,7 +7835,7 @@ func (x *GetSellerAgreementsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerAgreementsResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerAgreementsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{85}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *GetSellerAgreementsResponse) GetAgreements() []*SellerAgreement {
@@ -7175,7 +7855,7 @@ type RecordProductViewRequest struct {
 
 func (x *RecordProductViewRequest) Reset() {
 	*x = RecordProductViewRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[86]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7187,7 +7867,7 @@ func (x *RecordProductViewRequest) String() string {
 func (*RecordProductViewRequest) ProtoMessage() {}
 
 func (x *RecordProductViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[86]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7200,7 +7880,7 @@ func (x *RecordProductViewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordProductViewRequest.ProtoReflect.Descriptor instead.
 func (*RecordProductViewRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{86}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *RecordProductViewRequest) GetProductId() string {
@@ -7218,7 +7898,7 @@ type RecordProductViewResponse struct {
 
 func (x *RecordProductViewResponse) Reset() {
 	*x = RecordProductViewResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[87]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7230,7 +7910,7 @@ func (x *RecordProductViewResponse) String() string {
 func (*RecordProductViewResponse) ProtoMessage() {}
 
 func (x *RecordProductViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[87]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7243,7 +7923,7 @@ func (x *RecordProductViewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordProductViewResponse.ProtoReflect.Descriptor instead.
 func (*RecordProductViewResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{87}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{95}
 }
 
 type BlockBuyerRequest struct {
@@ -7261,7 +7941,7 @@ type BlockBuyerRequest struct {
 
 func (x *BlockBuyerRequest) Reset() {
 	*x = BlockBuyerRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[88]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7273,7 +7953,7 @@ func (x *BlockBuyerRequest) String() string {
 func (*BlockBuyerRequest) ProtoMessage() {}
 
 func (x *BlockBuyerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[88]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7286,7 +7966,7 @@ func (x *BlockBuyerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockBuyerRequest.ProtoReflect.Descriptor instead.
 func (*BlockBuyerRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{88}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *BlockBuyerRequest) GetSource() isBlockBuyerRequest_Source {
@@ -7342,7 +8022,7 @@ type BlockBuyerResponse struct {
 
 func (x *BlockBuyerResponse) Reset() {
 	*x = BlockBuyerResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[89]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7354,7 +8034,7 @@ func (x *BlockBuyerResponse) String() string {
 func (*BlockBuyerResponse) ProtoMessage() {}
 
 func (x *BlockBuyerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[89]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7367,7 +8047,7 @@ func (x *BlockBuyerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockBuyerResponse.ProtoReflect.Descriptor instead.
 func (*BlockBuyerResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{89}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *BlockBuyerResponse) GetChanged() bool {
@@ -7386,7 +8066,7 @@ type UnblockBuyerRequest struct {
 
 func (x *UnblockBuyerRequest) Reset() {
 	*x = UnblockBuyerRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[90]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7398,7 +8078,7 @@ func (x *UnblockBuyerRequest) String() string {
 func (*UnblockBuyerRequest) ProtoMessage() {}
 
 func (x *UnblockBuyerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[90]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7411,7 +8091,7 @@ func (x *UnblockBuyerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockBuyerRequest.ProtoReflect.Descriptor instead.
 func (*UnblockBuyerRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{90}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *UnblockBuyerRequest) GetBuyerId() string {
@@ -7431,7 +8111,7 @@ type UnblockBuyerResponse struct {
 
 func (x *UnblockBuyerResponse) Reset() {
 	*x = UnblockBuyerResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[91]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7443,7 +8123,7 @@ func (x *UnblockBuyerResponse) String() string {
 func (*UnblockBuyerResponse) ProtoMessage() {}
 
 func (x *UnblockBuyerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[91]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7456,7 +8136,7 @@ func (x *UnblockBuyerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockBuyerResponse.ProtoReflect.Descriptor instead.
 func (*UnblockBuyerResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{91}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *UnblockBuyerResponse) GetChanged() bool {
@@ -7477,7 +8157,7 @@ type ListBlockedBuyersRequest struct {
 
 func (x *ListBlockedBuyersRequest) Reset() {
 	*x = ListBlockedBuyersRequest{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[92]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7489,7 +8169,7 @@ func (x *ListBlockedBuyersRequest) String() string {
 func (*ListBlockedBuyersRequest) ProtoMessage() {}
 
 func (x *ListBlockedBuyersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[92]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7502,7 +8182,7 @@ func (x *ListBlockedBuyersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBlockedBuyersRequest.ProtoReflect.Descriptor instead.
 func (*ListBlockedBuyersRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{92}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ListBlockedBuyersRequest) GetPageSize() int32 {
@@ -7529,7 +8209,7 @@ type ListBlockedBuyersResponse struct {
 
 func (x *ListBlockedBuyersResponse) Reset() {
 	*x = ListBlockedBuyersResponse{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[93]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7541,7 +8221,7 @@ func (x *ListBlockedBuyersResponse) String() string {
 func (*ListBlockedBuyersResponse) ProtoMessage() {}
 
 func (x *ListBlockedBuyersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[93]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7554,7 +8234,7 @@ func (x *ListBlockedBuyersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBlockedBuyersResponse.ProtoReflect.Descriptor instead.
 func (*ListBlockedBuyersResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{93}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ListBlockedBuyersResponse) GetBlockedBuyers() []*BlockedBuyer {
@@ -7582,7 +8262,7 @@ type BlockedBuyer struct {
 
 func (x *BlockedBuyer) Reset() {
 	*x = BlockedBuyer{}
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[94]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7594,7 +8274,7 @@ func (x *BlockedBuyer) String() string {
 func (*BlockedBuyer) ProtoMessage() {}
 
 func (x *BlockedBuyer) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[94]
+	mi := &file_hawkr_seller_v1alpha1_seller_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7607,7 +8287,7 @@ func (x *BlockedBuyer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockedBuyer.ProtoReflect.Descriptor instead.
 func (*BlockedBuyer) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{94}
+	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *BlockedBuyer) GetBuyer() *BuyerCard {
@@ -7628,7 +8308,7 @@ var File_hawkr_seller_v1alpha1_seller_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/seller/v1alpha1/seller.proto\x12\x15hawkr.seller.v1alpha1\x1a!hawkr/common/v1alpha1/image.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/common/v1alpha1/postal_address.proto\x1a&hawkr/common/v1alpha1/store_card.proto\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\x1a\x16google/type/date.proto\"s\n" +
+	"\"hawkr/seller/v1alpha1/seller.proto\x12\x15hawkr.seller.v1alpha1\x1a$hawkr/common/v1alpha1/deadline.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/common/v1alpha1/postal_address.proto\x1a&hawkr/common/v1alpha1/store_card.proto\x1a$hawkr/payment/v1alpha1/payment.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\x1a\x16google/type/date.proto\"s\n" +
 	"\x13AgreementAcceptance\x12=\n" +
 	"\x04kind\x18\x01 \x01(\x0e2$.hawkr.seller.v1alpha1.AgreementKindB\x03\xe0A\x02R\x04kind\x12\x1d\n" +
 	"\aversion\x18\x02 \x01(\tB\x03\xe0A\x02R\aversion\"w\n" +
@@ -7964,7 +8644,46 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\x12\x17\n" +
 	"\x04etag\x18\x04 \x01(\tB\x03\xe0A\x02R\x04etag\"V\n" +
 	"\x1aRequestRemediationResponse\x128\n" +
-	"\ameasure\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.MeasureR\ameasure\"\x8e\x03\n" +
+	"\ameasure\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.MeasureR\ameasure\"\xa8\x04\n" +
+	"\aInquiry\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12;\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\".hawkr.seller.v1alpha1.InquiryKindB\x03\xe0A\x03R\x04kind\x12\x1d\n" +
+	"\amessage\x18\x03 \x01(\tB\x03\xe0A\x03R\amessage\x12@\n" +
+	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x12>\n" +
+	"\x05state\x18\x05 \x01(\x0e2#.hawkr.seller.v1alpha1.InquiryStateB\x03\xe0A\x03R\x05state\x12K\n" +
+	"\x0ereply_deadline\x18\x06 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\rreplyDeadline\x12>\n" +
+	"\x05reply\x18\a \x01(\v2#.hawkr.seller.v1alpha1.InquiryReplyB\x03\xe0A\x03R\x05reply\x12D\n" +
+	"\rwithdraw_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fwithdrawTime\x12 \n" +
+	"\tcan_reply\x18\t \x01(\bB\x03\xe0A\x03R\bcanReply\x125\n" +
+	"\x14reply_attachment_max\x18\n" +
+	" \x01(\x05B\x03\xe0A\x03R\x12replyAttachmentMax\"\xe6\x01\n" +
+	"\fInquiryReply\x12\x17\n" +
+	"\x04body\x18\x01 \x01(\tB\x03\xe0A\x03R\x04body\x12I\n" +
+	"\achannel\x18\x02 \x01(\x0e2*.hawkr.seller.v1alpha1.InquiryReplyChannelB\x03\xe0A\x03R\achannel\x12B\n" +
+	"\freceive_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vreceiveTime\x12.\n" +
+	"\x10attachment_count\x18\x04 \x01(\x05B\x03\xe0A\x03R\x0fattachmentCount\"\x8f\x01\n" +
+	"\x16ListMyInquiriesRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x129\n" +
+	"\x05state\x18\x03 \x01(\x0e2#.hawkr.seller.v1alpha1.InquiryStateR\x05state\"\xaf\x01\n" +
+	"\x17ListMyInquiriesResponse\x12<\n" +
+	"\tinquiries\x18\x01 \x03(\v2\x1e.hawkr.seller.v1alpha1.InquiryR\tinquiries\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12.\n" +
+	"\x13pending_reply_count\x18\x03 \x01(\x05R\x11pendingReplyCount\"9\n" +
+	"\x13GetMyInquiryRequest\x12\"\n" +
+	"\n" +
+	"inquiry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tinquiryId\"P\n" +
+	"\x14GetMyInquiryResponse\x128\n" +
+	"\ainquiry\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.InquiryR\ainquiry\"\x8a\x01\n" +
+	"\x15ReplyToInquiryRequest\x12\"\n" +
+	"\n" +
+	"inquiry_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tinquiryId\x12\x17\n" +
+	"\x04body\x18\x02 \x01(\tB\x03\xe0A\x02R\x04body\x124\n" +
+	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\"R\n" +
+	"\x16ReplyToInquiryResponse\x128\n" +
+	"\ainquiry\x18\x01 \x01(\v2\x1e.hawkr.seller.v1alpha1.InquiryR\ainquiry\"\x8e\x03\n" +
 	"\vPublicStore\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\"\n" +
 	"\n" +
@@ -8232,7 +8951,23 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18MeasureRequestCloseCause\x12+\n" +
 	"'MEASURE_REQUEST_CLOSE_CAUSE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#MEASURE_REQUEST_CLOSE_CAUSE_REVOKED\x10\x01\x12%\n" +
-	"!MEASURE_REQUEST_CLOSE_CAUSE_ENDED\x10\x022\x93\x16\n" +
+	"!MEASURE_REQUEST_CLOSE_CAUSE_ENDED\x10\x02*c\n" +
+	"\vInquiryKind\x12\x1c\n" +
+	"\x18INQUIRY_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14INQUIRY_KIND_RECORDS\x10\x01\x12\x1c\n" +
+	"\x18INQUIRY_KIND_EXPLANATION\x10\x02*}\n" +
+	"\fInquiryState\x12\x1d\n" +
+	"\x19INQUIRY_STATE_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12INQUIRY_STATE_OPEN\x10\x01\x12\x19\n" +
+	"\x15INQUIRY_STATE_REPLIED\x10\x02\x12\x1b\n" +
+	"\x17INQUIRY_STATE_WITHDRAWN\x10\x03*\xed\x01\n" +
+	"\x13InquiryReplyChannel\x12%\n" +
+	"!INQUIRY_REPLY_CHANNEL_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bINQUIRY_REPLY_CHANNEL_PHONE\x10\x01\x12\x1f\n" +
+	"\x1bINQUIRY_REPLY_CHANNEL_EMAIL\x10\x02\x12#\n" +
+	"\x1fINQUIRY_REPLY_CHANNEL_MESSAGING\x10\x03\x12\x1f\n" +
+	"\x1bINQUIRY_REPLY_CHANNEL_OTHER\x10\x04\x12'\n" +
+	"#INQUIRY_REPLY_CHANNEL_SELLER_CENTER\x10\x052\xe7\x18\n" +
 	"\x10SellerAppService\x12a\n" +
 	"\n" +
 	"ApplyStore\x12(.hawkr.seller.v1alpha1.ApplyStoreRequest\x1a).hawkr.seller.v1alpha1.ApplyStoreResponse\x12{\n" +
@@ -8256,7 +8991,10 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x0eListMyMeasures\x12,.hawkr.seller.v1alpha1.ListMyMeasuresRequest\x1a-.hawkr.seller.v1alpha1.ListMyMeasuresResponse\"\x03\x90\x02\x01\x12l\n" +
 	"\fGetMyMeasure\x12*.hawkr.seller.v1alpha1.GetMyMeasureRequest\x1a+.hawkr.seller.v1alpha1.GetMyMeasureResponse\"\x03\x90\x02\x01\x12g\n" +
 	"\fSubmitAppeal\x12*.hawkr.seller.v1alpha1.SubmitAppealRequest\x1a+.hawkr.seller.v1alpha1.SubmitAppealResponse\x12y\n" +
-	"\x12RequestRemediation\x120.hawkr.seller.v1alpha1.RequestRemediationRequest\x1a1.hawkr.seller.v1alpha1.RequestRemediationResponse\x12f\n" +
+	"\x12RequestRemediation\x120.hawkr.seller.v1alpha1.RequestRemediationRequest\x1a1.hawkr.seller.v1alpha1.RequestRemediationResponse\x12u\n" +
+	"\x0fListMyInquiries\x12-.hawkr.seller.v1alpha1.ListMyInquiriesRequest\x1a..hawkr.seller.v1alpha1.ListMyInquiriesResponse\"\x03\x90\x02\x01\x12l\n" +
+	"\fGetMyInquiry\x12*.hawkr.seller.v1alpha1.GetMyInquiryRequest\x1a+.hawkr.seller.v1alpha1.GetMyInquiryResponse\"\x03\x90\x02\x01\x12m\n" +
+	"\x0eReplyToInquiry\x12,.hawkr.seller.v1alpha1.ReplyToInquiryRequest\x1a-.hawkr.seller.v1alpha1.ReplyToInquiryResponse\x12f\n" +
 	"\n" +
 	"BlockBuyer\x12(.hawkr.seller.v1alpha1.BlockBuyerRequest\x1a).hawkr.seller.v1alpha1.BlockBuyerResponse\"\x03\x90\x02\x02\x12l\n" +
 	"\fUnblockBuyer\x12*.hawkr.seller.v1alpha1.UnblockBuyerRequest\x1a+.hawkr.seller.v1alpha1.UnblockBuyerResponse\"\x03\x90\x02\x02\x12{\n" +
@@ -8282,8 +9020,8 @@ func file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP() []byte {
 	return file_hawkr_seller_v1alpha1_seller_proto_rawDescData
 }
 
-var file_hawkr_seller_v1alpha1_seller_proto_enumTypes = make([]protoimpl.EnumInfo, 28)
-var file_hawkr_seller_v1alpha1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 95)
+var file_hawkr_seller_v1alpha1_seller_proto_enumTypes = make([]protoimpl.EnumInfo, 31)
+var file_hawkr_seller_v1alpha1_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 103)
 var file_hawkr_seller_v1alpha1_seller_proto_goTypes = []any{
 	(AgreementKind)(0),                             // 0: hawkr.seller.v1alpha1.AgreementKind
 	(StoreStatus)(0),                               // 1: hawkr.seller.v1alpha1.StoreStatus
@@ -8313,310 +9051,340 @@ var file_hawkr_seller_v1alpha1_seller_proto_goTypes = []any{
 	(TerminationGround)(0),                         // 25: hawkr.seller.v1alpha1.TerminationGround
 	(AppealUnavailableReason)(0),                   // 26: hawkr.seller.v1alpha1.AppealUnavailableReason
 	(MeasureRequestCloseCause)(0),                  // 27: hawkr.seller.v1alpha1.MeasureRequestCloseCause
-	(*AgreementAcceptance)(nil),                    // 28: hawkr.seller.v1alpha1.AgreementAcceptance
-	(*SellerAgreement)(nil),                        // 29: hawkr.seller.v1alpha1.SellerAgreement
-	(*Store)(nil),                                  // 30: hawkr.seller.v1alpha1.Store
-	(*CapabilityStatus)(nil),                       // 31: hawkr.seller.v1alpha1.CapabilityStatus
-	(*ApplyStoreRequest)(nil),                      // 32: hawkr.seller.v1alpha1.ApplyStoreRequest
-	(*ApplyStoreResponse)(nil),                     // 33: hawkr.seller.v1alpha1.ApplyStoreResponse
-	(*GetMyStoreOpeningRequest)(nil),               // 34: hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
-	(*GetMyStoreOpeningResponse)(nil),              // 35: hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
-	(*StoreOpeningUnavailability)(nil),             // 36: hawkr.seller.v1alpha1.StoreOpeningUnavailability
-	(*GetMyStoreRequest)(nil),                      // 37: hawkr.seller.v1alpha1.GetMyStoreRequest
-	(*GetMyStoreResponse)(nil),                     // 38: hawkr.seller.v1alpha1.GetMyStoreResponse
-	(*GetMyOnboardingRequest)(nil),                 // 39: hawkr.seller.v1alpha1.GetMyOnboardingRequest
-	(*GetMyOnboardingResponse)(nil),                // 40: hawkr.seller.v1alpha1.GetMyOnboardingResponse
-	(*OnboardingTask)(nil),                         // 41: hawkr.seller.v1alpha1.OnboardingTask
-	(*UpdateMyStoreRequest)(nil),                   // 42: hawkr.seller.v1alpha1.UpdateMyStoreRequest
-	(*UpdateMyStoreResponse)(nil),                  // 43: hawkr.seller.v1alpha1.UpdateMyStoreResponse
-	(*RefreshMyPaymentAccountRequest)(nil),         // 44: hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
-	(*RefreshMyPaymentAccountResponse)(nil),        // 45: hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
-	(*CompleteMyStoreOnboardingRequest)(nil),       // 46: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
-	(*CompleteMyStoreOnboardingResponse)(nil),      // 47: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
-	(*ListMyFollowersRequest)(nil),                 // 48: hawkr.seller.v1alpha1.ListMyFollowersRequest
-	(*ListMyFollowersResponse)(nil),                // 49: hawkr.seller.v1alpha1.ListMyFollowersResponse
-	(*BuyerCard)(nil),                              // 50: hawkr.seller.v1alpha1.BuyerCard
-	(*Follower)(nil),                               // 51: hawkr.seller.v1alpha1.Follower
-	(*GetMyDashboardRequest)(nil),                  // 52: hawkr.seller.v1alpha1.GetMyDashboardRequest
-	(*GetMyDashboardResponse)(nil),                 // 53: hawkr.seller.v1alpha1.GetMyDashboardResponse
-	(*Dashboard)(nil),                              // 54: hawkr.seller.v1alpha1.Dashboard
-	(*DashboardPeriod)(nil),                        // 55: hawkr.seller.v1alpha1.DashboardPeriod
-	(*PeriodAmount)(nil),                           // 56: hawkr.seller.v1alpha1.PeriodAmount
-	(*PeriodCount)(nil),                            // 57: hawkr.seller.v1alpha1.PeriodCount
-	(*DashboardSales)(nil),                         // 58: hawkr.seller.v1alpha1.DashboardSales
-	(*DashboardFollowers)(nil),                     // 59: hawkr.seller.v1alpha1.DashboardFollowers
-	(*OrderStatusCounts)(nil),                      // 60: hawkr.seller.v1alpha1.OrderStatusCounts
-	(*CloseMyStoreRequest)(nil),                    // 61: hawkr.seller.v1alpha1.CloseMyStoreRequest
-	(*CloseMyStoreResponse)(nil),                   // 62: hawkr.seller.v1alpha1.CloseMyStoreResponse
-	(*KYCIssue)(nil),                               // 63: hawkr.seller.v1alpha1.KYCIssue
-	(*KYCDocument)(nil),                            // 64: hawkr.seller.v1alpha1.KYCDocument
-	(*KYCRejection)(nil),                           // 65: hawkr.seller.v1alpha1.KYCRejection
-	(*IndividualKYC)(nil),                          // 66: hawkr.seller.v1alpha1.IndividualKYC
-	(*BusinessKYC)(nil),                            // 67: hawkr.seller.v1alpha1.BusinessKYC
-	(*KYCApplication)(nil),                         // 68: hawkr.seller.v1alpha1.KYCApplication
-	(*SaveKYCDraftRequest)(nil),                    // 69: hawkr.seller.v1alpha1.SaveKYCDraftRequest
-	(*SaveKYCDraftResponse)(nil),                   // 70: hawkr.seller.v1alpha1.SaveKYCDraftResponse
-	(*PaymentAccount)(nil),                         // 71: hawkr.seller.v1alpha1.PaymentAccount
-	(*GetMyPaymentAccountRequest)(nil),             // 72: hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
-	(*GetMyPaymentAccountResponse)(nil),            // 73: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
-	(*CreatePaymentOnboardingSessionRequest)(nil),  // 74: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
-	(*CreatePaymentOnboardingSessionResponse)(nil), // 75: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
-	(*HostedOnboarding)(nil),                       // 76: hawkr.seller.v1alpha1.HostedOnboarding
-	(*EmbeddedOnboarding)(nil),                     // 77: hawkr.seller.v1alpha1.EmbeddedOnboarding
-	(*StripeEmbeddedOnboarding)(nil),               // 78: hawkr.seller.v1alpha1.StripeEmbeddedOnboarding
-	(*GetMyKYCRequest)(nil),                        // 79: hawkr.seller.v1alpha1.GetMyKYCRequest
-	(*GetMyKYCResponse)(nil),                       // 80: hawkr.seller.v1alpha1.GetMyKYCResponse
-	(*SubmitKYCRequest)(nil),                       // 81: hawkr.seller.v1alpha1.SubmitKYCRequest
-	(*SubmitKYCResponse)(nil),                      // 82: hawkr.seller.v1alpha1.SubmitKYCResponse
-	(*CancelKYCRequest)(nil),                       // 83: hawkr.seller.v1alpha1.CancelKYCRequest
-	(*CancelKYCResponse)(nil),                      // 84: hawkr.seller.v1alpha1.CancelKYCResponse
-	(*BusinessRegistration)(nil),                   // 85: hawkr.seller.v1alpha1.BusinessRegistration
-	(*LookupBusinessRegistrationRequest)(nil),      // 86: hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
-	(*LookupBusinessRegistrationResponse)(nil),     // 87: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
-	(*ForumThreadLink)(nil),                        // 88: hawkr.seller.v1alpha1.ForumThreadLink
-	(*ContentRef)(nil),                             // 89: hawkr.seller.v1alpha1.ContentRef
-	(*RemediationUnavailability)(nil),              // 90: hawkr.seller.v1alpha1.RemediationUnavailability
-	(*AppealUnavailability)(nil),                   // 91: hawkr.seller.v1alpha1.AppealUnavailability
-	(*MeasureFinding)(nil),                         // 92: hawkr.seller.v1alpha1.MeasureFinding
-	(*MeasurePeriod)(nil),                          // 93: hawkr.seller.v1alpha1.MeasurePeriod
-	(*MeasureRequest)(nil),                         // 94: hawkr.seller.v1alpha1.MeasureRequest
-	(*Measure)(nil),                                // 95: hawkr.seller.v1alpha1.Measure
-	(*ListMyMeasuresRequest)(nil),                  // 96: hawkr.seller.v1alpha1.ListMyMeasuresRequest
-	(*ListMyMeasuresResponse)(nil),                 // 97: hawkr.seller.v1alpha1.ListMyMeasuresResponse
-	(*GetMyMeasureRequest)(nil),                    // 98: hawkr.seller.v1alpha1.GetMyMeasureRequest
-	(*GetMyMeasureResponse)(nil),                   // 99: hawkr.seller.v1alpha1.GetMyMeasureResponse
-	(*SubmitAppealRequest)(nil),                    // 100: hawkr.seller.v1alpha1.SubmitAppealRequest
-	(*SubmitAppealResponse)(nil),                   // 101: hawkr.seller.v1alpha1.SubmitAppealResponse
-	(*RequestRemediationRequest)(nil),              // 102: hawkr.seller.v1alpha1.RequestRemediationRequest
-	(*RequestRemediationResponse)(nil),             // 103: hawkr.seller.v1alpha1.RequestRemediationResponse
-	(*PublicStore)(nil),                            // 104: hawkr.seller.v1alpha1.PublicStore
-	(*StoreStats)(nil),                             // 105: hawkr.seller.v1alpha1.StoreStats
-	(*GetStoreRequest)(nil),                        // 106: hawkr.seller.v1alpha1.GetStoreRequest
-	(*GetStoreResponse)(nil),                       // 107: hawkr.seller.v1alpha1.GetStoreResponse
-	(*ListStoresRequest)(nil),                      // 108: hawkr.seller.v1alpha1.ListStoresRequest
-	(*ListStoresResponse)(nil),                     // 109: hawkr.seller.v1alpha1.ListStoresResponse
-	(*BatchGetStoresRequest)(nil),                  // 110: hawkr.seller.v1alpha1.BatchGetStoresRequest
-	(*BatchGetStoresResponse)(nil),                 // 111: hawkr.seller.v1alpha1.BatchGetStoresResponse
-	(*GetSellerAgreementsRequest)(nil),             // 112: hawkr.seller.v1alpha1.GetSellerAgreementsRequest
-	(*GetSellerAgreementsResponse)(nil),            // 113: hawkr.seller.v1alpha1.GetSellerAgreementsResponse
-	(*RecordProductViewRequest)(nil),               // 114: hawkr.seller.v1alpha1.RecordProductViewRequest
-	(*RecordProductViewResponse)(nil),              // 115: hawkr.seller.v1alpha1.RecordProductViewResponse
-	(*BlockBuyerRequest)(nil),                      // 116: hawkr.seller.v1alpha1.BlockBuyerRequest
-	(*BlockBuyerResponse)(nil),                     // 117: hawkr.seller.v1alpha1.BlockBuyerResponse
-	(*UnblockBuyerRequest)(nil),                    // 118: hawkr.seller.v1alpha1.UnblockBuyerRequest
-	(*UnblockBuyerResponse)(nil),                   // 119: hawkr.seller.v1alpha1.UnblockBuyerResponse
-	(*ListBlockedBuyersRequest)(nil),               // 120: hawkr.seller.v1alpha1.ListBlockedBuyersRequest
-	(*ListBlockedBuyersResponse)(nil),              // 121: hawkr.seller.v1alpha1.ListBlockedBuyersResponse
-	(*BlockedBuyer)(nil),                           // 122: hawkr.seller.v1alpha1.BlockedBuyer
-	(*v1alpha1.PostalAddress)(nil),                 // 123: hawkr.common.v1alpha1.PostalAddress
-	(*v1alpha1.Image)(nil),                         // 124: hawkr.common.v1alpha1.Image
-	(*timestamppb.Timestamp)(nil),                  // 125: google.protobuf.Timestamp
-	(*errdetails.LocalizedMessage)(nil),            // 126: google.rpc.LocalizedMessage
-	(*fieldmaskpb.FieldMask)(nil),                  // 127: google.protobuf.FieldMask
-	(*date.Date)(nil),                              // 128: google.type.Date
-	(v1alpha11.PaymentAccountStatus)(0),            // 129: hawkr.payment.v1alpha1.PaymentAccountStatus
-	(v1alpha11.EmbeddedOnboardingRuntime)(0),       // 130: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
-	(v1alpha1.PolicyCategory)(0),                   // 131: hawkr.common.v1alpha1.PolicyCategory
-	(*durationpb.Duration)(nil),                    // 132: google.protobuf.Duration
-	(*v1alpha1.StoreCard)(nil),                     // 133: hawkr.common.v1alpha1.StoreCard
+	(InquiryKind)(0),                               // 28: hawkr.seller.v1alpha1.InquiryKind
+	(InquiryState)(0),                              // 29: hawkr.seller.v1alpha1.InquiryState
+	(InquiryReplyChannel)(0),                       // 30: hawkr.seller.v1alpha1.InquiryReplyChannel
+	(*AgreementAcceptance)(nil),                    // 31: hawkr.seller.v1alpha1.AgreementAcceptance
+	(*SellerAgreement)(nil),                        // 32: hawkr.seller.v1alpha1.SellerAgreement
+	(*Store)(nil),                                  // 33: hawkr.seller.v1alpha1.Store
+	(*CapabilityStatus)(nil),                       // 34: hawkr.seller.v1alpha1.CapabilityStatus
+	(*ApplyStoreRequest)(nil),                      // 35: hawkr.seller.v1alpha1.ApplyStoreRequest
+	(*ApplyStoreResponse)(nil),                     // 36: hawkr.seller.v1alpha1.ApplyStoreResponse
+	(*GetMyStoreOpeningRequest)(nil),               // 37: hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
+	(*GetMyStoreOpeningResponse)(nil),              // 38: hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
+	(*StoreOpeningUnavailability)(nil),             // 39: hawkr.seller.v1alpha1.StoreOpeningUnavailability
+	(*GetMyStoreRequest)(nil),                      // 40: hawkr.seller.v1alpha1.GetMyStoreRequest
+	(*GetMyStoreResponse)(nil),                     // 41: hawkr.seller.v1alpha1.GetMyStoreResponse
+	(*GetMyOnboardingRequest)(nil),                 // 42: hawkr.seller.v1alpha1.GetMyOnboardingRequest
+	(*GetMyOnboardingResponse)(nil),                // 43: hawkr.seller.v1alpha1.GetMyOnboardingResponse
+	(*OnboardingTask)(nil),                         // 44: hawkr.seller.v1alpha1.OnboardingTask
+	(*UpdateMyStoreRequest)(nil),                   // 45: hawkr.seller.v1alpha1.UpdateMyStoreRequest
+	(*UpdateMyStoreResponse)(nil),                  // 46: hawkr.seller.v1alpha1.UpdateMyStoreResponse
+	(*RefreshMyPaymentAccountRequest)(nil),         // 47: hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
+	(*RefreshMyPaymentAccountResponse)(nil),        // 48: hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
+	(*CompleteMyStoreOnboardingRequest)(nil),       // 49: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
+	(*CompleteMyStoreOnboardingResponse)(nil),      // 50: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
+	(*ListMyFollowersRequest)(nil),                 // 51: hawkr.seller.v1alpha1.ListMyFollowersRequest
+	(*ListMyFollowersResponse)(nil),                // 52: hawkr.seller.v1alpha1.ListMyFollowersResponse
+	(*BuyerCard)(nil),                              // 53: hawkr.seller.v1alpha1.BuyerCard
+	(*Follower)(nil),                               // 54: hawkr.seller.v1alpha1.Follower
+	(*GetMyDashboardRequest)(nil),                  // 55: hawkr.seller.v1alpha1.GetMyDashboardRequest
+	(*GetMyDashboardResponse)(nil),                 // 56: hawkr.seller.v1alpha1.GetMyDashboardResponse
+	(*Dashboard)(nil),                              // 57: hawkr.seller.v1alpha1.Dashboard
+	(*DashboardPeriod)(nil),                        // 58: hawkr.seller.v1alpha1.DashboardPeriod
+	(*PeriodAmount)(nil),                           // 59: hawkr.seller.v1alpha1.PeriodAmount
+	(*PeriodCount)(nil),                            // 60: hawkr.seller.v1alpha1.PeriodCount
+	(*DashboardSales)(nil),                         // 61: hawkr.seller.v1alpha1.DashboardSales
+	(*DashboardFollowers)(nil),                     // 62: hawkr.seller.v1alpha1.DashboardFollowers
+	(*OrderStatusCounts)(nil),                      // 63: hawkr.seller.v1alpha1.OrderStatusCounts
+	(*CloseMyStoreRequest)(nil),                    // 64: hawkr.seller.v1alpha1.CloseMyStoreRequest
+	(*CloseMyStoreResponse)(nil),                   // 65: hawkr.seller.v1alpha1.CloseMyStoreResponse
+	(*KYCIssue)(nil),                               // 66: hawkr.seller.v1alpha1.KYCIssue
+	(*KYCDocument)(nil),                            // 67: hawkr.seller.v1alpha1.KYCDocument
+	(*KYCRejection)(nil),                           // 68: hawkr.seller.v1alpha1.KYCRejection
+	(*IndividualKYC)(nil),                          // 69: hawkr.seller.v1alpha1.IndividualKYC
+	(*BusinessKYC)(nil),                            // 70: hawkr.seller.v1alpha1.BusinessKYC
+	(*KYCApplication)(nil),                         // 71: hawkr.seller.v1alpha1.KYCApplication
+	(*SaveKYCDraftRequest)(nil),                    // 72: hawkr.seller.v1alpha1.SaveKYCDraftRequest
+	(*SaveKYCDraftResponse)(nil),                   // 73: hawkr.seller.v1alpha1.SaveKYCDraftResponse
+	(*PaymentAccount)(nil),                         // 74: hawkr.seller.v1alpha1.PaymentAccount
+	(*GetMyPaymentAccountRequest)(nil),             // 75: hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
+	(*GetMyPaymentAccountResponse)(nil),            // 76: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
+	(*CreatePaymentOnboardingSessionRequest)(nil),  // 77: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
+	(*CreatePaymentOnboardingSessionResponse)(nil), // 78: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
+	(*HostedOnboarding)(nil),                       // 79: hawkr.seller.v1alpha1.HostedOnboarding
+	(*EmbeddedOnboarding)(nil),                     // 80: hawkr.seller.v1alpha1.EmbeddedOnboarding
+	(*StripeEmbeddedOnboarding)(nil),               // 81: hawkr.seller.v1alpha1.StripeEmbeddedOnboarding
+	(*GetMyKYCRequest)(nil),                        // 82: hawkr.seller.v1alpha1.GetMyKYCRequest
+	(*GetMyKYCResponse)(nil),                       // 83: hawkr.seller.v1alpha1.GetMyKYCResponse
+	(*SubmitKYCRequest)(nil),                       // 84: hawkr.seller.v1alpha1.SubmitKYCRequest
+	(*SubmitKYCResponse)(nil),                      // 85: hawkr.seller.v1alpha1.SubmitKYCResponse
+	(*CancelKYCRequest)(nil),                       // 86: hawkr.seller.v1alpha1.CancelKYCRequest
+	(*CancelKYCResponse)(nil),                      // 87: hawkr.seller.v1alpha1.CancelKYCResponse
+	(*BusinessRegistration)(nil),                   // 88: hawkr.seller.v1alpha1.BusinessRegistration
+	(*LookupBusinessRegistrationRequest)(nil),      // 89: hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
+	(*LookupBusinessRegistrationResponse)(nil),     // 90: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
+	(*ForumThreadLink)(nil),                        // 91: hawkr.seller.v1alpha1.ForumThreadLink
+	(*ContentRef)(nil),                             // 92: hawkr.seller.v1alpha1.ContentRef
+	(*RemediationUnavailability)(nil),              // 93: hawkr.seller.v1alpha1.RemediationUnavailability
+	(*AppealUnavailability)(nil),                   // 94: hawkr.seller.v1alpha1.AppealUnavailability
+	(*MeasureFinding)(nil),                         // 95: hawkr.seller.v1alpha1.MeasureFinding
+	(*MeasurePeriod)(nil),                          // 96: hawkr.seller.v1alpha1.MeasurePeriod
+	(*MeasureRequest)(nil),                         // 97: hawkr.seller.v1alpha1.MeasureRequest
+	(*Measure)(nil),                                // 98: hawkr.seller.v1alpha1.Measure
+	(*ListMyMeasuresRequest)(nil),                  // 99: hawkr.seller.v1alpha1.ListMyMeasuresRequest
+	(*ListMyMeasuresResponse)(nil),                 // 100: hawkr.seller.v1alpha1.ListMyMeasuresResponse
+	(*GetMyMeasureRequest)(nil),                    // 101: hawkr.seller.v1alpha1.GetMyMeasureRequest
+	(*GetMyMeasureResponse)(nil),                   // 102: hawkr.seller.v1alpha1.GetMyMeasureResponse
+	(*SubmitAppealRequest)(nil),                    // 103: hawkr.seller.v1alpha1.SubmitAppealRequest
+	(*SubmitAppealResponse)(nil),                   // 104: hawkr.seller.v1alpha1.SubmitAppealResponse
+	(*RequestRemediationRequest)(nil),              // 105: hawkr.seller.v1alpha1.RequestRemediationRequest
+	(*RequestRemediationResponse)(nil),             // 106: hawkr.seller.v1alpha1.RequestRemediationResponse
+	(*Inquiry)(nil),                                // 107: hawkr.seller.v1alpha1.Inquiry
+	(*InquiryReply)(nil),                           // 108: hawkr.seller.v1alpha1.InquiryReply
+	(*ListMyInquiriesRequest)(nil),                 // 109: hawkr.seller.v1alpha1.ListMyInquiriesRequest
+	(*ListMyInquiriesResponse)(nil),                // 110: hawkr.seller.v1alpha1.ListMyInquiriesResponse
+	(*GetMyInquiryRequest)(nil),                    // 111: hawkr.seller.v1alpha1.GetMyInquiryRequest
+	(*GetMyInquiryResponse)(nil),                   // 112: hawkr.seller.v1alpha1.GetMyInquiryResponse
+	(*ReplyToInquiryRequest)(nil),                  // 113: hawkr.seller.v1alpha1.ReplyToInquiryRequest
+	(*ReplyToInquiryResponse)(nil),                 // 114: hawkr.seller.v1alpha1.ReplyToInquiryResponse
+	(*PublicStore)(nil),                            // 115: hawkr.seller.v1alpha1.PublicStore
+	(*StoreStats)(nil),                             // 116: hawkr.seller.v1alpha1.StoreStats
+	(*GetStoreRequest)(nil),                        // 117: hawkr.seller.v1alpha1.GetStoreRequest
+	(*GetStoreResponse)(nil),                       // 118: hawkr.seller.v1alpha1.GetStoreResponse
+	(*ListStoresRequest)(nil),                      // 119: hawkr.seller.v1alpha1.ListStoresRequest
+	(*ListStoresResponse)(nil),                     // 120: hawkr.seller.v1alpha1.ListStoresResponse
+	(*BatchGetStoresRequest)(nil),                  // 121: hawkr.seller.v1alpha1.BatchGetStoresRequest
+	(*BatchGetStoresResponse)(nil),                 // 122: hawkr.seller.v1alpha1.BatchGetStoresResponse
+	(*GetSellerAgreementsRequest)(nil),             // 123: hawkr.seller.v1alpha1.GetSellerAgreementsRequest
+	(*GetSellerAgreementsResponse)(nil),            // 124: hawkr.seller.v1alpha1.GetSellerAgreementsResponse
+	(*RecordProductViewRequest)(nil),               // 125: hawkr.seller.v1alpha1.RecordProductViewRequest
+	(*RecordProductViewResponse)(nil),              // 126: hawkr.seller.v1alpha1.RecordProductViewResponse
+	(*BlockBuyerRequest)(nil),                      // 127: hawkr.seller.v1alpha1.BlockBuyerRequest
+	(*BlockBuyerResponse)(nil),                     // 128: hawkr.seller.v1alpha1.BlockBuyerResponse
+	(*UnblockBuyerRequest)(nil),                    // 129: hawkr.seller.v1alpha1.UnblockBuyerRequest
+	(*UnblockBuyerResponse)(nil),                   // 130: hawkr.seller.v1alpha1.UnblockBuyerResponse
+	(*ListBlockedBuyersRequest)(nil),               // 131: hawkr.seller.v1alpha1.ListBlockedBuyersRequest
+	(*ListBlockedBuyersResponse)(nil),              // 132: hawkr.seller.v1alpha1.ListBlockedBuyersResponse
+	(*BlockedBuyer)(nil),                           // 133: hawkr.seller.v1alpha1.BlockedBuyer
+	(*v1alpha1.PostalAddress)(nil),                 // 134: hawkr.common.v1alpha1.PostalAddress
+	(*v1alpha1.Image)(nil),                         // 135: hawkr.common.v1alpha1.Image
+	(*timestamppb.Timestamp)(nil),                  // 136: google.protobuf.Timestamp
+	(*errdetails.LocalizedMessage)(nil),            // 137: google.rpc.LocalizedMessage
+	(*fieldmaskpb.FieldMask)(nil),                  // 138: google.protobuf.FieldMask
+	(*date.Date)(nil),                              // 139: google.type.Date
+	(v1alpha11.PaymentAccountStatus)(0),            // 140: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(v1alpha11.EmbeddedOnboardingRuntime)(0),       // 141: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
+	(v1alpha1.PolicyCategory)(0),                   // 142: hawkr.common.v1alpha1.PolicyCategory
+	(*durationpb.Duration)(nil),                    // 143: google.protobuf.Duration
+	(*v1alpha1.Deadline)(nil),                      // 144: hawkr.common.v1alpha1.Deadline
+	(*v1alpha1.StoreCard)(nil),                     // 145: hawkr.common.v1alpha1.StoreCard
 }
 var file_hawkr_seller_v1alpha1_seller_proto_depIdxs = []int32{
 	0,   // 0: hawkr.seller.v1alpha1.AgreementAcceptance.kind:type_name -> hawkr.seller.v1alpha1.AgreementKind
 	0,   // 1: hawkr.seller.v1alpha1.SellerAgreement.kind:type_name -> hawkr.seller.v1alpha1.AgreementKind
-	123, // 2: hawkr.seller.v1alpha1.Store.address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	124, // 3: hawkr.seller.v1alpha1.Store.logo:type_name -> hawkr.common.v1alpha1.Image
-	124, // 4: hawkr.seller.v1alpha1.Store.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	134, // 2: hawkr.seller.v1alpha1.Store.address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	135, // 3: hawkr.seller.v1alpha1.Store.logo:type_name -> hawkr.common.v1alpha1.Image
+	135, // 4: hawkr.seller.v1alpha1.Store.cover_image:type_name -> hawkr.common.v1alpha1.Image
 	1,   // 5: hawkr.seller.v1alpha1.Store.status:type_name -> hawkr.seller.v1alpha1.StoreStatus
-	125, // 6: hawkr.seller.v1alpha1.Store.create_time:type_name -> google.protobuf.Timestamp
-	125, // 7: hawkr.seller.v1alpha1.Store.update_time:type_name -> google.protobuf.Timestamp
+	136, // 6: hawkr.seller.v1alpha1.Store.create_time:type_name -> google.protobuf.Timestamp
+	136, // 7: hawkr.seller.v1alpha1.Store.update_time:type_name -> google.protobuf.Timestamp
 	2,   // 8: hawkr.seller.v1alpha1.CapabilityStatus.capability:type_name -> hawkr.seller.v1alpha1.SellerCapability
 	3,   // 9: hawkr.seller.v1alpha1.CapabilityStatus.missing:type_name -> hawkr.seller.v1alpha1.SellerRequirement
-	123, // 10: hawkr.seller.v1alpha1.ApplyStoreRequest.address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	28,  // 11: hawkr.seller.v1alpha1.ApplyStoreRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
-	30,  // 12: hawkr.seller.v1alpha1.ApplyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
-	36,  // 13: hawkr.seller.v1alpha1.GetMyStoreOpeningResponse.unavailabilities:type_name -> hawkr.seller.v1alpha1.StoreOpeningUnavailability
+	134, // 10: hawkr.seller.v1alpha1.ApplyStoreRequest.address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	31,  // 11: hawkr.seller.v1alpha1.ApplyStoreRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
+	33,  // 12: hawkr.seller.v1alpha1.ApplyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
+	39,  // 13: hawkr.seller.v1alpha1.GetMyStoreOpeningResponse.unavailabilities:type_name -> hawkr.seller.v1alpha1.StoreOpeningUnavailability
 	5,   // 14: hawkr.seller.v1alpha1.StoreOpeningUnavailability.reason:type_name -> hawkr.seller.v1alpha1.StoreOpeningUnavailableReason
-	126, // 15: hawkr.seller.v1alpha1.StoreOpeningUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	30,  // 16: hawkr.seller.v1alpha1.GetMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
-	31,  // 17: hawkr.seller.v1alpha1.GetMyStoreResponse.capabilities:type_name -> hawkr.seller.v1alpha1.CapabilityStatus
-	105, // 18: hawkr.seller.v1alpha1.GetMyStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
-	41,  // 19: hawkr.seller.v1alpha1.GetMyOnboardingResponse.tasks:type_name -> hawkr.seller.v1alpha1.OnboardingTask
+	137, // 15: hawkr.seller.v1alpha1.StoreOpeningUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	33,  // 16: hawkr.seller.v1alpha1.GetMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
+	34,  // 17: hawkr.seller.v1alpha1.GetMyStoreResponse.capabilities:type_name -> hawkr.seller.v1alpha1.CapabilityStatus
+	116, // 18: hawkr.seller.v1alpha1.GetMyStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
+	44,  // 19: hawkr.seller.v1alpha1.GetMyOnboardingResponse.tasks:type_name -> hawkr.seller.v1alpha1.OnboardingTask
 	6,   // 20: hawkr.seller.v1alpha1.OnboardingTask.id:type_name -> hawkr.seller.v1alpha1.OnboardingTaskId
 	7,   // 21: hawkr.seller.v1alpha1.OnboardingTask.state:type_name -> hawkr.seller.v1alpha1.OnboardingTaskState
 	8,   // 22: hawkr.seller.v1alpha1.OnboardingTask.action:type_name -> hawkr.seller.v1alpha1.OnboardingAction
-	126, // 23: hawkr.seller.v1alpha1.OnboardingTask.title:type_name -> google.rpc.LocalizedMessage
-	126, // 24: hawkr.seller.v1alpha1.OnboardingTask.status:type_name -> google.rpc.LocalizedMessage
-	30,  // 25: hawkr.seller.v1alpha1.UpdateMyStoreRequest.store:type_name -> hawkr.seller.v1alpha1.Store
-	127, // 26: hawkr.seller.v1alpha1.UpdateMyStoreRequest.update_mask:type_name -> google.protobuf.FieldMask
-	30,  // 27: hawkr.seller.v1alpha1.UpdateMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
-	30,  // 28: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse.store:type_name -> hawkr.seller.v1alpha1.Store
-	51,  // 29: hawkr.seller.v1alpha1.ListMyFollowersResponse.followers:type_name -> hawkr.seller.v1alpha1.Follower
-	124, // 30: hawkr.seller.v1alpha1.BuyerCard.avatar:type_name -> hawkr.common.v1alpha1.Image
-	50,  // 31: hawkr.seller.v1alpha1.Follower.buyer:type_name -> hawkr.seller.v1alpha1.BuyerCard
-	125, // 32: hawkr.seller.v1alpha1.Follower.create_time:type_name -> google.protobuf.Timestamp
-	54,  // 33: hawkr.seller.v1alpha1.GetMyDashboardResponse.dashboard:type_name -> hawkr.seller.v1alpha1.Dashboard
-	55,  // 34: hawkr.seller.v1alpha1.Dashboard.current_period:type_name -> hawkr.seller.v1alpha1.DashboardPeriod
-	55,  // 35: hawkr.seller.v1alpha1.Dashboard.previous_period:type_name -> hawkr.seller.v1alpha1.DashboardPeriod
-	58,  // 36: hawkr.seller.v1alpha1.Dashboard.sales:type_name -> hawkr.seller.v1alpha1.DashboardSales
-	59,  // 37: hawkr.seller.v1alpha1.Dashboard.followers:type_name -> hawkr.seller.v1alpha1.DashboardFollowers
-	57,  // 38: hawkr.seller.v1alpha1.Dashboard.product_views:type_name -> hawkr.seller.v1alpha1.PeriodCount
-	60,  // 39: hawkr.seller.v1alpha1.Dashboard.order_status_counts:type_name -> hawkr.seller.v1alpha1.OrderStatusCounts
-	128, // 40: hawkr.seller.v1alpha1.DashboardPeriod.first_date:type_name -> google.type.Date
-	128, // 41: hawkr.seller.v1alpha1.DashboardPeriod.last_date:type_name -> google.type.Date
-	56,  // 42: hawkr.seller.v1alpha1.DashboardSales.revenue:type_name -> hawkr.seller.v1alpha1.PeriodAmount
-	57,  // 43: hawkr.seller.v1alpha1.DashboardSales.orders:type_name -> hawkr.seller.v1alpha1.PeriodCount
-	57,  // 44: hawkr.seller.v1alpha1.DashboardSales.customers:type_name -> hawkr.seller.v1alpha1.PeriodCount
-	57,  // 45: hawkr.seller.v1alpha1.DashboardFollowers.new_followers:type_name -> hawkr.seller.v1alpha1.PeriodCount
-	30,  // 46: hawkr.seller.v1alpha1.CloseMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
+	137, // 23: hawkr.seller.v1alpha1.OnboardingTask.title:type_name -> google.rpc.LocalizedMessage
+	137, // 24: hawkr.seller.v1alpha1.OnboardingTask.status:type_name -> google.rpc.LocalizedMessage
+	33,  // 25: hawkr.seller.v1alpha1.UpdateMyStoreRequest.store:type_name -> hawkr.seller.v1alpha1.Store
+	138, // 26: hawkr.seller.v1alpha1.UpdateMyStoreRequest.update_mask:type_name -> google.protobuf.FieldMask
+	33,  // 27: hawkr.seller.v1alpha1.UpdateMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
+	33,  // 28: hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse.store:type_name -> hawkr.seller.v1alpha1.Store
+	54,  // 29: hawkr.seller.v1alpha1.ListMyFollowersResponse.followers:type_name -> hawkr.seller.v1alpha1.Follower
+	135, // 30: hawkr.seller.v1alpha1.BuyerCard.avatar:type_name -> hawkr.common.v1alpha1.Image
+	53,  // 31: hawkr.seller.v1alpha1.Follower.buyer:type_name -> hawkr.seller.v1alpha1.BuyerCard
+	136, // 32: hawkr.seller.v1alpha1.Follower.create_time:type_name -> google.protobuf.Timestamp
+	57,  // 33: hawkr.seller.v1alpha1.GetMyDashboardResponse.dashboard:type_name -> hawkr.seller.v1alpha1.Dashboard
+	58,  // 34: hawkr.seller.v1alpha1.Dashboard.current_period:type_name -> hawkr.seller.v1alpha1.DashboardPeriod
+	58,  // 35: hawkr.seller.v1alpha1.Dashboard.previous_period:type_name -> hawkr.seller.v1alpha1.DashboardPeriod
+	61,  // 36: hawkr.seller.v1alpha1.Dashboard.sales:type_name -> hawkr.seller.v1alpha1.DashboardSales
+	62,  // 37: hawkr.seller.v1alpha1.Dashboard.followers:type_name -> hawkr.seller.v1alpha1.DashboardFollowers
+	60,  // 38: hawkr.seller.v1alpha1.Dashboard.product_views:type_name -> hawkr.seller.v1alpha1.PeriodCount
+	63,  // 39: hawkr.seller.v1alpha1.Dashboard.order_status_counts:type_name -> hawkr.seller.v1alpha1.OrderStatusCounts
+	139, // 40: hawkr.seller.v1alpha1.DashboardPeriod.first_date:type_name -> google.type.Date
+	139, // 41: hawkr.seller.v1alpha1.DashboardPeriod.last_date:type_name -> google.type.Date
+	59,  // 42: hawkr.seller.v1alpha1.DashboardSales.revenue:type_name -> hawkr.seller.v1alpha1.PeriodAmount
+	60,  // 43: hawkr.seller.v1alpha1.DashboardSales.orders:type_name -> hawkr.seller.v1alpha1.PeriodCount
+	60,  // 44: hawkr.seller.v1alpha1.DashboardSales.customers:type_name -> hawkr.seller.v1alpha1.PeriodCount
+	60,  // 45: hawkr.seller.v1alpha1.DashboardFollowers.new_followers:type_name -> hawkr.seller.v1alpha1.PeriodCount
+	33,  // 46: hawkr.seller.v1alpha1.CloseMyStoreResponse.store:type_name -> hawkr.seller.v1alpha1.Store
 	10,  // 47: hawkr.seller.v1alpha1.KYCIssue.field:type_name -> hawkr.seller.v1alpha1.KYCField
 	11,  // 48: hawkr.seller.v1alpha1.KYCIssue.code:type_name -> hawkr.seller.v1alpha1.KYCIssueCode
-	125, // 49: hawkr.seller.v1alpha1.KYCRejection.decide_time:type_name -> google.protobuf.Timestamp
-	63,  // 50: hawkr.seller.v1alpha1.KYCRejection.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	128, // 51: hawkr.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
-	64,  // 52: hawkr.seller.v1alpha1.BusinessKYC.company_documents:type_name -> hawkr.seller.v1alpha1.KYCDocument
-	123, // 53: hawkr.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	136, // 49: hawkr.seller.v1alpha1.KYCRejection.decide_time:type_name -> google.protobuf.Timestamp
+	66,  // 50: hawkr.seller.v1alpha1.KYCRejection.issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	139, // 51: hawkr.seller.v1alpha1.BusinessKYC.company_register_date:type_name -> google.type.Date
+	67,  // 52: hawkr.seller.v1alpha1.BusinessKYC.company_documents:type_name -> hawkr.seller.v1alpha1.KYCDocument
+	134, // 53: hawkr.seller.v1alpha1.BusinessKYC.company_address:type_name -> hawkr.common.v1alpha1.PostalAddress
 	9,   // 54: hawkr.seller.v1alpha1.KYCApplication.status:type_name -> hawkr.seller.v1alpha1.KYCStatus
-	66,  // 55: hawkr.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.seller.v1alpha1.IndividualKYC
-	67,  // 56: hawkr.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.seller.v1alpha1.BusinessKYC
-	65,  // 57: hawkr.seller.v1alpha1.KYCApplication.last_rejection:type_name -> hawkr.seller.v1alpha1.KYCRejection
+	69,  // 55: hawkr.seller.v1alpha1.KYCApplication.individual:type_name -> hawkr.seller.v1alpha1.IndividualKYC
+	70,  // 56: hawkr.seller.v1alpha1.KYCApplication.business:type_name -> hawkr.seller.v1alpha1.BusinessKYC
+	68,  // 57: hawkr.seller.v1alpha1.KYCApplication.last_rejection:type_name -> hawkr.seller.v1alpha1.KYCRejection
 	10,  // 58: hawkr.seller.v1alpha1.KYCApplication.missing_fields:type_name -> hawkr.seller.v1alpha1.KYCField
 	4,   // 59: hawkr.seller.v1alpha1.KYCApplication.missing_store_fields:type_name -> hawkr.seller.v1alpha1.StoreField
-	63,  // 60: hawkr.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
-	125, // 61: hawkr.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
-	125, // 62: hawkr.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
-	125, // 63: hawkr.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
-	125, // 64: hawkr.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
-	68,  // 65: hawkr.seller.v1alpha1.SaveKYCDraftRequest.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	127, // 66: hawkr.seller.v1alpha1.SaveKYCDraftRequest.update_mask:type_name -> google.protobuf.FieldMask
-	68,  // 67: hawkr.seller.v1alpha1.SaveKYCDraftResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	129, // 68: hawkr.seller.v1alpha1.PaymentAccount.status:type_name -> hawkr.payment.v1alpha1.PaymentAccountStatus
-	125, // 69: hawkr.seller.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
-	71,  // 70: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse.account:type_name -> hawkr.seller.v1alpha1.PaymentAccount
+	66,  // 60: hawkr.seller.v1alpha1.KYCApplication.outstanding_issues:type_name -> hawkr.seller.v1alpha1.KYCIssue
+	136, // 61: hawkr.seller.v1alpha1.KYCApplication.submit_time:type_name -> google.protobuf.Timestamp
+	136, // 62: hawkr.seller.v1alpha1.KYCApplication.decide_time:type_name -> google.protobuf.Timestamp
+	136, // 63: hawkr.seller.v1alpha1.KYCApplication.create_time:type_name -> google.protobuf.Timestamp
+	136, // 64: hawkr.seller.v1alpha1.KYCApplication.update_time:type_name -> google.protobuf.Timestamp
+	71,  // 65: hawkr.seller.v1alpha1.SaveKYCDraftRequest.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	138, // 66: hawkr.seller.v1alpha1.SaveKYCDraftRequest.update_mask:type_name -> google.protobuf.FieldMask
+	71,  // 67: hawkr.seller.v1alpha1.SaveKYCDraftResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	140, // 68: hawkr.seller.v1alpha1.PaymentAccount.status:type_name -> hawkr.payment.v1alpha1.PaymentAccountStatus
+	136, // 69: hawkr.seller.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
+	74,  // 70: hawkr.seller.v1alpha1.GetMyPaymentAccountResponse.account:type_name -> hawkr.seller.v1alpha1.PaymentAccount
 	12,  // 71: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest.destination:type_name -> hawkr.seller.v1alpha1.OnboardingReturnDestination
-	130, // 72: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest.embedded_runtimes:type_name -> hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
-	76,  // 73: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.hosted:type_name -> hawkr.seller.v1alpha1.HostedOnboarding
-	77,  // 74: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.embedded:type_name -> hawkr.seller.v1alpha1.EmbeddedOnboarding
-	78,  // 75: hawkr.seller.v1alpha1.EmbeddedOnboarding.stripe:type_name -> hawkr.seller.v1alpha1.StripeEmbeddedOnboarding
-	68,  // 76: hawkr.seller.v1alpha1.GetMyKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	28,  // 77: hawkr.seller.v1alpha1.SubmitKYCRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
-	68,  // 78: hawkr.seller.v1alpha1.SubmitKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	68,  // 79: hawkr.seller.v1alpha1.CancelKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
-	128, // 80: hawkr.seller.v1alpha1.BusinessRegistration.setup_date:type_name -> google.type.Date
-	123, // 81: hawkr.seller.v1alpha1.BusinessRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
-	85,  // 82: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse.registration:type_name -> hawkr.seller.v1alpha1.BusinessRegistration
+	141, // 72: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest.embedded_runtimes:type_name -> hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
+	79,  // 73: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.hosted:type_name -> hawkr.seller.v1alpha1.HostedOnboarding
+	80,  // 74: hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse.embedded:type_name -> hawkr.seller.v1alpha1.EmbeddedOnboarding
+	81,  // 75: hawkr.seller.v1alpha1.EmbeddedOnboarding.stripe:type_name -> hawkr.seller.v1alpha1.StripeEmbeddedOnboarding
+	71,  // 76: hawkr.seller.v1alpha1.GetMyKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	31,  // 77: hawkr.seller.v1alpha1.SubmitKYCRequest.accepted_agreements:type_name -> hawkr.seller.v1alpha1.AgreementAcceptance
+	71,  // 78: hawkr.seller.v1alpha1.SubmitKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	71,  // 79: hawkr.seller.v1alpha1.CancelKYCResponse.application:type_name -> hawkr.seller.v1alpha1.KYCApplication
+	139, // 80: hawkr.seller.v1alpha1.BusinessRegistration.setup_date:type_name -> google.type.Date
+	134, // 81: hawkr.seller.v1alpha1.BusinessRegistration.postal_address:type_name -> hawkr.common.v1alpha1.PostalAddress
+	88,  // 82: hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse.registration:type_name -> hawkr.seller.v1alpha1.BusinessRegistration
 	17,  // 83: hawkr.seller.v1alpha1.ContentRef.kind:type_name -> hawkr.seller.v1alpha1.ContentKind
 	18,  // 84: hawkr.seller.v1alpha1.ContentRef.snapshot_state:type_name -> hawkr.seller.v1alpha1.ContentSnapshotState
-	125, // 85: hawkr.seller.v1alpha1.ContentRef.authored_time:type_name -> google.protobuf.Timestamp
-	88,  // 86: hawkr.seller.v1alpha1.ContentRef.forum_thread:type_name -> hawkr.seller.v1alpha1.ForumThreadLink
+	136, // 85: hawkr.seller.v1alpha1.ContentRef.authored_time:type_name -> google.protobuf.Timestamp
+	91,  // 86: hawkr.seller.v1alpha1.ContentRef.forum_thread:type_name -> hawkr.seller.v1alpha1.ForumThreadLink
 	24,  // 87: hawkr.seller.v1alpha1.RemediationUnavailability.reason:type_name -> hawkr.seller.v1alpha1.RemediationUnavailableReason
-	126, // 88: hawkr.seller.v1alpha1.RemediationUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	137, // 88: hawkr.seller.v1alpha1.RemediationUnavailability.message:type_name -> google.rpc.LocalizedMessage
 	26,  // 89: hawkr.seller.v1alpha1.AppealUnavailability.reason:type_name -> hawkr.seller.v1alpha1.AppealUnavailableReason
-	126, // 90: hawkr.seller.v1alpha1.AppealUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	131, // 91: hawkr.seller.v1alpha1.MeasureFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	137, // 90: hawkr.seller.v1alpha1.AppealUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	142, // 91: hawkr.seller.v1alpha1.MeasureFinding.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	13,  // 92: hawkr.seller.v1alpha1.MeasureFinding.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	125, // 93: hawkr.seller.v1alpha1.MeasureFinding.create_time:type_name -> google.protobuf.Timestamp
-	125, // 94: hawkr.seller.v1alpha1.MeasurePeriod.start_time:type_name -> google.protobuf.Timestamp
-	125, // 95: hawkr.seller.v1alpha1.MeasurePeriod.end_time:type_name -> google.protobuf.Timestamp
+	136, // 93: hawkr.seller.v1alpha1.MeasureFinding.create_time:type_name -> google.protobuf.Timestamp
+	136, // 94: hawkr.seller.v1alpha1.MeasurePeriod.start_time:type_name -> google.protobuf.Timestamp
+	136, // 95: hawkr.seller.v1alpha1.MeasurePeriod.end_time:type_name -> google.protobuf.Timestamp
 	23,  // 96: hawkr.seller.v1alpha1.MeasureRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureRequestState
-	125, // 97: hawkr.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
-	125, // 98: hawkr.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
+	136, // 97: hawkr.seller.v1alpha1.MeasureRequest.submit_time:type_name -> google.protobuf.Timestamp
+	136, // 98: hawkr.seller.v1alpha1.MeasureRequest.decide_time:type_name -> google.protobuf.Timestamp
 	27,  // 99: hawkr.seller.v1alpha1.MeasureRequest.close_cause:type_name -> hawkr.seller.v1alpha1.MeasureRequestCloseCause
 	22,  // 100: hawkr.seller.v1alpha1.MeasureRequest.kind:type_name -> hawkr.seller.v1alpha1.MeasureRequestKind
 	16,  // 101: hawkr.seller.v1alpha1.Measure.kind:type_name -> hawkr.seller.v1alpha1.MeasureKind
 	19,  // 102: hawkr.seller.v1alpha1.Measure.basis:type_name -> hawkr.seller.v1alpha1.MeasureBasis
-	92,  // 103: hawkr.seller.v1alpha1.Measure.findings:type_name -> hawkr.seller.v1alpha1.MeasureFinding
+	95,  // 103: hawkr.seller.v1alpha1.Measure.findings:type_name -> hawkr.seller.v1alpha1.MeasureFinding
 	20,  // 104: hawkr.seller.v1alpha1.Measure.risk_ground:type_name -> hawkr.seller.v1alpha1.RiskGround
 	21,  // 105: hawkr.seller.v1alpha1.Measure.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	93,  // 106: hawkr.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
-	125, // 107: hawkr.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
+	96,  // 106: hawkr.seller.v1alpha1.Measure.period:type_name -> hawkr.seller.v1alpha1.MeasurePeriod
+	136, // 107: hawkr.seller.v1alpha1.Measure.create_time:type_name -> google.protobuf.Timestamp
 	14,  // 108: hawkr.seller.v1alpha1.Measure.revoke_reason:type_name -> hawkr.seller.v1alpha1.RevokeReason
-	125, // 109: hawkr.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
-	132, // 110: hawkr.seller.v1alpha1.Measure.rejection_cooldown:type_name -> google.protobuf.Duration
-	94,  // 111: hawkr.seller.v1alpha1.Measure.requests:type_name -> hawkr.seller.v1alpha1.MeasureRequest
-	90,  // 112: hawkr.seller.v1alpha1.Measure.remediation_unavailabilities:type_name -> hawkr.seller.v1alpha1.RemediationUnavailability
+	136, // 109: hawkr.seller.v1alpha1.Measure.next_remediation_time:type_name -> google.protobuf.Timestamp
+	143, // 110: hawkr.seller.v1alpha1.Measure.rejection_cooldown:type_name -> google.protobuf.Duration
+	97,  // 111: hawkr.seller.v1alpha1.Measure.requests:type_name -> hawkr.seller.v1alpha1.MeasureRequest
+	93,  // 112: hawkr.seller.v1alpha1.Measure.remediation_unavailabilities:type_name -> hawkr.seller.v1alpha1.RemediationUnavailability
 	25,  // 113: hawkr.seller.v1alpha1.Measure.termination_ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	125, // 114: hawkr.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
-	91,  // 115: hawkr.seller.v1alpha1.Measure.appeal_unavailabilities:type_name -> hawkr.seller.v1alpha1.AppealUnavailability
-	89,  // 116: hawkr.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
+	136, // 114: hawkr.seller.v1alpha1.Measure.appeal_deadline_time:type_name -> google.protobuf.Timestamp
+	94,  // 115: hawkr.seller.v1alpha1.Measure.appeal_unavailabilities:type_name -> hawkr.seller.v1alpha1.AppealUnavailability
+	92,  // 116: hawkr.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
 	21,  // 117: hawkr.seller.v1alpha1.ListMyMeasuresRequest.state:type_name -> hawkr.seller.v1alpha1.MeasureState
-	95,  // 118: hawkr.seller.v1alpha1.ListMyMeasuresResponse.measures:type_name -> hawkr.seller.v1alpha1.Measure
-	95,  // 119: hawkr.seller.v1alpha1.GetMyMeasureResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	95,  // 120: hawkr.seller.v1alpha1.SubmitAppealResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	95,  // 121: hawkr.seller.v1alpha1.RequestRemediationResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
-	124, // 122: hawkr.seller.v1alpha1.PublicStore.logo:type_name -> hawkr.common.v1alpha1.Image
-	124, // 123: hawkr.seller.v1alpha1.PublicStore.cover_image:type_name -> hawkr.common.v1alpha1.Image
-	125, // 124: hawkr.seller.v1alpha1.PublicStore.update_time:type_name -> google.protobuf.Timestamp
-	104, // 125: hawkr.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.seller.v1alpha1.PublicStore
-	105, // 126: hawkr.seller.v1alpha1.GetStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
-	104, // 127: hawkr.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.seller.v1alpha1.PublicStore
-	133, // 128: hawkr.seller.v1alpha1.BatchGetStoresResponse.stores:type_name -> hawkr.common.v1alpha1.StoreCard
-	29,  // 129: hawkr.seller.v1alpha1.GetSellerAgreementsResponse.agreements:type_name -> hawkr.seller.v1alpha1.SellerAgreement
-	122, // 130: hawkr.seller.v1alpha1.ListBlockedBuyersResponse.blocked_buyers:type_name -> hawkr.seller.v1alpha1.BlockedBuyer
-	50,  // 131: hawkr.seller.v1alpha1.BlockedBuyer.buyer:type_name -> hawkr.seller.v1alpha1.BuyerCard
-	125, // 132: hawkr.seller.v1alpha1.BlockedBuyer.create_time:type_name -> google.protobuf.Timestamp
-	32,  // 133: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:input_type -> hawkr.seller.v1alpha1.ApplyStoreRequest
-	34,  // 134: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:input_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
-	37,  // 135: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:input_type -> hawkr.seller.v1alpha1.GetMyStoreRequest
-	39,  // 136: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:input_type -> hawkr.seller.v1alpha1.GetMyOnboardingRequest
-	44,  // 137: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
-	42,  // 138: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:input_type -> hawkr.seller.v1alpha1.UpdateMyStoreRequest
-	46,  // 139: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:input_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
-	48,  // 140: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:input_type -> hawkr.seller.v1alpha1.ListMyFollowersRequest
-	52,  // 141: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:input_type -> hawkr.seller.v1alpha1.GetMyDashboardRequest
-	61,  // 142: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:input_type -> hawkr.seller.v1alpha1.CloseMyStoreRequest
-	69,  // 143: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:input_type -> hawkr.seller.v1alpha1.SaveKYCDraftRequest
-	79,  // 144: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:input_type -> hawkr.seller.v1alpha1.GetMyKYCRequest
-	81,  // 145: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:input_type -> hawkr.seller.v1alpha1.SubmitKYCRequest
-	83,  // 146: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:input_type -> hawkr.seller.v1alpha1.CancelKYCRequest
-	72,  // 147: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
-	74,  // 148: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:input_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
-	86,  // 149: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:input_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
-	96,  // 150: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:input_type -> hawkr.seller.v1alpha1.ListMyMeasuresRequest
-	98,  // 151: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:input_type -> hawkr.seller.v1alpha1.GetMyMeasureRequest
-	100, // 152: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:input_type -> hawkr.seller.v1alpha1.SubmitAppealRequest
-	102, // 153: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:input_type -> hawkr.seller.v1alpha1.RequestRemediationRequest
-	116, // 154: hawkr.seller.v1alpha1.SellerAppService.BlockBuyer:input_type -> hawkr.seller.v1alpha1.BlockBuyerRequest
-	118, // 155: hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer:input_type -> hawkr.seller.v1alpha1.UnblockBuyerRequest
-	120, // 156: hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers:input_type -> hawkr.seller.v1alpha1.ListBlockedBuyersRequest
-	106, // 157: hawkr.seller.v1alpha1.SellerPublicService.GetStore:input_type -> hawkr.seller.v1alpha1.GetStoreRequest
-	108, // 158: hawkr.seller.v1alpha1.SellerPublicService.ListStores:input_type -> hawkr.seller.v1alpha1.ListStoresRequest
-	110, // 159: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:input_type -> hawkr.seller.v1alpha1.BatchGetStoresRequest
-	112, // 160: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:input_type -> hawkr.seller.v1alpha1.GetSellerAgreementsRequest
-	114, // 161: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:input_type -> hawkr.seller.v1alpha1.RecordProductViewRequest
-	33,  // 162: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:output_type -> hawkr.seller.v1alpha1.ApplyStoreResponse
-	35,  // 163: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:output_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
-	38,  // 164: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:output_type -> hawkr.seller.v1alpha1.GetMyStoreResponse
-	40,  // 165: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:output_type -> hawkr.seller.v1alpha1.GetMyOnboardingResponse
-	45,  // 166: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
-	43,  // 167: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:output_type -> hawkr.seller.v1alpha1.UpdateMyStoreResponse
-	47,  // 168: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:output_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
-	49,  // 169: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:output_type -> hawkr.seller.v1alpha1.ListMyFollowersResponse
-	53,  // 170: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:output_type -> hawkr.seller.v1alpha1.GetMyDashboardResponse
-	62,  // 171: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:output_type -> hawkr.seller.v1alpha1.CloseMyStoreResponse
-	70,  // 172: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:output_type -> hawkr.seller.v1alpha1.SaveKYCDraftResponse
-	80,  // 173: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:output_type -> hawkr.seller.v1alpha1.GetMyKYCResponse
-	82,  // 174: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:output_type -> hawkr.seller.v1alpha1.SubmitKYCResponse
-	84,  // 175: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:output_type -> hawkr.seller.v1alpha1.CancelKYCResponse
-	73,  // 176: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
-	75,  // 177: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:output_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
-	87,  // 178: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:output_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
-	97,  // 179: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:output_type -> hawkr.seller.v1alpha1.ListMyMeasuresResponse
-	99,  // 180: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:output_type -> hawkr.seller.v1alpha1.GetMyMeasureResponse
-	101, // 181: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:output_type -> hawkr.seller.v1alpha1.SubmitAppealResponse
-	103, // 182: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:output_type -> hawkr.seller.v1alpha1.RequestRemediationResponse
-	117, // 183: hawkr.seller.v1alpha1.SellerAppService.BlockBuyer:output_type -> hawkr.seller.v1alpha1.BlockBuyerResponse
-	119, // 184: hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer:output_type -> hawkr.seller.v1alpha1.UnblockBuyerResponse
-	121, // 185: hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers:output_type -> hawkr.seller.v1alpha1.ListBlockedBuyersResponse
-	107, // 186: hawkr.seller.v1alpha1.SellerPublicService.GetStore:output_type -> hawkr.seller.v1alpha1.GetStoreResponse
-	109, // 187: hawkr.seller.v1alpha1.SellerPublicService.ListStores:output_type -> hawkr.seller.v1alpha1.ListStoresResponse
-	111, // 188: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:output_type -> hawkr.seller.v1alpha1.BatchGetStoresResponse
-	113, // 189: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:output_type -> hawkr.seller.v1alpha1.GetSellerAgreementsResponse
-	115, // 190: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:output_type -> hawkr.seller.v1alpha1.RecordProductViewResponse
-	162, // [162:191] is the sub-list for method output_type
-	133, // [133:162] is the sub-list for method input_type
-	133, // [133:133] is the sub-list for extension type_name
-	133, // [133:133] is the sub-list for extension extendee
-	0,   // [0:133] is the sub-list for field type_name
+	98,  // 118: hawkr.seller.v1alpha1.ListMyMeasuresResponse.measures:type_name -> hawkr.seller.v1alpha1.Measure
+	98,  // 119: hawkr.seller.v1alpha1.GetMyMeasureResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	98,  // 120: hawkr.seller.v1alpha1.SubmitAppealResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	98,  // 121: hawkr.seller.v1alpha1.RequestRemediationResponse.measure:type_name -> hawkr.seller.v1alpha1.Measure
+	28,  // 122: hawkr.seller.v1alpha1.Inquiry.kind:type_name -> hawkr.seller.v1alpha1.InquiryKind
+	136, // 123: hawkr.seller.v1alpha1.Inquiry.create_time:type_name -> google.protobuf.Timestamp
+	29,  // 124: hawkr.seller.v1alpha1.Inquiry.state:type_name -> hawkr.seller.v1alpha1.InquiryState
+	144, // 125: hawkr.seller.v1alpha1.Inquiry.reply_deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	108, // 126: hawkr.seller.v1alpha1.Inquiry.reply:type_name -> hawkr.seller.v1alpha1.InquiryReply
+	136, // 127: hawkr.seller.v1alpha1.Inquiry.withdraw_time:type_name -> google.protobuf.Timestamp
+	30,  // 128: hawkr.seller.v1alpha1.InquiryReply.channel:type_name -> hawkr.seller.v1alpha1.InquiryReplyChannel
+	136, // 129: hawkr.seller.v1alpha1.InquiryReply.receive_time:type_name -> google.protobuf.Timestamp
+	29,  // 130: hawkr.seller.v1alpha1.ListMyInquiriesRequest.state:type_name -> hawkr.seller.v1alpha1.InquiryState
+	107, // 131: hawkr.seller.v1alpha1.ListMyInquiriesResponse.inquiries:type_name -> hawkr.seller.v1alpha1.Inquiry
+	107, // 132: hawkr.seller.v1alpha1.GetMyInquiryResponse.inquiry:type_name -> hawkr.seller.v1alpha1.Inquiry
+	107, // 133: hawkr.seller.v1alpha1.ReplyToInquiryResponse.inquiry:type_name -> hawkr.seller.v1alpha1.Inquiry
+	135, // 134: hawkr.seller.v1alpha1.PublicStore.logo:type_name -> hawkr.common.v1alpha1.Image
+	135, // 135: hawkr.seller.v1alpha1.PublicStore.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	136, // 136: hawkr.seller.v1alpha1.PublicStore.update_time:type_name -> google.protobuf.Timestamp
+	115, // 137: hawkr.seller.v1alpha1.GetStoreResponse.store:type_name -> hawkr.seller.v1alpha1.PublicStore
+	116, // 138: hawkr.seller.v1alpha1.GetStoreResponse.stats:type_name -> hawkr.seller.v1alpha1.StoreStats
+	115, // 139: hawkr.seller.v1alpha1.ListStoresResponse.stores:type_name -> hawkr.seller.v1alpha1.PublicStore
+	145, // 140: hawkr.seller.v1alpha1.BatchGetStoresResponse.stores:type_name -> hawkr.common.v1alpha1.StoreCard
+	32,  // 141: hawkr.seller.v1alpha1.GetSellerAgreementsResponse.agreements:type_name -> hawkr.seller.v1alpha1.SellerAgreement
+	133, // 142: hawkr.seller.v1alpha1.ListBlockedBuyersResponse.blocked_buyers:type_name -> hawkr.seller.v1alpha1.BlockedBuyer
+	53,  // 143: hawkr.seller.v1alpha1.BlockedBuyer.buyer:type_name -> hawkr.seller.v1alpha1.BuyerCard
+	136, // 144: hawkr.seller.v1alpha1.BlockedBuyer.create_time:type_name -> google.protobuf.Timestamp
+	35,  // 145: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:input_type -> hawkr.seller.v1alpha1.ApplyStoreRequest
+	37,  // 146: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:input_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningRequest
+	40,  // 147: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:input_type -> hawkr.seller.v1alpha1.GetMyStoreRequest
+	42,  // 148: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:input_type -> hawkr.seller.v1alpha1.GetMyOnboardingRequest
+	47,  // 149: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountRequest
+	45,  // 150: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:input_type -> hawkr.seller.v1alpha1.UpdateMyStoreRequest
+	49,  // 151: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:input_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingRequest
+	51,  // 152: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:input_type -> hawkr.seller.v1alpha1.ListMyFollowersRequest
+	55,  // 153: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:input_type -> hawkr.seller.v1alpha1.GetMyDashboardRequest
+	64,  // 154: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:input_type -> hawkr.seller.v1alpha1.CloseMyStoreRequest
+	72,  // 155: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:input_type -> hawkr.seller.v1alpha1.SaveKYCDraftRequest
+	82,  // 156: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:input_type -> hawkr.seller.v1alpha1.GetMyKYCRequest
+	84,  // 157: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:input_type -> hawkr.seller.v1alpha1.SubmitKYCRequest
+	86,  // 158: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:input_type -> hawkr.seller.v1alpha1.CancelKYCRequest
+	75,  // 159: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:input_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountRequest
+	77,  // 160: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:input_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest
+	89,  // 161: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:input_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationRequest
+	99,  // 162: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:input_type -> hawkr.seller.v1alpha1.ListMyMeasuresRequest
+	101, // 163: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:input_type -> hawkr.seller.v1alpha1.GetMyMeasureRequest
+	103, // 164: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:input_type -> hawkr.seller.v1alpha1.SubmitAppealRequest
+	105, // 165: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:input_type -> hawkr.seller.v1alpha1.RequestRemediationRequest
+	109, // 166: hawkr.seller.v1alpha1.SellerAppService.ListMyInquiries:input_type -> hawkr.seller.v1alpha1.ListMyInquiriesRequest
+	111, // 167: hawkr.seller.v1alpha1.SellerAppService.GetMyInquiry:input_type -> hawkr.seller.v1alpha1.GetMyInquiryRequest
+	113, // 168: hawkr.seller.v1alpha1.SellerAppService.ReplyToInquiry:input_type -> hawkr.seller.v1alpha1.ReplyToInquiryRequest
+	127, // 169: hawkr.seller.v1alpha1.SellerAppService.BlockBuyer:input_type -> hawkr.seller.v1alpha1.BlockBuyerRequest
+	129, // 170: hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer:input_type -> hawkr.seller.v1alpha1.UnblockBuyerRequest
+	131, // 171: hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers:input_type -> hawkr.seller.v1alpha1.ListBlockedBuyersRequest
+	117, // 172: hawkr.seller.v1alpha1.SellerPublicService.GetStore:input_type -> hawkr.seller.v1alpha1.GetStoreRequest
+	119, // 173: hawkr.seller.v1alpha1.SellerPublicService.ListStores:input_type -> hawkr.seller.v1alpha1.ListStoresRequest
+	121, // 174: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:input_type -> hawkr.seller.v1alpha1.BatchGetStoresRequest
+	123, // 175: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:input_type -> hawkr.seller.v1alpha1.GetSellerAgreementsRequest
+	125, // 176: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:input_type -> hawkr.seller.v1alpha1.RecordProductViewRequest
+	36,  // 177: hawkr.seller.v1alpha1.SellerAppService.ApplyStore:output_type -> hawkr.seller.v1alpha1.ApplyStoreResponse
+	38,  // 178: hawkr.seller.v1alpha1.SellerAppService.GetMyStoreOpening:output_type -> hawkr.seller.v1alpha1.GetMyStoreOpeningResponse
+	41,  // 179: hawkr.seller.v1alpha1.SellerAppService.GetMyStore:output_type -> hawkr.seller.v1alpha1.GetMyStoreResponse
+	43,  // 180: hawkr.seller.v1alpha1.SellerAppService.GetMyOnboarding:output_type -> hawkr.seller.v1alpha1.GetMyOnboardingResponse
+	48,  // 181: hawkr.seller.v1alpha1.SellerAppService.RefreshMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.RefreshMyPaymentAccountResponse
+	46,  // 182: hawkr.seller.v1alpha1.SellerAppService.UpdateMyStore:output_type -> hawkr.seller.v1alpha1.UpdateMyStoreResponse
+	50,  // 183: hawkr.seller.v1alpha1.SellerAppService.CompleteMyStoreOnboarding:output_type -> hawkr.seller.v1alpha1.CompleteMyStoreOnboardingResponse
+	52,  // 184: hawkr.seller.v1alpha1.SellerAppService.ListMyFollowers:output_type -> hawkr.seller.v1alpha1.ListMyFollowersResponse
+	56,  // 185: hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard:output_type -> hawkr.seller.v1alpha1.GetMyDashboardResponse
+	65,  // 186: hawkr.seller.v1alpha1.SellerAppService.CloseMyStore:output_type -> hawkr.seller.v1alpha1.CloseMyStoreResponse
+	73,  // 187: hawkr.seller.v1alpha1.SellerAppService.SaveKYCDraft:output_type -> hawkr.seller.v1alpha1.SaveKYCDraftResponse
+	83,  // 188: hawkr.seller.v1alpha1.SellerAppService.GetMyKYC:output_type -> hawkr.seller.v1alpha1.GetMyKYCResponse
+	85,  // 189: hawkr.seller.v1alpha1.SellerAppService.SubmitKYC:output_type -> hawkr.seller.v1alpha1.SubmitKYCResponse
+	87,  // 190: hawkr.seller.v1alpha1.SellerAppService.CancelKYC:output_type -> hawkr.seller.v1alpha1.CancelKYCResponse
+	76,  // 191: hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount:output_type -> hawkr.seller.v1alpha1.GetMyPaymentAccountResponse
+	78,  // 192: hawkr.seller.v1alpha1.SellerAppService.CreatePaymentOnboardingSession:output_type -> hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse
+	90,  // 193: hawkr.seller.v1alpha1.SellerAppService.LookupBusinessRegistration:output_type -> hawkr.seller.v1alpha1.LookupBusinessRegistrationResponse
+	100, // 194: hawkr.seller.v1alpha1.SellerAppService.ListMyMeasures:output_type -> hawkr.seller.v1alpha1.ListMyMeasuresResponse
+	102, // 195: hawkr.seller.v1alpha1.SellerAppService.GetMyMeasure:output_type -> hawkr.seller.v1alpha1.GetMyMeasureResponse
+	104, // 196: hawkr.seller.v1alpha1.SellerAppService.SubmitAppeal:output_type -> hawkr.seller.v1alpha1.SubmitAppealResponse
+	106, // 197: hawkr.seller.v1alpha1.SellerAppService.RequestRemediation:output_type -> hawkr.seller.v1alpha1.RequestRemediationResponse
+	110, // 198: hawkr.seller.v1alpha1.SellerAppService.ListMyInquiries:output_type -> hawkr.seller.v1alpha1.ListMyInquiriesResponse
+	112, // 199: hawkr.seller.v1alpha1.SellerAppService.GetMyInquiry:output_type -> hawkr.seller.v1alpha1.GetMyInquiryResponse
+	114, // 200: hawkr.seller.v1alpha1.SellerAppService.ReplyToInquiry:output_type -> hawkr.seller.v1alpha1.ReplyToInquiryResponse
+	128, // 201: hawkr.seller.v1alpha1.SellerAppService.BlockBuyer:output_type -> hawkr.seller.v1alpha1.BlockBuyerResponse
+	130, // 202: hawkr.seller.v1alpha1.SellerAppService.UnblockBuyer:output_type -> hawkr.seller.v1alpha1.UnblockBuyerResponse
+	132, // 203: hawkr.seller.v1alpha1.SellerAppService.ListBlockedBuyers:output_type -> hawkr.seller.v1alpha1.ListBlockedBuyersResponse
+	118, // 204: hawkr.seller.v1alpha1.SellerPublicService.GetStore:output_type -> hawkr.seller.v1alpha1.GetStoreResponse
+	120, // 205: hawkr.seller.v1alpha1.SellerPublicService.ListStores:output_type -> hawkr.seller.v1alpha1.ListStoresResponse
+	122, // 206: hawkr.seller.v1alpha1.SellerPublicService.BatchGetStores:output_type -> hawkr.seller.v1alpha1.BatchGetStoresResponse
+	124, // 207: hawkr.seller.v1alpha1.SellerPublicService.GetSellerAgreements:output_type -> hawkr.seller.v1alpha1.GetSellerAgreementsResponse
+	126, // 208: hawkr.seller.v1alpha1.SellerPublicService.RecordProductView:output_type -> hawkr.seller.v1alpha1.RecordProductViewResponse
+	177, // [177:209] is the sub-list for method output_type
+	145, // [145:177] is the sub-list for method input_type
+	145, // [145:145] is the sub-list for extension type_name
+	145, // [145:145] is the sub-list for extension extendee
+	0,   // [0:145] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_seller_v1alpha1_seller_proto_init() }
@@ -8639,8 +9407,8 @@ func file_hawkr_seller_v1alpha1_seller_proto_init() {
 		(*ContentRef_PostId)(nil),
 		(*ContentRef_ForumThread)(nil),
 	}
-	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[77].OneofWrappers = []any{}
-	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[88].OneofWrappers = []any{
+	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[85].OneofWrappers = []any{}
+	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[96].OneofWrappers = []any{
 		(*BlockBuyerRequest_CommentId)(nil),
 		(*BlockBuyerRequest_ForumEntryId)(nil),
 	}
@@ -8649,8 +9417,8 @@ func file_hawkr_seller_v1alpha1_seller_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_seller_v1alpha1_seller_proto_rawDesc), len(file_hawkr_seller_v1alpha1_seller_proto_rawDesc)),
-			NumEnums:      28,
-			NumMessages:   95,
+			NumEnums:      31,
+			NumMessages:   103,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

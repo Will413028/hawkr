@@ -24,6 +24,7 @@ import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../../media/data/media_repository.dart';
 import '../../notification/data/notification_repository.dart';
 import '../../post/presentation/widgets/page_header.dart';
+import '../data/inquiries.dart';
 import '../data/current_store.dart';
 import '../data/onboarding_tasks.dart';
 import '../data/seller_status_refresh.dart';
@@ -546,6 +547,9 @@ class ProfileScreen extends HookConsumerWidget {
                                   onShippingTap: () =>
                                       openShippingSettings(context, ref),
                                   notifUnread: unreadNotifCount.value,
+                                  pendingInquiries: ref.watch(
+                                    currentPendingInquiryCountProvider,
+                                  ),
                                   canManageBlocks: ref.watch(
                                     canBlockBuyersProvider,
                                   ),

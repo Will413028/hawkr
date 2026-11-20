@@ -168,6 +168,7 @@ const (
 	InquiryChannelEmail              = model.InquiryChannelEmail
 	InquiryChannelMessaging          = model.InquiryChannelMessaging
 	InquiryChannelOther              = model.InquiryChannelOther
+	InquiryChannelSellerCenter       = model.InquiryChannelSellerCenter
 	InquiryWithdrawAdmin             = model.InquiryWithdrawAdmin
 	InquiryWithdrawCaseClosed        = model.InquiryWithdrawCaseClosed
 	InquiryStateOpen                 = model.InquiryStateOpen
@@ -438,6 +439,14 @@ type (
 	WithdrawCaseInquiryInput = model.WithdrawCaseInquiryInput
 	// WithdrawCaseInquiryResult 是撤回詢問的結果。
 	WithdrawCaseInquiryResult = model.WithdrawCaseInquiryResult
+	// SellerInquiry 是賣家看到的一筆詢問。
+	SellerInquiry = model.SellerInquiry
+	// SellerInquiryPage 是一頁賣家的詢問，連同待回覆數。
+	SellerInquiryPage = model.SellerInquiryPage
+	// AccountInquiryListInput 是賣家帳號詢問清單的輸入。
+	AccountInquiryListInput = model.AccountInquiryListInput
+	// ReplyToInquiryInput 是賣家回覆詢問的輸入。
+	ReplyToInquiryInput = model.ReplyToInquiryInput
 	// InquiryCursor 是詢問列表的 keyset 位置。
 	InquiryCursor = model.InquiryCursor
 	// CaseInquiryListInput 是案件詢問清單的輸入。
@@ -666,6 +675,21 @@ func (m *Module) WithdrawCaseInquiry(ctx context.Context, in WithdrawCaseInquiry
 // CaseInquiries 是案件的詢問清單，舊到新。只由 admin 的 handler 呼叫，自己開讀取快照（不是跨模組入口）。
 func (m *Module) CaseInquiries(ctx context.Context, in CaseInquiryListInput) (AdminInquiryPage, error) {
 	return m.governance.Inquiries(ctx, in)
+}
+
+// AccountInquiries 是賣家帳號（全部 stint，含已關閉的店）的詢問清單，新到舊，連同待回覆數；自己開讀取快照，不要求店家營運中。
+func (m *Module) AccountInquiries(ctx context.Context, in AccountInquiryListInput) (SellerInquiryPage, error) {
+	return m.governance.AccountInquiries(ctx, in)
+}
+
+// AccountInquiry 讀取賣家帳號的一筆詢問；不屬於這個帳號與不存在都回 NotFound。
+func (m *Module) AccountInquiry(ctx context.Context, accountID int64, inquiryID uuid.UUID) (SellerInquiry, error) {
+	return m.governance.AccountInquiry(ctx, accountID, inquiryID)
+}
+
+// ReplyToInquiry 賣家在賣家中心回覆自己店家的詢問並結束詢問；必須在 transaction 外呼叫（附件先轉正）。已回覆或已撤回回 failed_precondition；逾期後仍可回覆。
+func (m *Module) ReplyToInquiry(ctx context.Context, in ReplyToInquiryInput) (SellerInquiry, error) {
+	return m.governance.ReplyToInquiry(ctx, in)
 }
 
 // Report 讀取一筆通報的後台檢視：補充、佐證與此刻可以做的動作。只由 admin 的 handler 呼叫，自己開讀取快照（不是跨模組入口）。

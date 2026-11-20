@@ -165,6 +165,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyMeasure":                   EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/SubmitAppeal":                   EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/RequestRemediation":             EffectWrite,
+	"/hawkr.seller.v1alpha1.SellerAppService/ListMyInquiries":                EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/GetMyInquiry":                   EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/ReplyToInquiry":                 EffectWrite,
 	// 店家封鎖是保護動作（同 BuyerAppService 的個人封鎖）；名單是讀取。
 	"/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer":        EffectSelfService,
 	"/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer":      EffectSelfService,
