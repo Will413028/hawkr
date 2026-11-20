@@ -16,10 +16,17 @@
 | 語意 | 行為 |
 |---|---|
 | `Create` | `AppName`、`UserID` 必填；`SessionID` 空則產生 UUID。同一個 (app, user, session) 已存在回錯（`already exists`），不覆蓋、不寫任何 state。初始 state 依前綴分流：`app:` 進 `app_states`、`user:` 進 `user_states`、`temp:` 丟棄，其餘進 session。 |
-| `Get` | 三個鍵必填；不存在或屬於別的使用者回包裝 `session.ErrNotFound` 的錯誤。state 是 session、app、user 三層合併（app、user 的 key 加回前綴）。events 依 `timestamp`、`id` 由舊到新；`After` 先篩（`timestamp >= After`），`NumRecentEvents` 再取最近 N 筆。 |
+| `Get` | 三個鍵必填；不存在或屬於別的使用者回包裝 `session.ErrNotFound` 的錯誤。state 是 session、app、user 三層合併（app、user 的 key 加回前綴）。events 依 `timestamp`、`seq`（寫入順序的 identity 欄）由舊到新；session 列與 events 在同一份 `db.InReadSnapshot` 讀取（所以不能在 transaction 內呼叫 `Get`）；`After` 先篩（`timestamp >= After`），`NumRecentEvents` 再取最近 N 筆。 |
 | `List` | `AppName` 必填；`UserID` 為空字串列出該 app 全部使用者的 session，不含 events；每個 session 帶自己使用者的 user 層 state。 |
 | `Delete` | 不存在或屬於別的使用者不是錯誤；events 由 FK 連帶刪除。 |
-| `AppendEvent` | partial event 不寫；沒有 ID 補 UUID、時間截到微秒（都就地改呼叫端的 event）；`StateDelta` 的 `temp:` key 寫前剝除（呼叫端的 event 不被改，live session 的 state 仍保留 `temp:` key 到這一輪結束）；一個 transaction 內鎖 session 列、寫 event、合併三層 state delta。session 不存在回包裝 `session.ErrNotFound` 的錯誤。成功後就地更新傳入的 session（events、state、`LastUpdateTime`）。 |
+| `AppendEvent` | partial event 不寫；沒有 ID 補 UUID、時間截到微秒（都就地改呼叫端的 event）；`StateDelta` 的 `temp:` key 寫前剝除（呼叫端的 event 不被改，live session 的 state 仍保留 `temp:` key 到這一輪結束）；一個 transaction 內鎖 session 列、寫 event、合併三層 state delta。session 不存在回包裝 `session.ErrNotFound` 的錯誤。成功後就地更新傳入的 session（events、state、`LastUpdateTime`）。重複 event id 回 `already exists`（`ON CONFLICT DO NOTHING` 看影響列數，不撞鍵）。 |
+
+- `Create`、`AppendEvent` 在提交後才更新 live session，所以拒絕在外層 transaction 內執行（`adksession.ErrInOuterTx`）；必須是最上層呼叫。
+- `NumRecentEvents` 超過 int32 時夾到 `math.MaxInt32`。
+
+**鎖順序**（`Create`、`AppendEvent` 同序，未來新增寫入路徑照此）：`assistant.sessions` 列、`assistant.app_states` 列、`assistant.user_states` 列。`events` 只插入不鎖舊列。跨模組的全域順序見 `backend/AGENTS.md` 規則 4。
+
+**已知限制**：`app_states` 每個 `app_name` 只有一列，任何帶 `app:` 前綴 state delta 的 `AppendEvent` 都鎖它，會讓所有買家的這類寫入串行。盤點結果：`rg -n '"app:' backend/services/ai-service` 沒有命中，舊買家助理不寫 `app:` key，目前實際上不會競爭；若日後引入 `app:` state，需先量測再決定是否拆分。
 
 - state 在 SQL 內以 jsonb `||` 合併（淺層、後寫的 key 覆蓋），並行 append 不丟 key。沒有 stale session 檢查（理由見 `CARRYOVER.md`）。
 - state 經 JSONB 往返，數字讀回是 float64；大整數 ID 一律以字串寫入。

@@ -69,9 +69,10 @@ func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (GetSess
 	return i, err
 }
 
-const insertEvent = `-- name: InsertEvent :exec
+const insertEvent = `-- name: InsertEvent :execrows
 INSERT INTO assistant.events (app_name, user_id, session_id, id, timestamp, event)
 VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (app_name, user_id, session_id, id) DO NOTHING
 `
 
 type InsertEventParams struct {
@@ -83,8 +84,9 @@ type InsertEventParams struct {
 	Event     []byte
 }
 
-func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error {
-	_, err := q.db.Exec(ctx, insertEvent,
+// 重複的 event id 回 0 列（呼叫端轉成錯誤）；不用撞主鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
+func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertEvent,
 		arg.AppName,
 		arg.UserID,
 		arg.SessionID,
@@ -92,7 +94,10 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 		arg.Timestamp,
 		arg.Event,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const insertSession = `-- name: InsertSession :execrows
@@ -129,7 +134,7 @@ SELECT id, timestamp, event
 FROM assistant.events
 WHERE app_name = $1 AND user_id = $2 AND session_id = $3
   AND ($4::timestamptz IS NULL OR timestamp >= $4::timestamptz)
-ORDER BY timestamp DESC, id DESC
+ORDER BY timestamp DESC, seq DESC
 LIMIT $5::int
 `
 
@@ -147,7 +152,7 @@ type ListEventsRow struct {
 	Event     []byte
 }
 
-// 先套 after 篩選再取最近 limit 筆（gorm 版相同），以 timestamp、id 為全序；回傳由新到舊，呼叫端反轉成時間順序。
+// 先套 after 篩選再取最近 limit 筆（gorm 版相同），以 timestamp、seq（寫入順序）為全序；回傳由新到舊，呼叫端反轉成時間順序。
 func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListEventsRow, error) {
 	rows, err := q.db.Query(ctx, listEvents,
 		arg.AppName,

@@ -24,7 +24,7 @@ schema `assistant`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `
 
 模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。
 
-- session 的寫入都在 `db.InTx` 內，transaction 內不呼叫 LLM（規則 5）。state delta 以 SQL 的 jsonb `||` 合併，不讀出再寫回；鎖順序 session 列、app 列、user 列（`Create`、`AppendEvent` 同序）。
+- session 的寫入都在 `db.InTx` 內，transaction 內不呼叫 LLM（規則 5）。state delta 以 SQL 的 jsonb `||` 合併，不讀出再寫回；鎖順序 session 列、app 列、user 列，詳見 `backend/docs/modules/assistant.md` §2。
 - `Create` 重複不靠撞唯一鍵（`ON CONFLICT DO NOTHING` 看影響列數），外層 transaction 不會因此 aborted。
 - `adksession` 的驗收是 ADK 的 `RunServiceTests`（`session_integration_test.go`，CI 的 Postgres）；`AppendEvent` 寫入內容由純函式 `encodeAppend` 算出，`temp:` 剝除有本機單元測試守。
 - 其餘不變量隨實作補上。

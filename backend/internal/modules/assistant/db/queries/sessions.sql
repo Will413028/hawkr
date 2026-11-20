@@ -38,17 +38,19 @@ SET state = state || @state_delta::jsonb, updated_at = @now
 WHERE app_name = @app_name AND user_id = @user_id AND id = @id
 RETURNING id;
 
--- name: InsertEvent :exec
+-- name: InsertEvent :execrows
+-- 重複的 event id 回 0 列（呼叫端轉成錯誤）；不用撞主鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
 INSERT INTO assistant.events (app_name, user_id, session_id, id, timestamp, event)
-VALUES (@app_name, @user_id, @session_id, @id, @timestamp, @event);
+VALUES (@app_name, @user_id, @session_id, @id, @timestamp, @event)
+ON CONFLICT (app_name, user_id, session_id, id) DO NOTHING;
 
 -- name: ListEvents :many
--- 先套 after 篩選再取最近 limit 筆（gorm 版相同），以 timestamp、id 為全序；回傳由新到舊，呼叫端反轉成時間順序。
+-- 先套 after 篩選再取最近 limit 筆（gorm 版相同），以 timestamp、seq（寫入順序）為全序；回傳由新到舊，呼叫端反轉成時間順序。
 SELECT id, timestamp, event
 FROM assistant.events
 WHERE app_name = @app_name AND user_id = @user_id AND session_id = @session_id
   AND (sqlc.narg('after')::timestamptz IS NULL OR timestamp >= sqlc.narg('after')::timestamptz)
-ORDER BY timestamp DESC, id DESC
+ORDER BY timestamp DESC, seq DESC
 LIMIT sqlc.narg('max_events')::int;
 
 -- name: MergeAppState :exec

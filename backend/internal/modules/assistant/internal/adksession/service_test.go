@@ -2,6 +2,7 @@ package adksession
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"testing"
 
@@ -56,5 +57,14 @@ func TestEncodeAppendStripsTempKeysFromPersistedBytes(t *testing.T) {
 	}
 	if !enc.hasApp || string(enc.appJSON) != `{"a":1}` || !enc.hasUser || string(enc.userJSON) != `{"u":2}` {
 		t.Fatalf("app=%s user=%s", enc.appJSON, enc.userJSON)
+	}
+}
+
+func TestClampEventsDoesNotOverflow(t *testing.T) {
+	if got := clampEvents(math.MaxInt32 + 1); got != math.MaxInt32 {
+		t.Fatalf("clamp = %d", got)
+	}
+	if got := clampEvents(5); got != 5 {
+		t.Fatalf("clamp = %d", got)
 	}
 }

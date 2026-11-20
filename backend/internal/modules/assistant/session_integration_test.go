@@ -117,24 +117,62 @@ func TestDuplicateCreateKeepsOriginalAndDoesNotWriteSharedState(t *testing.T) {
 	}
 }
 
-// 規則 3：撞唯一鍵後不能讓外層 transaction 進入 aborted；重複 Create 在外層 transaction 內失敗後，同一個 transaction 還能繼續查。
-func TestDuplicateCreateInsideOuterTxDoesNotAbortIt(t *testing.T) {
+// Create、AppendEvent 在提交後才更新 live session，外層 transaction 之後 rollback 會讓記憶體分岔，所以在外層 transaction 內一律拒絕。
+func TestCreateAndAppendRefuseToRunInsideOuterTx(t *testing.T) {
 	d := newDB(t)
 	s := adksession.New(d)
 	ctx := context.Background()
-	mustCreate(t, s, "u1", map[string]any{})
-	if _, err := s.Create(ctx, &session.CreateRequest{AppName: app, UserID: "u1", SessionID: "dup"}); err != nil {
-		t.Fatal(err)
-	}
+	sess := mustCreate(t, s, "u1", nil)
 	err := d.InTx(ctx, func(ctx context.Context) error {
-		if _, err := s.Create(ctx, &session.CreateRequest{AppName: app, UserID: "u1", SessionID: "dup"}); err == nil {
-			return errors.New("duplicate create succeeded")
+		if _, err := s.Create(ctx, &session.CreateRequest{AppName: app, UserID: "u1", SessionID: "x"}); !errors.Is(err, adksession.ErrInOuterTx) {
+			return fmt.Errorf("Create err = %v", err)
 		}
-		var n int
-		return d.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM assistant.sessions").Scan(&n)
+		if err := s.AppendEvent(ctx, sess, &session.Event{ID: "e", Author: "user", InvocationID: "i"}); !errors.Is(err, adksession.ErrInOuterTx) {
+			return fmt.Errorf("AppendEvent err = %v", err)
+		}
+		return nil
 	})
 	if err != nil {
-		t.Fatalf("outer tx aborted: %v", err)
+		t.Fatal(err)
+	}
+}
+
+// 規則 3：Get 的 session 列與 events 在同一份唯讀快照；快照不能開在 transaction 內，所以在外層 transaction 內呼叫會被 db 拒絕。
+// 若 Get 拆成兩個沒有快照的語句，這裡會成功而不是回 ErrSnapshotInTx。
+func TestGetReadsInOneSnapshot(t *testing.T) {
+	d := newDB(t)
+	s := adksession.New(d)
+	ctx := context.Background()
+	sess := mustCreate(t, s, "u1", nil)
+	err := d.InTx(ctx, func(ctx context.Context) error {
+		_, err := s.Get(ctx, &session.GetRequest{AppName: app, UserID: "u1", SessionID: sess.ID()})
+		if !errors.Is(err, db.ErrSnapshotInTx) {
+			return fmt.Errorf("Get err = %v, want ErrSnapshotInTx", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEventsWithEqualTimestampKeepInsertionOrder(t *testing.T) {
+	s := adksession.New(newDB(t))
+	ctx := context.Background()
+	sess := mustCreate(t, s, "u1", nil)
+	ts := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	ids := []string{"z", "m", "a", "q", "b"}
+	for _, id := range ids {
+		if err := s.AppendEvent(ctx, sess, &session.Event{ID: id, Author: "user", InvocationID: "i", Timestamp: ts}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var got []string
+	for ev := range get(t, s, "u1", sess.ID()).Events().All() {
+		got = append(got, ev.ID)
+	}
+	if strings.Join(got, ",") != strings.Join(ids, ",") {
+		t.Fatalf("order = %v, want %v", got, ids)
 	}
 }
 

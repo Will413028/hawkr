@@ -1,6 +1,6 @@
 // Package adksession 以 pgx 與 sqlc 實作 ADK v2 的 session.Service（A9-D5），資料在 assistant schema。
 //
-// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（service_integration_test.go，在 CI 的 Postgres 上跑）。
+// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（backend/internal/modules/assistant/session_integration_test.go，在 CI 的 Postgres 上跑）。
 // 寫入都在 db.InTx 內，transaction 內沒有任何外部 provider 呼叫（backend/AGENTS.md 規則 5）。
 package adksession
 
@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"time"
 
@@ -29,6 +30,24 @@ var _ session.Service = (*Service)(nil)
 
 // New 建立 session service。
 func New(d *db.DB) *Service { return &Service{db: d} }
+
+// ErrInOuterTx 是在已有 transaction 的 ctx 上呼叫 Create 或 AppendEvent 時回傳的錯誤：這兩個方法在提交後才更新
+// 傳入或回傳的 live session，外層 transaction 之後 rollback 會讓記憶體與資料庫分岔，所以必須是最上層的呼叫。
+var ErrInOuterTx = errors.New("adksession：寫入不能開在外層 transaction 內")
+
+func requireNoOuterTx(ctx context.Context) error {
+	if _, ok := db.TxFrom(ctx); ok {
+		return ErrInOuterTx
+	}
+	return nil
+}
+
+func clampEvents(n int) int32 {
+	if n > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(n)
+}
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.db.Conn(ctx)) }
 
@@ -55,6 +74,9 @@ func unmarshalState(b []byte) (map[string]any, error) {
 func (s *Service) Create(ctx context.Context, req *session.CreateRequest) (*session.CreateResponse, error) {
 	if req.AppName == "" || req.UserID == "" {
 		return nil, fmt.Errorf("app_name and user_id are required, got app_name: %q, user_id: %q", req.AppName, req.UserID)
+	}
+	if err := requireNoOuterTx(ctx); err != nil {
+		return nil, err
 	}
 	id := req.SessionID
 	if id == "" {
@@ -131,6 +153,20 @@ func (s *Service) Get(ctx context.Context, req *session.GetRequest) (*session.Ge
 	if req.AppName == "" || req.UserID == "" || req.SessionID == "" {
 		return nil, fmt.Errorf("app_name, user_id, session_id are required, got app_name: %q, user_id: %q, session_id: %q", req.AppName, req.UserID, req.SessionID)
 	}
+	var live *liveSession
+	err := s.db.InReadSnapshot(ctx, func(ctx context.Context) error {
+		var err error
+		live, err = s.getInSnapshot(ctx, req)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &session.GetResponse{Session: live}, nil
+}
+
+// getInSnapshot 在同一份快照內讀 session 列與 events（backend/AGENTS.md 規則 3）。
+func (s *Service) getInSnapshot(ctx context.Context, req *session.GetRequest) (*liveSession, error) {
 	q := s.q(ctx)
 	row, err := q.GetSession(ctx, store.GetSessionParams{AppName: req.AppName, UserID: req.UserID, ID: req.SessionID})
 	if err != nil {
@@ -149,7 +185,7 @@ func (s *Service) Get(ctx context.Context, req *session.GetRequest) (*session.Ge
 		p.After = &after
 	}
 	if req.NumRecentEvents > 0 {
-		n := int32(req.NumRecentEvents)
+		n := clampEvents(req.NumRecentEvents)
 		p.MaxEvents = &n
 	}
 	rows, err := q.ListEvents(ctx, p)
@@ -164,7 +200,7 @@ func (s *Service) Get(ctx context.Context, req *session.GetRequest) (*session.Ge
 		}
 		live.events = append(live.events, &ev)
 	}
-	return &session.GetResponse{Session: live}, nil
+	return live, nil
 }
 
 // List 列出 app 的 sessions，不含 events。UserID 為空時列出該 app 全部使用者的 sessions。
@@ -209,6 +245,9 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 	if ev == nil {
 		return fmt.Errorf("event is nil")
 	}
+	if err := requireNoOuterTx(ctx); err != nil {
+		return err
+	}
 	if ev.Partial {
 		return nil
 	}
@@ -231,8 +270,12 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 			}
 			return fmt.Errorf("更新 session：%w", err)
 		}
-		if err := q.InsertEvent(ctx, store.InsertEventParams{AppName: appName, UserID: userID, SessionID: id, ID: ev.ID, Timestamp: ev.Timestamp, Event: enc.eventJSON}); err != nil {
+		n, err := q.InsertEvent(ctx, store.InsertEventParams{AppName: appName, UserID: userID, SessionID: id, ID: ev.ID, Timestamp: ev.Timestamp, Event: enc.eventJSON})
+		if err != nil {
 			return fmt.Errorf("寫入 event：%w", err)
+		}
+		if n == 0 {
+			return fmt.Errorf("event %q already exists in session %q", ev.ID, id)
 		}
 		if enc.hasApp {
 			if err := q.MergeAppState(ctx, store.MergeAppStateParams{AppName: appName, StateDelta: enc.appJSON, Now: ev.Timestamp}); err != nil {
