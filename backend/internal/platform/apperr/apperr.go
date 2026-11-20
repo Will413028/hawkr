@@ -186,6 +186,9 @@ var ReasonImageNotProduced = newReason("IMAGE_NOT_PRODUCED")
 // ReasonAssistantTurnInProgress 表示這個助理對話已有一輪進行中，同一個對話同時只允許一輪；搭配 FailedPrecondition。
 var ReasonAssistantTurnInProgress = newReason("ASSISTANT_TURN_IN_PROGRESS")
 
+// ReasonAssistantTurnFailed 表示助理這一輪失敗，用於串流 error 事件的原因（事件在串流內，沒有搭配的 Connect code）。
+var ReasonAssistantTurnFailed = newReason("ASSISTANT_TURN_FAILED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

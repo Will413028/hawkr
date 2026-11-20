@@ -108,12 +108,13 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason CONTENT_TAKEDOWN_ACTIVE =
       ErrorReason._(14, _omitEnumNames ? '' : 'CONTENT_TAKEDOWN_ACTIVE');
 
-  /// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：assistant 與 procurement 的 server streaming
-  /// （WatchAssistantTurn、WatchRun）。client 放棄接續，改讀 GetRuntimeSnapshot（助理則重新送出）重建畫面。
+  /// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
+  /// client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
   static const ErrorReason REPLAY_CURSOR_EXPIRED =
       ErrorReason._(15, _omitEnumNames ? '' : 'REPLAY_CURSOR_EXPIRED');
 
-  /// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：client 帶了不是伺服器發出的 cursor。處理同 REPLAY_CURSOR_EXPIRED。
+  /// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
+  /// client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
   static const ErrorReason REPLAY_CURSOR_AHEAD =
       ErrorReason._(16, _omitEnumNames ? '' : 'REPLAY_CURSOR_AHEAD');
 
@@ -183,6 +184,12 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason ASSISTANT_TURN_IN_PROGRESS =
       ErrorReason._(30, _omitEnumNames ? '' : 'ASSISTANT_TURN_IN_PROGRESS');
 
+  /// 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
+  /// （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
+  /// 可以讓使用者重新送出。
+  static const ErrorReason ASSISTANT_TURN_FAILED =
+      ErrorReason._(31, _omitEnumNames ? '' : 'ASSISTANT_TURN_FAILED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -215,10 +222,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     IMAGE_RECITATION_BLOCKED,
     IMAGE_NOT_PRODUCED,
     ASSISTANT_TURN_IN_PROGRESS,
+    ASSISTANT_TURN_FAILED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 30);
+      $pb.ProtobufEnum.$_initByValueList(values, 31);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

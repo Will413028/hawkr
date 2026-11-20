@@ -67,10 +67,11 @@ enum ErrorReason {
   // AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
   CONTENT_TAKEDOWN_ACTIVE = 14;
 
-  // 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：assistant 與 procurement 的 server streaming
-  // （WatchAssistantTurn、WatchRun）。client 放棄接續，改讀 GetRuntimeSnapshot（助理則重新送出）重建畫面。
+  // 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
+  // client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
   REPLAY_CURSOR_EXPIRED = 15;
-  // 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：client 帶了不是伺服器發出的 cursor。處理同 REPLAY_CURSOR_EXPIRED。
+  // 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
+  // client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
   REPLAY_CURSOR_AHEAD = 16;
   // 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
   REQUIREMENT_NOT_READY = 17;
@@ -110,4 +111,8 @@ enum ErrorReason {
   // 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
   // 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
   ASSISTANT_TURN_IN_PROGRESS = 30;
+  // 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
+  // （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
+  // 可以讓使用者重新送出。
+  ASSISTANT_TURN_FAILED = 31;
 }
