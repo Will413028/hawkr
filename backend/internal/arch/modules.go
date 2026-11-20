@@ -52,6 +52,16 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"im": {Packages: map[string][]string{
+		"mediaref": {"store"},
+		"model":    {},
+		"purge":    {"mediaref", "model", "store"},
+		"read":     {"model", "rows", "store", "text"},
+		"rows":     {"model", "store"},
+		"store":    {},
+		"text":     {},
+		"write":    {"mediaref", "model", "rows", "store", "text"},
+	}},
 	"review": {Packages: map[string][]string{
 		"mediaref": {"store"},
 		"model":    {},
