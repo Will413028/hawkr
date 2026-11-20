@@ -847,7 +847,7 @@ class GetLatestAssistantSessionResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSessionId() => $_clearField(1);
 
-  /// 時間由舊到新。
+  /// 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。
   @$pb.TagNumber(2)
   $pb.PbList<AssistantMessage> get messages => $_getList(1);
 }
@@ -946,6 +946,8 @@ class AssistantAppServiceApi {
 
   /// SendAssistantMessage 送出一則訊息，開始一輪助理回覆。伺服器受理後立刻回輪次 ID，回覆內容從
   /// WatchAssistantTurn 取得。session_id 空字串表示開新的對話。
+  /// 每位買家同時進行中的輪次（跨對話）最多 2 輪、每分鐘最多送出 10 次，超過回 resource_exhausted，
+  /// 沒有 reason，帶 RetryInfo；以同一個 client_request_id 重送已受理的請求不計入上限。
   $async.Future<SendAssistantMessageResponse> sendAssistantMessage(
           $pb.ClientContext? ctx, SendAssistantMessageRequest request) =>
       _client.invoke<SendAssistantMessageResponse>(ctx, 'AssistantAppService',
@@ -958,7 +960,7 @@ class AssistantAppServiceApi {
       _client.invoke<WatchAssistantTurnResponse>(ctx, 'AssistantAppService',
           'WatchAssistantTurn', request, WatchAssistantTurnResponse());
 
-  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與訊息；沒有對話時 session_id 是空字串。
+  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與最近 100 則訊息；沒有對話時 session_id 是空字串。
   $async.Future<GetLatestAssistantSessionResponse> getLatestAssistantSession(
           $pb.ClientContext? ctx, GetLatestAssistantSessionRequest request) =>
       _client.invoke<GetLatestAssistantSessionResponse>(

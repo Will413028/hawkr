@@ -13,6 +13,8 @@ abstract final class AssistantAppService {
 
   /// SendAssistantMessage 送出一則訊息，開始一輪助理回覆。伺服器受理後立刻回輪次 ID，回覆內容從
   /// WatchAssistantTurn 取得。session_id 空字串表示開新的對話。
+  /// 每位買家同時進行中的輪次（跨對話）最多 2 輪、每分鐘最多送出 10 次，超過回 resource_exhausted，
+  /// 沒有 reason，帶 RetryInfo；以同一個 client_request_id 重送已受理的請求不計入上限。
   static const sendAssistantMessage = connect.Spec(
     '/$name/SendAssistantMessage',
     connect.StreamType.unary,
@@ -29,7 +31,7 @@ abstract final class AssistantAppService {
     hawkrassistantv1alpha1assistant.WatchAssistantTurnResponse.new,
   );
 
-  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與訊息；沒有對話時 session_id 是空字串。
+  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與最近 100 則訊息；沒有對話時 session_id 是空字串。
   static const getLatestAssistantSession = connect.Spec(
     '/$name/GetLatestAssistantSession',
     connect.StreamType.unary,

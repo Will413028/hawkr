@@ -11,6 +11,8 @@ import "assistant.connect.spec.dart" as specs;
 extension type AssistantAppServiceClient (connect.Transport _transport) {
   /// SendAssistantMessage 送出一則訊息，開始一輪助理回覆。伺服器受理後立刻回輪次 ID，回覆內容從
   /// WatchAssistantTurn 取得。session_id 空字串表示開新的對話。
+  /// 每位買家同時進行中的輪次（跨對話）最多 2 輪、每分鐘最多送出 10 次，超過回 resource_exhausted，
+  /// 沒有 reason，帶 RetryInfo；以同一個 client_request_id 重送已受理的請求不計入上限。
   Future<hawkrassistantv1alpha1assistant.SendAssistantMessageResponse> sendAssistantMessage(
     hawkrassistantv1alpha1assistant.SendAssistantMessageRequest input, {
     connect.Headers? headers,
@@ -47,7 +49,7 @@ extension type AssistantAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與訊息；沒有對話時 session_id 是空字串。
+  /// GetLatestAssistantSession 回傳呼叫者最近一次的對話與最近 100 則訊息；沒有對話時 session_id 是空字串。
   Future<hawkrassistantv1alpha1assistant.GetLatestAssistantSessionResponse> getLatestAssistantSession(
     hawkrassistantv1alpha1assistant.GetLatestAssistantSessionRequest input, {
     connect.Headers? headers,
