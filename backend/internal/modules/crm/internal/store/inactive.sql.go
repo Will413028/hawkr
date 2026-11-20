@@ -55,25 +55,32 @@ func (q *Queries) InsertInactiveParty(ctx context.Context, arg InsertInactivePar
 
 const listInactivePartiesWithData = `-- name: ListInactivePartiesWithData :many
 SELECT ip.kind, ip.party_id FROM crm.inactive_parties AS ip
-WHERE (ip.kind = 'BUYER' AND (
+WHERE (ip.kind, ip.party_id) > ($1::text, $2::bigint)
+  AND ((ip.kind = 'BUYER' AND (
           EXISTS (SELECT 1 FROM crm.customers AS c WHERE c.buyer_id = ip.party_id)
           OR EXISTS (SELECT 1 FROM crm.order_nets AS o WHERE o.buyer_id = ip.party_id)))
    OR (ip.kind = 'STORE' AND (
           EXISTS (SELECT 1 FROM crm.customers AS c WHERE c.store_id = ip.party_id)
           OR EXISTS (SELECT 1 FROM crm.order_nets AS o WHERE o.store_id = ip.party_id)
-          OR EXISTS (SELECT 1 FROM crm.tags AS t WHERE t.store_id = ip.party_id)))
+          OR EXISTS (SELECT 1 FROM crm.tags AS t WHERE t.store_id = ip.party_id))))
 ORDER BY ip.kind, ip.party_id
-LIMIT $1
+LIMIT $3
 `
+
+type ListInactivePartiesWithDataParams struct {
+	AfterKind string
+	AfterID   int64
+	MaxRows   int32
+}
 
 type ListInactivePartiesWithDataRow struct {
 	Kind    string
 	PartyID int64
 }
 
-// 抹除的保底掃描：已在 inactive_parties 但 crm 仍有資料的身分，最多 max_rows 個。
-func (q *Queries) ListInactivePartiesWithData(ctx context.Context, maxRows int32) ([]ListInactivePartiesWithDataRow, error) {
-	rows, err := q.db.Query(ctx, listInactivePartiesWithData, maxRows)
+// 抹除的保底掃描：已在 inactive_parties 但 crm 仍有資料的身分，依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 (”, 0)。
+func (q *Queries) ListInactivePartiesWithData(ctx context.Context, arg ListInactivePartiesWithDataParams) ([]ListInactivePartiesWithDataRow, error) {
+	rows, err := q.db.Query(ctx, listInactivePartiesWithData, arg.AfterKind, arg.AfterID, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +124,10 @@ type LockPartySharedParams struct {
 }
 
 // 「投影寫入」持同一把鎖的共享模式：投影之間不互相排隊（同一店家、同一買家的事件仍各自在 order_nets 與 customers 的列鎖上序列化），
-// 只與 Deactivate 的獨占互斥。投影依序持買家、店家兩把；Deactivate 一次只持一把，所以不會死結。
+// 只與 Deactivate 的獨占互斥。死結的論證：投影依序持 BUYER 一把、STORE 一把（都是共享），之後只取 crm 自己的 order_nets、customers 列鎖，
+// 不持 seller、buyer 擁有的任何鎖；等待 STORE 鎖時它只持 BUYER 共享。Deactivate 的呼叫者是買家關閉（只拿一把 BUYER 獨占）與 seller 的
+// retireBatch（同一個 transaction 依序拿多把 STORE 獨占，從不拿 BUYER），所以沒有任何 transaction 持 STORE 去等 BUYER；
+// 持有多把 STORE 獨占的 retireBatch 等的是別的投影的 STORE 共享，而那個投影拿到之後不再等任何 retireBatch 持有的鎖，會自己 commit 釋放。
 func (q *Queries) LockPartyShared(ctx context.Context, arg LockPartySharedParams) error {
 	_, err := q.db.Exec(ctx, lockPartyShared, arg.Kind, arg.PartyID)
 	return err

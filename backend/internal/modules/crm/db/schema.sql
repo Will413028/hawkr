@@ -61,12 +61,14 @@ CREATE INDEX customer_tags_by_tag ON crm.customer_tags (store_id, tag_id, buyer_
 -- 消費統計的投影（過渡：ordering 搬進單體後改讀 ordering 的 pub_*，這兩張表退場）。每單一列，列鎖取代舊的 advisory lock；
 -- net_amount 可暫時為負（退款先到）；只有 completed 的單計入 customers.total_spent。
 CREATE TABLE crm.order_nets (
-    order_no   TEXT        PRIMARY KEY,
-    store_id   BIGINT      NOT NULL,
-    buyer_id   BIGINT      NOT NULL,
-    completed  BOOLEAN     NOT NULL DEFAULT false,
-    net_amount BIGINT      NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
+    order_no      TEXT        PRIMARY KEY,
+    store_id      BIGINT      NOT NULL,
+    buyer_id      BIGINT      NOT NULL,
+    completed     BOOLEAN     NOT NULL DEFAULT false,
+    -- 這單是否收過全額退款（在已上鎖的列上讀寫；訂單比全額退款晚到時記 0）。
+    full_refunded BOOLEAN     NOT NULL DEFAULT false,
+    net_amount    BIGINT      NOT NULL,
+    updated_at    TIMESTAMPTZ NOT NULL,
     CONSTRAINT order_nets_order_no_check CHECK (char_length(order_no) >= 1 AND char_length(order_no) <= 128),
     CONSTRAINT order_nets_store_check CHECK (store_id > 0),
     CONSTRAINT order_nets_buyer_check CHECK (buyer_id > 0)
@@ -74,18 +76,15 @@ CREATE TABLE crm.order_nets (
 CREATE INDEX order_nets_by_customer ON crm.order_nets (store_id, buyer_id);
 CREATE INDEX order_nets_by_buyer ON crm.order_nets (buyer_id);
 
--- 已處理的事件。冪等靠 dedup_key 的 UNIQUE（order:<event_id>、refund:<external_ref_id 或 AS_REFUND_<case_no>>）；kind 供「這單是否收過全額退款」。儲存的代碼是 UPPER_SNAKE（ADR 2026-09-25-codemeta-retirement D3，TestStoredCodesInChecksAreUpperSnake）。
+-- 已處理的事件。冪等靠 dedup_key 的 UNIQUE（order:<event_id>、refund:<external_ref_id 或 AS_REFUND_<case_no>>）。
 -- 只追加的紀錄，主鍵是 DB 產生的 UUIDv7（row-identity ADR D1）；刪帳時隨 order_nets 連帶刪除。
 CREATE TABLE crm.ledger (
     id        UUID PRIMARY KEY DEFAULT uuidv7(),
     dedup_key TEXT NOT NULL,
     order_no  TEXT NOT NULL REFERENCES crm.order_nets (order_no) ON DELETE CASCADE,
-    kind      TEXT NOT NULL,
     CONSTRAINT ledger_dedup_key_key UNIQUE (dedup_key),
-    CONSTRAINT ledger_dedup_key_check CHECK (char_length(dedup_key) >= 1 AND char_length(dedup_key) <= 128),
-    CONSTRAINT ledger_kind_check CHECK (kind IN ('ORDER_COMPLETED', 'REFUND_FULL', 'REFUND_PARTIAL'))
+    CONSTRAINT ledger_dedup_key_check CHECK (char_length(dedup_key) >= 1 AND char_length(dedup_key) <= 128)
 );
-CREATE INDEX ledger_by_order ON crm.ledger (order_no, kind);
 
 -- 刪帳買家與退場店家的複本（kind 是 BUYER 或 STORE）：投影與刪除 job 以它關閉「刪後重放舊事件重建資料」。只插入不刪除，冪等。
 CREATE TABLE crm.inactive_parties (

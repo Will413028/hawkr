@@ -1,25 +1,22 @@
 -- 消費統計的投影（過渡，ordering 搬進單體後退場）。一個事件的 transaction：LockOrderNet → InsertLedger → SetOrderNet → 客戶的增量（design §3.3）。
 
 -- name: LockOrderNet :one
--- 取得並鎖住這一單的列（不存在時建立，completed=false、net_amount=0）：同單事件在這把列鎖上序列化。DO UPDATE 把 updated_at
+-- 取得並鎖住這一單的列（不存在時建立，completed=false、full_refunded=false、net_amount=0）：同單事件在這把列鎖上序列化。DO UPDATE 把 updated_at
 -- 設成自己，只為了鎖住既有的列並讓 RETURNING 回傳它。
-INSERT INTO crm.order_nets (order_no, store_id, buyer_id, completed, net_amount, updated_at)
-VALUES (sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(buyer_id), false, 0, sqlc.arg(now))
+INSERT INTO crm.order_nets (order_no, store_id, buyer_id, completed, full_refunded, net_amount, updated_at)
+VALUES (sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(buyer_id), false, false, 0, sqlc.arg(now))
 ON CONFLICT (order_no) DO UPDATE SET updated_at = crm.order_nets.updated_at
-RETURNING order_no, store_id, buyer_id, completed, net_amount;
+RETURNING order_no, store_id, buyer_id, completed, full_refunded, net_amount;
 
 -- name: InsertLedger :execrows
 -- 冪等的唯一依據是 dedup_key 的 UNIQUE：0 列表示重放。
-INSERT INTO crm.ledger (dedup_key, order_no, kind)
-VALUES (sqlc.arg(dedup_key), sqlc.arg(order_no), sqlc.arg(kind))
+INSERT INTO crm.ledger (dedup_key, order_no)
+VALUES (sqlc.arg(dedup_key), sqlc.arg(order_no))
 ON CONFLICT (dedup_key) DO NOTHING;
-
--- name: HasFullRefund :one
-SELECT EXISTS (SELECT 1 FROM crm.ledger WHERE order_no = sqlc.arg(order_no) AND kind = 'REFUND_FULL');
 
 -- name: SetOrderNet :exec
 UPDATE crm.order_nets
-SET completed = sqlc.arg(completed), net_amount = sqlc.arg(net_amount), updated_at = sqlc.arg(now)
+SET completed = sqlc.arg(completed), full_refunded = sqlc.arg(full_refunded), net_amount = sqlc.arg(net_amount), updated_at = sqlc.arg(now)
 WHERE order_no = sqlc.arg(order_no);
 
 -- name: UpsertCustomerOnOrder :exec

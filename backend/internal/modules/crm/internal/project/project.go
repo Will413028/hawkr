@@ -17,10 +17,6 @@ import (
 )
 
 const (
-	kindOrderCompleted = "ORDER_COMPLETED"
-	kindRefundFull     = "REFUND_FULL"
-	kindRefundPartial  = "REFUND_PARTIAL"
-
 	prefixOrder  = "order:"
 	prefixRefund = "refund:"
 )
@@ -63,8 +59,8 @@ func (s *Service) RecordOrderCompleted(ctx context.Context, e model.OrderComplet
 	if e.Amount < 0 {
 		return false, invalid("訂單金額 %d 為負", e.Amount)
 	}
-	return s.record(ctx, prefixOrder+e.EventID, kindOrderCompleted, e.OrderNo, e.StoreID, e.BuyerID, func(old state, fullRefunded bool) step {
-		return onOrderCompleted(old, e.Amount, fullRefunded)
+	return s.record(ctx, prefixOrder+e.EventID, e.OrderNo, e.StoreID, e.BuyerID, func(old state) step {
+		return onOrderCompleted(old, e.Amount)
 	}, true)
 }
 
@@ -77,19 +73,15 @@ func (s *Service) RecordRefund(ctx context.Context, r model.Refund) (bool, error
 	if !r.Outcome.Valid() {
 		return false, invalid("未知的退款結果 %q", r.Outcome)
 	}
-	kind := kindRefundFull
-	if r.Outcome == model.RefundPartial {
-		if r.Amount <= 0 {
-			return false, invalid("部分退款金額 %d 必須為正", r.Amount)
-		}
-		kind = kindRefundPartial
+	if r.Outcome == model.RefundPartial && r.Amount <= 0 {
+		return false, invalid("部分退款金額 %d 必須為正", r.Amount)
 	}
-	return s.record(ctx, prefixRefund+r.Key, kind, r.OrderNo, r.StoreID, r.BuyerID, func(old state, _ bool) step {
+	return s.record(ctx, prefixRefund+r.Key, r.OrderNo, r.StoreID, r.BuyerID, func(old state) step {
 		return onRefund(old, r.Outcome, r.Amount)
 	}, false)
 }
 
-func (s *Service) record(ctx context.Context, dedupKey, kind, orderNo string, storeID, buyerID int64, apply func(old state, fullRefunded bool) step, createCustomer bool) (bool, error) {
+func (s *Service) record(ctx context.Context, dedupKey, orderNo string, storeID, buyerID int64, apply func(old state) step, createCustomer bool) (bool, error) {
 	recorded := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		recorded = false
@@ -117,7 +109,7 @@ func (s *Service) record(ctx context.Context, dedupKey, kind, orderNo string, st
 		if old.StoreID != storeID || old.BuyerID != buyerID {
 			return fmt.Errorf("%w：單 %s 已記錄買家 %d、店家 %d，事件是買家 %d、店家 %d", model.ErrPartiesMismatch, orderNo, old.BuyerID, old.StoreID, buyerID, storeID)
 		}
-		n, err := q.InsertLedger(ctx, store.InsertLedgerParams{DedupKey: dedupKey, OrderNo: orderNo, Kind: kind})
+		n, err := q.InsertLedger(ctx, store.InsertLedgerParams{DedupKey: dedupKey, OrderNo: orderNo})
 		if err != nil {
 			return err
 		}
@@ -125,15 +117,11 @@ func (s *Service) record(ctx context.Context, dedupKey, kind, orderNo string, st
 			return nil
 		}
 		recorded = true
-		fullRefunded, err := q.HasFullRefund(ctx, orderNo)
-		if err != nil {
-			return err
-		}
-		st := apply(state{Completed: old.Completed, Net: old.NetAmount}, fullRefunded)
+		st := apply(state{Completed: old.Completed, FullRefunded: old.FullRefunded, Net: old.NetAmount})
 		if !st.Changed {
 			return nil
 		}
-		if err := q.SetOrderNet(ctx, store.SetOrderNetParams{Completed: st.Next.Completed, NetAmount: st.Next.Net, Now: now, OrderNo: orderNo}); err != nil {
+		if err := q.SetOrderNet(ctx, store.SetOrderNetParams{Completed: st.Next.Completed, FullRefunded: st.Next.FullRefunded, NetAmount: st.Next.Net, Now: now, OrderNo: orderNo}); err != nil {
 			return err
 		}
 		if createCustomer {

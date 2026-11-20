@@ -27,7 +27,7 @@ var Dependencies = map[string][]string{
 	"aftersales":        {"ordering", "coupon", "payment", "fulfillment", "buyer", "seller", "media"},
 	"review":            {"ordering", "catalog", "buyer", "seller", "media"},
 	"im":                {"ordering", "buyer", "seller", "media"},
-	"crm":               {"ordering", "buyer", "seller"}, // 刪帳訂閱 buyer.BuyerDeleted、seller.StoreRetired（A6-D18 W2）；A6-D8 去 identity、W3 去 coupon。
+	"crm":               {"buyer", "seller"}, // 訂閱 buyer.BuyerDeleted、seller.StoreRetired。
 	"finance":           {"aftersales", "ordering", "payment", "fulfillment"},
 	"social":            {"buyer", "seller", "media"},
 	"discovery":         {"ordering", "catalog", "buyer", "seller", "review"},

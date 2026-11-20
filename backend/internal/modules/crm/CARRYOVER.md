@@ -12,7 +12,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 |---|---|---|---|---|
 | ledger＋投影（`crm_customer_ledger` 逐事件加減 `total_spent`、`order_count`） | 訂單與退款的資料在 Java，crm 拿不到訂單表 | 成立（ordering 尚未搬進單體，Q7） | 讀時聚合 ordering 的資料，不複製 | 沿用（過渡）：資料在 Java 時只能投影；ordering 搬進單體後 `order_nets`、`ledger`、consumer 退場，改讀 ordering 的 `pub_*`；不做讀時聚合、重算工具、回填 |
 | advisory lock（`hashtext(order_no)`）序列化同單事件 | 同一單的訂單與退款事件不可交錯 | 成立，但 32 位元雜湊會讓不相干的單互等，且鎖不在列上 | 每單一列，用列鎖序列化 | 改：`order_nets` 每單一列，`LockOrderNet` 鎖列；`customers` 只加這張單貢獻的變化量（`total_spent + delta`），不以 `SUM` 重算 |
-| 全額退款以 ledger 自己的淨額沖銷（不信 Java 的 `refund_total_amount`） | Java 的全額退款金額可能與 crm 記錄的不一致 | 成立 | 以自己記錄的淨額為準 | 沿用：全額退款把該單 `net_amount` 歸零；後到的訂單遇到已有全額退款記 0 |
+| 全額退款以 ledger 自己的淨額沖銷（不信 Java 的 `refund_total_amount`） | Java 的全額退款金額可能與 crm 記錄的不一致 | 成立 | 以自己記錄的淨額為準 | 沿用：全額退款把該單 `net_amount` 歸零；後到的訂單遇到已有全額退款記 0；「收過全額退款」是 `order_nets.full_refunded`（在已上鎖的列上讀寫），`ledger` 不存 kind、不為這個查詢另建索引 |
 | 部分退款無下限、退款以 `order_count=0` 建客戶 | 無（舊碼的缺陷） | 不成立：`total_spent` 可能為負、出現 0 筆訂單的客戶 | 下限寫進 CHECK 並由計算結構保證 | 改：每單貢獻 `max(net, 0)`，`customers` CHECK `>= 0`；退款不建客戶列；順帶吸收舊註解自承的「部分退款排在全額退款之後再扣一次」 |
 | 退款冪等鍵 `external_ref_id`，缺時 `"AS_REFUND_"+case_no` | 上游沒有穩定的事件 ID：Java 每次建構 `RefundCompletedPayload` 都換新 UUID，`RefundSyncWorker` 每小時重發 | 成立 | 上游給穩定的事件 ID | 沿用（Java 不改）；鍵加命名空間前綴（`order:`、`refund:`），上限 128；ordering、aftersales 搬進單體後換單體事件 |
 | MQ handler 直接寫 DB、重試交給 broker | 無 | 不成立：單體有 River | consumer 只驗證並排 job，重試與觀測交給 job 系統 | 改：`legacy/crmconsumer` 的 handler 只解碼、驗證、排 River job；worker 在 transaction 外解析訂單、再投影；正確性來自 `ledger` 的 `UNIQUE(dedup_key)`，River 的 unique 只減少重複排程 |
@@ -45,7 +45,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 資料沒有搬移（系統從未上線），schema 是新的 baseline。
 
 - 表：`customers`（主鍵 `(store_id, buyer_id)`、`first_order_at`；無 TSID `id`、`nickname`、`phone`、`created_at`）、`tags`（UUIDv7、`UNIQUE(store_id,name)`）、`customer_tags`（三欄自然鍵、複合 FK）、`order_nets`、`ledger`（`id` uuidv7、`dedup_key` UNIQUE；無 `store_id`、`buyer_id`、`count_delta`、`amount_delta`）、`inactive_parties`。
-- 儲存的代碼（`customer_type`、`ledger.kind`、`inactive_parties.kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`ORDER_COMPLETED`、`REFUND_FULL`、`REFUND_PARTIAL`、`BUYER`、`STORE`）。
+- 儲存的代碼（`customer_type`、`inactive_parties.kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
 - 沒有 `blocklist`；沒有客戶列表的關鍵字搜尋；詳情沒有電話、Email、地址、優惠券數。
 - 退款不建客戶列；同一單號的第二個 `order.completed`（換了 `event_id`）不重複累加。
 - `legacy/crmservice`（只有 `VIPStatuses`）與 `services/crm-service` 不動：並行期單一生效者是舊服務，切換與刪除在 A6-6e。

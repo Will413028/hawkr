@@ -64,6 +64,7 @@ CREATE TABLE "crm"."order_nets" (
   "store_id" bigint NOT NULL,
   "buyer_id" bigint NOT NULL,
   "completed" boolean NOT NULL DEFAULT false,
+  "full_refunded" boolean NOT NULL DEFAULT false,
   "net_amount" bigint NOT NULL,
   "updated_at" timestamptz NOT NULL,
   PRIMARY KEY ("order_no"),
@@ -80,12 +81,8 @@ CREATE TABLE "crm"."ledger" (
   "id" uuid NOT NULL DEFAULT uuidv7(),
   "dedup_key" text NOT NULL,
   "order_no" text NOT NULL,
-  "kind" text NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "ledger_dedup_key_key" UNIQUE ("dedup_key"),
   CONSTRAINT "ledger_order_no_fkey" FOREIGN KEY ("order_no") REFERENCES "crm"."order_nets" ("order_no") ON UPDATE NO ACTION ON DELETE CASCADE,
-  CONSTRAINT "ledger_dedup_key_check" CHECK ((char_length(dedup_key) >= 1) AND (char_length(dedup_key) <= 128)),
-  CONSTRAINT "ledger_kind_check" CHECK (kind = ANY (ARRAY['ORDER_COMPLETED'::text, 'REFUND_FULL'::text, 'REFUND_PARTIAL'::text]))
+  CONSTRAINT "ledger_dedup_key_check" CHECK ((char_length(dedup_key) >= 1) AND (char_length(dedup_key) <= 128))
 );
--- Create index "ledger_by_order" to table: "ledger"
-CREATE INDEX "ledger_by_order" ON "crm"."ledger" ("order_no", "kind");

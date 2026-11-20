@@ -146,6 +146,17 @@ func (q *Queries) InsertTag(ctx context.Context, arg InsertTagParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const isStoreInactive = `-- name: IsStoreInactive :one
+SELECT EXISTS (SELECT 1 FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = $1)
+`
+
+func (q *Queries) IsStoreInactive(ctx context.Context, storeID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, isStoreInactive, storeID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listCustomerTags = `-- name: ListCustomerTags :many
 SELECT ct.buyer_id, t.id, t.name
 FROM crm.customer_tags AS ct JOIN crm.tags AS t ON t.store_id = ct.store_id AND t.id = ct.tag_id
@@ -220,7 +231,10 @@ func (q *Queries) ListTagIDsByNames(ctx context.Context, arg ListTagIDsByNamesPa
 }
 
 const listTags = `-- name: ListTags :many
-SELECT id, name FROM crm.tags WHERE store_id = $1 ORDER BY name, id
+SELECT t.id, t.name FROM crm.tags AS t
+WHERE t.store_id = $1
+  AND NOT EXISTS (SELECT 1 FROM crm.inactive_parties AS ip WHERE ip.kind = 'STORE' AND ip.party_id = t.store_id)
+ORDER BY t.name, t.id
 `
 
 type ListTagsRow struct {
@@ -228,6 +242,7 @@ type ListTagsRow struct {
 	Name string
 }
 
+// 已退場的店家沒有標籤（可見性在清除 job 跑之前就已經改好）。
 func (q *Queries) ListTags(ctx context.Context, storeID int64) ([]ListTagsRow, error) {
 	rows, err := q.db.Query(ctx, listTags, storeID)
 	if err != nil {
@@ -249,7 +264,12 @@ func (q *Queries) ListTags(ctx context.Context, storeID int64) ([]ListTagsRow, e
 }
 
 const lockCustomer = `-- name: LockCustomer :one
-SELECT buyer_id FROM crm.customers WHERE store_id = $1 AND buyer_id = $2 FOR UPDATE
+SELECT c.buyer_id FROM crm.customers AS c
+WHERE c.store_id = $1 AND c.buyer_id = $2
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
+FOR UPDATE OF c
 `
 
 type LockCustomerParams struct {
@@ -258,6 +278,7 @@ type LockCustomerParams struct {
 }
 
 // 鎖住客戶列（沒有列回 ErrNoRows）：同一位客戶的標籤上限檢查與插入串行，並讓只有客戶才能貼標在 FK 之前就得到 NotFound。
+// inactive 的買家或店家也回 ErrNoRows。
 func (q *Queries) LockCustomer(ctx context.Context, arg LockCustomerParams) (int64, error) {
 	row := q.db.QueryRow(ctx, lockCustomer, arg.StoreID, arg.BuyerID)
 	var buyer_id int64
@@ -271,7 +292,9 @@ SELECT pg_advisory_xact_lock(hashtextextended('crm.tags:' || $1::bigint::text, 0
 `
 
 // 標籤與客戶的標籤。
-// 同一家店的建立標籤（CreateTag、AddCustomerTags）串行：每店標籤數上限的檢查與插入之間不能有人插入。crm 自己的命名空間，不進鎖序。
+// 同一家店的標籤變更（CreateTag、AddCustomerTags、RenameTag、DeleteTag）串行：每店標籤數上限的檢查與插入之間不能有人插入，
+// AddCustomerTags 以名稱查到的標籤 ID 在它寫入客戶之前也不能被改名或刪除。選 advisory lock 而不是對查到的列 FOR SHARE：
+// AddCustomerTags 要先判斷「名稱不存在」再建立，列鎖鎖不住不存在的名稱，仍需要這把店家層級的鎖。crm 自己的命名空間，不進鎖序。
 func (q *Queries) LockStoreTags(ctx context.Context, storeID int64) error {
 	_, err := q.db.Exec(ctx, lockStoreTags, storeID)
 	return err

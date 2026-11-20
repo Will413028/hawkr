@@ -81,6 +81,7 @@ const (
 	DefaultPageSize    = model.DefaultPageSize
 	MaxPageSize        = model.MaxPageSize
 	MaxEventKeyLen     = model.MaxEventKeyLen
+	MaxOrderNoLen      = model.MaxOrderNoLen
 
 	ReasonCustomerNotFound = model.ReasonCustomerNotFound
 	ReasonTagNotFound      = model.ReasonTagNotFound

@@ -37,16 +37,16 @@ type CrmLedger struct {
 	ID       uuid.UUID
 	DedupKey string
 	OrderNo  string
-	Kind     string
 }
 
 type CrmOrderNet struct {
-	OrderNo   string
-	StoreID   int64
-	BuyerID   int64
-	Completed bool
-	NetAmount int64
-	UpdatedAt time.Time
+	OrderNo      string
+	StoreID      int64
+	BuyerID      int64
+	Completed    bool
+	FullRefunded bool
+	NetAmount    int64
+	UpdatedAt    time.Time
 }
 
 type CrmTag struct {

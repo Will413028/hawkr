@@ -87,7 +87,7 @@ func (s *Service) SetCustomerType(ctx context.Context, storeID, buyerID int64, t
 	})
 }
 
-// CreateTag 建立標籤。名稱撞同店的標籤回 AlreadyExists；超過每店上限回 FailedPrecondition。
+// CreateTag 建立標籤。名稱撞同店的標籤回 AlreadyExists；超過每店上限回 FailedPrecondition；店家已退場回 NotFound（標籤不存在）。
 func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (model.Tag, error) {
 	if storeID <= 0 {
 		return model.Tag{}, fmt.Errorf("crm：店家 %d 不是正整數", storeID)
@@ -100,6 +100,9 @@ func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (mo
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := q.LockStoreTags(ctx, storeID); err != nil {
+			return err
+		}
+		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
 			return err
 		}
 		if err := s.checkStoreCap(ctx, q, storeID, 1); err != nil {
@@ -118,6 +121,18 @@ func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (mo
 		return model.Tag{}, err
 	}
 	return tag, nil
+}
+
+// requireActiveStore 對已退場的店家（inactive_parties）回 notFound：可見性在清除 job 跑之前就已經改好，退場店家的標籤不再被寫入。
+func (s *Service) requireActiveStore(ctx context.Context, q *store.Queries, storeID int64, notFound func(context.Context) error) error {
+	inactive, err := q.IsStoreInactive(ctx, storeID)
+	if err != nil {
+		return err
+	}
+	if inactive {
+		return notFound(ctx)
+	}
+	return nil
 }
 
 func (s *Service) checkStoreCap(ctx context.Context, q *store.Queries, storeID int64, adding int) error {
@@ -141,7 +156,14 @@ func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID,
 		return err
 	}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		rows, err := s.q(ctx).RenameTag(ctx, store.RenameTagParams{Name: n, Now: s.d.Now().UTC(), StoreID: storeID, ID: tagID})
+		q := s.q(ctx)
+		if err := q.LockStoreTags(ctx, storeID); err != nil {
+			return err
+		}
+		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
+			return err
+		}
+		rows, err := q.RenameTag(ctx, store.RenameTagParams{Name: n, Now: s.d.Now().UTC(), StoreID: storeID, ID: tagID})
 		if err != nil {
 			return err
 		}
@@ -164,7 +186,14 @@ func (s *Service) DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID)
 		return fmt.Errorf("crm：店家 %d 不是正整數", storeID)
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		rows, err := s.q(ctx).DeleteTag(ctx, store.DeleteTagParams{StoreID: storeID, ID: tagID})
+		q := s.q(ctx)
+		if err := q.LockStoreTags(ctx, storeID); err != nil {
+			return err
+		}
+		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
+			return err
+		}
+		rows, err := q.DeleteTag(ctx, store.DeleteTagParams{StoreID: storeID, ID: tagID})
 		if err != nil {
 			return err
 		}

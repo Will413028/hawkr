@@ -1,7 +1,9 @@
 -- 標籤與客戶的標籤。
 
 -- name: LockStoreTags :exec
--- 同一家店的建立標籤（CreateTag、AddCustomerTags）串行：每店標籤數上限的檢查與插入之間不能有人插入。crm 自己的命名空間，不進鎖序。
+-- 同一家店的標籤變更（CreateTag、AddCustomerTags、RenameTag、DeleteTag）串行：每店標籤數上限的檢查與插入之間不能有人插入，
+-- AddCustomerTags 以名稱查到的標籤 ID 在它寫入客戶之前也不能被改名或刪除。選 advisory lock 而不是對查到的列 FOR SHARE：
+-- AddCustomerTags 要先判斷「名稱不存在」再建立，列鎖鎖不住不存在的名稱，仍需要這把店家層級的鎖。crm 自己的命名空間，不進鎖序。
 SELECT pg_advisory_xact_lock(hashtextextended('crm.tags:' || sqlc.arg(store_id)::bigint::text, 0));
 
 -- name: CountStoreTags :one
@@ -23,14 +25,27 @@ WHERE store_id = sqlc.arg(store_id) AND id = sqlc.arg(id);
 DELETE FROM crm.tags WHERE store_id = sqlc.arg(store_id) AND id = sqlc.arg(id);
 
 -- name: ListTags :many
-SELECT id, name FROM crm.tags WHERE store_id = sqlc.arg(store_id) ORDER BY name, id;
+-- 已退場的店家沒有標籤（可見性在清除 job 跑之前就已經改好）。
+SELECT t.id, t.name FROM crm.tags AS t
+WHERE t.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (SELECT 1 FROM crm.inactive_parties AS ip WHERE ip.kind = 'STORE' AND ip.party_id = t.store_id)
+ORDER BY t.name, t.id;
+
+-- name: IsStoreInactive :one
+SELECT EXISTS (SELECT 1 FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = sqlc.arg(store_id));
 
 -- name: ListTagIDsByNames :many
 SELECT id, name FROM crm.tags WHERE store_id = sqlc.arg(store_id) AND name = ANY(sqlc.arg(names)::text[]);
 
 -- name: LockCustomer :one
 -- 鎖住客戶列（沒有列回 ErrNoRows）：同一位客戶的標籤上限檢查與插入串行，並讓只有客戶才能貼標在 FK 之前就得到 NotFound。
-SELECT buyer_id FROM crm.customers WHERE store_id = sqlc.arg(store_id) AND buyer_id = sqlc.arg(buyer_id) FOR UPDATE;
+-- inactive 的買家或店家也回 ErrNoRows。
+SELECT c.buyer_id FROM crm.customers AS c
+WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
+FOR UPDATE OF c;
 
 -- name: CountCustomerTags :one
 SELECT count(*) FROM crm.customer_tags WHERE store_id = sqlc.arg(store_id) AND buyer_id = sqlc.arg(buyer_id);

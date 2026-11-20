@@ -34,7 +34,7 @@ func (k Kind) Valid() bool { return k == Buyer || k == Store }
 // batchSize 是每一批刪除的列數。
 const batchSize = 500
 
-// sweepBatch 是保底掃描每次最多補排的身分數。
+// sweepBatch 是保底掃描每一頁的身分數。
 const sweepBatch = 100
 
 // SweepInterval 是保底掃描的間隔。
@@ -97,24 +97,38 @@ func (s *Service) enqueue(ctx context.Context, kind Kind, id int64) error {
 	return s.d.Jobs.Enqueue(ctx, ErasePartyArgs{PartyKind: string(kind), PartyID: id}, &opts)
 }
 
-// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，身分仍在 inactive_parties 又還有資料；每次最多補排 sweepBatch 個身分，
-// 同一個身分還沒完成的 job 由唯一鍵合併。回傳這次檢查到的身分數。
+// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，身分仍在 inactive_parties 又還有資料。以 (kind, party_id) 的游標逐頁（每頁 sweepBatch 個、
+// 每頁一個 transaction）走完全部，同一個身分還沒完成的 job 由唯一鍵合併；選游標而不是「排除已有進行中 job 的身分」，因為後者要讀 River 的表，
+// 也不是「依上次掃描時間排序」，因為那要新增狀態欄位。每頁固定上限，所以掃描量只與「仍有資料的停用身分」成正比，前面的身分一直失敗也不會餓死後面的。
+// 回傳這次檢查到的身分數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
-	var n int
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		parties, err := s.q(ctx).ListInactivePartiesWithData(ctx, sweepBatch)
-		if err != nil {
-			return err
-		}
-		for _, p := range parties {
-			if err := s.enqueue(ctx, Kind(p.Kind), p.PartyID); err != nil {
+	total := 0
+	afterKind, afterID := "", int64(0)
+	for {
+		var parties []store.ListInactivePartiesWithDataRow
+		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			parties, err = s.q(ctx).ListInactivePartiesWithData(ctx, store.ListInactivePartiesWithDataParams{AfterKind: afterKind, AfterID: afterID, MaxRows: sweepBatch})
+			if err != nil {
 				return err
 			}
+			for _, p := range parties {
+				if err := s.enqueue(ctx, Kind(p.Kind), p.PartyID); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return total, err
 		}
-		n = len(parties)
-		return nil
-	})
-	return n, err
+		total += len(parties)
+		if len(parties) < sweepBatch {
+			return total, nil
+		}
+		last := parties[len(parties)-1]
+		afterKind, afterID = last.Kind, last.PartyID
+	}
 }
 
 // Erase 清除一個身分的 crm 資料，分批、每批一個 transaction；重跑只處理剩下的。

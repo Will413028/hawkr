@@ -16,17 +16,15 @@ func replay(events []ev) (state, int64, int64) {
 	var s state
 	var total int64
 	var minTotal int64
-	fullRefunded := false
 	for _, e := range events {
 		var st step
 		switch e.kind {
 		case "order":
-			st = onOrderCompleted(s, e.amount, fullRefunded)
+			st = onOrderCompleted(s, e.amount)
 		case "partial":
 			st = onRefund(s, model.RefundPartial, e.amount)
 		case "full":
 			st = onRefund(s, model.RefundFull, 0)
-			fullRefunded = true
 		}
 		s = st.Next
 		total += st.Delta
@@ -73,8 +71,8 @@ func TestOrderEventSequences(t *testing.T) {
 // 同一單號的第二個 order.completed（換了 event_id）不重複累加。
 func TestSecondOrderCompletedForSameOrderIsIgnored(t *testing.T) {
 	t.Parallel()
-	first := onOrderCompleted(state{}, 100, false)
-	second := onOrderCompleted(first.Next, 100, false)
+	first := onOrderCompleted(state{}, 100)
+	second := onOrderCompleted(first.Next, 100)
 	if second.Changed || second.Delta != 0 || second.Next != first.Next {
 		t.Fatalf("第二個 order.completed 改變了狀態：%+v", second)
 	}

@@ -86,6 +86,7 @@ func TestMalformedInputsArePermanentForBothEvents(t *testing.T) {
 		{"空 body", ``, ``},
 		{"缺 event_id", without(goodOrder, "event_id"), without(goodPartial, "event_id")},
 		{"缺 order_no", without(goodOrder, "order_no"), without(goodPartial, "order_no")},
+		{"order_no 超過字元上限", field(goodOrder, "order_no", strings.Repeat("單", crm.MaxOrderNoLen+1)), field(goodPartial, "order_no", strings.Repeat("單", crm.MaxOrderNoLen+1))},
 		{"event_id 或 external_ref_id 過長", field(goodOrder, "event_id", long), field(goodPartial, "external_ref_id", long)},
 	}
 	jobs := &recordedJobs{}

@@ -5,6 +5,9 @@
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -18,6 +21,9 @@ LIMIT sqlc.arg(max_rows);
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -31,6 +37,9 @@ LIMIT sqlc.arg(max_rows);
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -44,6 +53,9 @@ LIMIT sqlc.arg(max_rows);
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -57,6 +69,9 @@ LIMIT sqlc.arg(max_rows);
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -70,6 +85,9 @@ LIMIT sqlc.arg(max_rows);
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND (sqlc.narg(customer_type)::text IS NULL OR c.customer_type = sqlc.narg(customer_type)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -79,14 +97,27 @@ ORDER BY c.first_order_at ASC, c.buyer_id ASC
 LIMIT sqlc.arg(max_rows);
 
 -- name: GetCustomer :one
-SELECT store_id, buyer_id, customer_type, total_spent, order_count, first_order_at
-FROM crm.customers WHERE store_id = sqlc.arg(store_id) AND buyer_id = sqlc.arg(buyer_id);
+-- 已刪帳的買家與已退場的店家（inactive_parties）視為不存在：可見性在清除 job 跑之前就已經改好。
+SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
+FROM crm.customers AS c
+WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id));
 
 -- name: SetCustomerType :execrows
-UPDATE crm.customers SET customer_type = sqlc.arg(customer_type), updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND buyer_id = sqlc.arg(buyer_id);
+-- inactive 的買家或店家 0 列（呼叫者回 NotFound）。
+UPDATE crm.customers AS c SET customer_type = sqlc.arg(customer_type), updated_at = sqlc.arg(now)
+WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id));
 
 -- name: ListVIPStores :many
 -- 買家在這些店裡是 vip 的店（主鍵點查；沒有客戶列的店不回）。
-SELECT store_id FROM crm.customers
-WHERE buyer_id = sqlc.arg(buyer_id) AND store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND customer_type = 'VIP';
+-- inactive 的買家或店家不回。
+SELECT c.store_id FROM crm.customers AS c
+WHERE c.buyer_id = sqlc.arg(buyer_id) AND c.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND c.customer_type = 'VIP'
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id));

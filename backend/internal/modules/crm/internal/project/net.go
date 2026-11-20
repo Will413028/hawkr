@@ -2,10 +2,11 @@ package project
 
 import "github.com/Will413028/hawkr/backend/internal/modules/crm/internal/model"
 
-// state 是一張訂單在投影裡的狀態（order_nets 的列）：是否收過 order.completed，與淨額（可暫時為負：退款先到）。
+// state 是一張訂單在投影裡的狀態（order_nets 的列）：是否收過 order.completed、是否收過全額退款，與淨額（可暫時為負：退款先到）。
 type state struct {
-	Completed bool
-	Net       int64
+	Completed    bool
+	FullRefunded bool
+	Net          int64
 }
 
 // contribution 是這張單計入 customers.total_spent 的金額：只算 completed 的單，下限 0。
@@ -32,12 +33,12 @@ func stepTo(old, next state) step {
 
 // onOrderCompleted：單上已有全額退款時，訂單金額記 0（全額退款已把淨額歸零）；否則淨額加上訂單金額。
 // 單上已 completed 時不再計入：同一單號的第二個 order.completed（換了 event_id）不重複累加。
-func onOrderCompleted(old state, amount int64, fullRefunded bool) step {
+func onOrderCompleted(old state, amount int64) step {
 	if old.Completed {
 		return step{Next: old}
 	}
-	next := state{Completed: true, Net: old.Net + amount}
-	if fullRefunded {
+	next := state{Completed: true, FullRefunded: old.FullRefunded, Net: old.Net + amount}
+	if old.FullRefunded {
 		next.Net = 0
 	}
 	return stepTo(old, next)
@@ -47,6 +48,7 @@ func onOrderCompleted(old state, amount int64, fullRefunded bool) step {
 func onRefund(old state, outcome model.RefundOutcome, amount int64) step {
 	next := old
 	if outcome == model.RefundFull {
+		next.FullRefunded = true
 		next.Net = 0
 	} else {
 		next.Net -= amount

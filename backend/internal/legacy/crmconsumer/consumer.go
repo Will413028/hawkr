@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"unicode/utf8"
 
 	"github.com/riverqueue/river"
 
@@ -89,8 +90,8 @@ func (c Consumer) OrderCompleted(ctx context.Context, body []byte) error {
 	if e.EventID == "" || len(e.EventID) > crm.MaxEventKeyLen {
 		return invalid("crmconsumer：order.completed event_id 缺漏或過長")
 	}
-	if e.OrderNo == "" {
-		return invalid("crmconsumer：order.completed 缺 order_no")
+	if e.OrderNo == "" || utf8.RuneCountInString(e.OrderNo) > crm.MaxOrderNoLen {
+		return invalid("crmconsumer：order.completed order_no 缺漏或超過 %d 個字元", crm.MaxOrderNoLen)
 	}
 	buyerID, err := positiveID("order.completed buyer_id", e.BuyerID)
 	if err != nil {
@@ -179,8 +180,8 @@ func (c Consumer) RefundCompleted(ctx context.Context, body []byte) error {
 	if e.EventID == "" {
 		return invalid("crmconsumer：aftersales.refund.completed 缺 event_id")
 	}
-	if e.OrderNo == "" {
-		return invalid("crmconsumer：aftersales.refund.completed 缺 order_no")
+	if e.OrderNo == "" || utf8.RuneCountInString(e.OrderNo) > crm.MaxOrderNoLen {
+		return invalid("crmconsumer：aftersales.refund.completed order_no 缺漏或超過 %d 個字元", crm.MaxOrderNoLen)
 	}
 	key, err := refundDedupKey(e.ExternalRefID, e.CaseNo)
 	if err != nil {

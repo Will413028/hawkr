@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -263,4 +264,63 @@ func TestTagLimits(t *testing.T) {
 	}
 	// 已貼過的不算新增：貼滿後重貼同樣的 20 個仍成功。
 	f.mustAddTags(storeB, buyer1, names...)
+}
+
+func (f *fixture) slowInsert(table string) {
+	f.t.Helper()
+	f.exec(fmt.Sprintf(`CREATE FUNCTION crm.slow_%[1]s_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.3); RETURN NEW; END $$`, table))
+	f.exec(fmt.Sprintf(`CREATE TRIGGER slow_insert BEFORE INSERT ON crm.%[1]s FOR EACH ROW EXECUTE FUNCTION crm.slow_%[1]s_insert()`, table))
+}
+
+// CR1：AddCustomerTags 以名稱查到標籤 ID 之後、貼標之前，DeleteTag 不能插進來（否則 FK 23503 變成 internal）。
+// 貼標的 INSERT 慢 300ms 只拉寬競爭窗口；DeleteTag 在窗口內才開始。兩種順序都合法：貼標先（刪除隨後 cascade）或刪除先（貼標重建同名標籤）。
+func TestAddCustomerTagsConcurrentWithDeleteTag(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	tag, err := f.m.CreateTag(ctx, storeA, "常客")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.slowInsert("customer_tags")
+	errs := parallel(2, func(i int) error {
+		if i == 0 {
+			return f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"常客"})
+		}
+		time.Sleep(100 * time.Millisecond)
+		return f.m.DeleteTag(ctx, storeA, tag.ID)
+	})
+	noErrors(t, errs)
+	if n := f.scalar("SELECT count(*) FROM crm.customer_tags ct LEFT JOIN crm.tags t ON t.store_id = ct.store_id AND t.id = ct.tag_id WHERE t.id IS NULL"); n != 0 {
+		t.Fatalf("%d 筆貼標指向不存在的標籤", n)
+	}
+}
+
+// CR1：AddCustomerTags 判定「名稱不存在」之後要建立它，RenameTag 不能在這之間把別的標籤改成這個名稱（否則 INSERT 撞名被當成內部錯誤）。
+func TestAddCustomerTagsConcurrentWithRenameTag(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	old, err := f.m.CreateTag(ctx, storeA, "舊名")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.slowInsert("tags")
+	errs := parallel(2, func(i int) error {
+		if i == 0 {
+			return f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新名"})
+		}
+		time.Sleep(100 * time.Millisecond)
+		err := f.m.RenameTag(ctx, storeA, old.ID, "新名")
+		if crm.ReasonOf(err) == crm.ReasonTagNameTaken {
+			return nil // 貼標先建立了「新名」：合法的序列化結果
+		}
+		return err
+	})
+	noErrors(t, errs)
+	if got := f.tagNames(storeA); len(got) == 0 {
+		t.Fatal("標籤全不見了")
+	}
 }

@@ -13,8 +13,12 @@ import (
 )
 
 const getCustomer = `-- name: GetCustomer :one
-SELECT store_id, buyer_id, customer_type, total_spent, order_count, first_order_at
-FROM crm.customers WHERE store_id = $1 AND buyer_id = $2
+SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
+FROM crm.customers AS c
+WHERE c.store_id = $1 AND c.buyer_id = $2
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
 `
 
 type GetCustomerParams struct {
@@ -31,6 +35,7 @@ type GetCustomerRow struct {
 	FirstOrderAt time.Time
 }
 
+// 已刪帳的買家與已退場的店家（inactive_parties）視為不存在：可見性在清除 job 跑之前就已經改好。
 func (q *Queries) GetCustomer(ctx context.Context, arg GetCustomerParams) (GetCustomerRow, error) {
 	row := q.db.QueryRow(ctx, getCustomer, arg.StoreID, arg.BuyerID)
 	var i GetCustomerRow
@@ -49,6 +54,9 @@ const listCustomersByFirstOrderAsc = `-- name: ListCustomersByFirstOrderAsc :man
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -115,6 +123,9 @@ const listCustomersByFirstOrderDesc = `-- name: ListCustomersByFirstOrderDesc :m
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -181,6 +192,9 @@ const listCustomersByOrdersAsc = `-- name: ListCustomersByOrdersAsc :many
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -247,6 +261,9 @@ const listCustomersByOrdersDesc = `-- name: ListCustomersByOrdersDesc :many
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -313,6 +330,9 @@ const listCustomersBySpentAsc = `-- name: ListCustomersBySpentAsc :many
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -380,6 +400,9 @@ const listCustomersBySpentDesc = `-- name: ListCustomersBySpentDesc :many
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c
 WHERE c.store_id = $1
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
   AND ($2::text IS NULL OR c.customer_type = $2::text)
   AND ($3::uuid IS NULL OR EXISTS (
         SELECT 1 FROM crm.customer_tags AS ct
@@ -444,8 +467,11 @@ func (q *Queries) ListCustomersBySpentDesc(ctx context.Context, arg ListCustomer
 }
 
 const listVIPStores = `-- name: ListVIPStores :many
-SELECT store_id FROM crm.customers
-WHERE buyer_id = $1 AND store_id = ANY($2::bigint[]) AND customer_type = 'VIP'
+SELECT c.store_id FROM crm.customers AS c
+WHERE c.buyer_id = $1 AND c.store_id = ANY($2::bigint[]) AND c.customer_type = 'VIP'
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
 `
 
 type ListVIPStoresParams struct {
@@ -454,6 +480,7 @@ type ListVIPStoresParams struct {
 }
 
 // 買家在這些店裡是 vip 的店（主鍵點查；沒有客戶列的店不回）。
+// inactive 的買家或店家不回。
 func (q *Queries) ListVIPStores(ctx context.Context, arg ListVIPStoresParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, listVIPStores, arg.BuyerID, arg.StoreIds)
 	if err != nil {
@@ -475,8 +502,11 @@ func (q *Queries) ListVIPStores(ctx context.Context, arg ListVIPStoresParams) ([
 }
 
 const setCustomerType = `-- name: SetCustomerType :execrows
-UPDATE crm.customers SET customer_type = $1, updated_at = $2
-WHERE store_id = $3 AND buyer_id = $4
+UPDATE crm.customers AS c SET customer_type = $1, updated_at = $2
+WHERE c.store_id = $3 AND c.buyer_id = $4
+  AND NOT EXISTS (
+        SELECT 1 FROM crm.inactive_parties AS ip
+        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
 `
 
 type SetCustomerTypeParams struct {
@@ -486,6 +516,7 @@ type SetCustomerTypeParams struct {
 	BuyerID      int64
 }
 
+// inactive 的買家或店家 0 列（呼叫者回 NotFound）。
 func (q *Queries) SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setCustomerType,
 		arg.CustomerType,

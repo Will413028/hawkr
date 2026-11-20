@@ -37,32 +37,20 @@ func (q *Queries) AddCustomerSpent(ctx context.Context, arg AddCustomerSpentPara
 	return result.RowsAffected(), nil
 }
 
-const hasFullRefund = `-- name: HasFullRefund :one
-SELECT EXISTS (SELECT 1 FROM crm.ledger WHERE order_no = $1 AND kind = 'REFUND_FULL')
-`
-
-func (q *Queries) HasFullRefund(ctx context.Context, orderNo string) (bool, error) {
-	row := q.db.QueryRow(ctx, hasFullRefund, orderNo)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const insertLedger = `-- name: InsertLedger :execrows
-INSERT INTO crm.ledger (dedup_key, order_no, kind)
-VALUES ($1, $2, $3)
+INSERT INTO crm.ledger (dedup_key, order_no)
+VALUES ($1, $2)
 ON CONFLICT (dedup_key) DO NOTHING
 `
 
 type InsertLedgerParams struct {
 	DedupKey string
 	OrderNo  string
-	Kind     string
 }
 
 // 冪等的唯一依據是 dedup_key 的 UNIQUE：0 列表示重放。
 func (q *Queries) InsertLedger(ctx context.Context, arg InsertLedgerParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertLedger, arg.DedupKey, arg.OrderNo, arg.Kind)
+	result, err := q.db.Exec(ctx, insertLedger, arg.DedupKey, arg.OrderNo)
 	if err != nil {
 		return 0, err
 	}
@@ -71,10 +59,10 @@ func (q *Queries) InsertLedger(ctx context.Context, arg InsertLedgerParams) (int
 
 const lockOrderNet = `-- name: LockOrderNet :one
 
-INSERT INTO crm.order_nets (order_no, store_id, buyer_id, completed, net_amount, updated_at)
-VALUES ($1, $2, $3, false, 0, $4)
+INSERT INTO crm.order_nets (order_no, store_id, buyer_id, completed, full_refunded, net_amount, updated_at)
+VALUES ($1, $2, $3, false, false, 0, $4)
 ON CONFLICT (order_no) DO UPDATE SET updated_at = crm.order_nets.updated_at
-RETURNING order_no, store_id, buyer_id, completed, net_amount
+RETURNING order_no, store_id, buyer_id, completed, full_refunded, net_amount
 `
 
 type LockOrderNetParams struct {
@@ -85,15 +73,16 @@ type LockOrderNetParams struct {
 }
 
 type LockOrderNetRow struct {
-	OrderNo   string
-	StoreID   int64
-	BuyerID   int64
-	Completed bool
-	NetAmount int64
+	OrderNo      string
+	StoreID      int64
+	BuyerID      int64
+	Completed    bool
+	FullRefunded bool
+	NetAmount    int64
 }
 
 // 消費統計的投影（過渡，ordering 搬進單體後退場）。一個事件的 transaction：LockOrderNet → InsertLedger → SetOrderNet → 客戶的增量（design §3.3）。
-// 取得並鎖住這一單的列（不存在時建立，completed=false、net_amount=0）：同單事件在這把列鎖上序列化。DO UPDATE 把 updated_at
+// 取得並鎖住這一單的列（不存在時建立，completed=false、full_refunded=false、net_amount=0）：同單事件在這把列鎖上序列化。DO UPDATE 把 updated_at
 // 設成自己，只為了鎖住既有的列並讓 RETURNING 回傳它。
 func (q *Queries) LockOrderNet(ctx context.Context, arg LockOrderNetParams) (LockOrderNetRow, error) {
 	row := q.db.QueryRow(ctx, lockOrderNet,
@@ -108,6 +97,7 @@ func (q *Queries) LockOrderNet(ctx context.Context, arg LockOrderNetParams) (Loc
 		&i.StoreID,
 		&i.BuyerID,
 		&i.Completed,
+		&i.FullRefunded,
 		&i.NetAmount,
 	)
 	return i, err
@@ -115,20 +105,22 @@ func (q *Queries) LockOrderNet(ctx context.Context, arg LockOrderNetParams) (Loc
 
 const setOrderNet = `-- name: SetOrderNet :exec
 UPDATE crm.order_nets
-SET completed = $1, net_amount = $2, updated_at = $3
-WHERE order_no = $4
+SET completed = $1, full_refunded = $2, net_amount = $3, updated_at = $4
+WHERE order_no = $5
 `
 
 type SetOrderNetParams struct {
-	Completed bool
-	NetAmount int64
-	Now       time.Time
-	OrderNo   string
+	Completed    bool
+	FullRefunded bool
+	NetAmount    int64
+	Now          time.Time
+	OrderNo      string
 }
 
 func (q *Queries) SetOrderNet(ctx context.Context, arg SetOrderNetParams) error {
 	_, err := q.db.Exec(ctx, setOrderNet,
 		arg.Completed,
+		arg.FullRefunded,
 		arg.NetAmount,
 		arg.Now,
 		arg.OrderNo,
