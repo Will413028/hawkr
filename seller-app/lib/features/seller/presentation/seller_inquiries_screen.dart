@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -151,7 +152,7 @@ class InquiryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chip = inquiryStateChip(inquiry, now);
+    final chip = inquiryStateChip(inquiry, now, context.uiLocale);
     final deadline = inquiryDeadlineText(inquiry);
     final overdue = isInquiryOverdue(inquiry, now);
     return InkWell(
@@ -166,7 +167,7 @@ class InquiryCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    inquiryMeta(inquiry),
+                    inquiryMeta(inquiry, context.uiLocale),
                     style: AppTypography.sectionTitle,
                   ),
                 ),

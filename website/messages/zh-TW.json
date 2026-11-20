@@ -43,31 +43,12 @@
 			"blocked": "已封鎖「{name}」"
 		},
 		"inquiries": {
-			"title": "案件詢問",
-			"subtitle": "查看平台對案件的詢問並回覆；請在期限內回覆。",
-			"pendingSummary": "{count} 則詢問等你回覆",
+			"title": "平台詢問",
+			"subtitle": "查看平台的詢問並回覆；請在期限內回覆。",
+			"pendingSummary": "{count} 則詢問待回覆",
 			"filterLabel": "詢問狀態",
 			"filter": {
-				"all": "全部",
-				"open": "等你回覆",
-				"replied": "已回覆",
-				"withdrawn": "已撤回"
-			},
-			"kind": {
-				"records": "提供紀錄",
-				"explanation": "請說明"
-			},
-			"state": {
-				"open": "等你回覆",
-				"replied": "已回覆",
-				"withdrawn": "已撤回"
-			},
-			"channel": {
-				"phone": "電話",
-				"email": "Email",
-				"messaging": "通訊軟體",
-				"other": "其他",
-				"sellerCenter": "賣家中心"
+				"all": "全部"
 			},
 			"createdAt": "{time} 發出",
 			"deadline": {
@@ -81,8 +62,8 @@
 			},
 			"viewAndReply": "查看並回覆",
 			"viewDetail": "查看詳情",
-			"backToList": "查看全部詢問",
-			"detailTitle": "案件詢問",
+			"backToList": "查看全部平台詢問",
+			"detailTitle": "平台詢問",
 			"messageHeading": "平台的詢問",
 			"notFound": {
 				"title": "找不到這則詢問",
@@ -111,9 +92,9 @@
 				"attachmentCount": "附件 {count} 個"
 			},
 			"error": {
-				"title": "案件詢問載入時出了點狀況",
-				"description": "這個頁面沒有載入成功，你的帳號資料都安全。再試一次，或回到案件詢問。",
-				"home": "回案件詢問"
+				"title": "平台詢問載入時出了點狀況",
+				"description": "這個頁面沒有載入成功，你的帳號資料都安全。再試一次，或回到平台詢問。",
+				"home": "回平台詢問"
 			}
 		}
 	},

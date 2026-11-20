@@ -1,6 +1,5 @@
 import { type Timestamp, timestampDate } from "@bufbuild/protobuf/wkt";
 import {
-	InquiryKind,
 	InquiryReplyChannel,
 	InquiryState,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -8,68 +7,14 @@ import type { ChipColor } from "@/components/ui/Chip";
 import type { SellerInquiry } from "@/lib/seller/inquiries";
 
 /**
- * `/seller/inquiries` 的顯示規則。契約只給列舉；名詞與句子放在 website 的 messages（`seller.inquiries`），這裡只決定
- * 用哪個 key，UNSPECIFIED 與不認得的值回 undefined，由呼叫端不顯示。能不能回覆讀伺服器的 `canReply`，逾期只是標記。
+ * `/seller/inquiries` 的顯示規則。契約只給列舉；種類、狀態、回覆管道的名稱取自共用文案目錄（`@hawkr/ui-text`），
+ * 句子放在 website 的 messages（`seller.inquiries`）。能不能回覆讀伺服器的 `canReply`，逾期只是標記。
  */
 
 export const INQUIRIES_PATH = "/seller/inquiries";
 
 export function inquiryHref(inquiry: Pick<SellerInquiry, "id">): string {
 	return `${INQUIRIES_PATH}/${encodeURIComponent(inquiry.id)}`;
-}
-
-export type InquiryKindKey = "records" | "explanation";
-export type InquiryStateKey = "open" | "replied" | "withdrawn";
-export type InquiryChannelKey =
-	| "phone"
-	| "email"
-	| "messaging"
-	| "other"
-	| "sellerCenter";
-
-export function inquiryKindKey(kind: InquiryKind): InquiryKindKey | undefined {
-	switch (kind) {
-		case InquiryKind.RECORDS:
-			return "records";
-		case InquiryKind.EXPLANATION:
-			return "explanation";
-		default:
-			return undefined;
-	}
-}
-
-export function inquiryStateKey(
-	state: InquiryState,
-): InquiryStateKey | undefined {
-	switch (state) {
-		case InquiryState.OPEN:
-			return "open";
-		case InquiryState.REPLIED:
-			return "replied";
-		case InquiryState.WITHDRAWN:
-			return "withdrawn";
-		default:
-			return undefined;
-	}
-}
-
-export function inquiryChannelKey(
-	channel: InquiryReplyChannel,
-): InquiryChannelKey | undefined {
-	switch (channel) {
-		case InquiryReplyChannel.PHONE:
-			return "phone";
-		case InquiryReplyChannel.EMAIL:
-			return "email";
-		case InquiryReplyChannel.MESSAGING:
-			return "messaging";
-		case InquiryReplyChannel.OTHER:
-			return "other";
-		case InquiryReplyChannel.SELLER_CENTER:
-			return "sellerCenter";
-		default:
-			return undefined;
-	}
 }
 
 /** 狀態標籤的顏色：開放中是需要動作的提醒色，已回覆是完成，已撤回是中性。 */

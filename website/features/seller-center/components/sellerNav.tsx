@@ -132,7 +132,7 @@ export const SELLER_NAV_GROUPS: NavGroup[] = [
 			},
 			{
 				href: "/seller/inquiries",
-				label: "案件詢問",
+				label: "平台詢問",
 				icon: <SellerSidebarIcon name="paper" />,
 				badgeKey: "inquiries",
 			},

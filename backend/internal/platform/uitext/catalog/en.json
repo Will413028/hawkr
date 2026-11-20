@@ -78,6 +78,36 @@
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "Provider-hosted"
     },
+    "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
+      "message": "Provide an explanation"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_RECORDS": {
+      "message": "Provide records"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL": {
+      "message": "Email"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING": {
+      "message": "Messaging app"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER": {
+      "message": "Other"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE": {
+      "message": "Phone"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER": {
+      "message": "Seller Center"
+    },
+    "seller.InquiryState.INQUIRY_STATE_OPEN": {
+      "message": "Awaiting reply"
+    },
+    "seller.InquiryState.INQUIRY_STATE_REPLIED": {
+      "message": "Replied"
+    },
+    "seller.InquiryState.INQUIRY_STATE_WITHDRAWN": {
+      "message": "Withdrawn"
+    },
     "seller.KYCApplication.decide_time": {
       "message": "Approved at: {time}"
     },

@@ -1,6 +1,6 @@
 import SellerInquiryDetailPage from "@/features/seller/inquiries/SellerInquiryDetailPage";
 
-export const metadata = { title: "案件詢問" };
+export const metadata = { title: "平台詢問" };
 
 interface PageProps {
 	params: Promise<{ inquiryId: string }>;

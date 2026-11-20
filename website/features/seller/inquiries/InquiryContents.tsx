@@ -1,30 +1,34 @@
 "use client";
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import {
+	sellerInquiryKind,
+	sellerInquiryReplyChannel,
+	sellerInquiryState,
+} from "@hawkr/ui-text/keys";
 import { useTranslations } from "next-intl";
 import { Chip } from "@/components/ui/Chip";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
+import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import type { SellerInquiry } from "@/lib/seller/inquiries";
 import {
 	inquiryBody,
-	inquiryChannelKey,
 	inquiryDeadline,
-	inquiryKindKey,
 	inquiryStateColor,
-	inquiryStateKey,
 	replyIsOffSystem,
 } from "./inquiryDisplay";
 
 /** 狀態標籤與逾期標記。 */
 export function InquiryChips({ inquiry }: { inquiry: SellerInquiry }) {
 	const t = useTranslations("seller.inquiries");
-	const stateKey = inquiryStateKey(inquiry.state);
+	const ut = useUiText();
+	const stateLabel = optionalText(ut, sellerInquiryState(inquiry.state));
 	const deadline = inquiryDeadline(inquiry, new Date());
 	return (
 		<span className="inline-flex flex-wrap items-center gap-1.5">
-			{stateKey && (
+			{stateLabel && (
 				<Chip variant="flat" color={inquiryStateColor(inquiry.state)} size="sm">
-					{t(`state.${stateKey}`)}
+					{stateLabel}
 				</Chip>
 			)}
 			{deadline.kind === "overdue" && (
@@ -39,10 +43,11 @@ export function InquiryChips({ inquiry }: { inquiry: SellerInquiry }) {
 /** 種類、發出時間與期限的說明行。 */
 export function InquiryMeta({ inquiry }: { inquiry: SellerInquiry }) {
 	const t = useTranslations("seller.inquiries");
-	const kindKey = inquiryKindKey(inquiry.kind);
+	const ut = useUiText();
+	const kindLabel = optionalText(ut, sellerInquiryKind(inquiry.kind));
 	const deadline = inquiryDeadline(inquiry, new Date());
 	const parts = [
-		kindKey ? t(`kind.${kindKey}`) : null,
+		kindLabel ?? null,
 		inquiry.createTime
 			? t("createdAt", {
 					time: formatTaipeiDateTime(timestampDate(inquiry.createTime)),
@@ -65,11 +70,12 @@ export function InquiryMeta({ inquiry }: { inquiry: SellerInquiry }) {
 /** 已回覆的內容：回覆內文、管道、時間與附件數（附件是機敏檔，只顯示數量）。 */
 export function InquiryReplyView({ inquiry }: { inquiry: SellerInquiry }) {
 	const t = useTranslations("seller.inquiries");
+	const ut = useUiText();
 	const reply = inquiry.reply;
 	if (!reply) return null;
-	const channelKey = inquiryChannelKey(reply.channel);
 	const offSystem = replyIsOffSystem(inquiry);
-	const channel = channelKey ? t(`channel.${channelKey}`) : null;
+	const channel =
+		optionalText(ut, sellerInquiryReplyChannel(reply.channel)) ?? null;
 	const notes = [
 		offSystem && channel ? t("reply.offSystem", { channel }) : null,
 		!offSystem ? t("reply.viaSellerCenter") : null,

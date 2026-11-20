@@ -25,7 +25,7 @@ import type { DelegatedCapability } from "./state/session";
  *   capability；顯示入口會讓操作者誤以為能讀取賣家私人通知。
  * - `measures`：措施與申覆是賣家本人帳號範圍的頁（`/seller/measures`，不在工作區內），
  *   申覆只能由賣家本人提出；代行的區段對照也對這個網址不成立。
- * - `inquiries`：案件詢問是賣家本人帳號範圍的頁（`/seller/inquiries`，不在工作區內），回覆只能由賣家本人提出。
+ * - `inquiries`：平台詢問是賣家本人帳號範圍的頁（`/seller/inquiries`，不在工作區內），回覆只能由賣家本人提出。
  * - `blocked-buyers`：封鎖名單是賣家本人的保護設定，代行沒有對應的 capability，不給入口。
  *   ⚠️ 這份清單是**唯一需要手動維護**的：不決定就是默認對代行開放，而且不編譯錯、
  *   不測試紅。

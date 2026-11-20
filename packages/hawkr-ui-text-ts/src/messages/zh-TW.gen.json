@@ -88,6 +88,22 @@
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
       "CONTENT_KIND_POST": "貼文"
     },
+    "InquiryKind": {
+      "INQUIRY_KIND_EXPLANATION": "請說明",
+      "INQUIRY_KIND_RECORDS": "提供紀錄"
+    },
+    "InquiryReplyChannel": {
+      "INQUIRY_REPLY_CHANNEL_EMAIL": "電子信箱",
+      "INQUIRY_REPLY_CHANNEL_MESSAGING": "通訊軟體",
+      "INQUIRY_REPLY_CHANNEL_OTHER": "其他管道",
+      "INQUIRY_REPLY_CHANNEL_PHONE": "電話",
+      "INQUIRY_REPLY_CHANNEL_SELLER_CENTER": "賣家中心"
+    },
+    "InquiryState": {
+      "INQUIRY_STATE_OPEN": "待回覆",
+      "INQUIRY_STATE_REPLIED": "已回覆",
+      "INQUIRY_STATE_WITHDRAWN": "已撤回"
+    },
     "KYCApplication": {
       "decide_time": "核准時間：{time}",
       "submit_time": "送出時間：{time}"

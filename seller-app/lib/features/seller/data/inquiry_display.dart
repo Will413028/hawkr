@@ -1,9 +1,11 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import 'inquiries.dart' show isInquiryOverdue;
 
-/// 詢問畫面的顯示文字。契約只給列舉，這三個列舉只有賣家端用（不在共用文案目錄），名稱在這裡對照；
+/// 詢問畫面的顯示文字。契約只給列舉，種類、狀態、回覆管道的名稱取自共用文案目錄（`hawkr_ui_text`），
+/// 純函式的 `l` 是 UI 語系，沒有文字的值（UNSPECIFIED、不認得）回 null；
 /// 能不能回覆讀 `can_reply`、逾期以 `reply_deadline.due_time` 判斷，都不從其他欄位推導。
 
 enum InquiryTone { success, danger, warning, neutral }
@@ -18,41 +20,28 @@ const inquiryNotFoundDescription = '這則詢問不存在，或不屬於目前�
 const inquiryNotFoundAction = '回到平台詢問';
 const inquiryReplyTitle = '回覆詢問';
 
-String? inquiryKindLabel(InquiryKind kind) => switch (kind) {
-  InquiryKind.INQUIRY_KIND_RECORDS => '提供紀錄',
-  InquiryKind.INQUIRY_KIND_EXPLANATION => '請說明',
-  _ => null,
-};
-
-String? inquiryReplyChannelLabel(InquiryReplyChannel channel) =>
-    switch (channel) {
-      InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE => '電話',
-      InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL => '電子信箱',
-      InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING => '通訊軟體',
-      InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER => '其他管道',
-      InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER => '賣家中心',
-      _ => null,
-    };
-
 /// 詢問狀態的標籤；逾期（OPEN 且過了期限）顯示「已逾期」。沒有有效值（UNSPECIFIED）時 null。
 ({String label, InquiryTone tone})? inquiryStateChip(
   Inquiry inquiry,
   DateTime now,
+  UiLocale l,
 ) {
   if (isInquiryOverdue(inquiry, now)) {
     return (label: '已逾期', tone: InquiryTone.danger);
   }
+  final label = inquiry.state.uiText(l);
+  if (label == null) return null;
   return switch (inquiry.state) {
     InquiryState.INQUIRY_STATE_OPEN => (
-      label: '待回覆',
+      label: label,
       tone: InquiryTone.warning,
     ),
     InquiryState.INQUIRY_STATE_REPLIED => (
-      label: '已回覆',
+      label: label,
       tone: InquiryTone.success,
     ),
     InquiryState.INQUIRY_STATE_WITHDRAWN => (
-      label: '已撤回',
+      label: label,
       tone: InquiryTone.neutral,
     ),
     _ => null,
@@ -69,20 +58,20 @@ String? inquiryDeadlineText(Inquiry inquiry) {
 }
 
 /// 「提供紀錄 · 2026/11/20 10:00」之類的副標：種類與建立時間。
-String inquiryMeta(Inquiry inquiry) {
+String inquiryMeta(Inquiry inquiry, UiLocale l) {
   final parts = [
-    inquiryKindLabel(inquiry.kind),
+    inquiry.kind.uiText(l),
     if (inquiry.hasCreateTime()) formatTaipeiTimestamp(inquiry.createTime),
   ].whereType<String>().where((part) => part.isNotEmpty);
   return parts.join(' · ');
 }
 
 /// 已回覆詢問的回覆摘要：管道與時間（管理員記下的系統外回覆與賣家中心回覆同形）。
-String? inquiryReplyMeta(Inquiry inquiry) {
+String? inquiryReplyMeta(Inquiry inquiry, UiLocale l) {
   if (!inquiry.hasReply()) return null;
   final reply = inquiry.reply;
   final parts = [
-    inquiryReplyChannelLabel(reply.channel),
+    reply.channel.uiText(l),
     if (reply.hasReceiveTime()) formatTaipeiTimestamp(reply.receiveTime),
   ].whereType<String>().where((part) => part.isNotEmpty);
   return parts.isEmpty ? null : parts.join(' · ');

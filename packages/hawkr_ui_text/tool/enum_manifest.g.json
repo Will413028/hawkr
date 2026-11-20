@@ -144,21 +144,21 @@
       "name": "hawkr.seller.v1alpha1.InquiryKind",
       "dartClass": "InquiryKind",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.seller.v1alpha1.InquiryReplyChannel",
       "dartClass": "InquiryReplyChannel",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.seller.v1alpha1.InquiryState",
       "dartClass": "InquiryState",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

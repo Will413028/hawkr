@@ -1,5 +1,6 @@
 "use client";
 
+import { sellerInquiryState } from "@hawkr/ui-text/keys";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
@@ -8,6 +9,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { SellerEmptyState } from "@/features/seller-center/components/SellerEmptyState";
 import { SellerCardGridSkeleton } from "@/features/seller-center/components/SellerSkeletons";
 import { useSellerInquiries } from "@/lib/hooks/useSellerInquiries";
+import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import InquiryCard from "./InquiryCard";
 import {
 	INQUIRY_FILTERS,
@@ -16,11 +18,12 @@ import {
 } from "./inquiryDisplay";
 
 /**
- * 案件詢問列表（`/seller/inquiries`）：依狀態篩選，每張卡連到詳情頁回覆。詢問以帳號為範圍，不在賣家中心外框裡：
+ * 平台詢問列表（`/seller/inquiries`）：依狀態篩選，每張卡連到詳情頁回覆。詢問以帳號為範圍，不在賣家中心外框裡：
  * 店家已關閉的帳號一樣讀得到、回得了。
  */
 export default function SellerInquiriesPage() {
 	const t = useTranslations("seller.inquiries");
+	const ut = useUiText();
 	const [filter, setFilter] = React.useState<InquiryFilter>("all");
 	const { records, pendingReplyCount, loading, error } = useSellerInquiries(
 		inquiryFilterState(filter),
@@ -43,7 +46,13 @@ export default function SellerInquiriesPage() {
 					onSelectionChange={(key) => setFilter(key as InquiryFilter)}
 					items={INQUIRY_FILTERS.map((key) => ({
 						key,
-						label: t(`filter.${key}`),
+						label:
+							key === "all"
+								? t("filter.all")
+								: (optionalText(
+										ut,
+										sellerInquiryState(inquiryFilterState(key)),
+									) ?? key),
 					}))}
 				/>
 			}

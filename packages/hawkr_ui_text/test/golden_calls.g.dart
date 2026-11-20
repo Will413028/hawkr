@@ -26,6 +26,19 @@ const _enumNumber = <String, int>{
 	'GENDER_MALE': 1,
 	'GENDER_OTHER': 3,
 	'GENDER_UNSPECIFIED': 0,
+	'INQUIRY_KIND_EXPLANATION': 2,
+	'INQUIRY_KIND_RECORDS': 1,
+	'INQUIRY_KIND_UNSPECIFIED': 0,
+	'INQUIRY_REPLY_CHANNEL_EMAIL': 2,
+	'INQUIRY_REPLY_CHANNEL_MESSAGING': 3,
+	'INQUIRY_REPLY_CHANNEL_OTHER': 4,
+	'INQUIRY_REPLY_CHANNEL_PHONE': 1,
+	'INQUIRY_REPLY_CHANNEL_SELLER_CENTER': 5,
+	'INQUIRY_REPLY_CHANNEL_UNSPECIFIED': 0,
+	'INQUIRY_STATE_OPEN': 1,
+	'INQUIRY_STATE_REPLIED': 2,
+	'INQUIRY_STATE_UNSPECIFIED': 0,
+	'INQUIRY_STATE_WITHDRAWN': 3,
 	'KYC_FIELD_BUSINESS_COMPANY_ADDRESS': 8,
 	'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS': 7,
 	'KYC_FIELD_BUSINESS_COMPANY_NAME': 3,
@@ -210,6 +223,12 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n(value))!.uiText(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
+    case 'seller.InquiryKind':
+      return hawkr_seller_v1alpha1_seller.InquiryKind.valueOf(_n(value))!.uiText(l);
+    case 'seller.InquiryReplyChannel':
+      return hawkr_seller_v1alpha1_seller.InquiryReplyChannel.valueOf(_n(value))!.uiText(l);
+    case 'seller.InquiryState':
+      return hawkr_seller_v1alpha1_seller.InquiryState.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCApplication.decide_time':
       return sellerKYCApplicationDecideTime(l, time: params['time']! as String);
     case 'seller.KYCApplication.submit_time':

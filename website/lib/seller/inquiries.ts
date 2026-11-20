@@ -1,5 +1,5 @@
 /**
- * 賣家的案件詢問（`SellerAppService.ListMyInquiries`、`GetMyInquiry`、`ReplyToInquiry`）。賣家路徑直接使用生成的
+ * 賣家的平台詢問（`SellerAppService.ListMyInquiries`、`GetMyInquiry`、`ReplyToInquiry`）。賣家路徑直接使用生成的
  * `Inquiry`：能不能回覆讀 `canReply`、附件上限讀 `replyAttachmentMax`、逾期只是顯示標記（逾期後仍可回覆），client 不推導
  * 能不能回覆。附件是機敏檔，賣家只看得到數量。名稱與句子在呈現層（`features/seller/inquiries/inquiryDisplay.ts`）。
  */

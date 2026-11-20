@@ -232,6 +232,46 @@
       "message": "貼文",
       "description": "店家貼文。"
     },
+    "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
+      "message": "請說明",
+      "description": "請說明。"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_RECORDS": {
+      "message": "提供紀錄",
+      "description": "提供紀錄：賣家合作條款第 11.3 條的來源、批次、效期、進出貨及流向。"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL": {
+      "message": "電子信箱",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_EMAIL）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING": {
+      "message": "通訊軟體",
+      "description": "通訊軟體。"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER": {
+      "message": "其他管道",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_OTHER）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE": {
+      "message": "電話",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_PHONE）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER": {
+      "message": "賣家中心",
+      "description": "賣家在賣家中心回覆。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_OPEN": {
+      "message": "待回覆",
+      "description": "等賣家回覆。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_REPLIED": {
+      "message": "已回覆",
+      "description": "已回覆（終態）。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_WITHDRAWN": {
+      "message": "已撤回",
+      "description": "已撤回（終態）：賣家不必再回覆。"
+    },
     "seller.KYCApplication.decide_time": {
       "message": "核准時間：{time}",
       "params": {

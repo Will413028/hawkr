@@ -7,18 +7,21 @@ import {
 	InquirySchema,
 	InquiryState,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import {
+	sellerInquiryKind,
+	sellerInquiryReplyChannel,
+	sellerInquiryState,
+} from "@hawkr/ui-text/keys";
 import { describe, expect, it } from "vitest";
+import { uiTextFor } from "@/lib/i18n/ui-text";
 import en from "@/messages/en.json";
 import zhTW from "@/messages/zh-TW.json";
 import {
 	INQUIRY_FILTERS,
 	inquiryBody,
-	inquiryChannelKey,
 	inquiryDeadline,
 	inquiryFilterState,
 	inquiryHref,
-	inquiryKindKey,
-	inquiryStateKey,
 	replyIsOffSystem,
 } from "./inquiryDisplay";
 
@@ -34,41 +37,37 @@ const open = (canReply = true) =>
 		},
 	});
 
-describe("列舉到 messages key", () => {
-	it("UNSPECIFIED 與不認得的值沒有 key", () => {
-		expect(inquiryKindKey(InquiryKind.UNSPECIFIED)).toBeUndefined();
-		expect(inquiryStateKey(InquiryState.UNSPECIFIED)).toBeUndefined();
-		expect(inquiryChannelKey(InquiryReplyChannel.UNSPECIFIED)).toBeUndefined();
-		expect(inquiryKindKey(99 as InquiryKind)).toBeUndefined();
+describe("名稱取自共用文案目錄", () => {
+	it("UNSPECIFIED 與不認得的值沒有文字", () => {
+		expect(sellerInquiryKind(InquiryKind.UNSPECIFIED)).toBeUndefined();
+		expect(sellerInquiryState(InquiryState.UNSPECIFIED)).toBeUndefined();
+		expect(
+			sellerInquiryReplyChannel(InquiryReplyChannel.UNSPECIFIED),
+		).toBeUndefined();
+		expect(sellerInquiryKind(99 as InquiryKind)).toBeUndefined();
 	});
 
-	it("每個有效成員的 key 都在 zh-TW 與 en 的 messages 裡", () => {
-		const kinds = [InquiryKind.RECORDS, InquiryKind.EXPLANATION];
-		const states = [
-			InquiryState.OPEN,
-			InquiryState.REPLIED,
-			InquiryState.WITHDRAWN,
+	it("每個有效成員在 zh-TW 與 en 都有文字，篩選的 all 在 messages", () => {
+		const members = [
+			sellerInquiryKind(InquiryKind.RECORDS),
+			sellerInquiryKind(InquiryKind.EXPLANATION),
+			sellerInquiryState(InquiryState.OPEN),
+			sellerInquiryState(InquiryState.REPLIED),
+			sellerInquiryState(InquiryState.WITHDRAWN),
+			sellerInquiryReplyChannel(InquiryReplyChannel.PHONE),
+			sellerInquiryReplyChannel(InquiryReplyChannel.EMAIL),
+			sellerInquiryReplyChannel(InquiryReplyChannel.MESSAGING),
+			sellerInquiryReplyChannel(InquiryReplyChannel.OTHER),
+			sellerInquiryReplyChannel(InquiryReplyChannel.SELLER_CENTER),
 		];
-		const channels = [
-			InquiryReplyChannel.PHONE,
-			InquiryReplyChannel.EMAIL,
-			InquiryReplyChannel.MESSAGING,
-			InquiryReplyChannel.OTHER,
-			InquiryReplyChannel.SELLER_CENTER,
-		];
-		for (const messages of [zhTW, en]) {
-			const ns = messages.seller.inquiries as unknown as Record<
-				string,
-				Record<string, string>
-			>;
-			for (const k of kinds)
-				expect(ns.kind[inquiryKindKey(k) ?? ""]).toBeTruthy();
-			for (const s of states)
-				expect(ns.state[inquiryStateKey(s) ?? ""]).toBeTruthy();
-			for (const c of channels)
-				expect(ns.channel[inquiryChannelKey(c) ?? ""]).toBeTruthy();
-			for (const f of INQUIRY_FILTERS) expect(ns.filter[f]).toBeTruthy();
+		for (const locale of ["zh-TW", "en"] as const) {
+			const ut = uiTextFor(locale);
+			for (const m of members) expect(m && ut(m)).toBeTruthy();
 		}
+		for (const messages of [zhTW, en]) {
+			expect(messages.seller.inquiries.filter.all).toBeTruthy();
+		}
+		expect(INQUIRY_FILTERS).toContain("all");
 	});
 
 	it("zh-TW 與 en 的 seller.inquiries 有相同的 key 結構", () => {

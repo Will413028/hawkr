@@ -43,31 +43,12 @@
 			"blocked": "Blocked “{name}”"
 		},
 		"inquiries": {
-			"title": "Case inquiries",
+			"title": "Platform inquiries",
 			"subtitle": "See the questions the platform has about a case and reply. Please reply by the deadline.",
 			"pendingSummary": "{count, plural, one {# inquiry is} other {# inquiries are}} waiting for your reply",
 			"filterLabel": "Inquiry status",
 			"filter": {
-				"all": "All",
-				"open": "Awaiting reply",
-				"replied": "Replied",
-				"withdrawn": "Withdrawn"
-			},
-			"kind": {
-				"records": "Provide records",
-				"explanation": "Explain"
-			},
-			"state": {
-				"open": "Awaiting reply",
-				"replied": "Replied",
-				"withdrawn": "Withdrawn"
-			},
-			"channel": {
-				"phone": "Phone",
-				"email": "Email",
-				"messaging": "Messaging app",
-				"other": "Other",
-				"sellerCenter": "Seller Center"
+				"all": "All"
 			},
 			"createdAt": "Sent {time}",
 			"deadline": {
@@ -82,7 +63,7 @@
 			"viewAndReply": "View and reply",
 			"viewDetail": "View details",
 			"backToList": "All inquiries",
-			"detailTitle": "Case inquiry",
+			"detailTitle": "Platform inquiry",
 			"messageHeading": "The platform's inquiry",
 			"notFound": {
 				"title": "Inquiry not found",
@@ -111,9 +92,9 @@
 				"attachmentCount": "{count, plural, one {# attachment} other {# attachments}}"
 			},
 			"error": {
-				"title": "Something went wrong loading case inquiries",
-				"description": "This page did not load. Your account data is safe. Try again, or go back to case inquiries.",
-				"home": "Back to case inquiries"
+				"title": "Something went wrong loading platform inquiries",
+				"description": "This page did not load. Your account data is safe. Try again, or go back to platform inquiries.",
+				"home": "Back to platform inquiries"
 			}
 		}
 	},

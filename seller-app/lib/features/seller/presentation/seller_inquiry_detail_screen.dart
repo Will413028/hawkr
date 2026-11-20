@@ -1,9 +1,11 @@
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -91,10 +93,10 @@ class _DetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chip = inquiryStateChip(inquiry, now);
+    final chip = inquiryStateChip(inquiry, now, context.uiLocale);
     final deadline = inquiryDeadlineText(inquiry);
     final overdue = isInquiryOverdue(inquiry, now);
-    final replyMeta = inquiryReplyMeta(inquiry);
+    final replyMeta = inquiryReplyMeta(inquiry, context.uiLocale);
     final attachments = inquiryAttachmentText(inquiry);
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: HkSpace.lg),
@@ -108,7 +110,7 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      inquiryKindLabel(inquiry.kind) ?? inquiriesTitle,
+                      inquiry.kind.uiText(context.uiLocale) ?? inquiriesTitle,
                       style: AppTypography.sectionTitle,
                     ),
                   ),
@@ -123,7 +125,7 @@ class _DetailBody extends StatelessWidget {
               ),
               const SizedBox(height: HkSpace.xs),
               Text(
-                inquiryMeta(inquiry),
+                inquiryMeta(inquiry, context.uiLocale),
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textMuted,
                 ),
