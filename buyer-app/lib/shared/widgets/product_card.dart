@@ -31,8 +31,8 @@ enum ProductFavoriteSurfaceStyle {
 /// 商家名稱與頭像**只**由呼叫端傳入（`sellerName` / `sellerAvatarUrl`）。
 ///
 /// 卡片內部曾經在這兩個值為空時，用 `sellerAccountId` 逐張去打
-/// `/public/sellers/{id}` 補撈——那是列表頁的 N+1（20 張卡＝最多 20 次請求），
-/// 而且補不到東西：`/public/sellers/{id}` 回的是 `storeName` / `logoKey`，
+/// 已移除的舊商家端點補撈——那是列表頁的 N+1（20 張卡＝最多 20 次請求），
+/// 而且補不到東西：舊端點回的是 `storeName` / `logoKey`，
 /// 舊的 `Seller` model 讀的是 `name` / `avatar`，解析必定落空。
 /// `/public/products` 與分類列表都成對回
 /// `sellerName` + `sellerLogoKey`，補撈路徑因此整條移除。

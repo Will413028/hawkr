@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SITEMAP_SHARD_THRESHOLD, storeSitemapEntries } from "../app/sitemap";
+import {
+	loadSitemapStores,
+	SITEMAP_SHARD_THRESHOLD,
+	staticSitemapEntries,
+	storeSitemapEntries,
+} from "../app/sitemap";
 import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import {
 	collectAllStores,
+	fetchAllStoresWith,
 	type StoresPage,
 	storeSitemapRows,
 } from "../lib/seller/list-stores";
@@ -103,6 +109,85 @@ test("over the threshold every store is still emitted and an error is reported",
 		(m) => none.push(m),
 	);
 	assert.equal(none.length, 0);
+	__setEnvForTest(null);
+	__setFlavorForTest(null);
+});
+
+test("a repeated next_page_token throws instead of looping", async () => {
+	let calls = 0;
+	await assert.rejects(
+		collectAllStores(async (t) => {
+			if (++calls > 20) throw new Error("runaway pagination");
+			return {
+				stores: [store(`s${t}`)],
+				nextPageToken: t === "" ? "a" : t === "a" ? "b" : "a",
+			};
+		}),
+		/repeated next_page_token/,
+	);
+});
+
+test("each ListStores page gets its own signal", async () => {
+	const signals: (AbortSignal | undefined)[] = [];
+	const pages: Record<string, StoresPage> = {
+		"": { stores: [store("1")], nextPageToken: "a" },
+		a: { stores: [store("2")], nextPageToken: "" },
+	};
+	let made = 0;
+	const rows = await fetchAllStoresWith(
+		{
+			listStores: async (req, o) => {
+				signals.push(o.signal);
+				return pages[req.pageToken];
+			},
+		},
+		() => {
+			made++;
+			return new AbortController().signal;
+		},
+	);
+	assert.equal(rows.length, 2);
+	assert.equal(made, 2);
+	assert.notEqual(signals[0], signals[1]);
+});
+
+test("runtime store failure still yields static entries, reported once", async () => {
+	const reports: unknown[] = [];
+	const prev = process.env.NEXT_PHASE;
+	delete process.env.NEXT_PHASE;
+	try {
+		const stores = await loadSitemapStores(
+			async () => {
+				throw new Error("upstream down");
+			},
+			(e) => reports.push(e),
+		);
+		assert.deepEqual(stores, []);
+		assert.equal(reports.length, 1);
+		assert.ok(staticSitemapEntries(() => ["zh-TW"]).length > 0);
+		process.env.NEXT_PHASE = "phase-production-build";
+		await loadSitemapStores(
+			async () => {
+				throw new Error("x");
+			},
+			(e) => reports.push(e),
+		);
+		assert.equal(reports.length, 1);
+	} finally {
+		if (prev === undefined) delete process.env.NEXT_PHASE;
+		else process.env.NEXT_PHASE = prev;
+	}
+});
+
+test("store path comes from sellerPath; blank codes are skipped", () => {
+	__setEnvForTest(null);
+	__setFlavorForTest("prod");
+	const entries = storeSitemapEntries(
+		[{ storeCode: "  " }, { storeCode: "a b" }],
+		() => ["zh-TW"],
+	);
+	assert.equal(entries.length, 1);
+	assert.equal(entries[0].url, "https://example.com/sellers/a%20b");
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
 });

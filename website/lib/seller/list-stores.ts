@@ -42,24 +42,45 @@ export async function collectAllStores(
 	fetchPage: (pageToken: string) => Promise<StoresPage>,
 ): Promise<StoreSitemapRow[]> {
 	const rows: StoreSitemapRow[] = [];
+	const seen = new Set<string>();
 	let token = "";
 	do {
 		const page = await fetchPage(token);
 		rows.push(...storeSitemapRows(page));
 		token = page.nextPageToken;
+		if (token !== "") {
+			if (seen.has(token)) {
+				throw new Error(`ListStores repeated next_page_token "${token}"`);
+			}
+			seen.add(token);
+		}
 	} while (token !== "");
 	return rows;
 }
 
-export function fetchAllStoresForSitemap(
-	opts: PublicTransportOptions & { signal?: AbortSignal } = {},
+type ListStoresClient = {
+	listStores(
+		req: { pageSize: number; pageToken: string },
+		opts: { signal?: AbortSignal },
+	): Promise<StoresPage>;
+};
+
+/** `pageSignal` 每頁呼叫一次，每頁各有自己的逾時。 */
+export function fetchAllStoresWith(
+	client: ListStoresClient,
+	pageSignal?: () => AbortSignal,
 ): Promise<StoreSitemapRow[]> {
-	const { signal, ...transport } = opts;
-	const client = sellerPublicClient(transport);
 	return collectAllStores((pageToken) =>
 		client.listStores(
 			{ pageSize: LIST_STORES_PAGE_SIZE, pageToken },
-			{ signal },
+			{ signal: pageSignal?.() },
 		),
 	);
+}
+
+export function fetchAllStoresForSitemap(
+	opts: PublicTransportOptions & { pageSignal?: () => AbortSignal } = {},
+): Promise<StoreSitemapRow[]> {
+	const { pageSignal, ...transport } = opts;
+	return fetchAllStoresWith(sellerPublicClient(transport), pageSignal);
 }

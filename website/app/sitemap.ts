@@ -1,12 +1,11 @@
 import * as Sentry from "@sentry/nextjs";
 import type { MetadataRoute } from "next";
 import { getCachedSitemapStores } from "@/lib/api/cached";
-import { prerenderSafe } from "@/lib/api/prerender";
 import { type AppLocale, publishedFor, type Surface } from "@/lib/intl/locales";
 import { surfaceOfPath } from "@/lib/intl/paths";
 import type { StoreSitemapRow } from "@/lib/seller/list-stores";
 import { INDEXABLE_STATIC_ROUTES, isIndexable } from "@/lib/seo/indexability";
-import { absoluteUrl, languageAlternates } from "@/lib/seo/urls";
+import { absoluteUrl, languageAlternates, sellerPath } from "@/lib/seo/urls";
 
 /**
  * Static public routes → sitemap entries (pure; tested directly). Store URLs
@@ -62,7 +61,8 @@ export function storeSitemapEntries(
 		);
 	}
 	return stores.flatMap((store) => {
-		const path = `/sellers/${encodeURIComponent(store.storeCode)}`;
+		const path = sellerPath(store.storeCode);
+		if (path === "") return [];
 		const locales = published(surfaceOfPath(path));
 		const languages = languageAlternates(path, locales);
 		return locales
@@ -79,10 +79,29 @@ export function storeSitemapEntries(
 	});
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-	const stores = await getCachedSitemapStores().catch((err: unknown) => {
+/**
+ * 讀不到店家清單時降級成空清單，靜態項目照常回傳；失敗不進快取，下一次請求會重試。
+ * 只在執行期回報一次，build 階段不回報（`fillFetch` 與 build log 已留紀錄）。
+ */
+export async function loadSitemapStores(
+	read: () => Promise<StoreSitemapRow[]> = getCachedSitemapStores,
+	report: (err: unknown) => void = (err) => {
 		Sentry.captureException(err);
-		return prerenderSafe<StoreSitemapRow[]>([])(err);
-	});
+	},
+): Promise<StoreSitemapRow[]> {
+	try {
+		return await read();
+	} catch (err) {
+		if (process.env.NEXT_PHASE === "phase-production-build") {
+			console.warn("[sitemap] stores unavailable during build:", err);
+		} else {
+			report(err);
+		}
+		return [];
+	}
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+	const stores = await loadSitemapStores();
 	return [...staticSitemapEntries(), ...storeSitemapEntries(stores)];
 }

@@ -283,7 +283,7 @@ async function readSitemapStores() {
 		() =>
 			fetchAllStoresForSitemap({
 				locale: defaultLocale,
-				signal: upstreamSignal(),
+				pageSignal: upstreamSignal,
 			}),
 		{ key: ["sitemap-stores"], endpoint: "SellerPublicService/ListStores" },
 	);
