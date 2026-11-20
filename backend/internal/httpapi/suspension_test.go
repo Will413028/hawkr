@@ -293,7 +293,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 13 {
+	if methods != len(customerEffects) || len(descriptors) != 14 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }

@@ -50,6 +50,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -58,6 +59,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
@@ -159,6 +161,7 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -260,8 +263,18 @@ func runServe(ctx context.Context) error {
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	del := newDelegation(bus, delegationDeps)
+	// 買家助理的 LLM 只經單一建構點（internal/platform/llm）；沒有 API key 時回停用的 LLM，輪次以失敗結束。
+	assistantModule := assistant.New(assistant.Deps{DB: d, LLM: llm.New(llm.Assistant, llmConfig, log).LLM(), Orders: assistantOrders{orders}, Now: time.Now})
+	// 收到停止訊號就讓進行中的輪次以失敗結束：WatchAssistantTurn 的串流最長 100 秒，不等輪次結束 HTTP 的收尾會被它拖到逾時。
+	stopAssistant := context.AfterFunc(ctx, func() {
+		sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = assistantModule.Shutdown(sc)
+	})
+	defer stopAssistant()
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
+		Assistant:  assistantModule,
 		Ready:      d.Ping,
 		Social:     socialModule,
 		Moderation: moderationModule,
@@ -314,7 +327,10 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
-	return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	serveErr := serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	return errors.Join(serveErr, assistantModule.Shutdown(sc))
 }
 
 // workerConcurrency 是 default queue 同時執行的 job 上限。
