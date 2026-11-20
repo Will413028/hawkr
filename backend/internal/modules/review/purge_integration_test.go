@@ -206,3 +206,48 @@ func TestAuthorTargetsListsDistinctPairsUntilPurged(t *testing.T) {
 		t.Fatalf("清除後沒有：%v", got)
 	}
 }
+
+// A6-D12：每批刪除在同 transaction 對該批每個不同的 (店, 商品) 發一個 ReviewAggregateChanged；做完之後重跑不再發。
+func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	s1, s2 := f.exposableStore(t), f.exposableStore(t)
+	b := f.newBuyer(t)
+	f.exec(t, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
+		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, CASE WHEN n % 2 = 0 THEN $2::bigint ELSE $3::bigint END, 700 + n % 2, 5, 'sku', 1, $4
+		FROM generate_series(1, 250) AS n`, b.BuyerID, s1, s2, f.clock())
+	f.requestDeletion(t, b)
+	f.mu.Lock()
+	f.changed = nil
+	f.mu.Unlock()
+
+	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	got := slices.Clone(f.changed)
+	f.mu.Unlock()
+	count := map[review.Target]int{}
+	for _, e := range got {
+		count[review.Target{StoreID: e.StoreID, ProductID: e.ProductID}]++
+	}
+	want := map[review.Target]int{{StoreID: s1, ProductID: 700}: 2, {StoreID: s2, ProductID: 701}: 2}
+	if len(got) != 4 || len(count) != len(want) {
+		t.Fatalf("2 批 x 2 組 = 4 個事件：%+v", got)
+	}
+	for k, n := range want {
+		if count[k] != n {
+			t.Fatalf("%v 應發 %d 次：%v", k, n, count)
+		}
+	}
+
+	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.changed) != len(got) {
+		t.Fatalf("重跑不再發：%d -> %d", len(got), len(f.changed))
+	}
+}

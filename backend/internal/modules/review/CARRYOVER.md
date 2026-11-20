@@ -29,7 +29,7 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 快照採請求值（RD6：price、sku_name 取 client） | 賣家頁快照要可信 | 不成立 | 一切取權威來源 | 改：`SubmitInput` 沒有這些欄位，全取 `OrderForReview` 的項目；建立後不變 |
 | `GetOrderForReview` 任何錯誤都是 `ErrOrderNotFound`（RD9）；訂單圖用組好的 CDN URL 剝殼還原 | 暫時性故障與不存在要分流；Java 已直接回 object key | 不成立：Java 一律回 `image_object_key`（URL 是同一個 key 組的） | NotFound 與 Unavailable 分流；用權威欄位，不反解 URL | 改：`orderservice.OrderForReview` 只有回應內 code 404 是 `ErrOrderNotFound`，其餘（傳輸、其他 code、不合法欄位）是一般錯誤，review 轉 Unavailable；刪除 URL 剝殼 |
 | 單筆讀取不過濾隱藏（RD10） | 單筆與列表的可見性一致 | 不成立 | 一個述詞給所有公開讀取 | 改：`public.sql` 每支查詢帶同一段述詞（`testdata/public_predicate.sql`），`TestEveryPublicQueryCarriesThePublicPredicate` 守門；不可讀與不存在同為 NotFound |
-| 統計重算＋事件的競態（RD8） | 全量覆寫的消費者要收斂到最後狀態 | 成立（接受到 catalog 搬遷） | 版本或序號；或消費者讀 `pub_*` | 接受（計畫 RD8）：`reviewrelay` 的 job 執行時讀現況重算；不帶版本（Java 不讀）。刪帳的 `review.hidden` 由 `ReviewAuthorDeactivated` 的 job 在 transaction 外列出 `AuthorTargets` 逐組送；殘留：該 job 在 `review.purge_author` 刪完那位買家的評價之後才跑時列不到任何組，Java 的聚合不會在刪帳當下更新（A6-6e 接上 relay 前要決定，見 A6-1c 回報） |
+| 統計重算＋事件的競態（RD8） | 全量覆寫的消費者要收斂到最後狀態 | 成立（接受到 catalog 搬遷） | 版本或序號；或消費者讀 `pub_*` | 接受（計畫 RD8）：`reviewrelay` 的 job 執行時讀現況重算；不帶版本（Java 不讀）。刪帳的 `review.hidden` 由 `ReviewAuthorDeactivated` 的 job 在 transaction 外列出 `AuthorTargets` 逐組送；競態已解（A6-D12）：`review.purge_author` 每批刪除後在同 transaction 對該批每個不同的 (店, 商品) 發一個 `ReviewAggregateChanged`，所以 purge 先於 `AuthorTargets` 跑完時 Java 聚合仍會在刪帳當下重算，做完之後重跑不再發 |
 | 退款後評價仍計分（RD5） | 退款後的評價要排除 | 成立 | 排除全額退款的評價 | 接受（A6-D7 (a)，Will 2026-11-19）：只放行訂單狀態 50，先評後退的延後到 ordering 搬遷 |
 
 ## 傳輸層的沿用盤點
