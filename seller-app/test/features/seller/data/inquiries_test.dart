@@ -132,6 +132,40 @@ void main() {
       expect(server.gets, isEmpty);
     });
 
+    test('inquiryById：列表裡換成最新一筆後跟著更新（canReply 不過期）', () async {
+      final server = _Server()
+        ..pages[''] = ListMyInquiriesResponse(
+          inquiries: [inquiryOf(id: 'a', canReply: true)],
+        );
+      final container = _container(server);
+      await container.read(myInquiriesProvider('acc-1').future);
+      final sub = container.listen(
+        inquiryByIdProvider('acc-1', 'a'),
+        (_, _) {},
+      );
+      addTearDown(sub.close);
+      expect(
+        (await container.read(
+          inquiryByIdProvider('acc-1', 'a').future,
+        )).canReply,
+        isTrue,
+      );
+      container
+          .read(myInquiriesProvider('acc-1').notifier)
+          .adopt(
+            inquiryOf(
+              id: 'a',
+              state: InquiryState.INQUIRY_STATE_REPLIED,
+              canReply: false,
+            ),
+          );
+      final latest = await container.read(
+        inquiryByIdProvider('acc-1', 'a').future,
+      );
+      expect(latest.canReply, isFalse);
+      expect(latest.state, InquiryState.INQUIRY_STATE_REPLIED);
+    });
+
     test('inquiryById：沒讀過列表就 GetMyInquiry', () async {
       final server = _Server();
       final container = _container(server);

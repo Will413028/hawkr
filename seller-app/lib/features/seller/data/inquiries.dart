@@ -95,13 +95,17 @@ int currentPendingInquiryCount(Ref ref) {
   return ref.watch(pendingInquiryCountProvider(accountId)).value ?? 0;
 }
 
-/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
 @Riverpod(retry: noRetry)
 Future<Inquiry> inquiryById(Ref ref, String accountId, String inquiryId) async {
   final list = myInquiriesProvider(accountId);
   if (ref.exists(list)) {
-    final found = ref.read(list).value?.where((i) => i.id == inquiryId);
-    if (found != null && found.isNotEmpty) return found.first;
+    final found = ref
+        .watch(list)
+        .value
+        ?.where((i) => i.id == inquiryId)
+        .firstOrNull;
+    if (found != null) return found;
   }
   final response = await ref
       .watch(sellerClientProvider)

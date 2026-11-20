@@ -33,7 +33,11 @@ class EvidencePhoto {
   String? error;
 }
 
-Future<PickedEvidence?> pickEvidenceFromDevice(BuildContext context) async {
+/// [filenamePrefix] 是上傳檔名的前綴（申覆用 `appeal`、詢問回覆用 `inquiry`）。
+Future<PickedEvidence?> pickEvidenceFromDevice(
+  BuildContext context, {
+  required String filenamePrefix,
+}) async {
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
     builder: (sheetContext) => SafeArea(
@@ -69,7 +73,8 @@ Future<PickedEvidence?> pickEvidenceFromDevice(BuildContext context) async {
     final bytes = await File(image.path).readAsBytes();
     return (
       bytes: bytes,
-      filename: 'appeal_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      filename:
+          '${filenamePrefix}_${DateTime.now().millisecondsSinceEpoch}.jpg',
     );
   } catch (error) {
     HKLog.logW('[EvidencePicker] pick image failed: $error');
@@ -88,7 +93,7 @@ class EvidencePhotoTile extends StatelessWidget {
   final EvidencePhoto photo;
   final VoidCallback? onRemove;
 
-  /// 縮圖的邊長（沒有對應的共用尺寸，只有這個表單用）。
+  /// 縮圖的邊長（沒有對應的共用尺寸，只有申覆與詢問回覆的證據照片用）。
   static const _size = 72.0;
   static const _spinner = 20.0;
   static const _removeIcon = 14.0;

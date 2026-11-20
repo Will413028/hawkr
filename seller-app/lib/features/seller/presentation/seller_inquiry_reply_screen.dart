@@ -171,9 +171,12 @@ class _ReplyBodyState extends ConsumerState<_ReplyBody> {
 
   Future<void> _addPhoto() async {
     if (_photos.length >= _maxEvidence || _busy) return;
-    final picked = await (widget.pickEvidence ?? pickEvidenceFromDevice)(
-      context,
-    );
+    final picked =
+        await (widget.pickEvidence ??
+            (context) => pickEvidenceFromDevice(
+              context,
+              filenamePrefix: 'inquiry',
+            ))(context);
     if (picked == null || !mounted || _busy) return;
     if (_photos.length >= _maxEvidence) return;
     final photo = EvidencePhoto(_nextPhotoId++, picked.bytes);

@@ -254,9 +254,12 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
 
   Future<void> _addPhoto() async {
     if (_photos.length >= requestMaxEvidence || _busy) return;
-    final picked = await (widget.pickEvidence ?? pickEvidenceFromDevice)(
-      context,
-    );
+    final picked =
+        await (widget.pickEvidence ??
+            (context) => pickEvidenceFromDevice(
+              context,
+              filenamePrefix: 'appeal',
+            ))(context);
     // 選圖器開著的時候可能已經送出：送出中不再加照片（送出的清單已經定了）。
     if (picked == null || !mounted || _busy) return;
     if (_photos.length >= requestMaxEvidence) return;
