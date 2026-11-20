@@ -156,7 +156,6 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 |---|---|---|
 | `ReviewCreated` | 提交成功 | EventID、OccurredAt、ReviewID、StoreID、ProductID |
 | `ReviewAggregateChanged` | 隱藏、還原 | EventID、OccurredAt、StoreID、ProductID（只表示「這組聚合要重送」，不指稱單則評價） |
-| `ReviewAuthorDeactivated` | 作者進入刪帳（寫入 `inactive_authors`） | EventID、OccurredAt、BuyerID |
 
 ### 4.2 `M/legacy/reviewrelay`
 
