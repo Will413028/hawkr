@@ -175,6 +175,10 @@ func TestSendValidatesTheRequestAtTheEntry(t *testing.T) {
 			t.Errorf("%s：%v，要 INVALID_ARGUMENT", name, err)
 		}
 	}
+	_, err := c.SendAssistantMessage(ctx, asAccount(connect.NewRequest(&pb.SendAssistantMessageRequest{Topic: pb.AssistantTopic_ASSISTANT_TOPIC_CHAT, Message: "嗨", ClientRequestId: "abc"}), accountID))
+	if got := violationFields(t, err); len(got) != 1 || got[0] != "client_request_id" {
+		t.Errorf("client_request_id 不是 UUIDv4 的欄位路徑 = %v，要 [client_request_id]", got)
+	}
 	if len(m.submitted) != 0 {
 		t.Fatalf("被拒絕的請求不得到達模組：%+v", m.submitted)
 	}
@@ -209,6 +213,8 @@ func TestSendMapsModuleErrors(t *testing.T) {
 		{assistant.ErrTurnInProgress, connect.CodeFailedPrecondition, "ASSISTANT_TURN_IN_PROGRESS"},
 		{assistant.ErrSessionNotFound, connect.CodeNotFound, ""},
 		{assistant.ErrShuttingDown, connect.CodeUnavailable, ""},
+		{&assistant.LimitError{Err: assistant.ErrTooManyTurns, RetryAfter: 5 * time.Second}, connect.CodeResourceExhausted, ""},
+		{&assistant.LimitError{Err: assistant.ErrRateLimited, RetryAfter: 30 * time.Second}, connect.CodeResourceExhausted, ""},
 		{assistant.ErrIdempotencyMismatch, connect.CodeInvalidArgument, ""},
 		{assistant.ErrMessageRequired, connect.CodeInvalidArgument, ""},
 		{fmt.Errorf("%w: boom", assistant.ErrSessionCreate), connect.CodeInternal, ""},
@@ -362,5 +368,81 @@ func TestGetLatestSessionWithNoConversationIsEmpty(t *testing.T) {
 	resp, err := c.GetLatestAssistantSession(t.Context(), asAccount(connect.NewRequest(&pb.GetLatestAssistantSessionRequest{}), accountID))
 	if err != nil || resp.Msg.GetSessionId() != "" || len(resp.Msg.GetMessages()) != 0 {
 		t.Fatalf("response = %v, %v", resp, err)
+	}
+}
+
+func violationFields(t *testing.T, err error) []string {
+	t.Helper()
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatalf("不是 connect 錯誤：%v", err)
+	}
+	var fields []string
+	for _, d := range ce.Details() {
+		v, derr := d.Value()
+		if derr != nil {
+			t.Fatal(derr)
+		}
+		if br, ok := v.(*errdetails.BadRequest); ok {
+			for _, fv := range br.GetFieldViolations() {
+				fields = append(fields, fv.GetField())
+			}
+		}
+	}
+	return fields
+}
+
+func TestSendLimitErrorsCarryRetryInfo(t *testing.T) {
+	m := &fakeModule{submitErr: &assistant.LimitError{Err: assistant.ErrRateLimited, RetryAfter: 30 * time.Second}}
+	c, _ := setup(t, m, time.Second)
+	_, err := c.SendAssistantMessage(t.Context(), asAccount(connect.NewRequest(send(pb.AssistantTopic_ASSISTANT_TOPIC_CHAT, "嗨")), accountID))
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatalf("不是 connect 錯誤：%v", err)
+	}
+	for _, d := range ce.Details() {
+		v, derr := d.Value()
+		if derr != nil {
+			t.Fatal(derr)
+		}
+		if ri, ok := v.(*errdetails.RetryInfo); ok {
+			if ri.GetRetryDelay().AsDuration() != 30*time.Second {
+				t.Fatalf("RetryInfo = %v，要 30 秒", ri)
+			}
+			return
+		}
+	}
+	t.Fatal("RESOURCE_EXHAUSTED 沒有 RetryInfo")
+}
+
+// 模組的每一支 Tool 都對得到 AssistantTool；新增 Tool 卻漏了對應，這支測試先失敗。
+func TestEveryModelToolMapsToAnAssistantTool(t *testing.T) {
+	n := 0
+	for tool := assistant.ToolGetMyOrders; tool.Valid(); tool++ {
+		n++
+		if got, ok := toolToProto(tool); !ok || got == pb.AssistantTool_ASSISTANT_TOOL_UNSPECIFIED {
+			t.Errorf("tool %d 沒有對應的 AssistantTool", tool)
+		}
+	}
+	if n == 0 {
+		t.Fatal("沒有走過任何 Tool")
+	}
+}
+
+// 事件裡的 tool 對不到時，串流以 ASSISTANT_TURN_FAILED 的 error 事件結束，不是讓 RPC 中止。
+func TestWatchEndsWithATurnFailedEventWhenAToolHasNoMapping(t *testing.T) {
+	m := &fakeModule{turns: map[string]int64{"turn-1": buyerID}, events: []assistant.TurnEvent{
+		{Cursor: "1", Kind: assistant.EventText, Text: "你"},
+		{Cursor: "2", Kind: assistant.EventToolResult, Tool: assistant.Tool(99)},
+		{Cursor: "3", Kind: assistant.EventFinished},
+	}}
+	c, _ := setup(t, m, time.Second)
+	got, err := drain(t, c, &pb.WatchAssistantTurnRequest{TurnId: "turn-1"}, accountID)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("events = %v, %v", got, err)
+	}
+	e := got[1].GetError()
+	if e.GetReason() != commonpb.ErrorReason_ASSISTANT_TURN_FAILED || e.GetLocalizedMessage() == "" || got[1].GetCursor() != "2" {
+		t.Fatalf("最後一個事件 = %v", got[1])
 	}
 }

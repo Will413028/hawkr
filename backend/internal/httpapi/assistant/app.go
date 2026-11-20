@@ -21,7 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// WatchWindow 是一條 WatchAssistantTurn 串流的最長時間（A9-D12：Vercel 外部 rewrite 的上限），到了正常結束，client 以 cursor 接續。
+// WatchWindow 是一條 WatchAssistantTurn 串流的最長時間（Vercel 外部 rewrite 的上限），到了正常結束，client 以 cursor 接續。
 const WatchWindow = 100 * time.Second
 
 // Module 是助理業務的介面（*assistant.Module）。
@@ -80,7 +80,7 @@ func (h *App) SendAssistantMessage(ctx context.Context, req *connect.Request[pb.
 	}
 	requestID, err := rpc.ParseRequestID(msg.GetClientRequestId())
 	if err != nil {
-		return nil, err
+		return nil, rpc.RequiredField("client_request_id", "client_request_id 必須是 UUIDv4")
 	}
 	ref, err := h.m.SubmitTurn(ctx, model.SubmitTurnInput{
 		BuyerID:   buyerID,
@@ -109,6 +109,13 @@ func sendError(err error) error {
 		return apperr.NotFound("找不到這個對話")
 	case errors.Is(err, model.ErrTurnInProgress):
 		return apperr.FailedPrecondition("這個對話還有一則回覆進行中，請等它結束再送出").WithReason(apperr.ReasonAssistantTurnInProgress)
+	case errors.Is(err, model.ErrTooManyTurns), errors.Is(err, model.ErrRateLimited):
+		var le *model.LimitError
+		var retry time.Duration
+		if errors.As(err, &le) {
+			retry = le.RetryAfter
+		}
+		return apperr.ResourceExhausted(retry, "送出得太頻繁，請稍後再試")
 	case errors.Is(err, model.ErrShuttingDown):
 		return apperr.Unavailable("服務正在重新啟動，請稍後再試")
 	}
@@ -140,9 +147,14 @@ func (h *App) WatchAssistantTurn(ctx context.Context, req *connect.Request[pb.Wa
 		if err != nil {
 			return err
 		}
-		out, err := h.eventToProto(ctx, req.Msg.GetTurnId(), ev)
+		out, err := eventToProto(ev)
 		if err != nil {
-			return err
+			h.log.ErrorContext(ctx, "assistant：事件無法轉成回應，以失敗結束這條串流", "turn_id", req.Msg.GetTurnId(), "error", err)
+			out = &pb.WatchAssistantTurnResponse{Cursor: ev.Cursor, Event: &pb.WatchAssistantTurnResponse_Error{Error: &pb.AssistantStreamError{
+				Reason:           commonpb.ErrorReason_ASSISTANT_TURN_FAILED,
+				LocalizedMessage: rpc.CommonText(ctx, connect.CodeInternal).Text,
+			}}}
+			return stream.Send(out)
 		}
 		if err := stream.Send(out); err != nil {
 			return err
@@ -151,7 +163,7 @@ func (h *App) WatchAssistantTurn(ctx context.Context, req *connect.Request[pb.Wa
 	return nil
 }
 
-func (h *App) eventToProto(ctx context.Context, turnID string, ev model.TurnEvent) (*pb.WatchAssistantTurnResponse, error) {
+func eventToProto(ev model.TurnEvent) (*pb.WatchAssistantTurnResponse, error) {
 	out := &pb.WatchAssistantTurnResponse{Cursor: ev.Cursor}
 	switch ev.Kind {
 	case model.EventText:
@@ -165,8 +177,7 @@ func (h *App) eventToProto(ctx context.Context, turnID string, ev model.TurnEven
 	case model.EventFinished:
 		out.Event = &pb.WatchAssistantTurnResponse_Finished{Finished: &pb.AssistantFinished{SessionId: ev.SessionID}}
 	case model.EventError:
-		// 失敗的細分（FailureKind）只進 log，對外一律 ASSISTANT_TURN_FAILED（A9-D17）。
-		h.log.WarnContext(ctx, "assistant：這一輪以失敗結束", "turn_id", turnID, "failure", int(ev.Failure))
+		// 失敗的細分（FailureKind）不外流，對外一律 ASSISTANT_TURN_FAILED。
 		out.Event = &pb.WatchAssistantTurnResponse_Error{Error: &pb.AssistantStreamError{
 			Reason:           commonpb.ErrorReason_ASSISTANT_TURN_FAILED,
 			LocalizedMessage: ev.Message,

@@ -67,8 +67,8 @@ func New(d Deps) *Module {
 // Shutdown 取消進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
 func (m *Module) Shutdown(ctx context.Context) error { return m.turns.Shutdown(ctx) }
 
-// SubmitTurn 受理一則買家訊息，立刻回輪次 ID，agent 在背景執行（A9-D12）。必須在最上層呼叫，不得在 transaction 內。
-// 同一個對話已有一輪進行中回 ErrTurnInProgress（A9-D14）。語系取自 ctx（uitext.LocaleFrom）。
+// SubmitTurn 受理一則買家訊息，立刻回輪次 ID，agent 在背景執行。必須在最上層呼叫，不得在 transaction 內。
+// 同一個對話已有一輪進行中回 ErrTurnInProgress；每位買家同時進行中的輪次與每分鐘送出次數有上限，超過回 ErrTooManyTurns、ErrRateLimited（皆以 LimitError 包住）。冪等重送不計入上限。語系取自 ctx（uitext.LocaleFrom）。
 func (m *Module) SubmitTurn(ctx context.Context, in SubmitTurnInput) (TurnRef, error) {
 	return m.turns.Submit(ctx, in)
 }
@@ -78,7 +78,7 @@ func (m *Module) WatchTurn(ctx context.Context, buyerID int64, turnID, cursor st
 	return m.turns.Watch(ctx, buyerID, turnID, cursor)
 }
 
-// LatestSession 回買家最近一次對話與它的文字訊息（時間由舊到新）；沒有對話時 SessionID 是空字串。只讀呼叫者自己的對話。
+// LatestSession 回買家最近一次對話與它的最近 100 則文字訊息（時間由舊到新）；沒有對話時 SessionID 是空字串。只讀呼叫者自己的對話。
 func (m *Module) LatestSession(ctx context.Context, buyerID int64) (History, error) {
 	return history.Latest(ctx, m.sessions, buyerID)
 }
@@ -136,6 +136,9 @@ const (
 	ToolTrackMyPackage      = model.ToolTrackMyPackage
 )
 
+// LimitError 是 ErrTooManyTurns、ErrRateLimited 的外殼，帶 RetryAfter。
+type LimitError = model.LimitError
+
 // 事件種類與失敗種類。
 type (
 	EventKind   = model.EventKind
@@ -166,6 +169,8 @@ var (
 	ErrTurnNotFound        = model.ErrTurnNotFound
 	ErrCursorAhead         = model.ErrCursorAhead
 	ErrOuterTx             = model.ErrOuterTx
+	ErrTooManyTurns        = model.ErrTooManyTurns
+	ErrRateLimited         = model.ErrRateLimited
 	ErrShuttingDown        = model.ErrShuttingDown
 	ErrIdempotencyMismatch = model.ErrIdempotencyMismatch
 )

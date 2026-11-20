@@ -1,6 +1,7 @@
 package history
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strconv"
@@ -121,5 +122,37 @@ func TestLatestPicksTheMostRecentlyUpdatedSessionOfThisBuyerOnly(t *testing.T) {
 	none, err := Latest(t.Context(), svc, 3)
 	if err != nil || none.SessionID != "" {
 		t.Fatalf("沒有對話的買家 = %+v, %v", none, err)
+	}
+}
+
+// 只回最近的 100 則：101 則時最舊的一則被捨去，順序仍是由舊到新。
+func TestLatestReturnsOnlyTheMostRecent100Messages(t *testing.T) {
+	svc := session.InMemoryService()
+	s := newSession(t, svc, 1, "long")
+	for i := range MaxMessages + 1 {
+		appendContent(t, svc, s, "user", genai.NewContentFromText("m"+strconv.Itoa(i), genai.RoleUser))
+	}
+	got, err := Latest(t.Context(), svc, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Messages) != MaxMessages || got.Messages[0].Text != "m1" || got.Messages[MaxMessages-1].Text != "m"+strconv.Itoa(MaxMessages) {
+		t.Fatalf("訊息數 = %d，第一則 = %q，最後一則 = %q", len(got.Messages), got.Messages[0].Text, got.Messages[len(got.Messages)-1].Text)
+	}
+}
+
+// goneOnGet 模擬列出之後、讀取之前對話被刪除。
+type goneOnGet struct{ session.Service }
+
+func (goneOnGet) Get(context.Context, *session.GetRequest) (*session.GetResponse, error) {
+	return nil, session.ErrNotFound
+}
+
+func TestLatestTreatsASessionDeletedBetweenListAndGetAsNoSession(t *testing.T) {
+	svc := session.InMemoryService()
+	newSession(t, svc, 1, "s1")
+	got, err := Latest(t.Context(), goneOnGet{svc}, 1)
+	if err != nil || got.SessionID != "" || len(got.Messages) != 0 {
+		t.Fatalf("Latest = %+v, %v；要空的 History", got, err)
 	}
 }

@@ -52,6 +52,8 @@
 
 **事件緩衝（A9-D15 第 5 點）**：每輪一個只增不減的緩衝，上限 `DefaultBufferCapacity`（4096，含終止事件）個事件，序號從 1 起，cursor 是序號的十進位字串；不覆蓋舊事件，所以沒有「cursor 過期」。最後一格保留給終止事件：一般事件寫滿時，這一輪被中止（取消 runner、記 log），以 `error` 終止（已有文字是 `FailureInterrupted`，否則 `FailureNoOutput`），佔用照常在終止事件之前釋放（`TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession`、`TestBufferNeverOverwritesAndKeepsTheLastSlotForTheTerminalEvent`）。切片隨事件增長，不預先配置。輪次結束後保留 `DefaultRetention`（10 分鐘）供續看，超過時下一次送出或訂閱時清掉。`WatchTurn`：輪次不存在、已清掉或不屬於該買家回 `ErrTurnNotFound`；cursor 超前最新事件或不是非負整數回 `ErrCursorAhead`。迭代器在終止事件後結束；ctx 結束（handler 的 100 秒）時正常結束。
 
+**每位買家的上限（A9-D18）**：同時進行中的輪次最多 `DefaultMaxConcurrentTurns`（2，跨對話）、每分鐘最多送出 `DefaultMaxSubmitsPerMinute`（10，退貨政策也計），記憶體計數；超過回 `ErrTooManyTurns`、`ErrRateLimited`（以 `LimitError` 帶 `RetryAfter`），對外 `RESOURCE_EXHAUSTED`、無 reason、帶 `RetryInfo`。以同一個 `client_request_id` 重送已受理的請求不計入也不受上限擋；失敗路徑釋放同時輪次的名額。`LatestSession` 只回最近 `history.MaxMessages`（100）則訊息。
+
 **對外對應（A9-2c）**：`ErrTurnInProgress` → `FAILED_PRECONDITION` + `ASSISTANT_TURN_IN_PROGRESS`；`ErrCursorAhead` → `FAILED_PRECONDITION` + `REPLAY_CURSOR_AHEAD`；`ErrShuttingDown` → `UNAVAILABLE`；`ErrTurnNotFound`（含已超過保留期被清除，A9-D17 修訂）、`ErrSessionNotFound` → `NOT_FOUND`；`ErrMessageRequired`、`ErrInvalidTopic`、`ErrIdempotencyMismatch` → `INVALID_ARGUMENT`；`ErrSessionCreate`、`ErrOuterTx` → `INTERNAL`。`error` 事件的 reason 一律 `ASSISTANT_TURN_FAILED`（`FailureKind` 只進 log）。
 
 **冪等（`client_request_id`，A9-D17 修訂）**：鍵是（買家，`client_request_id`），存請求內容（主題、對話、訊息、圖片網址）的雜湊與 `(turn_id, session_id)`，與該輪的保留期（10 分鐘）一起清除；同鍵同內容回放第一次的結果，不看對話是否進行中、不開新的一輪；同鍵不同內容 `INVALID_ARGUMENT`；第一次受理失敗不留紀錄；同時送出同一個鍵的請求等第一個的結果。存在記憶體，重啟後遺失。

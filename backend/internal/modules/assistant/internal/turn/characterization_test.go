@@ -91,14 +91,14 @@ type observed struct {
 	HistoryContents       int              `json:"history_contents"`
 }
 
-// skippedFixtures 是驗 RPC 回應、不是輪次事件的 fixture（A9-2c 的 GetLatestAssistantSession，在 internal/history 比對）。
+// skippedFixtures 是驗 RPC 回應、不是輪次事件的 fixture（GetLatestAssistantSession，在 internal/history 比對）。
 var skippedFixtures = map[string]string{
 	"latest_session_after_chat": "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
 	"latest_session_empty":      "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
 }
 
 // recordedDefaultMessages 是舊服務按鈕端點在空訊息時代填的預設訊息（orders_happy_path、tracking_partial_detail_failure 的錄製以它送出）。
-// 新服務不再有預設訊息（A9-D17）：入口層對空訊息回 INVALID_ARGUMENT，這兩份 fixture 在測試裡補回當時的文字，輪次與 LLM 請求的比對維持不變。
+// 新服務不再有預設訊息：入口層對空訊息回 INVALID_ARGUMENT，這兩份 fixture 在測試裡補回當時的文字，輪次與 LLM 請求的比對維持不變。
 // 退貨政策不看訊息，不在表內。
 var recordedDefaultMessages = map[string]string{
 	"BuyerOrders":   "查詢我的訂單",

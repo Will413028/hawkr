@@ -1,5 +1,5 @@
-// Package turn 執行買家助理的一輪對話：受理後立刻回輪次 ID，agent 在背景跑，事件放記憶體的環形緩衝（A9-D12）；
-// 同一個對話同時只允許一輪進行中（A9-D14）。
+// Package turn 執行買家助理的一輪對話：受理後立刻回輪次 ID，agent 在背景跑，事件放記憶體的緩衝；
+// 同一個對話同時只允許一輪進行中，每位買家另有同時輪次數與每分鐘送出次數的上限（記憶體計數，單體是單一進程）。
 //
 // 這個套件不開 transaction，也不接受已在 transaction 內的 ctx：agent 執行包含 LLM 呼叫（backend/AGENTS.md 規則 5），
 // session 的寫入由 session.Service 自己在最上層開 transaction（adksession 在外層 transaction 內回 ErrInOuterTx）。
@@ -42,6 +42,14 @@ const (
 	DefaultRetention = 10 * time.Minute
 	// DefaultTimeout 是一輪從開始到結束的上限；到了就以失敗結束，釋放對話的佔用。
 	DefaultTimeout = 2 * time.Minute
+	// DefaultMaxConcurrentTurns 是每位買家同時進行中的輪次上限（跨對話）。
+	DefaultMaxConcurrentTurns = 2
+	// DefaultMaxSubmitsPerMinute 是每位買家每分鐘的送出次數上限。
+	DefaultMaxSubmitsPerMinute = 10
+	// submitWindow 是送出次數的計算窗口。
+	submitWindow = time.Minute
+	// concurrentRetryAfter 是同時輪次已滿時建議的重試間隔。
+	concurrentRetryAfter = 5 * time.Second
 
 	minBufferCapacity = 2
 )
@@ -56,8 +64,11 @@ type Config struct {
 	BufferCapacity int
 	Retention      time.Duration
 	Timeout        time.Duration
+	// MaxConcurrentTurns 與 MaxSubmitsPerMinute 是每位買家的上限，零值取預設。
+	MaxConcurrentTurns  int
+	MaxSubmitsPerMinute int
 
-	// ToolObserver 在每次 tool 呼叫結束時被呼叫（含模型送的參數的拷貝），可為 nil。參數不進對外事件（A9-D13 修訂）；
+	// ToolObserver 在每次 tool 呼叫結束時被呼叫（含模型送的參數的拷貝），可為 nil。參數不進對外事件；
 	// 這個觀察點給測試的 characterization 比對與日後的指標。可能從多個 goroutine 同時呼叫。
 	ToolObserver func(buyeragent.ToolCall)
 }
@@ -95,8 +106,11 @@ type Executor struct {
 	mu     sync.Mutex
 	closed bool
 	turns  map[string]*turnState
-	active map[string]struct{} // A9-D14：進行中的對話，鍵是 buyerID/sessionID
-	idem   map[string]*idemEntry
+	active map[string]struct{} // 進行中的對話，鍵是 buyerID/sessionID
+	// running 是每位買家進行中的輪次數；recent 是每位買家最近一分鐘內的送出時間。
+	running map[int64]int
+	recent  map[int64][]time.Time
+	idem    map[string]*idemEntry
 }
 
 // idemEntry 是一個冪等鍵的紀錄：請求內容的雜湊與第一次受理的結果。ready 關閉後 ok、ref 才可讀；
@@ -124,8 +138,14 @@ func New(cfg Config) *Executor {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = DefaultTimeout
 	}
+	if cfg.MaxConcurrentTurns <= 0 {
+		cfg.MaxConcurrentTurns = DefaultMaxConcurrentTurns
+	}
+	if cfg.MaxSubmitsPerMinute <= 0 {
+		cfg.MaxSubmitsPerMinute = DefaultMaxSubmitsPerMinute
+	}
 	base, cancel := context.WithCancel(context.Background())
-	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}, idem: map[string]*idemEntry{}}
+	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}, running: map[int64]int{}, recent: map[int64][]time.Time{}, idem: map[string]*idemEntry{}}
 }
 
 // Shutdown 取消所有進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
@@ -144,6 +164,26 @@ func (e *Executor) Shutdown(ctx context.Context) error {
 	}
 }
 
+// pruneBefore 回 ts 中不早於 cutoff 的部分（ts 依時間遞增）。
+func pruneBefore(ts []time.Time, cutoff time.Time) []time.Time {
+	i := 0
+	for i < len(ts) && ts[i].Before(cutoff) {
+		i++
+	}
+	return ts[i:]
+}
+
+// admitLocked 在持鎖時檢查買家的每分鐘送出次數，通過就記一次；同時輪次數由呼叫者先檢查。
+func (e *Executor) admitLocked(buyerID int64, now time.Time) error {
+	ts := pruneBefore(e.recent[buyerID], now.Add(-submitWindow))
+	if len(ts) >= e.cfg.MaxSubmitsPerMinute {
+		e.recent[buyerID] = ts
+		return &model.LimitError{Err: model.ErrRateLimited, RetryAfter: max(ts[0].Add(submitWindow).Sub(now), time.Second)}
+	}
+	e.recent[buyerID] = append(ts, now)
+	return nil
+}
+
 func guardKey(buyerID int64, sessionID string) string {
 	return strconv.FormatInt(buyerID, 10) + "/" + sessionID
 }
@@ -152,6 +192,11 @@ func (e *Executor) sweepLocked(now time.Time) {
 	for id, t := range e.turns {
 		if end, ok := t.buf.endTime(); ok && now.Sub(end) > e.cfg.Retention {
 			delete(e.turns, id)
+		}
+	}
+	for b, ts := range e.recent {
+		if len(pruneBefore(ts, now.Add(-submitWindow))) == 0 {
+			delete(e.recent, b)
 		}
 	}
 	for k, ent := range e.idem {
@@ -179,7 +224,7 @@ func (e *Executor) install(ctx context.Context, t *turnState) string {
 
 // Submit 受理一則訊息：驗證、解析（或建立）對話、佔用對話，然後在背景跑 agent，立刻回輪次 ID。
 //
-// 冪等（A9-D17 修訂）：in.RequestID 非空時，鍵是（買家，RequestID）。同一個鍵、同樣的內容再送，原樣回第一次的
+// 冪等：in.RequestID 非空時，鍵是（買家，RequestID）。同一個鍵、同樣的內容再送，原樣回第一次的
 // Ref（不開新的一輪，也不看對話是否已有一輪進行中）；同一個鍵、內容不同回 ErrIdempotencyMismatch。紀錄與該輪
 // 的保留期一起存活、一起清除（輪次被清掉後鍵就失效）。第一次受理失敗的不留紀錄，重送當作新請求；
 // 第一次還在受理中時，重送等它的結果。
@@ -203,15 +248,15 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 			return e.submitOwning(ctx, in, key, ent)
 		}
 		e.mu.Unlock()
-		if ent.hash != hash {
-			return Ref{}, model.ErrIdempotencyMismatch
-		}
 		select {
 		case <-ent.ready:
 		case <-ctx.Done():
 			return Ref{}, ctx.Err()
 		}
 		if ent.ok {
+			if ent.hash != hash {
+				return Ref{}, model.ErrIdempotencyMismatch
+			}
 			return ent.ref, nil
 		}
 	}
@@ -261,10 +306,14 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	if in.Topic == model.TopicReturnPolicy {
 		e.mu.Lock()
-		closed := e.closed
-		e.mu.Unlock()
-		if closed {
+		if e.closed {
+			e.mu.Unlock()
 			return Ref{}, model.ErrShuttingDown
+		}
+		err := e.admitLocked(in.BuyerID, e.cfg.Now())
+		e.mu.Unlock()
+		if err != nil {
+			return Ref{}, err
 		}
 		return e.submitReturnPolicy(ctx, in, loc)
 	}
@@ -275,7 +324,7 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}
 	userID := strconv.FormatInt(in.BuyerID, 10)
 
-	// 順序（A9-D15 第 4 點）：檢查 closed、佔用對話、wg.Add 都在同一把鎖內，session ID 由伺服器先產生，之後才寫 session。
+	// 順序：檢查 closed、佔用對話與買家上限、wg.Add 都在同一把鎖內，session ID 由伺服器先產生，之後才寫 session。
 	// 任何一步失敗都釋放佔用並 wg.Done，不留下沒有輪次的 session。
 	sessionID := in.SessionID
 	newSession := sessionID == ""
@@ -292,13 +341,22 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 		e.mu.Unlock()
 		return Ref{}, model.ErrTurnInProgress
 	}
+	if e.running[in.BuyerID] >= e.cfg.MaxConcurrentTurns {
+		e.mu.Unlock()
+		return Ref{}, &model.LimitError{Err: model.ErrTooManyTurns, RetryAfter: concurrentRetryAfter}
+	}
+	if err := e.admitLocked(in.BuyerID, e.cfg.Now()); err != nil {
+		e.mu.Unlock()
+		return Ref{}, err
+	}
 	e.active[key] = struct{}{}
+	e.running[in.BuyerID]++
 	e.wg.Add(1)
 	e.mu.Unlock()
 	started := false
 	defer func() {
 		if !started {
-			e.release(key)
+			e.release(in.BuyerID, key)
 			e.wg.Done()
 		}
 	}()
@@ -337,15 +395,21 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 		defer stop()
 		// 先釋放對話、再發出終止事件：client 一收到結束就重送，不會撞到上一輪的佔用。
 		terminal := e.execute(runCtx, t, in, userID, sessionID, content, loc)
-		e.release(key)
+		if terminal.Kind == model.EventError {
+			slog.WarnContext(runCtx, "assistant：這一輪以失敗結束", "turn_id", turnID, "failure", int(terminal.Failure))
+		}
+		e.release(in.BuyerID, key)
 		t.buf.append(terminal, e.cfg.Now())
 	}()
 	return Ref{TurnID: turnID, SessionID: sessionID}, nil
 }
 
-func (e *Executor) release(key string) {
+func (e *Executor) release(buyerID int64, key string) {
 	e.mu.Lock()
 	delete(e.active, key)
+	if e.running[buyerID]--; e.running[buyerID] <= 0 {
+		delete(e.running, buyerID)
+	}
 	e.mu.Unlock()
 }
 
@@ -367,7 +431,7 @@ func writeReturnPolicy(buf *buffer, sessionID string, loc uitext.Locale, now tim
 
 // execute 跑 agent 並回這一輪的終止事件；panic 也以失敗事件回傳。
 //
-// finished 的條件（A9-D15 第 4 點）：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse）。
+// finished 的條件：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse）。
 // 取消、逾時、模型安靜停下、事件數超過上限，只要最終回應沒有出現，一律是 error；迴圈之後不再看 ctx.Err()。
 func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, userID, sessionID string, content *genai.Content, loc uitext.Locale) (terminal model.Event) {
 	var sent strings.Builder

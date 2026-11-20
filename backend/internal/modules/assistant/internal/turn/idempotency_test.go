@@ -167,7 +167,7 @@ func TestEmptyMessageIsRejectedByTheRunnerToo(t *testing.T) {
 	}
 }
 
-// 輪次結束超過保留期就被清掉：訂閱回 ErrTurnNotFound（不是 cursor 過期，也不是成功；A9-D17 修訂）。
+// 輪次結束超過保留期就被清掉：訂閱回 ErrTurnNotFound（不是 cursor 過期，也不是成功）。
 func TestWatchOfATurnPastRetentionIsNotFound(t *testing.T) {
 	var mu sync.Mutex
 	now := time.Now()

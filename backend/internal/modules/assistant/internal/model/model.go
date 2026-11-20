@@ -102,11 +102,24 @@ var (
 	ErrCursorAhead = errors.New("assistant：cursor 超前")
 	// ErrIdempotencyMismatch 是同一個冪等鍵（client_request_id）帶了不同的內容；對外 INVALID_ARGUMENT。
 	ErrIdempotencyMismatch = errors.New("assistant：同一個 client_request_id 的內容不同")
+	// ErrTooManyTurns 是這位買家同時進行中的輪次（跨對話）已到上限；對外 RESOURCE_EXHAUSTED，沒有 reason，帶 RetryInfo。
+	ErrTooManyTurns = errors.New("assistant：同時進行中的輪次已到上限")
+	// ErrRateLimited 是這位買家每分鐘的送出次數已到上限；對外同 ErrTooManyTurns。
+	ErrRateLimited = errors.New("assistant：送出次數已到每分鐘上限")
 	// ErrShuttingDown 是執行器已 Shutdown，不再受理新的一輪。
 	ErrShuttingDown = errors.New("assistant：服務關閉中，不受理新的一輪")
 	// ErrOuterTx 是在已有 transaction 的 ctx 上送出：輪次會在背景執行並寫 session，不得綁在呼叫者的 transaction 上。
 	ErrOuterTx = errors.New("assistant：送出不能開在 transaction 內")
 )
+
+// LimitError 包住 ErrTooManyTurns 或 ErrRateLimited，帶多久之後可以再試。
+type LimitError struct {
+	Err        error
+	RetryAfter time.Duration
+}
+
+func (e *LimitError) Error() string { return e.Err.Error() }
+func (e *LimitError) Unwrap() error { return e.Err }
 
 // Role 是對話中一則訊息的發言者。
 type Role int
