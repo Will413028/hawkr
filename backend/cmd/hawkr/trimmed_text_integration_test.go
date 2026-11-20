@@ -68,6 +68,7 @@ var trimmedColumns = []trimmedColumn{
 	{table: "review.hides", column: "source_ref", constraint: "hides_source_ref_check"},
 	{table: "review.hides", column: "restore_reason", constraint: "hides_restore_reason_check",
 		extra: map[string]any{"restored_at": time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC), "restored_by": int64(1)}},
+	{table: "crm.tags", column: "name", constraint: "tags_name_check"},
 	{table: "im.messages", column: "content", constraint: "messages_content_check"},
 	{table: "im.hides", column: "reason_text", constraint: "hides_reason_text_check"},
 	{table: "im.hides", column: "source_ref", constraint: "hides_source_ref_check"},

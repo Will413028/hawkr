@@ -1,0 +1,158 @@
+// Package project 是消費統計的投影（過渡：ordering 搬進單體後改讀 ordering 的 pub_*，這個套件與 order_nets、ledger 退場）。
+// 兩個事件（order.completed、aftersales.refund.completed）各一個 transaction：身分 advisory lock 與 inactive 檢查 →
+// 鎖住該單的 order_nets 列 → ledger 去重 → 更新淨額 → 把這張單貢獻的變化量加到客戶。
+// 兩個 Record 方法的 recorded 為 true 表示事件是新的（ledger 新增一列），即使它沒有改變任何統計（同單號的第二個 order.completed、已歸零後的全額退款）。
+package project
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+	"unicode/utf8"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
+)
+
+const (
+	kindOrderCompleted = "ORDER_COMPLETED"
+	kindRefundFull     = "REFUND_FULL"
+	kindRefundPartial  = "REFUND_PARTIAL"
+
+	prefixOrder  = "order:"
+	prefixRefund = "refund:"
+)
+
+// Deps 是投影的依賴。
+type Deps struct {
+	DB  *db.DB
+	Now func() time.Time
+}
+
+// Service 執行投影。
+type Service struct{ d Deps }
+
+// New 建立投影。
+func New(d Deps) *Service { return &Service{d: d} }
+
+func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
+
+func invalid(format string, args ...any) error {
+	return fmt.Errorf("%w：%s", model.ErrInvalidEvent, fmt.Sprintf(format, args...))
+}
+
+func checkCommon(key, orderNo string, storeID, buyerID int64) error {
+	switch {
+	case key == "" || len(key) > model.MaxEventKeyLen:
+		return invalid("冪等鍵為空或超過 %d", model.MaxEventKeyLen)
+	case orderNo == "" || utf8.RuneCountInString(orderNo) > model.MaxOrderNoLen:
+		return invalid("單號為空或超過 %d", model.MaxOrderNoLen)
+	case storeID <= 0 || buyerID <= 0:
+		return invalid("店家 %d 或買家 %d 不是正整數", storeID, buyerID)
+	}
+	return nil
+}
+
+// RecordOrderCompleted 記一筆完成的訂單：以 event_id 去重（重放回 recorded=false）。買家或店家已刪帳、退場時不寫任何東西（recorded=false）。
+func (s *Service) RecordOrderCompleted(ctx context.Context, e model.OrderCompleted) (bool, error) {
+	if err := checkCommon(e.EventID, e.OrderNo, e.StoreID, e.BuyerID); err != nil {
+		return false, err
+	}
+	if e.Amount < 0 {
+		return false, invalid("訂單金額 %d 為負", e.Amount)
+	}
+	return s.record(ctx, prefixOrder+e.EventID, kindOrderCompleted, e.OrderNo, e.StoreID, e.BuyerID, func(old state, fullRefunded bool) step {
+		return onOrderCompleted(old, e.Amount, fullRefunded)
+	}, true)
+}
+
+// RecordRefund 記一筆完成的退款：以 Refund.Key 去重。退款不建立客戶列（客戶只在首筆完成訂單時建立）；退款先到時只記在這單的淨額，
+// 訂單到時一併算進去。
+func (s *Service) RecordRefund(ctx context.Context, r model.Refund) (bool, error) {
+	if err := checkCommon(r.Key, r.OrderNo, r.StoreID, r.BuyerID); err != nil {
+		return false, err
+	}
+	if !r.Outcome.Valid() {
+		return false, invalid("未知的退款結果 %q", r.Outcome)
+	}
+	kind := kindRefundFull
+	if r.Outcome == model.RefundPartial {
+		if r.Amount <= 0 {
+			return false, invalid("部分退款金額 %d 必須為正", r.Amount)
+		}
+		kind = kindRefundPartial
+	}
+	return s.record(ctx, prefixRefund+r.Key, kind, r.OrderNo, r.StoreID, r.BuyerID, func(old state, _ bool) step {
+		return onRefund(old, r.Outcome, r.Amount)
+	}, false)
+}
+
+func (s *Service) record(ctx context.Context, dedupKey, kind, orderNo string, storeID, buyerID int64, apply func(old state, fullRefunded bool) step, createCustomer bool) (bool, error) {
+	recorded := false
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		recorded = false
+		q := s.q(ctx)
+		// 身分鎖（買家先於店家，共享模式）與 Deactivate 的獨占互斥，再查 inactive_parties：沒有這把鎖時，這裡讀到「未 inactive」之後、commit 之前，
+		// 訂閱者可以 commit 並由抹除 job 先跑完，這個 transaction 隨後 commit 會重建客戶。共享模式讓投影之間不互相排隊。
+		if err := q.LockPartyShared(ctx, store.LockPartySharedParams{Kind: "BUYER", PartyID: buyerID}); err != nil {
+			return err
+		}
+		if err := q.LockPartyShared(ctx, store.LockPartySharedParams{Kind: "STORE", PartyID: storeID}); err != nil {
+			return err
+		}
+		inactive, err := q.AnyInactiveParty(ctx, store.AnyInactivePartyParams{BuyerID: buyerID, StoreID: storeID})
+		if err != nil {
+			return err
+		}
+		if inactive {
+			return nil
+		}
+		now := s.d.Now().UTC()
+		old, err := q.LockOrderNet(ctx, store.LockOrderNetParams{OrderNo: orderNo, StoreID: storeID, BuyerID: buyerID, Now: now})
+		if err != nil {
+			return err
+		}
+		if old.StoreID != storeID || old.BuyerID != buyerID {
+			return fmt.Errorf("%w：單 %s 已記錄買家 %d、店家 %d，事件是買家 %d、店家 %d", model.ErrPartiesMismatch, orderNo, old.BuyerID, old.StoreID, buyerID, storeID)
+		}
+		n, err := q.InsertLedger(ctx, store.InsertLedgerParams{DedupKey: dedupKey, OrderNo: orderNo, Kind: kind})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return nil
+		}
+		recorded = true
+		fullRefunded, err := q.HasFullRefund(ctx, orderNo)
+		if err != nil {
+			return err
+		}
+		st := apply(state{Completed: old.Completed, Net: old.NetAmount}, fullRefunded)
+		if !st.Changed {
+			return nil
+		}
+		if err := q.SetOrderNet(ctx, store.SetOrderNetParams{Completed: st.Next.Completed, NetAmount: st.Next.Net, Now: now, OrderNo: orderNo}); err != nil {
+			return err
+		}
+		if createCustomer {
+			if err := q.UpsertCustomerOnOrder(ctx, store.UpsertCustomerOnOrderParams{StoreID: storeID, BuyerID: buyerID, Delta: st.Delta, Now: now}); err != nil {
+				return err
+			}
+		} else if st.Delta != 0 {
+			rows, err := q.AddCustomerSpent(ctx, store.AddCustomerSpentParams{Delta: st.Delta, Now: now, StoreID: storeID, BuyerID: buyerID})
+			if err != nil {
+				return err
+			}
+			if rows == 0 {
+				return errors.New("crm：訂單已完成但客戶列不存在")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return recorded, nil
+}

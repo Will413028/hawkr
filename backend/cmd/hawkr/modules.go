@@ -4,6 +4,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -36,6 +37,7 @@ func modules() []migrate.Module {
 		{Name: "moderation", Dir: moderation.Migrations()},
 		{Name: "review", Dir: review.Migrations()},
 		{Name: "im", Dir: im.Migrations()},
+		{Name: "crm", Dir: crm.Migrations()},
 	}
 }
 

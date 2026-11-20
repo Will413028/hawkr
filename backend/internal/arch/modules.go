@@ -27,7 +27,7 @@ var Dependencies = map[string][]string{
 	"aftersales":        {"ordering", "coupon", "payment", "fulfillment", "buyer", "seller", "media"},
 	"review":            {"ordering", "catalog", "buyer", "seller", "media"},
 	"im":                {"ordering", "buyer", "seller", "media"},
-	"crm":               {"ordering", "coupon", "buyer", "identity"},
+	"crm":               {"ordering", "buyer", "seller"}, // 刪帳訂閱 buyer.BuyerDeleted、seller.StoreRetired（A6-D18 W2）；A6-D8 去 identity、W3 去 coupon。
 	"finance":           {"aftersales", "ordering", "payment", "fulfillment"},
 	"social":            {"buyer", "seller", "media"},
 	"discovery":         {"ordering", "catalog", "buyer", "seller", "review"},
@@ -52,6 +52,15 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"crm": {Packages: map[string][]string{
+		"model":   {},
+		"project": {"model", "store"},
+		"purge":   {"store"},
+		"read":    {"model", "store", "text"},
+		"store":   {},
+		"text":    {},
+		"write":   {"model", "store", "text"},
+	}},
 	"im": {Packages: map[string][]string{
 		"live":     {"model", "store", "text"},
 		"mediaref": {"store"},

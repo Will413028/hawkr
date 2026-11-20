@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -234,6 +235,82 @@ func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
 	var n int64
 	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'STORE' AND party_id = $1", s.StoreID).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("im 的複本 %d %v", n, err)
+	}
+}
+
+func newCRM(f *fixture) *crm.Module {
+	return crm.New(crm.Deps{DB: f.db, Jobs: f.queue, NewID: uuid.NewV7, Now: time.Now})
+}
+
+// crm 的訂閱者在買家事件的 transaction 內只寫自己的 inactive_parties（複本）並排清除 job，所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// crm 的表還沒被寫（pg_locks 沒有 crm 的 RowExclusiveLock），放開後複本才寫入。客戶、單與 ledger 只在清除 job 的 transaction 內刪，不在刪帳的
+// transaction 內（訂閱者不碰那些列）。只訂 BuyerDeleted，所以申請進入等待時 crm 什麼都不寫。兩條路徑都量。
+func TestDeletionLocksBuyerAndSellerBeforeCrmRows(t *testing.T) {
+	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			f := setupWith(t, migrate.Module{Name: "crm", Dir: crm.Migrations()})
+			m := newCRM(f)
+			events.Subscribe(f.bus, m.OnBuyerDeleted)
+			id, buyerID := f.account(t)
+			s := f.store(t, id)
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO crm.customers (store_id, buyer_id, total_spent, order_count, first_order_at, updated_at)
+				VALUES ($1, $2, 100, 1, now(), now())`, s.StoreID, buyerID); err != nil {
+				t.Fatal(err)
+			}
+			f.orders.mu.Lock()
+			f.orders.open = open
+			f.orders.mu.Unlock()
+
+			crmTouched := func() bool {
+				var n int64
+				err := f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+					WHERE c.relnamespace = 'crm'::regnamespace AND l.mode IN ('RowExclusiveLock', 'RowShareLock') AND l.granted
+					AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`).Scan(&n)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return n > 0
+			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "crm 的表", crmTouched)
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.customers WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
+				t.Fatalf("訂閱者不刪客戶列：%d %v", n, err)
+			}
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.inactive_parties WHERE kind = 'BUYER' AND party_id = $1", buyerID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if want := int64(map[bool]int{true: 0, false: 1}[open]); n != want {
+				t.Fatalf("crm 的複本 %d，預期 %d（只訂 BuyerDeleted：申請進入等待時不寫，關閉時才寫）", n, want)
+			}
+		})
+	}
+}
+
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；crm 的訂閱者之後才寫自己的 inactive_parties，
+// 所以順序是 seller → crm。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
+func TestStoreRetiredLocksSellerBeforeCrmRows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setupWith(t, migrate.Module{Name: "crm", Dir: crm.Migrations()})
+	m := newCRM(f)
+	events.Subscribe(f.bus, m.OnStoreRetired)
+	id, _ := f.account(t)
+	s := f.store(t, id)
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		var n int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", s.StoreID).Scan(&n); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: s.StoreID, StoreCode: s.StoreCode, AccountID: id})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = $1", s.StoreID).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("crm 的複本 %d %v", n, err)
 	}
 }
 

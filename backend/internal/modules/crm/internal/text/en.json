@@ -1,0 +1,31 @@
+{
+  "default": {
+    "crm.customer_not_found": {
+      "message": "Customer not found"
+    },
+    "crm.customer_type_invalid": {
+      "message": "The customer type is not valid"
+    },
+    "crm.store_ids_invalid": {
+      "message": "Stores must be 1 to {max} positive integers"
+    },
+    "crm.tag_limit_customer": {
+      "message": "A customer can have at most {max} tags"
+    },
+    "crm.tag_limit_store": {
+      "message": "A store can have at most {max} tags"
+    },
+    "crm.tag_name_invalid": {
+      "message": "A tag name must be 1 to {max} characters and cannot be only whitespace"
+    },
+    "crm.tag_name_taken": {
+      "message": "A tag with this name already exists"
+    },
+    "crm.tag_names_invalid": {
+      "message": "Add between 1 and {max} tags at a time"
+    },
+    "crm.tag_not_found": {
+      "message": "Tag not found"
+    }
+  }
+}
