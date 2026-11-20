@@ -203,6 +203,7 @@
 | A6-D9 | 刪帳改由 review、im 訂閱 buyer、seller 的刪除事件，不由 accountdeletion 直接呼叫（Will 2026-11-19，A6-1a 開工審查第 5 項） | A6-1c、A6-2a |
 | A6-D10 | 提交評價先檢查訂單擁有者，不是自己的訂單回 NotFound，不照舊碼先查狀態（Will 2026-11-19，A6-1b code-review 第 4 項） | A6-1b |
 | A6-D11 | 店家評分統計的讀取（discovery、seller 的 `StoreRatingStats`）留在舊 review-service 到 A6-6e，與刪路由同一個變更才換成 review 模組並刪 `legacy/reviewservice`：A6-6e 前評價仍寫進舊服務，提早換會讓評分讀到空表，違反「並行期單一生效者」（Will 2026-11-20，A6-1c 開工） | A6-1c、A6-6e |
+| A6-D12 | `review.purge_author` 每批刪除後，同 tx 對該批涉及的 (店, 商品) 發 `ReviewAggregateChanged`；刪帳當下的 `ReviewAuthorDeactivated` 保留。理由：purge 先於 relay 跑完時 relay 列不到目標，Java 聚合會停在舊值；每批工作量有上限，不違反設計審查第 9 項（Will 2026-11-20，A6-1c 實作發現） | A6-1c |
 
 ## 基線
 

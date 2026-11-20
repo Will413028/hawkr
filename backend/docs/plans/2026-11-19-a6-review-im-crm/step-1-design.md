@@ -145,7 +145,7 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 - 照 social 的兩段式（`social.go:625-638`、`purge_integration_test.go`）：訂閱 `buyer.BuyerDeletionRequested` 與 `buyer.BuyerDeleted`（兩個都訂：沒有開啟中訂單時只發後者），同 transaction 只做原子的狀態變更：`INSERT INTO review.inactive_authors (buyer_id) ON CONFLICT DO NOTHING` 並排一個 `review.purge_author` job（唯一鍵 buyer_id）。不在訂閱者內刪列：刪帳者的評價筆數沒有上限，而單體規則 4 限定同 transaction 訂閱者只做原子狀態變更。
 - 公開可讀述詞加 `NOT EXISTS (review.inactive_authors WHERE buyer_id = r.buyer_id)`，統計同述詞：評價在刪帳申請的那個 transaction 起就看不到、不計分。不讀 `buyer.pub_inactive_buyers()`（`buyer/db/pub.sql:16-18` 限定只給每日對帳）。
 - `review.purge_author` job：依 `id` 升序分批刪除該買家的評價（圖片列 CASCADE），每批記退場 asset、排媒體同步 job、排 `revalidate`。可重跑（從現況推導：還有列就刪）。
-- 訂閱者在寫入 `inactive_authors` 時只發一個 `ReviewAuthorDeactivated{BuyerID}`（transaction 內工作量固定）；reviewrelay 的 job 在 transaction 外列出該買家評過的 (store, product)，逐組重算並送 `review.hidden`，Java 的聚合在刪帳當下就開始更新，不等 purge（Will 2026-11-19，審查第 9 項）。
+- 訂閱者在寫入 `inactive_authors` 時只發一個 `ReviewAuthorDeactivated{BuyerID}`（transaction 內工作量固定）；reviewrelay 的 job 在 transaction 外列出該買家評過的 (store, product)，逐組重算並送 `review.hidden`，Java 的聚合在刪帳當下就開始更新，不等 purge（Will 2026-11-19，審查第 9 項）。purge job 每批刪除後同 tx 對該批的 (店, 商品) 發 `ReviewAggregateChanged`，保證 purge 先跑完時聚合仍會收斂（計畫 A6-D12）。
 - `Submit` 在第 4 步後查 `review.inactive_authors`，有列就 `FailedPrecondition`（刪除中的買家仍有開啟中訂單，之後完成的訂單不能再評）。
 
 ## 4. 事件與 relay
