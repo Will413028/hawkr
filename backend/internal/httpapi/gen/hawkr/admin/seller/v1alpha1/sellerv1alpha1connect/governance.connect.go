@@ -195,12 +195,12 @@ type SellerGovernanceAdminServiceClient interface {
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
-	// 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+	// 詢問建立後即出現在賣家中心，賣家在那裡回覆；推播與 email 由通知功能處理。
 	CreateCaseInquiry(context.Context, *connect.Request[v1alpha1.CreateCaseInquiryRequest]) (*connect.Response[v1alpha1.CreateCaseInquiryResponse], error)
 	// ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
 	ListCaseInquiries(context.Context, *connect.Request[v1alpha1.ListCaseInquiriesRequest]) (*connect.Response[v1alpha1.ListCaseInquiriesResponse], error)
 	// RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
-	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。管道不能選 SELLER_CENTER（那是賣家自己在賣家中心的回覆），選了回 invalid_argument。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
 	// （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
 	RecordCaseInquiryReply(context.Context, *connect.Request[v1alpha1.RecordCaseInquiryReplyRequest]) (*connect.Response[v1alpha1.RecordCaseInquiryReplyResponse], error)
 	// WithdrawCaseInquiry 撤回還沒回覆的詢問（賣家不必再回覆）。案件因決定或通報都移走而結案時，還沒結束的詢問由系統撤回（withdraw_cause 是 CASE_CLOSED）。
@@ -827,12 +827,12 @@ type SellerGovernanceAdminServiceHandler interface {
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
-	// 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+	// 詢問建立後即出現在賣家中心，賣家在那裡回覆；推播與 email 由通知功能處理。
 	CreateCaseInquiry(context.Context, *connect.Request[v1alpha1.CreateCaseInquiryRequest]) (*connect.Response[v1alpha1.CreateCaseInquiryResponse], error)
 	// ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
 	ListCaseInquiries(context.Context, *connect.Request[v1alpha1.ListCaseInquiriesRequest]) (*connect.Response[v1alpha1.ListCaseInquiriesResponse], error)
 	// RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
-	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。管道不能選 SELLER_CENTER（那是賣家自己在賣家中心的回覆），選了回 invalid_argument。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
 	// （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
 	RecordCaseInquiryReply(context.Context, *connect.Request[v1alpha1.RecordCaseInquiryReplyRequest]) (*connect.Response[v1alpha1.RecordCaseInquiryReplyResponse], error)
 	// WithdrawCaseInquiry 撤回還沒回覆的詢問（賣家不必再回覆）。案件因決定或通報都移走而結案時，還沒結束的詢問由系統撤回（withdraw_cause 是 CASE_CLOSED）。

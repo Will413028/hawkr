@@ -40,6 +40,9 @@ type Module interface {
 	AccountMeasure(ctx context.Context, accountID int64, measureID uuid.UUID) (model.Measure, error)
 	SubmitAppeal(context.Context, model.SubmitAppealInput) (model.Measure, error)
 	RequestRemediation(context.Context, model.RequestRemediationInput) (model.Measure, error)
+	AccountInquiries(context.Context, model.AccountInquiryListInput) (model.SellerInquiryPage, error)
+	AccountInquiry(ctx context.Context, accountID int64, inquiryID uuid.UUID) (model.SellerInquiry, error)
+	ReplyToInquiry(context.Context, model.ReplyToInquiryInput) (model.SellerInquiry, error)
 	blockModule
 }
 
