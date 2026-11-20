@@ -38,17 +38,29 @@ func (q *Queries) DeletePresenceStreams(ctx context.Context, ids []uuid.UUID) er
 }
 
 const extendPresenceStreams = `-- name: ExtendPresenceStreams :execrows
-UPDATE im.presence_streams SET expires_at = now() + $1::bigint * interval '1 millisecond'
-WHERE stream_id = ANY($2::uuid[])
+INSERT INTO im.presence_streams (stream_id, kind, party_id, expires_at)
+SELECT a.stream_id, k.kind, p.party_id, now() + $1::bigint * interval '1 millisecond'
+FROM unnest($2::uuid[]) WITH ORDINALITY AS a(stream_id, n)
+JOIN unnest($3::text[]) WITH ORDINALITY AS k(kind, n) ON k.n = a.n
+JOIN unnest($4::bigint[]) WITH ORDINALITY AS p(party_id, n) ON p.n = a.n
+ON CONFLICT (stream_id) DO UPDATE SET expires_at = EXCLUDED.expires_at
 `
 
 type ExtendPresenceStreamsParams struct {
-	TtlMs int64
-	Ids   []uuid.UUID
+	TtlMs    int64
+	Ids      []uuid.UUID
+	Kinds    []string
+	PartyIds []int64
 }
 
+// 延長仍在跑的串流的存活期；列被清掉（過期超過清理門檻、或資料庫重啟後 UNLOGGED 表是空的）的串流以同一句補回，所以仍被計數、仍顯示在線。
 func (q *Queries) ExtendPresenceStreams(ctx context.Context, arg ExtendPresenceStreamsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, extendPresenceStreams, arg.TtlMs, arg.Ids)
+	result, err := q.db.Exec(ctx, extendPresenceStreams,
+		arg.TtlMs,
+		arg.Ids,
+		arg.Kinds,
+		arg.PartyIds,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -97,7 +109,7 @@ func (q *Queries) IsPartyOnline(ctx context.Context, arg IsPartyOnlineParams) (b
 }
 
 const lockPartyStreams = `-- name: LockPartyStreams :exec
-SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || $2::bigint::text, 0))
+SELECT pg_advisory_xact_lock(hashtextextended('im.streams:' || $1::text || ':' || $2::bigint::text, 0))
 `
 
 type LockPartyStreamsParams struct {

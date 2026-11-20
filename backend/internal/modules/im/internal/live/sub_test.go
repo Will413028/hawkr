@@ -1,6 +1,7 @@
 package live
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
@@ -161,8 +162,8 @@ func TestMarkNeverBlocksOnAStalledConsumer(t *testing.T) {
 	<-done
 }
 
-// 重連後的 epoch：已交出游標的對話從游標補讀；不在游標裡的對話只對有新訊息的交 Resync{conversation}，沒有 Resync{all}。
-func TestEpochReadsFromCursorsAndResyncsOnlyActiveUnknownConversations(t *testing.T) {
+// 連上後的 epoch：已交出游標的對話從游標補讀並各交 Resync{conversation}；不在游標裡的對話只對有新訊息的交 Resync{conversation}，沒有 Resync{all}。
+func TestEpochReadsFromCursorsAndResyncsDeliveredAndActiveUnknownConversations(t *testing.T) {
 	t.Parallel()
 	r := newFakeReader()
 	h := newTestHub(t, r, Config{})
@@ -176,7 +177,6 @@ func TestEpochReadsFromCursorsAndResyncsOnlyActiveUnknownConversations(t *testin
 	r.add(known, 2, model.PartyStore)
 	r.add(known, 3, model.PartyStore)
 	r.active = []uuid.UUID{known, active}
-	_ = quiet
 	h.epoch(time.Unix(100, 0))
 	evs := drain(t, sub)
 	if got := seqs(evs, false); !slices.Equal(got, []int64{2, 3}) {
@@ -191,8 +191,8 @@ func TestEpochReadsFromCursorsAndResyncsOnlyActiveUnknownConversations(t *testin
 			resync = append(resync, e.ConversationID)
 		}
 	}
-	if !slices.Equal(resync, []uuid.UUID{active}) {
-		t.Fatalf("Resync 的對話 %v，預期只有 %v", resync, active)
+	if !slices.Equal(resync, []uuid.UUID{known, active}) {
+		t.Fatalf("Resync 的對話 %v，預期已交出游標的 %v 與中斷期間有訊息的 %v（安靜的 %v 沒有）", resync, known, active, quiet)
 	}
 }
 
@@ -305,5 +305,64 @@ func TestRevalidateReplacesThePartySnapshotAndEndsOnLostEligibility(t *testing.T
 	}
 	if h.streams.(*fakeStreams).deleted != 1 {
 		t.Fatal("結束時要刪存活標記")
+	}
+}
+
+// 延長批次帶每條串流的身分（kind 與 party），讓資料庫端能把已被清掉的列補回。
+func TestBeatExtendsEveryStreamWithItsIdentity(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	tick := make(chan time.Time)
+	streams := &fakeStreams{now: fakeDatabaseStart}
+	h := newTestHubStreams(t, newFakeReader(), streams, Config{
+		NewTicker: func(time.Duration) (<-chan time.Time, func()) { return tick, func() {} },
+	})
+	a, err := h.Subscribe(ctx, buyerParty(5), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := h.Subscribe(ctx, storeParty(5), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { defer close(done); h.beatLoop(ctx) }()
+	tick <- time.Time{}
+	tick <- time.Time{}
+	cancel()
+	<-done
+	streams.mu.Lock()
+	defer streams.mu.Unlock()
+	if len(streams.extended) == 0 {
+		t.Fatal("沒有延長")
+	}
+	want := map[Stream]bool{
+		{ID: a.id, Kind: model.PartyBuyer, PartyID: 5}: true,
+		{ID: b.id, Kind: model.PartyStore, PartyID: 5}: true,
+	}
+	got := streams.extended[0]
+	if len(got) != len(want) {
+		t.Fatalf("延長 %+v，預期 %+v", got, want)
+	}
+	for _, st := range got {
+		if !want[st] {
+			t.Fatalf("延長了不認得的 %+v，預期 %+v", st, want)
+		}
+	}
+}
+
+// ctx 在 Subscribe 的同時被取消：停止函式的指派與 Close 的讀取不能互相競爭（go test -race 才會抓到）。
+func TestSubscribeWithConcurrentlyCancelledContextHasNoRace(t *testing.T) {
+	t.Parallel()
+	h := newTestHub(t, newFakeReader(), Config{})
+	for range 200 {
+		ctx, cancel := context.WithCancel(t.Context())
+		go cancel()
+		s, err := h.Subscribe(ctx, buyerParty(5), nil)
+		if err == nil {
+			s.Close()
+		}
+		cancel()
 	}
 }

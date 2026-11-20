@@ -84,14 +84,14 @@ VALUES (
     $1, $2, $3, 1,
     CASE WHEN $4::text = 'BUYER' THEN 1 ELSE 0 END,
     CASE WHEN $4::text = 'STORE' THEN 1 ELSE 0 END,
-    now(), now()
+    clock_timestamp(), now()
 )
 ON CONFLICT (buyer_id, store_id) DO UPDATE
 SET last_seq = im.conversations.last_seq + 1,
     buyer_last_read_seq = CASE WHEN $4::text = 'BUYER' THEN im.conversations.last_seq + 1 ELSE im.conversations.buyer_last_read_seq END,
     store_last_read_seq = CASE WHEN $4::text = 'STORE' THEN im.conversations.last_seq + 1 ELSE im.conversations.store_last_read_seq END,
-    last_message_at = now()
-RETURNING id, last_seq, (xmax = 0) AS created
+    last_message_at = GREATEST(im.conversations.last_message_at, clock_timestamp())
+RETURNING id, last_seq, (xmax = 0) AS created, last_message_at
 `
 
 type AllocateSeqParams struct {
@@ -102,14 +102,16 @@ type AllocateSeqParams struct {
 }
 
 type AllocateSeqRow struct {
-	ID      uuid.UUID
-	LastSeq int64
-	Created bool
+	ID            uuid.UUID
+	LastSeq       int64
+	Created       bool
+	LastMessageAt time.Time
 }
 
 // 對話列：建立、配發 seq、已讀游標、列表與未讀。
 // 同一句 SQL 建立對話（還不存在時）、配發 seq，並把寄件人那一方的已讀游標推到新的 seq。並行送出在 ON CONFLICT 的列鎖上排隊，
-// 所以 seq 連續而且不重複；SET 右側讀的是更新前的列。last_message_at 只由資料庫 now() 寫入：監聽重連的補洞以資料庫時間比較。
+// 所以 seq 連續而且不重複；SET 右側讀的是更新前的列。last_message_at 只由資料庫的 clock_timestamp() 寫入（取更新前的值與它的較大者，
+// 所以不會倒退），並回傳給呼叫者當這則訊息的時間：監聽重連的補洞以資料庫時間比較，訊息的 created_at 與事件時間用同一個值。
 func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (AllocateSeqRow, error) {
 	row := q.db.QueryRow(ctx, allocateSeq,
 		arg.NewID,
@@ -118,14 +120,20 @@ func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (Alloc
 		arg.SenderKind,
 	)
 	var i AllocateSeqRow
-	err := row.Scan(&i.ID, &i.LastSeq, &i.Created)
+	err := row.Scan(
+		&i.ID,
+		&i.LastSeq,
+		&i.Created,
+		&i.LastMessageAt,
+	)
 	return i, err
 }
 
 const databaseNow = `-- name: DatabaseNow :one
-SELECT now()::timestamptz
+SELECT clock_timestamp()::timestamptz
 `
 
+// 監聽迴圈啟動時讀一次資料庫時間當作第一個補洞起點。用 clock_timestamp()：存活確認的 SELECT now() 是測試與維運辨認監聽連線的字首。
 func (q *Queries) DatabaseNow(ctx context.Context) (time.Time, error) {
 	row := q.db.QueryRow(ctx, databaseNow)
 	var column_1 time.Time
@@ -331,11 +339,17 @@ func (q *Queries) MarkAllReadStore(ctx context.Context, storeID int64) (int64, e
 }
 
 const markReadBuyer = `-- name: MarkReadBuyer :one
+WITH prev AS (
+    SELECT o.id, o.buyer_last_read_seq AS read_seq FROM im.conversations AS o
+    WHERE o.id = $2 AND o.buyer_id = $3
+    FOR UPDATE
+)
 UPDATE im.conversations AS c
 SET buyer_last_read_seq = GREATEST(c.buyer_last_read_seq, LEAST($1::bigint, c.last_seq))
-WHERE c.id = $2 AND c.buyer_id = $3
+FROM prev
+WHERE c.id = prev.id
 RETURNING c.buyer_last_read_seq AS read_seq, c.last_seq, c.buyer_id, c.store_id,
-          (c.buyer_last_read_seq > (SELECT p.buyer_last_read_seq FROM im.conversations AS p WHERE p.id = c.id))::boolean AS advanced
+          (c.buyer_last_read_seq > prev.read_seq)::boolean AS advanced
 `
 
 type MarkReadBuyerParams struct {
@@ -352,7 +366,8 @@ type MarkReadBuyerRow struct {
 	Advanced bool
 }
 
-// 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：RETURNING 裡的子查詢讀的是語句開始時的快照，即更新前的值。
+// 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：先 FOR UPDATE 鎖住並讀出
+// 更新前的值（並行的 MarkRead 在這裡排隊，拿到的是對方提交後的值），再與它比較，所以同一次前進只會有一個呼叫者得到 advanced。
 func (q *Queries) MarkReadBuyer(ctx context.Context, arg MarkReadBuyerParams) (MarkReadBuyerRow, error) {
 	row := q.db.QueryRow(ctx, markReadBuyer, arg.UptoSeq, arg.ID, arg.BuyerID)
 	var i MarkReadBuyerRow
@@ -367,11 +382,17 @@ func (q *Queries) MarkReadBuyer(ctx context.Context, arg MarkReadBuyerParams) (M
 }
 
 const markReadStore = `-- name: MarkReadStore :one
+WITH prev AS (
+    SELECT o.id, o.store_last_read_seq AS read_seq FROM im.conversations AS o
+    WHERE o.id = $2 AND o.store_id = $3
+    FOR UPDATE
+)
 UPDATE im.conversations AS c
 SET store_last_read_seq = GREATEST(c.store_last_read_seq, LEAST($1::bigint, c.last_seq))
-WHERE c.id = $2 AND c.store_id = $3
+FROM prev
+WHERE c.id = prev.id
 RETURNING c.store_last_read_seq AS read_seq, c.last_seq, c.buyer_id, c.store_id,
-          (c.store_last_read_seq > (SELECT p.store_last_read_seq FROM im.conversations AS p WHERE p.id = c.id))::boolean AS advanced
+          (c.store_last_read_seq > prev.read_seq)::boolean AS advanced
 `
 
 type MarkReadStoreParams struct {

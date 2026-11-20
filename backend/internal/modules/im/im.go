@@ -8,6 +8,7 @@ import (
 	"embed"
 	"io/fs"
 	"log/slog"
+	"slices"
 	"time"
 	"uuid"
 
@@ -279,13 +280,14 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描、抹除與其保底掃描）。由 cmd/hawkr 接上。
+// AddWorkers 登記 River worker（媒體引用同步與保底掃描、抹除與其保底掃描、存活標記清理）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
+	live.AddWorkers(workers, live.DBStreams{DB: m.pool})
 }
 
-// PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除）。
+// PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除、存活標記清理）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	return append(mediaref.PeriodicJobs(), purge.PeriodicJobs()...)
+	return slices.Concat(mediaref.PeriodicJobs(), purge.PeriodicJobs(), live.PeriodicJobs())
 }

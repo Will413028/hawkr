@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -65,9 +66,13 @@ func (f *fakeReader) ActiveSince(context.Context, model.Party, time.Time, int) (
 }
 
 type fakeStreams struct {
-	mu      sync.Mutex
-	open    int
-	deleted int
+	mu       sync.Mutex
+	open     int
+	deleted  int
+	extended [][]Stream
+	now      time.Time
+	nowErrs  int
+	nowCalls int
 }
 
 func (f *fakeStreams) Open(context.Context, model.PartyKind, int64, uuid.UUID, int, time.Duration) error {
@@ -76,7 +81,23 @@ func (f *fakeStreams) Open(context.Context, model.PartyKind, int64, uuid.UUID, i
 	f.open++
 	return nil
 }
-func (f *fakeStreams) Extend(context.Context, []uuid.UUID, time.Duration) error { return nil }
+func (f *fakeStreams) Extend(_ context.Context, streams []Stream, _ time.Duration) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.extended = append(f.extended, slices.Clone(streams))
+	return nil
+}
+
+func (f *fakeStreams) DatabaseNow(context.Context) (time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nowCalls++
+	if f.nowErrs > 0 {
+		f.nowErrs--
+		return time.Time{}, errors.New("db down")
+	}
+	return f.now, nil
+}
 func (f *fakeStreams) Delete(_ context.Context, ids []uuid.UUID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -84,12 +105,20 @@ func (f *fakeStreams) Delete(_ context.Context, ids []uuid.UUID) error {
 	return nil
 }
 
+// fakeDatabaseStart 是 fakeStreams 預設的資料庫時間：晚於各測試自己用的存活確認時間。
+var fakeDatabaseStart = time.Unix(5000, 0)
+
 func newTestHub(t *testing.T, r Reader, cfg Config) *Hub {
+	t.Helper()
+	return newTestHubStreams(t, r, &fakeStreams{now: fakeDatabaseStart}, cfg)
+}
+
+func newTestHubStreams(t *testing.T, r Reader, s Streams, cfg Config) *Hub {
 	t.Helper()
 	if cfg.NewID == nil {
 		cfg.NewID = uuid.NewV7
 	}
-	return NewHub(r, &fakeStreams{}, cfg)
+	return NewHub(r, s, cfg)
 }
 
 func buyerParty(id int64) model.Party { return model.Party{Kind: model.PartyBuyer, BuyerID: id} }

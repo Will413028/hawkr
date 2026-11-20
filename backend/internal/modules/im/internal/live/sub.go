@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"errors"
+	"maps"
 	"math"
 	"slices"
 	"sync"
@@ -136,7 +137,8 @@ func (s *Subscription) markUnread() {
 	s.wakeLocked()
 }
 
-// epoch 在監聽連線重連之後呼叫：已交出游標的對話都視為有訊號（從游標讀到最新），不在游標裡的對話只對中斷期間有訊息的交 Resync。
+// epoch 在監聽連線連上之後呼叫：已交出游標的對話都視為有訊號（從游標讀到最新），並交 Resync{conversation}（中斷期間的隱藏、還原、已讀不經游標補得回來，
+// client 重取該對話）；不在游標裡的對話只對中斷期間有訊息的交 Resync。
 func (s *Subscription) epoch(since time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -335,7 +337,8 @@ func (s *Subscription) process(ctx context.Context, w work) error {
 	return nil
 }
 
-// activeResync 對監聽中斷期間有新訊息、而且不在已交出游標裡的對話交 Resync（過多就整體 Resync）。回傳是否有交出。
+// activeResync 在監聽中斷之後交 Resync：已交出游標的每個對話（隱藏、還原、已讀的變化不經游標），加上中斷期間有新訊息、而且不在游標裡的對話；
+// 對話過多就整體 Resync。回傳是否有交出整體 Resync。
 func (s *Subscription) activeResync(ctx context.Context, w work, r *result) (bool, error) {
 	limit := s.h.cfg.MaxPending
 	ids, err := s.h.reader.ActiveSince(ctx, w.party, w.since, limit+1)
@@ -346,14 +349,24 @@ func (s *Subscription) activeResync(ctx context.Context, w work, r *result) (boo
 		r.evs = append(r.evs, Event{Kind: EventResync, All: true})
 		return true, nil
 	}
+	known := s.deliveredSnapshot()
+	for _, c := range sortedConvs(known) {
+		r.evs = append(r.evs, Event{Kind: EventResync, ConversationID: c})
+	}
 	slices.SortFunc(ids, uuid.UUID.Compare)
 	for _, c := range ids {
-		if _, ok := s.deliveredOf(c); ok {
+		if _, ok := known[c]; ok {
 			continue
 		}
 		r.evs = append(r.evs, Event{Kind: EventResync, ConversationID: c})
 	}
 	return false, nil
+}
+
+func (s *Subscription) deliveredSnapshot() map[uuid.UUID]int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return maps.Clone(s.delivered)
 }
 
 // readConversation 回傳這個對話是否交出了別人寄的訊息（總未讀可能改變）。

@@ -192,7 +192,6 @@ func (w *worker) Timeout(*river.Job[ErasePartyArgs]) time.Duration { return 5 * 
 func AddWorkers(workers *river.Workers, s *Service) {
 	river.AddWorker(workers, &worker{svc: s})
 	river.AddWorker(workers, &sweepWorker{svc: s})
-	river.AddWorker(workers, &presenceSweepWorker{svc: s})
 }
 
 // SweepArgs 是抹除的保底掃描。
@@ -220,50 +219,13 @@ func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[SweepArgs]) error {
 // Timeout 是一次掃描的時間上限。
 func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return time.Minute }
 
-// PresenceSweepArgs 清掉過期超過 10 分鐘的串流存活標記（崩潰的進程沒有 Close）。
-type PresenceSweepArgs struct{}
-
-// Kind 是 River 的 job 種類。
-func (PresenceSweepArgs) Kind() string { return "im.presence_sweep" }
-
-// InsertOpts 以 SweepInterval 為唯一性的時間窗。
-func (PresenceSweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByPeriod: SweepInterval}}
-}
-
-type presenceSweepWorker struct {
-	river.WorkerDefaults[PresenceSweepArgs]
-	svc *Service
-}
-
-// Work 清理過期的存活標記。
-func (w *presenceSweepWorker) Work(ctx context.Context, _ *river.Job[PresenceSweepArgs]) error {
-	_, err := w.svc.SweepPresence(ctx)
-	return err
-}
-
-// Timeout 是一次清理的時間上限。
-func (w *presenceSweepWorker) Timeout(*river.Job[PresenceSweepArgs]) time.Duration {
-	return time.Minute
-}
-
-// SweepPresence 刪除過期超過 10 分鐘的存活標記，回傳刪除的列數；讀取只認未過期的列，所以這只是清理。
-func (s *Service) SweepPresence(ctx context.Context) (int64, error) {
-	return s.q(ctx).SweepPresenceStreams(ctx)
-}
-
-// PeriodicJobs 回傳啟動即執行、每 SweepInterval 的抹除保底掃描與存活標記清理。
+// PeriodicJobs 回傳啟動即執行、每 SweepInterval 的抹除保底掃描。
 func PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(
 			river.PeriodicInterval(SweepInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
 			&river.PeriodicJobOpts{ID: "im.erase_sweep", RunOnStart: true},
-		),
-		river.NewPeriodicJob(
-			river.PeriodicInterval(SweepInterval),
-			func() (river.JobArgs, *river.InsertOpts) { return PresenceSweepArgs{}, nil },
-			&river.PeriodicJobOpts{ID: "im.presence_sweep", RunOnStart: true},
 		),
 	}
 }

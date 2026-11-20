@@ -15,7 +15,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 `Orders`、`Buyers`、`Stores` port。
-- `internal/write`（送出與守門、已讀、隱藏、還原）、`internal/read`（列表、訊息、未讀、relay 讀取）、`internal/rows`（列轉對外型別、墓碑與預覽推導）、`internal/mediaref`（媒體引用同步，照 review）、`internal/live`（即時通道：通知、LISTEN 連線、Hub、訂閱者）、`internal/purge`（刪帳與退場的訂閱者邏輯、抹除 job 與存活標記清理）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
+- `internal/write`（送出與守門、已讀、隱藏、還原）、`internal/read`（列表、訊息、未讀、relay 讀取）、`internal/rows`（列轉對外型別、墓碑與預覽推導）、`internal/mediaref`（媒體引用同步，照 review）、`internal/live`（即時通道：通知、LISTEN 連線、Hub、訂閱者、存活標記與其清理 job）、`internal/purge`（刪帳與退場的訂閱者邏輯、抹除 job 與保底掃描）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 訂單由 `Orders` port 取（`cmd/hawkr/im.go` 以 `legacy/orderservice` 實作，ordering 搬進單體後換）；`Buyers`、`Stores` 傳 `*buyer.Module`、`*seller.Module`。
 

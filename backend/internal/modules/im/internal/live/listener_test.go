@@ -99,3 +99,59 @@ func TestListenLoopBacksOffResetsAndSignalsEpoch(t *testing.T) {
 		t.Errorf("連線成功後退避要重置：%v", sleeps[7])
 	}
 }
+
+// 第一條連線的 epoch 帶的是啟動時讀到的資料庫時間：在第一次 LISTEN 成功之前就開的串流也會補洞。
+func TestFirstConnectionEpochCarriesTheStartupDatabaseTime(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	start := time.Unix(777, 0)
+	streams := &fakeStreams{now: start}
+	h := newTestHubStreams(t, newFakeReader(), streams, Config{
+		Sleep:     func(context.Context, time.Duration) error { return nil },
+		NewTicker: func(time.Duration) (<-chan time.Time, func()) { return make(chan time.Time), func() {} },
+	})
+	sub, err := h.Subscribe(ctx, buyerParty(5), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var since time.Time
+	dial := func(context.Context) (Conn, error) {
+		return &fakeConn{alive: time.Unix(900, 0), wait: func(ctx context.Context) error {
+			sub.mu.Lock()
+			since = sub.since
+			sub.mu.Unlock()
+			cancel()
+			return ctx.Err()
+		}}, nil
+	}
+	h.listenLoop(ctx, dial)
+	if !since.Equal(start) {
+		t.Fatalf("第一次 epoch 帶 %v，預期啟動時的資料庫時間 %v", since, start)
+	}
+}
+
+// 讀不到資料庫時間就退避重試，成功之前不撥號。
+func TestListenLoopRetriesTheStartupTimeBeforeDialing(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	streams := &fakeStreams{now: time.Unix(777, 0), nowErrs: 2}
+	sleeps := 0
+	h := newTestHubStreams(t, newFakeReader(), streams, Config{
+		Sleep:     func(context.Context, time.Duration) error { sleeps++; return nil },
+		NewTicker: func(time.Duration) (<-chan time.Time, func()) { return make(chan time.Time), func() {} },
+	})
+	callsAtDial := -1
+	dial := func(context.Context) (Conn, error) {
+		streams.mu.Lock()
+		callsAtDial = streams.nowCalls
+		streams.mu.Unlock()
+		cancel()
+		return nil, errors.New("stop")
+	}
+	h.listenLoop(ctx, dial)
+	if callsAtDial != 3 || sleeps != 2 {
+		t.Fatalf("撥號時已讀 %d 次資料庫時間、退避 %d 次，預期 3 與 2", callsAtDial, sleeps)
+	}
+}

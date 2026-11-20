@@ -166,12 +166,14 @@ func (h *Hub) Subscribe(ctx context.Context, p model.Party, cursors map[uuid.UUI
 		h.deleteRows(context.WithoutCancel(ctx), []uuid.UUID{id})
 		return nil, &Ended{Reason: EndShutdown}
 	}
+	s.mu.Lock()
+	s.stopCtx = context.AfterFunc(ctx, s.Close)
+	s.mu.Unlock()
 	if h.subs[s.key] == nil {
 		h.subs[s.key] = map[*Subscription]struct{}{}
 	}
 	h.subs[s.key][s] = struct{}{}
 	h.mu.Unlock()
-	s.stopCtx = context.AfterFunc(ctx, s.Close)
 	if h.AfterRegister != nil {
 		h.AfterRegister()
 	}
@@ -310,11 +312,11 @@ func (h *Hub) beatLoop(ctx context.Context) {
 			fails = 0
 			continue
 		}
-		ids := make([]uuid.UUID, len(subs))
+		streams := make([]Stream, len(subs))
 		for i, s := range subs {
-			ids[i] = s.id
+			streams[i] = Stream{ID: s.id, Kind: s.key.kind, PartyID: s.key.id}
 		}
-		if err := h.streams.Extend(ctx, ids, h.cfg.PresenceTTL); err != nil {
+		if err := h.streams.Extend(ctx, streams, h.cfg.PresenceTTL); err != nil {
 			if ctx.Err() != nil {
 				return
 			}

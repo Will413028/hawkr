@@ -19,7 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// T1：NOTIFY 只在 commit 後送達；payload 欄位正確。
+// NOTIFY 只在 commit 後送達；payload 欄位正確。
 func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -52,7 +52,7 @@ func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 	}
 }
 
-// T2：兩個進程（各自的 hub 與專用連線）共用一個資料庫：A 送出、B 的訂閱者收到。
+// 兩個進程（各自的 hub 與專用連線）共用一個資料庫：A 送出、B 的訂閱者收到。
 func TestSubscriberOnAnotherModuleReceivesTheMessage(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -68,7 +68,7 @@ func TestSubscriberOnAnotherModuleReceivesTheMessage(t *testing.T) {
 	}
 }
 
-// T3：監聽連線被殺：期間在 delivered 內的對話送出 3 則，重連後以 epoch 補齊，順序正確、不重複。
+// 監聽連線被殺：期間在 delivered 內的對話送出 3 則，重連後以 epoch 補齊，順序正確、不重複。
 func TestListenerReconnectBackfillsDeliveredConversations(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -111,7 +111,7 @@ func TestListenerReconnectBackfillsDeliveredConversations(t *testing.T) {
 	}
 }
 
-// T3b：重連的 Resync 範圍：只有中斷期間有新訊息、且不在 delivered 的對話收到 Resync{conversation}；十個訂閱者同時重連沒有 Resync{all}。
+// 重連的 Resync 範圍：中斷期間有新訊息、且不在 delivered 的對話收到 Resync{conversation}；十個訂閱者同時重連沒有 Resync{all}。
 func TestListenerReconnectResyncsOnlyActiveUnknownConversations(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -150,7 +150,7 @@ func TestListenerReconnectResyncsOnlyActiveUnknownConversations(t *testing.T) {
 	}
 }
 
-// T4：登記先於補洞：補洞讀取前後各插入一則，兩則都恰好收到一次。
+// 登記先於補洞：補洞讀取前後各插入一則，兩則都恰好收到一次。
 func TestRegisterPrecedesBackfill(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -178,7 +178,7 @@ func (f *fixture) hideInput(id uuid.UUID) im.HideInput {
 	return im.HideInput{MessageID: id, AdminID: 1, Category: string(policy.CommunityAssessable()[0])}
 }
 
-// T5：Hide、Restore 在外層 transaction：回滾不發；commit 後雙方收到 Message{Updated}（墓碑 → 還原），seq 相同。
+// Hide、Restore 在外層 transaction：回滾不發；commit 後雙方收到 Message{Updated}（墓碑 → 還原），seq 相同。
 func TestHideAndRestoreNotifyOnlyAfterCommit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -229,7 +229,7 @@ func TestHideAndRestoreNotifyOnlyAfterCommit(t *testing.T) {
 	}
 }
 
-// T6：身分隔離：buyer_id＝store_id＝5 互相收不到對方的對話；別人的對話 ID 作游標被忽略；偽造通知不會讓別人讀到內容。
+// 身分隔離：buyer_id＝store_id＝5 互相收不到對方的對話；別人的對話 ID 作游標被忽略；偽造通知不會讓別人讀到內容。
 func TestPartyIdentityIsolation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -262,7 +262,7 @@ func TestPartyIdentityIsolation(t *testing.T) {
 	}
 }
 
-// T7：慢消費者：訂閱者不 Next，1000 則橫跨 600 個對話的送出全部完成（mark 不阻塞）；恢復後收到 Resync{all}。
+// 慢消費者：訂閱者不 Next，1000 則橫跨 600 個對話的送出全部完成（mark 不阻塞）；恢復後收到 Resync{all}。
 func TestStalledSubscriberDoesNotBlockSendAndResyncsOnResume(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -290,7 +290,7 @@ func TestStalledSubscriberDoesNotBlockSendAndResyncsOnResume(t *testing.T) {
 	}
 }
 
-// T8：Revalidate：關店 → LostEligibility；停權 → 不結束且仍收訊息。
+// Revalidate：關店 → LostEligibility；停權 → 不結束且仍收訊息。
 func TestRevalidateEndsOnClosedStoreButNotOnSuspension(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -328,7 +328,7 @@ func asEnded(err error, target **im.Ended) bool {
 	return errors.As(err, target)
 }
 
-// T9：Run 的 ctx 結束 → 全部 Shutdown、presence 列已刪。
+// Run 的 ctx 結束 → 全部 Shutdown、presence 列已刪。
 func TestRunShutdownEndsEverySubscriptionAndDeletesRows(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -351,7 +351,7 @@ func TestRunShutdownEndsEverySubscriptionAndDeletesRows(t *testing.T) {
 	}
 }
 
-// T10：未讀。
+// 未讀。
 func TestUnreadEvents(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -415,7 +415,7 @@ func TestUnreadEvents(t *testing.T) {
 	}
 }
 
-// T11：PeerRead：前進才通知；沒前進（重送）不發 NOTIFY；MarkAllRead 不產生 PeerRead。
+// PeerRead：前進才通知；沒前進（重送）不發 NOTIFY；MarkAllRead 不產生 PeerRead。
 func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -437,7 +437,13 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	if len(got) != 2 || got[0].Kind != live.KindRead || got[0].Seq != 1 || got[0].Side != live.SideStore || got[1].Kind != live.KindMessage {
 		t.Fatalf("游標沒前進不發通知：%+v", got)
 	}
-	evs := collectUntil(t, buyerSub, messageSeq(conv, 2))
+	// 同一輪裡訊息排在對方已讀之前，所以要等兩者都到才算收完。
+	var sawMessage, sawPeer bool
+	evs := collectUntil(t, buyerSub, func(e im.Event) bool {
+		sawMessage = sawMessage || messageSeq(conv, 2)(e)
+		sawPeer = sawPeer || e.Kind == im.EventPeerRead
+		return sawMessage && sawPeer
+	})
 	var peer []im.Event
 	for _, e := range evs {
 		if e.Kind == im.EventPeerRead {
@@ -457,7 +463,7 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	}
 }
 
-// T12：presence。
+// presence。
 func TestPresence(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -547,7 +553,7 @@ func TestPresence(t *testing.T) {
 	}
 }
 
-// T13：Subscribe 的授權與全域並行上限。
+// Subscribe 的授權與全域並行上限。
 func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -631,7 +637,7 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 	}
 }
 
-// T16：listener 不佔連線池。
+// listener 不佔連線池。
 func TestListenerDoesNotHoldAPoolConnection(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -642,7 +648,7 @@ func TestListenerDoesNotHoldAPoolConnection(t *testing.T) {
 	}
 }
 
-// T18：連貫性：同一對話 50 則並行送出，串流收到的 seq 嚴格遞增且連續。
+// 連貫性：同一對話 50 則並行送出，串流收到的 seq 嚴格遞增且連續。
 func TestConcurrentSendsAreDeliveredInSeqOrder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -671,5 +677,148 @@ func TestConcurrentSendsAreDeliveredInSeqOrder(t *testing.T) {
 		if s != int64(i)+2 {
 			t.Fatalf("seq 要嚴格遞增且連續：%v", seqs)
 		}
+	}
+}
+
+// 中斷期間只有隱藏與已讀（沒有新訊息、沒有游標變化）：重連後 delivered 內的對話仍收到 Resync{conversation}。
+func TestListenerReconnectResyncsDeliveredConversationsWithHiddenAndReadChanges(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	gate := make(chan struct{})
+	slept := make(chan struct{}, 16)
+	cfg := fastBackoff()
+	cfg.Sleep = func(ctx context.Context, _ time.Duration) error {
+		slept <- struct{}{}
+		select {
+		case <-gate:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	m := f.newModule(cfg)
+	f.run(t, m)
+	sent := f.say(t, f.buyerParty(b1), s1, "m1")
+	conv := sent.ConversationID
+	sub := f.subscribe(t, m, f.buyerParty(b1), map[uuid.UUID]int64{conv: 1})
+	untilReady(t, sub)
+	f.exec(t, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND query LIKE 'SELECT now()%'`)
+	<-slept
+	if _, err := f.m.Hide(ctx, f.hideInput(sent.ID)); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.MarkRead(ctx, conv, f.storeParty(t, s1), 1); err != nil {
+		t.Fatal(err)
+	}
+	close(gate)
+	evs := collectUntil(t, sub, func(e im.Event) bool { return e.Kind == im.EventResync && e.ConversationID == conv })
+	if last := evs[len(evs)-1]; last.All {
+		t.Fatalf("預期 Resync{%v}，得到 %+v", conv, last)
+	}
+}
+
+// 在第一次 LISTEN 成功之前就開的串流：之後 commit 的訊息在第一條連線連上時補上。
+func TestStreamOpenedBeforeTheFirstListenReceivesLaterCommits(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	conv := f.say(t, f.buyerParty(b1), s1, "m1").ConversationID
+	m := f.newModule(fastBackoff())
+	dialing := make(chan struct{}, 1)
+	gate := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- im.RunWithGatedDial(ctx, m, dialing, gate) }()
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("Run 結束：%v", err)
+		}
+	})
+	select {
+	case <-dialing:
+	case <-time.After(guard):
+		t.Fatal("等不到第一次撥號")
+	}
+	sub := f.subscribe(t, m, f.storeParty(t, s1), map[uuid.UUID]int64{conv: 1})
+	untilReady(t, sub)
+	f.say(t, f.buyerParty(b1), s1, "m2")
+	close(gate)
+	collectUntil(t, sub, messageSeq(conv, 2))
+}
+
+// 延長批次把已被清掉的存活標記補回，串流仍被計數。
+func TestPresenceExtendReinsertsSweptRows(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	beat := make(chan time.Time)
+	const beatEvery = 3 * time.Hour
+	cfg := fastBackoff()
+	cfg.PresenceBeat = beatEvery
+	cfg.NewTicker = func(d time.Duration) (<-chan time.Time, func()) {
+		if d == beatEvery {
+			return beat, func() {}
+		}
+		return make(chan time.Time), func() {}
+	}
+	m := f.newModule(cfg)
+	f.run(t, m)
+	sub := f.subscribe(t, m, f.buyerParty(b1), nil)
+	untilReady(t, sub)
+	if n := f.scalar(t, `SELECT count(*) FROM im.presence_streams WHERE kind = 'BUYER' AND party_id = $1`, b1); n != 1 {
+		t.Fatalf("訂閱後應有 1 列，得到 %d", n)
+	}
+	f.exec(t, `DELETE FROM im.presence_streams`)
+	beat <- time.Time{}
+	beat <- time.Time{}
+	if n := f.scalar(t, `SELECT count(*) FROM im.presence_streams WHERE kind = 'BUYER' AND party_id = $1 AND expires_at > now()`, b1); n != 1 {
+		t.Fatalf("延長後被清掉的列要補回，得到 %d", n)
+	}
+}
+
+// 兩個並行的 MarkRead 推進同一個游標：後到的在列鎖上等，拿到前者提交後的值，所以只有一個 NOTIFY r。
+func TestConcurrentMarkReadNotifiesOnce(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	conv := f.say(t, f.buyerParty(b1), s1, "hello").ConversationID
+	store := f.storeParty(t, s1)
+	raw := f.listenRaw(t)
+	first := make(chan struct{})
+	release := make(chan struct{})
+	holder := make(chan error, 1)
+	go func() {
+		holder <- f.db.InTx(ctx, func(ctx context.Context) error {
+			if err := f.m.MarkRead(ctx, conv, store, 1); err != nil {
+				return err
+			}
+			close(first)
+			<-release
+			return nil
+		})
+	}()
+	<-first
+	second := make(chan error, 1)
+	go func() { second <- f.m.MarkRead(ctx, conv, store, 1) }()
+	f.eventually(t, "第二個 MarkRead 在列鎖上等", func() bool {
+		return f.scalar(t, `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`) > 0
+	})
+	close(release)
+	if err := <-holder; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
+	got := raw.waitFor(t, f, 2)
+	reads := 0
+	for _, p := range got {
+		if p.Kind == live.KindRead {
+			reads++
+		}
+	}
+	if reads != 1 {
+		t.Fatalf("預期恰好一個 r 通知，得到 %d：%+v", reads, got)
 	}
 }

@@ -82,13 +82,13 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		if inactive {
 			return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
 		}
-		now := s.d.Now().UTC()
 		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
 			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender),
 		})
 		if err != nil {
 			return err
 		}
+		now := seq.LastMessageAt.UTC()
 		msgID := s.d.NewID()
 		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), MessageType: string(in.Type), Now: now}
 		if in.Type == model.TypeText {

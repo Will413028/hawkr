@@ -64,6 +64,28 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | H22 推送幀帶發送者名稱與頭像 | 畫面要顯示 | 成立 | 事件只帶業務鍵，顯示資料由 httpapi 補 | 取代：`Event` 不帶名稱頭像 |
 | H25（新）presence 過期用哪個時鐘 | 多進程共享的過期判定 | 成立 | 單一時間來源 | 資料庫 `now()`；測試以 SQL 改 `expires_at` |
 | H26（新）LISTEN 連線手寫重連與退避 | 斷線自動恢復，並在重連成功時發 epoch | 成立 | `jackc/pgxlisten` | 手寫（約 60 行）：epoch 需要 `lastOK` 與重連掛點；新依賴要 Will 同意，要採用只換 `live/listener.go` |
+| H27（新）presence 延長補回被清掉的列 | 資料庫重啟後 UNLOGGED 表是空的、被清理掉的串流仍在跑 | 成立 | 只 UPDATE 的延長會讓這些串流不被計數、不顯示在線 | 取代：延長以 upsert 補回；`Close` 與延長的競爭最多讓列多活一個 `PresenceTTL` |
+
+## 即時通道的待決與重新評估觸發
+
+常數（`internal/live` 的 `Config` 預設與 `PresenceSweepInterval`）都是估計值，不是量測值；下表是各自重新評估的觸發條件。門檻是起始估計，量到資料後以量測值取代。
+
+| 項目 | 現值 | 重新評估的觸發 |
+|---|---|---|
+| `MaxStreamsPerParty` | 10 | 一週內 `Subscribe` 回 ResourceExhausted 的次數超過 `Subscribe` 總數的 1%，或單一帳號同時開啟的裝置數的 p95 超過 10 |
+| `MaxCursors` | 50 | client 回報有超過 5% 的串流開啟時有超過 50 個最近活動的對話 |
+| `MaxBacklog` | 200 | 因補洞超過 `MaxBacklog` 而交出的 `Resync{conversation}` 超過重連次數的 1% |
+| `MaxPending` | 500 | 因 `pending` 溢出而交出的 `Resync{all}` 每天超過訂閱數的 0.1% |
+| `MaxDelivered` | 1000 | 每條訂閱的 `delivered` 表在量測下占進程記憶體的比例超過 5%，或被修剪造成的重讀占補洞讀取的 10% 以上 |
+| `PresenceTTL`、`PresenceBeat` | 60 秒、20 秒 | 日誌「延長串流存活標記失敗」每進程每小時超過一次，或 presence 讀到離線但串流仍在的回報 |
+| `AliveEvery` | 10 秒 | 量到死連線偵測時間超過 10 秒的案例，或監聽迴圈的存活確認占資料庫查詢量的 1% 以上 |
+| `BackoffBase`、`BackoffMax` | 0.5 秒、30 秒 | 一小時內單一進程重連超過 20 次，或資料庫維護中重連請求造成連線數告警 |
+| `PresenceSweepInterval` | 15 分鐘 | `im.presence_streams` 的列數超過同時在線串流數的 10 倍 |
+
+| 待決 | 為什麼不在本步做 | 觸發 |
+|---|---|---|
+| 監聽重連補洞的時間界線：`ActiveSince` 以 `lastOK - margin` 比較，margin 是「im 寫入 transaction 最長開多久」 | repo 沒有任何 transaction 時間界線（連線池、`InTx`、`statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout` 都沒設定，httpapi 沒有請求 deadline），不發明數字；沒有界線時，開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at` 可能小於 `lastOK` 而漏掉（不在 `delivered` 的對話少一個 `Resync`） | 平台層設定 transaction 或 statement 的時間上限時，以那個上限當 margin；或 A6-5 為寫入路徑加請求 deadline 時 |
+| `Presence` 一個對話約 5 次循序的資料庫往返（授權、封鎖、對方身分、在線） | 目前沒有 handler 呼叫，批次化要看實際的呼叫形狀 | A6-5 開始：接 `Presence` handler 時改成一次查詢完成授權與在線 |
 
 ## 傳輸層的沿用盤點
 
