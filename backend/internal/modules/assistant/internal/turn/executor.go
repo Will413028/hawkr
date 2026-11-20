@@ -14,6 +14,7 @@ import (
 	"iter"
 	"log/slog"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,6 +94,8 @@ type Ref struct {
 type turnState struct {
 	buyerID int64
 	buf     *buffer
+	// stop 取消這一輪的執行；由 e.mu 保護，固定文案的輪次沒有。
+	stop context.CancelFunc
 }
 
 // Executor 是輪次執行器。
@@ -173,15 +176,33 @@ func pruneBefore(ts []time.Time, cutoff time.Time) []time.Time {
 	return ts[i:]
 }
 
+// rateWaitLocked 在持鎖時回買家的每分鐘送出次數是否已滿，已滿時回要等多久；不記錄。
+func (e *Executor) rateWaitLocked(buyerID int64, now time.Time) (time.Duration, bool) {
+	ts := pruneBefore(e.recent[buyerID], now.Add(-submitWindow))
+	e.recent[buyerID] = ts
+	if len(ts) >= e.cfg.MaxSubmitsPerMinute {
+		return max(ts[0].Add(submitWindow).Sub(now), time.Second), true
+	}
+	return 0, false
+}
+
 // admitLocked 在持鎖時檢查買家的每分鐘送出次數，通過就記一次；同時輪次數由呼叫者先檢查。
 func (e *Executor) admitLocked(buyerID int64, now time.Time) error {
-	ts := pruneBefore(e.recent[buyerID], now.Add(-submitWindow))
-	if len(ts) >= e.cfg.MaxSubmitsPerMinute {
-		e.recent[buyerID] = ts
-		return &model.LimitError{Err: model.ErrRateLimited, RetryAfter: max(ts[0].Add(submitWindow).Sub(now), time.Second)}
+	if wait, full := e.rateWaitLocked(buyerID, now); full {
+		return &model.LimitError{Err: model.ErrRateLimited, RetryAfter: wait}
 	}
-	e.recent[buyerID] = append(ts, now)
+	e.recent[buyerID] = append(e.recent[buyerID], now)
 	return nil
+}
+
+// unadmit 撤回 admitLocked 在 at 記下的那一次：受理失敗的送出不留紀錄，也就不佔每分鐘的名額。
+func (e *Executor) unadmit(buyerID int64, at time.Time) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	ts := e.recent[buyerID]
+	if i := slices.IndexFunc(ts, func(x time.Time) bool { return x.Equal(at) }); i >= 0 {
+		e.recent[buyerID] = slices.Delete(ts, i, i+1)
+	}
 }
 
 func guardKey(buyerID int64, sessionID string) string {
@@ -310,12 +331,17 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 			e.mu.Unlock()
 			return Ref{}, model.ErrShuttingDown
 		}
-		err := e.admitLocked(in.BuyerID, e.cfg.Now())
+		at := e.cfg.Now()
+		err := e.admitLocked(in.BuyerID, at)
 		e.mu.Unlock()
 		if err != nil {
 			return Ref{}, err
 		}
-		return e.submitReturnPolicy(ctx, in, loc)
+		ref, err := e.submitReturnPolicy(ctx, in, loc)
+		if err != nil {
+			e.unadmit(in.BuyerID, at)
+		}
+		return ref, err
 	}
 
 	message := in.Message
@@ -341,14 +367,17 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 		e.mu.Unlock()
 		return Ref{}, model.ErrTurnInProgress
 	}
+	at := e.cfg.Now()
+	wait, rateFull := e.rateWaitLocked(in.BuyerID, at)
 	if e.running[in.BuyerID] >= e.cfg.MaxConcurrentTurns {
 		e.mu.Unlock()
-		return Ref{}, &model.LimitError{Err: model.ErrTooManyTurns, RetryAfter: concurrentRetryAfter}
+		return Ref{}, &model.LimitError{Err: model.ErrTooManyTurns, RetryAfter: max(concurrentRetryAfter, wait)}
 	}
-	if err := e.admitLocked(in.BuyerID, e.cfg.Now()); err != nil {
+	if rateFull {
 		e.mu.Unlock()
-		return Ref{}, err
+		return Ref{}, &model.LimitError{Err: model.ErrRateLimited, RetryAfter: wait}
 	}
+	e.recent[in.BuyerID] = append(e.recent[in.BuyerID], at)
 	e.active[key] = struct{}{}
 	e.running[in.BuyerID]++
 	e.wg.Add(1)
@@ -357,6 +386,7 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	defer func() {
 		if !started {
 			e.release(in.BuyerID, key)
+			e.unadmit(in.BuyerID, at)
 			e.wg.Done()
 		}
 	}()
@@ -388,6 +418,9 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.cfg.Timeout)
 	stop := context.AfterFunc(e.base, cancel)
+	e.mu.Lock()
+	t.stop = cancel
+	e.mu.Unlock()
 	started = true
 	go func() {
 		defer e.wg.Done()
@@ -402,6 +435,21 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 		t.buf.append(terminal, e.cfg.Now())
 	}()
 	return Ref{TurnID: turnID, SessionID: sessionID}, nil
+}
+
+// Abort 讓買家自己的這一輪以失敗結束：取消它的執行，輪次照一般的失敗流程先釋放對話與同時輪次的名額，
+// 再把終止的 error 事件寫進緩衝，所有訂閱者看到同一個結尾。輪次不存在、不是這位買家的、已結束的都不做事。
+func (e *Executor) Abort(buyerID int64, turnID string) {
+	e.mu.Lock()
+	t, ok := e.turns[turnID]
+	var stop context.CancelFunc
+	if ok && t.buyerID == buyerID {
+		stop = t.stop
+	}
+	e.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
 }
 
 func (e *Executor) release(buyerID int64, key string) {

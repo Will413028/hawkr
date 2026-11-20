@@ -141,6 +141,30 @@ func TestLatestReturnsOnlyTheMostRecent100Messages(t *testing.T) {
 	}
 }
 
+// recordingGet 記下 Get 的請求。
+type recordingGet struct {
+	session.Service
+	req *session.GetRequest
+}
+
+func (r *recordingGet) Get(ctx context.Context, req *session.GetRequest) (*session.GetResponse, error) {
+	r.req = req
+	return r.Service.Get(ctx, req)
+}
+
+// 讀取有界：對 session service 的請求帶 NumRecentEvents，不是整個對話讀回來再截。
+func TestLatestBoundsTheDatabaseRead(t *testing.T) {
+	svc := session.InMemoryService()
+	newSession(t, svc, 1, "any")
+	r := &recordingGet{Service: svc}
+	if _, err := Latest(t.Context(), r, 1); err != nil {
+		t.Fatal(err)
+	}
+	if r.req == nil || r.req.NumRecentEvents != MaxMessages*eventsPerMessage {
+		t.Fatalf("Get 請求 = %+v，NumRecentEvents 要是 %d", r.req, MaxMessages*eventsPerMessage)
+	}
+}
+
 // goneOnGet 模擬列出之後、讀取之前對話被刪除。
 type goneOnGet struct{ session.Service }
 

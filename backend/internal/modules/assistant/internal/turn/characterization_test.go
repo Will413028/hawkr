@@ -18,7 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 這支測試鎖的是舊 ai-service 買家助理「現在的行為」（A9-2a 錄的 fixture），不是判斷那些行為是否正確。
+// 這支測試鎖的是舊 ai-service 買家助理「現在的行為」（錄下來的 fixture），不是判斷那些行為是否正確。
 // 舊路徑只送 text／done／error 三種事件；新串流多了 tool_result，且 error 是終止事件，所以比對規則是：
 //   - text：種類、順序、每段文字完全相同。
 //   - done → finished（帶 session ID）；error 之後舊路徑還會送 done，新串流 error 之後沒有事件，只比到 error。
@@ -26,9 +26,9 @@ import (
 //   - tool_result：舊路徑沒有，tool 身分取自 scripted_llm 的 function_call（限三支 tool，agenttool 的委派不算），
 //     成功與否取自 observed_llm_requests 裡回給 LLM 的 function response 有沒有 error；
 //     所有 fixture 的對外文字都在 tool 呼叫之後，所以預期序列是 tool_result 在前、舊事件在後，實際序列不同就失敗。
-//     事件不帶參數（A9-D13 修訂）：tool 名稱與參數改由 Config.ToolObserver 觀察到的呼叫與 scripted_llm 的 function_call 逐一比對。
-//   - 刻意偏離（A9-D15）：回給 LLM 的 tool 結果不再帶中文狀態標籤與下游錯誤文字，改為狀態代碼與錯誤代碼；
-//     追蹤 tool 的查詢狀態集合改為 20、30、32、35、40、54（A9-D16），單筆詳情失敗改為回 note 代碼；見 fedBackDeviations、fedBackSubstitutions 與 statusRemap，每一筆有理由與明確的替換。
+//     事件不帶參數：tool 名稱與參數改由 Config.ToolObserver 觀察到的呼叫與 scripted_llm 的 function_call 逐一比對。
+//   - 刻意偏離：回給 LLM 的 tool 結果不再帶中文狀態標籤與下游錯誤文字，改為狀態代碼與錯誤代碼；
+//     追蹤 tool 的查詢狀態集合改為 20、30、32、35、40、54，單筆詳情失敗改為回 note 代碼；見 fedBackDeviations、fedBackSubstitutions 與 statusRemap，每一筆有理由與明確的替換。
 
 const fixtureDir = "../../../../../docs/plans/2026-11-19-a9-agent/fixtures/assistant"
 
@@ -111,7 +111,7 @@ var toolIDs = map[string]model.Tool{
 	"track_my_package":       model.ToolTrackMyPackage,
 }
 
-// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture（A9-D15 第 2、3 點、A9-D16 第 1 點）及理由；
+// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture及理由；
 // 其餘 fixture 必須逐字相同。每一筆偏離在 fedBackSubstitutions 有明確的替換，比對時對錄製值套用替換後必須與實際相同。
 var fedBackDeviations = map[string]string{
 	"orders_happy_path":                  "status 由中文標籤改為狀態代碼（A9-D15 第 2 點）：「待出貨（物流單已建立，待出貨）」→ 20、「配送中」→ 30",

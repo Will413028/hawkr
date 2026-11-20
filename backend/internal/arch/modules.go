@@ -36,9 +36,9 @@ var Dependencies = map[string][]string{
 	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
 	"moderation":        {"social", "seller", "buyer", "accountsuspension", "media"},      // 社群檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立；快照引用的圖片在 media 登記引用（證據保全）。
 	"reviewqueue":       {"seller", "payment", "moderation"},                              // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
-	"procurement":       {"ordering", "catalog", "buyer", "seller"},                       // 採購（RFQ）；事件由 notification 訂閱，procurement 不依賴 notification（A9-D3）。
-	"assistant":         {"ordering", "catalog", "buyer"},                                 // 買家助理（A9-D3）。
-	"imageai":           {"seller", "media"},                                              // AI 修圖與配額（A9-D3）。
+	"procurement":       {"ordering", "catalog", "buyer", "seller"},                       // 採購（RFQ）；事件由 notification 訂閱，procurement 不依賴 notification。
+	"assistant":         {"ordering", "catalog", "buyer"},                                 // 買家助理。
+	"imageai":           {"seller", "media"},                                              // AI 修圖與配額。
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
 		"coupon", "aftersales", "review", "im", "social", "procurement", "finance", "delegation",
@@ -58,14 +58,14 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"adksession": {"store"},         // ADK session.Service 的 pgx 實作（A9-D5）
+		"adksession": {"store"},         // ADK session.Service 的 pgx 實作
 		"buyeragent": {"model", "text"}, // 買家 agent 與 3 支 tool；tool 身分用 model.Tool，coordinator 的退貨流程取共用文案
 		"feature":    {},
 		"history":    {"buyeragent", "model"}, // 買家最近一次對話的歷史（GetLatestAssistantSession）
 		"model":      {},
 		"store":      {},
 		"text":       {},
-		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次（A9-D12、D14）
+		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},
 	"procurement": {Packages: map[string][]string{
 		"feature": {},

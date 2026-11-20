@@ -32,10 +32,13 @@ const (
 	ToolGetBuyerOrderDetail
 	// ToolTrackMyPackage 查詢配送中包裹的物流狀態。
 	ToolTrackMyPackage
+
+	// ToolCount 排在最後一個 Tool 之後，不是工具；新增的 Tool 一律加在它前面，Valid 與走訪全部 Tool 都以它為界。
+	ToolCount
 )
 
-// Valid 回工具是不是上面三個之一。
-func (t Tool) Valid() bool { return t >= ToolGetMyOrders && t <= ToolTrackMyPackage }
+// Valid 回工具是不是 ToolCount 之前的任何一個。
+func (t Tool) Valid() bool { return t >= ToolGetMyOrders && t < ToolCount }
 
 // EventKind 是輪次事件的種類。
 type EventKind int
@@ -72,7 +75,7 @@ type Event struct {
 	// Text 是 EventText 的文字增量。
 	Text string
 
-	// Tool 與 ToolSucceeded 是 EventToolResult 的內容：用了哪支工具、有沒有成功。參數與回傳內容不進事件（A9-D13 修訂）。
+	// Tool 與 ToolSucceeded 是 EventToolResult 的內容：用了哪支工具、有沒有成功。參數與回傳內容不進事件。
 	Tool          Tool
 	ToolSucceeded bool
 
@@ -94,7 +97,7 @@ var (
 	ErrSessionNotFound = errors.New("assistant：找不到對話")
 	// ErrSessionCreate 是建立對話失敗。
 	ErrSessionCreate = errors.New("assistant：建立對話失敗")
-	// ErrTurnInProgress 是同一個對話已有一輪進行中（A9-D14）；對外是 FAILED_PRECONDITION，reason ASSISTANT_TURN_IN_PROGRESS。
+	// ErrTurnInProgress 是同一個對話已有一輪進行中；對外是 FAILED_PRECONDITION，reason ASSISTANT_TURN_IN_PROGRESS。
 	ErrTurnInProgress = errors.New("assistant：這個對話已有一輪進行中")
 	// ErrTurnNotFound 是輪次 ID 不存在、已過保留期、單體重啟過，或不屬於呼叫的買家。
 	ErrTurnNotFound = errors.New("assistant：找不到這一輪")

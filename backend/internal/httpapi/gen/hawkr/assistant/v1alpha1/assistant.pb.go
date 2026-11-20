@@ -762,7 +762,8 @@ func (*GetLatestAssistantSessionRequest) Descriptor() ([]byte, []int) {
 type GetLatestAssistantSessionResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	// 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。
+	// 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。伺服器只讀最近的一段 event，
+	// tool 呼叫特別密集的對話可能不足 100 則。
 	Messages      []*AssistantMessage `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

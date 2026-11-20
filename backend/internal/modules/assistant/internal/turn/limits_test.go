@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -110,9 +111,8 @@ func TestFailedSubmitsReleaseTheConcurrencySlot(t *testing.T) {
 	e := newExecutor(t, textLLM("嗨"), &fakeOrders{}, func(c *Config) {
 		c.Sessions = failingSessions{c.Sessions}
 		c.MaxConcurrentTurns = 1
-		c.MaxSubmitsPerMinute = 100
 	})
-	for i := range 5 {
+	for i := range 2 * DefaultMaxSubmitsPerMinute {
 		_, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "你好"})
 		if !errors.Is(err, model.ErrSessionCreate) {
 			t.Fatalf("第 %d 次 = %v，要 ErrSessionCreate（名額沒釋放會變成 ErrTooManyTurns）", i+1, err)
@@ -122,6 +122,93 @@ func TestFailedSubmitsReleaseTheConcurrencySlot(t *testing.T) {
 	if !errors.Is(err, model.ErrSessionNotFound) {
 		t.Fatalf("= %v，要 ErrSessionNotFound", err)
 	}
+}
+
+// 受理前失敗的送出（建立對話失敗、對話不存在）不留紀錄，不佔每分鐘的名額：失敗次數超過上限之後，成功的送出仍被受理。
+func TestFailedSubmitsDoNotCountTowardsThePerMinuteLimit(t *testing.T) {
+	clock := newClock()
+	var failing atomic.Bool
+	failing.Store(true)
+	e := newExecutor(t, textLLM("嗨"), &fakeOrders{}, func(c *Config) {
+		c.Now = clock.now
+		c.Sessions = toggledFailingSessions{Service: c.Sessions, failing: &failing}
+	})
+	for i := range 3 * DefaultMaxSubmitsPerMinute {
+		if _, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "你好"}); !errors.Is(err, model.ErrSessionCreate) {
+			t.Fatalf("第 %d 次 = %v，要 ErrSessionCreate", i+1, err)
+		}
+	}
+	for range DefaultMaxSubmitsPerMinute {
+		if _, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, SessionID: "不存在", Message: "你好"}); !errors.Is(err, model.ErrSessionNotFound) {
+			t.Fatalf("= %v，要 ErrSessionNotFound", err)
+		}
+	}
+	failing.Store(false)
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "終於成功"})
+	if err != nil {
+		t.Fatalf("失敗的送出佔了每分鐘的名額：%v", err)
+	}
+	collect(t, e, buyer, ref.TurnID, "")
+}
+
+type toggledFailingSessions struct {
+	session.Service
+	failing *atomic.Bool
+}
+
+func (s toggledFailingSessions) Create(ctx context.Context, req *session.CreateRequest) (*session.CreateResponse, error) {
+	if s.failing.Load() {
+		return nil, errors.New("session store down")
+	}
+	return s.Service.Create(ctx, req)
+}
+
+// 兩個上限都超過時，RetryAfter 取較長的那個，而且被擋的送出不記進每分鐘的次數。
+func TestBothLimitsExceededReturnsTheLongerRetryAfter(t *testing.T) {
+	clock := newClock()
+	g := newGatedLLM()
+	e := newExecutor(t, g, &fakeOrders{}, func(c *Config) {
+		c.Now = clock.now
+		c.MaxConcurrentTurns = 1
+		c.MaxSubmitsPerMinute = 1
+	})
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "你好"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock.advance(10 * time.Second)
+	_, err = e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "又一則"})
+	var le *model.LimitError
+	if !errors.As(err, &le) || le.RetryAfter != 50*time.Second {
+		t.Fatalf("err = %v，RetryAfter 要是每分鐘上限的 50 秒（比同時輪次的 %v 長）", err, concurrentRetryAfter)
+	}
+	close(g.release)
+	collect(t, e, buyer, ref.TurnID, "")
+}
+
+// Abort 讓進行中的一輪以失敗結束：終止事件是 error，名額釋放，同一個對話可以再送。
+func TestAbortEndsTheTurnAsFailedAndReleasesTheSession(t *testing.T) {
+	g := newGatedLLM()
+	e := newExecutor(t, g, &fakeOrders{}, nil)
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, Message: "你好"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, SessionID: ref.SessionID, Message: "再一則"}); !errors.Is(err, model.ErrTurnInProgress) {
+		t.Fatalf("進行中的對話 = %v，要 ErrTurnInProgress", err)
+	}
+	e.Abort(buyer+1, ref.TurnID)
+	e.Abort(buyer, ref.TurnID)
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventError {
+		t.Fatalf("最後一個事件 = %+v，要是 error", last)
+	}
+	again, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicChat, SessionID: ref.SessionID, Message: "再一則"})
+	if err != nil {
+		t.Fatalf("Abort 之後同一個對話仍被擋：%v", err)
+	}
+	close(g.release)
+	collect(t, e, buyer, again.TurnID, "")
 }
 
 // failOnceCreate 的第一次 Create 等到 release 才失敗，之後交給底層。

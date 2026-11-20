@@ -78,6 +78,9 @@ func (m *Module) WatchTurn(ctx context.Context, buyerID int64, turnID, cursor st
 	return m.turns.Watch(ctx, buyerID, turnID, cursor)
 }
 
+// AbortTurn 讓買家自己的這一輪以失敗結束（取消執行、釋放名額、緩衝補上終止的 error 事件）；輪次不存在、不是這位買家的、已結束的都不做事。
+func (m *Module) AbortTurn(buyerID int64, turnID string) { m.turns.Abort(buyerID, turnID) }
+
 // LatestSession 回買家最近一次對話與它的最近 100 則文字訊息（時間由舊到新）；沒有對話時 SessionID 是空字串。只讀呼叫者自己的對話。
 func (m *Module) LatestSession(ctx context.Context, buyerID int64) (History, error) {
 	return history.Latest(ctx, m.sessions, buyerID)
@@ -134,6 +137,7 @@ const (
 	ToolGetMyOrders         = model.ToolGetMyOrders
 	ToolGetBuyerOrderDetail = model.ToolGetBuyerOrderDetail
 	ToolTrackMyPackage      = model.ToolTrackMyPackage
+	ToolCount               = model.ToolCount
 )
 
 // LimitError 是 ErrTooManyTurns、ErrRateLimited 的外殼，帶 RetryAfter。

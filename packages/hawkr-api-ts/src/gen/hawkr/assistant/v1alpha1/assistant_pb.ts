@@ -301,7 +301,8 @@ export type GetLatestAssistantSessionResponse = Message<"hawkr.assistant.v1alpha
   sessionId: string;
 
   /**
-   * 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。
+   * 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。伺服器只讀最近的一段 event，
+   * tool 呼叫特別密集的對話可能不足 100 則。
    *
    * @generated from field: repeated hawkr.assistant.v1alpha1.AssistantMessage messages = 2;
    */

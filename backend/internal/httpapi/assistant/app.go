@@ -29,6 +29,7 @@ type Module interface {
 	SubmitTurn(ctx context.Context, in model.SubmitTurnInput) (model.TurnRef, error)
 	WatchTurn(ctx context.Context, buyerID int64, turnID, cursor string) (iter.Seq2[model.TurnEvent, error], error)
 	LatestSession(ctx context.Context, buyerID int64) (model.History, error)
+	AbortTurn(buyerID int64, turnID string)
 }
 
 // App 是 AssistantAppService 的 handler。
@@ -154,6 +155,7 @@ func (h *App) WatchAssistantTurn(ctx context.Context, req *connect.Request[pb.Wa
 				Reason:           commonpb.ErrorReason_ASSISTANT_TURN_FAILED,
 				LocalizedMessage: rpc.CommonText(ctx, connect.CodeInternal).Text,
 			}}}
+			h.m.AbortTurn(buyerID, req.Msg.GetTurnId())
 			return stream.Send(out)
 		}
 		if err := stream.Send(out); err != nil {
@@ -232,6 +234,7 @@ func toolToProto(t model.Tool) (pb.AssistantTool, bool) {
 		return pb.AssistantTool_ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL, true
 	case model.ToolTrackMyPackage:
 		return pb.AssistantTool_ASSISTANT_TOOL_TRACK_MY_PACKAGE, true
+	case model.ToolCount:
 	}
 	return pb.AssistantTool_ASSISTANT_TOOL_UNSPECIFIED, false
 }

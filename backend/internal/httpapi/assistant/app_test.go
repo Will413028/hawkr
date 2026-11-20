@@ -54,6 +54,13 @@ type fakeModule struct {
 	history   assistant.History
 	historyBy []int64
 	live      chan assistant.TurnEvent // 非 nil 時 Watch 阻塞等它
+	aborted   []string
+}
+
+func (f *fakeModule) AbortTurn(buyer int64, turnID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.aborted = append(f.aborted, strconv.FormatInt(buyer, 10)+"/"+turnID)
 }
 
 func (f *fakeModule) SubmitTurn(_ context.Context, in assistant.SubmitTurnInput) (assistant.TurnRef, error) {
@@ -418,11 +425,17 @@ func TestSendLimitErrorsCarryRetryInfo(t *testing.T) {
 // 模組的每一支 Tool 都對得到 AssistantTool；新增 Tool 卻漏了對應，這支測試先失敗。
 func TestEveryModelToolMapsToAnAssistantTool(t *testing.T) {
 	n := 0
-	for tool := assistant.ToolGetMyOrders; tool.Valid(); tool++ {
+	for tool := assistant.ToolGetMyOrders; tool < assistant.ToolCount; tool++ {
 		n++
+		if !tool.Valid() {
+			t.Errorf("tool %d 在 ToolCount 之前卻不合法", tool)
+		}
 		if got, ok := toolToProto(tool); !ok || got == pb.AssistantTool_ASSISTANT_TOOL_UNSPECIFIED {
 			t.Errorf("tool %d 沒有對應的 AssistantTool", tool)
 		}
+	}
+	if assistant.ToolCount.Valid() {
+		t.Error("ToolCount 是界線，不是合法的 Tool")
 	}
 	if n == 0 {
 		t.Fatal("沒有走過任何 Tool")
@@ -444,5 +457,8 @@ func TestWatchEndsWithATurnFailedEventWhenAToolHasNoMapping(t *testing.T) {
 	e := got[1].GetError()
 	if e.GetReason() != commonpb.ErrorReason_ASSISTANT_TURN_FAILED || e.GetLocalizedMessage() == "" || got[1].GetCursor() != "2" {
 		t.Fatalf("最後一個事件 = %v", got[1])
+	}
+	if want := strconv.FormatInt(buyerID, 10) + "/turn-1"; len(m.aborted) != 1 || m.aborted[0] != want {
+		t.Fatalf("aborted = %v，要 [%s]：串流以失敗結束時，這一輪也要在模組裡結束", m.aborted, want)
 	}
 }
