@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 // 賣家端的詢問：以帳號為範圍，擁有者是店家所屬的帳號。
@@ -230,9 +231,10 @@ func TestSellerInquiryListIsNewestFirstFilteredAndCounted(t *testing.T) {
 	_, other := f.open(t)
 	f.mustInquire(t, f.foodCase(t, other.StoreID).ID)
 	var ids []uuid.UUID
-	for range 4 {
+	for _, category := range []policy.Category{policy.FoodSafety, policy.Counterfeit, policy.UnlicensedSale, policy.ProhibitedGoods} {
 		f.now = f.now.Add(time.Hour)
-		ids = append(ids, f.mustInquire(t, f.foodCase(t, s.StoreID).ID).Inquiry.ID)
+		c, _ := f.newCase(t, s.StoreID, category, SeverityHigh, 1)
+		ids = append(ids, f.mustInquire(t, c.ID).Inquiry.ID)
 	}
 	_, err := f.sellerReply(t, owner, ids[0], "回覆")
 	must(t, err)
