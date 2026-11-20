@@ -52,7 +52,7 @@ func TestSellerReplyBlockTextCoversEveryBlockInBothLocales(t *testing.T) {
 	}
 }
 
-// 逾期不擋回覆（F2）：Availability 沒有逾期這個原因，只看撤回與已回覆。
+// 逾期不擋回覆：Availability 沒有逾期這個原因，只看撤回與已回覆。
 func TestOverdueDoesNotBlockTheReply(t *testing.T) {
 	if blocks := (model.CaseInquiry{}).Availability().RecordReply; len(blocks) != 0 {
 		t.Fatalf("blocks=%v", blocks)

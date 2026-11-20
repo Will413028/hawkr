@@ -8,8 +8,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 案件的詢問（step10e-reports-brief R4；設計 step10e-3cb-design §3.1）：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆
-// 還沒結束的詢問（DB 的 case_inquiries_one_open）。回覆在 3c-b 只由管理員記下（系統外收到）。處理狀態（InquiryState）與可以做的動作（Availability）由事實推導，不存。
+// 案件的詢問：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆
+// 還沒結束的詢問（DB 的 case_inquiries_one_open）。回覆有兩個來源：管理員記下系統外收到的（電話、信箱等管道），或賣家自己在賣家中心回覆（管道是 SELLER_CENTER）。處理狀態（InquiryState）與可以做的動作（Availability）由事實推導，不存。
 
 // InquiryKind 是平台要賣家做的事；值與 DB 的 case_inquiries_kind_check、契約的 CaseInquiryKind 一致。
 type InquiryKind string

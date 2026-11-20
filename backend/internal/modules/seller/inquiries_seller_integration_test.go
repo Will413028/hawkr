@@ -15,7 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 賣家端的詢問（10f-1）：以帳號為範圍，擁有者是店家所屬的帳號。
+// 賣家端的詢問：以帳號為範圍，擁有者是店家所屬的帳號。
 
 func (f *fixture) sellerReply(t *testing.T, accountID int64, inquiryID uuid.UUID, body string, tokens ...string) (SellerInquiry, error) {
 	t.Helper()
@@ -198,7 +198,7 @@ func TestSellerCannotReplyToAWithdrawnInquiry(t *testing.T) {
 	}
 }
 
-// 逾期後仍可回覆（F2）；已關閉的店家，詢問開放中也能讀與回覆（F6）。
+// 逾期後仍可回覆；已關閉的店家，詢問開放中也能讀與回覆。
 func TestSellerCanReplyAfterTheDeadlineAndAfterTheStoreClosed(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
