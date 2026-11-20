@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/adk/v2/agent"
@@ -31,8 +33,9 @@ import (
 )
 
 const (
-	// DefaultBufferCapacity 是每輪保留的事件數；超過時最舊的事件被覆蓋，接續的 cursor 落在被覆蓋的範圍回 ErrCursorExpired。
-	DefaultBufferCapacity = 1024
+	// DefaultBufferCapacity 是每輪事件數的上限（含終止事件）。緩衝只增不減，不覆蓋舊事件；寫滿時這一輪以失敗結束。
+	// 一則回覆的 text 增量通常是逐 token 一個事件，4096 留給長回覆的餘裕。
+	DefaultBufferCapacity = 4096
 	// DefaultRetention 是一輪結束後，輪次與它的事件還能被訂閱的時間。
 	DefaultRetention = 10 * time.Minute
 	// DefaultTimeout 是一輪從開始到結束的上限；到了就以失敗結束，釋放對話的佔用。
@@ -49,6 +52,10 @@ type Config struct {
 	BufferCapacity int
 	Retention      time.Duration
 	Timeout        time.Duration
+
+	// ToolObserver 在每次 tool 呼叫結束時被呼叫（含模型送的參數的拷貝），可為 nil。參數不進對外事件（A9-D13 修訂）；
+	// 這個觀察點給測試的 characterization 比對與日後的指標。可能從多個 goroutine 同時呼叫。
+	ToolObserver func(buyeragent.ToolCall)
 }
 
 // SubmitInput 是送出一則訊息。
@@ -75,9 +82,6 @@ type turnState struct {
 type Executor struct {
 	cfg Config
 
-	// events 產生 runner 的事件流；測試用它替換成不經 runner 的來源。
-	events func(ctx context.Context, r *runner.Runner, userID, sessionID string, content *genai.Content) iter.Seq2[*session.Event, error]
-
 	base   context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -103,7 +107,7 @@ func New(cfg Config) *Executor {
 		cfg.Timeout = DefaultTimeout
 	}
 	base, cancel := context.WithCancel(context.Background())
-	return &Executor{cfg: cfg, events: runnerEvents, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}}
+	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}}
 }
 
 // Shutdown 取消所有進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
@@ -153,15 +157,15 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	if !in.Topic.Valid() {
 		return Ref{}, model.ErrInvalidTopic
 	}
-	e.mu.Lock()
-	closed := e.closed
-	e.mu.Unlock()
-	if closed {
-		return Ref{}, model.ErrShuttingDown
-	}
 	loc := uitext.LocaleFrom(ctx)
 
 	if in.Topic == model.TopicReturnPolicy {
+		e.mu.Lock()
+		closed := e.closed
+		e.mu.Unlock()
+		if closed {
+			return Ref{}, model.ErrShuttingDown
+		}
 		return e.submitReturnPolicy(ctx, in, loc)
 	}
 
@@ -179,26 +183,13 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}
 	userID := strconv.FormatInt(in.BuyerID, 10)
 
+	// 順序（A9-D15 第 4 點）：檢查 closed、佔用對話、wg.Add 都在同一把鎖內，session ID 由伺服器先產生，之後才寫 session。
+	// 任何一步失敗都釋放佔用並 wg.Done，不留下沒有輪次的 session。
 	sessionID := in.SessionID
-	if sessionID == "" {
-		// 買家 ID 以字串寫入：數字經 JSONB 往返會被 float64 改寫。
-		resp, err := e.cfg.Sessions.Create(ctx, &session.CreateRequest{
-			AppName: buyeragent.AppName,
-			UserID:  userID,
-			State:   map[string]any{buyeragent.StateKeyBuyer: userID},
-		})
-		if err != nil {
-			slog.ErrorContext(ctx, "assistant：建立 session 失敗", "error", err)
-			return Ref{}, fmt.Errorf("%w: %w", model.ErrSessionCreate, err)
-		}
-		sessionID = resp.Session.ID()
-	} else if _, err := e.cfg.Sessions.Get(ctx, &session.GetRequest{AppName: buyeragent.AppName, UserID: userID, SessionID: sessionID}); err != nil {
-		if errors.Is(err, session.ErrNotFound) {
-			return Ref{}, model.ErrSessionNotFound
-		}
-		return Ref{}, fmt.Errorf("assistant：讀取 session：%w", err)
+	newSession := sessionID == ""
+	if newSession {
+		sessionID = platform.NewUUID(ctx)
 	}
-
 	key := guardKey(in.BuyerID, sessionID)
 	e.mu.Lock()
 	if e.closed {
@@ -212,6 +203,31 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	e.active[key] = struct{}{}
 	e.wg.Add(1)
 	e.mu.Unlock()
+	started := false
+	defer func() {
+		if !started {
+			e.release(key)
+			e.wg.Done()
+		}
+	}()
+
+	if newSession {
+		// 買家 ID 以字串寫入：數字經 JSONB 往返會被 float64 改寫。
+		if _, err := e.cfg.Sessions.Create(ctx, &session.CreateRequest{
+			AppName:   buyeragent.AppName,
+			UserID:    userID,
+			SessionID: sessionID,
+			State:     map[string]any{buyeragent.StateKeyBuyer: userID},
+		}); err != nil {
+			slog.ErrorContext(ctx, "assistant：建立 session 失敗", "error", err)
+			return Ref{}, fmt.Errorf("%w: %w", model.ErrSessionCreate, err)
+		}
+	} else if _, err := e.cfg.Sessions.Get(ctx, &session.GetRequest{AppName: buyeragent.AppName, UserID: userID, SessionID: sessionID}); err != nil {
+		if errors.Is(err, session.ErrNotFound) {
+			return Ref{}, model.ErrSessionNotFound
+		}
+		return Ref{}, fmt.Errorf("assistant：讀取 session：%w", err)
+	}
 
 	turnID, t := e.register(ctx, in.BuyerID)
 
@@ -222,6 +238,7 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.cfg.Timeout)
 	stop := context.AfterFunc(e.base, cancel)
+	started = true
 	go func() {
 		defer e.wg.Done()
 		defer cancel()
@@ -251,6 +268,9 @@ func (e *Executor) submitReturnPolicy(ctx context.Context, in SubmitInput, loc u
 }
 
 // execute 跑 agent 並回這一輪的終止事件；panic 也以失敗事件回傳。
+//
+// finished 的條件（A9-D15 第 4 點）：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse）。
+// 取消、逾時、模型安靜停下、事件數超過上限，只要最終回應沒有出現，一律是 error；迴圈之後不再看 ctx.Err()。
 func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, userID, sessionID string, content *genai.Content, loc uitext.Locale) (terminal model.Event) {
 	var sent strings.Builder
 	fail := func() model.Event {
@@ -261,19 +281,34 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			slog.ErrorContext(ctx, "assistant：輪次 panic", "panic", r)
+			slog.ErrorContext(ctx, "assistant：輪次 panic", "panic", r, "stack", string(debug.Stack()))
 			terminal = fail()
 		}
 	}()
 
-	emit := func(ev model.Event) { t.buf.append(ev, e.cfg.Now()) }
+	// 緩衝寫滿（事件數超過上限）時停掉這一輪：取消 runner，讓它在最終回應之前結束，走 fail()。
+	ctx, stopRun := context.WithCancel(ctx)
+	defer stopRun()
+	var overflow atomic.Bool
+	emit := func(ev model.Event) {
+		if !t.buf.append(ev, e.cfg.Now()) {
+			if overflow.CompareAndSwap(false, true) {
+				slog.WarnContext(ctx, "assistant：這一輪的事件數超過上限，中止", "limit", e.cfg.BufferCapacity)
+			}
+			stopRun()
+		}
+	}
 	deps := buyeragent.Deps{
 		Orders:  e.cfg.Orders,
 		Model:   e.cfg.Model,
 		BuyerID: in.BuyerID,
 		Now:     e.cfg.Now,
+		Locale:  loc,
 		OnTool: func(c buyeragent.ToolCall) {
-			emit(model.Event{Kind: model.EventToolResult, ToolName: c.Name, ToolFailed: c.Failed, ToolArgs: c.Args})
+			if e.cfg.ToolObserver != nil {
+				e.cfg.ToolObserver(c)
+			}
+			emit(model.Event{Kind: model.EventToolResult, Tool: c.Tool, ToolSucceeded: !c.Failed})
 		},
 	}
 	var (
@@ -302,12 +337,19 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 
 	// ADK 的 SSE 模式先送多個 Partial 的 chunk，最後送一個完整的非 Partial 回應。sent 記這一段已送出的文字：
 	// 非 Partial 到達時只補送沒送過的尾巴；tool 回應代表新一段文字開始，重置。
-	for ev, err := range e.events(ctx, r, userID, sessionID, content) {
-		if err != nil || ctx.Err() != nil {
-			slog.WarnContext(ctx, "assistant：agent 執行失敗", "error", errors.Join(err, ctx.Err()))
+	finalSeen := false
+	for ev, err := range r.Run(ctx, userID, sessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeSSE}) {
+		if err != nil {
+			slog.WarnContext(ctx, "assistant：agent 執行失敗", "error", err)
 			return fail()
 		}
-		if ev == nil || ev.Content == nil {
+		if ev == nil {
+			continue
+		}
+		if ev.Author == ag.Name() && ev.IsFinalResponse() && ev.ErrorCode == "" {
+			finalSeen = true
+		}
+		if ev.Content == nil {
 			continue
 		}
 		hasFuncResp := false
@@ -342,22 +384,17 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 			}
 		}
 	}
-	if ctx.Err() != nil {
-		slog.WarnContext(ctx, "assistant：輪次在 agent 結束前被取消或逾時", "error", ctx.Err())
+	if !finalSeen || overflow.Load() {
+		slog.WarnContext(ctx, "assistant：事件流結束但沒有根 agent 的最終回應", "overflow", overflow.Load(), "ctxErr", ctx.Err())
 		return fail()
 	}
 	return model.Event{Kind: model.EventFinished, SessionID: sessionID}
 }
 
-func runnerEvents(ctx context.Context, r *runner.Runner, userID, sessionID string, content *genai.Content) iter.Seq2[*session.Event, error] {
-	return r.Run(ctx, userID, sessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeSSE})
-}
-
 // Watch 訂閱一輪的事件，從 cursor 之後開始（空字串是從頭）。輪次不存在或不屬於 buyerID 回 ErrTurnNotFound，
-// cursor 早於緩衝回 ErrCursorExpired、超前（或不是伺服器發的值）回 ErrCursorAhead；這些都在回傳迭代器之前判定。
+// cursor 超前於最新事件（或不是伺服器發的值）回 ErrCursorAhead，在回傳迭代器之前判定；緩衝不覆蓋舊事件，所以沒有過期。
 //
 // 迭代器依序給事件，在終止事件之後結束；ctx 結束時正常結束（呼叫者用自己的期限，例如 100 秒，決定要不要續看）。
-// 消費太慢、事件被覆蓋時，迭代器以 ErrCursorExpired 結束。
 func (e *Executor) Watch(ctx context.Context, buyerID int64, turnID, cursor string) (iter.Seq2[model.Event, error], error) {
 	e.mu.Lock()
 	e.sweepLocked(e.cfg.Now())
@@ -372,11 +409,7 @@ func (e *Executor) Watch(ctx context.Context, buyerID int64, turnID, cursor stri
 	}
 	return func(yield func(model.Event, error) bool) {
 		for {
-			evs, wait, finished, err := t.buf.next(pos)
-			if err != nil {
-				yield(model.Event{}, err)
-				return
-			}
+			evs, wait, finished := t.buf.next(pos)
 			for _, ev := range evs {
 				if !yield(ev, nil) {
 					return

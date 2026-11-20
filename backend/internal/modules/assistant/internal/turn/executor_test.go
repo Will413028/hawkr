@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	adkmodel "google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/session"
@@ -143,7 +144,7 @@ func TestToolErrorIsReportedAsAFailedToolResultAndTheTurnStillFinishes(t *testin
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	if len(evs) != 3 || evs[0].Kind != model.EventToolResult || !evs[0].ToolFailed || evs[0].ToolName != "get_my_orders" {
+	if len(evs) != 3 || evs[0].Kind != model.EventToolResult || evs[0].ToolSucceeded || evs[0].Tool != model.ToolGetMyOrders {
 		t.Fatalf("要先有一個 failed 的 tool_result：%+v", evs)
 	}
 	if evs[1].Kind != model.EventText || evs[2].Kind != model.EventFinished {
@@ -153,8 +154,9 @@ func TestToolErrorIsReportedAsAFailedToolResultAndTheTurnStillFinishes(t *testin
 	if len(fed) != 1 {
 		t.Fatalf("回給 LLM 的 tool 結果 = %v", fed)
 	}
-	if resp, _ := fed[0]["response"].(map[string]any); resp["error"] == nil {
-		t.Fatalf("tool 的錯誤要回給 LLM：%v", fed)
+	// 模型只看到不帶語言的代碼，看不到下游的錯誤文字。
+	if resp, _ := fed[0]["response"].(map[string]any); resp["error"] != "upstream_unavailable" || len(resp) != 1 {
+		t.Fatalf("tool 的錯誤要以代碼回給 LLM：%v", fed)
 	}
 }
 
@@ -178,8 +180,11 @@ func TestToolsRefuseASessionWhoseBuyerIsNotTheTurnsBuyer(t *testing.T) {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	if evs[0].Kind != model.EventToolResult || !evs[0].ToolFailed {
+	if evs[0].Kind != model.EventToolResult || evs[0].ToolSucceeded {
 		t.Fatalf("身分範圍不符的 tool 要失敗：%+v", evs[0])
+	}
+	if resp, _ := llm.seen()[1].FunctionResponsesBack[0]["response"].(map[string]any); resp["error"] != "forbidden" {
+		t.Fatalf("身分範圍不符要回代碼 forbidden：%v", resp)
 	}
 	if orders.listCalls != 0 {
 		t.Fatalf("身分範圍不符時不可呼叫訂單服務，呼叫了 %d 次", orders.listCalls)
@@ -286,30 +291,75 @@ func TestWatchReplaysFromACursor(t *testing.T) {
 	}
 }
 
-func TestWatchCursorExpiredAndAhead(t *testing.T) {
-	e := newExecutor(t, manyPartials(10), &fakeOrders{}, func(c *Config) { c.BufferCapacity = 4 })
+func TestWatchCursorAhead(t *testing.T) {
+	e := newExecutor(t, manyPartials(10), &fakeOrders{}, nil)
 	ref, err := submitChat(t, e, "", "你好")
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.wg.Wait() // 這一輪已結束，終止事件已寫入
-	// 共 11 個事件，緩衝只留最後 4 個（序號 8 到 11）：cursor 7 還接得上，6 以前接不上。
-	for _, c := range []string{"", "0", "6"} {
-		if _, err := e.Watch(context.Background(), buyer, ref.TurnID, c); !errors.Is(err, model.ErrCursorExpired) {
-			t.Fatalf("cursor %q = %v，要 ErrCursorExpired", c, err)
+	// 共 11 個事件；緩衝不覆蓋舊事件，任何 0 到 11 的 cursor 都接得上。
+	for _, c := range []string{"", "0", "6", "11"} {
+		if _, err := e.Watch(context.Background(), buyer, ref.TurnID, c); err != nil {
+			t.Fatalf("cursor %q = %v", c, err)
 		}
 	}
 	if evs := collect(t, e, buyer, ref.TurnID, "7"); len(evs) != 4 {
 		t.Fatalf("cursor 7 要接到 4 個事件：%+v", evs)
 	}
-	for _, c := range []string{"12", "999", "not-a-cursor", "-1"} {
+	for _, c := range []string{"12", "999", "not-a-cursor", "-1", "+3"} {
 		if _, err := e.Watch(context.Background(), buyer, ref.TurnID, c); !errors.Is(err, model.ErrCursorAhead) {
 			t.Fatalf("cursor %q = %v，要 ErrCursorAhead", c, err)
 		}
 	}
-	// 兩種錯誤是不同的錯誤。
-	if errors.Is(model.ErrCursorExpired, model.ErrCursorAhead) {
-		t.Fatal("過期與超前必須是兩個錯誤")
+}
+
+func TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession(t *testing.T) {
+	// 上限 4：前 3 格給一般事件，第 4 格留給終止事件。10 個 text 增量寫不下。
+	e := newExecutor(t, manyPartials(10), &fakeOrders{}, func(c *Config) { c.BufferCapacity = 4 })
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if len(evs) != 4 {
+		t.Fatalf("事件數 = %d，要正好是上限 4：%+v", len(evs), evs)
+	}
+	for i, ev := range evs[:3] {
+		if ev.Kind != model.EventText || ev.Text != strconv.Itoa(i)+"," {
+			t.Fatalf("第 %d 個事件被改動（不得覆蓋）：%+v", i, ev)
+		}
+	}
+	if last := evs[3]; last.Kind != model.EventError || last.Failure != model.FailureInterrupted {
+		t.Fatalf("寫滿後要以 interrupted 的 error 結束：%+v", last)
+	}
+	// 終止事件之後佔用已釋放。
+	e.wg.Wait()
+	next, err := submitChat(t, e, ref.SessionID, "再問")
+	if err != nil {
+		t.Fatalf("緩衝寫滿結束後對話沒有釋放：%v", err)
+	}
+	collect(t, e, buyer, next.TurnID, "")
+}
+
+func TestBufferNeverOverwritesAndKeepsTheLastSlotForTheTerminalEvent(t *testing.T) {
+	b := newBuffer(3)
+	now := time.Now()
+	if !b.append(model.Event{Kind: model.EventText, Text: "a"}, now) || !b.append(model.Event{Kind: model.EventText, Text: "b"}, now) {
+		t.Fatal("前兩個一般事件要寫得進去")
+	}
+	if b.append(model.Event{Kind: model.EventText, Text: "c"}, now) {
+		t.Fatal("一般事件不得佔用保留給終止事件的最後一格")
+	}
+	if !b.append(model.Event{Kind: model.EventError}, now) {
+		t.Fatal("終止事件永遠寫得進去")
+	}
+	if b.append(model.Event{Kind: model.EventText, Text: "d"}, now) {
+		t.Fatal("終止之後不再寫入")
+	}
+	evs, _, finished := b.next(0)
+	if !finished && len(evs) != 3 || evs[0].Text != "a" || evs[1].Text != "b" || evs[2].Kind != model.EventError {
+		t.Fatalf("事件 = %+v", evs)
 	}
 }
 

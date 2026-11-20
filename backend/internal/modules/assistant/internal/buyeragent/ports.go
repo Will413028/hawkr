@@ -6,14 +6,18 @@ package buyeragent
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrOrderNotFound 是 Orders.OrderDetail 在訂單不存在或不屬於該買家時回的錯誤（實作者以 %w 包住自己的錯誤）。
+var ErrOrderNotFound = errors.New("buyeragent：找不到訂單")
 
 // Orders 是買家助理讀訂單的 port，由 composition root 以訂單服務的 client 實作。buyerID 是目前的 buyer_id。
 type Orders interface {
 	// MyOrders 回買家的訂單；statusFilter 空字串是全部。
 	MyOrders(ctx context.Context, buyerID int64, statusFilter string, page, pageSize int) ([]Order, error)
-	// OrderDetail 回買家的單筆訂單；不存在或不屬於該買家時回錯誤。
+	// OrderDetail 回買家的單筆訂單；不存在或不屬於該買家時回 ErrOrderNotFound。
 	OrderDetail(ctx context.Context, buyerID int64, orderNo string) (OrderDetail, error)
 }
 

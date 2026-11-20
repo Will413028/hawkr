@@ -132,7 +132,6 @@ var (
 	ErrSessionCreate   = model.ErrSessionCreate
 	ErrTurnInProgress  = model.ErrTurnInProgress
 	ErrTurnNotFound    = model.ErrTurnNotFound
-	ErrCursorExpired   = model.ErrCursorExpired
 	ErrCursorAhead     = model.ErrCursorAhead
 	ErrOuterTx         = model.ErrOuterTx
 	ErrShuttingDown    = model.ErrShuttingDown

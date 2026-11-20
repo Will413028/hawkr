@@ -21,13 +21,40 @@ const AppName = "hawkr_ai"
 // temperature 是所有買家 agent 的取樣溫度。
 const temperature = float32(0.3)
 
-const orderSpecialistInstruction = `你是買家訂單查詢助手。依 request 使用 get_my_orders 查訂單、get_buyer_order_detail 查單筆詳情，不需要確認。使用繁體中文回覆，適度使用 emoji。`
+// 系統提示的共用段落。提示本身是給模型的指令（繁體中文），買家看到的語言由 replyRule 決定。
 
-const trackingSpecialistInstruction = `你是買家包裹追蹤助手。收到訊息後直接使用 track_my_package 工具查詢配送中包裹的物流狀態，不需要確認。使用繁體中文回覆，適度使用 emoji。`
+// statusGuide 是訂單狀態碼表，來源是 CodeMeta〈業務狀態碼〉的 OrderStatus（擁有者是 ordering）；
+// tool 回給模型的 status 是這些代碼，不是任何語言的標籤。
+const statusGuide = `訂單狀態碼（tool 回傳的 status 是代碼）：0=待付款, 10=已付款, 20=待出貨, 30=配送中, 32=待取貨, 35=物流異常, 40=已送達（待買家確認收貨）, 50=已完成, 54=配送失敗未退款, 60=部分退款, 70=全額退款, 80=已取消。回覆時把代碼說成買家語言的狀態名稱，不要直接顯示代碼。`
 
-// coordinatorInstruction 是買家 coordinator 的系統提示。退貨流程取 zh-TW 的共用文案，與固定回覆同一份來源。
-// 疑似缺陷（照搬）：「訂單狀態碼：0／10／20／30／40」與 tool 實際回的狀態標籤不是同一張表。
-func coordinatorInstruction() string {
+// toolErrorGuide 說明 tool 失敗時回的代碼；下游的錯誤文字不會給模型。
+const toolErrorGuide = `tool 失敗時回傳 {"error": 代碼}：upstream_unavailable=訂單服務暫時不可用、order_not_found=查無這筆訂單、forbidden=無權查詢、tool_failed 與 delegate_failed=查詢失敗、unknown_tool=呼叫了不存在的工具。遇到錯誤時用買家的語言簡短說明查不到或請稍後再試，不要顯示代碼。`
+
+// replyRule 是回覆語言規則（A9-D15）：以買家這則訊息使用的語言回覆，判斷不了才用請求的語系。
+func replyRule(loc uitext.Locale) string {
+	fallback := "繁體中文"
+	if loc == uitext.EN {
+		fallback = "English"
+	}
+	return "以買家這則訊息使用的語言回覆；無法判斷時使用" + fallback + "。適度使用 emoji。"
+}
+
+func orderSpecialistInstruction(loc uitext.Locale) string {
+	return `你是買家訂單查詢助手。依 request 使用 get_my_orders 查訂單、get_buyer_order_detail 查單筆詳情，不需要確認。
+` + statusGuide + `
+` + toolErrorGuide + `
+` + replyRule(loc)
+}
+
+func trackingSpecialistInstruction(loc uitext.Locale) string {
+	return `你是買家包裹追蹤助手。收到訊息後直接使用 track_my_package 工具查詢配送中包裹的物流狀態，不需要確認。tool 回傳 note=no_packages_in_transit 表示目前沒有配送中的包裹。
+` + statusGuide + `
+` + toolErrorGuide + `
+` + replyRule(loc)
+}
+
+// coordinatorInstruction 是買家 coordinator 的系統提示。退貨流程取請求語系的共用文案，與固定回覆同一份來源。
+func coordinatorInstruction(loc uitext.Locale) string {
 	return `你是「Hawkr 購物小幫手」，服務對象是 Hawkr 平台上的買家。
 你的職責：理解買家意圖，委派給對的專職助手取得真實資料，最後彙整成友善回覆。
 
@@ -41,13 +68,14 @@ func coordinatorInstruction() string {
 - 先判斷意圖再呼叫；不確定就請買家澄清。
 
 退貨流程（可直接回覆，不需呼叫助手）：
-` + text.ReturnPolicyFacts(uitext.ZhTW).Text + `
+` + text.ReturnPolicyFacts(loc).Text + `
 
 一般注意事項：
 - 所有金額單位為新台幣（TWD）。
-- 訂單狀態碼：0=待付款, 10=待出貨, 20=已出貨/配送中, 30=已完成, 40=已取消。
-- 涉及退款、賠償或食安責任的具體處理，回覆：「請直接聯繫客服或要求轉接真人處理。」
-- 保持簡潔友善，使用繁體中文，適度使用 emoji。`
+- ` + statusGuide + `
+- ` + toolErrorGuide + `
+- 涉及退款、賠償或食安責任的具體處理，請買家直接聯繫客服或要求轉接真人處理。
+- 保持簡潔友善。` + replyRule(loc)
 }
 
 // Deps 是為一輪建構 agent 所需的依賴。
@@ -58,18 +86,27 @@ type Deps struct {
 	BuyerID int64
 	// Now 回現在時間（必填）。
 	Now func() time.Time
-	// OnTool 在每支 tool 執行結束時被呼叫；可能從多個 goroutine 同時呼叫。
+	// Locale 是請求的語系：買家訊息的語言判斷不了時，agent 用它回覆。
+	Locale uitext.Locale
+	// OnTool 在每次 tool 呼叫結束時被呼叫一次（成功、失敗、參數驗證失敗、panic 都算）；可能從多個 goroutine 同時呼叫。
 	OnTool func(ToolCall)
 }
 
-func (d Deps) specialist(name, description, instruction string, tools ...adktool.Tool) (agent.Agent, error) {
+// specialist 只接受 *guardedTool：沒有包過的 tool 掛不上 agent。
+func (d Deps) specialist(name, description, instruction string, tools ...*guardedTool) (agent.Agent, error) {
+	known := map[string]bool{}
+	list := make([]adktool.Tool, 0, len(tools))
+	for _, t := range tools {
+		known[t.Name()] = true
+		list = append(list, t)
+	}
 	a, err := llmagent.New(llmagent.Config{
 		Name:                  name,
 		Model:                 d.Model,
 		Description:           description,
 		Instruction:           instruction,
-		Tools:                 tools,
-		AfterToolCallbacks:    []llmagent.AfterToolCallback{d.afterTool},
+		Tools:                 list,
+		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(known)},
 		GenerateContentConfig: &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)},
 	})
 	if err != nil {
@@ -88,7 +125,7 @@ func (d Deps) OrdersSpecialist() (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.specialist("buyer_order_specialist", "查詢買家訂單清單與單筆訂單詳情", orderSpecialistInstruction, list, detail)
+	return d.specialist("buyer_order_specialist", "查詢買家訂單清單與單筆訂單詳情", orderSpecialistInstruction(d.Locale), list, detail)
 }
 
 // TrackingSpecialist 是「物流」入口直接使用的 agent。
@@ -97,7 +134,7 @@ func (d Deps) TrackingSpecialist() (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.specialist("buyer_tracking_specialist", "查詢買家配送中包裹的物流狀態", trackingSpecialistInstruction, track)
+	return d.specialist("buyer_tracking_specialist", "查詢買家配送中包裹的物流狀態", trackingSpecialistInstruction(d.Locale), track)
 }
 
 // Coordinator 是一般問答使用的 agent：不掛 function tool，兩個 specialist 以 agenttool 包起來；
@@ -114,8 +151,9 @@ func (d Deps) Coordinator() (agent.Agent, error) {
 	a, err := llmagent.New(llmagent.Config{
 		Name:                  "buyer_coordinator",
 		Model:                 d.Model,
-		Instruction:           coordinatorInstruction(),
+		Instruction:           coordinatorInstruction(d.Locale),
 		Tools:                 []adktool.Tool{agenttool.New(orders, nil), agenttool.New(tracking, nil)},
+		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(map[string]bool{orders.Name(): true, tracking.Name(): true})},
 		GenerateContentConfig: &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)},
 	})
 	if err != nil {

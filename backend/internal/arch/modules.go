@@ -58,13 +58,13 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"adksession": {"store"}, // ADK session.Service 的 pgx 實作（A9-D5）
-		"buyeragent": {"text"},  // 買家 agent 與 3 支 tool；coordinator 的退貨流程取共用文案
+		"adksession": {"store"},         // ADK session.Service 的 pgx 實作（A9-D5）
+		"buyeragent": {"model", "text"}, // 買家 agent 與 3 支 tool；tool 身分用 model.Tool，coordinator 的退貨流程取共用文案
 		"feature":    {},
 		"model":      {},
 		"store":      {},
 		"text":       {},
-		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、環形緩衝與同對話單一輪次（A9-D12、D14）
+		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次（A9-D12、D14）
 	}},
 	"procurement": {Packages: map[string][]string{
 		"feature": {},

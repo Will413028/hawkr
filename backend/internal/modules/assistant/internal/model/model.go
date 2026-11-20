@@ -19,6 +19,21 @@ const (
 // Valid 回主題是不是上面四個之一。
 func (t Topic) Valid() bool { return t >= TopicOrders && t <= TopicChat }
 
+// Tool 是助理可以使用的工具，對外是 proto 的 AssistantTool。零值不是合法的工具。
+type Tool int
+
+const (
+	// ToolGetMyOrders 查詢買家的訂單清單。
+	ToolGetMyOrders Tool = iota + 1
+	// ToolGetBuyerOrderDetail 查詢買家的單筆訂單。
+	ToolGetBuyerOrderDetail
+	// ToolTrackMyPackage 查詢配送中包裹的物流狀態。
+	ToolTrackMyPackage
+)
+
+// Valid 回工具是不是上面三個之一。
+func (t Tool) Valid() bool { return t >= ToolGetMyOrders && t <= ToolTrackMyPackage }
+
 // EventKind 是輪次事件的種類。
 type EventKind int
 
@@ -42,7 +57,7 @@ type FailureKind int
 const (
 	// FailureNoOutput 是失敗時還沒有任何文字送出（或最後一次 tool 回應之後還沒有）。
 	FailureNoOutput FailureKind = iota + 1
-	// FailureInterrupted 是已送出部分文字之後失敗。
+	// FailureInterrupted 是已送出部分文字之後失敗（含事件數超過每輪上限）。
 	FailureInterrupted
 )
 
@@ -54,10 +69,9 @@ type Event struct {
 	// Text 是 EventText 的文字增量。
 	Text string
 
-	// ToolName、ToolFailed、ToolArgs 是 EventToolResult 的內容；ToolArgs 是 tool 解析後的參數，沒有參數時是 nil。
-	ToolName   string
-	ToolFailed bool
-	ToolArgs   map[string]any
+	// Tool 與 ToolSucceeded 是 EventToolResult 的內容：用了哪支工具、有沒有成功。參數與回傳內容不進事件（A9-D13 修訂）。
+	Tool          Tool
+	ToolSucceeded bool
 
 	// SessionID 是 EventFinished 所屬的對話；退貨政策沒有對話，是請求帶的值（可為空）。
 	SessionID string
@@ -81,8 +95,6 @@ var (
 	ErrTurnInProgress = errors.New("assistant：這個對話已有一輪進行中")
 	// ErrTurnNotFound 是輪次 ID 不存在、已過保留期、單體重啟過，或不屬於呼叫的買家。
 	ErrTurnNotFound = errors.New("assistant：找不到這一輪")
-	// ErrCursorExpired 是 cursor 早於緩衝保留的第一個事件；對外 REPLAY_CURSOR_EXPIRED。
-	ErrCursorExpired = errors.New("assistant：cursor 已過期")
 	// ErrCursorAhead 是 cursor 超前於最新事件，或不是伺服器發出的值；對外 REPLAY_CURSOR_AHEAD。
 	ErrCursorAhead = errors.New("assistant：cursor 超前")
 	// ErrShuttingDown 是執行器已 Shutdown，不再受理新的一輪。

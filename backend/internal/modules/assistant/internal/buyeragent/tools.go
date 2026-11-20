@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 )
 
@@ -19,18 +20,9 @@ const StateKeyBuyer = "buyer_id"
 // ErrBuyerScope 是 tool 發現 session 的買家與這一輪的買家不一致（或缺值）時的錯誤。
 var ErrBuyerScope = errors.New("buyeragent：session 的買家與這一輪不一致")
 
-// ToolCall 是一次 tool 執行的結果，經 Deps.OnTool 回報。
-type ToolCall struct {
-	Name string
-	// Args 是模型呼叫 tool 時實際送出的參數（沒有參數時是 nil）。
-	Args map[string]any
-	// Failed 是 tool 回了錯誤；錯誤文字會回給 LLM，助理仍會接著回覆。
-	Failed bool
-}
-
 type orderQueryInput struct {
 	DateRange string `json:"date_range" jsonschema:"日期範圍：today, last_7_days, all"`
-	Status    string `json:"status,omitempty" jsonschema:"訂單狀態碼（0/10/20/30/40），空字串表示全部"`
+	Status    string `json:"status,omitempty" jsonschema:"訂單狀態碼（見系統提示的狀態碼表），可用逗號分隔多個，空字串表示全部"`
 	PageSize  int    `json:"page_size,omitempty" jsonschema:"回傳筆數（預設10，最大20）"`
 }
 
@@ -71,28 +63,22 @@ type trackingItem struct {
 }
 
 type trackingOutput struct {
-	Message  string         `json:"message,omitempty"`
+	// Note 是不帶語言的代碼（目前只有 no_packages_in_transit），模型依買家的語言轉述。
+	Note     string         `json:"note,omitempty"`
 	Packages []trackingItem `json:"packages"`
 }
 
-// orderStatusLabels 把訂單服務的狀態碼轉成給 LLM 看的中文。
-// 疑似缺陷（照搬，不修）：這張表的 20＝「待出貨」、30＝「配送中」，與 coordinator prompt 與 get_my_orders 說明寫的
-// 「20＝已出貨/配送中」不一致，track_my_package 又以狀態 20 當「配送中」查詢。
-var orderStatusLabels = map[string]string{
-	"0":  "待付款",
-	"10": "已付款（待建立物流單）",
-	"20": "待出貨（物流單已建立，待出貨）",
-	"30": "配送中",
-	"32": "待取貨",
-	"50": "已完成",
-	"80": "已取消",
-}
+// trackingStatuses 是「配送中的包裹」的訂單狀態：30 配送中、32 待取貨（CodeMeta〈業務狀態碼〉的 OrderStatus，擁有者是 ordering；
+// order-service 的 status filter 以逗號分隔多個值，見 OrderService.parseStatusFilter）。
+const trackingStatuses = "30,32"
 
-func statusLabel(code string) string {
-	if label, ok := orderStatusLabels[code]; ok {
-		return label
+// upstream 把訂單服務的錯誤記進 log，回給模型只有代碼：port 約定「不存在或不屬於該買家」回 ErrOrderNotFound。
+func upstream(ctx context.Context, tool string, err error) error {
+	if errors.Is(err, ErrOrderNotFound) {
+		return toolFail(codeOrderNotFound, err)
 	}
-	return code
+	slog.WarnContext(ctx, "assistant：訂單服務失敗", "tool", tool, "error", err)
+	return toolFail(codeUpstreamUnavailable, err)
 }
 
 // scopedBuyer 回這一輪的買家 ID，前提是 session state 記的買家與它一致。ADK v2 的 callback 與 tool 一律從 ctx.State() 讀。
@@ -112,37 +98,28 @@ func (d Deps) scopedBuyer(ctx agent.Context) (int64, error) {
 	return id, nil
 }
 
-// afterTool 是掛在 specialist 上的 AfterToolCallback：以模型實際送出的原始參數（args）與執行結果回報給 OnTool。
-// ADK 會把 tool 內的 panic 轉成 err，所以 panic 也會回報為失敗。
-func (d Deps) afterTool(_ agent.Context, t tool.Tool, args, _ map[string]any, err error) (map[string]any, error) {
-	if d.OnTool == nil {
-		return nil, nil
-	}
-	if len(args) == 0 {
-		args = nil
-	}
-	d.OnTool(ToolCall{Name: t.Name(), Args: args, Failed: err != nil})
-	return nil, nil
-}
-
-// newTool 建一支 tool：先驗身分範圍，再執行；結果由 afterTool 回報。
-func newTool[In, Out any](d Deps, name, description string, run func(ctx context.Context, buyerID int64, in In) (Out, error)) (tool.Tool, error) {
+// newTool 建一支 tool：handler 先驗身分範圍，再執行；外面包一層 guardedTool（唯一能掛上 agent 的型別）。
+func newTool[In, Out any](d Deps, id model.Tool, name, description string, run func(ctx context.Context, buyerID int64, in In) (Out, error)) (*guardedTool, error) {
 	t, err := functiontool.New(functiontool.Config{Name: name, Description: description}, func(ctx agent.Context, in In) (Out, error) {
 		var zero Out
 		buyerID, err := d.scopedBuyer(ctx)
 		if err != nil {
-			return zero, err
+			return zero, toolFail(codeForbidden, err)
 		}
 		return run(ctx, buyerID, in)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("buyeragent：建立 tool %s：%w", name, err)
 	}
-	return t, nil
+	c, ok := t.(callable)
+	if !ok {
+		return nil, fmt.Errorf("buyeragent：tool %s 不能執行（%T）", name, t)
+	}
+	return &guardedTool{inner: c, id: id, out: d.OnTool}, nil
 }
 
-func (d Deps) myOrdersTool() (tool.Tool, error) {
-	return newTool(d, "get_my_orders", "查詢買家的訂單清單，可依日期範圍和狀態篩選",
+func (d Deps) myOrdersTool() (*guardedTool, error) {
+	return newTool(d, model.ToolGetMyOrders, "get_my_orders", "查詢買家的訂單清單，可依日期範圍和狀態篩選",
 		func(ctx context.Context, buyerID int64, in orderQueryInput) (orderQueryOutput, error) {
 			pageSize := in.PageSize
 			if pageSize <= 0 || pageSize > 20 {
@@ -150,13 +127,13 @@ func (d Deps) myOrdersTool() (tool.Tool, error) {
 			}
 			orders, err := d.Orders.MyOrders(ctx, buyerID, in.Status, 1, pageSize)
 			if err != nil {
-				return orderQueryOutput{}, fmt.Errorf("查詢訂單失敗: %w", err)
+				return orderQueryOutput{}, upstream(ctx, "get_my_orders", err)
 			}
 			orders = filterByDateRange(orders, in.DateRange, d.Now())
 			items := make([]orderItem, 0, len(orders))
 			for _, o := range orders {
 				items = append(items, orderItem{
-					OrderNo: o.OrderNo, Status: statusLabel(o.Status), SellerName: o.SellerName,
+					OrderNo: o.OrderNo, Status: o.Status, SellerName: o.SellerName,
 					ItemCount: o.ItemCount, AmountTWD: o.Amount, CreateTimeMs: o.CreateTime.UnixMilli(),
 				})
 			}
@@ -164,16 +141,16 @@ func (d Deps) myOrdersTool() (tool.Tool, error) {
 		})
 }
 
-func (d Deps) orderDetailTool() (tool.Tool, error) {
-	return newTool(d, "get_buyer_order_detail", "查詢買家單筆訂單的詳細資訊",
+func (d Deps) orderDetailTool() (*guardedTool, error) {
+	return newTool(d, model.ToolGetBuyerOrderDetail, "get_buyer_order_detail", "查詢買家單筆訂單的詳細資訊",
 		func(ctx context.Context, buyerID int64, in orderDetailInput) (orderDetailOutput, error) {
 			detail, err := d.Orders.OrderDetail(ctx, buyerID, in.OrderNo)
 			if err != nil {
-				return orderDetailOutput{}, fmt.Errorf("查詢訂單 %s 失敗: %w", in.OrderNo, err)
+				return orderDetailOutput{}, upstream(ctx, "get_buyer_order_detail", err)
 			}
 			return orderDetailOutput{Result: map[string]any{
 				"order_no":        detail.OrderNo,
-				"status":          statusLabel(detail.Status),
+				"status":          detail.Status,
 				"amount_twd":      detail.Amount,
 				"seller_name":     detail.SellerName,
 				"shipping_method": detail.ShippingMethod,
@@ -185,15 +162,15 @@ func (d Deps) orderDetailTool() (tool.Tool, error) {
 		})
 }
 
-func (d Deps) trackingTool() (tool.Tool, error) {
-	return newTool(d, "track_my_package", "查詢買家配送中的包裹物流狀態",
+func (d Deps) trackingTool() (*guardedTool, error) {
+	return newTool(d, model.ToolTrackMyPackage, "track_my_package", "查詢買家配送中的包裹物流狀態",
 		func(ctx context.Context, buyerID int64, _ trackingInput) (trackingOutput, error) {
-			orders, err := d.Orders.MyOrders(ctx, buyerID, "20", 1, 10)
+			orders, err := d.Orders.MyOrders(ctx, buyerID, trackingStatuses, 1, 10)
 			if err != nil {
-				return trackingOutput{}, fmt.Errorf("查詢配送中訂單失敗: %w", err)
+				return trackingOutput{}, upstream(ctx, "track_my_package", err)
 			}
 			if len(orders) == 0 {
-				return trackingOutput{Message: "目前沒有配送中的包裹"}, nil
+				return trackingOutput{Note: "no_packages_in_transit"}, nil
 			}
 			packages := make([]trackingItem, 0, len(orders))
 			for _, o := range orders {
@@ -203,7 +180,7 @@ func (d Deps) trackingTool() (tool.Tool, error) {
 					continue
 				}
 				packages = append(packages, trackingItem{
-					OrderNo: detail.OrderNo, Status: statusLabel(detail.Status), ShippingMethod: detail.ShippingMethod,
+					OrderNo: detail.OrderNo, Status: detail.Status, ShippingMethod: detail.ShippingMethod,
 					ShippingStatus: detail.ShippingStatus, SellerName: detail.SellerName, Amount: detail.Amount,
 				})
 			}

@@ -38,18 +38,24 @@
 
 **主題與 agent**：`TopicOrders` 直接用訂單 specialist（空訊息時用預設訊息「查詢我的訂單」），`TopicTracking` 用物流 specialist（預設訊息「查詢包裹狀態」），`TopicChat` 用 coordinator（兩個 specialist 以 agenttool 掛上，不掛 function tool；空訊息回 `ErrMessageRequired`），`TopicReturnPolicy` 回固定文案、不呼叫 LLM、不建 session。tool 三支：`get_my_orders`、`get_buyer_order_detail`、`track_my_package`，都只經 `OrderReader` port 讀訂單。
 
-**送出流程**（回傳前同步完成）：拒絕在 transaction 內呼叫（`ErrOuterTx`）→ 主題與訊息檢查（`ErrInvalidTopic`、`ErrMessageRequired`）→ 解析對話：`SessionID` 空則建立（state 只有 `buyer_id`，十進位字串；失敗回 `ErrSessionCreate`），非空則必須已存在且屬於該買家（否則 `ErrSessionNotFound`，不自動建立）→ 佔用對話（`ErrTurnInProgress`）→ 登記輪次並起背景 goroutine。
+**送出流程**（回傳前同步完成）：拒絕在 transaction 內呼叫（`ErrOuterTx`）→ 主題與訊息檢查（`ErrInvalidTopic`、`ErrMessageRequired`）→ 在同一把鎖內依序檢查已關閉（`ErrShuttingDown`）、佔用對話（`ErrTurnInProgress`）、`wg.Add`；新對話的 ID 由伺服器先產生（UUID，用 `session.CreateRequest.SessionID` 傳入）→ 寫或讀 session：`SessionID` 空則以產生的 ID 建立（state 只有 `buyer_id`，十進位字串；失敗回 `ErrSessionCreate`），非空則必須已存在且屬於該買家（否則 `ErrSessionNotFound`，不自動建立；別的買家的 session 同樣是 NotFound）→ 登記輪次並起背景 goroutine。佔用與 `wg` 在 session 寫入之前取得，所以 `Shutdown` 之後不會有沒有輪次的 session；任何一步失敗都釋放佔用並 `wg.Done`（`TestFailedSessionWriteReleasesTheGuardAndTheWaitGroup`）。
 
 **單一進行中輪次（A9-D14）**：記憶體裡以 `buyerID/sessionID` 為鍵的佔用標記。釋放發生在終止事件寫入之前：client 一收到 finished 或 error 就能重送。正常結束、LLM 錯誤、panic、輪次逾時（`DefaultTimeout` 2 分鐘）、`Shutdown` 取消都會釋放。退貨政策不建 session，不佔用。
 
-**事件**：`text`（文字增量）、`tool_result`（tool 名稱、是否失敗、tool 解析後的參數）、`finished`（對話 ID）、`error`（`FailureNoOutput`＝還沒有任何文字、`FailureInterrupted`＝已送出部分文字，加上依語系的訊息）。`finished` 與 `error` 是終止事件，之後沒有事件。tool 失敗不終止這一輪：錯誤文字回給 LLM，助理仍回覆。文字規則：partial 的 chunk 逐段送出；非 partial 到達時只補送沒送過的尾巴；tool 回應之後重新計算；thought part 不外流。
+**事件**：`text`（文字增量）、`tool_result`（`Tool` 列舉＝三支 tool 之一、`ToolSucceeded`；對外是 `AssistantToolResult{tool, succeeded}`，顯示文字在共用文案目錄 `assistant.AssistantTool.*`；不帶參數與回傳內容，A9-D13 修訂）、`finished`（對話 ID）、`error`（`FailureNoOutput`＝還沒有任何文字、`FailureInterrupted`＝已送出部分文字，加上依語系的訊息）。`finished` 與 `error` 是終止事件，之後沒有事件。tool 失敗不終止這一輪：模型只收到錯誤代碼，助理仍回覆。文字規則：partial 的 chunk 逐段送出；非 partial 到達時只補送沒送過的尾巴；tool 回應之後重新計算；thought part 不外流。
 
-**環形緩衝**：每輪 `DefaultBufferCapacity`（1024）個事件，序號從 1 起，cursor 是序號的十進位字串。輪次結束後保留 `DefaultRetention`（10 分鐘）供續看，超過時下一次送出或訂閱時清掉。`WatchTurn`：輪次不存在、已清掉或不屬於該買家回 `ErrTurnNotFound`；cursor 早於緩衝起點回 `ErrCursorExpired`；cursor 超前最新事件或不是數字回 `ErrCursorAhead`。迭代器在終止事件後結束；ctx 結束（handler 的 100 秒）時正常結束；消費太慢被覆蓋時以 `ErrCursorExpired` 結束。
+**finished 的條件（A9-D15 第 4 點）**：事件迭代正常結束，而且看過根 agent 的最終回應（`IsFinalResponse`、作者是根 agent、沒有 `ErrorCode`）；否則一律是 `error`。取消、逾時、`Shutdown`、模型安靜停下、緩衝寫滿都落在這一條，迴圈之後不再看 `ctx.Err()`（`TestStreamThatEndsWithoutTheFinalResponseIsNotFinished`、`TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError`）。`Config.ToolObserver` 是觀察點：每次 tool 呼叫收到 tool、名稱、參數的深拷貝與是否失敗，只給測試與日後的指標，不進事件；characterization 靠它比對 tool 名稱與參數。
 
-**對外對應（A9-2c 實作）**：`ErrTurnInProgress` → `FAILED_PRECONDITION` + `ASSISTANT_TURN_IN_PROGRESS`；`ErrCursorExpired`／`ErrCursorAhead` → `FAILED_PRECONDITION` + `REPLAY_CURSOR_EXPIRED`／`REPLAY_CURSOR_AHEAD`；`ErrTurnNotFound`、`ErrSessionNotFound` → `NOT_FOUND`；`ErrMessageRequired`、`ErrInvalidTopic` → `INVALID_ARGUMENT`；`ErrSessionCreate` → `INTERNAL`。`error` 事件的 `ErrorReason` 未決（見 CARRYOVER 的待決）。
+**tool 包裝層（A9-D15 第 3 點）**：所有 function tool 都是 `buyeragent.guardedTool`，包在 `tool.Tool.Run` 外層，`specialist()` 只接受這個型別。它 recover panic（stack 只進 slog）、把任何錯誤換成固定代碼回給模型（`tool_failed`、`upstream_unavailable`、`order_not_found`、`forbidden`；下游的錯誤文字只進 log），並且每次呼叫恰好回報一次——參數驗證失敗與 panic 都算。模型叫了不存在的 tool 時，ADK 的預設錯誤文字會列出所有 tool 名稱，所以每個 agent 掛 `OnToolErrorCallback`：模型只看到 `unknown_tool`（coordinator 委派 specialist 失敗是 `delegate_failed`）；沒有對應的 `AssistantTool`，不能表示成 `tool_result`（UNSPECIFIED 不得當合法值），只記 log。
 
-**身分範圍**：每支 tool 自己驗：session state 的 `buyer_id` 必須等於這一輪的買家，否則 tool 回錯（`ErrBuyerScope`），不呼叫訂單服務。agent 與 tool 為每一輪重新建構，tool 完成時經回呼寫 `tool_result` 事件。
+**語言與代碼（A9-D15 第 2 點）**：agent 以買家這則訊息的語言回覆，判斷不了才用請求語系（系統提示的 `replyRule`）；退貨政策固定文案依請求語系（`text.ReturnPolicy*`）。tool 回給模型的 `status` 是訂單狀態代碼，不是標籤；`track_my_package` 沒有包裹時回 `note=no_packages_in_transit`。狀態碼表在系統提示（`statusGuide`），來源是 CodeMeta〈業務狀態碼〉的 OrderStatus（0、10、20、30、32、35、40、50、54、60、70、80），`TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource` 比對。追蹤 tool 查「30,32」（配送中、待取貨；order-service 的 status filter 以逗號分隔），舊服務查 20（待出貨）是缺陷，已更正。
+
+**事件緩衝（A9-D15 第 5 點）**：每輪一個只增不減的緩衝，上限 `DefaultBufferCapacity`（4096，含終止事件）個事件，序號從 1 起，cursor 是序號的十進位字串；不覆蓋舊事件，所以沒有「cursor 過期」。最後一格保留給終止事件：一般事件寫滿時，這一輪被中止（取消 runner、記 log），以 `error` 終止（已有文字是 `FailureInterrupted`，否則 `FailureNoOutput`），佔用照常在終止事件之前釋放（`TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession`、`TestBufferNeverOverwritesAndKeepsTheLastSlotForTheTerminalEvent`）。切片隨事件增長，不預先配置。輪次結束後保留 `DefaultRetention`（10 分鐘）供續看，超過時下一次送出或訂閱時清掉。`WatchTurn`：輪次不存在、已清掉或不屬於該買家回 `ErrTurnNotFound`；cursor 超前最新事件或不是非負整數回 `ErrCursorAhead`。迭代器在終止事件後結束；ctx 結束（handler 的 100 秒）時正常結束。
+
+**對外對應（A9-2c 實作）**：`ErrTurnInProgress` → `FAILED_PRECONDITION` + `ASSISTANT_TURN_IN_PROGRESS`；`ErrCursorAhead` → `FAILED_PRECONDITION` + `REPLAY_CURSOR_AHEAD`；`ErrShuttingDown` → `UNAVAILABLE`；`ErrTurnNotFound`、`ErrSessionNotFound` → `NOT_FOUND`；`ErrMessageRequired`、`ErrInvalidTopic` → `INVALID_ARGUMENT`；`ErrSessionCreate` → `INTERNAL`。`error` 事件的 `ErrorReason` 未決（見 CARRYOVER 的待決）。
+
+**身分範圍**：每支 tool 自己驗：session state 的 `buyer_id` 必須等於這一輪的買家，否則 tool 回 `forbidden`（內部 `ErrBuyerScope`），不呼叫訂單服務。agent 與 tool 為每一輪重新建構，包裝層在 tool 完成時經回呼寫 `tool_result` 事件。
 
 **不在 transaction 內**：輪次執行不開 transaction，也不接受在 transaction 內的 ctx；session 寫入由 `adksession` 在最上層開。
 
-**驗收**：`internal/turn` 的 characterization 測試鎖舊 ai-service 的行為（比對 fixture 的事件種類與順序、文字串接、tool 名稱與參數、結束或錯誤、LLM 請求的路由、使用者文字、回給 LLM 的 tool 結果）；跳過 `latest_session_*`（A9-2c）。
+**驗收**：`internal/turn` 的 characterization 測試鎖舊 ai-service 的行為（比對 fixture 的事件種類與順序、文字串接、經觀察點取得的 tool 名稱與參數、結束或錯誤、LLM 請求的路由、使用者文字、回給 LLM 的 tool 結果）；回給 LLM 的 tool 結果有 6 份 fixture 是 A9-D15 的刻意偏離（狀態標籤改代碼、下游錯誤文字改代碼、追蹤查詢狀態），每份在測試的 `fedBackDeviations` 與 `statusRemap` 寫理由，其餘必須逐字相同；跳過 `latest_session_*`（A9-2c）。

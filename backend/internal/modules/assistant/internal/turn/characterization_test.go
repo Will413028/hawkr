@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,9 +23,12 @@ import (
 //   - text：種類、順序、每段文字完全相同。
 //   - done → finished（帶 session ID）；error 之後舊路徑還會送 done，新串流 error 之後沒有事件，只比到 error。
 //   - error：code 500 的兩句文案對應 FailureNoOutput（查詢失敗）與 FailureInterrupted（回應中斷），文字相同。
-//   - tool_result：舊路徑沒有，名稱與參數取自 scripted_llm 的 function_call（限三支 tool，agenttool 的委派不算），
-//     是否失敗取自 observed_llm_requests 裡回給 LLM 的 function response 有沒有 error；
+//   - tool_result：舊路徑沒有，tool 身分取自 scripted_llm 的 function_call（限三支 tool，agenttool 的委派不算），
+//     成功與否取自 observed_llm_requests 裡回給 LLM 的 function response 有沒有 error；
 //     所有 fixture 的對外文字都在 tool 呼叫之後，所以預期序列是 tool_result 在前、舊事件在後，實際序列不同就失敗。
+//     事件不帶參數（A9-D13 修訂）：tool 名稱與參數改由 Config.ToolObserver 觀察到的呼叫與 scripted_llm 的 function_call 逐一比對。
+//   - 刻意偏離（A9-D15）：回給 LLM 的 tool 結果不再帶中文狀態標籤與下游錯誤文字，改為狀態代碼與錯誤代碼；
+//     追蹤 tool 的查詢狀態從 20（待出貨）改為 30、32（配送中、待取貨），見 fedBackDeviations 與 statusRemap，每一筆有理由。
 
 const fixtureDir = "../../../../../docs/plans/2026-11-19-a9-agent/fixtures/assistant"
 
@@ -93,7 +97,29 @@ var skippedFixtures = map[string]string{
 	"latest_session_empty":      "BuyerLatestSession 是 A9-2c 的 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器",
 }
 
-var toolNames = map[string]bool{"get_my_orders": true, "get_buyer_order_detail": true, "track_my_package": true}
+var toolIDs = map[string]model.Tool{
+	"get_my_orders":          model.ToolGetMyOrders,
+	"get_buyer_order_detail": model.ToolGetBuyerOrderDetail,
+	"track_my_package":       model.ToolTrackMyPackage,
+}
+
+// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture（A9-D15 第 2、3 點）；其餘 fixture 必須逐字相同。
+// 不在這裡的 fixture 不得偏離，所以新增偏離一定要寫理由。
+var fedBackDeviations = map[string]string{
+	"orders_happy_path":                  "status 由中文標籤改為狀態代碼（A9-D15 第 2 點）：「待出貨（物流單已建立，待出貨）」→ 20、「配送中」→ 30",
+	"llm_error_after_tool_call":          "同 orders_happy_path：status 由標籤改為代碼",
+	"order_detail_via_coordinator":       "同 orders_happy_path：訂單詳情的 status 由標籤改為代碼",
+	"tool_error_assistant_still_replies": "tool 錯誤不再把下游錯誤文字（「查詢訂單失敗: …」）給模型，改為代碼 upstream_unavailable（A9-D15 第 3 點）",
+	"tracking_no_packages":               "「目前沒有配送中的包裹」中文句改為代碼 note=no_packages_in_transit，空清單由 null 改為 []（A9-D15 第 2 點）",
+	"tracking_partial_detail_failure":    "status 由標籤改為代碼，且追蹤查詢的狀態由 20 改為 30、32（見 statusRemap）",
+}
+
+// statusRemap 是追蹤 tool 查詢狀態改變帶來的 fixture 輸入調整：舊 tool 查狀態 20（CodeMeta 的「待出貨」，不是配送中），
+// 新 tool 查 30、32（配送中、待取貨）；fixture 的訂單與詳情的狀態 20 與 30 互換，其餘輸入不動。
+var statusRemap = map[string]string{
+	"tracking_no_packages":            "舊 tool 以狀態 20 選包裹、新 tool 以 30、32 選：fixture 的 20 與 30 互換，被選中的訂單與原錄製相同",
+	"tracking_partial_detail_failure": "同 tracking_no_packages",
+}
 
 func loadFixtures(t *testing.T) []fixture {
 	t.Helper()
@@ -134,10 +160,23 @@ func (f fixture) orders() *fakeOrders {
 	if f.Backend.OrdersError != "" {
 		o.ordersErr = errors.New(f.Backend.OrdersError)
 	}
+	remap := func(status string) string {
+		if _, ok := statusRemap[f.Scenario]; ok {
+			switch status {
+			case "20":
+				return "30"
+			case "30":
+				return "20"
+			}
+		}
+		return status
+	}
 	for _, x := range f.Backend.Orders {
+		x.Status = remap(x.Status)
 		o.orders = append(o.orders, buyeragent.Order{OrderNo: x.OrderNo, Status: x.Status, SellerName: x.SellerName, Amount: x.Amount, CreateTime: time.UnixMilli(x.CreateTimeMs), ItemCount: x.ItemCount})
 	}
 	for k, d := range f.Backend.Details {
+		d.Status = remap(d.Status)
 		o.details[k] = buyeragent.OrderDetail{
 			OrderNo: d.OrderNo, Status: d.Status, SellerName: d.SellerName, ShippingMethod: d.ShippingMethod, ShippingStatus: d.ShippingStatus,
 			RecipientName: d.RecipientName, PaymentMethod: d.PaymentMethod, Amount: d.Amount, CreateTime: time.UnixMilli(d.CreateTimeMs), ShippingFee: d.ShippingFee,
@@ -175,7 +214,7 @@ func (f fixture) expectedEvents(sessionID string) []model.Event {
 		for _, fr := range o.FunctionResponsesBack {
 			name, _ := fr["name"].(string)
 			if resp, ok := fr["response"].(map[string]any); ok {
-				if _, hasErr := resp["error"]; hasErr && toolNames[name] {
+				if _, hasErr := resp["error"]; hasErr && toolIDs[name] != 0 {
 					failedTool[name] = true
 				}
 			}
@@ -183,14 +222,10 @@ func (f fixture) expectedEvents(sessionID string) []model.Event {
 	}
 	for _, c := range f.Script {
 		for _, ch := range c.Chunks {
-			if ch.FunctionCall == nil || !toolNames[ch.FunctionCall.Name] {
+			if ch.FunctionCall == nil || toolIDs[ch.FunctionCall.Name] == 0 {
 				continue
 			}
-			var args map[string]any
-			if len(ch.FunctionCall.Args) > 0 {
-				args = ch.FunctionCall.Args
-			}
-			tools = append(tools, model.Event{Kind: model.EventToolResult, ToolName: ch.FunctionCall.Name, ToolFailed: failedTool[ch.FunctionCall.Name], ToolArgs: args})
+			tools = append(tools, model.Event{Kind: model.EventToolResult, Tool: toolIDs[ch.FunctionCall.Name], ToolSucceeded: !failedTool[ch.FunctionCall.Name]})
 		}
 	}
 	out := tools
@@ -227,7 +262,16 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 			}
 			llm := &scriptedLLM{script: f.Script}
 			orders := f.orders()
+			var (
+				obsMu sync.Mutex
+				calls []buyeragent.ToolCall
+			)
 			e := newExecutor(t, llm, orders, func(c *Config) {
+				c.ToolObserver = func(tc buyeragent.ToolCall) {
+					obsMu.Lock()
+					calls = append(calls, tc)
+					obsMu.Unlock()
+				}
 				if f.Scenario == "session_create_failure" {
 					c.Sessions = failingSessions{c.Sessions}
 				}
@@ -266,6 +310,31 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				gj, _ := json.MarshalIndent(got, "", " ")
 				wj, _ := json.MarshalIndent(want, "", " ")
 				t.Fatalf("事件序列不同\n got: %s\nwant: %s", gj, wj)
+			}
+			// tool 名稱與參數：由觀察點與錄製的 function_call 逐一比對（事件不帶參數）。
+			obsMu.Lock()
+			gotCalls := append([]buyeragent.ToolCall(nil), calls...)
+			obsMu.Unlock()
+			var wantCalls []buyeragent.ToolCall
+			for _, sc := range f.Script {
+				for _, ch := range sc.Chunks {
+					if ch.FunctionCall != nil && toolIDs[ch.FunctionCall.Name] != 0 {
+						var args map[string]any
+						if len(ch.FunctionCall.Args) > 0 {
+							args = ch.FunctionCall.Args
+						}
+						wantCalls = append(wantCalls, buyeragent.ToolCall{Tool: toolIDs[ch.FunctionCall.Name], Name: ch.FunctionCall.Name, Args: args})
+					}
+				}
+			}
+			if len(gotCalls) != len(wantCalls) {
+				t.Fatalf("tool 呼叫 %d 次，錄製是 %d 次：%+v", len(gotCalls), len(wantCalls), gotCalls)
+			}
+			for i := range gotCalls {
+				g, w := gotCalls[i], wantCalls[i]
+				if g.Tool != w.Tool || g.Name != w.Name || !reflect.DeepEqual(g.Args, w.Args) {
+					t.Errorf("第 %d 次 tool 呼叫 = %+v，錄製是 %+v", i, g, w)
+				}
 			}
 			if f.Input.RPC != "BuyerReturnPolicy" && ref.SessionID == "" {
 				t.Fatal("非退貨政策的輪次要有 session ID")
@@ -308,7 +377,7 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				}
 				gj, _ := json.Marshal(s.FunctionResponsesBack)
 				wj, _ := json.Marshal(o.FunctionResponsesBack)
-				if string(gj) != string(wj) && (len(s.FunctionResponsesBack) != 0 || len(o.FunctionResponsesBack) != 0) {
+				if _, deviates := fedBackDeviations[f.Scenario]; !deviates && string(gj) != string(wj) && (len(s.FunctionResponsesBack) != 0 || len(o.FunctionResponsesBack) != 0) {
 					t.Errorf("第 %d 次呼叫回給 LLM 的 tool 結果不同\n got: %s\nwant: %s", i, gj, wj)
 				}
 			}

@@ -33,15 +33,6 @@ func TestFilterByDateRange(t *testing.T) {
 	}
 }
 
-func TestStatusLabelFallsBackToTheCode(t *testing.T) {
-	if got := statusLabel("30"); got != "配送中" {
-		t.Errorf("30 = %q", got)
-	}
-	if got := statusLabel("999"); got != "999" {
-		t.Errorf("未知狀態碼要原樣回傳，得到 %q", got)
-	}
-}
-
 func TestFilterByDateRangeTodayIsTheTaipeiDay(t *testing.T) {
 	// 2026-11-20 23:00 UTC 是台北 11-21 07:00；今天從台北 11-21 00:00（UTC 11-20 16:00）起算。
 	now := time.Date(2026, 11, 20, 23, 0, 0, 0, time.UTC)

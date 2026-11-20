@@ -9,7 +9,6 @@ import (
 	"time"
 
 	adkmodel "google.golang.org/adk/v2/model"
-	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 
@@ -46,22 +45,43 @@ func TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError(t *testing.T) {
 	}
 }
 
-func TestCancelledTurnWhoseEventStreamEndsWithoutAnErrorIsNotFinished(t *testing.T) {
-	e := newExecutor(t, textLLM("unused"), &fakeOrders{}, nil)
-	e.events = func(ctx context.Context, _ *runner.Runner, _, _ string, _ *genai.Content) iter.Seq2[*session.Event, error] {
-		return func(yield func(*session.Event, error) bool) {
-			ev := session.NewEvent(ctx, "inv")
-			ev.Partial = true
-			ev.Content = genai.NewContentFromText("半句", genai.RoleModel)
-			if !yield(ev, nil) {
-				return
-			}
-			e.cancel()
-			<-ctx.Done() // 等取消傳到這一輪，然後不回錯誤就結束
+// partialThenQuietLLM 先回一段 partial 文字，再等到 ctx 結束就停止迭代、不回錯誤：事件流在沒有最終回應時正常結束。
+type partialThenQuietLLM struct{ started chan struct{} }
+
+func (partialThenQuietLLM) Name() string { return "partial-quiet" }
+
+func (l partialThenQuietLLM) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, _ bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	return func(yield func(*adkmodel.LLMResponse, error) bool) {
+		if !yield(&adkmodel.LLMResponse{Partial: true, Content: genai.NewContentFromText("半句", genai.RoleModel)}, nil) {
+			return
 		}
+		l.started <- struct{}{}
+		<-ctx.Done()
 	}
+}
+
+func TestStreamThatEndsWithoutTheFinalResponseIsNotFinished(t *testing.T) {
+	l := partialThenQuietLLM{started: make(chan struct{}, 1)}
+	e := newExecutor(t, l, &fakeOrders{}, nil)
 	ref, err := submitChat(t, e, "", "你好")
 	if err != nil {
+		t.Fatal(err)
+	}
+	<-l.started
+	// 半句文字已進緩衝，才取消：否則「已送出部分文字」要看排程。
+	seq, err := e.Watch(context.Background(), buyer, ref.TurnID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for ev, err := range seq {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ev.Kind == model.EventText {
+			break
+		}
+	}
+	if err := e.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
@@ -176,7 +196,7 @@ func TestToolPanicIsReportedAsAFailedToolResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	if len(evs) < 2 || evs[0].Kind != model.EventToolResult || !evs[0].ToolFailed {
+	if len(evs) < 2 || evs[0].Kind != model.EventToolResult || evs[0].ToolSucceeded {
 		t.Fatalf("tool panic 要有一個 failed 的 tool_result：%+v", evs)
 	}
 	if evs[len(evs)-1].Kind != model.EventFinished {
@@ -184,21 +204,36 @@ func TestToolPanicIsReportedAsAFailedToolResult(t *testing.T) {
 	}
 }
 
-func TestToolArgsAreWhatTheModelSent(t *testing.T) {
+func TestToolObserverSeesTheArgsTheModelSentAndTheEventCarriesNone(t *testing.T) {
 	llm := &scriptedLLM{script: []scriptedCall{
 		// page_size 0 是模型送的；解析成 struct 再序列化會因 omitempty 把它吃掉。
 		{Chunks: []chunk{{FunctionCall: &chunkCall{Name: "get_my_orders", Args: map[string]any{"date_range": "all", "page_size": float64(0)}}}}},
 		{Chunks: []chunk{{Text: "好"}}},
 	}}
-	e := newExecutor(t, llm, &fakeOrders{}, nil)
+	var (
+		mu    sync.Mutex
+		calls []buyeragent.ToolCall
+	)
+	e := newExecutor(t, llm, &fakeOrders{}, func(c *Config) {
+		c.ToolObserver = func(tc buyeragent.ToolCall) {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, tc)
+			tc.Args["date_range"] = "tampered" // 觀察點拿到的是拷貝：改它不影響 ADK
+		}
+	})
 	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, Message: "查我的訂單"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	args := evs[0].ToolArgs
-	if evs[0].Kind != model.EventToolResult || len(args) != 2 || args["date_range"] != "all" || args["page_size"] != float64(0) {
-		t.Fatalf("ToolArgs 要是模型送的原樣：%+v", evs[0])
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 1 || calls[0].Name != "get_my_orders" || calls[0].Tool != model.ToolGetMyOrders || calls[0].Failed || len(calls[0].Args) != 2 || calls[0].Args["page_size"] != float64(0) {
+		t.Fatalf("觀察到的呼叫：%+v", calls)
+	}
+	if want := (model.Event{Kind: model.EventToolResult, Cursor: "1", Tool: model.ToolGetMyOrders, ToolSucceeded: true}); evs[0] != want {
+		t.Fatalf("tool_result 事件 = %+v，要 %+v（不帶參數）", evs[0], want)
 	}
 }
 
@@ -217,7 +252,7 @@ func TestOrderDetailResultIsWrappedInResult(t *testing.T) {
 	fed := llm.seen()[1].FunctionResponsesBack
 	resp, _ := fed[0]["response"].(map[string]any)
 	inner, _ := resp["result"].(map[string]any)
-	if inner["order_no"] != "A1" || inner["status"] != "配送中" || inner["amount_twd"] != float64(120) {
+	if inner["order_no"] != "A1" || inner["status"] != "30" || inner["amount_twd"] != float64(120) {
 		t.Fatalf("回給 LLM 的結果要是 {result:{…}}：%v", fed)
 	}
 }
