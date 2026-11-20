@@ -150,7 +150,7 @@
 
 拆 2a、2b：
 
-- **2a 資料與送出**：schema（UUIDv7、`seq`、`last_read_seq`）、送出守門（停權→停業→封鎖，含 A6-D1 的例外）、`orderservice.GetOrderForAfterSales`、`HasOrderBetween`、帳號與身分刪除的抹除（ID3）、`imrelay`、buyer／seller／identity 事件改 in-process 訂閱。
+- **2a 資料與送出**，照 A6-1 拆成兩個 session：**2a0** 設計書 `2026-11-19-a6-review-im-crm/step-2a-design.md` 與開工 design-review；**2a1**（被擋於 2a0 與設計書 §10 的 Will 決定）實作與完成前 design-review。內容：schema（UUIDv7、`seq`、`last_read_seq`）、送出守門（停權→停業→封鎖，含 A6-D1 的例外）、`orderservice.GetOrderForAfterSales`、`HasOrderBetween`、帳號與身分刪除的抹除（ID3）、`imrelay`、buyer／seller／identity 事件改 in-process 訂閱。
 - **2b 即時通道**：依 A6-D3；hub 單進程扇出；presence 依 A6-D5。
 - 刪帳：ID3 依身分抹除；依 A6-D9 訂閱 buyer、seller 的刪除事件（同 tx 只寫複本與排抹除 job），lockorder integration 測試涵蓋 im。
 - 消費端：gateway `G/handler/chat.go`、`gatewayproxy` 的 WebSocket 轉發；notification-service 的 `chat.message.sent`。
@@ -228,3 +228,4 @@
 | A6-1a review 設計 | 完成（2026-11-19） | 基線（上表）；開工 design-review 1 輪：2 輪，累計 findings 9 (blocking 0)，fixed 8、raised 2（A6-D9、第 9 項，Will 已決）；處理對照在設計書 §10 | — |
 | A6-1b review 模組本體 | 完成（2026-11-20） | 本機 build、vet（含 integration tag）、`go test ./...`、`make lint-monolith`、`make sqlc` 無 drift；CI（PR #407）含 testcontainers integration 全綠；mutation：本機 RD2、RD9（submit 與 legacy client）、公開述詞守門、token 空白與重複、OrderForReview 欄位檢查、Hide/Restore utf8、A6-D10 皆 killed，CI 一次批次（run 44570770267）RD1、RD2、RD3、RD6、RD7、RD9、RD10、F2、F3、F6 共 13 個 mutant 皆 killed；審查：`/code-review` 1 輪＋diff 審查 1 輪，findings 12 (blocking 0)，fixed 10、recorded 1、raised 1（A6-D10，Will 已決）、rejected 0 | F2（拿掉 `UNIQUE(review_id, asset_id)`）的 kill 沒確認是斷言失敗還是 migration checksum 先錯；同一性質另有單元層「重複 token 被拒」的 mutation 證明。媒體同步的 worker 與定期清理已在本步寫好、未接 `cmd/hawkr`，A6-1c 只剩接線與驗證（diff 審查 should，recorded） |
 | A6-1c 刪帳、媒體同步、reviewrelay | 完成（2026-11-20） | 本機 build、vet（含 integration tag）、`go test ./...`、`make lint-monolith`、`make sqlc` 無 drift；CI run 44649008948 四個 job 全綠（含 testcontainers integration）；mutation：CI run 44650114789 共 12 個 mutant 皆 killed（作者鎖兩側、Submit 交易內重查、排 purge、每批 `ReviewAggregateChanged`、purge 刪除、三處 `inactive_authors` 過濾、relay 送出 job 唯一、保底掃描兩個）；審查：`/code-review` 1 輪＋diff 審查 2 輪 findings 9 (blocking 0)，fixed 8、rejected 1；完成前 design-review findings 4 (blocking 0)，fixed 2（第 1 項 A6-D13 Will 決定）、recorded 1、rejected 1 | 鎖序 mutant 沒做（改動不是單一檢查）；評分讀取仍走舊 review-service（A6-D11，A6-6e 換）；social 的 purge 同樣缺保底掃描，未改 |
+| A6-2a0 im 資料與送出的設計 | 程式完成待決定（2026-11-20）：設計書 `step-2a-design.md` 完成，等 Will 拍板 §10 W1–W6 | 開工 design-review 2 輪：findings 9 (blocking 0)，fixed 7、raised 1（W6）、rejected 1；處理對照在設計書 §11 | 無程式、無測試（設計步驟）；W1–W6 未決，A6-2a1 被擋 |
