@@ -127,6 +127,9 @@ const (
 	// 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
 	// client 可以讓使用者直接重試。額度退回。
 	ErrorReason_IMAGE_NOT_PRODUCED ErrorReason = 29
+	// 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
+	// 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
+	ErrorReason_ASSISTANT_TURN_IN_PROGRESS ErrorReason = 30
 )
 
 // Enum value maps for ErrorReason.
@@ -162,6 +165,7 @@ var (
 		27: "IMAGE_SAFETY_BLOCKED",
 		28: "IMAGE_RECITATION_BLOCKED",
 		29: "IMAGE_NOT_PRODUCED",
+		30: "ASSISTANT_TURN_IN_PROGRESS",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -194,6 +198,7 @@ var (
 		"IMAGE_SAFETY_BLOCKED":         27,
 		"IMAGE_RECITATION_BLOCKED":     28,
 		"IMAGE_NOT_PRODUCED":           29,
+		"ASSISTANT_TURN_IN_PROGRESS":   30,
 	}
 )
 
@@ -228,7 +233,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xb3\x06\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xd3\x06\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -260,7 +265,8 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x14IMAGE_QUOTA_EXCEEDED\x10\x1a\x12\x18\n" +
 	"\x14IMAGE_SAFETY_BLOCKED\x10\x1b\x12\x1c\n" +
 	"\x18IMAGE_RECITATION_BLOCKED\x10\x1c\x12\x16\n" +
-	"\x12IMAGE_NOT_PRODUCED\x10\x1dB\x82\x02\n" +
+	"\x12IMAGE_NOT_PRODUCED\x10\x1d\x12\x1e\n" +
+	"\x1aASSISTANT_TURN_IN_PROGRESS\x10\x1eB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

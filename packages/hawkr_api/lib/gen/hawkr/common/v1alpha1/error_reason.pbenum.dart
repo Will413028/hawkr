@@ -178,6 +178,11 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason IMAGE_NOT_PRODUCED =
       ErrorReason._(29, _omitEnumNames ? '' : 'IMAGE_NOT_PRODUCED');
 
+  /// 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
+  /// 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
+  static const ErrorReason ASSISTANT_TURN_IN_PROGRESS =
+      ErrorReason._(30, _omitEnumNames ? '' : 'ASSISTANT_TURN_IN_PROGRESS');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -209,10 +214,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     IMAGE_SAFETY_BLOCKED,
     IMAGE_RECITATION_BLOCKED,
     IMAGE_NOT_PRODUCED,
+    ASSISTANT_TURN_IN_PROGRESS,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 29);
+      $pb.ProtobufEnum.$_initByValueList(values, 30);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

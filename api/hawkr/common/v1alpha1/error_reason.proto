@@ -107,4 +107,7 @@ enum ErrorReason {
   // 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
   // client 可以讓使用者直接重試。額度退回。
   IMAGE_NOT_PRODUCED = 29;
+  // 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
+  // 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
+  ASSISTANT_TURN_IN_PROGRESS = 30;
 }
