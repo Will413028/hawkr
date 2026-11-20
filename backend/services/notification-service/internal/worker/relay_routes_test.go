@@ -72,6 +72,7 @@ var notifyAllowlist = []notifyAllowlistEntry{
 	{"hawkr.seller", "seller.profile.changed", "cart.seller.profile.changed", "購物車依店家資料變更刷新，不通知任何人"},
 	{"hawkr.seller", "seller.exposure.changed", "product.seller.exposure.changed", "商品依店家曝光狀態更新，不通知任何人"},
 	{"hawkr.buyer", "buyer.favorite.removed", "product.buyer.favorite.removed", "商品收藏數扣減，取消收藏不通知賣家"},
+	{"hawkr.review", "review.hidden", "product.review.stats", "商品與店家的評價統計依隱藏重算，隱藏評價不通知任何人"},
 }
 
 func staticHandles(exchange, key string) (mq.Subscription, bool) {

@@ -70,7 +70,7 @@
 - 店家的生命週期事件：`StorePendingDeletion`（隨帳號刪除進入等待，`seller/internal/model/model.go:373-379`，發布點 `closing/closing.go:94`）；`StoreClosed`（可逆，「不是下游刪除資料的訊號」，`model.go:381-387`）；`StoreRetired`（不可逆，「店家的所有下游資料可以刪除」，`model.go:396-402`，在 seller purge job 的 transaction 內發布，`seller/internal/purge/purge.go:175-177`）。
 - identity 沒有「解除連結某個登入方式」的事件或方法（`grep -n -i unlink M/modules/identity/identity.go` 沒有命中）；identity 只發 `AccountCreated`、`AccountDeleted`、`AdminRoleRevoked`（`M/modules/identity/events.go:6-12`）。
 - accountdeletion 依序鎖 buyer、seller，再關閉 buyer 與 seller（`M/modules/accountdeletion/internal/request/request.go:368-392`）；有店家時在同一個流程裡 `Seller.BeginDeletion`（`:250-254`）。
-- review 的 A6-1c 實作是這裡要照的範本：`review.LockAuthor` 用 `pg_advisory_xact_lock(hashtextextended('review.author:'||id,0))`（`M/modules/review/db/queries/inactive.sql`）；`Deactivate` 必須在 transaction 內，持鎖後寫 `inactive_authors` 再排 job（`review/internal/purge/purge.go:80-98`）；purge job 的唯一性排除 Running（`:71-78`）；保底掃描在 transaction 內補排（`:100-118`）；`cmd/hawkr/review.go:28-29` 現在就接刪帳訂閱者。social 另訂 `StoreRetired`（`cmd/hawkr/social.go:97`）。
+- review 的 A6-1c 實作是這裡要照的範本：`review.LockAuthor` 用 `pg_advisory_xact_lock(hashtextextended('review.author:'||id,0))`（`M/modules/review/db/queries/inactive.sql`）；`Deactivate` 必須在 transaction 內，持鎖後寫 `inactive_authors` 再排 job（`review/internal/purge/purge.go:80-98`）；purge job 的唯一性包含 Running（River v0.51 要求 ByState 含 available、pending、running、scheduled，否則拒絕排入；review 原本排除 Running 是缺陷，已在 A6-2a1 一併修正）；保底掃描在 transaction 內補排（`:100-118`）；`cmd/hawkr/review.go:28-29` 現在就接刪帳訂閱者。social 另訂 `StoreRetired`（`cmd/hawkr/social.go:97`）。
 - `M/legacy/orderservice` 的錯誤分流範本：`ErrOrderNotFound`（`orderservice.go:170-172`）、`OrderForReview`（`:202-`：傳輸錯誤、其他 code、不合法的欄位都回一般錯誤，`code==NOT_FOUND` 才回 `ErrOrderNotFound`）。
 - `accountdeletion_lockorder_integration_test.go` 已有 social（`:60`）與 review（`:102`）兩個情境。
 
@@ -93,8 +93,8 @@ im.messages
   id               UUID PK                         -- UUIDv7
   conversation_id  UUID FK → conversations ON DELETE CASCADE
   seq              BIGINT NOT NULL CHECK > 0
-  sender_kind      TEXT NOT NULL CHECK IN ('buyer','store')
-  message_type     TEXT NOT NULL CHECK IN ('text','image')
+  sender_kind      TEXT NOT NULL CHECK IN ('BUYER','STORE')
+  message_type     TEXT NOT NULL CHECK IN ('TEXT','IMAGE')
   content          TEXT NULL CHECK char_length ≤ 4096   -- 文字訊息的內容；抹除後為 NULL
   image_asset_id   TEXT NULL
   image_object_key TEXT NULL
@@ -139,13 +139,13 @@ im.media_ref_sync / im.retired_assets               -- 照 review mediaref 的�
 -- name: AllocateSeq :one
 INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, buyer_last_read_seq, store_last_read_seq, last_message_at, created_at)
 VALUES (@new_id, @buyer_id, @store_id, 1,
-        CASE WHEN @sender_kind = 'buyer' THEN 1 ELSE 0 END,
-        CASE WHEN @sender_kind = 'store' THEN 1 ELSE 0 END,
+        CASE WHEN @sender_kind = 'BUYER' THEN 1 ELSE 0 END,
+        CASE WHEN @sender_kind = 'STORE' THEN 1 ELSE 0 END,
         @now, @now)
 ON CONFLICT (buyer_id, store_id) DO UPDATE
   SET last_seq = im.conversations.last_seq + 1,
-      buyer_last_read_seq = CASE WHEN @sender_kind = 'buyer' THEN im.conversations.last_seq + 1 ELSE im.conversations.buyer_last_read_seq END,
-      store_last_read_seq = CASE WHEN @sender_kind = 'store' THEN im.conversations.last_seq + 1 ELSE im.conversations.store_last_read_seq END,
+      buyer_last_read_seq = CASE WHEN @sender_kind = 'BUYER' THEN im.conversations.last_seq + 1 ELSE im.conversations.buyer_last_read_seq END,
+      store_last_read_seq = CASE WHEN @sender_kind = 'STORE' THEN im.conversations.last_seq + 1 ELSE im.conversations.store_last_read_seq END,
       last_message_at = EXCLUDED.last_message_at
 RETURNING id, last_seq, (xmax = 0) AS created;
 ```
@@ -277,7 +277,7 @@ func (m *Module) OnStoreRetired(ctx, e seller.StoreRetired) error // → deactiv
 
 ### 4.4 抹除 job `im.erase_party`
 
-- 唯一鍵 `(kind, party_id)`，狀態只算 Available、Pending、Retryable、Scheduled，不含 Running（同 `review/internal/purge/purge.go:71-78`：執行中又排進來的那一次排在它後面，不會被略過）。
+- 唯一鍵 `(kind, party_id)`，狀態包含 Running（River 的必要狀態）。執行中又排進來的那一次被合併掉也不會漏：`Deactivate` 與 `Send` 以 `LockParty` 串行，job 開始時已看得到所有訊息。保底掃描以 `ByPeriod` 定唯一性（不以 `ByArgs`，否則已完成的列會擋下之後的週期）。
 - 依 `id` 升序分批（每批 200），每批一個 transaction：鎖這一批訊息 → `UPDATE … SET content=NULL, image_*=NULL, erased_at=now WHERE erased_at IS NULL` → 圖片記退場並排媒體同步（ID8，同 `review/internal/purge/purge.go:161-173`）。訊息列保留：seq 連續，2b 的補洞才不會出現空洞（舊碼同樣保留列，`message.go:52-53`）。
 - 冪等：述詞是「這個身分還有沒抹除的訊息」，重跑只處理剩下的。
 - 保底掃描（A6-D13 的第 2 項，照 `review/internal/purge/purge.go:100-118`）：每 15 分鐘，在一個 transaction 內找出「在 `inactive_parties`、但還有未抹除的訊息」的身分，最多 100 個，補排 job。River 的 `Enqueue` 一律在 transaction 內（`f1b4996e` 的修正）。
@@ -367,7 +367,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 ### 7.3 依賴表與註冊
 
 - `M/arch/modules.go` 的 im 列不改：`ordering` 以 port 間接使用，`buyer`、`seller`、`media` 已在表上；不加 identity（§4.1）。
-- `cmd/hawkr/modules.go` 登記 im；`trimmedColumns` 登記 `messages.content`、`hides.reason_text`。`content` 只放文字訊息（§10 W6 (b)），trim CHECK 不帶條件。A6-5 加卡片時如果卡片也用 `content`，再改寫成條件式 `CHECK (message_type <> 'text' OR content !~ <trimtext.Pattern>)`，測試接受【量：讀 `cmd/hawkr/trimmed_text_integration_test.go`：regex 不要求 CHECK 只有這一段（`:96,115-117`），行為測試以 `extra` 補條件（`:25-29`）】。沒跑測試（要 Docker，本次不起容器）；實作時 `TestTrimmedTextChecksUseTheCanonicalPattern` 會量。
+- `cmd/hawkr/modules.go` 登記 im；`trimmedColumns` 登記 `messages.content`、`hides.reason_text`。`content` 只放文字訊息（§10 W6 (b)），trim CHECK 不帶條件。A6-5 加卡片時如果卡片也用 `content`，再改寫成條件式 `CHECK (message_type <> 'TEXT' OR content !~ <trimtext.Pattern>)`，測試接受【量：讀 `cmd/hawkr/trimmed_text_integration_test.go`：regex 不要求 CHECK 只有這一段（`:96,115-117`），行為測試以 `extra` 補條件（`:25-29`）】。沒跑測試（要 Docker，本次不起容器）；實作時 `TestTrimmedTextChecksUseTheCanonicalPattern` 會量。
 - 現在就接：`OnBuyerDeleted`、`OnStoreRetired` 的訂閱，以及抹除 job、保底掃描、媒體同步 worker（同 `cmd/hawkr/review.go:21-29` 的理由：A6-6e 前 im 的表沒有寫入者，訂閱接上沒有副作用）。
 - A6-6e 才接：`imrelay` 的訂閱與 worker。
 
@@ -386,7 +386,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 - **seq**：兩個 goroutine 對同一個（還不存在的）對話並行送 50 則，seq 是 1..100 且不重複，對話只有一列；結束時寄件人各自那一方的游標等於他最後一則的 seq。
 - **已讀游標**：買家寄 3 則後店家的未讀是 3、買家是 0；店家 `MarkRead(uptoSeq=99)` 只推到 `last_seq`；`MarkRead` 給較小的 seq 不倒退；直接以 SQL 寫 `buyer_last_read_seq = last_seq + 1` 或 `-1` 被 CHECK 擋下。
 - **刪帳競態**：送出持 `LockParty` 停住，訂閱者同時跑，後者等待；放行後抹除 job 看得到那則訊息。反過來，訂閱者先 commit，送出回錯誤。
-- **抹除 job**：分批、重跑結果相同；唯一性不含 Running（執行中排入的那一次會再跑）；保底掃描補排被丟棄的 job。
+- **抹除 job**：分批、重跑結果相同；唯一性包含 Running（River 的必要狀態）；保底掃描補排被丟棄的 job。
 - **鎖序**：`accountdeletion_lockorder_integration_test.go` 加 `TestDeletionLocksBuyerAndSellerBeforeImRows`（照 `:102` 的 review 版）：買家刪除時 im 的列在 buyer、seller 之後才鎖；另加 seller 退場的情境（`StoreRetired` 在 seller purge 的 transaction 內）。
 - **relay**：wire（go/ast）、golden、每個事件剛好一個發送 job。
 - **讀取不改狀態**：`ListMessages`、`MessagesAfter` 跑完後兩個已讀游標都不變。
@@ -397,7 +397,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
   4. 抹除依帳號列舉所有身分（`message.go:1069`）→ ID3 測試。
   5. 送出拿掉 `LockParty` 或 transaction 內的重查 → 刪帳競態測試。
   6. 訂閱者拿掉 `Enqueue` → 抹除測試。
-  7. 抹除 job 的唯一狀態加上 Running → 唯一性測試。
+  7. 抹除 job 的唯一狀態拿掉 Running → 必要狀態測試（River 會拒絕排入）。
   8. 保底掃描不補排 → 保底測試。
   9. 預覽推導拿掉隱藏述詞 → ID1 測試。
   10. `MessageSent` 改成 commit 後發 → ID7 測試。
@@ -497,3 +497,16 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 另依第 2 輪核對，§3.3 與 W1 的「進行中＝狀態 10–40」由【推】改成【量】（`OrderStatus.java:15-26`）。
 
 findings 9 (blocking 0)：fixed 7、recorded 0、raised 1（W6）、rejected 1。
+
+## 12. 實作時對本檔的修正（A6-2a1）
+
+| 項目 | 本檔原寫法 | 實作 | 依據 |
+|---|---|---|---|
+| 儲存代碼 | 小寫 `'buyer'`、`'text'` 等 | 大寫 `BUYER`、`STORE`、`TEXT`、`IMAGE` | `TestStoredCodesInChecksAreUpperSnake`（ADR `2026-09-25-codemeta-retirement` D3） |
+| relay 的 `content_preview` | 由 §5.2 的 Preview 轉 | 由完整文字依舊碼規則截 100 字並加 `...` | Preview 已截到 100 字，重現不了舊碼的 `...` |
+| relay 查買家或店家 | 查不到、查詢失敗都送空字串 | 查不到送空字串；查詢失敗回錯誤，由 River 重試 | 暫時性錯誤不送出降級的推播 |
+| relay 收件人已刪除 | 未寫 | 收件人在 `inactive_parties` 時不送 | 推播不送給已刪除的身分 |
+| 送出的鎖 | 只鎖寄件人 | 依 buyer→store 固定順序鎖雙方再重查 | 收件人的刪除與送出也要串行 |
+| 抹除 job 唯一性、保底掃描 | 不含 Running；`ByArgs` | 含 Running；掃描用 `ByPeriod` | River 的必要狀態；`ByArgs` 會被已完成的列擋住（§4.3 已改） |
+| 進行中訂單的判定 | 在 im 組合 | `legacy/orderservice` 的 `OpenOrderBetween` | 狀態碼屬舊契約的擁有者；`cmd/hawkr` 只接線 |
+| `messages_conversation_seq` 索引 | 有 | 刪除 | 與 `UNIQUE (conversation_id, seq)` 同欄位，btree 可反向掃描 |

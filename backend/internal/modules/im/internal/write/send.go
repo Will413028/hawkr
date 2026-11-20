@@ -1,0 +1,300 @@
+package write
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"unicode/utf8"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
+	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
+)
+
+// target 是一次送出的雙方：對話的買家、店家，以及店家的完整資料（G1、G2 用）。
+type target struct {
+	buyerID int64
+	store   seller.Store
+}
+
+// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
+// transaction 內依固定順序持雙方的 advisory lock、重查雙方是否已刪除、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
+func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
+	l := uitext.LocaleFrom(ctx)
+	body, err := s.checkInput(l, &in)
+	if err != nil {
+		return model.Message{}, err
+	}
+	t, buyerAccount, err := s.resolve(ctx, l, in)
+	if err != nil {
+		return model.Message{}, err
+	}
+	if err := s.guard(ctx, l, in.Sender, t, body); err != nil {
+		return model.Message{}, err
+	}
+
+	var asset media.Asset
+	if in.Type == model.TypeImage {
+		uploader := buyerAccount
+		if in.Sender.Kind == model.PartyStore {
+			uploader = t.store.AccountID
+		}
+		asset, err = media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: uploader}, media.Field{Name: "StagedToken"}, in.StagedToken, media.RefTypeChatMessage)
+		if err != nil {
+			return model.Message{}, err
+		}
+	}
+
+	var out model.Message
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		sender, receiver := in.Sender.Kind, counterpart(in.Sender.Kind)
+		// 兩方都持 advisory lock：Deactivate 一次只持一個身分的鎖，鎖序固定（買家先於店家，即 kind 字串序）所以不會死結。
+		for _, k := range []model.PartyKind{model.PartyBuyer, model.PartyStore} {
+			if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(k), PartyID: partyID(k, t)}); err != nil {
+				return err
+			}
+		}
+		inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(sender), PartyID: partyID(sender, t)})
+		if err != nil {
+			return err
+		}
+		if inactive {
+			return apperr.FailedPrecondition("%s", text.ImSenderInactive(l))
+		}
+		inactive, err = q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(receiver), PartyID: partyID(receiver, t)})
+		if err != nil {
+			return err
+		}
+		if inactive {
+			return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
+		}
+		now := s.d.Now().UTC()
+		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
+			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender), Now: now,
+		})
+		if err != nil {
+			return err
+		}
+		msgID := s.d.NewID()
+		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), MessageType: string(in.Type), Now: now}
+		if in.Type == model.TypeText {
+			p.Content = &body
+		} else {
+			p.ImageAssetID, p.ImageObjectKey = &asset.ID, &asset.ObjectKey
+		}
+		row, err := q.InsertMessage(ctx, p)
+		if err != nil {
+			return err
+		}
+		if in.Type == model.TypeImage {
+			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.MessageRef(msgID)); err != nil {
+				return err
+			}
+		}
+		if err := events.Publish(ctx, s.d.Events, model.MessageSent{
+			EventID: s.d.NewID(), OccurredAt: now, ConversationID: seq.ID, MessageID: msgID, Seq: seq.LastSeq,
+			SenderKind: sender, BuyerID: t.buyerID, StoreID: t.store.StoreID,
+		}); err != nil {
+			return err
+		}
+		out = rows.Message(rows.MessageRow{
+			ID: row.ID, ConversationID: row.ConversationID, Seq: row.Seq, SenderKind: row.SenderKind, MessageType: row.MessageType,
+			Content: row.Content, ImageAssetID: row.ImageAssetID, ImageObjectKey: row.ImageObjectKey, CreatedAt: row.CreatedAt, ErasedAt: row.ErasedAt,
+		})
+		return nil
+	})
+	return out, err
+}
+
+func counterpart(k model.PartyKind) model.PartyKind {
+	if k == model.PartyBuyer {
+		return model.PartyStore
+	}
+	return model.PartyBuyer
+}
+
+func partyID(k model.PartyKind, t target) int64 {
+	if k == model.PartyBuyer {
+		return t.buyerID
+	}
+	return t.store.StoreID
+}
+
+// checkInput 驗證輸入並回傳文字訊息去頭尾空白後的內容（圖片訊息回空字串）。其他 message_type 一律拒絕，不把空字串或未知值當有效值。
+func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, error) {
+	if !in.Sender.Kind.Valid() || in.Sender.ID() <= 0 || (in.Sender.Kind == model.PartyStore && in.Sender.Store == nil) {
+		return "", errors.New("im：寄件人身分不完整")
+	}
+	switch in.Type {
+	case model.TypeText:
+		if !utf8.ValidString(in.Text) || strings.ContainsRune(in.Text, 0) {
+			return "", apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImTextInvalid(l))
+		}
+		body := trimtext.Trim(in.Text)
+		if body == "" {
+			return "", apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImTextRequired(l))
+		}
+		if utf8.RuneCountInString(body) > model.MaxTextRunes {
+			return "", apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImTextTooLong(l, text.ImTextTooLongArgs{Max: model.MaxTextRunes}))
+		}
+		return body, nil
+	case model.TypeImage:
+		in.StagedToken = trimtext.Trim(in.StagedToken)
+		if in.StagedToken == "" {
+			return "", apperr.InvalidInputOn([]string{"StagedToken"}, "%s", text.ImImageTokenRequired(l))
+		}
+		return "", nil
+	}
+	return "", apperr.InvalidInputOn([]string{"Type"}, "%s", text.ImTypeUnsupported(l))
+}
+
+func unavailable(l uitext.Locale, cause error) error {
+	return apperr.WithCause(apperr.Unavailable("%s", text.ImIdentityUnavailable(l)), cause)
+}
+
+// resolve 解析對話與對方（不信 client 的寄件人）：給 ConversationID 時以對話授權，寄件人不是該對話的一方回 NotFound；
+// 首則訊息用 CounterpartID，並確認對方存在。同一人（買家的帳號等於店家的帳號）在這裡擋。回傳買家的 account_id（上傳者與同一人判斷用）。
+func (s *Service) resolve(ctx context.Context, l uitext.Locale, in model.SendInput) (target, int64, error) {
+	var buyerID, storeID int64
+	existing := in.ConversationID != (uuid.UUID{})
+	if existing {
+		c, err := s.q(ctx).GetConversation(ctx, in.ConversationID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return target{}, 0, apperr.NotFound("%s", text.ImConversationNotFound(l))
+		}
+		if err != nil {
+			return target{}, 0, err
+		}
+		if (in.Sender.Kind == model.PartyBuyer && c.BuyerID != in.Sender.BuyerID) || (in.Sender.Kind == model.PartyStore && c.StoreID != in.Sender.Store.StoreID) {
+			return target{}, 0, apperr.NotFound("%s", text.ImConversationNotFound(l))
+		}
+		buyerID, storeID = c.BuyerID, c.StoreID
+	} else {
+		if in.CounterpartID <= 0 {
+			return target{}, 0, apperr.InvalidInputOn([]string{"CounterpartID"}, "%s", text.ImCounterpartRequired(l))
+		}
+		if in.Sender.Kind == model.PartyBuyer {
+			buyerID, storeID = in.Sender.BuyerID, in.CounterpartID
+		} else {
+			buyerID, storeID = in.CounterpartID, in.Sender.Store.StoreID
+		}
+	}
+
+	t := target{buyerID: buyerID}
+	if in.Sender.Kind == model.PartyStore {
+		t.store = *in.Sender.Store
+		if !existing {
+			if _, err := s.d.Buyers.ProfileByBuyerID(ctx, buyerID); err != nil {
+				return target{}, 0, s.counterpartErr(l, err)
+			}
+		}
+	} else {
+		st, err := s.d.Stores.Store(ctx, storeID)
+		if err != nil {
+			return target{}, 0, s.counterpartErr(l, err)
+		}
+		t.store = st
+	}
+	account, err := s.d.Buyers.AccountIDByBuyerID(ctx, buyerID)
+	if err != nil {
+		return target{}, 0, s.counterpartErr(l, err)
+	}
+	if account == t.store.AccountID {
+		return target{}, 0, model.WithReason(apperr.InvalidInput("%s", text.ImSelfMessageNotAllowed(l)), model.ReasonSelfMessageNotAllowed)
+	}
+	return t, account, nil
+}
+
+// counterpartErr 把「對方不存在」與「查詢失敗」分開：前者 NotFound，後者 Unavailable（不放行，不當成不存在）。
+func (s *Service) counterpartErr(l uitext.Locale, err error) error {
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return apperr.NotFound("%s", text.ImCounterpartNotFound(l))
+	}
+	return unavailable(l, err)
+}
+
+// guard 是守門 G1..G5，順序固定：停權 → 停業 → 封鎖 → 收件人已刪除 → 詞典。每一項都是 in-process 讀取，任何查詢錯誤都回錯誤（fail-closed），
+// 例外（進行中的訂單或售後）只在 G1 或 G3 命中時才查，兩者共用一次查詢結果。body 是文字訊息的內容（圖片訊息為空，不過詞典）。
+func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party, t target, body string) error {
+	var openKnown, open bool
+	hasOpenOrder := func() (bool, error) {
+		if !openKnown {
+			v, err := s.d.Orders.OpenOrderBetween(ctx, t.buyerID, t.store.StoreID)
+			if err != nil {
+				return false, err
+			}
+			open, openKnown = v, true
+		}
+		return open, nil
+	}
+
+	// G1 停權：只擋寄件人是店家的情況；雙方之間有進行中的訂單或售後時放行。
+	if sender.Kind == model.PartyStore && sender.Store.Suspended() {
+		v, err := hasOpenOrder()
+		if err != nil {
+			return unavailable(l, err)
+		}
+		if !v {
+			return model.WithReason(apperr.PermissionDenied("%s", text.ImSellerSuspended(l)), model.ReasonSellerSuspended)
+		}
+	}
+
+	// G2 停業：只有店家狀態 CLOSED 算停業（等待刪除雙向都可以聊）；能力判斷以 seller 為準，兩個方向同一個條件。
+	if err := seller.Authorize(t.store, seller.CapChatSend); err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return model.WithReason(apperr.FailedPrecondition("%s", text.ImStoreClosed(l)), model.ReasonStoreClosed)
+		}
+		return unavailable(l, err)
+	}
+
+	// G3 封鎖：任一方向都擋；有進行中的訂單或售後時放行。
+	blocked, err := s.d.Buyers.IsBlockingStore(ctx, t.buyerID, t.store.StoreID)
+	if err != nil {
+		return unavailable(l, err)
+	}
+	if !blocked {
+		if blocked, err = s.d.Stores.StoreBlocksBuyer(ctx, t.store.StoreID, t.buyerID); err != nil {
+			return unavailable(l, err)
+		}
+	}
+	if blocked {
+		v, err := hasOpenOrder()
+		if err != nil {
+			return unavailable(l, err)
+		}
+		if !v {
+			return model.WithReason(apperr.FailedPrecondition("%s", text.ImChatBlocked(l)), model.ReasonChatBlocked)
+		}
+	}
+
+	// G4 收件人已刪除：transaction 外的這次檢查只是優化，讓已刪除的收件人不必先跑一次媒體 Finalize；正確性由 transaction 內持鎖後的重查保證。
+	receiver := counterpart(sender.Kind)
+	gone, err := s.inactive(ctx, receiver, partyID(receiver, t))
+	if err != nil {
+		return err
+	}
+	if gone {
+		return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
+	}
+
+	// G5 詞典：只查文字。
+	if body != "" {
+		if hit, _ := textfilter.Check(body); hit {
+			return model.WithReason(apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImModerationRejected(l)), model.ReasonModerationRejected)
+		}
+	}
+	return nil
+}

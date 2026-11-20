@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -140,6 +141,99 @@ func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 				t.Fatalf("訂閱者不刪評價列：%d %v", n, err)
 			}
 		})
+	}
+}
+
+type imStores struct {
+	*seller.Reader
+	noStoreBlocks
+}
+
+type noImOrders struct{}
+
+func (noImOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
+
+func newIM(f *fixture) *im.Module {
+	return im.New(im.Deps{
+		DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: imStores{seller.NewReader(f.db, time.Now), noStoreBlocks{}},
+		Orders: noImOrders{}, NewID: uuid.NewV7, Now: time.Now,
+	})
+}
+
+// im 的訂閱者在買家事件的 transaction 內寫自己的 inactive_parties（複本）並排抹除 job，所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// im 的表還沒被寫（pg_locks 沒有 im 的 RowExclusiveLock），放開後複本才寫入。買家寄出的訊息列只在抹除 job 的 transaction 內鎖，不在刪帳的
+// transaction 內（訂閱者不碰訊息列）。兩條路徑都量；im 只訂 BuyerDeleted，所以申請進入等待時 im 什麼都不寫。
+func TestDeletionLocksBuyerAndSellerBeforeImRows(t *testing.T) {
+	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			f := setupWith(t, migrate.Module{Name: "im", Dir: im.Migrations()})
+			m := newIM(f)
+			events.Subscribe(f.bus, m.OnBuyerDeleted)
+			id, buyerID := f.account(t)
+			s := f.store(t, id)
+			convID := uuid.NewV7()
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, buyer_last_read_seq, last_message_at, created_at)
+				VALUES ($1, $2, $3, 1, 1, now(), now())`, convID, buyerID, s.StoreID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
+				VALUES ($1, $2, 1, 'BUYER', 'TEXT', 'hi', now())`, uuid.NewV7(), convID); err != nil {
+				t.Fatal(err)
+			}
+			f.orders.mu.Lock()
+			f.orders.open = open
+			f.orders.mu.Unlock()
+
+			imTouched := func() bool {
+				var n int64
+				err := f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+					WHERE c.relnamespace = 'im'::regnamespace AND l.mode IN ('RowExclusiveLock', 'RowShareLock') AND l.granted
+					AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`).Scan(&n)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return n > 0
+			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "im 的表", imTouched)
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.messages WHERE erased_at IS NULL").Scan(&n); err != nil || n != 1 {
+				t.Fatalf("訂閱者不抹訊息列：%d %v", n, err)
+			}
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'BUYER' AND party_id = $1", buyerID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if want := int64(map[bool]int{true: 0, false: 1}[open]); n != want {
+				t.Fatalf("im 的複本 %d，預期 %d（只訂 BuyerDeleted：申請進入等待時不寫，關閉時才寫）", n, want)
+			}
+		})
+	}
+}
+
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；im 的訂閱者之後才寫自己的 inactive_parties，
+// 所以順序是 seller → im。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
+func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setupWith(t, migrate.Module{Name: "im", Dir: im.Migrations()})
+	m := newIM(f)
+	events.Subscribe(f.bus, m.OnStoreRetired)
+	id, _ := f.account(t)
+	s := f.store(t, id)
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		var n int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", s.StoreID).Scan(&n); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: s.StoreID, StoreCode: s.StoreCode, AccountID: id})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'STORE' AND party_id = $1", s.StoreID).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("im 的複本 %d %v", n, err)
 	}
 }
 

@@ -1,0 +1,55 @@
+{
+  "default": {
+    "im.chat_blocked": {
+      "message": "Messages cannot be sent in this conversation"
+    },
+    "im.conversation_not_found": {
+      "message": "Conversation not found"
+    },
+    "im.counterpart_not_found": {
+      "message": "The other party could not be found"
+    },
+    "im.counterpart_required": {
+      "message": "The conversation target is required"
+    },
+    "im.identity_unavailable": {
+      "message": "Unable to verify the conversation right now; please try again later"
+    },
+    "im.image_token_required": {
+      "message": "Please upload an image first"
+    },
+    "im.message_not_found": {
+      "message": "Message not found"
+    },
+    "im.moderation_rejected": {
+      "message": "The content does not meet community guidelines; please edit and resend"
+    },
+    "im.receiver_deleted": {
+      "message": "The recipient's account has been deleted"
+    },
+    "im.self_message_not_allowed": {
+      "message": "You cannot message yourself"
+    },
+    "im.seller_suspended": {
+      "message": "This seller account is suspended and cannot send messages"
+    },
+    "im.sender_inactive": {
+      "message": "Your account is being deleted and cannot send messages"
+    },
+    "im.store_closed": {
+      "message": "This store is closed and messages cannot be sent"
+    },
+    "im.text_invalid": {
+      "message": "The message is not valid text"
+    },
+    "im.text_required": {
+      "message": "The message cannot be empty"
+    },
+    "im.text_too_long": {
+      "message": "The message cannot exceed {max} characters"
+    },
+    "im.type_unsupported": {
+      "message": "Unsupported message type"
+    }
+  }
+}

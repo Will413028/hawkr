@@ -1,0 +1,126 @@
+{
+  "default": {
+    "im.chat_blocked": {
+      "message": "無法傳送訊息",
+      "description": "買家與店家之間任一方向有封鎖，且沒有進行中的訂單或售後。"
+    },
+    "im.conversation_not_found": {
+      "message": "找不到這個對話",
+      "description": "對話不存在，或呼叫者不是對話的一方（兩者同回應，不洩漏對話存在）。"
+    },
+    "im.counterpart_not_found": {
+      "message": "找不到對方",
+      "description": "首則訊息的對方（店家或買家）不存在。"
+    },
+    "im.counterpart_required": {
+      "message": "缺少對話對象",
+      "description": "沒有對話 ID，也沒有對方的 ID。"
+    },
+    "im.identity_unavailable": {
+      "message": "暫時無法驗證對話身分，請稍後再試",
+      "description": "buyer、seller 或訂單查詢失敗，fail-closed。"
+    },
+    "im.image_token_required": {
+      "message": "請先上傳圖片",
+      "description": "圖片訊息沒有 staged token。"
+    },
+    "im.message_not_found": {
+      "message": "找不到這則訊息",
+      "description": "訊息不存在（relay 讀單則訊息）。"
+    },
+    "im.moderation_rejected": {
+      "message": "內容不符社群守則，請修改後再送出",
+      "description": "文字訊息命中髒字詞典。"
+    },
+    "im.receiver_deleted": {
+      "message": "對方帳號已刪除，無法傳送訊息",
+      "description": "收件人在 inactive_parties。"
+    },
+    "im.self_message_not_allowed": {
+      "message": "不能傳訊息給自己",
+      "description": "買家帳號與店家帳號是同一個帳號。"
+    },
+    "im.seller_suspended": {
+      "message": "賣家帳號停權中，無法傳送訊息",
+      "description": "店家停權，且與對方之間沒有進行中的訂單或售後。"
+    },
+    "im.sender_inactive": {
+      "message": "帳號刪除中，無法傳送訊息",
+      "description": "寄件人在 inactive_parties。"
+    },
+    "im.store_closed": {
+      "message": "這家店已停止營業，無法傳送訊息",
+      "description": "對話的店家已關閉（CLOSED）。"
+    },
+    "im.text_invalid": {
+      "message": "訊息內容不是有效的文字",
+      "description": "文字訊息不是有效的 UTF-8。"
+    },
+    "im.text_required": {
+      "message": "訊息內容不可為空",
+      "description": "文字訊息去除頭尾空白後沒有內容。"
+    },
+    "im.text_too_long": {
+      "message": "訊息內容不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "文字訊息以字元計超過上限。max 是 model.MaxTextRunes。"
+    },
+    "im.type_unsupported": {
+      "message": "不支援的訊息類型",
+      "description": "message_type 不是 text 或 image。"
+    }
+  },
+  "staff": {
+    "hide.admin_required": {
+      "message": "缺少管理員",
+      "description": "隱藏或還原沒有管理員 ID。"
+    },
+    "hide.category_invalid": {
+      "message": "隱藏理由的類別不能用在聊天訊息",
+      "description": "類別不在 policy.CommunityAssessable。"
+    },
+    "hide.message_not_found": {
+      "message": "找不到這則訊息",
+      "description": "隱藏或還原的訊息不存在。"
+    },
+    "hide.not_hidden": {
+      "message": "這則訊息目前沒有被隱藏",
+      "description": "還原時沒有未還原的隱藏。"
+    },
+    "hide.reason_too_long": {
+      "message": "理由不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "隱藏理由超過上限。"
+    },
+    "hide.restore_reason": {
+      "message": "還原的原因必填，不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "還原原因空白或超過上限。"
+    },
+    "hide.source_ref_too_long": {
+      "message": "來源參照不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "source_ref 超過上限。"
+    },
+    "hide.text_invalid": {
+      "message": "理由不是有效的文字",
+      "description": "隱藏理由或來源參照不是有效的 UTF-8。"
+    }
+  }
+}
