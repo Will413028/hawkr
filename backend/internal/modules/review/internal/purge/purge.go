@@ -100,16 +100,21 @@ func (s *Service) enqueuePurge(ctx context.Context, buyerID int64) error {
 // Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家仍在 inactive_authors 又還有評價列；
 // 這裡每次最多補排 sweepBatch 位的清除 job，同一位買家還沒開始的 job 由唯一鍵合併。回傳這次檢查到的買家數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
-	ids, err := s.q(ctx).ListInactiveAuthorsWithReviews(ctx, sweepBatch)
-	if err != nil {
-		return 0, err
-	}
-	for _, id := range ids {
-		if err := s.enqueuePurge(ctx, id); err != nil {
-			return 0, err
+	var n int
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		ids, err := s.q(ctx).ListInactiveAuthorsWithReviews(ctx, sweepBatch)
+		if err != nil {
+			return err
 		}
-	}
-	return len(ids), nil
+		for _, id := range ids {
+			if err := s.enqueuePurge(ctx, id); err != nil {
+				return err
+			}
+		}
+		n = len(ids)
+		return nil
+	})
+	return n, err
 }
 
 // Purge 刪除買家的評價：依 id 升序分批，每批一個 transaction，內含刪列（附圖 CASCADE）、釋放的圖記成退場並排媒體同步、排快取失效。
