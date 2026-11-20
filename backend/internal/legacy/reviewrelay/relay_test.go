@@ -349,3 +349,29 @@ func TestAuthorDeactivatedWithNothingLeftSendsNothing(t *testing.T) {
 		t.Fatalf("published = %+v", got)
 	}
 }
+
+// 扇出的 job 以衍生的 event_id 做 unique：同一組重排得到同一個 event_id，且 job 帶 ByArgs 唯一性。
+func TestFanOutJobsAreUniqueByDerivedEventID(t *testing.T) {
+	w, r, _, _ := newFixture()
+	r.targets = []review.Target{{StoreID: 91, ProductID: 700}, {StoreID: 92, ProductID: 800}}
+	q := &recordingJobs{}
+	w.Jobs = q
+	args := ReviewAuthorDeactivatedArgs{eventFields{eventID.String(), occurredAt}, 301}
+	for i := 0; i < 2; i++ {
+		if err := w.reviewAuthorDeactivated(context.Background(), args); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, rerun := q.args[:2], q.args[2:]
+	for i := range first {
+		if first[i].(ReviewAggregateChangedArgs) != rerun[i].(ReviewAggregateChangedArgs) {
+			t.Fatalf("重排的參數要相同才會被 unique 合併：%+v vs %+v", first[i], rerun[i])
+		}
+	}
+	if first[0].(ReviewAggregateChangedArgs).EventID == first[1].(ReviewAggregateChangedArgs).EventID {
+		t.Fatal("不同組的 event_id 要不同")
+	}
+	if o := (ReviewAggregateChangedArgs{}).InsertOpts(); !o.UniqueOpts.ByArgs {
+		t.Fatal("ReviewAggregateChangedArgs 要以參數做 unique")
+	}
+}

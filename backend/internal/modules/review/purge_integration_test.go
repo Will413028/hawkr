@@ -280,7 +280,7 @@ func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
 	}()
 
 	deadline := time.Now().Add(10 * time.Second)
-	for f.scalar(t, "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") == 0 {
+	for f.authorLockWaiters(t, b.BuyerID) == 0 {
 		select {
 		case err := <-done:
 			t.Fatalf("Submit 應該在作者鎖上等，卻已回傳：%v", err)
@@ -303,5 +303,67 @@ func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
 	}
 	if n := f.reviewsOf(t, b); n != 0 {
 		t.Fatalf("刪帳者不能留下評價：%d", n)
+	}
+}
+
+// authorLockWaiters 數等在這位作者的 advisory lock 上的 session（只看這個 key，不受平行測試影響）：
+// bigint key 的高 32 位在 classid、低 32 位在 objid，objsubid = 1。
+func (f *fixture) authorLockWaiters(t *testing.T, buyerID int64) int64 {
+	t.Helper()
+	return f.scalar(t, `
+SELECT count(*) FROM pg_locks l,
+  LATERAL (SELECT hashtextextended('review.author:' || $1::bigint::text, 0) AS k) h
+WHERE l.locktype = 'advisory' AND NOT l.granted AND l.objsubid = 1
+  AND l.classid::bigint = (h.k >> 32) & 4294967295 AND l.objid::bigint = h.k & 4294967295`, buyerID)
+}
+
+// F1 的另一側：Deactivate 也要持作者鎖。測試持有同一把鎖（等同 Submit 的 transaction 持鎖中），真正的 OnBuyerDeleted 在另一個
+// transaction 必須等在鎖上、不能先寫 inactive_authors；鎖釋放後才完成。拿掉 Deactivate 的 LockAuthor 時它不會等，這個測試失敗；
+// 拿掉 Submit 的 LockAuthor 則由 TestSubmitWaitsForDeactivationAndIsRejected 失敗。
+func TestDeactivateWaitsForAuthorLock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	b := f.newBuyer(t)
+
+	tx, err := f.db.Pool().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::text, 0))", b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- f.db.InTx(ctx, func(ctx context.Context) error {
+			return f.module.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: b.BuyerID, AccountID: b.AccountID, OccurredAt: f.clock()})
+		})
+	}()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for f.authorLockWaiters(t, b.BuyerID) == 0 {
+		select {
+		case err := <-done:
+			t.Fatalf("Deactivate 應該在作者鎖上等，卻已回傳：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Deactivate 沒有等在作者鎖上")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 0 {
+		t.Fatalf("鎖釋放前不能已寫入 inactive_authors：%d", n)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 1 {
+		t.Fatalf("鎖釋放後 Deactivate 完成：%d", n)
 	}
 }

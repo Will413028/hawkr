@@ -66,8 +66,13 @@ type ReviewAuthorDeactivatedArgs struct {
 	BuyerID int64 `json:"buyer_id"`
 }
 
-func (ReviewCreatedArgs) Kind() string           { return "legacy.review_created" }
-func (ReviewAggregateChangedArgs) Kind() string  { return "legacy.review_aggregate_changed" }
+func (ReviewCreatedArgs) Kind() string          { return "legacy.review_created" }
+func (ReviewAggregateChangedArgs) Kind() string { return "legacy.review_aggregate_changed" }
+
+// InsertOpts 以整組參數（含衍生的 event_id）做 unique：父 job 重試重排同一組時只留一個。
+func (ReviewAggregateChangedArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
+}
 func (ReviewAuthorDeactivatedArgs) Kind() string { return "legacy.review_author_deactivated" }
 
 func fields(id fmt.Stringer, at time.Time) eventFields {
