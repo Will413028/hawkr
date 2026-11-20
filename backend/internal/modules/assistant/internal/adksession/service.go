@@ -50,7 +50,7 @@ func clampEvents(n int) int32 {
 	if n > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(n)
+	return int32(n) //nolint:gosec // 上面已夾到 MaxInt32；n 是 event 數量，不會是負數
 }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.db.Conn(ctx)) }
