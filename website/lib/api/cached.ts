@@ -11,6 +11,7 @@ import {
 } from "@/lib/posts/repo";
 import { fetchProductReviews } from "@/lib/reviews/repo";
 import { fetchPopularHashtags } from "@/lib/search/repo";
+import { fetchAllStoresForSitemap } from "@/lib/seller/list-stores";
 import { fetchPublicStore } from "@/lib/seller/public-store";
 import { PUBLIC_CACHE_TAGS, productTag, sellerTag } from "@/lib/seo/tags";
 import {
@@ -271,6 +272,29 @@ export function getCachedStore(storeCode: string) {
  */
 export function getCachedStoreOrThrow(storeCode: string) {
 	return readStore(storeCode).then(settled);
+}
+
+async function readSitemapStores() {
+	"use cache";
+	cacheTag(PUBLIC_CACHE_TAGS.sellers);
+	applyCacheTier("SELLER_PROFILE");
+	return fillFetch(
+		"sitemap-stores",
+		() =>
+			fetchAllStoresForSitemap({
+				locale: defaultLocale,
+				signal: upstreamSignal(),
+			}),
+		{ key: ["sitemap-stores"], endpoint: "SellerPublicService/ListStores" },
+	);
+}
+
+/**
+ * sitemap 用的全部可曝光店家（`ListStores` 翻完所有頁）。失敗照拋，不會被存成空清單：
+ * 快取層不存失敗，build 階段由 `fillFetch` 以一分鐘的標記項取代；呼叫端自己決定降級。
+ */
+export function getCachedSitemapStores() {
+	return readSitemapStores().then(settled);
 }
 
 async function readSellerReviewStats(id: string) {

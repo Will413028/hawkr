@@ -142,8 +142,8 @@ export interface SellerSocialImageSource {
  * cascade lives here so "which field represents this seller" has one answer.
  *
  * `bannerUrl` is deliberately NOT a step: it is not a field the seller API
- * returns. `/public/sellers/{id}` wires `coverKey`/`coverUrl` +
- * `logoKey`/`logoUrl` (gateway `handler.SellerDetail`) and nothing else, which
+ * returns. `GetStore` (`PublicStore`) returns `cover_image` and
+ * `logo` and nothing else, which
  * is why `caac25a5` removed the `bannerUrl` read from the storefront as a dead
  * fallback. Re-adding it would be re-adding a branch that can never be taken.
  */

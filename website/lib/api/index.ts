@@ -334,7 +334,7 @@ export async function fetchPublicProduct(id: string) {
 	return data ?? null;
 }
 
-/** `GET /public/sellers/{id}/stats` —— gateway `seller.go:137-144`。 */
+/** 店家統計的形狀（來源是 `GetStore` 的 `StoreStats`）。 */
 export interface SellerStats {
 	storeId?: number | string;
 	followers?: number;

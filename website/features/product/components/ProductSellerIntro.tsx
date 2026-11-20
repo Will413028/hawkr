@@ -9,7 +9,7 @@ interface ProductSellerIntroProps {
 	seller?: unknown;
 	/** 評價統計（avgRating/totalCount）— 不含訂閱數，別從這裡撈 followers。 */
 	sellerStats?: unknown;
-	/** `/public/sellers/{id}/stats` 的公開聚合 — 訂閱數（followers）唯一來源。 */
+	/** `GetStore` 的 `StoreStats` — 訂閱數（followers）唯一來源。 */
 	followerStats?: SellerStats | null;
 	productSeller?: unknown;
 	fallbackSeller?: unknown;
