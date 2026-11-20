@@ -44,7 +44,7 @@
 
 **事件**：`text`（文字增量）、`tool_result`（`Tool` 列舉＝三支 tool 之一、`ToolSucceeded`；對外是 `AssistantToolResult{tool, succeeded}`，顯示文字在共用文案目錄 `assistant.AssistantTool.*`；不帶參數與回傳內容，A9-D13 修訂）、`finished`（對話 ID）、`error`（`FailureNoOutput`＝還沒有任何文字、`FailureInterrupted`＝已送出部分文字，加上依語系的訊息）。`finished` 與 `error` 是終止事件，之後沒有事件。tool 失敗不終止這一輪：模型只收到錯誤代碼，助理仍回覆。文字規則：partial 的 chunk 逐段送出；非 partial 到達時只補送沒送過的尾巴；tool 回應之後重新計算；thought part 不外流。
 
-**finished 的條件（A9-D15 第 4 點）**：事件迭代正常結束，而且看過根 agent 的最終回應（`IsFinalResponse`、作者是根 agent、沒有 `ErrorCode`）；否則一律是 `error`。取消、逾時、`Shutdown`、模型安靜停下、緩衝寫滿都落在這一條，迴圈之後不再看 `ctx.Err()`（`TestStreamThatEndsWithoutTheFinalResponseIsNotFinished`、`TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError`）。`Config.ToolObserver` 是觀察點：每次 tool 呼叫收到 tool、名稱、參數的深拷貝與是否失敗，只給測試與日後的指標，不進事件；characterization 靠它比對 tool 名稱與參數。
+**finished 的條件（A9-D15 第 4 點）**：事件迭代正常結束，而且看過根 agent 的最終回應（`IsFinalResponse`、作者是根 agent、沒有 `ErrorCode`）；否則一律是 `error`。取消、逾時、`Shutdown`、模型安靜停下、緩衝寫滿都落在這一條，迴圈之後不再看 `ctx.Err()`（`TestStreamEndingNormallyWithoutAnyFinalResponseIsNotFinished`、`TestStreamThatEndsWithoutTheFinalResponseIsNotFinished`、`TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError`）。`Config.ToolObserver` 是觀察點：每次 tool 呼叫收到 tool、名稱、參數的深拷貝與是否失敗，只給測試與日後的指標，不進事件；characterization 靠它比對 tool 名稱與參數。
 
 **tool 包裝層（A9-D15 第 3 點）**：所有 function tool 都是 `buyeragent.guardedTool`，包在 `tool.Tool.Run` 外層，`specialist()` 只接受這個型別。它 recover panic（stack 只進 slog）、把任何錯誤換成固定代碼回給模型（`tool_failed`、`upstream_unavailable`、`order_not_found`、`forbidden`；下游的錯誤文字只進 log），並且每次呼叫恰好回報一次——參數驗證失敗與 panic 都算。模型叫了不存在的 tool 時，ADK 的預設錯誤文字會列出所有 tool 名稱，所以每個 agent 掛 `OnToolErrorCallback`：模型只看到 `unknown_tool`（coordinator 委派 specialist 失敗是 `delegate_failed`）；沒有對應的 `AssistantTool`，不能表示成 `tool_result`（UNSPECIFIED 不得當合法值），只記 log。
 

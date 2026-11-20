@@ -90,6 +90,27 @@ func TestStreamThatEndsWithoutTheFinalResponseIsNotFinished(t *testing.T) {
 	}
 }
 
+// emptyLLM 的回應串流沒有任何事件就正常結束，也沒有取消。
+type emptyLLM struct{}
+
+func (emptyLLM) Name() string { return "empty" }
+
+func (emptyLLM) GenerateContent(context.Context, *adkmodel.LLMRequest, bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	return func(func(*adkmodel.LLMResponse, error) bool) {}
+}
+
+func TestStreamEndingNormallyWithoutAnyFinalResponseIsNotFinished(t *testing.T) {
+	e := newExecutor(t, emptyLLM{}, &fakeOrders{}, nil)
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventError || last.Failure != model.FailureNoOutput {
+		t.Fatalf("迭代正常結束但沒有最終回應，要以 error 結束，不得是 finished：%+v", evs)
+	}
+}
+
 func TestSubmitAfterShutdownIsRejectedBeforeAnySessionIsCreated(t *testing.T) {
 	cs := &countingSessions{Service: session.InMemoryService()}
 	e := newExecutor(t, textLLM("hi"), &fakeOrders{}, func(c *Config) { c.Sessions = cs })
