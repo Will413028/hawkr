@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+	buildSitemap,
 	loadSitemapStores,
+	reportSitemapSize,
 	SITEMAP_SHARD_THRESHOLD,
 	staticSitemapEntries,
 	storeSitemapEntries,
@@ -85,30 +87,30 @@ test("store entries: default locale only for UGC, lastModified from update_time"
 	__setFlavorForTest(null);
 });
 
-test("over the threshold every store is still emitted and an error is reported", () => {
+test("over the threshold every entry is still emitted and an error is reported", () => {
+	const reports: string[] = [];
+	reportSitemapSize(SITEMAP_SHARD_THRESHOLD + 1, (m) => reports.push(m));
+	assert.equal(reports.length, 1);
+	reportSitemapSize(SITEMAP_SHARD_THRESHOLD, (m) => reports.push(m));
+	assert.equal(reports.length, 1);
+});
+
+test("the threshold counts the whole file: static plus store entries", () => {
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
-	const stores = Array.from(
-		{ length: SITEMAP_SHARD_THRESHOLD + 1 },
-		(_, i) => ({
-			storeCode: String(i + 1),
-		}),
-	);
+	const staticCount = staticSitemapEntries().length;
+	const storeCount = SITEMAP_SHARD_THRESHOLD - staticCount + 1;
+	assert.ok(storeCount <= SITEMAP_SHARD_THRESHOLD);
+	const rows = Array.from({ length: storeCount }, (_, i) => ({
+		storeCode: String(i + 1),
+	}));
 	const reports: string[] = [];
-	const entries = storeSitemapEntries(
-		stores,
-		() => ["zh-TW"],
-		(m) => reports.push(m),
-	);
-	assert.equal(entries.length, stores.length);
+	const entries = buildSitemap(rows, (m) => reports.push(m));
+	assert.equal(entries.length, SITEMAP_SHARD_THRESHOLD + 1);
 	assert.equal(reports.length, 1);
-	const none: string[] = [];
-	storeSitemapEntries(
-		stores.slice(0, 10),
-		() => ["zh-TW"],
-		(m) => none.push(m),
-	);
-	assert.equal(none.length, 0);
+	const quiet: string[] = [];
+	buildSitemap(rows.slice(1), (m) => quiet.push(m));
+	assert.equal(quiet.length, 0);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
 });
@@ -122,15 +124,9 @@ test("the threshold counts emitted URL entries, not stores", () => {
 			storeCode: String(i + 1),
 		})),
 	];
-	const reports: string[] = [];
-	const entries = storeSitemapEntries(
-		stores,
-		() => ["zh-TW"],
-		(m) => reports.push(m),
-	);
+	const entries = storeSitemapEntries(stores, () => ["zh-TW"]);
 	assert.equal(stores.length, SITEMAP_SHARD_THRESHOLD + 1);
 	assert.equal(entries.length, SITEMAP_SHARD_THRESHOLD);
-	assert.equal(reports.length, 0);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
 });

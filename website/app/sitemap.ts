@@ -12,7 +12,7 @@ import { absoluteUrl, languageAlternates, sellerPath } from "@/lib/seo/urls";
  * come from `storeSitemapEntries` (enumerated by `ListStores`); product URLs
  * are not listed yet.
  *
- * One sitemap file, no sharding: past `SITEMAP_SHARD_THRESHOLD` store URL entries an error
+ * One sitemap file, no sharding: past `SITEMAP_SHARD_THRESHOLD` entries in the file (static plus store) an error
  * is reported (the trigger to add `generateSitemaps`), the entries are still all emitted.
  *
  * One entry per PUBLISHED locale of each route (lib/intl/locales.ts): an
@@ -44,18 +44,15 @@ export function staticSitemapEntries(
 	});
 }
 
-/** sitemap 單檔上限 50,000 筆網址，門檻比對的是實際輸出的店家網址筆數，45,000 起要改成分檔。 */
+/** sitemap 單檔上限 50,000 筆網址，門檻比對的是整份檔案（靜態加店家）實際輸出的網址筆數，45,000 起要改成分檔。 */
 export const SITEMAP_SHARD_THRESHOLD = 45_000;
 
 /** 每家店每個已發佈語系一筆，規則同 `staticSitemapEntries`（UGC 頁只列預設語系）。 */
 export function storeSitemapEntries(
 	stores: readonly StoreSitemapRow[],
 	published: (surface: Surface) => readonly AppLocale[] = publishedFor,
-	report: (message: string) => void = (m) => {
-		Sentry.captureMessage(m, "error");
-	},
 ): MetadataRoute.Sitemap {
-	const entries = stores.flatMap((store) => {
+	return stores.flatMap((store) => {
 		const path = sellerPath(store.storeCode);
 		if (path === "") return [];
 		const locales = published(surfaceOfPath(path));
@@ -72,12 +69,20 @@ export function storeSitemapEntries(
 				...(languages ? { alternates: { languages } } : {}),
 			}));
 	});
-	if (entries.length > SITEMAP_SHARD_THRESHOLD) {
+}
+
+/** 整份 sitemap 的筆數超過門檻就回報，筆數照常全數輸出。 */
+export function reportSitemapSize(
+	total: number,
+	report: (message: string) => void = (m) => {
+		Sentry.captureMessage(m, "error");
+	},
+): void {
+	if (total > SITEMAP_SHARD_THRESHOLD) {
 		report(
-			`sitemap has ${entries.length} store URLs, over ${SITEMAP_SHARD_THRESHOLD}: shard it with generateSitemaps`,
+			`sitemap has ${total} URLs, over ${SITEMAP_SHARD_THRESHOLD}: shard it with generateSitemaps`,
 		);
 	}
-	return entries;
 }
 
 /**
@@ -102,7 +107,16 @@ export async function loadSitemapStores(
 	}
 }
 
+/** 靜態加店家的完整清單，筆數比對門檻的是整份檔案。 */
+export function buildSitemap(
+	stores: readonly StoreSitemapRow[],
+	report?: (message: string) => void,
+): MetadataRoute.Sitemap {
+	const entries = [...staticSitemapEntries(), ...storeSitemapEntries(stores)];
+	reportSitemapSize(entries.length, report);
+	return entries;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-	const stores = await loadSitemapStores();
-	return [...staticSitemapEntries(), ...storeSitemapEntries(stores)];
+	return buildSitemap(await loadSitemapStores());
 }
