@@ -822,3 +822,15 @@ func TestConcurrentMarkReadNotifiesOnce(t *testing.T) {
 		t.Fatalf("預期恰好一個 r 通知，得到 %d：%+v", reads, got)
 	}
 }
+
+// 訊息的 created_at 就是配發 seq 時寫進對話的 last_message_at（同一個資料庫時鐘值）。
+func TestMessageTimeIsTheConversationLastMessageTime(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	f.say(t, f.buyerParty(b1), s1, "first")
+	f.say(t, f.buyerParty(b1), s1, "second")
+	n := f.scalar(t, `SELECT count(*) FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id AND c.last_seq = m.seq WHERE m.created_at = c.last_message_at`)
+	if n != 1 {
+		t.Fatalf("最後一則訊息的 created_at 應等於 last_message_at，符合的對話 %d", n)
+	}
+}
