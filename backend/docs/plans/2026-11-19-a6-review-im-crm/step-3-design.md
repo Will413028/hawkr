@@ -1,4 +1,4 @@
-# A6-3 crm 模組：實作設計 v1（草稿，待開工 design-review）
+# A6-3 crm 模組：實作設計 v2（A6-3b 已實作；與實作的差異見 §15）
 
 上層：計畫 `../2026-11-19-a6-review-im-crm.md` 的「A6-3」、不變量表、CD1–CD10、A6-D2、A6-D8。路徑相對於 `backend/`；`CR=services/crm-service`、`CRi=CR/internal`、`M=internal`。標記：【量】＝打開檔案或跑過指令；【推】＝讀程式推論。核對時的 HEAD：dev `0243d91d`。
 
@@ -31,7 +31,7 @@
 
 | 來源 | 決定 | 本檔落點 |
 |---|---|---|
-| A6-D2 (i) | 刪 `blocklist` 值與 CRM 分頁，封鎖只在店家封鎖名單 | §1 `customer_type` CHECK 只有 `normal`／`vip`；§7；crm 不加 seller 依賴（§8.3） |
+| A6-D2 (i) | 刪 `blocklist` 值與 CRM 分頁，封鎖只在店家封鎖名單 | §1 `customer_type` CHECK 只有 `NORMAL`／`VIP`；§7；crm 不加 seller 依賴（§8.3） |
 | A6-D8 | CRM 只顯示暱稱與訂單統計 | §1 不存 `nickname`／`phone`；§5 讀取不回電話、Email、地址；identity 依賴移除（§8.3）；優惠券數見 W3 |
 | Q7／預設 | 以 legacy consumer 保留 ledger 與投影；ordering 搬遷時退場 | §3 |
 | Q11／預設 | 客戶在首筆完成訂單時建立 | §3.4：退款不建客戶列 |
@@ -81,7 +81,7 @@
 CREATE TABLE crm.customers (
   store_id      bigint      NOT NULL,
   buyer_id      bigint      NOT NULL,
-  customer_type text        NOT NULL DEFAULT 'normal' CHECK (customer_type IN ('normal','vip')),
+  customer_type text        NOT NULL DEFAULT 'NORMAL' CHECK (customer_type IN ('NORMAL','VIP')),
   total_spent   bigint      NOT NULL DEFAULT 0 CHECK (total_spent >= 0),
   order_count   integer     NOT NULL DEFAULT 0 CHECK (order_count >= 0),
   first_order_at timestamptz NOT NULL,
@@ -121,6 +121,7 @@ CREATE TABLE crm.order_nets (
   buyer_id     bigint      NOT NULL,
   completed    boolean     NOT NULL DEFAULT false,    -- 收過 order.completed
   net_amount   bigint      NOT NULL,                  -- 可暫時為負（退款先到）
+  full_refunded boolean    NOT NULL DEFAULT false,    -- 收過全額退款
   updated_at   timestamptz NOT NULL
 );
 CREATE INDEX ON crm.order_nets (store_id, buyer_id);
@@ -128,8 +129,7 @@ CREATE INDEX ON crm.order_nets (store_id, buyer_id);
 CREATE TABLE crm.ledger (
   id          uuid        PRIMARY KEY DEFAULT uuidv7(),  -- row-identity ADR D1「大量、只追加的紀錄」
   dedup_key   text        NOT NULL UNIQUE CHECK (char_length(dedup_key) BETWEEN 1 AND 128),  -- 冪等靠這個 UNIQUE
-  order_no    text        NOT NULL REFERENCES crm.order_nets (order_no),
-  kind        text        NOT NULL CHECK (kind IN ('order_completed','refund_full','refund_partial'))
+  order_no    text        NOT NULL REFERENCES crm.order_nets (order_no)
 );
 
 -- W2 採 (b) 時才建：刪帳買家與退場店家的複本，照 im.inactive_parties（im/db/schema.sql:88）、review.inactive_authors（review/db/schema.sql:91）
@@ -147,15 +147,15 @@ CREATE TABLE crm.inactive_parties (
 |---|---|
 | `customers` 去掉 TSID `id`，主鍵改 `(store_id, buyer_id)` | 舊 `UNIQUE(store_id,buyer_id)` 已是自然鍵，`id` 對外不需要（client 都以 `buyerId` 定位，`client-inventory.md` §2.3）【量】；row-identity ADR：關係列用自然鍵【推，依 ADR 分類】 |
 | 去 `nickname`、`phone` | A6-D8、M9：不存個資副本，刪帳後不留在別人的表；讀時經 buyer 補暱稱（§5） |
-| `customer_type` CHECK 只有 `normal`、`vip` | CD1／A6-D2 (i)、CD2 |
+| `customer_type` CHECK 只有 `NORMAL`、`VIP` | CD1／A6-D2 (i)、CD2 |
 | `total_spent >= 0`、`order_count >= 0` CHECK | CD7：下限語意由 §3.3 的計算結構保證，CHECK 是第二道 |
 | `first_order_at` 取代 `created_at` | 列表預設排序的語意鍵（舊以 `created_at DESC` 排）；`(…, buyer_id)` 次序鍵（CD9） |
 | `tags.id` UUIDv7；`UNIQUE(store_id,name)`；`UNIQUE(store_id,id)` | ADR 自有實體 UUIDv7；CD3；CD4 的複合 FK 目標 |
 | `customer_tags` 去 `BIGSERIAL`，主鍵＝三欄自然鍵；FK 改 `(store_id, tag_id)`；加 FK 到 `customers` | CD4；只有客戶才能貼標（舊 gateway 以「有訂單」把關，`G/handler/seller_crm.go:20-50`【量】，新規則由 DB 保證） |
 | 新增 `order_nets`；ledger 去 `store_id`、`buyer_id`、`count_delta`、`occurred_at` | §3.3：每單淨額列取代 advisory lock＋`SUM`；店與買家只存一次 |
-| ledger 主鍵 `id uuid DEFAULT uuidv7()`，冪等改 `UNIQUE(dedup_key)`；去 `amount_delta`、`received_at` | ADR `docs/adr/2026-09-25-row-identity-by-data-kind.md:47`（D1「大量、只追加的紀錄 → `uuid DEFAULT uuidv7()`」）：ledger 是只追加的紀錄，不是值的集合；冪等只需要 UNIQUE。§3.3 只讀 `dedup_key`（去重）與 `kind`（是否全額退款過），金額已在 `order_nets.net_amount`，兩欄無讀取者故刪 |
+| ledger 主鍵 `id uuid DEFAULT uuidv7()`，冪等改 `UNIQUE(dedup_key)`；去 `amount_delta`、`received_at` | ADR `docs/adr/2026-09-25-row-identity-by-data-kind.md:47`（D1「大量、只追加的紀錄 → `uuid DEFAULT uuidv7()`」）：ledger 是只追加的紀錄，不是值的集合；冪等只需要 UNIQUE。§3.3 只讀 `dedup_key`（去重）；是否全額退款過記在已上鎖的 `order_nets.full_refunded`，金額已在 `order_nets.net_amount`，兩欄無讀取者故刪 |
 | 新增 `inactive_parties`（W2 採 (b) 時） | 刪帳後重放舊事件不重建客戶，照 im、review 先例（W2） |
-| ledger `event_type` 加 CHECK、改名 `kind` | 值域進 CHECK（AGENTS 契約規則） |
+| ledger 去 `event_type`，全額退款狀態改存 `order_nets.full_refunded` | 每單一列已上鎖，狀態放在該列，免一個索引與每事件一次 `EXISTS` |
 
 ## 2. 分類值域與型別
 
@@ -189,7 +189,7 @@ ledger 的 `dedup_key` 有命名空間前綴（`order:`、`refund:`），兩種�
    - `refund_partial`：`net -= refund_amount`。
    - `refund_full`：`net = 0`（等同舊的 `-SUM`，但直接寫結果）。
 4. 在步驟 1 已鎖住的 `order_nets` 列上算增量：`delta = (new_completed ? GREATEST(new_net,0) : 0) - (old_completed ? GREATEST(old_net,0) : 0)`（只算 completed 的單；即 `GREATEST(new,0) - GREATEST(old,0)`），若客戶列存在（或本事件是 `order_completed` 而需建立）則 `UPDATE customers SET total_spent = total_spent + delta`；`order_completed` 首次另 `order_count += 1`。不用 `SUM` 子查詢重算：READ COMMITTED 下同一客戶的兩張不同訂單並發時，後到者等完 `customers` 列鎖後 EvalPlanQual 只重讀目標列，`SET` 裡的子查詢仍用語句開始時的快照，會漏算對方剛 commit 的 `order_nets`（lost update）【推，依 PG READ COMMITTED 的 UPDATE 語意】；增量 `total_spent + delta` 在 EPQ 下讀到最新列值，`customers` 的列級 UPDATE 讓同一客戶的事件序列化。
-5. W2 採 (b) 時：在投影 transaction 內、步驟 1 之前，依序持 (BUYER, buyer_id)、(STORE, store_id) 的 advisory lock（`pg_advisory_xact_lock`，與訂閱者的 `Deactivate` 用同一把），再查 `inactive_parties`；已 inactive → no-op（ack，不寫 ledger、`order_nets`、`customers`）。照 im 的 `Send`／`Deactivate` 串行（`im/internal/purge/purge.go:59,68`【量】）：沒有這把鎖時，投影讀到「未 inactive」後、commit 前，訂閱者 commit 並由刪除 job 先跑完，投影 commit 會重建客戶。刪帳後 ledger 被刪、dedup 不再擋重放，此時的冪等由 `inactive_parties` 承擔。另照 im 加保底掃描：已在 `inactive_parties` 但仍有列的身分補排刪除 job。
+5. W2 採 (b) 時：在投影 transaction 內、步驟 1 之前，依序持 (BUYER, buyer_id)、(STORE, store_id) 的共享 advisory lock（`pg_advisory_xact_lock_shared`；訂閱者的 `Deactivate` 對同一個鍵拿獨占鎖），再查 `inactive_parties`；已 inactive → no-op（ack，不寫 ledger、`order_nets`、`customers`）。照 im 的 `Send`／`Deactivate` 串行（`im/internal/purge/purge.go:59,68`【量】）：沒有這把鎖時，投影讀到「未 inactive」後、commit 前，訂閱者 commit 並由刪除 job 先跑完，投影 commit 會重建客戶。刪帳後 ledger 被刪、dedup 不再擋重放，此時的冪等由 `inactive_parties` 承擔。另照 im 加保底掃描：已在 `inactive_parties` 但仍有列的身分補排刪除 job。
 
 結果：
 
@@ -435,3 +435,34 @@ func (m *Module) RecordRefund(ctx, Refund) (recorded bool, err error)   // Refun
 | 11 | 第 2 輪：ledger→`order_nets` FK 無 cascade、刪後冪等的承擔者沒寫在 §3.3 | nit | fixed：§8.3 寫刪除順序或 cascade（實作擇一＋測試）；§3.3 步驟 5 寫明 |
 
 findings 11 (blocking 0)，fixed 10、recorded 0、raised 0、rejected 1
+
+## 15. A6-3b 實作與本設計的差異
+
+- 儲存值一律 UPPER_SNAKE（`NORMAL`、`VIP`）：`TestStoredCodesInChecksAreUpperSnake` 強制，§1、§1.1 已改。
+- §3.3 步驟 5 的身分鎖：投影拿共享、`Deactivate` 拿獨占。若兩邊都拿獨占，同店同買家的事件全串行，§11.2「改回 SUM 重算」的 mutation 存活；改後該 mutation 與刪帳重放的 mutation 都被擋下。
+- `ledger.kind` 與 `(order_no, kind)` 索引改為 `order_nets.full_refunded`（完成前 design-review）。
+- 讀取與賣家寫入排除 `inactive_parties`：已停用的買家、店家讀不到，寫入回 NotFound（`RemoveCustomerTag` 冪等）。
+- 標籤的建立、改名、刪除與貼標共用店家鎖 `LockStoreTags`。
+- 保底掃描以 `(kind, party_id)` 游標分頁掃完全部。
+- `first_order_at` 取投影處理時間（Java `completed_at` 格式無規定），ordering 搬遷時改取訂單完成時間（`CARRYOVER.md`）。
+
+## 16. 完成前審查
+
+| # | 來源 | finding | 嚴重度 | 處理 |
+|---|---|---|---|---|
+| 1 | design-review | inactive／purge 機制在 im、review、crm 第三份手抄，crm 的鎖模式與 im 分岔 | should | raised：交 Will 決定 |
+| 2 | design-review | `ledger.kind` 只為查全額退款 | nit | fixed（`6d9f3e3c`） |
+| 3 | design-review | 依賴表 crm 允許 `ordering` 但未用 | nit | fixed |
+| 4 | design-review | `first_order_at` 用處理時間 | nit | rejected：盤點表已寫退場條件，未上線無舊資料 |
+| 5 | code-review | Rename／Delete 不拿 `LockStoreTags`，與貼標競爭 | should | fixed，並發測試＋mutation |
+| 6 | code-review | 讀寫未排除 inactive 對象 | nit | fixed，測試＋mutation |
+| 7 | code-review | 死結論證註解不實 | nit | fixed，多店退場並發測試 |
+| 8 | code-review | 掃描固定取前 100 筆會餓死 | nit | fixed，230 筆測試 |
+| 9 | code-review | 超長 `order_no` 未在 handler 擋 | nit | fixed |
+| 10 | code-review | 依賴表敘事型註解 | nit | fixed |
+| 11 | 第 2 輪 | 本設計書仍寫 `ledger.kind` | should | fixed（本節與 §1、§1.1） |
+| 12 | 第 2 輪 | 並發測試靠 sleep 對齊競爭窗口，慢機器可能沒進窗口 | nit | rejected：斷言兩種順序都接受，不會誤報；只影響鑑別力，mutation 已實測擋下 |
+| 13 | 第 2 輪 | 死結測試未明確斷言無 40P01 | nit | rejected：`noErrors` 已涵蓋 |
+| 14 | 第 2 輪 | 貼標並發測試最後斷言弱 | nit | rejected：保證來自 `noErrors` |
+
+findings 14 (blocking 0)，fixed 9、recorded 0、raised 1、rejected 4
