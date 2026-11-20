@@ -403,7 +403,7 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
          - [ ] **10f 信任與安全上線前**（Will 2026-10-18，`2026-09-29-a3-buyer-seller/step10e-reports-brief.md` §4）：賣家中心與 seller-app 的「詢問」API 與畫面（R4）；「我的通報」與補充說明，先做 website 與 buyer-app（R7）；權利人通報與工作日行事曆移到 platform（R8）；檢舉表單（10d D4）的同意勾選、聯絡方式快照與 1919 說明（R5）；法律文字（R5、R8、R11）在 I-legal。website 的新頁排在 I-web-0 之後（I-web-0 已落地：`website/app/[locale]` 在 dev 的初始 commit `9f23df58`，2026-11-20 核對）。
             - 範圍確認（Will 2026-11-20，開工核對 dev `4670f1ea`）：四項都還沒被其他步驟做掉。R7 的改動：A7 已做 moderation `ListMyReports` 與 buyer-app `my_reports_screen`（只列社群對象），10f 把它擴成讀取時組裝 seller 與 moderation 兩種通報，再加 website 頁；聊天與評價的檢舉由 A6 補進「我的通報」，10f 不等 A6。
             - 子步驟（每一刀開工先做唯讀盤點與設計，SSOT 沒寫的取捨停下回報；各自 code-review，10f-6 前做 design-review）：
-              - [ ] 10f-1 賣家端的詢問（R4）：seller 的詢問讀取與回覆 API（附件走機敏上傳與 `evidence_accesses` 擁有者檢查）、期限改從出現在賣家中心起算、website 賣家中心與 seller-app 畫面、admin 拿掉「賣家端畫面上線前請另外聯絡賣家」的句子。
+              - [ ] 10f-1 賣家端的詢問（R4；設計 `2026-09-29-a3-buyer-seller/step10f-1-design.md`，F1–F7 Will 2026-11-20）：seller 的詢問讀取與回覆 API（附件走機敏上傳與 `evidence_accesses` 擁有者檢查）、期限改從出現在賣家中心起算、website 賣家中心與 seller-app 畫面、admin 拿掉「賣家端畫面上線前請另外聯絡賣家」的句子。
               - [ ] 10f-2 檢舉表單（R5）：同意勾選、聯絡方式快照、1919 說明；後端與 website、buyer-app 的表單同一刀。
               - [ ] 10f-3 我的通報與補充說明（R7）：讀取時組裝 seller 與 moderation 兩種通報、通報人補充說明的 API、buyer-app 既有頁擴充、website 新頁。
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
