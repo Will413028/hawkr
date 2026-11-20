@@ -344,7 +344,7 @@ func TestStreamEndingNormallyAfterPartialChunksFinishesWithoutARace(t *testing.T
 }
 
 func TestStreamEndingWithPartialChunksOnlyDoesNotRace(t *testing.T) {
-	t.Skip("ADK data race on partial-ending streams: <ISSUE_URL_PLACEHOLDER>；移除條件：google/adk-go 修正 runner.fromPlugin 對 Actions.Compaction 的寫入與 IsFinalResponse 的讀取後，升級 ADK 並刪除這個 Skip")
+	t.Skip("ADK data race on partial-ending streams: https://github.com/google/adk-go/issues/2447；移除條件：google/adk-go 修正 runner.fromPlugin 對 Actions.Compaction 的寫入與 IsFinalResponse 的讀取後，升級 ADK 並刪除這個 Skip")
 	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Partial: true, Text: "半句"}, {Partial: true, Text: "話"}}}}}
 	e := newExecutor(t, llm, &fakeOrders{}, nil)
 	ref, err := submitChat(t, e, "", "你好")
