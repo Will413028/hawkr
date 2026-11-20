@@ -40,6 +40,8 @@ const (
 	DefaultRetention = 10 * time.Minute
 	// DefaultTimeout 是一輪從開始到結束的上限；到了就以失敗結束，釋放對話的佔用。
 	DefaultTimeout = 2 * time.Minute
+
+	minBufferCapacity = 2
 )
 
 // Config 是執行器的依賴與參數；Now、Sessions、Model、Orders 必填，其餘零值取預設。
@@ -100,6 +102,8 @@ func New(cfg Config) *Executor {
 	if cfg.BufferCapacity <= 0 {
 		cfg.BufferCapacity = DefaultBufferCapacity
 	}
+	// 緩衝最後一格留給終止事件，所以至少要有一格一般事件加一格終止事件。
+	cfg.BufferCapacity = max(cfg.BufferCapacity, minBufferCapacity)
 	if cfg.Retention <= 0 {
 		cfg.Retention = DefaultRetention
 	}
@@ -261,9 +265,10 @@ func (e *Executor) submitReturnPolicy(ctx context.Context, in SubmitInput, loc u
 	turnID, t := e.register(ctx, in.BuyerID)
 	body := text.ReturnPolicyTitle(loc).Text + "\n\n" + text.ReturnPolicyFacts(loc).Text + "\n\n" + text.ReturnPolicyClosing(loc).Text
 	now := e.cfg.Now()
-	t.buf.append(model.Event{Kind: model.EventText, Text: body}, now)
 	// 照搬：固定文案不建 session，finished 帶的是請求的 session_id（可為空）。
-	t.buf.append(model.Event{Kind: model.EventFinished, SessionID: in.SessionID}, now)
+	if !t.buf.append(model.Event{Kind: model.EventText, Text: body}, now) || !t.buf.append(model.Event{Kind: model.EventFinished, SessionID: in.SessionID}, now) {
+		return Ref{}, errors.New("assistant：退貨政策事件寫入緩衝失敗")
+	}
 	return Ref{TurnID: turnID, SessionID: in.SessionID}, nil
 }
 
@@ -290,13 +295,15 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 	ctx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	var overflow atomic.Bool
-	emit := func(ev model.Event) {
-		if !t.buf.append(ev, e.cfg.Now()) {
-			if overflow.CompareAndSwap(false, true) {
-				slog.WarnContext(ctx, "assistant：這一輪的事件數超過上限，中止", "limit", e.cfg.BufferCapacity)
-			}
-			stopRun()
+	emit := func(ev model.Event) bool {
+		if t.buf.append(ev, e.cfg.Now()) {
+			return true
 		}
+		if overflow.CompareAndSwap(false, true) {
+			slog.WarnContext(ctx, "assistant：這一輪的事件數超過上限，中止", "limit", e.cfg.BufferCapacity)
+		}
+		stopRun()
+		return false
 	}
 	deps := buyeragent.Deps{
 		Orders:  e.cfg.Orders,
@@ -379,13 +386,18 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 				continue // thought 不得以一般文字外流
 			}
 			if part.Text != "" {
-				emit(model.Event{Kind: model.EventText, Text: part.Text})
-				sent.WriteString(part.Text)
+				if emit(model.Event{Kind: model.EventText, Text: part.Text}) {
+					sent.WriteString(part.Text)
+				}
 			}
 		}
 	}
-	if !finalSeen || overflow.Load() {
-		slog.WarnContext(ctx, "assistant：事件流結束但沒有根 agent 的最終回應", "overflow", overflow.Load(), "ctxErr", ctx.Err())
+	if overflow.Load() {
+		slog.WarnContext(ctx, "assistant：這一輪因事件數超過上限而以失敗結束", "limit", e.cfg.BufferCapacity)
+		return fail()
+	}
+	if !finalSeen {
+		slog.WarnContext(ctx, "assistant：事件流結束但沒有根 agent 的最終回應", "ctxErr", ctx.Err())
 		return fail()
 	}
 	return model.Event{Kind: model.EventFinished, SessionID: sessionID}

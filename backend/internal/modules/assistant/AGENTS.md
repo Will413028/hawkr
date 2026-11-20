@@ -31,9 +31,9 @@ schema `assistant`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `
 - 輪次執行器不開 transaction、不接受 transaction 內的 ctx（`ErrOuterTx`）；LLM 只經 `Deps.LLM`（`internal/platform/llm` 建構）。
 - 同一個對話同時只有一輪（A9-D14）：佔用在終止事件寫入之前釋放，所以釋放路徑（結束、錯誤、panic、逾時、取消）都要先 release 再發終止事件。
 - tool 的身分範圍：session state 的 `buyer_id` 必須等於這一輪的買家；新增 tool 一律用 `newTool`（它先驗範圍），在 callback 與 tool 裡用 `ctx.State()`，不用 `ctx.Session().State()`。
-- tool 只能經 `guardedTool` 掛上 agent（`specialist()` 只收這個型別）：它 recover panic、把錯誤換成固定代碼、每次呼叫恰好回報一次。回給模型的內容不帶語言（狀態用 CodeMeta OrderStatus 的代碼，錯誤用代碼），下游錯誤文字與 stack 只進 log；新增代碼同步改系統提示的 `toolErrorGuide`。
+- tool 只能經 `guardedTool` 掛上 agent（`specialist()` 只收這個型別）：它 recover panic、把錯誤換成固定代碼、每次呼叫恰好回報一次。回給模型的內容不帶語言（狀態用 CodeMeta OrderStatus 的代碼，錯誤用代碼），下游錯誤文字與 stack 只進 log；新增代碼同步改系統提示的 `toolErrorGuide`。有 tool 的 agent 一律以 `generateConfig` 設 Gemini `VALIDATED`＋`AllowedFunctionNames`（與已知名單同一份）；未知 tool 的事後防線只記 log、不發 `tool_result`。
 - `finished` 只在事件迭代正常結束且看過根 agent 的最終回應時發；其他一律 `error`，不看迴圈後的 `ctx.Err()`。`Submit` 的順序是 closed 檢查、佔用、`wg.Add`（同一把鎖）、產生 session ID、寫 session，任何失敗路徑都要釋放。
-- 每輪事件緩衝只增不減，上限含終止事件，最後一格留給終止事件；寫滿就中止這一輪，沒有 cursor 過期。`tool_result` 只帶 tool 列舉與成功與否，參數只經 `Config.ToolObserver` 給測試。
+- 每輪事件緩衝只增不減，上限含終止事件，最後一格留給終止事件；寫滿就中止這一輪（上限至少 2），沒有 cursor 過期。`tool_result` 只帶 tool 列舉與成功與否，參數只經 `Config.ToolObserver` 給測試。
 - 對外 enum 與錯誤原因不得用 UNSPECIFIED 當合法值；`error` 事件的 `ErrorReason` 由 A9-2c 的 handler 決定。
 
 ## 不負責

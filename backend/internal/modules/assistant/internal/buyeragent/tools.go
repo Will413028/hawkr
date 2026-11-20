@@ -63,21 +63,21 @@ type trackingItem struct {
 }
 
 type trackingOutput struct {
-	// Note 是不帶語言的代碼（目前只有 no_packages_in_transit），模型依買家的語言轉述。
+	// Note 是不帶語言的代碼（noteNoPackages、noteSomePackagesUnavailable），模型依買家的語言轉述。
 	Note     string         `json:"note,omitempty"`
 	Packages []trackingItem `json:"packages"`
 }
 
-// trackingStatuses 是「配送中的包裹」的訂單狀態：30 配送中、32 待取貨（CodeMeta〈業務狀態碼〉的 OrderStatus，擁有者是 ordering；
-// order-service 的 status filter 以逗號分隔多個值，見 OrderService.parseStatusFilter）。
-const trackingStatuses = "30,32"
+// trackingStatuses 是「追蹤中的包裹」的訂單狀態：20 待出貨（已建物流單）、30 配送中、32 待取貨、35 物流異常、40 已送達、
+// 54 配送失敗未退款。集合由 ordering 擁有（CodeMeta〈業務狀態碼〉的 OrderStatus；order-service 的 status filter 以逗號分隔多個值，
+// 見 OrderService.parseStatusFilter）：ordering 搬進單體後改由它提供，這裡不另行決定；每筆包裹帶自己的狀態碼，由模型回答。
+const trackingStatuses = "20,30,32,35,40,54"
 
-// upstream 把訂單服務的錯誤記進 log，回給模型只有代碼：port 約定「不存在或不屬於該買家」回 ErrOrderNotFound。
-func upstream(ctx context.Context, tool string, err error) error {
+// upstream 把訂單服務的錯誤換成給模型的代碼；錯誤原因由 guardedTool 記一次 log。port 約定「不存在或不屬於該買家」回 ErrOrderNotFound。
+func upstream(err error) error {
 	if errors.Is(err, ErrOrderNotFound) {
 		return toolFail(codeOrderNotFound, err)
 	}
-	slog.WarnContext(ctx, "assistant：訂單服務失敗", "tool", tool, "error", err)
 	return toolFail(codeUpstreamUnavailable, err)
 }
 
@@ -127,7 +127,7 @@ func (d Deps) myOrdersTool() (*guardedTool, error) {
 			}
 			orders, err := d.Orders.MyOrders(ctx, buyerID, in.Status, 1, pageSize)
 			if err != nil {
-				return orderQueryOutput{}, upstream(ctx, "get_my_orders", err)
+				return orderQueryOutput{}, upstream(err)
 			}
 			orders = filterByDateRange(orders, in.DateRange, d.Now())
 			items := make([]orderItem, 0, len(orders))
@@ -146,7 +146,7 @@ func (d Deps) orderDetailTool() (*guardedTool, error) {
 		func(ctx context.Context, buyerID int64, in orderDetailInput) (orderDetailOutput, error) {
 			detail, err := d.Orders.OrderDetail(ctx, buyerID, in.OrderNo)
 			if err != nil {
-				return orderDetailOutput{}, upstream(ctx, "get_buyer_order_detail", err)
+				return orderDetailOutput{}, upstream(err)
 			}
 			return orderDetailOutput{Result: map[string]any{
 				"order_no":        detail.OrderNo,
@@ -163,26 +163,36 @@ func (d Deps) orderDetailTool() (*guardedTool, error) {
 }
 
 func (d Deps) trackingTool() (*guardedTool, error) {
-	return newTool(d, model.ToolTrackMyPackage, "track_my_package", "查詢買家配送中的包裹物流狀態",
+	return newTool(d, model.ToolTrackMyPackage, "track_my_package", "查詢買家包裹的物流狀態",
 		func(ctx context.Context, buyerID int64, _ trackingInput) (trackingOutput, error) {
 			orders, err := d.Orders.MyOrders(ctx, buyerID, trackingStatuses, 1, 10)
 			if err != nil {
-				return trackingOutput{}, upstream(ctx, "track_my_package", err)
+				return trackingOutput{}, upstream(err)
 			}
 			if len(orders) == 0 {
-				return trackingOutput{Note: "no_packages_in_transit"}, nil
+				return trackingOutput{Note: noteNoPackages}, nil
 			}
 			packages := make([]trackingItem, 0, len(orders))
+			var lastErr error
+			failed := 0
 			for _, o := range orders {
 				detail, err := d.Orders.OrderDetail(ctx, buyerID, o.OrderNo)
 				if err != nil {
-					// 照搬：單筆物流詳情查失敗就略過，不通知 LLM（疑似缺陷：買家看到的清單少一筆卻沒有說明）。
+					failed++
+					lastErr = err
+					slog.WarnContext(ctx, "assistant：包裹詳情查詢失敗", "error", err)
 					continue
 				}
 				packages = append(packages, trackingItem{
 					OrderNo: detail.OrderNo, Status: detail.Status, ShippingMethod: detail.ShippingMethod,
 					ShippingStatus: detail.ShippingStatus, SellerName: detail.SellerName, Amount: detail.Amount,
 				})
+			}
+			if failed == len(orders) {
+				return trackingOutput{}, upstream(lastErr)
+			}
+			if failed > 0 {
+				return trackingOutput{Note: noteSomePackagesUnavailable, Packages: packages}, nil
 			}
 			return trackingOutput{Packages: packages}, nil
 		})

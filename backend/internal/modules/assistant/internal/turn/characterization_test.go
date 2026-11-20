@@ -28,7 +28,7 @@ import (
 //     所有 fixture 的對外文字都在 tool 呼叫之後，所以預期序列是 tool_result 在前、舊事件在後，實際序列不同就失敗。
 //     事件不帶參數（A9-D13 修訂）：tool 名稱與參數改由 Config.ToolObserver 觀察到的呼叫與 scripted_llm 的 function_call 逐一比對。
 //   - 刻意偏離（A9-D15）：回給 LLM 的 tool 結果不再帶中文狀態標籤與下游錯誤文字，改為狀態代碼與錯誤代碼；
-//     追蹤 tool 的查詢狀態從 20（待出貨）改為 30、32（配送中、待取貨），見 fedBackDeviations 與 statusRemap，每一筆有理由。
+//     追蹤 tool 的查詢狀態集合改為 20、30、32、35、40、54（A9-D16），單筆詳情失敗改為回 note 代碼；見 fedBackDeviations、fedBackSubstitutions 與 statusRemap，每一筆有理由與明確的替換。
 
 const fixtureDir = "../../../../../docs/plans/2026-11-19-a9-agent/fixtures/assistant"
 
@@ -103,21 +103,100 @@ var toolIDs = map[string]model.Tool{
 	"track_my_package":       model.ToolTrackMyPackage,
 }
 
-// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture（A9-D15 第 2、3 點）；其餘 fixture 必須逐字相同。
-// 不在這裡的 fixture 不得偏離，所以新增偏離一定要寫理由。
+// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture（A9-D15 第 2、3 點、A9-D16 第 1 點）及理由；
+// 其餘 fixture 必須逐字相同。每一筆偏離在 fedBackSubstitutions 有明確的替換，比對時對錄製值套用替換後必須與實際相同。
 var fedBackDeviations = map[string]string{
 	"orders_happy_path":                  "status 由中文標籤改為狀態代碼（A9-D15 第 2 點）：「待出貨（物流單已建立，待出貨）」→ 20、「配送中」→ 30",
 	"llm_error_after_tool_call":          "同 orders_happy_path：status 由標籤改為代碼",
 	"order_detail_via_coordinator":       "同 orders_happy_path：訂單詳情的 status 由標籤改為代碼",
 	"tool_error_assistant_still_replies": "tool 錯誤不再把下游錯誤文字（「查詢訂單失敗: …」）給模型，改為代碼 upstream_unavailable（A9-D15 第 3 點）",
-	"tracking_no_packages":               "「目前沒有配送中的包裹」中文句改為代碼 note=no_packages_in_transit，空清單由 null 改為 []（A9-D15 第 2 點）",
-	"tracking_partial_detail_failure":    "status 由標籤改為代碼，且追蹤查詢的狀態由 20 改為 30、32（見 statusRemap）",
+	"tracking_no_packages":               "「目前沒有配送中的包裹」中文句 message 改為代碼 note=no_packages_in_transit；packages 仍是 null（nil slice 的 JSON）",
+	"tracking_partial_detail_failure":    "status 由標籤改為代碼，且單筆詳情失敗不再靜默略過：回應多一個 note=some_packages_unavailable（A9-D16 第 1 點）",
 }
 
-// statusRemap 是追蹤 tool 查詢狀態改變帶來的 fixture 輸入調整：舊 tool 查狀態 20（CodeMeta 的「待出貨」，不是配送中），
-// 新 tool 查 30、32（配送中、待取貨）；fixture 的訂單與詳情的狀態 20 與 30 互換，其餘輸入不動。
+var statusLabelToCode = map[string]string{
+	"待出貨（物流單已建立，待出貨）": "20",
+	"配送中": "30",
+}
+
+// replaceStatusLabels 遞迴把 key 為 status 的中文標籤換成代碼。
+func replaceStatusLabels(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			if str, ok := e.(string); ok && k == "status" {
+				if code, ok := statusLabelToCode[str]; ok {
+					out[k] = code
+					continue
+				}
+			}
+			out[k] = replaceStatusLabels(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = replaceStatusLabels(e)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+// withNote 刪掉舊的 message、加上 note 代碼。
+func withNote(note string) func(any) any {
+	return func(v any) any {
+		m := v.(map[string]any)
+		out := map[string]any{}
+		for k, e := range m {
+			if k != "message" {
+				out[k] = e
+			}
+		}
+		out["note"] = note
+		return out
+	}
+}
+
+// fedBackSubstitutions 是每筆偏離的明確替換：作用在每個 tool 的 function response 的 response 值上。
+var fedBackSubstitutions = map[string]func(any) any{
+	"orders_happy_path":                  replaceStatusLabels,
+	"llm_error_after_tool_call":          replaceStatusLabels,
+	"order_detail_via_coordinator":       replaceStatusLabels,
+	"tool_error_assistant_still_replies": func(any) any { return map[string]any{"error": "upstream_unavailable"} },
+	"tracking_no_packages":               withNote("no_packages_in_transit"),
+	"tracking_partial_detail_failure": func(v any) any {
+		return withNote("some_packages_unavailable")(replaceStatusLabels(v))
+	},
+}
+
+// substituteFedBack 對錄製的 function response 套用該 fixture 的替換；coordinator 委派的回應（response 是 specialist 的文字）不受影響。
+func substituteFedBack(scenario string, recorded []map[string]any) []map[string]any {
+	sub, ok := fedBackSubstitutions[scenario]
+	if !ok {
+		return recorded
+	}
+	out := make([]map[string]any, len(recorded))
+	for i, fr := range recorded {
+		cp := map[string]any{}
+		for k, v := range fr {
+			cp[k] = v
+		}
+		name, _ := fr["name"].(string)
+		if toolIDs[name] != 0 {
+			cp["response"] = sub(fr["response"])
+		}
+		out[i] = cp
+	}
+	return out
+}
+
+// statusRemap 是追蹤 tool 查詢狀態改變帶來的 fixture 輸入調整：舊 tool 只查狀態 20，新 tool 查 20、30、32、35、40、54；
+// 為了讓被選中的訂單與原錄製相同，fixture 裡原本不會被選中的狀態 30 改成不在追蹤集合的 50，其餘輸入不動。
 var statusRemap = map[string]string{
-	"tracking_no_packages":            "舊 tool 以狀態 20 選包裹、新 tool 以 30、32 選：fixture 的 20 與 30 互換，被選中的訂單與原錄製相同",
+	"tracking_no_packages":            "舊 tool 只選狀態 20：fixture 的 30（新集合會選中）改為 50，被選中的訂單與原錄製相同",
 	"tracking_partial_detail_failure": "同 tracking_no_packages",
 }
 
@@ -162,11 +241,8 @@ func (f fixture) orders() *fakeOrders {
 	}
 	remap := func(status string) string {
 		if _, ok := statusRemap[f.Scenario]; ok {
-			switch status {
-			case "20":
-				return "30"
-			case "30":
-				return "20"
+			if status == "30" {
+				return "50"
 			}
 		}
 		return status
@@ -376,9 +452,9 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 					t.Errorf("第 %d 次呼叫的歷史長度 = %d，錄製是 %d", i, s.HistoryContents, o.HistoryContents)
 				}
 				gj, _ := json.Marshal(s.FunctionResponsesBack)
-				wj, _ := json.Marshal(o.FunctionResponsesBack)
-				if _, deviates := fedBackDeviations[f.Scenario]; !deviates && string(gj) != string(wj) && (len(s.FunctionResponsesBack) != 0 || len(o.FunctionResponsesBack) != 0) {
-					t.Errorf("第 %d 次呼叫回給 LLM 的 tool 結果不同\n got: %s\nwant: %s", i, gj, wj)
+				wj, _ := json.Marshal(substituteFedBack(f.Scenario, o.FunctionResponsesBack))
+				if string(gj) != string(wj) && (len(s.FunctionResponsesBack) != 0 || len(o.FunctionResponsesBack) != 0) {
+					t.Errorf("第 %d 次呼叫回給 LLM 的 tool 結果不同（已套用 fedBackSubstitutions）\n got: %s\nwant: %s", i, gj, wj)
 				}
 			}
 		})
@@ -398,4 +474,18 @@ func TestCharacterizationReturnPolicyTextIsTheSharedCatalogText(t *testing.T) {
 		return
 	}
 	t.Fatal("找不到 return_policy_fixed_text")
+}
+
+// 每一筆偏離都要有理由與明確的替換，反之亦然。
+func TestEveryFedBackDeviationHasAReasonAndASubstitution(t *testing.T) {
+	for name, reason := range fedBackDeviations {
+		if reason == "" || fedBackSubstitutions[name] == nil {
+			t.Errorf("%s：偏離要有理由與替換", name)
+		}
+	}
+	for name := range fedBackSubstitutions {
+		if fedBackDeviations[name] == "" {
+			t.Errorf("%s：有替換但沒有理由", name)
+		}
+	}
 }

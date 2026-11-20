@@ -269,3 +269,76 @@ func TestReturnPolicyTextFollowsTheRequestLocale(t *testing.T) {
 		t.Fatal("en 與 zh-TW 的退貨政策要是不同的文字")
 	}
 }
+
+func trackResponse(t *testing.T, llm *scriptedLLM, orders *fakeOrders) (map[string]any, []model.Event) {
+	t.Helper()
+	e := newExecutor(t, llm, orders, nil)
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicTracking, Message: "追"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	resp, _ := llm.seen()[1].FunctionResponsesBack[0]["response"].(map[string]any)
+	return resp, evs
+}
+
+// 追蹤 tool 只選 CodeMeta OrderStatus 的 20、30、32、35、40、54；每個包裹帶自己的狀態碼（A9-D16 第 1 點）。
+func TestTrackingSelectsExactlyTheInTransitFamilyOfStatusesAndEachPackageCarriesItsCode(t *testing.T) {
+	orders := &fakeOrders{details: map[string]buyeragent.OrderDetail{}}
+	for _, st := range []string{"0", "10", "20", "30", "32", "35", "40", "50", "54", "60", "70", "80"} {
+		no := "O" + st
+		orders.orders = append(orders.orders, buyeragent.Order{OrderNo: no, Status: st})
+		orders.details[no] = buyeragent.OrderDetail{OrderNo: no, Status: st}
+	}
+	llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+	resp, _ := trackResponse(t, llm, orders)
+	var got []string
+	pkgs, _ := resp["packages"].([]any)
+	for _, p := range pkgs {
+		m, _ := p.(map[string]any)
+		if m["order_no"] != "O"+m["status"].(string) {
+			t.Fatalf("包裹的狀態碼要是它自己的：%v", m)
+		}
+		got = append(got, m["status"].(string))
+	}
+	slices.Sort(got)
+	if want := []string{"20", "30", "32", "35", "40", "54"}; !slices.Equal(got, want) {
+		t.Fatalf("追蹤的狀態 = %v，要 %v", got, want)
+	}
+	if _, has := resp["note"]; has {
+		t.Fatalf("全部詳情都查到時不帶 note：%v", resp)
+	}
+}
+
+func TestTrackingFailsWithUpstreamUnavailableWhenEveryDetailLookupFails(t *testing.T) {
+	orders := &fakeOrders{
+		orders:     []buyeragent.Order{{OrderNo: "A", Status: "30"}, {OrderNo: "B", Status: "20"}},
+		detailErrs: map[string]error{"A": errors.New("timeout"), "B": errors.New("timeout")},
+	}
+	llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("抱歉")}}
+	resp, evs := trackResponse(t, llm, orders)
+	if resp["error"] != "upstream_unavailable" || len(resp) != 1 {
+		t.Fatalf("全部詳情失敗要回 upstream_unavailable：%v", resp)
+	}
+	tr := toolResults(evs)
+	if len(tr) != 1 || tr[0].Tool != model.ToolTrackMyPackage || tr[0].ToolSucceeded {
+		t.Fatalf("要有一個失敗的 tool_result：%+v", evs)
+	}
+}
+
+func TestTrackingSucceedsWithANoteCodeWhenSomePackageDetailsCannotBeLoaded(t *testing.T) {
+	orders := &fakeOrders{
+		orders:     []buyeragent.Order{{OrderNo: "A", Status: "30"}, {OrderNo: "B", Status: "20"}},
+		details:    map[string]buyeragent.OrderDetail{"A": {OrderNo: "A", Status: "30"}},
+		detailErrs: map[string]error{"B": errors.New("timeout")},
+	}
+	llm := &scriptedLLM{script: []scriptedCall{call("track_my_package", nil), say("好")}}
+	resp, evs := trackResponse(t, llm, orders)
+	pkgs, _ := resp["packages"].([]any)
+	if resp["note"] != "some_packages_unavailable" || len(pkgs) != 1 {
+		t.Fatalf("部分失敗要成功並帶 note 代碼：%v", resp)
+	}
+	if tr := toolResults(evs); len(tr) != 1 || !tr[0].ToolSucceeded {
+		t.Fatalf("部分失敗的 tool_result 要是成功：%+v", evs)
+	}
+}

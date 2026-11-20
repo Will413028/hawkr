@@ -31,10 +31,12 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 同對話單一輪次（A9-D14） | ADK `session.Service` 沒有條件寫入 | 是 | 輪次層序列化同一對話 | 記憶體佔用標記，結束時先釋放再發終止事件；`Submit` 的順序是 closed 檢查、佔用、`wg.Add`（同一把鎖）、伺服器產生 session ID、寫 session，任何失敗路徑都釋放（A9-D15 第 4 點）；`runner` 的 `AutoCreateSession` 關掉：帶了不存在的 session ID 回 `ErrSessionNotFound`（舊行為會用該 ID 自動建立一個沒有 `buyer_id` 的 session，tool 之後全部失敗；疑似缺陷） |
 | 輪次逾時 | 外部呼叫要有 deadline（規則：沒有 deadline 的外部呼叫不允許） | 是 | 每輪有上限 | `DefaultTimeout` 2 分鐘，計畫沒有規定數字（待決 3）；舊服務只靠 LLM 呼叫自身的 30 秒 |
 | agent 回覆語言：agent prompt 寫死「使用繁體中文」回覆 | 舊服務只服務 zh-TW 買家 | 否：買家介面是 zh-TW／en | 回覆語言跟隨使用者的語言 | 已決（A9-D15 第 2 點）：以買家這則訊息的語言回覆，判斷不了才用請求語系；退貨政策固定文案與 coordinator 的退貨流程依請求語系 |
-| tool 回給模型的內容（A9-2b 修正輪）：中文狀態標籤、中文提示句、下游錯誤文字（`查詢訂單失敗: %w`）原樣給模型 | 模型要看得懂結果 | 否：標籤表與 prompt 的狀態碼不一致，下游文字可能含內部位址或 stack | tool 輸出結構化代碼，語言由模型依使用者轉換；錯誤只給代碼，細節進 log | 已決（A9-D15 第 2、3 點）：`status` 是 CodeMeta OrderStatus 的代碼，狀態碼表在系統提示並由測試比對 CodeMeta；錯誤是 `tool_failed`、`upstream_unavailable`、`order_not_found`、`forbidden`、`unknown_tool`、`delegate_failed`；追蹤 tool 查「30,32」（舊的 20 是待出貨，缺陷） |
-| tool 的 panic 與錯誤處理（A9-2b 修正輪）：靠 ADK functiontool 內建 recover，錯誤文字（含 stack）原樣回給模型 | tool 內可能 panic、參數可能不合法 | 是 | 一層統一的包裝處理 panic、錯誤與可觀測性 | 已決（A9-D15 第 3 點）：`guardedTool` 包在 `tool.Tool.Run` 外層，是唯一能掛上 agent 的型別；panic stack 只進 slog、每次呼叫（含參數驗證失敗）恰好一個 `tool_result`；模型叫了不存在的 tool 只記 log、模型看到 `unknown_tool` |
+| tool 回給模型的內容（A9-2b 修正輪）：中文狀態標籤、中文提示句、下游錯誤文字（`查詢訂單失敗: %w`）原樣給模型 | 模型要看得懂結果 | 否：標籤表與 prompt 的狀態碼不一致，下游文字可能含內部位址或 stack | tool 輸出結構化代碼，語言由模型依使用者轉換；錯誤只給代碼，細節進 log | 已決（A9-D15 第 2、3 點）：`status` 是 CodeMeta OrderStatus 的代碼，狀態碼表在系統提示並由測試比對 CodeMeta；錯誤是 `tool_failed`、`upstream_unavailable`、`order_not_found`、`forbidden`、`unknown_tool`、`delegate_failed`；追蹤 tool 查「20,30,32,35,40,54」（A9-D16 第 1 點；舊的只查 20 是缺陷），每個包裹帶自己的狀態碼 |
+| tool 的 panic 與錯誤處理（A9-2b 修正輪）：靠 ADK functiontool 內建 recover，錯誤文字（含 stack）原樣回給模型 | tool 內可能 panic、參數可能不合法 | 是 | 一層統一的包裝處理 panic、錯誤與可觀測性 | 已決（A9-D15 第 3 點）：`guardedTool` 包在 `tool.Tool.Run` 外層，是唯一能掛上 agent 的型別；panic stack 只進 slog、每次呼叫（含參數驗證失敗）恰好一個 `tool_result`；解碼端以 Gemini `VALIDATED`＋`AllowedFunctionNames` 防未知 tool（修訂），事後防線：模型叫了不存在的 tool 只記 log、不發 `tool_result`、模型看到 `unknown_tool` |
 
-**待決**（計畫與 proto 沒有規定，已先以保守值實作，不阻擋 A9-2b）：1. 預設訊息是否刪除（A9-2c）；2. 緩衝上限（4096）與保留時間；3. 輪次逾時；4. `error` 事件的 `ErrorReason`：現有 enum 沒有「助理輪次失敗」的值，模組只給 `FailureKind`，handler 要新增 reason 或決定 UNSPECIFIED 的語意（A9-2c）；5. 疑似缺陷照搬未修，程式註解標「疑似缺陷」：單筆物流詳情失敗靜默略過、整句空白的訊息被當成有內容（狀態標籤表與 prompt 的狀態碼不一致、`track_my_package` 以狀態 20 當配送中已由 A9-D15 修正）。
+**A9-2c 交接**：`buyeragent.Orders` 由 composition root 的 adapter 實作，必須把 `orderservice.ErrOrderNotFound` 轉成 `buyeragent.ErrOrderNotFound` 並有測試（見 `docs/modules/assistant.md` 末段）；否則查無訂單會變成 `upstream_unavailable`。
+
+**待決**（計畫與 proto 沒有規定，已先以保守值實作，不阻擋 A9-2b）：1. 預設訊息是否刪除（A9-2c）；2. 緩衝上限（4096）與保留時間；3. 輪次逾時；4. `error` 事件的 `ErrorReason`：現有 enum 沒有「助理輪次失敗」的值，模組只給 `FailureKind`，handler 要新增 reason 或決定 UNSPECIFIED 的語意（A9-2c）；5. 疑似缺陷照搬未修，程式註解標「疑似缺陷」：整句空白的訊息被當成有內容（狀態標籤表與 prompt 的狀態碼不一致、`track_my_package` 以狀態 20 當配送中已由 A9-D15 修正、單筆物流詳情失敗靜默略過已由 A9-D16 修正（全失敗回 `upstream_unavailable`，部分失敗回 `note=some_packages_unavailable`））。
 
 ## 傳輸層的沿用盤點
 

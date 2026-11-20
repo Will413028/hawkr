@@ -25,6 +25,14 @@ const (
 	codeDelegateFailed      = "delegate_failed"
 )
 
+// 給模型看的 tool 結果說明代碼（tool 成功但有但書）：同樣不帶語言。
+const (
+	// noteNoPackages：目前沒有追蹤中的包裹。
+	noteNoPackages = "no_packages_in_transit"
+	// noteSomePackagesUnavailable：有部分包裹的詳情查不到，回的清單不完整。
+	noteSomePackagesUnavailable = "some_packages_unavailable"
+)
+
 // toolError 是 tool 回給模型的錯誤：Error() 只有代碼。cause 是真正的原因，只進 log，不給模型。
 type toolError struct {
 	code  string

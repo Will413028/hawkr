@@ -14,6 +14,9 @@ import (
 var ErrOrderNotFound = errors.New("buyeragent：找不到訂單")
 
 // Orders 是買家助理讀訂單的 port，由 composition root 以訂單服務的 client 實作。buyerID 是目前的 buyer_id。
+//
+// A9-2c 交接：composition root 的 adapter 必須把 orderservice.ErrOrderNotFound 轉成本套件的 ErrOrderNotFound，
+// 並有測試守住（否則查無訂單會被當成 upstream_unavailable 給模型）；見 CARRYOVER.md 與 docs/modules/assistant.md。
 type Orders interface {
 	// MyOrders 回買家的訂單；statusFilter 空字串是全部。
 	MyOrders(ctx context.Context, buyerID int64, statusFilter string, page, pageSize int) ([]Order, error)

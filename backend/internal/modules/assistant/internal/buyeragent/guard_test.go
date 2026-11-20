@@ -153,9 +153,16 @@ func TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource(t *t
 			t.Errorf("狀態碼表多了 %s，CodeMeta 沒有", code)
 		}
 	}
-	// 追蹤 tool 查的是配送中與待取貨。
-	if want["30"] != "配送中" || want["32"] != "待取貨" || trackingStatuses != "30,32" {
-		t.Errorf("trackingStatuses = %q，CodeMeta 的 30=%q、32=%q", trackingStatuses, want["30"], want["32"])
+	// 追蹤 tool 查的狀態集合（D16 第 1 點）：已建物流單、配送中、待取貨、物流異常、已送達、配送失敗未退款。
+	wantTracking := map[string]string{"20": "待出貨", "30": "配送中", "32": "待取貨", "35": "物流異常", "40": "已送達", "54": "配送失敗未退款（終態）"}
+	gotTracking := strings.Split(trackingStatuses, ",")
+	if len(gotTracking) != len(wantTracking) {
+		t.Errorf("trackingStatuses = %q，要正好是 %v", trackingStatuses, wantTracking)
+	}
+	for _, code := range gotTracking {
+		if label, ok := wantTracking[code]; !ok || want[code] != label {
+			t.Errorf("trackingStatuses 的 %s：CodeMeta 是 %q，預期 %q", code, want[code], label)
+		}
 	}
 }
 

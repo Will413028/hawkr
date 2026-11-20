@@ -47,7 +47,7 @@ func orderSpecialistInstruction(loc uitext.Locale) string {
 }
 
 func trackingSpecialistInstruction(loc uitext.Locale) string {
-	return `你是買家包裹追蹤助手。收到訊息後直接使用 track_my_package 工具查詢配送中包裹的物流狀態，不需要確認。tool 回傳 note=no_packages_in_transit 表示目前沒有配送中的包裹。
+	return `你是買家包裹追蹤助手。收到訊息後直接使用 track_my_package 工具查詢包裹（已建物流單到配送結束前後的訂單）的物流狀態，不需要確認。每個包裹帶自己的 status 代碼，依它回答買家，不要把所有包裹都說成配送中。tool 回傳 note=no_packages_in_transit 表示目前沒有可追蹤的包裹；note=some_packages_unavailable 表示有部分包裹的詳情暫時查不到，清單不完整，要告訴買家並建議稍後再查。
 ` + statusGuide + `
 ` + toolErrorGuide + `
 ` + replyRule(loc)
@@ -60,7 +60,7 @@ func coordinatorInstruction(loc uitext.Locale) string {
 
 可委派的專職助手（以工具形式呼叫，request 傳你要它做的事）：
 - buyer_order_specialist：查買家訂單清單、單筆訂單詳情
-- buyer_tracking_specialist：查配送中包裹物流狀態
+- buyer_tracking_specialist：查包裹物流狀態
 
 委派規則：
 - 需要真實資料一律呼叫對應專職助手，禁止自行編造數據。
@@ -92,12 +92,37 @@ type Deps struct {
 	OnTool func(ToolCall)
 }
 
+// toolNames 是這個 agent 掛的 tool 名稱（agenttool 的名稱是被包的 agent 名稱）；已知名單與解碼端限制都由它導出，只有這一份。
+func toolNames(tools []adktool.Tool) map[string]bool {
+	names := make(map[string]bool, len(tools))
+	for _, t := range tools {
+		names[t.Name()] = true
+	}
+	return names
+}
+
+// generateConfig 是每個 agent 的生成設定（A9-D15 第 3 點修訂）：有 tool 的 agent 以 Gemini 的 VALIDATED 模式
+// 把可呼叫的函式限制在自己的 tool 名稱，解碼端就不會產生未知的 tool 名稱；事後防線仍在 onToolError。
+func generateConfig(tools []adktool.Tool) *genai.GenerateContentConfig {
+	cfg := &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)}
+	if len(tools) == 0 {
+		return cfg
+	}
+	allowed := make([]string, 0, len(tools))
+	for _, t := range tools {
+		allowed = append(allowed, t.Name())
+	}
+	cfg.ToolConfig = &genai.ToolConfig{FunctionCallingConfig: &genai.FunctionCallingConfig{
+		Mode:                 genai.FunctionCallingConfigModeValidated,
+		AllowedFunctionNames: allowed,
+	}}
+	return cfg
+}
+
 // specialist 只接受 *guardedTool：沒有包過的 tool 掛不上 agent。
 func (d Deps) specialist(name, description, instruction string, tools ...*guardedTool) (agent.Agent, error) {
-	known := map[string]bool{}
 	list := make([]adktool.Tool, 0, len(tools))
 	for _, t := range tools {
-		known[t.Name()] = true
 		list = append(list, t)
 	}
 	a, err := llmagent.New(llmagent.Config{
@@ -106,8 +131,8 @@ func (d Deps) specialist(name, description, instruction string, tools ...*guarde
 		Description:           description,
 		Instruction:           instruction,
 		Tools:                 list,
-		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(known)},
-		GenerateContentConfig: &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)},
+		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(toolNames(list))},
+		GenerateContentConfig: generateConfig(list),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("buyeragent：建立 %s：%w", name, err)
@@ -134,7 +159,7 @@ func (d Deps) TrackingSpecialist() (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.specialist("buyer_tracking_specialist", "查詢買家配送中包裹的物流狀態", trackingSpecialistInstruction(d.Locale), track)
+	return d.specialist("buyer_tracking_specialist", "查詢買家包裹的物流狀態", trackingSpecialistInstruction(d.Locale), track)
 }
 
 // Coordinator 是一般問答使用的 agent：不掛 function tool，兩個 specialist 以 agenttool 包起來；
@@ -148,13 +173,14 @@ func (d Deps) Coordinator() (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
+	delegates := []adktool.Tool{agenttool.New(orders, nil), agenttool.New(tracking, nil)}
 	a, err := llmagent.New(llmagent.Config{
 		Name:                  "buyer_coordinator",
 		Model:                 d.Model,
 		Instruction:           coordinatorInstruction(d.Locale),
-		Tools:                 []adktool.Tool{agenttool.New(orders, nil), agenttool.New(tracking, nil)},
-		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(map[string]bool{orders.Name(): true, tracking.Name(): true})},
-		GenerateContentConfig: &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)},
+		Tools:                 delegates,
+		OnToolErrorCallbacks:  []llmagent.OnToolErrorCallback{onToolError(toolNames(delegates))},
+		GenerateContentConfig: generateConfig(delegates),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("buyeragent：建立 buyer_coordinator：%w", err)

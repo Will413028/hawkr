@@ -5,6 +5,7 @@ import (
 	"errors"
 	"iter"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -275,5 +276,107 @@ func TestOrderDetailResultIsWrappedInResult(t *testing.T) {
 	inner, _ := resp["result"].(map[string]any)
 	if inner["order_no"] != "A1" || inner["status"] != "30" || inner["amount_twd"] != float64(120) {
 		t.Fatalf("回給 LLM 的結果要是 {result:{…}}：%v", fed)
+	}
+}
+
+// 第一段文字就寫不進緩衝時，沒有任何文字送出：以「查詢失敗」（no_output）結束，不是「回應中斷」。
+func TestTurnWhoseFirstTextOverflowsTheBufferEndsAsNoOutput(t *testing.T) {
+	llm := &scriptedLLM{script: []scriptedCall{call("get_my_orders", map[string]any{"date_range": "all"}), say("好")}}
+	// 上限 2：第 1 格給 tool_result，最後一格留給終止事件，文字寫不進去。
+	e := newExecutor(t, llm, sampleOrders(), func(c *Config) { c.BufferCapacity = 2 })
+	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, Message: "查"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if len(evs) != 2 || evs[0].Kind != model.EventToolResult {
+		t.Fatalf("事件 = %+v", evs)
+	}
+	if last := evs[1]; last.Kind != model.EventError || last.Failure != model.FailureNoOutput {
+		t.Fatalf("沒有任何文字送出，要以 no_output 結束：%+v", last)
+	}
+}
+
+// 上限小於 2 時取 2：一格一般事件加一格終止事件，否則連第一個事件都寫不進去。
+func TestBufferCapacityBelowTwoIsRaisedToTwo(t *testing.T) {
+	e := newExecutor(t, textLLM("好"), &fakeOrders{}, func(c *Config) { c.BufferCapacity = 1 })
+	if e.cfg.BufferCapacity != 2 {
+		t.Fatalf("BufferCapacity = %d，要 2", e.cfg.BufferCapacity)
+	}
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if len(evs) != 2 || evs[0].Kind != model.EventText || evs[1].Kind != model.EventFinished {
+		t.Fatalf("事件 = %+v", evs)
+	}
+	rp, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicReturnPolicy})
+	if err != nil {
+		t.Fatalf("退貨政策在最小緩衝下要能受理：%v", err)
+	}
+	if evs := collect(t, e, buyer, rp.TurnID, ""); len(evs) != 2 || evs[1].Kind != model.EventFinished {
+		t.Fatalf("退貨政策事件 = %+v", evs)
+	}
+}
+
+// 事件流在 partial 之後以完整的最終回應正常結束，經真正的 ADK runner（-race 守這條路徑）。
+func TestStreamEndingNormallyAfterPartialChunksFinishesWithoutARace(t *testing.T) {
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{
+		{Partial: true, Text: "您好，"}, {Partial: true, Text: "請問"}, {Text: "您好，請問"},
+	}}}}
+	e := newExecutor(t, llm, &fakeOrders{}, nil)
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventFinished {
+		t.Fatalf("正常結尾要 finished：%+v", evs)
+	}
+	var got string
+	for _, ev := range evs {
+		got += ev.Text
+	}
+	if got != "您好，請問" {
+		t.Fatalf("文字 = %q", got)
+	}
+}
+
+func TestStreamEndingWithPartialChunksOnlyDoesNotRace(t *testing.T) {
+	t.Skip("ADK data race on partial-ending streams: <ISSUE_URL_PLACEHOLDER>；移除條件：google/adk-go 修正 runner.fromPlugin 對 Actions.Compaction 的寫入與 IsFinalResponse 的讀取後，升級 ADK 並刪除這個 Skip")
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Partial: true, Text: "半句"}, {Partial: true, Text: "話"}}}}}
+	e := newExecutor(t, llm, &fakeOrders{}, nil)
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventError {
+		t.Fatalf("沒有最終回應不得 finished：%+v", evs)
+	}
+}
+
+// execute 自己的 recover：agent 之外的程式（這裡是緩衝寫入時取時鐘）panic 也以失敗事件結束並釋放對話。
+func TestPanicInTheExecutorItselfEndsTheTurnAsAnErrorAndReleasesTheSession(t *testing.T) {
+	var calls atomic.Int32
+	now := func() time.Time {
+		if calls.Add(1) == 2 { // 第 1 次是登記時的清理，第 2 次是第一個 text 事件寫入
+			panic("clock exploded")
+		}
+		return time.Now()
+	}
+	e := newExecutor(t, textLLM("好"), &fakeOrders{}, func(c *Config) { c.Now = now })
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.wg.Wait() // 先等這一輪結束：Watch 也會取時鐘，不能讓它搶到會 panic 的那一次
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventError {
+		t.Fatalf("executor panic 要以 error 結束：%+v", evs)
+	}
+	if _, err := submitChat(t, e, ref.SessionID, "再問"); err != nil {
+		t.Fatalf("panic 後對話要已釋放：%v", err)
 	}
 }

@@ -45,6 +45,10 @@ type llmRequest struct {
 	FileURIs              []string
 	FunctionResponsesBack []map[string]any
 	HistoryContents       int
+	// CallingMode 與 AllowedNames 是請求的 ToolConfig.FunctionCallingConfig；DeclaredNames 是同一個請求宣告的函式名稱。
+	CallingMode   string
+	AllowedNames  []string
+	DeclaredNames []string
 }
 
 // agentOf 由系統提示判斷這次呼叫是哪個 agent（路由是否正確）。
@@ -68,6 +72,17 @@ func agentOf(req *adkmodel.LLMRequest) string {
 
 func summarize(req *adkmodel.LLMRequest) llmRequest {
 	s := llmRequest{Agent: agentOf(req), HistoryContents: len(req.Contents)}
+	if req.Config != nil {
+		if tc := req.Config.ToolConfig; tc != nil && tc.FunctionCallingConfig != nil {
+			s.CallingMode = string(tc.FunctionCallingConfig.Mode)
+			s.AllowedNames = append([]string(nil), tc.FunctionCallingConfig.AllowedFunctionNames...)
+		}
+		for _, tl := range req.Config.Tools {
+			for _, fd := range tl.FunctionDeclarations {
+				s.DeclaredNames = append(s.DeclaredNames, fd.Name)
+			}
+		}
+	}
 	if len(req.Contents) == 0 {
 		return s
 	}
