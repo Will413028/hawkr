@@ -52,8 +52,14 @@ func (f *fakeMessages) MessageForRelay(context.Context, uuid.UUID) (im.RelayMess
 }
 
 type fakeBuyers struct {
-	display []buyer.Display
-	err     error
+	display    []buyer.Display
+	err        error
+	byAccount  []int64
+	accountErr error
+}
+
+func (f *fakeBuyers) BuyerIDsByAccount(context.Context, int64) ([]int64, error) {
+	return f.byAccount, f.accountErr
 }
 
 func (f *fakeBuyers) BatchDisplay(context.Context, []int64) ([]buyer.Display, error) {
@@ -251,5 +257,59 @@ func TestOnMessageSentEnqueuesOneJobPerEvent(t *testing.T) {
 	}
 	if a, ok := q.args[0].(MessageSentArgs); !ok || a != sentArgs() {
 		t.Fatalf("job = %#v", q.args[0])
+	}
+}
+
+func storeSender(f *fixture, logo *string) {
+	f.messages.msg.SenderKind = im.PartyStore
+	f.stores.store.LogoKey = logo
+}
+
+func TestStoreSenderAvatarPrefersLogo(t *testing.T) {
+	f := newFixture()
+	storeSender(f, ptr("logo/22.jpg"))
+	f.buyers.byAccount = []int64{90}
+	f.buyers.display = []buyer.Display{{BuyerID: 90, Avatar: ptr("avatar/owner.jpg")}}
+	if err := f.worker.messageSent(t.Context(), sentArgs()); err != nil {
+		t.Fatal(err)
+	}
+	if got := body(t, f.jobs.published()[0])["sender_avatar"]; got != "logo/22.jpg" {
+		t.Fatalf("sender_avatar = %v", got)
+	}
+}
+
+func TestStoreSenderAvatarFallsBackToTheLiveOwnerStint(t *testing.T) {
+	for _, logo := range []*string{nil, ptr("")} {
+		f := newFixture()
+		storeSender(f, logo)
+		f.buyers.byAccount = []int64{80, 90}
+		f.buyers.display = []buyer.Display{
+			{BuyerID: 80, Deleted: true, Avatar: ptr("avatar/old.jpg")},
+			{BuyerID: 90, Avatar: ptr("avatar/owner.jpg")},
+		}
+		if err := f.worker.messageSent(t.Context(), sentArgs()); err != nil {
+			t.Fatal(err)
+		}
+		if got := body(t, f.jobs.published()[0])["sender_avatar"]; got != "avatar/owner.jpg" {
+			t.Fatalf("logo %v：sender_avatar = %v", logo, got)
+		}
+	}
+}
+
+func TestStoreSenderAvatarOwnerNotFoundIsEmptyAndLookupFailureRetries(t *testing.T) {
+	f := newFixture()
+	storeSender(f, nil)
+	if err := f.worker.messageSent(t.Context(), sentArgs()); err != nil {
+		t.Fatal(err)
+	}
+	if got := body(t, f.jobs.published()[0])["sender_avatar"]; got != "" {
+		t.Fatalf("sender_avatar = %v", got)
+	}
+
+	f = newFixture()
+	storeSender(f, nil)
+	f.buyers.accountErr = errors.New("db down")
+	if err := f.worker.messageSent(t.Context(), sentArgs()); err == nil || len(f.jobs.published()) != 0 {
+		t.Fatalf("要回錯誤且不送：err = %v", err)
 	}
 }

@@ -69,6 +69,7 @@ type Messages interface {
 // Buyers 是 relay 補暱稱與頭像的 port；*buyer.Module 實作它。
 type Buyers interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]buyer.Display, error)
+	BuyerIDsByAccount(ctx context.Context, accountID int64) ([]int64, error)
 }
 
 // Stores 是 relay 取店家名稱、logo 與帳號的 port；*seller.Module 實作它。
@@ -165,8 +166,9 @@ func (w *Worker) messageSent(ctx context.Context, a MessageSentArgs) error {
 		event.SenderID = itoa(m.StoreID)
 		if storeFound {
 			event.SenderName = store.StoreName
-			if store.LogoKey != nil {
-				event.SenderAvatar = *store.LogoKey
+			event.SenderAvatar, err = w.storeAvatar(ctx, store)
+			if err != nil {
+				return err
 			}
 		}
 		event.ReceiverType, event.ReceiverID = "buyer", itoa(m.BuyerID)
@@ -211,6 +213,34 @@ func (w *Worker) buyerDisplay(ctx context.Context, buyerID int64) (name, avatar 
 		}
 	}
 	return name, avatar, nil
+}
+
+// storeAvatar 是店家寄件人的頭像：舊碼用店家 logo，logo 沒設時退回店主帳號買家身分的頭像。
+// 帳號的 stint 可能有多個（含已關閉的），取存活的那個；查詢失敗回錯誤，查不到或沒有頭像回空字串。
+func (w *Worker) storeAvatar(ctx context.Context, st seller.Store) (string, error) {
+	if st.LogoKey != nil && *st.LogoKey != "" {
+		return *st.LogoKey, nil
+	}
+	ids, err := w.Buyers.BuyerIDsByAccount(ctx, st.AccountID)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return "", nil
+		}
+		return "", err
+	}
+	if len(ids) == 0 {
+		return "", nil
+	}
+	list, err := w.Buyers.BatchDisplay(ctx, ids)
+	if err != nil {
+		return "", err
+	}
+	for _, d := range list {
+		if !d.Deleted && d.Avatar != nil {
+			return *d.Avatar, nil
+		}
+	}
+	return "", nil
 }
 
 // previewSentence 是舊 computePreview 的結果：圖片是固定句子；文字超過 100 個字截斷並加 "..."（文字在寫入時已去頭尾空白）。
