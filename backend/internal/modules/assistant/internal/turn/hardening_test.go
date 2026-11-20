@@ -9,7 +9,9 @@ import (
 	"time"
 
 	adkmodel "google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
+	"google.golang.org/genai"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/buyeragent"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
@@ -41,6 +43,30 @@ func TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError(t *testing.T) {
 	evs := collect(t, e, buyer, ref.TurnID, "")
 	if last := evs[len(evs)-1]; last.Kind != model.EventError || last.Failure != model.FailureNoOutput {
 		t.Fatalf("被取消的輪次要以 error 結束，得到 %+v", last)
+	}
+}
+
+func TestCancelledTurnWhoseEventStreamEndsWithoutAnErrorIsNotFinished(t *testing.T) {
+	e := newExecutor(t, textLLM("unused"), &fakeOrders{}, nil)
+	e.events = func(ctx context.Context, _ *runner.Runner, _, _ string, _ *genai.Content) iter.Seq2[*session.Event, error] {
+		return func(yield func(*session.Event, error) bool) {
+			ev := session.NewEvent(ctx, "inv")
+			ev.Partial = true
+			ev.Content = genai.NewContentFromText("半句", genai.RoleModel)
+			if !yield(ev, nil) {
+				return
+			}
+			e.cancel()
+			<-ctx.Done() // 等取消傳到這一輪，然後不回錯誤就結束
+		}
+	}
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	if last := evs[len(evs)-1]; last.Kind != model.EventError || last.Failure != model.FailureInterrupted {
+		t.Fatalf("被取消、已送出部分文字的輪次要以 interrupted 結束：%+v", evs)
 	}
 }
 

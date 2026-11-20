@@ -75,6 +75,9 @@ type turnState struct {
 type Executor struct {
 	cfg Config
 
+	// events 產生 runner 的事件流；測試用它替換成不經 runner 的來源。
+	events func(ctx context.Context, r *runner.Runner, userID, sessionID string, content *genai.Content) iter.Seq2[*session.Event, error]
+
 	base   context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -100,7 +103,7 @@ func New(cfg Config) *Executor {
 		cfg.Timeout = DefaultTimeout
 	}
 	base, cancel := context.WithCancel(context.Background())
-	return &Executor{cfg: cfg, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}}
+	return &Executor{cfg: cfg, events: runnerEvents, base: base, cancel: cancel, turns: map[string]*turnState{}, active: map[string]struct{}{}}
 }
 
 // Shutdown 取消所有進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
@@ -299,7 +302,7 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 
 	// ADK 的 SSE 模式先送多個 Partial 的 chunk，最後送一個完整的非 Partial 回應。sent 記這一段已送出的文字：
 	// 非 Partial 到達時只補送沒送過的尾巴；tool 回應代表新一段文字開始，重置。
-	for ev, err := range r.Run(ctx, userID, sessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeSSE}) {
+	for ev, err := range e.events(ctx, r, userID, sessionID, content) {
 		if err != nil || ctx.Err() != nil {
 			slog.WarnContext(ctx, "assistant：agent 執行失敗", "error", errors.Join(err, ctx.Err()))
 			return fail()
@@ -344,6 +347,10 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 		return fail()
 	}
 	return model.Event{Kind: model.EventFinished, SessionID: sessionID}
+}
+
+func runnerEvents(ctx context.Context, r *runner.Runner, userID, sessionID string, content *genai.Content) iter.Seq2[*session.Event, error] {
+	return r.Run(ctx, userID, sessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeSSE})
 }
 
 // Watch 訂閱一輪的事件，從 cursor 之後開始（空字串是從頭）。輪次不存在或不屬於 buyerID 回 ErrTurnNotFound，
