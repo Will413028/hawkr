@@ -113,6 +113,28 @@ test("over the threshold every store is still emitted and an error is reported",
 	__setFlavorForTest(null);
 });
 
+test("the threshold counts emitted URL entries, not stores", () => {
+	__setEnvForTest(null);
+	__setFlavorForTest("prod");
+	const stores = [
+		{ storeCode: " " },
+		...Array.from({ length: SITEMAP_SHARD_THRESHOLD }, (_, i) => ({
+			storeCode: String(i + 1),
+		})),
+	];
+	const reports: string[] = [];
+	const entries = storeSitemapEntries(
+		stores,
+		() => ["zh-TW"],
+		(m) => reports.push(m),
+	);
+	assert.equal(stores.length, SITEMAP_SHARD_THRESHOLD + 1);
+	assert.equal(entries.length, SITEMAP_SHARD_THRESHOLD);
+	assert.equal(reports.length, 0);
+	__setEnvForTest(null);
+	__setFlavorForTest(null);
+});
+
 test("a repeated next_page_token throws instead of looping", async () => {
 	let calls = 0;
 	await assert.rejects(

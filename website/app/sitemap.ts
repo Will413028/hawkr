@@ -12,7 +12,7 @@ import { absoluteUrl, languageAlternates, sellerPath } from "@/lib/seo/urls";
  * come from `storeSitemapEntries` (enumerated by `ListStores`); product URLs
  * are not listed yet.
  *
- * One sitemap file, no sharding: past `SITEMAP_SHARD_THRESHOLD` stores an error
+ * One sitemap file, no sharding: past `SITEMAP_SHARD_THRESHOLD` store URL entries an error
  * is reported (the trigger to add `generateSitemaps`), the entries are still all emitted.
  *
  * One entry per PUBLISHED locale of each route (lib/intl/locales.ts): an
@@ -44,7 +44,7 @@ export function staticSitemapEntries(
 	});
 }
 
-/** sitemap 單檔上限 50,000 筆，45,000 起要改成分檔。 */
+/** sitemap 單檔上限 50,000 筆網址，門檻比對的是實際輸出的店家網址筆數，45,000 起要改成分檔。 */
 export const SITEMAP_SHARD_THRESHOLD = 45_000;
 
 /** 每家店每個已發佈語系一筆，規則同 `staticSitemapEntries`（UGC 頁只列預設語系）。 */
@@ -55,12 +55,7 @@ export function storeSitemapEntries(
 		Sentry.captureMessage(m, "error");
 	},
 ): MetadataRoute.Sitemap {
-	if (stores.length > SITEMAP_SHARD_THRESHOLD) {
-		report(
-			`sitemap has ${stores.length} stores, over ${SITEMAP_SHARD_THRESHOLD}: shard it with generateSitemaps`,
-		);
-	}
-	return stores.flatMap((store) => {
+	const entries = stores.flatMap((store) => {
 		const path = sellerPath(store.storeCode);
 		if (path === "") return [];
 		const locales = published(surfaceOfPath(path));
@@ -77,6 +72,12 @@ export function storeSitemapEntries(
 				...(languages ? { alternates: { languages } } : {}),
 			}));
 	});
+	if (entries.length > SITEMAP_SHARD_THRESHOLD) {
+		report(
+			`sitemap has ${entries.length} store URLs, over ${SITEMAP_SHARD_THRESHOLD}: shard it with generateSitemaps`,
+		);
+	}
+	return entries;
 }
 
 /**
