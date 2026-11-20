@@ -167,20 +167,24 @@ func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int
 	return rows.Review(r, rows.Images(imgs)[id]), nil
 }
 
-// ReviewForRelay 讀單則評價的原始列（relay 組事件 payload 用，不套公開可讀述詞）；列不存在（已清除）是 NotFound。
-func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.Review, error) {
+// ReviewForRelay 讀單則評價的原始列與它現在是否公開可讀（relay 組事件 payload 用，不套公開可讀述詞）；列不存在（已清除）是 NotFound。
+func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.RelayReview, error) {
 	r, err := s.q(ctx).GetReviewByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.Review{}, apperr.NotFound("%s", text.ReviewNotFound(uitext.LocaleFrom(ctx)))
+		return model.RelayReview{}, apperr.NotFound("%s", text.ReviewNotFound(uitext.LocaleFrom(ctx)))
 	}
 	if err != nil {
-		return model.Review{}, err
+		return model.RelayReview{}, err
 	}
 	imgs, err := s.q(ctx).ListReviewImages(ctx, []uuid.UUID{id})
 	if err != nil {
-		return model.Review{}, err
+		return model.RelayReview{}, err
 	}
-	return rows.Review(r, rows.Images(imgs)[id]), nil
+	public, err := s.q(ctx).IsReviewPublic(ctx, id)
+	if err != nil {
+		return model.RelayReview{}, err
+	}
+	return model.RelayReview{Review: rows.Review(r, rows.Images(imgs)[id]), Public: public}, nil
 }
 
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。

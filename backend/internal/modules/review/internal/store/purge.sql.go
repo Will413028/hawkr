@@ -51,6 +51,23 @@ func (q *Queries) GetReviewByID(ctx context.Context, id uuid.UUID) (ReviewReview
 	return i, err
 }
 
+const isReviewPublic = `-- name: IsReviewPublic :one
+SELECT EXISTS (
+  SELECT 1 FROM review.reviews AS r
+  WHERE r.id = $1
+    AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
+    AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+)
+`
+
+// relay 在 job 執行當下判斷這則評價現在是否公開可讀（沒有未還原的隱藏、作者不在 inactive_authors，與 testdata/public_predicate.sql 同一段述詞）。
+func (q *Queries) IsReviewPublic(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isReviewPublic, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listBuyerReviewTargets = `-- name: ListBuyerReviewTargets :many
 SELECT DISTINCT store_id, product_id FROM review.reviews
 WHERE buyer_id = $1

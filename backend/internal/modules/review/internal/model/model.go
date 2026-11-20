@@ -122,6 +122,12 @@ type Review struct {
 	Reply        *Reply
 }
 
+// RelayReview 是 relay 讀到的單則評價：Public 是 job 執行當下它是否公開可讀（沒有未還原的隱藏、作者不在刪帳中）。
+type RelayReview struct {
+	Review
+	Public bool
+}
+
 // Cursor 是 keyset 的位置：(created_at, id) 由大到小，之後的是比它更舊的。
 type Cursor struct {
 	CreatedAt time.Time

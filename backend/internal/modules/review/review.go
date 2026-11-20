@@ -67,6 +67,7 @@ type Deps struct {
 
 type (
 	Review                  = model.Review
+	RelayReview             = model.RelayReview
 	Image                   = model.Image
 	Reply                   = model.Reply
 	Cursor                  = model.Cursor
@@ -229,8 +230,8 @@ func (m *Module) AuthorTargets(ctx context.Context, buyerID int64) ([]Target, er
 	return m.purge.Targets(ctx, buyerID)
 }
 
-// ReviewForRelay 讀單則評價的原始列，不套公開可讀述詞（事件的 payload 要這則評價現在的內容）；已清除的是 NotFound。
-func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (Review, error) {
+// ReviewForRelay 讀單則評價的原始列，不套公開可讀述詞（事件的 payload 要這則評價現在的內容），Public 是現在是否公開可讀；已清除的是 NotFound。
+func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (RelayReview, error) {
 	return m.read.ReviewForRelay(ctx, id)
 }
 

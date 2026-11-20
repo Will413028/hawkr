@@ -22,3 +22,12 @@ ORDER BY store_id, product_id;
 -- name: GetReviewByID :one
 -- relay 讀單則評價（建立事件的 payload）：不過濾可見性，不存在才是沒有列。
 SELECT * FROM review.reviews WHERE id = sqlc.arg(id);
+
+-- name: IsReviewPublic :one
+-- relay 在 job 執行當下判斷這則評價現在是否公開可讀（沒有未還原的隱藏、作者不在 inactive_authors，與 testdata/public_predicate.sql 同一段述詞）。
+SELECT EXISTS (
+  SELECT 1 FROM review.reviews AS r
+  WHERE r.id = sqlc.arg(id)
+    AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
+    AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+);

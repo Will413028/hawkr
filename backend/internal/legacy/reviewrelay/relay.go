@@ -4,7 +4,7 @@
 //
 //	review.ReviewCreated            → review.created
 //	review.ReviewAggregateChanged   → review.hidden（隱藏或還原）
-//	review.ReviewAuthorDeactivated  → review.hidden，作者評過的每組 (店, 商品) 一則
+//	review.ReviewAuthorDeactivated  → 作者評過的每組 (店, 商品) 各排一個 ReviewAggregateChanged 的 job → 各一則 review.hidden
 //
 // 兩個事件的 review_id 一律是 0：新評價的 ID 是 UUIDv7，舊 wire 是 int64；讀它的只有 notification 模板放進推播 data 的 reviewId，
 // 四端都沒有讀（設計書 step-1-design.md §9 第 2 項）。
@@ -95,7 +95,7 @@ func OnReviewAuthorDeactivated(q jobs.Enqueuer) func(context.Context, review.Rev
 
 // Reviews 是 relay 讀評價的 port；*review.Module 實作它。
 type Reviews interface {
-	ReviewForRelay(ctx context.Context, id uuid.UUID) (review.Review, error)
+	ReviewForRelay(ctx context.Context, id uuid.UUID) (review.RelayReview, error)
 	ProductStats(ctx context.Context, productID int64) (review.ProductStats, error)
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
 	AuthorTargets(ctx context.Context, buyerID int64) ([]review.Target, error)
@@ -236,8 +236,9 @@ func (w *Worker) reviewAggregateChanged(ctx context.Context, a ReviewAggregateCh
 	return w.enqueuePublish(ctx, a.EventID, exchangeReview, "review.hidden", p)
 }
 
-// reviewAuthorDeactivated 在 transaction 外列出作者評過的 (店, 商品)，逐組送一則重算後的 review.hidden；每組的 event_id 由事件 ID 與
-// (店, 商品) 衍生，job 重試不會多送。review.purge_author 已經刪完這位作者的評價時沒有任何組可列，這時不送。
+// reviewAuthorDeactivated 在 transaction 外列出作者評過的 (店, 商品)，每組排一個 ReviewAggregateChangedArgs job（逐組各自在 25 秒內重算與送出，
+// 不在一個 job 裡跑完全部）；每組的 event_id 由事件 ID 與 (店, 商品) 衍生，job 重試與重複排入最後只有一則 review.hidden（PublishArgs 以
+// event_id 做 unique）。review.purge_author 已經刪完這位作者的評價時沒有任何組可列，這時不送。
 func (w *Worker) reviewAuthorDeactivated(ctx context.Context, a ReviewAuthorDeactivatedArgs) error {
 	targets, err := w.Reviews.AuthorTargets(ctx, a.BuyerID)
 	if err != nil {
@@ -245,11 +246,8 @@ func (w *Worker) reviewAuthorDeactivated(ctx context.Context, a ReviewAuthorDeac
 	}
 	for _, t := range targets {
 		id := derivedID(a.EventID, fmt.Sprintf("%d/%d", t.StoreID, t.ProductID))
-		p, err := w.hidden(ctx, id, a.Occurred, t.StoreID, t.ProductID)
-		if err != nil {
-			return err
-		}
-		if err := w.enqueuePublish(ctx, id, exchangeReview, "review.hidden", p); err != nil {
+		job := ReviewAggregateChangedArgs{eventFields: eventFields{EventID: id, Occurred: a.Occurred}, StoreID: t.StoreID, ProductID: t.ProductID}
+		if err := w.Jobs.Enqueue(ctx, job, nil); err != nil {
 			return err
 		}
 	}
@@ -267,6 +265,9 @@ func (w *Worker) reviewCreated(ctx context.Context, a ReviewCreatedArgs) error {
 	}
 	if err != nil {
 		return err
+	}
+	if !r.Public {
+		return nil // 評價在 job 執行時已被隱藏或作者在刪帳中：不通知賣家，也不外送內容
 	}
 	h, err := w.hidden(ctx, a.EventID, a.Occurred, r.StoreID, r.ProductID)
 	if err != nil {

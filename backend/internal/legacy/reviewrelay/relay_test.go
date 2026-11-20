@@ -35,19 +35,40 @@ func (q *recordingJobs) published() []rabbitmq.PublishArgs {
 	return out
 }
 
+func (q *recordingJobs) relayJobs() []river.JobArgs {
+	var out []river.JobArgs
+	for _, a := range q.args {
+		if _, ok := a.(rabbitmq.PublishArgs); !ok {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+func (q *recordingJobs) publishJobs() []river.JobArgs {
+	var out []river.JobArgs
+	for _, a := range q.args {
+		if _, ok := a.(rabbitmq.PublishArgs); ok {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
 type fakeReviews struct {
 	review  review.Review
+	hidden  bool
 	gone    bool
 	product map[int64]review.ProductStats
 	store   map[int64]review.StoreStats
 	targets []review.Target
 }
 
-func (f *fakeReviews) ReviewForRelay(context.Context, uuid.UUID) (review.Review, error) {
+func (f *fakeReviews) ReviewForRelay(context.Context, uuid.UUID) (review.RelayReview, error) {
 	if f.gone {
-		return review.Review{}, apperr.NotFound("gone")
+		return review.RelayReview{}, apperr.NotFound("gone")
 	}
-	return f.review, nil
+	return review.RelayReview{Review: f.review, Public: !f.hidden}, nil
 }
 
 func (f *fakeReviews) ProductStats(_ context.Context, id int64) (review.ProductStats, error) {
@@ -122,8 +143,18 @@ func run[E any](t *testing.T, w *Worker, on func(jobs.Enqueuer) func(context.Con
 	published := &recordingJobs{}
 	w2 := *w
 	w2.Jobs = published
-	if err := work(&w2, relayed.args[0]); err != nil {
-		t.Fatal(err)
+	// 逐個執行排入的 relay job（刪帳會扇出成每組一個 job），直到只剩送出的 PublishArgs。
+	pending := relayed.args
+	for len(pending) > 0 {
+		next := &recordingJobs{}
+		w2.Jobs = next
+		for _, a := range pending {
+			if err := work(&w2, a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		published.args = append(published.args, next.publishJobs()...)
+		pending = next.relayJobs()
 	}
 	return published.published()
 }
@@ -190,6 +221,34 @@ func TestReviewCreatedSkipsAPurgedReview(t *testing.T) {
 	r.gone = true
 	if got := run(t, w, OnReviewCreated, created()); len(got) != 0 {
 		t.Fatalf("published = %+v", got)
+	}
+}
+
+// 評價在 job 執行時已被隱藏或作者在刪帳中：不送 review.created（不外送內容、不通知賣家）。
+func TestReviewCreatedSkipsAReviewThatIsNoLongerPublic(t *testing.T) {
+	w, r, _, _ := newFixture()
+	r.hidden = true
+	if got := run(t, w, OnReviewCreated, created()); len(got) != 0 {
+		t.Fatalf("published = %+v", got)
+	}
+}
+
+// 刪帳不在一個 job 裡跑完全部：每組各排一個 job，job 數等於組數。
+func TestAuthorDeactivatedFansOutOneJobPerPair(t *testing.T) {
+	w, r, _, _ := newFixture()
+	r.targets = []review.Target{{StoreID: 91, ProductID: 700}, {StoreID: 92, ProductID: 800}}
+	q := &recordingJobs{}
+	w.Jobs = q
+	if err := w.reviewAuthorDeactivated(context.Background(), ReviewAuthorDeactivatedArgs{eventFields{eventID.String(), occurredAt}, 301}); err != nil {
+		t.Fatal(err)
+	}
+	if len(q.args) != 2 || len(q.published()) != 0 {
+		t.Fatalf("要排兩個扇出 job、不直接送：%+v", q.args)
+	}
+	for _, a := range q.args {
+		if _, ok := a.(ReviewAggregateChangedArgs); !ok {
+			t.Fatalf("job 種類 = %T", a)
+		}
 	}
 }
 
