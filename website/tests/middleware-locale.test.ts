@@ -5,6 +5,7 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { __resetForumThreadMemoForTest } from "../lib/forum/thread-guard";
 import { __setPublishedLocalesForTest } from "../lib/intl/locales";
+import { __resetStorefrontGuardMemoForTest } from "../lib/seller/storefront-guard";
 import { siteMiddleware } from "../middleware";
 
 // The prod flavor requires the browser API base on the web origin; a relative base is.
@@ -58,6 +59,7 @@ beforeEach(() => {
 afterEach(() => {
 	globalThis.fetch = realFetch;
 	__resetForumThreadMemoForTest();
+	__resetStorefrontGuardMemoForTest();
 	__setPublishedLocalesForTest(null);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
@@ -465,6 +467,14 @@ test("a forum thread the backend does not hold is a real 404 in every locale", a
 	}
 });
 
+test("a thread URL request calls GetStore exactly once", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	await siteMiddleware(request(`/sellers/2600123456/messages/${THREAD_ID}`));
+	assert.equal(calls.filter((u) => u.includes("GetStore")).length, 1);
+	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 1);
+});
+
 test("a non-UUID thread id is a 404 without asking the backend for the thread", async () => {
 	const calls: string[] = [];
 	backend(() => connectError(404, "not_found"), calls);
@@ -557,22 +567,14 @@ test("a present thread is re-asked after 60 s, so a deleted thread 404s promptly
 	}
 });
 
-test("an absent thread is remembered for a short time, then asked again", async () => {
-	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
-	try {
-		const calls: string[] = [];
-		backend(() => connectError(404, "not_found"), calls);
-		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
-		for (let i = 0; i < 3; i++) {
-			assert.equal((await siteMiddleware(request(path))).status, 404);
-		}
-		assert.equal(THREAD_CALLS(calls), 1);
-		mock.timers.tick(61_000);
+test("an absent thread is never memoised: every request asks again", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+	for (let i = 0; i < 3; i++) {
 		assert.equal((await siteMiddleware(request(path))).status, 404);
-		assert.equal(THREAD_CALLS(calls), 2);
-	} finally {
-		mock.timers.reset();
 	}
+	assert.equal(THREAD_CALLS(calls), 3);
 });
 
 const LETTER_ID = "0a1b2c3d-0000-4000-8000-00000000abcd";

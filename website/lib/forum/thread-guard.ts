@@ -1,6 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { socialPublicClient } from "@/lib/connect/social";
 import { defaultLocale } from "@/lib/intl/locales";
+import { createPresentMemo } from "@/lib/seller/storefront-guard";
 import { canonicalThreadId } from "./thread-id";
 
 /**
@@ -14,19 +15,14 @@ import { canonicalThreadId } from "./thread-id";
 const THREAD_PATH = /^\/sellers\/([^/]+)\/messages\/([^/]+)\/?$/;
 
 const LOOKUP_TIMEOUT_MS = 1_500;
-/** Short on both sides: a deleted thread must 404 promptly, a created one must stop 404ing promptly. */
-const PRESENT_TTL_MS = 60_000;
-const ABSENT_TTL_MS = 60_000;
-const MEMO_MAX_ENTRIES = 500;
+const MEMO_KEY_SEP = ":";
 
-/** Backend-confirmed answers only (never a timeout or 5xx), each with its own short TTL. */
-const presentMemo = new Map<string, number>();
-const absentMemo = new Map<string, number>();
+/** Only backend-confirmed "present" answers are kept (see `PRESENT_TTL_MS`); absent and errors never are. */
+const presentMemo = createPresentMemo<true>();
 
 /** Test-only: drops the per-isolate memo so cases cannot leak into each other. */
 export function __resetForumThreadMemoForTest(): void {
 	presentMemo.clear();
-	absentMemo.clear();
 }
 
 export type ForumThreadLookup =
@@ -48,15 +44,8 @@ export async function lookupForumThread(
 	threadId: string,
 	visitorIp?: string | null,
 ): Promise<ForumThreadLookup> {
-	const key = `${storeId}:${threadId}`;
-	const at = presentMemo.get(key);
-	if (at !== undefined && Date.now() - at < PRESENT_TTL_MS) {
-		return { kind: "present" };
-	}
-	const missAt = absentMemo.get(key);
-	if (missAt !== undefined && Date.now() - missAt < ABSENT_TTL_MS) {
-		return { kind: "absent" };
-	}
+	const key = `${storeId}${MEMO_KEY_SEP}${threadId}`;
+	if (presentMemo.get(key)) return { kind: "present" };
 	try {
 		await socialPublicClient({
 			locale: defaultLocale,
@@ -68,16 +57,12 @@ export async function lookupForumThread(
 	} catch (err) {
 		const code = ConnectError.from(err).code;
 		if (code === Code.NotFound || code === Code.InvalidArgument) {
-			if (absentMemo.size >= MEMO_MAX_ENTRIES) absentMemo.clear();
-			absentMemo.set(key, Date.now());
 			presentMemo.delete(key);
 			return { kind: "absent" };
 		}
 		return { kind: "unknown" };
 	}
-	if (presentMemo.size >= MEMO_MAX_ENTRIES) presentMemo.clear();
-	presentMemo.set(key, Date.now());
-	absentMemo.delete(key);
+	presentMemo.set(key, true);
 	return { kind: "present" };
 }
 
@@ -95,12 +80,12 @@ export function canonicalThreadPath(pathname: string): string | null {
 
 /**
  * True when the request is for a thread that does not exist. A non-UUID thread id
- * is absent without a call; an unknown seller or an unusable answer passes through
+ * is absent without a call; an unconfirmed store (no `storeId`) or an unusable answer passes through
  * (the page then renders as it would without this check).
  */
 export async function isMissingForumThread(
 	pathname: string,
-	storeIdOf: (sellerId: string) => Promise<string | null>,
+	storeId: string | null | undefined,
 	lookup: (
 		storeId: string,
 		threadId: string,
@@ -110,7 +95,6 @@ export async function isMissingForumThread(
 	if (!parsed) return false;
 	const threadId = canonicalThreadId(parsed.threadId);
 	if (!threadId) return true;
-	const storeId = await storeIdOf(parsed.sellerId);
 	if (!storeId) return false;
 	return (await lookup(storeId, threadId)).kind === "absent";
 }

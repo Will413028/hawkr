@@ -101,6 +101,10 @@ async function xRobotsTagFor(host: string): Promise<string | null> {
 	applyLaunchedProdEnv();
 	try {
 		const { siteMiddleware } = await import("../middleware");
+		const { __resetStorefrontGuardMemoForTest } = await import(
+			"../lib/seller/storefront-guard"
+		);
+		__resetStorefrontGuardMemoForTest();
 		const response = await siteMiddleware(
 			new NextRequest(`https://${host}/`, { headers: { host } }),
 		);
