@@ -130,6 +130,9 @@ func TestCreateAndAppendRefuseToRunInsideOuterTx(t *testing.T) {
 		if err := s.AppendEvent(ctx, sess, &session.Event{ID: "e", Author: "user", InvocationID: "i"}); !errors.Is(err, adksession.ErrInOuterTx) {
 			return fmt.Errorf("AppendEvent err = %v", err)
 		}
+		if err := s.AppendEvent(ctx, sess, &session.Event{ID: "p", Partial: true}); err != nil {
+			return fmt.Errorf("partial AppendEvent err = %v, want nil", err)
+		}
 		return nil
 	})
 	if err != nil {
@@ -185,8 +188,8 @@ func TestFailedAppendRollsBackStateDelta(t *testing.T) {
 		t.Fatal(err)
 	}
 	dup := &session.Event{ID: "e1", Author: "user", InvocationID: "i", Actions: session.EventActions{StateDelta: map[string]any{"k": "v", "app:a": "1", "user:b": "2"}}}
-	if err := s.AppendEvent(ctx, sess, dup); err == nil {
-		t.Fatal("duplicate event id accepted")
+	if err := s.AppendEvent(ctx, sess, dup); !errors.Is(err, adksession.ErrEventExists) {
+		t.Fatalf("duplicate event id err = %v, want ErrEventExists", err)
 	}
 	got := stateOf(get(t, s, "u1", sess.ID()))
 	for _, k := range []string{"k", "app:a", "user:b"} {

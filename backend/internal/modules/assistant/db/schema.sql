@@ -33,7 +33,7 @@ CREATE TABLE assistant.events (
     session_id TEXT NOT NULL,
     id TEXT NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL,
-    seq BIGINT GENERATED ALWAYS AS IDENTITY,
+    seq BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
     event JSONB NOT NULL,
     PRIMARY KEY (app_name, user_id, session_id, id),
     FOREIGN KEY (app_name, user_id, session_id) REFERENCES assistant.sessions (app_name, user_id, id) ON DELETE CASCADE,

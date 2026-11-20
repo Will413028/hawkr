@@ -84,7 +84,7 @@ type InsertEventParams struct {
 	Event     []byte
 }
 
-// 重複的 event id 回 0 列（呼叫端轉成錯誤）；不用撞主鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
+// 重複的 event id 回 0 列（呼叫端轉成錯誤）；用 ON CONFLICT DO NOTHING 而不撞主鍵，是為了不必依賴解析驅動回傳的 unique violation 錯誤。
 func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertEvent,
 		arg.AppName,
@@ -114,7 +114,7 @@ type InsertSessionParams struct {
 	Now     time.Time
 }
 
-// 已存在回 0 列（呼叫端轉成「已存在」錯誤）；不用撞唯一鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
+// 已存在回 0 列（呼叫端轉成「已存在」錯誤）；用 ON CONFLICT DO NOTHING 而不撞唯一鍵，是為了不必依賴解析驅動回傳的 unique violation 錯誤。
 func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertSession,
 		arg.AppName,

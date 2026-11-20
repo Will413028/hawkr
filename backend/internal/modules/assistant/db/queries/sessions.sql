@@ -1,5 +1,5 @@
 -- name: InsertSession :execrows
--- 已存在回 0 列（呼叫端轉成「已存在」錯誤）；不用撞唯一鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
+-- 已存在回 0 列（呼叫端轉成「已存在」錯誤）；用 ON CONFLICT DO NOTHING 而不撞唯一鍵，是為了不必依賴解析驅動回傳的 unique violation 錯誤。
 INSERT INTO assistant.sessions (app_name, user_id, id, state, created_at, updated_at)
 VALUES (@app_name, @user_id, @id, @state, @now, @now)
 ON CONFLICT (app_name, user_id, id) DO NOTHING;
@@ -39,7 +39,7 @@ WHERE app_name = @app_name AND user_id = @user_id AND id = @id
 RETURNING id;
 
 -- name: InsertEvent :execrows
--- 重複的 event id 回 0 列（呼叫端轉成錯誤）；不用撞主鍵再處理，因為撞鍵會讓外層 transaction 進入 aborted。
+-- 重複的 event id 回 0 列（呼叫端轉成錯誤）；用 ON CONFLICT DO NOTHING 而不撞主鍵，是為了不必依賴解析驅動回傳的 unique violation 錯誤。
 INSERT INTO assistant.events (app_name, user_id, session_id, id, timestamp, event)
 VALUES (@app_name, @user_id, @session_id, @id, @timestamp, @event)
 ON CONFLICT (app_name, user_id, session_id, id) DO NOTHING;

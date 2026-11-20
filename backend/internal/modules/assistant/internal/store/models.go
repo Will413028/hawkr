@@ -20,7 +20,7 @@ type AssistantEvent struct {
 	SessionID string
 	ID        string
 	Timestamp time.Time
-	Seq       *int64
+	Seq       int64
 	Event     []byte
 }
 

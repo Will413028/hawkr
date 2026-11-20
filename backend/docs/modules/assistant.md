@@ -19,7 +19,7 @@
 | `Get` | 三個鍵必填；不存在或屬於別的使用者回包裝 `session.ErrNotFound` 的錯誤。state 是 session、app、user 三層合併（app、user 的 key 加回前綴）。events 依 `timestamp`、`seq`（寫入順序的 identity 欄）由舊到新；session 列與 events 在同一份 `db.InReadSnapshot` 讀取（所以不能在 transaction 內呼叫 `Get`）；`After` 先篩（`timestamp >= After`），`NumRecentEvents` 再取最近 N 筆。 |
 | `List` | `AppName` 必填；`UserID` 為空字串列出該 app 全部使用者的 session，不含 events；每個 session 帶自己使用者的 user 層 state。 |
 | `Delete` | 不存在或屬於別的使用者不是錯誤；events 由 FK 連帶刪除。 |
-| `AppendEvent` | partial event 不寫；沒有 ID 補 UUID、時間截到微秒（都就地改呼叫端的 event）；`StateDelta` 的 `temp:` key 寫前剝除（呼叫端的 event 不被改，live session 的 state 仍保留 `temp:` key 到這一輪結束）；一個 transaction 內鎖 session 列、寫 event、合併三層 state delta。session 不存在回包裝 `session.ErrNotFound` 的錯誤。成功後就地更新傳入的 session（events、state、`LastUpdateTime`）。重複 event id 回 `already exists`（`ON CONFLICT DO NOTHING` 看影響列數，不撞鍵）。 |
+| `AppendEvent` | partial event 不寫；沒有 ID 補 UUID、時間截到微秒（都就地改呼叫端的 event）；`StateDelta` 的 `temp:` key 寫前剝除（呼叫端的 event 不被改，live session 的 state 仍保留 `temp:` key 到這一輪結束）；一個 transaction 內鎖 session 列、寫 event、合併三層 state delta。session 不存在回包裝 `session.ErrNotFound` 的錯誤。成功後就地更新傳入的 session（events、state、`LastUpdateTime`）。重複 event id 回包裝 `adksession.ErrEventExists` 的錯誤（`ON CONFLICT DO NOTHING` 看影響列數，為了不依賴解析驅動的 unique violation 錯誤）；呼叫端以 `errors.Is` 判斷。 |
 
 - `Create`、`AppendEvent` 在提交後才更新 live session，所以拒絕在外層 transaction 內執行（`adksession.ErrInOuterTx`）；必須是最上層呼叫。
 - `NumRecentEvents` 超過 int32 時夾到 `math.MaxInt32`。

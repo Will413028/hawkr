@@ -35,6 +35,10 @@ func New(d *db.DB) *Service { return &Service{db: d} }
 // 傳入或回傳的 live session，外層 transaction 之後 rollback 會讓記憶體與資料庫分岔，所以必須是最上層的呼叫。
 var ErrInOuterTx = errors.New("adksession：寫入不能開在外層 transaction 內")
 
+// ErrEventExists 是 event id 已存在於該 session 時回傳（以 errors.Is 判斷）。InsertEvent 用 ON CONFLICT DO NOTHING
+// 看影響列數，不依賴解析驅動回傳的 unique violation 錯誤。
+var ErrEventExists = errors.New("adksession：event 已存在")
+
 func requireNoOuterTx(ctx context.Context) error {
 	if _, ok := db.TxFrom(ctx); ok {
 		return ErrInOuterTx
@@ -245,11 +249,11 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 	if ev == nil {
 		return fmt.Errorf("event is nil")
 	}
-	if err := requireNoOuterTx(ctx); err != nil {
-		return err
-	}
 	if ev.Partial {
 		return nil
+	}
+	if err := requireNoOuterTx(ctx); err != nil {
+		return err
 	}
 	if ev.ID == "" {
 		ev.ID = platform.NewUUID(ctx)
@@ -275,7 +279,7 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 			return fmt.Errorf("寫入 event：%w", err)
 		}
 		if n == 0 {
-			return fmt.Errorf("event %q already exists in session %q", ev.ID, id)
+			return fmt.Errorf("%w: event %q in session %q", ErrEventExists, ev.ID, id)
 		}
 		if enc.hasApp {
 			if err := q.MergeAppState(ctx, store.MergeAppStateParams{AppName: appName, StateDelta: enc.appJSON, Now: ev.Timestamp}); err != nil {
