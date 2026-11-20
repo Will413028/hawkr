@@ -265,7 +265,7 @@ func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
 
-	lockSQL := "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::text, 0))"
+	lockSQL := "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::bigint::text, 0))"
 	tx, err := f.db.Pool().Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -333,7 +333,7 @@ func TestDeactivateWaitsForAuthorLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::text, 0))", b.BuyerID); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::bigint::text, 0))", b.BuyerID); err != nil {
 		t.Fatal(err)
 	}
 
