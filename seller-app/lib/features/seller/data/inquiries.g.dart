@@ -293,17 +293,17 @@ final class CurrentPendingInquiryCountProvider
 String _$currentPendingInquiryCountHash() =>
     r'95e582423f367a0b662f98e4de7a789695e51c69';
 
-/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
 
 @ProviderFor(inquiryById)
 final inquiryByIdProvider = InquiryByIdFamily._();
 
-/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
 
 final class InquiryByIdProvider
     extends $FunctionalProvider<AsyncValue<Inquiry>, Inquiry, FutureOr<Inquiry>>
     with $FutureModifier<Inquiry>, $FutureProvider<Inquiry> {
-  /// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+  /// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
   InquiryByIdProvider._({
     required InquiryByIdFamily super.from,
     required (String, String) super.argument,
@@ -347,9 +347,9 @@ final class InquiryByIdProvider
   }
 }
 
-String _$inquiryByIdHash() => r'89fada019e2227f2222e3709f6fb4e3e4f525656';
+String _$inquiryByIdHash() => r'0b8008c10aa985932b8d83f8a28b4e1a6edf7850';
 
-/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+/// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
 
 final class InquiryByIdFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Inquiry>, (String, String)> {
@@ -362,7 +362,7 @@ final class InquiryByIdFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的，否則 `GetMyInquiry`。
+  /// [accountId] 的 [inquiryId] 這一則詢問：已讀過列表而且列表裡有就用列表的（監看列表，回覆後列表換成最新一筆，這裡跟著更新），否則 `GetMyInquiry`。
 
   InquiryByIdProvider call(String accountId, String inquiryId) =>
       InquiryByIdProvider._(argument: (accountId, inquiryId), from: this);
