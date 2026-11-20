@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 )
 
 func TestBackoffGrowsExponentiallyCapsAndResets(t *testing.T) {
@@ -77,8 +79,8 @@ func TestListenLoopBacksOffResetsAndSignalsEpoch(t *testing.T) {
 				sub.mu.Lock()
 				since := sub.since
 				sub.mu.Unlock()
-				if !since.Equal(t1) {
-					t.Errorf("epoch 帶的存活時間 %v，預期前一條連線的 %v", since, t1)
+				if want := t1.Add(-model.RecoveryMargin); !since.Equal(want) {
+					t.Errorf("epoch 帶的補洞起點 %v，預期前一條連線的存活時間 %v 往回放 RecoveryMargin＝%v", since, t1, want)
 				}
 				cancel()
 				return ctx.Err()
@@ -126,8 +128,8 @@ func TestFirstConnectionEpochCarriesTheStartupDatabaseTime(t *testing.T) {
 		}}, nil
 	}
 	h.listenLoop(ctx, dial)
-	if !since.Equal(start) {
-		t.Fatalf("第一次 epoch 帶 %v，預期啟動時的資料庫時間 %v", since, start)
+	if want := start.Add(-model.RecoveryMargin); !since.Equal(want) {
+		t.Fatalf("第一次 epoch 帶 %v，預期啟動時的資料庫時間 %v 往回放 RecoveryMargin＝%v", since, start, want)
 	}
 }
 

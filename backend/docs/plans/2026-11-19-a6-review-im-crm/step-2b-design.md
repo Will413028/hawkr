@@ -202,7 +202,8 @@ func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.U
 
 `Run` 每次連線成功後對每個 `sub` 呼叫 `sub.epoch(lastOK)`：(1) 對 `delivered` 裡的每個對話視為有訊號（`pending[c] = {minQ: delivered[c]+1, maxQ: ∞}`，`Next` 時以 `base = delivered[c]` 讀到最新），**並各交一個 `Resync{conversation}`**：中斷期間的隱藏、還原與對方已讀的 NOTIFY 漏掉了，那些變化不經 seq 游標補得回來，client 依 §4.5 重取該對話（訊息補讀與 Resync 同時存在，client 以 seq 去重）；(2) 對**不在** `delivered` 的對話，只對中斷期間有訊息的那些交出 `Resync{conversation}`，而不是 `Resync{all}`：`im.conversations` 有 `last_message_at TIMESTAMPTZ NOT NULL`（`im/db/schema.sql:22`），並有 `(buyer_id, last_message_at DESC, id DESC)`、`(store_id, …)` 兩個索引（`schema.sql:31-32`），每次送出由 `AllocateSeq` 的 upsert 寫入（`queries/conversations.sql:6,17`）。`epoch` 以 Party 的那一方查 `WHERE <buyer_id|store_id> = $id AND last_message_at > $lastOK`，結果不在 `delivered` 的對話各交一個 `Resync{conversation}`（一次一個索引範圍掃描，筆數有 MaxPending 上限，超過就 `Resync{all}`）。`lastOK` 是監聽連線最後一次確認存活的**資料庫**時間（§3.1），兩邊都是資料庫時間：2b 把 `AllocateSeq` upsert 寫 `last_message_at` 的值從注入的 `Now` 改成資料庫 `now()`（§8），與 H25 同一原則，不需要 skew，也不假設主機跑 NTP。`last_message_at` 只在新訊息時前進；中斷期間只有可見度或已讀游標改變、而且不在 `delivered` 的對話，client 沒有該對話的游標、本來就會在打開時重新取，不需要 Resync；在 `delivered` 裡的對話一律 Resync（上述 (1)）。這解掉了「每次監聽重連，所有訂閱者同時收到 `Resync{all}` 並同時打 `ListConversations`」的重連風暴。重連期間 `Subscribe` 仍可呼叫：它先登記、再讀補洞，與 §4.2 命題 2 相同。epoch 的讀取量 ≤ 訂閱數 ×（`delivered` 對話數次 `MessagesAfter` ＋ 一次索引掃描），每次走 `(conversation_id, seq)` 唯一索引【推】；沒有量。
 
-**時間比較的已知界線（2b1 修正輪）**：`last_message_at` 由 `GREATEST(舊值, clock_timestamp())` 寫入（不倒退，且就是這則訊息的 `created_at` 與 `MessageSent.OccurredAt`，`AllocateSeq` 回傳同一個值）。寫入 transaction 的開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at`（語句時間）仍可能小於 `lastOK`，補洞以 `last_message_at > lastOK` 會漏掉它；要補這個縫需要「im 寫入 transaction 最長開多久」的界線（`lastOK - margin`），而 repo 沒有任何這個界線（連線池、`InTx`、`statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout` 都沒有設定，httpapi 也沒有請求 deadline），所以本步不補、不發明數字；待決與觸發條件記在 `CARRYOVER.md`。
+**時間比較的界線（A6-D17）**：`last_message_at` 由 `GREATEST(舊值, clock_timestamp())` 寫入（不倒退，且就是這則訊息的 `created_at` 與 `MessageSent.OccurredAt`，`AllocateSeq` 回傳同一個值）。寫入 transaction 開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at`（語句時間）可能小於 `lastOK`，補洞以 `last_message_at > lastOK` 會漏掉它。補法有兩半，共用 `model` 的同一組常數：(1) im 自己開的每個寫入 transaction（`write` 的 Send、Hide、Restore、MarkRead、MarkAllRead，經 `Service.inTx` 一個 helper）一開始就 `SET LOCAL statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout`，值都是 `model.WriteTxTimeout`（5 秒；Postgres 18 支援 `transaction_timeout`），所以開始早於某時刻的寫入最晚在 `WriteTxTimeout` 內提交或中止；(2) `Hub.epoch` 以 `lastOK - model.RecoveryMargin` 當補洞起點，`RecoveryMargin = WriteTxTimeout + ClockSkew`。`ClockSkew`（2 秒）吸收兩件事：`BEGIN` 到 `SET LOCAL` 生效之間的延遲（`transaction_timeout` 從設定時起算），以及存活確認的 `now()`（語句開始時間）與 `last_message_at` 的 `clock_timestamp()` 之間的差。`purge` 的抹除與 `Sweep` 不寫 `last_message_at`，不在界線內。
+外層 transaction：`inTx` 在 ctx 已有外層 transaction 時加入它而不 `SET LOCAL`，上限由外層決定，原因是 `SET LOCAL` 會覆寫外層（如 moderation 經 `InTx` 呼叫 `Hide`）的逾時，可能放寬外層自己設的較緊上限，或把外層較長的合法流程截成 5 秒。這代表巢狀的 `Send` 沒有 im 的界線；目前沒有 im 以外的模組巢狀呼叫 `Send`（只有測試），之後若有，呼叫端要自己為那個 transaction 設不超過 `WriteTxTimeout` 的上限（觸發條件記在 `CARRYOVER.md`）。
 
 ### 4.5 client 契約（給 A6-5、A6-6）
 
@@ -543,7 +544,7 @@ integration 測試用 `pg.NewDB`／`testdb.Server.NewURL`（CI 跑，本機不�
 
 findings 11 (blocking 0)：fixed 10、recorded 1、raised 0、rejected 0。
 
-## 16. 實作與本設計的差異（8526c9b8 與第一次修正輪）
+## 16. 實作與本設計的差異（8526c9b8 與修正輪）
 
 讓設計書與程式一致；每一項都是已經在程式裡的決定。
 
@@ -557,3 +558,4 @@ findings 11 (blocking 0)：fixed 10、recorded 1、raised 0、rejected 0。
 8. 串流並行上限的 advisory lock 鍵是 `im.streams:<kind>:<id>`，與送出的 `im.party:` 鎖不同命名空間。
 9. `epoch` 對 `delivered` 的對話交 `Resync{conversation}`（§4.4）；第一次連線也發 `epoch`（§3.1）。
 10. 授權在訂閱讀取路徑的單一呼叫點是 `internal/read/read.go` 的 `MessagesAfter` 裡的 `s.authorized(...)`（M6 的改壞點）。
+11. im 寫入 transaction 設時間上限，`epoch` 的補洞起點往回放同一常數加時鐘誤差（§4.4，A6-D17）；巢狀在外層 transaction 內時不覆寫外層的上限。

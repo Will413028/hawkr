@@ -59,7 +59,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	}
 
 	var out model.Message
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err = s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		sender, receiver := in.Sender.Kind, counterpart(in.Sender.Kind)
 		// 兩方都持 advisory lock：Deactivate 一次只持一個身分的鎖，鎖序固定（買家先於店家，即 kind 字串序）所以不會死結。

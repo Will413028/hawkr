@@ -274,8 +274,9 @@ func (h *Hub) dispatch(raw string) {
 	}
 }
 
-// epoch 在監聽連線重連成功後通知每個訂閱補洞；since 是前一條連線最後確認存活的資料庫時間。
-func (h *Hub) epoch(since time.Time) {
+// epoch 在監聽連線重連成功後通知每個訂閱補洞；lastOK 是前一條連線最後確認存活的資料庫時間，補洞起點往回放 model.RecoveryMargin。
+func (h *Hub) epoch(lastOK time.Time) {
+	since := lastOK.Add(-model.RecoveryMargin)
 	for _, s := range h.all() {
 		s.epoch(since)
 	}

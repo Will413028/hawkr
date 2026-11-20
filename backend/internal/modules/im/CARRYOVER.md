@@ -84,7 +84,7 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 
 | 待決 | 為什麼不在本步做 | 觸發 |
 |---|---|---|
-| 監聽重連補洞的時間界線：`ActiveSince` 以 `lastOK - margin` 比較，margin 是「im 寫入 transaction 最長開多久」 | repo 沒有任何 transaction 時間界線（連線池、`InTx`、`statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout` 都沒設定，httpapi 沒有請求 deadline），不發明數字；沒有界線時，開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at` 可能小於 `lastOK` 而漏掉（不在 `delivered` 的對話少一個 `Resync`） | 平台層設定 transaction 或 statement 的時間上限時，以那個上限當 margin；或 A6-5 為寫入路徑加請求 deadline 時 |
+| 監聽重連補洞的時間界線：`ActiveSince` 以 `lastOK - margin` 比較，margin 是「im 寫入 transaction 最長開多久」 | 開始早於 `lastOK`、提交晚於斷線的送出，其 `last_message_at` 可能小於 `lastOK` 而漏掉 | 已解（A6-D17）：im 自己開的寫入 transaction 經 `write` 的 `inTx` 設 `statement_timeout`、`idle_in_transaction_session_timeout`、`transaction_timeout` 為 `model.WriteTxTimeout`，`Hub.epoch` 起點為 `lastOK - model.RecoveryMargin`（`WriteTxTimeout + ClockSkew`，兩者同源）；巢狀在外層 transaction 時不覆寫外層的上限 | 有 im 以外的模組在自己的 transaction 內巢狀呼叫 `Send`（該 transaction 要自設不超過 `WriteTxTimeout` 的上限）；或 `WriteTxTimeout` 要調大（`RecoveryMargin` 自動跟著，補洞讀取範圍變大）；或 Postgres 降到 17 以下（沒有 `transaction_timeout`） |
 | `Presence` 一個對話約 5 次循序的資料庫往返（授權、封鎖、對方身分、在線） | 目前沒有 handler 呼叫，批次化要看實際的呼叫形狀 | A6-5 開始：接 `Presence` handler 時改成一次查詢完成授權與在線 |
 
 ## 傳輸層的沿用盤點

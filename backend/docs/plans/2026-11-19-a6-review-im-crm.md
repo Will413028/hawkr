@@ -206,6 +206,7 @@
 | A6-D13 | 刪帳的評分重算只走 purge 每批的 `ReviewAggregateChanged`（A6-D12），刪除 `ReviewAuthorDeactivated` 與 relay 的逐組展開，取代設計審查第 9 項的單一事件：purge job 與訂閱者同 tx 排入、可立即執行，兩條路徑延遲同級，留兩條只會每組重送（Will 2026-11-20，A6-1c 完成前 design-review 第 1 項）。purge 另加週期掃描補排失敗的 job（第 2 項） | A6-1c |
 | A6-D15 | 即時推送走 Postgres LISTEN/NOTIFY（送出同 tx 發 `NOTIFY`，commit 後才送達；串流以 `MessagesAfter` 讀 DB），不在 `platform/events` 加 commit 後掛點，取代「hub 單進程扇出」與 ID4 的接受；不做打字中，A6-6 刪三端的打字中（Will 2026-11-20，A6-2b 開工） | A6-2b、A6-6 |
 | A6-D16 | A6-2b 設計書 §13 W1–W5 全照建議：NOTIFY payload 加帶 buyer_id、store_id 路由鍵，內容不經通知（W1 (ii)）；presence 以 unary 輪詢（W2 (a)）；任一方向封鎖即對被封鎖方顯示離線（W3 (i)）；停權、封鎖不結束串流，只有關店由模組結束，session 失效與帳號刪除由 A6-5 helper 重驗結束（W4 (i)）；保留已讀指示，`MarkAllRead` 不逐對話推給對方（W5 (i)）（Will 2026-11-20） | A6-2b1、A6-5 |
+| A6-D17 | im 寫入 transaction 設時間上限（statement_timeout、idle_in_transaction_session_timeout），重連補洞起點往回放同一常數加時鐘誤差（Will 2026-11-20） | A6-2b1 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線

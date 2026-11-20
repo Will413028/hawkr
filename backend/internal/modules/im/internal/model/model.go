@@ -23,6 +23,16 @@ const (
 	MaxSourceRefRunes  = 200
 )
 
+const (
+	// WriteTxTimeout 是 im 寫入 transaction 開著的時間上限（statement、idle in transaction、整個 transaction 三者同值）。
+	WriteTxTimeout = 5 * time.Second
+	// ClockSkew 吸收 transaction 開始到 SET LOCAL 生效之間的延遲，以及存活確認的 now()（語句開始時間）與
+	// last_message_at 的 clock_timestamp() 之間的差。
+	ClockSkew = 2 * time.Second
+	// RecoveryMargin 是監聽重連補洞的起點往回放多少：開始早於 lastOK 的寫入 transaction 最晚在 WriteTxTimeout 內提交或中止。
+	RecoveryMargin = WriteTxTimeout + ClockSkew
+)
+
 // PartyKind 是對話的一方：買家或店家。值與 DB 的 CHECK 一致。
 type PartyKind string
 
