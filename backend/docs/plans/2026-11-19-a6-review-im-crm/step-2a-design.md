@@ -1,6 +1,6 @@
 # A6-2a im 模組（資料與送出）：實作設計 v1
 
-- 對象：計畫 `../2026-11-19-a6-review-im-crm.md` 的步驟 A6-2a。計畫的決定（A6-D1、A6-D3、A6-D5、A6-D9、A6-D13）、預設與不變量是上位規則，本檔只把它們落到模組上；本檔與計畫衝突時，以計畫為準，並在 §9 列出本檔提議的計畫修改。來源沒有定案的取捨列在 §10，等 Will 決定。
+- 對象：計畫 `../2026-11-19-a6-review-im-crm.md` 的步驟 A6-2a。計畫的決定（A6-D1、A6-D3、A6-D5、A6-D9、A6-D13）、預設與不變量是上位規則，本檔只把它們落到模組上；本檔與計畫衝突時，以計畫為準，並在 §9 列出本檔提議的計畫修改。來源沒有定案的取捨列在 §10，Will 已於 2026-11-20 全部決定。
 - 快照：dev `418e7d77`（2026-11-20）。
 - 標記：【量】＝打開檔案或跑過指令；【推】＝讀程式後推論。舊行為的出處都是本檔重新讀原始碼得到的 `file:line`；盤點裡的行號與這裡不同時，以這裡為準。
 - 路徑縮寫：`M=backend/internal`、`IM=backend/services/im-service`、`IMi=IM/internal`、`J=backend/services/java`。
@@ -10,7 +10,7 @@
 模組本體不會，它就是終態。過渡物有三個，各自有退場點：
 - 訂單查詢的 `Orders` port，由 `M/legacy/orderservice` 實作（ordering 搬遷時改成 in-process）。
 - `M/legacy/imrelay`（A8 notification 搬進單體時刪除）。
-- 「進行中訂單」的判定依賴 Java 能回答什麼（§3.3、§10 W1）；ordering 搬遷後改成讀 ordering 的 `pub_*` 或 API。
+- 「進行中訂單」的判定依賴 Java 能回答什麼（§3.3，依 §10 W1 的決定用現有 RPC 組合）；ordering 搬遷後改成讀 ordering 的 `pub_*` 或 API。
 
 即時通道（hub、streaming、presence）屬 A6-2b。本步的 `Send` 只負責發一個模組事件，2b 的 hub 訂閱它，所以 2b 不必改 2a 的寫入路徑。
 
@@ -94,16 +94,14 @@ im.messages
   conversation_id  UUID FK → conversations ON DELETE CASCADE
   seq              BIGINT NOT NULL CHECK > 0
   sender_kind      TEXT NOT NULL CHECK IN ('buyer','store')
-  message_type     TEXT NOT NULL CHECK IN ('text','image','card')
+  message_type     TEXT NOT NULL CHECK IN ('text','image')
   content          TEXT NULL CHECK char_length ≤ 4096   -- 文字訊息的內容；抹除後為 NULL
   image_asset_id   TEXT NULL
   image_object_key TEXT NULL
-  -- 卡片訊息的欄位（以及 'card' 這個 message_type 值本身）等 §10 W6 決定；下面的 preview_hint 是 W6 選 (c) 時的形狀
-  preview_hint     TEXT NULL CHECK char_length ≤ 100     -- 只有卡片訊息有（client 帶的一行摘要）
   created_at       TIMESTAMPTZ NOT NULL
   erased_at        TIMESTAMPTZ NULL                     -- 刪帳／退場抹除
   UNIQUE (conversation_id, seq)
-  CHECK 形狀：erased_at IS NULL 時 text/card 要有 content、image 要有 asset 與 key；erased_at IS NOT NULL 時 content、image_*、preview_hint 全為 NULL
+  CHECK 形狀：erased_at IS NULL 時 text 要有 content、image 要有 asset 與 key；erased_at IS NOT NULL 時 content、image_* 全為 NULL
   INDEX (conversation_id, seq DESC)
 
 im.hides                                            -- 照 social.hides、review.hides（A6-4 用）
@@ -118,10 +116,10 @@ im.media_ref_sync / im.retired_assets               -- 照 review mediaref 的�
 ### 1.1 和舊 schema 的差異與理由
 
 - 沒有 `room_id`（M2）、沒有 `receiver_id`：一對一對話裡，收件人就是對話的另一方，存兩份會讓兩份資料可能不一致（舊 schema 沒有任何約束保證 room_id 與 (buyer_id, store_id) 一致，`IM/db/schema/schema.sql:1-24`）。`sender_kind` 加上對話的兩方就足以還原寄件人的 ID，而且不會有舊 `sender_id` 一欄混兩種 ID 空間的問題（`schema.sql:29-30`）。
-- `message_type` 從整數 1/2（沒有 CHECK，`schema.sql:31`）改成 TEXT CHECK，並把卡片訊息獨立成 `card`。舊碼的卡片是 `type=1` 加上看起來像 JSON 的 content，靠 `computePreview` 猜（`message.go:81-84`），這正是計畫缺陷表最後一列「三端手寫聊天預覽偵測」的根源。卡片要存什麼（伺服器擁有的參照、2a 不支援、或自由 JSON 逐欄過詞典）交 §10 W6，不「先存 opaque、之後再定」。
+- `message_type` 從整數 1/2（沒有 CHECK，`schema.sql:31`）改成 TEXT CHECK，2a 只有 `text`、`image`（§10 W6 (b)）。舊碼的卡片是 `type=1` 加上看起來像 JSON 的 content，靠 `computePreview` 猜（`message.go:81-84`），這正是計畫缺陷表最後一列「三端手寫聊天預覽偵測」的根源。2a 不支援卡片，不「先存 opaque、之後再定」；卡片連同形狀（伺服器擁有的參照）在 A6-5 定 proto 時以往前的 migration 加。
 - 沒有 `is_read`、沒有兩欄未讀計數（舊 `schema.sql:12-13,39`，三套寫法見 `query.sql:40-62,99-135`）。
 - 沒有 `last_message_content`、`last_message_preview`、`preview_text`：**預覽在讀取時由最後一則訊息推導**（§5.2），所以隱藏、抹除不需要另外更新對話列，ID1 從結構上消失。計畫的寫法是「同 tx 更新對話預覽」，本檔改掉它的理由在 §9 第 1 項。
-- 沒有 `order_no`、`order_binding_verified_at`（舊 `schema.sql:16-18`）：停權的訂單例外改成每次送出時查（§3.2），理由在 §10 W2。
+- 沒有 `order_no`、`order_binding_verified_at`（舊 `schema.sql:16-18`）：停權的訂單例外改成每次送出時查「進行中」（§3.2、§3.3），理由在 §10 W2 (i)。
 - 沒有 `hidden_at`／`hidden_reason`，改用隱藏紀錄表（10e R12、RD3 的同一套做法）；沒有 `deleted_at`（舊欄位只有抹除在寫，`query.sql:148-159`），改名 `erased_at`，並由 CHECK 保證抹除後內容真的不在。
 
 ### 1.2 未讀
@@ -169,8 +167,7 @@ type SendInput struct {
     ConversationID uuid.UUID // 既有對話；或
     CounterpartID  int64     // 首則訊息：買家寄時是 store_id，店家寄時是 buyer_id
     Type           MessageType
-    Text           string    // text、card
-    PreviewHint    string    // card 必填，≤100 rune
+    Text           string    // text
     StagedToken    string    // image
 }
 ```
@@ -189,10 +186,11 @@ type SendInput struct {
 | G2 | 停業 | 對話店家的狀態不是營運中，雙向都擋（舊碼 `message.go:474-484`）；寄件人是店家時用 `seller.Authorize(store, CapChatSend)`，買家寄時看同一個條件 | 無 | FailedPrecondition `STORE_CLOSED`（舊 9207） |
 | G3 | 封鎖 | `buyer.IsBlockingStore(buyer, store)` 或 `seller.StoreBlocksBuyer(store, buyer)`，任一方向都擋（雙向一致，A6-D1） | 有「進行中」的訂單或售後（§3.3，A6-D1） | FailedPrecondition `CHAT_BLOCKED`（舊 9202；照舊是明確的錯誤，不做 shadow ban，`message.go:495-496`） |
 | G4 | 收件人已刪除 | 對方在 `im.inactive_parties`（§4） | 無 | FailedPrecondition `RECEIVER_DELETED`（舊 9206） |
-| G5 | 詞典 | 文字訊息經 `textfilter` 命中；卡片訊息的檢查範圍依 §10 W6（選 (a) 時沒有 client 文字可查，選 (c) 時每個文字欄位都查） | 無 | `MODERATION_REJECTED` |
+| G5 | 詞典 | 文字訊息經 `textfilter` 命中（2a 只有文字帶 client 文字，§10 W6 (b)） | 無 | `MODERATION_REJECTED` |
 
-- 停業的定義：店家狀態是 `CLOSED`（`seller/internal/model/model.go:27`）。`PENDING_DELETION` 算不算停業，見 §10 W3。
-- 例外的查詢只在需要時才做：G1 或 G3 命中時才呼叫 `Orders`（§3.3），這樣大多數送出不碰 Java。
+- 停業的定義：只有店家狀態是 `CLOSED`（`seller/internal/model/model.go:27`）；`PENDING_DELETION` 不算停業，雙向都可以聊（§10 W3 (i)）。
+- 首則訊息：買家與店家都能開啟對話，照舊碼（`message.go:373-382`；§10 W5 (i)），守門同上。
+- 例外的查詢只在需要時才做：G1 或 G3 命中時才呼叫 `Orders`（§3.3；停權與封鎖的例外共用同一個「進行中」判定，§10 W2 (i)），這樣大多數送出不碰 Java。
 - 舊碼的 `buyer↔buyer` 封鎖（`IsBlockedBetween`）不適用：聊天只有買家與店家兩方。
 - 舊碼收件人已刪帳的檢查讀 Redis 而且 fail-open（`message.go:501-515`）；新碼以 DB 的複本為準，而且在 transaction 內持鎖後再查一次寄件人（§4.3）。
 
@@ -206,7 +204,7 @@ A6-D1 的「進行中」是「訂單未完成或售後未結案」（`decision-b
 | `GetOrderForAfterSales(order_no)` | 單一訂單的買家、店家、狀態（`order.pb.go:8338`） | 依雙方查訂單 |
 | `aftersales.HasActiveCase(order_no)` | 單一訂單是否有活躍 case（`aftersales.proto:429-438`） | 依雙方查；單體也沒有 aftersales 的生成碼 |
 
-所以，用現有的 RPC **沒辦法精確回答**「雙方之間是否有任何一筆未完成的訂單或未結案的售後」。但售後那一半不必另查：order 保證有活躍售後 case 的訂單不會離開 40（下段），所以「進行中」＝雙方有一筆狀態 ∈ {10,20,30,32,35,40} 的訂單【推】。做法列在 §10 W1，本檔先依建議 (c) 寫介面，換成 (a) 時只換 port 的實作：
+所以，用現有的 RPC **沒辦法精確回答**「雙方之間是否有任何一筆未完成的訂單或未結案的售後」。但售後那一半不必另查：order 保證有活躍售後 case 的訂單不會離開 40（下段），所以「進行中」＝雙方有一筆狀態 ∈ {10,20,30,32,35,40} 的訂單【推】。做法依 §10 W1 (c)：用現有 RPC 組合，不改 Java；B8 ordering 搬遷時 port 換成精確的 in-process 查詢：
 
 - 自動完成在完成前反查 `hasActiveCase`，有就跳過（`J/order-service/.../scheduler/AutoCompleteScheduler.java:62-69`）；買家確認收貨前同步處置進行中的 case，退貨、退款、申訴中就擋下（`J/order-service/.../service/OrderService.java:943-954`）；狀態表寫 50「不可再發起售後」（`OrderStatus.java:22`）。【量：狀態表寫 60「唯一入邊 50→60」、54「唯一入邊 35→54，無出邊」，10–40 期間的部分退款不改狀態（`OrderStatus.java:15-26`）；開工 design-review 第 2 輪核對】
 
@@ -218,15 +216,15 @@ type Orders interface {
 }
 ```
 
-`M/legacy/orderservice` 依計畫補兩支方法，不管 W1 選哪一個都需要它們：
+`M/legacy/orderservice` 依計畫補兩支方法（im 組合兩者，A6-3 crm 也用）：
 - `HasOrderBetween(ctx, buyerID, storeID) (has bool, latestOrderNo string, err error)`：傳輸錯誤、非 0 的 code、`has=true` 但單號是空的，都回一般錯誤。
 - `OrderParties(ctx, orderNo) (OrderParties{OrderNo, BuyerID, StoreID int64; Status string}, error)`：呼叫 `GetOrderForAfterSales`，照 `OrderForReview` 分流（`code==NOT_FOUND` → `ErrOrderNotFound`；其他 → 一般錯誤；ID 不是正整數、單號不一致、狀態空白 → 一般錯誤）。只取四個欄位，**不把回應裡的買家姓名、電話、地址帶出這個轉接層**（最小化）。crm 的 `RecordRefund` 取同樣的四個欄位（`domain-inventory.md` §1.3），A6-3 直接用這支。
-- im 哪條路徑用哪一支：W1 選 (a) 時 im 只用新的 RPC，`OrderParties`、`HasOrderBetween` 給 A6-3 crm 用，或在 (c) 時由 im 組合；選 (c) 時 `OpenOrderBetween` = `HasOrderBetween` 取最近一筆 → `OrderParties` 看狀態 ∈ {10,20,30,32,35,40}；不查 aftersales（上段），不必新增 aftersales 的生成碼與 client。
+- `OpenOrderBetween` = `HasOrderBetween` 取最近一筆 → `OrderParties` 看狀態 ∈ {10,20,30,32,35,40}；不查 aftersales（上段），不必新增 aftersales 的生成碼與 client。已知看不到「最近一筆已結案、較舊的一筆還在配送」，錯的方向是多擋；CARRYOVER 記下這個情況與退場點 B8。
 - 這些都是 Java 的呼叫，在 transaction 外做（同 `OrderForReview` 的位置，`step-1-design.md` §3.1 第 3 步），只放在 G1／G3 命中時。
 
 ### 3.4 步驟
 
-1. 輸入驗證：文字 1..4096 rune（`trimtext.Trim` 之後不能是空的）；卡片依 §10 W6；圖片要有 token。
+1. 輸入驗證：文字 1..4096 rune（`trimtext.Trim` 之後不能是空的）；圖片要有 token；其他 `message_type` 回 InvalidArgument（2a 不支援卡片，§10 W6 (b)）。
 2. 解析對話與對方（§3.1）；寄件人不是該對話的一方 → NotFound。
 3. 守門 G1–G5（transaction 外的讀取；G1／G3 命中時才呼叫 `Orders`）。
 4. 圖片：transaction 外 `media.Finalize`（同 review 的 E7）。
@@ -248,7 +246,7 @@ type Orders interface {
 
 | 事件 | 抹除範圍 | 什麼時候發 |
 |---|---|---|
-| `buyer.BuyerDeleted`、`buyer.BuyerDeletionRequested` | 這個 buyer_id 寄出的訊息 | 帳號刪除（`buyer/internal/deletion/deletion.go:65,135`） |
+| `buyer.BuyerDeleted` | 這個 buyer_id 寄出的訊息 | 買家關閉（`buyer/internal/deletion/deletion.go:135`）；申請刪帳時的 `BuyerDeletionRequested` 不訂閱，等待期間仍可為開啟中的訂單聯絡店家（§10 W4 (ii)） |
 | `seller.StoreRetired` | 這個 store_id 寄出的訊息 | 店家退場：可能是帳號刪除，也可能只是關店後過了申覆期（`seller/internal/model/model.go:396-402`），這時帳號與買家身分都還在 |
 
 - 帳號刪除時，accountdeletion 關閉買家，並讓店家進入刪除流程（`request.go:250-254,368-392`），店家之後退場時發 `StoreRetired`。所以「帳號刪除才全抹」不需要另外的事件：買家與店家各自的事件涵蓋了兩個身分。
@@ -262,10 +260,11 @@ type Orders interface {
 ### 4.2 訂閱者（同一個 transaction，只做原子的狀態變更）
 
 ```go
-func (m *Module) OnBuyerDeletionRequested(ctx, e buyer.BuyerDeletionRequested) error // → deactivate(buyer, e.BuyerID)；時機見 §10 W4
-func (m *Module) OnBuyerDeleted(ctx, e buyer.BuyerDeleted) error                     // → deactivate(buyer, e.BuyerID)
-func (m *Module) OnStoreRetired(ctx, e seller.StoreRetired) error                    // → deactivate(store, e.StoreID)
+func (m *Module) OnBuyerDeleted(ctx, e buyer.BuyerDeleted) error  // → deactivate(buyer, e.BuyerID)
+func (m *Module) OnStoreRetired(ctx, e seller.StoreRetired) error // → deactivate(store, e.StoreID)
 ```
+
+- 不訂 `BuyerDeletionRequested`（§10 W4 (ii)）。前提「等待刪除的買家還能登入」沒有驗證【推】，2a1 開工時先確認；如果不能登入，改成 (i)：加訂 `OnBuyerDeletionRequested`（同樣 `deactivate(buyer, e.BuyerID)`），與 review、social 一致。
 
 `deactivate`：要求在 transaction 內（同 `review/internal/purge/purge.go:83-85`）→ `LockParty(kind, id)` → `INSERT INTO im.inactive_parties … ON CONFLICT DO NOTHING` → `Enqueue(im.erase_party{kind, id})`。不在訂閱者裡改訊息列：一個身分寄出的訊息數沒有上限（單體規則 4；review 的設計審查第 2 項）。
 
@@ -279,7 +278,7 @@ func (m *Module) OnStoreRetired(ctx, e seller.StoreRetired) error               
 ### 4.4 抹除 job `im.erase_party`
 
 - 唯一鍵 `(kind, party_id)`，狀態只算 Available、Pending、Retryable、Scheduled，不含 Running（同 `review/internal/purge/purge.go:71-78`：執行中又排進來的那一次排在它後面，不會被略過）。
-- 依 `id` 升序分批（每批 200），每批一個 transaction：鎖這一批訊息 → `UPDATE … SET content=NULL, image_*=NULL, preview_hint=NULL, erased_at=now WHERE erased_at IS NULL` → 圖片記退場並排媒體同步（ID8，同 `review/internal/purge/purge.go:161-173`）。訊息列保留：seq 連續，2b 的補洞才不會出現空洞（舊碼同樣保留列，`message.go:52-53`）。
+- 依 `id` 升序分批（每批 200），每批一個 transaction：鎖這一批訊息 → `UPDATE … SET content=NULL, image_*=NULL, erased_at=now WHERE erased_at IS NULL` → 圖片記退場並排媒體同步（ID8，同 `review/internal/purge/purge.go:161-173`）。訊息列保留：seq 連續，2b 的補洞才不會出現空洞（舊碼同樣保留列，`message.go:52-53`）。
 - 冪等：述詞是「這個身分還有沒抹除的訊息」，重跑只處理剩下的。
 - 保底掃描（A6-D13 的第 2 項，照 `review/internal/purge/purge.go:100-118`）：每 15 分鐘，在一個 transaction 內找出「在 `inactive_parties`、但還有未抹除的訊息」的身分，最多 100 個，補排 job。River 的 `Enqueue` 一律在 transaction 內（`f1b4996e` 的修正）。
 - 對話列本身不刪：另一方仍看得到歷史（墓碑）。顯示名稱讀取時由 `buyer.BatchDisplay` 的 `Deleted` 決定（`step-1-design.md` §0.4），模組不存快照。
@@ -311,7 +310,7 @@ func (m *Module) OnStoreRetired(ctx, e seller.StoreRetired) error               
 type Preview struct { Type MessageType; Text *string; Hidden, Erased bool; SenderKind PartyKind }
 ```
 
-- `Text` 只有文字訊息才給（rune 截斷 100，`message.go:88-93` 的長度照舊）；卡片給 `PreviewHint`；圖片沒有文字；隱藏或抹除的不給任何內容。顯示用的句子（「傳送了一張圖片」、「此訊息已被移除」）由 client 的呈現層依 enum 產生（共用文案目錄，A6-5、A6-6），模組不再寫死中文（舊碼 `message.go:45-46,76,83`）。
+- `Text` 只有文字訊息才給（rune 截斷 100，`message.go:88-93` 的長度照舊）；圖片沒有文字；卡片的預覽隨卡片延到 A6-5（§10 W6 (b)）；隱藏或抹除的不給任何內容。顯示用的句子（「傳送了一張圖片」、「此訊息已被移除」）由 client 的呈現層依 enum 產生（共用文案目錄，A6-5、A6-6），模組不再寫死中文（舊碼 `message.go:45-46,76,83`）。
 - 推播的預覽是 relay 用同一個函式從訊息算出來的（§6），所以推播與列表不會不一致。
 
 ## 6. `M/legacy/imrelay`
@@ -346,7 +345,7 @@ type Deps struct { DB; Events; Jobs; Media media.Media; Buyer *buyer.Module; Sel
 Send, MarkRead, MarkAllRead, Hide, Restore
 ListConversations, ListMessages, MessagesAfter, UnreadTotal
 MessageForRelay
-OnBuyerDeletionRequested, OnBuyerDeleted, OnStoreRetired
+OnBuyerDeleted, OnStoreRetired
 ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的保底掃描）
 // 事件：MessageSent
 ```
@@ -368,19 +367,17 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 ### 7.3 依賴表與註冊
 
 - `M/arch/modules.go` 的 im 列不改：`ordering` 以 port 間接使用，`buyer`、`seller`、`media` 已在表上；不加 identity（§4.1）。
-- `cmd/hawkr/modules.go` 登記 im；`trimmedColumns` 登記 `messages.content`（文字訊息）、`messages.preview_hint`、`hides.reason_text`。`content` 現在只放文字訊息（卡片等 W6），trim CHECK 可以不帶條件；如果 W6 讓 `content` 也放卡片，改寫成條件式 `CHECK (message_type <> 'text' OR content !~ <trimtext.Pattern>)`，測試接受【量：讀 `cmd/hawkr/trimmed_text_integration_test.go`】：
-  - 它用 regex 在整條 `pg_get_constraintdef` 裡找 `<欄> !~ '<Pattern>'::text`（`:96,115-117`），不要求 CHECK 只有這一段；`arch.CheckTrimmedText` 只擋 trim 函式與另列的空白碼位（`internal/arch/sqltext.go:114-`），不擋 `OR`。
-  - 行為測試以 `extra` 補其他欄位讓條件成立（`trimmedColumn.extra`，`:25-29`；先例 `seller.stores.contact_name`、`seller.measure_requests.decision_reason`，`:47,51-52`），登記時帶 `extra: {"message_type": "text"}`。
-  - 沒跑測試（要 Docker，本次不起容器）；實作時 `TestTrimmedTextChecksUseTheCanonicalPattern` 會量。
-- 現在就接：`OnBuyerDeletionRequested`、`OnBuyerDeleted`、`OnStoreRetired` 的訂閱，以及抹除 job、保底掃描、媒體同步 worker（同 `cmd/hawkr/review.go:21-29` 的理由：A6-6e 前 im 的表沒有寫入者，訂閱接上沒有副作用）。
+- `cmd/hawkr/modules.go` 登記 im；`trimmedColumns` 登記 `messages.content`、`hides.reason_text`。`content` 只放文字訊息（§10 W6 (b)），trim CHECK 不帶條件。A6-5 加卡片時如果卡片也用 `content`，再改寫成條件式 `CHECK (message_type <> 'text' OR content !~ <trimtext.Pattern>)`，測試接受【量：讀 `cmd/hawkr/trimmed_text_integration_test.go`：regex 不要求 CHECK 只有這一段（`:96,115-117`），行為測試以 `extra` 補條件（`:25-29`）】。沒跑測試（要 Docker，本次不起容器）；實作時 `TestTrimmedTextChecksUseTheCanonicalPattern` 會量。
+- 現在就接：`OnBuyerDeleted`、`OnStoreRetired` 的訂閱，以及抹除 job、保底掃描、媒體同步 worker（同 `cmd/hawkr/review.go:21-29` 的理由：A6-6e 前 im 的表沒有寫入者，訂閱接上沒有副作用）。
 - A6-6e 才接：`imrelay` 的訂閱與 worker。
 
 ## 8. 測試
 
-- **守門表格測試**（計畫的驗收）：寄件人 {買家, 店家} × 封鎖 {無, 買家封鎖店, 店封鎖買家} × 進行中 {無, 有, 查詢失敗}，期待值：無封鎖時放行；有封鎖且無進行中時 `CHAT_BLOCKED`；有封鎖且有進行中時放行；查詢失敗時 Unavailable。另外加停權 {否, 是} × 進行中，以及停業 × 兩個方向。
+- **守門表格測試**（計畫的驗收）：寄件人 {買家, 店家} × 封鎖 {無, 買家封鎖店, 店封鎖買家} × 進行中 {無, 有, 查詢失敗}，期待值：無封鎖時放行；有封鎖且無進行中時 `CHAT_BLOCKED`；有封鎖且有進行中時放行；查詢失敗時 Unavailable。另外加停權 {否, 是} × 進行中，停業 {營運中, 等待刪除, CLOSED} × 兩個方向（等待刪除放行，§10 W3），店家寄首則訊息放行（§10 W5），以及 `message_type` 不是 text、image 時 InvalidArgument。
 - **ID 回歸**（integration，`pg.NewDB`，CI）：
   - ID1：隱藏最後一則之後，列表的預覽 `Hidden=true` 而且不帶文字；抹除之後 `Erased=true`。
   - ID3：同一個帳號有買家與店家兩個身分；`BuyerDeleted` 之後只有買家身分寄的訊息被抹除，店家身分寄的還在；`StoreRetired` 反之。
+  - 刪帳時機：發 `BuyerDeletionRequested` 之後買家仍能送出、訊息不被抹除；`BuyerDeleted` 之後才抹除並擋送出（§10 W4 (ii)）。
   - ID5：`seller.Store` 或 `Orders` 回錯誤時，送出回錯誤，訊息表沒有新列。
   - ID6：A 的對話 ID 交給 B 讀或寫，回 NotFound；同一個數字同時是 buyer_id 與 store_id 時，不會讀到另一個身分空間的對話。
   - ID7：送出的 transaction 回滾時沒有 relay job；commit 時剛好一個。
@@ -408,6 +405,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
   12. 讀取方法裡更新已讀游標 → 讀取不改狀態的測試。
   13. `AllocateSeq` 不推進寄件人那一方的游標 → 未讀等式測試（寄件人的未讀應為 0）。
   14. 已讀游標的 CHECK 拿掉 `≤ last_seq`，或 `MarkRead` 拿掉 `LEAST(…, last_seq)` → 已讀游標測試。
+  15. 加訂 `BuyerDeletionRequested` 並 `deactivate` → 刪帳時機測試。
 
 ## 9. 本檔提議的計畫修改（design-review 後交 Will 或直接改）
 
@@ -416,12 +414,12 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 3. **不訂閱 identity 的事件**：計畫 A6-2a 寫「buyer／seller／identity 事件改 in-process 訂閱」。依 §4.1，identity 沒有身分層級的事件，帳號刪除已經經由 buyer 與 seller 的事件涵蓋兩個身分；依賴表也不必加 identity。建議改成「buyer、seller 事件」。另外補上 `seller.StoreRetired`：只關店、不刪帳時，店家身分的訊息由它觸發抹除（social 的前例 `cmd/hawkr/social.go:97`）。`seller.StoreSuspended` 的強制斷線屬 2b。
 4. **列表不再因封鎖隱藏對話**（§5.1）：A6-D1 讓有進行中訂單時仍可以聊，所以列表顯示全部對話，由 A6-5 標示無法送出的原因。
 5. **`chat.message.sent` 的值**：`conversation_id` 從房名字串變成對話 UUID，`message_id` 從 TSID 變成 UUID，wire 型別（string）不變。notification 把兩者放進推播的 data（`services/notification-service/db/migrations/20260703160000_1176_flipped_events_template_snake.sql:120`）。buyer-app 收到推播後以 `senderId` 導向聊天室（`buyer-app/lib/main.dart:337`），seller-app 與 website 有沒有讀 `conversationId` 沒有逐一確認【推】；A6-6 改 client 時一起確認。
-6. **計畫 A6-2a 的「`orderservice.GetOrderForAfterSales`、`HasOrderBetween`」**：建議把方法名寫成 `OrderParties`、`HasOrderBetween`，並註明 W1 的結論決定 im 用哪一支（§3.3）。
+6. **計畫 A6-2a 的「`orderservice.GetOrderForAfterSales`、`HasOrderBetween`」**：建議把方法名寫成 `OrderParties`、`HasOrderBetween`，並註明 im 依 §10 W1 (c) 組合兩者（§3.3）。
 7. **任務說明裡的 wire 來源**：`chat.message.sent` 的 struct 在 `IMi/usecase/message.go:103-114`，不在 `backend/pkg/mq/events.go`；計畫 A6-2a 的驗收文字如果寫了後者，要改。
 
-## 10. 需要 Will 決定
+## 10. Will 的決定（2026-11-20，六項都採建議）
 
-### W1 「進行中訂單或未結案售後」用什麼資料判定（擋 G1、G3 的例外）
+### W1 「進行中訂單或未結案售後」用什麼資料判定（G1、G3 的例外）——已決（Will 2026-11-20）：(c)
 
 - 前提題：A6-D1 要的是精確的「進行中」，但 Java 現有的 RPC 回答不了（§3.3）：`HasOrderBetween` 把已完成與已退款也算進去，而且只回最近一筆（`ORDER BY created_at DESC, id DESC LIMIT 1`，`OrderRepository.java:1224-1231`）。
 - 約束：`backend/AGENTS.md`「舊服務……只做維持運作所需的修改」。為 im 新增一支 Java RPC 是新功能，不是維持運作；選 (a) 等於為這一步開這條規則的例外，要 Will 明說。
@@ -437,34 +435,34 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 
 - 建議 (c)（改變原稿的 (a)）：(a) 的精確只多涵蓋一種情況（【推：頻率沒有量，上線前沒有資料可量】同一對買賣雙方有兩筆以上訂單，而且較新的那筆先結案），卻要違反舊服務的修改規則，做出一支 B8 就刪的 RPC；(c) 錯的方向是保守的（被封鎖的一方暫時不能聊，仍可透過訂單頁與客服處理），不改 Java，port 的形狀與 (a) 相同，B8 時直接換成精確的 in-process 查詢。CARRYOVER 寫下看不到的情況與退場點 B8。如果 Will 判斷那種情況不可接受，選 (a)，並在本檔記下這是 `backend/AGENTS.md` 規則的例外。
 
-### W2 停權賣家的例外用同一個定義嗎
+### W2 停權賣家的例外用同一個定義嗎——已決（Will 2026-11-20）：(i)
 
 - 現況：停權的店家只能在「已綁定訂單」的對話送出，綁定用的是 `NOT IN (0,80)`，綁定之後永久有效（`message.go:707-737`、`IM/db/schema/schema.sql:15-18`）。
 - 選項：(i) 與 W1 用同一個「進行中」判定，每次送出時查，不存綁定欄位；(ii) 照舊：曾經有關聯訂單就永久放行，保留 `order_no` 與綁定時間兩欄。
 - 業界：停權通常只保留履約必要的溝通（未結案訂單），結案後不再有例外。
 - 建議 (i)：一個定義、兩個例外共用，少兩個欄位與一條 client 帶 `order_no` 的「意圖參數」路徑（`message.go:330-336`）。
 
-### W3 店家「等待刪除」（PENDING_DELETION）時可不可以聊
+### W3 店家「等待刪除」（PENDING_DELETION）時可不可以聊——已決（Will 2026-11-20）：(i)
 
 - 事實：店家隨帳號刪除進入 `PENDING_DELETION` 時，「不再做經營類的事」（`seller/internal/model/model.go:373-374`），但帳號會等開啟中的訂單結束才刪；`CapChatSend` 只要求 `RequirementActive`，與 `RequirementNotPendingDeletion` 分開列（`capability.go:73,77`），表示 seller 的設計允許等待刪除的店家聊天【推：`Conditions.Active` 的推導沒有逐行讀】。舊碼只擋 `closed`（`message.go:483`）。
 - 選項：(i) 只有 `CLOSED` 算停業，等待刪除時雙向都可以聊；(ii) 等待刪除也算停業。
 - 建議 (i)：等待刪除的店家正在把開啟中的訂單出貨完，買家需要能聯絡；與 seller 的能力表一致。
 
-### W4 買家申請刪帳後，抹除從什麼時候開始
+### W4 買家申請刪帳後，抹除從什麼時候開始——已決（Will 2026-11-20）：(ii)，前提於 2a1 開工時確認
 
 - 事實：`BuyerDeletionRequested` 在買家進入 PENDING_DELETION（還有開啟中的訂單）時發；`BuyerDeleted` 在關閉時發（`buyer/internal/model/model.go:312-318`）。review 與 social 都在申請時就讓內容不可見（`review/internal/purge/purge.go:1-3`、`social.go:625-630`）。
 - 選項：(i) 照 review 與 social：申請時就寫複本、排抹除，之後這位買家不能再送訊息；(ii) 申請時不動，`BuyerDeleted` 才寫複本、排抹除，等待期間仍可以為開啟中的訂單聯絡店家。
 - 業界：刪帳申請期間通常仍允許處理未完成的交易。
 - 建議 (ii)：聊天是處理開啟中訂單的管道，和評價、貼文這類公開內容不同。選 (ii) 時只訂 `BuyerDeleted`（沒有開啟中的訂單時只發它，`social.go:632-633` 的註解），§4.2 的 `OnBuyerDeletionRequested` 拿掉。前提是等待刪除的買家還能登入，這一點沒有驗證【推】，實作開工時確認；如果不能登入，(i)、(ii) 沒有差別，選 (i) 與其他模組一致。
 
-### W5 店家能不能主動開啟對話
+### W5 店家能不能主動開啟對話——已決（Will 2026-11-20）：(i)
 
 - 事實：舊碼允許店家對任何買家送出首則訊息並建立對話（`message.go:373-382`）。
 - 選項：(i) 照舊；(ii) 只有買家能開啟對話，店家只能回覆既有對話；(iii) 店家只能對有訂單關係的買家開啟。
 - 業界：市集平台多半只讓買家開啟，或要求有交易關係，以避免店家騷擾或廣告。
 - 建議 (i) 照舊，本步不改產品行為；如果要收緊，選 (ii)，它不需要查 Java。seller-app 有「選擇聊天對象」的畫面（`seller-app/lib/.../chat_picker_remote_service.dart`，`client-inventory.md:45`），收緊時 UI 要一起改，需要先取得同意。
 
-### W6 卡片訊息存什麼（擋 §1 `im.messages` 的卡片欄位與 `message_type` 的 `card` 值、§3.2 G5、§3.4 第 1 步、§5.2 的卡片預覽、§7.3 `content` 的 trim CHECK 寫法）
+### W6 卡片訊息存什麼——已決（Will 2026-11-20）：(b) 2a 不支援卡片
 
 - 事實：舊碼的卡片是 client 帶的任意 JSON，預覽取 client 帶的 `extra["preview"]`（`message.go:346-354`），詞典只查文字（`:518-522`），等於一條繞過詞典的路。原稿照搬成「先存 opaque JSON、只查 hint、A6-5 再定形狀」，開工 design-review 第 2 項指出這是沒有形狀的欄位。上線前沒有相容性約束，沒有理由先存。
 - 選項：
@@ -473,7 +471,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
   - (c) 照舊存自由 JSON，但每個文字欄位都過 `textfilter`，hint 也過；伺服器不知道欄位語意，只能遞迴掃所有字串。
 - 業界：交易平台聊天裡的商品或訂單卡片是「參照」，內容由平台依參照即時組出（價格、狀態會變，不能信 client 的快照），例如 Shopee 聊天的商品卡【推：依公開產品行為】。
 - 建議 (b)：2a 的目標是資料與送出，卡片要引用哪些對象、client 怎麼顯示屬於 A6-5 的契約；先不支援就沒有繞過詞典的路，也不留沒有形狀的欄位。A6-5 定 proto 時依 (a) 的形狀加。若 Will 要 2a 就有卡片，選 (a)；不建議 (c)（伺服器替不認識的 JSON 背詞典責任，而且顯示內容仍是 client 的快照）。
-- 選 (b) 時本檔要改：§1 拿掉 `card` 值與 `preview_hint`；G5 只剩文字；§5.2 的卡片預覽延到 A6-5；`content` 的 trim CHECK 不帶條件（§7.3）。
+- 已套用到本檔：§1 拿掉 `card` 值與 `preview_hint`；G5 只剩文字；§3.4 第 1 步只收文字與圖片；§5.2 的卡片預覽延到 A6-5；`content` 的 trim CHECK 不帶條件（§7.3）。
 
 ## 11. 開工 design-review 的處理
 
@@ -482,7 +480,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 | # | 發現 | 嚴重度 | 處置 |
 |---|---|---|---|
 | 1 | `im.participants` 與對話列的 `buyer_id/store_id` 存兩份、沒有一致性約束，一對一對話不需要第二張表 | should | 改：刪 participants，`buyer_last_read_seq`、`store_last_read_seq`（CHECK `0 ≤ … ≤ last_seq`）放在對話列；寄件人推進已讀併進 `AllocateSeq` 的同一句 UPDATE（E13、§1、§1.2、§2、§3.4、§5.1、§8） |
-| 2 | 卡片先存 opaque JSON、詞典只查 hint，留下繞過詞典的路 | should | 交 Will：§10 W6（建議 2a 不支援卡片） |
+| 2 | 卡片先存 opaque JSON、詞典只查 hint，留下繞過詞典的路 | should | 交 Will：§10 W6，已決 (b)，2a 不支援卡片 |
 | 3 | 舊 buyer 身分是否都發 `BuyerDeleted` 寫成「實作開工時確認」 | should | 查完：一個帳號只有一個 buyer 身分（`UNIQUE (account_id)`），關閉只有 `CloseForDeletion` 一條路徑且必發 `BuyerDeleted`，沒有缺口（§4.1）；不需要 §9 的提議 |
 | 4 | W1 的簡報沒引用「舊服務只做維持運作的修改」，也沒交代 (a) 的售後判定由誰回答 | should | 改寫 W1：補上規則；查證售後不必跨服務（活躍 case 的訂單停在 40 以下），建議改成 (c)，退場點 B8 |
 | 5 | relay 把 Preview 轉回中文句子，等於共用文案目錄之外又一份顯示文字 | nit | 改：§6 寫明有目錄條目就取自 `platform/uitext`，目前沒有，登記成 CARRYOVER 的過渡物，退場點 A8 |
@@ -492,7 +490,7 @@ ErasePartyArgs, SweepErase, AddWorkers, PeriodicJobs（媒體同步、抹除的�
 
 | # | 發現 | 處置 |
 |---|---|---|
-| 7 | §1 的卡片欄位畫的是 W6 (c) 的形狀，和建議的 (b) 相反 | 駁回（nit）：§1 已標「等 W6」，W6 拍板後在 2a1 開工時依 §10 W6 最後一點改 |
+| 7 | §1 的卡片欄位畫的是 W6 (c) 的形狀，和建議的 (b) 相反 | 駁回（nit）；W6 決定 (b) 後已依 §10 W6 最後一點改 §1 |
 | 8 | W1「少見情況」沒標證據等級 | 改：標【推】，頻率上線前無資料可量 |
 | 9 | §5.1 `MarkMessagesRead` 列仍寫泛稱 `last_read_seq` | 改：寫成自己這一方的欄位 |
 
