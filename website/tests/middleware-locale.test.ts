@@ -5,7 +5,6 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { __resetForumThreadMemoForTest } from "../lib/forum/thread-guard";
 import { __setPublishedLocalesForTest } from "../lib/intl/locales";
-import { __resetStorefrontGuardMemoForTest } from "../lib/seller/storefront-guard";
 import { siteMiddleware } from "../middleware";
 
 // The prod flavor requires the browser API base on the web origin; a relative base is.
@@ -59,7 +58,6 @@ beforeEach(() => {
 afterEach(() => {
 	globalThis.fetch = realFetch;
 	__resetForumThreadMemoForTest();
-	__resetStorefrontGuardMemoForTest();
 	__setPublishedLocalesForTest(null);
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
@@ -294,7 +292,6 @@ const getStoreOk = () =>
 test("a store_code the backend does not hold is a real 404 in every locale, without saying why", async () => {
 	for (const [status, code] of [[404, "not_found"]] as const) {
 		for (const prefix of ["", "/en"]) {
-			__resetStorefrontGuardMemoForTest();
 			const calls: string[] = [];
 			globalThis.fetch = (async (input: RequestInfo | URL) => {
 				calls.push(input instanceof Request ? input.url : String(input));
@@ -317,7 +314,6 @@ test("a store_code the backend does not hold is a real 404 in every locale, with
 
 test("an invalid_argument answer from GetStore is unknown, not absent: the storefront passes through", async () => {
 	for (const prefix of ["", "/en"]) {
-		__resetStorefrontGuardMemoForTest();
 		globalThis.fetch = (async () =>
 			new Response(JSON.stringify({ code: "invalid_argument", message: "x" }), {
 				status: 400,
@@ -336,7 +332,6 @@ test("a present store_code storefront passes through with no redirect and keeps 
 		"/sellers/2600123456/reviews?utm_source=x",
 		"/en/sellers/2600123456/reviews?utm_source=x",
 	]) {
-		__resetStorefrontGuardMemoForTest();
 		const response = await siteMiddleware(request(path));
 		assert.notEqual(response.status, 308, path);
 		assert.notEqual(response.status, 404, path);
@@ -357,7 +352,6 @@ test("a store_id URL is a 404, not a redirect, and costs no backend call", async
 });
 
 test("an outage reading the store is not a 404", async () => {
-	__resetStorefrontGuardMemoForTest();
 	globalThis.fetch = (async () =>
 		new Response("{}", { status: 503 })) as typeof fetch;
 	const response = await siteMiddleware(request("/sellers/2600123456"));
@@ -454,7 +448,6 @@ const connectError = (status: number, code: string) =>
 test("a forum thread the backend does not hold is a real 404 in every locale", async () => {
 	for (const code of ["not_found", "invalid_argument"]) {
 		for (const prefix of ["", "/en"]) {
-			__resetStorefrontGuardMemoForTest();
 			__resetForumThreadMemoForTest();
 			const calls: string[] = [];
 			backend(
@@ -509,7 +502,6 @@ test("a thread lookup that fails or times out passes through instead of 404", as
 			throw new TypeError("fetch failed");
 		},
 	]) {
-		__resetStorefrontGuardMemoForTest();
 		__resetForumThreadMemoForTest();
 		backend(thread, []);
 		const response = await siteMiddleware(

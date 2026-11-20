@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
 import { resolveStorefrontRequest } from "./storefront-guard";
 
@@ -51,5 +52,26 @@ describe("resolveStorefrontRequest", () => {
 		await expect(
 			resolveStorefrontRequest("/sellers/2636840881", lookup),
 		).resolves.toEqual({ kind: "not-found" });
+	});
+});
+
+describe("lookupStore", () => {
+	it("answers 404 on the second call when GetStore turns not_found", async () => {
+		vi.resetModules();
+		const getStore = vi
+			.fn()
+			.mockResolvedValueOnce({ store: { id: "9" } })
+			.mockRejectedValueOnce(new ConnectError("gone", Code.NotFound));
+		vi.doMock("@/lib/connect/seller-public", () => ({
+			sellerPublicClient: () => ({ getStore }),
+		}));
+		const { resolveStorefrontRequest: resolve } = await import(
+			"./storefront-guard"
+		);
+		const path = "/sellers/2662192214";
+		await expect(resolve(path)).resolves.toEqual({ kind: "pass" });
+		await expect(resolve(path)).resolves.toEqual({ kind: "not-found" });
+		expect(getStore).toHaveBeenCalledTimes(2);
+		vi.doUnmock("@/lib/connect/seller-public");
 	});
 });

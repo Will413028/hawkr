@@ -220,10 +220,6 @@ async function middlewareFor(
 	}) as typeof fetch;
 	try {
 		const { siteMiddleware } = await import("../middleware");
-		const { __resetStorefrontGuardMemoForTest } = await import(
-			"../lib/seller/storefront-guard"
-		);
-		__resetStorefrontGuardMemoForTest();
 		return await siteMiddleware(
 			new NextRequest(`https://${host}${pathname}`, { headers: { host } }),
 		);

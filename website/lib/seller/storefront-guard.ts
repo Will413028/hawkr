@@ -7,22 +7,14 @@ import { isStoreAbsentError, isStoreCodeShape } from "./public-store";
  * 預渲染的回應沒有地方放狀態碼，頁面裡的 `notFound()` 會回 404 內容卻是 200，所以真正的 404 只能由
  * middleware 決定。只有 `GetStore` 回 not_found（店面不存在或不公開，兩者回應相同）
  * 才是 404，頁面不透露原因；invalid_argument 與其餘錯誤（5xx、逾時、連線失敗）都不是「沒有這家店」，
- * 屬於不明，放行讓頁面自己渲染。
+ * 屬於不明，放行讓頁面自己渲染。結果不快取：店面可能隨時停權或下架，快取會讓剛變成不公開的店面
+ * 在快取期間通過 middleware，頁面以 200 渲染 not-found 內容。
  */
 
 const STORE_PATH = /^\/sellers\/([^/]+)(\/.*)?$/;
 
 /** 在等著文件的訪客前面做的查詢，預算遠低於 `apiTimeoutMs`：放行是可接受的退路，卡住的 middleware 不是。 */
 const LOOKUP_TIMEOUT_MS = 1_500;
-
-/** 以 isolate 為單位記住「找到了」的答案（store_code 不會變），找不到與不明的答案不記。 */
-const MEMO_TTL_MS = 5 * 60_000;
-const MEMO_MAX_ENTRIES = 500;
-const presentMemo = new Map<string, { storeId: string; at: number }>();
-
-export function __resetStorefrontGuardMemoForTest(): void {
-	presentMemo.clear();
-}
 
 export type StoreLookup =
 	| { kind: "present"; storeId: string }
@@ -44,10 +36,6 @@ export async function lookupStore(
 	storeCode: string,
 	visitorIp?: string | null,
 ): Promise<StoreLookup> {
-	const hit = presentMemo.get(storeCode);
-	if (hit && Date.now() - hit.at < MEMO_TTL_MS) {
-		return { kind: "present", storeId: hit.storeId };
-	}
 	try {
 		const res = await sellerPublicClient({
 			locale: defaultLocale,
@@ -55,8 +43,6 @@ export async function lookupStore(
 		}).getStore({ storeCode }, { timeoutMs: LOOKUP_TIMEOUT_MS });
 		const storeId = res.store?.id ?? "";
 		if (!storeId) return { kind: "unknown" };
-		if (presentMemo.size >= MEMO_MAX_ENTRIES) presentMemo.clear();
-		presentMemo.set(storeCode, { storeId, at: Date.now() });
 		return { kind: "present", storeId };
 	} catch (err) {
 		return isStoreAbsentError(err) ? { kind: "absent" } : { kind: "unknown" };
