@@ -111,7 +111,7 @@
 | CD4 FK 不保證同店 | 接受：入口只有名稱路徑；新 schema 用複合 FK | A6-3 |
 | CD5 部分成功回成功 | 修：同 tx 整批＋回歸測試 | A6-3 |
 | CD6 consumer 錯誤分類不一致 | 修：統一 permanent／retry＋回歸測試 | A6-3 |
-| CD7 `total_spent` 可為負 | 修：退款依 ledger 冪等、下限語意寫進 CHECK＋回歸測試 | A6-3 |
+| CD7 `total_spent` 可為負 | 修：退款依 ledger 冪等、下限語意寫進 CHECK＋回歸測試；下限由每單淨額取 `GREATEST(…,0)` 結構保證，順帶吸收「部分退款排在全額後」的殘餘風險 | A6-3 |
 | CD8 賣家看得到買家電話 Email | 修（A6-D8）：CRM 不回電話與 Email＋回歸測試 | A6-3 |
 | CD9 分頁無次序鍵 | 修：keyset `(sort_key, id)`、刪快取 | A6-3 |
 | CD10 tx 外呼叫 order | 接受：ordering 搬遷時消失 | A6-3 |
@@ -156,8 +156,10 @@
 
 ### A6-3 crm 模組（被擋於：A6-D2、A6-D8；A7-1b 已完成）
 
-- 範圍：`internal/modules/crm`；`order.completed`、`aftersales.refund.completed` legacy consumer（ledger 冪等鍵取自事件 ID）；coupon legacy client；黑名單依 A6-D2 併入 seller 店家封鎖（依賴表若加 seller 要寫理由）；`GetBuyerVipStatuses` 改 in-process；刪 `internal/legacy/crmservice`。
-- 驗收：consumer 重放冪等測試；CD 各回歸測試的 mutation。
+照 A6-1、A6-2 拆成兩個 session：**A6-3a** 設計書 `2026-11-19-a6-review-im-crm/step-3-design.md` 與開工 design-review；**A6-3b**（A6-3a 完成、設計書的待決題已決）實作與完成前 design-review。
+
+- 範圍（A6-D18 修訂）：`internal/modules/crm`（設計書 `step-3-design.md`）；`order.completed`、`aftersales.refund.completed` legacy consumer（只在測試啟用，A6-6e 接線），ledger 冪等鍵：`order.completed` 取 `event_id`，退款取 `external_ref_id`（缺時 `case_no`）——Java 每次重發退款都換新 `event_id`（`RefundCompletedPayload.java:59`）；黑名單依 A6-D2 (i) 刪除；刪帳與店家退場訂閱者（`inactive_parties`，依賴表加 seller，理由：訂閱 `seller.StoreRetired`）；依賴表 crm 去 `identity`、`coupon`；建好 `crm.VIPStatuses`，但 `GetBuyerVipStatuses` 換成 in-process 與刪 `internal/legacy/crmservice` 移到 A6-6e。不建 coupon legacy client。
+- 驗收：consumer 重放冪等測試；同客戶不同訂單並發；CD 各回歸測試的 mutation（設計書 §11）。
 
 ### A6-4 moderation 加評價、聊天對象（被擋於：A6-1、A6-2、A6-D3 對象）
 
@@ -169,10 +171,11 @@
 - Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `lookup`、`meta`、`orders`、`coupons` 改由擁有者的方法提供。
 - 必做方法清單：`interface-inventory.md` §1 的 34 支扣掉去向為「刪除」的 8 支，逐支對到 Connect 方法；派工附上整張表。
 - 驗收：`buf lint`；handler 測試涵蓋清單的每個方法；生成檔無 drift；mutation：拿掉檢舉參照的擁有者檢查，測試要失敗。
+- CD8 驗收：`SellerCrmService` 回應欄位測試證明永不回 phone、email；mutation：把聯絡欄位加回回應，測試要失敗（A6-3 設計書 §11.2）。
 
 ### A6-6 client（被擋於：A6-5；Q1 的缺口在這裡結束）
 
-拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
+拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`、刪除 `internal/legacy/crmservice`（A6-D18），把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
 
 - 驗收：各端 CI 等價檢查；e2e 推到 CI；6e 接上 relay 與 consumer 後，以 backend-e2e-verify 擷取 `reviewrelay`、`imrelay` 的 RabbitMQ wire 與 crm consumer 的入帳；封鎖與檢舉按鈕以單體實打（backend-e2e-verify）。
 - UI：封鎖名單分頁改名或拿掉（A6-D2）先取得同意。
@@ -207,6 +210,7 @@
 | A6-D15 | 即時推送走 Postgres LISTEN/NOTIFY（送出同 tx 發 `NOTIFY`，commit 後才送達；串流以 `MessagesAfter` 讀 DB），不在 `platform/events` 加 commit 後掛點，取代「hub 單進程扇出」與 ID4 的接受；不做打字中，A6-6 刪三端的打字中（Will 2026-11-20，A6-2b 開工） | A6-2b、A6-6 |
 | A6-D16 | A6-2b 設計書 §13 W1–W5 全照建議：NOTIFY payload 加帶 buyer_id、store_id 路由鍵，內容不經通知（W1 (ii)）；presence 以 unary 輪詢（W2 (a)）；任一方向封鎖即對被封鎖方顯示離線（W3 (i)）；停權、封鎖不結束串流，只有關店由模組結束，session 失效與帳號刪除由 A6-5 helper 重驗結束（W4 (i)）；保留已讀指示，`MarkAllRead` 不逐對話推給對方（W5 (i)）（Will 2026-11-20） | A6-2b1、A6-5 |
 | A6-D17 | im 寫入 transaction 設時間上限（statement_timeout、idle_in_transaction_session_timeout），重連補洞起點往回放同一常數加時鐘誤差（Will 2026-11-20） | A6-2b1 |
+| A6-D18 | A6-3 設計書 §13 W1–W5 全照建議：VIP 查詢切換與刪 `legacy/crmservice` 延到 A6-6e（W1 (a)，同 A6-D11）；刪帳與店家退場時清除 crm 資料並以 `inactive_parties` 擋重放（W2 (b)）；不建 coupon legacy client、CRM 不回優惠券數（W3 (a)）；標籤上限每店 200、每客戶 20（W4 (a)）；拿掉 CRM 客戶列表的關鍵字搜尋，A6-6 改 UI（W5 (a)，Will 已同意這項 UI 改動）（Will 2026-11-20） | A6-3b、A6-6 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -235,3 +239,4 @@
 | A6-2a1 im 資料與送出的實作 | 完成（2026-11-20，PR #411）：im 模組 schema、送出守門、抹除（訂 `BuyerDeleted`、`StoreRetired`；W4 前提已核對：等待刪除的帳號仍可登入）、`imrelay`（未接線，A6-6e）、`orderservice.OpenOrderBetween`；順帶修 review purge 的 River 唯一性（缺 Running、掃描被已完成列擋住）與 `review.hidden` 的通知 allowlist；與設計書不同處記在設計書 §12 | 完成前 design-review 7 項 (blocking 0)：fixed 5、raised 1（`mediaref` 第 7 份，待 Will）、rejected 1（較舊訂單多擋，W1 (c) 已接受）；code-review 8 項 (important 2)：fixed 8；mutation §8 15 項＋修正輪 6 項 | 已跑：`go build`、`go vet -tags integration`、`go test ./...`、`make lint-monolith`、CI 全部 job（含 testcontainers integration）；未跑：無 |
 | A6-2b0 即時通道的設計 | 完成（2026-11-20）：設計書 `step-2b-design.md`；A6-D15（Will 開工時決定）、W1–W5 已決（A6-D16） | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 1、raised 0、rejected 0；處理對照在設計書 §15 | 無程式、無測試（設計步驟） |
 | A6-2b1 即時通道的實作 | 完成（2026-11-20，PR #412）：`im/internal/live`（LISTEN 連線、扇出、訂閱、presence）、寫入端 `NOTIFY`、寫入 transaction 上限（A6-D17）；未接 `cmd/hawkr`（A6-5）；與設計書不同處記在設計書 §16 | 本機 `go build`、`go vet -tags integration`、`go test ./...`、`go test -race`（im）、`make lint-monolith`、`make sqlc` 無 drift；CI run 44750191321 im 全部 integration 通過；mutation：本機單元 15 個 killed，CI 批次 run 44743745834（22 killed）＋44749188726（補強後 M12、寫入上限 5 路徑、M15 共 6 個 killed）；審查：`/code-review` 1 輪＋完成前 design-review 1 輪＋diff 審查 1 輪（第 2 輪），findings 16 (blocking 0)，fixed 14、recorded 2、raised 1（L2，A6-D17 已決後修）、rejected 1 | M7、M20 的 kill 是逾時或 cleanup 卡住，不是乾淨的斷言失敗；M4、M13、M22 integration 版沒跑（M4 無單點改法、M13 不存在、M22 單元已覆蓋）；補洞時間界線不含 COMMIT 本身耗時（只靠 2 秒時鐘誤差，未量測）；巢狀於外層 transaction 的 im 寫入不設上限（目前無呼叫端，觸發條件在 CARRYOVER）；同一 CI run 的 seller `TestSellerInquiryListIsNewestFirstFilteredAndCounted` 失敗是 dev 既有（run 44731436154），不屬本步 |
+| A6-3a crm 設計 | 設計書與開工 design-review 完成，完成（2026-11-20）：W1–W5 已決（A6-D18），§10 計畫修改已套用 | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 0、raised 0、rejected 1；處理對照在設計書 §14；兩處計畫與事實衝突已核對原始碼（`RefundCompletedPayload.java:59` 每次新 UUID、`membership.go:90` VIP 唯一呼叫端） | 無程式、無測試（設計步驟）；— |
