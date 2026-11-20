@@ -30,6 +30,7 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 輪次事件暫存（A9-D12） | 單體是單一進程 | 是 | 小量、短命的串流事件放記憶體環形緩衝 | 每輪 1024 個事件、結束後保留 10 分鐘（常數 `DefaultBufferCapacity`、`DefaultRetention`，計畫沒有規定數字，待 Will 確認，待決 2）；輪次 ID 是隨機 UUID 且須買家相符 |
 | 同對話單一輪次（A9-D14） | ADK `session.Service` 沒有條件寫入 | 是 | 輪次層序列化同一對話 | 記憶體佔用標記，結束時先釋放再發終止事件；`runner` 的 `AutoCreateSession` 關掉：帶了不存在的 session ID 回 `ErrSessionNotFound`（舊行為會用該 ID 自動建立一個沒有 `buyer_id` 的 session，tool 之後全部失敗；疑似缺陷） |
 | 輪次逾時 | 外部呼叫要有 deadline（規則：沒有 deadline 的外部呼叫不允許） | 是 | 每輪有上限 | `DefaultTimeout` 2 分鐘，計畫沒有規定數字（待決 3）；舊服務只靠 LLM 呼叫自身的 30 秒 |
+| agent 回覆語言（A9-2b 修正輪）：agent prompt 寫死「使用繁體中文」回覆 | 舊服務只服務 zh-TW 買家 | 否：買家介面是 zh-TW／en，其他文字依語系 | 回覆語言跟隨請求語系 | 照搬（舊服務同樣只回 zh-TW；en 買家收到 zh-TW 回覆）；未決，待 A9-2c 決定 |
 
 **待決**（計畫與 proto 沒有規定，已先以保守值實作，不阻擋 A9-2b）：1. 預設訊息是否刪除（A9-2c）；2. 緩衝容量與保留時間；3. 輪次逾時；4. `error` 事件的 `ErrorReason`：現有 enum 沒有「助理輪次失敗」的值，模組只給 `FailureKind`，handler 要新增 reason 或決定 UNSPECIFIED 的語意（A9-2c）；5. 疑似缺陷照搬未修，程式註解標「疑似缺陷」：狀態標籤表與 prompt 的狀態碼不一致、`track_my_package` 以狀態 20 當配送中、單筆物流詳情失敗靜默略過、整句空白的訊息被當成有內容。
 

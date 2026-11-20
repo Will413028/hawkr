@@ -85,6 +85,8 @@ var (
 	ErrCursorExpired = errors.New("assistant：cursor 已過期")
 	// ErrCursorAhead 是 cursor 超前於最新事件，或不是伺服器發出的值；對外 REPLAY_CURSOR_AHEAD。
 	ErrCursorAhead = errors.New("assistant：cursor 超前")
+	// ErrShuttingDown 是執行器已 Shutdown，不再受理新的一輪。
+	ErrShuttingDown = errors.New("assistant：服務關閉中，不受理新的一輪")
 	// ErrOuterTx 是在已有 transaction 的 ctx 上送出：輪次會在背景執行並寫 session，不得綁在呼叫者的 transaction 上。
 	ErrOuterTx = errors.New("assistant：送出不能開在 transaction 內")
 )

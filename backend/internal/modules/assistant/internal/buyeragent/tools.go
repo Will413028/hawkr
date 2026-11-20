@@ -2,12 +2,12 @@ package buyeragent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
@@ -22,7 +22,7 @@ var ErrBuyerScope = errors.New("buyeragent：session 的買家與這一輪不一
 // ToolCall 是一次 tool 執行的結果，經 Deps.OnTool 回報。
 type ToolCall struct {
 	Name string
-	// Args 是 tool 解析後的參數（沒有參數時是 nil）。
+	// Args 是模型呼叫 tool 時實際送出的參數（沒有參數時是 nil）。
 	Args map[string]any
 	// Failed 是 tool 回了錯誤；錯誤文字會回給 LLM，助理仍會接著回覆。
 	Failed bool
@@ -50,6 +50,11 @@ type orderQueryOutput struct {
 
 type orderDetailInput struct {
 	OrderNo string `json:"order_no" jsonschema:"訂單編號"`
+}
+
+// orderDetailOutput 的 Result 是訂單詳情；明寫 result 外層，LLM 看到的形狀與舊服務一致。
+type orderDetailOutput struct {
+	Result map[string]any `json:"result"`
 }
 
 type trackingInput struct{}
@@ -107,36 +112,28 @@ func (d Deps) scopedBuyer(ctx agent.Context) (int64, error) {
 	return id, nil
 }
 
-func (d Deps) record(name string, in any, failed bool) {
+// afterTool 是掛在 specialist 上的 AfterToolCallback：以模型實際送出的原始參數（args）與執行結果回報給 OnTool。
+// ADK 會把 tool 內的 panic 轉成 err，所以 panic 也會回報為失敗。
+func (d Deps) afterTool(_ agent.Context, t tool.Tool, args, _ map[string]any, err error) (map[string]any, error) {
 	if d.OnTool == nil {
-		return
-	}
-	var args map[string]any
-	if b, err := json.Marshal(in); err == nil {
-		_ = json.Unmarshal(b, &args)
+		return nil, nil
 	}
 	if len(args) == 0 {
 		args = nil
 	}
-	d.OnTool(ToolCall{Name: name, Args: args, Failed: failed})
+	d.OnTool(ToolCall{Name: t.Name(), Args: args, Failed: err != nil})
+	return nil, nil
 }
 
-// newTool 建一支 tool：先驗身分範圍，再執行，結束後回報結果。
+// newTool 建一支 tool：先驗身分範圍，再執行；結果由 afterTool 回報。
 func newTool[In, Out any](d Deps, name, description string, run func(ctx context.Context, buyerID int64, in In) (Out, error)) (tool.Tool, error) {
 	t, err := functiontool.New(functiontool.Config{Name: name, Description: description}, func(ctx agent.Context, in In) (Out, error) {
 		var zero Out
 		buyerID, err := d.scopedBuyer(ctx)
 		if err != nil {
-			d.record(name, in, true)
 			return zero, err
 		}
-		out, err := run(ctx, buyerID, in)
-		if err != nil {
-			d.record(name, in, true)
-			return zero, err
-		}
-		d.record(name, in, false)
-		return out, nil
+		return run(ctx, buyerID, in)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("buyeragent：建立 tool %s：%w", name, err)
@@ -169,12 +166,12 @@ func (d Deps) myOrdersTool() (tool.Tool, error) {
 
 func (d Deps) orderDetailTool() (tool.Tool, error) {
 	return newTool(d, "get_buyer_order_detail", "查詢買家單筆訂單的詳細資訊",
-		func(ctx context.Context, buyerID int64, in orderDetailInput) (json.RawMessage, error) {
+		func(ctx context.Context, buyerID int64, in orderDetailInput) (orderDetailOutput, error) {
 			detail, err := d.Orders.OrderDetail(ctx, buyerID, in.OrderNo)
 			if err != nil {
-				return nil, fmt.Errorf("查詢訂單 %s 失敗: %w", in.OrderNo, err)
+				return orderDetailOutput{}, fmt.Errorf("查詢訂單 %s 失敗: %w", in.OrderNo, err)
 			}
-			return json.Marshal(map[string]any{
+			return orderDetailOutput{Result: map[string]any{
 				"order_no":        detail.OrderNo,
 				"status":          statusLabel(detail.Status),
 				"amount_twd":      detail.Amount,
@@ -184,7 +181,7 @@ func (d Deps) orderDetailTool() (tool.Tool, error) {
 				"shipping_fee":    detail.ShippingFee,
 				"recipient_name":  detail.RecipientName,
 				"payment_method":  detail.PaymentMethod,
-			})
+			}}, nil
 		})
 }
 
@@ -218,8 +215,7 @@ func filterByDateRange(orders []Order, dateRange string, now time.Time) []Order 
 	var cutoff int64
 	switch dateRange {
 	case "today":
-		y, m, day := now.Date()
-		cutoff = time.Date(y, m, day, 0, 0, 0, 0, now.Location()).UnixMilli()
+		cutoff = twtime.Midnight(now).UnixMilli()
 	case "last_7_days":
 		cutoff = now.AddDate(0, 0, -7).UnixMilli()
 	default:

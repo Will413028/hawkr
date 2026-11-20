@@ -69,6 +69,7 @@ func (d Deps) specialist(name, description, instruction string, tools ...adktool
 		Description:           description,
 		Instruction:           instruction,
 		Tools:                 tools,
+		AfterToolCallbacks:    []llmagent.AfterToolCallback{d.afterTool},
 		GenerateContentConfig: &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)},
 	})
 	if err != nil {

@@ -41,3 +41,17 @@ func TestStatusLabelFallsBackToTheCode(t *testing.T) {
 		t.Errorf("未知狀態碼要原樣回傳，得到 %q", got)
 	}
 }
+
+func TestFilterByDateRangeTodayIsTheTaipeiDay(t *testing.T) {
+	// 2026-11-20 23:00 UTC 是台北 11-21 07:00；今天從台北 11-21 00:00（UTC 11-20 16:00）起算。
+	now := time.Date(2026, 11, 20, 23, 0, 0, 0, time.UTC)
+	at := func(d time.Time) Order { return Order{OrderNo: d.String(), CreateTime: d} }
+	orders := []Order{
+		at(time.Date(2026, 11, 20, 16, 0, 0, 0, time.UTC)),                        // 台北今天 00:00
+		at(time.Date(2026, 11, 20, 16, 0, 0, 0, time.UTC).Add(-time.Millisecond)), // 台北昨天最後一毫秒
+		at(time.Date(2026, 11, 20, 8, 0, 0, 0, time.UTC)),                         // 台北昨天 16:00
+	}
+	if got := len(filterByDateRange(orders, "today", now)); got != 1 {
+		t.Errorf("today：%d 筆，要 1", got)
+	}
+}

@@ -125,13 +125,13 @@ func TestCreateAndAppendRefuseToRunInsideOuterTx(t *testing.T) {
 	sess := mustCreate(t, s, "u1", nil)
 	err := d.InTx(ctx, func(ctx context.Context) error {
 		if _, err := s.Create(ctx, &session.CreateRequest{AppName: app, UserID: "u1", SessionID: "x"}); !errors.Is(err, adksession.ErrInOuterTx) {
-			return fmt.Errorf("Create err = %w", err)
+			return fmt.Errorf("Create err = %v", err) //nolint:errorlint // err may be nil here; %w would print %!w(<nil>)
 		}
 		if err := s.AppendEvent(ctx, sess, &session.Event{ID: "e", Author: "user", InvocationID: "i"}); !errors.Is(err, adksession.ErrInOuterTx) {
-			return fmt.Errorf("AppendEvent err = %w", err)
+			return fmt.Errorf("AppendEvent err = %v", err) //nolint:errorlint // err may be nil here; %w would print %!w(<nil>)
 		}
 		if err := s.AppendEvent(ctx, sess, &session.Event{ID: "p", Partial: true}); err != nil {
-			return fmt.Errorf("partial AppendEvent err = %w, want nil", err)
+			return fmt.Errorf("partial AppendEvent err = %v, want nil", err) //nolint:errorlint // err may be nil here; %w would print %!w(<nil>)
 		}
 		return nil
 	})
@@ -150,7 +150,7 @@ func TestGetReadsInOneSnapshot(t *testing.T) {
 	err := d.InTx(ctx, func(ctx context.Context) error {
 		_, err := s.Get(ctx, &session.GetRequest{AppName: app, UserID: "u1", SessionID: sess.ID()})
 		if !errors.Is(err, db.ErrSnapshotInTx) {
-			return fmt.Errorf("Get err = %w, want ErrSnapshotInTx", err)
+			return fmt.Errorf("Get err = %v, want ErrSnapshotInTx", err) //nolint:errorlint // err may be nil here; %w would print %!w(<nil>)
 		}
 		return nil
 	})

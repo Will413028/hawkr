@@ -80,6 +80,7 @@ type Executor struct {
 	wg     sync.WaitGroup
 
 	mu     sync.Mutex
+	closed bool
 	turns  map[string]*turnState
 	active map[string]struct{} // A9-D14：進行中的對話，鍵是 buyerID/sessionID
 }
@@ -104,6 +105,9 @@ func New(cfg Config) *Executor {
 
 // Shutdown 取消所有進行中的輪次（它們以失敗結束）並等它們收尾，或等到 ctx 結束。
 func (e *Executor) Shutdown(ctx context.Context) error {
+	e.mu.Lock()
+	e.closed = true
+	e.mu.Unlock()
 	e.cancel()
 	done := make(chan struct{})
 	go func() { e.wg.Wait(); close(done) }()
@@ -145,6 +149,12 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}
 	if !in.Topic.Valid() {
 		return Ref{}, model.ErrInvalidTopic
+	}
+	e.mu.Lock()
+	closed := e.closed
+	e.mu.Unlock()
+	if closed {
+		return Ref{}, model.ErrShuttingDown
 	}
 	loc := uitext.LocaleFrom(ctx)
 
@@ -188,11 +198,16 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	key := guardKey(in.BuyerID, sessionID)
 	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		return Ref{}, model.ErrShuttingDown
+	}
 	if _, busy := e.active[key]; busy {
 		e.mu.Unlock()
 		return Ref{}, model.ErrTurnInProgress
 	}
 	e.active[key] = struct{}{}
+	e.wg.Add(1)
 	e.mu.Unlock()
 
 	turnID, t := e.register(ctx, in.BuyerID)
@@ -204,7 +219,6 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 
 	runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.cfg.Timeout)
 	stop := context.AfterFunc(e.base, cancel)
-	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
 		defer cancel()
@@ -324,6 +338,10 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 				sent.WriteString(part.Text)
 			}
 		}
+	}
+	if ctx.Err() != nil {
+		slog.WarnContext(ctx, "assistant：輪次在 agent 結束前被取消或逾時", "error", ctx.Err())
+		return fail()
 	}
 	return model.Event{Kind: model.EventFinished, SessionID: sessionID}
 }

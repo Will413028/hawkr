@@ -8,11 +8,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
 )
 
-// buffer 是一輪的事件環形緩衝：第 s 個事件（s 從 1 起）存在 ring[(s-1)%len(ring)]，只保留最近 len(ring) 個。
+// buffer 是一輪的事件環形緩衝：第 s 個事件（s 從 1 起）存在 ring[(s-1)%capacity]，只保留最近 capacity 個；ring 隨事件增長，不預先配置。
 // 終止事件（finished 或 error）是最後一個，不會被覆蓋。
 type buffer struct {
 	mu      sync.Mutex
 	ring    []model.Event
+	cap     uint64
 	last    uint64 // 最新事件的序號，0 表示還沒有事件
 	done    bool
 	changed chan struct{} // 每次 append 後關閉並換新，喚醒等待者
@@ -20,15 +21,19 @@ type buffer struct {
 }
 
 func newBuffer(capacity int) *buffer {
-	return &buffer{ring: make([]model.Event, capacity), changed: make(chan struct{})}
+	return &buffer{
+		ring:    make([]model.Event, 0, min(capacity, 16)),
+		cap:     uint64(capacity), //nolint:gosec // New 已把非正數換成預設值，capacity 一定大於 0
+		changed: make(chan struct{}),
+	}
 }
 
 // first 回緩衝裡最舊事件的序號；呼叫者持有 mu。
 func (b *buffer) first() uint64 {
-	if b.last <= uint64(len(b.ring)) {
+	if b.last <= b.cap {
 		return 1
 	}
-	return b.last - uint64(len(b.ring)) + 1
+	return b.last - b.cap + 1
 }
 
 // append 寫入一個事件。終止事件之後的寫入被忽略（回 false）。
@@ -40,7 +45,11 @@ func (b *buffer) append(ev model.Event, now time.Time) bool {
 	}
 	b.last++
 	ev.Cursor = strconv.FormatUint(b.last, 10)
-	b.ring[(b.last-1)%uint64(len(b.ring))] = ev
+	if uint64(len(b.ring)) < b.cap {
+		b.ring = append(b.ring, ev)
+	} else {
+		b.ring[(b.last-1)%b.cap] = ev
+	}
 	if ev.Kind.Terminal() {
 		b.done = true
 		b.endedAt = now
@@ -85,7 +94,7 @@ func (b *buffer) next(pos uint64) (evs []model.Event, wait <-chan struct{}, fini
 		return nil, nil, false, model.ErrCursorExpired
 	}
 	for s := pos + 1; s <= b.last; s++ {
-		evs = append(evs, b.ring[(s-1)%uint64(len(b.ring))])
+		evs = append(evs, b.ring[(s-1)%b.cap])
 	}
 	if len(evs) > 0 {
 		return evs, nil, false, nil

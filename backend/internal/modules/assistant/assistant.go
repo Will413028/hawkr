@@ -53,6 +53,9 @@ type Module struct {
 // New 建立模組。
 func New(d Deps) *Module {
 	sessions := adksession.New(d.DB)
+	if d.Now == nil {
+		d.Now = time.Now //nolint:forbidigo // assigns the clock dependency without calling it
+	}
 	return &Module{
 		feature:  feature.New(feature.Deps{}),
 		sessions: sessions,
@@ -132,4 +135,5 @@ var (
 	ErrCursorExpired   = model.ErrCursorExpired
 	ErrCursorAhead     = model.ErrCursorAhead
 	ErrOuterTx         = model.ErrOuterTx
+	ErrShuttingDown    = model.ErrShuttingDown
 )
