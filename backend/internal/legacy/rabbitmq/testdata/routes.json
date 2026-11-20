@@ -70,6 +70,16 @@
     "package": "internal/legacy/buyerrelay"
   },
   {
+    "exchange": "hawkr.review",
+    "routing_key": "review.created",
+    "package": "internal/legacy/reviewrelay"
+  },
+  {
+    "exchange": "hawkr.review",
+    "routing_key": "review.hidden",
+    "package": "internal/legacy/reviewrelay"
+  },
+  {
     "exchange": "hawkr.seller",
     "routing_key": "seller.deleted",
     "package": "internal/legacy/sellerrelay"
