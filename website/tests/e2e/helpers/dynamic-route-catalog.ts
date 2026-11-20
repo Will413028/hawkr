@@ -190,6 +190,11 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 	// 帳號層級的頁面：登入即可、不分工作區（`requiredAccessForPath` 回 `account`）。
 	// 訪客導 /login 但不帶 role。
 	{
+		pattern: "/seller/inquiries/[inquiryId]",
+		access: "account",
+		fixture: "protected-placeholder",
+	},
+	{
 		pattern: "/seller/measures/[measureId]",
 		access: "account",
 		fixture: "protected-placeholder",
