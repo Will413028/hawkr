@@ -62,20 +62,23 @@ type PurgeAuthorArgs struct {
 // Kind 是 River 的 job 種類。
 func (PurgeAuthorArgs) Kind() string { return "review.purge_author" }
 
-// InsertOpts 讓同一位買家還沒結束的 job 合併（申請刪除與關閉各排一次）：唯一鍵是 BuyerID，含執行中與重試中的狀態。
-// 執行中被略過的那一次不會漏：買家進入刪除中之後沒有新評價（Submit 查 inactive_authors），執行中的 job 會處理完剩下的。
+// InsertOpts 讓同一位買家還沒開始的 job 合併（申請刪除與關閉各排一次）：唯一鍵是 BuyerID，不含執行中的狀態（job 可重跑），
+// 執行中又排入的那一次排在它後面，不會被略過。買家進入刪除中之後沒有新評價：Submit 在 transaction 內持 LockAuthor 再查 inactive_authors，
+// 與 Deactivate 串行，所以清除 job 看不到之後才提交的評價。
 func (PurgeAuthorArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
+		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRetryable, rivertype.JobStateScheduled,
 	}}}
 }
 
 // Deactivate 是買家刪帳時同 transaction 的原子狀態變更：記進 inactive_authors、排清除 job，第一次寫入時發一個 ReviewAuthorDeactivated。
-// 冪等：重複呼叫（申請與關閉兩個事件）不重發事件；清除 job 以買家為唯一鍵合併。必須在 transaction 內。
+// 先持作者的 advisory lock，與 Submit 的 insert transaction 串行。冪等：重複呼叫（申請與關閉兩個事件）不重發事件；清除 job 以買家為唯一鍵合併。必須在 transaction 內。
 func (s *Service) Deactivate(ctx context.Context, buyerID int64, at time.Time) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return fmt.Errorf("review：Deactivate 必須在 transaction 內")
+	}
+	if err := s.q(ctx).LockAuthor(ctx, buyerID); err != nil {
+		return err
 	}
 	n, err := s.q(ctx).InsertInactiveAuthor(ctx, store.InsertInactiveAuthorParams{BuyerID: buyerID, Since: at.UTC()})
 	if err != nil {

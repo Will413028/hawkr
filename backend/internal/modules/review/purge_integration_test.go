@@ -6,6 +6,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -249,5 +250,58 @@ func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
 	defer f.mu.Unlock()
 	if len(f.changed) != len(got) {
 		t.Fatalf("重跑不再發：%d -> %d", len(got), len(f.changed))
+	}
+}
+
+// F1：Submit 與刪帳的 Deactivate 以作者鎖串行。Deactivate 的 transaction 持鎖時 Submit 在鎖上等；Deactivate 提交後 Submit 要被擋下，
+// 不能留下刪帳者的評價（清除 job 找不到列就結束，之後不會再有人刪）。
+func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	b := f.newBuyer(t)
+	it := f.order(b, storeID, 700)
+
+	lockSQL := "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::text, 0))"
+	tx, err := f.db.Pool().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	if _, err := tx.Exec(ctx, lockSQL, b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, Content: "晚到的"})
+		done <- err
+	}()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for f.scalar(t, "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") == 0 {
+		select {
+		case err := <-done:
+			t.Fatalf("Submit 應該在作者鎖上等，卻已回傳：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Submit 沒有等在作者鎖上")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO review.inactive_authors (buyer_id, since) VALUES ($1, $2)", b.BuyerID, f.clock()); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := <-done; kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("鎖釋放後要回 FailedPrecondition：%v", err)
+	}
+	if n := f.reviewsOf(t, b); n != 0 {
+		t.Fatalf("刪帳者不能留下評價：%d", n)
 	}
 }

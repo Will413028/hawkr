@@ -29,6 +29,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 - `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 發 `ReviewAggregateChanged` 並排快取失效；重複隱藏不發事件。
 - 媒體引用只由同步 job 寫；transaction 內只寫業務列、同步版本並排 job，不呼叫 media。
 - 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只寫 `inactive_authors`、排 `review.purge_author`（以買家為唯一鍵），第一次寫入時發一個 `ReviewAuthorDeactivated`，不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批記退場資產、排媒體同步與 `revalidate`，每批每組 (店, 商品) 發一個 `ReviewAggregateChanged`（A6-D12），可重跑。守門：`TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows`、`TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
+- `Deactivate` 與 `Submit` 的 insert transaction 先持同一把作者 advisory lock（`LockAuthor`，鎖在 review 自己的命名空間，不進鎖序），`Submit` 持鎖後再查 `inactive_authors`；清除 job 的唯一性不含執行中的狀態。守門：`TestSubmitWaitsForDeactivationAndIsRejected`。
 - 本步的 transaction 內不呼叫 provider；`Submit` 撞唯一鍵用 `ON CONFLICT DO NOTHING`，不 catch 23505。
 
 ## 不負責

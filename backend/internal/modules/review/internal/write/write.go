@@ -67,8 +67,8 @@ func orderNotFound(l uitext.Locale) error {
 	return model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
 }
 
-// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運 → 期限 → 項目 → transaction 外轉正圖片 →
-// transaction 內寫列、排媒體同步與快取失效、發事件。
+// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運（提早擋，省掉轉正圖片）→ 期限 → 項目 → transaction 外轉正圖片 →
+// transaction 內持作者鎖再確認買家仍營運（與刪帳的 Deactivate 串行，這次才是定論）、寫列、排媒體同步與快取失效、發事件。
 func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Review, error) {
 	l := uitext.LocaleFrom(ctx)
 	content, rating, err := s.checkSubmit(l, &in)
@@ -119,6 +119,16 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	var out model.Review
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
+		if err := q.LockAuthor(ctx, in.BuyerID); err != nil {
+			return err
+		}
+		inactive, err := q.IsInactiveAuthor(ctx, in.BuyerID)
+		if err != nil {
+			return err
+		}
+		if inactive {
+			return apperr.FailedPrecondition("%s", text.ReviewAuthorInactive(l))
+		}
 		now := s.d.Now().UTC()
 		id := s.d.NewID()
 		row, err := q.InsertReview(ctx, store.InsertReviewParams{
@@ -207,15 +217,16 @@ func findItem(items []model.OrderItem, id int64) (model.OrderItem, bool) {
 
 // bust 排入店面頁與商品頁的快取失效（評價數與評分在這兩頁）；必須在 transaction 內呼叫。
 func (s *Service) bust(ctx context.Context, storeID, productID int64) error {
+	tags := []string{revalidate.ProductTag(productID)}
 	st, err := s.d.Stores.Store(ctx, storeID)
 	switch {
 	case err == nil:
-		return s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: append(revalidate.StoreTags(st.StoreID, st.StoreCode), revalidate.ProductTag(productID))}, nil)
+		tags = append(tags, revalidate.StoreTags(st.StoreID, st.StoreCode)...)
 	case apperr.KindOf(err) == apperr.KindNotFound:
-		return nil
 	default:
 		return err
 	}
+	return s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: tags}, nil)
 }
 
 // Reply 是店家回覆（可覆蓋，每次都重跑詞典）：店家要有 CapMarketing（停權 fail-closed）；擁有權與公開可讀都在 UPDATE 的 WHERE，

@@ -42,3 +42,14 @@ func (q *Queries) IsInactiveAuthor(ctx context.Context, buyerID int64) (bool, er
 	err := row.Scan(&exists)
 	return exists, err
 }
+
+const lockAuthor = `-- name: LockAuthor :exec
+SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::bigint::text, 0))
+`
+
+// 同一位作者的「進入刪帳」與「提交評價」以 transaction 級 advisory lock 串行（Submit 沒有可鎖的列：評價列還不存在）；
+// 鎖的是 review 自己的命名空間，不碰 identity、buyer、seller 的列，不進鎖序。
+func (q *Queries) LockAuthor(ctx context.Context, buyerID int64) error {
+	_, err := q.db.Exec(ctx, lockAuthor, buyerID)
+	return err
+}
