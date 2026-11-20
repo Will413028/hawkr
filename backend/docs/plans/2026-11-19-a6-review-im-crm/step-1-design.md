@@ -15,7 +15,7 @@
 - `M/legacy/orderservice` 加 `OrderForReview`（只補 review 用的這一支；`GetOrderForAfterSales`、`HasOrderBetween` 屬 A6-2、A6-3）。
 - `M/legacy/reviewrelay`（新）：`review.created`、`review.hidden` 照舊形狀送 `hawkr.review`。
 - `M/platform/revalidate` 加 `ProductTag(productID int64)`（`"product:<id>"`，與舊 `pkg/revalidate/tags.go:9` 同字串）。
-- 換掉 `M/legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go:21-69`、`cmd/hawkr/seller.go:71`）改接 `review.StoreRatingStats`，刪除 `M/legacy/reviewservice`。
+- ~~換掉 `M/legacy/reviewservice` 的 3 個呼叫端~~：移到 A6-6e（計畫 A6-D11，Will 2026-11-20）；A6-6e 前評價仍寫進舊服務，提早換會讀到空表。
 - `CARRYOVER.md`、`AGENTS.md`、`cmd/hawkr` 註冊（`modules.go`、`trimmedColumns`、worker、事件訂閱）。
 
 ## 0.2 不在範圍

@@ -136,7 +136,7 @@
 
 - **A6-1a** 設計書與開工 design-review（完成）。
 - **A6-1b** 模組本體：schema、提交、回覆、讀取、統計、隱藏與還原、`orderservice.OrderForReview`、RD1–RD3、RD6、RD7、RD9、RD10 的回歸測試與 mutation、`CARRYOVER.md`、`AGENTS.md`。
-- **A6-1c**（被擋於 A6-1b）刪帳訂閱者與 purge job（RD4）、媒體同步、`revalidate.ProductTag`、`reviewrelay`（wire＋golden）、換掉 `legacy/reviewservice` 的 3 個呼叫端並刪除它、完成前 design-review。
+- **A6-1c**（被擋於 A6-1b）刪帳訂閱者與 purge job（RD4）、媒體同步、`revalidate.ProductTag`、`reviewrelay`（wire＋golden）、完成前 design-review。review 模組在 `cmd/hawkr` 建構並接刪帳訂閱者與媒體同步 worker；`legacy/reviewservice` 的 3 個呼叫端不換（A6-D11，移到 A6-6e）。
 
 
 - 範圍：`internal/modules/review`（schema、評價建立與回覆、公開可讀述詞、隱藏紀錄與還原 API、封鎖過濾 SQL 述詞）；`orderservice.GetOrderForReview`；`reviewrelay`（形狀同舊事件）；RD1–RD10 處置；`CARRYOVER.md` 沿用盤點（M 列）。
@@ -174,7 +174,7 @@
 
 ### A6-6 client（被擋於：A6-5；Q1 的缺口在這裡結束）
 
-拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
+拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
 
 - 驗收：各端 CI 等價檢查；e2e 推到 CI；6e 接上 relay 與 consumer 後，以 backend-e2e-verify 擷取 `reviewrelay`、`imrelay` 的 RabbitMQ wire 與 crm consumer 的入帳；封鎖與檢舉按鈕以單體實打（backend-e2e-verify）。
 - UI：封鎖名單分頁改名或拿掉（A6-D2）先取得同意。
@@ -202,6 +202,7 @@
 | A6-D8 | CRM 只顯示暱稱與訂單統計 | A6-3 |
 | A6-D9 | 刪帳改由 review、im 訂閱 buyer、seller 的刪除事件，不由 accountdeletion 直接呼叫（Will 2026-11-19，A6-1a 開工審查第 5 項） | A6-1c、A6-2a |
 | A6-D10 | 提交評價先檢查訂單擁有者，不是自己的訂單回 NotFound，不照舊碼先查狀態（Will 2026-11-19，A6-1b code-review 第 4 項） | A6-1b |
+| A6-D11 | 店家評分統計的讀取（discovery、seller 的 `StoreRatingStats`）留在舊 review-service 到 A6-6e，與刪路由同一個變更才換成 review 模組並刪 `legacy/reviewservice`：A6-6e 前評價仍寫進舊服務，提早換會讓評分讀到空表，違反「並行期單一生效者」（Will 2026-11-20，A6-1c 開工） | A6-1c、A6-6e |
 
 ## 基線
 
