@@ -779,7 +779,13 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 		t.Fatalf("來源不符：%v", err)
 	}
 	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, s1), f.buyerParty(b1), 0, 10)
-	if err != nil || !msgs.Items[len(msgs.Items)-1].Hidden {
+	stillHidden := false
+	for _, m := range msgs.Items {
+		if m.Seq == last.Seq {
+			stillHidden = m.Hidden
+		}
+	}
+	if err != nil || !stillHidden {
 		t.Fatalf("來源不符時隱藏仍在：%+v %v", msgs, err)
 	}
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); err != nil {

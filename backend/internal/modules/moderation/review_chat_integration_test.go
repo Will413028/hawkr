@@ -100,6 +100,16 @@ func (f *fixture) openChatCase(t *testing.T, messageID uuid.UUID, c snapshot.Con
 	return mustV[CaseDetail](t)(f.module.Case(context.Background(), id)).Case
 }
 
+// cloneCase 直接建立同一個內容的第二個案件並複製快照：內容已被隱藏，不能再經 SubmitReport 檢舉（§1.1／§1.2，已隱藏回 NotFound）。
+func (f *fixture) cloneCase(t *testing.T, src Case) Case {
+	t.Helper()
+	id := uuid.NewV7()
+	now := f.clock()
+	f.exec(t, `INSERT INTO moderation.cases (id, target_kind, content_id, opened_at) SELECT $1, target_kind, content_id, $2 FROM moderation.cases WHERE id = $3`, id, now, src.ID)
+	f.exec(t, `INSERT INTO moderation.case_snapshots (id, case_id, content_sha256, content, asset_ids, captured_at) SELECT $1, $2, content_sha256, content, asset_ids, $3 FROM moderation.case_snapshots WHERE case_id = $4`, uuid.NewV7(), id, now, src.ID)
+	return mustV[CaseDetail](t)(f.module.Case(context.Background(), id)).Case
+}
+
 func buyerChatSnapshot(buyerID int64, conv uuid.UUID, seq int64) snapshot.Content {
 	return snapshot.Content{Kind: TargetChatMessage, Chat: &snapshot.Chat{
 		AuthorKind: "BUYER", AuthorID: buyerID, Body: fmt.Sprintf("m%d", seq), ConversationID: conv.String(), Seq: seq, AuthoredAt: time.Date(2026, 11, 2, 4, 0, 0, 0, time.UTC),
@@ -305,6 +315,9 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 			}
 		}
 	}
+	if strings.Contains(fmt.Sprintf("%+v", c.Context), "m3") {
+		t.Fatalf("被隱藏的前文內容不得出現在快照前後文：%+v", c.Context)
+	}
 	var raw string
 	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT content FROM moderation.case_snapshots WHERE case_id = $1", res.Case.ID).Scan(&raw); err != nil {
 		t.Fatal(err)
@@ -410,6 +423,16 @@ func TestReportAuthorizationForChatAndReview(t *testing.T) {
 	}
 	if err := submit(stranger, TargetReview, r.ID); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("已隱藏的評價：%v", err)
+	}
+	r2 := f.reviewBy(t, f.buyerProfile(t), storeID, 2, "普通")
+	blocker, _ := f.newBuyer(t)
+	if err := submit(blocker, TargetReview, r2.ID); err != nil {
+		t.Fatalf("未封鎖時可檢舉：%v", err)
+	}
+	r3 := f.reviewBy(t, f.buyerProfile(t), storeID, 2, "普通")
+	mustV[bool](t)(f.buyer.BlockBuyer(ctx, blocker, r3.BuyerID))
+	if err := submit(blocker, TargetReview, r3.ID); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("觀看者封鎖評價作者後不可檢舉（同 GetReview 的可讀規則）：%v", err)
 	}
 }
 
@@ -653,7 +676,7 @@ func TestReverseOfALaterCaseDoesNotRestoreAnEarlierCasesHideForReviewAndComment(
 	for _, tc := range cases {
 		a := f.openCase(t, tc.target)
 		mustV[CaseDetail](t)(f.decide(t, a, ActionHide, policy.Spam))
-		b := f.openCase(t, tc.target)
+		b := f.cloneCase(t, a)
 		mustV[CaseDetail](t)(f.decide(t, b, ActionHide, policy.Spam))
 		if _, err := f.reverse(b.ID); kindOf(err) != apperr.KindFailedPrecondition {
 			t.Fatalf("%s：後到案件的撤銷：%v", tc.name, err)
