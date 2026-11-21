@@ -146,6 +146,19 @@ func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID
 	return result.RowsAffected(), nil
 }
 
+const clearStoreReporterDescriptions = `-- name: ClearStoreReporterDescriptions :execrows
+UPDATE moderation.reports SET description = NULL WHERE reporter_store_id = $1 AND description IS NOT NULL
+`
+
+// 店家退場：清掉該店以檢舉人身分送出的全部檢舉的說明；檢舉列與 reporter_store_id（業務鍵）留著。
+func (q *Queries) ClearStoreReporterDescriptions(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, clearStoreReporterDescriptions, reporterStoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeCase = `-- name: CloseCase :execrows
 UPDATE moderation.cases
 SET decision = $1, decision_category = $2, decision_action = $3,
@@ -251,6 +264,31 @@ DELETE FROM moderation.case_snapshots WHERE id = ANY($1::uuid[])
 // 刪快照，檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
 func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSnapshots, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStoreReporterDailyCount = `-- name: DeleteStoreReporterDailyCount :execrows
+DELETE FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1
+`
+
+func (q *Queries) DeleteStoreReporterDailyCount(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStoreReporterDailyCount, reporterStoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStoreReporterRequests = `-- name: DeleteStoreReporterRequests :execrows
+DELETE FROM moderation.report_requests WHERE reporter_store_id = $1
+`
+
+// 店家退場：刪掉該店的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+func (q *Queries) DeleteStoreReporterRequests(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStoreReporterRequests, reporterStoreID)
 	if err != nil {
 		return 0, err
 	}
