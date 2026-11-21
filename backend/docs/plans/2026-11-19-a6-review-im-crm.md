@@ -173,6 +173,9 @@
 
 ### A6-4 moderation 加評價、聊天對象（被擋於：A6-1、A6-2、A6-D3 對象）
 
+拆三個 session：**A6-4a** 設計書 `step-4-design.md` 與開工 design-review（完成）；**A6-4b** REVIEW、CHAT_MESSAGE 對象、快照（依種類分開，GetCase 對外）、經 review／im 的隱藏與 `ReverseHide`（A6-D21 W1、W4）；**A6-4c** 店家內容走 seller 下架（`CHAT_MESSAGE`、`REVIEW_REPLY`）與店家檢舉聊天訊息（A6-D21 W2、W3），完成前 design-review 涵蓋 4b＋4c。
+- 鎖序前提已核對：隱藏與還原不取擁有者守門，計畫的 buyer → seller → review/im → moderation 不變（設計書 §5【推】，由 4b 的並行 integration 證明）。
+
 - 範圍：`TargetKind` 加 REVIEW、CHAT_MESSAGE（proto、Go、CHECK migration）；快照形狀（聊天含前後文，A6-D3）；隱藏與還原經 review、im API 同 tx；作者為店家時走 seller 措施（A7-D5′）；依賴表 moderation 加 review、im；`reviewqueue` 分支不變（來源仍是 moderation）。
 - 驗收：檢舉→隱藏→還原的 integration；鎖序測試；mutation：還原時不清隱藏紀錄、隱藏時不更新對話預覽（ID1），測試各要失敗。
 
@@ -223,6 +226,7 @@
 | A6-D18 | A6-3 設計書 §13 W1–W5 全照建議：VIP 查詢切換與刪 `legacy/crmservice` 延到 A6-6e（W1 (a)，同 A6-D11）；刪帳與店家退場時清除 crm 資料並以 `inactive_parties` 擋重放（W2 (b)）；不建 coupon legacy client、CRM 不回優惠券數（W3 (a)）；標籤上限每店 200、每客戶 20（W4 (a)）；拿掉 CRM 客戶列表的關鍵字搜尋，A6-6 改 UI（W5 (a)，Will 已同意這項 UI 改動）（Will 2026-11-20） | A6-3b、A6-6 |
 | A6-D19 | 停用身分的事實與守門只在擁有者：buyer 加「未關閉」、seller 加「未退場」的共享列鎖（`FOR KEY SHARE`）與狀態 `pub_*`，獨占端沿用既有的 `LockForDeletion`、`RetireDueStores`；review、im、crm 刪自己的 `inactive_*` 複本與 advisory lock，讀取改 join 擁有者 `pub_*`；抹除 job 留在各模組；social 保留複本（存旗標，規則 2 例外）；不做平台框架。簡報 `2026-11-19-a6-review-im-crm/step-3c-brief.md`（Will 2026-11-21） | A6-3c、A6-4 |
 | A6-D20 | A6-3c 設計書 §10 W1–W7：W1 (a′) 不存在的 ID 當已停用並跳過；NotFound 時查 pub 分辨，已關閉／已退場記 info、不存在記 error（修訂 Will 2026-11-21）；W2 (a) 新增 `pub_closed_buyers()`；W3 (a) `LockActive`／`LockBuyerShared` 降為 `FOR KEY SHARE`；W4 (b) 業務寫入降為 `FOR NO KEY UPDATE`、只有轉移保留 `FOR UPDATE`；W5 (a) 不加索引、門檻寫進 CARRYOVER；W6 (b) sweep 唯一性 helper 本步收齊全部 14 處；W7 (b) 整合測試替身斷言 legacy RPC 不在 tx 內（Will 2026-11-21） | A6-3c1 |
+| A6-D21 | A6-4 設計書 §W：W1 (a) moderation 新增 `ReverseHide`，案件維持結案，另記還原欄位與稽核紀錄，同 tx 呼叫 review／im／social 的 `Restore`；W2 (a) 店家寫的聊天訊息與評價回覆照 A7-D5′ 走 seller 內容下架，新增 `CHAT_MESSAGE`、`REVIEW_REPLY` 對象，im 讀取 join `seller.pub_content_takedowns()`；W3 (a) 檢舉人改為買家或店家二選一，只有 `CHAT_MESSAGE` 接受店家檢舉；W4 (a) `GetCase` 回應加依種類分開的快照欄位，快照 struct 改依種類分開，後台頁面在 A6-6（Will 2026-11-21） | A6-4 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -255,3 +259,4 @@
 | A6-3b crm 實作 | 完成（2026-11-21）：`internal/modules/crm`、`internal/legacy/crmconsumer`（只在測試啟用）；與設計書的差異見 `step-3-design.md` §15；§16 #1 依 A6-D19 交 A6-3c 處理 | go build／vet、unit、`make sqlc` 無 drift（主 session 重跑）；完成前 design-review＋/code-review＋第 2 輪：findings 14 (blocking 0)，fixed 9、recorded 0、raised 1、rejected 4（設計書 §16）；CI `backend monolith` run 44850261836（5ad73cbe）三個 job 全綠，含 integration test（testcontainers） | 36 個 mutation 只在實作者的原生 Postgres 跑過（CI 不跑 mutation） |
 | A6-3c0 擁有者守門設計 | 完成（2026-11-21）：設計書 `step-3c-design.md`，W1–W7 已決（A6-D20） | 開工 design-review 1 輪：findings 6 (blocking 0)，fixed 1、recorded 3、raised 2（W4、W6）、rejected 0；Postgres 列鎖衝突表以官方 explicit-locking 頁核對 | 第 2 輪未派：拍板改的是 W4、W6 的選項，設計書已有 (b) 的完整描述，實作規定寫在 §10 末；`SKIP LOCKED` 語意與 pub 函式內聯待 3c1 的 integration 證明 |
 | A6-3c1 擁有者守門實作 | 完成（2026-11-21）：buyer `LockNotClosed`／`pub_closed_buyers`、seller `LockNotRetired`／`pub_retired_stores`；W3、W4 鎖強度；`platform/jobs` 的 `UniqueByArgs`／`SweepOpts` 收齊 14 處；review、im、crm 刪 `inactive_*` 與 advisory lock | CI run 44862272441（87b0a3da）全部 job 綠，含 integration（`SKIP LOCKED` 跳過、pub 函式內聯 EXPLAIN 在真實 Postgres 通過）；mutation run 44863292682：19 個全 KILLED（§8.3 M1–M13、W4 兩個、修正輪 F4／F6／F8 各一、im relay join 一個；M1 以測試逾時被殺）；審查 2 輪：findings 13 (blocking 1)，fixed 10、recorded 1（seller ScheduleExpiry 唯一性狀態，`seller/CARRYOVER.md`）、raised 1（crm 守門 NotFound 一律記 error log，見 W1；Will 2026-11-21 決定 (a′)，已在後續 commit 實作）、rejected 1（buyer 孤兒註解不存在） | `TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard` 在守門被拿掉時以逾時而非斷言失敗 |
+| A6-4a 設計 | 完成（2026-11-21）：設計書 `step-4-design.md`，W1–W4 已決（A6-D21） | 開工 design-review 1 輪：findings 7 (blocking 2)，fixed 5、recorded 0、raised 2（W2／W3，Will 已決）、rejected 0 | 第 2 輪未派：改動只有 `MessageForReport` 加入呼叫方 tx，由規則 3 與先例 `seller/governance.go:600` 定案；無程式、無測試（設計步驟） |
