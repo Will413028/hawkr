@@ -11,6 +11,7 @@ import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
+import "hawkr/seller/v1alpha1/report.proto";
 
 // ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 service ModerationAppService {
@@ -19,7 +20,9 @@ service ModerationAppService {
   // 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
   rpc SubmitReport(SubmitReportRequest) returns (SubmitReportResponse);
 
-  // ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+  // ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+  // 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+  // （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -76,19 +79,27 @@ message ListMyReportsRequest {
 }
 
 message ListMyReportsResponse {
-  repeated ReportRecord reports = 1;
+  repeated MyReportItem reports = 1;
   string next_page_token = 2;
 }
 
-// ReportRecord 是呼叫者送出的一筆檢舉。
-message ReportRecord {
+// MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
+message MyReportItem {
   string id = 1;
-  ReportTarget target = 2;
-  hawkr.common.v1alpha1.PolicyCategory category = 3;
+  hawkr.common.v1alpha1.PolicyCategory category = 2;
   // 送出時的說明；沒有或已超過保留期被清除時是空字串。
-  string description = 4;
-  ReportOutcome outcome = 5;
-  google.protobuf.Timestamp create_time = 6;
-  // 案件結案的時間；處理中不設。
-  optional google.protobuf.Timestamp resolve_time = 7;
+  string description = 3;
+  google.protobuf.Timestamp create_time = 4;
+  // 結果設定或案件結案的時間；處理中不設。
+  optional google.protobuf.Timestamp resolve_time = 5;
+  oneof subject {
+    CommunityReport community = 6;
+    hawkr.seller.v1alpha1.StoreReport store = 7;
+  }
+}
+
+// CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
+message CommunityReport {
+  ReportTarget target = 1;
+  ReportOutcome outcome = 2;
 }

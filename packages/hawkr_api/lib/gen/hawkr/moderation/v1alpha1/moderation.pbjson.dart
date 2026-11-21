@@ -18,6 +18,8 @@ import 'dart:typed_data' as $typed_data;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $0;
 
+import '../../seller/v1alpha1/report.pbjson.dart' as $1;
+
 @$core.Deprecated('Use reportTargetKindDescriptor instead')
 const ReportTargetKind$json = {
   '1': 'ReportTargetKind',
@@ -156,7 +158,7 @@ const ListMyReportsResponse$json = {
       '3': 1,
       '4': 3,
       '5': 11,
-      '6': '.hawkr.moderation.v1alpha1.ReportRecord',
+      '6': '.hawkr.moderation.v1alpha1.MyReportItem',
       '10': 'reports'
     },
     {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
@@ -166,42 +168,26 @@ const ListMyReportsResponse$json = {
 /// Descriptor for `ListMyReportsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List listMyReportsResponseDescriptor = $convert.base64Decode(
     'ChVMaXN0TXlSZXBvcnRzUmVzcG9uc2USQQoHcmVwb3J0cxgBIAMoCzInLmhhd2tyLm1vZGVyYX'
-    'Rpb24udjFhbHBoYTEuUmVwb3J0UmVjb3JkUgdyZXBvcnRzEiYKD25leHRfcGFnZV90b2tlbhgC'
+    'Rpb24udjFhbHBoYTEuTXlSZXBvcnRJdGVtUgdyZXBvcnRzEiYKD25leHRfcGFnZV90b2tlbhgC'
     'IAEoCVINbmV4dFBhZ2VUb2tlbg==');
 
-@$core.Deprecated('Use reportRecordDescriptor instead')
-const ReportRecord$json = {
-  '1': 'ReportRecord',
+@$core.Deprecated('Use myReportItemDescriptor instead')
+const MyReportItem$json = {
+  '1': 'MyReportItem',
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
     {
-      '1': 'target',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.moderation.v1alpha1.ReportTarget',
-      '10': 'target'
-    },
-    {
       '1': 'category',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 14,
       '6': '.hawkr.common.v1alpha1.PolicyCategory',
       '10': 'category'
     },
-    {'1': 'description', '3': 4, '4': 1, '5': 9, '10': 'description'},
-    {
-      '1': 'outcome',
-      '3': 5,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.moderation.v1alpha1.ReportOutcome',
-      '10': 'outcome'
-    },
+    {'1': 'description', '3': 3, '4': 1, '5': 9, '10': 'description'},
     {
       '1': 'create_time',
-      '3': 6,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
@@ -209,30 +195,78 @@ const ReportRecord$json = {
     },
     {
       '1': 'resolve_time',
-      '3': 7,
+      '3': 5,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
-      '9': 0,
+      '9': 1,
       '10': 'resolveTime',
       '17': true
     },
+    {
+      '1': 'community',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.moderation.v1alpha1.CommunityReport',
+      '9': 0,
+      '10': 'community'
+    },
+    {
+      '1': 'store',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.StoreReport',
+      '9': 0,
+      '10': 'store'
+    },
   ],
   '8': [
+    {'1': 'subject'},
     {'1': '_resolve_time'},
   ],
 };
 
-/// Descriptor for `ReportRecord`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List reportRecordDescriptor = $convert.base64Decode(
-    'CgxSZXBvcnRSZWNvcmQSDgoCaWQYASABKAlSAmlkEj8KBnRhcmdldBgCIAEoCzInLmhhd2tyLm'
-    '1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0UgZ0YXJnZXQSQQoIY2F0ZWdvcnkYAyAB'
-    'KA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlSCGNhdGVnb3J5EiAKC2'
-    'Rlc2NyaXB0aW9uGAQgASgJUgtkZXNjcmlwdGlvbhJCCgdvdXRjb21lGAUgASgOMiguaGF3a3Iu'
-    'bW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lUgdvdXRjb21lEjsKC2NyZWF0ZV90aW'
-    '1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIKY3JlYXRlVGltZRJCCgxyZXNv'
-    'bHZlX3RpbWUYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSABSC3Jlc29sdmVUaW'
-    '1liAEBQg8KDV9yZXNvbHZlX3RpbWU=');
+/// Descriptor for `MyReportItem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List myReportItemDescriptor = $convert.base64Decode(
+    'CgxNeVJlcG9ydEl0ZW0SDgoCaWQYASABKAlSAmlkEkEKCGNhdGVnb3J5GAIgASgOMiUuaGF3a3'
+    'IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5UghjYXRlZ29yeRIgCgtkZXNjcmlwdGlv'
+    'bhgDIAEoCVILZGVzY3JpcHRpb24SOwoLY3JlYXRlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG'
+    '9idWYuVGltZXN0YW1wUgpjcmVhdGVUaW1lEkIKDHJlc29sdmVfdGltZRgFIAEoCzIaLmdvb2ds'
+    'ZS5wcm90b2J1Zi5UaW1lc3RhbXBIAVILcmVzb2x2ZVRpbWWIAQESSgoJY29tbXVuaXR5GAYgAS'
+    'gLMiouaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5Db21tdW5pdHlSZXBvcnRIAFIJY29tbXVu'
+    'aXR5EjoKBXN0b3JlGAcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN0b3JlUmVwb3J0SA'
+    'BSBXN0b3JlQgkKB3N1YmplY3RCDwoNX3Jlc29sdmVfdGltZQ==');
+
+@$core.Deprecated('Use communityReportDescriptor instead')
+const CommunityReport$json = {
+  '1': 'CommunityReport',
+  '2': [
+    {
+      '1': 'target',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.moderation.v1alpha1.ReportTarget',
+      '10': 'target'
+    },
+    {
+      '1': 'outcome',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.moderation.v1alpha1.ReportOutcome',
+      '10': 'outcome'
+    },
+  ],
+};
+
+/// Descriptor for `CommunityReport`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List communityReportDescriptor = $convert.base64Decode(
+    'Cg9Db21tdW5pdHlSZXBvcnQSPwoGdGFyZ2V0GAEgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MW'
+    'FscGhhMS5SZXBvcnRUYXJnZXRSBnRhcmdldBJCCgdvdXRjb21lGAIgASgOMiguaGF3a3IubW9k'
+    'ZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lUgdvdXRjb21l');
 
 const $core.Map<$core.String, $core.dynamic> ModerationAppServiceBase$json = {
   '1': 'ModerationAppService',
@@ -261,7 +295,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.moderation.v1alpha1.ListMyReportsRequest': ListMyReportsRequest$json,
   '.hawkr.moderation.v1alpha1.ListMyReportsResponse':
       ListMyReportsResponse$json,
-  '.hawkr.moderation.v1alpha1.ReportRecord': ReportRecord$json,
+  '.hawkr.moderation.v1alpha1.MyReportItem': MyReportItem$json,
+  '.hawkr.moderation.v1alpha1.CommunityReport': CommunityReport$json,
+  '.hawkr.seller.v1alpha1.StoreReport': $1.StoreReport$json,
 };
 
 /// Descriptor for `ModerationAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

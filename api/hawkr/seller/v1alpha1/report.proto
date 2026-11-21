@@ -20,10 +20,17 @@ service SellerReportAppService {
   // 超過回 resource_exhausted（帶 RetryInfo）。
   rpc CreateReport(CreateReportRequest) returns (CreateReportResponse);
 
-  // ListMyReports 列出呼叫者的檢舉，新到舊。
-  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse) {
+  // GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+  // 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
+  rpc GetMyReport(GetMyReportRequest) returns (GetMyReportResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  // AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+  // （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+  // 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+  // resource_exhausted（帶 RetryInfo）。
+  rpc AddReportSupplement(AddReportSupplementRequest) returns (AddReportSupplementResponse);
 }
 
 // ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
@@ -41,9 +48,9 @@ enum ReportOutcome {
   REPORT_OUTCOME_ABUSIVE = 5;
 }
 
-// MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
+// StoreReport 是檢舉人看到的自己的店家檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
 // 店名與 logo 由 client 以 store_id 呼叫 SellerPublicService.BatchGetStores。
-message MyReport {
+message StoreReport {
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2;
@@ -80,20 +87,53 @@ message CreateReportRequest {
 
 message CreateReportResponse {
   // 新的檢舉；supplemented 時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
-  MyReport report = 1;
+  StoreReport report = 1;
   // 這次的內容補充到同一個台北日、同一家店、同一個類別、還沒有結果的那一筆。
   bool supplemented = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // supplemented 時給檢舉人看的那一句（伺服器的句子：它說的是伺服器的去重規則）；沒有補充時不設。
   google.rpc.LocalizedMessage notice = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-message ListMyReportsRequest {
-  // 預設 20，上限 100。
-  int32 page_size = 1;
-  string page_token = 2;
+message GetMyReportRequest {
+  // 檢舉的 id。
+  string report_id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-message ListMyReportsResponse {
-  repeated MyReport reports = 1;
-  string next_page_token = 2;
+message GetMyReportResponse {
+  StoreReport report = 1;
+  // 補充（去重併入的與檢舉人主動補充的合在一起），舊到新。
+  repeated ReportSupplement supplements = 2;
+  // 原檢舉與全部補充的佐證，依送出的順序。
+  repeated ReportEvidence evidence = 3;
+}
+
+// ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
+message ReportSupplement {
+  string id = 1;
+  string description = 2;
+  google.protobuf.Timestamp create_time = 3;
+  // 這則補充帶來的佐證在 GetMyReportResponse.evidence 的 position。
+  repeated int32 evidence_positions = 4;
+}
+
+// ReportEvidence 是檢舉的一張佐證。佐證是機敏檔：回應只帶它在這筆檢舉裡的順序，不帶檔案的網址。
+message ReportEvidence {
+  // 佐證在這筆檢舉裡的順序（從 0 起）。
+  int32 position = 1;
+}
+
+message AddReportSupplementRequest {
+  // 要補充的檢舉 id。
+  string report_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 補充內容，最多 2000 字（規則同 CreateReport 的 description）。
+  string description = 2 [(google.api.field_behavior) = REQUIRED];
+  // 佐證圖片的 staged token，最多 5 張（同 CreateReport）。
+  repeated string evidence_staged_tokens = 3;
+}
+
+message AddReportSupplementResponse {
+  // 補充之後的檢舉、全部補充與佐證（同 GetMyReportResponse）。
+  StoreReport report = 1;
+  repeated ReportSupplement supplements = 2;
+  repeated ReportEvidence evidence = 3;
 }

@@ -23,15 +23,19 @@ export 'report.pb.dart';
 abstract class SellerReportAppServiceBase extends $pb.GeneratedService {
   $async.Future<$3.CreateReportResponse> createReport(
       $pb.ServerContext ctx, $3.CreateReportRequest request);
-  $async.Future<$3.ListMyReportsResponse> listMyReports(
-      $pb.ServerContext ctx, $3.ListMyReportsRequest request);
+  $async.Future<$3.GetMyReportResponse> getMyReport(
+      $pb.ServerContext ctx, $3.GetMyReportRequest request);
+  $async.Future<$3.AddReportSupplementResponse> addReportSupplement(
+      $pb.ServerContext ctx, $3.AddReportSupplementRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'CreateReport':
         return $3.CreateReportRequest();
-      case 'ListMyReports':
-        return $3.ListMyReportsRequest();
+      case 'GetMyReport':
+        return $3.GetMyReportRequest();
+      case 'AddReportSupplement':
+        return $3.AddReportSupplementRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -42,8 +46,11 @@ abstract class SellerReportAppServiceBase extends $pb.GeneratedService {
     switch (methodName) {
       case 'CreateReport':
         return createReport(ctx, request as $3.CreateReportRequest);
-      case 'ListMyReports':
-        return listMyReports(ctx, request as $3.ListMyReportsRequest);
+      case 'GetMyReport':
+        return getMyReport(ctx, request as $3.GetMyReportRequest);
+      case 'AddReportSupplement':
+        return addReportSupplement(
+            ctx, request as $3.AddReportSupplementRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

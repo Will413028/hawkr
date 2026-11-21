@@ -53,7 +53,9 @@ type ModerationAppServiceClient interface {
 	// 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
 	// 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
 	SubmitReport(context.Context, *connect.Request[v1alpha1.SubmitReportRequest]) (*connect.Response[v1alpha1.SubmitReportResponse], error)
-	// ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+	// ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+	// 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+	// （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
 	ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error)
 }
 
@@ -108,7 +110,9 @@ type ModerationAppServiceHandler interface {
 	// 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
 	// 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
 	SubmitReport(context.Context, *connect.Request[v1alpha1.SubmitReportRequest]) (*connect.Response[v1alpha1.SubmitReportResponse], error)
-	// ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+	// ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+	// 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+	// （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
 	ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error)
 }
 

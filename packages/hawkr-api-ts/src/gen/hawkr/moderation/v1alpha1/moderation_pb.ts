@@ -16,13 +16,15 @@ import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { PolicyCategory } from "../../common/v1alpha1/policy_category_pb";
 import { file_hawkr_common_v1alpha1_policy_category } from "../../common/v1alpha1/policy_category_pb";
+import type { StoreReport } from "../../seller/v1alpha1/report_pb";
+import { file_hawkr_seller_v1alpha1_report } from "../../seller/v1alpha1/report_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/moderation/v1alpha1/moderation.proto.
  */
 export const file_hawkr_moderation_v1alpha1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SGWhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEiXwoMUmVwb3J0VGFyZ2V0Ej4KBGtpbmQYASABKA4yKy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEtpbmRCA+BBAhIPCgJpZBgCIAEoCUID4EECIsQBChNTdWJtaXRSZXBvcnRSZXF1ZXN0EjwKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQISPAoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAhITCgtkZXNjcmlwdGlvbhgDIAEoCRIcCgpyZXF1ZXN0X2lkGAQgASgJQgjijM/XCAIIASJaChRTdWJtaXRSZXBvcnRSZXNwb25zZRIRCglyZXBvcnRfaWQYASABKAkSLwoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj0KFExpc3RNeVJlcG9ydHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImoKFUxpc3RNeVJlcG9ydHNSZXNwb25zZRI4CgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRSZWNvcmQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJItUCCgxSZXBvcnRSZWNvcmQSCgoCaWQYASABKAkSNwoGdGFyZ2V0GAIgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRUYXJnZXQSNwoIY2F0ZWdvcnkYAyABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnkSEwoLZGVzY3JpcHRpb24YBCABKAkSOQoHb3V0Y29tZRgFIAEoDjIoLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0T3V0Y29tZRIvCgtjcmVhdGVfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNQoMcmVzb2x2ZV90aW1lGAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBQg8KDV9yZXNvbHZlX3RpbWUqtQEKEFJlcG9ydFRhcmdldEtpbmQSIgoeUkVQT1JUX1RBUkdFVF9LSU5EX1VOU1BFQ0lGSUVEEAASGwoXUkVQT1JUX1RBUkdFVF9LSU5EX1BPU1QQARIeChpSRVBPUlRfVEFSR0VUX0tJTkRfQ09NTUVOVBACEiIKHlJFUE9SVF9UQVJHRVRfS0lORF9GT1JVTV9FTlRSWRADEhwKGFJFUE9SVF9UQVJHRVRfS0lORF9CVVlFUhAEKooBCg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASGgoWUkVQT1JUX09VVENPTUVfUEVORElORxABEhwKGFJFUE9SVF9PVVRDT01FX1ZJT0xBVElPThACEh8KG1JFUE9SVF9PVVRDT01FX05PX1ZJT0xBVElPThADMoACChRNb2RlcmF0aW9uQXBwU2VydmljZRJvCgxTdWJtaXRSZXBvcnQSLi5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlcXVlc3QaLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlc3BvbnNlEncKDUxpc3RNeVJlcG9ydHMSLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXF1ZXN0GjAuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category]);
+  fileDesc("CipoYXdrci9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SGWhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEiXwoMUmVwb3J0VGFyZ2V0Ej4KBGtpbmQYASABKA4yKy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEtpbmRCA+BBAhIPCgJpZBgCIAEoCUID4EECIsQBChNTdWJtaXRSZXBvcnRSZXF1ZXN0EjwKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQISPAoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAhITCgtkZXNjcmlwdGlvbhgDIAEoCRIcCgpyZXF1ZXN0X2lkGAQgASgJQgjijM/XCAIIASJaChRTdWJtaXRSZXBvcnRSZXNwb25zZRIRCglyZXBvcnRfaWQYASABKAkSLwoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj0KFExpc3RNeVJlcG9ydHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImoKFUxpc3RNeVJlcG9ydHNSZXNwb25zZRI4CgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5NeVJlcG9ydEl0ZW0SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIuICCgxNeVJlcG9ydEl0ZW0SCgoCaWQYASABKAkSNwoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnkSEwoLZGVzY3JpcHRpb24YAyABKAkSLwoLY3JlYXRlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjUKDHJlc29sdmVfdGltZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARI/Cgljb21tdW5pdHkYBiABKAsyKi5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkNvbW11bml0eVJlcG9ydEgAEjMKBXN0b3JlGAcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN0b3JlUmVwb3J0SABCCQoHc3ViamVjdEIPCg1fcmVzb2x2ZV90aW1lIoUBCg9Db21tdW5pdHlSZXBvcnQSNwoGdGFyZ2V0GAEgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRUYXJnZXQSOQoHb3V0Y29tZRgCIAEoDjIoLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0T3V0Y29tZSq1AQoQUmVwb3J0VGFyZ2V0S2luZBIiCh5SRVBPUlRfVEFSR0VUX0tJTkRfVU5TUEVDSUZJRUQQABIbChdSRVBPUlRfVEFSR0VUX0tJTkRfUE9TVBABEh4KGlJFUE9SVF9UQVJHRVRfS0lORF9DT01NRU5UEAISIgoeUkVQT1JUX1RBUkdFVF9LSU5EX0ZPUlVNX0VOVFJZEAMSHAoYUkVQT1JUX1RBUkdFVF9LSU5EX0JVWUVSEAQqigEKDVJlcG9ydE91dGNvbWUSHgoaUkVQT1JUX09VVENPTUVfVU5TUEVDSUZJRUQQABIaChZSRVBPUlRfT1VUQ09NRV9QRU5ESU5HEAESHAoYUkVQT1JUX09VVENPTUVfVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAMygAIKFE1vZGVyYXRpb25BcHBTZXJ2aWNlEm8KDFN1Ym1pdFJlcG9ydBIuLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuU3VibWl0UmVwb3J0UmVxdWVzdBovLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuU3VibWl0UmVwb3J0UmVzcG9uc2USdwoNTGlzdE15UmVwb3J0cxIvLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdE15UmVwb3J0c1JlcXVlc3QaMC5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_seller_v1alpha1_report]);
 
 /**
  * ReportTarget 是被檢舉的對象。
@@ -141,9 +143,9 @@ export const ListMyReportsRequestSchema: GenMessage<ListMyReportsRequest> = /*@_
  */
 export type ListMyReportsResponse = Message<"hawkr.moderation.v1alpha1.ListMyReportsResponse"> & {
   /**
-   * @generated from field: repeated hawkr.moderation.v1alpha1.ReportRecord reports = 1;
+   * @generated from field: repeated hawkr.moderation.v1alpha1.MyReportItem reports = 1;
    */
-  reports: ReportRecord[];
+  reports: MyReportItem[];
 
   /**
    * @generated from field: string next_page_token = 2;
@@ -159,57 +161,88 @@ export const ListMyReportsResponseSchema: GenMessage<ListMyReportsResponse> = /*
   messageDesc(file_hawkr_moderation_v1alpha1_moderation, 4);
 
 /**
- * ReportRecord 是呼叫者送出的一筆檢舉。
+ * MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
  *
- * @generated from message hawkr.moderation.v1alpha1.ReportRecord
+ * @generated from message hawkr.moderation.v1alpha1.MyReportItem
  */
-export type ReportRecord = Message<"hawkr.moderation.v1alpha1.ReportRecord"> & {
+export type MyReportItem = Message<"hawkr.moderation.v1alpha1.MyReportItem"> & {
   /**
    * @generated from field: string id = 1;
    */
   id: string;
 
   /**
-   * @generated from field: hawkr.moderation.v1alpha1.ReportTarget target = 2;
-   */
-  target?: ReportTarget | undefined;
-
-  /**
-   * @generated from field: hawkr.common.v1alpha1.PolicyCategory category = 3;
+   * @generated from field: hawkr.common.v1alpha1.PolicyCategory category = 2;
    */
   category: PolicyCategory;
 
   /**
    * 送出時的說明；沒有或已超過保留期被清除時是空字串。
    *
-   * @generated from field: string description = 4;
+   * @generated from field: string description = 3;
    */
   description: string;
 
   /**
-   * @generated from field: hawkr.moderation.v1alpha1.ReportOutcome outcome = 5;
-   */
-  outcome: ReportOutcome;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp create_time = 6;
+   * @generated from field: google.protobuf.Timestamp create_time = 4;
    */
   createTime?: Timestamp | undefined;
 
   /**
-   * 案件結案的時間；處理中不設。
+   * 結果設定或案件結案的時間；處理中不設。
    *
-   * @generated from field: optional google.protobuf.Timestamp resolve_time = 7;
+   * @generated from field: optional google.protobuf.Timestamp resolve_time = 5;
    */
   resolveTime?: Timestamp | undefined;
+
+  /**
+   * @generated from oneof hawkr.moderation.v1alpha1.MyReportItem.subject
+   */
+  subject: {
+    /**
+     * @generated from field: hawkr.moderation.v1alpha1.CommunityReport community = 6;
+     */
+    value: CommunityReport;
+    case: "community";
+  } | {
+    /**
+     * @generated from field: hawkr.seller.v1alpha1.StoreReport store = 7;
+     */
+    value: StoreReport;
+    case: "store";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
- * Describes the message hawkr.moderation.v1alpha1.ReportRecord.
- * Use `create(ReportRecordSchema)` to create a new message.
+ * Describes the message hawkr.moderation.v1alpha1.MyReportItem.
+ * Use `create(MyReportItemSchema)` to create a new message.
  */
-export const ReportRecordSchema: GenMessage<ReportRecord> = /*@__PURE__*/
+export const MyReportItemSchema: GenMessage<MyReportItem> = /*@__PURE__*/
   messageDesc(file_hawkr_moderation_v1alpha1_moderation, 5);
+
+/**
+ * CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
+ *
+ * @generated from message hawkr.moderation.v1alpha1.CommunityReport
+ */
+export type CommunityReport = Message<"hawkr.moderation.v1alpha1.CommunityReport"> & {
+  /**
+   * @generated from field: hawkr.moderation.v1alpha1.ReportTarget target = 1;
+   */
+  target?: ReportTarget | undefined;
+
+  /**
+   * @generated from field: hawkr.moderation.v1alpha1.ReportOutcome outcome = 2;
+   */
+  outcome: ReportOutcome;
+};
+
+/**
+ * Describes the message hawkr.moderation.v1alpha1.CommunityReport.
+ * Use `create(CommunityReportSchema)` to create a new message.
+ */
+export const CommunityReportSchema: GenMessage<CommunityReport> = /*@__PURE__*/
+  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 6);
 
 /**
  * ReportTargetKind 是檢舉對象的種類。
@@ -309,7 +342,9 @@ export const ModerationAppService: GenService<{
     output: typeof SubmitReportResponseSchema;
   },
   /**
-   * ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+   * ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+   * 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+   * （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
    *
    * @generated from rpc hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports
    */

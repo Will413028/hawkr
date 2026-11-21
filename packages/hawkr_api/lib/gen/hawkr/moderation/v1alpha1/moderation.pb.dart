@@ -17,7 +17,8 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $0;
 
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $1;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $2;
+import '../../seller/v1alpha1/report.pb.dart' as $1;
 import 'moderation.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -99,7 +100,7 @@ class ReportTarget extends $pb.GeneratedMessage {
 class SubmitReportRequest extends $pb.GeneratedMessage {
   factory SubmitReportRequest({
     ReportTarget? target,
-    $1.PolicyCategory? category,
+    $2.PolicyCategory? category,
     $core.String? description,
     $core.String? requestId,
   }) {
@@ -127,8 +128,8 @@ class SubmitReportRequest extends $pb.GeneratedMessage {
       createEmptyInstance: SubmitReportRequest.$_createMessage)
     ..aOM<ReportTarget>(1, _omitFieldNames ? '' : 'target',
         subBuilder: ReportTarget.$_createMessage)
-    ..aE<$1.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
-        enumValues: $1.PolicyCategory.values)
+    ..aE<$2.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $2.PolicyCategory.values)
     ..aOS(3, _omitFieldNames ? '' : 'description')
     ..aOS(4, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false;
@@ -169,9 +170,9 @@ class SubmitReportRequest extends $pb.GeneratedMessage {
 
   /// 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
   @$pb.TagNumber(2)
-  $1.PolicyCategory get category => $_getN(1);
+  $2.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set category($1.PolicyCategory value) => $_setField(2, value);
+  set category($2.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)
@@ -348,7 +349,7 @@ class ListMyReportsRequest extends $pb.GeneratedMessage {
 
 class ListMyReportsResponse extends $pb.GeneratedMessage {
   factory ListMyReportsResponse({
-    $core.Iterable<ReportRecord>? reports,
+    $core.Iterable<MyReportItem>? reports,
     $core.String? nextPageToken,
   }) {
     final result = ListMyReportsResponse._();
@@ -371,8 +372,8 @@ class ListMyReportsResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.moderation.v1alpha1'),
       createEmptyInstance: ListMyReportsResponse.$_createMessage)
-    ..pPM<ReportRecord>(1, _omitFieldNames ? '' : 'reports',
-        subBuilder: ReportRecord.$_createMessage)
+    ..pPM<MyReportItem>(1, _omitFieldNames ? '' : 'reports',
+        subBuilder: MyReportItem.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
     ..hasRequiredFields = false;
 
@@ -401,7 +402,7 @@ class ListMyReportsResponse extends $pb.GeneratedMessage {
   static ListMyReportsResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<ReportRecord> get reports => $_getList(0);
+  $pb.PbList<MyReportItem> get reports => $_getList(0);
 
   @$pb.TagNumber(2)
   $core.String get nextPageToken => $_getSZ(1);
@@ -413,77 +414,94 @@ class ListMyReportsResponse extends $pb.GeneratedMessage {
   void clearNextPageToken() => $_clearField(2);
 }
 
-/// ReportRecord 是呼叫者送出的一筆檢舉。
-class ReportRecord extends $pb.GeneratedMessage {
-  factory ReportRecord({
+enum MyReportItem_Subject { community, store, notSet }
+
+/// MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
+class MyReportItem extends $pb.GeneratedMessage {
+  factory MyReportItem({
     $core.String? id,
-    ReportTarget? target,
-    $1.PolicyCategory? category,
+    $2.PolicyCategory? category,
     $core.String? description,
-    ReportOutcome? outcome,
     $0.Timestamp? createTime,
     $0.Timestamp? resolveTime,
+    CommunityReport? community,
+    $1.StoreReport? store,
   }) {
-    final result = ReportRecord._();
+    final result = MyReportItem._();
     if (id != null) result.id = id;
-    if (target != null) result.target = target;
     if (category != null) result.category = category;
     if (description != null) result.description = description;
-    if (outcome != null) result.outcome = outcome;
     if (createTime != null) result.createTime = createTime;
     if (resolveTime != null) result.resolveTime = resolveTime;
+    if (community != null) result.community = community;
+    if (store != null) result.store = store;
     return result;
   }
 
-  ReportRecord._();
+  MyReportItem._();
 
-  factory ReportRecord.fromBuffer($core.List<$core.int> data,
+  factory MyReportItem.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ReportRecord()..mergeFromBuffer(data, registry);
-  factory ReportRecord.fromJson($core.String json,
+      MyReportItem()..mergeFromBuffer(data, registry);
+  factory MyReportItem.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ReportRecord()..mergeFromJson(json, registry);
+      MyReportItem()..mergeFromJson(json, registry);
 
+  static const $core.Map<$core.int, MyReportItem_Subject>
+      _MyReportItem_SubjectByTag = {
+    6: MyReportItem_Subject.community,
+    7: MyReportItem_Subject.store,
+    0: MyReportItem_Subject.notSet
+  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ReportRecord',
+      _omitMessageNames ? '' : 'MyReportItem',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.moderation.v1alpha1'),
-      createEmptyInstance: ReportRecord.$_createMessage)
+      createEmptyInstance: MyReportItem.$_createMessage)
+    ..oo(0, [6, 7])
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOM<ReportTarget>(2, _omitFieldNames ? '' : 'target',
-        subBuilder: ReportTarget.$_createMessage)
-    ..aE<$1.PolicyCategory>(3, _omitFieldNames ? '' : 'category',
-        enumValues: $1.PolicyCategory.values)
-    ..aOS(4, _omitFieldNames ? '' : 'description')
-    ..aE<ReportOutcome>(5, _omitFieldNames ? '' : 'outcome',
-        enumValues: ReportOutcome.values)
-    ..aOM<$0.Timestamp>(6, _omitFieldNames ? '' : 'createTime',
+    ..aE<$2.PolicyCategory>(2, _omitFieldNames ? '' : 'category',
+        enumValues: $2.PolicyCategory.values)
+    ..aOS(3, _omitFieldNames ? '' : 'description')
+    ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'createTime',
         subBuilder: $0.Timestamp.$_createMessage)
-    ..aOM<$0.Timestamp>(7, _omitFieldNames ? '' : 'resolveTime',
+    ..aOM<$0.Timestamp>(5, _omitFieldNames ? '' : 'resolveTime',
         subBuilder: $0.Timestamp.$_createMessage)
+    ..aOM<CommunityReport>(6, _omitFieldNames ? '' : 'community',
+        subBuilder: CommunityReport.$_createMessage)
+    ..aOM<$1.StoreReport>(7, _omitFieldNames ? '' : 'store',
+        subBuilder: $1.StoreReport.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ReportRecord clone() => deepCopy();
+  MyReportItem clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ReportRecord copyWith(void Function(ReportRecord) updates) =>
-      super.copyWith((message) => updates(message as ReportRecord))
-          as ReportRecord;
+  MyReportItem copyWith(void Function(MyReportItem) updates) =>
+      super.copyWith((message) => updates(message as MyReportItem))
+          as MyReportItem;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use ReportRecord() / ReportRecord.new instead')
-  static ReportRecord create() => ReportRecord._();
-  static $pb.GeneratedMessage $_createMessage() => ReportRecord._();
+  @$core.Deprecated('Use MyReportItem() / MyReportItem.new instead')
+  static MyReportItem create() => MyReportItem._();
+  static $pb.GeneratedMessage $_createMessage() => MyReportItem._();
   @$core.override
-  ReportRecord createEmptyInstance() => ReportRecord._();
+  MyReportItem createEmptyInstance() => MyReportItem._();
   @$core.pragma('dart2js:noInline')
-  static ReportRecord getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReportRecord>(
-          ReportRecord.$_createMessage);
-  static ReportRecord? _defaultInstance;
+  static MyReportItem getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MyReportItem>(
+          MyReportItem.$_createMessage);
+  static MyReportItem? _defaultInstance;
+
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  MyReportItem_Subject whichSubject() =>
+      _MyReportItem_SubjectByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  void clearSubject() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
   $core.String get id => $_getSZ(0);
@@ -495,66 +513,143 @@ class ReportRecord extends $pb.GeneratedMessage {
   void clearId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  ReportTarget get target => $_getN(1);
+  $2.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
-  set target(ReportTarget value) => $_setField(2, value);
+  set category($2.PolicyCategory value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasTarget() => $_has(1);
+  $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(2)
-  void clearTarget() => $_clearField(2);
-  @$pb.TagNumber(2)
-  ReportTarget ensureTarget() => $_ensure(1);
-
-  @$pb.TagNumber(3)
-  $1.PolicyCategory get category => $_getN(2);
-  @$pb.TagNumber(3)
-  set category($1.PolicyCategory value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCategory() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCategory() => $_clearField(3);
+  void clearCategory() => $_clearField(2);
 
   /// 送出時的說明；沒有或已超過保留期被清除時是空字串。
-  @$pb.TagNumber(4)
-  $core.String get description => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set description($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDescription() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDescription() => $_clearField(4);
+  @$pb.TagNumber(3)
+  $core.String get description => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set description($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDescription() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDescription() => $_clearField(3);
 
+  @$pb.TagNumber(4)
+  $0.Timestamp get createTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set createTime($0.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCreateTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCreateTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.Timestamp ensureCreateTime() => $_ensure(3);
+
+  /// 結果設定或案件結案的時間；處理中不設。
   @$pb.TagNumber(5)
-  ReportOutcome get outcome => $_getN(4);
+  $0.Timestamp get resolveTime => $_getN(4);
   @$pb.TagNumber(5)
-  set outcome(ReportOutcome value) => $_setField(5, value);
+  set resolveTime($0.Timestamp value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasOutcome() => $_has(4);
+  $core.bool hasResolveTime() => $_has(4);
   @$pb.TagNumber(5)
-  void clearOutcome() => $_clearField(5);
+  void clearResolveTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $0.Timestamp ensureResolveTime() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $0.Timestamp get createTime => $_getN(5);
+  CommunityReport get community => $_getN(5);
   @$pb.TagNumber(6)
-  set createTime($0.Timestamp value) => $_setField(6, value);
+  set community(CommunityReport value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasCreateTime() => $_has(5);
+  $core.bool hasCommunity() => $_has(5);
   @$pb.TagNumber(6)
-  void clearCreateTime() => $_clearField(6);
+  void clearCommunity() => $_clearField(6);
   @$pb.TagNumber(6)
-  $0.Timestamp ensureCreateTime() => $_ensure(5);
+  CommunityReport ensureCommunity() => $_ensure(5);
 
-  /// 案件結案的時間；處理中不設。
   @$pb.TagNumber(7)
-  $0.Timestamp get resolveTime => $_getN(6);
+  $1.StoreReport get store => $_getN(6);
   @$pb.TagNumber(7)
-  set resolveTime($0.Timestamp value) => $_setField(7, value);
+  set store($1.StoreReport value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasResolveTime() => $_has(6);
+  $core.bool hasStore() => $_has(6);
   @$pb.TagNumber(7)
-  void clearResolveTime() => $_clearField(7);
+  void clearStore() => $_clearField(7);
   @$pb.TagNumber(7)
-  $0.Timestamp ensureResolveTime() => $_ensure(6);
+  $1.StoreReport ensureStore() => $_ensure(6);
+}
+
+/// CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
+class CommunityReport extends $pb.GeneratedMessage {
+  factory CommunityReport({
+    ReportTarget? target,
+    ReportOutcome? outcome,
+  }) {
+    final result = CommunityReport._();
+    if (target != null) result.target = target;
+    if (outcome != null) result.outcome = outcome;
+    return result;
+  }
+
+  CommunityReport._();
+
+  factory CommunityReport.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CommunityReport()..mergeFromBuffer(data, registry);
+  factory CommunityReport.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CommunityReport()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommunityReport',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.moderation.v1alpha1'),
+      createEmptyInstance: CommunityReport.$_createMessage)
+    ..aOM<ReportTarget>(1, _omitFieldNames ? '' : 'target',
+        subBuilder: ReportTarget.$_createMessage)
+    ..aE<ReportOutcome>(2, _omitFieldNames ? '' : 'outcome',
+        enumValues: ReportOutcome.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommunityReport clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommunityReport copyWith(void Function(CommunityReport) updates) =>
+      super.copyWith((message) => updates(message as CommunityReport))
+          as CommunityReport;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CommunityReport() / CommunityReport.new instead')
+  static CommunityReport create() => CommunityReport._();
+  static $pb.GeneratedMessage $_createMessage() => CommunityReport._();
+  @$core.override
+  CommunityReport createEmptyInstance() => CommunityReport._();
+  @$core.pragma('dart2js:noInline')
+  static CommunityReport getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CommunityReport>(
+          CommunityReport.$_createMessage);
+  static CommunityReport? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ReportTarget get target => $_getN(0);
+  @$pb.TagNumber(1)
+  set target(ReportTarget value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTarget() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTarget() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ReportTarget ensureTarget() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  ReportOutcome get outcome => $_getN(1);
+  @$pb.TagNumber(2)
+  set outcome(ReportOutcome value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOutcome() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOutcome() => $_clearField(2);
 }
 
 /// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
@@ -571,7 +666,9 @@ class ModerationAppServiceApi {
       _client.invoke<SubmitReportResponse>(ctx, 'ModerationAppService',
           'SubmitReport', request, SubmitReportResponse());
 
-  /// ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+  /// ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+  /// 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+  /// （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
   $async.Future<ListMyReportsResponse> listMyReports(
           $pb.ClientContext? ctx, ListMyReportsRequest request) =>
       _client.invoke<ListMyReportsResponse>(ctx, 'ModerationAppService',

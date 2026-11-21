@@ -23,12 +23,24 @@ abstract final class SellerReportAppService {
     hawkrsellerv1alpha1report.CreateReportResponse.new,
   );
 
-  /// ListMyReports 列出呼叫者的檢舉，新到舊。
-  static const listMyReports = connect.Spec(
-    '/$name/ListMyReports',
+  /// GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+  /// 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
+  static const getMyReport = connect.Spec(
+    '/$name/GetMyReport',
     connect.StreamType.unary,
-    hawkrsellerv1alpha1report.ListMyReportsRequest.new,
-    hawkrsellerv1alpha1report.ListMyReportsResponse.new,
+    hawkrsellerv1alpha1report.GetMyReportRequest.new,
+    hawkrsellerv1alpha1report.GetMyReportResponse.new,
     idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+  /// （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+  /// 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+  /// resource_exhausted（帶 RetryInfo）。
+  static const addReportSupplement = connect.Spec(
+    '/$name/AddReportSupplement',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1report.AddReportSupplementRequest.new,
+    hawkrsellerv1alpha1report.AddReportSupplementResponse.new,
   );
 }

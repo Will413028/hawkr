@@ -94,9 +94,9 @@ func (ReportOutcome) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{0}
 }
 
-// MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
+// StoreReport 是檢舉人看到的自己的店家檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
 // 店名與 logo 由 client 以 store_id 呼叫 SellerPublicService.BatchGetStores。
-type MyReport struct {
+type StoreReport struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	StoreId string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -118,20 +118,20 @@ type MyReport struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *MyReport) Reset() {
-	*x = MyReport{}
+func (x *StoreReport) Reset() {
+	*x = StoreReport{}
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MyReport) String() string {
+func (x *StoreReport) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MyReport) ProtoMessage() {}
+func (*StoreReport) ProtoMessage() {}
 
-func (x *MyReport) ProtoReflect() protoreflect.Message {
+func (x *StoreReport) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -143,75 +143,75 @@ func (x *MyReport) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MyReport.ProtoReflect.Descriptor instead.
-func (*MyReport) Descriptor() ([]byte, []int) {
+// Deprecated: Use StoreReport.ProtoReflect.Descriptor instead.
+func (*StoreReport) Descriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MyReport) GetId() string {
+func (x *StoreReport) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *MyReport) GetStoreId() string {
+func (x *StoreReport) GetStoreId() string {
 	if x != nil {
 		return x.StoreId
 	}
 	return ""
 }
 
-func (x *MyReport) GetProductId() string {
+func (x *StoreReport) GetProductId() string {
 	if x != nil {
 		return x.ProductId
 	}
 	return ""
 }
 
-func (x *MyReport) GetOrderNo() string {
+func (x *StoreReport) GetOrderNo() string {
 	if x != nil {
 		return x.OrderNo
 	}
 	return ""
 }
 
-func (x *MyReport) GetCategory() v1alpha1.PolicyCategory {
+func (x *StoreReport) GetCategory() v1alpha1.PolicyCategory {
 	if x != nil {
 		return x.Category
 	}
 	return v1alpha1.PolicyCategory(0)
 }
 
-func (x *MyReport) GetDescription() string {
+func (x *StoreReport) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *MyReport) GetResolutionNote() string {
+func (x *StoreReport) GetResolutionNote() string {
 	if x != nil {
 		return x.ResolutionNote
 	}
 	return ""
 }
 
-func (x *MyReport) GetCreateTime() *timestamppb.Timestamp {
+func (x *StoreReport) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
 	}
 	return nil
 }
 
-func (x *MyReport) GetResolveTime() *timestamppb.Timestamp {
+func (x *StoreReport) GetResolveTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ResolveTime
 	}
 	return nil
 }
 
-func (x *MyReport) GetOutcome() ReportOutcome {
+func (x *StoreReport) GetOutcome() ReportOutcome {
 	if x != nil {
 		return x.Outcome
 	}
@@ -311,7 +311,7 @@ func (x *CreateReportRequest) GetEvidenceStagedTokens() []string {
 type CreateReportResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 新的檢舉；supplemented 時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
-	Report *MyReport `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Report *StoreReport `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
 	// 這次的內容補充到同一個台北日、同一家店、同一個類別、還沒有結果的那一筆。
 	Supplemented bool `protobuf:"varint,2,opt,name=supplemented,proto3" json:"supplemented,omitempty"`
 	// supplemented 時給檢舉人看的那一句（伺服器的句子：它說的是伺服器的去重規則）；沒有補充時不設。
@@ -350,7 +350,7 @@ func (*CreateReportResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *CreateReportResponse) GetReport() *MyReport {
+func (x *CreateReportResponse) GetReport() *StoreReport {
 	if x != nil {
 		return x.Report
 	}
@@ -371,29 +371,28 @@ func (x *CreateReportResponse) GetNotice() *errdetails.LocalizedMessage {
 	return nil
 }
 
-type ListMyReportsRequest struct {
+type GetMyReportRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 預設 20，上限 100。
-	PageSize      int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// 檢舉的 id。
+	ReportId      string `protobuf:"bytes,1,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListMyReportsRequest) Reset() {
-	*x = ListMyReportsRequest{}
+func (x *GetMyReportRequest) Reset() {
+	*x = GetMyReportRequest{}
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListMyReportsRequest) String() string {
+func (x *GetMyReportRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListMyReportsRequest) ProtoMessage() {}
+func (*GetMyReportRequest) ProtoMessage() {}
 
-func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
+func (x *GetMyReportRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -405,47 +404,43 @@ func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListMyReportsRequest.ProtoReflect.Descriptor instead.
-func (*ListMyReportsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetMyReportRequest.ProtoReflect.Descriptor instead.
+func (*GetMyReportRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ListMyReportsRequest) GetPageSize() int32 {
+func (x *GetMyReportRequest) GetReportId() string {
 	if x != nil {
-		return x.PageSize
-	}
-	return 0
-}
-
-func (x *ListMyReportsRequest) GetPageToken() string {
-	if x != nil {
-		return x.PageToken
+		return x.ReportId
 	}
 	return ""
 }
 
-type ListMyReportsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reports       []*MyReport            `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
-	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+type GetMyReportResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Report *StoreReport           `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	// 補充（去重併入的與檢舉人主動補充的合在一起），舊到新。
+	Supplements []*ReportSupplement `protobuf:"bytes,2,rep,name=supplements,proto3" json:"supplements,omitempty"`
+	// 原檢舉與全部補充的佐證，依送出的順序。
+	Evidence      []*ReportEvidence `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListMyReportsResponse) Reset() {
-	*x = ListMyReportsResponse{}
+func (x *GetMyReportResponse) Reset() {
+	*x = GetMyReportResponse{}
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListMyReportsResponse) String() string {
+func (x *GetMyReportResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListMyReportsResponse) ProtoMessage() {}
+func (*GetMyReportResponse) ProtoMessage() {}
 
-func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
+func (x *GetMyReportResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -457,31 +452,278 @@ func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListMyReportsResponse.ProtoReflect.Descriptor instead.
-func (*ListMyReportsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetMyReportResponse.ProtoReflect.Descriptor instead.
+func (*GetMyReportResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ListMyReportsResponse) GetReports() []*MyReport {
+func (x *GetMyReportResponse) GetReport() *StoreReport {
 	if x != nil {
-		return x.Reports
+		return x.Report
 	}
 	return nil
 }
 
-func (x *ListMyReportsResponse) GetNextPageToken() string {
+func (x *GetMyReportResponse) GetSupplements() []*ReportSupplement {
 	if x != nil {
-		return x.NextPageToken
+		return x.Supplements
+	}
+	return nil
+}
+
+func (x *GetMyReportResponse) GetEvidence() []*ReportEvidence {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+// ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
+type ReportSupplement struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	CreateTime  *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// 這則補充帶來的佐證在 GetMyReportResponse.evidence 的 position。
+	EvidencePositions []int32 `protobuf:"varint,4,rep,packed,name=evidence_positions,json=evidencePositions,proto3" json:"evidence_positions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ReportSupplement) Reset() {
+	*x = ReportSupplement{}
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportSupplement) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportSupplement) ProtoMessage() {}
+
+func (x *ReportSupplement) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportSupplement.ProtoReflect.Descriptor instead.
+func (*ReportSupplement) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ReportSupplement) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
+}
+
+func (x *ReportSupplement) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ReportSupplement) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *ReportSupplement) GetEvidencePositions() []int32 {
+	if x != nil {
+		return x.EvidencePositions
+	}
+	return nil
+}
+
+// ReportEvidence 是檢舉的一張佐證。佐證是機敏檔：回應只帶它在這筆檢舉裡的順序，不帶檔案的網址。
+type ReportEvidence struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 佐證在這筆檢舉裡的順序（從 0 起）。
+	Position      int32 `protobuf:"varint,1,opt,name=position,proto3" json:"position,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportEvidence) Reset() {
+	*x = ReportEvidence{}
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportEvidence) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportEvidence) ProtoMessage() {}
+
+func (x *ReportEvidence) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportEvidence.ProtoReflect.Descriptor instead.
+func (*ReportEvidence) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ReportEvidence) GetPosition() int32 {
+	if x != nil {
+		return x.Position
+	}
+	return 0
+}
+
+type AddReportSupplementRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要補充的檢舉 id。
+	ReportId string `protobuf:"bytes,1,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	// 補充內容，最多 2000 字（規則同 CreateReport 的 description）。
+	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	// 佐證圖片的 staged token，最多 5 張（同 CreateReport）。
+	EvidenceStagedTokens []string `protobuf:"bytes,3,rep,name=evidence_staged_tokens,json=evidenceStagedTokens,proto3" json:"evidence_staged_tokens,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AddReportSupplementRequest) Reset() {
+	*x = AddReportSupplementRequest{}
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddReportSupplementRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddReportSupplementRequest) ProtoMessage() {}
+
+func (x *AddReportSupplementRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddReportSupplementRequest.ProtoReflect.Descriptor instead.
+func (*AddReportSupplementRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AddReportSupplementRequest) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *AddReportSupplementRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AddReportSupplementRequest) GetEvidenceStagedTokens() []string {
+	if x != nil {
+		return x.EvidenceStagedTokens
+	}
+	return nil
+}
+
+type AddReportSupplementResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 補充之後的檢舉、全部補充與佐證（同 GetMyReportResponse）。
+	Report        *StoreReport        `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Supplements   []*ReportSupplement `protobuf:"bytes,2,rep,name=supplements,proto3" json:"supplements,omitempty"`
+	Evidence      []*ReportEvidence   `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddReportSupplementResponse) Reset() {
+	*x = AddReportSupplementResponse{}
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddReportSupplementResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddReportSupplementResponse) ProtoMessage() {}
+
+func (x *AddReportSupplementResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddReportSupplementResponse.ProtoReflect.Descriptor instead.
+func (*AddReportSupplementResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AddReportSupplementResponse) GetReport() *StoreReport {
+	if x != nil {
+		return x.Report
+	}
+	return nil
+}
+
+func (x *AddReportSupplementResponse) GetSupplements() []*ReportSupplement {
+	if x != nil {
+		return x.Supplements
+	}
+	return nil
+}
+
+func (x *AddReportSupplementResponse) GetEvidence() []*ReportEvidence {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
 }
 
 var File_hawkr_seller_v1alpha1_report_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xc3\x03\n" +
-	"\bMyReport\x12\x13\n" +
+	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xc6\x03\n" +
+	"\vStoreReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
 	"\n" +
@@ -502,28 +744,44 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\n" +
 	"product_id\x18\x04 \x01(\tR\tproductId\x12\x19\n" +
 	"\border_no\x18\x05 \x01(\tR\aorderNo\x124\n" +
-	"\x16evidence_staged_tokens\x18\x06 \x03(\tR\x14evidenceStagedTokens\"\xb3\x01\n" +
-	"\x14CreateReportResponse\x127\n" +
-	"\x06report\x18\x01 \x01(\v2\x1f.hawkr.seller.v1alpha1.MyReportR\x06report\x12'\n" +
+	"\x16evidence_staged_tokens\x18\x06 \x03(\tR\x14evidenceStagedTokens\"\xb6\x01\n" +
+	"\x14CreateReportResponse\x12:\n" +
+	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12'\n" +
 	"\fsupplemented\x18\x02 \x01(\bB\x03\xe0A\x03R\fsupplemented\x129\n" +
-	"\x06notice\x18\x03 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\x06notice\"R\n" +
-	"\x14ListMyReportsRequest\x12\x1b\n" +
-	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
-	"\n" +
-	"page_token\x18\x02 \x01(\tR\tpageToken\"z\n" +
-	"\x15ListMyReportsResponse\x129\n" +
-	"\areports\x18\x01 \x03(\v2\x1f.hawkr.seller.v1alpha1.MyReportR\areports\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*\xcc\x01\n" +
+	"\x06notice\x18\x03 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\x06notice\"6\n" +
+	"\x12GetMyReportRequest\x12 \n" +
+	"\treport_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breportId\"\xdf\x01\n" +
+	"\x13GetMyReportResponse\x12:\n" +
+	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12I\n" +
+	"\vsupplements\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.ReportSupplementR\vsupplements\x12A\n" +
+	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence\"\xb0\x01\n" +
+	"\x10ReportSupplement\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12;\n" +
+	"\vcreate_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\x12-\n" +
+	"\x12evidence_positions\x18\x04 \x03(\x05R\x11evidencePositions\",\n" +
+	"\x0eReportEvidence\x12\x1a\n" +
+	"\bposition\x18\x01 \x01(\x05R\bposition\"\x9b\x01\n" +
+	"\x1aAddReportSupplementRequest\x12 \n" +
+	"\treport_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breportId\x12%\n" +
+	"\vdescription\x18\x02 \x01(\tB\x03\xe0A\x02R\vdescription\x124\n" +
+	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\"\xe7\x01\n" +
+	"\x1bAddReportSupplementResponse\x12:\n" +
+	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12I\n" +
+	"\vsupplements\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.ReportSupplementR\vsupplements\x12A\n" +
+	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence*\xcc\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_ACTION_TAKEN\x10\x01\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x02\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_INSUFFICIENT\x10\x03\x12\x1c\n" +
 	"\x18REPORT_OUTCOME_DUPLICATE\x10\x04\x12\x1a\n" +
-	"\x16REPORT_OUTCOME_ABUSIVE\x10\x052\xf2\x01\n" +
+	"\x16REPORT_OUTCOME_ABUSIVE\x10\x052\xea\x02\n" +
 	"\x16SellerReportAppService\x12g\n" +
-	"\fCreateReport\x12*.hawkr.seller.v1alpha1.CreateReportRequest\x1a+.hawkr.seller.v1alpha1.CreateReportResponse\x12o\n" +
-	"\rListMyReports\x12+.hawkr.seller.v1alpha1.ListMyReportsRequest\x1a,.hawkr.seller.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x01B\xfd\x01\n" +
+	"\fCreateReport\x12*.hawkr.seller.v1alpha1.CreateReportRequest\x1a+.hawkr.seller.v1alpha1.CreateReportResponse\x12i\n" +
+	"\vGetMyReport\x12).hawkr.seller.v1alpha1.GetMyReportRequest\x1a*.hawkr.seller.v1alpha1.GetMyReportResponse\"\x03\x90\x02\x01\x12|\n" +
+	"\x13AddReportSupplement\x121.hawkr.seller.v1alpha1.AddReportSupplementRequest\x1a2.hawkr.seller.v1alpha1.AddReportSupplementResponseB\xfd\x01\n" +
 	"\x19com.hawkr.seller.v1alpha1B\vReportProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1;sellerv1alpha1\xa2\x02\x03HSX\xaa\x02\x15Hawkr.Seller.V1alpha1\xca\x02\x15Hawkr\\Seller\\V1alpha1\xe2\x02!Hawkr\\Seller\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Seller::V1alpha1b\x06proto3"
 
 var (
@@ -539,36 +797,48 @@ func file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_seller_v1alpha1_report_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_hawkr_seller_v1alpha1_report_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_hawkr_seller_v1alpha1_report_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_hawkr_seller_v1alpha1_report_proto_goTypes = []any{
 	(ReportOutcome)(0),                  // 0: hawkr.seller.v1alpha1.ReportOutcome
-	(*MyReport)(nil),                    // 1: hawkr.seller.v1alpha1.MyReport
+	(*StoreReport)(nil),                 // 1: hawkr.seller.v1alpha1.StoreReport
 	(*CreateReportRequest)(nil),         // 2: hawkr.seller.v1alpha1.CreateReportRequest
 	(*CreateReportResponse)(nil),        // 3: hawkr.seller.v1alpha1.CreateReportResponse
-	(*ListMyReportsRequest)(nil),        // 4: hawkr.seller.v1alpha1.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil),       // 5: hawkr.seller.v1alpha1.ListMyReportsResponse
-	(v1alpha1.PolicyCategory)(0),        // 6: hawkr.common.v1alpha1.PolicyCategory
-	(*timestamppb.Timestamp)(nil),       // 7: google.protobuf.Timestamp
-	(*errdetails.LocalizedMessage)(nil), // 8: google.rpc.LocalizedMessage
+	(*GetMyReportRequest)(nil),          // 4: hawkr.seller.v1alpha1.GetMyReportRequest
+	(*GetMyReportResponse)(nil),         // 5: hawkr.seller.v1alpha1.GetMyReportResponse
+	(*ReportSupplement)(nil),            // 6: hawkr.seller.v1alpha1.ReportSupplement
+	(*ReportEvidence)(nil),              // 7: hawkr.seller.v1alpha1.ReportEvidence
+	(*AddReportSupplementRequest)(nil),  // 8: hawkr.seller.v1alpha1.AddReportSupplementRequest
+	(*AddReportSupplementResponse)(nil), // 9: hawkr.seller.v1alpha1.AddReportSupplementResponse
+	(v1alpha1.PolicyCategory)(0),        // 10: hawkr.common.v1alpha1.PolicyCategory
+	(*timestamppb.Timestamp)(nil),       // 11: google.protobuf.Timestamp
+	(*errdetails.LocalizedMessage)(nil), // 12: google.rpc.LocalizedMessage
 }
 var file_hawkr_seller_v1alpha1_report_proto_depIdxs = []int32{
-	6,  // 0: hawkr.seller.v1alpha1.MyReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	7,  // 1: hawkr.seller.v1alpha1.MyReport.create_time:type_name -> google.protobuf.Timestamp
-	7,  // 2: hawkr.seller.v1alpha1.MyReport.resolve_time:type_name -> google.protobuf.Timestamp
-	0,  // 3: hawkr.seller.v1alpha1.MyReport.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
-	6,  // 4: hawkr.seller.v1alpha1.CreateReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	1,  // 5: hawkr.seller.v1alpha1.CreateReportResponse.report:type_name -> hawkr.seller.v1alpha1.MyReport
-	8,  // 6: hawkr.seller.v1alpha1.CreateReportResponse.notice:type_name -> google.rpc.LocalizedMessage
-	1,  // 7: hawkr.seller.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.seller.v1alpha1.MyReport
-	2,  // 8: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:input_type -> hawkr.seller.v1alpha1.CreateReportRequest
-	4,  // 9: hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports:input_type -> hawkr.seller.v1alpha1.ListMyReportsRequest
-	3,  // 10: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:output_type -> hawkr.seller.v1alpha1.CreateReportResponse
-	5,  // 11: hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports:output_type -> hawkr.seller.v1alpha1.ListMyReportsResponse
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 0: hawkr.seller.v1alpha1.StoreReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	11, // 1: hawkr.seller.v1alpha1.StoreReport.create_time:type_name -> google.protobuf.Timestamp
+	11, // 2: hawkr.seller.v1alpha1.StoreReport.resolve_time:type_name -> google.protobuf.Timestamp
+	0,  // 3: hawkr.seller.v1alpha1.StoreReport.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
+	10, // 4: hawkr.seller.v1alpha1.CreateReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	1,  // 5: hawkr.seller.v1alpha1.CreateReportResponse.report:type_name -> hawkr.seller.v1alpha1.StoreReport
+	12, // 6: hawkr.seller.v1alpha1.CreateReportResponse.notice:type_name -> google.rpc.LocalizedMessage
+	1,  // 7: hawkr.seller.v1alpha1.GetMyReportResponse.report:type_name -> hawkr.seller.v1alpha1.StoreReport
+	6,  // 8: hawkr.seller.v1alpha1.GetMyReportResponse.supplements:type_name -> hawkr.seller.v1alpha1.ReportSupplement
+	7,  // 9: hawkr.seller.v1alpha1.GetMyReportResponse.evidence:type_name -> hawkr.seller.v1alpha1.ReportEvidence
+	11, // 10: hawkr.seller.v1alpha1.ReportSupplement.create_time:type_name -> google.protobuf.Timestamp
+	1,  // 11: hawkr.seller.v1alpha1.AddReportSupplementResponse.report:type_name -> hawkr.seller.v1alpha1.StoreReport
+	6,  // 12: hawkr.seller.v1alpha1.AddReportSupplementResponse.supplements:type_name -> hawkr.seller.v1alpha1.ReportSupplement
+	7,  // 13: hawkr.seller.v1alpha1.AddReportSupplementResponse.evidence:type_name -> hawkr.seller.v1alpha1.ReportEvidence
+	2,  // 14: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:input_type -> hawkr.seller.v1alpha1.CreateReportRequest
+	4,  // 15: hawkr.seller.v1alpha1.SellerReportAppService.GetMyReport:input_type -> hawkr.seller.v1alpha1.GetMyReportRequest
+	8,  // 16: hawkr.seller.v1alpha1.SellerReportAppService.AddReportSupplement:input_type -> hawkr.seller.v1alpha1.AddReportSupplementRequest
+	3,  // 17: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:output_type -> hawkr.seller.v1alpha1.CreateReportResponse
+	5,  // 18: hawkr.seller.v1alpha1.SellerReportAppService.GetMyReport:output_type -> hawkr.seller.v1alpha1.GetMyReportResponse
+	9,  // 19: hawkr.seller.v1alpha1.SellerReportAppService.AddReportSupplement:output_type -> hawkr.seller.v1alpha1.AddReportSupplementResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_seller_v1alpha1_report_proto_init() }
@@ -582,7 +852,7 @@ func file_hawkr_seller_v1alpha1_report_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_seller_v1alpha1_report_proto_rawDesc), len(file_hawkr_seller_v1alpha1_report_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

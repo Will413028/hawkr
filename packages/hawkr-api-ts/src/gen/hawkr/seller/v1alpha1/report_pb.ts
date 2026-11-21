@@ -22,15 +22,15 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/seller/v1alpha1/report.proto.
  */
 export const file_hawkr_seller_v1alpha1_report: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9zZWxsZXIvdjFhbHBoYTEvcmVwb3J0LnByb3RvEhVoYXdrci5zZWxsZXIudjFhbHBoYTEi2QIKCE15UmVwb3J0Eg8KAmlkGAEgASgJQgPgQQgSEAoIc3RvcmVfaWQYAiABKAkSEgoKcHJvZHVjdF9pZBgDIAEoCRIQCghvcmRlcl9ubxgEIAEoCRI3CghjYXRlZ29yeRgFIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgGIAEoCRIXCg9yZXNvbHV0aW9uX25vdGUYByABKAkSLwoLY3JlYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDHJlc29sdmVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoHb3V0Y29tZRgKIAEoDjIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBvcnRPdXRjb21lQgPgQQMiygEKE0NyZWF0ZVJlcG9ydFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhI8CghjYXRlZ29yeRgCIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECEhgKC2Rlc2NyaXB0aW9uGAMgASgJQgPgQQISEgoKcHJvZHVjdF9pZBgEIAEoCRIQCghvcmRlcl9ubxgFIAEoCRIeChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAYgAygJIpUBChRDcmVhdGVSZXBvcnRSZXNwb25zZRIvCgZyZXBvcnQYASABKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSGQoMc3VwcGxlbWVudGVkGAIgASgIQgPgQQMSMQoGbm90aWNlGAMgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQMiPQoUTGlzdE15UmVwb3J0c1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkiYgoVTGlzdE15UmVwb3J0c1Jlc3BvbnNlEjAKB3JlcG9ydHMYASADKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJKswBCg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASHwobUkVQT1JUX09VVENPTUVfQUNUSU9OX1RBS0VOEAESHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfSU5TVUZGSUNJRU5UEAMSHAoYUkVQT1JUX09VVENPTUVfRFVQTElDQVRFEAQSGgoWUkVQT1JUX09VVENPTUVfQUJVU0lWRRAFMvIBChZTZWxsZXJSZXBvcnRBcHBTZXJ2aWNlEmcKDENyZWF0ZVJlcG9ydBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5DcmVhdGVSZXBvcnRSZXF1ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVJlcG9ydFJlc3BvbnNlEm8KDUxpc3RNeVJlcG9ydHMSKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15UmVwb3J0c1JlcXVlc3QaLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15UmVwb3J0c1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_hawkr_common_v1alpha1_policy_category, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
+  fileDesc("CiJoYXdrci9zZWxsZXIvdjFhbHBoYTEvcmVwb3J0LnByb3RvEhVoYXdrci5zZWxsZXIudjFhbHBoYTEi3AIKC1N0b3JlUmVwb3J0Eg8KAmlkGAEgASgJQgPgQQgSEAoIc3RvcmVfaWQYAiABKAkSEgoKcHJvZHVjdF9pZBgDIAEoCRIQCghvcmRlcl9ubxgEIAEoCRI3CghjYXRlZ29yeRgFIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgGIAEoCRIXCg9yZXNvbHV0aW9uX25vdGUYByABKAkSLwoLY3JlYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDHJlc29sdmVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoHb3V0Y29tZRgKIAEoDjIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBvcnRPdXRjb21lQgPgQQMiygEKE0NyZWF0ZVJlcG9ydFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhI8CghjYXRlZ29yeRgCIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECEhgKC2Rlc2NyaXB0aW9uGAMgASgJQgPgQQISEgoKcHJvZHVjdF9pZBgEIAEoCRIQCghvcmRlcl9ubxgFIAEoCRIeChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAYgAygJIpgBChRDcmVhdGVSZXBvcnRSZXNwb25zZRIyCgZyZXBvcnQYASABKAsyIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3RvcmVSZXBvcnQSGQoMc3VwcGxlbWVudGVkGAIgASgIQgPgQQMSMQoGbm90aWNlGAMgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQMiLAoSR2V0TXlSZXBvcnRSZXF1ZXN0EhYKCXJlcG9ydF9pZBgBIAEoCUID4EECIsABChNHZXRNeVJlcG9ydFJlc3BvbnNlEjIKBnJlcG9ydBgBIAEoCzIiLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdG9yZVJlcG9ydBI8CgtzdXBwbGVtZW50cxgCIAMoCzInLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBvcnRTdXBwbGVtZW50EjcKCGV2aWRlbmNlGAMgAygLMiUuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydEV2aWRlbmNlIoABChBSZXBvcnRTdXBwbGVtZW50EgoKAmlkGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEi8KC2NyZWF0ZV90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIaChJldmlkZW5jZV9wb3NpdGlvbnMYBCADKAUiIgoOUmVwb3J0RXZpZGVuY2USEAoIcG9zaXRpb24YASABKAUibgoaQWRkUmVwb3J0U3VwcGxlbWVudFJlcXVlc3QSFgoJcmVwb3J0X2lkGAEgASgJQgPgQQISGAoLZGVzY3JpcHRpb24YAiABKAlCA+BBAhIeChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAMgAygJIsgBChtBZGRSZXBvcnRTdXBwbGVtZW50UmVzcG9uc2USMgoGcmVwb3J0GAEgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN0b3JlUmVwb3J0EjwKC3N1cHBsZW1lbnRzGAIgAygLMicuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydFN1cHBsZW1lbnQSNwoIZXZpZGVuY2UYAyADKAsyJS5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVwb3J0RXZpZGVuY2UqzAEKDVJlcG9ydE91dGNvbWUSHgoaUkVQT1JUX09VVENPTUVfVU5TUEVDSUZJRUQQABIfChtSRVBPUlRfT1VUQ09NRV9BQ1RJT05fVEFLRU4QARIfChtSRVBPUlRfT1VUQ09NRV9OT19WSU9MQVRJT04QAhIfChtSRVBPUlRfT1VUQ09NRV9JTlNVRkZJQ0lFTlQQAxIcChhSRVBPUlRfT1VUQ09NRV9EVVBMSUNBVEUQBBIaChZSRVBPUlRfT1VUQ09NRV9BQlVTSVZFEAUy6gIKFlNlbGxlclJlcG9ydEFwcFNlcnZpY2USZwoMQ3JlYXRlUmVwb3J0EiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVJlcG9ydFJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUmVwb3J0UmVzcG9uc2USaQoLR2V0TXlSZXBvcnQSKS5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlSZXBvcnRSZXF1ZXN0GiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15UmVwb3J0UmVzcG9uc2UiA5ACARJ8ChNBZGRSZXBvcnRTdXBwbGVtZW50EjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkFkZFJlcG9ydFN1cHBsZW1lbnRSZXF1ZXN0GjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkFkZFJlcG9ydFN1cHBsZW1lbnRSZXNwb25zZWIGcHJvdG8z", [file_hawkr_common_v1alpha1_policy_category, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
 
 /**
- * MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
+ * StoreReport 是檢舉人看到的自己的店家檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
  * 店名與 logo 由 client 以 store_id 呼叫 SellerPublicService.BatchGetStores。
  *
- * @generated from message hawkr.seller.v1alpha1.MyReport
+ * @generated from message hawkr.seller.v1alpha1.StoreReport
  */
-export type MyReport = Message<"hawkr.seller.v1alpha1.MyReport"> & {
+export type StoreReport = Message<"hawkr.seller.v1alpha1.StoreReport"> & {
   /**
    * @generated from field: string id = 1;
    */
@@ -95,10 +95,10 @@ export type MyReport = Message<"hawkr.seller.v1alpha1.MyReport"> & {
 };
 
 /**
- * Describes the message hawkr.seller.v1alpha1.MyReport.
- * Use `create(MyReportSchema)` to create a new message.
+ * Describes the message hawkr.seller.v1alpha1.StoreReport.
+ * Use `create(StoreReportSchema)` to create a new message.
  */
-export const MyReportSchema: GenMessage<MyReport> = /*@__PURE__*/
+export const StoreReportSchema: GenMessage<StoreReport> = /*@__PURE__*/
   messageDesc(file_hawkr_seller_v1alpha1_report, 0);
 
 /**
@@ -162,9 +162,9 @@ export type CreateReportResponse = Message<"hawkr.seller.v1alpha1.CreateReportRe
   /**
    * 新的檢舉；supplemented 時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
    *
-   * @generated from field: hawkr.seller.v1alpha1.MyReport report = 1;
+   * @generated from field: hawkr.seller.v1alpha1.StoreReport report = 1;
    */
-  report?: MyReport | undefined;
+  report?: StoreReport | undefined;
 
   /**
    * 這次的內容補充到同一個台北日、同一家店、同一個類別、還沒有結果的那一筆。
@@ -189,50 +189,173 @@ export const CreateReportResponseSchema: GenMessage<CreateReportResponse> = /*@_
   messageDesc(file_hawkr_seller_v1alpha1_report, 2);
 
 /**
- * @generated from message hawkr.seller.v1alpha1.ListMyReportsRequest
+ * @generated from message hawkr.seller.v1alpha1.GetMyReportRequest
  */
-export type ListMyReportsRequest = Message<"hawkr.seller.v1alpha1.ListMyReportsRequest"> & {
+export type GetMyReportRequest = Message<"hawkr.seller.v1alpha1.GetMyReportRequest"> & {
   /**
-   * 預設 20，上限 100。
+   * 檢舉的 id。
    *
-   * @generated from field: int32 page_size = 1;
+   * @generated from field: string report_id = 1;
    */
-  pageSize: number;
-
-  /**
-   * @generated from field: string page_token = 2;
-   */
-  pageToken: string;
+  reportId: string;
 };
 
 /**
- * Describes the message hawkr.seller.v1alpha1.ListMyReportsRequest.
- * Use `create(ListMyReportsRequestSchema)` to create a new message.
+ * Describes the message hawkr.seller.v1alpha1.GetMyReportRequest.
+ * Use `create(GetMyReportRequestSchema)` to create a new message.
  */
-export const ListMyReportsRequestSchema: GenMessage<ListMyReportsRequest> = /*@__PURE__*/
+export const GetMyReportRequestSchema: GenMessage<GetMyReportRequest> = /*@__PURE__*/
   messageDesc(file_hawkr_seller_v1alpha1_report, 3);
 
 /**
- * @generated from message hawkr.seller.v1alpha1.ListMyReportsResponse
+ * @generated from message hawkr.seller.v1alpha1.GetMyReportResponse
  */
-export type ListMyReportsResponse = Message<"hawkr.seller.v1alpha1.ListMyReportsResponse"> & {
+export type GetMyReportResponse = Message<"hawkr.seller.v1alpha1.GetMyReportResponse"> & {
   /**
-   * @generated from field: repeated hawkr.seller.v1alpha1.MyReport reports = 1;
+   * @generated from field: hawkr.seller.v1alpha1.StoreReport report = 1;
    */
-  reports: MyReport[];
+  report?: StoreReport | undefined;
 
   /**
-   * @generated from field: string next_page_token = 2;
+   * 補充（去重併入的與檢舉人主動補充的合在一起），舊到新。
+   *
+   * @generated from field: repeated hawkr.seller.v1alpha1.ReportSupplement supplements = 2;
    */
-  nextPageToken: string;
+  supplements: ReportSupplement[];
+
+  /**
+   * 原檢舉與全部補充的佐證，依送出的順序。
+   *
+   * @generated from field: repeated hawkr.seller.v1alpha1.ReportEvidence evidence = 3;
+   */
+  evidence: ReportEvidence[];
 };
 
 /**
- * Describes the message hawkr.seller.v1alpha1.ListMyReportsResponse.
- * Use `create(ListMyReportsResponseSchema)` to create a new message.
+ * Describes the message hawkr.seller.v1alpha1.GetMyReportResponse.
+ * Use `create(GetMyReportResponseSchema)` to create a new message.
  */
-export const ListMyReportsResponseSchema: GenMessage<ListMyReportsResponse> = /*@__PURE__*/
+export const GetMyReportResponseSchema: GenMessage<GetMyReportResponse> = /*@__PURE__*/
   messageDesc(file_hawkr_seller_v1alpha1_report, 4);
+
+/**
+ * ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
+ *
+ * @generated from message hawkr.seller.v1alpha1.ReportSupplement
+ */
+export type ReportSupplement = Message<"hawkr.seller.v1alpha1.ReportSupplement"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string description = 2;
+   */
+  description: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 3;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * 這則補充帶來的佐證在 GetMyReportResponse.evidence 的 position。
+   *
+   * @generated from field: repeated int32 evidence_positions = 4;
+   */
+  evidencePositions: number[];
+};
+
+/**
+ * Describes the message hawkr.seller.v1alpha1.ReportSupplement.
+ * Use `create(ReportSupplementSchema)` to create a new message.
+ */
+export const ReportSupplementSchema: GenMessage<ReportSupplement> = /*@__PURE__*/
+  messageDesc(file_hawkr_seller_v1alpha1_report, 5);
+
+/**
+ * ReportEvidence 是檢舉的一張佐證。佐證是機敏檔：回應只帶它在這筆檢舉裡的順序，不帶檔案的網址。
+ *
+ * @generated from message hawkr.seller.v1alpha1.ReportEvidence
+ */
+export type ReportEvidence = Message<"hawkr.seller.v1alpha1.ReportEvidence"> & {
+  /**
+   * 佐證在這筆檢舉裡的順序（從 0 起）。
+   *
+   * @generated from field: int32 position = 1;
+   */
+  position: number;
+};
+
+/**
+ * Describes the message hawkr.seller.v1alpha1.ReportEvidence.
+ * Use `create(ReportEvidenceSchema)` to create a new message.
+ */
+export const ReportEvidenceSchema: GenMessage<ReportEvidence> = /*@__PURE__*/
+  messageDesc(file_hawkr_seller_v1alpha1_report, 6);
+
+/**
+ * @generated from message hawkr.seller.v1alpha1.AddReportSupplementRequest
+ */
+export type AddReportSupplementRequest = Message<"hawkr.seller.v1alpha1.AddReportSupplementRequest"> & {
+  /**
+   * 要補充的檢舉 id。
+   *
+   * @generated from field: string report_id = 1;
+   */
+  reportId: string;
+
+  /**
+   * 補充內容，最多 2000 字（規則同 CreateReport 的 description）。
+   *
+   * @generated from field: string description = 2;
+   */
+  description: string;
+
+  /**
+   * 佐證圖片的 staged token，最多 5 張（同 CreateReport）。
+   *
+   * @generated from field: repeated string evidence_staged_tokens = 3;
+   */
+  evidenceStagedTokens: string[];
+};
+
+/**
+ * Describes the message hawkr.seller.v1alpha1.AddReportSupplementRequest.
+ * Use `create(AddReportSupplementRequestSchema)` to create a new message.
+ */
+export const AddReportSupplementRequestSchema: GenMessage<AddReportSupplementRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_seller_v1alpha1_report, 7);
+
+/**
+ * @generated from message hawkr.seller.v1alpha1.AddReportSupplementResponse
+ */
+export type AddReportSupplementResponse = Message<"hawkr.seller.v1alpha1.AddReportSupplementResponse"> & {
+  /**
+   * 補充之後的檢舉、全部補充與佐證（同 GetMyReportResponse）。
+   *
+   * @generated from field: hawkr.seller.v1alpha1.StoreReport report = 1;
+   */
+  report?: StoreReport | undefined;
+
+  /**
+   * @generated from field: repeated hawkr.seller.v1alpha1.ReportSupplement supplements = 2;
+   */
+  supplements: ReportSupplement[];
+
+  /**
+   * @generated from field: repeated hawkr.seller.v1alpha1.ReportEvidence evidence = 3;
+   */
+  evidence: ReportEvidence[];
+};
+
+/**
+ * Describes the message hawkr.seller.v1alpha1.AddReportSupplementResponse.
+ * Use `create(AddReportSupplementResponseSchema)` to create a new message.
+ */
+export const AddReportSupplementResponseSchema: GenMessage<AddReportSupplementResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_seller_v1alpha1_report, 8);
 
 /**
  * ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
@@ -308,14 +431,28 @@ export const SellerReportAppService: GenService<{
     output: typeof CreateReportResponseSchema;
   },
   /**
-   * ListMyReports 列出呼叫者的檢舉，新到舊。
+   * GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+   * 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
    *
-   * @generated from rpc hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports
+   * @generated from rpc hawkr.seller.v1alpha1.SellerReportAppService.GetMyReport
    */
-  listMyReports: {
+  getMyReport: {
     methodKind: "unary";
-    input: typeof ListMyReportsRequestSchema;
-    output: typeof ListMyReportsResponseSchema;
+    input: typeof GetMyReportRequestSchema;
+    output: typeof GetMyReportResponseSchema;
+  },
+  /**
+   * AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+   * （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+   * 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+   * resource_exhausted（帶 RetryInfo）。
+   *
+   * @generated from rpc hawkr.seller.v1alpha1.SellerReportAppService.AddReportSupplement
+   */
+  addReportSupplement: {
+    methodKind: "unary";
+    input: typeof AddReportSupplementRequestSchema;
+    output: typeof AddReportSupplementResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_seller_v1alpha1_report, 0);

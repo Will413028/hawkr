@@ -40,9 +40,12 @@ const (
 	// SellerReportAppServiceCreateReportProcedure is the fully-qualified name of the
 	// SellerReportAppService's CreateReport RPC.
 	SellerReportAppServiceCreateReportProcedure = "/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport"
-	// SellerReportAppServiceListMyReportsProcedure is the fully-qualified name of the
-	// SellerReportAppService's ListMyReports RPC.
-	SellerReportAppServiceListMyReportsProcedure = "/hawkr.seller.v1alpha1.SellerReportAppService/ListMyReports"
+	// SellerReportAppServiceGetMyReportProcedure is the fully-qualified name of the
+	// SellerReportAppService's GetMyReport RPC.
+	SellerReportAppServiceGetMyReportProcedure = "/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport"
+	// SellerReportAppServiceAddReportSupplementProcedure is the fully-qualified name of the
+	// SellerReportAppService's AddReportSupplement RPC.
+	SellerReportAppServiceAddReportSupplementProcedure = "/hawkr.seller.v1alpha1.SellerReportAppService/AddReportSupplement"
 )
 
 // SellerReportAppServiceClient is a client for the hawkr.seller.v1alpha1.SellerReportAppService
@@ -54,8 +57,14 @@ type SellerReportAppServiceClient interface {
 	// 已經有結果時，這次是新的檢舉。原本那一筆已有 10 則補充時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次，
 	// 超過回 resource_exhausted（帶 RetryInfo）。
 	CreateReport(context.Context, *connect.Request[v1alpha1.CreateReportRequest]) (*connect.Response[v1alpha1.CreateReportResponse], error)
-	// ListMyReports 列出呼叫者的檢舉，新到舊。
-	ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error)
+	// GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+	// 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
+	GetMyReport(context.Context, *connect.Request[v1alpha1.GetMyReportRequest]) (*connect.Response[v1alpha1.GetMyReportResponse], error)
+	// AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+	// （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+	// 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+	// resource_exhausted（帶 RetryInfo）。
+	AddReportSupplement(context.Context, *connect.Request[v1alpha1.AddReportSupplementRequest]) (*connect.Response[v1alpha1.AddReportSupplementResponse], error)
 }
 
 // NewSellerReportAppServiceClient constructs a client for the
@@ -76,11 +85,17 @@ func NewSellerReportAppServiceClient(httpClient connect.HTTPClient, baseURL stri
 			connect.WithSchema(sellerReportAppServiceMethods.ByName("CreateReport")),
 			connect.WithClientOptions(opts...),
 		),
-		listMyReports: connect.NewClient[v1alpha1.ListMyReportsRequest, v1alpha1.ListMyReportsResponse](
+		getMyReport: connect.NewClient[v1alpha1.GetMyReportRequest, v1alpha1.GetMyReportResponse](
 			httpClient,
-			baseURL+SellerReportAppServiceListMyReportsProcedure,
-			connect.WithSchema(sellerReportAppServiceMethods.ByName("ListMyReports")),
+			baseURL+SellerReportAppServiceGetMyReportProcedure,
+			connect.WithSchema(sellerReportAppServiceMethods.ByName("GetMyReport")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		addReportSupplement: connect.NewClient[v1alpha1.AddReportSupplementRequest, v1alpha1.AddReportSupplementResponse](
+			httpClient,
+			baseURL+SellerReportAppServiceAddReportSupplementProcedure,
+			connect.WithSchema(sellerReportAppServiceMethods.ByName("AddReportSupplement")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -88,8 +103,9 @@ func NewSellerReportAppServiceClient(httpClient connect.HTTPClient, baseURL stri
 
 // sellerReportAppServiceClient implements SellerReportAppServiceClient.
 type sellerReportAppServiceClient struct {
-	createReport  *connect.Client[v1alpha1.CreateReportRequest, v1alpha1.CreateReportResponse]
-	listMyReports *connect.Client[v1alpha1.ListMyReportsRequest, v1alpha1.ListMyReportsResponse]
+	createReport        *connect.Client[v1alpha1.CreateReportRequest, v1alpha1.CreateReportResponse]
+	getMyReport         *connect.Client[v1alpha1.GetMyReportRequest, v1alpha1.GetMyReportResponse]
+	addReportSupplement *connect.Client[v1alpha1.AddReportSupplementRequest, v1alpha1.AddReportSupplementResponse]
 }
 
 // CreateReport calls hawkr.seller.v1alpha1.SellerReportAppService.CreateReport.
@@ -97,9 +113,14 @@ func (c *sellerReportAppServiceClient) CreateReport(ctx context.Context, req *co
 	return c.createReport.CallUnary(ctx, req)
 }
 
-// ListMyReports calls hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports.
-func (c *sellerReportAppServiceClient) ListMyReports(ctx context.Context, req *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error) {
-	return c.listMyReports.CallUnary(ctx, req)
+// GetMyReport calls hawkr.seller.v1alpha1.SellerReportAppService.GetMyReport.
+func (c *sellerReportAppServiceClient) GetMyReport(ctx context.Context, req *connect.Request[v1alpha1.GetMyReportRequest]) (*connect.Response[v1alpha1.GetMyReportResponse], error) {
+	return c.getMyReport.CallUnary(ctx, req)
+}
+
+// AddReportSupplement calls hawkr.seller.v1alpha1.SellerReportAppService.AddReportSupplement.
+func (c *sellerReportAppServiceClient) AddReportSupplement(ctx context.Context, req *connect.Request[v1alpha1.AddReportSupplementRequest]) (*connect.Response[v1alpha1.AddReportSupplementResponse], error) {
+	return c.addReportSupplement.CallUnary(ctx, req)
 }
 
 // SellerReportAppServiceHandler is an implementation of the
@@ -111,8 +132,14 @@ type SellerReportAppServiceHandler interface {
 	// 已經有結果時，這次是新的檢舉。原本那一筆已有 10 則補充時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次，
 	// 超過回 resource_exhausted（帶 RetryInfo）。
 	CreateReport(context.Context, *connect.Request[v1alpha1.CreateReportRequest]) (*connect.Response[v1alpha1.CreateReportResponse], error)
-	// ListMyReports 列出呼叫者的檢舉，新到舊。
-	ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error)
+	// GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+	// 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
+	GetMyReport(context.Context, *connect.Request[v1alpha1.GetMyReportRequest]) (*connect.Response[v1alpha1.GetMyReportResponse], error)
+	// AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+	// （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+	// 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+	// resource_exhausted（帶 RetryInfo）。
+	AddReportSupplement(context.Context, *connect.Request[v1alpha1.AddReportSupplementRequest]) (*connect.Response[v1alpha1.AddReportSupplementResponse], error)
 }
 
 // NewSellerReportAppServiceHandler builds an HTTP handler from the service implementation. It
@@ -128,19 +155,27 @@ func NewSellerReportAppServiceHandler(svc SellerReportAppServiceHandler, opts ..
 		connect.WithSchema(sellerReportAppServiceMethods.ByName("CreateReport")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerReportAppServiceListMyReportsHandler := connect.NewUnaryHandler(
-		SellerReportAppServiceListMyReportsProcedure,
-		svc.ListMyReports,
-		connect.WithSchema(sellerReportAppServiceMethods.ByName("ListMyReports")),
+	sellerReportAppServiceGetMyReportHandler := connect.NewUnaryHandler(
+		SellerReportAppServiceGetMyReportProcedure,
+		svc.GetMyReport,
+		connect.WithSchema(sellerReportAppServiceMethods.ByName("GetMyReport")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerReportAppServiceAddReportSupplementHandler := connect.NewUnaryHandler(
+		SellerReportAppServiceAddReportSupplementProcedure,
+		svc.AddReportSupplement,
+		connect.WithSchema(sellerReportAppServiceMethods.ByName("AddReportSupplement")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/hawkr.seller.v1alpha1.SellerReportAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SellerReportAppServiceCreateReportProcedure:
 			sellerReportAppServiceCreateReportHandler.ServeHTTP(w, r)
-		case SellerReportAppServiceListMyReportsProcedure:
-			sellerReportAppServiceListMyReportsHandler.ServeHTTP(w, r)
+		case SellerReportAppServiceGetMyReportProcedure:
+			sellerReportAppServiceGetMyReportHandler.ServeHTTP(w, r)
+		case SellerReportAppServiceAddReportSupplementProcedure:
+			sellerReportAppServiceAddReportSupplementHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -154,6 +189,10 @@ func (UnimplementedSellerReportAppServiceHandler) CreateReport(context.Context, 
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportAppService.CreateReport is not implemented"))
 }
 
-func (UnimplementedSellerReportAppServiceHandler) ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports is not implemented"))
+func (UnimplementedSellerReportAppServiceHandler) GetMyReport(context.Context, *connect.Request[v1alpha1.GetMyReportRequest]) (*connect.Response[v1alpha1.GetMyReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportAppService.GetMyReport is not implemented"))
+}
+
+func (UnimplementedSellerReportAppServiceHandler) AddReportSupplement(context.Context, *connect.Request[v1alpha1.AddReportSupplementRequest]) (*connect.Response[v1alpha1.AddReportSupplementResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportAppService.AddReportSupplement is not implemented"))
 }
