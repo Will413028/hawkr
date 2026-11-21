@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,16 +19,12 @@ func (f *fixture) markInactive(kind string, id int64) {
 	f.t.Helper()
 	ctx := context.Background()
 	if kind == "BUYER" {
-		if err := ensureBuyer(ctx, f.db, id); err != nil {
-			f.t.Fatal(err)
-		}
 		f.exec("UPDATE buyer.buyers SET status = 'CLOSED', deleted_at = now() WHERE buyer_id = $1", id)
 		return
 	}
-	if err := ensureStore(ctx, f.db, id); err != nil {
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return closeStoreRows(ctx, f.db, id) }); err != nil {
 		f.t.Fatal(err)
 	}
-	f.exec("UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", id)
 }
 
 // 可見性在清除 job 跑之前就已經改好：已停用（買家關閉、店家退場）的買家或店家，讀取看不到、賣家寫入被拒（客戶不存在、標籤不存在），資料還在表裡（job 還沒跑）。
@@ -143,15 +140,12 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 	ctx := context.Background()
 	const stores, buyers = 6, 6
 	storeID := func(i int) int64 { return 200 + int64(i%stores) }
-	for i := 0; i < stores; i++ {
-		if err := ensureStore(ctx, f.db, storeID(i)); err != nil {
-			t.Fatal(err)
-		}
-	}
+	seedStores(t, f.db, storeID(0), storeID(stores-1))
+	seedBuyers(t, f.db, 300, 300+buyers-1)
 	started := make(chan struct{})
 	retired := make(chan error, 1)
+	var startOnce sync.Once
 	go func() {
-		close(started)
 		pending := make([]int64, 0, stores)
 		for i := 0; i < stores; i++ {
 			pending = append(pending, storeID(i))
@@ -171,6 +165,8 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 						skipped = append(skipped, id)
 						continue
 					}
+					// 第一列已鎖住才放行投影：重疊從這裡開始是確定的。
+					startOnce.Do(func() { close(started) })
 					if err := f.retireLocked(ctx, id); err != nil {
 						return err
 					}
@@ -179,6 +175,7 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 				return nil
 			})
 			if err != nil {
+				startOnce.Do(func() { close(started) })
 				retired <- err
 				return
 			}

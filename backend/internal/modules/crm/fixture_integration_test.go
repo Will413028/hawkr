@@ -19,12 +19,16 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
@@ -48,6 +52,26 @@ func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.Insert
 	return nil
 }
 
+func (*queue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
+	return true, nil
+}
+
+// noRegistry、noProducts、noOrders 是 seller 的外部 port 的替身：這裡的測試只用 seller 的守門與表，不會呼叫它們。
+type noRegistry struct{}
+
+func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
+	return gcis.Registration{}, false, nil
+}
+
+type noProducts struct{}
+
+func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+
+type noOrders struct{}
+
+func (noOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
+func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
+
 func (q *queue) count(kind string) int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -69,45 +93,24 @@ type fixture struct {
 	bus   *events.Bus
 }
 
-// guards 是 crm 的守門 port 的實作：買家走真正的 buyer 模組（LockNotClosed、關閉買家的 CloseForDeletion），店家走同形的替身（seller 的完整模組太重，
-// 真正的 seller 實作由 seller 與 cmd/hawkr 的整合測試驗證）。測試用固定的 ID，買家與店家列在第一次被守門時自動建立（營運中），已存在不動。
-type guards struct {
-	db    *db.DB
-	owner *buyer.Module
+// 預設的角色：店 storeA..storeC（10..12）與買家 100..199 在 setup 明確建立；其他 ID 的測試自己 seedBuyers／seedStores。
+
+// seedBuyers 以明確的 ID 建立營運中的買家列（最小的合法列，不經 OnAccountCreated）；守門走真正的 buyer 模組，沒有列的 ID 回 NotFound。
+func seedBuyers(t *testing.T, d *db.DB, lo, hi int64) {
+	t.Helper()
+	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'b', now(), now() FROM generate_series($1::bigint, $2::bigint) AS g`, lo, hi); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func ensureBuyer(ctx context.Context, d *db.DB, id int64) error {
-	_, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
-		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, 1000000 + $1::bigint, 'b', now(), now()) ON CONFLICT (buyer_id) DO NOTHING`, id)
-	return err
-}
-
-func ensureStore(ctx context.Context, d *db.DB, id int64) error {
-	_, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
-		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, $1::bigint, 2000000 + $1::bigint, 's', now(), now()) ON CONFLICT (store_id) DO NOTHING`, id)
-	return err
-}
-
-func (g *guards) LockNotClosed(ctx context.Context, id int64) error {
-	if err := ensureBuyer(ctx, g.db, id); err != nil {
-		return err
+// seedStores 以明確的 ID 建立營運中的店家列（最小的合法列）；守門走真正的 seller 模組。
+func seedStores(t *testing.T, d *db.DB, lo, hi int64) {
+	t.Helper()
+	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, g, 2000000 + g, 's', now(), now() FROM generate_series($1::bigint, $2::bigint) AS g`, lo, hi); err != nil {
+		t.Fatal(err)
 	}
-	return g.owner.LockNotClosed(ctx, id)
-}
-
-func (g *guards) LockNotRetired(ctx context.Context, id int64) error {
-	if _, ok := db.TxFrom(ctx); !ok {
-		return errors.New("LockNotRetired 必須在 transaction 內呼叫")
-	}
-	if err := ensureStore(ctx, g.db, id); err != nil {
-		return err
-	}
-	var retired bool
-	err := g.db.Conn(ctx).QueryRow(ctx, "SELECT retired_at IS NOT NULL FROM seller.stores WHERE store_id = $1 FOR KEY SHARE", id).Scan(&retired)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && retired) {
-		return apperr.NotFound("店家已退場")
-	}
-	return err
 }
 
 var epoch = time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
@@ -139,8 +142,13 @@ func setup(t *testing.T) *fixture {
 	bus := events.NewBus()
 	now := func() time.Time { return epoch.Add(time.Duration(tick.Add(1)) * time.Second) }
 	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: media.NewFake(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	g := &guards{db: d, owner: owner}
-	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: g, Stores: g, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	id := identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: log})
+	sl := seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: now, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, now), Events: bus, Jobs: q, Now: now, Logger: log})})
+	seedStores(t, d, storeA, storeC)
+	seedBuyers(t, d, buyer1, buyer1+99)
+	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: sl, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
 	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus}

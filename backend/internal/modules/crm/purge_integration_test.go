@@ -4,11 +4,13 @@ package crm_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
@@ -30,9 +32,6 @@ func (f *fixture) seedBuyerEverywhere(buyerID int64) {
 func (f *fixture) deleteBuyer(buyerID int64) {
 	f.t.Helper()
 	ctx := context.Background()
-	if err := ensureBuyer(ctx, f.db, buyerID); err != nil {
-		f.t.Fatal(err)
-	}
 	if err := f.owner.CloseForDeletion(ctx, buyerID); err != nil {
 		f.t.Fatal(err)
 	}
@@ -49,9 +48,6 @@ func (f *fixture) retireStore(storeID int64) {
 // 退場批次（seller 的 RetireDueStores）對店家列是 FOR UPDATE：先鎖列（被守門鎖住時等到對方提交）再改 retired_at。
 func (f *fixture) retireStoreErr(storeID int64) error {
 	ctx := context.Background()
-	if err := ensureStore(ctx, f.db, storeID); err != nil {
-		return err
-	}
 	return f.db.InTx(ctx, func(ctx context.Context) error {
 		var id int64
 		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", storeID).Scan(&id); err != nil {
@@ -63,10 +59,22 @@ func (f *fixture) retireStoreErr(storeID int64) error {
 
 // retireLocked 在呼叫方已持店家列的 FOR UPDATE 時把店家改成已退場並發 StoreRetired。
 func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
-	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", storeID); err != nil {
+	if err := closeStoreRows(ctx, f.db, storeID); err != nil {
 		return err
 	}
 	return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), StoreID: storeID, OccurredAt: epoch})
+}
+
+// closeStoreRows 把店家改成已關閉並退場，兩張表的列一起合法（stores_current_closure_fkey 在 commit 時檢查，所以必須在 transaction 內，且先寫關店紀錄）。
+func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", storeID); err != nil {
+		return err
+	}
+	_, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", storeID)
+	return err
 }
 
 func (f *fixture) rowsOfBuyer(buyerID int64) int64 {
@@ -196,9 +204,6 @@ func TestProjectionWaitsForConcurrentClosing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	if err := ensureBuyer(ctx, f.db, buyer1); err != nil {
-		t.Fatal(err)
-	}
 	closing := make(chan struct{})
 	release := make(chan struct{})
 	txDone := make(chan error, 1)

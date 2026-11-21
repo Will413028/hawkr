@@ -231,7 +231,6 @@ func TestVIPStatuses(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	storeC := int64(12)
 	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
 	f.mustOrder("evt-2", "O2", storeB, buyer1, 100)
 	f.mustOrder("evt-3", "O3", storeA, buyer2, 100)

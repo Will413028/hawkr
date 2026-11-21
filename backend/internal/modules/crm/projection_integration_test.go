@@ -14,6 +14,7 @@ import (
 const (
 	storeA = int64(10)
 	storeB = int64(11)
+	storeC = int64(12)
 	buyer1 = int64(100)
 	buyer2 = int64(101)
 )
@@ -161,6 +162,7 @@ func TestConcurrentOrderAndRefundOnSameOrder(t *testing.T) {
 		f.assertInvariant(storeA, buyer1+int64(i))
 	}
 	// 訂單與部分退款：兩種順序的結果都是 700。
+	seedBuyers(t, f.db, buyer2+1000, buyer2+1000+int64(n)-1)
 	errs = parallel(2*n, func(i int) error {
 		o := fmt.Sprintf("OP%d", i/2)
 		buyer := buyer2 + 1000 + int64(i/2)
