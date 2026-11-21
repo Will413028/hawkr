@@ -415,7 +415,7 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                 - [x] 10f-3a backend 與契約（合併 `ListMyReports`、`GetMyReport`、`AddReportSupplement`；commits `420258ef..d9ac3908`）
                   - 已跑：`make lint-monolith`、`go test`、`go vet -tags integration`、`buf lint`、buyer-app moderation 測試 91 項；CI `d9ac3908` 全綠（含 backend monolith integration：真模組合併分頁、補充同一寫入路徑與第 11 則、not_found）；red-proof 合併分頁 3 個 mutation（只取一個來源、尾端跨頁界、同時間順序）killed；`/code-review` 與 diff 審查 findings 10（blocking 0）：fixed 9、raised 1。
                   - 未跑：integration 層的 mutation（拿掉「有結果不能補充」、拿掉 `GetMyReport` 擁有者條件）：需要資料庫容器，本機不跑。
-                  - 待 Will：佐證縮圖（`ReportEvidence` 只有 `position`）、`AddReportSupplement` 限流與 `CreateReport` 分開計數。
+                  - H5（Will 2026-11-21）：佐證只顯示張數、縮圖延後；補充限流與 `CreateReport` 各自計數。
                   - 暫時狀態：buyer-app「我的檢舉」在 10f-3b 前只列社群檢舉。
                 - [ ] 10f-3b buyer-app（UI 版面先給 Will 同意）
                 - [ ] 10f-3c website（UI 版面先給 Will 同意）
