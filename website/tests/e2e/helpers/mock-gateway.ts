@@ -128,6 +128,10 @@ export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
 export const LIST_MY_INQUIRIES_URL = sellerMethod("ListMyInquiries");
+export const LIST_MY_REPORTS_URL =
+	/\/api\/connect\/hawkr\.moderation\.v1alpha1\.ModerationAppService\/ListMyReports(?:\?|$)/;
+export const GET_MY_REPORT_URL =
+	/\/api\/connect\/hawkr\.seller\.v1alpha1\.SellerReportAppService\/GetMyReport(?:\?|$)/;
 export const LIST_BLOCKED_BUYERS_URL = sellerMethod("ListBlockedBuyers");
 export const GET_MY_STORE_OPENING_URL = sellerMethod("GetMyStoreOpening");
 
@@ -1235,6 +1239,13 @@ export async function setupGatewayMocks(
 	await page.route(LIST_MY_INQUIRIES_URL, (route) => {
 		void fulfillConnect(route, {});
 	});
+
+	// 2f. 我的檢舉（ListMyReports、GetMyReport）：預設空；個別 spec 較晚註冊的 mock 會蓋過。
+	for (const url of [LIST_MY_REPORTS_URL, GET_MY_REPORT_URL]) {
+		await page.route(url, (route) => {
+			void fulfillConnect(route, {});
+		});
+	}
 
 	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
 	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {
