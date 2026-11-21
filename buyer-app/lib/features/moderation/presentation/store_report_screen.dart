@@ -12,7 +12,6 @@ import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
@@ -21,17 +20,18 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../media/data/media_repository.dart';
 import '../data/store_report_repository.dart';
+import 'report_form_parts.dart';
 import 'rune_limit_formatter.dart';
 import 'store_report_entry.dart';
 
-/// 成功後的提示：補充時用伺服器的 notice（有文字才用），否則「已收到檢舉」。
+/// 成功後的提示：補充時用伺服器的 notice（有文字才用），否則附上「我的檢舉」的指引。
 String storeReportSuccessText(pb.CreateReportResponse response) {
   if (response.supplemented &&
       response.hasNotice() &&
       response.notice.message.trim().isNotEmpty) {
     return response.notice.message;
   }
-  return '已收到檢舉';
+  return '已收到檢舉，處理結果可在「我的檢舉」查看';
 }
 
 /// 檢舉店家的整頁表單（`SellerReportAppService.CreateReport`）。
@@ -67,35 +67,19 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
 
   Future<void> _pickPhoto() async {
     if (_photos.length >= storeReportMaxEvidence) return;
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      imageQuality: 85,
-    );
-    if (picked != null && mounted) {
-      setState(() => _photos.add(File(picked.path)));
-    }
-  }
-
-  Future<List<String>> _stageEvidence() async {
-    final media = ref.read(mediaRepositoryProvider);
-    final tokens = <String>[];
-    for (final file in _photos) {
-      var token = _stagedByPath[file.path];
-      if (token == null) {
-        token = (await media.uploadImage(file: file)).stagedToken;
-        _stagedByPath[file.path] = token;
-      }
-      tokens.add(token);
-    }
-    return tokens;
+    final file = await pickReportPhoto();
+    if (file != null && mounted) setState(() => _photos.add(file));
   }
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
     setState(() => _submitting = true);
     try {
-      final tokens = await _stageEvidence();
+      final tokens = await stageReportEvidence(
+        ref.read(mediaRepositoryProvider),
+        _photos,
+        _stagedByPath,
+      );
       final response = await ref
           .read(storeReportRepositoryProvider)
           .create(
@@ -155,7 +139,7 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
                     ),
                     SizedBox(height: 16.h),
                   ],
-                  _label('類別', required: true),
+                  reportFieldLabel('類別', required: true),
                   SizedBox(height: 8.h),
                   for (final (category, label) in storeReportCategoryOptions(
                     locale,
@@ -166,7 +150,7 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
                       onTap: () => setState(() => _category = category),
                     ),
                   SizedBox(height: 20.h),
-                  _label('說明', required: true),
+                  reportFieldLabel('說明', required: true),
                   SizedBox(height: 8.h),
                   TextField(
                     key: const ValueKey('store-report-description'),
@@ -187,10 +171,10 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
                           style: const TextStyle(fontSize: 12),
                         ),
                     onChanged: (_) => setState(() {}),
-                    decoration: _decoration('請描述檢舉的原因與經過'),
+                    decoration: reportFieldDecoration('請描述檢舉的原因與經過'),
                   ),
                   SizedBox(height: 20.h),
-                  _label('訂單編號'),
+                  reportFieldLabel('訂單編號'),
                   SizedBox(height: 8.h),
                   TextField(
                     key: const ValueKey('store-report-order-no'),
@@ -198,12 +182,19 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
                     inputFormatters: [
                       RuneLimitFormatter(storeReportOrderNoMaxRunes),
                     ],
-                    decoration: _decoration('選填'),
+                    decoration: reportFieldDecoration('選填'),
                   ),
                   SizedBox(height: 20.h),
-                  _label('佐證圖片'),
+                  reportFieldLabel('佐證圖片'),
                   SizedBox(height: 8.h),
-                  _photoRow(),
+                  ReportPhotoRow(
+                    photos: _photos,
+                    maxCount: storeReportMaxEvidence,
+                    disabled: _submitting,
+                    addKey: const ValueKey('store-report-add-photo'),
+                    onAdd: _pickPhoto,
+                    onRemove: (i) => setState(() => _photos.removeAt(i)),
+                  ),
                   SizedBox(height: 28.h),
                   SizedBox(
                     width: double.infinity,
@@ -244,120 +235,6 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _decoration(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(fontSize: 14, color: AppColors.textDisabled),
-    filled: true,
-    fillColor: AppColors.gray100,
-    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8.r),
-      borderSide: BorderSide.none,
-    ),
-  );
-
-  Widget _label(String text, {bool required = false}) => RichText(
-    text: TextSpan(
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
-      children: [
-        TextSpan(text: text),
-        if (required)
-          const TextSpan(
-            text: ' *',
-            style: TextStyle(color: AppColors.danger, fontSize: 16),
-          ),
-      ],
-    ),
-  );
-
-  Widget _photoRow() {
-    final size = 80.w;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var i = 0; i < _photos.length; i++) ...[
-            SizedBox.square(
-              dimension: size,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16.r),
-                      child: Image.file(
-                        _photos[i],
-                        fit: BoxFit.cover,
-                        cacheWidth: 256,
-                        errorBuilder: (_, _, _) => const ColoredBox(
-                          color: AppColors.bgPrimary,
-                          child: Center(
-                            child: Icon(
-                              AppIcons.imageNotSupportedOutlined,
-                              color: AppIconColors.muted,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _submitting
-                          ? null
-                          : () => setState(() => _photos.removeAt(i)),
-                      child: Container(
-                        width: 20.w,
-                        height: 20.w,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          AppIcons.close,
-                          size: 14.sp,
-                          color: AppIconColors.onBrand,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 10.w),
-          ],
-          if (_photos.length < storeReportMaxEvidence)
-            GestureDetector(
-              key: const ValueKey('store-report-add-photo'),
-              onTap: _submitting ? null : _pickPhoto,
-              child: SizedBox.square(
-                dimension: size,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16.r),
-                    border: Border.all(
-                      color: AppColors.textPrimary.withValues(alpha: 0.3),
-                      width: 1.5.w,
-                    ),
-                  ),
-                  child: Icon(
-                    AppIcons.add,
-                    size: 24.sp,
-                    color: AppIconColors.defaultColor.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

@@ -10,6 +10,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
+
 import '../../../core/networking/suspension_signal.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/common_snackbar.dart';
@@ -17,11 +18,14 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../seller/data/store_card_provider.dart';
 import 'my_reports_notifier.dart';
 import 'paged_section.dart';
 import 'paged_section_widgets.dart';
+import 'report_view_parts.dart';
+import 'store_report_detail_screen.dart';
 
-/// 我的檢舉紀錄列表頁（`ListMyReports` 合併社群與店家兩種；店家檢舉的呈現在 10f-3b，在那之前只列社群對象，聊天、評價的檢舉在 A6 前不列）。
+/// 我的檢舉紀錄列表頁（`ListMyReports` 合併社群與店家兩種；店家檢舉可點進詳情）。
 /// 伺服器狀態在 [myReportsProvider]；這裡只顯示與發動作。
 class MyReportsScreen extends ConsumerWidget {
   const MyReportsScreen({super.key});
@@ -51,19 +55,15 @@ class MyReportsScreen extends ConsumerWidget {
     }
   }
 
-  String _formatTime(pb.MyReportItem r) {
-    if (!r.hasCreateTime()) return '';
-    final local = DateTime.fromMillisecondsSinceEpoch(
-      r.createTime.seconds.toInt() * 1000,
-    ).toLocal();
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-  }
+  String _formatTime(pb.MyReportItem r) =>
+      r.hasCreateTime() ? formatReportTime(r.createTime.toDateTime()) : '';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(myReportsProvider);
-    final visible = reports.items.where((r) => r.hasCommunity()).toList();
+    final visible = reports.items
+        .where((r) => r.hasCommunity() || r.hasStore())
+        .toList();
     final locale = ref.watch(uiLocaleProvider);
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -104,7 +104,12 @@ class MyReportsScreen extends ConsumerWidget {
                         }
                         return Padding(
                           padding: EdgeInsets.only(bottom: 16.h),
-                          child: _buildReportCard(visible[i], locale),
+                          child: _buildReportCard(
+                            context,
+                            ref,
+                            visible[i],
+                            locale,
+                          ),
                         );
                       },
                     ),
@@ -115,11 +120,21 @@ class MyReportsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReportCard(pb.MyReportItem r, UiLocale locale) {
-    final kind = r.community.target.kind.uiText(locale);
-    final outcome = r.community.outcome.uiText(locale);
+  Widget _buildReportCard(
+    BuildContext context,
+    WidgetRef ref,
+    pb.MyReportItem r,
+    UiLocale locale,
+  ) {
+    final store = r.hasStore();
+    final kind = store
+        ? ref.watch(storeCardProvider(r.store.storeId)).value?.name
+        : r.community.target.kind.uiText(locale);
+    final outcome = store
+        ? storeReportOutcomeText(r.store, locale)
+        : r.community.outcome.uiText(locale);
     final category = r.category.uiText(locale);
-    return Container(
+    final card = Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
@@ -148,22 +163,7 @@ class MyReportsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (outcome != null)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(999.r),
-                  ),
-                  child: Text(
-                    outcome,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
+              if (outcome != null) ReportOutcomeChip(outcome),
             ],
           ),
           if (category != null) ...[
@@ -205,10 +205,25 @@ class MyReportsScreen extends ConsumerWidget {
                 _formatTime(r),
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
+              if (store) ...[
+                const Spacer(),
+                HkIcon(
+                  HkIconName.chevronRight,
+                  size: 18.sp,
+                  color: AppIconColors.defaultColor,
+                ),
+              ],
             ],
           ),
         ],
       ),
+    );
+    if (!store) return card;
+    return InkWell(
+      key: ValueKey('my-report-store-${r.id}'),
+      borderRadius: BorderRadius.circular(16.r),
+      onTap: () => context.push(storeReportDetailRoute(r.id)),
+      child: card,
     );
   }
 }

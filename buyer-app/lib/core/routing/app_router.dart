@@ -54,6 +54,8 @@ import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/category/presentation/category_landing_screen.dart';
 import '../../features/member_card/presentation/spending_records_screen.dart';
 import '../../features/moderation/presentation/my_reports_screen.dart';
+import '../../features/moderation/presentation/store_report_detail_screen.dart';
+import '../../features/moderation/presentation/store_report_supplement_screen.dart';
 import '../../features/moderation/presentation/blocked_users_screen.dart';
 
 part 'app_router.g.dart';
@@ -351,6 +353,22 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/settings/reports',
         builder: (_, __) => const MyReportsScreen(),
+        routes: [
+          GoRoute(
+            path: ':reportId',
+            builder: (_, state) => StoreReportDetailScreen(
+              reportId: state.pathParameters['reportId']!,
+            ),
+            routes: [
+              GoRoute(
+                path: 'supplement',
+                builder: (_, state) => StoreReportSupplementScreen(
+                  reportId: state.pathParameters['reportId']!,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: storeReportRoute,

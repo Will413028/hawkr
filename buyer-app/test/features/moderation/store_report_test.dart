@@ -153,10 +153,10 @@ void main() {
   });
 
   test('成功提示：補充且 notice 有文字才用 notice，否則已收到檢舉', () {
-    expect(storeReportSuccessText(pb.CreateReportResponse()), '已收到檢舉');
+    expect(storeReportSuccessText(pb.CreateReportResponse()), contains('我的檢舉'));
     expect(
       storeReportSuccessText(pb.CreateReportResponse(supplemented: true)),
-      '已收到檢舉',
+      contains('我的檢舉'),
     );
     expect(
       storeReportSuccessText(
@@ -165,7 +165,7 @@ void main() {
           notice: LocalizedMessage(message: '  '),
         ),
       ),
-      '已收到檢舉',
+      contains('我的檢舉'),
     );
     expect(
       storeReportSuccessText(
@@ -236,7 +236,7 @@ void main() {
     expect(req.productId, 'p-9');
     expect(req.category, PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY);
     expect(req.description, '麵包有異物');
-    expect(find.text('已收到檢舉'), findsOneWidget);
+    expect(find.textContaining('我的檢舉'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
 
@@ -261,7 +261,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('伺服器說明：已補充到今天的同一筆檢舉'), findsOneWidget);
-    expect(find.text('已收到檢舉'), findsNothing);
+    expect(find.textContaining('我的檢舉'), findsNothing);
     await tester.pump(const Duration(seconds: 3));
   });
 }

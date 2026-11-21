@@ -168,7 +168,7 @@ void main() {
     expect(find.text('服務暫時不可用'), findsNothing);
   });
 
-  testWidgets('店家檢舉項目在 10f-3b 之前不畫成空白卡片', (tester) async {
+  testWidgets('店家檢舉項目與社群項目並列，沒有結果時顯示審核中', (tester) async {
     final moderation = FakeModeration(
       reportPages: [
         [
@@ -185,6 +185,7 @@ void main() {
 
     expect(find.text('社群檢舉內容'), findsOneWidget);
     expect(find.text('貼文'), findsOneWidget);
-    expect(find.text('審核中'), findsOneWidget);
+    expect(find.text('審核中'), findsNWidgets(2));
+    expect(find.text('店家檢舉內容'), findsOneWidget);
   });
 }

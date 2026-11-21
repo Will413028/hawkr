@@ -17,6 +17,9 @@ const storeReportDescriptionMaxRunes = 2000;
 const storeReportOrderNoMaxRunes = 64;
 const storeReportMaxEvidence = 5;
 
+/// 一則檢舉的補充說明上限（`report.proto`；去重補充與主動補充共用）。
+const storeReportMaxSupplements = 10;
+
 /// 檢舉人可選的類別：政策分類除了 UNSPECIFIED 與 PLATFORM_ABUSE（只給平台判定），順序依列舉值。
 final storeReportCategories = List<PolicyCategory>.unmodifiable(
   PolicyCategory.values.where(
@@ -58,4 +61,19 @@ class StoreReportRepository {
       ),
     );
   }
+
+  Future<pb.GetMyReportResponse> get(String reportId) =>
+      _client.getMyReport(pb.GetMyReportRequest(reportId: reportId));
+
+  Future<pb.AddReportSupplementResponse> addSupplement({
+    required String reportId,
+    required String description,
+    List<String> evidenceStagedTokens = const [],
+  }) => _client.addReportSupplement(
+    pb.AddReportSupplementRequest(
+      reportId: reportId,
+      description: description,
+      evidenceStagedTokens: evidenceStagedTokens,
+    ),
+  );
 }
