@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -15,15 +16,19 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 TIMEOUT_SECONDS = 15 * 60
+# 測試框架自己的逾時要比 runner 的長，否則先到期的框架逾時會被算成 KILLED。
+FRAMEWORK_TIMEOUT_SECONDS = TIMEOUT_SECONDS + 5 * 60
 REQUIRED = ("id", "stack", "file", "old", "new", "test", "why")
 FLUTTER_PREFIX = "flutter:"
-FIXED_STACKS = ("go-integration", "go", "website")
+FIXED_STACKS = ("go-integration", "go", "website", "flutter:buyer-app", "flutter:seller-app")
 
 KILLED = "KILLED"
 SURVIVED = "SURVIVED"
 TIMEOUT = "TIMEOUT"
 BASELINE_FAILED = "BASELINE-FAILED"
 APPLY_FAILED = "APPLY-FAILED"
+BUILD_FAILED = "BUILD-FAILED"
+NO_TESTS = "NO-TESTS"
 
 
 class ManifestError(Exception):
@@ -47,12 +52,24 @@ class Command:
     argv: list[str]
     cwd: Path
     env: dict[str, str]
+    stack: str = ""
 
 
 def valid_stack(stack: str) -> bool:
-    if stack in FIXED_STACKS:
-        return True
-    return stack.startswith(FLUTTER_PREFIX) and len(stack) > len(FLUTTER_PREFIX)
+    return stack in FIXED_STACKS
+
+
+def inside(repo: Path, path: Path) -> bool:
+    return path.resolve().is_relative_to(repo.resolve())
+
+
+def ran_no_tests(stack: str, output: str) -> bool:
+    """測試指令失敗時，輸出是否顯示一個測試都沒執行（轉換、語法或載入錯誤）。"""
+    if stack == "website":
+        return re.search(r"Tests\s+.*\d+\s+(passed|failed)", output) is None
+    if stack.startswith(FLUTTER_PREFIX):
+        return re.search(r"No tests ran|Failed to load", output) is not None
+    return False
 
 
 def load_manifest(path: Path) -> list[Mutant]:
@@ -105,22 +122,39 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     if stack in ("go-integration", "go"):
         if not rest:
             raise ManifestError("go 選擇器必須是「<套件> <regex>」")
-        argv = ["go", "test", "-count=1"]
+        argv = ["go", "test", "-count=1", "-timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s"]
         if stack == "go-integration":
             argv += ["-tags", "integration"]
         argv += [f"./{head.strip('/')}/", "-run", rest]
         env["GOWORK"] = "off"
-        return Command(argv, repo / "backend", env)
+        return Command(argv, repo / "backend", env, stack)
     if stack == "website":
         argv = ["pnpm", "exec", "vitest", "run", "--project", "unit", head]
         if rest:
             argv += ["-t", rest]
-        return Command(argv, repo / "website", env)
+        return Command(argv, repo / "website", env, stack)
     app = stack[len(FLUTTER_PREFIX):]
-    argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", head]
+    argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", "--timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s", head]
     if rest:
         argv += ["--plain-name", rest]
-    return Command(argv, repo / app, env)
+    return Command(argv, repo / app, env, stack)
+
+
+def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO) -> Command | None:
+    """變更後先確認還編譯得過；website 沒有便宜的逐 mutant 編譯，改看測試輸出（ran_no_tests）。"""
+    env = dict(os.environ)
+    if stack in ("go-integration", "go"):
+        head, _ = split_selector(selector)
+        argv = ["go", "test", "-c", "-o", os.devnull]
+        if stack == "go-integration":
+            argv += ["-tags", "integration"]
+        argv.append(f"./{head.strip('/')}/")
+        env["GOWORK"] = "off"
+        return Command(argv, repo / "backend", env, stack)
+    if stack.startswith(FLUTTER_PREFIX):
+        app = stack[len(FLUTTER_PREFIX):]
+        return Command(["dart", "analyze", "--no-fatal-warnings", str(repo / file)], repo / app, env, stack)
+    return None
 
 
 def test_file(stack: str, selector: str, repo: Path = REPO) -> Path:
@@ -135,12 +169,16 @@ def test_file(stack: str, selector: str, repo: Path = REPO) -> Path:
 def check_mutant(m: Mutant, repo: Path = REPO) -> str | None:
     """回傳問題描述；沒問題回 None（只讀，不執行測試）。"""
     path = repo / m.file
+    if not inside(repo, path):
+        return f"檔案在 repo 之外：{m.file}"
     if not path.is_file():
         return f"檔案不存在：{m.file}"
     count = path.read_text(encoding="utf-8").count(m.old)
     if count != 1:
         return f"old 在 {m.file} 出現 {count} 次（必須剛好 1 次）"
     target = test_file(m.stack, m.test, repo)
+    if not inside(repo, target):
+        return f"測試路徑在 repo 之外：{m.test.split()[0]}"
     if not target.exists():
         return f"測試路徑不存在：{target.relative_to(repo)}"
     return None
@@ -160,10 +198,15 @@ def run_test(cmd: Command) -> str:
     if proc.returncode == 0:
         return "PASS"
     sys.stdout.write("".join("    | " + ln + "\n" for ln in proc.stdout.splitlines()[-25:]))
+    if ran_no_tests(cmd.stack, proc.stdout):
+        return NO_TESTS
     return "FAIL"
 
 
-def run_mutant(m: Mutant, repo: Path, builder, runner) -> str:
+def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> str:
+    if not inside(repo, repo / m.file):
+        print(f"    檔案在 repo 之外：{m.file}")
+        return APPLY_FAILED
     cmd = builder(m.stack, m.test, repo)
     baseline = runner(cmd)
     if baseline != "PASS":
@@ -176,11 +219,16 @@ def run_mutant(m: Mutant, repo: Path, builder, runner) -> str:
         return APPLY_FAILED
     try:
         path.write_bytes(original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8"))
+        build = build_builder(m.stack, m.test, m.file, repo) if build_builder else None
+        if build is not None and runner(build) != "PASS":
+            return BUILD_FAILED
         outcome = runner(cmd)
     finally:
         path.write_bytes(original)
     if outcome == TIMEOUT:
         return TIMEOUT
+    if outcome == NO_TESTS:
+        return BUILD_FAILED
     return KILLED if outcome != "PASS" else SURVIVED
 
 
@@ -203,11 +251,12 @@ def summarize(results: list[tuple[Mutant, str]]) -> str:
     return "\n".join(lines)
 
 
-def execute(mutants: list[Mutant], repo: Path = REPO, builder=build_command, runner=run_test) -> int:
+def execute(mutants: list[Mutant], repo: Path = REPO, builder=build_command, runner=run_test,
+            build_builder=build_check_command) -> int:
     results: list[tuple[Mutant, str]] = []
     for m in mutants:
         print(f"== {m.id} [{m.stack}] {m.file}", flush=True)
-        result = run_mutant(m, repo, builder, runner)
+        result = run_mutant(m, repo, builder, runner, build_builder)
         print(f"{result}: {m.id}  ({m.why})", flush=True)
         results.append((m, result))
     summary = summarize(results)

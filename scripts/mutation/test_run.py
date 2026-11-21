@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run  # noqa: E402
@@ -19,6 +20,10 @@ class Base(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.repo = Path(self._tmp.name)
+        env = mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop("GITHUB_STEP_SUMMARY", None)
         quiet = contextlib.ExitStack()
         quiet.enter_context(contextlib.redirect_stdout(io.StringIO()))
         quiet.enter_context(contextlib.redirect_stderr(io.StringIO()))
@@ -84,6 +89,29 @@ class RunMutantTest(Base):
         r = run.run_mutant(self.mutant(), self.repo, self.builder, lambda c: next(seq))
         self.assertEqual(r, run.TIMEOUT)
 
+    def test_build_failure_is_not_killed(self):
+        calls = []
+
+        def runner(cmd):
+            calls.append(cmd.argv[0])
+            return "FAIL" if cmd.argv[0] == "build" else "PASS"
+
+        bb = lambda stack, sel, file, repo: run.Command(["build"], repo, {})
+        self.assertEqual(run.run_mutant(self.mutant(), self.repo, self.builder, runner, bb), run.BUILD_FAILED)
+        self.assertEqual((self.repo / "src.txt").read_text(encoding="utf-8"), "alpha beta\n")
+
+    def test_build_ok_then_killed(self):
+        bb = lambda stack, sel, file, repo: run.Command([sys.executable, "-c", "pass"], repo, {})
+        self.assertEqual(run.run_mutant(self.mutant(), self.repo, self.builder, run.run_test, bb), run.KILLED)
+
+    def test_no_tests_executed_is_build_failed(self):
+        seq = iter(["PASS", run.NO_TESTS])
+        r = run.run_mutant(self.mutant(), self.repo, self.builder, lambda c: next(seq))
+        self.assertEqual(r, run.BUILD_FAILED)
+
+    def test_escaping_file_is_apply_failed(self):
+        self.assertEqual(self.go(self.mutant(file="../x")), run.APPLY_FAILED)
+
     def test_runner_error_after_mutation_counts_as_killed_only_if_not_pass(self):
         seq = iter(["PASS", "ERROR"])
         r = run.run_mutant(self.mutant(), self.repo, self.builder, lambda c: next(seq))
@@ -92,15 +120,14 @@ class RunMutantTest(Base):
 
 class ExecuteTest(Base):
     def test_exit_codes(self):
-        self.assertEqual(run.execute([self.mutant()], self.repo, self.builder), 0)
-        self.assertEqual(run.execute([self.mutant(), self.mutant(id="s", new="gamma")], self.repo, self.builder), 1)
-        self.assertEqual(run.execute([], self.repo, self.builder), 1)
+        self.assertEqual(run.execute([self.mutant()], self.repo, self.builder, build_builder=None), 0)
+        self.assertEqual(run.execute([self.mutant(), self.mutant(id="s", new="gamma")], self.repo, self.builder, build_builder=None), 1)
+        self.assertEqual(run.execute([], self.repo, self.builder, build_builder=None), 1)
 
     def test_step_summary_written(self):
         out = self.repo / "summary.md"
         os.environ["GITHUB_STEP_SUMMARY"] = str(out)
-        self.addCleanup(os.environ.pop, "GITHUB_STEP_SUMMARY", None)
-        run.execute([self.mutant()], self.repo, self.builder)
+        run.execute([self.mutant()], self.repo, self.builder, build_builder=None)
         self.assertIn("1/1 KILLED", out.read_text(encoding="utf-8"))
 
 
@@ -133,6 +160,17 @@ class ManifestTest(Base):
             with self.subTest(payload=payload), self.assertRaises(run.ManifestError):
                 self.load(payload)
 
+    def test_flutter_stack_whitelist(self):
+        with self.assertRaises(run.ManifestError):
+            self.load({"mutants": [dict(self.good, stack="flutter:other")]})
+
+    def test_validate_rejects_escaping_paths(self):
+        outside = self.repo.parent / "outside.txt"
+        self.assertIsNotNone(run.check_mutant(self.mutant(file="../outside.txt"), self.repo))
+        self.assertIn("repo 之外", run.check_mutant(self.mutant(file="../outside.txt"), self.repo))
+        (self.repo / "backend").mkdir()
+        self.assertIn("repo 之外", run.check_mutant(self.mutant(test="../../x ^T$"), self.repo))
+
     def test_not_json(self):
         p = self.repo / "x.json"
         p.write_text("{", encoding="utf-8")
@@ -156,7 +194,9 @@ class CommandTest(unittest.TestCase):
     def test_commands(self):
         repo = Path("/r")
         c = run.build_command("go-integration", "internal/x ^TestA$", repo)
-        self.assertEqual(c.argv, ["go", "test", "-count=1", "-tags", "integration", "./internal/x/", "-run", "^TestA$"])
+        t = f"{run.FRAMEWORK_TIMEOUT_SECONDS}s"
+        self.assertGreater(run.FRAMEWORK_TIMEOUT_SECONDS, run.TIMEOUT_SECONDS)
+        self.assertEqual(c.argv, ["go", "test", "-count=1", "-timeout", t, "-tags", "integration", "./internal/x/", "-run", "^TestA$"])
         self.assertEqual((c.cwd, c.env["GOWORK"]), (repo / "backend", "off"))
         self.assertNotIn("integration", run.build_command("go", "p ^T$", repo).argv)
         w = run.build_command("website", "a/b.test.ts some name", repo)
@@ -165,6 +205,25 @@ class CommandTest(unittest.TestCase):
         f = run.build_command("flutter:buyer-app", "test/a_test.dart my case", repo)
         self.assertEqual(f.cwd, repo / "buyer-app")
         self.assertEqual(f.argv[-2:], ["--plain-name", "my case"])
+        self.assertEqual(f.argv[f.argv.index("--timeout") + 1], t)
+
+    def test_build_check_commands(self):
+        repo = Path("/r")
+        g = run.build_check_command("go-integration", "internal/x ^T$", "backend/internal/x/a.go", repo)
+        self.assertEqual(g.argv, ["go", "test", "-c", "-o", os.devnull, "-tags", "integration", "./internal/x/"])
+        self.assertEqual((g.cwd, g.env["GOWORK"]), (repo / "backend", "off"))
+        self.assertNotIn("integration", run.build_check_command("go", "p ^T$", "f", repo).argv)
+        d = run.build_check_command("flutter:seller-app", "test/a.dart", "seller-app/lib/a.dart", repo)
+        self.assertEqual(d.argv[:3], ["dart", "analyze", "--no-fatal-warnings"])
+        self.assertEqual(d.cwd, repo / "seller-app")
+        self.assertIsNone(run.build_check_command("website", "a.ts", "website/a.ts", repo))
+
+    def test_ran_no_tests(self):
+        self.assertTrue(run.ran_no_tests("website", "Error: Transform failed\n Tests  no tests"))
+        self.assertFalse(run.ran_no_tests("website", " Tests  1 failed | 3 passed (4)"))
+        self.assertTrue(run.ran_no_tests("flutter:buyer-app", "Failed to load \"test/a_test.dart\""))
+        self.assertFalse(run.ran_no_tests("flutter:buyer-app", "00:01 +0 -1: Some tests failed."))
+        self.assertFalse(run.ran_no_tests("go", "FAIL"))
 
 
 if __name__ == "__main__":

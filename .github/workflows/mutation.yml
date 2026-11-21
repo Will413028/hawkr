@@ -31,10 +31,16 @@ on:
 
 concurrency:
   group: mutation-${{ github.ref }}
-  cancel-in-progress: true
+  # push 不取消：下一次 push 只比對自己的 diff，被取消的 run 的清單不會再被跑到。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+
+env:
+  # 與 website-ci.yml 相同：測試不得連到真的主機（見該檔註解與 website/tests/setup/hermetic.mjs）。
+  API_BASE_URL: http://127.0.0.1:9/api/v1
+  NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:9/api/v1
 
 jobs:
   plan:
@@ -82,6 +88,10 @@ jobs:
             fi
           fi
           echo "manifests: ${manifests[*]:-(none)}"
+          if [[ ${#manifests[@]} -eq 0 && "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "::error::manifests 輸入沒有對到任何清單：${INPUT_MANIFESTS:-mutation/*.json}"
+            exit 1
+          fi
           if [[ ${#manifests[@]} -eq 0 ]]; then
             echo 'manifests=' >> "$GITHUB_OUTPUT"
             echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
