@@ -129,7 +129,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	must("InsertApprovalRecipient", q.InsertApprovalRecipient(ctx, store.InsertApprovalRecipientParams{ApprovalID: c.approval, Position: 0, StoreID: storeID}))
 	claimed, err := q.ClaimApprovalForExecute(ctx, store.ClaimApprovalForExecuteParams{ID: c.approval, Version: 1, BuyerID: &buyerID, Now: epoch})
 	must("ClaimApprovalForExecute", err)
-	n, err = q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: c.approval, Version: claimed.Version, Now: epoch})
+	n, err = q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: c.approval, Version: claimed.Version, BuyerID: &buyerID, Now: epoch})
 	rows("MarkApprovalSucceeded", n, err)
 	n, err = q.InsertPublication(ctx, store.InsertPublicationParams{ID: c.publication, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch})
 	rows("InsertPublication", n, err)
@@ -179,25 +179,25 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("目前狀態不是 from_status 時不得轉移（條件式 UPDATE）：n=%d", n)
 	}
 
-	next, err := q.NextRevisionNo(ctx, c.request)
+	next, err := q.NextRevisionNo(ctx, store.NextRevisionNoParams{RequestID: c.request, BuyerID: &c.buyer})
 	if err != nil || next != 2 {
 		t.Fatalf("NextRevisionNo = %d, %v", next, err)
 	}
 	rev2 := id()
-	if n, err := q.SupersedeActiveRevision(ctx, c.request); err != nil || n != 1 {
+	if n, err := q.SupersedeActiveRevision(ctx, store.SupersedeActiveRevisionParams{RequestID: c.request, BuyerID: &c.buyer}); err != nil || n != 1 {
 		t.Fatalf("SupersedeActiveRevision n=%d err=%v", n, err)
 	}
 	if err := q.InsertRevision(ctx, store.InsertRevisionParams{ID: rev2, RequestID: c.request, RevisionNo: next, ParentRevisionID: &c.revision, Item: ptr("夾克"), Now: epoch}); err != nil {
 		t.Fatal(err)
 	}
-	active, err := q.GetActiveRevision(ctx, c.request)
+	active, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: c.request, BuyerID: &c.buyer})
 	if err != nil || active.ID != rev2 || active.Item == nil || *active.Item != "夾克" {
 		t.Fatalf("GetActiveRevision = %+v, %v", active, err)
 	}
-	if got, err := q.GetRevision(ctx, store.GetRevisionParams{ID: c.revision, RequestID: c.request}); err != nil || got.Status != "SUPERSEDED" {
+	if got, err := q.GetRevision(ctx, store.GetRevisionParams{ID: c.revision, RequestID: c.request, BuyerID: &c.buyer}); err != nil || got.Status != "SUPERSEDED" {
 		t.Fatalf("GetRevision = %+v, %v", got, err)
 	}
-	if revs, err := q.ListRevisions(ctx, c.request); err != nil || len(revs) != 2 || revs[0].RevisionNo != 1 {
+	if revs, err := q.ListRevisions(ctx, store.ListRevisionsParams{RequestID: c.request, BuyerID: &c.buyer}); err != nil || len(revs) != 2 || revs[0].RevisionNo != 1 {
 		t.Fatalf("ListRevisions = %d, %v", len(revs), err)
 	}
 	// 一張需求同時只有一個現行版本：直接再寫一個 ACTIVE 會被 partial unique 擋下。
@@ -258,10 +258,10 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if got, err := q.GetCandidateSetByClientRequest(ctx, store.GetCandidateSetByClientRequestParams{RequestRevisionID: c.revision, ClientRequestID: set.ClientRequestID}); err != nil || got.ID != c.candidateSet {
 		t.Fatalf("GetCandidateSetByClientRequest = %+v, %v", got, err)
 	}
-	if n, err := q.SetCandidateSelected(ctx, store.SetCandidateSelectedParams{Selected: true, Now: &epoch, ID: c.candidate, CandidateSetID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer}); err != nil || n != 1 {
+	if n, err := q.SetCandidateSelected(ctx, store.SetCandidateSelectedParams{Selected: true, Now: epoch, ID: c.candidate, CandidateSetID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer}); err != nil || n != 1 {
 		t.Fatalf("SetCandidateSelected n=%d err=%v", n, err)
 	}
-	cands, err := q.ListCandidates(ctx, c.candidateSet)
+	cands, err := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: c.candidateSet, BuyerID: c.buyer})
 	if err != nil || len(cands) != 1 || !cands[0].Selected || cands[0].SelectedAt == nil {
 		t.Fatalf("ListCandidates = %+v, %v", cands, err)
 	}
@@ -271,7 +271,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if n, err := q.SetCandidateSelected(ctx, store.SetCandidateSelectedParams{Selected: false, ID: c.candidate, CandidateSetID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer}); err != nil || n != 1 {
 		t.Fatalf("取消選取 n=%d err=%v", n, err)
 	}
-	if cands, _ := q.ListCandidates(ctx, c.candidateSet); cands[0].Selected || cands[0].SelectedAt != nil {
+	if cands, _ := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: c.candidateSet, BuyerID: c.buyer}); cands[0].Selected || cands[0].SelectedAt != nil {
 		t.Fatal("取消選取後 selected_at 要清掉")
 	}
 
@@ -303,10 +303,10 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if _, err := q.ClaimApprovalForExecute(ctx, store.ClaimApprovalForExecuteParams{ID: c.approval, Version: 1, BuyerID: &c.buyer, Now: epoch}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("已執行過的核准不能再 claim：%v", err)
 	}
-	if rs, err := q.ListApprovalRecipients(ctx, c.approval); err != nil || len(rs) != 1 || rs[0].StoreID != storeID {
+	if rs, err := q.ListApprovalRecipients(ctx, store.ListApprovalRecipientsParams{ApprovalID: c.approval, BuyerID: &c.buyer}); err != nil || len(rs) != 1 || rs[0].StoreID != storeID {
 		t.Fatalf("ListApprovalRecipients = %+v, %v", rs, err)
 	}
-	pub, err := q.GetPublication(ctx, c.publication)
+	pub, err := q.GetPublication(ctx, store.GetPublicationParams{ID: c.publication, BuyerID: &c.buyer})
 	if err != nil || pub.State != "PUBLISHED" {
 		t.Fatalf("GetPublication = %+v, %v", pub, err)
 	}
@@ -316,7 +316,51 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if dup, err := q.InsertPublication(ctx, store.InsertPublicationParams{ID: id(), BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch}); err != nil || dup != 0 {
 		t.Fatalf("同一個核准只能發布一次：n=%d err=%v", dup, err)
 	}
-	invites, err := q.ListInvites(ctx, c.publication)
+	otherBuyer := int64(999)
+	if _, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: c.request, BuyerID: &otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀現行版本：%v", err)
+	}
+	if _, err := q.GetRevision(ctx, store.GetRevisionParams{ID: c.revision, RequestID: c.request, BuyerID: &otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀版本：%v", err)
+	}
+	if revs, err := q.ListRevisions(ctx, store.ListRevisionsParams{RequestID: c.request, BuyerID: &otherBuyer}); err != nil || len(revs) != 0 {
+		t.Fatalf("別的買家列不到版本：%d, %v", len(revs), err)
+	}
+	if n, _ := q.SupersedeActiveRevision(ctx, store.SupersedeActiveRevisionParams{RequestID: c.request, BuyerID: &otherBuyer}); n != 0 {
+		t.Fatal("別的買家不能把版本轉成 SUPERSEDED")
+	}
+	if cs, err := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: c.candidateSet, BuyerID: otherBuyer}); err != nil || len(cs) != 0 {
+		t.Fatalf("別的買家列不到候選：%d, %v", len(cs), err)
+	}
+	if rs, err := q.ListApprovalRecipients(ctx, store.ListApprovalRecipientsParams{ApprovalID: c.approval, BuyerID: &otherBuyer}); err != nil || len(rs) != 0 {
+		t.Fatalf("別的買家列不到收件店：%d, %v", len(rs), err)
+	}
+	if _, err := q.GetPublication(ctx, store.GetPublicationParams{ID: c.publication, BuyerID: &otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀發布：%v", err)
+	}
+	if is, err := q.ListInvites(ctx, store.ListInvitesParams{PublicationID: c.publication, BuyerID: &otherBuyer}); err != nil || len(is) != 0 {
+		t.Fatalf("別的買家列不到邀請：%d, %v", len(is), err)
+	}
+	if _, err := q.GetLiveAcceptance(ctx, store.GetLiveAcceptanceParams{RequestID: c.request, BuyerID: &otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀 live 接受單：%v", err)
+	}
+	if _, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: c.run, BuyerID: otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀 run 輸入：%v", err)
+	}
+	if n, _ := q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: c.approval, Version: 2, BuyerID: &otherBuyer, Now: epoch}); n != 0 {
+		t.Fatal("別的買家不能標核准成功")
+	}
+	expiredApproval := id()
+	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
+		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ConfirmedRfqSnapshotID: c.snapshot, AudienceMode: "DIRECT_RECIPIENTS",
+		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+	}); err != nil || n != 1 {
+		t.Fatalf("InsertApproval（過期測試）n=%d err=%v", n, err)
+	}
+	if _, err := q.ClaimApprovalForExecute(ctx, store.ClaimApprovalForExecuteParams{ID: expiredApproval, Version: 1, BuyerID: &c.buyer, Now: epoch.Add(2 * time.Hour)}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("過期的核准不能 claim：%v", err)
+	}
+	invites, err := q.ListInvites(ctx, store.ListInvitesParams{PublicationID: c.publication, BuyerID: &c.buyer})
 	if err != nil || len(invites) != 1 || invites[0].DeliveryState != "QUEUED" {
 		t.Fatalf("ListInvites = %+v, %v", invites, err)
 	}
@@ -337,7 +381,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if got, err := q.GetAcceptanceByClientRequest(ctx, store.GetAcceptanceByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: c.acceptanceClientRequest}); err != nil || got.ID != c.acceptance {
 		t.Fatalf("GetAcceptanceByClientRequest = %+v, %v", got, err)
 	}
-	if got, err := q.GetLiveAcceptance(ctx, c.request); err != nil || got.ID != c.acceptance {
+	if got, err := q.GetLiveAcceptance(ctx, store.GetLiveAcceptanceParams{RequestID: c.request, BuyerID: &c.buyer}); err != nil || got.ID != c.acceptance {
 		t.Fatalf("GetLiveAcceptance = %+v, %v", got, err)
 	}
 	if n, err := q.MarkOrderCreated(ctx, store.MarkOrderCreatedParams{ID: c.acceptance, OrderNo: ptr("O1"), PaymentDeadline: &epoch, Now: epoch}); err != nil || n != 1 {
@@ -353,7 +397,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if dup, err := q.InsertRun(ctx, store.InsertRunParams{ID: id(), BuyerID: c.buyer, RequestID: c.request, RunType: "TURN", ClientRequestID: run.ClientRequestID, Now: epoch}); err != nil || dup != 0 {
 		t.Fatalf("run 的冪等鍵：n=%d err=%v", dup, err)
 	}
-	if in, err := q.GetRunInput(ctx, c.run); err != nil || in.BuyerMessage != "我要三件外套" {
+	if in, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: c.run, BuyerID: c.buyer}); err != nil || in.BuyerMessage != "我要三件外套" {
 		t.Fatalf("GetRunInput = %+v, %v", in, err)
 	}
 	if used, err := q.GetUsage(ctx, store.GetUsageParams{BuyerID: c.buyer, PeriodStart: epoch}); err != nil || used != 1 {
@@ -382,7 +426,7 @@ func TestLiveLockOnlyBlocksActiveAcceptances(t *testing.T) {
 	if state != "ORDER_FAILED" || provisioning != "ORDER_FAILED" {
 		t.Fatalf("state=%s provisioning=%s", state, provisioning)
 	}
-	if _, err := q.GetLiveAcceptance(ctx, c.request); !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := q.GetLiveAcceptance(ctx, store.GetLiveAcceptanceParams{RequestID: c.request, BuyerID: &c.buyer}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("建單失敗後沒有 live 接受單：%v", err)
 	}
 	if n, err := q.InsertAcceptance(ctx, acceptanceParams(c, c.buyer, second, id())); err != nil || n != 1 {

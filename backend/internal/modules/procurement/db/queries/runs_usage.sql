@@ -11,7 +11,9 @@ SELECT * FROM procurement.agent_runs WHERE id = @id AND buyer_id = @buyer_id;
 INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, created_at) VALUES (@run_id, @buyer_message, @now);
 
 -- name: GetRunInput :one
-SELECT * FROM procurement.agent_run_inputs WHERE run_id = @run_id;
+SELECT i.* FROM procurement.agent_run_inputs i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.run_id = @run_id AND r.buyer_id = @buyer_id;
 
 -- name: ConsumeUsage :one
 -- 一列計數器加條件 UPDATE（A9-D9）：used 達上限就不更新、回 0 列（呼叫端拒絕）；沒有這一期的列時先建。

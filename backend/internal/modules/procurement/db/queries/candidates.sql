@@ -17,11 +17,14 @@ INSERT INTO procurement.candidates (
 VALUES (@id, @candidate_set_id, @store_id, @source_id, @score, @rank, @matched_facts, @unverifiable_facts, @facts_as_of, @now);
 
 -- name: ListCandidates :many
-SELECT * FROM procurement.candidates WHERE candidate_set_id = @candidate_set_id ORDER BY rank, id;
+SELECT c.* FROM procurement.candidates c
+JOIN procurement.candidate_sets s ON s.id = c.candidate_set_id
+WHERE c.candidate_set_id = @candidate_set_id AND s.buyer_id = @buyer_id
+ORDER BY c.rank, c.id;
 
 -- name: SetCandidateSelected :execrows
 -- 目標狀態的方法（契約的 ToggleSelection 指明目標狀態）。
 UPDATE procurement.candidates c
-SET selected = @selected, selected_at = CASE WHEN @selected THEN @now ELSE NULL END
+SET selected = @selected::bool, selected_at = CASE WHEN @selected::bool THEN @now::timestamptz ELSE NULL END
 FROM procurement.candidate_sets s
 WHERE c.id = @id AND c.candidate_set_id = s.id AND s.id = @candidate_set_id AND s.request_id = @request_id AND s.buyer_id = @buyer_id;

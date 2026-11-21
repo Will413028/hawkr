@@ -41,23 +41,26 @@ SELECT * FROM procurement.rfq_publication_approvals WHERE id = @id AND request_i
 SELECT * FROM procurement.rfq_publication_approvals WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
 
 -- name: ClaimApprovalForExecute :one
--- PENDING 推進到 EXECUTING；(id, version, buyer_id, state) 四項條件沒命中任何列就是 CAS 失敗（過期的 version 也要擋）。
+-- PENDING 推進到 EXECUTING；(id, version, buyer_id, state, expires_at) 沒命中任何列就是 CAS 失敗（過期的 version 與過期的核准都要擋）。
 UPDATE procurement.rfq_publication_approvals
 SET state = 'EXECUTING', version = version + 1, updated_at = @now
-WHERE id = @id AND version = @version AND buyer_id = @buyer_id AND state = 'PENDING'
+WHERE id = @id AND version = @version AND buyer_id = @buyer_id AND state = 'PENDING' AND expires_at > @now::timestamptz
 RETURNING *;
 
 -- name: MarkApprovalSucceeded :execrows
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = @now
-WHERE id = @id AND version = @version AND state = 'EXECUTING';
+WHERE id = @id AND version = @version AND buyer_id = @buyer_id AND state = 'EXECUTING';
 
 -- name: InsertApprovalRecipient :exec
 INSERT INTO procurement.rfq_publication_approval_recipients (approval_id, position, store_id)
 VALUES (@approval_id, @position, @store_id);
 
 -- name: ListApprovalRecipients :many
-SELECT * FROM procurement.rfq_publication_approval_recipients WHERE approval_id = @approval_id ORDER BY position;
+SELECT r.* FROM procurement.rfq_publication_approval_recipients r
+JOIN procurement.rfq_publication_approvals a ON a.id = r.approval_id
+WHERE r.approval_id = @approval_id AND a.buyer_id = @buyer_id
+ORDER BY r.position;
 
 -- name: InsertPublication :execrows
 INSERT INTO procurement.rfq_publications (
@@ -66,7 +69,7 @@ VALUES (@id, @buyer_id, @request_id, @request_revision_id, @approval_id, @schema
 ON CONFLICT DO NOTHING;
 
 -- name: GetPublication :one
-SELECT * FROM procurement.rfq_publications WHERE id = @id;
+SELECT * FROM procurement.rfq_publications WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: GetPublicationByClientRequest :one
 SELECT * FROM procurement.rfq_publications WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
@@ -76,7 +79,10 @@ INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, s
 VALUES (@id, @publication_id, @position, @store_id, 'QUEUED', @now, @now, @now);
 
 -- name: ListInvites :many
-SELECT * FROM procurement.rfq_publication_invites WHERE publication_id = @publication_id ORDER BY position;
+SELECT i.* FROM procurement.rfq_publication_invites i
+JOIN procurement.rfq_publications p ON p.id = i.publication_id
+WHERE i.publication_id = @publication_id AND p.buyer_id = @buyer_id
+ORDER BY i.position;
 
 -- name: MarkInviteSent :execrows
 UPDATE procurement.rfq_publication_invites SET delivery_state = 'SENT', delivery_state_at = @now, updated_at = @now
@@ -110,9 +116,10 @@ ON CONFLICT DO NOTHING;
 SELECT * FROM procurement.buyer_quote_acceptances WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
 
 -- name: GetLiveAcceptance :one
-SELECT * FROM procurement.buyer_quote_acceptances WHERE request_id = @request_id AND state = 'ACTIVE';
+SELECT * FROM procurement.buyer_quote_acceptances WHERE request_id = @request_id AND buyer_id = @buyer_id AND state = 'ACTIVE';
 
 -- name: MarkOrderCreated :execrows
+-- 建單 worker 專用（系統內部，免 buyer_id）：以 job 引數裡的接受單 id 定位，且買家關閉後接受單的 buyer_id 會被設為 NULL，帶 buyer_id 會讓已建好的單記不回來。
 UPDATE procurement.buyer_quote_acceptances
 SET order_provisioning_state = 'ORDER_CREATED', order_no = @order_no, payment_deadline = @payment_deadline, updated_at = @now
 WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER';

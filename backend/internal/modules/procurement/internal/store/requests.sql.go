@@ -13,11 +13,17 @@ import (
 )
 
 const getActiveRevision = `-- name: GetActiveRevision :one
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions WHERE request_id = $1 AND status = 'ACTIVE'
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1 AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
 `
 
-func (q *Queries) GetActiveRevision(ctx context.Context, requestID uuid.UUID) (ProcurementRequestRevision, error) {
-	row := q.db.QueryRow(ctx, getActiveRevision, requestID)
+type GetActiveRevisionParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+func (q *Queries) GetActiveRevision(ctx context.Context, arg GetActiveRevisionParams) (ProcurementRequestRevision, error) {
+	row := q.db.QueryRow(ctx, getActiveRevision, arg.RequestID, arg.BuyerID)
 	var i ProcurementRequestRevision
 	err := row.Scan(
 		&i.ID,
@@ -90,16 +96,18 @@ func (q *Queries) GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyer
 }
 
 const getRevision = `-- name: GetRevision :one
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions WHERE id = $1 AND request_id = $2
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.id = $1 AND v.request_id = $2
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $3)
 `
 
 type GetRevisionParams struct {
 	ID        uuid.UUID
 	RequestID uuid.UUID
+	BuyerID   *int64
 }
 
 func (q *Queries) GetRevision(ctx context.Context, arg GetRevisionParams) (ProcurementRequestRevision, error) {
-	row := q.db.QueryRow(ctx, getRevision, arg.ID, arg.RequestID)
+	row := q.db.QueryRow(ctx, getRevision, arg.ID, arg.RequestID, arg.BuyerID)
 	var i ProcurementRequestRevision
 	err := row.Scan(
 		&i.ID,
@@ -329,11 +337,18 @@ func (q *Queries) ListConversations(ctx context.Context, arg ListConversationsPa
 }
 
 const listRevisions = `-- name: ListRevisions :many
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions WHERE request_id = $1 ORDER BY revision_no
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
+ORDER BY revision_no
 `
 
-func (q *Queries) ListRevisions(ctx context.Context, requestID uuid.UUID) ([]ProcurementRequestRevision, error) {
-	rows, err := q.db.Query(ctx, listRevisions, requestID)
+type ListRevisionsParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+func (q *Queries) ListRevisions(ctx context.Context, arg ListRevisionsParams) ([]ProcurementRequestRevision, error) {
+	rows, err := q.db.Query(ctx, listRevisions, arg.RequestID, arg.BuyerID)
 	if err != nil {
 		return nil, err
 	}
@@ -412,11 +427,17 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 }
 
 const nextRevisionNo = `-- name: NextRevisionNo :one
-SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions WHERE request_id = $1
+SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions v WHERE v.request_id = $1
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
 `
 
-func (q *Queries) NextRevisionNo(ctx context.Context, requestID uuid.UUID) (int32, error) {
-	row := q.db.QueryRow(ctx, nextRevisionNo, requestID)
+type NextRevisionNoParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+func (q *Queries) NextRevisionNo(ctx context.Context, arg NextRevisionNoParams) (int32, error) {
+	row := q.db.QueryRow(ctx, nextRevisionNo, arg.RequestID, arg.BuyerID)
 	var next_no int32
 	err := row.Scan(&next_no)
 	return next_no, err
@@ -450,7 +471,7 @@ func (q *Queries) RenameConversation(ctx context.Context, arg RenameConversation
 
 const setConversationPreview = `-- name: SetConversationPreview :exec
 UPDATE procurement.conversations SET last_message_preview = $1, updated_at = $2
-WHERE id = $3 AND buyer_id = $4
+WHERE id = $3 AND buyer_id = $4 AND deleted_at IS NULL
 `
 
 type SetConversationPreviewParams struct {
@@ -519,13 +540,19 @@ func (q *Queries) SoftDeleteConversation(ctx context.Context, arg SoftDeleteConv
 }
 
 const supersedeActiveRevision = `-- name: SupersedeActiveRevision :execrows
-UPDATE procurement.request_revisions SET status = 'SUPERSEDED'
-WHERE request_id = $1 AND status = 'ACTIVE'
+UPDATE procurement.request_revisions v SET status = 'SUPERSEDED'
+WHERE v.request_id = $1 AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
 `
 
+type SupersedeActiveRevisionParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
 // 新版本寫入前先把現行版本轉成 SUPERSEDED（partial unique 擋雙頭）。
-func (q *Queries) SupersedeActiveRevision(ctx context.Context, requestID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, supersedeActiveRevision, requestID)
+func (q *Queries) SupersedeActiveRevision(ctx context.Context, arg SupersedeActiveRevisionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, supersedeActiveRevision, arg.RequestID, arg.BuyerID)
 	if err != nil {
 		return 0, err
 	}

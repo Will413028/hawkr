@@ -23,20 +23,26 @@ VALUES (
 
 -- name: SupersedeActiveRevision :execrows
 -- 新版本寫入前先把現行版本轉成 SUPERSEDED（partial unique 擋雙頭）。
-UPDATE procurement.request_revisions SET status = 'SUPERSEDED'
-WHERE request_id = @request_id AND status = 'ACTIVE';
+UPDATE procurement.request_revisions v SET status = 'SUPERSEDED'
+WHERE v.request_id = @request_id AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: GetActiveRevision :one
-SELECT * FROM procurement.request_revisions WHERE request_id = @request_id AND status = 'ACTIVE';
+SELECT * FROM procurement.request_revisions v WHERE v.request_id = @request_id AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: GetRevision :one
-SELECT * FROM procurement.request_revisions WHERE id = @id AND request_id = @request_id;
+SELECT * FROM procurement.request_revisions v WHERE v.id = @id AND v.request_id = @request_id
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: NextRevisionNo :one
-SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions WHERE request_id = @request_id;
+SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions v WHERE v.request_id = @request_id
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: ListRevisions :many
-SELECT * FROM procurement.request_revisions WHERE request_id = @request_id ORDER BY revision_no;
+SELECT * FROM procurement.request_revisions v WHERE v.request_id = @request_id
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id)
+ORDER BY revision_no;
 
 -- name: InsertConversation :exec
 INSERT INTO procurement.conversations (id, buyer_id, request_id, created_at, updated_at)
@@ -63,7 +69,7 @@ WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: SetConversationPreview :exec
 UPDATE procurement.conversations SET last_message_preview = @preview, updated_at = @now
-WHERE id = @id AND buyer_id = @buyer_id;
+WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: InsertTurn :execrows
 -- 冪等鍵在實體上（S4）：同一位買家的同一個 client_request_id 已有輪次時回 0 列，呼叫端改讀既有的輪次。

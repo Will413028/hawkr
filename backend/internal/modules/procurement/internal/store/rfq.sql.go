@@ -15,7 +15,7 @@ import (
 const claimApprovalForExecute = `-- name: ClaimApprovalForExecute :one
 UPDATE procurement.rfq_publication_approvals
 SET state = 'EXECUTING', version = version + 1, updated_at = $1
-WHERE id = $2 AND version = $3 AND buyer_id = $4 AND state = 'PENDING'
+WHERE id = $2 AND version = $3 AND buyer_id = $4 AND state = 'PENDING' AND expires_at > $1::timestamptz
 RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at
 `
 
@@ -26,7 +26,7 @@ type ClaimApprovalForExecuteParams struct {
 	BuyerID *int64
 }
 
-// PENDING 推進到 EXECUTING；(id, version, buyer_id, state) 四項條件沒命中任何列就是 CAS 失敗（過期的 version 也要擋）。
+// PENDING 推進到 EXECUTING；(id, version, buyer_id, state, expires_at) 沒命中任何列就是 CAS 失敗（過期的 version 與過期的核准都要擋）。
 func (q *Queries) ClaimApprovalForExecute(ctx context.Context, arg ClaimApprovalForExecuteParams) (ProcurementRfqPublicationApproval, error) {
 	row := q.db.QueryRow(ctx, claimApprovalForExecute,
 		arg.Now,
@@ -220,11 +220,16 @@ func (q *Queries) GetConfirmedSnapshotByClientRequest(ctx context.Context, arg G
 }
 
 const getLiveAcceptance = `-- name: GetLiveAcceptance :one
-SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND state = 'ACTIVE'
+SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
 `
 
-func (q *Queries) GetLiveAcceptance(ctx context.Context, requestID uuid.UUID) (ProcurementBuyerQuoteAcceptance, error) {
-	row := q.db.QueryRow(ctx, getLiveAcceptance, requestID)
+type GetLiveAcceptanceParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+func (q *Queries) GetLiveAcceptance(ctx context.Context, arg GetLiveAcceptanceParams) (ProcurementBuyerQuoteAcceptance, error) {
+	row := q.db.QueryRow(ctx, getLiveAcceptance, arg.RequestID, arg.BuyerID)
 	var i ProcurementBuyerQuoteAcceptance
 	err := row.Scan(
 		&i.ID,
@@ -320,11 +325,16 @@ func (q *Queries) GetPricePreviewByClientRequest(ctx context.Context, arg GetPri
 }
 
 const getPublication = `-- name: GetPublication :one
-SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE id = $1
+SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE id = $1 AND buyer_id = $2
 `
 
-func (q *Queries) GetPublication(ctx context.Context, id uuid.UUID) (ProcurementRfqPublication, error) {
-	row := q.db.QueryRow(ctx, getPublication, id)
+type GetPublicationParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+func (q *Queries) GetPublication(ctx context.Context, arg GetPublicationParams) (ProcurementRfqPublication, error) {
+	row := q.db.QueryRow(ctx, getPublication, arg.ID, arg.BuyerID)
 	var i ProcurementRfqPublication
 	err := row.Scan(
 		&i.ID,
@@ -695,11 +705,19 @@ func (q *Queries) InsertSellerResponse(ctx context.Context, arg InsertSellerResp
 }
 
 const listApprovalRecipients = `-- name: ListApprovalRecipients :many
-SELECT approval_id, position, store_id FROM procurement.rfq_publication_approval_recipients WHERE approval_id = $1 ORDER BY position
+SELECT r.approval_id, r.position, r.store_id FROM procurement.rfq_publication_approval_recipients r
+JOIN procurement.rfq_publication_approvals a ON a.id = r.approval_id
+WHERE r.approval_id = $1 AND a.buyer_id = $2
+ORDER BY r.position
 `
 
-func (q *Queries) ListApprovalRecipients(ctx context.Context, approvalID uuid.UUID) ([]ProcurementRfqPublicationApprovalRecipient, error) {
-	rows, err := q.db.Query(ctx, listApprovalRecipients, approvalID)
+type ListApprovalRecipientsParams struct {
+	ApprovalID uuid.UUID
+	BuyerID    *int64
+}
+
+func (q *Queries) ListApprovalRecipients(ctx context.Context, arg ListApprovalRecipientsParams) ([]ProcurementRfqPublicationApprovalRecipient, error) {
+	rows, err := q.db.Query(ctx, listApprovalRecipients, arg.ApprovalID, arg.BuyerID)
 	if err != nil {
 		return nil, err
 	}
@@ -719,11 +737,19 @@ func (q *Queries) ListApprovalRecipients(ctx context.Context, approvalID uuid.UU
 }
 
 const listInvites = `-- name: ListInvites :many
-SELECT id, publication_id, position, store_id, delivery_state, delivery_state_at, created_at, updated_at FROM procurement.rfq_publication_invites WHERE publication_id = $1 ORDER BY position
+SELECT i.id, i.publication_id, i.position, i.store_id, i.delivery_state, i.delivery_state_at, i.created_at, i.updated_at FROM procurement.rfq_publication_invites i
+JOIN procurement.rfq_publications p ON p.id = i.publication_id
+WHERE i.publication_id = $1 AND p.buyer_id = $2
+ORDER BY i.position
 `
 
-func (q *Queries) ListInvites(ctx context.Context, publicationID uuid.UUID) ([]ProcurementRfqPublicationInvite, error) {
-	rows, err := q.db.Query(ctx, listInvites, publicationID)
+type ListInvitesParams struct {
+	PublicationID uuid.UUID
+	BuyerID       *int64
+}
+
+func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]ProcurementRfqPublicationInvite, error) {
+	rows, err := q.db.Query(ctx, listInvites, arg.PublicationID, arg.BuyerID)
 	if err != nil {
 		return nil, err
 	}
@@ -754,17 +780,23 @@ func (q *Queries) ListInvites(ctx context.Context, publicationID uuid.UUID) ([]P
 const markApprovalSucceeded = `-- name: MarkApprovalSucceeded :execrows
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = $1
-WHERE id = $2 AND version = $3 AND state = 'EXECUTING'
+WHERE id = $2 AND version = $3 AND buyer_id = $4 AND state = 'EXECUTING'
 `
 
 type MarkApprovalSucceededParams struct {
 	Now     time.Time
 	ID      uuid.UUID
 	Version int32
+	BuyerID *int64
 }
 
 func (q *Queries) MarkApprovalSucceeded(ctx context.Context, arg MarkApprovalSucceededParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markApprovalSucceeded, arg.Now, arg.ID, arg.Version)
+	result, err := q.db.Exec(ctx, markApprovalSucceeded,
+		arg.Now,
+		arg.ID,
+		arg.Version,
+		arg.BuyerID,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -820,6 +852,7 @@ type MarkOrderCreatedParams struct {
 	ID              uuid.UUID
 }
 
+// 建單 worker 專用（系統內部，免 buyer_id）：以 job 引數裡的接受單 id 定位，且買家關閉後接受單的 buyer_id 會被設為 NULL，帶 buyer_id 會讓已建好的單記不回來。
 func (q *Queries) MarkOrderCreated(ctx context.Context, arg MarkOrderCreatedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markOrderCreated,
 		arg.OrderNo,

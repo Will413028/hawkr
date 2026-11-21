@@ -78,11 +78,18 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 }
 
 const getRunInput = `-- name: GetRunInput :one
-SELECT run_id, buyer_message, created_at FROM procurement.agent_run_inputs WHERE run_id = $1
+SELECT i.run_id, i.buyer_message, i.created_at FROM procurement.agent_run_inputs i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.run_id = $1 AND r.buyer_id = $2
 `
 
-func (q *Queries) GetRunInput(ctx context.Context, runID uuid.UUID) (ProcurementAgentRunInput, error) {
-	row := q.db.QueryRow(ctx, getRunInput, runID)
+type GetRunInputParams struct {
+	RunID   uuid.UUID
+	BuyerID int64
+}
+
+func (q *Queries) GetRunInput(ctx context.Context, arg GetRunInputParams) (ProcurementAgentRunInput, error) {
+	row := q.db.QueryRow(ctx, getRunInput, arg.RunID, arg.BuyerID)
 	var i ProcurementAgentRunInput
 	err := row.Scan(&i.RunID, &i.BuyerMessage, &i.CreatedAt)
 	return i, err

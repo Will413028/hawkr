@@ -127,11 +127,19 @@ func (q *Queries) InsertCandidateSet(ctx context.Context, arg InsertCandidateSet
 }
 
 const listCandidates = `-- name: ListCandidates :many
-SELECT id, candidate_set_id, store_id, source_id, score, rank, matched_facts, unverifiable_facts, facts_as_of, selected, selected_at, created_at FROM procurement.candidates WHERE candidate_set_id = $1 ORDER BY rank, id
+SELECT c.id, c.candidate_set_id, c.store_id, c.source_id, c.score, c.rank, c.matched_facts, c.unverifiable_facts, c.facts_as_of, c.selected, c.selected_at, c.created_at FROM procurement.candidates c
+JOIN procurement.candidate_sets s ON s.id = c.candidate_set_id
+WHERE c.candidate_set_id = $1 AND s.buyer_id = $2
+ORDER BY c.rank, c.id
 `
 
-func (q *Queries) ListCandidates(ctx context.Context, candidateSetID uuid.UUID) ([]ProcurementCandidate, error) {
-	rows, err := q.db.Query(ctx, listCandidates, candidateSetID)
+type ListCandidatesParams struct {
+	CandidateSetID uuid.UUID
+	BuyerID        int64
+}
+
+func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ProcurementCandidate, error) {
+	rows, err := q.db.Query(ctx, listCandidates, arg.CandidateSetID, arg.BuyerID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,14 +173,14 @@ func (q *Queries) ListCandidates(ctx context.Context, candidateSetID uuid.UUID) 
 
 const setCandidateSelected = `-- name: SetCandidateSelected :execrows
 UPDATE procurement.candidates c
-SET selected = $1, selected_at = CASE WHEN $1 THEN $2 ELSE NULL END
+SET selected = $1::bool, selected_at = CASE WHEN $1::bool THEN $2::timestamptz ELSE NULL END
 FROM procurement.candidate_sets s
 WHERE c.id = $3 AND c.candidate_set_id = s.id AND s.id = $4 AND s.request_id = $5 AND s.buyer_id = $6
 `
 
 type SetCandidateSelectedParams struct {
 	Selected       bool
-	Now            *time.Time
+	Now            time.Time
 	ID             uuid.UUID
 	CandidateSetID uuid.UUID
 	RequestID      uuid.UUID
