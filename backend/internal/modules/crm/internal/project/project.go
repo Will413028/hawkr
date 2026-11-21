@@ -96,38 +96,60 @@ func (s *Service) RecordRefund(ctx context.Context, r model.Refund) (bool, error
 	}, false)
 }
 
-// skipInactive 把守門的 NotFound（買家已關閉、店家已退場，或 ID 從未存在）當成「這筆事件不寫」：提交空的 transaction、不重試；
-// 其他錯誤原樣回傳（fail-closed）。只在 NotFound 這條路徑多讀一次 pub 函式分辨原因（正常路徑沒有額外讀取）：已關閉、已退場是正常的重放，
-// 記 info；不存在只可能是上游的壞資料（買家與店家列關閉、退場後仍保留），記 error 讓它看得見。分辨用的查詢失敗時記 error（帶該錯誤）並照樣略過，不讓事件失敗。
-func (s *Service) skipInactive(ctx context.Context, err error, party string, id int64, orderNo string, inactive func(ctx context.Context, id int64) ([]int64, error)) error {
-	if apperr.KindOf(err) != apperr.KindNotFound {
-		return err
+// skip 記下守門回 NotFound 的那一方：transaction 內只記這個、提交空的 transaction，分辨原因的讀取在 transaction 之後。
+type skip struct {
+	party string
+	id    int64
+	err   error
+}
+
+// isNotFound 判斷守門的錯誤是不是 NotFound（買家已關閉、店家已退場，或 ID 從未存在）：是就「這筆事件不寫」，其他錯誤照常回傳（fail-closed）。
+func isNotFound(err error) bool { return apperr.KindOf(err) == apperr.KindNotFound }
+
+// logSkip 在 transaction 提交之後（不在其內：分辨查詢失敗會讓 Postgres 中止 transaction，使空提交失敗而事件被重試）多讀一次 pub 函式分辨原因，
+// 只在略過路徑執行（正常路徑沒有額外讀取）：已關閉、已退場是正常的重放，記 info；不存在只可能是上游的壞資料（買家與店家列關閉、退場後仍保留），
+// 記 error 讓它看得見。分辨查詢失敗時記 error（帶該錯誤）並照樣略過，不讓事件失敗。
+func (s *Service) logSkip(ctx context.Context, k skip, orderNo string) {
+	q := store.New(s.d.DB.Conn(ctx))
+	var inactive bool
+	var qerr error
+	if k.party == "買家" {
+		inactive, qerr = q.BuyerClosed(ctx, k.id)
+	} else {
+		inactive, qerr = q.StoreRetired(ctx, k.id)
 	}
-	rows, qerr := inactive(ctx, id)
 	switch {
 	case qerr != nil:
-		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"守門回 NotFound，分辨已停用或不存在的查詢失敗，略過", "party_id", id, "order_no", orderNo, "error", qerr)
-	case len(rows) > 0:
-		s.d.Logger.InfoContext(ctx, "crm：投影事件的"+party+"已停用，略過", "party_id", id, "order_no", orderNo)
+		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+k.party+"守門回 NotFound，分辨已停用或不存在的查詢失敗，略過", "party_id", k.id, "order_no", orderNo, "error", qerr)
+	case inactive:
+		s.d.Logger.InfoContext(ctx, "crm：投影事件的"+k.party+"已停用，略過", "party_id", k.id, "order_no", orderNo)
 	default:
-		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"不存在，略過", "party_id", id, "order_no", orderNo, "error", err)
+		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+k.party+"不存在，略過", "party_id", k.id, "order_no", orderNo, "error", k.err)
 	}
-	return nil
 }
 
 func (s *Service) record(ctx context.Context, dedupKey, orderNo string, storeID, buyerID int64, apply func(old state) step, createCustomer bool) (bool, error) {
 	recorded := false
+	var skipped *skip
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		recorded = false
+		recorded, skipped = false, nil
 		q := s.q(ctx)
 		// 守門鎖是 transaction 的第一組語句（買家先於店家，列的 FOR KEY SHARE，持有到 transaction 結束）：擁有者轉移（關閉買家、店家退場）的
 		// FOR UPDATE 要等這個 transaction 提交，所以抹除 job 看不到之後才提交的投影；已關閉或已退場時事件不寫任何東西。
 		// 守門鎖在 crm 自己的列（order_nets、customers）之前取，lockorder 檢查器機械驗證順序。
-		if err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {
-			return s.skipInactive(ctx, err, "買家", buyerID, orderNo, q.ClosedBuyerIDs)
+		if gerr := s.d.Buyers.LockNotClosed(ctx, buyerID); gerr != nil {
+			if !isNotFound(gerr) {
+				return gerr
+			}
+			skipped = &skip{party: "買家", id: buyerID, err: gerr}
+			return nil
 		}
-		if err := s.d.Stores.LockNotRetired(ctx, storeID); err != nil {
-			return s.skipInactive(ctx, err, "店家", storeID, orderNo, q.RetiredStoreIDs)
+		if gerr := s.d.Stores.LockNotRetired(ctx, storeID); gerr != nil {
+			if !isNotFound(gerr) {
+				return gerr
+			}
+			skipped = &skip{party: "店家", id: storeID, err: gerr}
+			return nil
 		}
 		now := s.d.Now().UTC()
 		old, err := q.LockOrderNet(ctx, store.LockOrderNetParams{OrderNo: orderNo, StoreID: storeID, BuyerID: buyerID, Now: now})
@@ -169,6 +191,10 @@ func (s *Service) record(ctx context.Context, dedupKey, orderNo string, storeID,
 	})
 	if err != nil {
 		return false, err
+	}
+	if skipped != nil {
+		s.logSkip(ctx, *skipped, orderNo)
+		return false, nil
 	}
 	return recorded, nil
 }

@@ -37,29 +37,16 @@ func (q *Queries) AddCustomerSpent(ctx context.Context, arg AddCustomerSpentPara
 	return result.RowsAffected(), nil
 }
 
-const closedBuyerIDs = `-- name: ClosedBuyerIDs :many
-SELECT cb.buyer_id FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = $1::bigint
+const buyerClosed = `-- name: BuyerClosed :one
+SELECT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = $1::bigint)::boolean AS closed
 `
 
-// 守門回 NotFound 之後才呼叫（只在略過路徑）：回傳這個買家的列，有列表示已關閉，沒有表示從未存在。
-func (q *Queries) ClosedBuyerIDs(ctx context.Context, dollar_1 int64) ([]int64, error) {
-	rows, err := q.db.Query(ctx, closedBuyerIDs, dollar_1)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var buyer_id int64
-		if err := rows.Scan(&buyer_id); err != nil {
-			return nil, err
-		}
-		items = append(items, buyer_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+// 守門回 NotFound 之後才呼叫（只在略過路徑，transaction 之外）：true 表示這個買家已關閉，false 表示從未存在。
+func (q *Queries) BuyerClosed(ctx context.Context, buyerID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, buyerClosed, buyerID)
+	var closed bool
+	err := row.Scan(&closed)
+	return closed, err
 }
 
 const insertLedger = `-- name: InsertLedger :execrows
@@ -128,31 +115,6 @@ func (q *Queries) LockOrderNet(ctx context.Context, arg LockOrderNetParams) (Loc
 	return i, err
 }
 
-const retiredStoreIDs = `-- name: RetiredStoreIDs :many
-SELECT rs.store_id FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = $1::bigint
-`
-
-// 守門回 NotFound 之後才呼叫（只在略過路徑）：回傳這個店家的列，有列表示已退場，沒有表示從未存在。
-func (q *Queries) RetiredStoreIDs(ctx context.Context, dollar_1 int64) ([]int64, error) {
-	rows, err := q.db.Query(ctx, retiredStoreIDs, dollar_1)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var store_id int64
-		if err := rows.Scan(&store_id); err != nil {
-			return nil, err
-		}
-		items = append(items, store_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const setOrderNet = `-- name: SetOrderNet :exec
 UPDATE crm.order_nets
 SET completed = $1, full_refunded = $2, net_amount = $3, updated_at = $4
@@ -176,6 +138,18 @@ func (q *Queries) SetOrderNet(ctx context.Context, arg SetOrderNetParams) error 
 		arg.OrderNo,
 	)
 	return err
+}
+
+const storeRetired = `-- name: StoreRetired :one
+SELECT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = $1::bigint)::boolean AS retired
+`
+
+// 守門回 NotFound 之後才呼叫（只在略過路徑，transaction 之外）：true 表示這個店家已退場，false 表示從未存在。
+func (q *Queries) StoreRetired(ctx context.Context, storeID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, storeRetired, storeID)
+	var retired bool
+	err := row.Scan(&retired)
+	return retired, err
 }
 
 const upsertCustomerOnOrder = `-- name: UpsertCustomerOnOrder :exec

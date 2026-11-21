@@ -289,3 +289,26 @@ func TestProjectionSkipLogLevel(t *testing.T) {
 		}
 	})
 }
+
+// 分辨原因的查詢失敗時事件照樣略過（回成功、不寫、不重試），只記一筆 error。
+// 失敗的做法：把這個測試資料庫的 buyer.pub_closed_buyers() 換成會丟錯的版本（每個測試有自己的資料庫），不動產品程式。
+func TestProjectionSkipClassificationFailure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	if _, err := f.db.Pool().Exec(context.Background(), `CREATE OR REPLACE FUNCTION buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer
+		LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'classification boom'; END $$`); err != nil {
+		t.Fatal(err)
+	}
+	recorded, err := f.order("evt-1", "O1", storeA, 900, 100)
+	if err != nil || recorded {
+		t.Fatalf("recorded=%v err=%v，預期略過且成功", recorded, err)
+	}
+	for _, tbl := range []string{"crm.customers", "crm.order_nets", "crm.ledger"} {
+		if n := f.scalar("SELECT count(*) FROM " + tbl); n != 0 {
+			t.Fatalf("%s 有 %d 列，預期不寫任何東西", tbl, n)
+		}
+	}
+	if got := f.logs.levels(); len(got) != 1 || got[0] != "ERROR" {
+		t.Fatalf("log 層級 %v，預期只有 [ERROR]", got)
+	}
+}
