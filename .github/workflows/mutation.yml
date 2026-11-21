@@ -1,0 +1,165 @@
+name: mutation
+
+# 跑 mutation 清單（mutation/*.json，格式見 mutation/README.md）：在 CI 的拋棄式 checkout 裡把檔案的 old 換成 new，
+# 指定的測試必須變紅。取代以前「開暫存分支、貼 patch、改 workflow」的手動做法。
+# - 只在清單、runner 或本 workflow 變動時觸發；push／PR 只跑這次事件改到的清單，
+#   runner 或 workflow 改了就全跑（它們壞了會讓所有清單的結果失真）。
+# - 清單裡用到哪些 stack 就扇出哪些 job：Go integration 要 Docker（testcontainers，ubuntu-latest 內建）、
+#   website 要 pnpm workspace、Flutter 要對應 App 的 fvm 版本。沒用到的 stack 不跑。
+# - mutation 不在開發機跑（機器共用、integration 需要資料庫容器），驗收只看這個 job。
+# - 先在未改動的樹上跑一次基準，紅的基準不能證明什麼（BASELINE-FAILED）。
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'mutation/**'
+      - 'scripts/mutation/**'
+      - '.github/workflows/mutation.yml'
+  pull_request:
+    paths:
+      - 'mutation/**'
+      - 'scripts/mutation/**'
+      - '.github/workflows/mutation.yml'
+  workflow_dispatch:
+    inputs:
+      manifests:
+        description: 要跑的清單路徑（以空白分隔，可用萬用字元）
+        required: false
+        default: 'mutation/*.json'
+        type: string
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: 選清單與 stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      manifests: ${{ steps.pick.outputs.manifests }}
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: 決定要跑的清單與 stack
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MANIFESTS: ${{ inputs.manifests }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            # 輸入刻意不加引號，讓空白分隔的路徑與萬用字元在 checkout 裡展開。
+            # shellcheck disable=SC2206
+            manifests=(${INPUT_MANIFESTS:-mutation/*.json})
+          else
+            base="$PR_BASE_SHA"
+            if [[ "$EVENT_NAME" == "push" ]]; then base="$PUSH_BEFORE_SHA"; fi
+            if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              # 新分支或查不到前一個 commit：沒有可比對的基準，全跑。
+              manifests=(mutation/*.json)
+            else
+              git diff --name-only "$base" HEAD > "$RUNNER_TEMP/changed"
+              if grep -qE '^(scripts/mutation/|\.github/workflows/mutation\.yml$)' "$RUNNER_TEMP/changed"; then
+                manifests=(mutation/*.json)
+              else
+                manifests=()
+                while IFS= read -r f; do
+                  if [[ "$f" =~ ^mutation/[^/]+\.json$ && -f "$f" ]]; then manifests+=("$f"); fi
+                done < "$RUNNER_TEMP/changed"
+              fi
+            fi
+          fi
+          echo "manifests: ${manifests[*]:-(none)}"
+          if [[ ${#manifests[@]} -eq 0 ]]; then
+            echo 'manifests=' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          stacks="$(python3 scripts/mutation/run.py --list-stacks "${manifests[@]}")"
+          echo "manifests=${manifests[*]}" >> "$GITHUB_OUTPUT"
+          STACKS="$stacks" python3 - >> "$GITHUB_OUTPUT" <<'PY'
+          import json, os
+          include = []
+          for s in json.loads(os.environ["STACKS"]):
+              kind = "flutter" if s.startswith("flutter:") else ("website" if s == "website" else "go")
+              include.append({"stack": s, "kind": kind, "app": s.removeprefix("flutter:") if kind == "flutter" else ""})
+          print("matrix=" + json.dumps({"include": include}))
+          PY
+
+  mutate:
+    name: mutation (${{ matrix.stack }})
+    needs: plan
+    if: needs.plan.outputs.manifests != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.kind == 'go'
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+
+      - uses: ./.github/actions/pnpm-install
+        if: matrix.kind == 'website'
+
+      - name: Read Flutter version from .fvmrc
+        id: fvmrc
+        if: matrix.kind == 'flutter'
+        env:
+          APP: ${{ matrix.app }}
+        run: echo "flutter_version=$(jq -r .flutter "$APP/.fvmrc")" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: matrix.kind == 'flutter'
+        with:
+          flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
+          channel: stable
+          cache: true
+      - name: flutter pub get
+        if: matrix.kind == 'flutter'
+        working-directory: ${{ matrix.app }}
+        run: flutter pub get
+
+      - name: 跑 mutation（${{ matrix.stack }}）
+        env:
+          STACK: ${{ matrix.stack }}
+          MANIFESTS: ${{ needs.plan.outputs.manifests }}
+        run: |
+          # MANIFESTS 刻意不加引號，讓多個路徑各自展開。
+          # shellcheck disable=SC2086
+          python3 scripts/mutation/run.py --stack "$STACK" $MANIFESTS
+
+  gate:
+    # 只要有一個 mutation job 沒有全部 KILLED 就失敗；plan 判定沒有清單要跑時 mutate 是 skipped，視為通過。
+    name: gate (mutation)
+    if: always()
+    needs: [plan, mutate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every job succeeded or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a needed job ended with: $r"; exit 1 ;; esac
+          done
