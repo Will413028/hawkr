@@ -57,9 +57,11 @@ export type UiTextKey =
 	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -320,6 +322,8 @@ const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>
 	2: "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT",
 	3: "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY",
 	4: "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER",
+	5: "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW",
+	6: "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE",
 };
 
 /** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

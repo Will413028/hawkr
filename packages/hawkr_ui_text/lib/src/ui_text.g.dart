@@ -107,6 +107,10 @@ return switch ((l, value)) {
 (UiLocale.en, 3) => 'Forum post',
 (UiLocale.zhTW, 4) => '使用者',
 (UiLocale.en, 4) => 'User',
+(UiLocale.zhTW, 5) => '評價',
+(UiLocale.en, 5) => 'Review',
+(UiLocale.zhTW, 6) => '聊天訊息',
+(UiLocale.en, 6) => 'Chat message',
 _ => null,
 };
 }

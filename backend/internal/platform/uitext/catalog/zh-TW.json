@@ -180,6 +180,10 @@
       "message": "使用者",
       "description": "買家；id 是買家的 ID。"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "買家與店家之間的一則聊天訊息；id 是訊息 ID。"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "留言",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）"
@@ -191,6 +195,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "貼文",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "評價",
+      "description": "買家寫的評價；id 是評價 ID。"
     },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
@@ -836,6 +844,10 @@
       "message": "買家",
       "description": "買家；id 是買家的 ID。\n受眾：後台員工"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "買家與店家之間的一則聊天訊息；id 是訊息 ID。\n受眾：後台員工"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "留言",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）\n受眾：後台員工"
@@ -847,6 +859,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "貼文",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "評價",
+      "description": "買家寫的評價；id 是評價 ID。\n受眾：後台員工"
     },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "已核准",
