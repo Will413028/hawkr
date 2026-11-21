@@ -1719,7 +1719,6 @@ const PreviewRfqPriceResponse$json = {
   '1': 'PreviewRfqPriceResponse',
   '2': [
     {'1': 'price_preview_id', '3': 1, '4': 1, '5': 9, '10': 'pricePreviewId'},
-    {'1': 'version', '3': 2, '4': 1, '5': 9, '10': 'version'},
     {
       '1': 'buyer_requested_range',
       '3': 3,
@@ -1743,17 +1742,21 @@ const PreviewRfqPriceResponse$json = {
   '8': [
     {'1': '_quote_total_range'},
   ],
+  '9': [
+    {'1': 2, '2': 3},
+  ],
+  '10': ['version'],
 };
 
 /// Descriptor for `PreviewRfqPriceResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List previewRfqPriceResponseDescriptor = $convert.base64Decode(
     'ChdQcmV2aWV3UmZxUHJpY2VSZXNwb25zZRIoChBwcmljZV9wcmV2aWV3X2lkGAEgASgJUg5wcm'
-    'ljZVByZXZpZXdJZBIYCgd2ZXJzaW9uGAIgASgJUgd2ZXJzaW9uEmMKFWJ1eWVyX3JlcXVlc3Rl'
-    'ZF9yYW5nZRgDIAEoCzIvLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkJ1eWVyUmVxdWVzdG'
-    'VkUmFuZ2VSE2J1eWVyUmVxdWVzdGVkUmFuZ2USIQoMcGF5bG9hZF9oYXNoGAQgASgJUgtwYXls'
-    'b2FkSGFzaBJcChFxdW90ZV90b3RhbF9yYW5nZRgFIAEoCzIrLmhhd2tyLnByb2N1cmVtZW50Ln'
-    'YxYWxwaGExLlF1b3RlVG90YWxSYW5nZUgAUg9xdW90ZVRvdGFsUmFuZ2WIAQFCFAoSX3F1b3Rl'
-    'X3RvdGFsX3Jhbmdl');
+    'ljZVByZXZpZXdJZBJjChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYAyABKAsyLy5oYXdrci5wcm9j'
+    'dXJlbWVudC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlUhNidXllclJlcXVlc3RlZFJhbm'
+    'dlEiEKDHBheWxvYWRfaGFzaBgEIAEoCVILcGF5bG9hZEhhc2gSXAoRcXVvdGVfdG90YWxfcmFu'
+    'Z2UYBSABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5RdW90ZVRvdGFsUmFuZ2VIAF'
+    'IPcXVvdGVUb3RhbFJhbmdliAEBQhQKEl9xdW90ZV90b3RhbF9yYW5nZUoECAIQA1IHdmVyc2lv'
+    'bg==');
 
 @$core.Deprecated('Use confirmRfqSnapshotRequestDescriptor instead')
 const ConfirmRfqSnapshotRequest$json = {
@@ -1784,17 +1787,13 @@ const ConfirmRfqSnapshotRequest$json = {
       '8': {},
       '10': 'pricePreviewId'
     },
-    {
-      '1': 'price_preview_version',
-      '3': 5,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'pricePreviewVersion'
-    },
     {'1': 'payload_hash', '3': 6, '4': 1, '5': 9, '8': {}, '10': 'payloadHash'},
     {'1': 'buyer_note', '3': 7, '4': 1, '5': 9, '10': 'buyerNote'},
   ],
+  '9': [
+    {'1': 5, '2': 6},
+  ],
+  '10': ['price_preview_version'],
 };
 
 /// Descriptor for `ConfirmRfqSnapshotRequest`. Decode as a `google.protobuf.DescriptorProto`.
@@ -1803,9 +1802,8 @@ final $typed_data.Uint8List confirmRfqSnapshotRequestDescriptor = $convert.base6
     'VxdWVzdElkEjcKEWNsaWVudF9yZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIAVIPY2xpZW50'
     'UmVxdWVzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQgPgQQJSEmV4cGVjdGVkUm'
     'V2aXNpb25JZBItChBwcmljZV9wcmV2aWV3X2lkGAQgASgJQgPgQQJSDnByaWNlUHJldmlld0lk'
-    'EjcKFXByaWNlX3ByZXZpZXdfdmVyc2lvbhgFIAEoCUID4EECUhNwcmljZVByZXZpZXdWZXJzaW'
-    '9uEiYKDHBheWxvYWRfaGFzaBgGIAEoCUID4EECUgtwYXlsb2FkSGFzaBIdCgpidXllcl9ub3Rl'
-    'GAcgASgJUglidXllck5vdGU=');
+    'EiYKDHBheWxvYWRfaGFzaBgGIAEoCUID4EECUgtwYXlsb2FkSGFzaBIdCgpidXllcl9ub3RlGA'
+    'cgASgJUglidXllck5vdGVKBAgFEAZSFXByaWNlX3ByZXZpZXdfdmVyc2lvbg==');
 
 @$core.Deprecated('Use confirmRfqSnapshotResponseDescriptor instead')
 const ConfirmRfqSnapshotResponse$json = {

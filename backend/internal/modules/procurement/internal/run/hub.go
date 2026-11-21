@@ -30,6 +30,9 @@ type Hub struct {
 	max    int
 	logger *slog.Logger
 
+	listenFn func(ctx context.Context, ready func()) error
+	sleep    func(ctx context.Context, d time.Duration) error
+
 	mu    sync.Mutex
 	subs  map[uuid.UUID]map[*Subscription]struct{}
 	count int
@@ -37,7 +40,20 @@ type Hub struct {
 
 // NewHub 建立 Hub；max 是訂閱數上限。
 func NewHub(d *db.DB, max int, logger *slog.Logger) *Hub {
-	return &Hub{db: d, max: max, logger: logger, subs: map[uuid.UUID]map[*Subscription]struct{}{}}
+	h := &Hub{db: d, max: max, logger: logger, sleep: sleepCtx, subs: map[uuid.UUID]map[*Subscription]struct{}{}}
+	h.listenFn = h.listen
+	return h
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 // Subscription 是一個 run 的喚醒訂閱；C 的容量是 1，多次通知合併成一次。
@@ -115,23 +131,21 @@ func (h *Hub) notifyAll() {
 func (h *Hub) Run(ctx context.Context) error {
 	backoff := reconnectMin
 	for {
-		err := h.listen(ctx)
+		err := h.listenFn(ctx, func() { backoff = reconnectMin })
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 		h.logger.WarnContext(ctx, "procurement：run 的 LISTEN 連線中斷，稍後重連", "error", err, "retryIn", backoff)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
+		if err := h.sleep(ctx, backoff); err != nil {
+			return err
 		}
 		backoff = min(backoff*2, reconnectMax)
 	}
 }
 
-func (h *Hub) listen(ctx context.Context) error {
+func (h *Hub) listen(ctx context.Context, ready func()) error {
 	conn, err := pgx.ConnectConfig(ctx, h.db.Pool().Config().ConnConfig.Copy())
 	if err != nil {
 		return fmt.Errorf("連線：%w", err)
@@ -140,6 +154,7 @@ func (h *Hub) listen(ctx context.Context) error {
 	if _, err := conn.Exec(ctx, "LISTEN "+notifyChannel); err != nil {
 		return fmt.Errorf("LISTEN：%w", err)
 	}
+	ready()
 	h.notifyAll()
 	for {
 		n, err := conn.WaitForNotification(ctx)

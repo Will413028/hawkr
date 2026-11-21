@@ -217,7 +217,7 @@ enum RunStatus {
 // RunFailureReason 是 run 失敗或逾時的機器可讀原因，只在 FAILED 與 EXPIRED 時有值。
 enum RunFailureReason {
   RUN_FAILURE_REASON_UNSPECIFIED = 0;
-  // 執行 run 的程序消失（重啟或逾時），由讀取路徑標成失敗。買家重送。
+  // 執行 run 的程序消失（重啟或逾時），由週期 sweeper 標成失敗。買家重送。
   RUN_FAILURE_REASON_WORKER_LOST = 1;
   // 候選搜尋失敗。
   RUN_FAILURE_REASON_SEARCH_FAILED = 2;
@@ -727,7 +727,8 @@ message PreviewRfqPriceRequest {
 
 message PreviewRfqPriceResponse {
   string price_preview_id = 1;
-  string version = 2;
+  reserved 2;
+  reserved "version";
   BuyerRequestedRange buyer_requested_range = 3;
   string payload_hash = 4;
   // 需求沒有填數量時不設；不回 0，也不把單價當總額。
@@ -742,7 +743,8 @@ message ConfirmRfqSnapshotRequest {
   ];
   string expected_revision_id = 3 [(google.api.field_behavior) = REQUIRED];
   string price_preview_id = 4 [(google.api.field_behavior) = REQUIRED];
-  string price_preview_version = 5 [(google.api.field_behavior) = REQUIRED];
+  reserved 5;
+  reserved "price_preview_version";
   string payload_hash = 6 [(google.api.field_behavior) = REQUIRED];
   // 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
   string buyer_note = 7;

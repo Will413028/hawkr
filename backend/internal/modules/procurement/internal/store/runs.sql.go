@@ -31,25 +31,45 @@ func (q *Queries) ClaimRun(ctx context.Context, arg ClaimRunParams) (int64, erro
 	return result.RowsAffected(), nil
 }
 
-const expireRunEvents = `-- name: ExpireRunEvents :execrows
-WITH advanced AS (
-    UPDATE procurement.agent_runs
-    SET min_available_seq = last_event_seq + 1
+const expireRunEvents = `-- name: ExpireRunEvents :one
+WITH due AS (
+    SELECT id FROM procurement.agent_runs
     WHERE completed_at < $1::timestamptz AND min_available_seq <= last_event_seq
-    RETURNING id, min_available_seq
+    ORDER BY completed_at
+    LIMIT $2::int
+    FOR UPDATE SKIP LOCKED
+), advanced AS (
+    UPDATE procurement.agent_runs r
+    SET min_available_seq = r.last_event_seq + 1
+    FROM due
+    WHERE r.id = due.id
+    RETURNING r.id, r.min_available_seq
+), deleted AS (
+    DELETE FROM procurement.agent_run_events e
+    USING advanced a
+    WHERE e.run_id = a.id AND e.seq < a.min_available_seq
+    RETURNING e.run_id
 )
-DELETE FROM procurement.agent_run_events e
-USING advanced a
-WHERE e.run_id = a.id AND e.seq < a.min_available_seq
+SELECT (SELECT count(*) FROM advanced)::bigint AS runs, (SELECT count(*) FROM deleted)::bigint AS events
 `
 
-// 結束超過保留期的 run：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
-func (q *Queries) ExpireRunEvents(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, expireRunEvents, cutoff)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type ExpireRunEventsParams struct {
+	Cutoff time.Time
+	Batch  int32
+}
+
+type ExpireRunEventsRow struct {
+	Runs   int64
+	Events int64
+}
+
+// 結束超過保留期的 run，一次最多 @batch 個：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
+// 回傳推進的 run 數與刪除的事件數；推進過的 run 不再符合條件，呼叫端迴圈到 runs 為 0。
+func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams) (ExpireRunEventsRow, error) {
+	row := q.db.QueryRow(ctx, expireRunEvents, arg.Cutoff, arg.Batch)
+	var i ExpireRunEventsRow
+	err := row.Scan(&i.Runs, &i.Events)
+	return i, err
 }
 
 const finishRun = `-- name: FinishRun :execrows

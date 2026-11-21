@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"uuid"
 
@@ -152,5 +153,87 @@ func TestDispatcherRegistersTheRunWorker(t *testing.T) {
 func TestPeriodicJobsCoverTheSweeperAndThePurger(t *testing.T) {
 	if n := len(PeriodicJobs()); n != 2 {
 		t.Fatalf("排程 = %d 個，要 sweeper 與清除各一個", n)
+	}
+}
+
+func TestHubBackoffResetsAfterASuccessfulListen(t *testing.T) {
+	h := newTestHub(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var sleeps []time.Duration
+	calls := 0
+	h.listenFn = func(_ context.Context, ready func()) error {
+		calls++
+		if calls == 1 || calls == 3 {
+			ready()
+		}
+		return errors.New("連線中斷")
+	}
+	h.sleep = func(_ context.Context, d time.Duration) error {
+		sleeps = append(sleeps, d)
+		if len(sleeps) == 3 {
+			cancel()
+			return ctx.Err()
+		}
+		return nil
+	}
+	if err := h.Run(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run = %v", err)
+	}
+	want := []time.Duration{reconnectMin, 2 * reconnectMin, reconnectMin}
+	for i := range want {
+		if sleeps[i] != want[i] {
+			t.Fatalf("退避 = %v，要 %v：LISTEN 成功之後要從頭退避", sleeps, want)
+		}
+	}
+}
+
+func TestWatchStopsWithoutWaitingOnceAnEndedRunIsDrained(t *testing.T) {
+	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED", "RESUMED"} {
+		if !IsEndedStatus(status) || !drainedEndedRun(true, 0) {
+			t.Fatalf("%s 的 run 讀完事件就要結束串流", status)
+		}
+	}
+	for _, status := range []string{"QUEUED", "RUNNING", "WAITING_FOR_INPUT", "CANCEL_REQUESTED", ""} {
+		if IsEndedStatus(status) {
+			t.Fatalf("%s 不是結束狀態", status)
+		}
+	}
+	if drainedEndedRun(false, 0) || drainedEndedRun(true, watchPage) {
+		t.Fatal("未結束的 run、或這一頁填滿時不得結束串流")
+	}
+}
+
+func TestDrainExpiredLoopsUntilNoRunAdvances(t *testing.T) {
+	batches := [][2]int64{{100, 30}, {100, 20}, {3, 5}, {0, 0}}
+	i := 0
+	got, err := drainExpired(context.Background(), func(context.Context) (int64, int64, error) {
+		b := batches[i]
+		i++
+		return b[0], b[1], nil
+	})
+	if err != nil || got != 55 || i != len(batches) {
+		t.Fatalf("total = %d, steps = %d, err = %v；要 55 個事件、跑完 %d 批", got, i, err, len(batches))
+	}
+}
+
+func TestAcceptedPayloadCarriesTheConversationID(t *testing.T) {
+	run, conv := uuid.NewV7(), uuid.NewV7()
+	read := func(c *uuid.UUID) map[string]string {
+		b, err := acceptedPayload(run, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]map[string]string
+		if err := json.Unmarshal(b, &m); err != nil {
+			t.Fatal(err)
+		}
+		return m[EventRunAccepted]
+	}
+	if got := read(&conv); got["runId"] != run.String() || got["conversationId"] != conv.String() {
+		t.Fatalf("payload = %v", got)
+	}
+	if _, has := read(nil)["conversationId"]; has {
+		t.Fatal("沒有對話時不寫 conversationId")
 	}
 }

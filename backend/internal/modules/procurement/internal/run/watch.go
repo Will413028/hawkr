@@ -54,6 +54,14 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 	ctx, cancel := context.WithTimeout(ctx, w.Window)
 	defer cancel()
 	for {
+		r, err := q.GetRunForBuyer(ctx, store.GetRunForBuyerParams{ID: runID, BuyerID: buyerID})
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		ended := IsEndedStatus(r.Status)
 		events, err := q.ListRunEventsAfter(ctx, store.ListRunEventsAfterParams{RunID: runID, AfterSeq: after, PageSize: watchPage})
 		if err != nil {
 			if ctx.Err() != nil {
@@ -73,6 +81,9 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 		if len(events) == watchPage {
 			continue
 		}
+		if drainedEndedRun(ended, len(events)) {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return nil
@@ -90,4 +101,19 @@ func parseCursor(c string) (int64, error) {
 		return 0, apperr.InvalidInputOn([]string{"cursor"}, "cursor 不正確")
 	}
 	return n, nil
+}
+
+// IsEndedStatus 回報 run 狀態是否已不會再寫事件。
+func IsEndedStatus(status string) bool {
+	switch status {
+	case "SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED", "RESUMED":
+		return true
+	}
+	return false
+}
+
+// drainedEndedRun：在列事件之前讀到 run 已結束（狀態與結尾事件同一個 transaction 可見），且這一頁沒有填滿，
+// 代表該送的都送完了；之後再等通知只會等到串流視窗結束。
+func drainedEndedRun(endedBeforeList bool, listed int) bool {
+	return endedBeforeList && listed < watchPage
 }

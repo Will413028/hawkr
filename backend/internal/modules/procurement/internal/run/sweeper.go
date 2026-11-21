@@ -91,13 +91,37 @@ type Purger struct {
 	Ledger Ledger
 }
 
-// Purge 回傳刪除的事件數。
+// purgeBatch 是一次清除處理的 run 數上限，避免一個 statement 持有大量列鎖與長時間的 transaction。
+const purgeBatch = 100
+
+// Purge 分批清除，直到沒有符合條件的 run，回傳刪除的事件數。
 func (p Purger) Purge(ctx context.Context) (int64, error) {
-	n, err := store.New(p.DB.Conn(ctx)).ExpireRunEvents(ctx, p.Ledger.Now().Add(-RetentionPeriod))
-	if err != nil {
-		return 0, fmt.Errorf("run：清除過期事件：%w", err)
+	cutoff := p.Ledger.Now().Add(-RetentionPeriod)
+	return drainExpired(ctx, func(ctx context.Context) (int64, int64, error) {
+		r, err := store.New(p.DB.Conn(ctx)).ExpireRunEvents(ctx, store.ExpireRunEventsParams{Cutoff: cutoff, Batch: purgeBatch})
+		if err != nil {
+			return 0, 0, fmt.Errorf("run：清除過期事件：%w", err)
+		}
+		return r.Runs, r.Events, nil
+	})
+}
+
+// drainExpired 重複呼叫 step 直到它推進的 run 數為 0，回傳刪除的事件總數。
+func drainExpired(ctx context.Context, step func(context.Context) (runs, events int64, err error)) (int64, error) {
+	var total int64
+	for {
+		runs, events, err := step(ctx)
+		if err != nil {
+			return total, err
+		}
+		total += events
+		if runs == 0 {
+			return total, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
 	}
-	return n, nil
 }
 
 // PurgeArgs 是週期清除的 job。

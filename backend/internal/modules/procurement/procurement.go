@@ -62,6 +62,14 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
+	switch {
+	case d.DB == nil:
+		panic("procurement.New：Deps.DB 必填")
+	case d.Now == nil:
+		panic("procurement.New：Deps.Now 必填")
+	case d.Logger == nil:
+		panic("procurement.New：Deps.Logger 必填")
+	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
 	return &Module{
 		retention: retention.New(d.DB),

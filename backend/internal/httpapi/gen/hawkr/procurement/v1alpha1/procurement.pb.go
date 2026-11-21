@@ -321,7 +321,7 @@ type RunFailureReason int32
 
 const (
 	RunFailureReason_RUN_FAILURE_REASON_UNSPECIFIED RunFailureReason = 0
-	// 執行 run 的程序消失（重啟或逾時），由讀取路徑標成失敗。買家重送。
+	// 執行 run 的程序消失（重啟或逾時），由週期 sweeper 標成失敗。買家重送。
 	RunFailureReason_RUN_FAILURE_REASON_WORKER_LOST RunFailureReason = 1
 	// 候選搜尋失敗。
 	RunFailureReason_RUN_FAILURE_REASON_SEARCH_FAILED RunFailureReason = 2
@@ -3923,7 +3923,6 @@ func (x *PreviewRfqPriceRequest) GetBuyerRequestedRange() *BuyerRequestedRange {
 type PreviewRfqPriceResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	PricePreviewId      string                 `protobuf:"bytes,1,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
-	Version             string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,3,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
 	PayloadHash         string                 `protobuf:"bytes,4,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// 需求沒有填數量時不設；不回 0，也不把單價當總額。
@@ -3969,13 +3968,6 @@ func (x *PreviewRfqPriceResponse) GetPricePreviewId() string {
 	return ""
 }
 
-func (x *PreviewRfqPriceResponse) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
-}
-
 func (x *PreviewRfqPriceResponse) GetBuyerRequestedRange() *BuyerRequestedRange {
 	if x != nil {
 		return x.BuyerRequestedRange
@@ -3998,13 +3990,12 @@ func (x *PreviewRfqPriceResponse) GetQuoteTotalRange() *QuoteTotalRange {
 }
 
 type ConfirmRfqSnapshotRequest struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	RequestId           string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	ClientRequestId     string                 `protobuf:"bytes,2,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	ExpectedRevisionId  string                 `protobuf:"bytes,3,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
-	PricePreviewId      string                 `protobuf:"bytes,4,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
-	PricePreviewVersion string                 `protobuf:"bytes,5,opt,name=price_preview_version,json=pricePreviewVersion,proto3" json:"price_preview_version,omitempty"`
-	PayloadHash         string                 `protobuf:"bytes,6,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	RequestId          string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ClientRequestId    string                 `protobuf:"bytes,2,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
+	ExpectedRevisionId string                 `protobuf:"bytes,3,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
+	PricePreviewId     string                 `protobuf:"bytes,4,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
+	PayloadHash        string                 `protobuf:"bytes,6,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
 	BuyerNote     string `protobuf:"bytes,7,opt,name=buyer_note,json=buyerNote,proto3" json:"buyer_note,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -4065,13 +4056,6 @@ func (x *ConfirmRfqSnapshotRequest) GetExpectedRevisionId() string {
 func (x *ConfirmRfqSnapshotRequest) GetPricePreviewId() string {
 	if x != nil {
 		return x.PricePreviewId
-	}
-	return ""
-}
-
-func (x *ConfirmRfqSnapshotRequest) GetPricePreviewVersion() string {
-	if x != nil {
-		return x.PricePreviewVersion
 	}
 	return ""
 }
@@ -8667,24 +8651,22 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x14expected_revision_id\x18\x02 \x01(\tB\x03\xe0A\x02R\x12expectedRevisionId\x127\n" +
 	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x12#\n" +
 	"\rdelivery_city\x18\x04 \x01(\tR\fdeliveryCity\x12h\n" +
-	"\x15buyer_requested_range\x18\x05 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeB\x03\xe0A\x02R\x13buyerRequestedRange\"\xd9\x02\n" +
+	"\x15buyer_requested_range\x18\x05 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeB\x03\xe0A\x02R\x13buyerRequestedRange\"\xce\x02\n" +
 	"\x17PreviewRfqPriceResponse\x12(\n" +
-	"\x10price_preview_id\x18\x01 \x01(\tR\x0epricePreviewId\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12c\n" +
+	"\x10price_preview_id\x18\x01 \x01(\tR\x0epricePreviewId\x12c\n" +
 	"\x15buyer_requested_range\x18\x03 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeR\x13buyerRequestedRange\x12!\n" +
 	"\fpayload_hash\x18\x04 \x01(\tR\vpayloadHash\x12\\\n" +
 	"\x11quote_total_range\x18\x05 \x01(\v2+.hawkr.procurement.v1alpha1.QuoteTotalRangeH\x00R\x0fquoteTotalRange\x88\x01\x01B\x14\n" +
-	"\x12_quote_total_range\"\xde\x02\n" +
+	"\x12_quote_total_rangeJ\x04\b\x02\x10\x03R\aversion\"\xc2\x02\n" +
 	"\x19ConfirmRfqSnapshotRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x127\n" +
 	"\x11client_request_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x125\n" +
 	"\x14expected_revision_id\x18\x03 \x01(\tB\x03\xe0A\x02R\x12expectedRevisionId\x12-\n" +
-	"\x10price_preview_id\x18\x04 \x01(\tB\x03\xe0A\x02R\x0epricePreviewId\x127\n" +
-	"\x15price_preview_version\x18\x05 \x01(\tB\x03\xe0A\x02R\x13pricePreviewVersion\x12&\n" +
+	"\x10price_preview_id\x18\x04 \x01(\tB\x03\xe0A\x02R\x0epricePreviewId\x12&\n" +
 	"\fpayload_hash\x18\x06 \x01(\tB\x03\xe0A\x02R\vpayloadHash\x12\x1d\n" +
 	"\n" +
-	"buyer_note\x18\a \x01(\tR\tbuyerNote\"\xcc\x01\n" +
+	"buyer_note\x18\a \x01(\tR\tbuyerNoteJ\x04\b\x05\x10\x06R\x15price_preview_version\"\xcc\x01\n" +
 	"\x1aConfirmRfqSnapshotResponse\x129\n" +
 	"\x19confirmed_rfq_snapshot_id\x18\x01 \x01(\tR\x16confirmedRfqSnapshotId\x12!\n" +
 	"\fpayload_hash\x18\x02 \x01(\tR\vpayloadHash\x12@\n" +

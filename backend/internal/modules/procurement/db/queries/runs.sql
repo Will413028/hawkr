@@ -41,17 +41,28 @@ ORDER BY created_at
 LIMIT @batch
 FOR UPDATE SKIP LOCKED;
 
--- name: ExpireRunEvents :execrows
--- 結束超過保留期的 run：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
-WITH advanced AS (
-    UPDATE procurement.agent_runs
-    SET min_available_seq = last_event_seq + 1
+-- name: ExpireRunEvents :one
+-- 結束超過保留期的 run，一次最多 @batch 個：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
+-- 回傳推進的 run 數與刪除的事件數；推進過的 run 不再符合條件，呼叫端迴圈到 runs 為 0。
+WITH due AS (
+    SELECT id FROM procurement.agent_runs
     WHERE completed_at < @cutoff::timestamptz AND min_available_seq <= last_event_seq
-    RETURNING id, min_available_seq
+    ORDER BY completed_at
+    LIMIT @batch::int
+    FOR UPDATE SKIP LOCKED
+), advanced AS (
+    UPDATE procurement.agent_runs r
+    SET min_available_seq = r.last_event_seq + 1
+    FROM due
+    WHERE r.id = due.id
+    RETURNING r.id, r.min_available_seq
+), deleted AS (
+    DELETE FROM procurement.agent_run_events e
+    USING advanced a
+    WHERE e.run_id = a.id AND e.seq < a.min_available_seq
+    RETURNING e.run_id
 )
-DELETE FROM procurement.agent_run_events e
-USING advanced a
-WHERE e.run_id = a.id AND e.seq < a.min_available_seq;
+SELECT (SELECT count(*) FROM advanced)::bigint AS runs, (SELECT count(*) FROM deleted)::bigint AS events;
 
 -- name: UpsertRunArtifact :one
 -- 每個 (run_id, artifact_type) 一列就地更新（A9-D20 R3）；version 遞增，當 ARTIFACT_UPSERTED 的去重序號。

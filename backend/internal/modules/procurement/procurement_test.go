@@ -2,10 +2,14 @@ package procurement_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
 type fakeSellers struct {
@@ -46,4 +50,31 @@ func TestOpenStoresBatchesBySellerLimit(t *testing.T) {
 	if _, ok := got[1]; !ok || len(got) != 2 {
 		t.Fatalf("got = %v", got)
 	}
+}
+
+func testDeps() procurement.Deps {
+	return procurement.Deps{
+		DB: new(db.DB), Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+}
+
+func TestNewRejectsMissingRequiredDeps(t *testing.T) {
+	cases := map[string]func(*procurement.Deps){
+		"DB":     func(d *procurement.Deps) { d.DB = nil },
+		"Now":    func(d *procurement.Deps) { d.Now = nil },
+		"Logger": func(d *procurement.Deps) { d.Logger = nil },
+	}
+	for name, clear := range cases {
+		d := testDeps()
+		clear(&d)
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("缺 Deps.%s 要在 New panic", name)
+				}
+			}()
+			procurement.New(d)
+		}()
+	}
+	procurement.New(testDeps())
 }

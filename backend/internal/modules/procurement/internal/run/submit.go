@@ -81,9 +81,9 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: in.Message, Now: now}); err != nil {
 			return fmt.Errorf("run：寫入輸入：%w", err)
 		}
-		accepted, err := json.Marshal(map[string]any{EventRunAccepted: map[string]string{"runId": id.String()}})
+		accepted, err := acceptedPayload(id, in.ConversationID)
 		if err != nil {
-			return fmt.Errorf("run：組 run_accepted 事件：%w", err)
+			return err
 		}
 		if _, err := s.Ledger.Append(ctx, id, EventRunAccepted, accepted); err != nil {
 			return err
@@ -94,6 +94,18 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		return uuid.UUID{}, err
 	}
 	return id, nil
+}
+
+func acceptedPayload(runID uuid.UUID, conversationID *uuid.UUID) ([]byte, error) {
+	body := map[string]string{"runId": runID.String()}
+	if conversationID != nil {
+		body["conversationId"] = conversationID.String()
+	}
+	b, err := json.Marshal(map[string]any{EventRunAccepted: body})
+	if err != nil {
+		return nil, fmt.Errorf("run：組 run_accepted 事件：%w", err)
+	}
+	return b, nil
 }
 
 func replay(ctx context.Context, q *store.Queries, in SubmitInput) (uuid.UUID, error) {

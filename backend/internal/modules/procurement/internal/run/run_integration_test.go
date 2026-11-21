@@ -491,3 +491,68 @@ func TestArtifactUpsertUpdatesInPlace(t *testing.T) {
 		t.Fatalf("要就地更新成第二版：%+v %v", a, err)
 	}
 }
+
+func TestRewatchingAnEndedRunFromTheLastCursorReturnsImmediately(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	hub := run.NewHub(d, run.MaxSubscriptions, discard())
+	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{}}
+	id, err := s.Submit(ctx, input(1, req, 5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := ledger(d, now).Finish(ctx, id, "SUCCEEDED", ""); err != nil || !ok {
+		t.Fatalf("Finish = %v, %v", ok, err)
+	}
+	r, _ := store.New(d.Conn(ctx)).GetRun(ctx, id)
+	w := run.Watcher{DB: d, Hub: hub, Window: time.Hour}
+	var sent int
+	if err := w.Watch(ctx, 1, id, run.Cursor(r.LastEventSeq), func(run.Event) error { sent++; return nil }); err != nil {
+		t.Fatalf("Watch：%v（串流視窗是一小時，ctx 30 秒：卡住就會是逾時）", err)
+	}
+	if sent != 0 || ctx.Err() != nil {
+		t.Fatalf("sent = %d, ctx = %v", sent, ctx.Err())
+	}
+}
+
+func TestPurgeAdvancesMoreRunsThanOneBatch(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	old := now.Add(-run.RetentionPeriod - time.Hour)
+	const runs = 250
+	for range runs {
+		finishedRun(ctx, t, d, req, 1, old, 2)
+	}
+	p := run.Purger{DB: d, Ledger: ledger(d, now)}
+	n, err := p.Purge(ctx)
+	if err != nil || n == 0 {
+		t.Fatalf("Purge = %d, %v", n, err)
+	}
+	if left := count(ctx, t, d, `SELECT count(*) FROM procurement.agent_runs WHERE min_available_seq <= last_event_seq AND completed_at IS NOT NULL`); left != 0 {
+		t.Fatalf("還有 %d 個過期的 run 沒推進：一次呼叫要清到沒有", left)
+	}
+}
+
+func TestSubmitWritesTheConversationIDInRunAccepted(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	conv := uuid.NewV7()
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.conversations (id, request_id, buyer_id, created_at, updated_at) VALUES ($1, $2, 1, $3, $3)`, conv, req, now); err != nil {
+		t.Skipf("conversations 欄位與測試假設不同：%v", err)
+	}
+	in := input(1, req, 5)
+	in.ConversationID = &conv
+	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{}}
+	id, err := s.Submit(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := d.Pool().QueryRow(ctx, `SELECT payload->'run_accepted'->>'conversationId' FROM procurement.agent_run_events WHERE run_id = $1 AND seq = 1`, id).Scan(&got); err != nil || got != conv.String() {
+		t.Fatalf("conversationId = %q, %v", got, err)
+	}
+}

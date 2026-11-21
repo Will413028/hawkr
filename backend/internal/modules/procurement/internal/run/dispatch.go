@@ -14,7 +14,7 @@ import (
 // Executor 執行一個已被領走（RUNNING）的 run：LLM 與 provider 呼叫在這裡，不在 transaction 內。回傳錯誤表示 run 失敗。
 // run 自己的事件與產出經 Ledger 寫入；成功時 Executor 負責把 run 轉成終態（Ledger.Finish）。
 type Executor interface {
-	Execute(ctx context.Context, runID store.ProcurementAgentRun) error
+	Execute(ctx context.Context, run store.ProcurementAgentRun) error
 }
 
 // RunTimeoutLimit 是一次 run 的執行上限（River job 的 Timeout）；超過的由 ctx 取消，sweeper 再標失敗。

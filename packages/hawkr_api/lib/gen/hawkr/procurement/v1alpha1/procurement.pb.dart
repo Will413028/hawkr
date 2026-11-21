@@ -3890,14 +3890,12 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
 class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
   factory PreviewRfqPriceResponse({
     $core.String? pricePreviewId,
-    $core.String? version,
     BuyerRequestedRange? buyerRequestedRange,
     $core.String? payloadHash,
     QuoteTotalRange? quoteTotalRange,
   }) {
     final result = PreviewRfqPriceResponse._();
     if (pricePreviewId != null) result.pricePreviewId = pricePreviewId;
-    if (version != null) result.version = version;
     if (buyerRequestedRange != null)
       result.buyerRequestedRange = buyerRequestedRange;
     if (payloadHash != null) result.payloadHash = payloadHash;
@@ -3920,7 +3918,6 @@ class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: PreviewRfqPriceResponse.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'pricePreviewId')
-    ..aOS(2, _omitFieldNames ? '' : 'version')
     ..aOM<BuyerRequestedRange>(3, _omitFieldNames ? '' : 'buyerRequestedRange',
         subBuilder: BuyerRequestedRange.$_createMessage)
     ..aOS(4, _omitFieldNames ? '' : 'payloadHash')
@@ -3961,46 +3958,37 @@ class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPricePreviewId() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.String get version => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set version($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasVersion() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearVersion() => $_clearField(2);
-
   @$pb.TagNumber(3)
-  BuyerRequestedRange get buyerRequestedRange => $_getN(2);
+  BuyerRequestedRange get buyerRequestedRange => $_getN(1);
   @$pb.TagNumber(3)
   set buyerRequestedRange(BuyerRequestedRange value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasBuyerRequestedRange() => $_has(2);
+  $core.bool hasBuyerRequestedRange() => $_has(1);
   @$pb.TagNumber(3)
   void clearBuyerRequestedRange() => $_clearField(3);
   @$pb.TagNumber(3)
-  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(2);
+  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(1);
 
   @$pb.TagNumber(4)
-  $core.String get payloadHash => $_getSZ(3);
+  $core.String get payloadHash => $_getSZ(2);
   @$pb.TagNumber(4)
-  set payloadHash($core.String value) => $_setString(3, value);
+  set payloadHash($core.String value) => $_setString(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasPayloadHash() => $_has(3);
+  $core.bool hasPayloadHash() => $_has(2);
   @$pb.TagNumber(4)
   void clearPayloadHash() => $_clearField(4);
 
   /// 需求沒有填數量時不設；不回 0，也不把單價當總額。
   @$pb.TagNumber(5)
-  QuoteTotalRange get quoteTotalRange => $_getN(4);
+  QuoteTotalRange get quoteTotalRange => $_getN(3);
   @$pb.TagNumber(5)
   set quoteTotalRange(QuoteTotalRange value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasQuoteTotalRange() => $_has(4);
+  $core.bool hasQuoteTotalRange() => $_has(3);
   @$pb.TagNumber(5)
   void clearQuoteTotalRange() => $_clearField(5);
   @$pb.TagNumber(5)
-  QuoteTotalRange ensureQuoteTotalRange() => $_ensure(4);
+  QuoteTotalRange ensureQuoteTotalRange() => $_ensure(3);
 }
 
 class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
@@ -4009,7 +3997,6 @@ class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
     $core.String? clientRequestId,
     $core.String? expectedRevisionId,
     $core.String? pricePreviewId,
-    $core.String? pricePreviewVersion,
     $core.String? payloadHash,
     $core.String? buyerNote,
   }) {
@@ -4019,8 +4006,6 @@ class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
     if (expectedRevisionId != null)
       result.expectedRevisionId = expectedRevisionId;
     if (pricePreviewId != null) result.pricePreviewId = pricePreviewId;
-    if (pricePreviewVersion != null)
-      result.pricePreviewVersion = pricePreviewVersion;
     if (payloadHash != null) result.payloadHash = payloadHash;
     if (buyerNote != null) result.buyerNote = buyerNote;
     return result;
@@ -4044,7 +4029,6 @@ class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'clientRequestId')
     ..aOS(3, _omitFieldNames ? '' : 'expectedRevisionId')
     ..aOS(4, _omitFieldNames ? '' : 'pricePreviewId')
-    ..aOS(5, _omitFieldNames ? '' : 'pricePreviewVersion')
     ..aOS(6, _omitFieldNames ? '' : 'payloadHash')
     ..aOS(7, _omitFieldNames ? '' : 'buyerNote')
     ..hasRequiredFields = false;
@@ -4111,31 +4095,22 @@ class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearPricePreviewId() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.String get pricePreviewVersion => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set pricePreviewVersion($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasPricePreviewVersion() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearPricePreviewVersion() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.String get payloadHash => $_getSZ(5);
+  $core.String get payloadHash => $_getSZ(4);
   @$pb.TagNumber(6)
-  set payloadHash($core.String value) => $_setString(5, value);
+  set payloadHash($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasPayloadHash() => $_has(5);
+  $core.bool hasPayloadHash() => $_has(4);
   @$pb.TagNumber(6)
   void clearPayloadHash() => $_clearField(6);
 
   /// 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
   @$pb.TagNumber(7)
-  $core.String get buyerNote => $_getSZ(6);
+  $core.String get buyerNote => $_getSZ(5);
   @$pb.TagNumber(7)
-  set buyerNote($core.String value) => $_setString(6, value);
+  set buyerNote($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasBuyerNote() => $_has(6);
+  $core.bool hasBuyerNote() => $_has(5);
   @$pb.TagNumber(7)
   void clearBuyerNote() => $_clearField(7);
 }
