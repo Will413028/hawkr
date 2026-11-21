@@ -170,7 +170,7 @@
 		"backToList": "Back to My reports",
 		"resolutionNote": "Platform note",
 		"yourReport": "Your report",
-		"evidenceCount": "{count} evidence photos attached",
+		"evidenceCount": "{count, plural, one {# evidence photo} other {# evidence photos}} attached",
 		"supplementsHeading": "Additional details ({count}/{max})",
 		"supplementButton": "Add details",
 		"supplementTitle": "Add details",

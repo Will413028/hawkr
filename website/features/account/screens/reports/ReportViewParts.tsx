@@ -17,13 +17,29 @@ export function ReportOutcomeChip({ text }: { text: string }) {
 	);
 }
 
-/** 店名：卡片還沒讀到或沒有卡片時不顯示文字（只留佔位，不退回快照）。 */
-export function StoreName({ storeId }: { storeId: string }) {
-	const { views } = useStoreCardViews([storeId]);
-	const name = views.get(storeId)?.name;
-	return name ? (
-		<span>{name}</span>
-	) : (
-		<span aria-hidden className="inline-block h-4 w-24 rounded bg-content2" />
+export interface StoreNameState {
+	name: string | undefined;
+	settled: boolean;
+}
+
+/** 店名：還沒讀到時顯示骨架；讀完仍沒有卡片時不顯示文字（與 buyer-app 一致，不退回快照）。 */
+export function StoreName({ name, settled }: StoreNameState) {
+	if (name) return <span>{name}</span>;
+	if (settled) return null;
+	return (
+		<span
+			aria-hidden
+			data-testid="store-name-skeleton"
+			className="inline-block h-4 w-24 rounded bg-content2"
+		/>
 	);
+}
+
+/** 一個畫面一次的店卡讀取；`nameOf` 回傳某店的呈現狀態。 */
+export function useStoreNames(storeIds: readonly string[]) {
+	const { views, settled } = useStoreCardViews(storeIds);
+	return (storeId: string): StoreNameState => ({
+		name: views.get(storeId)?.name,
+		settled,
+	});
 }

@@ -15,12 +15,21 @@ import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { messagesFor } from "@/lib/intl/config";
+import { queryKeys } from "@/lib/query/keys";
 
 const mocks = vi.hoisted(() => ({
 	status: "guest",
 	openLogin: vi.fn(),
 	createReport: vi.fn(),
 	sellerSelf: null as null | { store: { id: string; storeCode: string } },
+	invalidate: vi.fn(),
+}));
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@tanstack/react-query")>()),
+	useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
+}));
+vi.mock("@/lib/hooks/useQueryIdentity", () => ({
+	useQueryIdentity: () => ({ accountId: "1", activeRole: "buyer" }),
 }));
 vi.mock("@/lib/hooks/useSellerSelf", () => ({
 	useSellerSelf: () => ({
@@ -140,6 +149,20 @@ describe("ReportDialog", () => {
 				evidenceStagedTokens: [],
 			}),
 		);
+	});
+
+	it("invalidates the my-reports key prefix after a successful submit", async () => {
+		mocks.createReport.mockResolvedValue({ supplemented: true });
+		renderDialog(vi.fn());
+		fillValid();
+		fireEvent.click(screen.getByRole("button", { name: "送出檢舉" }));
+		await waitFor(() => expect(mocks.invalidate).toHaveBeenCalledTimes(1));
+		expect(mocks.invalidate).toHaveBeenCalledWith({
+			queryKey: queryKeys.buyer.myReports({
+				accountId: "1",
+				activeRole: "buyer",
+			}),
+		});
 	});
 
 	it("shows the received text when not supplemented", async () => {

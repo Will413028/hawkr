@@ -2,6 +2,7 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import { errorText } from "@hawkr/api/connect/errors";
+import { fieldMessage } from "@hawkr/api/connect/submit";
 import { trimGoSpace } from "@hawkr/api/text/server-text";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -13,6 +14,7 @@ import type { StoreReportDetail } from "./hooks";
 import {
 	DescriptionField,
 	EvidenceField,
+	submitFailureView,
 	useEvidenceUploads,
 } from "./ReportFormParts";
 import {
@@ -27,9 +29,11 @@ export interface SupplementDialogProps {
 	reportId: string;
 	/** 補充成功：用回應的完整詳情取代畫面資料。 */
 	onAdded: (latest: StoreReportDetail) => void;
-	/** 伺服器以前置條件拒絕（已有結果、已滿 10 則）：呼叫端重讀詳情。 */
-	onStale: () => void;
+	/** 伺服器以前置條件拒絕（已有結果、已滿 10 則）：呼叫端重讀詳情並顯示伺服器訊息，對話框隨即關閉。 */
+	onStale: (message: string) => void;
 }
+
+const RENDERED_FIELDS = new Set(["description", "evidence_staged_tokens"]);
 
 type Outcome =
 	| { kind: "idle" }
@@ -50,23 +54,28 @@ export default function SupplementDialog({
 	const [busy, setBusy] = React.useState(false);
 	const [showErrors, setShowErrors] = React.useState(false);
 	const [outcome, setOutcome] = React.useState<Outcome>({ kind: "idle" });
+	const [serverFields, setServerFields] = React.useState<
+		Record<string, string>
+	>({});
 
 	React.useEffect(() => {
 		if (!open) return;
 		setDescription("");
 		setShowErrors(false);
 		setOutcome({ kind: "idle" });
+		setServerFields({});
 	}, [open]);
 
 	const draftError: SupplementFormError | undefined =
 		validateSupplementDescription(description);
-	const fieldError = showErrors
+	const localError = showErrors
 		? draftError === "descriptionRequired"
 			? t("errorDescriptionRequired")
 			: draftError === "descriptionTooLong"
 				? t("errorDescriptionTooLong", { max: DESCRIPTION_MAX })
 				: undefined
 		: undefined;
+	const fieldError = localError ?? fieldMessage(serverFields, "description");
 
 	const close = () => {
 		if (busy || evidence.uploading) return;
@@ -78,6 +87,7 @@ export default function SupplementDialog({
 		setShowErrors(true);
 		if (draftError !== undefined || evidence.uploading) return;
 		setBusy(true);
+		setServerFields({});
 		setOutcome({ kind: "idle" });
 		try {
 			const response = await addReportSupplement({
@@ -88,8 +98,14 @@ export default function SupplementDialog({
 			onAdded(response);
 			setOutcome({ kind: "done" });
 		} catch (e) {
-			setOutcome({ kind: "error", message: errorText(e, defaults) });
-			if (ConnectError.from(e).code === Code.FailedPrecondition) onStale();
+			if (ConnectError.from(e).code === Code.FailedPrecondition) {
+				onStale(errorText(e, defaults));
+				onClose();
+				return;
+			}
+			const failure = submitFailureView(e, defaults, RENDERED_FIELDS);
+			setServerFields(failure.fields);
+			setOutcome({ kind: "error", message: failure.message });
 		} finally {
 			setBusy(false);
 		}
@@ -137,13 +153,24 @@ export default function SupplementDialog({
 				<div className="grid gap-4">
 					<DescriptionField
 						value={description}
-						onChange={setDescription}
+						onChange={(next) => {
+							setDescription(next);
+							setServerFields((prev) => {
+								if (!("description" in prev)) return prev;
+								const { description: _drop, ...rest } = prev;
+								return rest;
+							});
+						}}
 						placeholder={t("supplementPlaceholder")}
 						disabled={busy}
 						error={fieldError}
 					/>
-					<EvidenceField evidence={evidence} disabled={busy} />
-					{outcome.kind === "error" ? (
+					<EvidenceField
+						evidence={evidence}
+						disabled={busy}
+						error={fieldMessage(serverFields, "evidence_staged_tokens")}
+					/>
+					{outcome.kind === "error" && outcome.message ? (
 						<p
 							className="m-0 text-sm font-semibold text-danger-700"
 							role="alert"

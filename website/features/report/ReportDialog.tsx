@@ -1,19 +1,22 @@
 "use client";
 
-import { Code } from "@connectrpc/connect";
-import { fieldMessage, submitError } from "@hawkr/api/connect/submit";
+import { fieldMessage } from "@hawkr/api/connect/submit";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { trimGoSpace } from "@hawkr/api/text/server-text";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { Input, Select } from "@/components/ui";
 import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
+import { queryKeys } from "@/lib/query/keys";
 import { createReport } from "./api";
 import {
 	DescriptionField,
 	EvidenceField,
+	submitFailureView,
 	useEvidenceUploads,
 } from "./ReportFormParts";
 import {
@@ -53,6 +56,8 @@ export default function ReportDialog({
 }: ReportDialogProps) {
 	const t = useTranslations("report");
 	const ut = useUiText();
+	const queryClient = useQueryClient();
+	const identity = useQueryIdentity();
 	const defaults = useDefaultErrorText();
 	const categories = React.useMemo(() => reportCategoryOptions(ut), [ut]);
 	const [category, setCategory] = React.useState<string>("");
@@ -117,29 +122,17 @@ export default function ReportDialog({
 				orderNo: trimGoSpace(orderNo),
 				evidenceStagedTokens: evidence.tokens,
 			});
+			void queryClient.invalidateQueries({
+				queryKey: queryKeys.buyer.myReports(identity),
+			});
 			setOutcome({
 				kind: "done",
 				message: reportSuccessText(response, t("received")),
 			});
 		} catch (e) {
-			const failure = submitError(e, defaults);
-			if (failure.kind === "fields") setServerFields(failure.fields);
-			const unmatched =
-				failure.kind === "fields" &&
-				!Object.keys(failure.fields).some((k) => RENDERED_FIELDS.has(k));
-			setOutcome({
-				kind: "error",
-				message:
-					failure.kind === "fields"
-						? unmatched
-							? Object.values(failure.fields).join("；") ||
-								failure.message ||
-								defaults(Code.InvalidArgument)
-							: (failure.message ?? "")
-						: failure.kind === "message"
-							? failure.message
-							: defaults(Code.Internal),
-			});
+			const failure = submitFailureView(e, defaults, RENDERED_FIELDS);
+			setServerFields(failure.fields);
+			setOutcome({ kind: "error", message: failure.message });
 		} finally {
 			setBusy(false);
 		}

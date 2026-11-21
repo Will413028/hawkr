@@ -25,6 +25,7 @@ import {
 	formatReportTime,
 	ReportOutcomeChip,
 	StoreName,
+	useStoreNames,
 } from "./ReportViewParts";
 
 export default function StoreReportDetailClient({
@@ -38,6 +39,10 @@ export default function StoreReportDetailClient({
 	const { detail, loading, error, notFound, refetch, adopt, invalidate } =
 		useMyReport(reportId);
 	const [supplementOpen, setSupplementOpen] = React.useState(false);
+	const [staleMessage, setStaleMessage] = React.useState<string>();
+	const storeName = useStoreNames(
+		detail?.report ? [detail.report.storeId] : [],
+	);
 
 	const backLink = (
 		<Link
@@ -71,9 +76,7 @@ export default function StoreReportDetailClient({
 		}
 		return (
 			<SellerPageShell title={title} actions={backLink}>
-				{loading ? (
-					<p className="text-sm text-foreground-soft">{t("loading")}</p>
-				) : null}
+				<p className="text-sm text-foreground-soft">{t("loading")}</p>
 			</SellerPageShell>
 		);
 	}
@@ -87,7 +90,7 @@ export default function StoreReportDetailClient({
 			<Card className="flex flex-col gap-3 p-5">
 				<div className="flex items-start justify-between gap-2">
 					<strong className="text-lg text-hk-heading">
-						<StoreName storeId={r.storeId} />
+						<StoreName {...storeName(r.storeId)} />
 					</strong>
 					{outcome ? <ReportOutcomeChip text={outcome} /> : null}
 				</div>
@@ -153,6 +156,11 @@ export default function StoreReportDetailClient({
 						</div>
 					))}
 				</section>
+				{staleMessage ? (
+					<p className="m-0 text-sm font-semibold text-danger-700" role="alert">
+						{staleMessage}
+					</p>
+				) : null}
 				{canSupplement(detail) ? (
 					<Button onClick={() => setSupplementOpen(true)}>
 						{t("supplementButton")}
@@ -163,8 +171,14 @@ export default function StoreReportDetailClient({
 				open={supplementOpen}
 				onClose={() => setSupplementOpen(false)}
 				reportId={reportId}
-				onAdded={adopt}
-				onStale={() => void invalidate()}
+				onAdded={(latest) => {
+					setStaleMessage(undefined);
+					adopt(latest);
+				}}
+				onStale={(message) => {
+					setStaleMessage(message);
+					void invalidate();
+				}}
 			/>
 		</SellerPageShell>
 	);

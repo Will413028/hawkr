@@ -599,23 +599,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		url: "/account/reports/route-report-1",
 		pathname: "/account/reports/route-report-1",
 		mocks: [],
-		async setup(page) {
-			await page.route(
-				/\/api\/connect\/hawkr\.seller\.v1alpha1\.SellerReportAppService\/GetMyReport(?:\?|$)/,
-				(route) =>
-					fulfillConnect(route, {
-						report: {
-							id: "route-report-1",
-							storeId: SELLER_ID,
-							category: "POLICY_CATEGORY_FRAUD",
-							description: "路由測試檢舉內容",
-							createTime: "2026-01-01T00:00:00Z",
-						},
-						supplements: [],
-						evidence: [],
-					}),
-			);
-		},
 		requiredRequests: [],
 		async assertVisible(page) {
 			await assertHeading(page, "檢舉詳情");

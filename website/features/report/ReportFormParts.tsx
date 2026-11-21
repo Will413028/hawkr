@@ -1,5 +1,7 @@
 "use client";
 
+import { Code } from "@connectrpc/connect";
+import { submitError } from "@hawkr/api/connect/submit";
 import { goTrimmedRuneCount } from "@hawkr/api/text/server-text";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -116,4 +118,38 @@ export function DescriptionField({
 			</span>
 		</div>
 	);
+}
+
+export interface SubmitFailureView {
+	/** 伺服器欄位違規，鍵是欄位路徑。 */
+	fields: Record<string, string>;
+	/** 表單層的訊息；欄位違規都有對應欄位時為空字串。 */
+	message: string;
+}
+
+/** 把送出失敗對應到表單：欄位違規顯示在欄位上，沒有任何欄位對得上的才併入表單層訊息。 */
+export function submitFailureView(
+	e: unknown,
+	defaults: Parameters<typeof submitError>[1],
+	renderedFields: ReadonlySet<string>,
+): SubmitFailureView {
+	const failure = submitError(e, defaults);
+	if (failure.kind === "fields") {
+		const unmatched = !Object.keys(failure.fields).some((k) =>
+			renderedFields.has(k),
+		);
+		return {
+			fields: failure.fields,
+			message: unmatched
+				? Object.values(failure.fields).join("；") ||
+					failure.message ||
+					defaults(Code.InvalidArgument)
+				: (failure.message ?? ""),
+		};
+	}
+	return {
+		fields: {},
+		message:
+			failure.kind === "message" ? failure.message : defaults(Code.Internal),
+	};
 }

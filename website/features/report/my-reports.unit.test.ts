@@ -3,6 +3,7 @@
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
+import { BadRequestSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import {
 	CommunityReportSchema,
@@ -32,7 +33,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
+import { createTranslator, NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { uiTextFor } from "@/lib/i18n/ui-text";
@@ -42,6 +43,8 @@ const mocks = vi.hoisted(() => ({
 	listMyReports: vi.fn(),
 	getMyReport: vi.fn(),
 	addReportSupplement: vi.fn(),
+	cardCalls: vi.fn(),
+	cards: { settled: true, missing: false },
 }));
 vi.mock("./api", () => mocks);
 vi.mock("@/lib/auth/use-account-status", () => ({
@@ -51,12 +54,20 @@ vi.mock("@/lib/hooks/useQueryIdentity", () => ({
 	useQueryIdentity: () => ({ accountId: "1", activeRole: "buyer" }),
 }));
 vi.mock("@/lib/seller/useStoreCardViews", () => ({
-	useStoreCardViews: (ids: string[]) => ({
-		views: new Map(
-			ids.map((id) => [id, { id, name: `店-${id}`, logoUrl: "", href: "" }]),
-		),
-		settled: true,
-	}),
+	useStoreCardViews: (ids: string[]) => {
+		mocks.cardCalls(ids);
+		return {
+			views: new Map(
+				mocks.cards.missing || !mocks.cards.settled
+					? []
+					: ids.map((id) => [
+							id,
+							{ id, name: `店-${id}`, logoUrl: "", href: "" },
+						]),
+			),
+			settled: mocks.cards.settled,
+		};
+	},
 }));
 vi.mock("@/components/shared/Link", async () => {
 	const react = await import("react");
@@ -137,7 +148,32 @@ const renderDetail = () =>
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	mocks.cards.settled = true;
+	mocks.cards.missing = false;
 });
+
+const storeItem = (id: string, storeId: string) =>
+	create(MyReportItemSchema, {
+		id,
+		category: PolicyCategory.FRAUD,
+		createTime: when,
+		subject: { case: "store", value: storeReport({ id, storeId }) },
+	});
+const communityItem = (id: string) =>
+	create(MyReportItemSchema, {
+		id,
+		category: PolicyCategory.SPAM,
+		createTime: when,
+		subject: {
+			case: "community",
+			value: create(CommunityReportSchema, {
+				target: create(ReportTargetSchema, {
+					kind: ReportTargetKind.POST,
+					id: "post1",
+				}),
+			}),
+		},
+	});
 
 describe("MyReportsClient", () => {
 	it("renders community and store items; only the store item links to detail", async () => {
@@ -189,6 +225,88 @@ describe("MyReportsClient", () => {
 		);
 		render(wrap(React.createElement(MyReportsClient)));
 		await waitFor(() => expect(screen.getByText("尚無檢舉紀錄")).toBeTruthy());
+	});
+});
+
+describe("MyReportsClient fixes", () => {
+	it("keeps loaded items and shows the error inline when load more fails", async () => {
+		mocks.listMyReports
+			.mockResolvedValueOnce(
+				create(ListMyReportsResponseSchema, {
+					reports: [storeItem("r1", "s1")],
+					nextPageToken: "t2",
+				}),
+			)
+			.mockRejectedValueOnce(new ConnectError("boom", Code.Unavailable));
+		render(wrap(React.createElement(MyReportsClient)));
+		fireEvent.click(await screen.findByRole("button", { name: "載入更多" }));
+		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+		expect(screen.getByText("店-s1")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "載入更多" })).toBeTruthy();
+	});
+
+	it("looks up all store cards in one call", async () => {
+		mocks.listMyReports.mockResolvedValue(
+			create(ListMyReportsResponseSchema, {
+				reports: [storeItem("r1", "s1"), storeItem("r2", "s2")],
+			}),
+		);
+		render(wrap(React.createElement(MyReportsClient)));
+		await screen.findByText("店-s1");
+		expect(screen.getByText("店-s2")).toBeTruthy();
+		const withIds = mocks.cardCalls.mock.calls.filter((c) => c[0].length > 0);
+		expect(withIds.length).toBeGreaterThan(0);
+		for (const c of withIds) expect(c[0]).toEqual(["s1", "s2"]);
+	});
+
+	it("shows a skeleton until settled and no placeholder once settled without a card", async () => {
+		mocks.cards.settled = false;
+		mocks.listMyReports.mockResolvedValue(
+			create(ListMyReportsResponseSchema, { reports: [storeItem("r1", "s1")] }),
+		);
+		const { container, rerender } = render(
+			wrap(React.createElement(MyReportsClient)),
+		);
+		await waitFor(() =>
+			expect(
+				container.querySelector("[data-testid=store-name-skeleton]"),
+			).not.toBeNull(),
+		);
+		mocks.cards.settled = true;
+		mocks.cards.missing = true;
+		rerender(wrap(React.createElement(MyReportsClient)));
+		await waitFor(() =>
+			expect(
+				container.querySelector("[data-testid=store-name-skeleton]"),
+			).toBeNull(),
+		);
+	});
+
+	it("keeps the load-more button when every loaded item is of an unknown case", async () => {
+		mocks.listMyReports.mockResolvedValue(
+			create(ListMyReportsResponseSchema, {
+				reports: [create(MyReportItemSchema, { id: "x1" })],
+				nextPageToken: "t2",
+			}),
+		);
+		render(wrap(React.createElement(MyReportsClient)));
+		await screen.findByRole("button", { name: "載入更多" });
+		expect(screen.queryByText("尚無檢舉紀錄")).toBeNull();
+	});
+
+	it("does not collide keys for equal ids of different subject cases", async () => {
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		mocks.listMyReports.mockResolvedValue(
+			create(ListMyReportsResponseSchema, {
+				reports: [communityItem("1"), storeItem("1", "s1")],
+			}),
+		);
+		render(wrap(React.createElement(MyReportsClient)));
+		await screen.findByText("店-s1");
+		expect(spy.mock.calls.some((c) => String(c[0]).includes("same key"))).toBe(
+			false,
+		);
+		spy.mockRestore();
 	});
 });
 
@@ -303,5 +421,70 @@ describe("StoreReportDetailClient", () => {
 		fireEvent.click(screen.getByRole("button", { name: "送出補充說明" }));
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
 		await waitFor(() => expect(mocks.getMyReport).toHaveBeenCalledTimes(2));
+	});
+});
+
+describe("SupplementDialog fixes", () => {
+	async function openAndSubmit() {
+		renderDetail();
+		fireEvent.click(await screen.findByRole("button", { name: "補充說明" }));
+		fireEvent.change(screen.getByLabelText(/^說明/), {
+			target: { value: "內容" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "送出補充說明" }));
+	}
+
+	it("shows a server field violation on the description field", async () => {
+		mocks.getMyReport.mockResolvedValue(detail(storeReport(), 0));
+		mocks.addReportSupplement.mockRejectedValue(
+			new ConnectError("bad", Code.InvalidArgument, undefined, [
+				{
+					desc: BadRequestSchema,
+					value: {
+						fieldViolations: [
+							{
+								field: "description",
+								description: "x",
+								localizedMessage: {
+									locale: "zh-TW",
+									message: "說明含不允許的內容",
+								},
+							},
+						],
+					},
+				},
+			]),
+		);
+		await openAndSubmit();
+		await waitFor(() =>
+			expect(screen.getByText("說明含不允許的內容")).toBeTruthy(),
+		);
+		expect(screen.queryByRole("alert")).toBeNull();
+	});
+
+	it("closes the dialog on failed_precondition and shows the error on the page", async () => {
+		mocks.getMyReport.mockResolvedValue(detail(storeReport(), 0));
+		mocks.addReportSupplement.mockRejectedValue(
+			new ConnectError("已有處理結果", Code.FailedPrecondition),
+		);
+		await openAndSubmit();
+		await waitFor(() => expect(mocks.getMyReport).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		expect(screen.getByRole("alert")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "送出補充說明" })).toBeNull();
+	});
+});
+
+describe("report.evidenceCount", () => {
+	const en = createTranslator({
+		locale: "en",
+		messages: messagesFor("en"),
+		namespace: "report",
+	});
+	it("pluralizes in en", () => {
+		expect(en("evidenceCount", { count: 1 })).toBe("1 evidence photo attached");
+		expect(en("evidenceCount", { count: 2 })).toBe(
+			"2 evidence photos attached",
+		);
 	});
 });

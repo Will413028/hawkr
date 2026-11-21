@@ -1240,12 +1240,23 @@ export async function setupGatewayMocks(
 		void fulfillConnect(route, {});
 	});
 
-	// 2f. 我的檢舉（ListMyReports、GetMyReport）：預設空；個別 spec 較晚註冊的 mock 會蓋過。
-	for (const url of [LIST_MY_REPORTS_URL, GET_MY_REPORT_URL]) {
-		await page.route(url, (route) => {
-			void fulfillConnect(route, {});
+	// 2f. 我的檢舉：列表預設空；單筆預設一筆有效的店家檢舉（無 outcome，顯示審核中）。個別 spec 較晚註冊的 mock 會蓋過。
+	await page.route(LIST_MY_REPORTS_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
+	await page.route(GET_MY_REPORT_URL, (route) => {
+		void fulfillConnect(route, {
+			report: {
+				id: "route-report-1",
+				storeId: "route-store-1",
+				category: "POLICY_CATEGORY_FRAUD",
+				description: "路由測試檢舉內容",
+				createTime: "2026-01-01T00:00:00Z",
+			},
+			supplements: [],
+			evidence: [],
 		});
-	}
+	});
 
 	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
 	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {

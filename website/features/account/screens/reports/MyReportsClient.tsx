@@ -23,9 +23,17 @@ import {
 	formatReportTime,
 	ReportOutcomeChip,
 	StoreName,
+	type StoreNameState,
+	useStoreNames,
 } from "./ReportViewParts";
 
-function ReportCard({ item }: { item: MyReportItem }) {
+function ReportCard({
+	item,
+	storeName,
+}: {
+	item: MyReportItem;
+	storeName: (storeId: string) => StoreNameState;
+}) {
 	const t = useTranslations("report");
 	const ut = useUiText();
 	const store = item.subject.case === "store" ? item.subject.value : undefined;
@@ -43,7 +51,7 @@ function ReportCard({ item }: { item: MyReportItem }) {
 			<div className="flex items-start justify-between gap-2">
 				<strong className="text-base text-hk-heading">
 					{store ? (
-						<StoreName storeId={store.storeId} />
+						<StoreName {...storeName(store.storeId)} />
 					) : (
 						optionalText(
 							ut,
@@ -89,10 +97,16 @@ export default function MyReportsClient() {
 	const visible = reports.filter(
 		(r) => r.subject.case === "community" || r.subject.case === "store",
 	);
+	const storeName = useStoreNames(
+		visible.flatMap((r) =>
+			r.subject.case === "store" ? [r.subject.value.storeId] : [],
+		),
+	);
+	const nextPageFailed = error != null && reports.length > 0;
 
 	return (
 		<SellerPageShell title={t("myReportsTitle")}>
-			{error ? (
+			{error && reports.length === 0 ? (
 				<div className="flex flex-col items-start gap-2">
 					<p className="m-0 text-sm font-semibold text-danger-700" role="alert">
 						{errorText(error, defaults)}
@@ -103,7 +117,7 @@ export default function MyReportsClient() {
 				</div>
 			) : loading ? (
 				<p className="text-sm text-foreground-soft">{t("loading")}</p>
-			) : visible.length === 0 ? (
+			) : visible.length === 0 && !hasMore && !nextPageFailed ? (
 				<ScEmpty>
 					<ScEmptyTitle>{t("myReportsEmpty")}</ScEmptyTitle>
 				</ScEmpty>
@@ -111,11 +125,19 @@ export default function MyReportsClient() {
 				<>
 					<ul className="m-0 flex list-none flex-col gap-3 p-0">
 						{visible.map((item) => (
-							<li key={item.id}>
-								<ReportCard item={item} />
+							<li key={`${item.subject.case}:${item.id}`}>
+								<ReportCard item={item} storeName={storeName} />
 							</li>
 						))}
 					</ul>
+					{nextPageFailed ? (
+						<p
+							className="m-0 text-sm font-semibold text-danger-700"
+							role="alert"
+						>
+							{errorText(error, defaults)}
+						</p>
+					) : null}
 					{hasMore ? (
 						<Button
 							variant="bordered"
