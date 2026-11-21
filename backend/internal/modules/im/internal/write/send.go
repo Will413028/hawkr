@@ -65,11 +65,17 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		// 守門鎖是 transaction 內的第一組語句，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
 		// 買家先於店家（鎖序同 accountdeletion），持有到 transaction 結束。取到之後才算這次寫入看到的狀態，不重用 guard 的讀取結果。
 		// 不得把 guard 或 legacy 呼叫搬進這個 transaction（列鎖會跨網路呼叫）。
-		if err := s.d.Buyers.LockNotClosed(ctx, t.buyerID); err != nil {
-			return s.closedGuardError(l, err, sender, model.PartyBuyer)
+		// 兩個守門鎖都取（買家先於店家），再依寄件人優先翻譯 NotFound：雙方都已停用時回「寄件人已停用」，不因取鎖順序變成收件人訊息。
+		buyerErr := s.d.Buyers.LockNotClosed(ctx, t.buyerID)
+		if buyerErr != nil && apperr.KindOf(buyerErr) != apperr.KindNotFound {
+			return buyerErr
 		}
-		if err := s.d.Stores.LockNotRetired(ctx, t.store.StoreID); err != nil {
-			return s.closedGuardError(l, err, sender, model.PartyStore)
+		storeErr := s.d.Stores.LockNotRetired(ctx, t.store.StoreID)
+		if storeErr != nil && apperr.KindOf(storeErr) != apperr.KindNotFound {
+			return storeErr
+		}
+		if err := s.closedGuardError(l, buyerErr, storeErr, sender); err != nil {
+			return err
 		}
 		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
 			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender),
@@ -112,15 +118,20 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	return out, err
 }
 
-// closedGuardError 把守門的 NotFound（已關閉、已退場或不存在）依寄件人與收件人的角色翻成原有的訊息與 reason；其他錯誤原樣回傳（fail-closed）。
-func (s *Service) closedGuardError(l uitext.Locale, err error, sender, guarded model.PartyKind) error {
-	if apperr.KindOf(err) != apperr.KindNotFound {
-		return err
+// closedGuardError 把兩個守門的 NotFound（已關閉、已退場或不存在）翻成原有的訊息與 reason：寄件人那一方先翻（寄件人已停用），
+// 收件人那一方其次（對方已刪除）；兩者都通過回 nil。呼叫前非 NotFound 的錯誤已原樣回傳（fail-closed）。
+func (s *Service) closedGuardError(l uitext.Locale, buyerErr, storeErr error, sender model.PartyKind) error {
+	senderErr, receiverErr := storeErr, buyerErr
+	if sender == model.PartyBuyer {
+		senderErr, receiverErr = buyerErr, storeErr
 	}
-	if guarded == sender {
+	if senderErr != nil {
 		return apperr.FailedPrecondition("%s", text.ImSenderInactive(l))
 	}
-	return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
+	if receiverErr != nil {
+		return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
+	}
+	return nil
 }
 
 func counterpart(k model.PartyKind) model.PartyKind {
