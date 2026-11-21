@@ -67,7 +67,7 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, want := len(declarations), methodCount(t); got != want || got != 88 {
-		t.Fatalf("declarations=%d methods=%d，預期 86", got, want)
+		t.Fatalf("declarations=%d methods=%d，預期 88", got, want)
 	}
 
 	for procedure := range declarations {

@@ -52,7 +52,7 @@ message GetHolidayCalendarCoverageResponse {
 // HolidayCalendarYear 是一個已匯入的年份。
 message HolidayCalendarYear {
   // 西元年。
-  int32 year = 1 [(google.api.field_behavior) = IDENTIFIER];
+  int32 year = 1;
 
   // 該年的天數（365 或 366）。
   int32 day_count = 2;

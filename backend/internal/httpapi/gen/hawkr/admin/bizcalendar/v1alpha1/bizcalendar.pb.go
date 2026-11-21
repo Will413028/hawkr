@@ -303,9 +303,9 @@ const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc = "" +
 	"!GetHolidayCalendarCoverageRequest\"\xb0\x01\n" +
 	"\"GetHolidayCalendarCoverageResponse\x12K\n" +
 	"\x05years\x18\x01 \x03(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x05years\x12=\n" +
-	"\x11last_covered_date\x18\x02 \x01(\v2\x11.google.type.DateR\x0flastCoveredDate\"p\n" +
-	"\x13HolidayCalendarYear\x12\x17\n" +
-	"\x04year\x18\x01 \x01(\x05B\x03\xe0A\bR\x04year\x12\x1b\n" +
+	"\x11last_covered_date\x18\x02 \x01(\v2\x11.google.type.DateR\x0flastCoveredDate\"k\n" +
+	"\x13HolidayCalendarYear\x12\x12\n" +
+	"\x04year\x18\x01 \x01(\x05R\x04year\x12\x1b\n" +
 	"\tday_count\x18\x02 \x01(\x05R\bdayCount\x12#\n" +
 	"\rholiday_count\x18\x03 \x01(\x05R\fholidayCount2\xe3\x02\n" +
 	"\x17BizCalendarAdminService\x12\x98\x01\n" +

@@ -13,6 +13,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -64,12 +65,27 @@ type ImportResult struct {
 }
 
 const (
-	countYearSQL = `SELECT count(*) FROM bizcalendar.days WHERE year = $1`
 	// 一次匯入就是整年每一天，所以逐日 upsert 就是整年取代；同時匯入同一年的兩個 transaction 由主鍵與列鎖序列化，不會留下半年資料。
-	upsertSQL = `INSERT INTO bizcalendar.days (day, holiday, note, year)
+	// 輸入已依 day 升序（importColumns），兩個 transaction 取列鎖的順序一致，不會死結。xmax <> 0 是被取代的既有列。
+	upsertSQL = `WITH up AS (
+INSERT INTO bizcalendar.days (day, holiday, note, year)
 SELECT t.day, t.holiday, t.note, $4::smallint FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note)
-ON CONFLICT (day) DO UPDATE SET holiday = EXCLUDED.holiday, note = EXCLUDED.note`
+ON CONFLICT (day) DO UPDATE SET holiday = EXCLUDED.holiday, note = EXCLUDED.note
+RETURNING (xmax <> 0) AS replaced)
+SELECT count(*) FILTER (WHERE replaced) FROM up`
 )
+
+// importColumns 把 days 依日期升序攤成 upsert 的三個欄位陣列（同層多列依 ID 升序的規則）；不改動 days。
+func importColumns(days []Day) (dates []time.Time, holidays []bool, notes []string) {
+	sorted := slices.SortedFunc(slices.Values(days), func(a, b Day) int { return a.Date.Compare(b.Date) })
+	dates = make([]time.Time, len(sorted))
+	holidays = make([]bool, len(sorted))
+	notes = make([]string, len(sorted))
+	for i, d := range sorted {
+		dates[i], holidays[i], notes[i] = d.Date, d.Holiday, d.Note
+	}
+	return dates, holidays, notes
+}
 
 // Import 解析 content（ParseOfficeCalendar 的格式）並整年取代 year 的資料，同一個 transaction 寫一筆後台紀錄。解析失敗時不寫入任何東西。
 func (s *Store) Import(ctx context.Context, actor adminaudit.Actor, year int, content string) (ImportResult, error) {
@@ -77,12 +93,9 @@ func (s *Store) Import(ctx context.Context, actor adminaudit.Actor, year int, co
 	if err != nil {
 		return ImportResult{}, err
 	}
-	dates := make([]time.Time, len(days))
-	holidays := make([]bool, len(days))
-	notes := make([]string, len(days))
+	dates, holidays, notes := importColumns(days)
 	res := ImportResult{Year: year, DayCount: len(days)}
-	for i, d := range days {
-		dates[i], holidays[i], notes[i] = d.Date, d.Holiday, d.Note
+	for _, d := range days {
 		if d.Holiday {
 			res.HolidayCount++
 		}
@@ -90,10 +103,7 @@ func (s *Store) Import(ctx context.Context, actor adminaudit.Actor, year int, co
 	err = s.db.InTx(ctx, func(ctx context.Context) error {
 		conn := s.db.Conn(ctx)
 		y := int16(year) //nolint:gosec // year 已由 ParseOfficeCalendar 限在 MinYear..MaxYear
-		if err := conn.QueryRow(ctx, countYearSQL, y).Scan(&res.ReplacedDayCount); err != nil {
-			return fmt.Errorf("bizcalendar: count year: %w", err)
-		}
-		if _, err := conn.Exec(ctx, upsertSQL, dates, holidays, notes, y); err != nil {
+		if err := conn.QueryRow(ctx, upsertSQL, dates, holidays, notes, y).Scan(&res.ReplacedDayCount); err != nil {
 			return fmt.Errorf("bizcalendar: import year: %w", err)
 		}
 		return s.audit.Record(ctx, adminaudit.Entry{
