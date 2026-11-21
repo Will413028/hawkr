@@ -187,6 +187,12 @@
 
 ### A6-5 對外 API（被擋於：A6-1～4）
 
+拆四個子步驟，各自一個 session：
+- **5a** 契約設計書 `2026-11-19-a6-review-im-crm/step-5-design.md`：34 支逐支對到 Connect 方法（扣刪除 8 支）、`ReportTarget` 參照形狀（含店家檢舉人的 `CHAT_MESSAGE` 入口）、訊息種類 enum、卡片訊息的伺服器參照（A6-D14 W6）、串流 helper（心跳、壽命、寫入期限、session 重驗，A6-D16 W4）、CRM 的 lookup／meta／orders／coupons 由哪個擁有者提供；取捨列成 W 題交 Will，開工 design-review。
+- **5b** `ReviewService` 與評價檢舉（5a 已決）。
+- **5c** `ChatService`（含 streaming helper、接 `cmd/hawkr`）與聊天檢舉（5a 已決）。
+- **5d** `SellerCrmService` 與擁有者方法、CD8 驗收（5a 已決）；完成前 design-review 涵蓋 5b–5d。
+
 - Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `lookup`、`meta`、`orders`、`coupons` 改由擁有者的方法提供。
 - 必做方法清單：`interface-inventory.md` §1 的 34 支扣掉去向為「刪除」的 8 支，逐支對到 Connect 方法；派工附上整張表。
 - 驗收：`buf lint`；handler 測試涵蓋清單的每個方法；生成檔無 drift；mutation：拿掉檢舉參照的擁有者檢查，測試要失敗。
