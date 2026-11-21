@@ -135,7 +135,7 @@ const (
 	// （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
 	// 可以讓使用者重新送出。
 	ErrorReason_ASSISTANT_TURN_FAILED ErrorReason = 31
-	// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch。同一個需求同時只允許一個進行中的 run
+	// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
 	// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
 	ErrorReason_PROCUREMENT_RUN_IN_PROGRESS ErrorReason = 32
 )

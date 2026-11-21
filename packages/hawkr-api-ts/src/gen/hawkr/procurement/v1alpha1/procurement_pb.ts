@@ -4469,7 +4469,8 @@ export const CancelDispositionSchema: GenEnum<CancelDisposition> = /*@__PURE__*/
 export const BuyerProcurementAppService: GenService<{
   /**
    * SubmitTurn 送出買家的一則訊息，開始一輪釐清。request_id 空字串表示新建需求。伺服器受理後立刻回 run ID，
-   * 這一輪的過程與結果（turn_result 事件）從 WatchRun 取得。每個買家同時進行的輪次有上限，超過回 resource_exhausted；
+   * 這一輪的過程與結果（turn_result 事件）從 WatchRun 取得。這個需求已有進行中的 run 回 FAILED_PRECONDITION，
+   * reason 是 PROCUREMENT_RUN_IN_PROGRESS。買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）；
    * 本期額度用完回 resource_exhausted，reason 是 AGENT_MONTHLY_QUOTA_EXCEEDED。
    *
    * @generated from rpc hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitTurn
@@ -4491,7 +4492,8 @@ export const BuyerProcurementAppService: GenService<{
   },
   /**
    * StartCandidateSearch 開始為需求搜尋候選賣家（背景執行，以 GetCandidateSearch 取得結果）。
-   * 需求還沒齊備回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
+   * 需求還沒齊備回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；這個需求已有進行中的 run 回 FAILED_PRECONDITION，
+   * reason 是 PROCUREMENT_RUN_IN_PROGRESS。買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）。
    *
    * @generated from rpc hawkr.procurement.v1alpha1.BuyerProcurementAppService.StartCandidateSearch
    */
@@ -4693,7 +4695,9 @@ export const BuyerProcurementAppService: GenService<{
   },
   /**
    * ResumeRun 回覆 run 停下來等待的中斷，從中斷處接續。中斷已被回覆回 FAILED_PRECONDITION，
-   * reason 是 APPROVAL_ALREADY_RESOLVED；run 不在等待輸入的狀態回 FAILED_PRECONDITION，reason 是 RUN_NOT_ACTIVE。
+   * reason 是 APPROVAL_ALREADY_RESOLVED；run 不在等待輸入的狀態回 FAILED_PRECONDITION，reason 是 RUN_NOT_ACTIVE；
+   * 這個需求已有進行中的 run（包含另一個正在回答的 run）回 FAILED_PRECONDITION，reason 是 PROCUREMENT_RUN_IN_PROGRESS。
+   * 買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）。
    *
    * @generated from rpc hawkr.procurement.v1alpha1.BuyerProcurementAppService.ResumeRun
    */
