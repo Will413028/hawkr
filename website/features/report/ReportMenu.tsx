@@ -6,7 +6,9 @@ import AppIcon from "@/components/shared/AppIcon";
 import AuthGateWaitModal from "@/components/shared/AuthGateWaitModal";
 import useDisclosureMenu from "@/components/shared/useDisclosureMenu";
 import Button from "@/components/ui/Button";
+import { isOwnSellerTarget } from "@/features/seller/components/seller-chat-guard";
 import { useAuthGate } from "@/lib/auth/useAuthGate";
+import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import { useLoginRequiredOverlay } from "@/lib/state/use-login-required-overlay";
 import ReportDialog from "./ReportDialog";
 
@@ -49,6 +51,9 @@ export default function ReportMenu({
 		triggerRef,
 		panelRef,
 	});
+
+	const { data: sellerSelf } = useSellerSelf();
+	if (isOwnSellerTarget(storeId, sellerSelf)) return null;
 
 	return (
 		<span className={`relative inline-flex ${className ?? ""}`}>

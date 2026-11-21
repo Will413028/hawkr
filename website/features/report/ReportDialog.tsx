@@ -32,6 +32,13 @@ export interface ReportDialogProps {
 	product?: { id: string; name: string };
 }
 
+const RENDERED_FIELDS = new Set([
+	"category",
+	"description",
+	"order_no",
+	"evidence_staged_tokens",
+]);
+
 type Outcome =
 	| { kind: "idle" }
 	| { kind: "error"; message: string }
@@ -59,8 +66,11 @@ export default function ReportDialog({
 	>({});
 	const [outcome, setOutcome] = React.useState<Outcome>({ kind: "idle" });
 	const countId = React.useId();
+	const generation = React.useRef(0);
+	const uploadGeneration = React.useRef(0);
 
 	React.useEffect(() => {
+		generation.current += 1;
 		if (!open) return;
 		setCategory("");
 		setDescription("");
@@ -91,7 +101,7 @@ export default function ReportDialog({
 				);
 
 	const close = () => {
-		if (busy) return;
+		if (busy || uploading) return;
 		onClose();
 	};
 
@@ -118,11 +128,18 @@ export default function ReportDialog({
 		} catch (e) {
 			const failure = submitError(e, defaults);
 			if (failure.kind === "fields") setServerFields(failure.fields);
+			const unmatched =
+				failure.kind === "fields" &&
+				!Object.keys(failure.fields).some((k) => RENDERED_FIELDS.has(k));
 			setOutcome({
 				kind: "error",
 				message:
 					failure.kind === "fields"
-						? (failure.message ?? "")
+						? unmatched
+							? Object.values(failure.fields).join("；") ||
+								failure.message ||
+								defaults(Code.InvalidArgument)
+							: (failure.message ?? "")
 						: failure.kind === "message"
 							? failure.message
 							: defaults(Code.Internal),
@@ -131,6 +148,14 @@ export default function ReportDialog({
 			setBusy(false);
 		}
 	};
+
+	const clearServerField = (...keys: string[]) =>
+		setServerFields((prev) => {
+			if (!keys.some((k) => k in prev)) return prev;
+			const next = { ...prev };
+			for (const k of keys) delete next[k];
+			return next;
+		});
 
 	const title = product ? t("titleProduct") : t("titleStore");
 	const done = outcome.kind === "done";
@@ -190,7 +215,10 @@ export default function ReportDialog({
 						size="lg"
 						isRequired
 						value={category}
-						onChange={(e) => setCategory(e.target.value)}
+						onChange={(e) => {
+							setCategory(e.target.value);
+							clearServerField("category");
+						}}
 						disabled={busy}
 						isInvalid={fieldError("category", "category") !== undefined}
 						errorMessage={fieldError("category", "category")}
@@ -209,7 +237,10 @@ export default function ReportDialog({
 							size="lg"
 							isRequired
 							value={description}
-							onChange={(e) => setDescription(e.target.value)}
+							onChange={(e) => {
+								setDescription(e.target.value);
+								clearServerField("description");
+							}}
 							placeholder={t("descriptionPlaceholder")}
 							minRows={4}
 							aria-describedby={countId}
@@ -229,21 +260,36 @@ export default function ReportDialog({
 						size="lg"
 						label={t("orderNo")}
 						value={orderNo}
-						onChange={(e) => setOrderNo(e.target.value)}
+						onChange={(e) => {
+							setOrderNo(e.target.value);
+							clearServerField("order_no");
+						}}
 						disabled={busy}
 						isInvalid={fieldError("orderNo", "order_no") !== undefined}
 						errorMessage={fieldError("orderNo", "order_no")}
 					/>
 					<AfterSalePhotoUploader
 						value={photos}
-						onChange={setPhotos}
+						onChange={(next) => {
+							if (uploadGeneration.current !== generation.current) return;
+							setPhotos(next);
+							clearServerField("evidence_staged_tokens");
+						}}
 						max={EVIDENCE_MAX}
 						disabled={busy}
 						label={t("evidence")}
 						hint={t("evidenceHint", { max: EVIDENCE_MAX })}
-						onUploadingChange={setUploading}
+						onUploadingChange={(v) => {
+							if (v) uploadGeneration.current = generation.current;
+							setUploading(v);
+						}}
 						error={fieldMessage(serverFields, "evidence_staged_tokens")}
 					/>
+					{uploading ? (
+						<p className="m-0 text-xs text-hk-muted" role="status">
+							{t("uploadingWait")}
+						</p>
+					) : null}
 					{outcome.kind === "error" && outcome.message ? (
 						<p
 							className="m-0 text-sm font-semibold text-danger-700"
