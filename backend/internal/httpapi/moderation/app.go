@@ -109,10 +109,10 @@ func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitRe
 	}), nil
 }
 
-// 合併清單的每頁筆數：預設 20、上限 50。
+// 合併清單的每頁筆數：預設 20、上限取兩個來源上限的較小者（合併以兩邊各回 size 筆為前提）。
 const (
 	defaultPageSize int32 = 20
-	maxPageSize     int32 = 50
+	maxPageSize           = min(moderation.MyReportsMaxPageSize, sellermod.ReportMaxPageSize)
 )
 
 // myReportsCursor 是合併清單的 page token 內容：兩個來源各自的下一頁位置。Done 的來源已經取完（Cursor 不用）；沒有 Done 而 Cursor 為 nil 是還沒讀過（第一頁）。

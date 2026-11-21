@@ -253,6 +253,8 @@ const (
 	MeasureActionShorten         = model.MeasureActionShorten
 	MeasureActionRevoke          = model.MeasureActionRevoke
 	MeasureActionEnd             = model.MeasureActionEnd
+	// ReportMaxPageSize 是通報清單每頁筆數的上限。
+	ReportMaxPageSize = model.ReportMaxPageSize
 	// MaxSupplements 是一筆通報最多的補充則數。
 	MaxSupplements = model.MaxSupplements
 	// ReviewWindow 是 RISK 措施複審期限的上限。

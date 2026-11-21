@@ -169,12 +169,12 @@ func (h *Reports) AddReportSupplement(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	if err := h.countSubmit(accountID, sellerv1alpha1connect.SellerReportAppServiceAddReportSupplementProcedure); err != nil {
-		return nil, err
-	}
 	msg := req.Msg
 	id, err := rpc.ParseUUID("report_id", msg.GetReportId())
 	if err != nil {
+		return nil, err
+	}
+	if err := h.countSubmit(accountID, sellerv1alpha1connect.SellerReportAppServiceAddReportSupplementProcedure); err != nil {
 		return nil, err
 	}
 	r, err := h.m.AddReportSupplement(ctx, model.AddSupplementInput{

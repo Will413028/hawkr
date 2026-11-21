@@ -105,6 +105,9 @@ const (
 func CaseStateValues() []CaseState { return []CaseState{CaseStateOpen, CaseStateClosed} }
 
 const (
+	// ReportDefaultPageSize 與 ReportMaxPageSize 是通報清單（檢舉人、後台）的每頁筆數。
+	ReportDefaultPageSize int32 = 20
+	ReportMaxPageSize     int32 = 100
 	// MaxSupplements 是一筆通報最多的補充則數（超過時回 failed_precondition）。
 	MaxSupplements = 10
 	// MaxReportEvidence 是一筆通報（原通報加全部補充）最多的佐證張數，位置的上界。

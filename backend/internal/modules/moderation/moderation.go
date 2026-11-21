@@ -81,6 +81,9 @@ type (
 	CasePage = model.CasePage
 )
 
+// MyReportsMaxPageSize 是檢舉人清單每頁筆數的上限。
+const MyReportsMaxPageSize = model.MaxPageSize
+
 const (
 	TargetPost          = model.TargetPost
 	TargetComment       = model.TargetComment

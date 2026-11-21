@@ -215,6 +215,9 @@ func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput
 	if err != nil {
 		return model.Report{}, err
 	}
+	if owned.Outcome != nil {
+		return model.Report{}, apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
+	}
 	now := s.now()
 	evidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)
 	if err != nil {

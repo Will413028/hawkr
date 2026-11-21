@@ -22,16 +22,18 @@ import (
 // pagedCommunity 與 pagedStores 以真的 keyset 語意（建立時間新到舊、id 新到舊、取 size 筆並以 Next 標示還有）回傳固定的資料，
 // 並記錄每次呼叫的游標，讓測試能看「取完的來源是否不再被讀」。
 type pagedCommunity struct {
-	rows  []moderation.ReportItem
-	calls []*moderation.ReportCursor
+	rows   []moderation.ReportItem
+	calls  []*moderation.ReportCursor
+	buyers []int64
 }
 
 func (p *pagedCommunity) SubmitReport(context.Context, moderation.SubmitInput) (moderation.SubmitResult, error) {
 	return moderation.SubmitResult{}, nil
 }
 
-func (p *pagedCommunity) MyReports(_ context.Context, _ int64, after *moderation.ReportCursor, size int32) (moderation.ReportPage, error) {
+func (p *pagedCommunity) MyReports(_ context.Context, buyerID int64, after *moderation.ReportCursor, size int32) (moderation.ReportPage, error) {
 	p.calls = append(p.calls, after)
+	p.buyers = append(p.buyers, buyerID)
 	var rest []moderation.ReportItem
 	for _, r := range p.rows {
 		if after == nil || r.Report.CreatedAt.Before(after.CreatedAt) || (r.Report.CreatedAt.Equal(after.CreatedAt) && string(r.Report.ID[:]) < string(after.ID[:])) {
@@ -52,12 +54,14 @@ func (p *pagedCommunity) MyReports(_ context.Context, _ int64, after *moderation
 }
 
 type pagedStores struct {
-	rows  []sellermod.Report
-	calls []*sellermod.ReportCursor
+	rows   []sellermod.Report
+	calls  []*sellermod.ReportCursor
+	buyers []int64
 }
 
 func (p *pagedStores) BuyerReports(_ context.Context, in sellermod.BuyerReportListInput) (sellermod.ReportPage, error) {
 	p.calls = append(p.calls, in.After)
+	p.buyers = append(p.buyers, in.BuyerID)
 	var rest []sellermod.Report
 	for _, r := range p.rows {
 		if in.After == nil || r.CreatedAt.Before(in.After.CreatedAt) || (r.CreatedAt.Equal(in.After.CreatedAt) && string(r.ID[:]) < string(in.After.ID[:])) {
@@ -75,6 +79,14 @@ func (p *pagedStores) BuyerReports(_ context.Context, in sellermod.BuyerReportLi
 }
 
 type fakeStores struct{ pagedStores }
+
+// shortStores 每頁比要求的少回一筆（至少一筆）、但仍以 Next 標示還有：合併不能假設來源剛好回 size 筆。
+type shortStores struct{ pagedStores }
+
+func (p *shortStores) BuyerReports(ctx context.Context, in sellermod.BuyerReportListInput) (sellermod.ReportPage, error) {
+	in.PageSize = max(1, in.PageSize-1)
+	return p.pagedStores.BuyerReports(ctx, in)
+}
 
 func idOf(n byte) uuid.UUID { return uuid.UUID{15: n} }
 
@@ -245,5 +257,47 @@ func TestListMyReportsStoreItemCarriesTheStoreReportAndSharedFields(t *testing.T
 	if it.GetCommunity() != nil || it.GetStore().GetId() != it.GetId() || it.GetStore().GetResolutionNote() != "查過了" || it.GetDescription() != "s" ||
 		!it.GetResolveTime().AsTime().Equal(resolved) || !it.GetCreateTime().AsTime().Equal(r.CreatedAt) {
 		t.Fatalf("%v", it)
+	}
+}
+
+func TestListMyReportsSourceReturningFewerThanSizeWithNextLosesNothing(t *testing.T) {
+	c := &pagedCommunity{rows: sortedCommunity(community(1, 1), community(3, 3), community(5, 5), community(7, 7))}
+	s := &shortStores{pagedStores{rows: sortedStores(storeReport(2, 2), storeReport(4, 4), storeReport(6, 6), storeReport(8, 8))}}
+	e := newEnvWith(t, c, s)
+	want := []string{"c1", "s2", "c3", "s4", "c5", "s6", "c7", "s8"}
+	for _, size := range []int32{2, 3, 5} {
+		if got, _ := pageAll(t, e, size); !slices.Equal(got, want) {
+			t.Fatalf("size=%d：%v，預期 %v", size, got, want)
+		}
+	}
+}
+
+func TestListMyReportsPassesTheCallerBuyerToBothSources(t *testing.T) {
+	c := &pagedCommunity{rows: sortedCommunity(community(1, 1))}
+	s := &pagedStores{rows: sortedStores(storeReport(2, 2))}
+	e := newEnvWith(t, c, s)
+	pageAll(t, e, 5)
+	if len(c.buyers) == 0 || len(s.buyers) == 0 {
+		t.Fatalf("兩個來源都該被讀：%v %v", c.buyers, s.buyers)
+	}
+	for _, b := range append(slices.Clone(c.buyers), s.buyers...) {
+		if b != 7 {
+			t.Fatalf("來源收到的買家 %d，預期呼叫者 7：%v %v", b, c.buyers, s.buyers)
+		}
+	}
+}
+
+func TestMergedPageSizeLimitFitsBothSources(t *testing.T) {
+	if maxPageSize > moderation.MyReportsMaxPageSize || maxPageSize > sellermod.ReportMaxPageSize {
+		t.Fatalf("合併的上限 %d 超過來源的上限（%d、%d）", maxPageSize, moderation.MyReportsMaxPageSize, sellermod.ReportMaxPageSize)
+	}
+}
+
+func TestOutcomeAndTargetEnumsMatchTheModules(t *testing.T) {
+	if m := rpc.EnumMismatches[pb.ReportTargetKind]([]moderation.TargetKind{moderation.TargetPost, moderation.TargetComment, moderation.TargetForumEntry, moderation.TargetBuyer}); len(m) != 0 {
+		t.Fatalf("ReportTargetKind：%v", m)
+	}
+	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomePending, moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {
+		t.Fatalf("ReportOutcome：%v", m)
 	}
 }

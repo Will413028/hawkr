@@ -904,10 +904,10 @@ const reportSupplements = `-- name: ReportSupplements :many
 SELECT id, report_id, description, seq, created_at
 FROM seller.report_supplements
 WHERE report_id = ANY($1::uuid[])
-ORDER BY report_id, created_at, id
+ORDER BY report_id, seq
 `
 
-// 一批通報的補充，依通報、舊到新。
+// 一批通報的補充，依通報、編號（seq，鎖住通報後遞增，不依賴時鐘）舊到新。
 func (q *Queries) ReportSupplements(ctx context.Context, reportIds []uuid.UUID) ([]SellerReportSupplement, error) {
 	rows, err := q.db.Query(ctx, reportSupplements, reportIds)
 	if err != nil {

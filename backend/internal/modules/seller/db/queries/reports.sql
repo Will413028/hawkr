@@ -31,11 +31,11 @@ FROM seller.report_supplements
 WHERE report_id = $1;
 
 -- name: ReportSupplements :many
--- 一批通報的補充，依通報、舊到新。
+-- 一批通報的補充，依通報、編號（seq，鎖住通報後遞增，不依賴時鐘）舊到新。
 SELECT *
 FROM seller.report_supplements
 WHERE report_id = ANY(sqlc.arg(report_ids)::uuid[])
-ORDER BY report_id, created_at, id;
+ORDER BY report_id, seq;
 
 -- name: InsertReportEvidence :exec
 -- 一次送出的第 position 張佐證（submission_seq 0 是原通報、1..10 是補充；position 0..4，DB 保證每次送出最多 5 張）。

@@ -56,7 +56,9 @@ func New(d Deps) *Service {
 // now 是寫入用的現在：截到微秒（Postgres 的 timestamptz 精度），之後與已存的時間比較才不會被奈秒的差異誤判。
 func (s *Service) now() time.Time { return s.d.Now().UTC().Truncate(time.Microsecond) }
 
-func pageSize(size int32) (int32, error) { return pagination.PageSize(size, 20, 100) }
+func pageSize(size int32) (int32, error) {
+	return pagination.PageSize(size, model.ReportDefaultPageSize, model.ReportMaxPageSize)
+}
 
 // inquiryPageSize 是詢問清單的每頁筆數：預設 50，上限 100（一個案件的詢問不多，通常一頁讀完）。
 func inquiryPageSize(size int32) (int32, error) { return pagination.PageSize(size, 50, 100) }
@@ -364,12 +366,10 @@ func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, re
 	for i, id := range ids {
 		byReport[id] = i
 	}
-	bySupplement := map[uuid.UUID]*model.Supplement{}
 	for _, row := range supplements {
 		i := byReport[row.ReportID]
 		supplement := model.Supplement{ID: row.ID, Description: row.Description, CreatedAt: row.CreatedAt}
 		reports[i].Supplements = append(reports[i].Supplements, supplement)
-		bySupplement[row.ID] = &reports[i].Supplements[len(reports[i].Supplements)-1]
 	}
 	for _, row := range evidence {
 		// 「第 n 張」依送出的順序與次內位置編號（查詢已排序），是讀取時算的序號，不存。
