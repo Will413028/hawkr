@@ -646,25 +646,28 @@ func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error
 // content_takedowns，讓被下架的留言與討論區留言重新求值，並排受影響的貼文與店面頁的快取失效（貼文的公開讀取直接探測複本）。內容不存在、已刪除或不是措施的店家寫的時回 *TakedownContentError（歸屬核對在這裡，每條建立入口共用），
 // 措施跟著回滾。鎖的順序 identity → buyer → seller → social：訂閱者在 seller 的事件裡鎖 social 的列。
 func (m *Module) OnMeasureCreated(ctx context.Context, e seller.MeasureCreated) error {
-	if len(e.Contents) == 0 {
+	contents := takedownContents(e.Contents)
+	if len(contents) == 0 {
 		return nil
 	}
-	return m.stats.ApplyTakedowns(ctx, e.MeasureID, e.StoreID, e.OccurredAt, takedownContents(e.Contents))
+	return m.stats.ApplyTakedowns(ctx, e.MeasureID, e.StoreID, e.OccurredAt, contents)
 }
 
 // OnMeasureRevoked 是 seller 撤銷措施時同 transaction 的訂閱者：刪除該措施的複本並讓內容重新求值，內容立即回到公開讀取。同一則內容被另一個未撤銷的措施
 // 下架時仍然隱藏。
 func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) error {
-	if len(e.Contents) == 0 {
+	if len(takedownContents(e.Contents)) == 0 {
 		return nil
 	}
 	return m.stats.ReleaseTakedowns(ctx, e.MeasureID)
 }
 
 func takedownContents(refs []seller.ContentRef) []stats.Content {
-	out := make([]stats.Content, len(refs))
-	for i, r := range refs {
-		out[i] = stats.Content{Kind: r.Kind, ID: r.ID}
+	var out []stats.Content
+	for _, r := range refs {
+		if r.Kind.Social() {
+			out = append(out, stats.Content{Kind: r.Kind, ID: r.ID})
+		}
 	}
 	return out
 }

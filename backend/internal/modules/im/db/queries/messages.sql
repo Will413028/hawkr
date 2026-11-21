@@ -8,7 +8,7 @@ RETURNING *;
 -- name: ListMessagesBefore :many
 -- 以 seq 做 keyset（新的在前）；before_seq 為 0 表示從最新開始。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS m
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
 WHERE m.conversation_id = sqlc.arg(conversation_id)
@@ -19,7 +19,7 @@ LIMIT sqlc.arg(max_rows);
 -- name: ListMessagesAfter :many
 -- 斷線補洞：seq 大於 after_seq 的訊息，舊的在前。
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS m
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
 WHERE m.conversation_id = sqlc.arg(conversation_id) AND m.seq > sqlc.arg(after_seq)::bigint
@@ -30,7 +30,7 @@ LIMIT sqlc.arg(max_rows);
 -- relay 讀單則訊息與它的對話：不套可見性，Hidden、erased_at 與收件人是否已刪除讓呼叫端決定要不要送。
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
-       (h.id IS NOT NULL)::boolean AS hidden,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden,
        CASE WHEN m.sender_kind = 'BUYER'
             THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
             ELSE EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
@@ -92,7 +92,7 @@ SELECT CASE WHEN sqlc.arg(kind)::text = 'BUYER'
 SELECT (m.id = sqlc.arg(message_id)::uuid)::boolean AS is_target,
        m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS t
 JOIN im.messages AS m ON m.conversation_id = t.conversation_id AND m.seq BETWEEN t.seq - sqlc.arg(radius)::bigint AND t.seq + sqlc.arg(radius)::bigint
 JOIN im.conversations AS c ON c.id = m.conversation_id
