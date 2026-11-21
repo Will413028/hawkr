@@ -19,6 +19,7 @@ CREATE SCHEMA moderation;
 -- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功；新檢舉掛進既有案件也加一（同一個 transaction；開案的那筆不加，版本從 1 起），
 -- 所以管理員讀到的檢舉集合不是結案時的集合就會版本衝突。
 -- measure_id 是 TAKEDOWN 決定建立的 seller 措施 ID（跨 schema 不建 FK），結案時同一個 UPDATE 寫入；內容下架一定有、其他處置與進行中的案件一定是 NULL（cases_measure_check）。
+-- reversed_at、reversed_by_admin_id、reverse_reason 是 HIDE 決定的撤銷（ReverseHide）：案件維持結案、決定不改，撤銷記在原決定旁；三欄同有同無，只允許處置是 HIDE 的案件（cases_reversed_*）。
 -- decision_category 是 platform/policy.Assessable 的值（模組的 TestChecksMatchGo）；買家分支另外限於 CommunityAssessable，由寫入端檢查。
 CREATE TABLE moderation.cases (
     id                  UUID        PRIMARY KEY,
@@ -33,7 +34,10 @@ CREATE TABLE moderation.cases (
     decided_by_admin_id BIGINT,
     closed_at           TIMESTAMPTZ,
     measure_id          UUID,
-    CONSTRAINT cases_target_kind_check CHECK (target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'BUYER')),
+    reversed_at          TIMESTAMPTZ,
+    reversed_by_admin_id BIGINT,
+    reverse_reason       TEXT,
+    CONSTRAINT cases_target_kind_check CHECK (target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'BUYER', 'REVIEW', 'CHAT_MESSAGE')),
     CONSTRAINT cases_target_check CHECK (
         (target_kind = 'BUYER' AND buyer_id > 0 AND content_id IS NULL)
         OR (target_kind <> 'BUYER' AND content_id IS NOT NULL AND buyer_id IS NULL)
@@ -54,11 +58,18 @@ CREATE TABLE moderation.cases (
     ),
     CONSTRAINT cases_action_target_check CHECK (
         decision_action IS NULL
-        OR (decision_action = 'HIDE' AND target_kind IN ('COMMENT', 'FORUM_ENTRY'))
-        OR (decision_action IN ('WARN', 'BAN') AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'BUYER'))
+        OR (decision_action = 'HIDE' AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'REVIEW', 'CHAT_MESSAGE'))
+        OR (decision_action IN ('WARN', 'BAN') AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'BUYER', 'REVIEW', 'CHAT_MESSAGE'))
         OR (decision_action = 'TAKEDOWN' AND target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
     ),
-    CONSTRAINT cases_measure_check CHECK ((decision_action IS NOT DISTINCT FROM 'TAKEDOWN') = (measure_id IS NOT NULL))
+    CONSTRAINT cases_measure_check CHECK ((decision_action IS NOT DISTINCT FROM 'TAKEDOWN') = (measure_id IS NOT NULL)),
+    CONSTRAINT cases_reversed_by_check CHECK (reversed_by_admin_id > 0),
+    CONSTRAINT cases_reversed_together_check CHECK (
+        (reversed_at IS NULL AND reversed_by_admin_id IS NULL AND reverse_reason IS NULL)
+        OR (reversed_at IS NOT NULL AND reversed_by_admin_id IS NOT NULL AND reverse_reason IS NOT NULL AND closed_at IS NOT NULL AND reversed_at >= closed_at)
+    ),
+    CONSTRAINT cases_reversed_hide_check CHECK (reversed_at IS NULL OR decision_action = 'HIDE'),
+    CONSTRAINT cases_reverse_reason_check CHECK (reverse_reason IS NULL OR (char_length(reverse_reason) >= 1 AND char_length(reverse_reason) <= 500 AND reverse_reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
 -- 一個對象至多一個進行中案件。
 CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;

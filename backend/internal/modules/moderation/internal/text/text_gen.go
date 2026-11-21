@@ -223,3 +223,28 @@ func ReportTargetInvalid(l uitext.Locale) uitext.Message {
 	}
 	return uitext.Message{Text: "檢舉對象不合法", Locale: uitext.ZhTW}
 }
+
+// ReverseAlreadyReversed 是後台員工受眾的模組句子 reverse.already_reversed（只有 zh-TW）。
+func ReverseAlreadyReversed() uitext.Message {
+	return uitext.Message{Text: "這個案件的隱藏已經撤銷過", Locale: uitext.ZhTW}
+}
+
+// ReverseCaseRequired 是後台員工受眾的模組句子 reverse.case_required（只有 zh-TW）。
+func ReverseCaseRequired() uitext.Message {
+	return uitext.Message{Text: "案件必填", Locale: uitext.ZhTW}
+}
+
+// ReverseNotHide 是後台員工受眾的模組句子 reverse.not_hide（只有 zh-TW）。
+func ReverseNotHide() uitext.Message {
+	return uitext.Message{Text: "只有處置是隱藏的已結案案件能撤銷", Locale: uitext.ZhTW}
+}
+
+// ReverseReasonRequiredArgs 是 ReverseReasonRequired 的參數。
+type ReverseReasonRequiredArgs struct {
+	Max int
+}
+
+// ReverseReasonRequired 是後台員工受眾的模組句子 reverse.reason_required（只有 zh-TW）。
+func ReverseReasonRequired(a ReverseReasonRequiredArgs) uitext.Message {
+	return uitext.Message{Text: "撤銷原因必填，最多 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
+}

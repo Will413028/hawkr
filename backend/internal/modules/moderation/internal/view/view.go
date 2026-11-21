@@ -43,6 +43,9 @@ func Case(r store.ModerationCase) model.Case {
 		a := model.Action(*r.DecisionAction)
 		c.Action = &a
 	}
+	if r.ReversedAt != nil && r.ReversedByAdminID != nil && r.ReverseReason != nil {
+		c.Reversal = &model.Reversal{At: *r.ReversedAt, AdminID: *r.ReversedByAdminID, Reason: *r.ReverseReason}
+	}
 	return c
 }
 
@@ -91,6 +94,28 @@ func (r Reader) Case(ctx context.Context, id uuid.UUID) (model.CaseDetail, error
 		return model.CaseDetail{}, apperr.NotFound("%s", text.CaseNotFound())
 	}
 	return d, err
+}
+
+// Snapshot 讀案件最近一份凍結的內容快照；案件不存在回 NotFound，沒有快照（已過保留期被清除）回 nil。
+func (r Reader) Snapshot(ctx context.Context, id uuid.UUID) (*snapshot.Content, error) {
+	q := store.New(r.DB.Conn(ctx))
+	if _, err := q.GetCase(ctx, id); errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.NotFound("%s", text.CaseNotFound())
+	} else if err != nil {
+		return nil, fmt.Errorf("moderation：讀取案件 %s：%w", id, err)
+	}
+	body, err := q.LatestSnapshotContent(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("moderation：讀取案件 %s 的快照：%w", id, err)
+	}
+	c, err := snapshot.Decode(body)
+	if err != nil {
+		return nil, fmt.Errorf("moderation：解讀案件 %s 的快照：%w", id, err)
+	}
+	return &c, nil
 }
 
 // Cases 列案件（不含檢舉），開案時間新的在前（keyset，不回總數）。篩選的狀態或對象種類不是合法的值回 InvalidInput；size 依 pagination.PageSize。

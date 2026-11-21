@@ -11,18 +11,21 @@ import (
 )
 
 type ModerationCase struct {
-	ID               uuid.UUID
-	TargetKind       string
-	ContentID        *uuid.UUID
-	BuyerID          *int64
-	Version          int64
-	OpenedAt         time.Time
-	Decision         *string
-	DecisionCategory *string
-	DecisionAction   *string
-	DecidedByAdminID *int64
-	ClosedAt         *time.Time
-	MeasureID        *uuid.UUID
+	ID                uuid.UUID
+	TargetKind        string
+	ContentID         *uuid.UUID
+	BuyerID           *int64
+	Version           int64
+	OpenedAt          time.Time
+	Decision          *string
+	DecisionCategory  *string
+	DecisionAction    *string
+	DecidedByAdminID  *int64
+	ClosedAt          *time.Time
+	MeasureID         *uuid.UUID
+	ReversedAt        *time.Time
+	ReversedByAdminID *int64
+	ReverseReason     *string
 }
 
 type ModerationCaseSnapshot struct {

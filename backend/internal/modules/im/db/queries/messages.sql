@@ -85,3 +85,17 @@ SELECT CASE WHEN sqlc.arg(kind)::text = 'BUYER'
             THEN EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = sqlc.arg(party_id)::bigint)
             ELSE EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = sqlc.arg(party_id)::bigint)
        END::boolean AS inactive;
+
+-- name: MessagesForReport :many
+-- 檢舉用的證據讀取：被檢舉的訊息與同一對話 seq 前後各 window 則，一句 SQL 保證同一時點；不鎖列。is_target 標出被檢舉的那則，授權（呼叫者是對話的一方）與
+-- 「被檢舉的訊息已隱藏或已抹除」由呼叫端依回來的列判斷。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。
+SELECT (m.id = sqlc.arg(message_id)::uuid)::boolean AS is_target,
+       m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.created_at, m.erased_at,
+       c.buyer_id, c.store_id,
+       (h.id IS NOT NULL)::boolean AS hidden
+FROM im.messages AS t
+JOIN im.messages AS m ON m.conversation_id = t.conversation_id AND m.seq BETWEEN t.seq - sqlc.arg(radius)::bigint AND t.seq + sqlc.arg(radius)::bigint
+JOIN im.conversations AS c ON c.id = m.conversation_id
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE t.id = sqlc.arg(message_id)::uuid
+ORDER BY m.seq;

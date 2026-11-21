@@ -35,6 +35,8 @@ type fakeCases struct {
 	gotSize   int32
 	gotID     uuid.UUID
 	decided   []moderation.DecideInput
+	reversed  []moderation.ReverseInput
+	snapshot  *moderation.Snapshot
 	calls     map[string]int
 }
 
@@ -61,6 +63,18 @@ func (f *fakeCases) DecideCase(_ context.Context, in moderation.DecideInput) (mo
 	f.called("DecideCase")
 	f.decided = append(f.decided, in)
 	return f.detail, f.err
+}
+
+func (f *fakeCases) ReverseHide(_ context.Context, in moderation.ReverseInput) (moderation.CaseDetail, error) {
+	f.called("ReverseHide")
+	f.reversed = append(f.reversed, in)
+	return f.detail, f.err
+}
+
+func (f *fakeCases) CaseSnapshot(_ context.Context, id uuid.UUID) (*moderation.Snapshot, error) {
+	f.called("CaseSnapshot")
+	f.gotID = id
+	return f.snapshot, nil
 }
 
 func newAdminEnv(t *testing.T, f *fakeCases) moderationv1alpha1connect.ModerationAdminServiceClient {
@@ -295,6 +309,10 @@ func TestEveryMethodRequiresItsPermission(t *testing.T) {
 			_, err := c.DecideCase(t.Context(), withRole(&adminpb.DecideCaseRequest{Id: id, Etag: "1", Decision: adminpb.CaseDecision_CASE_DECISION_NO_VIOLATION}, role))
 			return err
 		},
+		"ReverseHide": func(role string) error {
+			_, err := c.ReverseHide(t.Context(), withRole(&adminpb.ReverseHideRequest{Id: id, Reason: "誤判"}, role))
+			return err
+		},
 	}
 	methods := adminpb.File_hawkr_admin_moderation_v1alpha1_moderation_proto.Services().ByName("ModerationAdminService").Methods()
 	if methods.Len() != len(calls) {
@@ -313,7 +331,7 @@ func TestEveryMethodRequiresItsPermission(t *testing.T) {
 			t.Errorf("%s OWNER：err = %v", name, err)
 		}
 	}
-	if f.calls["Cases"] != 1 || f.calls["Case"] != 1 || f.calls["DecideCase"] != 1 {
+	if f.calls["Cases"] != 1 || f.calls["Case"] != 1 || f.calls["DecideCase"] != 1 || f.calls["ReverseHide"] != 1 {
 		t.Fatalf("OWNER 通過後每個方法恰好到模組一次：%v", f.calls)
 	}
 }
@@ -322,4 +340,73 @@ func withRole[T any](msg *T, role string) *connect.Request[T] {
 	req := connect.NewRequest(msg)
 	req.Header().Set("X-Test-Role", role)
 	return req
+}
+
+func TestReverseHidePassesTheAdminProcedureAndReasonAndMapsTheReversal(t *testing.T) {
+	caseID := uuid.NewV7()
+	at := time.Date(2026, 11, 21, 1, 2, 3, 0, time.UTC)
+	f := &fakeCases{detail: moderation.CaseDetail{Case: moderation.Case{ID: caseID, Version: 5, OpenedAt: at, Reversal: &moderation.Reversal{At: at, AdminID: 42, Reason: "誤判"}}}}
+	c := newAdminEnv(t, f)
+	resp, err := c.ReverseHide(t.Context(), connect.NewRequest(&adminpb.ReverseHideRequest{Id: caseID.String(), Reason: "誤判"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := moderation.ReverseInput{CaseID: caseID, Actor: adminaudit.Actor{AdminID: 42, Action: moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure}, Reason: "誤判"}
+	if len(f.reversed) != 1 || f.reversed[0] != want {
+		t.Fatalf("reversed = %+v\nwant %+v", f.reversed, want)
+	}
+	if r := resp.Msg.GetCase().GetReversal(); r == nil || r.GetReversedBy() != "42" || r.GetReason() != "誤判" || !r.GetReverseTime().AsTime().Equal(at) {
+		t.Fatalf("reversal = %+v", r)
+	}
+}
+
+func TestReverseHideRejectsABadID(t *testing.T) {
+	f := &fakeCases{}
+	c := newAdminEnv(t, f)
+	_, err := c.ReverseHide(t.Context(), connect.NewRequest(&adminpb.ReverseHideRequest{Id: "x", Reason: "r"}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || len(f.reversed) != 0 {
+		t.Fatalf("err = %v, reversed = %d", err, len(f.reversed))
+	}
+}
+
+func TestGetCaseMapsEachSnapshotKindToTheOneof(t *testing.T) {
+	at := time.Date(2026, 11, 21, 1, 2, 3, 0, time.UTC)
+	for name, tc := range map[string]struct {
+		snap  *moderation.Snapshot
+		check func(*adminpb.CaseSnapshot) bool
+	}{
+		"社群": {&moderation.Snapshot{Kind: moderation.TargetComment, Social: &moderation.SocialSnapshot{AuthorKind: "BUYER", AuthorID: 7, Body: "本文", MediaRefs: []string{"a"}, AuthoredAt: at}},
+			func(s *adminpb.CaseSnapshot) bool {
+				x := s.GetSocial()
+				return x.GetAuthorId() == "7" && x.GetBody() == "本文" && len(x.GetAssetIds()) == 1
+			}},
+		"買家": {&moderation.Snapshot{Kind: moderation.TargetBuyer, Buyer: &moderation.BuyerSnapshot{DisplayName: "小明", Avatar: "k"}},
+			func(s *adminpb.CaseSnapshot) bool { return s.GetBuyer().GetDisplayName() == "小明" }},
+		"評價": {&moderation.Snapshot{Kind: moderation.TargetReview, Review: &moderation.ReviewSnapshot{AuthorID: 9, SubjectStoreID: 4, ProductID: 5, Rating: 2, Body: "差", ReplyBody: "抱歉"}},
+			func(s *adminpb.CaseSnapshot) bool {
+				x := s.GetReview()
+				return x.GetAuthorId() == "9" && x.GetStoreId() == "4" && x.GetProductId() == "5" && x.GetRating() == 2 && x.GetReplyBody() == "抱歉"
+			}},
+		"聊天": {&moderation.Snapshot{Kind: moderation.TargetChatMessage, Chat: &moderation.ChatSnapshot{AuthorKind: "STORE", AuthorID: 4, ConversationID: "c", Seq: 6,
+			Context: []moderation.ChatContextMessage{{Seq: 5, SenderKind: "BUYER", SenderID: 9, Type: "TEXT", Hidden: true, SentAt: at}}}},
+			func(s *adminpb.CaseSnapshot) bool {
+				x := s.GetChat()
+				return x.GetSeq() == 6 && len(x.GetContext()) == 1 && x.GetContext()[0].GetHidden() && x.GetContext()[0].GetSenderId() == "9"
+			}},
+	} {
+		f := &fakeCases{detail: moderation.CaseDetail{Case: moderation.Case{ID: uuid.NewV7(), Version: 1, OpenedAt: at}}, snapshot: tc.snap}
+		c := newAdminEnv(t, f)
+		resp, err := c.GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: uuid.NewV7().String()}))
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		if !tc.check(resp.Msg.GetSnapshot()) {
+			t.Errorf("%s：%+v", name, resp.Msg.GetSnapshot())
+		}
+	}
+	f := &fakeCases{detail: moderation.CaseDetail{Case: moderation.Case{ID: uuid.NewV7(), Version: 1, OpenedAt: at}}}
+	resp, err := newAdminEnv(t, f).GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: uuid.NewV7().String()}))
+	if err != nil || resp.Msg.Snapshot != nil {
+		t.Fatalf("沒有快照不設：%v %+v", err, resp.Msg.Snapshot)
+	}
 }

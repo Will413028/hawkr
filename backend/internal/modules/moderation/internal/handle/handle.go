@@ -20,11 +20,13 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -37,10 +39,24 @@ import (
 // SourceRefPrefix 是寫進各處分紀錄的來源參照的前綴，後面接案件 ID；其他模組把它當不透明的字串。
 const SourceRefPrefix = "moderation:case:"
 
+// Reviews 是處理案件用到的 review 方法（*review.Module）。
+type Reviews interface {
+	Hide(ctx context.Context, in review.HideInput) (review.Hide, error)
+	Restore(ctx context.Context, in review.RestoreInput) (review.Hide, error)
+}
+
+// Chats 是處理案件用到的 im 方法（*im.Module）。
+type Chats interface {
+	Hide(ctx context.Context, in im.HideInput) (im.Hide, error)
+	Restore(ctx context.Context, in im.RestoreInput) (im.Hide, error)
+}
+
 // Deps 是處理案件的依賴，全部必填。
 type Deps struct {
 	DB         *db.DB
 	Social     *social.Module
+	Review     Reviews
+	IM         Chats
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
@@ -200,11 +216,7 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 		if !owner.Exists {
 			return nil
 		}
-		_, err := s.d.Social.Hide(ctx, social.HideInput{
-			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
-			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID,
-		})
-		return err
+		return s.hide(ctx, c, in, ref)
 	case model.ActionWarn:
 		if author.Kind != social.ActorBuyer {
 			return apperr.FailedPrecondition("%s", text.DecideWarnNotBuyer())
@@ -227,26 +239,68 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 	return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 }
 
-// author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；內容向 social 讀。內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，
-// 所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；隱藏的目的（內容不可見）已達成，由呼叫端視為成功。
+// author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；評價與聊天訊息的作者一律取案件快照凍結的作者（評價作者與訊息寄件方都不會變，不回頭問擁有者）；
+// 社群內容向 social 讀。社群內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；
+// 隱藏的目的（內容不可見）已達成，由呼叫端視為成功。評價與聊天的擁有者模組在隱藏時回 NotFound（已清除）的情形由 hide 視為成功。
 func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, res *applied) (social.Actor, social.ContentOwner, error) {
 	t := c.Target
-	if t.Kind == model.TargetBuyer {
+	switch t.Kind {
+	case model.TargetBuyer:
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
+	case model.TargetReview, model.TargetChatMessage:
+		frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
+		if err != nil {
+			return social.Actor{}, social.ContentOwner{}, err
+		}
+		if frozen.Kind != t.Kind {
+			return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：案件 %s 的快照種類 %s 與對象種類 %s 不符", c.ID, frozen.Kind, t.Kind)
+		}
+		kind, id, _ := frozen.Author()
+		author := social.Actor{Kind: social.ActorKind(kind), ID: id}
+		return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID(), Exists: true}, nil
+	case model.TargetPost, model.TargetComment, model.TargetForumEntry:
+		owner, err := s.d.Social.ContentOwner(ctx, social.Target{Kind: social.TargetKind(t.Kind), ID: t.ContentID})
+		if err != nil {
+			return social.Actor{}, social.ContentOwner{}, err
+		}
+		if owner.Exists {
+			return owner.Author, owner, nil
+		}
+		frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
+		if err != nil {
+			return social.Actor{}, social.ContentOwner{}, err
+		}
+		kind, id, _ := frozen.Author()
+		author := social.Actor{Kind: social.ActorKind(kind), ID: id}
+		return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID()}, nil
 	}
-	owner, err := s.d.Social.ContentOwner(ctx, social.Target{Kind: social.TargetKind(t.Kind), ID: t.ContentID})
-	if err != nil {
-		return social.Actor{}, social.ContentOwner{}, err
+	return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：不認得的對象種類 %q", t.Kind)
+}
+
+// hide 呼叫擁有內容的模組隱藏內容，來源參照指回案件。評價或聊天訊息已被清除（擁有者回 NotFound）時視為成功、不寫隱藏紀錄：隱藏的目的已達成。
+// 隱藏不取擁有者的守門（LockNotClosed、LockNotRetired、LockActive）：作者停用不該讓處分失敗。
+func (s *Service) hide(ctx context.Context, c model.Case, in model.DecideInput, ref string) error {
+	var err error
+	switch c.Target.Kind {
+	case model.TargetReview:
+		_, err = s.d.Review.Hide(ctx, review.HideInput{ReviewID: c.Target.ContentID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID})
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil
+		}
+	case model.TargetChatMessage:
+		_, err = s.d.IM.Hide(ctx, im.HideInput{MessageID: c.Target.ContentID, Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID})
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil
+		}
+	case model.TargetComment, model.TargetForumEntry:
+		_, err = s.d.Social.Hide(ctx, social.HideInput{
+			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
+			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID,
+		})
+	case model.TargetPost, model.TargetBuyer:
+		return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionNotForTarget())
 	}
-	if owner.Exists {
-		return owner.Author, owner, nil
-	}
-	frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
-	if err != nil {
-		return social.Actor{}, social.ContentOwner{}, err
-	}
-	author := social.Actor{Kind: social.ActorKind(frozen.AuthorKind), ID: frozen.AuthorID}
-	return author, social.ContentOwner{Author: author, StoreID: frozen.StoreID}, nil
+	return err
 }
 
 // snapshotReader 是讀案件快照的查詢（*store.Queries）。
@@ -287,7 +341,10 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return err
 	}
-	storeID := frozen.StoreID
+	if frozen.Social == nil {
+		return apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
+	}
+	storeID := frozen.Social.StoreID
 	if err := CheckTakedownStore(owner, storeID); err != nil {
 		return err
 	}
@@ -309,7 +366,7 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
-	sn, err := measureSnapshot(c.Target.Kind, storeID, frozen)
+	sn, err := measureSnapshot(c.Target.Kind, storeID, *frozen.Social)
 	if err != nil {
 		return err
 	}
@@ -333,7 +390,7 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 
 // measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
 // 這裡只解析凍結的字串 id。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
-func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
+func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Social) (seller.ContentSnapshot, error) {
 	post, _ := uuid.Parse(f.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
 	thread, _ := uuid.Parse(f.ThreadID) // 同上
 	k := seller.ContentKind(kind)
@@ -342,4 +399,87 @@ func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (
 		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
 	}
 	return sn, nil
+}
+
+// ValidateReverse 檢查撤銷輸入的形狀並正規化原因（去頭尾空白）；不查資料庫。
+func ValidateReverse(in model.ReverseInput) (model.ReverseInput, error) {
+	switch {
+	case in.CaseID == uuid.UUID{}:
+		return in, apperr.InvalidInputOn([]string{"CaseID"}, "%s", text.ReverseCaseRequired())
+	case in.Actor.AdminID <= 0:
+		return in, errors.New("moderation：撤銷隱藏的 Actor.AdminID 不是正數，handler 沒有帶管理員")
+	case in.Actor.Action == "":
+		return in, errors.New("moderation：撤銷隱藏的 Actor.Action 空白，handler 沒有帶 procedure 名稱")
+	}
+	in.Reason = trimtext.Trim(in.Reason)
+	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > model.MaxTextRunes {
+		return in, apperr.InvalidInputOn([]string{"Reason"}, "%s", text.ReverseReasonRequired(text.ReverseReasonRequiredArgs{Max: model.MaxTextRunes}))
+	}
+	return in, nil
+}
+
+// Reverse 撤銷一個已結案的 HIDE 決定：案件維持結案、決定不改，撤銷記在案件上（reversed_*）；同 transaction 呼叫擁有內容的模組還原目前未還原的隱藏
+// （review、im、social 的 Restore），並寫後台動作紀錄。順序同 Decide：先讀案件（不鎖）、再呼叫擁有內容的模組（鎖內容列）、最後寫 moderation 自己的列。
+// 案件不存在回 NotFound；案件還在進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition；擁有者模組沒有未還原的隱藏時回它的 FailedPrecondition，什麼都不寫。
+func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.CaseDetail, error) {
+	in, err := ValidateReverse(in)
+	if err != nil {
+		return model.CaseDetail{}, err
+	}
+	var out model.CaseDetail
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		row, err := q.GetCase(ctx, in.CaseID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("%s", text.CaseNotFound())
+		}
+		if err != nil {
+			return fmt.Errorf("moderation：讀取案件 %s：%w", in.CaseID, err)
+		}
+		c := view.Case(row)
+		if c.ClosedAt == nil || c.Action == nil || *c.Action != model.ActionHide {
+			return apperr.FailedPrecondition("%s", text.ReverseNotHide())
+		}
+		if c.Reversal != nil {
+			return apperr.FailedPrecondition("%s", text.ReverseAlreadyReversed())
+		}
+		if err := s.restore(ctx, c, in); err != nil {
+			return err
+		}
+		now := s.d.Now().UTC()
+		n, err := q.ReverseCase(ctx, store.ReverseCaseParams{ID: in.CaseID, ReversedAt: &now, AdminID: &in.Actor.AdminID, Reason: &in.Reason})
+		if err != nil {
+			return fmt.Errorf("moderation：撤銷案件 %s：%w", in.CaseID, err)
+		}
+		if n == 0 {
+			return apperr.FailedPrecondition("%s", text.ReverseAlreadyReversed())
+		}
+		if err := s.d.Audit.Record(ctx, adminaudit.Entry{
+			Actor: in.Actor, TargetType: "moderation_case", TargetID: in.CaseID.String(),
+			Detail: map[string]any{"reverse": string(model.ActionHide), "target_kind": string(c.Target.Kind)},
+		}); err != nil {
+			return err
+		}
+		out, err = view.Detail(ctx, q, in.CaseID)
+		return err
+	})
+	return out, err
+}
+
+// restore 呼叫擁有內容的模組還原目前未還原的隱藏；不取擁有者的守門（同 hide）。
+func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInput) error {
+	var err error
+	switch c.Target.Kind {
+	case model.TargetReview:
+		_, err = s.d.Review.Restore(ctx, review.RestoreInput{ReviewID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason})
+	case model.TargetChatMessage:
+		_, err = s.d.IM.Restore(ctx, im.RestoreInput{MessageID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason})
+	case model.TargetComment, model.TargetForumEntry:
+		_, err = s.d.Social.Restore(ctx, social.RestoreInput{
+			Target: social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID}, AdminID: in.Actor.AdminID, Reason: in.Reason,
+		})
+	case model.TargetPost, model.TargetBuyer:
+		return apperr.FailedPrecondition("%s", text.ReverseNotHide())
+	}
+	return err
 }

@@ -167,6 +167,22 @@ func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int
 	return rows.Review(r, rows.Images(imgs)[id]), nil
 }
 
+// ReviewForReport 是檢舉用的單筆讀取：可讀規則與 GetReview 共用同一組公開可讀述詞與觀看者封鎖，不可讀與不存在同為 NotFound；不鎖列、加入呼叫方的 transaction。
+func (s *Service) ReviewForReport(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (model.ReportedReview, error) {
+	r, err := s.GetReview(ctx, id, viewerBuyerID)
+	if err != nil {
+		return model.ReportedReview{}, err
+	}
+	out := model.ReportedReview{
+		ID: r.ID, BuyerID: r.BuyerID, StoreID: r.StoreID, ProductID: r.ProductID, Rating: r.Rating, Content: r.Content,
+		AssetIDs: make([]string, len(r.Images)), CreatedAt: r.CreatedAt, Reply: r.Reply,
+	}
+	for i, im := range r.Images {
+		out.AssetIDs[i] = im.AssetID
+	}
+	return out, nil
+}
+
 // ReviewForRelay 讀單則評價的原始列與它現在是否公開可讀（relay 組事件 payload 用，不套公開可讀述詞）；列不存在（已清除）是 NotFound。
 func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.RelayReview, error) {
 	r, err := s.q(ctx).GetReviewByID(ctx, id)

@@ -250,3 +250,55 @@ func (s *Service) peerOnline(ctx context.Context, p model.Party, c store.ImConve
 	}
 	return q.IsPartyOnline(ctx, store.IsPartyOnlineParams{Kind: peerKind, PartyID: peerID})
 }
+
+// MessageForReport 是檢舉用的證據讀取：呼叫者要是該訊息所屬對話的一方，否則（含訊息不存在）NotFound，不洩漏對話存在；被檢舉的訊息已隱藏或已抹除也是 NotFound；
+// 前後各 window 則已隱藏或已抹除的是墓碑，不帶內容。被檢舉的訊息與前後文以一句 SQL 讀回（同一時點），不鎖列、加入呼叫方的 transaction（不開 InReadSnapshot）。
+func (s *Service) MessageForReport(ctx context.Context, messageID uuid.UUID, reporter model.Party, window int) (model.ReportedMessage, error) {
+	if err := reporter.Authorize(); err != nil {
+		return model.ReportedMessage{}, err
+	}
+	if window < 0 {
+		return model.ReportedMessage{}, errors.New("im：前後文的則數不能是負數")
+	}
+	notFound := apperr.NotFound("%s", text.ImMessageNotFound(uitext.LocaleFrom(ctx)))
+	rs, err := s.q(ctx).MessagesForReport(ctx, store.MessagesForReportParams{MessageID: messageID, Radius: int64(window)})
+	if err != nil {
+		return model.ReportedMessage{}, err
+	}
+	var out model.ReportedMessage
+	found := false
+	for _, r := range rs {
+		if (reporter.Kind == model.PartyBuyer && r.BuyerID != reporter.BuyerID) || (reporter.Kind == model.PartyStore && r.StoreID != reporter.Store.StoreID) {
+			return model.ReportedMessage{}, notFound
+		}
+		m := model.ReportedChatMessage{
+			ID: r.ID, Seq: r.Seq, SenderKind: model.PartyKind(r.SenderKind), Type: model.MessageType(r.MessageType), CreatedAt: r.CreatedAt,
+			Hidden: r.Hidden, Erased: r.ErasedAt != nil,
+		}
+		m.SenderID = r.BuyerID
+		if m.SenderKind == model.PartyStore {
+			m.SenderID = r.StoreID
+		}
+		if !m.Hidden && !m.Erased {
+			if r.Content != nil {
+				m.Text = *r.Content
+			}
+			if r.ImageAssetID != nil {
+				m.AssetID = *r.ImageAssetID
+			}
+		}
+		if r.IsTarget {
+			found = true
+			if m.Hidden || m.Erased {
+				return model.ReportedMessage{}, notFound
+			}
+			out.ConversationID, out.BuyerID, out.StoreID, out.Message = r.ConversationID, r.BuyerID, r.StoreID, m
+			continue
+		}
+		out.Context = append(out.Context, m)
+	}
+	if !found {
+		return model.ReportedMessage{}, notFound
+	}
+	return out, nil
+}

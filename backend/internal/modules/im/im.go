@@ -75,24 +75,26 @@ type Deps struct {
 type LiveConfig = live.Config
 
 type (
-	Party            = model.Party
-	PartyKind        = model.PartyKind
-	MessageType      = model.MessageType
-	Message          = model.Message
-	Image            = model.Image
-	Preview          = model.Preview
-	Conversation     = model.Conversation
-	ConversationPage = model.ConversationPage
-	MessagePage      = model.MessagePage
-	Cursor           = model.Cursor
-	SendInput        = model.SendInput
-	RelayMessage     = model.RelayMessage
-	HideInput        = model.HideInput
-	RestoreInput     = model.RestoreInput
-	Hide             = model.Hide
-	MessageSent      = model.MessageSent
-	Reason           = model.Reason
-	PresenceState    = model.PresenceState
+	Party               = model.Party
+	PartyKind           = model.PartyKind
+	MessageType         = model.MessageType
+	Message             = model.Message
+	Image               = model.Image
+	Preview             = model.Preview
+	Conversation        = model.Conversation
+	ConversationPage    = model.ConversationPage
+	MessagePage         = model.MessagePage
+	Cursor              = model.Cursor
+	SendInput           = model.SendInput
+	RelayMessage        = model.RelayMessage
+	ReportedMessage     = model.ReportedMessage
+	ReportedChatMessage = model.ReportedChatMessage
+	HideInput           = model.HideInput
+	RestoreInput        = model.RestoreInput
+	Hide                = model.Hide
+	MessageSent         = model.MessageSent
+	Reason              = model.Reason
+	PresenceState       = model.PresenceState
 
 	// Subscription 是一個 Party 的一條拉取式事件流（Next、Revalidate、Close）。
 	Subscription = live.Subscription
@@ -228,6 +230,12 @@ func (m *Module) UnreadTotal(ctx context.Context, p Party) (int64, error) {
 // MessageForRelay 讀單則訊息與它的對話的原始資料，不套可見性（Hidden、Erased 標出）；不存在是 NotFound。
 func (m *Module) MessageForRelay(ctx context.Context, id uuid.UUID) (RelayMessage, error) {
 	return m.read.MessageForRelay(ctx, id)
+}
+
+// MessageForReport 是檢舉用的聊天證據讀取（moderation 凍結快照用，不是顯示用）：reporter 要是該訊息所屬對話的一方，否則回 NotFound；被檢舉的訊息已隱藏或已抹除回 NotFound；
+// 被檢舉的訊息與 seq 前後各 window 則一句 SQL 讀回，前後文已隱藏或已抹除的是墓碑（不帶內容）。不鎖列、不開 transaction，加入呼叫方的。
+func (m *Module) MessageForReport(ctx context.Context, messageID uuid.UUID, reporter Party, window int) (ReportedMessage, error) {
+	return m.read.MessageForReport(ctx, messageID, reporter, window)
 }
 
 // Subscribe 為 Party 開一條即時事件流：先登記（同時執行每個 Party 全域並行上限，超過回 ResourceExhausted）再讀 Cursors 的補洞，

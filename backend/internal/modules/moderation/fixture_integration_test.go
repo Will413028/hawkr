@@ -20,9 +20,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -102,7 +104,45 @@ func (s storeBlocksFromTable) StoreBlocksBuyer(ctx context.Context, storeID, buy
 	return blocked, err
 }
 
+// reviewOrders 是 review 的訂單 port 的替身：以訂單號查。
+type reviewOrders struct {
+	mu   sync.Mutex
+	byNo map[string]review.OrderForReview
+}
+
+func (o *reviewOrders) OrderForReview(_ context.Context, orderNo string) (review.OrderForReview, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	v, ok := o.byNo[orderNo]
+	if !ok {
+		return review.OrderForReview{}, review.ErrOrderNotFound
+	}
+	return v, nil
+}
+
+// chatOrders 是 im 的訂單 port 的替身：雙方之間沒有進行中的訂單。
+type chatOrders struct{}
+
+func (chatOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
+
+// chatStores 是 im 的 Stores port：守門的鎖與封鎖檢查走真正的 seller 模組，店家資料的條件在這裡固定成營運中（seller 自己的條件推導由 seller 的測試驗證）。
+type chatStores struct{ *seller.Module }
+
+func (s chatStores) Store(ctx context.Context, id int64) (seller.Store, error) {
+	st, err := s.Module.Store(ctx, id)
+	if err != nil {
+		return seller.Store{}, err
+	}
+	st.Status, st.Sanctions = seller.Active, seller.NoSanctions()
+	st.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true}
+	return st, nil
+}
+
 type fixture struct {
+	review   *review.Module
+	im       *im.Module
+	orders   *reviewOrders
+	aggs     atomic.Int64
 	db       *db.DB
 	identity *identity.Module
 	buyer    *buyer.Module
@@ -138,6 +178,8 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "social", Dir: social.Migrations()},
+		migrate.Module{Name: "review", Dir: review.Migrations()},
+		migrate.Module{Name: "im", Dir: im.Migrations()},
 		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()},
 		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 		migrate.Module{Name: "moderation", Dir: Migrations()},
@@ -162,7 +204,11 @@ func setup(t *testing.T) *fixture {
 	})
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
-	f.module = New(Deps{DB: d, Social: f.social, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.orders = &reviewOrders{byNo: map[string]review.OrderForReview{}}
+	f.review = review.New(review.Deps{DB: d, Events: bus, Media: fm, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: fm, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	events.Subscribe(bus, func(context.Context, review.ReviewAggregateChanged) error { f.aggs.Add(1); return nil })
+	f.module = New(Deps{DB: d, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.social.OnBuyerDeleted)

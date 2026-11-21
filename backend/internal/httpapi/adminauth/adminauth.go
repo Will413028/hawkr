@@ -75,9 +75,10 @@ var declarations = map[string]declaration{
 	contentv1alpha1connect.ContentAdminServiceCreateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesCreate, auditPending),
 	contentv1alpha1connect.ContentAdminServiceUpdateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesUpdate, auditPending),
 
-	moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:  requires(adminperm.ModerationCasesList, auditReadOnly),
-	moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:    requires(adminperm.ModerationCasesGet, auditReadOnly),
-	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure: requires(adminperm.ModerationCasesDecide, auditAudited),
+	moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:   requires(adminperm.ModerationCasesList, auditReadOnly),
+	moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:     requires(adminperm.ModerationCasesGet, auditReadOnly),
+	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  requires(adminperm.ModerationCasesDecide, auditAudited),
+	moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: requires(adminperm.ModerationCasesReverse, auditAudited),
 
 	socialv1alpha1connect.SocialAdminServiceListPostsProcedure: requires(adminperm.SocialPostsList, auditReadOnly),
 

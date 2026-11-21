@@ -211,6 +211,29 @@ type RelayMessage struct {
 	Preview          Preview
 }
 
+// ReportedMessage 是檢舉用的聊天證據讀取（給 moderation 凍結快照）：被檢舉的那則與同一對話 seq 前後各 window 則（不含被檢舉的那則，依 seq 由小到大）。
+type ReportedMessage struct {
+	ConversationID uuid.UUID
+	BuyerID        int64
+	StoreID        int64
+	Message        ReportedChatMessage
+	Context        []ReportedChatMessage
+}
+
+// ReportedChatMessage 是證據裡的一則訊息：寄件方由對話的 buyer_id、store_id 推出。已隱藏或已抹除的訊息是墓碑（Hidden、Erased 為真），不帶 Text 與 AssetID。
+type ReportedChatMessage struct {
+	ID         uuid.UUID
+	Seq        int64
+	SenderKind PartyKind
+	SenderID   int64
+	Type       MessageType
+	Text       string
+	AssetID    string
+	CreatedAt  time.Time
+	Hidden     bool
+	Erased     bool
+}
+
 // HideInput 是隱藏的輸入；Category 是 policy.CommunityAssessable 的值。
 type HideInput struct {
 	MessageID uuid.UUID

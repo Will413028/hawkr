@@ -122,6 +122,21 @@ type Review struct {
 	Reply        *Reply
 }
 
+// ReportedReview 是檢舉用的評價證據讀取（給 moderation 凍結快照）：作者、本文、評分、圖片 asset ID、發表時間、所屬店家與商品、店家回覆。
+// 它不是顯示用的投影（沒有 ItemImageKey、SkuName、Price），兩者各自演進。
+type ReportedReview struct {
+	ID        uuid.UUID
+	BuyerID   int64
+	StoreID   int64
+	ProductID int64
+	Rating    int
+	Content   string
+	// AssetIDs 是評價附圖的 asset ID，依位置排序。
+	AssetIDs  []string
+	CreatedAt time.Time
+	Reply     *Reply
+}
+
 // RelayReview 是 relay 讀到的單則評價：Public 是 job 執行當下它是否公開可讀（沒有未還原的隱藏、作者不在刪帳中）。
 type RelayReview struct {
 	Review
