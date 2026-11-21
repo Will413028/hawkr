@@ -119,6 +119,7 @@ CREATE TABLE moderation.reports (
 );
 CREATE INDEX reports_case_time ON moderation.reports (case_id, created_at, id);
 CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, created_at DESC, id DESC) WHERE reporter_buyer_id IS NOT NULL;
+CREATE INDEX reports_store_reporter_time ON moderation.reports (reporter_store_id, created_at DESC, id DESC) WHERE reporter_store_id IS NOT NULL;
 CREATE INDEX reports_snapshot ON moderation.reports (snapshot_id) WHERE snapshot_id IS NOT NULL;
 
 -- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：檢舉人是買家或店家（恰好一欄），(檢舉人種類, 檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；

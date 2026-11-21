@@ -123,6 +123,12 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 }
 
 func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
+	if in.ReporterStoreID > 0 {
+		// 店家檢舉人先於 moderation 的任何列鎖住「尚未退場」：店家退場的訂閱者清檢舉人資料時，已退場的店不會再有新列，並行的送出與退場在店家列上序列化。
+		if err := s.d.Seller.LockNotRetired(ctx, in.ReporterStoreID); err != nil {
+			return model.SubmitResult{}, contentNotFound(ctx, err)
+		}
+	}
 	q := store.New(s.d.DB.Conn(ctx))
 	var hash []byte
 	if in.RequestID != nil {

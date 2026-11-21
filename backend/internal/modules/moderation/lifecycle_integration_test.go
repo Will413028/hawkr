@@ -399,3 +399,33 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 		t.Fatalf("認定引用的來源檢舉 %d 筆，預期 1", n)
 	}
 }
+
+// A6-D22 退場的店不能再以檢舉人身分送出：送出的 transaction 先以 LockNotRetired 鎖店家列，已退場回 NotFound，不留檢舉、冪等紀錄與計數列。
+// mutation：拿掉 report.attempt 開頭的 LockNotRetired → 退場的店送出成功，斷言失敗。
+func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID, storeAccount := f.exposableStore(t)
+	b, _ := f.newBuyer(t)
+	_, ids := f.seedChat(t, b, storeID, 4, 0)
+	if _, err := f.seller.CloseCurrent(ctx, storeAccount); err != nil {
+		t.Fatalf("關店：%v", err)
+	}
+	f.exec(t, `UPDATE seller.stores SET retired_at = $2, description = NULL, prize = NULL, website_url = NULL,
+		logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID, f.clock())
+	rid := uuid.New()
+	_, err := f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: storeID, Target: Target{Kind: TargetChatMessage, ContentID: ids[1]}, Category: policy.Harassment, Description: "退場後的說明", RequestID: &rid})
+	if kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("已退場的店送出要 NotFound：%v", err)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE reporter_store_id = $1", storeID); n != 0 {
+		t.Fatalf("不能留下檢舉：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID); n != 0 {
+		t.Fatalf("不能留下冪等紀錄：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1", storeID); n != 0 {
+		t.Fatalf("不能留下每日計數列：%d", n)
+	}
+}
