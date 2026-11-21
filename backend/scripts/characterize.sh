@@ -38,6 +38,8 @@ fi
 PGHOST=${PGHOST:-localhost}
 PG_USER=dbadmin
 PG_PASSWORD=Hawkr2024Admin
+# 本機 compose 的 Redis 有密碼；CI 的 job services 沒有，設 CHARACTERIZE_REDIS_PASSWORD=（空）。
+REDIS_PASSWORD=${CHARACTERIZE_REDIS_PASSWORD-HawkrRedis2026}
 MONOLITH_DB=characterize_monolith
 FAKE_MEDIA_PORT=19937
 MONOLITH_PORT=18080
@@ -52,7 +54,15 @@ pids=()
 dbs=()
 gateway_env=()
 
-psql_admin() { docker exec hawkr-postgres psql -U "$PG_USER" -d postgres -q "$@"; }
+# 預設進本機 compose 的 hawkr-postgres 容器；CI 的 job services 沒有固定容器名，設
+# CHARACTERIZE_PSQL_URL（postgres 管理連線字串）時改用 runner 上的 psql。
+psql_admin() {
+  if [ -n "${CHARACTERIZE_PSQL_URL:-}" ]; then
+    psql "$CHARACTERIZE_PSQL_URL" -q "$@"
+  else
+    docker exec hawkr-postgres psql -U "$PG_USER" -d postgres -q "$@"
+  fi
+}
 
 cleanup() {
   for pid in ${pids[@]+"${pids[@]}"}; do
@@ -88,6 +98,7 @@ db_url() { echo "postgres://${PG_USER}:${PG_PASSWORD}@${PGHOST}:5432/$1?sslmode=
 
 # 上一次沒有結束乾淨的服務還佔著 port 時，新的服務起不來，測試卻會打到舊的那一個。
 require_free_port() {
+  command -v lsof >/dev/null 2>&1 || return 0
   if lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "port $1 已經有程式在聽，先停掉它：lsof -nP -iTCP:$1 -sTCP:LISTEN" >&2
     exit 1
@@ -132,6 +143,8 @@ dev_token() {
   (clean_env DATABASE_URL="$MONOLITH_DB_URL" DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" "${LOG_DIR}/hawkr" dev-token "$@")
 }
 BUYER_TOKEN=$(dev_token)
+# 第二位買家（不帶 -account 會建立新帳號）：情境要測「別人的資源」時用 ch.Buyer2。
+BUYER2_TOKEN=$(dev_token)
 ADMIN_TOKEN=$(dev_token -admin -user dev_characterize_admin)
 
 # 管理員第一次認證時建立、而且沒有任何角色（ADR 2026-10-04-admin-roles）：GetSession 不需要權限，用它建立管理員，再以 CLI 授予 OWNER。
@@ -155,7 +168,7 @@ start_bg gateway \
   APP_ENV=local GIN_MODE=release INTERNAL_AUTH_MODE=off \
   PORT="$GATEWAY_PORT" DEBUG_PORT=19901 METRICS_PORT=19902 \
   JWT_SECRET="$JWT_SECRET" IM_CHAT_STREAM_JWT_SECRET="$IM_SECRET" MEDIA_BASE_URL=http://media.invalid \
-  REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD=HawkrRedis2026 \
+  REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD="$REDIS_PASSWORD" \
   ACCOUNT_SERVICE_HOST=127.0.0.1 ACCOUNT_SERVICE_GRPC_PORT="$LEGACY_PORT" \
   SELLER_SERVICE_HOST=127.0.0.1 SELLER_SERVICE_GRPC_PORT="$LEGACY_PORT" \
   ${gateway_env[@]+"${gateway_env[@]}"} \
@@ -172,6 +185,6 @@ curl -fsS "http://127.0.0.1:${GATEWAY_PORT}/api/v1/health" >/dev/null
 curl -fsS "http://127.0.0.1:${MONOLITH_PORT}/readyz" >/dev/null
 
 ENTRY_URL="http://127.0.0.1:${MONOLITH_PORT}" \
-CHARACTERIZE_BUYER_TOKEN="$BUYER_TOKEN" CHARACTERIZE_ADMIN_TOKEN="$ADMIN_TOKEN" \
+CHARACTERIZE_BUYER_TOKEN="$BUYER_TOKEN" CHARACTERIZE_BUYER2_TOKEN="$BUYER2_TOKEN" CHARACTERIZE_ADMIN_TOKEN="$ADMIN_TOKEN" \
 FAKE_MEDIA_ADDR="127.0.0.1:${FAKE_MEDIA_PORT}" \
 GOWORK=off go test -count=1 -tags gateway -v "./${PKG_DIR}/"

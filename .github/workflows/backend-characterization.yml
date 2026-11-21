@@ -1,0 +1,111 @@
+name: backend characterization
+
+# 搬遷中模組的特性測試：scripts/characterize.sh <模組> 在 runner 上起單體（入口）、舊 gateway 與該模組的舊服務，
+# 以 REST driver 經入口與 gateway 對舊服務跑情境（ADR 2026-09-26-external-contract-protobuf-connect D4、
+# 主計畫 2026-09-24-go-modular-monolith.md 階段 B 開工前條件）。B1-D10 決定：Postgres 與 Redis 用 job 的
+# services:，Java 服務以 mvnw package 後 java -jar 起行程，不用 compose。
+#
+# 加一個舊服務（B2–B10）：在 matrix.include 加一項（module、java_pl；舊服務是 Go 就留空 java_pl），並在
+# internal/httpapi/<模組>/characterization 放情境與 legacy.sh（make new-characterization name=<模組> legacy=<服務>）。
+# media 不接物件儲存（B1-D12）；舊服務刪除時，它的 matrix 項目與 legacy.sh 一起刪除，這支 workflow 留給其他模組。
+
+on:
+  pull_request:
+    paths: &characterization_paths
+      - 'backend/scripts/characterize.sh'
+      - 'backend/internal/httpapi/characterize/**'
+      - 'backend/internal/httpapi/*/characterization/**'
+      - 'backend/gateway/**'
+      - 'backend/services/java/**'
+      - 'backend/.go-version'
+      - '.github/workflows/backend-characterization.yml'
+  push:
+    branches: [main, dev]
+    paths: *characterization_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-characterization-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  characterize:
+    name: characterize (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: media
+            java_pl: ':media-service'
+    services:
+      # 與 docker-compose-infra.yml 同一組映像與帳密（本機專用的固定值）。
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dbadmin
+          POSTGRES_PASSWORD: Hawkr2024Admin
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dbadmin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: |
+            backend/go.sum
+            backend/gateway/go.sum
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        if: matrix.java_pl != ''
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/services/java/**/pom.xml
+      - name: 建 Java 舊服務的 jar
+        if: matrix.java_pl != ''
+        working-directory: backend/services/java
+        env:
+          JAVA_PL: ${{ matrix.java_pl }}
+        run: ./mvnw package -B -q -pl "$JAVA_PL" -am -DskipTests
+      - name: 特性測試（${{ matrix.module }}）
+        env:
+          MODULE: ${{ matrix.module }}
+          PGHOST: localhost
+          CHARACTERIZE_PSQL_URL: postgres://dbadmin:Hawkr2024Admin@localhost:5432/postgres
+          # job 的 Redis 沒有密碼；本機 compose 的才有。
+          CHARACTERIZE_REDIS_PASSWORD: ''
+        run: scripts/characterize.sh "$MODULE"
+      - name: 服務的 log
+        if: failure()
+        run: |
+          for f in /tmp/tmp.*/*.log; do
+            echo "::group::$f"
+            tail -n 80 "$f" || true
+            echo "::endgroup::"
+          done
