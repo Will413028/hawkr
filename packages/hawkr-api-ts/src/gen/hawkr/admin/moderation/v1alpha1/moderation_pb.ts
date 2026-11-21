@@ -27,7 +27,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/moderation/v1alpha1/moderation.proto.
  */
 export const file_hawkr_admin_moderation_v1alpha1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("CjBoYXdrci9hZG1pbi9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SH2hhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEi0wUKBENhc2USDwoCaWQYASABKAlCA+BBAxI8CgZ0YXJnZXQYAiABKAsyJy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEID4EEDEj4KBXN0YXRlGAMgASgOMiouaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU3RhdGVCA+BBAxI0CgtjcmVhdGVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJECghkZWNpc2lvbhgFIAEoDjItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZURlY2lzaW9uQgPgQQMSPAoIY2F0ZWdvcnkYBiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAxJACgZhY3Rpb24YByABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb25CA+BBAxIXCgpkZWNpZGVkX2J5GAggASgJQgPgQQMSOgoMcmVzb2x2ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDSACIAQESEQoEZXRhZxgKIAEoCUID4EEDEhkKDHJlcG9ydF9jb3VudBgLIAEoA0ID4EEDEhwKCm1lYXN1cmVfaWQYDCABKAlCA+BBA0gBiAEBEhoKCHN0b3JlX2lkGA0gASgJQgPgQQNIAogBARJJCghyZXZlcnNhbBgOIAEoCzItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJldmVyc2FsQgPgQQNIA4gBAUIPCg1fcmVzb2x2ZV90aW1lQg0KC19tZWFzdXJlX2lkQgsKCV9zdG9yZV9pZEILCglfcmV2ZXJzYWwidAoMQ2FzZVJldmVyc2FsEjUKDHJldmVyc2VfdGltZRgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIYCgtyZXZlcnNlZF9ieRgCIAEoCUID4EEDEhMKBnJlYXNvbhgDIAEoCUID4EEDIp8CCgxDYXNlU25hcHNob3QSQQoGc29jaWFsGAEgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5Tb2NpYWxTbmFwc2hvdEgAEj8KBWJ1eWVyGAIgASgLMi4uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5CdXllclNuYXBzaG90SAASQQoGcmV2aWV3GAMgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5SZXZpZXdTbmFwc2hvdEgAEj0KBGNoYXQYBCABKAsyLS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNoYXRTbmFwc2hvdEgAQgkKB2NvbnRlbnQivAEKDlNvY2lhbFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBAUIQCg5fYXV0aG9yZWRfdGltZSI/Cg1CdXllclNuYXBzaG90EhkKDGRpc3BsYXlfbmFtZRgBIAEoCUID4EEDEhMKBmF2YXRhchgCIAEoCUID4EEDIoACCg5SZXZpZXdTbmFwc2hvdBIWCglhdXRob3JfaWQYASABKAlCA+BBAxIVCghzdG9yZV9pZBgCIAEoCUID4EEDEhcKCnByb2R1Y3RfaWQYAyABKAlCA+BBAxITCgZyYXRpbmcYBCABKAVCA+BBAxIRCgRib2R5GAUgASgJQgPgQQMSFgoJYXNzZXRfaWRzGAYgAygJQgPgQQMSOwoNYXV0aG9yZWRfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0gAiAEBEhcKCnJlcGx5X2JvZHkYCCABKAlCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSK1AgoMQ2hhdFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBARIcCg9jb252ZXJzYXRpb25faWQYBiABKAlCA+BBAxIQCgNzZXEYByABKANCA+BBAxJJCgdjb250ZXh0GAggAygLMjMuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DaGF0Q29udGV4dE1lc3NhZ2VCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSL0AQoSQ2hhdENvbnRleHRNZXNzYWdlEhAKA3NlcRgBIAEoA0ID4EEDEhgKC3NlbmRlcl9raW5kGAIgASgJQgPgQQMSFgoJc2VuZGVyX2lkGAMgASgJQgPgQQMSEQoEdHlwZRgEIAEoCUID4EEDEhEKBGJvZHkYBSABKAlCA+BBAxIWCglhc3NldF9pZHMYBiADKAlCA+BBAxIyCglzZW5kX3RpbWUYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSEwoGaGlkZGVuGAggASgIQgPgQQMSEwoGZXJhc2VkGAkgASgIQgPgQQMi7AEKCkNhc2VSZXBvcnQSDwoCaWQYASABKAlCA+BBAxITCgtyZXBvcnRlcl9pZBgCIAEoCRI3CghjYXRlZ29yeRgDIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgEIAEoCRI5CgdvdXRjb21lGAUgASgOMiguaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lEi8KC2NyZWF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCK2AQoQTGlzdENhc2VzUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCRI5CgVzdGF0ZRgDIAEoDjIqLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVN0YXRlEkAKC3RhcmdldF9raW5kGAQgASgOMisuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRUYXJnZXRLaW5kImIKEUxpc3RDYXNlc1Jlc3BvbnNlEjQKBWNhc2VzGAEgAygLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIhCg5HZXRDYXNlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECItcBCg9HZXRDYXNlUmVzcG9uc2USMwoEY2FzZRgBIAEoCzIlLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZRI8CgdyZXBvcnRzGAIgAygLMisuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlUmVwb3J0EkQKCHNuYXBzaG90GAMgASgLMi0uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU25hcHNob3RIAIgBAUILCglfc25hcHNob3QizwIKEURlY2lkZUNhc2VSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQISEQoEZXRhZxgCIAEoCUID4EECEkQKCGRlY2lzaW9uGAMgASgOMi0uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlRGVjaXNpb25CA+BBAhI3CghjYXRlZ29yeRgEIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRI7CgZhY3Rpb24YBSABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb24SDgoGcmVhc29uGAYgASgJEjoKCHNldmVyaXR5GAggASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlZpb2xhdGlvblNldmVyaXR5SgQIBxAIUghzdG9yZV9pZCKHAQoSRGVjaWRlQ2FzZVJlc3BvbnNlEjMKBGNhc2UYASABKAsyJS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2USPAoHcmVwb3J0cxgCIAMoCzIrLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJlcG9ydCI6ChJSZXZlcnNlSGlkZVJlcXVlc3QSDwoCaWQYASABKAlCA+BBAhITCgZyZWFzb24YAiABKAlCA+BBAiKIAQoTUmV2ZXJzZUhpZGVSZXNwb25zZRIzCgRjYXNlGAEgASgLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEjwKB3JlcG9ydHMYAiADKAsyKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VSZXBvcnQqUwoJQ2FzZVN0YXRlEhoKFkNBU0VfU1RBVEVfVU5TUEVDSUZJRUQQABITCg9DQVNFX1NUQVRFX09QRU4QARIVChFDQVNFX1NUQVRFX0NMT1NFRBACKmoKDENhc2VEZWNpc2lvbhIdChlDQVNFX0RFQ0lTSU9OX1VOU1BFQ0lGSUVEEAASGwoXQ0FTRV9ERUNJU0lPTl9WSU9MQVRJT04QARIeChpDQVNFX0RFQ0lTSU9OX05PX1ZJT0xBVElPThACKoQBCgpDYXNlQWN0aW9uEhsKF0NBU0VfQUNUSU9OX1VOU1BFQ0lGSUVEEAASFAoQQ0FTRV9BQ1RJT05fSElERRABEhQKEENBU0VfQUNUSU9OX1dBUk4QAhITCg9DQVNFX0FDVElPTl9CQU4QAxIYChRDQVNFX0FDVElPTl9UQUtFRE9XThAEMvUDChZNb2RlcmF0aW9uQWRtaW5TZXJ2aWNlEncKCUxpc3RDYXNlcxIxLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdENhc2VzUmVxdWVzdBoyLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdENhc2VzUmVzcG9uc2UiA5ACARJxCgdHZXRDYXNlEi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5HZXRDYXNlUmVxdWVzdBowLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuR2V0Q2FzZVJlc3BvbnNlIgOQAgESdQoKRGVjaWRlQ2FzZRIyLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuRGVjaWRlQ2FzZVJlcXVlc3QaMy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkRlY2lkZUNhc2VSZXNwb25zZRJ4CgtSZXZlcnNlSGlkZRIzLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuUmV2ZXJzZUhpZGVSZXF1ZXN0GjQuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5SZXZlcnNlSGlkZVJlc3BvbnNlYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_moderation_v1alpha1_moderation, file_hawkr_seller_v1alpha1_seller]);
+  fileDesc("CjBoYXdrci9hZG1pbi9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SH2hhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEi0wUKBENhc2USDwoCaWQYASABKAlCA+BBAxI8CgZ0YXJnZXQYAiABKAsyJy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEID4EEDEj4KBXN0YXRlGAMgASgOMiouaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU3RhdGVCA+BBAxI0CgtjcmVhdGVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJECghkZWNpc2lvbhgFIAEoDjItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZURlY2lzaW9uQgPgQQMSPAoIY2F0ZWdvcnkYBiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAxJACgZhY3Rpb24YByABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb25CA+BBAxIXCgpkZWNpZGVkX2J5GAggASgJQgPgQQMSOgoMcmVzb2x2ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDSACIAQESEQoEZXRhZxgKIAEoCUID4EEDEhkKDHJlcG9ydF9jb3VudBgLIAEoA0ID4EEDEhwKCm1lYXN1cmVfaWQYDCABKAlCA+BBA0gBiAEBEhoKCHN0b3JlX2lkGA0gASgJQgPgQQNIAogBARJJCghyZXZlcnNhbBgOIAEoCzItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJldmVyc2FsQgPgQQNIA4gBAUIPCg1fcmVzb2x2ZV90aW1lQg0KC19tZWFzdXJlX2lkQgsKCV9zdG9yZV9pZEILCglfcmV2ZXJzYWwidAoMQ2FzZVJldmVyc2FsEjUKDHJldmVyc2VfdGltZRgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIYCgtyZXZlcnNlZF9ieRgCIAEoCUID4EEDEhMKBnJlYXNvbhgDIAEoCUID4EEDIu0CCgxDYXNlU25hcHNob3QSQQoGc29jaWFsGAEgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5Tb2NpYWxTbmFwc2hvdEgAEj8KBWJ1eWVyGAIgASgLMi4uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5CdXllclNuYXBzaG90SAASQQoGcmV2aWV3GAMgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5SZXZpZXdTbmFwc2hvdEgAEj0KBGNoYXQYBCABKAsyLS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNoYXRTbmFwc2hvdEgAEkwKDHJldmlld19yZXBseRgFIAEoCzI0Lmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuUmV2aWV3UmVwbHlTbmFwc2hvdEgAQgkKB2NvbnRlbnQivAEKDlNvY2lhbFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBAUIQCg5fYXV0aG9yZWRfdGltZSI/Cg1CdXllclNuYXBzaG90EhkKDGRpc3BsYXlfbmFtZRgBIAEoCUID4EEDEhMKBmF2YXRhchgCIAEoCUID4EEDIoACCg5SZXZpZXdTbmFwc2hvdBIWCglhdXRob3JfaWQYASABKAlCA+BBAxIVCghzdG9yZV9pZBgCIAEoCUID4EEDEhcKCnByb2R1Y3RfaWQYAyABKAlCA+BBAxITCgZyYXRpbmcYBCABKAVCA+BBAxIRCgRib2R5GAUgASgJQgPgQQMSFgoJYXNzZXRfaWRzGAYgAygJQgPgQQMSOwoNYXV0aG9yZWRfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0gAiAEBEhcKCnJlcGx5X2JvZHkYCCABKAlCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSLAAQoTUmV2aWV3UmVwbHlTbmFwc2hvdBIVCghzdG9yZV9pZBgBIAEoCUID4EEDEhYKCXJldmlld19pZBgCIAEoCUID4EEDEhgKC3Jldmlld2VyX2lkGAMgASgJQgPgQQMSEQoEYm9keRgEIAEoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBAUIQCg5fYXV0aG9yZWRfdGltZSK1AgoMQ2hhdFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBARIcCg9jb252ZXJzYXRpb25faWQYBiABKAlCA+BBAxIQCgNzZXEYByABKANCA+BBAxJJCgdjb250ZXh0GAggAygLMjMuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DaGF0Q29udGV4dE1lc3NhZ2VCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSL0AQoSQ2hhdENvbnRleHRNZXNzYWdlEhAKA3NlcRgBIAEoA0ID4EEDEhgKC3NlbmRlcl9raW5kGAIgASgJQgPgQQMSFgoJc2VuZGVyX2lkGAMgASgJQgPgQQMSEQoEdHlwZRgEIAEoCUID4EEDEhEKBGJvZHkYBSABKAlCA+BBAxIWCglhc3NldF9pZHMYBiADKAlCA+BBAxIyCglzZW5kX3RpbWUYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSEwoGaGlkZGVuGAggASgIQgPgQQMSEwoGZXJhc2VkGAkgASgIQgPgQQMinQIKCkNhc2VSZXBvcnQSDwoCaWQYASABKAlCA+BBAxIbChFyZXBvcnRlcl9idXllcl9pZBgCIAEoCUgAEhsKEXJlcG9ydGVyX3N0b3JlX2lkGAcgASgJSAASNwoIY2F0ZWdvcnkYAyABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnkSEwoLZGVzY3JpcHRpb24YBCABKAkSOQoHb3V0Y29tZRgFIAEoDjIoLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0T3V0Y29tZRIvCgtjcmVhdGVfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCgoIcmVwb3J0ZXIitgEKEExpc3RDYXNlc1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkSOQoFc3RhdGUYAyABKA4yKi5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VTdGF0ZRJACgt0YXJnZXRfa2luZBgEIAEoDjIrLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0S2luZCJiChFMaXN0Q2FzZXNSZXNwb25zZRI0CgVjYXNlcxgBIAMoCzIlLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiIQoOR2V0Q2FzZVJlcXVlc3QSDwoCaWQYASABKAlCA+BBAiLXAQoPR2V0Q2FzZVJlc3BvbnNlEjMKBGNhc2UYASABKAsyJS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2USPAoHcmVwb3J0cxgCIAMoCzIrLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJlcG9ydBJECghzbmFwc2hvdBgDIAEoCzItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVNuYXBzaG90SACIAQFCCwoJX3NuYXBzaG90Is8CChFEZWNpZGVDYXNlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECEhEKBGV0YWcYAiABKAlCA+BBAhJECghkZWNpc2lvbhgDIAEoDjItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZURlY2lzaW9uQgPgQQISNwoIY2F0ZWdvcnkYBCABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnkSOwoGYWN0aW9uGAUgASgOMisuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlQWN0aW9uEg4KBnJlYXNvbhgGIAEoCRI6CghzZXZlcml0eRgIIAEoDjIoLmhhd2tyLnNlbGxlci52MWFscGhhMS5WaW9sYXRpb25TZXZlcml0eUoECAcQCFIIc3RvcmVfaWQihwEKEkRlY2lkZUNhc2VSZXNwb25zZRIzCgRjYXNlGAEgASgLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEjwKB3JlcG9ydHMYAiADKAsyKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VSZXBvcnQiOgoSUmV2ZXJzZUhpZGVSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQISEwoGcmVhc29uGAIgASgJQgPgQQIiiAEKE1JldmVyc2VIaWRlUmVzcG9uc2USMwoEY2FzZRgBIAEoCzIlLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZRI8CgdyZXBvcnRzGAIgAygLMisuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlUmVwb3J0KlMKCUNhc2VTdGF0ZRIaChZDQVNFX1NUQVRFX1VOU1BFQ0lGSUVEEAASEwoPQ0FTRV9TVEFURV9PUEVOEAESFQoRQ0FTRV9TVEFURV9DTE9TRUQQAipqCgxDYXNlRGVjaXNpb24SHQoZQ0FTRV9ERUNJU0lPTl9VTlNQRUNJRklFRBAAEhsKF0NBU0VfREVDSVNJT05fVklPTEFUSU9OEAESHgoaQ0FTRV9ERUNJU0lPTl9OT19WSU9MQVRJT04QAiqEAQoKQ2FzZUFjdGlvbhIbChdDQVNFX0FDVElPTl9VTlNQRUNJRklFRBAAEhQKEENBU0VfQUNUSU9OX0hJREUQARIUChBDQVNFX0FDVElPTl9XQVJOEAISEwoPQ0FTRV9BQ1RJT05fQkFOEAMSGAoUQ0FTRV9BQ1RJT05fVEFLRURPV04QBDL1AwoWTW9kZXJhdGlvbkFkbWluU2VydmljZRJ3CglMaXN0Q2FzZXMSMS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RDYXNlc1JlcXVlc3QaMi5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RDYXNlc1Jlc3BvbnNlIgOQAgEScQoHR2V0Q2FzZRIvLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuR2V0Q2FzZVJlcXVlc3QaMC5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkdldENhc2VSZXNwb25zZSIDkAIBEnUKCkRlY2lkZUNhc2USMi5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkRlY2lkZUNhc2VSZXF1ZXN0GjMuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5EZWNpZGVDYXNlUmVzcG9uc2USeAoLUmV2ZXJzZUhpZGUSMy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLlJldmVyc2VIaWRlUmVxdWVzdBo0Lmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuUmV2ZXJzZUhpZGVSZXNwb25zZWIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_moderation_v1alpha1_moderation, file_hawkr_seller_v1alpha1_seller]);
 
 /**
  * Case 是一個案件。
@@ -199,6 +199,12 @@ export type CaseSnapshot = Message<"hawkr.admin.moderation.v1alpha1.CaseSnapshot
      */
     value: ChatSnapshot;
     case: "chat";
+  } | {
+    /**
+     * @generated from field: hawkr.admin.moderation.v1alpha1.ReviewReplySnapshot review_reply = 5;
+     */
+    value: ReviewReplySnapshot;
+    case: "reviewReply";
   } | { case: undefined; value?: undefined };
 };
 
@@ -337,6 +343,51 @@ export const ReviewSnapshotSchema: GenMessage<ReviewSnapshot> = /*@__PURE__*/
   messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 5);
 
 /**
+ * ReviewReplySnapshot 是店家對評價的回覆的快照；作者永遠是評價所屬的店家。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.ReviewReplySnapshot
+ */
+export type ReviewReplySnapshot = Message<"hawkr.admin.moderation.v1alpha1.ReviewReplySnapshot"> & {
+  /**
+   * 回覆的店家，也是評價所屬的店家。
+   *
+   * @generated from field: string store_id = 1;
+   */
+  storeId: string;
+
+  /**
+   * 評價 ID（回覆沒有自己的 ID）。
+   *
+   * @generated from field: string review_id = 2;
+   */
+  reviewId: string;
+
+  /**
+   * 評價的買家（上下文）。
+   *
+   * @generated from field: string reviewer_id = 3;
+   */
+  reviewerId: string;
+
+  /**
+   * @generated from field: string body = 4;
+   */
+  body: string;
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp authored_time = 5;
+   */
+  authoredTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ReviewReplySnapshot.
+ * Use `create(ReviewReplySnapshotSchema)` to create a new message.
+ */
+export const ReviewReplySnapshotSchema: GenMessage<ReviewReplySnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 6);
+
+/**
  * ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。
  *
  * @generated from message hawkr.admin.moderation.v1alpha1.ChatSnapshot
@@ -392,7 +443,7 @@ export type ChatSnapshot = Message<"hawkr.admin.moderation.v1alpha1.ChatSnapshot
  * Use `create(ChatSnapshotSchema)` to create a new message.
  */
 export const ChatSnapshotSchema: GenMessage<ChatSnapshot> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 6);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 7);
 
 /**
  * ChatContextMessage 是聊天前後文的一則；已隱藏或已抹除的是墓碑（不帶 body 與 asset_ids）。
@@ -453,7 +504,7 @@ export type ChatContextMessage = Message<"hawkr.admin.moderation.v1alpha1.ChatCo
  * Use `create(ChatContextMessageSchema)` to create a new message.
  */
 export const ChatContextMessageSchema: GenMessage<ChatContextMessage> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 7);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 8);
 
 /**
  * CaseReport 是案件裡的一筆檢舉。
@@ -467,11 +518,27 @@ export type CaseReport = Message<"hawkr.admin.moderation.v1alpha1.CaseReport"> &
   id: string;
 
   /**
-   * 檢舉人（買家 ID）。
+   * 檢舉人：買家或店家，恰好設一個（店家只會檢舉店家聊天訊息）。
    *
-   * @generated from field: string reporter_id = 2;
+   * @generated from oneof hawkr.admin.moderation.v1alpha1.CaseReport.reporter
    */
-  reporterId: string;
+  reporter: {
+    /**
+     * 買家 ID（過渡期的十進位整數字串）。
+     *
+     * @generated from field: string reporter_buyer_id = 2;
+     */
+    value: string;
+    case: "reporterBuyerId";
+  } | {
+    /**
+     * 店家 ID（過渡期的十進位整數字串）。
+     *
+     * @generated from field: string reporter_store_id = 7;
+     */
+    value: string;
+    case: "reporterStoreId";
+  } | { case: undefined; value?: undefined };
 
   /**
    * @generated from field: hawkr.common.v1alpha1.PolicyCategory category = 3;
@@ -503,7 +570,7 @@ export type CaseReport = Message<"hawkr.admin.moderation.v1alpha1.CaseReport"> &
  * Use `create(CaseReportSchema)` to create a new message.
  */
 export const CaseReportSchema: GenMessage<CaseReport> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 8);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 9);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ListCasesRequest
@@ -541,7 +608,7 @@ export type ListCasesRequest = Message<"hawkr.admin.moderation.v1alpha1.ListCase
  * Use `create(ListCasesRequestSchema)` to create a new message.
  */
 export const ListCasesRequestSchema: GenMessage<ListCasesRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 9);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 10);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ListCasesResponse
@@ -563,7 +630,7 @@ export type ListCasesResponse = Message<"hawkr.admin.moderation.v1alpha1.ListCas
  * Use `create(ListCasesResponseSchema)` to create a new message.
  */
 export const ListCasesResponseSchema: GenMessage<ListCasesResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 10);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 11);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.GetCaseRequest
@@ -580,7 +647,7 @@ export type GetCaseRequest = Message<"hawkr.admin.moderation.v1alpha1.GetCaseReq
  * Use `create(GetCaseRequestSchema)` to create a new message.
  */
 export const GetCaseRequestSchema: GenMessage<GetCaseRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 11);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 12);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.GetCaseResponse
@@ -611,7 +678,7 @@ export type GetCaseResponse = Message<"hawkr.admin.moderation.v1alpha1.GetCaseRe
  * Use `create(GetCaseResponseSchema)` to create a new message.
  */
 export const GetCaseResponseSchema: GenMessage<GetCaseResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 12);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 13);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.DecideCaseRequest
@@ -668,7 +735,7 @@ export type DecideCaseRequest = Message<"hawkr.admin.moderation.v1alpha1.DecideC
  * Use `create(DecideCaseRequestSchema)` to create a new message.
  */
 export const DecideCaseRequestSchema: GenMessage<DecideCaseRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 13);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 14);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.DecideCaseResponse
@@ -690,7 +757,7 @@ export type DecideCaseResponse = Message<"hawkr.admin.moderation.v1alpha1.Decide
  * Use `create(DecideCaseResponseSchema)` to create a new message.
  */
 export const DecideCaseResponseSchema: GenMessage<DecideCaseResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 14);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 15);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ReverseHideRequest
@@ -714,7 +781,7 @@ export type ReverseHideRequest = Message<"hawkr.admin.moderation.v1alpha1.Revers
  * Use `create(ReverseHideRequestSchema)` to create a new message.
  */
 export const ReverseHideRequestSchema: GenMessage<ReverseHideRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 15);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 16);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ReverseHideResponse
@@ -736,7 +803,7 @@ export type ReverseHideResponse = Message<"hawkr.admin.moderation.v1alpha1.Rever
  * Use `create(ReverseHideResponseSchema)` to create a new message.
  */
 export const ReverseHideResponseSchema: GenMessage<ReverseHideResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 16);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 17);
 
 /**
  * CaseState 是案件的狀態。

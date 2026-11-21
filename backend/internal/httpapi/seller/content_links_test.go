@@ -7,6 +7,7 @@ import (
 
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
 
 // fakeLinks 回報 posts 與 threads 裡的目標還在；其餘（含沒設定）是已刪除。calls 記錄問了幾次、每次問了哪些目標。
@@ -85,5 +86,28 @@ func TestLinkAvailabilitySkipsWhenNoTargetsAndFailsWithoutSource(t *testing.T) {
 	linked.Contents = []model.MeasureContent{linkedContent(model.ContentPost, model.ContentLink{PostID: uuid.NewV7()})}
 	if _, err := adminMeasures(context.Background(), nil, []model.Measure{linked}); err == nil {
 		t.Fatal("有連結卻沒有查詢來源應回錯誤")
+	}
+}
+
+// 聊天訊息與評價回覆的快照沒有連結：不問 social，也不被當成討論串（零值連結不是討論串 0）。
+func TestLinklessSnapshotsAreNotTreatedAsForumThreads(t *testing.T) {
+	var calls [][]uuid.UUID
+	m := riskMeasureFixture()
+	m.Kind = model.MeasureContentTakedown
+	m.Contents = []model.MeasureContent{
+		linkedContent(model.ContentKind(contentkind.ChatMessage), model.ContentLink{}),
+		linkedContent(model.ContentKind(contentkind.ReviewReply), model.ContentLink{}),
+	}
+	got, err := adminMeasures(context.Background(), fakeLinks{calls: &calls}, []model.Measure{m})
+	if err != nil || len(calls) != 0 {
+		t.Fatalf("沒有連結不該問 social（也不該因為沒有來源而失敗）：calls=%v err=%v", calls, err)
+	}
+	for i, c := range got[0].GetContents() {
+		if c.GetLinkAvailable() {
+			t.Errorf("內容 %d：沒有連結，link_available 應為 false", i)
+		}
+	}
+	if _, err := adminMeasures(context.Background(), nil, []model.Measure{m}); err != nil {
+		t.Fatalf("沒有連結時沒有來源也不是錯誤：%v", err)
 	}
 }

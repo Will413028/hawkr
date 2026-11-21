@@ -1,5 +1,6 @@
 import { createClient } from "@connectrpc/connect";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
+import { ModerationAppService } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import { SellerReportAppService } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import { authedTransport } from "@/lib/connect/transport";
 
@@ -21,4 +22,27 @@ export function createReport(input: CreateReportInput) {
 		orderNo: input.orderNo ?? "",
 		evidenceStagedTokens: input.evidenceStagedTokens,
 	});
+}
+
+export function listMyReports(pageToken: string) {
+	return createClient(ModerationAppService, authedTransport()).listMyReports({
+		pageToken,
+	});
+}
+
+export function getMyReport(reportId: string) {
+	return createClient(SellerReportAppService, authedTransport()).getMyReport({
+		reportId,
+	});
+}
+
+export function addReportSupplement(input: {
+	reportId: string;
+	description: string;
+	evidenceStagedTokens: string[];
+}) {
+	return createClient(
+		SellerReportAppService,
+		authedTransport(),
+	).addReportSupplement(input);
 }

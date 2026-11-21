@@ -154,6 +154,7 @@ type fixture struct {
 	module   *Module
 	media    *media.Fake
 	jobs     *testQueue
+	bus      *events.Bus
 	ids      atomic.Int64
 	mu       sync.Mutex
 	now      time.Time
@@ -186,6 +187,7 @@ func setup(t *testing.T) *fixture {
 	))
 	f := &fixture{db: d, now: time.Date(2026, 11, 2, 4, 0, 0, 0, time.UTC)}
 	bus := events.NewBus()
+	f.bus = bus
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := &testQueue{}
 	f.jobs = q
@@ -215,8 +217,13 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.social.OnStoreRetired)
 	events.Subscribe(bus, f.social.OnMeasureCreated)
 	events.Subscribe(bus, f.social.OnMeasureRevoked)
+	events.Subscribe(bus, f.im.OnMeasureCreated)
+	events.Subscribe(bus, f.im.OnMeasureRevoked)
+	events.Subscribe(bus, f.review.OnMeasureCreated)
+	events.Subscribe(bus, f.review.OnMeasureRevoked)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
+	events.Subscribe(bus, f.module.Retention().OnStoreRetired)
 	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
@@ -260,15 +267,29 @@ func (f *fixture) newBuyer(t *testing.T) (buyerID, accountID int64) {
 	return p.BuyerID, accountID
 }
 
-// exposableStore 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。
+// exposableStore 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。帳號是不存在於 identity 的編號。
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
-	accountID = f.next()
+	return f.exposableStoreOn(t, f.next())
+}
+
+// exposableStoreOnIdentityAccount 同 exposableStore，但帳號是真的 identity 帳號（沒有買家列），讓 CloseCurrent 這類要鎖帳號列的路徑走得通。
+func (f *fixture) exposableStoreOnIdentityAccount(t *testing.T) (storeID, accountID int64) {
+	t.Helper()
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+		t.Fatal(err)
+	}
+	return f.exposableStoreOn(t, accountID)
+}
+
+func (f *fixture) exposableStoreOn(t *testing.T, accountID int64) (storeID, _ int64) {
+	t.Helper()
 	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
 		VALUES ($1, $2, '測試店', 'logo/k', 'logo-asset', '63000010', $3, $3)`, accountID, accountID, f.clock())
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
+	f.exec(t, `INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
 	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())

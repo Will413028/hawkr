@@ -63,6 +63,7 @@ export type UiTextKey =
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -70,9 +71,11 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
+	| "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
+	| "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY"
 	| "seller.InquiryKind.INQUIRY_KIND_EXPLANATION"
 	| "seller.InquiryKind.INQUIRY_KIND_RECORDS"
 	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL"
@@ -331,6 +334,7 @@ const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>
 	4: "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER",
 	5: "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW",
 	6: "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE",
+	7: "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY",
 };
 
 /** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
@@ -371,6 +375,8 @@ const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.ContentKind.CONTENT_KIND_POST",
 	2: "seller.ContentKind.CONTENT_KIND_COMMENT",
 	3: "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY",
+	4: "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE",
+	5: "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY",
 };
 
 /** seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

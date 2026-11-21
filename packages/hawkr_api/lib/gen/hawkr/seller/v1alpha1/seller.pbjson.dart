@@ -390,6 +390,8 @@ const ContentKind$json = {
     {'1': 'CONTENT_KIND_POST', '2': 1},
     {'1': 'CONTENT_KIND_COMMENT', '2': 2},
     {'1': 'CONTENT_KIND_FORUM_ENTRY', '2': 3},
+    {'1': 'CONTENT_KIND_CHAT_MESSAGE', '2': 4},
+    {'1': 'CONTENT_KIND_REVIEW_REPLY', '2': 5},
   ],
 };
 
@@ -397,7 +399,8 @@ const ContentKind$json = {
 final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
     'CgtDb250ZW50S2luZBIcChhDT05URU5UX0tJTkRfVU5TUEVDSUZJRUQQABIVChFDT05URU5UX0'
     'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
-    'UlVNX0VOVFJZEAM=');
+    'UlVNX0VOVFJZEAMSHQoZQ09OVEVOVF9LSU5EX0NIQVRfTUVTU0FHRRAEEh0KGUNPTlRFTlRfS0'
+    'lORF9SRVZJRVdfUkVQTFkQBQ==');
 
 @$core.Deprecated('Use contentSnapshotStateDescriptor instead')
 const ContentSnapshotState$json = {

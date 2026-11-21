@@ -20,6 +20,14 @@ type LinkAvailability interface {
 
 var errLinksRequired = errors.New("httpapi/seller：措施有內容快照的連結，但沒有 LinkAvailability 可查目標還在不在")
 
+// snapshotLink 回傳內容快照的連結；沒有快照或連結是零值（聊天訊息、評價回覆沒有連結目標）時第二個回傳值為假。
+func snapshotLink(c model.MeasureContent) (model.ContentLink, bool) {
+	if c.Snapshot == nil || c.Snapshot.Link == (model.ContentLink{}) {
+		return model.ContentLink{}, false
+	}
+	return c.Snapshot.Link, true
+}
+
 // markLinkAvailability 把 ms 的內容快照連結目標是否還在寫進對應的 ContentRef.LinkAvailable：整批只問 social 一次（每類目標一個查詢），沒有連結目標時不問。
 // refsOf(i) 回傳 ms[i] 轉成回應後的 Contents，順序與 ms[i].Contents 相同。
 func markLinkAvailability(ctx context.Context, src LinkAvailability, ms []model.Measure, refsOf func(i int) []*pb.ContentRef) error {
@@ -28,10 +36,11 @@ func markLinkAvailability(ctx context.Context, src LinkAvailability, ms []model.
 	seenPost, seenThread := map[uuid.UUID]bool{}, map[social.ForumThread]bool{}
 	for _, m := range ms {
 		for _, c := range m.Contents {
-			if c.Snapshot == nil {
+			l, ok := snapshotLink(c)
+			if !ok {
 				continue
 			}
-			if l := c.Snapshot.Link; l.PostID != uuid.Nil() {
+			if l.PostID != uuid.Nil() {
 				if !seenPost[l.PostID] {
 					seenPost[l.PostID] = true
 					posts = append(posts, l.PostID)
@@ -55,10 +64,11 @@ func markLinkAvailability(ctx context.Context, src LinkAvailability, ms []model.
 	for i, m := range ms {
 		refs := refsOf(i)
 		for j, c := range m.Contents {
-			if c.Snapshot == nil {
+			l, ok := snapshotLink(c)
+			if !ok {
 				continue
 			}
-			if l := c.Snapshot.Link; l.PostID != uuid.Nil() {
+			if l.PostID != uuid.Nil() {
 				refs[j].LinkAvailable = av.Posts[l.PostID]
 			} else {
 				refs[j].LinkAvailable = av.Threads[social.ForumThread{StoreID: l.StoreID, ThreadID: l.ThreadID}]

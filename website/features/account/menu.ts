@@ -40,6 +40,7 @@ const BASE_BUYER_MENU_ITEMS = [
 		href: "/account/invoice-profiles",
 		icon: "invoiceProfiles",
 	},
+	{ label: "我的檢舉", href: "/account/reports", icon: "reports" },
 ] as const satisfies ReadonlyArray<BuyerMenuItem>;
 
 /**
@@ -107,6 +108,7 @@ export const BUYER_MENU_GROUPS: ReadonlyArray<BuyerMenuGroup> = [
 		items: [
 			BASE_BUYER_MENU_ITEMS[6], // 我的評論
 			BASE_BUYER_MENU_ITEMS[7], // 通知
+			BASE_BUYER_MENU_ITEMS[11], // 我的檢舉
 		],
 	},
 	{

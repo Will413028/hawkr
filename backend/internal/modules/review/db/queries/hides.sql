@@ -18,3 +18,8 @@ RETURNING *;
 -- name: HasActiveHide :one
 -- 訊息或評價目前有沒有未還原的隱藏；還原沒有列時用來分辨「沒有隱藏」與「隱藏來源不符」。
 SELECT EXISTS (SELECT 1 FROM review.hides WHERE review_id = sqlc.arg(review_id) AND restored_at IS NULL);
+
+-- name: TakenDownReplyIDs :many
+-- 店家回覆被內容下架措施下架的評價（seller.pub_content_takedowns()，content_id 是評價 ID）：讀取時把回覆換成沒有回覆，評價本身不受影響。
+SELECT td.content_id::uuid AS review_id FROM seller.pub_content_takedowns() AS td
+WHERE td.content_kind = 'REVIEW_REPLY' AND td.content_id = ANY(sqlc.arg(ids)::uuid[]);

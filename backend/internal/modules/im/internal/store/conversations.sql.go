@@ -164,7 +164,7 @@ func (q *Queries) GetConversation(ctx context.Context, id uuid.UUID) (ImConversa
 const listConversationsBuyer = `-- name: ListConversationsBuyer :many
 SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.buyer_last_read_seq AS read_seq, c.store_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.conversations AS c
 JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
@@ -240,7 +240,7 @@ func (q *Queries) ListConversationsBuyer(ctx context.Context, arg ListConversati
 const listConversationsStore = `-- name: ListConversationsStore :many
 SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.buyer_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.conversations AS c
 JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL

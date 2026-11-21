@@ -179,6 +179,15 @@ func ReportDescriptionTooLong(l uitext.Locale, a ReportDescriptionTooLongArgs) u
 	return uitext.Message{Text: "檢舉說明不可超過 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
 }
 
+// ReportReporterNotFound 是模組句子 report.reporter_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportReporterNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This account is no longer active and cannot submit reports", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "檢舉人已停用，無法送出檢舉", Locale: uitext.ZhTW}
+}
+
 // ReportReporterRequired 是模組句子 report.reporter_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReportReporterRequired(l uitext.Locale) uitext.Message {
 	switch l {

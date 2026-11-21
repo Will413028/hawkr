@@ -200,6 +200,10 @@
       "message": "評價",
       "description": "買家寫的評價；id 是評價 ID。"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
@@ -228,6 +232,10 @@
       "message": "金流商收件（託管頁面）",
       "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
     },
+    "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "店家寄出的聊天訊息。"
+    },
     "seller.ContentKind.CONTENT_KIND_COMMENT": {
       "message": "留言",
       "description": "貼文底下的留言。"
@@ -239,6 +247,10 @@
     "seller.ContentKind.CONTENT_KIND_POST": {
       "message": "貼文",
       "description": "店家貼文。"
+    },
+    "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆（ID 是評價的 ID）。"
     },
     "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
       "message": "請說明",
@@ -887,6 +899,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
       "message": "評價",
       "description": "買家寫的評價；id 是評價 ID。\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。\n受眾：後台員工"
     },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "已核准",

@@ -53,7 +53,7 @@ RETURNING c.submitted
 `
 
 type BumpDailyCountParams struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
 	Day             time.Time
 	DailyLimit      int32
 }
@@ -82,6 +82,30 @@ type BumpRefSeqParams struct {
 func (q *Queries) BumpRefSeq(ctx context.Context, arg BumpRefSeqParams) error {
 	_, err := q.db.Exec(ctx, bumpRefSeq, arg.RefType, arg.RefID, arg.Now)
 	return err
+}
+
+const bumpStoreDailyCount = `-- name: BumpStoreDailyCount :one
+INSERT INTO moderation.reporter_daily_counts AS c (reporter_store_id, day, submitted)
+VALUES ($1, $2, 1)
+ON CONFLICT (reporter_store_id) DO UPDATE
+SET day = EXCLUDED.day,
+    submitted = CASE WHEN c.day = EXCLUDED.day THEN c.submitted + 1 ELSE 1 END
+WHERE c.day <> EXCLUDED.day OR c.submitted < $3::int
+RETURNING c.submitted
+`
+
+type BumpStoreDailyCountParams struct {
+	ReporterStoreID *int64
+	Day             time.Time
+	DailyLimit      int32
+}
+
+// 店家檢舉人的每日上限，與買家各自計數，規則同 BumpDailyCount。
+func (q *Queries) BumpStoreDailyCount(ctx context.Context, arg BumpStoreDailyCountParams) (int32, error) {
+	row := q.db.QueryRow(ctx, bumpStoreDailyCount, arg.ReporterStoreID, arg.Day, arg.DailyLimit)
+	var submitted int32
+	err := row.Scan(&submitted)
+	return submitted, err
 }
 
 const clearExpiredDescriptionsBatch = `-- name: ClearExpiredDescriptionsBatch :execrows
@@ -114,8 +138,21 @@ UPDATE moderation.reports SET description = NULL WHERE reporter_buyer_id = $1 AN
 `
 
 // 檢舉人刪帳（A7-D21）：清掉他全部檢舉的說明；檢舉列與 reporter_buyer_id（假名鍵）留著。
-func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID int64) (int64, error) {
+func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, clearReporterDescriptions, reporterBuyerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const clearStoreReporterDescriptions = `-- name: ClearStoreReporterDescriptions :execrows
+UPDATE moderation.reports SET description = NULL WHERE reporter_store_id = $1 AND description IS NOT NULL
+`
+
+// 店家退場：清掉該店以檢舉人身分送出的全部檢舉的說明；檢舉列與 reporter_store_id（業務鍵）留著。
+func (q *Queries) ClearStoreReporterDescriptions(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, clearStoreReporterDescriptions, reporterStoreID)
 	if err != nil {
 		return 0, err
 	}
@@ -171,8 +208,8 @@ func (q *Queries) CountReportsOfCase(ctx context.Context, caseID uuid.UUID) (int
 
 const deleteExpiredReportRequestsBatch = `-- name: DeleteExpiredReportRequestsBatch :execrows
 DELETE FROM moderation.report_requests
-WHERE (reporter_buyer_id, request_id) IN (
-    SELECT q.reporter_buyer_id, q.request_id
+WHERE report_id IN (
+    SELECT q.report_id
     FROM moderation.report_requests q
     JOIN moderation.reports r ON r.id = q.report_id
     JOIN moderation.cases c ON c.id = r.case_id
@@ -199,7 +236,7 @@ const deleteReporterDailyCount = `-- name: DeleteReporterDailyCount :execrows
 DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1
 `
 
-func (q *Queries) DeleteReporterDailyCount(ctx context.Context, reporterBuyerID int64) (int64, error) {
+func (q *Queries) DeleteReporterDailyCount(ctx context.Context, reporterBuyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReporterDailyCount, reporterBuyerID)
 	if err != nil {
 		return 0, err
@@ -212,7 +249,7 @@ DELETE FROM moderation.report_requests WHERE reporter_buyer_id = $1
 `
 
 // 檢舉人刪帳（A7-D21）：刪掉他的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
-func (q *Queries) DeleteReporterRequests(ctx context.Context, reporterBuyerID int64) (int64, error) {
+func (q *Queries) DeleteReporterRequests(ctx context.Context, reporterBuyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReporterRequests, reporterBuyerID)
 	if err != nil {
 		return 0, err
@@ -233,34 +270,62 @@ func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const deleteStoreReporterDailyCount = `-- name: DeleteStoreReporterDailyCount :execrows
+DELETE FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1
+`
+
+func (q *Queries) DeleteStoreReporterDailyCount(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStoreReporterDailyCount, reporterStoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStoreReporterRequests = `-- name: DeleteStoreReporterRequests :execrows
+DELETE FROM moderation.report_requests WHERE reporter_store_id = $1
+`
+
+// 店家退場：刪掉該店的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+func (q *Queries) DeleteStoreReporterRequests(ctx context.Context, reporterStoreID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStoreReporterRequests, reporterStoreID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const existingOpenReport = `-- name: ExistingOpenReport :one
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at FROM moderation.reports r
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.reporter_store_id, r.category, r.description, r.snapshot_id, r.created_at FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE c.target_kind = $1 AND c.closed_at IS NULL
   AND (c.content_id = $2 OR c.buyer_id = $3)
-  AND r.reporter_buyer_id = $4
+  AND (r.reporter_buyer_id = $4 OR r.reporter_store_id = $5)
 `
 
 type ExistingOpenReportParams struct {
 	TargetKind      string
 	ContentID       *uuid.UUID
 	BuyerID         *int64
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 }
 
-// 這位檢舉人對這個對象在進行中案件裡已有的檢舉。
+// 這位檢舉人（買家或店家，另一欄傳 NULL）對這個對象在進行中案件裡已有的檢舉。
 func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReportParams) (ModerationReport, error) {
 	row := q.db.QueryRow(ctx, existingOpenReport,
 		arg.TargetKind,
 		arg.ContentID,
 		arg.BuyerID,
 		arg.ReporterBuyerID,
+		arg.ReporterStoreID,
 	)
 	var i ModerationReport
 	err := row.Scan(
 		&i.ID,
 		&i.CaseID,
 		&i.ReporterBuyerID,
+		&i.ReporterStoreID,
 		&i.Category,
 		&i.Description,
 		&i.SnapshotID,
@@ -437,16 +502,17 @@ func (q *Queries) InsertContentCase(ctx context.Context, arg InsertContentCasePa
 }
 
 const insertReport = `-- name: InsertReport :one
-INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT DO NOTHING
-RETURNING id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at
+RETURNING id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at
 `
 
 type InsertReportParams struct {
 	ID              uuid.UUID
 	CaseID          uuid.UUID
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	Category        string
 	Description     *string
 	SnapshotID      *uuid.UUID
@@ -459,6 +525,7 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 		arg.ID,
 		arg.CaseID,
 		arg.ReporterBuyerID,
+		arg.ReporterStoreID,
 		arg.Category,
 		arg.Description,
 		arg.SnapshotID,
@@ -469,6 +536,7 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 		&i.ID,
 		&i.CaseID,
 		&i.ReporterBuyerID,
+		&i.ReporterStoreID,
 		&i.Category,
 		&i.Description,
 		&i.SnapshotID,
@@ -478,13 +546,14 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Mod
 }
 
 const insertReportRequest = `-- name: InsertReportRequest :execrows
-INSERT INTO moderation.report_requests (reporter_buyer_id, request_id, report_id, request_hash)
-VALUES ($1, $2, $3, $4)
+INSERT INTO moderation.report_requests (reporter_buyer_id, reporter_store_id, request_id, report_id, request_hash)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
 `
 
 type InsertReportRequestParams struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	RequestID       uuid.UUID
 	ReportID        uuid.UUID
 	RequestHash     []byte
@@ -494,6 +563,7 @@ type InsertReportRequestParams struct {
 func (q *Queries) InsertReportRequest(ctx context.Context, arg InsertReportRequestParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertReportRequest,
 		arg.ReporterBuyerID,
+		arg.ReporterStoreID,
 		arg.RequestID,
 		arg.ReportID,
 		arg.RequestHash,
@@ -758,7 +828,7 @@ func (q *Queries) ListOpenCases(ctx context.Context, arg ListOpenCasesParams) ([
 }
 
 const listReportsOfReporter = `-- name: ListReportsOfReporter :many
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.reporter_store_id, r.category, r.description, r.snapshot_id, r.created_at, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
 FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE r.reporter_buyer_id = $1
@@ -768,7 +838,7 @@ LIMIT $4::int
 `
 
 type ListReportsOfReporterParams struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
 	AfterCreated    time.Time
 	AfterID         uuid.UUID
 	MaxRows         int32
@@ -802,6 +872,7 @@ func (q *Queries) ListReportsOfReporter(ctx context.Context, arg ListReportsOfRe
 			&i.ModerationReport.ID,
 			&i.ModerationReport.CaseID,
 			&i.ModerationReport.ReporterBuyerID,
+			&i.ModerationReport.ReporterStoreID,
 			&i.ModerationReport.Category,
 			&i.ModerationReport.Description,
 			&i.ModerationReport.SnapshotID,
@@ -948,14 +1019,15 @@ func (q *Queries) RefSeq(ctx context.Context, arg RefSeqParams) (int64, error) {
 }
 
 const reportByRequest = `-- name: ReportByRequest :one
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, q.request_hash
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.reporter_store_id, r.category, r.description, r.snapshot_id, r.created_at, q.request_hash
 FROM moderation.report_requests q
 JOIN moderation.reports r ON r.id = q.report_id
-WHERE q.reporter_buyer_id = $1 AND q.request_id = $2
+WHERE (q.reporter_buyer_id = $1 OR q.reporter_store_id = $2) AND q.request_id = $3
 `
 
 type ReportByRequestParams struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	RequestID       uuid.UUID
 }
 
@@ -966,12 +1038,13 @@ type ReportByRequestRow struct {
 
 // 這位檢舉人以這個 request_id 第一次得到的檢舉與當時的內容雜湊（不看案件狀態，A7-D28 第 3 點）。
 func (q *Queries) ReportByRequest(ctx context.Context, arg ReportByRequestParams) (ReportByRequestRow, error) {
-	row := q.db.QueryRow(ctx, reportByRequest, arg.ReporterBuyerID, arg.RequestID)
+	row := q.db.QueryRow(ctx, reportByRequest, arg.ReporterBuyerID, arg.ReporterStoreID, arg.RequestID)
 	var i ReportByRequestRow
 	err := row.Scan(
 		&i.ModerationReport.ID,
 		&i.ModerationReport.CaseID,
 		&i.ModerationReport.ReporterBuyerID,
+		&i.ModerationReport.ReporterStoreID,
 		&i.ModerationReport.Category,
 		&i.ModerationReport.Description,
 		&i.ModerationReport.SnapshotID,
@@ -1045,7 +1118,7 @@ func (q *Queries) ReportIDsOfCase(ctx context.Context, arg ReportIDsOfCaseParams
 }
 
 const reportWithOutcome = `-- name: ReportWithOutcome :one
-SELECT r.id, r.case_id, r.reporter_buyer_id, r.category, r.description, r.snapshot_id, r.created_at, c.decision, c.decision_category, c.decision_action, c.closed_at
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.reporter_store_id, r.category, r.description, r.snapshot_id, r.created_at, c.decision, c.decision_category, c.decision_action, c.closed_at
 FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE r.id = $1
@@ -1067,6 +1140,7 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 		&i.ModerationReport.ID,
 		&i.ModerationReport.CaseID,
 		&i.ModerationReport.ReporterBuyerID,
+		&i.ModerationReport.ReporterStoreID,
 		&i.ModerationReport.Category,
 		&i.ModerationReport.Description,
 		&i.ModerationReport.SnapshotID,
@@ -1080,7 +1154,7 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 }
 
 const reportsOfCase = `-- name: ReportsOfCase :many
-SELECT id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
+SELECT id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
 `
 
 func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]ModerationReport, error) {
@@ -1096,6 +1170,7 @@ func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]Modera
 			&i.ID,
 			&i.CaseID,
 			&i.ReporterBuyerID,
+			&i.ReporterStoreID,
 			&i.Category,
 			&i.Description,
 			&i.SnapshotID,

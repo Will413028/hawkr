@@ -45,6 +45,8 @@ const (
 	ReportTargetKind_REPORT_TARGET_KIND_REVIEW ReportTargetKind = 5
 	// 買家與店家之間的一則聊天訊息；id 是訊息 ID。
 	ReportTargetKind_REPORT_TARGET_KIND_CHAT_MESSAGE ReportTargetKind = 6
+	// 店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。
+	ReportTargetKind_REPORT_TARGET_KIND_REVIEW_REPLY ReportTargetKind = 7
 )
 
 // Enum value maps for ReportTargetKind.
@@ -57,6 +59,7 @@ var (
 		4: "REPORT_TARGET_KIND_BUYER",
 		5: "REPORT_TARGET_KIND_REVIEW",
 		6: "REPORT_TARGET_KIND_CHAT_MESSAGE",
+		7: "REPORT_TARGET_KIND_REVIEW_REPLY",
 	}
 	ReportTargetKind_value = map[string]int32{
 		"REPORT_TARGET_KIND_UNSPECIFIED":  0,
@@ -66,6 +69,7 @@ var (
 		"REPORT_TARGET_KIND_BUYER":        4,
 		"REPORT_TARGET_KIND_REVIEW":       5,
 		"REPORT_TARGET_KIND_CHAT_MESSAGE": 6,
+		"REPORT_TARGET_KIND_REVIEW_REPLY": 7,
 	}
 )
 
@@ -651,7 +655,7 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\r_resolve_time\"\x96\x01\n" +
 	"\x0fCommunityReport\x12?\n" +
 	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12B\n" +
-	"\aoutcome\x18\x02 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome*\xf9\x01\n" +
+	"\aoutcome\x18\x02 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome*\x9e\x02\n" +
 	"\x10ReportTargetKind\x12\"\n" +
 	"\x1eREPORT_TARGET_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REPORT_TARGET_KIND_POST\x10\x01\x12\x1e\n" +
@@ -659,7 +663,8 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x1eREPORT_TARGET_KIND_FORUM_ENTRY\x10\x03\x12\x1c\n" +
 	"\x18REPORT_TARGET_KIND_BUYER\x10\x04\x12\x1d\n" +
 	"\x19REPORT_TARGET_KIND_REVIEW\x10\x05\x12#\n" +
-	"\x1fREPORT_TARGET_KIND_CHAT_MESSAGE\x10\x06*\x8a\x01\n" +
+	"\x1fREPORT_TARGET_KIND_CHAT_MESSAGE\x10\x06\x12#\n" +
+	"\x1fREPORT_TARGET_KIND_REVIEW_REPLY\x10\a*\x8a\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16REPORT_OUTCOME_PENDING\x10\x01\x12\x1c\n" +

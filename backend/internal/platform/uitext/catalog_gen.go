@@ -218,6 +218,8 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 			return "評價", true
 		case "CHAT_MESSAGE":
 			return "聊天訊息", true
+		case "REVIEW_REPLY":
+			return "評價回覆", true
 		}
 		return "", false
 	}
@@ -235,6 +237,8 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 			return "Review", true
 		case "CHAT_MESSAGE":
 			return "Chat message", true
+		case "REVIEW_REPLY":
+			return "Review reply", true
 		}
 	}
 	switch v {
@@ -250,6 +254,8 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 		return "評價", true
 	case "CHAT_MESSAGE":
 		return "聊天訊息", true
+	case "REVIEW_REPLY":
+		return "評價回覆", true
 	}
 	return "", false
 }
@@ -316,6 +322,10 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 		return "留言", true
 	case "FORUM_ENTRY":
 		return "討論區留言", true
+	case "CHAT_MESSAGE":
+		return "聊天訊息", true
+	case "REVIEW_REPLY":
+		return "評價回覆", true
 	}
 	return "", false
 }

@@ -1,0 +1,94 @@
+{
+ "mutants": [
+  {
+   "id": "supplement-button-always",
+   "stack": "website",
+   "file": "website/features/report/report-logic.ts",
+   "old": "return (\n\t\tdetail.report !== undefined &&\n\t\tdetail.report.outcome === undefined &&\n\t\tdetail.supplements.length < MAX_SUPPLEMENTS\n\t);",
+   "new": "return true;",
+   "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
+   "why": "補充入口永遠顯示（有結果、滿 10 則仍顯示）"
+  },
+  {
+   "id": "supplement-limit-dropped",
+   "stack": "website",
+   "file": "website/features/report/report-logic.ts",
+   "old": " &&\n\t\tdetail.supplements.length < MAX_SUPPLEMENTS",
+   "new": "",
+   "test": "features/report/my-reports.unit.test.ts hides the supplement button at 10 supplements",
+   "why": "補充滿 10 則仍顯示補充入口"
+  },
+  {
+   "id": "supplement-shown-with-outcome",
+   "stack": "website",
+   "file": "website/features/report/report-logic.ts",
+   "old": "detail.report.outcome === undefined &&",
+   "new": "true &&",
+   "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
+   "why": "已有結果仍顯示補充入口"
+  },
+  {
+   "id": "success-sentence-tail-removed",
+   "stack": "website",
+   "file": "website/messages/zh-TW.json",
+   "old": "已收到檢舉，處理結果可在「我的檢舉」查看",
+   "new": "已收到檢舉",
+   "test": "features/report/report-ui.unit.test.ts shows the received text when not supplemented",
+   "why": "成功句後半（指向我的檢舉）被刪掉"
+  },
+  {
+   "id": "list-drops-store-items",
+   "stack": "website",
+   "file": "website/features/account/screens/reports/MyReportsClient.tsx",
+   "old": "(r) => r.subject.case === \"community\" || r.subject.case === \"store\",",
+   "new": "(r) => r.subject.case === \"community\",",
+   "test": "features/report/my-reports.unit.test.ts renders community and store items",
+   "why": "我的檢舉清單只留社群項目，店家項目消失"
+  },
+  {
+   "id": "load-more-cursor-dropped",
+   "stack": "website",
+   "file": "website/features/report/hooks.ts",
+   "old": "getNextPageParam: (last) => last.nextPageToken || undefined,",
+   "new": "getNextPageParam: () => undefined,",
+   "test": "features/report/my-reports.unit.test.ts keeps loaded items and shows the error inline when load more fails",
+   "why": "翻頁游標不傳，永遠沒有下一頁"
+  },
+  {
+   "id": "not-found-flag-dropped",
+   "stack": "website",
+   "file": "website/features/report/hooks.ts",
+   "old": "query.error != null &&\n\t\t\tConnectError.from(query.error).code === Code.NotFound",
+   "new": "false",
+   "test": "features/report/my-reports.unit.test.ts renders the not-found presentation for a missing report",
+   "why": "別人的或不存在的檢舉不再顯示 not-found 版面"
+  },
+  {
+   "id": "form-failure-unmatched-inverted",
+   "stack": "website",
+   "file": "website/features/report/ReportFormParts.tsx",
+   "old": "const unmatched = !Object.keys(failure.fields).some(",
+   "new": "const unmatched = Object.keys(failure.fields).some(",
+   "test": "features/report/report-ui.unit.test.ts shows a field violation that no rendered field matches in the alert",
+   "why": "共用的送出失敗對應（ReportFormParts）反向：對不上欄位的違規不進表單層訊息"
+  },
+  {
+   "id": "blank-supplement-submitted",
+   "stack": "website",
+   "file": "website/features/report/SupplementDialog.tsx",
+   "old": "if (draftError !== undefined || evidence.uploading) return;",
+   "new": "if (evidence.uploading) return;",
+   "test": "features/report/my-reports.unit.test.ts does not submit a blank supplement",
+   "why": "空白補充仍送出"
+  },
+  {
+   "id": "stale-dialog-stays-open",
+   "stack": "website",
+   "file": "website/features/report/SupplementDialog.tsx",
+   "old": "onStale(errorText(e, defaults));\n\t\t\t\tonClose();",
+   "new": "onStale(errorText(e, defaults));",
+   "test": "features/report/my-reports.unit.test.ts closes the dialog on failed_precondition and shows the error on the page",
+   "why": "伺服器以前置條件拒絕後對話框不關閉"
+  }
+ ]
+}

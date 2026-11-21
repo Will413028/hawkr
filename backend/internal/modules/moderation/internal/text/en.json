@@ -15,6 +15,9 @@
     "report.description_too_long": {
       "message": "The description cannot exceed {max} characters"
     },
+    "report.reporter_not_found": {
+      "message": "This account is no longer active and cannot submit reports"
+    },
     "report.reporter_required": {
       "message": "Buyer identity required"
     },

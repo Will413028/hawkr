@@ -16,6 +16,7 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -338,7 +339,11 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 			if err != nil {
 				return nil, err
 			}
-			refs = append(refs, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+			kind := rpc.EnumFromProto[model.ContentKind](ref.GetKind())
+			if k := contentkind.Kind(kind); k.Valid() && !k.Social() {
+				return nil, apperr.InvalidInputOn([]string{apperr.IndexedField("content_takedown.contents", i) + ".kind"}, "聊天訊息與評價回覆的下架只經檢舉案件建立")
+			}
+			refs = append(refs, model.ContentRef{Kind: kind, ID: id})
 		}
 		contents, err := h.takedownContents(ctx, in.StoreID, refs)
 		if err != nil {

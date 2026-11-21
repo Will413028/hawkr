@@ -593,6 +593,20 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		},
 	},
 	{
+		id: "buyer-store-report-detail",
+		pattern: "/account/reports/[id]",
+		role: "buyer",
+		url: "/account/reports/route-report-1",
+		pathname: "/account/reports/route-report-1",
+		mocks: [],
+		requiredRequests: [],
+		async assertVisible(page) {
+			await assertHeading(page, "檢舉詳情");
+			await assertText(page, "路由測試檢舉內容");
+			await assertText(page, "審核中");
+		},
+	},
+	{
 		id: "buyer-wallet-detail",
 		pattern: "/account/wallet/[sellerId]",
 		role: "buyer",
@@ -1233,7 +1247,7 @@ test.describe("authenticated protected dynamic route smoke", {
 				entry.access !== "account",
 		).map(({ access, pattern }) => ({ role: access, pattern }));
 		const covered = ROUTE_CASES.map(({ role, pattern }) => ({ role, pattern }));
-		expect(covered).toHaveLength(19);
+		expect(covered).toHaveLength(20);
 		expect(covered).toEqual(expected);
 	});
 

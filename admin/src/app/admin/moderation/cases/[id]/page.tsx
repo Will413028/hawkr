@@ -30,6 +30,7 @@ import {
 	caseDecisionText,
 	caseStateText,
 	caseStateVariant,
+	reporterText,
 	reportOutcomeText,
 	targetKindText,
 } from "../../moderation-text";
@@ -218,7 +219,7 @@ export default function ModerationCaseDetailPage() {
 						{reports.map((report) => (
 							<li key={report.id}>
 								<div>
-									{timeText(report.createTime)}・檢舉人 {report.reporterId}・
+									{timeText(report.createTime)}・{reporterText(report)}・
 									{policyCategoryText(report.category)}・
 									{reportOutcomeText(report.outcome)}
 								</div>

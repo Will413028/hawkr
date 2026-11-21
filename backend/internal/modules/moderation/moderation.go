@@ -80,6 +80,8 @@ type (
 	BuyerSnapshot = snapshot.Buyer
 	// ReviewSnapshot 是評價的快照。
 	ReviewSnapshot = snapshot.Review
+	// ReviewReplySnapshot 是店家對評價的回覆的快照。
+	ReviewReplySnapshot = snapshot.ReviewReply
 	// ChatSnapshot 是聊天訊息與前後文的快照。
 	ChatSnapshot = snapshot.Chat
 	// ChatContextMessage 是聊天前後文的一則。
@@ -110,6 +112,7 @@ const (
 	TargetBuyer         = model.TargetBuyer
 	TargetReview        = model.TargetReview
 	TargetChatMessage   = model.TargetChatMessage
+	TargetReviewReply   = model.TargetReviewReply
 	DecisionViolation   = model.DecisionViolation
 	DecisionNoViolation = model.DecisionNoViolation
 	ActionHide          = model.ActionHide
@@ -207,6 +210,11 @@ func (r *Retention) SyncSnapshotMedia(ctx context.Context, snapshotID uuid.UUID)
 // OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者：清掉這位檢舉人全部檢舉的說明與每日計數列，檢舉列與 reporter_buyer_id 留著（A7-D21）。
 func (r *Retention) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
 	return r.svc.OnBuyerDeletionRequested(ctx, e)
+}
+
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：清掉該店以檢舉人身分送出全部檢舉的說明、冪等紀錄與每日計數列，檢舉列與 reporter_store_id 留著（A6-D22）。
+func (r *Retention) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
+	return r.svc.OnStoreRetired(ctx, e)
 }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（冪等）。

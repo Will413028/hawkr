@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "supplement-outcome-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/governance/report.go",
+   "old": "\tif owned.Outcome != nil {\n\t\treturn model.Report{}, apperr.FailedPrecondition(\"%s\", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)\n\t}\n\tnow := s.now()\n\tevidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)\n\tif err != nil {\n\t\treturn model.Report{}, err\n\t}\n\tvar out model.Report\n\terr = s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tlocked, err := q.LockReport(ctx, in.ReportID)\n\t\tif errors.Is(err, pgx.ErrNoRows) || (err == nil && locked.ReporterBuyerID != in.BuyerID) {\n\t\t\treturn errMyReportNotFound(ctx)\n\t\t}\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif locked.Outcome != nil {\n\t\t\treturn apperr.FailedPrecondition(\"%s\", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)\n\t\t}\n",
+   "new": "\tnow := s.now()\n\tevidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)\n\tif err != nil {\n\t\treturn model.Report{}, err\n\t}\n\tvar out model.Report\n\terr = s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tlocked, err := q.LockReport(ctx, in.ReportID)\n\t\tif errors.Is(err, pgx.ErrNoRows) || (err == nil && locked.ReporterBuyerID != in.BuyerID) {\n\t\t\treturn errMyReportNotFound(ctx)\n\t\t}\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "test": "internal/modules/seller ^TestReporterCannotSupplementAReportThatHasAnOutcome$",
+   "why": "AddSupplement no longer rejects a report that already has an outcome (both the pre-check and the check under the lock are removed)"
+  },
+  {
+   "id": "get-my-report-owner-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/governance/report.go",
+   "old": "(err == nil && row.ReporterBuyerID != buyerID) {\n\t\t\treturn errMyReportNotFound(ctx)\n\t\t}\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tout, err = loadBuyerReport(ctx, q, reportID)",
+   "new": "(err == nil && row.ReporterBuyerID < 0) {\n\t\t\treturn errMyReportNotFound(ctx)\n\t\t}\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tout, err = loadBuyerReport(ctx, q, reportID)",
+   "test": "internal/modules/seller ^TestReporterOnlySeesAndSupplementsTheirOwnReports$",
+   "why": "BuyerReport (behind GetMyReport) returns another reporter's report instead of not_found"
+  }
+ ]
+}

@@ -77,10 +77,17 @@ func New(d Deps) *Service { return &Service{d: d} }
 // Validate 檢查輸入的形狀並正規化說明（去頭尾空白）；不查資料庫。
 func Validate(ctx context.Context, in model.SubmitInput) (model.SubmitInput, error) {
 	l := uitext.LocaleFrom(ctx)
-	if in.ReporterBuyerID <= 0 {
-		return in, apperr.InvalidInputOn([]string{"ReporterBuyerID"}, "%s", moderationtext.ReportReporterRequired(l))
+	if (in.ReporterBuyerID > 0) == (in.ReporterStoreID > 0) || in.ReporterBuyerID < 0 || in.ReporterStoreID < 0 {
+		fields := []string{"ReporterBuyerID", "ReporterStoreID"}
+		switch {
+		case in.ReporterBuyerID < 0 && in.ReporterStoreID <= 0:
+			fields = fields[:1]
+		case in.ReporterStoreID < 0 && in.ReporterBuyerID <= 0:
+			fields = fields[1:]
+		}
+		return in, apperr.InvalidInputOn(fields, "%s", moderationtext.ReportReporterRequired(l))
 	}
-	if !in.Target.Validate() {
+	if !in.Target.Validate() || (in.ReporterStoreID > 0 && in.Target.Kind != model.TargetChatMessage) {
 		return in, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportTargetInvalid(l))
 	}
 	if !in.Category.CommunityReporterSelectable() {
@@ -115,13 +122,32 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 	return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 次遇到並行競爭", maxAttempts)
 }
 
+// lockReporter 以 FOR KEY SHARE 鎖檢舉人的擁有者列：買家尚未關閉（刪除中放行）、店家尚未退場；否則回檢舉人專屬的 NotFound。
+func (s *Service) lockReporter(ctx context.Context, in model.SubmitInput) error {
+	var err error
+	if in.ReporterStoreID > 0 {
+		err = s.d.Seller.LockNotRetired(ctx, in.ReporterStoreID)
+	} else {
+		err = s.d.Buyer.LockNotClosed(ctx, in.ReporterBuyerID)
+	}
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return apperr.NotFound("%s", moderationtext.ReportReporterNotFound(uitext.LocaleFrom(ctx)))
+	}
+	return err
+}
+
 func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
+	// 檢舉人的擁有者守門鎖先於 moderation 的任何列（buyer、seller 先於 moderation）：關閉或退場的訂閱者清檢舉人資料時，並行的送出與轉移在擁有者列上序列化。
+	// 必要條件：店家檢舉人已退場時，新檢舉在凍結內容（CapChatRead）已回 NotFound，鎖要擋的是凍結之前就返回、卻會寫 report_requests 的路徑（併入進行中案件的 recordRequest）與重送；買家檢舉人沒有這道前置擋，鎖是唯一的守門。
+	if err := s.lockReporter(ctx, in); err != nil {
+		return model.SubmitResult{}, err
+	}
 	q := store.New(s.d.DB.Conn(ctx))
 	var hash []byte
 	if in.RequestID != nil {
 		hash = requestHash(in)
 		// request_id 先於一切（A7-D28 第 3 點）：同一位檢舉人的同一個 request_id 一律回第一次的結果，不看案件現在是進行中還是已結案。
-		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID})
+		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: buyerPtr(in), ReporterStoreID: storePtr(in), RequestID: *in.RequestID})
 		switch {
 		case err == nil:
 			if !bytes.Equal(first.RequestHash, hash) {
@@ -133,7 +159,7 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 		}
 	}
 	existing, err := q.ExistingOpenReport(ctx, store.ExistingOpenReportParams{
-		TargetKind: string(in.Target.Kind), ContentID: in.Target.ContentIDPtr(), BuyerID: in.Target.BuyerIDPtr(), ReporterBuyerID: in.ReporterBuyerID,
+		TargetKind: string(in.Target.Kind), ContentID: in.Target.ContentIDPtr(), BuyerID: in.Target.BuyerIDPtr(), ReporterBuyerID: buyerPtr(in), ReporterStoreID: storePtr(in),
 	})
 	switch {
 	case err == nil:
@@ -153,9 +179,7 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	body, sum := snapshot.Encode(content)
 	now := s.d.Now().UTC()
 
-	if _, err := q.BumpDailyCount(ctx, store.BumpDailyCountParams{
-		ReporterBuyerID: in.ReporterBuyerID, Day: twtime.Day(now), DailyLimit: model.DailyReportLimit,
-	}); errors.Is(err, pgx.ErrNoRows) {
+	if _, err := s.bump(ctx, q, in, now); errors.Is(err, pgx.ErrNoRows) {
 		return model.SubmitResult{}, apperr.ResourceExhausted(twtime.Midnight(now).AddDate(0, 0, 1).Sub(now), "%s",
 			moderationtext.ReportDailyLimit(uitext.LocaleFrom(ctx), moderationtext.ReportDailyLimitArgs{Max: model.DailyReportLimit}))
 	} else if err != nil {
@@ -197,7 +221,7 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 		desc = &in.Description
 	}
 	row, err := q.InsertReport(ctx, store.InsertReportParams{
-		ID: s.d.NewID(), CaseID: c.ID, ReporterBuyerID: in.ReporterBuyerID, Category: string(in.Category),
+		ID: s.d.NewID(), CaseID: c.ID, ReporterBuyerID: buyerPtr(in), ReporterStoreID: storePtr(in), Category: string(in.Category),
 		Description: desc, SnapshotID: &snapshotID, CreatedAt: now,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -212,13 +236,35 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	return model.SubmitResult{Report: view.Report(row, nil), Case: view.Case(attached), Created: true}, nil
 }
 
+func buyerPtr(in model.SubmitInput) *int64 {
+	if in.ReporterBuyerID > 0 {
+		return &in.ReporterBuyerID
+	}
+	return nil
+}
+
+func storePtr(in model.SubmitInput) *int64 {
+	if in.ReporterStoreID > 0 {
+		return &in.ReporterStoreID
+	}
+	return nil
+}
+
+// bump 扣檢舉人當天的額度：買家與店家各自一份計數，上限相同（model.DailyReportLimit）；到上限回 pgx.ErrNoRows。
+func (s *Service) bump(ctx context.Context, q *store.Queries, in model.SubmitInput, now time.Time) (int32, error) {
+	if in.ReporterStoreID > 0 {
+		return q.BumpStoreDailyCount(ctx, store.BumpStoreDailyCountParams{ReporterStoreID: &in.ReporterStoreID, Day: twtime.Day(now), DailyLimit: model.DailyReportLimit})
+	}
+	return q.BumpDailyCount(ctx, store.BumpDailyCountParams{ReporterBuyerID: &in.ReporterBuyerID, Day: twtime.Day(now), DailyLimit: model.DailyReportLimit})
+}
+
 // recordRequest 記下 request_id 對應的檢舉（沒帶 request_id 時什麼都不做）。同一個 (檢舉人, request_id) 已被並行的請求記下時回 errRetry：
 // 這一輪的交易整個放棄，重試時從頭讀到對方的紀錄並比對內容雜湊。
 func (s *Service) recordRequest(ctx context.Context, q *store.Queries, in model.SubmitInput, reportID uuid.UUID, hash []byte) error {
 	if in.RequestID == nil {
 		return nil
 	}
-	n, err := q.InsertReportRequest(ctx, store.InsertReportRequestParams{ReporterBuyerID: in.ReporterBuyerID, RequestID: *in.RequestID, ReportID: reportID, RequestHash: hash})
+	n, err := q.InsertReportRequest(ctx, store.InsertReportRequestParams{ReporterBuyerID: buyerPtr(in), ReporterStoreID: storePtr(in), RequestID: *in.RequestID, ReportID: reportID, RequestHash: hash})
 	if err != nil {
 		return fmt.Errorf("moderation：記下 request_id：%w", err)
 	}
@@ -245,7 +291,7 @@ func (s *Service) MyReports(ctx context.Context, buyerID int64, after *model.Rep
 	}
 	at, id := after.Key()
 	rows, err := store.New(s.d.DB.Conn(ctx)).ListReportsOfReporter(ctx, store.ListReportsOfReporterParams{
-		ReporterBuyerID: buyerID, AfterCreated: at, AfterID: id, MaxRows: size + 1,
+		ReporterBuyerID: &buyerID, AfterCreated: at, AfterID: id, MaxRows: size + 1,
 	})
 	if err != nil {
 		return model.ReportPage{}, fmt.Errorf("moderation：列出我的檢舉：%w", err)
@@ -310,6 +356,8 @@ func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Co
 		return s.freezeReview(ctx, in)
 	case model.TargetChatMessage:
 		return s.freezeChatMessage(ctx, in)
+	case model.TargetReviewReply:
+		return s.freezeReviewReply(ctx, in)
 	case model.TargetPost, model.TargetComment, model.TargetForumEntry:
 		return s.freezeSocial(ctx, in)
 	}
@@ -338,7 +386,7 @@ func (s *Service) freezeSocial(ctx context.Context, in model.SubmitInput) (snaps
 
 // notSelf 擋掉檢舉自己的內容（含同一帳號的其他身分）。
 func (s *Service) notSelf(ctx context.Context, in model.SubmitInput, author social.Actor) error {
-	same, err := s.sameAccount(ctx, in.ReporterBuyerID, author)
+	same, err := s.sameAccount(ctx, in, author)
 	if err != nil {
 		return err
 	}
@@ -377,7 +425,15 @@ func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snaps
 
 // freezeChatMessage 向 im 讀被檢舉的訊息與前後各 ChatContextWindow 則（一句 SQL）；檢舉人要是對話的一方，訊息已隱藏或抹除都是 NotFound。
 func (s *Service) freezeChatMessage(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
-	m, err := s.d.IM.MessageForReport(ctx, in.Target.ContentID, im.Party{Kind: im.PartyBuyer, BuyerID: in.ReporterBuyerID}, model.ChatContextWindow)
+	party := im.Party{Kind: im.PartyBuyer, BuyerID: in.ReporterBuyerID}
+	if in.ReporterStoreID > 0 {
+		st, err := s.d.Seller.Store(ctx, in.ReporterStoreID)
+		if err != nil {
+			return snapshot.Content{}, contentNotFound(ctx, err)
+		}
+		party = im.Party{Kind: im.PartyStore, Store: &st}
+	}
+	m, err := s.d.IM.MessageForReport(ctx, in.Target.ContentID, party, model.ChatContextWindow)
 	if err != nil {
 		return snapshot.Content{}, contentNotFound(ctx, err)
 	}
@@ -403,6 +459,23 @@ func (s *Service) freezeChatMessage(ctx context.Context, in model.SubmitInput) (
 	return snapshot.Content{Kind: model.TargetChatMessage, Chat: &out}, nil
 }
 
+// freezeReviewReply 向 review 讀評價與店家回覆（可讀規則同評價；回覆被下架或沒有回覆都是 NotFound），作者是評價所屬的店家。
+func (s *Service) freezeReviewReply(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
+	r, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, in.ReporterBuyerID)
+	if err != nil {
+		return snapshot.Content{}, contentNotFound(ctx, err)
+	}
+	if r.Reply == nil {
+		return snapshot.Content{}, apperr.NotFound("%s", moderationtext.ReportContentNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err := s.notSelf(ctx, in, social.Actor{Kind: social.ActorStore, ID: r.StoreID}); err != nil {
+		return snapshot.Content{}, err
+	}
+	return snapshot.Content{Kind: model.TargetReviewReply, ReviewReply: &snapshot.ReviewReply{
+		StoreID: r.StoreID, ReviewID: r.ID.String(), ReviewerID: r.BuyerID, Body: r.Reply.Content, AuthoredAt: r.Reply.RepliedAt,
+	}}, nil
+}
+
 func assetRefs(id string) []string {
 	if id == "" {
 		return nil
@@ -418,7 +491,7 @@ func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapsh
 	if len(displays) != 1 || displays[0].Deleted {
 		return snapshot.Content{}, apperr.NotFound("%s", moderationtext.ReportBuyerNotFound(uitext.LocaleFrom(ctx)))
 	}
-	same, err := s.sameAccount(ctx, in.ReporterBuyerID, social.Actor{Kind: social.ActorBuyer, ID: in.Target.BuyerID})
+	same, err := s.sameAccount(ctx, in, social.Actor{Kind: social.ActorBuyer, ID: in.Target.BuyerID})
 	if err != nil {
 		return snapshot.Content{}, err
 	}
@@ -435,9 +508,21 @@ func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapsh
 	return snapshot.Content{Kind: model.TargetBuyer, Buyer: &c}, nil
 }
 
+// reporterAccount 是檢舉人的帳號：買家檢舉人取買家的帳號，店家檢舉人取店家所屬的帳號。
+func (s *Service) reporterAccount(ctx context.Context, in model.SubmitInput) (int64, error) {
+	if in.ReporterStoreID > 0 {
+		st, err := s.d.Seller.Store(ctx, in.ReporterStoreID)
+		if err != nil {
+			return 0, err
+		}
+		return st.AccountID, nil
+	}
+	return s.d.Buyer.AccountIDByBuyerID(ctx, in.ReporterBuyerID)
+}
+
 // sameAccount 說明作者是不是檢舉人自己：買家作者比對帳號（同一個帳號的歷史 stint 也算自己），店家作者比對店家所屬的帳號。
-func (s *Service) sameAccount(ctx context.Context, reporterBuyerID int64, author social.Actor) (bool, error) {
-	reporter, err := s.d.Buyer.AccountIDByBuyerID(ctx, reporterBuyerID)
+func (s *Service) sameAccount(ctx context.Context, in model.SubmitInput, author social.Actor) (bool, error) {
+	reporter, err := s.reporterAccount(ctx, in)
 	if err != nil {
 		return false, err
 	}

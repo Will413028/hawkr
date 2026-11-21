@@ -32,8 +32,9 @@ func newModeration(d *db.DB, soc *social.Module, rev *review.Module, chat *im.Mo
 	})
 }
 
-// subscribeModeration 讓買家進入刪除中與關閉在同一個 transaction 清掉檢舉人的說明、冪等紀錄與每日計數列（單體規則 4 的原子狀態變更）。
+// subscribeModeration 讓買家進入刪除中與關閉、店家退場在同一個 transaction 清掉檢舉人的說明、冪等紀錄與每日計數列（單體規則 4 的原子狀態變更）。
 func subscribeModeration(bus *events.Bus, r *moderation.Retention) {
 	events.Subscribe(bus, r.OnBuyerDeletionRequested)
 	events.Subscribe(bus, r.OnBuyerDeleted)
+	events.Subscribe(bus, r.OnStoreRetired)
 }
