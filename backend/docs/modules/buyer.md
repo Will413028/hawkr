@@ -85,7 +85,8 @@
 
 形狀宣告在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫的 migration；形狀的清單在 `AGENTS.md`。
 
-- `pub_inactive_buyers()`：此刻不是營運中的買家，申請刪除起就算，買家寫的內容從那一刻起不公開。social 在 `BuyerDeletionRequested`、`BuyerDeleted` 的同 transaction 訂閱者，把這個事實複製進自己的 `inactive_authors` 並讓內容重新求值，讀取與 `reevaluate_*` 只讀複本。函式只給 social 每日對帳的 Go 查詢核對複本是否漏了，不給 trigger 或旗標的求值呼叫。
+- `pub_inactive_buyers()`：此刻不是營運中的買家，申請刪除起就算，買家寫的內容從那一刻起不公開。social 在 `BuyerDeletionRequested`、`BuyerDeleted` 的同 transaction 訂閱者，把這個事實複製進自己的 `inactive_authors` 並讓內容重新求值，讀取與 `reevaluate_*` 只讀複本。函式給 social 每日對帳的 Go 查詢核對複本是否漏了，也給 review 的讀取過濾（EXISTS，申請刪除起就隱藏），不給 trigger 或旗標的求值呼叫。
+- `pub_closed_buyers()`：此刻已關閉（CLOSED）的買家，不含刪除中，列永久保留，沒有時間參數。給 im、crm 的讀取過濾。`LockNotClosed(ctx, buyerID)` 是對應的寫入守門：在呼叫方的 transaction 內以 `FOR KEY SHARE`（與 `LockActive` 共用 `LockBuyerShared`）確認買家尚未關閉，ACTIVE 與 PENDING_DELETION 都放行，已關閉與不存在回 NotFound，沒有 transaction 時回錯誤；`BeginDeletion` 與 `CloseForDeletion` 的 `FOR UPDATE` 要等它提交（`TestClosedBuyersAndLockNotClosed`、`TestLockNotClosedBlocksBeginDeletionUntilCommit`）。
 - `pub_blocked_buyers()`、`pub_blocked_stores()`：封鎖的現況，一列一個封鎖，強一致，沒有時間參數，不建投影；兩種對象各一個函式，不共用 kind 欄位。social 在公開可讀述詞內以 `EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() b WHERE b.blocker_buyer_id = $1 AND b.store_id = $2)` 檢查觀看者封鎖了店，以兩個 `pub_blocked_buyers()` 的 EXISTS（兩個方向）檢查兩位買家之間的封鎖。函式會被內聯，走各表的主鍵或反向索引。
 
 ## 11. 已知限制

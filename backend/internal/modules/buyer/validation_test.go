@@ -17,6 +17,7 @@ func TestInvalidIDsRejectedBeforeDatabaseAccess(t *testing.T) {
 			"profile":                 func() error { _, err := module.Profile(ctx, invalidID); return err },
 			"profile by buyer":        func() error { _, err := module.ProfileByBuyerID(ctx, invalidID); return err },
 			"lock active":             func() error { return module.LockActive(ctx, invalidID) },
+			"lock not closed":         func() error { return module.LockNotClosed(ctx, invalidID) },
 			"account stints":          func() error { _, err := module.BuyerIDsByAccount(ctx, invalidID); return err },
 			"addresses":               func() error { _, err := module.ListAddresses(ctx, invalidID); return err },
 			"address owner":           func() error { _, err := module.GetAddress(ctx, invalidID, 1); return err },

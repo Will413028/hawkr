@@ -46,6 +46,22 @@ func RequireActiveShared(ctx context.Context, queries *store.Queries, id int64) 
 	return nil
 }
 
+// RequireNotClosedShared 以 FOR KEY SHARE 確認 stint 尚未關閉：ACTIVE 與 PENDING_DELETION 都放行；BeginDeletion 與 CloseForDeletion 的
+// FOR UPDATE 要等持有這個鎖的 transaction 提交，所以關閉之前成立的寫入一定先提交。已關閉與不存在回 NotFound。
+func RequireNotClosedShared(ctx context.Context, queries *store.Queries, id int64) error {
+	if err := model.Positive(id); err != nil {
+		return err
+	}
+	buyerRow, err := queries.LockBuyerShared(ctx, id)
+	if err != nil {
+		return model.Error(err)
+	}
+	if buyerRow.Status == string(model.Closed) || buyerRow.PiiClearedAt != nil {
+		return apperr.NotFound("買家已關閉")
+	}
+	return nil
+}
+
 // Profile 將儲存的 stint 轉成公開 profile。
 func Profile(buyerRow store.BuyerBuyer) model.Profile {
 	profile := model.Profile{

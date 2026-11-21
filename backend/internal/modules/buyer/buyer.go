@@ -224,6 +224,13 @@ func (module *Module) LockActive(ctx context.Context, buyerID int64) error {
 	return module.profile.LockActive(ctx, buyerID)
 }
 
+// LockNotClosed 在呼叫方的 transaction 內以 FOR KEY SHARE 確認買家尚未關閉（ACTIVE 與 PENDING_DELETION 都放行），鎖持有到 transaction 結束：
+// BeginDeletion 與 CloseForDeletion 的 FOR UPDATE 要等這個 transaction 提交。已關閉與不存在回 NotFound。必須在 transaction 內呼叫
+// （沒有 transaction 時鎖在語句結束就放掉，沒有意義）。鎖順序同 LockActive：帳號列、買家列，然後才是呼叫方自己的表。
+func (module *Module) LockNotClosed(ctx context.Context, buyerID int64) error {
+	return module.profile.LockNotClosed(ctx, buyerID)
+}
+
 // AccountIDByBuyerID 讀取歷史或現任 stint 所屬的帳號鍵，不曝露個資。
 func (module *Module) AccountIDByBuyerID(ctx context.Context, buyerID int64) (int64, error) {
 	return module.profile.AccountIDByBuyerID(ctx, buyerID)

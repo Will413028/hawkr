@@ -12,7 +12,8 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 
 形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只能呼叫函式。改形狀等於改契約：同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §10。
 
-- `buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer (buyer_id bigint)`：此刻不是營運中的買家（刪除中與已關閉），沒有時間參數。給 social 每日對帳核對複本，不給求值呼叫。守門：`TestInactiveBuyersAndDeletionRequestedEvent`。
+- `buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer (buyer_id bigint)`：此刻不是營運中的買家（刪除中與已關閉），沒有時間參數。給 social 每日對帳核對複本、review 的讀取過濾，不給求值呼叫。守門：`TestInactiveBuyersAndDeletionRequestedEvent`。
+- `buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer (buyer_id bigint)`：此刻已關閉（CLOSED）的買家，不含刪除中，沒有時間參數。給 im、crm 的讀取過濾。守門：`TestClosedBuyersAndLockNotClosed`、`TestPubClosedBuyersIsInlined`。
 - `buyer.pub_blocked_buyers() RETURNS SETOF buyer.pub_blocked_buyer (blocker_buyer_id bigint, blocked_buyer_id bigint)` 與 `buyer.pub_blocked_stores() RETURNS SETOF buyer.pub_blocked_store (blocker_buyer_id bigint, store_id bigint)`：封鎖現況，一列一個封鎖，強一致、沒有時間參數，兩種對象不共用 kind 欄位。給 social 的述詞內聯使用。守門：`TestPubBlocksIsInlinedAndUsesTheIndexes`。
 
 ## 模組內部結構
