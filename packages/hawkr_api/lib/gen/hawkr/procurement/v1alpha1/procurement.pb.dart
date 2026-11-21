@@ -412,7 +412,7 @@ class RecordedField extends $pb.GeneratedMessage {
 class RejectedField extends $pb.GeneratedMessage {
   factory RejectedField({
     SlotKey? key,
-    $core.String? reason,
+    RejectionReason? reason,
   }) {
     final result = RejectedField._();
     if (key != null) result.key = key;
@@ -435,7 +435,8 @@ class RejectedField extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: RejectedField.$_createMessage)
     ..aE<SlotKey>(1, _omitFieldNames ? '' : 'key', enumValues: SlotKey.values)
-    ..aOS(2, _omitFieldNames ? '' : 'reason')
+    ..aE<RejectionReason>(2, _omitFieldNames ? '' : 'reason',
+        enumValues: RejectionReason.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -470,9 +471,9 @@ class RejectedField extends $pb.GeneratedMessage {
   void clearKey() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.String get reason => $_getSZ(1);
+  RejectionReason get reason => $_getN(1);
   @$pb.TagNumber(2)
-  set reason($core.String value) => $_setString(1, value);
+  set reason(RejectionReason value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasReason() => $_has(1);
   @$pb.TagNumber(2)

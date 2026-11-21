@@ -55,33 +55,53 @@ type Input struct {
 	Question              *Question
 	PricePreviewAvailable bool
 	Rfq                   RfqState
+	// PrevStreak 與 Skipped 是上一輪持久化的連續選填計數與買家跳過的欄位；CapExhausted 是 PickNext 這一輪回的第二個值。
+	PrevStreak   int
+	Skipped      []model.SlotKey
+	CapExhausted bool
 }
 
 // Plan 是這一輪的決策。
 type Plan struct {
-	Act      Act
-	Salient  []slots.Recorded
+	Act     Act
+	Salient []slots.Recorded
+	// Adjusted 是值有保留但被調整過的欄位（例如過長被截斷）；它們不會讓這一輪變成「輸入被拒」。
+	Adjusted []slots.Rejection
 	Question *Question
+	// OptionalStreak 與 Skipped 是這一輪要持久化的選填進度（turns.optional_streak、turns.skipped_slots），下一輪帶回 Input。
+	OptionalStreak int
+	Skipped        []model.SlotKey
 }
 
 // Decide 選出這一輪的 act。優先序：降級、有欄位被拒、更正已有的欄位、品項消歧、必填未齊、詢價快照過期、快照已確認待核准、
-// 還有選填問題、有價格參考、需求齊備。
+// 還有選填問題、有價格參考、需求齊備。被截斷但值有保留的欄位只是調整提示，不算被拒。
+// 更正的欄位排在 Salient 最前面，而且一定全數帶入（其餘事實補到 MaxSalientFacts 為止），敘述才說得出改了什麼。
 func Decide(in Input) Plan {
-	n := len(in.Recorded)
-	if n > MaxSalientFacts {
-		n = MaxSalientFacts
+	rejected, adjusted := splitRejections(in.Rejected)
+	corrected, others := splitCorrected(in)
+	salient := append([]slots.Recorded{}, corrected...)
+	for _, r := range others {
+		if len(salient) >= MaxSalientFacts {
+			break
+		}
+		salient = append(salient, r)
 	}
-	return Plan{Act: selectAct(in), Salient: in.Recorded[:n:n], Question: in.Question}
+	ready := len(in.Next.MissingRequired()) == 0
+	return Plan{
+		Act: selectAct(in, len(rejected) > 0, len(corrected) > 0), Salient: salient, Adjusted: adjusted, Question: in.Question,
+		OptionalStreak: NextOptionalStreak(ready, in.Question, in.CapExhausted, in.PrevStreak),
+		Skipped:        append([]model.SlotKey{}, in.Skipped...),
+	}
 }
 
-func selectAct(in Input) Act {
+func selectAct(in Input, rejected, corrected bool) Act {
 	ready := len(in.Next.MissingRequired()) == 0
 	switch {
 	case in.Degraded:
 		return ExtractionDegraded
-	case len(in.Rejected) > 0:
+	case rejected:
 		return InputRejected
-	case hasCorrection(in):
+	case corrected:
 		return CorrectionApplied
 	case in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:
 		return ItemNeedsDisambiguation
@@ -99,14 +119,28 @@ func selectAct(in Input) Act {
 	return RequestBasicsReady
 }
 
-// hasCorrection 判斷這一輪記下的欄位裡有沒有任何一個在 Current 就已經有值：是的話是更正，不是第一次填。
-func hasCorrection(in Input) bool {
-	for _, r := range in.Recorded {
-		if wasSet(in.Current, r.Key) {
-			return true
+// splitRejections 把值有保留的截斷分出來：它不丟棄任何內容，不該讓整輪變成「輸入被拒」。
+func splitRejections(in []slots.Rejection) (rejected, adjusted []slots.Rejection) {
+	for _, r := range in {
+		if r.Reason == slots.ReasonTruncated {
+			adjusted = append(adjusted, r)
+		} else {
+			rejected = append(rejected, r)
 		}
 	}
-	return false
+	return rejected, adjusted
+}
+
+// splitCorrected 把這一輪記下的欄位分成「Current 已有值（更正）」與「第一次填」，各自維持 recorded 的順序。
+func splitCorrected(in Input) (corrected, others []slots.Recorded) {
+	for _, r := range in.Recorded {
+		if wasSet(in.Current, r.Key) {
+			corrected = append(corrected, r)
+		} else {
+			others = append(others, r)
+		}
+	}
+	return corrected, others
 }
 
 // wasSet 不含 ItemResolution：它由伺服器而不是買家填入，第一次填與換掉都不算買家更正。

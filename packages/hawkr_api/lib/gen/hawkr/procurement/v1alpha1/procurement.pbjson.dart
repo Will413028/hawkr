@@ -49,6 +49,40 @@ final $typed_data.Uint8List slotKeyDescriptor = $convert.base64Decode(
     'RUxJVkVSWV9EQVRFEAgSIQodU0xPVF9LRVlfRVhBQ1RfTUFUQ0hfUkVRVUlSRUQQCRIgChxTTE'
     '9UX0tFWV9JVEVNX0RJU0FNQklHVUFUSU9OEAo=');
 
+@$core.Deprecated('Use rejectionReasonDescriptor instead')
+const RejectionReason$json = {
+  '1': 'RejectionReason',
+  '2': [
+    {'1': 'REJECTION_REASON_UNSPECIFIED', '2': 0},
+    {'1': 'REJECTION_REASON_EMPTY', '2': 1},
+    {'1': 'REJECTION_REASON_TRUNCATED', '2': 2},
+    {'1': 'REJECTION_REASON_QUANTITY_RANGE', '2': 3},
+    {'1': 'REJECTION_REASON_BUDGET_RANGE', '2': 4},
+    {'1': 'REJECTION_REASON_UNIT_NOT_ALLOWED', '2': 5},
+    {'1': 'REJECTION_REASON_CITY_UNRECOGNIZED', '2': 6},
+    {'1': 'REJECTION_REASON_DATE_FORMAT', '2': 7},
+    {'1': 'REJECTION_REASON_DATE_MISSING_YEAR', '2': 8},
+    {'1': 'REJECTION_REASON_DATE_PAST', '2': 9},
+    {'1': 'REJECTION_REASON_DATE_TOO_FAR', '2': 10},
+    {'1': 'REJECTION_REASON_RESOLUTION_NO_ITEM', '2': 11},
+    {'1': 'REJECTION_REASON_RESOLUTION_NO_LABEL', '2': 12},
+    {'1': 'REJECTION_REASON_RESOLUTION_UNKNOWN_KIND', '2': 13},
+  ],
+};
+
+/// Descriptor for `RejectionReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List rejectionReasonDescriptor = $convert.base64Decode(
+    'Cg9SZWplY3Rpb25SZWFzb24SIAocUkVKRUNUSU9OX1JFQVNPTl9VTlNQRUNJRklFRBAAEhoKFl'
+    'JFSkVDVElPTl9SRUFTT05fRU1QVFkQARIeChpSRUpFQ1RJT05fUkVBU09OX1RSVU5DQVRFRBAC'
+    'EiMKH1JFSkVDVElPTl9SRUFTT05fUVVBTlRJVFlfUkFOR0UQAxIhCh1SRUpFQ1RJT05fUkVBU0'
+    '9OX0JVREdFVF9SQU5HRRAEEiUKIVJFSkVDVElPTl9SRUFTT05fVU5JVF9OT1RfQUxMT1dFRBAF'
+    'EiYKIlJFSkVDVElPTl9SRUFTT05fQ0lUWV9VTlJFQ09HTklaRUQQBhIgChxSRUpFQ1RJT05fUk'
+    'VBU09OX0RBVEVfRk9STUFUEAcSJgoiUkVKRUNUSU9OX1JFQVNPTl9EQVRFX01JU1NJTkdfWUVB'
+    'UhAIEh4KGlJFSkVDVElPTl9SRUFTT05fREFURV9QQVNUEAkSIQodUkVKRUNUSU9OX1JFQVNPTl'
+    '9EQVRFX1RPT19GQVIQChInCiNSRUpFQ1RJT05fUkVBU09OX1JFU09MVVRJT05fTk9fSVRFTRAL'
+    'EigKJFJFSkVDVElPTl9SRUFTT05fUkVTT0xVVElPTl9OT19MQUJFTBAMEiwKKFJFSkVDVElPTl'
+    '9SRUFTT05fUkVTT0xVVElPTl9VTktOT1dOX0tJTkQQDQ==');
+
 @$core.Deprecated('Use requestStatusDescriptor instead')
 const RequestStatus$json = {
   '1': 'RequestStatus',
@@ -519,14 +553,22 @@ const RejectedField$json = {
       '6': '.hawkr.procurement.v1alpha1.SlotKey',
       '10': 'key'
     },
-    {'1': 'reason', '3': 2, '4': 1, '5': 9, '10': 'reason'},
+    {
+      '1': 'reason',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.procurement.v1alpha1.RejectionReason',
+      '10': 'reason'
+    },
   ],
 };
 
 /// Descriptor for `RejectedField`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rejectedFieldDescriptor = $convert.base64Decode(
     'Cg1SZWplY3RlZEZpZWxkEjUKA2tleRgBIAEoDjIjLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaG'
-    'ExLlNsb3RLZXlSA2tleRIWCgZyZWFzb24YAiABKAlSBnJlYXNvbg==');
+    'ExLlNsb3RLZXlSA2tleRJDCgZyZWFzb24YAiABKA4yKy5oYXdrci5wcm9jdXJlbWVudC52MWFs'
+    'cGhhMS5SZWplY3Rpb25SZWFzb25SBnJlYXNvbg==');
 
 @$core.Deprecated('Use itemResolutionDescriptor instead')
 const ItemResolution$json = {

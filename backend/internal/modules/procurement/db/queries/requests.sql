@@ -82,10 +82,10 @@ WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 -- 冪等鍵在實體上（S4）：同一位買家的同一個 client_request_id 已有輪次時回 0 列，呼叫端改讀既有的輪次。
 INSERT INTO procurement.turns (
     id, request_id, conversation_id, buyer_id, result_revision_id, source,
-    buyer_message, assistant_reply, steps, recorded_this_turn, client_request_id, created_at)
+    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at)
 VALUES (
     @id, @request_id, @conversation_id, @buyer_id, @result_revision_id, @source,
-    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @client_request_id, @now)
+    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @optional_streak, @skipped_slots, @client_request_id, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetTurnByClientRequest :one

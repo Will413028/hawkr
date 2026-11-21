@@ -232,6 +232,58 @@
       "message": "金流商收件（託管頁面）",
       "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
     },
+    "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
+      "message": "單價預算不在可接受的範圍內",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_BUDGET_RANGE）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": {
+      "message": "無法辨識這個縣市",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_CITY_UNRECOGNIZED）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT": {
+      "message": "日期格式不正確",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_FORMAT）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR": {
+      "message": "日期缺少西元年份",
+      "description": "日期只有月日、沒有西元年；不替買家補年份。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_PAST": {
+      "message": "日期已經過了",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_PAST）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR": {
+      "message": "日期太久以後",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_TOO_FAR）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_EMPTY": {
+      "message": "內容是空的",
+      "description": "內容是空的。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE": {
+      "message": "數量不在可接受的範圍內",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_QUANTITY_RANGE）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
+      "message": "還沒有品項，無法指定品項分類",
+      "description": "品項被丟棄（或還沒有品項），所以不能附上分類判定。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {
+      "message": "品項分類沒有名稱",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_RESOLUTION_NO_LABEL）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": {
+      "message": "品項分類的判定方式不明",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_RESOLUTION_UNKNOWN_KIND）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_TRUNCATED": {
+      "message": "超過長度上限，已截斷",
+      "description": "文字超過長度上限，已截斷後採用（值有保留）。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
+      "message": "這個單位不支援",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_UNIT_NOT_ALLOWED）"
+    },
     "seller.ContentKind.CONTENT_KIND_COMMENT": {
       "message": "留言",
       "description": "貼文底下的留言。"

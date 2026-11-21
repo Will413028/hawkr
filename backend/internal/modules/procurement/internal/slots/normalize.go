@@ -3,35 +3,43 @@ package slots
 import (
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/twaddr"
 )
 
-// cityAliases 把常用簡稱與合併前的舊縣市名對到 AllowedCities 的正式值。只收唯一解的別名：新竹、嘉義同時有市與縣，刻意不收，
-// 讓 Apply 拒絕並請買家講清楚，不替他猜。
-var cityAliases = map[string]string{
-	"台北": "台北市", "臺北": "臺北市",
-	"台北縣": "新北市", "臺北縣": "新北市", "新北": "新北市",
-	"桃園": "桃園市", "桃園縣": "桃園市",
-	"台中": "台中市", "臺中": "臺中市",
-	"台中縣": "台中市", "臺中縣": "臺中市",
-	"台南": "台南市", "臺南": "臺南市",
-	"台南縣": "台南市", "臺南縣": "臺南市",
-	"高雄": "高雄市", "高雄縣": "高雄市",
-	"基隆": "基隆市",
-	"苗栗": "苗栗縣",
-	"彰化": "彰化縣",
-	"南投": "南投縣",
-	"雲林": "雲林縣",
-	"屏東": "屏東縣",
-	"宜蘭": "宜蘭縣",
-	"花蓮": "花蓮縣",
-	"台東": "台東縣", "臺東": "臺東縣",
-	"澎湖": "澎湖縣",
-	"金門": "金門縣",
-	"連江": "連江縣",
+// mergedCounties 是升格合併前的舊縣名對到現行縣市（代碼表只有現行縣市，這幾個不能從名稱推導）。
+var mergedCounties = map[string]string{
+	"臺北縣": "新北市", "桃園縣": "桃園市", "臺中縣": "臺中市", "臺南縣": "臺南市", "高雄縣": "高雄市",
 }
 
+// cityNames 把縣市的正式名稱與去掉「市／縣」的簡稱對到代碼表（platform/twaddr）的縣市名；同一個簡稱對到兩個縣市
+// （新竹、嘉義）的不收，讓 Apply 拒絕並請買家講清楚，不替他猜。
+var cityNames = func() map[string]string {
+	m := map[string]string{}
+	short := map[string][]string{}
+	for _, c := range twaddr.Counties() {
+		m[c.Name] = c.Name
+		r := []rune(c.Name)
+		base := string(r[:len(r)-1])
+		short[base] = append(short[base], c.Name)
+	}
+	for base, names := range short {
+		if len(names) == 1 {
+			m[base] = names[0]
+		}
+	}
+	return m
+}()
+
+// normalizeCity 先把「台」統一成代碼表的「臺」，再對縣市；回傳代碼表的正式名稱，台與臺只有這一種拼法。
 func normalizeCity(raw string) (string, bool) {
-	c, ok := cityAliases[raw]
+	v := strings.ReplaceAll(raw, "台", "臺")
+	if c, ok := mergedCounties[v]; ok {
+		return c, true
+	}
+	c, ok := cityNames[v]
 	return c, ok
 }
 
@@ -58,8 +66,12 @@ func normalizeDeliveryDate(raw string) (string, bool) {
 }
 
 func dateFormatReason(v string) Reason {
-	if monthDayOnlyPattern.MatchString(v) {
-		return ReasonDateMissingYear
+	if m := monthDayOnlyPattern.FindStringSubmatch(v); m != nil {
+		month, _ := strconv.Atoi(m[1])
+		day, _ := strconv.Atoi(m[2])
+		if month >= 1 && month <= 12 && day >= 1 && day <= 31 {
+			return ReasonDateMissingYear
+		}
 	}
 	return ReasonDateFormat
 }

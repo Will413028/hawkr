@@ -463,6 +463,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.procurement.v1alpha1.RejectionReason",
+      "tsName": "RejectionReason",
+      "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.procurement.v1alpha1.RequestStatus",
       "tsName": "RequestStatus",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",

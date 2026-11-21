@@ -10,6 +10,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart'
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
@@ -168,6 +169,43 @@ _ => null,
 extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.RequirementCollection {
   /// payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
+}
+
+String? _procurementRejectionReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '內容是空的',
+(UiLocale.en, 1) => 'The content is empty',
+(UiLocale.zhTW, 2) => '超過長度上限，已截斷',
+(UiLocale.en, 2) => 'Over the length limit, shortened',
+(UiLocale.zhTW, 3) => '數量不在可接受的範圍內',
+(UiLocale.en, 3) => 'The quantity is out of range',
+(UiLocale.zhTW, 4) => '單價預算不在可接受的範圍內',
+(UiLocale.en, 4) => 'The budget per unit is out of range',
+(UiLocale.zhTW, 5) => '這個單位不支援',
+(UiLocale.en, 5) => 'This unit is not supported',
+(UiLocale.zhTW, 6) => '無法辨識這個縣市',
+(UiLocale.en, 6) => 'The city could not be recognized',
+(UiLocale.zhTW, 7) => '日期格式不正確',
+(UiLocale.en, 7) => 'The date format is not valid',
+(UiLocale.zhTW, 8) => '日期缺少西元年份',
+(UiLocale.en, 8) => 'The date is missing the year',
+(UiLocale.zhTW, 9) => '日期已經過了',
+(UiLocale.en, 9) => 'The date has already passed',
+(UiLocale.zhTW, 10) => '日期太久以後',
+(UiLocale.en, 10) => 'The date is too far ahead',
+(UiLocale.zhTW, 11) => '還沒有品項，無法指定品項分類',
+(UiLocale.en, 11) => 'There is no item yet, so no item category can be set',
+(UiLocale.zhTW, 12) => '品項分類沒有名稱',
+(UiLocale.en, 12) => 'The item category has no name',
+(UiLocale.zhTW, 13) => '品項分類的判定方式不明',
+(UiLocale.en, 13) => 'The way the item category was decided is unknown',
+_ => null,
+};
+}
+
+extension ProcurementRejectionReasonUiText on hawkr_procurement_v1alpha1_procurement.RejectionReason {
+  /// procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementRejectionReason(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {

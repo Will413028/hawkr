@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { assistantAssistantTool, buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { assistantAssistantTool, buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, sellerContentKind, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -103,6 +103,20 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"POLICY_CATEGORY_SPAM": 14,
 	"POLICY_CATEGORY_UNLICENSED_SALE": 3,
 	"POLICY_CATEGORY_UNSPECIFIED": 0,
+	"REJECTION_REASON_BUDGET_RANGE": 4,
+	"REJECTION_REASON_CITY_UNRECOGNIZED": 6,
+	"REJECTION_REASON_DATE_FORMAT": 7,
+	"REJECTION_REASON_DATE_MISSING_YEAR": 8,
+	"REJECTION_REASON_DATE_PAST": 9,
+	"REJECTION_REASON_DATE_TOO_FAR": 10,
+	"REJECTION_REASON_EMPTY": 1,
+	"REJECTION_REASON_QUANTITY_RANGE": 3,
+	"REJECTION_REASON_RESOLUTION_NO_ITEM": 11,
+	"REJECTION_REASON_RESOLUTION_NO_LABEL": 12,
+	"REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": 13,
+	"REJECTION_REASON_TRUNCATED": 2,
+	"REJECTION_REASON_UNIT_NOT_ALLOWED": 5,
+	"REJECTION_REASON_UNSPECIFIED": 0,
 	"REPORT_OUTCOME_NO_VIOLATION": 3,
 	"REPORT_OUTCOME_PENDING": 1,
 	"REPORT_OUTCOME_UNSPECIFIED": 0,
@@ -231,6 +245,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "payment.RequirementCollection": {
 		return paymentRequirementCollection(num(c.value));
+	}
+	case "procurement.RejectionReason": {
+		return procurementRejectionReason(num(c.value));
 	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num(c.value));

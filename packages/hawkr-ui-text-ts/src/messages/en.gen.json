@@ -89,6 +89,23 @@
       "REQUIREMENT_COLLECTION_PROVIDER": "Provider-hosted"
     }
   },
+  "procurement": {
+    "RejectionReason": {
+      "REJECTION_REASON_BUDGET_RANGE": "The budget per unit is out of range",
+      "REJECTION_REASON_CITY_UNRECOGNIZED": "The city could not be recognized",
+      "REJECTION_REASON_DATE_FORMAT": "The date format is not valid",
+      "REJECTION_REASON_DATE_MISSING_YEAR": "The date is missing the year",
+      "REJECTION_REASON_DATE_PAST": "The date has already passed",
+      "REJECTION_REASON_DATE_TOO_FAR": "The date is too far ahead",
+      "REJECTION_REASON_EMPTY": "The content is empty",
+      "REJECTION_REASON_QUANTITY_RANGE": "The quantity is out of range",
+      "REJECTION_REASON_RESOLUTION_NO_ITEM": "There is no item yet, so no item category can be set",
+      "REJECTION_REASON_RESOLUTION_NO_LABEL": "The item category has no name",
+      "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "The way the item category was decided is unknown",
+      "REJECTION_REASON_TRUNCATED": "Over the length limit, shortened",
+      "REJECTION_REASON_UNIT_NOT_ALLOWED": "This unit is not supported"
+    }
+  },
   "seller": {
     "ContentKind": {
       "CONTENT_KIND_COMMENT": "留言",

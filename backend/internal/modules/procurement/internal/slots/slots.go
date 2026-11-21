@@ -42,13 +42,6 @@ const (
 // AllowedUnits 只允許重量單位：KG、CATTY、GRAM 都有公斤換算係數，詢價的計價基準據此決定。
 var AllowedUnits = []string{"KG", "CATTY", "GRAM"}
 
-// AllowedCities 是台灣 22 縣市，臺／台兩種寫法都收。
-var AllowedCities = []string{
-	"臺北市", "台北市", "新北市", "桃園市", "臺中市", "台中市", "臺南市", "台南市", "高雄市",
-	"基隆市", "新竹市", "新竹縣", "苗栗縣", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣",
-	"屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "台東縣", "澎湖縣", "金門縣", "連江縣",
-}
-
 // 必填欄位：形成詢價規格的最小集合，順序固定。
 var requiredSlots = []model.SlotKey{Item, DeliveryCity, Unit}
 
@@ -68,7 +61,7 @@ type Resolution struct {
 	Label string
 }
 
-// Set 是一個需求版本的內容；指標欄位 nil 表示買家還沒填。DeliveryDate 是 UTC 午夜表示的日曆日。
+// Set 是一個需求版本的內容；指標欄位 nil 表示買家還沒填；ExactMatchRequired 的 nil 是系統預設（見 ExactMatch）。DeliveryDate 是 UTC 午夜表示的日曆日。
 type Set struct {
 	Item               *string
 	Resolution         *Resolution
@@ -134,7 +127,14 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 			*dst = &v
 		}
 	}
-	applyText(Item, p.Item, &out.Item)
+	itemRejected := false
+	if p.Item != nil {
+		if v, ok := boundedText(*p.Item, reject, Item); ok {
+			out.Item = &v
+		} else {
+			itemRejected = true
+		}
+	}
 	applyText(Packaging, p.Packaging, &out.Packaging)
 
 	// 品項一變動就清掉舊解析：解析結果與品項原話同生命週期，這裡是唯一的守點。判準是 Apply 前後的值不同，不是 p.Item 非 nil——
@@ -144,7 +144,7 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 	}
 
 	if p.Resolution != nil {
-		if out.Item == nil {
+		if out.Item == nil || itemRejected {
 			reject(ItemResolution, ReasonResolutionNoItem)
 		} else if r, ok := validResolution(*p.Resolution, reject); ok {
 			out.Resolution = &r
@@ -179,14 +179,10 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 	}
 
 	if p.DeliveryCity != nil {
-		v := trimtext.Trim(*p.DeliveryCity)
-		if canonical, ok := normalizeCity(v); ok {
-			v = canonical
-		}
-		if !contains(AllowedCities, v) {
-			reject(DeliveryCity, ReasonCityUnrecognized)
+		if canonical, ok := normalizeCity(trimtext.Trim(*p.DeliveryCity)); ok {
+			out.DeliveryCity = &canonical
 		} else {
-			out.DeliveryCity = &v
+			reject(DeliveryCity, ReasonCityUnrecognized)
 		}
 	}
 
@@ -212,11 +208,6 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 	if p.ExactMatchRequired != nil {
 		v := *p.ExactMatchRequired
 		out.ExactMatchRequired = &v
-	}
-	if out.ExactMatchRequired == nil {
-		// 預設只找完全相符的品項；放寬必須是買家明確同意的動作。
-		def := true
-		out.ExactMatchRequired = &def
 	}
 	return out, rejected
 }
@@ -251,6 +242,9 @@ func validResolution(r Resolution, reject func(model.SlotKey, Reason)) (Resoluti
 	}
 	return Resolution{Kind: r.Kind, Label: label}, true
 }
+
+// ExactMatch 是生效的「只找完全相符」：買家沒設過（nil）時是系統預設 true；放寬必須是買家明確同意的動作。
+func (s Set) ExactMatch() bool { return s.ExactMatchRequired == nil || *s.ExactMatchRequired }
 
 // MissingRequired 回傳仍缺的必填欄位，順序固定；全部填齊時是空 slice，不是 nil。
 func (s Set) MissingRequired() []model.SlotKey {

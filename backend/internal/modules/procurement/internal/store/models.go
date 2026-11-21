@@ -342,6 +342,8 @@ type ProcurementTurn struct {
 	AssistantReply   string
 	Steps            []byte
 	RecordedThisTurn []byte
+	OptionalStreak   int32
+	SkippedSlots     []string
 	ClientRequestID  uuid.UUID
 	CreatedAt        time.Time
 }

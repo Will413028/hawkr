@@ -168,6 +168,28 @@ enum SlotKey {
   SLOT_KEY_ITEM_DISAMBIGUATION = 10;
 }
 
+// RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。
+enum RejectionReason {
+  REJECTION_REASON_UNSPECIFIED = 0;
+  // 內容是空的。
+  REJECTION_REASON_EMPTY = 1;
+  // 文字超過長度上限，已截斷後採用（值有保留）。
+  REJECTION_REASON_TRUNCATED = 2;
+  REJECTION_REASON_QUANTITY_RANGE = 3;
+  REJECTION_REASON_BUDGET_RANGE = 4;
+  REJECTION_REASON_UNIT_NOT_ALLOWED = 5;
+  REJECTION_REASON_CITY_UNRECOGNIZED = 6;
+  REJECTION_REASON_DATE_FORMAT = 7;
+  // 日期只有月日、沒有西元年；不替買家補年份。
+  REJECTION_REASON_DATE_MISSING_YEAR = 8;
+  REJECTION_REASON_DATE_PAST = 9;
+  REJECTION_REASON_DATE_TOO_FAR = 10;
+  // 品項被丟棄（或還沒有品項），所以不能附上分類判定。
+  REJECTION_REASON_RESOLUTION_NO_ITEM = 11;
+  REJECTION_REASON_RESOLUTION_NO_LABEL = 12;
+  REJECTION_REASON_RESOLUTION_UNKNOWN_KIND = 13;
+}
+
 // RequestStatus 是採購需求的進度。
 enum RequestStatus {
   REQUEST_STATUS_UNSPECIFIED = 0;
@@ -404,7 +426,7 @@ message RecordedField {
 
 message RejectedField {
   SlotKey key = 1;
-  string reason = 2;
+  RejectionReason reason = 2;
 }
 
 // ItemResolution 是買家的品項原話被判定成平台分類樹的哪個節點，以及判定的方式。必須對買家可見且可更正。

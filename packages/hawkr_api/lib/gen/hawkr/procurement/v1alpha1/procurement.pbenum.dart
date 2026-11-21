@@ -67,6 +67,79 @@ class SlotKey extends $pb.ProtobufEnum {
   const SlotKey._(super.value, super.name);
 }
 
+/// RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。
+class RejectionReason extends $pb.ProtobufEnum {
+  static const RejectionReason REJECTION_REASON_UNSPECIFIED = RejectionReason._(
+      0, _omitEnumNames ? '' : 'REJECTION_REASON_UNSPECIFIED');
+
+  /// 內容是空的。
+  static const RejectionReason REJECTION_REASON_EMPTY =
+      RejectionReason._(1, _omitEnumNames ? '' : 'REJECTION_REASON_EMPTY');
+
+  /// 文字超過長度上限，已截斷後採用（值有保留）。
+  static const RejectionReason REJECTION_REASON_TRUNCATED =
+      RejectionReason._(2, _omitEnumNames ? '' : 'REJECTION_REASON_TRUNCATED');
+  static const RejectionReason REJECTION_REASON_QUANTITY_RANGE =
+      RejectionReason._(
+          3, _omitEnumNames ? '' : 'REJECTION_REASON_QUANTITY_RANGE');
+  static const RejectionReason REJECTION_REASON_BUDGET_RANGE =
+      RejectionReason._(
+          4, _omitEnumNames ? '' : 'REJECTION_REASON_BUDGET_RANGE');
+  static const RejectionReason REJECTION_REASON_UNIT_NOT_ALLOWED =
+      RejectionReason._(
+          5, _omitEnumNames ? '' : 'REJECTION_REASON_UNIT_NOT_ALLOWED');
+  static const RejectionReason REJECTION_REASON_CITY_UNRECOGNIZED =
+      RejectionReason._(
+          6, _omitEnumNames ? '' : 'REJECTION_REASON_CITY_UNRECOGNIZED');
+  static const RejectionReason REJECTION_REASON_DATE_FORMAT = RejectionReason._(
+      7, _omitEnumNames ? '' : 'REJECTION_REASON_DATE_FORMAT');
+
+  /// 日期只有月日、沒有西元年；不替買家補年份。
+  static const RejectionReason REJECTION_REASON_DATE_MISSING_YEAR =
+      RejectionReason._(
+          8, _omitEnumNames ? '' : 'REJECTION_REASON_DATE_MISSING_YEAR');
+  static const RejectionReason REJECTION_REASON_DATE_PAST =
+      RejectionReason._(9, _omitEnumNames ? '' : 'REJECTION_REASON_DATE_PAST');
+  static const RejectionReason REJECTION_REASON_DATE_TOO_FAR =
+      RejectionReason._(
+          10, _omitEnumNames ? '' : 'REJECTION_REASON_DATE_TOO_FAR');
+
+  /// 品項被丟棄（或還沒有品項），所以不能附上分類判定。
+  static const RejectionReason REJECTION_REASON_RESOLUTION_NO_ITEM =
+      RejectionReason._(
+          11, _omitEnumNames ? '' : 'REJECTION_REASON_RESOLUTION_NO_ITEM');
+  static const RejectionReason REJECTION_REASON_RESOLUTION_NO_LABEL =
+      RejectionReason._(
+          12, _omitEnumNames ? '' : 'REJECTION_REASON_RESOLUTION_NO_LABEL');
+  static const RejectionReason REJECTION_REASON_RESOLUTION_UNKNOWN_KIND =
+      RejectionReason._(
+          13, _omitEnumNames ? '' : 'REJECTION_REASON_RESOLUTION_UNKNOWN_KIND');
+
+  static const $core.List<RejectionReason> values = <RejectionReason>[
+    REJECTION_REASON_UNSPECIFIED,
+    REJECTION_REASON_EMPTY,
+    REJECTION_REASON_TRUNCATED,
+    REJECTION_REASON_QUANTITY_RANGE,
+    REJECTION_REASON_BUDGET_RANGE,
+    REJECTION_REASON_UNIT_NOT_ALLOWED,
+    REJECTION_REASON_CITY_UNRECOGNIZED,
+    REJECTION_REASON_DATE_FORMAT,
+    REJECTION_REASON_DATE_MISSING_YEAR,
+    REJECTION_REASON_DATE_PAST,
+    REJECTION_REASON_DATE_TOO_FAR,
+    REJECTION_REASON_RESOLUTION_NO_ITEM,
+    REJECTION_REASON_RESOLUTION_NO_LABEL,
+    REJECTION_REASON_RESOLUTION_UNKNOWN_KIND,
+  ];
+
+  static final $core.List<RejectionReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
+  static RejectionReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RejectionReason._(super.value, super.name);
+}
+
 /// RequestStatus 是採購需求的進度。
 class RequestStatus extends $pb.ProtobufEnum {
   static const RequestStatus REQUEST_STATUS_UNSPECIFIED =

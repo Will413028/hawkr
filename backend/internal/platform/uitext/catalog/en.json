@@ -87,6 +87,45 @@
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "Provider-hosted"
     },
+    "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
+      "message": "The budget per unit is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": {
+      "message": "The city could not be recognized"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT": {
+      "message": "The date format is not valid"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR": {
+      "message": "The date is missing the year"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_PAST": {
+      "message": "The date has already passed"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR": {
+      "message": "The date is too far ahead"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_EMPTY": {
+      "message": "The content is empty"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE": {
+      "message": "The quantity is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
+      "message": "There is no item yet, so no item category can be set"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {
+      "message": "The item category has no name"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": {
+      "message": "The way the item category was decided is unknown"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_TRUNCATED": {
+      "message": "Over the length limit, shortened"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
+      "message": "This unit is not supported"
+    },
     "seller.KYCApplication.decide_time": {
       "message": "Approved at: {time}"
     },

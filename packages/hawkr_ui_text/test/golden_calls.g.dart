@@ -10,6 +10,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart'
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -103,6 +104,20 @@ const _enumNumber = <String, int>{
 	'POLICY_CATEGORY_SPAM': 14,
 	'POLICY_CATEGORY_UNLICENSED_SALE': 3,
 	'POLICY_CATEGORY_UNSPECIFIED': 0,
+	'REJECTION_REASON_BUDGET_RANGE': 4,
+	'REJECTION_REASON_CITY_UNRECOGNIZED': 6,
+	'REJECTION_REASON_DATE_FORMAT': 7,
+	'REJECTION_REASON_DATE_MISSING_YEAR': 8,
+	'REJECTION_REASON_DATE_PAST': 9,
+	'REJECTION_REASON_DATE_TOO_FAR': 10,
+	'REJECTION_REASON_EMPTY': 1,
+	'REJECTION_REASON_QUANTITY_RANGE': 3,
+	'REJECTION_REASON_RESOLUTION_NO_ITEM': 11,
+	'REJECTION_REASON_RESOLUTION_NO_LABEL': 12,
+	'REJECTION_REASON_RESOLUTION_UNKNOWN_KIND': 13,
+	'REJECTION_REASON_TRUNCATED': 2,
+	'REJECTION_REASON_UNIT_NOT_ALLOWED': 5,
+	'REJECTION_REASON_UNSPECIFIED': 0,
 	'REPORT_OUTCOME_NO_VIOLATION': 3,
 	'REPORT_OUTCOME_PENDING': 1,
 	'REPORT_OUTCOME_UNSPECIFIED': 0,
@@ -215,6 +230,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n(value))!.uiText(l);
     case 'payment.RequirementCollection':
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n(value))!.uiText(l);
+    case 'procurement.RejectionReason':
+      return hawkr_procurement_v1alpha1_procurement.RejectionReason.valueOf(_n(value))!.uiText(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCApplication.decide_time':

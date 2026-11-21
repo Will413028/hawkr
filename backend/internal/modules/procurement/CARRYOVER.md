@@ -40,7 +40,7 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 
 ## 領域層的沿用盤點（A9-3b-2a）
 
-舊 `ai-service/internal/procurement/domain` 的 slots、planner、templates 搬成 `internal/slots`、`internal/planner`、`internal/reply`、`internal/text`，不搬 LLM narrator 與 realizer（A9-D24 第 4 項）。對照測試的來源行號寫在各測試的註解。「決定」欄標「待 Will」的是照舊行為搬過來、從零設計可能不同、計畫與決定沒有定案的項目，不自行決定。
+舊 `ai-service/internal/procurement/domain` 的 slots、planner、templates 搬成 `internal/slots`、`internal/planner`、`internal/reply`、`internal/text`，不搬 LLM narrator 與 realizer（A9-D24 第 4 項）。對照測試的來源在本節最後的「對照測試的來源」。A9-D25（Will 2026-11-21）已決定下表原本待決的項目。
 
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
@@ -55,18 +55,28 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 問題卡的 `Source`、選項的 `Value` 在 wire 上 | 前端 types.ts 已宣告 | 否：新 proto 的 `QuestionOption` 只有 `option_id`、`label`，`ClarifyQuestion` 沒有 source | 契約是唯一來源 | 刪 `Source`；`Value` 留在伺服器內部，回答時以選項 ID 反查 |
 | 欄位代碼的小寫字串（`item`、`delivery_city`）與 `crop_disambiguation` | 前端 JSON 的 key | 否：proto `SlotKey` 值名（`ITEM`、`ITEM_DISAMBIGUATION`） | 契約是唯一來源 | 改：用 `model.SlotKey`，值是 proto 值名；「crop」是農產內容的舊稱，改叫 item（選項 ID `item-other`、`category-<id>`） |
 | 必填欄位＝品項、配送城市、單位；選填順序＝數量（含單位）、到貨日、包裝、單價預算；連續選填上限 3；數量與到貨日不可跳過；單位折進數量的複合問題卡 | 產品決定（舊註解：2026-08-09、2026-08-23 Will；報價單前提） | 是（產品規則，計畫沒有改它） | — | 沿用，原樣搬，有對照測試 |
-| `AllowedUnits` 只收重量單位、`AllowedCities` 手寫 26 個字串（臺／台兩種寫法）、別名表、六都選項、到貨日 ≤365 天、數量 ≤1,000,000、單價預算 ≤10,000,000 | 需要可比對的固定值 | 部分：台灣鄉鎮市區代碼表已有 `platform/twaddr`，縣市在其中是正規資料 | 縣市取自代碼表而不是第二份手寫清單 | 待 Will：照搬，不改（見下方開放問題 2） |
-| `RecordedThisTurn` 的「前後是否不同」規則與 `computeHasCorrection`（recorded 的欄位在 Current 已有值就是更正，`ExactMatchRequired` 因 `Apply` 預設值恆算更正） | 讓更正與第一次填分開回應 | 是 | — | 沿用，原樣搬；`ExactMatchRequired` 的怪處列在開放問題 6 |
-| 模板文字 `REQUEST_BASICS_READY` 的「我現在就去幫你找找看合適的候選」 | 舊流程需求齊備後自動搜尋 | 否：A9-D24 第 3 項把候選搜尋拆成買家觸發的獨立 run，這句話在搜尋尚未開始時是假話 | 只說已發生或買家下一步要做的事 | 待 Will：文字原樣搬（zh-TW 逐字相同），見開放問題 4 |
+| `AllowedUnits` 只收重量單位、`AllowedCities` 手寫 26 個字串（臺／台兩種寫法）、別名表、六都選項、到貨日 ≤365 天、數量 ≤1,000,000、單價預算 ≤10,000,000 | 需要可比對的固定值 | 部分：縣市在 `platform/twaddr` 有正規資料 | 縣市取自代碼表而不是第二份手寫清單 | 改（A9-D25 第 2 項）：刪手寫清單，縣市層級取自 `platform/twaddr.Counties()`，輸入的「台」統一成代碼表的「臺」，存與回傳只有一種拼法；簡稱（去掉市／縣）只在唯一時收，新竹、嘉義有市有縣不收；升格前的舊縣名（臺北縣等 5 個）無法由代碼表推導，留一張小表。單位、數字上限、六都選項照搬（`TestEveryTwaddrCountyIsAccepted`、`TestNormalizeCity`） |
+| `RecordedThisTurn` 的「前後是否不同」規則與 `computeHasCorrection`（recorded 的欄位在 Current 已有值就是更正） | 讓更正與第一次填分開回應 | 是 | — | 沿用；`ExactMatchRequired` 改（A9-D25 第 6 項）：`Apply` 不再補預設值，`nil` 是系統預設、`Set.ExactMatch()` 取生效值，只有改掉買家設過的值才算更正（`TestExactMatchDefaultIsNotBuyerSet`、`TestFirstExplicitExactMatchIsNotACorrection`） |
+| 模板文字 `REQUEST_BASICS_READY` 的「我現在就去幫你找找看合適的候選」 | 舊流程需求齊備後自動搜尋 | 否：A9-D24 第 3 項把候選搜尋拆成買家觸發的獨立 run | 只說已發生或買家下一步要做的事 | 改（A9-D25 第 4 項）：zh-TW「需求已齊，可以開始找候選」，en 同義句 |
 
-開放問題（3b-2a 交 Will）：
+A9-D25 對開放問題的決定（Will 2026-11-21）：
 
-1. 連續選填計數與被買家跳過的欄位存在哪：舊版存在 revision 的 patch payload（`optionalStreak`、`Skip`），新 schema 的 `turns` 沒有對應欄位，`PickNext`、`NextOptionalStreak` 是純函式、輸入由呼叫端給。選項：存在 `run_interrupts` 的 payload（問題與計數一起）、`turns` 加欄位、或從 `turns` 與問題歷史重算。3b-2c 開工前要定。
-2. 縣市清單與別名：維持手寫 `AllowedCities`（含臺／台兩種寫法）或改由 `platform/twaddr` 推導、存正規名稱；選項裡的六都是否維持。
-3. 品項消歧的分階段精靈（舊 `CropSelection` 的 GROUP、ITEM、DESCRIBE 與 `queryText`、父分類）沒有搬：新的 `resolver` 回扁平的符合清單，`Resolution` 不存分類 ID；是否要兩層選擇、狀態放哪屬於 crop gate 的 3b-2c。目前只搬單層消歧問題卡（有候選與無候選兩種）。
-4. `REQUEST_BASICS_READY` 的下一步句要不要改成不宣稱已開始搜尋（例如改成請買家按搜尋）。
-5. proto `RejectedField.reason` 是字串：目前由 `reply.RejectionReason` 依請求語系組好文字放進去（同 `Step.label` 的做法）。若要讓 client 依代碼自行顯示或在地化，要在 proto 加 reason 列舉；這會改契約，不在 3b-2a 自行決定。
-6. `ExactMatchRequired` 在第一次 `Apply` 之後恆為非 nil，之後買家再明講它一律被判為「更正」；舊版如此。從零設計會讓「系統預設值」與「買家設定值」可分辨（例如多一個旗標）。
+1. 連續選填計數與跳過的欄位：`turns.optional_streak`、`turns.skipped_slots`（具名欄位，CHECK 限選填欄位），每輪寫入（`InsertTurn`）；`planner.Input` 帶上一輪的值，`planner.Plan` 回這一輪要存的值。讀上一輪、寫這一輪的接線在 3b-2c 的 turn 用例。
+2. 縣市：見上表。
+3. 品項消歧的兩層選擇（舊 `CropSelection` 的 GROUP、ITEM、DESCRIBE 與 `queryText`、父分類）：留給 3b-2c，3b-2a 不做；新的 `resolver` 回扁平的符合清單，`Resolution` 不存分類 ID，目前只搬單層消歧問題卡（有候選與無候選兩種）。3b-2c 開工時要決定狀態放哪、`ItemDisambiguation` 問題卡是否分階段。
+4. `REQUEST_BASICS_READY`：見上表。
+5. `RejectedField.reason`：proto 加列舉 `RejectionReason`（`REJECTION_REASON_*`，UNSPECIFIED=0），client 依值查共用文案目錄（`procurement.RejectionReason.*`）；敘述段落裡帶上限數字的原因句仍在模組 `internal/text`（`reject.*`）。
+6. `ExactMatchRequired`：見上表。
+
+## 對照測試的來源
+
+下列測試的輸入與預期取自舊 `backend/services/ai-service/internal/procurement/`（行號見 commit `76de5c02` 的測試註解）：
+
+| 新測試 | 舊來源 |
+|---|---|
+| `slots`：`TestApplyParity`、`TestNormalize*`、`TestRecordedThisTurn*`、`TestMissingRequired` | `domain/slots_test.go`、`domain/testdata/slots_apply/*.json`、`domain/normalize_test.go`、`domain/recorded_test.go` |
+| `planner`：`TestPickNextParity`、`TestCanSkip`、`TestBuildForShapes`、`TestNextOptionalStreakParity`、`TestDecideParity` | `domain/pick_next_question_test.go`、`usecase/question_history_test.go`、`domain/dialogue_planner_test.go` |
+| `reply`：`TestRenderParity`、`TestTextFallbackJoinsWithSpace`、`TestRejectionReasonsInZhTW`、`TestQuestionTextParity` | `domain/dialogue_templates_test.go`、`domain/testdata/dialogue_templates/*.json`；zh-TW 逐字相同，只有 `REQUEST_BASICS_READY` 的下一步句與單位清單（改用本地化單位名）依 A9-D25 與審查修正而不同 |
 
 ## 冪等鍵逐支判定（S4）
 

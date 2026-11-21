@@ -88,7 +88,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	must("InsertConversation", q.InsertConversation(ctx, store.InsertConversationParams{ID: c.conversation, BuyerID: buyerID, RequestID: c.request, Now: epoch}))
 	n, err := q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: c.turn, RequestID: c.request, ConversationID: c.conversation, BuyerID: buyerID, ResultRevisionID: c.revision, Source: "LLM_EXTRACT",
-		BuyerMessage: "我要三件外套", AssistantReply: "好的", Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), ClientRequestID: id(), Now: epoch,
+		BuyerMessage: "我要三件外套", AssistantReply: "好的", Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), OptionalStreak: 2, SkippedSlots: []string{"PACKAGING"}, ClientRequestID: id(), Now: epoch,
 	})
 	rows("InsertTurn", n, err)
 	n, err = q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: c.candidateSet, RequestID: c.request, RequestRevisionID: c.revision, BuyerID: buyerID, ClientRequestID: id(), Now: epoch})
@@ -239,9 +239,12 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if err != nil || len(turns) != 1 {
 		t.Fatalf("ListTurnsByRequest = %d, %v", len(turns), err)
 	}
+	if turns[0].OptionalStreak != 2 || len(turns[0].SkippedSlots) != 1 || turns[0].SkippedSlots[0] != "PACKAGING" {
+		t.Fatalf("optional progress = %d %v, want 2 [PACKAGING]", turns[0].OptionalStreak, turns[0].SkippedSlots)
+	}
 	dup, err := q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: id(), RequestID: c.request, ConversationID: c.conversation, BuyerID: c.buyer, ResultRevisionID: rev2, Source: "ANSWER",
-		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), ClientRequestID: turns[0].ClientRequestID, Now: epoch,
+		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: []string{}, ClientRequestID: turns[0].ClientRequestID, Now: epoch,
 	})
 	if err != nil || dup != 0 {
 		t.Fatalf("重送的 InsertTurn n=%d err=%v", dup, err)

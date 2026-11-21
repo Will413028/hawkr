@@ -9,9 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 )
 
-// 對照測試的「舊」指舊 ai-service：backend/services/ai-service/internal/procurement/ 的 domain/ 與 usecase/。
-// 輸入與預期取自舊測試，註解標出來源 file:line。
-
 var base = struct {
 	item, city, unit, pkg string
 	qty                   int32
@@ -40,7 +37,6 @@ func TestPickNextParity(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		src     string
 		set     slots.Set
 		missing []model.SlotKey
 		skipped map[model.SlotKey]bool
@@ -48,37 +44,37 @@ func TestPickNextParity(t *testing.T) {
 		want    model.SlotKey // "" 表示沒有問題
 		capHit  bool
 	}{
-		{"required wins over optional", "pick_next_question_test.go:8", slots.Set{}, []model.SlotKey{slots.DeliveryCity}, nil, 0, slots.DeliveryCity, false},
-		{"unit-only missing routes to the quantity compound card", "pick_next_question_test.go:44", required(), []model.SlotKey{slots.Unit}, nil, 0, slots.Quantity, false},
-		{"first optional is quantity", "pick_next_question_test.go:72", required(), nil, nil, 0, slots.Quantity, false},
-		{"then delivery date", "pick_next_question_test.go:72", withQty(required()), nil, nil, 0, slots.DeliveryDate, false},
-		{"then packaging", "pick_next_question_test.go:72", withDate(withQty(required())), nil, nil, 0, slots.Packaging, false},
-		{"budget last, needs unit", "pick_next_question_test.go:102", withPkg(withDate(withQty(required()))), nil, nil, 0, slots.BudgetPerUnit, false},
-		{"quantity known, unit missing asks the unit follow-up, not budget", "pick_next_question_test.go:125", qtyOnly, nil, nil, 0, slots.Quantity, false},
-		{"cap stops asking and reports it", "pick_next_question_test.go:150", required(), nil, nil, MaxConsecutiveOptionalQuestions, "", true},
-		{"nothing left, not a cap hit", "pick_next_question_test.go:166", full, nil, nil, 0, "", false},
-		{"nothing left even at the cap is not a cap hit", "pick_next_question_test.go:166", full, nil, nil, MaxConsecutiveOptionalQuestions, "", false},
-		{"skipped optional slot is passed over", "turn.go:456 (skip set consumed by PickNextQuestion)", required(), nil, map[model.SlotKey]bool{slots.Quantity: true}, 0, slots.DeliveryDate, false},
-		{"streak below the cap still asks", "pick_next_question_test.go:150", required(), nil, nil, MaxConsecutiveOptionalQuestions - 1, slots.Quantity, false},
+		{"required wins over optional", slots.Set{}, []model.SlotKey{slots.DeliveryCity}, nil, 0, slots.DeliveryCity, false},
+		{"unit-only missing routes to the quantity compound card", required(), []model.SlotKey{slots.Unit}, nil, 0, slots.Quantity, false},
+		{"first optional is quantity", required(), nil, nil, 0, slots.Quantity, false},
+		{"then delivery date", withQty(required()), nil, nil, 0, slots.DeliveryDate, false},
+		{"then packaging", withDate(withQty(required())), nil, nil, 0, slots.Packaging, false},
+		{"budget last, needs unit", withPkg(withDate(withQty(required()))), nil, nil, 0, slots.BudgetPerUnit, false},
+		{"quantity known, unit missing asks the unit follow-up, not budget", qtyOnly, nil, nil, 0, slots.Quantity, false},
+		{"cap stops asking and reports it", required(), nil, nil, MaxConsecutiveOptionalQuestions, "", true},
+		{"nothing left, not a cap hit", full, nil, nil, 0, "", false},
+		{"nothing left even at the cap is not a cap hit", full, nil, nil, MaxConsecutiveOptionalQuestions, "", false},
+		{"skipped optional slot is passed over", required(), nil, map[model.SlotKey]bool{slots.Quantity: true}, 0, slots.DeliveryDate, false},
+		{"streak below the cap still asks", required(), nil, nil, MaxConsecutiveOptionalQuestions - 1, slots.Quantity, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			q, capHit := PickNext(c.set, c.missing, c.skipped, c.streak)
 			if capHit != c.capHit {
-				t.Errorf("(%s) capExhausted = %v, want %v", c.src, capHit, c.capHit)
+				t.Errorf("capExhausted = %v, want %v", capHit, c.capHit)
 			}
 			switch {
 			case c.want == "" && q != nil:
-				t.Errorf("(%s) want no question, got %+v", c.src, q)
+				t.Errorf("want no question, got %+v", q)
 			case c.want != "" && (q == nil || q.Slot != c.want):
-				t.Errorf("(%s) want question for %s, got %+v", c.src, c.want, q)
+				t.Errorf("want question for %s, got %+v", c.want, q)
 			}
 		})
 	}
 }
 
 func TestBuildForShapes(t *testing.T) {
-	t.Run("delivery city offers the six cities and free text (pick_next_question_test.go:8)", func(t *testing.T) {
+	t.Run("delivery city offers the six cities and free text", func(t *testing.T) {
 		q := BuildFor(slots.DeliveryCity, slots.Set{})
 		if len(q.Options) != 6 || !q.AllowFreeText || q.Prompt != PromptDeliveryCity {
 			t.Errorf("got %+v", q)
@@ -87,24 +83,24 @@ func TestBuildForShapes(t *testing.T) {
 			t.Errorf("first option = %+v", q.Options[0])
 		}
 	})
-	t.Run("free-text slot has empty non-nil options (pick_next_question_test.go:192)", func(t *testing.T) {
+	t.Run("free-text slot has empty non-nil options", func(t *testing.T) {
 		if q := BuildFor(slots.Packaging, slots.Set{}); q.Options == nil || len(q.Options) != 0 {
 			t.Errorf("options = %#v", q.Options)
 		}
 	})
-	t.Run("quantity, both unknown: compound (pick_next_question_test.go:201)", func(t *testing.T) {
+	t.Run("quantity, both unknown: compound", func(t *testing.T) {
 		q := BuildFor(slots.Quantity, slots.Set{})
 		if q.Slot != slots.Quantity || q.Prompt != PromptQuantity || !q.AllowFreeText || len(q.UnitOptions) != 3 || q.CanSkip {
 			t.Errorf("got %+v", q)
 		}
 	})
-	t.Run("quantity known, unit missing: unit follow-up (pick_next_question_test.go:224)", func(t *testing.T) {
+	t.Run("quantity known, unit missing: unit follow-up", func(t *testing.T) {
 		q := BuildFor(slots.Quantity, slots.Set{Quantity: &base.qty})
 		if q.Prompt != PromptUnit || q.AllowFreeText || len(q.UnitOptions) != 3 {
 			t.Errorf("got %+v", q)
 		}
 	})
-	t.Run("both known: amount only (pick_next_question_test.go:242)", func(t *testing.T) {
+	t.Run("both known: amount only", func(t *testing.T) {
 		q := BuildFor(slots.Quantity, slots.Set{Quantity: &base.qty, Unit: &base.unit})
 		if q.Prompt != PromptQuantity || !q.AllowFreeText || len(q.UnitOptions) != 0 {
 			t.Errorf("got %+v", q)
@@ -125,7 +121,7 @@ func TestBuildForShapes(t *testing.T) {
 	})
 }
 
-func TestCanSkip(t *testing.T) { // pick_next_question_test.go:258
+func TestCanSkip(t *testing.T) {
 	want := map[model.SlotKey]bool{
 		slots.Item: false, slots.DeliveryCity: false, slots.DeliveryDate: false, slots.Quantity: false,
 		slots.Packaging: true, slots.BudgetPerUnit: true,
@@ -138,7 +134,7 @@ func TestCanSkip(t *testing.T) { // pick_next_question_test.go:258
 }
 
 func TestItemDisambiguation(t *testing.T) {
-	t.Run("candidates plus the other option (pick_next_question_test.go:311)", func(t *testing.T) {
+	t.Run("candidates plus the other option", func(t *testing.T) {
 		q := BuildItemDisambiguation([]ItemCandidate{{CategoryID: 18, Label: "有機小白菜"}})
 		if q.Slot != slots.ItemDisambiguation || q.AllowFreeText || q.CanSkip || q.Prompt != PromptItemChoices || len(q.Options) != 2 {
 			t.Fatalf("got %+v", q)
@@ -150,7 +146,7 @@ func TestItemDisambiguation(t *testing.T) {
 			t.Errorf("other option = %+v", last)
 		}
 	})
-	t.Run("no candidates: only the describe option with its own prompt (pick_next_question_test.go:346)", func(t *testing.T) {
+	t.Run("no candidates: only the describe option with its own prompt", func(t *testing.T) {
 		q := BuildItemDisambiguation(nil)
 		if len(q.Options) != 1 || q.Options[0].ID != ItemOtherOptionID || q.Options[0].Kind != OptionDescribe {
 			t.Fatalf("options = %+v", q.Options)
@@ -161,28 +157,27 @@ func TestItemDisambiguation(t *testing.T) {
 	})
 }
 
-func TestNextOptionalStreakParity(t *testing.T) { // usecase/question_history_test.go:115-181，舊 computeOptionalStreak（turn.go:538）
+func TestNextOptionalStreakParity(t *testing.T) {
 	pkg := &Question{Slot: slots.Packaging}
 	cases := []struct {
 		name   string
-		src    string
 		ready  bool
 		q      *Question
 		capHit bool
 		prev   int
 		want   int
 	}{
-		{"still clarifying resets", "question_history_test.go:115", false, &Question{Slot: slots.DeliveryCity}, false, 5, 0},
-		{"optional question asked increments", "question_history_test.go:122", true, pkg, false, 2, 3},
-		{"cap hit keeps the streak", "question_history_test.go:132", true, nil, true, MaxConsecutiveOptionalQuestions, MaxConsecutiveOptionalQuestions},
-		{"disambiguation does not move the streak", "question_history_test.go:153", true, &Question{Slot: slots.ItemDisambiguation}, false, 2, 2},
-		{"nothing left to ask resets", "question_history_test.go:166", true, nil, false, 2, 0},
-		{"required-slot question when ready resets", "question_history_test.go:176", true, &Question{Slot: slots.DeliveryCity}, false, 2, 0},
+		{"still clarifying resets", false, &Question{Slot: slots.DeliveryCity}, false, 5, 0},
+		{"optional question asked increments", true, pkg, false, 2, 3},
+		{"cap hit keeps the streak", true, nil, true, MaxConsecutiveOptionalQuestions, MaxConsecutiveOptionalQuestions},
+		{"disambiguation does not move the streak", true, &Question{Slot: slots.ItemDisambiguation}, false, 2, 2},
+		{"nothing left to ask resets", true, nil, false, 2, 0},
+		{"required-slot question when ready resets", true, &Question{Slot: slots.DeliveryCity}, false, 2, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := NextOptionalStreak(c.ready, c.q, c.capHit, c.prev); got != c.want {
-				t.Errorf("(%s) = %d, want %d", c.src, got, c.want)
+				t.Errorf("= %d, want %d", got, c.want)
 			}
 		})
 	}
@@ -190,37 +185,36 @@ func TestNextOptionalStreakParity(t *testing.T) { // usecase/question_history_te
 
 func rec(key model.SlotKey, v string) []slots.Recorded { return []slots.Recorded{{Key: key, Value: v}} }
 
-func TestDecideParity(t *testing.T) { // dialogue_planner_test.go:11-226 的每一個 act 與優先序
+func TestDecideParity(t *testing.T) {
 	disamb := BuildItemDisambiguation([]ItemCandidate{{CategoryID: 1, Label: "小白菜"}})
 	opt := &Question{Slot: slots.Quantity}
 	apple, fuji := "蘋果", "富士蘋果"
 	cases := []struct {
 		name string
-		src  string
 		in   Input
 		want Act
 	}{
-		{"missing required", "dialogue_planner_test.go:11", Input{Next: slots.Set{Item: &apple}}, AckAndAskRequired},
-		{"degraded beats everything", "dialogue_planner_test.go:20", Input{Degraded: true, Rejected: []slots.Rejection{{Key: slots.Item}}}, ExtractionDegraded},
-		{"rejected beats correction", "dialogue_planner_test.go:27", Input{
+		{"missing required", Input{Next: slots.Set{Item: &apple}}, AckAndAskRequired},
+		{"degraded beats everything", Input{Degraded: true, Rejected: []slots.Rejection{{Key: slots.Item}}}, ExtractionDegraded},
+		{"rejected beats correction", Input{
 			Rejected: []slots.Rejection{{Key: slots.Item}}, Current: slots.Set{Item: &apple}, Next: ready(), Recorded: rec(slots.Item, "蘋果")}, InputRejected},
-		{"correction of an existing field", "dialogue_planner_test.go:36", Input{
+		{"correction of an existing field", Input{
 			Current: slots.Set{Item: &apple}, Next: withItem(ready(), &fuji), Recorded: rec(slots.Item, fuji)}, CorrectionApplied},
-		{"first-time fill is not a correction", "dialogue_planner_test.go:46", Input{
+		{"first-time fill is not a correction", Input{
 			Next: ready(), Recorded: rec(slots.Item, apple)}, RequestBasicsReady},
-		{"ready with a follow-up question", "dialogue_planner_test.go:58", Input{Next: ready(), Question: opt}, AckAndAskOptional},
-		{"ready, nothing to ask", "dialogue_planner_test.go:65", Input{Next: ready()}, RequestBasicsReady},
-		{"price preview available", "dialogue_planner_test.go:70", Input{Next: ready(), PricePreviewAvailable: true}, PricePreviewAvailable},
-		{"rfq stale", "dialogue_planner_test.go:78", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqStale}, RfqReconfirmRequired},
-		{"rfq confirmed selects approval, not a separate confirmed act", "dialogue_planner_test.go:86", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqConfirmed}, PublicationApprovalRequired},
-		{"correction beats not-ready", "dialogue_planner_test.go:104", Input{
+		{"ready with a follow-up question", Input{Next: ready(), Question: opt}, AckAndAskOptional},
+		{"ready, nothing to ask", Input{Next: ready()}, RequestBasicsReady},
+		{"price preview available", Input{Next: ready(), PricePreviewAvailable: true}, PricePreviewAvailable},
+		{"rfq stale", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqStale}, RfqReconfirmRequired},
+		{"rfq confirmed selects approval, not a separate confirmed act", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqConfirmed}, PublicationApprovalRequired},
+		{"correction beats not-ready", Input{
 			Current: slots.Set{Item: &apple}, Next: withItem(slots.Set{Item: &apple}, &fuji), Recorded: rec(slots.Item, fuji)}, CorrectionApplied},
-		{"question beats price preview", "dialogue_planner_test.go:128", Input{Next: ready(), PricePreviewAvailable: true, Question: opt}, AckAndAskOptional},
-		{"disambiguation beats not-ready", "dialogue_planner_test.go:161", Input{Next: slots.Set{}, Question: disamb}, ItemNeedsDisambiguation},
-		{"rejected beats disambiguation", "dialogue_planner_test.go:170", Input{Rejected: []slots.Rejection{{Key: slots.Unit}}, Question: disamb}, InputRejected},
-		{"disambiguation with a ready request", "dialogue_planner_test.go:177", Input{Next: ready(), Question: disamb}, ItemNeedsDisambiguation},
-		{"stale rfq beats an optional question", "selectActCode order: ready, then rfq state, then question", Input{Next: ready(), Rfq: RfqStale, Question: opt}, RfqReconfirmRequired},
-		{"confirmed rfq beats price preview", "selectActCode order", Input{Next: ready(), Rfq: RfqConfirmed, PricePreviewAvailable: true}, PublicationApprovalRequired},
+		{"question beats price preview", Input{Next: ready(), PricePreviewAvailable: true, Question: opt}, AckAndAskOptional},
+		{"disambiguation beats not-ready", Input{Next: slots.Set{}, Question: disamb}, ItemNeedsDisambiguation},
+		{"rejected beats disambiguation", Input{Rejected: []slots.Rejection{{Key: slots.Unit}}, Question: disamb}, InputRejected},
+		{"disambiguation with a ready request", Input{Next: ready(), Question: disamb}, ItemNeedsDisambiguation},
+		{"stale rfq beats an optional question", Input{Next: ready(), Rfq: RfqStale, Question: opt}, RfqReconfirmRequired},
+		{"confirmed rfq beats price preview", Input{Next: ready(), Rfq: RfqConfirmed, PricePreviewAvailable: true}, PublicationApprovalRequired},
 	}
 	reached := map[Act]bool{}
 	for _, c := range cases {
@@ -228,11 +222,11 @@ func TestDecideParity(t *testing.T) { // dialogue_planner_test.go:11-226 的每�
 			got := Decide(c.in).Act
 			reached[got] = true
 			if got != c.want {
-				t.Errorf("(%s) act = %s, want %s", c.src, got, c.want)
+				t.Errorf("act = %s, want %s", got, c.want)
 			}
 		})
 	}
-	for _, a := range All { // dialogue_planner_test.go:136：每個 act 至少有一組輸入選得到
+	for _, a := range All {
 		if !reached[a] {
 			t.Errorf("act %s is not reached by any case", a)
 		}
@@ -241,7 +235,7 @@ func TestDecideParity(t *testing.T) { // dialogue_planner_test.go:11-226 的每�
 
 func withItem(s slots.Set, item *string) slots.Set { s.Item = item; return s }
 
-func TestDecideSalientFactsCapped(t *testing.T) { // 舊 salientFactRefsFor（dialogue_planner.go:148）：最多 2 個，維持 recorded 的順序
+func TestDecideSalientFactsCapped(t *testing.T) {
 	rs := []slots.Recorded{{Key: slots.Item, Value: "a"}, {Key: slots.Quantity, Value: "1"}, {Key: slots.Unit, Value: "KG"}}
 	p := Decide(Input{Next: ready(), Recorded: rs})
 	if !reflect.DeepEqual(p.Salient, rs[:2]) {
@@ -256,5 +250,71 @@ func TestDecidePassesQuestionThrough(t *testing.T) {
 	q := &Question{Slot: slots.Packaging}
 	if got := Decide(Input{Next: ready(), Question: q}).Question; got != q {
 		t.Errorf("question = %v", got)
+	}
+}
+
+func TestTruncatedValueIsAnAdjustmentNotARejection(t *testing.T) {
+	trunc := slots.Rejection{Key: slots.Item, Reason: slots.ReasonTruncated}
+	p := Decide(Input{Next: ready(), Rejected: []slots.Rejection{trunc}, Recorded: rec(slots.Item, "a")})
+	if p.Act != RequestBasicsReady {
+		t.Errorf("act = %s, want %s", p.Act, RequestBasicsReady)
+	}
+	if !reflect.DeepEqual(p.Adjusted, []slots.Rejection{trunc}) {
+		t.Errorf("adjusted = %v", p.Adjusted)
+	}
+	missing := Decide(Input{Next: slots.Set{}, Rejected: []slots.Rejection{trunc}})
+	if missing.Act != AckAndAskRequired {
+		t.Errorf("act with missing required = %s, want %s", missing.Act, AckAndAskRequired)
+	}
+	both := Decide(Input{Next: ready(), Rejected: []slots.Rejection{trunc, {Key: slots.Unit, Reason: slots.ReasonUnitNotAllowed}}})
+	if both.Act != InputRejected || len(both.Adjusted) != 1 {
+		t.Errorf("act = %s, adjusted = %v; a real rejection still wins", both.Act, both.Adjusted)
+	}
+}
+
+func TestCorrectedFieldsComeFirstInSalient(t *testing.T) {
+	apple, fuji := "蘋果", "富士蘋果"
+	rs := []slots.Recorded{{Key: slots.Quantity, Value: "5"}, {Key: slots.Packaging, Value: "箱"}, {Key: slots.Item, Value: fuji}}
+	p := Decide(Input{Current: slots.Set{Item: &apple}, Next: withItem(ready(), &fuji), Recorded: rs})
+	if p.Act != CorrectionApplied || len(p.Salient) != MaxSalientFacts || p.Salient[0].Key != slots.Item {
+		t.Errorf("act = %s, salient = %v; the corrected item must lead", p.Act, p.Salient)
+	}
+	q := 3
+	qty := int32(q)
+	cur := slots.Set{Item: &apple, Quantity: &qty, DeliveryCity: &base.city}
+	three := []slots.Recorded{{Key: slots.Item, Value: fuji}, {Key: slots.Quantity, Value: "4"}, {Key: slots.DeliveryCity, Value: "臺北市"}}
+	if got := Decide(Input{Current: cur, Next: ready(), Recorded: three}).Salient; len(got) != 3 {
+		t.Errorf("salient = %v, want every corrected field", got)
+	}
+}
+
+func TestDecideCarriesOptionalProgress(t *testing.T) {
+	pkg := &Question{Slot: slots.Packaging}
+	skipped := []model.SlotKey{slots.Quantity}
+	p := Decide(Input{Next: ready(), Question: pkg, PrevStreak: 2, Skipped: skipped})
+	if p.OptionalStreak != 3 || !reflect.DeepEqual(p.Skipped, skipped) {
+		t.Errorf("streak = %d, skipped = %v", p.OptionalStreak, p.Skipped)
+	}
+	capped := Decide(Input{Next: ready(), PrevStreak: MaxConsecutiveOptionalQuestions, CapExhausted: true})
+	if capped.OptionalStreak != MaxConsecutiveOptionalQuestions {
+		t.Errorf("streak when capped = %d", capped.OptionalStreak)
+	}
+	if Decide(Input{Next: slots.Set{}, PrevStreak: 2}).OptionalStreak != 0 {
+		t.Error("streak must reset while required fields are missing")
+	}
+}
+
+func TestFirstExplicitExactMatchIsNotACorrection(t *testing.T) {
+	buyerSet := false
+	rs := rec(slots.ExactMatchRequired, "false")
+	first := Decide(Input{Current: ready(), Next: func() slots.Set { s := ready(); s.ExactMatchRequired = &buyerSet; return s }(), Recorded: rs})
+	if first.Act == CorrectionApplied {
+		t.Error("setting ExactMatchRequired for the first time must not count as a correction")
+	}
+	cur := ready()
+	yes := true
+	cur.ExactMatchRequired = &yes
+	if Decide(Input{Current: cur, Next: ready(), Recorded: rs}).Act != CorrectionApplied {
+		t.Error("changing a buyer-set value is a correction")
 	}
 }

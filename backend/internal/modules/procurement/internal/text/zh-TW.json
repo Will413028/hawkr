@@ -163,6 +163,15 @@
       },
       "description": "必填未齊時的確認句：本輪記下的事實，facts 以分隔詞連接。"
     },
+    "reply.adjusted.warning": {
+      "message": "有幾個內容我調整過了：{items}",
+      "params": {
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "有欄位的值被調整後採用（例如過長被截斷）時的提示句，items 是「欄位：原因」以分隔詞連接。"
+    },
     "reply.approval.complete": {
       "message": "RFQ 快照已經確認好了。",
       "description": "詢價快照已確認、待核准時的完成句。"
@@ -172,8 +181,8 @@
       "description": "詢價快照已確認、待核准時的原因句。"
     },
     "reply.basics_ready.next": {
-      "message": "我現在就去幫你找找看合適的候選。",
-      "description": "需求齊備時的下一步句（沿用舊句，內容宣稱已開始搜尋，見開放問題）。"
+      "message": "需求已齊，可以開始找候選",
+      "description": "需求齊備時的下一步句：只說買家接下來可以做的事，不宣稱已開始搜尋。"
     },
     "reply.basics_ready.understood": {
       "message": "好的，需求已經齊全了。",

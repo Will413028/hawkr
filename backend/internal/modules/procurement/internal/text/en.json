@@ -90,6 +90,9 @@
     "reply.ack_required.recorded": {
       "message": "Noted: {facts}"
     },
+    "reply.adjusted.warning": {
+      "message": "Some of what you entered was adjusted: {items}"
+    },
     "reply.approval.complete": {
       "message": "The RFQ snapshot is confirmed."
     },
@@ -97,7 +100,7 @@
       "message": "It is sent to sellers only after you approve it."
     },
     "reply.basics_ready.next": {
-      "message": "I'll go look for suitable candidates for you now."
+      "message": "Your request is complete. You can start finding candidates."
     },
     "reply.basics_ready.understood": {
       "message": "Great, your request is complete."

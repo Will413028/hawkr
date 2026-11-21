@@ -11,9 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 對照測試的「舊」指舊 ai-service 的 domain/（dialogue_templates.go、recorded.go、pick_next_question.go、slots.go）。
-// 預期文字取自舊 testdata/dialogue_templates/*.json 的 populatedArgsBlocks，zh-TW 逐字相同。
-
 const zh, en = uitext.ZhTW, uitext.EN
 
 func b(k BlockKind, text string) Block { return Block{k, text} }
@@ -23,56 +20,55 @@ func TestRenderParity(t *testing.T) {
 	packaging := planner.BuildFor(slots.Packaging, slots.Set{})
 	cases := []struct {
 		name string
-		src  string
 		plan planner.Plan
 		args Args
 		want []Block
 	}{
-		{"ack and ask required, no facts", "testdata/dialogue_templates/ack_and_ask_required.json (emptyArgsBlocks)",
+		{"ack and ask required, no facts",
 			planner.Plan{Act: planner.AckAndAskRequired}, Args{},
 			[]Block{b(Understood, "已收到你的訊息。")}},
-		{"ack and ask required, with facts and missing", "testdata/dialogue_templates/ack_and_ask_required.json (populatedArgsBlocks)",
+		{"ack and ask required, with facts and missing",
 			planner.Plan{Act: planner.AckAndAskRequired, Salient: []slots.Recorded{{Key: slots.Item, Value: "寶島梨"}}},
 			Args{Missing: []model.SlotKey{slots.DeliveryCity, slots.Quantity}},
 			[]Block{b(Understood, "已記錄：品項：寶島梨"), b(NextStep, "還想請你補充：配送城市、數量")}},
-		{"ack and ask optional uses the question prompt", "testdata/dialogue_templates/ack_and_ask_optional.json; dialogue_templates_test.go:55",
+		{"ack and ask optional uses the question prompt",
 			planner.Plan{Act: planner.AckAndAskOptional, Question: packaging}, Args{},
 			[]Block{b(Understood, "好的，主要資訊都到齊了。"), b(NextStep, "包裝上有什麼需求嗎？")}},
-		{"correction applied", "testdata/dialogue_templates/correction_applied.json; dialogue_templates_test.go:64",
+		{"correction applied",
 			planner.Plan{Act: planner.CorrectionApplied, Salient: []slots.Recorded{{Key: slots.Quantity, Value: "50"}}}, Args{},
 			[]Block{b(Understood, "已經幫你更新：數量：50")}},
-		{"input rejected", "testdata/dialogue_templates/input_rejected.json; dialogue_templates_test.go:73",
+		{"input rejected",
 			planner.Plan{Act: planner.InputRejected}, Args{Rejected: []slots.Rejection{{Key: slots.DeliveryCity, Reason: slots.ReasonCityUnrecognized}}},
 			[]Block{b(Warning, "有幾個內容我沒辦法直接採用：配送城市：不是可辨識的縣市名稱"), b(NextStep, "麻煩再確認一下。")}},
-		{"extraction degraded", "testdata/dialogue_templates/extraction_degraded.json",
+		{"extraction degraded",
 			planner.Plan{Act: planner.ExtractionDegraded}, Args{},
 			[]Block{b(Warning, "需求解析暫時無法使用。"), b(Context, "已保留你目前的需求內容，可以繼續補充或稍後再試。")}},
-		{"request basics ready", "testdata/dialogue_templates/request_basics_ready.json",
+		{"request basics ready",
 			planner.Plan{Act: planner.RequestBasicsReady}, Args{},
-			[]Block{b(Understood, "好的，需求已經齊全了。"), b(NextStep, "我現在就去幫你找找看合適的候選。")}},
-		{"price preview available", "testdata/dialogue_templates/price_preview_available.json",
+			[]Block{b(Understood, "好的，需求已經齊全了。"), b(NextStep, "需求已齊，可以開始找候選")}},
+		{"price preview available",
 			planner.Plan{Act: planner.PricePreviewAvailable}, Args{},
 			[]Block{b(Context, "已經有市場參考價可以看了。"), b(NextStep, "要不要先確認一下希望詢價區間？")}},
-		{"rfq reconfirm required", "testdata/dialogue_templates/rfq_reconfirm_required.json",
+		{"rfq reconfirm required",
 			planner.Plan{Act: planner.RfqReconfirmRequired}, Args{},
 			[]Block{b(Warning, "需求內容有更新，之前確認的 RFQ 快照已經過期。"), b(NextStep, "需要重新確認一次。")}},
-		{"publication approval required", "testdata/dialogue_templates/publication_approval_required.json",
+		{"publication approval required",
 			planner.Plan{Act: planner.PublicationApprovalRequired}, Args{},
 			[]Block{b(Complete, "RFQ 快照已經確認好了。"), b(Rationale, "等你核准後才會正式送出給賣家。")}},
-		{"item needs disambiguation uses the question prompt", "testdata/dialogue_templates/item_needs_disambiguation.json; dialogue_templates_test.go:137",
+		{"item needs disambiguation uses the question prompt",
 			planner.Plan{Act: planner.ItemNeedsDisambiguation, Question: disamb}, Args{},
 			[]Block{b(NextStep, "找到幾個相符的品項，麻煩選一下你要的是哪一個：")}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := Render(zh, c.plan, c.args); !reflect.DeepEqual(got, c.want) {
-				t.Errorf("(%s)\n got %v\nwant %v", c.src, got, c.want)
+				t.Errorf("\n got %v\nwant %v", got, c.want)
 			}
 		})
 	}
 }
 
-// 舊 dialogue_templates_test.go:10：每個 act 在每個語系都有段落，段落有種類與文字。
+// 每個 act 在每個語系都有段落，段落有種類與文字。
 func TestEveryActRendersInEveryLocale(t *testing.T) {
 	q := planner.BuildFor(slots.Packaging, slots.Set{})
 	for _, l := range []uitext.Locale{zh, en} {
@@ -106,7 +102,7 @@ func TestRenderEnglishIsNotChinese(t *testing.T) {
 	}
 }
 
-func TestTextFallbackJoinsWithSpace(t *testing.T) { // dialogue_templates_test.go:125,133
+func TestTextFallbackJoinsWithSpace(t *testing.T) {
 	got := TextFallback([]Block{b(Understood, "已收到你的需求。"), b(NextStep, "還想請你補充：配送城市。")})
 	if got != "已收到你的需求。 還想請你補充：配送城市。" {
 		t.Errorf("got %q", got)
@@ -116,14 +112,13 @@ func TestTextFallbackJoinsWithSpace(t *testing.T) { // dialogue_templates_test.g
 	}
 }
 
-// 舊 slots.go 的拒絕原因字串（SlotLabels 在 recorded.go:393；原因在 slots.go:131-221、normalize.go:368）。
-func TestRejectionReasonsMatchOldTextInZhTW(t *testing.T) {
+func TestRejectionReasonsInZhTW(t *testing.T) {
 	want := map[slots.Reason]string{
 		slots.ReasonEmpty:            "空值，未採用",
 		slots.ReasonTruncated:        "超過 200 字，已截斷",
 		slots.ReasonQuantityRange:    "數量需介於 1 與 1000000 之間",
 		slots.ReasonBudgetRange:      "單價預算需介於 1 與 10000000 元之間",
-		slots.ReasonUnitNotAllowed:   "單位不在允許清單內：KG/CATTY/GRAM",
+		slots.ReasonUnitNotAllowed:   "單位不在允許清單內：公斤、台斤、公克",
 		slots.ReasonCityUnrecognized: "不是可辨識的縣市名稱",
 		slots.ReasonDateFormat:       "日期格式需為 YYYY-MM-DD",
 		slots.ReasonDateMissingYear:  "缺少西元年份，請補上年份（例如 2026-08-20）",
@@ -149,7 +144,7 @@ func TestRejectionReasonsMatchOldTextInZhTW(t *testing.T) {
 	}
 }
 
-func TestSlotLabelsMatchOldTable(t *testing.T) { // recorded.go:393
+func TestSlotLabelsInZhTW(t *testing.T) {
 	want := map[model.SlotKey]string{
 		slots.Item: "品項", slots.ItemResolution: "品項分類", slots.Quantity: "數量", slots.Unit: "單位", slots.Packaging: "包裝",
 		slots.BudgetPerUnit: "單價預算", slots.DeliveryCity: "配送城市", slots.DeliveryDate: "到貨日期", slots.ExactMatchRequired: "是否需完全相符",
@@ -164,7 +159,7 @@ func TestSlotLabelsMatchOldTable(t *testing.T) { // recorded.go:393
 	}
 }
 
-func TestRecordedValueRendersBooleans(t *testing.T) { // recorded.go:496
+func TestRecordedValueRendersBooleans(t *testing.T) {
 	if got := RecordedValue(zh, slots.Recorded{Key: slots.ExactMatchRequired, Value: "true"}); got != "是" {
 		t.Errorf("true = %q", got)
 	}
@@ -176,7 +171,7 @@ func TestRecordedValueRendersBooleans(t *testing.T) { // recorded.go:496
 	}
 }
 
-// 問題卡的文字（pick_next_question.go:62 SlotPrompts、:75 SlotOptions、:235-243 消歧選項）。
+// 問題卡的文字。
 func TestQuestionTextParity(t *testing.T) {
 	prompts := map[model.SlotKey]string{
 		slots.Item: "這次想採購什麼品項？", slots.DeliveryCity: "要送到哪個城市呢？", slots.Packaging: "包裝上有什麼需求嗎？",
@@ -221,3 +216,51 @@ func TestQuestionTextParity(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestAdjustedValueWarnsInsideTheNormalAct(t *testing.T) {
+	plan := planner.Plan{Act: planner.RequestBasicsReady, Adjusted: []slots.Rejection{{Key: slots.Item, Reason: slots.ReasonTruncated}}}
+	got := Render(zh, plan, Args{Rejected: plan.Adjusted})
+	want := []Block{
+		b(Understood, "好的，需求已經齊全了。"), b(NextStep, "需求已齊，可以開始找候選"),
+		b(Warning, "有幾個內容我調整過了：品項：超過 200 字，已截斷"),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+	rejected := planner.Plan{Act: planner.InputRejected, Adjusted: plan.Adjusted}
+	args := Args{Rejected: []slots.Rejection{{Key: slots.Item, Reason: slots.ReasonTruncated}, {Key: slots.Unit, Reason: slots.ReasonCityUnrecognized}}}
+	blocks := Render(zh, rejected, args)
+	if strings.Contains(blocks[0].Text, "截斷") {
+		t.Errorf("the rejection list must not repeat the adjustment: %q", blocks[0].Text)
+	}
+}
+
+func TestCorrectionCarriesTheNextStep(t *testing.T) {
+	salient := []slots.Recorded{{Key: slots.Item, Value: "富士蘋果"}}
+	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 1, Label: "蘋果"}})
+	got := Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient, Question: disamb}, Args{})
+	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "找到幾個相符的品項，麻煩選一下你要的是哪一個：" {
+		t.Errorf("disambiguation: %v", got)
+	}
+	got = Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient}, Args{Missing: []model.SlotKey{slots.DeliveryCity, slots.Unit}})
+	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "還想請你補充：配送城市、單位" {
+		t.Errorf("missing required: %v", got)
+	}
+	got = Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient}, Args{})
+	if len(got) != 1 {
+		t.Errorf("nothing pending: %v", got)
+	}
+}
+
+func TestUnitValuesAreLocalized(t *testing.T) {
+	if got := RecordedValue(zh, slots.Recorded{Key: slots.Unit, Value: "CATTY"}); got != "台斤" {
+		t.Errorf("zh recorded unit = %q", got)
+	}
+	if got := RecordedValue(en, slots.Recorded{Key: slots.Unit, Value: "KG"}); strings.Contains(got, "KG") || got == "" {
+		t.Errorf("en recorded unit = %q, want the localized label", got)
+	}
+	rej := slots.Rejection{Key: slots.Unit, Reason: slots.ReasonUnitNotAllowed}
+	if got := RejectionReason(en, rej); strings.ContainsAny(got, "/") || strings.Contains(got, "CATTY") {
+		t.Errorf("en allowed units = %q", got)
+	}
+}

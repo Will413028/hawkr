@@ -62,6 +62,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
+	case "procurement.RejectionReason":
+		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.KYCApplication.decide_time":

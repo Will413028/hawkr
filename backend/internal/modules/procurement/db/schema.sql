@@ -94,6 +94,8 @@ CREATE TABLE procurement.turns (
     assistant_reply TEXT NOT NULL DEFAULT '',
     steps JSONB NOT NULL DEFAULT '[]',
     recorded_this_turn JSONB NOT NULL DEFAULT '[]',
+    optional_streak INTEGER NOT NULL DEFAULT 0,
+    skipped_slots TEXT[] NOT NULL DEFAULT '{}',
     client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT turns_buyer_check CHECK (buyer_id > 0),
@@ -101,7 +103,9 @@ CREATE TABLE procurement.turns (
     CONSTRAINT turns_buyer_message_check CHECK (char_length(buyer_message) <= 2000 AND buyer_message !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT turns_assistant_reply_check CHECK (char_length(assistant_reply) <= 4000 AND assistant_reply !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT turns_steps_check CHECK (jsonb_typeof(steps) = 'array'),
-    CONSTRAINT turns_recorded_check CHECK (jsonb_typeof(recorded_this_turn) = 'array')
+    CONSTRAINT turns_recorded_check CHECK (jsonb_typeof(recorded_this_turn) = 'array'),
+    CONSTRAINT turns_optional_streak_check CHECK (optional_streak >= 0),
+    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['QUANTITY', 'DELIVERY_DATE', 'PACKAGING', 'BUDGET_PER_UNIT'])
 );
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);

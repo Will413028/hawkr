@@ -320,6 +320,20 @@ func ReplyAckRequiredRecorded(l uitext.Locale, a ReplyAckRequiredRecordedArgs) u
 	return uitext.Message{Text: "已記錄：" + a.Facts, Locale: uitext.ZhTW}
 }
 
+// ReplyAdjustedWarningArgs 是 ReplyAdjustedWarning 的參數。
+type ReplyAdjustedWarningArgs struct {
+	Items string
+}
+
+// ReplyAdjustedWarning 是模組句子 reply.adjusted.warning；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReplyAdjustedWarning(l uitext.Locale, a ReplyAdjustedWarningArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Some of what you entered was adjusted: " + a.Items, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有幾個內容我調整過了：" + a.Items, Locale: uitext.ZhTW}
+}
+
 // ReplyApprovalComplete 是模組句子 reply.approval.complete；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplyApprovalComplete(l uitext.Locale) uitext.Message {
 	switch l {
@@ -342,9 +356,9 @@ func ReplyApprovalRationale(l uitext.Locale) uitext.Message {
 func ReplyBasicsReadyNext(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "I'll go look for suitable candidates for you now.", Locale: uitext.EN}
+		return uitext.Message{Text: "Your request is complete. You can start finding candidates.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "我現在就去幫你找找看合適的候選。", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "需求已齊，可以開始找候選", Locale: uitext.ZhTW}
 }
 
 // ReplyBasicsReadyUnderstood 是模組句子 reply.basics_ready.understood；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

@@ -1,8 +1,6 @@
 package reply
 
 import (
-	"strings"
-
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
@@ -35,15 +33,39 @@ func SlotLabel(l uitext.Locale, key model.SlotKey) string {
 	return string(key)
 }
 
-// RecordedValue 是本輪記下的欄位值的顯示字串；是否欄位依語系轉成「是／否」。
+// RecordedValue 是本輪記下的欄位值的顯示字串；是否欄位依語系轉成「是／否」，單位代碼換成該語系的單位名稱。
 func RecordedValue(l uitext.Locale, r slots.Recorded) string {
-	if r.Key == slots.ExactMatchRequired {
+	switch r.Key {
+	case slots.ExactMatchRequired:
 		if r.Value == "true" {
 			return text.ValueYes(l).Text
 		}
 		return text.ValueNo(l).Text
+	case slots.Unit:
+		return unitLabel(l, r.Value)
 	}
 	return r.Value
+}
+
+// unitLabel 是單位代碼的顯示名稱；不認得的代碼原樣回傳，不讓買家看到空字串。
+func unitLabel(l uitext.Locale, code string) string {
+	switch code {
+	case "KG":
+		return text.UnitKg(l).Text
+	case "CATTY":
+		return text.UnitCatty(l).Text
+	case "GRAM":
+		return text.UnitGram(l).Text
+	}
+	return code
+}
+
+func allowedUnits(l uitext.Locale) string {
+	labels := make([]string, 0, len(slots.AllowedUnits))
+	for _, u := range slots.AllowedUnits {
+		labels = append(labels, unitLabel(l, u))
+	}
+	return join(l, labels)
 }
 
 // RejectionReason 是欄位被拒或被修正的原因文字。
@@ -58,7 +80,7 @@ func RejectionReason(l uitext.Locale, r slots.Rejection) string {
 	case slots.ReasonBudgetRange:
 		return text.RejectBudgetRange(l, text.RejectBudgetRangeArgs{Max: slots.MaxBudgetPerUnit}).Text
 	case slots.ReasonUnitNotAllowed:
-		return text.RejectUnitNotAllowed(l, text.RejectUnitNotAllowedArgs{Allowed: strings.Join(slots.AllowedUnits, "/")}).Text
+		return text.RejectUnitNotAllowed(l, text.RejectUnitNotAllowedArgs{Allowed: allowedUnits(l)}).Text
 	case slots.ReasonCityUnrecognized:
 		return text.RejectCityUnrecognized(l).Text
 	case slots.ReasonDateFormat:
@@ -143,14 +165,7 @@ func options(l uitext.Locale, in []planner.Option) []RenderedOption {
 func optionLabel(l uitext.Locale, o planner.Option) string {
 	switch o.Kind {
 	case planner.OptionUnit:
-		switch o.Value {
-		case "KG":
-			return text.UnitKg(l).Text
-		case "CATTY":
-			return text.UnitCatty(l).Text
-		case "GRAM":
-			return text.UnitGram(l).Text
-		}
+		return unitLabel(l, o.Value)
 	case planner.OptionOther:
 		return text.OptionOther(l).Text
 	case planner.OptionDescribe:

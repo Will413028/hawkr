@@ -38,6 +38,18 @@ type Args struct {
 
 // Render 依 act 選模板組出段落。act 是封閉集合，沒有「找不到模板」的退路：每個 act 都有測試窮舉。
 func Render(l uitext.Locale, p planner.Plan, a Args) []Block {
+	blocks := render(l, p, a)
+	if len(p.Adjusted) > 0 && p.Act != planner.ExtractionDegraded {
+		items := make([]string, 0, len(p.Adjusted))
+		for _, r := range p.Adjusted {
+			items = append(items, pair(l, SlotLabel(l, r.Key), RejectionReason(l, r)))
+		}
+		blocks = append(blocks, Block{Warning, text.ReplyAdjustedWarning(l, text.ReplyAdjustedWarningArgs{Items: join(l, items)}).Text})
+	}
+	return blocks
+}
+
+func render(l uitext.Locale, p planner.Plan, a Args) []Block {
 	switch p.Act {
 	case planner.AckAndAskRequired:
 		var blocks []Block
@@ -47,11 +59,7 @@ func Render(l uitext.Locale, p planner.Plan, a Args) []Block {
 			blocks = append(blocks, Block{Understood, text.ReplyAckRequiredReceived(l).Text})
 		}
 		if len(a.Missing) > 0 {
-			labels := make([]string, 0, len(a.Missing))
-			for _, k := range a.Missing {
-				labels = append(labels, SlotLabel(l, k))
-			}
-			blocks = append(blocks, Block{NextStep, text.ReplyAckRequiredMissing(l, text.ReplyAckRequiredMissingArgs{Missing: join(l, labels)}).Text})
+			blocks = append(blocks, Block{NextStep, text.ReplyAckRequiredMissing(l, text.ReplyAckRequiredMissingArgs{Missing: join(l, slotLabels(l, a.Missing))}).Text})
 		}
 		return blocks
 	case planner.AckAndAskOptional:
@@ -60,10 +68,17 @@ func Render(l uitext.Locale, p planner.Plan, a Args) []Block {
 			{NextStep, questionPrompt(l, p)},
 		}
 	case planner.CorrectionApplied:
-		return []Block{{Understood, text.ReplyCorrectionUpdated(l, text.ReplyCorrectionUpdatedArgs{Facts: join(l, facts(l, p.Salient))}).Text}}
+		blocks := []Block{{Understood, text.ReplyCorrectionUpdated(l, text.ReplyCorrectionUpdatedArgs{Facts: join(l, facts(l, p.Salient))}).Text}}
+		if step := nextStep(l, p, a); step != "" {
+			blocks = append(blocks, Block{NextStep, step})
+		}
+		return blocks
 	case planner.InputRejected:
-		items := make([]string, 0, len(a.Rejected))
+		var items []string
 		for _, r := range a.Rejected {
+			if r.Reason == slots.ReasonTruncated {
+				continue
+			}
 			items = append(items, pair(l, SlotLabel(l, r.Key), RejectionReason(l, r)))
 		}
 		return []Block{
@@ -108,6 +123,27 @@ func TextFallback(blocks []Block) string {
 		texts = append(texts, b.Text)
 	}
 	return strings.Join(texts, " ")
+}
+
+// nextStep 是更正之後仍待處理的下一步：品項消歧的問題、必填缺項、選填問題，依序取第一個有的。
+func nextStep(l uitext.Locale, p planner.Plan, a Args) string {
+	switch {
+	case p.Question != nil && p.Question.Slot == slots.ItemDisambiguation:
+		return questionPrompt(l, p)
+	case len(a.Missing) > 0:
+		return text.ReplyAckRequiredMissing(l, text.ReplyAckRequiredMissingArgs{Missing: join(l, slotLabels(l, a.Missing))}).Text
+	case p.Question != nil:
+		return questionPrompt(l, p)
+	}
+	return ""
+}
+
+func slotLabels(l uitext.Locale, keys []model.SlotKey) []string {
+	labels := make([]string, 0, len(keys))
+	for _, k := range keys {
+		labels = append(labels, SlotLabel(l, k))
+	}
+	return labels
 }
 
 func questionPrompt(l uitext.Locale, p planner.Plan) string {

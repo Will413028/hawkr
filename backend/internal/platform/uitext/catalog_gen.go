@@ -318,6 +318,70 @@ func (t Text) PaymentRequirementCollection(v string) (string, bool) {
 	return "", false
 }
 
+// ProcurementRejectionReason 是 procurement.RejectionReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ProcurementRejectionReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "EMPTY":
+			return "The content is empty", true
+		case "TRUNCATED":
+			return "Over the length limit, shortened", true
+		case "QUANTITY_RANGE":
+			return "The quantity is out of range", true
+		case "BUDGET_RANGE":
+			return "The budget per unit is out of range", true
+		case "UNIT_NOT_ALLOWED":
+			return "This unit is not supported", true
+		case "CITY_UNRECOGNIZED":
+			return "The city could not be recognized", true
+		case "DATE_FORMAT":
+			return "The date format is not valid", true
+		case "DATE_MISSING_YEAR":
+			return "The date is missing the year", true
+		case "DATE_PAST":
+			return "The date has already passed", true
+		case "DATE_TOO_FAR":
+			return "The date is too far ahead", true
+		case "RESOLUTION_NO_ITEM":
+			return "There is no item yet, so no item category can be set", true
+		case "RESOLUTION_NO_LABEL":
+			return "The item category has no name", true
+		case "RESOLUTION_UNKNOWN_KIND":
+			return "The way the item category was decided is unknown", true
+		}
+	}
+	switch v {
+	case "EMPTY":
+		return "內容是空的", true
+	case "TRUNCATED":
+		return "超過長度上限，已截斷", true
+	case "QUANTITY_RANGE":
+		return "數量不在可接受的範圍內", true
+	case "BUDGET_RANGE":
+		return "單價預算不在可接受的範圍內", true
+	case "UNIT_NOT_ALLOWED":
+		return "這個單位不支援", true
+	case "CITY_UNRECOGNIZED":
+		return "無法辨識這個縣市", true
+	case "DATE_FORMAT":
+		return "日期格式不正確", true
+	case "DATE_MISSING_YEAR":
+		return "日期缺少西元年份", true
+	case "DATE_PAST":
+		return "日期已經過了", true
+	case "DATE_TOO_FAR":
+		return "日期太久以後", true
+	case "RESOLUTION_NO_ITEM":
+		return "還沒有品項，無法指定品項分類", true
+	case "RESOLUTION_NO_LABEL":
+		return "品項分類沒有名稱", true
+	case "RESOLUTION_UNKNOWN_KIND":
+		return "品項分類的判定方式不明", true
+	}
+	return "", false
+}
+
 // SellerContentKind 是 seller.ContentKind 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerContentKind(v string) (string, bool) {
