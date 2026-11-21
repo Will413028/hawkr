@@ -32,7 +32,7 @@ func TestListMyReportsMergesTheRealModulesInterleavedOwnerOnly(t *testing.T) {
 	me, other := profile.BuyerID, s.newBuyer(t)
 
 	base := time.Now().UTC().Truncate(time.Microsecond).Add(-time.Hour)
-	categories := []policy.Category{policy.Fraud, policy.FoodSafety, policy.Harassment, policy.Spam}
+	categories := []policy.Category{policy.Fraud, policy.FoodSafety, policy.MisleadingInfo, policy.Other}
 	var want []string
 	for i := range 4 {
 		c, err := s.moderation.SubmitReport(ctx, moderation.SubmitInput{ReporterBuyerID: me, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: s.newBuyer(t)}, Category: policy.Spam})
