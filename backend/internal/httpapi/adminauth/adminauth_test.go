@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -65,7 +66,7 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 86 {
+	if got, want := len(declarations), methodCount(t); got != want || got != 88 {
 		t.Fatalf("declarations=%d methods=%d，預期 86", got, want)
 	}
 
@@ -329,6 +330,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		}
 	}
 	wantAudited := []string{
+		bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,

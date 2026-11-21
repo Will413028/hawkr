@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -62,6 +63,9 @@ const sessionReason = "回答「我是誰」與登出，對任何已通過驗證
 
 // declarations 是每個 admin 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應（Check 在啟動時檢查）。
 var declarations = map[string]declaration{
+	bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure:      requires(adminperm.BizcalendarHolidayCalendarImport, auditAudited),
+	bizcalendarv1alpha1connect.BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure: requires(adminperm.BizcalendarHolidayCoverageGet, auditReadOnly),
+
 	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure:        requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),
 	buyerv1alpha1connect.BuyerAdminServiceListMembershipPlansProcedure:  requires(adminperm.BuyerMembershipPlansList, auditReadOnly),
 	buyerv1alpha1connect.BuyerAdminServiceUpdateMembershipPlanProcedure: requires(adminperm.BuyerMembershipPlansUpdate, auditPending),
