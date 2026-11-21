@@ -406,7 +406,10 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
               - [x] 10f-1 賣家端的詢問（完成 2026-11-20：merge `b57d6953`、CI 修正 `bc73c693`，CI 全綠於 `bc73c693`；審查兩輪 8 項全修，文案 Will 2026-11-20 核准；R4；設計 `2026-09-29-a3-buyer-seller/step10f-1-design.md`，F1–F7 Will 2026-11-20）：seller 的詢問讀取與回覆 API（附件走機敏上傳與 `evidence_accesses` 擁有者檢查）、期限改從出現在賣家中心起算、website 賣家中心與 seller-app 畫面、admin 拿掉「賣家端畫面上線前請另外聯絡賣家」的句子。
               - 10f-2 前提改變（Will 2026-11-21，G1–G2；設計 `2026-09-29-a3-buyer-seller/step10f-2-design.md`）：R5 的同意勾選、聯絡方式快照、1919 說明只服務 FDA 轉報，ADR `2026-10-27-general-ecommerce-scope-cut` D3 已刪轉報，三項不做；10d D4 的檢舉表單移到 10f 後沒有步驟承接，由 10f-2b 接手；匿名的 `SubmitFoodSafetyReport` 刪除（一般電商登入才能檢舉）。
               - [x] 10f-2a 刪除匿名食安入口（完成 2026-11-21：`b6ebd5a8`、修正 `ae0c79ee`，CI 除 repo hygiene 外全綠於 `ae0c79ee`；repo hygiene 失敗的 9 處文件路徑都在 A6 計畫目錄，`492151cd` 起即失敗，不屬本步；diff 審查無缺陷，`/code-review` 6 項 nit 修 5、空案件 1 項不修（`cases` 允許 `NO_REPORTS`、未上線）；未跑：拿掉 `reporter_buyer_id` NOT NULL 的 mutation，需資料庫）：契約、單體、`seller.reports` 的匿名聯絡欄位與清除 job、admin 的匿名檢舉人顯示、ADR 修訂。
-              - [ ] 10f-2b 檢舉表單：website 與 buyer-app 店面、商品頁「⋯ → 檢舉」接 `CreateReport`；版面與文案先取得 Will 同意。
+              - [x] 10f-2b 檢舉表單：website 與 buyer-app 店面、商品頁「⋯ → 檢舉」接 `CreateReport`；版面與文案先取得 Will 同意。（Will 2026-11-21 同意版面；commits `9377f25e`、`54a30f75`、`18e27811`、`0238b2e6`）
+                - 已跑：website lint、vitest 3191 項；buyer-app analyze、flutter test 1680 項；兩端 red-proof（把 `PLATFORM_ABUSE` 加回清單）killed；`/code-review` 與兩輪 diff 審查，findings 13（blocking 1）：fixed 11、recorded 2（nit：website 選單在 `useSellerSelf` 載入前會短暫顯示於自己的店；website `notice` 全空白未 trim）。未跑：website e2e（推給 CI）。
+                - 成功句只留「已收到檢舉」：「我的檢舉」頁目前只列社群檢舉；10f-3 把店家檢舉併入後再加回「可在「我的檢舉」查看」。
+                - 延後：buyer-app 店面頁在自己的店仍顯示「⋯ → 檢舉」（伺服器擋下並顯示錯誤），`GetStoreResponse` 沒有擁有者欄位；觸發條件：店家 API 加擁有者欄位，或 10f-3 動到店面頁時。
               - [ ] 10f-3 我的通報與補充說明（R7）：讀取時組裝 seller 與 moderation 兩種通報、通報人補充說明的 API、buyer-app 既有頁擴充、website 新頁。
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
               - [ ] 10f-5 權利人通報（R8）：不必登入的表單、著作權法定流程（補正、回復通知、恢復）、商標與專利的平台流程；開工前先出決定簡報。
