@@ -1,6 +1,7 @@
 import {
 	CaseAction,
 	CaseDecision,
+	type CaseReport,
 	CaseState,
 } from "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
@@ -104,6 +105,17 @@ export function actionsFor(kind: ReportTargetKind): readonly CaseAction[] {
 			];
 		case ReportTargetKind.BUYER:
 			return [CaseAction.WARN, CaseAction.BAN];
+		case ReportTargetKind.REVIEW:
+			return [CaseAction.HIDE, CaseAction.WARN, CaseAction.BAN];
+		case ReportTargetKind.CHAT_MESSAGE:
+			return [
+				CaseAction.HIDE,
+				CaseAction.WARN,
+				CaseAction.BAN,
+				CaseAction.TAKEDOWN,
+			];
+		case ReportTargetKind.REVIEW_REPLY:
+			return [CaseAction.TAKEDOWN];
 		default:
 			return [];
 	}
@@ -114,4 +126,16 @@ export function categoriesFor(action: CaseAction): readonly PolicyCategory[] {
 	return action === CaseAction.TAKEDOWN
 		? CONTENT_TAKEDOWN_CATEGORIES
 		: COMMUNITY_ASSESSABLE_CATEGORIES;
+}
+
+/** 檢舉人：買家或店家（`CaseReport.reporter` 恰好設一個）；兩者都沒有（不認得的值）顯示「未知」。 */
+export function reporterText(report: CaseReport): string {
+	switch (report.reporter.case) {
+		case "reporterBuyerId":
+			return `檢舉人（買家）${report.reporter.value}`;
+		case "reporterStoreId":
+			return `檢舉人（店家）${report.reporter.value}`;
+		default:
+			return `檢舉人 ${unknownText()}`;
+	}
 }

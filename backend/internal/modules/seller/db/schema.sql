@@ -713,7 +713,7 @@ CREATE TABLE seller.measure_findings (
 );
 CREATE INDEX measure_findings_violation ON seller.measure_findings (violation_id);
 
--- 內容下架措施（kind = 'CONTENT_TAKEDOWN'）的對象：一個措施可以對應多則內容（content_kind 是 POST、COMMENT 或 FORUM_ENTRY，content_id 是 social 的列）。
+-- 內容下架措施（kind = 'CONTENT_TAKEDOWN'）的對象：一個措施可以對應多則內容（content_kind 是 POST、COMMENT、FORUM_ENTRY、CHAT_MESSAGE 或 REVIEW_REPLY，content_id 依種類是 social、im、review 的列）。
 -- content_id 是社群內容的不透明外部參照（seller 不讀 social，不建跨 schema FK）。只在建立措施的 transaction 寫入，建立後不可修訂（要改就撤銷再建立）；
 -- 只有內容下架措施有列（模組保證）。pub_content_takedowns 發布此刻生效中措施的對象。
 CREATE TABLE seller.measure_contents (

@@ -278,6 +278,7 @@ WHERE r.id = $3
   AND r.store_id = $4
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'REVIEW_REPLY' AND td.content_id = r.id)
 RETURNING r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at
 `
 
@@ -288,7 +289,7 @@ type ReplyToReviewParams struct {
 	StoreID int64
 }
 
-// 店家回覆（可覆蓋）：擁有權與公開可讀都在 WHERE，0 列由呼叫端補查分流（不存在、不是這家店、不可回覆）。
+// 店家回覆（可覆蓋）：擁有權、公開可讀與回覆沒被內容下架（生效中的 REVIEW_REPLY 措施，先鎖評價列，與建立措施序列化）都在 WHERE，0 列由呼叫端補查分流（不存在、不是這家店、不可回覆）。
 func (q *Queries) ReplyToReview(ctx context.Context, arg ReplyToReviewParams) (ReviewReview, error) {
 	row := q.db.QueryRow(ctx, replyToReview,
 		arg.Content,

@@ -78,7 +78,14 @@ func New(d Deps) *Service { return &Service{d: d} }
 func Validate(ctx context.Context, in model.SubmitInput) (model.SubmitInput, error) {
 	l := uitext.LocaleFrom(ctx)
 	if (in.ReporterBuyerID > 0) == (in.ReporterStoreID > 0) || in.ReporterBuyerID < 0 || in.ReporterStoreID < 0 {
-		return in, apperr.InvalidInputOn([]string{"ReporterBuyerID"}, "%s", moderationtext.ReportReporterRequired(l))
+		fields := []string{"ReporterBuyerID", "ReporterStoreID"}
+		switch {
+		case in.ReporterBuyerID < 0 && in.ReporterStoreID <= 0:
+			fields = fields[:1]
+		case in.ReporterStoreID < 0 && in.ReporterBuyerID <= 0:
+			fields = fields[1:]
+		}
+		return in, apperr.InvalidInputOn(fields, "%s", moderationtext.ReportReporterRequired(l))
 	}
 	if !in.Target.Validate() || (in.ReporterStoreID > 0 && in.Target.Kind != model.TargetChatMessage) {
 		return in, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportTargetInvalid(l))

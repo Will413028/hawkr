@@ -1084,9 +1084,14 @@ func (x *ChatContextMessage) GetErased() bool {
 type CaseReport struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// 檢舉人（買家 ID）。
-	ReporterId string                   `protobuf:"bytes,2,opt,name=reporter_id,json=reporterId,proto3" json:"reporter_id,omitempty"`
-	Category   v1alpha11.PolicyCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
+	// 檢舉人：買家或店家，恰好設一個（店家只會檢舉店家聊天訊息）。
+	//
+	// Types that are valid to be assigned to Reporter:
+	//
+	//	*CaseReport_ReporterBuyerId
+	//	*CaseReport_ReporterStoreId
+	Reporter isCaseReport_Reporter    `protobuf_oneof:"reporter"`
+	Category v1alpha11.PolicyCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 送出時的說明；沒有或已超過保留期被清除時是空字串。
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// 結果由案件的決定推導：進行中是 PENDING。
@@ -1133,9 +1138,27 @@ func (x *CaseReport) GetId() string {
 	return ""
 }
 
-func (x *CaseReport) GetReporterId() string {
+func (x *CaseReport) GetReporter() isCaseReport_Reporter {
 	if x != nil {
-		return x.ReporterId
+		return x.Reporter
+	}
+	return nil
+}
+
+func (x *CaseReport) GetReporterBuyerId() string {
+	if x != nil {
+		if x, ok := x.Reporter.(*CaseReport_ReporterBuyerId); ok {
+			return x.ReporterBuyerId
+		}
+	}
+	return ""
+}
+
+func (x *CaseReport) GetReporterStoreId() string {
+	if x != nil {
+		if x, ok := x.Reporter.(*CaseReport_ReporterStoreId); ok {
+			return x.ReporterStoreId
+		}
 	}
 	return ""
 }
@@ -1167,6 +1190,24 @@ func (x *CaseReport) GetCreateTime() *timestamppb.Timestamp {
 	}
 	return nil
 }
+
+type isCaseReport_Reporter interface {
+	isCaseReport_Reporter()
+}
+
+type CaseReport_ReporterBuyerId struct {
+	// 買家 ID（過渡期的十進位整數字串）。
+	ReporterBuyerId string `protobuf:"bytes,2,opt,name=reporter_buyer_id,json=reporterBuyerId,proto3,oneof"`
+}
+
+type CaseReport_ReporterStoreId struct {
+	// 店家 ID（過渡期的十進位整數字串）。
+	ReporterStoreId string `protobuf:"bytes,7,opt,name=reporter_store_id,json=reporterStoreId,proto3,oneof"`
+}
+
+func (*CaseReport_ReporterBuyerId) isCaseReport_Reporter() {}
+
+func (*CaseReport_ReporterStoreId) isCaseReport_Reporter() {}
 
 type ListCasesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1743,17 +1784,19 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\tasset_ids\x18\x06 \x03(\tB\x03\xe0A\x03R\bassetIds\x12<\n" +
 	"\tsend_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\bsendTime\x12\x1b\n" +
 	"\x06hidden\x18\b \x01(\bB\x03\xe0A\x03R\x06hidden\x12\x1b\n" +
-	"\x06erased\x18\t \x01(\bB\x03\xe0A\x03R\x06erased\"\xa8\x02\n" +
+	"\x06erased\x18\t \x01(\bB\x03\xe0A\x03R\x06erased\"\xef\x02\n" +
 	"\n" +
 	"CaseReport\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12\x1f\n" +
-	"\vreporter_id\x18\x02 \x01(\tR\n" +
-	"reporterId\x12A\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12,\n" +
+	"\x11reporter_buyer_id\x18\x02 \x01(\tH\x00R\x0freporterBuyerId\x12,\n" +
+	"\x11reporter_store_id\x18\a \x01(\tH\x00R\x0freporterStoreId\x12A\n" +
 	"\bcategory\x18\x03 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12B\n" +
 	"\aoutcome\x18\x05 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome\x12;\n" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"createTime\"\xde\x01\n" +
+	"createTimeB\n" +
+	"\n" +
+	"\breporter\"\xde\x01\n" +
 	"\x10ListCasesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -1924,6 +1967,10 @@ func file_hawkr_admin_moderation_v1alpha1_moderation_proto_init() {
 	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5].OneofWrappers = []any{}
 	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6].OneofWrappers = []any{}
 	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[7].OneofWrappers = []any{}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[9].OneofWrappers = []any{
+		(*CaseReport_ReporterBuyerId)(nil),
+		(*CaseReport_ReporterStoreId)(nil),
+	}
 	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

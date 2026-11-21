@@ -122,6 +122,31 @@ func TestReviewReplyTakedownHidesOnlyTheReply(t *testing.T) {
 	}
 }
 
+// 回覆被下架期間店家不能覆蓋回覆（比照社群：被隱藏的留言不能編輯）；撤銷後可再回覆。
+func TestReplyIsRejectedWhileItsTakedownIsEnforced(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID, _ := f.exposableStore(t)
+	author := f.buyerProfile(t)
+	reporter, _ := f.newBuyer(t)
+	r := f.reviewBy(t, author, storeID, 3, "普通")
+	st := mustV[seller.Store](t)(f.sellerRd.Store(ctx, storeID))
+	mustV[review.Review](t)(f.review.Reply(ctx, review.ReplyInput{Store: st, ReviewID: r.ID, Content: "不實的回覆"}))
+	res := f.submit(t, reporter, Target{Kind: TargetReviewReply, ContentID: r.ID}, policy.Harassment)
+	d := mustV[CaseDetail](t)(f.module.DecideCase(ctx, f.takedownInput(res.Case)))
+
+	_, err := f.review.Reply(ctx, review.ReplyInput{Store: st, ReviewID: r.ID, Content: "換個說法"})
+	if kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("下架期間不能覆蓋回覆：%v", err)
+	}
+
+	f.revokeMeasure(t, *d.Case.MeasureID)
+	if got := mustV[review.Review](t)(f.review.Reply(ctx, review.ReplyInput{Store: st, ReviewID: r.ID, Content: "換個說法"})); got.Reply == nil || got.Reply.Content != "換個說法" {
+		t.Fatalf("撤銷後可再回覆：%+v", got.Reply)
+	}
+}
+
 // 沒有回覆的評價不能被檢舉回覆；買家與評價作者的 WARN、HIDE 不適用於回覆。
 func TestReviewReplyReportRequiresAReplyAndRejectsBuyerActions(t *testing.T) {
 	t.Parallel()

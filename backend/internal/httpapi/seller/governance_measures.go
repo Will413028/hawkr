@@ -340,7 +340,7 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 				return nil, err
 			}
 			kind := rpc.EnumFromProto[model.ContentKind](ref.GetKind())
-			if !contentkind.Kind(kind).Social() {
+			if k := contentkind.Kind(kind); k.Valid() && !k.Social() {
 				return nil, apperr.InvalidInputOn([]string{apperr.IndexedField("content_takedown.contents", i) + ".kind"}, "聊天訊息與評價回覆的下架只經檢舉案件建立")
 			}
 			refs = append(refs, model.ContentRef{Kind: kind, ID: id})

@@ -6,7 +6,6 @@ package review
 import (
 	"context"
 	"embed"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"io/fs"
 	"log/slog"
 	"time"
@@ -21,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/write"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"

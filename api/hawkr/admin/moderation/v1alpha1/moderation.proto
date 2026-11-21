@@ -191,8 +191,13 @@ message ChatContextMessage {
 // CaseReport 是案件裡的一筆檢舉。
 message CaseReport {
   string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 檢舉人（買家 ID）。
-  string reporter_id = 2;
+  // 檢舉人：買家或店家，恰好設一個（店家只會檢舉店家聊天訊息）。
+  oneof reporter {
+    // 買家 ID（過渡期的十進位整數字串）。
+    string reporter_buyer_id = 2;
+    // 店家 ID（過渡期的十進位整數字串）。
+    string reporter_store_id = 7;
+  }
   hawkr.common.v1alpha1.PolicyCategory category = 3;
   // 送出時的說明；沒有或已超過保留期被清除時是空字串。
   string description = 4;

@@ -2,6 +2,8 @@ package report
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -30,6 +32,33 @@ func TestValidateAcceptsExactlyTheCommunityReporterCategories(t *testing.T) {
 	in.Category = ""
 	if _, err := Validate(context.Background(), in); err == nil {
 		t.Error("空的類別不能通過")
+	}
+}
+
+func TestValidateReporterErrorPointsAtTheOffendingField(t *testing.T) {
+	for name, tt := range map[string]struct {
+		buyer, store int64
+		want         []string
+	}{
+		"沒有檢舉人":   {0, 0, []string{"ReporterBuyerID", "ReporterStoreID"}},
+		"兩者都有":    {1, 3, []string{"ReporterBuyerID", "ReporterStoreID"}},
+		"負的買家檢舉人": {-1, 0, []string{"ReporterBuyerID"}},
+		"負的店家檢舉人": {0, -3, []string{"ReporterStoreID"}},
+	} {
+		in := input()
+		in.ReporterBuyerID, in.ReporterStoreID = tt.buyer, tt.store
+		_, err := Validate(context.Background(), in)
+		var ae *apperr.Error
+		if !errors.As(err, &ae) {
+			t.Fatalf("%s：%v", name, err)
+		}
+		var got []string
+		for _, v := range ae.FieldViolations() {
+			got = append(got, v.Field)
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("%s：欄位 %v，要 %v", name, got, tt.want)
+		}
 	}
 }
 

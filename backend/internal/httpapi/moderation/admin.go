@@ -169,11 +169,15 @@ func reportsPB(reports []moderation.Report) []*adminpb.CaseReport {
 	for i, r := range reports {
 		out[i] = &adminpb.CaseReport{
 			Id:          r.ID.String(),
-			ReporterId:  rpc.FormatID(r.ReporterBuyerID),
 			Category:    rpc.EnumToProto[commonpb.PolicyCategory](r.Category),
 			Description: r.Description,
 			Outcome:     rpc.EnumToProto[pb.ReportOutcome](r.Outcome),
 			CreateTime:  timestamppb.New(r.CreatedAt),
+		}
+		if r.ReporterStoreID > 0 {
+			out[i].Reporter = &adminpb.CaseReport_ReporterStoreId{ReporterStoreId: rpc.FormatID(r.ReporterStoreID)}
+		} else {
+			out[i].Reporter = &adminpb.CaseReport_ReporterBuyerId{ReporterBuyerId: rpc.FormatID(r.ReporterBuyerID)}
 		}
 	}
 	return out

@@ -20,10 +20,12 @@ moderation `Decide` → `apply`：作者取自案件快照或 social `ContentOwn
 | W3 | `reports`、`report_requests`、`reporter_daily_counts` 加 `reporter_store_id`＋恰好一欄 CHECK，去重鍵與冪等鍵與每日計數依檢舉人種類各一份（`UNIQUE (case_id, reporter_store_id)`、`report_requests_store_key`、`reporter_daily_counts_store_key`，額度 20、買家與店家各自計數）；`SubmitInput.ReporterStoreID`（與 `ReporterBuyerID` 恰好一個為正）；店家只能檢舉 CHAT_MESSAGE，而且要通過 `im.Party.Authorize`（`CapChatRead`）與 `MessageForReport` 的對話方核對；本人核對改以帳號比（`reporterAccount`） | 已做；Connect handler 接線（App 的檢舉 proto 與 session 解出店家）是 A6-5 |
 
 ## 3. 鎖順序
-seller（建立措施）→ im(13)／review(12) 訂閱者鎖內容列 → moderation(24)；與 §5.2 一致【推】。併發 integration test `TestTakedownRacesWithEraseAndSendWithoutDeadlock`、`TestReplyTakedownRacesWithReviewHide`（`takedown_chat_review_integration_test.go`）：已寫、本機不跑，交 CI。
+seller（建立措施）→ im(13)／review(12) 訂閱者鎖內容列 → moderation(24)；與 §5.2 一致【推】。併發 integration test `TestTakedownRacesWithEraseAndSendWithoutDeadlock`、`TestReplyTakedownRacesWithReviewHideWithoutDeadlock`（`takedown_chat_review_integration_test.go`）：已寫、本機不跑，交 CI。
 
 ## 4. 讀取述詞【量】
 `pub_content_takedowns()` 是 SQL 函式，社群用複本是因為量測；im／review 依 A6-D21 不建複本。效能未量測（改動僅 EXISTS 子查詢，列表頁每頁至多 max_rows 則）。
+- 預期的索引使用【推】：`pub_content_takedowns()` 加了 `c.measure_status = 'ENFORCED'`（與 `m.status` 同值，複合外鍵同步，回傳的列不變；migration `20261121120000_seller_pub_content_takedowns_enforced_filter.sql`）後，函式是單一 SELECT 的 SQL 函式、可內嵌，逐列的 `EXISTS (… content_kind = 'CHAT_MESSAGE' AND content_id = m.id)` 應走部分唯一索引 `measure_contents_one_enforced (content_kind, content_id) WHERE measure_status = 'ENFORCED'` 單筆探查，再以主鍵取措施列核對 `status`、`kind`。沒有這個條件時，部分索引的述詞不被查詢蘊含、不能用。EXPLAIN 本機沒有跑（本機不起資料庫），交 CI 或 Will 在有資料的環境量。
+- im 的 `hidden`（未還原的隱藏或生效中的下架）寫成 SQL 函式不可行：單體規則 6 要求函式只參照自己的表，而下架分支要讀 `seller.pub_content_takedowns()`；改以 `TestEveryHiddenColumnUsesTheCanonicalExpression` 守住每個 `AS hidden` 都是同一個運算式、且 `pub_content_takedowns()` 不出現在其他寫法。
 
 ## 5. 預定 mutation（未執行；本機不跑容器，交 CI 與 `scripts/red-proof.py`，不得在工作目錄編輯後還原）
 
@@ -32,12 +34,14 @@ seller（建立措施）→ im(13)／review(12) 訂閱者鎖內容列 → modera
 | 1 | im 預覽與列表的 `pub_content_takedowns()` 分支拿掉 | `TestStoreChatTakedownTombstonesAndRevokeRestores` |
 | 2 | review 回覆遮蔽（`takenDownReplies`）拿掉 | `TestReviewReplyTakedownHidesOnlyTheReply` |
 | 3 | social `takedownContents` 的 `Social()` 過濾拿掉（聊天種類使 `splitContents` 報錯） | `TestStoreChatTakedownTombstonesAndRevokeRestores` |
-| 4 | seller `measure_contents_link_check` 的非社群分支改成允許連結 | seller `TestChecksMatchGo` 與 `TestNonSocialContentKindsRequireEmptyLinks` |
+| 4 | seller `measure_contents_link_check` 的非社群分支改成允許連結 | seller `TestContentSnapshotSchemaConstraints`（聊天訊息、評價回覆帶連結的兩列）；Go 端的同一條規則改 `ValidateSnapshot` 則由單元測試 `TestNonSocialContentKindsRequireEmptyLinks` 擋 |
 | 5 | 店家檢舉人套到 REVIEW（`Validate` 的種類限制拿掉） | `TestStoreReporterIsAcceptedOnlyForChatMessages`、report 單元測試 |
 | 6 | 拿掉 `reports_reporter_kind_check`（恰好一欄） | `TestChecksMatchGo`、`TestReporterKindCheckRejectsNoneAndBoth` |
 | 7 | im 訂閱者拿掉歸屬核對 | `TestTakedownRejectsAMessageThatIsNotTheMeasureStores` |
 | 8 | `BumpStoreDailyCount` 改成讀買家的計數列 | `TestStoreDailyQuotaIsCountedSeparatelyFromTheBuyer` |
 | 9 | 把 `CloseCase` 移到 `Seller.CreateMeasureInTx` 之前 | lockorder 檢查器（併發測試） |
+| 10 | review `ReplyToReview` 的 WHERE 拿掉 `pub_content_takedowns()` 的 NOT EXISTS | `TestReplyIsRejectedWhileItsTakedownIsEnforced` |
+| 11 | im 任一查詢的 `hidden` 運算式拿掉下架分支 | `TestEveryHiddenColumnUsesTheCanonicalExpression`（單元），行為由 mutant 1 的測試擋 |
 
 ## 6. 已決（Will 2026-11-21）
 - 下架的店家聊天訊息與 HIDE 一樣在列表與預覽顯示墓碑；REVIEW_REPLY 下架只遮回覆，店家自己的視圖也遮（照現行實作）。
