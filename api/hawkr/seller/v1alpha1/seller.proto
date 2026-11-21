@@ -998,6 +998,10 @@ enum ContentKind {
   CONTENT_KIND_COMMENT = 2;
   // 討論區留言。
   CONTENT_KIND_FORUM_ENTRY = 3;
+  // 店家寄出的聊天訊息。
+  CONTENT_KIND_CHAT_MESSAGE = 4;
+  // 店家對評價的回覆（ID 是評價的 ID）。
+  CONTENT_KIND_REVIEW_REPLY = 5;
 }
 
 // ContentSnapshotState 是內容下架對象上處分依據快照的狀態。
