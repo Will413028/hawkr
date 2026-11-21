@@ -38,6 +38,36 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 買家關閉後採購資料的去向（S10） | 個資在不再需要時刪除，交易紀錄依法保留 | 成立（買家自由文字會轉呈賣家） | 刪個資、匿名保留交易紀錄 | `retention.OnBuyerDeleted` 訂閱 `BuyerDeleted`（同 transaction，`cmd/hawkr` 在 serve 與 worker 訂閱）：刪對話、輪次、run、候選集、報價清單、額度、ADK session、沒發布過的需求；已發布的需求與預覽、快照、核准、發布、接受單的 `buyer_id` 設 NULL，邀請與賣家回價原樣保留；保留期跟詢價的生命週期，不另訂（Will 2026-11-21）；`TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords`、原子性 `TestBuyerDeletedIsAtomicWhenALaterStepFails` |
 | selection 與 conversation（S11） | selection 與 candidate 1:1 | 是 1:1 | 折入 candidate | selection 併入 `candidates.selected`、`selected_at`（一表少三個冗餘 id）；conversation 與 request 維持兩張表（契約有兩個獨立 ID，刪對話不刪需求） |
 
+## 領域層的沿用盤點（A9-3b-2a）
+
+舊 `ai-service/internal/procurement/domain` 的 slots、planner、templates 搬成 `internal/slots`、`internal/planner`、`internal/reply`、`internal/text`，不搬 LLM narrator 與 realizer（A9-D24 第 4 項）。對照測試的來源行號寫在各測試的註解。「決定」欄標「待 Will」的是照舊行為搬過來、從零設計可能不同、計畫與決定沒有定案的項目，不自行決定。
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| 拒絕原因與模板文字寫死在 domain 的中文字串（`slots.go`、`dialogue_templates.go`、`SlotLabels`、`SlotPrompts`） | 單一語系的前端直接顯示伺服器字串 | 否：買家介面是 zh-TW／en（ADR 2026-10-17），使用者面文字走目錄 | domain 回代碼，呈現層依語系查文字 | 改：原因、act、問句、選項都是代碼，文字在 `internal/text`（`make uitext`，zh-TW 與 en）；zh-TW 文字與舊版逐字相同（`reply_test.go` 對照） |
+| `Apply` 以 UTC 判斷到貨日的「今天」 | 伺服器與買家同時區 | 否：日曆日一律台北（`platform/twtime`），UTC 在台北凌晨會收下昨天 | 以使用者所在日曆日為界 | 改：以 `twtime.Day(now)` 為界，上限是今天加 365 天；差異有測試（`TestApplyDateBoundariesUseTaipeiCalendarDay`） |
+| 文字截斷後不再去尾端空白 | 資料表沒有空白 CHECK | 否：`request_revisions` 的文字欄有「頭尾不得有空白」CHECK | 寫入端保證 CHECK 成立 | 改：截斷後再 `trimtext.Trim`（`TestApplyTruncationLeavesNoTrailingSpace`） |
+| `ItemResolution` 帶 `CategoryID`，驗證「已確認分類必須有 ID、自行描述不可有 ID」 | 分類 ID 要存在需求版本裡 | 否：A9-3a 的 schema 只存 `kind` 與 `label` | 只存有消費者的欄位 | 刪 `CategoryID` 與兩條 ID 規則；標籤超過 200 字照一般文字截斷（資料表 CHECK） |
+| `Slots.Hash()`（artifact 的 input_hash） | artifact 要比對輸入版本 | 否：A9-D24 第 5 項不寫 run 產出 | — | 刪 |
+| `DialoguePlanV1` 的信封：schemaVersion、stateVersion、planHash、policyVersion、templateVersion、toneHints、maxSentences、artifactRefs、salientFactRefs、nextQuestionRef、allowed／forbidden claim codes、readinessGate | 給 LLM realizer 與 semantic validator 當輸入與稽核 | 否：不搬 realizer 與 validator（A9-D24 第 4 項），proto 沒有這些欄位 | 沒有消費者的欄位不建 | 刪；`planner.Plan` 只有 act、最多 2 個本輪事實、下一題 |
+| 17 個 act 常數（其中 7 個「Phase 1 不可達」）與找不到模板時的通用句 | 之後各步驟解除封鎖時不必再命名 | 否：沒有寫入者的值不留（同 S6） | 只定義會被選中的值，封閉集合沒有找不到模板的退路 | 刪 7 個與通用句，留 10 個；每個 act 在 zh-TW 與 en 都有測試窮舉 |
+| `PlanDialogue` 輸入的冗餘旗標（`Ready` 與 `Missing`、`HasRejected` 與 `Rejected`、`CropDisambiguationPending` 與 `Question`） | 呼叫端各自算好餵入 | 否：它們由同一份資料決定，分開傳是兩個真相來源 | 由單一來源推導 | 改：由 `Next.MissingRequired()`、`len(Rejected)`、`Question.Slot` 推導 |
+| 問題卡的 `Source`、選項的 `Value` 在 wire 上 | 前端 types.ts 已宣告 | 否：新 proto 的 `QuestionOption` 只有 `option_id`、`label`，`ClarifyQuestion` 沒有 source | 契約是唯一來源 | 刪 `Source`；`Value` 留在伺服器內部，回答時以選項 ID 反查 |
+| 欄位代碼的小寫字串（`item`、`delivery_city`）與 `crop_disambiguation` | 前端 JSON 的 key | 否：proto `SlotKey` 值名（`ITEM`、`ITEM_DISAMBIGUATION`） | 契約是唯一來源 | 改：用 `model.SlotKey`，值是 proto 值名；「crop」是農產內容的舊稱，改叫 item（選項 ID `item-other`、`category-<id>`） |
+| 必填欄位＝品項、配送城市、單位；選填順序＝數量（含單位）、到貨日、包裝、單價預算；連續選填上限 3；數量與到貨日不可跳過；單位折進數量的複合問題卡 | 產品決定（舊註解：2026-08-09、2026-08-23 Will；報價單前提） | 是（產品規則，計畫沒有改它） | — | 沿用，原樣搬，有對照測試 |
+| `AllowedUnits` 只收重量單位、`AllowedCities` 手寫 26 個字串（臺／台兩種寫法）、別名表、六都選項、到貨日 ≤365 天、數量 ≤1,000,000、單價預算 ≤10,000,000 | 需要可比對的固定值 | 部分：台灣鄉鎮市區代碼表已有 `platform/twaddr`，縣市在其中是正規資料 | 縣市取自代碼表而不是第二份手寫清單 | 待 Will：照搬，不改（見下方開放問題 2） |
+| `RecordedThisTurn` 的「前後是否不同」規則與 `computeHasCorrection`（recorded 的欄位在 Current 已有值就是更正，`ExactMatchRequired` 因 `Apply` 預設值恆算更正） | 讓更正與第一次填分開回應 | 是 | — | 沿用，原樣搬；`ExactMatchRequired` 的怪處列在開放問題 6 |
+| 模板文字 `REQUEST_BASICS_READY` 的「我現在就去幫你找找看合適的候選」 | 舊流程需求齊備後自動搜尋 | 否：A9-D24 第 3 項把候選搜尋拆成買家觸發的獨立 run，這句話在搜尋尚未開始時是假話 | 只說已發生或買家下一步要做的事 | 待 Will：文字原樣搬（zh-TW 逐字相同），見開放問題 4 |
+
+開放問題（3b-2a 交 Will）：
+
+1. 連續選填計數與被買家跳過的欄位存在哪：舊版存在 revision 的 patch payload（`optionalStreak`、`Skip`），新 schema 的 `turns` 沒有對應欄位，`PickNext`、`NextOptionalStreak` 是純函式、輸入由呼叫端給。選項：存在 `run_interrupts` 的 payload（問題與計數一起）、`turns` 加欄位、或從 `turns` 與問題歷史重算。3b-2c 開工前要定。
+2. 縣市清單與別名：維持手寫 `AllowedCities`（含臺／台兩種寫法）或改由 `platform/twaddr` 推導、存正規名稱；選項裡的六都是否維持。
+3. 品項消歧的分階段精靈（舊 `CropSelection` 的 GROUP、ITEM、DESCRIBE 與 `queryText`、父分類）沒有搬：新的 `resolver` 回扁平的符合清單，`Resolution` 不存分類 ID；是否要兩層選擇、狀態放哪屬於 crop gate 的 3b-2c。目前只搬單層消歧問題卡（有候選與無候選兩種）。
+4. `REQUEST_BASICS_READY` 的下一步句要不要改成不宣稱已開始搜尋（例如改成請買家按搜尋）。
+5. proto `RejectedField.reason` 是字串：目前由 `reply.RejectionReason` 依請求語系組好文字放進去（同 `Step.label` 的做法）。若要讓 client 依代碼自行顯示或在地化，要在 proto 加 reason 列舉；這會改契約，不在 3b-2a 自行決定。
+6. `ExactMatchRequired` 在第一次 `Apply` 之後恆為非 nil，之後買家再明講它一律被判為「更正」；舊版如此。從零設計會讓「系統預設值」與「買家設定值」可分辨（例如多一個旗標）。
+
 ## 冪等鍵逐支判定（S4）
 
 `api/hawkr/procurement/v1alpha1/procurement.proto` 帶 `client_request_id` 的 15 支 RPC。「建立型」的鍵放在被建立的實體上（`(buyer_id, client_request_id)` 唯一，重送時 `ON CONFLICT DO NOTHING` 回 0 列、改讀既有的實體並比對內容）；「目標狀態」的方法本身重送結果相同，不建收據。

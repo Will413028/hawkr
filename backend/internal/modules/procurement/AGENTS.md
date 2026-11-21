@@ -4,7 +4,7 @@
 
 ## 職責
 
-買家採購（RFQ）與賣家報價；採購的另一半（賣家回報價）也在這裡。服務買家與賣家。事件 `procurement.*` 由 notification 訂閱（A9-D1 保留的那條）。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller；不依賴 notification（notification 依賴 procurement，方向見 `internal/arch/modules.go`）。資料層已建（A9-3a）：schema、sqlc 查詢、resolver、候選型別、買家關閉的清除；run、串流、賣家報價與建單在 A9-3b、3c。行為規格的唯一來源是 `backend/docs/modules/procurement.md`。
+買家採購（RFQ）與賣家報價；採購的另一半（賣家回報價）也在這裡。服務買家與賣家。事件 `procurement.*` 由 notification 訂閱。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller；不依賴 notification（方向見 `internal/arch/modules.go`）。資料層已建（A9-3a）：schema、sqlc 查詢、resolver、候選型別、買家關閉的清除；run、串流、賣家報價與建單在 A9-3b、3c。
 
 ## 擁有的資料
 
@@ -26,7 +26,7 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、reconciler、保留期清除、共用 LISTEN）。
+- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、reconciler、保留期清除、共用 LISTEN）；`slots`（欄位驗證，拒絕原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，沒有 LLM 敘述）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
