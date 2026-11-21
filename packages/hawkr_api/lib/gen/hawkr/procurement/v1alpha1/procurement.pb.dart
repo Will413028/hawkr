@@ -2615,6 +2615,7 @@ class Candidate extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
+  /// 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
   @$pb.TagNumber(3)
   $core.double get score => $_getN(1);
   @$pb.TagNumber(3)

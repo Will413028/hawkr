@@ -711,7 +711,7 @@ type PublicationState int32
 const (
 	PublicationState_PUBLICATION_STATE_UNSPECIFIED PublicationState = 0
 	// 伺服器已建立發布；不代表已投遞或已被看到。
-	PublicationState_PUBLICATION_STATE_PUBLISHED PublicationState = 1
+	PublicationState_PUBLICATION_STATE_PUBLISHED PublicationState = 1 // 沒有重發與撤回發布的方法，所以目前只有這一個值；新值隨它的寫入方法一起加。
 )
 
 // Enum value maps for PublicationState.
@@ -2966,11 +2966,12 @@ func (x *UnverifiableFact) GetReason() string {
 
 // Candidate 是一位候選賣家：只有結構化欄位，不含研究摘要、定位等自由文字。
 type Candidate struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Score             float64                `protobuf:"fixed64,3,opt,name=score,proto3" json:"score,omitempty"`
-	MatchedFacts      []*MatchedFact         `protobuf:"bytes,4,rep,name=matched_facts,json=matchedFacts,proto3" json:"matched_facts,omitempty"`
-	UnverifiableFacts []*UnverifiableFact    `protobuf:"bytes,5,rep,name=unverifiable_facts,json=unverifiableFacts,proto3" json:"unverifiable_facts,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
+	Score             float64             `protobuf:"fixed64,3,opt,name=score,proto3" json:"score,omitempty"`
+	MatchedFacts      []*MatchedFact      `protobuf:"bytes,4,rep,name=matched_facts,json=matchedFacts,proto3" json:"matched_facts,omitempty"`
+	UnverifiableFacts []*UnverifiableFact `protobuf:"bytes,5,rep,name=unverifiable_facts,json=unverifiableFacts,proto3" json:"unverifiable_facts,omitempty"`
 	// 以上事實成立的時間。
 	FactsTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=facts_time,json=factsTime,proto3" json:"facts_time,omitempty"`
 	Selected  bool                   `protobuf:"varint,7,opt,name=selected,proto3" json:"selected,omitempty"`
@@ -8595,7 +8596,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x05label\x18\x02 \x01(\tR\x05label\"j\n" +
 	"\x10UnverifiableFact\x12>\n" +
 	"\bslot_key\x18\x01 \x01(\x0e2#.hawkr.procurement.v1alpha1.SlotKeyR\aslotKey\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x84\x03\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xf0\x02\n" +
 	"\tCandidate\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x01R\x05score\x12L\n" +
@@ -8604,7 +8605,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\n" +
 	"facts_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tfactsTime\x12\x1a\n" +
 	"\bselected\x18\a \x01(\bR\bselected\x126\n" +
-	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeJ\x04\b\x02\x10\x03R\fdisplay_name\"z\n" +
+	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\"z\n" +
 	"\x1bStartCandidateSearchRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x127\n" +
@@ -9137,10 +9138,10 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\fAudienceMode\x12\x1d\n" +
 	"\x19AUDIENCE_MODE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17AUDIENCE_MODE_WISH_POOL\x10\x01\x12#\n" +
-	"\x1fAUDIENCE_MODE_DIRECT_RECIPIENTS\x10\x02*\x9d\x01\n" +
+	"\x1fAUDIENCE_MODE_DIRECT_RECIPIENTS\x10\x02*V\n" +
 	"\x10PublicationState\x12!\n" +
 	"\x1dPUBLICATION_STATE_UNSPECIFIED\x10\x00\x12\x1f\n" +
-	"\x1bPUBLICATION_STATE_PUBLISHED\x10\x01\"\x04\b\x02\x10\x02\"\x04\b\x03\x10\x03*\x1cPUBLICATION_STATE_SUPERSEDED*\x1bPUBLICATION_STATE_CANCELLED*\xa0\x01\n" +
+	"\x1bPUBLICATION_STATE_PUBLISHED\x10\x01*\xa0\x01\n" +
 	"\x13InviteDeliveryState\x12%\n" +
 	"!INVITE_DELIVERY_STATE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cINVITE_DELIVERY_STATE_QUEUED\x10\x01\x12\x1e\n" +

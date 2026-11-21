@@ -240,18 +240,12 @@ const PublicationState$json = {
     {'1': 'PUBLICATION_STATE_UNSPECIFIED', '2': 0},
     {'1': 'PUBLICATION_STATE_PUBLISHED', '2': 1},
   ],
-  '4': [
-    {'1': 2, '2': 2},
-    {'1': 3, '2': 3},
-  ],
-  '5': ['PUBLICATION_STATE_SUPERSEDED', 'PUBLICATION_STATE_CANCELLED'],
 };
 
 /// Descriptor for `PublicationState`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List publicationStateDescriptor = $convert.base64Decode(
     'ChBQdWJsaWNhdGlvblN0YXRlEiEKHVBVQkxJQ0FUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASHw'
-    'obUFVCTElDQVRJT05fU1RBVEVfUFVCTElTSEVEEAEiBAgCEAIiBAgDEAMqHFBVQkxJQ0FUSU9O'
-    'X1NUQVRFX1NVUEVSU0VERUQqG1BVQkxJQ0FUSU9OX1NUQVRFX0NBTkNFTExFRA==');
+    'obUFVCTElDQVRJT05fU1RBVEVfUFVCTElTSEVEEAE=');
 
 @$core.Deprecated('Use inviteDeliveryStateDescriptor instead')
 const InviteDeliveryState$json = {
@@ -1325,10 +1319,6 @@ const Candidate$json = {
       '10': 'store'
     },
   ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
-  '10': ['display_name'],
 };
 
 /// Descriptor for `Candidate`. Decode as a `google.protobuf.DescriptorProto`.
@@ -1339,8 +1329,7 @@ final $typed_data.Uint8List candidateDescriptor = $convert.base64Decode(
     'tyLnByb2N1cmVtZW50LnYxYWxwaGExLlVudmVyaWZpYWJsZUZhY3RSEXVudmVyaWZpYWJsZUZh'
     'Y3RzEjkKCmZhY3RzX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUglmYW'
     'N0c1RpbWUSGgoIc2VsZWN0ZWQYByABKAhSCHNlbGVjdGVkEjYKBXN0b3JlGAggASgLMiAuaGF3'
-    'a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmVKBAgCEANSDGRpc3BsYXlfbmFtZQ'
-    '==');
+    'a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmU=');
 
 @$core.Deprecated('Use startCandidateSearchRequestDescriptor instead')
 const StartCandidateSearchRequest$json = {
