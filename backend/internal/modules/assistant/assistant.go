@@ -12,7 +12,7 @@ import (
 
 	adkmodel "google.golang.org/adk/v2/model"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/adksession"
+	"github.com/Will413028/hawkr/backend/internal/platform/adksession"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/buyeragent"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/feature"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/history"
@@ -53,7 +53,7 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	sessions := adksession.New(d.DB)
+	sessions := adksession.New(d.DB, "assistant")
 	if d.Now == nil {
 		d.Now = time.Now //nolint:forbidigo // assigns the clock dependency without calling it
 	}

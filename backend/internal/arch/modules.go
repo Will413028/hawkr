@@ -58,12 +58,10 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"adksession": {"store"},         // ADK session.Service 的 pgx 實作
 		"buyeragent": {"model", "text"}, // 買家 agent 與 3 支 tool；tool 身分用 model.Tool，coordinator 的退貨流程取共用文案
 		"feature":    {},
 		"history":    {"buyeragent", "model"}, // 買家最近一次對話的歷史（GetLatestAssistantSession）
 		"model":      {},
-		"store":      {},
 		"text":       {},
 		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},

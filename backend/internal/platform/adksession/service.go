@@ -1,6 +1,9 @@
-// Package adksession 以 pgx 與 sqlc 實作 ADK v2 的 session.Service（A9-D5），資料在 assistant schema。
+// Package adksession 以 pgx 實作 ADK v2 的 session.Service（A9-D5、A9-D19 S7）。
 //
-// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（backend/internal/modules/assistant/session_integration_test.go，在 CI 的 Postgres 上跑）。
+// 四張表（sessions、events、app_states、user_states）由呼叫的模組在自己的 schema 建（形狀見 assistant 的 db/schema.sql），
+// New 收 schema 名稱；本套件不擁有任何表。
+//
+// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（各模組的 session_integration_test.go，在 CI 的 Postgres 上跑）。
 // 寫入都在 db.InTx 內，transaction 內沒有任何外部 provider 呼叫（backend/AGENTS.md 規則 5）。
 package adksession
 
@@ -17,19 +20,26 @@ import (
 	"google.golang.org/adk/v2/platform"
 	"google.golang.org/adk/v2/session"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
 // Service 實作 session.Service。
 type Service struct {
 	db *db.DB
+	q  *queries
 }
 
 var _ session.Service = (*Service)(nil)
 
-// New 建立 session service。
-func New(d *db.DB) *Service { return &Service{db: d} }
+// New 建立 session service；schema 是呼叫的模組放四張 ADK 表的 schema（小寫字母、數字、底線）。
+// schema 不合法是程式錯誤（寫死在模組的組裝處），所以直接 panic。
+func New(d *db.DB, schema string) *Service {
+	q, err := newQueries(schema, d.Conn)
+	if err != nil {
+		panic(err)
+	}
+	return &Service{db: d, q: q}
+}
 
 // ErrInOuterTx 是在已有 transaction 的 ctx 上呼叫 Create 或 AppendEvent 時回傳的錯誤：這兩個方法在提交後才更新
 // 傳入或回傳的 live session，外層 transaction 之後 rollback 會讓記憶體與資料庫分岔，所以必須是最上層的呼叫。
@@ -52,8 +62,6 @@ func clampEvents(n int) int32 {
 	}
 	return int32(n) //nolint:gosec // 上面已夾到 MaxInt32；n 是 event 數量，不會是負數
 }
-
-func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.db.Conn(ctx)) }
 
 func marshalState(m map[string]any) ([]byte, error) {
 	if m == nil {
@@ -103,8 +111,8 @@ func (s *Service) Create(ctx context.Context, req *session.CreateRequest) (*sess
 
 	var out *liveSession
 	err = s.db.InTx(ctx, func(ctx context.Context) error {
-		q := s.q(ctx)
-		n, err := q.InsertSession(ctx, store.InsertSessionParams{AppName: req.AppName, UserID: req.UserID, ID: id, State: sessJSON, Now: now})
+		q := s.q
+		n, err := q.InsertSession(ctx, req.AppName, req.UserID, id, sessJSON, now)
 		if err != nil {
 			return fmt.Errorf("寫入 session：%w", err)
 		}
@@ -113,16 +121,16 @@ func (s *Service) Create(ctx context.Context, req *session.CreateRequest) (*sess
 		}
 		// 鎖順序：session 列、app 列、user 列；AppendEvent 同序。
 		if len(appDelta) > 0 {
-			if err := q.MergeAppState(ctx, store.MergeAppStateParams{AppName: req.AppName, StateDelta: appJSON, Now: now}); err != nil {
+			if err := q.MergeAppState(ctx, req.AppName, appJSON, now); err != nil {
 				return fmt.Errorf("寫入 app state：%w", err)
 			}
 		}
 		if len(userDelta) > 0 {
-			if err := q.MergeUserState(ctx, store.MergeUserStateParams{AppName: req.AppName, UserID: req.UserID, StateDelta: userJSON, Now: now}); err != nil {
+			if err := q.MergeUserState(ctx, req.AppName, req.UserID, userJSON, now); err != nil {
 				return fmt.Errorf("寫入 user state：%w", err)
 			}
 		}
-		row, err := q.GetSession(ctx, store.GetSessionParams{AppName: req.AppName, UserID: req.UserID, ID: id})
+		row, err := q.GetSession(ctx, req.AppName, req.UserID, id)
 		if err != nil {
 			return fmt.Errorf("讀回 session：%w", err)
 		}
@@ -171,8 +179,8 @@ func (s *Service) Get(ctx context.Context, req *session.GetRequest) (*session.Ge
 
 // getInSnapshot 在同一份快照內讀 session 列與 events（backend/AGENTS.md 規則 3）。
 func (s *Service) getInSnapshot(ctx context.Context, req *session.GetRequest) (*liveSession, error) {
-	q := s.q(ctx)
-	row, err := q.GetSession(ctx, store.GetSessionParams{AppName: req.AppName, UserID: req.UserID, ID: req.SessionID})
+	q := s.q
+	row, err := q.GetSession(ctx, req.AppName, req.UserID, req.SessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("%w: %q", session.ErrNotFound, req.SessionID)
@@ -183,16 +191,17 @@ func (s *Service) getInSnapshot(ctx context.Context, req *session.GetRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	p := store.ListEventsParams{AppName: req.AppName, UserID: req.UserID, SessionID: req.SessionID}
+	var after *time.Time
 	if !req.After.IsZero() {
-		after := req.After
-		p.After = &after
+		a := req.After
+		after = &a
 	}
+	var maxEvents *int32
 	if req.NumRecentEvents > 0 {
 		n := clampEvents(req.NumRecentEvents)
-		p.MaxEvents = &n
+		maxEvents = &n
 	}
-	rows, err := q.ListEvents(ctx, p)
+	rows, err := q.ListEvents(ctx, req.AppName, req.UserID, req.SessionID, after, maxEvents)
 	if err != nil {
 		return nil, fmt.Errorf("讀 events：%w", err)
 	}
@@ -212,7 +221,7 @@ func (s *Service) List(ctx context.Context, req *session.ListRequest) (*session.
 	if req.AppName == "" {
 		return nil, fmt.Errorf("app_name is required, got app_name: %q", req.AppName)
 	}
-	rows, err := s.q(ctx).ListSessions(ctx, store.ListSessionsParams{AppName: req.AppName, UserID: req.UserID})
+	rows, err := s.q.ListSessions(ctx, req.AppName, req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("列 sessions：%w", err)
 	}
@@ -232,7 +241,7 @@ func (s *Service) Delete(ctx context.Context, req *session.DeleteRequest) error 
 	if req.AppName == "" || req.UserID == "" || req.SessionID == "" {
 		return fmt.Errorf("app_name, user_id, session_id are required, got app_name: %q, user_id: %q, session_id: %q", req.AppName, req.UserID, req.SessionID)
 	}
-	if err := s.q(ctx).DeleteSession(ctx, store.DeleteSessionParams{AppName: req.AppName, UserID: req.UserID, ID: req.SessionID}); err != nil {
+	if err := s.q.DeleteSession(ctx, req.AppName, req.UserID, req.SessionID); err != nil {
 		return fmt.Errorf("刪 session：%w", err)
 	}
 	return nil
@@ -267,14 +276,14 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 
 	appName, userID, id := cur.AppName(), cur.UserID(), cur.ID()
 	err = s.db.InTx(ctx, func(ctx context.Context) error {
-		q := s.q(ctx)
-		if _, err := q.TouchSessionForAppend(ctx, store.TouchSessionForAppendParams{StateDelta: enc.sessJSON, Now: ev.Timestamp, AppName: appName, UserID: userID, ID: id}); err != nil {
+		q := s.q
+		if _, err := q.TouchSessionForAppend(ctx, appName, userID, id, enc.sessJSON, ev.Timestamp); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("%w: %q, cannot apply event", session.ErrNotFound, id)
 			}
 			return fmt.Errorf("更新 session：%w", err)
 		}
-		n, err := q.InsertEvent(ctx, store.InsertEventParams{AppName: appName, UserID: userID, SessionID: id, ID: ev.ID, Timestamp: ev.Timestamp, Event: enc.eventJSON})
+		n, err := q.InsertEvent(ctx, appName, userID, id, ev.ID, ev.Timestamp, enc.eventJSON)
 		if err != nil {
 			return fmt.Errorf("寫入 event：%w", err)
 		}
@@ -282,12 +291,12 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 			return fmt.Errorf("%w: event %q in session %q", ErrEventExists, ev.ID, id)
 		}
 		if enc.hasApp {
-			if err := q.MergeAppState(ctx, store.MergeAppStateParams{AppName: appName, StateDelta: enc.appJSON, Now: ev.Timestamp}); err != nil {
+			if err := q.MergeAppState(ctx, appName, enc.appJSON, ev.Timestamp); err != nil {
 				return fmt.Errorf("寫入 app state：%w", err)
 			}
 		}
 		if enc.hasUser {
-			if err := q.MergeUserState(ctx, store.MergeUserStateParams{AppName: appName, UserID: userID, StateDelta: enc.userJSON, Now: ev.Timestamp}); err != nil {
+			if err := q.MergeUserState(ctx, appName, userID, enc.userJSON, ev.Timestamp); err != nil {
 				return fmt.Errorf("寫入 user state：%w", err)
 			}
 		}
