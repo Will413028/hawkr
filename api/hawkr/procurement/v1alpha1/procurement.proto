@@ -504,8 +504,8 @@ message RunSummary {
 message OpenConfirmation {
   string interrupt_id = 1;
   InterruptKind kind = 2;
-  // 沒有設定表示不會到期。
-  optional google.protobuf.Timestamp expire_time = 3;
+  reserved 3;
+  reserved "expire_time";
   // 待回答的問題，讓重新載入之後能還原同一個畫面。
   ClarifyQuestion question = 4;
 }

@@ -676,3 +676,48 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 		t.Fatal("已 SUCCEEDED 的核准不能再被標一次（CAS）")
 	}
 }
+
+// A9-D20 R4：run 帳本的 publication_id 是 ON DELETE SET NULL，BuyerDeleted 先刪 run（子表隨 CASCADE），
+// 之後匿名保留的發布不再被 run 牽連；agent_runs.buyer_id 維持 NOT NULL，所以 run 只能刪、不能匿名。
+func TestBuyerDeletedDeletesRunsBeforeAnonymizingPublications(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	q := store.New(d.Pool())
+	c := seed(ctx, t, q, 51, true)
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET publication_id = $1 WHERE id = $2`, c.publication, c.run); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_run_events (run_id, seq, event_type, occurred_at, created_at) VALUES ($1, 1, 'text', $2, $2)`, c.run, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_run_artifacts (run_id, artifact_type, version, status, data, checksum, as_of, created_at, updated_at) VALUES ($1, 'X', 1, 'READY', '{}', 'c', $2, $2, $2)`, c.run, epoch); err != nil {
+		t.Fatal(err)
+	}
+	m := New(Deps{DB: d})
+	if err := d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 51}) }); err != nil {
+		t.Fatal(err)
+	}
+	for _, tbl := range []string{"agent_runs", "agent_run_inputs", "agent_run_events", "agent_run_artifacts"} {
+		if n := count(ctx, t, d, tbl, "true"); n != 0 {
+			t.Errorf("%s 還剩 %d 列", tbl, n)
+		}
+	}
+	if n := count(ctx, t, d, "rfq_publications", "id = $1 AND buyer_id IS NULL", c.publication); n != 1 {
+		t.Fatalf("發布要保留並匿名，實際 %d 列", n)
+	}
+}
+
+func TestDeletingAPublicationClearsTheRunReference(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	c := seed(ctx, t, store.New(d.Pool()), 52, true)
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET publication_id = $1 WHERE id = $2`, c.publication, c.run); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `DELETE FROM procurement.rfq_publications WHERE id = $1`, c.publication); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(ctx, t, d, "agent_runs", "id = $1 AND publication_id IS NULL", c.run); n != 1 {
+		t.Fatalf("run 要保留、publication_id 設 NULL，實際 %d 列", n)
+	}
+}

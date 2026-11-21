@@ -1538,13 +1538,11 @@ class OpenConfirmation extends $pb.GeneratedMessage {
   factory OpenConfirmation({
     $core.String? interruptId,
     InterruptKind? kind,
-    $1.Timestamp? expireTime,
     ClarifyQuestion? question,
   }) {
     final result = OpenConfirmation._();
     if (interruptId != null) result.interruptId = interruptId;
     if (kind != null) result.kind = kind;
-    if (expireTime != null) result.expireTime = expireTime;
     if (question != null) result.question = question;
     return result;
   }
@@ -1566,8 +1564,6 @@ class OpenConfirmation extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'interruptId')
     ..aE<InterruptKind>(2, _omitFieldNames ? '' : 'kind',
         enumValues: InterruptKind.values)
-    ..aOM<$1.Timestamp>(3, _omitFieldNames ? '' : 'expireTime',
-        subBuilder: $1.Timestamp.$_createMessage)
     ..aOM<ClarifyQuestion>(4, _omitFieldNames ? '' : 'question',
         subBuilder: ClarifyQuestion.$_createMessage)
     ..hasRequiredFields = false;
@@ -1612,29 +1608,17 @@ class OpenConfirmation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearKind() => $_clearField(2);
 
-  /// 沒有設定表示不會到期。
-  @$pb.TagNumber(3)
-  $1.Timestamp get expireTime => $_getN(2);
-  @$pb.TagNumber(3)
-  set expireTime($1.Timestamp value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasExpireTime() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearExpireTime() => $_clearField(3);
-  @$pb.TagNumber(3)
-  $1.Timestamp ensureExpireTime() => $_ensure(2);
-
   /// 待回答的問題，讓重新載入之後能還原同一個畫面。
   @$pb.TagNumber(4)
-  ClarifyQuestion get question => $_getN(3);
+  ClarifyQuestion get question => $_getN(2);
   @$pb.TagNumber(4)
   set question(ClarifyQuestion value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasQuestion() => $_has(3);
+  $core.bool hasQuestion() => $_has(2);
   @$pb.TagNumber(4)
   void clearQuestion() => $_clearField(4);
   @$pb.TagNumber(4)
-  ClarifyQuestion ensureQuestion() => $_ensure(3);
+  ClarifyQuestion ensureQuestion() => $_ensure(2);
 }
 
 /// PublishedRfq 是已成立的詢價發布結果。

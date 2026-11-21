@@ -48,3 +48,36 @@ func TestProcurementSubscribesBeforeModeration(t *testing.T) {
 		}
 	}
 }
+
+// worker 角色要登記採購 run 的 sweeper 與事件清除，並把它們的排程交給 River：漏了其中一個，逾時的 run 就沒有人標失敗（A9-D6）。
+func TestWorkerRoleRegistersProcurementJobs(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registers, schedules bool
+	for _, d := range file.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "runWorker" {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			switch f := call.Fun.(type) {
+			case *ast.Ident:
+				registers = registers || f.Name == "addProcurementWorkers"
+			case *ast.SelectorExpr:
+				if x, ok := f.X.(*ast.Ident); ok && x.Name == "procurementModule" && f.Sel.Name == "PeriodicJobs" {
+					schedules = true
+				}
+			}
+			return true
+		})
+	}
+	if !registers || !schedules {
+		t.Fatalf("runWorker：addProcurementWorkers = %v，procurementModule.PeriodicJobs = %v", registers, schedules)
+	}
+}

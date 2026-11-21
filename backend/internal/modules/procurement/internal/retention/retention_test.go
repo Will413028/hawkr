@@ -69,3 +69,10 @@ func TestExemptionsStateAReason(t *testing.T) {
 		}
 	}
 }
+
+// run 要在其他刪除與匿名步驟之前（A9-D20 R4）：agent_runs.buyer_id 是 NOT NULL，不能被匿名成 NULL，只能整列刪。
+func TestRunsAreDeletedBeforeEveryOtherStep(t *testing.T) {
+	if len(steps) == 0 || len(steps[0].tables) != 1 || steps[0].tables[0] != "agent_runs" {
+		t.Fatalf("第一個步驟要是 agent_runs，實際是 %q", steps[0].name)
+	}
+}

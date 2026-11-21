@@ -70,6 +70,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"model":     {},
 		"resolver":  {},        // 品項用詞對分類樹，人工同義詞（A9-D7）
 		"retention": {"store"}, // 買家關閉後刪除與匿名（S10）
+		"run":       {"store"}, // run 帳本：送出與配額、事件與續傳、sweeper、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
 		"store":     {},
 	}},
 	"moderation": {Packages: map[string][]string{

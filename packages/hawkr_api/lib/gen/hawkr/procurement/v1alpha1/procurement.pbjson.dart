@@ -936,16 +936,6 @@ const OpenConfirmation$json = {
       '10': 'kind'
     },
     {
-      '1': 'expire_time',
-      '3': 3,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '9': 0,
-      '10': 'expireTime',
-      '17': true
-    },
-    {
       '1': 'question',
       '3': 4,
       '4': 1,
@@ -954,18 +944,18 @@ const OpenConfirmation$json = {
       '10': 'question'
     },
   ],
-  '8': [
-    {'1': '_expire_time'},
+  '9': [
+    {'1': 3, '2': 4},
   ],
+  '10': ['expire_time'],
 };
 
 /// Descriptor for `OpenConfirmation`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List openConfirmationDescriptor = $convert.base64Decode(
     'ChBPcGVuQ29uZmlybWF0aW9uEiEKDGludGVycnVwdF9pZBgBIAEoCVILaW50ZXJydXB0SWQSPQ'
     'oEa2luZBgCIAEoDjIpLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkludGVycnVwdEtpbmRS'
-    'BGtpbmQSQAoLZXhwaXJlX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSA'
-    'BSCmV4cGlyZVRpbWWIAQESRwoIcXVlc3Rpb24YBCABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52'
-    'MWFscGhhMS5DbGFyaWZ5UXVlc3Rpb25SCHF1ZXN0aW9uQg4KDF9leHBpcmVfdGltZQ==');
+    'BGtpbmQSRwoIcXVlc3Rpb24YBCABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5DbG'
+    'FyaWZ5UXVlc3Rpb25SCHF1ZXN0aW9uSgQIAxAEUgtleHBpcmVfdGltZQ==');
 
 @$core.Deprecated('Use publishedRfqDescriptor instead')
 const PublishedRfq$json = {
@@ -4242,10 +4232,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       ItemDisambiguationOption$json,
   '.hawkr.procurement.v1alpha1.RunSummary': RunSummary$json,
   '.hawkr.procurement.v1alpha1.OpenConfirmation': OpenConfirmation$json,
-  '.google.protobuf.Timestamp': $1.Timestamp$json,
   '.hawkr.procurement.v1alpha1.ClarifyQuestion': ClarifyQuestion$json,
   '.hawkr.procurement.v1alpha1.QuestionOption': QuestionOption$json,
   '.hawkr.procurement.v1alpha1.PublishedRfq': PublishedRfq$json,
+  '.google.protobuf.Timestamp': $1.Timestamp$json,
   '.hawkr.procurement.v1alpha1.StartCandidateSearchRequest':
       StartCandidateSearchRequest$json,
   '.hawkr.procurement.v1alpha1.StartCandidateSearchResponse':

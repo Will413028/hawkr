@@ -31,10 +31,12 @@ var exempt = map[string]string{
 func sessionKey(buyerID int64) string { return strconv.FormatInt(buyerID, 10) }
 
 var steps = []step{
+	// run 最先刪（A9-D20 R4）：子表（輸入、事件、產出、interrupt）隨 run CASCADE；agent_runs.buyer_id 維持 NOT NULL，
+	// 所以不能留到匿名步驟，agent_runs.publication_id 是 ON DELETE SET NULL，之後的步驟不再碰到 run。
+	{"run", []string{"agent_runs"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) { return q.DeleteBuyerRuns(ctx, b) }},
 	{"對話", []string{"conversations"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerConversations(ctx, b)
 	}},
-	{"run", []string{"agent_runs"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) { return q.DeleteBuyerRuns(ctx, b) }},
 	{"候選集", []string{"candidate_sets"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerCandidateSets(ctx, b)
 	}},

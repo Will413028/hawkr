@@ -26,7 +26,7 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選；`internal/retention` 處理買家關閉。
+- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、事件與續傳、sweeper、保留期清除、共用 LISTEN）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -40,6 +40,8 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 - 建立型方法的冪等鍵放在被建立的實體上；rename、delete、withdraw、decline 是目標狀態的方法，不建收據（S4，逐支判定見 CARRYOVER）。
 - `BuyerDeleted` 同 transaction：買家資料刪除，已發布的需求與賣家看得到的紀錄保留、`buyer_id` 設 NULL（S10：`retention.OnBuyerDeleted`）。
 - 頭尾不得有空白的文字欄登記在 `cmd/hawkr` 的 `trimmedColumns`；新增文字欄一併登記。
+- run 事件在 run 結束 7 天後由週期 job 清除並推進 `min_available_seq`；cursor 早於範圍回 `REPLAY_CURSOR_EXPIRED`，超前回 `REPLAY_CURSOR_AHEAD`。interrupt 不設到期；artifact 每個 `(run_id, artifact_type)` 一列就地更新（A9-D20）。
+- run 逾時由 sweeper 標 `WORKER_LOST`、買家重送，job `MaxAttempts` 為 1，不重驅（A9-D6）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱（`run.MaxSubscriptions`）。
 - 配額是一列計數器加條件 UPDATE（`ConsumeUsage`），沒有預約表（A9-D9）。
 
 ## 不負責

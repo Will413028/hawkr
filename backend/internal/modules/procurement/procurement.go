@@ -8,10 +8,15 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
+	"time"
+
+	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -41,7 +46,9 @@ type SellerStores interface {
 
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
-	DB *db.DB
+	DB     *db.DB
+	Now    func() time.Time
+	Logger *slog.Logger
 	// Sellers 是候選搜尋確認店家營業中的 seller 方法；A9-3b 掛上候選搜尋時才有呼叫者。
 	Sellers SellerStores
 }
@@ -49,12 +56,25 @@ type Deps struct {
 // Module 是 procurement 模組。
 type Module struct {
 	retention *retention.Service
+	sweeper   run.Sweeper
+	purger    run.Purger
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
-	return &Module{retention: retention.New(d.DB)}
+	ledger := run.Ledger{DB: d.DB, Now: d.Now}
+	return &Module{
+		retention: retention.New(d.DB),
+		sweeper:   run.Sweeper{DB: d.DB, Ledger: ledger, QueuedTimeout: run.QueuedTimeout, RunTimeout: run.RunningTimeout, Logger: d.Logger},
+		purger:    run.Purger{DB: d.DB, Ledger: ledger},
+	}
 }
+
+// AddWorkers 登記 run 的 sweeper 與事件清除的 River worker。
+func (m *Module) AddWorkers(workers *river.Workers) { run.AddWorkers(workers, m.sweeper, m.purger) }
+
+// PeriodicJobs 回傳 sweeper 與事件清除的排程。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob { return run.PeriodicJobs() }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（A9-D19 S10）：刪除買家的採購資料，賣家看得到的紀錄保留並把 buyer_id 設 NULL。冪等。
 func (m *Module) OnBuyerDeleted(ctx context.Context, e BuyerDeleted) error {

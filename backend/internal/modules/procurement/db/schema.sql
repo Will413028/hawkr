@@ -408,7 +408,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acce
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
 
--- run 帳本（形狀由 A9-3b 開工時補全）：沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
+-- run 帳本：沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。
 CREATE TABLE procurement.agent_runs (
     id UUID PRIMARY KEY,
@@ -417,7 +417,7 @@ CREATE TABLE procurement.agent_runs (
     conversation_id UUID REFERENCES procurement.conversations (id) ON DELETE CASCADE,
     parent_run_id UUID REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
-    publication_id UUID REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
+    publication_id UUID REFERENCES procurement.rfq_publications (id) ON DELETE SET NULL,
     run_type TEXT NOT NULL,
     status TEXT NOT NULL,
     failure_reason TEXT,
@@ -439,6 +439,7 @@ CREATE TABLE procurement.agent_runs (
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);
 CREATE INDEX agent_runs_request ON procurement.agent_runs (request_id, created_at DESC);
 CREATE INDEX agent_runs_unfinished ON procurement.agent_runs (status, created_at) WHERE status IN ('QUEUED', 'RUNNING');
+CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WHERE completed_at IS NOT NULL AND min_available_seq <= last_event_seq;
 
 -- run 的輸入（買家原文，具名文字欄）。沒有 retention_class（只有一個字面值、沒有讀取者）。
 CREATE TABLE procurement.agent_run_inputs (
@@ -448,7 +449,7 @@ CREATE TABLE procurement.agent_run_inputs (
     CONSTRAINT agent_run_inputs_message_check CHECK (char_length(buyer_message) BETWEEN 1 AND 2000 AND buyer_message !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 
--- run 事件：(run_id, seq) 識別；payload 是 proto JSON（WatchRunResponse 的 oneof），形狀靠 proto 規則演進（S3），沒有 schema_version。保留期與清除由 A9-3b 定。
+-- run 事件：(run_id, seq) 識別；payload 是 proto JSON（WatchRunResponse 的 oneof），形狀靠 proto 規則演進（S3），沒有 schema_version。run 結束 7 天後由週期 job 清除並把 min_available_seq 推到 last_event_seq + 1（A9-D20 R1）。
 CREATE TABLE procurement.agent_run_events (
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     seq BIGINT NOT NULL,
@@ -462,24 +463,23 @@ CREATE TABLE procurement.agent_run_events (
     CONSTRAINT agent_run_events_payload_check CHECK (jsonb_typeof(payload) = 'object')
 );
 
--- run 的產出，不可變、多版（A9-3b 開工時確認是否仍需要多版）。
+-- run 的產出：每個 (run_id, artifact_type) 一列就地更新（A9-D20 R3）；version 只當 ARTIFACT_UPSERTED 的去重序號。
 CREATE TABLE procurement.agent_run_artifacts (
-    artifact_id UUID NOT NULL,
-    version INT NOT NULL,
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     artifact_type TEXT NOT NULL,
+    version INT NOT NULL,
     status TEXT NOT NULL,
     data JSONB NOT NULL,
     checksum TEXT NOT NULL,
     as_of TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (artifact_id, version),
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (run_id, artifact_type),
     CONSTRAINT agent_run_artifacts_version_check CHECK (version >= 1),
     CONSTRAINT agent_run_artifacts_data_check CHECK (jsonb_typeof(data) = 'object')
 );
-CREATE INDEX agent_run_artifacts_run ON procurement.agent_run_artifacts (run_id, artifact_type);
 
--- run 停下來等買家回答的中斷。interrupt_kind 只有 CLARIFICATION 一值；沒有 expires_at 與 response_schema_version（A9-3b 確認是否有寫入者再補）。
+-- run 停下來等買家回答的中斷。interrupt_kind 只有 CLARIFICATION 一值；不設到期，下一輪送出即取代（A9-D20 R2）。
 CREATE TABLE procurement.agent_run_interrupts (
     id UUID PRIMARY KEY,
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,

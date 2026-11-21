@@ -34,15 +34,15 @@ type ProcurementAgentRun struct {
 }
 
 type ProcurementAgentRunArtifact struct {
-	ArtifactID   uuid.UUID
-	Version      int32
 	RunID        uuid.UUID
 	ArtifactType string
+	Version      int32
 	Status       string
 	Data         []byte
 	Checksum     string
 	AsOf         time.Time
 	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type ProcurementAgentRunEvent struct {
