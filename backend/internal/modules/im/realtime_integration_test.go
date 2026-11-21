@@ -267,6 +267,11 @@ func TestStalledSubscriberDoesNotBlockSendAndResyncsOnResume(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	m := f.newModule(im.LiveConfig{MaxPending: 500})
+	buyerIDs := make([]int64, 0, 600)
+	for i := range 600 {
+		buyerIDs = append(buyerIDs, int64(100+i))
+	}
+	seedParties(t, f.db, buyerIDs, nil)
 	f.run(t, m)
 	sub := f.subscribe(t, m, f.storeParty(t, s1), nil)
 	untilReady(t, sub)
@@ -634,6 +639,7 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 	}
 
 	// 存活標記寫不進去：Subscribe 失敗（fail-closed）。
+	seedParties(t, f.db, []int64{99}, nil)
 	f.exec(t, "ALTER TABLE im.presence_streams RENAME TO presence_streams_gone")
 	_, err = m1.Subscribe(ctx, f.buyerParty(99), nil)
 	if err == nil || kindOf(err) == apperr.KindResourceExhausted {
