@@ -175,4 +175,5 @@ A6-D14 W6 (b) 定了「伺服器參照」的方向，但商品與訂單的擁有
 - W2 (c)：`SubmitReport` 不加欄位，由 `im.MessageForReport` 推導檢舉人是買家方或店家方；店家送出的檢舉列表照 W1 另開 `ListMyStoreReports`。
 - W3 (a)：這次只出 `TEXT`、`IMAGE`；卡片延到 ordering 或 catalog 進單體（B8）後加。
 - W4 (a)：`SendMessageRequest.request_id` 必填 UUIDv4，im 加 `UNIQUE (conversation_id, sender_kind, request_id)`，重送回傳既有訊息。
-- W5、W6：待決。
+- W5 (a)：刪 `lookup`，優惠券選買家改從 `ListCustomers` 挑（UI 方向已同意，畫面細節在 A6-6 給 Will 看）。
+- W6 (a)：CRM 不暴露訂單；seller-app 客戶詳情改用店家訂單列表加 `buyer_id` 篩選，5d 先查 Java 列表是否支援，不支援停下回報。
