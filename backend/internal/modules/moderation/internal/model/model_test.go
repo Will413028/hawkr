@@ -12,7 +12,7 @@ func TestActionAllowedOnMatchesTheDocumentedMatrix(t *testing.T) {
 		ActionHide:     {TargetComment: true, TargetForumEntry: true, TargetReview: true, TargetChatMessage: true},
 		ActionWarn:     {TargetComment: true, TargetForumEntry: true, TargetBuyer: true, TargetReview: true, TargetChatMessage: true},
 		ActionBan:      {TargetComment: true, TargetForumEntry: true, TargetBuyer: true, TargetReview: true, TargetChatMessage: true},
-		ActionTakedown: {TargetPost: true, TargetComment: true, TargetForumEntry: true},
+		ActionTakedown: {TargetPost: true, TargetComment: true, TargetForumEntry: true, TargetChatMessage: true, TargetReviewReply: true},
 	}
 	for _, a := range Actions() {
 		for _, k := range TargetKinds() {

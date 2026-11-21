@@ -169,11 +169,15 @@ func reportsPB(reports []moderation.Report) []*adminpb.CaseReport {
 	for i, r := range reports {
 		out[i] = &adminpb.CaseReport{
 			Id:          r.ID.String(),
-			ReporterId:  rpc.FormatID(r.ReporterBuyerID),
 			Category:    rpc.EnumToProto[commonpb.PolicyCategory](r.Category),
 			Description: r.Description,
 			Outcome:     rpc.EnumToProto[pb.ReportOutcome](r.Outcome),
 			CreateTime:  timestamppb.New(r.CreatedAt),
+		}
+		if r.ReporterStoreID > 0 {
+			out[i].Reporter = &adminpb.CaseReport_ReporterStoreId{ReporterStoreId: rpc.FormatID(r.ReporterStoreID)}
+		} else {
+			out[i].Reporter = &adminpb.CaseReport_ReporterBuyerId{ReporterBuyerId: rpc.FormatID(r.ReporterBuyerID)}
 		}
 	}
 	return out
@@ -196,6 +200,11 @@ func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
 		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Review{Review: &adminpb.ReviewSnapshot{
 			AuthorId: rpc.FormatID(x.AuthorID), StoreId: rpc.FormatID(x.SubjectStoreID), ProductId: rpc.FormatID(x.ProductID), Rating: int32(x.Rating), //nolint:gosec // 評價分數是 1 到 5
 			Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt), ReplyBody: x.ReplyBody,
+		}}}
+	case c.ReviewReply != nil:
+		x := c.ReviewReply
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_ReviewReply{ReviewReply: &adminpb.ReviewReplySnapshot{
+			StoreId: rpc.FormatID(x.StoreID), ReviewId: x.ReviewID, ReviewerId: rpc.FormatID(x.ReviewerID), Body: x.Body, AuthoredTime: optionalTime(x.AuthoredAt),
 		}}}
 	case c.Chat != nil:
 		x := c.Chat

@@ -68,7 +68,7 @@ function kase(patch: MessageInitShape<typeof CaseSchema> = {}) {
 const reports = [
 	create(CaseReportSchema, {
 		id: "r-new",
-		reporterId: "b-2",
+		reporter: { case: "reporterBuyerId", value: "b-2" },
 		category: PolicyCategory.SPAM,
 		description: "新的檢舉",
 		outcome: ReportOutcome.PENDING,
@@ -76,7 +76,7 @@ const reports = [
 	}),
 	create(CaseReportSchema, {
 		id: "r-old",
-		reporterId: "b-1",
+		reporter: { case: "reporterStoreId", value: "7" },
 		category: PolicyCategory.HATE,
 		description: "舊的檢舉",
 		outcome: ReportOutcome.PENDING,
@@ -136,6 +136,9 @@ test("案件與全部檢舉，舊到新", async () => {
 	const text = bodyText();
 	assert.ok(text.includes("留言") && text.includes("comment-1"));
 	assert.ok(text.indexOf("舊的檢舉") < text.indexOf("新的檢舉"));
+	assert.ok(
+		text.includes("檢舉人（買家）b-2") && text.includes("檢舉人（店家）7"),
+	);
 });
 
 test("進行中的案件：決定不違規帶讀到的 etag，不帶處置欄位", async () => {

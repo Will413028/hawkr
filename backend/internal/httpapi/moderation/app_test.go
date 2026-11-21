@@ -267,6 +267,7 @@ func TestReviewAndChatMessageTargetsAreContentIDs(t *testing.T) {
 	for kind, want := range map[pb.ReportTargetKind]moderation.TargetKind{
 		pb.ReportTargetKind_REPORT_TARGET_KIND_REVIEW:       moderation.TargetReview,
 		pb.ReportTargetKind_REPORT_TARGET_KIND_CHAT_MESSAGE: moderation.TargetChatMessage,
+		pb.ReportTargetKind_REPORT_TARGET_KIND_REVIEW_REPLY: moderation.TargetReviewReply,
 	} {
 		got, err := target(&pb.ReportTarget{Kind: kind, Id: id.String()})
 		if err != nil || got.Kind != want || got.ContentID != id || got.BuyerID != 0 {

@@ -182,7 +182,7 @@ func TestFrozenContentReadsTheSnapshotOncePerDecide(t *testing.T) {
 func TestMeasureSnapshotFromTheFrozenContent(t *testing.T) {
 	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
 	post, thread := uuid.NewV7(), uuid.NewV7()
-	frozen := snapshot.Social{Body: "全文", AuthoredAt: at, MediaRefs: []string{"a", "b"}, PostID: post.String(), ThreadID: thread.String()}
+	frozen := snapshot.Content{Kind: model.TargetComment, Social: &snapshot.Social{Body: "全文", AuthoredAt: at, MediaRefs: []string{"a", "b"}, PostID: post.String(), ThreadID: thread.String()}}
 	got, err := measureSnapshot(model.TargetComment, 12, frozen)
 	if err != nil || got.Body != "全文" || !got.AuthoredAt.Equal(at) || got.ImageCount != 2 || got.Link != (seller.ContentLink{PostID: post}) {
 		t.Fatalf("留言 %+v err=%v", got, err)
@@ -192,7 +192,7 @@ func TestMeasureSnapshotFromTheFrozenContent(t *testing.T) {
 		t.Fatalf("討論區留言 %+v err=%v", got, err)
 	}
 	for _, kind := range []model.TargetKind{model.TargetPost, model.TargetComment, model.TargetForumEntry} {
-		if _, err := measureSnapshot(kind, 12, snapshot.Social{Body: "舊格式", AuthoredAt: at}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		if _, err := measureSnapshot(kind, 12, snapshot.Content{Kind: kind, Social: &snapshot.Social{Body: "舊格式", AuthoredAt: at}}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 			t.Errorf("%s 缺連結：%v", kind, err)
 		}
 	}
@@ -224,5 +224,23 @@ func TestValidateReverse(t *testing.T) {
 		if _, err := ValidateReverse(in); err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {
 			t.Errorf("%s 是接線錯誤：%v", name, err)
 		}
+	}
+}
+
+// 聊天訊息與評價回覆的措施快照：本文、發文時間、圖片張數照凍結的內容，連結一律全空；沒有種類專屬欄位的內容不傳快照。
+func TestMeasureSnapshotForChatMessageAndReviewReply(t *testing.T) {
+	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
+	chat := snapshot.Content{Kind: model.TargetChatMessage, Chat: &snapshot.Chat{AuthorKind: "STORE", AuthorID: 12, StoreID: 12, Body: "訊息", AuthoredAt: at, MediaRefs: []string{"a"}}}
+	got, err := measureSnapshot(model.TargetChatMessage, 12, chat)
+	if err != nil || got.Body != "訊息" || got.ImageCount != 1 || got.Link != (seller.ContentLink{}) || !got.AuthoredAt.Equal(at) {
+		t.Fatalf("聊天 %+v err=%v", got, err)
+	}
+	reply := snapshot.Content{Kind: model.TargetReviewReply, ReviewReply: &snapshot.ReviewReply{StoreID: 12, ReviewID: uuid.NewV7().String(), Body: "回覆", AuthoredAt: at}}
+	got, err = measureSnapshot(model.TargetReviewReply, 12, reply)
+	if err != nil || got.Body != "回覆" || got.ImageCount != 0 || got.Link != (seller.ContentLink{}) {
+		t.Fatalf("回覆 %+v err=%v", got, err)
+	}
+	if _, err := measureSnapshot(model.TargetReviewReply, 12, snapshot.Content{Kind: model.TargetReview, Review: &snapshot.Review{}}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("評價不能下架：%v", err)
 	}
 }

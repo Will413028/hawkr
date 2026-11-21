@@ -37,11 +37,13 @@ const (
 	// TargetReview 是買家寫的評價（review 模組）；TargetChatMessage 是買家與店家之間的一則聊天訊息（im 模組）。
 	TargetReview      TargetKind = "REVIEW"
 	TargetChatMessage TargetKind = "CHAT_MESSAGE"
+	// TargetReviewReply 是店家對評價的回覆（review 模組）；ContentID 是評價 ID（回覆沒有自己的 ID，一則評價至多一則回覆）。
+	TargetReviewReply TargetKind = "REVIEW_REPLY"
 )
 
 // TargetKinds 回傳全部檢舉對象的種類，與 cases_target_kind_check 一致。
 func TargetKinds() []TargetKind {
-	return []TargetKind{TargetPost, TargetComment, TargetForumEntry, TargetBuyer, TargetReview, TargetChatMessage}
+	return []TargetKind{TargetPost, TargetComment, TargetForumEntry, TargetBuyer, TargetReview, TargetChatMessage, TargetReviewReply}
 }
 
 // Valid 說明這是不是檢舉對象的種類。
@@ -116,7 +118,7 @@ func (a Action) AllowedOn(k TargetKind) bool {
 	case ActionWarn, ActionBan:
 		return k == TargetComment || k == TargetForumEntry || k == TargetBuyer || k == TargetReview || k == TargetChatMessage
 	case ActionTakedown:
-		return k == TargetPost || k == TargetComment || k == TargetForumEntry
+		return k == TargetPost || k == TargetComment || k == TargetForumEntry || k == TargetChatMessage || k == TargetReviewReply
 	}
 	return false
 }
@@ -182,9 +184,11 @@ type Reversal struct {
 
 // Report 是一筆檢舉；Outcome 由所屬案件推導。
 type Report struct {
-	ID              uuid.UUID
-	CaseID          uuid.UUID
+	ID     uuid.UUID
+	CaseID uuid.UUID
+	// ReporterBuyerID 與 ReporterStoreID 恰好一個是正數（買家或店家檢舉人，A6-D21 W3）。
 	ReporterBuyerID int64
+	ReporterStoreID int64
 	Category        policy.Category
 	Description     string
 	SnapshotID      *uuid.UUID
@@ -194,7 +198,9 @@ type Report struct {
 
 // SubmitInput 是送出檢舉的輸入。
 type SubmitInput struct {
+	// ReporterBuyerID 與 ReporterStoreID 恰好一個是正數；店家檢舉人只能檢舉 CHAT_MESSAGE（而且要是那段對話的一方）。
 	ReporterBuyerID int64
+	ReporterStoreID int64
 	Target          Target
 	Category        policy.Category
 	Description     string

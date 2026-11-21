@@ -374,7 +374,8 @@ END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、
 -- 沒有結束時間，生效與否只看 status，所以不收 at。給 social 的每日對帳核對它自己的複本 social.content_takedowns 有沒有漏或多（Go 查詢；
--- social 的讀取不 join 它，D-sync）。
+-- social 的讀取不 join 它，D-sync）。c.measure_status 是 m.status 的複本（複合外鍵同步），兩邊都寫是為了讓 im、review 的逐列 EXISTS 能走部分唯一索引
+-- measure_contents_one_enforced（content_kind, content_id）WHERE measure_status = 'ENFORCED'。
 CREATE TYPE seller.pub_content_takedown AS (measure_id UUID, content_kind TEXT, content_id UUID);
 
 CREATE FUNCTION seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown
@@ -383,7 +384,7 @@ BEGIN ATOMIC
     SELECT c.measure_id, c.content_kind, c.content_id
     FROM seller.measures m
     JOIN seller.measure_contents c ON c.measure_id = m.id
-    WHERE m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN';
+    WHERE m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN' AND c.measure_status = 'ENFORCED';
 END;
 
 -- 鎖住一個內容下架措施此刻生效中的對象並回傳（VOLATILE：帶鎖的 SELECT 不能在 STABLE 函式裡）。鎖是措施列與它的對象列的 FOR SHARE：撤銷措施的 UPDATE 寫這兩處

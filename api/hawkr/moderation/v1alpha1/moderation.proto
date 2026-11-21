@@ -40,6 +40,8 @@ enum ReportTargetKind {
   REPORT_TARGET_KIND_REVIEW = 5;
   // 買家與店家之間的一則聊天訊息；id 是訊息 ID。
   REPORT_TARGET_KIND_CHAT_MESSAGE = 6;
+  // 店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。
+  REPORT_TARGET_KIND_REVIEW_REPLY = 7;
 }
 
 // ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。

@@ -48,7 +48,8 @@ type ModerationMediaRefSync struct {
 type ModerationReport struct {
 	ID              uuid.UUID
 	CaseID          uuid.UUID
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	Category        string
 	Description     *string
 	SnapshotID      *uuid.UUID
@@ -56,14 +57,16 @@ type ModerationReport struct {
 }
 
 type ModerationReportRequest struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	RequestID       uuid.UUID
 	ReportID        uuid.UUID
 	RequestHash     []byte
 }
 
 type ModerationReporterDailyCount struct {
-	ReporterBuyerID int64
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
 	Day             time.Time
 	Submitted       int32
 }

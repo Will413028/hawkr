@@ -27,6 +27,8 @@ func newReview(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module
 	})
 	events.Subscribe(bus, m.OnBuyerDeletionRequested)
 	events.Subscribe(bus, m.OnBuyerDeleted)
+	events.Subscribe(bus, m.OnMeasureCreated)
+	events.Subscribe(bus, m.OnMeasureRevoked)
 	return m
 }
 

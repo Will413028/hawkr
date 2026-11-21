@@ -70,9 +70,16 @@ func (s *Service) page(ctx context.Context, list []store.ReviewReview, size int3
 		return model.Page{}, err
 	}
 	byReview := rows.Images(imgs)
+	down, err := s.takenDownReplies(ctx, ids)
+	if err != nil {
+		return model.Page{}, err
+	}
 	out := model.Page{Reviews: make([]model.Review, len(list))}
 	for i, r := range list {
 		out.Reviews[i] = rows.Review(r, byReview[r.ID])
+		if down[r.ID] {
+			out.Reviews[i].Reply = nil
+		}
 	}
 	if more {
 		last := list[len(list)-1]
@@ -164,7 +171,28 @@ func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int
 	if err != nil {
 		return model.Review{}, err
 	}
-	return rows.Review(r, rows.Images(imgs)[id]), nil
+	out := rows.Review(r, rows.Images(imgs)[id])
+	down, err := s.takenDownReplies(ctx, []uuid.UUID{id})
+	if err != nil {
+		return model.Review{}, err
+	}
+	if down[id] {
+		out.Reply = nil
+	}
+	return out, nil
+}
+
+// takenDownReplies 回傳店家回覆被內容下架措施下架的評價 ID；讀取時回覆換成沒有回覆。
+func (s *Service) takenDownReplies(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	got, err := s.q(ctx).TakenDownReplyIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]bool, len(got))
+	for _, id := range got {
+		out[id] = true
+	}
+	return out, nil
 }
 
 // ReviewForReport 是檢舉用的單筆讀取：可讀規則與 GetReview 共用同一組公開可讀述詞與觀看者封鎖，不可讀與不存在同為 NotFound；不鎖列、加入呼叫方的 transaction。

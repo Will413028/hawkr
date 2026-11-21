@@ -27,6 +27,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 - 長度以字元計（上限 1000）；附圖最多 4 張（`review_images_position_check`、`MaxImages`）；超過回 InvalidInput，不截斷。
 - 訂單不是提交者的，回與不存在相同的 NotFound（A6-D10，先於狀態檢查）；只有訂單狀態 50 能評價，期限 30 天；`Orders` 回 `ErrOrderNotFound` 才是 NotFound，其他錯誤一律 Unavailable。
 - `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 發 `ReviewAggregateChanged` 並排快取失效；重複隱藏不發事件。
+- 店家回覆可被 seller 的內容下架措施（`REVIEW_REPLY`，`content_id` 是評價 ID，A6-D21）下架：review 不存複本，`TakenDownReplyIDs` join `seller.pub_content_takedowns()`，列表與單筆讀取把 `Reply` 設為 nil（店家自己的視圖也一樣），評價照常、統計不變；`OnMeasureCreated`／`OnMeasureRevoked` 同 transaction 依 id 升序鎖評價列並核對評價屬於措施的店家（不符回 `TakedownContentError`），不發事件（回覆不進評分彙總）（`TestReviewReplyTakedownHidesOnlyTheReply`）。
 - 媒體引用只由同步 job 寫；transaction 內只寫業務列、同步版本並排 job，不呼叫 media。
 - 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只排 `review.purge_author`（`EnqueuePurge`）（以買家為唯一鍵），不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批記退場資產、排媒體同步與 `revalidate`，每批每組 (店, 商品) 發一個 `ReviewAggregateChanged`（A6-D12），可重跑；`review.purge_sweep` 週期掃描補排失敗被丟棄的清除 job（A6-D13）。守門：`TestDeactivationHidesReviewsImmediatelyViaThePubJoin`、`TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
 - `Submit` 的 insert transaction 第一句 `Buyers.LockActive`（買家列 `FOR KEY SHARE`，與買家轉移的 `FOR UPDATE` 互斥），NotFound 與 FailedPrecondition 都回 `ReviewAuthorInactive`；清除 job 的唯一性不含執行中的狀態。守門：`TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard`。

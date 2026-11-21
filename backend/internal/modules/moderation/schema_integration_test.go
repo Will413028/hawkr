@@ -123,7 +123,9 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 		"買家不能下架":        {"BUYER", violation, ptr("SPAM"), ptr("TAKEDOWN"), &admin, &closed},
 		"買家不能隱藏":        {"BUYER", violation, ptr("SPAM"), ptr("HIDE"), &admin, &closed},
 		"評價不能下架":        {"REVIEW", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN"), &admin, &closed},
-		"聊天不能下架":        {"CHAT_MESSAGE", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN"), &admin, &closed},
+		"評價回覆不能隱藏":      {"REVIEW_REPLY", violation, ptr("SPAM"), ptr("HIDE"), &admin, &closed},
+		"評價回覆不能警告":      {"REVIEW_REPLY", violation, ptr("SPAM"), ptr("WARN"), &admin, &closed},
+		"評價回覆不能停權":      {"REVIEW_REPLY", violation, ptr("HARASSMENT"), ptr("BAN"), &admin, &closed},
 		"OTHER 不能當認定類別": {"COMMENT", violation, ptr("OTHER"), ptr("HIDE"), &admin, &closed},
 		"結案早於開案":        {"COMMENT", noViolation, none, none, &admin, ptr(opened.Add(-time.Hour))},
 	} {
@@ -135,19 +137,21 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 		kind                    string
 		decision, category, act *string
 	}{
-		"進行中":  {"COMMENT", none, none, none},
-		"不違規":  {"FORUM_ENTRY", noViolation, none, none},
-		"留言隱藏": {"COMMENT", violation, ptr("HATE"), ptr("HIDE")},
-		"買家警告": {"BUYER", violation, ptr("SEXUAL_CONTENT"), ptr("WARN")},
-		"買家停權": {"BUYER", violation, ptr("HARASSMENT"), ptr("BAN")},
-		"貼文下架": {"POST", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN")},
-		"留言警告": {"COMMENT", violation, ptr("SPAM"), ptr("WARN")},
-		"評價隱藏": {"REVIEW", violation, ptr("SPAM"), ptr("HIDE")},
-		"評價警告": {"REVIEW", violation, ptr("SPAM"), ptr("WARN")},
-		"評價停權": {"REVIEW", violation, ptr("HARASSMENT"), ptr("BAN")},
-		"聊天隱藏": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("HIDE")},
-		"聊天警告": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("WARN")},
-		"聊天停權": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("BAN")},
+		"進行中":    {"COMMENT", none, none, none},
+		"不違規":    {"FORUM_ENTRY", noViolation, none, none},
+		"留言隱藏":   {"COMMENT", violation, ptr("HATE"), ptr("HIDE")},
+		"買家警告":   {"BUYER", violation, ptr("SEXUAL_CONTENT"), ptr("WARN")},
+		"買家停權":   {"BUYER", violation, ptr("HARASSMENT"), ptr("BAN")},
+		"貼文下架":   {"POST", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN")},
+		"留言警告":   {"COMMENT", violation, ptr("SPAM"), ptr("WARN")},
+		"評價隱藏":   {"REVIEW", violation, ptr("SPAM"), ptr("HIDE")},
+		"評價警告":   {"REVIEW", violation, ptr("SPAM"), ptr("WARN")},
+		"評價停權":   {"REVIEW", violation, ptr("HARASSMENT"), ptr("BAN")},
+		"聊天隱藏":   {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("HIDE")},
+		"聊天警告":   {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("WARN")},
+		"聊天停權":   {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("BAN")},
+		"聊天下架":   {"CHAT_MESSAGE", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN")},
+		"評價回覆下架": {"REVIEW_REPLY", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN")},
 	} {
 		adminID, closedAt := &admin, &closed
 		if c.decision == nil {

@@ -112,6 +112,7 @@ message CaseSnapshot {
     BuyerSnapshot buyer = 2;
     ReviewSnapshot review = 3;
     ChatSnapshot chat = 4;
+    ReviewReplySnapshot review_reply = 5;
   }
 }
 
@@ -147,6 +148,18 @@ message ReviewSnapshot {
   string reply_body = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
+// ReviewReplySnapshot 是店家對評價的回覆的快照；作者永遠是評價所屬的店家。
+message ReviewReplySnapshot {
+  // 回覆的店家，也是評價所屬的店家。
+  string store_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 評價 ID（回覆沒有自己的 ID）。
+  string review_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 評價的買家（上下文）。
+  string reviewer_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp authored_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
 // ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。
 message ChatSnapshot {
   // 寄件方種類：BUYER 或 STORE。
@@ -178,8 +191,13 @@ message ChatContextMessage {
 // CaseReport 是案件裡的一筆檢舉。
 message CaseReport {
   string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 檢舉人（買家 ID）。
-  string reporter_id = 2;
+  // 檢舉人：買家或店家，恰好設一個（店家只會檢舉店家聊天訊息）。
+  oneof reporter {
+    // 買家 ID（過渡期的十進位整數字串）。
+    string reporter_buyer_id = 2;
+    // 店家 ID（過渡期的十進位整數字串）。
+    string reporter_store_id = 7;
+  }
   hawkr.common.v1alpha1.PolicyCategory category = 3;
   // 送出時的說明；沒有或已超過保留期被清除時是空字串。
   string description = 4;

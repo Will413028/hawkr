@@ -95,6 +95,8 @@ func TestEveryPublicQueryCarriesThePublicPredicate(t *testing.T) {
 // 公開讀取以外讀 review.reviews 的查詢（寫入路徑、作者本人、診斷）要明列：新增的讀取預設是公開讀取，放在 public.sql 才有述詞的保證。
 var nonPublicReads = map[string]bool{
 	"InsertReview": true, "ListMyReviews": true, "ReplyToReview": true, "GetReviewForDiagnosis": true, "LockReview": true,
+	// 內容下架訂閱者（takedowns.sql）：seller 措施同 transaction 鎖評價列核對歸屬，不回內容。
+	"LockReviewsForTakedown": true,
 	// review.review_images 的非公開讀寫：附圖只經已過可讀述詞的評價列取（ListReviewImages 的呼叫端傳入的 ID 來自公開或作者本人的列），
 	// ReviewAssets 是媒體同步 job 讀業務列現況，不對外。
 	"InsertReviewImage": true, "ListReviewImages": true, "ReviewAssets": true,

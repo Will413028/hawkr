@@ -24,6 +24,8 @@ type Content struct {
 	Buyer  *Buyer           `json:"buyer,omitempty"`
 	Review *Review          `json:"review,omitempty"`
 	Chat   *Chat            `json:"chat,omitempty"`
+	// ReviewReply 是店家對評價的回覆；Kind 為 REVIEW_REPLY。
+	ReviewReply *ReviewReply `json:"review_reply,omitempty"`
 }
 
 // Social 是貼文、留言與討論區留言的快照。AuthoredAt 是作者發文的時間，PostID 是貼文與貼文留言連結的貼文，ThreadID 是討論區留言所屬的討論串（與 StoreID 組成連結）：
@@ -37,6 +39,15 @@ type Social struct {
 	AuthoredAt time.Time `json:"authored_at,omitzero"`
 	PostID     string    `json:"post_id,omitempty"`
 	ThreadID   string    `json:"thread_id,omitempty"`
+}
+
+// ReviewReply 是店家回覆的快照：作者與歸屬都是評價所屬的店家（StoreID）；ReviewID 是評價 ID（回覆沒有自己的 ID），ReviewerID 是評價的買家（上下文）。
+type ReviewReply struct {
+	StoreID    int64     `json:"store_id"`
+	ReviewID   string    `json:"review_id"`
+	ReviewerID int64     `json:"reviewer_id"`
+	Body       string    `json:"body"`
+	AuthoredAt time.Time `json:"authored_at,omitzero"`
 }
 
 // Buyer 是被檢舉買家的公開檔案。
@@ -93,6 +104,8 @@ func (c Content) Author() (kind string, id int64, ok bool) {
 		return string(social.ActorBuyer), c.Review.AuthorID, true
 	case c.Chat != nil:
 		return c.Chat.AuthorKind, c.Chat.AuthorID, true
+	case c.ReviewReply != nil:
+		return string(social.ActorStore), c.ReviewReply.StoreID, true
 	}
 	return "", 0, false
 }
@@ -104,6 +117,8 @@ func (c Content) StoreID() int64 {
 		return c.Social.StoreID
 	case c.Chat != nil:
 		return c.Chat.StoreID
+	case c.ReviewReply != nil:
+		return c.ReviewReply.StoreID
 	}
 	return 0
 }
@@ -133,10 +148,13 @@ func (c Content) AssetIDs() []string {
 	return out
 }
 
+// Takedownable 說明這份快照是不是店家寫的內容的種類（社群內容、聊天訊息、評價回覆）：只有這些能走 seller 的內容下架措施。
+func (c Content) Takedownable() bool { return c.Social != nil || c.Chat != nil || c.ReviewReply != nil }
+
 // Validate 檢查 Kind 與種類專屬欄位一致：恰好有一個欄位有值，而且就是 Kind 對應的那個。
 func (c Content) Validate() error {
 	set := 0
-	for _, p := range []bool{c.Social != nil, c.Buyer != nil, c.Review != nil, c.Chat != nil} {
+	for _, p := range []bool{c.Social != nil, c.Buyer != nil, c.Review != nil, c.Chat != nil, c.ReviewReply != nil} {
 		if p {
 			set++
 		}
@@ -151,6 +169,8 @@ func (c Content) Validate() error {
 		ok = c.Review != nil
 	case model.TargetChatMessage:
 		ok = c.Chat != nil
+	case model.TargetReviewReply:
+		ok = c.ReviewReply != nil
 	}
 	if !ok || set != 1 {
 		return fmt.Errorf("snapshot：種類 %q 與欄位不一致", c.Kind)
@@ -191,6 +211,11 @@ func Normalize(c Content) Content {
 		r := *c.Review
 		r.Body, r.ReplyBody, r.AuthoredAt, r.MediaRefs = body(r.Body), body(r.ReplyBody), at(r.AuthoredAt), refs(r.MediaRefs)
 		c.Review = &r
+	}
+	if c.ReviewReply != nil {
+		r := *c.ReviewReply
+		r.Body, r.AuthoredAt = body(r.Body), at(r.AuthoredAt)
+		c.ReviewReply = &r
 	}
 	if c.Chat != nil {
 		ch := *c.Chat

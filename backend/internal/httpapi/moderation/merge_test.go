@@ -306,7 +306,7 @@ func TestMergedPageSizeLimitFitsBothSources(t *testing.T) {
 }
 
 func TestOutcomeAndTargetEnumsMatchTheModules(t *testing.T) {
-	if m := rpc.EnumMismatches[pb.ReportTargetKind]([]moderation.TargetKind{moderation.TargetPost, moderation.TargetComment, moderation.TargetForumEntry, moderation.TargetBuyer, moderation.TargetReview, moderation.TargetChatMessage}); len(m) != 0 {
+	if m := rpc.EnumMismatches[pb.ReportTargetKind]([]moderation.TargetKind{moderation.TargetPost, moderation.TargetComment, moderation.TargetForumEntry, moderation.TargetBuyer, moderation.TargetReview, moderation.TargetChatMessage, moderation.TargetReviewReply}); len(m) != 0 {
 		t.Fatalf("ReportTargetKind：%v", m)
 	}
 	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomePending, moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {

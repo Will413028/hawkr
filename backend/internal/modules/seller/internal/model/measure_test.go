@@ -995,6 +995,31 @@ func TestValidateContentTargetsRules(t *testing.T) {
 	}
 }
 
+func TestNonSocialContentKindsRequireEmptyLinks(t *testing.T) {
+	var postID, threadID uuid.UUID
+	postID[15], threadID[15] = 9, 8
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	for _, kind := range []ContentKind{ContentChatMessage, ContentReviewReply} {
+		built := NewContentSnapshot(kind, "x", at, 0, 7, postID, threadID)
+		if built.Link != (ContentLink{}) {
+			t.Errorf("%s：組出的快照不得帶連結：%+v", kind, built.Link)
+		}
+		if err := ValidateSnapshot(kind, built); err != nil {
+			t.Errorf("%s：沒有連結的快照要通過：%v", kind, err)
+		}
+		for name, l := range map[string]ContentLink{
+			"貼文連結":  {PostID: postID},
+			"討論串連結": {StoreID: 7, ThreadID: threadID},
+		} {
+			s := built
+			s.Link = l
+			if err := ValidateSnapshot(kind, s); err == nil {
+				t.Errorf("%s：帶%s要被拒絕", kind, name)
+			}
+		}
+	}
+}
+
 func TestExcerptTruncatesAtRunesAndMarksOnlyWhenLonger(t *testing.T) {
 	exact := strings.Repeat("字", ExcerptRunes)
 	tests := []struct{ name, body, want string }{

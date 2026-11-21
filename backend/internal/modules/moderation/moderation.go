@@ -80,6 +80,8 @@ type (
 	BuyerSnapshot = snapshot.Buyer
 	// ReviewSnapshot 是評價的快照。
 	ReviewSnapshot = snapshot.Review
+	// ReviewReplySnapshot 是店家對評價的回覆的快照。
+	ReviewReplySnapshot = snapshot.ReviewReply
 	// ChatSnapshot 是聊天訊息與前後文的快照。
 	ChatSnapshot = snapshot.Chat
 	// ChatContextMessage 是聊天前後文的一則。
@@ -110,6 +112,7 @@ const (
 	TargetBuyer         = model.TargetBuyer
 	TargetReview        = model.TargetReview
 	TargetChatMessage   = model.TargetChatMessage
+	TargetReviewReply   = model.TargetReviewReply
 	DecisionViolation   = model.DecisionViolation
 	DecisionNoViolation = model.DecisionNoViolation
 	ActionHide          = model.ActionHide

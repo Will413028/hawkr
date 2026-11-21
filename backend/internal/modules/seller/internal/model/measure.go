@@ -47,6 +47,10 @@ const (
 	ContentComment = contentkind.Comment
 	// ContentForumEntry 討論區留言。
 	ContentForumEntry = contentkind.ForumEntry
+	// ContentChatMessage 店家寄出的聊天訊息（im）。
+	ContentChatMessage = contentkind.ChatMessage
+	// ContentReviewReply 店家對評價的回覆（review，content_id 是評價 ID）。
+	ContentReviewReply = contentkind.ReviewReply
 )
 
 // ContentKindValues 回傳全部內容種類，與 DB 的 measure_contents_content_kind_check 一致。
@@ -176,6 +180,9 @@ func ValidateContentRefs(field string, refs []ContentRef) error {
 // 只組裝、不驗證：格式由 validateSnapshot 唯一把關（缺連結 id 或發文時間為零會被拒絕）。後台建立與 moderation 轉用案件快照兩個入口共用它。
 func NewContentSnapshot(kind ContentKind, body string, authoredAt time.Time, mediaCount int, storeID int64, postID, threadID uuid.UUID) ContentSnapshot {
 	s := ContentSnapshot{Body: body, AuthoredAt: authoredAt, ImageCount: int32(mediaCount)} //nolint:gosec // 一則內容的圖片張數遠小於 int32
+	if !kind.Social() {
+		return s
+	}
 	if kind == contentkind.ForumEntry {
 		s.Link = ContentLink{StoreID: storeID, ThreadID: threadID}
 	} else {
@@ -200,6 +207,12 @@ func validateSnapshot(at string, kind ContentKind, s ContentSnapshot) error {
 	if kind == contentkind.ForumEntry {
 		if l.PostID != uuid.Nil() || l.StoreID <= 0 || l.ThreadID == uuid.Nil() {
 			return apperr.InvalidInputOn([]string{at}, "討論區發言的連結必須是店家加討論串")
+		}
+		return nil
+	}
+	if !kind.Social() {
+		if l != (ContentLink{}) {
+			return apperr.InvalidInputOn([]string{at}, "聊天訊息與評價回覆沒有連結")
 		}
 		return nil
 	}

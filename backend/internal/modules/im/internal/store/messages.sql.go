@@ -34,7 +34,7 @@ func (q *Queries) EraseMessages(ctx context.Context, arg EraseMessagesParams) (i
 const getMessageForRelay = `-- name: GetMessageForRelay :one
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
-       (h.id IS NOT NULL)::boolean AS hidden,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden,
        CASE WHEN m.sender_kind = 'BUYER'
             THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
             ELSE EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
@@ -184,7 +184,7 @@ func (q *Queries) ListInactivePartiesWithMessages(ctx context.Context, arg ListI
 
 const listMessagesAfter = `-- name: ListMessagesAfter :many
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS m
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
 WHERE m.conversation_id = $1 AND m.seq > $2::bigint
@@ -247,7 +247,7 @@ func (q *Queries) ListMessagesAfter(ctx context.Context, arg ListMessagesAfterPa
 
 const listMessagesBefore = `-- name: ListMessagesBefore :many
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS m
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
 WHERE m.conversation_id = $1
@@ -392,7 +392,7 @@ const messagesForReport = `-- name: MessagesForReport :many
 SELECT (m.id = $1::uuid)::boolean AS is_target,
        m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.messages AS t
 JOIN im.messages AS m ON m.conversation_id = t.conversation_id AND m.seq BETWEEN t.seq - $2::bigint AND t.seq + $2::bigint
 JOIN im.conversations AS c ON c.id = m.conversation_id

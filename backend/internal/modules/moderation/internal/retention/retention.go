@@ -142,13 +142,13 @@ func (s *Service) clearReporter(ctx context.Context, buyerID, accountID int64) e
 	}
 	q := store.New(s.d.DB.Conn(ctx))
 	for _, id := range ids {
-		if _, err := q.ClearReporterDescriptions(ctx, id); err != nil {
+		if _, err := q.ClearReporterDescriptions(ctx, &id); err != nil {
 			return fmt.Errorf("moderation：清除檢舉人 %d 的說明：%w", id, err)
 		}
-		if _, err := q.DeleteReporterRequests(ctx, id); err != nil {
+		if _, err := q.DeleteReporterRequests(ctx, &id); err != nil {
 			return fmt.Errorf("moderation：刪除檢舉人 %d 的冪等紀錄：%w", id, err)
 		}
-		if _, err := q.DeleteReporterDailyCount(ctx, id); err != nil {
+		if _, err := q.DeleteReporterDailyCount(ctx, &id); err != nil {
 			return fmt.Errorf("moderation：刪除檢舉人 %d 的每日計數：%w", id, err)
 		}
 	}

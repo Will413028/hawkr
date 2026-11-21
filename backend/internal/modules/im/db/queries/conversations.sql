@@ -67,7 +67,7 @@ SELECT COALESCE(SUM(last_seq - store_last_read_seq), 0)::bigint FROM im.conversa
 -- 預覽在讀取時由最後一則訊息推導（隱藏與抹除不必另外更新對話列）：以 (id, last_seq) 取最後一則，LEFT JOIN 未還原的隱藏。
 SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.buyer_last_read_seq AS read_seq, c.store_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.conversations AS c
 JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
@@ -79,7 +79,7 @@ LIMIT sqlc.arg(max_rows);
 -- name: ListConversationsStore :many
 SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.buyer_last_read_seq AS peer_read_seq, c.last_message_at,
        m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
-       (h.id IS NOT NULL)::boolean AS hidden
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
 FROM im.conversations AS c
 JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
