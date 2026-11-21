@@ -215,6 +215,10 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.social.OnStoreRetired)
 	events.Subscribe(bus, f.social.OnMeasureCreated)
 	events.Subscribe(bus, f.social.OnMeasureRevoked)
+	events.Subscribe(bus, f.im.OnMeasureCreated)
+	events.Subscribe(bus, f.im.OnMeasureRevoked)
+	events.Subscribe(bus, f.review.OnMeasureCreated)
+	events.Subscribe(bus, f.review.OnMeasureRevoked)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
 	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
@@ -269,6 +273,7 @@ func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
+	f.exec(t, `INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
 	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())

@@ -794,15 +794,25 @@ class ContentKind extends $pb.ProtobufEnum {
   static const ContentKind CONTENT_KIND_FORUM_ENTRY =
       ContentKind._(3, _omitEnumNames ? '' : 'CONTENT_KIND_FORUM_ENTRY');
 
+  /// 店家寄出的聊天訊息。
+  static const ContentKind CONTENT_KIND_CHAT_MESSAGE =
+      ContentKind._(4, _omitEnumNames ? '' : 'CONTENT_KIND_CHAT_MESSAGE');
+
+  /// 店家對評價的回覆（ID 是評價的 ID）。
+  static const ContentKind CONTENT_KIND_REVIEW_REPLY =
+      ContentKind._(5, _omitEnumNames ? '' : 'CONTENT_KIND_REVIEW_REPLY');
+
   static const $core.List<ContentKind> values = <ContentKind>[
     CONTENT_KIND_UNSPECIFIED,
     CONTENT_KIND_POST,
     CONTENT_KIND_COMMENT,
     CONTENT_KIND_FORUM_ENTRY,
+    CONTENT_KIND_CHAT_MESSAGE,
+    CONTENT_KIND_REVIEW_REPLY,
   ];
 
   static final $core.List<ContentKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static ContentKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

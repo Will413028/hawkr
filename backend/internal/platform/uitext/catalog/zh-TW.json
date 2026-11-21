@@ -212,6 +212,10 @@
       "message": "評價",
       "description": "買家寫的評價；id 是評價 ID。"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
@@ -292,6 +296,10 @@
       "message": "這個單位不支援",
       "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_UNIT_NOT_ALLOWED）"
     },
+    "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "店家寄出的聊天訊息。"
+    },
     "seller.ContentKind.CONTENT_KIND_COMMENT": {
       "message": "留言",
       "description": "貼文底下的留言。"
@@ -303,6 +311,10 @@
     "seller.ContentKind.CONTENT_KIND_POST": {
       "message": "貼文",
       "description": "店家貼文。"
+    },
+    "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆（ID 是評價的 ID）。"
     },
     "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
       "message": "請說明",
@@ -951,6 +963,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
       "message": "評價",
       "description": "買家寫的評價；id 是評價 ID。\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
+      "message": "評價回覆",
+      "description": "店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。\n受眾：後台員工"
     },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "已核准",

@@ -74,7 +74,7 @@ var trimmedColumns = []trimmedColumn{
 	{table: "im.hides", column: "source_ref", constraint: "hides_source_ref_check"},
 	{table: "im.hides", column: "restore_reason", constraint: "hides_restore_reason_check",
 		extra: map[string]any{"restored_at": time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC), "restored_by": int64(1)}},
-	{table: "moderation.reports", column: "description", constraint: "reports_description_check"},
+	{table: "moderation.reports", column: "description", constraint: "reports_description_check", extra: map[string]any{"reporter_buyer_id": int64(1)}},
 	{table: "moderation.cases", column: "reverse_reason", constraint: "cases_reverse_reason_check",
 		extra: map[string]any{"reversed_at": sellerEpoch.Add(time.Hour), "reversed_by_admin_id": int64(1), "closed_at": sellerEpoch, "opened_at": sellerEpoch,
 			"decision": "VIOLATION", "decision_category": "SPAM", "decision_action": "HIDE", "decided_by_admin_id": int64(1)}},

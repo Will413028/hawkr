@@ -28,12 +28,12 @@ RETURNING *;
 SELECT * FROM moderation.cases WHERE id = sqlc.arg(id);
 
 -- name: ExistingOpenReport :one
--- 這位檢舉人對這個對象在進行中案件裡已有的檢舉。
+-- 這位檢舉人（買家或店家，另一欄傳 NULL）對這個對象在進行中案件裡已有的檢舉。
 SELECT r.* FROM moderation.reports r
 JOIN moderation.cases c ON c.id = r.case_id
 WHERE c.target_kind = sqlc.arg(target_kind) AND c.closed_at IS NULL
   AND (c.content_id = sqlc.narg(content_id) OR c.buyer_id = sqlc.narg(buyer_id))
-  AND r.reporter_buyer_id = sqlc.arg(reporter_buyer_id);
+  AND (r.reporter_buyer_id = sqlc.narg(reporter_buyer_id) OR r.reporter_store_id = sqlc.narg(reporter_store_id));
 
 -- name: InsertSnapshot :execrows
 -- 同一案同一份內容已有快照時什麼都不寫（0 列）。
@@ -46,15 +46,15 @@ SELECT id FROM moderation.case_snapshots WHERE case_id = sqlc.arg(case_id) AND c
 
 -- name: InsertReport :one
 -- 同一位檢舉人在同一個案件的第二筆，什麼都不寫（沒有回傳列）。
-INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, category, description, snapshot_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(reporter_buyer_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at))
+INSERT INTO moderation.reports (id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.narg(reporter_buyer_id), sqlc.narg(reporter_store_id), sqlc.arg(category), sqlc.narg(description), sqlc.arg(snapshot_id), sqlc.arg(created_at))
 ON CONFLICT DO NOTHING
 RETURNING *;
 
 -- name: InsertReportRequest :execrows
 -- 記下 (檢舉人, request_id) 對應的檢舉；同一個 (檢舉人, request_id) 已有紀錄時什麼都不寫（回 0 列，呼叫端重試並比對內容）。
-INSERT INTO moderation.report_requests (reporter_buyer_id, request_id, report_id, request_hash)
-VALUES (sqlc.arg(reporter_buyer_id), sqlc.arg(request_id), sqlc.arg(report_id), sqlc.arg(request_hash))
+INSERT INTO moderation.report_requests (reporter_buyer_id, reporter_store_id, request_id, report_id, request_hash)
+VALUES (sqlc.narg(reporter_buyer_id), sqlc.narg(reporter_store_id), sqlc.arg(request_id), sqlc.arg(report_id), sqlc.arg(request_hash))
 ON CONFLICT DO NOTHING;
 
 -- name: ReportByRequest :one
@@ -62,7 +62,7 @@ ON CONFLICT DO NOTHING;
 SELECT sqlc.embed(r), q.request_hash
 FROM moderation.report_requests q
 JOIN moderation.reports r ON r.id = q.report_id
-WHERE q.reporter_buyer_id = sqlc.arg(reporter_buyer_id) AND q.request_id = sqlc.arg(request_id);
+WHERE (q.reporter_buyer_id = sqlc.narg(reporter_buyer_id) OR q.reporter_store_id = sqlc.narg(reporter_store_id)) AND q.request_id = sqlc.arg(request_id);
 
 -- name: ListReportsOfReporter :many
 -- 檢舉人自己的檢舉，新的在前，帶所屬案件的對象與決定（結果由案件推導）。keyset：(created_at, id) 由大到小。
@@ -79,6 +79,16 @@ LIMIT sqlc.arg(max_rows)::int;
 INSERT INTO moderation.reporter_daily_counts AS c (reporter_buyer_id, day, submitted)
 VALUES (sqlc.arg(reporter_buyer_id), sqlc.arg(day), 1)
 ON CONFLICT (reporter_buyer_id) DO UPDATE
+SET day = EXCLUDED.day,
+    submitted = CASE WHEN c.day = EXCLUDED.day THEN c.submitted + 1 ELSE 1 END
+WHERE c.day <> EXCLUDED.day OR c.submitted < sqlc.arg(daily_limit)::int
+RETURNING c.submitted;
+
+-- name: BumpStoreDailyCount :one
+-- 店家檢舉人的每日上限，與買家各自計數，規則同 BumpDailyCount。
+INSERT INTO moderation.reporter_daily_counts AS c (reporter_store_id, day, submitted)
+VALUES (sqlc.arg(reporter_store_id), sqlc.arg(day), 1)
+ON CONFLICT (reporter_store_id) DO UPDATE
 SET day = EXCLUDED.day,
     submitted = CASE WHEN c.day = EXCLUDED.day THEN c.submitted + 1 ELSE 1 END
 WHERE c.day <> EXCLUDED.day OR c.submitted < sqlc.arg(daily_limit)::int
@@ -153,8 +163,8 @@ DELETE FROM moderation.report_requests WHERE reporter_buyer_id = sqlc.arg(report
 -- name: DeleteExpiredReportRequestsBatch :execrows
 -- 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
 DELETE FROM moderation.report_requests
-WHERE (reporter_buyer_id, request_id) IN (
-    SELECT q.reporter_buyer_id, q.request_id
+WHERE report_id IN (
+    SELECT q.report_id
     FROM moderation.report_requests q
     JOIN moderation.reports r ON r.id = q.report_id
     JOIN moderation.cases c ON c.id = r.case_id

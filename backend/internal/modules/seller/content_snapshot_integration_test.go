@@ -139,6 +139,8 @@ func TestContentSnapshotSchemaConstraints(t *testing.T) {
 		"已存快照但本文為空":  {"measure_contents_snapshot_fields_check", "UPDATE seller.measure_contents SET snapshot_body = NULL WHERE measure_id = $1"},
 		"已清空但本文還在":   {"measure_contents_snapshot_fields_check", "UPDATE seller.measure_contents SET snapshot_state = 'CLEARED' WHERE measure_id = $1"},
 		"貼文同時有討論串連結": {"measure_contents_link_check", "UPDATE seller.measure_contents SET link_store_id = 1, link_thread_id = gen_random_uuid() WHERE measure_id = $1"},
+		"聊天訊息帶貼文連結":  {"measure_contents_link_check", "UPDATE seller.measure_contents SET content_kind = 'CHAT_MESSAGE' WHERE measure_id = $1"},
+		"評價回覆帶貼文連結":  {"measure_contents_link_check", "UPDATE seller.measure_contents SET content_kind = 'REVIEW_REPLY' WHERE measure_id = $1"},
 		"圖片張數為負":     {"measure_contents_snapshot_image_count_check", "UPDATE seller.measure_contents SET snapshot_image_count = -1 WHERE measure_id = $1"},
 		"狀態不合法":      {"measure_contents_snapshot_state_check", "UPDATE seller.measure_contents SET snapshot_state = 'OTHER', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL, link_post_id = NULL, link_store_id = NULL, link_thread_id = NULL WHERE measure_id = $1"},
 	} {

@@ -23,5 +23,7 @@ func newIM(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers im.Buyers, seller
 	})
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
+	events.Subscribe(bus, m.OnMeasureCreated)
+	events.Subscribe(bus, m.OnMeasureRevoked)
 	return m
 }

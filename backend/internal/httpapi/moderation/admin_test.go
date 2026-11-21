@@ -179,7 +179,7 @@ func TestGetCaseReturnsTheCaseWithItsReports(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := res.Msg.GetReports()
-	if f.gotID != caseID || res.Msg.GetCase().GetId() != caseID.String() || len(r) != 1 || r[0].GetReporterId() != "11" || r[0].GetDescription() != "廣告" ||
+	if f.gotID != caseID || res.Msg.GetCase().GetId() != caseID.String() || len(r) != 1 || r[0].GetReporterBuyerId() != "11" || r[0].GetDescription() != "廣告" ||
 		r[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || r[0].GetId() != reportID.String() ||
 		res.Msg.GetCase().GetReportCount() != 1 || res.Msg.GetCase().GetMeasureId() != measure.String() || res.Msg.GetCase().GetStoreId() != "12" {
 		t.Fatalf("response = %+v", res.Msg)
@@ -402,5 +402,18 @@ func TestGetCaseMapsEachSnapshotKindToTheOneof(t *testing.T) {
 	resp, err := newAdminEnv(t, f).GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: uuid.NewV7().String()}))
 	if err != nil || resp.Msg.Snapshot != nil {
 		t.Fatalf("沒有快照不設：%v %+v", err, resp.Msg.Snapshot)
+	}
+}
+
+func TestReportsPBCarriesTheReporterKind(t *testing.T) {
+	got := reportsPB([]moderation.Report{
+		{ID: uuid.NewV7(), ReporterBuyerID: 5},
+		{ID: uuid.NewV7(), ReporterStoreID: 7},
+	})
+	if got[0].GetReporterBuyerId() != "5" || got[0].GetReporterStoreId() != "" {
+		t.Errorf("買家檢舉人：%+v", got[0])
+	}
+	if got[1].GetReporterStoreId() != "7" || got[1].GetReporterBuyerId() != "" {
+		t.Errorf("店家檢舉人：%+v", got[1])
 	}
 }

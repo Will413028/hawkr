@@ -28,13 +28,14 @@ ORDER BY r.created_at DESC, r.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: ReplyToReview :one
--- 店家回覆（可覆蓋）：擁有權與公開可讀都在 WHERE，0 列由呼叫端補查分流（不存在、不是這家店、不可回覆）。
+-- 店家回覆（可覆蓋）：擁有權、公開可讀與回覆沒被內容下架（生效中的 REVIEW_REPLY 措施，先鎖評價列，與建立措施序列化）都在 WHERE，0 列由呼叫端補查分流（不存在、不是這家店、不可回覆）。
 UPDATE review.reviews AS r
 SET reply_content = sqlc.arg(content), replied_at = sqlc.arg(now)
 WHERE r.id = sqlc.arg(id)
   AND r.store_id = sqlc.arg(store_id)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'REVIEW_REPLY' AND td.content_id = r.id)
 RETURNING r.*;
 
 -- name: GetReviewForDiagnosis :one

@@ -37,7 +37,7 @@ CREATE TABLE moderation.cases (
     reversed_at          TIMESTAMPTZ,
     reversed_by_admin_id BIGINT,
     reverse_reason       TEXT,
-    CONSTRAINT cases_target_kind_check CHECK (target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'BUYER', 'REVIEW', 'CHAT_MESSAGE')),
+    CONSTRAINT cases_target_kind_check CHECK (target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'BUYER', 'REVIEW', 'CHAT_MESSAGE', 'REVIEW_REPLY')),
     CONSTRAINT cases_target_check CHECK (
         (target_kind = 'BUYER' AND buyer_id > 0 AND content_id IS NULL)
         OR (target_kind <> 'BUYER' AND content_id IS NOT NULL AND buyer_id IS NULL)
@@ -60,7 +60,7 @@ CREATE TABLE moderation.cases (
         decision_action IS NULL
         OR (decision_action = 'HIDE' AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'REVIEW', 'CHAT_MESSAGE'))
         OR (decision_action IN ('WARN', 'BAN') AND target_kind IN ('COMMENT', 'FORUM_ENTRY', 'BUYER', 'REVIEW', 'CHAT_MESSAGE'))
-        OR (decision_action = 'TAKEDOWN' AND target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
+        OR (decision_action = 'TAKEDOWN' AND target_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'CHAT_MESSAGE', 'REVIEW_REPLY'))
     ),
     CONSTRAINT cases_measure_check CHECK ((decision_action IS NOT DISTINCT FROM 'TAKEDOWN') = (measure_id IS NOT NULL)),
     CONSTRAINT cases_reversed_by_check CHECK (reversed_by_admin_id > 0),
@@ -97,47 +97,60 @@ CREATE TABLE moderation.case_snapshots (
     CONSTRAINT case_snapshots_content_check CHECK (char_length(content) >= 2)
 );
 
--- 檢舉：一案一人一筆（UNIQUE (case_id, reporter_buyer_id)），結案後新案件自然可以再檢舉。檢舉不存結果，各檢舉的結果由所屬案件的決定推導（查詢時 join）。
--- reporter_buyer_id 是檢舉的買家（buyer 擁有的業務鍵，不建跨 schema 的 FK）；category 是 platform/policy.CommunityReporterSelectable 的值
+-- 檢舉：一案一人一筆（買家 UNIQUE (case_id, reporter_buyer_id)、店家 UNIQUE (case_id, reporter_store_id)），結案後新案件自然可以再檢舉。檢舉不存結果，各檢舉的結果由所屬案件的決定推導（查詢時 join）。
+-- 檢舉人是買家或店家，恰好填一欄（reports_reporter_kind_check；店家只能檢舉聊天訊息，由寫入端擋）：reporter_buyer_id、reporter_store_id 是各自擁有者的業務鍵，不建跨 schema 的 FK；category 是 platform/policy.CommunityReporterSelectable 的值
 -- （模組的 TestChecksMatchGo）；snapshot_id 是送出時凍結的那一份，保留期後為 NULL。
 CREATE TABLE moderation.reports (
     id                UUID        PRIMARY KEY,
     case_id           UUID        NOT NULL REFERENCES moderation.cases (id),
-    reporter_buyer_id BIGINT      NOT NULL,
+    reporter_buyer_id BIGINT,
+    reporter_store_id BIGINT,
     category          TEXT        NOT NULL,
     description       TEXT,
     snapshot_id       UUID        REFERENCES moderation.case_snapshots (id) ON DELETE SET NULL,
     created_at        TIMESTAMPTZ NOT NULL,
     CONSTRAINT reports_case_reporter_key UNIQUE (case_id, reporter_buyer_id),
+    CONSTRAINT reports_case_store_reporter_key UNIQUE (case_id, reporter_store_id),
     CONSTRAINT reports_reporter_check CHECK (reporter_buyer_id > 0),
+    CONSTRAINT reports_reporter_store_check CHECK (reporter_store_id > 0),
+    CONSTRAINT reports_reporter_kind_check CHECK ((reporter_buyer_id IS NOT NULL) <> (reporter_store_id IS NOT NULL)),
     CONSTRAINT reports_category_check CHECK (category IN ('SPAM', 'HARASSMENT', 'HATE', 'SEXUAL_CONTENT', 'MISLEADING_INFO', 'FOOD_SAFETY', 'FRAUD', 'OTHER')),
     CONSTRAINT reports_description_check CHECK (description IS NULL OR (char_length(description) >= 1 AND char_length(description) <= 500 AND description !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
 CREATE INDEX reports_case_time ON moderation.reports (case_id, created_at, id);
-CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, created_at DESC, id DESC);
+CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, created_at DESC, id DESC) WHERE reporter_buyer_id IS NOT NULL;
 CREATE INDEX reports_snapshot ON moderation.reports (snapshot_id) WHERE snapshot_id IS NOT NULL;
 
--- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：(檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；
+-- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：檢舉人是買家或店家（恰好一欄），(檢舉人種類, 檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；
 -- 兩條路徑都記，所以案件結案後同一個 request_id 重送仍回第一次的結果。request_hash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256，重送時比對內容是否相同。
 CREATE TABLE moderation.report_requests (
-    reporter_buyer_id BIGINT NOT NULL,
+    reporter_buyer_id BIGINT,
+    reporter_store_id BIGINT,
     request_id        UUID   NOT NULL,
     report_id         UUID   NOT NULL REFERENCES moderation.reports (id),
     request_hash      BYTEA  NOT NULL,
-    PRIMARY KEY (reporter_buyer_id, request_id),
+    CONSTRAINT report_requests_buyer_key UNIQUE (reporter_buyer_id, request_id),
+    CONSTRAINT report_requests_store_key UNIQUE (reporter_store_id, request_id),
     CONSTRAINT report_requests_reporter_check CHECK (reporter_buyer_id > 0),
+    CONSTRAINT report_requests_reporter_store_check CHECK (reporter_store_id > 0),
+    CONSTRAINT report_requests_reporter_kind_check CHECK ((reporter_buyer_id IS NOT NULL) <> (reporter_store_id IS NOT NULL)),
     CONSTRAINT report_requests_hash_check CHECK (octet_length(request_hash) = 32)
 );
 CREATE INDEX report_requests_report ON moderation.report_requests (report_id);
 
--- 每位檢舉人每個台北日最多 20 筆：一人一列，day 是台北日（platform/twtime.Day）。送出時單一 upsert 原子地「換日重算、未達上限才加一」，
+-- 每位檢舉人每個台北日最多 20 筆，買家與店家各自計數（檢舉人恰好一欄）：一人一列，day 是台北日（platform/twtime.Day）。送出時單一 upsert 原子地「換日重算、未達上限才加一」，
 -- 沒有先 count 再比較的空窗；upsert 鎖住這一列，同一檢舉人的並行送出自然序列化。
 CREATE TABLE moderation.reporter_daily_counts (
-    reporter_buyer_id BIGINT PRIMARY KEY,
+    reporter_buyer_id BIGINT,
+    reporter_store_id BIGINT,
     day               DATE   NOT NULL,
     submitted         INT    NOT NULL,
+    CONSTRAINT reporter_daily_counts_buyer_key UNIQUE (reporter_buyer_id),
+    CONSTRAINT reporter_daily_counts_store_key UNIQUE (reporter_store_id),
     CONSTRAINT reporter_daily_counts_reporter_check CHECK (reporter_buyer_id > 0),
-    CONSTRAINT reporter_daily_counts_submitted_check CHECK (submitted BETWEEN 1 AND 20)
+    CONSTRAINT reporter_daily_counts_reporter_store_check CHECK (reporter_store_id > 0),
+    CONSTRAINT reporter_daily_counts_reporter_kind_check CHECK ((reporter_buyer_id IS NOT NULL) <> (reporter_store_id IS NOT NULL)),
+    CONSTRAINT reporter_daily_counts_submitted_check CHECK (submitted >= 1 AND submitted <= 20)
 );
 
 -- 快照圖片在 media 的引用同步（internal/mediaref，演算法在 media 模組）：引用只由同步 job 寫入。media_ref_sync 的 seq 先於 job 遞增，synced_seq 結算

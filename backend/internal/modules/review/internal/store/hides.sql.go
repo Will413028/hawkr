@@ -110,3 +110,29 @@ func (q *Queries) RestoreHide(ctx context.Context, arg RestoreHideParams) (Revie
 	)
 	return i, err
 }
+
+const takenDownReplyIDs = `-- name: TakenDownReplyIDs :many
+SELECT td.content_id::uuid AS review_id FROM seller.pub_content_takedowns() AS td
+WHERE td.content_kind = 'REVIEW_REPLY' AND td.content_id = ANY($1::uuid[])
+`
+
+// 店家回覆被內容下架措施下架的評價（seller.pub_content_takedowns()，content_id 是評價 ID）：讀取時把回覆換成沒有回覆，評價本身不受影響。
+func (q *Queries) TakenDownReplyIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, takenDownReplyIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var review_id uuid.UUID
+		if err := rows.Scan(&review_id); err != nil {
+			return nil, err
+		}
+		items = append(items, review_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
