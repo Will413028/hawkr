@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -28,7 +30,8 @@ TIMEOUT = "TIMEOUT"
 BASELINE_FAILED = "BASELINE-FAILED"
 APPLY_FAILED = "APPLY-FAILED"
 BUILD_FAILED = "BUILD-FAILED"
-NO_TESTS = "NO-TESTS"
+BUILD_ERROR = "BUILD-ERROR"
+ERROR = "ERROR"
 
 
 class ManifestError(Exception):
@@ -63,12 +66,17 @@ def inside(repo: Path, path: Path) -> bool:
     return path.resolve().is_relative_to(repo.resolve())
 
 
-def ran_no_tests(stack: str, output: str) -> bool:
-    """測試指令失敗時，輸出是否顯示一個測試都沒執行（轉換、語法或載入錯誤）。"""
+WEBSITE_BUILD_ERROR = re.compile(r"Transform failed|SyntaxError|Failed to parse source")
+FLUTTER_BUILD_ERROR = re.compile(r"Compilation failed|^\S+:\d+:\d+: Error: ", re.MULTILINE)
+
+
+def has_build_error(stack: str, output: str) -> bool:
+    """測試指令失敗時，輸出是否帶有 mutant 本身壞掉的明確標記（轉換、語法或編譯錯誤）。
+    沒有標記的失敗（含沒有測試摘要）一律當作測試擋下。"""
     if stack == "website":
-        return re.search(r"Tests\s+.*\d+\s+(passed|failed)", output) is None
+        return WEBSITE_BUILD_ERROR.search(output) is not None
     if stack.startswith(FLUTTER_PREFIX):
-        return re.search(r"No tests ran|Failed to load", output) is not None
+        return FLUTTER_BUILD_ERROR.search(output) is not None
     return False
 
 
@@ -122,7 +130,7 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     if stack in ("go-integration", "go"):
         if not rest:
             raise ManifestError("go 選擇器必須是「<套件> <regex>」")
-        argv = ["go", "test", "-count=1", "-timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s"]
+        argv = ["go", "test", "-count=1", "-vet=off", "-timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s"]
         if stack == "go-integration":
             argv += ["-tags", "integration"]
         argv += [f"./{head.strip('/')}/", "-run", rest]
@@ -134,7 +142,7 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
             argv += ["-t", rest]
         return Command(argv, repo / "website", env, stack)
     app = stack[len(FLUTTER_PREFIX):]
-    argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", "--timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s", head]
+    argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", head]
     if rest:
         argv += ["--plain-name", rest]
     return Command(argv, repo / app, env, stack)
@@ -153,6 +161,8 @@ def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO)
         return Command(argv, repo / "backend", env, stack)
     if stack.startswith(FLUTTER_PREFIX):
         app = stack[len(FLUTTER_PREFIX):]
+        if not inside(repo / app, repo / file):
+            return None
         return Command(["dart", "analyze", "--no-fatal-warnings", str(repo / file)], repo / app, env, stack)
     return None
 
@@ -186,20 +196,25 @@ def check_mutant(m: Mutant, repo: Path = REPO) -> str | None:
 
 def run_test(cmd: Command) -> str:
     try:
-        proc = subprocess.run(
-            cmd.argv, cwd=cmd.cwd, env=cmd.env, timeout=TIMEOUT_SECONDS,
+        proc = subprocess.Popen(
+            cmd.argv, cwd=cmd.cwd, env=cmd.env, start_new_session=True,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
-    except subprocess.TimeoutExpired:
-        return TIMEOUT
     except OSError as e:
         print(f"    無法執行 {cmd.argv[0]}：{e}", file=sys.stderr)
-        return "ERROR"
+        return ERROR
+    try:
+        out, _ = proc.communicate(timeout=TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+        proc.communicate()
+        return TIMEOUT
     if proc.returncode == 0:
         return "PASS"
-    sys.stdout.write("".join("    | " + ln + "\n" for ln in proc.stdout.splitlines()[-25:]))
-    if ran_no_tests(cmd.stack, proc.stdout):
-        return NO_TESTS
+    sys.stdout.write("".join("    | " + ln + "\n" for ln in out.splitlines()[-25:]))
+    if has_build_error(cmd.stack, out):
+        return BUILD_ERROR
     return "FAIL"
 
 
@@ -220,14 +235,18 @@ def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> st
     try:
         path.write_bytes(original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8"))
         build = build_builder(m.stack, m.test, m.file, repo) if build_builder else None
-        if build is not None and runner(build) != "PASS":
-            return BUILD_FAILED
+        if build is not None:
+            built = runner(build)
+            if built in (TIMEOUT, ERROR):
+                return built
+            if built != "PASS":
+                return BUILD_FAILED
         outcome = runner(cmd)
     finally:
         path.write_bytes(original)
     if outcome == TIMEOUT:
         return TIMEOUT
-    if outcome == NO_TESTS:
+    if outcome == BUILD_ERROR:
         return BUILD_FAILED
     return KILLED if outcome != "PASS" else SURVIVED
 

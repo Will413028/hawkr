@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -105,7 +106,7 @@ class RunMutantTest(Base):
         self.assertEqual(run.run_mutant(self.mutant(), self.repo, self.builder, run.run_test, bb), run.KILLED)
 
     def test_no_tests_executed_is_build_failed(self):
-        seq = iter(["PASS", run.NO_TESTS])
+        seq = iter(["PASS", run.BUILD_ERROR])
         r = run.run_mutant(self.mutant(), self.repo, self.builder, lambda c: next(seq))
         self.assertEqual(r, run.BUILD_FAILED)
 
@@ -165,9 +166,13 @@ class ManifestTest(Base):
             self.load({"mutants": [dict(self.good, stack="flutter:other")]})
 
     def test_validate_rejects_escaping_paths(self):
-        outside = self.repo.parent / "outside.txt"
-        self.assertIsNotNone(run.check_mutant(self.mutant(file="../outside.txt"), self.repo))
-        self.assertIn("repo 之外", run.check_mutant(self.mutant(file="../outside.txt"), self.repo))
+        with tempfile.TemporaryDirectory() as other:
+            real = Path(other) / "outside.txt"
+            real.write_text("alpha beta\n", encoding="utf-8")
+            (self.repo / "link.txt").symlink_to(real)
+            for f in ("link.txt", str(real)):
+                with self.subTest(file=f):
+                    self.assertIn("repo 之外", run.check_mutant(self.mutant(file=f), self.repo))
         (self.repo / "backend").mkdir()
         self.assertIn("repo 之外", run.check_mutant(self.mutant(test="../../x ^T$"), self.repo))
 
@@ -196,7 +201,7 @@ class CommandTest(unittest.TestCase):
         c = run.build_command("go-integration", "internal/x ^TestA$", repo)
         t = f"{run.FRAMEWORK_TIMEOUT_SECONDS}s"
         self.assertGreater(run.FRAMEWORK_TIMEOUT_SECONDS, run.TIMEOUT_SECONDS)
-        self.assertEqual(c.argv, ["go", "test", "-count=1", "-timeout", t, "-tags", "integration", "./internal/x/", "-run", "^TestA$"])
+        self.assertEqual(c.argv, ["go", "test", "-count=1", "-vet=off", "-timeout", t, "-tags", "integration", "./internal/x/", "-run", "^TestA$"])
         self.assertEqual((c.cwd, c.env["GOWORK"]), (repo / "backend", "off"))
         self.assertNotIn("integration", run.build_command("go", "p ^T$", repo).argv)
         w = run.build_command("website", "a/b.test.ts some name", repo)
@@ -205,7 +210,8 @@ class CommandTest(unittest.TestCase):
         f = run.build_command("flutter:buyer-app", "test/a_test.dart my case", repo)
         self.assertEqual(f.cwd, repo / "buyer-app")
         self.assertEqual(f.argv[-2:], ["--plain-name", "my case"])
-        self.assertEqual(f.argv[f.argv.index("--timeout") + 1], t)
+        self.assertNotIn("--timeout", f.argv)
+        self.assertIn("-vet=off", c.argv)
 
     def test_build_check_commands(self):
         repo = Path("/r")
@@ -213,17 +219,53 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(g.argv, ["go", "test", "-c", "-o", os.devnull, "-tags", "integration", "./internal/x/"])
         self.assertEqual((g.cwd, g.env["GOWORK"]), (repo / "backend", "off"))
         self.assertNotIn("integration", run.build_check_command("go", "p ^T$", "f", repo).argv)
+        self.assertIsNone(run.build_check_command("flutter:seller-app", "test/a.dart", "packages/hawkr_ui_text/lib/a.dart", repo))
         d = run.build_check_command("flutter:seller-app", "test/a.dart", "seller-app/lib/a.dart", repo)
         self.assertEqual(d.argv[:3], ["dart", "analyze", "--no-fatal-warnings"])
         self.assertEqual(d.cwd, repo / "seller-app")
         self.assertIsNone(run.build_check_command("website", "a.ts", "website/a.ts", repo))
 
-    def test_ran_no_tests(self):
-        self.assertTrue(run.ran_no_tests("website", "Error: Transform failed\n Tests  no tests"))
-        self.assertFalse(run.ran_no_tests("website", " Tests  1 failed | 3 passed (4)"))
-        self.assertTrue(run.ran_no_tests("flutter:buyer-app", "Failed to load \"test/a_test.dart\""))
-        self.assertFalse(run.ran_no_tests("flutter:buyer-app", "00:01 +0 -1: Some tests failed."))
-        self.assertFalse(run.ran_no_tests("go", "FAIL"))
+    def test_has_build_error(self):
+        self.assertTrue(run.has_build_error("website", "Error: Transform failed with 1 error"))
+        self.assertTrue(run.has_build_error("website", "SyntaxError: Unexpected token"))
+        self.assertFalse(run.has_build_error("website", "Error: connect ECONNREFUSED"))
+        self.assertFalse(run.has_build_error("website", " Tests  1 failed | 3 passed (4)"))
+        self.assertTrue(run.has_build_error("flutter:buyer-app", "Failed to load \"t.dart\":\nCompilation failed for testPath=x"))
+        self.assertTrue(run.has_build_error("flutter:buyer-app", "lib/a.dart:3:1: Error: Expected ';'."))
+        self.assertFalse(run.has_build_error("flutter:buyer-app", "00:01 +0 -1: Some tests failed."))
+        self.assertFalse(run.has_build_error("flutter:buyer-app", "Failed to load \"t.dart\": timeout"))
+        self.assertFalse(run.has_build_error("go", "FAIL"))
+
+
+class ProcessTest(Base):
+    def test_timeout_kills_process_tree(self):
+        pidfile = self.repo / "pid"
+        child = self.repo / "child.py"
+        child.write_text(f"import os,time\nopen({str(pidfile)!r},'w').write(str(os.getpid()))\ntime.sleep(60)\n", encoding="utf-8")
+        code = f"import subprocess,sys,time\nsubprocess.Popen([sys.executable,{str(child)!r}])\ntime.sleep(60)\n"
+        with mock.patch.object(run, "TIMEOUT_SECONDS", 2):
+            r = run.run_test(run.Command([sys.executable, "-c", code], self.repo, dict(os.environ)))
+        self.assertEqual(r, run.TIMEOUT)
+        pid = int(pidfile.read_text())
+        time.sleep(0.5)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    def test_cannot_start_is_error(self):
+        self.assertEqual(run.run_test(run.Command(["/nonexistent-bin"], self.repo, {})), run.ERROR)
+
+
+class BuildCheckOutcomeTest(Base):
+    def outcome(self, build_result):
+        def runner(cmd):
+            return build_result if cmd.argv[0] == "build" else "PASS"
+        bb = lambda stack, sel, file, repo: run.Command(["build"], repo, {})
+        return run.run_mutant(self.mutant(), self.repo, self.builder, runner, bb)
+
+    def test_mapping(self):
+        self.assertEqual(self.outcome(run.TIMEOUT), run.TIMEOUT)
+        self.assertEqual(self.outcome(run.ERROR), run.ERROR)
+        self.assertEqual(self.outcome("FAIL"), run.BUILD_FAILED)
 
 
 if __name__ == "__main__":

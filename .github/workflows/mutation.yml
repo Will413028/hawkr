@@ -30,8 +30,8 @@ on:
         type: string
 
 concurrency:
-  group: mutation-${{ github.ref }}
-  # push 不取消：下一次 push 只比對自己的 diff，被取消的 run 的清單不會再被跑到。
+  group: mutation-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # push 的 group 以 sha 區分，互不取消也不會把排隊中的 run 擠掉：每次 push 只比對自己的 diff，被取消的清單不會再被跑到。
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
