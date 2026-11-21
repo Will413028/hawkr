@@ -5,6 +5,8 @@ package procurement
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -560,7 +562,7 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 	bystander := seed(ctx, t, q, 42, true)
 	seedSession(ctx, t, d, 41)
 	seedSession(ctx, t, d, 42)
-	m := New(Deps{DB: d})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
 	deleteBuyer := func() error {
 		return d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 41}) })
@@ -612,7 +614,7 @@ func TestBuyerDeletedIsAtomicWhenALaterStepFails(t *testing.T) {
 		CREATE TRIGGER fail_usage_delete BEFORE DELETE ON procurement.usage FOR EACH ROW EXECUTE FUNCTION procurement.fail_usage_delete();`); err != nil {
 		t.Fatal(err)
 	}
-	m := New(Deps{DB: d})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	err := d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 51}) })
 	if err == nil {
 		t.Fatal("注入的失敗要讓 OnBuyerDeleted 回錯")
@@ -709,7 +711,7 @@ func TestBuyerDeletedDeletesRunsBeforeAnonymizingPublications(t *testing.T) {
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_run_artifacts (run_id, artifact_type, version, status, data, checksum, as_of, created_at, updated_at) VALUES ($1, 'X', 1, 'READY', '{}', 'c', $2, $2, $2)`, c.run, epoch); err != nil {
 		t.Fatal(err)
 	}
-	m := New(Deps{DB: d})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err := d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 51}) }); err != nil {
 		t.Fatal(err)
 	}

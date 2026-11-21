@@ -546,7 +546,7 @@ func TestSubmitCancelsTheWaitingRunOfTheSameConversationOnly(t *testing.T) {
 	d := newDB(t)
 	req := seedRequest(ctx, t, d, 1)
 	conv := seedConversation(ctx, t, d, 1, req)
-	other := seedConversation(ctx, t, d, 1, req)
+	other := seedConversation(ctx, t, d, 1, seedRequest(ctx, t, d, 1))
 	waiting := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusWaitingForInput)
 	elsewhere := seedConversationRun(ctx, t, d, req, 1, other, run.StatusWaitingForInput)
 	running := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusRunning)
