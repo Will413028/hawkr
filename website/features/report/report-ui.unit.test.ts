@@ -158,7 +158,11 @@ describe("ReportDialog", () => {
 		});
 		fireEvent.change(screen.getByLabelText(/說明/), { target: { value: "x" } });
 		fireEvent.click(screen.getByRole("button", { name: "送出檢舉" }));
-		await waitFor(() => expect(screen.getByText("已收到檢舉")).toBeTruthy());
+		await waitFor(() =>
+			expect(
+				screen.getByText("已收到檢舉，處理結果可在「我的檢舉」查看"),
+			).toBeTruthy(),
+		);
 	});
 
 	it("shows a field violation that no rendered field matches in the alert", async () => {
