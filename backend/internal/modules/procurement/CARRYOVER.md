@@ -132,7 +132,10 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 - 狀態值收斂（S6）：發布 `PUBLISHED`；`write_closed_reason` 只有 `DECLINED`；接受單 `state` 為 `ACTIVE`、`ORDER_FAILED`（新增，A9-D19 修訂：建單失敗解除 live 鎖）；邀請 `delivery_state` 無 `NOT_SENT`。proto `PublicationState` 刪 `SUPERSEDED`、`CANCELLED`。
 - 回價：版本無驗證欄位與 hash 複本；賣家回價身分列無 `buyer_id`、`version`；品相欄位（`offered_quality_*`、`conversion_basis`）仍是契約必填，是否屬 scope cut 殘留由 A9-3c 開工時交 Will 決定。
 - run：無 `controller_kind`、`version`、`domain_ref_type`、`domain_ref_id`（改 typed 外鍵）；`agent_run_inputs` 無 `retention_class`、`input_schema_version`，買家原文是具名欄位；`agent_run_events` 主鍵改 `(run_id, seq)`、無 `schema_version`、`trace_id`；`agent_run_interrupts` 無 `expires_at`、`response_schema_version`（3b 確認是否有寫入者）、`run_artifacts` 無 `domain_ref_*`、`updated_at`。
-- 額度：`usage.usage_count` 改名 `used`，條件 UPDATE，無預約表（A9-D9）。
+- 額度：`usage.usage_count` 改名 `used`，條件 UPDATE，無預約表（A9-D9）。只有 TURN 扣額度，`agent_runs.quota_period_start` 可為 NULL，退款只在非 NULL 時做（A9-D24(3)）。
+- 每買家上限（A9-D24(6)）：進行中數與每分鐘送出數都對 `agent_runs` 計數，在買家的 advisory lock 內；舊 ai-service 的記憶體計數不搬（多 pod 與重啟會各算各的）。沒有「同需求一個進行中」的唯一索引：既有的 integration fixture 會對同一個需求種多個進行中的 run，而買家鎖已序列化同買家的送出（需求只屬於一位買家）。
+- 回答中斷：子 run 失敗重新開放中斷（A9-D24(7)）。未決：子 run 被買家取消時，中斷維持 RESOLVED、父 run 維持 RESUMED（買家要重新送出一輪），計畫沒有決定要不要同樣重新開放，等 Will 決定。
+- ADK session 四張表：採購目前沒有讀寫者（只有 `retention` 的刪除與一致性測試），A9-D24(2) 之後是否還需要待 Will 決定，這一步沒有刪。
 - 買家關閉：新增 `BuyerDeleted` 訂閱者，刪買家資料、匿名保留賣家可見的紀錄（S10）；ai-service 沒有任何刪帳處理。
 - 候選同義詞：不沿用 851 筆農產別名與 `synonyms` map，空表起步（S8、AD3）。
 - 變動：`procurement.proto` 的 `Candidate.display_name` 與沒有寫入者的 `PublicationState` 值刪除（上線前不留 `reserved`）。

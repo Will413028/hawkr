@@ -1,0 +1,98 @@
+[
+ {
+  "id": "P1",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "func ChargesQuota(runType string) bool { return runType == RunTypeTurn }",
+  "new": "func ChargesQuota(runType string) bool { return true }",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestOnlyTurnRunsChargeQuota$'",
+  "expect": "TestOnlyTurnRunsChargeQuota"
+ },
+ {
+  "id": "P1b",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "func ChargesQuota(runType string) bool { return runType == RunTypeTurn }",
+  "new": "func ChargesQuota(runType string) bool { return true }",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestOnlyTurnRunsChargeTheQuota$'",
+  "expect": "TestOnlyTurnRunsChargeTheQuota (integration)"
+ },
+ {
+  "id": "P2",
+  "file": "backend/internal/modules/procurement/internal/run/settle.go",
+  "old": "if r.QuotaPeriodStart == nil {",
+  "new": "if false {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestNonTurnFailureDoesNotRefundAndTurnFailureRefundsOnce$'",
+  "expect": "TestNonTurnFailureDoesNotRefundAndTurnFailureRefundsOnce (integration)"
+ },
+ {
+  "id": "P3",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "if to == StatusFailed && r.ParentRunID != nil {",
+  "new": "if false && r.ParentRunID != nil {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestFailedChildRunReopensTheInterruptSoTheBuyerCanAnswerAgain$'",
+  "expect": "TestFailedChildRunReopensTheInterruptSoTheBuyerCanAnswerAgain (integration)"
+ },
+ {
+  "id": "P4",
+  "file": "backend/internal/modules/procurement/internal/run/submit.go",
+  "old": "if active >= int64(s.Limits.active()) {",
+  "new": "if active >= 1000000 {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAtMostTwoRunsInProgressPerBuyerUnderConcurrency$'",
+  "expect": "TestAtMostTwoRunsInProgressPerBuyerUnderConcurrency (integration)"
+ },
+ {
+  "id": "P5",
+  "file": "backend/internal/modules/procurement/internal/run/submit.go",
+  "old": "\t\tif n > 0 {",
+  "new": "\t\tif n > 1000000 {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestOneRunInProgressPerRequestUnderConcurrency$'",
+  "expect": "TestOneRunInProgressPerRequestUnderConcurrency (integration)"
+ },
+ {
+  "id": "P6",
+  "file": "backend/internal/modules/procurement/internal/run/submit.go",
+  "old": "if len(recent) >= int(limit) {",
+  "new": "if len(recent) >= int(limit)*1000000 {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAtMostTenSubmitsPerBuyerPerMinute$'",
+  "expect": "TestAtMostTenSubmitsPerBuyerPerMinute (integration)"
+ },
+ {
+  "id": "P7",
+  "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
+  "old": "return d.settleFailure(context.WithoutCancel(ctx), run, nil)",
+  "new": "return nil",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure$'",
+  "expect": "TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure (integration)"
+ },
+ {
+  "id": "P8",
+  "file": "backend/internal/modules/procurement/procurement.go",
+  "old": "\tm.dispatcher.AddWorker(workers)\n",
+  "new": "",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/ -run '^TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers$'",
+  "expect": "TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers"
+ },
+ {
+  "id": "P9",
+  "file": "backend/cmd/hawkr/main.go",
+  "old": "\taddProcurementWorkers(workers, procurementModule)\n",
+  "new": "",
+  "cmd": "GOWORK=off go test -count=1 ./cmd/hawkr/ -run '^TestWorkerRoleRegistersProcurementJobs$'",
+  "expect": "TestWorkerRoleRegistersProcurementJobs"
+ },
+ {
+  "id": "P10",
+  "file": "backend/cmd/hawkr/main.go",
+  "old": "stopProcurementHub := startProcurementHub(ctx, procurementModule, log)",
+  "new": "stopProcurementHub := func() {}",
+  "cmd": "GOWORK=off go test -count=1 ./cmd/hawkr/ -run '^TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot$'",
+  "expect": "TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot"
+ },
+ {
+  "id": "P11",
+  "file": "backend/internal/modules/procurement/internal/run/resume.go",
+  "old": "if irq.Status != \"PENDING\" {",
+  "new": "if false {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestResumeCreatesAChildRunWithoutChargingAndResolvesTheInterrupt$'",
+  "expect": "TestResumeCreatesAChildRunWithoutChargingAndResolvesTheInterrupt (integration)"
+ }
+]
