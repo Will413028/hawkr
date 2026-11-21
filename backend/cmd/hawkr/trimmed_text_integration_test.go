@@ -67,6 +67,20 @@ var trimmedColumns = []trimmedColumn{
 	{table: "social.posts", column: "body", constraint: "posts_body_check"},
 	{table: "social.comments", column: "body", constraint: "comments_body_check"},
 	{table: "social.forum_entries", column: "body", constraint: "forum_entries_body_check"},
+	{table: "procurement.request_revisions", column: "item", constraint: "request_revisions_item_check"},
+	{table: "procurement.request_revisions", column: "item_resolution_label", constraint: "request_revisions_resolution_label_check", extra: map[string]any{"item_resolution_kind": "BUYER_DESCRIBED"}},
+	{table: "procurement.request_revisions", column: "unit", constraint: "request_revisions_unit_check"},
+	{table: "procurement.request_revisions", column: "packaging", constraint: "request_revisions_packaging_check"},
+	{table: "procurement.request_revisions", column: "delivery_city", constraint: "request_revisions_delivery_city_check"},
+	{table: "procurement.conversations", column: "title", constraint: "conversations_title_check"},
+	{table: "procurement.conversations", column: "last_message_preview", constraint: "conversations_preview_check"},
+	{table: "procurement.turns", column: "buyer_message", constraint: "turns_buyer_message_check"},
+	{table: "procurement.turns", column: "assistant_reply", constraint: "turns_assistant_reply_check"},
+	{table: "procurement.confirmed_rfq_snapshots", column: "buyer_note", constraint: "confirmed_rfq_snapshots_note_check"},
+	{table: "procurement.seller_response_versions", column: "offered_quality_inspection_notes", constraint: "seller_response_versions_notes_check"},
+	{table: "procurement.seller_response_versions", column: "terms_note", constraint: "seller_response_versions_terms_check"},
+	{table: "procurement.seller_response_versions", column: "deviation_disclosure", constraint: "seller_response_versions_deviation_check"},
+	{table: "procurement.agent_run_inputs", column: "buyer_message", constraint: "agent_run_inputs_message_check"},
 }
 
 // 「頭尾沒有空白的文字」在整個單體只有 platform/trimtext 一個定義（DB 的 CHECK 與寫入端的 Trim 同一個集合）。對 migration 套用後

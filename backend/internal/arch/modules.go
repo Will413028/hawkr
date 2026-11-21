@@ -66,9 +66,11 @@ var InternalDependencies = map[string]InternalGraph{
 		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},
 	"procurement": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"candidate": {"model"}, // 候選只收 OPEN 的店、買家與 LLM 兩種候選型別的分界（A9-D8、S9）
+		"model":     {},
+		"resolver":  {},        // 品項用詞對分類樹，人工同義詞（A9-D7）
+		"retention": {"store"}, // 買家關閉後刪除與匿名（S10）
+		"store":     {},
 	}},
 	"moderation": {Packages: map[string][]string{
 		"handle":    {"model", "snapshot", "store", "text", "view"},
