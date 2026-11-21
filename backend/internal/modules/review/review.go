@@ -176,9 +176,9 @@ func (m *Module) ListOwnStoreReviews(ctx context.Context, storeID int64, f Filte
 	return m.read.ListOwnStoreReviews(ctx, storeID, f, after, size)
 }
 
-// ListMyReviews 是作者本人的評價歷史（隱藏的不給作者）。
-func (m *Module) ListMyReviews(ctx context.Context, buyerID int64, after *Cursor, size int32) (Page, error) {
-	return m.read.ListMyReviews(ctx, buyerID, after, size)
+// ListMyReviews 是作者本人的評價歷史（隱藏的不給作者）；orderItemID 大於 0 時只列那個訂單項目的評價。
+func (m *Module) ListMyReviews(ctx context.Context, buyerID, orderItemID int64, after *Cursor, size int32) (Page, error) {
+	return m.read.ListMyReviews(ctx, buyerID, orderItemID, after, size)
 }
 
 // GetReview 是單筆公開讀取：不可讀的與不存在的同為 NotFound。

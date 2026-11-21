@@ -141,11 +141,11 @@ func (s *Service) ListOwnStoreReviews(ctx context.Context, storeID int64, f mode
 	return s.ListStoreReviews(ctx, storeID, 0, f, after, size)
 }
 
-// ListMyReviews 是作者本人的評價歷史：被隱藏的不給作者（舊行為）。
-func (s *Service) ListMyReviews(ctx context.Context, buyerID int64, after *model.Cursor, size int32) (model.Page, error) {
+// ListMyReviews 是作者本人的評價歷史：被隱藏的不給作者（舊行為）；orderItemID 大於 0 時只列那個訂單項目的評價。
+func (s *Service) ListMyReviews(ctx context.Context, buyerID, orderItemID int64, after *model.Cursor, size int32) (model.Page, error) {
 	size = pageSize(size)
 	at, id := cursorParams(after)
-	list, err := s.q(ctx).ListMyReviews(ctx, store.ListMyReviewsParams{BuyerID: buyerID, AfterCreatedAt: at, AfterID: id, PageSize: size + 1})
+	list, err := s.q(ctx).ListMyReviews(ctx, store.ListMyReviewsParams{BuyerID: buyerID, OrderItemID: orderItemID, AfterCreatedAt: at, AfterID: id, PageSize: size + 1})
 	if err != nil {
 		return model.Page{}, err
 	}

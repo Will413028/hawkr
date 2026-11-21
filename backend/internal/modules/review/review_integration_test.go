@@ -325,7 +325,7 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("隱藏的評價單筆讀取：%v", err)
 	}
-	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, nil, 50)); len(mine.Reviews) != 0 {
+	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); len(mine.Reviews) != 0 {
 		t.Fatalf("作者的歷史不含隱藏的（舊行為）：%d", len(mine.Reviews))
 	}
 	if _, err := f.module.GetReview(ctx, uuid.UUID{}, 0); kindOf(err) != apperr.KindNotFound {

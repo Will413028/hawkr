@@ -19,9 +19,10 @@ WHERE review_id = ANY(sqlc.arg(review_ids)::uuid[])
 ORDER BY review_id, position;
 
 -- name: ListMyReviews :many
--- 作者本人：隱藏的評價不給作者（舊行為）。keyset：(created_at, id) 由大到小。
+-- 作者本人：隱藏的評價不給作者（舊行為）。order_item_id 大於 0 時只列那個訂單項目的評價（至多一則）。keyset：(created_at, id) 由大到小。
 SELECT r.* FROM review.reviews AS r
 WHERE r.buyer_id = sqlc.arg(buyer_id)
+  AND (sqlc.arg(order_item_id)::bigint = 0 OR r.order_item_id = sqlc.arg(order_item_id)::bigint)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
   AND (sqlc.narg(after_created_at)::timestamptz IS NULL OR (r.created_at, r.id) < (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_id)::uuid))
 ORDER BY r.created_at DESC, r.id DESC
