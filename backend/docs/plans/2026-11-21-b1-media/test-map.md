@@ -6,11 +6,11 @@
 2. 機敏上傳與機敏預覽的行為規格（B1-D12）：CI 的 Java 沒有物件儲存設定，這兩個端點對 Java 測不到，規格以 Java 原始碼與既有單元測試為準，逐條附 `file:line`，B1-3 的 Connect 情境直接依它寫。
 3. `secure_download` 的承接（端點刪除，但它的行為由擁有者代理端點接手）。
 
-**證據等級**：179 的數字與每列的 `file:line` 是【量】，由 `check-test-map.py` 掃 Java 測試原始碼（`@Test`）得出，並與本表逐列比對；「Go 對應」與「退場理由」是【推】：依 Java 測試方法名與被測原始碼判斷，沒有逐一讀測試本體，B1-2 與 B1-3 實作時若發現測試的真實斷言與這裡不符，直接改本表（檢查腳本會在列數、行號或方法名漂移時失敗）。
+**證據等級**：179 的數字與每列的 `file:line` 是【量】，由 `check-test-map.py` 掃 Java 測試原始碼（`@Test`）得出，並與本表逐列比對；「Go 對應」與「退場理由」是【推】：依 Java 測試方法名與被測原始碼判斷，沒有逐一讀測試本體，B1-2 與 B1-3 實作時若發現測試的真實斷言與這裡不符，直接改本表（手動跑檢查腳本，會在列數、行號或方法名漂移時失敗）。
 
 **規則**：Java 路徑相對 `backend/services/java/media-service/src/test/java/io/github/will413028/hawkr/media/`；Java 原始碼的 `file:line` 相對 `backend/services/java/media-service/src/main/java/io/github/will413028/hawkr/media/`。測試名稱前綴是計畫中的 Go 測試名，落地時可以改名，但行為要在；改名時一併更新本表。
 
-**檢查**：`python3 backend/docs/plans/2026-11-21-b1-media/check-test-map.py`（任何空格、缺列、多列、行號或方法名對不上、兩欄都填或都沒填，回非零）。B1-8 決定它要不要移到 `scripts/` 並接進 CI。
+**檢查**：`python3 backend/docs/plans/2026-11-21-b1-media/check-test-map.py`（任何空格、缺列、多列、行號或方法名對不上、兩欄都填或都沒填，回非零）。這是手動檢查，在各步驟驗收時跑；沒有任何 CI 會自動跑它，B1-8 決定它要不要移到 `scripts/` 並接進 CI。
 
 **步驟代號**：B1-2 = Go media 核心（schema、儲存、加密、生命週期、GC）；B1-3 = Connect 契約與上傳 handler；B1-5 = 擁有者模組切換與過渡機制刪除。
 

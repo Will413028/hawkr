@@ -14,11 +14,13 @@ JAVA_GRPC_PORT=19938
 
 legacy_start() {
   local jar
-  jar=$(find services/java/media-service/target -maxdepth 1 -name "media-service-*.jar" 2>/dev/null | head -n 1 || true)
-  if [ -z "$jar" ]; then
-    echo "找不到 media-service 的 jar，先建：(cd services/java && ./mvnw package -pl :media-service -am -DskipTests)" >&2
+  local jars=() f
+  while IFS= read -r f; do jars+=("$f"); done < <(find services/java/media-service/target -maxdepth 1 -name "media-service-*.jar" ! -name "*-plain.jar" ! -name "*-sources.jar" 2>/dev/null | sort)
+  if [ "${#jars[@]}" -ne 1 ]; then
+    echo "media-service 的 jar 應該恰好一個，找到 ${#jars[@]} 個：${jars[*]:-無}。先建：(cd services/java && ./mvnw package -pl :media-service -am -DskipTests)" >&2
     exit 1
   fi
+  jar=${jars[0]}
   require_free_port "$JAVA_HTTP_PORT"
   require_free_port "$JAVA_GRPC_PORT"
   create_db media_characterization

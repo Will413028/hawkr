@@ -12,8 +12,7 @@
 // 與 TestLegacy 一起刪除。
 package characterization
 
-// B1-1 只有 REST driver（對舊的 media-service）：Connect driver 與 monolith_integration_test.go 在 B1-3 隨新契約補上，
-// 屆時同一份情境對單體再跑一次。這裡只涵蓋不需要物件儲存的兩個端點（B1-D12）：機敏上傳與機敏預覽在 CI 的 Java
+// 目前只有 REST driver（對舊的 media-service）。這裡只涵蓋不需要物件儲存的兩個端點（B1-D12）：機敏上傳與機敏預覽在 CI 的 Java
 // 沒有 R2 設定時測不到，行為規格在 docs/plans/2026-11-21-b1-media/test-map.md。
 
 import (

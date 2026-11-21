@@ -16,7 +16,7 @@ import (
 // 起的 Java media-service（沒有物件儲存設定，B1-D12），只用 Postgres 與 Redis。身分是腳本以 hawkr dev-token 簽的 token。
 
 // TestMain 起假的 media-service：單體的 MEDIA_SERVICE_ADDR 指向它（單體其他模組的 media port 要有人接），與被測的
-// Java media-service 是兩回事。B1-5 刪除 fakemedia 時一起刪除。
+// Java media-service 是兩回事。
 func TestMain(m *testing.M) {
 	stop, err := ch.ServeFakeMedia(os.Getenv(ch.EnvFakeMediaAddr))
 	if err != nil {

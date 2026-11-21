@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """檢查 test-map.md 與 Java 測試原始碼一致、沒有空格。
 
-預期的列清單不寫死：掃 backend/services/java/media-service/src/test 底下每個 *Test.java 的 @Test，取得
+預期的列清單不寫死：掃 backend/services/java/media-service/src/test 底下每個 *.java 的 @Test，取得
 (相對路徑, 方法宣告行, 方法名)，逐列比對 test-map.md 的對照表：
 
   - 列數必須等於掃到的 @Test 數（缺列、多列、重複都失敗）；
@@ -14,6 +14,7 @@
 """
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -23,17 +24,20 @@ DEFAULT_MAP = HERE / "test-map.md"
 DASH = "—"
 
 TEST_RE = re.compile(r"^\s*@Test\b")
+UNSUPPORTED_RE = re.compile(r"^\s*@(ParameterizedTest|RepeatedTest|TestFactory)\b")
 METHOD_RE = re.compile(r"\bvoid\s+(\w+)\s*\(")
 ROW_RE = re.compile(r"^\| (\d+) \| `([^`]+):(\d+)` \| `([^`]+)` \| (.*?) \| (.*?) \|$")
 
 
-def scan_java():
+def scan_java(root=JAVA_TEST_ROOT):
     expected = []
-    for path in sorted(JAVA_TEST_ROOT.rglob("*Test.java")):
+    for path in sorted(root.rglob("*.java")):
         lines = path.read_text(encoding="utf-8").split("\n")
-        rel = path.relative_to(JAVA_TEST_ROOT).as_posix()
+        rel = path.relative_to(root).as_posix()
         i = 0
         while i < len(lines):
+            if UNSUPPORTED_RE.match(lines[i]):
+                raise SystemExit(f"{rel}:{i + 1} 有 {lines[i].strip()}：展開後的案例數不固定，腳本不支援，先擴充腳本")
             if TEST_RE.match(lines[i]):
                 j = i
                 while j < len(lines) and not METHOD_RE.search(lines[j]):
@@ -130,6 +134,18 @@ def self_test(text, expected):
         "方法名改錯": rename_method,
     }
     failures = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "Helper.java").write_text("class Helper {\n  @Test\n  void a() {}\n}\n", encoding="utf-8")
+        if scan_java(root) != [("Helper.java", 3, "a")]:
+            failures.append("自我測試：檔名不是 *Test.java 的 @Test 沒被掃到")
+        for ann in ("ParameterizedTest", "RepeatedTest", "TestFactory"):
+            (root / "Helper.java").write_text(f"class Helper {{\n  @{ann}\n  void a() {{}}\n}}\n", encoding="utf-8")
+            try:
+                scan_java(root)
+                failures.append(f"自我測試：@{ann} 沒有讓掃描失敗")
+            except SystemExit:
+                pass
     if check(text, expected)[0]:
         failures.append("自我測試：原檔本身就沒通過")
     for name, fn in cases.items():
@@ -148,7 +164,7 @@ def main(argv):
         failures = self_test(text, expected)
         for f in failures:
             print(f, file=sys.stderr)
-        print("自我測試：7 種突變全部被抓到" if not failures else "自我測試失敗")
+        print("自我測試：7 種突變與不支援的測試註解全部被抓到" if not failures else "自我測試失敗")
         return 1 if failures else 0
     errors, n_rows, n_expected = check(text, expected)
     for e in errors:

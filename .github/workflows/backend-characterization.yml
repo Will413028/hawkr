@@ -2,7 +2,7 @@ name: backend characterization
 
 # 搬遷中模組的特性測試：scripts/characterize.sh <模組> 在 runner 上起單體（入口）、舊 gateway 與該模組的舊服務，
 # 以 REST driver 經入口與 gateway 對舊服務跑情境（ADR 2026-09-26-external-contract-protobuf-connect D4、
-# 主計畫 2026-09-24-go-modular-monolith.md 階段 B 開工前條件）。B1-D10 決定：Postgres 與 Redis 用 job 的
+# 主計畫 2026-09-24-go-modular-monolith.md 階段 B 開工前條件）。Postgres 與 Redis 用 job 的
 # services:，Java 服務以 mvnw package 後 java -jar 起行程，不用 compose。
 #
 # 加一個舊服務（B2–B10）：在 matrix.include 加一項（module、java_pl；舊服務是 Go 就留空 java_pl），並在
@@ -18,6 +18,10 @@ on:
       - 'backend/gateway/**'
       - 'backend/services/java/**'
       - 'backend/.go-version'
+      - 'backend/go.mod'
+      - 'backend/go.sum'
+      - 'backend/cmd/**'
+      - 'backend/internal/**'
       - '.github/workflows/backend-characterization.yml'
   push:
     branches: [main, dev]

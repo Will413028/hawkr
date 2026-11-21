@@ -2,6 +2,7 @@ package characterization
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -88,8 +89,9 @@ var scenarios = []ch.Scenario[Driver]{
 			Filename: "photo-" + ch.Nonce() + ".webp", ContentType: "image/webp", FileSize: "512",
 		})))
 		ch.Must(t, ch.Ret(d.CompleteUploadSession(ctx, ch.Buyer, s.ID)))
-		if _, err := d.CompleteUploadSession(ctx, ch.Buyer, s.ID); err == nil {
-			t.Fatalf("第二次完成同一個會話應該失敗")
+		_, err := d.CompleteUploadSession(ctx, ch.Buyer, s.ID)
+		if !errors.Is(err, ch.ErrRejected) {
+			t.Fatalf("第二次完成同一個會話應該被服務以業務層 envelope 拒絕，實際：%v", err)
 		}
 	}},
 	{Name: "complete rejects secure session", Run: func(ctx context.Context, t ch.T, d Driver) {
