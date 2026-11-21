@@ -122,8 +122,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := s.d.Buyers.LockActive(ctx, in.BuyerID); err != nil {
-			switch apperr.KindOf(err) {
-			case apperr.KindFailedPrecondition, apperr.KindNotFound:
+			if k := apperr.KindOf(err); k == apperr.KindFailedPrecondition || k == apperr.KindNotFound {
 				return apperr.FailedPrecondition("%s", text.ReviewAuthorInactive(l))
 			}
 			return err

@@ -10,13 +10,8 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
-
-func sellerRetired(id int64) seller.StoreRetired {
-	return seller.StoreRetired{StoreID: id, OccurredAt: epoch}
-}
 
 // markInactive 讓擁有者的狀態變成已停用（買家 CLOSED、店家已退場）：crm 只讀擁有者的 pub 函式，不存複本。
 func (f *fixture) markInactive(kind string, id int64) {

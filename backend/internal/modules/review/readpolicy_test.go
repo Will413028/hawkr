@@ -99,7 +99,7 @@ var nonPublicReads = map[string]bool{
 	// ReviewAssets 是媒體同步 job 讀業務列現況，不對外。
 	"InsertReviewImage": true, "ListReviewImages": true, "ReviewAssets": true,
 	// 刪帳清除與 relay（purge.sql）：作者已不是營運中，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
-	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveAuthorsWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
+	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveBuyersWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
 }
 
 // ReplyToReview 雖然不在 public.sql，仍以公開可讀為回覆的前提。

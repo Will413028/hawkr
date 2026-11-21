@@ -102,7 +102,7 @@
 系統從未上線，schema 不受舊資料相容性約束。
 - 刪除硬清地址、逐筆發 FavoriteRemoved；pending 期間買家仍可用（收藏、追蹤除外）；一個帳號一生一個買家，關閉後不再新建。
 - 買家不是 identity 的角色（W5）：建立與關閉都不授予、移除角色，舊契約的買家位元由 `internal/legacy/accounttype` 合成。
-- 新增（A7-1a，buyer-service 沒有）：`pub_inactive_buyers()` 給 social 每日對帳核對它自己的複本、也給 review 的讀取過濾（`inactive_authors`；social 在刪帳的同 transaction 訂閱者寫複本並讓內容重新求值，讀取不 join 它）；`BuyerDeletionRequested` 在進入刪除中時發一次，供 social 排清除 job；`LockActive` 讓其他模組的買家寫入與 `BeginDeletion` 序列化。必要條件：舊的 `buyer.deleted` 只在關閉時發，申請刪除到關閉之間內容仍公開、清除 job 與新寫入會競態；單體同 DB 才做得到 `FOR KEY SHARE` 守門。
+- 新增（A7-1a，buyer-service 沒有）：`pub_inactive_buyers()` 給 social 每日對帳核對它自己的複本、也給 review 的讀取過濾（join，不複製；social 在刪帳的同 transaction 訂閱者寫複本並讓內容重新求值，讀取不 join 它）；`BuyerDeletionRequested` 在進入刪除中時發一次，供 social 排清除 job；`LockActive` 讓其他模組的買家寫入與 `BeginDeletion` 序列化。必要條件：舊的 `buyer.deleted` 只在關閉時發，申請刪除到關閉之間內容仍公開、清除 job 與新寫入會競態；單體同 DB 才做得到 `FOR KEY SHARE` 守門。
 - PII 僅清 CLOSED 的單一 stint、排序並分批處理完積壓。
 - 事件原子發布且帶 UUIDv7 與注入 clock 的 OccurredAt；會員 request_id 比對內容。
 - avatar NULL 表示預設頭像，client 決定呈現，不再儲存 public/defaults/buyer_avatar.png；頭像更新併入 UpdateProfile（avatar_staged_token），移除獨立 UpdateAvatar RPC。

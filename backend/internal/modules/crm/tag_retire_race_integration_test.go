@@ -20,7 +20,7 @@ func (f *fixture) lockWaiters() int64 {
 // 進行中的標籤寫入與店家退場交錯：寫入已經通過停用檢查、卡在標籤的唯一鍵上（另一個未提交的 transaction 先插了同名標籤）時，店家退場提交、
 // 抹除跑完；之後寫入才繼續。店家退場後不得留下標籤。
 //
-// 現況的缺口：標籤寫入只讀 inactive_parties，不取身分鎖（LockStoreTags 鎖的是標籤命名空間，與退場不互斥），所以寫入在退場提交之後仍然成功，
+// 現況的缺口：標籤寫入只讀 crm 當時的複本表（已刪除），不取身分鎖（LockStoreTags 鎖的是標籤命名空間，與退場不互斥），所以寫入在退場提交之後仍然成功，
 // 資料留在已退場店家名下、抹除 job 不會再回頭刪。擁有者守門之後，退場要等寫入提交（寫入先取店家列的 FOR KEY SHARE），抹除在寫入之後才跑。
 func TestTagWriteInFlightAcrossStoreRetirementLeavesNothing(t *testing.T) {
 	t.Parallel()

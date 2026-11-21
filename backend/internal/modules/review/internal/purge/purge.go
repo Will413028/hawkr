@@ -90,7 +90,7 @@ func (s *Service) enqueuePurge(ctx context.Context, buyerID int64) error {
 func (s *Service) Sweep(ctx context.Context) (int, error) {
 	var n int
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		ids, err := s.q(ctx).ListInactiveAuthorsWithReviews(ctx, sweepBatch)
+		ids, err := s.q(ctx).ListInactiveBuyersWithReviews(ctx, sweepBatch)
 		if err != nil {
 			return err
 		}

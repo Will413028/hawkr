@@ -68,7 +68,7 @@ func (q *Queries) IsReviewPublic(ctx context.Context, id uuid.UUID) (bool, error
 	return exists, err
 }
 
-const listInactiveAuthorsWithReviews = `-- name: ListInactiveAuthorsWithReviews :many
+const listInactiveBuyersWithReviews = `-- name: ListInactiveBuyersWithReviews :many
 SELECT ib.buyer_id FROM buyer.pub_inactive_buyers() AS ib
 WHERE EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ib.buyer_id)
 ORDER BY ib.buyer_id
@@ -76,8 +76,8 @@ LIMIT $1
 `
 
 // 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，由小到大，最多 max_rows 位。
-func (q *Queries) ListInactiveAuthorsWithReviews(ctx context.Context, maxRows int32) ([]int64, error) {
-	rows, err := q.db.Query(ctx, listInactiveAuthorsWithReviews, maxRows)
+func (q *Queries) ListInactiveBuyersWithReviews(ctx context.Context, maxRows int32) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listInactiveBuyersWithReviews, maxRows)
 	if err != nil {
 		return nil, err
 	}
