@@ -4,6 +4,7 @@ package im_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sync"
@@ -573,6 +574,45 @@ func TestSweepRequeuesDroppedEraseJobs(t *testing.T) {
 	f.jobs.reset()
 	if n, err := f.m.SweepErase(ctx); err != nil || n != 0 || f.jobs.count("im.erase_party") != 0 {
 		t.Fatalf("抹完不再補排：n=%d err=%v", n, err)
+	}
+}
+
+// 保底掃描分頁走完全部：超過一頁（100）時最後面的身分也會被補排，前面的身分一直失敗不會讓它餓死。
+func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	const parties = 230
+	last := int64(1000 + parties - 1)
+	f.exec(t, `INSERT INTO buyer.buyers (buyer_id, account_id, status, display_name, created_at, updated_at, deleted_at)
+		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', now(), now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
+	f.exec(t, `INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, last_message_at, created_at)
+		SELECT gen_random_uuid(), g, 1, 1, now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
+	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
+		SELECT gen_random_uuid(), c.id, 1, 'BUYER', 'TEXT', 'x', now() FROM im.conversations AS c`)
+	seen := func() map[int64]int {
+		f.jobs.mu.Lock()
+		defer f.jobs.mu.Unlock()
+		out := map[int64]int{}
+		for _, a := range f.jobs.args {
+			var v struct {
+				PartyID int64 `json:"party_id"`
+			}
+			b, _ := json.Marshal(a)
+			if err := json.Unmarshal(b, &v); err != nil {
+				t.Fatal(err)
+			}
+			out[v.PartyID]++
+		}
+		return out
+	}
+	n, err := f.m.SweepErase(ctx)
+	if err != nil || n != parties {
+		t.Fatalf("掃到 %d 個身分 err=%v，預期 %d", n, err, parties)
+	}
+	got := seen()
+	if len(got) != parties || got[last] != 1 || got[1000] != 1 {
+		t.Fatalf("補排了 %d 個不同的身分，最後一個 %d 次、第一個 %d 次", len(got), got[last], got[1000])
 	}
 }
 

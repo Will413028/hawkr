@@ -145,18 +145,25 @@ SELECT kind::text AS kind, party_id::bigint AS party_id FROM (
         SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
         WHERE c.store_id = rs.store_id AND m.sender_kind = 'STORE' AND m.erased_at IS NULL)
 ) AS parties
+WHERE (kind, party_id) > ($1::text, $2::bigint)
 ORDER BY kind, party_id
-LIMIT $1
+LIMIT $3
 `
+
+type ListInactivePartiesWithMessagesParams struct {
+	AfterKind string
+	AfterID   int64
+	MaxRows   int32
+}
 
 type ListInactivePartiesWithMessagesRow struct {
 	Kind    string
 	PartyID int64
 }
 
-// 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，最多 max_rows 個。
-func (q *Queries) ListInactivePartiesWithMessages(ctx context.Context, maxRows int32) ([]ListInactivePartiesWithMessagesRow, error) {
-	rows, err := q.db.Query(ctx, listInactivePartiesWithMessages, maxRows)
+// 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 (”, 0)。
+func (q *Queries) ListInactivePartiesWithMessages(ctx context.Context, arg ListInactivePartiesWithMessagesParams) ([]ListInactivePartiesWithMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listInactivePartiesWithMessages, arg.AfterKind, arg.AfterID, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}

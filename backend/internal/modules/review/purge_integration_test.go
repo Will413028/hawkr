@@ -4,6 +4,7 @@ package review_test
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -214,6 +215,41 @@ func TestSweepPurgeEnqueuesOnlyInactiveBuyersWithReviewsLeft(t *testing.T) {
 	}
 	if n != 0 || f.jobs.count("review.purge_author") != 0 {
 		t.Fatalf("清除完成後不再排：n=%d %v", n, f.jobs.kinds())
+	}
+}
+
+// 保底掃描分頁走完全部：超過一頁（100）時最後面的買家也會被補排，前面的買家一直失敗不會讓它餓死。
+func TestSweepPurgeReachesBuyersBeyondOneBatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	const buyers = 230
+	last := int64(100000 + buyers - 1)
+	storeID := f.exposableStore(t)
+	f.exec(t, `INSERT INTO buyer.buyers (buyer_id, account_id, status, display_name, created_at, updated_at, deleted_at)
+		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', now(), now(), now() FROM generate_series(100000, $1::bigint) AS g`, last)
+	f.exec(t, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
+		SELECT gen_random_uuid(), 'N' || g, g, g, $2, 700, 5, 'sku', 1, $3 FROM generate_series(100000, $1::bigint) AS g`, last, storeID, f.clock())
+	f.jobs.reset()
+	n, err := f.module.SweepPurge(ctx)
+	if err != nil || n != buyers {
+		t.Fatalf("掃到 %d 位買家 err=%v，預期 %d", n, err, buyers)
+	}
+	f.jobs.mu.Lock()
+	defer f.jobs.mu.Unlock()
+	seen := map[int64]int{}
+	for _, a := range f.jobs.args {
+		var v struct {
+			BuyerID int64 `json:"buyer_id"`
+		}
+		b, _ := json.Marshal(a)
+		if err := json.Unmarshal(b, &v); err != nil {
+			t.Fatal(err)
+		}
+		seen[v.BuyerID]++
+	}
+	if len(seen) != buyers || seen[last] != 1 || seen[100000] != 1 {
+		t.Fatalf("補排了 %d 位不同的買家，最後一位 %d 次、第一位 %d 次", len(seen), seen[last], seen[100000])
 	}
 }
 

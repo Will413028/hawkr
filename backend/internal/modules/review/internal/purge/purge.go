@@ -77,6 +77,9 @@ func (PurgeAuthorArgs) InsertOpts() river.InsertOpts {
 // EnqueuePurge 在買家刪帳（申請與關閉）時排清除 job：只排 job，不要求 transaction（訂閱者在刪帳的 transaction 內呼叫時併入它）。
 // 冪等：清除 job 以買家為唯一鍵合併。可見性不在這裡改，由公開述詞的 pub_inactive_buyers join 提供。
 func (s *Service) EnqueuePurge(ctx context.Context, buyerID int64) error {
+	if buyerID <= 0 {
+		return fmt.Errorf("review：停用的買家 %d 不合法", buyerID)
+	}
 	return s.enqueuePurge(ctx, buyerID)
 }
 
@@ -86,23 +89,35 @@ func (s *Service) enqueuePurge(ctx context.Context, buyerID int64) error {
 }
 
 // Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家已不營運（pub_inactive_buyers）又還有評價列；
-// 這裡每次最多補排 sweepBatch 位的清除 job，同一位買家還沒開始的 job 由唯一鍵合併。回傳這次檢查到的買家數。
+// 以 buyer_id 的游標逐頁（每頁 sweepBatch 位、每頁一個 transaction）走完全部，同一位買家還沒開始的 job 由唯一鍵合併；
+// 每頁固定上限，前面的買家一直失敗也不會餓死後面的。回傳這次檢查到的買家數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
-	var n int
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		ids, err := s.q(ctx).ListInactiveBuyersWithReviews(ctx, sweepBatch)
-		if err != nil {
-			return err
-		}
-		for _, id := range ids {
-			if err := s.enqueuePurge(ctx, id); err != nil {
+	total := 0
+	after := int64(0)
+	for {
+		var ids []int64
+		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			ids, err = s.q(ctx).ListInactiveBuyersWithReviews(ctx, store.ListInactiveBuyersWithReviewsParams{AfterID: after, MaxRows: sweepBatch})
+			if err != nil {
 				return err
 			}
+			for _, id := range ids {
+				if err := s.enqueuePurge(ctx, id); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return total, err
 		}
-		n = len(ids)
-		return nil
-	})
-	return n, err
+		total += len(ids)
+		if len(ids) < sweepBatch {
+			return total, nil
+		}
+		after = ids[len(ids)-1]
+	}
 }
 
 // Purge 刪除買家的評價：依 id 升序分批，每批一個 transaction，內含刪列（附圖 CASCADE）、釋放的圖記成退場並排媒體同步、排快取失效。

@@ -65,6 +65,9 @@ func (ErasePartyArgs) InsertOpts() river.InsertOpts {
 // EnqueueErase 在買家關閉或店家退場時排抹除 job：只排 job，不要求 transaction（訂閱者在轉移的 transaction 內呼叫時併入它）。
 // 冪等：抹除 job 以 (PartyKind, PartyID) 為唯一鍵合併。事實不在這裡存，由擁有者的狀態與 pub 函式提供。
 func (s *Service) EnqueueErase(ctx context.Context, kind model.PartyKind, id int64) error {
+	if !kind.Valid() || id <= 0 {
+		return fmt.Errorf("im：停用的身分 %q/%d 不合法", kind, id)
+	}
 	return s.enqueue(ctx, kind, id)
 }
 
@@ -74,23 +77,36 @@ func (s *Service) enqueue(ctx context.Context, kind model.PartyKind, id int64) e
 }
 
 // Sweep 是抹除的保底：job 用完 MaxAttempts 被丟棄後，身分已在 buyer.pub_closed_buyers()／seller.pub_retired_stores() 又還有未抹除的訊息；
-// 這裡每次最多補排 sweepBatch 個身分的 job，同一個身分還沒開始的 job 由唯一鍵合併。回傳這次檢查到的身分數。
+// 以 (kind, party_id) 的游標逐頁（每頁 sweepBatch 個、每頁一個 transaction）走完全部，同一個身分還沒開始的 job 由唯一鍵合併；
+// 每頁固定上限，前面的身分一直失敗也不會餓死後面的。回傳這次檢查到的身分數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
-	var n int
-	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		parties, err := s.q(ctx).ListInactivePartiesWithMessages(ctx, sweepBatch)
-		if err != nil {
-			return err
-		}
-		for _, p := range parties {
-			if err := s.enqueue(ctx, model.PartyKind(p.Kind), p.PartyID); err != nil {
+	total := 0
+	afterKind, afterID := "", int64(0)
+	for {
+		var parties []store.ListInactivePartiesWithMessagesRow
+		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			parties, err = s.q(ctx).ListInactivePartiesWithMessages(ctx, store.ListInactivePartiesWithMessagesParams{AfterKind: afterKind, AfterID: afterID, MaxRows: sweepBatch})
+			if err != nil {
 				return err
 			}
+			for _, p := range parties {
+				if err := s.enqueue(ctx, model.PartyKind(p.Kind), p.PartyID); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return total, err
 		}
-		n = len(parties)
-		return nil
-	})
-	return n, err
+		total += len(parties)
+		if len(parties) < sweepBatch {
+			return total, nil
+		}
+		last := parties[len(parties)-1]
+		afterKind, afterID = last.Kind, last.PartyID
+	}
 }
 
 // Erase 抹除一個身分寄出的訊息：依 id 升序分批，每批一個 transaction，內含清空內容與圖片欄位（寫 erased_at）、釋放的圖記成退場並排媒體同步。

@@ -63,7 +63,7 @@ SET content = NULL, image_asset_id = NULL, image_object_key = NULL, erased_at = 
 WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND erased_at IS NULL;
 
 -- name: ListInactivePartiesWithMessages :many
--- 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，最多 max_rows 個。
+-- 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 ('', 0)。
 SELECT kind::text AS kind, party_id::bigint AS party_id FROM (
     SELECT 'BUYER' AS kind, cb.buyer_id AS party_id FROM buyer.pub_closed_buyers() AS cb
     WHERE EXISTS (
@@ -75,6 +75,7 @@ SELECT kind::text AS kind, party_id::bigint AS party_id FROM (
         SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
         WHERE c.store_id = rs.store_id AND m.sender_kind = 'STORE' AND m.erased_at IS NULL)
 ) AS parties
+WHERE (kind, party_id) > (sqlc.arg(after_kind)::text, sqlc.arg(after_id)::bigint)
 ORDER BY kind, party_id
 LIMIT sqlc.arg(max_rows);
 

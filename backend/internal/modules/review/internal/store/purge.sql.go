@@ -70,14 +70,20 @@ func (q *Queries) IsReviewPublic(ctx context.Context, id uuid.UUID) (bool, error
 
 const listInactiveBuyersWithReviews = `-- name: ListInactiveBuyersWithReviews :many
 SELECT ib.buyer_id FROM buyer.pub_inactive_buyers() AS ib
-WHERE EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ib.buyer_id)
+WHERE ib.buyer_id > $1::bigint
+  AND EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ib.buyer_id)
 ORDER BY ib.buyer_id
-LIMIT $1
+LIMIT $2
 `
 
-// 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，由小到大，最多 max_rows 位。
-func (q *Queries) ListInactiveBuyersWithReviews(ctx context.Context, maxRows int32) ([]int64, error) {
-	rows, err := q.db.Query(ctx, listInactiveBuyersWithReviews, maxRows)
+type ListInactiveBuyersWithReviewsParams struct {
+	AfterID int64
+	MaxRows int32
+}
+
+// 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，依 buyer_id 的 keyset 由小到大，最多 max_rows 位；第一頁的游標是 0。
+func (q *Queries) ListInactiveBuyersWithReviews(ctx context.Context, arg ListInactiveBuyersWithReviewsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listInactiveBuyersWithReviews, arg.AfterID, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}

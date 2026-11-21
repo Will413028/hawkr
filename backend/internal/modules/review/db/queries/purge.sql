@@ -14,9 +14,10 @@ FOR NO KEY UPDATE;
 DELETE FROM review.reviews WHERE id = ANY(sqlc.arg(ids)::uuid[]);
 
 -- name: ListInactiveBuyersWithReviews :many
--- 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，由小到大，最多 max_rows 位。
+-- 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，依 buyer_id 的 keyset 由小到大，最多 max_rows 位；第一頁的游標是 0。
 SELECT ib.buyer_id FROM buyer.pub_inactive_buyers() AS ib
-WHERE EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ib.buyer_id)
+WHERE ib.buyer_id > sqlc.arg(after_id)::bigint
+  AND EXISTS (SELECT 1 FROM review.reviews AS r WHERE r.buyer_id = ib.buyer_id)
 ORDER BY ib.buyer_id
 LIMIT sqlc.arg(max_rows);
 
