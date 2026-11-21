@@ -216,7 +216,7 @@ func (module *Module) ProfileByBuyerID(ctx context.Context, buyerID int64) (Prof
 	return module.profile.ProfileByBuyerID(ctx, buyerID)
 }
 
-// LockActive 在呼叫方的 transaction 內以共享鎖確認買家是營運中（ACTIVE），鎖持有到 transaction 結束：BeginDeletion 的排他鎖要等
+// LockActive 在呼叫方的 transaction 內以 FOR KEY SHARE 確認買家是營運中（ACTIVE），鎖持有到 transaction 結束：BeginDeletion 的排他鎖要等
 // 這個 transaction 提交，所以買家的社群寫入（讚、分享、留言）若在刪帳申請之前成立，一定在清除 job 開始之前提交；申請之後才開始的
 // 寫入回 FailedPrecondition。已關閉回 NotFound。鎖順序：帳號列、買家列，然後才是呼叫方自己的表。必須在 transaction 內呼叫
 // （沒有 transaction 時鎖在語句結束就放掉，沒有意義）。

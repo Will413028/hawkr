@@ -23,11 +23,12 @@ WHERE buyer_id = $1
 FOR UPDATE;
 
 -- name: LockBuyerShared :one
--- 以共享鎖讀取指定 stint：與 BeginDeletion 的 FOR UPDATE 互斥，與別的共享鎖不互斥。其他模組的買家寫入用它與刪帳序列化。
+-- 以 FOR KEY SHARE 讀取指定 stint：與 BeginDeletion 等狀態轉換的 FOR UPDATE 互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+-- 其他模組的買家寫入用它與刪帳序列化；它只擋「買家列被刪或轉換狀態」，不擋業務欄位的更新。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
-FOR SHARE;
+FOR KEY SHARE;
 
 -- name: CreateBuyer :one
 -- 建帳時建立帳號唯一的買家；同一帳號再建立違反 buyers_account，視為不變量被破壞。

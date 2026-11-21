@@ -119,7 +119,7 @@ func (service *Service) ProfileByBuyerID(ctx context.Context, id int64) (model.P
 	return stint.Profile(buyerRow), nil
 }
 
-// LockActive 在呼叫方的 transaction 內以共享鎖確認 stint 是營運中；沒有 transaction 是呼叫端的錯誤。
+// LockActive 在呼叫方的 transaction 內以 FOR KEY SHARE 確認 stint 是營運中；沒有 transaction 是呼叫端的錯誤。
 func (service *Service) LockActive(ctx context.Context, id int64) error {
 	if err := model.Positive(id); err != nil {
 		return err

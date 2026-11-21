@@ -374,10 +374,11 @@ const lockBuyerShared = `-- name: LockBuyerShared :one
 SELECT buyer_id, account_id, status, version, display_name, phone, gender, avatar, avatar_asset_id, birth_date, city, job, created_at, updated_at, deleted_at, pii_cleared_at
 FROM buyer.buyers
 WHERE buyer_id = $1
-FOR SHARE
+FOR KEY SHARE
 `
 
-// 以共享鎖讀取指定 stint：與 BeginDeletion 的 FOR UPDATE 互斥，與別的共享鎖不互斥。其他模組的買家寫入用它與刪帳序列化。
+// 以 FOR KEY SHARE 讀取指定 stint：與 BeginDeletion 等狀態轉換的 FOR UPDATE 互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+// 其他模組的買家寫入用它與刪帳序列化；它只擋「買家列被刪或轉換狀態」，不擋業務欄位的更新。
 func (q *Queries) LockBuyerShared(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, lockBuyerShared, buyerID)
 	var i BuyerBuyer

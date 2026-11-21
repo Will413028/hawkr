@@ -26,7 +26,7 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 - 帳號活著 ⇔ 買家活著；一帳號一生一個買家（`UNIQUE (account_id)`），只在建帳 transaction 內建立，只由 accountdeletion 關閉。守門：`TestAccountCreatedCreatesTheOnlyBuyer`、`TestRequestClosedDeletesAccountAndCompletes`（accountdeletion）。規格：§2。
 - CLOSED 必有 deleted_at，PII 只清 CLOSED，未清的暱稱 1–100 字元。守門：DB CHECK、`TestPIICleanupStintsAndBacklog`。規格：§2。
 - 刪帳前置條件：帳號列鎖先於買家列；`BeginDeletion`／`CloseForDeletion` 重送安全。守門：`TestDeletionParticipantIdempotency`、`TestCompletePendingChecksOrdersAgain`（accountdeletion）。規格：§2。
-- `LockActive` 與 `BeginDeletion` 序列化。守門：`TestLockActiveSerializesWithBeginDeletion`。規格：§2。
+- `LockActive`（`FOR KEY SHARE`）與 `BeginDeletion`（`FOR UPDATE`）序列化。守門：`TestLockActiveSerializesWithBeginDeletion`。規格：§2。
 - 事件只在真正插入或刪除時發布。守門：`TestIdempotentEvents`。規格：§5。
 - 更新以版本條件比對，profile 在買家列鎖內合併。守門：`TestProfileVersionCAS`、`TestAddressVersionCASAndDefaultBumps`、`TestConcurrentProfilePatchesPreserveBothFields`。規格：§3。
 - 頭像引用只由 `buyer.media_sync` 寫入，已退場的頭像不能寫回，transaction 內不呼叫 media。守門：`TestRetiredAvatarCannotBeWrittenBack`、`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtAsset`、DB `buyers_avatar_asset_check`。規格：§3。

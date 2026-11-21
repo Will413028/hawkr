@@ -27,7 +27,7 @@ func Require(ctx context.Context, queries *store.Queries, id int64, active bool)
 	return buyerRow, nil
 }
 
-// RequireActiveShared 以共享鎖確認 stint 是營運中：BeginDeletion 的排他鎖要等持有共享鎖的 transaction 提交才拿得到，
+// RequireActiveShared 以 FOR KEY SHARE 確認 stint 是營運中：BeginDeletion 的排他鎖要等持有共享鎖的 transaction 提交才拿得到，
 // 拿到之後才開始的寫入會看到買家已不是營運中。已關閉回 NotFound，刪除中回 FailedPrecondition。
 func RequireActiveShared(ctx context.Context, queries *store.Queries, id int64) error {
 	if err := model.Positive(id); err != nil {
