@@ -1,4 +1,11 @@
 {
+  "assistant": {
+    "AssistantTool": {
+      "ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": "正在查詢訂單詳情",
+      "ASSISTANT_TOOL_GET_MY_ORDERS": "正在查詢你的訂單",
+      "ASSISTANT_TOOL_TRACK_MY_PACKAGE": "正在查詢包裹物流"
+    }
+  },
   "buyer": {
     "Gender": {
       "GENDER_FEMALE": "女性",
@@ -83,6 +90,23 @@
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "平台收件（內嵌元件）",
       "REQUIREMENT_COLLECTION_PROVIDER": "金流商收件（託管頁面）"
+    }
+  },
+  "procurement": {
+    "RejectionReason": {
+      "REJECTION_REASON_BUDGET_RANGE": "單價預算不在可接受的範圍內",
+      "REJECTION_REASON_CITY_UNRECOGNIZED": "無法辨識這個縣市",
+      "REJECTION_REASON_DATE_FORMAT": "日期格式不正確",
+      "REJECTION_REASON_DATE_MISSING_YEAR": "日期缺少西元年份",
+      "REJECTION_REASON_DATE_PAST": "日期已經過了",
+      "REJECTION_REASON_DATE_TOO_FAR": "日期太久以後",
+      "REJECTION_REASON_EMPTY": "內容是空的",
+      "REJECTION_REASON_QUANTITY_RANGE": "數量不在可接受的範圍內",
+      "REJECTION_REASON_RESOLUTION_NO_ITEM": "品項未確定，無法指定品項分類",
+      "REJECTION_REASON_RESOLUTION_NO_LABEL": "品項分類沒有名稱",
+      "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "品項分類的判定方式不明",
+      "REJECTION_REASON_TRUNCATED": "超過長度上限，已截斷",
+      "REJECTION_REASON_UNIT_NOT_ALLOWED": "這個單位不支援"
     }
   },
   "seller": {

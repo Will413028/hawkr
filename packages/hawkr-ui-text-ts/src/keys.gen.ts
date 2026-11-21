@@ -1,10 +1,12 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
+import type { AssistantTool } from "@hawkr/api/gen/hawkr/assistant/v1alpha1/assistant_pb";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
@@ -13,6 +15,9 @@ import type { UiMessage } from "./message";
 export type { DefaultErrorText, UiMessage } from "./message";
 
 export type UiTextKey =
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE"
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
@@ -71,6 +76,19 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
+	| "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE"
+	| "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_PAST"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR"
+	| "procurement.RejectionReason.REJECTION_REASON_EMPTY"
+	| "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND"
+	| "procurement.RejectionReason.REJECTION_REASON_TRUNCATED"
+	| "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED"
 	| "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
@@ -222,6 +240,19 @@ export const SELLER_MEASURE_REQUEST_KIND_NAME: Readonly<Record<number, string>> 
 	2: "MEASURE_REQUEST_KIND_REMEDIATION",
 };
 
+const ASSISTANT_ASSISTANT_TOOL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS",
+	2: "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL",
+	3: "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE",
+};
+
+/** assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function assistantAssistantTool(v: AssistantTool): UiMessage | undefined {
+	const key = ASSISTANT_ASSISTANT_TOOL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const BUYER_GENDER: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "buyer.Gender.GENDER_MALE",
 	2: "buyer.Gender.GENDER_FEMALE",
@@ -367,6 +398,29 @@ const PAYMENT_REQUIREMENT_COLLECTION: Readonly<Partial<Record<number, UiTextKey>
 /** payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function paymentRequirementCollection(v: RequirementCollection): UiMessage | undefined {
 	const key = PAYMENT_REQUIREMENT_COLLECTION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PROCUREMENT_REJECTION_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "procurement.RejectionReason.REJECTION_REASON_EMPTY",
+	2: "procurement.RejectionReason.REJECTION_REASON_TRUNCATED",
+	3: "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE",
+	4: "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE",
+	5: "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED",
+	6: "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED",
+	7: "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT",
+	8: "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR",
+	9: "procurement.RejectionReason.REJECTION_REASON_DATE_PAST",
+	10: "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR",
+	11: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM",
+	12: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL",
+	13: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND",
+};
+
+/** procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function procurementRejectionReason(v: RejectionReason): UiMessage | undefined {
+	const key = PROCUREMENT_REJECTION_REASON[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

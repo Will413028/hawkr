@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+// imageai 模組給後台的 API：修圖風格與每家店的每週額度。前台的 API 在 hawkr.imageai.v1alpha1。
+//
+// 修改以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：UpdateAiStyle 必須帶讀到的 etag，
+// 沒帶回 INVALID_ARGUMENT，與目前版本不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT。
+// Delete 的 etag 選填，帶了就同樣檢查。
+//
+// 部分更新用 update_mask（Google AIP-134），規則同 hawkr.admin.content.v1alpha1。
+// 縮圖是 hawkr.common.v1alpha1.Image，只出現在回應；換圖時在 thumbnail_staged_token 帶 media 上傳完成後
+// 拿到的 staged token，沒帶表示沿用目前的圖。
+package hawkr.admin.imageai.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/imageai/v1alpha1/imageai.proto";
+
+// ImageAiAdminService 只有管理員能呼叫。
+service ImageAiAdminService {
+  // ListAiStylesForAdmin 列出風格（含停用的），依 display_order 排列。不分頁：風格由營運維護，數量有限。
+  rpc ListAiStylesForAdmin(ListAiStylesForAdminRequest) returns (ListAiStylesForAdminResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateAiStyle 新增風格；縮圖必須是新上傳的圖。
+  rpc CreateAiStyle(CreateAiStyleRequest) returns (CreateAiStyleResponse);
+
+  rpc UpdateAiStyle(UpdateAiStyleRequest) returns (UpdateAiStyleResponse);
+
+  // DeleteAiStyle 刪除風格，並釋放它的縮圖。
+  rpc DeleteAiStyle(DeleteAiStyleRequest) returns (DeleteAiStyleResponse);
+
+  // GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
+  rpc GetAiQuota(GetAiQuotaRequest) returns (GetAiQuotaResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateAiQuota 為一家店個別設定每週額度。額度以店家為 key，沒有 Create：還沒有個別設定時（custom 為 false），
+  // 不帶 etag 的呼叫建立它；已經有個別設定卻沒帶 etag 回 ALREADY_EXISTS（VERSION_CONFLICT）；
+  // 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。
+  rpc UpdateAiQuota(UpdateAiQuotaRequest) returns (UpdateAiQuotaResponse);
+
+  // DeleteAiQuota 刪除一家店的個別設定，回到預設額度。沒有個別設定時回 NOT_FOUND。
+  rpc DeleteAiQuota(DeleteAiQuotaRequest) returns (DeleteAiQuotaResponse);
+}
+
+// AiStyle 是後台看到的修圖風格。
+message AiStyle {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 風格的識別名稱；建立後不能修改。
+  string name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
+  // 顯示用的名稱。
+  string label = 3 [(google.api.field_behavior) = REQUIRED];
+  // 套用這個風格時送給模型的提示詞。
+  string prompt = 4 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.Image thumbnail = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 換成剛上傳的縮圖；空字串表示沿用目前的圖。建立時必填。
+  string thumbnail_staged_token = 6 [(google.api.field_behavior) = INPUT_ONLY];
+  // 顯示順序，小的在前。
+  int32 display_order = 7;
+  // 是否為該用途的預設風格；同一個用途只有一個預設。
+  bool default_style = 8;
+  // 停用的風格前台看不到。
+  bool enabled = 9;
+  // 適用的用途；建立後不能修改。
+  hawkr.imageai.v1alpha1.AiStyleCategory category = 10 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
+  google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 目前的版本，client 當成不透明的字串。修改時帶讀到的值。
+  string etag = 13;
+}
+
+// AiQuota 是一家店的每週修圖額度。
+message AiQuota {
+  // 店家的 ID。
+  string store_id = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
+  // 每週可修圖的次數上限。
+  int32 weekly_limit = 2 [(google.api.field_behavior) = REQUIRED];
+  // 本週已使用的次數。
+  int32 weekly_usage = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 營運的備註，為什麼個別調整。
+  string memo = 4;
+  // 這個額度是個別設定的（true），還是預設值（false）。
+  bool custom = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 目前的版本，client 當成不透明的字串；預設額度沒有。修改時帶讀到的值。
+  string etag = 7;
+}
+
+message ListAiStylesForAdminRequest {
+  // 沒有設定時列出全部用途。
+  optional hawkr.imageai.v1alpha1.AiStyleCategory category = 1;
+}
+
+message ListAiStylesForAdminResponse {
+  repeated AiStyle ai_styles = 1;
+}
+
+message CreateAiStyleRequest {
+  // thumbnail_staged_token 必填，不需要 etag。
+  AiStyle ai_style = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateAiStyleResponse {
+  AiStyle ai_style = 1;
+}
+
+message UpdateAiStyleRequest {
+  // id 與 etag 必填。
+  AiStyle ai_style = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateAiStyleResponse {
+  AiStyle ai_style = 1;
+}
+
+message DeleteAiStyleRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；帶了就必須與目前的版本相符。
+  string etag = 2;
+}
+
+message DeleteAiStyleResponse {}
+
+message GetAiQuotaRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetAiQuotaResponse {
+  AiQuota ai_quota = 1;
+}
+
+message UpdateAiQuotaRequest {
+  // store_id 與 weekly_limit 必填；etag 的規則見 UpdateAiQuota。
+  AiQuota ai_quota = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateAiQuotaResponse {
+  AiQuota ai_quota = 1;
+}
+
+message DeleteAiQuotaRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；帶了就必須與目前的版本相符。
+  string etag = 2;
+}
+
+message DeleteAiQuotaResponse {}

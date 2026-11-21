@@ -37,6 +37,8 @@ func goldenEnum(name, prefix string) string {
 // goldenCall 呼叫 c.Fn 對應的生成函式；ok 是 false 表示「沒有文字」。
 func goldenCall(t Text, c goldenCase) (string, bool) {
 	switch c.Fn {
+	case "assistant.AssistantTool":
+		return t.AssistantAssistantTool(goldenEnum(c.Value, "ASSISTANT_TOOL_"))
 	case "buyer.Gender":
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
 	case "buyer.Profile.gender_unset":
@@ -60,6 +62,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
+	case "procurement.RejectionReason":
+		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.InquiryKind":

@@ -36,6 +36,11 @@ type ReportingEnqueuer interface {
 	EnqueueReport(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (inserted bool, err error)
 }
 
+// RescueStuckJobsAfter 是 job 執行多久沒收尾就被 River 視為卡住（程序死掉）而救回或丟棄。
+// 各 worker 自己的 Timeout 較長時仍受尊重（超過它才救，river 的 job_rescuer）；採購 run 的 job 只有一次機會，被救等於丟棄，
+// 由 reconciler 把 run 標失敗（A9-D22）。它必須不小於採購 run job 的 Timeout，否則正在跑的 run 會被丟棄（procurement/internal/run 的測試守住）。
+const RescueStuckJobsAfter = 3 * time.Minute
+
 // softStopTimeout 是停止時等進行中 job 收尾的時間；超過就取消它們，之後依重試設定再跑。
 const softStopTimeout = 30 * time.Second
 
@@ -65,6 +70,8 @@ func NewWorker(d *db.DB, workers *river.Workers, queues map[string]int, periodic
 		Queues:       qc,
 		Workers:      workers,
 		PeriodicJobs: periodic,
+
+		RescueStuckJobsAfter: RescueStuckJobsAfter,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("jobs：建立 worker client：%w", err)
@@ -91,6 +98,36 @@ func (c *Client) EnqueueReport(ctx context.Context, args river.JobArgs, opts *ri
 		return false, fmt.Errorf("jobs：排入 %s：%w", args.Kind(), err)
 	}
 	return !res.UniqueSkippedAsDuplicate, nil
+}
+
+// EnqueueJob 排入一個 job 並回傳 job id。ctx 裡有 transaction 時，job 在該 transaction commit 後才可見。
+func (c *Client) EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (int64, error) {
+	var res *rivertype.JobInsertResult
+	var err error
+	if tx, ok := db.TxFrom(ctx); ok {
+		res, err = c.river.InsertTx(ctx, tx, args, opts)
+	} else {
+		res, err = c.river.Insert(ctx, args, opts)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("jobs：排入 %s：%w", args.Kind(), err)
+	}
+	return res.Job.ID, nil
+}
+
+// CancelJob 取消一個 job：還沒執行的直接取消，執行中的取消它的 ctx。ctx 裡有 transaction 時在該 transaction 內執行；
+// 已完成的 job 不受影響。
+func (c *Client) CancelJob(ctx context.Context, jobID int64) error {
+	var err error
+	if tx, ok := db.TxFrom(ctx); ok {
+		_, err = c.river.JobCancelTx(ctx, tx, jobID)
+	} else {
+		_, err = c.river.JobCancel(ctx, jobID)
+	}
+	if err != nil {
+		return fmt.Errorf("jobs：取消 job %d：%w", jobID, err)
+	}
+	return nil
 }
 
 // Run 執行 job 直到 ctx 結束，之後停止取新工作並等進行中的 job 收尾。

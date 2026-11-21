@@ -138,6 +138,57 @@ var ReasonContactEmailRequired = newReason("CONTACT_EMAIL_REQUIRED")
 // ReasonContentTakedownActive 表示要下架的內容已經有生效中的內容下架措施；搭配 FailedPrecondition。
 var ReasonContentTakedownActive = newReason("CONTENT_TAKEDOWN_ACTIVE")
 
+// ReasonReplayCursorExpired 表示串流（助理與採購的 server streaming）的 cursor 早於保留的事件範圍；搭配 FailedPrecondition。
+var ReasonReplayCursorExpired = newReason("REPLAY_CURSOR_EXPIRED")
+
+// ReasonReplayCursorAhead 表示串流的 cursor 超前於最新的事件；搭配 FailedPrecondition。
+var ReasonReplayCursorAhead = newReason("REPLAY_CURSOR_AHEAD")
+
+// ReasonRequirementNotReady 表示採購需求的必填欄位還沒填滿，不能搜尋候選；搭配 FailedPrecondition。
+var ReasonRequirementNotReady = newReason("REQUIREMENT_NOT_READY")
+
+// ReasonApprovalPending 表示採購需求有待回覆的中斷，回答與倒回在這期間不能寫入；搭配 FailedPrecondition。
+var ReasonApprovalPending = newReason("APPROVAL_PENDING")
+
+// ReasonApprovalAlreadyResolved 表示要回覆的中斷已經被回覆過；搭配 FailedPrecondition。
+var ReasonApprovalAlreadyResolved = newReason("APPROVAL_ALREADY_RESOLVED")
+
+// ReasonRunNotActive 表示 run 已不在進行中，不能對它下需要進行中的命令；搭配 FailedPrecondition。
+var ReasonRunNotActive = newReason("RUN_NOT_ACTIVE")
+
+// ReasonRfqResponseExpired 表示被接受的賣家回價版本已過有效期；搭配 FailedPrecondition。
+var ReasonRfqResponseExpired = newReason("RFQ_RESPONSE_EXPIRED")
+
+// ReasonRfqRecipientClosed 表示賣家對這筆詢價已經不能再寫入（已婉拒、已結案或他人成交）；搭配 FailedPrecondition。
+var ReasonRfqRecipientClosed = newReason("RFQ_RECIPIENT_CLOSED")
+
+// ReasonRfqCheckoutAlreadyActive 表示同一張採購需求已有進行中的成交；搭配 FailedPrecondition，Metadata 的 orderNo 是既有訂單。
+var ReasonRfqCheckoutAlreadyActive = newReason("RFQ_CHECKOUT_ALREADY_ACTIVE")
+
+// ReasonRfqAlreadyAwarded 表示同一張採購需求已經成交，不能再接受報價；搭配 FailedPrecondition。
+var ReasonRfqAlreadyAwarded = newReason("RFQ_ALREADY_AWARDED")
+
+// ReasonAgentMonthlyQuotaExceeded 表示本期的採購額度已用完；搭配 ResourceExhausted，Metadata 的 remaining、resetTime 說明剩餘與重置時間。
+var ReasonAgentMonthlyQuotaExceeded = newReason("AGENT_MONTHLY_QUOTA_EXCEEDED")
+
+// ReasonImageQuotaExceeded 表示本週的 AI 修圖額度已用完；搭配 ResourceExhausted，Metadata 的 remaining、resetTime 說明剩餘與重置時間。
+var ReasonImageQuotaExceeded = newReason("IMAGE_QUOTA_EXCEEDED")
+
+// ReasonImageSafetyBlocked 表示圖片或提示詞被安全性檢查擋下，重送結果相同；搭配 InvalidArgument。
+var ReasonImageSafetyBlocked = newReason("IMAGE_SAFETY_BLOCKED")
+
+// ReasonImageRecitationBlocked 表示圖片涉及著作權複誦而被擋下，重送結果相同；搭配 InvalidArgument。
+var ReasonImageRecitationBlocked = newReason("IMAGE_RECITATION_BLOCKED")
+
+// ReasonImageNotProduced 表示模型沒有產出圖片，可以重試；搭配 Unavailable。
+var ReasonImageNotProduced = newReason("IMAGE_NOT_PRODUCED")
+
+// ReasonAssistantTurnInProgress 表示這個助理對話已有一輪進行中，同一個對話同時只允許一輪；搭配 FailedPrecondition。
+var ReasonAssistantTurnInProgress = newReason("ASSISTANT_TURN_IN_PROGRESS")
+
+// ReasonAssistantTurnFailed 表示助理這一輪失敗，用於串流 error 事件的原因（事件在串流內，沒有搭配的 Connect code）。
+var ReasonAssistantTurnFailed = newReason("ASSISTANT_TURN_FAILED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

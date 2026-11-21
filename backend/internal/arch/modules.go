@@ -88,14 +88,24 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"buyeragent": {"model", "text"}, // 買家 agent 與 3 支 tool；tool 身分用 model.Tool，coordinator 的退貨流程取共用文案
+		"feature":    {},
+		"history":    {"buyeragent", "model"}, // 買家最近一次對話的歷史（GetLatestAssistantSession）
+		"model":      {},
+		"text":       {},
+		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},
 	"procurement": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"candidate": {"model"}, // 候選只收 OPEN 的店、買家與 LLM 兩種候選型別的分界（A9-D8、S9）
+		"model":     {},
+		"planner":   {"model", "slots"},                    // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
+		"reply":     {"model", "planner", "slots", "text"}, // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
+		"resolver":  {},                                    // 品項用詞對分類樹，人工同義詞（A9-D7）
+		"retention": {"store"},                             // 買家關閉後刪除與匿名（S10）
+		"run":       {"store"},                             // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
+		"slots":     {"model"},                             // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
+		"store":     {},
+		"text":      {}, // 模組句子（ADR 2026-10-17 多語系）
 	}},
 	"moderation": {Packages: map[string][]string{
 		"handle":    {"model", "snapshot", "store", "text", "view"},
