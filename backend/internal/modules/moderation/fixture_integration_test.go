@@ -267,12 +267,23 @@ func (f *fixture) newBuyer(t *testing.T) (buyerID, accountID int64) {
 	return p.BuyerID, accountID
 }
 
-// exposableStore 建一家可以公開曝光的店（帳號是真的 identity 帳號，讓 CloseCurrent 等要鎖帳號列的路徑走得通；其餘直接寫 seller 的表，最小的列），回傳 store_id 與帳號。
+// exposableStore 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。帳號是不存在於 identity 的編號。
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
+	t.Helper()
+	return f.exposableStoreOn(t, f.next())
+}
+
+// exposableStoreOnIdentityAccount 同 exposableStore，但帳號是真的 identity 帳號（沒有買家列），讓 CloseCurrent 這類要鎖帳號列的路徑走得通。
+func (f *fixture) exposableStoreOnIdentityAccount(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
 		t.Fatal(err)
 	}
+	return f.exposableStoreOn(t, accountID)
+}
+
+func (f *fixture) exposableStoreOn(t *testing.T, accountID int64) (storeID, _ int64) {
+	t.Helper()
 	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
 		VALUES ($1, $2, '測試店', 'logo/k', 'logo-asset', '63000010', $3, $3)`, accountID, accountID, f.clock())
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {

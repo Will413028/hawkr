@@ -409,7 +409,7 @@ func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	storeID, storeAccount := f.exposableStore(t)
+	storeID, storeAccount := f.exposableStoreOnIdentityAccount(t)
 	b, _ := f.newBuyer(t)
 	_, ids := f.seedChat(t, b, storeID, 4, 0)
 	target := Target{Kind: TargetChatMessage, ContentID: ids[1]}
