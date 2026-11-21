@@ -52,6 +52,15 @@ func allowedFrom(to string) []string {
 	return out
 }
 
+// publicFrom 是公開的 Transition 允許的來源：WAITING_FOR_INPUT 轉 SUCCEEDED 只在回答的提交點（同時解決中斷），公開入口不含這條邊。
+func publicFrom(to string) []string {
+	from := allowedFrom(to)
+	if to == StatusSucceeded {
+		from = slices.DeleteFunc(from, func(s string) bool { return s == StatusWaitingForInput })
+	}
+	return from
+}
+
 // activeStatuses 回傳還沒到終態的狀態：事件只能在這些狀態下寫入。
 func activeStatuses() []string {
 	var out []string

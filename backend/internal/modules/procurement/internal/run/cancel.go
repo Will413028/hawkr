@@ -53,7 +53,7 @@ func (c Canceller) Cancel(ctx context.Context, buyerID int64, runID uuid.UUID) (
 		case StatusCancelRequested:
 			out = CancelOutcome{Status: r.Status, Disposition: DispositionRequested}
 		case StatusWaitingForInput:
-			if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {
+			if err := cancelWaiting(ctx, c.DB, c.Ledger, c.Jobs, r.ID); err != nil {
 				return err
 			}
 			out = CancelOutcome{Status: StatusCancelled, Disposition: DispositionRequested}
@@ -68,22 +68,50 @@ func (c Canceller) Cancel(ctx context.Context, buyerID int64, runID uuid.UUID) (
 }
 
 func (c Canceller) request(ctx context.Context, r store.ProcurementAgentRun, out *CancelOutcome) error {
-	if r.JobID == nil {
-		return fmt.Errorf("run：%s 沒有 job，無法取消", r.ID)
-	}
-	if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelRequested, ""); err != nil {
-		return err
-	}
-	state, err := c.Jobs.CancelJob(ctx, *r.JobID)
+	status, err := requestCancel(ctx, c.Ledger, c.Jobs, r)
 	if err != nil {
 		return err
 	}
-	*out = CancelOutcome{Status: StatusCancelRequested, Disposition: DispositionRequested}
+	*out = CancelOutcome{Status: status, Disposition: DispositionRequested}
+	return nil
+}
+
+// requestCancel 要求取消一個排隊或執行中的 run（呼叫端已鎖它）：轉 CANCEL_REQUESTED 並取消 River job，同一個 transaction；
+// job 已被 River 直接取消（沒有 executor 會領它）的直接轉 CANCELLED。回傳命令之後 run 的狀態。
+func requestCancel(ctx context.Context, l Ledger, jobs JobQueue, r store.ProcurementAgentRun) (string, error) {
+	if r.JobID == nil {
+		return "", fmt.Errorf("run：%s 沒有 job，無法取消", r.ID)
+	}
+	if _, err := l.Transition(ctx, r.ID, StatusCancelRequested, ""); err != nil {
+		return "", err
+	}
+	state, err := jobs.CancelJob(ctx, *r.JobID)
+	if err != nil {
+		return "", err
+	}
 	if jobCancelledBeforeStart(state) {
-		if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {
-			return err
+		if _, err := l.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {
+			return "", err
 		}
-		out.Status = StatusCancelled
+		return StatusCancelled, nil
+	}
+	return StatusCancelRequested, nil
+}
+
+// cancelWaiting 取消等待輸入的 run（呼叫端已鎖它）：轉 CANCELLED（它的 PENDING 中斷隨之取消），
+// 並要求取消正在回答它的中斷的 run（否則回答 run 會繼續跑、提交時才被拒）。全部在呼叫端的 transaction 內。
+func cancelWaiting(ctx context.Context, d *db.DB, l Ledger, jobs JobQueue, runID uuid.UUID) error {
+	if _, err := l.Transition(ctx, runID, StatusCancelled, ""); err != nil {
+		return err
+	}
+	answers, err := store.New(d.Conn(ctx)).LockInProgressAnswerRuns(ctx, runID)
+	if err != nil {
+		return fmt.Errorf("run：列出進行中的回答 run：%w", err)
+	}
+	for _, a := range answers {
+		if _, err := requestCancel(ctx, l, jobs, a); err != nil {
+			return fmt.Errorf("run：取消回答 run %s：%w", a.ID, err)
+		}
 	}
 	return nil
 }

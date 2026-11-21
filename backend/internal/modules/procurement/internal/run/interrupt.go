@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // InterruptInput 是 run 停下來等買家回答的寫入。Payload 是中斷內容（JSON 物件），也是接續的唯一狀態；
@@ -27,12 +28,28 @@ type InterruptInput struct {
 func (l Ledger) Interrupt(ctx context.Context, in InterruptInput) (uuid.UUID, error) {
 	id := uuid.NewV7()
 	err := l.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := l.lockAskingOf(ctx, in.RunID); err != nil {
+			return err
+		}
+		r, err := store.New(l.DB.Conn(ctx)).LockRun(ctx, in.RunID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("找不到這個 run")
+		}
+		if err != nil {
+			return fmt.Errorf("run：鎖 run：%w", err)
+		}
+		if IsTerminal(r.Status) {
+			return ErrRunTerminal
+		}
+		if r.Status != StatusRunning {
+			return &InvalidTransitionError{From: r.Status, To: StatusWaitingForInput}
+		}
 		if len(in.TurnResultEvent) > 0 {
 			if _, err := l.append(ctx, in.RunID, EventTurnResult, in.TurnResultEvent, []string{StatusRunning}); err != nil {
 				return err
 			}
 		}
-		if _, err := l.Transition(ctx, in.RunID, StatusWaitingForInput, ""); err != nil {
+		if _, err := l.commitTransition(ctx, in.RunID, StatusWaitingForInput, "", allowedFrom(StatusWaitingForInput)); err != nil {
 			return err
 		}
 		if err := store.New(l.DB.Conn(ctx)).InsertInterrupt(ctx, store.InsertInterruptParams{

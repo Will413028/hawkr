@@ -53,11 +53,19 @@ WHERE id = @id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED;
 
 -- name: LockWaitingRunIDs :many
--- 同一個買家、同一個對話裡等待輸入的 run；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
+-- 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
 SELECT id FROM procurement.agent_runs
-WHERE buyer_id = @buyer_id AND conversation_id = @conversation_id AND status = 'WAITING_FOR_INPUT'
+WHERE buyer_id = @buyer_id AND request_id = @request_id AND status = 'WAITING_FOR_INPUT'
 ORDER BY id
 FOR UPDATE;
+
+-- name: LockInProgressAnswerRuns :many
+-- 回答 @run_id 的中斷、還在進行中（排隊或執行中）的回答 run；提問的 run 被取消或被取代時一併要求取消它們。
+SELECT a.* FROM procurement.agent_runs a
+JOIN procurement.agent_run_interrupts i ON i.id = a.interrupt_id
+WHERE i.run_id = @run_id AND a.status IN ('QUEUED', 'RUNNING')
+ORDER BY a.id
+FOR UPDATE OF a;
 
 -- name: ExpireRunEvents :one
 -- 結束超過保留期的 run，一次最多 @batch 個：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
@@ -87,7 +95,7 @@ SELECT * FROM procurement.agent_runs WHERE buyer_id = @buyer_id AND client_reque
 
 -- name: LockBuyerSubmits :exec
 -- 同一位買家的送出在這裡排隊（交易級 advisory lock），之後的進行中數與每分鐘送出數才看得到前一個交易已提交的 run。
-SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || @buyer_id::bigint::text, 0));
+SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || @buyer_id::bigint, 0));
 
 -- name: CountBuyerActiveRuns :one
 SELECT count(*) FROM procurement.agent_runs

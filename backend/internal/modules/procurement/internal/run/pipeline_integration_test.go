@@ -612,3 +612,72 @@ func TestConcurrentResumesOfOneInterruptAdmitExactlyOne(t *testing.T) {
 		t.Fatalf("成功 %d、拒絕 %d", ok.Load(), rejected.Load())
 	}
 }
+
+func TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, wide())
+	parent, irq, req := waitingParent(ctx, t, d, s, 1)
+	nextID, err := s.Submit(ctx, input(1, req, 100))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runOf(ctx, t, d, parent).Status != run.StatusCancelled || interruptStatus(ctx, t, d, irq) != "CANCELLED" || pendingInterrupts(ctx, t, d, req) != 0 {
+		t.Fatal("同一個需求的新一輪要取代等待中的 run 並取消它的 PENDING 中斷，不論對話")
+	}
+	start(ctx, t, d, nextID)
+	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: nextID, Payload: []byte(`{}`)}); err != nil {
+		t.Fatalf("取代之後新的一輪可以提出新問題：%v", err)
+	}
+}
+
+func TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, run.Limits{MaxActiveRuns: 1, MaxSubmitsPerMinute: 100})
+	req := seedRequest(ctx, t, d, 1)
+	if _, err := s.Submit(ctx, input(1, req, 100)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Submit(ctx, input(1, req, 100)); err == nil {
+		t.Fatal("同一個需求已有進行中的 run，要被擋下")
+	} else if reason, kind := reasonOf(err); reason != apperr.ReasonProcurementRunInProgress || kind != apperr.KindFailedPrecondition {
+		t.Fatalf("同需求與買家上限同時成立時要回 PROCUREMENT_RUN_IN_PROGRESS：%v", err)
+	}
+}
+
+func TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun(t *testing.T) {
+	for name, tc := range map[string]struct {
+		jobState rivertype.JobState
+		want     string
+	}{
+		"job 執行中":  {rivertype.JobStateRunning, run.StatusCancelRequested},
+		"job 還沒領走": {rivertype.JobStateCancelled, run.StatusCancelled},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			d := newDB(t)
+			jobs := &recordingJobs{cancelState: tc.jobState}
+			s := submitter(d, jobs, wide())
+			parent, irq, _ := waitingParent(ctx, t, d, s, 1)
+			answer, err := s.Resume(ctx, resumeInput(irq, "L"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			start(ctx, t, d, answer)
+			c := run.Canceller{DB: d, Ledger: ledger(d, now), Jobs: jobs}
+			if out, err := c.Cancel(ctx, 1, parent); err != nil || out.Status != run.StatusCancelled {
+				t.Fatalf("%+v %v", out, err)
+			}
+			if got := runOf(ctx, t, d, answer); got.Status != tc.want {
+				t.Fatalf("提問的 run 被取消時回答 run = %s，預期 %s", got.Status, tc.want)
+			}
+			if len(jobs.cancels) != 1 || jobs.cancels[0] != *runOf(ctx, t, d, answer).JobID {
+				t.Fatalf("要取消回答 run 的 job：%v", jobs.cancels)
+			}
+			if interruptStatus(ctx, t, d, irq) != "CANCELLED" {
+				t.Fatal("中斷要轉 CANCELLED")
+			}
+		})
+	}
+}

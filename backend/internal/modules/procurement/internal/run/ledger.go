@@ -120,15 +120,28 @@ func (l Ledger) missingOrTerminal(ctx context.Context, q *store.Queries, runID u
 	return fmt.Errorf("run：狀態 %s 不接受寫入", r.Status)
 }
 
-// Transition 是 run 狀態的唯一寫入口：同一個 transaction 內以 UPDATE … WHERE status IN (允許的來源) 轉換，終態同時寫串流的結尾事件
+// Transition 是 run 狀態的公開寫入口：同一個 transaction 內以 UPDATE … WHERE status IN (允許的來源) 轉換，終態同時寫串流的結尾事件
 // （狀態與結尾事件一起可見，訂閱者看得到終態就一定讀得到結尾）。回傳轉換後的列。
 // run 已在終態回 ErrRunTerminal，非終態但沒有這條邊回 *InvalidTransitionError，不存在回 NOT_FOUND。
-// 兩個附帶的同交易寫入：回答中斷的 run（interrupt_id 非空）轉 SUCCEEDED 或 WAITING_FOR_INPUT 時是回答的提交點，中斷轉 RESOLVED、提問的 run 轉 SUCCEEDED；
+// 轉入 WAITING_FOR_INPUT 只能經 Interrupt（要同時有中斷），WAITING_FOR_INPUT 轉 SUCCEEDED 只在回答的提交點（要同時解決中斷）；這兩條邊公開的 Transition 都拒絕。
+// 回答中斷的 run（interrupt_id 非空）轉 SUCCEEDED 是回答的提交點：被回答的中斷轉 RESOLVED、提問的 run 轉 SUCCEEDED；
 // 等待輸入的 run 轉 CANCELLED 時它的 PENDING 中斷轉 CANCELLED。回答的 run 失敗或被取消不動中斷與提問的 run。
 func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReason string) (store.ProcurementAgentRun, error) {
+	if to == StatusWaitingForInput {
+		return store.ProcurementAgentRun{}, fmt.Errorf("run：%s 只能經 Ledger.Interrupt 轉入", to)
+	}
+	return l.commitTransition(ctx, runID, to, failureReason, publicFrom(to))
+}
+
+// commitTransition 是 Transition 與 Interrupt 共用的轉換，from 是允許的來源狀態。
+// 回答中斷的 run 轉 SUCCEEDED 或 WAITING_FOR_INPUT 時同一個 transaction 內提交回答（commitAnswer）。
+func (l Ledger) commitTransition(ctx context.Context, runID uuid.UUID, to, failureReason string, from []string) (store.ProcurementAgentRun, error) {
 	var out store.ProcurementAgentRun
 	err := l.DB.InTx(ctx, func(ctx context.Context) error {
-		r, err := l.transition(ctx, runID, to, failureReason)
+		if err := l.lockAskingOf(ctx, runID); err != nil {
+			return err
+		}
+		r, err := l.transition(ctx, runID, to, failureReason, from)
 		if err != nil {
 			return err
 		}
@@ -141,7 +154,31 @@ func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReas
 	return out, err
 }
 
-func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReason string) (store.ProcurementAgentRun, error) {
+// lockAskingOf 在 run 是回答 run 時先鎖提問的 run 與被回答的中斷：全域鎖順序是提問的 run、中斷、回答的 run（取消、取代與 Resume 相同），
+// 回答的提交點若先鎖自己的列再鎖提問的 run，會與取消互相等待。run 不存在或不是回答 run 時什麼都不鎖。
+func (l Ledger) lockAskingOf(ctx context.Context, runID uuid.UUID) error {
+	q := store.New(l.DB.Conn(ctx))
+	r, err := q.GetRun(ctx, runID)
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && r.InterruptID == nil {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("run：讀取 run：%w", err)
+	}
+	irq, err := q.GetInterrupt(ctx, *r.InterruptID)
+	if err != nil {
+		return fmt.Errorf("run：讀取被回答的中斷：%w", err)
+	}
+	if _, err := q.LockRun(ctx, irq.RunID); err != nil {
+		return fmt.Errorf("run：鎖提問的 run：%w", err)
+	}
+	if _, err := q.LockInterrupt(ctx, irq.ID); err != nil {
+		return fmt.Errorf("run：鎖被回答的中斷：%w", err)
+	}
+	return nil
+}
+
+func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReason string, from []string) (store.ProcurementAgentRun, error) {
 	if err := checkTarget(to, failureReason); err != nil {
 		return store.ProcurementAgentRun{}, err
 	}
@@ -155,7 +192,7 @@ func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReas
 		terminal := IsTerminal(to)
 		now := l.Now()
 		r, err := q.TransitionRun(ctx, store.TransitionRunParams{
-			ID: runID, ToStatus: to, FailureReason: reason, Terminal: terminal, FromStatuses: allowedFrom(to), Now: now,
+			ID: runID, ToStatus: to, FailureReason: reason, Terminal: terminal, FromStatuses: from, Now: now,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return l.rejectedTransition(ctx, q, runID, to)
@@ -185,25 +222,18 @@ func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReas
 // ErrInterruptNotPending 表示回答的提交點發現被回答的中斷已不是 PENDING（提問的 run 在回答期間被取消或取代）；提交整個回滾，回答的 run 留在原狀態，由呼叫端（executor）把它標失敗。
 var ErrInterruptNotPending = errors.New("run：被回答的中斷已不在等待回答")
 
-// commitAnswer 是回答成功的提交點（與回答 run 的轉換同一個 transaction）：中斷轉 RESOLVED，提問的 run 由 WAITING_FOR_INPUT 經一般守衛轉換到 SUCCEEDED。
+// commitAnswer 是回答成功的提交點（與回答 run 的轉換同一個 transaction，提問的 run 與中斷已由 lockAskingOf 鎖住）：
+// 中斷轉 RESOLVED，提問的 run 由 WAITING_FOR_INPUT 轉到 SUCCEEDED。
 func (l Ledger) commitAnswer(ctx context.Context, interruptID uuid.UUID) error {
 	q := store.New(l.DB.Conn(ctx))
 	irq, err := q.GetInterrupt(ctx, interruptID)
 	if err != nil {
 		return fmt.Errorf("run：讀取被回答的中斷：%w", err)
 	}
-	// 鎖順序：提問的 run 先、中斷後（與 Resume、取消相同），避免與取消互相等待。
-	if _, err := q.LockRun(ctx, irq.RunID); err != nil {
-		return fmt.Errorf("run：鎖提問的 run：%w", err)
-	}
-	irq, err = q.LockInterrupt(ctx, interruptID)
-	if err != nil {
-		return fmt.Errorf("run：鎖被回答的中斷：%w", err)
-	}
 	if irq.Status != "PENDING" {
 		return ErrInterruptNotPending
 	}
-	if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, ""); err != nil {
+	if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, "", allowedFrom(StatusSucceeded)); err != nil {
 		if errors.Is(err, ErrRunTerminal) {
 			return ErrInterruptNotPending
 		}

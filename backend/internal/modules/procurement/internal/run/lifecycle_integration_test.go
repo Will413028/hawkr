@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/riverqueue/river/rivertype"
 	"uuid"
@@ -79,7 +80,16 @@ func TestTransitionAppliesOnlyTheEdgesOfTheTable(t *testing.T) {
 				id := seedRun(ctx, t, d, req, 1, from, nil)
 				r, err := l.Transition(ctx, id, to, reasonFor(to))
 				var inv *run.InvalidTransitionError
+				viaOtherEntry := to == run.StatusWaitingForInput || from == run.StatusWaitingForInput && to == run.StatusSucceeded
 				switch {
+				case to == run.StatusWaitingForInput:
+					if err == nil {
+						t.Fatal("公開的 Transition 不得轉入 WAITING_FOR_INPUT（只能經 Interrupt）")
+					}
+				case from == run.StatusWaitingForInput && to == run.StatusSucceeded:
+					if !errors.As(err, &inv) || inv.From != from || inv.To != to {
+						t.Fatalf("WAITING_FOR_INPUT 轉 SUCCEEDED 只在回答的提交點，公開入口要 InvalidTransitionError：%v", err)
+					}
 				case run.CanTransition(from, to):
 					if err != nil || r.Status != to {
 						t.Fatalf("允許的邊要成功：%v %s", err, r.Status)
@@ -99,7 +109,7 @@ func TestTransitionAppliesOnlyTheEdgesOfTheTable(t *testing.T) {
 						t.Fatalf("沒有這條邊要 InvalidTransitionError：%v", err)
 					}
 				}
-				if !run.CanTransition(from, to) {
+				if !run.CanTransition(from, to) || viaOtherEntry {
 					if got := runOf(ctx, t, d, id); got.Status != from || eventCount(ctx, t, d, id) != 0 {
 						t.Fatalf("被拒絕的轉換不得改狀態或寫事件：%s", got.Status)
 					}
@@ -622,5 +632,103 @@ func TestDispatcherSkipsARunDeletedBeforeOrDuringExecution(t *testing.T) {
 	}))
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatalf("執行中被刪除也不該讓 job 報錯：%v", err)
+	}
+}
+
+func TestPublicTransitionCannotLeaveWaitingForInputToSucceededWithoutResolvingTheInterrupt(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, wide())
+	parent, irq, _ := waitingParent(ctx, t, d, s, 1)
+	var inv *run.InvalidTransitionError
+	if _, err := ledger(d, now).Transition(ctx, parent, run.StatusSucceeded, ""); !errors.As(err, &inv) {
+		t.Fatalf("err = %v，要 InvalidTransitionError", err)
+	}
+	if runOf(ctx, t, d, parent).Status != run.StatusWaitingForInput || interruptStatus(ctx, t, d, irq) != "PENDING" {
+		t.Fatal("被拒絕之後提問的 run 與中斷維持原狀")
+	}
+}
+
+func TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition(t *testing.T) {
+	for name, event := range map[string][]byte{"沒有事件": nil, "帶 turn_result": []byte(`{"turn_result":{}}`)} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			d := newDB(t)
+			req := seedRequest(ctx, t, d, 1)
+			id := seedRun(ctx, t, d, req, 1, run.StatusCancelRequested, nil)
+			_, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: id, Payload: []byte(`{}`), TurnResultEvent: event})
+			var inv *run.InvalidTransitionError
+			if !errors.As(err, &inv) || inv.From != run.StatusCancelRequested || inv.To != run.StatusWaitingForInput {
+				t.Fatalf("err = %v，要 InvalidTransitionError", err)
+			}
+			if eventCount(ctx, t, d, id) != 0 || pendingInterrupts(ctx, t, d, req) != 0 {
+				t.Fatal("被拒絕的寫入不得留下事件或中斷")
+			}
+		})
+	}
+}
+
+func TestRunsTableTiesTheQuotaPeriodToTurnRuns(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	for name, tc := range map[string]struct {
+		runType string
+		period  *time.Time
+		wantErr bool
+	}{
+		"TURN 有額度期間":  {"TURN", &now, false},
+		"TURN 沒有額度期間": {"TURN", nil, true},
+		"候選搜尋沒有額度期間":  {"CANDIDATE_SEARCH", nil, false},
+		"候選搜尋帶了額度期間":  {"CANDIDATE_SEARCH", &now, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_runs (id, buyer_id, request_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+				VALUES ($1, 1, $2, $3, 'QUEUED', $4, $5, $6, $6)`, uuid.NewV7(), req, tc.runType, uuid.NewV7(), tc.period, now)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v，wantErr = %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestBuyerSubmitLockUsesTheNamespacedKeyOfThatBuyer(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	held := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- d.InTx(ctx, func(ctx context.Context) error {
+			if err := store.New(d.Conn(ctx)).LockBuyerSubmits(ctx, 7); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	<-held
+	canLock := func(key string) bool {
+		tx, err := d.Pool().Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		var got bool
+		if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))`, key).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if canLock("procurement.run_submit:7") {
+		t.Error("買家 7 的送出鎖要佔住 procurement.run_submit:7 這個鍵")
+	}
+	if !canLock("procurement.run_submit:8") {
+		t.Error("別的買家的鍵不受影響")
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

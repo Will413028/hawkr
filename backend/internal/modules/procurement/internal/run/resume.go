@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"uuid"
@@ -30,7 +29,7 @@ func (s Submitter) Resume(ctx context.Context, in ResumeInput) (uuid.UUID, error
 	var answerID uuid.UUID
 	err := s.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.DB.Conn(ctx))
-		if err := q.LockBuyerSubmits(ctx, strconv.FormatInt(in.BuyerID, 10)); err != nil {
+		if err := q.LockBuyerSubmits(ctx, in.BuyerID); err != nil {
 			return fmt.Errorf("run：鎖買家的送出：%w", err)
 		}
 		existing, err := q.GetRunByIdempotencyKey(ctx, store.GetRunByIdempotencyKeyParams{BuyerID: in.BuyerID, ClientRequestID: in.ClientRequestID})

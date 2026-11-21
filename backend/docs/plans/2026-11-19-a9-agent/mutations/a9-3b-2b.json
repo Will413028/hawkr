@@ -98,7 +98,7 @@
  {
   "id": "P13",
   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
-  "old": "if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, \"\"); err != nil {",
+  "old": "if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, \"\", allowedFrom(StatusSucceeded)); err != nil {",
   "new": "if _, err := l.Now(), error(nil); err != nil {",
   "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction$'",
   "expect": "TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction (integration)"
@@ -126,5 +126,85 @@
   "new": "if false {",
   "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending$'",
   "expect": "TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending (integration)"
+ },
+ {
+  "id": "P17",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "\tif to == StatusWaitingForInput {\n",
+  "new": "\tif false {\n",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestPublicTransitionRejectsEnteringWaitingForInputWithoutTouchingTheDatabase$'",
+  "expect": "TestPublicTransitionRejectsEnteringWaitingForInputWithoutTouchingTheDatabase"
+ },
+ {
+  "id": "P18",
+  "file": "backend/internal/modules/procurement/internal/run/transition.go",
+  "old": "\tif to == StatusSucceeded {\n\t\tfrom = slices.DeleteFunc",
+  "new": "\tif false {\n\t\tfrom = slices.DeleteFunc",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestPublicTransitionSourcesExcludeTheAnswerCommitEdge$'",
+  "expect": "TestPublicTransitionSourcesExcludeTheAnswerCommitEdge"
+ },
+ {
+  "id": "P19",
+  "file": "backend/internal/modules/procurement/internal/run/transition.go",
+  "old": "\tif to == StatusSucceeded {\n\t\tfrom = slices.DeleteFunc",
+  "new": "\tif false {\n\t\tfrom = slices.DeleteFunc",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestPublicTransitionCannotLeaveWaitingForInputToSucceededWithoutResolvingTheInterrupt$'",
+  "expect": "TestPublicTransitionCannotLeaveWaitingForInputToSucceededWithoutResolvingTheInterrupt (integration)"
+ },
+ {
+  "id": "P20",
+  "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+  "old": "AND request_id = $2 AND status = 'WAITING_FOR_INPUT'",
+  "new": "AND request_id = $2 AND status = 'NEVER'",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation$'",
+  "expect": "TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation (integration)"
+ },
+ {
+  "id": "P21",
+  "file": "backend/internal/modules/procurement/internal/run/submit.go",
+  "old": "\tif requestID != nil {\n\t\tn, err := q.CountRequestActiveRuns(ctx, *requestID)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"run：數需求進行中的 run：%w\", err)\n\t\t}\n\t\tif n > 0 {\n\t\t\treturn apperr.FailedPrecondition(\"這個需求已有進行中的 run\").WithReason(apperr.ReasonProcurementRunInProgress)\n\t\t}\n\t}\n\tactive, err := q.CountBuyerActiveRuns(ctx, buyerID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"run：數進行中的 run：%w\", err)\n\t}\n\tif active >= int64(s.Limits.active()) {\n\t\treturn apperr.ResourceExhausted(5*time.Second, \"同時進行中的採購已達上限，請等目前的完成後再送出\")\n\t}\n",
+  "new": "\tactive, err := q.CountBuyerActiveRuns(ctx, buyerID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"run：數進行中的 run：%w\", err)\n\t}\n\tif active >= int64(s.Limits.active()) {\n\t\treturn apperr.ResourceExhausted(5*time.Second, \"同時進行中的採購已達上限，請等目前的完成後再送出\")\n\t}\n\tif requestID != nil {\n\t\tn, err := q.CountRequestActiveRuns(ctx, *requestID)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"run：數需求進行中的 run：%w\", err)\n\t\t}\n\t\tif n > 0 {\n\t\t\treturn apperr.FailedPrecondition(\"這個需求已有進行中的 run\").WithReason(apperr.ReasonProcurementRunInProgress)\n\t\t}\n\t}\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit$'",
+  "expect": "TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit (integration)"
+ },
+ {
+  "id": "P22",
+  "file": "backend/internal/modules/procurement/db/migrations/20261121165341_procurement_run_quota_check.sql",
+  "old": "CHECK ((run_type = 'TURN'::text) = (quota_period_start IS NOT NULL))",
+  "new": "CHECK (true)",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestRunsTableTiesTheQuotaPeriodToTurnRuns$'",
+  "expect": "TestRunsTableTiesTheQuotaPeriodToTurnRuns (integration)"
+ },
+ {
+  "id": "P23",
+  "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+  "old": "\t\tif r.Status != StatusRunning {\n",
+  "new": "\t\tif false {\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition$'",
+  "expect": "TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition (integration)"
+ },
+ {
+  "id": "P24",
+  "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+  "old": "'procurement.run_submit:' || $1::bigint",
+  "new": "'procurement.run_submit_x:' || $1::bigint",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestBuyerSubmitLockUsesTheNamespacedKeyOfThatBuyer$'",
+  "expect": "TestBuyerSubmitLockUsesTheNamespacedKeyOfThatBuyer (integration)"
+ },
+ {
+  "id": "P25",
+  "file": "backend/internal/platform/jobs/jobs.go",
+  "old": "\tif errors.Is(err, river.ErrNotFound) {\n",
+  "new": "\tif false {\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/platform/jobs/ -run '^TestCancelJobTreatsAMissingJobRowAsCancelled$'",
+  "expect": "TestCancelJobTreatsAMissingJobRowAsCancelled (integration)"
+ },
+ {
+  "id": "P26",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "\tfor _, a := range answers {\n",
+  "new": "\tfor _, a := range answers[:0] {\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun$'",
+  "expect": "TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun (integration)"
  }
 ]

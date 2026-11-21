@@ -17,7 +17,7 @@ import (
 
 // Executor 執行一個已被領走（RUNNING）的 run：LLM 與 provider 呼叫在這裡，不在 transaction 內。
 //
-// 契約：回傳 nil 之前 run 必須已到終態或 WAITING_FOR_INPUT（經 Ledger.Transition），否則 reconciler 把它標失敗；
+// 契約：回傳 nil 之前 run 必須已到終態（經 Ledger.Transition）或 WAITING_FOR_INPUT（經 Ledger.Interrupt），否則 reconciler 把它標失敗；
 // 回傳錯誤表示 run 失敗，Dispatcher 負責轉 FAILED 並退額度（ctx 被關機或逾時取消的是 WORKER_LOST）；ctx 被取消（取消、關機或逾時）時盡快返回。
 // run 的事件與產出經 Ledger 寫入；寫入收到 ErrRunTerminal 代表 run 已被別處收斂，executor 應停止並回傳它（Dispatcher 視為正常結束）。
 type Executor interface {

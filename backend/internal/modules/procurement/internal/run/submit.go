@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -93,7 +92,7 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 	id := uuid.NewV7()
 	err := s.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.DB.Conn(ctx))
-		if err := q.LockBuyerSubmits(ctx, strconv.FormatInt(in.BuyerID, 10)); err != nil {
+		if err := q.LockBuyerSubmits(ctx, in.BuyerID); err != nil {
 			return fmt.Errorf("run：鎖買家的送出：%w", err)
 		}
 		existing, err := q.GetRunByIdempotencyKey(ctx, store.GetRunByIdempotencyKeyParams{BuyerID: in.BuyerID, ClientRequestID: in.ClientRequestID})
@@ -129,10 +128,8 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 				return fmt.Errorf("run：扣額度：%w", err)
 			}
 		}
-		if in.ConversationID != nil {
-			if err := s.cancelSuperseded(ctx, q, in.BuyerID, *in.ConversationID); err != nil {
-				return err
-			}
+		if err := s.cancelSuperseded(ctx, q, in.BuyerID, in.RequestID); err != nil {
+			return err
 		}
 		return s.start(ctx, q, id, in.Message, in.ConversationID, now)
 	})
@@ -156,13 +153,6 @@ func (s Submitter) insertRun(ctx context.Context, q *store.Queries, p store.Inse
 
 // checkLimits 在買家的鎖之內檢查進行中數、每分鐘送出數與同需求的進行中 run。requestID 非 nil 時檢查該需求。
 func (s Submitter) checkLimits(ctx context.Context, q *store.Queries, buyerID int64, requestID *uuid.UUID, now time.Time) error {
-	active, err := q.CountBuyerActiveRuns(ctx, buyerID)
-	if err != nil {
-		return fmt.Errorf("run：數進行中的 run：%w", err)
-	}
-	if active >= int64(s.Limits.active()) {
-		return apperr.ResourceExhausted(5*time.Second, "同時進行中的採購已達上限，請等目前的完成後再送出")
-	}
 	if requestID != nil {
 		n, err := q.CountRequestActiveRuns(ctx, *requestID)
 		if err != nil {
@@ -171,6 +161,13 @@ func (s Submitter) checkLimits(ctx context.Context, q *store.Queries, buyerID in
 		if n > 0 {
 			return apperr.FailedPrecondition("這個需求已有進行中的 run").WithReason(apperr.ReasonProcurementRunInProgress)
 		}
+	}
+	active, err := q.CountBuyerActiveRuns(ctx, buyerID)
+	if err != nil {
+		return fmt.Errorf("run：數進行中的 run：%w", err)
+	}
+	if active >= int64(s.Limits.active()) {
+		return apperr.ResourceExhausted(5*time.Second, "同時進行中的採購已達上限，請等目前的完成後再送出")
 	}
 	limit := s.Limits.perMinute()
 	recent, err := q.OldestBuyerRunsSince(ctx, store.OldestBuyerRunsSinceParams{BuyerID: buyerID, Since: now.Add(-submitWindow), MaxRows: limit})
@@ -206,15 +203,14 @@ func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, me
 	return nil
 }
 
-// cancelSuperseded 把同一個對話裡等待輸入的 run 轉 CANCELLED（不退額度）：新的一輪取代它，之後不會再有人回答。
-func (s Submitter) cancelSuperseded(ctx context.Context, q *store.Queries, buyerID int64, conversationID uuid.UUID) error {
-	ids, err := q.LockWaitingRunIDs(ctx, store.LockWaitingRunIDsParams{BuyerID: buyerID, ConversationID: &conversationID})
+// cancelSuperseded 把同一個需求裡等待輸入的 run 轉 CANCELLED（不退額度，它的 PENDING 中斷與進行中的回答 run 一併取消）：新的一輪取代它，之後不會再有人回答。
+func (s Submitter) cancelSuperseded(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) error {
+	ids, err := q.LockWaitingRunIDs(ctx, store.LockWaitingRunIDsParams{BuyerID: buyerID, RequestID: requestID})
 	if err != nil {
 		return fmt.Errorf("run：列出等待輸入的 run：%w", err)
 	}
 	return cancelAll(ctx, ids, func(ctx context.Context, id uuid.UUID) error {
-		_, err := s.Ledger.Transition(ctx, id, StatusCancelled, "")
-		return err
+		return cancelWaiting(ctx, s.DB, s.Ledger, s.Jobs, id)
 	})
 }
 

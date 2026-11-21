@@ -467,13 +467,63 @@ func (q *Queries) LockActiveRun(ctx context.Context, id uuid.UUID) (ProcurementA
 }
 
 const lockBuyerSubmits = `-- name: LockBuyerSubmits :exec
-SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || $1, 0))
+SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || $1::bigint, 0))
 `
 
 // 同一位買家的送出在這裡排隊（交易級 advisory lock），之後的進行中數與每分鐘送出數才看得到前一個交易已提交的 run。
-func (q *Queries) LockBuyerSubmits(ctx context.Context, buyerIdpgCatalogint8 string) error {
-	_, err := q.db.Exec(ctx, lockBuyerSubmits, buyerIdpgCatalogint8)
+func (q *Queries) LockBuyerSubmits(ctx context.Context, buyerID int64) error {
+	_, err := q.db.Exec(ctx, lockBuyerSubmits, buyerID)
 	return err
+}
+
+const lockInProgressAnswerRuns = `-- name: LockInProgressAnswerRuns :many
+SELECT a.id, a.buyer_id, a.request_id, a.conversation_id, a.interrupt_id, a.candidate_set_id, a.publication_id, a.run_type, a.status, a.failure_reason, a.result_revision_id, a.last_event_seq, a.min_available_seq, a.client_request_id, a.job_id, a.quota_period_start, a.created_at, a.started_at, a.completed_at, a.updated_at FROM procurement.agent_runs a
+JOIN procurement.agent_run_interrupts i ON i.id = a.interrupt_id
+WHERE i.run_id = $1 AND a.status IN ('QUEUED', 'RUNNING')
+ORDER BY a.id
+FOR UPDATE OF a
+`
+
+// 回答 @run_id 的中斷、還在進行中（排隊或執行中）的回答 run；提問的 run 被取消或被取代時一併要求取消它們。
+func (q *Queries) LockInProgressAnswerRuns(ctx context.Context, runID uuid.UUID) ([]ProcurementAgentRun, error) {
+	rows, err := q.db.Query(ctx, lockInProgressAnswerRuns, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProcurementAgentRun{}
+	for rows.Next() {
+		var i ProcurementAgentRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.BuyerID,
+			&i.RequestID,
+			&i.ConversationID,
+			&i.InterruptID,
+			&i.CandidateSetID,
+			&i.PublicationID,
+			&i.RunType,
+			&i.Status,
+			&i.FailureReason,
+			&i.ResultRevisionID,
+			&i.LastEventSeq,
+			&i.MinAvailableSeq,
+			&i.ClientRequestID,
+			&i.JobID,
+			&i.QuotaPeriodStart,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockInterrupt = `-- name: LockInterrupt :one
@@ -531,19 +581,19 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRu
 
 const lockWaitingRunIDs = `-- name: LockWaitingRunIDs :many
 SELECT id FROM procurement.agent_runs
-WHERE buyer_id = $1 AND conversation_id = $2 AND status = 'WAITING_FOR_INPUT'
+WHERE buyer_id = $1 AND request_id = $2 AND status = 'WAITING_FOR_INPUT'
 ORDER BY id
 FOR UPDATE
 `
 
 type LockWaitingRunIDsParams struct {
-	BuyerID        int64
-	ConversationID *uuid.UUID
+	BuyerID   int64
+	RequestID uuid.UUID
 }
 
-// 同一個買家、同一個對話裡等待輸入的 run；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
+// 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
 func (q *Queries) LockWaitingRunIDs(ctx context.Context, arg LockWaitingRunIDsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, lockWaitingRunIDs, arg.BuyerID, arg.ConversationID)
+	rows, err := q.db.Query(ctx, lockWaitingRunIDs, arg.BuyerID, arg.RequestID)
 	if err != nil {
 		return nil, err
 	}

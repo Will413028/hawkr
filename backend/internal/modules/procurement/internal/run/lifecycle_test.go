@@ -364,3 +364,18 @@ func TestLimitsDefaultToTwoInProgressAndTenPerMinute(t *testing.T) {
 		t.Fatalf("設定值 %d、%d", l.active(), l.perMinute())
 	}
 }
+
+func TestPublicTransitionRejectsEnteringWaitingForInputWithoutTouchingTheDatabase(t *testing.T) {
+	if _, err := (Ledger{}).Transition(context.Background(), uuid.NewV7(), StatusWaitingForInput, ""); err == nil {
+		t.Fatal("公開的 Transition 要拒絕轉入 WAITING_FOR_INPUT")
+	}
+}
+
+func TestPublicTransitionSourcesExcludeTheAnswerCommitEdge(t *testing.T) {
+	if from := publicFrom(StatusSucceeded); slices.Contains(from, StatusWaitingForInput) || !slices.Contains(from, StatusRunning) {
+		t.Fatalf("SUCCEEDED 的公開來源 = %v，不得含 WAITING_FOR_INPUT、要含 RUNNING", from)
+	}
+	if from := publicFrom(StatusCancelled); !slices.Contains(from, StatusWaitingForInput) {
+		t.Fatalf("CANCELLED 的公開來源 = %v，要含 WAITING_FOR_INPUT", from)
+	}
+}
