@@ -30,6 +30,10 @@
       },
       "description": "檢舉說明超過字數上限（以字元計）。max 是 model.MaxDescriptionRunes。"
     },
+    "report.reporter_not_found": {
+      "message": "檢舉人已停用，無法送出檢舉",
+      "description": "檢舉人（買家或店家）已關閉或退場，送出的 transaction 在擁有者守門鎖回 NotFound。"
+    },
     "report.reporter_required": {
       "message": "需要買家身分",
       "description": "檢舉人沒有買家身分（沒有買家 ID）。"

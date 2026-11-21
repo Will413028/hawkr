@@ -122,12 +122,25 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 	return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 次遇到並行競爭", maxAttempts)
 }
 
-func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
+// lockReporter 以 FOR KEY SHARE 鎖檢舉人的擁有者列：買家尚未關閉（刪除中放行）、店家尚未退場；否則回檢舉人專屬的 NotFound。
+func (s *Service) lockReporter(ctx context.Context, in model.SubmitInput) error {
+	var err error
 	if in.ReporterStoreID > 0 {
-		// 店家檢舉人先於 moderation 的任何列鎖住「尚未退場」：店家退場的訂閱者清檢舉人資料時，已退場的店不會再有新列，並行的送出與退場在店家列上序列化。
-		if err := s.d.Seller.LockNotRetired(ctx, in.ReporterStoreID); err != nil {
-			return model.SubmitResult{}, contentNotFound(ctx, err)
-		}
+		err = s.d.Seller.LockNotRetired(ctx, in.ReporterStoreID)
+	} else {
+		err = s.d.Buyer.LockNotClosed(ctx, in.ReporterBuyerID)
+	}
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return apperr.NotFound("%s", moderationtext.ReportReporterNotFound(uitext.LocaleFrom(ctx)))
+	}
+	return err
+}
+
+func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
+	// 檢舉人的擁有者守門鎖先於 moderation 的任何列（buyer、seller 先於 moderation）：關閉或退場的訂閱者清檢舉人資料時，並行的送出與轉移在擁有者列上序列化。
+	// 必要條件：店家檢舉人已退場時，新檢舉在凍結內容（CapChatRead）已回 NotFound，鎖要擋的是凍結之前就返回、卻會寫 report_requests 的路徑（併入進行中案件的 recordRequest）與重送；買家檢舉人沒有這道前置擋，鎖是唯一的守門。
+	if err := s.lockReporter(ctx, in); err != nil {
+		return model.SubmitResult{}, err
 	}
 	q := store.New(s.d.DB.Conn(ctx))
 	var hash []byte
