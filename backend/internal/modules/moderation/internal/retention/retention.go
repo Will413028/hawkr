@@ -18,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -130,6 +131,22 @@ func (s *Service) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDel
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（沒有開啟中的訂單時買家直接關閉，只發這個事件）。
 func (s *Service) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
 	return s.clearReporter(ctx, e.BuyerID, e.AccountID)
+}
+
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：清掉該店以檢舉人身分送出的全部檢舉的說明、冪等紀錄與每日計數列（店家額度與買家分開計）；
+// 檢舉列與 reporter_store_id 留著。冪等。
+func (s *Service) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
+	q := store.New(s.d.DB.Conn(ctx))
+	if _, err := q.ClearStoreReporterDescriptions(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：清除店家檢舉人 %d 的說明：%w", e.StoreID, err)
+	}
+	if _, err := q.DeleteStoreReporterRequests(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：刪除店家檢舉人 %d 的冪等紀錄：%w", e.StoreID, err)
+	}
+	if _, err := q.DeleteStoreReporterDailyCount(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：刪除店家檢舉人 %d 的每日計數：%w", e.StoreID, err)
+	}
+	return nil
 }
 
 func (s *Service) clearReporter(ctx context.Context, buyerID, accountID int64) error {

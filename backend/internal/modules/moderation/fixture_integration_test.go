@@ -154,6 +154,7 @@ type fixture struct {
 	module   *Module
 	media    *media.Fake
 	jobs     *testQueue
+	bus      *events.Bus
 	ids      atomic.Int64
 	mu       sync.Mutex
 	now      time.Time
@@ -186,6 +187,7 @@ func setup(t *testing.T) *fixture {
 	))
 	f := &fixture{db: d, now: time.Date(2026, 11, 2, 4, 0, 0, 0, time.UTC)}
 	bus := events.NewBus()
+	f.bus = bus
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := &testQueue{}
 	f.jobs = q
@@ -221,6 +223,7 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.review.OnMeasureRevoked)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
+	events.Subscribe(bus, f.module.Retention().OnStoreRetired)
 	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
