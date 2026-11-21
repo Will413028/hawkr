@@ -492,7 +492,7 @@ social 的 34 檔不動（`rg -l -i "$P" social | wc -l`＝34【量，簡報】�
 
 ## 10. 待決題
 
-### W1 守門對「不存在」的處理：crm 重放到不存在的買家或店家
+### W1 守門對「不存在」的處理：crm 重放到不存在的買家或店家——已決（Will 2026-11-21，A6-D20）：(a)
 
 `LockNotClosed`、`LockNotRetired` 對已關閉與不存在都回 NotFound（比照 `LockActive`）。crm 的投影現況：不在複本的買家 ID 一律當營運中，照寫（`project.go:97-102`）。換成守門後，從未存在的 ID 會被當成「已停用」。
 
@@ -500,32 +500,32 @@ social 的 34 檔不動（`rg -l -i "$P" social | wc -l`＝34【量，簡報】�
 - (b) 守門回可區分的原因（例如 NotFound 帶 reason）；已關閉靜默跳過，不存在回錯誤，由 River 重試到上限後人工處理。
 - (c) 守門不分，crm 另以 `buyer.ProfileByBuyerID` 先確認存在（多一次讀取）。
 
-建議 (a)：buyer、店家列不會被刪（§0.4），不存在只可能是壞資料，重試不會讓它存在；(b) 會讓守門的契約多一個分類，所有消費端都要處理。證據等級：Java ordering 只對真實訂單發事件【推，未對 Java 端核對】。狀態：未決。
+建議 (a)：buyer、店家列不會被刪（§0.4），不存在只可能是壞資料，重試不會讓它存在；(b) 會讓守門的契約多一個分類，所有消費端都要處理。證據等級：Java ordering 只對真實訂單發事件【推，未對 Java 端核對】。狀態：已決，見標題。
 
-### W2 `pub_closed_buyers()` 的形狀
+### W2 `pub_closed_buyers()` 的形狀——已決（Will 2026-11-21，A6-D20）：(a)
 
 - (a) 新增獨立函式 `pub_closed_buyers()`（本檔採用）。
 - (b) 把 `pub_inactive_buyer` 加一欄 `status` 或 `closed boolean`，同一個函式服務兩種消費者；social 的 sqlc 與對帳查詢、契約測試都受影響。
 
-建議 (a)：不改既有契約的形狀、不牽動 social；代價是 buyer 多一個函式。`pub_inactive_buyers` 與 `pub_closed_buyers` 是同一張表的兩個謂詞，沒有第三個消費者形狀時不抽象。狀態：未決。
+建議 (a)：不改既有契約的形狀、不牽動 social；代價是 buyer 多一個函式。`pub_inactive_buyers` 與 `pub_closed_buyers` 是同一張表的兩個謂詞，沒有第三個消費者形狀時不抽象。狀態：已決，見標題。
 
-### W3 `LockActive`／`LockBuyerShared` 是否同步降為 `FOR KEY SHARE`
+### W3 `LockActive`／`LockBuyerShared` 是否同步降為 `FOR KEY SHARE`——已決（Will 2026-11-21，A6-D20）：(a)
 
 - (a) 降，`LockNotClosed` 與 `LockActive` 共用一支查詢（本檔 §1.5 建議）。
 - (b) 不降，新增 `LockBuyerKeyShare`，買家有兩種共享強度。
 
-建議 (a)，3c1 獨立 commit，social 與 buyer 的守門測試整組重跑。證據：讀過全部 `UPDATE buyer.buyers` 都在 `FOR UPDATE` 之後，等待集合不變【推】。風險：social 的行為面（`block.go:63` 也用 `LockBuyerShared`）需要整組測試證明。狀態：未決。
+建議 (a)，3c1 獨立 commit，social 與 buyer 的守門測試整組重跑。證據：讀過全部 `UPDATE buyer.buyers` 都在 `FOR UPDATE` 之後，等待集合不變【推】。風險：social 的行為面（`block.go:63` 也用 `LockBuyerShared`）需要整組測試證明。狀態：已決，見標題。
 
-### W4 守門與業務寫入的互等（簡報 §4 的修正，見 §0.4.1 第 1 點）
+### W4 守門與業務寫入的互等（簡報 §4 的修正，見 §0.4.1 第 1 點）——已決（Will 2026-11-21，A6-D20）：(b)
 
 買家的業務寫入持 `FOR UPDATE`（`stint.go:11-27`），店家的持 `FOR UPDATE`（`seller/internal/stint/stint.go:20-33`），所以每則 im 訊息、每筆 crm 投影的 `FOR KEY SHARE` 會與它們互等；單則 tx 都短，但沒有量測。
 
 - (a) 接受，量測觸發條件（守門等待時間、`pg_locks` 等待）超過門檻再處理。
 - (b) 把業務寫入的列鎖降成 `FOR NO KEY UPDATE`（它們不改被外鍵參照的鍵），只有轉移（`BeginDeletion`、`CloseForDeletion`、`LockAccountStores`、`RetireDueStores`）保留 `FOR UPDATE`。買家要拆 `LockBuyer`（`Require` 與轉移共用）成兩支；店家的 `LockStore` 只被 `stint.Lock` 使用，改一行；24 個 seller 呼叫點不動。串行化不變（官方表：`FOR UPDATE` 與 `FOR NO KEY UPDATE` 衝突）。
 
-建議 (a) 先上，(b) 是一行到兩行的後續修，觸發條件寫進 CARRYOVER；理由：系統未上線、沒有量測數字，先不改兩個擁有者的寫入鎖強度。狀態：未決。
+建議 (a) 先上，(b) 是一行到兩行的後續修，觸發條件寫進 CARRYOVER；理由：系統未上線、沒有量測數字，先不改兩個擁有者的寫入鎖強度。狀態：已決，見標題。
 
-### W5 sweep 的掃描範圍與索引
+### W5 sweep 的掃描範圍與索引——已決（Will 2026-11-21，A6-D20）：(a)
 
 新 sweep 從擁有者的 pub 函式出發（買家 `status <> 'ACTIVE'`、店家 `retired_at IS NOT NULL`）逐一 `EXISTS` 消費者資料，而舊版從消費者自己的小複本表出發。pub 函式的結果集隨時間單調增加（列永久保留），buyer 沒有 `status` 的索引（`buyer/db/schema.sql` 的索引清單）。
 
@@ -533,18 +533,23 @@ social 的 34 檔不動（`rg -l -i "$P" social | wc -l`＝34【量，簡報】�
 - (b) buyer 加 `WHERE status <> 'ACTIVE'` 的部分索引、seller 的 `stores_purge_pending` 不涵蓋已完成第二段的店，另加 `WHERE retired_at IS NOT NULL` 的索引。
 - (c) 從消費者端出發（`SELECT DISTINCT buyer_id FROM review.reviews`），再 join pub；全表掃描 reviews，不可取。
 
-建議 (a)，改 (b) 的觸發條件寫進各模組 CARRYOVER：sweep 單輪耗時超過 30 秒（River job 的執行時間）或 closed 買家數超過 10 萬列（`SELECT count(*) FROM buyer.buyers WHERE status <> 'ACTIVE'`）；門檻數值是推測，沒有量測。未量測：closed 買家數、單次耗時。狀態：未決。
+建議 (a)，改 (b) 的觸發條件寫進各模組 CARRYOVER：sweep 單輪耗時超過 30 秒（River job 的執行時間）或 closed 買家數超過 10 萬列（`SELECT count(*) FROM buyer.buyers WHERE status <> 'ACTIVE'`）；門檻數值是推測，沒有量測。未量測：closed 買家數、單次耗時。狀態：已決，見標題。
 
-### W6 共用 sweep helper 的範圍
+### W6 共用 sweep helper 的範圍——已決（Will 2026-11-21，A6-D20）：(b)
 
 - (a) 只改 review、im、crm 與 im 的 `live/sweep.go`（本步需要的 4 處）。
 - (b) 同時改 social、payment、media、seller、`P/inbox` 共 10 處相同的五狀態清單與其他 `ByPeriod` 選項。
 
-建議 (a)：(b) 各處的狀態集合（`terminationStates`、`registryOpenStates`）可能不同，要逐一核對，超出本步；但 `P/jobs` helper 的命名與位置照 (b) 的終態設計，並在 `AGENTS.md`「重複實作」的欄位登記還沒搬的 10 處。狀態：未決。
+建議 (a)：(b) 各處的狀態集合（`terminationStates`、`registryOpenStates`）可能不同，要逐一核對，超出本步；但 `P/jobs` helper 的命名與位置照 (b) 的終態設計，並在 `AGENTS.md`「重複實作」的欄位登記還沒搬的 10 處。狀態：已決，見標題。
 
-### W7 「legacy client 在 tx 內被呼叫」的機械檢查形狀
+### W7 「legacy client 在 tx 內被呼叫」的機械檢查形狀——已決（Will 2026-11-21，A6-D20）：(b)
 
-見 §6：(a) `internal/arch` 的 AST 規則（只抓 closure 內直接呼叫）；(b) 整合測試替身斷言沒有 tx（只守有測試的路徑）；(c) 兩者都做。建議 (b)，本步 im 一個測試；(a) 另案。狀態：未決。
+見 §6：(a) `internal/arch` 的 AST 規則（只抓 closure 內直接呼叫）；(b) 整合測試替身斷言沒有 tx（只守有測試的路徑）；(c) 兩者都做。建議 (b)，本步 im 一個測試；(a) 另案。狀態：已決，見標題。
+
+### 拍板後的實作規定（A6-D20）
+
+- W4 (b)：3c1 一併把業務寫入降成 `FOR NO KEY UPDATE`；買家把 `LockBuyer` 拆成業務用（`FOR NO KEY UPDATE`）與轉移用（`FOR UPDATE`，`LockForDeletion` 沿用）兩支；店家 `LockStore`（只被 `stint.Lock` 用）改 `FOR NO KEY UPDATE`，`RetireDueStores`、`LockAccountStores` 保留 `FOR UPDATE`。驗收加：守門與業務寫入並行不等待的 integration；mutation：業務寫入改回 `FOR UPDATE` → 該測試失敗。buyer、seller 整組 unit＋integration 重跑。§9.5 W4 相關觸發條件作廢。
+- W6 (b)：3c1 收齊全部 14 處（§5 的 4 處加 social、payment、media、seller、`P/inbox` 的 10 處）。實作第一步逐處列出狀態集合與 `ByPeriod` 選項；能歸成兩種以內就各一個 helper，超過兩種停下回報。`AGENTS.md`「重複實作」不登記殘留。
 
 ## 11. 未查證與限制
 

@@ -165,7 +165,7 @@
 
 照 A6-1 拆兩個 session：**A6-3c0** 設計書（以 `step-3c-brief.md` 為輸入，含 buyer、seller 新 API 的完整清單、各模組改點、migration）與開工 design-review；**A6-3c1** 實作與完成前 design-review。
 
-- 範圍：buyer、seller 新增共享守門與狀態 `pub_*`；review、im、crm 改用擁有者守門、刪 `inactive_*` 表與 advisory lock、保底掃描改讀擁有者 `pub_*`；`internal/arch` 依賴與 lockorder 登記；各模組 `CARRYOVER.md` 更新。
+- 範圍：buyer、seller 新增共享守門與狀態 `pub_*`，業務寫入鎖降為 `FOR NO KEY UPDATE`（A6-D20 W4）；sweep 唯一性 helper 收齊全部 14 處（A6-D20 W6）；review、im、crm 改用擁有者守門、刪 `inactive_*` 表與 advisory lock、保底掃描改讀擁有者 `pub_*`；`internal/arch` 依賴與 lockorder 登記；各模組 `CARRYOVER.md` 更新。
 - 不能動：social 的 `inactive_authors` 與每日對帳；各模組抹除 job 的刪除範圍；im「刪帳申請中仍可聊天」語意；守門鎖取在 RPC 之後（`im` 的 `send.go` 先呼叫 order 再進 tx）。
 - 消費端：`rg -n "inactive_parties|inactive_authors|LockParty|LockPartyShared|LockActive" backend/internal`。
 - 驗收：lockorder integration（反序要失敗）；每模組「停用後立即看不到、寫入被擋、重放不重建」integration；mutation：拿掉守門鎖 → 停用與寫入交錯測試失敗；拿掉讀取 join → 可見性測試失敗；im 刪帳申請中可送訊息的回歸測試。
@@ -222,6 +222,7 @@
 | A6-D17 | im 寫入 transaction 設時間上限（statement_timeout、idle_in_transaction_session_timeout），重連補洞起點往回放同一常數加時鐘誤差（Will 2026-11-20） | A6-2b1 |
 | A6-D18 | A6-3 設計書 §13 W1–W5 全照建議：VIP 查詢切換與刪 `legacy/crmservice` 延到 A6-6e（W1 (a)，同 A6-D11）；刪帳與店家退場時清除 crm 資料並以 `inactive_parties` 擋重放（W2 (b)）；不建 coupon legacy client、CRM 不回優惠券數（W3 (a)）；標籤上限每店 200、每客戶 20（W4 (a)）；拿掉 CRM 客戶列表的關鍵字搜尋，A6-6 改 UI（W5 (a)，Will 已同意這項 UI 改動）（Will 2026-11-20） | A6-3b、A6-6 |
 | A6-D19 | 停用身分的事實與守門只在擁有者：buyer 加「未關閉」、seller 加「未退場」的共享列鎖（`FOR KEY SHARE`）與狀態 `pub_*`，獨占端沿用既有的 `LockForDeletion`、`RetireDueStores`；review、im、crm 刪自己的 `inactive_*` 複本與 advisory lock，讀取改 join 擁有者 `pub_*`；抹除 job 留在各模組；social 保留複本（存旗標，規則 2 例外）；不做平台框架。簡報 `2026-11-19-a6-review-im-crm/step-3c-brief.md`（Will 2026-11-21） | A6-3c、A6-4 |
+| A6-D20 | A6-3c 設計書 §10 W1–W7：W1 (a) 不存在的 ID 當已停用、記 error log；W2 (a) 新增 `pub_closed_buyers()`；W3 (a) `LockActive`／`LockBuyerShared` 降為 `FOR KEY SHARE`；W4 (b) 業務寫入降為 `FOR NO KEY UPDATE`、只有轉移保留 `FOR UPDATE`；W5 (a) 不加索引、門檻寫進 CARRYOVER；W6 (b) sweep 唯一性 helper 本步收齊全部 14 處；W7 (b) 整合測試替身斷言 legacy RPC 不在 tx 內（Will 2026-11-21） | A6-3c1 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -252,3 +253,4 @@
 | A6-2b1 即時通道的實作 | 完成（2026-11-20，PR #412）：`im/internal/live`（LISTEN 連線、扇出、訂閱、presence）、寫入端 `NOTIFY`、寫入 transaction 上限（A6-D17）；未接 `cmd/hawkr`（A6-5）；與設計書不同處記在設計書 §16 | 本機 `go build`、`go vet -tags integration`、`go test ./...`、`go test -race`（im）、`make lint-monolith`、`make sqlc` 無 drift；CI run 44750191321 im 全部 integration 通過；mutation：本機單元 15 個 killed，CI 批次 run 44743745834（22 killed）＋44749188726（補強後 M12、寫入上限 5 路徑、M15 共 6 個 killed）；審查：`/code-review` 1 輪＋完成前 design-review 1 輪＋diff 審查 1 輪（第 2 輪），findings 16 (blocking 0)，fixed 14、recorded 2、raised 1（L2，A6-D17 已決後修）、rejected 1 | M7、M20 的 kill 是逾時或 cleanup 卡住，不是乾淨的斷言失敗；M4、M13、M22 integration 版沒跑（M4 無單點改法、M13 不存在、M22 單元已覆蓋）；補洞時間界線不含 COMMIT 本身耗時（只靠 2 秒時鐘誤差，未量測）；巢狀於外層 transaction 的 im 寫入不設上限（目前無呼叫端，觸發條件在 CARRYOVER）；同一 CI run 的 seller `TestSellerInquiryListIsNewestFirstFilteredAndCounted` 失敗是 dev 既有（run 44731436154），不屬本步 |
 | A6-3a crm 設計 | 設計書與開工 design-review 完成，完成（2026-11-20）：W1–W5 已決（A6-D18），§10 計畫修改已套用 | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 0、raised 0、rejected 1；處理對照在設計書 §14；兩處計畫與事實衝突已核對原始碼（`RefundCompletedPayload.java:59` 每次新 UUID、`membership.go:90` VIP 唯一呼叫端） | 無程式、無測試（設計步驟）；— |
 | A6-3b crm 實作 | 完成（2026-11-21）：`internal/modules/crm`、`internal/legacy/crmconsumer`（只在測試啟用）；與設計書的差異見 `step-3-design.md` §15；§16 #1 依 A6-D19 交 A6-3c 處理 | go build／vet、unit、`make sqlc` 無 drift（主 session 重跑）；完成前 design-review＋/code-review＋第 2 輪：findings 14 (blocking 0)，fixed 9、recorded 0、raised 1、rejected 4（設計書 §16）；CI `backend monolith` run 44850261836（5ad73cbe）三個 job 全綠，含 integration test（testcontainers） | 36 個 mutation 只在實作者的原生 Postgres 跑過（CI 不跑 mutation） |
+| A6-3c0 擁有者守門設計 | 完成（2026-11-21）：設計書 `step-3c-design.md`，W1–W7 已決（A6-D20） | 開工 design-review 1 輪：findings 6 (blocking 0)，fixed 1、recorded 3、raised 2（W4、W6）、rejected 0；Postgres 列鎖衝突表以官方 explicit-locking 頁核對 | 第 2 輪未派：拍板改的是 W4、W6 的選項，設計書已有 (b) 的完整描述，實作規定寫在 §10 末；`SKIP LOCKED` 語意與 pub 函式內聯待 3c1 的 integration 證明 |
