@@ -486,6 +486,8 @@ type (
 	ReportCursor = model.ReportCursor
 	// ReportListInput 是 admin 通報清單的輸入。
 	ReportListInput = model.ReportListInput
+	// AddSupplementInput 是檢舉人為自己的通報主動補充的輸入。
+	AddSupplementInput = model.AddSupplementInput
 	// BuyerReportListInput 是檢舉人自己的通報列表的輸入。
 	BuyerReportListInput = model.BuyerReportListInput
 	// ReportPage 是一頁通報（檢舉人自己的）。
@@ -691,6 +693,16 @@ func (m *Module) AdminReports(ctx context.Context, in ReportListInput) (AdminRep
 // AdminCases 是 admin 的案件清單。
 func (m *Module) AdminCases(ctx context.Context, in CaseListInput) (AdminCasePage, error) {
 	return m.governance.AdminCases(ctx, in)
+}
+
+// BuyerReport 讀登入的檢舉人自己的一筆通報（含補充與佐證）；別人的或不存在的是 NotFound。
+func (m *Module) BuyerReport(ctx context.Context, buyerID int64, reportID uuid.UUID) (Report, error) {
+	return m.governance.BuyerReport(ctx, buyerID, reportID)
+}
+
+// AddReportSupplement 是檢舉人為自己還沒有結果的通報主動補充（與去重併入的補充同一串、同一個上限）；必須在 transaction 外呼叫（佐證先轉正）。
+func (m *Module) AddReportSupplement(ctx context.Context, in AddSupplementInput) (Report, error) {
+	return m.governance.AddSupplement(ctx, in)
 }
 
 // BuyerReports 是登入的檢舉人自己的通報。

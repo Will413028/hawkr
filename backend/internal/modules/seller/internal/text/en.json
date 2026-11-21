@@ -132,11 +132,17 @@
     "report.duplicate_supplemented": {
       "message": "You already reported this store in this category today. Your new details were added to the original report."
     },
+    "report.my_not_found": {
+      "message": "This report could not be found."
+    },
     "report.own_store": {
       "message": "You cannot report your own store."
     },
     "report.submit_conflict": {
       "message": "A conflict occurred while submitting. Please try again shortly."
+    },
+    "report.supplement_closed": {
+      "message": "This report already has an outcome and cannot be supplemented."
     },
     "report.supplement_limit": {
       "message": "{max, plural, one {This report has already been supplemented {max} time and cannot be supplemented again.} other {This report has already been supplemented {max} times and cannot be supplemented again.}}"

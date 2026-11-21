@@ -380,14 +380,15 @@ func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, re
 	}
 	// 補充的佐證位置要等 Supplements 的切片不再成長之後才能取指標，所以分兩輪。
 	for i := range reports {
-		index := make(map[uuid.UUID]int, len(reports[i].Supplements))
-		for j, supplement := range reports[i].Supplements {
+		r := &reports[i]
+		index := make(map[uuid.UUID]int, len(r.Supplements))
+		for j, supplement := range r.Supplements {
 			index[supplement.ID] = j
 		}
-		for _, e := range reports[i].Evidence {
+		for _, e := range r.Evidence {
 			if e.SupplementID != nil {
 				if j, ok := index[*e.SupplementID]; ok {
-					reports[i].Supplements[j].EvidencePositions = append(reports[i].Supplements[j].EvidencePositions, e.Position)
+					r.Supplements[j].EvidencePositions = append(r.Supplements[j].EvidencePositions, e.Position)
 				}
 			}
 		}

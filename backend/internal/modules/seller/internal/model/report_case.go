@@ -545,6 +545,15 @@ type SubmitReportInput struct {
 	EvidenceTokens     []string
 }
 
+// AddSupplementInput 是檢舉人為自己的通報主動補充的輸入：BuyerID 是呼叫者的買家（通報必須是他的），佐證由 AccountID 上傳。
+type AddSupplementInput struct {
+	ReportID       uuid.UUID
+	BuyerID        int64
+	AccountID      int64
+	Description    string
+	EvidenceTokens []string
+}
+
 // SubmitReportResult 是提出通報的結果。ReportID 一定有值。Supplemented 表示去重期間內已有同一個檢舉人、還沒有結果的通報，這次的內容補充到它、沒有新增。
 // Report：新增時有值；補充時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
 type SubmitReportResult struct {

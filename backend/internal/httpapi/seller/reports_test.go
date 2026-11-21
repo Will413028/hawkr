@@ -30,11 +30,13 @@ const supplementNotice = "你今天已經檢舉過這家店的這個類別，這
 
 // reportModule 是檢舉入口的模組替身：supplement 決定 SubmitReport 是新增還是補充到原本那一筆（匿名的補充不帶 Report）。
 type reportModule struct {
-	supplement bool
-	err        error
-	submitted  []model.SubmitReportInput
-	listed     model.BuyerReportListInput
-	page       model.ReportPage
+	supplement   bool
+	err          error
+	submitted    []model.SubmitReportInput
+	detail       model.Report
+	readBuyer    int64
+	readID       uuid.UUID
+	supplemented []model.AddSupplementInput
 }
 
 func (m *reportModule) SubmitReport(_ context.Context, in model.SubmitReportInput) (model.SubmitReportResult, error) {
@@ -51,9 +53,17 @@ func (m *reportModule) SubmitReport(_ context.Context, in model.SubmitReportInpu
 	return model.SubmitReportResult{ReportID: r.ID, Report: &r}, nil
 }
 
-func (m *reportModule) BuyerReports(_ context.Context, in model.BuyerReportListInput) (model.ReportPage, error) {
-	m.listed = in
-	return m.page, nil
+func (m *reportModule) BuyerReport(_ context.Context, buyerID int64, id uuid.UUID) (model.Report, error) {
+	m.readBuyer, m.readID = buyerID, id
+	return m.detail, m.err
+}
+
+func (m *reportModule) AddReportSupplement(_ context.Context, in model.AddSupplementInput) (model.Report, error) {
+	if m.err != nil {
+		return model.Report{}, m.err
+	}
+	m.supplemented = append(m.supplemented, in)
+	return m.detail, nil
 }
 
 type buyersOf map[int64]int64
@@ -108,41 +118,75 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 	}
 }
 
-// 我的檢舉以呼叫者的買家為範圍，page token 綁在買家上；回應只帶結果，不帶平台內部的分案（案件、嚴重度、處理的管理員）。
-func TestListMyReportsIsScopedToTheCallersBuyer(t *testing.T) {
+// GetMyReport 以呼叫者的買家為範圍，回應帶補充與佐證的順序，不帶平台內部的分案（案件、嚴重度、處理的管理員）；模組的 NotFound 原樣轉出。
+func TestGetMyReportIsScopedToTheCallersBuyer(t *testing.T) {
 	admin := int64(9)
 	assessed := policy.Fraud
 	caseID := uuid.NewV7()
 	outcome := model.OutcomeDuplicate
-	cursor := &model.ReportCursor{CreatedAt: governanceNow, ID: uuid.NewV7()}
-	m := &reportModule{page: model.ReportPage{Items: []model.Report{{
-		ID: uuid.NewV7(), StoreID: 12, Category: policy.Fraud, Description: "d", Outcome: &outcome, ResolvedAt: &governanceNow,
+	supplementID := uuid.NewV7()
+	reportID := uuid.NewV7()
+	m := &reportModule{detail: model.Report{
+		ID: reportID, StoreID: 12, Category: policy.Fraud, Description: "d", Outcome: &outcome, ResolvedAt: &governanceNow,
 		CaseID: &caseID, AssessedCategory: &assessed, TriagedByAdminID: &admin, CreatedAt: governanceNow,
-	}}, Next: cursor}}
+		Supplements: []model.Supplement{{ID: supplementID, Description: "more", CreatedAt: governanceNow, EvidencePositions: []int{1}}},
+		Evidence:    []model.Evidence{{Position: 0}, {Position: 1, SupplementID: &supplementID}},
+	}}
 	h := newTestReports(t, m, buyersOf{5: 500, 6: 600})
-	got, err := h.ListMyReports(accountCtx(5), connect.NewRequest(&pb.ListMyReportsRequest{PageSize: 1}))
+	got, err := h.GetMyReport(accountCtx(5), connect.NewRequest(&pb.GetMyReportRequest{ReportId: reportID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.listed.BuyerID != 500 || m.listed.PageSize != 1 || len(got.Msg.GetReports()) != 1 || got.Msg.GetReports()[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_DUPLICATE ||
-		got.Msg.GetReports()[0].GetResolveTime() == nil {
-		t.Fatalf("listed=%+v got=%v", m.listed, got.Msg)
+	if m.readBuyer != 500 || m.readID != reportID || got.Msg.GetReport().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_DUPLICATE ||
+		len(got.Msg.GetSupplements()) != 1 || got.Msg.GetSupplements()[0].GetEvidencePositions()[0] != 1 || len(got.Msg.GetEvidence()) != 2 {
+		t.Fatalf("buyer=%d got=%v", m.readBuyer, got.Msg)
 	}
-	token := got.Msg.GetNextPageToken()
-	if _, err := h.ListMyReports(accountCtx(5), connect.NewRequest(&pb.ListMyReportsRequest{PageToken: token})); err != nil || m.listed.After == nil || *m.listed.After != *cursor {
-		t.Fatalf("after=%+v err=%v", m.listed.After, err)
-	}
-	_, err = h.ListMyReports(accountCtx(6), connect.NewRequest(&pb.ListMyReportsRequest{PageToken: token}))
-	wantInvalidArgument(t, err)
-	scope := rpc.PageScope(sellerv1alpha1connect.SellerReportAppServiceListMyReportsProcedure, 500)
-	_, err = h.ListMyReports(accountCtx(5), connect.NewRequest(&pb.ListMyReportsRequest{PageToken: rpc.TokenFor(scope, &model.ReportCursor{})}))
-	wantInvalidArgument(t, err)
 	raw := protojson.Format(got.Msg)
-	for _, leaked := range []string{caseID.String(), "caseId", "assessed", "triage", "severity"} {
+	for _, leaked := range []string{caseID.String(), "caseId", "assessed", "triage", "severity", "objectKey"} {
 		if strings.Contains(raw, leaked) {
 			t.Fatalf("檢舉人看不到案件、平台判定類別與嚴重度（%s）：%s", leaked, raw)
 		}
 	}
+	m.err = apperr.NotFound("x")
+	if _, err := h.GetMyReport(accountCtx(6), connect.NewRequest(&pb.GetMyReportRequest{ReportId: reportID.String()})); apperr.KindOf(err) != apperr.KindNotFound || m.readBuyer != 600 {
+		t.Fatalf("buyer=%d err=%v", m.readBuyer, err)
+	}
+	_, err = h.GetMyReport(accountCtx(5), connect.NewRequest(&pb.GetMyReportRequest{ReportId: "nope"}))
+	wantInvalidArgument(t, err)
+}
+
+// AddReportSupplement 以呼叫者的買家與帳號寫入，額度與 CreateReport 同樣的兩個時間窗（各自計數）；超過額度不呼叫模組。
+func TestAddReportSupplementUsesTheCallersBuyerAndQuota(t *testing.T) {
+	reportID := uuid.NewV7()
+	m := &reportModule{detail: model.Report{ID: reportID, StoreID: 12, Category: policy.Fraud, CreatedAt: governanceNow}}
+	limiter := &limiterFake{}
+	h, err := NewReports(m, buyersOf{5: 500}, limiter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &pb.AddReportSupplementRequest{ReportId: reportID.String(), Description: "補充", EvidenceStagedTokens: []string{"t1"}}
+	got, err := h.AddReportSupplement(accountCtx(5), connect.NewRequest(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in := m.supplemented[0]; in.ReportID != reportID || in.BuyerID != 500 || in.AccountID != 5 || in.Description != "補充" || len(in.EvidenceTokens) != 1 ||
+		got.Msg.GetReport().GetId() != reportID.String() {
+		t.Fatalf("in=%+v got=%v", in, got.Msg)
+	}
+	if len(limiter.calls) != len(ReportSubmitQuotas) || !strings.Contains(limiter.calls[0].key, sellerv1alpha1connect.SellerReportAppServiceAddReportSupplementProcedure) {
+		t.Fatalf("calls=%+v", limiter.calls)
+	}
+	limiter.calls, limiter.deny = nil, true
+	if _, err := h.AddReportSupplement(accountCtx(5), connect.NewRequest(req)); apperr.KindOf(err) != apperr.KindResourceExhausted || len(m.supplemented) != 1 {
+		t.Fatalf("超過額度：%v supplemented=%d", err, len(m.supplemented))
+	}
+	limiter.deny = false
+	m.err = apperr.FailedPrecondition("closed")
+	if _, err := h.AddReportSupplement(accountCtx(5), connect.NewRequest(req)); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("模組的 failed_precondition 原樣轉出：%v", err)
+	}
+	_, err = h.AddReportSupplement(accountCtx(5), connect.NewRequest(&pb.AddReportSupplementRequest{ReportId: "nope", Description: "x"}))
+	wantInvalidArgument(t, err)
 }
 
 // 登入通報的帳號額度：兩個時間窗在同一次 Allow 一起計（key 帶帳號與時間窗；全部在額度內才都計，由 limiter 保證），任何一個

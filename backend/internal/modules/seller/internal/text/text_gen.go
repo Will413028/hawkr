@@ -765,6 +765,15 @@ func ReportDuplicateSupplemented(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。", Locale: uitext.ZhTW}
 }
 
+// ReportMyNotFound 是模組句子 report.my_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportMyNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This report could not be found.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這筆檢舉。", Locale: uitext.ZhTW}
+}
+
 // ReportNotFound 是後台員工受眾的模組句子 report.not_found（只有 zh-TW）。
 func ReportNotFound() uitext.Message {
 	return uitext.Message{Text: "找不到這筆通報。", Locale: uitext.ZhTW}
@@ -786,6 +795,15 @@ func ReportSubmitConflict(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "A conflict occurred while submitting. Please try again shortly.", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "送出時發生衝突，請稍後再試一次。", Locale: uitext.ZhTW}
+}
+
+// ReportSupplementClosed 是模組句子 report.supplement_closed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportSupplementClosed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This report already has an outcome and cannot be supplemented.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆檢舉已經有處理結果，不能再補充。", Locale: uitext.ZhTW}
 }
 
 // ReportSupplementLimitArgs 是 ReportSupplementLimit 的參數。

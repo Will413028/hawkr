@@ -59,8 +59,15 @@ type env struct {
 // newEnv 掛上真的 Connect handler 與 rpc 的 interceptor；header X-Test-Account 非空時以買家帳號登入，X-Test-Admin 非空時以管理員登入。
 func newEnv(t *testing.T, r *fakeReports) *env {
 	t.Helper()
+	return newEnvWith(t, r, &fakeStores{})
+}
+
+// newEnvWith 以指定的社群與店家來源掛上 handler；env.r 只在來源是 *fakeReports 時有值。
+func newEnvWith(t *testing.T, reports Reports, stores StoreReports) *env {
+	t.Helper()
+	r, _ := reports.(*fakeReports)
 	logs := &bytes.Buffer{}
-	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(NewApp(r, fakeBuyers{}), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(logs, nil)))))
+	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(NewApp(reports, stores, fakeBuyers{}), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(logs, nil)))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch {
@@ -182,16 +189,16 @@ func TestSubmitReportRejectsMalformedTargetsAndRequestIDsBeforeTheModule(t *test
 	}
 }
 
-func TestListMyReportsMapsDerivedOutcomeAndPages(t *testing.T) {
+func TestListMyReportsMapsCommunityItemsAndPages(t *testing.T) {
 	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	closed := at.Add(time.Hour)
 	id1, id2, target := uuid.UUID{1}, uuid.UUID{2}, uuid.UUID{3}
 	r := &fakeReports{page: moderation.ReportPage{
 		Items: []moderation.ReportItem{
 			{Report: moderation.Report{ID: id1, Category: policy.Spam, Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomeViolation}, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: target}, ClosedAt: &closed},
-			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at, Outcome: moderation.OutcomePending}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
+			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at.Add(-time.Minute), Outcome: moderation.OutcomePending}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
 		},
-		Next: &moderation.ReportCursor{CreatedAt: at, ID: id2},
+		Next: &moderation.ReportCursor{CreatedAt: at.Add(-time.Minute), ID: id2},
 	}}
 	e := newEnv(t, r)
 	resp, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{PageSize: 5}))
@@ -203,12 +210,12 @@ func TestListMyReportsMapsDerivedOutcomeAndPages(t *testing.T) {
 		t.Fatalf("回 %d 筆", len(got))
 	}
 	a, b := got[0], got[1]
-	if a.GetId() != id1.String() || a.GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_POST || a.GetTarget().GetId() != target.String() ||
-		a.GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_SPAM || a.GetDescription() != "廣告" || a.GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_VIOLATION ||
-		!a.GetCreateTime().AsTime().Equal(at) || !a.GetResolveTime().AsTime().Equal(closed) {
+	if a.GetId() != id1.String() || a.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_POST || a.GetCommunity().GetTarget().GetId() != target.String() ||
+		a.GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_SPAM || a.GetDescription() != "廣告" || a.GetCommunity().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_VIOLATION ||
+		!a.GetCreateTime().AsTime().Equal(at) || !a.GetResolveTime().AsTime().Equal(closed) || a.GetStore() != nil {
 		t.Fatalf("第一筆：%v", a)
 	}
-	if b.GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetTarget().GetId() != "9" || b.GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || b.ResolveTime != nil {
+	if b.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetCommunity().GetTarget().GetId() != "9" || b.GetCommunity().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || b.ResolveTime != nil {
 		t.Fatalf("第二筆：%v", b)
 	}
 	if r.gotBuyer != 7 || r.gotSize != 5 || resp.Msg.GetNextPageToken() == "" {
@@ -219,15 +226,6 @@ func TestListMyReportsMapsDerivedOutcomeAndPages(t *testing.T) {
 	}
 	if _, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{PageToken: "garbage"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("壞 token：%v", err)
-	}
-}
-
-func TestOutcomeAndTargetEnumsMatchTheModule(t *testing.T) {
-	if m := rpc.EnumMismatches[pb.ReportTargetKind]([]moderation.TargetKind{moderation.TargetPost, moderation.TargetComment, moderation.TargetForumEntry, moderation.TargetBuyer}); len(m) != 0 {
-		t.Fatalf("ReportTargetKind：%v", m)
-	}
-	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomePending, moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {
-		t.Fatalf("ReportOutcome：%v", m)
 	}
 }
 

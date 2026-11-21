@@ -6,6 +6,8 @@ package moderation
 
 import (
 	"context"
+	"slices"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -14,7 +16,10 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	sellermod "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -22,6 +27,11 @@ import (
 type Reports interface {
 	SubmitReport(ctx context.Context, in moderation.SubmitInput) (moderation.SubmitResult, error)
 	MyReports(ctx context.Context, buyerID int64, after *moderation.ReportCursor, size int32) (moderation.ReportPage, error)
+}
+
+// StoreReports 是店家檢舉的來源（*seller.Module）。
+type StoreReports interface {
+	BuyerReports(ctx context.Context, in sellermod.BuyerReportListInput) (sellermod.ReportPage, error)
 }
 
 // Buyers 把登入的帳號對到買家身分（*buyer.Module）。
@@ -32,13 +42,16 @@ type Buyers interface {
 // App 實作 ModerationAppService。
 type App struct {
 	reports Reports
+	stores  StoreReports
 	buyers  Buyers
 }
 
 var _ moderationv1alpha1connect.ModerationAppServiceHandler = (*App)(nil)
 
 // NewApp 建立 handler。
-func NewApp(reports Reports, buyers Buyers) *App { return &App{reports: reports, buyers: buyers} }
+func NewApp(reports Reports, stores StoreReports, buyers Buyers) *App {
+	return &App{reports: reports, stores: stores, buyers: buyers}
+}
 
 var submitPaths = rpc.FieldPaths{
 	"Target": "target", "Category": "category", "Description": "description", "RequestID": "request_id",
@@ -96,37 +109,138 @@ func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitRe
 	}), nil
 }
 
+// 合併清單的每頁筆數：預設 20、上限 50。
+const (
+	defaultPageSize int32 = 20
+	maxPageSize     int32 = 50
+)
+
+// myReportsCursor 是合併清單的 page token 內容：兩個來源各自的下一頁位置。Done 的來源已經取完（Cursor 不用）；沒有 Done 而 Cursor 為 nil 是還沒讀過（第一頁）。
+type myReportsCursor struct {
+	Community     *moderation.ReportCursor `json:"c,omitempty"`
+	CommunityDone bool                     `json:"cd,omitempty"`
+	Store         *sellermod.ReportCursor  `json:"s,omitempty"`
+	StoreDone     bool                     `json:"sd,omitempty"`
+}
+
+func (c myReportsCursor) Valid() bool {
+	return (c.Community == nil || c.Community.Valid()) && (c.Store == nil || c.Store.Valid()) &&
+		(!c.CommunityDone || c.Community == nil) && (!c.StoreDone || c.Store == nil)
+}
+
+// mergedReport 是合併排序中的一筆：兩個來源各取到的檢舉，依 (create_time 新到舊、社群在前、id 新到舊) 排序。
+type mergedReport struct {
+	createdAt time.Time
+	store     bool
+	community moderation.ReportItem
+	storeItem sellermod.Report
+}
+
+func (m mergedReport) before(o mergedReport) bool {
+	if !m.createdAt.Equal(o.createdAt) {
+		return m.createdAt.After(o.createdAt)
+	}
+	return !m.store && o.store
+}
+
+// ListMyReports 以 API composition 合併社群與店家兩個來源的檢舉（模組之間不互相依賴，組裝只在這裡）。每頁兩邊各取 size 筆（模組以多取一筆判斷還有沒有下一頁，Next 非 nil 就是還有），
+// 合併後取前 size 筆；各來源的游標推進到已輸出的最後一筆，沒輸出到的來源保留原游標。來源只有在「沒有更多（Next 為 nil）而且取到的每一筆都已輸出」時才算取完。
 func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyReportsRequest]) (*connect.Response[pb.ListMyReportsResponse], error) {
 	buyerID, err := rpc.AccountBuyerID(ctx, h.buyers)
 	if err != nil {
 		return nil, err
 	}
+	size, err := pagination.PageSize(req.Msg.GetPageSize(), defaultPageSize, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
 	scope := rpc.PageScope(moderationv1alpha1connect.ModerationAppServiceListMyReportsProcedure, buyerID)
-	after, err := rpc.ValidCursor[moderation.ReportCursor](scope, req.Msg.GetPageToken())
+	cur, err := rpc.ValidCursor[myReportsCursor](scope, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	page, err := h.reports.MyReports(ctx, buyerID, after, req.Msg.GetPageSize())
-	if err != nil {
-		return nil, err
+	if cur == nil {
+		cur = &myReportsCursor{}
 	}
-	out := &pb.ListMyReportsResponse{Reports: make([]*pb.ReportRecord, len(page.Items))}
-	for i, it := range page.Items {
-		rec := &pb.ReportRecord{
-			Id:          it.Report.ID.String(),
-			Target:      targetPB(it.Target),
-			Category:    rpc.EnumToProto[commonpb.PolicyCategory](it.Report.Category),
-			Description: it.Report.Description,
-			Outcome:     rpc.EnumToProto[pb.ReportOutcome](it.Report.Outcome),
-			CreateTime:  timestamppb.New(it.Report.CreatedAt),
+	var community moderation.ReportPage
+	if !cur.CommunityDone {
+		if community, err = h.reports.MyReports(ctx, buyerID, cur.Community, size); err != nil {
+			return nil, err
 		}
-		if it.ClosedAt != nil {
-			rec.ResolveTime = timestamppb.New(*it.ClosedAt)
-		}
-		out.Reports[i] = rec
 	}
-	if page.Next != nil {
-		out.NextPageToken = rpc.TokenFor(scope, page.Next)
+	var stores sellermod.ReportPage
+	if !cur.StoreDone {
+		if stores, err = h.stores.BuyerReports(ctx, sellermod.BuyerReportListInput{BuyerID: buyerID, PageSize: size, After: cur.Store}); err != nil {
+			return nil, err
+		}
+	}
+	all := make([]mergedReport, 0, len(community.Items)+len(stores.Items))
+	for _, it := range community.Items {
+		all = append(all, mergedReport{createdAt: it.Report.CreatedAt, community: it})
+	}
+	for _, r := range stores.Items {
+		all = append(all, mergedReport{createdAt: r.CreatedAt, store: true, storeItem: r})
+	}
+	slices.SortStableFunc(all, func(a, b mergedReport) int {
+		switch {
+		case a.before(b):
+			return -1
+		case b.before(a):
+			return 1
+		}
+		return 0
+	})
+	if len(all) > int(size) {
+		all = all[:size]
+	}
+	next := *cur
+	out := &pb.ListMyReportsResponse{Reports: make([]*pb.MyReportItem, len(all))}
+	emittedCommunity, emittedStore := 0, 0
+	for i, m := range all {
+		if m.store {
+			emittedStore++
+			next.Store = &sellermod.ReportCursor{CreatedAt: m.storeItem.CreatedAt, ID: m.storeItem.ID}
+			out.Reports[i] = storeItemPB(m.storeItem)
+			continue
+		}
+		emittedCommunity++
+		next.Community = &moderation.ReportCursor{CreatedAt: m.community.Report.CreatedAt, ID: m.community.Report.ID}
+		out.Reports[i] = communityItemPB(m.community)
+	}
+	if !cur.CommunityDone && community.Next == nil && emittedCommunity == len(community.Items) {
+		next.CommunityDone, next.Community = true, nil
+	}
+	if !cur.StoreDone && stores.Next == nil && emittedStore == len(stores.Items) {
+		next.StoreDone, next.Store = true, nil
+	}
+	if !next.CommunityDone || !next.StoreDone {
+		out.NextPageToken = rpc.TokenFor(scope, next)
 	}
 	return connect.NewResponse(out), nil
+}
+
+func communityItemPB(it moderation.ReportItem) *pb.MyReportItem {
+	item := &pb.MyReportItem{
+		Id:          it.Report.ID.String(),
+		Category:    rpc.EnumToProto[commonpb.PolicyCategory](it.Report.Category),
+		Description: it.Report.Description,
+		CreateTime:  timestamppb.New(it.Report.CreatedAt),
+		Subject: &pb.MyReportItem_Community{Community: &pb.CommunityReport{
+			Target:  targetPB(it.Target),
+			Outcome: rpc.EnumToProto[pb.ReportOutcome](it.Report.Outcome),
+		}},
+	}
+	if it.ClosedAt != nil {
+		item.ResolveTime = timestamppb.New(*it.ClosedAt)
+	}
+	return item
+}
+
+func storeItemPB(r sellermod.Report) *pb.MyReportItem {
+	store := httpseller.ToStoreReport(r)
+	return &pb.MyReportItem{
+		Id: store.GetId(), Category: store.GetCategory(), Description: store.GetDescription(),
+		CreateTime: store.GetCreateTime(), ResolveTime: store.GetResolveTime(),
+		Subject: &pb.MyReportItem_Store{Store: store},
+	}
 }
