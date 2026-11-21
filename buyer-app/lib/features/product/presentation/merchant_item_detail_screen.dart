@@ -117,6 +117,7 @@ class _MerchantItemDetailScreenState
   bool _shareLoading = false;
   bool _isFavorite = false;
   bool _selfOwned = false;
+  bool _selfOwnedResolved = false;
   bool _addingToCart = false;
   bool _directingCheckout = false;
   bool _viewItemSent = false;
@@ -129,7 +130,8 @@ class _MerchantItemDetailScreenState
   String _resolvedMerchantId = '';
 
   /// 檢舉的店家 id：商品詳情解析出的 store id；自己的商品不能檢舉自己的店。
-  String get _reportStoreId => _selfOwned ? '' : _resolvedMerchantId;
+  String get _reportStoreId =>
+      (!_selfOwnedResolved || _selfOwned) ? '' : _resolvedMerchantId;
   String _resolvedMerchantName = '';
 
   // 商品詳情（由 _loadProductDetail 填入）
@@ -567,6 +569,7 @@ class _MerchantItemDetailScreenState
         _selectedQty = 1;
         _isFavorite = isFavorited;
         _selfOwned = isSelfOwned;
+        _selfOwnedResolved = true;
         _isRestockSubscribed = isRestockSubscribed;
         if (_resolvedMerchantId.isEmpty && sellerId.isNotEmpty) {
           _resolvedMerchantId = sellerId;

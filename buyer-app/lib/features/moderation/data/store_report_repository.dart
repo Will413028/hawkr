@@ -1,6 +1,7 @@
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
@@ -24,6 +25,12 @@ final storeReportCategories = List<PolicyCategory>.unmodifiable(
         c != PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE,
   ),
 );
+
+/// 畫面要顯示的類別與標籤：沒有目錄文字的類別不顯示。
+List<(PolicyCategory, String)> storeReportCategoryOptions(UiLocale locale) => [
+  for (final c in storeReportCategories)
+    if (c.uiText(locale) case final label?) (c, label),
+];
 
 /// 檢舉店家（`SellerReportAppService.CreateReport`）。
 class StoreReportRepository {

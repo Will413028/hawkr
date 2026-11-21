@@ -84,6 +84,7 @@ Future<void> _pump(
       ),
       GoRoute(
         path: storeReportRoute,
+        redirect: (_, state) => storeReportRedirect(state.extra),
         builder: (_, state) =>
             StoreReportScreen(args: state.extra! as StoreReportArgs),
       ),
@@ -135,6 +136,52 @@ void main() {
     for (final c in storeReportCategories) {
       expect(c.uiText(UiLocale.zhTW), isNotNull, reason: '$c');
     }
+  });
+
+  test('畫面選項只含有標籤的可檢舉類別', () {
+    final options = storeReportCategoryOptions(UiLocale.zhTW);
+    expect(options, isNotEmpty);
+    final cats = options.map((o) => o.$1);
+    expect(
+      cats,
+      isNot(contains(PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE)),
+    );
+    expect(cats, isNot(contains(PolicyCategory.POLICY_CATEGORY_UNSPECIFIED)));
+    for (final o in options) {
+      expect(o.$2, isNotEmpty);
+    }
+  });
+
+  test('成功提示：補充且 notice 有文字才用 notice，否則已收到檢舉', () {
+    expect(storeReportSuccessText(pb.CreateReportResponse()), '已收到檢舉');
+    expect(
+      storeReportSuccessText(pb.CreateReportResponse(supplemented: true)),
+      '已收到檢舉',
+    );
+    expect(
+      storeReportSuccessText(
+        pb.CreateReportResponse(
+          supplemented: true,
+          notice: LocalizedMessage(message: '  '),
+        ),
+      ),
+      '已收到檢舉',
+    );
+    expect(
+      storeReportSuccessText(
+        pb.CreateReportResponse(
+          supplemented: true,
+          notice: LocalizedMessage(message: '已補充'),
+        ),
+      ),
+      '已補充',
+    );
+  });
+
+  test('沒有店家 id 的 /report/store 轉回首頁', () {
+    expect(storeReportRedirect(null), '/');
+    expect(storeReportRedirect(const StoreReportArgs(storeId: '')), '/');
+    expect(storeReportRedirect(const StoreReportArgs(storeId: 's')), isNull);
   });
 
   testWidgets('訪客點檢舉走登入閘門，不顯示表單', (tester) async {
@@ -189,7 +236,7 @@ void main() {
     expect(req.productId, 'p-9');
     expect(req.category, PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY);
     expect(req.description, '麵包有異物');
-    expect(find.text('已收到檢舉，處理結果可在「我的檢舉」查看'), findsOneWidget);
+    expect(find.text('已收到檢舉'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
 
@@ -214,7 +261,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('伺服器說明：已補充到今天的同一筆檢舉'), findsOneWidget);
-    expect(find.text('已收到檢舉，處理結果可在「我的檢舉」查看'), findsNothing);
+    expect(find.text('已收到檢舉'), findsNothing);
     await tester.pump(const Duration(seconds: 3));
   });
 }

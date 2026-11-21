@@ -25,6 +25,10 @@ class StoreReportArgs {
 
 const storeReportRoute = '/report/store';
 
+/// 沒有帶店家 id 的 /report/store（深連結、重建）回首頁，不渲染送不出去的表單。
+String? storeReportRedirect(Object? extra) =>
+    extra is StoreReportArgs && extra.storeId.isNotEmpty ? null : '/';
+
 /// 店面與商品頁「⋯」的共用入口：選單只有「檢舉」，訪客點了走登入閘門 [requireLogin]，登入後才進表單頁。
 Future<void> showStoreReportMenu(
   BuildContext context,

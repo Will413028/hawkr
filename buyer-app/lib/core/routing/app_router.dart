@@ -354,11 +354,9 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: storeReportRoute,
-        builder: (_, state) => StoreReportScreen(
-          args:
-              state.extra as StoreReportArgs? ??
-              const StoreReportArgs(storeId: ''),
-        ),
+        redirect: (_, state) => storeReportRedirect(state.extra),
+        builder: (_, state) =>
+            StoreReportScreen(args: state.extra! as StoreReportArgs),
       ),
       GoRoute(
         path: '/settings/blocks',

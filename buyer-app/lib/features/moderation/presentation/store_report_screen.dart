@@ -5,12 +5,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
-import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -23,6 +23,16 @@ import '../../media/data/media_repository.dart';
 import '../data/store_report_repository.dart';
 import 'rune_limit_formatter.dart';
 import 'store_report_entry.dart';
+
+/// 成功後的提示：補充時用伺服器的 notice（有文字才用），否則「已收到檢舉」。
+String storeReportSuccessText(pb.CreateReportResponse response) {
+  if (response.supplemented &&
+      response.hasNotice() &&
+      response.notice.message.trim().isNotEmpty) {
+    return response.notice.message;
+  }
+  return '已收到檢舉';
+}
 
 /// 檢舉店家的整頁表單（`SellerReportAppService.CreateReport`）。
 class StoreReportScreen extends ConsumerStatefulWidget {
@@ -97,9 +107,7 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
             evidenceStagedTokens: tokens,
           );
       if (!mounted) return;
-      final message = response.supplemented
-          ? response.notice.message
-          : '已收到檢舉，處理結果可在「我的檢舉」查看';
+      final message = storeReportSuccessText(response);
       showFloatingToast(context, message, isSuccess: true);
       context.pop(true);
     } catch (e) {
@@ -149,9 +157,11 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
                   ],
                   _label('類別', required: true),
                   SizedBox(height: 8.h),
-                  for (final category in storeReportCategories)
+                  for (final (category, label) in storeReportCategoryOptions(
+                    locale,
+                  ))
                     _CategoryTile(
-                      label: category.uiText(locale) ?? '',
+                      label: label,
                       selected: _category == category,
                       onTap: () => setState(() => _category = category),
                     ),
