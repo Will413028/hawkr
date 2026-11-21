@@ -1,6 +1,7 @@
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -35,6 +36,16 @@ List<(PolicyCategory, String)> storeReportCategoryOptions(UiLocale locale) => [
     if (c.uiText(locale) case final label?) (c, label),
 ];
 
+/// 讀取或補充我的檢舉時，畫面要分流處理的失敗；[cause] 是原始例外，用來產生錯誤文字。其餘錯誤原樣拋出。
+enum StoreReportFailureKind { notFound, preconditionFailed }
+
+class StoreReportFailure implements Exception {
+  const StoreReportFailure(this.kind, this.cause);
+
+  final StoreReportFailureKind kind;
+  final Object cause;
+}
+
 /// 檢舉店家（`SellerReportAppService.CreateReport`）。
 class StoreReportRepository {
   StoreReportRepository(this._client);
@@ -62,18 +73,37 @@ class StoreReportRepository {
     );
   }
 
-  Future<pb.GetMyReportResponse> get(String reportId) =>
-      _client.getMyReport(pb.GetMyReportRequest(reportId: reportId));
+  Future<pb.GetMyReportResponse> get(String reportId) async {
+    try {
+      return await _client.getMyReport(
+        pb.GetMyReportRequest(reportId: reportId),
+      );
+    } on ConnectException catch (e) {
+      if (e.code == Code.notFound) {
+        throw StoreReportFailure(StoreReportFailureKind.notFound, e);
+      }
+      rethrow;
+    }
+  }
 
   Future<pb.AddReportSupplementResponse> addSupplement({
     required String reportId,
     required String description,
     List<String> evidenceStagedTokens = const [],
-  }) => _client.addReportSupplement(
-    pb.AddReportSupplementRequest(
-      reportId: reportId,
-      description: description,
-      evidenceStagedTokens: evidenceStagedTokens,
-    ),
-  );
+  }) async {
+    try {
+      return await _client.addReportSupplement(
+        pb.AddReportSupplementRequest(
+          reportId: reportId,
+          description: description,
+          evidenceStagedTokens: evidenceStagedTokens,
+        ),
+      );
+    } on ConnectException catch (e) {
+      if (e.code == Code.failedPrecondition) {
+        throw StoreReportFailure(StoreReportFailureKind.preconditionFailed, e);
+      }
+      rethrow;
+    }
+  }
 }

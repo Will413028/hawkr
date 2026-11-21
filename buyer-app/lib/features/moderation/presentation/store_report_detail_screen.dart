@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
-import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
@@ -55,8 +54,12 @@ class StoreReportDetailScreen extends ConsumerWidget {
 
   Widget _error(WidgetRef ref, Object e) {
     if (isAccountSuspendedError(e)) return const SizedBox.shrink();
-    final message = errorText(e, defaults: ref.read(defaultErrorTextProvider));
-    if (e is ConnectException && e.code == Code.notFound) {
+    final cause = e is StoreReportFailure ? e.cause : e;
+    final message = errorText(
+      cause,
+      defaults: ref.read(defaultErrorTextProvider),
+    );
+    if (e is StoreReportFailure && e.kind == StoreReportFailureKind.notFound) {
       return HkEmptyState(
         key: const ValueKey('store-report-not-found'),
         icon: HkIconName.emptyAfterSale,

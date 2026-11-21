@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -83,13 +82,15 @@ class _StoreReportSupplementScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      if (isAccountSuspendedError(e)) return;
+      final cause = e is StoreReportFailure ? e.cause : e;
+      if (isAccountSuspendedError(cause)) return;
       showFloatingToast(
         context,
-        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+        errorText(cause, defaults: ref.read(defaultErrorTextProvider)),
         isSuccess: false,
       );
-      if (e is ConnectException && e.code == Code.failedPrecondition) {
+      if (e is StoreReportFailure &&
+          e.kind == StoreReportFailureKind.preconditionFailed) {
         context.pop(storeReportSupplementStale);
       }
     }
