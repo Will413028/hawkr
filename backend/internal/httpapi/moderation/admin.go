@@ -2,6 +2,7 @@ package moderation
 
 import (
 	"context"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,8 +21,9 @@ import (
 // Cases 是案件的來源與處理者（*moderation.Module）。
 type Cases interface {
 	Cases(ctx context.Context, f moderation.CaseFilter, after *moderation.CaseCursor, size int32) (moderation.CasePage, error)
-	Case(ctx context.Context, id uuid.UUID) (moderation.CaseDetail, error)
+	CaseWithSnapshot(ctx context.Context, id uuid.UUID) (moderation.CaseDetail, *moderation.Snapshot, error)
 	DecideCase(ctx context.Context, in moderation.DecideInput) (moderation.CaseDetail, error)
+	ReverseHide(ctx context.Context, in moderation.ReverseInput) (moderation.CaseDetail, error)
 }
 
 // Admin 實作 ModerationAdminService。授權（只有管理員、逐方法的權限）由 rpc 的 interceptor 與 adminauth 的宣告表檢查。
@@ -33,8 +35,9 @@ var _ moderationv1alpha1connect.ModerationAdminServiceHandler = (*Admin)(nil)
 func NewAdmin(cases Cases) *Admin { return &Admin{cases: cases} }
 
 var (
-	listPaths   = rpc.FieldPaths{"State": "state", "TargetKind": "target_kind"}
-	decidePaths = rpc.FieldPaths{
+	listPaths    = rpc.FieldPaths{"State": "state", "TargetKind": "target_kind"}
+	reversePaths = rpc.FieldPaths{"CaseID": "id", "Reason": "reason"}
+	decidePaths  = rpc.FieldPaths{
 		"CaseID": "id", "Version": "etag", "Decision": "decision", "Category": "category", "Action": "action",
 		"Text": "reason", "Severity": "severity",
 	}
@@ -69,11 +72,29 @@ func (h *Admin) GetCase(ctx context.Context, req *connect.Request[adminpb.GetCas
 	if err != nil {
 		return nil, err
 	}
-	d, err := h.cases.Case(ctx, id)
+	d, snap, err := h.cases.CaseWithSnapshot(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&adminpb.GetCaseResponse{Case: casePB(d.Case), Reports: reportsPB(d.Reports)}), nil
+	return connect.NewResponse(&adminpb.GetCaseResponse{Case: casePB(d.Case), Reports: reportsPB(d.Reports), Snapshot: snapshotPB(snap)}), nil
+}
+
+func (h *Admin) ReverseHide(ctx context.Context, req *connect.Request[adminpb.ReverseHideRequest]) (*connect.Response[adminpb.ReverseHideResponse], error) {
+	admin, err := rpc.RequireAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := rpc.ParseUUID("id", req.Msg.GetId())
+	if err != nil {
+		return nil, err
+	}
+	d, err := h.cases.ReverseHide(ctx, moderation.ReverseInput{
+		CaseID: id, Actor: adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, Reason: req.Msg.GetReason(),
+	})
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, reversePaths)
+	}
+	return connect.NewResponse(&adminpb.ReverseHideResponse{Case: casePB(d.Case), Reports: reportsPB(d.Reports)}), nil
 }
 
 func (h *Admin) DecideCase(ctx context.Context, req *connect.Request[adminpb.DecideCaseRequest]) (*connect.Response[adminpb.DecideCaseResponse], error) {
@@ -130,6 +151,9 @@ func casePB(c moderation.Case) *adminpb.Case {
 	if c.Action != nil {
 		out.Action = rpc.EnumToProto[adminpb.CaseAction](*c.Action)
 	}
+	if c.Reversal != nil {
+		out.Reversal = &adminpb.CaseReversal{ReverseTime: timestamppb.New(c.Reversal.At), ReversedBy: rpc.FormatID(c.Reversal.AdminID), Reason: c.Reversal.Reason}
+	}
 	if c.DecidedByAdmin != nil {
 		out.DecidedBy = rpc.FormatID(*c.DecidedByAdmin)
 	}
@@ -153,4 +177,46 @@ func reportsPB(reports []moderation.Report) []*adminpb.CaseReport {
 		}
 	}
 	return out
+}
+
+// snapshotPB 把案件的內容快照轉成 oneof；沒有快照回 nil。
+func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
+	switch {
+	case c == nil:
+		return nil
+	case c.Social != nil:
+		x := c.Social
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Social{Social: &adminpb.SocialSnapshot{
+			AuthorKind: x.AuthorKind, AuthorId: rpc.FormatID(x.AuthorID), Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt),
+		}}}
+	case c.Buyer != nil:
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Buyer{Buyer: &adminpb.BuyerSnapshot{DisplayName: c.Buyer.DisplayName, Avatar: c.Buyer.Avatar}}}
+	case c.Review != nil:
+		x := c.Review
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Review{Review: &adminpb.ReviewSnapshot{
+			AuthorId: rpc.FormatID(x.AuthorID), StoreId: rpc.FormatID(x.SubjectStoreID), ProductId: rpc.FormatID(x.ProductID), Rating: int32(x.Rating), //nolint:gosec // 評價分數是 1 到 5
+			Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt), ReplyBody: x.ReplyBody,
+		}}}
+	case c.Chat != nil:
+		x := c.Chat
+		out := &adminpb.ChatSnapshot{
+			AuthorKind: x.AuthorKind, AuthorId: rpc.FormatID(x.AuthorID), Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt),
+			ConversationId: x.ConversationID, Seq: x.Seq, Context: make([]*adminpb.ChatContextMessage, len(x.Context)),
+		}
+		for i, m := range x.Context {
+			out.Context[i] = &adminpb.ChatContextMessage{
+				Seq: m.Seq, SenderKind: m.SenderKind, SenderId: rpc.FormatID(m.SenderID), Type: m.Type, Body: m.Body, AssetIds: m.MediaRefs,
+				SendTime: timestamppb.New(m.SentAt), Hidden: m.Hidden, Erased: m.Erased,
+			}
+		}
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Chat{Chat: out}}
+	}
+	return nil
+}
+
+func optionalTime(t time.Time) *timestamppb.Timestamp {
+	if t.IsZero() {
+		return nil
+	}
+	return timestamppb.New(t)
 }

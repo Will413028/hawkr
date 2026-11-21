@@ -7,8 +7,10 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -23,9 +25,9 @@ func newModerationRetention(d *db.DB, buyers *buyer.Module, med media.Media, jc 
 }
 
 // newModeration 組裝 moderation 模組；serve 以 Module.Retention() 訂閱買家的刪除事件。
-func newModeration(d *db.DB, soc *social.Module, sel *seller.Module, buyers *buyer.Module, suspension *accountsuspension.Module, med media.Media, jc jobs.Enqueuer, log *slog.Logger) *moderation.Module {
+func newModeration(d *db.DB, soc *social.Module, rev *review.Module, chat *im.Module, sel *seller.Module, buyers *buyer.Module, suspension *accountsuspension.Module, med media.Media, jc jobs.Enqueuer, log *slog.Logger) *moderation.Module {
 	return moderation.New(moderation.Deps{
-		DB: d, Social: soc, Seller: sel, Buyer: buyers, Suspension: suspension,
+		DB: d, Social: soc, Review: rev, IM: chat, Seller: sel, Buyer: buyers, Suspension: suspension,
 		Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 }

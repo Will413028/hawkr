@@ -112,6 +112,12 @@ SET decision = sqlc.arg(decision), decision_category = sqlc.narg(decision_catego
     decided_by_admin_id = sqlc.arg(admin_id), closed_at = sqlc.arg(closed_at), measure_id = sqlc.narg(measure_id), version = version + 1
 WHERE id = sqlc.arg(id) AND closed_at IS NULL AND version = sqlc.arg(version);
 
+-- name: ReverseCase :execrows
+-- 撤銷 HIDE 決定：案件維持結案、決定不改，撤銷記在原決定旁。只有已結案、處置是 HIDE、還沒撤銷的案件轉移成功；0 列表示不符合（已被撤銷或不是 HIDE）。
+UPDATE moderation.cases
+SET reversed_at = sqlc.arg(reversed_at), reversed_by_admin_id = sqlc.arg(admin_id), reverse_reason = sqlc.arg(reason)
+WHERE id = sqlc.arg(id) AND closed_at IS NOT NULL AND decision_action = 'HIDE' AND reversed_at IS NULL;
+
 -- name: ExpiredSnapshotsBatch :many
 -- 結案早於 cutoff 的案件的快照（與它們引用的資產）：鎖住這些列，同一個 transaction 內釋放資產引用再刪除。
 SELECT s.id, s.asset_ids FROM moderation.case_snapshots s

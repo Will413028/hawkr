@@ -19,7 +19,7 @@
 - 處置：HIDE／WARN／BAN 對兩種新對象的分流；HIDE 在 moderation 的 transaction 內呼叫 `review.Hide`／`im.Hide`。
 - 還原：moderation 的還原入口（形狀見 §W1）在同一個 transaction 呼叫 `review.Restore`／`im.Restore`。
 - 依賴表 `moderation += review, im`；lockorder 不用改（§5）。
-- 測試、mutation、`CARRYOVER.md`／`AGENTS.md`／`docs/modules/moderation.md` 更新。
+- 測試、mutation、`CARRYOVER.md`／`AGENTS.md`／`backend/docs/modules/moderation.md` 更新。
 
 ## 0.2 不在範圍
 
@@ -68,7 +68,7 @@
 
 1. **ID1 的 mutation**：計畫驗收寫「隱藏時不更新對話預覽要失敗」。im 沒有預覽欄位（上表），沒有「更新預覽」可拿掉。照 `step-2a-design.md` §9 第 1 項改成：「預覽推導拿掉 `hides` 述詞，A6-4 的整合測試要失敗」。
 2. **聊天對象在買家單方檢舉下必然是店家寫的**：檢舉人只有買家；聊天的另一方只會是店家；檢舉自己的訊息被擋（`sameAccount`，`report.go:343-370`）。所以 `CHAT_MESSAGE` 案件的作者**全部是店家**，計畫寫的「隱藏經 im API」在現行規則下走不到（HIDE 對店家作者回 `DecideHideStoreContent`，`handle.go:199-201`）。這讓 §W2、§W3 成為本步的前提，不是枝節。
-3. **文件和程式碼對不上**：`internal/handle/AGENTS.md:8` 與 `docs/modules/moderation.md:27` 寫「內容已刪除時隱藏回 FailedPrecondition」，程式與測試是「不呼叫、回成功」（上表）。本步順手把兩份文件改成跟程式一致（只改文件，以程式為準：A7 的測試名稱已經是現行規格）。
+3. **文件和程式碼對不上**：`internal/handle/AGENTS.md:8` 與 `backend/docs/modules/moderation.md:27` 寫「內容已刪除時隱藏回 FailedPrecondition」，程式與測試是「不呼叫、回成功」（上表）。本步順手把兩份文件改成跟程式一致（只改文件，以程式為準：A7 的測試名稱已經是現行規格）。
 4. 計畫的鎖序寫「buyer → seller → review/im → moderation」。結論成立，但隱藏與還原根本不碰 buyer、seller（§5）；只有 §W2 選 (a) 時才會出現 seller。
 
 ## 1. 各模組新增與修改的 API（完整清單）
@@ -124,7 +124,7 @@
 | REVIEW | 買家 | `review.Hide`；評價已清除→成功、不寫 | `social.Warn`（買家處分的唯一擁有者，`handle.go:208-213`） | `accountsuspension.Suspend` | 不會發生（評價只有買家寫） |
 | CHAT_MESSAGE | 買家或店家（§0.4.1 第 2 點：買家單方檢舉下只會是店家） | 買家作者：`im.Hide` | 買家作者：`social.Warn` | 買家作者：同上 | §W2 |
 
-還原：只對「這個案件的處置是 HIDE」的案件；呼叫對象模組的 `Restore`，還原的是「目前未還原的那一筆」（同一則內容的隱藏是冪等的，可能由先前案件建立）。還原和寫 moderation 的還原紀錄在同一個 transaction，鎖序 review／im → moderation。
+還原：只對「這個案件的處置是 HIDE」的案件；呼叫對象模組的 `Restore`，帶來源參照 `moderation:case:<案件 id>`，只還原來源相同的未還原隱藏（同一則內容的隱藏是冪等的，後到案件沿用先到案件那一筆，撤銷後到的案件不能還原別案的隱藏，回 FailedPrecondition）；內容已被清除或刪除（擁有者回 NotFound）時同 Hide 視為成功，撤銷仍記在案件上。還原和寫 moderation 的還原紀錄在同一個 transaction，鎖序 review／im → moderation。
 
 ## 3. 快照形狀
 
@@ -220,7 +220,7 @@ type ContextMessage struct {
 |---|---|
 | proto＋生成物 | `api/.../moderation.proto`、Go connect 生成、TS `@hawkr/api`、Dart `hawkr_api`（約 4–6） |
 | 共用文案 | catalog 兩個 JSON＋生成的 TS／Dart／Go（約 6） |
-| moderation | `model/model.go`、`snapshot/snapshot.go`、`report/report.go`、`handle/handle.go`、`moderation.go`、migration＋`schema.sql`＋`atlas.sum`、文件 3（`AGENTS.md`、`handle/AGENTS.md`、`CARRYOVER.md`）、`docs/modules/moderation.md`（約 12） |
+| moderation | `model/model.go`、`snapshot/snapshot.go`、`report/report.go`、`handle/handle.go`、`moderation.go`、migration＋`schema.sql`＋`atlas.sum`、文件 3（`AGENTS.md`、`handle/AGENTS.md`、`CARRYOVER.md`）、`backend/docs/modules/moderation.md`（約 12） |
 | review | `review.go`、`model/model.go`、讀取實作 1、查詢 0–1（約 3–4） |
 | im | `im.go`、`model/model.go`、`read/read.go`、`messages.sql`＋生成（約 5） |
 | arch、cmd | `modules.go`、`cmd/hawkr/moderation.go`、`httpapi/moderation/admin_integration_test.go` 的組裝（3） |

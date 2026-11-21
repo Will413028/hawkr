@@ -64,9 +64,11 @@
     },
     "ReportTargetKind": {
       "REPORT_TARGET_KIND_BUYER": "使用者",
+      "REPORT_TARGET_KIND_CHAT_MESSAGE": "聊天訊息",
       "REPORT_TARGET_KIND_COMMENT": "留言",
       "REPORT_TARGET_KIND_FORUM_ENTRY": "討論區留言",
-      "REPORT_TARGET_KIND_POST": "貼文"
+      "REPORT_TARGET_KIND_POST": "貼文",
+      "REPORT_TARGET_KIND_REVIEW": "評價"
     }
   },
   "payment": {

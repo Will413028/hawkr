@@ -121,6 +121,10 @@
       },
       "description": "還原原因空白或超過上限。"
     },
+    "hide.source_mismatch": {
+      "message": "這則訊息目前的隱藏不是由這個案件造成的，不能由它還原",
+      "description": "依案件還原時，未還原的隱藏來源參照與案件不同。"
+    },
     "hide.source_ref_too_long": {
       "message": "來源參照不可超過 {max} 個字",
       "params": {

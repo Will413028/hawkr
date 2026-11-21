@@ -31,14 +31,14 @@ var Dependencies = map[string][]string{
 	"finance":           {"aftersales", "ordering", "payment", "fulfillment"},
 	"social":            {"buyer", "seller", "media"},
 	"discovery":         {"ordering", "catalog", "buyer", "seller", "review"},
-	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
-	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
-	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
-	"moderation":        {"social", "seller", "buyer", "accountsuspension", "media"},      // 社群檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立；快照引用的圖片在 media 登記引用（證據保全）。
-	"reviewqueue":       {"seller", "payment", "moderation"},                              // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
-	"procurement":       {"ordering", "catalog", "buyer", "seller"},                       // 採購（RFQ）；事件由 notification 訂閱，procurement 不依賴 notification（A9-D3）。
-	"assistant":         {"ordering", "catalog", "buyer"},                                 // 買家助理（A9-D3）。
-	"imageai":           {"seller", "media"},                                              // AI 修圖與配額（A9-D3）。
+	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"},            // 授權、session、稽核與編排全由 delegation 擁有。
+	"accountdeletion":   {"identity", "buyer", "seller"},                                             // 刪除帳號的流程管理者。
+	"accountsuspension": {"identity", "seller"},                                                      // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
+	"moderation":        {"social", "seller", "buyer", "accountsuspension", "media", "review", "im"}, // 社群、評價與聊天訊息的檢舉與處置：案件、檢舉、內容快照；處分經各擁有者模組建立（評價、聊天訊息的隱藏與還原經 review、im）；快照引用的圖片在 media 登記引用（證據保全）。
+	"reviewqueue":       {"seller", "payment", "moderation"},                                         // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
+	"procurement":       {"ordering", "catalog", "buyer", "seller"},                                  // 採購（RFQ）；事件由 notification 訂閱，procurement 不依賴 notification（A9-D3）。
+	"assistant":         {"ordering", "catalog", "buyer"},                                            // 買家助理（A9-D3）。
+	"imageai":           {"seller", "media"},                                                         // AI 修圖與配額（A9-D3）。
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
 		"coupon", "aftersales", "review", "im", "social", "procurement", "finance", "delegation",

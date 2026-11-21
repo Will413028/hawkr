@@ -48,6 +48,9 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
       "message": "User"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "Chat message"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "Comment"
     },
@@ -56,6 +59,9 @@
     },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "Post"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "Review"
     },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"

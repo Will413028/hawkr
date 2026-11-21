@@ -65,8 +65,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 85 {
-		t.Fatalf("declarations=%d methods=%d，預期 85", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 86 {
+		t.Fatalf("declarations=%d methods=%d，預期 86", got, want)
 	}
 
 	for procedure := range declarations {
@@ -330,6 +330,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 	}
 	wantAudited := []string{
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
+		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
@@ -448,9 +449,10 @@ func TestModerationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		perm  adminperm.Permission
 		audit auditMode
 	}{
-		moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:  {adminperm.ModerationCasesList, auditReadOnly},
-		moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:    {adminperm.ModerationCasesGet, auditReadOnly},
-		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure: {adminperm.ModerationCasesDecide, auditAudited},
+		moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:   {adminperm.ModerationCasesList, auditReadOnly},
+		moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:     {adminperm.ModerationCasesGet, auditReadOnly},
+		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  {adminperm.ModerationCasesDecide, auditAudited},
+		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: {adminperm.ModerationCasesReverse, auditAudited},
 	} {
 		d, ok := declarations[procedure]
 		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {

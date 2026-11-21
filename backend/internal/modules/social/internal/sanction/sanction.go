@@ -358,12 +358,23 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 		q := s.q(ctx)
 		now := s.d.Now().UTC()
 		var row store.SocialHide
+		var active bool
+		missing := false
 		if in.Target.Kind == model.TargetComment {
-			row, err = q.RestoreCommentHide(ctx, store.RestoreCommentHideParams{CommentID: &in.Target.ID, AdminID: &in.AdminID, Reason: &in.Reason, Now: &now})
+			row, err = q.RestoreCommentHide(ctx, store.RestoreCommentHideParams{CommentID: &in.Target.ID, AdminID: &in.AdminID, Reason: &in.Reason, Now: &now, SourceRef: optional(in.SourceRef)})
+			if missing = errors.Is(err, pgx.ErrNoRows); missing {
+				active, err = q.HasActiveCommentHide(ctx, &in.Target.ID)
+			}
 		} else {
-			row, err = q.RestoreForumEntryHide(ctx, store.RestoreForumEntryHideParams{ForumEntryID: &in.Target.ID, AdminID: &in.AdminID, Reason: &in.Reason, Now: &now})
+			row, err = q.RestoreForumEntryHide(ctx, store.RestoreForumEntryHideParams{ForumEntryID: &in.Target.ID, AdminID: &in.AdminID, Reason: &in.Reason, Now: &now, SourceRef: optional(in.SourceRef)})
+			if missing = errors.Is(err, pgx.ErrNoRows); missing {
+				active, err = q.HasActiveForumEntryHide(ctx, &in.Target.ID)
+			}
 		}
-		if errors.Is(err, pgx.ErrNoRows) {
+		if missing && err == nil {
+			if active {
+				return apperr.FailedPrecondition("%s", text.HideSourceMismatch())
+			}
 			return apperr.FailedPrecondition("%s", text.HideNotHidden())
 		}
 		if err != nil {

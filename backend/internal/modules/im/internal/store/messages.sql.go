@@ -388,6 +388,76 @@ func (q *Queries) LockStoreMessageBatch(ctx context.Context, arg LockStoreMessag
 	return items, nil
 }
 
+const messagesForReport = `-- name: MessagesForReport :many
+SELECT (m.id = $1::uuid)::boolean AS is_target,
+       m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.created_at, m.erased_at,
+       c.buyer_id, c.store_id,
+       (h.id IS NOT NULL)::boolean AS hidden
+FROM im.messages AS t
+JOIN im.messages AS m ON m.conversation_id = t.conversation_id AND m.seq BETWEEN t.seq - $2::bigint AND t.seq + $2::bigint
+JOIN im.conversations AS c ON c.id = m.conversation_id
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE t.id = $1::uuid
+ORDER BY m.seq
+`
+
+type MessagesForReportParams struct {
+	MessageID uuid.UUID
+	Radius    int64
+}
+
+type MessagesForReportRow struct {
+	IsTarget       bool
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	Seq            int64
+	SenderKind     string
+	MessageType    string
+	Content        *string
+	ImageAssetID   *string
+	CreatedAt      time.Time
+	ErasedAt       *time.Time
+	BuyerID        int64
+	StoreID        int64
+	Hidden         bool
+}
+
+// 檢舉用的證據讀取：被檢舉的訊息與同一對話 seq 前後各 window 則，一句 SQL 保證同一時點；不鎖列。is_target 標出被檢舉的那則，授權（呼叫者是對話的一方）與
+// 「被檢舉的訊息已隱藏或已抹除」由呼叫端依回來的列判斷。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。
+func (q *Queries) MessagesForReport(ctx context.Context, arg MessagesForReportParams) ([]MessagesForReportRow, error) {
+	rows, err := q.db.Query(ctx, messagesForReport, arg.MessageID, arg.Radius)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MessagesForReportRow{}
+	for rows.Next() {
+		var i MessagesForReportRow
+		if err := rows.Scan(
+			&i.IsTarget,
+			&i.ID,
+			&i.ConversationID,
+			&i.Seq,
+			&i.SenderKind,
+			&i.MessageType,
+			&i.Content,
+			&i.ImageAssetID,
+			&i.CreatedAt,
+			&i.ErasedAt,
+			&i.BuyerID,
+			&i.StoreID,
+			&i.Hidden,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const partyInactive = `-- name: PartyInactive :one
 SELECT CASE WHEN $1::text = 'BUYER'
             THEN EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = $2::bigint)

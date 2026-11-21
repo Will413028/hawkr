@@ -12,5 +12,9 @@ RETURNING *;
 -- 還原評價目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 UPDATE review.hides
 SET restored_at = GREATEST(sqlc.arg(now)::timestamptz, hidden_at), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
-WHERE review_id = sqlc.arg(review_id) AND restored_at IS NULL
+WHERE review_id = sqlc.arg(review_id) AND restored_at IS NULL AND (sqlc.narg(source_ref)::text IS NULL OR source_ref = sqlc.narg(source_ref)::text)
 RETURNING *;
+
+-- name: HasActiveHide :one
+-- 訊息或評價目前有沒有未還原的隱藏；還原沒有列時用來分辨「沒有隱藏」與「隱藏來源不符」。
+SELECT EXISTS (SELECT 1 FROM review.hides WHERE review_id = sqlc.arg(review_id) AND restored_at IS NULL);

@@ -16,13 +16,16 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/handle"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/report"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/retention"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -65,6 +68,22 @@ type (
 	SubmitResult = model.SubmitResult
 	// DecideInput 是處理案件的輸入。
 	DecideInput = model.DecideInput
+	// ReverseInput 是撤銷 HIDE 決定的輸入。
+	ReverseInput = model.ReverseInput
+	// Reversal 是案件上 HIDE 決定的撤銷紀錄。
+	Reversal = model.Reversal
+	// Snapshot 是案件凍結的內容快照（依對象種類的 tagged union：Social、Buyer、Review、Chat 恰好一個有值）。
+	Snapshot = snapshot.Content
+	// SocialSnapshot 是貼文、留言與討論區留言的快照。
+	SocialSnapshot = snapshot.Social
+	// BuyerSnapshot 是被檢舉買家的公開檔案快照。
+	BuyerSnapshot = snapshot.Buyer
+	// ReviewSnapshot 是評價的快照。
+	ReviewSnapshot = snapshot.Review
+	// ChatSnapshot 是聊天訊息與前後文的快照。
+	ChatSnapshot = snapshot.Chat
+	// ChatContextMessage 是聊天前後文的一則。
+	ChatContextMessage = snapshot.ContextMessage
 	// ReportItem 是檢舉人讀自己檢舉時的一筆。
 	ReportItem = model.ReportItem
 	// ReportCursor 是檢舉清單的排序鍵。
@@ -89,6 +108,8 @@ const (
 	TargetComment       = model.TargetComment
 	TargetForumEntry    = model.TargetForumEntry
 	TargetBuyer         = model.TargetBuyer
+	TargetReview        = model.TargetReview
+	TargetChatMessage   = model.TargetChatMessage
 	DecisionViolation   = model.DecisionViolation
 	DecisionNoViolation = model.DecisionNoViolation
 	ActionHide          = model.ActionHide
@@ -100,6 +121,8 @@ const (
 	OutcomeNoViolation  = model.OutcomeNoViolation
 	CaseOpen            = model.CaseOpen
 	CaseClosed          = model.CaseClosed
+	// ChatContextWindow 是聊天對象的證據快照裡，被檢舉訊息前後各保留的訊息數。
+	ChatContextWindow = model.ChatContextWindow
 	// DailyReportLimit 是每位檢舉人每個台北日最多新增的檢舉數。
 	DailyReportLimit = model.DailyReportLimit
 	// SnapshotRetention 是結案後保留內容快照的期間。
@@ -112,6 +135,8 @@ const (
 type Deps struct {
 	DB         *db.DB
 	Social     *social.Module
+	Review     *review.Module
+	IM         *im.Module
 	Seller     *seller.Module
 	Buyer      *buyer.Module
 	Suspension *accountsuspension.Module
@@ -133,14 +158,14 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Social == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Social == nil || d.Review == nil || d.IM == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.Jobs == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
 	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
-		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
-		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
+		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Holds: ret.svc.Holds(), NewID: d.NewID, Now: d.Now}),
+		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
 		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}
@@ -213,9 +238,20 @@ func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, er
 	return m.handle.Decide(ctx, in)
 }
 
+// ReverseHide 撤銷一個已結案的 HIDE 決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 呼叫擁有內容的模組（review、im、social）
+// 還原目前未還原的隱藏，並寫後台動作紀錄（Actor.Action 是動作名稱）。案件不存在回 NotFound；案件進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition。
+func (m *Module) ReverseHide(ctx context.Context, in ReverseInput) (CaseDetail, error) {
+	return m.handle.Reverse(ctx, in)
+}
+
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。
 func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
+}
+
+// CaseWithSnapshot 同一個唯讀快照裡讀案件（含檢舉）與最近一份凍結的內容快照（沒有回 nil）；後台 `GetCase` 用，兩者不會來自不同時間點。案件不存在回 NotFound。
+func (m *Module) CaseWithSnapshot(ctx context.Context, id uuid.UUID) (CaseDetail, *Snapshot, error) {
+	return m.view.CaseWithSnapshot(ctx, id)
 }
 
 // Cases 列案件（不含檢舉），開案時間新的在前（keyset）：state 篩進行中或已結案、target kind 篩對象種類，空值是不篩，不合法的值回 InvalidInput。

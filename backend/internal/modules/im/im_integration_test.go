@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -756,5 +757,85 @@ func TestRetireSkipsAStoreHeldByASend(t *testing.T) {
 	}
 	if n := pick(); n != 1 {
 		t.Fatalf("Send 提交之後下一輪要選得到：%d", n)
+	}
+}
+
+// Restore 帶來源參照：沒有未還原的隱藏與隱藏是別案造成的是兩種不同的 FailedPrecondition，後者不動隱藏。
+// 殺死的變異：Restore 忽略 SourceRef；兩種情況回同一句。
+func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.say(t, f.buyerParty(b1), s1, "first")
+	last := f.say(t, f.storeParty(t, s1), b1, "內容")
+	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
+		t.Fatalf("沒有隱藏：%v", err)
+	}
+	if _, err := f.m.Hide(ctx, im.HideInput{MessageID: last.ID, AdminID: 1, Category: string(policy.CommunityAssessable()[0]), SourceRef: "case-1"}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-2"})
+	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "不是由這個案件造成") {
+		t.Fatalf("來源不符：%v", err)
+	}
+	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, s1), f.buyerParty(b1), 0, 10)
+	stillHidden := false
+	for _, m := range msgs.Items {
+		if m.Seq == last.Seq {
+			stillHidden = m.Hidden
+		}
+	}
+	if err != nil || !stillHidden {
+		t.Fatalf("來源不符時隱藏仍在：%+v %v", msgs, err)
+	}
+	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); err != nil {
+		t.Fatalf("來源相符可還原：%v", err)
+	}
+}
+
+// 檢舉證據的前後文：已隱藏的訊息（文字或圖片）是墓碑，只帶旗標，不帶 Text 與 AssetID；未隱藏的照常帶內容。
+func TestMessageForReportReturnsTombstonesForHiddenContext(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	buyerSide := f.buyerParty(b1)
+	visibleText := f.say(t, buyerSide, s1, "可見的文字")
+	hiddenText := f.say(t, buyerSide, s1, "被隱藏的文字")
+	hiddenImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: "hid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	visibleImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: "vis"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := f.say(t, buyerSide, s1, "被檢舉的訊息")
+	for _, id := range []uuid.UUID{hiddenText.ID, hiddenImage.ID} {
+		if _, err := f.m.Hide(ctx, f.hideInput(id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := f.m.MessageForReport(ctx, target.ID, f.storeParty(t, s1), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Context) != 4 {
+		t.Fatalf("前後文應有 4 則：%+v", got.Context)
+	}
+	byID := map[uuid.UUID]im.ReportedChatMessage{}
+	for _, c := range got.Context {
+		byID[c.ID] = c
+	}
+	for _, id := range []uuid.UUID{hiddenText.ID, hiddenImage.ID} {
+		c := byID[id]
+		if !c.Hidden || c.Erased || c.Text != "" || c.AssetID != "" {
+			t.Fatalf("已隱藏的前後文要是墓碑（只帶旗標）：%+v", c)
+		}
+	}
+	if c := byID[visibleText.ID]; c.Hidden || c.Erased || c.Text != "可見的文字" || c.AssetID != "" {
+		t.Fatalf("未隱藏的文字要帶內容：%+v", c)
+	}
+	if c := byID[visibleImage.ID]; c.Hidden || c.Erased || c.Text != "" || c.AssetID != media.AssetFor("vis") {
+		t.Fatalf("未隱藏的圖片要帶 AssetID：%+v", c)
 	}
 }

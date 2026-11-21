@@ -126,5 +126,6 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 抹除保證「進入刪除後沒有新訊息」 | | 理由改為擁有者列鎖互斥（`ErasePartyArgs` 註解已改寫） |
 | G4 `s.inactive`：tx 外的提早檢查 | 必要條件是「被擋的請求不做 Finalize 轉正圖片」 | 成立，保留；改讀 `PartyInactive`（pub）；tx 內守門才是正確性保證 |
 | 只訂 `BuyerDeleted`，不訂 `BuyerDeletionRequested`（刪帳申請中仍可聊天） | 守門只擋 CLOSED | 成立；`LockNotClosed` 放行 PENDING_DELETION，讀取用 `pub_closed_buyers()`；`TestPendingDeletionBuyerCanStillSend`、`cmd/hawkr` 的 `TestIMDeletionTimingSubscribesOnlyToBuyerDeleted` 守住 |
+| `MessageForReport` 是證據讀取，不給顯示用 | 檢舉的快照要被檢舉訊息與 seq 前後各 5 則（同一時點）與寄件方 ID，顯示路徑只有分頁讀取 | 成立 | 同 | 新增（A6-4b）：被檢舉訊息與前後文一句 SQL（`MessagesForReport`）讀回；授權（檢舉人是對話的一方）與「已隱藏或已抹除的被檢舉訊息是 NotFound」同顯示路徑的可見性；前後文的隱藏與抹除回墓碑、不帶內容；不鎖列、不開 `InReadSnapshot` |
 
 觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `im.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。

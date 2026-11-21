@@ -30,9 +30,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -149,7 +151,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
-		DB: d, Social: socialModule, Seller: sellers, Buyer: buyers, Suspension: suspension,
+		DB: d, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
 		Media: fakeMedia, Jobs: queue, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")

@@ -69,5 +69,6 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 刪帳訂閱者只排 job、抹除 job、保底掃描 | 抹除的形狀在 review 自己 | 成立，保留；`Deactivate` 改名 `EnqueuePurge`（只排 job，不要求 transaction），保底掃描讀 `pub_inactive_buyers` |
 | 公開述詞只寫一份（`testdata/public_predicate.sql`） | 一條規則一個定義 | 成立，述詞內容改 join；`TestInactiveBuyersPredicateInlinesThePubFunction` 以 `EXPLAIN` 鎖住內聯 |
 | `AuthorInactive`：`Submit` tx 外的提早檢查 | 必要條件是「被擋的請求不做 Finalize 轉正圖片」 | 成立，保留；tx 內的 `LockActive` 才是正確性保證，提早檢查只省成本 |
+| `ReviewForReport` 是證據讀取，不給顯示用 | 檢舉的快照要證據欄位（作者、評分、店家回覆、圖片 asset ID），顯示投影有 `ItemImageKey` 等，兩者各自演進 | 成立 | 同 | 新增（A6-4b）：可讀規則與 `GetReview` 共用同一個公開可讀述詞與觀看者封鎖（`ReviewForReport` 呼叫同一條讀取路徑，不另寫述詞）；不鎖列、加入呼叫方的 transaction |
 
 觸發條件（改為 buyer 加 `WHERE status <> 'ACTIVE'` 的部分索引；門檻是推測，沒有量測）：`review.purge_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status <> 'ACTIVE'` 超過 10 萬列。保底掃描從 `pub_inactive_buyers()` 出發逐一 `EXISTS` 評價列（`reviews_buyer` 索引），不加索引（設計 W5 (a)）。

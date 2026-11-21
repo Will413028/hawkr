@@ -340,8 +340,13 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		now := s.d.Now().UTC()
-		row, err := q.RestoreHide(ctx, store.RestoreHideParams{ReviewID: in.ReviewID, AdminID: &in.AdminID, Reason: &in.Reason, Now: now})
+		row, err := q.RestoreHide(ctx, store.RestoreHideParams{ReviewID: in.ReviewID, AdminID: &in.AdminID, Reason: &in.Reason, Now: now, SourceRef: optional(in.SourceRef)})
 		if errors.Is(err, pgx.ErrNoRows) {
+			if active, aerr := q.HasActiveHide(ctx, in.ReviewID); aerr != nil {
+				return aerr
+			} else if active {
+				return apperr.FailedPrecondition("%s", text.HideSourceMismatch())
+			}
 			return apperr.FailedPrecondition("%s", text.HideNotHidden())
 		}
 		if err != nil {

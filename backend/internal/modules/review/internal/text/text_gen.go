@@ -49,6 +49,11 @@ func HideReviewNotFound() uitext.Message {
 	return uitext.Message{Text: "找不到這則評價", Locale: uitext.ZhTW}
 }
 
+// HideSourceMismatch 是後台員工受眾的模組句子 hide.source_mismatch（只有 zh-TW）。
+func HideSourceMismatch() uitext.Message {
+	return uitext.Message{Text: "這則評價目前的隱藏不是由這個案件造成的，不能由它還原", Locale: uitext.ZhTW}
+}
+
 // HideSourceRefTooLongArgs 是 HideSourceRefTooLong 的參數。
 type HideSourceRefTooLongArgs struct {
 	Max int

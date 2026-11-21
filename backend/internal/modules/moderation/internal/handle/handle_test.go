@@ -164,12 +164,12 @@ func TestFrozenContentMissingSnapshotUsesTheCallersSentence(t *testing.T) {
 }
 
 func TestFrozenContentReadsTheSnapshotOncePerDecide(t *testing.T) {
-	body, _ := snapshot.Encode(snapshot.Content{AuthorKind: "STORE", AuthorID: 7, StoreID: 7})
+	body, _ := snapshot.Encode(snapshot.Content{Kind: model.TargetPost, Social: &snapshot.Social{AuthorKind: "STORE", AuthorID: 7, StoreID: 7}})
 	q := &fakeSnapshots{body: body}
 	var res applied
 	for range 3 {
 		got, err := res.frozenContent(context.Background(), q, uuid.New(), text.DecideSnapshotMissing)
-		if err != nil || got.StoreID != 7 {
+		if err != nil || got.StoreID() != 7 {
 			t.Fatalf("%+v %v", got, err)
 		}
 	}
@@ -182,7 +182,7 @@ func TestFrozenContentReadsTheSnapshotOncePerDecide(t *testing.T) {
 func TestMeasureSnapshotFromTheFrozenContent(t *testing.T) {
 	at := time.Date(2026, 11, 1, 3, 4, 5, 0, time.UTC)
 	post, thread := uuid.NewV7(), uuid.NewV7()
-	frozen := snapshot.Content{Body: "全文", AuthoredAt: at, MediaRefs: []string{"a", "b"}, PostID: post.String(), ThreadID: thread.String()}
+	frozen := snapshot.Social{Body: "全文", AuthoredAt: at, MediaRefs: []string{"a", "b"}, PostID: post.String(), ThreadID: thread.String()}
 	got, err := measureSnapshot(model.TargetComment, 12, frozen)
 	if err != nil || got.Body != "全文" || !got.AuthoredAt.Equal(at) || got.ImageCount != 2 || got.Link != (seller.ContentLink{PostID: post}) {
 		t.Fatalf("留言 %+v err=%v", got, err)
@@ -192,8 +192,37 @@ func TestMeasureSnapshotFromTheFrozenContent(t *testing.T) {
 		t.Fatalf("討論區留言 %+v err=%v", got, err)
 	}
 	for _, kind := range []model.TargetKind{model.TargetPost, model.TargetComment, model.TargetForumEntry} {
-		if _, err := measureSnapshot(kind, 12, snapshot.Content{Body: "舊格式", AuthoredAt: at}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		if _, err := measureSnapshot(kind, 12, snapshot.Social{Body: "舊格式", AuthoredAt: at}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 			t.Errorf("%s 缺連結：%v", kind, err)
+		}
+	}
+}
+
+func TestValidateReverse(t *testing.T) {
+	ok := model.ReverseInput{CaseID: uuid.NewV7(), Actor: adminaudit.Actor{AdminID: 3, Action: "/test/ReverseHide"}, Reason: " 誤判 "}
+	got, err := ValidateReverse(ok)
+	if err != nil || got.Reason != "誤判" {
+		t.Fatalf("合法的輸入：%+v %v", got, err)
+	}
+	for name, mutate := range map[string]func(*model.ReverseInput){
+		"沒有案件": func(in *model.ReverseInput) { in.CaseID = uuid.UUID{} },
+		"原因空白": func(in *model.ReverseInput) { in.Reason = " 　 " },
+		"原因太長": func(in *model.ReverseInput) { in.Reason = strings.Repeat("字", model.MaxTextRunes+1) },
+	} {
+		in := ok
+		mutate(&in)
+		if _, err := ValidateReverse(in); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v", name, err)
+		}
+	}
+	for name, mutate := range map[string]func(*model.ReverseInput){
+		"沒有管理員":        func(in *model.ReverseInput) { in.Actor.AdminID = 0 },
+		"沒有 procedure": func(in *model.ReverseInput) { in.Actor.Action = "" },
+	} {
+		in := ok
+		mutate(&in)
+		if _, err := ValidateReverse(in); err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {
+			t.Errorf("%s 是接線錯誤：%v", name, err)
 		}
 	}
 }

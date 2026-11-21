@@ -64,9 +64,11 @@
     },
     "ReportTargetKind": {
       "REPORT_TARGET_KIND_BUYER": "User",
+      "REPORT_TARGET_KIND_CHAT_MESSAGE": "Chat message",
       "REPORT_TARGET_KIND_COMMENT": "Comment",
       "REPORT_TARGET_KIND_FORUM_ENTRY": "Forum post",
-      "REPORT_TARGET_KIND_POST": "Post"
+      "REPORT_TARGET_KIND_POST": "Post",
+      "REPORT_TARGET_KIND_REVIEW": "Review"
     }
   },
   "payment": {

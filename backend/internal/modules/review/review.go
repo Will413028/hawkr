@@ -68,6 +68,7 @@ type Deps struct {
 type (
 	Review                 = model.Review
 	RelayReview            = model.RelayReview
+	ReportedReview         = model.ReportedReview
 	Image                  = model.Image
 	Reply                  = model.Reply
 	Cursor                 = model.Cursor
@@ -180,6 +181,12 @@ func (m *Module) ListMyReviews(ctx context.Context, buyerID int64, after *Cursor
 // GetReview 是單筆公開讀取：不可讀的與不存在的同為 NotFound。
 func (m *Module) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (Review, error) {
 	return m.read.GetReview(ctx, id, viewerBuyerID)
+}
+
+// ReviewForReport 是檢舉用的評價證據讀取（moderation 凍結快照用，不是顯示用）：可讀規則同 GetReview（公開可讀述詞與觀看者封鎖），不可讀與不存在同為 NotFound；
+// 不鎖列、不開 transaction，加入呼叫方的。
+func (m *Module) ReviewForReport(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (ReportedReview, error) {
+	return m.read.ReviewForReport(ctx, id, viewerBuyerID)
 }
 
 // ProductStats 是商品的評價統計。

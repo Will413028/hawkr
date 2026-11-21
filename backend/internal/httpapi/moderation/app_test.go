@@ -261,3 +261,19 @@ func TestListMyReportsPointsAtPageSizeWhenTheModuleRejectsIt(t *testing.T) {
 		t.Fatalf("欄位已附給 client，不該有 ERROR log：%s", e.logs.String())
 	}
 }
+
+func TestReviewAndChatMessageTargetsAreContentIDs(t *testing.T) {
+	id := uuid.New()
+	for kind, want := range map[pb.ReportTargetKind]moderation.TargetKind{
+		pb.ReportTargetKind_REPORT_TARGET_KIND_REVIEW:       moderation.TargetReview,
+		pb.ReportTargetKind_REPORT_TARGET_KIND_CHAT_MESSAGE: moderation.TargetChatMessage,
+	} {
+		got, err := target(&pb.ReportTarget{Kind: kind, Id: id.String()})
+		if err != nil || got.Kind != want || got.ContentID != id || got.BuyerID != 0 {
+			t.Errorf("%v：%+v %v", kind, got, err)
+		}
+		if back := targetPB(got); back.GetKind() != kind || back.GetId() != id.String() {
+			t.Errorf("%v：轉回契約 %+v", kind, back)
+		}
+	}
+}

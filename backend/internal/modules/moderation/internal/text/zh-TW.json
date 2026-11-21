@@ -144,6 +144,27 @@
     "decide.warn_not_buyer": {
       "message": "作者不是買家，不能警告",
       "description": "警告的對象作者不是買家。"
+    },
+    "reverse.already_reversed": {
+      "message": "這個案件的隱藏已經撤銷過",
+      "description": "撤銷的案件已有撤銷紀錄（reversed_at 不是 NULL）。"
+    },
+    "reverse.case_required": {
+      "message": "案件必填",
+      "description": "撤銷隱藏沒有案件 ID。"
+    },
+    "reverse.not_hide": {
+      "message": "只有處置是隱藏的已結案案件能撤銷",
+      "description": "案件還在進行中，或決定不是以 HIDE 處置。"
+    },
+    "reverse.reason_required": {
+      "message": "撤銷原因必填，最多 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "撤銷原因空白、只有空白或超過上限。max 是 model.MaxTextRunes。"
     }
   }
 }

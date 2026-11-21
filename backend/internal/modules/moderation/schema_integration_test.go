@@ -122,6 +122,8 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 		"貼文不能停權":        {"POST", violation, ptr("SPAM"), ptr("BAN"), &admin, &closed},
 		"買家不能下架":        {"BUYER", violation, ptr("SPAM"), ptr("TAKEDOWN"), &admin, &closed},
 		"買家不能隱藏":        {"BUYER", violation, ptr("SPAM"), ptr("HIDE"), &admin, &closed},
+		"評價不能下架":        {"REVIEW", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN"), &admin, &closed},
+		"聊天不能下架":        {"CHAT_MESSAGE", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN"), &admin, &closed},
 		"OTHER 不能當認定類別": {"COMMENT", violation, ptr("OTHER"), ptr("HIDE"), &admin, &closed},
 		"結案早於開案":        {"COMMENT", noViolation, none, none, &admin, ptr(opened.Add(-time.Hour))},
 	} {
@@ -140,6 +142,12 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 		"買家停權": {"BUYER", violation, ptr("HARASSMENT"), ptr("BAN")},
 		"貼文下架": {"POST", violation, ptr("FOOD_SAFETY"), ptr("TAKEDOWN")},
 		"留言警告": {"COMMENT", violation, ptr("SPAM"), ptr("WARN")},
+		"評價隱藏": {"REVIEW", violation, ptr("SPAM"), ptr("HIDE")},
+		"評價警告": {"REVIEW", violation, ptr("SPAM"), ptr("WARN")},
+		"評價停權": {"REVIEW", violation, ptr("HARASSMENT"), ptr("BAN")},
+		"聊天隱藏": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("HIDE")},
+		"聊天警告": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("WARN")},
+		"聊天停權": {"CHAT_MESSAGE", violation, ptr("HARASSMENT"), ptr("BAN")},
 	} {
 		adminID, closedAt := &admin, &closed
 		if c.decision == nil {
@@ -148,6 +156,50 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 		if err := insert(c.kind, c.decision, c.category, c.act, adminID, closedAt); err != nil {
 			t.Errorf("%s：合法的組合要通過：%v", name, err)
 		}
+	}
+}
+
+// 撤銷欄位（reversed_*）的 CHECK：三欄同有同無；只有處置是 HIDE 的已結案案件可以有；撤銷不早於結案；原因頭尾不得有空白；合法的撤銷照常寫入。
+func TestCaseReversalChecks(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	opened := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	closed := opened.Add(time.Hour)
+	insert := func(action string, reversedAt *time.Time, by *int64, reason *string) error {
+		_, err := f.db.Conn(context.Background()).Exec(context.Background(), `INSERT INTO moderation.cases
+			(id, target_kind, content_id, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, reversed_at, reversed_by_admin_id, reverse_reason)
+			VALUES ($1, 'COMMENT', $2, $3, 'VIOLATION', 'SPAM', $4, 1, $5, $6, $7, $8)`, uuid.NewV7(), uuid.NewV7(), opened, action, closed, reversedAt, by, reason)
+		return err
+	}
+	at, early, admin := closed.Add(time.Hour), closed.Add(-time.Minute), int64(3)
+	for name, c := range map[string]struct {
+		action string
+		at     *time.Time
+		by     *int64
+		reason *string
+	}{
+		"只有時間":      {"HIDE", &at, nil, nil},
+		"沒有原因":      {"HIDE", &at, &admin, nil},
+		"沒有管理員":     {"HIDE", &at, nil, ptr("誤判")},
+		"WARN 不能撤銷": {"WARN", &at, &admin, ptr("誤判")},
+		"撤銷早於結案":    {"HIDE", &early, &admin, ptr("誤判")},
+		"原因有尾端空白":   {"HIDE", &at, &admin, ptr("誤判 ")},
+		"原因空字串":     {"HIDE", &at, &admin, ptr("")},
+		"管理員不是正數":   {"HIDE", &at, ptr(int64(0)), ptr("誤判")},
+	} {
+		if err := insert(c.action, c.at, c.by, c.reason); err == nil {
+			t.Errorf("%s：要被 CHECK 擋下", name)
+		}
+	}
+	if err := insert("HIDE", &at, &admin, ptr("誤判")); err != nil {
+		t.Errorf("合法的撤銷：%v", err)
+	}
+	if err := insert("HIDE", nil, nil, nil); err != nil {
+		t.Errorf("沒有撤銷：%v", err)
+	}
+	if _, err := f.db.Conn(context.Background()).Exec(context.Background(), `INSERT INTO moderation.cases (id, target_kind, content_id, opened_at, reversed_at, reversed_by_admin_id, reverse_reason)
+		VALUES ($1, 'COMMENT', $2, $3, $4, 3, '誤判')`, uuid.NewV7(), uuid.NewV7(), opened, at); err == nil {
+		t.Error("進行中的案件不能有撤銷")
 	}
 }
 

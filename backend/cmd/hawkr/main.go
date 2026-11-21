@@ -241,11 +241,11 @@ func runServe(ctx context.Context) error {
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)
-	newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
-	newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
+	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
+	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
+	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
 	subscribeModeration(bus, moderationModule.Retention())
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
