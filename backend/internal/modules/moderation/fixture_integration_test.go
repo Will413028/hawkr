@@ -215,6 +215,10 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.social.OnStoreRetired)
 	events.Subscribe(bus, f.social.OnMeasureCreated)
 	events.Subscribe(bus, f.social.OnMeasureRevoked)
+	events.Subscribe(bus, f.im.OnMeasureCreated)
+	events.Subscribe(bus, f.im.OnMeasureRevoked)
+	events.Subscribe(bus, f.review.OnMeasureCreated)
+	events.Subscribe(bus, f.review.OnMeasureRevoked)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
 	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
