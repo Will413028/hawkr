@@ -21,7 +21,7 @@ import 'my_reports_notifier.dart';
 import 'paged_section.dart';
 import 'paged_section_widgets.dart';
 
-/// 我的檢舉紀錄列表頁（`ListMyReports`，只列社群對象；聊天、評價的檢舉在 A6 前不列）。
+/// 我的檢舉紀錄列表頁（`ListMyReports` 合併社群與店家兩種；店家檢舉的呈現在 10f-3b，在那之前只列社群對象，聊天、評價的檢舉在 A6 前不列）。
 /// 伺服器狀態在 [myReportsProvider]；這裡只顯示與發動作。
 class MyReportsScreen extends ConsumerWidget {
   const MyReportsScreen({super.key});
@@ -63,6 +63,7 @@ class MyReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(myReportsProvider);
+    final visible = reports.items.where((r) => r.hasCommunity()).toList();
     final locale = ref.watch(uiLocaleProvider);
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -81,7 +82,7 @@ class MyReportsScreen extends ConsumerWidget {
                     message: _errorMessage(ref, reports.error),
                     onRetry: () => _reload(context, ref),
                   )
-                : reports.items.isEmpty
+                : visible.isEmpty
                 ? const HkEmptyState(
                     key: ValueKey('my-reports-empty-state'),
                     iconKey: ValueKey('my-reports-empty-state-icon'),
@@ -92,10 +93,9 @@ class MyReportsScreen extends ConsumerWidget {
                     onRefresh: () => _reload(context, ref),
                     child: ListView.builder(
                       padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 20.h),
-                      itemCount:
-                          reports.items.length + (reports.hasMore ? 1 : 0),
+                      itemCount: visible.length + (reports.hasMore ? 1 : 0),
                       itemBuilder: (_, i) {
-                        if (i == reports.items.length) {
+                        if (i == visible.length) {
                           return PagedLoadMoreFooter(
                             moreKey: const ValueKey('my-reports-more'),
                             loading: reports.loadingMore,
@@ -104,7 +104,7 @@ class MyReportsScreen extends ConsumerWidget {
                         }
                         return Padding(
                           padding: EdgeInsets.only(bottom: 16.h),
-                          child: _buildReportCard(reports.items[i], locale),
+                          child: _buildReportCard(visible[i], locale),
                         );
                       },
                     ),

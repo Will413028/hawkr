@@ -8,15 +8,15 @@ part of 'my_reports_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+/// 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留；畫面在 10f-3b 之前只顯示社群的。換觀看者整份重建。
 
 @ProviderFor(MyReports)
 final myReportsProvider = MyReportsProvider._();
 
-/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+/// 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留；畫面在 10f-3b 之前只顯示社群的。換觀看者整份重建。
 final class MyReportsProvider
     extends $NotifierProvider<MyReports, PagedSection<pb.MyReportItem>> {
-  /// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+  /// 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留；畫面在 10f-3b 之前只顯示社群的。換觀看者整份重建。
   MyReportsProvider._()
     : super(
         from: null,
@@ -48,7 +48,7 @@ final class MyReportsProvider
 
 String _$myReportsHash() => r'906959ed2e6b6ba50797ed8c3dd082adc611a02c';
 
-/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+/// 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留；畫面在 10f-3b 之前只顯示社群的。換觀看者整份重建。
 
 abstract class _$MyReports extends $Notifier<PagedSection<pb.MyReportItem>> {
   PagedSection<pb.MyReportItem> build();
