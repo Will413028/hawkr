@@ -168,3 +168,11 @@ A6-D14 W6 (b) 定了「伺服器參照」的方向，但商品與訂單的擁有
 - (a) 不放進 CRM；SA 客戶詳情的訂單分頁改用既有的店家訂單列表加 `buyer_id` 篩選（若 Java 店家訂單列表已支援；5d 先查，不支援就回報）。
 - (b) 補 legacy orderservice 呼叫 Java `GetBuyerOrdersForSeller`，以 `CrmAppService.ListCustomerOrders` 暴露，B8 換成 ordering 模組。
 建議 (a)：訂單屬 ordering，不該由 crm 服務代為暴露；(a) 若 Java 列表不支援篩選，退回 (b)。
+
+## 已決（Will 2026-11-21）
+
+- W1 (g)：沒有單一資源可推導身分的聊天方法依集合分方法，買家版與店家版各一支（例如 `ListConversations`／`ListStoreConversations`；未讀、全部已讀、串流、presence、開新對話同理），店家由「呼叫者此刻的店」推導（帳號至多一家現行店，`seller/db/schema.sql:102`），請求不帶 `store_id`；與 social 的 `ListMyPosts`、`ListStoreComments` 同形，ADR 不修訂。§5.3、§5.4 的 `store_id` 依此改為分方法。觸發重開：一個帳號可管多家店或店家有員工。
+- W2 (c)：`SubmitReport` 不加欄位，由 `im.MessageForReport` 推導檢舉人是買家方或店家方；店家送出的檢舉列表照 W1 另開 `ListMyStoreReports`。
+- W3 (a)：這次只出 `TEXT`、`IMAGE`；卡片延到 ordering 或 catalog 進單體（B8）後加。
+- W4 (a)：`SendMessageRequest.request_id` 必填 UUIDv4，im 加 `UNIQUE (conversation_id, sender_kind, request_id)`，重送回傳既有訊息。
+- W5、W6：待決。
