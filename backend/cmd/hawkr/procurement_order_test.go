@@ -81,3 +81,63 @@ func TestWorkerRoleRegistersProcurementJobs(t *testing.T) {
 		t.Fatalf("runWorker：addProcurementWorkers = %v，procurementModule.PeriodicJobs = %v", registers, schedules)
 	}
 }
+
+func funcBody(t *testing.T, name string) *ast.BlockStmt {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range file.Decls {
+		if fn, ok := d.(*ast.FuncDecl); ok && fn.Name.Name == name {
+			return fn.Body
+		}
+	}
+	t.Fatalf("找不到 %s", name)
+	return nil
+}
+
+func calls(body *ast.BlockStmt, name string) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			if id, ok := call.Fun.(*ast.Ident); ok && id.Name == name {
+				found = true
+			}
+		}
+		return true
+	})
+	return found
+}
+
+// WatchRun 的串流在 serve 角色：沒啟動共用的 LISTEN，串流永遠收不到喚醒；worker 角色不需要它。
+func TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot(t *testing.T) {
+	if !calls(funcBody(t, "runServe"), "startProcurementHub") {
+		t.Error("runServe 沒有呼叫 startProcurementHub")
+	}
+	if calls(funcBody(t, "runWorker"), "startProcurementHub") {
+		t.Error("runWorker 不該啟動 Hub")
+	}
+}
+
+// 送出與取消要排入、取消 River job：serve 與 worker 組模組時都得給 job client，不能是 nil。
+func TestProcurementModuleIsBuiltWithTheJobClientInBothRoles(t *testing.T) {
+	for _, name := range []string{"runServe", "runWorker"} {
+		withJobs := false
+		ast.Inspect(funcBody(t, name), func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "newProcurement" && len(call.Args) == 3 {
+				if a, ok := call.Args[1].(*ast.Ident); ok && a.Name == "jc" {
+					withJobs = true
+				}
+			}
+			return true
+		})
+		if !withJobs {
+			t.Errorf("%s：newProcurement 沒有帶 jc", name)
+		}
+	}
+}
