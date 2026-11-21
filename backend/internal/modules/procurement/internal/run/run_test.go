@@ -195,7 +195,7 @@ func TestHubBackoffResetsAfterASuccessfulListen(t *testing.T) {
 }
 
 func TestWatchStopsWithoutWaitingOnceAnEndedRunIsDrained(t *testing.T) {
-	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED", "RESUMED"} {
+	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED"} {
 		if !IsTerminal(status) || !drainedEndedRun(true, 0) {
 			t.Fatalf("%s 的 run 讀完事件就要結束串流", status)
 		}

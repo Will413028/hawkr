@@ -42,7 +42,7 @@ func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int
 }
 
 const getRunForBuyer = `-- name: GetRunForBuyer :one
-SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
 `
 
 type GetRunForBuyerParams struct {
@@ -58,13 +58,12 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 		&i.BuyerID,
 		&i.RequestID,
 		&i.ConversationID,
-		&i.ParentRunID,
+		&i.InterruptID,
 		&i.CandidateSetID,
 		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
-		&i.ResumedIntoRunID,
 		&i.ResultRevisionID,
 		&i.LastEventSeq,
 		&i.MinAvailableSeq,
@@ -114,7 +113,7 @@ func (q *Queries) GetUsage(ctx context.Context, arg GetUsageParams) (int32, erro
 }
 
 const insertRun = `-- name: InsertRun :execrows
-INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, parent_run_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, interrupt_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, 'QUEUED', $7, $8, $9, $9)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
@@ -124,7 +123,7 @@ type InsertRunParams struct {
 	BuyerID          int64
 	RequestID        uuid.UUID
 	ConversationID   *uuid.UUID
-	ParentRunID      *uuid.UUID
+	InterruptID      *uuid.UUID
 	RunType          string
 	ClientRequestID  uuid.UUID
 	QuotaPeriodStart *time.Time
@@ -138,7 +137,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, er
 		arg.BuyerID,
 		arg.RequestID,
 		arg.ConversationID,
-		arg.ParentRunID,
+		arg.InterruptID,
 		arg.RunType,
 		arg.ClientRequestID,
 		arg.QuotaPeriodStart,

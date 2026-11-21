@@ -63,7 +63,7 @@ CREATE UNIQUE INDEX request_revisions_no ON procurement.request_revisions (reque
 -- 一張需求同時只有一個現行版本，由資料庫擋雙頭。
 CREATE UNIQUE INDEX request_revisions_active ON procurement.request_revisions (request_id) WHERE status = 'ACTIVE';
 
--- 一個買家的對話，與 requests 1:1。ADK session ID 是 request ID 的字串（跨掛起與回答兩個 run 存活，S7）。軟刪除只在這裡：買家刪對話後需求與已發布的詢價保留。
+-- 一個買家的對話，與 requests 1:1。軟刪除只在這裡：買家刪對話後需求與已發布的詢價保留。
 CREATE TABLE procurement.conversations (
     id UUID PRIMARY KEY,
     buyer_id BIGINT NOT NULL,
@@ -419,13 +419,12 @@ CREATE TABLE procurement.agent_runs (
     buyer_id BIGINT NOT NULL,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     conversation_id UUID REFERENCES procurement.conversations (id) ON DELETE CASCADE,
-    parent_run_id UUID REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
+    interrupt_id UUID,
     candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
     publication_id UUID REFERENCES procurement.rfq_publications (id) ON DELETE SET NULL,
     run_type TEXT NOT NULL,
     status TEXT NOT NULL,
     failure_reason TEXT,
-    resumed_into_run_id UUID,
     result_revision_id UUID REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
     last_event_seq BIGINT NOT NULL DEFAULT 0,
     min_available_seq BIGINT NOT NULL DEFAULT 1,
@@ -438,11 +437,13 @@ CREATE TABLE procurement.agent_runs (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT agent_runs_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT agent_runs_type_check CHECK (run_type IN ('TURN', 'CANDIDATE_SEARCH', 'CLARIFICATION_RESUME', 'PUBLICATION')),
-    CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'RESUMED')),
+    CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
     CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR')),
-    CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1)
+    CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1),
+    CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL))
 );
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);
+CREATE INDEX agent_runs_interrupt ON procurement.agent_runs (interrupt_id) WHERE interrupt_id IS NOT NULL;
 CREATE INDEX agent_runs_request ON procurement.agent_runs (request_id, created_at DESC);
 CREATE INDEX agent_runs_unfinished ON procurement.agent_runs (id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 CREATE INDEX agent_runs_buyer_created ON procurement.agent_runs (buyer_id, created_at DESC);
@@ -471,25 +472,26 @@ CREATE TABLE procurement.agent_run_events (
     CONSTRAINT agent_run_events_payload_check CHECK (jsonb_typeof(payload) = 'object')
 );
 
--- run 停下來等買家回答的中斷。interrupt_kind 只有 CLARIFICATION 一值；不設到期，下一輪送出即取代（A9-D20 R2）。RESOLVED 只表示被子 run 回答（resolved_by_child_run_id 必填）；run 被取消或被取代時 interrupt 維持 PENDING，讀取只認狀態為 WAITING_FOR_INPUT 的 run 的 PENDING interrupt。子 run 失敗時 interrupt 回到 PENDING。
+-- run 停下來等買家回答的中斷，只在回答成功時解決（A9-D26）：回答的 run（agent_runs.interrupt_id 指向它）轉 SUCCEEDED 或寫入自己的新中斷的同一個 transaction 內，這筆轉 RESOLVED、提問的 run 轉 SUCCEEDED；回答失敗或被取消不動它。
+-- request_id 與 run 的 request_id 相同，放在這裡讓「每個需求最多一筆 PENDING」能用部分唯一索引表達。提問的 run 被取消或被新一輪取代時，這筆轉 CANCELLED（closed_at 是離開 PENDING 的時間），不再佔用索引。不設到期（A9-D20 R2）。
 CREATE TABLE procurement.agent_run_interrupts (
     id UUID PRIMARY KEY,
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
+    request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     interrupt_kind TEXT NOT NULL,
     status TEXT NOT NULL,
     payload JSONB NOT NULL DEFAULT '{}',
     facts_as_of TIMESTAMPTZ,
-    resolved_by_child_run_id UUID REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL,
-    resolved_at TIMESTAMPTZ,
+    closed_at TIMESTAMPTZ,
     CONSTRAINT agent_run_interrupts_kind_check CHECK (interrupt_kind IN ('CLARIFICATION')),
-    CONSTRAINT agent_run_interrupts_status_check CHECK (status IN ('PENDING', 'RESOLVED')),
+    CONSTRAINT agent_run_interrupts_status_check CHECK (status IN ('PENDING', 'RESOLVED', 'CANCELLED')),
     CONSTRAINT agent_run_interrupts_payload_check CHECK (jsonb_typeof(payload) = 'object'),
-    CONSTRAINT agent_run_interrupts_resolved_check CHECK ((status = 'RESOLVED') = (resolved_by_child_run_id IS NOT NULL AND resolved_at IS NOT NULL) AND (status = 'PENDING') = (resolved_by_child_run_id IS NULL AND resolved_at IS NULL))
+    CONSTRAINT agent_run_interrupts_closed_check CHECK ((status = 'PENDING') = (closed_at IS NULL))
 );
 CREATE INDEX agent_run_interrupts_run ON procurement.agent_run_interrupts (run_id);
-CREATE UNIQUE INDEX agent_run_interrupts_pending ON procurement.agent_run_interrupts (run_id) WHERE status = 'PENDING';
-CREATE UNIQUE INDEX agent_run_interrupts_child ON procurement.agent_run_interrupts (resolved_by_child_run_id) WHERE resolved_by_child_run_id IS NOT NULL;
+CREATE UNIQUE INDEX agent_run_interrupts_pending ON procurement.agent_run_interrupts (request_id) WHERE status = 'PENDING';
+ALTER TABLE procurement.agent_runs ADD CONSTRAINT agent_runs_interrupt_fkey FOREIGN KEY (interrupt_id) REFERENCES procurement.agent_run_interrupts (id) ON DELETE CASCADE;
 
 -- 買家每期的送出次數：一列計數器加條件 UPDATE（A9-D9），沒有預約表。
 CREATE TABLE procurement.usage (
@@ -500,49 +502,4 @@ CREATE TABLE procurement.usage (
     PRIMARY KEY (buyer_id, period_start),
     CONSTRAINT usage_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT usage_used_check CHECK (used >= 0)
-);
-
--- ADK session.Service 的四張表（S7）：由 internal/platform/adksession 讀寫（schema 傳 procurement），形狀與 assistant 的同名表相同。
--- 鍵是 ADK 的字串；session ID 是 request ID 的字串，user_id 是買家 ID 的十進位字串。session 跨越掛起與回答兩個 run（graph 的 checkpoint）。
-CREATE TABLE procurement.sessions (
-    app_name TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    id TEXT NOT NULL,
-    state JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (app_name, user_id, id),
-    CONSTRAINT sessions_key_check CHECK (app_name <> '' AND user_id <> '' AND id <> ''),
-    CONSTRAINT sessions_state_check CHECK (jsonb_typeof(state) = 'object')
-);
-
-CREATE TABLE procurement.events (
-    app_name TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    session_id TEXT NOT NULL,
-    id TEXT NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    seq BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY,
-    event JSONB NOT NULL,
-    PRIMARY KEY (app_name, user_id, session_id, id),
-    FOREIGN KEY (app_name, user_id, session_id) REFERENCES procurement.sessions (app_name, user_id, id) ON DELETE CASCADE,
-    CONSTRAINT events_id_check CHECK (id <> ''),
-    CONSTRAINT events_event_check CHECK (jsonb_typeof(event) = 'object')
-);
-CREATE INDEX events_session_time ON procurement.events (app_name, user_id, session_id, timestamp, seq);
-
-CREATE TABLE procurement.app_states (
-    app_name TEXT PRIMARY KEY,
-    state JSONB NOT NULL DEFAULT '{}',
-    updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT app_states_state_check CHECK (jsonb_typeof(state) = 'object')
-);
-
-CREATE TABLE procurement.user_states (
-    app_name TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    state JSONB NOT NULL DEFAULT '{}',
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (app_name, user_id),
-    CONSTRAINT user_states_state_check CHECK (jsonb_typeof(state) = 'object')
 );

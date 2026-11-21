@@ -4,18 +4,17 @@
 
 ## 職責
 
-買家採購（RFQ）與賣家報價（賣家回報價也在這裡），服務買家與賣家。事件 `procurement.*` 由 notification 訂閱。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller，不依賴 notification（見 `internal/arch/modules.go`）。資料層已建（A9-3a）：schema、查詢、resolver、候選型別、買家關閉清除；run、串流、賣家報價與建單在 A9-3b、3c。行為規格的唯一來源是 `backend/docs/modules/procurement.md`。
+買家採購（RFQ）與賣家報價（賣家回報價也在這裡），服務買家與賣家。事件 `procurement.*` 由 notification 訂閱。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller，不依賴 notification（見 `internal/arch/modules.go`）。資料層（A9-3a）：schema、查詢、resolver、候選型別、買家關閉清除；run 與串流 A9-3b，賣家報價與建單 3c。行為規格的唯一來源是 `backend/docs/modules/procurement.md`。
 
 ## 擁有的資料
 
-schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。A9-3a 建好 23 張業務表與 ADK session 的 4 張表，無 handler、job、relay（A9-3b、3c 才接）：
+schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。A9-3a 建好 23 張業務表，無 handler、job、relay：
 
 - 需求：`requests`、`request_revisions`、`conversations`、`turns`。
 - 候選：`candidate_sets`、`candidates`。
 - 詢價：`price_previews`、`confirmed_rfq_snapshots`、`rfq_publication_approvals` 與 `_recipients`、`rfq_publications`、`_invites`。
 - 賣家回價與接受：`seller_responses`、`seller_response_versions`、`_drafts`、`buyer_shortlist_entries`、`buyer_quote_acceptances`。
 - run：`agent_runs`、`_inputs`、`_events`、`_interrupts`。額度：`usage`。
-- session 四張表由 `internal/platform/adksession`（schema 傳 `procurement`）讀寫，session ID 是 request ID 的字串。
 
 無 outbox、`*_commands`、預約表、`controller_kind`、`candidate_leads`、lane 與 prospect。讀取模型：無。
 
@@ -40,10 +39,11 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 - 建立型方法的冪等鍵放在被建立的實體上；rename、delete、withdraw、decline 是目標狀態的方法，不建收據（S4，逐支判定見 CARRYOVER）。
 - `BuyerDeleted` 同 transaction：買家資料刪除，已發布的需求與賣家看得到的紀錄保留、`buyer_id` 設 NULL（S10：`retention.OnBuyerDeleted`）。
 - 頭尾不得有空白的文字欄登記在 `cmd/hawkr` 的 `trimmedColumns`；新增文字欄一併登記。
-- run 事件在 run 結束 7 天後由週期 job 清除並推進 `min_available_seq`；cursor 早於範圍回 `REPLAY_CURSOR_EXPIRED`，超前回 `REPLAY_CURSOR_AHEAD`。interrupt 不到期；只有 TURN 扣額度；買家上限在送出的買家鎖內檢查。
-- run 狀態只經 `Ledger.Transition`（`UPDATE … WHERE status IN (允許來源)`，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態之後回 `run.ErrRunTerminal`，executor 收到就停止；串流只有結尾事件 `finished`。
-- 每個 run 一個 River job（建 run 的同交易排入，job id 存在 `agent_runs.job_id`，`MaxAttempts` 1、Timeout 2 分；`RescueStuckJobsAfter` 3 分），不重驅。
-- job 死了的 run 由 `run.Reconciler`（每分鐘，逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已死收斂到 CANCELLED（不退額度）；關機或逾時取消 job 標 `WORKER_LOST` 並退額度；等待輸入的 run 可直接取消（無 job、不退額度），同對話新一輪自動取消它（A9-D23）；買家取消不退額度（A9-D6、A9-D22）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱（`run.MaxSubscriptions`）。
+- run 事件在 run 結束 7 天後由週期 job 清除並推進 `min_available_seq`；cursor 過舊回 `REPLAY_CURSOR_EXPIRED`，超前回 `REPLAY_CURSOR_AHEAD`。interrupt 不到期；只有 TURN 扣額度；買家上限在買家鎖內檢查。
+- run 狀態只經 `Ledger.Transition`（`UPDATE … WHERE status IN (允許來源)`，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態後回 `run.ErrRunTerminal`，executor 收到就停止；串流只有結尾事件 `finished`。
+- 每個 run 一個 River job（建 run 的同交易排入，id 存 `agent_runs.job_id`，`MaxAttempts` 1、Timeout 2 分；`RescueStuckJobsAfter` 3 分），不重驅。
+- job 死了的 run 由 `run.Reconciler`（每分鐘，逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已死收斂到 CANCELLED（不退額度）；關機或逾時取消 job 標 `WORKER_LOST` 並退額度；等待輸入的 run 可直接取消（無 job、不退額度、中斷轉 CANCELLED），同對話新一輪自動取消它（A9-D23）；買家取消不退額度（A9-D6）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱。
+- 中斷回答成功才解決（A9-D26）：回答 run 成功或寫新中斷的同交易，中斷 RESOLVED、提問的 run SUCCEEDED；失敗或取消不還原；每需求最多一筆 PENDING；不用 adksession。
 - 配額是一列計數器加條件 UPDATE（`ConsumeUsage`），沒有預約表（A9-D9）。
 
 ## 不負責

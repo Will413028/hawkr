@@ -123,7 +123,25 @@ func (l Ledger) missingOrTerminal(ctx context.Context, q *store.Queries, runID u
 // Transition 是 run 狀態的唯一寫入口：同一個 transaction 內以 UPDATE … WHERE status IN (允許的來源) 轉換，終態同時寫串流的結尾事件
 // （狀態與結尾事件一起可見，訂閱者看得到終態就一定讀得到結尾）。回傳轉換後的列。
 // run 已在終態回 ErrRunTerminal，非終態但沒有這條邊回 *InvalidTransitionError，不存在回 NOT_FOUND。
+// 兩個附帶的同交易寫入：回答中斷的 run（interrupt_id 非空）轉 SUCCEEDED 或 WAITING_FOR_INPUT 時是回答的提交點，中斷轉 RESOLVED、提問的 run 轉 SUCCEEDED；
+// 等待輸入的 run 轉 CANCELLED 時它的 PENDING 中斷轉 CANCELLED。回答的 run 失敗或被取消不動中斷與提問的 run。
 func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReason string) (store.ProcurementAgentRun, error) {
+	var out store.ProcurementAgentRun
+	err := l.DB.InTx(ctx, func(ctx context.Context) error {
+		r, err := l.transition(ctx, runID, to, failureReason)
+		if err != nil {
+			return err
+		}
+		out = r
+		if r.InterruptID != nil && (to == StatusSucceeded || to == StatusWaitingForInput) {
+			return l.commitAnswer(ctx, *r.InterruptID)
+		}
+		return nil
+	})
+	return out, err
+}
+
+func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReason string) (store.ProcurementAgentRun, error) {
 	if err := checkTarget(to, failureReason); err != nil {
 		return store.ProcurementAgentRun{}, err
 	}
@@ -135,8 +153,9 @@ func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReas
 			reason = &failureReason
 		}
 		terminal := IsTerminal(to)
+		now := l.Now()
 		r, err := q.TransitionRun(ctx, store.TransitionRunParams{
-			ID: runID, ToStatus: to, FailureReason: reason, Terminal: terminal, FromStatuses: allowedFrom(to), Now: l.Now(),
+			ID: runID, ToStatus: to, FailureReason: reason, Terminal: terminal, FromStatuses: allowedFrom(to), Now: now,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return l.rejectedTransition(ctx, q, runID, to)
@@ -145,9 +164,9 @@ func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReas
 			return fmt.Errorf("run：轉換狀態：%w", err)
 		}
 		out = r
-		if to == StatusFailed && r.ParentRunID != nil {
-			if err := reopenParent(ctx, q, r, l.Now()); err != nil {
-				return err
+		if to == StatusCancelled {
+			if _, err := q.CancelInterruptsOfRun(ctx, store.CancelInterruptsOfRunParams{RunID: runID, Now: &now}); err != nil {
+				return fmt.Errorf("run：取消中斷：%w", err)
 			}
 		}
 		if !terminal {
@@ -161,6 +180,39 @@ func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReas
 		return err
 	})
 	return out, err
+}
+
+// ErrInterruptNotPending 表示回答的提交點發現被回答的中斷已不是 PENDING（提問的 run 在回答期間被取消或取代）；提交整個回滾，回答的 run 留在原狀態，由呼叫端（executor）把它標失敗。
+var ErrInterruptNotPending = errors.New("run：被回答的中斷已不在等待回答")
+
+// commitAnswer 是回答成功的提交點（與回答 run 的轉換同一個 transaction）：中斷轉 RESOLVED，提問的 run 由 WAITING_FOR_INPUT 經一般守衛轉換到 SUCCEEDED。
+func (l Ledger) commitAnswer(ctx context.Context, interruptID uuid.UUID) error {
+	q := store.New(l.DB.Conn(ctx))
+	irq, err := q.GetInterrupt(ctx, interruptID)
+	if err != nil {
+		return fmt.Errorf("run：讀取被回答的中斷：%w", err)
+	}
+	// 鎖順序：提問的 run 先、中斷後（與 Resume、取消相同），避免與取消互相等待。
+	if _, err := q.LockRun(ctx, irq.RunID); err != nil {
+		return fmt.Errorf("run：鎖提問的 run：%w", err)
+	}
+	irq, err = q.LockInterrupt(ctx, interruptID)
+	if err != nil {
+		return fmt.Errorf("run：鎖被回答的中斷：%w", err)
+	}
+	if irq.Status != "PENDING" {
+		return ErrInterruptNotPending
+	}
+	if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, ""); err != nil {
+		if errors.Is(err, ErrRunTerminal) {
+			return ErrInterruptNotPending
+		}
+		return err
+	}
+	if _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptParams{ID: interruptID, Now: ptr(l.Now())}); err != nil {
+		return fmt.Errorf("run：中斷轉已解決：%w", err)
+	}
+	return nil
 }
 
 func (l Ledger) rejectedTransition(ctx context.Context, q *store.Queries, runID uuid.UUID, to string) error {
@@ -198,18 +250,4 @@ func finishedPayload(status, failureReason string) ([]byte, error) {
 	return json.Marshal(map[string]any{EventFinished: body})
 }
 
-// reopenParent 在回答中斷的子 run 失敗時，同一個 transaction 把中斷重新開放、父 run 退回 WAITING_FOR_INPUT，買家可以再回答一次。
-// 父 run 的串流已在 RESUMED 時以 finished 結尾，這裡不再寫事件；client 看子 run 的串流收到 FAILED 後改讀快照。
-func reopenParent(ctx context.Context, q *store.Queries, child store.ProcurementAgentRun, now time.Time) error {
-	if _, err := q.ReopenInterruptOfChild(ctx, &child.ID); err != nil {
-		return fmt.Errorf("run：重新開放中斷：%w", err)
-	}
-	n, err := q.ReopenResumedRun(ctx, store.ReopenResumedRunParams{ID: *child.ParentRunID, ChildRunID: &child.ID, Now: now})
-	if err != nil {
-		return fmt.Errorf("run：父 run 退回等待輸入：%w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("run：子 run %s 的父 run 不是它接手的 RESUMED run", child.ID)
-	}
-	return nil
-}
+func ptr[T any](v T) *T { return &v }

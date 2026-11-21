@@ -24,14 +24,6 @@
   "expect": "TestNonTurnFailureDoesNotRefundAndTurnFailureRefundsOnce (integration)"
  },
  {
-  "id": "P3",
-  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
-  "old": "if to == StatusFailed && r.ParentRunID != nil {",
-  "new": "if false && r.ParentRunID != nil {",
-  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestFailedChildRunReopensTheInterruptSoTheBuyerCanAnswerAgain$'",
-  "expect": "TestFailedChildRunReopensTheInterruptSoTheBuyerCanAnswerAgain (integration)"
- },
- {
   "id": "P4",
   "file": "backend/internal/modules/procurement/internal/run/submit.go",
   "old": "if active >= int64(s.Limits.active()) {",
@@ -88,11 +80,51 @@
   "expect": "TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot"
  },
  {
-  "id": "P11",
+  "id": "P3",
   "file": "backend/internal/modules/procurement/internal/run/resume.go",
-  "old": "if irq.Status != \"PENDING\" {",
+  "old": "if irq.Status == \"RESOLVED\" {",
   "new": "if false {",
-  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestResumeCreatesAChildRunWithoutChargingAndResolvesTheInterrupt$'",
-  "expect": "TestResumeCreatesAChildRunWithoutChargingAndResolvesTheInterrupt (integration)"
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction$'",
+  "expect": "TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction (integration)"
+ },
+ {
+  "id": "P12",
+  "file": "backend/internal/modules/procurement/internal/run/resume.go",
+  "old": "\t\treturn s.start(ctx, q, answerID, in.Message, asking.ConversationID, now)",
+  "new": "\t\tif _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptParams{ID: irq.ID, Now: &now}); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.start(ctx, q, answerID, in.Message, asking.ConversationID, now)",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse$'",
+  "expect": "TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse (integration)"
+ },
+ {
+  "id": "P13",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, \"\"); err != nil {",
+  "new": "if _, err := l.Now(), error(nil); err != nil {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction$'",
+  "expect": "TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction (integration)"
+ },
+ {
+  "id": "P14",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "\t\tif to == StatusCancelled {",
+  "new": "\t\tif false {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestSupersededWaitingRunCancelsItsInterruptAndFreesThePendingSlot$'",
+  "expect": "TestSupersededWaitingRunCancelsItsInterruptAndFreesThePendingSlot (integration)"
+ },
+ {
+  "id": "P15",
+  "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+  "old": "\t\tProcessing: processing,",
+  "new": "\t\tProcessing: false,",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse$'",
+  "expect": "TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse (integration)"
+ },
+ {
+  "id": "P16",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "if r.InterruptID != nil && (to == StatusSucceeded || to == StatusWaitingForInput) {",
+  "new": "if false {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending$'",
+  "expect": "TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending (integration)"
  }
 ]

@@ -98,46 +98,52 @@ SELECT count(*) FROM procurement.agent_runs
 WHERE request_id = @request_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 
 -- name: InsertInterrupt :exec
-INSERT INTO procurement.agent_run_interrupts (id, run_id, interrupt_kind, status, payload, facts_as_of, created_at)
-VALUES (@id, @run_id, 'CLARIFICATION', 'PENDING', @payload, sqlc.narg('facts_as_of'), @now);
+INSERT INTO procurement.agent_run_interrupts (id, run_id, request_id, interrupt_kind, status, payload, facts_as_of, created_at)
+SELECT @id, r.id, r.request_id, 'CLARIFICATION', 'PENDING', @payload, sqlc.narg('facts_as_of'), @now
+FROM procurement.agent_runs r WHERE r.id = @run_id;
 
 -- name: GetOpenInterruptForRun :one
--- 一個 run 的未回答中斷：只認等待輸入的 run；被取消或被取代的 run 的 interrupt 不算。
-SELECT i.* FROM procurement.agent_run_interrupts i
+-- 一個 run 的未回答中斷：只認等待輸入的 run；被取消或被取代的 run 的中斷已是 CANCELLED。processing：有回答它的 run 還在進行中（QUEUED、RUNNING、CANCEL_REQUESTED）。
+SELECT i.*, EXISTS (
+    SELECT 1 FROM procurement.agent_runs a
+    WHERE a.interrupt_id = i.id AND a.status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+) AS processing
+FROM procurement.agent_run_interrupts i
 JOIN procurement.agent_runs r ON r.id = i.run_id
 WHERE i.run_id = @run_id AND r.buyer_id = @buyer_id AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING';
 
 -- name: GetOpenInterruptForRequest :one
--- 一個需求目前等買家回答的中斷（同一需求同時只有一個等待中的 run）。
-SELECT i.* FROM procurement.agent_run_interrupts i
+-- 一個需求目前等買家回答的中斷（部分唯一索引保證最多一筆）；processing 同上。
+SELECT i.*, EXISTS (
+    SELECT 1 FROM procurement.agent_runs a
+    WHERE a.interrupt_id = i.id AND a.status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+) AS processing
+FROM procurement.agent_run_interrupts i
 JOIN procurement.agent_runs r ON r.id = i.run_id
-WHERE r.request_id = @request_id AND r.buyer_id = @buyer_id AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING'
-ORDER BY i.created_at DESC
-LIMIT 1;
+WHERE i.request_id = @request_id AND r.buyer_id = @buyer_id AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING';
+
+-- name: GetInterrupt :one
+SELECT * FROM procurement.agent_run_interrupts WHERE id = @id;
+
+-- name: LockInterrupt :one
+SELECT * FROM procurement.agent_run_interrupts WHERE id = @id FOR UPDATE;
 
 -- name: ResolveInterrupt :execrows
+-- 回答成功的提交點：只有仍是 PENDING 的中斷會轉。
 UPDATE procurement.agent_run_interrupts
-SET status = 'RESOLVED', resolved_by_child_run_id = @child_run_id, resolved_at = @now
-WHERE id = @id AND run_id = @run_id AND status = 'PENDING';
+SET status = 'RESOLVED', closed_at = @now
+WHERE id = @id AND status = 'PENDING';
 
--- name: ReopenInterruptOfChild :one
--- 子 run 失敗：被它回答的 interrupt 回到 PENDING，回傳它屬於哪個 run。
+-- name: CancelInterruptsOfRun :execrows
+-- 提問的 run 被取消或被取代：它的 PENDING 中斷轉 CANCELLED，讓每個需求最多一筆 PENDING 的索引不被它佔住。
 UPDATE procurement.agent_run_interrupts
-SET status = 'PENDING', resolved_by_child_run_id = NULL, resolved_at = NULL
-WHERE resolved_by_child_run_id = @child_run_id
-RETURNING run_id;
-
--- name: SetResumedInto :execrows
--- 父 run 轉 RESUMED 之後記下接手的子 run。
-UPDATE procurement.agent_runs SET resumed_into_run_id = @child_run_id WHERE id = @id AND status = 'RESUMED';
+SET status = 'CANCELLED', closed_at = @now
+WHERE run_id = @run_id AND status = 'PENDING';
 
 -- name: GetInterruptForBuyer :one
 SELECT i.* FROM procurement.agent_run_interrupts i
 JOIN procurement.agent_runs r ON r.id = i.run_id
 WHERE i.id = @id AND r.buyer_id = @buyer_id;
-
--- name: GetInterruptResolvedBy :one
-SELECT * FROM procurement.agent_run_interrupts WHERE resolved_by_child_run_id = @child_run_id;
 
 -- name: OldestBuyerRunsSince :many
 -- 買家在 @since 之後建立的 run 的時間，新的在前，最多 @max_rows 筆；每分鐘送出上限用它判斷並算出要等多久。
@@ -145,9 +151,3 @@ SELECT created_at FROM procurement.agent_runs
 WHERE buyer_id = @buyer_id AND created_at > @since::timestamptz
 ORDER BY created_at DESC
 LIMIT @max_rows::int;
-
--- name: ReopenResumedRun :execrows
--- 子 run 失敗時把父 run 退回等待輸入：只有仍被這個子 run 接手的 RESUMED 父 run 才動。
-UPDATE procurement.agent_runs
-SET status = 'WAITING_FOR_INPUT', resumed_into_run_id = NULL, completed_at = NULL, updated_at = @now
-WHERE id = @id AND status = 'RESUMED' AND resumed_into_run_id = @child_run_id;

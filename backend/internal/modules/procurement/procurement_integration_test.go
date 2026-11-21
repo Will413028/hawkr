@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,12 +15,9 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/adk/v2/session"
-	"google.golang.org/adk/v2/session/sessiontestsuite"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
-	"github.com/Will413028/hawkr/backend/internal/platform/adksession"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -43,14 +39,6 @@ func id() uuid.UUID {
 }
 
 func ptr[T any](v T) *T { return &v }
-
-// S7：ADK 的 session.Service 合格測試在 procurement 自己的 schema 上也通過（assistant 在 assistant schema 上跑同一套）。
-func TestADKServiceConformanceOnProcurementSchema(t *testing.T) {
-	sessiontestsuite.RunServiceTests(t, sessiontestsuite.SuiteOptions{
-		SupportsUserProvidedSessionID: true,
-		ProvidesServerAssignedEventID: false,
-	}, func(t *testing.T) session.Service { return adksession.New(newDB(t), Schema) })
-}
 
 // chain 是一位買家從需求到接受報價的整條資料，每一列都由 store 的查詢寫入，所以這個測試同時是每支寫入查詢的第一個執行者。
 type chain struct {
@@ -518,9 +506,9 @@ func TestUsageCounterIsConditional(t *testing.T) {
 }
 
 type snapshotOfBuyer struct {
-	requests, conversations, turns, candidateSets, runs, usage, sessions int
-	publishedRequestBuyerNull                                            bool
-	anonymized                                                           map[string]int
+	requests, conversations, turns, candidateSets, runs, usage int
+	publishedRequestBuyerNull                                  bool
+	anonymized                                                 map[string]int
 }
 
 var anonymizedTables = []string{"price_previews", "confirmed_rfq_snapshots", "rfq_publication_approvals", "rfq_publications", "buyer_quote_acceptances"}
@@ -534,22 +522,11 @@ func snap(ctx context.Context, t *testing.T, d *db.DB, c chain) snapshotOfBuyer 
 	s.candidateSets = count(ctx, t, d, "candidate_sets", "id = $1", c.candidateSet)
 	s.runs = count(ctx, t, d, "agent_runs", "id = $1", c.run)
 	s.usage = count(ctx, t, d, "usage", "buyer_id = $1", c.buyer)
-	s.sessions = count(ctx, t, d, "sessions", "user_id = $1", formatInt(c.buyer))
 	s.publishedRequestBuyerNull = count(ctx, t, d, "requests", "id = $1 AND buyer_id IS NULL", c.request) == 1
 	for _, tbl := range anonymizedTables {
 		s.anonymized[tbl] = count(ctx, t, d, tbl, "request_id = $1 AND buyer_id IS NULL", c.request)
 	}
 	return s
-}
-
-func formatInt(n int64) string { return strconv.FormatInt(n, 10) }
-
-func seedSession(ctx context.Context, t *testing.T, d *db.DB, buyerID int64) {
-	t.Helper()
-	s := adksession.New(d, Schema)
-	if _, err := s.Create(ctx, &session.CreateRequest{AppName: "procurement", UserID: formatInt(buyerID), SessionID: formatInt(buyerID) + "-s"}); err != nil {
-		t.Fatalf("建立 ADK session：%v", err)
-	}
 }
 
 // S10：BuyerDeleted 後，買家資料刪除；已發布的需求與賣家看得到的紀錄保留、buyer_id 設 NULL；別的買家不受影響；重送冪等。
@@ -560,8 +537,6 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 	published := seed(ctx, t, q, 41, true)
 	draft := seed(ctx, t, q, 41, false)
 	bystander := seed(ctx, t, q, 42, true)
-	seedSession(ctx, t, d, 41)
-	seedSession(ctx, t, d, 42)
 	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
 	deleteBuyer := func() error {
@@ -583,8 +558,8 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 			t.Errorf("%s 保留且 buyer_id 為 NULL，實際 %d 列", tbl, s.anonymized[tbl])
 		}
 	}
-	if s.conversations != 0 || s.turns != 0 || s.candidateSets != 0 || s.runs != 0 || s.usage != 0 || s.sessions != 0 {
-		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、候選、run、額度、session）要刪除：%+v", s)
+	if s.conversations != 0 || s.turns != 0 || s.candidateSets != 0 || s.runs != 0 || s.usage != 0 {
+		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、候選、run、額度）要刪除：%+v", s)
 	}
 	for _, kept := range []struct{ table, where string }{
 		{"rfq_publication_invites", "id = $1"}, {"seller_responses", "id = $1"}, {"rfq_publication_approval_recipients", "approval_id = $1"},
@@ -594,7 +569,7 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 			t.Errorf("賣家看得到的 %s 要保留", kept.table)
 		}
 	}
-	if b := snap(ctx, t, d, bystander); b.requests != 1 || b.conversations != 1 || b.turns != 1 || b.runs != 1 || b.usage != 1 || b.sessions != 1 || b.publishedRequestBuyerNull {
+	if b := snap(ctx, t, d, bystander); b.requests != 1 || b.conversations != 1 || b.turns != 1 || b.runs != 1 || b.usage != 1 || b.publishedRequestBuyerNull {
 		t.Fatalf("別的買家不受影響：%+v", b)
 	}
 	if err := deleteBuyer(); err != nil {

@@ -16,13 +16,12 @@ type ProcurementAgentRun struct {
 	BuyerID          int64
 	RequestID        uuid.UUID
 	ConversationID   *uuid.UUID
-	ParentRunID      *uuid.UUID
+	InterruptID      *uuid.UUID
 	CandidateSetID   *uuid.UUID
 	PublicationID    *uuid.UUID
 	RunType          string
 	Status           string
 	FailureReason    *string
-	ResumedIntoRunID *uuid.UUID
 	ResultRevisionID *uuid.UUID
 	LastEventSeq     int64
 	MinAvailableSeq  int64
@@ -51,21 +50,15 @@ type ProcurementAgentRunInput struct {
 }
 
 type ProcurementAgentRunInterrupt struct {
-	ID                   uuid.UUID
-	RunID                uuid.UUID
-	InterruptKind        string
-	Status               string
-	Payload              []byte
-	FactsAsOf            *time.Time
-	ResolvedByChildRunID *uuid.UUID
-	CreatedAt            time.Time
-	ResolvedAt           *time.Time
-}
-
-type ProcurementAppState struct {
-	AppName   string
-	State     []byte
-	UpdatedAt time.Time
+	ID            uuid.UUID
+	RunID         uuid.UUID
+	RequestID     uuid.UUID
+	InterruptKind string
+	Status        string
+	Payload       []byte
+	FactsAsOf     *time.Time
+	CreatedAt     time.Time
+	ClosedAt      *time.Time
 }
 
 type ProcurementBuyerQuoteAcceptance struct {
@@ -149,16 +142,6 @@ type ProcurementConversation struct {
 	DeletedAt          *time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
-}
-
-type ProcurementEvent struct {
-	AppName   string
-	UserID    string
-	SessionID string
-	ID        string
-	Timestamp time.Time
-	Seq       int64
-	Event     []byte
 }
 
 type ProcurementPricePreview struct {
@@ -310,15 +293,6 @@ type ProcurementSellerResponseVersion struct {
 	CreatedAt                     time.Time
 }
 
-type ProcurementSession struct {
-	AppName   string
-	UserID    string
-	ID        string
-	State     []byte
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
 type ProcurementTurn struct {
 	ID               uuid.UUID
 	RequestID        uuid.UUID
@@ -341,11 +315,4 @@ type ProcurementUsage struct {
 	PeriodStart time.Time
 	Used        int32
 	UpdatedAt   time.Time
-}
-
-type ProcurementUserState struct {
-	AppName   string
-	UserID    string
-	State     []byte
-	UpdatedAt time.Time
 }

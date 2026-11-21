@@ -100,7 +100,7 @@ DELETE FROM procurement.conversations WHERE buyer_id = $1
 `
 
 // 買家關閉（BuyerDeleted，S10）。買家資料刪除；賣家看得到的紀錄（已發布的詢價與其下游）保留並把 buyer_id 設 NULL（保留期跟詢價的生命週期）。
-// 順序：先清買家專屬的資料，再處理需求本身，最後清額度與 ADK session。
+// 順序：先清買家專屬的資料，再處理需求本身，最後清額度。
 func (q *Queries) DeleteBuyerConversations(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerConversations, buyerID)
 	if err != nil {
@@ -115,19 +115,6 @@ DELETE FROM procurement.agent_runs WHERE buyer_id = $1
 
 func (q *Queries) DeleteBuyerRuns(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerRuns, buyerID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const deleteBuyerSessions = `-- name: DeleteBuyerSessions :execrows
-DELETE FROM procurement.sessions WHERE user_id = $1
-`
-
-// ADK session（graph 的 checkpoint，含買家的對話內容）；events 由 FK 連帶刪除，user_states 以 user_id 刪。
-func (q *Queries) DeleteBuyerSessions(ctx context.Context, userID string) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteBuyerSessions, userID)
 	if err != nil {
 		return 0, err
 	}
@@ -152,18 +139,6 @@ DELETE FROM procurement.usage WHERE buyer_id = $1
 
 func (q *Queries) DeleteBuyerUsage(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerUsage, buyerID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const deleteBuyerUserStates = `-- name: DeleteBuyerUserStates :execrows
-DELETE FROM procurement.user_states WHERE user_id = $1
-`
-
-func (q *Queries) DeleteBuyerUserStates(ctx context.Context, userID string) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteBuyerUserStates, userID)
 	if err != nil {
 		return 0, err
 	}

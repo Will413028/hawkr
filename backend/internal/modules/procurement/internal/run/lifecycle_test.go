@@ -21,7 +21,7 @@ import (
 
 var allStatuses = []string{
 	StatusQueued, StatusRunning, StatusWaitingForInput, StatusCancelRequested,
-	StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed,
+	StatusSucceeded, StatusFailed, StatusCancelled,
 }
 
 // 期望的邊直接寫在測試裡，不從 edges 推導：表被改動時這裡要同步改。
@@ -29,7 +29,7 @@ var wantEdges = map[string][]string{
 	StatusQueued:          {StatusRunning, StatusCancelRequested, StatusFailed},
 	StatusRunning:         {StatusWaitingForInput, StatusSucceeded, StatusFailed, StatusCancelRequested},
 	StatusCancelRequested: {StatusCancelled, StatusFailed},
-	StatusWaitingForInput: {StatusResumed, StatusCancelled},
+	StatusWaitingForInput: {StatusSucceeded, StatusCancelled},
 }
 
 func TestEveryPairOfStatusesIsAllowedOrRejectedAsTheTableSays(t *testing.T) {
@@ -49,7 +49,7 @@ func TestEveryPairOfStatusesIsAllowedOrRejectedAsTheTableSays(t *testing.T) {
 }
 
 func TestTerminalStatesAreAbsorbingAndOnlyActiveOnesAcceptEvents(t *testing.T) {
-	terminal := []string{StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed}
+	terminal := []string{StatusSucceeded, StatusFailed, StatusCancelled}
 	for _, s := range allStatuses {
 		if got, want := IsTerminal(s), slices.Contains(terminal, s); got != want {
 			t.Errorf("IsTerminal(%s) = %v", s, got)
@@ -75,9 +75,8 @@ func TestAllowedFromIsTheInverseOfTheEdges(t *testing.T) {
 		StatusCancelRequested: {StatusQueued, StatusRunning},
 		StatusFailed:          {StatusCancelRequested, StatusQueued, StatusRunning},
 		StatusCancelled:       {StatusCancelRequested, StatusWaitingForInput},
-		StatusSucceeded:       {StatusRunning},
+		StatusSucceeded:       {StatusRunning, StatusWaitingForInput},
 		StatusWaitingForInput: {StatusRunning},
-		StatusResumed:         {StatusWaitingForInput},
 		StatusQueued:          nil,
 	}
 	for to, want := range cases {
@@ -340,7 +339,7 @@ func TestCancelAllCancelsEveryRunAndStopsAtTheFirstError(t *testing.T) {
 
 func TestAWaitingRunCanBeCancelledButNeverFailedOrExpired(t *testing.T) {
 	if !CanTransition(StatusWaitingForInput, StatusCancelled) || CanTransition(StatusWaitingForInput, StatusFailed) {
-		t.Fatal("WAITING_FOR_INPUT 只能到 RESUMED 與 CANCELLED")
+		t.Fatal("WAITING_FOR_INPUT 只能到 SUCCEEDED 與 CANCELLED")
 	}
 	if _, known := edges["EXPIRED"]; known {
 		t.Fatal("EXPIRED 已刪除，沒有寫入者")

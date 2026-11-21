@@ -33,7 +33,7 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// Schema 是本模組的 schema 名稱，也是 ADK session 四張表（internal/platform/adksession）所在的 schema。
+// Schema 是本模組的 schema 名稱。
 const Schema = "procurement"
 
 // BuyerDeleted 是 buyer 關閉買家時同 transaction 發布的事件（本模組的訂閱者見 Module.OnBuyerDeleted）。

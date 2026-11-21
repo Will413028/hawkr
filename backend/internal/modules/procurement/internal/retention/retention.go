@@ -4,7 +4,6 @@ package retention
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -27,8 +26,6 @@ type step struct {
 var exempt = map[string]string{
 	"turns": "對話與需求刪除時 ON DELETE CASCADE 連帶刪除（conversation_id、request_id 都是 CASCADE）",
 }
-
-func sessionKey(buyerID int64) string { return strconv.FormatInt(buyerID, 10) }
 
 var steps = []step{
 	// run 最先刪（A9-D20 R4）：子表（輸入、事件、產出、interrupt）隨 run CASCADE；agent_runs.buyer_id 維持 NOT NULL，
@@ -65,12 +62,6 @@ var steps = []step{
 		return q.AnonymizeBuyerRequests(ctx, &b)
 	}},
 	{"額度", []string{"usage"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) { return q.DeleteBuyerUsage(ctx, b) }},
-	{"ADK session", nil, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
-		return q.DeleteBuyerSessions(ctx, sessionKey(b))
-	}},
-	{"ADK user state", nil, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
-		return q.DeleteBuyerUserStates(ctx, sessionKey(b))
-	}},
 }
 
 // Covered 回傳有清除步驟或明列豁免的表（含 buyer_id 的表都必須在裡面）。
@@ -89,7 +80,7 @@ func Covered() map[string]string {
 
 // OnBuyerDeleted 在 BuyerDeleted 的 transaction 內執行（單體規則 4：同 transaction 的訂閱者只做原子的狀態變更）：
 //
-//   - 刪除：對話與輪次、run、候選與候選清單、報價清單、沒有發布過的需求（連帶 revision、預覽、快照、核准）、額度、ADK session（graph 的 checkpoint）。
+//   - 刪除：對話與輪次、run、候選與候選清單、報價清單、沒有發布過的需求（連帶 revision、預覽、快照、核准）、額度。
 //   - 保留並匿名：已發布的需求，與它下游賣家看得到的紀錄（預覽、快照、核准、發布、邀請、回價、接受單）；buyer_id 設 NULL，保留期跟詢價的生命週期。
 //
 // 全部冪等：重送時已沒有列可動。

@@ -1,5 +1,5 @@
 -- 買家關閉（BuyerDeleted，S10）。買家資料刪除；賣家看得到的紀錄（已發布的詢價與其下游）保留並把 buyer_id 設 NULL（保留期跟詢價的生命週期）。
--- 順序：先清買家專屬的資料，再處理需求本身，最後清額度與 ADK session。
+-- 順序：先清買家專屬的資料，再處理需求本身，最後清額度。
 
 -- name: DeleteBuyerConversations :execrows
 DELETE FROM procurement.conversations WHERE buyer_id = @buyer_id;
@@ -40,10 +40,3 @@ UPDATE procurement.requests SET buyer_id = NULL WHERE buyer_id = @buyer_id;
 
 -- name: DeleteBuyerUsage :execrows
 DELETE FROM procurement.usage WHERE buyer_id = @buyer_id;
-
--- name: DeleteBuyerSessions :execrows
--- ADK session（graph 的 checkpoint，含買家的對話內容）；events 由 FK 連帶刪除，user_states 以 user_id 刪。
-DELETE FROM procurement.sessions WHERE user_id = @user_id;
-
--- name: DeleteBuyerUserStates :execrows
-DELETE FROM procurement.user_states WHERE user_id = @user_id;

@@ -54,7 +54,7 @@ func i64(v int64) *int64 { return &v }
 
 var allStatuses = []string{
 	run.StatusQueued, run.StatusRunning, run.StatusWaitingForInput, run.StatusCancelRequested,
-	run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed,
+	run.StatusSucceeded, run.StatusFailed, run.StatusCancelled,
 }
 
 func reasonFor(to string) string {
@@ -241,7 +241,7 @@ func TestReconcilerIgnoresWaitingForInputAndTerminalRunsWithoutReadingJobs(t *te
 	req := seedRequest(ctx, t, d, 1)
 	waiting := seedRun(ctx, t, d, req, 1, run.StatusWaitingForInput, i64(7))
 	var terminals []uuid.UUID
-	for _, s := range []string{run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed} {
+	for _, s := range []string{run.StatusSucceeded, run.StatusFailed, run.StatusCancelled} {
 		terminals = append(terminals, seedRun(ctx, t, d, req, 1, s, i64(8)))
 	}
 	states := &fakeStates{states: map[int64]rivertype.JobState{7: rivertype.JobStateDiscarded, 8: rivertype.JobStateDiscarded}}
@@ -375,7 +375,6 @@ func TestCancelOnRunsThatAreNotInFlight(t *testing.T) {
 		run.StatusCancelled: run.DispositionAlreadyCancelled,
 		run.StatusSucceeded: run.DispositionAlreadyTerminal,
 		run.StatusFailed:    run.DispositionAlreadyTerminal,
-		run.StatusResumed:   run.DispositionAlreadyTerminal,
 	}
 	for status, want := range cases {
 		id := seedRun(ctx, t, d, req, 1, status, i64(1))

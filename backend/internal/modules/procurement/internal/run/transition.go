@@ -16,7 +16,6 @@ const (
 	StatusSucceeded       = "SUCCEEDED"
 	StatusFailed          = "FAILED"
 	StatusCancelled       = "CANCELLED"
-	StatusResumed         = "RESUMED"
 )
 
 // edges 是 run 狀態機允許的邊（from → 可到的 to），也是唯一的來源：沒有出邊的狀態是終態，終態吸收。
@@ -24,11 +23,10 @@ var edges = map[string][]string{
 	StatusQueued:          {StatusRunning, StatusCancelRequested, StatusFailed},
 	StatusRunning:         {StatusWaitingForInput, StatusSucceeded, StatusFailed, StatusCancelRequested},
 	StatusCancelRequested: {StatusCancelled, StatusFailed},
-	StatusWaitingForInput: {StatusResumed, StatusCancelled},
+	StatusWaitingForInput: {StatusSucceeded, StatusCancelled},
 	StatusSucceeded:       nil,
 	StatusFailed:          nil,
 	StatusCancelled:       nil,
-	StatusResumed:         nil,
 }
 
 // IsTerminal 回報狀態是否是終態（已知狀態而且沒有出邊）。
