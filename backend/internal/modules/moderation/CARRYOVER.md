@@ -28,6 +28,15 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 證據保全：快照引用的圖片只存 `asset_id`，社群在刪文與店家退場時釋放自己的引用（A7-D21） | 申訴期內要能重現被檢舉的那一版，含圖片 | 成立：不保全的話，作者刪貼文後只剩指向已回收資產的字串 | 保全證據（在引用端 hold，不複製檔案） | 新增：快照以 `(GOVERNANCE_EVIDENCE, 快照 ID)` 在 media 登記引用（借用既有的 ref type，CodeMeta 凍結不新增值），同步 job 寫入、快照刪除時才解除；沒有新的 media API。已知殘餘：新快照的同步 job 還沒跑完、而作者已刪貼文且 GC 已回收時，圖片已經不在（同 media 規格 §7 的方向：一般引用同樣有這個窗口）；買家頭像只存 object key，沒有 asset ID，不在保全範圍，觸發：要保全頭像時由 buyer 提供 asset ID |
 | 檢舉人的說明文字與每日計數無保留期（A7-D21） | 個資最小化（GDPR 5(1)(e)） | 說明是自由文字，可能含個資 | 說明與快照同期清、刪帳時清 | 新增：說明在結案滿 184 天與快照一起清；檢舉人刪帳時（買家刪除事件，同 transaction 訂閱者；沿用 social 的訂閱模式而不是讓 accountdeletion 依賴 moderation）清他全部檢舉（含同帳號歷史身分）的說明、冪等紀錄（request_hash 是說明的雜湊）與每日計數列，檢舉列與 `reporter_buyer_id`（假名鍵）留著。每日計數列對未刪帳的檢舉人每人一列、有界，不清 |
 | 髒字詞典（M17） | 預先過濾 | 屬於 social 的寫入路徑（A7-1a 已放在 `platform/textfilter`） | 詞庫有擁有者與後台維護 | 不在本模組：詞庫的擁有者與後台維護是另一個決定，觸發是營運要求新增詞 |
+| 扁平的 `snapshot.Content` 加種類專屬欄位（A6-4 設計 §9 第 1 列） | 依種類的 tagged union（每種一個 struct） | 「既有雜湊不變」不是約束（未上線，根目錄 `AGENTS.md`） | 依種類的 struct | 改（A6-D21 W4 (a)）：`snapshot.Content` 是 tagged union（Social、Buyer、Review、Chat 恰好一個有值，Decode 驗種類與欄位一致），後台 `GetCase` 帶 `snapshot` oneof；後台畫面在 A6-6 |
+| 隱藏表在內容模組、moderation 只存案件 | 同（處分紀錄與效果同模組，10e R12） | 成立 | 同 | 沿用：評價隱藏在 review、聊天訊息隱藏在 im |
+| HIDE 遇到已清除內容視為成功 | 同（隱藏的目的已達成；不讓案件卡住） | 成立 | 同 | 沿用，擴到評價與聊天訊息（擁有者回 NotFound 視為成功、不寫隱藏紀錄）；`internal/handle/AGENTS.md` 與 `docs/modules/moderation.md` 的過時句（FailedPrecondition）已改正，以程式與測試為準 |
+| 證據保全以 media 引用（`GOVERNANCE_EVIDENCE`） | 同 | 成立 | 同 | 沿用，範圍擴到聊天前後文的圖片（`snapshot.Content.AssetIDs`：被檢舉訊息與前後文圖片的聯集，墓碑不算） |
+| 處分終態、不重開不改判（`Decide`），更正在擁有處分的模組做 | 處分可撤銷，撤銷記在原決定旁並留稽核（DSA 第 20 條申訴後撤銷；各平台在原 enforcement 上記 reversal） | 不成立：後台沒有任何還原入口，計畫驗收要「檢舉→隱藏→還原」 | 撤銷紀錄與原決定同處 | 改（A6-D21 W1 (a)）：`ReverseHide`，案件維持結案、決定不改，`cases.reversed_*` 三欄與 `adminaudit`；同 transaction 呼叫 review／im／social 的 `Restore`；社群留言、討論區留言一併受惠 |
+| 評價與聊天訊息的隱藏與還原要不要取擁有者的守門 | 守門擋停用身分產生新資料；處分不產生新資料 | 不成立：取了會讓已停用作者的處分失敗 | 處分不被作者狀態擋 | 不取（`LockActive`、`LockNotClosed`、`LockNotRetired` 都不呼叫，`TestHideWorksWhileTheAuthorIsDeactivated`） |
+| 檢舉人只有買家 | 平台雙邊都能檢舉（聊天是雙方私訊） | 買家單方檢舉下，聊天案件的作者全是店家，HIDE 回 `DecideHideStoreContent` | 雙邊 | 待 A6-4c（A6-D21 W2、W3 (a)：店家檢舉人與店家訊息的 seller 措施）；本步只做買家檢舉人與買家作者的處置路徑 |
+| WARN 寫在 social 的買家警告 | 買家處分紀錄放 buyer 或獨立 enforcement 模組 | 沿用成立 | 同 | 沿用：觸發是第三種非社群對象需要警告時（評價、聊天訊息的買家作者的警告仍在 social） |
+| 前後文窗格固定 5 則 | 依時間窗或依則數 | A6-D3 | 同 | 沿用 `model.ChatContextWindow = 5` |
 
 ## 傳輸層的沿用盤點
 
@@ -44,7 +53,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。
 
-- 檢舉對象：貼文、留言、討論區留言與買家（舊：`REVIEW`、`POST`、`POST_COMMENT`、`SELLER_FORUM`、`CHAT_MESSAGE`、`USER`）；評價與聊天對象在 A6-4。
+- 檢舉對象：貼文、留言、討論區留言、買家、評價與聊天訊息（舊：`REVIEW`、`POST`、`POST_COMMENT`、`SELLER_FORUM`、`CHAT_MESSAGE`、`USER`）。
 - 檢舉不存 `status`、`resolved_action`、`resolved_by`、`resolved_at`：結果由案件推導。
 - 沒有 `evidence` 欄：證據是送出時凍結的快照。
 - 檢舉說明 `description` 選填，最多 500 字，頭尾沒有空白。
