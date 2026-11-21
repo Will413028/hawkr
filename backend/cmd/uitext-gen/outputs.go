@@ -70,17 +70,17 @@ func (m *Model) Outputs() (map[string][]byte, error) {
 	return out, nil
 }
 
-// checkEnumValueNames 擋下 golden 與分派表依賴的前提：目錄用到的列舉，值名全域唯一。
+// checkEnumValueNames 擋下同一個列舉內重複的值名（值號表以列舉全名加值名為鍵，不同列舉的同名值不衝突）。
 func (m *Model) checkEnumValueNames() error {
-	seen := map[string]string{}
 	var errs errList
 	for _, e := range m.usedEnums() {
+		seen := map[string]bool{}
 		for _, v := range enumNames(e) {
 			name := string(v.Name())
-			if prev, ok := seen[name]; ok && prev != string(e.Desc.FullName()) {
-				errs.addf("值名 %s 同時屬於 %s 與 %s，golden 的分派表以值名查值號", name, prev, e.Desc.FullName())
+			if seen[name] {
+				errs.addf("值名 %s 在列舉 %s 內重複，golden 的值號表以列舉全名加值名為鍵", name, e.Desc.FullName())
 			}
-			seen[name] = string(e.Desc.FullName())
+			seen[name] = true
 		}
 	}
 	return errs.err()
