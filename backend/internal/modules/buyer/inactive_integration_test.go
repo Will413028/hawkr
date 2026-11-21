@@ -100,3 +100,23 @@ func TestLockActiveSerializesWithBeginDeletion(t *testing.T) {
 		t.Fatalf("刪帳申請之後的寫入要被拒絕：%v", err)
 	}
 }
+
+// 守門（LockActive，FOR KEY SHARE）與同一個買家的業務寫入（FOR NO KEY UPDATE）不互相等待：守門的 transaction 還沒結束，
+// 業務寫入就能完成。業務寫入若改回 FOR UPDATE，會等到 context 的期限而失敗。
+func TestOwnerGuardDoesNotBlockBusinessWritesOnTheSameBuyer(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	b := profile(t, f, 73)
+	name := "Concurrent"
+	err := f.database.InTx(ctx, func(txCtx context.Context) error {
+		if err := f.module.LockActive(txCtx, b.BuyerID); err != nil {
+			return err
+		}
+		writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		_, err := f.module.UpdateProfile(writeCtx, UpdateProfileInput{BuyerID: b.BuyerID, ExpectedVersion: b.Version, DisplayName: &name})
+		return err
+	})
+	must(t, err)
+}

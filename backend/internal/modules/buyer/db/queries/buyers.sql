@@ -16,7 +16,15 @@ FROM buyer.buyers
 WHERE buyer_id = $1;
 
 -- name: LockBuyer :one
--- 鎖定指定 stint，序列化其業務寫入。
+-- 鎖定指定 stint，序列化其業務寫入（FOR NO KEY UPDATE）：與別的業務寫入互斥，與 LockBuyerShared 的 FOR KEY SHARE 不互斥。
+-- 只能搭配不改 buyers 的唯一鍵欄位（buyer_id、account_id）的更新使用；狀態轉換與刪帳用 LockBuyerForTransition。
+SELECT *
+FROM buyer.buyers
+WHERE buyer_id = $1
+FOR NO KEY UPDATE;
+
+-- name: LockBuyerForTransition :one
+-- 鎖定指定 stint 以做狀態轉換或刪除（FOR UPDATE）：與 LockBuyerShared 的 FOR KEY SHARE 互斥，其他模組的買家寫入守門因此要等它。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1

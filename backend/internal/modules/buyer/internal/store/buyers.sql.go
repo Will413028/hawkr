@@ -342,12 +342,45 @@ const lockBuyer = `-- name: LockBuyer :one
 SELECT buyer_id, account_id, status, version, display_name, phone, gender, avatar, avatar_asset_id, birth_date, city, job, created_at, updated_at, deleted_at, pii_cleared_at
 FROM buyer.buyers
 WHERE buyer_id = $1
+FOR NO KEY UPDATE
+`
+
+// 鎖定指定 stint，序列化其業務寫入（FOR NO KEY UPDATE）：與別的業務寫入互斥，與 LockBuyerShared 的 FOR KEY SHARE 不互斥。
+// 只能搭配不改 buyers 的唯一鍵欄位（buyer_id、account_id）的更新使用；狀態轉換與刪帳用 LockBuyerForTransition。
+func (q *Queries) LockBuyer(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
+	row := q.db.QueryRow(ctx, lockBuyer, buyerID)
+	var i BuyerBuyer
+	err := row.Scan(
+		&i.BuyerID,
+		&i.AccountID,
+		&i.Status,
+		&i.Version,
+		&i.DisplayName,
+		&i.Phone,
+		&i.Gender,
+		&i.Avatar,
+		&i.AvatarAssetID,
+		&i.BirthDate,
+		&i.City,
+		&i.Job,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.PiiClearedAt,
+	)
+	return i, err
+}
+
+const lockBuyerForTransition = `-- name: LockBuyerForTransition :one
+SELECT buyer_id, account_id, status, version, display_name, phone, gender, avatar, avatar_asset_id, birth_date, city, job, created_at, updated_at, deleted_at, pii_cleared_at
+FROM buyer.buyers
+WHERE buyer_id = $1
 FOR UPDATE
 `
 
-// 鎖定指定 stint，序列化其業務寫入。
-func (q *Queries) LockBuyer(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
-	row := q.db.QueryRow(ctx, lockBuyer, buyerID)
+// 鎖定指定 stint 以做狀態轉換或刪除（FOR UPDATE）：與 LockBuyerShared 的 FOR KEY SHARE 互斥，其他模組的買家寫入守門因此要等它。
+func (q *Queries) LockBuyerForTransition(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
+	row := q.db.QueryRow(ctx, lockBuyerForTransition, buyerID)
 	var i BuyerBuyer
 	err := row.Scan(
 		&i.BuyerID,

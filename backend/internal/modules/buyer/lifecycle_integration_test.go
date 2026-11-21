@@ -259,7 +259,7 @@ func waitForBuyerLock(ctx context.Context, fixture *fixture) error {
 SELECT EXISTS (
     SELECT 1 FROM pg_stat_activity
     WHERE datname = current_database() AND wait_event_type = 'Lock'
-      AND query LIKE '%-- name: LockBuyer :one%'
+      AND query LIKE '%-- name: LockBuyerForTransition :one%'
 )`).Scan(&waiting)
 		if err != nil {
 			return err
