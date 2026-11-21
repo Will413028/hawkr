@@ -247,8 +247,8 @@ func runServe(ctx context.Context) error {
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, sellerModule, buyerModule, suspension, med, jc, log)
-	subscribeModeration(bus, moderationModule.Retention())
 	subscribeProcurement(bus, d)
+	subscribeModeration(bus, moderationModule.Retention())
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
@@ -442,8 +442,8 @@ func runWorker(ctx context.Context) error {
 		Jobs:         jc,
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
-	subscribeModeration(bus, moderationModule)
 	subscribeProcurement(bus, d)
+	subscribeModeration(bus, moderationModule)
 	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
