@@ -537,11 +537,15 @@ func TestPresence(t *testing.T) {
 		t.Fatalf("非共有對話要 NotFound：%v", err)
 	}
 	// 對方已退場。
-	f.exec(t, "UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", s1)
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return closeStoreRows(ctx, f.db, s1) }); err != nil {
+		t.Fatal(err)
+	}
 	if online() {
 		t.Fatal("對方在 seller.pub_retired_stores() 要離線")
 	}
-	f.exec(t, "UPDATE seller.stores SET status = 'ACTIVE', current_closed_at = NULL, retired_at = NULL WHERE store_id = $1", s1)
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return reopenStoreRows(ctx, f.db, s1) }); err != nil {
+		t.Fatal(err)
+	}
 	// Close 之後離線。
 	sub.Close()
 	if online() {

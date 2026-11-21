@@ -5,7 +5,6 @@ package im_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -26,14 +25,15 @@ func TestWriteTxBeyondTheBoundFails(t *testing.T) {
 	buyer := f.buyerParty(b1)
 	lockConversation := `SELECT 1 FROM im.conversations WHERE id = $1 FOR UPDATE`
 	lockMessage := `SELECT 1 FROM im.messages WHERE id = $1 FOR UPDATE`
-	lockParty := fmt.Sprintf(`SELECT pg_advisory_xact_lock(hashtextextended('im.party:BUYER:%d', 0)), $1::text IS NOT NULL`, b1)
+	// Send 的第一個鎖是買家的守門鎖（buyer.LockNotClosed，FOR KEY SHARE）：持有該列的 FOR UPDATE 就會讓它等。
+	lockBuyer := `SELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE`
 	cases := []struct {
 		name string
 		lock string
 		arg  any
 		call func() error
 	}{
-		{"Send", lockParty, "x", func() error {
+		{"Send", lockBuyer, b1, func() error {
 			_, err := f.m.Send(ctx, im.SendInput{Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "blocked"})
 			return err
 		}},

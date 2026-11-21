@@ -12,17 +12,21 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
@@ -90,29 +94,50 @@ type buyers struct {
 	accounts map[int64]int64
 	blocking bool
 	blockErr error
-	// owner 是真正的 buyer 模組：守門 LockNotClosed 與關閉買家（CloseForDeletion）都走它，買家列在第一次被守門時自動建立（營運中）。
+	// owner 是真正的 buyer 模組：守門 LockNotClosed 與關閉買家（CloseForDeletion）都走它。
 	owner *buyer.Module
-	db    *db.DB
 }
 
-// ensureBuyer 建立指定 buyer_id 的買家列（營運中）；已存在不動。測試用固定的 ID，不經 OnAccountCreated。
-func ensureBuyer(ctx context.Context, d *db.DB, id int64) error {
-	_, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
-		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, 1000 + $1::bigint, 'b', now(), now()) ON CONFLICT (buyer_id) DO NOTHING`, id)
+// seedParties 以明確的 ID 建立營運中的買家與店家列（最小的合法列，不經 OnAccountCreated）。守門走真正的 buyer 與 seller 模組，沒有列的 ID 回 NotFound。
+func seedParties(t *testing.T, d *db.DB, buyerIDs, storeIDs []int64) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, 1000 + g, 'b', now(), now() FROM unnest($1::bigint[]) AS g`, buyerIDs); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, g, 2000 + g, 's', now(), now() FROM unnest($1::bigint[]) AS g`, storeIDs); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// closeStoreRows 把店家改成已關閉並退場，兩張表的列一起合法（stores_current_closure_fkey 在 commit 時檢查，所以必須在 transaction 內，且先寫關店紀錄）。
+func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", storeID); err != nil {
+		return err
+	}
+	_, err := d.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
+		logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID)
 	return err
 }
 
-// ensureStore 建立指定 store_id 的店家列（營運中）；已存在不動。
-func ensureStore(ctx context.Context, d *db.DB, id int64) error {
-	_, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
-		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, $1::bigint, 2000 + $1::bigint, 's', now(), now()) ON CONFLICT (store_id) DO NOTHING`, id)
+// reopenStoreRows 是 closeStoreRows 的反向（測試用：讓同一家店回到營運中），同樣必須在 transaction 內。
+func reopenStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("reopenStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.store_closures SET reopened_at = now() WHERE store_id = $1 AND reopened_at IS NULL", storeID); err != nil {
+		return err
+	}
+	_, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'ACTIVE', current_closed_at = NULL, retired_at = NULL WHERE store_id = $1", storeID)
 	return err
 }
 
 func (b *buyers) LockNotClosed(ctx context.Context, id int64) error {
-	if err := ensureBuyer(ctx, b.db, id); err != nil {
-		return err
-	}
 	return b.owner.LockNotClosed(ctx, id)
 }
 
@@ -138,7 +163,7 @@ func (b *buyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 // stores 是 im 的 Stores port 的替身：店家預設是營運中、沒有停權，帳號是 2000 + store_id。
 type stores struct {
 	mu    sync.Mutex
-	db    *db.DB
+	owner *seller.Module
 	byID  map[int64]seller.Store
 	err   error
 	block bool
@@ -160,20 +185,9 @@ func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
 	return activeStore(id, 2000+id), nil
 }
 
-// LockNotRetired 是 seller.LockNotRetired 的同形替身（seller 的完整模組太重）：transaction 內對店家列 FOR KEY SHARE，已退場與不存在回 NotFound。
-// 真正的 seller 實作由 seller 與 cmd/hawkr 的整合測試驗證。
+// LockNotRetired 委派給真正的 seller 模組（守門的查詢與鎖由它擁有），取到鎖之後呼叫 afterLock。
 func (s *stores) LockNotRetired(ctx context.Context, id int64) error {
-	if _, ok := db.TxFrom(ctx); !ok {
-		return errors.New("LockNotRetired 必須在 transaction 內呼叫")
-	}
-	if err := ensureStore(ctx, s.db, id); err != nil {
-		return err
-	}
-	var retired bool
-	err := s.db.Conn(ctx).QueryRow(ctx, "SELECT retired_at IS NOT NULL FROM seller.stores WHERE store_id = $1 FOR KEY SHARE", id).Scan(&retired)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && retired) {
-		return apperr.NotFound("店家已退場")
-	}
+	err := s.owner.LockNotRetired(ctx, id)
 	if err == nil && s.afterLock != nil {
 		s.afterLock()
 	}
@@ -192,6 +206,26 @@ func activeStore(id, account int64) seller.Store {
 		Conditions: seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true},
 	}
 }
+
+func (*queue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
+	return true, nil
+}
+
+// noRegistry、noProducts、noOrders 是 seller 的外部 port 的替身：這裡的測試只用 seller 的守門與表，不會呼叫它們。
+type noRegistry struct{}
+
+func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
+	return gcis.Registration{}, false, nil
+}
+
+type noProducts struct{}
+
+func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+
+type noOrders struct{}
+
+func (noOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
+func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
 
 type fixture struct {
 	db     *db.DB
@@ -230,7 +264,11 @@ func setup(t *testing.T) *fixture {
 	}
 	f.media.Key = func(_, token string) string { return "chat/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&strings.Builder{}, nil))
-	f.stores.db, f.buyers.db = database, database
+	bus := f.bus
+	identityModule := identity.New(identity.Deps{DB: database, Events: bus, Now: f.clock, Logger: logger})
+	f.stores.owner = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: database, Events: bus, Jobs: f.jobs, Identity: identityModule, Media: f.media, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: logger,
+		Payment: payment.New(payment.Deps{DB: database, Audit: adminaudit.New(database, f.clock), Events: bus, Jobs: f.jobs, Now: f.clock, Logger: logger})})
+	seedParties(t, database, []int64{b1, b2, 5, 7}, []int64{s1, s2, 5, 9})
 	f.buyers.owner = buyer.New(buyer.Deps{DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Now: f.clock, Logger: logger})
 	f.m = im.New(im.Deps{
 		DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Buyers: f.buyers, Stores: f.stores, Orders: f.orders,

@@ -335,9 +335,6 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 	t.Helper()
 	ctx := context.Background()
-	if err := ensureBuyer(ctx, f.db, buyerID); err != nil {
-		t.Fatal(err)
-	}
 	if err := f.buyers.owner.CloseForDeletion(ctx, buyerID); err != nil {
 		t.Fatal(err)
 	}
@@ -347,12 +344,8 @@ func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 func (f *fixture) storeRetired(t *testing.T, storeID, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
-	if err := ensureStore(ctx, f.db, storeID); err != nil {
-		t.Fatal(err)
-	}
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		if _, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
-			logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID); err != nil {
+		if err := closeStoreRows(ctx, f.db, storeID); err != nil {
 			return err
 		}
 		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), OccurredAt: f.clock(), StoreID: storeID, AccountID: accountID})
