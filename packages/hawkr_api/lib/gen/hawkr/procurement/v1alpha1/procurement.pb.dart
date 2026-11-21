@@ -2540,7 +2540,6 @@ class UnverifiableFact extends $pb.GeneratedMessage {
 class Candidate extends $pb.GeneratedMessage {
   factory Candidate({
     $core.String? id,
-    $core.String? displayName,
     $core.double? score,
     $core.Iterable<MatchedFact>? matchedFacts,
     $core.Iterable<UnverifiableFact>? unverifiableFacts,
@@ -2550,7 +2549,6 @@ class Candidate extends $pb.GeneratedMessage {
   }) {
     final result = Candidate._();
     if (id != null) result.id = id;
-    if (displayName != null) result.displayName = displayName;
     if (score != null) result.score = score;
     if (matchedFacts != null) result.matchedFacts.addAll(matchedFacts);
     if (unverifiableFacts != null)
@@ -2576,7 +2574,6 @@ class Candidate extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: Candidate.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOS(2, _omitFieldNames ? '' : 'displayName')
     ..aD(3, _omitFieldNames ? '' : 'score')
     ..pPM<MatchedFact>(4, _omitFieldNames ? '' : 'matchedFacts',
         subBuilder: MatchedFact.$_createMessage)
@@ -2618,62 +2615,53 @@ class Candidate extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.String get displayName => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set displayName($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasDisplayName() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearDisplayName() => $_clearField(2);
-
   @$pb.TagNumber(3)
-  $core.double get score => $_getN(2);
+  $core.double get score => $_getN(1);
   @$pb.TagNumber(3)
-  set score($core.double value) => $_setDouble(2, value);
+  set score($core.double value) => $_setDouble(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasScore() => $_has(2);
+  $core.bool hasScore() => $_has(1);
   @$pb.TagNumber(3)
   void clearScore() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $pb.PbList<MatchedFact> get matchedFacts => $_getList(3);
+  $pb.PbList<MatchedFact> get matchedFacts => $_getList(2);
 
   @$pb.TagNumber(5)
-  $pb.PbList<UnverifiableFact> get unverifiableFacts => $_getList(4);
+  $pb.PbList<UnverifiableFact> get unverifiableFacts => $_getList(3);
 
   /// 以上事實成立的時間。
   @$pb.TagNumber(6)
-  $1.Timestamp get factsTime => $_getN(5);
+  $1.Timestamp get factsTime => $_getN(4);
   @$pb.TagNumber(6)
   set factsTime($1.Timestamp value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasFactsTime() => $_has(5);
+  $core.bool hasFactsTime() => $_has(4);
   @$pb.TagNumber(6)
   void clearFactsTime() => $_clearField(6);
   @$pb.TagNumber(6)
-  $1.Timestamp ensureFactsTime() => $_ensure(5);
+  $1.Timestamp ensureFactsTime() => $_ensure(4);
 
   @$pb.TagNumber(7)
-  $core.bool get selected => $_getBF(6);
+  $core.bool get selected => $_getBF(5);
   @$pb.TagNumber(7)
-  set selected($core.bool value) => $_setBool(6, value);
+  set selected($core.bool value) => $_setBool(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasSelected() => $_has(6);
+  $core.bool hasSelected() => $_has(5);
   @$pb.TagNumber(7)
   void clearSelected() => $_clearField(7);
 
   /// 賣家的店家卡片。
   @$pb.TagNumber(8)
-  $2.StoreCard get store => $_getN(7);
+  $2.StoreCard get store => $_getN(6);
   @$pb.TagNumber(8)
   set store($2.StoreCard value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasStore() => $_has(7);
+  $core.bool hasStore() => $_has(6);
   @$pb.TagNumber(8)
   void clearStore() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.StoreCard ensureStore() => $_ensure(7);
+  $2.StoreCard ensureStore() => $_ensure(6);
 }
 
 class StartCandidateSearchRequest extends $pb.GeneratedMessage {

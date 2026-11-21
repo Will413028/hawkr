@@ -423,25 +423,13 @@ class PublicationState extends $pb.ProtobufEnum {
       PublicationState._(
           1, _omitEnumNames ? '' : 'PUBLICATION_STATE_PUBLISHED');
 
-  /// 同一張需求的新一次發布取代了這次。
-  static const PublicationState PUBLICATION_STATE_SUPERSEDED =
-      PublicationState._(
-          2, _omitEnumNames ? '' : 'PUBLICATION_STATE_SUPERSEDED');
-
-  /// 買家撤回了這次發布。
-  static const PublicationState PUBLICATION_STATE_CANCELLED =
-      PublicationState._(
-          3, _omitEnumNames ? '' : 'PUBLICATION_STATE_CANCELLED');
-
   static const $core.List<PublicationState> values = <PublicationState>[
     PUBLICATION_STATE_UNSPECIFIED,
     PUBLICATION_STATE_PUBLISHED,
-    PUBLICATION_STATE_SUPERSEDED,
-    PUBLICATION_STATE_CANCELLED,
   ];
 
   static final $core.List<PublicationState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
   static PublicationState? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

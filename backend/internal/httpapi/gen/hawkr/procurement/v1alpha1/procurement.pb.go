@@ -712,10 +712,6 @@ const (
 	PublicationState_PUBLICATION_STATE_UNSPECIFIED PublicationState = 0
 	// 伺服器已建立發布；不代表已投遞或已被看到。
 	PublicationState_PUBLICATION_STATE_PUBLISHED PublicationState = 1
-	// 同一張需求的新一次發布取代了這次。
-	PublicationState_PUBLICATION_STATE_SUPERSEDED PublicationState = 2
-	// 買家撤回了這次發布。
-	PublicationState_PUBLICATION_STATE_CANCELLED PublicationState = 3
 )
 
 // Enum value maps for PublicationState.
@@ -723,14 +719,10 @@ var (
 	PublicationState_name = map[int32]string{
 		0: "PUBLICATION_STATE_UNSPECIFIED",
 		1: "PUBLICATION_STATE_PUBLISHED",
-		2: "PUBLICATION_STATE_SUPERSEDED",
-		3: "PUBLICATION_STATE_CANCELLED",
 	}
 	PublicationState_value = map[string]int32{
 		"PUBLICATION_STATE_UNSPECIFIED": 0,
 		"PUBLICATION_STATE_PUBLISHED":   1,
-		"PUBLICATION_STATE_SUPERSEDED":  2,
-		"PUBLICATION_STATE_CANCELLED":   3,
 	}
 )
 
@@ -2976,7 +2968,6 @@ func (x *UnverifiableFact) GetReason() string {
 type Candidate struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	DisplayName       string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	Score             float64                `protobuf:"fixed64,3,opt,name=score,proto3" json:"score,omitempty"`
 	MatchedFacts      []*MatchedFact         `protobuf:"bytes,4,rep,name=matched_facts,json=matchedFacts,proto3" json:"matched_facts,omitempty"`
 	UnverifiableFacts []*UnverifiableFact    `protobuf:"bytes,5,rep,name=unverifiable_facts,json=unverifiableFacts,proto3" json:"unverifiable_facts,omitempty"`
@@ -3022,13 +3013,6 @@ func (*Candidate) Descriptor() ([]byte, []int) {
 func (x *Candidate) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *Candidate) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
 	}
 	return ""
 }
@@ -8611,17 +8595,16 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x05label\x18\x02 \x01(\tR\x05label\"j\n" +
 	"\x10UnverifiableFact\x12>\n" +
 	"\bslot_key\x18\x01 \x01(\x0e2#.hawkr.procurement.v1alpha1.SlotKeyR\aslotKey\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x93\x03\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x84\x03\n" +
 	"\tCandidate\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x01R\x05score\x12L\n" +
 	"\rmatched_facts\x18\x04 \x03(\v2'.hawkr.procurement.v1alpha1.MatchedFactR\fmatchedFacts\x12[\n" +
 	"\x12unverifiable_facts\x18\x05 \x03(\v2,.hawkr.procurement.v1alpha1.UnverifiableFactR\x11unverifiableFacts\x129\n" +
 	"\n" +
 	"facts_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tfactsTime\x12\x1a\n" +
 	"\bselected\x18\a \x01(\bR\bselected\x126\n" +
-	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\"z\n" +
+	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeJ\x04\b\x02\x10\x03R\fdisplay_name\"z\n" +
 	"\x1bStartCandidateSearchRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x127\n" +
@@ -9154,12 +9137,10 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\fAudienceMode\x12\x1d\n" +
 	"\x19AUDIENCE_MODE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17AUDIENCE_MODE_WISH_POOL\x10\x01\x12#\n" +
-	"\x1fAUDIENCE_MODE_DIRECT_RECIPIENTS\x10\x02*\x99\x01\n" +
+	"\x1fAUDIENCE_MODE_DIRECT_RECIPIENTS\x10\x02*\x9d\x01\n" +
 	"\x10PublicationState\x12!\n" +
 	"\x1dPUBLICATION_STATE_UNSPECIFIED\x10\x00\x12\x1f\n" +
-	"\x1bPUBLICATION_STATE_PUBLISHED\x10\x01\x12 \n" +
-	"\x1cPUBLICATION_STATE_SUPERSEDED\x10\x02\x12\x1f\n" +
-	"\x1bPUBLICATION_STATE_CANCELLED\x10\x03*\xa0\x01\n" +
+	"\x1bPUBLICATION_STATE_PUBLISHED\x10\x01\"\x04\b\x02\x10\x02\"\x04\b\x03\x10\x03*\x1cPUBLICATION_STATE_SUPERSEDED*\x1bPUBLICATION_STATE_CANCELLED*\xa0\x01\n" +
 	"\x13InviteDeliveryState\x12%\n" +
 	"!INVITE_DELIVERY_STATE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cINVITE_DELIVERY_STATE_QUEUED\x10\x01\x12\x1e\n" +

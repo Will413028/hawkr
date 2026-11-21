@@ -239,16 +239,19 @@ const PublicationState$json = {
   '2': [
     {'1': 'PUBLICATION_STATE_UNSPECIFIED', '2': 0},
     {'1': 'PUBLICATION_STATE_PUBLISHED', '2': 1},
-    {'1': 'PUBLICATION_STATE_SUPERSEDED', '2': 2},
-    {'1': 'PUBLICATION_STATE_CANCELLED', '2': 3},
   ],
+  '4': [
+    {'1': 2, '2': 2},
+    {'1': 3, '2': 3},
+  ],
+  '5': ['PUBLICATION_STATE_SUPERSEDED', 'PUBLICATION_STATE_CANCELLED'],
 };
 
 /// Descriptor for `PublicationState`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List publicationStateDescriptor = $convert.base64Decode(
     'ChBQdWJsaWNhdGlvblN0YXRlEiEKHVBVQkxJQ0FUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASHw'
-    'obUFVCTElDQVRJT05fU1RBVEVfUFVCTElTSEVEEAESIAocUFVCTElDQVRJT05fU1RBVEVfU1VQ'
-    'RVJTRURFRBACEh8KG1BVQkxJQ0FUSU9OX1NUQVRFX0NBTkNFTExFRBAD');
+    'obUFVCTElDQVRJT05fU1RBVEVfUFVCTElTSEVEEAEiBAgCEAIiBAgDEAMqHFBVQkxJQ0FUSU9O'
+    'X1NUQVRFX1NVUEVSU0VERUQqG1BVQkxJQ0FUSU9OX1NUQVRFX0NBTkNFTExFRA==');
 
 @$core.Deprecated('Use inviteDeliveryStateDescriptor instead')
 const InviteDeliveryState$json = {
@@ -1287,7 +1290,6 @@ const Candidate$json = {
   '1': 'Candidate',
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
-    {'1': 'display_name', '3': 2, '4': 1, '5': 9, '10': 'displayName'},
     {'1': 'score', '3': 3, '4': 1, '5': 1, '10': 'score'},
     {
       '1': 'matched_facts',
@@ -1323,18 +1325,22 @@ const Candidate$json = {
       '10': 'store'
     },
   ],
+  '9': [
+    {'1': 2, '2': 3},
+  ],
+  '10': ['display_name'],
 };
 
 /// Descriptor for `Candidate`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List candidateDescriptor = $convert.base64Decode(
-    'CglDYW5kaWRhdGUSEwoCaWQYASABKAlCA+BBCFICaWQSIQoMZGlzcGxheV9uYW1lGAIgASgJUg'
-    'tkaXNwbGF5TmFtZRIUCgVzY29yZRgDIAEoAVIFc2NvcmUSTAoNbWF0Y2hlZF9mYWN0cxgEIAMo'
-    'CzInLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLk1hdGNoZWRGYWN0UgxtYXRjaGVkRmFjdH'
-    'MSWwoSdW52ZXJpZmlhYmxlX2ZhY3RzGAUgAygLMiwuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBo'
-    'YTEuVW52ZXJpZmlhYmxlRmFjdFIRdW52ZXJpZmlhYmxlRmFjdHMSOQoKZmFjdHNfdGltZRgGIA'
-    'EoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZhY3RzVGltZRIaCghzZWxlY3RlZBgH'
-    'IAEoCFIIc2VsZWN0ZWQSNgoFc3RvcmUYCCABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3'
-    'RvcmVDYXJkUgVzdG9yZQ==');
+    'CglDYW5kaWRhdGUSEwoCaWQYASABKAlCA+BBCFICaWQSFAoFc2NvcmUYAyABKAFSBXNjb3JlEk'
+    'wKDW1hdGNoZWRfZmFjdHMYBCADKAsyJy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5NYXRj'
+    'aGVkRmFjdFIMbWF0Y2hlZEZhY3RzElsKEnVudmVyaWZpYWJsZV9mYWN0cxgFIAMoCzIsLmhhd2'
+    'tyLnByb2N1cmVtZW50LnYxYWxwaGExLlVudmVyaWZpYWJsZUZhY3RSEXVudmVyaWZpYWJsZUZh'
+    'Y3RzEjkKCmZhY3RzX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUglmYW'
+    'N0c1RpbWUSGgoIc2VsZWN0ZWQYByABKAhSCHNlbGVjdGVkEjYKBXN0b3JlGAggASgLMiAuaGF3'
+    'a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmVKBAgCEANSDGRpc3BsYXlfbmFtZQ'
+    '==');
 
 @$core.Deprecated('Use startCandidateSearchRequestDescriptor instead')
 const StartCandidateSearchRequest$json = {

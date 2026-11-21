@@ -287,10 +287,9 @@ enum PublicationState {
   PUBLICATION_STATE_UNSPECIFIED = 0;
   // 伺服器已建立發布；不代表已投遞或已被看到。
   PUBLICATION_STATE_PUBLISHED = 1;
-  // 同一張需求的新一次發布取代了這次。
-  PUBLICATION_STATE_SUPERSEDED = 2;
-  // 買家撤回了這次發布。
-  PUBLICATION_STATE_CANCELLED = 3;
+  // 沒有重發與撤回發布的方法，所以目前只有這一個值；新值隨它的寫入方法一起加。
+  reserved 2, 3;
+  reserved "PUBLICATION_STATE_SUPERSEDED", "PUBLICATION_STATE_CANCELLED";
 }
 
 // InviteDeliveryState 是詢價通知投遞給賣家的狀態。
@@ -602,7 +601,9 @@ message UnverifiableFact {
 // Candidate 是一位候選賣家：只有結構化欄位，不含研究摘要、定位等自由文字。
 message Candidate {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  string display_name = 2;
+  // 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
+  reserved 2;
+  reserved "display_name";
   double score = 3;
   repeated MatchedFact matched_facts = 4;
   repeated UnverifiableFact unverifiable_facts = 5;
