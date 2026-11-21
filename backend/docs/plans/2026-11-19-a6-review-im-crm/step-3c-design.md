@@ -18,7 +18,7 @@
 - buyer：`LockNotClosed`、`pub_closed_buyers()`；seller：`LockNotRetired`、`pub_retired_stores()`；各自的 migration、`pub.sql`、契約測試。
 - review、im、crm：寫入路徑在 transaction 內取擁有者守門；讀取改 join `pub_*`；訂閱者只排抹除 job；保底掃描改讀 `pub_*`；刪三張複本表。
 - sweep 的 River 唯一性選項抽成共用 helper（§5）。
-- `internal/arch` 與 `platform/lockorder` 的登記檢查（§6）、測試與 mutation（§8）、各模組 `CARRYOVER.md`／`AGENTS.md`／`docs/modules/*.md` 更新。
+- `internal/arch` 與 `platform/lockorder` 的登記檢查（§6）、測試與 mutation（§8）、各模組 `CARRYOVER.md`／`AGENTS.md`／`backend/docs/modules/*.md` 更新。
 
 ## 0.2 不在範圍
 
@@ -55,7 +55,7 @@
 | accountdeletion 在派發事件前先鎖買家、店家，再 `BeginDeletion`／`CloseForDeletion` | `accountdeletion/internal/request/request.go:365-392` |
 | `pub_inactive_buyers()`：`buyer.buyers` 中 `status <> 'ACTIVE'`（PENDING_DELETION 加 CLOSED），無時間參數 | `buyer/db/objects.sql:9-14`；`buyer/db/pub.sql:19-21` |
 | seller 沒有「已退場」的 pub 或守門；`pub_exposable_stores(at)` 是「可曝光」，不能重用 | `seller/db/pub.sql`（`rg -n "CREATE FUNCTION" seller/db/pub.sql`：`pub_exposable_stores`、`pub_review_items`、`pub_content_takedowns`、`pub_lock_content_takedowns`） |
-| seller 已有帶鎖的 pub 先例：`pub_lock_content_takedowns`（VOLATILE，`FOR SHARE`） | `seller/db/pub.sql:69`；`docs/modules/seller.md` §21 |
+| seller 已有帶鎖的 pub 先例：`pub_lock_content_takedowns`（VOLATILE，`FOR SHARE`） | `seller/db/pub.sql:69`；`backend/docs/modules/seller.md` §21 |
 | 退場的事實欄位是 `seller.stores.retired_at`；索引 `stores_retire_pending` | `seller/db/schema.sql:58,108` |
 | 買家、店家列在 CLOSED／退場後仍保留（pub 函式依賴列存在；`ClearPII` 只更新欄位） | `buyer/db/queries/buyers.sql:128-130`；`seller/db/schema.sql:63-68`【推】 |
 | im 的 `Send`：`guard`（含 `Orders.OpenOrderBetween` 網路 RPC）在 `send.go:45` 呼叫、`inTx` 在 `send.go:62` 才開；tx 內先 `LockParty` 雙方、再 `IsInactiveParty`、`AllocateSeq` | `im/internal/write/send.go:45,62-86,239` |
@@ -77,7 +77,7 @@
 
 1. 簡報 §4 表格最後一列寫「`FOR KEY SHARE` 不擋店家或買家的資料更新；只擋 `FOR UPDATE` 的轉移」。**業務寫入本身就持 `FOR UPDATE`**（買家 `stint.Require`、店家 `stint.Lock`，見上表），所以守門的 `FOR KEY SHARE` 會與每一個買家或店家的業務寫入互相等待，不只和刪帳、退場。LockActive 現況（`FOR SHARE`）本來就有同樣的互等，但 im 的每則訊息與 crm 的每筆投影是新增的熱路徑。見 W4。
 2. 簡報 §8 的 im 檔數 22 含 `LockPartyStreams`（im 自己的存活標記鎖，`live/streams.go`、`presence.sql`）的假命中。排除後 im 是 18（§7）。
-3. `pub_inactive_buyers` 的現有契約寫「只給 social 每日對帳，不給求值或旗標呼叫」（`buyer/AGENTS.md:15`、`pub.sql:18`、`docs/modules/buyer.md:88`）。review 的每支公開讀取都 join 它，等於改契約，必須同一次變更改這些說明（§1.3）。
+3. `pub_inactive_buyers` 的現有契約寫「只給 social 每日對帳，不給求值或旗標呼叫」（`buyer/AGENTS.md:15`、`pub.sql:18`、`backend/docs/modules/buyer.md:88`）。review 的每支公開讀取都 join 它，等於改契約，必須同一次變更改這些說明（§1.3）。
 
 ## 1. buyer、seller 新增的 API（完整清單）
 
@@ -202,7 +202,7 @@ END;
 ### 1.3 review 是否重用 `pub_inactive_buyers`：重用【量】
 
 - 簡報 §8 的前提是 review 在申請刪除時就隱藏。核對：`OnBuyerDeletionRequested` 與 `OnBuyerDeleted` 都呼叫 `Deactivate`（`review/review.go:211-224`），所以 review 的「inactive」＝PENDING_DELETION 加 CLOSED＝`status <> 'ACTIVE'`，與 `pub_inactive_buyers()` 的定義逐字相同（`buyer/db/objects.sql:9-14`）。守門是 `LockActive`（只放行 ACTIVE）。不另建 pub。
-- 同次變更要改的契約文字：`buyer/db/pub.sql:13-18` 的註解（把「給 social 對帳」改成「social 對帳；review 的讀取過濾」）、`buyer/db/objects.sql` 同段註解、`buyer/AGENTS.md:15`、`docs/modules/buyer.md:88`、`buyer/CARRYOVER.md:105`。`TestInactiveBuyersAndDeletionRequestedEvent` 不用改。
+- 同次變更要改的契約文字：`buyer/db/pub.sql:13-18` 的註解（把「給 social 對帳」改成「social 對帳；review 的讀取過濾」）、`buyer/db/objects.sql` 同段註解、`buyer/AGENTS.md:15`、`backend/docs/modules/buyer.md:88`、`buyer/CARRYOVER.md:105`。`TestInactiveBuyersAndDeletionRequestedEvent` 不用改。
 - im 與 crm 要的是 CLOSED（不含刪除中），不能重用它，所以才新增 `pub_closed_buyers`（W2 討論形狀）。
 
 ### 1.4 完整清單
@@ -215,7 +215,7 @@ END;
 | seller | `Module.LockNotRetired`、`stint.RequireNotRetiredShared` | `seller/seller.go`、`seller/internal/stint/stint.go` |
 | seller | `LockStoreKeyShare` | `seller/db/queries/stores.sql` 與生成的 `stores.sql.go` |
 | seller | `pub_retired_stores()` | `db/pub.sql`、`db/objects.sql`、新 migration、`atlas.sum` |
-| buyer、seller | 文件 | `AGENTS.md`「發布的讀取介面」、`docs/modules/buyer.md`、`docs/modules/seller.md` §21、鎖順序節 |
+| buyer、seller | 文件 | `AGENTS.md`「發布的讀取介面」、`backend/docs/modules/buyer.md`、`backend/docs/modules/seller.md` §21、鎖順序節 |
 
 ### 1.5 選做：`LockActive` 從 `FOR SHARE` 降成 `FOR KEY SHARE`——建議做（W3）
 
@@ -379,8 +379,8 @@ rg -l -i "$P" buyer seller | wc -l                             # buyer、seller 
 | 其中生成（`make sqlc`，不手改） | 12 | 5＋3＋4 |
 | 新增：三份 `crm`／`im` 的 `sqlc.yaml`（im、crm 各 1）、`crm.go`／`crm.Deps` 組裝、`cmd/hawkr` 組裝與測試 | 約 6 | `cmd/hawkr/im.go`、`im_integration_test.go`、`review.go`、`review_wiring_test.go`、crm 的 `fixture_integration_test.go`、`crmconsumer/consumer_integration_test.go` |
 | `accountdeletion/accountdeletion_lockorder_integration_test.go` | 1 | 斷言複本列改成斷言 job |
-| buyer（`buyer.go`、`profile.go`、`stint.go`、`buyers.sql`＋生成、`objects.sql`、`pub.sql`、migration＋`atlas.sum`、測試、`AGENTS.md`、`CARRYOVER.md`、`docs/modules/buyer.md`） | 約 12 |  |
-| seller（`seller.go`、`stint.go`、`stores.sql`＋生成、`objects.sql`、`pub.sql`、migration＋`atlas.sum`、測試、`AGENTS.md`、`docs/modules/seller.md`） | 約 11 |  |
+| buyer（`buyer.go`、`profile.go`、`stint.go`、`buyers.sql`＋生成、`objects.sql`、`pub.sql`、migration＋`atlas.sum`、測試、`AGENTS.md`、`CARRYOVER.md`、`backend/docs/modules/buyer.md`） | 約 12 |  |
+| seller（`seller.go`、`stint.go`、`stores.sql`＋生成、`objects.sql`、`pub.sql`、migration＋`atlas.sum`、測試、`AGENTS.md`、`backend/docs/modules/seller.md`） | 約 11 |  |
 | 三個刪表 migration＋`atlas.sum` | 6 | 每模組 2 |
 | `P/jobs/unique.go`＋測試 | 2 | W6 擴大範圍時加 social、payment、media、seller 約 +8 |
 | `internal/arch` 與 `P/lockorder` | 0–2 | §8.1 的守門測試放哪裡見該節 |

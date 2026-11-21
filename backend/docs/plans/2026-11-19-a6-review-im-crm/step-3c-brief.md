@@ -17,9 +17,9 @@ review、im、crm 三份複本的必要條件**不成立**：它們只在查詢�
 
 | 程式 | 排程 | 來源 | 分類 |
 |---|---|---|---|
-| crm 投影、ledger、legacy consumer | ordering 搬遷時改讀 ordering 的 `pub_*` | `docs/plans/2026-11-19-a6-review-im-crm.md:75,79,125` | SELF-IMPOSED（Java ordering 是我們的程式） |
+| crm 投影、ledger、legacy consumer | ordering 搬遷時改讀 ordering 的 `pub_*` | `backend/docs/plans/2026-11-19-a6-review-im-crm.md:75,79,125` | SELF-IMPOSED（Java ordering 是我們的程式） |
 | crm 複本的「擋刪後重放」用途 | 投影退場時跟著消失 | 同上【推論】 | SELF-IMPOSED |
-| review、im、social 的停用機制 | 沒有排程 | `rg -n "退場\|ordering 搬遷" docs/plans/2026-11-19-a6-review-im-crm.md`【實測】 | — |
+| review、im、social 的停用機制 | 沒有排程 | `rg -n "退場\|ordering 搬遷" backend/docs/plans/2026-11-19-a6-review-im-crm.md`【實測】 | — |
 
 現在改的話，ordering 搬遷時只會丟掉 crm 投影端那一次守門呼叫，約 1–2 個檔【推論】。
 
