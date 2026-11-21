@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqoQMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA5iBnByb3RvMw");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqiwQKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVWSUVXX0FMUkVBRFlfRVhJU1RTEA8SGAoUT1JERVJfTk9UX1JFVklFV0FCTEUQEBIZChVSRVZJRVdfV0lORE9XX0VYUElSRUQQERIYChRSRVZJRVdfTk9UX1JFUExZQUJMRRASYgZwcm90bzM");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -150,6 +150,38 @@ export enum ErrorReason {
    * @generated from enum value: CONTENT_TAKEDOWN_ACTIVE = 14;
    */
   CONTENT_TAKEDOWN_ACTIVE = 14,
+
+  /**
+   * 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。client 改顯示既有的評價
+   * （ReviewAppService.ListMyReviews 帶 order_item_id）。ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: REVIEW_ALREADY_EXISTS = 15;
+   */
+  REVIEW_ALREADY_EXISTS = 15,
+
+  /**
+   * 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+   * ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: ORDER_NOT_REVIEWABLE = 16;
+   */
+  ORDER_NOT_REVIEWABLE = 16,
+
+  /**
+   * 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+   * ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: REVIEW_WINDOW_EXPIRED = 17;
+   */
+  REVIEW_WINDOW_EXPIRED = 17,
+
+  /**
+   * 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+   * ReviewAppService.ReplyReview。
+   *
+   * @generated from enum value: REVIEW_NOT_REPLYABLE = 18;
+   */
+  REVIEW_NOT_REPLYABLE = 18,
 }
 
 /**
