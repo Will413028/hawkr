@@ -513,6 +513,59 @@ final class BuyerAppClientProvider
 
 String _$buyerAppClientHash() => r'0843c0945207433da5159c77adbbe14a6cf70806';
 
+/// 檢舉店家（`SellerReportAppService`）。
+
+@ProviderFor(sellerReportAppClient)
+final sellerReportAppClientProvider = SellerReportAppClientProvider._();
+
+/// 檢舉店家（`SellerReportAppService`）。
+
+final class SellerReportAppClientProvider
+    extends
+        $FunctionalProvider<
+          SellerReportAppServiceClient,
+          SellerReportAppServiceClient,
+          SellerReportAppServiceClient
+        >
+    with $Provider<SellerReportAppServiceClient> {
+  /// 檢舉店家（`SellerReportAppService`）。
+  SellerReportAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sellerReportAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sellerReportAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SellerReportAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SellerReportAppServiceClient create(Ref ref) {
+    return sellerReportAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SellerReportAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SellerReportAppServiceClient>(value),
+    );
+  }
+}
+
+String _$sellerReportAppClientHash() =>
+    r'4ec4db7b77272300ed62f01270c7576e93d28426';
+
 /// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
 
 @ProviderFor(moderationAppClient)

@@ -18,6 +18,7 @@ import '../../../shared/utils/require_login.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../chat/presentation/chat_focus_policy.dart';
 import '../../follow/data/follow_repository.dart';
+import '../../moderation/presentation/store_report_entry.dart';
 import '../data/store_card_display.dart';
 import '../data/seller_repository.dart';
 import 'widgets/merchant_chat_tab.dart';
@@ -411,6 +412,13 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
                 onToggleFollow: _toggleFollow,
                 onChat: chatCallback(),
                 onCart: cartCallback(),
+                onMore: _merchantId == null
+                    ? null
+                    : () => showStoreReportMenu(
+                        context,
+                        ref,
+                        args: StoreReportArgs(storeId: _merchantId!),
+                      ),
               ),
             ),
             SliverOverlapAbsorber(

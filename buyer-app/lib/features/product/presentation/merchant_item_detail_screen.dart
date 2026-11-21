@@ -51,6 +51,7 @@ import '../../moderation/data/block_target.dart';
 import '../../moderation/data/report_target.dart';
 import '../../moderation/data/report_target_type.dart' show ReportTargetType;
 import '../../moderation/presentation/report_block_action_sheet.dart';
+import '../../moderation/presentation/store_report_entry.dart';
 import '../../../shared/utils/price_display.dart';
 import '../../../shared/utils/require_login.dart';
 import '../../../shared/widgets/share_bottom_sheet.dart';
@@ -126,6 +127,9 @@ class _MerchantItemDetailScreenState
 
   // 由 _loadProductDetail 從 seller.sellerAccountId / seller.name 解析
   String _resolvedMerchantId = '';
+
+  /// 檢舉的店家 id：商品詳情解析出的 store id；自己的商品不能檢舉自己的店。
+  String get _reportStoreId => _selfOwned ? '' : _resolvedMerchantId;
   String _resolvedMerchantName = '';
 
   // 商品詳情（由 _loadProductDetail 填入）
@@ -704,6 +708,17 @@ class _MerchantItemDetailScreenState
             favoriteEnabled: favoriteEnabled,
             onToggleFavorite: _toggleFavorite,
             onShare: _shareLoading ? null : _handleShare,
+            onMore: _reportStoreId.isEmpty
+                ? null
+                : () => showStoreReportMenu(
+                    context,
+                    ref,
+                    args: StoreReportArgs(
+                      storeId: _reportStoreId,
+                      productId: (widget.skuId ?? '').trim(),
+                      productName: widget.title.trim(),
+                    ),
+                  ),
             purchaseDock: !_selfOwned && _isProductOutOfStock
                 ? _RestockSubscribeButton(
                     subscribed: _isRestockSubscribed,
@@ -1115,6 +1130,7 @@ class _ProductFloatingDetailSurface extends StatelessWidget {
     required this.favoriteEnabled,
     required this.onToggleFavorite,
     this.onShare,
+    this.onMore,
   });
 
   final Widget child;
@@ -1124,6 +1140,7 @@ class _ProductFloatingDetailSurface extends StatelessWidget {
   final bool favoriteEnabled;
   final VoidCallback onToggleFavorite;
   final VoidCallback? onShare;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -1210,6 +1227,17 @@ class _ProductFloatingDetailSurface extends StatelessWidget {
                                   onTap: onShare,
                                   child: const Icon(
                                     AppIcons.shareOutlined,
+                                    size: HkControl.icon,
+                                    color: AppIconColors.strong,
+                                  ),
+                                ),
+                                const SizedBox(width: HkSpace.sm),
+                                _ProductOverlayIconButton(
+                                  key: const ValueKey('product-detail-more'),
+                                  semanticLabel: '更多',
+                                  onTap: onMore,
+                                  child: const Icon(
+                                    AppIcons.moreHoriz,
                                     size: HkControl.icon,
                                     color: AppIconColors.strong,
                                   ),

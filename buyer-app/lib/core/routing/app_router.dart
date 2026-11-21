@@ -21,6 +21,8 @@ import '../../features/home/presentation/main_navigation_screen.dart';
 import '../../features/product/presentation/search_screen.dart';
 import '../../features/product/presentation/search_results_screen.dart';
 import '../../features/product/presentation/merchant_item_detail_screen.dart';
+import '../../features/moderation/presentation/store_report_entry.dart';
+import '../../features/moderation/presentation/store_report_screen.dart';
 import '../../features/seller/presentation/merchant_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/order/presentation/order_detail_screen.dart';
@@ -349,6 +351,14 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/settings/reports',
         builder: (_, __) => const MyReportsScreen(),
+      ),
+      GoRoute(
+        path: storeReportRoute,
+        builder: (_, state) => StoreReportScreen(
+          args:
+              state.extra as StoreReportArgs? ??
+              const StoreReportArgs(storeId: ''),
+        ),
       ),
       GoRoute(
         path: '/settings/blocks',

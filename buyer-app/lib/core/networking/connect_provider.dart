@@ -5,6 +5,7 @@ import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
 import 'package:hawkr_api/transport.dart';
@@ -94,6 +95,11 @@ SocialAppServiceClient socialAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 BuyerAppServiceClient buyerAppClient(Ref ref) =>
     BuyerAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 檢舉店家（`SellerReportAppService`）。
+@Riverpod(keepAlive: true)
+SellerReportAppServiceClient sellerReportAppClient(Ref ref) =>
+    SellerReportAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 檢舉社群內容與讀自己送出的檢舉（`ModerationAppService`）。
 @Riverpod(keepAlive: true)
