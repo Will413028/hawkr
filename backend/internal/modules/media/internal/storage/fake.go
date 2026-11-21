@@ -70,11 +70,15 @@ func (f *Fake) Put(_ context.Context, in PutInput) error {
 		return err
 	}
 	if int64(len(data)) != in.Size {
-		return errors.New("storage: body length differs from declared size")
+		return ErrSizeMismatch
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.objects[in.Key] = fakeObject{data: data, contentType: in.ContentType}
+	contentType := in.ContentType
+	if contentType == "" {
+		contentType = DefaultContentType
+	}
+	f.objects[in.Key] = fakeObject{data: data, contentType: contentType}
 	return nil
 }
 

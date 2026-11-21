@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -43,6 +44,9 @@ func New(cfg Config) (*S3, error) {
 	return &S3{bucket: cfg.Bucket, client: client, presign: s3.NewPresignClient(client)}, nil
 }
 
+// md5DigestSize 是 Content-MD5 解碼後的位元組數。
+const md5DigestSize = 16
+
 func validatePresign(in PresignPutInput) error {
 	switch {
 	case in.Key == "":
@@ -55,6 +59,11 @@ func validatePresign(in PresignPutInput) error {
 		return errors.New("storage: empty content md5")
 	case in.Expires <= 0:
 		return errors.New("storage: expiry must be positive")
+	case in.Expires > MaxPresignExpiry:
+		return errors.New("storage: expiry exceeds the SigV4 limit of 7 days")
+	}
+	if raw, err := base64.StdEncoding.DecodeString(in.ContentMD5); err != nil || len(raw) != md5DigestSize {
+		return errors.New("storage: content md5 must be standard base64 of 16 bytes")
 	}
 	return nil
 }
@@ -117,13 +126,21 @@ func (s *S3) Put(ctx context.Context, in PutInput) error {
 		return errors.New("storage: empty key")
 	}
 	body, ok := in.Body.(io.ReadSeeker)
-	if !ok {
+	if ok {
+		remaining, err := remainingLen(body)
+		if err != nil {
+			return fmt.Errorf("storage: measure put body: %w", err)
+		}
+		if remaining != in.Size {
+			return ErrSizeMismatch
+		}
+	} else {
 		data, err := io.ReadAll(io.LimitReader(in.Body, in.Size+1))
 		if err != nil {
 			return fmt.Errorf("storage: read put body: %w", err)
 		}
 		if int64(len(data)) != in.Size {
-			return errors.New("storage: body length differs from declared size")
+			return ErrSizeMismatch
 		}
 		body = bytes.NewReader(data)
 	}
@@ -147,17 +164,34 @@ func (s *S3) Put(ctx context.Context, in PutInput) error {
 // Delete 實作 Store；S3 的 DeleteObject 對不存在的物件本來就回成功。
 func (s *S3) Delete(ctx context.Context, key string) error {
 	if _, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}); err != nil {
-		if isNotFound(err) {
-			return nil
-		}
 		return fmt.Errorf("storage: delete: %w", err)
 	}
 	return nil
 }
 
+func remainingLen(r io.ReadSeeker) (int64, error) {
+	cur, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+	end, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := r.Seek(cur, io.SeekStart); err != nil {
+		return 0, err
+	}
+	return end - cur, nil
+}
+
+// isNotFound 只認 key 不存在：NoSuchKey、NotFound，以及 HEAD 沒有 body 的 404；NoSuchBucket 等其他錯誤碼一律是錯誤。
 func isNotFound(err error) bool {
 	var nsk *s3types.NoSuchKey
 	if errors.As(err, &nsk) {
+		return true
+	}
+	var nf *s3types.NotFound
+	if errors.As(err, &nf) {
 		return true
 	}
 	var ae interface{ ErrorCode() string }
@@ -165,6 +199,9 @@ func isNotFound(err error) bool {
 		switch ae.ErrorCode() {
 		case "NoSuchKey", "NotFound":
 			return true
+		case "", "UnknownError":
+		default:
+			return false
 		}
 	}
 	var re interface{ HTTPStatusCode() int }

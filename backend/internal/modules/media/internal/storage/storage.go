@@ -13,6 +13,15 @@ import (
 // ErrNotFound 表示物件不存在（Get、Head）。Delete 不存在的物件不是錯誤。
 var ErrNotFound = errors.New("storage: object not found")
 
+// ErrSizeMismatch 表示 Put 的 Body 長度與 Size 不符；S3 與 Fake 行為一致，且在送出請求前就回。
+var ErrSizeMismatch = errors.New("storage: body length differs from declared size")
+
+// DefaultContentType 是 Put 沒給 ContentType 時物件的型別（與 S3 預設一致）。
+const DefaultContentType = "application/octet-stream"
+
+// MaxPresignExpiry 是 SigV4 預簽網址的有效期上限。
+const MaxPresignExpiry = 7 * 24 * time.Hour
+
 // Store 是 media 需要的物件儲存操作。所有呼叫都不得放在 DB transaction 內。
 type Store interface {
 	// PresignPut 產生預簽 PUT。簽章綁確切的 Content-Length、Content-Type、Content-MD5 與 If-None-Match: *，
@@ -22,7 +31,8 @@ type Store interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	// Head 回傳物件的大小與型別。不存在回 ErrNotFound。
 	Head(ctx context.Context, key string) (ObjectInfo, error)
-	// Put 寫入物件；同一個 key 重寫會覆蓋，讓處理 job 重試時冪等。
+	// Put 寫入物件。Body 應為 io.ReadSeeker（例如暫存檔）；非 seekable 的 Body 會整個讀進記憶體。
+	// Body 剩餘長度與 Size 不符回 ErrSizeMismatch。同一個 key 重寫會覆蓋，讓處理 job 重試時冪等。
 	Put(ctx context.Context, in PutInput) error
 	// Delete 刪除物件；物件不存在視為成功。
 	Delete(ctx context.Context, key string) error

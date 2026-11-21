@@ -151,24 +151,41 @@ func TestPresignedPutSignsExactlyTheBoundHeaders(t *testing.T) {
 			p.Headers["Content-Type"] != "image/png" || p.Headers["Content-MD5"] == "" {
 			t.Errorf("headers: %v", p.Headers)
 		}
-		if !strings.HasPrefix(u.Path, "/bkt/tmp/") && !strings.HasPrefix(u.Path, "/tmp/") {
-			t.Errorf("path %q", u.Path)
-		}
 	}
-	u, _ := presigned(t, r2Env())
-	if u.Host != "bkt.acct123.r2.cloudflarestorage.com" && u.Host != "acct123.r2.cloudflarestorage.com" {
-		t.Errorf("host %q", u.Host)
+}
+
+func TestPresignedURLAddressing(t *testing.T) {
+	u, _ := presigned(t, s3Env())
+	if u.Host != "localhost:9000" || !strings.HasPrefix(u.Path, "/bkt/tmp/") {
+		t.Errorf("s3compat url: host %q path %q", u.Host, u.Path)
+	}
+	u, _ = presigned(t, r2Env())
+	if u.Host != "bkt.acct123.r2.cloudflarestorage.com" || !strings.HasPrefix(u.Path, "/tmp/") {
+		t.Errorf("r2 url: host %q path %q", u.Host, u.Path)
 	}
 }
 
 func TestPresignRejectsIncompleteInput(t *testing.T) {
-	ok := PresignPutInput{Key: "tmp/x", ContentLength: 1, ContentType: "a/b", ContentMD5: "m", Expires: time.Minute}
+	ok := PresignPutInput{Key: "tmp/x", ContentLength: 1, ContentType: "a/b", ContentMD5: "1B2M2Y8AsgTpgAmY7PhCfg==", Expires: time.Minute}
 	mutate := []func(*PresignPutInput){
 		func(i *PresignPutInput) { i.Key = "" },
 		func(i *PresignPutInput) { i.ContentLength = 0 },
 		func(i *PresignPutInput) { i.ContentType = "" },
 		func(i *PresignPutInput) { i.ContentMD5 = "" },
 		func(i *PresignPutInput) { i.Expires = 0 },
+		func(i *PresignPutInput) { i.Expires = MaxPresignExpiry + time.Second },
+		func(i *PresignPutInput) { i.ContentMD5 = "m" },
+		func(i *PresignPutInput) { i.ContentMD5 = "1B2M2Y8AsgTpgAmY7PhCfg" },
+		func(i *PresignPutInput) { i.ContentMD5 = "1B2M2Y8AsgTpgAmY7PhCfg--" },
+		func(i *PresignPutInput) { i.ContentMD5 = "AAAA" },
+	}
+	if _, err := NewFake().PresignPut(context.Background(), ok); err != nil {
+		t.Fatalf("valid input rejected: %v", err)
+	}
+	atLimit := ok
+	atLimit.Expires = MaxPresignExpiry
+	if _, err := NewFake().PresignPut(context.Background(), atLimit); err != nil {
+		t.Fatalf("7 day expiry rejected: %v", err)
 	}
 	for i, m := range mutate {
 		in := ok
@@ -211,9 +228,16 @@ func TestFake(t *testing.T) {
 	if err := f.Put(ctx, PutInput{Key: "a", Body: bytes.NewReader([]byte("hello")), Size: 5, ContentType: "text/plain"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Put(ctx, PutInput{Key: "b", Body: bytes.NewReader([]byte("hi")), Size: 5}); err == nil {
-		t.Error("size mismatch accepted")
+	if err := f.Put(ctx, PutInput{Key: "b", Body: bytes.NewReader([]byte("hi")), Size: 5}); !errors.Is(err, ErrSizeMismatch) {
+		t.Errorf("size mismatch: %v", err)
 	}
+	if err := f.Put(ctx, PutInput{Key: "c", Body: strings.NewReader("x"), Size: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := f.Head(ctx, "c"); info.ContentType != DefaultContentType {
+		t.Errorf("default content type = %q", info.ContentType)
+	}
+	_ = f.Delete(ctx, "c")
 	info, err := f.Head(ctx, "a")
 	if err != nil || info.Size != 5 || info.ContentType != "text/plain" {
 		t.Fatalf("head: %+v %v", info, err)

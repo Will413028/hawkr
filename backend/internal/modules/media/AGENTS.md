@@ -15,6 +15,7 @@
 ## 模組內部結構
 
 - 根套件以型別別名公開 `internal/model` 的 `Uploader`、`Ref`、`Asset`、`SecureAsset` 與 `Media`；`internal/refsync` 是引用同步的演算法，由 `media.Sync*` 公開；`fake.go` 是測試用的記憶體內 `media.NewFake`。
+- `internal/storage` 是物件儲存：`Store` port、S3 adapter（`r2`、`s3compat`，aws-sdk-go-v2）與只給測試用的 `Fake`。
 - `Media` 由 `internal/legacy/mediaservice` 呼叫 media-service 的 gRPC client 實作，在 `cmd/hawkr` 接線。
 - `ref_type.go` 由 CodeMeta 生成（`generate.sh --go-media`），不得手改。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加子領域時同步修改圖。
@@ -37,4 +38,4 @@
 
 ## 決策紀錄
 
-實作還在舊服務，尚無 `CARRYOVER.md`（實作搬進單體時建立）。相關 ADR：`docs/adr/2026-10-03-media-references-owner-side.md`（引用由擁有者端的同步 job 單一寫入，終點是 media 不認識業務；文末修訂：機敏下載由擁有者端點代理）、`docs/adr/2026-09-24-go-modular-monolith.md`（D2）。
+決策與沿用盤點見 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-10-03-media-references-owner-side.md`（引用由擁有者端的同步 job 單一寫入，終點是 media 不認識業務；文末修訂：機敏下載由擁有者端點代理）、`docs/adr/2026-09-24-go-modular-monolith.md`（D2）。
