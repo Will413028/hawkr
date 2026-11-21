@@ -10,11 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
-
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
-	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
 
@@ -121,53 +118,9 @@ func TestAccountLimiterFailsClosedWhenTheTableIsFull(t *testing.T) {
 	}
 }
 
-// 匿名的食安通報有兩個時間窗（10 分鐘 5 次、1 小時 10 次），以來源 IP 計數：全部在額度內才一起計，被拒絕的請求都不計（不扣
-// 另一個時間窗）；RetryInfo 是最久的等待時間。1 小時用完之後，新的 10 分鐘也送不出去。登入的通報不在入口計（帳號額度在
-// handler），其他方法不受影響。
-func TestReportSubmissionIsLimitedByTwoWindows(t *testing.T) {
-	now := entryNow
-	path := sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure
-	svcPath, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
-	h, err := assemble(Deps{
-		Now: func() time.Time { return now }, Origins: []string{testOrigin},
-		OriginAuth: OriginAuth{Main: []byte("main-secret"), CI: []byte("ci-secret")}, Logger: slog.New(slog.DiscardHandler),
-	}, []service{{"/" + svcPath + "/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	post := func(ip string) *httptest.ResponseRecorder {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
-		r.Header.Set("Content-Type", "application/json")
-		r.RemoteAddr = ip + ":4000"
-		return do(h, r)
-	}
-	window := func(name, retry string) {
-		t.Helper()
-		for i := range 5 {
-			if rec := post("192.0.2.1"); rec.Code != http.StatusOK {
-				t.Fatalf("%s 第 %d 次 = %d", name, i+1, rec.Code)
-			}
-		}
-		rec := post("192.0.2.1")
-		if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), `"retryDelay":"`+retry+`"`) {
-			t.Fatalf("%s 第 6 次 = %d %q", name, rec.Code, rec.Body)
-		}
-		// 文字是共用文案目錄的 RESOURCE_EXHAUSTED，不是入口自己寫的一句。
-		if text := rpc.CommonText(t.Context(), connect.CodeResourceExhausted).Text; text != "操作過於頻繁，請稍後再試" || !strings.Contains(rec.Body.String(), text) {
-			t.Fatalf("%s 第 6 次的文字 = %q，預期目錄的 %q", name, rec.Body, text)
-		}
-	}
-	window("第一個 10 分鐘", "600s")
-	if rec := post("192.0.2.2"); rec.Code != http.StatusOK {
-		t.Fatalf("另一個 IP 不該被擋：%d", rec.Code)
-	}
-	now = now.Add(10 * time.Minute)
-	// 被拒絕的第 6 次沒有扣 1 小時的額度：這 10 分鐘還能送 5 次；第 6 次兩個時間窗都超過，RetryInfo 是較久的 1 小時那個。
-	window("第二個 10 分鐘", "3000s")
-	now = now.Add(10 * time.Minute)
-	if rec := post("192.0.2.1"); rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), `"retryDelay":"2400s"`) {
-		t.Fatalf("1 小時的額度用完，要等到這個小時結束：%d %q", rec.Code, rec.Body)
-	}
+// 登入的通報在入口照一般級別，帳號額度在 handler。
+func TestCreateReportUsesTheDefaultTierAtTheEntry(t *testing.T) {
+	t.Parallel()
 	if !slices.Equal(tiersOf(sellerconnect.SellerReportAppServiceCreateReportProcedure), []rateTier{tierDefault}) {
 		t.Fatal("登入的通報在入口照一般級別，帳號額度在 handler")
 	}
@@ -222,7 +175,7 @@ func TestAppLoginProceduresShareTheirOwnTier(t *testing.T) {
 }
 
 func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
-	path := sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure
+	path := identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure
 	svcPath, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
 	h, err := assemble(Deps{
 		Now: func() time.Time { return entryNow }, Origins: []string{testOrigin},
@@ -232,7 +185,7 @@ func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rec *httptest.ResponseRecorder
-	for range 6 {
+	for range tierAppLogin.visitor + 1 {
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Accept-Language", "en")

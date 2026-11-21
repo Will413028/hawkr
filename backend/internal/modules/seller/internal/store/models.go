@@ -450,30 +450,25 @@ type SellerProspectDistinctPair struct {
 }
 
 type SellerReport struct {
-	ID                   uuid.UUID
-	StoreID              int64
-	ProductID            *string
-	OrderNo              *string
-	Category             string
-	Description          string
-	ReporterBuyerID      *int64
-	ReporterPhone        *string
-	ReporterEmail        *string
-	ReporterName         *string
-	ContactErasedAt      *time.Time
-	CaseID               *uuid.UUID
-	AssessedCategory     *string
-	TriagedAt            *time.Time
-	TriagedByAdminID     *int64
-	Outcome              *string
-	ResolvedAt           *time.Time
-	ResolvedByAdminID    *int64
-	ResolutionNote       *string
-	DiscardedSubmissions int32
-	SupplementsSeenSeq   int16
-	Version              int64
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                 uuid.UUID
+	StoreID            int64
+	ProductID          *string
+	OrderNo            *string
+	Category           string
+	Description        string
+	ReporterBuyerID    int64
+	CaseID             *uuid.UUID
+	AssessedCategory   *string
+	TriagedAt          *time.Time
+	TriagedByAdminID   *int64
+	Outcome            *string
+	ResolvedAt         *time.Time
+	ResolvedByAdminID  *int64
+	ResolutionNote     *string
+	SupplementsSeenSeq int16
+	Version            int64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type SellerReportCaseMove struct {
@@ -499,7 +494,6 @@ type SellerReportSupplement struct {
 	ID          uuid.UUID
 	ReportID    uuid.UUID
 	Description string
-	MatchedBy   *string
 	Seq         int16
 	CreatedAt   time.Time
 }

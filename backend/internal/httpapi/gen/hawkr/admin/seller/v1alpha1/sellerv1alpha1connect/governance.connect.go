@@ -6,7 +6,7 @@
 // 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
 // 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；記內部註記、
 // 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
-// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
+// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService；賣家看措施與申覆在 SellerAppService。
 //
 // 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
 // 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
@@ -164,7 +164,7 @@ const (
 // hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService service.
 type SellerGovernanceAdminServiceClient interface {
 	// ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
-	// （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+	// （待分案與案件成員的處理順序）。清單的通報不帶 evidence 與 supplements（GetReport 才有）。
 	ListReports(context.Context, *connect.Request[v1alpha1.ListReportsRequest]) (*connect.Response[v1alpha1.ListReportsResponse], error)
 	// GetReport 讀一筆通報，含補充、佐證與 etag；can_* 與 available_outcomes 是此刻能做的動作。
 	GetReport(context.Context, *connect.Request[v1alpha1.GetReportRequest]) (*connect.Response[v1alpha1.GetReportResponse], error)
@@ -796,7 +796,7 @@ func (c *sellerGovernanceAdminServiceClient) ListViolations(ctx context.Context,
 // hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService service.
 type SellerGovernanceAdminServiceHandler interface {
 	// ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
-	// （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+	// （待分案與案件成員的處理順序）。清單的通報不帶 evidence 與 supplements（GetReport 才有）。
 	ListReports(context.Context, *connect.Request[v1alpha1.ListReportsRequest]) (*connect.Response[v1alpha1.ListReportsResponse], error)
 	// GetReport 讀一筆通報，含補充、佐證與 etag；can_* 與 available_outcomes 是此刻能做的動作。
 	GetReport(context.Context, *connect.Request[v1alpha1.GetReportRequest]) (*connect.Response[v1alpha1.GetReportResponse], error)

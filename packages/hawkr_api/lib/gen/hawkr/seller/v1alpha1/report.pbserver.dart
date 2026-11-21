@@ -54,33 +54,3 @@ abstract class SellerReportAppServiceBase extends $pb.GeneratedService {
   $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       get $messageJson => SellerReportAppServiceBase$messageJson;
 }
-
-abstract class SellerReportPublicServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.SubmitFoodSafetyReportResponse> submitFoodSafetyReport(
-      $pb.ServerContext ctx, $3.SubmitFoodSafetyReportRequest request);
-
-  $pb.GeneratedMessage createRequest($core.String methodName) {
-    switch (methodName) {
-      case 'SubmitFoodSafetyReport':
-        return $3.SubmitFoodSafetyReportRequest();
-      default:
-        throw $core.ArgumentError('Unknown method: $methodName');
-    }
-  }
-
-  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
-      $core.String methodName, $pb.GeneratedMessage request) {
-    switch (methodName) {
-      case 'SubmitFoodSafetyReport':
-        return submitFoodSafetyReport(
-            ctx, request as $3.SubmitFoodSafetyReportRequest);
-      default:
-        throw $core.ArgumentError('Unknown method: $methodName');
-    }
-  }
-
-  $core.Map<$core.String, $core.dynamic> get $json =>
-      SellerReportPublicServiceBase$json;
-  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
-      get $messageJson => SellerReportPublicServiceBase$messageJson;
-}

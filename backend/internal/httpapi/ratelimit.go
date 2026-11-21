@@ -21,11 +21,10 @@ import (
 
 const rateWindow = time.Minute
 
-// rateTier 是一個級別在一個時間窗的額度（window 是 0 時為 rateWindow）。ssr、ci 是網頁 SSR 與 CI 的身分（它們代表很多人），
+// rateTier 是一個級別在 rateWindow 內的額度。ssr、ci 是網頁 SSR 與 CI 的身分（它們代表很多人），
 // 0 表示同 visitor。
 type rateTier struct {
 	name             string
-	window           time.Duration
 	visitor, ssr, ci int
 }
 
@@ -44,23 +43,12 @@ var (
 // 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
 var tierAppLogin = rateTier{name: "app-login", visitor: 30}
 
-// tierReportSubmit 是匿名食安通報以來源 IP 計數的兩個時間窗（httpseller.ReportSubmitQuotas；登入的通報以帳號在 handler 計數）。
-// 通報只由瀏覽器或 App 送出，SSR 與 CI 的身分沒有加倍。不加 captcha：食安通報是不能被第三方依賴擋住的緊急管道（同一則決策）。
-var tierReportSubmit = func() []rateTier {
-	tiers := make([]rateTier, len(httpseller.ReportSubmitQuotas))
-	for i, q := range httpseller.ReportSubmitQuotas {
-		tiers[i] = rateTier{name: "report-submit-" + q.Window.String(), window: q.Window, visitor: q.Limit}
-	}
-	return tiers
-}()
-
-// procedureTiers 是需要自己額度的 procedure（每個時間窗一個級別，全部在額度內才放行）；其餘依 service 的使用者類別。
+// procedureTiers 是需要自己額度的 procedure；其餘依 service 的使用者類別。
 var procedureTiers = map[string][]rateTier{
-	sellerconnect.SellerPublicServiceRecordProductViewProcedure:            {tierProductView},
-	socialconnect.SocialPublicServiceRecordPostViewProcedure:               {tierPostView},
-	sellerconnect.SellerReportPublicServiceSubmitFoodSafetyReportProcedure: tierReportSubmit,
-	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure:       {tierAppLogin},
-	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:          {tierAppLogin},
+	sellerconnect.SellerPublicServiceRecordProductViewProcedure:      {tierProductView},
+	socialconnect.SocialPublicServiceRecordPostViewProcedure:         {tierPostView},
+	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: {tierAppLogin},
+	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    {tierAppLogin},
 }
 
 // tiersOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。
@@ -75,13 +63,6 @@ func tiersOf(procedure string) []rateTier {
 	case rpc.AudienceApp, rpc.AudienceAdmin, rpc.AudienceDelegated:
 	}
 	return []rateTier{tierDefault}
-}
-
-func (t rateTier) span() time.Duration {
-	if t.window == 0 {
-		return rateWindow
-	}
-	return t.window
 }
 
 func (t rateTier) limit(subject string) int {
@@ -181,7 +162,7 @@ func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 		tiers := tiersOf(r.URL.Path)
 		reqs := make([]rateRequest, len(tiers))
 		for i, tier := range tiers {
-			reqs[i] = rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: tier.span()}
+			reqs[i] = rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: rateWindow}
 		}
 		if ok, wait := l.allowAll(reqs...); !ok {
 			_ = connect.NewErrorWriter().Write(w, r, rpc.NegotiatedRetryLater(w, r, wait))

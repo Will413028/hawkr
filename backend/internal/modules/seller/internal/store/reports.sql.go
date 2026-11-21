@@ -13,7 +13,7 @@ import (
 )
 
 const adminReports = `-- name: AdminReports :many
-SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.reporter_phone, r.reporter_email, r.reporter_name, r.contact_erased_at, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.discarded_submissions, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
+SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
        s.store_name AS store_name,
        (s.status = 'CLOSED')::bool AS store_closed,
        (SELECT count(*) FROM seller.report_supplements p WHERE p.report_id = r.id)::int AS supplement_count,
@@ -87,10 +87,6 @@ func (q *Queries) AdminReports(ctx context.Context, arg AdminReportsParams) ([]A
 			&i.SellerReport.Category,
 			&i.SellerReport.Description,
 			&i.SellerReport.ReporterBuyerID,
-			&i.SellerReport.ReporterPhone,
-			&i.SellerReport.ReporterEmail,
-			&i.SellerReport.ReporterName,
-			&i.SellerReport.ContactErasedAt,
 			&i.SellerReport.CaseID,
 			&i.SellerReport.AssessedCategory,
 			&i.SellerReport.TriagedAt,
@@ -99,7 +95,6 @@ func (q *Queries) AdminReports(ctx context.Context, arg AdminReportsParams) ([]A
 			&i.SellerReport.ResolvedAt,
 			&i.SellerReport.ResolvedByAdminID,
 			&i.SellerReport.ResolutionNote,
-			&i.SellerReport.DiscardedSubmissions,
 			&i.SellerReport.SupplementsSeenSeq,
 			&i.SellerReport.Version,
 			&i.SellerReport.CreatedAt,
@@ -121,7 +116,7 @@ func (q *Queries) AdminReports(ctx context.Context, arg AdminReportsParams) ([]A
 }
 
 const adminReportsQueue = `-- name: AdminReportsQueue :many
-SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.reporter_phone, r.reporter_email, r.reporter_name, r.contact_erased_at, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.discarded_submissions, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
+SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
        s.store_name AS store_name,
        (s.status = 'CLOSED')::bool AS store_closed,
        (SELECT count(*) FROM seller.report_supplements p WHERE p.report_id = r.id)::int AS supplement_count,
@@ -193,10 +188,6 @@ func (q *Queries) AdminReportsQueue(ctx context.Context, arg AdminReportsQueuePa
 			&i.SellerReport.Category,
 			&i.SellerReport.Description,
 			&i.SellerReport.ReporterBuyerID,
-			&i.SellerReport.ReporterPhone,
-			&i.SellerReport.ReporterEmail,
-			&i.SellerReport.ReporterName,
-			&i.SellerReport.ContactErasedAt,
 			&i.SellerReport.CaseID,
 			&i.SellerReport.AssessedCategory,
 			&i.SellerReport.TriagedAt,
@@ -205,7 +196,6 @@ func (q *Queries) AdminReportsQueue(ctx context.Context, arg AdminReportsQueuePa
 			&i.SellerReport.ResolvedAt,
 			&i.SellerReport.ResolvedByAdminID,
 			&i.SellerReport.ResolutionNote,
-			&i.SellerReport.DiscardedSubmissions,
 			&i.SellerReport.SupplementsSeenSeq,
 			&i.SellerReport.Version,
 			&i.SellerReport.CreatedAt,
@@ -245,7 +235,7 @@ func (q *Queries) BumpReportVersion(ctx context.Context, arg BumpReportVersionPa
 }
 
 const buyerReports = `-- name: BuyerReports :many
-SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 FROM seller.reports
 WHERE reporter_buyer_id = $1::bigint
   AND (
@@ -286,10 +276,6 @@ func (q *Queries) BuyerReports(ctx context.Context, arg BuyerReportsParams) ([]S
 			&i.Category,
 			&i.Description,
 			&i.ReporterBuyerID,
-			&i.ReporterPhone,
-			&i.ReporterEmail,
-			&i.ReporterName,
-			&i.ContactErasedAt,
 			&i.CaseID,
 			&i.AssessedCategory,
 			&i.TriagedAt,
@@ -298,7 +284,6 @@ func (q *Queries) BuyerReports(ctx context.Context, arg BuyerReportsParams) ([]S
 			&i.ResolvedAt,
 			&i.ResolvedByAdminID,
 			&i.ResolutionNote,
-			&i.DiscardedSubmissions,
 			&i.SupplementsSeenSeq,
 			&i.Version,
 			&i.CreatedAt,
@@ -315,7 +300,7 @@ func (q *Queries) BuyerReports(ctx context.Context, arg BuyerReportsParams) ([]S
 }
 
 const duplicateBuyerReport = `-- name: DuplicateBuyerReport :one
-SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 FROM seller.reports
 WHERE reporter_buyer_id = $1::bigint AND store_id = $2 AND category = $3 AND outcome IS NULL
   AND (created_at AT TIME ZONE 'Asia/Taipei')::date = ($4::timestamptz AT TIME ZONE 'Asia/Taipei')::date
@@ -345,10 +330,6 @@ func (q *Queries) DuplicateBuyerReport(ctx context.Context, arg DuplicateBuyerRe
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -357,136 +338,12 @@ func (q *Queries) DuplicateBuyerReport(ctx context.Context, arg DuplicateBuyerRe
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const duplicateContactReport = `-- name: DuplicateContactReport :one
-SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.reporter_phone, r.reporter_email, r.reporter_name, r.contact_erased_at, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.discarded_submissions, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
-       (CASE
-          WHEN r.reporter_phone = $1::text AND r.reporter_email = $2::text THEN 'BOTH'
-          WHEN r.reporter_phone = $1::text THEN 'PHONE'
-          ELSE 'EMAIL'
-        END)::text AS matched_by
-FROM seller.reports r
-WHERE r.store_id = $3 AND r.reporter_buyer_id IS NULL AND r.outcome IS NULL
-  AND (r.reporter_phone = $1::text OR r.reporter_email = $2::text)
-  AND date_trunc('week', r.created_at AT TIME ZONE 'Asia/Taipei') = date_trunc('week', $4::timestamptz AT TIME ZONE 'Asia/Taipei')
-ORDER BY r.created_at, r.id
-LIMIT 1
-`
-
-type DuplicateContactReportParams struct {
-	Phone   *string
-	Email   *string
-	StoreID int64
-	Now     time.Time
-}
-
-type DuplicateContactReportRow struct {
-	SellerReport SellerReport
-	MatchedBy    string
-}
-
-// 匿名的同一支電話或同一個 email 在同一個台北 ISO 週對同一個店家已有、還沒有結果的通報（與 reports_phone_weekly、reports_email_weekly 同一個條件）。
-// matched_by 是這次送出和它比對到的方式：電話與 email 都相同是 BOTH，否則是相同的那一個。
-func (q *Queries) DuplicateContactReport(ctx context.Context, arg DuplicateContactReportParams) (DuplicateContactReportRow, error) {
-	row := q.db.QueryRow(ctx, duplicateContactReport,
-		arg.Phone,
-		arg.Email,
-		arg.StoreID,
-		arg.Now,
-	)
-	var i DuplicateContactReportRow
-	err := row.Scan(
-		&i.SellerReport.ID,
-		&i.SellerReport.StoreID,
-		&i.SellerReport.ProductID,
-		&i.SellerReport.OrderNo,
-		&i.SellerReport.Category,
-		&i.SellerReport.Description,
-		&i.SellerReport.ReporterBuyerID,
-		&i.SellerReport.ReporterPhone,
-		&i.SellerReport.ReporterEmail,
-		&i.SellerReport.ReporterName,
-		&i.SellerReport.ContactErasedAt,
-		&i.SellerReport.CaseID,
-		&i.SellerReport.AssessedCategory,
-		&i.SellerReport.TriagedAt,
-		&i.SellerReport.TriagedByAdminID,
-		&i.SellerReport.Outcome,
-		&i.SellerReport.ResolvedAt,
-		&i.SellerReport.ResolvedByAdminID,
-		&i.SellerReport.ResolutionNote,
-		&i.SellerReport.DiscardedSubmissions,
-		&i.SellerReport.SupplementsSeenSeq,
-		&i.SellerReport.Version,
-		&i.SellerReport.CreatedAt,
-		&i.SellerReport.UpdatedAt,
-		&i.MatchedBy,
-	)
-	return i, err
-}
-
-const eraseExpiredContacts = `-- name: EraseExpiredContacts :many
-UPDATE seller.reports
-SET reporter_phone = NULL,
-    reporter_email = NULL,
-    reporter_name = NULL,
-    contact_erased_at = $1::timestamptz,
-    updated_at = $1::timestamptz
-WHERE id IN (
-    SELECT r.id
-    FROM seller.reports r
-    WHERE r.reporter_buyer_id IS NULL AND r.contact_erased_at IS NULL
-      AND (r.created_at < $2::timestamptz
-           OR (r.resolved_at IS NOT NULL AND r.created_at < $3::timestamptz AND r.resolved_at < $4::timestamptz))
-    ORDER BY r.created_at
-    LIMIT $5
-    FOR UPDATE SKIP LOCKED
-)
-RETURNING (NOT (resolved_at IS NOT NULL AND created_at < $3::timestamptz AND resolved_at < $4::timestamptz))::bool AS capped
-`
-
-type EraseExpiredContactsParams struct {
-	Now            time.Time
-	CapCutoff      time.Time
-	CreatedCutoff  time.Time
-	ResolvedCutoff time.Time
-	BatchSize      int32
-}
-
-// 把清除時間已到的匿名通報的聯絡欄位清成 NULL，一次最多 batch_size 筆；回傳每筆清掉的通報是否只靠絕對上限（capped）清的。清除時間有兩條：
-// 一是有結果的，greatest(建立 + 90 天, 結果 + 30 天)；二是絕對上限，建立滿 365 天（created_at < cap_cutoff），不論有沒有結果。依 created_at 掃描。
-func (q *Queries) EraseExpiredContacts(ctx context.Context, arg EraseExpiredContactsParams) ([]bool, error) {
-	rows, err := q.db.Query(ctx, eraseExpiredContacts,
-		arg.Now,
-		arg.CapCutoff,
-		arg.CreatedCutoff,
-		arg.ResolvedCutoff,
-		arg.BatchSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []bool{}
-	for rows.Next() {
-		var capped bool
-		if err := rows.Scan(&capped); err != nil {
-			return nil, err
-		}
-		items = append(items, capped)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const evidenceAssets = `-- name: EvidenceAssets :many
@@ -516,24 +373,6 @@ func (q *Queries) EvidenceAssets(ctx context.Context, refID uuid.UUID) ([]string
 		return nil, err
 	}
 	return items, nil
-}
-
-const incrementDiscardedSubmissions = `-- name: IncrementDiscardedSubmissions :exec
-UPDATE seller.reports
-SET discarded_submissions = discarded_submissions + 1,
-    updated_at = $1
-WHERE id = $2
-`
-
-type IncrementDiscardedSubmissionsParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-// 補充已達上限、內容沒有存下的匿名送出：只加計數，不動版本（沒有存下任何會影響後台判斷的內容）。
-func (q *Queries) IncrementDiscardedSubmissions(ctx context.Context, arg IncrementDiscardedSubmissionsParams) error {
-	_, err := q.db.Exec(ctx, incrementDiscardedSubmissions, arg.Now, arg.ID)
-	return err
 }
 
 const insertEvidenceAccess = `-- name: InsertEvidenceAccess :exec
@@ -567,16 +406,16 @@ func (q *Queries) InsertEvidenceAccess(ctx context.Context, arg InsertEvidenceAc
 
 const insertReport = `-- name: InsertReport :one
 INSERT INTO seller.reports (
-    id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email,
-    reporter_name, created_at, updated_at
+    id, store_id, product_id, order_no, category, description, reporter_buyer_id,
+    created_at, updated_at
 )
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10,
-    $11, $11
+    $7,
+    $8, $8
 )
 ON CONFLICT DO NOTHING
-RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
 type InsertReportParams struct {
@@ -586,10 +425,7 @@ type InsertReportParams struct {
 	OrderNo         *string
 	Category        string
 	Description     string
-	ReporterBuyerID *int64
-	ReporterPhone   *string
-	ReporterEmail   *string
-	ReporterName    *string
+	ReporterBuyerID int64
 	Now             time.Time
 }
 
@@ -603,9 +439,6 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Sel
 		arg.Category,
 		arg.Description,
 		arg.ReporterBuyerID,
-		arg.ReporterPhone,
-		arg.ReporterEmail,
-		arg.ReporterName,
 		arg.Now,
 	)
 	var i SellerReport
@@ -617,10 +450,6 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Sel
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -629,7 +458,6 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Sel
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -666,9 +494,9 @@ func (q *Queries) InsertReportEvidence(ctx context.Context, arg InsertReportEvid
 }
 
 const insertReportSupplement = `-- name: InsertReportSupplement :one
-INSERT INTO seller.report_supplements (id, report_id, seq, description, matched_by, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, report_id, description, matched_by, seq, created_at
+INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, report_id, description, seq, created_at
 `
 
 type InsertReportSupplementParams struct {
@@ -676,18 +504,16 @@ type InsertReportSupplementParams struct {
 	ReportID    uuid.UUID
 	Seq         int16
 	Description string
-	MatchedBy   *string
 	Now         time.Time
 }
 
-// 補充：去重期間內同一位檢舉人的重複送出併入原通報（呼叫方已鎖住通報並確認沒有結果、沒有超過上限）。matched_by 只有匿名的補充有。
+// 補充：去重期間內同一位檢舉人的重複送出併入原通報（呼叫方已鎖住通報並確認沒有結果、沒有超過上限）。
 func (q *Queries) InsertReportSupplement(ctx context.Context, arg InsertReportSupplementParams) (SellerReportSupplement, error) {
 	row := q.db.QueryRow(ctx, insertReportSupplement,
 		arg.ID,
 		arg.ReportID,
 		arg.Seq,
 		arg.Description,
-		arg.MatchedBy,
 		arg.Now,
 	)
 	var i SellerReportSupplement
@@ -695,7 +521,6 @@ func (q *Queries) InsertReportSupplement(ctx context.Context, arg InsertReportSu
 		&i.ID,
 		&i.ReportID,
 		&i.Description,
-		&i.MatchedBy,
 		&i.Seq,
 		&i.CreatedAt,
 	)
@@ -703,7 +528,7 @@ func (q *Queries) InsertReportSupplement(ctx context.Context, arg InsertReportSu
 }
 
 const lockReport = `-- name: LockReport :one
-SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 FROM seller.reports
 WHERE id = $1
 FOR UPDATE
@@ -721,10 +546,6 @@ func (q *Queries) LockReport(ctx context.Context, id uuid.UUID) (SellerReport, e
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -733,7 +554,6 @@ func (q *Queries) LockReport(ctx context.Context, id uuid.UUID) (SellerReport, e
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -743,7 +563,7 @@ func (q *Queries) LockReport(ctx context.Context, id uuid.UUID) (SellerReport, e
 }
 
 const lockReports = `-- name: LockReports :many
-SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 FROM seller.reports
 WHERE id = ANY($1::uuid[])
 ORDER BY id
@@ -768,10 +588,6 @@ func (q *Queries) LockReports(ctx context.Context, ids []uuid.UUID) ([]SellerRep
 			&i.Category,
 			&i.Description,
 			&i.ReporterBuyerID,
-			&i.ReporterPhone,
-			&i.ReporterEmail,
-			&i.ReporterName,
-			&i.ContactErasedAt,
 			&i.CaseID,
 			&i.AssessedCategory,
 			&i.TriagedAt,
@@ -780,7 +596,6 @@ func (q *Queries) LockReports(ctx context.Context, ids []uuid.UUID) ([]SellerRep
 			&i.ResolvedAt,
 			&i.ResolvedByAdminID,
 			&i.ResolutionNote,
-			&i.DiscardedSubmissions,
 			&i.SupplementsSeenSeq,
 			&i.Version,
 			&i.CreatedAt,
@@ -801,7 +616,7 @@ UPDATE seller.reports r
 SET supplements_seen_seq = (SELECT max(p.seq) FROM seller.report_supplements p WHERE p.report_id = r.id)
 WHERE r.id = $1 AND r.outcome IS NULL
   AND EXISTS (SELECT 1 FROM seller.report_supplements p WHERE p.report_id = r.id AND p.seq > r.supplements_seen_seq)
-RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
 // 記下管理員看過這筆通報此刻的全部補充（把 supplements_seen_seq 設成最新一則的編號）；呼叫方已鎖住通報並比對過版本。**不改 version 與 updated_at**
@@ -818,10 +633,6 @@ func (q *Queries) MarkReportSupplementsSeen(ctx context.Context, id uuid.UUID) (
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -830,7 +641,6 @@ func (q *Queries) MarkReportSupplementsSeen(ctx context.Context, id uuid.UUID) (
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -847,7 +657,7 @@ SET case_id = $1::uuid,
     version = r.version + 1,
     updated_at = $3::timestamptz
 WHERE r.id = $4 AND r.version = $5::bigint AND r.case_id IS NOT NULL AND r.outcome IS NULL
-RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
 type MoveReportParams struct {
@@ -876,10 +686,6 @@ func (q *Queries) MoveReport(ctx context.Context, arg MoveReportParams) (SellerR
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -888,7 +694,6 @@ func (q *Queries) MoveReport(ctx context.Context, arg MoveReportParams) (SellerR
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -898,7 +703,7 @@ func (q *Queries) MoveReport(ctx context.Context, arg MoveReportParams) (SellerR
 }
 
 const reportByID = `-- name: ReportByID :one
-SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+SELECT id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 FROM seller.reports
 WHERE id = $1
 `
@@ -914,10 +719,6 @@ func (q *Queries) ReportByID(ctx context.Context, id uuid.UUID) (SellerReport, e
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -926,7 +727,6 @@ func (q *Queries) ReportByID(ctx context.Context, id uuid.UUID) (SellerReport, e
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -936,7 +736,7 @@ func (q *Queries) ReportByID(ctx context.Context, id uuid.UUID) (SellerReport, e
 }
 
 const reportDetails = `-- name: ReportDetails :many
-SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.reporter_phone, r.reporter_email, r.reporter_name, r.contact_erased_at, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.discarded_submissions, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
+SELECT r.id, r.store_id, r.product_id, r.order_no, r.category, r.description, r.reporter_buyer_id, r.case_id, r.assessed_category, r.triaged_at, r.triaged_by_admin_id, r.outcome, r.resolved_at, r.resolved_by_admin_id, r.resolution_note, r.supplements_seen_seq, r.version, r.created_at, r.updated_at,
        s.store_name AS store_name,
        (s.status = 'CLOSED')::bool AS store_closed,
        (SELECT count(*) FROM seller.report_supplements p WHERE p.report_id = r.id)::int AS supplement_count,
@@ -975,10 +775,6 @@ func (q *Queries) ReportDetails(ctx context.Context, ids []uuid.UUID) ([]ReportD
 			&i.SellerReport.Category,
 			&i.SellerReport.Description,
 			&i.SellerReport.ReporterBuyerID,
-			&i.SellerReport.ReporterPhone,
-			&i.SellerReport.ReporterEmail,
-			&i.SellerReport.ReporterName,
-			&i.SellerReport.ContactErasedAt,
 			&i.SellerReport.CaseID,
 			&i.SellerReport.AssessedCategory,
 			&i.SellerReport.TriagedAt,
@@ -987,7 +783,6 @@ func (q *Queries) ReportDetails(ctx context.Context, ids []uuid.UUID) ([]ReportD
 			&i.SellerReport.ResolvedAt,
 			&i.SellerReport.ResolvedByAdminID,
 			&i.SellerReport.ResolutionNote,
-			&i.SellerReport.DiscardedSubmissions,
 			&i.SellerReport.SupplementsSeenSeq,
 			&i.SellerReport.Version,
 			&i.SellerReport.CreatedAt,
@@ -1106,7 +901,7 @@ func (q *Queries) ReportFindingSources(ctx context.Context, reportIds []uuid.UUI
 }
 
 const reportSupplements = `-- name: ReportSupplements :many
-SELECT id, report_id, description, matched_by, seq, created_at
+SELECT id, report_id, description, seq, created_at
 FROM seller.report_supplements
 WHERE report_id = ANY($1::uuid[])
 ORDER BY report_id, created_at, id
@@ -1126,7 +921,6 @@ func (q *Queries) ReportSupplements(ctx context.Context, reportIds []uuid.UUID) 
 			&i.ID,
 			&i.ReportID,
 			&i.Description,
-			&i.MatchedBy,
 			&i.Seq,
 			&i.CreatedAt,
 		); err != nil {
@@ -1163,7 +957,7 @@ type ResolveCaseReportsParams struct {
 type ResolveCaseReportsRow struct {
 	ID              uuid.UUID
 	StoreID         int64
-	ReporterBuyerID *int64
+	ReporterBuyerID int64
 }
 
 // 案件結案時，還沒有結果的成員全部帶入預設結果與說明；回傳帶入的通報（發 ReportResolved 用）。呼叫方已鎖住案件與全部成員。
@@ -1202,7 +996,7 @@ SET outcome = $1::text,
     version = version + 1,
     updated_at = $2::timestamptz
 WHERE id = $5 AND version = $6::bigint AND outcome IS NULL
-RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
 type ResolveReportParams struct {
@@ -1233,10 +1027,6 @@ func (q *Queries) ResolveReport(ctx context.Context, arg ResolveReportParams) (S
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -1245,7 +1035,6 @@ func (q *Queries) ResolveReport(ctx context.Context, arg ResolveReportParams) (S
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,
@@ -1317,7 +1106,7 @@ SET case_id = $1::uuid,
     version = r.version + 1,
     updated_at = $3::timestamptz
 WHERE r.id = $5 AND r.version = $6::bigint AND r.case_id IS NULL AND r.outcome IS NULL
-RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email, reporter_name, contact_erased_at, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, discarded_submissions, supplements_seen_seq, version, created_at, updated_at
+RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
 type TriageReportParams struct {
@@ -1348,10 +1137,6 @@ func (q *Queries) TriageReport(ctx context.Context, arg TriageReportParams) (Sel
 		&i.Category,
 		&i.Description,
 		&i.ReporterBuyerID,
-		&i.ReporterPhone,
-		&i.ReporterEmail,
-		&i.ReporterName,
-		&i.ContactErasedAt,
 		&i.CaseID,
 		&i.AssessedCategory,
 		&i.TriagedAt,
@@ -1360,7 +1145,6 @@ func (q *Queries) TriageReport(ctx context.Context, arg TriageReportParams) (Sel
 		&i.ResolvedAt,
 		&i.ResolvedByAdminID,
 		&i.ResolutionNote,
-		&i.DiscardedSubmissions,
 		&i.SupplementsSeenSeq,
 		&i.Version,
 		&i.CreatedAt,

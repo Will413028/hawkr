@@ -5,7 +5,6 @@ import {
 	CaseState,
 	type Report,
 	ReportState,
-	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import { unknownText } from "@/lib/ui-text";
@@ -100,24 +99,4 @@ export function caseStatusText(
 			? caseDecisionText(kase.decision)
 			: textOf<CaseCloseReason>(CASE_CLOSE_REASON_TEXT, kase.closeReason);
 	return `${closed}：${detail}`;
-}
-
-/** 匿名的補充以哪一種聯絡方式比對到原通報；兩者都相同時，以及登入者的補充，不需要提醒。 */
-const SUPPLEMENT_MATCH_NOTICE: Record<
-	Exclude<SupplementMatch, SupplementMatch.UNSPECIFIED | SupplementMatch.BOTH>,
-	string
-> = {
-	[SupplementMatch.PHONE]:
-		"以電話比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	[SupplementMatch.EMAIL]:
-		"以聯絡信箱比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-};
-
-/** 補充的比對提醒；不需要提醒時回 undefined。 */
-export function supplementMatchNotice(
-	match: SupplementMatch,
-): string | undefined {
-	return (SUPPLEMENT_MATCH_NOTICE as Partial<Record<SupplementMatch, string>>)[
-		match
-	];
 }

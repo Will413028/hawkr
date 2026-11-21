@@ -208,37 +208,6 @@ final $typed_data.Uint8List listMyReportsResponseDescriptor = $convert.base64Dec
     '52MWFscGhhMS5NeVJlcG9ydFIHcmVwb3J0cxImCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAlSDW5l'
     'eHRQYWdlVG9rZW4=');
 
-@$core.Deprecated('Use submitFoodSafetyReportRequestDescriptor instead')
-const SubmitFoodSafetyReportRequest$json = {
-  '1': 'SubmitFoodSafetyReportRequest',
-  '2': [
-    {'1': 'store_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'storeId'},
-    {'1': 'description', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'description'},
-    {'1': 'product_id', '3': 3, '4': 1, '5': 9, '10': 'productId'},
-    {'1': 'order_no', '3': 4, '4': 1, '5': 9, '10': 'orderNo'},
-    {'1': 'phone', '3': 5, '4': 1, '5': 9, '10': 'phone'},
-    {'1': 'email', '3': 6, '4': 1, '5': 9, '10': 'email'},
-    {'1': 'name', '3': 7, '4': 1, '5': 9, '10': 'name'},
-  ],
-};
-
-/// Descriptor for `SubmitFoodSafetyReportRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List submitFoodSafetyReportRequestDescriptor = $convert.base64Decode(
-    'Ch1TdWJtaXRGb29kU2FmZXR5UmVwb3J0UmVxdWVzdBIeCghzdG9yZV9pZBgBIAEoCUID4EECUg'
-    'dzdG9yZUlkEiUKC2Rlc2NyaXB0aW9uGAIgASgJQgPgQQJSC2Rlc2NyaXB0aW9uEh0KCnByb2R1'
-    'Y3RfaWQYAyABKAlSCXByb2R1Y3RJZBIZCghvcmRlcl9ubxgEIAEoCVIHb3JkZXJObxIUCgVwaG'
-    '9uZRgFIAEoCVIFcGhvbmUSFAoFZW1haWwYBiABKAlSBWVtYWlsEhIKBG5hbWUYByABKAlSBG5h'
-    'bWU=');
-
-@$core.Deprecated('Use submitFoodSafetyReportResponseDescriptor instead')
-const SubmitFoodSafetyReportResponse$json = {
-  '1': 'SubmitFoodSafetyReportResponse',
-};
-
-/// Descriptor for `SubmitFoodSafetyReportResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List submitFoodSafetyReportResponseDescriptor =
-    $convert.base64Decode('Ch5TdWJtaXRGb29kU2FmZXR5UmVwb3J0UmVzcG9uc2U=');
-
 const $core.Map<$core.String, $core.dynamic> SellerReportAppServiceBase$json = {
   '1': 'SellerReportAppService',
   '2': [
@@ -275,30 +244,3 @@ final $typed_data.Uint8List sellerReportAppServiceDescriptor = $convert.base64De
     'ZWF0ZVJlcG9ydFJlc3BvbnNlEm8KDUxpc3RNeVJlcG9ydHMSKy5oYXdrci5zZWxsZXIudjFhbH'
     'BoYTEuTGlzdE15UmVwb3J0c1JlcXVlc3QaLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15'
     'UmVwb3J0c1Jlc3BvbnNlIgOQAgE=');
-
-const $core.Map<$core.String, $core.dynamic>
-    SellerReportPublicServiceBase$json = {
-  '1': 'SellerReportPublicService',
-  '2': [
-    {
-      '1': 'SubmitFoodSafetyReport',
-      '2': '.hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest',
-      '3': '.hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse'
-    },
-  ],
-};
-
-@$core.Deprecated('Use sellerReportPublicServiceDescriptor instead')
-const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
-    SellerReportPublicServiceBase$messageJson = {
-  '.hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest':
-      SubmitFoodSafetyReportRequest$json,
-  '.hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse':
-      SubmitFoodSafetyReportResponse$json,
-};
-
-/// Descriptor for `SellerReportPublicService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
-final $typed_data.Uint8List sellerReportPublicServiceDescriptor = $convert.base64Decode(
-    'ChlTZWxsZXJSZXBvcnRQdWJsaWNTZXJ2aWNlEoUBChZTdWJtaXRGb29kU2FmZXR5UmVwb3J0Ej'
-    'QuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEZvb2RTYWZldHlSZXBvcnRSZXF1ZXN0GjUu'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEZvb2RTYWZldHlSZXBvcnRSZXNwb25zZQ==');

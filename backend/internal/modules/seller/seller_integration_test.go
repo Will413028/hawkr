@@ -951,7 +951,6 @@ func TestChecksMatchGo(t *testing.T) {
 		{"measure_requests", "measure_requests_close_cause_check", stringsOf(RequestCloseCauseValues()), true},
 		{"reports", "reports_category_check", stringsOf(policy.ReporterSelectable()), true},
 		{"reports", "reports_outcome_check", stringsOf(OutcomeValues()), true},
-		{"report_supplements", "report_supplements_matched_by_check", stringsOf(SupplementMatchValues()), true},
 		{"cases", "cases_category_check", stringsOf(policy.Assessable()), true},
 		{"cases", "cases_severity_check", stringsOf(SeverityValues()), true},
 		{"cases", "cases_close_check", append(stringsOf(CaseCloseReasonValues()), stringsOf(DecisionValues())...), true},

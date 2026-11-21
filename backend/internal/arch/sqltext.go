@@ -173,7 +173,7 @@ func CheckTrimmedText(module, file, content string) []string {
 // 去掉頭尾空白後再比對的寫入端不受它影響。新增一項要寫明是哪個欄位、為什麼不是頭尾空白。
 var interiorSpaceFormats = map[string]string{
 	`^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$`: "seller.stores.support_email 的格式：整個 email 沒有空白",
-	`^[^@[:space:]]+@[^@[:space:]]+$`:                 "seller.reports.reporter_email 的格式：整個 email 沒有空白",
+	`^[^@[:space:]]+@[^@[:space:]]+$`:                 "identity.accounts.self_entered_email 的格式：整個 email 沒有空白",
 }
 
 var (

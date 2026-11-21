@@ -5,8 +5,8 @@
 // source: hawkr/seller/v1alpha1/report.proto
 
 // 對店家的檢舉（檢舉與食安通報同一種資源，ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R7）：登入的買家送出與查自己的
-// 檢舉（SellerReportAppService），任何人都能送的匿名食安檢舉（SellerReportPublicService）。這兩個 service 不要求賣家能力：
-// 檢舉人是買家或匿名者，不是店家。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
+// 檢舉（SellerReportAppService）。這個 service 不要求賣家能力：
+// 檢舉人是買家，不是店家。食品安全事件也由登入的買家以 CreateReport（類別 FOOD_SAFETY）檢舉，沒有匿名入口（ADR 2026-10-27-general-ecommerce-scope-cut D3）。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
 // （後台稱「通報」與「案件」，檢舉人看到的是這裡的「檢舉」與結果）。
 
 package sellerv1alpha1
@@ -476,142 +476,6 @@ func (x *ListMyReportsResponse) GetNextPageToken() string {
 	return ""
 }
 
-type SubmitFoodSafetyReportRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
-	StoreId string `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	// 事件的說明，最多 2000 字。
-	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	// 相關的商品 id，最多 64 字；可以不填。
-	ProductId string `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 相關的訂單編號，最多 64 字；可以不填。
-	OrderNo string `protobuf:"bytes,4,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
-	// 台灣的電話號碼；phone 與 email 至少填一個。
-	Phone string `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`
-	// phone 與 email 至少填一個，最多 254 字。
-	Email string `protobuf:"bytes,6,opt,name=email,proto3" json:"email,omitempty"`
-	// 檢舉人的稱呼，最多 100 字；可以不填。
-	Name          string `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubmitFoodSafetyReportRequest) Reset() {
-	*x = SubmitFoodSafetyReportRequest{}
-	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubmitFoodSafetyReportRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubmitFoodSafetyReportRequest) ProtoMessage() {}
-
-func (x *SubmitFoodSafetyReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubmitFoodSafetyReportRequest.ProtoReflect.Descriptor instead.
-func (*SubmitFoodSafetyReportRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetStoreId() string {
-	if x != nil {
-		return x.StoreId
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetOrderNo() string {
-	if x != nil {
-		return x.OrderNo
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetPhone() string {
-	if x != nil {
-		return x.Phone
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetEmail() string {
-	if x != nil {
-		return x.Email
-	}
-	return ""
-}
-
-func (x *SubmitFoodSafetyReportRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-// SubmitFoodSafetyReportResponse 沒有內容：新的檢舉、補充與超過上限而沒有存下的送出回應相同。
-type SubmitFoodSafetyReportResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubmitFoodSafetyReportResponse) Reset() {
-	*x = SubmitFoodSafetyReportResponse{}
-	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubmitFoodSafetyReportResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubmitFoodSafetyReportResponse) ProtoMessage() {}
-
-func (x *SubmitFoodSafetyReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_seller_v1alpha1_report_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubmitFoodSafetyReportResponse.ProtoReflect.Descriptor instead.
-func (*SubmitFoodSafetyReportResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP(), []int{6}
-}
-
 var File_hawkr_seller_v1alpha1_report_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
@@ -649,17 +513,7 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"z\n" +
 	"\x15ListMyReportsResponse\x129\n" +
 	"\areports\x18\x01 \x03(\v2\x1f.hawkr.seller.v1alpha1.MyReportR\areports\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xe0\x01\n" +
-	"\x1dSubmitFoodSafetyReportRequest\x12\x1e\n" +
-	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12%\n" +
-	"\vdescription\x18\x02 \x01(\tB\x03\xe0A\x02R\vdescription\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x03 \x01(\tR\tproductId\x12\x19\n" +
-	"\border_no\x18\x04 \x01(\tR\aorderNo\x12\x14\n" +
-	"\x05phone\x18\x05 \x01(\tR\x05phone\x12\x14\n" +
-	"\x05email\x18\x06 \x01(\tR\x05email\x12\x12\n" +
-	"\x04name\x18\a \x01(\tR\x04name\" \n" +
-	"\x1eSubmitFoodSafetyReportResponse*\xcc\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*\xcc\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_ACTION_TAKEN\x10\x01\x12\x1f\n" +
@@ -669,9 +523,7 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\x16REPORT_OUTCOME_ABUSIVE\x10\x052\xf2\x01\n" +
 	"\x16SellerReportAppService\x12g\n" +
 	"\fCreateReport\x12*.hawkr.seller.v1alpha1.CreateReportRequest\x1a+.hawkr.seller.v1alpha1.CreateReportResponse\x12o\n" +
-	"\rListMyReports\x12+.hawkr.seller.v1alpha1.ListMyReportsRequest\x1a,.hawkr.seller.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x012\xa3\x01\n" +
-	"\x19SellerReportPublicService\x12\x85\x01\n" +
-	"\x16SubmitFoodSafetyReport\x124.hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest\x1a5.hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponseB\xfd\x01\n" +
+	"\rListMyReports\x12+.hawkr.seller.v1alpha1.ListMyReportsRequest\x1a,.hawkr.seller.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x01B\xfd\x01\n" +
 	"\x19com.hawkr.seller.v1alpha1B\vReportProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1;sellerv1alpha1\xa2\x02\x03HSX\xaa\x02\x15Hawkr.Seller.V1alpha1\xca\x02\x15Hawkr\\Seller\\V1alpha1\xe2\x02!Hawkr\\Seller\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Seller::V1alpha1b\x06proto3"
 
 var (
@@ -687,37 +539,33 @@ func file_hawkr_seller_v1alpha1_report_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_seller_v1alpha1_report_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_hawkr_seller_v1alpha1_report_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_hawkr_seller_v1alpha1_report_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_hawkr_seller_v1alpha1_report_proto_goTypes = []any{
-	(ReportOutcome)(0),                     // 0: hawkr.seller.v1alpha1.ReportOutcome
-	(*MyReport)(nil),                       // 1: hawkr.seller.v1alpha1.MyReport
-	(*CreateReportRequest)(nil),            // 2: hawkr.seller.v1alpha1.CreateReportRequest
-	(*CreateReportResponse)(nil),           // 3: hawkr.seller.v1alpha1.CreateReportResponse
-	(*ListMyReportsRequest)(nil),           // 4: hawkr.seller.v1alpha1.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil),          // 5: hawkr.seller.v1alpha1.ListMyReportsResponse
-	(*SubmitFoodSafetyReportRequest)(nil),  // 6: hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest
-	(*SubmitFoodSafetyReportResponse)(nil), // 7: hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse
-	(v1alpha1.PolicyCategory)(0),           // 8: hawkr.common.v1alpha1.PolicyCategory
-	(*timestamppb.Timestamp)(nil),          // 9: google.protobuf.Timestamp
-	(*errdetails.LocalizedMessage)(nil),    // 10: google.rpc.LocalizedMessage
+	(ReportOutcome)(0),                  // 0: hawkr.seller.v1alpha1.ReportOutcome
+	(*MyReport)(nil),                    // 1: hawkr.seller.v1alpha1.MyReport
+	(*CreateReportRequest)(nil),         // 2: hawkr.seller.v1alpha1.CreateReportRequest
+	(*CreateReportResponse)(nil),        // 3: hawkr.seller.v1alpha1.CreateReportResponse
+	(*ListMyReportsRequest)(nil),        // 4: hawkr.seller.v1alpha1.ListMyReportsRequest
+	(*ListMyReportsResponse)(nil),       // 5: hawkr.seller.v1alpha1.ListMyReportsResponse
+	(v1alpha1.PolicyCategory)(0),        // 6: hawkr.common.v1alpha1.PolicyCategory
+	(*timestamppb.Timestamp)(nil),       // 7: google.protobuf.Timestamp
+	(*errdetails.LocalizedMessage)(nil), // 8: google.rpc.LocalizedMessage
 }
 var file_hawkr_seller_v1alpha1_report_proto_depIdxs = []int32{
-	8,  // 0: hawkr.seller.v1alpha1.MyReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	9,  // 1: hawkr.seller.v1alpha1.MyReport.create_time:type_name -> google.protobuf.Timestamp
-	9,  // 2: hawkr.seller.v1alpha1.MyReport.resolve_time:type_name -> google.protobuf.Timestamp
+	6,  // 0: hawkr.seller.v1alpha1.MyReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	7,  // 1: hawkr.seller.v1alpha1.MyReport.create_time:type_name -> google.protobuf.Timestamp
+	7,  // 2: hawkr.seller.v1alpha1.MyReport.resolve_time:type_name -> google.protobuf.Timestamp
 	0,  // 3: hawkr.seller.v1alpha1.MyReport.outcome:type_name -> hawkr.seller.v1alpha1.ReportOutcome
-	8,  // 4: hawkr.seller.v1alpha1.CreateReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	6,  // 4: hawkr.seller.v1alpha1.CreateReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	1,  // 5: hawkr.seller.v1alpha1.CreateReportResponse.report:type_name -> hawkr.seller.v1alpha1.MyReport
-	10, // 6: hawkr.seller.v1alpha1.CreateReportResponse.notice:type_name -> google.rpc.LocalizedMessage
+	8,  // 6: hawkr.seller.v1alpha1.CreateReportResponse.notice:type_name -> google.rpc.LocalizedMessage
 	1,  // 7: hawkr.seller.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.seller.v1alpha1.MyReport
 	2,  // 8: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:input_type -> hawkr.seller.v1alpha1.CreateReportRequest
 	4,  // 9: hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports:input_type -> hawkr.seller.v1alpha1.ListMyReportsRequest
-	6,  // 10: hawkr.seller.v1alpha1.SellerReportPublicService.SubmitFoodSafetyReport:input_type -> hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest
-	3,  // 11: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:output_type -> hawkr.seller.v1alpha1.CreateReportResponse
-	5,  // 12: hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports:output_type -> hawkr.seller.v1alpha1.ListMyReportsResponse
-	7,  // 13: hawkr.seller.v1alpha1.SellerReportPublicService.SubmitFoodSafetyReport:output_type -> hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
+	3,  // 10: hawkr.seller.v1alpha1.SellerReportAppService.CreateReport:output_type -> hawkr.seller.v1alpha1.CreateReportResponse
+	5,  // 11: hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports:output_type -> hawkr.seller.v1alpha1.ListMyReportsResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -734,9 +582,9 @@ func file_hawkr_seller_v1alpha1_report_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_seller_v1alpha1_report_proto_rawDesc), len(file_hawkr_seller_v1alpha1_report_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   5,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   1,
 		},
 		GoTypes:           file_hawkr_seller_v1alpha1_report_proto_goTypes,
 		DependencyIndexes: file_hawkr_seller_v1alpha1_report_proto_depIdxs,

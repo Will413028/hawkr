@@ -187,4 +187,15 @@
 - 「決策的稽核是領域列本身」不再是全部：領域列仍保存領域會讀的決策事實（誰決定、決定了什麼、現在的狀態），但「哪位管理員在何時對哪個對象做了什麼」的總帳改由平台套件 `internal/platform/adminaudit` 保證，每個後台寫入 RPC 在領域變更的同一個 transaction 內留一筆（`2026-11-14-platform-admin-audit-log.md`）。seller 的後台寫入目前宣告 `auditPending`，遷入的觸發條件是上線前。
 - 「讀取紀錄與修改紀錄目前沒有對外的列表方法」（2026-10-04 修訂）的延後：對外讀取不再由各模組各做列表方法，統一用 `cmd/hawkr` 的 `admin-audit` 營運子命令讀平台紀錄；seller 既有的讀取紀錄與修改紀錄表遷入平台紀錄的觸發條件同上（上線前）；檢視畫面的觸發條件是第二位管理員。
 
+## 修訂：匿名食安入口與聯絡方式保留刪除（2026-11-21，ADR `2026-10-27-general-ecommerce-scope-cut` D3；Will 2026-11-21 決定 G2；計畫 `plans/2026-09-29-a3-buyer-seller/step10f-2-design.md` 的 10f-2a）
+
+原決策段保留歷史。FDA 轉報刪除之後（「FDA 轉報刪除」一段），匿名食安入口存在的理由（食安法）不再成立。下列句子與新決定衝突，改成：
+
+- 「對外入口（2026-10-04）」的匿名半段不再成立：`SellerReportPublicService` 與 `SubmitFoodSafetyReport` 刪除；食安事件由登入的買家以 `SellerReportAppService.CreateReport`（類別 `FOOD_SAFETY`，可附佐證，分案期限仍是 4 小時）檢舉。額度只剩登入以帳號計數的兩個時間窗；入口的每 IP 額度（`tierReportSubmit`）刪除。
+- 檢舉人剛好一種（登入的買家或匿名的電話、email）改成一定是登入的買家：`reports.reporter_buyer_id` 為 `NOT NULL` 且大於零；`reporter_phone`、`reporter_email`、`reporter_name`、`contact_erased_at`、`discarded_submissions`、`report_supplements.matched_by` 與匿名的去重索引（電話、email 的 ISO 週）、`reports_contact_cap` 刪除。補充只剩登入檢舉人的補充，超過 10 則一律回 `failed_precondition`。
+- 聯絡方式的保留規則（結果設定後 30 天且不早於建立後 90 天、絕對上限 365 天）與清除 job（`seller.erase_report_contacts`）刪除：不再收集聯絡方式，就沒有要清的欄位，保留上限的決定（2026-10-18）隨欄位消失。
+- 契約：後台 `Report.contact`（9）、`contact_erase_time`（10）、`discarded_submission_count`（24）與 `ReportSupplement.matched_by`（5）改為 reserved，`ReporterContact`、`SupplementMatch` 刪除；`reporter_buyer_id` 一定有值。`ReportReceived` 不再帶確認信地址與 `Discarded`，`ReporterBuyerID` 為必有。
+- 資料：系統從未上線，migration 先刪既有的匿名通報與依附它的補充、移動紀錄、認定來源與佐證讀取紀錄，再收緊約束。
+- 理由（計畫 10f-2 G2）：一般電商的基準（Shopee、momo、Amazon）是登入才能檢舉；匿名入口的理由是食安法，範圍縮減已刪掉轉報義務。匿名入口一併刪除它的聯絡方式保留、清除 job 與每 IP 額度。10f-5 的權利人通報不預先保留這些欄位（它的儲存在 10f-5 決定簡報裡定）。
+
 本檔修訂已超過 3 段，下一次修訂時改寫成整合版。

@@ -428,7 +428,7 @@ func TestResolveRulesFollowTheCaseAndItsMeasures(t *testing.T) {
 		t.Fatalf("ReportResolved 每筆通報各發一次：%d", len(events))
 	}
 	for i, e := range events[:4] {
-		if e.Outcome != *direct[i].Outcome || e.CaseID != nil || e.ReporterBuyerID == nil || e.StoreID != s.StoreID {
+		if e.Outcome != *direct[i].Outcome || e.CaseID != nil || e.ReporterBuyerID <= 0 || e.StoreID != s.StoreID {
 			t.Errorf("直接結掉的事件 %d：%+v", i, e)
 		}
 	}
@@ -886,7 +886,7 @@ func TestSupplementsAreSeenOnlyWhenTheAdminActsOnThatReport(t *testing.T) {
 	supplement := func(r AdminReport) {
 		t.Helper()
 		f.now = f.now.Add(time.Minute)
-		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: *r.ReporterBuyerID, Category: r.Category, Description: "補充"})
+		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: r.ReporterBuyerID, Category: r.Category, Description: "補充"})
 		must(t, err)
 		if !got.Supplemented {
 			t.Fatalf("要併成補充：%+v", got)
@@ -956,7 +956,7 @@ func TestMarkReportSupplementsSeenRecordsOnlyTheMarkerAndNeverAdvancesTheVersion
 	supplement := func(r AdminReport) {
 		t.Helper()
 		f.now = f.now.Add(time.Minute)
-		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: *r.ReporterBuyerID, Category: r.Category, Description: "補充"})
+		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: r.ReporterBuyerID, Category: r.Category, Description: "補充"})
 		must(t, err)
 		if !got.Supplemented {
 			t.Fatalf("要併成補充：%+v", got)
@@ -1045,7 +1045,7 @@ func TestUnseenSupplementsDoNotDependOnTheClock(t *testing.T) {
 	supplement := func() {
 		t.Helper()
 		r := f.reportOf(t, members[0].ID)
-		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: *r.ReporterBuyerID, Category: r.Category, Description: "補充"})
+		got, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: r.ReporterBuyerID, Category: r.Category, Description: "補充"})
 		must(t, err)
 		if !got.Supplemented {
 			t.Fatalf("要併成補充：%+v", got)

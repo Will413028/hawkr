@@ -1,6 +1,6 @@
 // Package governance 是商家治理（ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R3、R7）的通報與案件：通報（檢舉與食安通報同一張表，一位檢舉人
 // 的一次送出，含之後的補充）與它的佐證、分案、設定結果、移動，案件（同一家店、同一個平台判定類別，同時最多一個進行中的案件）的決定、改嚴重度與內部註記，
-// 匿名聯絡欄位的保留期限清理，以及通報與措施上請求的佐證讀取。措施（警告、停權與終止合作）、認定與申覆在 measure 套件；治理的狀態改變在寫入的 transaction 內發模組事件，
+// 以及通報與措施上請求的佐證讀取。措施（警告、停權與終止合作）、認定與申覆在 measure 套件；治理的狀態改變在寫入的 transaction 內發模組事件，
 // 送達由 A8 的 notification 負責。
 //
 // 鎖順序（單體規則 4 與 D3／D4 修訂 (c) 第 3 層的細化）：seller 內的全序是 identity 帳號列（需要時）→ 店家列（帳號全部的 stint，依 store_id，stint.LockAccountOf）→
@@ -119,9 +119,9 @@ func toReport(row store.SellerReport) model.Report {
 	r := model.Report{
 		ID: row.ID, StoreID: row.StoreID, ProductID: row.ProductID, OrderNo: row.OrderNo,
 		Category: policy.Category(row.Category), Description: row.Description, ReporterBuyerID: row.ReporterBuyerID,
-		ContactErasedAt: row.ContactErasedAt, CaseID: row.CaseID, TriagedAt: row.TriagedAt, TriagedByAdminID: row.TriagedByAdminID,
+		CaseID: row.CaseID, TriagedAt: row.TriagedAt, TriagedByAdminID: row.TriagedByAdminID,
 		ResolvedAt: row.ResolvedAt, ResolvedByAdminID: row.ResolvedByAdminID, ResolutionNote: row.ResolutionNote,
-		DiscardedSubmissions: int(row.DiscardedSubmissions), SupplementsSeenSeq: int(row.SupplementsSeenSeq), Version: row.Version, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		SupplementsSeenSeq: int(row.SupplementsSeenSeq), Version: row.Version, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 	if row.AssessedCategory != nil {
 		category := policy.Category(*row.AssessedCategory)
@@ -130,9 +130,6 @@ func toReport(row store.SellerReport) model.Report {
 	if row.Outcome != nil {
 		outcome := model.Outcome(*row.Outcome)
 		r.Outcome = &outcome
-	}
-	if row.ReporterBuyerID == nil && row.ContactErasedAt == nil {
-		r.Contact = &model.ReporterContact{Phone: row.ReporterPhone, Email: row.ReporterEmail, Name: row.ReporterName}
 	}
 	return r
 }
@@ -371,10 +368,6 @@ func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, re
 	for _, row := range supplements {
 		i := byReport[row.ReportID]
 		supplement := model.Supplement{ID: row.ID, Description: row.Description, CreatedAt: row.CreatedAt}
-		if row.MatchedBy != nil {
-			matched := model.SupplementMatch(*row.MatchedBy)
-			supplement.MatchedBy = &matched
-		}
 		reports[i].Supplements = append(reports[i].Supplements, supplement)
 		bySupplement[row.ID] = &reports[i].Supplements[len(reports[i].Supplements)-1]
 	}

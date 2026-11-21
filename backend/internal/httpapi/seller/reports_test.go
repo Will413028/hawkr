@@ -12,7 +12,6 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
@@ -46,9 +45,7 @@ func (m *reportModule) SubmitReport(_ context.Context, in model.SubmitReportInpu
 	r := model.Report{ID: uuid.NewV7(), StoreID: in.StoreID, Category: in.Category, Description: in.Description, CreatedAt: governanceNow}
 	if m.supplement {
 		result := model.SubmitReportResult{ReportID: r.ID, Supplemented: true, Notice: uitext.Message{Text: supplementNotice, Locale: uitext.ZhTW}}
-		if in.ReporterBuyerID > 0 {
-			result.Report = &r
-		}
+		result.Report = &r
 		return result, nil
 	}
 	return model.SubmitReportResult{ReportID: r.ID, Report: &r}, nil
@@ -91,7 +88,7 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if in := m.submitted[0]; in.ReporterBuyerID != 500 || in.AccountID != 5 || in.StoreID != 12 || in.Category != policy.Counterfeit ||
-		len(in.EvidenceTokens) != 1 || in.Phone+in.Email+in.Name != "" {
+		len(in.EvidenceTokens) != 1 {
 		t.Fatalf("in=%+v", in)
 	}
 	if got.Msg.GetReport().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_UNSPECIFIED || got.Msg.GetReport().GetStoreId() != "12" ||
@@ -108,35 +105,6 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 	}
 	if _, err := h.CreateReport(accountCtx(6), connect.NewRequest(req)); err == nil || apperr.KindOf(err) == apperr.KindNotFound {
 		t.Fatalf("存活的帳號沒有買家是不變量被破壞（internal），不是 not_found：%v", err)
-	}
-}
-
-// 匿名的食安檢舉：新的、補充的與超過上限而丟掉的送出回應完全相同（不洩漏這支電話用過）；類別固定是食安；登入的呼叫者照樣以匿名記錄，只帶帳號給「不能檢舉自己的店」。
-// 不在 handler 計帳號額度（匿名的額度在入口以 IP 計）。
-func TestFoodSafetyReportResponsesDoNotRevealDuplicates(t *testing.T) {
-	m := &reportModule{}
-	h := newTestReports(t, m, buyersOf{})
-	req := &pb.SubmitFoodSafetyReportRequest{StoreId: "12", Description: "吃了不舒服", Phone: "0912345678", Name: "王"}
-	first, err := h.SubmitFoodSafetyReport(context.Background(), connect.NewRequest(req))
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.supplement = true
-	again, err := h.SubmitFoodSafetyReport(accountCtx(5), connect.NewRequest(req))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !proto.Equal(first.Msg, again.Msg) || !proto.Equal(first.Msg, &pb.SubmitFoodSafetyReportResponse{}) {
-		t.Fatalf("new=%v supplement=%v", first.Msg, again.Msg)
-	}
-	for i, in := range m.submitted {
-		wantAccount := int64(0)
-		if i == 1 {
-			wantAccount = 5 // 登入的呼叫者：帳號只給「不能檢舉自己的店」，檢舉人仍是匿名
-		}
-		if in.Category != policy.FoodSafety || in.ReporterBuyerID != 0 || in.AccountID != wantAccount || in.Phone != "0912345678" || in.Name != "王" {
-			t.Fatalf("in=%+v", in)
-		}
 	}
 }
 
@@ -203,10 +171,6 @@ func TestCreateReportCountsBothAccountQuotasTogether(t *testing.T) {
 	if _, err := h.CreateReport(accountCtx(5), connect.NewRequest(req)); apperr.KindOf(err) != apperr.KindResourceExhausted || len(m.submitted) != 1 || len(limiter.calls) != len(ReportSubmitQuotas) {
 		t.Fatalf("超過額度：%v submitted=%d calls=%d", err, len(m.submitted), len(limiter.calls))
 	}
-	limiter.calls = nil
-	if _, err := h.SubmitFoodSafetyReport(context.Background(), connect.NewRequest(&pb.SubmitFoodSafetyReportRequest{StoreId: "12", Description: "x", Phone: "0912345678"})); err != nil || len(limiter.calls) != 0 {
-		t.Fatalf("匿名入口不以帳號計數：%v calls=%d", err, len(limiter.calls))
-	}
 	if _, err := NewReports(m, buyersOf{}, nil); err == nil {
 		t.Fatal("沒有 limiter 不能建立")
 	}
@@ -257,8 +221,7 @@ func TestReportPathsExistInTheRequests(t *testing.T) {
 		paths rpc.FieldPaths
 		req   interface{ ProtoReflect() protoreflect.Message }
 	}{
-		"create":   {createReportPaths, &pb.CreateReportRequest{}},
-		"foodsafe": {foodSafetyReportPaths, &pb.SubmitFoodSafetyReportRequest{}},
+		"create": {createReportPaths, &pb.CreateReportRequest{}},
 	} {
 		if missing := rpc.CheckFieldPaths(c.req.ProtoReflect().Descriptor(), c.paths); len(missing) > 0 {
 			t.Errorf("%s：不存在的路徑 %v", name, missing)

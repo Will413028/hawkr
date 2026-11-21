@@ -3,8 +3,8 @@
 // Source: hawkr/seller/v1alpha1/report.proto
 
 // 對店家的檢舉（檢舉與食安通報同一種資源，ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R7）：登入的買家送出與查自己的
-// 檢舉（SellerReportAppService），任何人都能送的匿名食安檢舉（SellerReportPublicService）。這兩個 service 不要求賣家能力：
-// 檢舉人是買家或匿名者，不是店家。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
+// 檢舉（SellerReportAppService）。這個 service 不要求賣家能力：
+// 檢舉人是買家，不是店家。食品安全事件也由登入的買家以 CreateReport（類別 FOOD_SAFETY）檢舉，沒有匿名入口（ADR 2026-10-27-general-ecommerce-scope-cut D3）。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
 // （後台稱「通報」與「案件」，檢舉人看到的是這裡的「檢舉」與結果）。
 package sellerv1alpha1connect
 
@@ -27,9 +27,6 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// SellerReportAppServiceName is the fully-qualified name of the SellerReportAppService service.
 	SellerReportAppServiceName = "hawkr.seller.v1alpha1.SellerReportAppService"
-	// SellerReportPublicServiceName is the fully-qualified name of the SellerReportPublicService
-	// service.
-	SellerReportPublicServiceName = "hawkr.seller.v1alpha1.SellerReportPublicService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -46,9 +43,6 @@ const (
 	// SellerReportAppServiceListMyReportsProcedure is the fully-qualified name of the
 	// SellerReportAppService's ListMyReports RPC.
 	SellerReportAppServiceListMyReportsProcedure = "/hawkr.seller.v1alpha1.SellerReportAppService/ListMyReports"
-	// SellerReportPublicServiceSubmitFoodSafetyReportProcedure is the fully-qualified name of the
-	// SellerReportPublicService's SubmitFoodSafetyReport RPC.
-	SellerReportPublicServiceSubmitFoodSafetyReportProcedure = "/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport"
 )
 
 // SellerReportAppServiceClient is a client for the hawkr.seller.v1alpha1.SellerReportAppService
@@ -162,90 +156,4 @@ func (UnimplementedSellerReportAppServiceHandler) CreateReport(context.Context, 
 
 func (UnimplementedSellerReportAppServiceHandler) ListMyReports(context.Context, *connect.Request[v1alpha1.ListMyReportsRequest]) (*connect.Response[v1alpha1.ListMyReportsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportAppService.ListMyReports is not implemented"))
-}
-
-// SellerReportPublicServiceClient is a client for the
-// hawkr.seller.v1alpha1.SellerReportPublicService service.
-type SellerReportPublicServiceClient interface {
-	// SubmitFoodSafetyReport 匿名檢舉食品安全事件，必須留下電話或 email（主管機關可能需要聯絡檢舉人），不收佐證圖片（要附圖請
-	// 登入後以 CreateReport 檢舉）。店家的規則與 CreateReport 相同；呼叫者登入而且店家屬於他的帳號時回 invalid_argument（store_id）。
-	// 同一支電話或同一個 email 對同一家店，一個台北 ISO 週內、還沒有結果的那一筆存在時，這次的內容補充到它（每筆最多 10 則，超過時
-	// 內容不存）；新的檢舉、補充與超過上限的送出回應完全相同（回應沒有內容），不會透露這支電話或 email 用過。每個來源 IP
-	// （登入的呼叫者以帳號計）10 分鐘最多 5 次、1 小時最多 10 次，被拒絕的送出不計；超過回 resource_exhausted（帶 RetryInfo）。
-	// 聯絡方式在「結果設定後 30 天、且不早於送出後 90 天」清除；還沒有結果的檢舉不清除。
-	SubmitFoodSafetyReport(context.Context, *connect.Request[v1alpha1.SubmitFoodSafetyReportRequest]) (*connect.Response[v1alpha1.SubmitFoodSafetyReportResponse], error)
-}
-
-// NewSellerReportPublicServiceClient constructs a client for the
-// hawkr.seller.v1alpha1.SellerReportPublicService service. By default, it uses the Connect protocol
-// with the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed requests. To
-// use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or connect.WithGRPCWeb()
-// options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewSellerReportPublicServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SellerReportPublicServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	sellerReportPublicServiceMethods := v1alpha1.File_hawkr_seller_v1alpha1_report_proto.Services().ByName("SellerReportPublicService").Methods()
-	return &sellerReportPublicServiceClient{
-		submitFoodSafetyReport: connect.NewClient[v1alpha1.SubmitFoodSafetyReportRequest, v1alpha1.SubmitFoodSafetyReportResponse](
-			httpClient,
-			baseURL+SellerReportPublicServiceSubmitFoodSafetyReportProcedure,
-			connect.WithSchema(sellerReportPublicServiceMethods.ByName("SubmitFoodSafetyReport")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// sellerReportPublicServiceClient implements SellerReportPublicServiceClient.
-type sellerReportPublicServiceClient struct {
-	submitFoodSafetyReport *connect.Client[v1alpha1.SubmitFoodSafetyReportRequest, v1alpha1.SubmitFoodSafetyReportResponse]
-}
-
-// SubmitFoodSafetyReport calls
-// hawkr.seller.v1alpha1.SellerReportPublicService.SubmitFoodSafetyReport.
-func (c *sellerReportPublicServiceClient) SubmitFoodSafetyReport(ctx context.Context, req *connect.Request[v1alpha1.SubmitFoodSafetyReportRequest]) (*connect.Response[v1alpha1.SubmitFoodSafetyReportResponse], error) {
-	return c.submitFoodSafetyReport.CallUnary(ctx, req)
-}
-
-// SellerReportPublicServiceHandler is an implementation of the
-// hawkr.seller.v1alpha1.SellerReportPublicService service.
-type SellerReportPublicServiceHandler interface {
-	// SubmitFoodSafetyReport 匿名檢舉食品安全事件，必須留下電話或 email（主管機關可能需要聯絡檢舉人），不收佐證圖片（要附圖請
-	// 登入後以 CreateReport 檢舉）。店家的規則與 CreateReport 相同；呼叫者登入而且店家屬於他的帳號時回 invalid_argument（store_id）。
-	// 同一支電話或同一個 email 對同一家店，一個台北 ISO 週內、還沒有結果的那一筆存在時，這次的內容補充到它（每筆最多 10 則，超過時
-	// 內容不存）；新的檢舉、補充與超過上限的送出回應完全相同（回應沒有內容），不會透露這支電話或 email 用過。每個來源 IP
-	// （登入的呼叫者以帳號計）10 分鐘最多 5 次、1 小時最多 10 次，被拒絕的送出不計；超過回 resource_exhausted（帶 RetryInfo）。
-	// 聯絡方式在「結果設定後 30 天、且不早於送出後 90 天」清除；還沒有結果的檢舉不清除。
-	SubmitFoodSafetyReport(context.Context, *connect.Request[v1alpha1.SubmitFoodSafetyReportRequest]) (*connect.Response[v1alpha1.SubmitFoodSafetyReportResponse], error)
-}
-
-// NewSellerReportPublicServiceHandler builds an HTTP handler from the service implementation. It
-// returns the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewSellerReportPublicServiceHandler(svc SellerReportPublicServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	sellerReportPublicServiceMethods := v1alpha1.File_hawkr_seller_v1alpha1_report_proto.Services().ByName("SellerReportPublicService").Methods()
-	sellerReportPublicServiceSubmitFoodSafetyReportHandler := connect.NewUnaryHandler(
-		SellerReportPublicServiceSubmitFoodSafetyReportProcedure,
-		svc.SubmitFoodSafetyReport,
-		connect.WithSchema(sellerReportPublicServiceMethods.ByName("SubmitFoodSafetyReport")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/hawkr.seller.v1alpha1.SellerReportPublicService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case SellerReportPublicServiceSubmitFoodSafetyReportProcedure:
-			sellerReportPublicServiceSubmitFoodSafetyReportHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
-}
-
-// UnimplementedSellerReportPublicServiceHandler returns CodeUnimplemented from all methods.
-type UnimplementedSellerReportPublicServiceHandler struct{}
-
-func (UnimplementedSellerReportPublicServiceHandler) SubmitFoodSafetyReport(context.Context, *connect.Request[v1alpha1.SubmitFoodSafetyReportRequest]) (*connect.Response[v1alpha1.SubmitFoodSafetyReportResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerReportPublicService.SubmitFoodSafetyReport is not implemented"))
 }

@@ -399,7 +399,7 @@ func TestEvidenceAccessesRequireAnOwnerAndExistingEvidence(t *testing.T) {
 	}
 }
 
-// 通報的對象只能是曾經公開過的店：從沒公開過的店與不存在的店同一個 NotFound（匿名入口不能探測店家 ID），什麼都不寫；曾經公開
+// 通報的對象只能是曾經公開過的店：從沒公開過的店與不存在的店同一個 NotFound（不能探測店家 ID），什麼都不寫；曾經公開
 // 過、之後關閉的店照樣可以通報。
 func TestOnlyStoresThatWereEverPublicCanBeReported(t *testing.T) {
 	t.Parallel()
@@ -407,7 +407,7 @@ func TestOnlyStoresThatWereEverPublicCanBeReported(t *testing.T) {
 	ctx := context.Background()
 	accountID, s := f.open(t)
 	submit := func(storeID int64) error {
-		_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: storeID, Phone: "0912345678", Category: policy.FoodSafety, Description: "x"})
+		_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: storeID, ReporterBuyerID: 7, Category: policy.FoodSafety, Description: "x"})
 		return err
 	}
 	never, missing := submit(s.StoreID), submit(s.StoreID+1000)

@@ -5,7 +5,6 @@ import {
 	CaseDecision,
 	CaseState,
 	ReportState,
-	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
@@ -13,7 +12,6 @@ import {
 	caseStatusText,
 	reportOutcomeText,
 	reportStatusText,
-	supplementMatchNotice,
 } from "../src/app/admin/violation-reports/report-text";
 
 /**
@@ -122,17 +120,4 @@ test("案件的狀態：進行中｜已結案：採取措施｜已結案：不�
 		caseStatusText({ state: CaseState.UNSPECIFIED, ...none }),
 		"未知",
 	);
-});
-
-test("匿名補充的比對提醒：電話或聯絡信箱其中一個相同才提醒；兩者都相同與登入者的補充不提醒", () => {
-	assert.equal(
-		supplementMatchNotice(SupplementMatch.PHONE),
-		"以電話比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	);
-	assert.equal(
-		supplementMatchNotice(SupplementMatch.EMAIL),
-		"以聯絡信箱比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	);
-	assert.equal(supplementMatchNotice(SupplementMatch.BOTH), undefined);
-	assert.equal(supplementMatchNotice(SupplementMatch.UNSPECIFIED), undefined);
 });

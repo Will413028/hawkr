@@ -183,9 +183,8 @@ func toReport(r model.AdminReport) *adminpb.Report {
 		TriageTime: optionalTimestamp(r.TriagedAt), TriageDeadline: toDeadline(r.TriageDeadline),
 		ResolvedByAdminId: formatAdminID(r.ResolvedByAdminID), ResolveTime: optionalTimestamp(r.ResolvedAt), ResolutionNote: deref(r.ResolutionNote),
 		SupplementCount: int32(r.SupplementCount), LatestSupplementTime: optionalTimestamp(r.LatestSupplementAt), //nolint:gosec // 補充最多 MaxSupplements 則
-		DiscardedSubmissionCount: int32(r.DiscardedSubmissions), //nolint:gosec // 計數不會超過 int32
-		Etag:                     rpc.Etag(r.Version),
-		CanTriage:                len(r.Availability.Triage) == 0, CanResolve: len(outcomes) > 0, CanMove: len(r.Availability.Move) == 0,
+		Etag:      rpc.Etag(r.Version),
+		CanTriage: len(r.Availability.Triage) == 0, CanResolve: len(outcomes) > 0, CanMove: len(r.Availability.Move) == 0,
 		CanCiteAsSource: len(r.Availability.CiteAsSource) == 0, EffectiveCategory: rpc.EnumToProto[commonpb.PolicyCategory](r.EffectiveCategory()),
 		HasUnseenSupplements: r.HasUnseenSupplements(),
 		CreateTime:           timestamppb.New(r.CreatedAt), UpdateTime: timestamppb.New(r.UpdatedAt),
@@ -205,23 +204,12 @@ func toReport(r model.AdminReport) *adminpb.Report {
 	if r.Outcome != nil {
 		out.Outcome = rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
 	}
-	if r.ReporterBuyerID != nil {
-		out.ReporterBuyerId = rpc.FormatID(*r.ReporterBuyerID)
-	}
-	if c := r.Contact; c != nil {
-		out.Contact = &adminpb.ReporterContact{Phone: deref(c.Phone), Email: deref(c.Email), Name: deref(c.Name)}
-	}
-	if r.ContactErasedAt != nil {
-		out.ContactEraseTime = timestamppb.New(*r.ContactErasedAt)
-	}
+	out.ReporterBuyerId = rpc.FormatID(r.ReporterBuyerID)
 	out.Evidence = toEvidence(len(r.Evidence), func(i int) string { return reportEvidenceURI(r.ID, i) })
 	for _, s := range r.Supplements {
 		supplement := &adminpb.ReportSupplement{Id: s.ID.String(), Description: s.Description, CreateTime: timestamppb.New(s.CreatedAt)}
 		for _, position := range s.EvidencePositions {
 			supplement.EvidencePositions = append(supplement.EvidencePositions, int32(position)) //nolint:gosec // 位置最多 MaxReportEvidence
-		}
-		if s.MatchedBy != nil {
-			supplement.MatchedBy = rpc.EnumToProto[adminpb.SupplementMatch](*s.MatchedBy)
 		}
 		out.Supplements = append(out.Supplements, supplement)
 	}
@@ -351,9 +339,7 @@ func (h *Governance) ListReports(ctx context.Context, req *connect.Request[admin
 	}
 	out := &adminpb.ListReportsResponse{Reports: make([]*adminpb.Report, len(page.Items))}
 	for i, r := range page.Items {
-		// 清單不帶匿名檢舉人的聯絡方式（個資只在讀單筆時出現，與佐證相同）。
 		out.Reports[i] = toReport(r)
-		out.Reports[i].Contact = nil
 	}
 	if page.Next != nil {
 		out.NextPageToken = rpc.TokenFor(scope, page.Next)

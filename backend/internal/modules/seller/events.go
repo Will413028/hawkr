@@ -30,11 +30,7 @@ type StoreReopened = model.StoreReopened
 // StoreRetired 在 stint 退場（關店後的第一段清理，一般關店 30 天、終止合作取 30 天與最晚申覆期限較晚者）的 transaction 內發出，一個店家只發一次；個資在第二段（保留期滿）才清：此後恢復營業不可能，下游的店家資料可以刪除。
 type StoreRetired = model.StoreRetired
 
-// ReportReceived 在每次送出的 transaction 內發出：新的檢舉、補充（SupplementID）、補充已達上限而沒有存下的匿名送出（Discarded）。ConfirmationEmail 是這次送出留的 email
-// （只有匿名）：確認信寄到這裡；它只在事件與 A8 同一個 transaction 排入的 job 參數裡，不落 seller 的表。
-// 義務（A8 的訂閱者）：訂閱者不得在 job 完成後保留這個欄位——River v0.47.0 預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天
-// （`rivershared/riversharedmaintenance/river_shared_maintenance.go`），job 參數裡的地址會跟著留那麼久，所以 A8 的寄送 job 必須在完成或丟棄時清掉參數裡的地址
-// （或參數只放 report／supplement 的參照，由 job 執行時再讀；地址就落在 seller，回到 365 天的保留規則管得到的範圍）。計畫書 A8 列了同一條。
+// ReportReceived 在每次送出的 transaction 內發出：新的檢舉或補充（SupplementID）。檢舉人一定是登入的買家（ReporterBuyerID），A8 用站內通知回覆。
 type ReportReceived = model.ReportReceived
 
 // ReportResolved 在通報有了結果的 transaction 內發出，每筆通報一次：個別設定、直接結掉或案件結案帶入都算。

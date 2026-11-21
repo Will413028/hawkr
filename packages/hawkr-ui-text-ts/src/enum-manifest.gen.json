@@ -232,13 +232,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.admin.seller.v1alpha1.SupplementMatch",
-      "tsName": "SupplementMatch",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.admin.seller.v1alpha1.TerminationViolationRequirement",
       "tsName": "TerminationViolationRequirement",
       "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb",

@@ -20,12 +20,9 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
-	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	socialv1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -115,7 +112,6 @@ const (
 	procDeleteAccount   = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
 	procGetProfile      = "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile"
 	procAddFavorite     = "/hawkr.buyer.v1alpha1.BuyerAppService/AddFavorite"
-	procSubmitFoodSafe  = "/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport"
 	procListLiveBanners = "/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"
 )
 
@@ -136,7 +132,7 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 			t.Fatalf("%s：%d code=%q reason=%q called=%v，預期 403 permission_denied ACCOUNT_SUSPENDED", proc, rec.Code, code, reason, s.Called)
 		}
 	}
-	for _, proc := range []string{procSubmitFoodSafe, procListLiveBanners} {
+	for _, proc := range []string{procListLiveBanners} {
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		if rec.Code != http.StatusOK || s.Principal || s.Suspended {
 			t.Fatalf("%s：%d %+v，預期以訪客執行（ctx 沒有 principal）", proc, rec.Code, s)
@@ -293,7 +289,7 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 13 {
+	if methods != len(customerEffects) || len(descriptors) != 12 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }
@@ -386,47 +382,6 @@ func TestSuspendedAccountCannotUpgradeALegacyRESTConnection(t *testing.T) {
 	}
 	if rec, s := callAs(t, h, "suspended", http.MethodGet, "/api/v1/app/chat/ws"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
 		t.Fatalf("沒有升級的 GET：%d %+v", rec.Code, s)
-	}
-}
-
-type recordingReports struct{ submitted []model.SubmitReportInput }
-
-func (m *recordingReports) SubmitReport(_ context.Context, in model.SubmitReportInput) (model.SubmitReportResult, error) {
-	m.submitted = append(m.submitted, in)
-	return model.SubmitReportResult{}, nil
-}
-
-func (*recordingReports) BuyerReports(context.Context, model.BuyerReportListInput) (model.ReportPage, error) {
-	return model.ReportPage{}, nil
-}
-
-type allowAll struct{}
-
-func (allowAll) Allow(...httpseller.Limit) (bool, time.Duration) { return true, 0 }
-
-// 停權的帳號送食安檢舉：經 withSession 與真的 handler，模組收到的檢舉沒有 AccountID（以訪客身分）；沒有停權的帳號照常帶帳號。
-func TestSuspendedAccountFoodSafetyReportCarriesNoAccount(t *testing.T) {
-	for token, wantAccount := range map[string]int64{"suspended": 0, "good": 9} {
-		m := &recordingReports{}
-		reports, err := httpseller.NewReports(m, nil, allowAll{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		mux := http.NewServeMux()
-		path, handler := sellerconnect.NewSellerReportPublicServiceHandler(reports)
-		mux.Handle(path, handler)
-		h := withSession(suspendedAuth{}, slog.New(slog.DiscardHandler), mux)
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procSubmitFoodSafe, strings.NewReader(`{"storeId":"12","description":"x","phone":"0912345678","name":"王"}`))
-		r.Header.Set("Authorization", "Bearer "+token)
-		r.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, r)
-		if rec.Code != http.StatusOK || len(m.submitted) != 1 {
-			t.Fatalf("%s：%d %q submitted=%d", token, rec.Code, rec.Body, len(m.submitted))
-		}
-		if got := m.submitted[0]; got.AccountID != wantAccount || got.StoreID != 12 {
-			t.Fatalf("%s：模組收到 %+v，預期 AccountID=%d", token, got, wantAccount)
-		}
 	}
 }
 

@@ -3,8 +3,8 @@
 /* eslint-disable */
 
 // 對店家的檢舉（檢舉與食安通報同一種資源，ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R7）：登入的買家送出與查自己的
-// 檢舉（SellerReportAppService），任何人都能送的匿名食安檢舉（SellerReportPublicService）。這兩個 service 不要求賣家能力：
-// 檢舉人是買家或匿名者，不是店家。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
+// 檢舉（SellerReportAppService）。這個 service 不要求賣家能力：
+// 檢舉人是買家，不是店家。食品安全事件也由登入的買家以 CreateReport（類別 FOOD_SAFETY）檢舉，沒有匿名入口（ADR 2026-10-27-general-ecommerce-scope-cut D3）。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
 // （後台稱「通報」與「案件」，檢舉人看到的是這裡的「檢舉」與結果）。
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
@@ -22,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/seller/v1alpha1/report.proto.
  */
 export const file_hawkr_seller_v1alpha1_report: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9zZWxsZXIvdjFhbHBoYTEvcmVwb3J0LnByb3RvEhVoYXdrci5zZWxsZXIudjFhbHBoYTEi2QIKCE15UmVwb3J0Eg8KAmlkGAEgASgJQgPgQQgSEAoIc3RvcmVfaWQYAiABKAkSEgoKcHJvZHVjdF9pZBgDIAEoCRIQCghvcmRlcl9ubxgEIAEoCRI3CghjYXRlZ29yeRgFIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgGIAEoCRIXCg9yZXNvbHV0aW9uX25vdGUYByABKAkSLwoLY3JlYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDHJlc29sdmVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoHb3V0Y29tZRgKIAEoDjIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBvcnRPdXRjb21lQgPgQQMiygEKE0NyZWF0ZVJlcG9ydFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhI8CghjYXRlZ29yeRgCIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECEhgKC2Rlc2NyaXB0aW9uGAMgASgJQgPgQQISEgoKcHJvZHVjdF9pZBgEIAEoCRIQCghvcmRlcl9ubxgFIAEoCRIeChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAYgAygJIpUBChRDcmVhdGVSZXBvcnRSZXNwb25zZRIvCgZyZXBvcnQYASABKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSGQoMc3VwcGxlbWVudGVkGAIgASgIQgPgQQMSMQoGbm90aWNlGAMgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQMiPQoUTGlzdE15UmVwb3J0c1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkiYgoVTGlzdE15UmVwb3J0c1Jlc3BvbnNlEjAKB3JlcG9ydHMYASADKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIqIBCh1TdWJtaXRGb29kU2FmZXR5UmVwb3J0UmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEhgKC2Rlc2NyaXB0aW9uGAIgASgJQgPgQQISEgoKcHJvZHVjdF9pZBgDIAEoCRIQCghvcmRlcl9ubxgEIAEoCRINCgVwaG9uZRgFIAEoCRINCgVlbWFpbBgGIAEoCRIMCgRuYW1lGAcgASgJIiAKHlN1Ym1pdEZvb2RTYWZldHlSZXBvcnRSZXNwb25zZSrMAQoNUmVwb3J0T3V0Y29tZRIeChpSRVBPUlRfT1VUQ09NRV9VTlNQRUNJRklFRBAAEh8KG1JFUE9SVF9PVVRDT01FX0FDVElPTl9UQUtFThABEh8KG1JFUE9SVF9PVVRDT01FX05PX1ZJT0xBVElPThACEh8KG1JFUE9SVF9PVVRDT01FX0lOU1VGRklDSUVOVBADEhwKGFJFUE9SVF9PVVRDT01FX0RVUExJQ0FURRAEEhoKFlJFUE9SVF9PVVRDT01FX0FCVVNJVkUQBTLyAQoWU2VsbGVyUmVwb3J0QXBwU2VydmljZRJnCgxDcmVhdGVSZXBvcnQSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUmVwb3J0UmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5DcmVhdGVSZXBvcnRSZXNwb25zZRJvCg1MaXN0TXlSZXBvcnRzEisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXF1ZXN0GiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXNwb25zZSIDkAIBMqMBChlTZWxsZXJSZXBvcnRQdWJsaWNTZXJ2aWNlEoUBChZTdWJtaXRGb29kU2FmZXR5UmVwb3J0EjQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEZvb2RTYWZldHlSZXBvcnRSZXF1ZXN0GjUuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEZvb2RTYWZldHlSZXBvcnRSZXNwb25zZWIGcHJvdG8z", [file_hawkr_common_v1alpha1_policy_category, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
+  fileDesc("CiJoYXdrci9zZWxsZXIvdjFhbHBoYTEvcmVwb3J0LnByb3RvEhVoYXdrci5zZWxsZXIudjFhbHBoYTEi2QIKCE15UmVwb3J0Eg8KAmlkGAEgASgJQgPgQQgSEAoIc3RvcmVfaWQYAiABKAkSEgoKcHJvZHVjdF9pZBgDIAEoCRIQCghvcmRlcl9ubxgEIAEoCRI3CghjYXRlZ29yeRgFIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgGIAEoCRIXCg9yZXNvbHV0aW9uX25vdGUYByABKAkSLwoLY3JlYXRlX3RpbWUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDHJlc29sdmVfdGltZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoHb3V0Y29tZRgKIAEoDjIkLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBvcnRPdXRjb21lQgPgQQMiygEKE0NyZWF0ZVJlcG9ydFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhI8CghjYXRlZ29yeRgCIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECEhgKC2Rlc2NyaXB0aW9uGAMgASgJQgPgQQISEgoKcHJvZHVjdF9pZBgEIAEoCRIQCghvcmRlcl9ubxgFIAEoCRIeChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAYgAygJIpUBChRDcmVhdGVSZXBvcnRSZXNwb25zZRIvCgZyZXBvcnQYASABKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSGQoMc3VwcGxlbWVudGVkGAIgASgIQgPgQQMSMQoGbm90aWNlGAMgASgLMhwuZ29vZ2xlLnJwYy5Mb2NhbGl6ZWRNZXNzYWdlQgPgQQMiPQoUTGlzdE15UmVwb3J0c1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkiYgoVTGlzdE15UmVwb3J0c1Jlc3BvbnNlEjAKB3JlcG9ydHMYASADKAsyHy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTXlSZXBvcnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJKswBCg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASHwobUkVQT1JUX09VVENPTUVfQUNUSU9OX1RBS0VOEAESHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfSU5TVUZGSUNJRU5UEAMSHAoYUkVQT1JUX09VVENPTUVfRFVQTElDQVRFEAQSGgoWUkVQT1JUX09VVENPTUVfQUJVU0lWRRAFMvIBChZTZWxsZXJSZXBvcnRBcHBTZXJ2aWNlEmcKDENyZWF0ZVJlcG9ydBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5DcmVhdGVSZXBvcnRSZXF1ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVJlcG9ydFJlc3BvbnNlEm8KDUxpc3RNeVJlcG9ydHMSKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15UmVwb3J0c1JlcXVlc3QaLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15UmVwb3J0c1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_hawkr_common_v1alpha1_policy_category, file_google_api_field_behavior, file_google_protobuf_timestamp, file_google_rpc_error_details]);
 
 /**
  * MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
@@ -235,82 +235,6 @@ export const ListMyReportsResponseSchema: GenMessage<ListMyReportsResponse> = /*
   messageDesc(file_hawkr_seller_v1alpha1_report, 4);
 
 /**
- * @generated from message hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest
- */
-export type SubmitFoodSafetyReportRequest = Message<"hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest"> & {
-  /**
-   * 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
-   *
-   * @generated from field: string store_id = 1;
-   */
-  storeId: string;
-
-  /**
-   * 事件的說明，最多 2000 字。
-   *
-   * @generated from field: string description = 2;
-   */
-  description: string;
-
-  /**
-   * 相關的商品 id，最多 64 字；可以不填。
-   *
-   * @generated from field: string product_id = 3;
-   */
-  productId: string;
-
-  /**
-   * 相關的訂單編號，最多 64 字；可以不填。
-   *
-   * @generated from field: string order_no = 4;
-   */
-  orderNo: string;
-
-  /**
-   * 台灣的電話號碼；phone 與 email 至少填一個。
-   *
-   * @generated from field: string phone = 5;
-   */
-  phone: string;
-
-  /**
-   * phone 與 email 至少填一個，最多 254 字。
-   *
-   * @generated from field: string email = 6;
-   */
-  email: string;
-
-  /**
-   * 檢舉人的稱呼，最多 100 字；可以不填。
-   *
-   * @generated from field: string name = 7;
-   */
-  name: string;
-};
-
-/**
- * Describes the message hawkr.seller.v1alpha1.SubmitFoodSafetyReportRequest.
- * Use `create(SubmitFoodSafetyReportRequestSchema)` to create a new message.
- */
-export const SubmitFoodSafetyReportRequestSchema: GenMessage<SubmitFoodSafetyReportRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_seller_v1alpha1_report, 5);
-
-/**
- * SubmitFoodSafetyReportResponse 沒有內容：新的檢舉、補充與超過上限而沒有存下的送出回應相同。
- *
- * @generated from message hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse
- */
-export type SubmitFoodSafetyReportResponse = Message<"hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse"> & {
-};
-
-/**
- * Describes the message hawkr.seller.v1alpha1.SubmitFoodSafetyReportResponse.
- * Use `create(SubmitFoodSafetyReportResponseSchema)` to create a new message.
- */
-export const SubmitFoodSafetyReportResponseSchema: GenMessage<SubmitFoodSafetyReportResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_seller_v1alpha1_report, 6);
-
-/**
  * ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
  *
  * @generated from enum hawkr.seller.v1alpha1.ReportOutcome
@@ -395,28 +319,4 @@ export const SellerReportAppService: GenService<{
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_seller_v1alpha1_report, 0);
-
-/**
- * SellerReportPublicService 是不需要登入的檢舉入口。
- *
- * @generated from service hawkr.seller.v1alpha1.SellerReportPublicService
- */
-export const SellerReportPublicService: GenService<{
-  /**
-   * SubmitFoodSafetyReport 匿名檢舉食品安全事件，必須留下電話或 email（主管機關可能需要聯絡檢舉人），不收佐證圖片（要附圖請
-   * 登入後以 CreateReport 檢舉）。店家的規則與 CreateReport 相同；呼叫者登入而且店家屬於他的帳號時回 invalid_argument（store_id）。
-   * 同一支電話或同一個 email 對同一家店，一個台北 ISO 週內、還沒有結果的那一筆存在時，這次的內容補充到它（每筆最多 10 則，超過時
-   * 內容不存）；新的檢舉、補充與超過上限的送出回應完全相同（回應沒有內容），不會透露這支電話或 email 用過。每個來源 IP
-   * （登入的呼叫者以帳號計）10 分鐘最多 5 次、1 小時最多 10 次，被拒絕的送出不計；超過回 resource_exhausted（帶 RetryInfo）。
-   * 聯絡方式在「結果設定後 30 天、且不早於送出後 90 天」清除；還沒有結果的檢舉不清除。
-   *
-   * @generated from rpc hawkr.seller.v1alpha1.SellerReportPublicService.SubmitFoodSafetyReport
-   */
-  submitFoodSafetyReport: {
-    methodKind: "unary";
-    input: typeof SubmitFoodSafetyReportRequestSchema;
-    output: typeof SubmitFoodSafetyReportResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_hawkr_seller_v1alpha1_report, 1);
 

@@ -124,7 +124,7 @@ func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) 
 	for i := range rounds {
 		_, s := f.open(t)
 		c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
-		buyer := *f.reportOf(t, members[0].ID).ReporterBuyerID
+		buyer := f.reportOf(t, members[0].ID).ReporterBuyerID
 		version := f.caseOf(t, c.ID).Version
 		supplement := func() error {
 			_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: buyer, Category: policy.Fraud, Description: "補充"})
@@ -148,7 +148,7 @@ func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) 
 		// 移動對補充。
 		_, s2 := f.open(t)
 		_, m2 := f.newCase(t, s2.StoreID, policy.Counterfeit, SeverityLow, 2)
-		buyer2 := *f.reportOf(t, m2[0].ID).ReporterBuyerID
+		buyer2 := f.reportOf(t, m2[0].ID).ReporterBuyerID
 		moveVersion := f.reportOf(t, m2[0].ID).Version
 		a, b = race(func() error {
 			sev := SeverityLow
@@ -223,7 +223,7 @@ func TestASupplementNeverInvalidatesTheCaseVersion(t *testing.T) {
 	f := setup(t)
 	_, s := f.open(t)
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
-	buyer := *f.reportOf(t, members[0].ID).ReporterBuyerID
+	buyer := f.reportOf(t, members[0].ID).ReporterBuyerID
 	for range 3 {
 		f.now = f.now.Add(time.Minute)
 		if r, err := f.module.SubmitReport(context.Background(), SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: buyer, Category: policy.Fraud, Description: "補充"}); err != nil || !r.Supplemented {

@@ -26,11 +26,10 @@ import {
 	TRIAGE_FAILED_TEXT,
 } from "../report-actions";
 import { caseColumnText, reportStatusBadge, storeLabel } from "../report-list";
-import { reportOutcomeText, supplementMatchNotice } from "../report-text";
+import { reportOutcomeText } from "../report-text";
 import {
 	actorTimeText,
 	evidenceItems,
-	reporterView,
 	supplementTitle,
 	timeText,
 } from "../report-view";
@@ -134,7 +133,6 @@ export default function ReportDetailPage() {
 	}
 
 	const status = reportStatusBadge(report);
-	const reporter = reporterView(report);
 	const evidence = evidenceItems(report);
 
 	const handleMove = async (
@@ -223,54 +221,25 @@ export default function ReportDetailPage() {
 				</div>
 			</Section>
 
-			{(report.supplements.length > 0 ||
-				report.discardedSubmissionCount > 0) && (
+			{report.supplements.length > 0 && (
 				<Section id="report-supplements-title" icon="add_comment" title="補充">
 					<ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
-						{report.supplements.map((supplement, i) => {
-							const matched = supplementMatchNotice(supplement.matchedBy);
-							return (
-								<li key={supplement.id} style={{ marginBottom: 12 }}>
-									<div className="adm-operation-field-note">
-										{supplementTitle(i, supplement.createTime)}
-									</div>
-									{matched && (
-										<div className="adm-operation-field-note">{matched}</div>
-									)}
-									<div style={{ whiteSpace: "pre-wrap" }}>
-										{supplement.description}
-									</div>
-								</li>
-							);
-						})}
+						{report.supplements.map((supplement, i) => (
+							<li key={supplement.id} style={{ marginBottom: 12 }}>
+								<div className="adm-operation-field-note">
+									{supplementTitle(i, supplement.createTime)}
+								</div>
+								<div style={{ whiteSpace: "pre-wrap" }}>
+									{supplement.description}
+								</div>
+							</li>
+						))}
 					</ol>
-					{report.discardedSubmissionCount > 0 && (
-						<p className="adm-operation-field-note">
-							另有 {report.discardedSubmissionCount}{" "}
-							次重複送出因補充已達上限，內容沒有存下。
-						</p>
-					)}
 				</Section>
 			)}
 
 			<Section id="report-reporter-title" icon="person" title="檢舉人">
-				{reporter.kind === "buyer" ? (
-					<p>買家 ID {reporter.buyerId}</p>
-				) : (
-					<>
-						<p>匿名</p>
-						{reporter.contact.length > 0 && (
-							<div className="info-grid">
-								{reporter.contact.map((row) => (
-									<Field key={row.label} label={row.label}>
-										{row.value}
-									</Field>
-								))}
-							</div>
-						)}
-						{reporter.erasedText && <p>{reporter.erasedText}</p>}
-					</>
-				)}
+				<p>買家 ID {report.reporterBuyerId}</p>
 			</Section>
 
 			<Section id="report-evidence-title" icon="attach_file" title="佐證">
