@@ -84,16 +84,6 @@ CREATE TABLE im.hides (
 CREATE UNIQUE INDEX hides_active_message ON im.hides (message_id) WHERE restored_at IS NULL;
 CREATE INDEX hides_message ON im.hides (message_id, hidden_at);
 
--- 刪帳者與退場店家的複本（kind 是 BUYER 或 STORE，party_id 是 buyer_id 或 store_id）：送出以它擋寄件人與收件人。只插入不刪除，冪等。
-CREATE TABLE im.inactive_parties (
-    kind     TEXT        NOT NULL,
-    party_id BIGINT      NOT NULL,
-    since    TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (kind, party_id),
-    CONSTRAINT inactive_parties_kind_check CHECK (kind IN ('BUYER', 'STORE')),
-    CONSTRAINT inactive_parties_party_check CHECK (party_id > 0)
-);
-
 -- media 引用的同步版本與退場資產：形狀與語意同 review、social（internal/mediaref）。ref 的列不刪除。
 CREATE TABLE im.media_ref_sync (
     ref_type   TEXT        NOT NULL,

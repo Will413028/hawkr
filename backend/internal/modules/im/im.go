@@ -251,17 +251,17 @@ func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.U
 	return m.read.Presence(ctx, p, conversationIDs)
 }
 
-// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把這個 buyer_id 記進 inactive_parties、排 im.erase_party job，
-// 不在這裡改訊息列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
+// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：排 im.erase_party job，不存狀態（買家關閉的事實在 buyer，
+// 送出與讀取以 LockNotClosed 與 pub_closed_buyers() 為準），不在這裡改訊息列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
 // 鎖的順序 identity → buyer → seller → im：accountdeletion 在派發事件之前先鎖完買家與店家。
 func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
-	return m.purge.Deactivate(ctx, PartyBuyer, e.BuyerID, e.OccurredAt)
+	return m.purge.EnqueueErase(ctx, PartyBuyer, e.BuyerID)
 }
 
-// OnStoreRetired 是店家退場時同 transaction 的訂閱者：把這個 store_id 記進 inactive_parties、排 im.erase_party job。
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：排 im.erase_party job（店家退場的事實在 seller，以 LockNotRetired 與 pub_retired_stores() 為準）。
 // 只抹店家身分寄出的訊息；同一個帳號的買家身分由 OnBuyerDeleted 負責。
 func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
-	return m.purge.Deactivate(ctx, PartyStore, e.StoreID, e.OccurredAt)
+	return m.purge.EnqueueErase(ctx, PartyStore, e.StoreID)
 }
 
 // ErasePartyMessages 抹除一個身分寄出的訊息（分批，冪等）。它是 im.erase_party job 的內容，給 worker 與測試呼叫。
@@ -269,7 +269,7 @@ func (m *Module) ErasePartyMessages(ctx context.Context, kind PartyKind, id int6
 	return m.purge.Erase(ctx, kind, id)
 }
 
-// SweepErase 補排仍在 inactive_parties 又還有未抹除訊息的身分的抹除 job（保底掃描的內容，給 worker 與測試呼叫）。
+// SweepErase 補排已關閉的買家與已退場的店家中仍有未抹除訊息的身分的抹除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepErase(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
 // SyncMedia 同步一個 ref 的 media 引用（job 與測試用）。

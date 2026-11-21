@@ -236,7 +236,7 @@ func (s *Service) peerOnline(ctx context.Context, p model.Party, c store.ImConve
 		peerKind, peerID = string(model.PartyBuyer), c.BuyerID
 	}
 	q := s.q(ctx)
-	inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: peerKind, PartyID: peerID})
+	inactive, err := q.PartyInactive(ctx, store.PartyInactiveParams{Kind: peerKind, PartyID: peerID})
 	if err != nil || inactive {
 		return false, err
 	}

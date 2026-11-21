@@ -10,6 +10,24 @@ import (
 	"uuid"
 )
 
+type BuyerPubBlockedBuyer struct {
+	BlockerBuyerID int64
+	BlockedBuyerID int64
+}
+
+type BuyerPubBlockedStore struct {
+	BlockerBuyerID int64
+	StoreID        int64
+}
+
+type BuyerPubClosedBuyer struct {
+	BuyerID int64
+}
+
+type BuyerPubInactiveBuyer struct {
+	BuyerID int64
+}
+
 type ImConversation struct {
 	ID               uuid.UUID
 	BuyerID          int64
@@ -32,12 +50,6 @@ type ImHide struct {
 	RestoredAt     *time.Time
 	RestoredBy     *int64
 	RestoreReason  *string
-}
-
-type ImInactiveParty struct {
-	Kind    string
-	PartyID int64
-	Since   time.Time
 }
 
 type ImMediaRefSync struct {
@@ -74,4 +86,36 @@ type ImRetiredAsset struct {
 	AssetID    string
 	RetiredAt  time.Time
 	UnlinkedAt *time.Time
+}
+
+type SellerPubContentTakedown struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+type SellerPubExposableStore struct {
+	StoreID int64
+}
+
+type SellerPubRetiredStore struct {
+	StoreID int64
+}
+
+type SellerPubReviewItem struct {
+	Kind             string
+	ItemID           string
+	ReportID         *uuid.UUID
+	CaseID           *uuid.UUID
+	InquiryID        *uuid.UUID
+	AuthorityOrderID *uuid.UUID
+	TargetPosition   *int16
+	AccountID        *int64
+	MeasureID        *uuid.UUID
+	RequestID        *uuid.UUID
+	KycApplicationID *uuid.UUID
+	StoreID          *int64
+	StoreName        *string
+	StartAt          time.Time
+	DueAt            time.Time
 }

@@ -31,11 +31,10 @@ LIMIT sqlc.arg(max_rows);
 SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
        c.buyer_id, c.store_id,
        (h.id IS NOT NULL)::boolean AS hidden,
-       EXISTS (
-           SELECT 1 FROM im.inactive_parties AS ip
-           WHERE (m.sender_kind = 'BUYER' AND ip.kind = 'STORE' AND ip.party_id = c.store_id)
-              OR (m.sender_kind = 'STORE' AND ip.kind = 'BUYER' AND ip.party_id = c.buyer_id)
-       ) AS receiver_inactive
+       CASE WHEN m.sender_kind = 'BUYER'
+            THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+            ELSE EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+       END::boolean AS receiver_inactive
 FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
 LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
@@ -64,13 +63,24 @@ SET content = NULL, image_asset_id = NULL, image_object_key = NULL, erased_at = 
 WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND erased_at IS NULL;
 
 -- name: ListInactivePartiesWithMessages :many
--- 抹除的保底掃描：已在 inactive_parties 但仍有未抹除訊息的身分，最多 max_rows 個。
-SELECT ip.kind, ip.party_id FROM im.inactive_parties AS ip
-WHERE (ip.kind = 'BUYER' AND EXISTS (
-          SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
-          WHERE c.buyer_id = ip.party_id AND m.sender_kind = 'BUYER' AND m.erased_at IS NULL))
-   OR (ip.kind = 'STORE' AND EXISTS (
-          SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
-          WHERE c.store_id = ip.party_id AND m.sender_kind = 'STORE' AND m.erased_at IS NULL))
-ORDER BY ip.kind, ip.party_id
+-- 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，最多 max_rows 個。
+SELECT kind::text AS kind, party_id::bigint AS party_id FROM (
+    SELECT 'BUYER' AS kind, cb.buyer_id AS party_id FROM buyer.pub_closed_buyers() AS cb
+    WHERE EXISTS (
+        SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
+        WHERE c.buyer_id = cb.buyer_id AND m.sender_kind = 'BUYER' AND m.erased_at IS NULL)
+    UNION ALL
+    SELECT 'STORE' AS kind, rs.store_id AS party_id FROM seller.pub_retired_stores() AS rs
+    WHERE EXISTS (
+        SELECT 1 FROM im.conversations AS c JOIN im.messages AS m ON m.conversation_id = c.id
+        WHERE c.store_id = rs.store_id AND m.sender_kind = 'STORE' AND m.erased_at IS NULL)
+) AS parties
+ORDER BY kind, party_id
 LIMIT sqlc.arg(max_rows);
+
+-- name: PartyInactive :one
+-- 一方是否已關閉（買家）或已退場（店家）：不取鎖的讀取（G4 的提早檢查與在線狀態）。Send 的正確性由 transaction 內的 LockNotClosed、LockNotRetired 保證。
+SELECT CASE WHEN sqlc.arg(kind)::text = 'BUYER'
+            THEN EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = sqlc.arg(party_id)::bigint)
+            ELSE EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = sqlc.arg(party_id)::bigint)
+       END::boolean AS inactive;

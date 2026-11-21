@@ -34,6 +34,7 @@ func (imBuyers) ProfileByBuyerID(context.Context, int64) (buyer.Profile, error) 
 	return buyer.Profile{}, nil
 }
 func (imBuyers) IsBlockingStore(context.Context, int64, int64) (bool, error) { return false, nil }
+func (imBuyers) LockNotClosed(context.Context, int64) error                  { return nil }
 
 type imStores struct{}
 
@@ -46,6 +47,7 @@ func (imStores) Store(_ context.Context, id int64) (seller.Store, error) {
 	return st, nil
 }
 func (imStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+func (imStores) LockNotRetired(context.Context, int64) error                  { return nil }
 
 type imOrders struct{}
 
@@ -68,7 +70,11 @@ type live struct {
 
 func setupLive(t *testing.T) *live {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "im", Dir: im.Migrations()}))
+	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "im", Dir: im.Migrations()},
+	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
 		t.Fatal(err)

@@ -98,8 +98,8 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 	}
 }
 
-// review 的訂閱者在買家事件的 transaction 內寫自己的 inactive_authors（複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
-// review 的表還沒被寫（pg_locks 沒有 inactive_authors 的 RowExclusiveLock），放開後複本才寫入。買家的評價列只在 purge job 的 transaction
+// review 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// review 的表還沒被碰（pg_locks 沒有 review 的 RowExclusiveLock），放開後 job 才排入。買家的評價列只在 purge job 的 transaction
 // 內鎖，不在刪帳的 transaction 內（訂閱者不碰評價列）。兩條路徑都量。
 func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
@@ -134,10 +134,10 @@ func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 				return n > 0
 			}
 			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "review 的表", reviewTouched)
-			var n int64
-			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
-				t.Fatalf("review 的複本 %d %v", n, err)
+			if n := f.queue.count("review.purge_author"); n != 1 {
+				t.Fatalf("review 的清除 job %d 個（每條刪帳路徑只發一個買家事件，排一次）", n)
 			}
+			var n int64
 			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM review.reviews WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
 				t.Fatalf("訂閱者不刪評價列：%d %v", n, err)
 			}
@@ -148,21 +148,27 @@ func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 type imStores struct {
 	*seller.Reader
 	noStoreBlocks
+	owner *seller.Module
 }
 
 type noImOrders struct{}
 
 func (noImOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
 
+// LockNotRetired 走真正的 seller 模組：退場的事實與守門鎖只在 seller。
+func (s imStores) LockNotRetired(ctx context.Context, id int64) error {
+	return s.owner.LockNotRetired(ctx, id)
+}
+
 func newIM(f *fixture) *im.Module {
 	return im.New(im.Deps{
-		DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: imStores{seller.NewReader(f.db, time.Now), noStoreBlocks{}},
+		DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: imStores{Reader: seller.NewReader(f.db, time.Now), owner: f.seller},
 		Orders: noImOrders{}, NewID: uuid.NewV7, Now: time.Now,
 	})
 }
 
-// im 的訂閱者在買家事件的 transaction 內寫自己的 inactive_parties（複本）並排抹除 job，所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
-// im 的表還沒被寫（pg_locks 沒有 im 的 RowExclusiveLock），放開後複本才寫入。買家寄出的訊息列只在抹除 job 的 transaction 內鎖，不在刪帳的
+// im 的訂閱者在買家事件的 transaction 內只排抹除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// im 的表還沒被碰（pg_locks 沒有 im 的 RowExclusiveLock），放開後 job 才排入。買家寄出的訊息列只在抹除 job 的 transaction 內鎖，不在刪帳的
 // transaction 內（訂閱者不碰訊息列）。兩條路徑都量；im 只訂 BuyerDeleted，所以申請進入等待時 im 什麼都不寫。
 func TestDeletionLocksBuyerAndSellerBeforeImRows(t *testing.T) {
 	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
@@ -202,17 +208,14 @@ func TestDeletionLocksBuyerAndSellerBeforeImRows(t *testing.T) {
 			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.messages WHERE erased_at IS NULL").Scan(&n); err != nil || n != 1 {
 				t.Fatalf("訂閱者不抹訊息列：%d %v", n, err)
 			}
-			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'BUYER' AND party_id = $1", buyerID).Scan(&n); err != nil {
-				t.Fatal(err)
-			}
-			if want := int64(map[bool]int{true: 0, false: 1}[open]); n != want {
-				t.Fatalf("im 的複本 %d，預期 %d（只訂 BuyerDeleted：申請進入等待時不寫，關閉時才寫）", n, want)
+			if want := map[bool]int{true: 0, false: 1}[open]; f.queue.count("im.erase_party") != want {
+				t.Fatalf("im 的抹除 job %d 個，預期 %d（只訂 BuyerDeleted：申請進入等待時不排，關閉時才排）", f.queue.count("im.erase_party"), want)
 			}
 		})
 	}
 }
 
-// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；im 的訂閱者之後才寫自己的 inactive_parties，
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；im 的訂閱者之後才排抹除 job，
 // 所以順序是 seller → im。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
 func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
 	t.Parallel()
@@ -232,9 +235,8 @@ func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var n int64
-	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'STORE' AND party_id = $1", s.StoreID).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("im 的複本 %d %v", n, err)
+	if n := f.queue.count("im.erase_party"); n != 1 {
+		t.Fatalf("im 的抹除 job %d 個", n)
 	}
 }
 
@@ -242,8 +244,8 @@ func newCRM(f *fixture) *crm.Module {
 	return crm.New(crm.Deps{DB: f.db, Jobs: f.queue, NewID: uuid.NewV7, Now: time.Now})
 }
 
-// crm 的訂閱者在買家事件的 transaction 內只寫自己的 inactive_parties（複本）並排清除 job，所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
-// crm 的表還沒被寫（pg_locks 沒有 crm 的 RowExclusiveLock），放開後複本才寫入。客戶、單與 ledger 只在清除 job 的 transaction 內刪，不在刪帳的
+// crm 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// crm 的表還沒被碰（pg_locks 沒有 crm 的 RowExclusiveLock），放開後 job 才排入。客戶、單與 ledger 只在清除 job 的 transaction 內刪，不在刪帳的
 // transaction 內（訂閱者不碰那些列）。只訂 BuyerDeleted，所以申請進入等待時 crm 什麼都不寫。兩條路徑都量。
 func TestDeletionLocksBuyerAndSellerBeforeCrmRows(t *testing.T) {
 	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
@@ -278,17 +280,14 @@ func TestDeletionLocksBuyerAndSellerBeforeCrmRows(t *testing.T) {
 			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.customers WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
 				t.Fatalf("訂閱者不刪客戶列：%d %v", n, err)
 			}
-			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.inactive_parties WHERE kind = 'BUYER' AND party_id = $1", buyerID).Scan(&n); err != nil {
-				t.Fatal(err)
-			}
-			if want := int64(map[bool]int{true: 0, false: 1}[open]); n != want {
-				t.Fatalf("crm 的複本 %d，預期 %d（只訂 BuyerDeleted：申請進入等待時不寫，關閉時才寫）", n, want)
+			if want := map[bool]int{true: 0, false: 1}[open]; f.queue.count("crm.erase_party") != want {
+				t.Fatalf("crm 的清除 job %d 個，預期 %d（只訂 BuyerDeleted：申請進入等待時不排，關閉時才排）", f.queue.count("crm.erase_party"), want)
 			}
 		})
 	}
 }
 
-// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；crm 的訂閱者之後才寫自己的 inactive_parties，
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；crm 的訂閱者之後才排清除 job，
 // 所以順序是 seller → crm。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
 func TestStoreRetiredLocksSellerBeforeCrmRows(t *testing.T) {
 	t.Parallel()
@@ -308,9 +307,8 @@ func TestStoreRetiredLocksSellerBeforeCrmRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var n int64
-	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = $1", s.StoreID).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("crm 的複本 %d %v", n, err)
+	if n := f.queue.count("crm.erase_party"); n != 1 {
+		t.Fatalf("crm 的清除 job %d 個", n)
 	}
 }
 

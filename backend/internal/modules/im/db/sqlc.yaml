@@ -1,11 +1,11 @@
 # 改完 schema.sql 或 queries/ 之後，在本目錄執行 `sqlc generate`。
 #
-# 只讀本模組的 schema.sql：query 參照別的模組的表時，sqlc generate 就會失敗
+# 讀本模組的 schema.sql 加依賴表允許的 buyer、seller 的 pub.sql（pub_closed_buyers、pub_retired_stores）：query 參照別的模組的表時，sqlc generate 就會失敗
 # （ADR 2026-09-24-go-modular-monolith D3 的機械檢查；CI 重新生成並比對）。
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: "schema.sql"
+    schema: ["schema.sql", "../../buyer/db/pub.sql", "../../seller/db/pub.sql"]
     queries: "queries/"
     gen:
       go:

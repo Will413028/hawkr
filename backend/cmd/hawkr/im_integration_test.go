@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -21,7 +21,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-type imTestBuyers struct{}
+// imTestBuyers 是 im 的 Buyers port：守門 LockNotClosed 走真正的 buyer 模組（買家的關閉事實只在 buyer），其餘是固定的替身。
+type imTestBuyers struct{ owner *buyer.Module }
 
 func (imTestBuyers) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {
 	return 1000 + id, nil
@@ -30,6 +31,9 @@ func (imTestBuyers) ProfileByBuyerID(context.Context, int64) (buyer.Profile, err
 	return buyer.Profile{}, nil
 }
 func (imTestBuyers) IsBlockingStore(context.Context, int64, int64) (bool, error) { return false, nil }
+func (b imTestBuyers) LockNotClosed(ctx context.Context, id int64) error {
+	return b.owner.LockNotClosed(ctx, id)
+}
 
 type imTestStores struct{}
 
@@ -40,24 +44,40 @@ func (imTestStores) Store(_ context.Context, id int64) (seller.Store, error) {
 	}, nil
 }
 func (imTestStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+func (imTestStores) LockNotRetired(context.Context, int64) error                  { return nil }
 
 type imNoOrders struct{}
 
 func (imNoOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
 
-// 刪帳時機（A6-D14 W4 (ii)）：newIM 只訂 BuyerDeleted。發 BuyerDeletionRequested 之後買家仍能送出、訊息不被抹除、沒有複本與抹除 job；
-// BuyerDeleted 之後才寫複本、排抹除 job、擋送出，抹除 job 跑完才抹除。這是正式組裝（newIM）的測試：加訂 BuyerDeletionRequested 時它失敗。
+// 刪帳時機（A6-D14 W4 (ii)）：newIM 只訂 BuyerDeleted。BuyerDeletionRequested（buyer 的 BeginDeletion）之後買家仍能送出、訊息不被抹除、沒有抹除 job；
+// BuyerDeleted（CloseForDeletion）之後才排抹除 job、擋送出（守門 LockNotClosed 讀 buyer 的狀態），抹除 job 跑完才抹除。
+// 這是正式組裝（newIM）的測試：加訂 BuyerDeletionRequested 時它失敗。
 func TestIMDeletionTimingSubscribesOnlyToBuyerDeleted(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "im", Dir: im.Migrations()}))
+	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "im", Dir: im.Migrations()},
+	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
 		t.Fatal(err)
 	}
 	bus := events.NewBus()
-	m := newIM(d, bus, queue, imTestBuyers{}, imTestStores{}, media.NewFake(), imNoOrders{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	const buyerID, storeID = int64(11), int64(22)
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	fakeMedia := media.NewFake()
+	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Media: fakeMedia, Now: time.Now, Logger: log})
+	m := newIM(d, bus, queue, imTestBuyers{owner: owner}, imTestStores{}, fakeMedia, imNoOrders{}, log)
+	if err := owner.OnAccountCreated(ctx, identity.AccountCreated{AccountID: 7001, Name: "買家"}); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := owner.Profile(ctx, 7001)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyerID, storeID := profile.BuyerID, int64(22)
 	send := func(text string) error {
 		_, err := m.Send(ctx, im.SendInput{Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: text})
 		return err
@@ -74,25 +94,18 @@ func TestIMDeletionTimingSubscribesOnlyToBuyerDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := d.InTx(ctx, func(ctx context.Context) error {
-		return events.Publish(ctx, bus, buyer.BuyerDeletionRequested{EventID: uuid.NewV7(), OccurredAt: time.Now(), BuyerID: buyerID, AccountID: 1000 + buyerID})
-	}); err != nil {
+	if err := owner.BeginDeletion(ctx, buyerID); err != nil {
 		t.Fatal(err)
 	}
 	if err := send("while pending deletion"); err != nil {
 		t.Fatalf("等待刪除的買家仍能為開啟中的訂單聯絡店家：%v", err)
 	}
-	if n := count("SELECT count(*) FROM im.inactive_parties") + count(eraseJobs) + count("SELECT count(*) FROM im.messages WHERE erased_at IS NOT NULL"); n != 0 {
-		t.Fatalf("BuyerDeletionRequested 不該寫複本、排 job 或抹除：%d", n)
+	if n := count(eraseJobs) + count("SELECT count(*) FROM im.messages WHERE erased_at IS NOT NULL"); n != 0 {
+		t.Fatalf("BuyerDeletionRequested 不該排 job 或抹除：%d", n)
 	}
 
-	if err := d.InTx(ctx, func(ctx context.Context) error {
-		return events.Publish(ctx, bus, buyer.BuyerDeleted{EventID: uuid.NewV7(), OccurredAt: time.Now(), BuyerID: buyerID, AccountID: 1000 + buyerID})
-	}); err != nil {
+	if err := owner.CloseForDeletion(ctx, buyerID); err != nil {
 		t.Fatal(err)
-	}
-	if n := count("SELECT count(*) FROM im.inactive_parties WHERE kind = 'BUYER'"); n != 1 {
-		t.Fatalf("BuyerDeleted 要寫複本：%d", n)
 	}
 	if n := count(eraseJobs); n != 1 {
 		t.Fatalf("BuyerDeleted 要排 1 個抹除 job：%d", n)

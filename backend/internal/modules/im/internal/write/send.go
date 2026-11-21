@@ -31,7 +31,7 @@ type target struct {
 }
 
 // Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
-// transaction 內依固定順序持雙方的 advisory lock、重查雙方是否已刪除、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
+// transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
@@ -61,26 +61,15 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	var out model.Message
 	err = s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		sender, receiver := in.Sender.Kind, counterpart(in.Sender.Kind)
-		// 兩方都持 advisory lock：Deactivate 一次只持一個身分的鎖，鎖序固定（買家先於店家，即 kind 字串序）所以不會死結。
-		for _, k := range []model.PartyKind{model.PartyBuyer, model.PartyStore} {
-			if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(k), PartyID: partyID(k, t)}); err != nil {
-				return err
-			}
+		sender := in.Sender.Kind
+		// 守門鎖是 transaction 內的第一組語句，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
+		// 買家先於店家（鎖序同 accountdeletion），持有到 transaction 結束。取到之後才算這次寫入看到的狀態，不重用 guard 的讀取結果。
+		// 不得把 guard 或 legacy 呼叫搬進這個 transaction（列鎖會跨網路呼叫）。
+		if err := s.d.Buyers.LockNotClosed(ctx, t.buyerID); err != nil {
+			return s.closedGuardError(l, err, sender, model.PartyBuyer)
 		}
-		inactive, err := q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(sender), PartyID: partyID(sender, t)})
-		if err != nil {
-			return err
-		}
-		if inactive {
-			return apperr.FailedPrecondition("%s", text.ImSenderInactive(l))
-		}
-		inactive, err = q.IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(receiver), PartyID: partyID(receiver, t)})
-		if err != nil {
-			return err
-		}
-		if inactive {
-			return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
+		if err := s.d.Stores.LockNotRetired(ctx, t.store.StoreID); err != nil {
+			return s.closedGuardError(l, err, sender, model.PartyStore)
 		}
 		seq, err := q.AllocateSeq(ctx, store.AllocateSeqParams{
 			NewID: s.d.NewID(), BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender),
@@ -121,6 +110,17 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		return nil
 	})
 	return out, err
+}
+
+// closedGuardError 把守門的 NotFound（已關閉、已退場或不存在）依寄件人與收件人的角色翻成原有的訊息與 reason；其他錯誤原樣回傳（fail-closed）。
+func (s *Service) closedGuardError(l uitext.Locale, err error, sender, guarded model.PartyKind) error {
+	if apperr.KindOf(err) != apperr.KindNotFound {
+		return err
+	}
+	if guarded == sender {
+		return apperr.FailedPrecondition("%s", text.ImSenderInactive(l))
+	}
+	return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
 }
 
 func counterpart(k model.PartyKind) model.PartyKind {
@@ -284,7 +284,7 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		}
 	}
 
-	// G4 收件人已刪除：transaction 外的這次檢查只是優化，讓已刪除的收件人不必先跑一次媒體 Finalize；正確性由 transaction 內持鎖後的重查保證。
+	// G4 收件人已刪除：transaction 外的這次檢查只是優化，讓已刪除的收件人不必先跑一次媒體 Finalize；正確性由 transaction 內的守門鎖（LockNotClosed、LockNotRetired）保證。
 	receiver := counterpart(sender.Kind)
 	gone, err := s.inactive(ctx, receiver, partyID(receiver, t))
 	if err != nil {

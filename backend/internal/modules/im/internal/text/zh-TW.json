@@ -38,7 +38,7 @@
     },
     "im.receiver_deleted": {
       "message": "對方帳號已刪除，無法傳送訊息",
-      "description": "收件人在 inactive_parties。"
+      "description": "收件人已關閉（買家）或已退場（店家）。"
     },
     "im.self_message_not_allowed": {
       "message": "不能傳訊息給自己",
@@ -50,7 +50,7 @@
     },
     "im.sender_inactive": {
       "message": "帳號刪除中，無法傳送訊息",
-      "description": "寄件人在 inactive_parties。"
+      "description": "寄件人已關閉（買家）或已退場（店家）。"
     },
     "im.store_closed": {
       "message": "這家店已停止營業，無法傳送訊息",

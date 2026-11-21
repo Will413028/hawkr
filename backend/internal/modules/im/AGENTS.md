@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id)`、`last_seq`、兩個已讀游標）、`messages`（`seq`）、`hides`、`inactive_parties`（刪帳者、退場店家的複本）、`presence_streams`（UNLOGGED：每條串流一列，是在線狀態的來源與每個 Party 並行串流數的全域計數）、`media_ref_sync`、`retired_assets`。讀取模型：無。
+schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id)`、`last_seq`、兩個已讀游標）、`messages`（`seq`）、`hides`、`presence_streams`（UNLOGGED：每條串流一列，是在線狀態的來源與每個 Party 並行串流數的全域計數）、`media_ref_sync`、`retired_assets`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -24,9 +24,9 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 - 送出的寄件人由呼叫者的 session 決定（`Party`），模組不收 client 帶的寄件人；給 `ConversationID` 時以對話授權，不是該對話的一方回 NotFound。守門順序固定 G1 停權 → G2 停業 → G3 封鎖 → G4 收件人已刪除 → G5 詞典，任何查詢錯誤回 Unavailable（不放行）。守門：`write` 的守門表格測試。
 - 停權（G1）與封鎖（G3）共用「進行中」判定（`Orders.OpenOrderBetween`，只在 G1 或 G3 命中時查，一次送出最多一次）：有進行中的訂單或售後就放行；查詢失敗回 Unavailable。停業只有 `CLOSED`，等待刪除雙向都可聊。
 - seq 由 `AllocateSeq` 一句 SQL 配發（建立對話、`last_seq + 1`、推進寄件人自己那一方的游標）；`UNIQUE (conversation_id, seq)` 是最終保證；seq 沒有空洞。未讀 = `last_seq - 自己的游標`；兩個游標以 CHECK 限在 `0..last_seq`；`MarkRead` 只前進不超過 `last_seq`；讀取方法不寫游標。
-- `Send` 在同一個 transaction 依固定順序（買家先於店家）持雙方的 `LockParty`（advisory，`im.party:<kind>:<id>`，不進鎖序；`Deactivate` 一次只持一個，所以不會死結）、重查雙方的 `inactive_parties`、寫列、排媒體同步、發 `MessageSent`；媒體 `Finalize` 在 transaction 外。
+- `Send` 的 `inTx` 第一組語句：`Buyers.LockNotClosed`、`Stores.LockNotRetired`（買家先於店家，`FOR KEY SHARE`；刪除中的買家放行），在 `guard`（含 `Orders` RPC，tx 外）之後、`AllocateSeq` 之前；NotFound 翻成既有訊息。`guard` 與 legacy 呼叫不得進 tx（`TestSendCallsOrdersOutsideTheWriteTransaction`）。讀取讀 `pub_closed_buyers()`、`pub_retired_stores()`。見 `CARRYOVER.md`。
 - 預覽不存，讀取時由最後一則推導（隱藏與抹除不給任何內容）；隱藏、抹除的訊息在所有讀取路徑都回墓碑；模組不寫中文句子。
-- 刪帳與退場：`OnBuyerDeleted`、`OnStoreRetired` 同 transaction 只寫 `inactive_parties`、排 `im.erase_party`（以身分為唯一鍵，ByState 含 Running，River 要求 available、pending、running、scheduled 都在內）；只抹該身分寄出的訊息（不依帳號列舉）；不訂 `BuyerDeletionRequested`、不訂 identity 事件。job 依 id 升序每批 200，保留列、清空內容與圖片並記退場資產、排媒體同步，可重跑；`im.erase_sweep` 每 15 分鐘補排。
+- 刪帳與退場：`OnBuyerDeleted`、`OnStoreRetired` 同 transaction 只排 `im.erase_party`（`EnqueueErase`，以身分為唯一鍵，ByState 含 Running）；只抹該身分寄出的訊息（不依帳號列舉）；不訂 `BuyerDeletionRequested`、不訂 identity 事件。job 依 id 升序每批 200，保留列、清空內容與圖片並記退場資產、排媒體同步，可重跑；`im.erase_sweep` 每 15 分鐘補排。
 - 儲存的代碼是 UPPER_SNAKE（`BUYER`、`STORE`、`TEXT`、`IMAGE`）；`message_type` 只有 `TEXT`、`IMAGE`，卡片隨對外契約加。
 - 媒體引用只由同步 job 寫；本步的 transaction 內不呼叫 provider。
 - 即時通知（頻道 `im_events`）由 `write` 在寫入的同一個 transaction 內 `pg_notify`，不經 `events.Publish`；payload 只有業務鍵與 seq。訂閱者的內容一律經 `MessagesAfter` 讀取（授權在讀取），通知只是提示，漏掉的靠游標補洞。

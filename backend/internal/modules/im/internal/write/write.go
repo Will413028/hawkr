@@ -34,12 +34,16 @@ type Buyers interface {
 	AccountIDByBuyerID(ctx context.Context, buyerID int64) (int64, error)
 	ProfileByBuyerID(ctx context.Context, buyerID int64) (buyer.Profile, error)
 	IsBlockingStore(ctx context.Context, buyerID, storeID int64) (bool, error)
+	// LockNotClosed 在 transaction 內以 FOR KEY SHARE 確認買家尚未關閉（刪除中放行）；已關閉與不存在回 NotFound。
+	LockNotClosed(ctx context.Context, buyerID int64) error
 }
 
 // Stores 是送出用到的 seller 公開 API；正式組裝傳 *seller.Module。
 type Stores interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 	StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
+	// LockNotRetired 在 transaction 內以 FOR KEY SHARE 確認店家尚未退場；已退場與不存在回 NotFound。
+	LockNotRetired(ctx context.Context, storeID int64) error
 }
 
 // Deps 是寫入路徑的依賴。
@@ -59,7 +63,7 @@ type Deps struct {
 // Service 是寫入路徑的 use case。
 type Service struct {
 	d Deps
-	// inactive 回報一方是否在 inactive_parties；預設讀資料庫，守門的單元測試以替身取代。
+	// inactive 回報一方是否已關閉（買家）或已退場（店家），讀擁有者的 pub 函式、不取鎖；預設讀資料庫，守門的單元測試以替身取代。
 	inactive func(ctx context.Context, kind model.PartyKind, id int64) (bool, error)
 }
 
@@ -67,7 +71,7 @@ type Service struct {
 func New(d Deps) *Service {
 	s := &Service{d: d}
 	s.inactive = func(ctx context.Context, kind model.PartyKind, id int64) (bool, error) {
-		return s.q(ctx).IsInactiveParty(ctx, store.IsInactivePartyParams{Kind: string(kind), PartyID: id})
+		return s.q(ctx).PartyInactive(ctx, store.PartyInactiveParams{Kind: string(kind), PartyID: id})
 	}
 	return s
 }

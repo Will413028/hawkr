@@ -6,7 +6,7 @@
     },
     "review.author_inactive": {
       "message": "帳號刪除中，無法評價",
-      "description": "買家正在刪除帳號（inactive_authors 有列）時提交評價。"
+      "description": "買家正在刪除帳號（不再營運中）時提交評價。"
     },
     "review.content_invalid_text": {
       "message": "評價內容不是有效的文字",

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -322,9 +322,7 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有未還原的隱藏：%v", err)
 	}
-	f.deactivate(t, func(ctx context.Context) error {
-		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), OccurredAt: f.clock(), StoreID: s1, AccountID: 2000 + s1})
-	})
+	f.storeRetired(t, s1, 2000+s1)
 	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, s1); err != nil {
 		t.Fatal(err)
 	}
@@ -333,18 +331,35 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	}
 }
 
-func (f *fixture) deactivate(t *testing.T, publish func(context.Context) error) {
+// buyerDeleted 關閉買家（buyer 的 CloseForDeletion，事實的唯一來源）；buyer 在同 transaction 發 BuyerDeleted，im 的訂閱者排抹除 job。
+func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 	t.Helper()
-	if err := f.db.InTx(context.Background(), publish); err != nil {
+	ctx := context.Background()
+	if err := ensureBuyer(ctx, f.db, buyerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.buyers.owner.CloseForDeletion(ctx, buyerID); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
+// storeRetired 讓店家退場（seller 的 retired_at 是事實的唯一來源，最小的列）並在同 transaction 發 StoreRetired。
+func (f *fixture) storeRetired(t *testing.T, storeID, accountID int64) {
 	t.Helper()
-	f.deactivate(t, func(ctx context.Context) error {
-		return events.Publish(ctx, f.bus, buyer.BuyerDeleted{EventID: uuid.New(), OccurredAt: f.clock(), BuyerID: buyerID, AccountID: 1000 + buyerID})
+	ctx := context.Background()
+	if err := ensureStore(ctx, f.db, storeID); err != nil {
+		t.Fatal(err)
+	}
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		if _, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
+			logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), OccurredAt: f.clock(), StoreID: storeID, AccountID: accountID})
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (f *fixture) erased(t *testing.T, kind string) (erased, kept int64) {
@@ -380,9 +395,7 @@ func TestErasureIsPerIdentity(t *testing.T) {
 		t.Fatalf("只該抹一則：%d", n)
 	}
 
-	f.deactivate(t, func(ctx context.Context) error {
-		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), OccurredAt: f.clock(), StoreID: s1, AccountID: 5000})
-	})
+	f.storeRetired(t, s1, 5000)
 	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, s1); err != nil {
 		t.Fatal(err)
 	}
@@ -397,28 +410,107 @@ func TestErasureIsPerIdentity(t *testing.T) {
 	}
 }
 
-// 抹除之後送出被擋：寄件人已刪除是 FailedPrecondition，寄給已刪除者是 RECEIVER_DELETED；兩者都不留列。
-func TestInactivePartiesCannotSendOrReceive(t *testing.T) {
+// 買家關閉、店家退場之後送出被擋：寄件人已停用是 FailedPrecondition，寄給已停用者是 RECEIVER_DELETED；兩者都不留列。
+// 讀取側也要對：relay 的 receiver_inactive 讀擁有者的 pub 函式。
+func TestPartiesCannotSendOrReceiveAfterClosedOrRetired(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "hi")
+	f.say(t, f.buyerParty(b2), s2, "to the store that will retire")
+	var relayID uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT m.id FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.buyer_id = $1 AND m.sender_kind = 'BUYER'", b2).Scan(&relayID); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := f.m.MessageForRelay(ctx, relayID); err != nil || r.ReceiverInactive {
+		t.Fatalf("退場之前收件人營運中：%+v %v", r, err)
+	}
+
 	f.buyerDeleted(t, b1)
-	before := f.scalar(t, "SELECT count(*) FROM im.messages")
 	if _, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("已刪除的寄件人：%v", err)
+		t.Fatalf("已關閉的寄件人：%v", err)
 	}
 	_, err := f.m.Send(ctx, im.SendInput{Sender: f.storeParty(t, s1), CounterpartID: b1, Type: im.TypeText, Text: "anyone there"})
 	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) != im.ReasonReceiverDeleted {
-		t.Fatalf("寄給已刪除者：%v", err)
+		t.Fatalf("寄給已關閉者：%v", err)
 	}
-	if got := f.scalar(t, "SELECT count(*) FROM im.messages"); got != before {
-		t.Fatalf("被擋的送出留下了列：%d -> %d", before, got)
+
+	f.storeRetired(t, s2, 2000+s2)
+	_, err = f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b2), CounterpartID: s2, Type: im.TypeText, Text: "to retired"})
+	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) != im.ReasonReceiverDeleted {
+		t.Fatalf("寄給已退場的店：%v", err)
+	}
+	_, err = f.m.Send(ctx, im.SendInput{Sender: f.storeParty(t, s2), CounterpartID: b2, Type: im.TypeText, Text: "from retired"})
+	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) == im.ReasonReceiverDeleted {
+		t.Fatalf("已退場的寄件人要是寄件人已停用，不是 RECEIVER_DELETED：%v", err)
+	}
+	if got := f.scalar(t, "SELECT count(*) FROM im.messages"); got != 2 {
+		t.Fatalf("被擋的送出留下了列：%d", got)
+	}
+	if r, err := f.m.MessageForRelay(ctx, relayID); err != nil || !r.ReceiverInactive {
+		t.Fatalf("退場之後 relay 的 receiver_inactive 要為真：%+v %v", r, err)
+	}
+	r, err := f.m.MessageForRelay(ctx, mustMessageID(t, f, b1))
+	if err != nil || r.ReceiverInactive {
+		t.Fatalf("買家關閉時，買家寄出的訊息收件人是店家（營運中）：%+v %v", r, err)
 	}
 }
 
-// 刪帳的訂閱者排抹除 job（拿掉 Enqueue 時這個測試失敗），而且與複本在同一個 transaction（排入失敗時複本一起回滾）。
-func TestSubscriberEnqueuesTheEraseJobAtomically(t *testing.T) {
+func mustMessageID(t *testing.T, f *fixture, buyerID int64) uuid.UUID {
+	t.Helper()
+	var id uuid.UUID
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(),
+		"SELECT m.id FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.buyer_id = $1 AND m.sender_kind = 'BUYER'", buyerID).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// 刪帳申請中的買家仍可聊天（計畫「不能動」）：BeginDeletion 之後買家與店家雙向仍可送、訊息不被抹除、沒有抹除 job；CloseForDeletion 之後才擋、才有 job。
+func TestPendingDeletionBuyerCanStillSend(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.say(t, f.buyerParty(b1), s1, "before")
+	if err := f.buyers.owner.BeginDeletion(ctx, b1); err != nil {
+		t.Fatal(err)
+	}
+	f.say(t, f.buyerParty(b1), s1, "buyer while pending")
+	f.say(t, f.storeParty(t, s1), b1, "store to pending buyer")
+	if n := f.jobs.count("im.erase_party"); n != 0 {
+		t.Fatalf("刪除申請不排抹除 job：%d", n)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages WHERE erased_at IS NOT NULL"); n != 0 {
+		t.Fatalf("刪除申請不抹訊息：%d", n)
+	}
+	f.buyerDeleted(t, b1)
+	if n := f.jobs.count("im.erase_party"); n != 1 {
+		t.Fatalf("關閉之後才排抹除 job：%d", n)
+	}
+	if _, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "after"}); kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("關閉之後被擋：%v", err)
+	}
+}
+
+// Send 不得在寫入 transaction 內呼叫 legacy 的 Orders（列鎖不跨網路呼叫）：封鎖時 guard 會查進行中的訂單，替身記下呼叫時 ctx 是否帶 transaction。
+func TestSendCallsOrdersOutsideTheWriteTransaction(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	f.stores.block = true
+	f.orders.open = true
+	f.say(t, f.buyerParty(b1), s1, "blocked but open order")
+	f.orders.mu.Lock()
+	defer f.orders.mu.Unlock()
+	if f.orders.calls == 0 {
+		t.Fatal("封鎖時 guard 要查訂單")
+	}
+	if f.orders.inTx {
+		t.Fatal("Orders 在寫入 transaction 內被呼叫")
+	}
+}
+
+// 刪帳的訂閱者排抹除 job（拿掉 Enqueue 時這個測試失敗）；不存任何複本。
+func TestSubscriberEnqueuesTheEraseJob(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.say(t, f.buyerParty(b1), s1, "hi")
@@ -426,17 +518,8 @@ func TestSubscriberEnqueuesTheEraseJobAtomically(t *testing.T) {
 	if n := f.jobs.count("im.erase_party"); n != 1 {
 		t.Fatalf("抹除 job %d 個", n)
 	}
-	if n := f.scalar(t, "SELECT count(*) FROM im.inactive_parties WHERE kind = 'BUYER' AND party_id = $1", b1); n != 1 {
-		t.Fatalf("複本 %d 列", n)
-	}
-	// 冪等：重送同一個事件不重複寫複本。
-	f.buyerDeleted(t, b1)
-	if n := f.scalar(t, "SELECT count(*) FROM im.inactive_parties"); n != 1 {
-		t.Fatalf("複本 %d 列", n)
-	}
-	// 在 transaction 外呼叫訂閱者是程式錯誤。
-	if err := f.m.OnBuyerDeleted(context.Background(), buyer.BuyerDeleted{BuyerID: b2, OccurredAt: time.Now()}); err == nil {
-		t.Fatal("transaction 外要回錯誤")
+	if n := f.scalar(t, "SELECT count(*) FROM pg_tables WHERE schemaname = 'im' AND tablename = 'inactive_parties'"); n != 0 {
+		t.Fatalf("複本表已刪除：%d", n)
 	}
 }
 
@@ -479,7 +562,7 @@ func TestEraseJobBatchesAndIsRerunnable(t *testing.T) {
 	}
 }
 
-// 保底掃描：job 被丟棄後，仍在 inactive_parties 又有未抹除訊息的身分被補排；抹完之後不再補排。
+// 保底掃描：job 被丟棄後，已關閉或已退場又有未抹除訊息的身分被補排（來源是擁有者的 pub 函式）；抹完之後不再補排。
 func TestSweepRequeuesDroppedEraseJobs(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -539,97 +622,106 @@ func TestImageMessagesSyncAndRetireOnErase(t *testing.T) {
 	}
 }
 
-// 刪帳競態（鎖 + 重查）：送出與訂閱者以 LockParty 串行。測試持有同一把鎖（等同訂閱者的 transaction 持鎖中），Send 要等在鎖上；
-// 持鎖者提交 inactive_parties 之後 Send 被擋、不留訊息。拿掉 Send 的 LockParty 時它不會等；拿掉 transaction 內的重查時訊息會寫進去。
-func TestSendWaitsForDeactivationAndIsRejected(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	tx, err := f.db.Pool().Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
+// holdSend 啟動一個 Send（買家 b1 寄給店家 s1），讓它的 transaction 停在已持有買家與店家守門鎖之後（stores.afterLock）；回傳放行函式與結果 channel。
+func (f *fixture) holdSend(t *testing.T) (release func(), done <-chan error) {
+	t.Helper()
+	held, rel := make(chan struct{}), make(chan struct{})
+	var first atomic.Bool
+	f.stores.afterLock = func() {
+		if first.CompareAndSwap(false, true) {
+			close(held)
+			<-rel
+		}
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('im.party:' || 'BUYER' || ':' || $1::bigint::text, 0))", b1); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
+	res := make(chan error, 1)
 	go func() {
-		_, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "晚到的"})
-		done <- err
+		_, err := f.m.Send(context.Background(), im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "持鎖中"})
+		res <- err
 	}()
-	f.waitForPartyLock(t, "BUYER", b1, done)
-	if _, err := tx.Exec(ctx, "INSERT INTO im.inactive_parties (kind, party_id, since) VALUES ('BUYER', $1, now())", b1); err != nil {
-		t.Fatal(err)
+	select {
+	case <-held:
+	case err := <-res:
+		t.Fatalf("Send 沒有停在持鎖中：%v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Send 沒有走到守門鎖")
 	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("鎖釋放後要回 FailedPrecondition：%v", err)
-	}
-	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 0 {
-		t.Fatalf("刪帳者不能留下訊息：%d", n)
-	}
+	return func() { close(rel) }, res
 }
 
-// 反過來：訂閱者也要持鎖。測試持有同一把鎖（等同 Send 的 transaction 持鎖中），真正的 OnBuyerDeleted 在另一個 transaction 必須等在鎖上、
-// 不能先寫 inactive_parties；鎖釋放後才完成。
-func TestDeactivateWaitsForPartyLock(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	tx, err := f.db.Pool().Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('im.party:' || 'BUYER' || ':' || $1::bigint::text, 0))", b1); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() {
-		done <- f.db.InTx(ctx, func(ctx context.Context) error {
-			return f.m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: b1, AccountID: 1000 + b1, OccurredAt: f.clock()})
-		})
-	}()
-	f.waitForPartyLock(t, "BUYER", b1, done)
-	if n := f.scalar(t, "SELECT count(*) FROM im.inactive_parties"); n != 0 {
-		t.Fatalf("鎖釋放前不能已寫入 inactive_parties：%d", n)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if n := f.scalar(t, "SELECT count(*) FROM im.inactive_parties"); n != 1 {
-		t.Fatalf("鎖釋放後 Deactivate 完成：%d", n)
-	}
-}
-
-// waitForPartyLock 等到有 session 等在這個身分的 advisory lock 上（只看這個 key，不受平行測試影響）：
-// bigint key 的高 32 位在 classid、低 32 位在 objid，objsubid = 1。等的過程中對方先回傳就是失敗（沒有等在鎖上）。
-func (f *fixture) waitForPartyLock(t *testing.T, kind string, id int64, done <-chan error) {
+// waitLockWaiter 等到有連線等在鎖上（每個整合測試有自己的資料庫）；等的過程中 done 先回傳就是失敗（沒有等在鎖上）。
+func (f *fixture) waitLockWaiter(t *testing.T, done <-chan error) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
-	for {
-		n := f.scalar(t, `
-SELECT count(*) FROM pg_locks l,
-  LATERAL (SELECT hashtextextended('im.party:' || $1::text || ':' || $2::bigint::text, 0) AS k) h
-WHERE l.locktype = 'advisory' AND NOT l.granted AND l.objsubid = 1
-  AND l.classid::bigint = (h.k >> 32) & 4294967295 AND l.objid::bigint = h.k & 4294967295`, kind, id)
-		if n > 0 {
-			return
-		}
+	for f.scalar(t, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 0 {
 		select {
 		case err := <-done:
-			t.Fatalf("應該等在 party 鎖上，卻已回傳：%v", err)
+			t.Fatalf("應該等在守門鎖上，卻已回傳：%v", err)
 		default:
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("沒有等在 party 鎖上")
+			t.Fatal("沒有等在守門鎖上")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// 刪帳競態：Send 的 transaction 持買家列的 FOR KEY SHARE 時，買家關閉（FOR UPDATE）要等；Send 先提交，之後的送出被擋。
+// 拿掉 Send 的 LockNotClosed 時關閉不會等，這個測試失敗。
+func TestSendWaitsForClosingAndIsRejected(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	release, sent := f.holdSend(t)
+	closed := make(chan error, 1)
+	go func() { closed <- f.buyers.owner.CloseForDeletion(ctx, b1) }()
+	f.waitLockWaiter(t, closed)
+	if st := f.scalar(t, "SELECT count(*) FROM buyer.buyers WHERE buyer_id = $1 AND status = 'ACTIVE'", b1); st != 1 {
+		t.Fatal("守門鎖釋放前買家不能已關閉")
+	}
+	release()
+	if err := <-sent; err != nil {
+		t.Fatalf("先取得守門鎖的 Send 要成功：%v", err)
+	}
+	if err := <-closed; err != nil {
+		t.Fatal(err)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
+		t.Fatalf("關閉之前提交的訊息要在：%d", n)
+	}
+	if _, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "晚到的"}); kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("關閉之後要被擋：%v", err)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
+		t.Fatalf("被擋的送出不能留下訊息：%d", n)
+	}
+}
+
+// 店家退場的批次對被守門鎖住的店 FOR UPDATE SKIP LOCKED：Send 持守門鎖時跳過它、不等；Send 提交之後下一輪才選得到。
+func TestRetireSkipsAStoreHeldByASend(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	release, sent := f.holdSend(t)
+	pick := func() int {
+		rows, err := f.db.Pool().Query(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE SKIP LOCKED", s1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		n := 0
+		for rows.Next() {
+			n++
+		}
+		return n
+	}
+	if n := pick(); n != 0 {
+		t.Fatalf("持守門鎖的店要被跳過：%d", n)
+	}
+	release()
+	if err := <-sent; err != nil {
+		t.Fatal(err)
+	}
+	if n := pick(); n != 1 {
+		t.Fatalf("Send 提交之後下一輪要選得到：%d", n)
 	}
 }

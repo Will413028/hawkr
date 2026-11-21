@@ -40,6 +40,8 @@ func (f *fakeBuyers) ProfileByBuyerID(context.Context, int64) (buyer.Profile, er
 	return buyer.Profile{}, f.profileErr
 }
 
+func (f *fakeBuyers) LockNotClosed(context.Context, int64) error { return nil }
+
 func (f *fakeBuyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 	return f.blocking, f.blockingErr
 }
@@ -57,6 +59,8 @@ func (f *fakeStores) Store(context.Context, int64) (seller.Store, error) {
 	f.storeCalled++
 	return f.store, f.err
 }
+
+func (f *fakeStores) LockNotRetired(context.Context, int64) error { return nil }
 
 func (f *fakeStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) {
 	f.blocksCalls++

@@ -13,10 +13,10 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | M1 對話、訊息 ID 是 TSID bigint，`messages.id` 同時是歷史游標 | Java 或別的服務拿對話或訊息 ID 當鍵 | 不成立：只有 `chat.message.sent` 的 `message_id`、`conversation_id` 進推播 data，沒有別的服務查實體 | 實體主鍵用應用層產生的 UUIDv7（row-identity ADR）；游標用有序的序號 | 改：`conversations.id`、`messages.id`、`hides.id` 是 UUIDv7；`buyer_id`、`store_id` 維持 bigint（外部業務鍵）；訊息游標是對話內的 `seq` |
 | M2 房名 `b<buyerID>_s<storeID>` 字串，同時是路由、授權、鎖鍵與對外 ID | 一對買賣雙方要有唯一的對話 | 成立，但不需要字串 | 對話是 `(buyer_id, store_id)` 的唯一列，授權以對話 ID＋session 的一方判斷 | 改：刪 `room_id`，`UNIQUE (buyer_id, store_id)`；送出與讀取以對話 ID 授權，不是該對話的一方回 NotFound（ID6）；同一個數字同時是 buyer_id 與 store_id 時不會串到另一個身分空間 |
 | M3 訊息順序：`pg_advisory_xact_lock(hashtext(room_id))`＋`MAX(seq_id)+1`、`UNIQUE(room_id, seq_id)` | 每個對話的訊息要有連續、唯一的序號，斷線補洞靠它 | 成立；但 32 位元雜湊鎖碰撞時會讓不相干的房間互等 | 單一 DB 在對話列上遞增計數取序 | 改：`AllocateSeq` 一句 `INSERT … ON CONFLICT DO UPDATE` 建立對話、配發 `last_seq`、同時推進寄件人的已讀游標；鎖的是對話列本身；rollback 時 `last_seq` 跟著回滾，seq 沒有空洞（2b 的補洞依賴它） |
-| M4 Redis：封鎖讀取（`block:out:`／`block:in:`）、`im:account:deleted:<id>` 標記（fail-open、無 TTL）、同步速率限制、WS ticket | 送出要即時的封鎖與刪帳資料 | 不成立：封鎖在 buyer、seller 的 DB，刪帳事實由事件複製進 im 自己的表，單體同一個資料庫 | 同庫用擁有者的 API；查詢失敗就整個操作失敗（fail-closed） | 改：封鎖用 `buyer.IsBlockingStore`、`seller.StoreBlocksBuyer`；刪帳用 `im.inactive_parties`（G4）；刪除 Redis 依賴；速率限制與 WS ticket 屬 A6-2b、A6-5 |
+| M4 Redis：封鎖讀取（`block:out:`／`block:in:`）、`im:account:deleted:<id>` 標記（fail-open、無 TTL）、同步速率限制、WS ticket | 送出要即時的封鎖與刪帳資料 | 不成立：封鎖在 buyer、seller 的 DB，刪帳與退場的事實在 buyer、seller（A6-3c 起，不再複製進 im），單體同一個資料庫 | 同庫用擁有者的 API；查詢失敗就整個操作失敗（fail-closed） | 改：封鎖用 `buyer.IsBlockingStore`、`seller.StoreBlocksBuyer`；停用用 `buyer.pub_closed_buyers()`、`seller.pub_retired_stores()`（G4 的 `PartyInactive`）與 `Send` 的守門鎖；刪除 Redis 依賴；速率限制與 WS ticket 屬 A6-2b、A6-5 |
 | M5 `buyer_id`、`store_id` 的 `DEFAULT 0` 哨兵 | 舊資料沒有身分的訊息 | 不成立：系統從未上線 | NOT NULL ＋ CHECK > 0 | 改：`conversations.buyer_id`、`store_id` 是 `NOT NULL CHECK > 0` |
 | M6 媒體：送出時 `FinalizeAndLink`、脫敏時 `ReleaseChatReferences` | media 呼叫與業務列寫入要一致，媒體呼叫不得在 DB transaction 內 | 不成立：失敗時留下孤兒 link | 與 review、social 同：transaction 外 `Finalize`，transaction 內寫列＋同步版本＋排同步 job，同步 job 依業務列現況 Link／Unlink | 改：`mediaref` 與 `media_ref_sync`、`retired_assets`；抹除時每批記退場資產並排同步（ID8）；同步 worker 與保底掃描已接進 `cmd/hawkr` 的 worker（`newIM`）。`internal/mediaref` 是各擁有媒體的模組的第 7 份同形外殼（演算法已共用在 `media.RefSyncer`），不抽成共用：整套同步（外殼、`media_ref_sync`、`retired_assets`）在 B1 換成 media 不認識業務的終點時一起刪除（ADR `2026-10-03-media-references-owner-side`；Will 2026-11-20）。重新評估：B1 之前又有模組要加一份時，改評估提前 B1 |
-| M8 MQ 消費者：`buyer.deleted`、`seller.deleted`、`account.deleted`、`seller.suspended` | 刪帳與退場要驅動 im 抹除 | 成立 | 同庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：只訂 `buyer.BuyerDeleted` 與 `seller.StoreRetired`（只寫 `inactive_parties`、排 `im.erase_party` job）；不訂 identity 的 `AccountDeleted`（只有帳號鍵，要列舉歷史身分才能用，那是 ID3 的根源），不訂 `BuyerDeletionRequested`（等待刪除的買家仍能登入，為開啟中的訂單聯絡店家，A6-D14 W4；前提 2a1 開工時以 `identity/internal/model/model.go:123` 與 `sessions.sql` 確認）；`seller.StoreSuspended` 的強制斷線屬 2b |
+| M8 MQ 消費者：`buyer.deleted`、`seller.deleted`、`account.deleted`、`seller.suspended` | 刪帳與退場要驅動 im 抹除 | 成立 | 同庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：只訂 `buyer.BuyerDeleted` 與 `seller.StoreRetired`（只排 `im.erase_party` job，不存複本）；不訂 identity 的 `AccountDeleted`（只有帳號鍵，要列舉歷史身分才能用，那是 ID3 的根源），不訂 `BuyerDeletionRequested`（等待刪除的買家仍能登入，為開啟中的訂單聯絡店家，A6-D14 W4；前提 2a1 開工時以 `identity/internal/model/model.go:123` 與 `sessions.sql` 確認）；`seller.StoreSuspended` 的強制斷線屬 2b |
 | M9 對話列表讀時補名稱頭像，不存個資 | 列表要顯示對方 | 成立（顯示需要），但不能存快照 | 讀時批次補，已刪帳回旗標不回名稱 | 沿用：模組不存快照；`buyer.BatchDisplay` 由 httpapi 在 A6-5 補 |
 | M11 事件：fat event（`chat.message.sent`）、`go` 協程發送、無 outbox | Java notification 依賴舊 wire | 成立（A6-6e 前仍由舊 im-service 發） | 模組事件只帶領域鍵，同 transaction 發布；relay 在 transaction 外組 wire payload | 改：`MessageSent` 只帶領域鍵、同 transaction 發布（ID7）；wire 形狀由 `legacy/imrelay` 維持，`conversation_id`、`message_id` 的值從房名、TSID 變成 UUID 字串（型別不變，設計書 §9 第 5 項），A6-6e 才接進 `cmd/hawkr` |
 | M12 封鎖：`IsBlocked(sender, receiver)` 在送出與列表時，沒有訂單例外；列表過濾有封鎖的對話 | 封鎖要在送出時生效 | 成立，但 A6-D1 要求有進行中的訂單時仍可以聊 | 封鎖時保留進行中交易的溝通 | 改：G3 雙向擋，有進行中的訂單或售後時放行（`Orders` port）；列表不再因封鎖隱藏對話（設計書 §9 第 4 項），由 A6-5 標示無法送出的原因 |
@@ -32,8 +32,8 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 停權賣家的訂單綁定（`order_no`、`order_binding_verified_at`，client 帶 `order_no`、`NOT IN (0,80)`、綁定永久有效） | 停權時仍可為進行中的訂單聯絡 | 成立，但判準太寬（已完成與已退款也算） | 停權只保留履約必要的溝通 | 改（W1 (c)、W2 (i)）：G1 與 G3 共用一個「進行中」判定，每次送出時查，不存綁定欄位；以 `legacy/orderservice` 的 `HasOrderBetween` 取最近一筆再以 `OrderParties` 看狀態 ∈ {10,20,30,32,35,40}。已知看不到「最近一筆已結案、較舊的一筆還在配送」，錯的方向是多擋；退場點 B8（ordering 搬遷時 port 換成精確的 in-process 查詢） |
 | 卡片訊息：client 帶任意 JSON，預覽取 `extra["preview"]`，詞典只查文字 | 聊天裡引用商品或訂單 | 成立，但沒有形狀的欄位繞過詞典 | 卡片是伺服器擁有的參照，顯示內容由平台依參照組出 | 不搬（W6 (b)）：`message_type` 只有 `TEXT`、`IMAGE`；卡片連同形狀在 A6-5 定 proto 時以往前的 migration 加 |
 | `chat.message.sent` 的 `content_preview` 中文句子（「傳送了一張圖片」等） | 推播要有預覽文字 | 成立 | 共用文案目錄 | 過渡物：共用文案目錄目前沒有聊天條目（量：`rg -n "chat\|Chat\|訊息\|圖片" backend/internal/platform/uitext/catalog/zh-TW.json` 只命中社群檢舉的「垃圾訊息」），句子暫放 `legacy/imrelay`；A6-5、A6-6 為 client 加聊天預覽的目錄條目時改取同一批；退場點 A8（relay 刪除） |
-| `LockParty`：送出與 `Deactivate` 之間的互斥（舊碼沒有；舊 `account:deleted` 標記無鎖） | 送出的寫入與「身分進入刪除」要有先後，否則抹除 job 看不到之後才 commit 的訊息 | 成立 | 同一個身分的狀態變更與依賴它的寫入以鎖串行 | 新增：`pg_advisory_xact_lock`（`im.party:<kind>:<id>`），不用列鎖，因為 `Send` 在送出前沒有鎖買家或店家的列（鎖列要多鎖別的模組的表，也會與 accountdeletion 的 identity → buyer → seller 鎖序互相牽動）；不進 `lockorder`，因為它只在 im 自己的 transaction 內取、沒有跨模組的持鎖次序。`Send` 依固定順序（買家先於店家）鎖雙方再重查 `inactive_parties`，`Deactivate` 一次只鎖一個，所以不會死結；前提：`Send` 不先持買家或店家的列鎖，改了要重看 |
-| `im.erase_sweep` 每 15 分鐘的保底掃描 | job 用完 `MaxAttempts` 被丟棄後，身分仍在 `inactive_parties` 又還有未抹除的訊息 | 成立 | 週期性對帳補排 | 新增：唯一性以 `SweepInterval` 為時間窗（預設的 ByState 含 completed，會讓掃描被擋約一天）；抹除本身冪等可重跑 |
+| `LockParty` advisory lock 與 `inactive_parties` 複本（A6-2；A6-3c 已刪） | 送出的寫入與「身分進入刪除」要有先後，否則抹除 job 看不到之後才 commit 的訊息 | 成立（先後），但複本與 advisory lock 的理由都不成立：理由一「避開跨模組鎖序」只因擁有者 API 沒有形狀，理由二「刪帳申請中仍可聊天」已由 `LockNotClosed` 放行 PENDING_DELETION 提供 | 同一個身分的狀態變更與依賴它的寫入以擁有者的列鎖串行 | 改：`Send` 在 `inTx` 內先取 `buyer.LockNotClosed`、再取 `seller.LockNotRetired`（`FOR KEY SHARE`；擁有者轉移的 `FOR UPDATE` 與它互斥，店家退場的 `RetireDueStores` 是 `SKIP LOCKED`，被守門鎖住的店這一輪跳過、下一輪再退）；鎖序買家先於店家，由 lockorder 機械檢查（Modules 順序 buyer、seller 在 im 之前）；前提「`Send` 不先持買家或店家的列鎖」本步已重看、不再成立。規定：兩把鎖取在 `inTx` 內、`guard` 的 RPC 之後、`AllocateSeq` 之前；取到後才算這次寫入看到的狀態；不得把 `guard` 或 legacy 呼叫搬進 `inTx`（列鎖會跨網路呼叫）；機械化是 `TestSendCallsOrdersOutsideTheWriteTransaction`（W7 (b)） |
+| `im.erase_sweep` 每 15 分鐘的保底掃描 | job 用完 `MaxAttempts` 被丟棄後，身分已在 `buyer.pub_closed_buyers()`／`seller.pub_retired_stores()` 又還有未抹除的訊息 | 成立 | 週期性對帳補排 | 新增：來源是擁有者的 pub（A6-3c 起）；唯一性以 `SweepInterval` 為時間窗（預設的 ByState 含 completed，會讓掃描被擋約一天）；抹除本身冪等可重跑 |
 | `im.hides` 訊息隱藏紀錄 | 隱藏要可多次、可還原，並且能追溯 | 成立 | 形狀同 `review.hides`、`social.hides`：還原留列、同一則訊息未還原的隱藏至多一筆 | 新增：本模組只有資料與讀取（`Hidden`），隱藏與還原的決定由 moderation 呼叫 `Hide`／`Restore` |
 
 ## 即時通道的沿用盤點
@@ -103,8 +103,8 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。
 
-- 表：`conversations`（UUIDv7、`UNIQUE (buyer_id, store_id)`、`last_seq` 與兩個已讀游標、無 `room_id`、無預覽欄位、無未讀計數欄、無 `order_no` 綁定）、`messages`（`seq`、`sender_kind`、`message_type`、`erased_at`；無 `receiver_id`、`is_read`、`deleted_at`、`preview_text`、`hidden_at`）、`hides`、`inactive_parties`、`media_ref_sync`、`retired_assets`。
-- 儲存的代碼（`sender_kind`、`message_type`、`inactive_parties.kind`）是 UPPER_SNAKE（`BUYER`、`STORE`、`TEXT`、`IMAGE`），依 ADR 2026-09-25-codemeta-retirement D3 與 `TestStoredCodesInChecksAreUpperSnake`。
+- 表：`conversations`（UUIDv7、`UNIQUE (buyer_id, store_id)`、`last_seq` 與兩個已讀游標、無 `room_id`、無預覽欄位、無未讀計數欄、無 `order_no` 綁定）、`messages`（`seq`、`sender_kind`、`message_type`、`erased_at`；無 `receiver_id`、`is_read`、`deleted_at`、`preview_text`、`hidden_at`）、`hides`、`media_ref_sync`、`retired_assets`。
+- 儲存的代碼（`sender_kind`、`message_type`）是 UPPER_SNAKE（`BUYER`、`STORE`、`TEXT`、`IMAGE`），依 ADR 2026-09-25-codemeta-retirement D3 與 `TestStoredCodesInChecksAreUpperSnake`。
 - 送出把寄件人自己那一方標成已讀；讀取方法不改任何狀態。
 - 停業只有 `CLOSED` 算；停權的訂單例外與封鎖的例外是同一個「進行中」判定；首則訊息買家與店家都能開啟（W5）。
 - 刪帳與退場只抹該身分寄出的訊息；等待刪除的買家仍能送出。
@@ -112,3 +112,19 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 - `chat.message.sent` 的 `conversation_id`、`message_id` 是 UUID 字串。
 
 `legacy/imrelay` 的 `typedWorker`、`baseEvent` 與其他舊 relay 的同名機制刻意重複（relay 是暫時的，notification 搬進單體後刪除），不抽共用。
+
+## A6-3c 停用身分改由擁有者守門的沿用盤點
+
+設計：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3c-design.md` §9.2、§9.5。
+
+| 照搬的機制 | 從零設計 | 結論 |
+|---|---|---|
+| `inactive_parties` 複本與 `LockParty` | 見上方 `LockParty` 列：兩個理由都不成立 | 刪表（`im_drop_inactive_parties`）；守門與讀取走 buyer、seller |
+| 前提「`Send` 不先持買家或店家的列鎖，改了要重看」 | 本步改了，已重看 | 不成立：`Send` 在 tx 內先持買家、店家的 `FOR KEY SHARE`，再寫自己的列；鎖序與 accountdeletion 的 `lockParticipants` 同序 |
+| 抹除 job 與 `im.erase_sweep` | 抹除形狀在 im 自己 | 成立，保留；`Deactivate` 改名 `EnqueueErase`（只排 job），掃描來源改 pub |
+| `guard` 在 tx 外 | 守門鎖不得跨 RPC | 成立且新增規定：鎖取在 `inTx` 內、RPC 之後，取到後重查 |
+| 抹除保證「進入刪除後沒有新訊息」 | | 理由改為擁有者列鎖互斥（`ErasePartyArgs` 註解已改寫） |
+| G4 `s.inactive`：tx 外的提早檢查 | 必要條件是「被擋的請求不做 Finalize 轉正圖片」 | 成立，保留；改讀 `PartyInactive`（pub）；tx 內守門才是正確性保證 |
+| 只訂 `BuyerDeleted`，不訂 `BuyerDeletionRequested`（刪帳申請中仍可聊天） | 守門只擋 CLOSED | 成立；`LockNotClosed` 放行 PENDING_DELETION，讀取用 `pub_closed_buyers()`；`TestPendingDeletionBuyerCanStillSend`、`cmd/hawkr` 的 `TestIMDeletionTimingSubscribesOnlyToBuyerDeleted` 守住 |
+
+觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `im.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。

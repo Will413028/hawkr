@@ -12,6 +12,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -69,12 +70,17 @@ type orders struct {
 	open  bool
 	err   error
 	calls int
+	// inTx 記錄任何一次呼叫時 ctx 是否帶著 transaction（Send 不得在寫入 transaction 內呼叫 legacy）。
+	inTx bool
 }
 
-func (o *orders) OpenOrderBetween(context.Context, int64, int64) (bool, error) {
+func (o *orders) OpenOrderBetween(ctx context.Context, _, _ int64) (bool, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.calls++
+	if _, ok := db.TxFrom(ctx); ok {
+		o.inTx = true
+	}
 	return o.open, o.err
 }
 
@@ -84,6 +90,30 @@ type buyers struct {
 	accounts map[int64]int64
 	blocking bool
 	blockErr error
+	// owner 是真正的 buyer 模組：守門 LockNotClosed 與關閉買家（CloseForDeletion）都走它，買家列在第一次被守門時自動建立（營運中）。
+	owner *buyer.Module
+	db    *db.DB
+}
+
+// ensureBuyer 建立指定 buyer_id 的買家列（營運中）；已存在不動。測試用固定的 ID，不經 OnAccountCreated。
+func ensureBuyer(ctx context.Context, d *db.DB, id int64) error {
+	_, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, 1000 + $1::bigint, 'b', now(), now()) ON CONFLICT (buyer_id) DO NOTHING`, id)
+	return err
+}
+
+// ensureStore 建立指定 store_id 的店家列（營運中）；已存在不動。
+func ensureStore(ctx context.Context, d *db.DB, id int64) error {
+	_, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, $1::bigint, 2000 + $1::bigint, 's', now(), now()) ON CONFLICT (store_id) DO NOTHING`, id)
+	return err
+}
+
+func (b *buyers) LockNotClosed(ctx context.Context, id int64) error {
+	if err := ensureBuyer(ctx, b.db, id); err != nil {
+		return err
+	}
+	return b.owner.LockNotClosed(ctx, id)
 }
 
 func (b *buyers) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {
@@ -108,11 +138,14 @@ func (b *buyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 // stores 是 im 的 Stores port 的替身：店家預設是營運中、沒有停權，帳號是 2000 + store_id。
 type stores struct {
 	mu    sync.Mutex
+	db    *db.DB
 	byID  map[int64]seller.Store
 	err   error
 	block bool
 	// blockErr 讓 StoreBlocksBuyer 回錯誤。
 	blockErr error
+	// afterLock 在 LockNotRetired 取到鎖之後呼叫（Send 的 transaction 此時持有買家與店家的守門鎖），測試用它把 transaction 停在持鎖中。
+	afterLock func()
 }
 
 func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
@@ -125,6 +158,26 @@ func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
 		return st, nil
 	}
 	return activeStore(id, 2000+id), nil
+}
+
+// LockNotRetired 是 seller.LockNotRetired 的同形替身（seller 的完整模組太重）：transaction 內對店家列 FOR KEY SHARE，已退場與不存在回 NotFound。
+// 真正的 seller 實作由 seller 與 cmd/hawkr 的整合測試驗證。
+func (s *stores) LockNotRetired(ctx context.Context, id int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("LockNotRetired 必須在 transaction 內呼叫")
+	}
+	if err := ensureStore(ctx, s.db, id); err != nil {
+		return err
+	}
+	var retired bool
+	err := s.db.Conn(ctx).QueryRow(ctx, "SELECT retired_at IS NOT NULL FROM seller.stores WHERE store_id = $1 FOR KEY SHARE", id).Scan(&retired)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && retired) {
+		return apperr.NotFound("店家已退場")
+	}
+	if err == nil && s.afterLock != nil {
+		s.afterLock()
+	}
+	return err
 }
 
 func (s *stores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) {
@@ -165,7 +218,11 @@ func (f *fixture) clock() time.Time {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "im", Dir: im.Migrations()}))
+	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "im", Dir: im.Migrations()},
+	))
 	f := &fixture{
 		db: database, bus: events.NewBus(), jobs: &queue{}, media: media.NewFake(),
 		buyers: &buyers{accounts: map[int64]int64{}}, stores: &stores{byID: map[int64]seller.Store{}}, orders: &orders{},
@@ -173,6 +230,8 @@ func setup(t *testing.T) *fixture {
 	}
 	f.media.Key = func(_, token string) string { return "chat/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&strings.Builder{}, nil))
+	f.stores.db, f.buyers.db = database, database
+	f.buyers.owner = buyer.New(buyer.Deps{DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Now: f.clock, Logger: logger})
 	f.m = im.New(im.Deps{
 		DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Buyers: f.buyers, Stores: f.stores, Orders: f.orders,
 		NewID: uuid.NewV7, Now: f.clock, Logger: logger,

@@ -1,5 +1,6 @@
-// Package purge 是買家刪帳與店家退場的訊息抹除。可見性在 job 跑之前已經改好：訂閱者在刪帳（或退場）的 transaction 內把該身分記進
-// inactive_parties（送出擋寄件人與收件人），只排一個 job，transaction 內的工作量固定（單體規則 4）；實際抹除由 job 依 id 升序分批做
+// Package purge 是買家刪帳與店家退場的訊息抹除。可見性在 job 跑之前已經改好：擁有者（buyer、seller）的狀態就是事實，
+// 送出以 transaction 內的 LockNotClosed、LockNotRetired 擋寄件人與收件人，讀取 join buyer.pub_closed_buyers()、seller.pub_retired_stores()；
+// 訂閱者在刪帳（或退場）的 transaction 內只排一個 job，工作量固定（單體規則 4）；實際抹除由 job 依 id 升序分批做
 // （一個身分寄出的訊息數沒有上限）。訊息列保留（seq 連續），內容與圖片清空；job 冪等：述詞是「這個身分還有沒抹除的訊息」。
 package purge
 
@@ -55,25 +56,15 @@ type ErasePartyArgs struct {
 func (ErasePartyArgs) Kind() string { return "im.erase_party" }
 
 // InsertOpts 讓同一個身分還沒開始的 job 合併：唯一鍵是 (PartyKind, PartyID)，含執行中的狀態（River 要求 available、pending、running、scheduled 都在內）：執行中又排入的那一次併入它：
-// 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。身分進入刪除之後沒有新訊息：Send 在 transaction 內持 LockParty 再查 inactive_parties，
-// 與 Deactivate 串行，所以抹除 job 看不到之後才送出的訊息。
+// 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。身分進入刪除之後沒有新訊息：Send 在 transaction 內持擁有者列的 FOR KEY SHARE（買家 LockNotClosed、店家 LockNotRetired），
+// 擁有者轉移（關閉買家、退場店家）的 FOR UPDATE 與它互斥，所以抹除 job 看不到之後才送出的訊息。
 func (ErasePartyArgs) InsertOpts() river.InsertOpts {
 	return jobs.UniqueByArgs(10)
 }
 
-// Deactivate 是刪帳或退場時同 transaction 的原子狀態變更：記進 inactive_parties、排抹除 job。先持該身分的 advisory lock，
-// 與 Send 的 insert transaction 串行。冪等。必須在 transaction 內。
-func (s *Service) Deactivate(ctx context.Context, kind model.PartyKind, id int64, at time.Time) error {
-	if _, ok := db.TxFrom(ctx); !ok {
-		return fmt.Errorf("im：Deactivate 必須在 transaction 內")
-	}
-	q := s.q(ctx)
-	if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(kind), PartyID: id}); err != nil {
-		return err
-	}
-	if _, err := q.InsertInactiveParty(ctx, store.InsertInactivePartyParams{Kind: string(kind), PartyID: id, Since: at.UTC()}); err != nil {
-		return err
-	}
+// EnqueueErase 在買家關閉或店家退場時排抹除 job：只排 job，不要求 transaction（訂閱者在轉移的 transaction 內呼叫時併入它）。
+// 冪等：抹除 job 以 (PartyKind, PartyID) 為唯一鍵合併。事實不在這裡存，由擁有者的狀態與 pub 函式提供。
+func (s *Service) EnqueueErase(ctx context.Context, kind model.PartyKind, id int64) error {
 	return s.enqueue(ctx, kind, id)
 }
 
@@ -82,7 +73,7 @@ func (s *Service) enqueue(ctx context.Context, kind model.PartyKind, id int64) e
 	return s.d.Jobs.Enqueue(ctx, ErasePartyArgs{PartyKind: string(kind), PartyID: id}, &opts)
 }
 
-// Sweep 是抹除的保底：job 用完 MaxAttempts 被丟棄後，身分仍在 inactive_parties 又還有未抹除的訊息；
+// Sweep 是抹除的保底：job 用完 MaxAttempts 被丟棄後，身分已在 buyer.pub_closed_buyers()／seller.pub_retired_stores() 又還有未抹除的訊息；
 // 這裡每次最多補排 sweepBatch 個身分的 job，同一個身分還沒開始的 job 由唯一鍵合併。回傳這次檢查到的身分數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
 	var n int
