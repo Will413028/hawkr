@@ -161,6 +161,16 @@
 - 範圍（A6-D18 修訂）：`internal/modules/crm`（設計書 `step-3-design.md`）；`order.completed`、`aftersales.refund.completed` legacy consumer（只在測試啟用，A6-6e 接線），ledger 冪等鍵：`order.completed` 取 `event_id`，退款取 `external_ref_id`（缺時 `case_no`）——Java 每次重發退款都換新 `event_id`（`RefundCompletedPayload.java:59`）；黑名單依 A6-D2 (i) 刪除；刪帳與店家退場訂閱者（`inactive_parties`，依賴表加 seller，理由：訂閱 `seller.StoreRetired`）；依賴表 crm 去 `identity`、`coupon`；建好 `crm.VIPStatuses`，但 `GetBuyerVipStatuses` 換成 in-process 與刪 `internal/legacy/crmservice` 移到 A6-6e。不建 coupon legacy client。
 - 驗收：consumer 重放冪等測試；同客戶不同訂單並發；CD 各回歸測試的 mutation（設計書 §11）。
 
+### A6-3c 停用身分改由擁有者守門（A6-D19；被擋於：A6-3b CI 驗收）
+
+照 A6-1 拆兩個 session：**A6-3c0** 設計書（以 `step-3c-brief.md` 為輸入，含 buyer、seller 新 API 的完整清單、各模組改點、migration）與開工 design-review；**A6-3c1** 實作與完成前 design-review。
+
+- 範圍：buyer、seller 新增共享守門與狀態 `pub_*`；review、im、crm 改用擁有者守門、刪 `inactive_*` 表與 advisory lock、保底掃描改讀擁有者 `pub_*`；`internal/arch` 依賴與 lockorder 登記；各模組 `CARRYOVER.md` 更新。
+- 不能動：social 的 `inactive_authors` 與每日對帳；各模組抹除 job 的刪除範圍；im「刪帳申請中仍可聊天」語意；守門鎖取在 RPC 之後（`im` 的 `send.go` 先呼叫 order 再進 tx）。
+- 消費端：`rg -n "inactive_parties|inactive_authors|LockParty|LockPartyShared|LockActive" backend/internal`。
+- 驗收：lockorder integration（反序要失敗）；每模組「停用後立即看不到、寫入被擋、重放不重建」integration；mutation：拿掉守門鎖 → 停用與寫入交錯測試失敗；拿掉讀取 join → 可見性測試失敗；im 刪帳申請中可送訊息的回歸測試。
+- 觸發改回複本：量到熱門店家 multixact 或鎖等待有問題時，該擁有者改 advisory 並替 lockorder 加分類器。
+
 ### A6-4 moderation 加評價、聊天對象（被擋於：A6-1、A6-2、A6-D3 對象）
 
 - 範圍：`TargetKind` 加 REVIEW、CHAT_MESSAGE（proto、Go、CHECK migration）；快照形狀（聊天含前後文，A6-D3）；隱藏與還原經 review、im API 同 tx；作者為店家時走 seller 措施（A7-D5′）；依賴表 moderation 加 review、im；`reviewqueue` 分支不變（來源仍是 moderation）。
@@ -211,6 +221,7 @@
 | A6-D16 | A6-2b 設計書 §13 W1–W5 全照建議：NOTIFY payload 加帶 buyer_id、store_id 路由鍵，內容不經通知（W1 (ii)）；presence 以 unary 輪詢（W2 (a)）；任一方向封鎖即對被封鎖方顯示離線（W3 (i)）；停權、封鎖不結束串流，只有關店由模組結束，session 失效與帳號刪除由 A6-5 helper 重驗結束（W4 (i)）；保留已讀指示，`MarkAllRead` 不逐對話推給對方（W5 (i)）（Will 2026-11-20） | A6-2b1、A6-5 |
 | A6-D17 | im 寫入 transaction 設時間上限（statement_timeout、idle_in_transaction_session_timeout），重連補洞起點往回放同一常數加時鐘誤差（Will 2026-11-20） | A6-2b1 |
 | A6-D18 | A6-3 設計書 §13 W1–W5 全照建議：VIP 查詢切換與刪 `legacy/crmservice` 延到 A6-6e（W1 (a)，同 A6-D11）；刪帳與店家退場時清除 crm 資料並以 `inactive_parties` 擋重放（W2 (b)）；不建 coupon legacy client、CRM 不回優惠券數（W3 (a)）；標籤上限每店 200、每客戶 20（W4 (a)）；拿掉 CRM 客戶列表的關鍵字搜尋，A6-6 改 UI（W5 (a)，Will 已同意這項 UI 改動）（Will 2026-11-20） | A6-3b、A6-6 |
+| A6-D19 | 停用身分的事實與守門只在擁有者：buyer 加「未關閉」、seller 加「未退場」的共享列鎖（`FOR KEY SHARE`）與狀態 `pub_*`，獨占端沿用既有的 `LockForDeletion`、`RetireDueStores`；review、im、crm 刪自己的 `inactive_*` 複本與 advisory lock，讀取改 join 擁有者 `pub_*`；抹除 job 留在各模組；social 保留複本（存旗標，規則 2 例外）；不做平台框架。簡報 `2026-11-19-a6-review-im-crm/step-3c-brief.md`（Will 2026-11-21） | A6-3c、A6-4 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -240,4 +251,4 @@
 | A6-2b0 即時通道的設計 | 完成（2026-11-20）：設計書 `step-2b-design.md`；A6-D15（Will 開工時決定）、W1–W5 已決（A6-D16） | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 1、raised 0、rejected 0；處理對照在設計書 §15 | 無程式、無測試（設計步驟） |
 | A6-2b1 即時通道的實作 | 完成（2026-11-20，PR #412）：`im/internal/live`（LISTEN 連線、扇出、訂閱、presence）、寫入端 `NOTIFY`、寫入 transaction 上限（A6-D17）；未接 `cmd/hawkr`（A6-5）；與設計書不同處記在設計書 §16 | 本機 `go build`、`go vet -tags integration`、`go test ./...`、`go test -race`（im）、`make lint-monolith`、`make sqlc` 無 drift；CI run 44750191321 im 全部 integration 通過；mutation：本機單元 15 個 killed，CI 批次 run 44743745834（22 killed）＋44749188726（補強後 M12、寫入上限 5 路徑、M15 共 6 個 killed）；審查：`/code-review` 1 輪＋完成前 design-review 1 輪＋diff 審查 1 輪（第 2 輪），findings 16 (blocking 0)，fixed 14、recorded 2、raised 1（L2，A6-D17 已決後修）、rejected 1 | M7、M20 的 kill 是逾時或 cleanup 卡住，不是乾淨的斷言失敗；M4、M13、M22 integration 版沒跑（M4 無單點改法、M13 不存在、M22 單元已覆蓋）；補洞時間界線不含 COMMIT 本身耗時（只靠 2 秒時鐘誤差，未量測）；巢狀於外層 transaction 的 im 寫入不設上限（目前無呼叫端，觸發條件在 CARRYOVER）；同一 CI run 的 seller `TestSellerInquiryListIsNewestFirstFilteredAndCounted` 失敗是 dev 既有（run 44731436154），不屬本步 |
 | A6-3a crm 設計 | 設計書與開工 design-review 完成，完成（2026-11-20）：W1–W5 已決（A6-D18），§10 計畫修改已套用 | 開工 design-review 2 輪：findings 11 (blocking 0)，fixed 10、recorded 0、raised 0、rejected 1；處理對照在設計書 §14；兩處計畫與事實衝突已核對原始碼（`RefundCompletedPayload.java:59` 每次新 UUID、`membership.go:90` VIP 唯一呼叫端） | 無程式、無測試（設計步驟）；— |
-| A6-3b crm 實作 | 程式完成待驗收（2026-11-21）：`internal/modules/crm`、`internal/legacy/crmconsumer`（只在測試啟用）；與設計書的差異見 `step-3-design.md` §15；inactive／purge 機制第三份手抄待 Will 決定（§16 #1） | go build／vet、unit、`make sqlc` 無 drift（主 session 重跑）；完成前 design-review＋/code-review＋第 2 輪：findings 14 (blocking 0)，fixed 9、recorded 0、raised 1、rejected 4（設計書 §16） | integration 與 36 個 mutation 只在實作者的原生 Postgres 跑過，CI 容器結果待 push 後確認 |
+| A6-3b crm 實作 | 程式完成待驗收（2026-11-21）：`internal/modules/crm`、`internal/legacy/crmconsumer`（只在測試啟用）；與設計書的差異見 `step-3-design.md` §15；§16 #1 依 A6-D19 交 A6-3c 處理 | go build／vet、unit、`make sqlc` 無 drift（主 session 重跑）；完成前 design-review＋/code-review＋第 2 輪：findings 14 (blocking 0)，fixed 9、recorded 0、raised 1、rejected 4（設計書 §16） | integration 與 36 個 mutation 只在實作者的原生 Postgres 跑過，CI 容器結果待 push 後確認 |

@@ -450,7 +450,7 @@ findings 11 (blocking 0)，fixed 10、recorded 0、raised 0、rejected 1
 
 | # | 來源 | finding | 嚴重度 | 處理 |
 |---|---|---|---|---|
-| 1 | design-review | inactive／purge 機制在 im、review、crm 第三份手抄，crm 的鎖模式與 im 分岔 | should | raised：交 Will 決定 |
+| 1 | design-review | inactive／purge 機制在 im、review、crm 第三份手抄，crm 的鎖模式與 im 分岔 | should | raised → Will 2026-11-21 決定 A6-D19，A6-3c 改由擁有者守門 |
 | 2 | design-review | `ledger.kind` 只為查全額退款 | nit | fixed（`6d9f3e3c`） |
 | 3 | design-review | 依賴表 crm 允許 `ordering` 但未用 | nit | fixed |
 | 4 | design-review | `first_order_at` 用處理時間 | nit | rejected：盤點表已寫退場條件，未上線無舊資料 |
