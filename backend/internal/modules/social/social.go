@@ -662,10 +662,11 @@ func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) 
 	return m.stats.ReleaseTakedowns(ctx, e.MeasureID)
 }
 
+// takedownContents 略過社群以外的已知種類（聊天訊息、評價回覆由 im、review 讀取時判斷）；不認得的種類留給 stats 回錯誤。
 func takedownContents(refs []seller.ContentRef) []stats.Content {
 	var out []stats.Content
 	for _, r := range refs {
-		if r.Kind.Social() {
+		if r.Kind.Social() || !r.Kind.Valid() {
 			out = append(out, stats.Content{Kind: r.Kind, ID: r.ID})
 		}
 	}
