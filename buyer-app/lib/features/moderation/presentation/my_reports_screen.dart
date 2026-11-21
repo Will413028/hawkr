@@ -51,7 +51,7 @@ class MyReportsScreen extends ConsumerWidget {
     }
   }
 
-  String _formatTime(pb.ReportRecord r) {
+  String _formatTime(pb.MyReportItem r) {
     if (!r.hasCreateTime()) return '';
     final local = DateTime.fromMillisecondsSinceEpoch(
       r.createTime.seconds.toInt() * 1000,
@@ -115,9 +115,9 @@ class MyReportsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReportCard(pb.ReportRecord r, UiLocale locale) {
-    final kind = r.target.kind.uiText(locale);
-    final outcome = r.outcome.uiText(locale);
+  Widget _buildReportCard(pb.MyReportItem r, UiLocale locale) {
+    final kind = r.community.target.kind.uiText(locale);
+    final outcome = r.community.outcome.uiText(locale);
     final category = r.category.uiText(locale);
     return Container(
       padding: EdgeInsets.all(16.w),

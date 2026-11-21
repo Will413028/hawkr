@@ -118,18 +118,20 @@ class FakeBuyerApp {
   );
 }
 
-mod.ReportRecord reportRecord(
+mod.MyReportItem reportRecord(
   String id, {
   ReportTargetKind kind = ReportTargetKind.REPORT_TARGET_KIND_POST,
   PolicyCategory category = PolicyCategory.POLICY_CATEGORY_SPAM,
   ReportOutcome outcome = ReportOutcome.REPORT_OUTCOME_PENDING,
   String description = '',
-}) => mod.ReportRecord(
+}) => mod.MyReportItem(
   id: id,
-  target: mod.ReportTarget(kind: kind, id: 'target-$id'),
   category: category,
   description: description,
-  outcome: outcome,
+  community: mod.CommunityReport(
+    target: mod.ReportTarget(kind: kind, id: 'target-$id'),
+    outcome: outcome,
+  ),
 );
 
 /// `ModerationAppService` 的 fake。[failFirst] 次 `SubmitReport` 先失敗（模擬網路中斷後重試）。
@@ -141,7 +143,7 @@ class FakeModeration {
     this.submitError,
   });
 
-  List<List<mod.ReportRecord>> reportPages;
+  List<List<mod.MyReportItem>> reportPages;
 
   /// 設了就讓每次 `SubmitReport` 都以它失敗。
   ConnectException? submitError;

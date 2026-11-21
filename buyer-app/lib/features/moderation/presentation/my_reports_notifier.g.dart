@@ -15,7 +15,7 @@ final myReportsProvider = MyReportsProvider._();
 
 /// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
 final class MyReportsProvider
-    extends $NotifierProvider<MyReports, PagedSection<pb.ReportRecord>> {
+    extends $NotifierProvider<MyReports, PagedSection<pb.MyReportItem>> {
   /// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
   MyReportsProvider._()
     : super(
@@ -36,39 +36,39 @@ final class MyReportsProvider
   MyReports create() => MyReports();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(PagedSection<pb.ReportRecord> value) {
+  Override overrideWithValue(PagedSection<pb.MyReportItem> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<PagedSection<pb.ReportRecord>>(
+      providerOverride: $SyncValueProvider<PagedSection<pb.MyReportItem>>(
         value,
       ),
     );
   }
 }
 
-String _$myReportsHash() => r'5045d5dc2805247bec5018bf33366cb5f1672132';
+String _$myReportsHash() => r'906959ed2e6b6ba50797ed8c3dd082adc611a02c';
 
 /// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
 
-abstract class _$MyReports extends $Notifier<PagedSection<pb.ReportRecord>> {
-  PagedSection<pb.ReportRecord> build();
+abstract class _$MyReports extends $Notifier<PagedSection<pb.MyReportItem>> {
+  PagedSection<pb.MyReportItem> build();
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
         this.ref
             as $Ref<
-              PagedSection<pb.ReportRecord>,
-              PagedSection<pb.ReportRecord>
+              PagedSection<pb.MyReportItem>,
+              PagedSection<pb.MyReportItem>
             >;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                PagedSection<pb.ReportRecord>,
-                PagedSection<pb.ReportRecord>
+                PagedSection<pb.MyReportItem>,
+                PagedSection<pb.MyReportItem>
               >,
-              PagedSection<pb.ReportRecord>,
+              PagedSection<pb.MyReportItem>,
               Object?,
               Object?
             >;

@@ -41,7 +41,7 @@ class _FakeReports {
     ) async {
       requests.add(req);
       return pb.CreateReportResponse(
-        report: pb.MyReport(id: 'r1'),
+        report: pb.StoreReport(id: 'r1'),
         supplemented: supplemented,
         notice: supplemented
             ? LocalizedMessage(message: '伺服器說明：已補充到今天的同一筆檢舉')
