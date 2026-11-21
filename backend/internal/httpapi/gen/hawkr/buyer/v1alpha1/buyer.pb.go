@@ -3286,7 +3286,7 @@ type BlockAuthorRequest_ForumEntryId struct {
 }
 
 type BlockAuthorRequest_ReviewId struct {
-	// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。
+	// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
 	ReviewId string `protobuf:"bytes,3,opt,name=review_id,json=reviewId,proto3,oneof"`
 }
 

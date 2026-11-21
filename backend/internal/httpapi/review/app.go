@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // App 實作 ReviewAppService。
@@ -66,6 +68,27 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
+// replyStore 由評價所屬的店推導回覆的店家：評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied；評價讀不到或不存在回 not_found。
+// 賣家能力與店家一致的檢查仍在模組。
+func (h *App) replyStore(ctx context.Context, reviewID uuid.UUID) (seller.Store, error) {
+	p, err := rpc.RequireAccount(ctx)
+	if err != nil {
+		return seller.Store{}, err
+	}
+	r, err := h.reads.GetReview(ctx, reviewID, 0)
+	if err != nil {
+		return seller.Store{}, err
+	}
+	st, err := h.stores.Store(ctx, r.StoreID)
+	if err != nil {
+		return seller.Store{}, err
+	}
+	if st.AccountID != p.ID {
+		return seller.Store{}, apperr.PermissionDenied("不是你的店的評價")
+	}
+	return st, nil
+}
+
 func (h *App) GetReview(ctx context.Context, req *connect.Request[pb.GetReviewRequest]) (*connect.Response[pb.GetReviewResponse], error) {
 	id, err := rpc.ParseUUID("review_id", req.Msg.GetReviewId())
 	if err != nil {
@@ -91,7 +114,7 @@ func (h *App) ReplyReview(ctx context.Context, req *connect.Request[pb.ReplyRevi
 	if err != nil {
 		return nil, err
 	}
-	st, err := h.store(ctx)
+	st, err := h.replyStore(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +186,10 @@ func (h *App) ListOwnStoreReviews(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	f := filterOf(msg.Rating, msg.GetWithImages())
+	f, err := filterOf(msg.Rating, msg.GetWithImages())
+	if err != nil {
+		return nil, err
+	}
 	scope := filterScope(reviewv1alpha1connect.ReviewAppServiceListOwnStoreReviewsProcedure, rpc.FormatID(st.StoreID), f)
 	after, err := decodeCursor(scope, msg.GetPageToken())
 	if err != nil {

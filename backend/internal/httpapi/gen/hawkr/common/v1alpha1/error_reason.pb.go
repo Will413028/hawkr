@@ -85,8 +85,9 @@ const (
 	// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
 	// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
 	ErrorReason_CONTENT_TAKEDOWN_ACTIVE ErrorReason = 14
-	// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。client 改顯示既有的評價
-	// （ReviewAppService.ListMyReviews 帶 order_item_id）。ReviewAppService.CreateReview。
+	// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+	// 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+	// ReviewAppService.CreateReview。
 	ErrorReason_REVIEW_ALREADY_EXISTS ErrorReason = 15
 	// 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
 	// ReviewAppService.CreateReview。

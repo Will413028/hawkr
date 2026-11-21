@@ -121,7 +121,20 @@ func (f *fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Displ
 	return f.displays, nil
 }
 
-type fakeStores struct{ own *seller.Store }
+type fakeStores struct {
+	own  *seller.Store
+	byID map[int64]seller.Store
+}
+
+func (f fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
+	if st, ok := f.byID[id]; ok {
+		return st, nil
+	}
+	if f.own != nil && f.own.StoreID == id {
+		return *f.own, nil
+	}
+	return seller.Store{}, apperr.NotFound("no store")
+}
 
 func (f fakeStores) CurrentStore(context.Context, int64) (seller.Store, error) {
 	if f.own == nil {
@@ -431,6 +444,7 @@ func TestGetReviewReadsAsTheCallersBuyerAndMapsNotFound(t *testing.T) {
 
 func TestReplyReviewActsAsTheCallersCurrentStoreAndReturnsTheStoreView(t *testing.T) {
 	e := newEnv(t, ownStore())
+	e.reads.one = sampleReview(1)
 	e.writes.review = sampleReview(1)
 	resp, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "謝謝"}))
 	if err != nil {
@@ -444,20 +458,46 @@ func TestReplyReviewActsAsTheCallersCurrentStoreAndReturnsTheStoreView(t *testin
 	}
 }
 
-func TestReplyReviewWithoutAStoreIsNotFoundAndNeverReachesTheModule(t *testing.T) {
+func TestReplyReviewByAnAccountWithoutAStoreIsPermissionDeniedBecauseTheReviewIsPublic(t *testing.T) {
 	e := newEnv(t, nil)
+	e.reads.one = sampleReview(1)
+	e.app.stores = fakeStores{byID: map[int64]seller.Store{callerStoreID: {StoreID: callerStoreID, AccountID: 99}}}
 	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
-	if codeOf(err) != connect.CodeNotFound || len(e.writes.calls) != 0 {
-		t.Fatalf("沒有店：%v calls=%v", err, e.writes.calls)
+	if codeOf(err) != connect.CodePermissionDenied || len(e.writes.calls) != 0 {
+		t.Fatalf("沒有店的帳號回覆別人的評價：%v calls=%v", err, e.writes.calls)
 	}
 }
 
-func TestReplyReviewOfAnotherStoresReviewKeepsTheModulePermissionDenied(t *testing.T) {
-	e := newEnv(t, ownStore())
-	e.writes.err = apperr.PermissionDenied("不是你的評價")
+func TestReplyReviewOfAnotherStoresReviewIsPermissionDeniedBeforeTheModule(t *testing.T) {
+	e := newEnv(t, &seller.Store{StoreID: 12, AccountID: callerAccount})
+	e.reads.one = sampleReview(1)
+	e.app.stores = fakeStores{own: e.app.stores.(fakeStores).own, byID: map[int64]seller.Store{callerStoreID: {StoreID: callerStoreID, AccountID: 99}}}
 	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
-	if codeOf(err) != connect.CodePermissionDenied {
-		t.Fatalf("評價不屬於呼叫者的店：%v", err)
+	if codeOf(err) != connect.CodePermissionDenied || len(e.writes.calls) != 0 {
+		t.Fatalf("評價不屬於呼叫者的店：%v calls=%v", err, e.writes.calls)
+	}
+}
+
+func TestReplyReviewOfAMissingOrUnreadableReviewIsNotFoundAndNeverReachesTheModule(t *testing.T) {
+	e := newEnv(t, ownStore())
+	e.reads.err = apperr.NotFound("看不到")
+	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
+	if codeOf(err) != connect.CodeNotFound || len(e.writes.calls) != 0 {
+		t.Fatalf("評價不存在：%v calls=%v", err, e.writes.calls)
+	}
+}
+
+func TestReplyReviewReadsTheReviewWithoutAViewerSoTheStoreIsDerivedFromIt(t *testing.T) {
+	e := newEnv(t, nil)
+	r := sampleReview(1)
+	r.StoreID = 55
+	e.reads.one, e.writes.review = r, r
+	e.app.stores = fakeStores{byID: map[int64]seller.Store{55: {StoreID: 55, AccountID: callerAccount}}}
+	if _, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"})); err != nil {
+		t.Fatal(err)
+	}
+	if e.writes.reply.Store.StoreID != 55 || e.reads.viewer != 0 {
+		t.Fatalf("店家取自評價所屬店：%+v viewer=%d", e.writes.reply, e.reads.viewer)
 	}
 }
 
@@ -472,7 +512,7 @@ func TestReplyReviewIsCheckedAgainstTheModulesMarketingCapability(t *testing.T) 
 	suspended.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: true, TransfersActive: true, StoreName: true, Logo: true, TownCode: true}
 	wantBlocked := seller.Authorize(*suspended, declared.capability) != nil
 	// 沒有資料庫的模組：能力檢查在碰資料庫之前，被擋的回模組的錯誤，通過的會走到資料庫而 panic。
-	h, err := NewApp(&fakeReads{}, moduleWrites{&review.Module{}}, &fakeBuyers{}, fakeStores{own: suspended}, images(t), slog.New(slog.DiscardHandler))
+	h, err := NewApp(&fakeReads{one: sampleReview(1)}, moduleWrites{&review.Module{}}, &fakeBuyers{}, fakeStores{own: suspended}, images(t), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -505,7 +545,7 @@ func TestReplyReviewOfAnActiveStorePassesTheModulesCapabilityCheck(t *testing.T)
 	st.Status = seller.Active
 	st.Sanctions = seller.NoSanctions()
 	st.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: true, TransfersActive: true, StoreName: true, Logo: true, TownCode: true}
-	h, err := NewApp(&fakeReads{}, moduleWrites{&review.Module{}}, &fakeBuyers{}, fakeStores{own: st}, images(t), slog.New(slog.DiscardHandler))
+	h, err := NewApp(&fakeReads{one: sampleReview(1)}, moduleWrites{&review.Module{}}, &fakeBuyers{}, fakeStores{own: st}, images(t), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,6 +606,7 @@ func TestCreateReviewMapsModuleReasonsToTheContractReasons(t *testing.T) {
 
 func TestReplyReviewMapsNotReplyableToTheContractReason(t *testing.T) {
 	e := newEnv(t, ownStore())
+	e.reads.one = sampleReview(1)
 	e.writes.err = withReason(apperr.FailedPrecondition("不能回覆"), review.ReasonNotReplyable)
 	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
 	if codeOf(err) != connect.CodeFailedPrecondition || reasonOf(err) != "REVIEW_NOT_REPLYABLE" {
@@ -703,5 +744,63 @@ func TestConstructorsRequireTheirDependencies(t *testing.T) {
 	}
 	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeBuyers{}, nil, images(t), log); err == nil {
 		t.Error("App 需要 Stores")
+	}
+}
+
+func TestPageTokenScopeUsesTheParsedIDSoEquivalentSpellingsShareIt(t *testing.T) {
+	e := newEnv(t, nil)
+	next := review.Cursor{CreatedAt: at, ID: uuid.UUID{9}}
+	e.reads.page = review.Page{Reviews: []review.Review{sampleReview(1)}, Next: &next}
+	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "7"}))
+	if err != nil || resp.Msg.GetNextPageToken() == "" {
+		t.Fatalf("%v %v", resp, err)
+	}
+	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "007", PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatalf("商品 '7' 的 token 用 '007' 續頁：%v", err)
+	}
+	sresp, err := e.public.ListStoreReviews(context.Background(), connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "7"}))
+	if err != nil || sresp.Msg.GetNextPageToken() == "" {
+		t.Fatalf("%v %v", sresp, err)
+	}
+	if _, err := e.public.ListStoreReviews(context.Background(), connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "007", PageToken: sresp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatalf("店家 '7' 的 token 用 '007' 續頁：%v", err)
+	}
+}
+
+func TestExplicitRatingOutsideOneToFiveIsInvalidArgumentOnTheRatingField(t *testing.T) {
+	e := newEnv(t, ownStore())
+	for _, bad := range []int32{0, -1, 6} {
+		rating := bad
+		calls := map[string]func() error{
+			"product": func() error {
+				_, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31", Rating: &rating}))
+				return err
+			},
+			"store": func() error {
+				_, err := e.public.ListStoreReviews(context.Background(), connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "11", Rating: &rating}))
+				return err
+			},
+			"own": func() error {
+				_, err := e.app.ListOwnStoreReviews(signedIn(), connect.NewRequest(&pb.ListOwnStoreReviewsRequest{Rating: &rating}))
+				return err
+			},
+		}
+		for name, call := range calls {
+			ce := rpc.ConnectError(context.Background(), call())
+			found := false
+			for _, d := range ce.Details() {
+				if v, err := d.Value(); err == nil {
+					if br, ok := v.(*errdetails.BadRequest); ok && len(br.GetFieldViolations()) == 1 && br.GetFieldViolations()[0].GetField() == "rating" {
+						found = true
+					}
+				}
+			}
+			if ce.Code() != connect.CodeInvalidArgument || !found {
+				t.Errorf("%s rating=%d：%v %v", name, bad, ce.Code(), ce.Details())
+			}
+		}
+	}
+	if len(e.reads.calls) != 0 {
+		t.Errorf("不合法的星等不能到模組：%v", e.reads.calls)
 	}
 }

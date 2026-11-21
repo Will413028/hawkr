@@ -4285,7 +4285,7 @@ class BlockAuthorRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearForumEntryId() => $_clearField(2);
 
-  /// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。
+  /// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
   @$pb.TagNumber(3)
   $core.String get reviewId => $_getSZ(2);
   @$pb.TagNumber(3)

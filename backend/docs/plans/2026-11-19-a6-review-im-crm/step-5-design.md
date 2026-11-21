@@ -118,7 +118,7 @@
 
 ## 7. ErrorReason
 
-模組等 A6-5 定案的原因【量，facts §4】：review `REVIEW_ALREADY_EXISTS`、`ORDER_NOT_REVIEWABLE`、`REVIEW_WINDOW_EXPIRED`、`REVIEW_NOT_REPLYABLE`；im `SELF_MESSAGE_NOT_ALLOWED`、`STORE_CLOSED`、`CHAT_BLOCKED`、`RECEIVER_DELETED`；crm `CRM_TAG_NAME_TAKEN`、`CRM_TAG_LIMIT`；共用 `MODERATION_REJECTED`。原則：只有 client 會依它分支的才進 enum；「找不到」類（`ORDER_NOT_FOUND`、`CRM_CUSTOMER_NOT_FOUND`、`CRM_TAG_NOT_FOUND`）一律 `not_found` 不帶 reason（規範 L37 反列舉）；`SELLER_SUSPENDED` 沿用既有值 2。5b–5d 各自加自己的值，同一個 PR 更新 `uitext` 目錄的錯誤句。
+模組等 A6-5 定案的原因【量，facts §4】：review `REVIEW_ALREADY_EXISTS`、`ORDER_NOT_REVIEWABLE`、`REVIEW_WINDOW_EXPIRED`、`REVIEW_NOT_REPLYABLE`；im `SELF_MESSAGE_NOT_ALLOWED`、`STORE_CLOSED`、`CHAT_BLOCKED`、`RECEIVER_DELETED`；crm `CRM_TAG_NAME_TAKEN`、`CRM_TAG_LIMIT`；共用 `MODERATION_REJECTED`。原則：只有 client 會依它分支的才進 enum；「找不到」類（`ORDER_NOT_FOUND`、`CRM_CUSTOMER_NOT_FOUND`、`CRM_TAG_NOT_FOUND`）一律 `not_found` 不帶 reason（規範 L37 反列舉）；`SELLER_SUSPENDED` 沿用既有值 2。`MODERATION_REJECTED`：review 送出的審核拒絕是欄位錯誤（invalid_argument 帶欄位違規），client 不依 reason 分支，5b 不加，只在 client 需要分支時再加。5b–5d 各自加自己的值，同一個 PR 更新 `uitext` 目錄的錯誤句。
 
 ## 8. 子步驟分工與驗收
 

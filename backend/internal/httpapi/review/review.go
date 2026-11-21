@@ -46,9 +46,10 @@ type Buyers interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]buyer.Display, error)
 }
 
-// Stores 是呼叫者此刻的店的來源（*seller.Module）。
+// Stores 是店家的來源（*seller.Module）：呼叫者此刻的店，以及依 ID 讀店（含已關閉的）。
 type Stores interface {
 	CurrentStore(ctx context.Context, accountID int64) (seller.Store, error)
+	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
 
 // presenter 是 Public 與 App 共用的組裝：觀看者身分與評價轉成回應所需的顯示資料。
@@ -113,9 +114,12 @@ func boolKey(b bool) string {
 	return "0"
 }
 
-// filterOf 把請求的 rating 與 with_images 轉成模組的篩選；rating 的範圍由模組檢查。
-func filterOf(rating *int32, withImages bool) review.Filter {
-	return review.Filter{Rating: ratingOf(rating), WithImages: withImages}
+// filterOf 把請求的 rating 與 with_images 轉成模組的篩選；明確送出的 rating 不在 1 到 5 是 invalid_argument（不當成不篩選）。
+func filterOf(rating *int32, withImages bool) (review.Filter, error) {
+	if rating != nil && (*rating < 1 || *rating > 5) {
+		return review.Filter{}, rpc.RequiredField("rating", "rating 必須在 1 到 5")
+	}
+	return review.Filter{Rating: ratingOf(rating), WithImages: withImages}, nil
 }
 
 func ratingOf(r *int32) int {

@@ -34,8 +34,11 @@ func (h *Public) ListProductReviews(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, err
 	}
-	f := filterOf(msg.Rating, msg.GetWithImages())
-	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListProductReviewsProcedure, msg.GetProductId(), f)
+	f, err := filterOf(msg.Rating, msg.GetWithImages())
+	if err != nil {
+		return nil, err
+	}
+	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListProductReviewsProcedure, rpc.FormatID(productID), f)
 	after, err := decodeCursor(scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -59,8 +62,11 @@ func (h *Public) ListStoreReviews(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, err
 	}
-	f := filterOf(msg.Rating, msg.GetWithImages())
-	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListStoreReviewsProcedure, msg.GetStoreId(), f)
+	f, err := filterOf(msg.Rating, msg.GetWithImages())
+	if err != nil {
+		return nil, err
+	}
+	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListStoreReviewsProcedure, rpc.FormatID(storeID), f)
 	after, err := decodeCursor(scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err

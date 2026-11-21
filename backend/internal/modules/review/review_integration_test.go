@@ -587,3 +587,29 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 		t.Fatalf("來源相符可還原：%v", err)
 	}
 }
+
+// ListMyReviews 帶 order_item_id 只回那個訂單項目的評價；不存在的項目回空；不帶時回全部。
+func TestListMyReviewsFiltersByOrderItem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	author := f.newBuyer(t)
+	r1 := f.submit(t, author, storeID, 700, 5, "好")
+	r2 := f.submit(t, author, storeID, 701, 4, "不錯")
+
+	one := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r1.OrderItemID, nil, 50))
+	if !sameIDs(ids(one), r1.ID) {
+		t.Fatalf("帶 r1 的訂單項目只回 r1：%v", ids(one))
+	}
+	two := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID, nil, 50))
+	if !sameIDs(ids(two), r2.ID) {
+		t.Fatalf("帶 r2 的訂單項目只回 r2：%v", ids(two))
+	}
+	if none := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID+999999, nil, 50)); len(none.Reviews) != 0 {
+		t.Fatalf("不存在的訂單項目回空：%v", ids(none))
+	}
+	if all := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); !sameIDs(ids(all), r2.ID, r1.ID) {
+		t.Fatalf("不帶篩選回全部（新到舊）：%v", ids(all))
+	}
+}

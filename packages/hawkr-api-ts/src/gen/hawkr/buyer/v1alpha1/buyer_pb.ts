@@ -1419,7 +1419,7 @@ export type BlockAuthorRequest = Message<"hawkr.buyer.v1alpha1.BlockAuthorReques
     case: "forumEntryId";
   } | {
     /**
-     * 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。
+     * 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
      *
      * @generated from field: string review_id = 3;
      */

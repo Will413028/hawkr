@@ -41,7 +41,7 @@ abstract final class ReviewPublicService {
   );
 }
 /// ReviewAppService 是登入者的評價。評價是買家與店家共用的資源（買家寫、店家回）：CreateReview 與 ListMyReviews 是買家；
-/// ReplyReview 與 ListOwnStoreReviews 的店家身分由伺服器從 session 推導（呼叫者此刻的店），請求不帶 store_id。
+/// ListOwnStoreReviews 的店家身分由伺服器從 session 推導（呼叫者此刻的店），ReplyReview 的店家由評價所屬的店推導，請求都不帶 store_id。
 abstract final class ReviewAppService {
   /// Fully-qualified name of the ReviewAppService service.
   static const name = 'hawkr.review.v1alpha1.ReviewAppService';
@@ -55,8 +55,8 @@ abstract final class ReviewAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// ReplyReview 以呼叫者此刻的店回覆一則評價，已有回覆時覆蓋。需要賣家能力 CAP_MARKETING。呼叫者沒有店或評價不存在回 not_found，
-  /// 評價不屬於呼叫者的店回 permission_denied，評價此刻不能回覆（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
+  /// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在或呼叫者讀不到回 not_found，
+  /// 評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied，評價此刻不能回覆（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
   static const replyReview = connect.Spec(
     '/$name/ReplyReview',
     connect.StreamType.unary,
@@ -66,7 +66,7 @@ abstract final class ReviewAppService {
   );
 
   /// CreateReview 以呼叫者的買家身分對一個已完成的訂單項目寫評價。商品、規格、價格與商品圖取自訂單項目。訂單不是呼叫者的或不存在回 not_found；
-  /// 同一個訂單項目已有評價回 already_exists 與 REVIEW_ALREADY_EXISTS；訂單還不能評價回 failed_precondition 與 ORDER_NOT_REVIEWABLE；
+  /// 同一個訂單項目已有評價（可能已被平台隱藏而不在 ListMyReviews 的結果中）回 already_exists 與 REVIEW_ALREADY_EXISTS，client 顯示「已評價」；訂單還不能評價回 failed_precondition 與 ORDER_NOT_REVIEWABLE；
   /// 超過評價期限回 failed_precondition 與 REVIEW_WINDOW_EXPIRED。
   static const createReview = connect.Spec(
     '/$name/CreateReview',
@@ -75,7 +75,7 @@ abstract final class ReviewAppService {
     hawkrreviewv1alpha1review.CreateReviewResponse.new,
   );
 
-  /// ListMyReviews 列出呼叫者自己寫的評價，新到舊；被平台隱藏的不列。order_item_id 只列那個訂單項目的評價（至多一則），用來判斷某個訂單項目寫過評價沒有。
+  /// ListMyReviews 列出呼叫者自己寫的評價，新到舊；被平台隱藏的不列（作者看不到被隱藏的評價）。order_item_id 只列那個訂單項目的可見評價（至多一則）；沒有結果不代表沒寫過，被隱藏的評價仍占著該訂單項目（CreateReview 會回 REVIEW_ALREADY_EXISTS）。
   /// page_token 只能用在同一個 order_item_id。
   static const listMyReviews = connect.Spec(
     '/$name/ListMyReviews',

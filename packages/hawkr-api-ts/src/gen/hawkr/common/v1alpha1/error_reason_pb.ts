@@ -152,8 +152,9 @@ export enum ErrorReason {
   CONTENT_TAKEDOWN_ACTIVE = 14,
 
   /**
-   * 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。client 改顯示既有的評價
-   * （ReviewAppService.ListMyReviews 帶 order_item_id）。ReviewAppService.CreateReview。
+   * 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+   * 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+   * ReviewAppService.CreateReview。
    *
    * @generated from enum value: REVIEW_ALREADY_EXISTS = 15;
    */
