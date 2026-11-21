@@ -88,7 +88,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 		MatchedFacts: []byte(`[{"slotKey":"ITEM","label":"外套"}]`), UnverifiableFacts: []byte("[]"), FactsAsOf: epoch, Now: epoch,
 	}))
 	must("InsertRun", func() error {
-		n, err := q.InsertRun(ctx, store.InsertRunParams{ID: c.run, BuyerID: buyerID, RequestID: c.request, ConversationID: &c.conversation, RunType: "TURN", ClientRequestID: id(), Now: epoch})
+		n, err := q.InsertRun(ctx, store.InsertRunParams{ID: c.run, BuyerID: buyerID, RequestID: c.request, ConversationID: &c.conversation, RunType: "TURN", ClientRequestID: id(), QuotaPeriodStart: &epoch, Now: epoch})
 		if err == nil && n != 1 {
 			err = errors.New("InsertRun 沒有寫入")
 		}
@@ -408,7 +408,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if err != nil || run.Status != "QUEUED" || run.RunType != "TURN" {
 		t.Fatalf("GetRunForBuyer = %+v, %v", run, err)
 	}
-	if dup, err := q.InsertRun(ctx, store.InsertRunParams{ID: id(), BuyerID: c.buyer, RequestID: c.request, RunType: "TURN", ClientRequestID: run.ClientRequestID, Now: epoch}); err != nil || dup != 0 {
+	if dup, err := q.InsertRun(ctx, store.InsertRunParams{ID: id(), BuyerID: c.buyer, RequestID: c.request, RunType: "TURN", ClientRequestID: run.ClientRequestID, QuotaPeriodStart: &epoch, Now: epoch}); err != nil || dup != 0 {
 		t.Fatalf("run 的冪等鍵：n=%d err=%v", dup, err)
 	}
 	if in, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: c.run, BuyerID: c.buyer}); err != nil || in.BuyerMessage != "我要三件外套" {

@@ -440,7 +440,8 @@ CREATE TABLE procurement.agent_runs (
     CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
     CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR')),
     CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1),
-    CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL))
+    CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL)),
+    CONSTRAINT agent_runs_quota_check CHECK ((run_type = 'TURN') = (quota_period_start IS NOT NULL))
 );
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);
 CREATE INDEX agent_runs_interrupt ON procurement.agent_runs (interrupt_id) WHERE interrupt_id IS NOT NULL;
