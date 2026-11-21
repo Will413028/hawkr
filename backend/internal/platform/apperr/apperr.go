@@ -183,6 +183,9 @@ var ReasonImageRecitationBlocked = newReason("IMAGE_RECITATION_BLOCKED")
 // ReasonImageNotProduced 表示模型沒有產出圖片，可以重試；搭配 Unavailable。
 var ReasonImageNotProduced = newReason("IMAGE_NOT_PRODUCED")
 
+// ReasonProcurementRunInProgress 表示這個採購需求已有進行中的 run，同一個需求同時只允許一個；搭配 FailedPrecondition。
+var ReasonProcurementRunInProgress = newReason("PROCUREMENT_RUN_IN_PROGRESS")
+
 // ReasonAssistantTurnInProgress 表示這個助理對話已有一輪進行中，同一個對話同時只允許一輪；搭配 FailedPrecondition。
 var ReasonAssistantTurnInProgress = newReason("ASSISTANT_TURN_IN_PROGRESS")
 

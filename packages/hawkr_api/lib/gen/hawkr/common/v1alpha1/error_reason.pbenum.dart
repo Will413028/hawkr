@@ -190,6 +190,11 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason ASSISTANT_TURN_FAILED =
       ErrorReason._(31, _omitEnumNames ? '' : 'ASSISTANT_TURN_FAILED');
 
+  /// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch。同一個需求同時只允許一個進行中的 run
+  /// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
+  static const ErrorReason PROCUREMENT_RUN_IN_PROGRESS =
+      ErrorReason._(32, _omitEnumNames ? '' : 'PROCUREMENT_RUN_IN_PROGRESS');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -223,10 +228,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     IMAGE_NOT_PRODUCED,
     ASSISTANT_TURN_IN_PROGRESS,
     ASSISTANT_TURN_FAILED,
+    PROCUREMENT_RUN_IN_PROGRESS,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 31);
+      $pb.ProtobufEnum.$_initByValueList(values, 32);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
