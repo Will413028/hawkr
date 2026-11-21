@@ -244,11 +244,6 @@ func (m *Module) ReverseHide(ctx context.Context, in ReverseInput) (CaseDetail, 
 	return m.handle.Reverse(ctx, in)
 }
 
-// CaseSnapshot 讀案件最近一份凍結的內容快照；沒有快照（結案滿保留期後被清除）回 nil。案件不存在回 NotFound。
-func (m *Module) CaseSnapshot(ctx context.Context, id uuid.UUID) (*Snapshot, error) {
-	return m.view.Snapshot(ctx, id)
-}
-
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。
 func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)

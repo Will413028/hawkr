@@ -420,7 +420,7 @@ func ValidateReverse(in model.ReverseInput) (model.ReverseInput, error) {
 
 // Reverse 撤銷一個已結案的 HIDE 決定：案件維持結案、決定不改，撤銷記在案件上（reversed_*）；同 transaction 呼叫擁有內容的模組還原這個案件造成的隱藏
 // （review、im、social 的 Restore，帶來源參照），並寫後台動作紀錄。順序同 Decide：先讀案件（不鎖）、再呼叫擁有內容的模組（鎖內容列）、最後寫 moderation 自己的列。
-// 案件不存在回 NotFound；案件還在進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition；擁有者模組沒有未還原的隱藏、或未還原的隱藏不是這個案件造成的（冪等隱藏沿用別案的那一筆）時回它的 FailedPrecondition，什麼都不寫；內容已被清除時照常記下撤銷。
+// 案件不存在回 NotFound；案件還在進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition；擁有者模組沒有未還原的隱藏、或未還原的隱藏不是這個案件造成的（冪等隱藏沿用別案的那一筆）時回它的 FailedPrecondition，什麼都不寫；內容已被清除時照常記下撤銷（稽核 detail 的 restored 為 false，實際還原了才是 true）。
 func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.CaseDetail, error) {
 	in, err := ValidateReverse(in)
 	if err != nil {
@@ -443,7 +443,8 @@ func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.Cas
 		if c.Reversal != nil {
 			return apperr.FailedPrecondition("%s", text.ReverseAlreadyReversed())
 		}
-		if err := s.restore(ctx, c, in); err != nil {
+		restored, err := s.restore(ctx, c, in)
+		if err != nil {
 			return err
 		}
 		now := s.d.Now().UTC()
@@ -456,7 +457,7 @@ func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.Cas
 		}
 		if err := s.d.Audit.Record(ctx, adminaudit.Entry{
 			Actor: in.Actor, TargetType: "moderation_case", TargetID: in.CaseID.String(),
-			Detail: map[string]any{"reverse": string(model.ActionHide), "target_kind": string(c.Target.Kind)},
+			Detail: map[string]any{"reverse": string(model.ActionHide), "target_kind": string(c.Target.Kind), "restored": restored},
 		}); err != nil {
 			return err
 		}
@@ -468,7 +469,7 @@ func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.Cas
 
 // restore 呼叫擁有內容的模組還原這個案件造成的隱藏（帶來源參照 moderation:case:<id>，別的案件或別處造成的隱藏不動，回 FailedPrecondition）；不取擁有者的守門（同 hide）。
 // 內容已被清除或刪除（擁有者回 NotFound）時視為成功：內容本來就不可見，同 hide 的規則（設計 §1.3），撤銷仍照常記在案件上。
-func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInput) error {
+func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInput) (bool, error) {
 	ref := SourceRefPrefix + c.ID.String()
 	var err error
 	switch c.Target.Kind {
@@ -481,10 +482,10 @@ func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInp
 			Target: social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID}, AdminID: in.Actor.AdminID, Reason: in.Reason, SourceRef: ref,
 		})
 	case model.TargetPost, model.TargetBuyer:
-		return apperr.FailedPrecondition("%s", text.ReverseNotHide())
+		return false, apperr.FailedPrecondition("%s", text.ReverseNotHide())
 	}
 	if apperr.KindOf(err) == apperr.KindNotFound {
-		return nil
+		return false, nil
 	}
-	return err
+	return err == nil, err
 }

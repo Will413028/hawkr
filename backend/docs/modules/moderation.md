@@ -4,7 +4,7 @@
 
 ## 1. 範圍與公開介面
 
-- 根套件公開 `Module`：`SubmitReport`、`MyReports`、`DecideCase`、`ReverseHide`（撤銷已結案的 HIDE 決定，§3.1）、`Case`、`CaseSnapshot`（案件最近一份凍結的內容快照，後台 `GetCase` 的 `snapshot`）、`OpenReportCounts`（貼文在進行中案件裡的檢舉數，只算進行中案件，後台貼文列表 A7-2f-5 用）、`Cases`（後台列案件：狀態與對象種類篩選、`(opened_at, id)` 由大到小的 keyset，預設 20、上限 50）、`PurgeSnapshots`、`AddWorkers`、`PeriodicJobs`，以及只靠 DB、buyer、media 與 job 佇列的 `Retention`（`NewRetention`：快照與說明的保留期、快照圖片的 media 引用、買家刪除事件的訂閱者；worker 與事件組裝只組它，不組完整模組）。對外 API 是 `httpapi/moderation`：`ModerationAppService`（買家）與 `ModerationAdminService`（`ListCases`、`GetCase`、`DecideCase`、`ReverseHide`，權限 `moderation.cases.list`、`get`、`decide`、`reverse`）；`DecideCase` 在結案的同一個 transaction 寫後台動作紀錄（`platform/adminaudit`，對象 `moderation_case`，detail 只放決定、處置、類別、對象種類與版本，不放理由文字）。後台待辦在 A7-1e。
+- 根套件公開 `Module`：`SubmitReport`、`MyReports`、`DecideCase`、`ReverseHide`（撤銷已結案的 HIDE 決定，§3.1）、`Case`、`CaseWithSnapshot`（同一個唯讀快照讀案件與最近一份凍結的內容快照，後台 `GetCase` 用）、`OpenReportCounts`（貼文在進行中案件裡的檢舉數，只算進行中案件，後台貼文列表 A7-2f-5 用）、`Cases`（後台列案件：狀態與對象種類篩選、`(opened_at, id)` 由大到小的 keyset，預設 20、上限 50）、`PurgeSnapshots`、`AddWorkers`、`PeriodicJobs`，以及只靠 DB、buyer、media 與 job 佇列的 `Retention`（`NewRetention`：快照與說明的保留期、快照圖片的 media 引用、買家刪除事件的訂閱者；worker 與事件組裝只組它，不組完整模組）。對外 API 是 `httpapi/moderation`：`ModerationAppService`（買家）與 `ModerationAdminService`（`ListCases`、`GetCase`、`DecideCase`、`ReverseHide`，權限 `moderation.cases.list`、`get`、`decide`、`reverse`）；`DecideCase` 在結案的同一個 transaction 寫後台動作紀錄（`platform/adminaudit`，對象 `moderation_case`，detail 只放決定、處置、類別、對象種類與版本，不放理由文字）。後台待辦在 A7-1e。
 - 依賴 social、review、im、seller、buyer、`accountsuspension`、media（快照圖片的引用）；不依賴 identity、不依賴 notification（A7-1d 不發事件，A8 依案件決定通知時再加）。
 - 擁有的資料：`moderation.cases`、`reports`、`case_snapshots`、`reporter_daily_counts`、`media_ref_sync`、`retired_assets`（快照圖片引用的同步，演算法在 media）；主鍵 UUIDv7，不建跨 schema FK。
 - 對象：貼文、留言、討論區留言、評價、聊天訊息（`content_id`）與買家（`buyer_id`）。評價與聊天訊息的檢舉人只有買家（店家檢舉人與店家寫的聊天訊息的處置在 A6-4c）。
@@ -36,6 +36,7 @@
 - 輸入：案件、管理員（`adminaudit.Actor`）、原因（1 到 500 字）。只對已結案、處置是 `HIDE`、還沒撤銷的案件：進行中、`WARN`／`BAN`／`TAKEDOWN`、不違規、已撤銷過都是 FailedPrecondition；不存在是 NotFound。
 - 案件維持結案、決定不改；`cases.reversed_at`、`reversed_by_admin_id`、`reverse_reason` 三欄同有同無（CHECK 只允許 HIDE 案件、撤銷不早於結案）。
 - 同一個 transaction：先讀案件（不鎖）、呼叫擁有內容的模組 `Restore`（review、im、social；帶來源參照 `moderation:case:<案件 id>`，只還原來源相同的未還原隱藏：沒有未還原的隱藏、或未還原的隱藏是別的案件造成的（`Hide` 冪等，後到的案件沿用先到那一筆）都回該模組的 FailedPrecondition、什麼都不寫；內容已被清除或刪除（擁有者回 NotFound）時視為成功，同 `Hide`，撤銷仍照常記下）、最後寫案件的撤銷欄位與 `adminaudit.Record`。鎖序 review／im／social → moderation，同 `Decide`。
+- 沿用別案隱藏的案件不能撤銷：HIDE 若沿用了別的案件已造成的隱藏（`Hide` 冪等），該案件的 ReverseHide 回 FailedPrecondition；只有造成這筆隱藏的案件能撤銷它，要還原需撤銷那個案件。稽核 detail 的 `restored` 記擁有者是否真的還原（內容已清除為 false）。
 - 對外：`ModerationAdminService.ReverseHide`，權限 `ModerationCasesReverse`（`moderation.cases.reverse`；一支方法一個權限，不與 `DecideCase` 共用），宣告 `audited`。
 
 ## 4. 檢舉結果的推導

@@ -136,7 +136,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 	}
 
 	res := f.submit(t, reporter, Target{Kind: TargetReview, ContentID: r.ID}, policy.Spam)
-	snap := mustV[*Snapshot](t)(f.module.CaseSnapshot(ctx, res.Case.ID))
+	snap := caseSnapshot(t, f, res.Case.ID)
 	if snap == nil || snap.Review == nil || snap.Kind != TargetReview {
 		t.Fatalf("評價案件的快照：%+v", snap)
 	}
@@ -256,6 +256,9 @@ func TestReverseHideRestoresACommentAndRecordsTheReversal(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM social.hides WHERE comment_id = $1 AND restored_at IS NOT NULL", w.comment.ID); n != 1 {
 		t.Fatalf("social 的還原留列：%d", n)
 	}
+	if n := f.count(t, "SELECT count(*) FROM adminaudit.records WHERE action = $1 AND target_id = $2 AND detail->>'restored' = 'true'", reverseAction, c.ID.String()); n != 1 {
+		t.Fatalf("實際還原時稽核要記 restored=true：%d", n)
+	}
 }
 
 // 8.1-2（檢舉面）：快照的 Context 恰好前 5、後 5、不含被檢舉的那則；被隱藏的前文是墓碑，隱藏的內容不進快照；前後文的圖片一併被證據保全；
@@ -270,7 +273,7 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 	f.hideMessage(t, ids[3])
 
 	res := f.submit(t, reporter, Target{Kind: TargetChatMessage, ContentID: ids[6]}, policy.Harassment)
-	snap := mustV[*Snapshot](t)(f.module.CaseSnapshot(ctx, res.Case.ID))
+	snap := caseSnapshot(t, f, res.Case.ID)
 	if snap == nil || snap.Chat == nil {
 		t.Fatalf("聊天案件的快照：%+v", snap)
 	}
@@ -549,6 +552,9 @@ func TestReverseHideOfAPurgedReviewStillRecordsTheReversal(t *testing.T) {
 	if d.Case.Reversal == nil || d.Case.ClosedAt == nil {
 		t.Fatalf("案件維持結案並記下撤銷：%+v", d.Case)
 	}
+	if n := f.count(t, "SELECT count(*) FROM adminaudit.records WHERE action = $1 AND target_id = $2 AND detail->>'restored' = 'false'", reverseAction, c.ID.String()); n != 1 {
+		t.Fatalf("內容已清除時稽核要記 restored=false：%d", n)
+	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND reversed_at IS NOT NULL AND reversed_by_admin_id = 9", c.ID); n != 1 {
 		t.Fatalf("reversed_* 要寫入：%d", n)
 	}
@@ -580,5 +586,87 @@ func TestReverseOfALaterCaseDoesNotRestoreAnEarlierCasesHide(t *testing.T) {
 	mustV[CaseDetail](t)(f.reverse(a.ID))
 	if hidden, _ := f.hidden(t, party, conv, 7); hidden {
 		t.Fatal("撤銷先到的案件要還原")
+	}
+}
+
+func caseSnapshot(t *testing.T, f *fixture, id uuid.UUID) *Snapshot {
+	t.Helper()
+	d, snap, err := f.module.CaseWithSnapshot(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Case.ID != id {
+		t.Fatalf("案件與快照要是同一個案件：%+v", d.Case)
+	}
+	return snap
+}
+
+// CaseWithSnapshot 對真實資料庫：回案件（含檢舉）與同案件的快照；快照被清除後回 nil 而案件仍在；案件不存在是 NotFound。
+// 殺死的變異：快照用別的案件 ID 查、案件不存在不回 NotFound、沒有快照時回錯。
+func TestCaseWithSnapshotReturnsTheCaseAndItsSnapshot(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	w := f.world(t)
+	other := f.openCase(t, Target{Kind: TargetPost, ContentID: w.post.ID})
+	c := f.openCase(t, commentTarget(w.comment))
+	d, snap, err := f.module.CaseWithSnapshot(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Case.ID != c.ID || len(d.Reports) != 1 || snap == nil || snap.Social == nil || snap.Kind != TargetComment || snap.Social.Body != "留言內容" {
+		t.Fatalf("案件與快照：%+v %+v", d, snap)
+	}
+	if o := caseSnapshot(t, f, other.ID); o == nil || o.Kind != TargetPost {
+		t.Fatalf("別的案件有自己的快照：%+v", o)
+	}
+	f.exec(t, "DELETE FROM moderation.case_snapshots WHERE case_id = $1", c.ID)
+	d, snap, err = f.module.CaseWithSnapshot(ctx, c.ID)
+	if err != nil || snap != nil || d.Case.ID != c.ID {
+		t.Fatalf("快照被清除後案件仍在、快照是 nil：%+v %+v %v", d, snap, err)
+	}
+	if _, _, err := f.module.CaseWithSnapshot(ctx, uuid.New()); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("案件不存在：%v", err)
+	}
+}
+
+// 第二個案件沿用第一個案件的隱藏（冪等 Hide）後，撤銷第二個回 FailedPrecondition、內容仍隱藏、不留紀錄；撤銷第一個才還原。
+// 殺死的變異：review／social 的 Restore 忽略 source_ref。
+func TestReverseOfALaterCaseDoesNotRestoreAnEarlierCasesHideForReviewAndComment(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	author := f.buyerProfile(t)
+	r := f.reviewBy(t, author, storeID, 3, "普通")
+	w := f.world(t)
+	cases := []struct {
+		name    string
+		target  Target
+		visible func() bool
+	}{
+		{"review", Target{Kind: TargetReview, ContentID: r.ID}, func() bool {
+			_, err := f.review.GetReview(context.Background(), r.ID, 0)
+			return err == nil
+		}},
+		{"comment", commentTarget(w.comment), func() bool { return f.readable(t, social.TargetComment, w.comment.ID) }},
+	}
+	for _, tc := range cases {
+		a := f.openCase(t, tc.target)
+		mustV[CaseDetail](t)(f.decide(t, a, ActionHide, policy.Spam))
+		b := f.openCase(t, tc.target)
+		mustV[CaseDetail](t)(f.decide(t, b, ActionHide, policy.Spam))
+		if _, err := f.reverse(b.ID); kindOf(err) != apperr.KindFailedPrecondition {
+			t.Fatalf("%s：後到案件的撤銷：%v", tc.name, err)
+		}
+		if tc.visible() {
+			t.Fatalf("%s：別案的隱藏不能被還原", tc.name)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND reversed_at IS NOT NULL", b.ID); n != 0 {
+			t.Fatalf("%s：失敗的撤銷不能留下紀錄", tc.name)
+		}
+		mustV[CaseDetail](t)(f.reverse(a.ID))
+		if !tc.visible() {
+			t.Fatalf("%s：撤銷先到的案件要還原", tc.name)
+		}
 	}
 }

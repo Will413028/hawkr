@@ -563,3 +563,27 @@ func TestRestoreNeverPrecedesHiddenAt(t *testing.T) {
 		t.Fatalf("restored_at %v 早於 hidden_at %v", restored.RestoredAt, h.HiddenAt)
 	}
 }
+
+// Restore 帶來源參照：沒有未還原的隱藏（not-hidden 句子）與隱藏是別案造成的（source-mismatch 句子）是兩種不同的 FailedPrecondition，後者不動隱藏。
+// 殺死的變異：Restore 忽略 SourceRef（來源不符仍還原）；兩種情況回同一句。
+func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 3, "普通")
+	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-1"}); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
+		t.Fatalf("沒有隱藏：%v", err)
+	}
+	hide(t, f, r.ID)
+	_, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-2"})
+	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "不是由這個案件造成") {
+		t.Fatalf("來源不符：%v", err)
+	}
+	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("來源不符時隱藏仍在：%v", err)
+	}
+	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-1"}); err != nil {
+		t.Fatalf("來源相符可還原：%v", err)
+	}
+}

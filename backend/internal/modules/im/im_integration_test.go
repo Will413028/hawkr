@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -756,5 +757,32 @@ func TestRetireSkipsAStoreHeldByASend(t *testing.T) {
 	}
 	if n := pick(); n != 1 {
 		t.Fatalf("Send 提交之後下一輪要選得到：%d", n)
+	}
+}
+
+// Restore 帶來源參照：沒有未還原的隱藏與隱藏是別案造成的是兩種不同的 FailedPrecondition，後者不動隱藏。
+// 殺死的變異：Restore 忽略 SourceRef；兩種情況回同一句。
+func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.say(t, f.buyerParty(b1), s1, "first")
+	last := f.say(t, f.storeParty(t, s1), b1, "內容")
+	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
+		t.Fatalf("沒有隱藏：%v", err)
+	}
+	if _, err := f.m.Hide(ctx, im.HideInput{MessageID: last.ID, AdminID: 1, Category: string(policy.CommunityAssessable()[0]), SourceRef: "case-1"}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-2"})
+	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "不是由這個案件造成") {
+		t.Fatalf("來源不符：%v", err)
+	}
+	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, s1), f.buyerParty(b1), 0, 10)
+	if err != nil || !msgs.Items[len(msgs.Items)-1].Hidden {
+		t.Fatalf("來源不符時隱藏仍在：%+v %v", msgs, err)
+	}
+	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); err != nil {
+		t.Fatalf("來源相符可還原：%v", err)
 	}
 }
