@@ -68,7 +68,8 @@
       "REPORT_TARGET_KIND_COMMENT": "Comment",
       "REPORT_TARGET_KIND_FORUM_ENTRY": "Forum post",
       "REPORT_TARGET_KIND_POST": "Post",
-      "REPORT_TARGET_KIND_REVIEW": "Review"
+      "REPORT_TARGET_KIND_REVIEW": "Review",
+      "REPORT_TARGET_KIND_REVIEW_REPLY": "Review reply"
     }
   },
   "payment": {
@@ -86,9 +87,11 @@
   },
   "seller": {
     "ContentKind": {
+      "CONTENT_KIND_CHAT_MESSAGE": "聊天訊息",
       "CONTENT_KIND_COMMENT": "留言",
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
-      "CONTENT_KIND_POST": "貼文"
+      "CONTENT_KIND_POST": "貼文",
+      "CONTENT_KIND_REVIEW_REPLY": "評價回覆"
     },
     "InquiryKind": {
       "INQUIRY_KIND_EXPLANATION": "Provide an explanation",

@@ -197,6 +197,11 @@ func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
 			AuthorId: rpc.FormatID(x.AuthorID), StoreId: rpc.FormatID(x.SubjectStoreID), ProductId: rpc.FormatID(x.ProductID), Rating: int32(x.Rating), //nolint:gosec // 評價分數是 1 到 5
 			Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt), ReplyBody: x.ReplyBody,
 		}}}
+	case c.ReviewReply != nil:
+		x := c.ReviewReply
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_ReviewReply{ReviewReply: &adminpb.ReviewReplySnapshot{
+			StoreId: rpc.FormatID(x.StoreID), ReviewId: x.ReviewID, ReviewerId: rpc.FormatID(x.ReviewerID), Body: x.Body, AuthoredTime: optionalTime(x.AuthoredAt),
+		}}}
 	case c.Chat != nil:
 		x := c.Chat
 		out := &adminpb.ChatSnapshot{

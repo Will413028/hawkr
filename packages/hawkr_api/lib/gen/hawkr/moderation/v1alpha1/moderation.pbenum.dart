@@ -40,6 +40,11 @@ class ReportTargetKind extends $pb.ProtobufEnum {
       ReportTargetKind._(
           6, _omitEnumNames ? '' : 'REPORT_TARGET_KIND_CHAT_MESSAGE');
 
+  /// 店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。
+  static const ReportTargetKind REPORT_TARGET_KIND_REVIEW_REPLY =
+      ReportTargetKind._(
+          7, _omitEnumNames ? '' : 'REPORT_TARGET_KIND_REVIEW_REPLY');
+
   static const $core.List<ReportTargetKind> values = <ReportTargetKind>[
     REPORT_TARGET_KIND_UNSPECIFIED,
     REPORT_TARGET_KIND_POST,
@@ -48,10 +53,11 @@ class ReportTargetKind extends $pb.ProtobufEnum {
     REPORT_TARGET_KIND_BUYER,
     REPORT_TARGET_KIND_REVIEW,
     REPORT_TARGET_KIND_CHAT_MESSAGE,
+    REPORT_TARGET_KIND_REVIEW_REPLY,
   ];
 
   static final $core.List<ReportTargetKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 7);
   static ReportTargetKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

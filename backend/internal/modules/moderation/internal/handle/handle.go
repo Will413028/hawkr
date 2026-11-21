@@ -247,7 +247,7 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, re
 	switch t.Kind {
 	case model.TargetBuyer:
 		return social.Actor{Kind: social.ActorBuyer, ID: t.BuyerID}, social.ContentOwner{}, nil
-	case model.TargetReview, model.TargetChatMessage:
+	case model.TargetReview, model.TargetChatMessage, model.TargetReviewReply:
 		frozen, err := res.frozenContent(ctx, q, c.ID, text.DecideSnapshotMissing)
 		if err != nil {
 			return social.Actor{}, social.ContentOwner{}, err
@@ -297,7 +297,7 @@ func (s *Service) hide(ctx context.Context, c model.Case, in model.DecideInput, 
 			Target:   social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID},
 			Category: string(in.Category), Text: in.Text, SourceRef: ref, AdminID: in.Actor.AdminID,
 		})
-	case model.TargetPost, model.TargetBuyer:
+	case model.TargetPost, model.TargetBuyer, model.TargetReviewReply:
 		return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionNotForTarget())
 	}
 	return err
@@ -341,10 +341,10 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return err
 	}
-	if frozen.Social == nil {
+	if frozen.Kind != c.Target.Kind || !frozen.Takedownable() {
 		return apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
 	}
-	storeID := frozen.Social.StoreID
+	storeID := frozen.StoreID()
 	if err := CheckTakedownStore(owner, storeID); err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	if err != nil {
 		return fmt.Errorf("moderation：計算案件的檢舉數：%w", err)
 	}
-	sn, err := measureSnapshot(c.Target.Kind, storeID, *frozen.Social)
+	sn, err := measureSnapshot(c.Target.Kind, storeID, frozen)
 	if err != nil {
 		return err
 	}
@@ -389,12 +389,22 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 }
 
 // measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
-// 這裡只解析凍結的字串 id。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
-func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Social) (seller.ContentSnapshot, error) {
-	post, _ := uuid.Parse(f.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
-	thread, _ := uuid.Parse(f.ThreadID) // 同上
+// 這裡只依種類取出凍結的欄位並解析字串 id（只有社群內容有連結；聊天訊息與評價回覆的連結必須全空）。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
+func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
 	k := seller.ContentKind(kind)
-	sn := seller.NewContentSnapshot(k, f.Body, f.AuthoredAt, len(f.MediaRefs), storeID, post, thread)
+	var sn seller.ContentSnapshot
+	switch {
+	case f.Social != nil:
+		post, _ := uuid.Parse(f.Social.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
+		thread, _ := uuid.Parse(f.Social.ThreadID) // 同上
+		sn = seller.NewContentSnapshot(k, f.Social.Body, f.Social.AuthoredAt, len(f.Social.MediaRefs), storeID, post, thread)
+	case f.Chat != nil:
+		sn = seller.NewContentSnapshot(k, f.Chat.Body, f.Chat.AuthoredAt, len(f.Chat.MediaRefs), storeID, uuid.UUID{}, uuid.UUID{})
+	case f.ReviewReply != nil:
+		sn = seller.NewContentSnapshot(k, f.ReviewReply.Body, f.ReviewReply.AuthoredAt, 0, storeID, uuid.UUID{}, uuid.UUID{})
+	default:
+		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
+	}
 	if err := seller.ValidateContentSnapshot(k, sn); err != nil {
 		return seller.ContentSnapshot{}, apperr.FailedPrecondition("%s", text.DecideTakedownSnapshotMissing())
 	}
@@ -481,7 +491,7 @@ func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInp
 		_, err = s.d.Social.Restore(ctx, social.RestoreInput{
 			Target: social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID}, AdminID: in.Actor.AdminID, Reason: in.Reason, SourceRef: ref,
 		})
-	case model.TargetPost, model.TargetBuyer:
+	case model.TargetPost, model.TargetBuyer, model.TargetReviewReply:
 		return false, apperr.FailedPrecondition("%s", text.ReverseNotHide())
 	}
 	if apperr.KindOf(err) == apperr.KindNotFound {

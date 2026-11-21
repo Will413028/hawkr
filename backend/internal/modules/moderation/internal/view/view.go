@@ -52,7 +52,7 @@ func Case(r store.ModerationCase) model.Case {
 // Report 轉換檢舉列；decision 是所屬案件的決定（nil 是進行中），結果由它推導。
 func Report(r store.ModerationReport, decision *string) model.Report {
 	out := model.Report{
-		ID: r.ID, CaseID: r.CaseID, ReporterBuyerID: r.ReporterBuyerID, Category: policy.Category(r.Category),
+		ID: r.ID, CaseID: r.CaseID, ReporterBuyerID: deref(r.ReporterBuyerID), ReporterStoreID: deref(r.ReporterStoreID), Category: policy.Category(r.Category),
 		SnapshotID: r.SnapshotID, CreatedAt: r.CreatedAt, Outcome: model.OutcomeOf(decision),
 	}
 	if r.Description != nil {
@@ -224,4 +224,11 @@ func (r Reader) OpenReportCounts(ctx context.Context, postIDs []uuid.UUID) (map[
 		out[*row.PostID] = row.Reports
 	}
 	return out, nil
+}
+
+func deref(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

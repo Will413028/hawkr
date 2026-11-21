@@ -112,6 +112,7 @@ message CaseSnapshot {
     BuyerSnapshot buyer = 2;
     ReviewSnapshot review = 3;
     ChatSnapshot chat = 4;
+    ReviewReplySnapshot review_reply = 5;
   }
 }
 
@@ -145,6 +146,18 @@ message ReviewSnapshot {
   optional google.protobuf.Timestamp authored_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 店家回覆（上下文，不是被檢舉的內容）；沒有回覆是空字串。
   string reply_body = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ReviewReplySnapshot 是店家對評價的回覆的快照；作者永遠是評價所屬的店家。
+message ReviewReplySnapshot {
+  // 回覆的店家，也是評價所屬的店家。
+  string store_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 評價 ID（回覆沒有自己的 ID）。
+  string review_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 評價的買家（上下文）。
+  string reviewer_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp authored_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。

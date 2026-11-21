@@ -6,6 +6,7 @@ package review
 import (
 	"context"
 	"embed"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"io/fs"
 	"log/slog"
 	"time"
@@ -66,19 +67,21 @@ type Deps struct {
 }
 
 type (
-	Review                 = model.Review
-	RelayReview            = model.RelayReview
-	ReportedReview         = model.ReportedReview
-	Image                  = model.Image
-	Reply                  = model.Reply
-	Cursor                 = model.Cursor
-	Page                   = model.Page
-	Filter                 = model.Filter
-	SubmitInput            = model.SubmitInput
-	ReplyInput             = model.ReplyInput
-	HideInput              = model.HideInput
-	RestoreInput           = model.RestoreInput
-	Hide                   = model.Hide
+	Review         = model.Review
+	RelayReview    = model.RelayReview
+	ReportedReview = model.ReportedReview
+	Image          = model.Image
+	Reply          = model.Reply
+	Cursor         = model.Cursor
+	Page           = model.Page
+	Filter         = model.Filter
+	SubmitInput    = model.SubmitInput
+	ReplyInput     = model.ReplyInput
+	HideInput      = model.HideInput
+	RestoreInput   = model.RestoreInput
+	Hide           = model.Hide
+	// TakedownContentError 是內容下架的對象不成立；OnMeasureCreated 回這個錯誤讓措施回滾。
+	TakedownContentError   = write.TakedownContentError
 	ProductStats           = model.ProductStats
 	StoreStats             = model.StoreStats
 	StoreRating            = model.StoreRating
@@ -247,4 +250,16 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 // PeriodicJobs 回傳保底掃描的排程（媒體引用、刪帳清除）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	return append(mediaref.PeriodicJobs(), purge.PeriodicJobs()...)
+}
+
+// OnMeasureCreated 是 seller 建立內容下架措施時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：只處理店家對評價的回覆（Contents 裡種類是 REVIEW_REPLY 的對象），
+// 鎖住列並核對歸屬，不存複本（讀取述詞 join seller.pub_content_takedowns()，A6-D21）；對象不是措施的店家的評價回覆時回 *TakedownContentError 讓措施回滾。
+// 鎖的順序 seller → review（moderation 的 Decide 先建立措施、後寫案件列）。
+func (m *Module) OnMeasureCreated(ctx context.Context, e seller.MeasureCreated) error {
+	return m.write.TakedownCreated(ctx, e)
+}
+
+// OnMeasureRevoked 是 seller 撤銷措施時同 transaction 的訂閱者：鎖住列，內容立即回到可見（另一個生效中的措施仍下架它時，讀取述詞照樣遮住）。
+func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) error {
+	return m.write.TakedownRevoked(ctx, e)
 }

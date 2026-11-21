@@ -92,9 +92,11 @@ type (
 	HideInput           = model.HideInput
 	RestoreInput        = model.RestoreInput
 	Hide                = model.Hide
-	MessageSent         = model.MessageSent
-	Reason              = model.Reason
-	PresenceState       = model.PresenceState
+	// TakedownContentError 是內容下架的對象不成立；OnMeasureCreated 回這個錯誤讓措施回滾。
+	TakedownContentError = write.TakedownContentError
+	MessageSent          = model.MessageSent
+	Reason               = model.Reason
+	PresenceState        = model.PresenceState
 
 	// Subscription 是一個 Party 的一條拉取式事件流（Next、Revalidate、Close）。
 	Subscription = live.Subscription
@@ -298,4 +300,16 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 // PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除、存活標記清理）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	return slices.Concat(mediaref.PeriodicJobs(), purge.PeriodicJobs(), live.PeriodicJobs())
+}
+
+// OnMeasureCreated 是 seller 建立內容下架措施時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：只處理店家寄出的聊天訊息（Contents 裡種類是 CHAT_MESSAGE 的對象），
+// 鎖住列並核對歸屬、發可見度改變的 NOTIFY，不存複本（讀取述詞 join seller.pub_content_takedowns()，A6-D21）；對象不是措施的店家寄的訊息時回 *TakedownContentError 讓措施回滾。
+// 鎖的順序 seller → im（moderation 的 Decide 先建立措施、後寫案件列）。
+func (m *Module) OnMeasureCreated(ctx context.Context, e seller.MeasureCreated) error {
+	return m.write.TakedownCreated(ctx, e)
+}
+
+// OnMeasureRevoked 是 seller 撤銷措施時同 transaction 的訂閱者：鎖住列並發 NOTIFY，內容立即回到可見（另一個生效中的措施仍下架它時，讀取述詞照樣遮住）。
+func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) error {
+	return m.write.TakedownRevoked(ctx, e)
 }

@@ -36,6 +36,7 @@ export const TARGET_KIND_OPTIONS: readonly ReportTargetKind[] = [
 	ReportTargetKind.BUYER,
 	ReportTargetKind.REVIEW,
 	ReportTargetKind.CHAT_MESSAGE,
+	ReportTargetKind.REVIEW_REPLY,
 ];
 
 export function targetKindText(kind: ReportTargetKind): string {

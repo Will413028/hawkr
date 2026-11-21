@@ -63,6 +63,9 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
       "message": "Review"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
+      "message": "Review reply"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"
     },

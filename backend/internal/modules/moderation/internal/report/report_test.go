@@ -35,11 +35,20 @@ func TestValidateAcceptsExactlyTheCommunityReporterCategories(t *testing.T) {
 
 func TestValidateRejectsMalformedInput(t *testing.T) {
 	for name, mutate := range map[string]func(*model.SubmitInput){
-		"沒有檢舉人":  func(in *model.SubmitInput) { in.ReporterBuyerID = 0 },
-		"負的檢舉人":  func(in *model.SubmitInput) { in.ReporterBuyerID = -1 },
-		"對象形狀錯":  func(in *model.SubmitInput) { in.Target.BuyerID = 5 },
-		"說明太長":   func(in *model.SubmitInput) { in.Description = strings.Repeat("字", model.MaxDescriptionRunes+1) },
-		"沒有對象種類": func(in *model.SubmitInput) { in.Target.Kind = "" },
+		"沒有檢舉人":   func(in *model.SubmitInput) { in.ReporterBuyerID = 0 },
+		"負的檢舉人":   func(in *model.SubmitInput) { in.ReporterBuyerID = -1 },
+		"買家與店家同時": func(in *model.SubmitInput) { in.ReporterStoreID = 3 },
+		"店家檢舉評價": func(in *model.SubmitInput) {
+			in.ReporterBuyerID, in.ReporterStoreID, in.Target.Kind = 0, 3, model.TargetReview
+		},
+		"店家檢舉社群留言": func(in *model.SubmitInput) { in.ReporterBuyerID, in.ReporterStoreID = 0, 3 },
+		"店家檢舉評價回覆": func(in *model.SubmitInput) {
+			in.ReporterBuyerID, in.ReporterStoreID, in.Target.Kind = 0, 3, model.TargetReviewReply
+		},
+		"負的店家檢舉人": func(in *model.SubmitInput) { in.ReporterBuyerID, in.ReporterStoreID = 0, -3 },
+		"對象形狀錯":   func(in *model.SubmitInput) { in.Target.BuyerID = 5 },
+		"說明太長":    func(in *model.SubmitInput) { in.Description = strings.Repeat("字", model.MaxDescriptionRunes+1) },
+		"沒有對象種類":  func(in *model.SubmitInput) { in.Target.Kind = "" },
 	} {
 		in := input()
 		mutate(&in)
@@ -59,5 +68,13 @@ func TestValidateTrimsAndBoundsTheDescriptionByRunes(t *testing.T) {
 	in.Description = strings.Repeat("字", model.MaxDescriptionRunes)
 	if _, err := Validate(context.Background(), in); err != nil {
 		t.Fatalf("剛好上限要通過（以字數計，不是 bytes）：%v", err)
+	}
+}
+
+func TestValidateAcceptsAStoreReporterOnlyOnChatMessages(t *testing.T) {
+	in := input()
+	in.ReporterBuyerID, in.ReporterStoreID, in.Target.Kind = 0, 3, model.TargetChatMessage
+	if _, err := Validate(context.Background(), in); err != nil {
+		t.Fatalf("店家檢舉聊天訊息：%v", err)
 	}
 }

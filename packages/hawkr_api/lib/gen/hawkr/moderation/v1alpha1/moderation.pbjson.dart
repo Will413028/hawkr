@@ -31,6 +31,7 @@ const ReportTargetKind$json = {
     {'1': 'REPORT_TARGET_KIND_BUYER', '2': 4},
     {'1': 'REPORT_TARGET_KIND_REVIEW', '2': 5},
     {'1': 'REPORT_TARGET_KIND_CHAT_MESSAGE', '2': 6},
+    {'1': 'REPORT_TARGET_KIND_REVIEW_REPLY', '2': 7},
   ],
 };
 
@@ -40,7 +41,8 @@ final $typed_data.Uint8List reportTargetKindDescriptor = $convert.base64Decode(
     'sKF1JFUE9SVF9UQVJHRVRfS0lORF9QT1NUEAESHgoaUkVQT1JUX1RBUkdFVF9LSU5EX0NPTU1F'
     'TlQQAhIiCh5SRVBPUlRfVEFSR0VUX0tJTkRfRk9SVU1fRU5UUlkQAxIcChhSRVBPUlRfVEFSR0'
     'VUX0tJTkRfQlVZRVIQBBIdChlSRVBPUlRfVEFSR0VUX0tJTkRfUkVWSUVXEAUSIwofUkVQT1JU'
-    'X1RBUkdFVF9LSU5EX0NIQVRfTUVTU0FHRRAG');
+    'X1RBUkdFVF9LSU5EX0NIQVRfTUVTU0FHRRAGEiMKH1JFUE9SVF9UQVJHRVRfS0lORF9SRVZJRV'
+    'dfUkVQTFkQBw==');
 
 @$core.Deprecated('Use reportOutcomeDescriptor instead')
 const ReportOutcome$json = {

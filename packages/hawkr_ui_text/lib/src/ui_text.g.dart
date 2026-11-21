@@ -111,6 +111,8 @@ return switch ((l, value)) {
 (UiLocale.en, 5) => 'Review',
 (UiLocale.zhTW, 6) => '聊天訊息',
 (UiLocale.en, 6) => 'Chat message',
+(UiLocale.zhTW, 7) => '評價回覆',
+(UiLocale.en, 7) => 'Review reply',
 _ => null,
 };
 }
@@ -161,6 +163,8 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '貼文',
 (UiLocale.zhTW || UiLocale.en, 2) => '留言',
 (UiLocale.zhTW || UiLocale.en, 3) => '討論區留言',
+(UiLocale.zhTW || UiLocale.en, 4) => '聊天訊息',
+(UiLocale.zhTW || UiLocale.en, 5) => '評價回覆',
 _ => null,
 };
 }
