@@ -214,6 +214,14 @@
     "PaymentAccount": {
       "payouts_inactive_note": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },
+    "ReportOutcome": {
+      "REPORT_OUTCOME_ABUSIVE": "Resolved (not accepted)",
+      "REPORT_OUTCOME_ACTION_TAKEN": "Resolved (action taken)",
+      "REPORT_OUTCOME_DUPLICATE": "Resolved (duplicate report)",
+      "REPORT_OUTCOME_INSUFFICIENT": "Resolved (insufficient information)",
+      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
+      "REPORT_OUTCOME_PENDING": "Under review"
+    },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
       "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",

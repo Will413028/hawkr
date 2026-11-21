@@ -44,8 +44,9 @@ func EnumToProto[E protoEnum, T ~string](t T) E {
 }
 
 // EnumMismatches 列出模組的值域 values 與契約的列舉 E 對不上的地方，給測試用：每個模組的值都要轉得成
-// proto 的值再轉回來，每個 proto 的值（UNSPECIFIED 除外）也都要是模組的值。
-func EnumMismatches[E protoEnum, T ~string](values []T) []string {
+// proto 的值再轉回來，每個 proto 的值（UNSPECIFIED 與 contractOnly 除外）也都要是模組的值；
+// contractOnly 是只在契約上有、模組沒有儲存的值（例如由伺服器對應出的「還沒有結果」）。
+func EnumMismatches[E protoEnum, T ~string](values []T, contractOnly ...E) []string {
 	var zero E
 	d := zero.Descriptor()
 	var out []string
@@ -58,7 +59,7 @@ func EnumMismatches[E protoEnum, T ~string](values []T) []string {
 	vs := d.Values()
 	for i := range vs.Len() {
 		v := vs.Get(i)
-		if v.Number() == 0 {
+		if v.Number() == 0 || slices.Contains(contractOnly, E(v.Number())) {
 			continue
 		}
 		if !slices.Contains(values, EnumFromProto[T](E(v.Number()))) {

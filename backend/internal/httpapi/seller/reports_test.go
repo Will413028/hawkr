@@ -101,7 +101,7 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 		len(in.EvidenceTokens) != 1 {
 		t.Fatalf("in=%+v", in)
 	}
-	if got.Msg.GetReport().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_UNSPECIFIED || got.Msg.GetReport().GetStoreId() != "12" ||
+	if got.Msg.GetReport().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || got.Msg.GetReport().GetStoreId() != "12" ||
 		got.Msg.GetSupplemented() || got.Msg.GetNotice() != nil {
 		t.Fatalf("report=%v", got.Msg)
 	}

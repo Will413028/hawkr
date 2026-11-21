@@ -201,6 +201,24 @@
     "seller.PaymentAccount.payouts_inactive_note": {
       "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "Resolved (not accepted)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "Resolved (action taken)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "Resolved (duplicate report)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "Resolved (insufficient information)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "Resolved (no violation)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_PENDING": {
+      "message": "Under review"
+    },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
     },
