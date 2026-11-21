@@ -1,4 +1,4 @@
-# A6-4 moderation 加評價、聊天對象：實作設計 v1（A6-4 設計書，開工 design-review 第 1 輪已處理）
+# A6-4 moderation 加評價、聊天對象：實作設計 v1（A6-4 設計書，開工 design-review 第 1 輪已處理，§W 已決）
 
 上層：計畫 `../2026-11-19-a6-review-im-crm.md` 的「A6-4」、A6-D3、A6-D19、A6-D20、不變量表與缺陷 RD3、ID1。路徑相對於 `backend/`；`M=internal/modules`、`P=internal/platform`。標記：【量】＝打開檔案或跑過指令；【推】＝讀程式推論；未查證＝沒有查到來源。核對時的 HEAD：dev `d9ac3908`。
 
@@ -268,7 +268,7 @@ type ContextMessage struct {
 
 review、im 的 `CARRYOVER.md`：各加一列「`ReviewForReport`／`MessageForReport` 是證據讀取，不給顯示用；可讀規則與顯示讀取共用同一個述詞」。
 
-## §W 待拍板
+## §W 待拍板（已決：A6-D21，Will 2026-11-21，W1–W4 皆選 (a)；4b 依此改寫 §3 為依種類分開的 struct）
 
 ### W1 還原的入口與案件紀錄
 
