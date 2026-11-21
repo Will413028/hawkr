@@ -192,6 +192,8 @@ type RestoreInput struct {
 	ReviewID uuid.UUID
 	AdminID  int64
 	Reason   string
+	// SourceRef 非空時只還原來源參照相同的未還原隱藏；有未還原隱藏但來源不同回 FailedPrecondition。空字串還原目前的那一筆。
+	SourceRef string
 }
 
 // Hide 是一筆隱藏紀錄；Created 為假表示同一則評價已有未還原的隱藏（冪等回傳既有的）。

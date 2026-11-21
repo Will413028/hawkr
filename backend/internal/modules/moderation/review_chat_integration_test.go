@@ -529,3 +529,56 @@ func TestHideRacesWithEraseAndSendWithoutDeadlock(t *testing.T) {
 		}
 	}
 }
+
+// 撤銷時內容已被清除（評價刪除）：同 Hide 的規則視為成功，撤銷仍記在案件上。殺死的變異：ReverseHide 在擁有者回 NotFound 時回錯。
+func TestReverseHideOfAPurgedReviewStillRecordsTheReversal(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	author := f.buyerProfile(t)
+	reporter, _ := f.newBuyer(t)
+	r := f.reviewBy(t, author, storeID, 3, "普通")
+	c := f.submit(t, reporter, Target{Kind: TargetReview, ContentID: r.ID}, policy.Spam).Case
+	mustV[CaseDetail](t)(f.decide(t, c, ActionHide, policy.Spam))
+	f.exec(t, "DELETE FROM review.reviews WHERE id = $1", r.ID)
+
+	d, err := f.reverse(c.ID)
+	if err != nil {
+		t.Fatalf("內容已清除的撤銷要成功：%v", err)
+	}
+	if d.Case.Reversal == nil || d.Case.ClosedAt == nil {
+		t.Fatalf("案件維持結案並記下撤銷：%+v", d.Case)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND reversed_at IS NOT NULL AND reversed_by_admin_id = 9", c.ID); n != 1 {
+		t.Fatalf("reversed_* 要寫入：%d", n)
+	}
+}
+
+// 冪等的 Hide 讓後到的案件沿用先到案件的那一筆：撤銷後到的案件不能還原別案的隱藏（FailedPrecondition，內容仍隱藏），撤銷先到的案件才還原。
+// 殺死的變異：Restore 忽略 source_ref（B 的撤銷會還原 A 的隱藏）。
+func TestReverseOfALaterCaseDoesNotRestoreAnEarlierCasesHide(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	b, _ := f.newBuyer(t)
+	conv, ids := f.seedChat(t, b, storeID, 7, 0)
+	party := im.Party{Kind: im.PartyBuyer, BuyerID: b}
+	a := f.openChatCase(t, ids[7], buyerChatSnapshot(b, conv, 7))
+	mustV[CaseDetail](t)(f.decide(t, a, ActionHide, policy.Spam))
+	bc := f.openChatCase(t, ids[7], buyerChatSnapshot(b, conv, 7))
+	mustV[CaseDetail](t)(f.decide(t, bc, ActionHide, policy.Spam))
+
+	if _, err := f.reverse(bc.ID); kindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("後到案件的撤銷：%v", err)
+	}
+	if hidden, _ := f.hidden(t, party, conv, 7); !hidden {
+		t.Fatal("別案的隱藏不能被還原")
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND reversed_at IS NOT NULL", bc.ID); n != 0 {
+		t.Fatal("失敗的撤銷不能留下紀錄")
+	}
+	mustV[CaseDetail](t)(f.reverse(a.ID))
+	if hidden, _ := f.hidden(t, party, conv, 7); hidden {
+		t.Fatal("撤銷先到的案件要還原")
+	}
+}

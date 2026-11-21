@@ -21,10 +21,9 @@ import (
 // Cases 是案件的來源與處理者（*moderation.Module）。
 type Cases interface {
 	Cases(ctx context.Context, f moderation.CaseFilter, after *moderation.CaseCursor, size int32) (moderation.CasePage, error)
-	Case(ctx context.Context, id uuid.UUID) (moderation.CaseDetail, error)
+	CaseWithSnapshot(ctx context.Context, id uuid.UUID) (moderation.CaseDetail, *moderation.Snapshot, error)
 	DecideCase(ctx context.Context, in moderation.DecideInput) (moderation.CaseDetail, error)
 	ReverseHide(ctx context.Context, in moderation.ReverseInput) (moderation.CaseDetail, error)
-	CaseSnapshot(ctx context.Context, id uuid.UUID) (*moderation.Snapshot, error)
 }
 
 // Admin 實作 ModerationAdminService。授權（只有管理員、逐方法的權限）由 rpc 的 interceptor 與 adminauth 的宣告表檢查。
@@ -73,11 +72,7 @@ func (h *Admin) GetCase(ctx context.Context, req *connect.Request[adminpb.GetCas
 	if err != nil {
 		return nil, err
 	}
-	d, err := h.cases.Case(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	snap, err := h.cases.CaseSnapshot(ctx, id)
+	d, snap, err := h.cases.CaseWithSnapshot(ctx, id)
 	if err != nil {
 		return nil, err
 	}

@@ -125,6 +125,28 @@ func (q *Queries) GetPostSnapshot(ctx context.Context, id uuid.UUID) (GetPostSna
 	return i, err
 }
 
+const hasActiveCommentHide = `-- name: HasActiveCommentHide :one
+SELECT EXISTS (SELECT 1 FROM social.hides WHERE comment_id = $1 AND restored_at IS NULL)
+`
+
+func (q *Queries) HasActiveCommentHide(ctx context.Context, commentID *uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveCommentHide, commentID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const hasActiveForumEntryHide = `-- name: HasActiveForumEntryHide :one
+SELECT EXISTS (SELECT 1 FROM social.hides WHERE forum_entry_id = $1 AND restored_at IS NULL)
+`
+
+func (q *Queries) HasActiveForumEntryHide(ctx context.Context, forumEntryID *uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveForumEntryHide, forumEntryID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const insertCommentHide = `-- name: InsertCommentHide :one
 
 INSERT INTO social.hides (id, comment_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
@@ -390,7 +412,7 @@ func (q *Queries) ListSanctions(ctx context.Context, arg ListSanctionsParams) ([
 const restoreCommentHide = `-- name: RestoreCommentHide :one
 UPDATE social.hides
 SET restored_at = $1, restored_by = $2, restore_reason = $3
-WHERE comment_id = $4 AND restored_at IS NULL
+WHERE comment_id = $4 AND restored_at IS NULL AND ($5::text IS NULL OR source_ref = $5::text)
 RETURNING id, comment_id, forum_entry_id, reason_category, reason_text, source_ref, admin_id, hidden_at, restored_at, restored_by, restore_reason
 `
 
@@ -399,6 +421,7 @@ type RestoreCommentHideParams struct {
 	AdminID   *int64
 	Reason    *string
 	CommentID *uuid.UUID
+	SourceRef *string
 }
 
 // 還原留言目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
@@ -408,6 +431,7 @@ func (q *Queries) RestoreCommentHide(ctx context.Context, arg RestoreCommentHide
 		arg.AdminID,
 		arg.Reason,
 		arg.CommentID,
+		arg.SourceRef,
 	)
 	var i SocialHide
 	err := row.Scan(
@@ -429,7 +453,7 @@ func (q *Queries) RestoreCommentHide(ctx context.Context, arg RestoreCommentHide
 const restoreForumEntryHide = `-- name: RestoreForumEntryHide :one
 UPDATE social.hides
 SET restored_at = $1, restored_by = $2, restore_reason = $3
-WHERE forum_entry_id = $4 AND restored_at IS NULL
+WHERE forum_entry_id = $4 AND restored_at IS NULL AND ($5::text IS NULL OR source_ref = $5::text)
 RETURNING id, comment_id, forum_entry_id, reason_category, reason_text, source_ref, admin_id, hidden_at, restored_at, restored_by, restore_reason
 `
 
@@ -438,6 +462,7 @@ type RestoreForumEntryHideParams struct {
 	AdminID      *int64
 	Reason       *string
 	ForumEntryID *uuid.UUID
+	SourceRef    *string
 }
 
 func (q *Queries) RestoreForumEntryHide(ctx context.Context, arg RestoreForumEntryHideParams) (SocialHide, error) {
@@ -446,6 +471,7 @@ func (q *Queries) RestoreForumEntryHide(ctx context.Context, arg RestoreForumEnt
 		arg.AdminID,
 		arg.Reason,
 		arg.ForumEntryID,
+		arg.SourceRef,
 	)
 	var i SocialHide
 	err := row.Scan(

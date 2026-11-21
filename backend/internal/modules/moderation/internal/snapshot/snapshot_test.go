@@ -26,7 +26,7 @@ func TestEquivalentRepresentationsHashTheSame(t *testing.T) {
 		"頭尾空白":         comment("　第一行\n第二行 \t", "a", "b"),
 		"媒體參照重複":       comment("第一行\n第二行", "a", "b", "a"),
 		"舊式 CR 換行":     comment("第一行\r第二行", "b", "a"),
-		"NBSP 與全形空白包住": comment(" 第一行\n第二行　", "a", "b"),
+		"NBSP 與全形空白包住": comment(" 第一行\n第二行　", "a", "b"),
 	} {
 		if _, got := Encode(c); got != want {
 			t.Errorf("%s：雜湊應與正規形式相同", name)

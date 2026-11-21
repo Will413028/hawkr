@@ -206,8 +206,13 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			}
 			return err
 		}
-		row, err := q.RestoreHide(ctx, store.RestoreHideParams{MessageID: in.MessageID, AdminID: &in.AdminID, Reason: &in.Reason, Now: s.d.Now().UTC()})
+		row, err := q.RestoreHide(ctx, store.RestoreHideParams{MessageID: in.MessageID, AdminID: &in.AdminID, Reason: &in.Reason, Now: s.d.Now().UTC(), SourceRef: optional(in.SourceRef)})
 		if errors.Is(err, pgx.ErrNoRows) {
+			if active, aerr := q.HasActiveHide(ctx, in.MessageID); aerr != nil {
+				return aerr
+			} else if active {
+				return apperr.FailedPrecondition("%s", text.HideSourceMismatch())
+			}
 			return apperr.FailedPrecondition("%s", text.HideNotHidden())
 		}
 		if err != nil {

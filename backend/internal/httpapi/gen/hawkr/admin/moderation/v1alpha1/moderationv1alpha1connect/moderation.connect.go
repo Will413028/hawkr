@@ -65,7 +65,8 @@ type ModerationAdminServiceClient interface {
 	// 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
 	// ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
-	// 目前未還原的隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過或沒有未還原的隱藏回 FAILED_PRECONDITION。
+	// 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+	// 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
 	ReverseHide(context.Context, *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error)
 }
 
@@ -149,7 +150,8 @@ type ModerationAdminServiceHandler interface {
 	// 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
 	// ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
-	// 目前未還原的隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過或沒有未還原的隱藏回 FAILED_PRECONDITION。
+	// 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+	// 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
 	ReverseHide(context.Context, *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error)
 }
 

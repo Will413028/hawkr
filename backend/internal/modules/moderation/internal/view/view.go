@@ -118,6 +118,24 @@ func (r Reader) Snapshot(ctx context.Context, id uuid.UUID) (*snapshot.Content, 
 	return &c, nil
 }
 
+// CaseWithSnapshot 在同一個唯讀快照（InReadSnapshot）裡讀案件與它最近的快照，兩者來自同一個時間點（不會一個是結案前、一個是清除後）；
+// 案件不存在回 NotFound，沒有快照回 nil。ctx 不可已在 transaction 內。
+func (r Reader) CaseWithSnapshot(ctx context.Context, id uuid.UUID) (model.CaseDetail, *snapshot.Content, error) {
+	var (
+		d    model.CaseDetail
+		snap *snapshot.Content
+	)
+	err := r.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
+		var err error
+		if d, err = r.Case(ctx, id); err != nil {
+			return err
+		}
+		snap, err = r.Snapshot(ctx, id)
+		return err
+	})
+	return d, snap, err
+}
+
 // Cases 列案件（不含檢舉），開案時間新的在前（keyset，不回總數）。篩選的狀態或對象種類不是合法的值回 InvalidInput；size 依 pagination.PageSize。
 func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.CaseCursor, size int32) (model.CasePage, error) {
 	if f.State != "" && !slices.Contains(model.CaseStates(), f.State) {

@@ -418,9 +418,9 @@ func ValidateReverse(in model.ReverseInput) (model.ReverseInput, error) {
 	return in, nil
 }
 
-// Reverse 撤銷一個已結案的 HIDE 決定：案件維持結案、決定不改，撤銷記在案件上（reversed_*）；同 transaction 呼叫擁有內容的模組還原目前未還原的隱藏
-// （review、im、social 的 Restore），並寫後台動作紀錄。順序同 Decide：先讀案件（不鎖）、再呼叫擁有內容的模組（鎖內容列）、最後寫 moderation 自己的列。
-// 案件不存在回 NotFound；案件還在進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition；擁有者模組沒有未還原的隱藏時回它的 FailedPrecondition，什麼都不寫。
+// Reverse 撤銷一個已結案的 HIDE 決定：案件維持結案、決定不改，撤銷記在案件上（reversed_*）；同 transaction 呼叫擁有內容的模組還原這個案件造成的隱藏
+// （review、im、social 的 Restore，帶來源參照），並寫後台動作紀錄。順序同 Decide：先讀案件（不鎖）、再呼叫擁有內容的模組（鎖內容列）、最後寫 moderation 自己的列。
+// 案件不存在回 NotFound；案件還在進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition；擁有者模組沒有未還原的隱藏、或未還原的隱藏不是這個案件造成的（冪等隱藏沿用別案的那一筆）時回它的 FailedPrecondition，什麼都不寫；內容已被清除時照常記下撤銷。
 func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.CaseDetail, error) {
 	in, err := ValidateReverse(in)
 	if err != nil {
@@ -466,20 +466,25 @@ func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.Cas
 	return out, err
 }
 
-// restore 呼叫擁有內容的模組還原目前未還原的隱藏；不取擁有者的守門（同 hide）。
+// restore 呼叫擁有內容的模組還原這個案件造成的隱藏（帶來源參照 moderation:case:<id>，別的案件或別處造成的隱藏不動，回 FailedPrecondition）；不取擁有者的守門（同 hide）。
+// 內容已被清除或刪除（擁有者回 NotFound）時視為成功：內容本來就不可見，同 hide 的規則（設計 §1.3），撤銷仍照常記在案件上。
 func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInput) error {
+	ref := SourceRefPrefix + c.ID.String()
 	var err error
 	switch c.Target.Kind {
 	case model.TargetReview:
-		_, err = s.d.Review.Restore(ctx, review.RestoreInput{ReviewID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason})
+		_, err = s.d.Review.Restore(ctx, review.RestoreInput{ReviewID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason, SourceRef: ref})
 	case model.TargetChatMessage:
-		_, err = s.d.IM.Restore(ctx, im.RestoreInput{MessageID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason})
+		_, err = s.d.IM.Restore(ctx, im.RestoreInput{MessageID: c.Target.ContentID, AdminID: in.Actor.AdminID, Reason: in.Reason, SourceRef: ref})
 	case model.TargetComment, model.TargetForumEntry:
 		_, err = s.d.Social.Restore(ctx, social.RestoreInput{
-			Target: social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID}, AdminID: in.Actor.AdminID, Reason: in.Reason,
+			Target: social.Target{Kind: social.TargetKind(c.Target.Kind), ID: c.Target.ContentID}, AdminID: in.Actor.AdminID, Reason: in.Reason, SourceRef: ref,
 		})
 	case model.TargetPost, model.TargetBuyer:
 		return apperr.FailedPrecondition("%s", text.ReverseNotHide())
+	}
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return nil
 	}
 	return err
 }

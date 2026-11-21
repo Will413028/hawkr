@@ -12,6 +12,18 @@ import (
 	"uuid"
 )
 
+const hasActiveHide = `-- name: HasActiveHide :one
+SELECT EXISTS (SELECT 1 FROM review.hides WHERE review_id = $1 AND restored_at IS NULL)
+`
+
+// 訊息或評價目前有沒有未還原的隱藏；還原沒有列時用來分辨「沒有隱藏」與「隱藏來源不符」。
+func (q *Queries) HasActiveHide(ctx context.Context, reviewID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveHide, reviewID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const insertHide = `-- name: InsertHide :one
 
 INSERT INTO review.hides (id, review_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
@@ -62,15 +74,16 @@ func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ReviewH
 const restoreHide = `-- name: RestoreHide :one
 UPDATE review.hides
 SET restored_at = GREATEST($1::timestamptz, hidden_at), restored_by = $2, restore_reason = $3
-WHERE review_id = $4 AND restored_at IS NULL
+WHERE review_id = $4 AND restored_at IS NULL AND ($5::text IS NULL OR source_ref = $5::text)
 RETURNING id, review_id, reason_category, reason_text, source_ref, admin_id, hidden_at, restored_at, restored_by, restore_reason
 `
 
 type RestoreHideParams struct {
-	Now      time.Time
-	AdminID  *int64
-	Reason   *string
-	ReviewID uuid.UUID
+	Now       time.Time
+	AdminID   *int64
+	Reason    *string
+	ReviewID  uuid.UUID
+	SourceRef *string
 }
 
 // 還原評價目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
@@ -80,6 +93,7 @@ func (q *Queries) RestoreHide(ctx context.Context, arg RestoreHideParams) (Revie
 		arg.AdminID,
 		arg.Reason,
 		arg.ReviewID,
+		arg.SourceRef,
 	)
 	var i ReviewHide
 	err := row.Scan(

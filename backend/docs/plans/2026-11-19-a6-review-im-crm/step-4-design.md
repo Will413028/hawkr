@@ -124,7 +124,7 @@
 | REVIEW | 買家 | `review.Hide`；評價已清除→成功、不寫 | `social.Warn`（買家處分的唯一擁有者，`handle.go:208-213`） | `accountsuspension.Suspend` | 不會發生（評價只有買家寫） |
 | CHAT_MESSAGE | 買家或店家（§0.4.1 第 2 點：買家單方檢舉下只會是店家） | 買家作者：`im.Hide` | 買家作者：`social.Warn` | 買家作者：同上 | §W2 |
 
-還原：只對「這個案件的處置是 HIDE」的案件；呼叫對象模組的 `Restore`，還原的是「目前未還原的那一筆」（同一則內容的隱藏是冪等的，可能由先前案件建立）。還原和寫 moderation 的還原紀錄在同一個 transaction，鎖序 review／im → moderation。
+還原：只對「這個案件的處置是 HIDE」的案件；呼叫對象模組的 `Restore`，帶來源參照 `moderation:case:<案件 id>`，只還原來源相同的未還原隱藏（同一則內容的隱藏是冪等的，後到案件沿用先到案件那一筆，撤銷後到的案件不能還原別案的隱藏，回 FailedPrecondition）；內容已被清除或刪除（擁有者回 NotFound）時同 Hide 視為成功，撤銷仍記在案件上。還原和寫 moderation 的還原紀錄在同一個 transaction，鎖序 review／im → moderation。
 
 ## 3. 快照形狀
 

@@ -254,6 +254,11 @@ func (m *Module) Case(ctx context.Context, id uuid.UUID) (CaseDetail, error) {
 	return m.view.Case(ctx, id)
 }
 
+// CaseWithSnapshot 同一個唯讀快照裡讀案件（含檢舉）與最近一份凍結的內容快照（沒有回 nil）；後台 `GetCase` 用，兩者不會來自不同時間點。案件不存在回 NotFound。
+func (m *Module) CaseWithSnapshot(ctx context.Context, id uuid.UUID) (CaseDetail, *Snapshot, error) {
+	return m.view.CaseWithSnapshot(ctx, id)
+}
+
 // Cases 列案件（不含檢舉），開案時間新的在前（keyset）：state 篩進行中或已結案、target kind 篩對象種類，空值是不篩，不合法的值回 InvalidInput。
 func (m *Module) Cases(ctx context.Context, f CaseFilter, after *CaseCursor, size int32) (CasePage, error) {
 	return m.view.Cases(ctx, f, after, size)

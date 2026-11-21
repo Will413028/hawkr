@@ -53,10 +53,10 @@ func (f *fakeCases) Cases(_ context.Context, fl moderation.CaseFilter, after *mo
 	return f.page, f.err
 }
 
-func (f *fakeCases) Case(_ context.Context, id uuid.UUID) (moderation.CaseDetail, error) {
-	f.called("Case")
+func (f *fakeCases) CaseWithSnapshot(_ context.Context, id uuid.UUID) (moderation.CaseDetail, *moderation.Snapshot, error) {
+	f.called("CaseWithSnapshot")
 	f.gotID = id
-	return f.detail, f.err
+	return f.detail, f.snapshot, f.err
 }
 
 func (f *fakeCases) DecideCase(_ context.Context, in moderation.DecideInput) (moderation.CaseDetail, error) {
@@ -69,12 +69,6 @@ func (f *fakeCases) ReverseHide(_ context.Context, in moderation.ReverseInput) (
 	f.called("ReverseHide")
 	f.reversed = append(f.reversed, in)
 	return f.detail, f.err
-}
-
-func (f *fakeCases) CaseSnapshot(_ context.Context, id uuid.UUID) (*moderation.Snapshot, error) {
-	f.called("CaseSnapshot")
-	f.gotID = id
-	return f.snapshot, nil
 }
 
 func newAdminEnv(t *testing.T, f *fakeCases) moderationv1alpha1connect.ModerationAdminServiceClient {
@@ -331,7 +325,7 @@ func TestEveryMethodRequiresItsPermission(t *testing.T) {
 			t.Errorf("%s OWNER：err = %v", name, err)
 		}
 	}
-	if f.calls["Cases"] != 1 || f.calls["Case"] != 1 || f.calls["DecideCase"] != 1 || f.calls["ReverseHide"] != 1 {
+	if f.calls["Cases"] != 1 || f.calls["CaseWithSnapshot"] != 1 || f.calls["DecideCase"] != 1 || f.calls["ReverseHide"] != 1 {
 		t.Fatalf("OWNER 通過後每個方法恰好到模組一次：%v", f.calls)
 	}
 }
