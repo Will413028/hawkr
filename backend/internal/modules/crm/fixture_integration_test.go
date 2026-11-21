@@ -3,7 +3,9 @@
 package crm_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -84,6 +86,37 @@ func (q *queue) count(kind string) int {
 	return n
 }
 
+// logSink 收 crm 的 log（JSON 一行一筆），測試用 levels 看層級。
+type logSink struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (l *logSink) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+func (l *logSink) levels() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []string
+	for _, line := range bytes.Split(l.buf.Bytes(), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var r struct {
+			Level string `json:"level"`
+		}
+		if err := json.Unmarshal(line, &r); err != nil {
+			panic(err)
+		}
+		out = append(out, r.Level)
+	}
+	return out
+}
+
 type fixture struct {
 	t     *testing.T
 	db    *db.DB
@@ -91,6 +124,7 @@ type fixture struct {
 	q     *queue
 	owner *buyer.Module
 	bus   *events.Bus
+	logs  *logSink
 }
 
 // 預設的角色：店 storeA..storeC（10..12）與買家 100..199 在 setup 明確建立；其他 ID 的測試自己 seedBuyers／seedStores。
@@ -148,10 +182,11 @@ func setup(t *testing.T) *fixture {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, now), Events: bus, Jobs: q, Now: now, Logger: log})})
 	seedStores(t, d, storeA, storeC)
 	seedBuyers(t, d, buyer1, buyer1+99)
-	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: sl, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	logs := &logSink{}
+	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: sl, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewJSONHandler(logs, nil))})
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
-	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus}
+	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus, logs: logs}
 }
 
 func (f *fixture) exec(sql string, args ...any) {

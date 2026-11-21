@@ -97,12 +97,21 @@ func (s *Service) RecordRefund(ctx context.Context, r model.Refund) (bool, error
 }
 
 // skipInactive 把守門的 NotFound（買家已關閉、店家已退場，或 ID 從未存在）當成「這筆事件不寫」：提交空的 transaction、不重試；
-// 其他錯誤原樣回傳（fail-closed）。不存在只可能是上游的壞資料（買家與店家列關閉、退場後仍保留），所以記 error log 讓它看得見。
-func (s *Service) skipInactive(ctx context.Context, err error, party string, id int64, orderNo string) error {
+// 其他錯誤原樣回傳（fail-closed）。只在 NotFound 這條路徑多讀一次 pub 函式分辨原因（正常路徑沒有額外讀取）：已關閉、已退場是正常的重放，
+// 記 info；不存在只可能是上游的壞資料（買家與店家列關閉、退場後仍保留），記 error 讓它看得見。分辨用的查詢失敗時記 error（帶該錯誤）並照樣略過，不讓事件失敗。
+func (s *Service) skipInactive(ctx context.Context, err error, party string, id int64, orderNo string, inactive func(ctx context.Context, id int64) ([]int64, error)) error {
 	if apperr.KindOf(err) != apperr.KindNotFound {
 		return err
 	}
-	s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"已停用或不存在，略過", "party_id", id, "order_no", orderNo, "error", err)
+	rows, qerr := inactive(ctx, id)
+	switch {
+	case qerr != nil:
+		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"守門回 NotFound，分辨已停用或不存在的查詢失敗，略過", "party_id", id, "order_no", orderNo, "error", qerr)
+	case len(rows) > 0:
+		s.d.Logger.InfoContext(ctx, "crm：投影事件的"+party+"已停用，略過", "party_id", id, "order_no", orderNo)
+	default:
+		s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"不存在，略過", "party_id", id, "order_no", orderNo, "error", err)
+	}
 	return nil
 }
 
@@ -115,10 +124,10 @@ func (s *Service) record(ctx context.Context, dedupKey, orderNo string, storeID,
 		// FOR UPDATE 要等這個 transaction 提交，所以抹除 job 看不到之後才提交的投影；已關閉或已退場時事件不寫任何東西。
 		// 守門鎖在 crm 自己的列（order_nets、customers）之前取，lockorder 檢查器機械驗證順序。
 		if err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {
-			return s.skipInactive(ctx, err, "買家", buyerID, orderNo)
+			return s.skipInactive(ctx, err, "買家", buyerID, orderNo, q.ClosedBuyerIDs)
 		}
 		if err := s.d.Stores.LockNotRetired(ctx, storeID); err != nil {
-			return s.skipInactive(ctx, err, "店家", storeID, orderNo)
+			return s.skipInactive(ctx, err, "店家", storeID, orderNo, q.RetiredStoreIDs)
 		}
 		now := s.d.Now().UTC()
 		old, err := q.LockOrderNet(ctx, store.LockOrderNetParams{OrderNo: orderNo, StoreID: storeID, BuyerID: buyerID, Now: now})

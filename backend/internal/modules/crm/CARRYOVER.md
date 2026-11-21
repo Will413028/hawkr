@@ -61,6 +61,6 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 | 標籤與客戶寫入只讀複本、不取鎖 | 寫入要與轉移串行 | 缺口，已補：`TestTagWriteInFlightAcrossStoreRetirementLeavesNothing`（先以測試 commit 重現，再修）；`requireActiveStore`、`IsStoreInactive` 刪除，守門的 NotFound 對應 `tagNotFound`／客戶 NotFound |
 | 抹除 job、保底掃描 | 抹除形狀在 crm 自己 | 成立，保留；`Deactivate` 改名 `EnqueueErase`（只排 job），掃描改 `UNION ALL` 讀兩個 pub，保留 `(kind, party_id)` keyset |
 | 投影端的守門 | ordering 搬遷時投影退場 | 過渡程式；退場點與 `step-3-design.md` §0 一致 |
-| 投影遇到不存在的買家或店家（W1 (a)） | 買家、店家列關閉與退場後仍保留，不存在只可能是壞資料 | 行為變更：原本照寫，改後跳過並記 error log（不重試） |
+| 投影遇到不存在的買家或店家（W1 (a′)） | 買家、店家列關閉與退場後仍保留，不存在只可能是壞資料 | 行為變更：原本照寫，改後跳過（不重試）；守門回 NotFound 時才多讀一次 `pub_closed_buyers()`／`pub_retired_stores()` 分辨：已關閉、已退場記 info，不存在記 error；分辨查詢失敗記 error 並照樣跳過（Will 2026-11-21 修訂） |
 
 觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `crm.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。

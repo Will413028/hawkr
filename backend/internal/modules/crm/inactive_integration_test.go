@@ -244,3 +244,48 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 		}
 	}
 }
+
+// 守門回 NotFound 時事件一律略過（不寫、不重試）；log 層級分辨原因：已關閉、已退場是 info，從未存在是 error。
+func TestProjectionSkipLogLevel(t *testing.T) {
+	t.Parallel()
+	const missingBuyer, missingStore = int64(900), int64(901)
+	cases := []struct {
+		name  string
+		setup func(f *fixture)
+		store int64
+		buyer int64
+		want  string
+	}{
+		{"closed buyer", func(f *fixture) { f.markInactive("BUYER", buyer1) }, storeA, buyer1, "INFO"},
+		{"missing buyer", func(*fixture) {}, storeA, missingBuyer, "ERROR"},
+		{"retired store", func(f *fixture) { f.markInactive("STORE", storeB) }, storeB, buyer1, "INFO"},
+		{"missing store", func(*fixture) {}, missingStore, buyer1, "ERROR"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			f := setup(t)
+			c.setup(f)
+			recorded, err := f.order("evt-1", "O1", c.store, c.buyer, 100)
+			if err != nil || recorded {
+				t.Fatalf("recorded=%v err=%v，預期略過", recorded, err)
+			}
+			for _, tbl := range []string{"crm.customers", "crm.order_nets", "crm.ledger"} {
+				if n := f.scalar("SELECT count(*) FROM " + tbl); n != 0 {
+					t.Fatalf("%s 有 %d 列，預期不寫任何東西", tbl, n)
+				}
+			}
+			if got := f.logs.levels(); len(got) != 1 || got[0] != c.want {
+				t.Fatalf("log 層級 %v，預期只有 [%s]", got, c.want)
+			}
+		})
+	}
+	t.Run("normal path logs nothing", func(t *testing.T) {
+		t.Parallel()
+		f := setup(t)
+		f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+		if got := f.logs.levels(); len(got) != 0 {
+			t.Fatalf("正常路徑記了 log：%v", got)
+		}
+	})
+}

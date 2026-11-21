@@ -485,14 +485,14 @@ social 的 34 檔不動（`rg -l -i "$P" social | wc -l`＝34【量，簡報】�
 |---|---|
 | review 的 `AuthorInactive`、im 的 G4 `s.inactive`：tx 外的提早檢查 | 保留，必要條件是「被擋的請求不做 Finalize 轉正圖片」；tx 內的守門才是正確性保證，提早檢查只省成本 |
 | crm 刪 `requireActiveStore`，錯誤對應改由守門的 NotFound | 行為不變：對外仍是 `tagNotFound`／客戶 NotFound，§8.2 的寫入被擋測試斷言錯誤碼 |
-| crm 投影遇到不存在的買家或店家（W1） | 行為變更：原本照寫，改後跳過並記 error log；依 W1 拍板 |
+| crm 投影遇到不存在的買家或店家（W1） | 行為變更：原本照寫，改後跳過（不重試）；NotFound 時查 pub 分辨，已關閉／已退場記 info、不存在記 error；依 W1 (a′) 拍板 |
 | 店家退場靠 `RetireDueStores` 的 `SKIP LOCKED` 跳過被守門鎖住的店 | 接受跳過；熱門店家可能連續多輪被跳過。觸發條件：店家 `retired_at` 落後於排定時點超過 1 小時（4 輪），改為該店在下一輪不用 `SKIP LOCKED`、等待取鎖；門檻是推測 |
 | `P/jobs` 的 sweep helper 與 `SweepInterval` 常數 | 依 W6 拍板 |
 | W3 選 (a) 時會改到 social 使用的 `LockActive`／`LockBuyerShared` 鎖強度 | §0.2 的「social 不動」指 social 的複本與對帳；W3 (a) 時 social 的整組 unit＋integration 要重跑 |
 
 ## 10. 待決題
 
-### W1 守門對「不存在」的處理：crm 重放到不存在的買家或店家——已決（Will 2026-11-21，A6-D20）：(a)
+### W1 守門對「不存在」的處理：crm 重放到不存在的買家或店家——已決（Will 2026-11-21，A6-D20）：(a)；修訂（Will 2026-11-21）：(a′) 只在 NotFound 時查 pub 分辨，已關閉／已退場記 info，不存在記 error
 
 `LockNotClosed`、`LockNotRetired` 對已關閉與不存在都回 NotFound（比照 `LockActive`）。crm 的投影現況：不在複本的買家 ID 一律當營運中，照寫（`project.go:97-102`）。換成守門後，從未存在的 ID 會被當成「已停用」。
 

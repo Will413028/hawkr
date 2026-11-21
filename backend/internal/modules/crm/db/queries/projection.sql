@@ -34,3 +34,11 @@ SET total_spent = crm.customers.total_spent + EXCLUDED.total_spent,
 UPDATE crm.customers
 SET total_spent = total_spent + sqlc.arg(delta), updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND buyer_id = sqlc.arg(buyer_id);
+
+-- name: ClosedBuyerIDs :many
+-- 守門回 NotFound 之後才呼叫（只在略過路徑）：回傳這個買家的列，有列表示已關閉，沒有表示從未存在。
+SELECT cb.buyer_id FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = $1::bigint;
+
+-- name: RetiredStoreIDs :many
+-- 守門回 NotFound 之後才呼叫（只在略過路徑）：回傳這個店家的列，有列表示已退場，沒有表示從未存在。
+SELECT rs.store_id FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = $1::bigint;
