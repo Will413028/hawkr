@@ -780,23 +780,18 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 const markApprovalSucceeded = `-- name: MarkApprovalSucceeded :execrows
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = $1
-WHERE id = $2 AND version = $3 AND buyer_id = $4 AND state = 'EXECUTING'
+WHERE id = $2 AND version = $3 AND state = 'EXECUTING'
 `
 
 type MarkApprovalSucceededParams struct {
 	Now     time.Time
 	ID      uuid.UUID
 	Version int32
-	BuyerID *int64
 }
 
+// 不帶 buyer_id：(id, version, state) 已是 CAS，擁有者在 ClaimApprovalForExecute 驗過；BuyerDeleted 把 buyer_id 設 NULL 後仍要能收尾。
 func (q *Queries) MarkApprovalSucceeded(ctx context.Context, arg MarkApprovalSucceededParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markApprovalSucceeded,
-		arg.Now,
-		arg.ID,
-		arg.Version,
-		arg.BuyerID,
-	)
+	result, err := q.db.Exec(ctx, markApprovalSucceeded, arg.Now, arg.ID, arg.Version)
 	if err != nil {
 		return 0, err
 	}

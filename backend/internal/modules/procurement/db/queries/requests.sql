@@ -11,15 +11,18 @@ SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id;
 UPDATE procurement.requests SET status = @status, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND status = @from_status;
 
--- name: InsertRevision :exec
+-- name: InsertRevision :execrows
+-- 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
 INSERT INTO procurement.request_revisions (
     id, request_id, revision_no, parent_revision_id, status,
     item, item_resolution_kind, item_resolution_label, quantity, unit, packaging,
     budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at)
-VALUES (
-    @id, @request_id, @revision_no, @parent_revision_id, 'ACTIVE',
+SELECT
+    @id, r.id, @revision_no, @parent_revision_id, 'ACTIVE',
     @item, @item_resolution_kind, @item_resolution_label, @quantity, @unit, @packaging,
-    @budget_per_unit, @delivery_city, @delivery_date, @exact_match_required, @now);
+    @budget_per_unit, @delivery_city, @delivery_date, @exact_match_required, @now
+FROM procurement.requests r
+WHERE r.id = @request_id AND r.buyer_id = @buyer_id;
 
 -- name: SupersedeActiveRevision :execrows
 -- 新版本寫入前先把現行版本轉成 SUPERSEDED（partial unique 擋雙頭）。
@@ -36,8 +39,12 @@ SELECT * FROM procurement.request_revisions v WHERE v.id = @id AND v.request_id 
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: NextRevisionNo :one
-SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions v WHERE v.request_id = @request_id
-  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
+-- 從需求出發：需求不屬於 buyer_id（或不存在）時沒有列（ErrNoRows），不會被聚合函數補成一列。
+SELECT (COALESCE(MAX(v.revision_no), 0) + 1)::int AS next_no
+FROM procurement.requests r
+LEFT JOIN procurement.request_revisions v ON v.request_id = r.id
+WHERE r.id = @request_id AND r.buyer_id = @buyer_id
+GROUP BY r.id;
 
 -- name: ListRevisions :many
 SELECT * FROM procurement.request_revisions v WHERE v.request_id = @request_id

@@ -197,20 +197,21 @@ func (q *Queries) InsertRequest(ctx context.Context, arg InsertRequestParams) er
 	return err
 }
 
-const insertRevision = `-- name: InsertRevision :exec
+const insertRevision = `-- name: InsertRevision :execrows
 INSERT INTO procurement.request_revisions (
     id, request_id, revision_no, parent_revision_id, status,
     item, item_resolution_kind, item_resolution_label, quantity, unit, packaging,
     budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at)
-VALUES (
-    $1, $2, $3, $4, 'ACTIVE',
-    $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15)
+SELECT
+    $1, r.id, $2, $3, 'ACTIVE',
+    $4, $5, $6, $7, $8, $9,
+    $10, $11, $12, $13, $14
+FROM procurement.requests r
+WHERE r.id = $15 AND r.buyer_id = $16
 `
 
 type InsertRevisionParams struct {
 	ID                  uuid.UUID
-	RequestID           uuid.UUID
 	RevisionNo          int32
 	ParentRevisionID    *uuid.UUID
 	Item                *string
@@ -224,12 +225,14 @@ type InsertRevisionParams struct {
 	DeliveryDate        *time.Time
 	ExactMatchRequired  *bool
 	Now                 time.Time
+	RequestID           uuid.UUID
+	BuyerID             *int64
 }
 
-func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) error {
-	_, err := q.db.Exec(ctx, insertRevision,
+// 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
+func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertRevision,
 		arg.ID,
-		arg.RequestID,
 		arg.RevisionNo,
 		arg.ParentRevisionID,
 		arg.Item,
@@ -243,8 +246,13 @@ func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) 
 		arg.DeliveryDate,
 		arg.ExactMatchRequired,
 		arg.Now,
+		arg.RequestID,
+		arg.BuyerID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const insertTurn = `-- name: InsertTurn :execrows
@@ -427,8 +435,11 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 }
 
 const nextRevisionNo = `-- name: NextRevisionNo :one
-SELECT (COALESCE(MAX(revision_no), 0) + 1)::int AS next_no FROM procurement.request_revisions v WHERE v.request_id = $1
-  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
+SELECT (COALESCE(MAX(v.revision_no), 0) + 1)::int AS next_no
+FROM procurement.requests r
+LEFT JOIN procurement.request_revisions v ON v.request_id = r.id
+WHERE r.id = $1 AND r.buyer_id = $2
+GROUP BY r.id
 `
 
 type NextRevisionNoParams struct {
@@ -436,6 +447,7 @@ type NextRevisionNoParams struct {
 	BuyerID   *int64
 }
 
+// 從需求出發：需求不屬於 buyer_id（或不存在）時沒有列（ErrNoRows），不會被聚合函數補成一列。
 func (q *Queries) NextRevisionNo(ctx context.Context, arg NextRevisionNoParams) (int32, error) {
 	row := q.db.QueryRow(ctx, nextRevisionNo, arg.RequestID, arg.BuyerID)
 	var next_no int32

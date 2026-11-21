@@ -48,9 +48,10 @@ WHERE id = @id AND version = @version AND buyer_id = @buyer_id AND state = 'PEND
 RETURNING *;
 
 -- name: MarkApprovalSucceeded :execrows
+-- 不帶 buyer_id：(id, version, state) 已是 CAS，擁有者在 ClaimApprovalForExecute 驗過；BuyerDeleted 把 buyer_id 設 NULL 後仍要能收尾。
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = @now
-WHERE id = @id AND version = @version AND buyer_id = @buyer_id AND state = 'EXECUTING';
+WHERE id = @id AND version = @version AND state = 'EXECUTING';
 
 -- name: InsertApprovalRecipient :exec
 INSERT INTO procurement.rfq_publication_approval_recipients (approval_id, position, store_id)

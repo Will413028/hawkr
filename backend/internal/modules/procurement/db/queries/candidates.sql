@@ -8,7 +8,7 @@ ON CONFLICT (request_revision_id, client_request_id) DO NOTHING;
 SELECT * FROM procurement.candidate_sets WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
 
 -- name: GetCandidateSetByClientRequest :one
-SELECT * FROM procurement.candidate_sets WHERE request_revision_id = @request_revision_id AND client_request_id = @client_request_id;
+SELECT * FROM procurement.candidate_sets WHERE request_revision_id = @request_revision_id AND client_request_id = @client_request_id AND buyer_id = @buyer_id;
 
 -- name: InsertCandidate :exec
 -- 沒有店名欄位（S9）；呼叫端只給 OPEN 的店。

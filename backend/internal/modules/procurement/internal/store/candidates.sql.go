@@ -13,16 +13,17 @@ import (
 )
 
 const getCandidateSetByClientRequest = `-- name: GetCandidateSetByClientRequest :one
-SELECT id, request_id, request_revision_id, buyer_id, client_request_id, created_at FROM procurement.candidate_sets WHERE request_revision_id = $1 AND client_request_id = $2
+SELECT id, request_id, request_revision_id, buyer_id, client_request_id, created_at FROM procurement.candidate_sets WHERE request_revision_id = $1 AND client_request_id = $2 AND buyer_id = $3
 `
 
 type GetCandidateSetByClientRequestParams struct {
 	RequestRevisionID uuid.UUID
 	ClientRequestID   uuid.UUID
+	BuyerID           int64
 }
 
 func (q *Queries) GetCandidateSetByClientRequest(ctx context.Context, arg GetCandidateSetByClientRequestParams) (ProcurementCandidateSet, error) {
-	row := q.db.QueryRow(ctx, getCandidateSetByClientRequest, arg.RequestRevisionID, arg.ClientRequestID)
+	row := q.db.QueryRow(ctx, getCandidateSetByClientRequest, arg.RequestRevisionID, arg.ClientRequestID, arg.BuyerID)
 	var i ProcurementCandidateSet
 	err := row.Scan(
 		&i.ID,
