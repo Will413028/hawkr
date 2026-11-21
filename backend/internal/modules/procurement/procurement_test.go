@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/riverqueue/river"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -77,4 +80,24 @@ func TestNewRejectsMissingRequiredDeps(t *testing.T) {
 		}()
 	}
 	procurement.New(testDeps())
+}
+
+func registered[T river.JobArgs](w *river.Workers) bool {
+	return river.AddWorkerSafely(w, river.WorkFunc(func(context.Context, *river.Job[T]) error { return nil })) != nil
+}
+
+// 漏登記執行 run 的 worker，送出的 run 永遠停在 QUEUED；漏了 reconciler 或清除，死掉的 run 與過期事件沒有人收。
+func TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers(t *testing.T) {
+	m := procurement.New(procurement.Deps{DB: &db.DB{}, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	w := river.NewWorkers()
+	m.AddWorkers(w)
+	if !registered[run.RunArgs](w) {
+		t.Error("沒有登記執行 run 的 worker（procurement.run）")
+	}
+	if !registered[run.ReconcileArgs](w) {
+		t.Error("沒有登記 reconciler")
+	}
+	if !registered[run.PurgeArgs](w) {
+		t.Error("沒有登記事件清除")
+	}
 }

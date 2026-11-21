@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,10 +28,13 @@ type Executor interface {
 const RunTimeoutLimit = 2 * time.Minute
 
 // Dispatcher 是 RunArgs 的 worker：領走 QUEUED 的 run、執行，失敗時標 FAILED 並退回額度，取消時收斂到 CANCELLED。
+//
+// Executors 依 run 類型登記執行者；沒有登記執行者的類型當成該類型的 pipeline 失敗收斂（記 log），不會留在 RUNNING 等 reconciler。
 type Dispatcher struct {
-	DB       *db.DB
-	Ledger   Ledger
-	Executor Executor
+	DB        *db.DB
+	Ledger    Ledger
+	Executors map[string]Executor
+	Logger    *slog.Logger
 }
 
 type runWorker struct {
@@ -53,7 +57,12 @@ func (d Dispatcher) Run(ctx context.Context, args RunArgs) error {
 	if claimed, err := claimResult(err); err != nil || !claimed {
 		return err
 	}
-	execErr := d.Executor.Execute(ctx, run)
+	executor, ok := d.Executors[run.RunType]
+	if !ok {
+		d.logger().ErrorContext(ctx, "procurement：這個 run 類型沒有登記執行者，標為失敗", "run_id", run.ID.String(), "run_type", run.RunType)
+		return d.settleFailure(context.WithoutCancel(ctx), run, nil)
+	}
+	execErr := executor.Execute(ctx, run)
 	if execErr == nil || errors.Is(execErr, ErrRunTerminal) {
 		return nil
 	}
@@ -105,8 +114,15 @@ func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgen
 }
 
 func failureFor(runType string) string {
-	if runType == runTypeCandidateSearch {
+	if runType == RunTypeCandidateSearch {
 		return FailureSearchFailed
 	}
 	return FailureTurnPipelineErr
+}
+
+func (d Dispatcher) logger() *slog.Logger {
+	if d.Logger == nil {
+		return slog.Default()
+	}
+	return d.Logger
 }

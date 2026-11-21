@@ -12,6 +12,30 @@ import (
 	"uuid"
 )
 
+const countBuyerActiveRuns = `-- name: CountBuyerActiveRuns :one
+SELECT count(*) FROM procurement.agent_runs
+WHERE buyer_id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+`
+
+func (q *Queries) CountBuyerActiveRuns(ctx context.Context, buyerID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countBuyerActiveRuns, buyerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countRequestActiveRuns = `-- name: CountRequestActiveRuns :one
+SELECT count(*) FROM procurement.agent_runs
+WHERE request_id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+`
+
+func (q *Queries) CountRequestActiveRuns(ctx context.Context, requestID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countRequestActiveRuns, requestID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const expireRunEvents = `-- name: ExpireRunEvents :one
 WITH due AS (
     SELECT id FROM procurement.agent_runs
@@ -53,6 +77,115 @@ func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams
 	return i, err
 }
 
+const getInterruptForBuyer = `-- name: GetInterruptForBuyer :one
+SELECT i.id, i.run_id, i.interrupt_kind, i.status, i.payload, i.facts_as_of, i.resolved_by_child_run_id, i.created_at, i.resolved_at FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.id = $1 AND r.buyer_id = $2
+`
+
+type GetInterruptForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID int64
+}
+
+func (q *Queries) GetInterruptForBuyer(ctx context.Context, arg GetInterruptForBuyerParams) (ProcurementAgentRunInterrupt, error) {
+	row := q.db.QueryRow(ctx, getInterruptForBuyer, arg.ID, arg.BuyerID)
+	var i ProcurementAgentRunInterrupt
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.InterruptKind,
+		&i.Status,
+		&i.Payload,
+		&i.FactsAsOf,
+		&i.ResolvedByChildRunID,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const getInterruptResolvedBy = `-- name: GetInterruptResolvedBy :one
+SELECT id, run_id, interrupt_kind, status, payload, facts_as_of, resolved_by_child_run_id, created_at, resolved_at FROM procurement.agent_run_interrupts WHERE resolved_by_child_run_id = $1
+`
+
+func (q *Queries) GetInterruptResolvedBy(ctx context.Context, childRunID *uuid.UUID) (ProcurementAgentRunInterrupt, error) {
+	row := q.db.QueryRow(ctx, getInterruptResolvedBy, childRunID)
+	var i ProcurementAgentRunInterrupt
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.InterruptKind,
+		&i.Status,
+		&i.Payload,
+		&i.FactsAsOf,
+		&i.ResolvedByChildRunID,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const getOpenInterruptForRequest = `-- name: GetOpenInterruptForRequest :one
+SELECT i.id, i.run_id, i.interrupt_kind, i.status, i.payload, i.facts_as_of, i.resolved_by_child_run_id, i.created_at, i.resolved_at FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE r.request_id = $1 AND r.buyer_id = $2 AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING'
+ORDER BY i.created_at DESC
+LIMIT 1
+`
+
+type GetOpenInterruptForRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 一個需求目前等買家回答的中斷（同一需求同時只有一個等待中的 run）。
+func (q *Queries) GetOpenInterruptForRequest(ctx context.Context, arg GetOpenInterruptForRequestParams) (ProcurementAgentRunInterrupt, error) {
+	row := q.db.QueryRow(ctx, getOpenInterruptForRequest, arg.RequestID, arg.BuyerID)
+	var i ProcurementAgentRunInterrupt
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.InterruptKind,
+		&i.Status,
+		&i.Payload,
+		&i.FactsAsOf,
+		&i.ResolvedByChildRunID,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const getOpenInterruptForRun = `-- name: GetOpenInterruptForRun :one
+SELECT i.id, i.run_id, i.interrupt_kind, i.status, i.payload, i.facts_as_of, i.resolved_by_child_run_id, i.created_at, i.resolved_at FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.run_id = $1 AND r.buyer_id = $2 AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING'
+`
+
+type GetOpenInterruptForRunParams struct {
+	RunID   uuid.UUID
+	BuyerID int64
+}
+
+// 一個 run 的未回答中斷：只認等待輸入的 run；被取消或被取代的 run 的 interrupt 不算。
+func (q *Queries) GetOpenInterruptForRun(ctx context.Context, arg GetOpenInterruptForRunParams) (ProcurementAgentRunInterrupt, error) {
+	row := q.db.QueryRow(ctx, getOpenInterruptForRun, arg.RunID, arg.BuyerID)
+	var i ProcurementAgentRunInterrupt
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.InterruptKind,
+		&i.Status,
+		&i.Payload,
+		&i.FactsAsOf,
+		&i.ResolvedByChildRunID,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
 const getRun = `-- name: GetRun :one
 SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1
 `
@@ -81,32 +214,6 @@ func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getRunArtifact = `-- name: GetRunArtifact :one
-SELECT run_id, artifact_type, version, status, data, checksum, as_of, created_at, updated_at FROM procurement.agent_run_artifacts WHERE run_id = $1 AND artifact_type = $2
-`
-
-type GetRunArtifactParams struct {
-	RunID        uuid.UUID
-	ArtifactType string
-}
-
-func (q *Queries) GetRunArtifact(ctx context.Context, arg GetRunArtifactParams) (ProcurementAgentRunArtifact, error) {
-	row := q.db.QueryRow(ctx, getRunArtifact, arg.RunID, arg.ArtifactType)
-	var i ProcurementAgentRunArtifact
-	err := row.Scan(
-		&i.RunID,
-		&i.ArtifactType,
-		&i.Version,
-		&i.Status,
-		&i.Data,
-		&i.Checksum,
-		&i.AsOf,
-		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -148,6 +255,30 @@ func (q *Queries) GetRunByIdempotencyKey(ctx context.Context, arg GetRunByIdempo
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertInterrupt = `-- name: InsertInterrupt :exec
+INSERT INTO procurement.agent_run_interrupts (id, run_id, interrupt_kind, status, payload, facts_as_of, created_at)
+VALUES ($1, $2, 'CLARIFICATION', 'PENDING', $3, $4, $5)
+`
+
+type InsertInterruptParams struct {
+	ID        uuid.UUID
+	RunID     uuid.UUID
+	Payload   []byte
+	FactsAsOf *time.Time
+	Now       time.Time
+}
+
+func (q *Queries) InsertInterrupt(ctx context.Context, arg InsertInterruptParams) error {
+	_, err := q.db.Exec(ctx, insertInterrupt,
+		arg.ID,
+		arg.RunID,
+		arg.Payload,
+		arg.FactsAsOf,
+		arg.Now,
+	)
+	return err
 }
 
 const insertRunEvent = `-- name: InsertRunEvent :exec
@@ -283,6 +414,16 @@ func (q *Queries) LockActiveRun(ctx context.Context, id uuid.UUID) (ProcurementA
 	return i, err
 }
 
+const lockBuyerSubmits = `-- name: LockBuyerSubmits :exec
+SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || $1, 0))
+`
+
+// 同一位買家的送出在這裡排隊（交易級 advisory lock），之後的進行中數與每分鐘送出數才看得到前一個交易已提交的 run。
+func (q *Queries) LockBuyerSubmits(ctx context.Context, buyerIdpgCatalogint8 string) error {
+	_, err := q.db.Exec(ctx, lockBuyerSubmits, buyerIdpgCatalogint8)
+	return err
+}
+
 const lockRun = `-- name: LockRun :one
 SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 FOR UPDATE
 `
@@ -380,6 +521,120 @@ func (q *Queries) NotifyRun(ctx context.Context, runID string) error {
 	return err
 }
 
+const oldestBuyerRunsSince = `-- name: OldestBuyerRunsSince :many
+SELECT created_at FROM procurement.agent_runs
+WHERE buyer_id = $1 AND created_at > $2::timestamptz
+ORDER BY created_at DESC
+LIMIT $3::int
+`
+
+type OldestBuyerRunsSinceParams struct {
+	BuyerID int64
+	Since   time.Time
+	MaxRows int32
+}
+
+// 買家在 @since 之後建立的 run 的時間，新的在前，最多 @max_rows 筆；每分鐘送出上限用它判斷並算出要等多久。
+func (q *Queries) OldestBuyerRunsSince(ctx context.Context, arg OldestBuyerRunsSinceParams) ([]time.Time, error) {
+	rows, err := q.db.Query(ctx, oldestBuyerRunsSince, arg.BuyerID, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []time.Time{}
+	for rows.Next() {
+		var created_at time.Time
+		if err := rows.Scan(&created_at); err != nil {
+			return nil, err
+		}
+		items = append(items, created_at)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reopenInterruptOfChild = `-- name: ReopenInterruptOfChild :one
+UPDATE procurement.agent_run_interrupts
+SET status = 'PENDING', resolved_by_child_run_id = NULL, resolved_at = NULL
+WHERE resolved_by_child_run_id = $1
+RETURNING run_id
+`
+
+// 子 run 失敗：被它回答的 interrupt 回到 PENDING，回傳它屬於哪個 run。
+func (q *Queries) ReopenInterruptOfChild(ctx context.Context, childRunID *uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, reopenInterruptOfChild, childRunID)
+	var run_id uuid.UUID
+	err := row.Scan(&run_id)
+	return run_id, err
+}
+
+const reopenResumedRun = `-- name: ReopenResumedRun :execrows
+UPDATE procurement.agent_runs
+SET status = 'WAITING_FOR_INPUT', resumed_into_run_id = NULL, completed_at = NULL, updated_at = $1
+WHERE id = $2 AND status = 'RESUMED' AND resumed_into_run_id = $3
+`
+
+type ReopenResumedRunParams struct {
+	Now        time.Time
+	ID         uuid.UUID
+	ChildRunID *uuid.UUID
+}
+
+// 子 run 失敗時把父 run 退回等待輸入：只有仍被這個子 run 接手的 RESUMED 父 run 才動。
+func (q *Queries) ReopenResumedRun(ctx context.Context, arg ReopenResumedRunParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reopenResumedRun, arg.Now, arg.ID, arg.ChildRunID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const resolveInterrupt = `-- name: ResolveInterrupt :execrows
+UPDATE procurement.agent_run_interrupts
+SET status = 'RESOLVED', resolved_by_child_run_id = $1, resolved_at = $2
+WHERE id = $3 AND run_id = $4 AND status = 'PENDING'
+`
+
+type ResolveInterruptParams struct {
+	ChildRunID *uuid.UUID
+	Now        *time.Time
+	ID         uuid.UUID
+	RunID      uuid.UUID
+}
+
+func (q *Queries) ResolveInterrupt(ctx context.Context, arg ResolveInterruptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, resolveInterrupt,
+		arg.ChildRunID,
+		arg.Now,
+		arg.ID,
+		arg.RunID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setResumedInto = `-- name: SetResumedInto :execrows
+UPDATE procurement.agent_runs SET resumed_into_run_id = $1 WHERE id = $2 AND status = 'RESUMED'
+`
+
+type SetResumedIntoParams struct {
+	ChildRunID *uuid.UUID
+	ID         uuid.UUID
+}
+
+// 父 run 轉 RESUMED 之後記下接手的子 run。
+func (q *Queries) SetResumedInto(ctx context.Context, arg SetResumedIntoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setResumedInto, arg.ChildRunID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setRunJob = `-- name: SetRunJob :exec
 UPDATE procurement.agent_runs SET job_id = $1 WHERE id = $2
 `
@@ -449,39 +704,4 @@ func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (P
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const upsertRunArtifact = `-- name: UpsertRunArtifact :one
-INSERT INTO procurement.agent_run_artifacts (run_id, artifact_type, version, status, data, checksum, as_of, created_at, updated_at)
-VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $7)
-ON CONFLICT (run_id, artifact_type) DO UPDATE
-SET version = procurement.agent_run_artifacts.version + 1, status = EXCLUDED.status, data = EXCLUDED.data,
-    checksum = EXCLUDED.checksum, as_of = EXCLUDED.as_of, updated_at = EXCLUDED.updated_at
-RETURNING version
-`
-
-type UpsertRunArtifactParams struct {
-	RunID        uuid.UUID
-	ArtifactType string
-	Status       string
-	Data         []byte
-	Checksum     string
-	AsOf         time.Time
-	Now          time.Time
-}
-
-// 每個 (run_id, artifact_type) 一列就地更新（A9-D20 R3）；version 遞增，當 ARTIFACT_UPSERTED 的去重序號。
-func (q *Queries) UpsertRunArtifact(ctx context.Context, arg UpsertRunArtifactParams) (int32, error) {
-	row := q.db.QueryRow(ctx, upsertRunArtifact,
-		arg.RunID,
-		arg.ArtifactType,
-		arg.Status,
-		arg.Data,
-		arg.Checksum,
-		arg.AsOf,
-		arg.Now,
-	)
-	var version int32
-	err := row.Scan(&version)
-	return version, err
 }

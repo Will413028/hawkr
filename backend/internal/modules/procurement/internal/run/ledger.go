@@ -21,6 +21,7 @@ import (
 const (
 	EventRunAccepted = "run_accepted"
 	EventFinished    = "finished"
+	EventTurnResult  = "turn_result"
 )
 
 // Run 的失敗原因（與 schema 的 CHECK 相同）。
@@ -28,11 +29,20 @@ const (
 	FailureWorkerLost       = "WORKER_LOST"
 	FailureSearchFailed     = "SEARCH_FAILED"
 	FailureTurnPipelineErr  = "TURN_PIPELINE_ERROR"
-	runTypeCandidateSearch  = "CANDIDATE_SEARCH"
 	notifyChannel           = "procurement_run"
 	protoStatusPrefix       = "RUN_STATUS_"
 	protoFailureReasonPrefx = "RUN_FAILURE_REASON_"
 )
+
+// Run 的類型（與 schema 的 CHECK 相同）。只有 TURN 扣額度。
+const (
+	RunTypeTurn            = "TURN"
+	RunTypeCandidateSearch = "CANDIDATE_SEARCH"
+	RunTypeResume          = "CLARIFICATION_RESUME"
+)
+
+// ChargesQuota 回報這個類型的 run 是否扣額度（A9-D24）：候選搜尋與回答中斷的子 run 不扣。
+func ChargesQuota(runType string) bool { return runType == RunTypeTurn }
 
 // IsTerminalEvent 回報事件類型是否是串流的結尾。
 func IsTerminalEvent(eventType string) bool {
@@ -135,6 +145,11 @@ func (l Ledger) Transition(ctx context.Context, runID uuid.UUID, to, failureReas
 			return fmt.Errorf("run：轉換狀態：%w", err)
 		}
 		out = r
+		if to == StatusFailed && r.ParentRunID != nil {
+			if err := reopenParent(ctx, q, r, l.Now()); err != nil {
+				return err
+			}
+		}
 		if !terminal {
 			return nil
 		}
@@ -183,13 +198,18 @@ func finishedPayload(status, failureReason string) ([]byte, error) {
 	return json.Marshal(map[string]any{EventFinished: body})
 }
 
-// UpsertArtifact 就地更新 (run, artifact_type) 的產出並回傳新的 version（ARTIFACT_UPSERTED 的去重序號）。
-func (l Ledger) UpsertArtifact(ctx context.Context, runID uuid.UUID, artifactType, status string, data []byte, checksum string, asOf time.Time) (int32, error) {
-	v, err := store.New(l.DB.Conn(ctx)).UpsertRunArtifact(ctx, store.UpsertRunArtifactParams{
-		RunID: runID, ArtifactType: artifactType, Status: status, Data: data, Checksum: checksum, AsOf: asOf, Now: l.Now(),
-	})
-	if err != nil {
-		return 0, fmt.Errorf("run：寫入產出：%w", err)
+// reopenParent 在回答中斷的子 run 失敗時，同一個 transaction 把中斷重新開放、父 run 退回 WAITING_FOR_INPUT，買家可以再回答一次。
+// 父 run 的串流已在 RESUMED 時以 finished 結尾，這裡不再寫事件；client 看子 run 的串流收到 FAILED 後改讀快照。
+func reopenParent(ctx context.Context, q *store.Queries, child store.ProcurementAgentRun, now time.Time) error {
+	if _, err := q.ReopenInterruptOfChild(ctx, &child.ID); err != nil {
+		return fmt.Errorf("run：重新開放中斷：%w", err)
 	}
-	return v, nil
+	n, err := q.ReopenResumedRun(ctx, store.ReopenResumedRunParams{ID: *child.ParentRunID, ChildRunID: &child.ID, Now: now})
+	if err != nil {
+		return fmt.Errorf("run：父 run 退回等待輸入：%w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("run：子 run %s 的父 run 不是它接手的 RESUMED run", child.ID)
+	}
+	return nil
 }

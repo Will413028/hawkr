@@ -28,23 +28,11 @@ type ProcurementAgentRun struct {
 	MinAvailableSeq  int64
 	ClientRequestID  uuid.UUID
 	JobID            *int64
-	QuotaPeriodStart time.Time
+	QuotaPeriodStart *time.Time
 	CreatedAt        time.Time
 	StartedAt        *time.Time
 	CompletedAt      *time.Time
 	UpdatedAt        time.Time
-}
-
-type ProcurementAgentRunArtifact struct {
-	RunID        uuid.UUID
-	ArtifactType string
-	Version      int32
-	Status       string
-	Data         []byte
-	Checksum     string
-	AsOf         time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
 }
 
 type ProcurementAgentRunEvent struct {

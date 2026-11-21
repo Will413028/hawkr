@@ -37,6 +37,10 @@ func newDB(t *testing.T) *db.DB {
 	return pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "procurement", Dir: procurement.Migrations()}))
 }
 
+func turnOnly(e run.Executor) map[string]run.Executor {
+	return map[string]run.Executor{run.RunTypeTurn: e}
+}
+
 func discard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func ledger(d *db.DB, at time.Time) run.Ledger {
@@ -115,9 +119,8 @@ func TestConcurrentSubmitsNeverExceedTheQuota(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)
 	jobs := &recordingJobs{}
-	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: jobs}
+	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: jobs, Limits: run.Limits{MaxActiveRuns: 100, MaxSubmitsPerMinute: 100}}
 	const buyer, limit, attempts = int64(1), int32(3), 12
-	req := seedRequest(ctx, t, d, buyer)
 
 	var wg sync.WaitGroup
 	var ok, exhausted atomic.Int32
@@ -125,7 +128,7 @@ func TestConcurrentSubmitsNeverExceedTheQuota(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.Submit(ctx, input(buyer, req, limit))
+			_, err := s.Submit(ctx, input(buyer, seedRequest(ctx, t, d, buyer), limit))
 			switch reason, kind := reasonOf(err); {
 			case err == nil:
 				ok.Add(1)
@@ -207,7 +210,7 @@ func TestExecutorFailureFailsTheRunAndRefundsTheQuota(t *testing.T) {
 		t.Fatal(err)
 	}
 	args := run.RunArgs{RunID: id}
-	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: failingExecutor{}}
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executors: turnOnly(failingExecutor{})}
 	if err := disp.Run(ctx, args); err != nil {
 		t.Fatal(err)
 	}
@@ -435,32 +438,6 @@ func TestSubscriptionsShareOneListenConnection(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatalf("第 %d 條訂閱沒有被喚醒", i)
 		}
-	}
-}
-
-func TestArtifactUpsertUpdatesInPlace(t *testing.T) {
-	ctx := context.Background()
-	d := newDB(t)
-	req := seedRequest(ctx, t, d, 1)
-	id := finishedRun(ctx, t, d, req, 1, now, 0)
-	l := ledger(d, now)
-	v1, err := l.UpsertArtifact(ctx, id, "CANDIDATES", "READY", []byte(`{"n":1}`), "c1", now)
-	if err != nil || v1 != 1 {
-		t.Fatalf("第一次 version = %d, %v", v1, err)
-	}
-	v2, err := l.UpsertArtifact(ctx, id, "CANDIDATES", "READY", []byte(`{"n":2}`), "c2", now)
-	if err != nil || v2 != 2 {
-		t.Fatalf("第二次 version = %d, %v", v2, err)
-	}
-	if _, err := l.UpsertArtifact(ctx, id, "OTHER", "READY", []byte(`{}`), "c3", now); err != nil {
-		t.Fatal(err)
-	}
-	if n := count(ctx, t, d, `SELECT count(*) FROM procurement.agent_run_artifacts WHERE run_id = $1`, id); n != 2 {
-		t.Fatalf("每個 (run, type) 一列，實際 %d 列", n)
-	}
-	a, err := store.New(d.Conn(ctx)).GetRunArtifact(ctx, store.GetRunArtifactParams{RunID: id, ArtifactType: "CANDIDATES"})
-	if err != nil || a.Version != 2 || a.Checksum != "c2" || string(a.Data) != `{"n": 2}` {
-		t.Fatalf("要就地更新成第二版：%+v %v", a, err)
 	}
 }
 

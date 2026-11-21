@@ -406,7 +406,7 @@ func TestExecutorStoppedByCancellationEndsCancelledWithoutRefund(t *testing.T) {
 	jobs := &recordingJobs{}
 	id := submitOne(ctx, t, d, jobs, 1)
 	l := ledger(d, now)
-	disp := run.Dispatcher{DB: d, Ledger: l, Executor: cancellingExecutor{c: run.Canceller{DB: d, Ledger: l, Jobs: jobs}, id: id}}
+	disp := run.Dispatcher{DB: d, Ledger: l, Executors: turnOnly(cancellingExecutor{c: run.Canceller{DB: d, Ledger: l, Jobs: jobs}, id: id})}
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +430,7 @@ func TestExecutorThatReturnsWithoutSettlingIsFailedByTheReconcilerWithRefund(t *
 	d := newDB(t)
 	jobs := &recordingJobs{}
 	id := submitOne(ctx, t, d, jobs, 1)
-	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(context.Context, store.ProcurementAgentRun) error { return nil })}
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executors: turnOnly(funcExecutor(func(context.Context, store.ProcurementAgentRun) error { return nil }))}
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatal(err)
 	}
@@ -453,13 +453,13 @@ func TestExecutorStoppingOnATerminalRunChangesNothing(t *testing.T) {
 	d := newDB(t)
 	id := submitOne(ctx, t, d, &recordingJobs{}, 1)
 	l := ledger(d, now)
-	disp := run.Dispatcher{DB: d, Ledger: l, Executor: funcExecutor(func(ctx context.Context, r store.ProcurementAgentRun) error {
+	disp := run.Dispatcher{DB: d, Ledger: l, Executors: turnOnly(funcExecutor(func(ctx context.Context, r store.ProcurementAgentRun) error {
 		if _, err := l.Transition(ctx, r.ID, run.StatusFailed, run.FailureWorkerLost); err != nil {
 			return err
 		}
 		_, err := l.Append(ctx, r.ID, "text", []byte(`{"text":{"text":"late"}}`))
 		return err
-	})}
+	}))}
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatalf("executor 收到 ErrRunTerminal 就是正常結束：%v", err)
 	}
@@ -480,7 +480,7 @@ func TestDispatcherDoesNotRunACancelRequestedRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	ran := false
-	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(context.Context, store.ProcurementAgentRun) error { ran = true; return nil })}
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executors: turnOnly(funcExecutor(func(context.Context, store.ProcurementAgentRun) error { ran = true; return nil }))}
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil || ran {
 		t.Fatalf("已要求取消的 run 不得被領走：%v ran=%v", err, ran)
 	}
@@ -549,7 +549,7 @@ func TestSubmitCancelsTheWaitingRunOfTheSameConversationOnly(t *testing.T) {
 	other := seedConversation(ctx, t, d, 1, seedRequest(ctx, t, d, 1))
 	waiting := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusWaitingForInput)
 	elsewhere := seedConversationRun(ctx, t, d, req, 1, other, run.StatusWaitingForInput)
-	running := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusRunning)
+	running := seedConversationRun(ctx, t, d, seedRequest(ctx, t, d, 1), 1, conv, run.StatusRunning)
 	in := input(1, req, 5)
 	in.ConversationID = &conv
 	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{}}
@@ -592,10 +592,10 @@ func TestShutdownOrTimeoutOfTheJobContextFailsTheRunAsWorkerLostWithRefund(t *te
 	d := newDB(t)
 	id := submitOne(ctx, t, d, &recordingJobs{}, 1)
 	jobCtx, stop := context.WithCancel(ctx)
-	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(c context.Context, _ store.ProcurementAgentRun) error {
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executors: turnOnly(funcExecutor(func(c context.Context, _ store.ProcurementAgentRun) error {
 		stop()
 		return c.Err()
-	})}
+	}))}
 	if err := disp.Run(jobCtx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatal(err)
 	}
@@ -608,19 +608,19 @@ func TestShutdownOrTimeoutOfTheJobContextFailsTheRunAsWorkerLostWithRefund(t *te
 func TestDispatcherSkipsARunDeletedBeforeOrDuringExecution(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)
-	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(context.Context, store.ProcurementAgentRun) error { return errors.New("不該執行") })}
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executors: turnOnly(funcExecutor(func(context.Context, store.ProcurementAgentRun) error { return errors.New("不該執行") }))}
 	if err := disp.Run(ctx, run.RunArgs{RunID: uuid.NewV7()}); err != nil {
 		t.Fatalf("run 已被刪除（BuyerDeleted）job 不該報錯：%v", err)
 	}
 	id := submitOne(ctx, t, d, &recordingJobs{}, 1)
 	l := ledger(d, now)
-	disp.Executor = funcExecutor(func(ctx context.Context, r store.ProcurementAgentRun) error {
+	disp.Executors = turnOnly(funcExecutor(func(ctx context.Context, r store.ProcurementAgentRun) error {
 		if _, err := d.Pool().Exec(ctx, `DELETE FROM procurement.agent_runs WHERE id = $1`, r.ID); err != nil {
 			return err
 		}
 		_, err := l.Append(ctx, r.ID, "text", []byte(`{}`))
 		return err
-	})
+	}))
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
 		t.Fatalf("執行中被刪除也不該讓 job 報錯：%v", err)
 	}

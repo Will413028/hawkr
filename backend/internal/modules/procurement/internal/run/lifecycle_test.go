@@ -168,7 +168,7 @@ func TestDecideMapsRunAndJobStatesAsTheLifecycleDecisionSays(t *testing.T) {
 			t.Errorf("decide(%s, job 不存在) = %+v，要 %+v", status, got, w)
 		}
 	}
-	search := store.ProcurementAgentRun{Status: StatusRunning, RunType: runTypeCandidateSearch}
+	search := store.ProcurementAgentRun{Status: StatusRunning, RunType: RunTypeCandidateSearch}
 	if got := decide(search, rivertype.JobStateCompleted, true); got.reason != FailureSearchFailed || !got.refund {
 		t.Errorf("候選搜尋的執行者違約要 SEARCH_FAILED 並退額度：%+v", got)
 	}
@@ -266,8 +266,8 @@ func TestSettleOutcomeDistinguishesBuyerCancelShutdownAndPipelineFailure(t *test
 		{"買家取消", StatusCancelRequested, "TURN", context.Canceled, outcome{action: actionCancel}},
 		{"買家取消且 ctx 沒取消", StatusCancelRequested, "TURN", nil, outcome{action: actionCancel}},
 		{"關機", StatusRunning, "TURN", context.Canceled, lost},
-		{"逾時", StatusRunning, runTypeCandidateSearch, context.DeadlineExceeded, lost},
-		{"一般失敗：搜尋", StatusRunning, runTypeCandidateSearch, nil, outcome{action: actionFail, reason: FailureSearchFailed, refund: true}},
+		{"逾時", StatusRunning, RunTypeCandidateSearch, context.DeadlineExceeded, lost},
+		{"一般失敗：搜尋", StatusRunning, RunTypeCandidateSearch, nil, outcome{action: actionFail, reason: FailureSearchFailed, refund: true}},
 		{"一般失敗：輪次", StatusRunning, "TURN", nil, outcome{action: actionFail, reason: FailureTurnPipelineErr, refund: true}},
 	}
 	for _, c := range cases {
@@ -344,5 +344,24 @@ func TestAWaitingRunCanBeCancelledButNeverFailedOrExpired(t *testing.T) {
 	}
 	if _, known := edges["EXPIRED"]; known {
 		t.Fatal("EXPIRED 已刪除，沒有寫入者")
+	}
+}
+
+func TestOnlyTurnRunsChargeQuota(t *testing.T) {
+	for runType, want := range map[string]bool{RunTypeTurn: true, RunTypeCandidateSearch: false, RunTypeResume: false, "PUBLICATION": false} {
+		if got := ChargesQuota(runType); got != want {
+			t.Errorf("ChargesQuota(%s) = %v，要 %v", runType, got, want)
+		}
+	}
+}
+
+func TestLimitsDefaultToTwoInProgressAndTenPerMinute(t *testing.T) {
+	var l Limits
+	if l.active() != 2 || l.perMinute() != 10 {
+		t.Fatalf("預設 %d、%d", l.active(), l.perMinute())
+	}
+	l = Limits{MaxActiveRuns: 5, MaxSubmitsPerMinute: 7}
+	if l.active() != 5 || l.perMinute() != 7 {
+		t.Fatalf("設定值 %d、%d", l.active(), l.perMinute())
 	}
 }

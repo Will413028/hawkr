@@ -412,7 +412,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acce
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
 
--- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
+-- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用；只有 TURN 扣額度，其餘 run 類型為 NULL，退款只在非 NULL 時做）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。
 CREATE TABLE procurement.agent_runs (
     id UUID PRIMARY KEY,
@@ -431,7 +431,7 @@ CREATE TABLE procurement.agent_runs (
     min_available_seq BIGINT NOT NULL DEFAULT 1,
     client_request_id UUID NOT NULL,
     job_id BIGINT,
-    quota_period_start TIMESTAMPTZ NOT NULL,
+    quota_period_start TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
@@ -445,6 +445,8 @@ CREATE TABLE procurement.agent_runs (
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);
 CREATE INDEX agent_runs_request ON procurement.agent_runs (request_id, created_at DESC);
 CREATE INDEX agent_runs_unfinished ON procurement.agent_runs (id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
+CREATE INDEX agent_runs_buyer_created ON procurement.agent_runs (buyer_id, created_at DESC);
+CREATE INDEX agent_runs_buyer_active ON procurement.agent_runs (buyer_id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WHERE completed_at IS NOT NULL AND min_available_seq <= last_event_seq;
 
 -- run 的輸入（買家原文，具名文字欄）。沒有 retention_class（只有一個字面值、沒有讀取者）。
@@ -469,23 +471,7 @@ CREATE TABLE procurement.agent_run_events (
     CONSTRAINT agent_run_events_payload_check CHECK (jsonb_typeof(payload) = 'object')
 );
 
--- run 的產出：每個 (run_id, artifact_type) 一列就地更新（A9-D20 R3）；version 只當 ARTIFACT_UPSERTED 的去重序號。
-CREATE TABLE procurement.agent_run_artifacts (
-    run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
-    artifact_type TEXT NOT NULL,
-    version INT NOT NULL,
-    status TEXT NOT NULL,
-    data JSONB NOT NULL,
-    checksum TEXT NOT NULL,
-    as_of TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (run_id, artifact_type),
-    CONSTRAINT agent_run_artifacts_version_check CHECK (version >= 1),
-    CONSTRAINT agent_run_artifacts_data_check CHECK (jsonb_typeof(data) = 'object')
-);
-
--- run 停下來等買家回答的中斷。interrupt_kind 只有 CLARIFICATION 一值；不設到期，下一輪送出即取代（A9-D20 R2）。
+-- run 停下來等買家回答的中斷。interrupt_kind 只有 CLARIFICATION 一值；不設到期，下一輪送出即取代（A9-D20 R2）。RESOLVED 只表示被子 run 回答（resolved_by_child_run_id 必填）；run 被取消或被取代時 interrupt 維持 PENDING，讀取只認狀態為 WAITING_FOR_INPUT 的 run 的 PENDING interrupt。子 run 失敗時 interrupt 回到 PENDING。
 CREATE TABLE procurement.agent_run_interrupts (
     id UUID PRIMARY KEY,
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
@@ -498,9 +484,12 @@ CREATE TABLE procurement.agent_run_interrupts (
     resolved_at TIMESTAMPTZ,
     CONSTRAINT agent_run_interrupts_kind_check CHECK (interrupt_kind IN ('CLARIFICATION')),
     CONSTRAINT agent_run_interrupts_status_check CHECK (status IN ('PENDING', 'RESOLVED')),
-    CONSTRAINT agent_run_interrupts_payload_check CHECK (jsonb_typeof(payload) = 'object')
+    CONSTRAINT agent_run_interrupts_payload_check CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT agent_run_interrupts_resolved_check CHECK ((status = 'RESOLVED') = (resolved_by_child_run_id IS NOT NULL AND resolved_at IS NOT NULL) AND (status = 'PENDING') = (resolved_by_child_run_id IS NULL AND resolved_at IS NULL))
 );
 CREATE INDEX agent_run_interrupts_run ON procurement.agent_run_interrupts (run_id);
+CREATE UNIQUE INDEX agent_run_interrupts_pending ON procurement.agent_run_interrupts (run_id) WHERE status = 'PENDING';
+CREATE UNIQUE INDEX agent_run_interrupts_child ON procurement.agent_run_interrupts (resolved_by_child_run_id) WHERE resolved_by_child_run_id IS NOT NULL;
 
 -- 買家每期的送出次數：一列計數器加條件 UPDATE（A9-D9），沒有預約表。
 CREATE TABLE procurement.usage (

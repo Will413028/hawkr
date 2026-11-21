@@ -82,17 +82,72 @@ WITH due AS (
 )
 SELECT (SELECT count(*) FROM advanced)::bigint AS runs, (SELECT count(*) FROM deleted)::bigint AS events;
 
--- name: UpsertRunArtifact :one
--- 每個 (run_id, artifact_type) 一列就地更新（A9-D20 R3）；version 遞增，當 ARTIFACT_UPSERTED 的去重序號。
-INSERT INTO procurement.agent_run_artifacts (run_id, artifact_type, version, status, data, checksum, as_of, created_at, updated_at)
-VALUES (@run_id, @artifact_type, 1, @status, @data, @checksum, @as_of, @now, @now)
-ON CONFLICT (run_id, artifact_type) DO UPDATE
-SET version = procurement.agent_run_artifacts.version + 1, status = EXCLUDED.status, data = EXCLUDED.data,
-    checksum = EXCLUDED.checksum, as_of = EXCLUDED.as_of, updated_at = EXCLUDED.updated_at
-RETURNING version;
-
--- name: GetRunArtifact :one
-SELECT * FROM procurement.agent_run_artifacts WHERE run_id = @run_id AND artifact_type = @artifact_type;
-
 -- name: GetRunByIdempotencyKey :one
 SELECT * FROM procurement.agent_runs WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
+
+-- name: LockBuyerSubmits :exec
+-- 同一位買家的送出在這裡排隊（交易級 advisory lock），之後的進行中數與每分鐘送出數才看得到前一個交易已提交的 run。
+SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || @buyer_id::bigint::text, 0));
+
+-- name: CountBuyerActiveRuns :one
+SELECT count(*) FROM procurement.agent_runs
+WHERE buyer_id = @buyer_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
+
+-- name: CountRequestActiveRuns :one
+SELECT count(*) FROM procurement.agent_runs
+WHERE request_id = @request_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
+
+-- name: InsertInterrupt :exec
+INSERT INTO procurement.agent_run_interrupts (id, run_id, interrupt_kind, status, payload, facts_as_of, created_at)
+VALUES (@id, @run_id, 'CLARIFICATION', 'PENDING', @payload, sqlc.narg('facts_as_of'), @now);
+
+-- name: GetOpenInterruptForRun :one
+-- 一個 run 的未回答中斷：只認等待輸入的 run；被取消或被取代的 run 的 interrupt 不算。
+SELECT i.* FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.run_id = @run_id AND r.buyer_id = @buyer_id AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING';
+
+-- name: GetOpenInterruptForRequest :one
+-- 一個需求目前等買家回答的中斷（同一需求同時只有一個等待中的 run）。
+SELECT i.* FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE r.request_id = @request_id AND r.buyer_id = @buyer_id AND r.status = 'WAITING_FOR_INPUT' AND i.status = 'PENDING'
+ORDER BY i.created_at DESC
+LIMIT 1;
+
+-- name: ResolveInterrupt :execrows
+UPDATE procurement.agent_run_interrupts
+SET status = 'RESOLVED', resolved_by_child_run_id = @child_run_id, resolved_at = @now
+WHERE id = @id AND run_id = @run_id AND status = 'PENDING';
+
+-- name: ReopenInterruptOfChild :one
+-- 子 run 失敗：被它回答的 interrupt 回到 PENDING，回傳它屬於哪個 run。
+UPDATE procurement.agent_run_interrupts
+SET status = 'PENDING', resolved_by_child_run_id = NULL, resolved_at = NULL
+WHERE resolved_by_child_run_id = @child_run_id
+RETURNING run_id;
+
+-- name: SetResumedInto :execrows
+-- 父 run 轉 RESUMED 之後記下接手的子 run。
+UPDATE procurement.agent_runs SET resumed_into_run_id = @child_run_id WHERE id = @id AND status = 'RESUMED';
+
+-- name: GetInterruptForBuyer :one
+SELECT i.* FROM procurement.agent_run_interrupts i
+JOIN procurement.agent_runs r ON r.id = i.run_id
+WHERE i.id = @id AND r.buyer_id = @buyer_id;
+
+-- name: GetInterruptResolvedBy :one
+SELECT * FROM procurement.agent_run_interrupts WHERE resolved_by_child_run_id = @child_run_id;
+
+-- name: OldestBuyerRunsSince :many
+-- 買家在 @since 之後建立的 run 的時間，新的在前，最多 @max_rows 筆；每分鐘送出上限用它判斷並算出要等多久。
+SELECT created_at FROM procurement.agent_runs
+WHERE buyer_id = @buyer_id AND created_at > @since::timestamptz
+ORDER BY created_at DESC
+LIMIT @max_rows::int;
+
+-- name: ReopenResumedRun :execrows
+-- 子 run 失敗時把父 run 退回等待輸入：只有仍被這個子 run 接手的 RESUMED 父 run 才動。
+UPDATE procurement.agent_runs
+SET status = 'WAITING_FOR_INPUT', resumed_into_run_id = NULL, completed_at = NULL, updated_at = @now
+WHERE id = @id AND status = 'RESUMED' AND resumed_into_run_id = @child_run_id;

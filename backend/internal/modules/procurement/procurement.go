@@ -51,13 +51,29 @@ type Deps struct {
 	Logger *slog.Logger
 	// Sellers 是候選搜尋確認店家營業中的 seller 方法；A9-3b 掛上候選搜尋時才有呼叫者。
 	Sellers SellerStores
+	// Jobs 排入與取消 run 的 River job（*jobs.Client 滿足它）；送出與取消路徑需要，只跑 worker 的程序可以不給。
+	Jobs JobQueue
+	// Executors 依 run 類型登記執行者（run.RunTypeTurn 等）；沒有登記的類型，worker 領到時把 run 標為該類型的 pipeline 失敗。
+	Executors map[string]Executor
+	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
+	Limits run.Limits
 }
+
+// JobQueue 是 run 需要的 River 操作。
+type JobQueue = run.JobQueue
+
+// Executor 執行一個被領走的 run（契約見 run.Executor）。
+type Executor = run.Executor
 
 // Module 是 procurement 模組。
 type Module struct {
 	retention  *retention.Service
 	reconciler run.Reconciler
 	purger     run.Purger
+	dispatcher run.Dispatcher
+	submitter  run.Submitter
+	canceller  run.Canceller
+	hub        *run.Hub
 }
 
 // New 建立模組。
@@ -72,14 +88,24 @@ func New(d Deps) *Module {
 	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
 	return &Module{
+		dispatcher: run.Dispatcher{DB: d.DB, Ledger: ledger, Executors: d.Executors, Logger: d.Logger},
+		submitter:  run.Submitter{DB: d.DB, Ledger: ledger, Jobs: d.Jobs, Limits: d.Limits},
+		canceller:  run.Canceller{DB: d.DB, Ledger: ledger, Jobs: d.Jobs},
+		hub:        run.NewHub(d.DB, run.MaxSubscriptions, d.Logger),
 		retention:  retention.New(d.DB),
 		reconciler: run.Reconciler{DB: d.DB, Ledger: ledger, Logger: d.Logger},
 		purger:     run.Purger{DB: d.DB, Ledger: ledger},
 	}
 }
 
-// AddWorkers 登記 run 的 reconciler 與事件清除的 River worker。
-func (m *Module) AddWorkers(workers *river.Workers) { run.AddWorkers(workers, m.reconciler, m.purger) }
+// AddWorkers 登記執行 run 的 worker、reconciler 與事件清除的 River worker。
+func (m *Module) AddWorkers(workers *river.Workers) {
+	m.dispatcher.AddWorker(workers)
+	run.AddWorkers(workers, m.reconciler, m.purger)
+}
+
+// RunHub 維持 WatchRun 共用的 LISTEN 連線直到 ctx 結束（回傳 ctx.Err()）；serve 程序啟動時另開 goroutine 跑它。
+func (m *Module) RunHub(ctx context.Context) error { return m.hub.Run(ctx) }
 
 // PeriodicJobs 回傳 reconciler 與事件清除的排程。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob { return run.PeriodicJobs() }

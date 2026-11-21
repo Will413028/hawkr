@@ -114,8 +114,8 @@ func (q *Queries) GetUsage(ctx context.Context, arg GetUsageParams) (int32, erro
 }
 
 const insertRun = `-- name: InsertRun :execrows
-INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, 'QUEUED', $6, $7, $8, $8)
+INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, parent_run_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, 'QUEUED', $7, $8, $9, $9)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
@@ -124,19 +124,21 @@ type InsertRunParams struct {
 	BuyerID          int64
 	RequestID        uuid.UUID
 	ConversationID   *uuid.UUID
+	ParentRunID      *uuid.UUID
 	RunType          string
 	ClientRequestID  uuid.UUID
-	QuotaPeriodStart time.Time
+	QuotaPeriodStart *time.Time
 	Now              time.Time
 }
 
-// 建 run 的方法的冪等鍵放在 run 上（S4）；同一位買家的同一個 client_request_id 已有 run 時回 0 列。形狀由 A9-3b 補全。
+// 建 run 的方法的冪等鍵放在 run 上（S4）；同一位買家的同一個 client_request_id 已有 run 時回 0 列。quota_period_start 只有扣額度的 run（TURN）有值。
 func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertRun,
 		arg.ID,
 		arg.BuyerID,
 		arg.RequestID,
 		arg.ConversationID,
+		arg.ParentRunID,
 		arg.RunType,
 		arg.ClientRequestID,
 		arg.QuotaPeriodStart,
