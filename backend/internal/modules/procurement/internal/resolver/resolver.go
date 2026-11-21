@@ -4,7 +4,7 @@
 // 才查人工同義詞，以同義詞指向的名稱比對。Resolution.BuyerTerm 永遠是買家的原詞（去頭尾空白），不論怎麼命中。
 // 同義詞放在本目錄的 synonyms.json（go:embed），空表起步，不沿用農產內容（A9-D19 S8）。
 //
-// 分類樹由 TaxonomyReader 提供（catalog 搬進單體前是 internal/legacy 的 client，經 cmd/hawkr 轉接），經單一 in-process TTL 快取（B8）。
+// 分類樹由 TaxonomyReader 提供（catalog 搬進單體前是 internal/legacy 的 client，經 cmd/hawkr 轉接），經單一 in-process 快取：TTL 過期後仍回舊樹並在背景更新，失敗退避（B8；catalog 搬進單體時整段刪除）。
 package resolver
 
 import (
@@ -64,6 +64,8 @@ const (
 	TreeTTL = 30 * time.Second
 	// LoadTimeout 是一次讀分類樹的上限。
 	LoadTimeout = 30 * time.Second
+	// RetryBackoff 是讀取失敗後不再發起讀取的時間。
+	RetryBackoff = 10 * time.Second
 )
 
 //go:embed synonyms.json
@@ -122,6 +124,12 @@ type Resolver struct {
 	tree     *index
 	loading  *treeLoad
 	loadedAt time.Time
+	// retryAfter 之前不發起新的讀取；lastErr 是造成它的錯誤。
+	retryAfter time.Time
+	lastErr    error
+
+	// beforeWait 只給測試：在呼叫者開始等待共用讀取之前呼叫。
+	beforeWait func()
 }
 
 // New 建立解析器；now 是模組注入的時鐘（快取的 TTL 用它判斷）。
@@ -159,23 +167,36 @@ type treeLoad struct {
 	err  error
 }
 
-// index 回傳可用的分類樹：TTL 內直接用快取；過期時所有呼叫共用同一次讀取，
-// 等待者可因 ctx 結束而離開（讀取本身不隨第一個呼叫者取消）；重讀失敗時繼續用舊樹。
+// index 回傳可用的分類樹（stale-while-revalidate）：
+//
+//   - 有快取樹：立即回它，不等讀取；過期時在背景更新（同時只有一次讀取），失敗後 RetryBackoff 內不再發起讀取，期間繼續用舊樹。
+//   - 沒有快取樹：所有呼叫共用同一次讀取，等待者可因 ctx 結束而離開（讀取本身不隨呼叫者取消）；
+//     失敗後 RetryBackoff 內直接回上一次的錯誤，不再發起讀取。
 func (r *Resolver) index(ctx context.Context) (*index, error) {
 	r.mu.Lock()
-	if r.tree != nil && r.now().Sub(r.loadedAt) < TreeTTL {
+	now := r.now()
+	if r.tree != nil {
 		idx := r.tree
+		if now.Sub(r.loadedAt) >= TreeTTL && r.loading == nil && !now.Before(r.retryAfter) {
+			r.startLoadLocked(ctx)
+		}
 		r.mu.Unlock()
 		return idx, nil
 	}
 	l := r.loading
 	if l == nil {
-		l = &treeLoad{done: make(chan struct{})}
-		r.loading = l
-		go r.load(context.WithoutCancel(ctx), l)
+		if now.Before(r.retryAfter) {
+			err := r.lastErr
+			r.mu.Unlock()
+			return nil, fmt.Errorf("resolver：讀分類樹：%w", err)
+		}
+		l = r.startLoadLocked(ctx)
 	}
 	r.mu.Unlock()
 
+	if r.beforeWait != nil {
+		r.beforeWait()
+	}
 	select {
 	case <-l.done:
 	case <-ctx.Done():
@@ -185,22 +206,46 @@ func (r *Resolver) index(ctx context.Context) (*index, error) {
 	idx := r.tree
 	r.mu.Unlock()
 	if l.err != nil {
-		if idx != nil {
-			return idx, nil
-		}
 		return nil, fmt.Errorf("resolver：讀分類樹：%w", l.err)
 	}
 	return idx, nil
 }
 
+func (r *Resolver) startLoadLocked(ctx context.Context) *treeLoad {
+	l := &treeLoad{done: make(chan struct{})}
+	r.loading = l
+	go r.load(context.WithoutCancel(ctx), l)
+	return l
+}
+
+// load 讀一次分類樹。reader 的 panic 轉成錯誤：這是背景 goroutine，沒人接就會讓整個進程結束。
 func (r *Resolver) load(ctx context.Context, l *treeLoad) {
-	ctx, cancel := context.WithTimeout(ctx, LoadTimeout)
-	defer cancel()
-	nodes, err := r.reader.CategoryTree(ctx)
+	var idx *index
+	err := func() (err error) {
+		defer func() {
+			if p := recover(); p != nil {
+				err = fmt.Errorf("讀取時 panic：%v", p)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(ctx, LoadTimeout)
+		defer cancel()
+		nodes, err := r.reader.CategoryTree(ctx)
+		if err != nil {
+			return err
+		}
+		idx = buildIndex(nodes)
+		return nil
+	}()
 	r.mu.Lock()
+	now := r.now()
 	if err == nil {
-		r.tree = buildIndex(nodes)
-		r.loadedAt = r.now()
+		r.tree = idx
+		r.loadedAt = now
+		r.retryAfter = time.Time{}
+		r.lastErr = nil
+	} else {
+		r.retryAfter = now.Add(RetryBackoff)
+		r.lastErr = err
 	}
 	r.loading = nil
 	l.err = err
