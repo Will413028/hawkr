@@ -121,7 +121,7 @@ func TestAccountLimiterFailsClosedWhenTheTableIsFull(t *testing.T) {
 // 登入的通報在入口照一般級別，帳號額度在 handler。
 func TestCreateReportUsesTheDefaultTierAtTheEntry(t *testing.T) {
 	t.Parallel()
-	if !slices.Equal(tiersOf(sellerconnect.SellerReportAppServiceCreateReportProcedure), []rateTier{tierDefault}) {
+	if tierOf(sellerconnect.SellerReportAppServiceCreateReportProcedure) != tierDefault {
 		t.Fatal("登入的通報在入口照一般級別，帳號額度在 handler")
 	}
 }
@@ -165,7 +165,7 @@ func TestAppLoginProceduresShareTheirOwnTier(t *testing.T) {
 		identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure,
 		identityconnect.IdentityPublicServiceExchangeIdTokenProcedure,
 	} {
-		if got := tiersOf(procedure); !slices.Equal(got, []rateTier{tierAppLogin}) {
+		if got := tierOf(procedure); got != tierAppLogin {
 			t.Errorf("%s 的級別 = %v，預期 tierAppLogin", procedure, got)
 		}
 	}

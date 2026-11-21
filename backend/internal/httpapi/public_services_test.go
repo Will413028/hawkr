@@ -174,14 +174,14 @@ func TestRecordProductViewIsLimitedPerSourceIP(t *testing.T) {
 
 // 貼文瀏覽的打點同樣是匿名的公開寫入：有自己的級別（獨立計數，不與商品瀏覽共用），額度低於一般的公開讀取。
 func TestRecordPostViewHasItsOwnLowerQuota(t *testing.T) {
-	tiers := tiersOf(socialconnect.SocialPublicServiceRecordPostViewProcedure)
-	if len(tiers) != 1 || tiers[0].name != tierPostView.name {
-		t.Fatalf("級別 = %+v，預期只有 %s", tiers, tierPostView.name)
+	tier := tierOf(socialconnect.SocialPublicServiceRecordPostViewProcedure)
+	if tier != tierPostView {
+		t.Fatalf("級別 = %+v，預期 %s", tier, tierPostView.name)
 	}
 	if tierPostView.name == tierProductView.name || tierPostView.visitor >= tierPublic.visitor {
 		t.Fatalf("tierPostView = %+v 應獨立計數而且低於 tierPublic（%d）", tierPostView, tierPublic.visitor)
 	}
-	if got := tiersOf(socialconnect.SocialPublicServiceGetPostProcedure); len(got) != 1 || got[0].name != tierPublic.name {
+	if got := tierOf(socialconnect.SocialPublicServiceGetPostProcedure); got != tierPublic {
 		t.Fatalf("讀取貼文不該有打點的額度：%+v", got)
 	}
 }

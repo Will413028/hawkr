@@ -5,6 +5,14 @@ DELETE FROM "seller"."report_supplements" WHERE report_id IN (SELECT id FROM "se
 DELETE FROM "seller"."report_case_moves" WHERE report_id IN (SELECT id FROM "seller"."reports" WHERE reporter_buyer_id IS NULL);
 DELETE FROM "seller"."finding_reports" WHERE report_id IN (SELECT id FROM "seller"."reports" WHERE reporter_buyer_id IS NULL);
 DELETE FROM "seller"."reports" WHERE reporter_buyer_id IS NULL;
+-- 已退場的 River job `seller.erase_report_contacts` 不再有 worker：清掉佇列裡的殘留（River 的表由 jobs.Migrate 先建立，沒有時略過）。
+DO $$
+BEGIN
+  IF to_regclass('river.river_job') IS NOT NULL THEN
+    DELETE FROM river.river_job WHERE kind = 'seller.erase_report_contacts';
+  END IF;
+END
+$$;
 -- Modify "report_supplements" table
 ALTER TABLE "seller"."report_supplements" DROP CONSTRAINT "report_supplements_matched_by_check", DROP COLUMN "matched_by";
 -- Drop index "reports_buyer_daily" from table: "reports"

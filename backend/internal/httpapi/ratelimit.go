@@ -44,25 +44,25 @@ var (
 var tierAppLogin = rateTier{name: "app-login", visitor: 30}
 
 // procedureTiers 是需要自己額度的 procedure；其餘依 service 的使用者類別。
-var procedureTiers = map[string][]rateTier{
-	sellerconnect.SellerPublicServiceRecordProductViewProcedure:      {tierProductView},
-	socialconnect.SocialPublicServiceRecordPostViewProcedure:         {tierPostView},
-	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: {tierAppLogin},
-	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    {tierAppLogin},
+var procedureTiers = map[string]rateTier{
+	sellerconnect.SellerPublicServiceRecordProductViewProcedure:      tierProductView,
+	socialconnect.SocialPublicServiceRecordPostViewProcedure:         tierPostView,
+	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: tierAppLogin,
+	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    tierAppLogin,
 }
 
-// tiersOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。
-func tiersOf(procedure string) []rateTier {
+// tierOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。
+func tierOf(procedure string) rateTier {
 	if t, ok := procedureTiers[procedure]; ok {
 		return t
 	}
 	audience, _ := rpc.AudienceOf(procedure)
 	switch audience {
 	case rpc.AudiencePublic:
-		return []rateTier{tierPublic}
+		return tierPublic
 	case rpc.AudienceApp, rpc.AudienceAdmin, rpc.AudienceDelegated:
 	}
-	return []rateTier{tierDefault}
+	return tierDefault
 }
 
 func (t rateTier) limit(subject string) int {
@@ -154,17 +154,13 @@ func (l *rateLimiter) allowAll(reqs ...rateRequest) (bool, time.Duration) {
 	return true, 0
 }
 
-// withRateLimit 為 Connect 的請求計數：procedure 的每個級別（時間窗）全部在額度內才記一次，任何一個超過就回
-// resource_exhausted（帶 RetryInfo，最久的那個等待時間），也都不記。
+// withRateLimit 為 Connect 的請求計數：超過 procedure 級別的額度就回
+// resource_exhausted（帶 RetryInfo），不記。
 func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		subject := rpc.SubjectFrom(r.Context())
-		tiers := tiersOf(r.URL.Path)
-		reqs := make([]rateRequest, len(tiers))
-		for i, tier := range tiers {
-			reqs[i] = rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: rateWindow}
-		}
-		if ok, wait := l.allowAll(reqs...); !ok {
+		tier := tierOf(r.URL.Path)
+		if ok, wait := l.allowAll(rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: rateWindow}); !ok {
 			_ = connect.NewErrorWriter().Write(w, r, rpc.NegotiatedRetryLater(w, r, wait))
 			return
 		}

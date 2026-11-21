@@ -108,11 +108,12 @@ func reasonOf(t *testing.T, body []byte) (code, reason string) {
 }
 
 const (
-	procGetSession      = "/hawkr.identity.v1alpha1.IdentityAppService/GetSession"
-	procDeleteAccount   = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
-	procGetProfile      = "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile"
-	procAddFavorite     = "/hawkr.buyer.v1alpha1.BuyerAppService/AddFavorite"
-	procListLiveBanners = "/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"
+	procGetSession        = "/hawkr.identity.v1alpha1.IdentityAppService/GetSession"
+	procDeleteAccount     = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
+	procGetProfile        = "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile"
+	procAddFavorite       = "/hawkr.buyer.v1alpha1.BuyerAppService/AddFavorite"
+	procListLiveBanners   = "/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"
+	procRecordProductView = "/hawkr.seller.v1alpha1.SellerPublicService/RecordProductView"
 )
 
 // 停權的帳號：讀取與自助放行（principal 與停權時間都在 ctx）；寫入回 permission_denied 與 ACCOUNT_SUSPENDED，handler 不被呼叫；
@@ -132,7 +133,7 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 			t.Fatalf("%s：%d code=%q reason=%q called=%v，預期 403 permission_denied ACCOUNT_SUSPENDED", proc, rec.Code, code, reason, s.Called)
 		}
 	}
-	for _, proc := range []string{procListLiveBanners} {
+	for _, proc := range []string{procListLiveBanners, procRecordProductView} {
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		if rec.Code != http.StatusOK || s.Principal || s.Suspended {
 			t.Fatalf("%s：%d %+v，預期以訪客執行（ctx 沒有 principal）", proc, rec.Code, s)
