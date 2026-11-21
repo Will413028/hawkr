@@ -41,11 +41,6 @@ type ReviewHide struct {
 	RestoreReason  *string
 }
 
-type ReviewInactiveAuthor struct {
-	BuyerID int64
-	Since   time.Time
-}
-
 type ReviewMediaRefSync struct {
 	RefType   string
 	RefID     string

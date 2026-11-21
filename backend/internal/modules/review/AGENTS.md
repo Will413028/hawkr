@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`review_images`（最多 4 張）、`hides`（隱藏紀錄，含還原）、`inactive_authors`（刪帳買家的複本）、`media_ref_sync`、`retired_assets`。讀取模型：無。
+schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`review_images`（最多 4 張）、`hides`（隱藏紀錄，含還原）、`media_ref_sync`、`retired_assets`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -21,15 +21,15 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 
 ## 不變量
 
-- 公開可讀 = 沒有未還原的隱藏、作者不在 `inactive_authors`；`db/queries/public.sql` 每支查詢以同一段述詞開頭（`testdata/public_predicate.sql`），讀 `review.reviews` 的非公開查詢要列在 `nonPublicReads`（`TestEveryPublicQueryCarriesThePublicPredicate`、`TestNonPublicReviewReadsAreListed`）。新的公開讀取一律放進 `public.sql`。
+- 公開可讀 = 沒有未還原的隱藏、作者不在 `buyer.pub_inactive_buyers()`（join，不複製狀態）；`db/queries/public.sql` 每支查詢以同一段述詞開頭（`testdata/public_predicate.sql`），讀 `review.reviews` 的非公開查詢要列在 `nonPublicReads`（`TestEveryPublicQueryCarriesThePublicPredicate`、`TestNonPublicReviewReadsAreListed`）。新的公開讀取一律放進 `public.sql`。
 - 觀看者的封鎖（買家之間任一方向、封鎖店）在 SQL 述詞內、keyset 之前；匿名與有觀看者分兩支查詢；統計不過濾觀看者；店家封鎖買家不影響可見性。
 - 一個訂單項目至多一則評價（`reviews_order_item_key`）；`product_id`、`sku_name`、`price`、商品圖只取自訂單項目，`SubmitInput` 沒有這些欄位；評價建立後不變。
 - 長度以字元計（上限 1000）；附圖最多 4 張（`review_images_position_check`、`MaxImages`）；超過回 InvalidInput，不截斷。
 - 訂單不是提交者的，回與不存在相同的 NotFound（A6-D10，先於狀態檢查）；只有訂單狀態 50 能評價，期限 30 天；`Orders` 回 `ErrOrderNotFound` 才是 NotFound，其他錯誤一律 Unavailable。
 - `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 發 `ReviewAggregateChanged` 並排快取失效；重複隱藏不發事件。
 - 媒體引用只由同步 job 寫；transaction 內只寫業務列、同步版本並排 job，不呼叫 media。
-- 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只寫 `inactive_authors`、排 `review.purge_author`（以買家為唯一鍵），不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批記退場資產、排媒體同步與 `revalidate`，每批每組 (店, 商品) 發一個 `ReviewAggregateChanged`（A6-D12），可重跑；`review.purge_sweep` 週期掃描補排失敗被丟棄的清除 job（A6-D13）。守門：`TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows`、`TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
-- `Deactivate` 與 `Submit` 的 insert transaction 先持同一把作者 advisory lock（`LockAuthor`，鎖在 review 自己的命名空間，不進鎖序），`Submit` 持鎖後再查 `inactive_authors`；清除 job 的唯一性不含執行中的狀態。守門：`TestSubmitWaitsForDeactivationAndIsRejected`、`TestDeactivateWaitsForAuthorLock`。
+- 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只排 `review.purge_author`（`EnqueuePurge`）（以買家為唯一鍵），不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批記退場資產、排媒體同步與 `revalidate`，每批每組 (店, 商品) 發一個 `ReviewAggregateChanged`（A6-D12），可重跑；`review.purge_sweep` 週期掃描補排失敗被丟棄的清除 job（A6-D13）。守門：`TestDeactivationHidesReviewsImmediatelyViaThePubJoin`、`TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
+- `Submit` 的 insert transaction 第一句 `Buyers.LockActive`（買家列 `FOR KEY SHARE`，與買家轉移的 `FOR UPDATE` 互斥），NotFound 與 FailedPrecondition 都回 `ReviewAuthorInactive`；清除 job 的唯一性不含執行中的狀態。守門：`TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard`。
 - 本步的 transaction 內不呼叫 provider；`Submit` 撞唯一鍵用 `ON CONFLICT DO NOTHING`，不 catch 23505。
 
 ## 不負責

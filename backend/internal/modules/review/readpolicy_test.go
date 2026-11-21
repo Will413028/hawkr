@@ -11,7 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 公開可讀的規則（沒有未還原的隱藏、作者不在 inactive_authors）只寫一份：testdata/public_predicate.sql。這組測試讀 db/queries 的原始檔，
+// 公開可讀的規則（沒有未還原的隱藏、作者不在 buyer.pub_inactive_buyers()）只寫一份：testdata/public_predicate.sql。這組測試讀 db/queries 的原始檔，
 // 要求公開讀取每一支都帶它（漏掉只會是「少了這段文字」，由這裡擋），而且讀 review.reviews 的查詢不是公開讀取就必須明列。
 
 type query struct{ name, file, body string }
@@ -98,7 +98,7 @@ var nonPublicReads = map[string]bool{
 	// review.review_images 的非公開讀寫：附圖只經已過可讀述詞的評價列取（ListReviewImages 的呼叫端傳入的 ID 來自公開或作者本人的列），
 	// ReviewAssets 是媒體同步 job 讀業務列現況，不對外。
 	"InsertReviewImage": true, "ListReviewImages": true, "ReviewAssets": true,
-	// 刪帳清除與 relay（purge.sql）：作者已在 inactive_authors，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
+	// 刪帳清除與 relay（purge.sql）：作者已不是營運中，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
 	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveAuthorsWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
 }
 

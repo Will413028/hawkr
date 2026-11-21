@@ -205,20 +205,20 @@ func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult
 // SweepMedia 補排版本比已同步的新的 ref。
 func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
 
-// SweepPurge 補排仍在 inactive_authors 又還有評價列的買家的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
+// SweepPurge 補排 buyer.pub_inactive_buyers() 中又還有評價列的買家的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepPurge(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
-// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把買家記進 inactive_authors
-// （評價從這個 transaction 起不可讀、不計分）、排 review.purge_author job。不在這裡刪列：
+// OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：排 review.purge_author job
+// （評價從這個 transaction 提交起不可讀、不計分，由公開述詞 join buyer.pub_inactive_buyers() 提供，不複製狀態）。不在這裡刪列：
 // 刪帳者的評價筆數沒有上限。鎖的順序 identity → buyer → seller → review：accountdeletion 在派發事件之前先鎖完買家與店家。
 func (m *Module) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDeletionRequested) error {
-	return m.purge.Deactivate(ctx, e.BuyerID, e.OccurredAt)
+	return m.purge.EnqueuePurge(ctx, e.BuyerID)
 }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（冪等）。沒有開啟中的訂單時買家直接關閉，只發這個
 // 事件、沒有 BuyerDeletionRequested，所以兩個事件都要訂。
 func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
-	return m.purge.Deactivate(ctx, e.BuyerID, e.OccurredAt)
+	return m.purge.EnqueuePurge(ctx, e.BuyerID)
 }
 
 // PurgeAuthor 刪除買家的評價（分批，冪等）。它是 review.purge_author job 的內容，給 worker 與測試呼叫。

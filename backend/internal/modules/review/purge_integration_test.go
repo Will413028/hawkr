@@ -15,8 +15,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
+// requestDeletion 讓買家進入刪除中（buyer 的 BeginDeletion，狀態的唯一來源），再呼叫 review 的訂閱者排清除 job。
 func (f *fixture) requestDeletion(t *testing.T, b buyer.Profile) {
 	t.Helper()
+	if err := f.buyers.BeginDeletion(context.Background(), b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
 	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
 		return f.module.OnBuyerDeletionRequested(ctx, buyer.BuyerDeletionRequested{BuyerID: b.BuyerID, AccountID: b.AccountID, OccurredAt: f.clock()})
 	})
@@ -30,8 +34,9 @@ func (f *fixture) reviewsOf(t *testing.T, b buyer.Profile) int64 {
 	return f.scalar(t, "SELECT count(*) FROM review.reviews WHERE buyer_id = $1", b.BuyerID)
 }
 
-// RD4：刪帳申請的那個 transaction 起，買家的評價不可讀、不計分；訂閱者只寫複本與排 job，不刪列。
-func TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows(t *testing.T) {
+// RD4：刪帳申請（BeginDeletion）提交的同一刻起，買家的評價不可讀、不計分（公開述詞 join buyer.pub_inactive_buyers()）；列還在，
+// 沒有訂閱者也沒有 job。
+func TestDeactivationHidesReviewsImmediatelyViaThePubJoin(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -44,7 +49,9 @@ func TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows(t *testing.T) {
 	}
 	f.jobs.reset()
 
-	f.requestDeletion(t, leaving)
+	if err := f.buyers.BeginDeletion(ctx, leaving.BuyerID); err != nil {
+		t.Fatal(err)
+	}
 
 	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{}, nil, 20))
 	if !sameIDs(ids(page), kept.ID) {
@@ -60,15 +67,19 @@ func TestRD4DeletionRequestUncountsTheReviewsWithoutDeletingRows(t *testing.T) {
 		t.Fatalf("單筆讀取不給刪帳者的評價：%v", err)
 	}
 	if n := f.reviewsOf(t, leaving); n != 1 {
-		t.Fatalf("訂閱者不刪列：%d", n)
+		t.Fatalf("可見性不刪列：%d", n)
 	}
+	if len(f.jobs.kinds()) != 0 {
+		t.Fatalf("沒有跑訂閱者就沒有 job：%v", f.jobs.kinds())
+	}
+	f.requestDeletion(t, leaving)
 	if f.jobs.count("review.purge_author") != 1 {
-		t.Fatalf("排一個清除 job：%v", f.jobs.kinds())
+		t.Fatalf("訂閱者排一個清除 job：%v", f.jobs.kinds())
 	}
 }
 
-// 兩個事件都訂：先申請後關閉，或直接關閉，複本只插入一次。
-func TestDeactivationSubscribersInsertOnce(t *testing.T) {
+// 兩個事件都訂：先申請後關閉，或直接關閉，訂閱者都只排清除 job（River 以買家合併），不寫任何複本。
+func TestSubscribersEnqueueOnePurgeJob(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -80,10 +91,6 @@ func TestDeactivationSubscribersInsertOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 1 {
-		t.Fatalf("複本一列：%d", n)
-	}
-
 	direct := f.newBuyer(t)
 	err = f.db.InTx(ctx, func(ctx context.Context) error {
 		return f.module.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: direct.BuyerID, AccountID: direct.AccountID, OccurredAt: f.clock()})
@@ -91,11 +98,11 @@ func TestDeactivationSubscribersInsertOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", direct.BuyerID); n != 1 {
-		t.Fatalf("直接關閉也寫複本：%d", n)
-	}
 	if f.jobs.count("review.purge_author") != 3 {
 		t.Fatalf("每次訂閱都排清除 job（River 以買家合併）：%v", f.jobs.kinds())
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM pg_tables WHERE schemaname = 'review' AND tablename = 'inactive_authors'"); n != 0 {
+		t.Fatalf("複本表已刪除：%d", n)
 	}
 }
 
@@ -175,8 +182,8 @@ func TestPurgeLoopsOverBatches(t *testing.T) {
 	}
 }
 
-// 保底掃描：在 inactive_authors 又還有評價列、而且沒有排隊中的清除 job 的買家補排一個；沒有評價列的買家與還在營運的買家都不排。
-func TestSweepPurgeEnqueuesOnlyInactiveAuthorsWithReviewsLeft(t *testing.T) {
+// 保底掃描：在 buyer.pub_inactive_buyers() 又還有評價列、而且沒有排隊中的清除 job 的買家補排一個；沒有評價列的買家與還在營運的買家都不排。
+func TestSweepPurgeEnqueuesOnlyInactiveBuyersWithReviewsLeft(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -255,9 +262,9 @@ func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
 	}
 }
 
-// F1：Submit 與刪帳的 Deactivate 以作者鎖串行。Deactivate 的 transaction 持鎖時 Submit 在鎖上等；Deactivate 提交後 Submit 要被擋下，
-// 不能留下刪帳者的評價（清除 job 找不到列就結束，之後不會再有人刪）。
-func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
+// F1：Submit 在 transaction 內第一句 buyer.LockActive，與買家轉移的列鎖互斥。BeginDeletion 的 transaction 未提交時 Submit 在買家列上等；
+// 提交後 Submit 要被擋下，不能留下刪帳者的評價（清除 job 找不到列就結束，之後不會再有人刪）。
+func TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -265,14 +272,21 @@ func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
 
-	lockSQL := "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::bigint::text, 0))"
-	tx, err := f.db.Pool().Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, lockSQL, b.BuyerID); err != nil {
-		t.Fatal(err)
+	held, release, finished := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		finished <- f.db.InTx(ctx, func(ctx context.Context) error {
+			if err := f.buyers.BeginDeletion(ctx, b.BuyerID); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	select {
+	case <-held:
+	case err := <-finished:
+		t.Fatalf("BeginDeletion 的 transaction 沒有持住：%v", err)
 	}
 
 	done := make(chan error, 1)
@@ -282,90 +296,32 @@ func TestSubmitWaitsForDeactivationAndIsRejected(t *testing.T) {
 	}()
 
 	deadline := time.Now().Add(10 * time.Second)
-	for f.authorLockWaiters(t, b.BuyerID) == 0 {
+	for f.lockWaiters(t) == 0 {
 		select {
 		case err := <-done:
-			t.Fatalf("Submit 應該在作者鎖上等，卻已回傳：%v", err)
+			t.Fatalf("Submit 應該在買家列的守門鎖上等，卻已回傳：%v", err)
 		default:
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("Submit 沒有等在作者鎖上")
+			t.Fatal("Submit 沒有等在守門鎖上")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if _, err := tx.Exec(ctx, "INSERT INTO review.inactive_authors (buyer_id, since) VALUES ($1, $2)", b.BuyerID, f.clock()); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
+	close(release)
+	if err := <-finished; err != nil {
 		t.Fatal(err)
 	}
 
 	if err := <-done; kindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("鎖釋放後要回 FailedPrecondition：%v", err)
+		t.Fatalf("轉移提交後要回 FailedPrecondition：%v", err)
 	}
 	if n := f.reviewsOf(t, b); n != 0 {
 		t.Fatalf("刪帳者不能留下評價：%d", n)
 	}
 }
 
-// authorLockWaiters 數等在這位作者的 advisory lock 上的 session（只看這個 key，不受平行測試影響）：
-// bigint key 的高 32 位在 classid、低 32 位在 objid，objsubid = 1。
-func (f *fixture) authorLockWaiters(t *testing.T, buyerID int64) int64 {
+// lockWaiters 數目前等在鎖上的連線（每個整合測試有自己的資料庫，不受平行測試影響）。
+func (f *fixture) lockWaiters(t *testing.T) int64 {
 	t.Helper()
-	return f.scalar(t, `
-SELECT count(*) FROM pg_locks l,
-  LATERAL (SELECT hashtextextended('review.author:' || $1::bigint::text, 0) AS k) h
-WHERE l.locktype = 'advisory' AND NOT l.granted AND l.objsubid = 1
-  AND l.classid::bigint = (h.k >> 32) & 4294967295 AND l.objid::bigint = h.k & 4294967295`, buyerID)
-}
-
-// F1 的另一側：Deactivate 也要持作者鎖。測試持有同一把鎖（等同 Submit 的 transaction 持鎖中），真正的 OnBuyerDeleted 在另一個
-// transaction 必須等在鎖上、不能先寫 inactive_authors；鎖釋放後才完成。拿掉 Deactivate 的 LockAuthor 時它不會等，這個測試失敗；
-// 拿掉 Submit 的 LockAuthor 則由 TestSubmitWaitsForDeactivationAndIsRejected 失敗。
-func TestDeactivateWaitsForAuthorLock(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	b := f.newBuyer(t)
-
-	tx, err := f.db.Pool().Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('review.author:' || $1::bigint::text, 0))", b.BuyerID); err != nil {
-		t.Fatal(err)
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- f.db.InTx(ctx, func(ctx context.Context) error {
-			return f.module.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: b.BuyerID, AccountID: b.AccountID, OccurredAt: f.clock()})
-		})
-	}()
-
-	deadline := time.Now().Add(10 * time.Second)
-	for f.authorLockWaiters(t, b.BuyerID) == 0 {
-		select {
-		case err := <-done:
-			t.Fatalf("Deactivate 應該在作者鎖上等，卻已回傳：%v", err)
-		default:
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("Deactivate 沒有等在作者鎖上")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 0 {
-		t.Fatalf("鎖釋放前不能已寫入 inactive_authors：%d", n)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if n := f.scalar(t, "SELECT count(*) FROM review.inactive_authors WHERE buyer_id = $1", b.BuyerID); n != 1 {
-		t.Fatalf("鎖釋放後 Deactivate 完成：%d", n)
-	}
+	return f.scalar(t, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
 }

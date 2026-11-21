@@ -12,6 +12,18 @@ import (
 	"uuid"
 )
 
+const authorInactive = `-- name: AuthorInactive :one
+SELECT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = $1::bigint)
+`
+
+// 提交評價的提早檢查（transaction 外，只為省掉轉正圖片）：買家不再營運中。正確性由 transaction 內的 buyer.LockActive 保證。
+func (q *Queries) AuthorInactive(ctx context.Context, buyerID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, authorInactive, buyerID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getReviewForDiagnosis = `-- name: GetReviewForDiagnosis :one
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at, EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL) AS hidden
 FROM review.reviews AS r
@@ -265,7 +277,7 @@ SET reply_content = $1, replied_at = $2
 WHERE r.id = $3
   AND r.store_id = $4
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 RETURNING r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at
 `
 

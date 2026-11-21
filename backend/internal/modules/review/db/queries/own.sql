@@ -34,7 +34,7 @@ SET reply_content = sqlc.arg(content), replied_at = sqlc.arg(now)
 WHERE r.id = sqlc.arg(id)
   AND r.store_id = sqlc.arg(store_id)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 RETURNING r.*;
 
 -- name: GetReviewForDiagnosis :one
@@ -46,3 +46,7 @@ WHERE r.id = sqlc.arg(id);
 -- name: LockReview :one
 -- 隱藏與還原先鎖評價列（只鎖自己的列）。
 SELECT * FROM review.reviews WHERE id = sqlc.arg(id) FOR NO KEY UPDATE;
+
+-- name: AuthorInactive :one
+-- 提交評價的提早檢查（transaction 外，只為省掉轉正圖片）：買家不再營運中。正確性由 transaction 內的 buyer.LockActive 保證。
+SELECT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = sqlc.arg(buyer_id)::bigint);

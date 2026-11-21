@@ -16,7 +16,7 @@ const getPublicReviewAnonymous = `-- name: GetPublicReviewAnonymous :one
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 `
 
 func (q *Queries) GetPublicReviewAnonymous(ctx context.Context, id uuid.UUID) (ReviewReview, error) {
@@ -45,7 +45,7 @@ const getPublicReviewForViewer = `-- name: GetPublicReviewForViewer :one
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
   AND NOT EXISTS (
     SELECT 1 FROM buyer.pub_blocked_buyers() bb
     WHERE (bb.blocker_buyer_id = $2::bigint AND bb.blocked_buyer_id = r.buyer_id)
@@ -87,7 +87,7 @@ const listProductReviewsAnonymous = `-- name: ListProductReviewsAnonymous :many
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.product_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
   AND ($2::smallint = 0 OR r.rating = $2::smallint)
   AND (NOT $3::boolean OR EXISTS (SELECT 1 FROM review.review_images AS ri WHERE ri.review_id = r.id))
   AND ($4::timestamptz IS NULL OR (r.created_at, r.id) < ($4::timestamptz, $5::uuid))
@@ -104,7 +104,7 @@ type ListProductReviewsAnonymousParams struct {
 	PageSize       int32
 }
 
-// 公開可讀的評價讀取。這個檔的每一支查詢都以同一段述詞（公開可讀：沒有未還原的隱藏、作者不在 inactive_authors，別名 r）過濾，
+// 公開可讀的評價讀取。這個檔的每一支查詢都以同一段述詞（公開可讀：沒有未還原的隱藏、作者不在 buyer.pub_inactive_buyers()，別名 r）過濾，
 // testdata/public_predicate.sql 是那段述詞的 golden，TestEveryPublicQueryCarriesThePublicPredicate 逐支比對；
 // 沒有述詞的讀取不得放在這個檔。觀看者的封鎖另有一支查詢（匿名與有觀看者分兩支，不用 `$v IS NULL OR …` 開關）：
 // 買家之間任一方向的封鎖與觀看者封鎖店，在 keyset 之前過濾，所以被擋的列不佔頁。統計不過濾觀看者。
@@ -155,7 +155,7 @@ const listProductReviewsForViewer = `-- name: ListProductReviewsForViewer :many
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.product_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
   AND NOT EXISTS (
     SELECT 1 FROM buyer.pub_blocked_buyers() bb
     WHERE (bb.blocker_buyer_id = $2::bigint AND bb.blocked_buyer_id = r.buyer_id)
@@ -227,7 +227,7 @@ const listStoreReviewsAnonymous = `-- name: ListStoreReviewsAnonymous :many
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.store_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
   AND ($2::smallint = 0 OR r.rating = $2::smallint)
   AND (NOT $3::boolean OR EXISTS (SELECT 1 FROM review.review_images AS ri WHERE ri.review_id = r.id))
   AND ($4::timestamptz IS NULL OR (r.created_at, r.id) < ($4::timestamptz, $5::uuid))
@@ -290,7 +290,7 @@ const listStoreReviewsForViewer = `-- name: ListStoreReviewsForViewer :many
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.store_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
   AND NOT EXISTS (
     SELECT 1 FROM buyer.pub_blocked_buyers() bb
     WHERE (bb.blocker_buyer_id = $2::bigint AND bb.blocked_buyer_id = r.buyer_id)
@@ -365,7 +365,7 @@ SELECT
 FROM review.reviews AS r
 WHERE r.product_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 `
 
 type ProductStatsRow struct {
@@ -388,7 +388,7 @@ SELECT
 FROM review.reviews AS r
 WHERE r.store_id = ANY($1::bigint[])
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 GROUP BY r.store_id
 ORDER BY r.store_id
 `
@@ -432,7 +432,7 @@ SELECT
 FROM review.reviews AS r
 WHERE r.store_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM review.inactive_authors AS ia WHERE ia.buyer_id = r.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)
 `
 
 type StoreStatsRow struct {

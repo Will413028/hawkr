@@ -30,9 +30,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Buyers 是提交時查上傳者帳號的 buyer 公開 API（media 轉正要確認 staged token 屬於上傳的帳號）。
+// Buyers 是提交時查上傳者帳號的 buyer 公開 API（media 轉正要確認 staged token 屬於上傳的帳號；LockActive 是寫入的守門）。
 type Buyers interface {
 	AccountIDByBuyerID(ctx context.Context, buyerID int64) (int64, error)
+	// LockActive 在 transaction 內以 FOR KEY SHARE 確認買家營運中（申請刪除與已關閉都被擋）。
+	LockActive(ctx context.Context, buyerID int64) error
 }
 
 // Stores 是讀店家（取 store_code 組快取失效的 tag）的 seller 公開 API。
@@ -68,7 +70,7 @@ func orderNotFound(l uitext.Locale) error {
 }
 
 // Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運（提早擋，省掉轉正圖片）→ 期限 → 項目 → transaction 外轉正圖片 →
-// transaction 內持作者鎖再確認買家仍營運（與刪帳的 Deactivate 串行，這次才是定論）、寫列、排媒體同步與快取失效、發事件。
+// transaction 內第一句 buyer.LockActive 守門（與刪帳轉移的買家列 FOR UPDATE 互斥，這次才是定論）、寫列、排媒體同步與快取失效、發事件。
 func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Review, error) {
 	l := uitext.LocaleFrom(ctx)
 	content, rating, err := s.checkSubmit(l, &in)
@@ -89,7 +91,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	if order.Status != model.OrderStatusCompleted {
 		return model.Review{}, model.WithReason(apperr.FailedPrecondition("%s", text.ReviewOrderNotReviewable(l)), model.ReasonOrderNotReviewable)
 	}
-	inactive, err := s.q(ctx).IsInactiveAuthor(ctx, in.BuyerID)
+	inactive, err := s.q(ctx).AuthorInactive(ctx, in.BuyerID)
 	if err != nil {
 		return model.Review{}, err
 	}
@@ -119,15 +121,12 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	var out model.Review
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if err := q.LockAuthor(ctx, in.BuyerID); err != nil {
+		if err := s.d.Buyers.LockActive(ctx, in.BuyerID); err != nil {
+			switch apperr.KindOf(err) {
+			case apperr.KindFailedPrecondition, apperr.KindNotFound:
+				return apperr.FailedPrecondition("%s", text.ReviewAuthorInactive(l))
+			}
 			return err
-		}
-		inactive, err := q.IsInactiveAuthor(ctx, in.BuyerID)
-		if err != nil {
-			return err
-		}
-		if inactive {
-			return apperr.FailedPrecondition("%s", text.ReviewAuthorInactive(l))
 		}
 		now := s.d.Now().UTC()
 		id := s.d.NewID()

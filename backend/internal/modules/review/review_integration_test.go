@@ -120,6 +120,35 @@ func TestViewerBlockPredicateInlinesThePubFunctions(t *testing.T) {
 	}
 }
 
+// 公開述詞（testdata/public_predicate.sql）的 pub_inactive_buyers join 要被 planner 內聯：計畫裡沒有 Function Scan。
+func TestInactiveBuyersPredicateInlinesThePubFunction(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	raw, err := os.ReadFile("testdata/public_predicate.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "buyer.pub_inactive_buyers()") {
+		t.Fatal("述詞沒有 join buyer.pub_inactive_buyers()")
+	}
+	var plan []string
+	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "EXPLAIN SELECT r.id FROM review.reviews AS r WHERE r.product_id = 700 AND "+string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			t.Fatal(err)
+		}
+		plan = append(plan, line)
+	}
+	if got := strings.Join(plan, "\n"); strings.Contains(got, "Function Scan") {
+		t.Fatalf("pub_inactive_buyers 沒有被內聯：\n%s", got)
+	}
+}
+
 // RD2：內容與回覆以字元計：1000 個中文字可過、1001 個被擋。
 func TestRD2LengthIsCountedInRunes(t *testing.T) {
 	t.Parallel()
@@ -303,9 +332,11 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 		t.Fatalf("不存在：%v", err)
 	}
 
-	// 作者刪帳中（inactive_authors 有列）：公開不可讀、不計分。
+	// 作者刪帳中（buyer.pub_inactive_buyers() 有列）：公開不可讀、不計分。
 	r2 := f.submit(t, f.newBuyer(t), storeID, 700, 1, "差")
-	f.exec(t, "INSERT INTO review.inactive_authors (buyer_id, since) VALUES ($1, $2)", r2.BuyerID, f.clock())
+	if err := f.buyers.BeginDeletion(ctx, r2.BuyerID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.module.GetReview(ctx, r2.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("作者刪帳中：%v", err)
 	}
@@ -361,7 +392,9 @@ func TestSubmitRules(t *testing.T) {
 	}
 	f.advance(-30 * 24 * time.Hour)
 
-	f.exec(t, "INSERT INTO review.inactive_authors (buyer_id, since) VALUES ($1, $2)", b.BuyerID, f.clock())
+	if err := f.buyers.BeginDeletion(ctx, b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it2.orderNo, OrderItemID: it2.itemID, Rating: 5}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("刪帳中的買家不能再評價：%v", err)
 	}

@@ -1,5 +1,5 @@
-// Package purge 是買家刪帳的評價清除。可見性在 job 跑之前已經改好：訂閱者在買家刪帳的 transaction 內把他記進 inactive_authors
-// （公開可讀的述詞與統計都排除他），只排一個 job，transaction 內的工作量固定（單體規則 4）；
+// Package purge 是買家刪帳的評價清除。可見性在 job 跑之前已經改好：公開可讀的述詞與統計 join buyer.pub_inactive_buyers()，
+// 買家刪帳的 transaction 一提交評價就不可讀；訂閱者只排一個 job，transaction 內的工作量固定（單體規則 4）；
 // 實際刪列由 job 依 id 升序分批做（刪帳者的評價筆數沒有上限）。job 冪等：述詞是「買家還有評價列」，重跑只處理剩下的。
 package purge
 
@@ -68,24 +68,15 @@ type PurgeAuthorArgs struct {
 func (PurgeAuthorArgs) Kind() string { return "review.purge_author" }
 
 // InsertOpts 讓同一位買家還沒開始的 job 合併（申請刪除與關閉各排一次）：唯一鍵是 BuyerID，含執行中的狀態（River 要求 available、pending、running、scheduled 都在內）：執行中又排入的那一次併入它：
-// 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。買家進入刪除中之後沒有新評價：Submit 在 transaction 內持 LockAuthor 再查 inactive_authors，
-// 與 Deactivate 串行，所以清除 job 看不到之後才提交的評價。
+// 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。買家進入刪除中之後沒有新評價：Submit 在 transaction 內先取 buyer.LockActive（買家列的 FOR KEY SHARE），
+// 與刪帳轉移的 FOR UPDATE 互斥，所以清除 job 看不到之後才提交的評價。
 func (PurgeAuthorArgs) InsertOpts() river.InsertOpts {
 	return jobs.UniqueByArgs(10)
 }
 
-// Deactivate 是買家刪帳時同 transaction 的原子狀態變更：記進 inactive_authors、排清除 job。
-// 先持作者的 advisory lock，與 Submit 的 insert transaction 串行。冪等：重複呼叫（申請與關閉兩個事件）；清除 job 以買家為唯一鍵合併。必須在 transaction 內。
-func (s *Service) Deactivate(ctx context.Context, buyerID int64, at time.Time) error {
-	if _, ok := db.TxFrom(ctx); !ok {
-		return fmt.Errorf("review：Deactivate 必須在 transaction 內")
-	}
-	if err := s.q(ctx).LockAuthor(ctx, buyerID); err != nil {
-		return err
-	}
-	if _, err := s.q(ctx).InsertInactiveAuthor(ctx, store.InsertInactiveAuthorParams{BuyerID: buyerID, Since: at.UTC()}); err != nil {
-		return err
-	}
+// EnqueuePurge 在買家刪帳（申請與關閉）時排清除 job：只排 job，不要求 transaction（訂閱者在刪帳的 transaction 內呼叫時併入它）。
+// 冪等：清除 job 以買家為唯一鍵合併。可見性不在這裡改，由公開述詞的 pub_inactive_buyers join 提供。
+func (s *Service) EnqueuePurge(ctx context.Context, buyerID int64) error {
 	return s.enqueuePurge(ctx, buyerID)
 }
 
@@ -94,7 +85,7 @@ func (s *Service) enqueuePurge(ctx context.Context, buyerID int64) error {
 	return s.d.Jobs.Enqueue(ctx, PurgeAuthorArgs{BuyerID: buyerID}, &opts)
 }
 
-// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家仍在 inactive_authors 又還有評價列；
+// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家已不營運（pub_inactive_buyers）又還有評價列；
 // 這裡每次最多補排 sweepBatch 位的清除 job，同一位買家還沒開始的 job 由唯一鍵合併。回傳這次檢查到的買家數。
 func (s *Service) Sweep(ctx context.Context) (int, error) {
 	var n int

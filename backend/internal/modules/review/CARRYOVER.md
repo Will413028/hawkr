@@ -14,7 +14,7 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | M4 Redis（封鎖的 `block:out:`／`block:in:` 讀取；啟動連不上只警告、封鎖 fail-open） | review 需要即時的封鎖資料 | 不成立：封鎖在 buyer 的 DB，單體同一個資料庫 | 同庫用擁有者發布的唯讀函式，在 SQL 述詞內過濾，失敗就整個查詢失敗（fail-closed） | 改：`buyer.pub_blocked_buyers()`、`buyer.pub_blocked_stores()` 內聯進公開查詢的述詞；刪除 Redis 依賴。review 沒有其他 Redis key |
 | M5 `product_id DEFAULT 0`、`store_id DEFAULT 0` 哨兵 | 舊資料沒有商品 ID 的評價 | 不成立：系統從未上線，訂單項目一定有商品 | NOT NULL ＋ CHECK > 0，不用哨兵 | 改：`product_id`、`store_id` 是 `NOT NULL CHECK > 0`；訂單項目沒有商品 ID 時 legacy 轉接回錯誤而不是 0（`orderservice.OrderForReview`）。`item_image_key` 沒有圖是 NULL＋CHECK 非空，不用空字串哨兵 |
 | M6 媒體引用：提交時 `FinalizeAndLink`（先 link 後插入，插入失敗不回滾）、評價從不釋放 | media 呼叫與業務列寫入要一致 | 不成立：媒體呼叫不得在 DB transaction 內（單體規則 5）；失敗時留下孤兒 link | 與 social 同：transaction 外 `Finalize`，transaction 內寫列＋同步版本＋排同步 job，同步 job 依業務列現況 Link／Unlink | 改：`mediaref`（照 social）與 `media_ref_sync`、`retired_assets`；提交失敗時沒有任何 link。刪帳 purge 的釋放（RD4）在每批的 transaction 內記退場資產並排同步；同步 worker 與保底掃描已接進 `cmd/hawkr` 的 worker（`newReview`） |
-| M8 MQ 消費者（review 沒有消費者） | 刪帳等外部事件要驅動 review | 成立（新增需求 A6-D6：買家刪帳要刪評價） | 同一資料庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：訂閱 `buyer.BuyerDeletionRequested`／`BuyerDeleted`，只寫 `inactive_authors` 並排 purge job；訂閱者（`OnBuyerDeletionRequested`／`OnBuyerDeleted`，`cmd/hawkr` 的 `newReview` 在 serve 與 worker 訂閱）與 `review.purge_author` job（`internal/purge`，依 id 升序每批 200、可重跑）已在 A6-1c。刪帳者的評價一寫進 `inactive_authors` 就不公開、不計分；`review.purge_sweep` 週期 job（`purge.PeriodicJobs`，啟動即跑、每 15 分鐘、每次最多 100 位）找出在 `inactive_authors` 但仍有評價列的買家補排 `purge_author`，補 MaxAttempts 用完被丟棄的 job（A6-D13） |
+| M8 MQ 消費者（review 沒有消費者） | 刪帳等外部事件要驅動 review | 成立（新增需求 A6-D6：買家刪帳要刪評價） | 同一資料庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：訂閱 `buyer.BuyerDeletionRequested`／`BuyerDeleted`，只排 purge job（不寫複本；A6-3c 起）；訂閱者（`OnBuyerDeletionRequested`／`OnBuyerDeleted`，`cmd/hawkr` 的 `newReview` 在 serve 與 worker 訂閱）與 `review.purge_author` job（`internal/purge`，依 id 升序每批 200、可重跑）已在 A6-1c。刪帳者的評價在買家進入刪除中的 transaction 提交時就不公開、不計分（讀取 join `buyer.pub_inactive_buyers()`）；`review.purge_sweep` 週期 job（`purge.PeriodicJobs`，啟動即跑、每 15 分鐘、每次最多 100 位）找出在 `buyer.pub_inactive_buyers()` 但仍有評價列的買家補排 `purge_author`，補 MaxAttempts 用完被丟棄的 job（A6-D13） |
 | M9 買家名稱與頭像讀時由 gateway 補，註銷旗標 `BuyerDeleted` | 評價列表要顯示買家 | 成立（顯示需要），但不能存快照（個資） | 讀時批次補，已刪帳回旗標不回名稱 | 沿用：模組不存買家快照；`buyer.BatchDisplay` 由 httpapi 在 A6-5 補 |
 | M10 快取失效：commit 之後 best-effort 的 `BustAsync`，店家 tag 另用一次 RPC 解 `store_code` | 評分與評價數變動後 website 快取要失效 | 成立，但 commit 後 best-effort 會在崩潰時漏失效 | 寫入同 transaction 排 job（transactional outbox），tag 由 seller API 取 | 改：提交、隱藏、還原在同 transaction 排 `revalidate` job（`seller.Store.StoreCode` 取代 `ResolveStoreCode`）。商品 tag（`revalidate.ProductTag`，與舊 `pkg/revalidate/tags.go` 同字串）與店家的兩個 tag 在同一個 job（`write.bust` 組 tag；刪帳清除的每批在 `purge.bust` 組） |
 | M11 事件：fat event、無 outbox（`review.created`、`review.hidden` 帶統計與暱稱） | Java order、product、notification 依賴舊 wire | 成立（A6-1c 前 Java 仍消費） | 模組事件只帶領域鍵，relay 在 transaction 外組 wire payload | 改：模組事件 `ReviewCreated`、`ReviewAggregateChanged` 只帶領域鍵、同 transaction 發布；wire 形狀由 `legacy/reviewrelay`（A6-1c）維持：`wire_test` 對舊 `pkg/mq/events.go` 的 struct 逐欄比對；`review.hidden` 沒有放進 `event_payload_keys.json` golden（notification-service 的 `TestTemplateContract` 要求 golden 每一項都有模板，`review.hidden` 沒有模板），它的消費者契約（Java `ReviewStatsConsumer` 的 `product_id`、`product_avg_rating`、`product_review_count`）由 `reviewrelay/golden_test.go` 對 Java 原始碼驗。relay 只在測試啟用，A6-6e 才接進 `cmd/hawkr`。重複隱藏不再重發（只有狀態真的改變才發） |
@@ -46,9 +46,9 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 ## 與 review-service 的差異
 
-資料沒有搬移（系統從未上線），schema 是新的 baseline。
+資料沒有搬移（系統從未上線），schema 是新的 baseline（`review.inactive_authors` 已由 A6-3c 的 migration 刪除）。
 
-- 表：`order_item_reviews` → `review.reviews`（UUIDv7 主鍵、`order_item_id` UNIQUE、無 `hidden_at`／`hidden_reason`／`deleted_at`／`image_keys`）、`review.review_images`、`review.hides`、`review.inactive_authors`、`review.media_ref_sync`、`review.retired_assets`。
+- 表：`order_item_reviews` → `review.reviews`（UUIDv7 主鍵、`order_item_id` UNIQUE、無 `hidden_at`／`hidden_reason`／`deleted_at`／`image_keys`）、`review.review_images`、`review.hides`、`review.media_ref_sync`、`review.retired_assets`。
 - 隱藏可以還原；重複隱藏不重發事件。
 - 內容、回覆長度以字元計；`price`、`sku_name`、`product_id`、商品圖全取訂單項目；附圖最多 4 張且超過回錯誤。
 - 公開讀取（列表、單筆、統計）共用同一個「公開可讀」述詞；觀看者封鎖在 SQL 內、keyset 之前；單筆讀取不再洩漏隱藏的評價。
@@ -57,3 +57,17 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 快取失效在寫入同 transaction 排 job。
 
 `legacy/reviewrelay` 的 `typedWorker`、`baseEvent` 與其他舊 relay 的同名機制刻意重複（relay 是暫時的，隨 A8、catalog、ordering 搬遷刪除，見計畫「延後」），不抽共用。
+
+## A6-3c 停用身分改由擁有者守門的沿用盤點
+
+設計：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3c-design.md` §9.1、§9.5。
+
+| 照搬的機制 | 先問「從零設計會怎麼做」 | 結論 |
+|---|---|---|
+| `inactive_authors` 複本表（A6-1c） | 複本的必要條件是「資料庫端存旗標」且「函式只能參照自己的表」；review 只在查詢過濾與寫入把關，沒有存旗標 | 不成立；公開述詞、`own`、`purge` 的查詢 join `buyer.pub_inactive_buyers()`，刪表（`review_drop_inactive_authors`） |
+| `LockAuthor`（`Submit` 沒有可鎖的列，所以用 advisory lock） | buyer 已有 `LockActive`，鎖的是買家列（`FOR KEY SHARE`），lockorder 看得到 | 不成立；`Submit` 的 transaction 第一句 `Buyers.LockActive`，FailedPrecondition 與 NotFound 都翻成 `ReviewAuthorInactive` |
+| 刪帳訂閱者只排 job、抹除 job、保底掃描 | 抹除的形狀在 review 自己 | 成立，保留；`Deactivate` 改名 `EnqueuePurge`（只排 job，不要求 transaction），保底掃描讀 `pub_inactive_buyers` |
+| 公開述詞只寫一份（`testdata/public_predicate.sql`） | 一條規則一個定義 | 成立，述詞內容改 join；`TestInactiveBuyersPredicateInlinesThePubFunction` 以 `EXPLAIN` 鎖住內聯 |
+| `AuthorInactive`：`Submit` tx 外的提早檢查 | 必要條件是「被擋的請求不做 Finalize 轉正圖片」 | 成立，保留；tx 內的 `LockActive` 才是正確性保證，提早檢查只省成本 |
+
+觸發條件（改為 buyer 加 `WHERE status <> 'ACTIVE'` 的部分索引；門檻是推測，沒有量測）：`review.purge_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status <> 'ACTIVE'` 超過 10 萬列。保底掃描從 `pub_inactive_buyers()` 出發逐一 `EXISTS` 評價列（`reviews_buyer` 索引），不加索引（設計 W5 (a)）。

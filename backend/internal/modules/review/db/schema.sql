@@ -86,14 +86,6 @@ CREATE TABLE review.hides (
 CREATE UNIQUE INDEX hides_active_review ON review.hides (review_id) WHERE restored_at IS NULL;
 CREATE INDEX hides_review ON review.hides (review_id, hidden_at);
 
--- 不再營運中的買家（刪除中與已關閉）作者的複本：公開可讀的述詞引用它（NOT EXISTS），讓刪帳申請的那個 transaction 起評價就看不到、不計分
--- 。買家的狀態不回到營運中，只插入不刪除，冪等。不讀 buyer.pub_inactive_buyers()（它只給每日對帳）。
-CREATE TABLE review.inactive_authors (
-    buyer_id BIGINT      PRIMARY KEY,
-    since    TIMESTAMPTZ NOT NULL,
-    CONSTRAINT inactive_authors_buyer_check CHECK (buyer_id > 0)
-);
-
 -- media 引用的同步版本與退場資產：形狀與語意同 social（internal/mediaref）。ref 的列不刪除。
 CREATE TABLE review.media_ref_sync (
     ref_type   TEXT        NOT NULL,
