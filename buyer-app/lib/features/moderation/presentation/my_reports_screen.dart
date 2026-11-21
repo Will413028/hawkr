@@ -42,6 +42,12 @@ class MyReportsScreen extends ConsumerWidget {
   );
 
   Future<void> _reload(BuildContext context, WidgetRef ref) async {
+    for (final r in ref.read(myReportsProvider).items) {
+      if (r.hasStore() &&
+          ref.read(storeCardProvider(r.store.storeId)).hasError) {
+        ref.invalidate(storeCardProvider(r.store.storeId));
+      }
+    }
     final ok = await ref.read(myReportsProvider.notifier).reload();
     if (!ok && context.mounted) {
       _toastError(context, ref);
@@ -104,12 +110,7 @@ class MyReportsScreen extends ConsumerWidget {
                         }
                         return Padding(
                           padding: EdgeInsets.only(bottom: 16.h),
-                          child: _buildReportCard(
-                            context,
-                            ref,
-                            visible[i],
-                            locale,
-                          ),
+                          child: _buildReportCard(context, visible[i], locale),
                         );
                       },
                     ),
@@ -122,19 +123,20 @@ class MyReportsScreen extends ConsumerWidget {
 
   Widget _buildReportCard(
     BuildContext context,
-    WidgetRef ref,
     pb.MyReportItem r,
     UiLocale locale,
   ) {
     final store = r.hasStore();
-    final kind = store
-        ? ref.watch(storeCardProvider(r.store.storeId)).value?.name
-        : r.community.target.kind.uiText(locale);
+    const titleStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    );
     final outcome = store
         ? storeReportOutcomeText(r.store, locale)
         : r.community.outcome.uiText(locale);
     final category = r.category.uiText(locale);
-    final card = Container(
+    final card = Ink(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
@@ -154,14 +156,12 @@ class MyReportsScreen extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  kind ?? '',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                child: store
+                    ? StoreNameText(r.store.storeId, style: titleStyle)
+                    : Text(
+                        r.community.target.kind.uiText(locale) ?? '',
+                        style: titleStyle,
+                      ),
               ),
               if (outcome != null) ReportOutcomeChip(outcome),
             ],

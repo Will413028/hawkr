@@ -3,20 +3,22 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
+import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
+import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../seller/data/store_card_provider.dart';
 import '../data/store_report_repository.dart';
 import 'report_view_parts.dart';
 import 'store_report_detail_provider.dart';
-import 'my_reports_notifier.dart';
 import 'paged_section_widgets.dart';
 import 'store_report_supplement_screen.dart';
 
@@ -40,13 +42,31 @@ class StoreReportDetailScreen extends ConsumerWidget {
   final String reportId;
 
   Future<void> _supplement(BuildContext context, WidgetRef ref) async {
-    final added = await context.push<bool>(
+    final result = await context.push<Object>(
       storeReportSupplementRoute(reportId),
     );
-    if (added == true) {
-      ref.invalidate(storeReportDetailProvider(reportId));
-      await ref.read(myReportsProvider.notifier).reload();
+    final provider = storeReportDetailProvider(reportId);
+    if (result is pb.AddReportSupplementResponse) {
+      ref.read(provider.notifier).applySupplement(result);
+    } else if (result == storeReportSupplementStale) {
+      ref.invalidate(provider);
     }
+  }
+
+  Widget _error(WidgetRef ref, Object e) {
+    if (isAccountSuspendedError(e)) return const SizedBox.shrink();
+    final message = errorText(e, defaults: ref.read(defaultErrorTextProvider));
+    if (e is ConnectException && e.code == Code.notFound) {
+      return HkEmptyState(
+        key: const ValueKey('store-report-not-found'),
+        icon: HkIconName.emptyAfterSale,
+        message: message,
+      );
+    }
+    return PagedErrorState(
+      message: message,
+      onRetry: () => ref.invalidate(storeReportDetailProvider(reportId)),
+    );
   }
 
   @override
@@ -65,14 +85,7 @@ class StoreReportDetailScreen extends ConsumerWidget {
           Expanded(
             child: detail.when(
               loading: () => const TruckLoadingOverlay(message: '載入中...'),
-              error: (e, _) => PagedErrorState(
-                message: errorText(
-                  e,
-                  defaults: ref.read(defaultErrorTextProvider),
-                ),
-                onRetry: () =>
-                    ref.invalidate(storeReportDetailProvider(reportId)),
-              ),
+              error: (e, _) => _error(ref, e),
               data: (d) => _body(context, ref, d, locale),
             ),
           ),
@@ -88,7 +101,6 @@ class StoreReportDetailScreen extends ConsumerWidget {
     UiLocale locale,
   ) {
     final r = d.report;
-    final storeName = ref.watch(storeCardProvider(r.storeId)).value?.name ?? '';
     final outcome = storeReportOutcomeText(r, locale);
     final category = r.category.uiText(locale);
     final ownEvidence = reportOwnEvidenceCount(d);
@@ -105,8 +117,8 @@ class StoreReportDetailScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        storeName,
+                      child: StoreNameText(
+                        r.storeId,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,

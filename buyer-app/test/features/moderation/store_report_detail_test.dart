@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
@@ -11,6 +14,8 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart'
+    show Code, ConnectException, ErrorDetail;
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
@@ -57,21 +62,30 @@ class _FakeSellerReports {
   _FakeSellerReports(this.detail);
   pb.GetMyReportResponse detail;
   int gets = 0;
+  Object? getError;
+  Object? addError;
+  Completer<void>? addGate;
   final List<pb.AddReportSupplementRequest> added = [];
 
   SellerReportAppServiceClient client() => SellerReportAppServiceClient(
     FakeTransportBuilder()
         .unary(SellerReportAppService.getMyReport, (req, _) async {
           gets++;
+          if (getError != null) throw getError!;
           return detail;
         })
         .unary(SellerReportAppService.addReportSupplement, (req, _) async {
           added.add(req);
+          await addGate?.future;
+          if (addError != null) throw addError!;
           detail = pb.GetMyReportResponse(
             report: detail.report,
             supplements: [...detail.supplements, _supp('new', const [])],
           );
-          return pb.AddReportSupplementResponse(report: detail.report);
+          return pb.AddReportSupplementResponse(
+            report: detail.report,
+            supplements: detail.supplements,
+          );
         })
         .build(),
   );
@@ -82,6 +96,7 @@ Future<void> _pump(
   required FakeModeration moderation,
   required _FakeSellerReports reports,
   String initial = '/settings/reports',
+  bool Function()? cardsFailing,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
@@ -121,6 +136,7 @@ Future<void> _pump(
         sellerRepositoryProvider.overrideWithValue(
           fakeSellerRepository(
             cards: [StoreCard(id: 'store-1', name: '好店')],
+            failing: cardsFailing,
           ),
         ),
       ],
@@ -278,8 +294,144 @@ void main() {
     expect(find.text('已收到補充說明'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
-    expect(reports.gets, 2);
-    expect(moderation.listRequests.length, 2);
+    expect(reports.gets, 1);
+    expect(moderation.listRequests.length, 1);
     expect(find.text('補充說明（1/10）'), findsOneWidget);
+  });
+
+  Future<void> openSupplement(WidgetTester tester, _FakeSellerReports r) async {
+    await _pump(
+      tester,
+      moderation: FakeModeration(),
+      reports: r,
+      initial: '/settings/reports/r1',
+    );
+    await tester.tap(_button);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('store-report-supplement-description')),
+      '更多',
+    );
+    await tester.pump();
+  }
+
+  final submitFinder = find.byKey(
+    const ValueKey('store-report-supplement-submit'),
+  );
+
+  testWidgets('補充：送出中擋住返回鈕與返回手勢', (tester) async {
+    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+      ..addGate = Completer<void>();
+    await openSupplement(tester, reports);
+    await tester.tap(submitFinder);
+    await tester.pump();
+    await tester.tap(find.bySemanticsLabel('返回'));
+    await tester.pump();
+    expect(find.text('補充說明'), findsWidgets);
+    expect(tester.widget<PopScope>(find.byType(PopScope).last).canPop, isFalse);
+    reports.addGate!.complete();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    expect(reports.added, hasLength(1));
+    expect(find.text('補充說明（1/10）'), findsOneWidget);
+  });
+
+  testWidgets('補充：前置條件失敗顯示伺服器文字並關閉後重讀詳情', (tester) async {
+    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+      ..addError = ConnectException(
+        Code.failedPrecondition,
+        'x',
+        details: [
+          ErrorDetail(
+            'google.rpc.LocalizedMessage',
+            LocalizedMessage(message: '檢舉已處理').writeToBuffer(),
+          ),
+        ],
+      );
+    await openSupplement(tester, reports);
+    reports.detail = pb.GetMyReportResponse(
+      report: _store(outcome: ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN),
+    );
+    await tester.tap(submitFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('檢舉已處理'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('檢舉詳情'), findsOneWidget);
+    expect(reports.gets, 2);
+    expect(_button, findsNothing);
+  });
+
+  testWidgets('詳情：NOT_FOUND 顯示不存在狀態且沒有重試', (tester) async {
+    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+      ..getError = ConnectException(
+        Code.notFound,
+        'x',
+        details: [
+          ErrorDetail(
+            'google.rpc.LocalizedMessage',
+            LocalizedMessage(message: '找不到這筆檢舉').writeToBuffer(),
+          ),
+        ],
+      );
+    await _pump(
+      tester,
+      moderation: FakeModeration(),
+      reports: reports,
+      initial: '/settings/reports/r1',
+    );
+    expect(
+      find.byKey(const ValueKey('store-report-not-found')),
+      findsOneWidget,
+    );
+    expect(find.text('找不到這筆檢舉'), findsOneWidget);
+    expect(find.byType(ElevatedButton), findsNothing);
+    expect(find.byType(OutlinedButton), findsNothing);
+    expect(find.byType(TextButton), findsNothing);
+  });
+
+  testWidgets('詳情：停權錯誤不顯示錯誤訊息', (tester) async {
+    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+      ..getError = ConnectException(
+        Code.permissionDenied,
+        '帳號已停權',
+        details: [
+          ErrorDetail(
+            'google.rpc.ErrorInfo',
+            (ErrorInfo()
+                  ..reason = 'ACCOUNT_SUSPENDED'
+                  ..domain = 'hawkr')
+                .writeToBuffer(),
+          ),
+        ],
+      );
+    await _pump(
+      tester,
+      moderation: FakeModeration(),
+      reports: reports,
+      initial: '/settings/reports/r1',
+    );
+    expect(reports.gets, 1);
+    expect(find.text('帳號已停權'), findsNothing);
+    expect(find.text('重試'), findsNothing);
+  });
+
+  testWidgets('店名：讀取失敗時顯示骨架條，點一下重讀後顯示店名', (tester) async {
+    var failing = true;
+    await _pump(
+      tester,
+      moderation: FakeModeration(),
+      reports: _FakeSellerReports(pb.GetMyReportResponse(report: _store())),
+      initial: '/settings/reports/r1',
+      cardsFailing: () => failing,
+    );
+    expect(find.text('好店'), findsNothing);
+    final retry = find.byKey(const ValueKey('store-name-retry'));
+    expect(retry, findsOneWidget);
+    failing = false;
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(find.text('好店'), findsOneWidget);
   });
 }

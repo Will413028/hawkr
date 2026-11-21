@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -23,9 +24,12 @@ import 'rune_limit_formatter.dart';
 String storeReportSupplementRoute(String reportId) =>
     '/settings/reports/${Uri.encodeComponent(reportId)}/supplement';
 
+/// 補充被伺服器以前置條件拒絕（例如檢舉已有結果）時的關閉結果：詳情頁據此重讀。
+const storeReportSupplementStale = 'stale';
+
 const storeReportSupplementSuccessText = '已收到補充說明';
 
-/// 對自己的店家檢舉補充說明（`AddReportSupplement`）：成功後以 true 關閉。
+/// 對自己的店家檢舉補充說明（`AddReportSupplement`）：成功後以 `AddReportSupplementResponse` 關閉，前置條件失敗以 [storeReportSupplementStale] 關閉。
 class StoreReportSupplementScreen extends ConsumerStatefulWidget {
   const StoreReportSupplementScreen({super.key, required this.reportId});
 
@@ -66,7 +70,7 @@ class _StoreReportSupplementScreenState
         _photos,
         _stagedByPath,
       );
-      await ref
+      final response = await ref
           .read(storeReportRepositoryProvider)
           .addSupplement(
             reportId: widget.reportId,
@@ -75,7 +79,7 @@ class _StoreReportSupplementScreenState
           );
       if (!mounted) return;
       showFloatingToast(context, storeReportSupplementSuccessText);
-      context.pop(true);
+      context.pop(response);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -85,103 +89,116 @@ class _StoreReportSupplementScreenState
         errorText(e, defaults: ref.read(defaultErrorTextProvider)),
         isSuccess: false,
       );
+      if (e is ConnectException && e.code == Code.failedPrecondition) {
+        context.pop(storeReportSupplementStale);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      body: Column(
-        children: [
-          commonTitleTopBar(
-            context,
-            title: '補充說明',
-            backIcon: AppIcons.chevronLeft,
-            onBack: () => context.pop(),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 32.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  reportFieldLabel('說明', required: true),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    key: const ValueKey('store-report-supplement-description'),
-                    controller: _description,
-                    minLines: 4,
-                    maxLines: 8,
-                    inputFormatters: [
-                      RuneLimitFormatter(storeReportDescriptionMaxRunes),
-                    ],
-                    buildCounter:
-                        (
-                          _, {
-                          required currentLength,
-                          required isFocused,
-                          maxLength,
-                        }) => Text(
-                          '${_description.text.runes.length}/$storeReportDescriptionMaxRunes',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                    onChanged: (_) => setState(() {}),
-                    decoration: reportFieldDecoration('請補充檢舉的原因與經過'),
-                  ),
-                  SizedBox(height: 20.h),
-                  reportFieldLabel('佐證圖片'),
-                  SizedBox(height: 8.h),
-                  ReportPhotoRow(
-                    photos: _photos,
-                    maxCount: storeReportMaxEvidence,
-                    disabled: _submitting,
-                    addKey: const ValueKey('store-report-supplement-add-photo'),
-                    onAdd: _pickPhoto,
-                    onRemove: (i) => setState(() => _photos.removeAt(i)),
-                  ),
-                  SizedBox(height: 28.h),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      key: const ValueKey('store-report-supplement-submit'),
-                      onPressed: _canSubmit ? _submit : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.danger,
-                        disabledBackgroundColor: AppColors.gray300,
-                        minimumSize: const Size(0, HkControl.minTap),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: HkSpace.lg,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
+    return PopScope(
+      canPop: !_submitting,
+      child: Scaffold(
+        backgroundColor: AppColors.bgPrimary,
+        body: Column(
+          children: [
+            commonTitleTopBar(
+              context,
+              title: '補充說明',
+              backIcon: AppIcons.chevronLeft,
+              onBack: () {
+                if (!_submitting) context.pop();
+              },
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 32.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    reportFieldLabel('說明', required: true),
+                    SizedBox(height: 8.h),
+                    TextField(
+                      key: const ValueKey(
+                        'store-report-supplement-description',
                       ),
-                      child: _submitting
-                          ? SizedBox(
-                              width: 20.w,
-                              height: 20.w,
-                              child: const HkBrandLoader(
-                                tone: HkBrandLoaderTone.mono,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const HkButtonLabel(
-                              '送出補充說明',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
+                      controller: _description,
+                      minLines: 4,
+                      maxLines: 8,
+                      inputFormatters: [
+                        RuneLimitFormatter(storeReportDescriptionMaxRunes),
+                      ],
+                      buildCounter:
+                          (
+                            _, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => Text(
+                            '${_description.text.runes.length}/$storeReportDescriptionMaxRunes',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                      onChanged: (_) => setState(() {}),
+                      decoration: reportFieldDecoration('請補充檢舉的原因與經過'),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 20.h),
+                    reportFieldLabel('佐證圖片'),
+                    SizedBox(height: 8.h),
+                    ReportPhotoRow(
+                      photos: _photos,
+                      maxCount: storeReportMaxEvidence,
+                      disabled: _submitting,
+                      addKey: const ValueKey(
+                        'store-report-supplement-add-photo',
+                      ),
+                      onAdd: _pickPhoto,
+                      onRemove: (i) => setState(() => _photos.removeAt(i)),
+                    ),
+                    SizedBox(height: 28.h),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        key: const ValueKey('store-report-supplement-submit'),
+                        onPressed: _canSubmit ? _submit : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.danger,
+                          disabledBackgroundColor: AppColors.gray300,
+                          minimumSize: const Size(0, HkControl.minTap),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: HkSpace.lg,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                        ),
+                        child: _submitting
+                            ? SizedBox(
+                                width: 20.w,
+                                height: 20.w,
+                                child: const HkBrandLoader(
+                                  tone: HkBrandLoaderTone.mono,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const HkButtonLabel(
+                                '送出補充說明',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
