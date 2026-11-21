@@ -68,7 +68,7 @@ func (ReconcileArgs) Kind() string { return "seller.reconcile_suspensions" }
 
 // InsertOpts 把同一小時的排程與重啟合併。
 func (ReconcileArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: time.Hour}}
+	return jobs.SweepOpts(time.Hour)
 }
 
 // reconcileBatch 是對帳一次讀取的帳號數。

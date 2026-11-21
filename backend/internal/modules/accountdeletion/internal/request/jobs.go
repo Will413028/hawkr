@@ -9,6 +9,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const pendingBatchSize int32 = 100
@@ -39,7 +40,7 @@ type ReconcileArgs struct{}
 func (ReconcileArgs) Kind() string { return "accountdeletion.reconcile" }
 
 func (ReconcileArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: time.Hour}}
+	return jobs.SweepOpts(time.Hour)
 }
 
 type reconcileWorker struct {

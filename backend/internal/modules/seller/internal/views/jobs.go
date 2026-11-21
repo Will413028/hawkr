@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const (
@@ -26,7 +28,7 @@ func (RollupArgs) Kind() string { return rollupID }
 
 // InsertOpts 將同一個間隔內的排程與重啟合併。
 func (RollupArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: rollupInterval}}
+	return jobs.SweepOpts(rollupInterval)
 }
 
 // PurgeArgs 是原始瀏覽事件清理的工作。
@@ -37,7 +39,7 @@ func (PurgeArgs) Kind() string { return purgeID }
 
 // InsertOpts 將同一小時的排程與重啟合併。
 func (PurgeArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: purgeInterval}}
+	return jobs.SweepOpts(purgeInterval)
 }
 
 type rollupWorker struct {

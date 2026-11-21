@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // PresenceSweepInterval 是存活標記清理的間隔。清理只刪過期超過 10 分鐘的列，讀取與計數都只認未過期的列，所以間隔不影響正確性，只決定表的大小。
@@ -18,7 +20,9 @@ func (PresenceSweepArgs) Kind() string { return "im.presence_sweep" }
 
 // InsertOpts 以 PresenceSweepInterval 為唯一性的時間窗：同一個週期內的排程與重啟合併，窗過了就能再排。
 func (PresenceSweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByPeriod: PresenceSweepInterval}}
+	o := jobs.SweepOpts(PresenceSweepInterval)
+	o.MaxAttempts = 1
+	return o
 }
 
 type presenceSweepWorker struct {

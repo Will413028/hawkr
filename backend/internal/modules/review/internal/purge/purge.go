@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
@@ -72,10 +71,7 @@ func (PurgeAuthorArgs) Kind() string { return "review.purge_author" }
 // 該身分進入刪除後不再有新資料，執行中的 job 已涵蓋全部。買家進入刪除中之後沒有新評價：Submit 在 transaction 內持 LockAuthor 再查 inactive_authors，
 // 與 Deactivate 串行，所以清除 job 看不到之後才提交的評價。
 func (PurgeAuthorArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
-	}}}
+	return jobs.UniqueByArgs(10)
 }
 
 // Deactivate 是買家刪帳時同 transaction 的原子狀態變更：記進 inactive_authors、排清除 job。
@@ -249,7 +245,9 @@ func (SweepArgs) Kind() string { return "review.purge_sweep" }
 
 // InsertOpts 以 SweepInterval 為唯一性的時間窗：同一個週期內的排程與重啟合併，窗過了就能再排。
 func (SweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByPeriod: SweepInterval}}
+	o := jobs.SweepOpts(SweepInterval)
+	o.MaxAttempts = 1
+	return o
 }
 
 type sweepWorker struct {

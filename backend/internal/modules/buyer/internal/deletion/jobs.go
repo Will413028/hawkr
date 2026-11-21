@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // CleanupArgs 清理已關閉且超過保留期限個資的工作。
@@ -42,5 +44,5 @@ func (service *Service) PeriodicJobs() []*river.PeriodicJob {
 
 // InsertOpts 將同一小時的排程與重啟合併；下一小時不受已完成工作的保留時間影響。
 func (CleanupArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: time.Hour}}
+	return jobs.SweepOpts(time.Hour)
 }

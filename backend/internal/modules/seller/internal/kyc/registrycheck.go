@@ -9,13 +9,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // 公司型申請送件時的登記資料查詢快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「登記資料快照」）。流程（三段式，backend AGENTS.md 規則 5）：
@@ -76,14 +76,6 @@ const (
 // registryCheckDeadline 是一筆查詢的期限。
 func registryCheckDeadline(requestedAt time.Time) time.Time { return requestedAt.Add(registryDeadline) }
 
-// 唯一鍵涵蓋「還沒有結果」的狀態（排隊中、執行中、等重試）；不含 completed，也不含 discarded／cancelled：被丟棄的 job 之後要能補排。
-func registryOpenStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable,
-		rivertype.JobStateScheduled,
-	}
-}
-
 // RegistryCheckArgs 是一次登記資料查詢的 job，以 check_id 為唯一鍵。
 type RegistryCheckArgs struct {
 	CheckID uuid.UUID `json:"check_id" river:"unique"`
@@ -94,7 +86,7 @@ func (RegistryCheckArgs) Kind() string { return "seller.kyc_registry_check" }
 
 // InsertOpts 是排入選項：以 check_id 去重（不含已完成的），重試上限 registryMaxAttempts 只防失控。
 func (RegistryCheckArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: registryMaxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: registryOpenStates()}}
+	return jobs.UniqueByArgs(registryMaxAttempts)
 }
 
 // enqueueRegistryCheck 排入查詢 job；inserted 為 false 表示被唯一鍵略過（同一筆查詢還有排隊、執行或等重試的 job）。
@@ -194,7 +186,7 @@ func (RegistrySweepArgs) Kind() string { return "seller.kyc_registry_sweep" }
 
 // InsertOpts 把同一段時間內的排程與重啟合併。
 func (RegistrySweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: registrySweepInterval / 2}}
+	return jobs.SweepOpts(registrySweepInterval / 2)
 }
 
 type registrySweepWorker struct {

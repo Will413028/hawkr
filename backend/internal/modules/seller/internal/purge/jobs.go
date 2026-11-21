@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // jobID 是排程的識別，也是 River job 的 kind。
@@ -18,7 +20,7 @@ func (Args) Kind() string { return jobID }
 
 // InsertOpts 將同一小時的排程與重啟合併；下一小時不受已完成工作的保留時間影響（同 buyer 的清理）。
 func (Args) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: time.Hour}}
+	return jobs.SweepOpts(time.Hour)
 }
 
 type worker struct {

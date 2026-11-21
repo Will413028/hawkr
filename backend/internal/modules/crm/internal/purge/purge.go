@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -67,10 +66,7 @@ func (ErasePartyArgs) Kind() string { return "crm.erase_party" }
 // InsertOpts 讓同一個身分還沒完成的 job 合併：唯一鍵是 (PartyKind, PartyID)，含執行中的狀態（River 要求 available、pending、running、
 // retryable、scheduled 都在內）。身分進入刪除之後投影不再寫它的資料（inactive 檢查與 Deactivate 以身分鎖串行），所以執行中的 job 已涵蓋全部。
 func (ErasePartyArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
-	}}}
+	return jobs.UniqueByArgs(10)
 }
 
 // Deactivate 是刪帳或退場時同 transaction 的原子狀態變更：先持該身分的 advisory lock（與投影串行），記進 inactive_parties、排清除 job。
@@ -202,7 +198,9 @@ func (SweepArgs) Kind() string { return "crm.erase_sweep" }
 
 // InsertOpts 以 SweepInterval 為唯一性的時間窗：同一個週期內的排程與重啟合併，窗過了就能再排。
 func (SweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByPeriod: SweepInterval}}
+	o := jobs.SweepOpts(SweepInterval)
+	o.MaxAttempts = 1
+	return o
 }
 
 type sweepWorker struct {
