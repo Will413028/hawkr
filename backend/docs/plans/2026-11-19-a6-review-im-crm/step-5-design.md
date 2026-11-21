@@ -20,7 +20,7 @@
 | 3 | ReplyReview | 對外 | `ReviewAppService.ReplyReview`（店家身分由評價所屬店推導，`CapMarketing`） | 5b |
 | 4 | SubmitOrderReview | 對外 | `ReviewAppService.CreateReview` | 5b |
 | 5 | ListMyOrderReviews | 對外 | `ReviewAppService.ListMyReviews`（篩選 `order_item_id`，取代 SA 翻頁找單一明細） | 5b |
-| 6 | GetSellerOrderReviews | 對外，拆二 | `ReviewPublicService.ListStoreReviews`（觀看者封鎖過濾）＋`ReviewAppService.ListOwnStoreReviews`（`store_id`，不濾） | 5b |
+| 6 | GetSellerOrderReviews | 對外，拆二 | `ReviewPublicService.ListStoreReviews`（觀看者封鎖過濾）＋`ReviewAppService.ListOwnStoreReviews`（呼叫者此刻的店，不帶 `store_id`，不濾；W1 (g)） | 5b |
 | 7 | GetSellerOrderReviewStats | 對外 | `ReviewPublicService.GetStoreReviewStats`（公開與自己的店數字相同，A6-D4 統計不濾，一支即可） | 5b |
 | 8 | ListStoreRatingStats | 單體內 | `review.StoreRatingStats`，6e 換接線 | — |
 | 9 | HideReview | 單體內 | `review.Hide/Restore`（A6-4b） | — |
@@ -56,7 +56,7 @@
 
 ## 2. 服務與身分
 
-- `ReviewPublicService`（未登入可讀；觀看者可選，宣告 `publicViewerDependent`）、`ReviewAppService`（登入）。評價是買家與店家共用的資源（買家寫、店家回），照 10-17 修訂用 `<模組>AppService`，身分由資源推導：`CreateReview`、`ListMyReviews` 是買家；`ReplyReview` 由評價所屬店推導店家身分並向 seller 檢查 `CapMarketing`；`ListOwnStoreReviews` 帶 `store_id`，向 seller 檢查呼叫者擁有該店。
+- `ReviewPublicService`（未登入可讀；觀看者可選，宣告 `publicViewerDependent`）、`ReviewAppService`（登入）。評價是買家與店家共用的資源（買家寫、店家回），照 10-17 修訂用 `<模組>AppService`，身分由資源推導：`CreateReview`、`ListMyReviews` 是買家；`ReplyReview` 由評價所屬店推導店家身分並向 seller 檢查 `CapMarketing`；`ListOwnStoreReviews` 不帶 `store_id`，店家由 `seller.CurrentStore` 推導（W1 (g)，與 social 的 `ListMyPosts` 同形）。
 - `ChatAppService`：聊天也是共用資源。單一對話或訊息上的方法（`ListMessages`、`SendMessage` 對既有對話、`MarkConversationRead`）由對話歸屬推導 Party：呼叫者是對話的買家方，或擁有對話的店；自己跟自己的店不能對話（`SELF_MESSAGE_NOT_ALLOWED`），所以同一帳號在同一對話只會有一種身分【推，依 im `Send` 守門】。沒有單一資源可推導的方法（列表、未讀、全部已讀、串流、presence、開新對話）見 W1。
 - `CrmAppService`：資源只屬於店家，方法都帶 `store_id`（資源的上層），向 seller 宣告 `CapMarketing`。不叫 `SellerAppService` 的方法：CRM 是 crm 模組擁有的資源，服務屬於擁有資源的模組（規範 L23–31）。
 - 所有新方法進 `httpapi/effects.go` 的 customerEffects（讀＝Read、寫＝Write）、店家身分方法進 seller 能力宣告表；漏列啟動失敗【量，facts §2】。讀取標 `NO_SIDE_EFFECTS`；`MarkConversationRead`、`MarkAllRead` 是寫。
