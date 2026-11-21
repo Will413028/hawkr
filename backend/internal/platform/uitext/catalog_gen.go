@@ -938,6 +938,53 @@ func (t Text) SellerPaymentAccountPayoutsInactiveNote() string {
 	return "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。"
 }
 
+// SellerReportOutcome 是 seller.ReportOutcome 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerReportOutcome(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "ACTION_TAKEN":
+			return "已採取措施", true
+		case "NO_VIOLATION":
+			return "未違規", true
+		case "INSUFFICIENT":
+			return "內容不足", true
+		case "DUPLICATE":
+			return "重複", true
+		case "ABUSIVE":
+			return "濫報", true
+		}
+		return "", false
+	}
+	if t.Locale() == EN {
+		switch v {
+		case "ACTION_TAKEN":
+			return "Resolved (action taken)", true
+		case "NO_VIOLATION":
+			return "Resolved (no violation)", true
+		case "INSUFFICIENT":
+			return "Resolved (insufficient information)", true
+		case "DUPLICATE":
+			return "Resolved (duplicate report)", true
+		case "ABUSIVE":
+			return "Resolved (not accepted)", true
+		}
+	}
+	switch v {
+	case "ACTION_TAKEN":
+		return "已處理（已採取措施）", true
+	case "NO_VIOLATION":
+		return "已處理（不違規）", true
+	case "INSUFFICIENT":
+		return "已處理（資料不足）", true
+	case "DUPLICATE":
+		return "已處理（重複檢舉）", true
+	case "ABUSIVE":
+		return "已處理（不受理）", true
+	}
+	return "", false
+}
+
 // SellerRevokeReason 是 seller.RevokeReason 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerRevokeReason(v string) (string, bool) {
@@ -1026,6 +1073,14 @@ func (t Text) SellerStoreField(v string) (string, bool) {
 		return "商店電話", true
 	}
 	return "", false
+}
+
+// SellerStoreReportOutcomeUnset 是 seller.StoreReport.outcome_unset 的文案。
+func (t Text) SellerStoreReportOutcomeUnset() string {
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
 }
 
 // SellerTerminationGround 是 seller.TerminationGround 的文案。

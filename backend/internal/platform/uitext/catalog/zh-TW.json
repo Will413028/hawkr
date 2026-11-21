@@ -666,6 +666,26 @@
       "message": "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。",
       "description": "收款已啟用但撥款（payouts_active 為 false）尚未啟用時，接在收款帳戶說明後的一行。"
     },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "已處理（不受理）",
+      "description": "濫用檢舉。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "已處理（已採取措施）",
+      "description": "平台採取了措施（只會是案件裡的檢舉）。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "已處理（重複檢舉）",
+      "description": "與另一筆檢舉重複。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "已處理（資料不足）",
+      "description": "內容不足，無法判斷。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "已處理（不違規）",
+      "description": "查過之後沒有違規。"
+    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"
@@ -769,6 +789,10 @@
     "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL": {
       "message": "客服電子信箱",
       "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）都用這一套。（值 STORE_FIELD_SUPPORT_EMAIL）"
+    },
+    "seller.StoreReport.outcome_unset": {
+      "message": "審核中",
+      "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
     },
     "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY": {
       "message": "破產",
@@ -936,6 +960,26 @@
     "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_REJECTED": {
       "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆駁回} MEASURE_REQUEST_KIND_REMEDIATION {解除請求駁回} other {請求駁回}}",
       "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "濫報",
+      "description": "濫用檢舉。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "已採取措施",
+      "description": "平台採取了措施（只會是案件裡的檢舉）。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "重複",
+      "description": "與另一筆檢舉重複。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "內容不足",
+      "description": "內容不足，無法判斷。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "未違規",
+      "description": "查過之後沒有違規。\n受眾：後台員工"
     }
   },
   "variants": {

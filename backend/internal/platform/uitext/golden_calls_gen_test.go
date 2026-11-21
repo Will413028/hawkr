@@ -136,6 +136,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
 	case "seller.PaymentAccount.payouts_inactive_note":
 		return t.SellerPaymentAccountPayoutsInactiveNote(), true
+	case "seller.ReportOutcome":
+		return t.SellerReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
 	case "seller.RevokeReason":
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":
@@ -144,6 +146,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerSellerRequirement(goldenEnum(c.Value, "SELLER_REQUIREMENT_"))
 	case "seller.StoreField":
 		return t.SellerStoreField(goldenEnum(c.Value, "STORE_FIELD_"))
+	case "seller.StoreReport.outcome_unset":
+		return t.SellerStoreReportOutcomeUnset(), true
 	case "seller.TerminationGround":
 		return t.SellerTerminationGround(goldenEnum(c.Value, "TERMINATION_GROUND_"))
 	case "seller.ViolationSeverity":

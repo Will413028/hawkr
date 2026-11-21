@@ -196,7 +196,7 @@ class StoreReport extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   $0.Timestamp ensureResolveTime() => $_ensure(8);
 
-  /// 結果；還沒有結果時是 UNSPECIFIED（處理中）。
+  /// 結果；還沒有結果時不設（與 resolve_time 不設同時成立）。
   @$pb.TagNumber(10)
   ReportOutcome get outcome => $_getN(9);
   @$pb.TagNumber(10)

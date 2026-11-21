@@ -5,6 +5,7 @@ import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { UiMessage } from "./message";
@@ -156,6 +157,11 @@ export type UiTextKey =
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE"
 	| "seller.PaymentAccount.payouts_inactive_note"
+	| "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE"
+	| "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN"
+	| "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE"
+	| "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT"
+	| "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -182,6 +188,7 @@ export type UiTextKey =
 	| "seller.StoreField.STORE_FIELD_CONTACT_NAME"
 	| "seller.StoreField.STORE_FIELD_CONTACT_PHONE"
 	| "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL"
+	| "seller.StoreReport.outcome_unset"
 	| "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY"
 	| "seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS"
 	| "seller.TerminationGround.TERMINATION_GROUND_DISSOLUTION"
@@ -711,6 +718,21 @@ export function sellerPaymentAccountPayoutsInactiveNote(): UiMessage {
 	return { key: "seller.PaymentAccount.payouts_inactive_note" };
 }
 
+const SELLER_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN",
+	2: "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
+	3: "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT",
+	4: "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE",
+	5: "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE",
+};
+
+/** seller.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerReportOutcome(v: SellerReportOutcome): UiMessage | undefined {
+	const key = SELLER_REPORT_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const SELLER_REVOKE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED",
 	2: "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION",
@@ -775,6 +797,11 @@ export function sellerStoreField(v: StoreField): UiMessage | undefined {
 	const key = SELLER_STORE_FIELD[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+/** seller.StoreReport.outcome_unset */
+export function sellerStoreReportOutcomeUnset(): UiMessage {
+	return { key: "seller.StoreReport.outcome_unset" };
 }
 
 const SELLER_TERMINATION_GROUND: Readonly<Partial<Record<number, UiTextKey>>> = {

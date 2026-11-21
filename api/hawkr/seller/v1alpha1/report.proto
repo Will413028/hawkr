@@ -33,7 +33,7 @@ service SellerReportAppService {
   rpc AddReportSupplement(AddReportSupplementRequest) returns (AddReportSupplementResponse);
 }
 
-// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時，使用它的 optional 欄位不設值；UNSPECIFIED 不帶意義，伺服器不回。
 enum ReportOutcome {
   REPORT_OUTCOME_UNSPECIFIED = 0;
   // 平台採取了措施（只會是案件裡的檢舉）。
@@ -66,8 +66,8 @@ message StoreReport {
   google.protobuf.Timestamp create_time = 8;
   // 結果設定的時間；還沒有結果時不設。
   google.protobuf.Timestamp resolve_time = 9;
-  // 結果；還沒有結果時是 UNSPECIFIED（處理中）。
-  ReportOutcome outcome = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結果；還沒有結果時不設（與 resolve_time 不設同時成立）。
+  optional ReportOutcome outcome = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message CreateReportRequest {

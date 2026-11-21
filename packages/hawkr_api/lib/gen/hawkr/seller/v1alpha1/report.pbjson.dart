@@ -81,8 +81,13 @@ const StoreReport$json = {
       '5': 14,
       '6': '.hawkr.seller.v1alpha1.ReportOutcome',
       '8': {},
-      '10': 'outcome'
+      '9': 0,
+      '10': 'outcome',
+      '17': true
     },
+  ],
+  '8': [
+    {'1': '_outcome'},
   ],
 };
 
@@ -94,9 +99,9 @@ final $typed_data.Uint8List storeReportDescriptor = $convert.base64Decode(
     'N5Q2F0ZWdvcnlSCGNhdGVnb3J5EiAKC2Rlc2NyaXB0aW9uGAYgASgJUgtkZXNjcmlwdGlvbhIn'
     'Cg9yZXNvbHV0aW9uX25vdGUYByABKAlSDnJlc29sdXRpb25Ob3RlEjsKC2NyZWF0ZV90aW1lGA'
     'ggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIKY3JlYXRlVGltZRI9CgxyZXNvbHZl'
-    'X3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgtyZXNvbHZlVGltZRJDCg'
+    'X3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgtyZXNvbHZlVGltZRJICg'
     'dvdXRjb21lGAogASgOMiQuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydE91dGNvbWVCA+BB'
-    'A1IHb3V0Y29tZQ==');
+    'A0gAUgdvdXRjb21liAEBQgoKCF9vdXRjb21l');
 
 @$core.Deprecated('Use createReportRequestDescriptor instead')
 const CreateReportRequest$json = {

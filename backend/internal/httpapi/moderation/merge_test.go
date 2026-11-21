@@ -260,6 +260,18 @@ func TestListMyReportsStoreItemCarriesTheStoreReportAndSharedFields(t *testing.T
 	}
 }
 
+func TestListMyReportsUnresolvedStoreItemHasNoOutcome(t *testing.T) {
+	e := newEnvWith(t, &pagedCommunity{}, &pagedStores{rows: []sellermod.Report{storeReport(1, 9)}})
+	resp, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{}))
+	if err != nil || len(resp.Msg.GetReports()) != 1 {
+		t.Fatalf("%v %v", resp.Msg, err)
+	}
+	it := resp.Msg.GetReports()[0]
+	if it.GetStore().Outcome != nil || it.ResolveTime != nil {
+		t.Fatalf("outcome=%v 解決時間=%v", it.GetStore().Outcome, it.GetResolveTime())
+	}
+}
+
 func TestListMyReportsSourceReturningFewerThanSizeWithNextLosesNothing(t *testing.T) {
 	c := &pagedCommunity{rows: sortedCommunity(community(1, 1), community(3, 3), community(5, 5), community(7, 7))}
 	s := &shortStores{pagedStores{rows: sortedStores(storeReport(2, 2), storeReport(4, 4), storeReport(6, 6), storeReport(8, 8))}}

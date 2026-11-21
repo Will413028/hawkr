@@ -30,7 +30,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時，使用它的 optional 欄位不設值；UNSPECIFIED 不帶意義，伺服器不回。
 type ReportOutcome int32
 
 const (
@@ -112,8 +112,8 @@ type StoreReport struct {
 	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
 	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
-	// 結果；還沒有結果時是 UNSPECIFIED（處理中）。
-	Outcome       ReportOutcome `protobuf:"varint,10,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	// 結果；還沒有結果時不設（與 resolve_time 不設同時成立）。
+	Outcome       *ReportOutcome `protobuf:"varint,10,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome,oneof" json:"outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -212,8 +212,8 @@ func (x *StoreReport) GetResolveTime() *timestamppb.Timestamp {
 }
 
 func (x *StoreReport) GetOutcome() ReportOutcome {
-	if x != nil {
-		return x.Outcome
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
 	}
 	return ReportOutcome_REPORT_OUTCOME_UNSPECIFIED
 }
@@ -722,7 +722,7 @@ var File_hawkr_seller_v1alpha1_report_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xc6\x03\n" +
+	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xd7\x03\n" +
 	"\vStoreReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
@@ -734,9 +734,11 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\x0fresolution_note\x18\a \x01(\tR\x0eresolutionNote\x12;\n" +
 	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTime\x12=\n" +
-	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\vresolveTime\x12C\n" +
+	"\fresolve_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\vresolveTime\x12H\n" +
 	"\aoutcome\x18\n" +
-	" \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcome\"\x94\x02\n" +
+	" \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03H\x00R\aoutcome\x88\x01\x01B\n" +
+	"\n" +
+	"\b_outcome\"\x94\x02\n" +
 	"\x13CreateReportRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12F\n" +
 	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\bcategory\x12%\n" +
@@ -846,6 +848,7 @@ func file_hawkr_seller_v1alpha1_report_proto_init() {
 	if File_hawkr_seller_v1alpha1_report_proto != nil {
 		return
 	}
+	file_hawkr_seller_v1alpha1_report_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

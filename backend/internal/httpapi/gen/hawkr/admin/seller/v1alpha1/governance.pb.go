@@ -332,8 +332,8 @@ type Report struct {
 	// 第一次分案的時間，移動不改；沒有分案過時不設。
 	TriageTime       *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=triage_time,json=triageTime,proto3" json:"triage_time,omitempty"`
 	TriagedByAdminId string                 `protobuf:"bytes,15,opt,name=triaged_by_admin_id,json=triagedByAdminId,proto3" json:"triaged_by_admin_id,omitempty"`
-	// 結果；還沒有結果時是 UNSPECIFIED。
-	Outcome v1alpha11.ReportOutcome `protobuf:"varint,16,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	// 結果；還沒有結果時不設（與 resolve_time 不設同時成立）。
+	Outcome *v1alpha11.ReportOutcome `protobuf:"varint,16,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome,oneof" json:"outcome,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
 	ResolveTime       *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
 	ResolvedByAdminId string                 `protobuf:"bytes,18,opt,name=resolved_by_admin_id,json=resolvedByAdminId,proto3" json:"resolved_by_admin_id,omitempty"`
@@ -497,8 +497,8 @@ func (x *Report) GetTriagedByAdminId() string {
 }
 
 func (x *Report) GetOutcome() v1alpha11.ReportOutcome {
-	if x != nil {
-		return x.Outcome
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
 	}
 	return v1alpha11.ReportOutcome(0)
 }
@@ -5555,7 +5555,7 @@ var File_hawkr_admin_seller_v1alpha1_governance_proto protoreflect.FileDescripto
 
 const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\n" +
-	",hawkr/admin/seller/v1alpha1/governance.proto\x12\x1bhawkr.admin.seller.v1alpha1\x1a1hawkr/admin/seller/v1alpha1/authority_order.proto\x1a.hawkr/admin/seller/v1alpha1/case_inquiry.proto\x1a)hawkr/admin/seller/v1alpha1/measure.proto\x1a$hawkr/common/v1alpha1/deadline.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x0f\n" +
+	",hawkr/admin/seller/v1alpha1/governance.proto\x12\x1bhawkr.admin.seller.v1alpha1\x1a1hawkr/admin/seller/v1alpha1/authority_order.proto\x1a.hawkr/admin/seller/v1alpha1/case_inquiry.proto\x1a)hawkr/admin/seller/v1alpha1/measure.proto\x1a$hawkr/common/v1alpha1/deadline.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb5\x0f\n" +
 	"\x06Report\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
@@ -5572,8 +5572,8 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"\x11assessed_category\x18\r \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x03R\x10assessedCategory\x12@\n" +
 	"\vtriage_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"triageTime\x122\n" +
-	"\x13triaged_by_admin_id\x18\x0f \x01(\tB\x03\xe0A\x03R\x10triagedByAdminId\x12C\n" +
-	"\aoutcome\x18\x10 \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03R\aoutcome\x12B\n" +
+	"\x13triaged_by_admin_id\x18\x0f \x01(\tB\x03\xe0A\x03R\x10triagedByAdminId\x12H\n" +
+	"\aoutcome\x18\x10 \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03H\x00R\aoutcome\x88\x01\x01\x12B\n" +
 	"\fresolve_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vresolveTime\x124\n" +
 	"\x14resolved_by_admin_id\x18\x12 \x01(\tB\x03\xe0A\x03R\x11resolvedByAdminId\x12,\n" +
 	"\x0fresolution_note\x18\x13 \x01(\tB\x03\xe0A\x03R\x0eresolutionNote\x12F\n" +
@@ -5596,7 +5596,9 @@ const file_hawkr_admin_seller_v1alpha1_governance_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18# \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12M\n" +
-	"\x0ftriage_deadline\x18$ \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0etriageDeadlineJ\x04\b\t\x10\n" +
+	"\x0ftriage_deadline\x18$ \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0etriageDeadlineB\n" +
+	"\n" +
+	"\b_outcomeJ\x04\b\t\x10\n" +
 	"J\x04\b\n" +
 	"\x10\vJ\x04\b\x18\x10\x19R\acontactR\x12contact_erase_timeR\x1adiscarded_submission_count\"\xc2\x01\n" +
 	"\x10ReportSupplement\x12\x0e\n" +
@@ -6356,6 +6358,7 @@ func file_hawkr_admin_seller_v1alpha1_governance_proto_init() {
 	file_hawkr_admin_seller_v1alpha1_authority_order_proto_init()
 	file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_init()
 	file_hawkr_admin_seller_v1alpha1_measure_proto_init()
+	file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[0].OneofWrappers = []any{}
 	file_hawkr_admin_seller_v1alpha1_governance_proto_msgTypes[5].OneofWrappers = []any{
 		(*CaseTarget_Join)(nil),
 		(*CaseTarget_OpenNew)(nil),

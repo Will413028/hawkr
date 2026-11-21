@@ -186,6 +186,11 @@ return "生效中";
 	"seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW": () => "完成平台審核",
 	"seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PAYMENT_ACCOUNT": () => "設定收款帳戶",
 	"seller.PaymentAccount.payouts_inactive_note": () => "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。",
+	"seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": () => "已處理（已採取措施）",
+	"seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "已處理（不違規）",
+	"seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": () => "已處理（資料不足）",
+	"seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": () => "已處理（重複檢舉）",
+	"seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": () => "已處理（不受理）",
 	"seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED": () => "申覆成立",
 	"seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": () => "平台更正",
 	"seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION": () => "主管機關或法院的決定",
@@ -212,6 +217,7 @@ return "生效中";
 	"seller.StoreField.STORE_FIELD_CONTACT_MOBILE": () => "聯絡人手機",
 	"seller.StoreField.STORE_FIELD_SUPPORT_EMAIL": () => "客服電子信箱",
 	"seller.StoreField.STORE_FIELD_CONTACT_PHONE": () => "商店電話",
+	"seller.StoreReport.outcome_unset": () => "審核中",
 	"seller.TerminationGround.TERMINATION_GROUND_NOTICE": () => "預告終止（第 21.2 條）",
 	"seller.TerminationGround.TERMINATION_GROUND_MATERIAL_BREACH": () => "重大違約未改善",
 	"seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS": () => "停業",
@@ -291,6 +297,11 @@ default:
 return "請求已結案";
 }
 })(),
+	"seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": () => "已採取措施",
+	"seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "未違規",
+	"seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": () => "內容不足",
+	"seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": () => "重複",
+	"seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": () => "濫報",
 };
 
 /**

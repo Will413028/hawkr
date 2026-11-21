@@ -435,3 +435,17 @@ func TestTriageAndMoveForwardTheExplicitTarget(t *testing.T) {
 	}))
 	wantInvalidArgument(t, err)
 }
+
+func TestToReportOutcomeIsUnsetUntilResolved(t *testing.T) {
+	report := foodSafetyReport()
+	if got := toReport(report); got.Outcome != nil || got.GetResolveTime() != nil {
+		t.Fatalf("未處理：outcome=%v resolve_time=%v", got.Outcome, got.GetResolveTime())
+	}
+	noViolation, resolvedAt := model.OutcomeNoViolation, report.CreatedAt
+	resolved := report.Report
+	resolved.Outcome, resolved.ResolvedAt = &noViolation, &resolvedAt
+	got := toReport(model.AdminReport{Report: resolved, Availability: model.ReportFacts{Report: resolved}.Availability()})
+	if got.Outcome == nil || got.GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_NO_VIOLATION || got.GetResolveTime() == nil {
+		t.Fatalf("已處理：outcome=%v resolve_time=%v", got.Outcome, got.GetResolveTime())
+	}
+}

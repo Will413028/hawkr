@@ -202,7 +202,8 @@ func toReport(r model.AdminReport) *adminpb.Report {
 		out.AssessedCategory = rpc.EnumToProto[commonpb.PolicyCategory](*r.AssessedCategory)
 	}
 	if r.Outcome != nil {
-		out.Outcome = rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
+		o := rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
+		out.Outcome = &o
 	}
 	out.ReporterBuyerId = rpc.FormatID(r.ReporterBuyerID)
 	out.Evidence = toEvidence(len(r.Evidence), func(i int) string { return reportEvidenceURI(r.ID, i) })

@@ -217,6 +217,22 @@ test("通報內容、檢舉人、佐證與處理：登入的檢舉人是買家 I
 	assert.doesNotMatch(text, /補充/u, "沒有補充就沒有補充區塊");
 });
 
+test("結果：還沒有結果（沒有設值）顯示「-」，有結果顯示名稱", async () => {
+	await openPage(transportWith({ getReport: () => ({ report: report({}) }) }));
+	assert.match(bodyText(), /結果-結案/u);
+	await openPage(
+		transportWith({
+			getReport: () => ({
+				report: report({
+					state: ReportState.RESOLVED,
+					outcome: ReportOutcome.DUPLICATE,
+				}),
+			}),
+		}),
+	);
+	assert.match(bodyText(), /結果重複結案/u);
+});
+
 test("補充依序列出；佐證分原通報與補充", async () => {
 	const evidence = (position: number) =>
 		create(EvidenceSchema, {

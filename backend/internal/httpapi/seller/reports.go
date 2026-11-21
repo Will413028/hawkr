@@ -103,7 +103,8 @@ func ToStoreReport(r model.Report) *pb.StoreReport {
 		out.ResolveTime = timestamppb.New(*r.ResolvedAt)
 	}
 	if r.Outcome != nil {
-		out.Outcome = rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
+		o := rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
+		out.Outcome = &o
 	}
 	return out
 }

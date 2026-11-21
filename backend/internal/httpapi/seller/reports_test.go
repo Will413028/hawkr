@@ -101,7 +101,7 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 		len(in.EvidenceTokens) != 1 {
 		t.Fatalf("in=%+v", in)
 	}
-	if got.Msg.GetReport().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_UNSPECIFIED || got.Msg.GetReport().GetStoreId() != "12" ||
+	if got.Msg.GetReport().Outcome != nil || got.Msg.GetReport().GetStoreId() != "12" ||
 		got.Msg.GetSupplemented() || got.Msg.GetNotice() != nil {
 		t.Fatalf("report=%v", got.Msg)
 	}
@@ -115,6 +115,19 @@ func TestCreateReportUsesTheCallersBuyer(t *testing.T) {
 	}
 	if _, err := h.CreateReport(accountCtx(6), connect.NewRequest(req)); err == nil || apperr.KindOf(err) == apperr.KindNotFound {
 		t.Fatalf("存活的帳號沒有買家是不變量被破壞（internal），不是 not_found：%v", err)
+	}
+}
+
+func TestGetMyReportUnresolvedHasNoOutcome(t *testing.T) {
+	reportID := uuid.NewV7()
+	m := &reportModule{detail: model.Report{ID: reportID, StoreID: 12, Category: policy.Fraud, Description: "d", CreatedAt: governanceNow}}
+	h := newTestReports(t, m, buyersOf{5: 500})
+	got, err := h.GetMyReport(accountCtx(5), connect.NewRequest(&pb.GetMyReportRequest{ReportId: reportID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := got.Msg.GetReport(); r.Outcome != nil || r.GetResolveTime() != nil {
+		t.Fatalf("outcome=%v resolve_time=%v", r.Outcome, r.GetResolveTime())
 	}
 }
 
