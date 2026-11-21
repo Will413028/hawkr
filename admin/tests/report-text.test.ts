@@ -28,10 +28,10 @@ function valuesOf<E extends number>(
 	);
 }
 
-test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報", () => {
+test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報｜處理中", () => {
 	assert.deepEqual(
 		valuesOf(ReportOutcome, ReportOutcome.UNSPECIFIED).map(reportOutcomeText),
-		["已採取措施", "未違規", "內容不足", "重複", "濫報"],
+		["已採取措施", "未違規", "內容不足", "重複", "濫報", "處理中"],
 	);
 	assert.equal(reportOutcomeText(ReportOutcome.UNSPECIFIED), "未知");
 	assert.equal(reportOutcomeText(99 as ReportOutcome), "未知");

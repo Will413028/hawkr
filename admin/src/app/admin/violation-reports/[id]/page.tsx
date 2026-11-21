@@ -285,7 +285,7 @@ export default function ReportDetailPage() {
 						{actorTimeText(report.triagedByAdminId, report.triageTime)}
 					</Field>
 					<Field label="結果">
-						{report.outcome === ReportOutcome.UNSPECIFIED
+						{report.outcome === ReportOutcome.PENDING
 							? NONE
 							: reportOutcomeText(report.outcome)}
 					</Field>
