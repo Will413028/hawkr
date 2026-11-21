@@ -426,6 +426,7 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                   - 已跑：`pnpm lint`、vitest（本機在高負載下有與本步無關的逾時，單檔重跑通過）、build、`design:check`；CI `56c0b4da` 全綠（website e2e 分片 5/8 的 `locale-routing.spec.ts:124` hydration 斷言首跑失敗、重跑通過）；`/code-review` 與兩輪 diff 審查 findings 11（blocking 0）：fixed 10、rejected 1（空清單不發請求，`useStoreCardViews` 的 `enabled`）。
                   - 未跑：mutation 10 筆（補充按鈕永遠顯示、拿掉 10 則上限、成功句刪後半、清單只留社群等），repo 沒有 CI mutation job，待 CI。
                   - 延後：店名讀取失敗時一直顯示佔位（`useStoreCardViews` 的 `settled` 只等於成功，沒有錯誤與重讀）；觸發條件：改 `useStoreCardViews` 或使用者回報。
+              - [ ] 10f-3m CI mutation job（Will 2026-11-21 照建議）：repo 加一個跑 mutation 清單的 CI job（清單格式：檔、舊字串→新字串、預期變紅的測試；複本裡改、測試要變紅），涵蓋 Go integration（需資料庫，只在 CI）與 website、Flutter 的單元測試；建好後補跑 10f-3a 的 integration mutation 2 筆與 10f-3c 的 10 筆。用 quality-baseline 的流程；依賴與 Action 版本照根目錄 AGENTS.md「依賴與供應鏈」先經同意。
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
               - [ ] 10f-5 權利人通報（R8）：不必登入的表單、著作權法定流程（補正、回復通知、恢復）、商標與專利的平台流程；開工前先出決定簡報。
               - [ ] 10f-6 收尾：完成定義核對、design-review、延後項回主清單。
