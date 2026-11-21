@@ -2,7 +2,7 @@
 
 唯讀審查，worktree `.worktrees/a9-1b-proto`（分支 `a9-1b-proto`），2026-11-21。路徑相對 `backend/`，除非另註。
 
-縮寫：`PS`＝`services/ai-service/db/schema/procurement.sql`；`PLAN`＝`docs/plans/2026-11-19-a9-agent.md`；`CO`＝`internal/modules/procurement/CARRYOVER.md`；`DI`＝`docs/plans/2026-11-19-a9-agent/domain-inventory.md`；`BR`＝同目錄 `decision-brief.md`；`PROTO`＝repo 根 `api/hawkr/procurement/v1alpha1/procurement.proto`；`ADR-S`＝`docs/adr/2026-11-19-ai-service-monolith-scope.md`（repo 根）；`ADR-ID`＝`docs/adr/2026-09-25-row-identity-by-data-kind.md`；`ADR-V`＝`docs/adr/2026-09-25-optimistic-concurrency-etag.md`；`ADR-C`＝`docs/adr/2026-09-25-codemeta-retirement.md`；`AI`＝`services/ai-service`。
+縮寫：`PS`＝`services/ai-service/db/schema/procurement.sql`；`PLAN`＝`backend/docs/plans/2026-11-19-a9-agent.md`；`CO`＝`internal/modules/procurement/CARRYOVER.md`；`DI`＝`backend/docs/plans/2026-11-19-a9-agent/domain-inventory.md`；`BR`＝同目錄 `decision-brief.md`；`PROTO`＝repo 根 `api/hawkr/procurement/v1alpha1/procurement.proto`；`ADR-S`＝`docs/adr/2026-11-19-ai-service-monolith-scope.md`（repo 根）；`ADR-ID`＝`docs/adr/2026-09-25-row-identity-by-data-kind.md`；`ADR-V`＝`docs/adr/2026-09-25-optimistic-concurrency-etag.md`；`ADR-C`＝`docs/adr/2026-09-25-codemeta-retirement.md`；`AI`＝`services/ai-service`。
 
 標記：【量】＝讀到或數到（附 file:line 或指令）；【推】＝推論。
 
@@ -166,7 +166,7 @@ c. `PLAN:39` 不變量表有「刪帳訂閱者」，但沒有任何一行說採�
 ### S10 買家關閉後採購資料的去向
 
 - 現況：ai-service 沒有任何刪帳處理（消費事件 0，`DI:26`）。單體已有訂閱買家刪除事件的先例：social 訂閱 `buyer.BuyerDeletionRequested`、`BuyerDeleted`，寫複本並排清除 job（`internal/modules/social/social.go:625-637`【量】）。`PLAN:39` 把「刪帳訂閱者」列在 lockorder 依賴，卻沒有一行說採購要做什麼。
-- 資料面：採購含買家自由文字（slots、訊息原文、`buyer_note`，且 `buyer_note` 已轉呈給賣家）；`accountdeletion` 有未結訂單時買家保留、完成後關閉（`docs/modules/accountdeletion.md` §3）。
+- 資料面：採購含買家自由文字（slots、訊息原文、`buyer_note`，且 `buyer_note` 已轉呈給賣家）；`accountdeletion` 有未結訂單時買家保留、完成後關閉（`backend/docs/modules/accountdeletion.md` §3）。
 - 選項：(a) 不處理（現況，系統未上線）；(b) 訂閱 `BuyerDeleted`，匿名化或刪除未發布的需求、對話、訊息，已發布的詢價與已成交的 acceptance 保留（賣家與訂單需要）；(c) 同 (b)，另對已發布的 `buyer_note` 也清除。
 - 建議 (b)：業界做法是「個資在不再需要時刪除，交易紀錄依法保留」。這同時決定 3a 的表要能被「依 buyer_id 清除」：索引與外鍵關係（`turns` 與 `requests` 的 `buyer_id` 索引）。未決的是保留期與是否匿名化 `buyer_id`，需要 Will 決定。需要補進 `CARRYOVER` 的「與 ai-service 的差異」。
 

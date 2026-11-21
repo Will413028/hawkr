@@ -7,7 +7,7 @@
 - 來源是 ai-service；搬遷計畫與決定見 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）。
 - 依賴：ordering、catalog、buyer。
 - 公開介面：`SubmitTurn`、`WatchTurn`、`LatestSession`、`Shutdown`；handler（`internal/httpapi/assistant`）呼叫它們，proto 到錯誤碼的對應見第 3 節。
-- 舊行為的 characterization fixture 在 `docs/plans/2026-11-19-a9-agent/fixtures/assistant/`（A9-2a 以替身 LLM 錄自舊 ai-service 的買家路徑；每份含輸入、替身回應、假 tool 後端資料、實際送出的事件序列）。
+- 舊行為的 characterization fixture 在 `backend/docs/plans/2026-11-19-a9-agent/fixtures/assistant/`（A9-2a 以替身 LLM 錄自舊 ai-service 的買家路徑；每份含輸入、替身回應、假 tool 後端資料、實際送出的事件序列）。
 
 ## 2. Session 儲存（A9-D5）
 
