@@ -146,17 +146,6 @@ func (q *Queries) InsertTag(ctx context.Context, arg InsertTagParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
-const isStoreInactive = `-- name: IsStoreInactive :one
-SELECT EXISTS (SELECT 1 FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = $1)
-`
-
-func (q *Queries) IsStoreInactive(ctx context.Context, storeID int64) (bool, error) {
-	row := q.db.QueryRow(ctx, isStoreInactive, storeID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const listCustomerTags = `-- name: ListCustomerTags :many
 SELECT ct.buyer_id, t.id, t.name
 FROM crm.customer_tags AS ct JOIN crm.tags AS t ON t.store_id = ct.store_id AND t.id = ct.tag_id
@@ -233,7 +222,7 @@ func (q *Queries) ListTagIDsByNames(ctx context.Context, arg ListTagIDsByNamesPa
 const listTags = `-- name: ListTags :many
 SELECT t.id, t.name FROM crm.tags AS t
 WHERE t.store_id = $1
-  AND NOT EXISTS (SELECT 1 FROM crm.inactive_parties AS ip WHERE ip.kind = 'STORE' AND ip.party_id = t.store_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = t.store_id)
 ORDER BY t.name, t.id
 `
 
@@ -266,9 +255,8 @@ func (q *Queries) ListTags(ctx context.Context, storeID int64) ([]ListTagsRow, e
 const lockCustomer = `-- name: LockCustomer :one
 SELECT c.buyer_id FROM crm.customers AS c
 WHERE c.store_id = $1 AND c.buyer_id = $2
-  AND NOT EXISTS (
-        SELECT 1 FROM crm.inactive_parties AS ip
-        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
 FOR UPDATE OF c
 `
 

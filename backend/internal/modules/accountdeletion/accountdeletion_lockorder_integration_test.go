@@ -241,7 +241,7 @@ func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
 }
 
 func newCRM(f *fixture) *crm.Module {
-	return crm.New(crm.Deps{DB: f.db, Jobs: f.queue, NewID: uuid.NewV7, Now: time.Now})
+	return crm.New(crm.Deps{DB: f.db, Jobs: f.queue, Buyers: f.buyer, Stores: f.seller, NewID: uuid.NewV7, Now: time.Now})
 }
 
 // crm 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時

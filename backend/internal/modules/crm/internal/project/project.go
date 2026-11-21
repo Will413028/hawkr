@@ -1,5 +1,5 @@
 // Package project 是消費統計的投影（過渡：ordering 搬進單體後改讀 ordering 的 pub_*，這個套件與 order_nets、ledger 退場）。
-// 兩個事件（order.completed、aftersales.refund.completed）各一個 transaction：身分 advisory lock 與 inactive 檢查 →
+// 兩個事件（order.completed、aftersales.refund.completed）各一個 transaction：守門（買家 LockNotClosed、店家 LockNotRetired，擁有者列的 FOR KEY SHARE）→
 // 鎖住該單的 order_nets 列 → ledger 去重 → 更新淨額 → 把這張單貢獻的變化量加到客戶。
 // 兩個 Record 方法的 recorded 為 true 表示事件是新的（ledger 新增一列），即使它沒有改變任何統計（同單號的第二個 order.completed、已歸零後的全額退款）。
 package project
@@ -8,11 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 	"unicode/utf8"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
@@ -21,10 +23,23 @@ const (
 	prefixRefund = "refund:"
 )
 
+// Buyers 是投影的買家守門（buyer 公開 API）：transaction 內以 FOR KEY SHARE 確認買家尚未關閉，已關閉與不存在回 NotFound。
+type Buyers interface {
+	LockNotClosed(ctx context.Context, buyerID int64) error
+}
+
+// Stores 是投影的店家守門（seller 公開 API）：transaction 內以 FOR KEY SHARE 確認店家尚未退場，已退場與不存在回 NotFound。
+type Stores interface {
+	LockNotRetired(ctx context.Context, storeID int64) error
+}
+
 // Deps 是投影的依賴。
 type Deps struct {
-	DB  *db.DB
-	Now func() time.Time
+	DB     *db.DB
+	Buyers Buyers
+	Stores Stores
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 // Service 執行投影。
@@ -81,25 +96,29 @@ func (s *Service) RecordRefund(ctx context.Context, r model.Refund) (bool, error
 	}, false)
 }
 
+// skipInactive 把守門的 NotFound（買家已關閉、店家已退場，或 ID 從未存在）當成「這筆事件不寫」：提交空的 transaction、不重試；
+// 其他錯誤原樣回傳（fail-closed）。不存在只可能是上游的壞資料（買家與店家列關閉、退場後仍保留），所以記 error log 讓它看得見。
+func (s *Service) skipInactive(ctx context.Context, err error, party string, id int64, orderNo string) error {
+	if apperr.KindOf(err) != apperr.KindNotFound {
+		return err
+	}
+	s.d.Logger.ErrorContext(ctx, "crm：投影事件的"+party+"已停用或不存在，略過", "party_id", id, "order_no", orderNo, "error", err)
+	return nil
+}
+
 func (s *Service) record(ctx context.Context, dedupKey, orderNo string, storeID, buyerID int64, apply func(old state) step, createCustomer bool) (bool, error) {
 	recorded := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		recorded = false
 		q := s.q(ctx)
-		// 身分鎖（買家先於店家，共享模式）與 Deactivate 的獨占互斥，再查 inactive_parties：沒有這把鎖時，這裡讀到「未 inactive」之後、commit 之前，
-		// 訂閱者可以 commit 並由抹除 job 先跑完，這個 transaction 隨後 commit 會重建客戶。共享模式讓投影之間不互相排隊。
-		if err := q.LockPartyShared(ctx, store.LockPartySharedParams{Kind: "BUYER", PartyID: buyerID}); err != nil {
-			return err
+		// 守門鎖是 transaction 的第一組語句（買家先於店家，列的 FOR KEY SHARE，持有到 transaction 結束）：擁有者轉移（關閉買家、店家退場）的
+		// FOR UPDATE 要等這個 transaction 提交，所以抹除 job 看不到之後才提交的投影；已關閉或已退場時事件不寫任何東西。
+		// 守門鎖在 crm 自己的列（order_nets、customers）之前取，lockorder 檢查器機械驗證順序。
+		if err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {
+			return s.skipInactive(ctx, err, "買家", buyerID, orderNo)
 		}
-		if err := q.LockPartyShared(ctx, store.LockPartySharedParams{Kind: "STORE", PartyID: storeID}); err != nil {
-			return err
-		}
-		inactive, err := q.AnyInactiveParty(ctx, store.AnyInactivePartyParams{BuyerID: buyerID, StoreID: storeID})
-		if err != nil {
-			return err
-		}
-		if inactive {
-			return nil
+		if err := s.d.Stores.LockNotRetired(ctx, storeID); err != nil {
+			return s.skipInactive(ctx, err, "店家", storeID, orderNo)
 		}
 		now := s.d.Now().UTC()
 		old, err := q.LockOrderNet(ctx, store.LockOrderNetParams{OrderNo: orderNo, StoreID: storeID, BuyerID: buyerID, Now: now})

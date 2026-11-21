@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,8 +17,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -54,10 +61,53 @@ func (q *queue) count(kind string) int {
 }
 
 type fixture struct {
-	t  *testing.T
-	db *db.DB
-	m  *crm.Module
-	q  *queue
+	t     *testing.T
+	db    *db.DB
+	m     *crm.Module
+	q     *queue
+	owner *buyer.Module
+	bus   *events.Bus
+}
+
+// guards 是 crm 的守門 port 的實作：買家走真正的 buyer 模組（LockNotClosed、關閉買家的 CloseForDeletion），店家走同形的替身（seller 的完整模組太重，
+// 真正的 seller 實作由 seller 與 cmd/hawkr 的整合測試驗證）。測試用固定的 ID，買家與店家列在第一次被守門時自動建立（營運中），已存在不動。
+type guards struct {
+	db    *db.DB
+	owner *buyer.Module
+}
+
+func ensureBuyer(ctx context.Context, d *db.DB, id int64) error {
+	_, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, 1000000 + $1::bigint, 'b', now(), now()) ON CONFLICT (buyer_id) DO NOTHING`, id)
+	return err
+}
+
+func ensureStore(ctx context.Context, d *db.DB, id int64) error {
+	_, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE VALUES ($1::bigint, $1::bigint, 2000000 + $1::bigint, 's', now(), now()) ON CONFLICT (store_id) DO NOTHING`, id)
+	return err
+}
+
+func (g *guards) LockNotClosed(ctx context.Context, id int64) error {
+	if err := ensureBuyer(ctx, g.db, id); err != nil {
+		return err
+	}
+	return g.owner.LockNotClosed(ctx, id)
+}
+
+func (g *guards) LockNotRetired(ctx context.Context, id int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("LockNotRetired 必須在 transaction 內呼叫")
+	}
+	if err := ensureStore(ctx, g.db, id); err != nil {
+		return err
+	}
+	var retired bool
+	err := g.db.Conn(ctx).QueryRow(ctx, "SELECT retired_at IS NOT NULL FROM seller.stores WHERE store_id = $1 FOR KEY SHARE", id).Scan(&retired)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && retired) {
+		return apperr.NotFound("店家已退場")
+	}
+	return err
 }
 
 var epoch = time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
@@ -79,14 +129,21 @@ func newIDs() func() uuid.UUID {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "crm", Dir: crm.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "crm", Dir: crm.Migrations()},
+	))
 	var tick atomic.Int64
 	q := &queue{}
-	m := crm.New(crm.Deps{
-		DB: d, Jobs: q, NewID: newIDs(),
-		Now: func() time.Time { return epoch.Add(time.Duration(tick.Add(1)) * time.Second) },
-	})
-	return &fixture{t: t, db: d, m: m, q: q}
+	bus := events.NewBus()
+	now := func() time.Time { return epoch.Add(time.Duration(tick.Add(1)) * time.Second) }
+	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: media.NewFake(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	g := &guards{db: d, owner: owner}
+	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: g, Stores: g, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	events.Subscribe(bus, m.OnBuyerDeleted)
+	events.Subscribe(bus, m.OnStoreRetired)
+	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus}
 }
 
 func (f *fixture) exec(sql string, args ...any) {

@@ -12,7 +12,9 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -34,6 +36,12 @@ func (p parties) OrderParties(_ context.Context, orderNo string) (orderservice.O
 	return orderservice.OrderParties{OrderNo: orderNo, BuyerID: v[0], StoreID: v[1], Status: "50"}, nil
 }
 
+// openGuards 是 crm 的守門 port 的替身：買家與店家都營運中（這組測試驗證消費端的冪等，守門本身由 crm 的整合測試驗證）。
+type openGuards struct{}
+
+func (openGuards) LockNotClosed(context.Context, int64) error  { return nil }
+func (openGuards) LockNotRetired(context.Context, int64) error { return nil }
+
 type env struct {
 	t   *testing.T
 	d   *db.DB
@@ -44,12 +52,16 @@ type env struct {
 
 func setup(t *testing.T, p parties) *env {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "crm", Dir: crm.Migrations()}))
+	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "crm", Dir: crm.Migrations()},
+	))
 	client, err := jobs.NewInsertOnly(d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := crm.New(crm.Deps{DB: d, Jobs: client, NewID: uuid.NewV7, Now: func() time.Time { return time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC) }})
+	m := crm.New(crm.Deps{DB: d, Jobs: client, Buyers: openGuards{}, Stores: openGuards{}, NewID: uuid.NewV7, Now: func() time.Time { return time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC) }})
 	q := &recordedJobs{}
 	return &env{t: t, d: d, crm: m, q: q, c: Consumer{CRM: m, Orders: p, Jobs: q}}
 }

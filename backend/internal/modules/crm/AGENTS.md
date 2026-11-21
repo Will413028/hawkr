@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `crm`（`db/schema.sql`）：`customers`（主鍵 `(store_id, buyer_id)`）、`tags`、`customer_tags`、`order_nets`（每單淨額與是否收過全額退款，投影）、`ledger`（已處理事件，投影）、`inactive_parties`（刪帳者、退場店家的複本）。沒有個資欄（暱稱、電話等）。讀取模型：無。
+schema `crm`（`db/schema.sql`）：`customers`（主鍵 `(store_id, buyer_id)`）、`tags`、`customer_tags`、`order_nets`（每單淨額與是否收過全額退款，投影）、`ledger`（已處理事件，投影）。沒有個資欄（暱稱、電話等）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -26,8 +26,8 @@ schema `crm`（`db/schema.sql`）：`customers`（主鍵 `(store_id, buyer_id)`�
 - 標籤名稱經 `trimtext.Trim`、1–50 字元，`UNIQUE (store_id, name)`；`customer_tags` 以複合 FK 保證標籤與客戶同店、且只有客戶才能貼標。每店 200 個、每位客戶 20 個（先鎖客戶列再鎖店家標籤鎖 `LockStoreTags`；建立、貼標、改名、刪除標籤都持這把鎖，名稱到 ID 的解析與檢查、插入串行）。`AddCustomerTags` 單 transaction，任何一步失敗整批回滾。
 - 客戶只在首筆完成訂單時建立，退款不建。`total_spent` 恆等於該客戶 completed 訂單 `SUM(GREATEST(net_amount, 0))`：事件在鎖住的 `order_nets` 列上算這張單貢獻的變化量，加到客戶（`total_spent + delta`，不以 `SUM` 重算）。`order_count` 是完成訂單數，退款不扣。守門：`project/net_test.go`、`TestConcurrentOrdersOfOneCustomer`。
 - 投影冪等靠 `ledger.dedup_key` 的 UNIQUE（`order:<event_id>`；退款 `refund:<external_ref_id 或 AS_REFUND_<case_no>>`，Java 每次重發退款都換 `event_id`）。River 的 unique 只是減少重複排程。
-- 刪帳與退場：訂閱者同 transaction 只寫 `inactive_parties`、排 `crm.erase_party`；投影在 transaction 內依序持買家、店家的 advisory lock（共享模式，投影之間不互相排隊；`Deactivate` 持獨占）再查 `inactive_parties`，已停用就不寫。清除 job 先 `order_nets`（ledger cascade）後 `customers`（`customer_tags` cascade），店家另刪 `tags`；`crm.erase_sweep` 每 15 分鐘補排。
-- 可見性：`inactive_parties` 裡的買家或店家，讀取（列表、詳情、標籤、`VIPStatuses`）看不到，賣家寫入回 NotFound（客戶不存在、標籤不存在），不等清除 job 跑完。守門：`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers`、`TestInactiveStoreIsInvisibleAndReadOnlyToSellers`。
+- 刪帳與退場：訂閱者同 transaction 只排 `crm.erase_party`（`EnqueueErase`，不存複本）；投影的 transaction 第一組語句取 `Buyers.LockNotClosed`、`Stores.LockNotRetired`（買家先於店家，`FOR KEY SHARE`），NotFound 就不寫並記 error log，其後才是 `LockOrderNet`。標籤與客戶寫入同樣先取守門：店家層只取 `LockNotRetired`，客戶層先 `LockNotClosed` 再 `LockNotRetired`，之後才是 `LockStoreTags`、`LockCustomer`。清除 job 先 `order_nets`（ledger cascade）後 `customers`（`customer_tags` cascade），店家另刪 `tags`；`crm.erase_sweep` 每 15 分鐘補排。
+- 可見性：已關閉的買家（`buyer.pub_closed_buyers()`）與已退場的店家（`seller.pub_retired_stores()`），讀取（列表、詳情、標籤、`VIPStatuses`）看不到，賣家寫入回 NotFound（客戶不存在、標籤不存在），不等清除 job 跑完。守門：`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers`、`TestInactiveStoreIsInvisibleAndReadOnlyToSellers`、`TestTagWriteInFlightAcrossStoreRetirementLeavesNothing`。
 - 儲存的代碼是 UPPER_SNAKE。
 
 ## 不負責

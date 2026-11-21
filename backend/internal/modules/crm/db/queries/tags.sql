@@ -28,11 +28,8 @@ DELETE FROM crm.tags WHERE store_id = sqlc.arg(store_id) AND id = sqlc.arg(id);
 -- 已退場的店家沒有標籤（可見性在清除 job 跑之前就已經改好）。
 SELECT t.id, t.name FROM crm.tags AS t
 WHERE t.store_id = sqlc.arg(store_id)
-  AND NOT EXISTS (SELECT 1 FROM crm.inactive_parties AS ip WHERE ip.kind = 'STORE' AND ip.party_id = t.store_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = t.store_id)
 ORDER BY t.name, t.id;
-
--- name: IsStoreInactive :one
-SELECT EXISTS (SELECT 1 FROM crm.inactive_parties WHERE kind = 'STORE' AND party_id = sqlc.arg(store_id));
 
 -- name: ListTagIDsByNames :many
 SELECT id, name FROM crm.tags WHERE store_id = sqlc.arg(store_id) AND name = ANY(sqlc.arg(names)::text[]);
@@ -42,9 +39,8 @@ SELECT id, name FROM crm.tags WHERE store_id = sqlc.arg(store_id) AND name = ANY
 -- inactive 的買家或店家也回 ErrNoRows。
 SELECT c.buyer_id FROM crm.customers AS c
 WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
-  AND NOT EXISTS (
-        SELECT 1 FROM crm.inactive_parties AS ip
-        WHERE (ip.kind = 'STORE' AND ip.party_id = c.store_id) OR (ip.kind = 'BUYER' AND ip.party_id = c.buyer_id))
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
 FOR UPDATE OF c;
 
 -- name: CountCustomerTags :one

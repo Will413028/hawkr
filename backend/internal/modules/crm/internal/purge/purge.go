@@ -1,5 +1,6 @@
-// Package purge 是買家刪帳與店家退場的 crm 資料清除。可見性在 job 跑之前已經改好：訂閱者在刪帳（或退場）的 transaction 內把該身分記進
-// inactive_parties（投影遇到它就不寫），只排一個 job，transaction 內的工作量固定（單體規則 4）；實際刪除由 job 分批做
+// Package purge 是買家刪帳與店家退場的 crm 資料清除。可見性在 job 跑之前已經改好：擁有者（buyer、seller）的狀態就是事實，
+// 投影與寫入在 transaction 內取 LockNotClosed、LockNotRetired（擁有者列的 FOR KEY SHARE，遇到已停用就不寫），讀取 join pub 函式；
+// 訂閱者在刪帳（或退場）的 transaction 內只排一個 job，工作量固定（單體規則 4）；實際刪除由 job 分批做
 // （一個身分的資料量沒有上限）。job 冪等：述詞是「這個身分還有 crm 資料」。
 //
 // 買家刪帳：刪該買家在各店的 order_nets（ledger 隨 ON DELETE CASCADE）與 customers（customer_tags 隨 cascade）。
@@ -19,7 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// Kind 是被刪除的身分種類，值與 inactive_parties 的 CHECK 一致。
+// Kind 是被刪除的身分種類，值是 "BUYER"、"STORE"。
 type Kind string
 
 const (
@@ -64,26 +65,16 @@ type ErasePartyArgs struct {
 func (ErasePartyArgs) Kind() string { return "crm.erase_party" }
 
 // InsertOpts 讓同一個身分還沒完成的 job 合併：唯一鍵是 (PartyKind, PartyID)，含執行中的狀態（River 要求 available、pending、running、
-// retryable、scheduled 都在內）。身分進入刪除之後投影不再寫它的資料（inactive 檢查與 Deactivate 以身分鎖串行），所以執行中的 job 已涵蓋全部。
+// retryable、scheduled 都在內）。身分進入刪除之後投影與寫入不再寫它的資料（守門的 FOR KEY SHARE 與擁有者轉移的 FOR UPDATE 互斥），所以執行中的 job 已涵蓋全部。
 func (ErasePartyArgs) InsertOpts() river.InsertOpts {
 	return jobs.UniqueByArgs(10)
 }
 
-// Deactivate 是刪帳或退場時同 transaction 的原子狀態變更：先持該身分的 advisory lock（與投影串行），記進 inactive_parties、排清除 job。
-// 冪等。必須在 transaction 內。
-func (s *Service) Deactivate(ctx context.Context, kind Kind, id int64, at time.Time) error {
-	if _, ok := db.TxFrom(ctx); !ok {
-		return fmt.Errorf("crm：Deactivate 必須在 transaction 內")
-	}
+// EnqueueErase 在買家關閉或店家退場時排清除 job：只排 job，不要求 transaction（訂閱者在轉移的 transaction 內呼叫時併入它）。
+// 冪等：清除 job 以 (PartyKind, PartyID) 為唯一鍵合併。事實不在這裡存，由擁有者的狀態與 pub 函式提供。
+func (s *Service) EnqueueErase(ctx context.Context, kind Kind, id int64) error {
 	if !kind.Valid() || id <= 0 {
 		return fmt.Errorf("crm：停用的身分 %q/%d 不合法", kind, id)
-	}
-	q := s.q(ctx)
-	if err := q.LockParty(ctx, store.LockPartyParams{Kind: string(kind), PartyID: id}); err != nil {
-		return err
-	}
-	if _, err := q.InsertInactiveParty(ctx, store.InsertInactivePartyParams{Kind: string(kind), PartyID: id, Since: at.UTC()}); err != nil {
-		return err
 	}
 	return s.enqueue(ctx, kind, id)
 }
@@ -93,7 +84,7 @@ func (s *Service) enqueue(ctx context.Context, kind Kind, id int64) error {
 	return s.d.Jobs.Enqueue(ctx, ErasePartyArgs{PartyKind: string(kind), PartyID: id}, &opts)
 }
 
-// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，身分仍在 inactive_parties 又還有資料。以 (kind, party_id) 的游標逐頁（每頁 sweepBatch 個、
+// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，身分已在 buyer.pub_closed_buyers()／seller.pub_retired_stores() 又還有資料。以 (kind, party_id) 的游標逐頁（每頁 sweepBatch 個、
 // 每頁一個 transaction）走完全部，同一個身分還沒完成的 job 由唯一鍵合併；選游標而不是「排除已有進行中 job 的身分」，因為後者要讀 River 的表，
 // 也不是「依上次掃描時間排序」，因為那要新增狀態欄位。每頁固定上限，所以掃描量只與「仍有資料的停用身分」成正比，前面的身分一直失敗也不會餓死後面的。
 // 回傳這次檢查到的身分數。

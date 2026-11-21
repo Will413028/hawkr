@@ -6,9 +6,10 @@ import (
 	"context"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 func (f *fixture) seedBuyerEverywhere(buyerID int64) {
@@ -25,12 +26,14 @@ func (f *fixture) seedBuyerEverywhere(buyerID int64) {
 	}
 }
 
+// deleteBuyer 關閉買家（buyer 的 CloseForDeletion，事實的唯一來源）；buyer 在同 transaction 發 BuyerDeleted，crm 的訂閱者排清除 job。
 func (f *fixture) deleteBuyer(buyerID int64) {
 	f.t.Helper()
-	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return f.m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: buyerID, OccurredAt: epoch})
-	})
-	if err != nil {
+	ctx := context.Background()
+	if err := ensureBuyer(ctx, f.db, buyerID); err != nil {
+		f.t.Fatal(err)
+	}
+	if err := f.owner.CloseForDeletion(ctx, buyerID); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -42,11 +45,28 @@ func (f *fixture) retireStore(storeID int64) {
 	}
 }
 
-// retireStoreErr 讓店家退場並在同 transaction 通知訂閱者；回傳錯誤，讓測試可以在 goroutine 內呼叫。
+// retireStoreErr 讓店家退場並在同 transaction 發 StoreRetired；回傳錯誤，讓測試可以在 goroutine 內呼叫。
+// 退場批次（seller 的 RetireDueStores）對店家列是 FOR UPDATE：先鎖列（被守門鎖住時等到對方提交）再改 retired_at。
 func (f *fixture) retireStoreErr(storeID int64) error {
-	return f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return f.m.OnStoreRetired(ctx, seller.StoreRetired{StoreID: storeID, OccurredAt: epoch})
+	ctx := context.Background()
+	if err := ensureStore(ctx, f.db, storeID); err != nil {
+		return err
+	}
+	return f.db.InTx(ctx, func(ctx context.Context) error {
+		var id int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", storeID).Scan(&id); err != nil {
+			return err
+		}
+		return f.retireLocked(ctx, storeID)
 	})
+}
+
+// retireLocked 在呼叫方已持店家列的 FOR UPDATE 時把店家改成已退場並發 StoreRetired。
+func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", storeID); err != nil {
+		return err
+	}
+	return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), StoreID: storeID, OccurredAt: epoch})
 }
 
 func (f *fixture) rowsOfBuyer(buyerID int64) int64 {
@@ -56,7 +76,7 @@ func (f *fixture) rowsOfBuyer(buyerID int64) int64 {
 	  + (SELECT count(*) FROM crm.customer_tags WHERE buyer_id = $1)`, buyerID)
 }
 
-// W2 (b)：買家刪帳 → 訂閱者只記 inactive_parties 並排 job（不動客戶列）；job 清掉該買家在各店的列，別人的不動。
+// W2 (b)：買家關閉 → 訂閱者只排 job（不動客戶列、不存複本）；job 清掉該買家在各店的列，別人的不動。
 func TestBuyerDeletionErasesOnlyThatBuyer(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -67,7 +87,7 @@ func TestBuyerDeletionErasesOnlyThatBuyer(t *testing.T) {
 		t.Fatalf("排入 %d 個清除 job，預期 1", n)
 	}
 	if f.rowsOfBuyer(buyer1) == 0 {
-		t.Fatal("訂閱者在事件 transaction 內就改了客戶列（單體規則 4：只記複本與排 job）")
+		t.Fatal("訂閱者在事件 transaction 內就改了客戶列（單體規則 4：只排 job）")
 	}
 	if err := f.m.ErasePartyData(context.Background(), "BUYER", buyer1); err != nil {
 		t.Fatal(err)
@@ -93,10 +113,18 @@ func TestReplayAfterBuyerDeletionDoesNotRecreateRows(t *testing.T) {
 	f := setup(t)
 	f.seedBuyerEverywhere(buyer1)
 	f.deleteBuyer(buyer1)
+	o := "ORD-" + sn(int(buyer1)) + "-0"
+	// 抹除 job 還沒跑：守門在買家關閉之後就擋，不依賴抹除是否完成。
+	before := f.rowsOfBuyer(buyer1)
+	if ok, err := f.order("evt-early", o, storeA, buyer1, 1000); err != nil || ok {
+		t.Fatalf("抹除前重放 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
+	}
+	if after := f.rowsOfBuyer(buyer1); after != before {
+		t.Fatalf("抹除前的重放改了資料：%d -> %d", before, after)
+	}
 	if err := f.m.ErasePartyData(context.Background(), "BUYER", buyer1); err != nil {
 		t.Fatal(err)
 	}
-	o := "ORD-" + sn(int(buyer1)) + "-0"
 	if ok, err := f.order("evt-"+o, o, storeA, buyer1, 1000); err != nil || ok {
 		t.Fatalf("重放 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
 	}
@@ -140,13 +168,13 @@ func TestStoreRetirementErasesTheStore(t *testing.T) {
 	}
 }
 
-// 保底掃描：已在 inactive_parties 又還有資料的身分補排 job；清完之後不再補排。
+// 保底掃描：已關閉的買家（buyer.pub_closed_buyers()）又還有資料的身分補排 job；清完之後不再補排。
 func TestSweepRequeuesPartiesStillHoldingData(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.seedBuyerEverywhere(buyer1)
 	f.seedBuyerEverywhere(buyer2)
-	f.exec("INSERT INTO crm.inactive_parties (kind, party_id, since) VALUES ('BUYER', $1, $2)", buyer1, epoch)
+	f.markInactive("BUYER", buyer1)
 	n, err := f.m.SweepErase(context.Background())
 	if err != nil || n != 1 {
 		t.Fatalf("掃到 %d 個身分 err=%v，預期 1（買家 2 沒有被停用）", n, err)
@@ -162,27 +190,29 @@ func TestSweepRequeuesPartiesStillHoldingData(t *testing.T) {
 	}
 }
 
-// 投影與 Deactivate 交錯（兩條連線控制交錯）：Deactivate 的 transaction 先持身分鎖並寫了 inactive_parties 但還沒 commit，
-// 這時進來的投影必須等它 commit 再查 inactive_parties，看到「已停用」而不寫任何東西。沒有身分鎖時，投影讀到「未停用」就寫入並 commit，
-// 之後 Deactivate commit、清除 job 跑完也不會再回頭刪它。
-func TestProjectionWaitsForConcurrentDeactivation(t *testing.T) {
+// 投影與買家關閉交錯（兩條連線控制交錯）：關閉的 transaction 先持買家列的 FOR UPDATE 還沒 commit，這時進來的投影必須在守門鎖上等它 commit，
+// 再看到「已關閉」而不寫任何東西。沒有守門鎖時，投影讀到「未關閉」就寫入並 commit，之後關閉 commit、清除 job 跑完也不會再回頭刪它。
+func TestProjectionWaitsForConcurrentClosing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	deactivated := make(chan struct{})
+	if err := ensureBuyer(ctx, f.db, buyer1); err != nil {
+		t.Fatal(err)
+	}
+	closing := make(chan struct{})
 	release := make(chan struct{})
 	txDone := make(chan error, 1)
 	go func() {
 		txDone <- f.db.InTx(ctx, func(ctx context.Context) error {
-			if err := f.m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: buyer1, OccurredAt: epoch}); err != nil {
+			if err := f.owner.CloseForDeletion(ctx, buyer1); err != nil {
 				return err
 			}
-			close(deactivated)
+			close(closing)
 			<-release
 			return nil
 		})
 	}()
-	<-deactivated
+	<-closing
 	type result struct {
 		ok  bool
 		err error
@@ -192,21 +222,21 @@ func TestProjectionWaitsForConcurrentDeactivation(t *testing.T) {
 		ok, err := f.order("evt-1", "O1", storeA, buyer1, 1000)
 		res <- result{ok, err}
 	}()
-	// 投影卡在身分鎖上（advisory lock 未被授予）；以輪詢等到它出現，不靠固定的睡眠長度。
+	// 投影卡在守門鎖上（買家列的 FOR KEY SHARE 等 FOR UPDATE）；以輪詢等到它出現，不靠固定的睡眠長度。
 	deadline := time.Now().Add(10 * time.Second)
-	for f.scalar("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") == 0 {
+	for f.lockWaiters() == 0 {
 		select {
 		case r := <-res:
-			// 沒有身分鎖：投影在 Deactivate commit 之前就跑完了。
+			// 沒有守門鎖：投影在關閉 commit 之前就跑完了。
 			close(release)
 			if err := <-txDone; err != nil {
 				t.Error(err)
 			}
-			t.Fatalf("投影沒有等 Deactivate 的身分鎖就結束了：recorded=%v err=%v", r.ok, r.err)
+			t.Fatalf("投影沒有等買家關閉的列鎖就結束了：recorded=%v err=%v", r.ok, r.err)
 		default:
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("等不到投影卡在身分鎖上")
+			t.Fatal("等不到投影卡在守門鎖上")
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
@@ -216,9 +246,9 @@ func TestProjectionWaitsForConcurrentDeactivation(t *testing.T) {
 	}
 	r := <-res
 	if r.err != nil || r.ok {
-		t.Fatalf("recorded=%v err=%v，預期 false、nil（買家已停用）", r.ok, r.err)
+		t.Fatalf("recorded=%v err=%v，預期 false、nil（買家已關閉）", r.ok, r.err)
 	}
 	if f.count("crm.customers")+f.count("crm.order_nets")+f.count("crm.ledger") != 0 {
-		t.Fatal("投影在買家停用之後仍寫入了資料")
+		t.Fatal("投影在買家關閉之後仍寫入了資料")
 	}
 }

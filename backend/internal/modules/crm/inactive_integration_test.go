@@ -18,12 +18,24 @@ func sellerRetired(id int64) seller.StoreRetired {
 	return seller.StoreRetired{StoreID: id, OccurredAt: epoch}
 }
 
+// markInactive 讓擁有者的狀態變成已停用（買家 CLOSED、店家已退場）：crm 只讀擁有者的 pub 函式，不存複本。
 func (f *fixture) markInactive(kind string, id int64) {
 	f.t.Helper()
-	f.exec("INSERT INTO crm.inactive_parties (kind, party_id, since) VALUES ($1, $2, $3)", kind, id, epoch)
+	ctx := context.Background()
+	if kind == "BUYER" {
+		if err := ensureBuyer(ctx, f.db, id); err != nil {
+			f.t.Fatal(err)
+		}
+		f.exec("UPDATE buyer.buyers SET status = 'CLOSED', deleted_at = now() WHERE buyer_id = $1", id)
+		return
+	}
+	if err := ensureStore(ctx, f.db, id); err != nil {
+		f.t.Fatal(err)
+	}
+	f.exec("UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", id)
 }
 
-// 可見性在清除 job 跑之前就已經改好：inactive 的買家或店家，讀取看不到、賣家寫入被拒（客戶不存在、標籤不存在），資料還在表裡（job 還沒跑）。
+// 可見性在清除 job 跑之前就已經改好：已停用（買家關閉、店家退場）的買家或店家，讀取看不到、賣家寫入被拒（客戶不存在、標籤不存在），資料還在表裡（job 還沒跑）。
 func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -104,6 +116,9 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	t.Run("SetCustomerType", func(t *testing.T) {
 		wantKind(t, f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeNormal), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
+	t.Run("RemoveCustomerTag", func(t *testing.T) {
+		wantKind(t, f.m.RemoveCustomerTag(ctx, storeB, buyer1, tagID), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
 		wantKind(t, f.m.AddCustomerTags(ctx, storeB, buyer1, []string{"新"}), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", storeB); n != 1 {
@@ -125,26 +140,56 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	})
 }
 
-// CR3：一個 transaction 依序退場多家店（持多把 STORE 獨占），同時跑這些店與多位買家的投影；不得死結，最終狀態正確。
+// CR3：退場批次（一個 transaction 對多家店 FOR UPDATE SKIP LOCKED，被守門鎖住的店這一輪跳過、下一輪再退）同時跑這些店與多位買家的投影；
+// 不得死結，最終全部退場、狀態正確。
 func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	const stores, buyers = 6, 6
 	storeID := func(i int) int64 { return 200 + int64(i%stores) }
+	for i := 0; i < stores; i++ {
+		if err := ensureStore(ctx, f.db, storeID(i)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	started := make(chan struct{})
 	retired := make(chan error, 1)
 	go func() {
-		retired <- f.db.InTx(ctx, func(ctx context.Context) error {
-			close(started)
-			for i := 0; i < stores; i++ {
-				if err := f.m.OnStoreRetired(ctx, sellerRetired(storeID(i))); err != nil {
-					return err
+		close(started)
+		pending := make([]int64, 0, stores)
+		for i := 0; i < stores; i++ {
+			pending = append(pending, storeID(i))
+		}
+		for len(pending) > 0 {
+			var skipped []int64
+			err := f.db.InTx(ctx, func(ctx context.Context) error {
+				skipped = skipped[:0]
+				for _, id := range pending {
+					rows, err := f.db.Conn(ctx).Query(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 AND retired_at IS NULL FOR UPDATE SKIP LOCKED", id)
+					if err != nil {
+						return err
+					}
+					got := rows.Next()
+					rows.Close()
+					if !got {
+						skipped = append(skipped, id)
+						continue
+					}
+					if err := f.retireLocked(ctx, id); err != nil {
+						return err
+					}
+					time.Sleep(20 * time.Millisecond)
 				}
-				time.Sleep(20 * time.Millisecond)
+				return nil
+			})
+			if err != nil {
+				retired <- err
+				return
 			}
-			return nil
-		})
+			pending = append(pending[:0], skipped...)
+		}
+		retired <- nil
 	}()
 	<-started
 	errs := parallel(60, func(i int) error {
@@ -153,7 +198,7 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 	})
 	noErrors(t, errs)
 	if err := <-retired; err != nil {
-		t.Fatalf("退場 transaction：%v", err)
+		t.Fatalf("退場批次：%v", err)
 	}
 	for i := 0; i < stores; i++ {
 		if err := f.m.ErasePartyData(ctx, "STORE", storeID(i)); err != nil {
@@ -163,8 +208,11 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 	if n := f.count("crm.customers") + f.count("crm.order_nets") + f.count("crm.ledger"); n != 0 {
 		t.Fatalf("退場並清除後還剩 %d 列", n)
 	}
-	if n := f.count("crm.inactive_parties"); n != stores {
-		t.Fatalf("inactive_parties %d 列，預期 %d", n, stores)
+	if n := f.count("seller.pub_retired_stores()"); n != stores {
+		t.Fatalf("退場的店 %d 家，預期 %d", n, stores)
+	}
+	if n := f.q.count("crm.erase_party"); n != stores {
+		t.Fatalf("清除 job %d 個，預期 %d", n, stores)
 	}
 }
 
@@ -174,7 +222,8 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	const parties = 230
-	f.exec("INSERT INTO crm.inactive_parties (kind, party_id, since) SELECT 'BUYER', g, $1 FROM generate_series(1000, $2::int) AS g", epoch, 1000+parties-1)
+	f.exec(`INSERT INTO buyer.buyers (buyer_id, account_id, status, display_name, created_at, updated_at, deleted_at)
+		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', $1, $1, $1 FROM generate_series(1000, $2::int) AS g`, epoch, 1000+parties-1)
 	f.exec("INSERT INTO crm.customers (store_id, buyer_id, first_order_at, updated_at) SELECT 5, g, $1, $1 FROM generate_series(1000, $2::int) AS g", epoch, 1000+parties-1)
 	seen := func() map[int64]int {
 		f.q.mu.Lock()

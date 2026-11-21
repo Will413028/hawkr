@@ -25,7 +25,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 | `customer_type` 字串無 CHECK，註解 `normal, vip, blocklist` | 賣家要區分一般與 VIP；封鎖要在客戶列表裡操作 | 不成立：封鎖只在店家封鎖名單（A6-D2 (i)） | enum＋CHECK | 改：CHECK 只有 `NORMAL`、`VIP`；儲存的代碼是 UPPER_SNAKE（ADR 2026-09-25-codemeta-retirement D3 與 `TestStoredCodesInChecksAreUpperSnake`，設計書寫的小寫與它衝突，以測試強制的為準）；`SetCustomerType` 驗值域與列數 |
 | 標籤：`crm_tags` 無 `UNIQUE(store_id,name)`、`customer_tags` FK 只指 `tags(id)`、`AddCustomerTags` 任何錯誤當不存在而新建、單筆失敗只記 warn 並回成功 | 同店標籤名稱唯一、標籤與客戶同店、批次是原子的 | 成立（舊碼的缺陷） | 唯一鍵＋複合 FK＋單 transaction | 改：`UNIQUE(store_id,name)`；複合 FK `(store_id, tag_id)`；`AddCustomerTags` 單 transaction，名稱不存在才建，任何錯誤整批回滾；加標籤數上限（每店 200、每客戶 20，W4）；刪除 `SearchCustomersByTags` 等沒有呼叫者的 RPC |
 | `page`／`size`＋`COUNT`、`LIMIT/OFFSET`、`ORDER BY` 無次序鍵（M18） | 賣家要翻頁 | 成立，但 OFFSET 隨深度變慢、同值的列跨頁會重複或遺漏 | keyset，不回總數 | 改：`(排序鍵, buyer_id)` keyset；三個排序欄位 × 兩個方向各一句查詢與索引 |
-| `buyer.deleted` 只抹 `nickname`、`phone`，客戶列、標籤、ledger 保留；店家退場沒有處理 | 刪帳後不留對可識別個人的主觀標註 | 不成立：沒有個資欄後只剩標註與統計，標籤是對可識別個人的主觀註記 | 刪帳清除，並關閉「刪後重放舊事件重建」 | 改（A6-D18 W2 (b)）：訂閱 `BuyerDeleted`、`StoreRetired`，同 transaction 記 `inactive_parties`、排清除 job；投影持身分 advisory lock 再查複本（設計書寫 `pg_advisory_xact_lock`；投影端改共享模式 `_shared`、`Deactivate` 持獨占，否則同店、同買家的事件全被一把鎖串行，§3.3 的列鎖與 `delta` 就沒有並發可守）；清除 job 分批刪；保底掃描；`customers(buyer_id)` 索引是這個決定的必要條件 |
+| `buyer.deleted` 只抹 `nickname`、`phone`，客戶列、標籤、ledger 保留；店家退場沒有處理 | 刪帳後不留對可識別個人的主觀標註 | 不成立：沒有個資欄後只剩標註與統計，標籤是對可識別個人的主觀註記 | 刪帳清除，並關閉「刪後重放舊事件重建」 | 改（A6-D18 W2 (b)）：訂閱 `BuyerDeleted`、`StoreRetired`，同 transaction 只排清除 job（A6-3c 起不存複本）；投影先取擁有者守門 `LockNotClosed`、`LockNotRetired`（`FOR KEY SHARE`，不互相排隊，與轉移的 `FOR UPDATE` 互斥，取代原本的 advisory lock 與複本）；清除 job 分批刪；保底掃描；`customers(buyer_id)` 索引是這個決定的必要條件 |
 | `first_order_at` 的語意（舊 `created_at`） | 列表預設排序要有「最早成為客戶」的時間 | 成立 | 取事件的完成時間 | 沿用語意、取處理時間：Java 的 `completed_at` 是未規定格式的字串，且舊資料不搬，所以用投影收到事件的時間（`Now()`）；ordering 搬進單體後改取訂單的完成時間 |
 
 ## 傳輸層的沿用盤點
@@ -44,8 +44,23 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。
 
-- 表：`customers`（主鍵 `(store_id, buyer_id)`、`first_order_at`；無 TSID `id`、`nickname`、`phone`、`created_at`）、`tags`（UUIDv7、`UNIQUE(store_id,name)`）、`customer_tags`（三欄自然鍵、複合 FK）、`order_nets`、`ledger`（`id` uuidv7、`dedup_key` UNIQUE；無 `store_id`、`buyer_id`、`count_delta`、`amount_delta`）、`inactive_parties`。
-- 儲存的代碼（`customer_type`、`inactive_parties.kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
+- 表：`customers`（主鍵 `(store_id, buyer_id)`、`first_order_at`；無 TSID `id`、`nickname`、`phone`、`created_at`）、`tags`（UUIDv7、`UNIQUE(store_id,name)`）、`customer_tags`（三欄自然鍵、複合 FK）、`order_nets`、`ledger`（`id` uuidv7、`dedup_key` UNIQUE；無 `store_id`、`buyer_id`、`count_delta`、`amount_delta`）。
+- 儲存的代碼（`customer_type`、清除 job 的 `party_kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
 - 沒有 `blocklist`；沒有客戶列表的關鍵字搜尋；詳情沒有電話、Email、地址、優惠券數。
 - 退款不建客戶列；同一單號的第二個 `order.completed`（換了 `event_id`）不重複累加。
 - `legacy/crmservice`（只有 `VIPStatuses`）與 `services/crm-service` 不動：並行期單一生效者是舊服務，切換與刪除在 A6-6e。
+
+## A6-3c 停用身分改由擁有者守門的沿用盤點
+
+設計：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3c-design.md` §9.3、§9.5。
+
+| 照搬的機制 | 從零設計 | 結論 |
+|---|---|---|
+| `inactive_parties`、`LockParty`／`LockPartyShared`（基準形狀但放錯擁有者） | 事實與守門應在擁有者 | 不成立；改 `LockNotClosed`＋`LockNotRetired`，刪表（`crm_drop_inactive_parties`）與 advisory lock |
+| 「Deactivate 與 retireBatch 的死結論證」 | 新設計的 retireBatch 是 `FOR UPDATE SKIP LOCKED`，不等待、不進 lockorder 的等待集合 | 論證不再需要，已刪除；`TestRetiringManyStoresWhileProjectingDoesNotDeadlock` 對新機制驗證 |
+| 標籤與客戶寫入只讀複本、不取鎖 | 寫入要與轉移串行 | 缺口，已補：`TestTagWriteInFlightAcrossStoreRetirementLeavesNothing`（先以測試 commit 重現，再修）；`requireActiveStore`、`IsStoreInactive` 刪除，守門的 NotFound 對應 `tagNotFound`／客戶 NotFound |
+| 抹除 job、保底掃描 | 抹除形狀在 crm 自己 | 成立，保留；`Deactivate` 改名 `EnqueueErase`（只排 job），掃描改 `UNION ALL` 讀兩個 pub，保留 `(kind, party_id)` keyset |
+| 投影端的守門 | ordering 搬遷時投影退場 | 過渡程式；退場點與 `step-3-design.md` §0 一致 |
+| 投影遇到不存在的買家或店家（W1 (a)） | 買家、店家列關閉與退場後仍保留，不存在只可能是壞資料 | 行為變更：原本照寫，改後跳過並記 error log（不重試） |
+
+觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `crm.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。

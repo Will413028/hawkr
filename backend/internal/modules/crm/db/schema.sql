@@ -85,13 +85,3 @@ CREATE TABLE crm.ledger (
     CONSTRAINT ledger_dedup_key_key UNIQUE (dedup_key),
     CONSTRAINT ledger_dedup_key_check CHECK (char_length(dedup_key) >= 1 AND char_length(dedup_key) <= 128)
 );
-
--- 刪帳買家與退場店家的複本（kind 是 BUYER 或 STORE）：投影與刪除 job 以它關閉「刪後重放舊事件重建資料」。只插入不刪除，冪等。
-CREATE TABLE crm.inactive_parties (
-    kind     TEXT        NOT NULL,
-    party_id BIGINT      NOT NULL,
-    since    TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (kind, party_id),
-    CONSTRAINT inactive_parties_kind_check CHECK (kind IN ('BUYER', 'STORE')),
-    CONSTRAINT inactive_parties_party_check CHECK (party_id > 0)
-);

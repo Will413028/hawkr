@@ -41,12 +41,21 @@ func Migrations() fs.FS {
 type Deps struct {
 	DB   *db.DB
 	Jobs jobs.Enqueuer
+	// Buyers 與 Stores 是投影與寫入的守門（擁有者列的 FOR KEY SHARE），組裝點傳 *buyer.Module 與 *seller.Module。
+	Buyers Buyers
+	Stores Stores
 	// NewID 產生標籤的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
 	Logger *slog.Logger
 }
+
+// Buyers 與 Stores 是 crm 用到的 buyer、seller 公開 API（守門，必須在 transaction 內呼叫）。
+type (
+	Buyers = write.Buyers
+	Stores = write.Stores
+)
 
 type (
 	CustomerType      = model.CustomerType
@@ -111,16 +120,16 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Jobs == nil || d.Now == nil || d.NewID == nil {
-		panic("crm：DB、Jobs、Now 與 NewID 是必要的")
+	if d.DB == nil || d.Jobs == nil || d.Now == nil || d.NewID == nil || d.Buyers == nil || d.Stores == nil {
+		panic("crm：DB、Jobs、Now、NewID、Buyers 與 Stores 是必要的")
 	}
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
 	return &Module{
-		write:   write.New(write.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
+		write:   write.New(write.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, NewID: d.NewID, Now: d.Now}),
 		read:    read.New(read.Deps{DB: d.DB}),
-		project: project.New(project.Deps{DB: d.DB, Now: d.Now}),
+		project: project.New(project.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, Now: d.Now, Logger: d.Logger}),
 		purge:   purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Logger: d.Logger}),
 	}
 }
@@ -185,16 +194,16 @@ func (m *Module) RecordRefund(ctx context.Context, r Refund) (recorded bool, err
 	return m.project.RecordRefund(ctx, r)
 }
 
-// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：把這個 buyer_id 記進 inactive_parties、排 crm.erase_party job，
-// 不在這裡改客戶列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
+// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：排 crm.erase_party job，不存狀態（買家關閉的事實在 buyer，
+// 投影與寫入以 LockNotClosed、讀取以 pub_closed_buyers() 為準），不在這裡改客戶列。不訂 BuyerDeletionRequested：等待刪除的買家仍能登入，為開啟中的訂單聯絡店家。
 // 鎖的順序 identity → buyer → seller → crm：accountdeletion 在派發事件之前先鎖完買家與店家。
 func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
-	return m.purge.Deactivate(ctx, purge.Buyer, e.BuyerID, e.OccurredAt)
+	return m.purge.EnqueueErase(ctx, purge.Buyer, e.BuyerID)
 }
 
-// OnStoreRetired 是店家退場時同 transaction 的訂閱者：把這個 store_id 記進 inactive_parties、排 crm.erase_party job。
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：排 crm.erase_party job（店家退場的事實在 seller，以 LockNotRetired 與 pub_retired_stores() 為準）。
 func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
-	return m.purge.Deactivate(ctx, purge.Store, e.StoreID, e.OccurredAt)
+	return m.purge.EnqueueErase(ctx, purge.Store, e.StoreID)
 }
 
 // ErasePartyData 清除一個身分的 crm 資料（分批，冪等）。kind 是 "BUYER" 或 "STORE"。它是 crm.erase_party job 的內容，給 worker 與測試呼叫。
@@ -202,7 +211,7 @@ func (m *Module) ErasePartyData(ctx context.Context, kind string, id int64) erro
 	return m.purge.Erase(ctx, purge.Kind(kind), id)
 }
 
-// SweepErase 補排仍在 inactive_parties 又還有資料的身分的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
+// SweepErase 補排已關閉的買家與已退場的店家中仍有資料的身分的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepErase(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
 // AddWorkers 登記 River worker（清除與其保底掃描）。由 cmd/hawkr 接上（A6-6e）。

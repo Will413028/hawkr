@@ -22,11 +22,23 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// Buyers 是寫入的買家守門（buyer 公開 API）：transaction 內以 FOR KEY SHARE 確認買家尚未關閉，已關閉與不存在回 NotFound。
+type Buyers interface {
+	LockNotClosed(ctx context.Context, buyerID int64) error
+}
+
+// Stores 是寫入的店家守門（seller 公開 API）：transaction 內以 FOR KEY SHARE 確認店家尚未退場，已退場與不存在回 NotFound。
+type Stores interface {
+	LockNotRetired(ctx context.Context, storeID int64) error
+}
+
 // Deps 是寫入路徑的依賴。
 type Deps struct {
-	DB    *db.DB
-	NewID func() uuid.UUID
-	Now   func() time.Time
+	DB     *db.DB
+	Buyers Buyers
+	Stores Stores
+	NewID  func() uuid.UUID
+	Now    func() time.Time
 }
 
 // Service 是寫入路徑的 use case。
@@ -52,6 +64,30 @@ func tagNotFound(ctx context.Context) error {
 	return model.WithReason(apperr.NotFound("%s", text.CrmTagNotFound(uitext.LocaleFrom(ctx))), model.ReasonTagNotFound)
 }
 
+// lockStore 是店家層寫入（標籤）的守門：transaction 的第一句取店家列的 FOR KEY SHARE，已退場或不存在對應 notFound。
+// 取在 LockStoreTags（標籤命名空間的 advisory lock）與 crm 自己的列之前：擁有者轉移的 FOR UPDATE 要等這個 transaction 提交，
+// 所以抹除 job 看不到之後才提交的標籤。
+func (s *Service) lockStore(ctx context.Context, storeID int64, notFound func(context.Context) error) error {
+	if err := s.d.Stores.LockNotRetired(ctx, storeID); err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return notFound(ctx)
+		}
+		return err
+	}
+	return nil
+}
+
+// lockCustomerParties 是客戶層寫入的守門：依序（買家先於店家，鎖序規則 4）取買家與店家列的 FOR KEY SHARE，已停用或不存在對應客戶 NotFound。
+func (s *Service) lockCustomerParties(ctx context.Context, storeID, buyerID int64) error {
+	if err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return customerNotFound(ctx)
+		}
+		return err
+	}
+	return s.lockStore(ctx, storeID, customerNotFound)
+}
+
 func nameTaken(ctx context.Context) error {
 	return model.WithReason(apperr.AlreadyExists("%s", text.CrmTagNameTaken(uitext.LocaleFrom(ctx))), model.ReasonTagNameTaken)
 }
@@ -74,6 +110,9 @@ func (s *Service) SetCustomerType(ctx context.Context, storeID, buyerID int64, t
 		return apperr.InvalidInputOn([]string{"CustomerType"}, "%s", text.CrmCustomerTypeInvalid(uitext.LocaleFrom(ctx)))
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
+			return err
+		}
 		n, err := s.q(ctx).SetCustomerType(ctx, store.SetCustomerTypeParams{
 			CustomerType: string(t), Now: s.d.Now().UTC(), StoreID: storeID, BuyerID: buyerID,
 		})
@@ -87,7 +126,7 @@ func (s *Service) SetCustomerType(ctx context.Context, storeID, buyerID int64, t
 	})
 }
 
-// CreateTag 建立標籤。名稱撞同店的標籤回 AlreadyExists；超過每店上限回 FailedPrecondition；店家已退場回 NotFound（標籤不存在）。
+// CreateTag 建立標籤。名稱撞同店的標籤回 AlreadyExists；超過每店上限回 FailedPrecondition；店家已退場（守門 LockNotRetired 回 NotFound）回 NotFound（標籤不存在）。
 func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (model.Tag, error) {
 	if storeID <= 0 {
 		return model.Tag{}, fmt.Errorf("crm：店家 %d 不是正整數", storeID)
@@ -99,10 +138,10 @@ func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (mo
 	tag := model.Tag{ID: s.d.NewID(), Name: n}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if err := q.LockStoreTags(ctx, storeID); err != nil {
+		if err := s.lockStore(ctx, storeID, tagNotFound); err != nil {
 			return err
 		}
-		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
+		if err := q.LockStoreTags(ctx, storeID); err != nil {
 			return err
 		}
 		if err := s.checkStoreCap(ctx, q, storeID, 1); err != nil {
@@ -121,18 +160,6 @@ func (s *Service) CreateTag(ctx context.Context, storeID int64, name string) (mo
 		return model.Tag{}, err
 	}
 	return tag, nil
-}
-
-// requireActiveStore 對已退場的店家（inactive_parties）回 notFound：可見性在清除 job 跑之前就已經改好，退場店家的標籤不再被寫入。
-func (s *Service) requireActiveStore(ctx context.Context, q *store.Queries, storeID int64, notFound func(context.Context) error) error {
-	inactive, err := q.IsStoreInactive(ctx, storeID)
-	if err != nil {
-		return err
-	}
-	if inactive {
-		return notFound(ctx)
-	}
-	return nil
 }
 
 func (s *Service) checkStoreCap(ctx context.Context, q *store.Queries, storeID int64, adding int) error {
@@ -157,10 +184,10 @@ func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID,
 	}
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if err := q.LockStoreTags(ctx, storeID); err != nil {
+		if err := s.lockStore(ctx, storeID, tagNotFound); err != nil {
 			return err
 		}
-		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
+		if err := q.LockStoreTags(ctx, storeID); err != nil {
 			return err
 		}
 		rows, err := q.RenameTag(ctx, store.RenameTagParams{Name: n, Now: s.d.Now().UTC(), StoreID: storeID, ID: tagID})
@@ -187,10 +214,10 @@ func (s *Service) DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID)
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if err := q.LockStoreTags(ctx, storeID); err != nil {
+		if err := s.lockStore(ctx, storeID, tagNotFound); err != nil {
 			return err
 		}
-		if err := s.requireActiveStore(ctx, q, storeID, tagNotFound); err != nil {
+		if err := q.LockStoreTags(ctx, storeID); err != nil {
 			return err
 		}
 		rows, err := q.DeleteTag(ctx, store.DeleteTagParams{StoreID: storeID, ID: tagID})
@@ -230,7 +257,10 @@ func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, n
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		// 先鎖客戶列（沒有列 = 不是客戶，在 FK 之前就回 NotFound），再鎖店家的標籤建立；全模組都是這個順序。
+		// 先取守門（買家、店家），再鎖客戶列（沒有列 = 不是客戶，在 FK 之前就回 NotFound），再鎖店家的標籤建立；全模組都是這個順序。
+		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
+			return err
+		}
 		if _, err := q.LockCustomer(ctx, store.LockCustomerParams{StoreID: storeID, BuyerID: buyerID}); errors.Is(err, pgx.ErrNoRows) {
 			return customerNotFound(ctx)
 		} else if err != nil {
@@ -296,6 +326,9 @@ func (s *Service) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64,
 		return err
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
+			return err
+		}
 		_, err := s.q(ctx).DeleteCustomerTag(ctx, store.DeleteCustomerTagParams{StoreID: storeID, BuyerID: buyerID, TagID: tagID})
 		return err
 	})
