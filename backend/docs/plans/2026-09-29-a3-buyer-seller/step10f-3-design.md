@@ -18,12 +18,13 @@
 | # | 題目 | 選項 | 建議 |
 |---|---|---|---|
 | H1 | 「讀取時組裝」放哪裡 | A：client 各叫兩支再合併（兩端各寫一次合併與分頁，違反「同一邏輯不在兩個 client 各寫」）；B：伺服器端 API composition：擴充 moderation 的 `ListMyReports`，handler 在 `httpapi` 層從兩個模組讀取並合併分頁，刪除 seller 的 `ListMyReports`；C：事件投影成讀取表（R7 已定讀取時組裝，且無效能需求） | **B**。模組之間不互相依賴，組裝只在 httpapi；A6 的聊天、評價檢舉加成新成員 |
-| H1b | 合併後的項目形狀（兩套 `ReportOutcome` 值不同） | A：共用欄位（id、category、description、create_time、resolve_time）＋`oneof subject { CommunityReport community; StoreReport store; }`，兩套結果各留在成員裡（social 用 moderation 的、store 用 seller 的，含 `resolution_note`）；`resolve_time` 兩邊都有來源（moderation `ReportRecord.resolve_time` 是案件結案時間，`moderation.proto:93`）。`StoreReport` 是 seller 的 `MyReport` 改名，留在 `seller/v1alpha1/report.proto`，moderation proto import 它，`GetMyReport` 的回應也用它；B：統一成一套新 enum（要定兩套的對應，會丟掉 INSUFFICIENT／DUPLICATE 等區分或替社群硬造值） | **A**。兩套結果語意本來就不同（案件推導 vs. 每筆結果），文案目錄已各有文字，不改 uitext |
+| H1b | 合併後的項目形狀（兩套 `ReportOutcome` 值不同） | A：共用欄位（id、category、description、create_time、resolve_time）＋`oneof subject { CommunityReport community; StoreReport store; }`，兩套結果各留在成員裡（social 用 moderation 的、store 用 seller 的，含 `resolution_note`）；`resolve_time` 兩邊都有來源（moderation `ReportRecord.resolve_time` 是案件結案時間，`moderation.proto:93`）。`StoreReport` 是 seller 的 `MyReport` 改名，留在 `seller/v1alpha1/report.proto`，moderation proto import 它，`GetMyReport` 的回應也用它；B：統一成一套新 enum（要定兩套的對應，會丟掉 INSUFFICIENT／DUPLICATE 等區分或替社群硬造值） | **A**。兩套結果語意本來就不同（案件推導 vs. 每筆結果），H6 修訂：文案目錄只有 moderation 那套有文字 |
 | H1c | 店名、logo | A：照現有契約，client 以 `store_id` 呼叫 `BatchGetStores`；B：伺服器在組裝時帶入 | **A**。與店家卡片其他頁一致；合併清單不新增對 seller 公開資料的耦合 |
 | H2 | 通報人的補充說明 | A：只給店家、商品檢舉加 `AddReportSupplement`；B：A＋moderation 也加補充表 | **A**。社群檢舉是一鍵檢舉（說明 500 字選填），Instagram、YouTube 也不提供補充；觸發條件：A7 的申訴或案件需要補充時 |
 | H2b | 主動補充的上限 | A：與去重補充共用同一串、同一個 10 則上限（術語表「補充」改成涵蓋兩種來源）；B：分開兩串、各自上限 | **A**。admin 看到的是同一串補充，`supplements_seen_seq` 與事件只有一條路徑 |
 | H3 | 詳情 | A：清單直接帶補充；B：清單不帶，店家檢舉另有 `GetMyReport` | **B**。與 admin `GetReport` 同樣分法。欄位：`StoreReport` 全部欄位＋補充（內容、時間、佐證）＋原始佐證；佐證只回 `position`，畫面顯示「已附 N 張佐證」（H5） |
 | H5 | 佐證縮圖、補充限流（10f-3a 實作時發現，Will 2026-11-21 照建議） | 縮圖：A 檢舉人讀自己佐證的路由；B 只顯示張數。限流：A `AddReportSupplement` 與 `CreateReport` 各自計數；B 共用額度 | 縮圖 **B**（延後，觸發條件：使用者回饋需要回看佐證，或 admin 機敏檔路由開放檢舉人讀取）；限流 **A**（補充本身上限 10 則） |
+| H6 | seller `ReportOutcome` 的買家面文字（10f-3b 開工時發現目錄缺；Will 2026-11-21 照建議） | A：加 `REPORT_OUTCOME_PENDING`，沒有結果時回 PENDING（UNSPECIFIED 不帶意義，與 moderation 一致），目錄補 6 值；B：不改契約，client 以 `resolve_time` 判斷 | **A**。文案：審核中／已處理（已採取措施）／已處理（不違規）／已處理（資料不足）／已處理（重複檢舉）／已處理（不受理）；en：Under review／Resolved (action taken)／Resolved (no violation)／Resolved (insufficient information)／Resolved (duplicate report)／Resolved (not accepted)。由 10f-3a2 做 |
 | H4 | 成功句 | 10f-2b 留下的「處理結果可在「我的檢舉」查看」兩端加回 | 照做（Will 2026-11-21 已提） |
 
 UI 版面（清單項目、詳情頁、補充表單）在 10f-3b 開工前給 Will 同意（共通規則「UI 改動」）。3a 的欄位由 H3 定死，不等 UI 同意；UI 同意若要新欄位，回到 3a 補。

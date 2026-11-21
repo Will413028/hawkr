@@ -417,6 +417,7 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                   - 未跑：integration 層的 mutation（拿掉「有結果不能補充」、拿掉 `GetMyReport` 擁有者條件）：需要資料庫容器，本機不跑。
                   - H5（Will 2026-11-21）：佐證只顯示張數、縮圖延後；補充限流與 `CreateReport` 各自計數。
                   - 暫時狀態：buyer-app「我的檢舉」在 10f-3b 前只列社群檢舉。
+                - [ ] 10f-3a2 seller `ReportOutcome` 加 PENDING 與目錄文字（H6）
                 - [ ] 10f-3b buyer-app（UI 版面 Will 2026-11-21 同意：店家卡片＝店名＋結果 chip＋商品＋原因＋說明＋時間、可點；詳情頁「檢舉詳情」含平台說明、你的檢舉、「已附 N 張佐證」、補充說明（n/10）、處理中且未滿 10 則才有「補充說明」按鈕；補充表單沿用 10f-2b，成功句「已收到補充說明」；website 10f-3c 同結構）
                 - [ ] 10f-3c website（UI 版面先給 Will 同意）
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
