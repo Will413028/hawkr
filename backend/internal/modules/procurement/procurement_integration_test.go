@@ -643,7 +643,7 @@ func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 				unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency,
 				goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, valid_until,
 				outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
 			id(), c.sellerResponse, version, basis, epoch, id())
 		return err
 	}
@@ -662,6 +662,7 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	q := store.New(d.Pool())
 	c := seed(ctx, t, q, 71, false)
 	snapshot, preview, approval := id(), id(), id()
+	policyID, policyVersion := "wish-pool", int32(1)
 	if n, err := q.InsertPricePreview(ctx, store.InsertPricePreviewParams{
 		ID: preview, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2,
 		BasisQuantity: 1, BasisUnit: "件", ClientRequestID: id(), ExpiresAt: epoch.Add(time.Hour), Now: epoch,
@@ -676,7 +677,7 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	}
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
 		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ConfirmedRfqSnapshotID: snapshot, AudienceMode: "WISH_POOL",
-		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+		AudiencePolicyID: &policyID, AudiencePolicyVersion: &policyVersion, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)
 	}
