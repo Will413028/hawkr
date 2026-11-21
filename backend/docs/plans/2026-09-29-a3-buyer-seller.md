@@ -419,8 +419,9 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                   - 暫時狀態：buyer-app「我的檢舉」在 10f-3b 前只列社群檢舉。
                 - [x] 10f-3a2 seller `StoreReport.outcome` 改 `optional` 與目錄文字（H6）；uitext-gen 值號表改以列舉全名加值名為鍵
                   - 已跑：lint、gofmt、`go test`、`buf lint`、生成器重跑無 drift、admin 1148 項、ui-text TS／Dart、兩支 App analyze；CI `b11b2d41` 全綠（15 job）；red-proof：uitext-gen 鍵改回只用值名，`enum_key_test` killed；`/code-review` findings 7（important 1）：fixed 5、raised 1（H6 改照規範）、moot 1。
-                - [ ] 10f-3b buyer-app（UI 版面 Will 2026-11-21 同意：店家卡片＝店名＋結果 chip＋商品＋原因＋說明＋時間、可點；詳情頁「檢舉詳情」含平台說明、你的檢舉、「已附 N 張佐證」、補充說明（n/10）、處理中且未滿 10 則才有「補充說明」按鈕；補充表單沿用 10f-2b，成功句「已收到補充說明」；website 10f-3c 同結構）
+                - [x] 10f-3b buyer-app（UI 版面 Will 2026-11-21 同意：店家卡片＝店名＋結果 chip＋商品＋原因＋說明＋時間、可點；詳情頁「檢舉詳情」含平台說明、你的檢舉、「已附 N 張佐證」、補充說明（n/10）、處理中且未滿 10 則才有「補充說明」按鈕；補充表單沿用 10f-2b，成功句「已收到補充說明」；website 10f-3c 同結構）
                   - 延後：卡片與詳情不顯示商品名稱（沒有以 product_id 讀商品的 API，舊 REST 只能以 sku 查）；觸發條件：商品模組提供以 id 讀取的公開 API。
+                  - 已跑：`flutter analyze`、`custom_lint`、moderation＋讀原始碼守門測試 332 項；red-proof 3 個 mutation（補充按鈕永遠顯示、拿掉 10 則上限、成功句刪後半）killed；CI `2e0e085c` buyer-app 全綠（`ea3287e4` 曾被 `presentation_io_guardrail_test` 擋，已修）；`/code-review` findings 9（important 3）：fixed 7、recorded 1（商品名稱）、rejected 1（H4 成功句已核准）。
                 - [ ] 10f-3c website（UI 版面先給 Will 同意）
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
               - [ ] 10f-5 權利人通報（R8）：不必登入的表單、著作權法定流程（補正、回復通知、恢復）、商標與專利的平台流程；開工前先出決定簡報。
