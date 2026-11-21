@@ -115,19 +115,20 @@ func (c *Client) EnqueueJob(ctx context.Context, args river.JobArgs, opts *river
 	return res.Job.ID, nil
 }
 
-// CancelJob 取消一個 job：還沒執行的直接取消，執行中的取消它的 ctx。ctx 裡有 transaction 時在該 transaction 內執行；
-// 已完成的 job 不受影響。
-func (c *Client) CancelJob(ctx context.Context, jobID int64) error {
+// CancelJob 取消一個 job 並回傳取消之後 job 的狀態：還沒執行的直接成為 cancelled；執行中的取消它的 ctx，狀態仍是 running，由 worker 結束後收尾；
+// 已完成的 job 不受影響、回傳原狀態。ctx 裡有 transaction 時在該 transaction 內執行。
+func (c *Client) CancelJob(ctx context.Context, jobID int64) (rivertype.JobState, error) {
+	var row *rivertype.JobRow
 	var err error
 	if tx, ok := db.TxFrom(ctx); ok {
-		_, err = c.river.JobCancelTx(ctx, tx, jobID)
+		row, err = c.river.JobCancelTx(ctx, tx, jobID)
 	} else {
-		_, err = c.river.JobCancel(ctx, jobID)
+		row, err = c.river.JobCancel(ctx, jobID)
 	}
 	if err != nil {
-		return fmt.Errorf("jobs：取消 job %d：%w", jobID, err)
+		return "", fmt.Errorf("jobs：取消 job %d：%w", jobID, err)
 	}
-	return nil
+	return row.State, nil
 }
 
 // Run 執行 job 直到 ctx 結束，之後停止取新工作並等進行中的 job 收尾。

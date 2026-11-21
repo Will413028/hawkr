@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -156,5 +157,33 @@ func TestUniqueHelpersAreAcceptedByRiverAndMergeDuplicates(t *testing.T) {
 		if _, err := d.Conn(ctx).Exec(ctx, "DELETE FROM river.river_job"); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestCancelJobReportsTheStateAfterCancelling(t *testing.T) {
+	t.Parallel()
+	d := migrated(t)
+	c, err := jobs.NewInsertOnly(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id int64
+	if err := d.InTx(context.Background(), func(ctx context.Context) error {
+		var err error
+		id, err = c.EnqueueJob(ctx, pingArgs{N: 1}, nil)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var state rivertype.JobState
+	if err := d.InTx(context.Background(), func(ctx context.Context) error {
+		var err error
+		state, err = c.CancelJob(ctx, id)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if state != rivertype.JobStateCancelled {
+		t.Fatalf("取消一個還沒執行的 job 之後的狀態 = %s，預期 cancelled", state)
 	}
 }
