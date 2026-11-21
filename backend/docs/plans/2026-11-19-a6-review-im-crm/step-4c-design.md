@@ -27,7 +27,7 @@ seller（建立措施）→ im(13)／review(12) 訂閱者鎖內容列 → modera
 - 預期的索引使用【推】：`pub_content_takedowns()` 加了 `c.measure_status = 'ENFORCED'`（與 `m.status` 同值，複合外鍵同步，回傳的列不變；migration `20261121120000_seller_pub_content_takedowns_enforced_filter.sql`）後，函式是單一 SELECT 的 SQL 函式、可內嵌，逐列的 `EXISTS (… content_kind = 'CHAT_MESSAGE' AND content_id = m.id)` 應走部分唯一索引 `measure_contents_one_enforced (content_kind, content_id) WHERE measure_status = 'ENFORCED'` 單筆探查，再以主鍵取措施列核對 `status`、`kind`。沒有這個條件時，部分索引的述詞不被查詢蘊含、不能用。EXPLAIN 本機沒有跑（本機不起資料庫），交 CI 或 Will 在有資料的環境量。
 - im 的 `hidden`（未還原的隱藏或生效中的下架）寫成 SQL 函式不可行：單體規則 6 要求函式只參照自己的表，而下架分支要讀 `seller.pub_content_takedowns()`；改以 `TestEveryHiddenColumnUsesTheCanonicalExpression` 守住每個 `AS hidden` 都是同一個運算式、且 `pub_content_takedowns()` 不出現在其他寫法。
 
-## 5. 預定 mutation（未執行；本機不跑容器，交 CI 與 `scripts/red-proof.py`，不得在工作目錄編輯後還原）
+## 5. mutation（CI run 44909500419、44910476574 全部 KILLED；#4 拆成 schema 與 Go 端兩個）
 
 | # | mutant | 要失敗的測試 |
 |---|---|---|
