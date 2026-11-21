@@ -50,7 +50,7 @@ BenchmarkSingleShot/Open-2        212   6633022 ns/op  3161.68 MB/s    98922 B/o
 
 ## (b) R2 是否有依前綴的生命週期規則（給 B1-D3）
 
-**結論：repo 內沒有任何 bucket 規則，也沒有任何規則依賴 category 前綴【量】；線上 bucket 的實際設定【未驗】（沒有雲端存取）。**
+**結論：repo 內沒有任何 bucket 規則，也沒有任何規則依賴 category 前綴【量】；Cloudflare 帳號裡沒有 hawkr 的媒體 bucket（`cf r2 buckets list` 只有其他專案的 5 個，加上本次建的 sandbox）【量】，所以沒有線上規則要相容。**
 
 - 現在的樹【量】：`*.tf`、wrangler 設定、lifecycle／CORS 的 JSON、shell、`.github/workflows`、compose、Java `application.yml` 都搜不到 lifecycle、CORS 或前綴規則。`backend/workers/image-gateway/wrangler.toml:12-14` 只有 R2 binding；`backend/infra/` 只剩 mq。本 repo 的歷史也沒有：`git log --all --diff-filter=D --name-only -- 'backend/infra/**'` 無輸出。
 - 公司時期 repo 的舊設定（已不在本 repo；只當線索）【量，讀自舊 repo 歷史】：dev 與 prod 的 lifecycle 相同——`tmp/` 前綴 30 天過期、整個 bucket 的未完成 multipart 7 天中止；沒有 `public/`、`secure/` 或 category 前綴的規則；CORS 是整個 bucket 一條。
@@ -89,7 +89,9 @@ BenchmarkSingleShot/Open-2        212   6633022 ns/op  3161.68 MB/s    98922 B/o
 
 ## (e) R2 預簽上傳能綁什麼（給 B1-D5）
 
-**文件查證完成【量，官方文件 2026-11-21 讀取】；sandbox bucket 實測【未驗】：repo 的本機脈絡裡沒有可寫的 R2 sandbox 憑證，需要 Will 提供。**
+**結論：預簽 PUT 可以把 `Content-Length`（確切大小）、`Content-Type`、`Content-MD5`、`If-None-Match` 綁進簽章【量，sandbox bucket 實測】；不能綁大小範圍（R2 不支援表單 POST）【量，官方文件】。**
+
+官方文件（2026-11-21 讀取）：
 
 | 問題 | 文件寫的 | 出處 |
 |---|---|---|
@@ -104,8 +106,38 @@ BenchmarkSingleShot/Open-2        212   6633022 ns/op  3161.68 MB/s    98922 B/o
 | lifecycle | 可依前綴；範例單位是天；過期後「通常 24 小時內」移除；未完成 multipart 預設 7 天中止 | `https://developers.cloudflare.com/r2/buckets/object-lifecycles/` |
 | 瀏覽器預簽 PUT 的 CORS | `AllowedMethods` 對應方法、`AllowedHeaders` 列 client 會送的 header、`ExposeHeaders` 可放 `ETag` | `https://developers.cloudflare.com/r2/buckets/cors/` |
 
+實測（2026-11-21）：sandbox bucket `hawkr-sandbox-media`（只限它的 Object Read＋Write token；憑證位置記在本機個人脈絡檔），腳本 `r2_presign_probe.py`（同目錄；自己算 SigV4 query 簽章，payload 是 `UNSIGNED-PAYLOAD`，從環境變數讀 `R2_*`）。
+
+```
+$ python3 r2_presign_probe.py
+0 control (only host signed), 2000 bytes text/plain: HTTP 200
+1a signed len=1000 type=png, send 1000 png: HTTP 200
+1b signed len=1000 type=png, send 2000 png: HTTP 403 SignatureDoesNotMatch
+1c signed len=1000 type=png, send 999 png: HTTP 403 SignatureDoesNotMatch
+1d signed len=1000 type=png, send 1000 text/plain: HTTP 403 SignatureDoesNotMatch
+1e signed type=png only, send 5000 png: HTTP 200
+  HEAD c0: HTTP 200
+  HEAD c1a: HTTP 200
+  HEAD c1b: HTTP 404
+  HEAD c1c: HTTP 404
+  HEAD c1d: HTTP 404
+  HEAD c1e: HTTP 200
+2a signed if-none-match:*, first PUT: HTTP 200
+2b signed if-none-match:*, second PUT same key: HTTP 412 PreconditionFailed
+2c signed if-none-match:*, client omits the header: HTTP 403 SignatureDoesNotMatch
+3a signed content-md5, matching body: HTTP 200
+3b signed content-md5, different body same length: HTTP 400 BadDigest
+```
+
+- **大小**：簽了 `content-length` 後，大小多一個或少一個位元組都回 403，而且不落檔（1b、1c 的 HEAD 是 404）。綁的是確切大小，不是上限：client 建立上傳時先報檔案大小，伺服器檢查不超過上限後把它簽進網址。沒簽的 header 不受限（對照組 0、1e）。
+- **型別**：與文件一致（1d）。
+- **不覆寫**：`If-None-Match: *` 可簽進預簽網址並生效（2a、2b）；client 不帶就 403（2c）。暫存 key 可以做到只寫一次。
+- **內容完整性**：`Content-MD5` 可簽，內容不符回 400（3b）。
+- token 範圍【量】：對 sandbox bucket 可寫可讀；對同帳號另外兩個 bucket 的 `PutObject`、`ListObjectsV2` 都回 `AccessDenied`。
+- lifecycle【量】：`cf r2 buckets lifecycle update hawkr-sandbox-media --force --body '{"rules":[…{"id":"tmp-expire-1d","conditions":{"prefix":"tmp/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":86400}}}]}'` 後讀回一致（sandbox 現在就是這條規則）。API 也收下 `maxAge: 3600`（讀回 3600，之後改回 86400）；小於一天的規則實際多久刪【未驗】，文件只說「通常 24 小時內」。
+
 對 B1-D5 的含意：
 
-- 「大小上限由儲存端的簽章條件擋」只剩一條路：把 `Content-Length` 納入預簽 PUT 的 signed headers。這是 SigV4 的一般行為【推】，R2 文件沒有承諾，**必須實測**才能寫進 B1-3 的驗收。
-- 實測不成立或不做實測時的做法：預簽 PUT 不限大小，伺服器端處理時以 `HEAD` 的大小判定，超量就刪暫存物件、不產生正式物件。暫存區是私有的，超量物件最多留到 GC 或 lifecycle（最短 1 天＋最多 24 小時延遲）。B1-3 驗收已寫「二選一寫死」。
-- 待實測清單（拿到憑證後）：(1) 簽 `content-length` 後送不同大小的 body 是否被拒、回什麼；(2) 簽 `content-type` 後送不同型別（對照文件）；(3) 預簽 PUT 帶 `If-None-Match: *` 是否可簽且生效；(4) `tmp/` 前綴 lifecycle 規則能否以 API 設定 1 天。
+- B1-3 驗收的「二選一」可以寫死成**儲存端簽章條件**：預簽 PUT 簽 `content-length`、`content-type`、`if-none-match: *`，超量或型別不符在 R2 就被拒、不產生暫存物件。伺服器端處理仍要依 magic bytes 驗格式（`Content-Type` 是 client 宣告的）。
+- 預簽網址只能用 `<ACCOUNT_ID>.r2.cloudflarestorage.com`，瀏覽器直傳要設 bucket CORS（`AllowedHeaders` 至少 `content-type`、`if-none-match`；`content-length` 由瀏覽器自帶）。瀏覽器端的 preflight 沒實測【未驗】，留給 B1-3 的 website e2e。
+- 機敏檔明文在暫存區停留的時間上限＝處理 job 的延遲（正常路徑處理完就刪）；處理失敗時由 GC 與 `tmp/` lifecycle（1 天＋最多 24 小時）兜底。這是否可接受屬 D5 已寫的「超出可接受範圍就列回決定題」；我的判斷是可接受（暫存區私有、沒有公開網址），沒有列回【推】。
