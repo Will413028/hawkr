@@ -85,7 +85,7 @@ INSERT INTO procurement.turns (
     buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at)
 VALUES (
     @id, @request_id, @conversation_id, @buyer_id, @result_revision_id, @source,
-    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @optional_streak, @skipped_slots, @client_request_id, @now)
+    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @optional_streak, COALESCE(@skipped_slots::text[], '{}'), @client_request_id, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetTurnByClientRequest :one

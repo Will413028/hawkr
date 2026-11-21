@@ -263,7 +263,7 @@ INSERT INTO procurement.turns (
     buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11, $12, $13, $14)
+    $7, $8, $9, $10, $11, COALESCE($12::text[], '{}'), $13, $14)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 

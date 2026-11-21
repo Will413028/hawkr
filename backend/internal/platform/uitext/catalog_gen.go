@@ -344,7 +344,7 @@ func (t Text) ProcurementRejectionReason(v string) (string, bool) {
 		case "DATE_TOO_FAR":
 			return "The date is too far ahead", true
 		case "RESOLUTION_NO_ITEM":
-			return "There is no item yet, so no item category can be set", true
+			return "The item is missing or was rejected, so no item category can be set", true
 		case "RESOLUTION_NO_LABEL":
 			return "The item category has no name", true
 		case "RESOLUTION_UNKNOWN_KIND":
@@ -373,7 +373,7 @@ func (t Text) ProcurementRejectionReason(v string) (string, bool) {
 	case "DATE_TOO_FAR":
 		return "日期太久以後", true
 	case "RESOLUTION_NO_ITEM":
-		return "還沒有品項，無法指定品項分類", true
+		return "品項未確定，無法指定品項分類", true
 	case "RESOLUTION_NO_LABEL":
 		return "品項分類沒有名稱", true
 	case "RESOLUTION_UNKNOWN_KIND":

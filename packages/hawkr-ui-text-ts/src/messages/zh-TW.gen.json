@@ -99,7 +99,7 @@
       "REJECTION_REASON_DATE_TOO_FAR": "日期太久以後",
       "REJECTION_REASON_EMPTY": "內容是空的",
       "REJECTION_REASON_QUANTITY_RANGE": "數量不在可接受的範圍內",
-      "REJECTION_REASON_RESOLUTION_NO_ITEM": "還沒有品項，無法指定品項分類",
+      "REJECTION_REASON_RESOLUTION_NO_ITEM": "品項未確定，無法指定品項分類",
       "REJECTION_REASON_RESOLUTION_NO_LABEL": "品項分類沒有名稱",
       "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "品項分類的判定方式不明",
       "REJECTION_REASON_TRUNCATED": "超過長度上限，已截斷",

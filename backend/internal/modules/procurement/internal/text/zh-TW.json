@@ -108,8 +108,8 @@
       "description": "欄位被拒的原因：數量不在範圍內。"
     },
     "reject.resolution_no_item": {
-      "message": "沒有品項可以解析",
-      "description": "品項分類被拒的原因：需求還沒有品項。"
+      "message": "品項未確定，無法指定品項分類",
+      "description": "品項分類被拒的原因：需求沒有品項，或品項這輪被退回。"
     },
     "reject.resolution_no_label": {
       "message": "品項分類必須有名稱",
@@ -181,11 +181,11 @@
       "description": "詢價快照已確認、待核准時的原因句。"
     },
     "reply.basics_ready.next": {
-      "message": "需求已齊，可以開始找候選",
+      "message": "需求已齊，可以開始找候選。",
       "description": "需求齊備時的下一步句：只說買家接下來可以做的事，不宣稱已開始搜尋。"
     },
     "reply.basics_ready.understood": {
-      "message": "好的，需求已經齊全了。",
+      "message": "好的，資料都齊了。",
       "description": "需求齊備時的確認句。"
     },
     "reply.correction.updated": {

@@ -1,2 +1,2 @@
 -- Modify "turns" table
-ALTER TABLE "procurement"."turns" ADD CONSTRAINT "turns_optional_streak_check" CHECK (optional_streak >= 0), ADD CONSTRAINT "turns_skipped_slots_check" CHECK ((skipped_slots <@ ARRAY['QUANTITY'::text, 'DELIVERY_DATE'::text, 'PACKAGING'::text, 'BUDGET_PER_UNIT'::text])), ADD COLUMN "optional_streak" integer NOT NULL DEFAULT 0, ADD COLUMN "skipped_slots" text[] NOT NULL DEFAULT '{}';
+ALTER TABLE "procurement"."turns" ADD CONSTRAINT "turns_optional_streak_check" CHECK (optional_streak >= 0), ADD CONSTRAINT "turns_skipped_slots_check" CHECK ((skipped_slots <@ ARRAY['PACKAGING'::text, 'BUDGET_PER_UNIT'::text])), ADD COLUMN "optional_streak" integer NOT NULL DEFAULT 0, ADD COLUMN "skipped_slots" text[] NOT NULL DEFAULT '{}';

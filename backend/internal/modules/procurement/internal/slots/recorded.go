@@ -21,7 +21,7 @@ var order = []model.SlotKey{
 
 // RecordedThisTurn 算出這一輪要顯示的欄位：patch 有帶、而且 Apply 後真的跟 current 不同的欄位，值讀 next。
 // 用「前後是否不同」而不是看 rejected 清單：截斷但有採用的欄位也是這輪記下的，完全丟棄的不是。
-// ExactMatchRequired 的系統預設補值不是買家這輪說的，只看 patch 是否帶它。
+// ExactMatchRequired 只有買家明確設定的值才算記下；nil 是系統預設，不算。這輪只看 patch 是否帶它。
 func RecordedThisTurn(patch Patch, current, next Set) []Recorded {
 	out := []Recorded{}
 	for _, k := range order {

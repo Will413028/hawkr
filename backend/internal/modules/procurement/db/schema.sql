@@ -105,7 +105,7 @@ CREATE TABLE procurement.turns (
     CONSTRAINT turns_steps_check CHECK (jsonb_typeof(steps) = 'array'),
     CONSTRAINT turns_recorded_check CHECK (jsonb_typeof(recorded_this_turn) = 'array'),
     CONSTRAINT turns_optional_streak_check CHECK (optional_streak >= 0),
-    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['QUANTITY', 'DELIVERY_DATE', 'PACKAGING', 'BUDGET_PER_UNIT'])
+    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['PACKAGING', 'BUDGET_PER_UNIT'])
 );
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);

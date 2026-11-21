@@ -265,7 +265,7 @@
       "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_QUANTITY_RANGE）"
     },
     "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
-      "message": "還沒有品項，無法指定品項分類",
+      "message": "品項未確定，無法指定品項分類",
       "description": "品項被丟棄（或還沒有品項），所以不能附上分類判定。"
     },
     "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {

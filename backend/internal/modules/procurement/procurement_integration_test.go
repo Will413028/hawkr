@@ -249,6 +249,19 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if err != nil || dup != 0 {
 		t.Fatalf("重送的 InsertTurn n=%d err=%v", dup, err)
 	}
+	nilSkipID := id()
+	if n, err := q.InsertTurn(ctx, store.InsertTurnParams{
+		ID: id(), RequestID: c.request, ConversationID: c.conversation, BuyerID: c.buyer, ResultRevisionID: rev2, Source: "ANSWER",
+		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: nil, ClientRequestID: nilSkipID, Now: epoch,
+	}); err != nil || n != 1 {
+		t.Fatalf("nil SkippedSlots 的 InsertTurn 要存成空陣列，n=%d err=%v", n, err)
+	}
+	if got, err := q.GetTurnByClientRequest(ctx, store.GetTurnByClientRequestParams{BuyerID: c.buyer, ClientRequestID: nilSkipID}); err != nil || got.SkippedSlots == nil || len(got.SkippedSlots) != 0 {
+		t.Fatalf("nil SkippedSlots 讀回 = %v, %v, want 空陣列", got.SkippedSlots, err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.turns SET skipped_slots = ARRAY['QUANTITY'] WHERE id = $1`, c.turn); err == nil {
+		t.Fatal("skipped_slots 只允許 PACKAGING、BUDGET_PER_UNIT：QUANTITY 要被 CHECK 擋下")
+	}
 	if got, err := q.GetTurnByClientRequest(ctx, store.GetTurnByClientRequestParams{BuyerID: c.buyer, ClientRequestID: turns[0].ClientRequestID}); err != nil || got.ID != c.turn {
 		t.Fatalf("GetTurnByClientRequest = %+v, %v", got, err)
 	}

@@ -99,7 +99,7 @@
       "REJECTION_REASON_DATE_TOO_FAR": "The date is too far ahead",
       "REJECTION_REASON_EMPTY": "The content is empty",
       "REJECTION_REASON_QUANTITY_RANGE": "The quantity is out of range",
-      "REJECTION_REASON_RESOLUTION_NO_ITEM": "There is no item yet, so no item category can be set",
+      "REJECTION_REASON_RESOLUTION_NO_ITEM": "The item is missing or was rejected, so no item category can be set",
       "REJECTION_REASON_RESOLUTION_NO_LABEL": "The item category has no name",
       "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "The way the item category was decided is unknown",
       "REJECTION_REASON_TRUNCATED": "Over the length limit, shortened",

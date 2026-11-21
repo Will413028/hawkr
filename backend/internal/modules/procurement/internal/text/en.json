@@ -64,7 +64,7 @@
       "message": "Quantity must be between 1 and {max}"
     },
     "reject.resolution_no_item": {
-      "message": "There is no item to categorize"
+      "message": "The item is missing or was rejected, so no item category can be set"
     },
     "reject.resolution_no_label": {
       "message": "The item category needs a name"
@@ -103,7 +103,7 @@
       "message": "Your request is complete. You can start finding candidates."
     },
     "reply.basics_ready.understood": {
-      "message": "Great, your request is complete."
+      "message": "Great, I have everything."
     },
     "reply.correction.updated": {
       "message": "Updated: {facts}"

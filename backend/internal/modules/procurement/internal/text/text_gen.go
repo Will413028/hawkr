@@ -223,9 +223,9 @@ func RejectQuantityRange(l uitext.Locale, a RejectQuantityRangeArgs) uitext.Mess
 func RejectResolutionNoItem(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "There is no item to categorize", Locale: uitext.EN}
+		return uitext.Message{Text: "The item is missing or was rejected, so no item category can be set", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "沒有品項可以解析", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "品項未確定，無法指定品項分類", Locale: uitext.ZhTW}
 }
 
 // RejectResolutionNoLabel 是模組句子 reject.resolution_no_label；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
@@ -358,16 +358,16 @@ func ReplyBasicsReadyNext(l uitext.Locale) uitext.Message {
 	case uitext.EN:
 		return uitext.Message{Text: "Your request is complete. You can start finding candidates.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "需求已齊，可以開始找候選", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "需求已齊，可以開始找候選。", Locale: uitext.ZhTW}
 }
 
 // ReplyBasicsReadyUnderstood 是模組句子 reply.basics_ready.understood；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplyBasicsReadyUnderstood(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "Great, your request is complete.", Locale: uitext.EN}
+		return uitext.Message{Text: "Great, I have everything.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "好的，需求已經齊全了。", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "好的，資料都齊了。", Locale: uitext.ZhTW}
 }
 
 // ReplyCorrectionUpdatedArgs 是 ReplyCorrectionUpdated 的參數。

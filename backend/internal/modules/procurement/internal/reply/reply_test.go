@@ -45,7 +45,7 @@ func TestRenderParity(t *testing.T) {
 			[]Block{b(Warning, "需求解析暫時無法使用。"), b(Context, "已保留你目前的需求內容，可以繼續補充或稍後再試。")}},
 		{"request basics ready",
 			planner.Plan{Act: planner.RequestBasicsReady}, Args{},
-			[]Block{b(Understood, "好的，需求已經齊全了。"), b(NextStep, "需求已齊，可以開始找候選")}},
+			[]Block{b(Understood, "好的，資料都齊了。"), b(NextStep, "需求已齊，可以開始找候選。")}},
 		{"price preview available",
 			planner.Plan{Act: planner.PricePreviewAvailable}, Args{},
 			[]Block{b(Context, "已經有市場參考價可以看了。"), b(NextStep, "要不要先確認一下希望詢價區間？")}},
@@ -124,7 +124,7 @@ func TestRejectionReasonsInZhTW(t *testing.T) {
 		slots.ReasonDateMissingYear:  "缺少西元年份，請補上年份（例如 2026-08-20）",
 		slots.ReasonDatePast:         "到貨日不可早於今天",
 		slots.ReasonDateTooFar:       "到貨日不可超過 365 天後",
-		slots.ReasonResolutionNoItem: "沒有品項可以解析",
+		slots.ReasonResolutionNoItem: "品項未確定，無法指定品項分類",
 	}
 	for reason, text := range want {
 		if got := RejectionReason(zh, slots.Rejection{Key: slots.Item, Reason: reason}); got != text {
@@ -221,7 +221,7 @@ func TestAdjustedValueWarnsInsideTheNormalAct(t *testing.T) {
 	plan := planner.Plan{Act: planner.RequestBasicsReady, Adjusted: []slots.Rejection{{Key: slots.Item, Reason: slots.ReasonTruncated}}}
 	got := Render(zh, plan, Args{Rejected: plan.Adjusted})
 	want := []Block{
-		b(Understood, "好的，需求已經齊全了。"), b(NextStep, "需求已齊，可以開始找候選"),
+		b(Understood, "好的，資料都齊了。"), b(NextStep, "需求已齊，可以開始找候選。"),
 		b(Warning, "有幾個內容我調整過了：品項：超過 200 字，已截斷"),
 	}
 	if !reflect.DeepEqual(got, want) {
