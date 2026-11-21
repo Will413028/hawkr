@@ -212,7 +212,7 @@ var InternalDependencies = map[string]InternalGraph{
 		},
 	},
 	"media": {
-		Packages: map[string][]string{"model": {}, "refsync": {"model"}},
+		Packages: map[string][]string{"model": {}, "refsync": {"model"}, "storage": {}},
 	},
 	"accountsuspension": {
 		Packages: map[string][]string{}, // 只有根套件：編排，沒有內部套件。

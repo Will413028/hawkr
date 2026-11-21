@@ -1,0 +1,49 @@
+{
+ "mutants": [
+  {
+   "id": "presign-content-length-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentLength: aws.Int64(in.ContentLength),\n\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "new": "\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs Content-Length, so a client could upload any size"
+  },
+  {
+   "id": "presign-md5-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentMD5:    aws.String(in.ContentMD5),\n\t\tIfNoneMatch:",
+   "new": "\t\tIfNoneMatch:",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs Content-MD5"
+  },
+  {
+   "id": "presign-if-none-match-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tIfNoneMatch:   aws.String(\"*\"),\n\t}, s3.WithPresignExpires",
+   "new": "\t}, s3.WithPresignExpires",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs If-None-Match, so a presigned URL can overwrite an existing object"
+  },
+  {
+   "id": "key-not-random-version",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/keys.go",
+   "old": "b[6] = b[6]&0x0f | 0x40\n",
+   "new": "b[6] = b[6]&0x0f | 0x10\n",
+   "test": "internal/modules/media/internal/storage ^TestNewKey$",
+   "why": "generated keys are no longer uuid v4"
+  },
+  {
+   "id": "config-r2-bucket-optional",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/config.go",
+   "old": "Bucket:          e.String(\"MEDIA_R2_BUCKET\"),",
+   "new": "Bucket:          e.StringOr(\"MEDIA_R2_BUCKET\", \"b\"),",
+   "test": "internal/modules/media/internal/storage ^TestConfigRejectsEverySingleMissingSetting$",
+   "why": "a missing r2 bucket silently falls back to a default instead of failing startup"
+  }
+ ]
+}
