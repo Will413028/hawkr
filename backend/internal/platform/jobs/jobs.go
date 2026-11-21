@@ -11,6 +11,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -116,7 +117,7 @@ func (c *Client) EnqueueJob(ctx context.Context, args river.JobArgs, opts *river
 }
 
 // CancelJob 取消一個 job 並回傳取消之後 job 的狀態：還沒執行的直接成為 cancelled；執行中的取消它的 ctx，狀態仍是 running，由 worker 結束後收尾；
-// 已完成的 job 不受影響、回傳原狀態。ctx 裡有 transaction 時在該 transaction 內執行。
+// 已完成的 job 不受影響、回傳原狀態；job 列已不存在（被清掉）視同已取消，沒有 executor 會再領它。ctx 裡有 transaction 時在該 transaction 內執行。
 func (c *Client) CancelJob(ctx context.Context, jobID int64) (rivertype.JobState, error) {
 	var row *rivertype.JobRow
 	var err error
@@ -124,6 +125,9 @@ func (c *Client) CancelJob(ctx context.Context, jobID int64) (rivertype.JobState
 		row, err = c.river.JobCancelTx(ctx, tx, jobID)
 	} else {
 		row, err = c.river.JobCancel(ctx, jobID)
+	}
+	if errors.Is(err, river.ErrNotFound) {
+		return rivertype.JobStateCancelled, nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("jobs：取消 job %d：%w", jobID, err)
