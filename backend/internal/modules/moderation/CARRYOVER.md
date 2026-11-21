@@ -30,7 +30,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 髒字詞典（M17） | 預先過濾 | 屬於 social 的寫入路徑（A7-1a 已放在 `platform/textfilter`） | 詞庫有擁有者與後台維護 | 不在本模組：詞庫的擁有者與後台維護是另一個決定，觸發是營運要求新增詞 |
 | 扁平的 `snapshot.Content` 加種類專屬欄位（A6-4 設計 §9 第 1 列） | 依種類的 tagged union（每種一個 struct） | 「既有雜湊不變」不是約束（未上線，根目錄 `AGENTS.md`） | 依種類的 struct | 改（A6-D21 W4 (a)）：`snapshot.Content` 是 tagged union（Social、Buyer、Review、Chat 恰好一個有值，Decode 驗種類與欄位一致），後台 `GetCase` 帶 `snapshot` oneof；後台畫面在 A6-6 |
 | 隱藏表在內容模組、moderation 只存案件 | 同（處分紀錄與效果同模組，10e R12） | 成立 | 同 | 沿用：評價隱藏在 review、聊天訊息隱藏在 im |
-| HIDE 遇到已清除內容視為成功 | 同（隱藏的目的已達成；不讓案件卡住） | 成立 | 同 | 沿用，擴到評價與聊天訊息（擁有者回 NotFound 視為成功、不寫隱藏紀錄）；`internal/handle/AGENTS.md` 與 `docs/modules/moderation.md` 的過時句（FailedPrecondition）已改正，以程式與測試為準 |
+| HIDE 遇到已清除內容視為成功 | 同（隱藏的目的已達成；不讓案件卡住） | 成立 | 同 | 沿用，擴到評價與聊天訊息（擁有者回 NotFound 視為成功、不寫隱藏紀錄）；`internal/handle/AGENTS.md` 與 `backend/docs/modules/moderation.md` 的過時句（FailedPrecondition）已改正，以程式與測試為準 |
 | 證據保全以 media 引用（`GOVERNANCE_EVIDENCE`） | 同 | 成立 | 同 | 沿用，範圍擴到聊天前後文的圖片（`snapshot.Content.AssetIDs`：被檢舉訊息與前後文圖片的聯集，墓碑不算） |
 | 處分終態、不重開不改判（`Decide`），更正在擁有處分的模組做 | 處分可撤銷，撤銷記在原決定旁並留稽核（DSA 第 20 條申訴後撤銷；各平台在原 enforcement 上記 reversal） | 不成立：後台沒有任何還原入口，計畫驗收要「檢舉→隱藏→還原」 | 撤銷紀錄與原決定同處 | 改（A6-D21 W1 (a)）：`ReverseHide`，案件維持結案、決定不改，`cases.reversed_*` 三欄與 `adminaudit`；同 transaction 呼叫 review／im／social 的 `Restore`，帶來源參照 `moderation:case:<id>` 只還原本案造成的隱藏（冪等的 `Hide` 讓後到的案件沿用先到那一筆，撤銷後到案件回 FailedPrecondition，不動別案的隱藏）；擁有者回 NotFound（內容已清除）視為成功並照常記下撤銷；社群留言、討論區留言一併受惠 |
 | 評價與聊天訊息的隱藏與還原要不要取擁有者的守門 | 守門擋停用身分產生新資料；處分不產生新資料 | 不成立：取了會讓已停用作者的處分失敗 | 處分不被作者狀態擋 | 不取（`LockActive`、`LockNotClosed`、`LockNotRetired` 都不呼叫，`TestHideWorksWhileTheAuthorIsDeactivated`） |
