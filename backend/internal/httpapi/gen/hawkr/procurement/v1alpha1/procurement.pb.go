@@ -333,7 +333,7 @@ const (
 	// 已受理，還沒取得執行資源。
 	RunStatus_RUN_STATUS_QUEUED  RunStatus = 1
 	RunStatus_RUN_STATUS_RUNNING RunStatus = 2
-	// 停在中斷，等買家回答釐清問題。
+	// 停在中斷，等買家回答釐清問題；回答的 run 成功之後轉 SUCCEEDED。
 	RunStatus_RUN_STATUS_WAITING_FOR_INPUT RunStatus = 3
 	// 已收到取消，還沒收斂到終態。
 	RunStatus_RUN_STATUS_CANCEL_REQUESTED RunStatus = 4
@@ -342,8 +342,6 @@ const (
 	// 失敗，原因見 RunFailureReason。
 	RunStatus_RUN_STATUS_FAILED    RunStatus = 6
 	RunStatus_RUN_STATUS_CANCELLED RunStatus = 7
-	// 交棒給接續的 run。
-	RunStatus_RUN_STATUS_RESUMED RunStatus = 8
 )
 
 // Enum value maps for RunStatus.
@@ -357,7 +355,6 @@ var (
 		5: "RUN_STATUS_SUCCEEDED",
 		6: "RUN_STATUS_FAILED",
 		7: "RUN_STATUS_CANCELLED",
-		8: "RUN_STATUS_RESUMED",
 	}
 	RunStatus_value = map[string]int32{
 		"RUN_STATUS_UNSPECIFIED":       0,
@@ -368,7 +365,6 @@ var (
 		"RUN_STATUS_SUCCEEDED":         5,
 		"RUN_STATUS_FAILED":            6,
 		"RUN_STATUS_CANCELLED":         7,
-		"RUN_STATUS_RESUMED":           8,
 	}
 )
 
@@ -9075,7 +9071,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\rRUN_TYPE_TURN\x10\x01\x12\x1d\n" +
 	"\x19RUN_TYPE_CANDIDATE_SEARCH\x10\x02\x12!\n" +
 	"\x1dRUN_TYPE_CLARIFICATION_RESUME\x10\x03\x12\x18\n" +
-	"\x14RUN_TYPE_PUBLICATION\x10\x04*\x96\x02\n" +
+	"\x14RUN_TYPE_PUBLICATION\x10\x04*\x98\x02\n" +
 	"\tRunStatus\x12\x1a\n" +
 	"\x16RUN_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11RUN_STATUS_QUEUED\x10\x01\x12\x16\n" +
@@ -9084,8 +9080,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x1bRUN_STATUS_CANCEL_REQUESTED\x10\x04\x12\x18\n" +
 	"\x14RUN_STATUS_SUCCEEDED\x10\x05\x12\x15\n" +
 	"\x11RUN_STATUS_FAILED\x10\x06\x12\x18\n" +
-	"\x14RUN_STATUS_CANCELLED\x10\a\x12\x16\n" +
-	"\x12RUN_STATUS_RESUMED\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_EXPIRED*\xce\x01\n" +
+	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xce\x01\n" +
 	"\x10RunFailureReason\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_WORKER_LOST\x10\x01\x12$\n" +

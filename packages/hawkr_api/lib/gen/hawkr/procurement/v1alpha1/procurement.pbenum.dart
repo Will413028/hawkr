@@ -220,7 +220,7 @@ class RunStatus extends $pb.ProtobufEnum {
   static const RunStatus RUN_STATUS_RUNNING =
       RunStatus._(2, _omitEnumNames ? '' : 'RUN_STATUS_RUNNING');
 
-  /// 停在中斷，等買家回答釐清問題。
+  /// 停在中斷，等買家回答釐清問題；回答的 run 成功之後轉 SUCCEEDED。
   static const RunStatus RUN_STATUS_WAITING_FOR_INPUT =
       RunStatus._(3, _omitEnumNames ? '' : 'RUN_STATUS_WAITING_FOR_INPUT');
 
@@ -238,10 +238,6 @@ class RunStatus extends $pb.ProtobufEnum {
   static const RunStatus RUN_STATUS_CANCELLED =
       RunStatus._(7, _omitEnumNames ? '' : 'RUN_STATUS_CANCELLED');
 
-  /// 交棒給接續的 run。
-  static const RunStatus RUN_STATUS_RESUMED =
-      RunStatus._(8, _omitEnumNames ? '' : 'RUN_STATUS_RESUMED');
-
   static const $core.List<RunStatus> values = <RunStatus>[
     RUN_STATUS_UNSPECIFIED,
     RUN_STATUS_QUEUED,
@@ -251,11 +247,10 @@ class RunStatus extends $pb.ProtobufEnum {
     RUN_STATUS_SUCCEEDED,
     RUN_STATUS_FAILED,
     RUN_STATUS_CANCELLED,
-    RUN_STATUS_RESUMED,
   ];
 
   static final $core.List<RunStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 8);
+      $pb.ProtobufEnum.$_initByValueList(values, 7);
   static RunStatus? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

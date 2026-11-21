@@ -220,7 +220,7 @@ enum RunStatus {
   // 已受理，還沒取得執行資源。
   RUN_STATUS_QUEUED = 1;
   RUN_STATUS_RUNNING = 2;
-  // 停在中斷，等買家回答釐清問題。
+  // 停在中斷，等買家回答釐清問題；回答的 run 成功之後轉 SUCCEEDED。
   RUN_STATUS_WAITING_FOR_INPUT = 3;
   // 已收到取消，還沒收斂到終態。
   RUN_STATUS_CANCEL_REQUESTED = 4;
@@ -229,10 +229,8 @@ enum RunStatus {
   // 失敗，原因見 RunFailureReason。
   RUN_STATUS_FAILED = 6;
   RUN_STATUS_CANCELLED = 7;
-  // 交棒給接續的 run。
-  RUN_STATUS_RESUMED = 8;
-  reserved 9;
-  reserved "RUN_STATUS_EXPIRED";
+  reserved 8, 9;
+  reserved "RUN_STATUS_RESUMED", "RUN_STATUS_EXPIRED";
 }
 
 // RunFailureReason 是 run 失敗的機器可讀原因，只在 FAILED 時有值。

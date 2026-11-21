@@ -130,12 +130,12 @@ const RunStatus$json = {
     {'1': 'RUN_STATUS_SUCCEEDED', '2': 5},
     {'1': 'RUN_STATUS_FAILED', '2': 6},
     {'1': 'RUN_STATUS_CANCELLED', '2': 7},
-    {'1': 'RUN_STATUS_RESUMED', '2': 8},
   ],
   '4': [
+    {'1': 8, '2': 8},
     {'1': 9, '2': 9},
   ],
-  '5': ['RUN_STATUS_EXPIRED'],
+  '5': ['RUN_STATUS_RESUMED', 'RUN_STATUS_EXPIRED'],
 };
 
 /// Descriptor for `RunStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
@@ -144,8 +144,8 @@ final $typed_data.Uint8List runStatusDescriptor = $convert.base64Decode(
     'VFVUVEEAESFgoSUlVOX1NUQVRVU19SVU5OSU5HEAISIAocUlVOX1NUQVRVU19XQUlUSU5HX0ZP'
     'Ul9JTlBVVBADEh8KG1JVTl9TVEFUVVNfQ0FOQ0VMX1JFUVVFU1RFRBAEEhgKFFJVTl9TVEFUVV'
     'NfU1VDQ0VFREVEEAUSFQoRUlVOX1NUQVRVU19GQUlMRUQQBhIYChRSVU5fU1RBVFVTX0NBTkNF'
-    'TExFRBAHEhYKElJVTl9TVEFUVVNfUkVTVU1FRBAIIgQICRAJKhJSVU5fU1RBVFVTX0VYUElSRU'
-    'Q=');
+    'TExFRBAHIgQICBAIIgQICRAJKhJSVU5fU1RBVFVTX1JFU1VNRUQqElJVTl9TVEFUVVNfRVhQSV'
+    'JFRA==');
 
 @$core.Deprecated('Use runFailureReasonDescriptor instead')
 const RunFailureReason$json = {
