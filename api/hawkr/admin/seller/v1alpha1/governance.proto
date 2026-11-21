@@ -304,7 +304,7 @@ message Report {
   // 第一次分案的時間，移動不改；沒有分案過時不設。
   google.protobuf.Timestamp triage_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   string triaged_by_admin_id = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 結果；還沒有結果時是 UNSPECIFIED。
+  // 結果；還沒有結果時是 PENDING。
   hawkr.seller.v1alpha1.ReportOutcome outcome = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結果設定的時間；還沒有結果時不設。
   google.protobuf.Timestamp resolve_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];

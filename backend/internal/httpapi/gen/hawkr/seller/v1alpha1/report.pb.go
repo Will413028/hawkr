@@ -30,7 +30,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 PENDING（與 resolve_time 不設同時成立）；UNSPECIFIED 不帶意義，伺服器不回。
 type ReportOutcome int32
 
 const (
@@ -45,6 +45,8 @@ const (
 	ReportOutcome_REPORT_OUTCOME_DUPLICATE ReportOutcome = 4
 	// 濫用檢舉。
 	ReportOutcome_REPORT_OUTCOME_ABUSIVE ReportOutcome = 5
+	// 還沒有結果（處理中）。
+	ReportOutcome_REPORT_OUTCOME_PENDING ReportOutcome = 6
 )
 
 // Enum value maps for ReportOutcome.
@@ -56,6 +58,7 @@ var (
 		3: "REPORT_OUTCOME_INSUFFICIENT",
 		4: "REPORT_OUTCOME_DUPLICATE",
 		5: "REPORT_OUTCOME_ABUSIVE",
+		6: "REPORT_OUTCOME_PENDING",
 	}
 	ReportOutcome_value = map[string]int32{
 		"REPORT_OUTCOME_UNSPECIFIED":  0,
@@ -64,6 +67,7 @@ var (
 		"REPORT_OUTCOME_INSUFFICIENT": 3,
 		"REPORT_OUTCOME_DUPLICATE":    4,
 		"REPORT_OUTCOME_ABUSIVE":      5,
+		"REPORT_OUTCOME_PENDING":      6,
 	}
 )
 
@@ -112,7 +116,7 @@ type StoreReport struct {
 	CreateTime     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
 	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`
-	// 結果；還沒有結果時是 UNSPECIFIED（處理中）。
+	// 結果；還沒有結果時是 PENDING。
 	Outcome       ReportOutcome `protobuf:"varint,10,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -770,14 +774,15 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\x1bAddReportSupplementResponse\x12:\n" +
 	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12I\n" +
 	"\vsupplements\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.ReportSupplementR\vsupplements\x12A\n" +
-	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence*\xcc\x01\n" +
+	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence*\xe8\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_ACTION_TAKEN\x10\x01\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x02\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_INSUFFICIENT\x10\x03\x12\x1c\n" +
 	"\x18REPORT_OUTCOME_DUPLICATE\x10\x04\x12\x1a\n" +
-	"\x16REPORT_OUTCOME_ABUSIVE\x10\x052\xea\x02\n" +
+	"\x16REPORT_OUTCOME_ABUSIVE\x10\x05\x12\x1a\n" +
+	"\x16REPORT_OUTCOME_PENDING\x10\x062\xea\x02\n" +
 	"\x16SellerReportAppService\x12g\n" +
 	"\fCreateReport\x12*.hawkr.seller.v1alpha1.CreateReportRequest\x1a+.hawkr.seller.v1alpha1.CreateReportResponse\x12i\n" +
 	"\vGetMyReport\x12).hawkr.seller.v1alpha1.GetMyReportRequest\x1a*.hawkr.seller.v1alpha1.GetMyReportResponse\"\x03\x90\x02\x01\x12|\n" +

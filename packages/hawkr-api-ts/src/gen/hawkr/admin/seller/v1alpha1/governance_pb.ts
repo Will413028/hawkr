@@ -134,7 +134,7 @@ export type Report = Message<"hawkr.admin.seller.v1alpha1.Report"> & {
   triagedByAdminId: string;
 
   /**
-   * 結果；還沒有結果時是 UNSPECIFIED。
+   * 結果；還沒有結果時是 PENDING。
    *
    * @generated from field: hawkr.seller.v1alpha1.ReportOutcome outcome = 16;
    */

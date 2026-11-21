@@ -332,7 +332,7 @@ type Report struct {
 	// 第一次分案的時間，移動不改；沒有分案過時不設。
 	TriageTime       *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=triage_time,json=triageTime,proto3" json:"triage_time,omitempty"`
 	TriagedByAdminId string                 `protobuf:"bytes,15,opt,name=triaged_by_admin_id,json=triagedByAdminId,proto3" json:"triaged_by_admin_id,omitempty"`
-	// 結果；還沒有結果時是 UNSPECIFIED。
+	// 結果；還沒有結果時是 PENDING。
 	Outcome v1alpha11.ReportOutcome `protobuf:"varint,16,opt,name=outcome,proto3,enum=hawkr.seller.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
 	// 結果設定的時間；還沒有結果時不設。
 	ResolveTime       *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=resolve_time,json=resolveTime,proto3" json:"resolve_time,omitempty"`

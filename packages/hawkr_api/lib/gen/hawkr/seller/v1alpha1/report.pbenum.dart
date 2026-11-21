@@ -14,7 +14,7 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+/// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 PENDING（與 resolve_time 不設同時成立）；UNSPECIFIED 不帶意義，伺服器不回。
 class ReportOutcome extends $pb.ProtobufEnum {
   static const ReportOutcome REPORT_OUTCOME_UNSPECIFIED =
       ReportOutcome._(0, _omitEnumNames ? '' : 'REPORT_OUTCOME_UNSPECIFIED');
@@ -39,6 +39,10 @@ class ReportOutcome extends $pb.ProtobufEnum {
   static const ReportOutcome REPORT_OUTCOME_ABUSIVE =
       ReportOutcome._(5, _omitEnumNames ? '' : 'REPORT_OUTCOME_ABUSIVE');
 
+  /// 還沒有結果（處理中）。
+  static const ReportOutcome REPORT_OUTCOME_PENDING =
+      ReportOutcome._(6, _omitEnumNames ? '' : 'REPORT_OUTCOME_PENDING');
+
   static const $core.List<ReportOutcome> values = <ReportOutcome>[
     REPORT_OUTCOME_UNSPECIFIED,
     REPORT_OUTCOME_ACTION_TAKEN,
@@ -46,10 +50,11 @@ class ReportOutcome extends $pb.ProtobufEnum {
     REPORT_OUTCOME_INSUFFICIENT,
     REPORT_OUTCOME_DUPLICATE,
     REPORT_OUTCOME_ABUSIVE,
+    REPORT_OUTCOME_PENDING,
   ];
 
   static final $core.List<ReportOutcome?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 5);
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
   static ReportOutcome? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
