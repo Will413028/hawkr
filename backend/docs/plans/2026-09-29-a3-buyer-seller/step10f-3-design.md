@@ -1,6 +1,6 @@
-# 10f-3 我的檢舉與補充說明（R7），設計草稿
+# 10f-3 我的檢舉與補充說明（R7），設計
 
-來源：`step10e-reports-brief.md` R7「信任與安全上線前那一刀做的」；計畫 10f 範圍確認（Will 2026-11-20）；`step10f-2-design.md` G1；盤點對照 dev `50d30a50`（2026-11-21）。決定 H1–H4：未決。兩輪獨立審查已處理（第 1 輪 findings 11，blocking 1，全 fixed；第 2 輪 findings 5：fixed 4、rejected 1）。
+來源：`step10e-reports-brief.md` R7「信任與安全上線前那一刀做的」；計畫 10f 範圍確認（Will 2026-11-20）；`step10f-2-design.md` G1；盤點對照 dev `50d30a50`（2026-11-21）。決定 H1–H4（含 H1b、H1c、H2b）：Will 2026-11-21 全照建議。兩輪獨立審查已處理（第 1 輪 findings 11，blocking 1，全 fixed；第 2 輪 findings 5：fixed 4、rejected 1）。
 
 使用者面名稱是「我的檢舉」（`docs/共通規範/使用者面用語術語表.md` L48–49）；「通報」是後台用語。前提：系統未上線，刪 RPC 不需相容窗口，回滾就是 revert。
 

@@ -411,6 +411,10 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                 - 成功句只留「已收到檢舉」：「我的檢舉」頁目前只列社群檢舉；10f-3 把店家檢舉併入後再加回「可在「我的檢舉」查看」。
                 - 延後：buyer-app 店面頁在自己的店仍顯示「⋯ → 檢舉」（伺服器擋下並顯示錯誤），`GetStoreResponse` 沒有擁有者欄位；觸發條件：店家 API 加擁有者欄位，或 10f-3 動到店面頁時。
               - [ ] 10f-3 我的通報與補充說明（R7）：讀取時組裝 seller 與 moderation 兩種通報、通報人補充說明的 API、buyer-app 既有頁擴充、website 新頁。
+                - 設計（Will 2026-11-21 全照建議，H1–H4；`2026-09-29-a3-buyer-seller/step10f-3-design.md`，兩輪獨立審查 findings 16（blocking 1）：fixed 15、rejected 1）。
+                - [ ] 10f-3a backend 與契約（合併 `ListMyReports`、`GetMyReport`、`AddReportSupplement`）
+                - [ ] 10f-3b buyer-app（UI 版面先給 Will 同意）
+                - [ ] 10f-3c website（UI 版面先給 Will 同意）
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
               - [ ] 10f-5 權利人通報（R8）：不必登入的表單、著作權法定流程（補正、回復通知、恢復）、商標與專利的平台流程；開工前先出決定簡報。
               - [ ] 10f-6 收尾：完成定義核對、design-review、延後項回主清單。
