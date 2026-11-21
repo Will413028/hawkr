@@ -132,5 +132,32 @@
 			"deleted": "此留言已刪除",
 			"hidden": "此留言已被隱藏"
 		}
+	},
+	"report": {
+		"menuLabel": "更多動作",
+		"menuItem": "檢舉",
+		"titleStore": "檢舉店家",
+		"titleProduct": "檢舉商品",
+		"targetProduct": "檢舉商品：{name}",
+		"loginTitle": "登入後即可檢舉",
+		"loginDescription": "檢舉需要登入，處理結果才能在「我的通報」讓你查看。",
+		"loginAction": "登入 / 註冊",
+		"category": "類別",
+		"categoryPlaceholder": "請選擇類別",
+		"description": "說明",
+		"descriptionPlaceholder": "請描述你遇到的情形",
+		"orderNo": "訂單編號（選填）",
+		"evidence": "佐證圖片（選填）",
+		"evidenceHint": "最多 {max} 張",
+		"submit": "送出檢舉",
+		"submitting": "送出中…",
+		"cancel": "取消",
+		"close": "完成",
+		"received": "已收到檢舉，處理結果可在「我的通報」查看",
+		"errorCategoryRequired": "請選擇類別",
+		"errorDescriptionRequired": "請填寫說明",
+		"errorDescriptionTooLong": "說明最多 {max} 字",
+		"errorOrderNoTooLong": "訂單編號最多 {max} 字",
+		"uploadingWait": "圖片上傳中，請稍候"
 	}
 }

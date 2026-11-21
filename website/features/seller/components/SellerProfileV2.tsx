@@ -6,6 +6,7 @@ import {
 	COMPACT_BACK_CONTROL_CLASSNAME,
 	CompactBackIcon,
 } from "@/components/shared/CompactBackControl";
+import ReportMenu from "@/features/report/ReportMenu";
 import SellerChatButton from "@/features/seller/components/SellerChatButton";
 import SellerCoverMedia from "@/features/seller/components/SellerCoverMedia";
 import SellerProfileDescription from "@/features/seller/components/SellerProfileDescription";
@@ -280,6 +281,7 @@ export default function SellerProfileV2({
 						activeLabel="已訂閱"
 						previewMode={previewMode}
 					/>
+					{!previewMode && storeId ? <ReportMenu storeId={storeId} /> : null}
 				</div>
 			</div>
 

@@ -132,5 +132,32 @@
 			"deleted": "This comment was deleted",
 			"hidden": "This comment was hidden"
 		}
+	},
+	"report": {
+		"menuLabel": "More actions",
+		"menuItem": "Report",
+		"titleStore": "Report store",
+		"titleProduct": "Report product",
+		"targetProduct": "Reporting product: {name}",
+		"loginTitle": "Sign in to report",
+		"loginDescription": "Reporting requires an account so you can follow the result in My Reports.",
+		"loginAction": "Sign in / Sign up",
+		"category": "Category",
+		"categoryPlaceholder": "Select a category",
+		"description": "Details",
+		"descriptionPlaceholder": "Describe what happened",
+		"orderNo": "Order number (optional)",
+		"evidence": "Evidence photos (optional)",
+		"evidenceHint": "Up to {max}",
+		"submit": "Submit report",
+		"submitting": "Submitting...",
+		"cancel": "Cancel",
+		"close": "Done",
+		"received": "Report received. You can follow the result in My Reports.",
+		"errorCategoryRequired": "Select a category",
+		"errorDescriptionRequired": "Enter the details",
+		"errorDescriptionTooLong": "Details can be at most {max} characters",
+		"errorOrderNoTooLong": "Order number can be at most {max} characters",
+		"uploadingWait": "Photos are uploading, please wait"
 	}
 }

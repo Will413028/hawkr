@@ -30,6 +30,7 @@ import ProductPurchaseBox, {
 import ProductReviewsSection from "@/features/product/components/ProductReviewsSection";
 import ProductSellerIntro from "@/features/product/components/ProductSellerIntro";
 import { ProductViewTracker } from "@/features/product/ProductViewTracker";
+import ReportMenu from "@/features/report/ReportMenu";
 import { ossImageUrl, resolveCdnUrl } from "@/lib/media/cdn";
 import { parseRating } from "@/lib/products/rating";
 import { sanitizeBlockStyle } from "@/lib/products/seller-repo";
@@ -386,9 +387,18 @@ export default function ProductDetailLayout({
 					<div className="flex flex-col gap-3">
 						<div className="product-detail-layout__identity grid grid-cols-[minmax(0,1fr)_minmax(190px,230px)] gap-5 items-start max-md:grid-cols-1 max-md:gap-4">
 							<div className="min-w-0">
-								<h1 className="[font-family:var(--font-primary)] text-4xl font-bold text-hk-heading m-0 leading-[1.3] max-lg:text-[1.75rem] max-md:text-2xl max-sm:text-xl">
-									{productName}
-								</h1>
+								<div className="flex items-start justify-between gap-2">
+									<h1 className="[font-family:var(--font-primary)] text-4xl font-bold text-hk-heading m-0 leading-[1.3] max-lg:text-[1.75rem] max-md:text-2xl max-sm:text-xl">
+										{productName}
+									</h1>
+									{!previewMode && sellerStoreId ? (
+										<ReportMenu
+											storeId={sellerStoreId}
+											product={{ id: productId, name: productName }}
+											className="shrink-0"
+										/>
+									) : null}
+								</div>
 								<div className="flex gap-2">
 									<span className="text-[0.8125rem] text-hk-muted">
 										商品分類 / {categoryName}
