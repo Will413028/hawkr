@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
@@ -42,12 +43,13 @@ func ledger(d *db.DB, at time.Time) run.Ledger {
 	return run.Ledger{DB: d, Now: func() time.Time { return at }}
 }
 
-// recordingJobs 記下排入與取消的 job；failWith 不為 nil 時排入失敗。
+// recordingJobs 記下排入與取消的 job；failWith 不為 nil 時排入失敗；cancelState 是取消之後回報的 job 狀態（預設 running）。
 type recordingJobs struct {
-	n        atomic.Int32
-	failWith error
-	mu       sync.Mutex
-	cancels  []int64
+	n           atomic.Int32
+	failWith    error
+	cancelState rivertype.JobState
+	mu          sync.Mutex
+	cancels     []int64
 }
 
 func (r *recordingJobs) EnqueueJob(_ context.Context, _ river.JobArgs, _ *river.InsertOpts) (int64, error) {
@@ -57,11 +59,14 @@ func (r *recordingJobs) EnqueueJob(_ context.Context, _ river.JobArgs, _ *river.
 	return int64(r.n.Add(1)), nil
 }
 
-func (r *recordingJobs) CancelJob(_ context.Context, id int64) error {
+func (r *recordingJobs) CancelJob(_ context.Context, id int64) (rivertype.JobState, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cancels = append(r.cancels, id)
-	return nil
+	if r.cancelState == "" {
+		return rivertype.JobStateRunning, nil
+	}
+	return r.cancelState, nil
 }
 
 func seedRequest(ctx context.Context, t *testing.T, d *db.DB, buyer int64) uuid.UUID {

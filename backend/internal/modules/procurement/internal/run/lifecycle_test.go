@@ -1,6 +1,7 @@
 package run
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,17 +9,19 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 var allStatuses = []string{
 	StatusQueued, StatusRunning, StatusWaitingForInput, StatusCancelRequested,
-	StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed, StatusExpired,
+	StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed,
 }
 
 // 期望的邊直接寫在測試裡，不從 edges 推導：表被改動時這裡要同步改。
@@ -26,7 +29,7 @@ var wantEdges = map[string][]string{
 	StatusQueued:          {StatusRunning, StatusCancelRequested, StatusFailed},
 	StatusRunning:         {StatusWaitingForInput, StatusSucceeded, StatusFailed, StatusCancelRequested},
 	StatusCancelRequested: {StatusCancelled, StatusFailed},
-	StatusWaitingForInput: {StatusResumed, StatusExpired},
+	StatusWaitingForInput: {StatusResumed, StatusCancelled},
 }
 
 func TestEveryPairOfStatusesIsAllowedOrRejectedAsTheTableSays(t *testing.T) {
@@ -46,7 +49,7 @@ func TestEveryPairOfStatusesIsAllowedOrRejectedAsTheTableSays(t *testing.T) {
 }
 
 func TestTerminalStatesAreAbsorbingAndOnlyActiveOnesAcceptEvents(t *testing.T) {
-	terminal := []string{StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed, StatusExpired}
+	terminal := []string{StatusSucceeded, StatusFailed, StatusCancelled, StatusResumed}
 	for _, s := range allStatuses {
 		if got, want := IsTerminal(s), slices.Contains(terminal, s); got != want {
 			t.Errorf("IsTerminal(%s) = %v", s, got)
@@ -71,11 +74,10 @@ func TestAllowedFromIsTheInverseOfTheEdges(t *testing.T) {
 		StatusRunning:         {StatusQueued},
 		StatusCancelRequested: {StatusQueued, StatusRunning},
 		StatusFailed:          {StatusCancelRequested, StatusQueued, StatusRunning},
-		StatusCancelled:       {StatusCancelRequested},
+		StatusCancelled:       {StatusCancelRequested, StatusWaitingForInput},
 		StatusSucceeded:       {StatusRunning},
 		StatusWaitingForInput: {StatusRunning},
 		StatusResumed:         {StatusWaitingForInput},
-		StatusExpired:         {StatusWaitingForInput},
 		StatusQueued:          nil,
 	}
 	for to, want := range cases {
@@ -88,8 +90,7 @@ func TestAllowedFromIsTheInverseOfTheEdges(t *testing.T) {
 func TestCheckTargetRejectsStatesAndReasonsThatAreNotValid(t *testing.T) {
 	bad := []struct{ to, reason string }{
 		{"", ""}, {"UNKNOWN", ""}, {StatusQueued, ""},
-		{StatusFailed, ""}, {StatusFailed, "nope"}, {StatusFailed, FailureExpired},
-		{StatusExpired, ""}, {StatusExpired, FailureWorkerLost},
+		{StatusFailed, ""}, {StatusFailed, "nope"}, {StatusFailed, "EXPIRED"}, {"EXPIRED", ""}, {"EXPIRED", "EXPIRED"},
 		{StatusSucceeded, FailureWorkerLost}, {StatusCancelled, FailureWorkerLost},
 	}
 	for _, c := range bad {
@@ -100,7 +101,6 @@ func TestCheckTargetRejectsStatesAndReasonsThatAreNotValid(t *testing.T) {
 	good := []struct{ to, reason string }{
 		{StatusRunning, ""}, {StatusSucceeded, ""}, {StatusCancelled, ""}, {StatusCancelRequested, ""},
 		{StatusFailed, FailureWorkerLost}, {StatusFailed, FailureSearchFailed}, {StatusFailed, FailureTurnPipelineErr},
-		{StatusExpired, FailureExpired},
 	}
 	for _, c := range good {
 		if err := checkTarget(c.to, c.reason); err != nil {
@@ -110,7 +110,7 @@ func TestCheckTargetRejectsStatesAndReasonsThatAreNotValid(t *testing.T) {
 }
 
 func TestAppendRefusesTheStreamTerminalEvents(t *testing.T) {
-	for _, typ := range []string{EventFinished, EventError} {
+	for _, typ := range []string{EventFinished} {
 		if _, err := (Ledger{}).Append(context.Background(), uuid.NewV7(), typ, []byte(`{}`)); err == nil {
 			t.Errorf("Append(%s) 要拒絕：結尾事件只隨終態轉換寫入", typ)
 		}
@@ -143,12 +143,14 @@ func TestDecideMapsRunAndJobStatesAsTheLifecycleDecisionSays(t *testing.T) {
 		for _, st := range active {
 			want[key{status, st}] = skip
 		}
-		want[key{status, rivertype.JobStateDiscarded}] = lost
 	}
 	want[key{StatusQueued, rivertype.JobStateCompleted}] = violation
 	want[key{StatusRunning, rivertype.JobStateCompleted}] = violation
 	want[key{StatusCancelRequested, rivertype.JobStateCompleted}] = cancel
 	want[key{StatusCancelRequested, rivertype.JobStateCancelled}] = cancel
+	want[key{StatusCancelRequested, rivertype.JobStateDiscarded}] = cancel
+	want[key{StatusQueued, rivertype.JobStateDiscarded}] = lost
+	want[key{StatusRunning, rivertype.JobStateDiscarded}] = lost
 	want[key{StatusQueued, rivertype.JobStateCancelled}] = lost
 	want[key{StatusRunning, rivertype.JobStateCancelled}] = lost
 	for k, w := range want {
@@ -156,8 +158,14 @@ func TestDecideMapsRunAndJobStatesAsTheLifecycleDecisionSays(t *testing.T) {
 		if got := decide(r, k.state, true); got != w {
 			t.Errorf("decide(%s, job %s) = %+v，要 %+v", k.status, k.state, got, w)
 		}
-		if got := decide(r, "", false); got != lost {
-			t.Errorf("decide(%s, job 不存在) = %+v，要 %+v", k.status, got, lost)
+	}
+	for _, status := range []string{StatusQueued, StatusRunning, StatusCancelRequested} {
+		w := lost
+		if status == StatusCancelRequested {
+			w = cancel
+		}
+		if got := decide(store.ProcurementAgentRun{Status: status, RunType: "TURN"}, "", false); got != w {
+			t.Errorf("decide(%s, job 不存在) = %+v，要 %+v", status, got, w)
 		}
 	}
 	search := store.ProcurementAgentRun{Status: StatusRunning, RunType: runTypeCandidateSearch}
@@ -188,7 +196,7 @@ func (f *fakeTx) InTx(ctx context.Context, fn func(context.Context) error) error
 func TestReconcileEachIsolatesARowThatFails(t *testing.T) {
 	ids := []uuid.UUID{uuid.NewV7(), uuid.NewV7(), uuid.NewV7(), uuid.NewV7()}
 	tx := &fakeTx{}
-	res := reconcileEach(context.Background(), tx, ids, func(_ context.Context, id uuid.UUID) (action, error) {
+	res, err := reconcileEach(context.Background(), tx, ids, func(_ context.Context, id uuid.UUID) (action, error) {
 		tx.staged = append(tx.staged, id)
 		switch id {
 		case ids[1]:
@@ -198,6 +206,9 @@ func TestReconcileEachIsolatesARowThatFails(t *testing.T) {
 		}
 		return actionFail, nil
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if want := []uuid.UUID{ids[0], ids[2], ids[3]}; !slices.Equal(tx.committed, want) {
 		t.Fatalf("committed = %v，要 %v：一列失敗不得讓其他列回滾或被跳過", tx.committed, want)
 	}
@@ -216,5 +227,122 @@ func TestRescueWindowCoversTheRunJobTimeout(t *testing.T) {
 	opts := RunArgs{}.InsertOpts()
 	if opts.MaxAttempts != 1 || opts.UniqueOpts.ByArgs {
 		t.Fatalf("run job 要 MaxAttempts 1 且不設唯一鍵：%+v", opts)
+	}
+}
+
+func TestReconcileEachStopsOnceTheContextIsDoneWithoutLoggingEachRow(t *testing.T) {
+	cases := map[string]func(context.Context) error{
+		"處理完才發現關機":       func(context.Context) error { return nil },
+		"處理中因關機而失敗（不記錄）": func(ctx context.Context) error { return ctx.Err() },
+	}
+	for name, outcomeOf := range cases {
+		t.Run(name, func(t *testing.T) {
+			ids := []uuid.UUID{uuid.NewV7(), uuid.NewV7(), uuid.NewV7()}
+			ctx, cancel := context.WithCancel(context.Background())
+			var processed int
+			var logs bytes.Buffer
+			res, err := reconcileEach(ctx, &fakeTx{}, ids, func(ctx context.Context, _ uuid.UUID) (action, error) {
+				processed++
+				cancel()
+				return actionSkip, outcomeOf(ctx)
+			}, slog.New(slog.NewTextHandler(&logs, nil)))
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("err = %v，要 context.Canceled", err)
+			}
+			if processed != 1 || res.Errors != 0 || logs.Len() != 0 {
+				t.Fatalf("processed = %d、errors = %d、log = %q：關機後不得再處理其他列或逐列記錄失敗", processed, res.Errors, logs.String())
+			}
+		})
+	}
+}
+
+func TestSettleOutcomeDistinguishesBuyerCancelShutdownAndPipelineFailure(t *testing.T) {
+	lost := outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
+	cases := []struct {
+		name, status, runType string
+		ctxErr                error
+		want                  outcome
+	}{
+		{"買家取消", StatusCancelRequested, "TURN", context.Canceled, outcome{action: actionCancel}},
+		{"買家取消且 ctx 沒取消", StatusCancelRequested, "TURN", nil, outcome{action: actionCancel}},
+		{"關機", StatusRunning, "TURN", context.Canceled, lost},
+		{"逾時", StatusRunning, runTypeCandidateSearch, context.DeadlineExceeded, lost},
+		{"一般失敗：搜尋", StatusRunning, runTypeCandidateSearch, nil, outcome{action: actionFail, reason: FailureSearchFailed, refund: true}},
+		{"一般失敗：輪次", StatusRunning, "TURN", nil, outcome{action: actionFail, reason: FailureTurnPipelineErr, refund: true}},
+	}
+	for _, c := range cases {
+		if got := settleOutcome(c.status, c.runType, c.ctxErr); got != c.want {
+			t.Errorf("%s：settleOutcome = %+v，要 %+v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestClaimResultSkipsRunsThatCannotBeClaimedIncludingDeletedOnes(t *testing.T) {
+	for name, err := range map[string]error{
+		"已終結": ErrRunTerminal, "已被領走": &InvalidTransitionError{From: StatusRunning, To: StatusRunning},
+		"已被刪除": apperr.NotFound("找不到這個 run"),
+	} {
+		if claimed, ret := claimResult(err); claimed || ret != nil {
+			t.Errorf("%s：claimResult = %v, %v，要略過且不回錯誤", name, claimed, ret)
+		}
+	}
+	if claimed, ret := claimResult(nil); !claimed || ret != nil {
+		t.Errorf("成功轉 RUNNING 要領到：%v, %v", claimed, ret)
+	}
+	if claimed, ret := claimResult(errors.New("連線中斷")); claimed || ret == nil {
+		t.Errorf("其他錯誤要回傳給 River：%v, %v", claimed, ret)
+	}
+}
+
+func TestReadRunErrorTurnsAMissingRunIntoNotFound(t *testing.T) {
+	if got := readRunError(pgx.ErrNoRows); apperr.KindOf(got) != apperr.KindNotFound {
+		t.Fatalf("readRunError(ErrNoRows) = %v，要 NOT_FOUND", got)
+	}
+	boom := errors.New("boom")
+	if got := readRunError(boom); !errors.Is(got, boom) || apperr.KindOf(got) != apperr.KindInternal {
+		t.Fatalf("其他錯誤原樣回傳：%v", got)
+	}
+}
+
+func TestOnlyACancelledJobSettlesTheCancelWithoutTheReconciler(t *testing.T) {
+	for state, want := range map[rivertype.JobState]bool{
+		rivertype.JobStateCancelled: true, rivertype.JobStateRunning: false, rivertype.JobStateAvailable: false,
+		rivertype.JobStateCompleted: false, rivertype.JobStateDiscarded: false, rivertype.JobStateScheduled: false,
+	} {
+		if got := jobCancelledBeforeStart(state); got != want {
+			t.Errorf("jobCancelledBeforeStart(%s) = %v", state, got)
+		}
+	}
+}
+
+func TestCancelAllCancelsEveryRunAndStopsAtTheFirstError(t *testing.T) {
+	ids := []uuid.UUID{uuid.NewV7(), uuid.NewV7(), uuid.NewV7()}
+	var got []uuid.UUID
+	if err := cancelAll(context.Background(), ids, func(_ context.Context, id uuid.UUID) error {
+		got = append(got, id)
+		return nil
+	}); err != nil || !slices.Equal(got, ids) {
+		t.Fatalf("cancelled = %v, err = %v，要全部 %v", got, err, ids)
+	}
+	got = nil
+	boom := errors.New("轉換失敗")
+	err := cancelAll(context.Background(), ids, func(_ context.Context, id uuid.UUID) error {
+		got = append(got, id)
+		if id == ids[1] {
+			return boom
+		}
+		return nil
+	})
+	if !errors.Is(err, boom) || len(got) != 2 {
+		t.Fatalf("err = %v、cancelled = %d：失敗要讓送出回滾，不得略過", err, len(got))
+	}
+}
+
+func TestAWaitingRunCanBeCancelledButNeverFailedOrExpired(t *testing.T) {
+	if !CanTransition(StatusWaitingForInput, StatusCancelled) || CanTransition(StatusWaitingForInput, StatusFailed) {
+		t.Fatal("WAITING_FOR_INPUT 只能到 RESUMED 與 CANCELLED")
+	}
+	if _, known := edges["EXPIRED"]; known {
+		t.Fatal("EXPIRED 已刪除，沒有寫入者")
 	}
 }

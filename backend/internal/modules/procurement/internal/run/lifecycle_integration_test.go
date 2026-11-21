@@ -54,15 +54,13 @@ func i64(v int64) *int64 { return &v }
 
 var allStatuses = []string{
 	run.StatusQueued, run.StatusRunning, run.StatusWaitingForInput, run.StatusCancelRequested,
-	run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed, run.StatusExpired,
+	run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed,
 }
 
 func reasonFor(to string) string {
 	switch to {
 	case run.StatusFailed:
 		return run.FailureWorkerLost
-	case run.StatusExpired:
-		return run.FailureExpired
 	}
 	return ""
 }
@@ -192,7 +190,8 @@ func TestReconcilerSettlesEachRunJobStateCombination(t *testing.T) {
 		{"queued_completed", run.StatusQueued, rivertype.JobStateCompleted, false, want{run.StatusFailed, run.FailureTurnPipelineErr, true}},
 		{"cancel_completed", run.StatusCancelRequested, rivertype.JobStateCompleted, false, want{run.StatusCancelled, "", false}},
 		{"cancel_cancelled", run.StatusCancelRequested, rivertype.JobStateCancelled, false, want{run.StatusCancelled, "", false}},
-		{"cancel_discarded", run.StatusCancelRequested, rivertype.JobStateDiscarded, false, want{run.StatusFailed, run.FailureWorkerLost, true}},
+		{"cancel_discarded", run.StatusCancelRequested, rivertype.JobStateDiscarded, false, want{run.StatusCancelled, "", false}},
+		{"cancel_not_found", run.StatusCancelRequested, "", true, want{run.StatusCancelled, "", false}},
 		{"running_cancelled", run.StatusRunning, rivertype.JobStateCancelled, false, want{run.StatusFailed, run.FailureWorkerLost, true}},
 		{"queued_available", run.StatusQueued, rivertype.JobStateAvailable, false, want{run.StatusQueued, "", false}},
 		{"running_running", run.StatusRunning, rivertype.JobStateRunning, false, want{run.StatusRunning, "", false}},
@@ -242,7 +241,7 @@ func TestReconcilerIgnoresWaitingForInputAndTerminalRunsWithoutReadingJobs(t *te
 	req := seedRequest(ctx, t, d, 1)
 	waiting := seedRun(ctx, t, d, req, 1, run.StatusWaitingForInput, i64(7))
 	var terminals []uuid.UUID
-	for _, s := range []string{run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed, run.StatusExpired} {
+	for _, s := range []string{run.StatusSucceeded, run.StatusFailed, run.StatusCancelled, run.StatusResumed} {
 		terminals = append(terminals, seedRun(ctx, t, d, req, 1, s, i64(8)))
 	}
 	states := &fakeStates{states: map[int64]rivertype.JobState{7: rivertype.JobStateDiscarded, 8: rivertype.JobStateDiscarded}}
@@ -349,8 +348,8 @@ func TestCancelRequestsCancellationAndCancelsTheJobInOneTransaction(t *testing.T
 
 type failingCancelJobs struct{ recordingJobs }
 
-func (*failingCancelJobs) CancelJob(context.Context, int64) error {
-	return errors.New("river 取消失敗")
+func (*failingCancelJobs) CancelJob(context.Context, int64) (rivertype.JobState, error) {
+	return "", errors.New("river 取消失敗")
 }
 
 func TestCancelRollsBackTheTransitionWhenTheJobCannotBeCancelled(t *testing.T) {
@@ -376,7 +375,6 @@ func TestCancelOnRunsThatAreNotInFlight(t *testing.T) {
 		run.StatusCancelled: run.DispositionAlreadyCancelled,
 		run.StatusSucceeded: run.DispositionAlreadyTerminal,
 		run.StatusFailed:    run.DispositionAlreadyTerminal,
-		run.StatusExpired:   run.DispositionAlreadyTerminal,
 		run.StatusResumed:   run.DispositionAlreadyTerminal,
 	}
 	for status, want := range cases {
@@ -384,10 +382,6 @@ func TestCancelOnRunsThatAreNotInFlight(t *testing.T) {
 		if out, err := c.Cancel(ctx, 1, id); err != nil || out.Disposition != want || out.Status != status {
 			t.Fatalf("%s：%+v %v", status, out, err)
 		}
-	}
-	waiting := seedRun(ctx, t, d, req, 1, run.StatusWaitingForInput, nil)
-	if _, err := c.Cancel(ctx, 1, waiting); !errors.Is(err, run.ErrNotCancellable) {
-		t.Fatalf("等待輸入的 run：%v", err)
 	}
 	if len(jobs.cancels) != 0 {
 		t.Fatalf("這些都不該取消 job：%v", jobs.cancels)
@@ -489,5 +483,145 @@ func TestDispatcherDoesNotRunACancelRequestedRun(t *testing.T) {
 	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(context.Context, store.ProcurementAgentRun) error { ran = true; return nil })}
 	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil || ran {
 		t.Fatalf("已要求取消的 run 不得被領走：%v ran=%v", err, ran)
+	}
+}
+
+func TestCancelOfAWaitingRunGoesStraightToCancelledWithoutAJobOrRefund(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	seedUsage(ctx, t, d, 1, 1)
+	jobs := &recordingJobs{}
+	waiting := seedRun(ctx, t, d, req, 1, run.StatusWaitingForInput, nil)
+	c := run.Canceller{DB: d, Ledger: ledger(d, now), Jobs: jobs}
+	out, err := c.Cancel(ctx, 1, waiting)
+	if err != nil || out.Status != run.StatusCancelled || out.Disposition != run.DispositionRequested {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	if r := runOf(ctx, t, d, waiting); r.Status != run.StatusCancelled || r.FailureReason != nil || lastEventType(ctx, t, d, waiting) != run.EventFinished {
+		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
+	}
+	if len(jobs.cancels) != 0 || used(ctx, t, d, 1) != 1 {
+		t.Fatalf("等待輸入沒有 job、取消不退額度：cancels=%v used=%d", jobs.cancels, used(ctx, t, d, 1))
+	}
+	if out, err := c.Cancel(ctx, 1, waiting); err != nil || out.Disposition != run.DispositionAlreadyCancelled {
+		t.Fatalf("重複取消要冪等：%+v %v", out, err)
+	}
+}
+
+func TestCancelSettlesInTheSameTransactionWhenTheJobIsAlreadyCancelled(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	jobs := &recordingJobs{cancelState: rivertype.JobStateCancelled}
+	id := submitOne(ctx, t, d, jobs, 1)
+	out, err := run.Canceller{DB: d, Ledger: ledger(d, now), Jobs: jobs}.Cancel(ctx, 1, id)
+	if err != nil || out.Status != run.StatusCancelled || out.Disposition != run.DispositionRequested {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	if r := runOf(ctx, t, d, id); r.Status != run.StatusCancelled || lastEventType(ctx, t, d, id) != run.EventFinished || used(ctx, t, d, 1) != 1 {
+		t.Fatalf("job 已取消不必等 reconciler，也不退額度：%s", r.Status)
+	}
+}
+
+func seedConversation(ctx context.Context, t *testing.T, d *db.DB, buyer int64, req uuid.UUID) uuid.UUID {
+	t.Helper()
+	id := uuid.NewV7()
+	if err := store.New(d.Conn(ctx)).InsertConversation(ctx, store.InsertConversationParams{ID: id, BuyerID: buyer, RequestID: req, Now: now}); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func seedConversationRun(ctx context.Context, t *testing.T, d *db.DB, req uuid.UUID, buyer int64, conv uuid.UUID, status string) uuid.UUID {
+	t.Helper()
+	id := seedRun(ctx, t, d, req, buyer, status, nil)
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET conversation_id = $2 WHERE id = $1`, id, conv); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func TestSubmitCancelsTheWaitingRunOfTheSameConversationOnly(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	conv := seedConversation(ctx, t, d, 1, req)
+	other := seedConversation(ctx, t, d, 1, req)
+	waiting := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusWaitingForInput)
+	elsewhere := seedConversationRun(ctx, t, d, req, 1, other, run.StatusWaitingForInput)
+	running := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusRunning)
+	in := input(1, req, 5)
+	in.ConversationID = &conv
+	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{}}
+	id, err := s.Submit(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := runOf(ctx, t, d, waiting); r.Status != run.StatusCancelled || r.FailureReason != nil || lastEventType(ctx, t, d, waiting) != run.EventFinished {
+		t.Fatalf("同對話等待輸入的 run 要自動取消：%s", r.Status)
+	}
+	if runOf(ctx, t, d, elsewhere).Status != run.StatusWaitingForInput || runOf(ctx, t, d, running).Status != run.StatusRunning || runOf(ctx, t, d, id).Status != run.StatusQueued {
+		t.Fatal("其他對話與進行中的 run 不得被動")
+	}
+	if used(ctx, t, d, 1) != 1 {
+		t.Fatal("自動取消不退額度，新的一輪扣一次")
+	}
+	if _, err := s.Submit(ctx, in); err != nil || runOf(ctx, t, d, id).Status != run.StatusQueued {
+		t.Fatalf("冪等重送不得再取消任何 run：%v", err)
+	}
+}
+
+func TestSubmitRollsBackTheAutoCancelWhenTheJobCannotBeEnqueued(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	req := seedRequest(ctx, t, d, 1)
+	conv := seedConversation(ctx, t, d, 1, req)
+	waiting := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusWaitingForInput)
+	in := input(1, req, 5)
+	in.ConversationID = &conv
+	if _, err := (run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{failWith: errors.New("排入失敗")}}).Submit(ctx, in); err == nil {
+		t.Fatal("排入失敗要回錯誤")
+	}
+	if runOf(ctx, t, d, waiting).Status != run.StatusWaitingForInput {
+		t.Fatal("自動取消要和送出一起回滾")
+	}
+}
+
+func TestShutdownOrTimeoutOfTheJobContextFailsTheRunAsWorkerLostWithRefund(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	id := submitOne(ctx, t, d, &recordingJobs{}, 1)
+	jobCtx, stop := context.WithCancel(ctx)
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(c context.Context, _ store.ProcurementAgentRun) error {
+		stop()
+		return c.Err()
+	})}
+	if err := disp.Run(jobCtx, run.RunArgs{RunID: id}); err != nil {
+		t.Fatal(err)
+	}
+	r := runOf(ctx, t, d, id)
+	if r.Status != run.StatusFailed || r.FailureReason == nil || *r.FailureReason != run.FailureWorkerLost || used(ctx, t, d, 1) != 0 {
+		t.Fatalf("run = %s %v used=%d", r.Status, r.FailureReason, used(ctx, t, d, 1))
+	}
+}
+
+func TestDispatcherSkipsARunDeletedBeforeOrDuringExecution(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: funcExecutor(func(context.Context, store.ProcurementAgentRun) error { return errors.New("不該執行") })}
+	if err := disp.Run(ctx, run.RunArgs{RunID: uuid.NewV7()}); err != nil {
+		t.Fatalf("run 已被刪除（BuyerDeleted）job 不該報錯：%v", err)
+	}
+	id := submitOne(ctx, t, d, &recordingJobs{}, 1)
+	l := ledger(d, now)
+	disp.Executor = funcExecutor(func(ctx context.Context, r store.ProcurementAgentRun) error {
+		if _, err := d.Pool().Exec(ctx, `DELETE FROM procurement.agent_runs WHERE id = $1`, r.ID); err != nil {
+			return err
+		}
+		_, err := l.Append(ctx, r.ID, "text", []byte(`{}`))
+		return err
+	})
+	if err := disp.Run(ctx, run.RunArgs{RunID: id}); err != nil {
+		t.Fatalf("執行中被刪除也不該讓 job 報錯：%v", err)
 	}
 }

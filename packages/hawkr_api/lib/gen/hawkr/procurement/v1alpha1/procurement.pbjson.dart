@@ -19,7 +19,7 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $1;
 
 import '../../../google/type/date.pbjson.dart' as $0;
-import '../../common/v1alpha1/image.pbjson.dart' as $4;
+import '../../common/v1alpha1/image.pbjson.dart' as $3;
 import '../../common/v1alpha1/store_card.pbjson.dart' as $2;
 
 @$core.Deprecated('Use slotKeyDescriptor instead')
@@ -97,8 +97,11 @@ const RunStatus$json = {
     {'1': 'RUN_STATUS_FAILED', '2': 6},
     {'1': 'RUN_STATUS_CANCELLED', '2': 7},
     {'1': 'RUN_STATUS_RESUMED', '2': 8},
-    {'1': 'RUN_STATUS_EXPIRED', '2': 9},
   ],
+  '4': [
+    {'1': 9, '2': 9},
+  ],
+  '5': ['RUN_STATUS_EXPIRED'],
 };
 
 /// Descriptor for `RunStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
@@ -107,7 +110,8 @@ final $typed_data.Uint8List runStatusDescriptor = $convert.base64Decode(
     'VFVUVEEAESFgoSUlVOX1NUQVRVU19SVU5OSU5HEAISIAocUlVOX1NUQVRVU19XQUlUSU5HX0ZP'
     'Ul9JTlBVVBADEh8KG1JVTl9TVEFUVVNfQ0FOQ0VMX1JFUVVFU1RFRBAEEhgKFFJVTl9TVEFUVV'
     'NfU1VDQ0VFREVEEAUSFQoRUlVOX1NUQVRVU19GQUlMRUQQBhIYChRSVU5fU1RBVFVTX0NBTkNF'
-    'TExFRBAHEhYKElJVTl9TVEFUVVNfUkVTVU1FRBAIEhYKElJVTl9TVEFUVVNfRVhQSVJFRBAJ');
+    'TExFRBAHEhYKElJVTl9TVEFUVVNfUkVTVU1FRBAIIgQICRAJKhJSVU5fU1RBVFVTX0VYUElSRU'
+    'Q=');
 
 @$core.Deprecated('Use runFailureReasonDescriptor instead')
 const RunFailureReason$json = {
@@ -117,8 +121,11 @@ const RunFailureReason$json = {
     {'1': 'RUN_FAILURE_REASON_WORKER_LOST', '2': 1},
     {'1': 'RUN_FAILURE_REASON_SEARCH_FAILED', '2': 2},
     {'1': 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR', '2': 3},
-    {'1': 'RUN_FAILURE_REASON_EXPIRED', '2': 4},
   ],
+  '4': [
+    {'1': 4, '2': 4},
+  ],
+  '5': ['RUN_FAILURE_REASON_EXPIRED'],
 };
 
 /// Descriptor for `RunFailureReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
@@ -126,7 +133,7 @@ final $typed_data.Uint8List runFailureReasonDescriptor = $convert.base64Decode(
     'ChBSdW5GYWlsdXJlUmVhc29uEiIKHlJVTl9GQUlMVVJFX1JFQVNPTl9VTlNQRUNJRklFRBAAEi'
     'IKHlJVTl9GQUlMVVJFX1JFQVNPTl9XT1JLRVJfTE9TVBABEiQKIFJVTl9GQUlMVVJFX1JFQVNP'
     'Tl9TRUFSQ0hfRkFJTEVEEAISKgomUlVOX0ZBSUxVUkVfUkVBU09OX1RVUk5fUElQRUxJTkVfRV'
-    'JST1IQAxIeChpSVU5fRkFJTFVSRV9SRUFTT05fRVhQSVJFRBAE');
+    'JST1IQAyIECAQQBCoaUlVOX0ZBSUxVUkVfUkVBU09OX0VYUElSRUQ=');
 
 @$core.Deprecated('Use stepStatusDescriptor instead')
 const StepStatus$json = {
@@ -3074,19 +3081,14 @@ const WatchRunResponse$json = {
       '9': 0,
       '10': 'finished'
     },
-    {
-      '1': 'error',
-      '3': 11,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.RunStreamError',
-      '9': 0,
-      '10': 'error'
-    },
   ],
   '8': [
     {'1': 'event'},
   ],
+  '9': [
+    {'1': 11, '2': 12},
+  ],
+  '10': ['error'],
 };
 
 /// Descriptor for `WatchRunResponse`. Decode as a `google.protobuf.DescriptorProto`.
@@ -3102,9 +3104,8 @@ final $typed_data.Uint8List watchRunResponseDescriptor = $convert.base64Decode(
     'b29sX3Jlc3VsdBgIIAEoCzImLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlRvb2xSZXN1bH'
     'RIAFIKdG9vbFJlc3VsdBJJCgt0dXJuX3Jlc3VsdBgJIAEoCzImLmhhd2tyLnByb2N1cmVtZW50'
     'LnYxYWxwaGExLlR1cm5SZXN1bHRIAFIKdHVyblJlc3VsdBJFCghmaW5pc2hlZBgKIAEoCzInLm'
-    'hhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlJ1bkZpbmlzaGVkSABSCGZpbmlzaGVkEkIKBWVy'
-    'cm9yGAsgASgLMiouaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUnVuU3RyZWFtRXJyb3JIAF'
-    'IFZXJyb3JCBwoFZXZlbnQ=');
+    'hhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlJ1bkZpbmlzaGVkSABSCGZpbmlzaGVkQgcKBWV2'
+    'ZW50SgQICxAMUgVlcnJvcg==');
 
 @$core.Deprecated('Use runAcceptedDescriptor instead')
 const RunAccepted$json = {
@@ -3249,6 +3250,13 @@ const RunFinished$json = {
       '6': '.hawkr.procurement.v1alpha1.RunFailureReason',
       '10': 'failureReason'
     },
+    {
+      '1': 'localized_message',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '10': 'localizedMessage'
+    },
   ],
 };
 
@@ -3256,56 +3264,8 @@ const RunFinished$json = {
 final $typed_data.Uint8List runFinishedDescriptor = $convert.base64Decode(
     'CgtSdW5GaW5pc2hlZBI9CgZzdGF0dXMYASABKA4yJS5oYXdrci5wcm9jdXJlbWVudC52MWFscG'
     'hhMS5SdW5TdGF0dXNSBnN0YXR1cxJTCg5mYWlsdXJlX3JlYXNvbhgCIAEoDjIsLmhhd2tyLnBy'
-    'b2N1cmVtZW50LnYxYWxwaGExLlJ1bkZhaWx1cmVSZWFzb25SDWZhaWx1cmVSZWFzb24=');
-
-@$core.Deprecated('Use runStreamErrorDescriptor instead')
-const RunStreamError$json = {
-  '1': 'RunStreamError',
-  '2': [
-    {
-      '1': 'reason',
-      '3': 1,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.common.v1alpha1.ErrorReason',
-      '10': 'reason'
-    },
-    {
-      '1': 'localized_message',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '10': 'localizedMessage'
-    },
-    {
-      '1': 'metadata',
-      '3': 3,
-      '4': 3,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.RunStreamError.MetadataEntry',
-      '10': 'metadata'
-    },
-  ],
-  '3': [RunStreamError_MetadataEntry$json],
-};
-
-@$core.Deprecated('Use runStreamErrorDescriptor instead')
-const RunStreamError_MetadataEntry$json = {
-  '1': 'MetadataEntry',
-  '2': [
-    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
-  ],
-  '7': {'7': true},
-};
-
-/// Descriptor for `RunStreamError`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List runStreamErrorDescriptor = $convert.base64Decode(
-    'Cg5SdW5TdHJlYW1FcnJvchI6CgZyZWFzb24YASABKA4yIi5oYXdrci5jb21tb24udjFhbHBoYT'
-    'EuRXJyb3JSZWFzb25SBnJlYXNvbhIrChFsb2NhbGl6ZWRfbWVzc2FnZRgCIAEoCVIQbG9jYWxp'
-    'emVkTWVzc2FnZRJUCghtZXRhZGF0YRgDIAMoCzI4Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaG'
-    'ExLlJ1blN0cmVhbUVycm9yLk1ldGFkYXRhRW50cnlSCG1ldGFkYXRhGjsKDU1ldGFkYXRhRW50'
-    'cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
+    'b2N1cmVtZW50LnYxYWxwaGExLlJ1bkZhaWx1cmVSZWFzb25SDWZhaWx1cmVSZWFzb24SKwoRbG'
+    '9jYWxpemVkX21lc3NhZ2UYAyABKAlSEGxvY2FsaXplZE1lc3NhZ2U=');
 
 @$core.Deprecated('Use cancelRunRequestDescriptor instead')
 const CancelRunRequest$json = {
@@ -4246,7 +4206,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.procurement.v1alpha1.MatchedFact': MatchedFact$json,
   '.hawkr.procurement.v1alpha1.UnverifiableFact': UnverifiableFact$json,
   '.hawkr.common.v1alpha1.StoreCard': $2.StoreCard$json,
-  '.hawkr.common.v1alpha1.Image': $4.Image$json,
+  '.hawkr.common.v1alpha1.Image': $3.Image$json,
   '.hawkr.procurement.v1alpha1.ToggleSelectionRequest':
       ToggleSelectionRequest$json,
   '.hawkr.procurement.v1alpha1.ToggleSelectionResponse':
@@ -4337,9 +4297,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.procurement.v1alpha1.MessageEvent': MessageEvent$json,
   '.hawkr.procurement.v1alpha1.ToolResult': ToolResult$json,
   '.hawkr.procurement.v1alpha1.RunFinished': RunFinished$json,
-  '.hawkr.procurement.v1alpha1.RunStreamError': RunStreamError$json,
-  '.hawkr.procurement.v1alpha1.RunStreamError.MetadataEntry':
-      RunStreamError_MetadataEntry$json,
   '.hawkr.procurement.v1alpha1.CancelRunRequest': CancelRunRequest$json,
   '.hawkr.procurement.v1alpha1.CancelRunResponse': CancelRunResponse$json,
   '.hawkr.procurement.v1alpha1.ResumeRunRequest': ResumeRunRequest$json,

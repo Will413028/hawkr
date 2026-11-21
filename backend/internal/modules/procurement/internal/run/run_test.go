@@ -106,9 +106,9 @@ func TestFinishedPayloadIsProtoJSONOfTheFinishedEvent(t *testing.T) {
 	}
 }
 
-func TestOnlyFinishedAndErrorEndTheStream(t *testing.T) {
-	if !IsTerminalEvent(EventFinished) || !IsTerminalEvent(EventError) || IsTerminalEvent(EventRunAccepted) || IsTerminalEvent("text") {
-		t.Fatal("串流的結尾只有 finished 與 error")
+func TestOnlyFinishedEndsTheStream(t *testing.T) {
+	if !IsTerminalEvent(EventFinished) || IsTerminalEvent("error") || IsTerminalEvent(EventRunAccepted) || IsTerminalEvent("text") {
+		t.Fatal("串流的結尾只有 finished（失敗也以它收尾）")
 	}
 }
 
@@ -195,7 +195,7 @@ func TestHubBackoffResetsAfterASuccessfulListen(t *testing.T) {
 }
 
 func TestWatchStopsWithoutWaitingOnceAnEndedRunIsDrained(t *testing.T) {
-	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED", "RESUMED"} {
+	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED", "RESUMED"} {
 		if !IsTerminal(status) || !drainedEndedRun(true, 0) {
 			t.Fatalf("%s 的 run 讀完事件就要結束串流", status)
 		}

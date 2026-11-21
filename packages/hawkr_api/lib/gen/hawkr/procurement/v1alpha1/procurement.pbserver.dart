@@ -15,107 +15,107 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'procurement.pb.dart' as $5;
+import 'procurement.pb.dart' as $4;
 import 'procurement.pbjson.dart';
 
 export 'procurement.pb.dart';
 
 abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$5.SubmitTurnResponse> submitTurn(
-      $pb.ServerContext ctx, $5.SubmitTurnRequest request);
-  $async.Future<$5.GetSnapshotResponse> getSnapshot(
-      $pb.ServerContext ctx, $5.GetSnapshotRequest request);
-  $async.Future<$5.StartCandidateSearchResponse> startCandidateSearch(
-      $pb.ServerContext ctx, $5.StartCandidateSearchRequest request);
-  $async.Future<$5.GetCandidateSearchResponse> getCandidateSearch(
-      $pb.ServerContext ctx, $5.GetCandidateSearchRequest request);
-  $async.Future<$5.ToggleSelectionResponse> toggleSelection(
-      $pb.ServerContext ctx, $5.ToggleSelectionRequest request);
-  $async.Future<$5.SubmitAnswerResponse> submitAnswer(
-      $pb.ServerContext ctx, $5.SubmitAnswerRequest request);
-  $async.Future<$5.RewindResponse> rewind(
-      $pb.ServerContext ctx, $5.RewindRequest request);
-  $async.Future<$5.PreviewRfqPriceResponse> previewRfqPrice(
-      $pb.ServerContext ctx, $5.PreviewRfqPriceRequest request);
-  $async.Future<$5.ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
-      $pb.ServerContext ctx, $5.ConfirmRfqSnapshotRequest request);
-  $async.Future<$5.PreviewRfqPublicationResponse> previewRfqPublication(
-      $pb.ServerContext ctx, $5.PreviewRfqPublicationRequest request);
-  $async.Future<$5.ExecuteRfqPublicationResponse> executeRfqPublication(
-      $pb.ServerContext ctx, $5.ExecuteRfqPublicationRequest request);
-  $async.Future<$5.ListConversationsResponse> listConversations(
-      $pb.ServerContext ctx, $5.ListConversationsRequest request);
-  $async.Future<$5.GetConversationMessagesResponse> getConversationMessages(
-      $pb.ServerContext ctx, $5.GetConversationMessagesRequest request);
-  $async.Future<$5.GetRuntimeSnapshotResponse> getRuntimeSnapshot(
-      $pb.ServerContext ctx, $5.GetRuntimeSnapshotRequest request);
-  $async.Future<$5.ListSellerResponsesResponse> listSellerResponses(
-      $pb.ServerContext ctx, $5.ListSellerResponsesRequest request);
-  $async.Future<$5.PutShortlistEntryResponse> putShortlistEntry(
-      $pb.ServerContext ctx, $5.PutShortlistEntryRequest request);
-  $async.Future<$5.DeleteShortlistEntryResponse> deleteShortlistEntry(
-      $pb.ServerContext ctx, $5.DeleteShortlistEntryRequest request);
-  $async.Future<$5.AcceptSellerQuoteResponse> acceptSellerQuote(
-      $pb.ServerContext ctx, $5.AcceptSellerQuoteRequest request);
-  $async.Future<$5.RenameConversationResponse> renameConversation(
-      $pb.ServerContext ctx, $5.RenameConversationRequest request);
-  $async.Future<$5.DeleteConversationResponse> deleteConversation(
-      $pb.ServerContext ctx, $5.DeleteConversationRequest request);
-  $async.Future<$5.WatchRunResponse> watchRun(
-      $pb.ServerContext ctx, $5.WatchRunRequest request);
-  $async.Future<$5.CancelRunResponse> cancelRun(
-      $pb.ServerContext ctx, $5.CancelRunRequest request);
-  $async.Future<$5.ResumeRunResponse> resumeRun(
-      $pb.ServerContext ctx, $5.ResumeRunRequest request);
+  $async.Future<$4.SubmitTurnResponse> submitTurn(
+      $pb.ServerContext ctx, $4.SubmitTurnRequest request);
+  $async.Future<$4.GetSnapshotResponse> getSnapshot(
+      $pb.ServerContext ctx, $4.GetSnapshotRequest request);
+  $async.Future<$4.StartCandidateSearchResponse> startCandidateSearch(
+      $pb.ServerContext ctx, $4.StartCandidateSearchRequest request);
+  $async.Future<$4.GetCandidateSearchResponse> getCandidateSearch(
+      $pb.ServerContext ctx, $4.GetCandidateSearchRequest request);
+  $async.Future<$4.ToggleSelectionResponse> toggleSelection(
+      $pb.ServerContext ctx, $4.ToggleSelectionRequest request);
+  $async.Future<$4.SubmitAnswerResponse> submitAnswer(
+      $pb.ServerContext ctx, $4.SubmitAnswerRequest request);
+  $async.Future<$4.RewindResponse> rewind(
+      $pb.ServerContext ctx, $4.RewindRequest request);
+  $async.Future<$4.PreviewRfqPriceResponse> previewRfqPrice(
+      $pb.ServerContext ctx, $4.PreviewRfqPriceRequest request);
+  $async.Future<$4.ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
+      $pb.ServerContext ctx, $4.ConfirmRfqSnapshotRequest request);
+  $async.Future<$4.PreviewRfqPublicationResponse> previewRfqPublication(
+      $pb.ServerContext ctx, $4.PreviewRfqPublicationRequest request);
+  $async.Future<$4.ExecuteRfqPublicationResponse> executeRfqPublication(
+      $pb.ServerContext ctx, $4.ExecuteRfqPublicationRequest request);
+  $async.Future<$4.ListConversationsResponse> listConversations(
+      $pb.ServerContext ctx, $4.ListConversationsRequest request);
+  $async.Future<$4.GetConversationMessagesResponse> getConversationMessages(
+      $pb.ServerContext ctx, $4.GetConversationMessagesRequest request);
+  $async.Future<$4.GetRuntimeSnapshotResponse> getRuntimeSnapshot(
+      $pb.ServerContext ctx, $4.GetRuntimeSnapshotRequest request);
+  $async.Future<$4.ListSellerResponsesResponse> listSellerResponses(
+      $pb.ServerContext ctx, $4.ListSellerResponsesRequest request);
+  $async.Future<$4.PutShortlistEntryResponse> putShortlistEntry(
+      $pb.ServerContext ctx, $4.PutShortlistEntryRequest request);
+  $async.Future<$4.DeleteShortlistEntryResponse> deleteShortlistEntry(
+      $pb.ServerContext ctx, $4.DeleteShortlistEntryRequest request);
+  $async.Future<$4.AcceptSellerQuoteResponse> acceptSellerQuote(
+      $pb.ServerContext ctx, $4.AcceptSellerQuoteRequest request);
+  $async.Future<$4.RenameConversationResponse> renameConversation(
+      $pb.ServerContext ctx, $4.RenameConversationRequest request);
+  $async.Future<$4.DeleteConversationResponse> deleteConversation(
+      $pb.ServerContext ctx, $4.DeleteConversationRequest request);
+  $async.Future<$4.WatchRunResponse> watchRun(
+      $pb.ServerContext ctx, $4.WatchRunRequest request);
+  $async.Future<$4.CancelRunResponse> cancelRun(
+      $pb.ServerContext ctx, $4.CancelRunRequest request);
+  $async.Future<$4.ResumeRunResponse> resumeRun(
+      $pb.ServerContext ctx, $4.ResumeRunRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'SubmitTurn':
-        return $5.SubmitTurnRequest();
+        return $4.SubmitTurnRequest();
       case 'GetSnapshot':
-        return $5.GetSnapshotRequest();
+        return $4.GetSnapshotRequest();
       case 'StartCandidateSearch':
-        return $5.StartCandidateSearchRequest();
+        return $4.StartCandidateSearchRequest();
       case 'GetCandidateSearch':
-        return $5.GetCandidateSearchRequest();
+        return $4.GetCandidateSearchRequest();
       case 'ToggleSelection':
-        return $5.ToggleSelectionRequest();
+        return $4.ToggleSelectionRequest();
       case 'SubmitAnswer':
-        return $5.SubmitAnswerRequest();
+        return $4.SubmitAnswerRequest();
       case 'Rewind':
-        return $5.RewindRequest();
+        return $4.RewindRequest();
       case 'PreviewRfqPrice':
-        return $5.PreviewRfqPriceRequest();
+        return $4.PreviewRfqPriceRequest();
       case 'ConfirmRfqSnapshot':
-        return $5.ConfirmRfqSnapshotRequest();
+        return $4.ConfirmRfqSnapshotRequest();
       case 'PreviewRfqPublication':
-        return $5.PreviewRfqPublicationRequest();
+        return $4.PreviewRfqPublicationRequest();
       case 'ExecuteRfqPublication':
-        return $5.ExecuteRfqPublicationRequest();
+        return $4.ExecuteRfqPublicationRequest();
       case 'ListConversations':
-        return $5.ListConversationsRequest();
+        return $4.ListConversationsRequest();
       case 'GetConversationMessages':
-        return $5.GetConversationMessagesRequest();
+        return $4.GetConversationMessagesRequest();
       case 'GetRuntimeSnapshot':
-        return $5.GetRuntimeSnapshotRequest();
+        return $4.GetRuntimeSnapshotRequest();
       case 'ListSellerResponses':
-        return $5.ListSellerResponsesRequest();
+        return $4.ListSellerResponsesRequest();
       case 'PutShortlistEntry':
-        return $5.PutShortlistEntryRequest();
+        return $4.PutShortlistEntryRequest();
       case 'DeleteShortlistEntry':
-        return $5.DeleteShortlistEntryRequest();
+        return $4.DeleteShortlistEntryRequest();
       case 'AcceptSellerQuote':
-        return $5.AcceptSellerQuoteRequest();
+        return $4.AcceptSellerQuoteRequest();
       case 'RenameConversation':
-        return $5.RenameConversationRequest();
+        return $4.RenameConversationRequest();
       case 'DeleteConversation':
-        return $5.DeleteConversationRequest();
+        return $4.DeleteConversationRequest();
       case 'WatchRun':
-        return $5.WatchRunRequest();
+        return $4.WatchRunRequest();
       case 'CancelRun':
-        return $5.CancelRunRequest();
+        return $4.CancelRunRequest();
       case 'ResumeRun':
-        return $5.ResumeRunRequest();
+        return $4.ResumeRunRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -125,57 +125,57 @@ abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'SubmitTurn':
-        return submitTurn(ctx, request as $5.SubmitTurnRequest);
+        return submitTurn(ctx, request as $4.SubmitTurnRequest);
       case 'GetSnapshot':
-        return getSnapshot(ctx, request as $5.GetSnapshotRequest);
+        return getSnapshot(ctx, request as $4.GetSnapshotRequest);
       case 'StartCandidateSearch':
         return startCandidateSearch(
-            ctx, request as $5.StartCandidateSearchRequest);
+            ctx, request as $4.StartCandidateSearchRequest);
       case 'GetCandidateSearch':
-        return getCandidateSearch(ctx, request as $5.GetCandidateSearchRequest);
+        return getCandidateSearch(ctx, request as $4.GetCandidateSearchRequest);
       case 'ToggleSelection':
-        return toggleSelection(ctx, request as $5.ToggleSelectionRequest);
+        return toggleSelection(ctx, request as $4.ToggleSelectionRequest);
       case 'SubmitAnswer':
-        return submitAnswer(ctx, request as $5.SubmitAnswerRequest);
+        return submitAnswer(ctx, request as $4.SubmitAnswerRequest);
       case 'Rewind':
-        return rewind(ctx, request as $5.RewindRequest);
+        return rewind(ctx, request as $4.RewindRequest);
       case 'PreviewRfqPrice':
-        return previewRfqPrice(ctx, request as $5.PreviewRfqPriceRequest);
+        return previewRfqPrice(ctx, request as $4.PreviewRfqPriceRequest);
       case 'ConfirmRfqSnapshot':
-        return confirmRfqSnapshot(ctx, request as $5.ConfirmRfqSnapshotRequest);
+        return confirmRfqSnapshot(ctx, request as $4.ConfirmRfqSnapshotRequest);
       case 'PreviewRfqPublication':
         return previewRfqPublication(
-            ctx, request as $5.PreviewRfqPublicationRequest);
+            ctx, request as $4.PreviewRfqPublicationRequest);
       case 'ExecuteRfqPublication':
         return executeRfqPublication(
-            ctx, request as $5.ExecuteRfqPublicationRequest);
+            ctx, request as $4.ExecuteRfqPublicationRequest);
       case 'ListConversations':
-        return listConversations(ctx, request as $5.ListConversationsRequest);
+        return listConversations(ctx, request as $4.ListConversationsRequest);
       case 'GetConversationMessages':
         return getConversationMessages(
-            ctx, request as $5.GetConversationMessagesRequest);
+            ctx, request as $4.GetConversationMessagesRequest);
       case 'GetRuntimeSnapshot':
-        return getRuntimeSnapshot(ctx, request as $5.GetRuntimeSnapshotRequest);
+        return getRuntimeSnapshot(ctx, request as $4.GetRuntimeSnapshotRequest);
       case 'ListSellerResponses':
         return listSellerResponses(
-            ctx, request as $5.ListSellerResponsesRequest);
+            ctx, request as $4.ListSellerResponsesRequest);
       case 'PutShortlistEntry':
-        return putShortlistEntry(ctx, request as $5.PutShortlistEntryRequest);
+        return putShortlistEntry(ctx, request as $4.PutShortlistEntryRequest);
       case 'DeleteShortlistEntry':
         return deleteShortlistEntry(
-            ctx, request as $5.DeleteShortlistEntryRequest);
+            ctx, request as $4.DeleteShortlistEntryRequest);
       case 'AcceptSellerQuote':
-        return acceptSellerQuote(ctx, request as $5.AcceptSellerQuoteRequest);
+        return acceptSellerQuote(ctx, request as $4.AcceptSellerQuoteRequest);
       case 'RenameConversation':
-        return renameConversation(ctx, request as $5.RenameConversationRequest);
+        return renameConversation(ctx, request as $4.RenameConversationRequest);
       case 'DeleteConversation':
-        return deleteConversation(ctx, request as $5.DeleteConversationRequest);
+        return deleteConversation(ctx, request as $4.DeleteConversationRequest);
       case 'WatchRun':
-        return watchRun(ctx, request as $5.WatchRunRequest);
+        return watchRun(ctx, request as $4.WatchRunRequest);
       case 'CancelRun':
-        return cancelRun(ctx, request as $5.CancelRunRequest);
+        return cancelRun(ctx, request as $4.CancelRunRequest);
       case 'ResumeRun':
-        return resumeRun(ctx, request as $5.ResumeRunRequest);
+        return resumeRun(ctx, request as $4.ResumeRunRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -188,33 +188,33 @@ abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
 }
 
 abstract class SellerProcurementAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$5.ListSellerPublicationsResponse> listSellerPublications(
-      $pb.ServerContext ctx, $5.ListSellerPublicationsRequest request);
-  $async.Future<$5.GetSellerPublicationResponse> getSellerPublication(
-      $pb.ServerContext ctx, $5.GetSellerPublicationRequest request);
-  $async.Future<$5.UpsertSellerResponseDraftResponse> upsertSellerResponseDraft(
-      $pb.ServerContext ctx, $5.UpsertSellerResponseDraftRequest request);
-  $async.Future<$5.SubmitSellerResponseResponse> submitSellerResponse(
-      $pb.ServerContext ctx, $5.SubmitSellerResponseRequest request);
-  $async.Future<$5.WithdrawSellerResponseResponse> withdrawSellerResponse(
-      $pb.ServerContext ctx, $5.WithdrawSellerResponseRequest request);
-  $async.Future<$5.DeclineRfqPublicationResponse> declineRfqPublication(
-      $pb.ServerContext ctx, $5.DeclineRfqPublicationRequest request);
+  $async.Future<$4.ListSellerPublicationsResponse> listSellerPublications(
+      $pb.ServerContext ctx, $4.ListSellerPublicationsRequest request);
+  $async.Future<$4.GetSellerPublicationResponse> getSellerPublication(
+      $pb.ServerContext ctx, $4.GetSellerPublicationRequest request);
+  $async.Future<$4.UpsertSellerResponseDraftResponse> upsertSellerResponseDraft(
+      $pb.ServerContext ctx, $4.UpsertSellerResponseDraftRequest request);
+  $async.Future<$4.SubmitSellerResponseResponse> submitSellerResponse(
+      $pb.ServerContext ctx, $4.SubmitSellerResponseRequest request);
+  $async.Future<$4.WithdrawSellerResponseResponse> withdrawSellerResponse(
+      $pb.ServerContext ctx, $4.WithdrawSellerResponseRequest request);
+  $async.Future<$4.DeclineRfqPublicationResponse> declineRfqPublication(
+      $pb.ServerContext ctx, $4.DeclineRfqPublicationRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'ListSellerPublications':
-        return $5.ListSellerPublicationsRequest();
+        return $4.ListSellerPublicationsRequest();
       case 'GetSellerPublication':
-        return $5.GetSellerPublicationRequest();
+        return $4.GetSellerPublicationRequest();
       case 'UpsertSellerResponseDraft':
-        return $5.UpsertSellerResponseDraftRequest();
+        return $4.UpsertSellerResponseDraftRequest();
       case 'SubmitSellerResponse':
-        return $5.SubmitSellerResponseRequest();
+        return $4.SubmitSellerResponseRequest();
       case 'WithdrawSellerResponse':
-        return $5.WithdrawSellerResponseRequest();
+        return $4.WithdrawSellerResponseRequest();
       case 'DeclineRfqPublication':
-        return $5.DeclineRfqPublicationRequest();
+        return $4.DeclineRfqPublicationRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -225,22 +225,22 @@ abstract class SellerProcurementAppServiceBase extends $pb.GeneratedService {
     switch (methodName) {
       case 'ListSellerPublications':
         return listSellerPublications(
-            ctx, request as $5.ListSellerPublicationsRequest);
+            ctx, request as $4.ListSellerPublicationsRequest);
       case 'GetSellerPublication':
         return getSellerPublication(
-            ctx, request as $5.GetSellerPublicationRequest);
+            ctx, request as $4.GetSellerPublicationRequest);
       case 'UpsertSellerResponseDraft':
         return upsertSellerResponseDraft(
-            ctx, request as $5.UpsertSellerResponseDraftRequest);
+            ctx, request as $4.UpsertSellerResponseDraftRequest);
       case 'SubmitSellerResponse':
         return submitSellerResponse(
-            ctx, request as $5.SubmitSellerResponseRequest);
+            ctx, request as $4.SubmitSellerResponseRequest);
       case 'WithdrawSellerResponse':
         return withdrawSellerResponse(
-            ctx, request as $5.WithdrawSellerResponseRequest);
+            ctx, request as $4.WithdrawSellerResponseRequest);
       case 'DeclineRfqPublication':
         return declineRfqPublication(
-            ctx, request as $5.DeclineRfqPublicationRequest);
+            ctx, request as $4.DeclineRfqPublicationRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

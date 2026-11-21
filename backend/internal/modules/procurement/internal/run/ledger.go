@@ -17,11 +17,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// 事件類型：WatchRunResponse 的 oneof 欄位名。串流在送出 finished 或 error 之後結束。
+// 事件類型：WatchRunResponse 的 oneof 欄位名。串流在送出 finished 之後結束；成功、失敗與取消都以它收尾。
 const (
 	EventRunAccepted = "run_accepted"
 	EventFinished    = "finished"
-	EventError       = "error"
 )
 
 // Run 的失敗原因（與 schema 的 CHECK 相同）。
@@ -29,7 +28,6 @@ const (
 	FailureWorkerLost       = "WORKER_LOST"
 	FailureSearchFailed     = "SEARCH_FAILED"
 	FailureTurnPipelineErr  = "TURN_PIPELINE_ERROR"
-	FailureExpired          = "EXPIRED"
 	runTypeCandidateSearch  = "CANDIDATE_SEARCH"
 	notifyChannel           = "procurement_run"
 	protoStatusPrefix       = "RUN_STATUS_"
@@ -38,7 +36,7 @@ const (
 
 // IsTerminalEvent 回報事件類型是否是串流的結尾。
 func IsTerminalEvent(eventType string) bool {
-	return eventType == EventFinished || eventType == EventError
+	return eventType == EventFinished
 }
 
 // Event 是帳本裡的一個事件；Payload 是 WatchRunResponse 的 oneof 欄位的 proto JSON（{"<type>": {...}}）。
@@ -65,7 +63,7 @@ type Ledger struct {
 
 // Append 在 transaction 內寫一筆事件並在 commit 時喚醒訂閱者；序號由 run 列配發。
 // 只在 run 非終態時寫：終態之後回 ErrRunTerminal（executor 收到就該停止），run 不存在回 NOT_FOUND。
-// 串流的結尾事件不經這裡，它只隨終態轉換一起寫（Transition）。
+// 串流的結尾事件 finished 不經這裡，它只隨終態轉換一起寫（Transition）。
 func (l Ledger) Append(ctx context.Context, runID uuid.UUID, eventType string, payload []byte) (int64, error) {
 	if IsTerminalEvent(eventType) {
 		return 0, fmt.Errorf("run：%s 事件只能隨終態轉換寫入", eventType)
@@ -171,9 +169,7 @@ func checkTarget(to, failureReason string) error {
 	switch {
 	case to == StatusFailed && failureReason != FailureWorkerLost && failureReason != FailureSearchFailed && failureReason != FailureTurnPipelineErr:
 		return fmt.Errorf("run：FAILED 需要失敗原因，收到 %q", failureReason)
-	case to == StatusExpired && failureReason != FailureExpired:
-		return fmt.Errorf("run：EXPIRED 的失敗原因是 %s，收到 %q", FailureExpired, failureReason)
-	case to != StatusFailed && to != StatusExpired && failureReason != "":
+	case to != StatusFailed && failureReason != "":
 		return fmt.Errorf("run：%s 不帶失敗原因", to)
 	}
 	return nil

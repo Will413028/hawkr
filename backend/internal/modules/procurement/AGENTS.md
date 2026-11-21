@@ -41,9 +41,9 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 - `BuyerDeleted` 同 transaction：買家資料刪除，已發布的需求與賣家看得到的紀錄保留、`buyer_id` 設 NULL（S10：`retention.OnBuyerDeleted`）。
 - 頭尾不得有空白的文字欄登記在 `cmd/hawkr` 的 `trimmedColumns`；新增文字欄一併登記。
 - run 事件在 run 結束 7 天後由週期 job 清除並推進 `min_available_seq`；cursor 早於範圍回 `REPLAY_CURSOR_EXPIRED`，超前回 `REPLAY_CURSOR_AHEAD`。interrupt 不設到期；artifact 每個 `(run_id, artifact_type)` 一列就地更新（A9-D20）。
-- run 狀態只經 `Ledger.Transition`（`UPDATE … WHERE status IN (允許來源)`，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態之後回 `run.ErrRunTerminal`，executor 收到就停止。
+- run 狀態只經 `Ledger.Transition`（`UPDATE … WHERE status IN (允許來源)`，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態之後回 `run.ErrRunTerminal`，executor 收到就停止；串流只有結尾事件 `finished`。
 - 每個 run 一個 River job（建 run 的同交易排入，job id 存在 `agent_runs.job_id`，`MaxAttempts` 1、Timeout 2 分；`RescueStuckJobsAfter` 3 分），不重驅。
-- job 死了的 run 由 `run.Reconciler`（每分鐘，逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已取消或完成收斂到 CANCELLED（不退額度）；買家取消不退額度（A9-D6、A9-D22）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱（`run.MaxSubscriptions`）。
+- job 死了的 run 由 `run.Reconciler`（每分鐘，逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已死收斂到 CANCELLED（不退額度）；關機或逾時取消 job 標 `WORKER_LOST` 並退額度；等待輸入的 run 可直接取消（無 job、不退額度），同對話新一輪自動取消它（A9-D23）；買家取消不退額度（A9-D6、A9-D22）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱（`run.MaxSubscriptions`）。
 - 配額是一列計數器加條件 UPDATE（`ConsumeUsage`），沒有預約表（A9-D9）。
 
 ## 不負責

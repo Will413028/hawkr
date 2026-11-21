@@ -40,30 +40,43 @@ type outcome struct {
 	refund bool
 }
 
-// decide 是 reconciler 的對照表（A9-D22）：run 的狀態與 job 的狀態決定怎麼收斂。
-// job 還在進行中（排隊、等重試、執行中）一律略過；FAILED 都退回額度，買家取消不退。
+// decide 是 reconciler 的對照表（A9-D22、A9-D23）：run 的狀態與 job 的狀態決定怎麼收斂。
+// job 還在進行中（排隊、等重試、執行中）一律略過；job 已死：要求取消中的 run 收斂到 CANCELLED（不退額度），
+// 其餘 FAILED 並退回額度（job 正常結束卻沒收尾的是執行者違約，沿用該 run 類型的 pipeline 失敗原因，其餘是 WORKER_LOST）。
 func decide(r store.ProcurementAgentRun, state rivertype.JobState, found bool) outcome {
-	if !found {
-		return outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
-	}
-	switch state {
-	case rivertype.JobStateDiscarded:
-		return outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
-	case rivertype.JobStateCompleted:
-		if r.Status == StatusCancelRequested {
-			return outcome{action: actionCancel}
+	reason := FailureWorkerLost
+	if found {
+		switch state {
+		case rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRetryable, rivertype.JobStateRunning, rivertype.JobStateScheduled:
+			return outcome{action: actionSkip}
+		case rivertype.JobStateCompleted:
+			reason = failureFor(r.RunType)
+		case rivertype.JobStateDiscarded, rivertype.JobStateCancelled:
+		default:
+			return outcome{action: actionSkip}
 		}
-		return outcome{action: actionFail, reason: failureFor(r.RunType), refund: true}
-	case rivertype.JobStateCancelled:
-		if r.Status == StatusCancelRequested {
-			return outcome{action: actionCancel}
-		}
-		return outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
-	case rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRetryable, rivertype.JobStateRunning, rivertype.JobStateScheduled:
-		return outcome{action: actionSkip}
-	default:
-		return outcome{action: actionSkip}
 	}
+	if r.Status == StatusCancelRequested {
+		return outcome{action: actionCancel}
+	}
+	return outcome{action: actionFail, reason: reason, refund: true}
+}
+
+// converge 把 run 依 outcome 收斂：失敗退額度，取消不退。
+func (l Ledger) converge(ctx context.Context, id uuid.UUID, o outcome) error {
+	var err error
+	switch o.action {
+	case actionFail:
+		if o.refund {
+			_, err = l.FailAndRefund(ctx, id, o.reason)
+		} else {
+			_, err = l.Transition(ctx, id, StatusFailed, o.reason)
+		}
+	case actionCancel:
+		_, err = l.Transition(ctx, id, StatusCancelled, "")
+	case actionSkip:
+	}
+	return err
 }
 
 // Reconciler 對帳 run 與它的 River job：job 已死而 run 還沒收斂的，轉到終態並寫串流的結尾事件。
@@ -88,12 +101,15 @@ func (r Reconciler) Reconcile(ctx context.Context, states JobStates) (ReconcileR
 		if err != nil {
 			return total, fmt.Errorf("run：列出要對帳的 run：%w", err)
 		}
-		res := reconcileEach(ctx, r.DB, ids, func(ctx context.Context, id uuid.UUID) (action, error) {
+		res, err := reconcileEach(ctx, r.DB, ids, func(ctx context.Context, id uuid.UUID) (action, error) {
 			return r.reconcileOne(ctx, states, id)
 		}, r.Logger)
 		total.Failed += res.Failed
 		total.Cancelled += res.Cancelled
 		total.Errors += res.Errors
+		if err != nil {
+			return total, err
+		}
 		if len(ids) < reconcileBatch {
 			break
 		}
@@ -113,9 +129,13 @@ type txRunner interface {
 }
 
 // reconcileEach 逐一處理 ids，每個 id 一個 transaction；某個 id 失敗就記錄並繼續下一個。
-func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process func(ctx context.Context, id uuid.UUID) (action, error), log *slog.Logger) ReconcileResult {
+// ctx 結束（關機）就停下並回傳 ctx 的錯誤，不逐列記錄失敗。
+func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process func(ctx context.Context, id uuid.UUID) (action, error), log *slog.Logger) (ReconcileResult, error) {
 	var res ReconcileResult
 	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return res, err
+		}
 		var act action
 		err := tx.InTx(ctx, func(ctx context.Context) error {
 			var err error
@@ -123,6 +143,9 @@ func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process fu
 			return err
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return res, ctx.Err()
+			}
 			res.Errors++
 			log.ErrorContext(ctx, "procurement：run 對帳失敗，略過這一列", "run_id", id.String(), "error", err)
 			continue
@@ -135,7 +158,7 @@ func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process fu
 		case actionSkip:
 		}
 	}
-	return res
+	return res, nil
 }
 
 func (r Reconciler) reconcileOne(ctx context.Context, states JobStates, id uuid.UUID) (action, error) {
@@ -154,18 +177,7 @@ func (r Reconciler) reconcileOne(ctx context.Context, states JobStates, id uuid.
 		}
 	}
 	o := decide(row, state, found)
-	switch o.action {
-	case actionFail:
-		if o.refund {
-			_, err = r.Ledger.FailAndRefund(ctx, id, o.reason)
-		} else {
-			_, err = r.Ledger.Transition(ctx, id, StatusFailed, o.reason)
-		}
-	case actionCancel:
-		_, err = r.Ledger.Transition(ctx, id, StatusCancelled, "")
-	case actionSkip:
-	}
-	return o.action, err
+	return o.action, r.Ledger.converge(ctx, id, o)
 }
 
 // clientJobStates 用 worker ctx 裡的 River client 在目前的 transaction 讀 job。

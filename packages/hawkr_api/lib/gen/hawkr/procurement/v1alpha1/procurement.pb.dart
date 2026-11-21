@@ -19,7 +19,6 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $1;
 
 import '../../../google/type/date.pb.dart' as $0;
-import '../../common/v1alpha1/error_reason.pbenum.dart' as $3;
 import '../../common/v1alpha1/store_card.pb.dart' as $2;
 import 'procurement.pbenum.dart';
 
@@ -3008,7 +3007,7 @@ class GetCandidateSearchResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearStatus() => $_clearField(4);
 
-  /// 只在 FAILED 與 EXPIRED 時有值。
+  /// 只在 FAILED 時有值。
   @$pb.TagNumber(5)
   RunFailureReason get failureReason => $_getN(4);
   @$pb.TagNumber(5)
@@ -7373,7 +7372,6 @@ enum WatchRunResponse_Event {
   toolResult,
   turnResult,
   finished,
-  error,
   notSet
 }
 
@@ -7390,7 +7388,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
     ToolResult? toolResult,
     TurnResult? turnResult,
     RunFinished? finished,
-    RunStreamError? error,
   }) {
     final result = WatchRunResponse._();
     if (cursor != null) result.cursor = cursor;
@@ -7403,7 +7400,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
     if (toolResult != null) result.toolResult = toolResult;
     if (turnResult != null) result.turnResult = turnResult;
     if (finished != null) result.finished = finished;
-    if (error != null) result.error = error;
     return result;
   }
 
@@ -7426,7 +7422,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
     8: WatchRunResponse_Event.toolResult,
     9: WatchRunResponse_Event.turnResult,
     10: WatchRunResponse_Event.finished,
-    11: WatchRunResponse_Event.error,
     0: WatchRunResponse_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -7434,7 +7429,7 @@ class WatchRunResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: WatchRunResponse.$_createMessage)
-    ..oo(0, [3, 4, 5, 6, 7, 8, 9, 10, 11])
+    ..oo(0, [3, 4, 5, 6, 7, 8, 9, 10])
     ..aOS(1, _omitFieldNames ? '' : 'cursor')
     ..aOM<$1.Timestamp>(2, _omitFieldNames ? '' : 'eventTime',
         subBuilder: $1.Timestamp.$_createMessage)
@@ -7454,8 +7449,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
         subBuilder: TurnResult.$_createMessage)
     ..aOM<RunFinished>(10, _omitFieldNames ? '' : 'finished',
         subBuilder: RunFinished.$_createMessage)
-    ..aOM<RunStreamError>(11, _omitFieldNames ? '' : 'error',
-        subBuilder: RunStreamError.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7488,7 +7481,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   @$pb.TagNumber(9)
   @$pb.TagNumber(10)
-  @$pb.TagNumber(11)
   WatchRunResponse_Event whichEvent() =>
       _WatchRunResponse_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(3)
@@ -7499,7 +7491,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   @$pb.TagNumber(9)
   @$pb.TagNumber(10)
-  @$pb.TagNumber(11)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   /// 這個事件的位置。client 記下最後收到的值，重新訂閱時帶回。
@@ -7607,7 +7598,7 @@ class WatchRunResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   TurnResult ensureTurnResult() => $_ensure(8);
 
-  /// run 到達終態。
+  /// run 到達終態（成功、失敗、取消都以它收尾）；之後沒有其他事件。
   @$pb.TagNumber(10)
   RunFinished get finished => $_getN(9);
   @$pb.TagNumber(10)
@@ -7618,18 +7609,6 @@ class WatchRunResponse extends $pb.GeneratedMessage {
   void clearFinished() => $_clearField(10);
   @$pb.TagNumber(10)
   RunFinished ensureFinished() => $_ensure(9);
-
-  /// run 失敗。
-  @$pb.TagNumber(11)
-  RunStreamError get error => $_getN(10);
-  @$pb.TagNumber(11)
-  set error(RunStreamError value) => $_setField(11, value);
-  @$pb.TagNumber(11)
-  $core.bool hasError() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearError() => $_clearField(11);
-  @$pb.TagNumber(11)
-  RunStreamError ensureError() => $_ensure(10);
 }
 
 class RunAccepted extends $pb.GeneratedMessage {
@@ -8130,10 +8109,12 @@ class RunFinished extends $pb.GeneratedMessage {
   factory RunFinished({
     RunStatus? status,
     RunFailureReason? failureReason,
+    $core.String? localizedMessage,
   }) {
     final result = RunFinished._();
     if (status != null) result.status = status;
     if (failureReason != null) result.failureReason = failureReason;
+    if (localizedMessage != null) result.localizedMessage = localizedMessage;
     return result;
   }
 
@@ -8155,6 +8136,7 @@ class RunFinished extends $pb.GeneratedMessage {
         enumValues: RunStatus.values)
     ..aE<RunFailureReason>(2, _omitFieldNames ? '' : 'failureReason',
         enumValues: RunFailureReason.values)
+    ..aOS(3, _omitFieldNames ? '' : 'localizedMessage')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8188,7 +8170,7 @@ class RunFinished extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearStatus() => $_clearField(1);
 
-  /// 只在 FAILED 與 EXPIRED 時有值。
+  /// 只在 FAILED 時有值。
   @$pb.TagNumber(2)
   RunFailureReason get failureReason => $_getN(1);
   @$pb.TagNumber(2)
@@ -8197,90 +8179,16 @@ class RunFinished extends $pb.GeneratedMessage {
   $core.bool hasFailureReason() => $_has(1);
   @$pb.TagNumber(2)
   void clearFailureReason() => $_clearField(2);
-}
 
-/// RunStreamError 是 run 的失敗，之後沒有其他事件。
-class RunStreamError extends $pb.GeneratedMessage {
-  factory RunStreamError({
-    $3.ErrorReason? reason,
-    $core.String? localizedMessage,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
-  }) {
-    final result = RunStreamError._();
-    if (reason != null) result.reason = reason;
-    if (localizedMessage != null) result.localizedMessage = localizedMessage;
-    if (metadata != null) result.metadata.addEntries(metadata);
-    return result;
-  }
-
-  RunStreamError._();
-
-  factory RunStreamError.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      RunStreamError()..mergeFromBuffer(data, registry);
-  factory RunStreamError.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      RunStreamError()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'RunStreamError',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
-      createEmptyInstance: RunStreamError.$_createMessage)
-    ..aE<$3.ErrorReason>(1, _omitFieldNames ? '' : 'reason',
-        enumValues: $3.ErrorReason.values)
-    ..aOS(2, _omitFieldNames ? '' : 'localizedMessage')
-    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'RunStreamError.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('hawkr.procurement.v1alpha1'))
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  RunStreamError clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  RunStreamError copyWith(void Function(RunStreamError) updates) =>
-      super.copyWith((message) => updates(message as RunStreamError))
-          as RunStreamError;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use RunStreamError() / RunStreamError.new instead')
-  static RunStreamError create() => RunStreamError._();
-  static $pb.GeneratedMessage $_createMessage() => RunStreamError._();
-  @$core.override
-  RunStreamError createEmptyInstance() => RunStreamError._();
-  @$core.pragma('dart2js:noInline')
-  static RunStreamError getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RunStreamError>(
-          RunStreamError.$_createMessage);
-  static RunStreamError? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $3.ErrorReason get reason => $_getN(0);
-  @$pb.TagNumber(1)
-  set reason($3.ErrorReason value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasReason() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearReason() => $_clearField(1);
-
-  /// 給使用者看的文字（zh-TW 或 en，依請求的語系）。
-  @$pb.TagNumber(2)
-  $core.String get localizedMessage => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set localizedMessage($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasLocalizedMessage() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearLocalizedMessage() => $_clearField(2);
-
-  /// 與 google.rpc.ErrorInfo.metadata 同規則：key 是 lowerCamelCase。
+  /// 給使用者看的失敗說明（zh-TW 或 en，依請求的語系）；只在 FAILED 時有值。
   @$pb.TagNumber(3)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(2);
+  $core.String get localizedMessage => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set localizedMessage($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLocalizedMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLocalizedMessage() => $_clearField(3);
 }
 
 class CancelRunRequest extends $pb.GeneratedMessage {

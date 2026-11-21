@@ -98,6 +98,6 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 - 變動：`procurement.proto` 的 `Candidate.display_name` 與沒有寫入者的 `PublicationState` 值刪除（上線前不留 `reserved`）。
 - run 帳本的 integration test（A9-3b）：`internal/run/run_integration_test.go` 與 `procurement_integration_test.go` 的 R4 兩支，要 Postgres，待推後 CI。
 - run 帳本外鍵（A9-D20 R4）：`agent_runs.publication_id` 為 `ON DELETE SET NULL`，其餘維持 CASCADE；BuyerDeleted 的 `run` 步驟排在第一（`TestRunsAreDeletedBeforeEveryOtherStep`）。
-- 待決（A9-3b 留下）：`Executor` 與 handler 接上後登記 `run.Dispatcher`、`run.Submitter`、`run.Canceller`（A9-3b-2）；等待輸入的 run 能否取消（A9-D22 沒寫，`Canceller` 現回 `ErrNotCancellable`）；job 被 River 取消而 run 不在 CANCEL_REQUESTED 時一律標 `WORKER_LOST`（A9-D22 沒寫）。
+- 待決（A9-3b 留下）：`Executor` 與 handler 接上後登記 `run.Dispatcher`、`run.Submitter`、`run.Canceller`（A9-3b-2）；`RunFinished.localized_message`（A9-D23：失敗時帶訊息）的文字由 WatchRun handler 依請求語系從 `failure_reason` 填，文字目錄與 `JobQueue` 的 River 實作（`CancelJob` 回傳取消後的 job 狀態）在 A9-3b-2 一併做；job 被 River 取消而 run 不在 CANCEL_REQUESTED 時一律標 `WORKER_LOST`（A9-D22 沒寫）。
 - 待刪（手寫 TTL 快取）：`resolver` 的手寫快取在 catalog 搬進單體（B8）時刪除，改用模組 API，見 B8 列。
 - 守門：`retention` 的清單由 `TestRetentionCoversEveryBuyerIdTable` 對 schema 檢查（含 `buyer_id` 的表必須登記或明列豁免與理由）；`adksession` 兩模組的表由 `TestAdkTablesHaveTheSameShapeInEveryModuleSchema` 比對形狀。

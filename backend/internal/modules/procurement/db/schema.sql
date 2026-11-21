@@ -434,8 +434,8 @@ CREATE TABLE procurement.agent_runs (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT agent_runs_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT agent_runs_type_check CHECK (run_type IN ('TURN', 'CANDIDATE_SEARCH', 'CLARIFICATION_RESUME', 'PUBLICATION')),
-    CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'RESUMED', 'EXPIRED')),
-    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'EXPIRED')),
+    CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'RESUMED')),
+    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR')),
     CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1)
 );
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);

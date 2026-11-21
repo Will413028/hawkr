@@ -2,7 +2,7 @@
 SELECT * FROM procurement.agent_runs WHERE id = @id;
 
 -- name: NextRunSeq :one
--- 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；updated_at 同時是執行中 run 的心跳。
+-- 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；run 是否還活著由 River job 的狀態決定，不看 updated_at。
 -- 只在 run 的狀態屬於 @statuses 時配發：終態之後的寫入拿不到序號。
 UPDATE procurement.agent_runs
 SET last_event_seq = last_event_seq + 1, updated_at = @now
@@ -51,6 +51,13 @@ LIMIT @batch;
 SELECT * FROM procurement.agent_runs
 WHERE id = @id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED;
+
+-- name: LockWaitingRunIDs :many
+-- 同一個買家、同一個對話裡等待輸入的 run；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
+SELECT id FROM procurement.agent_runs
+WHERE buyer_id = @buyer_id AND conversation_id = @conversation_id AND status = 'WAITING_FOR_INPUT'
+ORDER BY id
+FOR UPDATE;
 
 -- name: ExpireRunEvents :one
 -- 結束超過保留期的 run，一次最多 @batch 個：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。

@@ -316,6 +316,39 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRu
 	return i, err
 }
 
+const lockWaitingRunIDs = `-- name: LockWaitingRunIDs :many
+SELECT id FROM procurement.agent_runs
+WHERE buyer_id = $1 AND conversation_id = $2 AND status = 'WAITING_FOR_INPUT'
+ORDER BY id
+FOR UPDATE
+`
+
+type LockWaitingRunIDsParams struct {
+	BuyerID        int64
+	ConversationID *uuid.UUID
+}
+
+// 同一個買家、同一個對話裡等待輸入的 run；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
+func (q *Queries) LockWaitingRunIDs(ctx context.Context, arg LockWaitingRunIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockWaitingRunIDs, arg.BuyerID, arg.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const nextRunSeq = `-- name: NextRunSeq :one
 UPDATE procurement.agent_runs
 SET last_event_seq = last_event_seq + 1, updated_at = $1
@@ -329,7 +362,7 @@ type NextRunSeqParams struct {
 	Statuses []string
 }
 
-// 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；updated_at 同時是執行中 run 的心跳。
+// 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；run 是否還活著由 River job 的狀態決定，不看 updated_at。
 // 只在 run 的狀態屬於 @statuses 時配發：終態之後的寫入拿不到序號。
 func (q *Queries) NextRunSeq(ctx context.Context, arg NextRunSeqParams) (int64, error) {
 	row := q.db.QueryRow(ctx, nextRunSeq, arg.Now, arg.ID, arg.Statuses)

@@ -169,10 +169,6 @@ class RunStatus extends $pb.ProtobufEnum {
   static const RunStatus RUN_STATUS_RESUMED =
       RunStatus._(8, _omitEnumNames ? '' : 'RUN_STATUS_RESUMED');
 
-  /// 超過存活上限。
-  static const RunStatus RUN_STATUS_EXPIRED =
-      RunStatus._(9, _omitEnumNames ? '' : 'RUN_STATUS_EXPIRED');
-
   static const $core.List<RunStatus> values = <RunStatus>[
     RUN_STATUS_UNSPECIFIED,
     RUN_STATUS_QUEUED,
@@ -183,18 +179,17 @@ class RunStatus extends $pb.ProtobufEnum {
     RUN_STATUS_FAILED,
     RUN_STATUS_CANCELLED,
     RUN_STATUS_RESUMED,
-    RUN_STATUS_EXPIRED,
   ];
 
   static final $core.List<RunStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
   static RunStatus? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const RunStatus._(super.value, super.name);
 }
 
-/// RunFailureReason 是 run 失敗或逾時的機器可讀原因，只在 FAILED 與 EXPIRED 時有值。
+/// RunFailureReason 是 run 失敗的機器可讀原因，只在 FAILED 時有值。
 class RunFailureReason extends $pb.ProtobufEnum {
   static const RunFailureReason RUN_FAILURE_REASON_UNSPECIFIED =
       RunFailureReason._(
@@ -215,20 +210,15 @@ class RunFailureReason extends $pb.ProtobufEnum {
       RunFailureReason._(
           3, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR');
 
-  /// run 超過存活上限（RUN_STATUS_EXPIRED）。買家重送。
-  static const RunFailureReason RUN_FAILURE_REASON_EXPIRED =
-      RunFailureReason._(4, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_EXPIRED');
-
   static const $core.List<RunFailureReason> values = <RunFailureReason>[
     RUN_FAILURE_REASON_UNSPECIFIED,
     RUN_FAILURE_REASON_WORKER_LOST,
     RUN_FAILURE_REASON_SEARCH_FAILED,
     RUN_FAILURE_REASON_TURN_PIPELINE_ERROR,
-    RUN_FAILURE_REASON_EXPIRED,
   ];
 
   static final $core.List<RunFailureReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static RunFailureReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -659,7 +649,7 @@ class CancelDisposition extends $pb.ProtobufEnum {
       CancelDisposition._(
           0, _omitEnumNames ? '' : 'CANCEL_DISPOSITION_UNSPECIFIED');
 
-  /// 已收到取消，run 會收斂到 CANCELLED。
+  /// 已收到取消，run 已經或會收斂到 CANCELLED（以回應的 run_status 為準）。
   static const CancelDisposition CANCEL_DISPOSITION_REQUESTED =
       CancelDisposition._(
           1, _omitEnumNames ? '' : 'CANCEL_DISPOSITION_REQUESTED');

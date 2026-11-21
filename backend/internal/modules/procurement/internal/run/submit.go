@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -29,10 +30,10 @@ func (RunArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: 1}
 }
 
-// JobQueue 是 run 需要的 River 操作：排入並取回 job id、取消 job。ctx 裡有 transaction 時都在該 transaction 內執行。
+// JobQueue 是 run 需要的 River 操作：排入並取回 job id、取消 job 並回傳取消之後 job 的狀態。ctx 裡有 transaction 時都在該 transaction 內執行。
 type JobQueue interface {
 	EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (jobID int64, err error)
-	CancelJob(ctx context.Context, jobID int64) error
+	CancelJob(ctx context.Context, jobID int64) (rivertype.JobState, error)
 }
 
 // SubmitInput 是送出一個 run 的輸入。額度的上限與期間由呼叫端依買家的方案給。
@@ -48,7 +49,7 @@ type SubmitInput struct {
 	PeriodEnd       time.Time
 }
 
-// Submitter 是送出路徑：同一個 transaction 內冪等建 run、扣一次額度、寫輸入與第一個事件、排入 job 並記下 job id。
+// Submitter 是送出路徑：同一個 transaction 內冪等建 run、扣一次額度、自動取消同對話等待輸入的舊 run（A9-D23）、寫輸入與第一個事件、排入 job 並記下 job id。
 type Submitter struct {
 	DB     *db.DB
 	Ledger Ledger
@@ -82,6 +83,11 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 			}
 			return fmt.Errorf("run：扣額度：%w", err)
 		}
+		if in.ConversationID != nil {
+			if err := s.cancelSuperseded(ctx, q, in.BuyerID, *in.ConversationID); err != nil {
+				return err
+			}
+		}
 		if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: in.Message, Now: now}); err != nil {
 			return fmt.Errorf("run：寫入輸入：%w", err)
 		}
@@ -105,6 +111,27 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		return uuid.UUID{}, err
 	}
 	return id, nil
+}
+
+// cancelSuperseded 把同一個對話裡等待輸入的 run 轉 CANCELLED（不退額度）：新的一輪取代它，之後不會再有人回答。
+func (s Submitter) cancelSuperseded(ctx context.Context, q *store.Queries, buyerID int64, conversationID uuid.UUID) error {
+	ids, err := q.LockWaitingRunIDs(ctx, store.LockWaitingRunIDsParams{BuyerID: buyerID, ConversationID: &conversationID})
+	if err != nil {
+		return fmt.Errorf("run：列出等待輸入的 run：%w", err)
+	}
+	return cancelAll(ctx, ids, func(ctx context.Context, id uuid.UUID) error {
+		_, err := s.Ledger.Transition(ctx, id, StatusCancelled, "")
+		return err
+	})
+}
+
+func cancelAll(ctx context.Context, ids []uuid.UUID, cancel func(context.Context, uuid.UUID) error) error {
+	for _, id := range ids {
+		if err := cancel(ctx, id); err != nil {
+			return fmt.Errorf("run：取消被取代的 run %s：%w", id, err)
+		}
+	}
+	return nil
 }
 
 func acceptedPayload(runID uuid.UUID, conversationID *uuid.UUID) ([]byte, error) {

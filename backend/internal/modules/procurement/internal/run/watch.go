@@ -33,11 +33,8 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 	}
 	q := store.New(w.DB.Conn(ctx))
 	r, err := q.GetRunForBuyer(ctx, store.GetRunForBuyerParams{ID: runID, BuyerID: buyerID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.NotFound("找不到這個 run")
-	}
 	if err != nil {
-		return err
+		return readRunError(err)
 	}
 	if after+1 < r.MinAvailableSeq {
 		return apperr.FailedPrecondition("這個位置的事件已過保留期").WithReason(apperr.ReasonReplayCursorExpired)
@@ -59,7 +56,7 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 			if ctx.Err() != nil {
 				return nil
 			}
-			return err
+			return readRunError(err)
 		}
 		ended := IsTerminal(r.Status)
 		events, err := q.ListRunEventsAfter(ctx, store.ListRunEventsAfterParams{RunID: runID, AfterSeq: after, PageSize: watchPage})
@@ -90,6 +87,14 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 		case <-sub.C:
 		}
 	}
+}
+
+// readRunError 把讀 run 的錯誤分類：run 不存在（串流中途被刪除也一樣）是 NOT_FOUND。
+func readRunError(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.NotFound("找不到這個 run")
+	}
+	return err
 }
 
 func parseCursor(c string) (int64, error) {

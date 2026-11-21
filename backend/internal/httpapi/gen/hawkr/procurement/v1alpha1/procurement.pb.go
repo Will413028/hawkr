@@ -257,8 +257,6 @@ const (
 	RunStatus_RUN_STATUS_CANCELLED RunStatus = 7
 	// 交棒給接續的 run。
 	RunStatus_RUN_STATUS_RESUMED RunStatus = 8
-	// 超過存活上限。
-	RunStatus_RUN_STATUS_EXPIRED RunStatus = 9
 )
 
 // Enum value maps for RunStatus.
@@ -273,7 +271,6 @@ var (
 		6: "RUN_STATUS_FAILED",
 		7: "RUN_STATUS_CANCELLED",
 		8: "RUN_STATUS_RESUMED",
-		9: "RUN_STATUS_EXPIRED",
 	}
 	RunStatus_value = map[string]int32{
 		"RUN_STATUS_UNSPECIFIED":       0,
@@ -285,7 +282,6 @@ var (
 		"RUN_STATUS_FAILED":            6,
 		"RUN_STATUS_CANCELLED":         7,
 		"RUN_STATUS_RESUMED":           8,
-		"RUN_STATUS_EXPIRED":           9,
 	}
 )
 
@@ -316,7 +312,7 @@ func (RunStatus) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{3}
 }
 
-// RunFailureReason 是 run 失敗或逾時的機器可讀原因，只在 FAILED 與 EXPIRED 時有值。
+// RunFailureReason 是 run 失敗的機器可讀原因，只在 FAILED 時有值。
 type RunFailureReason int32
 
 const (
@@ -327,8 +323,6 @@ const (
 	RunFailureReason_RUN_FAILURE_REASON_SEARCH_FAILED RunFailureReason = 2
 	// 一輪釐清的處理流程中途出錯。
 	RunFailureReason_RUN_FAILURE_REASON_TURN_PIPELINE_ERROR RunFailureReason = 3
-	// run 超過存活上限（RUN_STATUS_EXPIRED）。買家重送。
-	RunFailureReason_RUN_FAILURE_REASON_EXPIRED RunFailureReason = 4
 )
 
 // Enum value maps for RunFailureReason.
@@ -338,14 +332,12 @@ var (
 		1: "RUN_FAILURE_REASON_WORKER_LOST",
 		2: "RUN_FAILURE_REASON_SEARCH_FAILED",
 		3: "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR",
-		4: "RUN_FAILURE_REASON_EXPIRED",
 	}
 	RunFailureReason_value = map[string]int32{
 		"RUN_FAILURE_REASON_UNSPECIFIED":         0,
 		"RUN_FAILURE_REASON_WORKER_LOST":         1,
 		"RUN_FAILURE_REASON_SEARCH_FAILED":       2,
 		"RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": 3,
-		"RUN_FAILURE_REASON_EXPIRED":             4,
 	}
 )
 
@@ -1093,7 +1085,7 @@ type CancelDisposition int32
 
 const (
 	CancelDisposition_CANCEL_DISPOSITION_UNSPECIFIED CancelDisposition = 0
-	// 已收到取消，run 會收斂到 CANCELLED。
+	// 已收到取消，run 已經或會收斂到 CANCELLED（以回應的 run_status 為準）。
 	CancelDisposition_CANCEL_DISPOSITION_REQUESTED         CancelDisposition = 1
 	CancelDisposition_CANCEL_DISPOSITION_ALREADY_CANCELLED CancelDisposition = 2
 	// run 已經結束，沒有東西可取消。
@@ -3230,7 +3222,7 @@ type GetCandidateSearchResponse struct {
 	RunId          string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	CandidateSetId string                 `protobuf:"bytes,3,opt,name=candidate_set_id,json=candidateSetId,proto3" json:"candidate_set_id,omitempty"`
 	Status         RunStatus              `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.RunStatus" json:"status,omitempty"`
-	// 只在 FAILED 與 EXPIRED 時有值。
+	// 只在 FAILED 時有值。
 	FailureReason RunFailureReason `protobuf:"varint,5,opt,name=failure_reason,json=failureReason,proto3,enum=hawkr.procurement.v1alpha1.RunFailureReason" json:"failure_reason,omitempty"`
 	Candidates    []*Candidate     `protobuf:"bytes,6,rep,name=candidates,proto3" json:"candidates,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -6309,7 +6301,6 @@ type WatchRunResponse struct {
 	//	*WatchRunResponse_ToolResult
 	//	*WatchRunResponse_TurnResult
 	//	*WatchRunResponse_Finished
-	//	*WatchRunResponse_Error
 	Event         isWatchRunResponse_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -6438,15 +6429,6 @@ func (x *WatchRunResponse) GetFinished() *RunFinished {
 	return nil
 }
 
-func (x *WatchRunResponse) GetError() *RunStreamError {
-	if x != nil {
-		if x, ok := x.Event.(*WatchRunResponse_Error); ok {
-			return x.Error
-		}
-	}
-	return nil
-}
-
 type isWatchRunResponse_Event interface {
 	isWatchRunResponse_Event()
 }
@@ -6487,13 +6469,8 @@ type WatchRunResponse_TurnResult struct {
 }
 
 type WatchRunResponse_Finished struct {
-	// run 到達終態。
+	// run 到達終態（成功、失敗、取消都以它收尾）；之後沒有其他事件。
 	Finished *RunFinished `protobuf:"bytes,10,opt,name=finished,proto3,oneof"`
-}
-
-type WatchRunResponse_Error struct {
-	// run 失敗。
-	Error *RunStreamError `protobuf:"bytes,11,opt,name=error,proto3,oneof"`
 }
 
 func (*WatchRunResponse_RunAccepted) isWatchRunResponse_Event() {}
@@ -6511,8 +6488,6 @@ func (*WatchRunResponse_ToolResult) isWatchRunResponse_Event() {}
 func (*WatchRunResponse_TurnResult) isWatchRunResponse_Event() {}
 
 func (*WatchRunResponse_Finished) isWatchRunResponse_Event() {}
-
-func (*WatchRunResponse_Error) isWatchRunResponse_Event() {}
 
 type RunAccepted struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -6883,10 +6858,12 @@ func (x *ToolResult) GetFailed() bool {
 type RunFinished struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Status RunStatus              `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.RunStatus" json:"status,omitempty"`
-	// 只在 FAILED 與 EXPIRED 時有值。
+	// 只在 FAILED 時有值。
 	FailureReason RunFailureReason `protobuf:"varint,2,opt,name=failure_reason,json=failureReason,proto3,enum=hawkr.procurement.v1alpha1.RunFailureReason" json:"failure_reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// 給使用者看的失敗說明（zh-TW 或 en，依請求的語系）；只在 FAILED 時有值。
+	LocalizedMessage string `protobuf:"bytes,3,opt,name=localized_message,json=localizedMessage,proto3" json:"localized_message,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RunFinished) Reset() {
@@ -6933,67 +6910,11 @@ func (x *RunFinished) GetFailureReason() RunFailureReason {
 	return RunFailureReason_RUN_FAILURE_REASON_UNSPECIFIED
 }
 
-// RunStreamError 是 run 的失敗，之後沒有其他事件。
-type RunStreamError struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Reason v1alpha1.ErrorReason   `protobuf:"varint,1,opt,name=reason,proto3,enum=hawkr.common.v1alpha1.ErrorReason" json:"reason,omitempty"`
-	// 給使用者看的文字（zh-TW 或 en，依請求的語系）。
-	LocalizedMessage string `protobuf:"bytes,2,opt,name=localized_message,json=localizedMessage,proto3" json:"localized_message,omitempty"`
-	// 與 google.rpc.ErrorInfo.metadata 同規則：key 是 lowerCamelCase。
-	Metadata      map[string]string `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RunStreamError) Reset() {
-	*x = RunStreamError{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[79]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RunStreamError) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RunStreamError) ProtoMessage() {}
-
-func (x *RunStreamError) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[79]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RunStreamError.ProtoReflect.Descriptor instead.
-func (*RunStreamError) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{79}
-}
-
-func (x *RunStreamError) GetReason() v1alpha1.ErrorReason {
-	if x != nil {
-		return x.Reason
-	}
-	return v1alpha1.ErrorReason(0)
-}
-
-func (x *RunStreamError) GetLocalizedMessage() string {
+func (x *RunFinished) GetLocalizedMessage() string {
 	if x != nil {
 		return x.LocalizedMessage
 	}
 	return ""
-}
-
-func (x *RunStreamError) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
 }
 
 type CancelRunRequest struct {
@@ -7005,7 +6926,7 @@ type CancelRunRequest struct {
 
 func (x *CancelRunRequest) Reset() {
 	*x = CancelRunRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[80]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7017,7 +6938,7 @@ func (x *CancelRunRequest) String() string {
 func (*CancelRunRequest) ProtoMessage() {}
 
 func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[80]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7030,7 +6951,7 @@ func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunRequest.ProtoReflect.Descriptor instead.
 func (*CancelRunRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{80}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *CancelRunRequest) GetRunId() string {
@@ -7051,7 +6972,7 @@ type CancelRunResponse struct {
 
 func (x *CancelRunResponse) Reset() {
 	*x = CancelRunResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[81]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7063,7 +6984,7 @@ func (x *CancelRunResponse) String() string {
 func (*CancelRunResponse) ProtoMessage() {}
 
 func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[81]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7076,7 +6997,7 @@ func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunResponse.ProtoReflect.Descriptor instead.
 func (*CancelRunResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{81}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *CancelRunResponse) GetRunId() string {
@@ -7111,7 +7032,7 @@ type ClarificationResponse struct {
 
 func (x *ClarificationResponse) Reset() {
 	*x = ClarificationResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[82]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7123,7 +7044,7 @@ func (x *ClarificationResponse) String() string {
 func (*ClarificationResponse) ProtoMessage() {}
 
 func (x *ClarificationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[82]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7136,7 +7057,7 @@ func (x *ClarificationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClarificationResponse.ProtoReflect.Descriptor instead.
 func (*ClarificationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{82}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *ClarificationResponse) GetOptionId() string {
@@ -7169,7 +7090,7 @@ type ResumeRunRequest struct {
 
 func (x *ResumeRunRequest) Reset() {
 	*x = ResumeRunRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7181,7 +7102,7 @@ func (x *ResumeRunRequest) String() string {
 func (*ResumeRunRequest) ProtoMessage() {}
 
 func (x *ResumeRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7194,7 +7115,7 @@ func (x *ResumeRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRunRequest.ProtoReflect.Descriptor instead.
 func (*ResumeRunRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{83}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *ResumeRunRequest) GetInterruptId() string {
@@ -7250,7 +7171,7 @@ type ResumeRunResponse struct {
 
 func (x *ResumeRunResponse) Reset() {
 	*x = ResumeRunResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[84]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7262,7 +7183,7 @@ func (x *ResumeRunResponse) String() string {
 func (*ResumeRunResponse) ProtoMessage() {}
 
 func (x *ResumeRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[84]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7275,7 +7196,7 @@ func (x *ResumeRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRunResponse.ProtoReflect.Descriptor instead.
 func (*ResumeRunResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{84}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *ResumeRunResponse) GetRunId() string {
@@ -7312,7 +7233,7 @@ type SellerPublicationSummary struct {
 
 func (x *SellerPublicationSummary) Reset() {
 	*x = SellerPublicationSummary{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[85]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7324,7 +7245,7 @@ func (x *SellerPublicationSummary) String() string {
 func (*SellerPublicationSummary) ProtoMessage() {}
 
 func (x *SellerPublicationSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[85]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7337,7 +7258,7 @@ func (x *SellerPublicationSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerPublicationSummary.ProtoReflect.Descriptor instead.
 func (*SellerPublicationSummary) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{85}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *SellerPublicationSummary) GetPublicationId() string {
@@ -7388,7 +7309,7 @@ type SellerResponseDraft struct {
 
 func (x *SellerResponseDraft) Reset() {
 	*x = SellerResponseDraft{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[86]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7400,7 +7321,7 @@ func (x *SellerResponseDraft) String() string {
 func (*SellerResponseDraft) ProtoMessage() {}
 
 func (x *SellerResponseDraft) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[86]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7413,7 +7334,7 @@ func (x *SellerResponseDraft) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerResponseDraft.ProtoReflect.Descriptor instead.
 func (*SellerResponseDraft) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{86}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *SellerResponseDraft) GetDraftVersion() string {
@@ -7458,7 +7379,7 @@ type SellerResponseVersion struct {
 
 func (x *SellerResponseVersion) Reset() {
 	*x = SellerResponseVersion{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[87]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7470,7 +7391,7 @@ func (x *SellerResponseVersion) String() string {
 func (*SellerResponseVersion) ProtoMessage() {}
 
 func (x *SellerResponseVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[87]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7483,7 +7404,7 @@ func (x *SellerResponseVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerResponseVersion.ProtoReflect.Descriptor instead.
 func (*SellerResponseVersion) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{87}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *SellerResponseVersion) GetSellerResponseId() string {
@@ -7573,7 +7494,7 @@ type SellerResponseClosure struct {
 
 func (x *SellerResponseClosure) Reset() {
 	*x = SellerResponseClosure{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[88]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7585,7 +7506,7 @@ func (x *SellerResponseClosure) String() string {
 func (*SellerResponseClosure) ProtoMessage() {}
 
 func (x *SellerResponseClosure) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[88]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7598,7 +7519,7 @@ func (x *SellerResponseClosure) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerResponseClosure.ProtoReflect.Descriptor instead.
 func (*SellerResponseClosure) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{88}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *SellerResponseClosure) GetSellerResponseId() string {
@@ -7656,7 +7577,7 @@ type SellerPublicationListItem struct {
 
 func (x *SellerPublicationListItem) Reset() {
 	*x = SellerPublicationListItem{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[89]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7668,7 +7589,7 @@ func (x *SellerPublicationListItem) String() string {
 func (*SellerPublicationListItem) ProtoMessage() {}
 
 func (x *SellerPublicationListItem) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[89]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7681,7 +7602,7 @@ func (x *SellerPublicationListItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerPublicationListItem.ProtoReflect.Descriptor instead.
 func (*SellerPublicationListItem) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{89}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *SellerPublicationListItem) GetPublication() *SellerPublicationSummary {
@@ -7723,7 +7644,7 @@ type ListSellerPublicationsRequest struct {
 
 func (x *ListSellerPublicationsRequest) Reset() {
 	*x = ListSellerPublicationsRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[90]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7735,7 +7656,7 @@ func (x *ListSellerPublicationsRequest) String() string {
 func (*ListSellerPublicationsRequest) ProtoMessage() {}
 
 func (x *ListSellerPublicationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[90]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7748,7 +7669,7 @@ func (x *ListSellerPublicationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerPublicationsRequest.ProtoReflect.Descriptor instead.
 func (*ListSellerPublicationsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{90}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *ListSellerPublicationsRequest) GetPageSize() int32 {
@@ -7775,7 +7696,7 @@ type ListSellerPublicationsResponse struct {
 
 func (x *ListSellerPublicationsResponse) Reset() {
 	*x = ListSellerPublicationsResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[91]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7787,7 +7708,7 @@ func (x *ListSellerPublicationsResponse) String() string {
 func (*ListSellerPublicationsResponse) ProtoMessage() {}
 
 func (x *ListSellerPublicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[91]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7800,7 +7721,7 @@ func (x *ListSellerPublicationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerPublicationsResponse.ProtoReflect.Descriptor instead.
 func (*ListSellerPublicationsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{91}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *ListSellerPublicationsResponse) GetPublications() []*SellerPublicationListItem {
@@ -7826,7 +7747,7 @@ type GetSellerPublicationRequest struct {
 
 func (x *GetSellerPublicationRequest) Reset() {
 	*x = GetSellerPublicationRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[92]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7838,7 +7759,7 @@ func (x *GetSellerPublicationRequest) String() string {
 func (*GetSellerPublicationRequest) ProtoMessage() {}
 
 func (x *GetSellerPublicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[92]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7851,7 +7772,7 @@ func (x *GetSellerPublicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerPublicationRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerPublicationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{92}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *GetSellerPublicationRequest) GetPublicationId() string {
@@ -7875,7 +7796,7 @@ type GetSellerPublicationResponse struct {
 
 func (x *GetSellerPublicationResponse) Reset() {
 	*x = GetSellerPublicationResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[93]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7887,7 +7808,7 @@ func (x *GetSellerPublicationResponse) String() string {
 func (*GetSellerPublicationResponse) ProtoMessage() {}
 
 func (x *GetSellerPublicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[93]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7900,7 +7821,7 @@ func (x *GetSellerPublicationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerPublicationResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerPublicationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{93}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *GetSellerPublicationResponse) GetPublication() *SellerPublicationSummary {
@@ -7944,7 +7865,7 @@ type UpsertSellerResponseDraftRequest struct {
 
 func (x *UpsertSellerResponseDraftRequest) Reset() {
 	*x = UpsertSellerResponseDraftRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[94]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7956,7 +7877,7 @@ func (x *UpsertSellerResponseDraftRequest) String() string {
 func (*UpsertSellerResponseDraftRequest) ProtoMessage() {}
 
 func (x *UpsertSellerResponseDraftRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[94]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7969,7 +7890,7 @@ func (x *UpsertSellerResponseDraftRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertSellerResponseDraftRequest.ProtoReflect.Descriptor instead.
 func (*UpsertSellerResponseDraftRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{94}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *UpsertSellerResponseDraftRequest) GetPublicationId() string {
@@ -8002,7 +7923,7 @@ type UpsertSellerResponseDraftResponse struct {
 
 func (x *UpsertSellerResponseDraftResponse) Reset() {
 	*x = UpsertSellerResponseDraftResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[95]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8014,7 +7935,7 @@ func (x *UpsertSellerResponseDraftResponse) String() string {
 func (*UpsertSellerResponseDraftResponse) ProtoMessage() {}
 
 func (x *UpsertSellerResponseDraftResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[95]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8027,7 +7948,7 @@ func (x *UpsertSellerResponseDraftResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use UpsertSellerResponseDraftResponse.ProtoReflect.Descriptor instead.
 func (*UpsertSellerResponseDraftResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{95}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *UpsertSellerResponseDraftResponse) GetDraft() *SellerResponseDraft {
@@ -8052,7 +7973,7 @@ type SubmitSellerResponseRequest struct {
 
 func (x *SubmitSellerResponseRequest) Reset() {
 	*x = SubmitSellerResponseRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[96]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8064,7 +7985,7 @@ func (x *SubmitSellerResponseRequest) String() string {
 func (*SubmitSellerResponseRequest) ProtoMessage() {}
 
 func (x *SubmitSellerResponseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[96]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8077,7 +7998,7 @@ func (x *SubmitSellerResponseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitSellerResponseRequest.ProtoReflect.Descriptor instead.
 func (*SubmitSellerResponseRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{96}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *SubmitSellerResponseRequest) GetPublicationId() string {
@@ -8131,7 +8052,7 @@ type SubmitSellerResponseResponse struct {
 
 func (x *SubmitSellerResponseResponse) Reset() {
 	*x = SubmitSellerResponseResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[97]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8143,7 +8064,7 @@ func (x *SubmitSellerResponseResponse) String() string {
 func (*SubmitSellerResponseResponse) ProtoMessage() {}
 
 func (x *SubmitSellerResponseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[97]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8156,7 +8077,7 @@ func (x *SubmitSellerResponseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitSellerResponseResponse.ProtoReflect.Descriptor instead.
 func (*SubmitSellerResponseResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{97}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *SubmitSellerResponseResponse) GetSellerResponse() *SellerResponseVersion {
@@ -8180,7 +8101,7 @@ type WithdrawSellerResponseRequest struct {
 
 func (x *WithdrawSellerResponseRequest) Reset() {
 	*x = WithdrawSellerResponseRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[98]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8192,7 +8113,7 @@ func (x *WithdrawSellerResponseRequest) String() string {
 func (*WithdrawSellerResponseRequest) ProtoMessage() {}
 
 func (x *WithdrawSellerResponseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[98]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8205,7 +8126,7 @@ func (x *WithdrawSellerResponseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawSellerResponseRequest.ProtoReflect.Descriptor instead.
 func (*WithdrawSellerResponseRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{98}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *WithdrawSellerResponseRequest) GetPublicationId() string {
@@ -8252,7 +8173,7 @@ type WithdrawSellerResponseResponse struct {
 
 func (x *WithdrawSellerResponseResponse) Reset() {
 	*x = WithdrawSellerResponseResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[99]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8264,7 +8185,7 @@ func (x *WithdrawSellerResponseResponse) String() string {
 func (*WithdrawSellerResponseResponse) ProtoMessage() {}
 
 func (x *WithdrawSellerResponseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[99]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8277,7 +8198,7 @@ func (x *WithdrawSellerResponseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawSellerResponseResponse.ProtoReflect.Descriptor instead.
 func (*WithdrawSellerResponseResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{99}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *WithdrawSellerResponseResponse) GetClosure() *SellerResponseClosure {
@@ -8299,7 +8220,7 @@ type DeclineRfqPublicationRequest struct {
 
 func (x *DeclineRfqPublicationRequest) Reset() {
 	*x = DeclineRfqPublicationRequest{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[100]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8311,7 +8232,7 @@ func (x *DeclineRfqPublicationRequest) String() string {
 func (*DeclineRfqPublicationRequest) ProtoMessage() {}
 
 func (x *DeclineRfqPublicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[100]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8324,7 +8245,7 @@ func (x *DeclineRfqPublicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineRfqPublicationRequest.ProtoReflect.Descriptor instead.
 func (*DeclineRfqPublicationRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{100}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *DeclineRfqPublicationRequest) GetPublicationId() string {
@@ -8357,7 +8278,7 @@ type DeclineRfqPublicationResponse struct {
 
 func (x *DeclineRfqPublicationResponse) Reset() {
 	*x = DeclineRfqPublicationResponse{}
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[101]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8369,7 +8290,7 @@ func (x *DeclineRfqPublicationResponse) String() string {
 func (*DeclineRfqPublicationResponse) ProtoMessage() {}
 
 func (x *DeclineRfqPublicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[101]
+	mi := &file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8382,7 +8303,7 @@ func (x *DeclineRfqPublicationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineRfqPublicationResponse.ProtoReflect.Descriptor instead.
 func (*DeclineRfqPublicationResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{101}
+	return file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *DeclineRfqPublicationResponse) GetClosure() *SellerResponseClosure {
@@ -8396,7 +8317,7 @@ var File_hawkr_procurement_v1alpha1_procurement_proto protoreflect.FileDescripto
 
 const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\n" +
-	",hawkr/procurement/v1alpha1/procurement.proto\x12\x1ahawkr.procurement.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16google/type/date.proto\x1a(hawkr/common/v1alpha1/error_reason.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"C\n" +
+	",hawkr/procurement/v1alpha1/procurement.proto\x12\x1ahawkr.procurement.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16google/type/date.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"C\n" +
 	"\x0eQuestionOption\x12\x1b\n" +
 	"\toption_id\x18\x01 \x01(\tR\boptionId\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\"\xc1\x02\n" +
@@ -8872,7 +8793,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x11_payment_deadline\"E\n" +
 	"\x0fWatchRunRequest\x12\x1a\n" +
 	"\x06run_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05runId\x12\x16\n" +
-	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"\xe1\x05\n" +
+	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"\xaa\x05\n" +
 	"\x10WatchRunResponse\x12\x16\n" +
 	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x129\n" +
 	"\n" +
@@ -8887,9 +8808,8 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\vturn_result\x18\t \x01(\v2&.hawkr.procurement.v1alpha1.TurnResultH\x00R\n" +
 	"turnResult\x12E\n" +
 	"\bfinished\x18\n" +
-	" \x01(\v2'.hawkr.procurement.v1alpha1.RunFinishedH\x00R\bfinished\x12B\n" +
-	"\x05error\x18\v \x01(\v2*.hawkr.procurement.v1alpha1.RunStreamErrorH\x00R\x05errorB\a\n" +
-	"\x05event\"`\n" +
+	" \x01(\v2'.hawkr.procurement.v1alpha1.RunFinishedH\x00R\bfinishedB\a\n" +
+	"\x05eventJ\x04\b\v\x10\fR\x05error\"`\n" +
 	"\vRunAccepted\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationIdJ\x04\b\x03\x10\x04R\vrun_version\"\x1f\n" +
@@ -8917,17 +8837,11 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\n" +
 	"ToolResult\x12\x1b\n" +
 	"\ttool_name\x18\x01 \x01(\tR\btoolName\x12\x16\n" +
-	"\x06failed\x18\x02 \x01(\bR\x06failed\"\xa1\x01\n" +
+	"\x06failed\x18\x02 \x01(\bR\x06failed\"\xce\x01\n" +
 	"\vRunFinished\x12=\n" +
 	"\x06status\x18\x01 \x01(\x0e2%.hawkr.procurement.v1alpha1.RunStatusR\x06status\x12S\n" +
-	"\x0efailure_reason\x18\x02 \x01(\x0e2,.hawkr.procurement.v1alpha1.RunFailureReasonR\rfailureReason\"\x8c\x02\n" +
-	"\x0eRunStreamError\x12:\n" +
-	"\x06reason\x18\x01 \x01(\x0e2\".hawkr.common.v1alpha1.ErrorReasonR\x06reason\x12+\n" +
-	"\x11localized_message\x18\x02 \x01(\tR\x10localizedMessage\x12T\n" +
-	"\bmetadata\x18\x03 \x03(\v28.hawkr.procurement.v1alpha1.RunStreamError.MetadataEntryR\bmetadata\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"J\n" +
+	"\x0efailure_reason\x18\x02 \x01(\x0e2,.hawkr.procurement.v1alpha1.RunFailureReasonR\rfailureReason\x12+\n" +
+	"\x11localized_message\x18\x03 \x01(\tR\x10localizedMessage\"J\n" +
 	"\x10CancelRunRequest\x12\x1a\n" +
 	"\x06run_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05runIdJ\x04\b\x02\x10\x03R\x14expected_run_version\"\xe1\x01\n" +
 	"\x11CancelRunResponse\x12\x15\n" +
@@ -9058,7 +8972,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\rRUN_TYPE_TURN\x10\x01\x12\x1d\n" +
 	"\x19RUN_TYPE_CANDIDATE_SEARCH\x10\x02\x12!\n" +
 	"\x1dRUN_TYPE_CLARIFICATION_RESUME\x10\x03\x12\x18\n" +
-	"\x14RUN_TYPE_PUBLICATION\x10\x04*\x94\x02\n" +
+	"\x14RUN_TYPE_PUBLICATION\x10\x04*\x96\x02\n" +
 	"\tRunStatus\x12\x1a\n" +
 	"\x16RUN_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11RUN_STATUS_QUEUED\x10\x01\x12\x16\n" +
@@ -9068,14 +8982,12 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x14RUN_STATUS_SUCCEEDED\x10\x05\x12\x15\n" +
 	"\x11RUN_STATUS_FAILED\x10\x06\x12\x18\n" +
 	"\x14RUN_STATUS_CANCELLED\x10\a\x12\x16\n" +
-	"\x12RUN_STATUS_RESUMED\x10\b\x12\x16\n" +
-	"\x12RUN_STATUS_EXPIRED\x10\t*\xcc\x01\n" +
+	"\x12RUN_STATUS_RESUMED\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_EXPIRED*\xce\x01\n" +
 	"\x10RunFailureReason\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_WORKER_LOST\x10\x01\x12$\n" +
 	" RUN_FAILURE_REASON_SEARCH_FAILED\x10\x02\x12*\n" +
-	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\x12\x1e\n" +
-	"\x1aRUN_FAILURE_REASON_EXPIRED\x10\x04*\xe5\x01\n" +
+	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
 	"\n" +
 	"StepStatus\x12\x1b\n" +
 	"\x17STEP_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -9196,7 +9108,7 @@ func file_hawkr_procurement_v1alpha1_procurement_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_procurement_v1alpha1_procurement_proto_enumTypes = make([]protoimpl.EnumInfo, 19)
-var file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes = make([]protoimpl.MessageInfo, 104)
+var file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes = make([]protoimpl.MessageInfo, 102)
 var file_hawkr_procurement_v1alpha1_procurement_proto_goTypes = []any{
 	(SlotKey)(0),                              // 0: hawkr.procurement.v1alpha1.SlotKey
 	(RequestStatus)(0),                        // 1: hawkr.procurement.v1alpha1.RequestStatus
@@ -9296,51 +9208,48 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_goTypes = []any{
 	(*MessageEvent)(nil),                      // 95: hawkr.procurement.v1alpha1.MessageEvent
 	(*ToolResult)(nil),                        // 96: hawkr.procurement.v1alpha1.ToolResult
 	(*RunFinished)(nil),                       // 97: hawkr.procurement.v1alpha1.RunFinished
-	(*RunStreamError)(nil),                    // 98: hawkr.procurement.v1alpha1.RunStreamError
-	(*CancelRunRequest)(nil),                  // 99: hawkr.procurement.v1alpha1.CancelRunRequest
-	(*CancelRunResponse)(nil),                 // 100: hawkr.procurement.v1alpha1.CancelRunResponse
-	(*ClarificationResponse)(nil),             // 101: hawkr.procurement.v1alpha1.ClarificationResponse
-	(*ResumeRunRequest)(nil),                  // 102: hawkr.procurement.v1alpha1.ResumeRunRequest
-	(*ResumeRunResponse)(nil),                 // 103: hawkr.procurement.v1alpha1.ResumeRunResponse
-	(*SellerPublicationSummary)(nil),          // 104: hawkr.procurement.v1alpha1.SellerPublicationSummary
-	(*SellerResponseDraft)(nil),               // 105: hawkr.procurement.v1alpha1.SellerResponseDraft
-	(*SellerResponseVersion)(nil),             // 106: hawkr.procurement.v1alpha1.SellerResponseVersion
-	(*SellerResponseClosure)(nil),             // 107: hawkr.procurement.v1alpha1.SellerResponseClosure
-	(*SellerPublicationListItem)(nil),         // 108: hawkr.procurement.v1alpha1.SellerPublicationListItem
-	(*ListSellerPublicationsRequest)(nil),     // 109: hawkr.procurement.v1alpha1.ListSellerPublicationsRequest
-	(*ListSellerPublicationsResponse)(nil),    // 110: hawkr.procurement.v1alpha1.ListSellerPublicationsResponse
-	(*GetSellerPublicationRequest)(nil),       // 111: hawkr.procurement.v1alpha1.GetSellerPublicationRequest
-	(*GetSellerPublicationResponse)(nil),      // 112: hawkr.procurement.v1alpha1.GetSellerPublicationResponse
-	(*UpsertSellerResponseDraftRequest)(nil),  // 113: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest
-	(*UpsertSellerResponseDraftResponse)(nil), // 114: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse
-	(*SubmitSellerResponseRequest)(nil),       // 115: hawkr.procurement.v1alpha1.SubmitSellerResponseRequest
-	(*SubmitSellerResponseResponse)(nil),      // 116: hawkr.procurement.v1alpha1.SubmitSellerResponseResponse
-	(*WithdrawSellerResponseRequest)(nil),     // 117: hawkr.procurement.v1alpha1.WithdrawSellerResponseRequest
-	(*WithdrawSellerResponseResponse)(nil),    // 118: hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse
-	(*DeclineRfqPublicationRequest)(nil),      // 119: hawkr.procurement.v1alpha1.DeclineRfqPublicationRequest
-	(*DeclineRfqPublicationResponse)(nil),     // 120: hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse
-	nil,                                       // 121: hawkr.procurement.v1alpha1.Step.SafeArgsEntry
-	nil,                                       // 122: hawkr.procurement.v1alpha1.RunStreamError.MetadataEntry
-	(*date.Date)(nil),                         // 123: google.type.Date
-	(*timestamppb.Timestamp)(nil),             // 124: google.protobuf.Timestamp
-	(*v1alpha1.StoreCard)(nil),                // 125: hawkr.common.v1alpha1.StoreCard
-	(v1alpha1.ErrorReason)(0),                 // 126: hawkr.common.v1alpha1.ErrorReason
+	(*CancelRunRequest)(nil),                  // 98: hawkr.procurement.v1alpha1.CancelRunRequest
+	(*CancelRunResponse)(nil),                 // 99: hawkr.procurement.v1alpha1.CancelRunResponse
+	(*ClarificationResponse)(nil),             // 100: hawkr.procurement.v1alpha1.ClarificationResponse
+	(*ResumeRunRequest)(nil),                  // 101: hawkr.procurement.v1alpha1.ResumeRunRequest
+	(*ResumeRunResponse)(nil),                 // 102: hawkr.procurement.v1alpha1.ResumeRunResponse
+	(*SellerPublicationSummary)(nil),          // 103: hawkr.procurement.v1alpha1.SellerPublicationSummary
+	(*SellerResponseDraft)(nil),               // 104: hawkr.procurement.v1alpha1.SellerResponseDraft
+	(*SellerResponseVersion)(nil),             // 105: hawkr.procurement.v1alpha1.SellerResponseVersion
+	(*SellerResponseClosure)(nil),             // 106: hawkr.procurement.v1alpha1.SellerResponseClosure
+	(*SellerPublicationListItem)(nil),         // 107: hawkr.procurement.v1alpha1.SellerPublicationListItem
+	(*ListSellerPublicationsRequest)(nil),     // 108: hawkr.procurement.v1alpha1.ListSellerPublicationsRequest
+	(*ListSellerPublicationsResponse)(nil),    // 109: hawkr.procurement.v1alpha1.ListSellerPublicationsResponse
+	(*GetSellerPublicationRequest)(nil),       // 110: hawkr.procurement.v1alpha1.GetSellerPublicationRequest
+	(*GetSellerPublicationResponse)(nil),      // 111: hawkr.procurement.v1alpha1.GetSellerPublicationResponse
+	(*UpsertSellerResponseDraftRequest)(nil),  // 112: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest
+	(*UpsertSellerResponseDraftResponse)(nil), // 113: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse
+	(*SubmitSellerResponseRequest)(nil),       // 114: hawkr.procurement.v1alpha1.SubmitSellerResponseRequest
+	(*SubmitSellerResponseResponse)(nil),      // 115: hawkr.procurement.v1alpha1.SubmitSellerResponseResponse
+	(*WithdrawSellerResponseRequest)(nil),     // 116: hawkr.procurement.v1alpha1.WithdrawSellerResponseRequest
+	(*WithdrawSellerResponseResponse)(nil),    // 117: hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse
+	(*DeclineRfqPublicationRequest)(nil),      // 118: hawkr.procurement.v1alpha1.DeclineRfqPublicationRequest
+	(*DeclineRfqPublicationResponse)(nil),     // 119: hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse
+	nil,                                       // 120: hawkr.procurement.v1alpha1.Step.SafeArgsEntry
+	(*date.Date)(nil),                         // 121: google.type.Date
+	(*timestamppb.Timestamp)(nil),             // 122: google.protobuf.Timestamp
+	(*v1alpha1.StoreCard)(nil),                // 123: hawkr.common.v1alpha1.StoreCard
 }
 var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	0,   // 0: hawkr.procurement.v1alpha1.ClarifyQuestion.slot_key:type_name -> hawkr.procurement.v1alpha1.SlotKey
 	19,  // 1: hawkr.procurement.v1alpha1.ClarifyQuestion.options:type_name -> hawkr.procurement.v1alpha1.QuestionOption
 	19,  // 2: hawkr.procurement.v1alpha1.ClarifyQuestion.unit_options:type_name -> hawkr.procurement.v1alpha1.QuestionOption
 	5,   // 3: hawkr.procurement.v1alpha1.Step.status:type_name -> hawkr.procurement.v1alpha1.StepStatus
-	121, // 4: hawkr.procurement.v1alpha1.Step.safe_args:type_name -> hawkr.procurement.v1alpha1.Step.SafeArgsEntry
+	120, // 4: hawkr.procurement.v1alpha1.Step.safe_args:type_name -> hawkr.procurement.v1alpha1.Step.SafeArgsEntry
 	0,   // 5: hawkr.procurement.v1alpha1.RecordedField.key:type_name -> hawkr.procurement.v1alpha1.SlotKey
 	0,   // 6: hawkr.procurement.v1alpha1.RejectedField.key:type_name -> hawkr.procurement.v1alpha1.SlotKey
 	7,   // 7: hawkr.procurement.v1alpha1.ItemResolution.kind:type_name -> hawkr.procurement.v1alpha1.ItemResolutionKind
-	123, // 8: hawkr.procurement.v1alpha1.Slots.delivery_date:type_name -> google.type.Date
+	121, // 8: hawkr.procurement.v1alpha1.Slots.delivery_date:type_name -> google.type.Date
 	24,  // 9: hawkr.procurement.v1alpha1.Slots.item_resolution:type_name -> hawkr.procurement.v1alpha1.ItemResolution
 	26,  // 10: hawkr.procurement.v1alpha1.ItemDisambiguation.candidates:type_name -> hawkr.procurement.v1alpha1.ItemDisambiguationOption
 	9,   // 11: hawkr.procurement.v1alpha1.Block.kind:type_name -> hawkr.procurement.v1alpha1.BlockKind
 	6,   // 12: hawkr.procurement.v1alpha1.Interrupt.kind:type_name -> hawkr.procurement.v1alpha1.InterruptKind
-	124, // 13: hawkr.procurement.v1alpha1.QuotaSnapshot.reset_time:type_name -> google.protobuf.Timestamp
+	122, // 13: hawkr.procurement.v1alpha1.QuotaSnapshot.reset_time:type_name -> google.protobuf.Timestamp
 	25,  // 14: hawkr.procurement.v1alpha1.TurnResult.slots:type_name -> hawkr.procurement.v1alpha1.Slots
 	23,  // 15: hawkr.procurement.v1alpha1.TurnResult.rejected:type_name -> hawkr.procurement.v1alpha1.RejectedField
 	0,   // 16: hawkr.procurement.v1alpha1.TurnResult.missing_required:type_name -> hawkr.procurement.v1alpha1.SlotKey
@@ -9349,19 +9258,19 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	20,  // 19: hawkr.procurement.v1alpha1.TurnResult.question:type_name -> hawkr.procurement.v1alpha1.ClarifyQuestion
 	28,  // 20: hawkr.procurement.v1alpha1.TurnResult.blocks:type_name -> hawkr.procurement.v1alpha1.Block
 	29,  // 21: hawkr.procurement.v1alpha1.TurnResult.evidence_refs:type_name -> hawkr.procurement.v1alpha1.EvidenceRef
-	124, // 22: hawkr.procurement.v1alpha1.TurnResult.create_time:type_name -> google.protobuf.Timestamp
+	122, // 22: hawkr.procurement.v1alpha1.TurnResult.create_time:type_name -> google.protobuf.Timestamp
 	30,  // 23: hawkr.procurement.v1alpha1.TurnResult.interrupt:type_name -> hawkr.procurement.v1alpha1.Interrupt
 	31,  // 24: hawkr.procurement.v1alpha1.TurnResult.quota:type_name -> hawkr.procurement.v1alpha1.QuotaSnapshot
 	2,   // 25: hawkr.procurement.v1alpha1.RunSummary.run_type:type_name -> hawkr.procurement.v1alpha1.RunType
 	3,   // 26: hawkr.procurement.v1alpha1.RunSummary.status:type_name -> hawkr.procurement.v1alpha1.RunStatus
 	6,   // 27: hawkr.procurement.v1alpha1.OpenConfirmation.kind:type_name -> hawkr.procurement.v1alpha1.InterruptKind
 	20,  // 28: hawkr.procurement.v1alpha1.OpenConfirmation.question:type_name -> hawkr.procurement.v1alpha1.ClarifyQuestion
-	124, // 29: hawkr.procurement.v1alpha1.PublishedRfq.publish_time:type_name -> google.protobuf.Timestamp
+	122, // 29: hawkr.procurement.v1alpha1.PublishedRfq.publish_time:type_name -> google.protobuf.Timestamp
 	8,   // 30: hawkr.procurement.v1alpha1.ConversationMessage.role:type_name -> hawkr.procurement.v1alpha1.ConversationRole
 	21,  // 31: hawkr.procurement.v1alpha1.ConversationMessage.steps:type_name -> hawkr.procurement.v1alpha1.Step
 	22,  // 32: hawkr.procurement.v1alpha1.ConversationMessage.recorded_this_turn:type_name -> hawkr.procurement.v1alpha1.RecordedField
-	124, // 33: hawkr.procurement.v1alpha1.ConversationMessage.create_time:type_name -> google.protobuf.Timestamp
-	124, // 34: hawkr.procurement.v1alpha1.ConversationSummary.update_time:type_name -> google.protobuf.Timestamp
+	122, // 33: hawkr.procurement.v1alpha1.ConversationMessage.create_time:type_name -> google.protobuf.Timestamp
+	122, // 34: hawkr.procurement.v1alpha1.ConversationSummary.update_time:type_name -> google.protobuf.Timestamp
 	1,   // 35: hawkr.procurement.v1alpha1.GetSnapshotResponse.status:type_name -> hawkr.procurement.v1alpha1.RequestStatus
 	25,  // 36: hawkr.procurement.v1alpha1.GetSnapshotResponse.slots:type_name -> hawkr.procurement.v1alpha1.Slots
 	0,   // 37: hawkr.procurement.v1alpha1.GetSnapshotResponse.missing_required:type_name -> hawkr.procurement.v1alpha1.SlotKey
@@ -9373,8 +9282,8 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	0,   // 43: hawkr.procurement.v1alpha1.UnverifiableFact.slot_key:type_name -> hawkr.procurement.v1alpha1.SlotKey
 	42,  // 44: hawkr.procurement.v1alpha1.Candidate.matched_facts:type_name -> hawkr.procurement.v1alpha1.MatchedFact
 	43,  // 45: hawkr.procurement.v1alpha1.Candidate.unverifiable_facts:type_name -> hawkr.procurement.v1alpha1.UnverifiableFact
-	124, // 46: hawkr.procurement.v1alpha1.Candidate.facts_time:type_name -> google.protobuf.Timestamp
-	125, // 47: hawkr.procurement.v1alpha1.Candidate.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	122, // 46: hawkr.procurement.v1alpha1.Candidate.facts_time:type_name -> google.protobuf.Timestamp
+	123, // 47: hawkr.procurement.v1alpha1.Candidate.store:type_name -> hawkr.common.v1alpha1.StoreCard
 	3,   // 48: hawkr.procurement.v1alpha1.StartCandidateSearchResponse.status:type_name -> hawkr.procurement.v1alpha1.RunStatus
 	3,   // 49: hawkr.procurement.v1alpha1.GetCandidateSearchResponse.status:type_name -> hawkr.procurement.v1alpha1.RunStatus
 	4,   // 50: hawkr.procurement.v1alpha1.GetCandidateSearchResponse.failure_reason:type_name -> hawkr.procurement.v1alpha1.RunFailureReason
@@ -9386,17 +9295,17 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	55,  // 56: hawkr.procurement.v1alpha1.PreviewRfqPriceRequest.buyer_requested_range:type_name -> hawkr.procurement.v1alpha1.BuyerRequestedRange
 	55,  // 57: hawkr.procurement.v1alpha1.PreviewRfqPriceResponse.buyer_requested_range:type_name -> hawkr.procurement.v1alpha1.BuyerRequestedRange
 	56,  // 58: hawkr.procurement.v1alpha1.PreviewRfqPriceResponse.quote_total_range:type_name -> hawkr.procurement.v1alpha1.QuoteTotalRange
-	124, // 59: hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse.expire_time:type_name -> google.protobuf.Timestamp
-	123, // 60: hawkr.procurement.v1alpha1.SellerFacingRfq.delivery_date:type_name -> google.type.Date
-	123, // 61: hawkr.procurement.v1alpha1.SellerFacingRfq.response_deadline:type_name -> google.type.Date
+	122, // 59: hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse.expire_time:type_name -> google.protobuf.Timestamp
+	121, // 60: hawkr.procurement.v1alpha1.SellerFacingRfq.delivery_date:type_name -> google.type.Date
+	121, // 61: hawkr.procurement.v1alpha1.SellerFacingRfq.response_deadline:type_name -> google.type.Date
 	61,  // 62: hawkr.procurement.v1alpha1.SellerFacingRfq.buyer_requested_range:type_name -> hawkr.procurement.v1alpha1.SellerFacingRequestedRange
 	10,  // 63: hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest.audience_mode:type_name -> hawkr.procurement.v1alpha1.AudienceMode
-	123, // 64: hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest.response_deadline:type_name -> google.type.Date
+	121, // 64: hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest.response_deadline:type_name -> google.type.Date
 	62,  // 65: hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse.seller_facing_payload:type_name -> hawkr.procurement.v1alpha1.SellerFacingRfq
-	124, // 66: hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse.expire_time:type_name -> google.protobuf.Timestamp
+	122, // 66: hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse.expire_time:type_name -> google.protobuf.Timestamp
 	11,  // 67: hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse.state:type_name -> hawkr.procurement.v1alpha1.PublicationState
 	10,  // 68: hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse.audience_mode:type_name -> hawkr.procurement.v1alpha1.AudienceMode
-	124, // 69: hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse.publish_time:type_name -> google.protobuf.Timestamp
+	122, // 69: hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse.publish_time:type_name -> google.protobuf.Timestamp
 	37,  // 70: hawkr.procurement.v1alpha1.ListConversationsResponse.conversations:type_name -> hawkr.procurement.v1alpha1.ConversationSummary
 	1,   // 71: hawkr.procurement.v1alpha1.GetConversationMessagesResponse.status:type_name -> hawkr.procurement.v1alpha1.RequestStatus
 	36,  // 72: hawkr.procurement.v1alpha1.GetConversationMessagesResponse.messages:type_name -> hawkr.procurement.v1alpha1.ConversationMessage
@@ -9409,18 +9318,18 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	78,  // 79: hawkr.procurement.v1alpha1.SellerQuote.offered_quality:type_name -> hawkr.procurement.v1alpha1.OfferedQuality
 	79,  // 80: hawkr.procurement.v1alpha1.SellerQuote.unit_basis:type_name -> hawkr.procurement.v1alpha1.UnitBasis
 	14,  // 81: hawkr.procurement.v1alpha1.SellerQuote.tax_inclusion_basis:type_name -> hawkr.procurement.v1alpha1.TaxInclusionBasis
-	124, // 82: hawkr.procurement.v1alpha1.SellerQuote.promised_delivery_time:type_name -> google.protobuf.Timestamp
-	124, // 83: hawkr.procurement.v1alpha1.SellerQuote.valid_until_time:type_name -> google.protobuf.Timestamp
+	122, // 82: hawkr.procurement.v1alpha1.SellerQuote.promised_delivery_time:type_name -> google.protobuf.Timestamp
+	122, // 83: hawkr.procurement.v1alpha1.SellerQuote.valid_until_time:type_name -> google.protobuf.Timestamp
 	15,  // 84: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.status:type_name -> hawkr.procurement.v1alpha1.SellerResponseStatus
-	124, // 85: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.submit_time:type_name -> google.protobuf.Timestamp
-	125, // 86: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	122, // 85: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.submit_time:type_name -> google.protobuf.Timestamp
+	123, // 86: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.store:type_name -> hawkr.common.v1alpha1.StoreCard
 	77,  // 87: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.quote:type_name -> hawkr.procurement.v1alpha1.SellerQuote
 	16,  // 88: hawkr.procurement.v1alpha1.BuyerFacingSellerResponse.acceptability:type_name -> hawkr.procurement.v1alpha1.QuoteAcceptability
 	80,  // 89: hawkr.procurement.v1alpha1.ListSellerResponsesResponse.seller_responses:type_name -> hawkr.procurement.v1alpha1.BuyerFacingSellerResponse
-	124, // 90: hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse.accept_time:type_name -> google.protobuf.Timestamp
+	122, // 90: hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse.accept_time:type_name -> google.protobuf.Timestamp
 	17,  // 91: hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse.order_provisioning_state:type_name -> hawkr.procurement.v1alpha1.OrderProvisioningState
-	124, // 92: hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse.payment_deadline:type_name -> google.protobuf.Timestamp
-	124, // 93: hawkr.procurement.v1alpha1.WatchRunResponse.event_time:type_name -> google.protobuf.Timestamp
+	122, // 92: hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse.payment_deadline:type_name -> google.protobuf.Timestamp
+	122, // 93: hawkr.procurement.v1alpha1.WatchRunResponse.event_time:type_name -> google.protobuf.Timestamp
 	91,  // 94: hawkr.procurement.v1alpha1.WatchRunResponse.run_accepted:type_name -> hawkr.procurement.v1alpha1.RunAccepted
 	92,  // 95: hawkr.procurement.v1alpha1.WatchRunResponse.text:type_name -> hawkr.procurement.v1alpha1.TextDelta
 	93,  // 96: hawkr.procurement.v1alpha1.WatchRunResponse.step:type_name -> hawkr.procurement.v1alpha1.StepEvent
@@ -9429,103 +9338,100 @@ var file_hawkr_procurement_v1alpha1_procurement_proto_depIdxs = []int32{
 	96,  // 99: hawkr.procurement.v1alpha1.WatchRunResponse.tool_result:type_name -> hawkr.procurement.v1alpha1.ToolResult
 	32,  // 100: hawkr.procurement.v1alpha1.WatchRunResponse.turn_result:type_name -> hawkr.procurement.v1alpha1.TurnResult
 	97,  // 101: hawkr.procurement.v1alpha1.WatchRunResponse.finished:type_name -> hawkr.procurement.v1alpha1.RunFinished
-	98,  // 102: hawkr.procurement.v1alpha1.WatchRunResponse.error:type_name -> hawkr.procurement.v1alpha1.RunStreamError
-	21,  // 103: hawkr.procurement.v1alpha1.StepEvent.step:type_name -> hawkr.procurement.v1alpha1.Step
-	5,   // 104: hawkr.procurement.v1alpha1.Activity.status:type_name -> hawkr.procurement.v1alpha1.StepStatus
-	3,   // 105: hawkr.procurement.v1alpha1.RunFinished.status:type_name -> hawkr.procurement.v1alpha1.RunStatus
-	4,   // 106: hawkr.procurement.v1alpha1.RunFinished.failure_reason:type_name -> hawkr.procurement.v1alpha1.RunFailureReason
-	126, // 107: hawkr.procurement.v1alpha1.RunStreamError.reason:type_name -> hawkr.common.v1alpha1.ErrorReason
-	122, // 108: hawkr.procurement.v1alpha1.RunStreamError.metadata:type_name -> hawkr.procurement.v1alpha1.RunStreamError.MetadataEntry
-	3,   // 109: hawkr.procurement.v1alpha1.CancelRunResponse.run_status:type_name -> hawkr.procurement.v1alpha1.RunStatus
-	18,  // 110: hawkr.procurement.v1alpha1.CancelRunResponse.cancel_disposition:type_name -> hawkr.procurement.v1alpha1.CancelDisposition
-	101, // 111: hawkr.procurement.v1alpha1.ResumeRunRequest.clarification:type_name -> hawkr.procurement.v1alpha1.ClarificationResponse
-	3,   // 112: hawkr.procurement.v1alpha1.ResumeRunResponse.run_status:type_name -> hawkr.procurement.v1alpha1.RunStatus
-	32,  // 113: hawkr.procurement.v1alpha1.ResumeRunResponse.result:type_name -> hawkr.procurement.v1alpha1.TurnResult
-	12,  // 114: hawkr.procurement.v1alpha1.SellerPublicationSummary.delivery_state:type_name -> hawkr.procurement.v1alpha1.InviteDeliveryState
-	124, // 115: hawkr.procurement.v1alpha1.SellerPublicationSummary.publish_time:type_name -> google.protobuf.Timestamp
-	124, // 116: hawkr.procurement.v1alpha1.SellerResponseDraft.update_time:type_name -> google.protobuf.Timestamp
-	77,  // 117: hawkr.procurement.v1alpha1.SellerResponseDraft.draft:type_name -> hawkr.procurement.v1alpha1.SellerQuote
-	15,  // 118: hawkr.procurement.v1alpha1.SellerResponseVersion.status:type_name -> hawkr.procurement.v1alpha1.SellerResponseStatus
-	124, // 119: hawkr.procurement.v1alpha1.SellerResponseVersion.submit_time:type_name -> google.protobuf.Timestamp
-	77,  // 120: hawkr.procurement.v1alpha1.SellerResponseVersion.quote:type_name -> hawkr.procurement.v1alpha1.SellerQuote
-	124, // 121: hawkr.procurement.v1alpha1.SellerResponseClosure.write_closed_time:type_name -> google.protobuf.Timestamp
-	104, // 122: hawkr.procurement.v1alpha1.SellerPublicationListItem.publication:type_name -> hawkr.procurement.v1alpha1.SellerPublicationSummary
-	62,  // 123: hawkr.procurement.v1alpha1.SellerPublicationListItem.seller_facing_payload:type_name -> hawkr.procurement.v1alpha1.SellerFacingRfq
-	15,  // 124: hawkr.procurement.v1alpha1.SellerPublicationListItem.latest_response_status:type_name -> hawkr.procurement.v1alpha1.SellerResponseStatus
-	108, // 125: hawkr.procurement.v1alpha1.ListSellerPublicationsResponse.publications:type_name -> hawkr.procurement.v1alpha1.SellerPublicationListItem
-	104, // 126: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.publication:type_name -> hawkr.procurement.v1alpha1.SellerPublicationSummary
-	105, // 127: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.draft:type_name -> hawkr.procurement.v1alpha1.SellerResponseDraft
-	106, // 128: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.latest_response:type_name -> hawkr.procurement.v1alpha1.SellerResponseVersion
-	62,  // 129: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.seller_facing_payload:type_name -> hawkr.procurement.v1alpha1.SellerFacingRfq
-	77,  // 130: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest.draft:type_name -> hawkr.procurement.v1alpha1.SellerQuote
-	105, // 131: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse.draft:type_name -> hawkr.procurement.v1alpha1.SellerResponseDraft
-	77,  // 132: hawkr.procurement.v1alpha1.SubmitSellerResponseRequest.quote:type_name -> hawkr.procurement.v1alpha1.SellerQuote
-	106, // 133: hawkr.procurement.v1alpha1.SubmitSellerResponseResponse.seller_response:type_name -> hawkr.procurement.v1alpha1.SellerResponseVersion
-	107, // 134: hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse.closure:type_name -> hawkr.procurement.v1alpha1.SellerResponseClosure
-	107, // 135: hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse.closure:type_name -> hawkr.procurement.v1alpha1.SellerResponseClosure
-	38,  // 136: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitTurn:input_type -> hawkr.procurement.v1alpha1.SubmitTurnRequest
-	40,  // 137: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetSnapshot:input_type -> hawkr.procurement.v1alpha1.GetSnapshotRequest
-	45,  // 138: hawkr.procurement.v1alpha1.BuyerProcurementAppService.StartCandidateSearch:input_type -> hawkr.procurement.v1alpha1.StartCandidateSearchRequest
-	47,  // 139: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetCandidateSearch:input_type -> hawkr.procurement.v1alpha1.GetCandidateSearchRequest
-	49,  // 140: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ToggleSelection:input_type -> hawkr.procurement.v1alpha1.ToggleSelectionRequest
-	51,  // 141: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitAnswer:input_type -> hawkr.procurement.v1alpha1.SubmitAnswerRequest
-	53,  // 142: hawkr.procurement.v1alpha1.BuyerProcurementAppService.Rewind:input_type -> hawkr.procurement.v1alpha1.RewindRequest
-	57,  // 143: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPrice:input_type -> hawkr.procurement.v1alpha1.PreviewRfqPriceRequest
-	59,  // 144: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ConfirmRfqSnapshot:input_type -> hawkr.procurement.v1alpha1.ConfirmRfqSnapshotRequest
-	63,  // 145: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPublication:input_type -> hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest
-	65,  // 146: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ExecuteRfqPublication:input_type -> hawkr.procurement.v1alpha1.ExecuteRfqPublicationRequest
-	67,  // 147: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListConversations:input_type -> hawkr.procurement.v1alpha1.ListConversationsRequest
-	69,  // 148: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetConversationMessages:input_type -> hawkr.procurement.v1alpha1.GetConversationMessagesRequest
-	71,  // 149: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetRuntimeSnapshot:input_type -> hawkr.procurement.v1alpha1.GetRuntimeSnapshotRequest
-	81,  // 150: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListSellerResponses:input_type -> hawkr.procurement.v1alpha1.ListSellerResponsesRequest
-	83,  // 151: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PutShortlistEntry:input_type -> hawkr.procurement.v1alpha1.PutShortlistEntryRequest
-	85,  // 152: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteShortlistEntry:input_type -> hawkr.procurement.v1alpha1.DeleteShortlistEntryRequest
-	87,  // 153: hawkr.procurement.v1alpha1.BuyerProcurementAppService.AcceptSellerQuote:input_type -> hawkr.procurement.v1alpha1.AcceptSellerQuoteRequest
-	73,  // 154: hawkr.procurement.v1alpha1.BuyerProcurementAppService.RenameConversation:input_type -> hawkr.procurement.v1alpha1.RenameConversationRequest
-	75,  // 155: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteConversation:input_type -> hawkr.procurement.v1alpha1.DeleteConversationRequest
-	89,  // 156: hawkr.procurement.v1alpha1.BuyerProcurementAppService.WatchRun:input_type -> hawkr.procurement.v1alpha1.WatchRunRequest
-	99,  // 157: hawkr.procurement.v1alpha1.BuyerProcurementAppService.CancelRun:input_type -> hawkr.procurement.v1alpha1.CancelRunRequest
-	102, // 158: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ResumeRun:input_type -> hawkr.procurement.v1alpha1.ResumeRunRequest
-	109, // 159: hawkr.procurement.v1alpha1.SellerProcurementAppService.ListSellerPublications:input_type -> hawkr.procurement.v1alpha1.ListSellerPublicationsRequest
-	111, // 160: hawkr.procurement.v1alpha1.SellerProcurementAppService.GetSellerPublication:input_type -> hawkr.procurement.v1alpha1.GetSellerPublicationRequest
-	113, // 161: hawkr.procurement.v1alpha1.SellerProcurementAppService.UpsertSellerResponseDraft:input_type -> hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest
-	115, // 162: hawkr.procurement.v1alpha1.SellerProcurementAppService.SubmitSellerResponse:input_type -> hawkr.procurement.v1alpha1.SubmitSellerResponseRequest
-	117, // 163: hawkr.procurement.v1alpha1.SellerProcurementAppService.WithdrawSellerResponse:input_type -> hawkr.procurement.v1alpha1.WithdrawSellerResponseRequest
-	119, // 164: hawkr.procurement.v1alpha1.SellerProcurementAppService.DeclineRfqPublication:input_type -> hawkr.procurement.v1alpha1.DeclineRfqPublicationRequest
-	39,  // 165: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitTurn:output_type -> hawkr.procurement.v1alpha1.SubmitTurnResponse
-	41,  // 166: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetSnapshot:output_type -> hawkr.procurement.v1alpha1.GetSnapshotResponse
-	46,  // 167: hawkr.procurement.v1alpha1.BuyerProcurementAppService.StartCandidateSearch:output_type -> hawkr.procurement.v1alpha1.StartCandidateSearchResponse
-	48,  // 168: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetCandidateSearch:output_type -> hawkr.procurement.v1alpha1.GetCandidateSearchResponse
-	50,  // 169: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ToggleSelection:output_type -> hawkr.procurement.v1alpha1.ToggleSelectionResponse
-	52,  // 170: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitAnswer:output_type -> hawkr.procurement.v1alpha1.SubmitAnswerResponse
-	54,  // 171: hawkr.procurement.v1alpha1.BuyerProcurementAppService.Rewind:output_type -> hawkr.procurement.v1alpha1.RewindResponse
-	58,  // 172: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPrice:output_type -> hawkr.procurement.v1alpha1.PreviewRfqPriceResponse
-	60,  // 173: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ConfirmRfqSnapshot:output_type -> hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse
-	64,  // 174: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPublication:output_type -> hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse
-	66,  // 175: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ExecuteRfqPublication:output_type -> hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse
-	68,  // 176: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListConversations:output_type -> hawkr.procurement.v1alpha1.ListConversationsResponse
-	70,  // 177: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetConversationMessages:output_type -> hawkr.procurement.v1alpha1.GetConversationMessagesResponse
-	72,  // 178: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetRuntimeSnapshot:output_type -> hawkr.procurement.v1alpha1.GetRuntimeSnapshotResponse
-	82,  // 179: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListSellerResponses:output_type -> hawkr.procurement.v1alpha1.ListSellerResponsesResponse
-	84,  // 180: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PutShortlistEntry:output_type -> hawkr.procurement.v1alpha1.PutShortlistEntryResponse
-	86,  // 181: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteShortlistEntry:output_type -> hawkr.procurement.v1alpha1.DeleteShortlistEntryResponse
-	88,  // 182: hawkr.procurement.v1alpha1.BuyerProcurementAppService.AcceptSellerQuote:output_type -> hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse
-	74,  // 183: hawkr.procurement.v1alpha1.BuyerProcurementAppService.RenameConversation:output_type -> hawkr.procurement.v1alpha1.RenameConversationResponse
-	76,  // 184: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteConversation:output_type -> hawkr.procurement.v1alpha1.DeleteConversationResponse
-	90,  // 185: hawkr.procurement.v1alpha1.BuyerProcurementAppService.WatchRun:output_type -> hawkr.procurement.v1alpha1.WatchRunResponse
-	100, // 186: hawkr.procurement.v1alpha1.BuyerProcurementAppService.CancelRun:output_type -> hawkr.procurement.v1alpha1.CancelRunResponse
-	103, // 187: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ResumeRun:output_type -> hawkr.procurement.v1alpha1.ResumeRunResponse
-	110, // 188: hawkr.procurement.v1alpha1.SellerProcurementAppService.ListSellerPublications:output_type -> hawkr.procurement.v1alpha1.ListSellerPublicationsResponse
-	112, // 189: hawkr.procurement.v1alpha1.SellerProcurementAppService.GetSellerPublication:output_type -> hawkr.procurement.v1alpha1.GetSellerPublicationResponse
-	114, // 190: hawkr.procurement.v1alpha1.SellerProcurementAppService.UpsertSellerResponseDraft:output_type -> hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse
-	116, // 191: hawkr.procurement.v1alpha1.SellerProcurementAppService.SubmitSellerResponse:output_type -> hawkr.procurement.v1alpha1.SubmitSellerResponseResponse
-	118, // 192: hawkr.procurement.v1alpha1.SellerProcurementAppService.WithdrawSellerResponse:output_type -> hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse
-	120, // 193: hawkr.procurement.v1alpha1.SellerProcurementAppService.DeclineRfqPublication:output_type -> hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse
-	165, // [165:194] is the sub-list for method output_type
-	136, // [136:165] is the sub-list for method input_type
-	136, // [136:136] is the sub-list for extension type_name
-	136, // [136:136] is the sub-list for extension extendee
-	0,   // [0:136] is the sub-list for field type_name
+	21,  // 102: hawkr.procurement.v1alpha1.StepEvent.step:type_name -> hawkr.procurement.v1alpha1.Step
+	5,   // 103: hawkr.procurement.v1alpha1.Activity.status:type_name -> hawkr.procurement.v1alpha1.StepStatus
+	3,   // 104: hawkr.procurement.v1alpha1.RunFinished.status:type_name -> hawkr.procurement.v1alpha1.RunStatus
+	4,   // 105: hawkr.procurement.v1alpha1.RunFinished.failure_reason:type_name -> hawkr.procurement.v1alpha1.RunFailureReason
+	3,   // 106: hawkr.procurement.v1alpha1.CancelRunResponse.run_status:type_name -> hawkr.procurement.v1alpha1.RunStatus
+	18,  // 107: hawkr.procurement.v1alpha1.CancelRunResponse.cancel_disposition:type_name -> hawkr.procurement.v1alpha1.CancelDisposition
+	100, // 108: hawkr.procurement.v1alpha1.ResumeRunRequest.clarification:type_name -> hawkr.procurement.v1alpha1.ClarificationResponse
+	3,   // 109: hawkr.procurement.v1alpha1.ResumeRunResponse.run_status:type_name -> hawkr.procurement.v1alpha1.RunStatus
+	32,  // 110: hawkr.procurement.v1alpha1.ResumeRunResponse.result:type_name -> hawkr.procurement.v1alpha1.TurnResult
+	12,  // 111: hawkr.procurement.v1alpha1.SellerPublicationSummary.delivery_state:type_name -> hawkr.procurement.v1alpha1.InviteDeliveryState
+	122, // 112: hawkr.procurement.v1alpha1.SellerPublicationSummary.publish_time:type_name -> google.protobuf.Timestamp
+	122, // 113: hawkr.procurement.v1alpha1.SellerResponseDraft.update_time:type_name -> google.protobuf.Timestamp
+	77,  // 114: hawkr.procurement.v1alpha1.SellerResponseDraft.draft:type_name -> hawkr.procurement.v1alpha1.SellerQuote
+	15,  // 115: hawkr.procurement.v1alpha1.SellerResponseVersion.status:type_name -> hawkr.procurement.v1alpha1.SellerResponseStatus
+	122, // 116: hawkr.procurement.v1alpha1.SellerResponseVersion.submit_time:type_name -> google.protobuf.Timestamp
+	77,  // 117: hawkr.procurement.v1alpha1.SellerResponseVersion.quote:type_name -> hawkr.procurement.v1alpha1.SellerQuote
+	122, // 118: hawkr.procurement.v1alpha1.SellerResponseClosure.write_closed_time:type_name -> google.protobuf.Timestamp
+	103, // 119: hawkr.procurement.v1alpha1.SellerPublicationListItem.publication:type_name -> hawkr.procurement.v1alpha1.SellerPublicationSummary
+	62,  // 120: hawkr.procurement.v1alpha1.SellerPublicationListItem.seller_facing_payload:type_name -> hawkr.procurement.v1alpha1.SellerFacingRfq
+	15,  // 121: hawkr.procurement.v1alpha1.SellerPublicationListItem.latest_response_status:type_name -> hawkr.procurement.v1alpha1.SellerResponseStatus
+	107, // 122: hawkr.procurement.v1alpha1.ListSellerPublicationsResponse.publications:type_name -> hawkr.procurement.v1alpha1.SellerPublicationListItem
+	103, // 123: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.publication:type_name -> hawkr.procurement.v1alpha1.SellerPublicationSummary
+	104, // 124: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.draft:type_name -> hawkr.procurement.v1alpha1.SellerResponseDraft
+	105, // 125: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.latest_response:type_name -> hawkr.procurement.v1alpha1.SellerResponseVersion
+	62,  // 126: hawkr.procurement.v1alpha1.GetSellerPublicationResponse.seller_facing_payload:type_name -> hawkr.procurement.v1alpha1.SellerFacingRfq
+	77,  // 127: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest.draft:type_name -> hawkr.procurement.v1alpha1.SellerQuote
+	104, // 128: hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse.draft:type_name -> hawkr.procurement.v1alpha1.SellerResponseDraft
+	77,  // 129: hawkr.procurement.v1alpha1.SubmitSellerResponseRequest.quote:type_name -> hawkr.procurement.v1alpha1.SellerQuote
+	105, // 130: hawkr.procurement.v1alpha1.SubmitSellerResponseResponse.seller_response:type_name -> hawkr.procurement.v1alpha1.SellerResponseVersion
+	106, // 131: hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse.closure:type_name -> hawkr.procurement.v1alpha1.SellerResponseClosure
+	106, // 132: hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse.closure:type_name -> hawkr.procurement.v1alpha1.SellerResponseClosure
+	38,  // 133: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitTurn:input_type -> hawkr.procurement.v1alpha1.SubmitTurnRequest
+	40,  // 134: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetSnapshot:input_type -> hawkr.procurement.v1alpha1.GetSnapshotRequest
+	45,  // 135: hawkr.procurement.v1alpha1.BuyerProcurementAppService.StartCandidateSearch:input_type -> hawkr.procurement.v1alpha1.StartCandidateSearchRequest
+	47,  // 136: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetCandidateSearch:input_type -> hawkr.procurement.v1alpha1.GetCandidateSearchRequest
+	49,  // 137: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ToggleSelection:input_type -> hawkr.procurement.v1alpha1.ToggleSelectionRequest
+	51,  // 138: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitAnswer:input_type -> hawkr.procurement.v1alpha1.SubmitAnswerRequest
+	53,  // 139: hawkr.procurement.v1alpha1.BuyerProcurementAppService.Rewind:input_type -> hawkr.procurement.v1alpha1.RewindRequest
+	57,  // 140: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPrice:input_type -> hawkr.procurement.v1alpha1.PreviewRfqPriceRequest
+	59,  // 141: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ConfirmRfqSnapshot:input_type -> hawkr.procurement.v1alpha1.ConfirmRfqSnapshotRequest
+	63,  // 142: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPublication:input_type -> hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest
+	65,  // 143: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ExecuteRfqPublication:input_type -> hawkr.procurement.v1alpha1.ExecuteRfqPublicationRequest
+	67,  // 144: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListConversations:input_type -> hawkr.procurement.v1alpha1.ListConversationsRequest
+	69,  // 145: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetConversationMessages:input_type -> hawkr.procurement.v1alpha1.GetConversationMessagesRequest
+	71,  // 146: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetRuntimeSnapshot:input_type -> hawkr.procurement.v1alpha1.GetRuntimeSnapshotRequest
+	81,  // 147: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListSellerResponses:input_type -> hawkr.procurement.v1alpha1.ListSellerResponsesRequest
+	83,  // 148: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PutShortlistEntry:input_type -> hawkr.procurement.v1alpha1.PutShortlistEntryRequest
+	85,  // 149: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteShortlistEntry:input_type -> hawkr.procurement.v1alpha1.DeleteShortlistEntryRequest
+	87,  // 150: hawkr.procurement.v1alpha1.BuyerProcurementAppService.AcceptSellerQuote:input_type -> hawkr.procurement.v1alpha1.AcceptSellerQuoteRequest
+	73,  // 151: hawkr.procurement.v1alpha1.BuyerProcurementAppService.RenameConversation:input_type -> hawkr.procurement.v1alpha1.RenameConversationRequest
+	75,  // 152: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteConversation:input_type -> hawkr.procurement.v1alpha1.DeleteConversationRequest
+	89,  // 153: hawkr.procurement.v1alpha1.BuyerProcurementAppService.WatchRun:input_type -> hawkr.procurement.v1alpha1.WatchRunRequest
+	98,  // 154: hawkr.procurement.v1alpha1.BuyerProcurementAppService.CancelRun:input_type -> hawkr.procurement.v1alpha1.CancelRunRequest
+	101, // 155: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ResumeRun:input_type -> hawkr.procurement.v1alpha1.ResumeRunRequest
+	108, // 156: hawkr.procurement.v1alpha1.SellerProcurementAppService.ListSellerPublications:input_type -> hawkr.procurement.v1alpha1.ListSellerPublicationsRequest
+	110, // 157: hawkr.procurement.v1alpha1.SellerProcurementAppService.GetSellerPublication:input_type -> hawkr.procurement.v1alpha1.GetSellerPublicationRequest
+	112, // 158: hawkr.procurement.v1alpha1.SellerProcurementAppService.UpsertSellerResponseDraft:input_type -> hawkr.procurement.v1alpha1.UpsertSellerResponseDraftRequest
+	114, // 159: hawkr.procurement.v1alpha1.SellerProcurementAppService.SubmitSellerResponse:input_type -> hawkr.procurement.v1alpha1.SubmitSellerResponseRequest
+	116, // 160: hawkr.procurement.v1alpha1.SellerProcurementAppService.WithdrawSellerResponse:input_type -> hawkr.procurement.v1alpha1.WithdrawSellerResponseRequest
+	118, // 161: hawkr.procurement.v1alpha1.SellerProcurementAppService.DeclineRfqPublication:input_type -> hawkr.procurement.v1alpha1.DeclineRfqPublicationRequest
+	39,  // 162: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitTurn:output_type -> hawkr.procurement.v1alpha1.SubmitTurnResponse
+	41,  // 163: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetSnapshot:output_type -> hawkr.procurement.v1alpha1.GetSnapshotResponse
+	46,  // 164: hawkr.procurement.v1alpha1.BuyerProcurementAppService.StartCandidateSearch:output_type -> hawkr.procurement.v1alpha1.StartCandidateSearchResponse
+	48,  // 165: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetCandidateSearch:output_type -> hawkr.procurement.v1alpha1.GetCandidateSearchResponse
+	50,  // 166: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ToggleSelection:output_type -> hawkr.procurement.v1alpha1.ToggleSelectionResponse
+	52,  // 167: hawkr.procurement.v1alpha1.BuyerProcurementAppService.SubmitAnswer:output_type -> hawkr.procurement.v1alpha1.SubmitAnswerResponse
+	54,  // 168: hawkr.procurement.v1alpha1.BuyerProcurementAppService.Rewind:output_type -> hawkr.procurement.v1alpha1.RewindResponse
+	58,  // 169: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPrice:output_type -> hawkr.procurement.v1alpha1.PreviewRfqPriceResponse
+	60,  // 170: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ConfirmRfqSnapshot:output_type -> hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse
+	64,  // 171: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PreviewRfqPublication:output_type -> hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse
+	66,  // 172: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ExecuteRfqPublication:output_type -> hawkr.procurement.v1alpha1.ExecuteRfqPublicationResponse
+	68,  // 173: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListConversations:output_type -> hawkr.procurement.v1alpha1.ListConversationsResponse
+	70,  // 174: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetConversationMessages:output_type -> hawkr.procurement.v1alpha1.GetConversationMessagesResponse
+	72,  // 175: hawkr.procurement.v1alpha1.BuyerProcurementAppService.GetRuntimeSnapshot:output_type -> hawkr.procurement.v1alpha1.GetRuntimeSnapshotResponse
+	82,  // 176: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ListSellerResponses:output_type -> hawkr.procurement.v1alpha1.ListSellerResponsesResponse
+	84,  // 177: hawkr.procurement.v1alpha1.BuyerProcurementAppService.PutShortlistEntry:output_type -> hawkr.procurement.v1alpha1.PutShortlistEntryResponse
+	86,  // 178: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteShortlistEntry:output_type -> hawkr.procurement.v1alpha1.DeleteShortlistEntryResponse
+	88,  // 179: hawkr.procurement.v1alpha1.BuyerProcurementAppService.AcceptSellerQuote:output_type -> hawkr.procurement.v1alpha1.AcceptSellerQuoteResponse
+	74,  // 180: hawkr.procurement.v1alpha1.BuyerProcurementAppService.RenameConversation:output_type -> hawkr.procurement.v1alpha1.RenameConversationResponse
+	76,  // 181: hawkr.procurement.v1alpha1.BuyerProcurementAppService.DeleteConversation:output_type -> hawkr.procurement.v1alpha1.DeleteConversationResponse
+	90,  // 182: hawkr.procurement.v1alpha1.BuyerProcurementAppService.WatchRun:output_type -> hawkr.procurement.v1alpha1.WatchRunResponse
+	99,  // 183: hawkr.procurement.v1alpha1.BuyerProcurementAppService.CancelRun:output_type -> hawkr.procurement.v1alpha1.CancelRunResponse
+	102, // 184: hawkr.procurement.v1alpha1.BuyerProcurementAppService.ResumeRun:output_type -> hawkr.procurement.v1alpha1.ResumeRunResponse
+	109, // 185: hawkr.procurement.v1alpha1.SellerProcurementAppService.ListSellerPublications:output_type -> hawkr.procurement.v1alpha1.ListSellerPublicationsResponse
+	111, // 186: hawkr.procurement.v1alpha1.SellerProcurementAppService.GetSellerPublication:output_type -> hawkr.procurement.v1alpha1.GetSellerPublicationResponse
+	113, // 187: hawkr.procurement.v1alpha1.SellerProcurementAppService.UpsertSellerResponseDraft:output_type -> hawkr.procurement.v1alpha1.UpsertSellerResponseDraftResponse
+	115, // 188: hawkr.procurement.v1alpha1.SellerProcurementAppService.SubmitSellerResponse:output_type -> hawkr.procurement.v1alpha1.SubmitSellerResponseResponse
+	117, // 189: hawkr.procurement.v1alpha1.SellerProcurementAppService.WithdrawSellerResponse:output_type -> hawkr.procurement.v1alpha1.WithdrawSellerResponseResponse
+	119, // 190: hawkr.procurement.v1alpha1.SellerProcurementAppService.DeclineRfqPublication:output_type -> hawkr.procurement.v1alpha1.DeclineRfqPublicationResponse
+	162, // [162:191] is the sub-list for method output_type
+	133, // [133:162] is the sub-list for method input_type
+	133, // [133:133] is the sub-list for extension type_name
+	133, // [133:133] is the sub-list for extension extendee
+	0,   // [0:133] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_procurement_v1alpha1_procurement_proto_init() }
@@ -9552,23 +9458,22 @@ func file_hawkr_procurement_v1alpha1_procurement_proto_init() {
 		(*WatchRunResponse_ToolResult)(nil),
 		(*WatchRunResponse_TurnResult)(nil),
 		(*WatchRunResponse_Finished)(nil),
-		(*WatchRunResponse_Error)(nil),
 	}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[75].OneofWrappers = []any{}
-	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83].OneofWrappers = []any{
+	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[82].OneofWrappers = []any{
 		(*ResumeRunRequest_Clarification)(nil),
 	}
-	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[84].OneofWrappers = []any{}
+	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[83].OneofWrappers = []any{}
+	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[87].OneofWrappers = []any{}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[88].OneofWrappers = []any{}
-	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[89].OneofWrappers = []any{}
-	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[93].OneofWrappers = []any{}
+	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[92].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc), len(file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc)),
 			NumEnums:      19,
-			NumMessages:   104,
+			NumMessages:   102,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

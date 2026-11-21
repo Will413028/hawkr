@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
 // Executor 執行一個已被領走（RUNNING）的 run：LLM 與 provider 呼叫在這裡，不在 transaction 內。
 //
 // 契約：回傳 nil 之前 run 必須已到終態或 WAITING_FOR_INPUT（經 Ledger.Transition），否則 reconciler 把它標失敗；
-// 回傳錯誤表示 run 失敗，Dispatcher 負責轉 FAILED 並退額度；ctx 被取消（取消或逾時）時盡快返回。
+// 回傳錯誤表示 run 失敗，Dispatcher 負責轉 FAILED 並退額度（ctx 被關機或逾時取消的是 WORKER_LOST）；ctx 被取消（取消、關機或逾時）時盡快返回。
 // run 的事件與產出經 Ledger 寫入；寫入收到 ErrRunTerminal 代表 run 已被別處收斂，executor 應停止並回傳它（Dispatcher 視為正常結束）。
 type Executor interface {
 	Execute(ctx context.Context, run store.ProcurementAgentRun) error
@@ -46,44 +47,56 @@ func (w *runWorker) Timeout(*river.Job[RunArgs]) time.Duration { return RunTimeo
 // AddWorker 登記執行 run 的 River worker。
 func (d Dispatcher) AddWorker(workers *river.Workers) { river.AddWorker(workers, &runWorker{d: d}) }
 
-// Run 領走並執行一個 run。run 已被領走、已取消或已終結時什麼都不做（不重驅）。
+// Run 領走並執行一個 run。run 已被領走、已取消、已終結或已被刪除時什麼都不做（不重驅）。
 func (d Dispatcher) Run(ctx context.Context, args RunArgs) error {
-	run, claimed, err := d.claim(ctx, args.RunID)
-	if err != nil || !claimed {
+	run, err := d.Ledger.Transition(ctx, args.RunID, StatusRunning, "")
+	if claimed, err := claimResult(err); err != nil || !claimed {
 		return err
 	}
 	execErr := d.Executor.Execute(ctx, run)
 	if execErr == nil || errors.Is(execErr, ErrRunTerminal) {
 		return nil
 	}
-	return d.settleFailure(context.WithoutCancel(ctx), run)
+	return d.settleFailure(context.WithoutCancel(ctx), run, ctx.Err())
 }
 
-func (d Dispatcher) claim(ctx context.Context, id uuid.UUID) (store.ProcurementAgentRun, bool, error) {
-	run, err := d.Ledger.Transition(ctx, id, StatusRunning, "")
+// claimResult 把領取（轉 RUNNING）的結果分類：領到了、不該執行（已被領走、已終結、已被刪除）或真正的錯誤。
+func claimResult(err error) (claimed bool, ret error) {
 	var invalid *InvalidTransitionError
 	switch {
 	case err == nil:
-		return run, true, nil
-	case errors.Is(err, ErrRunTerminal), errors.As(err, &invalid):
-		return store.ProcurementAgentRun{}, false, nil
+		return true, nil
+	case errors.Is(err, ErrRunTerminal), errors.As(err, &invalid), apperr.KindOf(err) == apperr.KindNotFound:
+		return false, nil
 	default:
-		return store.ProcurementAgentRun{}, false, fmt.Errorf("run：領取：%w", err)
+		return false, fmt.Errorf("run：領取：%w", err)
 	}
 }
 
-// settleFailure 在 executor 失敗後收斂 run：已要求取消的收斂到 CANCELLED（不退額度），否則 FAILED 並退額度；已在終態什麼都不做。
-func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun) error {
+// settleOutcome 決定 executor 失敗後 run 怎麼收斂：已要求取消的收斂到 CANCELLED（不退額度）；
+// job 的 ctx 被關機或 Timeout 取消（不是買家取消）是 WORKER_LOST；其餘是該 run 類型的 pipeline 失敗。失敗都退額度。
+func settleOutcome(status, runType string, jobCtxErr error) outcome {
+	switch {
+	case status == StatusCancelRequested:
+		return outcome{action: actionCancel}
+	case jobCtxErr != nil:
+		return outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
+	default:
+		return outcome{action: actionFail, reason: failureFor(runType), refund: true}
+	}
+}
+
+// settleFailure 在 executor 失敗後收斂 run；已在終態或已被刪除什麼都不做。
+func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun, jobCtxErr error) error {
 	return d.DB.InTx(ctx, func(ctx context.Context) error {
 		cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("run：讀取 run：%w", err)
 		}
-		if cur.Status == StatusCancelRequested {
-			_, err = d.Ledger.Transition(ctx, run.ID, StatusCancelled, "")
-		} else {
-			_, err = d.Ledger.FailAndRefund(ctx, run.ID, failureFor(run.RunType))
-		}
+		err = d.Ledger.converge(ctx, run.ID, settleOutcome(cur.Status, run.RunType, jobCtxErr))
 		if errors.Is(err, ErrRunTerminal) {
 			return nil
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river/rivertype"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -20,11 +21,9 @@ const (
 	DispositionAlreadyTerminal  = "ALREADY_TERMINAL"
 )
 
-// ErrNotCancellable 表示 run 停在等待輸入：它沒有進行中的 job，取消的語意沒有決定（A9-D22 沒寫）。
-var ErrNotCancellable = errors.New("run：等待輸入中的 run 不能取消")
-
 // Canceller 是取消路徑：轉 CANCEL_REQUESTED 與取消 River job 在同一個 transaction。
-// 買家取消不退額度；executor 收到 ctx 取消後轉 CANCELLED，沒有 executor 在跑（job 尚未被領走）的由 reconciler 收斂。
+// 買家取消不退額度；executor 收到 ctx 取消後轉 CANCELLED；job 已被 River 直接取消（還沒被領走）的在同一個 transaction 轉 CANCELLED；
+// 等待輸入的 run 沒有 job，直接轉 CANCELLED（A9-D23）。其餘由 reconciler 收斂。
 type Canceller struct {
 	DB     *db.DB
 	Ledger Ledger
@@ -54,7 +53,10 @@ func (c Canceller) Cancel(ctx context.Context, buyerID int64, runID uuid.UUID) (
 		case StatusCancelRequested:
 			out = CancelOutcome{Status: r.Status, Disposition: DispositionRequested}
 		case StatusWaitingForInput:
-			return ErrNotCancellable
+			if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {
+				return err
+			}
+			out = CancelOutcome{Status: StatusCancelled, Disposition: DispositionRequested}
 		case StatusQueued, StatusRunning:
 			return c.request(ctx, r, &out)
 		default:
@@ -72,9 +74,21 @@ func (c Canceller) request(ctx context.Context, r store.ProcurementAgentRun, out
 	if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelRequested, ""); err != nil {
 		return err
 	}
-	if err := c.Jobs.CancelJob(ctx, *r.JobID); err != nil {
+	state, err := c.Jobs.CancelJob(ctx, *r.JobID)
+	if err != nil {
 		return err
 	}
 	*out = CancelOutcome{Status: StatusCancelRequested, Disposition: DispositionRequested}
+	if jobCancelledBeforeStart(state) {
+		if _, err := c.Ledger.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {
+			return err
+		}
+		out.Status = StatusCancelled
+	}
 	return nil
+}
+
+// jobCancelledBeforeStart：River 回報 job 已是 cancelled 代表它不會有 executor 領走，run 不必等 reconciler。
+func jobCancelledBeforeStart(state rivertype.JobState) bool {
+	return state == rivertype.JobStateCancelled
 }
