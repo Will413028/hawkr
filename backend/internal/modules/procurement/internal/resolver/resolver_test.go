@@ -3,6 +3,8 @@ package resolver
 import (
 	"context"
 	"errors"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
@@ -122,5 +124,86 @@ func TestLoadSynonymsRejectsBadEntries(t *testing.T) {
 func TestEmbeddedSynonymsAreValidAndStartEmpty(t *testing.T) {
 	if got := EmbeddedSynonyms(); len(got) != 0 {
 		t.Fatalf("同義詞表應空表起步，現有 %d 筆", len(got))
+	}
+}
+
+// gateReader 讓測試用 channel 控制讀取何時完成。
+type gateReader struct {
+	mu      sync.Mutex
+	calls   int
+	started chan struct{}
+	release chan struct{}
+	nodes   []Node
+	err     error
+}
+
+func (g *gateReader) CategoryTree(context.Context) ([]Node, error) {
+	g.mu.Lock()
+	g.calls++
+	g.mu.Unlock()
+	g.started <- struct{}{}
+	<-g.release
+	return g.nodes, g.err
+}
+
+func (g *gateReader) count() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls
+}
+
+// 慢的分類服務下，N 個並行解析只讀一次。
+func TestConcurrentResolvesShareOneLoad(t *testing.T) {
+	g := &gateReader{started: make(chan struct{}, 8), release: make(chan struct{}), nodes: tree}
+	r := newResolver(g, nil)
+	const n = 8
+	errs := make(chan error, n)
+	for range n {
+		go func() { _, err := r.Resolve(context.Background(), "外套"); errs <- err }()
+	}
+	<-g.started
+	// 等其餘呼叫都進入等待：它們若各自讀取，started 會再收到訊號。
+	for range 1000 {
+		runtime.Gosched()
+	}
+	close(g.release)
+	for range n {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if c := g.count(); c != 1 {
+		t.Fatalf("%d 個並行解析讀了 %d 次分類樹，要 1 次", n, c)
+	}
+}
+
+// 等待者的 ctx 結束就立即離開，不等讀取完成。
+func TestCancelledContextReturnsWithoutWaitingForTheLoad(t *testing.T) {
+	g := &gateReader{started: make(chan struct{}, 2), release: make(chan struct{}), nodes: tree}
+	r := newResolver(g, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { _, err := r.Resolve(ctx, "外套"); done <- err }()
+	<-g.started
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v，要 context.Canceled", err)
+	}
+	close(g.release)
+}
+
+// 重讀失敗時繼續用舊樹。
+func TestFailedReloadKeepsServingTheOldTree(t *testing.T) {
+	reader := &fakeReader{nodes: tree}
+	now := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	r := New(reader, nil, func() time.Time { return now })
+	if _, err := r.Resolve(context.Background(), "外套"); err != nil {
+		t.Fatal(err)
+	}
+	reader.err = errors.New("boom")
+	now = now.Add(TreeTTL + time.Second)
+	res, err := r.Resolve(context.Background(), "外套")
+	if err != nil || len(res.Matches) == 0 {
+		t.Fatalf("重讀失敗要回舊樹的結果：%v %v", res, err)
 	}
 }

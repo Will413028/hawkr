@@ -120,6 +120,7 @@ type Resolver struct {
 
 	mu       sync.Mutex
 	tree     *index
+	loading  *treeLoad
 	loadedAt time.Time
 }
 
@@ -152,21 +153,59 @@ func (r *Resolver) Resolve(ctx context.Context, term string) (Resolution, error)
 	return res, nil
 }
 
+// treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。
+type treeLoad struct {
+	done chan struct{}
+	err  error
+}
+
+// index 回傳可用的分類樹：TTL 內直接用快取；過期時所有呼叫共用同一次讀取，
+// 等待者可因 ctx 結束而離開（讀取本身不隨第一個呼叫者取消）；重讀失敗時繼續用舊樹。
 func (r *Resolver) index(ctx context.Context) (*index, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.tree != nil && r.now().Sub(r.loadedAt) < TreeTTL {
-		return r.tree, nil
+		idx := r.tree
+		r.mu.Unlock()
+		return idx, nil
 	}
+	l := r.loading
+	if l == nil {
+		l = &treeLoad{done: make(chan struct{})}
+		r.loading = l
+		go r.load(context.WithoutCancel(ctx), l)
+	}
+	r.mu.Unlock()
+
+	select {
+	case <-l.done:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	r.mu.Lock()
+	idx := r.tree
+	r.mu.Unlock()
+	if l.err != nil {
+		if idx != nil {
+			return idx, nil
+		}
+		return nil, fmt.Errorf("resolver：讀分類樹：%w", l.err)
+	}
+	return idx, nil
+}
+
+func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 	ctx, cancel := context.WithTimeout(ctx, LoadTimeout)
 	defer cancel()
 	nodes, err := r.reader.CategoryTree(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("resolver：讀分類樹：%w", err)
+	r.mu.Lock()
+	if err == nil {
+		r.tree = buildIndex(nodes)
+		r.loadedAt = r.now()
 	}
-	r.tree = buildIndex(nodes)
-	r.loadedAt = r.now()
-	return r.tree, nil
+	r.loading = nil
+	l.err = err
+	r.mu.Unlock()
+	close(l.done)
 }
 
 type index struct {
