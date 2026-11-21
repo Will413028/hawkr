@@ -34,9 +34,20 @@ func Lock(ctx context.Context, q *store.Queries, storeID int64) (store.SellerSto
 // RequireNotRetiredShared 以 FOR KEY SHARE 確認 stint 尚未退場（營運中、關店、等待刪除都放行）：RetireDueStores 是 FOR UPDATE SKIP LOCKED，
 // 正被守門鎖住的店這一輪被跳過、下一輪再退場。已退場與不存在回 NotFound。不重用 Lock：它是 FOR UPDATE 且對 CLOSED 回 NotFound，
 // 語意是「寫入需要店家營運中」。
+//
+// 先不加鎖讀一次：不存在與已退場直接回 NotFound、不取鎖，打到已退場店家的流量因此不會持有 KEY SHARE 讓 RetireDueStores 與個資清理
+// （SKIP LOCKED）跳過它們。退場不可逆（retired_at 只會從 NULL 變成有值，沒有恢復路徑），所以「已退場」的判斷不必在鎖內重做；
+// 只有看起來未退場的才取 KEY SHARE，並在鎖內再讀一次（讀到之後、取鎖之前可能剛好被退場）。
 func RequireNotRetiredShared(ctx context.Context, q *store.Queries, storeID int64) error {
 	if err := model.Positive(storeID); err != nil {
 		return err
+	}
+	plain, err := q.StoreByID(ctx, storeID)
+	if err != nil {
+		return model.Error(err)
+	}
+	if plain.RetiredAt != nil {
+		return apperr.NotFound("店家已退場")
 	}
 	row, err := q.LockStoreKeyShare(ctx, storeID)
 	if err != nil {

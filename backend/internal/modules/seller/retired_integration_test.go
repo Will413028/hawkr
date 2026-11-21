@@ -124,3 +124,54 @@ func TestPubRetiredStoresIsInlined(t *testing.T) {
 		t.Fatalf("pub_retired_stores 沒有被內聯：\n%s", got)
 	}
 }
+
+// 守門（LockNotRetired，FOR KEY SHARE）與同一家店的業務寫入（stint.Lock，FOR NO KEY UPDATE）不互相等待：守門的 transaction 還沒結束，
+// 業務寫入就能完成。業務寫入若改成 FOR UPDATE，會等到 context 的期限而失敗。
+func TestOwnerGuardDoesNotBlockBusinessWritesOnTheSameStore(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, s := f.open(t)
+	err := f.db.InTx(ctx, func(txCtx context.Context) error {
+		if err := f.module.LockNotRetired(txCtx, s.StoreID); err != nil {
+			return err
+		}
+		writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		_, err := f.module.UpdateProfile(writeCtx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, Description: ptr("守門不擋業務寫入")})
+		return err
+	})
+	must(t, err)
+}
+
+// 對已退場與不存在的店，守門不取任何鎖：同一個 transaction 內另一條連線對該列 FOR UPDATE NOWAIT 立刻成功，
+// 所以打到已退場店家的流量不會讓 RetireDueStores 與個資清理（SKIP LOCKED）跳過它。
+func TestLockNotRetiredOnRetiredStoreHoldsNoLock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s := f.open(t)
+	_, err := f.module.CloseCurrent(ctx, accountID)
+	must(t, err)
+	f.now = f.now.Add(StoreRetireAfter + time.Second)
+	_, err = f.module.PurgePII(ctx)
+	must(t, err)
+	if !f.retired(t, s.StoreID) {
+		t.Fatal("要先退場")
+	}
+	err = f.db.InTx(ctx, func(txCtx context.Context) error {
+		if err := f.module.LockNotRetired(txCtx, s.StoreID); apperr.KindOf(err) != apperr.KindNotFound {
+			t.Errorf("已退場要 NotFound：%v", err)
+		}
+		other, err := f.db.Pool().Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer other.Rollback(ctx) //nolint:errcheck
+		var id int64
+		return other.QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE NOWAIT", s.StoreID).Scan(&id)
+	})
+	if err != nil {
+		t.Fatalf("守門對已退場的店不該持鎖：%v", err)
+	}
+}
