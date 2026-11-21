@@ -412,7 +412,11 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
                 - 延後：buyer-app 店面頁在自己的店仍顯示「⋯ → 檢舉」（伺服器擋下並顯示錯誤），`GetStoreResponse` 沒有擁有者欄位；觸發條件：店家 API 加擁有者欄位，或 10f-3 動到店面頁時。
               - [ ] 10f-3 我的通報與補充說明（R7）：讀取時組裝 seller 與 moderation 兩種通報、通報人補充說明的 API、buyer-app 既有頁擴充、website 新頁。
                 - 設計（Will 2026-11-21 全照建議，H1–H4；`2026-09-29-a3-buyer-seller/step10f-3-design.md`，兩輪獨立審查 findings 16（blocking 1）：fixed 15、rejected 1）。
-                - [ ] 10f-3a backend 與契約（合併 `ListMyReports`、`GetMyReport`、`AddReportSupplement`）
+                - [x] 10f-3a backend 與契約（合併 `ListMyReports`、`GetMyReport`、`AddReportSupplement`；commits `420258ef..d9ac3908`）
+                  - 已跑：`make lint-monolith`、`go test`、`go vet -tags integration`、`buf lint`、buyer-app moderation 測試 91 項；CI `d9ac3908` 全綠（含 backend monolith integration：真模組合併分頁、補充同一寫入路徑與第 11 則、not_found）；red-proof 合併分頁 3 個 mutation（只取一個來源、尾端跨頁界、同時間順序）killed；`/code-review` 與 diff 審查 findings 10（blocking 0）：fixed 9、raised 1。
+                  - 未跑：integration 層的 mutation（拿掉「有結果不能補充」、拿掉 `GetMyReport` 擁有者條件）：需要資料庫容器，本機不跑。
+                  - 待 Will：佐證縮圖（`ReportEvidence` 只有 `position`）、`AddReportSupplement` 限流與 `CreateReport` 分開計數。
+                  - 暫時狀態：buyer-app「我的檢舉」在 10f-3b 前只列社群檢舉。
                 - [ ] 10f-3b buyer-app（UI 版面先給 Will 同意）
                 - [ ] 10f-3c website（UI 版面先給 Will 同意）
               - [ ] 10f-4 工作日行事曆移到 platform（R8 前置）：`backend/services/invoice-service` 的行事曆搬到 `internal/platform`，invoice-service 的呼叫者同一刀改用。
