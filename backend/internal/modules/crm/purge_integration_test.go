@@ -37,12 +37,16 @@ func (f *fixture) deleteBuyer(buyerID int64) {
 
 func (f *fixture) retireStore(storeID int64) {
 	f.t.Helper()
-	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return f.m.OnStoreRetired(ctx, seller.StoreRetired{StoreID: storeID, OccurredAt: epoch})
-	})
-	if err != nil {
+	if err := f.retireStoreErr(storeID); err != nil {
 		f.t.Fatal(err)
 	}
+}
+
+// retireStoreErr 讓店家退場並在同 transaction 通知訂閱者；回傳錯誤，讓測試可以在 goroutine 內呼叫。
+func (f *fixture) retireStoreErr(storeID int64) error {
+	return f.db.InTx(context.Background(), func(ctx context.Context) error {
+		return f.m.OnStoreRetired(ctx, seller.StoreRetired{StoreID: storeID, OccurredAt: epoch})
+	})
 }
 
 func (f *fixture) rowsOfBuyer(buyerID int64) int64 {
