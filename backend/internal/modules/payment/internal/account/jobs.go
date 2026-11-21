@@ -6,19 +6,9 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
-
-// 唯一鍵涵蓋「還沒有結果」的狀態：排隊中、執行中、等重試。不含 completed：完成的 job 在 River 清掉之前仍會擋下同一個鍵的新 job。
-// running 不能排除（River 的規定），所以執行期間到的事件不靠重新排入，而靠 inbox：結果寫入後仍有未涵蓋的事件時 Sync 回 again，worker 以 snooze 再跑一輪。
-func openStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable,
-		rivertype.JobStateScheduled,
-	}
-}
 
 // EnsureArgs 是建立外部帳戶的 job，以 store_id 為唯一鍵：同一個擁有者同時最多一個排隊中的建立。
 type EnsureArgs struct {
@@ -30,7 +20,7 @@ func (EnsureArgs) Kind() string { return "payment.account_ensure" }
 
 // InsertOpts 是建立 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (EnsureArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+	return jobs.UniqueByArgs(maxAttempts)
 }
 
 func enqueueEnsure(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
@@ -51,7 +41,7 @@ func (ResolveArgs) Kind() string { return "payment.account_resolve" }
 
 // InsertOpts 是了結 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (ResolveArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+	return jobs.UniqueByArgs(maxAttempts)
 }
 
 func enqueueResolve(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
@@ -76,7 +66,7 @@ func (SyncArgs) Kind() string { return "payment.account_sync" }
 
 // InsertOpts 是同步 job 的排入選項。
 func (SyncArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+	return jobs.UniqueByArgs(maxAttempts)
 }
 
 func enqueueSync(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
@@ -93,7 +83,7 @@ func (SweepArgs) Kind() string { return "payment.account_sweep" }
 
 // InsertOpts 把同一段時間內的排程與重啟合併。
 func (SweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 10 * time.Minute}}
+	return jobs.SweepOpts(10 * time.Minute)
 }
 
 // resyncDelay 是結果寫入後仍有未涵蓋的事件時，等多久再跑一輪。
@@ -201,7 +191,7 @@ func (PurgeArgs) Kind() string { return "payment.account_purge" }
 
 // InsertOpts 是清理 job 的排入選項：以 store_id 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (PurgeArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+	return jobs.UniqueByArgs(maxAttempts)
 }
 
 func enqueuePurge(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {

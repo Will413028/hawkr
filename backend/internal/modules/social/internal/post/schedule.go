@@ -11,7 +11,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
@@ -21,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -37,14 +37,7 @@ func (PublishScheduledArgs) Kind() string { return "social.publish_scheduled" }
 
 // InsertOpts 見 PublishScheduledArgs。
 func (PublishScheduledArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: unfinishedStates()}}
-}
-
-func unfinishedStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
-	}
+	return jobs.UniqueByArgs(10)
 }
 
 // ValidateAuthorizers 確認每一種發起者都有授權實作；缺一種就回錯誤（social.New 在啟動時 panic）。

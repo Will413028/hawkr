@@ -177,7 +177,7 @@ test("案件欄：「案件 {id}」，沒有案件是「-」", () => {
 });
 
 test("通報的狀態徽章：待分案 warning、處理中 info、已採取措施 success、其他結果 gray；文字是名稱", () => {
-	const badge = (state: ReportState, outcome = ReportOutcome.UNSPECIFIED) =>
+	const badge = (state: ReportState, outcome?: ReportOutcome) =>
 		reportStatusBadge({ state, outcome });
 	assert.deepEqual(badge(ReportState.AWAITING_TRIAGE), {
 		label: "待分案",

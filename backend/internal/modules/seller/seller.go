@@ -593,6 +593,13 @@ func (m *Module) LockForDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.Lock(ctx, storeID)
 }
 
+// LockNotRetired 在呼叫方的 transaction 內以 FOR KEY SHARE 確認店家尚未退場（retired_at 為空；營運中、關店、等待刪除都放行），鎖持有到
+// transaction 結束：退場的 RetireDueStores 是 FOR UPDATE SKIP LOCKED，正被守門鎖住的店這一輪被跳過、下一輪再退場。已退場與不存在回
+// NotFound。必須在 transaction 內呼叫。鎖順序：買家列先於店家列（單體規則 4），之後才是呼叫方自己的表。
+func (m *Module) LockNotRetired(ctx context.Context, storeID int64) error {
+	return m.closing.LockNotRetired(ctx, storeID)
+}
+
 // BeginDeletion 讓店家隨帳號刪除進入等待；重送安全。只由 accountdeletion 在已鎖住帳號列的 transaction 內呼叫。
 func (m *Module) BeginDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.BeginDeletion(ctx, storeID)
@@ -622,19 +629,17 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	m.suspension.AddWorkers(workers)
 	m.closing.AddWorkers(workers)
 	m.measure.AddWorkers(workers)
-	m.governance.AddWorkers(workers)
 	m.kyc.AddWorkers(workers)
 	m.purge.AddWorkers(workers)
 	m.profile.AddWorkers(workers)
 	m.views.AddWorkers(workers)
 }
 
-// PeriodicJobs 回傳本模組的排程 job：第一次公開的記錄（每 15 分鐘）、措施的對帳、終止合作的對帳（每小時）、措施的結案掃描（每 5 分鐘）、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理（啟動即執行、每小時
+// PeriodicJobs 回傳本模組的排程 job：第一次公開的記錄（每 15 分鐘）、措施的對帳、終止合作的對帳（每小時）、措施的結案掃描（每 5 分鐘）、關店滿保留期的個資清理（啟動即執行、每小時
 // 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs := append(m.suspension.PeriodicJobs(), m.closing.PeriodicJobs()...)
 	jobs = append(jobs, m.measure.PeriodicJobs()...)
-	jobs = append(jobs, m.governance.PeriodicJobs()...)
 	jobs = append(jobs, m.purge.PeriodicJobs()...)
 	jobs = append(jobs, m.profile.PeriodicJobs()...)
 	jobs = append(jobs, m.views.PeriodicJobs()...)

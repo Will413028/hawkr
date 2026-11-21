@@ -47,11 +47,21 @@ FROM seller.store_exposures
 WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[]);
 
 -- name: LockStore :one
--- 鎖定指定 stint，序列化它的寫入。
+-- 鎖定指定 stint，序列化它的業務寫入（FOR NO KEY UPDATE）：與其他模組守門用的 FOR KEY SHARE 不互斥。
+-- 只搭配不改 stores 唯一鍵欄位（store_id、store_code、account_id、current_closed_at）的更新；關店與恢復營業改 current_closed_at，
+-- 走 LockAccountStores（FOR UPDATE）。
 SELECT *
 FROM seller.stores
 WHERE store_id = $1
-FOR UPDATE;
+FOR NO KEY UPDATE;
+
+-- name: LockStoreKeyShare :one
+-- 以 KEY SHARE 讀取指定 stint：只與 FOR UPDATE（RetireDueStores、LockAccountStores）互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+-- 其他模組的店家寫入用它與退場序列化。
+SELECT *
+FROM seller.stores
+WHERE store_id = $1
+FOR KEY SHARE;
 
 -- name: CreateStore :one
 -- 建立新的 stint；store_code 撞號時不寫入、回 0 列，由呼叫方換一個代碼重試。帳號已有目前的 stint 時違反

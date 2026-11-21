@@ -20,6 +20,10 @@ type BuyerPubBlockedStore struct {
 	StoreID        int64
 }
 
+type BuyerPubClosedBuyer struct {
+	BuyerID int64
+}
+
 type BuyerPubInactiveBuyer struct {
 	BuyerID int64
 }
@@ -31,6 +35,10 @@ type SellerPubContentTakedown struct {
 }
 
 type SellerPubExposableStore struct {
+	StoreID int64
+}
+
+type SellerPubRetiredStore struct {
 	StoreID int64
 }
 

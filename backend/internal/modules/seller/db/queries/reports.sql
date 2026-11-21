@@ -1,12 +1,12 @@
 -- name: InsertReport :one
 -- 新增通報；違反任一個去重的 UNIQUE（只比對還沒有結果的通報）時不寫入、回 0 列（不讓 transaction 失效），由呼叫方讀出既有的那一筆。
 INSERT INTO seller.reports (
-    id, store_id, product_id, order_no, category, description, reporter_buyer_id, reporter_phone, reporter_email,
-    reporter_name, created_at, updated_at
+    id, store_id, product_id, order_no, category, description, reporter_buyer_id,
+    created_at, updated_at
 )
 VALUES (
     sqlc.arg(id), sqlc.arg(store_id), sqlc.narg(product_id), sqlc.narg(order_no), sqlc.arg(category), sqlc.arg(description),
-    sqlc.narg(reporter_buyer_id), sqlc.narg(reporter_phone), sqlc.narg(reporter_email), sqlc.narg(reporter_name),
+    sqlc.arg(reporter_buyer_id),
     sqlc.arg(now), sqlc.arg(now)
 )
 ON CONFLICT DO NOTHING
@@ -19,26 +19,10 @@ FROM seller.reports
 WHERE reporter_buyer_id = sqlc.arg(buyer_id)::bigint AND store_id = sqlc.arg(store_id) AND category = sqlc.arg(category) AND outcome IS NULL
   AND (created_at AT TIME ZONE 'Asia/Taipei')::date = (sqlc.arg(now)::timestamptz AT TIME ZONE 'Asia/Taipei')::date;
 
--- name: DuplicateContactReport :one
--- 匿名的同一支電話或同一個 email 在同一個台北 ISO 週對同一個店家已有、還沒有結果的通報（與 reports_phone_weekly、reports_email_weekly 同一個條件）。
--- matched_by 是這次送出和它比對到的方式：電話與 email 都相同是 BOTH，否則是相同的那一個。
-SELECT sqlc.embed(r),
-       (CASE
-          WHEN r.reporter_phone = sqlc.narg(phone)::text AND r.reporter_email = sqlc.narg(email)::text THEN 'BOTH'
-          WHEN r.reporter_phone = sqlc.narg(phone)::text THEN 'PHONE'
-          ELSE 'EMAIL'
-        END)::text AS matched_by
-FROM seller.reports r
-WHERE r.store_id = sqlc.arg(store_id) AND r.reporter_buyer_id IS NULL AND r.outcome IS NULL
-  AND (r.reporter_phone = sqlc.narg(phone)::text OR r.reporter_email = sqlc.narg(email)::text)
-  AND date_trunc('week', r.created_at AT TIME ZONE 'Asia/Taipei') = date_trunc('week', sqlc.arg(now)::timestamptz AT TIME ZONE 'Asia/Taipei')
-ORDER BY r.created_at, r.id
-LIMIT 1;
-
 -- name: InsertReportSupplement :one
--- 補充：去重期間內同一位檢舉人的重複送出併入原通報（呼叫方已鎖住通報並確認沒有結果、沒有超過上限）。matched_by 只有匿名的補充有。
-INSERT INTO seller.report_supplements (id, report_id, seq, description, matched_by, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(report_id), sqlc.arg(seq), sqlc.arg(description), sqlc.narg(matched_by), sqlc.arg(now))
+-- 補充：去重期間內同一位檢舉人的重複送出併入原通報（呼叫方已鎖住通報並確認沒有結果、沒有超過上限）。
+INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(report_id), sqlc.arg(seq), sqlc.arg(description), sqlc.arg(now))
 RETURNING *;
 
 -- name: SupplementCount :one
@@ -47,11 +31,11 @@ FROM seller.report_supplements
 WHERE report_id = $1;
 
 -- name: ReportSupplements :many
--- 一批通報的補充，依通報、舊到新。
+-- 一批通報的補充，依通報、編號（seq，鎖住通報後遞增，不依賴時鐘）舊到新。
 SELECT *
 FROM seller.report_supplements
 WHERE report_id = ANY(sqlc.arg(report_ids)::uuid[])
-ORDER BY report_id, created_at, id;
+ORDER BY report_id, seq;
 
 -- name: InsertReportEvidence :exec
 -- 一次送出的第 position 張佐證（submission_seq 0 是原通報、1..10 是補充；position 0..4，DB 保證每次送出最多 5 張）。
@@ -71,13 +55,6 @@ SELECT *
 FROM seller.report_evidence
 WHERE report_id = ANY(sqlc.arg(report_ids)::uuid[])
 ORDER BY report_id, submission_seq, position;
-
--- name: IncrementDiscardedSubmissions :exec
--- 補充已達上限、內容沒有存下的匿名送出：只加計數，不動版本（沒有存下任何會影響後台判斷的內容）。
-UPDATE seller.reports
-SET discarded_submissions = discarded_submissions + 1,
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id);
 
 -- name: BumpReportVersion :exec
 -- 補充存下之後讓通報的版本前進：之前讀到這筆通報的分案、設定結果與移動會撞版本，後台重讀才看得到補充。
@@ -248,27 +225,6 @@ WHERE reporter_buyer_id = sqlc.arg(buyer_id)::bigint
   )
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
-
--- name: EraseExpiredContacts :many
--- 把清除時間已到的匿名通報的聯絡欄位清成 NULL，一次最多 batch_size 筆；回傳每筆清掉的通報是否只靠絕對上限（capped）清的。清除時間有兩條：
--- 一是有結果的，greatest(建立 + 90 天, 結果 + 30 天)；二是絕對上限，建立滿 365 天（created_at < cap_cutoff），不論有沒有結果。依 created_at 掃描。
-UPDATE seller.reports
-SET reporter_phone = NULL,
-    reporter_email = NULL,
-    reporter_name = NULL,
-    contact_erased_at = sqlc.arg(now)::timestamptz,
-    updated_at = sqlc.arg(now)::timestamptz
-WHERE id IN (
-    SELECT r.id
-    FROM seller.reports r
-    WHERE r.reporter_buyer_id IS NULL AND r.contact_erased_at IS NULL
-      AND (r.created_at < sqlc.arg(cap_cutoff)::timestamptz
-           OR (r.resolved_at IS NOT NULL AND r.created_at < sqlc.arg(created_cutoff)::timestamptz AND r.resolved_at < sqlc.arg(resolved_cutoff)::timestamptz))
-    ORDER BY r.created_at
-    LIMIT sqlc.arg(batch_size)
-    FOR UPDATE SKIP LOCKED
-)
-RETURNING (NOT (resolved_at IS NOT NULL AND created_at < sqlc.arg(created_cutoff)::timestamptz AND resolved_at < sqlc.arg(resolved_cutoff)::timestamptz))::bool AS capped;
 
 -- name: EvidenceAssets :many
 -- 以 ref_id（通報、請求或詢問的 ID）登記的佐證中，業務列目前指著的 asset（同步 job 讀的）。

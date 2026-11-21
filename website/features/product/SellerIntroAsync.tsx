@@ -1,4 +1,5 @@
-import { getCachedStore } from "@/lib/api/cached";
+import { unstable_rethrow } from "next/navigation";
+import { getCachedStoreOrThrow } from "@/lib/api/cached";
 import ProductSellerIntro from "./components/ProductSellerIntro";
 
 /**
@@ -7,9 +8,20 @@ import ProductSellerIntro from "./components/ProductSellerIntro";
  * <Suspense> fallback in ProductDetailPage); only the rating / review-count /
  * subscriber numbers need a store read, which gates this component. The read is
  * `GetStore` by the block's store_code; a block without a code has no storefront
- * link and its stats stay unset. Keeping the read here pulls that upstream
- * round-trip off the page's critical TTFB path.
+ * link and its stats stay unset. A store the read reports absent (not public)
+ * has no storefront either, so the embedded code is dropped and the card links
+ * nowhere. Keeping the read here pulls that upstream round-trip off the page's
+ * critical TTFB path.
  */
+function withoutStoreCode(productSeller: unknown): unknown {
+	if (!productSeller || typeof productSeller !== "object") return productSeller;
+	const { storeCode: _storeCode, ...rest } = productSeller as Record<
+		string,
+		unknown
+	>;
+	return rest;
+}
+
 export default async function SellerIntroAsync({
 	sellerId,
 	productSeller,
@@ -23,7 +35,19 @@ export default async function SellerIntroAsync({
 		(productSeller as { storeCode?: unknown } | null)?.storeCode ?? "",
 	).trim();
 	if (storeCode) {
-		const store = await getCachedStore(storeCode).catch(() => null);
+		let store: Awaited<ReturnType<typeof getCachedStoreOrThrow>> = null;
+		let readFailed = false;
+		try {
+			store = await getCachedStoreOrThrow(storeCode);
+		} catch (error) {
+			unstable_rethrow(error);
+			readFailed = true;
+			if (process.env.NEXT_PHASE !== "phase-production-build") {
+				console.warn("[SellerIntroAsync] store read failed", error);
+			}
+		}
+		// 讀取失敗是暫時的，保留內嵌的 storeCode；讀到「沒有這家店」才拿掉連結的來源。
+		const absent = !readFailed && store === null;
 		return (
 			<ProductSellerIntro
 				sellerId={sellerId}
@@ -38,7 +62,7 @@ export default async function SellerIntroAsync({
 						? { followers: store.followerCount }
 						: null
 				}
-				productSeller={productSeller}
+				productSeller={absent ? withoutStoreCode(productSeller) : productSeller}
 			/>
 		);
 	}

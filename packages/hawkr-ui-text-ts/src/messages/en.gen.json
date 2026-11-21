@@ -71,9 +71,11 @@
     },
     "ReportTargetKind": {
       "REPORT_TARGET_KIND_BUYER": "User",
+      "REPORT_TARGET_KIND_CHAT_MESSAGE": "Chat message",
       "REPORT_TARGET_KIND_COMMENT": "Comment",
       "REPORT_TARGET_KIND_FORUM_ENTRY": "Forum post",
-      "REPORT_TARGET_KIND_POST": "Post"
+      "REPORT_TARGET_KIND_POST": "Post",
+      "REPORT_TARGET_KIND_REVIEW": "Review"
     }
   },
   "payment": {
@@ -111,6 +113,22 @@
       "CONTENT_KIND_COMMENT": "留言",
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
       "CONTENT_KIND_POST": "貼文"
+    },
+    "InquiryKind": {
+      "INQUIRY_KIND_EXPLANATION": "Provide an explanation",
+      "INQUIRY_KIND_RECORDS": "Provide records"
+    },
+    "InquiryReplyChannel": {
+      "INQUIRY_REPLY_CHANNEL_EMAIL": "Email",
+      "INQUIRY_REPLY_CHANNEL_MESSAGING": "Messaging app",
+      "INQUIRY_REPLY_CHANNEL_OTHER": "Other",
+      "INQUIRY_REPLY_CHANNEL_PHONE": "Phone",
+      "INQUIRY_REPLY_CHANNEL_SELLER_CENTER": "Seller Center"
+    },
+    "InquiryState": {
+      "INQUIRY_STATE_OPEN": "Awaiting reply",
+      "INQUIRY_STATE_REPLIED": "Replied",
+      "INQUIRY_STATE_WITHDRAWN": "Withdrawn"
     },
     "KYCApplication": {
       "decide_time": "Approved at: {time}",
@@ -220,6 +238,13 @@
     "PaymentAccount": {
       "payouts_inactive_note": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },
+    "ReportOutcome": {
+      "REPORT_OUTCOME_ABUSIVE": "Resolved (not accepted)",
+      "REPORT_OUTCOME_ACTION_TAKEN": "Resolved (action taken)",
+      "REPORT_OUTCOME_DUPLICATE": "Resolved (duplicate report)",
+      "REPORT_OUTCOME_INSUFFICIENT": "Resolved (insufficient information)",
+      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)"
+    },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
       "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",
@@ -253,6 +278,9 @@
       "STORE_FIELD_CONTACT_NAME": "聯絡人姓名",
       "STORE_FIELD_CONTACT_PHONE": "商店電話",
       "STORE_FIELD_SUPPORT_EMAIL": "客服電子信箱"
+    },
+    "StoreReport": {
+      "outcome_unset": "Under review"
     },
     "TerminationGround": {
       "TERMINATION_GROUND_BANKRUPTCY": "破產",

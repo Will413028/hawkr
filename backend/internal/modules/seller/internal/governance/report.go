@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"time"
 	"uuid"
 
@@ -17,9 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/phone"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -46,50 +43,20 @@ func validateSubmit(in *model.SubmitReportInput) (store.InsertReportParams, erro
 	if err := mediaref.EvidenceTokens(in.EvidenceTokens); err != nil {
 		return params, err
 	}
-	switch {
-	case in.ReporterBuyerID < 0:
+	if in.ReporterBuyerID <= 0 {
 		return params, apperr.InvalidInputOn([]string{"ReporterBuyerID"}, "ID 必須為正數")
-	case in.ReporterBuyerID > 0:
-		if strings.TrimSpace(in.Phone+in.Email+in.Name) != "" {
-			return params, apperr.InvalidInputOn([]string{"Phone", "Email", "Name"}, "登入的通報人不留聯絡方式")
-		}
-		if len(in.EvidenceTokens) > 0 && in.AccountID <= 0 {
-			return params, apperr.InvalidInputOn([]string{"AccountID"}, "附佐證時必須提供上傳者")
-		}
-		params.ReporterBuyerID = &in.ReporterBuyerID
-		return params, nil
 	}
-	if len(in.EvidenceTokens) > 0 {
-		return params, apperr.InvalidInputOn([]string{"EvidenceTokens"}, "匿名通報不收佐證，請登入後通報")
+	if len(in.EvidenceTokens) > 0 && in.AccountID <= 0 {
+		return params, apperr.InvalidInputOn([]string{"AccountID"}, "附佐證時必須提供上傳者")
 	}
-	if p := model.Text(in.Phone); p != nil {
-		normalized := phone.NormalizeToLocal(*p)
-		if !phone.Valid(normalized) {
-			return params, apperr.InvalidInputOn([]string{"Phone"}, "聯絡電話不合法")
-		}
-		params.ReporterPhone = &normalized
-	}
-	if e := model.Text(in.Email); e != nil {
-		normalized, ok := emailaddr.Normalize(*e)
-		if !ok {
-			return params, apperr.InvalidInputOn([]string{"Email"}, "email 格式不正確")
-		}
-		params.ReporterEmail = &normalized
-	}
-	if params.ReporterPhone == nil && params.ReporterEmail == nil {
-		return params, apperr.InvalidInputOn([]string{"Phone", "Email"}, "匿名通報必須留下電話或 email")
-	}
-	if params.ReporterName, err = model.Optional(in.Name, 100, "Name", "姓名"); err != nil {
-		return params, err
-	}
+	params.ReporterBuyerID = in.ReporterBuyerID
 	return params, nil
 }
 
-// Submit 提出檢舉（登入的買家或匿名者）。店家必須存在（已關閉的也可以檢舉）；呼叫者登入（AccountID）而且店家屬於他的帳號時回 invalid_argument（StoreID）。
-// 去重的期間內（登入：同店家、同類別、同一個台北日；匿名：同電話或 email、同店家、同一個台北 ISO 週）已有還沒有結果的通報時，這次的內容補充到它
-// （Supplemented）：每筆通報最多 MaxSupplements 則，已達上限時登入的回 failed_precondition，匿名的內容不存、只計次數（Discarded）。每次送出都在同一個
-// transaction 發 ReportReceived（新的檢舉、補充、被丟掉的），確認信寄到這次送出留的 email，所以送出的人分辨不出是哪一種。已有結果的通報不再比對：
-// 這次是新的檢舉。佐證依 media 的順序在 transaction 外先轉正，以通報 ID 登記引用；寫入失敗時排入引用的收斂。
+// Submit 提出檢舉（登入的買家）。店家必須存在（已關閉的也可以檢舉）；呼叫者登入（AccountID）而且店家屬於他的帳號時回 invalid_argument（StoreID）。
+// 去重的期間內（同買家、同店家、同類別、同一個台北日）已有還沒有結果的通報時，這次的內容補充到它
+// （Supplemented）：每筆通報最多 MaxSupplements 則，已達上限時回 failed_precondition。每次送出都在同一個
+// transaction 發 ReportReceived（新的檢舉或補充）。已有結果的通報不再比對：這次是新的檢舉。佐證依 media 的順序在 transaction 外先轉正，以通報 ID 登記引用；寫入失敗時排入引用的收斂。
 func (s *Service) Submit(ctx context.Context, in model.SubmitReportInput) (model.SubmitReportResult, error) {
 	params, err := validateSubmit(&in)
 	if err != nil {
@@ -126,7 +93,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitReportInput) (model
 // submitAttempts 是一次送出寫入新通報的次數：撞到去重的那一筆在鎖住時已經有結果（剛被結案）就重做一次，那時它已離開 partial UNIQUE。
 const submitAttempts = 2
 
-// submit 在 transaction 內寫入一次送出：新通報、補充，或超過上限而丟掉的匿名送出。撞到去重的 InsertReport 是 ON CONFLICT DO NOTHING（0 列），
+// submit 在 transaction 內寫入一次送出：新通報或補充。撞到去重的 InsertReport 是 ON CONFLICT DO NOTHING（0 列），
 // 不會讓 transaction 失效，之後的 SQL 照常執行。
 func (s *Service) submit(ctx context.Context, q *store.Queries, params store.InsertReportParams, in model.SubmitReportInput, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
 	for range submitAttempts {
@@ -137,7 +104,7 @@ func (s *Service) submit(ctx context.Context, q *store.Queries, params store.Ins
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return model.SubmitReportResult{}, err
 		}
-		existing, matchedBy, err := s.duplicate(ctx, q, params, now)
+		existing, err := s.duplicate(ctx, q, params, now)
 		if errors.Is(err, pgx.ErrNoRows) {
 			// 撞到的那一筆在兩次查詢之間有了結果，已經離開去重的範圍。
 			continue
@@ -153,7 +120,7 @@ func (s *Service) submit(ctx context.Context, q *store.Queries, params store.Ins
 			// 等鎖的時候它被結案了：這次是新的檢舉。
 			continue
 		}
-		return s.supplement(ctx, q, locked, matchedBy, params, in, evidence, now)
+		return s.supplement(ctx, q, locked, params, evidence, now)
 	}
 	return model.SubmitReportResult{}, apperr.Unavailable("%s", text.ReportSubmitConflict(uitext.LocaleFrom(ctx)).Text)
 }
@@ -167,7 +134,7 @@ func (s *Service) created(ctx context.Context, q *store.Queries, row store.Selle
 	report.Evidence = evidence
 	if err := events.Publish(ctx, s.d.Events, model.ReportReceived{
 		EventID: uuid.NewV7(), OccurredAt: now, ReportID: row.ID, StoreID: row.StoreID, ReporterBuyerID: row.ReporterBuyerID,
-		Category: report.Category, ConfirmationEmail: row.ReporterEmail,
+		Category: report.Category,
 	}); err != nil {
 		return model.SubmitReportResult{}, err
 	}
@@ -175,64 +142,145 @@ func (s *Service) created(ctx context.Context, q *store.Queries, row store.Selle
 }
 
 // supplement 把這次的送出併入已鎖住、還沒有結果的原通報。
-func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store.SellerReport, matchedBy *model.SupplementMatch, params store.InsertReportParams, in model.SubmitReportInput, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
-	count, err := q.SupplementCount(ctx, locked.ID)
+func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store.SellerReport, params store.InsertReportParams, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
+	if err := s.appendSupplement(ctx, q, locked, params.Description, evidence, now); err != nil {
+		return model.SubmitReportResult{}, err
+	}
+	// 去重的鍵含買家，所以那一筆一定是呼叫者自己的：回應用它，並告訴他發生了什麼。
+	row, err := q.ReportByID(ctx, locked.ID)
 	if err != nil {
 		return model.SubmitReportResult{}, err
 	}
+	report := toReport(row)
+	return model.SubmitReportResult{ReportID: locked.ID, Supplemented: true, Report: &report, Notice: text.ReportDuplicateSupplemented(uitext.LocaleFrom(ctx))}, nil
+}
+
+// appendSupplement 是補充的唯一寫入路徑（去重併入與檢舉人主動補充共用）：通報已鎖住且沒有結果；合計最多 MaxSupplements 則，已達上限時回 failed_precondition。
+// 寫入補充與佐證、讓通報的版本前進（讀到舊版本的分案、設定結果與移動要重讀才看得到補充；不鎖、不改案件的版本），並在同一個 transaction 發帶 SupplementID 的 ReportReceived。
+func (s *Service) appendSupplement(ctx context.Context, q *store.Queries, locked store.SellerReport, description string, evidence []model.Evidence, now time.Time) error {
+	count, err := q.SupplementCount(ctx, locked.ID)
+	if err != nil {
+		return err
+	}
 	received := model.ReportReceived{
 		EventID: uuid.NewV7(), OccurredAt: now, ReportID: locked.ID, StoreID: locked.StoreID, ReporterBuyerID: locked.ReporterBuyerID,
-		Category: policy.Category(locked.Category), ConfirmationEmail: params.ReporterEmail,
+		Category: policy.Category(locked.Category),
 	}
 	if int(count) >= model.MaxSupplements {
-		if params.ReporterBuyerID != nil {
-			// 已轉正的佐證沒有引用，由 media 的 GC 回收（沿用撞到重複時的先例）。
-			return model.SubmitReportResult{}, apperr.FailedPrecondition("%s", text.ReportSupplementLimit(uitext.LocaleFrom(ctx), text.ReportSupplementLimitArgs{Max: model.MaxSupplements}).Text)
-		}
-		if err := q.IncrementDiscardedSubmissions(ctx, store.IncrementDiscardedSubmissionsParams{ID: locked.ID, Now: now}); err != nil {
-			return model.SubmitReportResult{}, err
-		}
-		received.Discarded = true
-		if err := events.Publish(ctx, s.d.Events, received); err != nil {
-			return model.SubmitReportResult{}, err
-		}
-		return model.SubmitReportResult{ReportID: locked.ID, Discarded: true}, nil
+		// 已轉正的佐證沒有引用，由 media 的 GC 回收（沿用撞到重複時的先例）。
+		return apperr.FailedPrecondition("%s", text.ReportSupplementLimit(uitext.LocaleFrom(ctx), text.ReportSupplementLimitArgs{Max: model.MaxSupplements}).Text)
 	}
 	supplementID := uuid.NewV7()
-	var matched *string
-	if matchedBy != nil {
-		m := string(*matchedBy)
-		matched = &m
-	}
 	// 第幾則補充 = 已有的則數 + 1（通報已鎖住，所以不會撞；DB 的 seq 1..10 與每筆通報內唯一是保底）。
 	seq := int16(count) + 1 //nolint:gosec // count < MaxSupplements
 	if _, err := q.InsertReportSupplement(ctx, store.InsertReportSupplementParams{
-		ID: supplementID, ReportID: locked.ID, Seq: seq, Description: params.Description, MatchedBy: matched, Now: now,
+		ID: supplementID, ReportID: locked.ID, Seq: seq, Description: description, Now: now,
 	}); err != nil {
-		return model.SubmitReportResult{}, err
+		return err
 	}
 	if err := s.writeEvidence(ctx, q, locked.ID, &supplementID, seq, evidence, now); err != nil {
-		return model.SubmitReportResult{}, err
+		return err
 	}
-	// 補充讓通報的版本前進（讀到舊版本的分案、設定結果與移動要重讀才看得到補充）；不鎖、不改案件（補充不改案件的版本）。
 	if err := q.BumpReportVersion(ctx, store.BumpReportVersionParams{ID: locked.ID, Now: now}); err != nil {
-		return model.SubmitReportResult{}, err
+		return err
 	}
 	received.SupplementID = &supplementID
-	if err := events.Publish(ctx, s.d.Events, received); err != nil {
-		return model.SubmitReportResult{}, err
+	return events.Publish(ctx, s.d.Events, received)
+}
+
+// AddSupplement 是檢舉人為自己還沒有結果的通報主動補充（必須在 transaction 外呼叫：佐證先轉正）。別人的或不存在的通報一律 NotFound；通報已有結果回
+// failed_precondition；寫入走 appendSupplement，與去重併入的補充同一串、同一個上限。回傳補充之後的通報（含全部補充與佐證）。
+func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput) (model.Report, error) {
+	if _, ok := db.TxFrom(ctx); ok {
+		return model.Report{}, apperr.FailedPrecondition("補充必須在 transaction 外開始")
 	}
-	result := model.SubmitReportResult{ReportID: locked.ID, Supplemented: true}
-	if params.ReporterBuyerID != nil {
-		// 去重的鍵含買家，所以那一筆一定是呼叫者自己的：回應用它，並告訴他發生了什麼。匿名的什麼都不回（重複提交的人不一定是原本的檢舉人）。
-		row, err := q.ReportByID(ctx, locked.ID)
-		if err != nil {
-			return model.SubmitReportResult{}, err
+	if in.BuyerID <= 0 {
+		return model.Report{}, apperr.InvalidInputOn([]string{"BuyerID"}, "ID 必須為正數")
+	}
+	description, err := model.Required(in.Description, 2000, "Description", "補充內容")
+	if err != nil {
+		return model.Report{}, err
+	}
+	if err := mediaref.EvidenceTokens(in.EvidenceTokens); err != nil {
+		return model.Report{}, err
+	}
+	if len(in.EvidenceTokens) > 0 && in.AccountID <= 0 {
+		return model.Report{}, apperr.InvalidInputOn([]string{"AccountID"}, "附佐證時必須提供上傳者")
+	}
+	// 佐證轉正之前先確認通報是呼叫者的，別人的 id 不會讓呼叫者的檔被轉正。
+	owned, err := store.New(s.d.DB.Conn(ctx)).ReportByID(ctx, in.ReportID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && owned.ReporterBuyerID != in.BuyerID) {
+		return model.Report{}, errMyReportNotFound(ctx)
+	}
+	if err != nil {
+		return model.Report{}, err
+	}
+	if owned.Outcome != nil {
+		return model.Report{}, apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
+	}
+	now := s.now()
+	evidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)
+	if err != nil {
+		return model.Report{}, err
+	}
+	var out model.Report
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		locked, err := q.LockReport(ctx, in.ReportID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && locked.ReporterBuyerID != in.BuyerID) {
+			return errMyReportNotFound(ctx)
 		}
-		report := toReport(row)
-		result.Report, result.Notice = &report, text.ReportDuplicateSupplemented(uitext.LocaleFrom(ctx))
+		if err != nil {
+			return err
+		}
+		if locked.Outcome != nil {
+			return apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
+		}
+		if err := s.appendSupplement(ctx, q, locked, description, evidence, now); err != nil {
+			return err
+		}
+		out, err = loadBuyerReport(ctx, q, in.ReportID)
+		return err
+	})
+	return out, err
+}
+
+func errMyReportNotFound(ctx context.Context) error {
+	return apperr.NotFound("%s", text.ReportMyNotFound(uitext.LocaleFrom(ctx)).Text)
+}
+
+// BuyerReport 讀檢舉人自己的一筆通報（含補充與佐證）；別人的或不存在的是 NotFound。
+func (s *Service) BuyerReport(ctx context.Context, buyerID int64, reportID uuid.UUID) (model.Report, error) {
+	if err := model.Positive(buyerID); err != nil {
+		return model.Report{}, err
 	}
-	return result, nil
+	var out model.Report
+	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		row, err := q.ReportByID(ctx, reportID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.ReporterBuyerID != buyerID) {
+			return errMyReportNotFound(ctx)
+		}
+		if err != nil {
+			return err
+		}
+		out, err = loadBuyerReport(ctx, q, reportID)
+		return err
+	})
+	return out, err
+}
+
+// loadBuyerReport 讀一筆通報的內容、補充與佐證（不做擁有者檢查，呼叫方已確認）。
+func loadBuyerReport(ctx context.Context, q *store.Queries, reportID uuid.UUID) (model.Report, error) {
+	row, err := q.ReportByID(ctx, reportID)
+	if err != nil {
+		return model.Report{}, err
+	}
+	reports := []model.Report{toReport(row)}
+	if err := loadReportDetail(ctx, q, []uuid.UUID{reportID}, reports); err != nil {
+		return model.Report{}, err
+	}
+	return reports[0], nil
 }
 
 // writeEvidence 寫入一次送出（submissionSeq：0 是原通報、1.. 是第幾則補充）的佐證，次內位置從 0 連號（DB 的 CHECK 保證最多 5 張），補充的佐證帶 supplementID；
@@ -251,23 +299,11 @@ func (s *Service) writeEvidence(ctx context.Context, q *store.Queries, reportID 
 	return mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.EvidenceRef(reportID))
 }
 
-// duplicate 讀出去重的期間內同一個檢舉人已有、還沒有結果的通報（與 DB 的 partial UNIQUE 同一個條件）；匿名的另回比對方式（電話、聯絡信箱或兩者）。
-// 沒有時回 pgx.ErrNoRows。
-func (s *Service) duplicate(ctx context.Context, q *store.Queries, params store.InsertReportParams, now time.Time) (store.SellerReport, *model.SupplementMatch, error) {
-	if params.ReporterBuyerID != nil {
-		row, err := q.DuplicateBuyerReport(ctx, store.DuplicateBuyerReportParams{
-			BuyerID: *params.ReporterBuyerID, StoreID: params.StoreID, Category: params.Category, Now: now,
-		})
-		return row, nil, err
-	}
-	row, err := q.DuplicateContactReport(ctx, store.DuplicateContactReportParams{
-		StoreID: params.StoreID, Phone: params.ReporterPhone, Email: params.ReporterEmail, Now: now,
+// duplicate 讀出去重的期間內同一個買家已有、還沒有結果的通報（與 DB 的 partial UNIQUE 同一個條件）。沒有時回 pgx.ErrNoRows。
+func (s *Service) duplicate(ctx context.Context, q *store.Queries, params store.InsertReportParams, now time.Time) (store.SellerReport, error) {
+	return q.DuplicateBuyerReport(ctx, store.DuplicateBuyerReportParams{
+		BuyerID: params.ReporterBuyerID, StoreID: params.StoreID, Category: params.Category, Now: now,
 	})
-	if err != nil {
-		return store.SellerReport{}, nil, err
-	}
-	matched := model.SupplementMatch(row.MatchedBy)
-	return row.SellerReport, &matched, nil
 }
 
 // Report 讀取一筆通報的後台檢視：補充、佐證、此刻可以做的動作與 etag（Version）。

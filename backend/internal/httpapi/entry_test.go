@@ -328,9 +328,9 @@ func TestRateLimitSubject(t *testing.T) {
 }
 
 func TestConnectIsRateLimitedByTier(t *testing.T) {
-	if !slices.Equal(tiersOf("/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners"), []rateTier{tierPublic}) ||
-		!slices.Equal(tiersOf("/hawkr.identity.v1alpha1.IdentityAppService/GetSession"), []rateTier{tierDefault}) ||
-		!slices.Equal(tiersOf("/hawkr.admin.content.v1alpha1.ContentAdminService/ListBanners"), []rateTier{tierDefault}) {
+	if tierOf("/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners") != tierPublic ||
+		tierOf("/hawkr.identity.v1alpha1.IdentityAppService/GetSession") != tierDefault ||
+		tierOf("/hawkr.admin.content.v1alpha1.ContentAdminService/ListBanners") != tierDefault {
 		t.Fatal("級別對錯了")
 	}
 	if tierPublic.limit("s:ssr") != 12000 || tierPublic.limit("v:1.2.3.4") != 600 || tierDefault.limit("s:ssr") != 300 {

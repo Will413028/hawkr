@@ -330,6 +330,33 @@ func InquiryRequestIdReused() uitext.Message {
 	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
 }
 
+// InquirySellerReplyBodyLength 是模組句子 inquiry.seller_reply.body_length；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyBodyLength(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your reply must be 1 to 4000 characters.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "回覆內容必須是 1 到 4000 字。", Locale: uitext.ZhTW}
+}
+
+// InquirySellerReplyUnavailableReplied 是模組句子 inquiry.seller_reply.unavailable.replied；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyUnavailableReplied(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This inquiry has already been replied to and cannot be replied to again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆詢問已經回覆過，不能再回覆。", Locale: uitext.ZhTW}
+}
+
+// InquirySellerReplyUnavailableWithdrawn 是模組句子 inquiry.seller_reply.unavailable.withdrawn；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InquirySellerReplyUnavailableWithdrawn(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This inquiry has been withdrawn, so no reply is needed.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆詢問已撤回，不需要回覆。", Locale: uitext.ZhTW}
+}
+
 // InquiryUnavailableReplied 是後台員工受眾的模組句子 inquiry.unavailable.replied（只有 zh-TW）。
 func InquiryUnavailableReplied() uitext.Message {
 	return uitext.Message{Text: "這筆詢問已記下回覆。", Locale: uitext.ZhTW}
@@ -738,6 +765,15 @@ func ReportDuplicateSupplemented(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。", Locale: uitext.ZhTW}
 }
 
+// ReportMyNotFound 是模組句子 report.my_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportMyNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This report could not be found.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這筆檢舉。", Locale: uitext.ZhTW}
+}
+
 // ReportNotFound 是後台員工受眾的模組句子 report.not_found（只有 zh-TW）。
 func ReportNotFound() uitext.Message {
 	return uitext.Message{Text: "找不到這筆通報。", Locale: uitext.ZhTW}
@@ -759,6 +795,15 @@ func ReportSubmitConflict(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "A conflict occurred while submitting. Please try again shortly.", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "送出時發生衝突，請稍後再試一次。", Locale: uitext.ZhTW}
+}
+
+// ReportSupplementClosed 是模組句子 report.supplement_closed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportSupplementClosed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This report already has an outcome and cannot be supplemented.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆檢舉已經有處理結果，不能再補充。", Locale: uitext.ZhTW}
 }
 
 // ReportSupplementLimitArgs 是 ReportSupplementLimit 的參數。

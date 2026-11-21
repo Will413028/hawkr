@@ -41,6 +41,7 @@ const (
 	ModerationCasesList               Permission = "moderation.cases.list"
 	ModerationCasesGet                Permission = "moderation.cases.get"
 	ModerationCasesDecide             Permission = "moderation.cases.decide"
+	ModerationCasesReverse            Permission = "moderation.cases.reverse"
 	PaymentAccountsGet                Permission = "payment.accounts.get"
 	PaymentAccountsRefresh            Permission = "payment.accounts.refresh"
 	PaymentAccountsRetryCreate        Permission = "payment.accounts.retry_create"
@@ -122,7 +123,7 @@ func Catalog() []Permission {
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
 		LegacyGatewayForward,
-		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide,
+		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide, ModerationCasesReverse,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,

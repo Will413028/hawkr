@@ -105,6 +105,15 @@ const (
 	// SellerAppServiceRequestRemediationProcedure is the fully-qualified name of the SellerAppService's
 	// RequestRemediation RPC.
 	SellerAppServiceRequestRemediationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/RequestRemediation"
+	// SellerAppServiceListMyInquiriesProcedure is the fully-qualified name of the SellerAppService's
+	// ListMyInquiries RPC.
+	SellerAppServiceListMyInquiriesProcedure = "/hawkr.seller.v1alpha1.SellerAppService/ListMyInquiries"
+	// SellerAppServiceGetMyInquiryProcedure is the fully-qualified name of the SellerAppService's
+	// GetMyInquiry RPC.
+	SellerAppServiceGetMyInquiryProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyInquiry"
+	// SellerAppServiceReplyToInquiryProcedure is the fully-qualified name of the SellerAppService's
+	// ReplyToInquiry RPC.
+	SellerAppServiceReplyToInquiryProcedure = "/hawkr.seller.v1alpha1.SellerAppService/ReplyToInquiry"
 	// SellerAppServiceBlockBuyerProcedure is the fully-qualified name of the SellerAppService's
 	// BlockBuyer RPC.
 	SellerAppServiceBlockBuyerProcedure = "/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer"
@@ -223,6 +232,16 @@ type SellerAppServiceClient interface {
 	// （VERSION_CONFLICT）；提出請求不改變 etag，所以請求已經生效後再送一次（包含重送同一個請求）回 failed_precondition，不寫入。
 	// 措施不是生效中、不是 RISK 依據、在冷卻期內、已有待處理的請求，或已撤銷時回 failed_precondition。不要求賣家角色。
 	RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error)
+	// ListMyInquiries 列出平台對呼叫者帳號所有店家發的詢問（案件上的提供紀錄或請說明），新到舊，含等回覆、已回覆（含管理員記下的系統外回覆）與已撤回（唯讀）。
+	// 以帳號為範圍，不要求賣家角色或店家營運中：店家關閉後詢問開放中仍可回覆。state 篩選此刻的狀態；UNSPECIFIED 不篩。pending_reply_count 是帳號待回覆
+	// （OPEN，逾期仍算）的總數，不受篩選與分頁影響，給導覽列徽章用（要只取數字時 page_size 取 1）。詢問只帶管理員轉述的說明，不含通報原文、佐證與檢舉人。
+	ListMyInquiries(context.Context, *connect.Request[v1alpha1.ListMyInquiriesRequest]) (*connect.Response[v1alpha1.ListMyInquiriesResponse], error)
+	// GetMyInquiry 回傳呼叫者帳號的一筆詢問。不屬於這個帳號的詢問與不存在的詢問都回 not_found。
+	GetMyInquiry(context.Context, *connect.Request[v1alpha1.GetMyInquiryRequest]) (*connect.Response[v1alpha1.GetMyInquiryResponse], error)
+	// ReplyToInquiry 回覆自己店家的詢問（內容加最多 5 份附件），回覆之後詢問結束；一則詢問一次回覆，要補資料由平台另發詢問。已回覆（含管理員記下的）與
+	// 已撤回回 failed_precondition，重送同一個請求也一樣（不寫入）。逾期後仍可回覆，直到撤回或案件結案。不屬於這個帳號的詢問回 not_found。
+	// 附件是機敏檔（先以機敏上傳取得 staged token），回覆之後賣家不讀回已上傳的附件，只看得到數量。不要求賣家角色。
+	ReplyToInquiry(context.Context, *connect.Request[v1alpha1.ReplyToInquiryRequest]) (*connect.Response[v1alpha1.ReplyToInquiryResponse], error)
 	// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
 	// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
 	// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
@@ -381,6 +400,26 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(sellerAppServiceMethods.ByName("RequestRemediation")),
 			connect.WithClientOptions(opts...),
 		),
+		listMyInquiries: connect.NewClient[v1alpha1.ListMyInquiriesRequest, v1alpha1.ListMyInquiriesResponse](
+			httpClient,
+			baseURL+SellerAppServiceListMyInquiriesProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("ListMyInquiries")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getMyInquiry: connect.NewClient[v1alpha1.GetMyInquiryRequest, v1alpha1.GetMyInquiryResponse](
+			httpClient,
+			baseURL+SellerAppServiceGetMyInquiryProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyInquiry")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		replyToInquiry: connect.NewClient[v1alpha1.ReplyToInquiryRequest, v1alpha1.ReplyToInquiryResponse](
+			httpClient,
+			baseURL+SellerAppServiceReplyToInquiryProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("ReplyToInquiry")),
+			connect.WithClientOptions(opts...),
+		),
 		blockBuyer: connect.NewClient[v1alpha1.BlockBuyerRequest, v1alpha1.BlockBuyerResponse](
 			httpClient,
 			baseURL+SellerAppServiceBlockBuyerProcedure,
@@ -428,6 +467,9 @@ type sellerAppServiceClient struct {
 	getMyMeasure                   *connect.Client[v1alpha1.GetMyMeasureRequest, v1alpha1.GetMyMeasureResponse]
 	submitAppeal                   *connect.Client[v1alpha1.SubmitAppealRequest, v1alpha1.SubmitAppealResponse]
 	requestRemediation             *connect.Client[v1alpha1.RequestRemediationRequest, v1alpha1.RequestRemediationResponse]
+	listMyInquiries                *connect.Client[v1alpha1.ListMyInquiriesRequest, v1alpha1.ListMyInquiriesResponse]
+	getMyInquiry                   *connect.Client[v1alpha1.GetMyInquiryRequest, v1alpha1.GetMyInquiryResponse]
+	replyToInquiry                 *connect.Client[v1alpha1.ReplyToInquiryRequest, v1alpha1.ReplyToInquiryResponse]
 	blockBuyer                     *connect.Client[v1alpha1.BlockBuyerRequest, v1alpha1.BlockBuyerResponse]
 	unblockBuyer                   *connect.Client[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse]
 	listBlockedBuyers              *connect.Client[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse]
@@ -540,6 +582,21 @@ func (c *sellerAppServiceClient) RequestRemediation(ctx context.Context, req *co
 	return c.requestRemediation.CallUnary(ctx, req)
 }
 
+// ListMyInquiries calls hawkr.seller.v1alpha1.SellerAppService.ListMyInquiries.
+func (c *sellerAppServiceClient) ListMyInquiries(ctx context.Context, req *connect.Request[v1alpha1.ListMyInquiriesRequest]) (*connect.Response[v1alpha1.ListMyInquiriesResponse], error) {
+	return c.listMyInquiries.CallUnary(ctx, req)
+}
+
+// GetMyInquiry calls hawkr.seller.v1alpha1.SellerAppService.GetMyInquiry.
+func (c *sellerAppServiceClient) GetMyInquiry(ctx context.Context, req *connect.Request[v1alpha1.GetMyInquiryRequest]) (*connect.Response[v1alpha1.GetMyInquiryResponse], error) {
+	return c.getMyInquiry.CallUnary(ctx, req)
+}
+
+// ReplyToInquiry calls hawkr.seller.v1alpha1.SellerAppService.ReplyToInquiry.
+func (c *sellerAppServiceClient) ReplyToInquiry(ctx context.Context, req *connect.Request[v1alpha1.ReplyToInquiryRequest]) (*connect.Response[v1alpha1.ReplyToInquiryResponse], error) {
+	return c.replyToInquiry.CallUnary(ctx, req)
+}
+
 // BlockBuyer calls hawkr.seller.v1alpha1.SellerAppService.BlockBuyer.
 func (c *sellerAppServiceClient) BlockBuyer(ctx context.Context, req *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error) {
 	return c.blockBuyer.CallUnary(ctx, req)
@@ -648,6 +705,16 @@ type SellerAppServiceHandler interface {
 	// （VERSION_CONFLICT）；提出請求不改變 etag，所以請求已經生效後再送一次（包含重送同一個請求）回 failed_precondition，不寫入。
 	// 措施不是生效中、不是 RISK 依據、在冷卻期內、已有待處理的請求，或已撤銷時回 failed_precondition。不要求賣家角色。
 	RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error)
+	// ListMyInquiries 列出平台對呼叫者帳號所有店家發的詢問（案件上的提供紀錄或請說明），新到舊，含等回覆、已回覆（含管理員記下的系統外回覆）與已撤回（唯讀）。
+	// 以帳號為範圍，不要求賣家角色或店家營運中：店家關閉後詢問開放中仍可回覆。state 篩選此刻的狀態；UNSPECIFIED 不篩。pending_reply_count 是帳號待回覆
+	// （OPEN，逾期仍算）的總數，不受篩選與分頁影響，給導覽列徽章用（要只取數字時 page_size 取 1）。詢問只帶管理員轉述的說明，不含通報原文、佐證與檢舉人。
+	ListMyInquiries(context.Context, *connect.Request[v1alpha1.ListMyInquiriesRequest]) (*connect.Response[v1alpha1.ListMyInquiriesResponse], error)
+	// GetMyInquiry 回傳呼叫者帳號的一筆詢問。不屬於這個帳號的詢問與不存在的詢問都回 not_found。
+	GetMyInquiry(context.Context, *connect.Request[v1alpha1.GetMyInquiryRequest]) (*connect.Response[v1alpha1.GetMyInquiryResponse], error)
+	// ReplyToInquiry 回覆自己店家的詢問（內容加最多 5 份附件），回覆之後詢問結束；一則詢問一次回覆，要補資料由平台另發詢問。已回覆（含管理員記下的）與
+	// 已撤回回 failed_precondition，重送同一個請求也一樣（不寫入）。逾期後仍可回覆，直到撤回或案件結案。不屬於這個帳號的詢問回 not_found。
+	// 附件是機敏檔（先以機敏上傳取得 staged token），回覆之後賣家不讀回已上傳的附件，只看得到數量。不要求賣家角色。
+	ReplyToInquiry(context.Context, *connect.Request[v1alpha1.ReplyToInquiryRequest]) (*connect.Response[v1alpha1.ReplyToInquiryResponse], error)
 	// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
 	// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
 	// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。
@@ -802,6 +869,26 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		connect.WithSchema(sellerAppServiceMethods.ByName("RequestRemediation")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAppServiceListMyInquiriesHandler := connect.NewUnaryHandler(
+		SellerAppServiceListMyInquiriesProcedure,
+		svc.ListMyInquiries,
+		connect.WithSchema(sellerAppServiceMethods.ByName("ListMyInquiries")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceGetMyInquiryHandler := connect.NewUnaryHandler(
+		SellerAppServiceGetMyInquiryProcedure,
+		svc.GetMyInquiry,
+		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyInquiry")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceReplyToInquiryHandler := connect.NewUnaryHandler(
+		SellerAppServiceReplyToInquiryProcedure,
+		svc.ReplyToInquiry,
+		connect.WithSchema(sellerAppServiceMethods.ByName("ReplyToInquiry")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sellerAppServiceBlockBuyerHandler := connect.NewUnaryHandler(
 		SellerAppServiceBlockBuyerProcedure,
 		svc.BlockBuyer,
@@ -867,6 +954,12 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceSubmitAppealHandler.ServeHTTP(w, r)
 		case SellerAppServiceRequestRemediationProcedure:
 			sellerAppServiceRequestRemediationHandler.ServeHTTP(w, r)
+		case SellerAppServiceListMyInquiriesProcedure:
+			sellerAppServiceListMyInquiriesHandler.ServeHTTP(w, r)
+		case SellerAppServiceGetMyInquiryProcedure:
+			sellerAppServiceGetMyInquiryHandler.ServeHTTP(w, r)
+		case SellerAppServiceReplyToInquiryProcedure:
+			sellerAppServiceReplyToInquiryHandler.ServeHTTP(w, r)
 		case SellerAppServiceBlockBuyerProcedure:
 			sellerAppServiceBlockBuyerHandler.ServeHTTP(w, r)
 		case SellerAppServiceUnblockBuyerProcedure:
@@ -964,6 +1057,18 @@ func (UnimplementedSellerAppServiceHandler) SubmitAppeal(context.Context, *conne
 
 func (UnimplementedSellerAppServiceHandler) RequestRemediation(context.Context, *connect.Request[v1alpha1.RequestRemediationRequest]) (*connect.Response[v1alpha1.RequestRemediationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.RequestRemediation is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) ListMyInquiries(context.Context, *connect.Request[v1alpha1.ListMyInquiriesRequest]) (*connect.Response[v1alpha1.ListMyInquiriesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.ListMyInquiries is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) GetMyInquiry(context.Context, *connect.Request[v1alpha1.GetMyInquiryRequest]) (*connect.Response[v1alpha1.GetMyInquiryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyInquiry is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) ReplyToInquiry(context.Context, *connect.Request[v1alpha1.ReplyToInquiryRequest]) (*connect.Response[v1alpha1.ReplyToInquiryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.ReplyToInquiry is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) BlockBuyer(context.Context, *connect.Request[v1alpha1.BlockBuyerRequest]) (*connect.Response[v1alpha1.BlockBuyerResponse], error) {

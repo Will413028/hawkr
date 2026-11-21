@@ -5,7 +5,6 @@ import {
 	CaseDecision,
 	CaseState,
 	ReportState,
-	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
@@ -13,7 +12,6 @@ import {
 	caseStatusText,
 	reportOutcomeText,
 	reportStatusText,
-	supplementMatchNotice,
 } from "../src/app/admin/violation-reports/report-text";
 
 /**
@@ -30,12 +28,13 @@ function valuesOf<E extends number>(
 	);
 }
 
-test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報", () => {
+test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報；沒有設值與不認得的值是「未知」", () => {
 	assert.deepEqual(
 		valuesOf(ReportOutcome, ReportOutcome.UNSPECIFIED).map(reportOutcomeText),
 		["已採取措施", "未違規", "內容不足", "重複", "濫報"],
 	);
 	assert.equal(reportOutcomeText(ReportOutcome.UNSPECIFIED), "未知");
+	assert.equal(reportOutcomeText(undefined), "未知");
 	assert.equal(reportOutcomeText(99 as ReportOutcome), "未知");
 });
 
@@ -51,14 +50,14 @@ test("通報的狀態：待分案｜處理中｜{結果}；沒有結果的 RESOL
 	assert.equal(
 		reportStatusText({
 			state: ReportState.AWAITING_TRIAGE,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"待分案",
 	);
 	assert.equal(
 		reportStatusText({
 			state: ReportState.IN_CASE,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"處理中",
 	);
@@ -71,14 +70,14 @@ test("通報的狀態：待分案｜處理中｜{結果}；沒有結果的 RESOL
 	assert.equal(
 		reportStatusText({
 			state: ReportState.RESOLVED,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"未知",
 	);
 	assert.equal(
 		reportStatusText({
 			state: ReportState.UNSPECIFIED,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"未知",
 	);
@@ -122,17 +121,4 @@ test("案件的狀態：進行中｜已結案：採取措施｜已結案：不�
 		caseStatusText({ state: CaseState.UNSPECIFIED, ...none }),
 		"未知",
 	);
-});
-
-test("匿名補充的比對提醒：電話或聯絡信箱其中一個相同才提醒；兩者都相同與登入者的補充不提醒", () => {
-	assert.equal(
-		supplementMatchNotice(SupplementMatch.PHONE),
-		"以電話比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	);
-	assert.equal(
-		supplementMatchNotice(SupplementMatch.EMAIL),
-		"以聯絡信箱比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	);
-	assert.equal(supplementMatchNotice(SupplementMatch.BOTH), undefined);
-	assert.equal(supplementMatchNotice(SupplementMatch.UNSPECIFIED), undefined);
 });

@@ -68,16 +68,19 @@ test("seller posts mount only the active responsive image tree and fall back cle
 
 test("storefront preview folds only its seller notice and preserves the real buyer subtree", () => {
 	const layout = source(
-		"app/[locale]/(seller)/seller-center/preview/[id]/layout.tsx",
+		"features/seller-center/preview/SellerStorefrontPreviewFrame.tsx",
 	);
 	const banner = source(
 		"features/seller-center/preview/SellerStorefrontPreviewBanner.tsx",
 	);
 
-	assert.match(layout, /<SellerStorefrontPreviewBanner \/>/);
 	assert.match(
 		layout,
-		/<StorefrontPreviewBoundary sellerId=\{id\}>\s*\{children\}\s*<\/StorefrontPreviewBoundary>/,
+		/<SellerStorefrontPreviewBanner canBePublic=\{canBePublic\} \/>/,
+	);
+	assert.match(
+		layout,
+		/<StorefrontPreviewBoundary>\s*\{children\}\s*<\/StorefrontPreviewBoundary>/,
 	);
 	assert.match(banner, /seller-mobile-disclosure-desktop/);
 	assert.match(banner, /<SellerMobileDisclosureList/);
@@ -85,8 +88,7 @@ test("storefront preview folds only its seller notice and preserves the real buy
 	assert.match(banner, /status: "唯讀"/);
 	assert.match(layout, /<h1 className="sr-only">買家視角預覽<\/h1>/);
 	assert.doesNotMatch(banner, /<h1\b/);
-	assert.match(banner, /使用正式公開商店資料/);
+	assert.match(banner, /previewNoticeText\(canBePublic\)/);
 	assert.match(banner, /href="\/seller-center\/me"/);
-	assert.match(banner, /product, post, forum, or review/);
 	assert.doesNotMatch(banner, /MarketProductCard|PostCardV2|ReviewList/);
 });

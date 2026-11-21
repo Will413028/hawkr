@@ -6,7 +6,7 @@
 
 // moderation 模組給後台的 API：社群檢舉的案件（管理員處理的單位）列表、讀取與決定。前台的 API 在 hawkr.moderation.v1alpha1。
 //
-// 案件是一個對象（貼文、留言、討論區留言或買家）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
+// 案件是一個對象（貼文、留言、討論區留言、買家、評價或聊天訊息）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
 // （更正在擁有處分的模組做）。決定以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：新的檢舉掛進案件會改 etag，
 // etag 過期或案件已結案回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
 // ID 是不透明的字串（案件、檢舉與社群內容是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -143,9 +143,9 @@ type CaseAction int32
 
 const (
 	CaseAction_CASE_ACTION_UNSPECIFIED CaseAction = 0
-	// 隱藏買家寫的留言或討論區留言。
+	// 隱藏買家寫的留言、討論區留言、評價或聊天訊息；店家寫的聊天訊息回 FAILED_PRECONDITION。
 	CaseAction_CASE_ACTION_HIDE CaseAction = 1
-	// 警告買家（作者是買家的留言、討論區留言，或被檢舉的買家）。
+	// 警告買家（作者是買家的留言、討論區留言、評價、聊天訊息，或被檢舉的買家）。
 	CaseAction_CASE_ACTION_WARN CaseAction = 2
 	// 停權買家帳號；帳號擁有店家時回 FAILED_PRECONDITION。
 	CaseAction_CASE_ACTION_BAN CaseAction = 3
@@ -223,7 +223,9 @@ type Case struct {
 	// 這個案件的 TAKEDOWN 決定建立的店家措施（seller 的措施 ID）；進行中、沒有下架處置的案件不設。
 	MeasureId *string `protobuf:"bytes,12,opt,name=measure_id,json=measureId,proto3,oneof" json:"measure_id,omitempty"`
 	// 案件內容快照裡凍結的作者店家（過渡期的十進位整數字串）；買家對象、沒有快照（結案滿保留期後被清除）或內容不是店家寫的不設。
-	StoreId       *string `protobuf:"bytes,13,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
+	StoreId *string `protobuf:"bytes,13,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
+	// HIDE 決定的撤銷（ReverseHide）；沒有撤銷不設。決定本身不改。
+	Reversal      *CaseReversal `protobuf:"bytes,14,opt,name=reversal,proto3,oneof" json:"reversal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -349,6 +351,639 @@ func (x *Case) GetStoreId() string {
 	return ""
 }
 
+func (x *Case) GetReversal() *CaseReversal {
+	if x != nil {
+		return x.Reversal
+	}
+	return nil
+}
+
+// CaseReversal 是案件上 HIDE 決定的撤銷紀錄。
+type CaseReversal struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ReverseTime *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=reverse_time,json=reverseTime,proto3" json:"reverse_time,omitempty"`
+	// 撤銷的管理員（帳號 ID）。
+	ReversedBy    string `protobuf:"bytes,2,opt,name=reversed_by,json=reversedBy,proto3" json:"reversed_by,omitempty"`
+	Reason        string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CaseReversal) Reset() {
+	*x = CaseReversal{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CaseReversal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CaseReversal) ProtoMessage() {}
+
+func (x *CaseReversal) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CaseReversal.ProtoReflect.Descriptor instead.
+func (*CaseReversal) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CaseReversal) GetReverseTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReverseTime
+	}
+	return nil
+}
+
+func (x *CaseReversal) GetReversedBy() string {
+	if x != nil {
+		return x.ReversedBy
+	}
+	return ""
+}
+
+func (x *CaseReversal) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+// CaseSnapshot 是案件最近一份凍結的被檢舉內容（檢舉當下的版本）：依對象種類恰好設一個欄位。
+type CaseSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Content:
+	//
+	//	*CaseSnapshot_Social
+	//	*CaseSnapshot_Buyer
+	//	*CaseSnapshot_Review
+	//	*CaseSnapshot_Chat
+	Content       isCaseSnapshot_Content `protobuf_oneof:"content"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CaseSnapshot) Reset() {
+	*x = CaseSnapshot{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CaseSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CaseSnapshot) ProtoMessage() {}
+
+func (x *CaseSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CaseSnapshot.ProtoReflect.Descriptor instead.
+func (*CaseSnapshot) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CaseSnapshot) GetContent() isCaseSnapshot_Content {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *CaseSnapshot) GetSocial() *SocialSnapshot {
+	if x != nil {
+		if x, ok := x.Content.(*CaseSnapshot_Social); ok {
+			return x.Social
+		}
+	}
+	return nil
+}
+
+func (x *CaseSnapshot) GetBuyer() *BuyerSnapshot {
+	if x != nil {
+		if x, ok := x.Content.(*CaseSnapshot_Buyer); ok {
+			return x.Buyer
+		}
+	}
+	return nil
+}
+
+func (x *CaseSnapshot) GetReview() *ReviewSnapshot {
+	if x != nil {
+		if x, ok := x.Content.(*CaseSnapshot_Review); ok {
+			return x.Review
+		}
+	}
+	return nil
+}
+
+func (x *CaseSnapshot) GetChat() *ChatSnapshot {
+	if x != nil {
+		if x, ok := x.Content.(*CaseSnapshot_Chat); ok {
+			return x.Chat
+		}
+	}
+	return nil
+}
+
+type isCaseSnapshot_Content interface {
+	isCaseSnapshot_Content()
+}
+
+type CaseSnapshot_Social struct {
+	Social *SocialSnapshot `protobuf:"bytes,1,opt,name=social,proto3,oneof"`
+}
+
+type CaseSnapshot_Buyer struct {
+	Buyer *BuyerSnapshot `protobuf:"bytes,2,opt,name=buyer,proto3,oneof"`
+}
+
+type CaseSnapshot_Review struct {
+	Review *ReviewSnapshot `protobuf:"bytes,3,opt,name=review,proto3,oneof"`
+}
+
+type CaseSnapshot_Chat struct {
+	Chat *ChatSnapshot `protobuf:"bytes,4,opt,name=chat,proto3,oneof"`
+}
+
+func (*CaseSnapshot_Social) isCaseSnapshot_Content() {}
+
+func (*CaseSnapshot_Buyer) isCaseSnapshot_Content() {}
+
+func (*CaseSnapshot_Review) isCaseSnapshot_Content() {}
+
+func (*CaseSnapshot_Chat) isCaseSnapshot_Content() {}
+
+// SocialSnapshot 是貼文、留言與討論區留言的快照。
+type SocialSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 作者種類：BUYER 或 STORE。
+	AuthorKind string `protobuf:"bytes,1,opt,name=author_kind,json=authorKind,proto3" json:"author_kind,omitempty"`
+	// 作者 ID（過渡期的十進位整數字串）。
+	AuthorId      string                 `protobuf:"bytes,2,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	AssetIds      []string               `protobuf:"bytes,4,rep,name=asset_ids,json=assetIds,proto3" json:"asset_ids,omitempty"`
+	AuthoredTime  *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=authored_time,json=authoredTime,proto3,oneof" json:"authored_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocialSnapshot) Reset() {
+	*x = SocialSnapshot{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocialSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocialSnapshot) ProtoMessage() {}
+
+func (x *SocialSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocialSnapshot.ProtoReflect.Descriptor instead.
+func (*SocialSnapshot) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SocialSnapshot) GetAuthorKind() string {
+	if x != nil {
+		return x.AuthorKind
+	}
+	return ""
+}
+
+func (x *SocialSnapshot) GetAuthorId() string {
+	if x != nil {
+		return x.AuthorId
+	}
+	return ""
+}
+
+func (x *SocialSnapshot) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *SocialSnapshot) GetAssetIds() []string {
+	if x != nil {
+		return x.AssetIds
+	}
+	return nil
+}
+
+func (x *SocialSnapshot) GetAuthoredTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthoredTime
+	}
+	return nil
+}
+
+// BuyerSnapshot 是被檢舉買家的公開檔案快照。
+type BuyerSnapshot struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DisplayName string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// 頭像的 object key；沒有頭像是空字串。
+	Avatar        string `protobuf:"bytes,2,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BuyerSnapshot) Reset() {
+	*x = BuyerSnapshot{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuyerSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuyerSnapshot) ProtoMessage() {}
+
+func (x *BuyerSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuyerSnapshot.ProtoReflect.Descriptor instead.
+func (*BuyerSnapshot) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BuyerSnapshot) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *BuyerSnapshot) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
+	}
+	return ""
+}
+
+// ReviewSnapshot 是評價的快照；作者永遠是買家。
+type ReviewSnapshot struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	AuthorId string                 `protobuf:"bytes,1,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	// 評價所屬的店家（上下文，不是作者）。
+	StoreId      string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	ProductId    string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Rating       int32                  `protobuf:"varint,4,opt,name=rating,proto3" json:"rating,omitempty"`
+	Body         string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	AssetIds     []string               `protobuf:"bytes,6,rep,name=asset_ids,json=assetIds,proto3" json:"asset_ids,omitempty"`
+	AuthoredTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=authored_time,json=authoredTime,proto3,oneof" json:"authored_time,omitempty"`
+	// 店家回覆（上下文，不是被檢舉的內容）；沒有回覆是空字串。
+	ReplyBody     string `protobuf:"bytes,8,opt,name=reply_body,json=replyBody,proto3" json:"reply_body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewSnapshot) Reset() {
+	*x = ReviewSnapshot{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewSnapshot) ProtoMessage() {}
+
+func (x *ReviewSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewSnapshot.ProtoReflect.Descriptor instead.
+func (*ReviewSnapshot) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ReviewSnapshot) GetAuthorId() string {
+	if x != nil {
+		return x.AuthorId
+	}
+	return ""
+}
+
+func (x *ReviewSnapshot) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *ReviewSnapshot) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *ReviewSnapshot) GetRating() int32 {
+	if x != nil {
+		return x.Rating
+	}
+	return 0
+}
+
+func (x *ReviewSnapshot) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ReviewSnapshot) GetAssetIds() []string {
+	if x != nil {
+		return x.AssetIds
+	}
+	return nil
+}
+
+func (x *ReviewSnapshot) GetAuthoredTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthoredTime
+	}
+	return nil
+}
+
+func (x *ReviewSnapshot) GetReplyBody() string {
+	if x != nil {
+		return x.ReplyBody
+	}
+	return ""
+}
+
+// ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。
+type ChatSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 寄件方種類：BUYER 或 STORE。
+	AuthorKind     string                 `protobuf:"bytes,1,opt,name=author_kind,json=authorKind,proto3" json:"author_kind,omitempty"`
+	AuthorId       string                 `protobuf:"bytes,2,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	Body           string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	AssetIds       []string               `protobuf:"bytes,4,rep,name=asset_ids,json=assetIds,proto3" json:"asset_ids,omitempty"`
+	AuthoredTime   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=authored_time,json=authoredTime,proto3,oneof" json:"authored_time,omitempty"`
+	ConversationId string                 `protobuf:"bytes,6,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Seq            int64                  `protobuf:"varint,7,opt,name=seq,proto3" json:"seq,omitempty"`
+	// 前後文，依 seq 由小到大，不含被檢舉的那則。
+	Context       []*ChatContextMessage `protobuf:"bytes,8,rep,name=context,proto3" json:"context,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatSnapshot) Reset() {
+	*x = ChatSnapshot{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatSnapshot) ProtoMessage() {}
+
+func (x *ChatSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatSnapshot.ProtoReflect.Descriptor instead.
+func (*ChatSnapshot) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ChatSnapshot) GetAuthorKind() string {
+	if x != nil {
+		return x.AuthorKind
+	}
+	return ""
+}
+
+func (x *ChatSnapshot) GetAuthorId() string {
+	if x != nil {
+		return x.AuthorId
+	}
+	return ""
+}
+
+func (x *ChatSnapshot) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ChatSnapshot) GetAssetIds() []string {
+	if x != nil {
+		return x.AssetIds
+	}
+	return nil
+}
+
+func (x *ChatSnapshot) GetAuthoredTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthoredTime
+	}
+	return nil
+}
+
+func (x *ChatSnapshot) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ChatSnapshot) GetSeq() int64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *ChatSnapshot) GetContext() []*ChatContextMessage {
+	if x != nil {
+		return x.Context
+	}
+	return nil
+}
+
+// ChatContextMessage 是聊天前後文的一則；已隱藏或已抹除的是墓碑（不帶 body 與 asset_ids）。
+type ChatContextMessage struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Seq        int64                  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	SenderKind string                 `protobuf:"bytes,2,opt,name=sender_kind,json=senderKind,proto3" json:"sender_kind,omitempty"`
+	SenderId   string                 `protobuf:"bytes,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	// 訊息類型：TEXT 或 IMAGE。
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Body          string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	AssetIds      []string               `protobuf:"bytes,6,rep,name=asset_ids,json=assetIds,proto3" json:"asset_ids,omitempty"`
+	SendTime      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=send_time,json=sendTime,proto3" json:"send_time,omitempty"`
+	Hidden        bool                   `protobuf:"varint,8,opt,name=hidden,proto3" json:"hidden,omitempty"`
+	Erased        bool                   `protobuf:"varint,9,opt,name=erased,proto3" json:"erased,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatContextMessage) Reset() {
+	*x = ChatContextMessage{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatContextMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatContextMessage) ProtoMessage() {}
+
+func (x *ChatContextMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatContextMessage.ProtoReflect.Descriptor instead.
+func (*ChatContextMessage) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ChatContextMessage) GetSeq() int64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *ChatContextMessage) GetSenderKind() string {
+	if x != nil {
+		return x.SenderKind
+	}
+	return ""
+}
+
+func (x *ChatContextMessage) GetSenderId() string {
+	if x != nil {
+		return x.SenderId
+	}
+	return ""
+}
+
+func (x *ChatContextMessage) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ChatContextMessage) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ChatContextMessage) GetAssetIds() []string {
+	if x != nil {
+		return x.AssetIds
+	}
+	return nil
+}
+
+func (x *ChatContextMessage) GetSendTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SendTime
+	}
+	return nil
+}
+
+func (x *ChatContextMessage) GetHidden() bool {
+	if x != nil {
+		return x.Hidden
+	}
+	return false
+}
+
+func (x *ChatContextMessage) GetErased() bool {
+	if x != nil {
+		return x.Erased
+	}
+	return false
+}
+
 // CaseReport 是案件裡的一筆檢舉。
 type CaseReport struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -367,7 +1002,7 @@ type CaseReport struct {
 
 func (x *CaseReport) Reset() {
 	*x = CaseReport{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[1]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -379,7 +1014,7 @@ func (x *CaseReport) String() string {
 func (*CaseReport) ProtoMessage() {}
 
 func (x *CaseReport) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[1]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -392,7 +1027,7 @@ func (x *CaseReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CaseReport.ProtoReflect.Descriptor instead.
 func (*CaseReport) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{1}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CaseReport) GetId() string {
@@ -452,7 +1087,7 @@ type ListCasesRequest struct {
 
 func (x *ListCasesRequest) Reset() {
 	*x = ListCasesRequest{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[2]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +1099,7 @@ func (x *ListCasesRequest) String() string {
 func (*ListCasesRequest) ProtoMessage() {}
 
 func (x *ListCasesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[2]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +1112,7 @@ func (x *ListCasesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCasesRequest.ProtoReflect.Descriptor instead.
 func (*ListCasesRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{2}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListCasesRequest) GetPageSize() int32 {
@@ -518,7 +1153,7 @@ type ListCasesResponse struct {
 
 func (x *ListCasesResponse) Reset() {
 	*x = ListCasesResponse{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[3]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +1165,7 @@ func (x *ListCasesResponse) String() string {
 func (*ListCasesResponse) ProtoMessage() {}
 
 func (x *ListCasesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[3]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,7 +1178,7 @@ func (x *ListCasesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCasesResponse.ProtoReflect.Descriptor instead.
 func (*ListCasesResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{3}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListCasesResponse) GetCases() []*Case {
@@ -569,7 +1204,7 @@ type GetCaseRequest struct {
 
 func (x *GetCaseRequest) Reset() {
 	*x = GetCaseRequest{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[4]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -581,7 +1216,7 @@ func (x *GetCaseRequest) String() string {
 func (*GetCaseRequest) ProtoMessage() {}
 
 func (x *GetCaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[4]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -594,7 +1229,7 @@ func (x *GetCaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCaseRequest.ProtoReflect.Descriptor instead.
 func (*GetCaseRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{4}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetCaseRequest) GetId() string {
@@ -608,14 +1243,16 @@ type GetCaseResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Case  *Case                  `protobuf:"bytes,1,opt,name=case,proto3" json:"case,omitempty"`
 	// 全部檢舉，送出時間由舊到新。
-	Reports       []*CaseReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
+	Reports []*CaseReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
+	// 案件最近一份凍結的被檢舉內容；沒有快照（結案滿保留期後被清除）不設。
+	Snapshot      *CaseSnapshot `protobuf:"bytes,3,opt,name=snapshot,proto3,oneof" json:"snapshot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetCaseResponse) Reset() {
 	*x = GetCaseResponse{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +1264,7 @@ func (x *GetCaseResponse) String() string {
 func (*GetCaseResponse) ProtoMessage() {}
 
 func (x *GetCaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +1277,7 @@ func (x *GetCaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCaseResponse.ProtoReflect.Descriptor instead.
 func (*GetCaseResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{5}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetCaseResponse) GetCase() *Case {
@@ -653,6 +1290,13 @@ func (x *GetCaseResponse) GetCase() *Case {
 func (x *GetCaseResponse) GetReports() []*CaseReport {
 	if x != nil {
 		return x.Reports
+	}
+	return nil
+}
+
+func (x *GetCaseResponse) GetSnapshot() *CaseSnapshot {
+	if x != nil {
+		return x.Snapshot
 	}
 	return nil
 }
@@ -677,7 +1321,7 @@ type DecideCaseRequest struct {
 
 func (x *DecideCaseRequest) Reset() {
 	*x = DecideCaseRequest{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +1333,7 @@ func (x *DecideCaseRequest) String() string {
 func (*DecideCaseRequest) ProtoMessage() {}
 
 func (x *DecideCaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +1346,7 @@ func (x *DecideCaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideCaseRequest.ProtoReflect.Descriptor instead.
 func (*DecideCaseRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{6}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DecideCaseRequest) GetId() string {
@@ -764,7 +1408,7 @@ type DecideCaseResponse struct {
 
 func (x *DecideCaseResponse) Reset() {
 	*x = DecideCaseResponse{}
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[7]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -776,7 +1420,7 @@ func (x *DecideCaseResponse) String() string {
 func (*DecideCaseResponse) ProtoMessage() {}
 
 func (x *DecideCaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[7]
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -789,7 +1433,7 @@ func (x *DecideCaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideCaseResponse.ProtoReflect.Descriptor instead.
 func (*DecideCaseResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{7}
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DecideCaseResponse) GetCase() *Case {
@@ -806,11 +1450,116 @@ func (x *DecideCaseResponse) GetReports() []*CaseReport {
 	return nil
 }
 
+type ReverseHideRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 撤銷原因，去除首尾空白後 1 到 500 個字元（以 Unicode 字元計）。
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReverseHideRequest) Reset() {
+	*x = ReverseHideRequest{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReverseHideRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReverseHideRequest) ProtoMessage() {}
+
+func (x *ReverseHideRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReverseHideRequest.ProtoReflect.Descriptor instead.
+func (*ReverseHideRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ReverseHideRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ReverseHideRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ReverseHideResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Case          *Case                  `protobuf:"bytes,1,opt,name=case,proto3" json:"case,omitempty"`
+	Reports       []*CaseReport          `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReverseHideResponse) Reset() {
+	*x = ReverseHideResponse{}
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReverseHideResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReverseHideResponse) ProtoMessage() {}
+
+func (x *ReverseHideResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReverseHideResponse.ProtoReflect.Descriptor instead.
+func (*ReverseHideResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ReverseHideResponse) GetCase() *Case {
+	if x != nil {
+		return x.Case
+	}
+	return nil
+}
+
+func (x *ReverseHideResponse) GetReports() []*CaseReport {
+	if x != nil {
+		return x.Reports
+	}
+	return nil
+}
+
 var File_hawkr_admin_moderation_v1alpha1_moderation_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xf5\x05\n" +
+	"0hawkr/admin/moderation/v1alpha1/moderation.proto\x12\x1fhawkr.admin.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a*hawkr/moderation/v1alpha1/moderation.proto\x1a\"hawkr/seller/v1alpha1/seller.proto\"\xd7\x06\n" +
 	"\x04Case\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12D\n" +
 	"\x06target\x18\x02 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x03R\x06target\x12E\n" +
@@ -828,10 +1577,68 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\freport_count\x18\v \x01(\x03B\x03\xe0A\x03R\vreportCount\x12'\n" +
 	"\n" +
 	"measure_id\x18\f \x01(\tB\x03\xe0A\x03H\x01R\tmeasureId\x88\x01\x01\x12#\n" +
-	"\bstore_id\x18\r \x01(\tB\x03\xe0A\x03H\x02R\astoreId\x88\x01\x01B\x0f\n" +
+	"\bstore_id\x18\r \x01(\tB\x03\xe0A\x03H\x02R\astoreId\x88\x01\x01\x12S\n" +
+	"\breversal\x18\x0e \x01(\v2-.hawkr.admin.moderation.v1alpha1.CaseReversalB\x03\xe0A\x03H\x03R\breversal\x88\x01\x01B\x0f\n" +
 	"\r_resolve_timeB\r\n" +
 	"\v_measure_idB\v\n" +
-	"\t_store_id\"\xa8\x02\n" +
+	"\t_store_idB\v\n" +
+	"\t_reversal\"\x95\x01\n" +
+	"\fCaseReversal\x12B\n" +
+	"\freverse_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vreverseTime\x12$\n" +
+	"\vreversed_by\x18\x02 \x01(\tB\x03\xe0A\x03R\n" +
+	"reversedBy\x12\x1b\n" +
+	"\x06reason\x18\x03 \x01(\tB\x03\xe0A\x03R\x06reason\"\xbc\x02\n" +
+	"\fCaseSnapshot\x12I\n" +
+	"\x06social\x18\x01 \x01(\v2/.hawkr.admin.moderation.v1alpha1.SocialSnapshotH\x00R\x06social\x12F\n" +
+	"\x05buyer\x18\x02 \x01(\v2..hawkr.admin.moderation.v1alpha1.BuyerSnapshotH\x00R\x05buyer\x12I\n" +
+	"\x06review\x18\x03 \x01(\v2/.hawkr.admin.moderation.v1alpha1.ReviewSnapshotH\x00R\x06review\x12C\n" +
+	"\x04chat\x18\x04 \x01(\v2-.hawkr.admin.moderation.v1alpha1.ChatSnapshotH\x00R\x04chatB\t\n" +
+	"\acontent\"\xf0\x01\n" +
+	"\x0eSocialSnapshot\x12$\n" +
+	"\vauthor_kind\x18\x01 \x01(\tB\x03\xe0A\x03R\n" +
+	"authorKind\x12 \n" +
+	"\tauthor_id\x18\x02 \x01(\tB\x03\xe0A\x03R\bauthorId\x12\x17\n" +
+	"\x04body\x18\x03 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
+	"\tasset_ids\x18\x04 \x03(\tB\x03\xe0A\x03R\bassetIds\x12I\n" +
+	"\rauthored_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\fauthoredTime\x88\x01\x01B\x10\n" +
+	"\x0e_authored_time\"T\n" +
+	"\rBuyerSnapshot\x12&\n" +
+	"\fdisplay_name\x18\x01 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12\x1b\n" +
+	"\x06avatar\x18\x02 \x01(\tB\x03\xe0A\x03R\x06avatar\"\xcf\x02\n" +
+	"\x0eReviewSnapshot\x12 \n" +
+	"\tauthor_id\x18\x01 \x01(\tB\x03\xe0A\x03R\bauthorId\x12\x1e\n" +
+	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
+	"\n" +
+	"product_id\x18\x03 \x01(\tB\x03\xe0A\x03R\tproductId\x12\x1b\n" +
+	"\x06rating\x18\x04 \x01(\x05B\x03\xe0A\x03R\x06rating\x12\x17\n" +
+	"\x04body\x18\x05 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
+	"\tasset_ids\x18\x06 \x03(\tB\x03\xe0A\x03R\bassetIds\x12I\n" +
+	"\rauthored_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\fauthoredTime\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"reply_body\x18\b \x01(\tB\x03\xe0A\x03R\treplyBodyB\x10\n" +
+	"\x0e_authored_time\"\x87\x03\n" +
+	"\fChatSnapshot\x12$\n" +
+	"\vauthor_kind\x18\x01 \x01(\tB\x03\xe0A\x03R\n" +
+	"authorKind\x12 \n" +
+	"\tauthor_id\x18\x02 \x01(\tB\x03\xe0A\x03R\bauthorId\x12\x17\n" +
+	"\x04body\x18\x03 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
+	"\tasset_ids\x18\x04 \x03(\tB\x03\xe0A\x03R\bassetIds\x12I\n" +
+	"\rauthored_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\fauthoredTime\x88\x01\x01\x12,\n" +
+	"\x0fconversation_id\x18\x06 \x01(\tB\x03\xe0A\x03R\x0econversationId\x12\x15\n" +
+	"\x03seq\x18\a \x01(\x03B\x03\xe0A\x03R\x03seq\x12R\n" +
+	"\acontext\x18\b \x03(\v23.hawkr.admin.moderation.v1alpha1.ChatContextMessageB\x03\xe0A\x03R\acontextB\x10\n" +
+	"\x0e_authored_time\"\xbf\x02\n" +
+	"\x12ChatContextMessage\x12\x15\n" +
+	"\x03seq\x18\x01 \x01(\x03B\x03\xe0A\x03R\x03seq\x12$\n" +
+	"\vsender_kind\x18\x02 \x01(\tB\x03\xe0A\x03R\n" +
+	"senderKind\x12 \n" +
+	"\tsender_id\x18\x03 \x01(\tB\x03\xe0A\x03R\bsenderId\x12\x17\n" +
+	"\x04type\x18\x04 \x01(\tB\x03\xe0A\x03R\x04type\x12\x17\n" +
+	"\x04body\x18\x05 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
+	"\tasset_ids\x18\x06 \x03(\tB\x03\xe0A\x03R\bassetIds\x12<\n" +
+	"\tsend_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\bsendTime\x12\x1b\n" +
+	"\x06hidden\x18\b \x01(\bB\x03\xe0A\x03R\x06hidden\x12\x1b\n" +
+	"\x06erased\x18\t \x01(\bB\x03\xe0A\x03R\x06erased\"\xa8\x02\n" +
 	"\n" +
 	"CaseReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12\x1f\n" +
@@ -853,10 +1660,12 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x05cases\x18\x01 \x03(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x05cases\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"%\n" +
 	"\x0eGetCaseRequest\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"\x93\x01\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"\xf0\x01\n" +
 	"\x0fGetCaseResponse\x129\n" +
 	"\x04case\x18\x01 \x01(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x04case\x12E\n" +
-	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports\"\x87\x03\n" +
+	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports\x12N\n" +
+	"\bsnapshot\x18\x03 \x01(\v2-.hawkr.admin.moderation.v1alpha1.CaseSnapshotH\x00R\bsnapshot\x88\x01\x01B\v\n" +
+	"\t_snapshot\"\x87\x03\n" +
 	"\x11DecideCaseRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\x12N\n" +
@@ -866,6 +1675,12 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12D\n" +
 	"\bseverity\x18\b \x01(\x0e2(.hawkr.seller.v1alpha1.ViolationSeverityR\bseverityJ\x04\b\a\x10\bR\bstore_id\"\x96\x01\n" +
 	"\x12DecideCaseResponse\x129\n" +
+	"\x04case\x18\x01 \x01(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x04case\x12E\n" +
+	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports\"F\n" +
+	"\x12ReverseHideRequest\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x1b\n" +
+	"\x06reason\x18\x02 \x01(\tB\x03\xe0A\x02R\x06reason\"\x97\x01\n" +
+	"\x13ReverseHideResponse\x129\n" +
 	"\x04case\x18\x01 \x01(\v2%.hawkr.admin.moderation.v1alpha1.CaseR\x04case\x12E\n" +
 	"\areports\x18\x02 \x03(\v2+.hawkr.admin.moderation.v1alpha1.CaseReportR\areports*S\n" +
 	"\tCaseState\x12\x1a\n" +
@@ -882,12 +1697,13 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x10CASE_ACTION_HIDE\x10\x01\x12\x14\n" +
 	"\x10CASE_ACTION_WARN\x10\x02\x12\x13\n" +
 	"\x0fCASE_ACTION_BAN\x10\x03\x12\x18\n" +
-	"\x14CASE_ACTION_TAKEDOWN\x10\x042\xfb\x02\n" +
+	"\x14CASE_ACTION_TAKEDOWN\x10\x042\xf5\x03\n" +
 	"\x16ModerationAdminService\x12w\n" +
 	"\tListCases\x121.hawkr.admin.moderation.v1alpha1.ListCasesRequest\x1a2.hawkr.admin.moderation.v1alpha1.ListCasesResponse\"\x03\x90\x02\x01\x12q\n" +
 	"\aGetCase\x12/.hawkr.admin.moderation.v1alpha1.GetCaseRequest\x1a0.hawkr.admin.moderation.v1alpha1.GetCaseResponse\"\x03\x90\x02\x01\x12u\n" +
 	"\n" +
-	"DecideCase\x122.hawkr.admin.moderation.v1alpha1.DecideCaseRequest\x1a3.hawkr.admin.moderation.v1alpha1.DecideCaseResponseB\xc2\x02\n" +
+	"DecideCase\x122.hawkr.admin.moderation.v1alpha1.DecideCaseRequest\x1a3.hawkr.admin.moderation.v1alpha1.DecideCaseResponse\x12x\n" +
+	"\vReverseHide\x123.hawkr.admin.moderation.v1alpha1.ReverseHideRequest\x1a4.hawkr.admin.moderation.v1alpha1.ReverseHideResponseB\xc2\x02\n" +
 	"#com.hawkr.admin.moderation.v1alpha1B\x0fModerationProtoP\x01Zkgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1;moderationv1alpha1\xa2\x02\x03HAM\xaa\x02\x1fHawkr.Admin.Moderation.V1alpha1\xca\x02\x1fHawkr\\Admin\\Moderation\\V1alpha1\xe2\x02+Hawkr\\Admin\\Moderation\\V1alpha1\\GPBMetadata\xea\x02\"Hawkr::Admin::Moderation::V1alpha1b\x06proto3"
 
 var (
@@ -903,59 +1719,84 @@ func file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDescGZIP() []byte 
 }
 
 var file_hawkr_admin_moderation_v1alpha1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_hawkr_admin_moderation_v1alpha1_moderation_proto_goTypes = []any{
 	(CaseState)(0),                   // 0: hawkr.admin.moderation.v1alpha1.CaseState
 	(CaseDecision)(0),                // 1: hawkr.admin.moderation.v1alpha1.CaseDecision
 	(CaseAction)(0),                  // 2: hawkr.admin.moderation.v1alpha1.CaseAction
 	(*Case)(nil),                     // 3: hawkr.admin.moderation.v1alpha1.Case
-	(*CaseReport)(nil),               // 4: hawkr.admin.moderation.v1alpha1.CaseReport
-	(*ListCasesRequest)(nil),         // 5: hawkr.admin.moderation.v1alpha1.ListCasesRequest
-	(*ListCasesResponse)(nil),        // 6: hawkr.admin.moderation.v1alpha1.ListCasesResponse
-	(*GetCaseRequest)(nil),           // 7: hawkr.admin.moderation.v1alpha1.GetCaseRequest
-	(*GetCaseResponse)(nil),          // 8: hawkr.admin.moderation.v1alpha1.GetCaseResponse
-	(*DecideCaseRequest)(nil),        // 9: hawkr.admin.moderation.v1alpha1.DecideCaseRequest
-	(*DecideCaseResponse)(nil),       // 10: hawkr.admin.moderation.v1alpha1.DecideCaseResponse
-	(*v1alpha1.ReportTarget)(nil),    // 11: hawkr.moderation.v1alpha1.ReportTarget
-	(*timestamppb.Timestamp)(nil),    // 12: google.protobuf.Timestamp
-	(v1alpha11.PolicyCategory)(0),    // 13: hawkr.common.v1alpha1.PolicyCategory
-	(v1alpha1.ReportOutcome)(0),      // 14: hawkr.moderation.v1alpha1.ReportOutcome
-	(v1alpha1.ReportTargetKind)(0),   // 15: hawkr.moderation.v1alpha1.ReportTargetKind
-	(v1alpha12.ViolationSeverity)(0), // 16: hawkr.seller.v1alpha1.ViolationSeverity
+	(*CaseReversal)(nil),             // 4: hawkr.admin.moderation.v1alpha1.CaseReversal
+	(*CaseSnapshot)(nil),             // 5: hawkr.admin.moderation.v1alpha1.CaseSnapshot
+	(*SocialSnapshot)(nil),           // 6: hawkr.admin.moderation.v1alpha1.SocialSnapshot
+	(*BuyerSnapshot)(nil),            // 7: hawkr.admin.moderation.v1alpha1.BuyerSnapshot
+	(*ReviewSnapshot)(nil),           // 8: hawkr.admin.moderation.v1alpha1.ReviewSnapshot
+	(*ChatSnapshot)(nil),             // 9: hawkr.admin.moderation.v1alpha1.ChatSnapshot
+	(*ChatContextMessage)(nil),       // 10: hawkr.admin.moderation.v1alpha1.ChatContextMessage
+	(*CaseReport)(nil),               // 11: hawkr.admin.moderation.v1alpha1.CaseReport
+	(*ListCasesRequest)(nil),         // 12: hawkr.admin.moderation.v1alpha1.ListCasesRequest
+	(*ListCasesResponse)(nil),        // 13: hawkr.admin.moderation.v1alpha1.ListCasesResponse
+	(*GetCaseRequest)(nil),           // 14: hawkr.admin.moderation.v1alpha1.GetCaseRequest
+	(*GetCaseResponse)(nil),          // 15: hawkr.admin.moderation.v1alpha1.GetCaseResponse
+	(*DecideCaseRequest)(nil),        // 16: hawkr.admin.moderation.v1alpha1.DecideCaseRequest
+	(*DecideCaseResponse)(nil),       // 17: hawkr.admin.moderation.v1alpha1.DecideCaseResponse
+	(*ReverseHideRequest)(nil),       // 18: hawkr.admin.moderation.v1alpha1.ReverseHideRequest
+	(*ReverseHideResponse)(nil),      // 19: hawkr.admin.moderation.v1alpha1.ReverseHideResponse
+	(*v1alpha1.ReportTarget)(nil),    // 20: hawkr.moderation.v1alpha1.ReportTarget
+	(*timestamppb.Timestamp)(nil),    // 21: google.protobuf.Timestamp
+	(v1alpha11.PolicyCategory)(0),    // 22: hawkr.common.v1alpha1.PolicyCategory
+	(v1alpha1.ReportOutcome)(0),      // 23: hawkr.moderation.v1alpha1.ReportOutcome
+	(v1alpha1.ReportTargetKind)(0),   // 24: hawkr.moderation.v1alpha1.ReportTargetKind
+	(v1alpha12.ViolationSeverity)(0), // 25: hawkr.seller.v1alpha1.ViolationSeverity
 }
 var file_hawkr_admin_moderation_v1alpha1_moderation_proto_depIdxs = []int32{
-	11, // 0: hawkr.admin.moderation.v1alpha1.Case.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
+	20, // 0: hawkr.admin.moderation.v1alpha1.Case.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
 	0,  // 1: hawkr.admin.moderation.v1alpha1.Case.state:type_name -> hawkr.admin.moderation.v1alpha1.CaseState
-	12, // 2: hawkr.admin.moderation.v1alpha1.Case.create_time:type_name -> google.protobuf.Timestamp
+	21, // 2: hawkr.admin.moderation.v1alpha1.Case.create_time:type_name -> google.protobuf.Timestamp
 	1,  // 3: hawkr.admin.moderation.v1alpha1.Case.decision:type_name -> hawkr.admin.moderation.v1alpha1.CaseDecision
-	13, // 4: hawkr.admin.moderation.v1alpha1.Case.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	22, // 4: hawkr.admin.moderation.v1alpha1.Case.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
 	2,  // 5: hawkr.admin.moderation.v1alpha1.Case.action:type_name -> hawkr.admin.moderation.v1alpha1.CaseAction
-	12, // 6: hawkr.admin.moderation.v1alpha1.Case.resolve_time:type_name -> google.protobuf.Timestamp
-	13, // 7: hawkr.admin.moderation.v1alpha1.CaseReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	14, // 8: hawkr.admin.moderation.v1alpha1.CaseReport.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
-	12, // 9: hawkr.admin.moderation.v1alpha1.CaseReport.create_time:type_name -> google.protobuf.Timestamp
-	0,  // 10: hawkr.admin.moderation.v1alpha1.ListCasesRequest.state:type_name -> hawkr.admin.moderation.v1alpha1.CaseState
-	15, // 11: hawkr.admin.moderation.v1alpha1.ListCasesRequest.target_kind:type_name -> hawkr.moderation.v1alpha1.ReportTargetKind
-	3,  // 12: hawkr.admin.moderation.v1alpha1.ListCasesResponse.cases:type_name -> hawkr.admin.moderation.v1alpha1.Case
-	3,  // 13: hawkr.admin.moderation.v1alpha1.GetCaseResponse.case:type_name -> hawkr.admin.moderation.v1alpha1.Case
-	4,  // 14: hawkr.admin.moderation.v1alpha1.GetCaseResponse.reports:type_name -> hawkr.admin.moderation.v1alpha1.CaseReport
-	1,  // 15: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.decision:type_name -> hawkr.admin.moderation.v1alpha1.CaseDecision
-	13, // 16: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	2,  // 17: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.action:type_name -> hawkr.admin.moderation.v1alpha1.CaseAction
-	16, // 18: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
-	3,  // 19: hawkr.admin.moderation.v1alpha1.DecideCaseResponse.case:type_name -> hawkr.admin.moderation.v1alpha1.Case
-	4,  // 20: hawkr.admin.moderation.v1alpha1.DecideCaseResponse.reports:type_name -> hawkr.admin.moderation.v1alpha1.CaseReport
-	5,  // 21: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ListCases:input_type -> hawkr.admin.moderation.v1alpha1.ListCasesRequest
-	7,  // 22: hawkr.admin.moderation.v1alpha1.ModerationAdminService.GetCase:input_type -> hawkr.admin.moderation.v1alpha1.GetCaseRequest
-	9,  // 23: hawkr.admin.moderation.v1alpha1.ModerationAdminService.DecideCase:input_type -> hawkr.admin.moderation.v1alpha1.DecideCaseRequest
-	6,  // 24: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ListCases:output_type -> hawkr.admin.moderation.v1alpha1.ListCasesResponse
-	8,  // 25: hawkr.admin.moderation.v1alpha1.ModerationAdminService.GetCase:output_type -> hawkr.admin.moderation.v1alpha1.GetCaseResponse
-	10, // 26: hawkr.admin.moderation.v1alpha1.ModerationAdminService.DecideCase:output_type -> hawkr.admin.moderation.v1alpha1.DecideCaseResponse
-	24, // [24:27] is the sub-list for method output_type
-	21, // [21:24] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	21, // 6: hawkr.admin.moderation.v1alpha1.Case.resolve_time:type_name -> google.protobuf.Timestamp
+	4,  // 7: hawkr.admin.moderation.v1alpha1.Case.reversal:type_name -> hawkr.admin.moderation.v1alpha1.CaseReversal
+	21, // 8: hawkr.admin.moderation.v1alpha1.CaseReversal.reverse_time:type_name -> google.protobuf.Timestamp
+	6,  // 9: hawkr.admin.moderation.v1alpha1.CaseSnapshot.social:type_name -> hawkr.admin.moderation.v1alpha1.SocialSnapshot
+	7,  // 10: hawkr.admin.moderation.v1alpha1.CaseSnapshot.buyer:type_name -> hawkr.admin.moderation.v1alpha1.BuyerSnapshot
+	8,  // 11: hawkr.admin.moderation.v1alpha1.CaseSnapshot.review:type_name -> hawkr.admin.moderation.v1alpha1.ReviewSnapshot
+	9,  // 12: hawkr.admin.moderation.v1alpha1.CaseSnapshot.chat:type_name -> hawkr.admin.moderation.v1alpha1.ChatSnapshot
+	21, // 13: hawkr.admin.moderation.v1alpha1.SocialSnapshot.authored_time:type_name -> google.protobuf.Timestamp
+	21, // 14: hawkr.admin.moderation.v1alpha1.ReviewSnapshot.authored_time:type_name -> google.protobuf.Timestamp
+	21, // 15: hawkr.admin.moderation.v1alpha1.ChatSnapshot.authored_time:type_name -> google.protobuf.Timestamp
+	10, // 16: hawkr.admin.moderation.v1alpha1.ChatSnapshot.context:type_name -> hawkr.admin.moderation.v1alpha1.ChatContextMessage
+	21, // 17: hawkr.admin.moderation.v1alpha1.ChatContextMessage.send_time:type_name -> google.protobuf.Timestamp
+	22, // 18: hawkr.admin.moderation.v1alpha1.CaseReport.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	23, // 19: hawkr.admin.moderation.v1alpha1.CaseReport.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
+	21, // 20: hawkr.admin.moderation.v1alpha1.CaseReport.create_time:type_name -> google.protobuf.Timestamp
+	0,  // 21: hawkr.admin.moderation.v1alpha1.ListCasesRequest.state:type_name -> hawkr.admin.moderation.v1alpha1.CaseState
+	24, // 22: hawkr.admin.moderation.v1alpha1.ListCasesRequest.target_kind:type_name -> hawkr.moderation.v1alpha1.ReportTargetKind
+	3,  // 23: hawkr.admin.moderation.v1alpha1.ListCasesResponse.cases:type_name -> hawkr.admin.moderation.v1alpha1.Case
+	3,  // 24: hawkr.admin.moderation.v1alpha1.GetCaseResponse.case:type_name -> hawkr.admin.moderation.v1alpha1.Case
+	11, // 25: hawkr.admin.moderation.v1alpha1.GetCaseResponse.reports:type_name -> hawkr.admin.moderation.v1alpha1.CaseReport
+	5,  // 26: hawkr.admin.moderation.v1alpha1.GetCaseResponse.snapshot:type_name -> hawkr.admin.moderation.v1alpha1.CaseSnapshot
+	1,  // 27: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.decision:type_name -> hawkr.admin.moderation.v1alpha1.CaseDecision
+	22, // 28: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	2,  // 29: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.action:type_name -> hawkr.admin.moderation.v1alpha1.CaseAction
+	25, // 30: hawkr.admin.moderation.v1alpha1.DecideCaseRequest.severity:type_name -> hawkr.seller.v1alpha1.ViolationSeverity
+	3,  // 31: hawkr.admin.moderation.v1alpha1.DecideCaseResponse.case:type_name -> hawkr.admin.moderation.v1alpha1.Case
+	11, // 32: hawkr.admin.moderation.v1alpha1.DecideCaseResponse.reports:type_name -> hawkr.admin.moderation.v1alpha1.CaseReport
+	3,  // 33: hawkr.admin.moderation.v1alpha1.ReverseHideResponse.case:type_name -> hawkr.admin.moderation.v1alpha1.Case
+	11, // 34: hawkr.admin.moderation.v1alpha1.ReverseHideResponse.reports:type_name -> hawkr.admin.moderation.v1alpha1.CaseReport
+	12, // 35: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ListCases:input_type -> hawkr.admin.moderation.v1alpha1.ListCasesRequest
+	14, // 36: hawkr.admin.moderation.v1alpha1.ModerationAdminService.GetCase:input_type -> hawkr.admin.moderation.v1alpha1.GetCaseRequest
+	16, // 37: hawkr.admin.moderation.v1alpha1.ModerationAdminService.DecideCase:input_type -> hawkr.admin.moderation.v1alpha1.DecideCaseRequest
+	18, // 38: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ReverseHide:input_type -> hawkr.admin.moderation.v1alpha1.ReverseHideRequest
+	13, // 39: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ListCases:output_type -> hawkr.admin.moderation.v1alpha1.ListCasesResponse
+	15, // 40: hawkr.admin.moderation.v1alpha1.ModerationAdminService.GetCase:output_type -> hawkr.admin.moderation.v1alpha1.GetCaseResponse
+	17, // 41: hawkr.admin.moderation.v1alpha1.ModerationAdminService.DecideCase:output_type -> hawkr.admin.moderation.v1alpha1.DecideCaseResponse
+	19, // 42: hawkr.admin.moderation.v1alpha1.ModerationAdminService.ReverseHide:output_type -> hawkr.admin.moderation.v1alpha1.ReverseHideResponse
+	39, // [39:43] is the sub-list for method output_type
+	35, // [35:39] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_moderation_v1alpha1_moderation_proto_init() }
@@ -964,13 +1805,23 @@ func file_hawkr_admin_moderation_v1alpha1_moderation_proto_init() {
 		return
 	}
 	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[0].OneofWrappers = []any{}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[2].OneofWrappers = []any{
+		(*CaseSnapshot_Social)(nil),
+		(*CaseSnapshot_Buyer)(nil),
+		(*CaseSnapshot_Review)(nil),
+		(*CaseSnapshot_Chat)(nil),
+	}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[3].OneofWrappers = []any{}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[5].OneofWrappers = []any{}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[6].OneofWrappers = []any{}
+	file_hawkr_admin_moderation_v1alpha1_moderation_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc), len(file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

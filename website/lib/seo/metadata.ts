@@ -120,7 +120,7 @@ function rootSocialImage(alt: string) {
 
 /** The seller media fields that can stand in for a store's share picture. */
 export interface SellerSocialImageSource {
-	/** Store cover objectKey (`coverKey` on the wire — see lib/api `fetchSeller`). */
+	/** Store cover objectKey (`PublicStoreView.coverImage`). */
 	coverImage?: string | null;
 	/** Store logo objectKey (`logoUrl` on the wire, normalised to `logo_url`). */
 	logo_url?: string | null;
@@ -142,8 +142,8 @@ export interface SellerSocialImageSource {
  * cascade lives here so "which field represents this seller" has one answer.
  *
  * `bannerUrl` is deliberately NOT a step: it is not a field the seller API
- * returns. `/public/sellers/{id}` wires `coverKey`/`coverUrl` +
- * `logoKey`/`logoUrl` (gateway `handler.SellerDetail`) and nothing else, which
+ * returns. `GetStore` (`PublicStore`) returns `cover_image` and
+ * `logo` and nothing else, which
  * is why `caac25a5` removed the `bannerUrl` read from the storefront as a dead
  * fallback. Re-adding it would be re-adding a branch that can never be taken.
  */

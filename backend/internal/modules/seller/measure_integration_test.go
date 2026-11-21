@@ -2140,7 +2140,7 @@ func TestAccountMeasuresCarryThePeriodAndState(t *testing.T) {
 	}
 }
 
-// 通報與案件的資料庫保證：檢舉人剛好一種、已採取措施一定在案件裡、結果與時間成對、通報的店家與平台判定類別一定等於案件的（複合外鍵）、
+// 通報與案件的資料庫保證：檢舉人是正數的買家（沒有匿名）、已採取措施一定在案件裡、結果與時間成對、通報的店家與平台判定類別一定等於案件的（複合外鍵）、
 // 移動紀錄的通報與兩個案件是同一家店、措施的來源案件是同一家店的、註記剛好掛在案件或措施的其中一個、改嚴重度的改前改後只在案件的註記、
 // 同一家店同一個類別同時最多一個進行中的案件、佐證的位置在一筆通報全部佐證的張數之內。
 // 每個案例只違反一條約束，而且指名是哪一條（wantViolates）：只看「有錯誤」會把參數數量不符之類不是資料庫擋下的錯誤也當成通過，
@@ -2151,13 +2151,13 @@ func TestReportSchemaConstraints(t *testing.T) {
 	ctx := context.Background()
 	_, s := f.open(t)
 	_, other := f.open(t)
-	f.anonymousReport(t, s.StoreID, "0912345678")
+	f.foodSafetyReport(t, s.StoreID, 9)
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
 	foreign, _ := f.newCase(t, other.StoreID, policy.Fraud, SeverityLow, 1)
 	foreignSecond, _ := f.newCase(t, other.StoreID, policy.Counterfeit, SeverityLow, 1) // 別家店的第二個案件：移動紀錄的來源與目標要不同
 	m := f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
 	// 同一位買家再送一次：members[0] 有一則補充（下面的佐證用它）。
-	if r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: *members[0].ReporterBuyerID, Category: policy.Fraud, Description: "補充"}); err != nil || !r.Supplemented {
+	if r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: members[0].ReporterBuyerID, Category: policy.Fraud, Description: "補充"}); err != nil || !r.Supplemented {
 		t.Fatalf("supplement=%+v err=%v", r, err)
 	}
 	insertReport := "INSERT INTO seller.reports (id, store_id, category, description, created_at, updated_at, "
@@ -2165,15 +2165,12 @@ func TestReportSchemaConstraints(t *testing.T) {
 	storeID, otherStoreID := fmt.Sprint(s.StoreID), fmt.Sprint(other.StoreID)
 	report0, report1, caseID, foreignID, foreignSecondID, measureID := members[0].ID.String(), members[1].ID.String(), c.ID.String(), foreign.ID.String(), foreignSecond.ID.String(), m.ID.String()
 	for _, v := range []struct{ name, constraint, sql string }{
-		{"買家又留電話", "reports_reporter_check", insertReport + "reporter_buyer_id, reporter_phone) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, '0912345678')"},
-		{"只有姓名", "reports_reporter_check", insertReport + "reporter_name) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), '王')"},
-		{"email 大寫", "reports_reporter_email_check", insertReport + "reporter_email) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 'A@b.c')"},
+		{"檢舉人不是正數", "reports_reporter_check", insertReport + "reporter_buyer_id) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 0)"},
 		{"已採取措施而沒有案件", "reports_action_taken_check", insertReport + "reporter_buyer_id, outcome, resolved_at, resolved_by_admin_id) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, 'ACTION_TAKEN', now(), 1)"},
 		{"結果不認得", "reports_outcome_check", insertReport + "reporter_buyer_id, outcome, resolved_at, resolved_by_admin_id) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, 'VERIFIED', now(), 1)"},
 		{"有結果沒有時間", "reports_resolved_check", insertReport + "reporter_buyer_id, outcome) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, 'NO_VIOLATION')"},
 		{"有時間沒有結果", "reports_resolved_check", insertReport + "reporter_buyer_id, resolved_at, resolved_by_admin_id) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, now(), 1)"},
 		{"說明只有空白", "reports_resolved_check", insertReport + "reporter_buyer_id, outcome, resolved_at, resolved_by_admin_id, resolution_note) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, 'ABUSIVE', now(), 1, '')"},
-		{"補充計數是負的", "reports_counts_check", insertReport + "reporter_buyer_id, discarded_submissions) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, -1)"},
 		{"版本是 0", "reports_counts_check", insertReport + "reporter_buyer_id, version) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, 0)"},
 		{"類別是 PLATFORM_ABUSE（檢舉人不能選）", "reports_category_check", insertReport + "reporter_buyer_id) VALUES (uuidv7(), $1, 'PLATFORM_ABUSE', 'x', now(), now(), 5)"},
 		{"掛了案件沒有平台判定類別", "reports_triage_check", "UPDATE seller.reports SET case_id = (SELECT id FROM seller.cases WHERE store_id = $1 LIMIT 1) WHERE id = (SELECT id FROM seller.reports WHERE case_id IS NULL AND store_id = $1 LIMIT 1)"},
@@ -2185,7 +2182,6 @@ func TestReportSchemaConstraints(t *testing.T) {
 		{"補充的佐證沒有指向補充", "report_evidence_supplement_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 1, 0, 'a', 'k')"},
 		{"補充的佐證指向的補充不是這一次送出", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report0 + "', 2, 0, id, 'a', 'k' FROM seller.report_supplements WHERE report_id = '" + report0 + "'"},
 		{"佐證的補充屬於別的通報", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report1 + "', 1, 0, id, 'a', 'k' FROM (SELECT id FROM seller.report_supplements LIMIT 1) x"},
-		{"補充的比對方式不認得", "report_supplements_matched_by_check", "INSERT INTO seller.report_supplements (id, report_id, seq, description, matched_by, created_at) VALUES (uuidv7(), '" + report0 + "', 2, 'x', 'NAME', now())"},
 		{"補充超過 10 則", "report_supplements_seq_check", fmt.Sprintf("INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '%s', %d, 'x', now())", report0, model.MaxSupplements+1)},
 		{"同一筆通報的補充序號重複", "report_supplements_report_seq_key", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 1, 'x', now())"},
 		{"補充是空的", "report_supplements_description_check", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 2, '', now())"},
@@ -2211,6 +2207,12 @@ func TestReportSchemaConstraints(t *testing.T) {
 		{"認定的嚴重度不認得", "violations_severity_check", "UPDATE seller.violations SET severity = 'WHATEVER' WHERE id = '" + m.Findings[0].ID.String() + "'"},
 	} {
 		f.wantViolates(t, v.name, v.constraint, strings.ReplaceAll(v.sql, "$1", storeID))
+	}
+	// 沒有匿名檢舉：檢舉人是 NOT NULL（CHECK 對 NULL 不會失敗，所以由欄位的 NOT NULL 擋下）。
+	_, nullErr := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.reports (id, store_id, category, description, created_at, updated_at) VALUES (uuidv7(), $1, 'FOOD_SAFETY', 'x', now(), now())", s.StoreID)
+	var notNull *pgconn.PgError
+	if !errors.As(nullErr, &notNull) || notNull.Code != "23502" || notNull.ColumnName != "reporter_buyer_id" {
+		t.Errorf("reporter_buyer_id 為 NULL 的通報要被 NOT NULL 擋下：%v", nullErr)
 	}
 	// 每次送出各自編號：原通報（第 0 次）與第 1 則補充各接受次內位置 0 到 4，同一次送出的同一個位置不能重複。
 	for _, e := range []struct{ seq, position int }{{0, 0}, {0, model.MaxEvidence - 1}} {

@@ -4,7 +4,7 @@
 
 // moderation 模組給後台的 API：社群檢舉的案件（管理員處理的單位）列表、讀取與決定。前台的 API 在 hawkr.moderation.v1alpha1。
 //
-// 案件是一個對象（貼文、留言、討論區留言或買家）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
+// 案件是一個對象（貼文、留言、討論區留言、買家、評價或聊天訊息）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
 // （更正在擁有處分的模組做）。決定以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：新的檢舉掛進案件會改 etag，
 // etag 過期或案件已結案回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
 // ID 是不透明的字串（案件、檢舉與社群內容是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -27,7 +27,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/moderation/v1alpha1/moderation.proto.
  */
 export const file_hawkr_admin_moderation_v1alpha1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("CjBoYXdrci9hZG1pbi9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SH2hhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEi+wQKBENhc2USDwoCaWQYASABKAlCA+BBAxI8CgZ0YXJnZXQYAiABKAsyJy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEID4EEDEj4KBXN0YXRlGAMgASgOMiouaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU3RhdGVCA+BBAxI0CgtjcmVhdGVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJECghkZWNpc2lvbhgFIAEoDjItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZURlY2lzaW9uQgPgQQMSPAoIY2F0ZWdvcnkYBiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAxJACgZhY3Rpb24YByABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb25CA+BBAxIXCgpkZWNpZGVkX2J5GAggASgJQgPgQQMSOgoMcmVzb2x2ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDSACIAQESEQoEZXRhZxgKIAEoCUID4EEDEhkKDHJlcG9ydF9jb3VudBgLIAEoA0ID4EEDEhwKCm1lYXN1cmVfaWQYDCABKAlCA+BBA0gBiAEBEhoKCHN0b3JlX2lkGA0gASgJQgPgQQNIAogBAUIPCg1fcmVzb2x2ZV90aW1lQg0KC19tZWFzdXJlX2lkQgsKCV9zdG9yZV9pZCLsAQoKQ2FzZVJlcG9ydBIPCgJpZBgBIAEoCUID4EEDEhMKC3JlcG9ydGVyX2lkGAIgASgJEjcKCGNhdGVnb3J5GAMgASgOMiUuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5EhMKC2Rlc2NyaXB0aW9uGAQgASgJEjkKB291dGNvbWUYBSABKA4yKC5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydE91dGNvbWUSLwoLY3JlYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrYBChBMaXN0Q2FzZXNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEjkKBXN0YXRlGAMgASgOMiouaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU3RhdGUSQAoLdGFyZ2V0X2tpbmQYBCABKA4yKy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEtpbmQiYgoRTGlzdENhc2VzUmVzcG9uc2USNAoFY2FzZXMYASADKAsyJS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2USFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIiEKDkdldENhc2VSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQIihAEKD0dldENhc2VSZXNwb25zZRIzCgRjYXNlGAEgASgLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEjwKB3JlcG9ydHMYAiADKAsyKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VSZXBvcnQizwIKEURlY2lkZUNhc2VSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQISEQoEZXRhZxgCIAEoCUID4EECEkQKCGRlY2lzaW9uGAMgASgOMi0uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlRGVjaXNpb25CA+BBAhI3CghjYXRlZ29yeRgEIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRI7CgZhY3Rpb24YBSABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb24SDgoGcmVhc29uGAYgASgJEjoKCHNldmVyaXR5GAggASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlZpb2xhdGlvblNldmVyaXR5SgQIBxAIUghzdG9yZV9pZCKHAQoSRGVjaWRlQ2FzZVJlc3BvbnNlEjMKBGNhc2UYASABKAsyJS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2USPAoHcmVwb3J0cxgCIAMoCzIrLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJlcG9ydCpTCglDYXNlU3RhdGUSGgoWQ0FTRV9TVEFURV9VTlNQRUNJRklFRBAAEhMKD0NBU0VfU1RBVEVfT1BFThABEhUKEUNBU0VfU1RBVEVfQ0xPU0VEEAIqagoMQ2FzZURlY2lzaW9uEh0KGUNBU0VfREVDSVNJT05fVU5TUEVDSUZJRUQQABIbChdDQVNFX0RFQ0lTSU9OX1ZJT0xBVElPThABEh4KGkNBU0VfREVDSVNJT05fTk9fVklPTEFUSU9OEAIqhAEKCkNhc2VBY3Rpb24SGwoXQ0FTRV9BQ1RJT05fVU5TUEVDSUZJRUQQABIUChBDQVNFX0FDVElPTl9ISURFEAESFAoQQ0FTRV9BQ1RJT05fV0FSThACEhMKD0NBU0VfQUNUSU9OX0JBThADEhgKFENBU0VfQUNUSU9OX1RBS0VET1dOEAQy+wIKFk1vZGVyYXRpb25BZG1pblNlcnZpY2USdwoJTGlzdENhc2VzEjEuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0Q2FzZXNSZXF1ZXN0GjIuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0Q2FzZXNSZXNwb25zZSIDkAIBEnEKB0dldENhc2USLy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkdldENhc2VSZXF1ZXN0GjAuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5HZXRDYXNlUmVzcG9uc2UiA5ACARJ1CgpEZWNpZGVDYXNlEjIuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5EZWNpZGVDYXNlUmVxdWVzdBozLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuRGVjaWRlQ2FzZVJlc3BvbnNlYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_moderation_v1alpha1_moderation, file_hawkr_seller_v1alpha1_seller]);
+  fileDesc("CjBoYXdrci9hZG1pbi9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SH2hhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEi0wUKBENhc2USDwoCaWQYASABKAlCA+BBAxI8CgZ0YXJnZXQYAiABKAsyJy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEID4EEDEj4KBXN0YXRlGAMgASgOMiouaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU3RhdGVCA+BBAxI0CgtjcmVhdGVfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxJECghkZWNpc2lvbhgFIAEoDjItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZURlY2lzaW9uQgPgQQMSPAoIY2F0ZWdvcnkYBiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAxJACgZhY3Rpb24YByABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb25CA+BBAxIXCgpkZWNpZGVkX2J5GAggASgJQgPgQQMSOgoMcmVzb2x2ZV90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDSACIAQESEQoEZXRhZxgKIAEoCUID4EEDEhkKDHJlcG9ydF9jb3VudBgLIAEoA0ID4EEDEhwKCm1lYXN1cmVfaWQYDCABKAlCA+BBA0gBiAEBEhoKCHN0b3JlX2lkGA0gASgJQgPgQQNIAogBARJJCghyZXZlcnNhbBgOIAEoCzItLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJldmVyc2FsQgPgQQNIA4gBAUIPCg1fcmVzb2x2ZV90aW1lQg0KC19tZWFzdXJlX2lkQgsKCV9zdG9yZV9pZEILCglfcmV2ZXJzYWwidAoMQ2FzZVJldmVyc2FsEjUKDHJldmVyc2VfdGltZRgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIYCgtyZXZlcnNlZF9ieRgCIAEoCUID4EEDEhMKBnJlYXNvbhgDIAEoCUID4EEDIp8CCgxDYXNlU25hcHNob3QSQQoGc29jaWFsGAEgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5Tb2NpYWxTbmFwc2hvdEgAEj8KBWJ1eWVyGAIgASgLMi4uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5CdXllclNuYXBzaG90SAASQQoGcmV2aWV3GAMgASgLMi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5SZXZpZXdTbmFwc2hvdEgAEj0KBGNoYXQYBCABKAsyLS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNoYXRTbmFwc2hvdEgAQgkKB2NvbnRlbnQivAEKDlNvY2lhbFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBAUIQCg5fYXV0aG9yZWRfdGltZSI/Cg1CdXllclNuYXBzaG90EhkKDGRpc3BsYXlfbmFtZRgBIAEoCUID4EEDEhMKBmF2YXRhchgCIAEoCUID4EEDIoACCg5SZXZpZXdTbmFwc2hvdBIWCglhdXRob3JfaWQYASABKAlCA+BBAxIVCghzdG9yZV9pZBgCIAEoCUID4EEDEhcKCnByb2R1Y3RfaWQYAyABKAlCA+BBAxITCgZyYXRpbmcYBCABKAVCA+BBAxIRCgRib2R5GAUgASgJQgPgQQMSFgoJYXNzZXRfaWRzGAYgAygJQgPgQQMSOwoNYXV0aG9yZWRfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0gAiAEBEhcKCnJlcGx5X2JvZHkYCCABKAlCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSK1AgoMQ2hhdFNuYXBzaG90EhgKC2F1dGhvcl9raW5kGAEgASgJQgPgQQMSFgoJYXV0aG9yX2lkGAIgASgJQgPgQQMSEQoEYm9keRgDIAEoCUID4EEDEhYKCWFzc2V0X2lkcxgEIAMoCUID4EEDEjsKDWF1dGhvcmVkX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAIgBARIcCg9jb252ZXJzYXRpb25faWQYBiABKAlCA+BBAxIQCgNzZXEYByABKANCA+BBAxJJCgdjb250ZXh0GAggAygLMjMuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DaGF0Q29udGV4dE1lc3NhZ2VCA+BBA0IQCg5fYXV0aG9yZWRfdGltZSL0AQoSQ2hhdENvbnRleHRNZXNzYWdlEhAKA3NlcRgBIAEoA0ID4EEDEhgKC3NlbmRlcl9raW5kGAIgASgJQgPgQQMSFgoJc2VuZGVyX2lkGAMgASgJQgPgQQMSEQoEdHlwZRgEIAEoCUID4EEDEhEKBGJvZHkYBSABKAlCA+BBAxIWCglhc3NldF9pZHMYBiADKAlCA+BBAxIyCglzZW5kX3RpbWUYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSEwoGaGlkZGVuGAggASgIQgPgQQMSEwoGZXJhc2VkGAkgASgIQgPgQQMi7AEKCkNhc2VSZXBvcnQSDwoCaWQYASABKAlCA+BBAxITCgtyZXBvcnRlcl9pZBgCIAEoCRI3CghjYXRlZ29yeRgDIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRITCgtkZXNjcmlwdGlvbhgEIAEoCRI5CgdvdXRjb21lGAUgASgOMiguaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lEi8KC2NyZWF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCK2AQoQTGlzdENhc2VzUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCRI5CgVzdGF0ZRgDIAEoDjIqLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVN0YXRlEkAKC3RhcmdldF9raW5kGAQgASgOMisuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRUYXJnZXRLaW5kImIKEUxpc3RDYXNlc1Jlc3BvbnNlEjQKBWNhc2VzGAEgAygLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIhCg5HZXRDYXNlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECItcBCg9HZXRDYXNlUmVzcG9uc2USMwoEY2FzZRgBIAEoCzIlLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZRI8CgdyZXBvcnRzGAIgAygLMisuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlUmVwb3J0EkQKCHNuYXBzaG90GAMgASgLMi0uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlU25hcHNob3RIAIgBAUILCglfc25hcHNob3QizwIKEURlY2lkZUNhc2VSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQISEQoEZXRhZxgCIAEoCUID4EECEkQKCGRlY2lzaW9uGAMgASgOMi0uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlRGVjaXNpb25CA+BBAhI3CghjYXRlZ29yeRgEIAEoDjIlLmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeRI7CgZhY3Rpb24YBSABKA4yKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VBY3Rpb24SDgoGcmVhc29uGAYgASgJEjoKCHNldmVyaXR5GAggASgOMiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlZpb2xhdGlvblNldmVyaXR5SgQIBxAIUghzdG9yZV9pZCKHAQoSRGVjaWRlQ2FzZVJlc3BvbnNlEjMKBGNhc2UYASABKAsyJS5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2USPAoHcmVwb3J0cxgCIAMoCzIrLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuQ2FzZVJlcG9ydCI6ChJSZXZlcnNlSGlkZVJlcXVlc3QSDwoCaWQYASABKAlCA+BBAhITCgZyZWFzb24YAiABKAlCA+BBAiKIAQoTUmV2ZXJzZUhpZGVSZXNwb25zZRIzCgRjYXNlGAEgASgLMiUuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5DYXNlEjwKB3JlcG9ydHMYAiADKAsyKy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkNhc2VSZXBvcnQqUwoJQ2FzZVN0YXRlEhoKFkNBU0VfU1RBVEVfVU5TUEVDSUZJRUQQABITCg9DQVNFX1NUQVRFX09QRU4QARIVChFDQVNFX1NUQVRFX0NMT1NFRBACKmoKDENhc2VEZWNpc2lvbhIdChlDQVNFX0RFQ0lTSU9OX1VOU1BFQ0lGSUVEEAASGwoXQ0FTRV9ERUNJU0lPTl9WSU9MQVRJT04QARIeChpDQVNFX0RFQ0lTSU9OX05PX1ZJT0xBVElPThACKoQBCgpDYXNlQWN0aW9uEhsKF0NBU0VfQUNUSU9OX1VOU1BFQ0lGSUVEEAASFAoQQ0FTRV9BQ1RJT05fSElERRABEhQKEENBU0VfQUNUSU9OX1dBUk4QAhITCg9DQVNFX0FDVElPTl9CQU4QAxIYChRDQVNFX0FDVElPTl9UQUtFRE9XThAEMvUDChZNb2RlcmF0aW9uQWRtaW5TZXJ2aWNlEncKCUxpc3RDYXNlcxIxLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdENhc2VzUmVxdWVzdBoyLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdENhc2VzUmVzcG9uc2UiA5ACARJxCgdHZXRDYXNlEi8uaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5HZXRDYXNlUmVxdWVzdBowLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuR2V0Q2FzZVJlc3BvbnNlIgOQAgESdQoKRGVjaWRlQ2FzZRIyLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuRGVjaWRlQ2FzZVJlcXVlc3QaMy5oYXdrci5hZG1pbi5tb2RlcmF0aW9uLnYxYWxwaGExLkRlY2lkZUNhc2VSZXNwb25zZRJ4CgtSZXZlcnNlSGlkZRIzLmhhd2tyLmFkbWluLm1vZGVyYXRpb24udjFhbHBoYTEuUmV2ZXJzZUhpZGVSZXF1ZXN0GjQuaGF3a3IuYWRtaW4ubW9kZXJhdGlvbi52MWFscGhhMS5SZXZlcnNlSGlkZVJlc3BvbnNlYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_moderation_v1alpha1_moderation, file_hawkr_seller_v1alpha1_seller]);
 
 /**
  * Case 是一個案件。
@@ -119,6 +119,13 @@ export type Case = Message<"hawkr.admin.moderation.v1alpha1.Case"> & {
    * @generated from field: optional string store_id = 13;
    */
   storeId?: string | undefined;
+
+  /**
+   * HIDE 決定的撤銷（ReverseHide）；沒有撤銷不設。決定本身不改。
+   *
+   * @generated from field: optional hawkr.admin.moderation.v1alpha1.CaseReversal reversal = 14;
+   */
+  reversal?: CaseReversal | undefined;
 };
 
 /**
@@ -127,6 +134,326 @@ export type Case = Message<"hawkr.admin.moderation.v1alpha1.Case"> & {
  */
 export const CaseSchema: GenMessage<Case> = /*@__PURE__*/
   messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 0);
+
+/**
+ * CaseReversal 是案件上 HIDE 決定的撤銷紀錄。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.CaseReversal
+ */
+export type CaseReversal = Message<"hawkr.admin.moderation.v1alpha1.CaseReversal"> & {
+  /**
+   * @generated from field: google.protobuf.Timestamp reverse_time = 1;
+   */
+  reverseTime?: Timestamp | undefined;
+
+  /**
+   * 撤銷的管理員（帳號 ID）。
+   *
+   * @generated from field: string reversed_by = 2;
+   */
+  reversedBy: string;
+
+  /**
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.CaseReversal.
+ * Use `create(CaseReversalSchema)` to create a new message.
+ */
+export const CaseReversalSchema: GenMessage<CaseReversal> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 1);
+
+/**
+ * CaseSnapshot 是案件最近一份凍結的被檢舉內容（檢舉當下的版本）：依對象種類恰好設一個欄位。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.CaseSnapshot
+ */
+export type CaseSnapshot = Message<"hawkr.admin.moderation.v1alpha1.CaseSnapshot"> & {
+  /**
+   * @generated from oneof hawkr.admin.moderation.v1alpha1.CaseSnapshot.content
+   */
+  content: {
+    /**
+     * @generated from field: hawkr.admin.moderation.v1alpha1.SocialSnapshot social = 1;
+     */
+    value: SocialSnapshot;
+    case: "social";
+  } | {
+    /**
+     * @generated from field: hawkr.admin.moderation.v1alpha1.BuyerSnapshot buyer = 2;
+     */
+    value: BuyerSnapshot;
+    case: "buyer";
+  } | {
+    /**
+     * @generated from field: hawkr.admin.moderation.v1alpha1.ReviewSnapshot review = 3;
+     */
+    value: ReviewSnapshot;
+    case: "review";
+  } | {
+    /**
+     * @generated from field: hawkr.admin.moderation.v1alpha1.ChatSnapshot chat = 4;
+     */
+    value: ChatSnapshot;
+    case: "chat";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.CaseSnapshot.
+ * Use `create(CaseSnapshotSchema)` to create a new message.
+ */
+export const CaseSnapshotSchema: GenMessage<CaseSnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 2);
+
+/**
+ * SocialSnapshot 是貼文、留言與討論區留言的快照。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.SocialSnapshot
+ */
+export type SocialSnapshot = Message<"hawkr.admin.moderation.v1alpha1.SocialSnapshot"> & {
+  /**
+   * 作者種類：BUYER 或 STORE。
+   *
+   * @generated from field: string author_kind = 1;
+   */
+  authorKind: string;
+
+  /**
+   * 作者 ID（過渡期的十進位整數字串）。
+   *
+   * @generated from field: string author_id = 2;
+   */
+  authorId: string;
+
+  /**
+   * @generated from field: string body = 3;
+   */
+  body: string;
+
+  /**
+   * @generated from field: repeated string asset_ids = 4;
+   */
+  assetIds: string[];
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp authored_time = 5;
+   */
+  authoredTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.SocialSnapshot.
+ * Use `create(SocialSnapshotSchema)` to create a new message.
+ */
+export const SocialSnapshotSchema: GenMessage<SocialSnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 3);
+
+/**
+ * BuyerSnapshot 是被檢舉買家的公開檔案快照。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.BuyerSnapshot
+ */
+export type BuyerSnapshot = Message<"hawkr.admin.moderation.v1alpha1.BuyerSnapshot"> & {
+  /**
+   * @generated from field: string display_name = 1;
+   */
+  displayName: string;
+
+  /**
+   * 頭像的 object key；沒有頭像是空字串。
+   *
+   * @generated from field: string avatar = 2;
+   */
+  avatar: string;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.BuyerSnapshot.
+ * Use `create(BuyerSnapshotSchema)` to create a new message.
+ */
+export const BuyerSnapshotSchema: GenMessage<BuyerSnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 4);
+
+/**
+ * ReviewSnapshot 是評價的快照；作者永遠是買家。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.ReviewSnapshot
+ */
+export type ReviewSnapshot = Message<"hawkr.admin.moderation.v1alpha1.ReviewSnapshot"> & {
+  /**
+   * @generated from field: string author_id = 1;
+   */
+  authorId: string;
+
+  /**
+   * 評價所屬的店家（上下文，不是作者）。
+   *
+   * @generated from field: string store_id = 2;
+   */
+  storeId: string;
+
+  /**
+   * @generated from field: string product_id = 3;
+   */
+  productId: string;
+
+  /**
+   * @generated from field: int32 rating = 4;
+   */
+  rating: number;
+
+  /**
+   * @generated from field: string body = 5;
+   */
+  body: string;
+
+  /**
+   * @generated from field: repeated string asset_ids = 6;
+   */
+  assetIds: string[];
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp authored_time = 7;
+   */
+  authoredTime?: Timestamp | undefined;
+
+  /**
+   * 店家回覆（上下文，不是被檢舉的內容）；沒有回覆是空字串。
+   *
+   * @generated from field: string reply_body = 8;
+   */
+  replyBody: string;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ReviewSnapshot.
+ * Use `create(ReviewSnapshotSchema)` to create a new message.
+ */
+export const ReviewSnapshotSchema: GenMessage<ReviewSnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 5);
+
+/**
+ * ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.ChatSnapshot
+ */
+export type ChatSnapshot = Message<"hawkr.admin.moderation.v1alpha1.ChatSnapshot"> & {
+  /**
+   * 寄件方種類：BUYER 或 STORE。
+   *
+   * @generated from field: string author_kind = 1;
+   */
+  authorKind: string;
+
+  /**
+   * @generated from field: string author_id = 2;
+   */
+  authorId: string;
+
+  /**
+   * @generated from field: string body = 3;
+   */
+  body: string;
+
+  /**
+   * @generated from field: repeated string asset_ids = 4;
+   */
+  assetIds: string[];
+
+  /**
+   * @generated from field: optional google.protobuf.Timestamp authored_time = 5;
+   */
+  authoredTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string conversation_id = 6;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: int64 seq = 7;
+   */
+  seq: bigint;
+
+  /**
+   * 前後文，依 seq 由小到大，不含被檢舉的那則。
+   *
+   * @generated from field: repeated hawkr.admin.moderation.v1alpha1.ChatContextMessage context = 8;
+   */
+  context: ChatContextMessage[];
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ChatSnapshot.
+ * Use `create(ChatSnapshotSchema)` to create a new message.
+ */
+export const ChatSnapshotSchema: GenMessage<ChatSnapshot> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 6);
+
+/**
+ * ChatContextMessage 是聊天前後文的一則；已隱藏或已抹除的是墓碑（不帶 body 與 asset_ids）。
+ *
+ * @generated from message hawkr.admin.moderation.v1alpha1.ChatContextMessage
+ */
+export type ChatContextMessage = Message<"hawkr.admin.moderation.v1alpha1.ChatContextMessage"> & {
+  /**
+   * @generated from field: int64 seq = 1;
+   */
+  seq: bigint;
+
+  /**
+   * @generated from field: string sender_kind = 2;
+   */
+  senderKind: string;
+
+  /**
+   * @generated from field: string sender_id = 3;
+   */
+  senderId: string;
+
+  /**
+   * 訊息類型：TEXT 或 IMAGE。
+   *
+   * @generated from field: string type = 4;
+   */
+  type: string;
+
+  /**
+   * @generated from field: string body = 5;
+   */
+  body: string;
+
+  /**
+   * @generated from field: repeated string asset_ids = 6;
+   */
+  assetIds: string[];
+
+  /**
+   * @generated from field: google.protobuf.Timestamp send_time = 7;
+   */
+  sendTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: bool hidden = 8;
+   */
+  hidden: boolean;
+
+  /**
+   * @generated from field: bool erased = 9;
+   */
+  erased: boolean;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ChatContextMessage.
+ * Use `create(ChatContextMessageSchema)` to create a new message.
+ */
+export const ChatContextMessageSchema: GenMessage<ChatContextMessage> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 7);
 
 /**
  * CaseReport 是案件裡的一筆檢舉。
@@ -176,7 +503,7 @@ export type CaseReport = Message<"hawkr.admin.moderation.v1alpha1.CaseReport"> &
  * Use `create(CaseReportSchema)` to create a new message.
  */
 export const CaseReportSchema: GenMessage<CaseReport> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 1);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 8);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ListCasesRequest
@@ -214,7 +541,7 @@ export type ListCasesRequest = Message<"hawkr.admin.moderation.v1alpha1.ListCase
  * Use `create(ListCasesRequestSchema)` to create a new message.
  */
 export const ListCasesRequestSchema: GenMessage<ListCasesRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 2);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 9);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.ListCasesResponse
@@ -236,7 +563,7 @@ export type ListCasesResponse = Message<"hawkr.admin.moderation.v1alpha1.ListCas
  * Use `create(ListCasesResponseSchema)` to create a new message.
  */
 export const ListCasesResponseSchema: GenMessage<ListCasesResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 3);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 10);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.GetCaseRequest
@@ -253,7 +580,7 @@ export type GetCaseRequest = Message<"hawkr.admin.moderation.v1alpha1.GetCaseReq
  * Use `create(GetCaseRequestSchema)` to create a new message.
  */
 export const GetCaseRequestSchema: GenMessage<GetCaseRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 4);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 11);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.GetCaseResponse
@@ -270,6 +597,13 @@ export type GetCaseResponse = Message<"hawkr.admin.moderation.v1alpha1.GetCaseRe
    * @generated from field: repeated hawkr.admin.moderation.v1alpha1.CaseReport reports = 2;
    */
   reports: CaseReport[];
+
+  /**
+   * 案件最近一份凍結的被檢舉內容；沒有快照（結案滿保留期後被清除）不設。
+   *
+   * @generated from field: optional hawkr.admin.moderation.v1alpha1.CaseSnapshot snapshot = 3;
+   */
+  snapshot?: CaseSnapshot | undefined;
 };
 
 /**
@@ -277,7 +611,7 @@ export type GetCaseResponse = Message<"hawkr.admin.moderation.v1alpha1.GetCaseRe
  * Use `create(GetCaseResponseSchema)` to create a new message.
  */
 export const GetCaseResponseSchema: GenMessage<GetCaseResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 5);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 12);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.DecideCaseRequest
@@ -334,7 +668,7 @@ export type DecideCaseRequest = Message<"hawkr.admin.moderation.v1alpha1.DecideC
  * Use `create(DecideCaseRequestSchema)` to create a new message.
  */
 export const DecideCaseRequestSchema: GenMessage<DecideCaseRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 6);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 13);
 
 /**
  * @generated from message hawkr.admin.moderation.v1alpha1.DecideCaseResponse
@@ -356,7 +690,53 @@ export type DecideCaseResponse = Message<"hawkr.admin.moderation.v1alpha1.Decide
  * Use `create(DecideCaseResponseSchema)` to create a new message.
  */
 export const DecideCaseResponseSchema: GenMessage<DecideCaseResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 7);
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 14);
+
+/**
+ * @generated from message hawkr.admin.moderation.v1alpha1.ReverseHideRequest
+ */
+export type ReverseHideRequest = Message<"hawkr.admin.moderation.v1alpha1.ReverseHideRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 撤銷原因，去除首尾空白後 1 到 500 個字元（以 Unicode 字元計）。
+   *
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ReverseHideRequest.
+ * Use `create(ReverseHideRequestSchema)` to create a new message.
+ */
+export const ReverseHideRequestSchema: GenMessage<ReverseHideRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 15);
+
+/**
+ * @generated from message hawkr.admin.moderation.v1alpha1.ReverseHideResponse
+ */
+export type ReverseHideResponse = Message<"hawkr.admin.moderation.v1alpha1.ReverseHideResponse"> & {
+  /**
+   * @generated from field: hawkr.admin.moderation.v1alpha1.Case case = 1;
+   */
+  case?: Case | undefined;
+
+  /**
+   * @generated from field: repeated hawkr.admin.moderation.v1alpha1.CaseReport reports = 2;
+   */
+  reports: CaseReport[];
+};
+
+/**
+ * Describes the message hawkr.admin.moderation.v1alpha1.ReverseHideResponse.
+ * Use `create(ReverseHideResponseSchema)` to create a new message.
+ */
+export const ReverseHideResponseSchema: GenMessage<ReverseHideResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 16);
 
 /**
  * CaseState 是案件的狀態。
@@ -434,14 +814,14 @@ export enum CaseAction {
   UNSPECIFIED = 0,
 
   /**
-   * 隱藏買家寫的留言或討論區留言。
+   * 隱藏買家寫的留言、討論區留言、評價或聊天訊息；店家寫的聊天訊息回 FAILED_PRECONDITION。
    *
    * @generated from enum value: CASE_ACTION_HIDE = 1;
    */
   HIDE = 1,
 
   /**
-   * 警告買家（作者是買家的留言、討論區留言，或被檢舉的買家）。
+   * 警告買家（作者是買家的留言、討論區留言、評價、聊天訊息，或被檢舉的買家）。
    *
    * @generated from enum value: CASE_ACTION_WARN = 2;
    */
@@ -504,6 +884,18 @@ export const ModerationAdminService: GenService<{
     methodKind: "unary";
     input: typeof DecideCaseRequestSchema;
     output: typeof DecideCaseResponseSchema;
+  },
+  /**
+   * ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
+   * 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+   * 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
+   *
+   * @generated from rpc hawkr.admin.moderation.v1alpha1.ModerationAdminService.ReverseHide
+   */
+  reverseHide: {
+    methodKind: "unary";
+    input: typeof ReverseHideRequestSchema;
+    output: typeof ReverseHideResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_admin_moderation_v1alpha1_moderation, 0);

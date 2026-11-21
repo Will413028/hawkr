@@ -1,15 +1,19 @@
+import * as Sentry from "@sentry/nextjs";
 import type { MetadataRoute } from "next";
+import { getCachedSitemapStores } from "@/lib/api/cached";
 import { type AppLocale, publishedFor, type Surface } from "@/lib/intl/locales";
 import { surfaceOfPath } from "@/lib/intl/paths";
+import type { StoreSitemapRow } from "@/lib/seller/list-stores";
 import { INDEXABLE_STATIC_ROUTES, isIndexable } from "@/lib/seo/indexability";
-import { absoluteUrl, languageAlternates } from "@/lib/seo/urls";
+import { absoluteUrl, languageAlternates, sellerPath } from "@/lib/seo/urls";
 
 /**
- * Static public routes → sitemap entries (pure; tested directly). Dynamic
- * product / seller URLs are added in a later PR once full-enumeration
- * endpoints + generateSitemaps sharding (50k cap) are wired — they need real
- * lastModified from entity updatedAt, which the current recommended-only
- * endpoints don't provide.
+ * Static public routes → sitemap entries (pure; tested directly). Store URLs
+ * come from `storeSitemapEntries` (enumerated by `ListStores`); product URLs
+ * are not listed yet.
+ *
+ * One sitemap file, no sharding: past `SITEMAP_SHARD_THRESHOLD` entries in the file (static plus store) an error
+ * is reported (the trigger to add `generateSitemaps`), the entries are still all emitted.
  *
  * One entry per PUBLISHED locale of each route (lib/intl/locales.ts): an
  * unpublished `/en` is never announced, and a non-default locale's UGC pages
@@ -21,7 +25,7 @@ import { absoluteUrl, languageAlternates } from "@/lib/seo/urls";
  * crawlers all 13 changed at the very same instant on every deploy (prod on
  * 2026-09-08 listed 13 identical timestamps), which is a signal Google learns
  * to ignore for the whole file. A date goes in only when it is the content's
- * own — the entity entries above will carry `updatedAt`.
+ * own — store entries carry the store's `update_time`.
  */
 export function staticSitemapEntries(
 	published: (surface: Surface) => readonly AppLocale[] = publishedFor,
@@ -40,6 +44,79 @@ export function staticSitemapEntries(
 	});
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
-	return staticSitemapEntries();
+/** sitemap 單檔上限 50,000 筆網址，門檻比對的是整份檔案（靜態加店家）實際輸出的網址筆數，45,000 起要改成分檔。 */
+export const SITEMAP_SHARD_THRESHOLD = 45_000;
+
+/** 每家店每個已發佈語系一筆，規則同 `staticSitemapEntries`（UGC 頁只列預設語系）。 */
+export function storeSitemapEntries(
+	stores: readonly StoreSitemapRow[],
+	published: (surface: Surface) => readonly AppLocale[] = publishedFor,
+): MetadataRoute.Sitemap {
+	return stores.flatMap((store) => {
+		const path = sellerPath(store.storeCode);
+		if (path === "") return [];
+		const locales = published(surfaceOfPath(path));
+		const languages = languageAlternates(path, locales);
+		return locales
+			.filter((locale) => isIndexable(path, locale))
+			.map((locale) => ({
+				url: absoluteUrl(path, locale),
+				...(store.updatedAtMs !== undefined
+					? { lastModified: new Date(store.updatedAtMs) }
+					: {}),
+				changeFrequency: "daily" as const,
+				priority: 0.6,
+				...(languages ? { alternates: { languages } } : {}),
+			}));
+	});
+}
+
+/** 整份 sitemap 的筆數超過門檻就回報，筆數照常全數輸出。 */
+export function reportSitemapSize(
+	total: number,
+	report: (message: string) => void = (m) => {
+		Sentry.captureMessage(m, "error");
+	},
+): void {
+	if (total > SITEMAP_SHARD_THRESHOLD) {
+		report(
+			`sitemap has ${total} URLs, over ${SITEMAP_SHARD_THRESHOLD}: shard it with generateSitemaps`,
+		);
+	}
+}
+
+/**
+ * 讀不到店家清單時降級成空清單，靜態項目照常回傳；失敗不進快取，下一次請求會重試。
+ * 只在執行期回報一次，build 階段不回報（`fillFetch` 與 build log 已留紀錄）。
+ */
+export async function loadSitemapStores(
+	read: () => Promise<StoreSitemapRow[]> = getCachedSitemapStores,
+	report: (err: unknown) => void = (err) => {
+		Sentry.captureException(err);
+	},
+): Promise<StoreSitemapRow[]> {
+	try {
+		return await read();
+	} catch (err) {
+		if (process.env.NEXT_PHASE === "phase-production-build") {
+			console.warn("[sitemap] stores unavailable during build:", err);
+		} else {
+			report(err);
+		}
+		return [];
+	}
+}
+
+/** 靜態加店家的完整清單，筆數比對門檻的是整份檔案。 */
+export function buildSitemap(
+	stores: readonly StoreSitemapRow[],
+	report?: (message: string) => void,
+): MetadataRoute.Sitemap {
+	const entries = [...staticSitemapEntries(), ...storeSitemapEntries(stores)];
+	reportSitemapSize(entries.length, report);
+	return entries;
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+	return buildSitemap(await loadSitemapStores());
 }

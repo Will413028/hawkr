@@ -62,11 +62,11 @@ func (f *fixture) buyerReport(t *testing.T, storeID, buyerID int64, category pol
 	return r
 }
 
-func (f *fixture) anonymousReport(t *testing.T, storeID int64, phone string) SubmitReportResult {
+func (f *fixture) foodSafetyReport(t *testing.T, storeID, buyerID int64) SubmitReportResult {
 	t.Helper()
 	f.everExposed(t, storeID)
 	r, err := f.module.SubmitReport(context.Background(), SubmitReportInput{
-		StoreID: storeID, Phone: phone, Name: "王小明", Category: policy.FoodSafety, Description: "食用後腹瀉",
+		StoreID: storeID, ReporterBuyerID: buyerID, Category: policy.FoodSafety, Description: "食用後腹瀉",
 	})
 	must(t, err)
 	return r
@@ -166,18 +166,16 @@ func (f *fixture) isSuspended(t *testing.T, storeID int64) bool {
 	return s.Suspended()
 }
 
-func TestSubmitReportValidatesTheReporter(t *testing.T) {
+func TestSubmitReportValidatesTheInput(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 	for _, in := range []SubmitReportInput{
-		{StoreID: s.StoreID, Category: policy.Fraud, Description: "沒有聯絡方式"},
-		{StoreID: s.StoreID, ReporterBuyerID: 5, Phone: "0912345678", Category: policy.Fraud, Description: "兩種通報人"},
-		{StoreID: s.StoreID, Phone: "12345", Category: policy.Fraud, Description: "電話錯誤"},
-		{StoreID: s.StoreID, Email: "not-an-email", Category: policy.Fraud, Description: "email 錯誤"},
-		{StoreID: s.StoreID, Phone: "0912345678", Category: policy.FoodSafety, Description: "匿名附圖", EvidenceTokens: []string{"t"}},
+		{StoreID: s.StoreID, Category: policy.Fraud, Description: "沒有檢舉人"},
+		{StoreID: s.StoreID, ReporterBuyerID: -1, Category: policy.Fraud, Description: "檢舉人不是正數"},
+		{StoreID: s.StoreID, ReporterBuyerID: 5, Category: policy.FoodSafety, Description: "附佐證沒有上傳者", EvidenceTokens: []string{"t"}},
 		{StoreID: s.StoreID, ReporterBuyerID: 5, Category: "SPAM", Description: "類別"},
 		{StoreID: s.StoreID, ReporterBuyerID: 5, Category: policy.Fraud, Description: "  "},
 		{StoreID: s.StoreID, ReporterBuyerID: 5, Category: policy.Fraud, Description: "太多佐證", AccountID: 1, EvidenceTokens: []string{"1", "2", "3", "4", "5", "6"}},
@@ -192,23 +190,18 @@ func TestSubmitReportValidatesTheReporter(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 0 {
 		t.Fatalf("rejected reports were written: %d", n)
 	}
-	anonymous, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, Phone: "+886 912-345-678", Email: " Victim@Example.com ", Category: policy.FoodSafety, Description: "腹瀉",
-	})
-	must(t, err)
-	c := anonymous.Report.Contact
-	if anonymous.Supplemented || c == nil || *c.Phone != "0912345678" || *c.Email != "victim@example.com" || c.Name != nil ||
-		anonymous.Report.ReporterBuyerID != nil || anonymous.Report.Outcome != nil || anonymous.Report.State() != ReportStateAwaitingTriage || anonymous.Report.Version != 1 {
-		t.Fatalf("anonymous=%+v contact=%+v", anonymous, c)
+	foodSafety := f.foodSafetyReport(t, s.StoreID, 6)
+	if foodSafety.Supplemented || foodSafety.Report.ReporterBuyerID != 6 || foodSafety.Report.Outcome != nil || foodSafety.Report.State() != ReportStateAwaitingTriage || foodSafety.Report.Version != 1 {
+		t.Fatalf("foodSafety=%+v", foodSafety)
 	}
 	// 分案期限來自 SQL 的審閱政策（seller.review_report_triage）：通報人選了食安 4 小時，其他類別 72 小時，開始是建立時間。
-	read, err := f.module.Report(ctx, anonymous.Report.ID)
+	read, err := f.module.Report(ctx, foodSafety.Report.ID)
 	must(t, err)
 	if d := read.TriageDeadline; d == nil || !d.Start.Equal(f.now) || !d.Due.Equal(f.now.Add(4*time.Hour)) {
 		t.Fatalf("food-safety triage deadline=%+v", d)
 	}
 	loggedIn := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
-	if loggedIn.Report.Contact != nil || *loggedIn.Report.ReporterBuyerID != 5 {
+	if loggedIn.Report.ReporterBuyerID != 5 {
 		t.Fatalf("logged-in=%+v", loggedIn.Report)
 	}
 	readLoggedIn, err := f.module.Report(ctx, loggedIn.Report.ID)
@@ -276,7 +269,7 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 	}
 }
 
-// 不能檢舉自己的店：登入的檢舉人與匿名入口的登入呼叫者都擋（invalid_argument 指到 StoreID）；從沒公開過的店仍是 not_found（不洩漏店家是不是那個帳號的）；
+// 不能檢舉自己的店：擋下（invalid_argument 指到 StoreID）；從沒公開過的店仍是 not_found（不洩漏店家是不是那個帳號的）；
 // 別的帳號可以檢舉。
 func TestAReporterCannotReportTheirOwnStore(t *testing.T) {
 	t.Parallel()
@@ -286,8 +279,8 @@ func TestAReporterCannotReportTheirOwnStore(t *testing.T) {
 	_, never := f.open(t)
 	f.everExposed(t, s.StoreID)
 	loggedIn := SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: owner, Category: policy.Fraud, Description: "自己的店"}
-	anonymousCaller := SubmitReportInput{StoreID: s.StoreID, Phone: "0912345678", AccountID: owner, Category: policy.FoodSafety, Description: "自己的店"}
-	for name, in := range map[string]SubmitReportInput{"登入的檢舉": loggedIn, "匿名入口的登入呼叫者": anonymousCaller} {
+	foodSafety := SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: owner, Category: policy.FoodSafety, Description: "自己的店"}
+	for name, in := range map[string]SubmitReportInput{"登入的檢舉": loggedIn, "食安檢舉": foodSafety} {
 		_, err := f.module.SubmitReport(ctx, in)
 		if got := invalidFields(t, err); !slices.Equal(got, []string{"StoreID"}) || !strings.Contains(err.Error(), "不能檢舉自己的店。") {
 			t.Errorf("%s：%v", name, err)
@@ -305,11 +298,6 @@ func TestAReporterCannotReportTheirOwnStore(t *testing.T) {
 	if _, err := f.module.SubmitReport(ctx, other); err != nil {
 		t.Fatalf("別的帳號可以檢舉：%v", err)
 	}
-	anonymous := anonymousCaller
-	anonymous.AccountID = 0
-	if _, err := f.module.SubmitReport(ctx, anonymous); err != nil {
-		t.Fatalf("沒登入的匿名送出沒有帳號可比對：%v", err)
-	}
 }
 
 func (f *fixture) mustAccountOf(t *testing.T, storeID int64) int64 {
@@ -319,9 +307,9 @@ func (f *fixture) mustAccountOf(t *testing.T, storeID int64) int64 {
 	return id
 }
 
-// 去重的日與週以台北時間為界（盤點：舊的是 UTC）。台北 23:30 與隔天 00:30 在 UTC 是同一天；台北週日 23:30 與週一
-// 00:30 在 UTC 是同一週。去重期間內、還沒有結果的那一筆存在時，這次的內容補充到它（Supplemented），不是新的通報。
-func TestReportDedupUsesTaipeiDayAndWeek(t *testing.T) {
+// 去重的日以台北時間為界（盤點：舊的是 UTC）。台北 23:30 與隔天 00:30 在 UTC 是同一天。去重期間內、還沒有結果的那一筆存在時，
+// 這次的內容補充到它（Supplemented），不是新的通報。
+func TestReportDedupUsesTheTaipeiDay(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	_, s := f.open(t)
@@ -339,28 +327,6 @@ func TestReportDedupUsesTaipeiDayAndWeek(t *testing.T) {
 	if next := f.buyerReport(t, s.StoreID, 5, policy.Fraud); next.Supplemented || next.ReportID == first.ReportID {
 		t.Fatal("next Taipei day must be a new report")
 	}
-
-	f.now = time.Date(2026, 10, 4, 15, 30, 0, 0, time.UTC) // 台北 10/4（日）23:30
-	weekly := f.anonymousReport(t, s.StoreID, "0911111111")
-	f.now = time.Date(2026, 10, 4, 15, 45, 0, 0, time.UTC)
-	if dup := f.anonymousReport(t, s.StoreID, "0911111111"); !dup.Supplemented || dup.ReportID != weekly.ReportID || dup.Report != nil {
-		t.Fatalf("same Taipei week must be a supplement, and an anonymous caller gets nothing back: %+v", dup)
-	}
-	f.now = time.Date(2026, 10, 4, 16, 30, 0, 0, time.UTC) // 台北 10/5（一）00:30，UTC 仍是同一週
-	if next := f.anonymousReport(t, s.StoreID, "0911111111"); next.Supplemented {
-		t.Fatal("next Taipei ISO week must be a new report")
-	}
-	byEmail, err := f.module.SubmitReport(context.Background(), SubmitReportInput{
-		StoreID: s.StoreID, Email: "a@example.com", Category: policy.Fraud, Description: "x",
-	})
-	must(t, err)
-	dupEmail, err := f.module.SubmitReport(context.Background(), SubmitReportInput{
-		StoreID: s.StoreID, Phone: "0922222222", Email: "A@example.com", Category: policy.Fraud, Description: "y",
-	})
-	must(t, err)
-	if !dupEmail.Supplemented || dupEmail.ReportID != byEmail.ReportID {
-		t.Fatalf("same email in the same week must be a supplement: %+v", dupEmail)
-	}
 }
 
 // 去重只比對還沒有結果的通報：原本那一筆有了結果之後，同一天的下一次送出是新的通報（包含被判濫報的人）。
@@ -370,16 +336,15 @@ func TestAReportWithAnOutcomeIsNoLongerDeduplicated(t *testing.T) {
 	_, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 	first := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
-	phone := f.anonymousReport(t, s.StoreID, "0933333333")
+	foodSafety := f.foodSafetyReport(t, s.StoreID, 6)
 	f.mustResolve(t, first.ReportID, OutcomeAbusive)
-	f.mustResolve(t, phone.ReportID, OutcomeNoViolation)
+	f.mustResolve(t, foodSafety.ReportID, OutcomeNoViolation)
 	again := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
 	if again.Supplemented || again.ReportID == first.ReportID || again.Report == nil || again.Report.Outcome != nil {
 		t.Fatalf("已有結果的通報不再比對，這次是新的通報：%+v", again)
 	}
-	anonymous := f.anonymousReport(t, s.StoreID, "0933333333")
-	if anonymous.Supplemented || anonymous.ReportID == phone.ReportID {
-		t.Fatalf("匿名也一樣：%+v", anonymous)
+	if next := f.foodSafetyReport(t, s.StoreID, 6); next.Supplemented || next.ReportID == foodSafety.ReportID {
+		t.Fatalf("食安檢舉也一樣：%+v", next)
 	}
 	// 新的這一筆還沒有結果，再送一次就是補充到它。
 	if third := f.buyerReport(t, s.StoreID, 5, policy.Fraud); !third.Supplemented || third.ReportID != again.ReportID {
@@ -416,7 +381,7 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	}
 	detail := f.reportOf(t, first.ReportID)
 	if detail.SupplementCount != 1 || len(detail.Supplements) != 1 || detail.Supplements[0].Description != "補充：又看到一次" || !detail.Supplements[0].CreatedAt.Equal(f.now) ||
-		detail.Supplements[0].MatchedBy != nil || !slices.Equal(detail.Supplements[0].EvidencePositions, []int{2}) || detail.LatestSupplementAt == nil || !detail.LatestSupplementAt.Equal(f.now) ||
+		!slices.Equal(detail.Supplements[0].EvidencePositions, []int{2}) || detail.LatestSupplementAt == nil || !detail.LatestSupplementAt.Equal(f.now) ||
 		len(detail.Evidence) != 3 || detail.Evidence[2].Position != 2 || detail.Evidence[2].SupplementID == nil || *detail.Evidence[2].SupplementID != detail.Supplements[0].ID ||
 		detail.Evidence[0].SupplementID != nil || detail.Evidence[2].AssetID != "asset-e3" {
 		t.Fatalf("detail=%+v", detail)
@@ -440,69 +405,20 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	if f.caseOf(t, *c.CaseID).UnseenSupplementReports != 0 {
 		t.Fatal("處理之後不再有新的補充")
 	}
-	// 事件：每次送出各發一個；補充的事件帶 supplement_id，登入的檢舉人沒有確認地址。
+	// 事件：每次送出各發一個；補充的事件帶 supplement_id。
 	events := received.all()
-	if len(events) != 2 || events[0].SupplementID != nil || events[0].Discarded || events[1].SupplementID == nil || *events[1].SupplementID != detail.Supplements[0].ID ||
-		events[1].ReportID != first.ReportID || events[1].ConfirmationEmail != nil || *events[1].ReporterBuyerID != 5 || events[1].Category != policy.Fraud {
+	if len(events) != 2 || events[0].SupplementID != nil || events[1].SupplementID == nil || *events[1].SupplementID != detail.Supplements[0].ID ||
+		events[1].ReportID != first.ReportID || events[1].ReporterBuyerID != 5 || events[1].Category != policy.Fraud {
 		t.Fatalf("events=%+v", events)
 	}
-	// 補充只新增：DB 的補充表沒有檢舉人的聯絡方式欄位（匿名補充只記比對方式）。
+	// 補充只新增：DB 的補充表沒有檢舉人的聯絡方式欄位。
 	if n := f.count(t, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'seller' AND table_name = 'report_supplements' AND column_name LIKE 'reporter%'"); n != 0 {
 		t.Fatalf("report_supplements 不存檢舉人的聯絡方式：%d 欄", n)
 	}
 }
 
-// 匿名的補充記下比對方式（電話、聯絡信箱或兩者）；補充者的聯絡方式不存、結果信只寄給原通報存下的地址；回應不帶任何內容。
-func TestAnonymousSupplementsRecordHowTheyMatchedWithoutStoringContactDetails(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	received := record[ReportReceived](f)
-	_, s := f.open(t)
-	f.everExposed(t, s.StoreID)
-	submit := func(phone, email, description string) SubmitReportResult {
-		t.Helper()
-		r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, Phone: phone, Email: email, Category: policy.FoodSafety, Description: description})
-		must(t, err)
-		return r
-	}
-	first := submit("0911111111", "owner@example.com", "原本的內容")
-	byPhone := submit("0911111111", "stranger@example.com", "電話相同")
-	byEmail := submit("0922222222", "owner@example.com", "信箱相同")
-	byBoth := submit("0911111111", "owner@example.com", "兩者相同")
-	for _, r := range []SubmitReportResult{byPhone, byEmail, byBoth} {
-		if !r.Supplemented || r.ReportID != first.ReportID || r.Report != nil {
-			t.Fatalf("匿名的補充不帶內容：%+v", r)
-		}
-	}
-	detail := f.reportOf(t, first.ReportID)
-	var matched []SupplementMatch
-	for _, s := range detail.Supplements {
-		matched = append(matched, *s.MatchedBy)
-	}
-	if !slices.Equal(matched, []SupplementMatch{MatchedByPhone, MatchedByEmail, MatchedByBoth}) {
-		t.Fatalf("matched_by=%v", matched)
-	}
-	// 通報存的聯絡方式仍是原通報的；補充者的電話與信箱沒有存下。
-	if *detail.Contact.Phone != "0911111111" || *detail.Contact.Email != "owner@example.com" || f.count(t, "SELECT count(*) FROM seller.reports") != 1 {
-		t.Fatalf("contact=%+v", detail.Contact)
-	}
-	// 每次送出都發 ReportReceived，確認地址是「這次送出留的」email（A8 用同一個範本寄到那個地址）。
-	var emails []string
-	for _, e := range received.all() {
-		emails = append(emails, *e.ConfirmationEmail)
-		if e.ReporterBuyerID != nil || e.Discarded {
-			t.Fatalf("event=%+v", e)
-		}
-	}
-	if !slices.Equal(emails, []string{"owner@example.com", "stranger@example.com", "owner@example.com", "owner@example.com"}) {
-		t.Fatalf("confirmation emails=%v", emails)
-	}
-}
-
-// 每筆通報最多 10 則補充：第 11 次送出，登入的回 failed_precondition（已轉正的佐證沒有引用），匿名的內容不存、discarded_submissions 加一、回應照舊、仍發 ReportReceived
-// （Discarded，帶這次的 email）。三種情形（新的、補充、超過上限）的回應與事件的形狀相同，送出的人分辨不出這支電話用過。
-func TestSupplementLimitIsTenAndAnonymousOverflowIsDiscardedQuietly(t *testing.T) {
+// 每筆通報最多 10 則補充：第 11 次送出回 failed_precondition（已轉正的佐證沒有引用），什麼都不存、不發事件。
+func TestSupplementLimitIsTen(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -510,7 +426,7 @@ func TestSupplementLimitIsTenAndAnonymousOverflowIsDiscardedQuietly(t *testing.T
 	accountID, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 
-	// 登入的檢舉人：10 則之後的第 11 次回 failed_precondition，什麼都不存。
+	// 10 則之後的第 11 次回 failed_precondition，什麼都不存。
 	submit := func(description string, tokens ...string) (SubmitReportResult, error) {
 		return f.module.SubmitReport(ctx, SubmitReportInput{
 			StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: description, EvidenceTokens: tokens,
@@ -532,35 +448,11 @@ func TestSupplementLimitIsTenAndAnonymousOverflowIsDiscardedQuietly(t *testing.T
 	if n := f.count(t, "SELECT count(*) FROM seller.report_evidence"); n != 0 || slices.Contains(f.jobs.kinds(), "seller.media_sync") {
 		t.Fatalf("超過上限的佐證沒有存下也沒有排入同步：evidence=%d jobs=%v", n, f.jobs.kinds())
 	}
-
-	// 匿名：三種情形。
-	f.now = f.now.Add(8 * 24 * time.Hour) // 下一個台北週，原本的登入通報不在去重範圍
-	anon := func(email, description string) SubmitReportResult {
-		t.Helper()
-		r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, Phone: "0944444444", Email: email, Category: policy.FoodSafety, Description: description})
-		must(t, err)
-		return r
+	if got := len(received.all()); got != 1+MaxSupplements {
+		t.Fatalf("被擋下的第 11 次不發事件：%d", got)
 	}
-	before := len(received.all())
-	newReport := anon("a@example.com", "新的")
-	for i := range MaxSupplements {
-		anon("b@example.com", fmt.Sprintf("補充 %d", i+1))
-	}
-	over := anon("c@example.com", "超過上限")
-	if newReport.Supplemented || over.Supplemented || !over.Discarded || over.Report != nil || over.ReportID != newReport.ReportID {
-		t.Fatalf("new=%+v over=%+v", newReport, over)
-	}
-	detail := f.reportOf(t, newReport.ReportID)
-	if detail.SupplementCount != MaxSupplements || detail.DiscardedSubmissions != 1 || len(detail.Supplements) != MaxSupplements {
-		t.Fatalf("超過上限的內容不存、計數加一：%+v", detail.Report)
-	}
-	events := received.all()[before:]
-	last := events[len(events)-1]
-	if len(events) != MaxSupplements+2 || !last.Discarded || last.SupplementID != nil || *last.ConfirmationEmail != "c@example.com" || events[0].SupplementID != nil || events[0].Discarded {
-		t.Fatalf("events=%+v", events)
-	}
-	// 計數不動版本（沒有存下任何會影響後台判斷的內容）。
-	if v := detail.Version; v != 1+MaxSupplements {
+	// 版本只隨存下的補充前進。
+	if v := f.reportOf(t, original.ReportID).Version; v != 1+MaxSupplements {
 		t.Fatalf("版本只隨存下的補充前進：%d", v)
 	}
 }
@@ -655,7 +547,7 @@ func TestAdminInboxKeysetHasNoGapsOrDuplicates(t *testing.T) {
 		}
 		var r SubmitReportResult
 		if i%3 == 2 {
-			r = f.anonymousReport(t, store, "09"+string(rune('1'+i))+"0000000")
+			r = f.foodSafetyReport(t, store, int64(100+i))
 		} else {
 			r = f.buyerReport(t, store, int64(100+i), policy.Fraud)
 		}
@@ -714,87 +606,8 @@ func TestAdminInboxKeysetHasNoGapsOrDuplicates(t *testing.T) {
 	}
 	mine, err := f.module.BuyerReports(ctx, BuyerReportListInput{BuyerID: 100, PageSize: 10})
 	must(t, err)
-	if len(mine.Items) != 1 || *mine.Items[0].ReporterBuyerID != 100 {
+	if len(mine.Items) != 1 || mine.Items[0].ReporterBuyerID != 100 {
 		t.Fatalf("buyer reports=%+v", mine.Items)
-	}
-}
-
-// 匿名檢舉人的聯絡欄位：清除時間是 greatest(建立 + 90 天, 結果設定 + 30 天)；不論有沒有結果，建立滿 365 天一律清（絕對上限，Will 2026-10-18），
-// 清理回報其中只靠上限清掉的筆數；登入的檢舉不受影響。結果信要寄到這個地址，所以案件拖得再久，有結果的也要等結果設定之後再留 30 天——除非先到了 365 天。
-func TestAnonymousContactErasedByTheOutcomeRuleAndTheAbsoluteCap(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, s := f.open(t)
-	end := f.now.Add(500 * 24 * time.Hour)
-	day := 24 * time.Hour
-	type scenario struct {
-		name              string
-		created, resolved time.Duration // 距離 end 的負數；resolved 為 0 表示沒有結果
-		erased, capped    bool          // 第一次清理（現在 = end）是否清掉、是否只靠上限
-	}
-	scenarios := []scenario{
-		{"建立 91 天前、結果 29 天前：不清", -91 * day, -29 * day, false, false},
-		{"建立 60 天前、結果 31 天前：不清（不早於建立後 90 天）", -60 * day, -31 * day, false, false},
-		{"建立 91 天前、結果 31 天前：依結果清", -91 * day, -31 * day, true, false},
-		{"建立 91 天前、沒有結果：不清", -91 * day, 0, false, false},
-		{"建立剛好 365 天前、沒有結果：不清（滿 365 天是嚴格大於）", -365 * day, 0, false, false},
-		{"建立 365 天又 1 微秒前、沒有結果：上限清", -365*day - time.Microsecond, 0, true, true},
-		{"建立 400 天前、結果 10 天前（結果還沒滿 30 天）：上限清", -400 * day, -10 * day, true, true},
-		{"建立差 1 分鐘滿 365 天、結果 10 天前：不清", -365*day + time.Minute, -10 * day, false, false},
-	}
-	ids := make([]uuid.UUID, len(scenarios))
-	for i, sc := range scenarios {
-		f.now = end.Add(sc.created)
-		ids[i] = f.anonymousReport(t, s.StoreID, fmt.Sprintf("09%08d", 55000000+i)).Report.ID
-		if sc.resolved != 0 {
-			f.now = end.Add(sc.resolved)
-			f.mustResolve(t, ids[i], OutcomeNoViolation)
-		}
-	}
-	f.now = end.Add(-400 * day)
-	logged := f.buyerReport(t, s.StoreID, 5, policy.Fraud).ReportID
-	f.mustResolve(t, logged, OutcomeNoViolation)
-	f.now = end
-	var wantErased, wantCapped int64
-	for _, sc := range scenarios {
-		if sc.erased {
-			wantErased++
-		}
-		if sc.capped {
-			wantCapped++
-		}
-	}
-	got, err := f.module.EraseExpiredReportContacts(ctx)
-	must(t, err)
-	if got.Erased != wantErased || got.Capped != wantCapped {
-		t.Fatalf("清理 %+v，預期清 %d 筆、其中 %d 筆只靠上限", got, wantErased, wantCapped)
-	}
-	for i, sc := range scenarios {
-		r := f.reportOf(t, ids[i])
-		if erased := r.ContactErasedAt != nil; erased != sc.erased || (erased && (r.Contact != nil || !r.ContactErasedAt.Equal(end))) || r.Description == "" {
-			t.Errorf("%s：erased=%v %+v", sc.name, erased, r.Report)
-		}
-	}
-	if r := f.reportOf(t, logged); r.ContactErasedAt != nil {
-		t.Fatalf("登入的檢舉不受影響（即使超過 365 天）：%+v", r.Report)
-	}
-	if got, err := f.module.EraseExpiredReportContacts(ctx); err != nil || got != (ContactErasure{}) {
-		t.Fatalf("second run: %+v err=%v", got, err)
-	}
-	// 之後：第 4 筆有了結果要等結果設定後 30 天才清；第 1、2 筆依結果規則先到期；第 5 筆（剛好 365 天、沒有結果）只靠上限清（Capped 1）；第 8 筆（差 1 分鐘滿 365 天）
-	// 這時結果規則也到期了，不算只靠上限。
-	f.now = end.Add(time.Hour)
-	f.mustResolve(t, ids[3], OutcomeInsufficient)
-	f.now = end.Add(time.Hour + 30*day - time.Minute)
-	got, err = f.module.EraseExpiredReportContacts(ctx)
-	must(t, err)
-	if got != (ContactErasure{Erased: 4, Capped: 1}) || f.reportOf(t, ids[3]).ContactErasedAt != nil || f.reportOf(t, ids[4]).ContactErasedAt == nil || f.reportOf(t, ids[7]).ContactErasedAt == nil {
-		t.Fatalf("結果設定後差一分鐘滿 30 天：%+v err=%v", got, err)
-	}
-	f.now = end.Add(time.Hour + 30*day + time.Minute)
-	if got, err := f.module.EraseExpiredReportContacts(ctx); err != nil || got != (ContactErasure{Erased: 1}) || f.reportOf(t, ids[3]).ContactErasedAt == nil {
-		t.Fatalf("結果設定後滿 30 天：%+v err=%v", got, err)
 	}
 }
 
@@ -952,28 +765,12 @@ func TestMeasureRejectsAnyInvalidSourceReportAndWritesNothing(t *testing.T) {
 	}
 }
 
-// 重複提交（補充）只回既有那一筆的 ID：匿名的不回它的內容、聯絡方式或任何檢舉人的資料（CR-5）。只知道電話號碼的人重送，不該因此
-// 讀到原檢舉人留下的姓名、email 與描述；登入的檢舉人拿回他自己那一筆（去重的鍵含買家）。
-func TestDuplicateSubmissionReturnsOnlyTheReportID(t *testing.T) {
+// 重複提交（補充）回呼叫者自己那一筆（去重的鍵含買家，所以不會是別人的通報）與說明發生了什麼的句子。
+func TestDuplicateSubmissionReturnsTheCallersOwnReport(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	ctx := context.Background()
 	_, s := f.open(t)
 	f.everExposed(t, s.StoreID)
-	first, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, Phone: "0912345678", Email: "victim@example.com", Name: "王小明", Category: policy.FoodSafety, Description: "食用後腹瀉",
-	})
-	must(t, err)
-	if first.Report == nil || first.Report.ID != first.ReportID || first.Supplemented {
-		t.Fatalf("first=%+v", first)
-	}
-	dup, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, Phone: "0912345678", Name: "路人", Category: policy.Fraud, Description: "只知道電話的人",
-	})
-	must(t, err)
-	if !dup.Supplemented || dup.ReportID != first.ReportID || dup.Report != nil || dup.Notice.Text != "" {
-		t.Fatalf("a duplicate must return only the id: %+v", dup)
-	}
 	buyer := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
 	again := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
 	if !again.Supplemented || again.ReportID != buyer.ReportID || again.Report == nil || again.Report.ID != buyer.ReportID || again.Notice.Text != "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。" {

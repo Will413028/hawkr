@@ -14,6 +14,7 @@ package moderationv1alpha1
 
 import (
 	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
+	v1alpha11 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -40,6 +41,10 @@ const (
 	ReportTargetKind_REPORT_TARGET_KIND_FORUM_ENTRY ReportTargetKind = 3
 	// 買家；id 是買家的 ID。
 	ReportTargetKind_REPORT_TARGET_KIND_BUYER ReportTargetKind = 4
+	// 買家寫的評價；id 是評價 ID。
+	ReportTargetKind_REPORT_TARGET_KIND_REVIEW ReportTargetKind = 5
+	// 買家與店家之間的一則聊天訊息；id 是訊息 ID。
+	ReportTargetKind_REPORT_TARGET_KIND_CHAT_MESSAGE ReportTargetKind = 6
 )
 
 // Enum value maps for ReportTargetKind.
@@ -50,13 +55,17 @@ var (
 		2: "REPORT_TARGET_KIND_COMMENT",
 		3: "REPORT_TARGET_KIND_FORUM_ENTRY",
 		4: "REPORT_TARGET_KIND_BUYER",
+		5: "REPORT_TARGET_KIND_REVIEW",
+		6: "REPORT_TARGET_KIND_CHAT_MESSAGE",
 	}
 	ReportTargetKind_value = map[string]int32{
-		"REPORT_TARGET_KIND_UNSPECIFIED": 0,
-		"REPORT_TARGET_KIND_POST":        1,
-		"REPORT_TARGET_KIND_COMMENT":     2,
-		"REPORT_TARGET_KIND_FORUM_ENTRY": 3,
-		"REPORT_TARGET_KIND_BUYER":       4,
+		"REPORT_TARGET_KIND_UNSPECIFIED":  0,
+		"REPORT_TARGET_KIND_POST":         1,
+		"REPORT_TARGET_KIND_COMMENT":      2,
+		"REPORT_TARGET_KIND_FORUM_ENTRY":  3,
+		"REPORT_TARGET_KIND_BUYER":        4,
+		"REPORT_TARGET_KIND_REVIEW":       5,
+		"REPORT_TARGET_KIND_CHAT_MESSAGE": 6,
 	}
 )
 
@@ -376,7 +385,7 @@ func (x *ListMyReportsRequest) GetPageToken() string {
 
 type ListMyReportsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reports       []*ReportRecord        `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	Reports       []*MyReportItem        `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
 	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -412,7 +421,7 @@ func (*ListMyReportsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ListMyReportsResponse) GetReports() []*ReportRecord {
+func (x *ListMyReportsResponse) GetReports() []*MyReportItem {
 	if x != nil {
 		return x.Reports
 	}
@@ -426,36 +435,39 @@ func (x *ListMyReportsResponse) GetNextPageToken() string {
 	return ""
 }
 
-// ReportRecord 是呼叫者送出的一筆檢舉。
-type ReportRecord struct {
+// MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
+type MyReportItem struct {
 	state    protoimpl.MessageState  `protogen:"open.v1"`
 	Id       string                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Target   *ReportTarget           `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
-	Category v1alpha1.PolicyCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
+	Category v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 送出時的說明；沒有或已超過保留期被清除時是空字串。
-	Description string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	Outcome     ReportOutcome          `protobuf:"varint,5,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
-	CreateTime  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	// 案件結案的時間；處理中不設。
-	ResolveTime   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=resolve_time,json=resolveTime,proto3,oneof" json:"resolve_time,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreateTime  *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// 結果設定或案件結案的時間；處理中不設。
+	ResolveTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=resolve_time,json=resolveTime,proto3,oneof" json:"resolve_time,omitempty"`
+	// Types that are valid to be assigned to Subject:
+	//
+	//	*MyReportItem_Community
+	//	*MyReportItem_Store
+	Subject       isMyReportItem_Subject `protobuf_oneof:"subject"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReportRecord) Reset() {
-	*x = ReportRecord{}
+func (x *MyReportItem) Reset() {
+	*x = MyReportItem{}
 	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReportRecord) String() string {
+func (x *MyReportItem) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReportRecord) ProtoMessage() {}
+func (*MyReportItem) ProtoMessage() {}
 
-func (x *ReportRecord) ProtoReflect() protoreflect.Message {
+func (x *MyReportItem) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -467,65 +479,145 @@ func (x *ReportRecord) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReportRecord.ProtoReflect.Descriptor instead.
-func (*ReportRecord) Descriptor() ([]byte, []int) {
+// Deprecated: Use MyReportItem.ProtoReflect.Descriptor instead.
+func (*MyReportItem) Descriptor() ([]byte, []int) {
 	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ReportRecord) GetId() string {
+func (x *MyReportItem) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *ReportRecord) GetTarget() *ReportTarget {
-	if x != nil {
-		return x.Target
-	}
-	return nil
-}
-
-func (x *ReportRecord) GetCategory() v1alpha1.PolicyCategory {
+func (x *MyReportItem) GetCategory() v1alpha1.PolicyCategory {
 	if x != nil {
 		return x.Category
 	}
 	return v1alpha1.PolicyCategory(0)
 }
 
-func (x *ReportRecord) GetDescription() string {
+func (x *MyReportItem) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *ReportRecord) GetOutcome() ReportOutcome {
-	if x != nil {
-		return x.Outcome
-	}
-	return ReportOutcome_REPORT_OUTCOME_UNSPECIFIED
-}
-
-func (x *ReportRecord) GetCreateTime() *timestamppb.Timestamp {
+func (x *MyReportItem) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
 	}
 	return nil
 }
 
-func (x *ReportRecord) GetResolveTime() *timestamppb.Timestamp {
+func (x *MyReportItem) GetResolveTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ResolveTime
 	}
 	return nil
 }
 
+func (x *MyReportItem) GetSubject() isMyReportItem_Subject {
+	if x != nil {
+		return x.Subject
+	}
+	return nil
+}
+
+func (x *MyReportItem) GetCommunity() *CommunityReport {
+	if x != nil {
+		if x, ok := x.Subject.(*MyReportItem_Community); ok {
+			return x.Community
+		}
+	}
+	return nil
+}
+
+func (x *MyReportItem) GetStore() *v1alpha11.StoreReport {
+	if x != nil {
+		if x, ok := x.Subject.(*MyReportItem_Store); ok {
+			return x.Store
+		}
+	}
+	return nil
+}
+
+type isMyReportItem_Subject interface {
+	isMyReportItem_Subject()
+}
+
+type MyReportItem_Community struct {
+	Community *CommunityReport `protobuf:"bytes,6,opt,name=community,proto3,oneof"`
+}
+
+type MyReportItem_Store struct {
+	Store *v1alpha11.StoreReport `protobuf:"bytes,7,opt,name=store,proto3,oneof"`
+}
+
+func (*MyReportItem_Community) isMyReportItem_Subject() {}
+
+func (*MyReportItem_Store) isMyReportItem_Subject() {}
+
+// CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
+type CommunityReport struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Target        *ReportTarget          `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	Outcome       ReportOutcome          `protobuf:"varint,2,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommunityReport) Reset() {
+	*x = CommunityReport{}
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommunityReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommunityReport) ProtoMessage() {}
+
+func (x *CommunityReport) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommunityReport.ProtoReflect.Descriptor instead.
+func (*CommunityReport) Descriptor() ([]byte, []int) {
+	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CommunityReport) GetTarget() *ReportTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *CommunityReport) GetOutcome() ReportOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return ReportOutcome_REPORT_OUTCOME_UNSPECIFIED
+}
+
 var File_hawkr_moderation_v1alpha1_moderation_proto protoreflect.FileDescriptor
 
 const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\"i\n" +
+	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\"i\n" +
 	"\fReportTarget\x12D\n" +
 	"\x04kind\x18\x01 \x01(\x0e2+.hawkr.moderation.v1alpha1.ReportTargetKindB\x03\xe0A\x02R\x04kind\x12\x13\n" +
 	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\"\xee\x01\n" +
@@ -544,24 +636,30 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"\x82\x01\n" +
 	"\x15ListMyReportsResponse\x12A\n" +
-	"\areports\x18\x01 \x03(\v2'.hawkr.moderation.v1alpha1.ReportRecordR\areports\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x9a\x03\n" +
-	"\fReportRecord\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12?\n" +
-	"\x06target\x18\x02 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12A\n" +
-	"\bcategory\x18\x03 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12B\n" +
-	"\aoutcome\x18\x05 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome\x12;\n" +
-	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"\areports\x18\x01 \x03(\v2'.hawkr.moderation.v1alpha1.MyReportItemR\areports\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa8\x03\n" +
+	"\fMyReportItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12A\n" +
+	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12;\n" +
+	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTime\x12B\n" +
-	"\fresolve_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x00R\vresolveTime\x88\x01\x01B\x0f\n" +
-	"\r_resolve_time*\xb5\x01\n" +
+	"\fresolve_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\vresolveTime\x88\x01\x01\x12J\n" +
+	"\tcommunity\x18\x06 \x01(\v2*.hawkr.moderation.v1alpha1.CommunityReportH\x00R\tcommunity\x12:\n" +
+	"\x05store\x18\a \x01(\v2\".hawkr.seller.v1alpha1.StoreReportH\x00R\x05storeB\t\n" +
+	"\asubjectB\x0f\n" +
+	"\r_resolve_time\"\x96\x01\n" +
+	"\x0fCommunityReport\x12?\n" +
+	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12B\n" +
+	"\aoutcome\x18\x02 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome*\xf9\x01\n" +
 	"\x10ReportTargetKind\x12\"\n" +
 	"\x1eREPORT_TARGET_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REPORT_TARGET_KIND_POST\x10\x01\x12\x1e\n" +
 	"\x1aREPORT_TARGET_KIND_COMMENT\x10\x02\x12\"\n" +
 	"\x1eREPORT_TARGET_KIND_FORUM_ENTRY\x10\x03\x12\x1c\n" +
-	"\x18REPORT_TARGET_KIND_BUYER\x10\x04*\x8a\x01\n" +
+	"\x18REPORT_TARGET_KIND_BUYER\x10\x04\x12\x1d\n" +
+	"\x19REPORT_TARGET_KIND_REVIEW\x10\x05\x12#\n" +
+	"\x1fREPORT_TARGET_KIND_CHAT_MESSAGE\x10\x06*\x8a\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16REPORT_OUTCOME_PENDING\x10\x01\x12\x1c\n" +
@@ -585,7 +683,7 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_moderation_v1alpha1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_hawkr_moderation_v1alpha1_moderation_proto_goTypes = []any{
 	(ReportTargetKind)(0),         // 0: hawkr.moderation.v1alpha1.ReportTargetKind
 	(ReportOutcome)(0),            // 1: hawkr.moderation.v1alpha1.ReportOutcome
@@ -594,30 +692,34 @@ var file_hawkr_moderation_v1alpha1_moderation_proto_goTypes = []any{
 	(*SubmitReportResponse)(nil),  // 4: hawkr.moderation.v1alpha1.SubmitReportResponse
 	(*ListMyReportsRequest)(nil),  // 5: hawkr.moderation.v1alpha1.ListMyReportsRequest
 	(*ListMyReportsResponse)(nil), // 6: hawkr.moderation.v1alpha1.ListMyReportsResponse
-	(*ReportRecord)(nil),          // 7: hawkr.moderation.v1alpha1.ReportRecord
-	(v1alpha1.PolicyCategory)(0),  // 8: hawkr.common.v1alpha1.PolicyCategory
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*MyReportItem)(nil),          // 7: hawkr.moderation.v1alpha1.MyReportItem
+	(*CommunityReport)(nil),       // 8: hawkr.moderation.v1alpha1.CommunityReport
+	(v1alpha1.PolicyCategory)(0),  // 9: hawkr.common.v1alpha1.PolicyCategory
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*v1alpha11.StoreReport)(nil), // 11: hawkr.seller.v1alpha1.StoreReport
 }
 var file_hawkr_moderation_v1alpha1_moderation_proto_depIdxs = []int32{
 	0,  // 0: hawkr.moderation.v1alpha1.ReportTarget.kind:type_name -> hawkr.moderation.v1alpha1.ReportTargetKind
 	2,  // 1: hawkr.moderation.v1alpha1.SubmitReportRequest.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
-	8,  // 2: hawkr.moderation.v1alpha1.SubmitReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	9,  // 3: hawkr.moderation.v1alpha1.SubmitReportResponse.create_time:type_name -> google.protobuf.Timestamp
-	7,  // 4: hawkr.moderation.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.moderation.v1alpha1.ReportRecord
-	2,  // 5: hawkr.moderation.v1alpha1.ReportRecord.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
-	8,  // 6: hawkr.moderation.v1alpha1.ReportRecord.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	1,  // 7: hawkr.moderation.v1alpha1.ReportRecord.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
-	9,  // 8: hawkr.moderation.v1alpha1.ReportRecord.create_time:type_name -> google.protobuf.Timestamp
-	9,  // 9: hawkr.moderation.v1alpha1.ReportRecord.resolve_time:type_name -> google.protobuf.Timestamp
-	3,  // 10: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:input_type -> hawkr.moderation.v1alpha1.SubmitReportRequest
-	5,  // 11: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:input_type -> hawkr.moderation.v1alpha1.ListMyReportsRequest
-	4,  // 12: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:output_type -> hawkr.moderation.v1alpha1.SubmitReportResponse
-	6,  // 13: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:output_type -> hawkr.moderation.v1alpha1.ListMyReportsResponse
-	12, // [12:14] is the sub-list for method output_type
-	10, // [10:12] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	9,  // 2: hawkr.moderation.v1alpha1.SubmitReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	10, // 3: hawkr.moderation.v1alpha1.SubmitReportResponse.create_time:type_name -> google.protobuf.Timestamp
+	7,  // 4: hawkr.moderation.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.moderation.v1alpha1.MyReportItem
+	9,  // 5: hawkr.moderation.v1alpha1.MyReportItem.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	10, // 6: hawkr.moderation.v1alpha1.MyReportItem.create_time:type_name -> google.protobuf.Timestamp
+	10, // 7: hawkr.moderation.v1alpha1.MyReportItem.resolve_time:type_name -> google.protobuf.Timestamp
+	8,  // 8: hawkr.moderation.v1alpha1.MyReportItem.community:type_name -> hawkr.moderation.v1alpha1.CommunityReport
+	11, // 9: hawkr.moderation.v1alpha1.MyReportItem.store:type_name -> hawkr.seller.v1alpha1.StoreReport
+	2,  // 10: hawkr.moderation.v1alpha1.CommunityReport.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
+	1,  // 11: hawkr.moderation.v1alpha1.CommunityReport.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
+	3,  // 12: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:input_type -> hawkr.moderation.v1alpha1.SubmitReportRequest
+	5,  // 13: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:input_type -> hawkr.moderation.v1alpha1.ListMyReportsRequest
+	4,  // 14: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:output_type -> hawkr.moderation.v1alpha1.SubmitReportResponse
+	6,  // 15: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:output_type -> hawkr.moderation.v1alpha1.ListMyReportsResponse
+	14, // [14:16] is the sub-list for method output_type
+	12, // [12:14] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_moderation_v1alpha1_moderation_proto_init() }
@@ -625,14 +727,17 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_init() {
 	if File_hawkr_moderation_v1alpha1_moderation_proto != nil {
 		return
 	}
-	file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5].OneofWrappers = []any{}
+	file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5].OneofWrappers = []any{
+		(*MyReportItem_Community)(nil),
+		(*MyReportItem_Store)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc), len(file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

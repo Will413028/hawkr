@@ -81,11 +81,16 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 	return format.Source([]byte(b.String()))
 }
 
+// enumValueKey 是值號表的鍵：列舉全名加值名。值名只在同一個 package 內唯一，不同 package 的列舉可以有同名的值。
+func enumValueKey(e *EnumInfo, name string) string {
+	return string(e.Desc.FullName()) + "." + name
+}
+
 func (m *Model) enumNumberTable(enums []*EnumInfo, quote func(string) string) string {
 	var parts []string
 	for _, e := range enums {
 		for _, v := range enumNames(e) {
-			parts = append(parts, fmt.Sprintf("%s: %d", quote(string(v.Name())), v.Number()))
+			parts = append(parts, fmt.Sprintf("%s: %d", quote(enumValueKey(e, string(v.Name()))), v.Number()))
 		}
 	}
 	sort.Strings(parts)
@@ -130,8 +135,8 @@ func (m *Model) EmitTSGoldenCalls() []byte {
 		fmt.Fprintf(&b, "\t%s: Code.%s,\n", jsString(c), connectCodeName(c))
 	}
 	b.WriteString("};\n\n")
-	b.WriteString(`function num(name: string | number | undefined): number {
-	const n = typeof name === "string" ? ENUM_NUMBER[name] : undefined;
+	b.WriteString(`function num(enumName: string, name: string | number | undefined): number {
+	const n = typeof name === "string" ? ENUM_NUMBER[enumName + "." + name] : undefined;
 	if (n === undefined) throw new Error("unknown enum value " + String(name));
 	return n;
 }
@@ -147,7 +152,7 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 			var args []string
 			switch f.Kind { //nolint:exhaustive // 其餘種類走預設分支
 			case FuncNoun, FuncVariant:
-				args = append(args, "num(c.value)")
+				args = append(args, fmt.Sprintf("num(%s, c.value)", jsString(string(f.Enum.Desc.FullName()))))
 			case FuncError:
 				args = append(args, "CODES[c.value ?? \"\"]")
 			}
@@ -160,7 +165,7 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 					case ParamInteger:
 						fields = append(fields, fmt.Sprintf("%s: p.%s as number", pr.Name, pr.Name))
 					default:
-						fields = append(fields, fmt.Sprintf("%s: num(p.%s)", pr.Name, pr.Name))
+						fields = append(fields, fmt.Sprintf("%s: num(%s, p.%s)", pr.Name, jsString(string(pr.Enum.Desc.FullName())), pr.Name))
 					}
 				}
 				args = append(args, "{ "+strings.Join(fields, ", ")+" }")
@@ -204,7 +209,7 @@ func (m *Model) EmitDartGoldenCalls() []byte {
 		fmt.Fprintf(&b, "  '%s': Code.%s,\n", c, lowerFirst(connectCodeName(c)))
 	}
 	b.WriteString("};\n\n")
-	b.WriteString(`int _n(Object? name) => _enumNumber[name]!;
+	b.WriteString(`int _n(String enumName, Object? name) => _enumNumber['$enumName.$name']!;
 
 /// 呼叫 fn 對應的生成函式；null 表示「沒有文字」。
 String? goldenText(String fn, String value, Map<String, Object?> params, UiLocale l) {
@@ -220,20 +225,20 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
 			case ParamInteger:
 				named = append(named, fmt.Sprintf("%s: (params['%s']! as num).toInt()", p.Name, p.Name))
 			default:
-				named = append(named, fmt.Sprintf("%s: %s.%s.valueOf(_n(params['%s']))!", p.Name, dartAlias(p.Enum), enumTypeName(p.Enum), p.Name))
+				named = append(named, fmt.Sprintf("%s: %s.%s.valueOf(_n('%s', params['%s']))!", p.Name, dartAlias(p.Enum), enumTypeName(p.Enum), p.Enum.Desc.FullName(), p.Name))
 			}
 		}
 		namedStr := strings.Join(named, ", ")
 		switch f.Kind {
 		case FuncNoun:
-			recv := fmt.Sprintf("%s.%s.valueOf(_n(value))!", dartAlias(f.Enum), enumTypeName(f.Enum))
+			recv := fmt.Sprintf("%s.%s.valueOf(_n('%s', value))!", dartAlias(f.Enum), enumTypeName(f.Enum), f.Enum.Desc.FullName())
 			arg := "l"
 			if namedStr != "" {
 				arg += ", " + namedStr
 			}
 			fmt.Fprintf(&b, "      return %s.uiText(%s);\n", recv, arg)
 		case FuncVariant:
-			recv := fmt.Sprintf("%s.%s.valueOf(_n(value))!", dartAlias(f.Enum), enumTypeName(f.Enum))
+			recv := fmt.Sprintf("%s.%s.valueOf(_n('%s', value))!", dartAlias(f.Enum), enumTypeName(f.Enum), f.Enum.Desc.FullName())
 			arg := "l"
 			if namedStr != "" {
 				arg += ", " + namedStr

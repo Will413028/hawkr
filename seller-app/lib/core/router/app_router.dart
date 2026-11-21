@@ -59,6 +59,9 @@ import '../../features/product/presentation/product_setup_spec_screen.dart';
 import '../../features/report/presentation/block_list_screen.dart';
 import '../../features/shipment_anomaly/presentation/shipment_anomaly_dashboard_screen.dart';
 import '../../features/seller/presentation/profile_screen.dart';
+import '../../features/seller/presentation/seller_inquiries_screen.dart';
+import '../../features/seller/presentation/seller_inquiry_detail_screen.dart';
+import '../../features/seller/presentation/seller_inquiry_reply_screen.dart';
 import '../../features/seller/presentation/seller_measure_request_form_screen.dart';
 import '../../features/seller/presentation/seller_appeal_screen.dart';
 import '../../features/seller/presentation/seller_certification_upload_screen.dart';
@@ -182,6 +185,17 @@ class SellerRoutes {
   /// （路由能力與無店家放行都沿用 [measureRequest] 的宣告）。
   static String measureRemediationFor(String measureId) =>
       '${measureRequestFor(measureId)}?$measureFormModeParam=$measureFormModeRemediation';
+
+  /// 平台詢問（帳號層級）：列表、一則詢問的內容、回覆表單；路徑參數是詢問 id，用 [inquiryDetailFor]、[inquiryReplyFor] 組網址。
+  static const inquiries = '/seller/inquiries';
+  static const inquiryDetail = '/seller/inquiries/:inquiryId';
+  static const inquiryReply = '/seller/inquiries/:inquiryId/reply';
+
+  static String inquiryDetailFor(String inquiryId) =>
+      '/seller/inquiries/${Uri.encodeComponent(inquiryId)}';
+
+  static String inquiryReplyFor(String inquiryId) =>
+      '${inquiryDetailFor(inquiryId)}/reply';
 
   /// 表單模式的查詢參數名稱與請求解除的值；沒有參數是申覆，其他值無效（路由導回 [measures]）。
   static const measureFormModeParam = 'mode';
@@ -1019,6 +1033,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SellerMeasureRequestFormScreen(
           measureId: state.pathParameters['measureId']!,
           kind: measureFormKindOf(state.uri)!,
+        ),
+      ),
+
+      GoRoute(
+        path: SellerRoutes.inquiries,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const SellerInquiriesScreen(),
+      ),
+      GoRoute(
+        path: SellerRoutes.inquiryDetail,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => SellerInquiryDetailScreen(
+          inquiryId: state.pathParameters['inquiryId']!,
+        ),
+      ),
+      GoRoute(
+        path: SellerRoutes.inquiryReply,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => SellerInquiryReplyScreen(
+          inquiryId: state.pathParameters['inquiryId']!,
         ),
       ),
 

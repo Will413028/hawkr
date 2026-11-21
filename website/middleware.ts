@@ -205,14 +205,11 @@ async function route(request: NextRequest): Promise<NextResponse> {
 			return NextResponse.redirect(threadUrl, 308);
 		}
 		// A thread the backend does not hold is a real 404 for the same reason
-		// (the page is prerendered; see lib/forum/thread-guard.ts). The store lookup
-		// is memoised, so a thread URL adds one thread call at most.
+		// (the page is prerendered; see lib/forum/thread-guard.ts). The storeId comes
+		// from the lookup above, so a thread URL costs one GetStore plus one thread call.
 		const missing = await isMissingForumThread(
 			pathname,
-			async (storeCode) => {
-				const store = await lookupStore(storeCode, visitorIp);
-				return store.kind === "present" ? store.storeId : null;
-			},
+			outcome.storeId,
 			(storeId, threadId) => lookupForumThread(storeId, threadId, visitorIp),
 		);
 		if (missing) return notFoundResponse(request);

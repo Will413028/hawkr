@@ -25,75 +25,44 @@ afterEach(() => {
 	delete (globalThis as { window?: unknown }).window;
 });
 
-test("fetchSeller soft-fails to null on 5xx (build immunity)", async () => {
+test("fetchSellerReviewStats soft-fails to null on 5xx (build immunity)", async () => {
 	respond = () => new Response("bad gateway", { status: 502 });
-	const { fetchSeller } = await import("../lib/api/index");
-	const result = await fetchSeller("1");
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	const result = await fetchSellerReviewStats("1");
 	assert.equal(result, null);
 });
 
-test("fetchSeller still returns null on 404", async () => {
+test("fetchSellerReviewStats still returns null on 404", async () => {
 	respond = () => new Response("not found", { status: 404 });
-	const { fetchSeller } = await import("../lib/api/index");
-	assert.equal(await fetchSeller("1"), null);
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	assert.equal(await fetchSellerReviewStats("1"), null);
 });
 
-// getCachedSeller reads through fetchSeller(id, true): a 5xx must THROW so the
-// use cache entry keeps its prior stale seller rather than caching an
+// getCachedSellerReviewStats reads through fetchSellerReviewStats(id, true): a 5xx must THROW so the
+// use cache entry keeps its prior stale value rather than caching an
 // outage-time null; a real 404 stays a cacheable null.
-test("fetchSeller(strict) THROWS on 5xx (cache must not swallow an outage)", async () => {
+test("fetchSellerReviewStats(strict) THROWS on 5xx (cache must not swallow an outage)", async () => {
 	respond = () => new Response("bad gateway", { status: 502 });
-	const { fetchSeller } = await import("../lib/api/index");
-	await assert.rejects(() => fetchSeller("1", true));
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	await assert.rejects(() => fetchSellerReviewStats("1", true));
 });
 
-test("fetchSeller(strict) still returns null on 404 (cacheable not-found)", async () => {
+test("fetchSellerReviewStats(strict) still returns null on 404 (cacheable not-found)", async () => {
 	respond = () => new Response("not found", { status: 404 });
-	const { fetchSeller } = await import("../lib/api/index");
-	assert.equal(await fetchSeller("1", true), null);
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	assert.equal(await fetchSellerReviewStats("1", true), null);
 });
 
-test("fetchSeller rejects malformed ids without calling the backend", async () => {
-	const { fetchSeller } = await import("../lib/api/index");
-	assert.equal(await fetchSeller("styles.css.map"), null);
+test("fetchSellerReviewStats rejects malformed ids without calling the backend", async () => {
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	assert.equal(await fetchSellerReviewStats("styles.css.map"), null);
 	assert.equal(lastInit, undefined);
 });
 
-test("fetchSeller attaches an abort signal (timeout)", async () => {
-	const { fetchSeller } = await import("../lib/api/index");
-	await fetchSeller("1");
+test("fetchSellerReviewStats attaches an abort signal (timeout)", async () => {
+	const { fetchSellerReviewStats } = await import("../lib/api/index");
+	await fetchSellerReviewStats("1");
 	assert.ok(lastInit?.signal, "expected a timeout AbortSignal on the request");
-});
-
-test("fetchSeller exposes only canonical logo_url to UI consumers", async () => {
-	respond = () =>
-		new Response(
-			JSON.stringify({
-				code: 0,
-				data: {
-					id: "1",
-					logoUrl: " https://media.example.com/i/avatar/store.png ",
-					logoKey: "public/store.png",
-					logo: "https://legacy.example/logo.png",
-					logo_url: "https://legacy.example/snake.png",
-					avatar: "https://legacy.example/avatar.png",
-				},
-			}),
-			{
-				status: 200,
-				headers: { "content-type": "application/json" },
-			},
-		);
-	const { fetchSeller } = await import("../lib/api/index");
-	const seller = await fetchSeller("1");
-
-	assert.equal(
-		seller?.logo_url,
-		"https://media.example.com/i/avatar/store.png",
-	);
-	for (const nonDisplayField of ["logoKey", "logo", "logoUrl", "avatar"]) {
-		assert.equal(Object.hasOwn(seller ?? {}, nonDisplayField), false);
-	}
 });
 
 const okEnvelope = () =>

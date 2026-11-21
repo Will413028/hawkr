@@ -110,6 +110,8 @@ const PRIVATE_PATHS = [
 	"/seller/measures/m1",
 	"/seller/measures/m1/appeal",
 	"/seller/measures/m1/remediation",
+	"/seller/inquiries",
+	"/seller/inquiries/i1",
 	"/checkout",
 	"/checkout/success",
 	"/cart",

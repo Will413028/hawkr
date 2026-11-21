@@ -29,7 +29,9 @@ extension type ModerationAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ListMyReports 列出呼叫者自己送出的檢舉，新到舊。每筆帶對象、原因、說明與結果（處理中、違規、不違規）。停權的帳號也可以呼叫。
+  /// ListMyReports 列出呼叫者自己送出的全部檢舉（社群內容與買家的，以及店家的），新到舊（建立時間，相同時社群在前，再依 id 新到舊）。
+  /// 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
+  /// （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
   Future<hawkrmoderationv1alpha1moderation.ListMyReportsResponse> listMyReports(
     hawkrmoderationv1alpha1moderation.ListMyReportsRequest input, {
     connect.Headers? headers,

@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const (
@@ -28,10 +30,9 @@ func (RecomputeArgs) Kind() string { return recomputeID }
 // 週期排入的工作、多個節點，都可能讓兩個重算同時或交錯執行。所以正確性不靠它，而是靠 replace 的序列化與開始時間檢查
 // （recompute_state）：重疊時較早開始的結果會被丟棄，不會蓋掉較新的快照。
 func (RecomputeArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{
-		MaxAttempts: recomputeAttempts,
-		UniqueOpts:  river.UniqueOpts{ByPeriod: RecomputeInterval},
-	}
+	o := jobs.SweepOpts(RecomputeInterval)
+	o.MaxAttempts = recomputeAttempts
+	return o
 }
 
 type recomputeWorker struct {

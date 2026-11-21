@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth/context";
 import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
 import { useChatUnread } from "@/lib/chat/unread-context";
 import { useSellerDashboard } from "@/lib/hooks/useSellerDashboard";
+import { usePendingInquiryCount } from "@/lib/hooks/useSellerInquiries";
 import { useSellerInvoiceOverview } from "@/lib/hooks/useSellerInvoices";
 import { useSellerPosts } from "@/lib/hooks/useSellerPosts";
 import { useSellerProducts } from "@/lib/hooks/useSellerProducts";
@@ -134,6 +135,9 @@ export default function SellerCenterShell({
 		enabled: canUse(SellerCapability.MARKETING),
 	});
 
+	// 待回覆的詢問以帳號為範圍，不看店家能力；徽章數字由伺服器算（`pending_reply_count`）。
+	const pendingInquiryCount = usePendingInquiryCount();
+
 	const [open, setOpen] = React.useState(false);
 	const [signingOut, setSigningOut] = React.useState(false);
 	const identitySubtitle = sellerId
@@ -172,6 +176,7 @@ export default function SellerCenterShell({
 			messages: unreadMessageCount,
 			notifications: unreadNotificationCount,
 			posts: postsCount,
+			inquiries: pendingInquiryCount,
 		};
 	}, [
 		dashboard,
@@ -179,6 +184,7 @@ export default function SellerCenterShell({
 		unreadMessageCount,
 		unreadNotificationCount,
 		postsCount,
+		pendingInquiryCount,
 	]);
 
 	const handleSignOut = async () => {

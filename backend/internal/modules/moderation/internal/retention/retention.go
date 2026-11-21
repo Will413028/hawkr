@@ -163,7 +163,7 @@ func (PurgeSnapshotsArgs) Kind() string { return "moderation.purge_snapshots" }
 
 // InsertOpts 讓同一個時段內的排程與重啟合併。
 func (PurgeSnapshotsArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 12 * time.Hour}}
+	return jobs.SweepOpts(12 * time.Hour)
 }
 
 type purgeWorker struct {

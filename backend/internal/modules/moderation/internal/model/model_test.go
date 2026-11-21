@@ -9,9 +9,9 @@ import (
 
 func TestActionAllowedOnMatchesTheDocumentedMatrix(t *testing.T) {
 	want := map[Action]map[TargetKind]bool{
-		ActionHide:     {TargetComment: true, TargetForumEntry: true},
-		ActionWarn:     {TargetComment: true, TargetForumEntry: true, TargetBuyer: true},
-		ActionBan:      {TargetComment: true, TargetForumEntry: true, TargetBuyer: true},
+		ActionHide:     {TargetComment: true, TargetForumEntry: true, TargetReview: true, TargetChatMessage: true},
+		ActionWarn:     {TargetComment: true, TargetForumEntry: true, TargetBuyer: true, TargetReview: true, TargetChatMessage: true},
+		ActionBan:      {TargetComment: true, TargetForumEntry: true, TargetBuyer: true, TargetReview: true, TargetChatMessage: true},
 		ActionTakedown: {TargetPost: true, TargetComment: true, TargetForumEntry: true},
 	}
 	for _, a := range Actions() {

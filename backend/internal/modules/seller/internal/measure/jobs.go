@@ -12,6 +12,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // CloseEndedArgs 是措施的結案掃描：把已結束的措施上失去標的的待處理解除請求結案。
@@ -22,7 +23,7 @@ func (CloseEndedArgs) Kind() string { return "seller.measure_close_ended_request
 
 // InsertOpts 把同一個週期的排程與重啟合併。
 func (CloseEndedArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: closeEndedInterval}}
+	return jobs.SweepOpts(closeEndedInterval)
 }
 
 const closeEndedInterval = 5 * time.Minute
@@ -146,7 +147,7 @@ func (PurgeContentSnapshotsArgs) Kind() string { return "seller.purge_content_sn
 
 // InsertOpts 讓同一個時段內的排程與重啟合併。
 func (PurgeContentSnapshotsArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 12 * time.Hour}}
+	return jobs.SweepOpts(12 * time.Hour)
 }
 
 // contentSnapshotBatch 是每個 transaction 清空的列數：分批做，不在一個 statement 持有大量列鎖。

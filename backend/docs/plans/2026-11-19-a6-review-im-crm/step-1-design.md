@@ -15,7 +15,7 @@
 - `M/legacy/orderservice` 加 `OrderForReview`（只補 review 用的這一支；`GetOrderForAfterSales`、`HasOrderBetween` 屬 A6-2、A6-3）。
 - `M/legacy/reviewrelay`（新）：`review.created`、`review.hidden` 照舊形狀送 `hawkr.review`。
 - `M/platform/revalidate` 加 `ProductTag(productID int64)`（`"product:<id>"`，與舊 `pkg/revalidate/tags.go:9` 同字串）。
-- 換掉 `M/legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go:21-69`、`cmd/hawkr/seller.go:71`）改接 `review.StoreRatingStats`，刪除 `M/legacy/reviewservice`。
+- ~~換掉 `M/legacy/reviewservice` 的 3 個呼叫端~~：移到 A6-6e（計畫 A6-D11，Will 2026-11-20）；A6-6e 前評價仍寫進舊服務，提早換會讀到空表。
 - `CARRYOVER.md`、`AGENTS.md`、`cmd/hawkr` 註冊（`modules.go`、`trimmedColumns`、worker、事件訂閱）。
 
 ## 0.2 不在範圍
@@ -118,7 +118,7 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 1. 輸入驗證：rating 1..5；content `trimtext.Trim` 後 ≤1000 rune（★RD2）；tokens ≤4；`price`、`sku_name`、`product_id` 不在輸入裡（★RD6，舊碼收 client 值）。
 2. `textfilter` 命中 → `MODERATION_REJECTED`（同舊碼，在查訂單之前）。
 3. `Orders.OrderForReview(orderNo)`：NotFound → `NotFound`；其他錯誤 → `Unavailable`（★RD9）。
-4. 狀態不是 `"50"` → `FailedPrecondition`（A6-D7 (a)）；買家不符 → `PermissionDenied`（順序同舊碼：先狀態後擁有者）。
+4. 買家不符 → `NotFound`（與訂單不存在同一個回應，不洩漏別人訂單的存在與狀態；★A6-D10）；狀態不是 `"50"` → `FailedPrecondition`（A6-D7 (a)）。
 5. 超過 `completed_at + 30 天` → `FailedPrecondition`（期限）。
 6. 項目不在訂單 → `InvalidArgument`；`product_id`、`sku_name`、`price`、`item_image_key` 全取訂單項目（★RD6）。
 7. transaction 外 `media.FinalizeList(tokens, RefTypeOrderReview)`。
@@ -145,7 +145,7 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 - 照 social 的兩段式（`social.go:625-638`、`purge_integration_test.go`）：訂閱 `buyer.BuyerDeletionRequested` 與 `buyer.BuyerDeleted`（兩個都訂：沒有開啟中訂單時只發後者），同 transaction 只做原子的狀態變更：`INSERT INTO review.inactive_authors (buyer_id) ON CONFLICT DO NOTHING` 並排一個 `review.purge_author` job（唯一鍵 buyer_id）。不在訂閱者內刪列：刪帳者的評價筆數沒有上限，而單體規則 4 限定同 transaction 訂閱者只做原子狀態變更。
 - 公開可讀述詞加 `NOT EXISTS (review.inactive_authors WHERE buyer_id = r.buyer_id)`，統計同述詞：評價在刪帳申請的那個 transaction 起就看不到、不計分。不讀 `buyer.pub_inactive_buyers()`（`buyer/db/pub.sql:16-18` 限定只給每日對帳）。
 - `review.purge_author` job：依 `id` 升序分批刪除該買家的評價（圖片列 CASCADE），每批記退場 asset、排媒體同步 job、排 `revalidate`。可重跑（從現況推導：還有列就刪）。
-- 訂閱者在寫入 `inactive_authors` 時只發一個 `ReviewAuthorDeactivated{BuyerID}`（transaction 內工作量固定）；reviewrelay 的 job 在 transaction 外列出該買家評過的 (store, product)，逐組重算並送 `review.hidden`，Java 的聚合在刪帳當下就開始更新，不等 purge（Will 2026-11-19，審查第 9 項）。
+- ~~訂閱者發 `ReviewAuthorDeactivated`、relay 逐組展開~~：由計畫 A6-D13 取代（Will 2026-11-20）。評分重算只走 purge 每批同 tx 發的 `ReviewAggregateChanged`（A6-D12）；週期掃描找出在 `inactive_authors` 但仍有評價列的買家並補排 purge job。
 - `Submit` 在第 4 步後查 `review.inactive_authors`，有列就 `FailedPrecondition`（刪除中的買家仍有開啟中訂單，之後完成的訂單不能再評）。
 
 ## 4. 事件與 relay
@@ -156,7 +156,6 @@ review.media_ref_sync / review.retired_assets   -- 照 social mediaref 的同步
 |---|---|---|
 | `ReviewCreated` | 提交成功 | EventID、OccurredAt、ReviewID、StoreID、ProductID |
 | `ReviewAggregateChanged` | 隱藏、還原 | EventID、OccurredAt、StoreID、ProductID（只表示「這組聚合要重送」，不指稱單則評價） |
-| `ReviewAuthorDeactivated` | 作者進入刪帳（寫入 `inactive_authors`） | EventID、OccurredAt、BuyerID |
 
 ### 4.2 `M/legacy/reviewrelay`
 

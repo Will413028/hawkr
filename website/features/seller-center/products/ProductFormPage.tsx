@@ -24,6 +24,7 @@ import ProductFormSections, {
 	LOCKED_SURFACE_CLASS,
 	LockedOverlay,
 } from "./components/ProductFormSections";
+import ProductLoadFailure from "./components/ProductLoadFailure";
 import { useProductForm } from "./hooks/useProductForm";
 
 function SparkleIcon() {
@@ -98,6 +99,15 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				</div>
 				<span className="visually-hidden">表單載入中</span>
 			</div>
+		);
+	}
+
+	if (form.loadStatus === "failed" || form.loadStatus === "notFound") {
+		return (
+			<ProductLoadFailure
+				status={form.loadStatus}
+				onRetry={() => void form.reload()}
+			/>
 		);
 	}
 

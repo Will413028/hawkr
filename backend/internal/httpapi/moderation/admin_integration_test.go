@@ -21,6 +21,7 @@ import (
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
+	appconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -30,9 +31,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -83,8 +86,12 @@ type adminStack struct {
 	buyers     *buyer.Module
 	social     *social.Module
 	sellers    *seller.Reader
+	sellerMod  *seller.Module
 	moderation *moderation.Module
-	admin      moderationv1alpha1connect.ModerationAdminServiceClient
+	// customerAccount 與 app 是一般顧客帳號與它的買家端入口（ModerationAppService）。
+	customerAccount int64
+	app             appconnect.ModerationAppServiceClient
+	admin           moderationv1alpha1connect.ModerationAdminServiceClient
 	// noRole 是認證過但沒有任何角色的管理員：每支方法都該回 permission_denied。
 	noRole moderationv1alpha1connect.ModerationAdminServiceClient
 	// customer 是一般顧客帳號：後台的 service 只給管理員。
@@ -145,7 +152,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
-		DB: d, Social: socialModule, Seller: sellers, Buyer: buyers, Suspension: suspension,
+		DB: d, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
 		Media: fakeMedia, Jobs: queue, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")
@@ -176,13 +183,14 @@ func startAdminStack(t *testing.T) *adminStack {
 	if _, err := id.Authenticate(t.Context(), noRoleToken); err != nil {
 		t.Fatal(err)
 	}
-	_, customerToken, err := id.DevNewSession(t.Context())
+	customerAccount, customerToken, err := id.DevNewSession(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	hc := srv.Client()
 	return &adminStack{
-		db: d, identity: id, buyers: buyers, social: socialModule, sellers: reader, moderation: mod,
+		db: d, identity: id, buyers: buyers, social: socialModule, sellers: reader, sellerMod: sellers, moderation: mod,
+		customerAccount: customerAccount, app: appconnect.NewModerationAppServiceClient(hc, srv.URL, bearer(customerToken)),
 		admin:    moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(ownerToken)),
 		noRole:   moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(noRoleToken)),
 		customer: moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(customerToken)),

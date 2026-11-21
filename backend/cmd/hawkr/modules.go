@@ -5,12 +5,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -36,6 +39,9 @@ func modules() []migrate.Module {
 		{Name: "moderation", Dir: moderation.Migrations()},
 		{Name: "assistant", Dir: assistant.Migrations()},
 		{Name: "procurement", Dir: procurement.Migrations()},
+		{Name: "review", Dir: review.Migrations()},
+		{Name: "im", Dir: im.Migrations()},
+		{Name: "crm", Dir: crm.Migrations()},
 	}
 }
 

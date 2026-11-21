@@ -104,65 +104,45 @@ const (
 // CaseStateValues 回傳全部案件狀態。
 func CaseStateValues() []CaseState { return []CaseState{CaseStateOpen, CaseStateClosed} }
 
-// SupplementMatch 是匿名的補充以哪一種聯絡方式比對到原通報；值與 DB 的 report_supplements_matched_by_check、契約的 SupplementMatch 一致。
-type SupplementMatch string
-
 const (
-	// MatchedByPhone 電話相同。
-	MatchedByPhone SupplementMatch = "PHONE"
-	// MatchedByEmail 聯絡信箱相同。
-	MatchedByEmail SupplementMatch = "EMAIL"
-	// MatchedByBoth 電話與聯絡信箱都相同。
-	MatchedByBoth SupplementMatch = "BOTH"
-)
-
-// SupplementMatchValues 回傳全部比對方式。
-func SupplementMatchValues() []SupplementMatch {
-	return []SupplementMatch{MatchedByPhone, MatchedByEmail, MatchedByBoth}
-}
-
-const (
-	// MaxSupplements 是一筆通報最多的補充則數（超過時，登入的送出回 failed_precondition，匿名的內容不存、只計次數）。
+	// ReportDefaultPageSize 與 ReportMaxPageSize 是通報清單（檢舉人、後台）的每頁筆數。
+	ReportDefaultPageSize int32 = 20
+	ReportMaxPageSize     int32 = 100
+	// MaxSupplements 是一筆通報最多的補充則數（超過時回 failed_precondition）。
 	MaxSupplements = 10
 	// MaxReportEvidence 是一筆通報（原通報加全部補充）最多的佐證張數，位置的上界。
 	MaxReportEvidence = MaxEvidence * (1 + MaxSupplements)
-	// ContactRetentionAfterOutcome 是匿名檢舉人聯絡欄位在結果設定之後的保留期限；清除時間是 greatest(建立 + ContactRetention, 結果 + 這個)。
-	ContactRetentionAfterOutcome = 30 * 24 * time.Hour
 )
 
-// Supplement 是同一位檢舉人在去重期間內再次送出、併入原通報的內容；只新增。MatchedBy 只有匿名的補充有；EvidencePositions 是這則補充帶來的佐證在
+// Supplement 是同一位檢舉人在去重期間內再次送出、併入原通報的內容；只新增。EvidencePositions 是這則補充帶來的佐證在
 // 通報的佐證裡的位置（單筆讀取時載入）。
 type Supplement struct {
 	ID                uuid.UUID
 	Description       string
-	MatchedBy         *SupplementMatch
 	EvidencePositions []int
 	CreatedAt         time.Time
 }
 
-// Report 是一次通報。登入的檢舉人有 ReporterBuyerID、沒有 Contact；匿名的相反（清除後 Contact 為 nil、ContactErasedAt 有值）。Supplements、Evidence 只在
+// Report 是一次通報。檢舉人一定是登入的買家（ReporterBuyerID）。Supplements、Evidence 只在
 // 讀取單筆時載入；SupplementCount、LatestSupplementSeq、LatestSupplementAt、SupplementsSeenSeq、StoreName 在清單與單筆都帶（StoreName 在個資清理之後是 nil）。
 type Report struct {
-	ID                   uuid.UUID
-	StoreID              int64
-	StoreName            *string
-	ProductID, OrderNo   *string
-	Category             policy.Category
-	Description          string
-	ReporterBuyerID      *int64
-	Contact              *ReporterContact
-	ContactErasedAt      *time.Time
-	CaseID               *uuid.UUID
-	AssessedCategory     *policy.Category
-	TriagedAt            *time.Time
-	TriagedByAdminID     *int64
-	Outcome              *Outcome
-	ResolvedAt           *time.Time
-	ResolvedByAdminID    *int64
-	ResolutionNote       *string
-	DiscardedSubmissions int
-	Version              int64
-	SupplementCount      int
+	ID                 uuid.UUID
+	StoreID            int64
+	StoreName          *string
+	ProductID, OrderNo *string
+	Category           policy.Category
+	Description        string
+	ReporterBuyerID    int64
+	CaseID             *uuid.UUID
+	AssessedCategory   *policy.Category
+	TriagedAt          *time.Time
+	TriagedByAdminID   *int64
+	Outcome            *Outcome
+	ResolvedAt         *time.Time
+	ResolvedByAdminID  *int64
+	ResolutionNote     *string
+	Version            int64
+	SupplementCount    int
 	// LatestSupplementSeq 是最新一則補充的編號（max(Supplement.Seq)；沒有補充時 0），與 SupplementsSeenSeq 比較就是「有新的補充」。
 	LatestSupplementSeq int
 	LatestSupplementAt  *time.Time
@@ -536,12 +516,6 @@ func (f ReportFacts) Availability() ReportAvailability {
 	return a
 }
 
-// ContactErasure 是一次匿名聯絡方式清理的結果：Erased 是清掉的筆數，Capped 是其中只靠絕對上限（ContactRetentionCap）清掉的筆數——
-// 沒有結果卻拖滿一年的匿名通報，代表處理流程卡住了，所以單獨計數。
-type ContactErasure struct {
-	Erased, Capped int64
-}
-
 // TriageTarget 是通報分案或移動到平台判定類別 Category 時，這家店此刻的去處：Case 是那個類別進行中的案件（加入它），nil 是沒有（開新案件）。
 type TriageTarget struct {
 	Category policy.Category
@@ -562,8 +536,8 @@ type AdminCase struct {
 	Availability CaseAvailability
 }
 
-// SubmitReportInput 是提出通報（檢舉）的輸入；空字串表示沒有提供。ReporterBuyerID 大於零是登入的檢舉人（呼叫方解析的業務鍵），佐證由 AccountID（同一個登入者的帳號）上傳；
-// ReporterBuyerID 為零是匿名，必須留電話或 email，不收佐證。AccountID 大於零而店家屬於那個帳號時不能檢舉自己的店（匿名入口在呼叫者登入時也帶上）。
+// SubmitReportInput 是提出通報（檢舉）的輸入；空字串表示沒有提供。ReporterBuyerID 必須大於零（呼叫方解析的業務鍵），佐證由 AccountID（同一個登入者的帳號）上傳；
+// AccountID 大於零而店家屬於那個帳號時不能檢舉自己的店。
 type SubmitReportInput struct {
 	StoreID            int64
 	ProductID, OrderNo string
@@ -571,19 +545,24 @@ type SubmitReportInput struct {
 	Description        string
 	ReporterBuyerID    int64
 	AccountID          int64
-	Phone, Email, Name string
 	EvidenceTokens     []string
 }
 
-// SubmitReportResult 是提出通報的結果。ReportID 一定有值。Supplemented 表示去重期間內已有同一個檢舉人、還沒有結果的通報，這次的內容補充到它、沒有新增；Discarded 表示
-// 那一筆的補充已達上限（只會是匿名的送出：登入的回錯誤），內容沒有存下。Report：新增時有值；登入的補充是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）；
-// 匿名的補充與丟棄是 nil——重複提交的人不一定是原本的檢舉人（例如只知道電話號碼的人），不回它的內容、聯絡方式或任何檢舉人的資料；匿名檢舉的傳輸層不得因此回不同的結果
-// （不洩漏這支電話用過）。
+// AddSupplementInput 是檢舉人為自己的通報主動補充的輸入：BuyerID 是呼叫者的買家（通報必須是他的），佐證由 AccountID 上傳。
+type AddSupplementInput struct {
+	ReportID       uuid.UUID
+	BuyerID        int64
+	AccountID      int64
+	Description    string
+	EvidenceTokens []string
+}
+
+// SubmitReportResult 是提出通報的結果。ReportID 一定有值。Supplemented 表示去重期間內已有同一個檢舉人、還沒有結果的通報，這次的內容補充到它、沒有新增。
+// Report：新增時有值；補充時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
 type SubmitReportResult struct {
 	ReportID     uuid.UUID
 	Report       *Report
 	Supplemented bool
-	Discarded    bool
 	// Notice 是補充到原通報時給檢舉人看的那一句（請求語系的伺服器句子：它說的是伺服器的去重規則）；只有 Supplemented 時有值。
 	Notice uitext.Message
 }
@@ -730,19 +709,15 @@ type AdminCasePage struct {
 	Next  *CaseCursor
 }
 
-// ReportReceived 在每次送出的 transaction 內發出：新的檢舉、補充（SupplementID）、補充已達上限而沒有存下的匿名送出（Discarded）。ConfirmationEmail 是這次送出留的
-// email（只有匿名；登入者是 nil，A8 用站內通知）：確認信寄到這裡。它只在事件與 A8 同一個 transaction 排入的 job 參數裡，不落 seller 的表，也不帶原檢舉人的聯絡方式。
-// A8 的訂閱者不得在 job 完成或丟棄後留著這個欄位（River 預設保留完成的 job 24 小時、丟棄的 7 天），見 events.go 與遷移計畫 A8。
+// ReportReceived 在每次送出的 transaction 內發出：新的檢舉或補充（SupplementID）。A8 用站內通知回覆檢舉人（ReporterBuyerID）。
 type ReportReceived struct {
-	OccurredAt        time.Time
-	EventID           uuid.UUID
-	ReportID          uuid.UUID
-	SupplementID      *uuid.UUID
-	Discarded         bool
-	StoreID           int64
-	ReporterBuyerID   *int64
-	Category          policy.Category
-	ConfirmationEmail *string
+	OccurredAt      time.Time
+	EventID         uuid.UUID
+	ReportID        uuid.UUID
+	SupplementID    *uuid.UUID
+	StoreID         int64
+	ReporterBuyerID int64
+	Category        policy.Category
 }
 
 // ReportResolved 在通報有了結果的 transaction 內發出，每筆通報一次：個別設定、直接結掉或案件結案帶入都算。CaseID 是通報所在的案件（沒有案件時 nil）。
@@ -751,7 +726,7 @@ type ReportResolved struct {
 	EventID         uuid.UUID
 	ReportID        uuid.UUID
 	StoreID         int64
-	ReporterBuyerID *int64
+	ReporterBuyerID int64
 	Outcome         Outcome
 	CaseID          *uuid.UUID
 }

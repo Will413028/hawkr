@@ -207,12 +207,11 @@ func (m *governanceModule) AdminViolations(_ context.Context, in model.Violation
 
 var governanceNow = time.Date(2026, 10, 4, 2, 0, 0, 0, time.UTC)
 
-// anonymousFoodSafetyReport 是一筆待分案的匿名食安通報（沒有案件也沒有結果，所以此刻可以分案、設定除了已採取措施以外的結果）。
-func anonymousFoodSafetyReport() model.AdminReport {
-	phone := "0912345678"
+// foodSafetyReport 是一筆待分案的食安通報（沒有案件也沒有結果，所以此刻可以分案、設定除了已採取措施以外的結果）。
+func foodSafetyReport() model.AdminReport {
 	r := model.Report{
 		ID: uuid.NewV7(), StoreID: 12, Category: policy.FoodSafety, Description: "吃了不舒服", Version: 4,
-		Contact: &model.ReporterContact{Phone: &phone}, CreatedAt: governanceNow, UpdatedAt: governanceNow,
+		ReporterBuyerID: 500, CreatedAt: governanceNow, UpdatedAt: governanceNow,
 		Evidence: []model.Evidence{{AssetID: "asset-secret-1", ObjectKey: "secure/governance/k1"}, {AssetID: "asset-secret-2", ObjectKey: "secure/governance/k2"}},
 		// 分案期限由模組的讀取路徑填入（seller.review_report_triage）；emitter 只轉換。
 		TriageDeadline: &model.Deadline{Start: governanceNow, Due: governanceNow.Add(4 * time.Hour)},
@@ -258,7 +257,6 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 		"CaseState":                      rpc.EnumMismatches[adminpb.CaseState](model.CaseStateValues()),
 		"CaseCloseReason":                rpc.EnumMismatches[adminpb.CaseCloseReason](model.CaseCloseReasonValues()),
 		"CaseDecision":                   rpc.EnumMismatches[adminpb.CaseDecision](model.DecisionValues()),
-		"SupplementMatch":                rpc.EnumMismatches[adminpb.SupplementMatch](model.SupplementMatchValues()),
 		"ViolationSeverity":              rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
 		"MeasureRequestKind":             rpc.EnumMismatches[pb.MeasureRequestKind](model.RequestKindValues()),
 		"RemediationUnavailableReason":   rpc.EnumMismatches[pb.RemediationUnavailableReason](model.RemediationUnavailableReasonValues()),
@@ -283,7 +281,7 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 
 // 佐證只以位置與檢視網址出現：asset ID 與 object key 不在任何回應裡（佐證是機敏檔，只經擁有者的端點讀）。
 func TestGovernanceResponsesCarryEvidenceOnlyAsViewURIs(t *testing.T) {
-	report, measure := anonymousFoodSafetyReport(), riskMeasureFixture()
+	report, measure := foodSafetyReport(), riskMeasureFixture()
 	m := &governanceModule{report: report, measure: measure}
 	h := NewTestGovernance(t, m)
 	got, err := h.GetReport(adminCtx(1), connect.NewRequest(&adminpb.GetReportRequest{Id: report.ID.String()}))
@@ -295,7 +293,7 @@ func TestGovernanceResponsesCarryEvidenceOnlyAsViewURIs(t *testing.T) {
 		r.GetEvidence()[1].GetViewUri() != "/api/files/admin/seller/reports/"+report.ID.String()+"/evidence/1" {
 		t.Fatalf("evidence=%v", r.GetEvidence())
 	}
-	if r.GetReporterBuyerId() != "" || r.GetContact().GetPhone() != "0912345678" || r.GetState() != adminpb.ReportState_REPORT_STATE_AWAITING_TRIAGE ||
+	if r.GetReporterBuyerId() != "500" || r.GetState() != adminpb.ReportState_REPORT_STATE_AWAITING_TRIAGE ||
 		!r.GetTriageDeadline().GetStartTime().AsTime().Equal(governanceNow) || !r.GetTriageDeadline().GetDueTime().AsTime().Equal(governanceNow.Add(4*time.Hour)) || r.GetTriageTime() != nil || r.GetEtag() != "4" {
 		t.Fatalf("report=%v", r)
 	}
@@ -449,7 +447,7 @@ func TestAdminMeasureCarriesTheRemediationRequests(t *testing.T) {
 
 // 指令都以呼叫的管理員記錄，列舉照轉（DecideAppeal 的裁定是結果列舉，不是布林）。
 func TestGovernanceCommandsUseTheCallingAdmin(t *testing.T) {
-	report, measure := anonymousFoodSafetyReport(), riskMeasureFixture()
+	report, measure := foodSafetyReport(), riskMeasureFixture()
 	m := &governanceModule{report: report, measure: measure, cases: caseFixture(model.CaseFacts{})}
 	h := NewTestGovernance(t, m)
 	ctx := adminCtx(42)
@@ -726,7 +724,7 @@ func TestListMeasuresMapsFiltersAndBindsThePageToken(t *testing.T) {
 // 清單的 page token 綁在篩選上：換了篩選就不能沿用；篩選照轉給模組；清單不帶匿名檢舉人的聯絡方式。
 func TestListReportsBindsThePageTokenToTheFilters(t *testing.T) {
 	cursor := &model.ReportCursor{CreatedAt: governanceNow, ID: uuid.NewV7()}
-	m := &governanceModule{reportPage: model.AdminReportPage{Items: []model.AdminReport{anonymousFoodSafetyReport()}, Next: cursor}}
+	m := &governanceModule{reportPage: model.AdminReportPage{Items: []model.AdminReport{foodSafetyReport()}, Next: cursor}}
 	h := NewTestGovernance(t, m)
 	caseID := uuid.NewV7()
 	req := &adminpb.ListReportsRequest{
@@ -735,9 +733,6 @@ func TestListReportsBindsThePageTokenToTheFilters(t *testing.T) {
 	got, err := h.ListReports(adminCtx(1), connect.NewRequest(req))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if got.Msg.GetReports()[0].GetContact() != nil {
-		t.Fatal("清單不帶匿名檢舉人的聯絡方式")
 	}
 	if in := m.reportList; *in.State != model.ReportStateInCase || *in.Category != policy.Other || in.StoreID != 12 || in.CaseID == nil || *in.CaseID != caseID || !in.CitableAsSource || in.PageSize != 1 {
 		t.Fatalf("in=%+v", in)
@@ -1056,7 +1051,7 @@ func TestCreateMeasureKindIsTheInputThatIsSet(t *testing.T) {
 
 // 已讀補充：帶通報 id 與讀到的 etag 照轉（不需要管理員 id 以外的資料）；沒帶 etag 不呼叫模組；回應是模組回的通報。
 func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
-	report := anonymousFoodSafetyReport()
+	report := foodSafetyReport()
 	m := &governanceModule{report: report}
 	h := NewTestGovernance(t, m)
 	got, err := h.MarkReportSupplementsSeen(adminCtx(42), connect.NewRequest(&adminpb.MarkReportSupplementsSeenRequest{Id: report.ID.String(), Etag: "9"}))

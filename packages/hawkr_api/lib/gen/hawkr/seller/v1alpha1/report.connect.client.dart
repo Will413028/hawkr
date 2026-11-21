@@ -31,16 +31,17 @@ extension type SellerReportAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ListMyReports 列出呼叫者的檢舉，新到舊。
-  Future<hawkrsellerv1alpha1report.ListMyReportsResponse> listMyReports(
-    hawkrsellerv1alpha1report.ListMyReportsRequest input, {
+  /// GetMyReport 讀呼叫者自己的一筆店家檢舉：檢舉本身、補充與佐證。別人的或不存在的 report_id 一律回 not_found（不洩漏存在與否）。
+  /// 呼叫者的全部檢舉（社群與店家）的清單是 hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports。
+  Future<hawkrsellerv1alpha1report.GetMyReportResponse> getMyReport(
+    hawkrsellerv1alpha1report.GetMyReportRequest input, {
     connect.Headers? headers,
     connect.AbortSignal? signal,
     Function(connect.Headers)? onHeader,
     Function(connect.Headers)? onTrailer,
   }) {
     return connect.Client(_transport).unary(
-      specs.SellerReportAppService.listMyReports,
+      specs.SellerReportAppService.getMyReport,
       input,
       signal: signal,
       headers: headers,
@@ -48,24 +49,20 @@ extension type SellerReportAppServiceClient (connect.Transport _transport) {
       onTrailer: onTrailer,
     );
   }
-}
-/// SellerReportPublicService 是不需要登入的檢舉入口。
-extension type SellerReportPublicServiceClient (connect.Transport _transport) {
-  /// SubmitFoodSafetyReport 匿名檢舉食品安全事件，必須留下電話或 email（主管機關可能需要聯絡檢舉人），不收佐證圖片（要附圖請
-  /// 登入後以 CreateReport 檢舉）。店家的規則與 CreateReport 相同；呼叫者登入而且店家屬於他的帳號時回 invalid_argument（store_id）。
-  /// 同一支電話或同一個 email 對同一家店，一個台北 ISO 週內、還沒有結果的那一筆存在時，這次的內容補充到它（每筆最多 10 則，超過時
-  /// 內容不存）；新的檢舉、補充與超過上限的送出回應完全相同（回應沒有內容），不會透露這支電話或 email 用過。每個來源 IP
-  /// （登入的呼叫者以帳號計）10 分鐘最多 5 次、1 小時最多 10 次，被拒絕的送出不計；超過回 resource_exhausted（帶 RetryInfo）。
-  /// 聯絡方式在「結果設定後 30 天、且不早於送出後 90 天」清除；還沒有結果的檢舉不清除。
-  Future<hawkrsellerv1alpha1report.SubmitFoodSafetyReportResponse> submitFoodSafetyReport(
-    hawkrsellerv1alpha1report.SubmitFoodSafetyReportRequest input, {
+
+  /// AddReportSupplement 為呼叫者自己、還沒有結果的一筆店家檢舉補充內容。與 CreateReport 去重時併入的補充是同一串、同一個上限
+  /// （每筆檢舉合計最多 10 則），admin 看到的是同一串補充。別人的或不存在的 report_id 回 not_found；檢舉已經有結果，或補充已
+  /// 達 10 則時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次（與 CreateReport 同樣的額度，各自計數），超過回
+  /// resource_exhausted（帶 RetryInfo）。
+  Future<hawkrsellerv1alpha1report.AddReportSupplementResponse> addReportSupplement(
+    hawkrsellerv1alpha1report.AddReportSupplementRequest input, {
     connect.Headers? headers,
     connect.AbortSignal? signal,
     Function(connect.Headers)? onHeader,
     Function(connect.Headers)? onTrailer,
   }) {
     return connect.Client(_transport).unary(
-      specs.SellerReportPublicService.submitFoodSafetyReport,
+      specs.SellerReportAppService.addReportSupplement,
       input,
       signal: signal,
       headers: headers,

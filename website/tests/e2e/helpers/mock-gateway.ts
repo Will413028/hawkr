@@ -127,6 +127,7 @@ export const REFRESH_MY_PAYMENT_ACCOUNT_URL = sellerMethod(
 export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
+export const LIST_MY_INQUIRIES_URL = sellerMethod("ListMyInquiries");
 export const LIST_BLOCKED_BUYERS_URL = sellerMethod("ListBlockedBuyers");
 export const GET_MY_STORE_OPENING_URL = sellerMethod("GetMyStoreOpening");
 
@@ -1229,6 +1230,11 @@ export async function setupGatewayMocks(
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
+
+	// 2b''. 平台詢問（ListMyInquiries，賣家導覽的待回覆徽章）：預設空。
+	await page.route(LIST_MY_INQUIRIES_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
 
 	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
 	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {

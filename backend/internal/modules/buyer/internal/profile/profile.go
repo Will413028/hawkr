@@ -119,7 +119,7 @@ func (service *Service) ProfileByBuyerID(ctx context.Context, id int64) (model.P
 	return stint.Profile(buyerRow), nil
 }
 
-// LockActive 在呼叫方的 transaction 內以共享鎖確認 stint 是營運中；沒有 transaction 是呼叫端的錯誤。
+// LockActive 在呼叫方的 transaction 內以 FOR KEY SHARE 確認 stint 是營運中；沒有 transaction 是呼叫端的錯誤。
 func (service *Service) LockActive(ctx context.Context, id int64) error {
 	if err := model.Positive(id); err != nil {
 		return err
@@ -128,6 +128,17 @@ func (service *Service) LockActive(ctx context.Context, id int64) error {
 		return errors.New("buyer：LockActive 必須在 transaction 內呼叫")
 	}
 	return stint.RequireActiveShared(ctx, store.New(service.deps.DB.Conn(ctx)), id)
+}
+
+// LockNotClosed 在呼叫方的 transaction 內以 FOR KEY SHARE 確認 stint 尚未關閉（刪除中也放行）；沒有 transaction 是呼叫端的錯誤。
+func (service *Service) LockNotClosed(ctx context.Context, id int64) error {
+	if err := model.Positive(id); err != nil {
+		return err
+	}
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("buyer：LockNotClosed 必須在 transaction 內呼叫")
+	}
+	return stint.RequireNotClosedShared(ctx, store.New(service.deps.DB.Conn(ctx)), id)
 }
 
 // AccountIDByBuyerID 只讀取 stint 的帳號鍵，包含已關閉的歷史 stint。

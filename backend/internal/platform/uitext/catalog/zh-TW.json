@@ -192,6 +192,10 @@
       "message": "使用者",
       "description": "買家；id 是買家的 ID。"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "買家與店家之間的一則聊天訊息；id 是訊息 ID。"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "留言",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）"
@@ -203,6 +207,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "貼文",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "評價",
+      "description": "買家寫的評價；id 是評價 ID。"
     },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
@@ -295,6 +303,46 @@
     "seller.ContentKind.CONTENT_KIND_POST": {
       "message": "貼文",
       "description": "店家貼文。"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
+      "message": "請說明",
+      "description": "請說明。"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_RECORDS": {
+      "message": "提供紀錄",
+      "description": "提供紀錄：賣家合作條款第 11.3 條的來源、批次、效期、進出貨及流向。"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL": {
+      "message": "電子信箱",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_EMAIL）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING": {
+      "message": "通訊軟體",
+      "description": "通訊軟體。"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER": {
+      "message": "其他管道",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_OTHER）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE": {
+      "message": "電話",
+      "description": "InquiryReplyChannel 是回覆怎麼收到的。（值 INQUIRY_REPLY_CHANNEL_PHONE）"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER": {
+      "message": "賣家中心",
+      "description": "賣家在賣家中心回覆。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_OPEN": {
+      "message": "待回覆",
+      "description": "等賣家回覆。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_REPLIED": {
+      "message": "已回覆",
+      "description": "已回覆（終態）。"
+    },
+    "seller.InquiryState.INQUIRY_STATE_WITHDRAWN": {
+      "message": "已撤回",
+      "description": "已撤回（終態）：賣家不必再回覆。"
     },
     "seller.KYCApplication.decide_time": {
       "message": "核准時間：{time}",
@@ -670,6 +718,26 @@
       "message": "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。",
       "description": "收款已啟用但撥款（payouts_active 為 false）尚未啟用時，接在收款帳戶說明後的一行。"
     },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "已處理（不受理）",
+      "description": "濫用檢舉。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "已處理（已採取措施）",
+      "description": "平台採取了措施（只會是案件裡的檢舉）。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "已處理（重複檢舉）",
+      "description": "與另一筆檢舉重複。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "已處理（資料不足）",
+      "description": "內容不足，無法判斷。"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "已處理（不違規）",
+      "description": "查過之後沒有違規。"
+    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"
@@ -774,6 +842,10 @@
       "message": "客服電子信箱",
       "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）都用這一套。（值 STORE_FIELD_SUPPORT_EMAIL）"
     },
+    "seller.StoreReport.outcome_unset": {
+      "message": "審核中",
+      "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
+    },
     "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY": {
       "message": "破產",
       "description": "第 21.3 條，立即生效。"
@@ -860,6 +932,10 @@
       "message": "買家",
       "description": "買家；id 是買家的 ID。\n受眾：後台員工"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "聊天訊息",
+      "description": "買家與店家之間的一則聊天訊息；id 是訊息 ID。\n受眾：後台員工"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "留言",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_COMMENT）\n受眾：後台員工"
@@ -871,6 +947,10 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "貼文",
       "description": "ReportTargetKind 是檢舉對象的種類。（值 REPORT_TARGET_KIND_POST）\n受眾：後台員工"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "評價",
+      "description": "買家寫的評價；id 是評價 ID。\n受眾：後台員工"
     },
     "seller.KYCStatus.KYC_STATUS_APPROVED": {
       "message": "已核准",
@@ -928,6 +1008,26 @@
     "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_REJECTED": {
       "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆駁回} MEASURE_REQUEST_KIND_REMEDIATION {解除請求駁回} other {請求駁回}}",
       "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "濫報",
+      "description": "濫用檢舉。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "已採取措施",
+      "description": "平台採取了措施（只會是案件裡的檢舉）。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "重複",
+      "description": "與另一筆檢舉重複。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "內容不足",
+      "description": "內容不足，無法判斷。\n受眾：後台員工"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "未違規",
+      "description": "查過之後沒有違規。\n受眾：後台員工"
     }
   },
   "variants": {

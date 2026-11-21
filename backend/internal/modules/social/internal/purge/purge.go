@@ -12,7 +12,6 @@ import (
 	"uuid"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
@@ -59,14 +58,7 @@ func (PurgeBuyerContentArgs) Kind() string { return "social.purge_buyer_content"
 // （River 的規定：執行中也要在內），不含已完成的。執行中被略過的那一次不會漏：買家進入刪除中之後沒有新內容（buyer.LockActive），
 // 執行中的 job 會處理完剩下的。
 func (PurgeBuyerContentArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: unfinishedStates()}}
-}
-
-func unfinishedStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-		rivertype.JobStateRetryable, rivertype.JobStateScheduled,
-	}
+	return jobs.UniqueByArgs(10)
 }
 
 // PurgeStoreContentArgs 清除一家退場店家的社群內容。
@@ -79,7 +71,7 @@ func (PurgeStoreContentArgs) Kind() string { return "social.purge_store_content"
 
 // InsertOpts 同 PurgeBuyerContentArgs，唯一鍵是 StoreID。
 func (PurgeStoreContentArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 10, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: unfinishedStates()}}
+	return jobs.UniqueByArgs(10)
 }
 
 // CleanupViewsArgs 清掉瀏覽去重用的舊資料。
@@ -90,7 +82,7 @@ func (CleanupViewsArgs) Kind() string { return "social.cleanup_views" }
 
 // InsertOpts 讓同一個時段內的排程與重啟合併。
 func (CleanupViewsArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 12 * time.Hour}}
+	return jobs.SweepOpts(12 * time.Hour)
 }
 
 // EnqueueBuyer 排入買家的清除 job（在呼叫方的 transaction 內）。

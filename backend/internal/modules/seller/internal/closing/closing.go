@@ -69,6 +69,17 @@ func (s *Service) Lock(ctx context.Context, storeID int64) error {
 	return err
 }
 
+// LockNotRetired 在呼叫方的 transaction 內以 FOR KEY SHARE 確認店家尚未退場；沒有 transaction 是呼叫端的錯誤（鎖在語句結束就放掉）。
+func (s *Service) LockNotRetired(ctx context.Context, storeID int64) error {
+	if err := model.Positive(storeID); err != nil {
+		return err
+	}
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("seller：LockNotRetired 必須在 transaction 內呼叫")
+	}
+	return stint.RequireNotRetiredShared(ctx, store.New(s.d.DB.Conn(ctx)), storeID)
+}
+
 // BeginDeletion 讓目前的 stint 隨帳號刪除進入等待，同一個 transaction 發出 StorePendingDeletion 並排入快取失效；已在
 // 等待時不做任何事（不重發），已關閉時成功（重送安全）。
 //

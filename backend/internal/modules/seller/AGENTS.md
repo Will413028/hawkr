@@ -10,7 +10,7 @@ schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依�
 
 ## 發布的讀取介面
 
-形狀在 `db/pub.sql`，定義在 `db/objects.sql`；消費端只能呼叫函式，改形狀要同一次變更更新 `pub.sql` 與消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意與各函式的守門測試見規格 §21。
+形狀在 `db/pub.sql`，定義在 `db/objects.sql`；消費端只能呼叫函式，改形狀要同一次變更更新 `pub.sql` 與消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意與各函式的守門測試見規格 §21。`pub_retired_stores()`（已退場的店）與寫入守門 `LockNotRetired`（`FOR KEY SHARE`）給 im、crm。
 
 ## 模組內部結構
 

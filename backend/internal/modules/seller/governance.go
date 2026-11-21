@@ -31,9 +31,6 @@ type ReportState = model.ReportState
 // CaseState 是案件此刻的狀態（進行中、已結案），讀取時推導。
 type CaseState = model.CaseState
 
-// SupplementMatch 是匿名的補充以哪一種聯絡方式比對到原通報。
-type SupplementMatch = model.SupplementMatch
-
 // ReportBlock 是通報此刻不能做某個動作的一個原因。
 type ReportBlock = model.ReportBlock
 
@@ -143,9 +140,6 @@ const (
 	ReportStateResolved              = model.ReportStateResolved
 	CaseStateOpen                    = model.CaseStateOpen
 	CaseStateClosed                  = model.CaseStateClosed
-	MatchedByPhone                   = model.MatchedByPhone
-	MatchedByEmail                   = model.MatchedByEmail
-	MatchedByBoth                    = model.MatchedByBoth
 	ReportBlockResolved              = model.ReportBlockResolved
 	ReportBlockAlreadyTriaged        = model.ReportBlockAlreadyTriaged
 	ReportBlockNeedsCase             = model.ReportBlockNeedsCase
@@ -168,6 +162,7 @@ const (
 	InquiryChannelEmail              = model.InquiryChannelEmail
 	InquiryChannelMessaging          = model.InquiryChannelMessaging
 	InquiryChannelOther              = model.InquiryChannelOther
+	InquiryChannelSellerCenter       = model.InquiryChannelSellerCenter
 	InquiryWithdrawAdmin             = model.InquiryWithdrawAdmin
 	InquiryWithdrawCaseClosed        = model.InquiryWithdrawCaseClosed
 	InquiryStateOpen                 = model.InquiryStateOpen
@@ -258,12 +253,8 @@ const (
 	MeasureActionShorten         = model.MeasureActionShorten
 	MeasureActionRevoke          = model.MeasureActionRevoke
 	MeasureActionEnd             = model.MeasureActionEnd
-	// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（從建立起算）；結果設定之後還要再留 ContactRetentionAfterOutcome。
-	ContactRetention = model.ContactRetention
-	// ContactRetentionAfterOutcome 是匿名檢舉人聯絡欄位在結果設定之後的保留期限。
-	ContactRetentionAfterOutcome = model.ContactRetentionAfterOutcome
-	// ContactRetentionCap 是匿名檢舉人聯絡欄位的絕對保留上限（從建立起算，不論有沒有結果）。
-	ContactRetentionCap = model.ContactRetentionCap
+	// ReportMaxPageSize 是通報清單每頁筆數的上限。
+	ReportMaxPageSize = model.ReportMaxPageSize
 	// MaxSupplements 是一筆通報最多的補充則數。
 	MaxSupplements = model.MaxSupplements
 	// ReviewWindow 是 RISK 措施複審期限的上限。
@@ -306,9 +297,6 @@ func ReportStateValues() []ReportState { return model.ReportStateValues() }
 
 // CaseStateValues 回傳全部案件狀態。
 func CaseStateValues() []CaseState { return model.CaseStateValues() }
-
-// SupplementMatchValues 回傳全部補充的比對方式。
-func SupplementMatchValues() []SupplementMatch { return model.SupplementMatchValues() }
 
 // ReportBlockValues 回傳全部通報不能做動作的原因。
 func ReportBlockValues() []ReportBlock { return model.ReportBlockValues() }
@@ -414,8 +402,6 @@ type (
 	ReadEvidenceInput = model.ReadEvidenceInput
 	// FileContent 是一份機敏檔的內容。
 	FileContent = model.FileContent
-	// ReporterContact 是匿名檢舉人的聯絡方式。
-	ReporterContact = model.ReporterContact
 	// CaseInquiry 是案件上對賣家的一筆詢問。
 	CaseInquiry = model.CaseInquiry
 	// InquiryReply 是管理員記下的賣家回覆（系統外收到）。
@@ -438,6 +424,14 @@ type (
 	WithdrawCaseInquiryInput = model.WithdrawCaseInquiryInput
 	// WithdrawCaseInquiryResult 是撤回詢問的結果。
 	WithdrawCaseInquiryResult = model.WithdrawCaseInquiryResult
+	// SellerInquiry 是賣家看到的一筆詢問。
+	SellerInquiry = model.SellerInquiry
+	// SellerInquiryPage 是一頁賣家的詢問，連同待回覆數。
+	SellerInquiryPage = model.SellerInquiryPage
+	// AccountInquiryListInput 是賣家帳號詢問清單的輸入。
+	AccountInquiryListInput = model.AccountInquiryListInput
+	// ReplyToInquiryInput 是賣家回覆詢問的輸入。
+	ReplyToInquiryInput = model.ReplyToInquiryInput
 	// InquiryCursor 是詢問列表的 keyset 位置。
 	InquiryCursor = model.InquiryCursor
 	// CaseInquiryListInput 是案件詢問清單的輸入。
@@ -470,8 +464,6 @@ type (
 	CaseTarget = model.CaseTarget
 	// JoinCase 是加入一個進行中的案件（讀到的案件 ID 與版本）。
 	JoinCase = model.JoinCase
-	// ContactErasure 是一次聯絡方式清理的結果。
-	ContactErasure = model.ContactErasure
 	// AdminCase 是後台看到的一個案件（含此刻可以做的動作）。
 	AdminCase = model.AdminCase
 	// SubmitReportInput 是提出通報（檢舉）的輸入。
@@ -496,6 +488,8 @@ type (
 	ReportCursor = model.ReportCursor
 	// ReportListInput 是 admin 通報清單的輸入。
 	ReportListInput = model.ReportListInput
+	// AddSupplementInput 是檢舉人為自己的通報主動補充的輸入。
+	AddSupplementInput = model.AddSupplementInput
 	// BuyerReportListInput 是檢舉人自己的通報列表的輸入。
 	BuyerReportListInput = model.BuyerReportListInput
 	// ReportPage 是一頁通報（檢舉人自己的）。
@@ -600,9 +594,9 @@ type (
 	EffectiveMeasure = model.EffectiveMeasure
 )
 
-// SubmitReport 提出檢舉（登入的買家或匿名者）；必須在 transaction 外呼叫（佐證先轉正）。去重的期間內已有同一個檢舉人、還沒有結果的通報時，這次的內容補充到它
+// SubmitReport 提出檢舉（登入的買家，ReporterBuyerID 必須大於零）；必須在 transaction 外呼叫（佐證先轉正）。去重的期間內已有同一個檢舉人、還沒有結果的通報時，這次的內容補充到它
 // （Supplemented；每筆最多 MaxSupplements 則）。通報的對象只能是曾經公開過的店（StoreCards 的規則：檢舉人看得到的店，已關閉的也算）；從沒公開過的與不存在的是同一個
-// NotFound，所以公開的匿名入口不能拿來探測從沒公開過的店家 ID（store_id 是連號）。登入的呼叫者（AccountID）不能檢舉自己的店。
+// NotFound，所以不能拿來探測從沒公開過的店家 ID（store_id 是連號）。登入的呼叫者（AccountID）不能檢舉自己的店。
 // 這是 A7-D5′ 之後 moderation 會呼叫的入口：依單體規則 3，它不開 InReadSnapshot；在呼叫方 transaction 內建立檢舉要另給加入呼叫方 transaction 的入口（SubmitReportInTx），
 // 在 A7 的刀和它的消費者一起加。
 func (m *Module) SubmitReport(ctx context.Context, in SubmitReportInput) (SubmitReportResult, error) {
@@ -668,6 +662,21 @@ func (m *Module) CaseInquiries(ctx context.Context, in CaseInquiryListInput) (Ad
 	return m.governance.Inquiries(ctx, in)
 }
 
+// AccountInquiries 是賣家帳號（全部 stint，含已關閉的店）的詢問清單，新到舊，連同待回覆數；自己開讀取快照，不要求店家營運中。
+func (m *Module) AccountInquiries(ctx context.Context, in AccountInquiryListInput) (SellerInquiryPage, error) {
+	return m.governance.AccountInquiries(ctx, in)
+}
+
+// AccountInquiry 讀取賣家帳號的一筆詢問；不屬於這個帳號與不存在都回 NotFound。
+func (m *Module) AccountInquiry(ctx context.Context, accountID int64, inquiryID uuid.UUID) (SellerInquiry, error) {
+	return m.governance.AccountInquiry(ctx, accountID, inquiryID)
+}
+
+// ReplyToInquiry 賣家在賣家中心回覆自己店家的詢問並結束詢問；必須在 transaction 外呼叫（附件先轉正）。已回覆或已撤回回 failed_precondition；逾期後仍可回覆。
+func (m *Module) ReplyToInquiry(ctx context.Context, in ReplyToInquiryInput) (SellerInquiry, error) {
+	return m.governance.ReplyToInquiry(ctx, in)
+}
+
 // Report 讀取一筆通報的後台檢視：補充、佐證與此刻可以做的動作。只由 admin 的 handler 呼叫，自己開讀取快照（不是跨模組入口）。
 func (m *Module) Report(ctx context.Context, reportID uuid.UUID) (AdminReport, error) {
 	return m.governance.Report(ctx, reportID)
@@ -688,15 +697,19 @@ func (m *Module) AdminCases(ctx context.Context, in CaseListInput) (AdminCasePag
 	return m.governance.AdminCases(ctx, in)
 }
 
+// BuyerReport 讀登入的檢舉人自己的一筆通報（含補充與佐證）；別人的或不存在的是 NotFound。
+func (m *Module) BuyerReport(ctx context.Context, buyerID int64, reportID uuid.UUID) (Report, error) {
+	return m.governance.BuyerReport(ctx, buyerID, reportID)
+}
+
+// AddReportSupplement 是檢舉人為自己還沒有結果的通報主動補充（與去重併入的補充同一串、同一個上限）；必須在 transaction 外呼叫（佐證先轉正）。
+func (m *Module) AddReportSupplement(ctx context.Context, in AddSupplementInput) (Report, error) {
+	return m.governance.AddSupplement(ctx, in)
+}
+
 // BuyerReports 是登入的檢舉人自己的通報。
 func (m *Module) BuyerReports(ctx context.Context, in BuyerReportListInput) (ReportPage, error) {
 	return m.governance.BuyerReports(ctx, in)
-}
-
-// EraseExpiredReportContacts 清掉清除時間已到的匿名檢舉人聯絡欄位（有結果的：建立滿 90 天且結果設定滿 30 天；不論有沒有結果：建立滿 365 天），
-// 回傳清掉的筆數與其中只靠 365 天上限清的筆數；它是 seller.erase_report_contacts job 的內容。
-func (m *Module) EraseExpiredReportContacts(ctx context.Context) (ContactErasure, error) {
-	return m.governance.EraseExpiredContacts(ctx)
 }
 
 // CreateCaseNote 新增案件的一則內部註記（只新增、不帶版本、不改案件的任何 etag）；案件可以是已結案的。

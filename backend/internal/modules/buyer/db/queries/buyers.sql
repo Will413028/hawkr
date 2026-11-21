@@ -16,18 +16,27 @@ FROM buyer.buyers
 WHERE buyer_id = $1;
 
 -- name: LockBuyer :one
--- 鎖定指定 stint，序列化其業務寫入。
+-- 鎖定指定 stint，序列化其業務寫入（FOR NO KEY UPDATE）：與別的業務寫入互斥，與 LockBuyerShared 的 FOR KEY SHARE 不互斥。
+-- 只能搭配不改 buyers 的唯一鍵欄位（buyer_id、account_id）的更新使用；狀態轉換與刪帳用 LockBuyerForTransition。
+SELECT *
+FROM buyer.buyers
+WHERE buyer_id = $1
+FOR NO KEY UPDATE;
+
+-- name: LockBuyerForTransition :one
+-- 鎖定指定 stint 以做狀態轉換或刪除（FOR UPDATE）：與 LockBuyerShared 的 FOR KEY SHARE 互斥，其他模組的買家寫入守門因此要等它。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
 FOR UPDATE;
 
 -- name: LockBuyerShared :one
--- 以共享鎖讀取指定 stint：與 BeginDeletion 的 FOR UPDATE 互斥，與別的共享鎖不互斥。其他模組的買家寫入用它與刪帳序列化。
+-- 以 FOR KEY SHARE 讀取指定 stint：與 BeginDeletion 等狀態轉換的 FOR UPDATE 互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+-- 其他模組的買家寫入用它與刪帳序列化；它只擋「買家列被刪或轉換狀態」，不擋業務欄位的更新。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
-FOR SHARE;
+FOR KEY SHARE;
 
 -- name: CreateBuyer :one
 -- 建帳時建立帳號唯一的買家；同一帳號再建立違反 buyers_account，視為不變量被破壞。

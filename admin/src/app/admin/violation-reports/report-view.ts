@@ -13,47 +13,11 @@ import {
 import { formatDateTimeShort } from "@/lib/format";
 import { policyCategoryText } from "@/lib/policy-category";
 
-// 通報與案件詳情頁的顯示邏輯（純函式）：檢舉人、佐證的名稱、補充與移動紀錄的句子。資料與可做的動作都來自伺服器。
+// 通報與案件詳情頁的顯示邏輯（純函式）：佐證的名稱、補充與移動紀錄的句子。資料與可做的動作都來自伺服器。
 
 /** 時間的顯示（台北時間，到分鐘）；沒有時間是「-」。 */
 export function timeText(value: Timestamp | undefined): string {
 	return value ? formatDateTimeShort(timestampDate(value)) : "-";
-}
-
-export type ReporterView =
-	| { kind: "buyer"; buyerId: string }
-	| {
-			kind: "anonymous";
-			/** 沒有提供的欄位不列。 */
-			contact: { label: string; value: string }[];
-			/** 聯絡方式已依保留期限清除時的說明。 */
-			erasedText: string | undefined;
-	  };
-
-/** 檢舉人：登入的檢舉人是買家 ID；匿名的列出電話、聯絡信箱與姓名，聯絡方式已清除時說明清除的時間。 */
-export function reporterView(
-	report: Pick<Report, "reporterBuyerId" | "contact" | "contactEraseTime">,
-): ReporterView {
-	if (report.reporterBuyerId) {
-		return { kind: "buyer", buyerId: report.reporterBuyerId };
-	}
-	const contact: { label: string; value: string }[] = [];
-	if (report.contact?.phone) {
-		contact.push({ label: "電話", value: report.contact.phone });
-	}
-	if (report.contact?.email) {
-		contact.push({ label: "聯絡信箱", value: report.contact.email });
-	}
-	if (report.contact?.name) {
-		contact.push({ label: "姓名", value: report.contact.name });
-	}
-	return {
-		kind: "anonymous",
-		contact,
-		erasedText: report.contactEraseTime
-			? `聯絡方式已於 ${timeText(report.contactEraseTime)} 依保留期限清除`
-			: undefined,
-	};
 }
 
 /** 補充的標題：「補充 {n}・{時間}」（n 從 1 起，舊到新）。 */

@@ -36,10 +36,28 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// testQueue 吞掉排入的 job：這些測試不執行 job。
-type testQueue struct{}
+// testQueue 記下排入的 job 種類與次數：這些測試不執行 job。
+type testQueue struct {
+	mu    sync.Mutex
+	kinds map[string]int
+}
 
-func (*testQueue) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
+func (q *testQueue) Enqueue(_ context.Context, args river.JobArgs, _ *river.InsertOpts) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.kinds == nil {
+		q.kinds = map[string]int{}
+	}
+	q.kinds[args.Kind()]++
+	return nil
+}
+
+// count 回傳某種 job 排入的次數。
+func (q *testQueue) count(kind string) int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.kinds[kind]
+}
 
 func (*testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
 	return true, nil

@@ -15,14 +15,9 @@ import { prerenderSafe } from "@/lib/api/prerender";
 
 interface Props {
 	sellerId: string;
-	/** Seller-center buyer-view preview: product cards open a read-only drawer. */
-	previewMode?: boolean;
 }
 
-export default async function StorefrontPage({
-	sellerId: id,
-	previewMode = false,
-}: Props) {
+export default async function StorefrontPage({ sellerId: id }: Props) {
 	// Only the first page is server-rendered (SEO/ISR body). Later pages are
 	// fetched client-side by SellerProductsClient off the `?page` URL param, so
 	// this route reads no dynamic API and stays statically renderable.
@@ -49,7 +44,6 @@ export default async function StorefrontPage({
 			sellerId={id}
 			initialProducts={productsData.records}
 			initialTotalPages={productsData.totalPages}
-			previewMode={previewMode}
 		/>
 	);
 }

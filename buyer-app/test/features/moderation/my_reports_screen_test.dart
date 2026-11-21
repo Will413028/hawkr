@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
+    as mod;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as seller;
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -163,5 +166,26 @@ void main() {
 
     expect(find.text('貼文'), findsOneWidget);
     expect(find.text('服務暫時不可用'), findsNothing);
+  });
+
+  testWidgets('店家檢舉項目與社群項目並列，沒有結果時顯示審核中', (tester) async {
+    final moderation = FakeModeration(
+      reportPages: [
+        [
+          mod.MyReportItem(
+            id: 's1',
+            description: '店家檢舉內容',
+            store: seller.StoreReport(id: 's1'),
+          ),
+          reportRecord('1', description: '社群檢舉內容'),
+        ],
+      ],
+    );
+    await _pump(tester, moderation);
+
+    expect(find.text('社群檢舉內容'), findsOneWidget);
+    expect(find.text('貼文'), findsOneWidget);
+    expect(find.text('審核中'), findsNWidgets(2));
+    expect(find.text('店家檢舉內容'), findsOneWidget);
   });
 }

@@ -41,6 +41,12 @@ type kycModule struct {
 	measure    model.Measure
 	appealIn   model.SubmitAppealInput
 	remedyIn   model.RequestRemediationInput
+
+	inquiryListIn model.AccountInquiryListInput
+	inquiryPage   model.SellerInquiryPage
+	inquiry       model.SellerInquiry
+	replyIn       model.ReplyToInquiryInput
+	replyErr      error
 }
 
 func (m *kycModule) SaveKYCDraft(_ context.Context, in model.KYCDraftInput) (model.KYCApplication, error) {
@@ -81,6 +87,21 @@ func (m *kycModule) SubmitAppeal(_ context.Context, in model.SubmitAppealInput) 
 func (m *kycModule) RequestRemediation(_ context.Context, in model.RequestRemediationInput) (model.Measure, error) {
 	m.remedyIn = in
 	return m.measure, nil
+}
+
+func (m *kycModule) AccountInquiries(_ context.Context, in model.AccountInquiryListInput) (model.SellerInquiryPage, error) {
+	m.inquiryListIn = in
+	return m.inquiryPage, nil
+}
+
+func (m *kycModule) AccountInquiry(_ context.Context, accountID int64, id uuid.UUID) (model.SellerInquiry, error) {
+	m.getAccount, m.getID = accountID, id
+	return m.inquiry, nil
+}
+
+func (m *kycModule) ReplyToInquiry(_ context.Context, in model.ReplyToInquiryInput) (model.SellerInquiry, error) {
+	m.replyIn = in
+	return m.inquiry, m.replyErr
 }
 
 func mask(paths ...string) *fieldmaskpb.FieldMask { return &fieldmaskpb.FieldMask{Paths: paths} }

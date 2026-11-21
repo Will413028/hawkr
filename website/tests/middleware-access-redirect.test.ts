@@ -34,6 +34,8 @@ test("a guest on an account page is sent to login without a role, keeping the re
 		"/seller/measures",
 		"/seller/measures/m1/appeal?from=list",
 		"/seller/measures/m1/remediation",
+		"/seller/inquiries",
+		"/seller/inquiries/i1",
 	]) {
 		const to = location(await siteMiddleware(request(path)));
 		assert.ok(to, path);
@@ -50,6 +52,8 @@ test("a signed-in visitor passes every access class, and public /seller pages ne
 		"/seller/measures",
 		"/seller/measures/m1/appeal",
 		"/seller/measures/m1/remediation",
+		"/seller/inquiries",
+		"/seller/inquiries/i1",
 	]) {
 		const response = await siteMiddleware(request(path, SIGNED_IN));
 		assert.equal(location(response), null, path);

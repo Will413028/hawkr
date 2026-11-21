@@ -15,23 +15,23 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'moderation.pb.dart' as $2;
+import 'moderation.pb.dart' as $3;
 import 'moderation.pbjson.dart';
 
 export 'moderation.pb.dart';
 
 abstract class ModerationAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.SubmitReportResponse> submitReport(
-      $pb.ServerContext ctx, $2.SubmitReportRequest request);
-  $async.Future<$2.ListMyReportsResponse> listMyReports(
-      $pb.ServerContext ctx, $2.ListMyReportsRequest request);
+  $async.Future<$3.SubmitReportResponse> submitReport(
+      $pb.ServerContext ctx, $3.SubmitReportRequest request);
+  $async.Future<$3.ListMyReportsResponse> listMyReports(
+      $pb.ServerContext ctx, $3.ListMyReportsRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'SubmitReport':
-        return $2.SubmitReportRequest();
+        return $3.SubmitReportRequest();
       case 'ListMyReports':
-        return $2.ListMyReportsRequest();
+        return $3.ListMyReportsRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -41,9 +41,9 @@ abstract class ModerationAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'SubmitReport':
-        return submitReport(ctx, request as $2.SubmitReportRequest);
+        return submitReport(ctx, request as $3.SubmitReportRequest);
       case 'ListMyReports':
-        return listMyReports(ctx, request as $2.ListMyReportsRequest);
+        return listMyReports(ctx, request as $3.ListMyReportsRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

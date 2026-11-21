@@ -14,7 +14,7 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+/// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時，使用它的 optional 欄位不設值；UNSPECIFIED 不帶意義，伺服器不回。
 class ReportOutcome extends $pb.ProtobufEnum {
   static const ReportOutcome REPORT_OUTCOME_UNSPECIFIED =
       ReportOutcome._(0, _omitEnumNames ? '' : 'REPORT_OUTCOME_UNSPECIFIED');

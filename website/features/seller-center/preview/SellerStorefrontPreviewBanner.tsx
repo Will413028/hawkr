@@ -3,6 +3,7 @@
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
 import { SellerMobileDisclosureList } from "@/features/seller-center/components/SellerMobileDisclosureList";
+import { previewNoticeText } from "@/lib/seller/storefront-preview";
 
 const PREVIEW_NOTICE = [{ id: "buyer-view-preview" }] as const;
 
@@ -15,11 +16,16 @@ function PreviewIcon() {
 }
 
 /**
- * Seller-only preview notice. The buyer storefront rendered below this notice
- * deliberately stays untouched: changing its product, post, forum, or review
- * cards would make 「買家視角預覽」 stop matching the real public storefront.
+ * Seller-only preview notice. The cards rendered below it are the buyer storefront's own
+ * presentational components, so 「買家視角預覽」 keeps matching the public storefront.
+ * `canBePublic` switches the notice when the store is not publicly visible yet.
  */
-export default function SellerStorefrontPreviewBanner() {
+export default function SellerStorefrontPreviewBanner({
+	canBePublic,
+}: {
+	canBePublic: boolean;
+}) {
+	const notice = previewNoticeText(canBePublic);
 	return (
 		<>
 			<section
@@ -37,9 +43,7 @@ export default function SellerStorefrontPreviewBanner() {
 						<p className="m-0 text-sm font-bold text-foreground">
 							買家視角預覽
 						</p>
-						<p className="m-0 text-xs text-foreground-muted">
-							使用正式公開商店資料；預覽期間不會送出訂閱、聊天、收藏、按讚、留言、分享或購買操作。
-						</p>
+						<p className="m-0 text-xs text-foreground-muted">{notice}</p>
 					</div>
 				</div>
 				<Button href="/seller-center/me" variant="bordered" size="sm">
@@ -63,7 +67,7 @@ export default function SellerStorefrontPreviewBanner() {
 						<>
 							<div className="seller-mobile-disclosure__body">
 								<p className="m-0 text-sm leading-6 text-foreground-muted">
-									使用正式公開商店資料；預覽期間不會送出訂閱、聊天、收藏、按讚、留言、分享或購買操作。
+									{notice}
 								</p>
 							</div>
 							<div className="seller-mobile-disclosure__actions">

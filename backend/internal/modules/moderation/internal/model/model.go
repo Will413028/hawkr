@@ -22,9 +22,11 @@ const (
 	MaxSourceReports = 20
 	// MaxTextRunes 是處置給作者的理由文字的上限（social 的隱藏與警告理由、seller 的 StatementToSeller 共同的較小者）。
 	MaxTextRunes = 500
+	// ChatContextWindow 是聊天對象的證據快照裡，被檢舉訊息前後各保留的訊息數（A6-D3）。
+	ChatContextWindow = 5
 )
 
-// TargetKind 是檢舉對象的種類；聊天與評價對象在 A6。
+// TargetKind 是檢舉對象的種類。
 type TargetKind string
 
 const (
@@ -32,17 +34,20 @@ const (
 	TargetComment    TargetKind = "COMMENT"
 	TargetForumEntry TargetKind = "FORUM_ENTRY"
 	TargetBuyer      TargetKind = "BUYER"
+	// TargetReview 是買家寫的評價（review 模組）；TargetChatMessage 是買家與店家之間的一則聊天訊息（im 模組）。
+	TargetReview      TargetKind = "REVIEW"
+	TargetChatMessage TargetKind = "CHAT_MESSAGE"
 )
 
 // TargetKinds 回傳全部檢舉對象的種類，與 cases_target_kind_check 一致。
 func TargetKinds() []TargetKind {
-	return []TargetKind{TargetPost, TargetComment, TargetForumEntry, TargetBuyer}
+	return []TargetKind{TargetPost, TargetComment, TargetForumEntry, TargetBuyer, TargetReview, TargetChatMessage}
 }
 
 // Valid 說明這是不是檢舉對象的種類。
 func (k TargetKind) Valid() bool { return slices.Contains(TargetKinds(), k) }
 
-// Target 是一個檢舉對象：內容（貼文、留言、討論區留言）用 ContentID，買家用 BuyerID，恰好填一欄。
+// Target 是一個檢舉對象：內容（貼文、留言、討論區留言、評價、聊天訊息）用 ContentID，買家用 BuyerID，恰好填一欄。
 type Target struct {
 	Kind      TargetKind
 	ContentID uuid.UUID
@@ -90,7 +95,7 @@ const (
 type Action string
 
 const (
-	// ActionHide 隱藏買家寫的留言或討論區留言（紀錄在 social）。
+	// ActionHide 隱藏買家寫的留言、討論區留言（紀錄在 social）、評價（review）或聊天訊息（im）。
 	ActionHide Action = "HIDE"
 	// ActionWarn 警告買家（紀錄在 social）。
 	ActionWarn Action = "WARN"
@@ -107,9 +112,9 @@ func Actions() []Action { return []Action{ActionHide, ActionWarn, ActionBan, Act
 func (a Action) AllowedOn(k TargetKind) bool {
 	switch a {
 	case ActionHide:
-		return k == TargetComment || k == TargetForumEntry
+		return k == TargetComment || k == TargetForumEntry || k == TargetReview || k == TargetChatMessage
 	case ActionWarn, ActionBan:
-		return k == TargetComment || k == TargetForumEntry || k == TargetBuyer
+		return k == TargetComment || k == TargetForumEntry || k == TargetBuyer || k == TargetReview || k == TargetChatMessage
 	case ActionTakedown:
 		return k == TargetPost || k == TargetComment || k == TargetForumEntry
 	}
@@ -164,6 +169,15 @@ type Case struct {
 	ReportCount int64
 	MeasureID   *uuid.UUID
 	StoreID     *int64
+	// Reversal 是 HIDE 決定的撤銷（ReverseHide）；沒有撤銷是 nil。決定本身不改。
+	Reversal *Reversal
+}
+
+// Reversal 是案件上 HIDE 決定的撤銷紀錄。
+type Reversal struct {
+	At      time.Time
+	AdminID int64
+	Reason  string
 }
 
 // Report 是一筆檢舉；Outcome 由所屬案件推導。
@@ -209,6 +223,14 @@ type DecideInput struct {
 	Action   Action
 	Text     string
 	Severity string
+}
+
+// ReverseInput 是撤銷 HIDE 決定的輸入：案件維持結案、決定不改，擁有內容的模組還原目前未還原的隱藏。
+type ReverseInput struct {
+	CaseID uuid.UUID
+	// Actor 同 DecideInput.Actor。
+	Actor  adminaudit.Actor
+	Reason string
 }
 
 // CaseDetail 是案件加上全部檢舉（各自帶推導出的結果）。

@@ -294,7 +294,6 @@ const getStoreOk = () =>
 test("a store_code the backend does not hold is a real 404 in every locale, without saying why", async () => {
 	for (const [status, code] of [[404, "not_found"]] as const) {
 		for (const prefix of ["", "/en"]) {
-			__resetStorefrontGuardMemoForTest();
 			const calls: string[] = [];
 			globalThis.fetch = (async (input: RequestInfo | URL) => {
 				calls.push(input instanceof Request ? input.url : String(input));
@@ -317,7 +316,6 @@ test("a store_code the backend does not hold is a real 404 in every locale, with
 
 test("an invalid_argument answer from GetStore is unknown, not absent: the storefront passes through", async () => {
 	for (const prefix of ["", "/en"]) {
-		__resetStorefrontGuardMemoForTest();
 		globalThis.fetch = (async () =>
 			new Response(JSON.stringify({ code: "invalid_argument", message: "x" }), {
 				status: 400,
@@ -336,7 +334,6 @@ test("a present store_code storefront passes through with no redirect and keeps 
 		"/sellers/2600123456/reviews?utm_source=x",
 		"/en/sellers/2600123456/reviews?utm_source=x",
 	]) {
-		__resetStorefrontGuardMemoForTest();
 		const response = await siteMiddleware(request(path));
 		assert.notEqual(response.status, 308, path);
 		assert.notEqual(response.status, 404, path);
@@ -357,7 +354,6 @@ test("a store_id URL is a 404, not a redirect, and costs no backend call", async
 });
 
 test("an outage reading the store is not a 404", async () => {
-	__resetStorefrontGuardMemoForTest();
 	globalThis.fetch = (async () =>
 		new Response("{}", { status: 503 })) as typeof fetch;
 	const response = await siteMiddleware(request("/sellers/2600123456"));
@@ -454,7 +450,6 @@ const connectError = (status: number, code: string) =>
 test("a forum thread the backend does not hold is a real 404 in every locale", async () => {
 	for (const code of ["not_found", "invalid_argument"]) {
 		for (const prefix of ["", "/en"]) {
-			__resetStorefrontGuardMemoForTest();
 			__resetForumThreadMemoForTest();
 			const calls: string[] = [];
 			backend(
@@ -470,6 +465,14 @@ test("a forum thread the backend does not hold is a real 404 in every locale", a
 			assert.match(threadCall, /storeId%22%3A%229%22|storeId=9|"storeId":"9"/);
 		}
 	}
+});
+
+test("a thread URL request calls GetStore exactly once", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	await siteMiddleware(request(`/sellers/2600123456/messages/${THREAD_ID}`));
+	assert.equal(calls.filter((u) => u.includes("GetStore")).length, 1);
+	assert.equal(calls.filter((u) => u.includes("GetForumThread")).length, 1);
 });
 
 test("a non-UUID thread id is a 404 without asking the backend for the thread", async () => {
@@ -509,7 +512,6 @@ test("a thread lookup that fails or times out passes through instead of 404", as
 			throw new TypeError("fetch failed");
 		},
 	]) {
-		__resetStorefrontGuardMemoForTest();
 		__resetForumThreadMemoForTest();
 		backend(thread, []);
 		const response = await siteMiddleware(
@@ -565,22 +567,14 @@ test("a present thread is re-asked after 60 s, so a deleted thread 404s promptly
 	}
 });
 
-test("an absent thread is remembered for a short time, then asked again", async () => {
-	mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
-	try {
-		const calls: string[] = [];
-		backend(() => connectError(404, "not_found"), calls);
-		const path = `/sellers/2600123456/messages/${THREAD_ID}`;
-		for (let i = 0; i < 3; i++) {
-			assert.equal((await siteMiddleware(request(path))).status, 404);
-		}
-		assert.equal(THREAD_CALLS(calls), 1);
-		mock.timers.tick(61_000);
+test("an absent thread is never memoised: every request asks again", async () => {
+	const calls: string[] = [];
+	backend(() => connectError(404, "not_found"), calls);
+	const path = `/sellers/2600123456/messages/${THREAD_ID}`;
+	for (let i = 0; i < 3; i++) {
 		assert.equal((await siteMiddleware(request(path))).status, 404);
-		assert.equal(THREAD_CALLS(calls), 2);
-	} finally {
-		mock.timers.reset();
 	}
+	assert.equal(THREAD_CALLS(calls), 3);
 });
 
 const LETTER_ID = "0a1b2c3d-0000-4000-8000-00000000abcd";

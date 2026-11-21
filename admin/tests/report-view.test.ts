@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { create } from "@bufbuild/protobuf";
 import {
-	ReporterContactSchema,
 	ReportMoveSchema,
 	ReportSupplementSchema,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
@@ -17,7 +16,6 @@ import {
 	derivedMeasureText,
 	evidenceItems,
 	moveRecordText,
-	reporterView,
 	reportSummary,
 	supplementSummary,
 	supplementTitle,
@@ -38,48 +36,6 @@ test("時間顯示台北時間到分鐘；沒有時間是「-」", () => {
 	assert.equal(timeText(undefined), "-");
 	assert.equal(actorTimeText("9001", ts(T0)), "9001・2026/10/18 10:00");
 	assert.equal(actorTimeText("", undefined), "-");
-});
-
-test("檢舉人：登入的是買家 ID；匿名的列出有提供的電話、聯絡信箱、姓名；聯絡方式已清除時說明清除的時間", () => {
-	assert.deepEqual(
-		reporterView({
-			reporterBuyerId: "50007",
-			contact: undefined,
-			contactEraseTime: undefined,
-		}),
-		{ kind: "buyer", buyerId: "50007" },
-	);
-	assert.deepEqual(
-		reporterView({
-			reporterBuyerId: "",
-			contact: create(ReporterContactSchema, {
-				phone: "0912345678",
-				email: "",
-				name: "王小明",
-			}),
-			contactEraseTime: undefined,
-		}),
-		{
-			kind: "anonymous",
-			contact: [
-				{ label: "電話", value: "0912345678" },
-				{ label: "姓名", value: "王小明" },
-			],
-			erasedText: undefined,
-		},
-	);
-	assert.deepEqual(
-		reporterView({
-			reporterBuyerId: "",
-			contact: undefined,
-			contactEraseTime: ts(T0),
-		}),
-		{
-			kind: "anonymous",
-			contact: [],
-			erasedText: "聯絡方式已於 2026/10/18 10:00 依保留期限清除",
-		},
-	);
 });
 
 test("補充的標題「補充 {n}・{時間}」；通報的摘要與補充的摘要", () => {

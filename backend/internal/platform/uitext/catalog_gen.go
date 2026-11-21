@@ -238,6 +238,10 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 			return "討論區留言", true
 		case "BUYER":
 			return "買家", true
+		case "REVIEW":
+			return "評價", true
+		case "CHAT_MESSAGE":
+			return "聊天訊息", true
 		}
 		return "", false
 	}
@@ -251,6 +255,10 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 			return "Forum post", true
 		case "BUYER":
 			return "User", true
+		case "REVIEW":
+			return "Review", true
+		case "CHAT_MESSAGE":
+			return "Chat message", true
 		}
 	}
 	switch v {
@@ -262,6 +270,10 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 		return "討論區留言", true
 	case "BUYER":
 		return "使用者", true
+	case "REVIEW":
+		return "評價", true
+	case "CHAT_MESSAGE":
+		return "聊天訊息", true
 	}
 	return "", false
 }
@@ -392,6 +404,82 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 		return "留言", true
 	case "FORUM_ENTRY":
 		return "討論區留言", true
+	}
+	return "", false
+}
+
+// SellerInquiryKind 是 seller.InquiryKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "RECORDS":
+			return "Provide records", true
+		case "EXPLANATION":
+			return "Provide an explanation", true
+		}
+	}
+	switch v {
+	case "RECORDS":
+		return "提供紀錄", true
+	case "EXPLANATION":
+		return "請說明", true
+	}
+	return "", false
+}
+
+// SellerInquiryReplyChannel 是 seller.InquiryReplyChannel 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryReplyChannel(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PHONE":
+			return "Phone", true
+		case "EMAIL":
+			return "Email", true
+		case "MESSAGING":
+			return "Messaging app", true
+		case "OTHER":
+			return "Other", true
+		case "SELLER_CENTER":
+			return "Seller Center", true
+		}
+	}
+	switch v {
+	case "PHONE":
+		return "電話", true
+	case "EMAIL":
+		return "電子信箱", true
+	case "MESSAGING":
+		return "通訊軟體", true
+	case "OTHER":
+		return "其他管道", true
+	case "SELLER_CENTER":
+		return "賣家中心", true
+	}
+	return "", false
+}
+
+// SellerInquiryState 是 seller.InquiryState 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerInquiryState(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "OPEN":
+			return "Awaiting reply", true
+		case "REPLIED":
+			return "Replied", true
+		case "WITHDRAWN":
+			return "Withdrawn", true
+		}
+	}
+	switch v {
+	case "OPEN":
+		return "待回覆", true
+	case "REPLIED":
+		return "已回覆", true
+	case "WITHDRAWN":
+		return "已撤回", true
 	}
 	return "", false
 }
@@ -928,6 +1016,53 @@ func (t Text) SellerPaymentAccountPayoutsInactiveNote() string {
 	return "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。"
 }
 
+// SellerReportOutcome 是 seller.ReportOutcome 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerReportOutcome(v string) (string, bool) {
+	if t.staff {
+		switch v {
+		case "ACTION_TAKEN":
+			return "已採取措施", true
+		case "NO_VIOLATION":
+			return "未違規", true
+		case "INSUFFICIENT":
+			return "內容不足", true
+		case "DUPLICATE":
+			return "重複", true
+		case "ABUSIVE":
+			return "濫報", true
+		}
+		return "", false
+	}
+	if t.Locale() == EN {
+		switch v {
+		case "ACTION_TAKEN":
+			return "Resolved (action taken)", true
+		case "NO_VIOLATION":
+			return "Resolved (no violation)", true
+		case "INSUFFICIENT":
+			return "Resolved (insufficient information)", true
+		case "DUPLICATE":
+			return "Resolved (duplicate report)", true
+		case "ABUSIVE":
+			return "Resolved (not accepted)", true
+		}
+	}
+	switch v {
+	case "ACTION_TAKEN":
+		return "已處理（已採取措施）", true
+	case "NO_VIOLATION":
+		return "已處理（不違規）", true
+	case "INSUFFICIENT":
+		return "已處理（資料不足）", true
+	case "DUPLICATE":
+		return "已處理（重複檢舉）", true
+	case "ABUSIVE":
+		return "已處理（不受理）", true
+	}
+	return "", false
+}
+
 // SellerRevokeReason 是 seller.RevokeReason 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerRevokeReason(v string) (string, bool) {
@@ -1016,6 +1151,14 @@ func (t Text) SellerStoreField(v string) (string, bool) {
 		return "商店電話", true
 	}
 	return "", false
+}
+
+// SellerStoreReportOutcomeUnset 是 seller.StoreReport.outcome_unset 的文案。
+func (t Text) SellerStoreReportOutcomeUnset() string {
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
 }
 
 // SellerTerminationGround 是 seller.TerminationGround 的文案。

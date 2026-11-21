@@ -27,7 +27,7 @@ func Require(ctx context.Context, queries *store.Queries, id int64, active bool)
 	return buyerRow, nil
 }
 
-// RequireActiveShared 以共享鎖確認 stint 是營運中：BeginDeletion 的排他鎖要等持有共享鎖的 transaction 提交才拿得到，
+// RequireActiveShared 以 FOR KEY SHARE 確認 stint 是營運中：BeginDeletion 的排他鎖要等持有共享鎖的 transaction 提交才拿得到，
 // 拿到之後才開始的寫入會看到買家已不是營運中。已關閉回 NotFound，刪除中回 FailedPrecondition。
 func RequireActiveShared(ctx context.Context, queries *store.Queries, id int64) error {
 	if err := model.Positive(id); err != nil {
@@ -42,6 +42,22 @@ func RequireActiveShared(ctx context.Context, queries *store.Queries, id int64) 
 	}
 	if buyerRow.Status != string(model.Active) {
 		return apperr.FailedPrecondition("買家正在刪除中")
+	}
+	return nil
+}
+
+// RequireNotClosedShared 以 FOR KEY SHARE 確認 stint 尚未關閉：ACTIVE 與 PENDING_DELETION 都放行；BeginDeletion 與 CloseForDeletion 的
+// FOR UPDATE 要等持有這個鎖的 transaction 提交，所以關閉之前成立的寫入一定先提交。已關閉與不存在回 NotFound。
+func RequireNotClosedShared(ctx context.Context, queries *store.Queries, id int64) error {
+	if err := model.Positive(id); err != nil {
+		return err
+	}
+	buyerRow, err := queries.LockBuyerShared(ctx, id)
+	if err != nil {
+		return model.Error(err)
+	}
+	if buyerRow.Status == string(model.Closed) || buyerRow.PiiClearedAt != nil {
+		return apperr.NotFound("買家已關閉")
 	}
 	return nil
 }

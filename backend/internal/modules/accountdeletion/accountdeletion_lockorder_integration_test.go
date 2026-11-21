@@ -12,7 +12,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -22,6 +25,12 @@ import (
 type noStoreBlocks struct{}
 
 func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+
+type noReviewOrders struct{}
+
+func (noReviewOrders) OrderForReview(context.Context, string) (review.OrderForReview, error) {
+	return review.OrderForReview{}, review.ErrOrderNotFound
+}
 
 type noProductChecks struct{}
 
@@ -76,66 +85,291 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 			f.orders.open = open
 			f.orders.mu.Unlock()
 
-			// 另一個 transaction 先鎖住店家列，讓帳號刪除停在店家列上。
-			held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
-			go func() {
-				holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
-					var n int64
-					if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", s.StoreID).Scan(&n); err != nil {
-						return err
-					}
-					close(held)
-					<-release
-					return nil
-				})
-			}()
-			<-held
-			reqDone := make(chan error, 1)
-			go func() { _, err := f.module.Request(ctx, adminRequest(id)); reqDone <- err }()
-			deadline := time.Now().Add(15 * time.Second)
-			for {
-				var waiting int64
-				if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'").Scan(&waiting); err != nil {
-					t.Fatal(err)
-				}
-				if waiting > 0 {
-					break
-				}
-				select {
-				case err := <-reqDone:
-					t.Fatalf("帳號刪除沒有停在店家列上就結束了：%v", err)
-				default:
-				}
-				if time.Now().After(deadline) {
-					t.Fatal("帳號刪除沒有卡在鎖上")
-				}
-				time.Sleep(5 * time.Millisecond)
+			socialTouched := func() bool {
+				return f.lockedNow(t, "SELECT 1 FROM social.comments WHERE id = $1 FOR NO KEY UPDATE NOWAIT", commentID)
 			}
-			socialLocked := f.lockedNow(t, "SELECT 1 FROM social.comments WHERE id = $1 FOR NO KEY UPDATE NOWAIT", commentID)
-			buyerLocked := f.lockedNow(t, "SELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE NOWAIT", buyerID)
-			close(release)
-			if err := <-holdDone; err != nil {
-				t.Fatal(err)
-			}
-			if err := <-reqDone; err != nil {
-				t.Fatalf("放開店家列之後帳號刪除要完成：%v", err)
-			}
-			var problems []string
-			if !buyerLocked {
-				problems = append(problems, "停在店家列上的時候買家列沒有被鎖（規則 4：buyer 在 seller 之前）")
-			}
-			if socialLocked {
-				problems = append(problems, "停在店家列上的時候 social 的留言列已經被鎖（規則 4：上層模組在 seller 之後）")
-			}
-			if len(problems) > 0 {
-				t.Fatal(strings.Join(problems, "；"))
-			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "social 的留言列", socialTouched)
 			// 事件確實派發了：複本在，否則上面的順序什麼也沒證明。
 			var n int64
 			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM social.inactive_authors WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
 				t.Fatalf("social 的複本 %d %v", n, err)
 			}
 		})
+	}
+}
+
+// review 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// review 的表還沒被碰（pg_locks 沒有 review 的 RowExclusiveLock），放開後 job 才排入。買家的評價列只在 purge job 的 transaction
+// 內鎖，不在刪帳的 transaction 內（訂閱者不碰評價列）。兩條路徑都量。
+func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
+	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			f := setupWith(t, migrate.Module{Name: "review", Dir: review.Migrations()})
+			rm := review.New(review.Deps{
+				DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: seller.NewReader(f.db, time.Now),
+				Orders: noReviewOrders{}, NewID: uuid.NewV7, Now: time.Now,
+			})
+			events.Subscribe(f.bus, rm.OnBuyerDeletionRequested)
+			events.Subscribe(f.bus, rm.OnBuyerDeleted)
+			id, buyerID := f.account(t)
+			s := f.store(t, id)
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
+				VALUES ($1, 'N1', 1, $2, $3, 7, 5, 'sku', 1, now())`, uuid.NewV7(), buyerID, s.StoreID); err != nil {
+				t.Fatal(err)
+			}
+			f.orders.mu.Lock()
+			f.orders.open = open
+			f.orders.mu.Unlock()
+
+			reviewTouched := func() bool {
+				var n int64
+				err := f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+					WHERE c.relnamespace = 'review'::regnamespace AND l.mode IN ('RowExclusiveLock', 'RowShareLock') AND l.granted
+					AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`).Scan(&n)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return n > 0
+			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "review 的表", reviewTouched)
+			if n := f.queue.count("review.purge_author"); n != 1 {
+				t.Fatalf("review 的清除 job %d 個（每條刪帳路徑只發一個買家事件，排一次）", n)
+			}
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM review.reviews WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
+				t.Fatalf("訂閱者不刪評價列：%d %v", n, err)
+			}
+		})
+	}
+}
+
+type imStores struct {
+	*seller.Reader
+	noStoreBlocks
+	owner *seller.Module
+}
+
+type noImOrders struct{}
+
+func (noImOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
+
+// LockNotRetired 走真正的 seller 模組：退場的事實與守門鎖只在 seller。
+func (s imStores) LockNotRetired(ctx context.Context, id int64) error {
+	return s.owner.LockNotRetired(ctx, id)
+}
+
+func newIM(f *fixture) *im.Module {
+	return im.New(im.Deps{
+		DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: imStores{Reader: seller.NewReader(f.db, time.Now), owner: f.seller},
+		Orders: noImOrders{}, NewID: uuid.NewV7, Now: time.Now,
+	})
+}
+
+// im 的訂閱者在買家事件的 transaction 內只排抹除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// im 的表還沒被碰（pg_locks 沒有 im 的 RowExclusiveLock），放開後 job 才排入。買家寄出的訊息列只在抹除 job 的 transaction 內鎖，不在刪帳的
+// transaction 內（訂閱者不碰訊息列）。兩條路徑都量；im 只訂 BuyerDeleted，所以申請進入等待時 im 什麼都不寫。
+func TestDeletionLocksBuyerAndSellerBeforeImRows(t *testing.T) {
+	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			f := setupWith(t, migrate.Module{Name: "im", Dir: im.Migrations()})
+			m := newIM(f)
+			events.Subscribe(f.bus, m.OnBuyerDeleted)
+			id, buyerID := f.account(t)
+			s := f.store(t, id)
+			convID := uuid.NewV7()
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, buyer_last_read_seq, last_message_at, created_at)
+				VALUES ($1, $2, $3, 1, 1, now(), now())`, convID, buyerID, s.StoreID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
+				VALUES ($1, $2, 1, 'BUYER', 'TEXT', 'hi', now())`, uuid.NewV7(), convID); err != nil {
+				t.Fatal(err)
+			}
+			f.orders.mu.Lock()
+			f.orders.open = open
+			f.orders.mu.Unlock()
+
+			imTouched := func() bool {
+				var n int64
+				err := f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+					WHERE c.relnamespace = 'im'::regnamespace AND l.mode IN ('RowExclusiveLock', 'RowShareLock') AND l.granted
+					AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`).Scan(&n)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return n > 0
+			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "im 的表", imTouched)
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM im.messages WHERE erased_at IS NULL").Scan(&n); err != nil || n != 1 {
+				t.Fatalf("訂閱者不抹訊息列：%d %v", n, err)
+			}
+			if want := map[bool]int{true: 0, false: 1}[open]; f.queue.count("im.erase_party") != want {
+				t.Fatalf("im 的抹除 job %d 個，預期 %d（只訂 BuyerDeleted：申請進入等待時不排，關閉時才排）", f.queue.count("im.erase_party"), want)
+			}
+		})
+	}
+}
+
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；im 的訂閱者之後才排抹除 job，
+// 所以順序是 seller → im。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
+func TestStoreRetiredLocksSellerBeforeImRows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setupWith(t, migrate.Module{Name: "im", Dir: im.Migrations()})
+	m := newIM(f)
+	events.Subscribe(f.bus, m.OnStoreRetired)
+	id, _ := f.account(t)
+	s := f.store(t, id)
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		var n int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", s.StoreID).Scan(&n); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: s.StoreID, StoreCode: s.StoreCode, AccountID: id})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := f.queue.count("im.erase_party"); n != 1 {
+		t.Fatalf("im 的抹除 job %d 個", n)
+	}
+}
+
+func newCRM(f *fixture) *crm.Module {
+	return crm.New(crm.Deps{DB: f.db, Jobs: f.queue, Buyers: f.buyer, Stores: f.seller, NewID: uuid.NewV7, Now: time.Now})
+}
+
+// crm 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
+// crm 的表還沒被碰（pg_locks 沒有 crm 的 RowExclusiveLock），放開後 job 才排入。客戶、單與 ledger 只在清除 job 的 transaction 內刪，不在刪帳的
+// transaction 內（訂閱者不碰那些列）。只訂 BuyerDeleted，所以申請進入等待時 crm 什麼都不寫。兩條路徑都量。
+func TestDeletionLocksBuyerAndSellerBeforeCrmRows(t *testing.T) {
+	for name, open := range map[string]bool{"申請進入等待": true, "直接關閉": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			f := setupWith(t, migrate.Module{Name: "crm", Dir: crm.Migrations()})
+			m := newCRM(f)
+			events.Subscribe(f.bus, m.OnBuyerDeleted)
+			id, buyerID := f.account(t)
+			s := f.store(t, id)
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO crm.customers (store_id, buyer_id, total_spent, order_count, first_order_at, updated_at)
+				VALUES ($1, $2, 100, 1, now(), now())`, s.StoreID, buyerID); err != nil {
+				t.Fatal(err)
+			}
+			f.orders.mu.Lock()
+			f.orders.open = open
+			f.orders.mu.Unlock()
+
+			crmTouched := func() bool {
+				var n int64
+				err := f.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+					WHERE c.relnamespace = 'crm'::regnamespace AND l.mode IN ('RowExclusiveLock', 'RowShareLock') AND l.granted
+					AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`).Scan(&n)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return n > 0
+			}
+			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "crm 的表", crmTouched)
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM crm.customers WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
+				t.Fatalf("訂閱者不刪客戶列：%d %v", n, err)
+			}
+			if want := map[bool]int{true: 0, false: 1}[open]; f.queue.count("crm.erase_party") != want {
+				t.Fatalf("crm 的清除 job %d 個，預期 %d（只訂 BuyerDeleted：申請進入等待時不排，關閉時才排）", f.queue.count("crm.erase_party"), want)
+			}
+		})
+	}
+}
+
+// 店家退場：StoreRetired 在 seller purge 的 transaction 內發布，那個 transaction 先鎖店家列；crm 的訂閱者之後才排清除 job，
+// 所以順序是 seller → crm。鎖順序檢查器（pg.NewDB）會在倒退時讓測試失敗。
+func TestStoreRetiredLocksSellerBeforeCrmRows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setupWith(t, migrate.Module{Name: "crm", Dir: crm.Migrations()})
+	m := newCRM(f)
+	events.Subscribe(f.bus, m.OnStoreRetired)
+	id, _ := f.account(t)
+	s := f.store(t, id)
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		var n int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", s.StoreID).Scan(&n); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.NewV7(), OccurredAt: time.Now(), StoreID: s.StoreID, StoreCode: s.StoreCode, AccountID: id})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := f.queue.count("crm.erase_party"); n != 1 {
+		t.Fatalf("crm 的清除 job %d 個", n)
+	}
+}
+
+// requestHeldOnStoreRow 讓帳號刪除停在店家列上（另一個 transaction 先鎖住它），此時量兩件事：買家列已鎖、上層模組的列還沒碰
+// （touched 回報上層模組是否已經動到自己的資料），再放開店家列並要求帳號刪除完成。
+func (f *fixture) requestHeldOnStoreRow(t *testing.T, accountID, buyerID, storeID int64, upper string, touched func() bool) {
+	t.Helper()
+	ctx := context.Background()
+	// 另一個 transaction 先鎖住店家列，讓帳號刪除停在店家列上。
+	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			var n int64
+			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", storeID).Scan(&n); err != nil {
+				return err
+			}
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	<-held
+	reqDone := make(chan error, 1)
+	go func() { _, err := f.module.Request(ctx, adminRequest(accountID)); reqDone <- err }()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		var waiting int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'").Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		select {
+		case err := <-reqDone:
+			t.Fatalf("帳號刪除沒有停在店家列上就結束了：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("帳號刪除沒有卡在鎖上")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	upperTouched := touched()
+	buyerLocked := f.lockedNow(t, "SELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE NOWAIT", buyerID)
+	close(release)
+	if err := <-holdDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-reqDone; err != nil {
+		t.Fatalf("放開店家列之後帳號刪除要完成：%v", err)
+	}
+	var problems []string
+	if !buyerLocked {
+		problems = append(problems, "停在店家列上的時候買家列沒有被鎖（規則 4：buyer 在 seller 之前）")
+	}
+	if upperTouched {
+		problems = append(problems, "停在店家列上的時候 "+upper+"已經被動到（規則 4：上層模組在 seller 之後）")
+	}
+	if len(problems) > 0 {
+		t.Fatal(strings.Join(problems, "；"))
 	}
 }
 

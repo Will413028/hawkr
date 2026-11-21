@@ -35,7 +35,7 @@ func outcomesOf(r *adminpb.Report) []pb.ReportOutcome {
 // 通報的 can_*、available_outcomes 與 can_cite_as_source 取自模組的 Availability（不輸出原因）：待分案的可以分案、不能移動、不能設為已採取措施；
 // 案件裡有導出措施的可以設為已採取措施；被否定的結果與已關閉的店家不能當認定的來源。
 func TestReportCarriesTheModulesAvailabilityWithoutReasons(t *testing.T) {
-	awaiting := anonymousFoodSafetyReport()
+	awaiting := foodSafetyReport()
 	got := toReport(awaiting)
 	if !got.GetCanTriage() || got.GetCanMove() || !got.GetCanResolve() || !got.GetCanCiteAsSource() || got.GetState() != adminpb.ReportState_REPORT_STATE_AWAITING_TRIAGE ||
 		!slices.Equal(outcomesOf(got), []pb.ReportOutcome{
@@ -118,7 +118,7 @@ func TestCaseCarriesTheModulesAvailabilityAndDecisionOptions(t *testing.T) {
 
 // 回應從不帶原因：沒有任何欄位說「為什麼不能」（K4′：按鈕依 can_* 隱藏，不顯示原因）。
 func TestAvailabilityIsNeverSerializedAsReasons(t *testing.T) {
-	raw := protojson.Format(toCase(caseFixture(model.CaseFacts{}))) + protojson.Format(toReport(anonymousFoodSafetyReport()))
+	raw := protojson.Format(toCase(caseFixture(model.CaseFacts{}))) + protojson.Format(toReport(foodSafetyReport()))
 	var reasons []string
 	for _, b := range model.ReportBlockValues() {
 		reasons = append(reasons, string(b))
@@ -136,7 +136,7 @@ func TestAvailabilityIsNeverSerializedAsReasons(t *testing.T) {
 
 // 改狀態的指令一律要帶 etag（決定依據通報或案件的內容，補充會在狀態不變時改變內容）；沒帶的請求不呼叫模組。
 func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
-	m := &governanceModule{report: anonymousFoodSafetyReport(), cases: caseFixture(model.CaseFacts{})}
+	m := &governanceModule{report: foodSafetyReport(), cases: caseFixture(model.CaseFacts{})}
 	h := NewTestGovernance(t, m)
 	ctx, id, caseID := adminCtx(7), uuid.NewV7().String(), uuid.NewV7().String()
 	for name, call := range map[string]func() error{
@@ -174,7 +174,7 @@ func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
 
 // 分案與移動：去處（加入進行中的案件或開新案件）原樣轉給模組，由模組驗證意圖此刻仍然成立；被移動的原案件關閉會帶出來。
 func TestMoveReportReportsTheClosedSourceCase(t *testing.T) {
-	report := anonymousFoodSafetyReport()
+	report := foodSafetyReport()
 	m := &governanceModule{report: report, moveResult: model.MoveReportResult{Report: report, SourceCaseClosed: true}}
 	h := NewTestGovernance(t, m)
 	got, err := h.MoveReport(adminCtx(3), connect.NewRequest(&adminpb.MoveReportRequest{
@@ -360,7 +360,7 @@ func TestCreateMeasureSourceCaseErrorsPointAtSourceCaseIDForEveryKind(t *testing
 // 伺服器輸出 client 本來要自己推導的東西（設計審查 #1、#4、#8）：每個可設定的結果帶 negates_source（同 Outcome.Negates）、生效的類別、分案與移動的去處
 // （有進行中的案件帶 id／嚴重度／etag，沒有就只有類別）、有沒有沒看過的補充（最新一則的編號大於看過的編號）。
 func TestReportCarriesTheDerivedFactsTheClientUsedToCompute(t *testing.T) {
-	awaiting := anonymousFoodSafetyReport()
+	awaiting := foodSafetyReport()
 	caseID := uuid.NewV7()
 	awaiting.SupplementCount, awaiting.LatestSupplementSeq, awaiting.SupplementsSeenSeq = 3, 3, 2
 	awaiting.Targets = []model.TriageTarget{
@@ -403,7 +403,7 @@ func TestReportCarriesTheDerivedFactsTheClientUsedToCompute(t *testing.T) {
 // 分案與移動的去處（oneof）：加入帶案件 id 與 etag、開新案件帶嚴重度；格式不對的案件 id 與 etag 是 invalid_argument（指到 target 底下的欄位）；
 // 沒有設去處的原樣交給模組，由它以 target 欄位錯誤回應（去處是否成立由模組在鎖內驗證）。
 func TestTriageAndMoveForwardTheExplicitTarget(t *testing.T) {
-	report := anonymousFoodSafetyReport()
+	report := foodSafetyReport()
 	m := &governanceModule{report: report, moveResult: model.MoveReportResult{Report: report}}
 	h := NewTestGovernance(t, m)
 	caseID := uuid.NewV7()
@@ -434,4 +434,18 @@ func TestTriageAndMoveForwardTheExplicitTarget(t *testing.T) {
 		Id: report.ID.String(), AssessedCategory: commonpb.PolicyCategory_POLICY_CATEGORY_FRAUD, Etag: "4", Target: join("x", "1"),
 	}))
 	wantInvalidArgument(t, err)
+}
+
+func TestToReportOutcomeIsUnsetUntilResolved(t *testing.T) {
+	report := foodSafetyReport()
+	if got := toReport(report); got.Outcome != nil || got.GetResolveTime() != nil {
+		t.Fatalf("未處理：outcome=%v resolve_time=%v", got.Outcome, got.GetResolveTime())
+	}
+	noViolation, resolvedAt := model.OutcomeNoViolation, report.CreatedAt
+	resolved := report.Report
+	resolved.Outcome, resolved.ResolvedAt = &noViolation, &resolvedAt
+	got := toReport(model.AdminReport{Report: resolved, Availability: model.ReportFacts{Report: resolved}.Availability()})
+	if got.Outcome == nil || got.GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_NO_VIOLATION || got.GetResolveTime() == nil {
+		t.Fatalf("已處理：outcome=%v resolve_time=%v", got.Outcome, got.GetResolveTime())
+	}
 }

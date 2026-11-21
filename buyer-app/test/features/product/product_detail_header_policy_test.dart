@@ -58,8 +58,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('product-detail-share')), findsOneWidget);
-    expect(find.byType(HkLiquidGlassSurface), findsNWidgets(3));
-    expect(find.byType(HkLiquidGlassIconButton), findsNWidgets(3));
+    expect(find.byType(HkLiquidGlassSurface), findsNWidgets(4));
+    expect(find.byType(HkLiquidGlassIconButton), findsNWidgets(4));
     expect(
       find.byKey(const ValueKey('product-detail-floating-motion')),
       findsNothing,

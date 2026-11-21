@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePreviewStore } from "./PreviewStoreContext";
 import StorefrontProductPreviewDrawer from "./StorefrontProductPreviewDrawer";
 import { productIdFromStorefrontPreviewHref } from "./storefrontProductPreview";
 
@@ -12,26 +13,28 @@ function interactiveTarget(target: EventTarget | null): Element | null {
 }
 
 function isReadonlyPostPreviewInteraction(target: Element): boolean {
-	return target.matches(
-		'[data-storefront-post-preview-trigger="true"], [data-storefront-post-preview-control="true"]',
+	return (
+		target.matches(
+			'[data-storefront-post-preview-trigger="true"], [data-storefront-post-preview-control="true"]',
+		) ||
+		target.closest('[data-storefront-preview-reading-control="true"]') !== null
 	);
 }
 
 /**
- * Preserve the buyer storefront's real visual/hover states while stopping its
- * write actions before child handlers run. Product cards open the existing
- * product drawer; post cards and the detail viewer's reading controls stay live
- * so sellers can inspect the full buyer-facing post without enabling likes,
- * comments, shares or navigation out of the preview. Storefront tabs sit
- * outside this boundary so sellers can still inspect every buyer-facing tab.
+ * Defense in depth around the preview tabs: the tabs already omit their write
+ * controls, and this boundary additionally cancels any link, button or form
+ * activation before child handlers run. Product cards open the read-only
+ * product drawer; post cards and the viewer's reading controls stay live.
+ * Storefront tabs sit outside this boundary so sellers can still inspect every
+ * buyer-facing tab.
  */
 export default function StorefrontPreviewBoundary({
 	children,
-	sellerId,
 }: {
 	children: React.ReactNode;
-	sellerId: string;
 }) {
+	const { view } = usePreviewStore();
 	const [previewProduct, setPreviewProduct] = React.useState<{
 		id: string;
 		name?: string;
@@ -102,7 +105,7 @@ export default function StorefrontPreviewBoundary({
 				key={previewProduct?.id ?? "closed"}
 				productId={previewProduct?.id ?? null}
 				productName={previewProduct?.name}
-				sellerId={sellerId}
+				store={view}
 				onClose={closePreview}
 			/>
 		</>

@@ -1286,7 +1286,7 @@ class _CouponTile extends StatelessWidget {
   final String sellerName;
 
   /// 發放者商家 store_id（CouponInstanceResponse.applicableStoreId）
-  /// 用來撈 /public/sellers/{id} 取真頭像
+  /// 頭像補撈的依據（舊的公開商家端點已移除，現在沒有補撈）
   final String storeId;
 
   /// 發放者頭像 URL（spec 待補；有就用，否則撈 storeId）。

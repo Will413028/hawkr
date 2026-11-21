@@ -21,6 +21,8 @@ import '../../features/home/presentation/main_navigation_screen.dart';
 import '../../features/product/presentation/search_screen.dart';
 import '../../features/product/presentation/search_results_screen.dart';
 import '../../features/product/presentation/merchant_item_detail_screen.dart';
+import '../../features/moderation/presentation/store_report_entry.dart';
+import '../../features/moderation/presentation/store_report_screen.dart';
 import '../../features/seller/presentation/merchant_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/order/presentation/order_detail_screen.dart';
@@ -52,6 +54,8 @@ import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/category/presentation/category_landing_screen.dart';
 import '../../features/member_card/presentation/spending_records_screen.dart';
 import '../../features/moderation/presentation/my_reports_screen.dart';
+import '../../features/moderation/presentation/store_report_detail_screen.dart';
+import '../../features/moderation/presentation/store_report_supplement_screen.dart';
 import '../../features/moderation/presentation/blocked_users_screen.dart';
 
 part 'app_router.g.dart';
@@ -349,6 +353,28 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/settings/reports',
         builder: (_, __) => const MyReportsScreen(),
+        routes: [
+          GoRoute(
+            path: ':reportId',
+            builder: (_, state) => StoreReportDetailScreen(
+              reportId: state.pathParameters['reportId']!,
+            ),
+            routes: [
+              GoRoute(
+                path: 'supplement',
+                builder: (_, state) => StoreReportSupplementScreen(
+                  reportId: state.pathParameters['reportId']!,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: storeReportRoute,
+        redirect: (_, state) => storeReportRedirect(state.extra),
+        builder: (_, state) =>
+            StoreReportScreen(args: state.extra! as StoreReportArgs),
       ),
       GoRoute(
         path: '/settings/blocks',

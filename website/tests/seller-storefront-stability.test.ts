@@ -9,7 +9,7 @@ async function source(relativePath: string): Promise<string> {
 test("seller storefront keeps critical media and server-owned content", async () => {
 	const [products, posts, feed, feedShell, reviews, messages, showcaseWarmer] =
 		await Promise.all([
-			source("features/sellers/storefront/SellerProductsClient.tsx"),
+			source("features/sellers/storefront/StorefrontProductGrid.tsx"),
 			source("features/sellers/posts/SellerPostsPage.tsx"),
 			source("features/feed/components/InfiniteFeed.tsx"),
 			source("features/feed/components/FeedClientShell.tsx"),

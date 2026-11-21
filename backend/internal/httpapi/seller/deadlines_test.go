@@ -36,7 +36,7 @@ func TestEveryDeadlineFieldIsEmittedOnlyWhileTheObligationExists(t *testing.T) {
 	}
 
 	// 通報
-	report := anonymousFoodSafetyReport()
+	report := foodSafetyReport()
 	report.TriageDeadline = dl(time.Minute, 4*time.Hour)
 	wantWire(t, "Report.triage_deadline", toReport(report).GetTriageDeadline(), report.TriageDeadline)
 	report.TriageDeadline = nil

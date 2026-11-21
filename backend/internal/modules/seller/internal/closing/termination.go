@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
@@ -30,21 +29,11 @@ type TerminationEffectArgs struct {
 // Kind 是 River 的 job 種類。
 func (TerminationEffectArgs) Kind() string { return "seller.termination_effect" }
 
-// terminationStates 是唯一鍵涵蓋的狀態：還沒有結果的（排隊中、執行中、等重試）。running 不能排除（River 的規定），所以執行期間被去重掉的加速排入
-// 由每小時的掃描補上，延遲不超過一小時，方向是「晚關」。不含 completed：完成的 job 在 River 清掉之前會擋下之後同一個鍵的排入。
-func terminationStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable,
-		rivertype.JobStateScheduled,
-	}
-}
-
 // ScheduleTermination 在 ctx 的 transaction 內排入排在 startsAt 的終止生效 job；同一個措施同時最多一個排隊中的 job。
 func ScheduleTermination(ctx context.Context, enqueuer jobs.Enqueuer, measureID uuid.UUID, startsAt time.Time) error {
-	return enqueuer.Enqueue(ctx, TerminationEffectArgs{MeasureID: measureID}, &river.InsertOpts{
-		ScheduledAt: startsAt,
-		UniqueOpts:  river.UniqueOpts{ByArgs: true, ByState: terminationStates()},
-	})
+	opts := jobs.UniqueByArgs(0)
+	opts.ScheduledAt = startsAt
+	return enqueuer.Enqueue(ctx, TerminationEffectArgs{MeasureID: measureID}, &opts)
 }
 
 // EffectTermination 是 job 的內容，三步：
@@ -226,7 +215,7 @@ func (ReconcileTerminationsArgs) Kind() string { return "seller.reconcile_termin
 
 // InsertOpts 把同一小時的排程與重啟合併。
 func (ReconcileTerminationsArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: time.Hour}}
+	return jobs.SweepOpts(time.Hour)
 }
 
 type effectWorker struct {

@@ -7,6 +7,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const (
@@ -23,7 +24,7 @@ func (ReconcileArgs) Kind() string { return reconcileJobID }
 
 // InsertOpts 將同一個週期的排程與重啟合併。
 func (ReconcileArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: reconcileInterval}}
+	return jobs.SweepOpts(reconcileInterval)
 }
 
 // ReconcileExposure 讓每家店最後公告的可曝光與現在一致，回傳掃描的店家數。它補上寫入路徑接不到的變化：時間造成的（處分

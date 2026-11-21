@@ -400,3 +400,15 @@ BEGIN ATOMIC
     ORDER BY c.content_kind, c.content_id
     FOR SHARE OF m, c;
 END;
+
+-- 發布的讀取介面 pub_retired_stores()（形狀宣告在 db/pub.sql，契約測試比對兩者）：已退場的店家（retired_at 不為空：第一段清理完成、StoreRetired 已發）。
+-- 不含只是 CLOSED、還可以恢復營業的店。退場不可逆，列永久保留。消費端是 im、crm 的讀取過濾；寫入守門是 seller.LockNotRetired。與 pub_exposable_stores（可曝光）互不重用。
+CREATE TYPE seller.pub_retired_store AS (store_id BIGINT);
+
+CREATE FUNCTION seller.pub_retired_stores() RETURNS SETOF seller.pub_retired_store
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT s.store_id
+    FROM seller.stores s
+    WHERE s.retired_at IS NOT NULL;
+END;

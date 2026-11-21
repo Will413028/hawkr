@@ -224,48 +224,6 @@ function isSellerAccountId(id: string): boolean {
 	return /^\d+$/.test(id);
 }
 
-export async function fetchSeller(id: string, strict = false) {
-	if (!isSellerAccountId(id)) return null;
-	// Two failure policies by caller:
-	//  - client (default): softFail — 404 / 5xx / timeout all resolve to null so a
-	//    transient backend never crashes the calling component (e.g. chat context).
-	//  - cache (strict, via getCachedSeller): softFailNotFound — a real 404 stays a
-	//    cacheable null, but a 5xx / network error THROWS so the use cache entry
-	//    keeps its prior stale value instead of caching an outage-time null.
-	//    prerenderSafe still guards the render layer at build as defense-in-depth.
-	// The seller entity is still untyped (Phase c openapi codegen will type it); the
-	// `any` data preserves the previous loose contract so the many seller consumers
-	// compile unchanged.
-	const { data: d } = await apiClient.public.get<LooseJson>(`/sellers/${id}`, {
-		credentials: "omit",
-		...(strict ? { softFailNotFound: true } : { softFail: true }),
-	});
-	if (!d) return null;
-	// Mutate-in-place (d is a fresh per-request object) rather than spread — an
-	// object spread would drop the Record index signature and re-narrow the result.
-	d.name = d.name || d.storeName || d.sellerName || "";
-	// §231: PublicSellerInfo sends `coverKey` (objectKey SSOT) + `coverUrl`
-	// (Gateway-composed); every `coverImage` consumer runs it through
-	// buildImageUrl/resolveCdnUrl, so the key is what we keep.
-	d.coverImage = typeof d.coverKey === "string" ? d.coverKey : "";
-	// `logo_url` 是**前端的顯示契約欄名**（B-238），不是 wire 名；wire 名是
-	// `logoUrl`。這一層刻意換名並刪掉其他圖片來源，讓下游只有一條路可走。
-	d.logo_url = typeof d.logoUrl === "string" ? d.logoUrl.trim() : "";
-	for (const nonDisplayLogoField of [
-		"logo",
-		"logoUrl",
-		"logoKey",
-		"avatar",
-	] as const) {
-		delete d[nonDisplayLogoField];
-	}
-	// PublicSellerInfo already emits websiteUrl under exactly this name (seller.go).
-	// It used to be re-derived from `website_url`, which after backend#2235
-	// would have overwritten the real value with "".
-	d.websiteUrl = d.websiteUrl || "";
-	return d;
-}
-
 export async function fetchSellerProducts(
 	id: string,
 	page = 1,
@@ -376,7 +334,7 @@ export async function fetchPublicProduct(id: string) {
 	return data ?? null;
 }
 
-/** `GET /public/sellers/{id}/stats` —— gateway `seller.go:137-144`。 */
+/** 店家統計的形狀（來源是 `GetStore` 的 `StoreStats`）。 */
 export interface SellerStats {
 	storeId?: number | string;
 	followers?: number;
@@ -384,19 +342,6 @@ export interface SellerStats {
 	totalOrders?: number;
 	totalProducts?: number;
 	totalSales?: number;
-}
-
-// Cache-only read (getCachedSellerStats is the sole caller): softFailNotFound —
-// a 404 → cacheable null, a 5xx / network error throws so the cache keeps stale.
-export async function fetchSellerStats(
-	id: string,
-): Promise<SellerStats | null> {
-	if (!isSellerAccountId(id)) return null;
-	const { data } = await apiClient.public.get<SellerStats>(
-		`/sellers/${id}/stats`,
-		{ credentials: "omit", softFailNotFound: true },
-	);
-	return data ?? null;
 }
 
 // strict (via getCachedCategoryTree): any transport failure throws so the cache

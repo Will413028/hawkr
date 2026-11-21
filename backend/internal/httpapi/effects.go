@@ -128,11 +128,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
 
 	// SellerReportAppService
-	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":  EffectWrite,
-	"/hawkr.seller.v1alpha1.SellerReportAppService/ListMyReports": EffectRead,
-
-	// SellerReportPublicService
-	"/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport": EffectWrite,
+	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,
+	"/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport":         EffectRead,
+	"/hawkr.seller.v1alpha1.SellerReportAppService/AddReportSupplement": EffectWrite,
 
 	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
 	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary": EffectRead,
@@ -170,6 +168,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyMeasure":                   EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/SubmitAppeal":                   EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/RequestRemediation":             EffectWrite,
+	"/hawkr.seller.v1alpha1.SellerAppService/ListMyInquiries":                EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/GetMyInquiry":                   EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/ReplyToInquiry":                 EffectWrite,
 	// 店家封鎖是保護動作（同 BuyerAppService 的個人封鎖）；名單是讀取。
 	"/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer":        EffectSelfService,
 	"/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer":      EffectSelfService,

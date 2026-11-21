@@ -11,6 +11,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as h
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
@@ -126,6 +127,10 @@ return switch ((l, value)) {
 (UiLocale.en, 3) => 'Forum post',
 (UiLocale.zhTW, 4) => '使用者',
 (UiLocale.en, 4) => 'User',
+(UiLocale.zhTW, 5) => '評價',
+(UiLocale.en, 5) => 'Review',
+(UiLocale.zhTW, 6) => '聊天訊息',
+(UiLocale.en, 6) => 'Chat message',
 _ => null,
 };
 }
@@ -220,6 +225,59 @@ _ => null,
 extension SellerContentKindUiText on hawkr_seller_v1alpha1_seller.ContentKind {
   /// seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _sellerContentKind(l, value);
+}
+
+String? _sellerInquiryKind(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '提供紀錄',
+(UiLocale.en, 1) => 'Provide records',
+(UiLocale.zhTW, 2) => '請說明',
+(UiLocale.en, 2) => 'Provide an explanation',
+_ => null,
+};
+}
+
+extension SellerInquiryKindUiText on hawkr_seller_v1alpha1_seller.InquiryKind {
+  /// seller.InquiryKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryKind(l, value);
+}
+
+String? _sellerInquiryReplyChannel(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '電話',
+(UiLocale.en, 1) => 'Phone',
+(UiLocale.zhTW, 2) => '電子信箱',
+(UiLocale.en, 2) => 'Email',
+(UiLocale.zhTW, 3) => '通訊軟體',
+(UiLocale.en, 3) => 'Messaging app',
+(UiLocale.zhTW, 4) => '其他管道',
+(UiLocale.en, 4) => 'Other',
+(UiLocale.zhTW, 5) => '賣家中心',
+(UiLocale.en, 5) => 'Seller Center',
+_ => null,
+};
+}
+
+extension SellerInquiryReplyChannelUiText on hawkr_seller_v1alpha1_seller.InquiryReplyChannel {
+  /// seller.InquiryReplyChannel 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryReplyChannel(l, value);
+}
+
+String? _sellerInquiryState(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '待回覆',
+(UiLocale.en, 1) => 'Awaiting reply',
+(UiLocale.zhTW, 2) => '已回覆',
+(UiLocale.en, 2) => 'Replied',
+(UiLocale.zhTW, 3) => '已撤回',
+(UiLocale.en, 3) => 'Withdrawn',
+_ => null,
+};
+}
+
+extension SellerInquiryStateUiText on hawkr_seller_v1alpha1_seller.InquiryState {
+  /// seller.InquiryState 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerInquiryState(l, value);
 }
 
 String? _sellerKYCField(UiLocale l, int value) {
@@ -423,6 +481,27 @@ extension SellerOnboardingTaskIdUiText on hawkr_seller_v1alpha1_seller.Onboardin
 
   /// seller.OnboardingTaskId.panel_title；沒有文字的值回 null。
   String? panelTitle(UiLocale l) => _sellerOnboardingTaskIdPanelTitle(l, value);
+}
+
+String? _sellerReportOutcome(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '已處理（已採取措施）',
+(UiLocale.en, 1) => 'Resolved (action taken)',
+(UiLocale.zhTW, 2) => '已處理（不違規）',
+(UiLocale.en, 2) => 'Resolved (no violation)',
+(UiLocale.zhTW, 3) => '已處理（資料不足）',
+(UiLocale.en, 3) => 'Resolved (insufficient information)',
+(UiLocale.zhTW, 4) => '已處理（重複檢舉）',
+(UiLocale.en, 4) => 'Resolved (duplicate report)',
+(UiLocale.zhTW, 5) => '已處理（不受理）',
+(UiLocale.en, 5) => 'Resolved (not accepted)',
+_ => null,
+};
+}
+
+extension SellerReportOutcomeUiText on hawkr_seller_v1alpha1_report.ReportOutcome {
+  /// seller.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerReportOutcome(l, value);
 }
 
 String? _sellerRevokeReason(UiLocale l, int value) {
@@ -751,6 +830,14 @@ String sellerPaymentAccountPayoutsInactiveNote(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。',
 UiLocale.en => 'Payouts to your bank account are not enabled yet. The payment provider may ask you for more information.',
+};
+}
+
+/// seller.StoreReport.outcome_unset
+String sellerStoreReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
 };
 }
 

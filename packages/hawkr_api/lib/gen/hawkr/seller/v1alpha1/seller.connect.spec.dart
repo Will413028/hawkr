@@ -243,6 +243,36 @@ abstract final class SellerAppService {
     hawkrsellerv1alpha1seller.RequestRemediationResponse.new,
   );
 
+  /// ListMyInquiries 列出平台對呼叫者帳號所有店家發的詢問（案件上的提供紀錄或請說明），新到舊，含等回覆、已回覆（含管理員記下的系統外回覆）與已撤回（唯讀）。
+  /// 以帳號為範圍，不要求賣家角色或店家營運中：店家關閉後詢問開放中仍可回覆。state 篩選此刻的狀態；UNSPECIFIED 不篩。pending_reply_count 是帳號待回覆
+  /// （OPEN，逾期仍算）的總數，不受篩選與分頁影響，給導覽列徽章用（要只取數字時 page_size 取 1）。詢問只帶管理員轉述的說明，不含通報原文、佐證與檢舉人。
+  static const listMyInquiries = connect.Spec(
+    '/$name/ListMyInquiries',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.ListMyInquiriesRequest.new,
+    hawkrsellerv1alpha1seller.ListMyInquiriesResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// GetMyInquiry 回傳呼叫者帳號的一筆詢問。不屬於這個帳號的詢問與不存在的詢問都回 not_found。
+  static const getMyInquiry = connect.Spec(
+    '/$name/GetMyInquiry',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.GetMyInquiryRequest.new,
+    hawkrsellerv1alpha1seller.GetMyInquiryResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// ReplyToInquiry 回覆自己店家的詢問（內容加最多 5 份附件），回覆之後詢問結束；一則詢問一次回覆，要補資料由平台另發詢問。已回覆（含管理員記下的）與
+  /// 已撤回回 failed_precondition，重送同一個請求也一樣（不寫入）。逾期後仍可回覆，直到撤回或案件結案。不屬於這個帳號的詢問回 not_found。
+  /// 附件是機敏檔（先以機敏上傳取得 staged token），回覆之後賣家不讀回已上傳的附件，只看得到數量。不要求賣家角色。
+  static const replyToInquiry = connect.Spec(
+    '/$name/ReplyToInquiry',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.ReplyToInquiryRequest.new,
+    hawkrsellerv1alpha1seller.ReplyToInquiryResponse.new,
+  );
+
   /// BlockBuyer 以呼叫者店家的身分封鎖一位買家：該買家不能在這家店留言、討論區發言與按讚，仍看得到店家的公開內容。買家以留言或討論區留言的
   /// 參照指定，參照要在呼叫者店家的內容裡讀得到，否則回 not_found；作者不是買家（是店家）回 invalid_argument；作者是店主本人的買家身分回
   /// invalid_argument。已經封鎖時也成功，changed 為 false。賣家能力 CAP_CONTENT_CONTRACT（封鎖是保護動作，停權時仍可做）。

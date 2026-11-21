@@ -7,7 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-Future<void> _pump(WidgetTester tester, {bool canManageBlocks = true}) async {
+Future<void> _pump(
+  WidgetTester tester, {
+  bool canManageBlocks = true,
+  int pendingInquiries = 0,
+}) async {
   tester.view.physicalSize = const Size(800, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -20,9 +24,14 @@ Future<void> _pump(WidgetTester tester, {bool canManageBlocks = true}) async {
             child: ProfileOtherOptionsCard(
               onShippingTap: () {},
               canManageBlocks: canManageBlocks,
+              pendingInquiries: pendingInquiries,
             ),
           ),
         ),
+      ),
+      GoRoute(
+        path: SellerRoutes.inquiries,
+        builder: (_, _) => const Scaffold(body: Text('INQUIRIES')),
       ),
       GoRoute(
         path: SellerRoutes.measures,
@@ -84,5 +93,27 @@ void main() {
     await _pump(tester, canManageBlocks: false);
     expect(find.text('封鎖名單'), findsNothing);
     expect(find.text('措施與申覆'), findsOneWidget);
+  });
+
+  testWidgets('「平台詢問」顯示待回覆數的徽章與說明，點下去開列表', (tester) async {
+    await _pump(tester, pendingInquiries: 3);
+    final row = find.ancestor(
+      of: find.text('平台詢問'),
+      matching: find.byType(OptionRow),
+    );
+    expect(tester.widget<OptionRow>(row).badgeCount, 3);
+    expect(find.text('有 3 則待回覆'), findsOneWidget);
+    await tester.tap(find.text('平台詢問'));
+    await tester.pumpAndSettle();
+    expect(find.text('INQUIRIES'), findsOneWidget);
+  });
+
+  testWidgets('沒有待回覆時「平台詢問」不顯示徽章數', (tester) async {
+    await _pump(tester);
+    final row = find.ancestor(
+      of: find.text('平台詢問'),
+      matching: find.byType(OptionRow),
+    );
+    expect(tester.widget<OptionRow>(row).badgeCount, 0);
   });
 }

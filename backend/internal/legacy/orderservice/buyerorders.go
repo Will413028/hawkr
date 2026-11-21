@@ -2,7 +2,6 @@ package orderservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -61,12 +60,6 @@ type RfqOrderResult struct {
 	PaymentDeadline time.Time
 	Replayed        bool
 }
-
-// codeNotFound 是 Java GrpcResponseCode.NOT_FOUND。
-const codeNotFound = 404
-
-// ErrOrderNotFound 表示 order-service 沒有回傳該買家的這張訂單。
-var ErrOrderNotFound = errors.New("orderservice：查無訂單")
 
 func accountHeader[T any](req *connect.Request[T], buyerID int64) *connect.Request[T] {
 	req.Header().Set("x-account-id", strconv.FormatInt(buyerID, 10))
@@ -137,7 +130,7 @@ func (c *Client) BuyerOrderDetail(ctx context.Context, buyerID int64, orderNo st
 	if err != nil {
 		return BuyerOrderDetail{}, fmt.Errorf("orderservice：GetOrder：%w", err)
 	}
-	if resp.Msg.GetCode() == codeNotFound {
+	if resp.Msg.GetCode() == grpcNotFound {
 		return BuyerOrderDetail{}, ErrOrderNotFound
 	}
 	if resp.Msg.GetCode() != 0 {

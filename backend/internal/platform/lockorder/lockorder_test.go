@@ -352,3 +352,34 @@ func TestClassifyLocksOnlyTheRelationsOfFromItems(t *testing.T) {
 		})
 	}
 }
+
+// 消費者先鎖了自己模組的列、才呼叫 buyer 或 seller 的守門鎖，是倒退：檢查器要回報。整合測試的 transaction 由測試檔開，檢查器整個跳過，
+// 所以「反序要失敗」只能在這裡以序列證明。
+func TestCheckerFlagsOwnerGuardAfterConsumerRowLock(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, guard, schema string
+	}{
+		{"buyer", "-- name: LockBuyerShared :one\nSELECT * FROM buyer.buyers WHERE buyer_id = $1 FOR KEY SHARE", "buyer"},
+		{"seller", "-- name: LockStoreKeyShare :one\nSELECT * FROM seller.stores WHERE store_id = $1 FOR KEY SHARE", "seller"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			k := NewChecker()
+			conn := new(int)
+			k.observe(conn, "begin")
+			k.observe(conn, "-- name: UpdateConversation :exec\nUPDATE im.conversations SET x = 1 WHERE id = $1")
+			k.observe(conn, c.guard)
+			k.observe(conn, "commit")
+
+			vs := k.Violations()
+			if len(vs) != 1 {
+				t.Fatalf("violations = %v，預期一筆", vs)
+			}
+			v := vs[0]
+			if v.Held.Lock.Schema != "im" || v.Then.Lock.Schema != c.schema || v.Then.Lock.Kind != "FOR KEY SHARE" {
+				t.Fatalf("violation = %+v", v)
+			}
+		})
+	}
+}

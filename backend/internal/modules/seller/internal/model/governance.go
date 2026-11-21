@@ -74,14 +74,6 @@ func ManualRevokeReasonValues() []RevokeReason {
 	return []RevokeReason{RevokeAdminCorrection, RevokeExternalDecision, RevokeOther}
 }
 
-// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（`backend/docs/modules/seller.md` §7 的 90 天），從建立時間起算；有結果的，清除時間是 greatest(建立 + ContactRetention, 結果 + ContactRetentionAfterOutcome)；
-// 不論有沒有結果，建立滿 ContactRetentionCap 一律清除。
-const ContactRetention = 90 * 24 * time.Hour
-
-// ContactRetentionCap 是匿名檢舉人聯絡欄位的絕對保留上限（Will 2026-10-18：GDPR 5(1)(e) 的儲存限制，保留要有期限）：從建立時間起算 365 天，不論有沒有結果、案件有沒有決定。
-// 清理 job 記下被這條上限強制清除的筆數（沒有結果的匿名通報拖到這裡，代表處理流程卡住了）。
-const ContactRetentionCap = 365 * 24 * time.Hour
-
 // EscalationWindow 與 EscalationCount 是升級規則：帳號在 EscalationWindow 內第 EscalationCount 次 MEDIUM 升為 HIGH。
 const (
 	EscalationWindow = 90 * 24 * time.Hour
@@ -119,11 +111,6 @@ type ReadEvidenceInput struct {
 	Kind     EvidenceKind
 	RefID    uuid.UUID
 	Position int
-}
-
-// ReporterContact 是匿名檢舉人的聯絡方式；保留期限後全部清成 nil。
-type ReporterContact struct {
-	Phone, Email, Name *string
 }
 
 // Violation 是一筆認定（違規）：admin 對一次違規事實的認定，只讀，不帶處分（處分是措施）。Severity 是套用的嚴重度，

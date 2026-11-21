@@ -37,7 +37,7 @@ func (service *Service) Lock(ctx context.Context, buyerID int64) error {
 	if err := model.Positive(buyerID); err != nil {
 		return err
 	}
-	_, err := store.New(service.deps.DB.Conn(ctx)).LockBuyer(ctx, buyerID)
+	_, err := store.New(service.deps.DB.Conn(ctx)).LockBuyerForTransition(ctx, buyerID)
 	return model.Error(err)
 }
 
@@ -51,7 +51,7 @@ func (service *Service) BeginDeletion(ctx context.Context, buyerID int64) error 
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(service.deps.DB.Conn(ctx))
-		current, err := q.LockBuyer(ctx, buyerID)
+		current, err := q.LockBuyerForTransition(ctx, buyerID)
 		if err != nil {
 			return model.Error(err)
 		}
@@ -81,7 +81,7 @@ func (service *Service) CloseForDeletion(ctx context.Context, buyerID int64) err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
 		queries := store.New(service.deps.DB.Conn(ctx))
-		current, err := queries.LockBuyer(ctx, buyerID)
+		current, err := queries.LockBuyerForTransition(ctx, buyerID)
 		if err != nil {
 			return model.Error(err)
 		}

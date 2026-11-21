@@ -32,6 +32,8 @@ interface Props {
 	itemErrors?: Record<string, string>;
 	/** 整個佐證欄位的錯誤（不指向哪一張）。 */
 	error?: string;
+	/** 上傳開始與結束時通知；表單用它在上傳中擋送出，免得漏掉還沒回來的照片。 */
+	onUploadingChange?: (uploading: boolean) => void;
 }
 
 /**
@@ -50,6 +52,7 @@ export function AfterSalePhotoUploader({
 	upload = uploadPublicPhoto,
 	itemErrors,
 	error,
+	onUploadingChange,
 }: Props) {
 	const [uploading, setUploading] = React.useState(false);
 	const [progress, setProgress] = React.useState(0);
@@ -58,6 +61,7 @@ export function AfterSalePhotoUploader({
 	const handlePick = async (file: File) => {
 		if (value.length >= max) return;
 		setUploading(true);
+		onUploadingChange?.(true);
 		setProgress(0);
 		setUploadError(null);
 		try {
@@ -66,6 +70,7 @@ export function AfterSalePhotoUploader({
 			setUploadError(e instanceof Error ? e.message : "上傳失敗，請再試一次");
 		} finally {
 			setUploading(false);
+			onUploadingChange?.(false);
 			setProgress(0);
 		}
 	};

@@ -69,7 +69,7 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 	for range 3 {
 		f.reportBy(t, a.StoreID, policy.Fraud)
 	}
-	f.anonymousReport(t, b.StoreID, "0912345678")
+	f.foodSafetyReport(t, b.StoreID, 9)
 	openCase, _ := f.newCase(t, a.StoreID, policy.Fraud, SeverityHigh, 3)
 	f.newCase(t, b.StoreID, policy.Counterfeit, SeverityLow, 2)
 	f.mustResolve(t, f.reportBy(t, a.StoreID, policy.Fraud).ID, OutcomeNoViolation)

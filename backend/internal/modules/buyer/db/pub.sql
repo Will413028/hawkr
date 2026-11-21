@@ -14,11 +14,22 @@ CREATE TABLE buyer.pub_inactive_buyer (
 );
 
 -- 此刻不是營運中的買家：正在刪除（PENDING_DELETION）與已關閉（CLOSED）。買家的狀態不隨時間變化，所以沒有時間參數。
--- 用法：上層模組在買家刪帳的同 transaction 訂閱者把這個事實複製進自己的表（social 的 inactive_authors），並用這個函式在每日對帳
--- 核對複本是否漏了：`SELECT b.buyer_id FROM buyer.pub_inactive_buyers() b WHERE NOT EXISTS (… 自己的複本 …)`；不給 trigger 或旗標的求值呼叫。
+-- 用法：social 在買家刪帳的同 transaction 訂閱者把這個事實複製進自己的表（inactive_authors），並用這個函式在每日對帳
+-- 核對複本是否漏了：`SELECT b.buyer_id FROM buyer.pub_inactive_buyers() b WHERE NOT EXISTS (… 自己的複本 …)`；review 的讀取過濾以
+-- `NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() b WHERE b.buyer_id = …)` 隱藏申請刪除起的作者。不給 trigger 或旗標的求值呼叫。
 CREATE FUNCTION buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer
 LANGUAGE sql STABLE
 AS $$ SELECT * FROM buyer.pub_inactive_buyer $$;
+
+CREATE TABLE buyer.pub_closed_buyer (
+    buyer_id BIGINT NOT NULL
+);
+
+-- 此刻已關閉（CLOSED）的買家：不含刪除中（刪除中用 pub_inactive_buyers）。買家關閉不可逆，列永久保留，沒有時間參數。
+-- 用法：im、crm 的讀取過濾，`NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() b WHERE b.buyer_id = …)`。
+CREATE FUNCTION buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer
+LANGUAGE sql STABLE
+AS $$ SELECT * FROM buyer.pub_closed_buyer $$;
 
 CREATE TABLE buyer.pub_blocked_buyer (
     blocker_buyer_id BIGINT NOT NULL,

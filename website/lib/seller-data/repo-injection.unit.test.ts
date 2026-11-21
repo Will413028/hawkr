@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ApiEnvelope } from "@/lib/api/client";
+import { ApiClientError, type ApiEnvelope } from "@/lib/api/client";
 import type { RepoFetcher } from "@/lib/api/delegated";
 import {
 	DelegatedRuntimeTransportError,
@@ -158,5 +158,18 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 			"/app/products?page=1&page_size=20",
 			"/app/orders/status_counts",
 		]);
+	});
+
+	it("商品編輯讀取：404 是 null，其他失敗照拋", async () => {
+		const notFound: RepoFetcher = () =>
+			Promise.reject(new ApiClientError("missing", 404));
+		const outage: RepoFetcher = () =>
+			Promise.reject(new ApiClientError("down", 503));
+		expect(
+			await createSellerProductRepo(notFound).fetchSellerProductEdit("1"),
+		).toBeNull();
+		await expect(
+			createSellerProductRepo(outage).fetchSellerProductEdit("1"),
+		).rejects.toThrow("down");
 	});
 });

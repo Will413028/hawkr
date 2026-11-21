@@ -7,29 +7,34 @@ import { DrawerSkeleton } from "@/components/ui/DrawerSkeleton";
 import ProductSellerIntro from "@/features/product/components/ProductSellerIntro";
 import { deriveDetailLayoutProps } from "@/features/product/deriveDetailLayoutProps";
 import ProductDetailLayout from "@/features/product/ProductDetailLayout";
-import {
-	fetchPublicProduct,
-	fetchSeller,
-	fetchSellerReviewStats,
-	fetchSellerStats,
-} from "@/lib/api";
+import { fetchSellerProductEdit } from "@/lib/products/seller-repo";
 import { fetchProductReviews } from "@/lib/reviews/repo";
-import { sellerIdFromPreviewProduct } from "./storefrontProductPreview";
+import type { PublicStoreView } from "@/lib/seller/public-store";
+import {
+	previewDetailProduct,
+	previewStoreStats,
+} from "@/lib/seller/storefront-preview";
 
 interface StorefrontProductPreviewDrawerProps {
 	productId: string | null;
 	productName?: string;
-	sellerId: string;
+	store: PublicStoreView;
 	onClose: () => void;
 }
 
+type ProductReviewsResult = Awaited<
+	ReturnType<typeof fetchProductReviews>
+> | null;
+
 interface LoadedProductPreview {
+	detail: NonNullable<Awaited<ReturnType<typeof fetchSellerProductEdit>>>;
+	reviewsResult: ProductReviewsResult;
+}
+
+interface ProductPreviewView {
 	product: Record<string, unknown>;
-	ownerSellerId: string;
-	seller: unknown;
-	sellerReviewStats: unknown;
-	followerStats: Awaited<ReturnType<typeof fetchSellerStats>>;
-	reviewsResult: Awaited<ReturnType<typeof fetchProductReviews>> | null;
+	store: PublicStoreView;
+	reviewsResult: ProductReviewsResult;
 }
 
 type PreviewLoadState =
@@ -38,25 +43,13 @@ type PreviewLoadState =
 	| { status: "unavailable" }
 	| { status: "error" };
 
-function asRecord(value: unknown): Record<string, unknown> {
-	return value && typeof value === "object"
-		? (value as Record<string, unknown>)
-		: {};
-}
-
-function ProductPreviewDetail({ data }: { data: LoadedProductPreview }) {
-	const embeddedSeller = asRecord(data.product.seller);
-	// Public detail payloads may carry storeId as a number. Normalise it into the
-	// layout's string-based seller seam after the ownership check has succeeded.
-	const product = {
-		...data.product,
-		storeId: data.ownerSellerId,
-		seller: { ...embeddedSeller, storeId: data.ownerSellerId },
-	};
+function ProductPreviewDetail({ data }: { data: ProductPreviewView }) {
+	const product = data.product;
+	const { sellerStats, followerStats } = previewStoreStats(data.store);
 	const derived = deriveDetailLayoutProps({
 		product,
-		seller: data.seller,
-		sellerStats: data.sellerReviewStats,
+		seller: product.seller,
+		sellerStats,
 		reviewsResult: data.reviewsResult,
 		descriptionImageDimEntries: [],
 	});
@@ -83,10 +76,10 @@ function ProductPreviewDetail({ data }: { data: LoadedProductPreview }) {
 				sellerIntroSlot={
 					<ProductSellerIntro
 						previewMode
-						sellerId={data.ownerSellerId}
-						seller={data.seller}
-						sellerStats={data.sellerReviewStats}
-						followerStats={data.followerStats}
+						sellerId={data.store.storeId}
+						seller={product.seller}
+						sellerStats={sellerStats}
+						followerStats={followerStats}
 						productSeller={product.seller}
 					/>
 				}
@@ -98,7 +91,7 @@ function ProductPreviewDetail({ data }: { data: LoadedProductPreview }) {
 export default function StorefrontProductPreviewDrawer({
 	productId,
 	productName,
-	sellerId,
+	store,
 	onClose,
 }: StorefrontProductPreviewDrawerProps) {
 	const [reloadKey, setReloadKey] = React.useState(0);
@@ -117,34 +110,20 @@ export default function StorefrontProductPreviewDrawer({
 		setLoadState({ status: "loading" });
 		(async () => {
 			try {
-				const product = await fetchPublicProduct(productId);
+				const detail = await fetchSellerProductEdit(productId);
 				if (!active) return;
-				const ownerSellerId = sellerIdFromPreviewProduct(product);
-				if (!product || ownerSellerId !== sellerId) {
+				if (!detail) {
 					setLoadState({ status: "unavailable" });
 					return;
 				}
-
-				const [seller, sellerReviewStats, followerStats, reviewsResult] =
-					await Promise.all([
-						fetchSeller(ownerSellerId).catch(() => null),
-						fetchSellerReviewStats(ownerSellerId).catch(() => null),
-						fetchSellerStats(ownerSellerId).catch(() => null),
-						fetchProductReviews(productId, { page: 1, pageSize: 6 }).catch(
-							() => null,
-						),
-					]);
+				const reviewsResult = await fetchProductReviews(productId, {
+					page: 1,
+					pageSize: 6,
+				}).catch(() => null);
 				if (!active) return;
 				setLoadState({
 					status: "ready",
-					data: {
-						product: product as Record<string, unknown>,
-						ownerSellerId,
-						seller,
-						sellerReviewStats,
-						followerStats,
-						reviewsResult,
-					},
+					data: { detail, reviewsResult },
 				});
 			} catch {
 				if (active) setLoadState({ status: "error" });
@@ -154,11 +133,23 @@ export default function StorefrontProductPreviewDrawer({
 		return () => {
 			active = false;
 		};
-	}, [productId, sellerId, reloadKey]);
+	}, [productId, reloadKey]);
+
+	const preview = React.useMemo<ProductPreviewView | null>(
+		() =>
+			loadState.status === "ready"
+				? {
+						product: previewDetailProduct(loadState.data.detail, store),
+						store,
+						reviewsResult: loadState.data.reviewsResult,
+					}
+				: null,
+		[loadState, store],
+	);
 
 	const description =
-		loadState.status === "ready"
-			? String(loadState.data.product.name ?? productName ?? "")
+		preview !== null
+			? String(preview.product.name ?? productName ?? "")
 			: productName || "以買家看到的公開資料呈現";
 
 	return (
@@ -177,9 +168,7 @@ export default function StorefrontProductPreviewDrawer({
 			{loadState.status === "loading" || loadState.status === "idle" ? (
 				<DrawerSkeleton rows={5} className="p-6" />
 			) : null}
-			{loadState.status === "ready" ? (
-				<ProductPreviewDetail data={loadState.data} />
-			) : null}
+			{preview ? <ProductPreviewDetail data={preview} /> : null}
 			{loadState.status === "unavailable" ? (
 				<div
 					className="grid min-h-64 place-items-center px-6 py-12 text-center"

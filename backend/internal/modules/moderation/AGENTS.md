@@ -2,7 +2,7 @@
 
 ## 職責
 
-社群內容（貼文、留言、討論區留言）與買家的檢舉：送出、案件、內容快照與處置。管理員對案件下決定，處置經擁有處分的模組建立：買家寫的內容隱藏或警告在 social、買家帳號停權經 `accountsuspension`、店家寫的內容下架是 seller 的措施。行為規格的唯一來源是 `backend/docs/modules/moderation.md`；聊天與評價對象在 A6，店家與商品的通報與案件留在 seller。
+社群內容（貼文、留言、討論區留言）、評價、聊天訊息與買家的檢舉：送出、案件、內容快照與處置。管理員對案件下決定，處置經擁有處分的模組建立：買家寫的內容隱藏或警告在 social（評價的隱藏在 review、聊天訊息的隱藏在 im）、買家帳號停權經 `accountsuspension`、店家寫的內容下架是 seller 的措施。行為規格的唯一來源是 `backend/docs/modules/moderation.md`；店家寫的聊天訊息的處置與店家檢舉人在 A6-4c，店家與商品的通報與案件留在 seller。
 
 ## 擁有的資料
 
@@ -15,8 +15,8 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 River 登記。
-- `internal/model` 型別與值域；`report` 送出；`handle` 處理與結案；`snapshot` 快照的正規化、雜湊與讀回；`retention` 快照與說明的保留期、買家刪除事件的訂閱者；`mediaref` 快照圖片的 media 引用（演算法在 media）；`text` 伺服器句子（`make uitext`）；`view` 讀取與轉換；`store` 是 sqlc。`Retention`（`NewRetention`）是 worker 與事件組裝用的子集，不需要 social、seller、accountsuspension。
-- 依賴圖的唯一來源是 `internal/arch/modules.go`；依賴 social、seller、buyer、`accountsuspension`、media，不依賴 identity（停權只經 `accountsuspension`），不依賴 notification。
+- `internal/model` 型別與值域；`report` 送出；`handle` 處理與結案；`snapshot` 快照（依對象種類的 tagged union）的正規化、雜湊與讀回；`retention` 快照與說明的保留期、買家刪除事件的訂閱者；`mediaref` 快照圖片的 media 引用（演算法在 media）；`text` 伺服器句子（`make uitext`）；`view` 讀取與轉換；`store` 是 sqlc。`Retention`（`NewRetention`）是 worker 與事件組裝用的子集，不需要 social、seller、accountsuspension。
+- 依賴圖的唯一來源是 `internal/arch/modules.go`；依賴 social、review、im、seller、buyer、`accountsuspension`、media，不依賴 identity（停權只經 `accountsuspension`），不依賴 notification。
 
 ## 不變量
 
@@ -29,7 +29,7 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 - 對象必須存在而且公開可讀，不能檢舉自己（含同一帳號的其他身分）；檢舉原因只能是 `policy.CommunityReporterSelectable()` 的八個值。
 - `OpenReportCounts` 只算進行中案件（`closed_at IS NULL`）的檢舉，已結案案件的檢舉不算，沒有進行中檢舉的貼文不在結果裡（`TestOpenReportCountsCountsOnlyReportsInOpenCases`）；`SocialAdminService.ListPosts` 在 `httpapi/social` 組合它與 social 的 `ListAdminPosts`，moderation 不依賴 social 的後台讀取。
 - `Cases` 列案件新到舊（keyset `(opened_at, id)`），狀態與對象種類空值是不篩、不合法的值回 InvalidInput（`TestCasesFilterByStateAndTargetKind`、`TestCasesKeysetPagingHasNoDuplicatesOrGaps`）。
-- 案件處理（`internal/handle`）的不變量：結案終態與版本轉移、處置與結案同一個 transaction 與鎖順序、內容下架的店家核對、後台決定的稽核紀錄，見 `internal/handle/AGENTS.md`；送出路徑的鎖順序見 `internal/report/AGENTS.md`，刪帳訂閱者與保留期清除見 `internal/retention/AGENTS.md`。
+- 案件處理（`internal/handle`）的不變量：結案終態與版本轉移、處置與結案同一個 transaction 與鎖順序、內容下架的店家核對、後台決定的稽核紀錄，見 `internal/handle/AGENTS.md`；送出路徑的鎖順序與評價、聊天訊息的證據讀取見 `internal/report/AGENTS.md`，刪帳訂閱者與保留期清除見 `internal/retention/AGENTS.md`。
 
 ## 不負責
 

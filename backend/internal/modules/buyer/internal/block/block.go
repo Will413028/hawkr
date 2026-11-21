@@ -56,7 +56,7 @@ func (service *Service) AddBuyer(ctx context.Context, buyerID, targetBuyerID int
 	return changed && err == nil, err
 }
 
-// lockPair 在同一個 transaction 依 buyer_id 升冪鎖兩列：發起者排他（營運中才放行）、對象共享（已關閉回 NotFound）。固定順序讓兩人同時互相封鎖
+// lockPair 在同一個 transaction 依 buyer_id 升冪鎖兩列：發起者排他（營運中才放行）、對象 FOR KEY SHARE（已關閉回 NotFound）。固定順序讓兩人同時互相封鎖
 // 不會互等；對象的共享鎖與對象刪帳的排他鎖互斥，鎖到之後才檢查狀態，所以不會留下指向已關閉買家的列。
 func lockPair(ctx context.Context, queries *store.Queries, initiatorID, targetID int64) error {
 	lockTarget := func() error {

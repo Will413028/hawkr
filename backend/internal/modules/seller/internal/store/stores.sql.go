@@ -546,12 +546,57 @@ const lockStore = `-- name: LockStore :one
 SELECT store_id, store_code, account_id, status, version, store_name, description, logo_key, logo_asset_id, cover_key, cover_asset_id, contact_phone, contact_name, contact_mobile, support_email, town_code, address_detail, prize, website_url, onboarding_completed, created_at, updated_at, pii_purged_at, first_exposed_at, current_closed_at, retired_at
 FROM seller.stores
 WHERE store_id = $1
-FOR UPDATE
+FOR NO KEY UPDATE
 `
 
-// 鎖定指定 stint，序列化它的寫入。
+// 鎖定指定 stint，序列化它的業務寫入（FOR NO KEY UPDATE）：與其他模組守門用的 FOR KEY SHARE 不互斥。
+// 只搭配不改 stores 唯一鍵欄位（store_id、store_code、account_id、current_closed_at）的更新；關店與恢復營業改 current_closed_at，
+// 走 LockAccountStores（FOR UPDATE）。
 func (q *Queries) LockStore(ctx context.Context, storeID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, lockStore, storeID)
+	var i SellerStore
+	err := row.Scan(
+		&i.StoreID,
+		&i.StoreCode,
+		&i.AccountID,
+		&i.Status,
+		&i.Version,
+		&i.StoreName,
+		&i.Description,
+		&i.LogoKey,
+		&i.LogoAssetID,
+		&i.CoverKey,
+		&i.CoverAssetID,
+		&i.ContactPhone,
+		&i.ContactName,
+		&i.ContactMobile,
+		&i.SupportEmail,
+		&i.TownCode,
+		&i.AddressDetail,
+		&i.Prize,
+		&i.WebsiteUrl,
+		&i.OnboardingCompleted,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PiiPurgedAt,
+		&i.FirstExposedAt,
+		&i.CurrentClosedAt,
+		&i.RetiredAt,
+	)
+	return i, err
+}
+
+const lockStoreKeyShare = `-- name: LockStoreKeyShare :one
+SELECT store_id, store_code, account_id, status, version, store_name, description, logo_key, logo_asset_id, cover_key, cover_asset_id, contact_phone, contact_name, contact_mobile, support_email, town_code, address_detail, prize, website_url, onboarding_completed, created_at, updated_at, pii_purged_at, first_exposed_at, current_closed_at, retired_at
+FROM seller.stores
+WHERE store_id = $1
+FOR KEY SHARE
+`
+
+// 以 KEY SHARE 讀取指定 stint：只與 FOR UPDATE（RetireDueStores、LockAccountStores）互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+// 其他模組的店家寫入用它與退場序列化。
+func (q *Queries) LockStoreKeyShare(ctx context.Context, storeID int64) (SellerStore, error) {
+	row := q.db.QueryRow(ctx, lockStoreKeyShare, storeID)
 	var i SellerStore
 	err := row.Scan(
 		&i.StoreID,

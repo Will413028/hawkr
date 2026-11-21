@@ -2,7 +2,7 @@ syntax = "proto3";
 
 // moderation 模組給後台的 API：社群檢舉的案件（管理員處理的單位）列表、讀取與決定。前台的 API 在 hawkr.moderation.v1alpha1。
 //
-// 案件是一個對象（貼文、留言、討論區留言或買家）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
+// 案件是一個對象（貼文、留言、討論區留言、買家、評價或聊天訊息）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
 // （更正在擁有處分的模組做）。決定以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：新的檢舉掛進案件會改 etag，
 // etag 過期或案件已結案回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
 // ID 是不透明的字串（案件、檢舉與社群內容是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -30,6 +30,11 @@ service ModerationAdminService {
   // DecideCase 對進行中的案件下決定並結案：違規要帶認定的類別、處置與給作者的理由，處置（社群內容的隱藏或警告、買家停權、店家寫的內容的下架措施）
   // 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
   rpc DecideCase(DecideCaseRequest) returns (DecideCaseResponse);
+
+  // ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
+  // 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+  // 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
+  rpc ReverseHide(ReverseHideRequest) returns (ReverseHideResponse);
 }
 
 // CaseState 是案件的狀態。
@@ -53,9 +58,9 @@ enum CaseDecision {
 // CaseAction 是違規的處置種類；能用在哪種對象由伺服器檢查（不適用回 INVALID_ARGUMENT）。
 enum CaseAction {
   CASE_ACTION_UNSPECIFIED = 0;
-  // 隱藏買家寫的留言或討論區留言。
+  // 隱藏買家寫的留言、討論區留言、評價或聊天訊息；店家寫的聊天訊息回 FAILED_PRECONDITION。
   CASE_ACTION_HIDE = 1;
-  // 警告買家（作者是買家的留言、討論區留言，或被檢舉的買家）。
+  // 警告買家（作者是買家的留言、討論區留言、評價、聊天訊息，或被檢舉的買家）。
   CASE_ACTION_WARN = 2;
   // 停權買家帳號；帳號擁有店家時回 FAILED_PRECONDITION。
   CASE_ACTION_BAN = 3;
@@ -88,6 +93,86 @@ message Case {
   optional string measure_id = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 案件內容快照裡凍結的作者店家（過渡期的十進位整數字串）；買家對象、沒有快照（結案滿保留期後被清除）或內容不是店家寫的不設。
   optional string store_id = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // HIDE 決定的撤銷（ReverseHide）；沒有撤銷不設。決定本身不改。
+  optional CaseReversal reversal = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CaseReversal 是案件上 HIDE 決定的撤銷紀錄。
+message CaseReversal {
+  google.protobuf.Timestamp reverse_time = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 撤銷的管理員（帳號 ID）。
+  string reversed_by = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string reason = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CaseSnapshot 是案件最近一份凍結的被檢舉內容（檢舉當下的版本）：依對象種類恰好設一個欄位。
+message CaseSnapshot {
+  oneof content {
+    SocialSnapshot social = 1;
+    BuyerSnapshot buyer = 2;
+    ReviewSnapshot review = 3;
+    ChatSnapshot chat = 4;
+  }
+}
+
+// SocialSnapshot 是貼文、留言與討論區留言的快照。
+message SocialSnapshot {
+  // 作者種類：BUYER 或 STORE。
+  string author_kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 作者 ID（過渡期的十進位整數字串）。
+  string author_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string asset_ids = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp authored_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// BuyerSnapshot 是被檢舉買家的公開檔案快照。
+message BuyerSnapshot {
+  string display_name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 頭像的 object key；沒有頭像是空字串。
+  string avatar = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ReviewSnapshot 是評價的快照；作者永遠是買家。
+message ReviewSnapshot {
+  string author_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 評價所屬的店家（上下文，不是作者）。
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string product_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 rating = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string asset_ids = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp authored_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 店家回覆（上下文，不是被檢舉的內容）；沒有回覆是空字串。
+  string reply_body = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ChatSnapshot 是被檢舉的聊天訊息與前後各 5 則的快照。
+message ChatSnapshot {
+  // 寄件方種類：BUYER 或 STORE。
+  string author_kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string author_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string asset_ids = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp authored_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string conversation_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 seq = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 前後文，依 seq 由小到大，不含被檢舉的那則。
+  repeated ChatContextMessage context = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ChatContextMessage 是聊天前後文的一則；已隱藏或已抹除的是墓碑（不帶 body 與 asset_ids）。
+message ChatContextMessage {
+  int64 seq = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string sender_kind = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string sender_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 訊息類型：TEXT 或 IMAGE。
+  string type = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string asset_ids = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp send_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool hidden = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool erased = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // CaseReport 是案件裡的一筆檢舉。
@@ -126,6 +211,8 @@ message GetCaseResponse {
   Case case = 1;
   // 全部檢舉，送出時間由舊到新。
   repeated CaseReport reports = 2;
+  // 案件最近一份凍結的被檢舉內容；沒有快照（結案滿保留期後被清除）不設。
+  optional CaseSnapshot snapshot = 3;
 }
 
 message DecideCaseRequest {
@@ -146,6 +233,17 @@ message DecideCaseRequest {
 }
 
 message DecideCaseResponse {
+  Case case = 1;
+  repeated CaseReport reports = 2;
+}
+
+message ReverseHideRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 撤銷原因，去除首尾空白後 1 到 500 個字元（以 Unicode 字元計）。
+  string reason = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ReverseHideResponse {
   Case case = 1;
   repeated CaseReport reports = 2;
 }

@@ -39,6 +39,8 @@ interface PostDetailViewerProps {
 	/** The tapped card's thumbnail box. The whole detail surface scales out of
 	 *  it on open and back into it on close. Null → plain fade (e.g. deep link). */
 	openRect?: OpenOriginRect | null;
+	/** 唯讀呈現：只顯示數字，不渲染按讚、留言、分享與留言區（賣家的店面預覽）。 */
+	readOnly?: boolean;
 }
 
 const CloseIcon = () => (
@@ -98,6 +100,7 @@ function PostPage({
 	onNext,
 	canPrev,
 	canNext,
+	readOnly = false,
 }: {
 	post: PostListItem;
 	isActive: boolean;
@@ -112,6 +115,7 @@ function PostPage({
 	onNext?: () => void;
 	canPrev?: boolean;
 	canNext?: boolean;
+	readOnly?: boolean;
 }) {
 	const [detail] = React.useState<PostDetail | null>(null);
 	const {
@@ -610,42 +614,57 @@ function PostPage({
 					 * taps are safe — the hook's `togglePendingRef` drops a second
 					 * toggle while one is in flight.
 					 */}
-					<button
-						type="button"
-						className={`post-viewer__action${liked ? " is-liked" : ""}`}
-						onClick={toggleLike}
-						aria-pressed={liked}
-						disabled={authWaiting}
-						aria-busy={likeBusy || authWaiting || undefined}
-						aria-label={liked ? "取消按讚" : "按讚"}
-					>
-						<AppIcon name="heart" fill={liked} size={26} />
-						<span>{formatCount(likeCount)}</span>
-					</button>
-					<button
-						type="button"
-						className="post-viewer__action"
-						onClick={handleComment}
-						aria-label={`留言 ${post.commentCount} 則`}
-					>
-						<AppIcon name="chat" size={26} />
-						<span>{formatCount(post.commentCount)}</span>
-					</button>
-					<button
-						type="button"
-						className="post-viewer__action"
-						onClick={handleShare}
-						aria-label="分享"
-					>
-						<AppIcon name="share" size={26} />
-					</button>
+					{readOnly ? (
+						<>
+							<div className={`post-viewer__action${liked ? " is-liked" : ""}`}>
+								<AppIcon name="heart" fill={liked} size={26} />
+								<span>{formatCount(likeCount)}</span>
+							</div>
+							<div className="post-viewer__action">
+								<AppIcon name="chat" size={26} />
+								<span>{formatCount(post.commentCount)}</span>
+							</div>
+						</>
+					) : (
+						<>
+							<button
+								type="button"
+								className={`post-viewer__action${liked ? " is-liked" : ""}`}
+								onClick={toggleLike}
+								aria-pressed={liked}
+								disabled={authWaiting}
+								aria-busy={likeBusy || authWaiting || undefined}
+								aria-label={liked ? "取消按讚" : "按讚"}
+							>
+								<AppIcon name="heart" fill={liked} size={26} />
+								<span>{formatCount(likeCount)}</span>
+							</button>
+							<button
+								type="button"
+								className="post-viewer__action"
+								onClick={handleComment}
+								aria-label={`留言 ${post.commentCount} 則`}
+							>
+								<AppIcon name="chat" size={26} />
+								<span>{formatCount(post.commentCount)}</span>
+							</button>
+							<button
+								type="button"
+								className="post-viewer__action"
+								onClick={handleShare}
+								aria-label="分享"
+							>
+								<AppIcon name="share" size={26} />
+							</button>
+						</>
+					)}
 				</footer>
 				{notice ? (
 					<p className="post-viewer__notice" role="status">
 						{notice}
 					</p>
 				) : null}
-				{showInlineComments ? (
+				{showInlineComments && !readOnly ? (
 					<div className="post-viewer__inline-comments">
 						<PostComments
 							postId={post.id}
@@ -759,6 +778,7 @@ export default function PostDetailViewer({
 	onNeedMore,
 	hasMore,
 	openRect,
+	readOnly = false,
 }: PostDetailViewerProps) {
 	const open = initialIndex !== null;
 	const surfaceRef = React.useRef<HTMLDivElement>(null);
@@ -1426,6 +1446,7 @@ export default function PostDetailViewer({
 									isActive={idx === activeIndex}
 									commentsActive={idx === activeIndex && sheetPostId === null}
 									showInlineComments={!isMobile}
+									readOnly={readOnly}
 									onRequestComments={handleRequestComments}
 									onPrev={goPrev}
 									onNext={goNext}
@@ -1442,11 +1463,13 @@ export default function PostDetailViewer({
 			</div>
 
 			{showHint && <PostViewerScrollHint />}
-			<CommentsBottomSheet
-				postId={sheetPostId}
-				open={sheetPostId !== null}
-				onClose={() => setSheetPostId(null)}
-			/>
+			{readOnly ? null : (
+				<CommentsBottomSheet
+					postId={sheetPostId}
+					open={sheetPostId !== null}
+					onClose={() => setSheetPostId(null)}
+				/>
+			)}
 		</div>
 	);
 

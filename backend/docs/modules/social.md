@@ -80,7 +80,7 @@
 - `MarkAuthorInactive` 先依 id 鎖內容列；求值是一次集合呼叫，`reevaluate_*` 在寫入前依同一個順序鎖整批 stats（貼文 stats → 父留言 stats → 討論區 stats，各依 id），不需要 `stats.Service.Lock`。
 - 資料庫與 API 的讀取、計數在申請提交的同一刻改好，沒有 job 的延遲。網站的快取頁不在其內：清除 job 在同 transaction 排入、立即可跑，由它的 `finish` 失效快取，晚秒級，快取 TTL 保底。
 - `buyer.pub_inactive_buyers` 只給每日對帳的核對查詢（`MissingInactiveAuthors`）。
-- **買家的寫入與刪帳序列化**：讚、分享、留言、編輯在寫入的 transaction 內先 `buyer.LockActive`（買家列的共享鎖，持有到提交）；編輯用不加鎖的讀取確認作者，再鎖買家列，最後才鎖內容列。刪帳申請（`BeginDeletion` 的排他鎖）要等它們提交，之後才開始的寫入被擋。鎖的順序：identity → buyer → seller → social。
+- **買家的寫入與刪帳序列化**：讚、分享、留言、編輯在寫入的 transaction 內先 `buyer.LockActive`（買家列的 `FOR KEY SHARE`，持有到提交）；編輯用不加鎖的讀取確認作者，再鎖買家列，最後才鎖內容列。刪帳申請（`BeginDeletion` 的排他鎖）要等它們提交，之後才開始的寫入被擋。鎖的順序：identity → buyer → seller → social。
 - **清除 job**：鎖 stats 列的順序固定為貼文的 stats、留言的 stats、討論區留言的 stats，各自依 ID 由小到大（`stats.Service.Lock`，在這一批的第一個寫入之前），與 trigger 的順序相同。買家刪帳的內容在申請的 transaction 已經不計入，job 的軟刪差額是 0。軟刪做完之後，把他全部已刪除的留言與討論區留言的內文設為 NULL（`scrubBodies`，墓碑列保留；`comments_scrubbed_check`：NULL 只出現在已刪除的列）。
 
 ## 8. 隱藏、還原與處分

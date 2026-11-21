@@ -57,6 +57,9 @@
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER": {
       "message": "User"
     },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE": {
+      "message": "Chat message"
+    },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT": {
       "message": "Comment"
     },
@@ -65,6 +68,9 @@
     },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": {
       "message": "Post"
+    },
+    "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": {
+      "message": "Review"
     },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"
@@ -125,6 +131,36 @@
     },
     "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
       "message": "This unit is not supported"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
+      "message": "Provide an explanation"
+    },
+    "seller.InquiryKind.INQUIRY_KIND_RECORDS": {
+      "message": "Provide records"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL": {
+      "message": "Email"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING": {
+      "message": "Messaging app"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER": {
+      "message": "Other"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE": {
+      "message": "Phone"
+    },
+    "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER": {
+      "message": "Seller Center"
+    },
+    "seller.InquiryState.INQUIRY_STATE_OPEN": {
+      "message": "Awaiting reply"
+    },
+    "seller.InquiryState.INQUIRY_STATE_REPLIED": {
+      "message": "Replied"
+    },
+    "seller.InquiryState.INQUIRY_STATE_WITHDRAWN": {
+      "message": "Withdrawn"
     },
     "seller.KYCApplication.decide_time": {
       "message": "Approved at: {time}"
@@ -213,8 +249,26 @@
     "seller.PaymentAccount.payouts_inactive_note": {
       "message": "Payouts to your bank account are not enabled yet. The payment provider may ask you for more information."
     },
+    "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": {
+      "message": "Resolved (not accepted)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN": {
+      "message": "Resolved (action taken)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": {
+      "message": "Resolved (duplicate report)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": {
+      "message": "Resolved (insufficient information)"
+    },
+    "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
+      "message": "Resolved (no violation)"
+    },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
+    },
+    "seller.StoreReport.outcome_unset": {
+      "message": "Under review"
     },
     "social.CommentState.placeholder.COMMENT_STATE_DELETED": {
       "message": "This comment was deleted"

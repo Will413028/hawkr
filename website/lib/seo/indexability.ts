@@ -18,6 +18,7 @@ export const PRIVATE_PREFIXES = [
 	"/account",
 	"/seller-center",
 	"/seller/measures",
+	"/seller/inquiries",
 	"/checkout",
 	"/cart",
 	"/payment",

@@ -70,6 +70,9 @@ final Map<String, SellerCapability?> routeCapabilities = {
   SellerRoutes.photoTools: null,
   SellerRoutes.measures: null,
   SellerRoutes.measureRequest: null,
+  SellerRoutes.inquiries: null,
+  SellerRoutes.inquiryDetail: null,
+  SellerRoutes.inquiryReply: null,
 
   CouponRoutes.editor: _marketing,
   CouponRoutes.add: _marketing,
@@ -97,13 +100,16 @@ final Map<String, SellerCapability?> routeCapabilities = {
 
 /// 沒有店家也能進的頁面（帳號層級）：還沒開店的帳號（`needsOnboarding`）導頁時放行這些，其餘一律導去開店頁。
 ///
-/// 開店流程自己（onboard、welcome 的 splash 自行導頁），以及以帳號為範圍的措施列表與申覆表單。每一項在
+/// 開店流程自己（onboard、welcome 的 splash 自行導頁），以及以帳號為範圍的措施列表與申覆表單、平台詢問。每一項在
 /// [routeCapabilities] 必須宣告為不需要能力（`route_capabilities_test.dart` 檢查）：沒有店家就沒有店家能力。
 const Set<String> routesAllowedWithoutStore = {
   AuthRoutes.onboard,
   AuthRoutes.welcome,
   SellerRoutes.measures,
   SellerRoutes.measureRequest,
+  SellerRoutes.inquiries,
+  SellerRoutes.inquiryDetail,
+  SellerRoutes.inquiryReply,
 };
 
 /// 依 [capabilities] 判斷這個路由現在開放嗎；沒有宣告的路由不開放。

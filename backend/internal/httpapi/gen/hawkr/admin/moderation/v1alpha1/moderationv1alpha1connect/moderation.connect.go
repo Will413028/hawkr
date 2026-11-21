@@ -4,7 +4,7 @@
 
 // moderation 模組給後台的 API：社群檢舉的案件（管理員處理的單位）列表、讀取與決定。前台的 API 在 hawkr.moderation.v1alpha1。
 //
-// 案件是一個對象（貼文、留言、討論區留言或買家）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
+// 案件是一個對象（貼文、留言、討論區留言、買家、評價或聊天訊息）的進行中檢舉的集合；同一對象同時至多一個進行中案件。決定即結案，結案是終態，不重開、不改判
 // （更正在擁有處分的模組做）。決定以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：新的檢舉掛進案件會改 etag，
 // etag 過期或案件已結案回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
 // ID 是不透明的字串（案件、檢舉與社群內容是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -49,6 +49,9 @@ const (
 	// ModerationAdminServiceDecideCaseProcedure is the fully-qualified name of the
 	// ModerationAdminService's DecideCase RPC.
 	ModerationAdminServiceDecideCaseProcedure = "/hawkr.admin.moderation.v1alpha1.ModerationAdminService/DecideCase"
+	// ModerationAdminServiceReverseHideProcedure is the fully-qualified name of the
+	// ModerationAdminService's ReverseHide RPC.
+	ModerationAdminServiceReverseHideProcedure = "/hawkr.admin.moderation.v1alpha1.ModerationAdminService/ReverseHide"
 )
 
 // ModerationAdminServiceClient is a client for the
@@ -61,6 +64,10 @@ type ModerationAdminServiceClient interface {
 	// DecideCase 對進行中的案件下決定並結案：違規要帶認定的類別、處置與給作者的理由，處置（社群內容的隱藏或警告、買家停權、店家寫的內容的下架措施）
 	// 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
+	// ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
+	// 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+	// 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
+	ReverseHide(context.Context, *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error)
 }
 
 // NewModerationAdminServiceClient constructs a client for the
@@ -95,14 +102,21 @@ func NewModerationAdminServiceClient(httpClient connect.HTTPClient, baseURL stri
 			connect.WithSchema(moderationAdminServiceMethods.ByName("DecideCase")),
 			connect.WithClientOptions(opts...),
 		),
+		reverseHide: connect.NewClient[v1alpha1.ReverseHideRequest, v1alpha1.ReverseHideResponse](
+			httpClient,
+			baseURL+ModerationAdminServiceReverseHideProcedure,
+			connect.WithSchema(moderationAdminServiceMethods.ByName("ReverseHide")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // moderationAdminServiceClient implements ModerationAdminServiceClient.
 type moderationAdminServiceClient struct {
-	listCases  *connect.Client[v1alpha1.ListCasesRequest, v1alpha1.ListCasesResponse]
-	getCase    *connect.Client[v1alpha1.GetCaseRequest, v1alpha1.GetCaseResponse]
-	decideCase *connect.Client[v1alpha1.DecideCaseRequest, v1alpha1.DecideCaseResponse]
+	listCases   *connect.Client[v1alpha1.ListCasesRequest, v1alpha1.ListCasesResponse]
+	getCase     *connect.Client[v1alpha1.GetCaseRequest, v1alpha1.GetCaseResponse]
+	decideCase  *connect.Client[v1alpha1.DecideCaseRequest, v1alpha1.DecideCaseResponse]
+	reverseHide *connect.Client[v1alpha1.ReverseHideRequest, v1alpha1.ReverseHideResponse]
 }
 
 // ListCases calls hawkr.admin.moderation.v1alpha1.ModerationAdminService.ListCases.
@@ -120,6 +134,11 @@ func (c *moderationAdminServiceClient) DecideCase(ctx context.Context, req *conn
 	return c.decideCase.CallUnary(ctx, req)
 }
 
+// ReverseHide calls hawkr.admin.moderation.v1alpha1.ModerationAdminService.ReverseHide.
+func (c *moderationAdminServiceClient) ReverseHide(ctx context.Context, req *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error) {
+	return c.reverseHide.CallUnary(ctx, req)
+}
+
 // ModerationAdminServiceHandler is an implementation of the
 // hawkr.admin.moderation.v1alpha1.ModerationAdminService service.
 type ModerationAdminServiceHandler interface {
@@ -130,6 +149,10 @@ type ModerationAdminServiceHandler interface {
 	// DecideCase 對進行中的案件下決定並結案：違規要帶認定的類別、處置與給作者的理由，處置（社群內容的隱藏或警告、買家停權、店家寫的內容的下架措施）
 	// 與結案在同一個 transaction，任何一步失敗都整個回滾；不違規不帶這些欄位。結案是終態，沒有重開。etag 必填。
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
+	// ReverseHide 撤銷已結案案件的隱藏決定：案件維持結案、決定不改，撤銷（時間、管理員、原因）記在案件上；同 transaction 還原擁有內容的模組（社群、評價、聊天訊息）
+	// 由這個案件造成的未還原隱藏。案件不存在回 NOT_FOUND；案件進行中、處置不是隱藏、已撤銷過、沒有未還原的隱藏或未還原的隱藏是別的案件造成的回 FAILED_PRECONDITION；
+	// 內容已被清除或刪除時仍記下撤銷並回成功（同隱藏）。
+	ReverseHide(context.Context, *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error)
 }
 
 // NewModerationAdminServiceHandler builds an HTTP handler from the service implementation. It
@@ -159,6 +182,12 @@ func NewModerationAdminServiceHandler(svc ModerationAdminServiceHandler, opts ..
 		connect.WithSchema(moderationAdminServiceMethods.ByName("DecideCase")),
 		connect.WithHandlerOptions(opts...),
 	)
+	moderationAdminServiceReverseHideHandler := connect.NewUnaryHandler(
+		ModerationAdminServiceReverseHideProcedure,
+		svc.ReverseHide,
+		connect.WithSchema(moderationAdminServiceMethods.ByName("ReverseHide")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.admin.moderation.v1alpha1.ModerationAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModerationAdminServiceListCasesProcedure:
@@ -167,6 +196,8 @@ func NewModerationAdminServiceHandler(svc ModerationAdminServiceHandler, opts ..
 			moderationAdminServiceGetCaseHandler.ServeHTTP(w, r)
 		case ModerationAdminServiceDecideCaseProcedure:
 			moderationAdminServiceDecideCaseHandler.ServeHTTP(w, r)
+		case ModerationAdminServiceReverseHideProcedure:
+			moderationAdminServiceReverseHideHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -186,4 +217,8 @@ func (UnimplementedModerationAdminServiceHandler) GetCase(context.Context, *conn
 
 func (UnimplementedModerationAdminServiceHandler) DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.moderation.v1alpha1.ModerationAdminService.DecideCase is not implemented"))
+}
+
+func (UnimplementedModerationAdminServiceHandler) ReverseHide(context.Context, *connect.Request[v1alpha1.ReverseHideRequest]) (*connect.Response[v1alpha1.ReverseHideResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.moderation.v1alpha1.ModerationAdminService.ReverseHide is not implemented"))
 }

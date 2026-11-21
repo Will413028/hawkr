@@ -14,8 +14,6 @@ import { sellerCanonicalUrl } from "@/lib/seo/urls";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
-	/** 賣家預覽：網址段是 store_id，不是 store_code。 */
-	preview?: boolean;
 }
 
 const POSTS_PAGE_SIZE = 12;
@@ -50,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function PostsPage({ params, preview = false }: Props) {
+export default async function PostsPage({ params }: Props) {
 	const { id } = await params;
 
 	// Posts is an infinite-scroll feed with no `?page` pagination UI, so the
@@ -64,7 +62,7 @@ export default async function PostsPage({ params, preview = false }: Props) {
 		nextPageToken: "",
 		pageSize: POSTS_PAGE_SIZE,
 	};
-	const storeId = (await resolveStorefront(id, preview))?.storeId ?? "";
+	const storeId = (await resolveStorefront(id))?.storeId ?? "";
 	const postsData = storeId
 		? await getCachedStorePosts(storeId, POSTS_PAGE_SIZE).catch(
 				prerenderSafe(emptyPosts),

@@ -6,7 +6,7 @@
 // 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
 // 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；記內部註記、
 // 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
-// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
+// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService；賣家看措施與申覆在 SellerAppService。
 //
 // 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
 // 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
@@ -164,7 +164,7 @@ const (
 // hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService service.
 type SellerGovernanceAdminServiceClient interface {
 	// ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
-	// （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+	// （待分案與案件成員的處理順序）。清單的通報不帶 evidence 與 supplements（GetReport 才有）。
 	ListReports(context.Context, *connect.Request[v1alpha1.ListReportsRequest]) (*connect.Response[v1alpha1.ListReportsResponse], error)
 	// GetReport 讀一筆通報，含補充、佐證與 etag；can_* 與 available_outcomes 是此刻能做的動作。
 	GetReport(context.Context, *connect.Request[v1alpha1.GetReportRequest]) (*connect.Response[v1alpha1.GetReportResponse], error)
@@ -195,12 +195,12 @@ type SellerGovernanceAdminServiceClient interface {
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
-	// 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+	// 詢問建立後即出現在賣家中心，賣家在那裡回覆；推播與 email 由通知功能處理。
 	CreateCaseInquiry(context.Context, *connect.Request[v1alpha1.CreateCaseInquiryRequest]) (*connect.Response[v1alpha1.CreateCaseInquiryResponse], error)
 	// ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
 	ListCaseInquiries(context.Context, *connect.Request[v1alpha1.ListCaseInquiriesRequest]) (*connect.Response[v1alpha1.ListCaseInquiriesResponse], error)
 	// RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
-	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。管道不能選 SELLER_CENTER（那是賣家自己在賣家中心的回覆），選了回 invalid_argument。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
 	// （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
 	RecordCaseInquiryReply(context.Context, *connect.Request[v1alpha1.RecordCaseInquiryReplyRequest]) (*connect.Response[v1alpha1.RecordCaseInquiryReplyResponse], error)
 	// WithdrawCaseInquiry 撤回還沒回覆的詢問（賣家不必再回覆）。案件因決定或通報都移走而結案時，還沒結束的詢問由系統撤回（withdraw_cause 是 CASE_CLOSED）。
@@ -796,7 +796,7 @@ func (c *sellerGovernanceAdminServiceClient) ListViolations(ctx context.Context,
 // hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService service.
 type SellerGovernanceAdminServiceHandler interface {
 	// ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
-	// （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+	// （待分案與案件成員的處理順序）。清單的通報不帶 evidence 與 supplements（GetReport 才有）。
 	ListReports(context.Context, *connect.Request[v1alpha1.ListReportsRequest]) (*connect.Response[v1alpha1.ListReportsResponse], error)
 	// GetReport 讀一筆通報，含補充、佐證與 etag；can_* 與 available_outcomes 是此刻能做的動作。
 	GetReport(context.Context, *connect.Request[v1alpha1.GetReportRequest]) (*connect.Response[v1alpha1.GetReportResponse], error)
@@ -827,12 +827,12 @@ type SellerGovernanceAdminServiceHandler interface {
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
-	// 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+	// 詢問建立後即出現在賣家中心，賣家在那裡回覆；推播與 email 由通知功能處理。
 	CreateCaseInquiry(context.Context, *connect.Request[v1alpha1.CreateCaseInquiryRequest]) (*connect.Response[v1alpha1.CreateCaseInquiryResponse], error)
 	// ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
 	ListCaseInquiries(context.Context, *connect.Request[v1alpha1.ListCaseInquiriesRequest]) (*connect.Response[v1alpha1.ListCaseInquiriesResponse], error)
 	// RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
-	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+	// 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。管道不能選 SELLER_CENTER（那是賣家自己在賣家中心的回覆），選了回 invalid_argument。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
 	// （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
 	RecordCaseInquiryReply(context.Context, *connect.Request[v1alpha1.RecordCaseInquiryReplyRequest]) (*connect.Response[v1alpha1.RecordCaseInquiryReplyResponse], error)
 	// WithdrawCaseInquiry 撤回還沒回覆的詢問（賣家不必再回覆）。案件因決定或通報都移走而結案時，還沒結束的詢問由系統撤回（withdraw_cause 是 CASE_CLOSED）。

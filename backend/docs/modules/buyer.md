@@ -19,9 +19,9 @@
 - 狀態有 ACTIVE、PENDING_DELETION、CLOSED。CLOSED 必有 `deleted_at`；PII 只能清 CLOSED。
 - `BeginDeletion` 把買家從 ACTIVE 轉成 PENDING_DELETION，並在同一個 transaction 發布 `BuyerDeletionRequested` 一次；重送不重複寫入，之後的關閉不再發。訂閱者只該排入自己的清除 job。刪帳申請不能撤回，只有完成。
 - `CloseForDeletion` 可關閉 ACTIVE 或 PENDING_DELETION，重送安全。關閉時在同一個 transaction 刪除收貨地址、收藏（逐筆發 `FavoriteRemoved`）、追蹤、瀏覽與補貨訂閱，刪除買家發起的兩種封鎖與以他為對象的 `blocked_buyers` 列，把目前的頭像記成退場，發布 `BuyerDeleted`；會員紀錄保留。PENDING_DELETION 期間不清這些資料（未結訂單需要地址）。
-- 前置條件：`BeginDeletion` 與 `CloseForDeletion` 只由 `accountdeletion` 在已以 `identity.LockAccount` 鎖住帳號列的 transaction 內呼叫。鎖順序是帳號列先於買家列；本模組只鎖買家列。刪帳時買家一定關閉。
+- 前置條件：`BeginDeletion` 與 `CloseForDeletion` 只由 `accountdeletion` 在已以 `identity.LockAccount` 鎖住帳號列的 transaction 內呼叫。鎖順序是帳號列先於買家列；本模組只鎖買家列。刪帳時買家一定關閉。買家列的鎖分兩級：業務寫入（`stint.Require`，`LockBuyer`）是 `FOR NO KEY UPDATE`，與其他模組守門的 `FOR KEY SHARE` 不互斥（業務寫入不改 `buyer_id`、`account_id`）；狀態轉換與刪帳（`BeginDeletion`、`CloseForDeletion`、`LockForDeletion`，`LockBuyerForTransition`）是 `FOR UPDATE`，等守門的 transaction 提交（`TestOwnerGuardDoesNotBlockBusinessWritesOnTheSameBuyer`）。
 - 刪帳由 `accountdeletion` 編排（seller 也是參與者）；buyer 只提供 `BeginDeletion` 與 `CloseForDeletion`，不刪帳號。
-- `LockActive(ctx, buyerID)` 給其他模組的寫入路徑，在自己的 transaction 內以共享鎖確認買家是 ACTIVE，鎖持有到 transaction 結束。`BeginDeletion` 的排他鎖要等它：申請刪除之前成立的寫入一定先於清除 job 提交；之後才開始的回 FailedPrecondition；已關閉回 NotFound；沒有 transaction 時回錯誤。鎖順序是帳號列、買家列、呼叫方自己的表。
+- `LockActive(ctx, buyerID)` 給其他模組的寫入路徑，在自己的 transaction 內以 `FOR KEY SHARE` 確認買家是 ACTIVE，鎖持有到 transaction 結束。`BeginDeletion` 的排他鎖要等它：申請刪除之前成立的寫入一定先於清除 job 提交；之後才開始的回 FailedPrecondition；已關閉回 NotFound；沒有 transaction 時回錯誤。鎖順序是帳號列、買家列、呼叫方自己的表。
 - pending 期間只禁止新增收藏與追蹤；profile、頭像、地址、瀏覽、補貨與會員仍可寫。
 - PII 清理：River 在啟動時排程並每小時補跑，以 `ByPeriod = time.Hour` 去重，completed job 留存但不阻擋下一小時。只清嚴格超過 30 天的 CLOSED stint，分批處理到積壓清完。未清 PII 的暱稱必須 1–100 字元，清理後為 NULL。
 
@@ -85,7 +85,8 @@
 
 形狀宣告在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫的 migration；形狀的清單在 `AGENTS.md`。
 
-- `pub_inactive_buyers()`：此刻不是營運中的買家，申請刪除起就算，買家寫的內容從那一刻起不公開。social 在 `BuyerDeletionRequested`、`BuyerDeleted` 的同 transaction 訂閱者，把這個事實複製進自己的 `inactive_authors` 並讓內容重新求值，讀取與 `reevaluate_*` 只讀複本。函式只給 social 每日對帳的 Go 查詢核對複本是否漏了，不給 trigger 或旗標的求值呼叫。
+- `pub_inactive_buyers()`：此刻不是營運中的買家，申請刪除起就算，買家寫的內容從那一刻起不公開。social 在 `BuyerDeletionRequested`、`BuyerDeleted` 的同 transaction 訂閱者，把這個事實複製進自己的 `inactive_authors` 並讓內容重新求值，讀取與 `reevaluate_*` 只讀複本。函式給 social 每日對帳的 Go 查詢核對複本是否漏了，也給 review 的讀取過濾（EXISTS，申請刪除起就隱藏），不給 trigger 或旗標的求值呼叫。
+- `pub_closed_buyers()`：此刻已關閉（CLOSED）的買家，不含刪除中，列永久保留，沒有時間參數。給 im、crm 的讀取過濾。`LockNotClosed(ctx, buyerID)` 是對應的寫入守門：在呼叫方的 transaction 內以 `FOR KEY SHARE`（與 `LockActive` 共用 `LockBuyerShared`）確認買家尚未關閉，ACTIVE 與 PENDING_DELETION 都放行，已關閉與不存在回 NotFound，沒有 transaction 時回錯誤；`BeginDeletion` 與 `CloseForDeletion` 的 `FOR UPDATE` 要等它提交（`TestClosedBuyersAndLockNotClosed`、`TestLockNotClosedBlocksBeginDeletionUntilCommit`）。
 - `pub_blocked_buyers()`、`pub_blocked_stores()`：封鎖的現況，一列一個封鎖，強一致，沒有時間參數，不建投影；兩種對象各一個函式，不共用 kind 欄位。social 在公開可讀述詞內以 `EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() b WHERE b.blocker_buyer_id = $1 AND b.store_id = $2)` 檢查觀看者封鎖了店，以兩個 `pub_blocked_buyers()` 的 EXISTS（兩個方向）檢查兩位買家之間的封鎖。函式會被內聯，走各表的主鍵或反向索引。
 
 ## 11. 已知限制

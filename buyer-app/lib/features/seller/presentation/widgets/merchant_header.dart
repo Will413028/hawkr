@@ -43,6 +43,7 @@ class MerchantHeader extends StatelessWidget {
     this.onToggleFollow,
     this.onChat,
     this.onCart,
+    this.onMore,
   });
 
   final String? bannerUrl;
@@ -60,6 +61,7 @@ class MerchantHeader extends StatelessWidget {
   final VoidCallback? onToggleFollow;
   final VoidCallback? onChat;
   final VoidCallback? onCart;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +212,13 @@ class MerchantHeader extends StatelessWidget {
                 iconSize: HkControl.icon,
                 semanticLabel: '聊天',
               ),
+              _TopBarIconButton(
+                key: const ValueKey('merchant-more'),
+                onTap: onMore,
+                icon: HkIconName.more,
+                iconSize: HkControl.icon,
+                semanticLabel: '更多',
+              ),
             ],
           ),
         ),
@@ -283,6 +292,13 @@ class MerchantHeader extends StatelessWidget {
                           icon: HkIconName.chat,
                           iconSize: HkControl.icon,
                           semanticLabel: '聊天',
+                        ),
+                        _TopBarIconButton(
+                          key: const ValueKey('merchant-more'),
+                          onTap: onMore,
+                          icon: HkIconName.more,
+                          iconSize: HkControl.icon,
+                          semanticLabel: '更多',
                         ),
                       ],
                     ),
@@ -644,6 +660,7 @@ class _MetaItem extends StatelessWidget {
 
 class _TopBarIconButton extends StatelessWidget {
   const _TopBarIconButton({
+    super.key,
     required this.semanticLabel,
     required this.icon,
     this.iconSize = 18,

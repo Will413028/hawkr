@@ -4,7 +4,7 @@ syntax = "proto3";
 // 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
 // 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；記內部註記、
 // 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
-// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
+// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService；賣家看措施與申覆在 SellerAppService。
 //
 // 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
 // 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
@@ -30,7 +30,7 @@ import "google/protobuf/timestamp.proto";
 // SellerGovernanceAdminService 只有管理員能呼叫。
 service SellerGovernanceAdminService {
   // ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
-  // （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+  // （待分案與案件成員的處理順序）。清單的通報不帶 evidence 與 supplements（GetReport 才有）。
   rpc ListReports(ListReportsRequest) returns (ListReportsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -81,7 +81,7 @@ service SellerGovernanceAdminService {
   // CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
   // 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
   // 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
-  // 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+  // 詢問建立後即出現在賣家中心，賣家在那裡回覆；推播與 email 由通知功能處理。
   rpc CreateCaseInquiry(CreateCaseInquiryRequest) returns (CreateCaseInquiryResponse);
 
   // ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
@@ -90,7 +90,7 @@ service SellerGovernanceAdminService {
   }
 
   // RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
-  // 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+  // 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。管道不能選 SELLER_CENTER（那是賣家自己在賣家中心的回覆），選了回 invalid_argument。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
   // （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
   rpc RecordCaseInquiryReply(RecordCaseInquiryReplyRequest) returns (RecordCaseInquiryReplyResponse);
 
@@ -267,14 +267,6 @@ enum CaseDecision {
   CASE_DECISION_NO_ACTION = 2;
 }
 
-// SupplementMatch 是匿名的補充以哪一種聯絡方式比對到原通報；BOTH 是電話與聯絡信箱都相同。
-enum SupplementMatch {
-  SUPPLEMENT_MATCH_UNSPECIFIED = 0;
-  SUPPLEMENT_MATCH_PHONE = 1;
-  SUPPLEMENT_MATCH_EMAIL = 2;
-  SUPPLEMENT_MATCH_BOTH = 3;
-}
-
 // AdminRevokeReason 是管理員撤銷措施時可以選的原因，是 hawkr.seller.v1alpha1.RevokeReason 的子集：
 // 接受申覆只由裁定申覆寫入，連帶撤銷（依據的認定已撤銷、關聯的終止已撤銷）只由撤銷認定或來源終止寫入，
 // 這三個值不在這裡，所以請求表示不出它們。值名去掉前綴就是模組的 RevokeReason 的值。
@@ -283,13 +275,6 @@ enum AdminRevokeReason {
   ADMIN_REVOKE_REASON_ADMIN_CORRECTION = 1;
   ADMIN_REVOKE_REASON_EXTERNAL_DECISION = 2;
   ADMIN_REVOKE_REASON_OTHER = 3;
-}
-
-// ReporterContact 是匿名檢舉人的聯絡方式；沒有提供的欄位是空字串。
-message ReporterContact {
-  string phone = 1;
-  string email = 2;
-  string name = 3;
 }
 
 // Report 是後台看到的通報：一位檢舉人的一次送出（含之後併入的補充），有自己的結果；可以掛在案件裡，也可以不開案件直接設定結果。
@@ -306,12 +291,10 @@ message Report {
   // 檢舉人選的類別：政策分類中檢舉人可選的值（不含 PLATFORM_ABUSE）。
   hawkr.common.v1alpha1.PolicyCategory category = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   string description = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 登入的檢舉人（買家 id）；匿名檢舉是空字串。
+  // 檢舉人（買家 id），一定有值。
   string reporter_buyer_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 不帶個資）。
-  ReporterContact contact = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 匿名檢舉人的聯絡方式被清除的時間；沒有清除時不設。
-  google.protobuf.Timestamp contact_erase_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 9, 10;
+  reserved "contact", "contact_erase_time";
   // 此刻的處理狀態。
   ReportState state = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 所在的案件；沒有案件時是空字串。
@@ -321,8 +304,8 @@ message Report {
   // 第一次分案的時間，移動不改；沒有分案過時不設。
   google.protobuf.Timestamp triage_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   string triaged_by_admin_id = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 結果；還沒有結果時是 UNSPECIFIED。
-  hawkr.seller.v1alpha1.ReportOutcome outcome = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結果；還沒有結果時不設（與 resolve_time 不設同時成立）。
+  optional hawkr.seller.v1alpha1.ReportOutcome outcome = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 結果設定的時間；還沒有結果時不設。
   google.protobuf.Timestamp resolve_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   string resolved_by_admin_id = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -335,8 +318,8 @@ message Report {
   int32 supplement_count = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最新一則補充的時間；沒有補充時不設。
   google.protobuf.Timestamp latest_supplement_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 補充已達上限、內容沒有存下的匿名送出次數。
-  int32 discarded_submission_count = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 24;
+  reserved "discarded_submission_count";
   // 通報的版本；補充、分案、設定結果與移動都讓它前進。
   string etag = 25;
   // 此刻可以分案。
@@ -371,8 +354,8 @@ message ReportSupplement {
   google.protobuf.Timestamp create_time = 3;
   // 這則補充帶來的佐證在 Report.evidence 的位置。
   repeated int32 evidence_positions = 4;
-  // 匿名的補充以哪一種聯絡方式比對到原通報；登入的補充是 UNSPECIFIED。送出者不一定是原檢舉人（只知道電話的人也會補充到同一筆）。
-  SupplementMatch matched_by = 5;
+  reserved 5;
+  reserved "matched_by";
 }
 
 // Case 是後台的案件：同一家店、同一個平台判定類別，同時最多一個進行中的案件。嚴重度在開案時設定，之後只經 ChangeCaseSeverity 修改；

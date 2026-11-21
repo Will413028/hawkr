@@ -9,7 +9,7 @@ interface ChatDrawerState {
 	/**
 	 * Optional header hints for first contact, before any conversation exists.
 	 * Needed on the seller → buyer direction, where the public-profile fallback
-	 * can't resolve a name (ThreadClient only fetches `/public/sellers/{id}`).
+	 * can't resolve a name (ThreadClient only fetches `GetStore`).
 	 */
 	peerName?: string;
 	peerAvatar?: string;

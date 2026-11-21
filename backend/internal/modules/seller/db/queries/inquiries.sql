@@ -86,3 +86,40 @@ ORDER BY inquiry_id, position;
 -- 詢問回覆附件的讀取紀錄：在讀取之前寫入，以 (inquiry_id, position) 指向那一張附件。
 INSERT INTO seller.evidence_accesses (access_id, inquiry_id, position, admin_id, accessed_at)
 VALUES (sqlc.arg(access_id), sqlc.arg(inquiry_id), sqlc.arg(position), sqlc.arg(admin_id), sqlc.arg(now));
+
+-- name: AccountCaseInquiries :many
+-- 賣家帳號全部店家上的詢問，新到舊（keyset）。state 篩選此刻的狀態（OPEN／REPLIED／WITHDRAWN，與 model.CaseInquiry.State 同一個定義），NULL 不篩。
+SELECT i.*
+FROM seller.case_inquiries i
+JOIN seller.stores s ON s.store_id = i.store_id
+WHERE s.account_id = sqlc.arg(account_id)
+  AND (
+    sqlc.narg(state)::text IS NULL OR
+    (sqlc.narg(state)::text = 'OPEN' AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL) OR
+    (sqlc.narg(state)::text = 'REPLIED' AND i.reply_received_at IS NOT NULL) OR
+    (sqlc.narg(state)::text = 'WITHDRAWN' AND i.withdrawn_at IS NOT NULL)
+  )
+  AND (
+    sqlc.narg(after_created_at)::timestamptz IS NULL OR
+    (i.created_at, i.id) < (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_id)::uuid)
+  )
+ORDER BY i.created_at DESC, i.id DESC
+LIMIT sqlc.arg(page_size);
+
+-- name: CountAccountOpenCaseInquiries :one
+-- 賣家帳號待回覆的詢問數（還沒回覆也沒撤回；逾期仍算）。
+SELECT count(*)::int
+FROM seller.case_inquiries i
+JOIN seller.stores s ON s.store_id = i.store_id
+WHERE s.account_id = sqlc.arg(account_id) AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL;
+
+-- name: ReplyCaseInquiryBySeller :one
+-- 賣家在賣家中心回覆；只在還沒結束時寫入，否則 0 列。收到與記下是同一個時刻。
+UPDATE seller.case_inquiries
+SET reply_body = sqlc.arg(body)::text,
+    reply_channel = 'SELLER_CENTER',
+    reply_received_at = sqlc.arg(now)::timestamptz,
+    reply_recorded_at = sqlc.arg(now)::timestamptz,
+    replied_by_account_id = sqlc.arg(account_id)::bigint
+WHERE id = sqlc.arg(id) AND reply_received_at IS NULL AND withdrawn_at IS NULL
+RETURNING *;

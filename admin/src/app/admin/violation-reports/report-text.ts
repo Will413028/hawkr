@@ -5,13 +5,13 @@ import {
 	CaseState,
 	type Report,
 	ReportState,
-	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
-import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
-import { unknownText } from "@/lib/ui-text";
+import type { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
+import { sellerReportOutcome } from "@hawkr/ui-text/keys";
+import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-// 通報與案件的名稱。這些列舉只有 admin 用，不在共用文案目錄裡，所以是 admin 的單端表（UNSPECIFIED 不在表裡）；
-// 不認得的值與 UNSPECIFIED 顯示「未知」。結果與決定的詞在 10f 做「我的檢舉」、A8 寫通知時才進術語表與目錄。
+// 通報與案件的名稱。結果取目錄的後台受眾文字；其餘列舉只有 admin 用，是 admin 的單端表（UNSPECIFIED 不在表裡）；
+// 不認得的值與 UNSPECIFIED 顯示「未知」。
 
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
@@ -20,20 +20,9 @@ function textOf<E extends number>(
 	return table[value] ?? unknownText();
 }
 
-/** 結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報。 */
-const REPORT_OUTCOME_TEXT: Record<
-	Exclude<ReportOutcome, ReportOutcome.UNSPECIFIED>,
-	string
-> = {
-	[ReportOutcome.ACTION_TAKEN]: "已採取措施",
-	[ReportOutcome.NO_VIOLATION]: "未違規",
-	[ReportOutcome.INSUFFICIENT]: "內容不足",
-	[ReportOutcome.DUPLICATE]: "重複",
-	[ReportOutcome.ABUSIVE]: "濫報",
-};
-
-export function reportOutcomeText(outcome: ReportOutcome): string {
-	return textOf<ReportOutcome>(REPORT_OUTCOME_TEXT, outcome);
+export function reportOutcomeText(outcome: ReportOutcome | undefined): string {
+	if (outcome === undefined) return unknownText();
+	return staffTextOrUnknown(sellerReportOutcome(outcome));
 }
 
 /** 決定的名稱：採取措施｜不採取措施。 */
@@ -100,24 +89,4 @@ export function caseStatusText(
 			? caseDecisionText(kase.decision)
 			: textOf<CaseCloseReason>(CASE_CLOSE_REASON_TEXT, kase.closeReason);
 	return `${closed}：${detail}`;
-}
-
-/** 匿名的補充以哪一種聯絡方式比對到原通報；兩者都相同時，以及登入者的補充，不需要提醒。 */
-const SUPPLEMENT_MATCH_NOTICE: Record<
-	Exclude<SupplementMatch, SupplementMatch.UNSPECIFIED | SupplementMatch.BOTH>,
-	string
-> = {
-	[SupplementMatch.PHONE]:
-		"以電話比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-	[SupplementMatch.EMAIL]:
-		"以聯絡信箱比對到這筆通報的匿名送出，送出者不一定是原檢舉人。",
-};
-
-/** 補充的比對提醒；不需要提醒時回 undefined。 */
-export function supplementMatchNotice(
-	match: SupplementMatch,
-): string | undefined {
-	return (SUPPLEMENT_MATCH_NOTICE as Partial<Record<SupplementMatch, string>>)[
-		match
-	];
 }

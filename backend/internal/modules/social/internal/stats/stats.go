@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // Deps 是重算的依賴。
@@ -376,7 +377,9 @@ func (ReconcileArgs) Kind() string { return "social.reconcile_counts" }
 
 // InsertOpts 讓同一個時段內的排程與重啟合併成一個 job。
 func (ReconcileArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 12 * time.Hour}, MaxAttempts: 3}
+	o := jobs.SweepOpts(12 * time.Hour)
+	o.MaxAttempts = 3
+	return o
 }
 
 type reconcileWorker struct {

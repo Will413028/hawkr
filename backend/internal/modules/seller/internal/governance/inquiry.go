@@ -41,10 +41,16 @@ func toInquiry(row store.SellerCaseInquiry) model.CaseInquiry {
 		ID: row.ID, CaseID: row.CaseID, StoreID: row.StoreID, Kind: model.InquiryKind(row.Kind), Message: row.Message,
 		CreatedAt: row.CreatedAt, CreatedByAdminID: row.CreatedByAdminID, DueAt: row.DueAt,
 	}
-	if row.ReplyReceivedAt != nil && row.ReplyBody != nil && row.ReplyChannel != nil && row.ReplyRecordedAt != nil && row.ReplyRecordedByAdminID != nil {
+	if row.ReplyReceivedAt != nil && row.ReplyBody != nil && row.ReplyChannel != nil && row.ReplyRecordedAt != nil {
 		i.Reply = &model.InquiryReply{
 			Body: *row.ReplyBody, Channel: model.InquiryReplyChannel(*row.ReplyChannel), ReceivedAt: *row.ReplyReceivedAt,
-			RecordedAt: *row.ReplyRecordedAt, RecordedByAdminID: *row.ReplyRecordedByAdminID,
+			RecordedAt: *row.ReplyRecordedAt,
+		}
+		if row.ReplyRecordedByAdminID != nil {
+			i.Reply.RecordedByAdminID = *row.ReplyRecordedByAdminID
+		}
+		if row.RepliedByAccountID != nil {
+			i.Reply.RepliedByAccountID = *row.RepliedByAccountID
 		}
 	}
 	if row.WithdrawnAt != nil && row.WithdrawnByAdminID != nil && row.WithdrawCause != nil {
@@ -252,7 +258,7 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.RecordCaseInquiryReplyResult{}, err
 	}
-	if !slices.Contains(model.InquiryReplyChannelValues(), in.Channel) {
+	if !slices.Contains(model.AdminRecordableChannels(), in.Channel) {
 		return model.RecordCaseInquiryReplyResult{}, invalidOn("Channel", text.InquiryChannelRequired())
 	}
 	if in.ReceivedAt.IsZero() {

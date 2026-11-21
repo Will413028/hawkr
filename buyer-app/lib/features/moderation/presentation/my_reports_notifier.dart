@@ -8,15 +8,15 @@ import 'paged_section.dart';
 
 part 'my_reports_notifier.g.dart';
 
-/// 我的檢舉（`ListMyReports`，只含社群對象）：分頁讀取。換觀看者整份重建。
+/// 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留。換觀看者整份重建。
 @riverpod
 class MyReports extends _$MyReports with ViewerScoped {
-  late SectionLoader<pb.ReportRecord> _loader;
+  late SectionLoader<pb.MyReportItem> _loader;
 
   @override
-  PagedSection<pb.ReportRecord> build() {
+  PagedSection<pb.MyReportItem> build() {
     bindViewer();
-    _loader = SectionLoader<pb.ReportRecord>(
+    _loader = SectionLoader<pb.MyReportItem>(
       read: () => state,
       write: (next) => state = next,
       fetch: (token) async {
@@ -28,7 +28,7 @@ class MyReports extends _$MyReports with ViewerScoped {
       scope: beginScope,
     );
     scheduleInitialLoad(beginScope(), reload);
-    return const PagedSection<pb.ReportRecord>();
+    return const PagedSection<pb.MyReportItem>();
   }
 
   Future<bool> reload() => _loader.loadFirst();

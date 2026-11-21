@@ -192,6 +192,9 @@ void main() {
         AuthRoutes.welcome,
         SellerRoutes.measures,
         SellerRoutes.measureRequest,
+        SellerRoutes.inquiries,
+        SellerRoutes.inquiryDetail,
+        SellerRoutes.inquiryReply,
       });
     });
 

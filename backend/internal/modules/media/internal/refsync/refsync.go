@@ -15,11 +15,11 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // 時間參數。Link 與 Unlink 各是一次最多 5 秒的呼叫（internal/legacy/mediaservice，沒有內層重試）。
@@ -312,16 +312,10 @@ func NextRetry(attemptedAt time.Time, attempt int) time.Time {
 // InsertOpts 是同步 job 的排入選項：以 (ref_type, ref_id) 去重，唯一鍵涵蓋還沒結束的狀態（含執行中，River 的規定）。執行期間
 // 發生的改變不靠重新排入，而靠結算比對版本後再跑一輪；結算與完成同一個 transaction，job 遺失與重試用盡由 Sweep 補上。
 func InsertOpts() river.InsertOpts {
-	return river.InsertOpts{
-		MaxAttempts: MaxAttempts,
-		UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{
-			rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
-			rivertype.JobStateRetryable, rivertype.JobStateScheduled,
-		}},
-	}
+	return jobs.UniqueByArgs(MaxAttempts)
 }
 
 // SweepInsertOpts 把同一個週期內的排程與重啟合併。
 func SweepInsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: SweepInterval}}
+	return jobs.SweepOpts(SweepInterval)
 }

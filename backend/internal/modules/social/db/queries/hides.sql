@@ -19,14 +19,20 @@ RETURNING *;
 -- 還原留言目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 UPDATE social.hides
 SET restored_at = sqlc.arg(now), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
-WHERE comment_id = sqlc.arg(comment_id) AND restored_at IS NULL
+WHERE comment_id = sqlc.arg(comment_id) AND restored_at IS NULL AND (sqlc.narg(source_ref)::text IS NULL OR source_ref = sqlc.narg(source_ref)::text)
 RETURNING *;
 
 -- name: RestoreForumEntryHide :one
 UPDATE social.hides
 SET restored_at = sqlc.arg(now), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
-WHERE forum_entry_id = sqlc.arg(forum_entry_id) AND restored_at IS NULL
+WHERE forum_entry_id = sqlc.arg(forum_entry_id) AND restored_at IS NULL AND (sqlc.narg(source_ref)::text IS NULL OR source_ref = sqlc.narg(source_ref)::text)
 RETURNING *;
+
+-- name: HasActiveCommentHide :one
+SELECT EXISTS (SELECT 1 FROM social.hides WHERE comment_id = sqlc.arg(comment_id) AND restored_at IS NULL);
+
+-- name: HasActiveForumEntryHide :one
+SELECT EXISTS (SELECT 1 FROM social.hides WHERE forum_entry_id = sqlc.arg(forum_entry_id) AND restored_at IS NULL);
 
 -- name: InsertSanction :one
 INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at)

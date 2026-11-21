@@ -200,12 +200,12 @@ CREATE INDEX cases_closed ON seller.cases (opened_at DESC, id DESC) WHERE closed
 CREATE INDEX cases_store ON seller.cases (store_id, opened_at DESC, id DESC);
 
 -- 通報（ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2）：檢舉與食安通報同一張表，一列是一位檢舉人的一次送出（之後的補充在 report_supplements）。
--- 檢舉人剛好一種（reports_reporter_check）：登入的買家（reporter_buyer_id，呼叫方給的業務鍵），或留下電話、email 的匿名者；匿名的聯絡欄位在保留期限後清成 NULL，
--- 記下 contact_erased_at（保留規則：結果設定後 30 天，且不早於建立後 90 天；沒有結果就不清）。
+-- 檢舉人一定是登入的買家（reporter_buyer_id，呼叫方給的業務鍵，NOT NULL）：沒有匿名入口，也不存檢舉人的聯絡方式（ADR 2026-10-27-general-ecommerce-scope-cut D3；
+-- 治理 ADR 2026-10-18 的 2026-11-21 修訂）。
 -- 每筆通報有自己的結果（outcome）：ACTION_TAKEN、NO_VIOLATION、INSUFFICIENT、DUPLICATE、ABUSIVE。通報二選一：分案（case_id、assessed_category、triaged_*：判定類別並掛到
 -- 同一家店、同一個類別的進行中案件，複合外鍵保證店家與類別一致），或不開案件直接設定結果（除了 ACTION_TAKEN：它一定在案件裡）。ACTION_TAKEN 只會出現在案件裡
 -- （reports_action_taken_check）。處理狀態（待分案、在案件裡、已有結果）在讀取時推導，不存。
--- version 是後台的 etag：補充、分案、設定結果（個別或結案帶入）與移動都加一。discarded_submissions 是補充已達上限、內容沒有存下的匿名送出次數。
+-- version 是後台的 etag：補充、分案、設定結果（個別或結案帶入）與移動都加一。
 -- 去重（partial UNIQUE）只比對還沒有結果的通報。product_id、order_no 是不透明的參照（擁有者是別的模組），不驗證存在。
 CREATE TABLE seller.reports (
     id                    UUID PRIMARY KEY,
@@ -214,11 +214,7 @@ CREATE TABLE seller.reports (
     order_no              TEXT,
     category              TEXT NOT NULL,
     description           TEXT NOT NULL,
-    reporter_buyer_id     BIGINT,
-    reporter_phone        TEXT,
-    reporter_email        TEXT,
-    reporter_name         TEXT,
-    contact_erased_at     TIMESTAMPTZ,
+    reporter_buyer_id     BIGINT NOT NULL,
     case_id               UUID,
     assessed_category     TEXT,
     triaged_at            TIMESTAMPTZ,
@@ -227,7 +223,6 @@ CREATE TABLE seller.reports (
     resolved_at           TIMESTAMPTZ,
     resolved_by_admin_id  BIGINT,
     resolution_note       TEXT,
-    discarded_submissions INTEGER NOT NULL DEFAULT 0,
     -- 管理員看過的最新補充的編號（report_supplements.seq；0 = 還沒看過任何補充）。分案、移動與明確已讀（MarkReportSupplementsSeen）把它設成當時最新一則的編號
     -- （三個動作都帶讀到的 etag，etag 含當時全部補充，所以做了就等於看過）。「有新的補充」= 還沒有結果，而且存在編號大於它的補充；不比時間，所以不依賴任何時鐘。
     -- 讀取、設定結果（有了結果就不再提醒）、結案帶入的預設結果、改案件嚴重度都不記。
@@ -244,16 +239,7 @@ CREATE TABLE seller.reports (
     CONSTRAINT reports_description_check CHECK (char_length(description) BETWEEN 1 AND 2000),
     CONSTRAINT reports_product_id_check CHECK (char_length(product_id) BETWEEN 1 AND 64),
     CONSTRAINT reports_order_no_check CHECK (char_length(order_no) BETWEEN 1 AND 64),
-    CONSTRAINT reports_reporter_check CHECK (
-        (reporter_buyer_id IS NOT NULL AND reporter_buyer_id > 0 AND reporter_phone IS NULL AND reporter_email IS NULL AND reporter_name IS NULL AND contact_erased_at IS NULL) OR
-        (reporter_buyer_id IS NULL AND contact_erased_at IS NULL AND (reporter_phone IS NOT NULL OR reporter_email IS NOT NULL)) OR
-        (reporter_buyer_id IS NULL AND contact_erased_at IS NOT NULL AND reporter_phone IS NULL AND reporter_email IS NULL AND reporter_name IS NULL)
-    ),
-    CONSTRAINT reports_reporter_phone_check CHECK (reporter_phone ~ '^0[0-9]{8,9}$'),
-    CONSTRAINT reports_reporter_email_check CHECK (
-        reporter_email = lower(reporter_email) AND char_length(reporter_email) <= 254 AND reporter_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'
-    ),
-    CONSTRAINT reports_reporter_name_check CHECK (char_length(reporter_name) BETWEEN 1 AND 100),
+    CONSTRAINT reports_reporter_check CHECK (reporter_buyer_id > 0),
     CONSTRAINT reports_triage_check CHECK (
         (case_id IS NULL) = (assessed_category IS NULL) AND (case_id IS NULL) = (triaged_at IS NULL) AND
         (triaged_at IS NULL) = (triaged_by_admin_id IS NULL) AND (triaged_at IS NULL OR triaged_at >= created_at)
@@ -265,7 +251,7 @@ CREATE TABLE seller.reports (
     ),
     CONSTRAINT reports_action_taken_check CHECK (outcome IS DISTINCT FROM 'ACTION_TAKEN' OR case_id IS NOT NULL),
     CONSTRAINT reports_admin_check CHECK (triaged_by_admin_id > 0 AND resolved_by_admin_id > 0),
-    CONSTRAINT reports_counts_check CHECK (discarded_submissions >= 0 AND version >= 1),
+    CONSTRAINT reports_counts_check CHECK (version >= 1),
     CONSTRAINT reports_supplements_seen_check CHECK (supplements_seen_seq BETWEEN 0 AND 10),
     CONSTRAINT reports_store_key UNIQUE (id, store_id),
     CONSTRAINT reports_case_fkey FOREIGN KEY (case_id, store_id, assessed_category) REFERENCES seller.cases (id, store_id, category)
@@ -273,32 +259,21 @@ CREATE TABLE seller.reports (
 -- admin 的通報清單與各篩選條件的 keyset（新到舊）。
 CREATE INDEX reports_created ON seller.reports (created_at DESC, id DESC);
 CREATE INDEX reports_store ON seller.reports (store_id, created_at DESC, id DESC);
-CREATE INDEX reports_reporter ON seller.reports (reporter_buyer_id, created_at DESC, id DESC) WHERE reporter_buyer_id IS NOT NULL;
+CREATE INDEX reports_reporter ON seller.reports (reporter_buyer_id, created_at DESC, id DESC);
 -- 「待分案」的存取路徑：沒有案件也沒有結果的通報，依建立時間舊到新；案件的成員，依建立時間舊到新。
 CREATE INDEX reports_awaiting_triage ON seller.reports (created_at, id) WHERE case_id IS NULL AND outcome IS NULL;
 CREATE INDEX reports_case ON seller.reports (case_id, created_at, id) WHERE case_id IS NOT NULL;
--- 去重（舊 ADR 決策五的 partial UNIQUE，日與週以台北時間為界；只比對還沒有結果的通報，有了結果的通報之後同一天可以再送新的）：登入的檢舉人對同一個店家、同一個類別一天一筆；
--- 匿名的同一支電話或同一個 email 對同一個店家一週（ISO 週，週一起算）一筆。
+-- 去重（partial UNIQUE，日以台北時間為界；只比對還沒有結果的通報，有了結果的通報之後同一天可以再送新的）：同一個買家對同一個店家、同一個類別一天一筆。
 CREATE UNIQUE INDEX reports_buyer_daily ON seller.reports (
     reporter_buyer_id, store_id, category, ((created_at AT TIME ZONE 'Asia/Taipei')::date)
-) WHERE reporter_buyer_id IS NOT NULL AND outcome IS NULL;
-CREATE UNIQUE INDEX reports_phone_weekly ON seller.reports (
-    reporter_phone, store_id, date_trunc('week', created_at AT TIME ZONE 'Asia/Taipei')
-) WHERE reporter_phone IS NOT NULL AND outcome IS NULL;
-CREATE UNIQUE INDEX reports_email_weekly ON seller.reports (
-    reporter_email, store_id, date_trunc('week', created_at AT TIME ZONE 'Asia/Taipei')
-) WHERE reporter_email IS NOT NULL AND outcome IS NULL;
--- 匿名聯絡欄位的保留期限清理有兩條路：有結果的依結果設定的時間（greatest(建立 + 90 天, 結果 + 30 天)），以及不論有沒有結果、建立滿 365 天的絕對上限（依建立時間）；
--- 清理查詢依建立時間掃描，兩條路共用這一個索引（以 resolved_at 為鍵的索引量過：EXPLAIN 不選它，所以沒有建）。
-CREATE INDEX reports_contact_cap ON seller.reports (created_at) WHERE reporter_buyer_id IS NULL AND contact_erased_at IS NULL;
+) WHERE outcome IS NULL;
 
--- 補充（R7）：去重期間內同一位檢舉人的重複送出，內容併入原通報；只新增，每筆通報最多 10 則（seq 1..10 且每筆通報內唯一，由 DB 保證）。matched_by 只在匿名的補充有值：以電話、聯絡信箱或兩者都相同比對到原通報。
+-- 補充（R7）：去重期間內同一位檢舉人的重複送出，內容併入原通報；只新增，每筆通報最多 10 則（seq 1..10 且每筆通報內唯一，由 DB 保證）。
 -- 補充不改案件的版本（案件顯示「有新的補充」），只讓通報的版本前進。
 CREATE TABLE seller.report_supplements (
     id          UUID PRIMARY KEY,
     report_id   UUID NOT NULL REFERENCES seller.reports (id),
     description TEXT NOT NULL,
-    matched_by  TEXT,
     -- 這是通報的第幾則補充（1..10）；佐證的 submission_seq 指向它（原通報是 0）。
     seq         SMALLINT NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL,
@@ -306,8 +281,7 @@ CREATE TABLE seller.report_supplements (
     CONSTRAINT report_supplements_seq_key UNIQUE (id, report_id, seq),
     CONSTRAINT report_supplements_report_seq_key UNIQUE (report_id, seq),
     CONSTRAINT report_supplements_seq_check CHECK (seq BETWEEN 1 AND 10),
-    CONSTRAINT report_supplements_description_check CHECK (char_length(description) BETWEEN 1 AND 2000),
-    CONSTRAINT report_supplements_matched_by_check CHECK (matched_by IN ('PHONE', 'EMAIL', 'BOTH'))
+    CONSTRAINT report_supplements_description_check CHECK (char_length(description) BETWEEN 1 AND 2000)
 );
 CREATE INDEX report_supplements_report ON seller.report_supplements (report_id, created_at, id);
 
@@ -349,7 +323,7 @@ CREATE INDEX report_case_moves_from ON seller.report_case_moves (from_case_id, m
 CREATE INDEX report_case_moves_to ON seller.report_case_moves (to_case_id, moved_at, id);
 
 -- 詢問（rb R4）：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆還沒結束的。
--- 回覆在 3c-b 只由管理員記下（系統外收到）；10f 加賣家在賣家中心的回覆（channel = SELLER_CENTER、replied_by_account_id）。
+-- 回覆有兩種作者：管理員記下系統外收到的（reply_recorded_by_admin_id，管道是 PHONE／EMAIL／MESSAGING／OTHER），或賣家在賣家中心回覆（replied_by_account_id，管道是 SELLER_CENTER）；CHECK 保證二選一。
 -- 回覆放在詢問列上而不是另一張表：一筆詢問一則回覆，一列一個事實，CHECK 直接保證「回覆與撤回互斥」；10f 改成多則回覆時才拆表（觸發：賣家要能補交）。
 -- store_id 是案件店家的複本，由複合外鍵保證相等：附件的 media 引用與 10f 賣家端「這是不是我的店」的授權都要它，不必 join 案件（先例 measures.account_id）。
 CREATE TABLE seller.case_inquiries (
@@ -368,6 +342,7 @@ CREATE TABLE seller.case_inquiries (
     reply_received_at          TIMESTAMPTZ,
     reply_recorded_at          TIMESTAMPTZ,
     reply_recorded_by_admin_id BIGINT,
+    replied_by_account_id      BIGINT,
     withdrawn_at               TIMESTAMPTZ,
     withdrawn_by_admin_id      BIGINT,
     withdraw_cause             TEXT,
@@ -380,9 +355,13 @@ CREATE TABLE seller.case_inquiries (
     CONSTRAINT case_inquiries_request_key UNIQUE (created_by_admin_id, request_id),
     -- 回覆欄位全有或全無；整個式子要是 TRUE（IS TRUE），理由同 cases_close_check。
     CONSTRAINT case_inquiries_reply_check CHECK ((
-        (reply_body IS NULL AND reply_channel IS NULL AND reply_received_at IS NULL AND reply_recorded_at IS NULL AND reply_recorded_by_admin_id IS NULL) OR
-        (char_length(reply_body) >= 1 AND char_length(reply_body) <= 4000 AND reply_channel IN ('PHONE', 'EMAIL', 'MESSAGING', 'OTHER')
-         AND reply_received_at >= created_at AND reply_recorded_at >= reply_received_at AND reply_recorded_by_admin_id > 0)
+        (reply_body IS NULL AND reply_channel IS NULL AND reply_received_at IS NULL AND reply_recorded_at IS NULL
+         AND reply_recorded_by_admin_id IS NULL AND replied_by_account_id IS NULL) OR
+        (char_length(reply_body) >= 1 AND char_length(reply_body) <= 4000
+         AND reply_received_at >= created_at AND reply_recorded_at >= reply_received_at AND (
+            (reply_channel IN ('PHONE', 'EMAIL', 'MESSAGING', 'OTHER') AND reply_recorded_by_admin_id > 0 AND replied_by_account_id IS NULL) OR
+            (reply_channel = 'SELLER_CENTER' AND replied_by_account_id > 0 AND reply_recorded_by_admin_id IS NULL)
+         ))
     ) IS TRUE),
     CONSTRAINT case_inquiries_withdraw_check CHECK ((
         (withdrawn_at IS NULL AND withdrawn_by_admin_id IS NULL AND withdraw_cause IS NULL) OR

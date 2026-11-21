@@ -161,5 +161,21 @@ export function createOwnerPostApi(client: OwnerPostClient) {
 			const res = await client.listMyPosts({ pageSize });
 			return res.posts.map(ownerListItem);
 		},
+
+		/** 只列已發布的貼文（買家看得到的那些），以 page_token 分頁；`nextPageToken` 空字串是沒有下一頁。 */
+		async listPublished(
+			pageSize: number,
+			pageToken = "",
+		): Promise<{ items: PostListItem[]; nextPageToken: string }> {
+			const res = await client.listMyPosts({
+				pageSize,
+				pageToken,
+				status: PostStatus.PUBLISHED,
+			});
+			return {
+				items: res.posts.map(ownerListItem),
+				nextPageToken: res.nextPageToken,
+			};
+		},
 	};
 }

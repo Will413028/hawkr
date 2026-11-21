@@ -1,0 +1,65 @@
+{
+  "default": {
+    "crm.customer_not_found": {
+      "message": "找不到這位客戶",
+      "description": "客戶不存在（這家店沒有這位買家的客戶列）。"
+    },
+    "crm.customer_type_invalid": {
+      "message": "客戶分類不合法",
+      "description": "分類值不是 NORMAL 或 VIP。"
+    },
+    "crm.store_ids_invalid": {
+      "message": "店家必須是 1 到 {max} 個正整數",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "VIPStatuses 的店家清單超過上限或含非正整數。max 是 model.MaxStoreIDs。"
+    },
+    "crm.tag_limit_customer": {
+      "message": "每位客戶最多 {max} 個標籤",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "加上這次新增後超過每位客戶的標籤上限。max 是 model.MaxTagsPerCustomer。"
+    },
+    "crm.tag_limit_store": {
+      "message": "每家店最多 {max} 個標籤",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "新增後超過每店的標籤上限。max 是 model.MaxTagsPerStore。"
+    },
+    "crm.tag_name_invalid": {
+      "message": "標籤名稱必須是 1 到 {max} 個字，且不可只有空白",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "去頭尾空白後為空或以字元計超過上限。max 是 model.MaxTagNameRunes。"
+    },
+    "crm.tag_name_taken": {
+      "message": "這個標籤名稱已經存在",
+      "description": "同一家店已有同名標籤（UNIQUE (store_id, name)）。"
+    },
+    "crm.tag_names_invalid": {
+      "message": "一次最多加上 {max} 個標籤，且至少要有一個",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "AddCustomerTags 的名稱清單為空或超過上限。max 是 model.MaxTagsPerCall。"
+    },
+    "crm.tag_not_found": {
+      "message": "找不到這個標籤",
+      "description": "標籤不存在，或屬於別家店。"
+    }
+  }
+}

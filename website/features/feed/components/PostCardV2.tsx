@@ -40,6 +40,8 @@ interface PostCardProps {
 	 *  used to seed the open zoom animation (FeedHeroZoom). */
 	onOpen?: (post: PostListItem, mediaRect?: DOMRect) => void;
 	onLike?: (post: PostListItem, next: boolean) => void;
+	/** 唯讀呈現：按讚數只顯示、不渲染按讚控制（賣家的店面預覽）。 */
+	readOnly?: boolean;
 }
 
 const HeartIcon = ({ filled }: { filled?: boolean }) => (
@@ -70,6 +72,7 @@ const PostCardV2 = React.memo(function PostCardV2({
 	imagePriority = false,
 	onOpen,
 	onLike,
+	readOnly = false,
 }: PostCardProps) {
 	const mediaRef = React.useRef<HTMLDivElement>(null);
 	const {
@@ -173,25 +176,36 @@ const PostCardV2 = React.memo(function PostCardV2({
 						}
 						return <span className="hkui-feed-card__badge">動態</span>;
 					})()}
-					<Button
-						type="button"
-						variant="light"
-						color="default"
-						size="sm"
-						isIconOnly
-						className={`hkui-feed-card__like h-auto w-auto${liked ? " is-liked" : ""}`}
-						onClick={toggleLike}
-						/* Optimistic-only, same as the detail viewer — see the note there. */
-						aria-pressed={liked}
-						disabled={authWaiting}
-						aria-busy={likeBusy || authWaiting || undefined}
-						aria-label={liked ? "取消按讚" : "按讚"}
-					>
-						<span className="inline-flex items-center gap-px">
-							<HeartIcon filled={liked} />
-							{likeCount > 0 && <span>{formatCount(likeCount)}</span>}
+					{readOnly ? (
+						<span
+							className={`hkui-feed-card__like h-auto w-auto${liked ? " is-liked" : ""}`}
+						>
+							<span className="inline-flex items-center gap-px">
+								<HeartIcon filled={liked} />
+								{likeCount > 0 && <span>{formatCount(likeCount)}</span>}
+							</span>
 						</span>
-					</Button>
+					) : (
+						<Button
+							type="button"
+							variant="light"
+							color="default"
+							size="sm"
+							isIconOnly
+							className={`hkui-feed-card__like h-auto w-auto${liked ? " is-liked" : ""}`}
+							onClick={toggleLike}
+							/* Optimistic-only, same as the detail viewer — see the note there. */
+							aria-pressed={liked}
+							disabled={authWaiting}
+							aria-busy={likeBusy || authWaiting || undefined}
+							aria-label={liked ? "取消按讚" : "按讚"}
+						>
+							<span className="inline-flex items-center gap-px">
+								<HeartIcon filled={liked} />
+								{likeCount > 0 && <span>{formatCount(likeCount)}</span>}
+							</span>
+						</Button>
+					)}
 				</div>
 
 				<div className="hkui-feed-card__body">
@@ -220,7 +234,7 @@ const PostCardV2 = React.memo(function PostCardV2({
 					</div>
 				</div>
 			</div>
-			<AuthGateWaitModal open={authWaiting} />
+			{readOnly ? null : <AuthGateWaitModal open={authWaiting} />}
 		</>
 	);
 });

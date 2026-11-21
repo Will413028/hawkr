@@ -16,6 +16,18 @@
       "message": "終止合作的申覆期限已過",
       "description": "申覆不可用：終止合作的申覆期間已結束（APPEAL_WINDOW_ENDED）；期限本身另以「申覆期限」顯示。"
     },
+    "inquiry.seller_reply.body_length": {
+      "message": "回覆內容必須是 1 到 4000 字。",
+      "description": "賣家回覆詢問：回覆內容去掉前後空白後不是 1 到 4000 字。"
+    },
+    "inquiry.seller_reply.unavailable.replied": {
+      "message": "這筆詢問已經回覆過，不能再回覆。",
+      "description": "賣家回覆詢問：詢問已有回覆（賣家自己的或管理員記下的）；一則詢問只有一次回覆，要補資料由平台另開詢問。"
+    },
+    "inquiry.seller_reply.unavailable.withdrawn": {
+      "message": "這筆詢問已撤回，不需要回覆。",
+      "description": "賣家回覆詢問：詢問已被管理員撤回或因案件結案而撤回。"
+    },
     "kyc.edit_unavailable.approved": {
       "message": "商家認證已通過，不需要修改或重新送出。",
       "description": "SaveKYCDraft 與 SubmitKYC 不能做：申請已核准。"
@@ -174,6 +186,10 @@
       "message": "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。",
       "description": "登入的檢舉人重複送出：去重期間內、還沒有結果的那一筆存在，這次的內容補充到它。CreateReportResponse.notice。"
     },
+    "report.my_not_found": {
+      "message": "找不到這筆檢舉。",
+      "description": "登入的檢舉人讀或補充自己的檢舉：不存在，或不是他的（兩者同一個回應，不洩漏存在與否）。"
+    },
     "report.own_store": {
       "message": "不能檢舉自己的店。",
       "description": "檢舉自己的店（帳號是店家的擁有者）。"
@@ -181,6 +197,10 @@
     "report.submit_conflict": {
       "message": "送出時發生衝突，請稍後再試一次。",
       "description": "送出檢舉：撞到去重的那一筆在鎖住時已經有結果，重做一次寫入仍然撞到另一筆（同一位檢舉人的並行送出）。搭配 unavailable，可以重送。"
+    },
+    "report.supplement_closed": {
+      "message": "這筆檢舉已經有處理結果，不能再補充。",
+      "description": "登入的檢舉人主動補充自己的檢舉，而那一筆已經有結果。"
     },
     "report.supplement_limit": {
       "message": "{max, plural, other {這筆檢舉已經補充 {max} 次，不能再補充。}}",

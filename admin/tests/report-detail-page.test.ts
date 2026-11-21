@@ -8,11 +8,9 @@ import {
 	type Transport,
 } from "@connectrpc/connect";
 import {
-	ReporterContactSchema,
 	ReportState,
 	ReportSupplementSchema,
 	SellerGovernanceAdminService,
-	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { EvidenceSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
@@ -219,7 +217,23 @@ test("通報內容、檢舉人、佐證與處理：登入的檢舉人是買家 I
 	assert.doesNotMatch(text, /補充/u, "沒有補充就沒有補充區塊");
 });
 
-test("匿名的檢舉人列出有提供的聯絡方式；補充標示比對方式、列出丟掉的次數；佐證分原通報與補充", async () => {
+test("結果：還沒有結果（沒有設值）顯示「-」，有結果顯示名稱", async () => {
+	await openPage(transportWith({ getReport: () => ({ report: report({}) }) }));
+	assert.match(bodyText(), /結果-結案/u);
+	await openPage(
+		transportWith({
+			getReport: () => ({
+				report: report({
+					state: ReportState.RESOLVED,
+					outcome: ReportOutcome.DUPLICATE,
+				}),
+			}),
+		}),
+	);
+	assert.match(bodyText(), /結果重複結案/u);
+});
+
+test("補充依序列出；佐證分原通報與補充", async () => {
 	const evidence = (position: number) =>
 		create(EvidenceSchema, {
 			position,
@@ -229,67 +243,39 @@ test("匿名的檢舉人列出有提供的聯絡方式；補充標示比對方�
 		transportWith({
 			getReport: () => ({
 				report: report({
-					reporterBuyerId: "",
-					contact: create(ReporterContactSchema, {
-						phone: "0912345678",
-						name: "王小明",
-					}),
+					reporterBuyerId: "50007",
 					supplements: [
 						create(ReportSupplementSchema, {
 							id: "s1",
 							description: "隔天仍不舒服",
 							createTime: ts(T0),
-							matchedBy: SupplementMatch.PHONE,
 							evidencePositions: [1],
 						}),
 						create(ReportSupplementSchema, {
 							id: "s2",
 							description: "附上診斷書",
 							createTime: ts(T0),
-							matchedBy: SupplementMatch.BOTH,
 						}),
 					],
 					supplementCount: 2,
-					discardedSubmissionCount: 3,
 					evidence: [evidence(0), evidence(1)],
 				}),
 			}),
 		}),
 	);
 	const text = bodyText();
-	assert.match(text, /匿名/u);
-	assert.match(text, /電話0912345678/u);
-	assert.match(text, /姓名王小明/u);
-	assert.doesNotMatch(text, /聯絡信箱/u, "沒提供的欄位不列");
+	assert.match(text, /買家 ID 50007/u);
+	assert.doesNotMatch(text, /匿名|聯絡信箱|比對/u);
 	assert.match(text, /補充 1・2026\/10\/18 10:00/u);
-	assert.match(
-		text,
-		/以電話比對到這筆通報的匿名送出，送出者不一定是原檢舉人。/u,
-	);
+	assert.match(text, /隔天仍不舒服/u);
 	assert.match(text, /補充 2・2026\/10\/18 10:00/u);
-	assert.equal(
-		text.match(/比對到這筆通報的匿名送出/gu)?.length,
-		1,
-		"電話與聯絡信箱都相同時不提醒",
-	);
-	assert.match(text, /另有 3 次重複送出因補充已達上限，內容沒有存下。/u);
+	assert.match(text, /附上診斷書/u);
 	const links = [
 		...dom.window.document.querySelectorAll(
 			'section[aria-labelledby="report-evidence-title"] .card-body a',
 		),
 	].map((a) => a.textContent);
 	assert.deepEqual(links, ["佐證 1", "補充 1 的佐證 1"]);
-});
-
-test("聯絡方式已清除時說明清除的時間", async () => {
-	await openPage(
-		transportWith({
-			getReport: () => ({
-				report: report({ reporterBuyerId: "", contactEraseTime: ts(T0) }),
-			}),
-		}),
-	);
-	assert.match(bodyText(), /聯絡方式已於 2026\/10\/18 10:00 依保留期限清除/u);
 });
 
 test("待分案的通報顯示分案期限：日期時間加相對時間，逾期時是「已逾期」", async () => {

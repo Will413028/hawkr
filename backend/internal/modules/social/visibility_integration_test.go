@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -350,5 +351,37 @@ func TestForumPageReadableOnAnEmptyPage(t *testing.T) {
 	must(t, err)
 	if page.Readable {
 		t.Fatal("店家不可曝光的空頁 Readable 應是 false")
+	}
+}
+
+// Restore 帶來源參照（留言、討論區留言）：沒有未還原的隱藏與隱藏是別案造成的是兩種不同的 FailedPrecondition，後者不動隱藏。
+// 殺死的變異：Restore 忽略 SourceRef；兩種情況回同一句。
+func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	author := f.newBuyer(t)
+	p := f.publishedPost(t, storeID, "貼文")
+	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(author), social.CommentInput{PostID: p.ID, Body: "留言"}))
+	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(author), social.ForumInput{StoreID: storeID, Body: "討論"}))
+	for _, target := range []social.Target{{Kind: social.TargetComment, ID: c.ID}, {Kind: social.TargetForumEntry, ID: e.ID}} {
+		restore := func(ref string) error {
+			_, err := f.module.Restore(ctx, social.RestoreInput{Target: target, AdminID: 9, Reason: "誤判", SourceRef: ref})
+			return err
+		}
+		if err := restore("case-1"); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
+			t.Fatalf("%v 沒有隱藏：%v", target.Kind, err)
+		}
+		mustV[social.Hide](t)(f.module.Hide(ctx, social.HideInput{Target: target, Category: "SPAM", Text: "廣告", SourceRef: "case-1", AdminID: 9}))
+		if err := restore("case-2"); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "不是由這個案件造成") {
+			t.Fatalf("%v 來源不符：%v", target.Kind, err)
+		}
+		if n := f.scalar(t, "SELECT count(*) FROM social.hides WHERE (comment_id = $1 OR forum_entry_id = $1) AND restored_at IS NULL", target.ID); n != 1 {
+			t.Fatalf("%v 來源不符時隱藏仍在：%d", target.Kind, n)
+		}
+		if err := restore("case-1"); err != nil {
+			t.Fatalf("%v 來源相符可還原：%v", target.Kind, err)
+		}
 	}
 }

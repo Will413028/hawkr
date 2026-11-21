@@ -66,6 +66,12 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
+	case "seller.InquiryKind":
+		return t.SellerInquiryKind(goldenEnum(c.Value, "INQUIRY_KIND_"))
+	case "seller.InquiryReplyChannel":
+		return t.SellerInquiryReplyChannel(goldenEnum(c.Value, "INQUIRY_REPLY_CHANNEL_"))
+	case "seller.InquiryState":
+		return t.SellerInquiryState(goldenEnum(c.Value, "INQUIRY_STATE_"))
 	case "seller.KYCApplication.decide_time":
 		return t.SellerKYCApplicationDecideTime(goldenString(c, "time")), true
 	case "seller.KYCApplication.submit_time":
@@ -134,6 +140,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerOnboardingTaskIdPanelTitle(goldenEnum(c.Value, "ONBOARDING_TASK_ID_"))
 	case "seller.PaymentAccount.payouts_inactive_note":
 		return t.SellerPaymentAccountPayoutsInactiveNote(), true
+	case "seller.ReportOutcome":
+		return t.SellerReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
 	case "seller.RevokeReason":
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":
@@ -142,6 +150,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerSellerRequirement(goldenEnum(c.Value, "SELLER_REQUIREMENT_"))
 	case "seller.StoreField":
 		return t.SellerStoreField(goldenEnum(c.Value, "STORE_FIELD_"))
+	case "seller.StoreReport.outcome_unset":
+		return t.SellerStoreReportOutcomeUnset(), true
 	case "seller.TerminationGround":
 		return t.SellerTerminationGround(goldenEnum(c.Value, "TERMINATION_GROUND_"))
 	case "seller.ViolationSeverity":

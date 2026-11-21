@@ -7,7 +7,8 @@ import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
-import type { ContentKind, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
+import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { UiMessage } from "./message";
 
@@ -62,9 +63,11 @@ export type UiTextKey =
 	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
+	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -88,6 +91,16 @@ export type UiTextKey =
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
+	| "seller.InquiryKind.INQUIRY_KIND_EXPLANATION"
+	| "seller.InquiryKind.INQUIRY_KIND_RECORDS"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE"
+	| "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER"
+	| "seller.InquiryState.INQUIRY_STATE_OPEN"
+	| "seller.InquiryState.INQUIRY_STATE_REPLIED"
+	| "seller.InquiryState.INQUIRY_STATE_WITHDRAWN"
 	| "seller.KYCApplication.decide_time"
 	| "seller.KYCApplication.submit_time"
 	| "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS"
@@ -159,6 +172,11 @@ export type UiTextKey =
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PLATFORM_REVIEW"
 	| "seller.OnboardingTaskId.panel_title.ONBOARDING_TASK_ID_PROFILE"
 	| "seller.PaymentAccount.payouts_inactive_note"
+	| "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE"
+	| "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN"
+	| "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE"
+	| "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT"
+	| "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -185,6 +203,7 @@ export type UiTextKey =
 	| "seller.StoreField.STORE_FIELD_CONTACT_NAME"
 	| "seller.StoreField.STORE_FIELD_CONTACT_PHONE"
 	| "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL"
+	| "seller.StoreReport.outcome_unset"
 	| "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY"
 	| "seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS"
 	| "seller.TerminationGround.TERMINATION_GROUND_DISSOLUTION"
@@ -341,6 +360,8 @@ const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>
 	2: "moderation.ReportTargetKind.REPORT_TARGET_KIND_COMMENT",
 	3: "moderation.ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY",
 	4: "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER",
+	5: "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW",
+	6: "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE",
 };
 
 /** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
@@ -409,6 +430,46 @@ const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 /** seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function sellerContentKind(v: ContentKind): UiMessage | undefined {
 	const key = SELLER_CONTENT_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryKind.INQUIRY_KIND_RECORDS",
+	2: "seller.InquiryKind.INQUIRY_KIND_EXPLANATION",
+};
+
+/** seller.InquiryKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryKind(v: InquiryKind): UiMessage | undefined {
+	const key = SELLER_INQUIRY_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_REPLY_CHANNEL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE",
+	2: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_EMAIL",
+	3: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_MESSAGING",
+	4: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_OTHER",
+	5: "seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_SELLER_CENTER",
+};
+
+/** seller.InquiryReplyChannel 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryReplyChannel(v: InquiryReplyChannel): UiMessage | undefined {
+	const key = SELLER_INQUIRY_REPLY_CHANNEL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const SELLER_INQUIRY_STATE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.InquiryState.INQUIRY_STATE_OPEN",
+	2: "seller.InquiryState.INQUIRY_STATE_REPLIED",
+	3: "seller.InquiryState.INQUIRY_STATE_WITHDRAWN",
+};
+
+/** seller.InquiryState 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerInquiryState(v: InquiryState): UiMessage | undefined {
+	const key = SELLER_INQUIRY_STATE[v];
 	if (key === undefined) return undefined;
 	return { key };
 }
@@ -705,6 +766,21 @@ export function sellerPaymentAccountPayoutsInactiveNote(): UiMessage {
 	return { key: "seller.PaymentAccount.payouts_inactive_note" };
 }
 
+const SELLER_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN",
+	2: "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
+	3: "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT",
+	4: "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE",
+	5: "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE",
+};
+
+/** seller.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerReportOutcome(v: SellerReportOutcome): UiMessage | undefined {
+	const key = SELLER_REPORT_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const SELLER_REVOKE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED",
 	2: "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION",
@@ -769,6 +845,11 @@ export function sellerStoreField(v: StoreField): UiMessage | undefined {
 	const key = SELLER_STORE_FIELD[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+/** seller.StoreReport.outcome_unset */
+export function sellerStoreReportOutcomeUnset(): UiMessage {
+	return { key: "seller.StoreReport.outcome_unset" };
 }
 
 const SELLER_TERMINATION_GROUND: Readonly<Partial<Record<number, UiTextKey>>> = {

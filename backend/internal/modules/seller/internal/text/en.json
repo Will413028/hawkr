@@ -12,6 +12,15 @@
     "appeal.unavailable.window_ended": {
       "message": "The appeal period for this termination has ended."
     },
+    "inquiry.seller_reply.body_length": {
+      "message": "Your reply must be 1 to 4000 characters."
+    },
+    "inquiry.seller_reply.unavailable.replied": {
+      "message": "This inquiry has already been replied to and cannot be replied to again."
+    },
+    "inquiry.seller_reply.unavailable.withdrawn": {
+      "message": "This inquiry has been withdrawn, so no reply is needed."
+    },
     "kyc.edit_unavailable.approved": {
       "message": "Your seller verification is approved, so you do not need to edit or resubmit it."
     },
@@ -123,11 +132,17 @@
     "report.duplicate_supplemented": {
       "message": "You already reported this store in this category today. Your new details were added to the original report."
     },
+    "report.my_not_found": {
+      "message": "This report could not be found."
+    },
     "report.own_store": {
       "message": "You cannot report your own store."
     },
     "report.submit_conflict": {
       "message": "A conflict occurred while submitting. Please try again shortly."
+    },
+    "report.supplement_closed": {
+      "message": "This report already has an outcome and cannot be supplemented."
     },
     "report.supplement_limit": {
       "message": "{max, plural, one {This report has already been supplemented {max} time and cannot be supplemented again.} other {This report has already been supplemented {max} times and cannot be supplemented again.}}"

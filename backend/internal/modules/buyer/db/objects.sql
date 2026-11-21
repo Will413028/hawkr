@@ -2,8 +2,9 @@
 -- 相同，TestSchemaFileMatchesMigrations）。
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻不是營運中的買家。申請刪除起就算（買家刪帳申請不能撤回，
--- accountdeletion.Request 之後只有完成）。消費端是 social 每日對帳的 Go 查詢：核對 social 自己的 inactive_authors 複本有沒有漏（複本由
--- BuyerDeletionRequested、BuyerDeleted 的同 transaction 訂閱者寫，內容的可見性與計數看複本，不 join 這個函式）。
+-- accountdeletion.Request 之後只有完成）。消費端有兩個：social 每日對帳的 Go 查詢，核對 social 自己的 inactive_authors 複本有沒有漏（複本由
+-- BuyerDeletionRequested、BuyerDeleted 的同 transaction 訂閱者寫，內容的可見性與計數看複本，不 join 這個函式）；review 的讀取過濾（EXISTS，
+-- 申請刪除起就隱藏）。
 CREATE TYPE buyer.pub_inactive_buyer AS (buyer_id BIGINT);
 
 CREATE FUNCTION buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer
@@ -12,6 +13,18 @@ BEGIN ATOMIC
     SELECT b.buyer_id
     FROM buyer.buyers b
     WHERE b.status <> 'ACTIVE';
+END;
+
+-- 發布的讀取介面 pub_closed_buyers()（形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻已關閉（CLOSED）的買家，不含刪除中。買家關閉不可逆，
+-- 列永久保留。消費端是 im、crm 的讀取過濾（買家關閉之後才不再顯示）；申請刪除到關閉之間的買家仍是正常對象，守門是 buyer.LockNotClosed。
+CREATE TYPE buyer.pub_closed_buyer AS (buyer_id BIGINT);
+
+CREATE FUNCTION buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT b.buyer_id
+    FROM buyer.buyers b
+    WHERE b.status = 'CLOSED';
 END;
 
 -- 發布的讀取介面 pub_blocked_buyers() 與 pub_blocked_stores()（形狀宣告在 db/pub.sql，契約測試比對兩者）：個人封鎖的現況，一列一個封鎖，

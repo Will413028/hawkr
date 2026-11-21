@@ -12,7 +12,8 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 
 形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只能呼叫函式。改形狀等於改契約：同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §10。
 
-- `buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer (buyer_id bigint)`：此刻不是營運中的買家（刪除中與已關閉），沒有時間參數。給 social 每日對帳核對複本，不給求值呼叫。守門：`TestInactiveBuyersAndDeletionRequestedEvent`。
+- `buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer (buyer_id bigint)`：此刻不是營運中的買家（刪除中與已關閉），沒有時間參數。給 social 每日對帳核對複本、review 的讀取過濾，不給求值呼叫。守門：`TestInactiveBuyersAndDeletionRequestedEvent`。
+- `buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer (buyer_id bigint)`：此刻已關閉（CLOSED）的買家，不含刪除中，沒有時間參數。給 im、crm 的讀取過濾。守門：`TestClosedBuyersAndLockNotClosed`、`TestPubClosedBuyersIsInlined`。
 - `buyer.pub_blocked_buyers() RETURNS SETOF buyer.pub_blocked_buyer (blocker_buyer_id bigint, blocked_buyer_id bigint)` 與 `buyer.pub_blocked_stores() RETURNS SETOF buyer.pub_blocked_store (blocker_buyer_id bigint, store_id bigint)`：封鎖現況，一列一個封鎖，強一致、沒有時間參數，兩種對象不共用 kind 欄位。給 social 的述詞內聯使用。守門：`TestPubBlocksIsInlinedAndUsesTheIndexes`。
 
 ## 模組內部結構
@@ -26,7 +27,7 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 - 帳號活著 ⇔ 買家活著；一帳號一生一個買家（`UNIQUE (account_id)`），只在建帳 transaction 內建立，只由 accountdeletion 關閉。守門：`TestAccountCreatedCreatesTheOnlyBuyer`、`TestRequestClosedDeletesAccountAndCompletes`（accountdeletion）。規格：§2。
 - CLOSED 必有 deleted_at，PII 只清 CLOSED，未清的暱稱 1–100 字元。守門：DB CHECK、`TestPIICleanupStintsAndBacklog`。規格：§2。
 - 刪帳前置條件：帳號列鎖先於買家列；`BeginDeletion`／`CloseForDeletion` 重送安全。守門：`TestDeletionParticipantIdempotency`、`TestCompletePendingChecksOrdersAgain`（accountdeletion）。規格：§2。
-- `LockActive` 與 `BeginDeletion` 序列化。守門：`TestLockActiveSerializesWithBeginDeletion`。規格：§2。
+- `LockActive`（`FOR KEY SHARE`）與 `BeginDeletion`（`FOR UPDATE`）序列化。守門：`TestLockActiveSerializesWithBeginDeletion`。規格：§2。
 - 事件只在真正插入或刪除時發布。守門：`TestIdempotentEvents`。規格：§5。
 - 更新以版本條件比對，profile 在買家列鎖內合併。守門：`TestProfileVersionCAS`、`TestAddressVersionCASAndDefaultBumps`、`TestConcurrentProfilePatchesPreserveBothFields`。規格：§3。
 - 頭像引用只由 `buyer.media_sync` 寫入，已退場的頭像不能寫回，transaction 內不呼叫 media。守門：`TestRetiredAvatarCannotBeWrittenBack`、`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtAsset`、DB `buyers_avatar_asset_check`。規格：§3。

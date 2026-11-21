@@ -131,3 +131,30 @@ func TestWorkerRunsEnqueuedJobsAndStopsWithTheContext(t *testing.T) {
 		t.Fatal("ctx 結束後 Run 沒有停止")
 	}
 }
+
+func TestUniqueHelpersAreAcceptedByRiverAndMergeDuplicates(t *testing.T) {
+	t.Parallel()
+	d := migrated(t)
+	c, err := jobs.NewInsertOnly(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for name, opts := range map[string]river.InsertOpts{
+		"by-args": jobs.UniqueByArgs(3),
+		"sweep":   jobs.SweepOpts(time.Hour),
+	} {
+		o := opts
+		first, err := c.EnqueueReport(ctx, pingArgs{N: 9}, &o)
+		if err != nil || !first {
+			t.Fatalf("%s: first insert = %v, %v", name, first, err)
+		}
+		second, err := c.EnqueueReport(ctx, pingArgs{N: 9}, &o)
+		if err != nil || second {
+			t.Fatalf("%s: duplicate insert = %v, %v; want merged", name, second, err)
+		}
+		if _, err := d.Conn(ctx).Exec(ctx, "DELETE FROM river.river_job"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

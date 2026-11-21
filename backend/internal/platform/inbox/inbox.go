@@ -22,7 +22,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -296,15 +295,6 @@ func (i *Inbox) Purge(ctx context.Context) (int64, error) {
 	}
 }
 
-// openStates 是派送 job 唯一鍵涵蓋的狀態：還沒有結果的（排隊、執行、等重試）。不含 completed 與 discarded：完成或用完重試的 job
-// 不擋補掃重派。
-func openStates() []rivertype.JobState {
-	return []rivertype.JobState{
-		rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable,
-		rivertype.JobStateScheduled,
-	}
-}
-
 // DispatchArgs 是派送一個事件的 job，以 (provider, event_id) 為唯一鍵。
 type DispatchArgs struct {
 	Provider string `json:"provider" river:"unique"`
@@ -316,7 +306,7 @@ func (DispatchArgs) Kind() string { return "inbox.dispatch" }
 
 // InsertOpts 是派送 job 的排入選項。
 func (DispatchArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: maxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: openStates()}}
+	return jobs.UniqueByArgs(maxAttempts)
 }
 
 func enqueueDispatch(ctx context.Context, jc jobs.Enqueuer, provider, eventID string) error {
@@ -333,7 +323,7 @@ func (SweepArgs) Kind() string { return "inbox.sweep" }
 
 // InsertOpts 把同一段時間內的排程與重啟合併。
 func (SweepArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 10 * time.Minute}}
+	return jobs.SweepOpts(10 * time.Minute)
 }
 
 type dispatchWorker struct {

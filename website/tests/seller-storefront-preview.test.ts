@@ -1,52 +1,55 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 function source(path: string): string {
 	return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
-test("seller preview reuses the real buyer storefront shell and public data", () => {
-	const layout = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/layout.tsx",
-	);
+const FRAME =
+	"../features/seller-center/preview/SellerStorefrontPreviewFrame.tsx";
+const PREVIEW_APP = "../app/[locale]/(seller)/seller-center/preview";
+
+test("seller preview reuses the buyer profile shell and reads the owner's own store", () => {
+	const layout = source(`${PREVIEW_APP}/layout.tsx`);
+	const frame = source(FRAME);
 	const previewBanner = source(
 		"../features/seller-center/preview/SellerStorefrontPreviewBanner.tsx",
 	);
-	const products = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/page.tsx",
-	);
+	const products = source(`${PREVIEW_APP}/page.tsx`);
 
 	assert.doesNotMatch(layout, /^"use client";/m);
+	assert.match(layout, /<SellerStorefrontPreviewFrame>/);
+	assert.match(frame, /^"use client";/m);
+	assert.match(frame, /useSellerSelf\(\)/);
 	assert.match(
-		layout,
-		/<h1 className="sr-only">買家視角預覽<\/h1>[\s\S]*<SellerStorefrontPreviewBanner \/>/,
+		frame,
+		/<h1 className="sr-only">買家視角預覽<\/h1>[\s\S]*<SellerStorefrontPreviewBanner canBePublic=\{canBePublic\} \/>/,
 	);
 	assert.match(previewBanner, /^"use client";/m);
 	assert.doesNotMatch(previewBanner, /<h1\b/);
-	assert.match(layout, /<SellerProfileV2[\s\S]*previewMode/);
-	assert.match(layout, /tabBasePath=\{previewRoot\}/);
-	assert.match(layout, /<StorefrontPreviewBoundary sellerId=\{id\}>/);
-	assert.match(products, /<StorefrontPage sellerId=\{id\} previewMode/);
-	assert.doesNotMatch(layout, /SellerProfileBranding/);
+	assert.match(frame, /<SellerProfileV2[\s\S]*previewMode/);
+	assert.match(frame, /tabBasePath=\{PREVIEW_ROOT\}/);
+	assert.match(frame, /PREVIEW_ROOT = "\/seller-center\/preview"/);
+	assert.match(frame, /<StorefrontPreviewBoundary>/);
+	assert.match(products, /<PreviewProductsTab \/>/);
+	assert.doesNotMatch(frame, /SellerProfileBranding/);
 });
 
-test("seller preview exposes the same four buyer storefront tabs", () => {
+test("seller preview exposes the same four buyer storefront tabs without a seller id segment", () => {
 	const tabs = source("../features/seller/components/SellerProfileTabs.tsx");
-	const posts = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/posts/page.tsx",
-	);
-	const messages = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/messages/page.tsx",
-	);
-	const reviews = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/reviews/page.tsx",
-	);
+	const posts = source(`${PREVIEW_APP}/posts/page.tsx`);
+	const messages = source(`${PREVIEW_APP}/messages/page.tsx`);
+	const reviews = source(`${PREVIEW_APP}/reviews/page.tsx`);
 
 	assert.match(tabs, /basePath \?\? `\/sellers\/\$\{sellerId\}`/);
-	assert.match(posts, /<SellerPostsPage/);
-	assert.match(messages, /<SellerMessagesPage/);
-	assert.match(reviews, /<SellerReviewsPage/);
+	assert.match(posts, /<PreviewPostsTab \/>/);
+	assert.match(messages, /<PreviewMessagesTab \/>/);
+	assert.match(reviews, /<PreviewReviewsTab \/>/);
+	assert.equal(
+		existsSync(new URL(`${PREVIEW_APP}/[id]`, import.meta.url)),
+		false,
+	);
 });
 
 test("storefront chat uses the internal store id rather than the route code", () => {
@@ -64,15 +67,30 @@ test("storefront chat uses the internal store id rather than the route code", ()
 	);
 });
 
-test("seller preview resolver uses the shared truck mark", () => {
-	const resolver = source(
-		"../features/seller-center/preview/SellerStorefrontPreviewPage.tsx",
-	);
+test("seller preview loading state uses the shared truck mark", () => {
+	const frame = source(FRAME);
 
-	assert.match(resolver, /import \{ TruckMark \}/);
-	assert.match(resolver, /<TruckMark/);
-	assert.match(resolver, /正在開啟真實買家頁面…/);
-	assert.match(resolver, /role="status"/);
+	assert.match(frame, /import \{ TruckMark \}/);
+	assert.match(frame, /<TruckMark/);
+	assert.match(frame, /正在載入店面預覽…/);
+	assert.match(frame, /role="status"/);
+});
+
+test("seller preview never reads through the shared public caches or the removed seller endpoints", () => {
+	const dir = new URL("../features/seller-center/preview/", import.meta.url);
+	const files = [
+		...readdirSync(dir).map((name) => new URL(name, dir)),
+		new URL("../lib/seller/storefront-preview.ts", import.meta.url),
+		new URL("../lib/seller/preview-posts.ts", import.meta.url),
+	];
+	for (const file of files) {
+		const text = readFileSync(file, "utf8");
+		assert.doesNotMatch(
+			text,
+			/getCached\w+|unstable_cache|fetchSeller\b|fetchSellerStats|fetchPublicProduct/,
+			file.pathname,
+		);
+	}
 });
 
 test("seller sidebar and buyer surfaces both draw the preview icon through the shared registry", () => {
@@ -84,9 +102,7 @@ test("seller sidebar and buyer surfaces both draw the preview icon through the s
 		source("../features/seller-center/components/SellerCenterShell.tsx"),
 		source("../features/seller-center/components/sellerNav.tsx"),
 	].join("\n");
-	const buyerPreview = source(
-		"../app/[locale]/(seller)/seller-center/preview/[id]/layout.tsx",
-	);
+	const buyerPreview = source(FRAME);
 	const buyerPreviewBanner = source(
 		"../features/seller-center/preview/SellerStorefrontPreviewBanner.tsx",
 	);
@@ -168,8 +184,11 @@ test("product and post cards open readonly previews while write actions stay blo
 	assert.match(boundary, /productIdFromStorefrontPreviewHref/);
 	assert.match(boundary, /aria-expanded", "true"/);
 	assert.match(boundary, /<StorefrontProductPreviewDrawer/);
-	assert.match(drawer, /fetchPublicProduct\(productId\)/);
-	assert.match(drawer, /ownerSellerId !== sellerId/);
+	assert.match(drawer, /fetchSellerProductEdit\(productId\)/);
+	assert.doesNotMatch(
+		drawer,
+		/fetchPublicProduct|fetchSeller\b|fetchSellerStats/,
+	);
 	assert.match(drawer, /<ProductDetailLayout[\s\S]*previewMode/);
 	assert.match(drawer, /<ProductSellerIntro[\s\S]*previewMode/);
 	assert.doesNotMatch(drawer, /ProductModal|ProductEditDrawer/);

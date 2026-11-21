@@ -5,7 +5,7 @@
 // source: hawkr/admin/seller/v1alpha1/case_inquiry.proto
 
 // 案件的詢問（step10e-reports-brief R4、step10e-3cb-design）：平台對案件的賣家的一次要求（提供紀錄或請求說明），有期限、一則回覆、可撤回；
-// 每個案件同時最多一筆還沒結束的詢問。回覆在賣家端的畫面上線（10f）之前只由管理員記下系統外收到的內容。指令（CreateCaseInquiry、
+// 每個案件同時最多一筆還沒結束的詢問。回覆有兩種來源：管理員記下系統外收到的內容，或賣家在賣家中心回覆（賣家端的方法在 SellerAppService）。指令（CreateCaseInquiry、
 // ListCaseInquiries、RecordCaseInquiryReply、WithdrawCaseInquiry）與它們的請求、回應在 SellerGovernanceAdminService（governance.proto；
 // 回應帶 Case，所以請求與回應放在那裡，避免兩個檔案互相 import）。
 
@@ -137,7 +137,7 @@ func (CaseInquiryState) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDescGZIP(), []int{1}
 }
 
-// CaseInquiryReplyChannel 是回覆怎麼收到的。賣家端畫面上線（10f）時加 SELLER_CENTER（賣家在賣家中心回覆）。
+// CaseInquiryReplyChannel 是回覆怎麼收到的。SELLER_CENTER 是賣家在賣家中心回覆，只由賣家的回覆產生，RecordCaseInquiryReply 不能選。
 type CaseInquiryReplyChannel int32
 
 const (
@@ -147,6 +147,8 @@ const (
 	// 通訊軟體。
 	CaseInquiryReplyChannel_CASE_INQUIRY_REPLY_CHANNEL_MESSAGING CaseInquiryReplyChannel = 3
 	CaseInquiryReplyChannel_CASE_INQUIRY_REPLY_CHANNEL_OTHER     CaseInquiryReplyChannel = 4
+	// 賣家在賣家中心回覆；回覆的帳號看 CaseInquiryReply.replied_by_account_id。
+	CaseInquiryReplyChannel_CASE_INQUIRY_REPLY_CHANNEL_SELLER_CENTER CaseInquiryReplyChannel = 5
 )
 
 // Enum value maps for CaseInquiryReplyChannel.
@@ -157,13 +159,15 @@ var (
 		2: "CASE_INQUIRY_REPLY_CHANNEL_EMAIL",
 		3: "CASE_INQUIRY_REPLY_CHANNEL_MESSAGING",
 		4: "CASE_INQUIRY_REPLY_CHANNEL_OTHER",
+		5: "CASE_INQUIRY_REPLY_CHANNEL_SELLER_CENTER",
 	}
 	CaseInquiryReplyChannel_value = map[string]int32{
-		"CASE_INQUIRY_REPLY_CHANNEL_UNSPECIFIED": 0,
-		"CASE_INQUIRY_REPLY_CHANNEL_PHONE":       1,
-		"CASE_INQUIRY_REPLY_CHANNEL_EMAIL":       2,
-		"CASE_INQUIRY_REPLY_CHANNEL_MESSAGING":   3,
-		"CASE_INQUIRY_REPLY_CHANNEL_OTHER":       4,
+		"CASE_INQUIRY_REPLY_CHANNEL_UNSPECIFIED":   0,
+		"CASE_INQUIRY_REPLY_CHANNEL_PHONE":         1,
+		"CASE_INQUIRY_REPLY_CHANNEL_EMAIL":         2,
+		"CASE_INQUIRY_REPLY_CHANNEL_MESSAGING":     3,
+		"CASE_INQUIRY_REPLY_CHANNEL_OTHER":         4,
+		"CASE_INQUIRY_REPLY_CHANNEL_SELLER_CENTER": 5,
 	}
 )
 
@@ -244,7 +248,7 @@ func (CaseInquiryWithdrawCause) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDescGZIP(), []int{3}
 }
 
-// CaseInquiry 是案件上對賣家的一筆詢問。賣家端的畫面上線（10f）之前，系統不會通知賣家；期限從建立起算，10f 改成從出現在賣家中心起算。
+// CaseInquiry 是案件上對賣家的一筆詢問。詢問建立後即出現在賣家中心，回覆期限從建立時間起算（賣家端以待回覆數提示；推播與 email 由通知功能處理）。
 type CaseInquiry struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -415,7 +419,7 @@ func (x *CaseInquiry) GetReplyDeadline() *v1alpha1.Deadline {
 	return nil
 }
 
-// CaseInquiryReply 是管理員記下的賣家回覆（系統外收到）。
+// CaseInquiryReply 是賣家的回覆：管理員記下系統外收到的（recorded_by_admin_id 有值），或賣家在賣家中心回覆的（channel 是 SELLER_CENTER、replied_by_account_id 有值），二選一。
 type CaseInquiryReply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 回覆內容（管理員記下的是摘錄或轉錄），1 到 4000 字。
@@ -426,10 +430,13 @@ type CaseInquiryReply struct {
 	// 收到的時間；案件的「待決定」從它重新起算。
 	ReceiveTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=receive_time,json=receiveTime,proto3" json:"receive_time,omitempty"`
 	// 記進系統的時間。
-	RecordTime        *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=record_time,json=recordTime,proto3" json:"record_time,omitempty"`
-	RecordedByAdminId string                 `protobuf:"bytes,6,opt,name=recorded_by_admin_id,json=recordedByAdminId,proto3" json:"recorded_by_admin_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	RecordTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=record_time,json=recordTime,proto3" json:"record_time,omitempty"`
+	// 管理員記下的回覆才有；賣家在賣家中心回覆時不設。
+	RecordedByAdminId string `protobuf:"bytes,6,opt,name=recorded_by_admin_id,json=recordedByAdminId,proto3" json:"recorded_by_admin_id,omitempty"`
+	// 賣家在賣家中心回覆時，回覆的帳號（account_id）；管理員記下的回覆不設。
+	RepliedByAccountId string `protobuf:"bytes,7,opt,name=replied_by_account_id,json=repliedByAccountId,proto3" json:"replied_by_account_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CaseInquiryReply) Reset() {
@@ -504,6 +511,13 @@ func (x *CaseInquiryReply) GetRecordedByAdminId() string {
 	return ""
 }
 
+func (x *CaseInquiryReply) GetRepliedByAccountId() string {
+	if x != nil {
+		return x.RepliedByAccountId
+	}
+	return ""
+}
+
 var File_hawkr_admin_seller_v1alpha1_case_inquiry_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
@@ -527,7 +541,7 @@ const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
 	"\x10can_record_reply\x18\r \x01(\bB\x03\xe0A\x03R\x0ecanRecordReply\x12&\n" +
 	"\fcan_withdraw\x18\x0e \x01(\bB\x03\xe0A\x03R\vcanWithdraw\x121\n" +
 	"\x12reply_evidence_max\x18\x0f \x01(\x05B\x03\xe0A\x03R\x10replyEvidenceMax\x12K\n" +
-	"\x0ereply_deadline\x18\x10 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\rreplyDeadline\"\xe6\x02\n" +
+	"\x0ereply_deadline\x18\x10 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\rreplyDeadline\"\x99\x03\n" +
 	"\x10CaseInquiryReply\x12\x12\n" +
 	"\x04body\x18\x01 \x01(\tR\x04body\x12A\n" +
 	"\bevidence\x18\x02 \x03(\v2%.hawkr.admin.seller.v1alpha1.EvidenceR\bevidence\x12N\n" +
@@ -535,7 +549,8 @@ const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
 	"\freceive_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vreceiveTime\x12;\n" +
 	"\vrecord_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"recordTime\x12/\n" +
-	"\x14recorded_by_admin_id\x18\x06 \x01(\tR\x11recordedByAdminId*v\n" +
+	"\x14recorded_by_admin_id\x18\x06 \x01(\tR\x11recordedByAdminId\x121\n" +
+	"\x15replied_by_account_id\x18\a \x01(\tR\x12repliedByAccountId*v\n" +
 	"\x0fCaseInquiryKind\x12!\n" +
 	"\x1dCASE_INQUIRY_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CASE_INQUIRY_KIND_RECORDS\x10\x01\x12!\n" +
@@ -544,13 +559,14 @@ const file_hawkr_admin_seller_v1alpha1_case_inquiry_proto_rawDesc = "" +
 	"\x1eCASE_INQUIRY_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17CASE_INQUIRY_STATE_OPEN\x10\x01\x12\x1e\n" +
 	"\x1aCASE_INQUIRY_STATE_REPLIED\x10\x02\x12 \n" +
-	"\x1cCASE_INQUIRY_STATE_WITHDRAWN\x10\x03*\xe1\x01\n" +
+	"\x1cCASE_INQUIRY_STATE_WITHDRAWN\x10\x03*\x8f\x02\n" +
 	"\x17CaseInquiryReplyChannel\x12*\n" +
 	"&CASE_INQUIRY_REPLY_CHANNEL_UNSPECIFIED\x10\x00\x12$\n" +
 	" CASE_INQUIRY_REPLY_CHANNEL_PHONE\x10\x01\x12$\n" +
 	" CASE_INQUIRY_REPLY_CHANNEL_EMAIL\x10\x02\x12(\n" +
 	"$CASE_INQUIRY_REPLY_CHANNEL_MESSAGING\x10\x03\x12$\n" +
-	" CASE_INQUIRY_REPLY_CHANNEL_OTHER\x10\x04*\x9b\x01\n" +
+	" CASE_INQUIRY_REPLY_CHANNEL_OTHER\x10\x04\x12,\n" +
+	"(CASE_INQUIRY_REPLY_CHANNEL_SELLER_CENTER\x10\x05*\x9b\x01\n" +
 	"\x18CaseInquiryWithdrawCause\x12+\n" +
 	"'CASE_INQUIRY_WITHDRAW_CAUSE_UNSPECIFIED\x10\x00\x12%\n" +
 	"!CASE_INQUIRY_WITHDRAW_CAUSE_ADMIN\x10\x01\x12+\n" +

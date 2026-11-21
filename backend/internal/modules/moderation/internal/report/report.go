@@ -17,11 +17,13 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
 	moderationtext "github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/view"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -38,10 +40,22 @@ const maxAttempts = 4
 
 var errRetry = errors.New("moderation：並行競爭，重來")
 
+// Reviews 是送出檢舉用到的 review 方法（*review.Module）：唯讀的證據讀取。
+type Reviews interface {
+	ReviewForReport(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (review.ReportedReview, error)
+}
+
+// Chats 是送出檢舉用到的 im 方法（*im.Module）：唯讀的證據讀取。
+type Chats interface {
+	MessageForReport(ctx context.Context, messageID uuid.UUID, reporter im.Party, window int) (im.ReportedMessage, error)
+}
+
 // Deps 是送出檢舉的依賴，全部必填。
 type Deps struct {
 	DB     *db.DB
 	Social *social.Module
+	Review Reviews
+	IM     Chats
 	Seller *seller.Module
 	Buyer  *buyer.Module
 	Holds  Holds
@@ -166,13 +180,13 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 
 	snapshotID := s.d.NewID()
 	n, err := q.InsertSnapshot(ctx, store.InsertSnapshotParams{
-		ID: snapshotID, CaseID: c.ID, ContentSha256: sum[:], Content: body, AssetIds: snapshot.Normalize(content).MediaRefs, CapturedAt: now,
+		ID: snapshotID, CaseID: c.ID, ContentSha256: sum[:], Content: body, AssetIds: content.AssetIDs(), CapturedAt: now,
 	})
 	if err != nil {
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入快照：%w", err)
 	}
 	if n == 1 {
-		if err := s.d.Holds.Hold(ctx, snapshotID, now, snapshot.Normalize(content).MediaRefs); err != nil {
+		if err := s.d.Holds.Hold(ctx, snapshotID, now, content.AssetIDs()); err != nil {
 			return model.SubmitResult{}, err
 		}
 	} else if snapshotID, err = q.SnapshotIDByHash(ctx, store.SnapshotIDByHashParams{CaseID: c.ID, ContentSha256: sum[:]}); err != nil {
@@ -289,9 +303,21 @@ func (s *Service) openCase(ctx context.Context, q *store.Queries, t model.Target
 
 // freeze 驗證對象並取得要凍結的內容：全部是不鎖列的讀取。
 func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
-	if in.Target.Kind == model.TargetBuyer {
+	switch in.Target.Kind {
+	case model.TargetBuyer:
 		return s.freezeBuyer(ctx, in)
+	case model.TargetReview:
+		return s.freezeReview(ctx, in)
+	case model.TargetChatMessage:
+		return s.freezeChatMessage(ctx, in)
+	case model.TargetPost, model.TargetComment, model.TargetForumEntry:
+		return s.freezeSocial(ctx, in)
 	}
+	return snapshot.Content{}, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportTargetInvalid(uitext.LocaleFrom(ctx)))
+}
+
+// freezeSocial 向 social 讀貼文、留言或討論區留言。
+func (s *Service) freezeSocial(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	l := uitext.LocaleFrom(ctx)
 	st := social.Target{Kind: social.TargetKind(in.Target.Kind), ID: in.Target.ContentID}
 	snap, err := s.d.Social.ContentSnapshot(ctx, st)
@@ -301,17 +327,87 @@ func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Co
 	if !snap.Exists || !snap.Readable {
 		return snapshot.Content{}, apperr.NotFound("%s", moderationtext.ReportContentNotFound(l))
 	}
-	same, err := s.sameAccount(ctx, in.ReporterBuyerID, snap.Author)
-	if err != nil {
+	if err := s.notSelf(ctx, in, snap.Author); err != nil {
 		return snapshot.Content{}, err
 	}
-	if same {
-		return snapshot.Content{}, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportSelfContent(l))
-	}
-	return snapshot.Content{
-		Kind: in.Target.Kind, AuthorKind: string(snap.Author.Kind), AuthorID: snap.Author.ID, StoreID: snap.StoreID,
+	return snapshot.Content{Kind: in.Target.Kind, Social: &snapshot.Social{
+		AuthorKind: string(snap.Author.Kind), AuthorID: snap.Author.ID, StoreID: snap.StoreID,
 		Body: snap.Body, MediaRefs: snap.MediaRefs, AuthoredAt: snap.AuthoredAt, PostID: uuidString(snap.PostID), ThreadID: uuidString(snap.ThreadID),
-	}, nil
+	}}, nil
+}
+
+// notSelf 擋掉檢舉自己的內容（含同一帳號的其他身分）。
+func (s *Service) notSelf(ctx context.Context, in model.SubmitInput, author social.Actor) error {
+	same, err := s.sameAccount(ctx, in.ReporterBuyerID, author)
+	if err != nil {
+		return err
+	}
+	if same {
+		return apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportSelfContent(uitext.LocaleFrom(ctx)))
+	}
+	return nil
+}
+
+// contentNotFound 把擁有者模組的 NotFound（不存在、不可讀、對話不屬於檢舉人）統一成檢舉的 NotFound 句子，不洩漏原因；其他錯誤原樣回傳。
+func contentNotFound(ctx context.Context, err error) error {
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return apperr.NotFound("%s", moderationtext.ReportContentNotFound(uitext.LocaleFrom(ctx)))
+	}
+	return err
+}
+
+// freezeReview 向 review 讀評價（可讀規則同顯示：公開可讀、觀看者封鎖），作者永遠是買家。
+func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
+	r, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, in.ReporterBuyerID)
+	if err != nil {
+		return snapshot.Content{}, contentNotFound(ctx, err)
+	}
+	if err := s.notSelf(ctx, in, social.Actor{Kind: social.ActorBuyer, ID: r.BuyerID}); err != nil {
+		return snapshot.Content{}, err
+	}
+	out := snapshot.Review{
+		AuthorID: r.BuyerID, SubjectStoreID: r.StoreID, ProductID: r.ProductID, Rating: r.Rating,
+		Body: r.Content, MediaRefs: r.AssetIDs, AuthoredAt: r.CreatedAt,
+	}
+	if r.Reply != nil {
+		out.ReplyBody = r.Reply.Content
+	}
+	return snapshot.Content{Kind: model.TargetReview, Review: &out}, nil
+}
+
+// freezeChatMessage 向 im 讀被檢舉的訊息與前後各 ChatContextWindow 則（一句 SQL）；檢舉人要是對話的一方，訊息已隱藏或抹除都是 NotFound。
+func (s *Service) freezeChatMessage(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
+	m, err := s.d.IM.MessageForReport(ctx, in.Target.ContentID, im.Party{Kind: im.PartyBuyer, BuyerID: in.ReporterBuyerID}, model.ChatContextWindow)
+	if err != nil {
+		return snapshot.Content{}, contentNotFound(ctx, err)
+	}
+	author := social.Actor{Kind: social.ActorBuyer, ID: m.Message.SenderID}
+	var storeID int64
+	if m.Message.SenderKind == im.PartyStore {
+		author.Kind, storeID = social.ActorStore, m.Message.SenderID
+	}
+	if err := s.notSelf(ctx, in, author); err != nil {
+		return snapshot.Content{}, err
+	}
+	out := snapshot.Chat{
+		AuthorKind: string(author.Kind), AuthorID: author.ID, StoreID: storeID, Body: m.Message.Text, MediaRefs: assetRefs(m.Message.AssetID),
+		AuthoredAt: m.Message.CreatedAt, ConversationID: m.ConversationID.String(), Seq: m.Message.Seq,
+		Context: make([]snapshot.ContextMessage, len(m.Context)),
+	}
+	for i, c := range m.Context {
+		out.Context[i] = snapshot.ContextMessage{
+			Seq: c.Seq, SenderKind: string(c.SenderKind), SenderID: c.SenderID, Type: string(c.Type), Body: c.Text, MediaRefs: assetRefs(c.AssetID),
+			SentAt: c.CreatedAt, Hidden: c.Hidden, Erased: c.Erased,
+		}
+	}
+	return snapshot.Content{Kind: model.TargetChatMessage, Chat: &out}, nil
+}
+
+func assetRefs(id string) []string {
+	if id == "" {
+		return nil
+	}
+	return []string{id}
 }
 
 func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
@@ -329,14 +425,14 @@ func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapsh
 	if same {
 		return snapshot.Content{}, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportSelfBuyer(uitext.LocaleFrom(ctx)))
 	}
-	c := snapshot.Content{Kind: model.TargetBuyer}
+	c := snapshot.Buyer{}
 	if displays[0].DisplayName != nil {
 		c.DisplayName = *displays[0].DisplayName
 	}
 	if displays[0].Avatar != nil {
 		c.Avatar = *displays[0].Avatar
 	}
-	return c, nil
+	return snapshot.Content{Kind: model.TargetBuyer, Buyer: &c}, nil
 }
 
 // sameAccount 說明作者是不是檢舉人自己：買家作者比對帳號（同一個帳號的歷史 stint 也算自己），店家作者比對店家所屬的帳號。

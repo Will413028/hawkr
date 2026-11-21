@@ -9,7 +9,7 @@ interface ProductSellerIntroProps {
 	seller?: unknown;
 	/** 評價統計（avgRating/totalCount）— 不含訂閱數，別從這裡撈 followers。 */
 	sellerStats?: unknown;
-	/** `/public/sellers/{id}/stats` 的公開聚合 — 訂閱數（followers）唯一來源。 */
+	/** `GetStore` 的 `StoreStats` — 訂閱數（followers）唯一來源。 */
 	followerStats?: SellerStats | null;
 	productSeller?: unknown;
 	fallbackSeller?: unknown;
@@ -192,9 +192,8 @@ export default function ProductSellerIntro({
 		),
 	);
 
-	// Seller identity uses the canonical display URL. fetchSeller 只吐
-	// `logoUrl`（非顯示用的 logoKey/logo/avatar 已在那裡被刪掉），商品 wire 的
-	// 內嵌賣家區塊也是 `logoUrl`。
+	// Seller identity uses the canonical display URL: `logoUrl`, on both the store
+	// view and the product wire's embedded seller block.
 	const avatarSrc = firstText(
 		sellerRecord.logoUrl,
 		productSellerRecord.logoUrl,

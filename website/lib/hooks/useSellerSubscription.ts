@@ -31,12 +31,14 @@ export interface SellerSubscriptionState {
  */
 export function useSellerSubscription(
 	sellerId: string | number,
+	options: { enabled?: boolean } = {},
 ): SellerSubscriptionState {
 	const { activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const isBuyer = activeRole === "buyer";
-	const enabled = isBuyer && sellerId != null && sellerId !== "";
+	const enabled =
+		(options.enabled ?? true) && isBuyer && sellerId != null && sellerId !== "";
 	const queryKey = React.useMemo(
 		() => queryKeys.buyer.subscription(identity, sellerId),
 		[identity, sellerId],
