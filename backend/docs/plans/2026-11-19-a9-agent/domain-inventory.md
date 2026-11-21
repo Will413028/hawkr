@@ -80,7 +80,7 @@
 | 不變量 | 強制處 | 備註 |
 |---|---|---|
 | 所有寫入冪等：以 `(buyer_id, client_request_id)` 為仲裁 | `UNIQUE` 索引（price_previews `procurement.sql:331`、各 `*_commands` 表）＋`!IsNew` 分支不重派（`PR/usecase/run_dispatch.go:300-312`） | 【量】；重試不得併發重跑同一個 child run（註解說明已裁決） |
-| 同一 request 同時只有一個 ACTIVE revision | `procurement.sql:23` 附近註解；`PR/repository/revision.go`（rewind 把舊分支整條標 SUPERSEDED） | 【量】註解；【推】由 usecase 在 tx 內維持，DB 沒有 partial unique（`grep 'WHERE status' procurement.sql` 未驗） |
+| 同一 request 同時只有一個 ACTIVE revision | `procurement.sql:23` 附近註解；`PR/repository/revision.go`（rewind 把舊分支整條標 SUPERSEDED） | 【量】註解；【推】由 usecase 在 tx 內維持，DB 另有 partial unique（`procurement.sql:38-40`） |
 | NOTIFY 一定在 commit 之後 | `PR/repository/run.go:406,459`；`candidate.go:404`；`publication.go:324` | 【量】；LISTEN 用專屬連線（`PR/repository/run_watch.go:62-100`） |
 | DB 是事件的 SSOT，wake channel 不帶內容 | `run_watch.go:44-50` | 【量】 |
 | 候選搜尋的終態寫入用 `fencing_token` 防舊 owner 覆寫 | `procurement.sql:169-170`；`PR/usecase/candidate_search.go:223-240` | 【量】 |
