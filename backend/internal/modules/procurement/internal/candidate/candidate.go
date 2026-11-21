@@ -21,20 +21,28 @@ type Found struct {
 }
 
 // KeepOpen 只留下 OPEN 的店，維持輸入順序；店不在 OPEN 的就不會成為候選。
+// 同一家店重複出現只留第一筆（candidates 的 (candidate_set_id, store_id) 唯一）。
 func KeepOpen(ctx context.Context, open OpenStores, found []Found) ([]Found, error) {
 	if len(found) == 0 {
 		return nil, nil
 	}
+	seen := make(map[int64]struct{}, len(found))
+	unique := make([]Found, 0, len(found))
 	ids := make([]int64, 0, len(found))
 	for _, f := range found {
+		if _, dup := seen[f.StoreID]; dup {
+			continue
+		}
+		seen[f.StoreID] = struct{}{}
+		unique = append(unique, f)
 		ids = append(ids, f.StoreID)
 	}
 	ok, err := open.OpenStoreIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("candidate：確認店家是否營業中：%w", err)
 	}
-	out := make([]Found, 0, len(found))
-	for _, f := range found {
+	out := make([]Found, 0, len(unique))
+	for _, f := range unique {
 		if _, isOpen := ok[f.StoreID]; isOpen {
 			out = append(out, f)
 		}

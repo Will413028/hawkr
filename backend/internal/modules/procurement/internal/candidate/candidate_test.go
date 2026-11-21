@@ -67,3 +67,23 @@ func TestKeepOpenWithNothingFoundSkipsTheLookup(t *testing.T) {
 		t.Fatalf("got=%v err=%v", got, err)
 	}
 }
+
+// 同一家店重複出現只留第一筆，也只問一次。
+func TestKeepOpenDeduplicatesStoresKeepingTheFirst(t *testing.T) {
+	gate := &fakeOpen{open: map[int64]struct{}{10: {}, 20: {}}}
+	in := found(10, 20, 10)
+	in[2].Score = 7
+	got, err := KeepOpen(context.Background(), gate, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []int64{10, 20}; !reflect.DeepEqual(ids(got), want) {
+		t.Fatalf("候選 = %v，要 %v", ids(got), want)
+	}
+	if got[0].Score == 7 {
+		t.Fatal("重複時要留第一筆")
+	}
+	if want := []int64{10, 20}; !reflect.DeepEqual(gate.got, want) {
+		t.Fatalf("查了 %v，要 %v", gate.got, want)
+	}
+}
