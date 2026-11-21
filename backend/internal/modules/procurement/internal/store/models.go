@@ -27,6 +27,8 @@ type ProcurementAgentRun struct {
 	LastEventSeq     int64
 	MinAvailableSeq  int64
 	ClientRequestID  uuid.UUID
+	JobID            *int64
+	QuotaPeriodStart time.Time
 	CreatedAt        time.Time
 	StartedAt        *time.Time
 	CompletedAt      *time.Time

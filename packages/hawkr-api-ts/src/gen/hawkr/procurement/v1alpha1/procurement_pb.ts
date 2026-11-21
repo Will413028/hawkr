@@ -3872,7 +3872,7 @@ export enum RunFailureReason {
   UNSPECIFIED = 0,
 
   /**
-   * 執行 run 的程序消失（重啟或逾時），由週期 sweeper 標成失敗。買家重送。
+   * 執行 run 的 job 消失（程序重啟或被丟棄），由週期 reconciler 標成失敗並退回額度。買家重送。
    *
    * @generated from enum value: RUN_FAILURE_REASON_WORKER_LOST = 1;
    */

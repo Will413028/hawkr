@@ -12,25 +12,6 @@ import (
 	"uuid"
 )
 
-const claimRun = `-- name: ClaimRun :execrows
-UPDATE procurement.agent_runs
-SET status = 'RUNNING', started_at = $1::timestamptz, updated_at = $1::timestamptz
-WHERE id = $2 AND status = 'QUEUED'
-`
-
-type ClaimRunParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-func (q *Queries) ClaimRun(ctx context.Context, arg ClaimRunParams) (int64, error) {
-	result, err := q.db.Exec(ctx, claimRun, arg.Now, arg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const expireRunEvents = `-- name: ExpireRunEvents :one
 WITH due AS (
     SELECT id FROM procurement.agent_runs
@@ -72,35 +53,8 @@ func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams
 	return i, err
 }
 
-const finishRun = `-- name: FinishRun :execrows
-UPDATE procurement.agent_runs
-SET status = $1, failure_reason = $2, completed_at = $3::timestamptz, updated_at = $3::timestamptz
-WHERE id = $4 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
-`
-
-type FinishRunParams struct {
-	Status        string
-	FailureReason *string
-	Now           time.Time
-	ID            uuid.UUID
-}
-
-// 只有還沒到終態的 run 能被終結（單一寫入者的條件式終態寫入）；失敗原因只在 FAILED 時有值。
-func (q *Queries) FinishRun(ctx context.Context, arg FinishRunParams) (int64, error) {
-	result, err := q.db.Exec(ctx, finishRun,
-		arg.Status,
-		arg.FailureReason,
-		arg.Now,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getRun = `-- name: GetRun :one
-SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1
+SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1
 `
 
 func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
@@ -122,6 +76,8 @@ func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun
 		&i.LastEventSeq,
 		&i.MinAvailableSeq,
 		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
@@ -157,7 +113,7 @@ func (q *Queries) GetRunArtifact(ctx context.Context, arg GetRunArtifactParams) 
 }
 
 const getRunByIdempotencyKey = `-- name: GetRunByIdempotencyKey :one
-SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetRunByIdempotencyKeyParams struct {
@@ -184,6 +140,8 @@ func (q *Queries) GetRunByIdempotencyKey(ctx context.Context, arg GetRunByIdempo
 		&i.LastEventSeq,
 		&i.MinAvailableSeq,
 		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
@@ -214,6 +172,39 @@ func (q *Queries) InsertRunEvent(ctx context.Context, arg InsertRunEventParams) 
 		arg.Now,
 	)
 	return err
+}
+
+const listActiveRunIDsAfter = `-- name: ListActiveRunIDsAfter :many
+SELECT id FROM procurement.agent_runs
+WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED') AND id > $1
+ORDER BY id
+LIMIT $2
+`
+
+type ListActiveRunIDsAfterParams struct {
+	After uuid.UUID
+	Batch int32
+}
+
+// reconciler 要對帳的 run：有 job 在管的三個狀態（WAITING_FOR_INPUT 沒有 job）。以 id 為游標分頁（UUIDv7 依時間遞增）。
+func (q *Queries) ListActiveRunIDsAfter(ctx context.Context, arg ListActiveRunIDsAfterParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listActiveRunIDsAfter, arg.After, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listRunEventsAfter = `-- name: ListRunEventsAfter :many
@@ -256,57 +247,92 @@ func (q *Queries) ListRunEventsAfter(ctx context.Context, arg ListRunEventsAfter
 	return items, nil
 }
 
-const listTimedOutRunIDs = `-- name: ListTimedOutRunIDs :many
-SELECT id FROM procurement.agent_runs
-WHERE (status = 'QUEUED' AND created_at < $1)
-   OR (status = 'RUNNING' AND updated_at < $2)
-ORDER BY created_at
-LIMIT $3
+const lockActiveRun = `-- name: LockActiveRun :one
+SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+WHERE id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED
 `
 
-type ListTimedOutRunIDsParams struct {
-	QueuedBefore  time.Time
-	RunningBefore time.Time
-	Batch         int32
+// 逐列處理時鎖住該列；別的交易正在寫它（例如 executor）就略過，下一輪再看。
+func (q *Queries) LockActiveRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
+	row := q.db.QueryRow(ctx, lockActiveRun, id)
+	var i ProcurementAgentRun
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.ConversationID,
+		&i.ParentRunID,
+		&i.CandidateSetID,
+		&i.PublicationID,
+		&i.RunType,
+		&i.Status,
+		&i.FailureReason,
+		&i.ResumedIntoRunID,
+		&i.ResultRevisionID,
+		&i.LastEventSeq,
+		&i.MinAvailableSeq,
+		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-// 逾時的 QUEUED（受理後一直沒被領走）與 RUNNING（心跳 updated_at 太久沒動）。SKIP LOCKED：另一個 sweeper 正在處理的列略過。
-func (q *Queries) ListTimedOutRunIDs(ctx context.Context, arg ListTimedOutRunIDsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listTimedOutRunIDs, arg.QueuedBefore, arg.RunningBefore, arg.Batch)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+const lockRun = `-- name: LockRun :one
+SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
+	row := q.db.QueryRow(ctx, lockRun, id)
+	var i ProcurementAgentRun
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.ConversationID,
+		&i.ParentRunID,
+		&i.CandidateSetID,
+		&i.PublicationID,
+		&i.RunType,
+		&i.Status,
+		&i.FailureReason,
+		&i.ResumedIntoRunID,
+		&i.ResultRevisionID,
+		&i.LastEventSeq,
+		&i.MinAvailableSeq,
+		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const nextRunSeq = `-- name: NextRunSeq :one
 UPDATE procurement.agent_runs
 SET last_event_seq = last_event_seq + 1, updated_at = $1
-WHERE id = $2
+WHERE id = $2 AND status = ANY($3::text[])
 RETURNING last_event_seq
 `
 
 type NextRunSeqParams struct {
-	Now time.Time
-	ID  uuid.UUID
+	Now      time.Time
+	ID       uuid.UUID
+	Statuses []string
 }
 
 // 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；updated_at 同時是執行中 run 的心跳。
+// 只在 run 的狀態屬於 @statuses 時配發：終態之後的寫入拿不到序號。
 func (q *Queries) NextRunSeq(ctx context.Context, arg NextRunSeqParams) (int64, error) {
-	row := q.db.QueryRow(ctx, nextRunSeq, arg.Now, arg.ID)
+	row := q.db.QueryRow(ctx, nextRunSeq, arg.Now, arg.ID, arg.Statuses)
 	var last_event_seq int64
 	err := row.Scan(&last_event_seq)
 	return last_event_seq, err
@@ -319,6 +345,77 @@ SELECT pg_notify('procurement_run', $1::text)
 func (q *Queries) NotifyRun(ctx context.Context, runID string) error {
 	_, err := q.db.Exec(ctx, notifyRun, runID)
 	return err
+}
+
+const setRunJob = `-- name: SetRunJob :exec
+UPDATE procurement.agent_runs SET job_id = $1 WHERE id = $2
+`
+
+type SetRunJobParams struct {
+	JobID *int64
+	ID    uuid.UUID
+}
+
+func (q *Queries) SetRunJob(ctx context.Context, arg SetRunJobParams) error {
+	_, err := q.db.Exec(ctx, setRunJob, arg.JobID, arg.ID)
+	return err
+}
+
+const transitionRun = `-- name: TransitionRun :one
+UPDATE procurement.agent_runs
+SET status = $1,
+    failure_reason = $2,
+    started_at = CASE WHEN $1::text = 'RUNNING' THEN $3::timestamptz ELSE started_at END,
+    completed_at = CASE WHEN $4::boolean THEN $3::timestamptz ELSE completed_at END,
+    updated_at = $3::timestamptz
+WHERE id = $5 AND status = ANY($6::text[])
+RETURNING id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at
+`
+
+type TransitionRunParams struct {
+	ToStatus      string
+	FailureReason *string
+	Now           time.Time
+	Terminal      bool
+	ID            uuid.UUID
+	FromStatuses  []string
+}
+
+// 唯一的狀態轉換：只有目前狀態在 @from_statuses（由允許的邊算出）時才寫，UPDATE 持有 run 列鎖到 transaction 結束。
+func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (ProcurementAgentRun, error) {
+	row := q.db.QueryRow(ctx, transitionRun,
+		arg.ToStatus,
+		arg.FailureReason,
+		arg.Now,
+		arg.Terminal,
+		arg.ID,
+		arg.FromStatuses,
+	)
+	var i ProcurementAgentRun
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.ConversationID,
+		&i.ParentRunID,
+		&i.CandidateSetID,
+		&i.PublicationID,
+		&i.RunType,
+		&i.Status,
+		&i.FailureReason,
+		&i.ResumedIntoRunID,
+		&i.ResultRevisionID,
+		&i.LastEventSeq,
+		&i.MinAvailableSeq,
+		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertRunArtifact = `-- name: UpsertRunArtifact :one

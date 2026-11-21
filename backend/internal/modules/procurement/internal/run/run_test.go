@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 	"time"
 
@@ -111,11 +112,11 @@ func TestOnlyFinishedAndErrorEndTheStream(t *testing.T) {
 	}
 }
 
-type sweepProbe struct {
-	river.WorkerDefaults[SweepArgs]
+type reconcileProbe struct {
+	river.WorkerDefaults[ReconcileArgs]
 }
 
-func (sweepProbe) Work(context.Context, *river.Job[SweepArgs]) error { return nil }
+func (reconcileProbe) Work(context.Context, *river.Job[ReconcileArgs]) error { return nil }
 
 type purgeProbe struct {
 	river.WorkerDefaults[PurgeArgs]
@@ -127,12 +128,12 @@ type runProbe struct{ river.WorkerDefaults[RunArgs] }
 
 func (runProbe) Work(context.Context, *river.Job[RunArgs]) error { return nil }
 
-// 以「再登記同一個 kind 會失敗」探測 worker 是否已登記：沒登記 sweeper，逾時的 run 就永遠停在 QUEUED／RUNNING（AD2）。
-func TestAddWorkersRegistersTheSweeperAndThePurger(t *testing.T) {
+// 以「再登記同一個 kind 會失敗」探測 worker 是否已登記：沒登記 reconciler，job 死了的 run 就永遠停在 QUEUED／RUNNING／CANCEL_REQUESTED（AD2）。
+func TestAddWorkersRegistersTheReconcilerAndThePurger(t *testing.T) {
 	workers := river.NewWorkers()
-	AddWorkers(workers, Sweeper{}, Purger{})
-	if err := river.AddWorkerSafely(workers, &sweepProbe{}); err == nil {
-		t.Error("sweeper 沒有登記")
+	AddWorkers(workers, Reconciler{}, Purger{})
+	if err := river.AddWorkerSafely(workers, &reconcileProbe{}); err == nil {
+		t.Error("reconciler 沒有登記")
 	}
 	if err := river.AddWorkerSafely(workers, &purgeProbe{}); err == nil {
 		t.Error("事件清除沒有登記")
@@ -150,9 +151,14 @@ func TestDispatcherRegistersTheRunWorker(t *testing.T) {
 	}
 }
 
-func TestPeriodicJobsCoverTheSweeperAndThePurger(t *testing.T) {
-	if n := len(PeriodicJobs()); n != 2 {
-		t.Fatalf("排程 = %d 個，要 sweeper 與清除各一個", n)
+func TestPeriodicJobsCoverTheReconcilerAndThePurger(t *testing.T) {
+	var kinds []string
+	for _, spec := range periodicSpecs {
+		kinds = append(kinds, spec.args.Kind())
+	}
+	want := []string{ReconcileArgs{}.Kind(), PurgeArgs{}.Kind()}
+	if !slices.Equal(kinds, want) || len(PeriodicJobs()) != len(periodicSpecs) {
+		t.Fatalf("排程 = %v（%d 個），要 %v", kinds, len(PeriodicJobs()), want)
 	}
 }
 
@@ -190,12 +196,12 @@ func TestHubBackoffResetsAfterASuccessfulListen(t *testing.T) {
 
 func TestWatchStopsWithoutWaitingOnceAnEndedRunIsDrained(t *testing.T) {
 	for _, status := range []string{"SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED", "RESUMED"} {
-		if !IsEndedStatus(status) || !drainedEndedRun(true, 0) {
+		if !IsTerminal(status) || !drainedEndedRun(true, 0) {
 			t.Fatalf("%s 的 run 讀完事件就要結束串流", status)
 		}
 	}
 	for _, status := range []string{"QUEUED", "RUNNING", "WAITING_FOR_INPUT", "CANCEL_REQUESTED", ""} {
-		if IsEndedStatus(status) {
+		if IsTerminal(status) {
 			t.Fatalf("%s 不是結束狀態", status)
 		}
 	}

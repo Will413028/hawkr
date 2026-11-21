@@ -55,9 +55,9 @@ type Deps struct {
 
 // Module 是 procurement 模組。
 type Module struct {
-	retention *retention.Service
-	sweeper   run.Sweeper
-	purger    run.Purger
+	retention  *retention.Service
+	reconciler run.Reconciler
+	purger     run.Purger
 }
 
 // New 建立模組。
@@ -72,16 +72,16 @@ func New(d Deps) *Module {
 	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
 	return &Module{
-		retention: retention.New(d.DB),
-		sweeper:   run.Sweeper{DB: d.DB, Ledger: ledger, QueuedTimeout: run.QueuedTimeout, RunTimeout: run.RunningTimeout, Logger: d.Logger},
-		purger:    run.Purger{DB: d.DB, Ledger: ledger},
+		retention:  retention.New(d.DB),
+		reconciler: run.Reconciler{DB: d.DB, Ledger: ledger, Logger: d.Logger},
+		purger:     run.Purger{DB: d.DB, Ledger: ledger},
 	}
 }
 
-// AddWorkers 登記 run 的 sweeper 與事件清除的 River worker。
-func (m *Module) AddWorkers(workers *river.Workers) { run.AddWorkers(workers, m.sweeper, m.purger) }
+// AddWorkers 登記 run 的 reconciler 與事件清除的 River worker。
+func (m *Module) AddWorkers(workers *river.Workers) { run.AddWorkers(workers, m.reconciler, m.purger) }
 
-// PeriodicJobs 回傳 sweeper 與事件清除的排程。
+// PeriodicJobs 回傳 reconciler 與事件清除的排程。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob { return run.PeriodicJobs() }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（A9-D19 S10）：刪除買家的採購資料，賣家看得到的紀錄保留並把 buyer_id 設 NULL。冪等。

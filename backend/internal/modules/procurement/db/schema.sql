@@ -408,7 +408,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acce
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
 
--- run 帳本：沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
+-- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。
 CREATE TABLE procurement.agent_runs (
     id UUID PRIMARY KEY,
@@ -426,6 +426,8 @@ CREATE TABLE procurement.agent_runs (
     last_event_seq BIGINT NOT NULL DEFAULT 0,
     min_available_seq BIGINT NOT NULL DEFAULT 1,
     client_request_id UUID NOT NULL,
+    job_id BIGINT,
+    quota_period_start TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
@@ -438,7 +440,7 @@ CREATE TABLE procurement.agent_runs (
 );
 CREATE UNIQUE INDEX agent_runs_idempotency ON procurement.agent_runs (buyer_id, client_request_id);
 CREATE INDEX agent_runs_request ON procurement.agent_runs (request_id, created_at DESC);
-CREATE INDEX agent_runs_unfinished ON procurement.agent_runs (status, created_at) WHERE status IN ('QUEUED', 'RUNNING');
+CREATE INDEX agent_runs_unfinished ON procurement.agent_runs (id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WHERE completed_at IS NOT NULL AND min_available_seq <= last_event_seq;
 
 -- run 的輸入（買家原文，具名文字欄）。沒有 retention_class（只有一個字面值、沒有讀取者）。

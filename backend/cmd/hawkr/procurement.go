@@ -21,6 +21,6 @@ func newProcurement(d *db.DB, log *slog.Logger) *procurement.Module {
 	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log})
 }
 
-// addProcurementWorkers 登記採購 run 的 sweeper 與事件清除。執行 run 的 worker（run.Dispatcher）與送出路徑要等 Executor 與
+// addProcurementWorkers 登記採購 run 的 reconciler 與事件清除。執行 run 的 worker（run.Dispatcher）與送出路徑要等 Executor 與
 // handler 接上才登記。
 func addProcurementWorkers(workers *river.Workers, m *procurement.Module) { m.AddWorkers(workers) }

@@ -42,17 +42,25 @@ func ledger(d *db.DB, at time.Time) run.Ledger {
 	return run.Ledger{DB: d, Now: func() time.Time { return at }}
 }
 
-// recordingJobs 記下排入的 job；failWith 不為 nil 時排入失敗。
+// recordingJobs 記下排入與取消的 job；failWith 不為 nil 時排入失敗。
 type recordingJobs struct {
 	n        atomic.Int32
 	failWith error
+	mu       sync.Mutex
+	cancels  []int64
 }
 
-func (r *recordingJobs) Enqueue(_ context.Context, _ river.JobArgs, _ *river.InsertOpts) error {
+func (r *recordingJobs) EnqueueJob(_ context.Context, _ river.JobArgs, _ *river.InsertOpts) (int64, error) {
 	if r.failWith != nil {
-		return r.failWith
+		return 0, r.failWith
 	}
-	r.n.Add(1)
+	return int64(r.n.Add(1)), nil
+}
+
+func (r *recordingJobs) CancelJob(_ context.Context, id int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cancels = append(r.cancels, id)
 	return nil
 }
 
@@ -193,7 +201,7 @@ func TestExecutorFailureFailsTheRunAndRefundsTheQuota(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := run.RunArgs{RunID: id, BuyerID: 1, PeriodStart: now}
+	args := run.RunArgs{RunID: id}
 	disp := run.Dispatcher{DB: d, Ledger: ledger(d, now), Executor: failingExecutor{}}
 	if err := disp.Run(ctx, args); err != nil {
 		t.Fatal(err)
@@ -219,61 +227,17 @@ func lastEventType(ctx context.Context, t *testing.T, d *db.DB, id uuid.UUID) st
 	return typ
 }
 
-// 逾時的列直接寫入模擬 crash：受理後沒有 worker 領走（QUEUED）、領走後沒有心跳（RUNNING）。
-func TestSweeperFailsTimedOutRunsAndEmitsTheTerminalEvent(t *testing.T) {
-	ctx := context.Background()
-	d := newDB(t)
-	req := seedRequest(ctx, t, d, 1)
-	insert := func(status string, createdAt, updatedAt time.Time) uuid.UUID {
-		id := uuid.NewV7()
-		_, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_runs (id, buyer_id, request_id, run_type, status, client_request_id, created_at, updated_at)
-			VALUES ($1, 1, $2, 'TURN', $3, $4, $5, $6)`, id, req, status, uuid.NewV7(), createdAt, updatedAt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return id
-	}
-	staleQueued := insert("QUEUED", now.Add(-run.QueuedTimeout-time.Minute), now.Add(-run.QueuedTimeout-time.Minute))
-	staleRunning := insert("RUNNING", now.Add(-time.Hour), now.Add(-run.RunningTimeout-time.Minute))
-	freshQueued := insert("QUEUED", now.Add(-time.Second), now.Add(-time.Second))
-	freshRunning := insert("RUNNING", now.Add(-time.Hour), now.Add(-time.Second))
-
-	sw := run.Sweeper{DB: d, Ledger: ledger(d, now), QueuedTimeout: run.QueuedTimeout, RunTimeout: run.RunningTimeout, Logger: discard()}
-	n, err := sw.Sweep(ctx)
-	if err != nil || n != 2 {
-		t.Fatalf("Sweep = %d, %v，要 2", n, err)
-	}
-	for _, id := range []uuid.UUID{staleQueued, staleRunning} {
-		r, _ := store.New(d.Conn(ctx)).GetRun(ctx, id)
-		if r.Status != "FAILED" || r.FailureReason == nil || *r.FailureReason != "WORKER_LOST" || r.CompletedAt == nil {
-			t.Fatalf("逾時的 run 要 FAILED／WORKER_LOST：%+v", r)
-		}
-		if lastEventType(ctx, t, d, id) != run.EventFinished {
-			t.Fatal("要發出串流的結尾事件")
-		}
-	}
-	for id, want := range map[uuid.UUID]string{freshQueued: "QUEUED", freshRunning: "RUNNING"} {
-		if r, _ := store.New(d.Conn(ctx)).GetRun(ctx, id); r.Status != want {
-			t.Fatalf("沒逾時的 run 不得被動：%s", r.Status)
-		}
-	}
-	if n, err := sw.Sweep(ctx); err != nil || n != 0 {
-		t.Fatalf("第二次掃描要冪等：%d %v", n, err)
-	}
-}
-
 func finishedRun(ctx context.Context, t *testing.T, d *db.DB, req uuid.UUID, buyer int64, completedAt time.Time, events int) uuid.UUID {
 	t.Helper()
-	id := uuid.NewV7()
-	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_runs (id, buyer_id, request_id, run_type, status, client_request_id, created_at, updated_at, completed_at)
-		VALUES ($1, $2, $3, 'TURN', 'SUCCEEDED', $4, $5, $5, $5)`, id, buyer, req, uuid.NewV7(), completedAt); err != nil {
-		t.Fatal(err)
-	}
+	id := seedRun(ctx, t, d, req, buyer, run.StatusRunning, nil)
 	l := ledger(d, completedAt)
 	for i := 0; i < events; i++ {
 		if _, err := l.Append(ctx, id, "text", []byte(`{"text":{"text":"x"}}`)); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'SUCCEEDED', completed_at = $2, updated_at = $2 WHERE id = $1`, id, completedAt); err != nil {
+		t.Fatal(err)
 	}
 	return id
 }
@@ -349,8 +313,11 @@ func TestWatchFollowsLiveEventsUntilTheTerminalEvent(t *testing.T) {
 	if _, err := l.Append(ctx, id, "text", []byte(`{"text":{"text":"a"}}`)); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := l.Finish(ctx, id, "SUCCEEDED", ""); err != nil || !ok {
-		t.Fatalf("Finish = %v, %v", ok, err)
+	if _, err := l.Transition(ctx, id, run.StatusRunning, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Transition(ctx, id, run.StatusSucceeded, ""); err != nil {
+		t.Fatalf("Transition = %v", err)
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -503,8 +470,10 @@ func TestRewatchingAnEndedRunFromTheLastCursorReturnsImmediately(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := ledger(d, now).Finish(ctx, id, "SUCCEEDED", ""); err != nil || !ok {
-		t.Fatalf("Finish = %v, %v", ok, err)
+	for _, to := range []string{run.StatusRunning, run.StatusSucceeded} {
+		if _, err := ledger(d, now).Transition(ctx, id, to, ""); err != nil {
+			t.Fatal(err)
+		}
 	}
 	r, _ := store.New(d.Conn(ctx)).GetRun(ctx, id)
 	w := run.Watcher{DB: d, Hub: hub, Window: time.Hour}

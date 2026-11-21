@@ -49,7 +49,7 @@ func TestProcurementSubscribesBeforeModeration(t *testing.T) {
 	}
 }
 
-// worker 角色要登記採購 run 的 sweeper 與事件清除，並把它們的排程交給 River：漏了其中一個，逾時的 run 就沒有人標失敗（A9-D6）。
+// worker 角色要登記採購 run 的 reconciler 與事件清除，並把它們的排程交給 River：漏了其中一個，job 死了的 run 就沒有人標失敗（A9-D6、A9-D22）。
 func TestWorkerRoleRegistersProcurementJobs(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
 	if err != nil {

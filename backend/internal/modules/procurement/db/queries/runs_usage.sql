@@ -1,7 +1,7 @@
 -- name: InsertRun :execrows
 -- 建 run 的方法的冪等鍵放在 run 上（S4）；同一位買家的同一個 client_request_id 已有 run 時回 0 列。形狀由 A9-3b 補全。
-INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, run_type, status, client_request_id, created_at, updated_at)
-VALUES (@id, @buyer_id, @request_id, @conversation_id, @run_type, 'QUEUED', @client_request_id, @now, @now)
+INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+VALUES (@id, @buyer_id, @request_id, @conversation_id, @run_type, 'QUEUED', @client_request_id, @quota_period_start, @now, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetRunForBuyer :one

@@ -61,7 +61,7 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 			}
 			return err
 		}
-		ended := IsEndedStatus(r.Status)
+		ended := IsTerminal(r.Status)
 		events, err := q.ListRunEventsAfter(ctx, store.ListRunEventsAfterParams{RunID: runID, AfterSeq: after, PageSize: watchPage})
 		if err != nil {
 			if ctx.Err() != nil {
@@ -101,15 +101,6 @@ func parseCursor(c string) (int64, error) {
 		return 0, apperr.InvalidInputOn([]string{"cursor"}, "cursor 不正確")
 	}
 	return n, nil
-}
-
-// IsEndedStatus 回報 run 狀態是否已不會再寫事件。
-func IsEndedStatus(status string) bool {
-	switch status {
-	case "SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED", "RESUMED":
-		return true
-	}
-	return false
 }
 
 // drainedEndedRun：在列事件之前讀到 run 已結束（狀態與結尾事件同一個 transaction 可見），且這一頁沒有填滿，

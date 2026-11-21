@@ -3,9 +3,10 @@ SELECT * FROM procurement.agent_runs WHERE id = @id;
 
 -- name: NextRunSeq :one
 -- 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；updated_at 同時是執行中 run 的心跳。
+-- 只在 run 的狀態屬於 @statuses 時配發：終態之後的寫入拿不到序號。
 UPDATE procurement.agent_runs
 SET last_event_seq = last_event_seq + 1, updated_at = @now
-WHERE id = @id
+WHERE id = @id AND status = ANY(@statuses::text[])
 RETURNING last_event_seq;
 
 -- name: InsertRunEvent :exec
@@ -21,24 +22,34 @@ WHERE run_id = @run_id AND seq > @after_seq
 ORDER BY seq
 LIMIT @page_size;
 
--- name: ClaimRun :execrows
+-- name: TransitionRun :one
+-- 唯一的狀態轉換：只有目前狀態在 @from_statuses（由允許的邊算出）時才寫，UPDATE 持有 run 列鎖到 transaction 結束。
 UPDATE procurement.agent_runs
-SET status = 'RUNNING', started_at = @now::timestamptz, updated_at = @now::timestamptz
-WHERE id = @id AND status = 'QUEUED';
+SET status = @to_status,
+    failure_reason = sqlc.narg('failure_reason'),
+    started_at = CASE WHEN @to_status::text = 'RUNNING' THEN @now::timestamptz ELSE started_at END,
+    completed_at = CASE WHEN @terminal::boolean THEN @now::timestamptz ELSE completed_at END,
+    updated_at = @now::timestamptz
+WHERE id = @id AND status = ANY(@from_statuses::text[])
+RETURNING *;
 
--- name: FinishRun :execrows
--- 只有還沒到終態的 run 能被終結（單一寫入者的條件式終態寫入）；失敗原因只在 FAILED 時有值。
-UPDATE procurement.agent_runs
-SET status = @status, failure_reason = sqlc.narg('failure_reason'), completed_at = @now::timestamptz, updated_at = @now::timestamptz
-WHERE id = @id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
+-- name: LockRun :one
+SELECT * FROM procurement.agent_runs WHERE id = @id FOR UPDATE;
 
--- name: ListTimedOutRunIDs :many
--- 逾時的 QUEUED（受理後一直沒被領走）與 RUNNING（心跳 updated_at 太久沒動）。SKIP LOCKED：另一個 sweeper 正在處理的列略過。
+-- name: SetRunJob :exec
+UPDATE procurement.agent_runs SET job_id = @job_id WHERE id = @id;
+
+-- name: ListActiveRunIDsAfter :many
+-- reconciler 要對帳的 run：有 job 在管的三個狀態（WAITING_FOR_INPUT 沒有 job）。以 id 為游標分頁（UUIDv7 依時間遞增）。
 SELECT id FROM procurement.agent_runs
-WHERE (status = 'QUEUED' AND created_at < @queued_before)
-   OR (status = 'RUNNING' AND updated_at < @running_before)
-ORDER BY created_at
-LIMIT @batch
+WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED') AND id > @after
+ORDER BY id
+LIMIT @batch;
+
+-- name: LockActiveRun :one
+-- 逐列處理時鎖住該列；別的交易正在寫它（例如 executor）就略過，下一輪再看。
+SELECT * FROM procurement.agent_runs
+WHERE id = @id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED;
 
 -- name: ExpireRunEvents :one

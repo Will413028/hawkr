@@ -321,7 +321,7 @@ type RunFailureReason int32
 
 const (
 	RunFailureReason_RUN_FAILURE_REASON_UNSPECIFIED RunFailureReason = 0
-	// 執行 run 的程序消失（重啟或逾時），由週期 sweeper 標成失敗。買家重送。
+	// 執行 run 的 job 消失（程序重啟或被丟棄），由週期 reconciler 標成失敗並退回額度。買家重送。
 	RunFailureReason_RUN_FAILURE_REASON_WORKER_LOST RunFailureReason = 1
 	// 候選搜尋失敗。
 	RunFailureReason_RUN_FAILURE_REASON_SEARCH_FAILED RunFailureReason = 2

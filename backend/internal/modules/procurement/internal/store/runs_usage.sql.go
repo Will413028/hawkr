@@ -42,7 +42,7 @@ func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int
 }
 
 const getRunForBuyer = `-- name: GetRunForBuyer :one
-SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
+SELECT id, buyer_id, request_id, conversation_id, parent_run_id, candidate_set_id, publication_id, run_type, status, failure_reason, resumed_into_run_id, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
 `
 
 type GetRunForBuyerParams struct {
@@ -69,6 +69,8 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 		&i.LastEventSeq,
 		&i.MinAvailableSeq,
 		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
@@ -112,19 +114,20 @@ func (q *Queries) GetUsage(ctx context.Context, arg GetUsageParams) (int32, erro
 }
 
 const insertRun = `-- name: InsertRun :execrows
-INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, run_type, status, client_request_id, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, 'QUEUED', $6, $7, $7)
+INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, 'QUEUED', $6, $7, $8, $8)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
 type InsertRunParams struct {
-	ID              uuid.UUID
-	BuyerID         int64
-	RequestID       uuid.UUID
-	ConversationID  *uuid.UUID
-	RunType         string
-	ClientRequestID uuid.UUID
-	Now             time.Time
+	ID               uuid.UUID
+	BuyerID          int64
+	RequestID        uuid.UUID
+	ConversationID   *uuid.UUID
+	RunType          string
+	ClientRequestID  uuid.UUID
+	QuotaPeriodStart time.Time
+	Now              time.Time
 }
 
 // 建 run 的方法的冪等鍵放在 run 上（S4）；同一位買家的同一個 client_request_id 已有 run 時回 0 列。形狀由 A9-3b 補全。
@@ -136,6 +139,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, er
 		arg.ConversationID,
 		arg.RunType,
 		arg.ClientRequestID,
+		arg.QuotaPeriodStart,
 		arg.Now,
 	)
 	if err != nil {

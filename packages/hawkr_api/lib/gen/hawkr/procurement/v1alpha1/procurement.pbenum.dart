@@ -200,7 +200,7 @@ class RunFailureReason extends $pb.ProtobufEnum {
       RunFailureReason._(
           0, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_UNSPECIFIED');
 
-  /// 執行 run 的程序消失（重啟或逾時），由週期 sweeper 標成失敗。買家重送。
+  /// 執行 run 的 job 消失（程序重啟或被丟棄），由週期 reconciler 標成失敗並退回額度。買家重送。
   static const RunFailureReason RUN_FAILURE_REASON_WORKER_LOST =
       RunFailureReason._(
           1, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_WORKER_LOST');

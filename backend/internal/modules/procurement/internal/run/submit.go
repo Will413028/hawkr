@@ -14,21 +14,25 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// RunArgs 是執行一個 run 的 job。BuyerID 與 PeriodStart 讓失敗時能退回額度，不必回頭查。
-// 不重試（MaxAttempts 1）：LLM 呼叫不冪等，重驅會產生不同結果並重複扣額度（A9-D6）；逾時沒完成的由 sweeper 標失敗。
+// RunArgs 是執行一個 run 的 job：每個 run 恰好一個 job，在建立 run 的同一個 transaction 排入，job id 存在 run 上。
+// 不重試（MaxAttempts 1）：LLM 呼叫不冪等，重驅會產生不同結果並重複扣額度（A9-D6）；job 死了沒收尾的由 reconciler 標失敗（A9-D22）。
+// 一個 run id 只會排入一次（重送走冪等回放、不排 job），所以不需要 job 層的唯一鍵。
 type RunArgs struct {
-	RunID       uuid.UUID `json:"runId"`
-	BuyerID     int64     `json:"buyerId"`
-	PeriodStart time.Time `json:"periodStart"`
+	RunID uuid.UUID `json:"runId"`
 }
 
 func (RunArgs) Kind() string { return "procurement.run" }
 
 func (RunArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 1, UniqueOpts: river.UniqueOpts{ByArgs: true}}
+	return river.InsertOpts{MaxAttempts: 1}
+}
+
+// JobQueue 是 run 需要的 River 操作：排入並取回 job id、取消 job。ctx 裡有 transaction 時都在該 transaction 內執行。
+type JobQueue interface {
+	EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (jobID int64, err error)
+	CancelJob(ctx context.Context, jobID int64) error
 }
 
 // SubmitInput 是送出一個 run 的輸入。額度的上限與期間由呼叫端依買家的方案給。
@@ -44,11 +48,11 @@ type SubmitInput struct {
 	PeriodEnd       time.Time
 }
 
-// Submitter 是送出路徑：同一個 transaction 內冪等建 run、扣一次額度、寫輸入與第一個事件、排入 job。
+// Submitter 是送出路徑：同一個 transaction 內冪等建 run、扣一次額度、寫輸入與第一個事件、排入 job 並記下 job id。
 type Submitter struct {
 	DB     *db.DB
 	Ledger Ledger
-	Jobs   jobs.Enqueuer
+	Jobs   JobQueue
 }
 
 // Submit 回傳 run ID；同一位買家以同一個 client_request_id 重送回第一次的 run（內容不同回 INVALID_ARGUMENT），不再扣額度。
@@ -60,7 +64,7 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		now := s.Ledger.Now()
 		n, err := q.InsertRun(ctx, store.InsertRunParams{
 			ID: id, BuyerID: in.BuyerID, RequestID: in.RequestID, ConversationID: in.ConversationID,
-			RunType: in.RunType, ClientRequestID: in.ClientRequestID, Now: now,
+			RunType: in.RunType, ClientRequestID: in.ClientRequestID, QuotaPeriodStart: in.PeriodStart, Now: now,
 		})
 		if err != nil {
 			return fmt.Errorf("run：建立 run：%w", err)
@@ -88,7 +92,14 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		if _, err := s.Ledger.Append(ctx, id, EventRunAccepted, accepted); err != nil {
 			return err
 		}
-		return s.Jobs.Enqueue(ctx, RunArgs{RunID: id, BuyerID: in.BuyerID, PeriodStart: in.PeriodStart}, nil)
+		jobID, err := s.Jobs.EnqueueJob(ctx, RunArgs{RunID: id}, nil)
+		if err != nil {
+			return err
+		}
+		if err := q.SetRunJob(ctx, store.SetRunJobParams{ID: id, JobID: &jobID}); err != nil {
+			return fmt.Errorf("run：記下 job：%w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return uuid.UUID{}, err
