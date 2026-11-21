@@ -69,3 +69,13 @@ AS $$ SELECT * FROM seller.pub_content_takedown $$;
 CREATE FUNCTION seller.pub_lock_content_takedowns(p_measure_id UUID) RETURNS SETOF seller.pub_content_takedown
 LANGUAGE sql VOLATILE
 AS $$ SELECT * FROM seller.pub_content_takedown $$;
+
+CREATE TABLE seller.pub_retired_store (
+    store_id BIGINT NOT NULL
+);
+
+-- 已退場的店家：第一段清理完成（retired_at 不為空，StoreRetired 已發）；不含只是 CLOSED、還可以恢復營業的店。退場不可逆，列永久保留，沒有時間參數。
+-- 用法：im、crm 的讀取過濾，`NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() r WHERE r.store_id = …)`。
+CREATE FUNCTION seller.pub_retired_stores() RETURNS SETOF seller.pub_retired_store
+LANGUAGE sql STABLE
+AS $$ SELECT * FROM seller.pub_retired_store $$;

@@ -593,6 +593,13 @@ func (m *Module) LockForDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.Lock(ctx, storeID)
 }
 
+// LockNotRetired 在呼叫方的 transaction 內以 FOR KEY SHARE 確認店家尚未退場（retired_at 為空；營運中、關店、等待刪除都放行），鎖持有到
+// transaction 結束：退場的 RetireDueStores 是 FOR UPDATE SKIP LOCKED，正被守門鎖住的店這一輪被跳過、下一輪再退場。已退場與不存在回
+// NotFound。必須在 transaction 內呼叫。鎖順序：買家列先於店家列（單體規則 4），之後才是呼叫方自己的表。
+func (m *Module) LockNotRetired(ctx context.Context, storeID int64) error {
+	return m.closing.LockNotRetired(ctx, storeID)
+}
+
 // BeginDeletion 讓店家隨帳號刪除進入等待；重送安全。只由 accountdeletion 在已鎖住帳號列的 transaction 內呼叫。
 func (m *Module) BeginDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.BeginDeletion(ctx, storeID)

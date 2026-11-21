@@ -55,6 +55,14 @@ FROM seller.stores
 WHERE store_id = $1
 FOR NO KEY UPDATE;
 
+-- name: LockStoreKeyShare :one
+-- 以 KEY SHARE 讀取指定 stint：只與 FOR UPDATE（RetireDueStores、LockAccountStores）互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
+-- 其他模組的店家寫入用它與退場序列化。
+SELECT *
+FROM seller.stores
+WHERE store_id = $1
+FOR KEY SHARE;
+
 -- name: CreateStore :one
 -- 建立新的 stint；store_code 撞號時不寫入、回 0 列，由呼叫方換一個代碼重試。帳號已有目前的 stint 時違反
 -- stores_current_account（呼叫方先鎖帳號再檢查，所以只在不變量被破壞時發生）。

@@ -36,6 +36,10 @@ type SellerPubExposableStore struct {
 	StoreID int64
 }
 
+type SellerPubRetiredStore struct {
+	StoreID int64
+}
+
 type SellerPubReviewItem struct {
 	Kind             string
 	ItemID           string

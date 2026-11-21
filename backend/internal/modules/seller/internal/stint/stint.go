@@ -31,6 +31,23 @@ func Lock(ctx context.Context, q *store.Queries, storeID int64) (store.SellerSto
 	return row, nil
 }
 
+// RequireNotRetiredShared 以 FOR KEY SHARE 確認 stint 尚未退場（營運中、關店、等待刪除都放行）：RetireDueStores 是 FOR UPDATE SKIP LOCKED，
+// 正被守門鎖住的店這一輪被跳過、下一輪再退場。已退場與不存在回 NotFound。不重用 Lock：它是 FOR UPDATE 且對 CLOSED 回 NotFound，
+// 語意是「寫入需要店家營運中」。
+func RequireNotRetiredShared(ctx context.Context, q *store.Queries, storeID int64) error {
+	if err := model.Positive(storeID); err != nil {
+		return err
+	}
+	row, err := q.LockStoreKeyShare(ctx, storeID)
+	if err != nil {
+		return model.Error(err)
+	}
+	if row.RetiredAt != nil {
+		return apperr.NotFound("店家已退場")
+	}
+	return nil
+}
+
 // LockAccountOf 鎖住 storeID 所屬帳號的全部 stint（含已關閉的，依 store_id 的順序）並回傳 storeID 那一列。措施的寫入與
 // 停權期間的重算都以帳號為單位、可能碰到同一個帳號的不同 stint，所以一律先以這個固定的順序鎖，兩個流程不會互鎖；
 // suspension.Recompute 在鎖內才讀措施。店家不存在回 NotFound。
