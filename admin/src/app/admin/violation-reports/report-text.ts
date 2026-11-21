@@ -20,7 +20,8 @@ function textOf<E extends number>(
 	return table[value] ?? unknownText();
 }
 
-export function reportOutcomeText(outcome: ReportOutcome): string {
+export function reportOutcomeText(outcome: ReportOutcome | undefined): string {
+	if (outcome === undefined) return unknownText();
 	return staffTextOrUnknown(sellerReportOutcome(outcome));
 }
 

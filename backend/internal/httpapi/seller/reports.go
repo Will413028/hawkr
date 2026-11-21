@@ -92,14 +92,6 @@ func (h *Reports) callerBuyer(ctx context.Context) (accountID, buyerID int64, er
 	return p.ID, buyerID, rpc.BuyerInvariant(p.ID, err)
 }
 
-// outcomeToProto 對應通報的結果；還沒有結果是 PENDING，UNSPECIFIED 不回給 client。
-func outcomeToProto(o *model.Outcome) pb.ReportOutcome {
-	if o == nil {
-		return pb.ReportOutcome_REPORT_OUTCOME_PENDING
-	}
-	return rpc.EnumToProto[pb.ReportOutcome](*o)
-}
-
 // ToStoreReport 是模組的通報對應契約的 StoreReport（moderation 的合併清單也用它）。
 func ToStoreReport(r model.Report) *pb.StoreReport {
 	out := &pb.StoreReport{
@@ -110,7 +102,10 @@ func ToStoreReport(r model.Report) *pb.StoreReport {
 	if r.ResolvedAt != nil {
 		out.ResolveTime = timestamppb.New(*r.ResolvedAt)
 	}
-	out.Outcome = outcomeToProto(r.Outcome)
+	if r.Outcome != nil {
+		o := rpc.EnumToProto[pb.ReportOutcome](*r.Outcome)
+		out.Outcome = &o
+	}
 	return out
 }
 

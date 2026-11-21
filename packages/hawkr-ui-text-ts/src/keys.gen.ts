@@ -159,7 +159,6 @@ export type UiTextKey =
 	| "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE"
 	| "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT"
 	| "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
-	| "seller.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION"
 	| "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED"
 	| "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION"
@@ -186,6 +185,7 @@ export type UiTextKey =
 	| "seller.StoreField.STORE_FIELD_CONTACT_NAME"
 	| "seller.StoreField.STORE_FIELD_CONTACT_PHONE"
 	| "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL"
+	| "seller.StoreReport.outcome_unset"
 	| "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY"
 	| "seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS"
 	| "seller.TerminationGround.TERMINATION_GROUND_DISSOLUTION"
@@ -718,7 +718,6 @@ const SELLER_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
 	3: "seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT",
 	4: "seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE",
 	5: "seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE",
-	6: "seller.ReportOutcome.REPORT_OUTCOME_PENDING",
 };
 
 /** seller.ReportOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
@@ -792,6 +791,11 @@ export function sellerStoreField(v: StoreField): UiMessage | undefined {
 	const key = SELLER_STORE_FIELD[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+/** seller.StoreReport.outcome_unset */
+export function sellerStoreReportOutcomeUnset(): UiMessage {
+	return { key: "seller.StoreReport.outcome_unset" };
 }
 
 const SELLER_TERMINATION_GROUND: Readonly<Partial<Record<number, UiTextKey>>> = {

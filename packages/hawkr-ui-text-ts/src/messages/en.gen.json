@@ -219,8 +219,7 @@
       "REPORT_OUTCOME_ACTION_TAKEN": "Resolved (action taken)",
       "REPORT_OUTCOME_DUPLICATE": "Resolved (duplicate report)",
       "REPORT_OUTCOME_INSUFFICIENT": "Resolved (insufficient information)",
-      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
-      "REPORT_OUTCOME_PENDING": "Under review"
+      "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)"
     },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
@@ -255,6 +254,9 @@
       "STORE_FIELD_CONTACT_NAME": "聯絡人姓名",
       "STORE_FIELD_CONTACT_PHONE": "商店電話",
       "STORE_FIELD_SUPPORT_EMAIL": "客服電子信箱"
+    },
+    "StoreReport": {
+      "outcome_unset": "Under review"
     },
     "TerminationGround": {
       "TERMINATION_GROUND_BANKRUPTCY": "破產",

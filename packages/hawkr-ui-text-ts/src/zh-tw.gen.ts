@@ -188,7 +188,6 @@ return "生效中";
 	"seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": () => "已處理（資料不足）",
 	"seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": () => "已處理（重複檢舉）",
 	"seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": () => "已處理（不受理）",
-	"seller.ReportOutcome.REPORT_OUTCOME_PENDING": () => "審核中",
 	"seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED": () => "申覆成立",
 	"seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": () => "平台更正",
 	"seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION": () => "主管機關或法院的決定",
@@ -215,6 +214,7 @@ return "生效中";
 	"seller.StoreField.STORE_FIELD_CONTACT_MOBILE": () => "聯絡人手機",
 	"seller.StoreField.STORE_FIELD_SUPPORT_EMAIL": () => "客服電子信箱",
 	"seller.StoreField.STORE_FIELD_CONTACT_PHONE": () => "商店電話",
+	"seller.StoreReport.outcome_unset": () => "審核中",
 	"seller.TerminationGround.TERMINATION_GROUND_NOTICE": () => "預告終止（第 21.2 條）",
 	"seller.TerminationGround.TERMINATION_GROUND_MATERIAL_BREACH": () => "重大違約未改善",
 	"seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS": () => "停業",
@@ -298,7 +298,6 @@ return "請求已結案";
 	"seller.ReportOutcome.REPORT_OUTCOME_INSUFFICIENT": () => "內容不足",
 	"seller.ReportOutcome.REPORT_OUTCOME_DUPLICATE": () => "重複",
 	"seller.ReportOutcome.REPORT_OUTCOME_ABUSIVE": () => "濫報",
-	"seller.ReportOutcome.REPORT_OUTCOME_PENDING": () => "處理中",
 };
 
 /**

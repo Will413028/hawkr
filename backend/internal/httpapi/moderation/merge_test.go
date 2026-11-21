@@ -12,7 +12,6 @@ import (
 	"connectrpc.com/connect"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
-	sellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
@@ -261,15 +260,15 @@ func TestListMyReportsStoreItemCarriesTheStoreReportAndSharedFields(t *testing.T
 	}
 }
 
-func TestListMyReportsUnresolvedStoreItemIsPending(t *testing.T) {
+func TestListMyReportsUnresolvedStoreItemHasNoOutcome(t *testing.T) {
 	e := newEnvWith(t, &pagedCommunity{}, &pagedStores{rows: []sellermod.Report{storeReport(1, 9)}})
 	resp, err := e.client.ListMyReports(context.Background(), signedIn(&pb.ListMyReportsRequest{}))
 	if err != nil || len(resp.Msg.GetReports()) != 1 {
 		t.Fatalf("%v %v", resp.Msg, err)
 	}
 	it := resp.Msg.GetReports()[0]
-	if got := it.GetStore().GetOutcome(); got != sellerpb.ReportOutcome_REPORT_OUTCOME_PENDING || it.ResolveTime != nil {
-		t.Fatalf("outcome=%v 解決時間=%v", got, it.GetResolveTime())
+	if it.GetStore().Outcome != nil || it.ResolveTime != nil {
+		t.Fatalf("outcome=%v 解決時間=%v", it.GetStore().Outcome, it.GetResolveTime())
 	}
 }
 

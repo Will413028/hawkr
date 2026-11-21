@@ -943,8 +943,6 @@ func (t Text) SellerReportOutcome(v string) (string, bool) {
 			return "重複", true
 		case "ABUSIVE":
 			return "濫報", true
-		case "PENDING":
-			return "處理中", true
 		}
 		return "", false
 	}
@@ -960,8 +958,6 @@ func (t Text) SellerReportOutcome(v string) (string, bool) {
 			return "Resolved (duplicate report)", true
 		case "ABUSIVE":
 			return "Resolved (not accepted)", true
-		case "PENDING":
-			return "Under review", true
 		}
 	}
 	switch v {
@@ -975,8 +971,6 @@ func (t Text) SellerReportOutcome(v string) (string, bool) {
 		return "已處理（重複檢舉）", true
 	case "ABUSIVE":
 		return "已處理（不受理）", true
-	case "PENDING":
-		return "審核中", true
 	}
 	return "", false
 }
@@ -1069,6 +1063,14 @@ func (t Text) SellerStoreField(v string) (string, bool) {
 		return "商店電話", true
 	}
 	return "", false
+}
+
+// SellerStoreReportOutcomeUnset 是 seller.StoreReport.outcome_unset 的文案。
+func (t Text) SellerStoreReportOutcomeUnset() string {
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
 }
 
 // SellerTerminationGround 是 seller.TerminationGround 的文案。

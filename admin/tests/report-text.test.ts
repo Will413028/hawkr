@@ -28,12 +28,13 @@ function valuesOf<E extends number>(
 	);
 }
 
-test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報｜處理中", () => {
+test("結果的名稱：已採取措施｜未違規｜內容不足｜重複｜濫報；沒有設值與不認得的值是「未知」", () => {
 	assert.deepEqual(
 		valuesOf(ReportOutcome, ReportOutcome.UNSPECIFIED).map(reportOutcomeText),
-		["已採取措施", "未違規", "內容不足", "重複", "濫報", "處理中"],
+		["已採取措施", "未違規", "內容不足", "重複", "濫報"],
 	);
 	assert.equal(reportOutcomeText(ReportOutcome.UNSPECIFIED), "未知");
+	assert.equal(reportOutcomeText(undefined), "未知");
 	assert.equal(reportOutcomeText(99 as ReportOutcome), "未知");
 });
 
@@ -49,14 +50,14 @@ test("通報的狀態：待分案｜處理中｜{結果}；沒有結果的 RESOL
 	assert.equal(
 		reportStatusText({
 			state: ReportState.AWAITING_TRIAGE,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"待分案",
 	);
 	assert.equal(
 		reportStatusText({
 			state: ReportState.IN_CASE,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"處理中",
 	);
@@ -69,14 +70,14 @@ test("通報的狀態：待分案｜處理中｜{結果}；沒有結果的 RESOL
 	assert.equal(
 		reportStatusText({
 			state: ReportState.RESOLVED,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"未知",
 	);
 	assert.equal(
 		reportStatusText({
 			state: ReportState.UNSPECIFIED,
-			outcome: ReportOutcome.UNSPECIFIED,
+			outcome: undefined,
 		}),
 		"未知",
 	);

@@ -3,7 +3,6 @@
 import { useMutation, useQuery } from "@connectrpc/connect-query";
 import { SellerGovernanceAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
-import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -285,7 +284,7 @@ export default function ReportDetailPage() {
 						{actorTimeText(report.triagedByAdminId, report.triageTime)}
 					</Field>
 					<Field label="結果">
-						{report.outcome === ReportOutcome.PENDING
+						{report.outcome === undefined
 							? NONE
 							: reportOutcomeText(report.outcome)}
 					</Field>

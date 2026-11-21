@@ -674,10 +674,6 @@
       "message": "已處理（不違規）",
       "description": "查過之後沒有違規。"
     },
-    "seller.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "審核中",
-      "description": "還沒有結果（處理中）。"
-    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"
@@ -781,6 +777,10 @@
     "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL": {
       "message": "客服電子信箱",
       "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）都用這一套。（值 STORE_FIELD_SUPPORT_EMAIL）"
+    },
+    "seller.StoreReport.outcome_unset": {
+      "message": "審核中",
+      "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
     },
     "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY": {
       "message": "破產",
@@ -964,10 +964,6 @@
     "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "未違規",
       "description": "查過之後沒有違規。\n受眾：後台員工"
-    },
-    "seller.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "處理中",
-      "description": "還沒有結果（處理中）。\n受眾：後台員工"
     }
   },
   "variants": {

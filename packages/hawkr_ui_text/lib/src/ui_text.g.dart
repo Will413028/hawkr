@@ -439,8 +439,6 @@ return switch ((l, value)) {
 (UiLocale.en, 4) => 'Resolved (duplicate report)',
 (UiLocale.zhTW, 5) => '已處理（不受理）',
 (UiLocale.en, 5) => 'Resolved (not accepted)',
-(UiLocale.zhTW, 6) => '審核中',
-(UiLocale.en, 6) => 'Under review',
 _ => null,
 };
 }
@@ -776,6 +774,14 @@ String sellerPaymentAccountPayoutsInactiveNote(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。',
 UiLocale.en => 'Payouts to your bank account are not enabled yet. The payment provider may ask you for more information.',
+};
+}
+
+/// seller.StoreReport.outcome_unset
+String sellerStoreReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
 };
 }
 

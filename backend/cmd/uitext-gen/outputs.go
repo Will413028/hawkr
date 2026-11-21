@@ -70,20 +70,28 @@ func (m *Model) Outputs() (map[string][]byte, error) {
 	return out, nil
 }
 
-// checkEnumValueNames 擋下同一個列舉內重複的值名（值號表以列舉全名加值名為鍵，不同列舉的同名值不衝突）。
+// checkEnumValueNames 擋下值號表的鍵（enumValueKey）重複：重複的鍵會讓 golden 查到另一個值的值號。
 func (m *Model) checkEnumValueNames() error {
 	var errs errList
-	for _, e := range m.usedEnums() {
-		seen := map[string]bool{}
-		for _, v := range enumNames(e) {
-			name := string(v.Name())
-			if seen[name] {
-				errs.addf("值名 %s 在列舉 %s 內重複，golden 的值號表以列舉全名加值名為鍵", name, e.Desc.FullName())
-			}
-			seen[name] = true
-		}
+	for _, k := range duplicateEnumKeys(m.usedEnums()) {
+		errs.addf("值號表的鍵 %s 重複", k)
 	}
 	return errs.err()
+}
+
+func duplicateEnumKeys(enums []*EnumInfo) []string {
+	seen := map[string]bool{}
+	var dups []string
+	for _, e := range enums {
+		for _, v := range enumNames(e) {
+			k := enumValueKey(e, string(v.Name()))
+			if seen[k] {
+				dups = append(dups, k)
+			}
+			seen[k] = true
+		}
+	}
+	return dups
 }
 
 // SourceFiles 回 -write 要寫回的來源檔（正規形式）。

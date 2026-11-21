@@ -39,3 +39,14 @@ func TestEnumNumberTableKeepsSameNamedValuesOfDifferentPackagesApart(t *testing.
 		t.Fatalf("兩個列舉的同名值應各有一筆：\n%s", got)
 	}
 }
+
+func TestDuplicateEnumKeysFlagsAnEnumListedTwiceAndNotSameNamedValuesOfDifferentPackages(t *testing.T) {
+	a := enumInPackage(t, "p.a.v1", 0, 1, 2)
+	b := enumInPackage(t, "p.b.v1", 0, 6, 7)
+	if got := duplicateEnumKeys([]*EnumInfo{a, b}); len(got) != 0 {
+		t.Fatalf("不同 package 的同名值不衝突：%v", got)
+	}
+	if got := duplicateEnumKeys([]*EnumInfo{a, b, a}); len(got) != len(enumNames(a)) || !strings.HasPrefix(got[0], "p.a.v1.Outcome.") {
+		t.Fatalf("同一個列舉列兩次，每個值都該重複：%v", got)
+	}
+}

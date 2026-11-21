@@ -216,11 +216,11 @@
     "seller.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "Resolved (no violation)"
     },
-    "seller.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "Under review"
-    },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
       "message": "Platform review and payout account both completed"
+    },
+    "seller.StoreReport.outcome_unset": {
+      "message": "Under review"
     },
     "social.CommentState.placeholder.COMMENT_STATE_DELETED": {
       "message": "This comment was deleted"

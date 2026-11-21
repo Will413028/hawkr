@@ -252,7 +252,7 @@ func riskMeasureFixture() model.Measure {
 func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 	for name, got := range map[string][]string{
 		"PolicyCategory":                 rpc.EnumMismatches[commonpb.PolicyCategory](policy.Values()),
-		"ReportOutcome":                  rpc.EnumMismatches[pb.ReportOutcome](model.OutcomeValues(), pb.ReportOutcome_REPORT_OUTCOME_PENDING),
+		"ReportOutcome":                  rpc.EnumMismatches[pb.ReportOutcome](model.OutcomeValues()),
 		"ReportState":                    rpc.EnumMismatches[adminpb.ReportState](model.ReportStateValues()),
 		"CaseState":                      rpc.EnumMismatches[adminpb.CaseState](model.CaseStateValues()),
 		"CaseCloseReason":                rpc.EnumMismatches[adminpb.CaseCloseReason](model.CaseCloseReasonValues()),
