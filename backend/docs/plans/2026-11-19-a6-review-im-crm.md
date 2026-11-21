@@ -179,6 +179,12 @@
 - 範圍：`TargetKind` 加 REVIEW、CHAT_MESSAGE（proto、Go、CHECK migration）；快照形狀（聊天含前後文，A6-D3）；隱藏與還原經 review、im API 同 tx；作者為店家時走 seller 措施（A7-D5′）；依賴表 moderation 加 review、im；`reviewqueue` 分支不變（來源仍是 moderation）。
 - 驗收：檢舉→隱藏→還原的 integration；鎖序測試；mutation：還原時不清隱藏紀錄、隱藏時不更新對話預覽（ID1），測試各要失敗。
 
+### A6-4d 店家退場清店家檢舉人資料（被擋於：A6-D22；不擋 A6-5）
+
+- 範圍：moderation 訂閱 `seller.StoreRetired`（同 transaction，沿用買家刪帳訂閱者的模式），清該店全部店家檢舉的說明、冪等紀錄（request_hash）與 `reporter_daily_counts` 的店家列；檢舉列留著。CARRYOVER 第 29 列補店家路徑。
+- 消費端：`rg -n "StoreRetired" backend/internal`。
+- 驗收：integration 測試證明退場後三者清空、檢舉列仍在、重送事件冪等；mutation（CI）：拿掉計數列的清除，測試要失敗。
+
 ### A6-5 對外 API（被擋於：A6-1～4）
 
 - Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `lookup`、`meta`、`orders`、`coupons` 改由擁有者的方法提供。
@@ -227,6 +233,7 @@
 | A6-D19 | 停用身分的事實與守門只在擁有者：buyer 加「未關閉」、seller 加「未退場」的共享列鎖（`FOR KEY SHARE`）與狀態 `pub_*`，獨占端沿用既有的 `LockForDeletion`、`RetireDueStores`；review、im、crm 刪自己的 `inactive_*` 複本與 advisory lock，讀取改 join 擁有者 `pub_*`；抹除 job 留在各模組；social 保留複本（存旗標，規則 2 例外）；不做平台框架。簡報 `2026-11-19-a6-review-im-crm/step-3c-brief.md`（Will 2026-11-21） | A6-3c、A6-4 |
 | A6-D20 | A6-3c 設計書 §10 W1–W7：W1 (a′) 不存在的 ID 當已停用並跳過；NotFound 時查 pub 分辨，已關閉／已退場記 info、不存在記 error（修訂 Will 2026-11-21）；W2 (a) 新增 `pub_closed_buyers()`；W3 (a) `LockActive`／`LockBuyerShared` 降為 `FOR KEY SHARE`；W4 (b) 業務寫入降為 `FOR NO KEY UPDATE`、只有轉移保留 `FOR UPDATE`；W5 (a) 不加索引、門檻寫進 CARRYOVER；W6 (b) sweep 唯一性 helper 本步收齊全部 14 處；W7 (b) 整合測試替身斷言 legacy RPC 不在 tx 內（Will 2026-11-21） | A6-3c1 |
 | A6-D21 | A6-4 設計書 §W：W1 (a) moderation 新增 `ReverseHide`，案件維持結案，另記還原欄位與稽核紀錄，同 tx 呼叫 review／im／social 的 `Restore`；W2 (a) 店家寫的聊天訊息與評價回覆照 A7-D5′ 走 seller 內容下架，新增 `CHAT_MESSAGE`、`REVIEW_REPLY` 對象，im 讀取 join `seller.pub_content_takedowns()`；W3 (a) 檢舉人改為買家或店家二選一，只有 `CHAT_MESSAGE` 接受店家檢舉；W4 (a) `GetCase` 回應加依種類分開的快照欄位，快照 struct 改依種類分開，後台頁面在 A6-6（Will 2026-11-21） | A6-4 |
+| A6-D22 | 店家退場（`seller.StoreRetired`）時比照買家刪帳：同 transaction 訂閱者清該店以店家檢舉人身分送出的檢舉說明、冪等紀錄與每日計數列，檢舉列與檢舉人鍵保留（Will 2026-11-21） | A6-4d |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
