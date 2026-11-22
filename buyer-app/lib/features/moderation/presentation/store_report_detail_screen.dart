@@ -107,8 +107,6 @@ class StoreReportDetailScreen extends ConsumerWidget {
     final outcome = storeReportOutcomeText(r, locale);
     final category = r.category.uiText(locale);
     final ownEvidence = reportOwnEvidenceCount(d);
-    final canSupplement =
-        !r.hasOutcome() && d.supplements.length < storeReportMaxSupplements;
     return Column(
       children: [
         Expanded(
@@ -154,9 +152,7 @@ class StoreReportDetailScreen extends ConsumerWidget {
                 if (r.description.isNotEmpty) _line(r.description),
                 if (ownEvidence > 0) _meta('已附 $ownEvidence 張佐證'),
                 SizedBox(height: 20.h),
-                _title(
-                  '補充說明（${d.supplements.length}/$storeReportMaxSupplements）',
-                ),
+                _title('補充說明（${d.supplements.length}/${d.supplementMax}）'),
                 SizedBox(height: 8.h),
                 for (final s in d.supplements) ...[
                   _meta(
@@ -173,7 +169,7 @@ class StoreReportDetailScreen extends ConsumerWidget {
             ),
           ),
         ),
-        if (canSupplement)
+        if (d.canSupplement)
           SafeArea(
             top: false,
             child: Padding(

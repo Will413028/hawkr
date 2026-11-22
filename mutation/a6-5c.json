@@ -1,0 +1,445 @@
+{
+ "mutants": [
+  {
+   "id": "deps-literal-integration-test-payment-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyer/buyer_integration_test.go",
+   "old": "Payment: &payment.Module{}, ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "An integration test's httpapi.Deps literal omits the required Payment, which only CI's integration run would otherwise catch at runtime."
+  },
+  {
+   "id": "deps-literal-template-stats-dropped",
+   "stack": "go",
+   "file": "backend/cmd/new-module/templates/characterization/monolith_integration_test.go.tmpl",
+   "old": "Stats: ch.Stats(t), ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "The new-module characterization template omits the required Stats in its httpapi.Deps literal, so every generated module would fail at runtime."
+  },
+  {
+   "id": "im-send-replay-never-found",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "err != nil || found {",
+   "new": "err != nil || found && false {",
+   "test": "internal/modules/im ^TestResendReturnsTheFirstMessageWithoutSideEffects$",
+   "why": "Send treats every request as new, so a resend no longer returns the first message and the conflict path never finds it."
+  },
+  {
+   "id": "im-send-replay-skips-content-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\tif !same {",
+   "new": "\tif false && !same {",
+   "test": "internal/modules/im ^TestResendWithDifferentContentIsRejected$",
+   "why": "A resend with the same request_id but different content is no longer rejected with InvalidInput on RequestID."
+  },
+  {
+   "id": "im-send-replay-lookup-ignores-sender-kind",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/store/messages.sql.go",
+   "old": "m.sender_kind = $3 AND m.request_id = $4",
+   "new": "$3::text IS NOT NULL AND m.request_id = $4",
+   "test": "internal/modules/im ^TestSameRequestIDFromBothSidesCreatesTwoMessages$",
+   "why": "The resend lookup stops keying on the sender side, so the store's message with the buyer's request_id is treated as a resend of the buyer's message."
+  },
+  {
+   "id": "im-send-conflict-commits-allocated-seq",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t\t\treturn errRetry\n",
+   "new": "\t\t\treturn nil\n",
+   "test": "internal/modules/im ^TestConflictingRequestIDRollsBackTheAllocatedSeqAndReturnsTheWinner$",
+   "why": "A request_id conflict no longer rolls the transaction back: the loser commits its allocated seq and returns an empty message, so the loser's response differs from the winner's and last_seq runs ahead of the stored messages."
+  },
+  {
+   "id": "im-conversation-parties-swapped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/read/read.go",
+   "old": "BuyerID: r.BuyerID, StoreID: r.StoreID}, nil\n}\n\n// MessageParties 回傳",
+   "new": "BuyerID: r.StoreID, StoreID: r.BuyerID}, nil\n}\n\n// MessageParties 回傳",
+   "test": "internal/modules/im ^TestPartiesReadsOwnershipOnly$",
+   "why": "ConversationParties returns the buyer and store the wrong way round."
+  },
+  {
+   "id": "im-presence-authorization-predicate-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/store/presence.sql.go",
+   "old": "  AND (($1::text = 'BUYER' AND c.buyer_id = $3::bigint)",
+   "new": "  AND (true OR ($1::text = 'BUYER' AND c.buyer_id = $3::bigint)",
+   "test": "internal/modules/im ^TestPresenceStoreCallerAndBatch$",
+   "why": "Presence stops restricting the batch to conversations owned by the caller, so another party's conversation is answered instead of failing the whole request with NotFound."
+  },
+  {
+   "id": "im-presence-store-caller-skips-buyers-blocked-by-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/read/read.go",
+   "old": "blocked, err = s.d.Stores.BuyersBlockedByStore(ctx, p.Store.StoreID, distinct(rs, func(r store.PresenceForPartyRow) int64 { return r.BuyerID }))",
+   "new": "blocked, err = map[int64]bool{}, nil",
+   "test": "internal/modules/im ^TestPresenceStoreCallerAndBatch$",
+   "why": "A store caller no longer asks seller which buyers it blocks, so a blocked buyer still shows online."
+  },
+  {
+   "id": "seller-buyers-blocked-by-store-drops-store-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/store/store_blocks.sql.go",
+   "old": "WHERE store_id = $1 AND buyer_id = ANY($2::bigint[])\nORDER BY buyer_id",
+   "new": "WHERE $1::bigint > 0 AND buyer_id = ANY($2::bigint[])\nORDER BY buyer_id",
+   "test": "internal/modules/seller ^TestBuyersBlockedByStoreReturnsOnlyThisStoresBlocks$",
+   "why": "The batch query stops filtering by store, so buyers blocked by another store are reported as blocked by this one."
+  },
+  {
+   "id": "chat-ownership-neither-side-allowed-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/rpc/chatparty.go",
+   "old": "\t}\n\treturn im.Party{}, ErrNotChatParty\n}",
+   "new": "\t}\n\treturn im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, nil\n}",
+   "test": "internal/httpapi/chat ^TestOwnershipDerivationNeitherSideAndMissingConversationAreIndistinguishable$",
+   "why": "A caller who is neither side of the conversation is let through as the buyer instead of getting the same not_found as a missing conversation."
+  },
+  {
+   "id": "chat-store-list-derives-buyer-identity",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "\tp, err := h.storeParty(ctx)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tscope := rpc.PageScope(chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure",
+   "new": "\tp, err := h.buyerParty(ctx)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tscope := rpc.PageScope(chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure",
+   "test": "internal/httpapi/chat ^TestEveryMethodSucceedsAndPassesTheDerivedPartyToTheModule$/^ListStoreConversations$",
+   "why": "The store-side conversation list acts as the caller's buyer identity instead of the current store."
+  },
+  {
+   "id": "chat-send-to-buyer-acts-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "if in.Sender, err = h.storeParty(ctx); err != nil {",
+   "new": "if in.Sender, err = h.buyerParty(ctx); err != nil {",
+   "test": "internal/httpapi/chat ^TestEveryMethodSucceedsAndPassesTheDerivedPartyToTheModule$/^SendMessageToBuyer$",
+   "why": "SendMessageToBuyer sends as the buyer identity rather than the current store."
+  },
+  {
+   "id": "chat-send-request-id-not-passed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "in := im.SendInput{RequestID: *rid}",
+   "new": "in := im.SendInput{}",
+   "test": "internal/httpapi/chat ^TestSendMessagePassesRequestIDAndContentToTheModule$",
+   "why": "The request_id is validated but never handed to the module, so a resend is no longer idempotent."
+  },
+  {
+   "id": "chat-tombstone-message-keeps-content",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tif m.Hidden || m.Erased {\n\t\treturn out, nil\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestMessagesNeverLeakObjectKeysAccountIDsOrTombstoneContent$",
+   "why": "A hidden or erased message carries its text and image again when the module returns content for it."
+  },
+  {
+   "id": "chat-tombstone-preview-keeps-text",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "if !p.Hidden && !p.Erased && p.Text != nil {",
+   "new": "if p.Text != nil {",
+   "test": "internal/httpapi/chat ^TestPreviewIsStructuredAndTombstonePreviewsCarryNoText$",
+   "why": "A hidden or erased last message still shows its text in the conversation preview."
+  },
+  {
+   "id": "chat-store-closed-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tim.ReasonStoreClosed:           apperr.ReasonStoreClosed,\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestSendMessageMapsModuleReasonsToTheContractReasons$/^停業$",
+   "why": "A closed-store rejection loses its STORE_CLOSED reason, so the client cannot turn the input read-only."
+  },
+  {
+   "id": "chat-receiver-deleted-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tim.ReasonReceiverDeleted:       apperr.ReasonReceiverDeleted,\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestSendMessageMapsModuleReasonsToTheContractReasons$/^對方已刪除$",
+   "why": "A deleted-receiver rejection loses its RECEIVER_DELETED reason."
+  },
+  {
+   "id": "chat-page-token-scope-without-identity",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "rpc.PageScope(chatv1alpha1connect.ChatAppServiceListConversationsProcedure, p.BuyerID)",
+   "new": "rpc.PageScope(chatv1alpha1connect.ChatAppServiceListConversationsProcedure, 0)",
+   "test": "internal/httpapi/chat ^TestConversationPageTokenRoundTripsAndIsBoundToProcedureAndIdentity$",
+   "why": "The conversation page token is no longer bound to the caller, so a token from another buyer is accepted."
+  },
+  {
+   "id": "chat-before-and-after-seq-both-allowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "if msg.BeforeSeq != nil && msg.AfterSeq != nil {",
+   "new": "if msg.BeforeSeq != nil && msg.AfterSeq != nil && false {",
+   "test": "internal/httpapi/chat ^TestListMessagesBeforeAndAfterSeqAreMutuallyExclusiveAndRouteToTheRightModuleCall$",
+   "why": "before_seq and after_seq are accepted together instead of invalid_argument."
+  },
+  {
+   "id": "chat-send-to-buyer-capability-declaration-changed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/declaration.go",
+   "old": "chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:     requires(seller.CapChatSend),",
+   "new": "chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:     requires(seller.CapChatRead),",
+   "test": "internal/httpapi/chat ^TestDeclaredCapabilitiesMatchWhatTheModuleChecks$",
+   "why": "The declared capability for the store sending a message no longer matches the capability the module checks."
+  },
+  {
+   "id": "deps-literal-template-im-dropped",
+   "stack": "go",
+   "file": "backend/cmd/new-module/templates/characterization/monolith_integration_test.go.tmpl",
+   "old": "IM: &im.Module{}, ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "A httpapi.Deps literal in the module template omits the required IM field, which must fail the literals guard."
+  },
+  {
+   "id": "chat-stream-guard-never-rechecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\t\terr := s.Guard(ctx)\n",
+   "new": "\t\t\tvar err error\n",
+   "test": "internal/httpapi/chat ^TestStreamRechecksEveryIntervalNotOnlyAtTheStart$",
+   "why": "The stream never calls Guard on the recheck tick, so a revoked session or closed store keeps the stream open until its lifetime ends."
+  },
+  {
+   "id": "chat-stream-lifetime-without-jitter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "cfg.LifetimeJitter*(2*s.Jitter()-1)",
+   "new": "0*cfg.LifetimeJitter*(2*s.Jitter()-1)",
+   "test": "internal/httpapi/chat ^TestStreamLifetimeCarriesPerStreamJitterFromTheInjectedSource$",
+   "why": "Every stream gets exactly MaxLifetime, so streams opened together reconnect together."
+  },
+  {
+   "id": "chat-stream-no-write-deadline",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "if err := s.SetWriteDeadline(s.Clock.Now().Add(cfg.WriteTimeout)); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/httpapi/chat ^TestStreamSetsTheWriteDeadlineBeforeEveryFrame$",
+   "why": "Frames are written without a per-write deadline, so a client that stops reading holds the connection forever."
+  },
+  {
+   "id": "chat-stream-guard-failures-never-reset",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\t\t\tfailures = 0\n",
+   "new": "\t\t\t\tfailures += 0\n",
+   "test": "internal/httpapi/chat ^TestStreamTransientGuardFailureCounterResetsAfterASuccess$",
+   "why": "Transient recheck failures accumulate across successes, so three scattered blips end a healthy stream."
+  },
+  {
+   "id": "chat-stream-guard-failure-threshold-one",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "failures >= cfg.MaxGuardFailures",
+   "new": "failures >= 1",
+   "test": "internal/httpapi/chat ^TestStreamTransientGuardFailureCounterResetsAfterASuccess$",
+   "why": "A single transient recheck failure ends the stream instead of three consecutive ones."
+  },
+  {
+   "id": "chat-stream-lost-eligibility-as-unavailable",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "return apperr.FailedPrecondition(\"店家已停業，無法再收到聊天事件\").WithReason(apperr.ReasonStoreClosed), true",
+   "new": "return apperr.WithCause(apperr.Unavailable(\"x\"), err), true",
+   "test": "internal/httpapi/chat ^TestStreamMapsModuleEndReasons$",
+   "why": "A closed store ends the stream as unavailable, so the client keeps reconnecting instead of learning the store is closed."
+  },
+  {
+   "id": "chat-stream-handler-never-closes-subscription",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\tstop()\n\t\ts.Close()\n",
+   "new": "\t\tstop()\n",
+   "test": "internal/httpapi/chat ^TestStreamHandlerClosesTheSubscriptionWhenTheClientGoesAway$",
+   "why": "The handler returns without closing the subscription, leaking the presence slot until its TTL."
+  },
+  {
+   "id": "chat-stream-store-subscribes-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\th.storeParty, h.storePartyOf)",
+   "new": "\t\th.buyerParty, h.buyerPartyOf)",
+   "test": "internal/httpapi/chat ^TestStreamEventsSubscribesAsTheDerivedParty$",
+   "why": "StreamStoreEvents subscribes with the buyer identity, so a store would receive the buyer's events."
+  },
+  {
+   "id": "chat-serve-without-im-run",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "serveErr := serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})",
+   "new": "serveErr := serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})",
+   "test": "cmd/hawkr ^TestServeRunsTheIMLiveChannelAndWorkerDoesNot$",
+   "why": "The serve path never starts im's LISTEN connection, so streams open but never receive an event."
+  },
+  {
+   "id": "report-chat-neither-side-submitted-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "\tcase errors.Is(err, rpc.ErrNotChatParty):\n\t\treturn moderation.SubmitInput{}, chatMessageNotFound()",
+   "new": "\tcase errors.Is(err, rpc.ErrNotChatParty):\n\t\treturn moderation.SubmitInput{ReporterBuyerID: buyerID}, nil",
+   "test": "internal/httpapi/moderation ^TestChatReportByANonPartyIsNotFoundLikeAMissingMessageAndNeverReachesTheModule$",
+   "why": "A caller who is neither side of the reported chat message is submitted as the buyer instead of getting the same not_found as a missing message."
+  },
+  {
+   "id": "report-chat-store-side-filled-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "return moderation.SubmitInput{ReporterStoreID: party.Store.StoreID}, nil",
+   "new": "return moderation.SubmitInput{ReporterBuyerID: party.Store.StoreID}, nil",
+   "test": "internal/httpapi/moderation ^TestChatReportFromTheStoreSideUsesTheCurrentStoreNotTheBuyer$",
+   "why": "The store side of a chat report is sent to the module as a buyer reporter with the store's ID."
+  },
+  {
+   "id": "block-message-buyer-skips-party-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\tif parties.BuyerID != c.BuyerID {",
+   "new": "\tif false && parties.BuyerID != c.BuyerID {",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageTheCallerIsNotPartyToIsNotFoundLikeAMissingOne$",
+   "why": "A buyer can block the store of any conversation by naming one of its messages, without being the buyer of that conversation."
+  },
+  {
+   "id": "block-message-store-skips-party-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\t\tif parties.StoreID != c.Store.StoreID {",
+   "new": "\t\tif false && parties.StoreID != c.Store.StoreID {",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageTheCallerIsNotPartyToIsNotFoundLikeAMissingOne$",
+   "why": "A store can block the buyer of any conversation by naming one of its messages, without being the store of that conversation."
+  },
+  {
+   "id": "block-message-store-caller-blocks-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "Author: social.Actor{Kind: social.ActorBuyer, ID: parties.BuyerID}",
+   "new": "Author: social.Actor{Kind: social.ActorStore, ID: parties.StoreID}",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageIsTheCounterpartOfTheCaller$",
+   "why": "The store-side message reference resolves to the caller's own store instead of the conversation's buyer."
+  },
+  {
+   "id": "store-reports-handler-reads-another-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "h.reports.MyStoreReports(ctx, store.StoreID, after, size)",
+   "new": "h.reports.MyStoreReports(ctx, store.StoreID+1, after, size)",
+   "test": "internal/httpapi/moderation ^TestListMyStoreReportsReadsTheCurrentStoresReportsOnly$",
+   "why": "ListMyStoreReports reads a different store's reports than the caller's current store."
+  },
+  {
+   "id": "store-reports-query-drops-reporter-store-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/store/moderation.sql.go",
+   "old": "WHERE r.reporter_store_id = $1\n  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)",
+   "new": "WHERE $1::bigint IS NOT NULL\n  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)",
+   "test": "internal/modules/moderation ^TestMyStoreReportsListsOnlyTheStoresOwnReportsPaged$",
+   "why": "The store reporter list stops filtering on reporter_store_id, so other stores' and buyers' reports appear."
+  },
+  {
+   "id": "im-send-nested-conflict-retried",
+   "stack": "go",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t\t\tif nested {\n",
+   "new": "\t\t\tif false && nested {\n",
+   "test": "internal/modules/im/internal/write ^TestRetrySendRetriesOnlyOutsideAnOuterTransaction$",
+   "why": "A Send joined to an outer transaction retries after a request_id conflict, running more SQL in a transaction the conflict did not roll back and leaving a seq gap."
+  },
+  {
+   "id": "im-send-never-detects-outer-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t_, nested := db.TxFrom(ctx)\n",
+   "new": "\t_, nested := db.TxFrom(ctx)\n\tnested = false\n",
+   "test": "internal/modules/im ^TestConflictingRequestIDInsideAnOuterTransactionFailsInsteadOfRetrying$",
+   "why": "Send stops recognising an outer transaction, so a request_id conflict inside one is retried in a transaction the conflict did not roll back and leaves a seq gap."
+  },
+  {
+   "id": "im-send-replay-ignores-hidden",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "return rows.Message(rows.MessageRow(row)), true, nil",
+   "new": "return rows.Message(func() rows.MessageRow { r := rows.MessageRow(row); r.Hidden = false; return r }()), true, nil",
+   "test": "internal/modules/im ^TestResendOfAHiddenOrErasedMessageReturnsATombstone$",
+   "why": "A resend of a hidden message returns its content with hidden=false instead of the tombstone."
+  },
+  {
+   "id": "im-send-replay-compares-erased-content",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": " && row.ErasedAt == nil {",
+   "new": " {",
+   "test": "internal/modules/im ^TestResendOfAHiddenOrErasedMessageReturnsATombstone$",
+   "why": "A resend of an erased text message compares against the erased (empty) content and is rejected as InvalidInput instead of returning the tombstone."
+  },
+  {
+   "id": "serve-run-cancelled-only-after-shutdown",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "serveAllThen(ctx, cancel, servers...)",
+   "new": "serveAllThen(ctx, nil, servers...)",
+   "test": "cmd/hawkr ^TestServeWithRunCancelsRunBeforeShutdownWhenAServerFails$",
+   "why": "When a server fails on its own, Run's context is cancelled only after Shutdown, so open streams do not end through Run and Shutdown waits out its timeout."
+  },
+  {
+   "id": "block-author-message-requires-store-card",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyer/blocks.go",
+   "old": "\t\tif req.Msg.GetMessageId() != \"\" {\n",
+   "new": "\t\tif false {\n",
+   "test": "internal/httpapi/buyer ^TestBlockAuthorByMessageBlocksAConversationStoreWithoutAStoreCard$",
+   "why": "Blocking a conversation's store through message_id fails with not_found when the store has no StoreCard, although such a store can hold a conversation."
+  },
+  {
+   "id": "chat-list-messages-zero-before-seq-is-latest",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "return max(*msg.BeforeSeq, 1)",
+   "new": "return *msg.BeforeSeq",
+   "test": "internal/httpapi/chat ^TestListMessagesExplicitZeroBeforeSeqIsNotTheLatestPage$",
+   "why": "An explicit before_seq of 0 reaches the module as 0 and returns the latest page instead of an empty one."
+  },
+  {
+   "id": "chat-stream-buyer-identity-lost-as-store-closed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\t\tif kind == im.PartyStore {\n",
+   "new": "\t\t\tif true {\n",
+   "test": "internal/httpapi/chat ^TestStreamGuardBuyerIdentityChangedEndsUnauthenticated$",
+   "why": "A buyer stream whose identity no longer matches ends as failed_precondition STORE_CLOSED, a reason the buyer contract does not have, instead of unauthenticated."
+  },
+  {
+   "id": "chat-stream-store-gone-as-unauthenticated",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\t\tif kind == im.PartyStore {\n",
+   "new": "\t\t\tif false {\n",
+   "test": "internal/httpapi/chat ^TestStreamGuardStoreGoneEndsWithStoreClosed$",
+   "why": "A store stream whose store is gone or replaced ends as unauthenticated instead of failed_precondition STORE_CLOSED."
+  },
+  {
+   "id": "chat-newapp-without-reads-accepted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "\tcase reads == nil:\n",
+   "new": "\tcase false && reads == nil:\n",
+   "test": "internal/httpapi/chat ^TestNewAppRejectsMissingReadsAndWrites$",
+   "why": "A chat handler without Reads starts and fails on the first request."
+  },
+  {
+   "id": "request-id-version-check-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/requestid/requestid.go",
+   "old": "id[6]>>4 == 4 && ",
+   "new": "",
+   "test": "internal/platform/requestid ^TestIsV4$",
+   "why": "Any UUID version with a valid variant is accepted as a request_id."
+  }
+ ]
+}

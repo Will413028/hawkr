@@ -6,10 +6,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
+import hashlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -147,6 +150,48 @@ def split_selector(selector: str) -> tuple[str, str]:
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
+UNSAFE_SPECIFIER = re.compile(r"[*?\[\]{}~$`()<>|&;\\\s]")
+WEBSITE_SHAPES = (["vitest", "run", "--project", "unit"], ["vitest", "run", "--project=unit"])
+EXPECTED_SHAPE = {
+    "admin": "node [--import <specifier>]... --test（specifier 不得以 - 開頭，不得含 glob、shell 字元或空白）",
+    "website": "vitest run --project unit（或 --project=unit），前後不得有其他 token",
+}
+
+
+def matches_script_grammar(app: str, argv: list[str]) -> bool:
+    """runner 要在 script 後面接自己的參數且不經 shell，所以 script 必須完全符合文法，不是只檢查幾個性質。"""
+    if app == "website":
+        return argv in WEBSITE_SHAPES
+    if not argv or argv[0] != "node" or argv[-1:] != ["--test"]:
+        return False
+    middle = argv[1:-1]
+    if len(middle) % 2:
+        return False
+    for flag, spec in zip(middle[::2], middle[1::2]):
+        if flag != "--import" or not spec or spec.startswith("-") or UNSAFE_SPECIFIER.search(spec):
+            return False
+    return True
+
+
+def package_script(repo: Path, app: str, name: str) -> list[str]:
+    """`<app>/package.json` 的 script 拆成 argv；測試的載入方式只在那裡寫一次。"""
+    path = repo / app / "package.json"
+    try:
+        script = json.loads(path.read_text(encoding="utf-8"))["scripts"][name]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise ManifestError(f"{path} 讀不到 script {name!r}：{e}") from e
+    where = f"{path} 的 script {name!r}"
+    if not isinstance(script, str):
+        raise ManifestError(f"{where} 必須是字串")
+    try:
+        argv = shlex.split(script)
+    except ValueError as e:
+        raise ManifestError(f"{where} 無法拆成 argv：{e}") from e
+    if not matches_script_grammar(app, argv):
+        raise ManifestError(f"{where} 不符合預期形狀 {EXPECTED_SHAPE[app]}：{script}")
+    return argv
+
+
 def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     head, rest = split_selector(selector)
     env = dict(os.environ)
@@ -163,13 +208,13 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
         return Command(argv, repo / moddir, env, stack)
     if stack == "admin":
         # node:test 的旗標要放在測試檔之前，放在後面會被忽略（整個檔案照跑）。
-        argv = ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test"]
+        argv = package_script(repo, "admin", "test:file")
         if rest:
             argv += ["--test-name-pattern", rest]
         argv.append(head)
         return Command(argv, repo / "admin", env, stack)
     if stack == "website":
-        argv = ["pnpm", "exec", "vitest", "run", "--project", "unit", head]
+        argv = ["pnpm", "exec", *package_script(repo, "website", "test:file"), head]
         if rest:
             argv += ["-t", rest]
         return Command(argv, repo / "website", env, stack)
@@ -260,6 +305,25 @@ def run_test(cmd: Command) -> str:
     return "FAIL"
 
 
+def atlas_sum(directory: Path) -> str:
+    """Atlas 的 atlas.sum 內容：逐檔累加的 SHA-256，第一行是「檔名＋逐檔雜湊」的總雜湊。"""
+    names = sorted(p.name for p in directory.iterdir() if p.is_file() and p.suffix == ".sql")
+    running = hashlib.sha256()
+    hashes = []
+    for name in names:
+        body = (directory / name).read_bytes()
+        running.update(name.encode("utf-8"))
+        running.update(body)
+        hashes.append(base64.b64encode(running.copy().digest()).decode("ascii"))
+    total = hashlib.sha256()
+    for name, h in zip(names, hashes):
+        total.update(name.encode("utf-8"))
+        total.update(h.encode("ascii"))
+    lines = [f"h1:{base64.b64encode(total.digest()).decode('ascii')}"]
+    lines += [f"{name} h1:{h}" for name, h in zip(names, hashes)]
+    return "\n".join(lines) + "\n"
+
+
 def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> str:
     if not inside(repo, repo / m.file):
         print(f"    檔案在 repo 之外：{m.file}")
@@ -274,8 +338,13 @@ def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> st
     if count != 1:
         print(f"    old 出現 {count} 次（必須剛好 1 次）")
         return APPLY_FAILED
+    mutated = original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8")
+    sum_path = path.parent / "atlas.sum"
+    sum_original = sum_path.read_bytes() if path.suffix == ".sql" and sum_path.is_file() else None
     try:
-        path.write_bytes(original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8"))
+        path.write_bytes(mutated)
+        if sum_original is not None:
+            sum_path.write_text(atlas_sum(path.parent), encoding="utf-8")
         build = build_builder(m.stack, m.test, m.file, repo) if build_builder else None
         if build is not None:
             built = runner(build)
@@ -286,6 +355,8 @@ def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> st
         outcome = runner(cmd)
     finally:
         path.write_bytes(original)
+        if sum_original is not None:
+            sum_path.write_bytes(sum_original)
     if outcome == TIMEOUT:
         return TIMEOUT
     if outcome == BUILD_ERROR:
@@ -345,7 +416,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.validate:
             bad = 0
             for m in mutants:
-                problem = check_mutant(m)
+                problem = check_mutant(m, REPO)
+                if problem is None and m.stack in EXPECTED_SHAPE:
+                    try:
+                        build_command(m.stack, m.test, REPO)
+                    except ManifestError as e:
+                        problem = str(e)
                 print(f"{'FAIL' if problem else 'ok'}: {m.id}" + (f"  {problem}" if problem else ""))
                 bad += bool(problem)
             return 1 if bad else 0

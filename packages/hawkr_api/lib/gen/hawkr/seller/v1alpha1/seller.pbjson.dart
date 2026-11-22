@@ -3439,6 +3439,7 @@ const BlockBuyerRequest$json = {
       '10': 'forumEntryId'
     },
     {'1': 'review_id', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'reviewId'},
+    {'1': 'message_id', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'messageId'},
   ],
   '8': [
     {'1': 'source'},
@@ -3449,7 +3450,8 @@ const BlockBuyerRequest$json = {
 final $typed_data.Uint8List blockBuyerRequestDescriptor = $convert.base64Decode(
     'ChFCbG9ja0J1eWVyUmVxdWVzdBIfCgpjb21tZW50X2lkGAEgASgJSABSCWNvbW1lbnRJZBImCg'
     '5mb3J1bV9lbnRyeV9pZBgCIAEoCUgAUgxmb3J1bUVudHJ5SWQSHQoJcmV2aWV3X2lkGAMgASgJ'
-    'SABSCHJldmlld0lkQggKBnNvdXJjZQ==');
+    'SABSCHJldmlld0lkEh8KCm1lc3NhZ2VfaWQYBCABKAlIAFIJbWVzc2FnZUlkQggKBnNvdXJjZQ'
+    '==');
 
 @$core.Deprecated('Use blockBuyerResponseDescriptor instead')
 const BlockBuyerResponse$json = {

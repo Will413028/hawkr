@@ -66,8 +66,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 88 {
-		t.Fatalf("declarations=%d methods=%d，預期 88", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 89 {
+		t.Fatalf("declarations=%d methods=%d，預期 89", got, want)
 	}
 
 	for procedure := range declarations {
@@ -363,7 +363,7 @@ func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 			continue
 		}
 		method := procedure[strings.LastIndex(procedure, "/")+1:]
-		if strings.HasPrefix(method, "Get") || strings.HasPrefix(method, "List") || method == "PreviewProspect" {
+		if strings.HasPrefix(method, "Get") || strings.HasPrefix(method, "List") || method == "PreviewProspect" || method == "PreviewHolidayCalendar" {
 			continue
 		}
 		if _, ok := exceptions[method]; !ok {

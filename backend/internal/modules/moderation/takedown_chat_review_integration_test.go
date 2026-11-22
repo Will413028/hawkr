@@ -327,7 +327,7 @@ func TestTakedownRacesWithEraseAndSendWithoutDeadlock(t *testing.T) {
 			},
 			func() error { return f.im.ErasePartyMessages(context.Background(), im.PartyStore, storeID) },
 			func() error {
-				_, err := f.im.Send(context.Background(), im.SendInput{Sender: im.Party{Kind: im.PartyBuyer, BuyerID: b}, CounterpartID: storeID, Type: im.TypeText, Text: "並行送出"})
+				_, err := f.im.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: im.Party{Kind: im.PartyBuyer, BuyerID: b}, CounterpartID: storeID, Type: im.TypeText, Text: "並行送出"})
 				return err
 			},
 		}

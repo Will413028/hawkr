@@ -893,6 +893,72 @@ func (q *Queries) ListReportsOfReporter(ctx context.Context, arg ListReportsOfRe
 	return items, nil
 }
 
+const listReportsOfStoreReporter = `-- name: ListReportsOfStoreReporter :many
+SELECT r.id, r.case_id, r.reporter_buyer_id, r.reporter_store_id, r.category, r.description, r.snapshot_id, r.created_at, c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE r.reporter_store_id = $1
+  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT $4::int
+`
+
+type ListReportsOfStoreReporterParams struct {
+	ReporterStoreID *int64
+	AfterCreated    time.Time
+	AfterID         uuid.UUID
+	MaxRows         int32
+}
+
+type ListReportsOfStoreReporterRow struct {
+	ModerationReport ModerationReport
+	TargetKind       string
+	ContentID        *uuid.UUID
+	BuyerID          *int64
+	Decision         *string
+	ClosedAt         *time.Time
+}
+
+// 店家檢舉人自己的檢舉（只有聊天訊息），形狀與 ListReportsOfReporter 相同。keyset：(created_at, id) 由大到小。
+func (q *Queries) ListReportsOfStoreReporter(ctx context.Context, arg ListReportsOfStoreReporterParams) ([]ListReportsOfStoreReporterRow, error) {
+	rows, err := q.db.Query(ctx, listReportsOfStoreReporter,
+		arg.ReporterStoreID,
+		arg.AfterCreated,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReportsOfStoreReporterRow{}
+	for rows.Next() {
+		var i ListReportsOfStoreReporterRow
+		if err := rows.Scan(
+			&i.ModerationReport.ID,
+			&i.ModerationReport.CaseID,
+			&i.ModerationReport.ReporterBuyerID,
+			&i.ModerationReport.ReporterStoreID,
+			&i.ModerationReport.Category,
+			&i.ModerationReport.Description,
+			&i.ModerationReport.SnapshotID,
+			&i.ModerationReport.CreatedAt,
+			&i.TargetKind,
+			&i.ContentID,
+			&i.BuyerID,
+			&i.Decision,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markUnlinked = `-- name: MarkUnlinked :exec
 UPDATE moderation.retired_assets
 SET unlinked_at = COALESCE(unlinked_at, $1)

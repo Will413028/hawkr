@@ -237,6 +237,12 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n('hawkr.buyer.v1alpha1.Gender', value))!.uiText(l);
     case 'buyer.Profile.gender_unset':
       return buyerProfileGenderUnset(l);
+    case 'chat.Preview.erased':
+      return chatPreviewErased(l);
+    case 'chat.Preview.hidden':
+      return chatPreviewHidden(l);
+    case 'chat.Preview.image':
+      return chatPreviewImage(l);
     case 'common.PolicyCategory':
       return hawkr_common_v1alpha1_policy_category.PolicyCategory.valueOf(_n('hawkr.common.v1alpha1.PolicyCategory', value))!.uiText(l);
     case 'common.StoreCard.closed_store':

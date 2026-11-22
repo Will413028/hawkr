@@ -168,7 +168,7 @@ class SubmitReportRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   ReportTarget ensureTarget() => $_ensure(0);
 
-  /// 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
+  /// 檢舉原因：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
   @$pb.TagNumber(2)
   $2.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
@@ -400,6 +400,151 @@ class ListMyReportsResponse extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ListMyReportsResponse>(
           ListMyReportsResponse.$_createMessage);
   static ListMyReportsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<MyReportItem> get reports => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class ListMyStoreReportsRequest extends $pb.GeneratedMessage {
+  factory ListMyStoreReportsRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListMyStoreReportsRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListMyStoreReportsRequest._();
+
+  factory ListMyStoreReportsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyStoreReportsRequest()..mergeFromBuffer(data, registry);
+  factory ListMyStoreReportsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyStoreReportsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyStoreReportsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.moderation.v1alpha1'),
+      createEmptyInstance: ListMyStoreReportsRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyStoreReportsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyStoreReportsRequest copyWith(
+          void Function(ListMyStoreReportsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListMyStoreReportsRequest))
+          as ListMyStoreReportsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyStoreReportsRequest() / ListMyStoreReportsRequest.new instead')
+  static ListMyStoreReportsRequest create() => ListMyStoreReportsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListMyStoreReportsRequest._();
+  @$core.override
+  ListMyStoreReportsRequest createEmptyInstance() =>
+      ListMyStoreReportsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyStoreReportsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyStoreReportsRequest>(
+          ListMyStoreReportsRequest.$_createMessage);
+  static ListMyStoreReportsRequest? _defaultInstance;
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListMyStoreReportsResponse extends $pb.GeneratedMessage {
+  factory ListMyStoreReportsResponse({
+    $core.Iterable<MyReportItem>? reports,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListMyStoreReportsResponse._();
+    if (reports != null) result.reports.addAll(reports);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListMyStoreReportsResponse._();
+
+  factory ListMyStoreReportsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyStoreReportsResponse()..mergeFromBuffer(data, registry);
+  factory ListMyStoreReportsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyStoreReportsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyStoreReportsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.moderation.v1alpha1'),
+      createEmptyInstance: ListMyStoreReportsResponse.$_createMessage)
+    ..pPM<MyReportItem>(1, _omitFieldNames ? '' : 'reports',
+        subBuilder: MyReportItem.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyStoreReportsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyStoreReportsResponse copyWith(
+          void Function(ListMyStoreReportsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListMyStoreReportsResponse))
+          as ListMyStoreReportsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyStoreReportsResponse() / ListMyStoreReportsResponse.new instead')
+  static ListMyStoreReportsResponse create() => ListMyStoreReportsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListMyStoreReportsResponse._();
+  @$core.override
+  ListMyStoreReportsResponse createEmptyInstance() =>
+      ListMyStoreReportsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyStoreReportsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyStoreReportsResponse>(
+          ListMyStoreReportsResponse.$_createMessage);
+  static ListMyStoreReportsResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
   $pb.PbList<MyReportItem> get reports => $_getList(0);
@@ -652,13 +797,15 @@ class CommunityReport extends $pb.GeneratedMessage {
   void clearOutcome() => $_clearField(2);
 }
 
-/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
+/// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；對聊天訊息的檢舉，檢舉人是買家或店家：由訊息所屬的對話推導呼叫者是哪一方（店家由呼叫者此刻的店推導，請求不帶身分）。
+/// 管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 class ModerationAppServiceApi {
   final $pb.RpcClient _client;
 
   ModerationAppServiceApi(this._client);
 
-  /// SubmitReport 送出一筆檢舉。對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
+  /// SubmitReport 送出一筆檢舉。檢舉人是買家；對象是聊天訊息時，呼叫者是該訊息所屬對話的任一方（買家，或呼叫者此刻的店）都可以送，不是對話的一方回 not_found，與訊息不存在相同。
+  /// 對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
   /// 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
   /// 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
   $async.Future<SubmitReportResponse> submitReport(
@@ -673,6 +820,13 @@ class ModerationAppServiceApi {
           $pb.ClientContext? ctx, ListMyReportsRequest request) =>
       _client.invoke<ListMyReportsResponse>(ctx, 'ModerationAppService',
           'ListMyReports', request, ListMyReportsResponse());
+
+  /// ListMyStoreReports 列出呼叫者此刻的店以店家身分送出的檢舉（對象只有聊天訊息），新到舊（建立時間，再依 id 新到舊）；請求不帶 store_id。
+  /// 每筆的 subject 是 community（對象與結果）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫；沒有店回 not_found，店家退場後沒有此刻的店，所以讀不到。
+  $async.Future<ListMyStoreReportsResponse> listMyStoreReports(
+          $pb.ClientContext? ctx, ListMyStoreReportsRequest request) =>
+      _client.invoke<ListMyStoreReportsResponse>(ctx, 'ModerationAppService',
+          'ListMyStoreReports', request, ListMyStoreReportsResponse());
 }
 
 const $core.bool _omitFieldNames =

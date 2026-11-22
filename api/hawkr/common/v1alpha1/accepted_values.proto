@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package hawkr.common.v1alpha1;
+
+import "google/protobuf/descriptor.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
+
+extend google.protobuf.FieldOptions {
+  // accepted_policy_categories 列出這個請求欄位接受的 PolicyCategory，順序是各 client 選項的呈現順序；UNSPECIFIED 不會出現在清單裡。
+  // 伺服器照樣驗證，儲存端的 CHECK 與清單一致。uitext-gen 讀它並生成 Go、TS、Dart 的常數，client 不再手寫子集。
+  repeated PolicyCategory accepted_policy_categories = 50001;
+}

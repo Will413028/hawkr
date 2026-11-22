@@ -7,8 +7,7 @@
 //
 // Import 把後台紀錄（platform/adminaudit）寫在同一個 transaction 內：紀錄與資料同生同滅。
 //
-// 遷移期（隨 A5 刪除）invoice-service 還有自己的工作日鏡像：Mirror 把窗口（今天 −30 到 +400 天）與已匯入年份的交集（從窗口起日連續）連同區間內的假日
-// 推給它，由後台匯入成功後與每天一次的對帳觸發；推送失敗不影響匯入，資料以這裡為準。
+// Import 在同一個 transaction 內發布 CalendarImported，讓需要同步行事曆的訂閱者（遷移期的 internal/legacy/bizcalendarrelay）在同一個 transaction 排入工作。
 package bizcalendar
 
 import (
@@ -23,6 +22,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -47,14 +47,20 @@ func Migrations() fs.FS {
 type Store struct {
 	db    *db.DB
 	audit *adminaudit.Log
+	bus   *events.Bus
+}
+
+// CalendarImported 是某一年的行事曆匯入後在同一個 transaction 內發布的事件。
+type CalendarImported struct {
+	Year int
 }
 
 // New 建立 Store。
-func New(d *db.DB, audit *adminaudit.Log) *Store {
-	if d == nil || audit == nil {
+func New(d *db.DB, audit *adminaudit.Log, bus *events.Bus) *Store {
+	if d == nil || audit == nil || bus == nil {
 		panic("bizcalendar: missing dependency")
 	}
-	return &Store{db: d, audit: audit}
+	return &Store{db: d, audit: audit, bus: bus}
 }
 
 // ImportResult 是一次匯入的結果。
@@ -71,8 +77,8 @@ const (
 	// 一次匯入就是整年每一天，所以逐日 upsert 就是整年取代；同時匯入同一年的兩個 transaction 由主鍵與列鎖序列化，不會留下半年資料。
 	// 輸入已依 day 升序（importColumns），兩個 transaction 取列鎖的順序一致，不會死結。xmax <> 0 是被取代的既有列。
 	upsertSQL = `WITH up AS (
-INSERT INTO bizcalendar.days (day, holiday, note, year)
-SELECT t.day, t.holiday, t.note, $4::smallint FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note) ORDER BY t.day
+INSERT INTO bizcalendar.days (day, holiday, note)
+SELECT t.day, t.holiday, t.note FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note) ORDER BY t.day
 ON CONFLICT (day) DO UPDATE SET holiday = EXCLUDED.holiday, note = EXCLUDED.note
 RETURNING (xmax <> 0) AS replaced)
 SELECT count(*) FILTER (WHERE replaced) FROM up`
@@ -105,14 +111,16 @@ func (s *Store) Import(ctx context.Context, actor adminaudit.Actor, year int, co
 	}
 	err = s.db.InTx(ctx, func(ctx context.Context) error {
 		conn := s.db.Conn(ctx)
-		y := int16(year) //nolint:gosec // year 已由 ParseOfficeCalendar 限在 MinYear..MaxYear
-		if err := conn.QueryRow(ctx, upsertSQL, dates, holidays, notes, y).Scan(&res.ReplacedDayCount); err != nil {
+		if err := conn.QueryRow(ctx, upsertSQL, dates, holidays, notes).Scan(&res.ReplacedDayCount); err != nil {
 			return fmt.Errorf("bizcalendar: import year: %w", err)
 		}
-		return s.audit.Record(ctx, adminaudit.Entry{
+		if err := s.audit.Record(ctx, adminaudit.Entry{
 			Actor: actor, TargetType: AuditTargetType, TargetID: fmt.Sprint(year),
 			Detail: map[string]any{"days": res.DayCount, "holidays": res.HolidayCount, "replaced_days": res.ReplacedDayCount},
-		})
+		}); err != nil {
+			return err
+		}
+		return events.Publish(ctx, s.bus, CalendarImported{Year: year})
 	})
 	if err != nil {
 		return ImportResult{}, err

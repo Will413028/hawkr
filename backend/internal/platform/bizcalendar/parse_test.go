@@ -122,13 +122,13 @@ func TestParseRejects(t *testing.T) {
 				return "20260103,六,2"
 			}
 			return l
-		}), "CSVContent", "第 4 行：應有 4 欄"},
+		}), "CSVContent", "第 4 行：應有 4 欄，實際 3 欄"},
 		{"欄數過多", 2026, csvOf(2026, func(d, l string) string {
 			if d == "20260103" {
 				return "20260103,六,2,a,b"
 			}
 			return l
-		}), "CSVContent", "第 4 行：應有 4 欄"},
+		}), "CSVContent", "第 4 行：應有 4 欄，實際 5 欄"},
 		{"日期不是 8 位", 2026, csvOf(2026, func(d, l string) string {
 			if d == "20260103" {
 				return "2026/1/3,六,2,"
@@ -172,13 +172,16 @@ func TestParseRejects(t *testing.T) {
 			}
 			return l
 		}), "CSVContent", "缺 2026-01-01"},
-		{"夾空行", 2026, strings.Replace(full, "20260103", "\r\n20260103", 1), "CSVContent", "第 4 行：應有 4 欄"},
-		{"引號", 2026, csvOf(2026, func(d, l string) string {
-			if d == "20260103" {
-				return `20260103,六,2,"a"`
-			}
-			return l
-		}), "CSVContent", "不支援引號"},
+		{"欄數不足", 2026, lineOf("20260103,?,2"), "CSVContent", "第 4 行：應有 4 欄，實際 3 欄"},
+		{"欄數過多", 2026, lineOf("20260103,?,2,,x"), "CSVContent", "第 4 行：應有 4 欄，實際 5 欄"},
+		{"引號沒有結尾", 2026, lineOf(`20260103,?,2,"abc`), "CSVContent", "第 4 行：引號格式不正確"},
+		{"欄位中間的引號", 2026, lineOf(`20260103,?,2,a"b`), "CSVContent", "第 4 行：引號格式不正確"},
+		{"表頭前有空行", 2026, "\n\n西元日期,星期,是否放假\n", "CSVContent", "第 3 行：表頭必須是"},
+		{"表頭不符且前有空行", 2026, "\n\ndate,weekday,flag,note\n", "CSVContent", "第 3 行：表頭必須是"},
+		{"備註含 NUL", 2026, lineOf("20260103,?,2,a\x00b"), "CSVContent", "第 4 行：欄位不得包含 NUL 字元"},
+		{"日期欄含 NUL", 2026, lineOf("2026\x00103,?,2,"), "CSVContent", "第 4 行：欄位不得包含 NUL 字元"},
+		{"只有空行", 2026, "\n\n", "CSVContent", "CSV 內容是空的"},
+		{"表頭欄數不對", 2026, "西元日期,星期,是否放假\n", "CSVContent", "第 1 行：表頭必須是"},
 		{"年份太小", 0, full, "Year", "年份必須在"},
 		{"年份太大", 10000, full, "Year", "年份必須在"},
 	}
@@ -223,5 +226,59 @@ func TestParseIgnoresWeekdayColumn(t *testing.T) {
 func TestParseAcceptsBOM(t *testing.T) {
 	if days, err := ParseOfficeCalendar(2026, "\uFEFF"+csvOf(2026, nil)); err != nil || len(days) != 365 {
 		t.Fatalf("days=%d err=%v", len(days), err)
+	}
+}
+
+func lineOf(line string) string {
+	return csvOf(2026, func(d, l string) string {
+		if d == "20260103" {
+			return line
+		}
+		return l
+	})
+}
+
+func quotedNote(note string) func(d, l string) string {
+	return func(d, l string) string {
+		if d == "20260103" {
+			return `20260103,?,2,` + note
+		}
+		return l
+	}
+}
+
+func TestParseAcceptsQuotedFieldWithComma(t *testing.T) {
+	days := mustParse(t, 2026, csvOf(2026, quotedNote(`"春節,補假"`)))
+	if got := days[2].Note; got != "春節,補假" {
+		t.Fatalf("note = %q", got)
+	}
+}
+
+func TestParseAcceptsQuotedHeader(t *testing.T) {
+	content := strings.Replace(csvOf(2026, nil), officeCalendarHeader, `"西元日期","星期","是否放假","備註"`, 1)
+	mustParse(t, 2026, content)
+}
+
+func TestParseSkipsBlankLines(t *testing.T) {
+	content := strings.Replace(csvOf(2026, nil), "20260103", "\r\n\r\n20260103", 1)
+	if days := mustParse(t, 2026, content); len(days) != 365 {
+		t.Fatalf("days = %d", len(days))
+	}
+}
+
+// 引號欄位內含換行時，後面的錯誤行號仍是檔案的實際行號。
+func TestParseReportsTheRealLineAfterAMultiLineQuotedField(t *testing.T) {
+	content := csvOf(2026, func(d, l string) string {
+		switch d {
+		case "20260103":
+			return "20260103,?,2,\"a\nb\""
+		case "20260105":
+			return "20260105,?,9,"
+		}
+		return l
+	})
+	_, err := ParseOfficeCalendar(2026, content)
+	if err == nil || !strings.Contains(err.Error(), "第 7 行：是否放假必須是") {
+		t.Fatalf("err = %v", err)
 	}
 }

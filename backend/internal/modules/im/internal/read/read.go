@@ -18,20 +18,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Buyers 是在線狀態判定用到的 buyer 公開 API；正式組裝傳 *buyer.Module。
-type Buyers interface {
-	IsBlockingStore(ctx context.Context, buyerID, storeID int64) (bool, error)
-}
-
 // Stores 是在線狀態判定用到的 seller 公開 API；正式組裝傳 *seller.Module。
 type Stores interface {
-	StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
+	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
+	BuyersBlockedByStore(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error)
 }
 
-// Deps 是讀取路徑的依賴；Buyers、Stores 只有 Presence 用。
+// Deps 是讀取路徑的依賴；Stores 只有 Presence 用。
 type Deps struct {
 	DB     *db.DB
-	Buyers Buyers
 	Stores Stores
 }
 
@@ -202,8 +197,10 @@ func (s *Service) ActiveSince(ctx context.Context, p model.Party, since time.Tim
 	return s.q(ctx).ActiveConversationIDsStore(ctx, store.ActiveConversationIDsStoreParams{StoreID: p.Store.StoreID, Since: since, MaxRows: int64(limit)})
 }
 
-// Presence 回報呼叫者的每個對話的對方是否在線。授權單位是共有的對話：任何一個對話不屬於呼叫者，整個呼叫回 NotFound，
-// 呼叫者無法用任意 ID 探測任意人。對方已刪帳或退場、任一方向有封鎖都回離線，與對方真的離線不可區分；封鎖查詢失敗回錯誤，不放行。
+// Presence 回報呼叫者的每個對話的對方是否在線，回傳順序對應輸入順序（重複的 ID 各回一筆）。授權單位是共有的對話：任何一個對話不屬於呼叫者
+// （或不存在），整個呼叫回 NotFound，呼叫者無法用任意 ID 探測任意人。對方已刪帳或退場、任一方向有封鎖都回離線，與對方真的離線不可區分。
+// 資料庫往返與對話數無關，固定 2 次：一句 SQL 同時做授權、對方是否關閉或退場、買家是否封鎖店、對方是否在線；再一次 seller 的批次查詢
+// 看店家是否封鎖買家（買家呼叫 StoresBlockingBuyer，店家呼叫 BuyersBlockedByStore）。封鎖查詢失敗回錯誤，不放行。
 func (s *Service) Presence(ctx context.Context, p model.Party, conversationIDs []uuid.UUID) ([]model.PresenceState, error) {
 	if err := p.Authorize(); err != nil {
 		return nil, err
@@ -211,44 +208,58 @@ func (s *Service) Presence(ctx context.Context, p model.Party, conversationIDs [
 	if len(conversationIDs) > model.MaxPresenceConversations {
 		return nil, apperr.InvalidInputOn([]string{"ConversationIDs"}, "%s", text.ImPresenceTooMany(uitext.LocaleFrom(ctx)))
 	}
-	convs := make([]store.ImConversation, len(conversationIDs))
-	for i, id := range conversationIDs {
-		c, err := s.authorized(ctx, id, p)
-		if err != nil {
-			return nil, err
-		}
-		convs[i] = c
+	if len(conversationIDs) == 0 {
+		return []model.PresenceState{}, nil
 	}
-	out := make([]model.PresenceState, len(convs))
-	for i, c := range convs {
-		online, err := s.peerOnline(ctx, p, c)
-		if err != nil {
-			return nil, err
+	callerKind, callerID := string(model.PartyBuyer), p.BuyerID
+	if p.Kind == model.PartyStore {
+		callerKind, callerID = string(model.PartyStore), p.Store.StoreID
+	}
+	rs, err := s.q(ctx).PresenceForParty(ctx, store.PresenceForPartyParams{Kind: callerKind, PartyID: callerID, Ids: conversationIDs})
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[uuid.UUID]store.PresenceForPartyRow, len(rs))
+	for _, r := range rs {
+		byID[r.ID] = r
+	}
+	for _, id := range conversationIDs {
+		if _, ok := byID[id]; !ok {
+			return nil, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
 		}
-		out[i] = model.PresenceState{ConversationID: c.ID, Online: online}
+	}
+	var blocked map[int64]bool
+	if p.Kind == model.PartyBuyer {
+		blocked, err = s.d.Stores.StoresBlockingBuyer(ctx, p.BuyerID, distinct(rs, func(r store.PresenceForPartyRow) int64 { return r.StoreID }))
+	} else {
+		blocked, err = s.d.Stores.BuyersBlockedByStore(ctx, p.Store.StoreID, distinct(rs, func(r store.PresenceForPartyRow) int64 { return r.BuyerID }))
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.PresenceState, len(conversationIDs))
+	for i, id := range conversationIDs {
+		r := byID[id]
+		peerID := r.StoreID
+		if p.Kind == model.PartyStore {
+			peerID = r.BuyerID
+		}
+		out[i] = model.PresenceState{ConversationID: id, Online: r.PeerOnline && !r.PeerInactive && !r.BuyerBlocksStore && !blocked[peerID]}
 	}
 	return out, nil
 }
 
-func (s *Service) peerOnline(ctx context.Context, p model.Party, c store.ImConversation) (bool, error) {
-	peerKind, peerID := string(model.PartyStore), c.StoreID
-	if p.Kind == model.PartyStore {
-		peerKind, peerID = string(model.PartyBuyer), c.BuyerID
+// distinct 取各列某個 ID 去重後的清單。
+func distinct(rs []store.PresenceForPartyRow, id func(store.PresenceForPartyRow) int64) []int64 {
+	seen := make(map[int64]bool, len(rs))
+	out := make([]int64, 0, len(rs))
+	for _, r := range rs {
+		if v := id(r); !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
 	}
-	q := s.q(ctx)
-	inactive, err := q.PartyInactive(ctx, store.PartyInactiveParams{Kind: peerKind, PartyID: peerID})
-	if err != nil || inactive {
-		return false, err
-	}
-	blocking, err := s.d.Buyers.IsBlockingStore(ctx, c.BuyerID, c.StoreID)
-	if err != nil || blocking {
-		return false, err
-	}
-	blocked, err := s.d.Stores.StoreBlocksBuyer(ctx, c.StoreID, c.BuyerID)
-	if err != nil || blocked {
-		return false, err
-	}
-	return q.IsPartyOnline(ctx, store.IsPartyOnlineParams{Kind: peerKind, PartyID: peerID})
+	return out
 }
 
 // MessageForReport 是檢舉用的證據讀取：呼叫者要是該訊息所屬對話的一方，否則（含訊息不存在）NotFound，不洩漏對話存在；被檢舉的訊息已隱藏或已抹除也是 NotFound；
@@ -301,4 +312,29 @@ func (s *Service) MessageForReport(ctx context.Context, messageID uuid.UUID, rep
 		return model.ReportedMessage{}, notFound
 	}
 	return out, nil
+}
+
+// ConversationParties 回傳對話的雙方（歸屬事實）；對話不存在回 NotFound。不套可見性、不鎖列、不開 transaction（加入呼叫方的）。
+// 給 httpapi 從呼叫者的身分推導自己是對話的哪一方用：呼叫端必須把「兩邊都不是呼叫者」當 NotFound 回給 client，不得把歸屬回給 client。
+func (s *Service) ConversationParties(ctx context.Context, conversationID uuid.UUID) (model.ConversationParties, error) {
+	r, err := s.q(ctx).ConversationParties(ctx, conversationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ConversationParties{}, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ConversationParties{}, err
+	}
+	return model.ConversationParties{ConversationID: r.ConversationID, BuyerID: r.BuyerID, StoreID: r.StoreID}, nil
+}
+
+// MessageParties 回傳訊息所屬對話的雙方；訊息不存在回 NotFound。語意與限制同 ConversationParties，隱藏與抹除的訊息照樣回歸屬。
+func (s *Service) MessageParties(ctx context.Context, messageID uuid.UUID) (model.ConversationParties, error) {
+	r, err := s.q(ctx).MessageParties(ctx, messageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ConversationParties{}, apperr.NotFound("%s", text.ImMessageNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ConversationParties{}, err
+	}
+	return model.ConversationParties{ConversationID: r.ConversationID, BuyerID: r.BuyerID, StoreID: r.StoreID}, nil
 }

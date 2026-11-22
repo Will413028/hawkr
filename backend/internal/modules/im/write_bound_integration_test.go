@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -34,7 +35,7 @@ func TestWriteTxBeyondTheBoundFails(t *testing.T) {
 		call func() error
 	}{
 		{"Send", lockBuyer, b1, func() error {
-			_, err := f.m.Send(ctx, im.SendInput{Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "blocked"})
+			_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "blocked"})
 			return err
 		}},
 		{"Hide", lockMessage, msg, func() error { _, err := f.m.Hide(ctx, f.hideInput(msg)); return err }},
@@ -109,7 +110,7 @@ func TestSendStraddlingLastOKIsResyncedOnReconnect(t *testing.T) {
 	holder := make(chan error, 1)
 	go func() {
 		holder <- f.db.InTx(ctx, func(ctx context.Context) error {
-			m, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "straddles"})
+			m, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "straddles"})
 			if err != nil {
 				return err
 			}

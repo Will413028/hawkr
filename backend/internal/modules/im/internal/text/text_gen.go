@@ -159,6 +159,24 @@ func ImReceiverDeleted(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "對方帳號已刪除，無法傳送訊息", Locale: uitext.ZhTW}
 }
 
+// ImRequestIdInvalid 是模組句子 im.request_id_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImRequestIdInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The request ID is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "請求識別碼無效", Locale: uitext.ZhTW}
+}
+
+// ImRequestIdReused 是模組句子 im.request_id_reused；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ImRequestIdReused(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This message differs from the one previously sent with the same request. Please refresh the page and try again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。", Locale: uitext.ZhTW}
+}
+
 // ImSelfMessageNotAllowed 是模組句子 im.self_message_not_allowed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ImSelfMessageNotAllowed(l uitext.Locale) uitext.Message {
 	switch l {

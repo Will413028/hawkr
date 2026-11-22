@@ -201,7 +201,7 @@
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。
 - [x] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行計畫 `2026-10-27-ecommerce-scope-cut`（已刪除，見該 ADR 文末修訂）步驟 5、6；完成時勾掉這一項。
-- [ ] **A5 invoice**：先不接手發票快照，等 B8 的 ordering。
+- [ ] **A5 invoice**：先不接手發票快照，等 B8 的 ordering。刪除 `internal/legacy/bizcalendarrelay` 時，一併刪 `platform/bizcalendar` 的 `CalendarImported` 事件型別與 `worker` 的 invoice client 接線。
   - 工作日行事曆（A3 計畫 10f-4，Will 2026-11-22）：invoice 搬進單體時刪掉 `services/invoice-service/internal/domain/bizday.go` 與 `invoice_business_day_mirror`，申訴 SLA 改用 `internal/platform` 的行事曆與假日資料。同時刪掉 10f-4b 為鏡像加的東西：單體的推送與它的 legacy client、推送用的環境變數、invoice-service 的 `ReplaceBusinessDayMirror` RPC 與涵蓋區間的表、相關告警規則。invoice 自己的曆制把補班的週六算成休息日（既有缺陷，10f-4a 記錄），改用 platform 的行事曆後消失，搬遷時加一個補班日的測試。
   - 機敏檔的後台讀取（A3 計畫 8f-1 留下的終點）：稅籍佐證與發票 PDF 改由 invoice 模組的 `/api/files/admin/invoice/...` 端點提供，網址由擁有者的 Connect 方法回傳，讀取經 `media.Media.ReadSecure`，存取紀錄進 invoice 模組（先寫再讀，寫不進去就不送），admin 的檢視不帶 asset ID。舊 invoice-service 的 admin 發票 PDF 下載目前不記讀取者，搬遷時一併補上。
   - 發票申訴的違規累計交給 seller（Will 2026-10-28，ADR `2026-09-18-invoice-service-architecture.md` 文末修訂）：invoice 搬進單體時刪掉 `seller_tax_profiles` 的 `violation_window_days`、`violation_threshold`、`suspension_days` 三欄與 `recommendation`、`suggestedSuspendDays`（含 proto、openapi、gateway DTO，以及 admin 申訴頁與建立處分對話框對它們的使用）；admin 改為顯示去重後的已確認申訴作為依據，由管理員經 seller 的 `CreateMeasure` 建立認定；決定發票是否新增認定類別（58A X-a、X3）。

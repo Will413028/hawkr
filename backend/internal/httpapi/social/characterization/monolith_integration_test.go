@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -157,7 +158,7 @@ func startMonolith(t *testing.T) *monolith {
 	h, err := httpapi.NewHandler(httpapi.Deps{Assistant: &assistant.Module{},
 		Ready: d.Ping, Identity: id, Seller: sellers, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegationDeps), Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute,
-		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
+		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
 		BuyerPorts: httpbuyer.Ports{Stores: sellers},
 	})
 	if err != nil {

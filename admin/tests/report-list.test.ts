@@ -11,6 +11,7 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
+import { SELLER_CREATE_REPORT_REQUEST_CATEGORY } from "@hawkr/ui-text/accepted";
 import {
 	CASE_STATE_FILTERS,
 	caseColumnText,
@@ -30,7 +31,6 @@ import {
 import {
 	ALL_CATEGORIES,
 	ASSESSABLE_CATEGORIES,
-	REPORTER_CATEGORIES,
 } from "../src/lib/policy-category";
 import { report, T0, ts } from "./fixtures/report-fixtures";
 
@@ -49,7 +49,7 @@ test("三個分頁：待分案｜案件｜所有通報，各自的來源與類�
 			["all-reports", "所有通報", "reports"],
 		],
 	);
-	assert.equal(AWAITING.categories, REPORTER_CATEGORIES);
+	assert.equal(AWAITING.categories, SELLER_CREATE_REPORT_REQUEST_CATEGORY);
 	assert.equal(CASES.categories, ASSESSABLE_CATEGORIES);
 	assert.equal(ALL.categories, ALL_CATEGORIES);
 	assert.equal(AWAITING.categories.length, 12);

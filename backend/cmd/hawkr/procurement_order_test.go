@@ -82,21 +82,6 @@ func TestWorkerRoleRegistersProcurementJobs(t *testing.T) {
 	}
 }
 
-func funcBody(t *testing.T, name string) *ast.BlockStmt {
-	t.Helper()
-	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, d := range file.Decls {
-		if fn, ok := d.(*ast.FuncDecl); ok && fn.Name.Name == name {
-			return fn.Body
-		}
-	}
-	t.Fatalf("找不到 %s", name)
-	return nil
-}
-
 func calls(body *ast.BlockStmt, name string) bool {
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {

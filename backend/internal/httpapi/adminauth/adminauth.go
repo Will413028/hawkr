@@ -64,6 +64,7 @@ const sessionReason = "回答「我是誰」與登出，對任何已通過驗證
 // declarations 是每個 admin 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應（Check 在啟動時檢查）。
 var declarations = map[string]declaration{
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure:      requires(adminperm.BizcalendarHolidayCalendarsImport, auditAudited),
+	bizcalendarv1alpha1connect.BizCalendarAdminServicePreviewHolidayCalendarProcedure:     requires(adminperm.BizcalendarHolidayCalendarsPreview, auditReadOnly),
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure: requires(adminperm.BizcalendarHolidayCalendarCoveragesGet, auditReadOnly),
 
 	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure:        requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),

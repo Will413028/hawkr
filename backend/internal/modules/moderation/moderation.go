@@ -240,6 +240,11 @@ func (m *Module) MyReports(ctx context.Context, buyerID int64, after *ReportCurs
 	return m.report.MyReports(ctx, buyerID, after, size)
 }
 
+// MyStoreReports 列出店家以檢舉人身分送出的檢舉（只有聊天訊息），形狀、排序與分頁同 MyReports；店家退場後的檢舉列留著但呼叫方不再有「此刻的店」，所以讀不到。
+func (m *Module) MyStoreReports(ctx context.Context, storeID int64, after *ReportCursor, size int32) (ReportPage, error) {
+	return m.report.MyStoreReports(ctx, storeID, after, size)
+}
+
 // DecideCase 處理案件並結案：違規要帶認定類別、處置種類與給作者的理由，處置（social 的隱藏或警告、停權、seller 的內容下架）與結案在同一個 transaction；
 // 結案是終態；同 transaction 寫一筆後台動作紀錄（Procedure 是動作名稱）。案件已結案或 Version 過期回 VersionConflict，處置整個回滾。
 func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	sellermod "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -29,6 +30,10 @@ type pagedCommunity struct {
 
 func (p *pagedCommunity) SubmitReport(context.Context, moderation.SubmitInput) (moderation.SubmitResult, error) {
 	return moderation.SubmitResult{}, nil
+}
+
+func (p *pagedCommunity) MyStoreReports(context.Context, int64, *moderation.ReportCursor, int32) (moderation.ReportPage, error) {
+	return moderation.ReportPage{}, nil
 }
 
 func (p *pagedCommunity) MyReports(_ context.Context, buyerID int64, after *moderation.ReportCursor, size int32) (moderation.ReportPage, error) {
@@ -57,6 +62,15 @@ type pagedStores struct {
 	rows   []sellermod.Report
 	calls  []*sellermod.ReportCursor
 	buyers []int64
+	// current 是呼叫者此刻的店；nil 表示沒有店（NotFound）。
+	current *sellermod.Store
+}
+
+func (p *pagedStores) CurrentStore(context.Context, int64) (sellermod.Store, error) {
+	if p.current == nil {
+		return sellermod.Store{}, apperr.NotFound("沒有店")
+	}
+	return *p.current, nil
 }
 
 func (p *pagedStores) BuyerReports(_ context.Context, in sellermod.BuyerReportListInput) (sellermod.ReportPage, error) {

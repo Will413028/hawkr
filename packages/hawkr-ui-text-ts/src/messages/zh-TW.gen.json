@@ -16,6 +16,13 @@
       "gender_unset": "尚未設定"
     }
   },
+  "chat": {
+    "Preview": {
+      "erased": "此訊息已被移除",
+      "hidden": "此訊息已被隱藏",
+      "image": "傳送了一張圖片"
+    }
+  },
   "common": {
     "PolicyCategory": {
       "POLICY_CATEGORY_COUNTERFEIT": "仿冒商品",

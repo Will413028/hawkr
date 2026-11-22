@@ -1,0 +1,265 @@
+{
+ "mutants": [
+  {
+   "id": "periodic-no-run-on-start",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "RunOnStart: true",
+   "new": "RunOnStart: false",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "The reconciliation push no longer runs at worker start, so a restarted invoice-service waits up to a day for its mirror."
+  },
+  {
+   "id": "periodic-interval-hourly",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "const reconcileInterval = 24 * time.Hour",
+   "new": "const reconcileInterval = time.Hour",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "The reconciliation interval changes away from the daily push the monitoring alerts assume."
+  },
+  {
+   "id": "coverage-ignores-clock",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "cal.CoveredThrough(h.now())",
+   "new": "cal.CoveredThrough(time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC))",
+   "test": "internal/httpapi/bizcalendar ^TestCoverageMapsYearsAndCoveredThrough$",
+   "why": "covered_through is computed from a fixed day instead of the injected clock."
+  },
+  {
+   "id": "covered-through-set-when-uncovered",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "if through, ok := cal.CoveredThrough(h.now()); ok {",
+   "new": "if through, _ := cal.CoveredThrough(h.now()); true {",
+   "test": "internal/httpapi/bizcalendar ^TestCoveredThroughIsUnsetWhenTodaysYearIsNotImported$",
+   "why": "An unset covered_through (today's year not imported) is returned as a real date."
+  },
+  {
+   "id": "covered-through-start-year-uncovered",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tif !c.Covers(year) {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "new": "\tif false {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "test": "internal/platform/bizcalendar ^TestCoveredThrough$",
+   "why": "A start day in an unimported year is reported as covered."
+  },
+  {
+   "id": "import-publishes-no-event",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "\t\treturn events.Publish(ctx, s.bus, CalendarImported{Year: year})",
+   "new": "\t\treturn nil",
+   "test": "internal/platform/bizcalendar ^TestImportPublishesCalendarImported$",
+   "why": "Import commits without publishing the calendar-imported event, so no push is enqueued."
+  },
+  {
+   "id": "import-swallows-subscriber-failure",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "\t\treturn events.Publish(ctx, s.bus, CalendarImported{Year: year})",
+   "new": "\t\t_ = events.Publish(ctx, s.bus, CalendarImported{Year: year})\n\t\treturn nil",
+   "test": "internal/platform/bizcalendar ^TestImportRollsBackWhenASubscriberFails$",
+   "why": "A failing subscriber no longer rolls the import back."
+  },
+  {
+   "id": "upsert-writes-removed-year-column",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "INSERT INTO bizcalendar.days (day, holiday, note)\nSELECT t.day, t.holiday, t.note FROM",
+   "new": "INSERT INTO bizcalendar.days (day, holiday, note, year)\nSELECT t.day, t.holiday, t.note, 2026 FROM",
+   "test": "internal/platform/bizcalendar ^TestImportWritesTheWholeYearAndAnAuditRecord$",
+   "why": "The upsert writes the dropped year column, proving the migration removed it."
+  },
+  {
+   "id": "parse-accepts-wrong-field-count",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tr.FieldsPerRecord = fieldsPerRecord\n",
+   "new": "\tr.FieldsPerRecord = -1\n",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄數過多$",
+   "why": "Rows with a wrong number of fields are accepted."
+  },
+  {
+   "id": "parse-lazy-quotes",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tr.FieldsPerRecord = fieldsPerRecord\n",
+   "new": "\tr.FieldsPerRecord = fieldsPerRecord\n\tr.LazyQuotes = true\n",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄位中間的引號$",
+   "why": "A bare quote inside a field is accepted instead of rejected."
+  },
+  {
+   "id": "parse-line-number-from-row-count",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\t\tn, _ := r.FieldPos(0)",
+   "new": "\t\tn := len(out) + 2",
+   "test": "internal/platform/bizcalendar ^TestParseReportsTheRealLineAfterAMultiLineQuotedField$",
+   "why": "Error line numbers count records instead of file lines, so a quoted multi-line field shifts them."
+  },
+  {
+   "id": "parse-header-unchecked",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tif strings.Join(header, \",\") != officeCalendarHeader {",
+   "new": "\tif false && strings.Join(header, \",\") != officeCalendarHeader {",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭不符$",
+   "why": "A file with a different header is accepted."
+  },
+  {
+   "id": "push-unique-again",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return river.InsertOpts{MaxAttempts: pushMaxAttempts}",
+   "new": "return river.InsertOpts{MaxAttempts: pushMaxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true}}",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsHaveNoUniquenessAndBoundedAttempts$",
+   "why": "An import enqueued while a push runs is merged away again."
+  },
+  {
+   "id": "push-max-attempts-default",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "const pushMaxAttempts = 10",
+   "new": "const pushMaxAttempts = 25",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsHaveNoUniquenessAndBoundedAttempts$",
+   "why": "A failing push job retries for days instead of being dropped within a day."
+  },
+  {
+   "id": "push-no-reload-compare",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "if last != nil && last.equal(cur) {",
+   "new": "if last != nil {",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushRepushesWhenTheCalendarChangedDuringThePush$",
+   "why": "The push never compares with the reloaded calendar, so a change during the push is not pushed again."
+  },
+  {
+   "id": "push-never-gives-up",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "if round == pushRounds {",
+   "new": "if round == pushRounds+100 {",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushFailsWhenTheCalendarNeverStabilises$",
+   "why": "An unstable calendar is pushed forever instead of failing for River to retry."
+  },
+  {
+   "id": "push-failure-not-logged",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "w.log.Error(\"行事曆推送給 invoice-service 失敗\", \"error\", err)",
+   "new": "_ = err",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushLogsTheFailureSentenceTheAlertSearchesFor$",
+   "why": "The failure sentence the alert runbook searches for is no longer logged."
+  },
+  {
+   "id": "wiring-serve-subscribe-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tsubscribeBizCalendarRelay(bus, jc)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "Imports no longer enqueue a push to invoice-service."
+  },
+  {
+   "id": "wiring-worker-add-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tbizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)\n",
+   "new": "\t_, _ = calendar, invoices\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "No worker handles the push jobs, so they pile up unexecuted."
+  },
+  {
+   "id": "wiring-worker-periodic-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The daily reconciliation push is no longer scheduled."
+  },
+  {
+   "id": "subscribe-handler-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/bizcalendar_events.go",
+   "old": "\tevents.Subscribe(bus, bizcalendarrelay.OnCalendarImported(queue))\n",
+   "new": "\t_, _ = bus, bizcalendarrelay.OnCalendarImported(queue)\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelaySubscribesTheImportHandler$",
+   "why": "subscribeBizCalendarRelay subscribes nothing."
+  },
+  {
+   "id": "parse-quote-error-last-line",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "return bad(line, \"引號格式不正確\")",
+   "new": "return bad(pe.Line, \"引號格式不正確\")",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^引號沒有結尾$",
+   "why": "A quote error reports the last line read instead of the line where the record starts."
+  },
+  {
+   "id": "parse-header-line-fixed-1",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "line, _ := r.FieldPos(0)\n\t\treturn nil, bad(line, \"表頭必須是 %s\", officeCalendarHeader)",
+   "new": "return nil, bad(1, \"表頭必須是 %s\", officeCalendarHeader)",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭不符且前有空行$",
+   "why": "A header mismatch always reports line 1 even after blank lines."
+  },
+  {
+   "id": "parse-field-count-detail-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\"應有 %d 欄，實際 %d 欄\", fieldsPerRecord, len(record)",
+   "new": "\"應有 %d 欄\", fieldsPerRecord",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄數不足$",
+   "why": "The field-count error no longer says the actual count."
+  },
+  {
+   "id": "parse-nul-accepted",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "strings.ContainsRune(f, 0)",
+   "new": "strings.ContainsRune(f, 'x') && false",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^備註含 NUL$",
+   "why": "A NUL in a field passes parsing and fails later at upsert."
+  },
+  {
+   "id": "wiring-worker-built-not-registered",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tbizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)\n",
+   "new": "\t_ = bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log)\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The worker is built but never registered, so push jobs are never executed."
+  },
+  {
+   "id": "wiring-worker-periodic-discarded",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "new": "\t_ = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The reconciliation job list is built but never reaches the River worker, so the daily push is not scheduled."
+  },
+  {
+   "id": "enqueue-insert-opts-override",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "return q.Enqueue(ctx, PushArgs{}, &river.InsertOpts{MaxAttempts: 1})",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedEnqueuesOnePush$",
+   "why": "An explicit insert option overrides PushArgs.InsertOpts, so the import push no longer gets its bounded retry attempts."
+  },
+  {
+   "id": "periodic-insert-opts-override",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return PushArgs{}, nil }",
+   "new": "return PushArgs{}, &river.InsertOpts{MaxAttempts: 1} }",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "An explicit insert option overrides PushArgs.InsertOpts for the reconciliation push."
+  }
+ ]
+}

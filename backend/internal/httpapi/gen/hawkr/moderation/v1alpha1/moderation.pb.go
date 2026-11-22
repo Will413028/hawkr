@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: hawkr/moderation/v1alpha1/moderation.proto
 
-// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，以及讀自己送出過的檢舉（ModerationAppService）。
+// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，聊天訊息所屬對話的任一方（買家或店家）檢舉該則訊息，以及讀自己送出過的檢舉（ModerationAppService）。
 //
 // 檢舉送出後只回檢舉 ID 與收件時間，案件（管理員處理的單位）不對外；檢舉的結果由所屬案件的決定推導，不另存逐筆結果。
 // ID 是不透明的字串（貼文、留言、討論區留言與檢舉是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -212,7 +212,7 @@ func (x *ReportTarget) GetId() string {
 type SubmitReportRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Target *ReportTarget          `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	// 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
+	// 檢舉原因：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
 	Category v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 選填的說明，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
@@ -439,6 +439,111 @@ func (x *ListMyReportsResponse) GetNextPageToken() string {
 	return ""
 }
 
+type ListMyStoreReportsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 20，上限 50。
+	PageSize      int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyStoreReportsRequest) Reset() {
+	*x = ListMyStoreReportsRequest{}
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyStoreReportsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyStoreReportsRequest) ProtoMessage() {}
+
+func (x *ListMyStoreReportsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyStoreReportsRequest.ProtoReflect.Descriptor instead.
+func (*ListMyStoreReportsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListMyStoreReportsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListMyStoreReportsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListMyStoreReportsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reports       []*MyReportItem        `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyStoreReportsResponse) Reset() {
+	*x = ListMyStoreReportsResponse{}
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyStoreReportsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyStoreReportsResponse) ProtoMessage() {}
+
+func (x *ListMyStoreReportsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyStoreReportsResponse.ProtoReflect.Descriptor instead.
+func (*ListMyStoreReportsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListMyStoreReportsResponse) GetReports() []*MyReportItem {
+	if x != nil {
+		return x.Reports
+	}
+	return nil
+}
+
+func (x *ListMyStoreReportsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 // MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
 type MyReportItem struct {
 	state    protoimpl.MessageState  `protogen:"open.v1"`
@@ -460,7 +565,7 @@ type MyReportItem struct {
 
 func (x *MyReportItem) Reset() {
 	*x = MyReportItem{}
-	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -472,7 +577,7 @@ func (x *MyReportItem) String() string {
 func (*MyReportItem) ProtoMessage() {}
 
 func (x *MyReportItem) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5]
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -485,7 +590,7 @@ func (x *MyReportItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MyReportItem.ProtoReflect.Descriptor instead.
 func (*MyReportItem) Descriptor() ([]byte, []int) {
-	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{5}
+	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MyReportItem) GetId() string {
@@ -575,7 +680,7 @@ type CommunityReport struct {
 
 func (x *CommunityReport) Reset() {
 	*x = CommunityReport{}
-	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -587,7 +692,7 @@ func (x *CommunityReport) String() string {
 func (*CommunityReport) ProtoMessage() {}
 
 func (x *CommunityReport) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[6]
+	mi := &file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -600,7 +705,7 @@ func (x *CommunityReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommunityReport.ProtoReflect.Descriptor instead.
 func (*CommunityReport) Descriptor() ([]byte, []int) {
-	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{6}
+	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CommunityReport) GetTarget() *ReportTarget {
@@ -621,13 +726,13 @@ var File_hawkr_moderation_v1alpha1_moderation_proto protoreflect.FileDescriptor
 
 const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\"i\n" +
+	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/accepted_values.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\"i\n" +
 	"\fReportTarget\x12D\n" +
 	"\x04kind\x18\x01 \x01(\x0e2+.hawkr.moderation.v1alpha1.ReportTargetKindB\x03\xe0A\x02R\x04kind\x12\x13\n" +
-	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\"\xee\x01\n" +
+	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\"\xfa\x01\n" +
 	"\x13SubmitReportRequest\x12D\n" +
-	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x02R\x06target\x12F\n" +
-	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\bcategory\x12 \n" +
+	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x02R\x06target\x12R\n" +
+	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x0f\xe0A\x02\x8a\xb5\x18\b\x0e\x0f\x10\x11\x04\x01\b\rR\bcategory\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12'\n" +
 	"\n" +
 	"request_id\x18\x04 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\"p\n" +
@@ -640,6 +745,13 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"\x82\x01\n" +
 	"\x15ListMyReportsResponse\x12A\n" +
+	"\areports\x18\x01 \x03(\v2'.hawkr.moderation.v1alpha1.MyReportItemR\areports\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"W\n" +
+	"\x19ListMyStoreReportsRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"\x87\x01\n" +
+	"\x1aListMyStoreReportsResponse\x12A\n" +
 	"\areports\x18\x01 \x03(\v2'.hawkr.moderation.v1alpha1.MyReportItemR\areports\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa8\x03\n" +
 	"\fMyReportItem\x12\x0e\n" +
@@ -669,10 +781,11 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16REPORT_OUTCOME_PENDING\x10\x01\x12\x1c\n" +
 	"\x18REPORT_OUTCOME_VIOLATION\x10\x02\x12\x1f\n" +
-	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x032\x80\x02\n" +
+	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x032\x89\x03\n" +
 	"\x14ModerationAppService\x12o\n" +
 	"\fSubmitReport\x12..hawkr.moderation.v1alpha1.SubmitReportRequest\x1a/.hawkr.moderation.v1alpha1.SubmitReportResponse\x12w\n" +
-	"\rListMyReports\x12/.hawkr.moderation.v1alpha1.ListMyReportsRequest\x1a0.hawkr.moderation.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x01B\x9d\x02\n" +
+	"\rListMyReports\x12/.hawkr.moderation.v1alpha1.ListMyReportsRequest\x1a0.hawkr.moderation.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x01\x12\x86\x01\n" +
+	"\x12ListMyStoreReports\x124.hawkr.moderation.v1alpha1.ListMyStoreReportsRequest\x1a5.hawkr.moderation.v1alpha1.ListMyStoreReportsResponse\"\x03\x90\x02\x01B\x9d\x02\n" +
 	"\x1dcom.hawkr.moderation.v1alpha1B\x0fModerationProtoP\x01Zegithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1;moderationv1alpha1\xa2\x02\x03HMX\xaa\x02\x19Hawkr.Moderation.V1alpha1\xca\x02\x19Hawkr\\Moderation\\V1alpha1\xe2\x02%Hawkr\\Moderation\\V1alpha1\\GPBMetadata\xea\x02\x1bHawkr::Moderation::V1alpha1b\x06proto3"
 
 var (
@@ -688,43 +801,48 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_moderation_v1alpha1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_hawkr_moderation_v1alpha1_moderation_proto_goTypes = []any{
-	(ReportTargetKind)(0),         // 0: hawkr.moderation.v1alpha1.ReportTargetKind
-	(ReportOutcome)(0),            // 1: hawkr.moderation.v1alpha1.ReportOutcome
-	(*ReportTarget)(nil),          // 2: hawkr.moderation.v1alpha1.ReportTarget
-	(*SubmitReportRequest)(nil),   // 3: hawkr.moderation.v1alpha1.SubmitReportRequest
-	(*SubmitReportResponse)(nil),  // 4: hawkr.moderation.v1alpha1.SubmitReportResponse
-	(*ListMyReportsRequest)(nil),  // 5: hawkr.moderation.v1alpha1.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil), // 6: hawkr.moderation.v1alpha1.ListMyReportsResponse
-	(*MyReportItem)(nil),          // 7: hawkr.moderation.v1alpha1.MyReportItem
-	(*CommunityReport)(nil),       // 8: hawkr.moderation.v1alpha1.CommunityReport
-	(v1alpha1.PolicyCategory)(0),  // 9: hawkr.common.v1alpha1.PolicyCategory
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
-	(*v1alpha11.StoreReport)(nil), // 11: hawkr.seller.v1alpha1.StoreReport
+	(ReportTargetKind)(0),              // 0: hawkr.moderation.v1alpha1.ReportTargetKind
+	(ReportOutcome)(0),                 // 1: hawkr.moderation.v1alpha1.ReportOutcome
+	(*ReportTarget)(nil),               // 2: hawkr.moderation.v1alpha1.ReportTarget
+	(*SubmitReportRequest)(nil),        // 3: hawkr.moderation.v1alpha1.SubmitReportRequest
+	(*SubmitReportResponse)(nil),       // 4: hawkr.moderation.v1alpha1.SubmitReportResponse
+	(*ListMyReportsRequest)(nil),       // 5: hawkr.moderation.v1alpha1.ListMyReportsRequest
+	(*ListMyReportsResponse)(nil),      // 6: hawkr.moderation.v1alpha1.ListMyReportsResponse
+	(*ListMyStoreReportsRequest)(nil),  // 7: hawkr.moderation.v1alpha1.ListMyStoreReportsRequest
+	(*ListMyStoreReportsResponse)(nil), // 8: hawkr.moderation.v1alpha1.ListMyStoreReportsResponse
+	(*MyReportItem)(nil),               // 9: hawkr.moderation.v1alpha1.MyReportItem
+	(*CommunityReport)(nil),            // 10: hawkr.moderation.v1alpha1.CommunityReport
+	(v1alpha1.PolicyCategory)(0),       // 11: hawkr.common.v1alpha1.PolicyCategory
+	(*timestamppb.Timestamp)(nil),      // 12: google.protobuf.Timestamp
+	(*v1alpha11.StoreReport)(nil),      // 13: hawkr.seller.v1alpha1.StoreReport
 }
 var file_hawkr_moderation_v1alpha1_moderation_proto_depIdxs = []int32{
 	0,  // 0: hawkr.moderation.v1alpha1.ReportTarget.kind:type_name -> hawkr.moderation.v1alpha1.ReportTargetKind
 	2,  // 1: hawkr.moderation.v1alpha1.SubmitReportRequest.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
-	9,  // 2: hawkr.moderation.v1alpha1.SubmitReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	10, // 3: hawkr.moderation.v1alpha1.SubmitReportResponse.create_time:type_name -> google.protobuf.Timestamp
-	7,  // 4: hawkr.moderation.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.moderation.v1alpha1.MyReportItem
-	9,  // 5: hawkr.moderation.v1alpha1.MyReportItem.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
-	10, // 6: hawkr.moderation.v1alpha1.MyReportItem.create_time:type_name -> google.protobuf.Timestamp
-	10, // 7: hawkr.moderation.v1alpha1.MyReportItem.resolve_time:type_name -> google.protobuf.Timestamp
-	8,  // 8: hawkr.moderation.v1alpha1.MyReportItem.community:type_name -> hawkr.moderation.v1alpha1.CommunityReport
-	11, // 9: hawkr.moderation.v1alpha1.MyReportItem.store:type_name -> hawkr.seller.v1alpha1.StoreReport
-	2,  // 10: hawkr.moderation.v1alpha1.CommunityReport.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
-	1,  // 11: hawkr.moderation.v1alpha1.CommunityReport.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
-	3,  // 12: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:input_type -> hawkr.moderation.v1alpha1.SubmitReportRequest
-	5,  // 13: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:input_type -> hawkr.moderation.v1alpha1.ListMyReportsRequest
-	4,  // 14: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:output_type -> hawkr.moderation.v1alpha1.SubmitReportResponse
-	6,  // 15: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:output_type -> hawkr.moderation.v1alpha1.ListMyReportsResponse
-	14, // [14:16] is the sub-list for method output_type
-	12, // [12:14] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	11, // 2: hawkr.moderation.v1alpha1.SubmitReportRequest.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	12, // 3: hawkr.moderation.v1alpha1.SubmitReportResponse.create_time:type_name -> google.protobuf.Timestamp
+	9,  // 4: hawkr.moderation.v1alpha1.ListMyReportsResponse.reports:type_name -> hawkr.moderation.v1alpha1.MyReportItem
+	9,  // 5: hawkr.moderation.v1alpha1.ListMyStoreReportsResponse.reports:type_name -> hawkr.moderation.v1alpha1.MyReportItem
+	11, // 6: hawkr.moderation.v1alpha1.MyReportItem.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
+	12, // 7: hawkr.moderation.v1alpha1.MyReportItem.create_time:type_name -> google.protobuf.Timestamp
+	12, // 8: hawkr.moderation.v1alpha1.MyReportItem.resolve_time:type_name -> google.protobuf.Timestamp
+	10, // 9: hawkr.moderation.v1alpha1.MyReportItem.community:type_name -> hawkr.moderation.v1alpha1.CommunityReport
+	13, // 10: hawkr.moderation.v1alpha1.MyReportItem.store:type_name -> hawkr.seller.v1alpha1.StoreReport
+	2,  // 11: hawkr.moderation.v1alpha1.CommunityReport.target:type_name -> hawkr.moderation.v1alpha1.ReportTarget
+	1,  // 12: hawkr.moderation.v1alpha1.CommunityReport.outcome:type_name -> hawkr.moderation.v1alpha1.ReportOutcome
+	3,  // 13: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:input_type -> hawkr.moderation.v1alpha1.SubmitReportRequest
+	5,  // 14: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:input_type -> hawkr.moderation.v1alpha1.ListMyReportsRequest
+	7,  // 15: hawkr.moderation.v1alpha1.ModerationAppService.ListMyStoreReports:input_type -> hawkr.moderation.v1alpha1.ListMyStoreReportsRequest
+	4,  // 16: hawkr.moderation.v1alpha1.ModerationAppService.SubmitReport:output_type -> hawkr.moderation.v1alpha1.SubmitReportResponse
+	6,  // 17: hawkr.moderation.v1alpha1.ModerationAppService.ListMyReports:output_type -> hawkr.moderation.v1alpha1.ListMyReportsResponse
+	8,  // 18: hawkr.moderation.v1alpha1.ModerationAppService.ListMyStoreReports:output_type -> hawkr.moderation.v1alpha1.ListMyStoreReportsResponse
+	16, // [16:19] is the sub-list for method output_type
+	13, // [13:16] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_moderation_v1alpha1_moderation_proto_init() }
@@ -732,7 +850,7 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_init() {
 	if File_hawkr_moderation_v1alpha1_moderation_proto != nil {
 		return
 	}
-	file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[5].OneofWrappers = []any{
+	file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[7].OneofWrappers = []any{
 		(*MyReportItem_Community)(nil),
 		(*MyReportItem_Store)(nil),
 	}
@@ -742,7 +860,7 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc), len(file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

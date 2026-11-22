@@ -122,20 +122,47 @@ void main() {
 
   test('類別清單不含 UNSPECIFIED 與 PLATFORM_ABUSE，其餘都有標籤', () {
     expect(
-      storeReportCategories,
+      sellerCreateReportRequestCategory,
       isNot(contains(PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE)),
     );
     expect(
-      storeReportCategories,
+      sellerCreateReportRequestCategory,
       isNot(contains(PolicyCategory.POLICY_CATEGORY_UNSPECIFIED)),
     );
     expect(
-      storeReportCategories,
+      sellerCreateReportRequestCategory,
       contains(PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY),
     );
-    for (final c in storeReportCategories) {
+    expect(sellerCreateReportRequestCategory, hasLength(12));
+    for (final c in sellerCreateReportRequestCategory) {
       expect(c.uiText(UiLocale.zhTW), isNotNull, reason: '$c');
     }
+  });
+
+  test('社群的四個類別不在店家檢舉的清單與畫面選項', () {
+    const communityOnly = [
+      PolicyCategory.POLICY_CATEGORY_SPAM,
+      PolicyCategory.POLICY_CATEGORY_HARASSMENT,
+      PolicyCategory.POLICY_CATEGORY_HATE,
+      PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT,
+    ];
+    final optionCategories = storeReportCategoryOptions(
+      UiLocale.zhTW,
+    ).map((o) => o.$1).toList();
+    for (final c in communityOnly) {
+      expect(
+        sellerCreateReportRequestCategory,
+        isNot(contains(c)),
+        reason: '$c',
+      );
+      expect(optionCategories, isNot(contains(c)), reason: '$c');
+    }
+    expect(
+      moderationSubmitReportRequestCategory,
+      containsAll(communityOnly),
+      reason: '社群檢舉的清單才有這四個',
+    );
+    expect(moderationSubmitReportRequestCategory, hasLength(8));
   });
 
   test('畫面選項只含有標籤的可檢舉類別', () {
@@ -245,11 +272,11 @@ void main() {
     await _pump(tester, loggedIn: true, reports: reports);
     await _openForm(tester);
     expect(find.text('檢舉店家'), findsOneWidget);
-    final spam = find.text(
-      PolicyCategory.POLICY_CATEGORY_SPAM.uiText(UiLocale.zhTW)!,
+    final fraud = find.text(
+      PolicyCategory.POLICY_CATEGORY_FRAUD.uiText(UiLocale.zhTW)!,
     );
-    await tester.ensureVisible(spam);
-    await tester.tap(spam);
+    await tester.ensureVisible(fraud);
+    await tester.tap(fraud);
     await tester.enterText(
       find.byKey(const ValueKey('store-report-description')),
       '重複內容',

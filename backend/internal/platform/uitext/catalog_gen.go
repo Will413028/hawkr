@@ -61,6 +61,30 @@ func (t Text) BuyerProfileGenderUnset() string {
 	return "尚未設定"
 }
 
+// ChatPreviewErased 是 chat.Preview.erased 的文案。
+func (t Text) ChatPreviewErased() string {
+	if t.Locale() == EN {
+		return "This message has been removed"
+	}
+	return "此訊息已被移除"
+}
+
+// ChatPreviewHidden 是 chat.Preview.hidden 的文案。
+func (t Text) ChatPreviewHidden() string {
+	if t.Locale() == EN {
+		return "This message has been hidden"
+	}
+	return "此訊息已被隱藏"
+}
+
+// ChatPreviewImage 是 chat.Preview.image 的文案。
+func (t Text) ChatPreviewImage() string {
+	if t.Locale() == EN {
+		return "Sent a photo"
+	}
+	return "傳送了一張圖片"
+}
+
 // CommonPolicyCategory 是 common.PolicyCategory 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) CommonPolicyCategory(v string) (string, bool) {

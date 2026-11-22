@@ -36,6 +36,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.chat.v1alpha1.ChatParty",
+      "dartClass": "ChatParty",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.chat.v1alpha1.MessageKind",
+      "dartClass": "MessageKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.common.v1alpha1.ErrorReason",
       "dartClass": "ErrorReason",
       "dartLibrary": "package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart",

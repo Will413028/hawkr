@@ -5,6 +5,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 )
 
 // FormatID 是對外的 ID：帳號、管理員、買家與店家的主鍵過渡期是整數（ADR 2026-09-25-row-identity-by-data-kind），
@@ -41,7 +42,7 @@ func ParseRequestID(raw string) (*uuid.UUID, error) {
 		return nil, nil
 	}
 	id, err := uuid.Parse(raw)
-	if err != nil || len(raw) != 36 || id[6]>>4 != 4 || id[8]&0xc0 != 0x80 {
+	if err != nil || len(raw) != 36 || !requestid.IsV4(id) {
 		return nil, RequiredField("request_id", "request_id 必須是 UUIDv4")
 	}
 	return &id, nil

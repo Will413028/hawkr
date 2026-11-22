@@ -31,6 +31,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/legacy/accountservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/bizcalendarrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerserver"
@@ -149,8 +150,6 @@ func runServe(ctx context.Context) error {
 	crmAddr := e.String("CRM_SERVICE_ADDR")
 	// 店家評價統計（店面頁、推薦排行）：review 還在舊服務（遷移計畫 A6）。
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
-	// 工作日行事曆由單體擁有，推給還在舊服務的 invoice-service 當鏡像（遷移計畫 10f-4b；A5 搬進單體後刪除）。
-	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	// 直接呼叫單體的 web 的 origin（CSRF 與 gateway 的 WebSocket 比對；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
 	// CDN 帶的 client IP header）。
 	origins := e.List("CORS_ALLOWED_ORIGINS")
@@ -208,26 +207,10 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	invoices, err := invoiceservice.New(invoiceAddr, internalSecret)
-	if err != nil {
-		return err
-	}
-	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now))
-	calendarMirror := bizcalendar.NewMirror(calendar, invoices, time.Now, log)
-	// 啟動時與每天對帳一次：匯入後的推送失敗、invoice 重開、窗口隨日期前進都靠它補齊；ctx 取消時結束，離開前等它收尾。
-	mirrorCtx, stopMirror := context.WithCancel(ctx)
-	mirrorDone := make(chan struct{})
-	go func() {
-		defer close(mirrorDone)
-		calendarMirror.Run(mirrorCtx, calendarMirrorInterval)
-	}()
-	defer func() {
-		stopMirror()
-		<-mirrorDone
-	}()
+	bus := events.NewBus()
+	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
 	// 刪除帳號、確認代行的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted、
 	// delegation.operation.completed），由 worker 送出。
-	bus := events.NewBus()
 	enqueueLegacy := func(ctx context.Context, a rabbitmq.PublishArgs) error {
 		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
 	}
@@ -264,6 +247,7 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)
@@ -307,6 +291,7 @@ func runServe(ctx context.Context) error {
 		Ready:      d.Ping,
 		Social:     socialModule,
 		Review:     reviewModule,
+		IM:         imModule,
 		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,
@@ -317,31 +302,30 @@ func runServe(ctx context.Context) error {
 			Now:    time.Now,
 			Logger: log,
 		}),
-		Identity:          id,
-		WebLogin:          webLogin,
-		AppLogin:          appLogin,
-		Buyer:             buyerModule,
-		Seller:            sellerModule,
-		Payment:           payments,
-		BizCalendar:       calendar,
-		BizCalendarMirror: calendarMirror,
-		Discovery:         discoveryModule,
-		ReviewQueue:       reviewqueue.New(reviewqueue.Deps{DB: d}),
-		Stats:             stats,
-		DashboardOrders:   sellerDashboardOrders{orders},
-		SocialProducts:    socialCards{products},
-		BuyerPorts:        httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
-		Deletion:          deletion,
-		Delegation:        del,
-		Images:            images,
-		WebOrigin:         web,
-		Origins:           origins,
-		OriginAuth:        originAuth,
-		ClientIP:          clientIP,
-		Legacy:            gateway,
-		LegacyPrefixes:    gatewayproxy.Prefixes,
-		Now:               time.Now,
-		Logger:            log,
+		Identity:        id,
+		WebLogin:        webLogin,
+		AppLogin:        appLogin,
+		Buyer:           buyerModule,
+		Seller:          sellerModule,
+		Payment:         payments,
+		BizCalendar:     calendar,
+		Discovery:       discoveryModule,
+		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
+		Stats:           stats,
+		DashboardOrders: sellerDashboardOrders{orders},
+		SocialProducts:  socialCards{products},
+		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
+		Deletion:        deletion,
+		Delegation:      del,
+		Images:          images,
+		WebOrigin:       web,
+		Origins:         origins,
+		OriginAuth:      originAuth,
+		ClientIP:        clientIP,
+		Legacy:          gateway,
+		LegacyPrefixes:  gatewayproxy.Prefixes,
+		Now:             time.Now,
+		Logger:          log,
 	})
 	if err != nil {
 		return err
@@ -359,14 +343,13 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
-	serveErr := serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
+	// Run 的連線是專用的（Deps.ListenConnConfig 為 nil：以主連線池的設定另開），所以 DATABASE_URL 必須是直連或 session 模式的 Postgres，不能經 transaction pooling。
+	serveErr := serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 	sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return errors.Join(serveErr, assistantModule.Shutdown(sc))
 }
-
-// calendarMirrorInterval 是行事曆推給 invoice-service 的對帳間隔。
-const calendarMirrorInterval = 24 * time.Hour
 
 // workerConcurrency 是 default queue 同時執行的 job 上限。
 const workerConcurrency = 10
@@ -384,6 +367,8 @@ func runWorker(ctx context.Context) error {
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
+	// 工作日行事曆推給還在舊服務的 invoice-service 當鏡像（bizcalendarrelay；A5 搬進單體後刪除）。
+	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
 	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	log := newLogger()
@@ -428,6 +413,10 @@ func runWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	invoices, err := invoiceservice.New(invoiceAddr, internalSecret)
+	if err != nil {
+		return err
+	}
 
 	jc, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -435,6 +424,7 @@ func runWorker(ctx context.Context) error {
 	}
 	bus := events.NewBus()
 	subscribeBuyerEvents(bus, jc)
+	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
 	id := newIdentity(d, bus, idc, log)
 	med, err := mediaservice.New(mediaCfg)
 	if err != nil {
@@ -507,6 +497,7 @@ func runWorker(ctx context.Context) error {
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
 	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
+	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)
@@ -519,6 +510,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
 	periodic = append(periodic, procurementModule.PeriodicJobs()...)
+	periodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)
 	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
 	if err != nil {
 		return err
@@ -574,6 +566,31 @@ func newServer(h http.Handler) *http.Server {
 	return srv
 }
 
+// serveWithRun 在 serveAll 之外跑一個與 server 同生命週期的背景元件（im 的即時通道）：任何一方（ctx 結束、server 失敗、run 失敗）觸發收尾時，先取消 run 的 ctx 再 Shutdown，
+// 讓開著的串流以 run 的收尾結束，而不是讓 Shutdown 等滿逾時；
+// run 在 ctx 沒結束時返回（含 nil）都是失敗，會讓 server 停止並讓 serve 回錯誤（process 退出，由平台重啟），不靜默吞掉。
+func serveWithRun(ctx context.Context, run func(context.Context) error, servers ...listening) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	runDone := make(chan error, 1)
+	go func() {
+		err := run(ctx)
+		switch {
+		case ctx.Err() != nil && (err == nil || errors.Is(err, context.Canceled)):
+			err = nil
+		case err == nil:
+			err = errors.New("背景元件在 ctx 結束前返回")
+		}
+		if err != nil {
+			cancel()
+		}
+		runDone <- err
+	}()
+	serveErr := serveAllThen(ctx, cancel, servers...)
+	cancel()
+	return errors.Join(serveErr, <-runDone)
+}
+
 // listening 是一個在 listener 上服務的 server。
 type listening struct {
 	ln  net.Listener
@@ -583,6 +600,11 @@ type listening struct {
 // serveAll 讓每個 server 在自己的 listener 上服務，直到 ctx 結束或其中一個失敗；之後全部停止接新連線，並等
 // 進行中的請求收尾。
 func serveAll(ctx context.Context, servers ...listening) error {
+	return serveAllThen(ctx, nil, servers...)
+}
+
+// serveAllThen 同 serveAll；beforeShutdown 非 nil 時，在觸發收尾之後、Shutdown 之前呼叫一次。
+func serveAllThen(ctx context.Context, beforeShutdown func(), servers ...listening) error {
 	errc := make(chan error, len(servers))
 	for _, s := range servers {
 		go func() { errc <- s.srv.Serve(s.ln) }()
@@ -591,6 +613,9 @@ func serveAll(ctx context.Context, servers ...listening) error {
 	select {
 	case first = <-errc:
 	case <-ctx.Done():
+	}
+	if beforeShutdown != nil {
+		beforeShutdown()
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

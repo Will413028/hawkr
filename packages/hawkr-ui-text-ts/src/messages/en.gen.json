@@ -16,6 +16,13 @@
       "gender_unset": "Not set"
     }
   },
+  "chat": {
+    "Preview": {
+      "erased": "This message has been removed",
+      "hidden": "This message has been hidden",
+      "image": "Sent a photo"
+    }
+  },
   "common": {
     "PolicyCategory": {
       "POLICY_CATEGORY_COUNTERFEIT": "仿冒商品",
