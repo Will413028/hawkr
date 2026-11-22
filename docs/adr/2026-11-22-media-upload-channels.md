@@ -3,7 +3,7 @@
 | 項目 | 值 |
 |---|---|
 | 狀態 | accepted |
-| 日期 | 2026-11-21（Will 決定方向）；2026-11-22（Will 決定機敏檔改經單體串流） |
+| 日期 | 2026-11-21（Will 決定方向）；2026-11-22（Will 決定機敏檔改經單體串流）；2026-11-23（Will 決定機敏檔分段上傳） |
 | 影響範圍 | `backend/internal/modules/media`、`api/` 的 media 契約、website、admin、buyer-app、seller-app 的上傳 |
 | 執行計畫 | `backend/docs/plans/2026-11-21-b1-media.md`（決定 B1-D2、B1-D5；B1-2 共用段的狀態機） |
 
@@ -60,6 +60,16 @@ public 圖片：取捨是「多一個非同步狀態與 client 輪詢」換「�
 
 - 量到 website 反代撐不住機敏檔大小，而且沒有不經反代的安全做法：重新評估機敏檔的通道。
 - R2 支援 POST policy 的大小範圍：public 可改綁範圍，省掉 client 先報大小。
+
+## 修訂 2026-11-23：機敏檔分段經單體
+
+脈絡段「反代路徑的請求大小上限未量測」的處理：website 部署環境的反代是 Next 的外部 rewrite（`website/lib/api/local-proxy.ts`），Vercel 對它的限制是每個請求最長 120 秒，超過回 `ROUTER_EXTERNAL_TARGET_ERROR`（<https://vercel.com/docs/limits>「Proxied request timeout」）；body 上限文件未寫。100 MiB 要在 120 秒內送完需要約 7 Mbps 上行（推論），慢速上行必失敗且不能續傳。觸發撤銷條件第一項。
+
+考慮過：先部署 preview 量 body 上限（120 秒逾時仍在）；website 改打單體的 API 子網域（cookie 範圍變寬、部署網域未定）；機敏檔改預簽直傳暫存區（明文停在 R2，違反本 ADR 的機敏檔理由）；上限降到 4 MB（大掃描檔被擋）。
+
+決策（Will 2026-11-23）：機敏檔維持經單體、明文不落 R2，改成分段上傳。`BeginSecureUpload` 宣告總大小，伺服器回 token 與段大小（4 MiB，單一來源在伺服器）；client 依序以 `PUT /api/files/secure_uploads/{token}/chunks/{index}` 送原始位元組，序號不符回 409 並以回應 header `Hawkr-Next-Index` 帶下一段序號，client 依它續傳（形狀比照 tus 的 offset 協定 <https://tus.io/protocols/resumable-upload>）。單體每段獨立加密，每次嘗試寫成新的 `secure/<asset>/<index>/<attempt>`，推進成功那次的 key 記在 DB，最後一段寫完才建資產列與 `ready` 的暫存列。密文格式見 ADR `2026-11-22-media-secure-stream-aead.md` 2026-11-23 修訂。App 也走同一條路，不留整檔單一請求的第二條路徑。
+
+代價：上傳會話要記進度、讀取串多個物件；換來每個請求在 4 MiB 內、不受 120 秒逾時影響，斷線可從下一段續傳。
 
 ## 相關
 
