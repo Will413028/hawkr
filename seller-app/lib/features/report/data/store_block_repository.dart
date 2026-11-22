@@ -79,6 +79,16 @@ class StoreBlockRepository {
     await _seller.blockBuyer(pb.BlockBuyerRequest(forumEntryId: forumEntryId));
   }
 
+  /// 以聊天訊息封鎖它所屬對話的買家（呼叫者此刻的店要是該對話的店家）。
+  Future<void> blockByMessage(String messageId) async {
+    await _seller.blockBuyer(pb.BlockBuyerRequest(messageId: messageId));
+  }
+
+  /// 以評價封鎖寫這則評價的買家（要是呼叫者此刻的店的評價）。
+  Future<void> blockByReview(String reviewId) async {
+    await _seller.blockBuyer(pb.BlockBuyerRequest(reviewId: reviewId));
+  }
+
   Future<void> unblock(String buyerId) async {
     await _seller.unblockBuyer(pb.UnblockBuyerRequest(buyerId: buyerId));
   }
