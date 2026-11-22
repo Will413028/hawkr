@@ -5,7 +5,7 @@ package storage
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // Content-MD5 是 S3 協定要求的完整性 header，不作安全用途
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -144,7 +144,7 @@ func startGarage(t *testing.T) (*S3, string) {
 }
 
 func md5B64(b []byte) string {
-	sum := md5.Sum(b)
+	sum := md5.Sum(b) //nolint:gosec // 同上
 	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
@@ -169,7 +169,7 @@ func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[strin
 	if err != nil {
 		t.Fatalf("send presigned put: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return resp.StatusCode
 }
@@ -191,7 +191,7 @@ func readAll(t *testing.T, s *S3, key string) []byte {
 	if err != nil {
 		t.Fatalf("get %s: %v", key, err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	b, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
