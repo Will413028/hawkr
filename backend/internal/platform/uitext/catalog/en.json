@@ -21,8 +21,14 @@
     "buyer.Gender.GENDER_OTHER": {
       "message": "Other"
     },
+    "buyer.Profile.deleted_name": {
+      "message": "Deleted account"
+    },
     "buyer.Profile.gender_unset": {
       "message": "Not set"
+    },
+    "chat.Message.unsupported_kind": {
+      "message": "Unsupported message"
     },
     "chat.Preview.erased": {
       "message": "This message has been removed"
@@ -56,6 +62,21 @@
     },
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME": {
+      "message": "First order date"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": {
+      "message": "Order count"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": {
+      "message": "Total spent"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_NORMAL": {
+      "message": "Regular customer"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_VIP": {
+      "message": "VIP"
     },
     "moderation.CommunityReport.outcome_unset": {
       "message": "Under review"
@@ -146,6 +167,24 @@
     },
     "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
       "message": "This unit is not supported"
+    },
+    "review.Review.rating_label_1": {
+      "message": "Very dissatisfied"
+    },
+    "review.Review.rating_label_2": {
+      "message": "Dissatisfied"
+    },
+    "review.Review.rating_label_3": {
+      "message": "Okay"
+    },
+    "review.Review.rating_label_4": {
+      "message": "Satisfied"
+    },
+    "review.Review.rating_label_5": {
+      "message": "Very satisfied"
+    },
+    "review.ReviewAuthor.anonymous_name": {
+      "message": "Anonymous member"
     },
     "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
       "message": "Provide an explanation"

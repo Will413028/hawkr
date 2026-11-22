@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_seller/l10n/time_ago_text.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -294,7 +297,9 @@ class ChatListScreen extends HookConsumerWidget {
           return _ConversationCard(
             title: item.title,
             subtitle: item.subtitle,
-            date: item.date,
+            date: item.timeAgo == null
+                ? ''
+                : timeAgoText(context.l10n, item.timeAgo!),
             unreadCount: item.unreadCount,
             avatarUrl: avatarUrl,
             onTap: openConversation,
@@ -842,7 +847,7 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
   // API spec: lastMessageTime 是 int64 epoch 毫秒
   final ts = raw['lastMessageTime'];
 
-  String date = '';
+  TimeAgo? timeAgo;
   try {
     DateTime? d;
     if (ts is int && ts > 0) {
@@ -852,7 +857,7 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
           : DateTime.fromMillisecondsSinceEpoch(ts);
     } else if (ts != null) {
       // 嘗試 ISO 字串
-      d = DateTime.tryParse('$ts');
+      d = tryParseTaipeiInstant('$ts');
       if (d == null) {
         final tsInt = int.tryParse('$ts') ?? 0;
         if (tsInt > 0) {
@@ -863,8 +868,7 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
       }
     }
     if (d != null && d.millisecondsSinceEpoch > 0) {
-      if (d.isUtc) d = d.toLocal();
-      date = formatTimeAgo(d);
+      timeAgo = taipeiTimeAgo(d);
     }
   } catch (_) {}
 
@@ -876,14 +880,14 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
 
   if (kDebugMode) {
     HKLog.logD(
-      '[ChatList] convId=$convId title="$title" lastMsg="$lastMsg" date=$date ts=$ts unread=$unread',
+      '[ChatList] convId=$convId title="$title" lastMsg="$lastMsg" timeAgo=$timeAgo ts=$ts unread=$unread',
     );
   }
 
   return _ChatItem(
     title: title,
     subtitle: subtitle,
-    date: date,
+    timeAgo: timeAgo,
     unreadCount: unread,
     isService: false,
     avatarUrl: avatarUrl,
@@ -895,7 +899,7 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
 class _ChatItem {
   final String title;
   final String subtitle;
-  final String date;
+  final TimeAgo? timeAgo;
   final int unreadCount;
   final bool isService;
   final String? avatarUrl;
@@ -905,7 +909,7 @@ class _ChatItem {
   const _ChatItem({
     required this.title,
     required this.subtitle,
-    required this.date,
+    this.timeAgo,
     this.unreadCount = 0,
     this.isService = false,
     this.avatarUrl,
@@ -916,7 +920,7 @@ class _ChatItem {
   _ChatItem copyWith({
     String? title,
     String? subtitle,
-    String? date,
+    TimeAgo? timeAgo,
     int? unreadCount,
     bool? isService,
     String? avatarUrl,
@@ -925,7 +929,7 @@ class _ChatItem {
   }) => _ChatItem(
     title: title ?? this.title,
     subtitle: subtitle ?? this.subtitle,
-    date: date ?? this.date,
+    timeAgo: timeAgo ?? this.timeAgo,
     unreadCount: unreadCount ?? this.unreadCount,
     isService: isService ?? this.isService,
     avatarUrl: avatarUrl ?? this.avatarUrl,

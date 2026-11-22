@@ -217,9 +217,11 @@ type Hide struct {
 
 // ProductStats 是商品的評價統計（只算公開可讀的評價）；Distribution[i] 是 (i+1) 星的評價數。
 type ProductStats struct {
-	Count        int64
-	Average      float64
-	Distribution [5]int64
+	Count int64
+	// WithImagesCount 是公開可讀且帶圖的評價數，與列表的 with_images 篩選同一個條件。
+	WithImagesCount int64
+	Average         float64
+	Distribution    [5]int64
 }
 
 // StoreStats 是店家的評價統計；Distribution[i] 是 (i+1) 星的評價數。

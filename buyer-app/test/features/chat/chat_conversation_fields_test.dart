@@ -137,12 +137,12 @@ void main() {
       expect(resolveConversationUnreadCount(const {}), 0);
     });
 
-    test('lastMessageTime 是 ISO 8601 UTC，轉成本地時間', () {
+    test('lastMessageTime 是 ISO 8601 UTC，保留時間點，顯示端走臺北時間', () {
       final parsed = resolveConversationLastMessageTime(const {
         'lastMessageTime': '2026-07-19T04:25:49Z',
       });
       expect(parsed, isNotNull);
-      expect(parsed!.isUtc, isFalse, reason: '顯示端要拿本地時間');
+      expect(parsed!.isUtc, isTrue);
       expect(parsed.toUtc().toIso8601String(), '2026-07-19T04:25:49.000Z');
       expect(
         resolveConversationLastMessageTime(const {'lastMessageTime': ''}),

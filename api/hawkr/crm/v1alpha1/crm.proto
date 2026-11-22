@@ -72,7 +72,7 @@ enum CustomerType {
 
 // CustomerSort 是客戶列表的排序欄位。
 enum CustomerSort {
-  // 同 CUSTOMER_SORT_FIRST_ORDER_TIME。
+  // 同 CUSTOMER_SORT_FIRST_ORDER_TIME；client 先把 UNSPECIFIED 換成 FIRST_ORDER_TIME 再查文案目錄的標籤，目錄不為它另設標籤。
   CUSTOMER_SORT_UNSPECIFIED = 0;
   // 首筆完成訂單的時間。
   CUSTOMER_SORT_FIRST_ORDER_TIME = 1;

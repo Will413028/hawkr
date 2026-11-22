@@ -43,8 +43,12 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.AssistantAssistantTool(goldenEnum(c.Value, "ASSISTANT_TOOL_"))
 	case "buyer.Gender":
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
+	case "buyer.Profile.deleted_name":
+		return t.BuyerProfileDeletedName(), true
 	case "buyer.Profile.gender_unset":
 		return t.BuyerProfileGenderUnset(), true
+	case "chat.Message.unsupported_kind":
+		return t.ChatMessageUnsupportedKind(), true
 	case "chat.Preview.erased":
 		return t.ChatPreviewErased(), true
 	case "chat.Preview.hidden":
@@ -62,6 +66,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "crm.CustomerSort":
+		return t.CrmCustomerSort(goldenEnum(c.Value, "CUSTOMER_SORT_"))
+	case "crm.CustomerType":
+		return t.CrmCustomerType(goldenEnum(c.Value, "CUSTOMER_TYPE_"))
 	case "moderation.CommunityReport.outcome_unset":
 		return t.ModerationCommunityReportOutcomeUnset(), true
 	case "moderation.ReportOutcome":
@@ -74,6 +82,18 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "procurement.RejectionReason":
 		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
+	case "review.Review.rating_label_1":
+		return t.ReviewReviewRatingLabel1(), true
+	case "review.Review.rating_label_2":
+		return t.ReviewReviewRatingLabel2(), true
+	case "review.Review.rating_label_3":
+		return t.ReviewReviewRatingLabel3(), true
+	case "review.Review.rating_label_4":
+		return t.ReviewReviewRatingLabel4(), true
+	case "review.Review.rating_label_5":
+		return t.ReviewReviewRatingLabel5(), true
+	case "review.ReviewAuthor.anonymous_name":
+		return t.ReviewReviewAuthorAnonymousName(), true
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.InquiryKind":

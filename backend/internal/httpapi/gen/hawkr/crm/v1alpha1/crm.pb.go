@@ -88,7 +88,7 @@ func (CustomerType) EnumDescriptor() ([]byte, []int) {
 type CustomerSort int32
 
 const (
-	// 同 CUSTOMER_SORT_FIRST_ORDER_TIME。
+	// 同 CUSTOMER_SORT_FIRST_ORDER_TIME；client 先把 UNSPECIFIED 換成 FIRST_ORDER_TIME 再查文案目錄的標籤，目錄不為它另設標籤。
 	CustomerSort_CUSTOMER_SORT_UNSPECIFIED CustomerSort = 0
 	// 首筆完成訂單的時間。
 	CustomerSort_CUSTOMER_SORT_FIRST_ORDER_TIME CustomerSort = 1

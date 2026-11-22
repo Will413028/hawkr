@@ -1,4 +1,4 @@
-import 'dart:ui' show PlatformDispatcher;
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:hawkr_api/errors.dart' show DefaultErrorText;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -7,6 +7,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 這支 App 已發佈的 UI 語系（ADR 2026-10-17-multi-locale-architecture D1）：未發佈的語系在解析時視為不存在。
 const publishedUiLocales = [UiLocale.zhTW];
+
+/// UI 語系對應的 Flutter [Locale]（ADR D1：zh-TW 是 `zh_Hant_TW`，en 是 `en`）；`MaterialApp.locale` 一律用這個，
+/// 不交給 Flutter 依裝置語言自己挑，未發佈的語系才不會出現。
+extension UiLocaleFlutter on UiLocale {
+  Locale get flutterLocale => switch (this) {
+    UiLocale.zhTW => Locale.fromSubtags(
+      languageCode: 'zh',
+      scriptCode: 'Hant',
+      countryCode: 'TW',
+    ),
+    UiLocale.en => const Locale('en'),
+  };
+}
 
 final uiLocaleProvider = Provider<UiLocale>(
   (ref) => resolveUiLocale(

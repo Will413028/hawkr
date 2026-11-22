@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileGenderUnset, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -45,6 +45,13 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_OPEN": 1,
 	"hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED": 2,
 	"hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED": 0,
+	"hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME": 1,
+	"hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": 3,
+	"hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": 2,
+	"hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_UNSPECIFIED": 0,
+	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL": 1,
+	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED": 0,
+	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP": 2,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": 3,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION": 2,
@@ -242,8 +249,14 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "buyer.Gender": {
 		return buyerGender(num("hawkr.buyer.v1alpha1.Gender", c.value));
 	}
+	case "buyer.Profile.deleted_name": {
+		return buyerProfileDeletedName();
+	}
 	case "buyer.Profile.gender_unset": {
 		return buyerProfileGenderUnset();
+	}
+	case "chat.Message.unsupported_kind": {
+		return chatMessageUnsupportedKind();
 	}
 	case "chat.Preview.erased": {
 		return chatPreviewErased();
@@ -269,6 +282,12 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "common.unknown": {
 		return commonUnknown();
 	}
+	case "crm.CustomerSort": {
+		return crmCustomerSort(num("hawkr.crm.v1alpha1.CustomerSort", c.value));
+	}
+	case "crm.CustomerType": {
+		return crmCustomerType(num("hawkr.crm.v1alpha1.CustomerType", c.value));
+	}
 	case "moderation.CommunityReport.outcome_unset": {
 		return moderationCommunityReportOutcomeUnset();
 	}
@@ -286,6 +305,24 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "procurement.RejectionReason": {
 		return procurementRejectionReason(num("hawkr.procurement.v1alpha1.RejectionReason", c.value));
+	}
+	case "review.Review.rating_label_1": {
+		return reviewReviewRatingLabel1();
+	}
+	case "review.Review.rating_label_2": {
+		return reviewReviewRatingLabel2();
+	}
+	case "review.Review.rating_label_3": {
+		return reviewReviewRatingLabel3();
+	}
+	case "review.Review.rating_label_4": {
+		return reviewReviewRatingLabel4();
+	}
+	case "review.Review.rating_label_5": {
+		return reviewReviewRatingLabel5();
+	}
+	case "review.ReviewAuthor.anonymous_name": {
+		return reviewReviewAuthorAnonymousName();
 	}
 	case "seller.ContentKind": {
 		return sellerContentKind(num("hawkr.seller.v1alpha1.ContentKind", c.value));

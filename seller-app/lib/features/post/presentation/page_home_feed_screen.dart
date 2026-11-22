@@ -336,7 +336,7 @@ class _PostPage extends HookConsumerWidget {
 
   String _formatDate(DateTime? d) {
     if (d == null) return '';
-    final l = d.toLocal();
+    final l = d.taipei;
     final yyyy = l.year.toString().padLeft(4, '0');
     final mm = l.month.toString().padLeft(2, '0');
     final dd = l.day.toString().padLeft(2, '0');

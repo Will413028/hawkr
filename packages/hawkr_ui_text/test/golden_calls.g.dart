@@ -8,6 +8,7 @@ import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
@@ -47,6 +48,13 @@ const _enumNumber = <String, int>{
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_OPEN': 1,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED': 2,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME': 1,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_ORDER_COUNT': 3,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT': 2,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL': 1,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP': 2,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION': 3,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION': 2,
@@ -236,8 +244,12 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_assistant_v1alpha1_assistant.AssistantTool.valueOf(_n('hawkr.assistant.v1alpha1.AssistantTool', value))!.uiText(l);
     case 'buyer.Gender':
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n('hawkr.buyer.v1alpha1.Gender', value))!.uiText(l);
+    case 'buyer.Profile.deleted_name':
+      return buyerProfileDeletedName(l);
     case 'buyer.Profile.gender_unset':
       return buyerProfileGenderUnset(l);
+    case 'chat.Message.unsupported_kind':
+      return chatMessageUnsupportedKind(l);
     case 'chat.Preview.erased':
       return chatPreviewErased(l);
     case 'chat.Preview.hidden':
@@ -254,6 +266,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'crm.CustomerSort':
+      return hawkr_crm_v1alpha1_crm.CustomerSort.valueOf(_n('hawkr.crm.v1alpha1.CustomerSort', value))!.uiText(l);
+    case 'crm.CustomerType':
+      return hawkr_crm_v1alpha1_crm.CustomerType.valueOf(_n('hawkr.crm.v1alpha1.CustomerType', value))!.uiText(l);
     case 'moderation.CommunityReport.outcome_unset':
       return moderationCommunityReportOutcomeUnset(l);
     case 'moderation.ReportOutcome':
@@ -266,6 +282,18 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n('hawkr.payment.v1alpha1.RequirementCollection', value))!.uiText(l);
     case 'procurement.RejectionReason':
       return hawkr_procurement_v1alpha1_procurement.RejectionReason.valueOf(_n('hawkr.procurement.v1alpha1.RejectionReason', value))!.uiText(l);
+    case 'review.Review.rating_label_1':
+      return reviewReviewRatingLabel1(l);
+    case 'review.Review.rating_label_2':
+      return reviewReviewRatingLabel2(l);
+    case 'review.Review.rating_label_3':
+      return reviewReviewRatingLabel3(l);
+    case 'review.Review.rating_label_4':
+      return reviewReviewRatingLabel4(l);
+    case 'review.Review.rating_label_5':
+      return reviewReviewRatingLabel5(l);
+    case 'review.ReviewAuthor.anonymous_name':
+      return reviewReviewAuthorAnonymousName(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n('hawkr.seller.v1alpha1.ContentKind', value))!.uiText(l);
     case 'seller.InquiryKind':

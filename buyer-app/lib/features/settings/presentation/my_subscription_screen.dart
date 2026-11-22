@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'dart:async';
@@ -1598,30 +1601,24 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         final milliseconds = value > 1000000000000
             ? value.toInt()
             : value.toInt() * 1000;
-        return DateTime.fromMillisecondsSinceEpoch(milliseconds).toLocal();
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
       final raw = value.toString().trim();
       final numeric = int.tryParse(raw);
       if (numeric != null) {
         final milliseconds = numeric > 1000000000000 ? numeric : numeric * 1000;
-        return DateTime.fromMillisecondsSinceEpoch(milliseconds).toLocal();
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
-      final parsed = DateTime.tryParse(raw);
-      if (parsed != null) return parsed.toLocal();
+      final parsed = tryParseTaipeiInstant(raw);
+      if (parsed != null) return parsed;
     }
     return null;
   }
 
   String _historyLabel(Map<String, dynamic> item) {
     final time = _activityTime(item);
-    if (time == null) return '最近看過';
-    final difference = DateTime.now().difference(time);
-    if (difference.isNegative || difference.inMinutes < 1) return '剛剛看過';
-    if (difference.inHours < 1) return '${difference.inMinutes} 分鐘前看過';
-    if (difference.inDays < 1) return '${difference.inHours} 小時前看過';
-    if (difference.inDays == 1) return '昨天看過';
-    if (difference.inDays < 7) return '${difference.inDays} 天前看過';
-    return '${time.month}/${time.day} 看過';
+    if (time == null) return context.l10n.viewedRecently;
+    return historyViewedText(context.l10n, time);
   }
 
   void _openMerchant(String storeCode) {

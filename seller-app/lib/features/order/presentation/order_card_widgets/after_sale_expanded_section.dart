@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -847,7 +848,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     String pad(int v) => v.toString().padLeft(2, '0');
     return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
   }
@@ -858,7 +859,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     if (text.isEmpty) return '';
     final dt = DateTime.tryParse(text);
     if (dt == null) return text;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     String pad(int v) => v.toString().padLeft(2, '0');
     return '${local.year}/${pad(local.month)}/${pad(local.day)}';
   }

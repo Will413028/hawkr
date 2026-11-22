@@ -25,6 +25,7 @@ import (
 // Reads 是聊天的讀取來源（*im.Module）。
 type Reads interface {
 	ListConversations(ctx context.Context, p im.Party, after *im.Cursor, size int32) (im.ConversationPage, error)
+	StoreConversationByBuyer(ctx context.Context, p im.Party, buyerID int64) (im.Conversation, error)
 	ListMessages(ctx context.Context, conversationID uuid.UUID, p im.Party, beforeSeq int64, size int32) (im.MessagePage, error)
 	MessagesAfter(ctx context.Context, conversationID uuid.UUID, p im.Party, afterSeq int64, size int32) (im.MessagePage, error)
 	UnreadTotal(ctx context.Context, p im.Party) (int64, error)

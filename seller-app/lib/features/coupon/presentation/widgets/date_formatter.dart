@@ -1,3 +1,5 @@
+import 'package:hawkr_api/taipei_time.dart';
+
 /// 日期格式化工具类
 ///
 /// 提供优惠券日期的格式化功能
@@ -16,8 +18,8 @@ class DateFormatter {
       // 解析 ISO 8601 格式
       final utc = DateTime.parse(dateStr);
 
-      // 转换为本地时区
-      final local = utc.toLocal();
+      // 转换为臺北时间
+      final local = utc.taipeiWall;
 
       // 格式化为 XXXX/XX/XX
       final year = local.year;
@@ -54,8 +56,8 @@ class DateFormatter {
 
     try {
       final utc = DateTime.parse(dateStr);
-      final local = utc.toLocal();
-      final now = DateTime.now();
+      final local = utc.taipeiWall;
+      final now = DateTime.now().taipei;
 
       // 比较日期（忽略时间）
       final expireDate = DateTime(local.year, local.month, local.day);

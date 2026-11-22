@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -109,7 +110,7 @@ class AppealDeadlineCard extends StatelessWidget {
   }
 
   String _fmt(DateTime dt) {
-    final l = dt.toLocal();
+    final l = dt.taipeiWall;
     String two(int n) => n.toString().padLeft(2, '0');
     return '${l.year}/${two(l.month)}/${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
   }

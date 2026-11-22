@@ -155,6 +155,7 @@ const Review$json = {
       '10': 'orderItemId',
       '17': true
     },
+    {'1': 'is_mine', '3': 15, '4': 1, '5': 8, '8': {}, '10': 'isMine'},
   ],
   '8': [
     {'1': '_reply'},
@@ -176,7 +177,8 @@ final $typed_data.Uint8List reviewDescriptor = $convert.base64Decode(
     'YTEuUmV2aWV3UmVwbHlCA+BBA0gAUgVyZXBseYgBARJACgZhdXRob3IYDCABKAsyIy5oYXdrci'
     '5yZXZpZXcudjFhbHBoYTEuUmV2aWV3QXV0aG9yQgPgQQNSBmF1dGhvchIjCghvcmRlcl9ubxgN'
     'IAEoCUID4EEDSAFSB29yZGVyTm+IAQESLAoNb3JkZXJfaXRlbV9pZBgOIAEoCUID4EEDSAJSC2'
-    '9yZGVySXRlbUlkiAEBQggKBl9yZXBseUILCglfb3JkZXJfbm9CEAoOX29yZGVyX2l0ZW1faWQ=');
+    '9yZGVySXRlbUlkiAEBEhwKB2lzX21pbmUYDyABKAhCA+BBA1IGaXNNaW5lQggKBl9yZXBseUIL'
+    'Cglfb3JkZXJfbm9CEAoOX29yZGVyX2l0ZW1faWQ=');
 
 @$core.Deprecated('Use listProductReviewsRequestDescriptor instead')
 const ListProductReviewsRequest$json = {
@@ -347,15 +349,16 @@ const GetProductReviewStatsResponse$json = {
       '6': '.hawkr.review.v1alpha1.RatingCount',
       '10': 'distribution'
     },
+    {'1': 'with_images_count', '3': 4, '4': 1, '5': 5, '10': 'withImagesCount'},
   ],
 };
 
 /// Descriptor for `GetProductReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List getProductReviewStatsResponseDescriptor =
-    $convert.base64Decode(
-        'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
-        'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
-        'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbg==');
+final $typed_data.Uint8List getProductReviewStatsResponseDescriptor = $convert.base64Decode(
+    'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
+    'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
+    'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbhIqChF3aXRoX2ltYWdlc1'
+    '9jb3VudBgEIAEoBVIPd2l0aEltYWdlc0NvdW50');
 
 @$core.Deprecated('Use getReviewRequestDescriptor instead')
 const GetReviewRequest$json = {

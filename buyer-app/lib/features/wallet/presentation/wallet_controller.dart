@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/session/session_provider.dart';
 import '../data/wallet_model.dart';
@@ -124,7 +125,7 @@ final class WalletCouponCardState {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return '';
     try {
-      final date = DateTime.parse(value).toLocal();
+      final date = DateTime.parse(value).taipeiWall;
       return '有效期至 ${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
     } on FormatException {
       final fallback = value.length >= 10

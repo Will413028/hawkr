@@ -81,14 +81,14 @@
       "name": "hawkr.crm.v1alpha1.CustomerSort",
       "dartClass": "CustomerSort",
       "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.crm.v1alpha1.CustomerType",
       "dartClass": "CustomerType",
       "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

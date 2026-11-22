@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -504,7 +505,7 @@ class CustomerRepository with ApiRequestHelper {
         raw.contains('T') ? raw : raw.replaceFirst(' ', 'T'),
       );
       if (dt != null) {
-        final local = dt.toLocal();
+        final local = dt.taipeiWall;
         if (format == 'MM/dd') {
           return '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
         }

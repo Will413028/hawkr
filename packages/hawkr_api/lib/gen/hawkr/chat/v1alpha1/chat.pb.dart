@@ -381,7 +381,7 @@ class ChatBuyer extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  /// 買家的暱稱；沒有設定或已刪除時不設。
+  /// 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
   @$pb.TagNumber(2)
   $core.String get name => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -412,7 +412,7 @@ class ChatBuyer extends $pb.GeneratedMessage {
   void clearDeleted() => $_clearField(4);
 }
 
-/// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+/// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
 class Conversation extends $pb.GeneratedMessage {
   factory Conversation({
     $core.String? id,
@@ -504,7 +504,7 @@ class Conversation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $2.StoreCard ensureStore() => $_ensure(1);
 
-  /// 對方的買家；只有店家版有。
+  /// 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
   @$pb.TagNumber(3)
   ChatBuyer get buyer => $_getN(2);
   @$pb.TagNumber(3)
@@ -938,6 +938,140 @@ class ListStoreConversationsResponse extends $pb.GeneratedMessage {
   $core.bool hasNextPageToken() => $_has(1);
   @$pb.TagNumber(2)
   void clearNextPageToken() => $_clearField(2);
+}
+
+class GetStoreConversationByBuyerRequest extends $pb.GeneratedMessage {
+  factory GetStoreConversationByBuyerRequest({
+    $core.String? buyerId,
+  }) {
+    final result = GetStoreConversationByBuyerRequest._();
+    if (buyerId != null) result.buyerId = buyerId;
+    return result;
+  }
+
+  GetStoreConversationByBuyerRequest._();
+
+  factory GetStoreConversationByBuyerRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreConversationByBuyerRequest()..mergeFromBuffer(data, registry);
+  factory GetStoreConversationByBuyerRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreConversationByBuyerRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStoreConversationByBuyerRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: GetStoreConversationByBuyerRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'buyerId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreConversationByBuyerRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreConversationByBuyerRequest copyWith(
+          void Function(GetStoreConversationByBuyerRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as GetStoreConversationByBuyerRequest))
+          as GetStoreConversationByBuyerRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetStoreConversationByBuyerRequest() / GetStoreConversationByBuyerRequest.new instead')
+  static GetStoreConversationByBuyerRequest create() =>
+      GetStoreConversationByBuyerRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetStoreConversationByBuyerRequest._();
+  @$core.override
+  GetStoreConversationByBuyerRequest createEmptyInstance() =>
+      GetStoreConversationByBuyerRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetStoreConversationByBuyerRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetStoreConversationByBuyerRequest>(
+          GetStoreConversationByBuyerRequest.$_createMessage);
+  static GetStoreConversationByBuyerRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buyerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buyerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuyerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuyerId() => $_clearField(1);
+}
+
+class GetStoreConversationByBuyerResponse extends $pb.GeneratedMessage {
+  factory GetStoreConversationByBuyerResponse({
+    Conversation? conversation,
+  }) {
+    final result = GetStoreConversationByBuyerResponse._();
+    if (conversation != null) result.conversation = conversation;
+    return result;
+  }
+
+  GetStoreConversationByBuyerResponse._();
+
+  factory GetStoreConversationByBuyerResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreConversationByBuyerResponse()..mergeFromBuffer(data, registry);
+  factory GetStoreConversationByBuyerResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreConversationByBuyerResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStoreConversationByBuyerResponse',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: GetStoreConversationByBuyerResponse.$_createMessage)
+    ..aOM<Conversation>(1, _omitFieldNames ? '' : 'conversation',
+        subBuilder: Conversation.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreConversationByBuyerResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreConversationByBuyerResponse copyWith(
+          void Function(GetStoreConversationByBuyerResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as GetStoreConversationByBuyerResponse))
+          as GetStoreConversationByBuyerResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetStoreConversationByBuyerResponse() / GetStoreConversationByBuyerResponse.new instead')
+  static GetStoreConversationByBuyerResponse create() =>
+      GetStoreConversationByBuyerResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetStoreConversationByBuyerResponse._();
+  @$core.override
+  GetStoreConversationByBuyerResponse createEmptyInstance() =>
+      GetStoreConversationByBuyerResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetStoreConversationByBuyerResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              GetStoreConversationByBuyerResponse>(
+          GetStoreConversationByBuyerResponse.$_createMessage);
+  static GetStoreConversationByBuyerResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Conversation get conversation => $_getN(0);
+  @$pb.TagNumber(1)
+  set conversation(Conversation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConversation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConversation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Conversation ensureConversation() => $_ensure(0);
 }
 
 class ListMessagesRequest extends $pb.GeneratedMessage {
@@ -3237,6 +3371,18 @@ class ChatAppServiceApi {
           $pb.ClientContext? ctx, ListStoreConversationsRequest request) =>
       _client.invoke<ListStoreConversationsResponse>(ctx, 'ChatAppService',
           'ListStoreConversations', request, ListStoreConversationsResponse());
+
+  /// GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+  /// 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+  $async.Future<GetStoreConversationByBuyerResponse>
+      getStoreConversationByBuyer($pb.ClientContext? ctx,
+              GetStoreConversationByBuyerRequest request) =>
+          _client.invoke<GetStoreConversationByBuyerResponse>(
+              ctx,
+              'ChatAppService',
+              'GetStoreConversationByBuyer',
+              request,
+              GetStoreConversationByBuyerResponse());
 
   /// ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
   /// after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
