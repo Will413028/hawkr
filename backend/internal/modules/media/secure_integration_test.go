@@ -990,7 +990,7 @@ func TestReadSecure_SwappedDroppedForeignOrRecountedChunksFailToRead(t *testing.
 			if err != nil {
 				t.Fatal(err)
 			}
-			foreign := "secure/" + a.ID.String() + "/1/" + uuid.NewString()
+			foreign := "secure/" + a.ID.String() + "/1/" + uuid.New().String()
 			if err := f.store.Fake.Put(t.Context(), putInput(foreign, readAll(t, rc))); err != nil {
 				t.Fatal(err)
 			}
