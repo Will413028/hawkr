@@ -583,6 +583,30 @@ UiLocale.en => 'Not set',
 };
 }
 
+/// chat.Preview.erased
+String chatPreviewErased(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '此訊息已被移除',
+UiLocale.en => 'This message has been removed',
+};
+}
+
+/// chat.Preview.hidden
+String chatPreviewHidden(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '此訊息已被隱藏',
+UiLocale.en => 'This message has been hidden',
+};
+}
+
+/// chat.Preview.image
+String chatPreviewImage(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '傳送了一張圖片',
+UiLocale.en => 'Sent a photo',
+};
+}
+
 /// common.StoreCard.closed_store
 String commonStoreCardClosedStore(UiLocale l) {
 return switch (l) {

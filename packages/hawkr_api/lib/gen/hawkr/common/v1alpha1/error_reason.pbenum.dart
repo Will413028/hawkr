@@ -127,6 +127,26 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason REVIEW_NOT_REPLYABLE =
       ErrorReason._(18, _omitEnumNames ? '' : 'REVIEW_NOT_REPLYABLE');
 
+  /// 不能傳訊息給自己（搭配 invalid_argument）：買家帳號與店家帳號是同一個帳號。client 不提供對自己的店傳訊息的入口，顯示 LocalizedMessage。
+  /// ChatAppService.SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason SELF_MESSAGE_NOT_ALLOWED =
+      ErrorReason._(19, _omitEnumNames ? '' : 'SELF_MESSAGE_NOT_ALLOWED');
+
+  /// 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason STORE_CLOSED =
+      ErrorReason._(20, _omitEnumNames ? '' : 'STORE_CLOSED');
+
+  /// 買家與店家之間任一方向有封鎖，而且沒有進行中的訂單或售後（搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason CHAT_BLOCKED =
+      ErrorReason._(21, _omitEnumNames ? '' : 'CHAT_BLOCKED');
+
+  /// 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason RECEIVER_DELETED =
+      ErrorReason._(22, _omitEnumNames ? '' : 'RECEIVER_DELETED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -147,10 +167,14 @@ class ErrorReason extends $pb.ProtobufEnum {
     ORDER_NOT_REVIEWABLE,
     REVIEW_WINDOW_EXPIRED,
     REVIEW_NOT_REPLYABLE,
+    SELF_MESSAGE_NOT_ALLOWED,
+    STORE_CLOSED,
+    CHAT_BLOCKED,
+    RECEIVER_DELETED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 18);
+      $pb.ProtobufEnum.$_initByValueList(values, 22);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

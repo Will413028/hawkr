@@ -98,6 +98,18 @@ const (
 	// 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
 	// ReviewAppService.ReplyReview。
 	ErrorReason_REVIEW_NOT_REPLYABLE ErrorReason = 18
+	// 不能傳訊息給自己（搭配 invalid_argument）：買家帳號與店家帳號是同一個帳號。client 不提供對自己的店傳訊息的入口，顯示 LocalizedMessage。
+	// ChatAppService.SendMessageToStore、SendMessageToBuyer。
+	ErrorReason_SELF_MESSAGE_NOT_ALLOWED ErrorReason = 19
+	// 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
+	// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+	ErrorReason_STORE_CLOSED ErrorReason = 20
+	// 買家與店家之間任一方向有封鎖，而且沒有進行中的訂單或售後（搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+	// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+	ErrorReason_CHAT_BLOCKED ErrorReason = 21
+	// 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+	// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+	ErrorReason_RECEIVER_DELETED ErrorReason = 22
 )
 
 // Enum value maps for ErrorReason.
@@ -122,6 +134,10 @@ var (
 		16: "ORDER_NOT_REVIEWABLE",
 		17: "REVIEW_WINDOW_EXPIRED",
 		18: "REVIEW_NOT_REPLYABLE",
+		19: "SELF_MESSAGE_NOT_ALLOWED",
+		20: "STORE_CLOSED",
+		21: "CHAT_BLOCKED",
+		22: "RECEIVER_DELETED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -143,6 +159,10 @@ var (
 		"ORDER_NOT_REVIEWABLE":       16,
 		"REVIEW_WINDOW_EXPIRED":      17,
 		"REVIEW_NOT_REPLYABLE":       18,
+		"SELF_MESSAGE_NOT_ALLOWED":   19,
+		"STORE_CLOSED":               20,
+		"CHAT_BLOCKED":               21,
+		"RECEIVER_DELETED":           22,
 	}
 )
 
@@ -177,7 +197,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x8b\x04\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xe3\x04\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -198,7 +218,11 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x15REVIEW_ALREADY_EXISTS\x10\x0f\x12\x18\n" +
 	"\x14ORDER_NOT_REVIEWABLE\x10\x10\x12\x19\n" +
 	"\x15REVIEW_WINDOW_EXPIRED\x10\x11\x12\x18\n" +
-	"\x14REVIEW_NOT_REPLYABLE\x10\x12B\x82\x02\n" +
+	"\x14REVIEW_NOT_REPLYABLE\x10\x12\x12\x1c\n" +
+	"\x18SELF_MESSAGE_NOT_ALLOWED\x10\x13\x12\x10\n" +
+	"\fSTORE_CLOSED\x10\x14\x12\x10\n" +
+	"\fCHAT_BLOCKED\x10\x15\x12\x14\n" +
+	"\x10RECEIVER_DELETED\x10\x16B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

@@ -41,6 +41,12 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
 	case "buyer.Profile.gender_unset":
 		return t.BuyerProfileGenderUnset(), true
+	case "chat.Preview.erased":
+		return t.ChatPreviewErased(), true
+	case "chat.Preview.hidden":
+		return t.ChatPreviewHidden(), true
+	case "chat.Preview.image":
+		return t.ChatPreviewImage(), true
 	case "common.PolicyCategory":
 		return t.CommonPolicyCategory(goldenEnum(c.Value, "POLICY_CATEGORY_"))
 	case "common.StoreCard.closed_store":

@@ -17,6 +17,9 @@ export type UiTextKey =
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
 	| "buyer.Profile.gender_unset"
+	| "chat.Preview.erased"
+	| "chat.Preview.hidden"
+	| "chat.Preview.image"
 	| "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT"
 	| "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION"
 	| "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY"
@@ -238,6 +241,21 @@ export function buyerGender(v: Gender): UiMessage | undefined {
 /** buyer.Profile.gender_unset */
 export function buyerProfileGenderUnset(): UiMessage {
 	return { key: "buyer.Profile.gender_unset" };
+}
+
+/** chat.Preview.erased */
+export function chatPreviewErased(): UiMessage {
+	return { key: "chat.Preview.erased" };
+}
+
+/** chat.Preview.hidden */
+export function chatPreviewHidden(): UiMessage {
+	return { key: "chat.Preview.hidden" };
+}
+
+/** chat.Preview.image */
+export function chatPreviewImage(): UiMessage {
+	return { key: "chat.Preview.image" };
 }
 
 const COMMON_POLICY_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
