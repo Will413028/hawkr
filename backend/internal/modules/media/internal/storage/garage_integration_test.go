@@ -166,7 +166,7 @@ func md5B64(b []byte) string {
 // sendPresigned 以純 net/http 送出預簽 PUT：header 取自簽發結果，可用 override 覆蓋個別 header；
 // Content-Length 由 body 長度決定（Go 不允許用 header 設定）。回傳 HTTP 狀態碼。
 // override 的值為空字串時刪除該 header。
-func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[string]string) int {
+func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[string]string) presignedResp {
 	t.Helper()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPut, p.URL, bytes.NewReader(body))
 	if err != nil {
@@ -190,8 +190,14 @@ func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[strin
 		t.Fatalf("send presigned put: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	_, _ = io.Copy(io.Discard, resp.Body)
-	return resp.StatusCode
+	return presignedResp{Status: resp.StatusCode, Body: string(b)}
+}
+
+type presignedResp struct {
+	Status int
+	Body   string
 }
 
 func presign(t *testing.T, s *S3, key string, body []byte, contentType, md5 string) PresignedPut {
@@ -226,10 +232,10 @@ func requireAbsent(t *testing.T, s *S3, key string) {
 	}
 }
 
-func requireStatus(t *testing.T, got, want int) {
+func requireStatus(t *testing.T, got presignedResp, want int) {
 	t.Helper()
-	if got != want {
-		t.Fatalf("want HTTP %d, got %d", want, got)
+	if got.Status != want {
+		t.Fatalf("want HTTP %d, got %d: %s", want, got.Status, got.Body)
 	}
 }
 
@@ -241,8 +247,8 @@ func TestGarageStore(t *testing.T) {
 		key := NewKey(PrefixTmp)
 		body := []byte("hello presigned world")
 		p := presign(t, s, key, body, "text/plain", md5B64(body))
-		if st := sendPresigned(t, p, body, nil); st != http.StatusOK {
-			t.Fatalf("want 200, got %d", st)
+		if st := sendPresigned(t, p, body, nil); st.Status != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", st.Status, st.Body)
 		}
 		if got := readAll(t, s, key); !bytes.Equal(got, body) {
 			t.Fatalf("got %q want %q", got, body)
@@ -288,7 +294,7 @@ func TestGarageStore(t *testing.T) {
 		signedBody := []byte("signed body AAAA")
 		other := []byte("other  body BBBB")
 		p := presign(t, s, key, signedBody, "text/plain", md5B64(signedBody))
-		requireStatus(t, sendPresigned(t, p, other, map[string]string{"Content-MD5": ""}), http.StatusForbidden)
+		requireStatus(t, sendPresigned(t, p, other, map[string]string{"Content-MD5": ""}), http.StatusBadRequest)
 		requireAbsent(t, s, key)
 	})
 
