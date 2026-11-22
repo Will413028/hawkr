@@ -94,10 +94,10 @@
    "id": "reverse-error-kept-on-reopen",
    "stack": "admin",
    "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
-   "old": "\tconst openReverse = () => {\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);",
-   "new": "\tconst openReverse = () => {",
+   "old": "\tconst openReverse = () => {\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);\n\t\tsetReverseOpen(true);\n\t};\n\tconst closeReverse = () => {\n\t\tsetReverseOpen(false);\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);\n\t};",
+   "new": "\tconst openReverse = () => {\n\t\tsetReverseOpen(true);\n\t};\n\tconst closeReverse = () => {\n\t\tsetReverseOpen(false);\n\t};",
    "test": "tests/moderation-case-snapshot-reverse.test.ts 關閉再開啟時",
-   "why": "A previous reverse error or reason survives closing and reopening the dialog."
+   "why": "Neither openReverse nor closeReverse clears the reason and error, so they survive closing and reopening the dialog. Clearing in only one of the two is an equivalent mutant because each path is covered by the other."
   },
   {
    "id": "chat-reported-line-dropped",
