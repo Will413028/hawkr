@@ -28,8 +28,8 @@
 
 ## 決定
 
-- 公開圖片在處理 job 中以 libvips 重新編碼，Go 綁定用 `github.com/cshum/vipsgen` v1.3.11（只有測試依賴；由 libvips introspection 生成，涵蓋動態圖與色彩轉換）。
-- 只收 JPEG、PNG、WebP、GIF（含動態 GIF 與動態 WebP）；HEIC 由 client 先轉 JPEG，伺服器拒收。
+- 公開圖片在處理 job 中以 libvips 重新編碼，Go 綁定用 `github.com/cshum/vipsgen` v1.3.11（正式程式的 cgo 依賴，它自己沒有非測試的傳遞依賴；由 libvips introspection 生成，涵蓋動態圖與色彩轉換）。
+- 只收 JPEG、PNG、WebP、GIF（含動態 GIF 與動態 WebP）；HEIC 由 client 先轉 JPEG，伺服器拒收；動態 PNG（APNG）拒收，libvips 只解得出第一格，不默默壓成靜態圖。
 - 完整解碼前先檢查像素上限與動態圖的「影格數 × 每格像素」上限，與位元組上限定義在同一處。
 - 輸出：方向已套進像素、sRGB、不帶任何 metadata；靜態不透明 → JPEG，有透明 → PNG，動態 → 原格式。
 - CI 以 apt 裝 `libvips-dev`；本機 `brew install vips`。部署映像在單體有 Dockerfile 時加入 libvips。
