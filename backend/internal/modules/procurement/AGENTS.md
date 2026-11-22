@@ -4,7 +4,7 @@
 
 ## 職責
 
-買家採購（RFQ）與賣家報價（賣家回報價也在這裡），服務買家與賣家。事件 `procurement.*` 由 notification 訂閱。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller，不依賴 notification（見 `internal/arch/modules.go`）。資料層（A9-3a）：schema、查詢、resolver、候選型別、買家關閉清除；run 與串流 A9-3b，賣家報價與建單 3c。行為規格的唯一來源是 `backend/docs/modules/procurement.md`。
+買家採購（RFQ）與賣家報價，服務買家與賣家。事件 `procurement.*` 由 notification 訂閱。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：ordering、catalog、buyer、seller，不依賴 notification（見 `internal/arch/modules.go`）。run 與串流 A9-3b，賣家報價與建單 3c。行為規格的唯一來源是 `backend/docs/modules/procurement.md`。
 
 ## 擁有的資料
 
@@ -25,14 +25,14 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN executor，不變量見 `internal/turn/AGENTS.md`）。
+- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選、翻頁收集；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN executor，不變量見 `internal/turn/AGENTS.md`）、`search`（CANDIDATE_SEARCH executor 與 `StartCandidateSearch`，規格見 `docs/modules/procurement.md` §4）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
 
 - 模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。
 - 候選沒有店名快照，只收 OPEN（seller 判定可公開曝光）的店，名稱讀取時由 StoreCard 組裝（S9：`candidate.KeepOpen`、`TestCandidatesHaveNoStoreNameColumns`）。
-- 買家回應的候選型別 `model.Candidate` 沒有自由文字；研究摘要只在 `LLMCandidate`（A9-D8、AD7：`TestCandidateCarriesNoFreeText`）。
+- 買家回應的候選型別 `model.Candidate` 沒有自由文字（A9-D8、AD7：`TestCandidateCarriesNoFreeText`）。
 - 買家的用詞不被同義詞覆寫：原詞有命中分類就不查同義詞（AD3）；人工同義詞在 `internal/resolver/synonyms.json`，空表起步。
 - 「現行 revision」只有 `request_revisions_active` 一種表示法；requests 與 acceptances 的轉移用條件式 UPDATE，不設 version。
 - 接受單的 live 鎖只擋 `state = 'ACTIVE'`；建單重試用盡轉 `ORDER_FAILED` 解除鎖（S6，A9-D19 修訂）。
