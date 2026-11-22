@@ -85,4 +85,34 @@ void main() {
       expect(formatTaipeiDate(instant), '2026/01/02');
     });
   });
+
+  group('TaipeiWallClock.taipei', () {
+    test('欄位是臺北牆上時間，與 toLocal 的裝置時區無關', () {
+      final t = DateTime.utc(2026, 7, 29, 16, 0).taipei;
+      expect([t.year, t.month, t.day, t.hour, t.minute], [2026, 7, 30, 0, 0]);
+      expect(t.weekday, DateTime.thursday);
+    });
+
+    test('輸入是 local 或 UTC 都以時間點計', () {
+      final instant = DateTime.utc(2026, 12, 31, 20, 5);
+      expect(instant.toLocal().taipei, instant.taipei);
+    });
+  });
+
+  group('TaipeiWallClock.taipeiWall', () {
+    test('帶時區標記（UTC）的值換成臺北', () {
+      final t = DateTime.parse('2026-07-29T16:00:00Z').taipeiWall;
+      expect([t.day, t.hour], [30, 0]);
+    });
+
+    test('帶位移的值以時間點計', () {
+      final t = DateTime.parse('2026-07-30T00:00:00+08:00').taipeiWall;
+      expect([t.day, t.hour], [30, 0]);
+    });
+
+    test('沒有時區標記的值已是臺北牆上時間，不因裝置時區位移', () {
+      final t = DateTime.parse('2026-07-30 08:30:00').taipeiWall;
+      expect([t.year, t.month, t.day, t.hour, t.minute], [2026, 7, 30, 8, 30]);
+    });
+  });
 }

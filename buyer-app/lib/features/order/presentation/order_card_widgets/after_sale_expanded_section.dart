@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
@@ -1006,7 +1007,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }

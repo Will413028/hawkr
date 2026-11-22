@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -336,7 +337,7 @@ class _OrderPickerCard extends StatelessWidget {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
-    final l = dt.toLocal();
+    final l = dt.taipeiWall;
     return '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}';
   }
 }

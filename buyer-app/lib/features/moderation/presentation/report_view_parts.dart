@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
@@ -25,7 +26,7 @@ String? communityReportOutcomeText(
     : moderationCommunityReportOutcomeUnset(locale);
 
 String formatReportTime(DateTime time) {
-  final local = time.toLocal();
+  final local = time.taipei;
   return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
       '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }

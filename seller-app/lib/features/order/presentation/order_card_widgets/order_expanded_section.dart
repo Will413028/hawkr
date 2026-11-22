@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'dart:io';
@@ -144,13 +145,13 @@ class _StatusInfoBox extends StatelessWidget {
         final n = int.tryParse(m.group(0)!);
         if (n != null) {
           dt = (m.group(0)!.length >= 13)
-              ? DateTime.fromMillisecondsSinceEpoch(n)
-              : DateTime.fromMillisecondsSinceEpoch(n * 1000);
+              ? DateTime.fromMillisecondsSinceEpoch(n, isUtc: true)
+              : DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true);
         }
       }
     }
     if (dt == null) return raw;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     String pad(int v) => v.toString().padLeft(2, '0');
     return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
   }

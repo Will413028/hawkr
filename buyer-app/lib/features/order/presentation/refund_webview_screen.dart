@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
@@ -134,7 +135,7 @@ class _RefundWebViewScreenState extends State<RefundWebViewScreen> {
   String _formatIsoDate(String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
   }
 

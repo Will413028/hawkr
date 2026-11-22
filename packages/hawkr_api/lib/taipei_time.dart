@@ -30,3 +30,16 @@ String formatTaipeiDate(DateTime dateTime) {
   final t = dateTime.toUtc().add(_taipeiUtcOffset);
   return '${t.year}/${_pad(t.month)}/${_pad(t.day)}';
 }
+
+/// 臺北牆上時間的視圖：回傳的 [DateTime] 是 UTC 旗標、欄位（`year`、`month`、`day`、`hour`、`minute`、`weekday`）讀起來就是臺北時間。
+///
+/// 取代顯示用的 `toLocal()`（欄位會跟著手機時區跑）。只用來讀欄位與組字串，不要拿它跟 `DateTime.now()`、
+/// 另一個時間點比先後或相減（旗標與位移都被改過）；算時間差照舊用原本的時間點。
+extension TaipeiWallClock on DateTime {
+  DateTime get taipei => toUtc().add(_taipeiUtcOffset);
+
+  /// 字串解析出來的時間（`DateTime.parse` 與 `tryParse`）：帶時區標記的是時間點，換成臺北牆上時間；沒有時區標記的（`isUtc` 為
+  /// false）本來就是臺北牆上時間（業務時間字串的約定，與 website `taipei.ts` 的 `WALL_CLOCK_RE` 相同），原樣回傳。
+  /// 不用 [taipei]：它對沒有時區標記的值會把裝置時區算進去。
+  DateTime get taipeiWall => isUtc ? taipei : this;
+}

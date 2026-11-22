@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -1344,12 +1345,10 @@ class ChatThreadScreen extends HookConsumerWidget {
               // Time separator pill
               Widget? timeSeparator;
               if (showTimeSeparator) {
-                final t = DateTime.fromMillisecondsSinceEpoch(
-                  curTsVal,
-                ).toLocal();
+                final t = DateTime.fromMillisecondsSinceEpoch(curTsVal).taipei;
                 final timeStr =
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                final today = DateTime.now();
+                final today = DateTime.now().taipei;
                 final isToday =
                     t.year == today.year &&
                     t.month == today.month &&
@@ -1638,7 +1637,7 @@ class ChatThreadScreen extends HookConsumerWidget {
               }
 
               // Time + read status
-              final t = DateTime.fromMillisecondsSinceEpoch(curTsVal).toLocal();
+              final t = DateTime.fromMillisecondsSinceEpoch(curTsVal).taipei;
               final h12 = t.hour == 0
                   ? 12
                   : (t.hour > 12 ? t.hour - 12 : t.hour);

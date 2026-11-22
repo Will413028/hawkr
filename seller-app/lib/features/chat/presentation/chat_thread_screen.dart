@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import '../../../features/seller/data/current_store.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -1097,10 +1098,10 @@ class ChatThreadScreen extends HookConsumerWidget {
               // 時間分隔線（間隔>5分鐘）
               Widget? timeSeparator;
               if (showTimeSeparator) {
-                final t = m.timestamp.toLocal();
+                final t = m.timestamp.taipei;
                 final timeStr =
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                final today = DateTime.now();
+                final today = DateTime.now().taipei;
                 final isToday =
                     t.year == today.year &&
                     t.month == today.month &&
@@ -1133,7 +1134,7 @@ class ChatThreadScreen extends HookConsumerWidget {
               }
 
               // ── 氣泡時間 + 已讀狀態（放在氣泡內部右下角）──
-              final msgTime = m.timestamp.toLocal();
+              final msgTime = m.timestamp.taipei;
               final msgH12 = msgTime.hour == 0
                   ? 12
                   : (msgTime.hour > 12 ? msgTime.hour - 12 : msgTime.hour);
