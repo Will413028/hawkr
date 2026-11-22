@@ -34,3 +34,23 @@ export function coverageBadge(days: number): {
 	if (days < 60) return { variant: "warning", label: `距耗盡 ${days} 天` };
 	return { variant: "success", label: `距耗盡 ${days} 天` };
 }
+
+const YEARS_BEFORE = 1;
+const YEARS_AFTER = 2;
+
+/** 可選的匯入年份：台北今年的前 1 年到後 2 年。 */
+export function yearOptions(thisYear: number): number[] {
+	return Array.from(
+		{ length: YEARS_BEFORE + YEARS_AFTER + 1 },
+		(_, i) => thisYear - YEARS_BEFORE + i,
+	);
+}
+
+/** 預設匯入年份：已涵蓋最後一年的下一年（在可選範圍內），否則今年。 */
+export function defaultImportYear(
+	thisYear: number,
+	coveredThrough: { year: number } | undefined,
+): number {
+	const next = coveredThrough ? coveredThrough.year + 1 : thisYear;
+	return yearOptions(thisYear).includes(next) ? next : thisYear;
+}

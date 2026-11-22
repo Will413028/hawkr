@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -257,5 +258,31 @@ func TestPreviewRejectsWhatImportRejectsWithTheSameMessage(t *testing.T) {
 		if !errors.As(previewErr, &pe) || !errors.As(importErr, &ie) || pe.Message() != ie.Message() {
 			t.Errorf("%s：預覽 %v 與匯入 %v 的訊息不同", name, previewErr, importErr)
 		}
+	}
+}
+
+func TestPreviewOrdersDaysByDateWhateverTheRowOrder(t *testing.T) {
+	lines := strings.Split(strings.TrimSpace(strings.TrimPrefix(fixture(t, "115.csv"), "\ufeff")), "\n")
+	header, rows := lines[0], lines[1:]
+	slices.Reverse(rows)
+	content := strings.Join(append([]string{header}, rows...), "\n") + "\n"
+	resp, err := newEnv(t, &fakeSource{}).PreviewHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.PreviewHolidayCalendarRequest{Year: 2026, CsvContent: content}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Msg
+	if d := m.GetFirstDate(); d.GetMonth() != 1 || d.GetDay() != 1 {
+		t.Errorf("first_date = %v", d)
+	}
+	if d := m.GetLastDate(); d.GetMonth() != 12 || d.GetDay() != 31 {
+		t.Errorf("last_date = %v", d)
+	}
+	var got []string
+	for _, h := range m.GetHolidays() {
+		d := h.GetDate()
+		got = append(got, time.Date(int(d.GetYear()), time.Month(d.GetMonth()), int(d.GetDay()), 0, 0, 0, 0, time.UTC).Format(time.DateOnly))
+	}
+	if len(got) == 0 || !slices.IsSorted(got) {
+		t.Errorf("holidays 沒有依日期排序：%v", got)
 	}
 }

@@ -35,6 +35,15 @@
    "new": "out.Year.HolidayCount += 2",
    "test": "internal/httpapi/bizcalendar ^TestPreviewMapsTheParsedYearWithoutCallingTheSource$",
    "why": "The previewed holiday count no longer matches the holidays in the file."
+  },
+  {
+   "id": "preview-skips-date-sort",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "\tslices.SortFunc(days, func(a, b bizcalendar.Day) int { return a.Date.Compare(b.Date) })\n",
+   "new": "\t_ = slices.Contains[[]int]\n",
+   "test": "internal/httpapi/bizcalendar ^TestPreviewOrdersDaysByDateWhateverTheRowOrder$",
+   "why": "Days stay in file row order, so first_date, last_date and the holiday list follow the rows instead of the calendar."
   }
  ]
 }

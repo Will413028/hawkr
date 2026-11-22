@@ -13,6 +13,8 @@ import {
 	buildImportRequest,
 	coverageBadge,
 	coverageDaysLeft,
+	defaultImportYear,
+	yearOptions,
 } from "./holiday-calendar";
 
 const IMPORT_FAILED_TEXT = "匯入失敗，請重試。";
@@ -24,24 +26,14 @@ interface ImportResult {
 	replacedDayCount: number;
 }
 
-const YEARS_BEFORE = 1;
-const YEARS_AFTER = 2;
-
-/** 可選的匯入年份：台北今年的前 1 年到後 2 年。 */
-function yearOptions(thisYear: number): number[] {
-	return Array.from(
-		{ length: YEARS_BEFORE + YEARS_AFTER + 1 },
-		(_, i) => thisYear - YEARS_BEFORE + i,
-	);
-}
-
 export default function HolidayCalendarPage() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// 上傳 / 解析狀態
 	const [fileName, setFileName] = useState("");
 	const [csvText, setCsvText] = useState("");
-	const [declaredYear, setDeclaredYear] = useState(""); // 匯入年份（字串）
+	const [fileLoaded, setFileLoaded] = useState(false);
+	const [pickedYear, setPickedYear] = useState(""); // 使用者明確選的年份；空字串 = 用預設
 	const [parseError, setParseError] = useState("");
 	const [dragging, setDragging] = useState(false);
 
@@ -80,7 +72,8 @@ export default function HolidayCalendarPage() {
 	const resetUpload = () => {
 		setFileName("");
 		setCsvText("");
-		setDeclaredYear("");
+		setFileLoaded(false);
+		setPickedYear("");
 		setParseError("");
 		if (fileInputRef.current) fileInputRef.current.value = "";
 	};
@@ -88,13 +81,8 @@ export default function HolidayCalendarPage() {
 	const thisYear = Number(formatIsoDate(new Date()).slice(0, 4));
 	const years = yearOptions(thisYear);
 
-	// 預設年份：已涵蓋的最後一年的下一年（在可選範圍內），否則今年
-	const defaultYear = () => {
-		const next = coverage?.coveredThrough
-			? coverage.coveredThrough.year + 1
-			: thisYear;
-		return String(years.includes(next) ? next : thisYear);
-	};
+	const declaredYear =
+		pickedYear || String(defaultImportYear(thisYear, coverage?.coveredThrough));
 
 	// 讀檔 → 以選定年份交給伺服器預覽
 	const handleFile = (file: File) => {
@@ -104,9 +92,13 @@ export default function HolidayCalendarPage() {
 		reader.onload = () => {
 			setFileName(file.name);
 			setCsvText(String(reader.result ?? ""));
-			setDeclaredYear(defaultYear());
+			setFileLoaded(true);
+			setPickedYear("");
 		};
-		reader.onerror = () => setParseError("讀取檔案失敗，請重試。");
+		reader.onerror = () => {
+			resetUpload();
+			setParseError("讀取檔案失敗，請重試。");
+		};
 		reader.readAsText(file);
 	};
 
@@ -118,13 +110,14 @@ export default function HolidayCalendarPage() {
 	};
 
 	const yearNum = declaredYear ? Number(declaredYear) : Number.NaN;
-	const hasFile = csvText !== "";
+	const hasFile = fileLoaded;
+	const previewEnabled = fileLoaded && !coverageLoading;
 	const previewQuery = useQuery(
 		BizCalendarAdminService.method.previewHolidayCalendar,
-		hasFile ? buildImportRequest(declaredYear, csvText) : undefined,
-		{ enabled: hasFile, retry: false },
+		previewEnabled ? buildImportRequest(declaredYear, csvText) : undefined,
+		{ enabled: previewEnabled, retry: false },
 	);
-	const previewing = hasFile && previewQuery.isFetching;
+	const previewing = hasFile && (coverageLoading || previewQuery.isFetching);
 	const previewError = hasFile && !previewing ? previewQuery.error : null;
 	const previewData = hasFile && !previewing ? previewQuery.data : undefined;
 	const previewReady = previewData !== undefined;
@@ -148,7 +141,7 @@ export default function HolidayCalendarPage() {
 	};
 
 	const handleConfirmImport = () => {
-		if (!csvText || !declaredYear || importing) return;
+		if (!fileLoaded || !declaredYear || importing) return;
 		importMutation.mutate(buildImportRequest(declaredYear, csvText));
 	};
 
@@ -236,7 +229,7 @@ export default function HolidayCalendarPage() {
 								id="hcal-year"
 								className="hcal-year-select"
 								value={declaredYear}
-								onChange={(e) => setDeclaredYear(e.target.value)}
+								onChange={(e) => setPickedYear(e.target.value)}
 							>
 								{years.map((y) => (
 									<option key={y} value={String(y)}>

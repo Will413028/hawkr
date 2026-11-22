@@ -5,6 +5,8 @@ import {
 	buildImportRequest,
 	coverageBadge,
 	coverageDaysLeft,
+	defaultImportYear,
+	yearOptions,
 } from "../src/app/admin/holiday-calendar/holiday-calendar";
 
 test("匯入請求帶整數年份與檔案全文", () => {
@@ -35,4 +37,18 @@ test("頁面呼叫 BizCalendarAdminService，不再打舊 gateway REST", async (
 	assert.doesNotMatch(src, /parseCalendarCsv|buildPreview|yearRowsOf/);
 	assert.doesNotMatch(src, /\/api\/v1\/admin\/holidays/);
 	assert.doesNotMatch(src, /services\/api"/);
+});
+
+test("匯入年份選項是今年前 1 年到後 2 年", () => {
+	assert.deepEqual(yearOptions(2026), [2025, 2026, 2027, 2028]);
+});
+
+test("預設匯入年份取涵蓋最後一年的下一年，超出選項則今年", () => {
+	assert.equal(defaultImportYear(2026, undefined), 2026);
+	assert.equal(defaultImportYear(2026, { year: 2026 }), 2027);
+	assert.equal(defaultImportYear(2026, { year: 2027 }), 2028);
+	assert.equal(defaultImportYear(2026, { year: 2028 }), 2026);
+	assert.equal(defaultImportYear(2026, { year: 2020 }), 2026);
+	assert.equal(defaultImportYear(2026, { year: 2024 }), 2025);
+	assert.equal(defaultImportYear(2026, { year: 2040 }), 2026);
 });
