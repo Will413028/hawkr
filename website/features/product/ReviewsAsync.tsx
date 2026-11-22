@@ -13,9 +13,11 @@ export default async function ReviewsAsync({
 }: {
 	productId: string;
 }) {
-	const reviewsResult = await getCachedProductReviews(productId, 1, 6).catch(
-		() => null,
+	// 讀取失敗不顯示成「還沒有評價」：整段不渲染，等下一次重新驗證。
+	const reviewsResult = await getCachedProductReviews(productId, 6).catch(
+		() => undefined,
 	);
+	if (reviewsResult === undefined) return null;
 	const { reviews, total } = mapLiveReviews(reviewsResult);
 	return <ProductReviewsSection reviews={reviews} reviewTotal={total} />;
 }

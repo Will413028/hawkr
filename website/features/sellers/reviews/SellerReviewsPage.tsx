@@ -7,6 +7,7 @@ import {
 } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
 import { storeRatingClause } from "@/lib/products/rating";
+import { STORE_REVIEWS_PAGE_SIZE } from "@/lib/reviews/repo";
 import { sellerNotFoundTitle } from "@/lib/seller/not-found-title";
 import { resolveStorefront } from "@/lib/seller/storefront-seller";
 import {
@@ -16,9 +17,9 @@ import {
 	socialImages,
 } from "@/lib/seo/metadata";
 import { sellerCanonicalUrl } from "@/lib/seo/urls";
-import type { SellerReviewItem } from "./ReviewList";
 import ReviewStatsCard, { type SellerReviewStats } from "./ReviewStatsCard";
 import ReviewsClient from "./ReviewsClient";
+import { sellerReviewItem } from "./reviewItem";
 
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
@@ -64,15 +65,19 @@ export default async function ReviewsPage({ params }: Props) {
 	// are fetched client-side by ReviewsClient off the `?page` URL param, so this
 	// route reads no dynamic API and stays statically renderable.
 	const [reviewsData, stats] = await Promise.all([
-		getCachedSellerReviews(id, 1).catch(
-			prerenderSafe({ records: [], total: 0, totalPages: 0 }),
+		getCachedSellerReviews(id).catch(
+			prerenderSafe({ reviews: [], nextPageToken: "" }),
 		),
 		(getCachedSellerReviewStats(id) as Promise<SellerReviewStats | null>).catch(
 			prerenderSafe(null),
 		),
 	]);
 
-	const reviews = reviewsData.records as SellerReviewItem[];
+	const reviews = reviewsData.reviews.map(sellerReviewItem);
+	// 總頁數由統計 RPC 的評價數算，不由已載入的頁加總。
+	const totalPages = Math.ceil(
+		(stats?.totalCount ?? 0) / STORE_REVIEWS_PAGE_SIZE,
+	);
 	const statsCard = <ReviewStatsCard stats={stats} />;
 
 	// Chrome (profile header / banner / shell) lives in the persistent
@@ -82,7 +87,7 @@ export default async function ReviewsPage({ params }: Props) {
 			sellerId={id}
 			statsCard={statsCard}
 			initialReviews={reviews}
-			initialTotalPages={reviewsData.totalPages}
+			initialTotalPages={totalPages}
 		/>
 	);
 }

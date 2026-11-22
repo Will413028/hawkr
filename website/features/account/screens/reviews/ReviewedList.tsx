@@ -17,7 +17,7 @@ export default function ReviewedList() {
 	if (loading && reviews.length === 0) {
 		return <p className="text-foreground-soft text-sm">載入中…</p>;
 	}
-	if (error && reviews.length === 0) {
+	if (error != null && reviews.length === 0) {
 		return <p className="text-danger text-sm">載入評價失敗，請稍後再試。</p>;
 	}
 	if (reviews.length === 0) {
@@ -42,7 +42,7 @@ export default function ReviewedList() {
 						<div className="flex flex-col gap-3 p-4">
 							<div className="grid grid-cols-[64px_1fr_auto] gap-3 items-start">
 								<AppImage
-									src={resolveCdnUrl(r.productImageKey)}
+									src={resolveCdnUrl(r.productImageUrl ?? "")}
 									width={64}
 									height={64}
 									sizes="64px"
@@ -67,9 +67,9 @@ export default function ReviewedList() {
 									{formatDate(r.createdAt)}
 								</small>
 							</div>
-							{r.imageKeys.length > 0 ? (
+							{r.imageUrls.length > 0 ? (
 								<div className="flex gap-2 flex-wrap">
-									{r.imageKeys.map((img) => (
+									{r.imageUrls.map((img) => (
 										<AppImage
 											key={img}
 											src={resolveCdnUrl(img)}

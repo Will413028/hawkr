@@ -2,12 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type * as React from "react";
-import type { SellerReviewItem } from "@/features/sellers/reviews/ReviewList";
-import ReviewStatsCard, {
-	type SellerReviewStats,
-} from "@/features/sellers/reviews/ReviewStatsCard";
+import ReviewStatsCard from "@/features/sellers/reviews/ReviewStatsCard";
 import ReviewsClient from "@/features/sellers/reviews/ReviewsClient";
-import { fetchSellerReviewStats, fetchSellerReviews } from "@/lib/api/index";
+import { sellerReviewItem } from "@/features/sellers/reviews/reviewItem";
+import {
+	fetchStoreReviewStats,
+	fetchStoreReviewsPage,
+	STORE_REVIEWS_PAGE_SIZE,
+} from "@/lib/reviews/repo";
 import { PREVIEW_REVIEWS_UNAVAILABLE } from "@/lib/seller/storefront-preview";
 import PreviewReadingControl from "./PreviewReadingControl";
 import { PreviewPublicOnly, usePreviewStore } from "./PreviewStoreContext";
@@ -23,11 +25,8 @@ function PublicReviews() {
 		queryKey: ["seller-preview", "reviews", view.storeId],
 		queryFn: async () => {
 			const [reviews, stats] = await Promise.all([
-				fetchSellerReviews(view.storeId, 1, true),
-				fetchSellerReviewStats(
-					view.storeId,
-					true,
-				) as Promise<SellerReviewStats | null>,
+				fetchStoreReviewsPage(view.storeId),
+				fetchStoreReviewStats(view.storeId),
 			]);
 			return { reviews, stats };
 		},
@@ -49,10 +48,9 @@ function PublicReviews() {
 		<ReviewsClient
 			sellerId={view.storeId}
 			statsCard={<ReviewStatsCard stats={stats} />}
-			initialReviews={reviews.records as SellerReviewItem[]}
-			initialTotalPages={reviews.totalPages}
+			initialReviews={reviews.reviews.map(sellerReviewItem)}
+			initialTotalPages={Math.ceil(stats.totalCount / STORE_REVIEWS_PAGE_SIZE)}
 			paginationWrapper={wrapPagination}
-			strict
 		/>
 	);
 }

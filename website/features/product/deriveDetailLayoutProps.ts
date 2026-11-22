@@ -17,6 +17,7 @@ import type { PurchaseBoxSku } from "@/features/product/components/ProductPurcha
 import { formatUnitLabel, ShippingMethod } from "@/lib/codemeta/enums";
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
+import type { Review } from "@/lib/reviews/repo";
 import type { ProductReview } from "./ProductDetailLayout";
 
 export type { ProductReview };
@@ -25,7 +26,7 @@ export interface DeriveInput {
 	product: Record<string, unknown>;
 	seller: unknown;
 	sellerStats: unknown;
-	reviewsResult: { reviews: unknown[]; total: number } | null;
+	reviewsResult: { reviews: Review[]; total: number } | null;
 	/**
 	 * pair 內第一個元素必須與 product.description.blocks 內的 image block 同
 	 * reference（descriptionImageDims Map key 用 object identity 比對）。
@@ -211,35 +212,21 @@ function shippingNoteFromMethods(methods: unknown): string {
  * never drift in how they read username/avatar/createdAt.
  */
 export function mapLiveReviews(
-	reviewsResult: { reviews: unknown[]; total: number } | null,
+	reviewsResult: { reviews: Review[]; total: number } | null,
 ): { reviews: ProductReview[]; total: number } {
 	const total = reviewsResult?.total ?? 0;
-	const reviews: ProductReview[] = (reviewsResult?.reviews ?? []).map(
-		(rvRaw) => {
-			const rv = asRecord(rvRaw);
-			const createdRaw = rv.createdAt as number | undefined;
-			return {
-				id: rv.id as number | string | undefined,
-				author: textOrEmpty(rv.username),
-				// `reviewsResult` is already normalized by lib/reviews/repo.ts
-				// (fetchProductReviews → normalizeReview). Since backend#2235 the
-				// domain type mirrors the wire field-for-field, so these names are
-				// the same on both sides of that boundary.
-				avatar: textOrEmpty(rv.avatarKey),
-				rating: parseRating(rv.rating) ?? 0,
-				text: textOrEmpty(rv.content),
-				// Photo list is `imageKeys` (bare objectKeys) on both the wire and
-				// the normalized shape; downstream renders via buildImageUrl.
-				photos: Array.isArray(rv.imageKeys) ? (rv.imageKeys as unknown[]) : [],
-				created_at: createdRaw,
-				// #374：這個字串在 server component（ReviewsAsync）算完才序列化下傳，
-				// 因此不會有 hydration mismatch，但 Workers runtime 是 UTC ——
-				// 用 `toLocaleDateString` 等於讓全部使用者看 UTC 日期，台北使用者在
-				// 16:00Z 之後的跨日窗口會看到差一天。固定台北偏移才是正確日期。
-				date: formatTaipeiDate(createdRaw),
-			};
-		},
-	);
+	const reviews: ProductReview[] = (reviewsResult?.reviews ?? []).map((rv) => ({
+		id: rv.id,
+		author: rv.username ?? "匿名",
+		avatar: rv.avatarUrl ?? "",
+		rating: rv.rating,
+		text: rv.content,
+		photos: rv.imageUrls,
+		created_at: rv.createdAt,
+		// #374：這個字串在 server component（ReviewsAsync）算完才序列化下傳，
+		// 固定台北偏移才是正確日期。
+		date: formatTaipeiDate(rv.createdAt),
+	}));
 	return { reviews, total };
 }
 

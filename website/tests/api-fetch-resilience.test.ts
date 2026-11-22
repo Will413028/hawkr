@@ -25,46 +25,6 @@ afterEach(() => {
 	delete (globalThis as { window?: unknown }).window;
 });
 
-test("fetchSellerReviewStats soft-fails to null on 5xx (build immunity)", async () => {
-	respond = () => new Response("bad gateway", { status: 502 });
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	const result = await fetchSellerReviewStats("1");
-	assert.equal(result, null);
-});
-
-test("fetchSellerReviewStats still returns null on 404", async () => {
-	respond = () => new Response("not found", { status: 404 });
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	assert.equal(await fetchSellerReviewStats("1"), null);
-});
-
-// getCachedSellerReviewStats reads through fetchSellerReviewStats(id, true): a 5xx must THROW so the
-// use cache entry keeps its prior stale value rather than caching an
-// outage-time null; a real 404 stays a cacheable null.
-test("fetchSellerReviewStats(strict) THROWS on 5xx (cache must not swallow an outage)", async () => {
-	respond = () => new Response("bad gateway", { status: 502 });
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	await assert.rejects(() => fetchSellerReviewStats("1", true));
-});
-
-test("fetchSellerReviewStats(strict) still returns null on 404 (cacheable not-found)", async () => {
-	respond = () => new Response("not found", { status: 404 });
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	assert.equal(await fetchSellerReviewStats("1", true), null);
-});
-
-test("fetchSellerReviewStats rejects malformed ids without calling the backend", async () => {
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	assert.equal(await fetchSellerReviewStats("styles.css.map"), null);
-	assert.equal(lastInit, undefined);
-});
-
-test("fetchSellerReviewStats attaches an abort signal (timeout)", async () => {
-	const { fetchSellerReviewStats } = await import("../lib/api/index");
-	await fetchSellerReviewStats("1");
-	assert.ok(lastInit?.signal, "expected a timeout AbortSignal on the request");
-});
-
 const okEnvelope = () =>
 	new Response(JSON.stringify({ code: 0, data: {} }), {
 		status: 200,

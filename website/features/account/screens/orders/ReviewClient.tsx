@@ -1,5 +1,6 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import * as React from "react";
 import AppImage from "@/components/shared/AppImage";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
@@ -8,6 +9,7 @@ import { Textarea } from "@/components/ui";
 import Button from "@/components/ui/Button";
 import { ImageCropDialog } from "@/components/ui/ImageCropDialog";
 import { useOrder } from "@/lib/hooks/useOrders";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { uploadImageFile } from "@/lib/media/upload";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
@@ -36,6 +38,7 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 	const [submittingItem, setSubmittingItem] = React.useState<string | null>(
 		null,
 	);
+	const defaultErrors = useDefaultErrorText();
 	const [error, setError] = React.useState<string | null>(null);
 	// Photos crop before uploading; cropped files collect here until the
 	// queue closes, then upload as one batch.
@@ -155,11 +158,7 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 		try {
 			await submitOrderItemReview({
 				orderNo: order.orderNo,
-				orderItemId: item.orderItemId,
-				productId: item.productId,
-				skuName: item.name,
-				productImageUrl: item.image ? resolveCdnUrl(item.image) : undefined,
-				price: item.price,
+				orderItemId: String(item.orderItemId),
 				rating: draft.rating,
 				content: draft.content.trim(),
 				stagedTokens: draft.photos.map((p) => p.stagedToken),
@@ -169,7 +168,7 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 				[key]: { ...draft, submitted: true },
 			}));
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "送出評價失敗");
+			setError(errorText(e, defaultErrors));
 		} finally {
 			setSubmittingItem(null);
 		}

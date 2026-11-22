@@ -32,9 +32,10 @@ vi.mock("@/features/sellers/components/SellerMessageTab", () => ({
 		return null;
 	},
 }));
-vi.mock("@/lib/api/index", () => ({
-	fetchSellerReviews: mocks.reviewsFetch,
-	fetchSellerReviewStats: mocks.statsFetch,
+vi.mock("@/lib/reviews/repo", () => ({
+	fetchStoreReviewsPage: mocks.reviewsFetch,
+	fetchStoreReviewStats: mocks.statsFetch,
+	STORE_REVIEWS_PAGE_SIZE: 10,
 }));
 vi.mock("@/features/sellers/reviews/ReviewsClient", () => ({
 	default: () => null,
@@ -110,8 +111,9 @@ describe("preview reviews and messages tabs when the store cannot be public", ()
 
 	it("reads the public sources once the store can be public", () => {
 		renderTab(PreviewReviewsTab, true);
-		expect(mocks.reviewsFetch).toHaveBeenCalledWith("700", 1, true);
-		expect(mocks.statsFetch).toHaveBeenCalledWith("700", true);
+		expect(mocks.reviewsFetch).toHaveBeenCalledWith("700");
+		expect(mocks.statsFetch).toHaveBeenCalledWith("700");
+
 		const html = renderTab(PreviewMessagesTab, true);
 		expect(mocks.messageTab).toHaveBeenCalledTimes(1);
 		expect(html).not.toContain(PREVIEW_MESSAGES_UNAVAILABLE);

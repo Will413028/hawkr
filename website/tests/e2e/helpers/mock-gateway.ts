@@ -1160,6 +1160,30 @@ export interface GatewayMockState {
  * social 的預設回應（空）：導覽列選單與賣家頁會讀貼文與熱門標籤，沒 mock 的 Connect 呼叫會落到打不通的 API
  * 變成 502（頁面健康檢查的同源 >=400）。個別 spec 較晚註冊的 mock 會蓋過這裡。
  */
+async function mockReviewDefaults(page: Page): Promise<void> {
+	const empty: Array<[string, unknown]> = [
+		["ReviewAppService/ListMyReviews", { reviews: [], nextPageToken: "" }],
+		["ReviewPublicService/ListProductReviews", { reviews: [] }],
+		["ReviewPublicService/ListStoreReviews", { reviews: [] }],
+		[
+			"ReviewPublicService/GetProductReviewStats",
+			{ count: 0, average: 0, distribution: [] },
+		],
+		[
+			"ReviewPublicService/GetStoreReviewStats",
+			{ count: 0, average: 0, distribution: [] },
+		],
+	];
+	for (const [method, body] of empty) {
+		await page.route(
+			new RegExp(`/api/connect/hawkr\\.review\\.v1alpha1\\.${method}(?:\\?|$)`),
+			(route) => {
+				void fulfillConnect(route, body);
+			},
+		);
+	}
+}
+
 async function mockSocialDefaults(page: Page): Promise<void> {
 	const empty: Array<[RegExp, unknown]> = [
 		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
@@ -1231,6 +1255,7 @@ export async function setupGatewayMocks(
 	await mockStoreCards(page);
 	await mockMyDashboard(page, {});
 	await mockSocialDefaults(page);
+	await mockReviewDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);

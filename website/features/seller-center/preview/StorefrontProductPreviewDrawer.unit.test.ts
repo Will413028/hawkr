@@ -23,7 +23,10 @@ vi.mock("@/lib/products/seller-repo", () => ({
 	fetchSellerProductEdit: mocks.fetchEdit,
 }));
 vi.mock("@/lib/reviews/repo", () => ({
-	fetchProductReviews: vi.fn().mockResolvedValue(null),
+	fetchProductReviewsPage: vi
+		.fn()
+		.mockResolvedValue({ reviews: [], nextPageToken: "" }),
+	fetchProductReviewStats: vi.fn().mockResolvedValue({ totalCount: 0 }),
 }));
 vi.mock("@/components/shared/Drawer", () => ({
 	Drawer: (props: { open: boolean; children: React.ReactNode }) =>
