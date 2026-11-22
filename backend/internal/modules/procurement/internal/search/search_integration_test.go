@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -385,6 +386,17 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 	f.fakes.pages = map[int]candidate.Page{1: hits(1, 2)}
 	s := f.mustStart()
 	held, release, replaced := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	var releaseOnce sync.Once
+	releaseHeld := func() { releaseOnce.Do(func() { close(release) }) }
+	dispatched := make(chan error, 1)
+	// 任何失敗路徑都先放開阻擋 transaction，再等搜尋提交結束，fixture 的清理才不會卡住。
+	t.Cleanup(func() {
+		releaseHeld()
+		select {
+		case <-dispatched:
+		case <-time.After(5 * time.Second):
+		}
+	})
 	f.fakes.onPage = func() {
 		go func() {
 			replaced <- f.d.InTx(context.Background(), func(ctx context.Context) error {
@@ -409,7 +421,6 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 		}()
 		<-held
 	}
-	dispatched := make(chan error, 1)
 	go func() { dispatched <- f.dispatch(s.RunID) }()
 	deadline := time.Now().Add(10 * time.Second)
 	for f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FOR UPDATE OF v%'`) == 0 {
@@ -423,7 +434,7 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	close(release)
+	releaseHeld()
 	if err := <-replaced; err != nil {
 		t.Fatal(err)
 	}
