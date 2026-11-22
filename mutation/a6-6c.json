@@ -40,8 +40,8 @@
    "id": "review-card-count-shown-on-load-failure",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
-   "old": "_loadError != null || statsCount == null\n        ?",
-   "new": "statsCount == null\n        ?",
+   "old": "_loadError != null || statsCount == null\n        ? '商品評價'\n        : '商品評價 ($statsCount)'",
+   "new": "false\n        ? '商品評價'\n        : '商品評價 (${statsCount ?? 0})'",
    "test": "test/features/product/product_review_preview_card_test.dart 讀取失敗時標題不顯示 (0)",
    "why": "讀取失敗仍顯示商品評價 (0)"
   },
@@ -95,7 +95,7 @@
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
    "old": "_totalCount = stats.count;",
-   "new": "_totalCount = list.length;",
+   "new": "_totalCount = page.items.length;",
    "test": "test/features/review/product_reviews_screen_layout_test.dart 總數與星等分布取自統計，超過 100 則時不是已載入的筆數",
    "why": "評價頁總數取已載入清單長度"
   },
