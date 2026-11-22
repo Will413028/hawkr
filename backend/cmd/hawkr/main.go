@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -461,7 +462,9 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
-	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency, media.ProcessQueue: media.ProcessQueueWorkers}, periodic)
+	queues := map[string]int{river.QueueDefault: workerConcurrency}
+	maps.Copy(queues, media.Queues())
+	c, err := jobs.NewWorker(d, workers, queues, periodic)
 	if err != nil {
 		return err
 	}

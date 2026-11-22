@@ -94,6 +94,8 @@ type Limits struct {
 	FramePixels int64
 	// AnimatedPixels 是動態圖「影格數 x 每格像素」的上限。
 	AnimatedPixels int64
+	// MaxDimension 是單邊像素上限（寬或高），套用在所有輸出。
+	MaxDimension int
 }
 
 // Sanitize 先辨認格式、讀標頭檢查像素上限，再解碼、套用方向、轉 sRGB、丟掉全部 metadata 後重新編碼。
@@ -104,7 +106,7 @@ func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
 	return sanitize(ctx, d, lim, nil)
 }
 
-// sanitize 的 fail 只給測試用：在指定階段（stageColour、stageAutorot、stageEncode）注入失敗。
+// sanitize 的 fail 只給測試用：在指定階段（stageColour、stageAutorot、stageAlpha、stageFlatten、stageEncode）注入失敗。
 func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string) error) (Result, error) {
 	if err := live(ctx); err != nil {
 		return Result{}, err
@@ -155,6 +157,8 @@ func live(ctx context.Context) error {
 const (
 	stageColour  = "colour"
 	stageAutorot = "autorot"
+	stageAlpha   = "alpha"
+	stageFlatten = "flatten"
 	stageEncode  = "encode"
 )
 
@@ -228,6 +232,9 @@ func checkPixels(w, h, pages int, lim Limits) error {
 	if w <= 0 || h <= 0 {
 		return fmt.Errorf("%w: empty dimensions", ErrMalformed)
 	}
+	if w > lim.MaxDimension || h > lim.MaxDimension {
+		return fmt.Errorf("%w: %dx%d exceeds %d per side", ErrTooLarge, w, h, lim.MaxDimension)
+	}
 	frame := int64(w) * int64(h)
 	if frame > lim.FramePixels {
 		return fmt.Errorf("%w: %d pixels per frame", ErrTooLarge, frame)
@@ -267,15 +274,21 @@ func hasTransparency(img *vips.Image) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return m < alphaOpaque(a), nil
+	opaque, err := alphaOpaque(a)
+	if err != nil {
+		return false, err
+	}
+	return m < opaque, nil
 }
 
-// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）。
-func alphaOpaque(a *vips.Image) float64 {
-	if a.BandFormat() == vips.BandFormatUchar {
-		return 255
+// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回錯誤，不猜值。
+func alphaOpaque(a *vips.Image) (float64, error) {
+	if f := a.BandFormat(); f == vips.BandFormatUchar {
+		return 255, nil
+	} else if f == vips.BandFormatUshort {
+		return 65535, nil
 	}
-	return 65535
+	return 0, fmt.Errorf("unsupported alpha band format %d", a.BandFormat())
 }
 
 func (s stages) encodeStill(img *vips.Image) (Result, error) {
@@ -286,7 +299,7 @@ func (s stages) encodeStill(img *vips.Image) (Result, error) {
 		return Result{}, err
 	}
 	var transparent bool
-	if err := s.step(stageColour, func() (err error) { transparent, err = hasTransparency(img); return }); err != nil {
+	if err := s.step(stageAlpha, func() (err error) { transparent, err = hasTransparency(img); return }); err != nil {
 		return Result{}, err
 	}
 	if transparent {
@@ -298,7 +311,7 @@ func (s stages) encodeStill(img *vips.Image) (Result, error) {
 		return Result{Data: out, Format: PNG}, err
 	}
 	if img.HasAlpha() {
-		if err := s.step(stageColour, func() error { return img.Flatten(nil) }); err != nil {
+		if err := s.step(stageFlatten, func() error { return img.Flatten(nil) }); err != nil {
 			return Result{}, err
 		}
 	}

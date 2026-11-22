@@ -39,6 +39,8 @@ const (
 const (
 	MaxImagePixels    int64 = 40_000_000
 	MaxAnimatedPixels int64 = 50_000_000
+	// MaxImageDimension 是單邊像素上限：JPEG 編碼器在任一邊超過 65500 時一律失敗，在標頭就拒絕，不讓它變成重試到用盡的暫時失敗。
+	MaxImageDimension = 65500
 )
 
 // ProcessQueue 是處理 job 專用的 River queue，ProcessQueueWorkers 是它同時執行的 job 數，整個模組只有這一處定義。

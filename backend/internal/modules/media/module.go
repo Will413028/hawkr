@@ -87,6 +87,9 @@ const (
 	ProcessMaxAttempts = upload.MaxAttempts
 )
 
+// Queues 回傳 worker 角色必須設定的 River queue 與併發上限，組裝點以它建 queue 設定。
+func Queues() map[string]int { return map[string]int{ProcessQueue: ProcessQueueWorkers} }
+
 var (
 	// ErrInTransaction：會碰物件儲存的呼叫，ctx 卻帶著 DB transaction。
 	ErrInTransaction = model.ErrInTransaction

@@ -2,6 +2,7 @@ package image_test
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -22,7 +23,7 @@ import (
 const gpsMarker = "GPS-25.0330N-121.5654E-SERIAL-A1B2C3"
 
 // 測試用的小上限：真正的值在 model，image 不依賴 model；這裡只驗「比較」的行為。
-var testLimits = image.Limits{FramePixels: 1_000_000, AnimatedPixels: 1_500_000}
+var testLimits = image.Limits{FramePixels: 1_000_000, AnimatedPixels: 1_500_000, MaxDimension: 65500}
 
 func sanitize(d []byte) (image.Result, error) {
 	return image.Sanitize(context.Background(), d, testLimits)
@@ -362,9 +363,13 @@ func isPermanentImageErr(err error) bool {
 func TestNonInputFailuresAreNotInputErrors(t *testing.T) {
 	src := pngBytes(t, solid(8, 8, color.NRGBA{10, 200, 30, 255}))
 	boom := errors.New("boom")
-	for _, stage := range []string{image.StageAutorot, image.StageColour, image.StageEncode} {
+	for _, stage := range []string{image.StageAutorot, image.StageColour, image.StageAlpha, image.StageFlatten, image.StageEncode} {
 		t.Run(stage, func(t *testing.T) {
-			_, err := image.SanitizeFailing(context.Background(), src, testLimits, stage, boom)
+			in := src
+			if stage == image.StageFlatten {
+				in = opaqueRGBAPNG(t, 8, 8) // 標準庫的編碼器會把不透明圖寫成 RGB，flatten 需要真的帶 alpha 通道的輸入
+			}
+			_, err := image.SanitizeFailing(context.Background(), in, testLimits, stage, boom)
 			if err == nil || !errors.Is(err, boom) {
 				t.Fatalf("err = %v，預期包著注入的錯誤", err)
 			}
@@ -404,7 +409,7 @@ func TestCancelledContextReturnsContextErrorBeforeWork(t *testing.T) {
 }
 
 func TestOpaqueAlphaChannelBecomesJPEG(t *testing.T) {
-	res, err := sanitize(pngBytes(t, solid(8, 8, color.NRGBA{10, 200, 30, 255})))
+	res, err := sanitize(opaqueRGBAPNG(t, 8, 8))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,4 +572,68 @@ func TestDecodableButDisallowedFormatIsUnrecognized(t *testing.T) {
 	if !errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) {
 		t.Fatalf("err = %v，預期只有 ErrUnrecognized", err)
 	}
+}
+
+func TestDimensionOverJPEGLimitIsRejectedFromTheHeader(t *testing.T) {
+	_, err := sanitize(pngBytes(t, solid(70000, 10, color.NRGBA{1, 2, 3, 255})))
+	if !errors.Is(err, image.ErrTooLarge) {
+		t.Fatalf("err = %v，預期 ErrTooLarge", err)
+	}
+}
+
+func TestAlphaOpaqueRejectsUnknownBandFormat(t *testing.T) {
+	img, err := vips.NewPngloadBuffer(pngBytes(t, solid(4, 4, color.NRGBA{1, 2, 3, 255})), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer img.Close()
+	if v, err := image.AlphaOpaque(img); err != nil || v != 255 {
+		t.Fatalf("uchar: %v, %v", v, err)
+	}
+	if err := img.Cast(vips.BandFormatFloat, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := image.AlphaOpaque(img); err == nil || isPermanentImageErr(err) {
+		t.Fatalf("err = %v，預期暫時性錯誤", err)
+	}
+}
+
+// opaqueRGBAPNG 手寫 color type 6（RGBA）的 PNG，alpha 全為 255。
+func opaqueRGBAPNG(t *testing.T, w, h int) []byte {
+	t.Helper()
+	var raw bytes.Buffer
+	for y := 0; y < h; y++ {
+		raw.WriteByte(0)
+		for x := 0; x < w; x++ {
+			raw.Write([]byte{10, 200, 30, 255})
+		}
+	}
+	var z bytes.Buffer
+	zw := zlib.NewWriter(&z)
+	if _, err := zw.Write(raw.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	out.Write([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})
+	chunk := func(typ string, data []byte) {
+		var n [4]byte
+		binary.BigEndian.PutUint32(n[:], uint32(len(data)))
+		out.Write(n[:])
+		out.WriteString(typ)
+		out.Write(data)
+		var c [4]byte
+		binary.BigEndian.PutUint32(c[:], crc32.ChecksumIEEE(append([]byte(typ), data...)))
+		out.Write(c[:])
+	}
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:], uint32(w))
+	binary.BigEndian.PutUint32(ihdr[4:], uint32(h))
+	ihdr[8], ihdr[9] = 8, 6
+	chunk("IHDR", ihdr)
+	chunk("IDAT", z.Bytes())
+	chunk("IEND", nil)
+	return out.Bytes()
 }

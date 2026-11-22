@@ -131,7 +131,7 @@
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
    "old": "if err := ctx.Err(); err != nil {",
-   "new": "if false {",
+   "new": "if err := ctx.Err(); err != nil && false {",
    "test": "internal/modules/media/internal/image ^TestCancelledContextReturnsContextErrorBeforeWork$",
    "why": "a cancelled context no longer stops the sanitizer"
   },
@@ -139,8 +139,8 @@
    "id": "opaque-alpha-stays-png",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "return m < alphaOpaque(a), nil",
-   "new": "return true, nil",
+   "old": "return m < opaque, nil",
+   "new": "return m < opaque || true, nil",
    "test": "internal/modules/media/internal/image ^TestOpaqueAlphaChannelBecomesJPEG$",
    "why": "an opaque image with an alpha band is emitted as a larger PNG instead of JPEG"
   },
@@ -170,6 +170,42 @@
    "new": "opts.Queue = \"\"",
    "test": "internal/modules/media/internal/upload ^TestProcessJobRunsOnItsOwnQueue$",
    "why": "the process job falls back to the shared default queue and its concurrency"
+  },
+  {
+   "id": "no-dimension-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if w > lim.MaxDimension || h > lim.MaxDimension {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestDimensionOverJPEGLimitIsRejectedFromTheHeader$",
+   "why": "an image over the JPEG per-side limit is no longer rejected permanently from the header"
+  },
+  {
+   "id": "alpha-unknown-format-guessed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\treturn 0, fmt.Errorf(\"unsupported alpha band format %d\", a.BandFormat())",
+   "new": "\treturn 65535, nil",
+   "test": "internal/modules/media/internal/image ^TestAlphaOpaqueRejectsUnknownBandFormat$",
+   "why": "an unknown alpha band format is silently treated as 16-bit"
+  },
+  {
+   "id": "flatten-stage-merged",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "s.step(stageFlatten, func() error { return img.Flatten(nil) })",
+   "new": "func() error { return img.Flatten(nil) }()",
+   "test": "internal/modules/media/internal/image ^TestNonInputFailuresAreNotInputErrors$",
+   "why": "the flatten step loses its own stage and failure-injection point"
+  },
+  {
+   "id": "queues-drop-process",
+   "stack": "go",
+   "file": "backend/internal/modules/media/module.go",
+   "old": "map[string]int{ProcessQueue: ProcessQueueWorkers}",
+   "new": "map[string]int{}",
+   "test": "internal/modules/media ^TestQueuesIncludesTheProcessQueue$",
+   "why": "the worker role no longer configures the media process queue"
   }
  ]
 }
