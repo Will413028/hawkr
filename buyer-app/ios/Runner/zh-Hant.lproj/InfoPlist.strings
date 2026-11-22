@@ -1,0 +1,6 @@
+/* 權限說明（ADR 2026-10-17-multi-locale-architecture）：內容與 Info.plist 的預設值相同。 */
+"NSCameraUsageDescription" = "需要使用相機拍攝商品評價照片或更新個人頭像";
+"NSLocationWhenInUseUsageDescription" = "用於配送地址定位與顯示附近商家";
+"NSMotionUsageDescription" = "用於改善瀏覽體驗（偵測手機方向變化）";
+"NSPhotoLibraryAddUsageDescription" = "需要將圖片儲存到相簿（例如：優惠券、訂單憑證）";
+"NSPhotoLibraryUsageDescription" = "需要從相簿選擇商品評價照片或個人頭像";
