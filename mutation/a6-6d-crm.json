@@ -1,0 +1,112 @@
+{
+ "mutants": [
+  {
+   "id": "crm-update-mask-drops-type",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "updateMask: fieldMask(customer, ['type']),",
+   "new": "updateMask: fieldMask(customer, ['buyer_id']),",
+   "test": "test/features/customer/customer_repository_test.dart updateCustomerType sends only type in the update mask",
+   "why": "UpdateCustomer sends a mask that does not list type."
+  },
+  {
+   "id": "crm-list-ignores-tag-filter",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "    if (tagId != null) request.tagId = tagId;\n",
+   "new": "",
+   "test": "test/features/customer/customer_repository_test.dart listCustomers sends store, filters, sort, direction and page token",
+   "why": "The tag filter is no longer sent to ListCustomers."
+  },
+  {
+   "id": "crm-list-drops-page-token",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "      pageToken: pageToken,\n    );\n    if (type != null)",
+   "new": "    );\n    if (type != null)",
+   "test": "test/features/customer/customer_repository_test.dart listCustomers sends store, filters, sort, direction and page token",
+   "why": "Paging never advances: page_token is not sent."
+  },
+  {
+   "id": "crm-get-customer-swallows-all-errors",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "      if (e.code == Code.notFound) return null;\n      rethrow;",
+   "new": "      return null;",
+   "test": "test/features/customer/customer_repository_test.dart getCustomer maps not_found to null and rethrows other errors",
+   "why": "A permission or network failure is reported as no customer."
+  },
+  {
+   "id": "crm-tag-customers-first-page-only",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "    } while (token.isNotEmpty);",
+   "new": "    } while (false);",
+   "test": "test/features/customer/customer_repository_test.dart listAllCustomersWithTag follows next_page_token to the end",
+   "why": "Coupon targets by tag only cover the first page."
+  },
+  {
+   "id": "crm-vip-filter-always-set",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_repository.dart",
+   "old": "    if (type != null) request.type = type;",
+   "new": "    request.type = type ?? CustomerType.CUSTOMER_TYPE_VIP;",
+   "test": "test/features/customer/customer_repository_test.dart listCustomers without a type filter leaves type unset",
+   "why": "The all-customers view is silently filtered to VIP."
+  },
+  {
+   "id": "crm-list-error-shown-as-empty",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_management_screen.dart",
+   "old": "                error: (err, stack) => _CustomerErrorState(",
+   "new": "                error: (err, stack) => const SizedBox.shrink() ?? _CustomerErrorState(",
+   "test": "test/features/customer/customer_management_screen_test.dart a read failure shows the server text and retry, not the empty state",
+   "why": "A list read failure renders nothing instead of the error state."
+  },
+  {
+   "id": "crm-load-more-failure-replaces-list",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_controller.dart",
+   "old": "      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));",
+   "new": "      state = AsyncError(e, StackTrace.current);",
+   "test": "test/features/customer/customer_management_screen_test.dart a load-more failure keeps loaded customers and offers retry",
+   "why": "A failed next page throws away the customers already loaded."
+  },
+  {
+   "id": "crm-default-sort-changed",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_controller.dart",
+   "old": "    this.sort = CustomerSort.CUSTOMER_SORT_ORDER_COUNT,",
+   "new": "    this.sort = CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME,",
+   "test": "test/features/customer/customer_management_screen_test.dart default filter sorts by order count descending",
+   "why": "Default sort differs from order count."
+  },
+  {
+   "id": "crm-orders-error-shown-as-empty",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_orders_screen.dart",
+   "old": "        error: (e, _) => Center(",
+   "new": "        error: (e, _) => const Center(child: Text('暫無訂單')) ?? Center(",
+   "test": "test/features/customer/customer_orders_test.dart a read failure is not shown as no orders",
+   "why": "Order read failure is shown as no orders."
+  },
+  {
+   "id": "crm-order-cancel-status-lost",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_orders.dart",
+   "old": "    80 => OrderStatus.cancelled,",
+   "new": "    80 => OrderStatus.delivering,",
+   "test": "test/features/customer/customer_orders_test.dart order summary maps to a record by status code",
+   "why": "Cancelled orders show as delivering."
+  },
+  {
+   "id": "crm-vip-menu-sends-normal",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_detail_screen.dart",
+   "old": "          ? CustomerType.CUSTOMER_TYPE_NORMAL\n          : CustomerType.CUSTOMER_TYPE_VIP;",
+   "new": "          ? CustomerType.CUSTOMER_TYPE_VIP\n          : CustomerType.CUSTOMER_TYPE_NORMAL;",
+   "test": "test/features/customer/customer_detail_more_menu_test.dart VIP update sends the contract type and flips the menu label",
+   "why": "Upgrade sends NORMAL."
+  }
+ ]
+}
