@@ -41,6 +41,7 @@ const BASE_BUYER_MENU_ITEMS = [
 		icon: "invoiceProfiles",
 	},
 	{ label: "我的檢舉", href: "/account/reports", icon: "reports" },
+	{ label: "封鎖名單", href: "/account/blocked", icon: "blocked" },
 ] as const satisfies ReadonlyArray<BuyerMenuItem>;
 
 /**
@@ -109,6 +110,7 @@ export const BUYER_MENU_GROUPS: ReadonlyArray<BuyerMenuGroup> = [
 			BASE_BUYER_MENU_ITEMS[6], // 我的評論
 			BASE_BUYER_MENU_ITEMS[7], // 通知
 			BASE_BUYER_MENU_ITEMS[11], // 我的檢舉
+			BASE_BUYER_MENU_ITEMS[12], // 封鎖名單
 		],
 	},
 	{

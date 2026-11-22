@@ -151,7 +151,7 @@
 		"descriptionOptional": "說明（選填）",
 		"blockConfirm": "封鎖",
 		"blocking": "封鎖中…",
-		"blockStoreDescription": "封鎖後，你將看不到這家店的貼文與討論區，雙方也無法互傳訊息。",
+		"blockStoreDescription": "封鎖後，你將看不到這家店的貼文與討論區，雙方也無法互傳訊息。可隨時在「封鎖名單」解除。",
 		"orderNo": "訂單編號（選填）",
 		"evidence": "佐證圖片（選填）",
 		"evidenceHint": "最多 {max} 張",

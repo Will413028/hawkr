@@ -151,7 +151,7 @@
 		"descriptionOptional": "Details (optional)",
 		"blockConfirm": "Block",
 		"blocking": "Blocking...",
-		"blockStoreDescription": "After blocking, you will no longer see this store's posts or forum, and neither of you can message the other.",
+		"blockStoreDescription": "After blocking, you will no longer see this store's posts or forum, and neither of you can message the other. You can unblock anytime in Blocked list.",
 		"orderNo": "Order number (optional)",
 		"evidence": "Evidence photos (optional)",
 		"evidenceHint": "Up to {max}",

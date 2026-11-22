@@ -79,6 +79,7 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/account/addresses",
 	"/account/addresses/new",
 	"/account/after-sales",
+	"/account/blocked",
 	"/account/coupons",
 	"/account/favorites",
 	"/account/help",

@@ -75,6 +75,11 @@ export const queryKeys = {
 			["buyer", ...idPrefix(id), "favorites", params ?? {}] as const,
 		following: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["buyer", ...idPrefix(id), "following", params ?? {}] as const,
+		// 買家封鎖名單兩段（`BuyerAppService.ListBlockedStores`／`ListBlockedBuyers`，見 lib/buyer/blocklist.ts）。
+		blockedStores: (id: QueryIdentity) =>
+			["buyer", ...idPrefix(id), "blocked-stores"] as const,
+		blockedBuyers: (id: QueryIdentity) =>
+			["buyer", ...idPrefix(id), "blocked-buyers"] as const,
 		// One seller's subscribed boolean (`GET /subscriptions/{sellerId}`),
 		// keyed by sellerId. A distinct segment keeps it disjoint from the
 		// `following` list family above.
