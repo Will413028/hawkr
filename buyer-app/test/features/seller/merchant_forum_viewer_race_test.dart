@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -39,6 +40,9 @@ Future<void> _pump(WidgetTester tester, FakeSocialPublic public) async {
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp.router(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           routerConfig: GoRouter(
             routes: [

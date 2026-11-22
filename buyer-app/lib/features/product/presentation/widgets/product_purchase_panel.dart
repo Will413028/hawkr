@@ -410,10 +410,12 @@ class ProductPurchaseSelector extends StatelessWidget {
     final selectedSpec = _selectedSpec;
     final stock = purchaseSpecStock(selectedSpec);
     final displayQuantity = quantity < 1 ? 1 : quantity;
-    final total = currentPrice == null ? null : currentPrice! * displayQuantity;
+    final total = currentPrice == null
+        ? null
+        : moneyTotal(currentPrice!, displayQuantity);
     final listTotal = currentListPrice == null
         ? null
-        : currentListPrice! * displayQuantity;
+        : moneyTotal(currentListPrice!, displayQuantity);
 
     final priceBlock = Column(
       key: const ValueKey('product-purchase-price'),

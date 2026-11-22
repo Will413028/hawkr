@@ -96,16 +96,30 @@ jobs:
           else
             old_sha="$PUSH_BEFORE"
           fi
+          is_pr=false
+          if [ "$EVENT_NAME" = "pull_request" ]; then is_pr=true; fi
           if [ -z "$old_sha" ] || [ "$old_sha" = "0000000000000000000000000000000000000000" ]; then
+            if [ "$is_pr" = "true" ]; then
+              echo "::error::pull_request has no base sha to compare against"
+              exit 1
+            fi
             echo "skip: no comparison commit for event $EVENT_NAME"
             exit 0
           fi
           if ! git fetch --no-tags --depth=1 origin "$old_sha"; then
-            echo "skip: cannot fetch $old_sha"
+            if [ "$is_pr" = "true" ]; then
+              echo "::error::cannot fetch base $old_sha"
+              exit 1
+            fi
+            echo "skip: cannot fetch $old_sha for event $EVENT_NAME"
             exit 0
           fi
           old_file="$RUNNER_TEMP/han_baseline.old.json"
           if ! git show "$old_sha:$APP/tool/han_baseline.json" > "$old_file"; then
+            if [ "$is_pr" = "true" ]; then
+              echo "::error::base $old_sha has no $APP/tool/han_baseline.json"
+              exit 1
+            fi
             echo "skip: $old_sha has no $APP/tool/han_baseline.json"
             exit 0
           fi
@@ -116,7 +130,10 @@ jobs:
         continue-on-error: true
         run: |
           flutter gen-l10n
-          test -z "$(git status --porcelain -- lib/l10n)"
+          if [ -n "$(git status --porcelain -- lib/l10n)" ]; then
+            git status --short -- lib/l10n
+            exit 1
+          fi
       - name: Upload dead-code report
         if: always()
         continue-on-error: true

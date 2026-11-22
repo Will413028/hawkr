@@ -1,4 +1,6 @@
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -352,7 +354,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                       resolveConversationLastMessageTime(c);
                                   final String date = localTime == null
                                       ? ''
-                                      : formatTaipeiTimeAgo(localTime);
+                                      : timeAgoText(
+                                          context.l10n,
+                                          taipeiTimeAgo(localTime),
+                                        );
                                   final unread = resolveConversationUnreadCount(
                                     c,
                                   );

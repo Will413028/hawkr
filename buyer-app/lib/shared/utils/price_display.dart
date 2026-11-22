@@ -30,7 +30,7 @@ class PriceDisplay {
     final s = parseMoney(salePrice);
     if (p == null || s == null) return false;
     if (s <= 0) return false;
-    return s < p;
+    return roundMoney(s) < roundMoney(p);
   }
 
   /// 商品卡是否有特價區間。
@@ -68,7 +68,7 @@ class PriceDisplay {
     if (mn != null && mx != null) {
       final mnStr = _fmtInt(mn);
       final mxStr = _fmtInt(mx);
-      if (mn == mx) return '$prefix$mnStr';
+      if (roundMoney(mn) == roundMoney(mx)) return '$prefix$mnStr';
       return '$prefix$mnStr~$mxStr';
     }
     return '$prefix${_fmtInt((mn ?? mx)!)}';
@@ -98,7 +98,7 @@ class PriceDisplay {
     final ep = positiveMoney(effectivePrice);
     if (ep == null) return '';
     final highest = (lpMax ?? lpMin)!;
-    if (highest <= ep) return '';
+    if (roundMoney(highest) <= roundMoney(ep)) return '';
     return '$prefix${formatRangeRaw(lpMin, lpMax)}';
   }
 
@@ -115,7 +115,8 @@ class PriceDisplay {
     if (label.isEmpty) return ('', null);
     final mn = positiveMoney(min);
     final mx = positiveMoney(max);
-    final single = (mn == null || mx == null || mn == mx)
+    final single =
+        (mn == null || mx == null || roundMoney(mn) == roundMoney(mx))
         ? (mn ?? mx)!.toDouble()
         : null;
     return (label, single);
@@ -127,7 +128,7 @@ class PriceDisplay {
     final mx = positiveMoney(max);
     if (mn == null && mx == null) return '';
     if (mn != null && mx != null) {
-      if (mn == mx) return _fmtInt(mn);
+      if (roundMoney(mn) == roundMoney(mx)) return _fmtInt(mn);
       return '${_fmtInt(mn)}~${_fmtInt(mx)}';
     }
     return _fmtInt((mn ?? mx)!);
@@ -138,15 +139,15 @@ class PriceDisplay {
     final lp = parseMoney(listPrice);
     final ep = parseMoney(effectivePrice);
     if (lp == null || ep == null) return false;
-    return lp > ep;
+    return roundMoney(lp) > roundMoney(ep);
   }
 
   /// 折扣百分比（四捨五入到整數），無效時回 null。
   static int? discountPercent({dynamic listPrice, dynamic salePrice}) {
     final lp = parseMoney(listPrice);
     final sp = parseMoney(salePrice);
-    if (lp == null || sp == null || lp <= 0 || sp <= 0 || sp >= lp) return null;
-    return (((lp - sp) / lp) * 100).round();
+    if (lp == null || sp == null) return null;
+    return moneyDiscountPercent(lp, sp);
   }
 
   static String _fmtInt(num v) => formatMoneyAmount(v);

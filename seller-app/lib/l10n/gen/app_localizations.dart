@@ -103,6 +103,48 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'繁體中文'**
   String get languageName;
+
+  /// Relative time under one minute.
+  ///
+  /// In zh, this message translates to:
+  /// **'剛剛'**
+  String get timeAgoJustNow;
+
+  /// Relative time in whole minutes (1 to 59).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}分鐘前}}'**
+  String timeAgoMinutes(int count);
+
+  /// Relative time in whole hours (1 to 23).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}小時前}}'**
+  String timeAgoHours(int count);
+
+  /// Relative time in Taipei calendar days (1 to 6).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}天前}}'**
+  String timeAgoDays(int count);
+
+  /// Taipei date in the current year, month and day.
+  ///
+  /// In zh, this message translates to:
+  /// **'{month}/{day}'**
+  String timeAgoMonthDay(int month, int day);
+
+  /// Taipei date in an earlier year.
+  ///
+  /// In zh, this message translates to:
+  /// **'{year}/{month}/{day}'**
+  String timeAgoFullDate(int year, int month, int day);
+
+  /// Marks a displayed time as Taipei time when the device time zone offset is not +8.
+  ///
+  /// In zh, this message translates to:
+  /// **'台北時間'**
+  String get taipeiTimeLabel;
 }
 
 class _AppLocalizationsDelegate

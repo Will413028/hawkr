@@ -1,4 +1,6 @@
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -448,7 +450,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     Widget commentCard(_CommentNode n) => _CommentCard(
       node: n,
       onReply: () => _setReplyTarget(n),
-      formatTimeAgo: formatTaipeiTimeAgo,
+      formatTimeAgo: (time) => timeAgoText(context.l10n, taipeiTimeAgo(time)),
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
       onReportOrBlock: _onReportOrBlock,

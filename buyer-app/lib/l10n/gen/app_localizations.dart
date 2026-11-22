@@ -103,6 +103,90 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'繁體中文'**
   String get languageName;
+
+  /// Relative time under one minute.
+  ///
+  /// In zh, this message translates to:
+  /// **'剛剛'**
+  String get timeAgoJustNow;
+
+  /// Relative time in whole minutes (1 to 59).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}分鐘前}}'**
+  String timeAgoMinutes(int count);
+
+  /// Relative time in whole hours (1 to 23).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}小時前}}'**
+  String timeAgoHours(int count);
+
+  /// Relative time in Taipei calendar days (1 to 6).
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count}天前}}'**
+  String timeAgoDays(int count);
+
+  /// Taipei date in the current year, month and day.
+  ///
+  /// In zh, this message translates to:
+  /// **'{month}/{day}'**
+  String timeAgoMonthDay(int month, int day);
+
+  /// Taipei date in an earlier year.
+  ///
+  /// In zh, this message translates to:
+  /// **'{year}/{month}/{day}'**
+  String timeAgoFullDate(int year, int month, int day);
+
+  /// Marks a displayed time as Taipei time when the device time zone offset is not +8.
+  ///
+  /// In zh, this message translates to:
+  /// **'台北時間'**
+  String get taipeiTimeLabel;
+
+  /// Browsing history label under one minute.
+  ///
+  /// In zh, this message translates to:
+  /// **'剛剛看過'**
+  String get viewedJustNow;
+
+  /// Browsing history label in whole minutes.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count} 分鐘前看過}}'**
+  String viewedMinutes(int count);
+
+  /// Browsing history label in whole hours.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count} 小時前看過}}'**
+  String viewedHours(int count);
+
+  /// Browsing history label for the previous Taipei calendar day.
+  ///
+  /// In zh, this message translates to:
+  /// **'昨天看過'**
+  String get viewedYesterday;
+
+  /// Browsing history label in Taipei calendar days.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count} 天前看過}}'**
+  String viewedDays(int count);
+
+  /// Browsing history label with the Taipei date.
+  ///
+  /// In zh, this message translates to:
+  /// **'{month}/{day} 看過'**
+  String viewedDate(int month, int day);
+
+  /// Browsing history label when the time is unknown.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近看過'**
+  String get viewedRecently;
 }
 
 class _AppLocalizationsDelegate

@@ -1,4 +1,18 @@
 {
   "@@locale": "en",
-  "languageName": "English"
+  "languageName": "English",
+  "timeAgoJustNow": "Just now",
+  "timeAgoMinutes": "{count, plural, =1{1 minute ago} other{{count} minutes ago}}",
+  "timeAgoHours": "{count, plural, =1{1 hour ago} other{{count} hours ago}}",
+  "timeAgoDays": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "timeAgoMonthDay": "{month}/{day}",
+  "timeAgoFullDate": "{year}/{month}/{day}",
+  "taipeiTimeLabel": "Taipei time",
+  "viewedJustNow": "Viewed just now",
+  "viewedMinutes": "{count, plural, =1{Viewed 1 minute ago} other{Viewed {count} minutes ago}}",
+  "viewedHours": "{count, plural, =1{Viewed 1 hour ago} other{Viewed {count} hours ago}}",
+  "viewedYesterday": "Viewed yesterday",
+  "viewedDays": "{count, plural, =1{Viewed 1 day ago} other{Viewed {count} days ago}}",
+  "viewedDate": "Viewed {month}/{day}",
+  "viewedRecently": "Viewed recently"
 }

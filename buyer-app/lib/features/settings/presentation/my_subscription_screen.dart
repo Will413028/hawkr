@@ -1,4 +1,6 @@
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'dart:async';
@@ -1607,7 +1609,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         final milliseconds = numeric > 1000000000000 ? numeric : numeric * 1000;
         return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
-      final parsed = DateTime.tryParse(raw);
+      final parsed = tryParseTaipeiInstant(raw);
       if (parsed != null) return parsed;
     }
     return null;
@@ -1615,8 +1617,8 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
 
   String _historyLabel(Map<String, dynamic> item) {
     final time = _activityTime(item);
-    if (time == null) return '最近看過';
-    return historyViewedLabel(time);
+    if (time == null) return context.l10n.viewedRecently;
+    return historyViewedText(context.l10n, time);
   }
 
   void _openMerchant(String storeCode) {
@@ -2013,19 +2015,4 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       ),
     );
   }
-}
-
-/// 瀏覽紀錄的相對時間標籤；一天以上的「昨天」「N 天前」與日期以臺北日曆日判斷。
-@visibleForTesting
-String historyViewedLabel(DateTime time, {DateTime? now}) {
-  final current = now ?? DateTime.now();
-  final difference = current.difference(time);
-  if (difference.isNegative || difference.inMinutes < 1) return '剛剛看過';
-  if (difference.inHours < 1) return '${difference.inMinutes} 分鐘前看過';
-  if (difference.inHours < 24) return '${difference.inHours} 小時前看過';
-  final days = taipeiCalendarDaysAgo(time, now: current);
-  if (days <= 1) return '昨天看過';
-  if (days < 7) return '$days 天前看過';
-  final t = time.taipei;
-  return '${t.month}/${t.day} 看過';
 }

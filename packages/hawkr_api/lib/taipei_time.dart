@@ -55,18 +55,116 @@ int taipeiCalendarDaysAgo(DateTime time, {DateTime? now}) {
   ).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
 }
 
-/// 相對時間字樣：剛剛 / N分鐘前 / N小時前 / N天前 / `M/D` / `YYYY/M/D`。
-///
-/// 一小時內與一天內用經過的時間；一天以上的天數與跨年判斷一律用臺北日曆日，不看裝置時區。
-String formatTaipeiTimeAgo(DateTime time, {DateTime? now}) {
+/// 相對時間的結構值；文字由各 App 的 ARB 組出。
+sealed class TimeAgo {
+  const TimeAgo();
+}
+
+/// 不到一分鐘（含時間在未來）。
+final class TimeAgoJustNow extends TimeAgo {
+  const TimeAgoJustNow();
+  @override
+  bool operator ==(Object other) => other is TimeAgoJustNow;
+  @override
+  int get hashCode => 1;
+}
+
+/// 經過的整分鐘，1 至 59。
+final class TimeAgoMinutes extends TimeAgo {
+  const TimeAgoMinutes(this.count);
+  final int count;
+  @override
+  bool operator ==(Object other) =>
+      other is TimeAgoMinutes && other.count == count;
+  @override
+  int get hashCode => Object.hash(2, count);
+}
+
+/// 經過的整小時，1 至 23。
+final class TimeAgoHours extends TimeAgo {
+  const TimeAgoHours(this.count);
+  final int count;
+  @override
+  bool operator ==(Object other) =>
+      other is TimeAgoHours && other.count == count;
+  @override
+  int get hashCode => Object.hash(3, count);
+}
+
+/// 臺北日曆日相差的天數，1 至 6。
+final class TimeAgoDays extends TimeAgo {
+  const TimeAgoDays(this.count);
+  final int count;
+  @override
+  bool operator ==(Object other) =>
+      other is TimeAgoDays && other.count == count;
+  @override
+  int get hashCode => Object.hash(4, count);
+}
+
+/// 七天以上、與 [now] 同一個臺北年份的臺北日期。
+final class TimeAgoMonthDay extends TimeAgo {
+  const TimeAgoMonthDay(this.month, this.day);
+  final int month;
+  final int day;
+  @override
+  bool operator ==(Object other) =>
+      other is TimeAgoMonthDay && other.month == month && other.day == day;
+  @override
+  int get hashCode => Object.hash(5, month, day);
+}
+
+/// 七天以上、不同臺北年份的臺北日期。
+final class TimeAgoFullDate extends TimeAgo {
+  const TimeAgoFullDate(this.year, this.month, this.day);
+  final int year;
+  final int month;
+  final int day;
+  @override
+  bool operator ==(Object other) =>
+      other is TimeAgoFullDate &&
+      other.year == year &&
+      other.month == month &&
+      other.day == day;
+  @override
+  int get hashCode => Object.hash(6, year, month, day);
+}
+
+/// [time] 相對 [now] 的結構值；一小時內與一天內用經過的時間，一天以上的天數與跨年判斷用臺北日曆日，不看裝置時區。
+TimeAgo taipeiTimeAgo(DateTime time, {DateTime? now}) {
   final current = now ?? DateTime.now();
   final diff = current.difference(time);
-  if (diff.isNegative || diff.inSeconds < 60) return '剛剛';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-  if (diff.inHours < 24) return '${diff.inHours}小時前';
+  if (diff.isNegative || diff.inSeconds < 60) return const TimeAgoJustNow();
+  if (diff.inMinutes < 60) return TimeAgoMinutes(diff.inMinutes);
+  if (diff.inHours < 24) return TimeAgoHours(diff.inHours);
   final days = taipeiCalendarDaysAgo(time, now: current);
-  if (days < 7) return '$days天前';
+  if (days < 7) return TimeAgoDays(days);
   final t = time.taipei;
-  if (t.year == current.taipei.year) return '${t.month}/${t.day}';
-  return '${t.year}/${t.month}/${t.day}';
+  if (t.year == current.taipei.year) return TimeAgoMonthDay(t.month, t.day);
+  return TimeAgoFullDate(t.year, t.month, t.day);
 }
+
+/// 解析時間字串成時間點：帶時區標記的照標記；沒有標記的當臺北牆上時間（業務時間字串的約定），換成對應的 UTC 時間點。
+/// 無法解析回 null。結果與裝置時區無關。
+DateTime? tryParseTaipeiInstant(String raw) {
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  if (parsed.isUtc) return parsed;
+  return DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  ).subtract(_taipeiUtcOffset);
+}
+
+/// [offset] 是否為臺北的 +8 時。
+bool isTaipeiOffset(Duration offset) => offset == _taipeiUtcOffset;
+
+/// 裝置目前的時區偏移不是 +8 時；此時顯示臺北時間處要標「台北時間」（ADR 多語系架構 D5）。
+bool isDeviceInTaipeiOffset({DateTime? now}) =>
+    isTaipeiOffset((now ?? DateTime.now()).timeZoneOffset);

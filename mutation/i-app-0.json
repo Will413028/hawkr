@@ -109,15 +109,6 @@
    "why": "The 10-digit seconds branch loses its UTC flag, so taipeiWall leaves device-local time unshifted."
   },
   {
-   "id": "money-decimals-restored",
-   "stack": "flutter:buyer-app",
-   "file": "packages/hawkr_api/lib/money.dart",
-   "old": "String formatMoneyAmount(num value) => value.round().toString();",
-   "new": "String formatMoneyAmount(num value) => value.toStringAsFixed(2);",
-   "test": "../packages/hawkr_api/test/money_test.dart formats with zero decimals and NT$ prefix",
-   "why": "Money prints two decimals again, against the ADR's zero-decimal rule."
-  },
-  {
    "id": "han-baseline-against-loosened",
    "stack": "flutter:buyer-app",
    "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
@@ -125,6 +116,51 @@
    "new": "final loosened = <String>[];",
    "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 任一字面值全域總次數變大失敗，新字面值也算",
    "why": "The baseline-against comparison never reports an increase."
+  },
+  {
+   "id": "money-decimals-restored",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/money.dart",
+   "old": "String formatMoneyAmount(num value) {\n  final n = roundMoney(value);",
+   "new": "String formatMoneyAmount(num value) {\n  if (value % 1 != 0) return value.toStringAsFixed(2);\n  final n = roundMoney(value);",
+   "test": "../packages/hawkr_api/test/money_test.dart rounds fractions instead of printing decimals",
+   "why": "Fractional money prints two decimals again, against the ADR's zero-decimal rule."
+  },
+  {
+   "id": "buyer-time-ago-minutes-unit-swapped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/l10n/time_ago_text.dart",
+   "old": "TimeAgoMinutes(:final count) => l.timeAgoMinutes(count),",
+   "new": "TimeAgoMinutes(:final count) => l.timeAgoHours(count),",
+   "test": "test/l10n/time_ago_text_test.dart composes zh text from each unit",
+   "why": "Minutes are composed with the hours message, so 5 minutes reads as 5 hours."
+  },
+  {
+   "id": "seller-time-ago-minutes-unit-swapped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/l10n/time_ago_text.dart",
+   "old": "TimeAgoMinutes(:final count) => l.timeAgoMinutes(count),",
+   "new": "TimeAgoMinutes(:final count) => l.timeAgoHours(count),",
+   "test": "test/l10n/time_ago_text_test.dart composes zh text from each unit",
+   "why": "Minutes are composed with the hours message, so 5 minutes reads as 5 hours."
+  },
+  {
+   "id": "unmarked-time-not-converted-from-taipei-wall",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "  ).subtract(_taipeiUtcOffset);",
+   "new": "  );",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart unmarked strings are Taipei wall clock",
+   "why": "A time string without a zone marker is no longer read as Taipei wall clock, so it is 8 hours late."
+  },
+  {
+   "id": "money-total-uses-unrounded-unit",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/money.dart",
+   "old": "int moneyTotal(num unitPrice, int quantity) => roundMoney(unitPrice) * quantity;",
+   "new": "int moneyTotal(num unitPrice, int quantity) => (unitPrice * quantity).round();",
+   "test": "../packages/hawkr_api/test/money_test.dart total is the rounded unit price times quantity",
+   "why": "The total multiplies the unrounded unit price, so it no longer equals the shown unit price times quantity."
   }
  ]
 }

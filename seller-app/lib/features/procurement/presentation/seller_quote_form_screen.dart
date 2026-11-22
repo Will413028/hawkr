@@ -1,4 +1,5 @@
 import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -857,6 +858,11 @@ class _QuoteTextField extends HookWidget {
   }
 }
 
+/// 日期時間選擇器的起始臺北牆上時間：已有值用它，沒有值是 [now] 起算一天後。
+@visibleForTesting
+DateTime quotePickerInitial(DateTime? current, DateTime now) =>
+    (current ?? now.toUtc().add(const Duration(days: 1))).taipeiWall;
+
 class _DateTimeField extends StatelessWidget {
   const _DateTimeField({
     required this.label,
@@ -880,7 +886,13 @@ class _DateTimeField extends StatelessWidget {
       child: InkWell(
         onTap: () => _pick(context, parsed),
         child: InputDecorator(
-          decoration: InputDecoration(labelText: label, errorText: error),
+          decoration: InputDecoration(
+            labelText: label,
+            errorText: error,
+            helperText: isDeviceInTaipeiOffset()
+                ? null
+                : context.l10n.taipeiTimeLabel,
+          ),
           child: Text(
             parsed == null ? '尚未設定' : _formatLocal(parsed),
             style: AppTypography.body,
@@ -899,7 +911,7 @@ class _DateTimeField extends StatelessWidget {
 
   Future<void> _pick(BuildContext context, DateTime? current) async {
     final now = DateTime.now();
-    final base = (current ?? now.add(const Duration(days: 1))).taipeiWall;
+    final base = quotePickerInitial(current, now);
     final date = await showDatePicker(
       context: context,
       initialDate: base,

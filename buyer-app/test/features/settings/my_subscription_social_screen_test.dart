@@ -17,6 +17,7 @@ import 'package:hawkr_buyer/features/settings/presentation/my_subscription_scree
 import 'package:hawkr_buyer/features/visit/data/visit_repository.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -505,6 +506,9 @@ Future<void> _pumpRouterScreen(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, __) => MaterialApp.router(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
@@ -545,6 +549,9 @@ Future<void> _pumpScreen(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, __) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),

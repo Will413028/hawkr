@@ -1,3 +1,4 @@
+import 'package:hawkr_api/money.dart';
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -442,7 +443,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
               flex: 1,
               child: Text(
                 // B-109：後端 amount 一律字串，使用 AmountUtils 做容錯解析
-                AmountUtils.formatNTD(record['amount']),
+                formatMoney(AmountUtils.parseToInt(record['amount'])),
                 textAlign: TextAlign.center,
                 style: textStyle,
               ),
