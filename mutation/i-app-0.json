@@ -96,7 +96,7 @@
    "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
    "old": "if (cur > allowed) {",
    "new": "if (cur > allowed + 1000000) {",
-   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 同檔次數增加失敗（刪一句加一句不同的也失敗）",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 同檔只增加不減少失敗",
    "why": "Per-literal count increases in an existing file no longer fail."
   },
   {
