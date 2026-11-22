@@ -60,9 +60,9 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 	if subtle.ConstantTimeCompare(sum[:], want) != 1 {
 		return ProcessResult{}, model.Permanent(model.RejectChecksumMismatch, errors.New("MD5 與宣告不符"))
 	}
-	res, err := image.Sanitize(ctx, data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels, MaxDimension: model.MaxImageDimension})
+	res, err := sanitizePublic(ctx, data)
 	if err != nil {
-		if errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge) {
+		if isImageRejection(err) {
 			return ProcessResult{}, model.Permanent(model.RejectUnrecognizedFormat, err)
 		}
 		return ProcessResult{}, err
@@ -72,4 +72,14 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 		return ProcessResult{}, err
 	}
 	return ProcessResult{SizeBytes: int64(len(res.Data)), ContentType: ct}, nil
+}
+
+// sanitizePublic 是 public 圖片的辨認與重新編碼，處理 job 與 PutPublic 共用，上限只取自 model。
+func sanitizePublic(ctx context.Context, data []byte) (image.Result, error) {
+	return image.Sanitize(ctx, data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels, MaxDimension: model.MaxImageDimension})
+}
+
+// isImageRejection 回報錯誤是不是輸入本身的問題（辨認不出、無法解碼、超過上限），這類不會因重試而成功。
+func isImageRejection(err error) bool {
+	return errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge)
 }

@@ -58,7 +58,7 @@ func secureServiceWith(t *testing.T, wrap func(*storage.Fake) storage.Store) (*S
 	return svc, d, st
 }
 
-// 最後的 transaction 回錯誤、其實已經提交：abortSecure 看到列是 READY，照成功回傳，而且不刪物件。
+// 最後的 transaction 回錯誤、其實已經提交：abortDirect 看到列是 READY，照成功回傳，而且不刪物件。
 func TestAbortSecure_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testing.T) {
 	svc, d, st := secureService(t)
 	res, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello")))
@@ -70,9 +70,8 @@ func TestAbortSecure_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testin
 	if err := d.Pool().QueryRow(t.Context(), `SELECT id, final_key FROM media.staged_uploads`).Scan(&id, &key); err != nil {
 		t.Fatal(err)
 	}
-	got, err := svc.abortSecure(t.Context(), id, key, res, errors.New("commit：連線中斷"))
-	if err != nil || got.Token != res.Token {
-		t.Fatalf("abortSecure = %+v, %v，預期照成功回 token", got, err)
+	if err := svc.abortDirect(t.Context(), id, key, errors.New("commit：連線中斷")); err != nil {
+		t.Fatalf("abortDirect = %v，預期照成功回 nil（res.Token=%s）", err, res.Token)
 	}
 	if _, err := st.Head(t.Context(), key); err != nil {
 		t.Fatalf("物件被刪了：%v", err)
@@ -98,7 +97,7 @@ func TestAbortSecure_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T
 		t.Fatal(err)
 	}
 	cause := errors.New("boom")
-	if _, err := svc.abortSecure(t.Context(), id, key, SecureResult{}, cause); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := svc.abortDirect(t.Context(), id, key, cause); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("err = %v，預期 FailedPrecondition", err)
 	}
 	if _, err := st.Head(t.Context(), key); err != nil {

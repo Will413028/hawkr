@@ -44,6 +44,8 @@ type (
 	BeginInput = upload.BeginInput
 	// SecureUploadResult 是 UploadSecure 的結果：token、辨認出的型別、明文大小與期限；資產 ID 不回給上傳者。
 	SecureUploadResult = upload.SecureResult
+	// PutPublicResult 是 PutPublic 的結果：token、重新編碼後的型別與大小、期限。
+	PutPublicResult = upload.PublicPutResult
 	// Keyring 是機敏資產的 KEK 金鑰環，由組裝點以 ParseKeyring 建立。
 	Keyring = secure.Keyring
 	// BeginResult 是 BeginUpload 的結果：預簽 PUT 與只出現一次的 token。
@@ -166,6 +168,18 @@ func (m *Module) BeginUpload(ctx context.Context, uploader Uploader, in BeginInp
 // SecureUploadConcurrency 立即回 ResourceExhausted。沒有 keyring 回 ErrNoKeyring。不得在 transaction 內呼叫。
 func (m *Module) UploadSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
 	return m.upload.UploadSecure(ctx, uploader, body)
+}
+
+// PutSecure 是模組內部的機敏直接寫入（B1-D14）：出貨單等由伺服器產生的 PDF 或圖片走這裡，管線與 UploadSecure 相同（magic bytes 辨認、STREAM 加密、不寫明文）。
+// 回傳暫存 token；擁有者在自己的 transaction 內以 Uploader 為 uploader 呼叫 Confirm，未確認的由 GC 回收。不得在 transaction 內呼叫；目前沒有呼叫方（B1-D7）。
+func (m *Module) PutSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
+	return m.upload.UploadSecure(ctx, uploader, body)
+}
+
+// PutPublic 是模組內部的公開圖片直接寫入（B1-D14）：只收 JPEG、PNG、WebP、GIF，規則與公開上傳相同（重新編碼、去 metadata、大小與像素上限），同步處理後寫入 public/ 並回傳立即可 Confirm 的 token。
+// PDF 與辨認不出的內容回 InvalidInput，不寫物件也不建列。不得在 transaction 內呼叫；目前沒有呼叫方（B1-D7）。
+func (m *Module) PutPublic(ctx context.Context, uploader Uploader, body io.Reader) (PutPublicResult, error) {
+	return m.upload.PutPublic(ctx, uploader, body)
 }
 
 // ReadSecure 讀機敏資產的明文（只讀 SECURE 且 ACTIVE；公開資產回 ErrNotSecure，其餘 NotFound）；授權由擁有者先做。

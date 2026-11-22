@@ -71,6 +71,33 @@
    "new": "if n < 0 {",
    "test": "cmd/hawkr ^TestWorkerQueuesRejectsNonPositiveConcurrency$",
    "why": "a zero-concurrency queue is accepted"
+  },
+  {
+   "id": "put-public-no-format-rejection",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "if isImageRejection(err) {",
+   "new": "if false && isImageRejection(err) {",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_RejectsNonImagesAsInvalidInput$",
+   "why": "PutPublic no longer turns an unrecognized or undecodable input (PDF, fake image) into a rejection"
+  },
+  {
+   "id": "put-public-no-size-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "max: model.MaxPublicUploadSize}",
+   "new": "max: model.MaxPublicUploadSize * 1000}",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_EnforcesTheSizeLimitOnActualBytes$",
+   "why": "PutPublic reads far beyond the public upload size limit"
+  },
+  {
+   "id": "put-secure-skips-encryption",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "plainSize, err := secure.Encrypt(tmp, br, dek)",
+   "new": "_ = dek\n\tplainSize, err := io.Copy(tmp, br)",
+   "test": "internal/modules/media ^TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm$",
+   "why": "the direct secure write stores the plaintext instead of the envelope-encrypted object"
   }
  ]
 }

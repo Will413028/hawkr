@@ -10,7 +10,7 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 
 ## 發布的讀取介面
 
-無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`UploadSecure`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與引用同步 `media.Sync*`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
+無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`UploadSecure`、`PutSecure`、`PutPublic`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與引用同步 `media.Sync*`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
 
 ## 模組內部結構
 
@@ -18,7 +18,7 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 - 依賴 libvips（`vipsgen`）：CI 裝 `libvips-dev`，本機 `brew install vips`。新增直接依賴先經同意。
 - 組裝點（`cmd/hawkr`）提供 `ObjectStore`（`MEDIA_STORAGE`，缺設定啟動失敗，不退回 fake）、`media.ParseKeyring(MEDIA_KEKS)`，並把 `media.Queues()` 經 `workerQueues` 併入 worker（queue 名重複啟動失敗）；模組不讀環境。
 - 依賴圖唯一來源：`internal/arch/modules.go` 的 `InternalDependencies`。
-- `PutPublic`、`PutSecure` 尚未實作：公開 PDF 與「公開只收圖片」衝突，直傳資產的狀態與確認方式計畫未定（B1-2c3）。
+- 內部直接寫入（B1-D14）：`PutSecure`（出貨單 PDF 與圖片，同 `UploadSecure` 管線）、`PutPublic`（只收圖片，同步重新編碼）建 `READY` 暫存並回 token，擁有者在自己的 transaction 內 `Confirm`，呼叫時 `Uploader` 帶操作者；沒確認的由 GC 回收。不新增資產狀態與身分型別，目前沒有呼叫方。
 
 ## 不變量
 
@@ -28,7 +28,7 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 - GC 只刪過期未確認的暫存（含超過 `StuckUploadGrace` 仍 `UPLOADED` 的）與其物件；先標 `DELETING` 並提交，transaction 外刪物件，再標 `DELETED`，失敗留著重試；已確認資產只由 `MarkDeleted` 刪。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`。
 - 期限與上限只在 `internal/model` 定義一次（`UploadTTL`、`PresignTTL`、`StuckUploadGrace`、`Max*Size`、`MaxImagePixels`、`MaxAnimatedPixels`、`MaxImageDimension`）。守門：`TestStuckUploadGraceOutlastsEveryProcessAttempt`。
 - `public/` 的圖片一律經 libvips 重新編碼（JPEG、PNG、WebP、GIF；sRGB、已套用方向、無 metadata）；辨認不出、無法解碼、超過上限永久拒絕；`image.Limits` 非正回 `ErrInvalidLimits`。守門：`TestFakeImageIsRejected`、`TestHeightOverDimensionLimitIsRejectedFromTheHeader`、`TestNonPositiveLimitsAreRejected`。
-- 機敏檔只以密文落地：`UploadSecure` 依 magic bytes 辨認、以實際讀到的位元組套用上限、STREAM 加密到暫存檔再 `Put`，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestUploadSecure_NoPlaintextInAnyPutOrStoredObject`（CI）。
+- 機敏檔只以密文落地：`UploadSecure` 依 magic bytes 辨認、以實際讀到的位元組套用上限、STREAM 加密到暫存檔再 `Put`，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestUploadSecure_NoPlaintextInAnyPutOrStoredObject`（CI）。直接寫入同規則：`TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm`（CI）、`TestPreparePublic_RejectsNonImagesAsInvalidInput`。
 
 ## 不負責
 

@@ -148,22 +148,32 @@ func (s *Service) UploadSecure(ctx context.Context, uploader model.Uploader, bod
 		return SecureResult{}, fmt.Errorf("media：建立機敏暫存上傳：%w", err)
 	}
 	result := SecureResult{Token: token, ContentType: contentType, SizeBytes: plainSize, ExpiresAt: expiresAt}
+	asset := store.InsertAssetParams{
+		ID: assetID, Visibility: string(model.VisibilitySecure), ObjectKey: finalKey, ContentType: contentType, SizeBytes: plainSize,
+		KekID: &kekID, WrappedDek: wrapped,
+	}
+	if err := s.commitDirect(ctx, uploadID, asset, tmp, info.Size(), secureObjectType); err != nil {
+		return SecureResult{}, err
+	}
+	return result, nil
+}
 
+// commitDirect 是直接寫入（UploadSecure、PutPublic）的後半段：暫存列已以 UPLOADED 與 final_key 建好；transaction 外 Put，
+// 再以一個 transaction 建資產列並把暫存列轉 READY。任何一步失敗都走 abortDirect 收斂；最後的 transaction 其實已提交時視為成功。
+func (s *Service) commitDirect(ctx context.Context, uploadID uuid.UUID, asset store.InsertAssetParams, body io.Reader, size int64, objectType string) error {
 	putCtx, cancel := context.WithTimeout(ctx, model.SecureUploadTimeout)
 	defer cancel()
-	if err := s.d.Store.Put(putCtx, storage.PutInput{Key: finalKey, Body: tmp, Size: info.Size(), ContentType: secureObjectType}); err != nil {
-		return s.abortSecure(ctx, uploadID, finalKey, result, fmt.Errorf("media：寫入機敏物件：%w", err))
+	if err := s.d.Store.Put(putCtx, storage.PutInput{Key: asset.ObjectKey, Body: body, Size: size, ContentType: objectType}); err != nil {
+		return s.abortDirect(ctx, uploadID, asset.ObjectKey, fmt.Errorf("media：寫入物件：%w", err))
 	}
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		now := s.d.Now()
 		q := s.q(ctx)
-		if err := q.InsertAsset(ctx, store.InsertAssetParams{
-			ID: assetID, Visibility: string(model.VisibilitySecure), ObjectKey: finalKey, ContentType: contentType, SizeBytes: plainSize,
-			KekID: &kekID, WrappedDek: wrapped, Now: now,
-		}); err != nil {
-			return fmt.Errorf("media：建立機敏資產：%w", err)
+		asset.Now = now
+		if err := q.InsertAsset(ctx, asset); err != nil {
+			return fmt.Errorf("media：建立資產：%w", err)
 		}
-		n, err := q.MarkUploadReady(ctx, store.MarkUploadReadyParams{ID: uploadID, AssetID: &assetID, Now: now})
+		n, err := q.MarkUploadReady(ctx, store.MarkUploadReadyParams{ID: uploadID, AssetID: &asset.ID, Now: now})
 		if err != nil {
 			return fmt.Errorf("media：標記就緒：%w", err)
 		}
@@ -173,9 +183,9 @@ func (s *Service) UploadSecure(ctx context.Context, uploader model.Uploader, bod
 		return nil
 	})
 	if err != nil {
-		return s.abortSecure(ctx, uploadID, finalKey, result, err)
+		return s.abortDirect(ctx, uploadID, asset.ObjectKey, err)
 	}
-	return result, nil
+	return nil
 }
 
 // secureReadErr 把讀 body 的錯誤分類：超過上限是 InvalidInput，其餘（client 中斷等）原樣回傳。
@@ -186,38 +196,38 @@ func secureReadErr(err error) error {
 	return fmt.Errorf("media：讀取機敏上傳：%w", err)
 }
 
-// abortSecure 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳，
+// abortDirect 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳 nil，
 // 重讀是 DELETING 或 DELETED（輸給 GC）回 FailedPrecondition「已過期」。內部的 errLost 不外漏。
 // 不受 ctx 取消影響：client 斷線時列與物件仍要收尾，但整段收尾有 model.SecureAbortTimeout 的時限。
 // 轉換本身失敗時什麼都不刪，列與物件留給 GC 在過期加寬限後回收。
-func (s *Service) abortSecure(ctx context.Context, uploadID uuid.UUID, finalKey string, ok SecureResult, cause error) (SecureResult, error) {
+func (s *Service) abortDirect(ctx context.Context, uploadID uuid.UUID, finalKey string, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.SecureAbortTimeout)
 	defer cancel()
 	if errors.Is(cause, errLost) {
-		cause = errors.New("media：機敏上傳的暫存列已被別處轉走，沒有完成")
+		cause = errors.New("media：直接上傳的暫存列已被別處轉走，沒有完成")
 	}
 	reason := string(model.RejectProcessingFailed)
 	n, err := s.q(ctx).MarkUploadRejected(ctx, store.MarkUploadRejectedParams{ID: uploadID, Reason: &reason, Now: s.d.Now()})
 	if err != nil {
-		s.d.Logger.ErrorContext(ctx, "media：機敏上傳失敗後標記拒絕失敗，留給 GC", "upload_id", uploadID, "error", err)
-		return SecureResult{}, cause
+		s.d.Logger.ErrorContext(ctx, "media：直接上傳失敗後標記拒絕失敗，留給 GC", "upload_id", uploadID, "error", err)
+		return cause
 	}
 	if n == 1 {
 		if err := s.d.Store.Delete(ctx, finalKey); err != nil {
-			s.d.Logger.WarnContext(ctx, "media：刪除失敗的機敏物件失敗，留給 GC", "upload_id", uploadID, "error", err)
+			s.d.Logger.WarnContext(ctx, "media：刪除失敗的物件失敗，留給 GC", "upload_id", uploadID, "error", err)
 		}
-		return SecureResult{}, cause
+		return cause
 	}
 	cur, err := s.q(ctx).GetUpload(ctx, uploadID)
 	if err != nil {
-		return SecureResult{}, fmt.Errorf("media：機敏上傳失敗後重讀暫存列：%w（原因：%w）", err, cause)
+		return fmt.Errorf("media：直接上傳失敗後重讀暫存列：%w（原因：%w）", err, cause)
 	}
 	state := model.UploadState(cur.State)
 	if state == model.StateReady {
-		return ok, nil
+		return nil
 	}
 	if state == model.StateDeleting || state == model.StateDeleted {
-		return SecureResult{}, apperr.FailedPrecondition("這筆上傳已過期")
+		return apperr.FailedPrecondition("這筆上傳已過期")
 	}
-	return SecureResult{}, cause
+	return cause
 }
