@@ -407,3 +407,65 @@ func TestOptionWithWhitespaceOnlyTextIsAnOptionAnswer(t *testing.T) {
 		t.Fatalf("%+v", o)
 	}
 }
+
+func TestLeafListCardPickConfirms(t *testing.T) {
+	// 大類沒有與原詞相符的末層：列出該大類的末層，選其中一個要能確認（現行分類樹仍有它）。
+	l1, l2 := match(100, "品0", "水果 > 品0"), match(101, "品1", "水果 > 品1")
+	rs := &fakeResolver{res: resolver.Resolution{}, leaves: map[int64][]resolver.Match{rootID("水果"): {l1, l2}}}
+	o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
+	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem {
+		t.Fatalf("前置：要是末層清單 ITEM 卡：%+v", o)
+	}
+	o2 := apply(t, rs, *o.Next, Answer{OptionID: "category-101"})
+	if o2.Kind != OutcomeResolved || o2.Resolution.CategoryID != 101 {
+		t.Fatalf("選末層清單卡上的項目要確認：%+v", o2)
+	}
+}
+
+func TestChildlessRootNeverConfirmsOnTypedPath(t *testing.T) {
+	root := match(5000, "蘋果", "蘋果")
+	root.RootID = 5000
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root}}}
+	o := apply(t, rs, *interrupt(uitext.ZhTW, describeCard("蘋果")).Next, Answer{FreeText: "蘋果"})
+	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == 5000 {
+		t.Fatalf("無子節點的大類不能確認自己：%+v", o)
+	}
+	if p := cardFromMatches([]resolver.Match{root}); p.Stage != StageDescribe {
+		t.Fatalf("只有大類自己：要 DESCRIBE：%+v", p)
+	}
+}
+
+func TestStalePickRebuildsThroughDecideMatches(t *testing.T) {
+	// 只剩 1 個現行命中：直接確認；0 個：描述卡。
+	one := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果")}}}
+	o := apply(t, one, itemPayload(t), Answer{OptionID: "category-2"})
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 1 {
+		t.Fatalf("剩 1 個要確認：%+v", o)
+	}
+	none := &fakeResolver{}
+	o = apply(t, none, itemPayload(t), Answer{OptionID: "category-2"})
+	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageDescribe {
+		t.Fatalf("剩 0 個要 DESCRIBE：%+v", o)
+	}
+}
+
+func TestStalePickOnGroupNarrowedCardStaysInRoot(t *testing.T) {
+	var ms []resolver.Match
+	for i := 0; i < 3; i++ {
+		ms = append(ms, match(int64(100+i), fmt.Sprintf("品%d", i), "水果 > 品"+fmt.Sprint(i)))
+	}
+	p := cardFromMatches(ms)
+	if p.Stage != StageItem || p.Root != rootID("水果") {
+		t.Fatalf("前置：ITEM 卡要記住大類：%+v", p)
+	}
+	// 選項 100 已消失；現行命中有 2 個水果、6 個別的大類：只在水果內出卡，不退回 GROUP 卡。
+	cur := []resolver.Match{ms[1], ms[2]}
+	for i, root := range []string{"加工品", "其他", "加工品", "其他", "加工品", "其他"} {
+		cur = append(cur, match(int64(800+i), fmt.Sprintf("他%d", i), root+" > 他"+fmt.Sprint(i)))
+	}
+	rs := &fakeResolver{res: resolver.Resolution{Matches: cur}}
+	o := apply(t, rs, p, Answer{OptionID: "category-100"})
+	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 2 {
+		t.Fatalf("要在原大類內出 ITEM 卡：%+v", o)
+	}
+}

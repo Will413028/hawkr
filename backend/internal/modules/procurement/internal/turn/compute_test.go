@@ -35,6 +35,23 @@ func (f *fakeResolver) Leaves(_ context.Context, rootID int64) ([]resolver.Match
 	return f.leaves[rootID], f.err
 }
 
+func (f *fakeResolver) Leaf(_ context.Context, id int64) (resolver.Match, bool, error) {
+	var all []resolver.Match
+	all = append(all, f.res.Matches...)
+	for _, ms := range f.byTerm {
+		all = append(all, ms...)
+	}
+	for _, ms := range f.leaves {
+		all = append(all, ms...)
+	}
+	for _, m := range all {
+		if m.CategoryID == id && m.Leaf {
+			return m, true, f.err
+		}
+	}
+	return resolver.Match{}, false, f.err
+}
+
 func (f *fakeResolver) Resolve(_ context.Context, term string) (resolver.Resolution, error) {
 	f.calls++
 	r := f.res

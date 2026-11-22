@@ -371,3 +371,20 @@ func (s *switchReader) CategoryTree(ctx context.Context) ([]Node, error) {
 	s.mu.Unlock()
 	return r.CategoryTree(ctx)
 }
+
+func TestLeafLooksUpByCategoryIDAndOnlyLeavesQualify(t *testing.T) {
+	nodes := []Node{{ID: 1, Name: "水果"}, {ID: 2, ParentID: 1, Name: "蘋果"}, {ID: 3, Name: "孤兒"}}
+	r := newResolver(&fakeReader{nodes: nodes}, nil)
+	for _, tc := range []struct {
+		id   int64
+		want bool
+	}{{2, true}, {1, false}, {99, false}, {3, true}} {
+		m, ok, err := r.Leaf(context.Background(), tc.id)
+		if err != nil || ok != tc.want {
+			t.Fatalf("Leaf(%d) = %+v %v %v，要 ok=%v", tc.id, m, ok, err, tc.want)
+		}
+	}
+	if m, _, _ := r.Leaf(context.Background(), 2); m.RootID != 1 || m.Name != "蘋果" {
+		t.Fatalf("%+v", m)
+	}
+}

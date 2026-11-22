@@ -180,7 +180,9 @@ type InterruptPayload struct {
 	Stage      string             `json:"stage"`
 	Query      string             `json:"query"`
 	Candidates []PayloadCandidate `json:"candidates"`
-	Question   QuestionJSON       `json:"question"`
+	// Root 是 ITEM 卡候選共同的大類 ID（分屬多個大類或沒有大類資訊時省略）；選項過期時只在這個大類內重新出卡。
+	Root     int64        `json:"rootId,string,omitempty"`
+	Question QuestionJSON `json:"question"`
 }
 
 // PayloadCandidate 是卡上的一個候選分類。

@@ -185,6 +185,19 @@ func (r *Resolver) Leaves(ctx context.Context, rootID int64) ([]Match, error) {
 	return out, nil
 }
 
+// Leaf 以分類 ID 查現行分類樹：節點存在而且是末層（沒有子節點）才回 true。
+func (r *Resolver) Leaf(ctx context.Context, categoryID int64) (Match, bool, error) {
+	idx, err := r.index(ctx)
+	if err != nil {
+		return Match{}, false, err
+	}
+	n, ok := idx.nodes[categoryID]
+	if !ok || idx.hasChild[n.ID] {
+		return Match{}, false, nil
+	}
+	return idx.match(n, ViaExact), true, nil
+}
+
 // treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。
 type treeLoad struct {
 	done chan struct{}

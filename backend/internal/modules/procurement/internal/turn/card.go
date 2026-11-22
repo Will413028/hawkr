@@ -26,14 +26,28 @@ func buildCard(query string, ms []resolver.Match) *pendingCard {
 	for _, m := range ms {
 		cands = append(cands, planner.ItemCandidate{CategoryID: m.CategoryID, Label: m.Name, Path: m.Path})
 	}
-	return cardOf(StageItem, query, cands, planner.BuildItemDisambiguation(cands))
+	c := cardOf(StageItem, query, cands, planner.BuildItemDisambiguation(cands))
+	c.payload.Root = commonRoot(ms)
+	return c
 }
 
-// leavesOnly 只留末層命中：大類與中間層節點不能被確認，也不計入出卡的門檻與分組。
+// commonRoot 是命中共同的大類 ID；沒有大類資訊或分屬多個大類回 0。
+func commonRoot(ms []resolver.Match) int64 {
+	var root int64
+	for _, m := range ms {
+		if m.RootID <= 0 || (root != 0 && m.RootID != root) {
+			return 0
+		}
+		root = m.RootID
+	}
+	return root
+}
+
+// leavesOnly 只留末層命中：大類、中間層節點與沒有子節點的大類自己都不能被確認，也不計入出卡的門檻與分組。
 func leavesOnly(ms []resolver.Match) []resolver.Match {
 	var out []resolver.Match
 	for _, m := range ms {
-		if m.Leaf {
+		if m.Leaf && m.CategoryID != m.RootID {
 			out = append(out, m)
 		}
 	}

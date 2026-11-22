@@ -81,18 +81,34 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 	if p.Stage == StageGroup {
 		return applyGroup(ctx, rs, l, now, p, c)
 	}
-	// 卡是當時算的：確認前以現在的分類樹再查一次，已消失的分類不確認，改用現在的命中重新出卡。
+	// 卡是當時算的：確認前以分類 ID 查現行分類樹，該分類已不是末層品項就不確認，改用現在的命中重新出卡。
+	m, ok, err := rs.Leaf(ctx, c.CategoryID)
+	if err != nil {
+		return Outcome{}, fmt.Errorf("turn：查分類：%w", err)
+	}
+	if ok {
+		if cur := usable(p.Query, []resolver.Match{m}, now); len(cur) == 1 {
+			return resolvedOutcome(*cur[0].set.Resolution), nil
+		}
+	}
 	res, err := rs.Resolve(ctx, p.Query)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("turn：解析品項：%w", err)
 	}
 	current := usable(p.Query, res.Matches, now)
-	for _, h := range current {
-		if h.match.CategoryID == c.CategoryID {
-			return resolvedOutcome(*h.set.Resolution), nil
+	if p.Root != 0 {
+		var inRoot []confirmed
+		for _, h := range current {
+			if h.match.RootID == p.Root {
+				inRoot = append(inRoot, h)
+			}
 		}
+		current = inRoot
 	}
-	return interrupt(l, buildCard(p.Query, matchesOf(current))), nil
+	if len(current) == 0 {
+		return interrupt(l, describeCard(p.Query)), nil
+	}
+	return decideMatches(l, p.Query, current), nil
 }
 
 // applyGroup：買家選了大類。只在該大類底下找與原詞相符的末層命中；沒有就列該大類的末層。不直接以大類當結果。
