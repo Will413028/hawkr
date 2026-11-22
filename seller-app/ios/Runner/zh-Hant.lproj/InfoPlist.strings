@@ -1,5 +1,6 @@
 /* 權限說明：與 Info.plist 預設值以外的語系文案；缺的 key 退回 Info.plist 的預設值。 */
-"NSCameraUsageDescription" = "需要使用相機拍攝商品評價照片或更新個人頭像";
-"NSLocationWhenInUseUsageDescription" = "用於配送地址定位與顯示附近商家";
-"NSPhotoLibraryAddUsageDescription" = "需要將圖片儲存到相簿（例如：優惠券、訂單憑證）";
-"NSPhotoLibraryUsageDescription" = "需要從相簿選擇商品評價照片或個人頭像";
+"NSCameraUsageDescription" = "需要使用相機，讓商家拍攝照片並傳送給顧客。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "允許 Hawkr 取得你的位置，以在地圖上顯示你的所在位置。";
+"NSLocationWhenInUseUsageDescription" = "允許 Hawkr 取得你的位置，以在地圖上顯示你的所在位置。";
+"NSPhotoLibraryAddUsageDescription" = "需要存取相簿，以儲存並上傳用於驗證的身分證照片。";
+"NSPhotoLibraryUsageDescription" = "需要存取照片，讓商家傳送與訂單相關的圖片給顧客。";
