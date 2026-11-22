@@ -191,11 +191,58 @@ func (r *Resolver) Leaf(ctx context.Context, categoryID int64) (Match, bool, err
 	if err != nil {
 		return Match{}, false, err
 	}
+	return leafIn(idx, categoryID)
+}
+
+// LeafFresh 與 Leaf 相同，但答案一定來自 TTL 之內讀到的分類樹：快取過期（或沒有）時同步等一次讀取，失敗（含退避期間）回錯誤，不退回舊樹。
+// 給「答案為否會觸發破壞性動作」的呼叫端用；Leaf 的 stale-while-revalidate 語意不變。
+func (r *Resolver) LeafFresh(ctx context.Context, categoryID int64) (Match, bool, error) {
+	idx, err := r.freshIndex(ctx)
+	if err != nil {
+		return Match{}, false, err
+	}
+	return leafIn(idx, categoryID)
+}
+
+func leafIn(idx *index, categoryID int64) (Match, bool, error) {
 	n, ok := idx.nodes[categoryID]
 	if !ok || idx.hasChild[n.ID] {
 		return Match{}, false, nil
 	}
 	return idx.match(n, ViaExact), true, nil
+}
+
+// freshIndex 回傳 TTL 之內讀到的分類樹；過期時等一次讀取（與其他呼叫共用進行中的讀取），讀取失敗或在退避期間回錯誤。
+func (r *Resolver) freshIndex(ctx context.Context) (*index, error) {
+	r.mu.Lock()
+	now := r.now()
+	if r.tree != nil && now.Sub(r.loadedAt) < TreeTTL {
+		idx := r.tree
+		r.mu.Unlock()
+		return idx, nil
+	}
+	l := r.loading
+	if l == nil {
+		if now.Before(r.retryAfter) {
+			err := r.lastErr
+			r.mu.Unlock()
+			return nil, fmt.Errorf("resolver：讀分類樹：%w", err)
+		}
+		l = r.startLoadLocked(ctx)
+	}
+	r.mu.Unlock()
+	select {
+	case <-l.done:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if l.err != nil {
+		return nil, fmt.Errorf("resolver：讀分類樹：%w", l.err)
+	}
+	r.mu.Lock()
+	idx := r.tree
+	r.mu.Unlock()
+	return idx, nil
 }
 
 // treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。

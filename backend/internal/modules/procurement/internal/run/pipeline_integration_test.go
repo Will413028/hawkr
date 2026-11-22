@@ -5,6 +5,7 @@ package run_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,9 +13,11 @@ import (
 
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -29,6 +32,24 @@ func submitter(d *db.DB, jobs run.JobQueue, l run.Limits) run.Submitter {
 func searchInput(buyer int64, request uuid.UUID) run.SubmitInput {
 	in := input(buyer, request, 5)
 	in.RunType = run.RunTypeCandidateSearch
+	in.Message = ""
+	in.PrepareCandidateSet = func(ctx context.Context, q *store.Queries) (uuid.UUID, error) {
+		rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: request, BuyerID: &buyer})
+		if errors.Is(err, pgx.ErrNoRows) {
+			rev.ID = uuid.NewV7()
+			n, err := q.InsertRevision(ctx, store.InsertRevisionParams{ID: rev.ID, RevisionNo: 1, Now: now, RequestID: request, BuyerID: &buyer})
+			if err != nil {
+				return uuid.UUID{}, err
+			}
+			if n != 1 {
+				return uuid.UUID{}, fmt.Errorf("InsertRevision n=%d", n)
+			}
+		} else if err != nil {
+			return uuid.UUID{}, err
+		}
+		id := uuid.NewV7()
+		return id, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: id, RequestID: request, RequestRevisionID: rev.ID, BuyerID: buyer, Now: now})
+	}
 	return in
 }
 
@@ -676,5 +697,61 @@ func TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun(
 				t.Fatal("中斷要轉 CANCELLED")
 			}
 		})
+	}
+}
+
+func TestCandidateSearchWritesNoRunInputAndReplaysOnRequestAndType(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	jobs := &recordingJobs{}
+	s := submitter(d, jobs, wide())
+	req := seedRequest(ctx, t, d, 1)
+	in := searchInput(1, req)
+	first, err := s.Submit(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := count(ctx, t, d, `SELECT count(*) FROM procurement.agent_run_inputs WHERE run_id = $1`, first); n != 0 {
+		t.Fatalf("候選搜尋不寫輸入列：%d", n)
+	}
+	again, err := s.Submit(ctx, in)
+	if err != nil || again != first || jobs.n.Load() != 1 {
+		t.Fatalf("重送回第一次的 run：%v %v %v jobs=%d", first, again, err, jobs.n.Load())
+	}
+	other := searchInput(1, seedRequest(ctx, t, d, 1))
+	other.ClientRequestID = in.ClientRequestID
+	if _, err := s.Submit(ctx, other); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("同 client_request_id 不同需求要 INVALID_ARGUMENT：%v", err)
+	}
+	asTurn := input(1, req, 5)
+	asTurn.ClientRequestID = in.ClientRequestID
+	if _, err := s.Submit(ctx, asTurn); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("同 client_request_id 不同類型要 INVALID_ARGUMENT：%v", err)
+	}
+}
+
+func TestCandidateSearchChecksInProgressRunBeforePreparingTheCandidateSet(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, wide())
+	req := seedRequest(ctx, t, d, 1)
+	if _, err := s.Submit(ctx, input(1, req, 5)); err != nil {
+		t.Fatal(err)
+	}
+	in := searchInput(1, req)
+	prepare, prepared := in.PrepareCandidateSet, false
+	in.PrepareCandidateSet = func(ctx context.Context, q *store.Queries) (uuid.UUID, error) {
+		prepared = true
+		return prepare(ctx, q)
+	}
+	_, err := s.Submit(ctx, in)
+	if reason, kind := reasonOf(err); reason != apperr.ReasonProcurementRunInProgress || kind != apperr.KindFailedPrecondition {
+		t.Fatalf("err = %v，要 PROCUREMENT_RUN_IN_PROGRESS", err)
+	}
+	if prepared {
+		t.Fatal("進行中的檢查要在建候選集之前")
+	}
+	if n := count(ctx, t, d, `SELECT count(*) FROM procurement.candidate_sets WHERE request_id = $1`, req); n != 0 {
+		t.Fatalf("被擋下的送出不得留下候選集：%d", n)
 	}
 }

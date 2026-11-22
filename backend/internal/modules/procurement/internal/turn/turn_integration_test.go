@@ -592,7 +592,7 @@ func TestMatchingRegressesOnlyWhenTheItemResolutionChanges(t *testing.T) {
 		"改縣市": {`{"delivery_city":"高雄"}`, "MATCHING"},
 		"改數量": {`{"quantity":21}`, "MATCHING"},
 		"改單位": {`{"unit":"CATTY"}`, "MATCHING"},
-		"改交期": {`{"delivery_date":"2099-01-01"}`, "MATCHING"},
+		"改交期": {`{"delivery_date":"2026-12-31"}`, "MATCHING"},
 		"改包裝": {`{"packaging":"箱"}`, "MATCHING"},
 	} {
 		f := newFixture(t)

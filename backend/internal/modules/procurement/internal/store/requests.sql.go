@@ -479,25 +479,39 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 	return items, nil
 }
 
-const lockRequestForBuyer = `-- name: LockRequestForBuyer :one
-SELECT id, buyer_id, status, created_at, updated_at FROM procurement.requests WHERE id = $1 AND buyer_id = $2 FOR UPDATE
+const lockActiveRevision = `-- name: LockActiveRevision :one
+SELECT v.id, v.request_id, v.revision_no, v.parent_revision_id, v.status, v.item, v.item_resolution_kind, v.item_resolution_label, v.item_resolution_category_id, v.quantity, v.unit, v.packaging, v.budget_per_unit, v.delivery_city, v.delivery_date, v.exact_match_required, v.created_at FROM procurement.request_revisions v WHERE v.request_id = $1 AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
+FOR UPDATE OF v
 `
 
-type LockRequestForBuyerParams struct {
-	ID      uuid.UUID
-	BuyerID *int64
+type LockActiveRevisionParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
 }
 
-// 鎖需求列並讀它的現行狀態；候選搜尋的提交與送出都先鎖它，與 TURN 的版本寫入串行。
-func (q *Queries) LockRequestForBuyer(ctx context.Context, arg LockRequestForBuyerParams) (ProcurementRequest, error) {
-	row := q.db.QueryRow(ctx, lockRequestForBuyer, arg.ID, arg.BuyerID)
-	var i ProcurementRequest
+// 鎖需求的現行版本列：候選搜尋的提交在 run 之後、需求列之前鎖它，與 TURN 的版本寫入（取代現行版本）串行；等鎖期間現行版本被取代時沒有列。
+func (q *Queries) LockActiveRevision(ctx context.Context, arg LockActiveRevisionParams) (ProcurementRequestRevision, error) {
+	row := q.db.QueryRow(ctx, lockActiveRevision, arg.RequestID, arg.BuyerID)
+	var i ProcurementRequestRevision
 	err := row.Scan(
 		&i.ID,
-		&i.BuyerID,
+		&i.RequestID,
+		&i.RevisionNo,
+		&i.ParentRevisionID,
 		&i.Status,
+		&i.Item,
+		&i.ItemResolutionKind,
+		&i.ItemResolutionLabel,
+		&i.ItemResolutionCategoryID,
+		&i.Quantity,
+		&i.Unit,
+		&i.Packaging,
+		&i.BudgetPerUnit,
+		&i.DeliveryCity,
+		&i.DeliveryDate,
+		&i.ExactMatchRequired,
 		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }

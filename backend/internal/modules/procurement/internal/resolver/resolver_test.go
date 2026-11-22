@@ -388,3 +388,48 @@ func TestLeafLooksUpByCategoryIDAndOnlyLeavesQualify(t *testing.T) {
 		t.Fatalf("%+v", m)
 	}
 }
+
+func TestLeafFreshReloadsAnExpiredTreeBeforeAnswering(t *testing.T) {
+	reader := &fakeReader{nodes: tree}
+	clk := newClock()
+	r := New(reader, nil, clk.now)
+	ctx := context.Background()
+	if _, ok, err := r.LeafFresh(ctx, 2); err != nil || !ok {
+		t.Fatalf("新鮮的樹：%v %v", ok, err)
+	}
+	reader.set([]Node{{ID: 1, Name: "服飾"}, {ID: 2, ParentID: 1, Name: "外套"}, {ID: 9, ParentID: 2, Name: "羽絨外套"}}, nil)
+	if _, ok, _ := r.LeafFresh(ctx, 2); !ok || reader.count() != 1 {
+		t.Fatalf("TTL 之內不重讀：ok=%v calls=%d", ok, reader.count())
+	}
+	clk.advance(TreeTTL + time.Second)
+	if _, ok, err := r.Leaf(ctx, 2); err != nil || !ok {
+		t.Fatalf("Leaf 的 stale-while-revalidate 語意不變：%v %v", ok, err)
+	}
+	waitIdle(r)
+	clk.advance(TreeTTL + time.Second)
+	if _, ok, err := r.LeafFresh(ctx, 2); err != nil || ok {
+		t.Fatalf("重讀後 2 已有子節點，要回 false：%v %v", ok, err)
+	}
+}
+
+func TestLeafFreshWithAnExpiredTreeAndFailedReloadReturnsAnErrorNotTheOldAnswer(t *testing.T) {
+	reader := &fakeReader{nodes: tree}
+	clk := newClock()
+	r := New(reader, nil, clk.now)
+	ctx := context.Background()
+	if _, _, err := r.LeafFresh(ctx, 2); err != nil {
+		t.Fatal(err)
+	}
+	clk.advance(TreeTTL + time.Second)
+	boom := errors.New("catalog down")
+	reader.set(nil, boom)
+	if _, ok, err := r.LeafFresh(ctx, 2); !errors.Is(err, boom) || ok {
+		t.Fatalf("讀取失敗要回錯誤：%v %v", ok, err)
+	}
+	if _, ok, err := r.LeafFresh(ctx, 2); err == nil || ok {
+		t.Fatalf("退避期間仍要回錯誤，不用舊樹：%v %v", ok, err)
+	}
+	if _, ok, err := r.Leaf(ctx, 2); err != nil || !ok {
+		t.Fatalf("Leaf 仍回舊樹：%v %v", ok, err)
+	}
+}

@@ -37,7 +37,11 @@ func newProcurementWorker(d *db.DB, jobs procurement.JobQueue, model llm.Model, 
 }
 
 // productSearch 把舊 product-service 的商品搜尋轉成候選搜尋的 port；一頁不滿 searchPageSize 筆就是最後一頁。catalog 搬進單體時整段刪除。
-type productSearch struct{ client *productservice.Client }
+type productSearch struct{ client productSearcher }
+
+type productSearcher interface {
+	SearchProducts(ctx context.Context, q productservice.SearchQuery) ([]productservice.SearchHit, error)
+}
 
 func (p productSearch) Page(ctx context.Context, q procurement.SearchQuery, page int) (procurement.SearchPage, error) {
 	hits, err := p.client.SearchProducts(ctx, productservice.SearchQuery{CategoryID: q.CategoryID, Keyword: q.Keyword, Page: page})

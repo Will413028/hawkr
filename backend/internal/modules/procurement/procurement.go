@@ -133,19 +133,19 @@ func New(d Deps) *Module {
 }
 
 // executors 在呼叫端給的登記之外補上 TURN 與 CANDIDATE_SEARCH 的 executor。
-// TURN：LLM 與 Taxonomy 都給才登記，只給其中一個是組裝錯誤。CANDIDATE_SEARCH：給了 Search 就要有 Taxonomy 與 Sellers（分類檢查與店家過濾）。
+// TURN 需要 LLM 與 Taxonomy；CANDIDATE_SEARCH 只需要 Search、Sellers 與 Taxonomy，不依賴 LLM。缺依賴是組裝錯誤，panic 訊息指名缺的欄位。
 func executors(d Deps, ledger run.Ledger) map[string]Executor {
 	hasLLM := d.LLM.LLM() != nil
-	if hasLLM != (d.Taxonomy != nil) {
-		panic("procurement.New：Deps.LLM 與 Deps.Taxonomy 要一起給")
-	}
-	if d.Search != nil && d.Sellers == nil {
+	switch {
+	case hasLLM && d.Taxonomy == nil:
+		panic("procurement.New：Deps.LLM 要與 Deps.Taxonomy 一起給")
+	case d.Taxonomy != nil && !hasLLM && d.Search == nil:
+		panic("procurement.New：Deps.Taxonomy 要與 Deps.LLM（TURN）或 Deps.Search（CANDIDATE_SEARCH）一起給")
+	case d.Search != nil && d.Sellers == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Sellers 一起給")
-	}
-	if d.Search != nil && d.Taxonomy == nil {
+	case d.Search != nil && d.Taxonomy == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Taxonomy 一起給")
-	}
-	if !hasLLM && d.Search == nil {
+	case !hasLLM && d.Search == nil:
 		return d.Executors
 	}
 	out := make(map[string]Executor, len(d.Executors)+2)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,6 +103,39 @@ type fakeSearch struct{}
 
 func (fakeSearch) Page(context.Context, procurement.SearchQuery, int) (procurement.SearchPage, error) {
 	return procurement.SearchPage{Last: true}, nil
+}
+
+func TestNewWiresTheSearchExecutorWithoutAnLLMAndRejectsEachMissingSearchDependency(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	disabled := llm.New(llm.Procurement, llm.Config{}, log)
+	searchOnly := procurement.New(newDeps(func(d *procurement.Deps) {
+		d.Taxonomy, d.Sellers, d.Search = noTaxonomy{}, &fakeSellers{}, fakeSearch{}
+	}))
+	if got := searchOnly.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeCandidateSearch {
+		t.Errorf("只給搜尋相依：executors = %v，要只登記 CANDIDATE_SEARCH", got)
+	}
+	turnOnly := procurement.New(newDeps(func(d *procurement.Deps) { d.LLM, d.Taxonomy = disabled, noTaxonomy{} }))
+	if got := turnOnly.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeTurn {
+		t.Errorf("只給 TURN 相依：executors = %v，要只登記 TURN", got)
+	}
+	for name, c := range map[string]struct {
+		fn   func(*procurement.Deps)
+		want string
+	}{
+		"搜尋缺 Sellers":    {func(d *procurement.Deps) { d.Taxonomy, d.Search = noTaxonomy{}, fakeSearch{} }, "Deps.Sellers"},
+		"搜尋缺 Taxonomy":   {func(d *procurement.Deps) { d.Sellers, d.Search = &fakeSellers{}, fakeSearch{} }, "Deps.Taxonomy"},
+		"LLM 缺 Taxonomy": {func(d *procurement.Deps) { d.LLM = disabled }, "Deps.Taxonomy"},
+	} {
+		func() {
+			defer func() {
+				msg, _ := recover().(string)
+				if !strings.Contains(msg, c.want) {
+					t.Errorf("%s：panic 訊息 %q 要指名 %s", name, msg, c.want)
+				}
+			}()
+			procurement.New(newDeps(c.fn))
+		}()
+	}
 }
 
 // CANDIDATE_SEARCH 的 executor 由 New 在給了搜尋、seller 與分類樹時登記；給了搜尋卻缺其他依賴是組裝錯誤。

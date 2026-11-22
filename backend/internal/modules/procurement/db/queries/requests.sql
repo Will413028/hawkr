@@ -16,9 +16,11 @@ WHERE id = @id AND buyer_id = @buyer_id AND status = @from_status;
 UPDATE procurement.requests SET status = @to_status, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND status = ANY(@from_statuses::text[]);
 
--- name: LockRequestForBuyer :one
--- 鎖需求列並讀它的現行狀態；候選搜尋的提交與送出都先鎖它，與 TURN 的版本寫入串行。
-SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id FOR UPDATE;
+-- name: LockActiveRevision :one
+-- 鎖需求的現行版本列：候選搜尋的提交在 run 之後、需求列之前鎖它，與 TURN 的版本寫入（取代現行版本）串行；等鎖期間現行版本被取代時沒有列。
+SELECT v.* FROM procurement.request_revisions v WHERE v.request_id = @request_id AND v.status = 'ACTIVE'
+  AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id)
+FOR UPDATE OF v;
 
 -- name: InsertRevision :execrows
 -- 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。

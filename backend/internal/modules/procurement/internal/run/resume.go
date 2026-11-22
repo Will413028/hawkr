@@ -74,7 +74,7 @@ func (s Submitter) Resume(ctx context.Context, in ResumeInput) (uuid.UUID, error
 		}); err != nil {
 			return err
 		}
-		return s.start(ctx, q, answerID, in.Message, in.Locale, asking.ConversationID, now)
+		return s.start(ctx, q, answerID, SubmitInput{RunType: RunTypeResume, Message: in.Message, Locale: in.Locale, ConversationID: asking.ConversationID}, now)
 	})
 	if err != nil {
 		return uuid.UUID{}, err

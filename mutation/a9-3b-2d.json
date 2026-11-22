@@ -107,6 +107,60 @@
    "new": "if false && !leaf {",
    "test": "internal/modules/procurement/internal/search ^TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification$",
    "why": "拿掉分類檢查：分類不再是末層仍照分類 ID 搜尋"
+  },
+  {
+   "id": "m13",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "Last: len(hits) < productservice.SearchPageSize",
+   "new": "Last: len(hits) <= productservice.SearchPageSize",
+   "test": "cmd/hawkr ^TestProductSearchTreatsOnlyAShortPageAsTheLastPage$",
+   "why": "剛好 50 筆的一頁被當成最後一頁：少翻一頁"
+  },
+  {
+   "id": "m14",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "if err := ctx.Err(); err != nil {",
+   "new": "if err := ctx.Err(); false && err != nil {",
+   "test": "internal/modules/procurement/internal/search ^TestFindReturnsTheContextErrorWhenCancelledAfterASuccessfulSearch$",
+   "why": "拿掉搜尋後的 ctx 檢查：ctx 已結束仍進 commit"
+  },
+  {
+   "id": "m15",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "_, leaf, err = e.Resolver.LeafFresh(ctx, q.CategoryID)",
+   "new": "_, leaf, err = e.Resolver.Leaf(ctx, q.CategoryID)",
+   "test": "internal/modules/procurement/internal/search ^TestFindSearchesWhenTheCachedTreeSaysNotLeafButTheFreshTreeStillHasIt$",
+   "why": "分類失效不以新鮮的樹重新確認：過期快取的否定答案誤清買家確認的分類"
+  },
+  {
+   "id": "m16",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/resolver/resolver.go",
+   "old": "if r.tree != nil && now.Sub(r.loadedAt) < TreeTTL {",
+   "new": "if r.tree != nil {",
+   "test": "internal/modules/procurement/internal/resolver ^TestLeafFreshReloadsAnExpiredTreeBeforeAnswering$",
+   "why": "LeafFresh 不看 TTL：過期的樹仍被當成新鮮"
+  },
+  {
+   "id": "m17",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if HasInput(in.RunType) {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchWritesNoRunInputAndReplaysOnRequestAndType$",
+   "why": "候選搜尋也寫輸入列：空訊息撞 CHECK"
+  },
+  {
+   "id": "m18",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tcandidateSetID, err := s.prepareCandidateSet(ctx, q, in)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "candidateSetID, err := s.prepareCandidateSet(ctx, q, in)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchChecksInProgressRunBeforePreparingTheCandidateSet$",
+   "why": "先建候選集再檢查進行中的 run：對即將被取代的版本建候選集"
   }
  ]
 }

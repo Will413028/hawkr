@@ -75,7 +75,7 @@ type SubmitInput struct {
 	Message         string
 	// Locale 是送出時的請求語系，存進 run 輸入，executor 用它渲染伺服器句子（背景 job 沒有請求 ctx）。
 	Locale uitext.Locale
-	// PrepareCandidateSet 只給 CANDIDATE_SEARCH：在買家的送出鎖與重送檢查之後、檢查上限之前呼叫，驗證前置並在同一個 transaction 建候選集，
+	// PrepareCandidateSet 只給 CANDIDATE_SEARCH：在買家的送出鎖、重送檢查與上限檢查（含同需求的進行中 run）之後呼叫，驗證前置並在同一個 transaction 建候選集，
 	// 回傳它的 ID，run 的 candidate_set_id 指向它。重送回第一次的 run，不會呼叫它。
 	PrepareCandidateSet func(ctx context.Context, q *store.Queries) (uuid.UUID, error)
 	QuotaLimit          int32
@@ -111,11 +111,11 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 			return fmt.Errorf("run：讀取重送的 run：%w", err)
 		}
 		now := s.Ledger.Now()
-		candidateSetID, err := s.prepareCandidateSet(ctx, q, in)
-		if err != nil {
+		if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {
 			return err
 		}
-		if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {
+		candidateSetID, err := s.prepareCandidateSet(ctx, q, in)
+		if err != nil {
 			return err
 		}
 		var quotaStart *time.Time
@@ -144,7 +144,7 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 				return err
 			}
 		}
-		return s.start(ctx, q, id, in.Message, in.Locale, in.ConversationID, now)
+		return s.start(ctx, q, id, in, now)
 	})
 	if err != nil {
 		return uuid.UUID{}, err
@@ -237,16 +237,21 @@ func LocaleOf(code string) (uitext.Locale, error) {
 	return "", fmt.Errorf("run：未知的語系代碼 %q", code)
 }
 
-// start 寫輸入與 run_accepted 事件、排入 job 並記下 job id。
-func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, message string, locale uitext.Locale, conversationID *uuid.UUID, now time.Time) error {
-	code, err := LocaleCode(locale)
-	if err != nil {
-		return err
+// HasInput 回報這個類型的 run 是否有買家輸入列：CANDIDATE_SEARCH 沒有買家訊息，輸入只取自候選集所指的需求版本，不寫 agent_run_inputs。
+func HasInput(runType string) bool { return runType != RunTypeCandidateSearch }
+
+// start 寫輸入（有買家輸入的類型）與 run_accepted 事件、排入 job 並記下 job id。
+func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, in SubmitInput, now time.Time) error {
+	if HasInput(in.RunType) {
+		code, err := LocaleCode(in.Locale)
+		if err != nil {
+			return err
+		}
+		if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: in.Message, Locale: code, Now: now}); err != nil {
+			return fmt.Errorf("run：寫入輸入：%w", err)
+		}
 	}
-	if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: message, Locale: code, Now: now}); err != nil {
-		return fmt.Errorf("run：寫入輸入：%w", err)
-	}
-	accepted, err := acceptedPayload(id, conversationID)
+	accepted, err := acceptedPayload(id, in.ConversationID)
 	if err != nil {
 		return err
 	}
@@ -304,12 +309,22 @@ func acceptedPayload(runID uuid.UUID, conversationID *uuid.UUID) ([]byte, error)
 }
 
 func replay(ctx context.Context, q *store.Queries, r store.ProcurementAgentRun, in SubmitInput) (uuid.UUID, error) {
+	if r.RequestID != in.RequestID || r.RunType != in.RunType {
+		return uuid.UUID{}, errReplayMismatch()
+	}
+	if !HasInput(r.RunType) {
+		return r.ID, nil
+	}
 	input, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: r.ID, BuyerID: in.BuyerID})
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("run：讀取重送的輸入：%w", err)
 	}
-	if r.RequestID != in.RequestID || r.RunType != in.RunType || input.BuyerMessage != in.Message {
-		return uuid.UUID{}, apperr.InvalidInputOn([]string{"client_request_id"}, "同一個 client_request_id 的內容不同")
+	if input.BuyerMessage != in.Message {
+		return uuid.UUID{}, errReplayMismatch()
 	}
 	return r.ID, nil
+}
+
+func errReplayMismatch() error {
+	return apperr.InvalidInputOn([]string{"client_request_id"}, "同一個 client_request_id 的內容不同")
 }

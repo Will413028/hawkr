@@ -57,7 +57,12 @@ type fakes struct {
 	blocked  map[int64]struct{}
 	blockErr error
 	notLeaf  bool
-	onPage   func()
+	// staleNotLeaf：快取的分類樹回「不是末層」，新鮮的樹仍有它；leafErr、freshErr 是兩種讀取的失敗；onLeaf 在分類檢查時呼叫。
+	staleNotLeaf bool
+	leafErr      error
+	freshErr     error
+	onLeaf       func()
+	onPage       func()
 }
 
 func (f *fakes) noTx() {
@@ -114,6 +119,20 @@ func (f *fakes) StoreIDsBlockingBuyer(_ context.Context, _ int64, ids []int64) (
 
 func (f *fakes) Leaf(context.Context, int64) (resolver.Match, bool, error) {
 	f.noTx()
+	if f.onLeaf != nil {
+		f.onLeaf()
+	}
+	if f.leafErr != nil {
+		return resolver.Match{}, false, f.leafErr
+	}
+	return resolver.Match{}, !f.notLeaf && !f.staleNotLeaf, nil
+}
+
+func (f *fakes) LeafFresh(context.Context, int64) (resolver.Match, bool, error) {
+	f.noTx()
+	if f.freshErr != nil {
+		return resolver.Match{}, false, f.freshErr
+	}
 	return resolver.Match{}, !f.notLeaf, nil
 }
 
@@ -422,6 +441,71 @@ func TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification(t *test
 	}
 }
 
+func (f *fixture) activeRevision() store.ProcurementRequestRevision {
+	f.t.Helper()
+	b := buyer
+	a, err := store.New(f.d.Conn(context.Background())).GetActiveRevision(context.Background(), store.GetActiveRevisionParams{RequestID: f.request, BuyerID: &b})
+	must(f.t, err)
+	return a
+}
+
+func TestStaleCachedNegativeIsConfirmedByAFreshTreeAndSearchProceeds(t *testing.T) {
+	f := newFixture(t, "MATCHING", "CATEGORY_CONFIRMED")
+	f.fakes.staleNotLeaf = true
+	f.fakes.pages = map[int]candidate.Page{1: hits(1)}
+	s := f.mustStart()
+	if err := f.dispatch(s.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.run(s.RunID); r.Status != run.StatusSucceeded {
+		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
+	}
+	if a := f.activeRevision(); a.ID != f.rev || a.ItemResolutionKind == nil {
+		t.Errorf("新鮮的樹仍有該末層，不得清買家確認的分類：%+v", a)
+	}
+}
+
+func TestUnreadableTaxonomyFailsTheRunWithoutClearingTheResolution(t *testing.T) {
+	for name, set := range map[string]func(*fakes){
+		"leaf read fails": func(f *fakes) { f.leafErr = errors.New("catalog down") },
+		"no fresh tree":   func(f *fakes) { f.notLeaf, f.freshErr = true, errors.New("catalog down") },
+	} {
+		f := newFixture(t, "MATCHING", "CATEGORY_CONFIRMED")
+		set(f.fakes)
+		s := f.mustStart()
+		if err := f.dispatch(s.RunID); err != nil {
+			t.Fatal(err)
+		}
+		r := f.run(s.RunID)
+		if r.Status != run.StatusFailed || r.FailureReason == nil || *r.FailureReason != run.FailureSearchFailed {
+			t.Errorf("%s：run = %s %v", name, r.Status, r.FailureReason)
+		}
+		if a := f.activeRevision(); a.ID != f.rev || a.ItemResolutionKind == nil || f.status() != "MATCHING" {
+			t.Errorf("%s：拿不到分類樹不得清解析或改狀態：%+v %s", name, a, f.status())
+		}
+	}
+}
+
+func TestCancelRequestedBeforeTheCategoryInvalidationCommitRollsEverythingBack(t *testing.T) {
+	f := newFixture(t, "MATCHING", "CATEGORY_CONFIRMED")
+	f.fakes.notLeaf = true
+	s := f.mustStart()
+	f.fakes.onLeaf = func() {
+		if _, err := ledger(f.d).Transition(context.Background(), s.RunID, run.StatusCancelRequested, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.dispatch(s.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.run(s.RunID); r.Status != run.StatusCancelled {
+		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
+	}
+	if a := f.activeRevision(); a.ID != f.rev || a.ItemResolutionKind == nil || f.status() != "MATCHING" {
+		t.Errorf("取消搶先要整筆回滾：%+v %s", a, f.status())
+	}
+}
+
 func TestStartPreconditions(t *testing.T) {
 	f := newFixture(t, "CLARIFYING", "CATEGORY_CONFIRMED")
 	if _, err := f.start(uuid.NewV7()); err == nil {
@@ -445,6 +529,9 @@ func TestStartRejectsASecondRunWhileOneIsInProgress(t *testing.T) {
 	if reason, kind := reasonOf(err); kind != apperr.KindFailedPrecondition || reason != apperr.ReasonProcurementRunInProgress {
 		t.Fatalf("err = %v", err)
 	}
+	if n := f.count(`SELECT count(*) FROM procurement.candidate_sets`); n != 1 {
+		t.Errorf("被擋下的 Start 不得多建候選集：%d", n)
+	}
 }
 
 func TestStartDoesNotChangeStatusOrChargeQuota(t *testing.T) {
@@ -462,6 +549,9 @@ func TestStartDoesNotChangeStatusOrChargeQuota(t *testing.T) {
 	}
 	if f.jobs.n.Load() != 1 {
 		t.Errorf("jobs = %d", f.jobs.n.Load())
+	}
+	if n := f.count(`SELECT count(*) FROM procurement.agent_run_inputs WHERE run_id = $1`, s.RunID); n != 0 {
+		t.Errorf("候選搜尋沒有買家訊息，不寫 agent_run_inputs：%d", n)
 	}
 }
 
@@ -484,7 +574,7 @@ func TestStartReplayReturnsTheSameRunAndCandidateSet(t *testing.T) {
 	other := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
 	_, err = other.start(cid)
 	must(t, err)
-	if _, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: other.request, ClientRequestID: cid, Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindInvalidInput && err == nil {
+	if _, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: other.request, ClientRequestID: cid, Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("同一個 client_request_id 不同需求要 INVALID_ARGUMENT：%v", err)
 	}
 }
