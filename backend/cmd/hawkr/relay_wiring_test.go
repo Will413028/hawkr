@@ -8,8 +8,19 @@ import (
 	"testing"
 )
 
-// callsIn 回傳 file 裡函式 fn 本體內用到的名稱：呼叫的 `Name`，與 `x.Name` 形式的參照（包含當成值傳出的方法，例如 `events.Subscribe(bus, m.OnX)`），已排序去重。
+// callsIn 回傳 file 裡函式 fn 本體內實際呼叫的名稱（`Name(...)` 與 `x.Name(...)`），已排序去重；只被參照而沒呼叫的不算。
 func callsIn(t *testing.T, file, fn string) []string {
+	t.Helper()
+	return namesIn(t, file, fn, true)
+}
+
+// refsIn 另外包含 `x.Name` 形式的參照（當成值傳出的方法，例如 `events.Subscribe(bus, m.OnX)`）。
+func refsIn(t *testing.T, file, fn string) []string {
+	t.Helper()
+	return namesIn(t, file, fn, false)
+}
+
+func namesIn(t *testing.T, file, fn string, callsOnly bool) []string {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
 	if err != nil {
@@ -26,11 +37,16 @@ func callsIn(t *testing.T, file, fn string) []string {
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.CallExpr:
-				if id, ok := x.Fun.(*ast.Ident); ok {
-					got = append(got, id.Name)
+				switch fun := x.Fun.(type) {
+				case *ast.Ident:
+					got = append(got, fun.Name)
+				case *ast.SelectorExpr:
+					if id, ok := fun.X.(*ast.Ident); ok {
+						got = append(got, id.Name+"."+fun.Sel.Name)
+					}
 				}
 			case *ast.SelectorExpr:
-				if id, ok := x.X.(*ast.Ident); ok {
+				if id, ok := x.X.(*ast.Ident); ok && !callsOnly {
 					got = append(got, id.Name+"."+x.Sel.Name)
 				}
 			}
@@ -47,7 +63,16 @@ func callsIn(t *testing.T, file, fn string) []string {
 
 func requireCalls(t *testing.T, file, fn string, want ...string) {
 	t.Helper()
-	got := callsIn(t, file, fn)
+	requireNames(t, callsIn(t, file, fn), file, fn, want)
+}
+
+func requireRefs(t *testing.T, file, fn string, want ...string) {
+	t.Helper()
+	requireNames(t, refsIn(t, file, fn), file, fn, want)
+}
+
+func requireNames(t *testing.T, got []string, file, fn string, want []string) {
+	t.Helper()
 	for _, w := range want {
 		if !slices.Contains(got, w) {
 			t.Errorf("%s 的 %s 沒有呼叫 %s（有：%v）", file, fn, w, got)
@@ -59,16 +84,16 @@ func requireCalls(t *testing.T, file, fn string, want ...string) {
 // relay 的訂閱在 serve 與 worker 共用的 newReview 內接上。
 func TestReviewRelayIsSubscribedByNewReview(t *testing.T) {
 	requireCalls(t, "review.go", "newReview", "subscribeReviewRelay")
-	requireCalls(t, "review.go", "subscribeReviewRelay", "reviewrelay.OnReviewCreated", "reviewrelay.OnReviewAggregateChanged")
+	requireRefs(t, "review.go", "subscribeReviewRelay", "reviewrelay.OnReviewCreated", "reviewrelay.OnReviewAggregateChanged")
 }
 
 func TestIMRelayIsSubscribedByNewIM(t *testing.T) {
 	requireCalls(t, "im.go", "newIM", "subscribeIMRelay")
-	requireCalls(t, "im.go", "subscribeIMRelay", "imrelay.OnMessageSent")
+	requireRefs(t, "im.go", "subscribeIMRelay", "imrelay.OnMessageSent")
 }
 
 func TestCRMModuleSubscribesTheLifecycleEvents(t *testing.T) {
-	requireCalls(t, "crm.go", "newCRM", "m.OnBuyerDeleted", "m.OnStoreRetired")
+	requireRefs(t, "crm.go", "newCRM", "m.OnBuyerDeleted", "m.OnStoreRetired")
 }
 
 // 兩個角色都建立三個模組（serve 的刪帳與退場、worker 的 CompletePending 都會發事件，訂閱要在兩邊）。
