@@ -417,21 +417,30 @@ test("coupon rows carry the seller store_code the wire now sends", async () => {
 	assert.equal(canonicalOnly(platform.storeCode), "");
 });
 
-test("conversation rows carry the seller store_code the wire now sends", async () => {
-	const { normalizeConversation } = await import("../lib/chat/repo");
-	const row = normalizeConversation({
-		targetUserId: STORE_ID,
-		storeName: "Store",
-		storeCode: STORE_CODE,
-	});
-	assert.equal(String(row.targetUserId), STORE_ID);
+test("conversation rows carry the seller store_code the wire sends", async () => {
+	const { conversationFromProto } = await import("../lib/chat/map");
+	const { create } = await import("@bufbuild/protobuf");
+	const { ConversationSchema } = await import(
+		"@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb"
+	);
+	const row = conversationFromProto(
+		create(ConversationSchema, {
+			id: "c1",
+			store: { id: STORE_ID, name: "Store", storeCode: STORE_CODE },
+		}),
+		"buyer",
+	);
+	assert.equal(row.targetUserId, STORE_ID);
 	assert.equal(row.storeCode, STORE_CODE);
 
 	// Buyer peers have no storefront, so no segment and no link.
-	const buyerPeer = normalizeConversation({
-		targetUserId: "2623900520",
-		targetNickname: "買家",
-	});
+	const buyerPeer = conversationFromProto(
+		create(ConversationSchema, {
+			id: "c2",
+			buyer: { id: "2623900520", name: "買家" },
+		}),
+		"store",
+	);
 	assert.equal(buyerPeer.storeCode, undefined);
 	assert.equal(canonicalOnly(buyerPeer.storeCode), "");
 });

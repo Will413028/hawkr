@@ -36,17 +36,17 @@ test("navbar chat navigation defers its route prefetch to user intent", () => {
 	assert.doesNotMatch(chatBubble, /useRouter|router\.prefetch|setTimeout/);
 });
 
-test("thread query reuses conversations without a duplicate socket listener", () => {
+test("thread query reuses conversations without a duplicate stream subscription", () => {
 	const hook = source("lib/hooks/useChat.ts");
 	const thread = source("features/account/screens/messages/ThreadClient.tsx");
 
 	assert.match(hook, /subscribeToSocket = true/);
-	assert.match(hook, /if \(!shouldFetch \|\| !subscribeToSocket\) return;/);
+	assert.match(hook, /shouldFetch && subscribeToSocket/);
 	assert.match(thread, /useConversations\(\{ subscribeToSocket: false \}\)/);
-	assert.match(
+	assert.doesNotMatch(
 		hook,
-		/query\.isFetching && query\.isPlaceholderData/,
-		"placeholder 第一次仍在 fetch 時必須保留列表 loading 語意",
+		/placeholderData/,
+		"a failed list read must not be indistinguishable from an empty list",
 	);
 });
 
@@ -56,13 +56,8 @@ test("chat event handlers consume send rejections after the hook surfaces them",
 		thread.indexOf("const handleSend ="),
 		thread.indexOf("const handleChange ="),
 	);
-	const attachmentHandler = thread.slice(
-		thread.indexOf("const handlePickAttachment ="),
-		thread.indexOf("const handlePickImage ="),
-	);
 
 	assert.match(textHandler, /await send\(draft\.trim\(\)\);[\s\S]*catch\s*\{/);
-	assert.match(attachmentHandler, /await send\(payload\);[\s\S]*catch\s*\{/);
 	assert.match(
 		textHandler,
 		/setDraft\(""\);[\s\S]*catch\s*\{/,

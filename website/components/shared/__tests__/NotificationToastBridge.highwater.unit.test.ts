@@ -17,9 +17,11 @@ vi.mock("@/lib/auth/context", () => ({ useAuth: () => auth.value }));
 vi.mock("@/lib/notifications/repo", () => ({
 	fetchNotifications: repo.fetchNotifications,
 }));
-vi.mock("@/lib/chat/ws", () => ({
-	getChatSocket: () => ({ connect: vi.fn(), onMessage: () => () => {} }),
+vi.mock("@/lib/chat/useChatStream", () => ({
+	useChatStream: () => ({ state: "connected", stream: null }),
 }));
+vi.mock("@/lib/chat/repo", () => ({ listConversations: vi.fn() }));
+vi.mock("@/lib/i18n/ui-text", () => ({ useUiText: () => () => "" }));
 vi.mock("@/lib/notifications/unread-context", () => ({
 	useNotificationUnread: () => ({
 		count: 1,

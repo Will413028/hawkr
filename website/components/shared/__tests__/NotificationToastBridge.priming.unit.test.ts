@@ -36,12 +36,11 @@ vi.mock("@/lib/notifications/repo", () => ({
 vi.mock("@/lib/notifications/toast-context", () => ({
 	useNotificationToast: () => ({ show: toast.show, dismiss: vi.fn() }),
 }));
-vi.mock("@/lib/chat/ws", () => ({
-	getChatSocket: () => ({
-		connect: vi.fn(),
-		onMessage: () => () => {},
-	}),
+vi.mock("@/lib/chat/useChatStream", () => ({
+	useChatStream: () => ({ state: "connected", stream: null }),
 }));
+vi.mock("@/lib/chat/repo", () => ({ listConversations: vi.fn() }));
+vi.mock("@/lib/i18n/ui-text", () => ({ useUiText: () => () => "" }));
 vi.mock("@/lib/sse/useNotificationStream", () => ({
 	useNotificationStream: (options: { handlers: unknown }) => {
 		stream.ready(options.handlers);

@@ -22,17 +22,6 @@ test("chat and notification image sinks normalize backend URLs before rendering"
 	assert.doesNotMatch(toast, /<img\s+src=\{toast\.imageUrl\}/);
 });
 
-test("attachment picker normalizes product and order images before preview and chat serialization", () => {
-	const picker = source("features/messages/components/AttachmentPicker.tsx");
-
-	assert.equal(
-		picker.match(/buildImageUrl\([\s\S]*?,\s*"thumb",?\s*\)/g)?.length,
-		3,
-	);
-	assert.doesNotMatch(picker, /imageUrl:\s*firstItem\?\.image\s*\?\?\s*""/);
-	assert.doesNotMatch(picker, /imageUrl:\s*pickString\(raw,/);
-});
-
 test("shared upload previews and product gallery sinks normalize remote URLs but leave local blobs on their own path", () => {
 	const uploader = source("components/ui/ImageUploader.tsx");
 	const gallery = source("features/seller/components/ProductImageUploader.tsx");

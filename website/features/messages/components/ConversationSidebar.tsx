@@ -8,9 +8,10 @@ import HawkrAgentConversationMarble from "@/features/procurement-assistant/Hawkr
 import HawkrAgentMark from "@/features/procurement-assistant/HawkrAgentMark";
 import type { HawkrAgentCategoryId } from "@/lib/animation/hawkr-agent-season";
 import { conversationRangeLabel } from "@/lib/chat/list-range";
-import { messagePreview } from "@/lib/chat/preview";
+import { previewText } from "@/lib/chat/map";
 import type { Conversation } from "@/lib/chat/types";
 import { formatTaipeiShortDate } from "@/lib/date/taipei";
+import { useUiText } from "@/lib/i18n/ui-text";
 import Link from "@/lib/intl/native-link";
 
 interface ConversationSidebarProps {
@@ -298,6 +299,7 @@ export default function ConversationSidebar({
 	const hasAgentSection = Boolean(assistantEntry);
 	const compactSectionTabs = hasAgentSection && collapsed && iconRailViewport;
 
+	const ut = useUiText();
 	const visibleItems = React.useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return items.filter((item) => {
@@ -307,11 +309,11 @@ export default function ConversationSidebar({
 			if (!q) return true;
 			return (
 				item.targetNickname.toLowerCase().includes(q) ||
-				String(item.targetUserId).includes(q) ||
-				item.lastMessage.toLowerCase().includes(q)
+				item.targetUserId.includes(q) ||
+				previewText(ut, item.preview).toLowerCase().includes(q)
 			);
 		});
-	}, [items, query, filter, hasAgentSection]);
+	}, [items, query, filter, hasAgentSection, ut]);
 
 	// Agent 列吃搜尋、但沒有未讀語意，所以不套未讀篩選。
 	const visibleAgentRows = React.useMemo(() => {
@@ -824,7 +826,7 @@ export default function ConversationSidebar({
 				) : (
 					<ul className="chat-sidebar__list">
 						{visibleItems.map((item) => {
-							const id = String(item.targetUserId);
+							const id = item.targetUserId;
 							const active = id === activeTargetId;
 							return (
 								<li key={id}>
@@ -850,10 +852,10 @@ export default function ConversationSidebar({
 										<span className="chat-sidebar__main">
 											<span className="chat-sidebar__item-head">
 												<strong>{item.targetNickname}</strong>
-												<small>{formatTime(item.lastMessageTime)}</small>
+												<small>{formatTime(item.lastMessageTimeMs)}</small>
 											</span>
 											<span className="chat-sidebar__preview">
-												{messagePreview(item.lastMessage, item.lastMessageType)}
+												{previewText(ut, item.preview)}
 											</span>
 										</span>
 										{item.unreadCount > 0 ? (

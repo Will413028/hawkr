@@ -1184,6 +1184,82 @@ async function mockReviewDefaults(page: Page): Promise<void> {
 	}
 }
 
+/** ChatAppService 的 Connect 方法（`/api/connect/hawkr.chat.v1alpha1.ChatAppService/{Method}`）。 */
+function chatMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.chat\\.v1alpha1\\.ChatAppService/${method}(?:\\?|$)`,
+	);
+}
+
+/** 對話列表的一列（Connect JSON：int64 是字串）。`peer` 在買家方是店家、在店家方是買家。 */
+export interface MockChatConversation {
+	id: string;
+	peerId: string;
+	peerName: string;
+	unreadCount?: number;
+	lastText?: string;
+}
+
+/**
+ * 註冊對話列表（買家方 `ListConversations`、店家方 `ListStoreConversations`）。
+ * 在 `setupGatewayMocks` 之後呼叫：後註冊的 route 優先，會蓋掉預設的空列表。
+ */
+export async function mockChatConversations(
+	page: Page,
+	side: "buyer" | "store",
+	rows: readonly MockChatConversation[],
+): Promise<void> {
+	const conversations = rows.map((r) => ({
+		id: r.id,
+		...(side === "buyer"
+			? { store: { id: r.peerId, name: r.peerName } }
+			: { buyer: { id: r.peerId, name: r.peerName } }),
+		unreadCount: String(r.unreadCount ?? 0),
+		lastMessageTime: "2026-09-05T00:00:00Z",
+		...(r.lastText
+			? { preview: { kind: "MESSAGE_KIND_TEXT", text: r.lastText } }
+			: {}),
+		peerReadSeq: "0",
+	}));
+	await page.route(
+		chatMethod(
+			side === "buyer" ? "ListConversations" : "ListStoreConversations",
+		),
+		(route) => {
+			void fulfillConnect(route, { conversations, nextPageToken: "" });
+		},
+	);
+}
+
+/**
+ * chat 的預設回應：沒有對話、沒有訊息、未讀 0、對方離線；即時串流回 not_found（終止、不重連、不發登入失效），
+ * 所以 e2e 不會留著一條開著的長連線，頁面照常載入。
+ */
+async function mockChatDefaults(page: Page): Promise<void> {
+	const empty: Array<[string, unknown]> = [
+		["ListConversations", { conversations: [], nextPageToken: "" }],
+		["ListStoreConversations", { conversations: [], nextPageToken: "" }],
+		["ListMessages", { messages: [], hasMore: false, peerReadSeq: "0" }],
+		["GetUnreadCount", { unreadCount: "0" }],
+		["GetStoreUnreadCount", { unreadCount: "0" }],
+		["GetPresence", { presences: [] }],
+		["GetStorePresence", { presences: [] }],
+		["MarkConversationRead", {}],
+		["MarkAllRead", {}],
+		["MarkAllStoreRead", {}],
+	];
+	for (const [method, body] of empty) {
+		await page.route(chatMethod(method), (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+	for (const method of ["StreamEvents", "StreamStoreEvents"]) {
+		await page.route(chatMethod(method), (route) => {
+			void fulfillConnectError(route, "not_found", "mock: no chat stream");
+		});
+	}
+}
+
 async function mockSocialDefaults(page: Page): Promise<void> {
 	const empty: Array<[RegExp, unknown]> = [
 		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
@@ -1256,6 +1332,7 @@ export async function setupGatewayMocks(
 	await mockMyDashboard(page, {});
 	await mockSocialDefaults(page);
 	await mockReviewDefaults(page);
+	await mockChatDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
