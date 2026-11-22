@@ -518,6 +518,8 @@ message BlockAuthorRequest {
     string forum_entry_id = 2;
     // 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
     string review_id = 3;
+    // 聊天訊息 ID：封鎖這則訊息所屬對話的店家（呼叫者要是該對話的買家；不是回 not_found，與訊息不存在相同）。訊息已隱藏或抹除仍可當參照。
+    string message_id = 4;
   }
 }
 

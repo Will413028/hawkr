@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqiwQKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVWSUVXX0FMUkVBRFlfRVhJU1RTEA8SGAoUT1JERVJfTk9UX1JFVklFV0FCTEUQEBIZChVSRVZJRVdfV0lORE9XX0VYUElSRUQQERIYChRSRVZJRVdfTk9UX1JFUExZQUJMRRASYgZwcm90bzM");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEq4wQKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVWSUVXX0FMUkVBRFlfRVhJU1RTEA8SGAoUT1JERVJfTk9UX1JFVklFV0FCTEUQEBIZChVSRVZJRVdfV0lORE9XX0VYUElSRUQQERIYChRSRVZJRVdfTk9UX1JFUExZQUJMRRASEhwKGFNFTEZfTUVTU0FHRV9OT1RfQUxMT1dFRBATEhAKDFNUT1JFX0NMT1NFRBAUEhAKDENIQVRfQkxPQ0tFRBAVEhQKEFJFQ0VJVkVSX0RFTEVURUQQFmIGcHJvdG8z");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -183,6 +183,38 @@ export enum ErrorReason {
    * @generated from enum value: REVIEW_NOT_REPLYABLE = 18;
    */
   REVIEW_NOT_REPLYABLE = 18,
+
+  /**
+   * 不能傳訊息給自己（搭配 invalid_argument）：買家帳號與店家帳號是同一個帳號。client 不提供對自己的店傳訊息的入口，顯示 LocalizedMessage。
+   * ChatAppService.SendMessageToStore、SendMessageToBuyer。
+   *
+   * @generated from enum value: SELF_MESSAGE_NOT_ALLOWED = 19;
+   */
+  SELF_MESSAGE_NOT_ALLOWED = 19,
+
+  /**
+   * 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
+   * ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer、StreamStoreEvents（店家串流重新驗證時店已不在或換了一家）。
+   *
+   * @generated from enum value: STORE_CLOSED = 20;
+   */
+  STORE_CLOSED = 20,
+
+  /**
+   * 買家與店家之間任一方向有封鎖，而且沒有進行中的訂單或售後（搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+   * ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+   *
+   * @generated from enum value: CHAT_BLOCKED = 21;
+   */
+  CHAT_BLOCKED = 21,
+
+  /**
+   * 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+   * ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+   *
+   * @generated from enum value: RECEIVER_DELETED = 22;
+   */
+  RECEIVER_DELETED = 22,
 }
 
 /**

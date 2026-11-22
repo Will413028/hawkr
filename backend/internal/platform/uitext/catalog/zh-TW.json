@@ -16,6 +16,18 @@
       "message": "尚未設定",
       "description": "買家沒有填性別時，性別欄位顯示的文字；也是選單裡清除性別的那一項。"
     },
+    "chat.Preview.erased": {
+      "message": "此訊息已被移除",
+      "description": "對話列表預覽：最後一則訊息的內容已抹除（erased 為真，寄件方帳號已刪除或店家已退場）。"
+    },
+    "chat.Preview.hidden": {
+      "message": "此訊息已被隱藏",
+      "description": "對話列表預覽：最後一則訊息被平台隱藏（hidden 為真）。"
+    },
+    "chat.Preview.image": {
+      "message": "傳送了一張圖片",
+      "description": "對話列表預覽：最後一則是圖片訊息，沒有被隱藏或抹除。"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
       "message": "仿冒商品",
       "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"

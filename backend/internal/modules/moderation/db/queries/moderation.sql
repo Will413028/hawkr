@@ -74,6 +74,16 @@ WHERE r.reporter_buyer_id = sqlc.arg(reporter_buyer_id)
 ORDER BY r.created_at DESC, r.id DESC
 LIMIT sqlc.arg(max_rows)::int;
 
+-- name: ListReportsOfStoreReporter :many
+-- 店家檢舉人自己的檢舉（只有聊天訊息），形狀與 ListReportsOfReporter 相同。keyset：(created_at, id) 由大到小。
+SELECT sqlc.embed(r), c.target_kind, c.content_id, c.buyer_id, c.decision, c.closed_at
+FROM moderation.reports r
+JOIN moderation.cases c ON c.id = r.case_id
+WHERE r.reporter_store_id = sqlc.arg(reporter_store_id)
+  AND (r.created_at, r.id) < (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT sqlc.arg(max_rows)::int;
+
 -- name: BumpDailyCount :one
 -- 每日上限 20：單一 upsert 原子地換日重算、未達上限才加一；沒有回傳列就是已到上限。DO UPDATE 的 WHERE 讓到上限時不改列。
 INSERT INTO moderation.reporter_daily_counts AS c (reporter_buyer_id, day, submitted)

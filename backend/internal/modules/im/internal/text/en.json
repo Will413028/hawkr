@@ -30,6 +30,12 @@
     "im.receiver_deleted": {
       "message": "The recipient's account has been deleted"
     },
+    "im.request_id_invalid": {
+      "message": "The request ID is not valid"
+    },
+    "im.request_id_reused": {
+      "message": "This message differs from the one previously sent with the same request. Please refresh the page and try again."
+    },
     "im.self_message_not_allowed": {
       "message": "You cannot message yourself"
     },

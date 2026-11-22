@@ -31,6 +31,39 @@ func (q *Queries) AddStoreBlock(ctx context.Context, arg AddStoreBlockParams) (i
 	return result.RowsAffected(), nil
 }
 
+const buyersBlockedByStore = `-- name: BuyersBlockedByStore :many
+SELECT buyer_id
+FROM seller.store_blocks
+WHERE store_id = $1 AND buyer_id = ANY($2::bigint[])
+ORDER BY buyer_id
+`
+
+type BuyersBlockedByStoreParams struct {
+	StoreID int64
+	Column2 []int64
+}
+
+// 輸入的買家中被指定店家封鎖的 buyer_id。
+func (q *Queries) BuyersBlockedByStore(ctx context.Context, arg BuyersBlockedByStoreParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, buyersBlockedByStore, arg.StoreID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var buyer_id int64
+		if err := rows.Scan(&buyer_id); err != nil {
+			return nil, err
+		}
+		items = append(items, buyer_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearStoreBlocksAgainstBuyer = `-- name: ClearStoreBlocksAgainstBuyer :exec
 DELETE
 FROM seller.store_blocks

@@ -21,6 +21,10 @@ RETURNING id, last_seq, (xmax = 0) AS created, last_message_at;
 -- name: GetConversation :one
 SELECT * FROM im.conversations WHERE id = sqlc.arg(id);
 
+-- name: ConversationParties :one
+-- 對話的雙方（歸屬）：不鎖列。
+SELECT id AS conversation_id, buyer_id, store_id FROM im.conversations WHERE id = sqlc.arg(id);
+
 -- name: MarkReadBuyer :one
 -- 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：先 FOR UPDATE 鎖住並讀出
 -- 更新前的值（並行的 MarkRead 在這裡排隊，拿到的是對方提交後的值），再與它比較，所以同一次前進只會有一個呼叫者得到 advanced。

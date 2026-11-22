@@ -91,8 +91,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
 
 	// ModerationAppService：檢舉是寫入（停權的帳號不能送出）；讀自己的檢舉停權的帳號也可以。
-	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":  EffectWrite,
-	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports": EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":       EffectWrite,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports":      EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyStoreReports": EffectRead,
 
 	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,
@@ -133,6 +134,24 @@ var customerEffects = map[string]Effect{
 	"/hawkr.review.v1alpha1.ReviewAppService/CreateReview":        EffectWrite,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
+
+	// ChatAppService
+	"/hawkr.chat.v1alpha1.ChatAppService/ListConversations":      EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/ListStoreConversations": EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/ListMessages":           EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessage":            EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessageToStore":     EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessageToBuyer":     EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead":   EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkAllRead":            EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkAllStoreRead":       EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetUnreadCount":         EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreUnreadCount":    EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetPresence":            EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetStorePresence":       EffectRead,
+	// 串流只讀：停權的帳號可讀，停權不結束串流（A6-D16 W4）。
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":      EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents": EffectRead,
 
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,

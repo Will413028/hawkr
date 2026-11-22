@@ -297,22 +297,53 @@ func (s *Service) MyReports(ctx context.Context, buyerID int64, after *model.Rep
 		return model.ReportPage{}, fmt.Errorf("moderation：列出我的檢舉：%w", err)
 	}
 	rows, more := model.TrimPage(rows, size)
-	out := model.ReportPage{Items: make([]model.ReportItem, len(rows))}
+	items := make([]model.ReportItem, len(rows))
 	for i, r := range rows {
-		t := model.Target{Kind: model.TargetKind(r.TargetKind)}
-		if r.ContentID != nil {
-			t.ContentID = *r.ContentID
-		}
-		if r.BuyerID != nil {
-			t.BuyerID = *r.BuyerID
-		}
-		out.Items[i] = model.ReportItem{Report: view.Report(r.ModerationReport, r.Decision), Target: t, ClosedAt: r.ClosedAt}
+		items[i] = reportItem(r.ModerationReport, r.TargetKind, r.ContentID, r.BuyerID, r.Decision, r.ClosedAt)
 	}
+	return reportPage(items, rows, more, func(r store.ListReportsOfReporterRow) store.ModerationReport { return r.ModerationReport }), nil
+}
+
+// MyStoreReports 是店家檢舉人自己的檢舉（只有聊天訊息），形狀同 MyReports。
+func (s *Service) MyStoreReports(ctx context.Context, storeID int64, after *model.ReportCursor, size int32) (model.ReportPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ReportPage{}, err
+	}
+	at, id := after.Key()
+	rows, err := store.New(s.d.DB.Conn(ctx)).ListReportsOfStoreReporter(ctx, store.ListReportsOfStoreReporterParams{
+		ReporterStoreID: &storeID, AfterCreated: at, AfterID: id, MaxRows: size + 1,
+	})
+	if err != nil {
+		return model.ReportPage{}, fmt.Errorf("moderation：列出店家的檢舉：%w", err)
+	}
+	rows, more := model.TrimPage(rows, size)
+	items := make([]model.ReportItem, len(rows))
+	for i, r := range rows {
+		items[i] = reportItem(r.ModerationReport, r.TargetKind, r.ContentID, r.BuyerID, r.Decision, r.ClosedAt)
+	}
+	return reportPage(items, rows, more, func(r store.ListReportsOfStoreReporterRow) store.ModerationReport { return r.ModerationReport }), nil
+}
+
+func reportItem(r store.ModerationReport, targetKind string, contentID *uuid.UUID, buyerID *int64, decision *string, closedAt *time.Time) model.ReportItem {
+	t := model.Target{Kind: model.TargetKind(targetKind)}
+	if contentID != nil {
+		t.ContentID = *contentID
+	}
+	if buyerID != nil {
+		t.BuyerID = *buyerID
+	}
+	return model.ReportItem{Report: view.Report(r, decision), Target: t, ClosedAt: closedAt}
+}
+
+// reportPage 組一頁：還有下一頁（more）時游標是這頁最後一列的 (created_at, id)。
+func reportPage[R any](items []model.ReportItem, rows []R, more bool, report func(R) store.ModerationReport) model.ReportPage {
+	out := model.ReportPage{Items: items}
 	if more {
-		last := rows[len(rows)-1].ModerationReport
+		last := report(rows[len(rows)-1])
 		out.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
-	return out, nil
+	return out
 }
 
 // replay 回傳既有的檢舉與它的案件。

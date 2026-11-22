@@ -150,6 +150,18 @@ var ReasonReviewWindowExpired = newReason("REVIEW_WINDOW_EXPIRED")
 // ReasonReviewNotReplyable 表示這則評價目前不能回覆（被隱藏、作者已離開、回覆被下架）；搭配 FailedPrecondition。
 var ReasonReviewNotReplyable = newReason("REVIEW_NOT_REPLYABLE")
 
+// ReasonSelfMessageNotAllowed 表示買家帳號與店家帳號是同一個帳號，不能傳訊息給自己；搭配 InvalidArgument。
+var ReasonSelfMessageNotAllowed = newReason("SELF_MESSAGE_NOT_ALLOWED")
+
+// ReasonStoreClosed 表示店家已停業，無法傳送訊息；搭配 FailedPrecondition。
+var ReasonStoreClosed = newReason("STORE_CLOSED")
+
+// ReasonChatBlocked 表示買家與店家之間任一方向有封鎖且沒有進行中的訂單或售後，無法傳送訊息；搭配 FailedPrecondition。
+var ReasonChatBlocked = newReason("CHAT_BLOCKED")
+
+// ReasonReceiverDeleted 表示收件人（買家或店家）的帳號已刪除，無法傳送訊息；搭配 FailedPrecondition。
+var ReasonReceiverDeleted = newReason("RECEIVER_DELETED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

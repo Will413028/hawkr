@@ -40,6 +40,14 @@
       "message": "對方帳號已刪除，無法傳送訊息",
       "description": "收件人已關閉（買家）或已退場（店家）。"
     },
+    "im.request_id_invalid": {
+      "message": "請求識別碼無效",
+      "description": "送出訊息的 request_id 缺少，或不是 UUIDv4。"
+    },
+    "im.request_id_reused": {
+      "message": "這次送出的內容和同一個請求先前送出的不同，請重新整理頁面後再試。",
+      "description": "送出訊息：同一個對話、同一個寄件方的 request_id 已經用在內容不同的請求（AIP-155）。"
+    },
     "im.self_message_not_allowed": {
       "message": "不能傳訊息給自己",
       "description": "買家帳號與店家帳號是同一個帳號。"

@@ -26,6 +26,7 @@ import (
 	httpbizcalendar "github.com/Will413028/hawkr/backend/internal/httpapi/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
+	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
@@ -39,6 +40,7 @@ import (
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	adminsocialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1/chatv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
@@ -60,6 +62,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -99,6 +102,8 @@ type Deps struct {
 	Social *social.Module
 	// Review 是評價（ReviewPublicService、ReviewAppService）；封鎖入口也用它解析評價參照的作者。
 	Review *review.Module
+	// IM 是買家與店家之間的聊天（ChatAppService）。
+	IM *im.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
@@ -176,6 +181,12 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Review == nil {
 		return nil, fmt.Errorf("httpapi：ReviewPublicService、ReviewAppService 與封鎖入口的評價參照需要 Review")
+	}
+	if deps.IM == nil {
+		return nil, fmt.Errorf("httpapi：ChatAppService 需要 IM")
+	}
+	if deps.Identity == nil {
+		return nil, fmt.Errorf("httpapi：ChatAppService 串流的重新驗證需要 Identity")
 	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
@@ -331,14 +342,24 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(reviewv1alpha1connect.NewReviewAppServiceHandler(reviewApp, opts...))
-	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
+	chatApp, err := httpchat.NewApp(deps.IM, deps.IM, httpchat.ModuleStreams(deps.IM), deps.Identity, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	chatPath, chatHandler := chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...)
+	add(chatPath, httpchat.WithStreamWriter(chatHandler))
+	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(moderationv1alpha1connect.NewModerationAppServiceHandler(moderationApp, opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {
 		return nil, err
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
-	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err

@@ -77,4 +77,16 @@ enum ErrorReason {
   // 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
   // ReviewAppService.ReplyReview。
   REVIEW_NOT_REPLYABLE = 18;
+  // 不能傳訊息給自己（搭配 invalid_argument）：買家帳號與店家帳號是同一個帳號。client 不提供對自己的店傳訊息的入口，顯示 LocalizedMessage。
+  // ChatAppService.SendMessageToStore、SendMessageToBuyer。
+  SELF_MESSAGE_NOT_ALLOWED = 19;
+  // 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  // ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer、StreamStoreEvents（店家串流重新驗證時店已不在或換了一家）。
+  STORE_CLOSED = 20;
+  // 買家與店家之間任一方向有封鎖，而且沒有進行中的訂單或售後（搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  // ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  CHAT_BLOCKED = 21;
+  // 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  // ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  RECEIVER_DELETED = 22;
 }

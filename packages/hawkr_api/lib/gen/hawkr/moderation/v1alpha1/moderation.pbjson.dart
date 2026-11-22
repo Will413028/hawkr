@@ -176,6 +176,44 @@ final $typed_data.Uint8List listMyReportsResponseDescriptor = $convert.base64Dec
     'Rpb24udjFhbHBoYTEuTXlSZXBvcnRJdGVtUgdyZXBvcnRzEiYKD25leHRfcGFnZV90b2tlbhgC'
     'IAEoCVINbmV4dFBhZ2VUb2tlbg==');
 
+@$core.Deprecated('Use listMyStoreReportsRequestDescriptor instead')
+const ListMyStoreReportsRequest$json = {
+  '1': 'ListMyStoreReportsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyStoreReportsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyStoreReportsRequestDescriptor =
+    $convert.base64Decode(
+        'ChlMaXN0TXlTdG9yZVJlcG9ydHNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoBVIIcGFnZVNpem'
+        'USHQoKcGFnZV90b2tlbhgCIAEoCVIJcGFnZVRva2Vu');
+
+@$core.Deprecated('Use listMyStoreReportsResponseDescriptor instead')
+const ListMyStoreReportsResponse$json = {
+  '1': 'ListMyStoreReportsResponse',
+  '2': [
+    {
+      '1': 'reports',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.moderation.v1alpha1.MyReportItem',
+      '10': 'reports'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyStoreReportsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyStoreReportsResponseDescriptor =
+    $convert.base64Decode(
+        'ChpMaXN0TXlTdG9yZVJlcG9ydHNSZXNwb25zZRJBCgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW'
+        '9kZXJhdGlvbi52MWFscGhhMS5NeVJlcG9ydEl0ZW1SB3JlcG9ydHMSJgoPbmV4dF9wYWdlX3Rv'
+        'a2VuGAIgASgJUg1uZXh0UGFnZVRva2Vu');
+
 @$core.Deprecated('Use myReportItemDescriptor instead')
 const MyReportItem$json = {
   '1': 'MyReportItem',
@@ -287,6 +325,12 @@ const $core.Map<$core.String, $core.dynamic> ModerationAppServiceBase$json = {
       '3': '.hawkr.moderation.v1alpha1.ListMyReportsResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'ListMyStoreReports',
+      '2': '.hawkr.moderation.v1alpha1.ListMyStoreReportsRequest',
+      '3': '.hawkr.moderation.v1alpha1.ListMyStoreReportsResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -303,6 +347,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.moderation.v1alpha1.MyReportItem': MyReportItem$json,
   '.hawkr.moderation.v1alpha1.CommunityReport': CommunityReport$json,
   '.hawkr.seller.v1alpha1.StoreReport': $1.StoreReport$json,
+  '.hawkr.moderation.v1alpha1.ListMyStoreReportsRequest':
+      ListMyStoreReportsRequest$json,
+  '.hawkr.moderation.v1alpha1.ListMyStoreReportsResponse':
+      ListMyStoreReportsResponse$json,
 };
 
 /// Descriptor for `ModerationAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -311,4 +359,7 @@ final $typed_data.Uint8List moderationAppServiceDescriptor = $convert.base64Deco
     '9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlcXVlc3QaLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxw'
     'aGExLlN1Ym1pdFJlcG9ydFJlc3BvbnNlEncKDUxpc3RNeVJlcG9ydHMSLy5oYXdrci5tb2Rlcm'
     'F0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXF1ZXN0GjAuaGF3a3IubW9kZXJhdGlvbi52'
-    'MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACAQ==');
+    'MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACARKGAQoSTGlzdE15U3RvcmVSZXBvcn'
+    'RzEjQuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXF1ZXN0'
+    'GjUuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXNwb25zZS'
+    'IDkAIB');

@@ -67,6 +67,14 @@ func (f *fakeStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 	return f.blocks, f.blocksErr
 }
 
+func (f *fakeStores) StoresBlockingBuyer(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+
+func (f *fakeStores) BuyersBlockedByStore(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+
 type fakeOrders struct {
 	open  bool
 	err   error
@@ -127,7 +135,7 @@ func (f *fixture) sender(kind model.PartyKind) model.Party {
 }
 
 func (f *fixture) input(kind model.PartyKind) model.SendInput {
-	in := model.SendInput{Sender: f.sender(kind), Type: model.TypeText, Text: "你好"}
+	in := model.SendInput{Sender: f.sender(kind), Type: model.TypeText, Text: "你好", RequestID: uuid.NewV4()}
 	if kind == model.PartyBuyer {
 		in.CounterpartID = storeID
 	} else {
@@ -402,5 +410,63 @@ func TestInputValidation(t *testing.T) {
 	in.Sender = model.Party{}
 	if _, err := f.s.checkInput("zh-TW", &in); err == nil {
 		t.Fatal("空的寄件人要回錯誤")
+	}
+}
+
+// RequestID 必填而且必須是 UUIDv4：零值、其他版本、其他 variant 都回 InvalidInput 指向 RequestID。
+func TestCheckInputRequestID(t *testing.T) {
+	v7 := uuid.NewV7()
+	badVariant := uuid.NewV4()
+	badVariant[8] = 0x00
+	cases := []struct {
+		name string
+		id   uuid.UUID
+		ok   bool
+	}{
+		{"v4", uuid.NewV4(), true},
+		{"零值", uuid.UUID{}, false},
+		{"v7", v7, false},
+		{"variant 不是 RFC 9562", badVariant, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture()
+			in := f.input(model.PartyBuyer)
+			in.RequestID = c.id
+			_, err := f.s.checkInput("zh-TW", &in)
+			if c.ok {
+				if err != nil {
+					t.Fatalf("v4 應通過，實際 %v", err)
+				}
+				return
+			}
+			var ae *apperr.Error
+			if apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "RequestID" {
+				t.Fatalf("要回 InvalidInput 指向 RequestID，實際 %v", err)
+			}
+		})
+	}
+}
+
+func TestRetrySendRetriesOnlyOutsideAnOuterTransaction(t *testing.T) {
+	calls := 0
+	conflict := func() (model.Message, error) { calls++; return model.Message{}, errRetry }
+	if _, err := retrySend(false, conflict); err == nil || errors.Is(err, errRetry) || calls != maxSendAttempts {
+		t.Fatalf("自己的 transaction 應重試到上限後回一般錯誤：calls=%d err=%v", calls, err)
+	}
+	calls = 0
+	if _, err := retrySend(true, conflict); !errors.Is(err, errNestedConflict) || calls != 1 {
+		t.Fatalf("外層 transaction 內撞鍵不得重試：calls=%d err=%v", calls, err)
+	}
+	calls = 0
+	ok := func() (model.Message, error) {
+		calls++
+		if calls < 2 {
+			return model.Message{}, errRetry
+		}
+		return model.Message{Seq: 7}, nil
+	}
+	if out, err := retrySend(false, ok); err != nil || out.Seq != 7 || calls != 2 {
+		t.Fatalf("重試後成功：calls=%d out=%+v err=%v", calls, out, err)
 	}
 }

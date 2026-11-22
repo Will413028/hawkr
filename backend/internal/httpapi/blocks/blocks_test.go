@@ -3,10 +3,12 @@ package blocks
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -221,15 +223,83 @@ func TestResolveAuthorOfAnUnreadableReviewIsNotFound(t *testing.T) {
 	}
 }
 
+type fakeMessages struct {
+	p     im.ConversationParties
+	err   error
+	gotID uuid.UUID
+	calls int
+}
+
+func (f *fakeMessages) MessageParties(_ context.Context, id uuid.UUID) (im.ConversationParties, error) {
+	f.calls++
+	f.gotID = id
+	return f.p, f.err
+}
+
+func TestResolveAuthorOfAMessageIsTheCounterpartOfTheCaller(t *testing.T) {
+	id := uuid.UUID{7}
+	f := &fakeMessages{p: im.ConversationParties{BuyerID: 3, StoreID: 20}}
+	got, err := (Sources{Messages: f}).ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, Ref{MessageID: id.String()})
+	if err != nil || got.Author != (social.Actor{Kind: social.ActorStore, ID: 20}) || got.StoreID != 20 {
+		t.Fatalf("買家以訊息封鎖的是對話的店：%+v %v", got, err)
+	}
+	got, err = (Sources{Messages: f}).ResolveAuthor(context.Background(), social.Caller{Store: &seller.Store{StoreID: 20}}, Ref{MessageID: id.String()})
+	if err != nil || got.Author != (social.Actor{Kind: social.ActorBuyer, ID: 3}) || got.StoreID != 20 {
+		t.Fatalf("店家以訊息封鎖的是對話的買家：%+v %v", got, err)
+	}
+	if f.gotID != id {
+		t.Fatalf("問 im 的是請求的訊息：%v", f.gotID)
+	}
+}
+
+func TestResolveAuthorOfAMessageTheCallerIsNotPartyToIsNotFoundLikeAMissingOne(t *testing.T) {
+	ref := Ref{MessageID: uuid.UUID{7}.String()}
+	f := &fakeMessages{p: im.ConversationParties{BuyerID: 3, StoreID: 20}}
+	for name, c := range map[string]social.Caller{
+		"別的買家":            {BuyerID: 4},
+		"別家店":             {Store: &seller.Store{StoreID: 21}},
+		"買家 ID 等於對話的店 ID": {BuyerID: 20},
+	} {
+		_, err := (Sources{Messages: f}).ResolveAuthor(context.Background(), c, ref)
+		if apperr.KindOf(err) != apperr.KindNotFound {
+			t.Fatalf("%s：%v", name, err)
+		}
+	}
+	missing := &fakeMessages{err: apperr.NotFound("no message")}
+	_, errMissing := (Sources{Messages: missing}).ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, ref)
+	_, errNotParty := (Sources{Messages: f}).ResolveAuthor(context.Background(), social.Caller{BuyerID: 4}, ref)
+	if errMissing == nil || errNotParty == nil || errMissing.Error() != errNotParty.Error() {
+		t.Fatalf("不存在與非對話方要是同一個答案：%v vs %v", errMissing, errNotParty)
+	}
+	boom := errors.New("boom")
+	if _, err := (Sources{Messages: &fakeMessages{err: boom}}).ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, ref); !errors.Is(err, boom) {
+		t.Fatalf("模組錯誤原樣回傳：%v", err)
+	}
+}
+
+func TestResolveAuthorRequiresExactlyOneReferenceIncludingMessageID(t *testing.T) {
+	s := Sources{Messages: &fakeMessages{}}
+	if _, err := s.ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, Ref{}); apperr.KindOf(err) != apperr.KindInvalidInput || !strings.Contains(err.Error(), "message_id") {
+		t.Fatalf("都沒設要指出 message_id：%v", err)
+	}
+	if _, err := s.ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, Ref{MessageID: uuid.UUID{7}.String(), CommentID: uuid.UUID{8}.String()}); apperr.KindOf(err) != apperr.KindInvalidInput || !strings.Contains(err.Error(), "只能設一個") {
+		t.Fatalf("設兩個：%v", err)
+	}
+	if _, err := s.ResolveAuthor(context.Background(), social.Caller{BuyerID: 3}, Ref{MessageID: "x"}); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("格式錯誤：%v", err)
+	}
+}
+
 func TestSourcesCompleteNeedsEveryOwner(t *testing.T) {
-	full := Sources{Authors: &fakeAuthors{}, Reviews: &fakeReviews{}, Identities: ids()}
+	full := Sources{Authors: &fakeAuthors{}, Reviews: &fakeReviews{}, Messages: &fakeMessages{}, Identities: ids()}
 	if !full.Complete() {
 		t.Fatal("來源齊全")
 	}
 	for name, s := range map[string]Sources{
-		"沒有 Authors": {Reviews: full.Reviews, Identities: full.Identities},
-		"沒有 Reviews": {Authors: full.Authors, Identities: full.Identities},
-		"沒有身分來源":     {Authors: full.Authors, Reviews: full.Reviews},
+		"沒有 Authors":  {Reviews: full.Reviews, Messages: full.Messages, Identities: full.Identities},
+		"沒有 Reviews":  {Authors: full.Authors, Messages: full.Messages, Identities: full.Identities},
+		"沒有 Messages": {Authors: full.Authors, Reviews: full.Reviews, Identities: full.Identities},
+		"沒有身分來源":      {Authors: full.Authors, Reviews: full.Reviews, Messages: full.Messages},
 	} {
 		if s.Complete() {
 			t.Fatalf("%s 要不完整", name)

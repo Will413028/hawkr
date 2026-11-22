@@ -12,6 +12,15 @@
     "buyer.Profile.gender_unset": {
       "message": "Not set"
     },
+    "chat.Preview.erased": {
+      "message": "This message has been removed"
+    },
+    "chat.Preview.hidden": {
+      "message": "This message has been hidden"
+    },
+    "chat.Preview.image": {
+      "message": "Sent a photo"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "Harassment or bullying"
     },
