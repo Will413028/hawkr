@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by 2026-11-22-im-realtime-delivery-connect-streaming.md |
 | 日期 | 2026-08-30 |
 | 影響範圍 | `services/im-service`、`gateway/internal/handler/chat.go`、`api/proto/im`、buyer／seller／web 三端 client |
 | 對應規格 | `docs/詳細設計書/14-即時通訊微服務（IM Service）詳細設計書.md` |

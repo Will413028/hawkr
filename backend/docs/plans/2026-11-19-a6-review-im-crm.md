@@ -215,6 +215,8 @@
 
 ## 決定
 
+各題的理由與否決方案收在三份 ADR，下表只留結論：`docs/adr/2026-11-22-im-realtime-delivery-connect-streaming.md`、`docs/adr/2026-11-22-review-chat-crm-policy-in-monolith.md`、`docs/adr/2026-11-22-deactivated-identity-guard-at-owner.md`。
+
 全部已決（Will 2026-11-19；D9 起逐題附日期）：D7 選 (a)，其他照 `decision-brief.md` 的建議；D9 在 A6-1a 開工審查時追加。
 
 | 題 | 結論 | 用在 |
