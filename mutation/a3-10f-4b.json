@@ -89,6 +89,69 @@
    "new": "\t\tcase <-m.trigger:\n",
    "test": "internal/platform/bizcalendar ^TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests$",
    "why": "A trigger is consumed without pushing."
+  },
+  {
+   "id": "mirror-accepts-bad-holiday-date",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\t\treturn 0, fmt.Errorf(\"%w: holiday date %q\", ErrInvalidBusinessDayMirror, raw)",
+   "new": "\t\t\tcontinue",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_BadBatchRejectedWholeAndMirrorUntouched$/^holiday_(not_a_date|format)$",
+   "why": "An unparsable holiday date is skipped instead of rejecting the whole batch, so a missing holiday silently shortens the SLA."
+  },
+  {
+   "id": "mirror-no-holiday-range-check",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\tif d.Before(from) || d.After(to) {",
+   "new": "\t\tif d.Before(from) && d.After(to) {",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_BadBatchRejectedWholeAndMirrorUntouched$/^holiday_(before|after)_range$",
+   "why": "A holiday outside the pushed coverage range is accepted instead of rejecting the batch."
+  },
+  {
+   "id": "mirror-replace-not-transactional",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\terr = u.tx.WithTx(ctx, func(ctx context.Context) error {",
+   "new": "\terr = func(fn func(context.Context) error) error { return fn(ctx) }(func(ctx context.Context) error {",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_InsertFailureRollsBackEverything$",
+   "why": "The replace runs outside the transaction, so a failed insert leaves the old rows deleted and the mirror half-written."
+  },
+  {
+   "id": "mirror-drops-coverage-write",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\treturn u.repo.SetCoverage(ctx, from, to, now)",
+   "new": "\t\treturn nil",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_ReplaceStoresRangeAndHolidays$",
+   "why": "The pushed coverage range is never stored, so the calendar cannot say which days it covers."
+  },
+  {
+   "id": "calendar-coverage-from-synced-at",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/domain/bizday.go",
+   "old": "\tc.coveredFrom = taipeiMidnight(coverage.From)\n\tc.coveredTo = taipeiMidnight(coverage.To)",
+   "new": "\tc.coveredFrom = taipeiMidnight(coverage.SyncedAt).AddDate(0, 0, -30)\n\tc.coveredTo = taipeiMidnight(coverage.SyncedAt).AddDate(0, 0, 400)",
+   "test": "internal/domain ^TestNewBusinessCalendarUsesStoredRangeNotSyncedAt$",
+   "why": "Coverage is derived from the push time plus a fixed window instead of the stored range, declaring never-imported years covered."
+  },
+  {
+   "id": "load-calendar-reads-without-snapshot",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/complaint.go",
+   "old": "\tholidays, coverage, err := repo.Snapshot(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))",
+   "new": "\tholidays, err := repo.ListHolidays(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))\n\tif err != nil {\n\t\treturn domain.BusinessCalendar{}, err\n\t}\n\tcoverage, err := repo.Coverage(ctx)",
+   "test": "internal/usecase ^TestLoadBusinessCalendarReadsHolidaysAndCoverageInOneSnapshot$",
+   "why": "Holidays and coverage are read in two separate queries instead of one snapshot, so a concurrent replace can pair old holidays with new coverage."
+  },
+  {
+   "id": "holiday-page-calls-wrong-rpc",
+   "stack": "admin",
+   "file": "admin/src/app/admin/holiday-calendar/page.tsx",
+   "old": "BizCalendarAdminService.method.importHolidayCalendar",
+   "new": "BizCalendarAdminService.method.getHolidayCalendarCoverage",
+   "test": "tests/holiday-calendar.test.ts 頁面呼叫 BizCalendarAdminService",
+   "why": "The import mutation points at another RPC, so the page no longer calls the new import service."
   }
  ]
 }
