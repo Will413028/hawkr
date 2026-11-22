@@ -183,34 +183,6 @@ class ProductRepository {
     return {};
   }
 
-  /// Get merchant product grades.
-  Future<List<Map<String, dynamic>>> getMerchantProductGrades(
-    String merchantId,
-    String skuId,
-  ) async {
-    if (skuId.isEmpty) return [];
-    try {
-      final resp = await _dio.get<dynamic>('/public/products/$skuId/rating');
-      final data = resp.data;
-      Iterable raw = [];
-      if (data is List) raw = data;
-      if (data is Map) {
-        for (final k in ['data', 'rows', 'list', 'grades']) {
-          if (data[k] is List) {
-            raw = data[k];
-            break;
-          }
-        }
-      }
-      return raw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    } on DioException {
-      return [];
-    }
-  }
-
   Future<List<String>> fetchSuggestions(String q) async {
     try {
       final resp = await _dio.get<Map<String, dynamic>>(

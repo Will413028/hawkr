@@ -71,7 +71,7 @@ void main() {
     expect(app.buyerListRequests.single.pageToken, '');
   });
 
-  testWidgets('已刪除的買家顯示「已刪除的帳號」，仍可解除封鎖', (tester) async {
+  testWidgets('已刪除的買家顯示「已刪除帳號」，仍可解除封鎖', (tester) async {
     final app = FakeBuyerApp(
       buyerPages: [
         [blockedBuyer('gone-1', name: '殘留的名稱', deleted: true)],
@@ -79,14 +79,14 @@ void main() {
     );
     await _pump(tester, app);
 
-    expect(find.text('已刪除的帳號'), findsOneWidget);
+    expect(find.text('已刪除帳號'), findsOneWidget);
     expect(find.text('殘留的名稱'), findsNothing);
     await tester.tap(find.text('解除封鎖'));
     await tester.pump();
     await tester.pump();
 
     expect(app.buyerUnblocks.single.buyerId, 'gone-1');
-    expect(find.text('已刪除的帳號'), findsNothing);
+    expect(find.text('已刪除帳號'), findsNothing);
     expect(find.text('尚無封鎖的使用者'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });

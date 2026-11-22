@@ -25,6 +25,8 @@ bool isAccountSuspendedError(Object error) =>
 const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit',
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
+  // 進入對話與收到訊息時自動標記已讀。
+  '/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead',
 };
 
 bool isBackgroundConnectProcedure(String procedure) =>
@@ -33,10 +35,6 @@ bool isBackgroundConnectProcedure(String procedure) =>
 /// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。推播裝置 token 的註冊與註銷不在這裡：
 /// 它們靜默是因為 registrar 自己吞掉非 2xx（`lib/features/notification/data/push/device_registrar.dart`），沒有任何分類器看得到。
 final _backgroundRestWrites = <({String method, RegExp path})>[
-  // 聊天連線票：開聊天與回到前景時自動鑄。
-  (method: 'POST', path: RegExp(r'/app/chat/ws-ticket/?$')),
-  // 進入對話自動標記已讀。
-  (method: 'PATCH', path: RegExp(r'/app/chat/conversations/[^/]+/?$')),
   // 開啟通知自動標記已讀（read-all 是使用者點的，不在這裡）。
   (method: 'PATCH', path: RegExp(r'/app/notifications/\d+/read/?$')),
 ];

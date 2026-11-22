@@ -11,6 +11,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
 import '../../../core/l10n/ui_locale.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
@@ -24,9 +25,6 @@ import 'blocked_list_notifier.dart';
 import 'paged_section.dart';
 import 'paged_section_widgets.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
-
-/// 已刪除帳號的買家沒有名稱，名單上顯示這句，仍可解除封鎖。
-const deletedAccountLabel = '已刪除的帳號';
 
 /// 封鎖名單頁：「店家」「買家」兩段，各自分頁。伺服器狀態在 [blockedListProvider]；這裡只顯示與發動作。
 class BlockedUsersScreen extends ConsumerWidget {
@@ -166,7 +164,9 @@ class BlockedUsersScreen extends ConsumerWidget {
                             final id = b.buyerId;
                             final name =
                                 b.deleted || b.displayName.trim().isEmpty
-                                ? deletedAccountLabel
+                                ? buyerProfileDeletedName(
+                                    ref.watch(uiLocaleProvider),
+                                  )
                                 : b.displayName.trim();
                             return _BlockedRow(
                               key: ValueKey('blocked-buyer-$id'),
