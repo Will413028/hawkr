@@ -3,6 +3,7 @@ import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -84,7 +85,7 @@ class RateScreen extends HookConsumerWidget {
                   SizedBox(height: 8.h),
                   Center(
                     child: Text(
-                      _ratingLabel(rating.value),
+                      _ratingLabel(rating.value, ref.watch(uiLocaleProvider)),
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -229,21 +230,13 @@ class RateScreen extends HookConsumerWidget {
       ),
     );
   }
-
-  String _ratingLabel(int r) {
-    switch (r) {
-      case 1:
-        return '非常不滿意';
-      case 2:
-        return '不滿意';
-      case 3:
-        return '一般';
-      case 4:
-        return '滿意';
-      case 5:
-        return '非常滿意';
-      default:
-        return '點擊評分';
-    }
-  }
 }
+
+String _ratingLabel(int r, UiLocale l) => switch (r) {
+  1 => reviewReviewRatingLabel1(l),
+  2 => reviewReviewRatingLabel2(l),
+  3 => reviewReviewRatingLabel3(l),
+  4 => reviewReviewRatingLabel4(l),
+  5 => reviewReviewRatingLabel5(l),
+  _ => '點擊評分',
+};

@@ -204,6 +204,42 @@ void main() {
     expect(fake.statsRequests.length, 1);
   });
 
+  testWidgets('有圖片篩選顯示統計的附圖筆數，標題筆數也隨之顯示', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        [reviewRecord('r1', rating: 5)],
+      ],
+      stats: pb.GetProductReviewStatsResponse(
+        count: 230,
+        average: 4.5,
+        withImagesCount: 37,
+      ),
+    );
+    await _pumpScreen(tester, fake);
+
+    final imageChip = find.byKey(const ValueKey('product-review-filter-有圖片'));
+    await tester.ensureVisible(imageChip);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: imageChip, matching: find.text('有圖片 (37)')),
+      findsOneWidget,
+    );
+    await tester.tap(imageChip);
+    await tester.pumpAndSettle();
+    expect(find.text('37 則'), findsOneWidget);
+  });
+
+  testWidgets('沒有暱稱的作者顯示共用文案的匿名名稱', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        [reviewRecord('r1', content: '好吃')],
+      ],
+    );
+    await _pumpScreen(tester, fake);
+
+    expect(find.text('匿名會員'), findsOneWidget);
+  });
+
   testWidgets('依 next_page_token 載入更多，超過 10 頁也不截斷', (tester) async {
     final fake = FakeReviewPublic(
       pages: [

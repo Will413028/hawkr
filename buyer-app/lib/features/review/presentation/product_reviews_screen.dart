@@ -5,13 +5,14 @@ import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import '../../../core/l10n/ui_locale.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/images.dart' as api;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 
-import '../../../core/l10n/ui_locale.dart';
 import '../../review/data/review_display.dart';
 import '../../review/data/review_repository.dart';
 import '../../../config/image_config.dart';
@@ -59,6 +60,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   int _totalCount = 0;
   double _avgRating = 0.0;
   Map<int, int> _ratingDistribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+  int _withImagesCount = 0;
 
   @override
   void initState() {
@@ -106,6 +108,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
           _totalCount = stats.count;
           _avgRating = stats.average;
           _ratingDistribution = stats.distribution;
+          _withImagesCount = stats.withImagesCount;
           _isLoading = false;
         });
       }
@@ -350,14 +353,14 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 
   Widget _buildFilterButtons() {
-    final filters = <(String, int?)>[
+    final filters = <(String, int)>[
       ('全部', _totalCount),
       ('5星', _ratingDistribution[5] ?? 0),
       ('4星', _ratingDistribution[4] ?? 0),
       ('3星', _ratingDistribution[3] ?? 0),
       ('2星', _ratingDistribution[2] ?? 0),
       ('1星', _ratingDistribution[1] ?? 0),
-      ('有圖片', null),
+      ('有圖片', _withImagesCount),
     ];
     return Column(
       key: const ValueKey('product-reviews-filter-section'),
@@ -373,9 +376,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 if (index > 0) const SizedBox(width: HkSpace.sm),
                 HkChoiceChip(
                   key: ValueKey('product-review-filter-${filters[index].$1}'),
-                  label: filters[index].$2 == null
-                      ? filters[index].$1
-                      : '${filters[index].$1} (${filters[index].$2})',
+                  label: '${filters[index].$1} (${filters[index].$2})',
                   selected: _selectedFilter == filters[index].$1,
                   onTap: () => _selectFilter(filters[index].$1),
                 ),
@@ -389,7 +390,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 
   Widget _buildReviewListHeading() {
     final count = _imagesFilter
-        ? null
+        ? _withImagesCount
         : (_ratingFilter == null
               ? _totalCount
               : (_ratingDistribution[_ratingFilter] ?? 0));
@@ -402,7 +403,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             style: AppTypography.sectionTitle,
           ),
         ),
-        if (count != null) Text('$count 則', style: AppTypography.metaMuted),
+        Text('$count 則', style: AppTypography.metaMuted),
       ],
     );
   }
@@ -517,7 +518,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     final userAvatar = review.authorAvatar;
     final displayName = review.authorName.isNotEmpty
         ? review.authorName
-        : anonymousReviewerName;
+        : reviewReviewAuthorAnonymousName(ref.read(uiLocaleProvider));
     final imageList = review.images;
     final reviewKey = review.id;
     return HkFrostedCardSurface(

@@ -14,12 +14,14 @@ pb.Review reviewRecord(
   String authorName = '',
   int images = 0,
   String? orderItemId,
+  bool isMine = false,
 }) => pb.Review(
   id: id,
   rating: rating,
   content: content,
   author: pb.ReviewAuthor(name: authorName),
   orderItemId: orderItemId,
+  isMine: isMine,
 );
 
 /// `ReviewPublicService` 的 fake。商品評價以頁給：第 n 頁的 token 是 `page-n`，最後一頁沒有 next token。

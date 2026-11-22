@@ -17,6 +17,7 @@ typedef ProductReviewStats = ({
   int count,
   double average,
   Map<int, int> distribution,
+  int withImagesCount,
 });
 
 /// 評價（`ReviewPublicService`、`ReviewAppService`）。讀取失敗一律丟出，不回空清單：呼叫端要把
@@ -64,6 +65,7 @@ class ReviewRepository {
       count: response.count,
       average: response.average,
       distribution: distribution,
+      withImagesCount: response.withImagesCount,
     );
   }
 

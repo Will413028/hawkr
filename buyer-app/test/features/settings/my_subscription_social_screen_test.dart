@@ -76,6 +76,7 @@ void main() {
         count: 18,
         average: 4.8,
         distribution: {5: 18, 4: 0, 3: 0, 2: 0, 1: 0},
+        withImagesCount: 0,
       ),
     );
   });

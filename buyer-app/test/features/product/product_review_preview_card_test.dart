@@ -85,6 +85,24 @@ void main() {
     expect(find.text('好吃'), findsOneWidget);
   });
 
+  testWidgets('自己的評價不顯示檢舉入口，別人的顯示；沒有暱稱顯示匿名名稱', (tester) async {
+    final client = FakeReviewPublic(
+      pages: [
+        [
+          reviewRecord('mine', content: '我的', isMine: true),
+          reviewRecord('other', content: '別人的', authorName: '小明'),
+        ],
+      ],
+    ).client();
+    await pump(tester, client, ValueNotifier('55'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('我的'), findsOneWidget);
+    expect(find.text('別人的'), findsOneWidget);
+    expect(find.text('匿名會員'), findsOneWidget);
+    expect(find.bySemanticsLabel('更多評價操作'), findsOneWidget);
+  });
+
   testWidgets('skuId 換掉後重新載入，舊 sku 較晚回來的回應不覆蓋', (tester) async {
     final slow = <String, Completer>{};
     final client = ReviewPublicServiceClient(

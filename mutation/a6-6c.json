@@ -179,6 +179,51 @@
    "new": "setState(() {\n          _loadingMore = false;\n          _reviews = [];\n        });\n        showFloatingToast(",
    "test": "test/features/review/product_reviews_screen_layout_test.dart 下一頁失敗保留已載入的評價並可再試",
    "why": "下一頁讀取失敗清掉已載入的評價"
+  },
+  {
+   "id": "images-chip-count-not-from-stats",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "withImagesCount: response.withImagesCount,",
+   "new": "withImagesCount: 0,",
+   "test": "test/features/review/review_repository_test.dart 取伺服器的數量、平均與各星等，缺的星等補 0",
+   "why": "附圖筆數沒有取自統計"
+  },
+  {
+   "id": "images-heading-count-hidden",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "? _withImagesCount\n        : (_ratingFilter",
+   "new": "? 0\n        : (_ratingFilter",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 有圖片篩選顯示統計的附圖筆數，標題筆數也隨之顯示",
+   "why": "選有圖片時標題筆數不是附圖筆數"
+  },
+  {
+   "id": "own-review-shows-report",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
+   "old": "if (reviewId.isNotEmpty && !review.isMine) ...[",
+   "new": "if (reviewId.isNotEmpty) ...[",
+   "test": "test/features/product/product_review_preview_card_test.dart 自己的評價不顯示檢舉入口，別人的顯示；沒有暱稱顯示匿名名稱",
+   "why": "自己的評價也出現檢舉入口"
+  },
+  {
+   "id": "rating-label-4-wrong",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/rate_screen.dart",
+   "old": "4 => reviewReviewRatingLabel4(l),",
+   "new": "4 => reviewReviewRatingLabel3(l),",
+   "test": "test/features/review/rate_screen_label_test.dart 星等文字取自共用文案目錄，1 到 5 星各自對應",
+   "why": "4 星顯示成 3 星的文字"
+  },
+  {
+   "id": "deleted-buyer-name-blank",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/blocked_users_screen.dart",
+   "old": "? buyerProfileDeletedName(\n                                    ref.watch(uiLocaleProvider),\n                                  )",
+   "new": "? ''",
+   "test": "test/features/moderation/blocked_users_screen_test.dart 已刪除的買家顯示「已刪除帳號」，仍可解除封鎖",
+   "why": "已刪除買家沒有顯示名稱"
   }
  ]
 }

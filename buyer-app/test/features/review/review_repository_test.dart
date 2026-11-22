@@ -54,6 +54,7 @@ void main() {
         stats: pb.GetProductReviewStatsResponse(
           count: 230,
           average: 4.5,
+          withImagesCount: 42,
           distribution: [
             pb.RatingCount(rating: 5, count: 200),
             pb.RatingCount(rating: 1, count: 30),
@@ -66,6 +67,7 @@ void main() {
 
       expect(stats.count, 230);
       expect(stats.average, 4.5);
+      expect(stats.withImagesCount, 42);
       expect(stats.distribution, {5: 200, 4: 0, 3: 0, 2: 0, 1: 30});
       expect(fake.statsRequests.single.productId, '55');
     });

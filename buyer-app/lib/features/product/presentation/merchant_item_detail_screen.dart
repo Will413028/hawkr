@@ -25,6 +25,7 @@ import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart'
     as pb_review;
 import '../../../core/l10n/ui_locale.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../review/data/review_display.dart';
 import '../../review/data/review_repository.dart';
@@ -2389,7 +2390,7 @@ class ProductReviewPreviewCardState
   }) {
     final displayName = review.authorName.isNotEmpty
         ? review.authorName
-        : anonymousReviewerName;
+        : reviewReviewAuthorAnonymousName(ref.read(uiLocaleProvider));
     final avatar = review.authorAvatar;
     final dateStr = review.createDateText;
     final reviewId = review.id;
@@ -2474,7 +2475,7 @@ class ProductReviewPreviewCardState
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (reviewId.isNotEmpty) ...[
+                  if (reviewId.isNotEmpty && !review.isMine) ...[
                     SizedBox(width: 8.w),
                     HkFrostedIconButton(
                       label: '更多評價操作',
