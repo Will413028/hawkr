@@ -24,6 +24,8 @@ const (
 	// PromptItemChoices 是「有幾個相符的品項，請選一個」；PromptItemDescribe 是「找不到，請描述」。
 	PromptItemChoices  Prompt = "ITEM_CHOICES"
 	PromptItemDescribe Prompt = "ITEM_DESCRIBE"
+	// PromptItemGroupChoices 是「相符的品項分散在幾個大類，先選大類」。
+	PromptItemGroupChoices Prompt = "ITEM_GROUP_CHOICES"
 )
 
 // OptionKind 決定選項的顯示文字從哪來。
@@ -241,4 +243,20 @@ func copyOptions(in []Option) []Option {
 	out := make([]Option, len(in))
 	copy(out, in)
 	return out
+}
+
+// BuildGroupDisambiguation 是先問大類的問題卡：每個候選是一個大類（Label 是大類名），最多 MaxItemOptions 個，加固定的「其他，自行描述」，開放自由輸入。
+func BuildGroupDisambiguation(groups []ItemCandidate) *Question {
+	groups = groups[:min(len(groups), MaxItemOptions)]
+	opts := make([]Option, 0, len(groups)+1)
+	for _, g := range groups {
+		opts = append(opts, Option{ID: ItemOptionID(g), Value: g.Label, Kind: OptionValue})
+	}
+	opts = append(opts, Option{ID: ItemOtherOptionID, Value: "OTHER", Kind: OptionOther})
+	return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemGroupChoices, Options: opts, AllowFreeText: true}
+}
+
+// BuildItemDescribe 是請買家自由描述品項的問題卡：沒有選項，只收文字。
+func BuildItemDescribe() *Question {
+	return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemDescribe, AllowFreeText: true}
 }

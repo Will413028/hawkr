@@ -18,6 +18,8 @@ import (
 // Resolver 把品項用詞對到分類樹（*resolver.Resolver 滿足它）。
 type Resolver interface {
 	Resolve(ctx context.Context, term string) (resolver.Resolution, error)
+	// Leaves 回傳大類底下的末層節點（不含大類自己），依分類樹順序。
+	Leaves(ctx context.Context, rootID int64) ([]resolver.Match, error)
 }
 
 // 請求的狀態（與 schema 的 CHECK 相同）。
@@ -92,7 +94,7 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 			for _, c := range cands {
 				ms = append(ms, c.match)
 			}
-			pending = disambiguationPayload(res.BuyerTerm, ms)
+			pending = buildCard(res.BuyerTerm, ms)
 		}
 	}
 
@@ -139,11 +141,6 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 	return d, nil
 }
 
-type pendingCard struct {
-	payload InterruptPayload
-	card    *planner.Question
-}
-
 // confirmed 是一個能被 Apply 收下當品項解析的命中，與收下後的欄位組。
 type confirmed struct {
 	match resolver.Match
@@ -161,20 +158,6 @@ func confirmable(next slots.Set, ms []resolver.Match, now time.Time) []confirmed
 		}
 	}
 	return out
-}
-
-func disambiguationPayload(buyerTerm string, matches []resolver.Match) *pendingCard {
-	cands := make([]planner.ItemCandidate, 0, len(matches))
-	for _, m := range matches {
-		cands = append(cands, planner.ItemCandidate{CategoryID: m.CategoryID, Label: m.Name, Path: m.Path})
-	}
-	card := planner.BuildItemDisambiguation(cands)
-	shown := cands[:min(len(cands), planner.MaxItemOptions)]
-	p := InterruptPayload{Stage: StageItem, Query: buyerTerm, Candidates: make([]PayloadCandidate, 0, len(shown))}
-	for _, c := range shown {
-		p.Candidates = append(p.Candidates, PayloadCandidate{CategoryID: c.CategoryID, Label: c.Label, Path: c.Path})
-	}
-	return &pendingCard{payload: p, card: card}
 }
 
 // rfqState 把「需求最新的確認快照」換成 planner 的詢價狀態：快照指向這一輪開始前的現行版本、而且這一輪沒有改動內容才算有效，

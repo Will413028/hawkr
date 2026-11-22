@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"hash/fnv"
 	"strings"
 	"testing"
 	"time"
@@ -23,14 +24,23 @@ import (
 var now = time.Date(2026, 11, 22, 3, 0, 0, 0, time.UTC)
 
 type fakeResolver struct {
-	res   resolver.Resolution
-	err   error
-	calls int
+	res    resolver.Resolution
+	byTerm map[string][]resolver.Match
+	leaves map[int64][]resolver.Match
+	err    error
+	calls  int
+}
+
+func (f *fakeResolver) Leaves(_ context.Context, rootID int64) ([]resolver.Match, error) {
+	return f.leaves[rootID], f.err
 }
 
 func (f *fakeResolver) Resolve(_ context.Context, term string) (resolver.Resolution, error) {
 	f.calls++
 	r := f.res
+	if ms, ok := f.byTerm[term]; ok {
+		r.Matches = ms
+	}
 	r.BuyerTerm = term
 	return r, f.err
 }
@@ -45,8 +55,20 @@ func resolved() slots.Set {
 	}
 }
 
+// match 組一個末層命中；大類取路徑的第一段，大類 ID 由大類名固定算出（路徑空白時沒有大類資訊）。
 func match(id int64, name, path string) resolver.Match {
-	return resolver.Match{CategoryID: id, Name: name, Path: path, Via: resolver.ViaExact}
+	m := resolver.Match{CategoryID: id, Name: name, Path: path, Via: resolver.ViaExact, Leaf: true}
+	if path != "" {
+		m.RootName = strings.SplitN(path, " > ", 2)[0]
+		m.RootID = rootID(m.RootName)
+	}
+	return m
+}
+
+func rootID(name string) int64 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	return int64(h.Sum32()%100000) + 1
 }
 
 func decideOK(t *testing.T, rs Resolver, prior priorState, patch slots.Patch) decision {
@@ -89,6 +111,9 @@ func TestAmbiguousItemPausesWithAOneLevelCardCappedAtFive(t *testing.T) {
 	}
 	if d.next.Resolution != nil {
 		t.Errorf("還沒選，不得有解析：%+v", d.next.Resolution)
+	}
+	if d.interrupt.Stage != StageItem {
+		t.Errorf("同一大類的命中不問大類：stage = %s", d.interrupt.Stage)
 	}
 	if got := len(d.interrupt.Candidates); got != planner.MaxItemOptions {
 		t.Errorf("candidates = %d，要截成 %d", got, planner.MaxItemOptions)

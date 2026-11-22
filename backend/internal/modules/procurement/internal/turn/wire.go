@@ -165,12 +165,17 @@ func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) 
 
 // 中斷 payload 的階段。
 const (
+	// StageGroup 是先問大類：卡上的候選是大類節點。
+	StageGroup = "GROUP"
+	// StageItem 是選末層品項：卡上的候選是末層分類。
 	StageItem = "ITEM"
+	// StageDescribe 是請買家自由描述品項：沒有選項，Query 保留原詞。
+	StageDescribe = "DESCRIBE"
 )
 
 // InterruptPayload 是品項消歧中斷的 payload，也是接續的唯一狀態（A9-D24(2)、A9-D28(1)）。
 // Question 是當時對買家顯示的那張卡（已依送出語系渲染），讀取模型（OpenConfirmation.question）直接用它還原同一個畫面；
-// Candidates 是卡上選項背後的分類，回答時以選項 ID（category-<id>）對回分類，不信任 client 傳的分類 ID。
+// Candidates 是卡上選項背後的分類（GROUP 階段是大類節點，CategoryID 與 Path 都是大類；DESCRIBE 階段沒有），回答時以選項 ID（category-<id>）對回分類，不信任 client 傳的分類 ID。
 type InterruptPayload struct {
 	Stage      string             `json:"stage"`
 	Query      string             `json:"query"`

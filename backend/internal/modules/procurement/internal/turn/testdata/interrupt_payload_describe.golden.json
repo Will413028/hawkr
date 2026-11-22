@@ -1,0 +1,10 @@
+{
+  "stage": "DESCRIBE",
+  "query": "蘋果",
+  "candidates": [],
+  "question": {
+    "slotKey": "SLOT_KEY_ITEM_DISAMBIGUATION",
+    "prompt": "找不到符合的品項，請描述你要的品項：",
+    "allowFreeText": true
+  }
+}

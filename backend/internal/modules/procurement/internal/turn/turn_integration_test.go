@@ -4,6 +4,7 @@ package turn_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"iter"
@@ -65,6 +66,19 @@ func (taxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
 		{ID: 18, ParentID: 1, Name: "小白菜"},
 		{ID: 21, ParentID: 2, Name: "蘋果"}, {ID: 22, ParentID: 3, Name: "蘋果"},
 	}, nil
+}
+
+// wideTaxonomy 是替身分類樹：「梨」在兩個大類底下各有三個末層（共 6 個命中，跨大類）。
+type wideTaxonomy struct{}
+
+func (wideTaxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
+	nodes := []resolver.Node{{ID: 1, Name: "水果"}, {ID: 2, Name: "加工品"}}
+	for i := int64(0); i < 3; i++ {
+		nodes = append(nodes,
+			resolver.Node{ID: 10 + i, ParentID: 1, Name: "梨"},
+			resolver.Node{ID: 20 + i, ParentID: 2, Name: "梨"})
+	}
+	return nodes, nil
 }
 
 // scripted 是替身 model.LLM：依序回應，最後一個重複；onCall 在每次呼叫時執行（斷言、模擬取消）。
@@ -135,8 +149,12 @@ func (f *fixture) submit(message string, locale uitext.Locale) uuid.UUID {
 }
 
 func (f *fixture) executor(ext turn.SlotExtractor) turn.Executor {
+	return f.executorWith(ext, taxonomy{})
+}
+
+func (f *fixture) executorWith(ext turn.SlotExtractor, tree resolver.TaxonomyReader) turn.Executor {
 	return turn.Executor{
-		DB: f.d, Ledger: f.ledger(), Extractor: ext, Resolver: resolver.New(taxonomy{}, resolver.Synonyms{}, func() time.Time { return now }),
+		DB: f.d, Ledger: f.ledger(), Extractor: ext, Resolver: resolver.New(tree, resolver.Synonyms{}, func() time.Time { return now }),
 		Now: func() time.Time { return now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }
@@ -325,6 +343,33 @@ func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) { // I2
 		t.Errorf("同需求的新一輪要取消等待中的 run：%s", r.Status)
 	}
 	_ = next
+}
+
+func TestManyMatchesAcrossGroupsInterruptWithAGroupCard(t *testing.T) { // A9-D28(1)
+	ctx := context.Background()
+	f := newFixture(t)
+	id := f.submit("梨", uitext.ZhTW)
+	l := &scripted{steps: []func(context.Context) (*adkmodel.LLMResponse, error){say(`{"item":"梨"}`)}}
+	if err := f.runWith(ctx, id, f.executorWith(llmExtractor(l), wideTaxonomy{})); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.run(id); r.Status != run.StatusWaitingForInput {
+		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
+	}
+	irq, found, err := f.ledger().OpenInterruptForRun(ctx, buyer, id)
+	if err != nil || !found {
+		t.Fatalf("interrupt = %+v %v %v", irq, found, err)
+	}
+	var p turn.InterruptPayload
+	if err := json.Unmarshal(irq.Payload, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Stage != turn.StageGroup || p.Query != "梨" || len(p.Candidates) != 2 || p.Candidates[0].CategoryID != 1 || p.Candidates[0].Label != "水果" || p.Candidates[1].CategoryID != 2 {
+		t.Errorf("payload 要是列兩個大類的 GROUP 卡：%s", irq.Payload)
+	}
+	if len(p.Question.Options) != 3 || p.Question.Options[2].OptionID != "item-other" {
+		t.Errorf("卡要有兩個大類加其他：%+v", p.Question)
+	}
 }
 
 func TestCancelWhileTheModelIsRunningEndsCancelledWithoutWritesOrRefund(t *testing.T) { // I3

@@ -224,6 +224,78 @@
    "new": "retryable: true,",
    "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
    "why": "安全類 ErrorCode 也重試"
+  },
+  {
+   "id": "m8",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "return applyGroup(ctx, rs, l, now, p, c)",
+   "new": "return resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: c.CategoryID, Label: c.Label}), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyGroupChoice$",
+   "why": "選大類後直接以大類當品項確認：不再在該大類底下找末層"
+  },
+  {
+   "id": "m9",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn interrupt(l, describeCard(p.Query)), nil",
+   "new": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 1, Label: \"\"}), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyOtherGoesToDescribeNeverConfirms$",
+   "why": "選「其他」直接產生空 label 的 CATEGORY_CONFIRMED，不進 DESCRIBE"
+  },
+  {
+   "id": "m12",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "len(groups) >= 2",
+   "new": "len(groups) >= 1",
+   "test": "internal/modules/procurement/internal/turn ^TestGroupCardOnlyWhenMoreThanFiveAcrossGroups$",
+   "why": "GROUP 卡條件拿掉「跨大類」：命中全在同一大類也問大類"
+  },
+  {
+   "id": "m12i",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "len(groups) >= 2",
+   "new": "len(groups) >= 3",
+   "test": "internal/modules/procurement/internal/turn ^TestManyMatchesAcrossGroupsInterruptWithAGroupCard$",
+   "why": "跨兩個大類不再出 GROUP 卡：TURN executor 寫出的中斷 stage 變成 ITEM"
+  },
+  {
+   "id": "m13",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "if len(ms) > planner.MaxItemOptions {",
+   "new": "if len(ms) >= planner.MaxItemOptions {",
+   "test": "internal/modules/procurement/internal/turn ^TestGroupCardOnlyWhenMoreThanFiveAcrossGroups$",
+   "why": "命中剛好 5 個且跨大類也問大類（門檻差一）"
+  },
+  {
+   "id": "m14",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if planner.ItemOptionID(planner.ItemCandidate{CategoryID: c.CategoryID}) == id {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyItemChoice$",
+   "why": "ITEM 選項 ID 不對照 payload 的候選：永遠取第一個候選"
+  },
+  {
+   "id": "m15",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "func onCard(p InterruptPayload, id string) bool {",
+   "new": "func onCard(p InterruptPayload, id string) bool {\n\tif true {\n\t\treturn true\n\t}",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyRejectsOptionsNotOnTheCard$",
+   "why": "選項不檢查是否在卡上：DESCRIBE 卡（沒有選項）也收「其他」"
+  },
+  {
+   "id": "m16",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if p.Stage == StageDescribe {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyFreeText$",
+   "why": "DESCRIBE 階段 0 命中改成再出 DESCRIBE 卡：不再以 BUYER_DESCRIBED 解析"
   }
  ]
 }

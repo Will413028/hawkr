@@ -48,6 +48,10 @@
       "message": "找不到符合的品項，請描述你要的品項：",
       "description": "品項消歧問句：沒有候選，請買家自行描述。"
     },
+    "prompt.item_group_choices": {
+      "message": "相符的品項分散在幾個大類，請先選你要的是哪一類：",
+      "description": "品項消歧問句：相符的品項跨多個大類，先問大類。"
+    },
     "prompt.packaging": {
       "message": "包裝上有什麼需求嗎？",
       "description": "問題卡問句：包裝。"

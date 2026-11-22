@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // 線格式的 golden：模組不能 import httpapi/gen，所以 internal/httpapi 的 TestProcurementTurnWireMatchesProto 讀這些檔案，
@@ -71,4 +72,17 @@ func TestWireGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkGolden(t, "interrupt_payload.golden.json", payload)
+
+	group := buildPayload(buildCard("蘋果", spread(6, "水果", "加工品")), uitext.ZhTW)
+	payload, err = json.Marshal(group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkGolden(t, "interrupt_payload_group.golden.json", payload)
+
+	payload, err = json.Marshal(buildPayload(describeCard("蘋果"), uitext.ZhTW))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkGolden(t, "interrupt_payload_describe.golden.json", payload)
 }

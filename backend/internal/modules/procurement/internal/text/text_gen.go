@@ -105,6 +105,15 @@ func PromptItemDescribe(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "找不到符合的品項，請描述你要的品項：", Locale: uitext.ZhTW}
 }
 
+// PromptItemGroupChoices 是模組句子 prompt.item_group_choices；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PromptItemGroupChoices(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The matching items fall into several categories. Which category do you mean?", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "相符的品項分散在幾個大類，請先選你要的是哪一類：", Locale: uitext.ZhTW}
+}
+
 // PromptPackaging 是模組句子 prompt.packaging；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PromptPackaging(l uitext.Locale) uitext.Message {
 	switch l {

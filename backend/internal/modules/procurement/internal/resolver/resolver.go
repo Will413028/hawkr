@@ -50,6 +50,11 @@ type Match struct {
 	// Path 是從根到這個節點的名稱，以「 > 」串接。
 	Path string
 	Via  Via
+	// RootID、RootName 是路徑最上層（大類）的節點；根節點自己的 RootID 是自己的 ID。
+	RootID   int64
+	RootName string
+	// Leaf 是這個節點沒有子節點（末層品項）。
+	Leaf bool
 }
 
 // Resolution 是一次解析的結果。
@@ -161,6 +166,25 @@ func (r *Resolver) Resolve(ctx context.Context, term string) (Resolution, error)
 	return res, nil
 }
 
+// Leaves 回傳大類 rootID 底下的末層節點（不含大類自己），順序依分類樹讀取結果。
+func (r *Resolver) Leaves(ctx context.Context, rootID int64) ([]Match, error) {
+	idx, err := r.index(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []Match
+	for _, id := range idx.order {
+		n := idx.nodes[id]
+		if n.ID == rootID || idx.hasChild[n.ID] {
+			continue
+		}
+		if m := idx.match(n, ViaExact); m.RootID == rootID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
 // treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。
 type treeLoad struct {
 	done chan struct{}
@@ -256,14 +280,21 @@ func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 type index struct {
 	nodes  map[int64]Node
 	byNorm map[string][]int64
+	// order 是節點在分類樹讀取結果中的順序；hasChild 記錄有子節點的節點。
+	order    []int64
+	hasChild map[int64]bool
 }
 
 func buildIndex(nodes []Node) *index {
-	idx := &index{nodes: make(map[int64]Node, len(nodes)), byNorm: map[string][]int64{}}
+	idx := &index{nodes: make(map[int64]Node, len(nodes)), byNorm: map[string][]int64{}, hasChild: map[int64]bool{}}
 	for _, n := range nodes {
 		idx.nodes[n.ID] = n
+		idx.order = append(idx.order, n.ID)
 	}
 	for _, n := range nodes {
+		if n.ParentID != 0 {
+			idx.hasChild[n.ParentID] = true
+		}
 		k := normalize(n.Name)
 		idx.byNorm[k] = append(idx.byNorm[k], n.ID)
 	}
@@ -273,10 +304,27 @@ func buildIndex(nodes []Node) *index {
 func (x *index) byName(key string, via Via) []Match {
 	var out []Match
 	for _, id := range x.byNorm[key] {
-		n := x.nodes[id]
-		out = append(out, Match{CategoryID: id, Name: n.Name, Path: x.path(n), Via: via})
+		out = append(out, x.match(x.nodes[id], via))
 	}
 	return out
+}
+
+func (x *index) match(n Node, via Via) Match {
+	root := x.root(n)
+	return Match{CategoryID: n.ID, Name: n.Name, Path: x.path(n), Via: via, RootID: root.ID, RootName: root.Name, Leaf: !x.hasChild[n.ID]}
+}
+
+func (x *index) root(n Node) Node {
+	seen := map[int64]bool{n.ID: true}
+	for n.ParentID != 0 && !seen[n.ParentID] {
+		parent, ok := x.nodes[n.ParentID]
+		if !ok {
+			break
+		}
+		seen[parent.ID] = true
+		n = parent
+	}
+	return n
 }
 
 func (x *index) path(n Node) string {

@@ -30,6 +30,9 @@
     "prompt.item_describe": {
       "message": "We could not find a matching item. Please describe what you need:"
     },
+    "prompt.item_group_choices": {
+      "message": "The matching items fall into several categories. Which category do you mean?"
+    },
     "prompt.packaging": {
       "message": "Any packaging requirements?"
     },

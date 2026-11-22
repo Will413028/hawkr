@@ -150,6 +150,8 @@ func Prompt(l uitext.Locale, p planner.Prompt) string {
 		return text.PromptItemChoices(l).Text
 	case planner.PromptItemDescribe:
 		return text.PromptItemDescribe(l).Text
+	case planner.PromptItemGroupChoices:
+		return text.PromptItemGroupChoices(l).Text
 	}
 	return string(p)
 }

@@ -79,23 +79,40 @@ func TestProcurementTurnWireMatchesProto(t *testing.T) {
 }
 
 func TestProcurementInterruptPayloadQuestionMatchesProto(t *testing.T) {
-	var payload struct {
-		Stage      string            `json:"stage"`
-		Query      string            `json:"query"`
-		Candidates []json.RawMessage `json:"candidates"`
-		Question   json.RawMessage   `json:"question"`
-	}
-	if err := json.Unmarshal(readGolden(t, "interrupt_payload.golden.json"), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload.Stage != "ITEM" || payload.Query == "" || len(payload.Candidates) == 0 {
-		t.Errorf("payload = %+v", payload)
-	}
-	var q procurementv1alpha1.ClarifyQuestion
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(payload.Question, &q); err != nil {
-		t.Fatalf("payload.question 不是合法的 ClarifyQuestion：%v", err)
-	}
-	if q.GetSlotKey() != procurementv1alpha1.SlotKey_SLOT_KEY_ITEM_DISAMBIGUATION || len(q.GetOptions()) != len(payload.Candidates)+1 {
-		t.Errorf("question = %v", &q)
+	for _, tc := range []struct {
+		file       string
+		stage      string
+		candidates int
+		options    int
+		describe   bool
+	}{
+		{"interrupt_payload.golden.json", "ITEM", 2, 3, false},
+		{"interrupt_payload_group.golden.json", "GROUP", 2, 3, false},
+		{"interrupt_payload_describe.golden.json", "DESCRIBE", 0, 0, true},
+	} {
+		t.Run(tc.stage, func(t *testing.T) {
+			var payload struct {
+				Stage      string            `json:"stage"`
+				Query      string            `json:"query"`
+				Candidates []json.RawMessage `json:"candidates"`
+				Question   json.RawMessage   `json:"question"`
+			}
+			if err := json.Unmarshal(readGolden(t, tc.file), &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Stage != tc.stage || payload.Query == "" || len(payload.Candidates) != tc.candidates {
+				t.Errorf("payload = %+v", payload)
+			}
+			var q procurementv1alpha1.ClarifyQuestion
+			if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(payload.Question, &q); err != nil {
+				t.Fatalf("payload.question 不是合法的 ClarifyQuestion：%v", err)
+			}
+			if q.GetSlotKey() != procurementv1alpha1.SlotKey_SLOT_KEY_ITEM_DISAMBIGUATION || len(q.GetOptions()) != tc.options || !q.GetAllowFreeText() || q.GetPrompt() == "" {
+				t.Errorf("question = %v", &q)
+			}
+			if tc.describe && len(q.GetOptions()) != 0 {
+				t.Errorf("描述卡沒有選項：%v", &q)
+			}
+		})
 	}
 }
