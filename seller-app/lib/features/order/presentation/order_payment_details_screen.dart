@@ -1,3 +1,4 @@
+import 'package:hawkr_api/money.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:flutter/material.dart';
@@ -93,8 +94,7 @@ class OrderPaymentDetailsScreen extends StatelessWidget {
   /// ——它會讓賣家以為這筆訂單免稅，或以為稅要另外加。
   /// 要看稅額拆分請到發票詳情，那裡的數字來自 invoice_documents。
   String _money(num? value) {
-    final v = value ?? 0;
-    return 'NT\$${v.toStringAsFixed(0)}';
+    return formatMoney(value ?? 0);
   }
 
   Widget _summaryRow(

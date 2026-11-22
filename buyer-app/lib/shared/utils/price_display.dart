@@ -1,3 +1,5 @@
+import 'package:hawkr_api/money.dart';
+
 /// SKU 特價顯示與判斷共用 helper（PayUni issue #758）
 ///
 /// 規則來源：docs/payuni_sale_price_two_app_integration_plan.md §2.1
@@ -147,8 +149,5 @@ class PriceDisplay {
     return (((lp - sp) / lp) * 100).round();
   }
 
-  static String _fmtInt(num v) {
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(2);
-  }
+  static String _fmtInt(num v) => formatMoneyAmount(v);
 }

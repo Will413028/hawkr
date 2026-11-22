@@ -1,3 +1,4 @@
+import 'package:hawkr_api/money.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -81,9 +82,7 @@ class ChatProductBubble extends StatelessWidget {
     );
     final original = PriceDisplay.parseMoney(rawPrice);
     final price = eff != null
-        ? (eff == eff.roundToDouble()
-              ? eff.toInt().toString()
-              : eff.toStringAsFixed(2))
+        ? formatMoneyAmount(eff)
         : (rawPrice ?? '').toString();
     final imageUrl = (product['imageUrl'] ?? '').toString();
 
