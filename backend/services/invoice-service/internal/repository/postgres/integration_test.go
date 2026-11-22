@@ -645,7 +645,7 @@ func TestIntegration_BusinessDay_NeverPushedReturnsNil(t *testing.T) {
 	if _, err := pool.Exec(ctx, `TRUNCATE invoice_business_day_mirror, invoice_business_day_coverage`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
-	got, err := repo.Coverage(ctx)
+	_, got, err := repo.Snapshot(ctx, time.Time{}, time.Time{})
 	if err != nil {
 		t.Fatalf("沒有涵蓋區間不該回錯誤：%v", err)
 	}
@@ -670,7 +670,7 @@ func TestIntegration_BusinessDay_CoverageRoundTripAndOverwrite(t *testing.T) {
 	if err := repo.Insert(ctx, day(12, 25), synced); err != nil {
 		t.Fatalf("Insert: %v", err)
 	}
-	got, err := repo.Coverage(ctx)
+	_, got, err := repo.Snapshot(ctx, day(1, 1), day(12, 31))
 	if err != nil || got == nil {
 		t.Fatalf("Coverage: %v %v", got, err)
 	}
@@ -686,7 +686,7 @@ func TestIntegration_BusinessDay_CoverageRoundTripAndOverwrite(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM invoice_business_day_coverage`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("涵蓋區間應恆為單列，n=%d err=%v", n, err)
 	}
-	got, _ = repo.Coverage(ctx)
+	_, got, _ = repo.Snapshot(ctx, day(1, 1), day(12, 31))
 	if got.From.Format("2006-01-02") != "2026-11-01" || got.To.Format("2006-01-02") != "2026-11-30" {
 		t.Fatalf("覆蓋後的區間不對：%+v", *got)
 	}
@@ -744,23 +744,81 @@ func newInbox(eventID, dedupKey string) domain.NewInboxEvent {
 	}
 }
 
-func TestIntegration_BusinessDay_SnapshotReadsHolidaysAndCoverageTogether(t *testing.T) {
+func TestIntegration_BusinessDay_SnapshotSingleQuery(t *testing.T) {
 	pool := testPool(t)
-	ctx := context.Background()
 	repo := NewBusinessDayRepository(pool)
+	tm := database.NewTxManager(pool)
 	synced := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
 	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
-	if _, err := repo.DeleteAll(ctx); err != nil {
-		t.Fatal(err)
+	fmtDays := func(ds []time.Time) []string {
+		out := make([]string, 0, len(ds))
+		for _, d := range ds {
+			out = append(out, d.Format("2006-01-02"))
+		}
+		return out
 	}
-	if err := repo.Insert(ctx, day(11, 24), synced); err != nil {
-		t.Fatal(err)
+
+	// 兩種呼叫方式必須得到同樣的結果：交易外、與已在 READ COMMITTED 交易內。
+	modes := map[string]func(t *testing.T, fn func(ctx context.Context)){
+		"outside_tx": func(t *testing.T, fn func(ctx context.Context)) { fn(context.Background()) },
+		"inside_tx": func(t *testing.T, fn func(ctx context.Context)) {
+			if err := tm.WithTx(context.Background(), func(ctx context.Context) error { fn(ctx); return nil }); err != nil {
+				t.Fatal(err)
+			}
+		},
 	}
-	if err := repo.SetCoverage(ctx, day(10, 23), day(12, 31), synced); err != nil {
-		t.Fatal(err)
-	}
-	holidays, cov, err := repo.Snapshot(ctx, day(11, 1), day(11, 30))
-	if err != nil || len(holidays) != 1 || cov == nil || !cov.To.Equal(day(12, 31)) {
-		t.Fatalf("Snapshot = %v %v %v", holidays, cov, err)
+	for name, run := range modes {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			if _, err := pool.Exec(ctx, `TRUNCATE invoice_business_day_mirror, invoice_business_day_coverage`); err != nil {
+				t.Fatal(err)
+			}
+			// 沒有涵蓋列：假日照回，涵蓋區間為 nil。
+			if err := repo.Insert(ctx, day(11, 24), synced); err != nil {
+				t.Fatal(err)
+			}
+			run(t, func(ctx context.Context) {
+				h, cov, err := repo.Snapshot(ctx, day(11, 1), day(11, 30))
+				if err != nil || cov != nil || len(h) != 1 {
+					t.Fatalf("無涵蓋列：holidays=%v cov=%v err=%v", h, cov, err)
+				}
+			})
+
+			if err := repo.Insert(ctx, day(10, 1), synced); err != nil { // 區間外
+				t.Fatal(err)
+			}
+			if err := repo.Insert(ctx, day(11, 1), synced); err != nil { // 下界（含）
+				t.Fatal(err)
+			}
+			if err := repo.Insert(ctx, day(11, 30), synced); err != nil { // 上界（含）
+				t.Fatal(err)
+			}
+			if err := repo.Insert(ctx, day(12, 25), synced); err != nil { // 區間外
+				t.Fatal(err)
+			}
+			if err := repo.SetCoverage(ctx, day(10, 23), day(12, 31), synced); err != nil {
+				t.Fatal(err)
+			}
+			run(t, func(ctx context.Context) {
+				h, cov, err := repo.Snapshot(ctx, day(11, 1), day(11, 30))
+				if err != nil || cov == nil {
+					t.Fatalf("Snapshot = %v %v %v", h, cov, err)
+				}
+				if got := fmtDays(h); len(got) != 3 || got[0] != "2026-11-01" || got[1] != "2026-11-24" || got[2] != "2026-11-30" {
+					t.Fatalf("區間內假日（含兩端、依日期排序）不對：%v", got)
+				}
+				if !cov.From.Equal(day(10, 23)) || !cov.To.Equal(day(12, 31)) || !cov.SyncedAt.Equal(synced) {
+					t.Fatalf("涵蓋區間不對：%+v", *cov)
+				}
+			})
+
+			// 區間內沒有假日但有涵蓋列：仍要回涵蓋區間。
+			run(t, func(ctx context.Context) {
+				h, cov, err := repo.Snapshot(ctx, day(11, 2), day(11, 3))
+				if err != nil || len(h) != 0 || cov == nil {
+					t.Fatalf("空假日：holidays=%v cov=%v err=%v", h, cov, err)
+				}
+			})
+		})
 	}
 }

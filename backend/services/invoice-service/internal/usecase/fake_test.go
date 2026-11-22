@@ -797,24 +797,15 @@ type fakeBizDays struct {
 	synced *time.Time
 }
 
-func (f *fakeBizDays) ListHolidays(context.Context, time.Time, time.Time) ([]time.Time, error) {
-	return nil, nil
-}
-
 func (f *fakeBizDays) SetCoverage(context.Context, time.Time, time.Time, time.Time) error { return nil }
 
-// Coverage 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
-func (f *fakeBizDays) Coverage(context.Context) (*domain.BusinessDayCoverage, error) {
+// Snapshot 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
+func (f *fakeBizDays) Snapshot(context.Context, time.Time, time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
 	if f.synced == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	base := *f.synced
-	return &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
-}
-
-func (f *fakeBizDays) Snapshot(ctx context.Context, _, _ time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
-	c, err := f.Coverage(ctx)
-	return nil, c, err
+	return nil, &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
 
 // ---------------------------------------------------------------------------

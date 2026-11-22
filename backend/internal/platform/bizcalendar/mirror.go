@@ -76,6 +76,7 @@ func NewMirror(store Loader, client MirrorClient, now func() time.Time, log *slo
 
 // Trigger 要求 Run 的 goroutine 盡快推送一次，不等待也不阻塞；已有待處理的要求時合併成一次。
 // 所有推送都在 Run 的 goroutine 裡串行執行，每次都在送出前才讀行事曆，所以較晚讀到的資料不會被較早讀到的覆蓋。
+// 這個串行保證只在單一單體實例內成立：多個實例各有各的 Run，彼此的推送不會被排序。
 func (m *Mirror) Trigger() {
 	select {
 	case m.trigger <- struct{}{}:

@@ -262,7 +262,7 @@ func (u *SellerComplaint) Respond(ctx context.Context, in RespondComplaintInput)
 // calendarAround 讀一次鏡像，組出「已逾期 X 個工作天」所需區間的行事曆快照。
 //
 // 一個請求只讀一次（與 Complaint.calendarAround 同一條理由）：分兩次讀會讓倒數與逾期
-// 天數在鏡像剛好被 INV.gov 覆寫的那一瞬間互相矛盾。
+// 天數在鏡像剛好被單體推送覆寫的那一瞬間互相矛盾。
 func (u *SellerComplaint) calendarAround(ctx context.Context, now time.Time) (domain.BusinessCalendar, error) {
 	return loadBusinessCalendar(ctx, u.businessDay,
 		now.AddDate(0, 0, -complaintCalendarLookbehind),

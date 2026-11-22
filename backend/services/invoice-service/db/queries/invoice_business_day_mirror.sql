@@ -19,12 +19,6 @@ DELETE FROM invoice_business_day_mirror;
 INSERT INTO invoice_business_day_mirror (holiday_date, synced_at)
 VALUES (sqlc.arg(holiday_date), sqlc.arg(synced_at));
 
--- name: ListBusinessDayHolidays :many
--- 給 pkg/bizcalendar.AddBusinessDays 的純函式吃（它不碰 DB、不碰網路）。
-SELECT * FROM invoice_business_day_mirror
-WHERE holiday_date >= sqlc.arg(from_date) AND holiday_date <= sqlc.arg(to_date)
-ORDER BY holiday_date;
-
 -- name: UpsertBusinessDayCoverage :exec
 -- 覆蓋涵蓋區間與推送時間。必須與 DeleteAllBusinessDays、InsertBusinessDay 在同一交易內。
 INSERT INTO invoice_business_day_coverage (singleton, covered_from, covered_to, synced_at)
@@ -34,6 +28,13 @@ SET covered_from = EXCLUDED.covered_from,
     covered_to = EXCLUDED.covered_to,
     synced_at = EXCLUDED.synced_at;
 
--- name: GetBusinessDayCoverage :one
--- 鏡像的涵蓋區間與新鮮度（invoice_business_calendar_stale 告警的資料面）。從未推送過回 pgx.ErrNoRows。
-SELECT covered_from, covered_to, synced_at FROM invoice_business_day_coverage;
+-- name: SnapshotBusinessDayMirror :many
+-- 涵蓋區間（含新鮮度）與區間內的假日，一個陳述式讀完：單一陳述式在 READ COMMITTED 下
+-- 也只看到同一份快照，不會拿到推送前後混合的結果。
+-- 沒有涵蓋列（從未推送）仍回一列，三個涵蓋欄位為 NULL；區間內沒有假日時 holiday_date 為 NULL。
+SELECT c.covered_from, c.covered_to, c.synced_at, h.holiday_date
+FROM (SELECT 1) AS base
+LEFT JOIN invoice_business_day_coverage c ON true
+LEFT JOIN invoice_business_day_mirror h
+  ON h.holiday_date >= sqlc.arg(from_date) AND h.holiday_date <= sqlc.arg(to_date)
+ORDER BY h.holiday_date;

@@ -7,6 +7,7 @@ package gen
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -36,24 +37,6 @@ func (q *Queries) DeleteAllBusinessDays(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-const getBusinessDayCoverage = `-- name: GetBusinessDayCoverage :one
-SELECT covered_from, covered_to, synced_at FROM invoice_business_day_coverage
-`
-
-type GetBusinessDayCoverageRow struct {
-	CoveredFrom pgtype.Date        `db:"covered_from" json:"covered_from"`
-	CoveredTo   pgtype.Date        `db:"covered_to" json:"covered_to"`
-	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
-}
-
-// 鏡像的涵蓋區間與新鮮度（invoice_business_calendar_stale 告警的資料面）。從未推送過回 pgx.ErrNoRows。
-func (q *Queries) GetBusinessDayCoverage(ctx context.Context) (GetBusinessDayCoverageRow, error) {
-	row := q.db.QueryRow(ctx, getBusinessDayCoverage)
-	var i GetBusinessDayCoverageRow
-	err := row.Scan(&i.CoveredFrom, &i.CoveredTo, &i.SyncedAt)
-	return i, err
-}
-
 const insertBusinessDay = `-- name: InsertBusinessDay :exec
 INSERT INTO invoice_business_day_mirror (holiday_date, synced_at)
 VALUES ($1, $2)
@@ -70,28 +53,45 @@ func (q *Queries) InsertBusinessDay(ctx context.Context, arg InsertBusinessDayPa
 	return err
 }
 
-const listBusinessDayHolidays = `-- name: ListBusinessDayHolidays :many
-SELECT holiday_date, synced_at FROM invoice_business_day_mirror
-WHERE holiday_date >= $1 AND holiday_date <= $2
-ORDER BY holiday_date
+const snapshotBusinessDayMirror = `-- name: SnapshotBusinessDayMirror :many
+SELECT c.covered_from, c.covered_to, c.synced_at, h.holiday_date
+FROM (SELECT 1) AS base
+LEFT JOIN invoice_business_day_coverage c ON true
+LEFT JOIN invoice_business_day_mirror h
+  ON h.holiday_date >= $1 AND h.holiday_date <= $2
+ORDER BY h.holiday_date
 `
 
-type ListBusinessDayHolidaysParams struct {
+type SnapshotBusinessDayMirrorParams struct {
 	FromDate pgtype.Date `db:"from_date" json:"from_date"`
 	ToDate   pgtype.Date `db:"to_date" json:"to_date"`
 }
 
-// 給 pkg/bizcalendar.AddBusinessDays 的純函式吃（它不碰 DB、不碰網路）。
-func (q *Queries) ListBusinessDayHolidays(ctx context.Context, arg ListBusinessDayHolidaysParams) ([]InvoiceBusinessDayMirror, error) {
-	rows, err := q.db.Query(ctx, listBusinessDayHolidays, arg.FromDate, arg.ToDate)
+type SnapshotBusinessDayMirrorRow struct {
+	CoveredFrom pgtype.Date `db:"covered_from" json:"covered_from"`
+	CoveredTo   pgtype.Date `db:"covered_to" json:"covered_to"`
+	SyncedAt    *time.Time  `db:"synced_at" json:"synced_at"`
+	HolidayDate pgtype.Date `db:"holiday_date" json:"holiday_date"`
+}
+
+// 涵蓋區間（含新鮮度）與區間內的假日，一個陳述式讀完：單一陳述式在 READ COMMITTED 下
+// 也只看到同一份快照，不會拿到推送前後混合的結果。
+// 沒有涵蓋列（從未推送）仍回一列，三個涵蓋欄位為 NULL；區間內沒有假日時 holiday_date 為 NULL。
+func (q *Queries) SnapshotBusinessDayMirror(ctx context.Context, arg SnapshotBusinessDayMirrorParams) ([]SnapshotBusinessDayMirrorRow, error) {
+	rows, err := q.db.Query(ctx, snapshotBusinessDayMirror, arg.FromDate, arg.ToDate)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []InvoiceBusinessDayMirror{}
+	items := []SnapshotBusinessDayMirrorRow{}
 	for rows.Next() {
-		var i InvoiceBusinessDayMirror
-		if err := rows.Scan(&i.HolidayDate, &i.SyncedAt); err != nil {
+		var i SnapshotBusinessDayMirrorRow
+		if err := rows.Scan(
+			&i.CoveredFrom,
+			&i.CoveredTo,
+			&i.SyncedAt,
+			&i.HolidayDate,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

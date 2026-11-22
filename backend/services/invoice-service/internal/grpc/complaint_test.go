@@ -50,20 +50,17 @@ func (f xDocs) ListOrderDocumentsForBuyer(_ context.Context, sourceRef string, b
 
 type xBiz struct{ synced *time.Time }
 
-func (xBiz) DeleteAll(context.Context) (int64, error)           { return 0, nil }
-func (xBiz) Insert(context.Context, time.Time, time.Time) error { return nil }
-func (xBiz) ListHolidays(context.Context, time.Time, time.Time) ([]time.Time, error) {
-	return nil, nil
-}
+func (xBiz) DeleteAll(context.Context) (int64, error)                             { return 0, nil }
+func (xBiz) Insert(context.Context, time.Time, time.Time) error                   { return nil }
 func (f xBiz) SetCoverage(context.Context, time.Time, time.Time, time.Time) error { return nil }
 
-// Coverage 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
-func (f xBiz) Coverage(context.Context) (*domain.BusinessDayCoverage, error) {
+// Snapshot 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
+func (f xBiz) Snapshot(context.Context, time.Time, time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
 	if f.synced == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	base := *f.synced
-	return &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
+	return nil, &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
 
 type xOutbox struct{ domain.OutboxRepository }
@@ -395,13 +392,4 @@ func xLong(n int) string {
 		b[i] = '字'
 	}
 	return string(b)
-}
-
-func (f xBiz) Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
-	h, err := f.ListHolidays(ctx, from, to)
-	if err != nil {
-		return nil, nil, err
-	}
-	c, err := f.Coverage(ctx)
-	return h, c, err
 }

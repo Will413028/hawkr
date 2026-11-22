@@ -49,6 +49,8 @@ func TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart(t *testing
 		{"today in the last imported year", []int{2026, 2027}, "2027-12-20", true, "2027-11-20", "2027-12-31", ""},
 		// 窗口起日在前一年（沒匯入），今天的年份有 ⇒ 從今天所在連續區段的 1 月 1 日起。
 		{"window start year not imported but today's is", []int{2027}, "2027-01-10", true, "2027-01-01", "2027-12-31", ""},
+		// 窗口起日在前一年且前一年也已匯入 ⇒ 往回延伸到窗口起日，不停在今天所在年的 1 月 1 日。
+		{"window start year imported too", []int{2026, 2027}, "2027-01-10", true, "2026-12-11", "2027-12-31", ""},
 		// 今天的年份沒有匯入 ⇒ 沒有涵蓋，即使窗口後段落在已匯入的年份。
 		{"today's year not imported", []int{2027}, "2026-11-22", false, "2026-10-23", "", ""},
 		{"nothing imported", nil, "2026-11-22", false, "2026-10-23", "", ""},
@@ -220,8 +222,19 @@ func TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests(t *testing.T) 
 	done := make(chan struct{})
 	go func() { m.Run(ctx, time.Hour); close(done) }()
 	<-g.entered // 啟動時的推送卡在送出
-	for range 5 {
-		m.Trigger() // 不得阻塞；五次合併成一次待處理
+	triggered := make(chan struct{})
+	go func() {
+		for range 5 {
+			m.Trigger() // 不得阻塞；五次合併成一次待處理
+		}
+		close(triggered)
+	}()
+	select {
+	case <-triggered:
+	case <-time.After(2 * time.Second):
+		close(g.release)
+		cancel()
+		t.Fatal("Trigger 阻塞了呼叫端")
 	}
 	close(g.release)
 	deadline := time.After(5 * time.Second)

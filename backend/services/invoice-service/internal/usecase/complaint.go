@@ -466,7 +466,7 @@ func (u *Complaint) slaDueAt(cal domain.BusinessCalendar, now time.Time) time.Ti
 	if !cal.Covers(now, now.AddDate(0, 0, domain.ComplaintSlaHardCapDays)) {
 		// 推送的涵蓋區間沒有罩住這段期間（或從未推送）⇒ 未涵蓋的日期一律視為假日、落在硬上限（偏晚）。
 		// 這裡只留一行 WARN：告警的資料面是 invoice_business_day_coverage，
-		// 由 INV.gov 的 InvoiceBusinessDayMirrorEmpty／Stale 負責，不在請求路徑上重造一套。
+		// 由 Prometheus 規則 InvoiceBusinessDayMirrorEmpty／InvoiceBusinessDayMirrorStale（指標 invoice_business_day_mirror_age_seconds，sql-exporter 讀 coverage.synced_at）負責，不在請求路徑上重造一套。
 		u.logger().Warn("invoice.complaint.business_calendar_stale")
 	}
 	return cal.ComplaintSlaDueAt(now)

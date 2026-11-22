@@ -136,15 +136,6 @@
    "why": "Coverage is derived from the push time plus a fixed window instead of the stored range, declaring never-imported years covered."
   },
   {
-   "id": "load-calendar-reads-without-snapshot",
-   "stack": "go:backend/services/invoice-service",
-   "file": "backend/services/invoice-service/internal/usecase/complaint.go",
-   "old": "\tholidays, coverage, err := repo.Snapshot(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))",
-   "new": "\tholidays, err := repo.ListHolidays(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))\n\tif err != nil {\n\t\treturn domain.BusinessCalendar{}, err\n\t}\n\tcoverage, err := repo.Coverage(ctx)",
-   "test": "internal/usecase ^TestLoadBusinessCalendarReadsHolidaysAndCoverageInOneSnapshot$",
-   "why": "Holidays and coverage are read in two separate queries instead of one snapshot, so a concurrent replace can pair old holidays with new coverage."
-  },
-  {
    "id": "holiday-page-calls-wrong-rpc",
    "stack": "admin",
    "file": "admin/src/app/admin/holiday-calendar/page.tsx",
@@ -152,6 +143,42 @@
    "new": "BizCalendarAdminService.method.getHolidayCalendarCoverage",
    "test": "tests/holiday-calendar.test.ts 頁面呼叫 BizCalendarAdminService",
    "why": "The import mutation points at another RPC, so the page no longer calls the new import service."
+  },
+  {
+   "id": "push-never-extends-back-over-imported-years",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "old": "\tfor cal.Covers(first - 1) {",
+   "new": "\tfor false {",
+   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The imported run is never extended backwards, so a window start in an earlier imported year is clipped to January 1 of today's year."
+  },
+  {
+   "id": "snapshot-inner-joins-coverage",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/gen/invoice_business_day_mirror.sql.go",
+   "old": "LEFT JOIN invoice_business_day_coverage c ON true",
+   "new": "JOIN invoice_business_day_coverage c ON true",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "Without a coverage row the snapshot returns no rows at all, dropping the holidays instead of reporting never-pushed coverage."
+  },
+  {
+   "id": "snapshot-upper-bound-exclusive",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/gen/invoice_business_day_mirror.sql.go",
+   "old": "h.holiday_date <= $2",
+   "new": "h.holiday_date < $2",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "A holiday on the last day of the requested range is dropped."
+  },
+  {
+   "id": "snapshot-coverage-only-with-holidays",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/audit_repo.go",
+   "old": "\t\tif cov == nil {\n\t\t\tcf, ct",
+   "new": "\t\tif cov == nil && len(holidays) > 0 {\n\t\t\tcf, ct",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "A range without holidays reports no coverage, so a covered calendar looks never pushed."
   }
  ]
 }
