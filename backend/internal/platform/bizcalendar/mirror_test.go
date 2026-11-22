@@ -43,12 +43,14 @@ func TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart(t *testing
 	}{
 		// 2026-11-22 −30 天 ＝ 2026-10-23；+400 天 ＝ 2027-12-27；兩年都匯入 ⇒ 取窗口迄日。
 		{"both years cover the whole window", []int{2026, 2027}, "2026-11-22", true, "2026-10-23", "2027-12-27", "2026-10-24"},
-		// 只匯入 2026：涵蓋只到年底，不宣稱 2027 已涵蓋（舊的 synced_at±窗口會宣稱到 2027-12-27）。
+		// 只匯入 2026：涵蓋只到年底，不宣稱 2027 已涵蓋。
 		{"only the first year imported", []int{2026}, "2026-11-22", true, "2026-10-23", "2026-12-31", "2026-10-24"},
-		// 窗口起日在 2027（匯入的第二年），2028 沒有 ⇒ 只到 2027-12-31。
-		{"window start in the last imported year", []int{2026, 2027}, "2028-01-10", true, "2027-12-11", "2027-12-31", ""},
-		// 起日的年份沒有匯入 ⇒ 沒有涵蓋，即使窗口後段落在已匯入的年份。
-		{"start year not imported", []int{2027}, "2026-11-22", false, "2026-10-23", "", ""},
+		// 今天在 2027（匯入的第二年），2028 沒有 ⇒ 只到 2027-12-31。
+		{"today in the last imported year", []int{2026, 2027}, "2027-12-20", true, "2027-11-20", "2027-12-31", ""},
+		// 窗口起日在前一年（沒匯入），今天的年份有 ⇒ 從今天所在連續區段的 1 月 1 日起。
+		{"window start year not imported but today's is", []int{2027}, "2027-01-10", true, "2027-01-01", "2027-12-31", ""},
+		// 今天的年份沒有匯入 ⇒ 沒有涵蓋，即使窗口後段落在已匯入的年份。
+		{"today's year not imported", []int{2027}, "2026-11-22", false, "2026-10-23", "", ""},
 		{"nothing imported", nil, "2026-11-22", false, "2026-10-23", "", ""},
 	}
 	for _, tc := range tests {
@@ -180,5 +182,68 @@ func TestMirrorRunPushesAtStartAndStopsOnCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("ctx 取消後 Run 沒有結束")
+	}
+}
+
+type gatedClient struct {
+	mu      sync.Mutex
+	active  int
+	maxSeen int
+	calls   int
+	release chan struct{}
+	entered chan struct{}
+}
+
+func (g *gatedClient) ReplaceBusinessDayMirror(context.Context, time.Time, time.Time, []time.Time) error {
+	g.mu.Lock()
+	g.active++
+	g.calls++
+	if g.active > g.maxSeen {
+		g.maxSeen = g.active
+	}
+	n := g.calls
+	g.mu.Unlock()
+	if n == 1 {
+		g.entered <- struct{}{}
+		<-g.release
+	}
+	g.mu.Lock()
+	g.active--
+	g.mu.Unlock()
+	return nil
+}
+
+func TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests(t *testing.T) {
+	g := &gatedClient{release: make(chan struct{}), entered: make(chan struct{}, 1)}
+	m := newTestMirror(calendarOf(t, 2026), g)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { m.Run(ctx, time.Hour); close(done) }()
+	<-g.entered // 啟動時的推送卡在送出
+	for range 5 {
+		m.Trigger() // 不得阻塞；五次合併成一次待處理
+	}
+	close(g.release)
+	deadline := time.After(5 * time.Second)
+	for {
+		g.mu.Lock()
+		n := g.calls
+		g.mu.Unlock()
+		if n >= 2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("Trigger 後沒有再推送")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	<-done
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.maxSeen != 1 || g.calls != 2 {
+		t.Fatalf("maxConcurrent=%d calls=%d，want 1 與 2", g.maxSeen, g.calls)
 	}
 }

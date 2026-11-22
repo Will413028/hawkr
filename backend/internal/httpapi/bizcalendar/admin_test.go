@@ -147,16 +147,13 @@ func TestCoverageOfAnEmptyCalendarHasNoLastDate(t *testing.T) {
 	}
 }
 
-type fakePusher struct {
-	calls int
-	err   error
-}
+type fakePusher struct{ calls int }
 
-func (f *fakePusher) Push(context.Context) error { f.calls++; return f.err }
+func (f *fakePusher) Trigger() { f.calls++ }
 
 func TestImportPushesAfterASuccessfulImport(t *testing.T) {
 	p := &fakePusher{}
-	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p, slog.New(slog.DiscardHandler)))
+	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
 	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: fixture(t, "115.csv")})); err != nil {
 		t.Fatal(err)
 	}
@@ -165,23 +162,10 @@ func TestImportPushesAfterASuccessfulImport(t *testing.T) {
 	}
 }
 
-// 資料的擁有者是單體：推送失敗，匯入仍然成功。
-func TestImportSucceedsWhenThePushFails(t *testing.T) {
-	p := &fakePusher{err: errors.New("invoice down")}
-	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p, slog.New(slog.DiscardHandler)))
-	resp, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: fixture(t, "115.csv")}))
-	if err != nil || resp.Msg.GetYear().GetYear() != 2026 {
-		t.Fatalf("推送失敗不得讓匯入失敗：%v %v", resp, err)
-	}
-	if p.calls != 1 {
-		t.Fatalf("calls = %d", p.calls)
-	}
-}
-
 // 解析失敗（沒有寫入）時不推送。
 func TestImportDoesNotPushWhenTheImportFails(t *testing.T) {
 	p := &fakePusher{}
-	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p, slog.New(slog.DiscardHandler)))
+	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
 	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: "bad"})); err == nil {
 		t.Fatal("壞檔應失敗")
 	}

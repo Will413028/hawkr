@@ -505,7 +505,7 @@ func (s sellerStoreNames) StoreNames(ctx context.Context, storeIDs []int64) (map
 func bizCalendarAdmin(deps Deps) *httpbizcalendar.Admin {
 	a := httpbizcalendar.NewAdmin(deps.BizCalendar)
 	if deps.BizCalendarMirror != nil {
-		a.WithMirror(deps.BizCalendarMirror, deps.Logger)
+		a.WithMirror(deps.BizCalendarMirror)
 	}
 	return a
 }

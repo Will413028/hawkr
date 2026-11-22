@@ -459,12 +459,11 @@ groups:
           summary: "env={{ $labels.env }}：{{ $value }} 筆付款後修改請求卡在 REISSUE_FAILED"
           description: "env={{ $labels.env }}：**買家原本持有的合法發票已經作廢、新發票不存在，而那是平台的操作造成的**——58 §7.3.6 稱它為最嚴重的單一狀態，SLA 15 分鐘。處置：① 查 invoice_correction_requests 該列的 document_id，找它的替代票（invoice_documents.original_document_id = 該 document_id）與對應 operation ② 替代票的 operation 若在 FAILED_*，走 ADM 端點 52「安全重試」——那會在同一事務內把 correction 推回 VOID_REISSUE_IN_PROGRESS（R09），重開成功後自動落 COMPLETED ③ 替代票**已經 ISSUED** 而 correction 仍是 REISSUE_FAILED ⇒ 那是收尾漏了，走一次性維運 SQL 補 status／reissued_document_id／completed_at，**同一交易補一列 invoice_status_history**（裸 UPDATE 不留痕會讓下一個人看到假的軌跡）④ 無論哪一支，買家都要收到人話通知，不得沿用「處理中」通用文案。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）。⚠️ 既有的 InvoiceVoidWithoutReissue 守不到這一格：它看文件側，重試成功那一刻就熄滅，而 correction 那一列還卡著。"
 
-      # 行事曆鏡像過期（58 §5.1.14；2026-09-04 補）。
+      # 行事曆鏡像過期（58 §5.1.14）。鏡像由單體推送。
       #
       # 🔴 兩個門檻是**兩個不同的失效模式**，不能只設一個：
-      #   -1 ＝ 鏡像空表 ⇒ 同步器從未成功跑過一次（2026-09-04 之前的常態：
-      #        DeleteAll／Insert 零呼叫端）。這是 critical。
-      #   > 48h ＝ 同步器在跑但連兩天失敗（shipping 掛了／NetworkPolicy 被改）。
+      #   -1 ＝ 從未收到推送（`invoice_business_day_coverage` 沒有列）。這是 critical。
+      #   > 48h ＝ 單體在推但連兩天失敗（invoice-service 連不到／單體今年沒有匯入）。
       #
       # 為什麼要告警而不是靠它自己恢復：鏡像過期的後果是**申訴 SLA 悄悄從 3 工作天
       # 退成 14 自然日**，方向偏晚 ⇒ 不會有賣家來抱怨（對他們是好事），
@@ -477,7 +476,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：發票服務的工作日行事曆鏡像是空的"
-          description: "env={{ $labels.env }}：`invoice_business_day_mirror` 一列都沒有 ⇒ `BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① invoice-service 的 `invoice.gov.calendar_*` log —— INV.gov 每日 UTC 16:00 跑一次，`calendar_sync_skipped` 代表 wiring 缺依賴、`calendar_fetch_failed` 代表打不到 shipping、`calendar_write_failed` 代表 DB 寫入失敗 ② shipping-service 的 `holidays` 表本身有沒有資料（owner 在那裡，ADM 有匯入介面）③ NetworkPolicy 的 `shipping-service-ingress` 有沒有還列著 invoice-service。修好之後**不必手動補資料**，下一次 INV.gov 會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT（該表的 COMMENT 明令），它是唯讀鏡像。"
+          description: "env={{ $labels.env }}：`invoice_business_day_coverage` 沒有列 ⇒ invoice-service 從未收到單體推送的行事曆，`BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① 單體的 log：「行事曆窗口內沒有已匯入的資料，不推送給 invoice-service」warning 代表今天所在的年份尚未匯入（到後台匯入該年度辦公日曆）；「行事曆推送給 invoice-service 失敗」error 代表呼叫失敗 ② 單體的 `INVOICE_SERVICE_ADDR` 與內部密鑰是否指向可連的 invoice-service ③ invoice-service 的 BusinessCalendarMirror RPC 錯誤 log。修好之後不必手動補資料，單體每日對帳與每次匯入都會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT，涵蓋區間與假日只來自單體的推送。"
 
       - alert: InvoiceBusinessDayMirrorStale
         expr: min by (env) (invoice_business_day_mirror_age_seconds) > 172800
@@ -487,7 +486,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：工作日行事曆鏡像已 {{ $value | humanizeDuration }} 沒有更新"
-          description: "env={{ $labels.env }}：INV.gov 每日同步一次，超過 48 小時沒更新代表**連續兩天失敗**。鏡像還在（舊資料比空表準得多，同步器刻意在 RPC 失敗時保留舊值），但涵蓋窗口是以 `max(synced_at)` 推算的 [−30, +400] 天 —— 它會隨時間往後漂出真實範圍，屆時落在窗口外的日期一律被當成假日。診斷步驟與上一條相同（`invoice.gov.calendar_*` log ⇒ shipping ⇒ NetworkPolicy）。"
+          description: "env={{ $labels.env }}：單體每日對帳推送一次，超過 48 小時沒更新代表**連續兩天推送失敗或沒有推送**。鏡像還在（推送失敗時 invoice-service 保留舊值），但 `invoice_business_day_coverage` 的涵蓋區間不會往後延伸，區間外的日期一律被當成假日。查：單體 log 的「行事曆推送給 invoice-service 失敗」error、`INVOICE_SERVICE_ADDR` 設定，以及「行事曆窗口內沒有已匯入的資料」warning（今天所在的年份尚未匯入時單體什麼都不推）。"
 
       - alert: InvoiceInboxStranded
         expr: sum by (env, event_type, status) (invoice_inbox_stranded_rows) > 0

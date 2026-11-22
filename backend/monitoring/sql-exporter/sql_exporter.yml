@@ -821,19 +821,19 @@ collectors:
                  OR (status = 'WAITING_CONFIRMATION' AND updated_at < now() - interval '24 hours'))
           GROUP BY 1, 2
 
-      # 🔴 行事曆鏡像的新鮮度（58 §5.1.14；2026-09-04 補）。
+      # 🔴 行事曆鏡像的新鮮度（58 §5.1.14）。
       #
       # 這一格是「機制自己有沒有在跑」的唯一訊號。鏡像過期的後果**完全靜默**：
       # BusinessCalendar 對未涵蓋日一律當假日 ⇒ 申訴 SLA 悄悄退到 14 自然日的
       # 硬上限，而 ComplaintSlaDueAt 恆有回傳值、沒有錯誤、沒有測試會紅。
       #
       # 🔴 空表回 -1 而不是「沒有序列」：後者在 PromQL 上與「exporter 掛了」
-      # 無法分辨，而空表恰恰是最該告警的狀態（同步器從未成功跑過一次）。
+      # 無法分辨，而空表恰恰是最該告警的狀態（單體從未成功推送過）。
       # 用 max(synced_at) 而不是 count(*)：假日筆數本來就會隨區間變動，
-      # 而「上一次成功同步是什麼時候」才是這個機制的健康度。
+      # 而「上一次成功推送是什麼時候」才是這個機制的健康度。
       - metric_name: invoice_business_day_mirror_age_seconds
         type: gauge
-        help: 'Seconds since the business-day mirror was last synced; -1 when the mirror is empty (58 M39/5.1.14)'
+        help: 'Seconds since the monolith last pushed the business-day calendar (invoice_business_day_coverage.synced_at); -1 when nothing was ever pushed (58 M39/5.1.14)'
         values:
           - age
         query: |

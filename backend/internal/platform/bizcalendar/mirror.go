@@ -9,8 +9,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 推送給 invoice-service 的窗口：今天往前 30 天到往後 400 天（台北日）。數字是 invoice-service 的同步窗口（它是獨立 module，
-// 不能 import 這裡，所以以值重複；隨 A5 一起刪除）。
+// 推送給 invoice-service 的窗口：今天往前 30 天到往後 400 天（台北日）。窗口常數只由這裡擁有：invoice-service 只儲存收到的涵蓋區間，
+// 不再有自己的窗口。
 const (
 	mirrorPastDays   = 30
 	mirrorFutureDays = 400
@@ -22,23 +22,31 @@ type MirrorClient interface {
 	ReplaceBusinessDayMirror(ctx context.Context, from, to time.Time, holidays []time.Time) error
 }
 
-// MirrorBatch 算出要推送的批次：窗口是 now 所在台北日的前 30 天到後 400 天，取與已匯入年份的交集，而且要從窗口起日連續：
-// 起日所在的年份沒有匯入就沒有任何涵蓋（ok = false，from 仍是窗口起日）；有的話往後延伸到連續已匯入年份的 12 月 31 日，或窗口迄日，取較早者。
-// 中間缺一年時只推到缺口之前，缺口之後不宣稱涵蓋。holidays 是區間內的放假日，由早到晚。
+// MirrorBatch 算出要推送的批次：涵蓋區間是「包含今天（台北日）的連續已匯入年份」與窗口（今天前 30 天到後 400 天）的交集，
+// 起日是窗口起日與該連續區段第一年 1 月 1 日的較晚者，迄日是窗口迄日與區段最後一年 12 月 31 日的較早者。
+// 今天所在的年份沒有匯入就沒有任何涵蓋（ok = false，from 仍是窗口起日）。中間缺一年時只推到缺口之前。
+// holidays 是區間內的放假日，由早到晚。
 func MirrorBatch(cal *Calendar, now time.Time) (from, to time.Time, holidays []time.Time, ok bool) {
 	today := twtime.Day(now)
-	from = today.AddDate(0, 0, -mirrorPastDays)
+	windowStart := today.AddDate(0, 0, -mirrorPastDays)
 	windowEnd := today.AddDate(0, 0, mirrorFutureDays)
-	if !cal.Covers(from.Year()) {
-		return from, time.Time{}, nil, false
+	if !cal.Covers(today.Year()) {
+		return windowStart, time.Time{}, nil, false
 	}
-	year := from.Year()
-	for cal.Covers(year+1) && time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC).Before(windowEnd) {
-		year++
+	first, last := today.Year(), today.Year()
+	for cal.Covers(first - 1) {
+		first--
 	}
-	to = time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
-	if windowEnd.Before(to) {
-		to = windowEnd
+	for cal.Covers(last + 1) {
+		last++
+	}
+	from = windowStart
+	if runStart := time.Date(first, time.January, 1, 0, 0, 0, 0, time.UTC); runStart.After(from) {
+		from = runStart
+	}
+	to = windowEnd
+	if runEnd := time.Date(last, time.December, 31, 0, 0, 0, 0, time.UTC); runEnd.Before(to) {
+		to = runEnd
 	}
 	return from, to, cal.HolidaysBetween(from, to), true
 }
@@ -54,6 +62,8 @@ type Mirror struct {
 	client MirrorClient
 	now    func() time.Time
 	log    *slog.Logger
+	// trigger 讓其他 goroutine 要求立刻推送一次；容量 1，已有待處理的要求時合併。
+	trigger chan struct{}
 }
 
 // NewMirror 建立 Mirror。
@@ -61,7 +71,16 @@ func NewMirror(store Loader, client MirrorClient, now func() time.Time, log *slo
 	if store == nil || client == nil || now == nil || log == nil {
 		panic("bizcalendar: missing mirror dependency")
 	}
-	return &Mirror{store: store, client: client, now: now, log: log}
+	return &Mirror{store: store, client: client, now: now, log: log, trigger: make(chan struct{}, 1)}
+}
+
+// Trigger 要求 Run 的 goroutine 盡快推送一次，不等待也不阻塞；已有待處理的要求時合併成一次。
+// 所有推送都在 Run 的 goroutine 裡串行執行，每次都在送出前才讀行事曆，所以較晚讀到的資料不會被較早讀到的覆蓋。
+func (m *Mirror) Trigger() {
+	select {
+	case m.trigger <- struct{}{}:
+	default:
+	}
 }
 
 // Push 讀出目前的行事曆並推送一次。窗口內沒有涵蓋時什麼都不推（對方保留舊鏡像）並記 warning，不是錯誤。冪等：同一份資料重推結果相同。
@@ -82,7 +101,7 @@ func (m *Mirror) Push(ctx context.Context) error {
 	return nil
 }
 
-// Run 啟動時推一次，之後每 every 對帳推一次，直到 ctx 取消才回傳。失敗只記 log，下一輪重試。
+// Run 啟動時推一次，之後每 every 對帳推一次，並在每次 Trigger 後推一次，直到 ctx 取消才回傳。失敗只記 log，下一輪重試。
 func (m *Mirror) Run(ctx context.Context, every time.Duration) {
 	m.pushLogged(ctx)
 	t := time.NewTicker(every)
@@ -92,6 +111,8 @@ func (m *Mirror) Run(ctx context.Context, every time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			m.pushLogged(ctx)
+		case <-m.trigger:
 			m.pushLogged(ctx)
 		}
 	}

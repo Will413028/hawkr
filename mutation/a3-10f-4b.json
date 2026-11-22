@@ -4,7 +4,7 @@
    "id": "push-to-ignores-imported-years",
    "stack": "go",
    "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tto = time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)\n\tif windowEnd.Before(to) {\n\t\tto = windowEnd\n\t}",
+   "old": "\tto = windowEnd\n\tif runEnd := time.Date(last, time.December, 31, 0, 0, 0, 0, time.UTC); runEnd.Before(to) {\n\t\tto = runEnd\n\t}",
    "new": "\tto = windowEnd",
    "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The pushed coverage always runs to the window end instead of the intersection with the imported years, so a never-imported year is declared covered."
@@ -13,8 +13,8 @@
    "id": "push-skips-year-gap",
    "stack": "go",
    "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tfor cal.Covers(year+1) && time.Date(",
-   "new": "\tfor time.Date(",
+   "old": "\tfor cal.Covers(last + 1) {",
+   "new": "\tfor last < 2100 {",
    "test": "internal/platform/bizcalendar ^TestMirrorBatchStopsAtTheFirstGap$",
    "why": "The window extends across a missing year instead of stopping at the first gap, so the gap year is declared covered."
   },
@@ -22,10 +22,10 @@
    "id": "push-start-year-uncovered-still-pushed",
    "stack": "go",
    "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tif !cal.Covers(from.Year()) {",
-   "new": "\tif !cal.Covers(from.Year()) && false {",
+   "old": "\tif !cal.Covers(today.Year()) {",
+   "new": "\tif !cal.Covers(today.Year()) && false {",
    "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
-   "why": "A window whose start year was never imported is still pushed."
+   "why": "A window whose today's year was never imported is still pushed."
   },
   {
    "id": "push-window-past-29",
@@ -49,28 +49,46 @@
    "id": "import-does-not-push",
    "stack": "go",
    "file": "backend/internal/httpapi/bizcalendar/admin.go",
-   "old": "\th.push(ctx)\n\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
+   "old": "\th.trigger()\n\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
    "new": "\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
    "test": "internal/httpapi/bizcalendar ^TestImportPushesAfterASuccessfulImport$",
    "why": "A successful import no longer pushes the calendar to invoice-service."
-  },
-  {
-   "id": "import-fails-when-push-fails",
-   "stack": "go",
-   "file": "backend/internal/httpapi/bizcalendar/admin.go",
-   "old": "\th.push(ctx)\n\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
-   "new": "\tif h.pusher != nil {\n\t\tif err := h.pusher.Push(ctx); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
-   "test": "internal/httpapi/bizcalendar ^TestImportSucceedsWhenThePushFails$",
-   "why": "A push failure fails the import although the data is already committed and owned by the monolith."
   },
   {
    "id": "import-pushes-after-failed-import",
    "stack": "go",
    "file": "backend/internal/httpapi/bizcalendar/admin.go",
    "old": "\tres, err := h.src.Import(ctx, adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, int(req.Msg.GetYear()), req.Msg.GetCsvContent())\n\tif err != nil {\n\t\treturn nil, err\n\t}",
-   "new": "\tres, err := h.src.Import(ctx, adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, int(req.Msg.GetYear()), req.Msg.GetCsvContent())\n\tif err != nil {\n\t\th.push(ctx)\n\t\treturn nil, err\n\t}",
+   "new": "\tres, err := h.src.Import(ctx, adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, int(req.Msg.GetYear()), req.Msg.GetCsvContent())\n\tif err != nil {\n\t\th.trigger()\n\t\treturn nil, err\n\t}",
    "test": "internal/httpapi/bizcalendar ^TestImportDoesNotPushWhenTheImportFails$",
    "why": "A failed import still triggers a push."
+  },
+  {
+   "id": "push-run-start-ignores-first-year",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "old": "runStart.After(from)",
+   "new": "false",
+   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The start is always the window start, so a window start in a never-imported year is declared covered."
+  },
+  {
+   "id": "trigger-blocks",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "old": "\tselect {\n\tcase m.trigger <- struct{}{}:\n\tdefault:\n\t}",
+   "new": "\tm.trigger <- struct{}{}",
+   "test": "internal/platform/bizcalendar ^TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests$",
+   "why": "Trigger blocks when a request is already pending instead of coalescing."
+  },
+  {
+   "id": "run-ignores-trigger",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "old": "\t\tcase <-m.trigger:\n\t\t\tm.pushLogged(ctx)\n",
+   "new": "\t\tcase <-m.trigger:\n",
+   "test": "internal/platform/bizcalendar ^TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests$",
+   "why": "A trigger is consumed without pushing."
   }
  ]
 }

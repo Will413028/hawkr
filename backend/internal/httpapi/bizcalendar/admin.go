@@ -3,7 +3,6 @@ package bizcalendar
 
 import (
 	"context"
-	"log/slog"
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/type/date"
@@ -21,27 +20,26 @@ type Source interface {
 	Load(ctx context.Context) (*bizcalendar.Calendar, error)
 }
 
-// Pusher 把目前的行事曆推給 invoice-service（*bizcalendar.Mirror）。
+// Pusher 要求把目前的行事曆推給 invoice-service（*bizcalendar.Mirror）；Trigger 不等待推送完成。
 type Pusher interface {
-	Push(ctx context.Context) error
+	Trigger()
 }
 
 // Admin 實作 BizCalendarAdminService。授權（只有管理員、各方法的權限）由 rpc 的 interceptor 與 adminauth 的宣告表檢查。
 type Admin struct {
 	src    Source
 	pusher Pusher
-	log    *slog.Logger
 }
 
 var _ bizcalendarv1alpha1connect.BizCalendarAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。
-func NewAdmin(src Source) *Admin { return &Admin{src: src, log: slog.New(slog.DiscardHandler)} }
+func NewAdmin(src Source) *Admin { return &Admin{src: src} }
 
 // WithMirror 讓每次匯入成功後把行事曆推給 invoice-service。推送放在這一層而不在 platform 的 Import 裡：Import 的 transaction 只管資料與後台紀錄，
 // 對舊服務的呼叫是遷移期的組裝，隨 A5 一起刪掉時不碰 platform。
-func (h *Admin) WithMirror(p Pusher, log *slog.Logger) *Admin {
-	h.pusher, h.log = p, log
+func (h *Admin) WithMirror(p Pusher) *Admin {
+	h.pusher = p
 	return h
 }
 
@@ -55,7 +53,7 @@ func (h *Admin) ImportHolidayCalendar(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	h.push(ctx)
+	h.trigger()
 	return connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{
 		Year:             &adminpb.HolidayCalendarYear{Year: req.Msg.GetYear(), DayCount: int32(res.DayCount), HolidayCount: int32(res.HolidayCount)}, //nolint:gosec // 一年最多 366 天
 		ReplacedDayCount: int32(res.ReplacedDayCount),                                                                                                 //nolint:gosec // 同上
@@ -78,13 +76,10 @@ func (h *Admin) GetHolidayCalendarCoverage(ctx context.Context, _ *connect.Reque
 	return connect.NewResponse(out), nil
 }
 
-// push 在匯入已提交之後推送。資料的擁有者是這裡，推送失敗不讓匯入失敗：只記 log，下一次每日對帳重送。
-// 用 WithoutCancel：操作者關掉頁面不該中斷已經開始的推送。
-func (h *Admin) push(ctx context.Context) {
-	if h.pusher == nil {
-		return
-	}
-	if err := h.pusher.Push(context.WithoutCancel(ctx)); err != nil {
-		h.log.Error("匯入後推送行事曆給 invoice-service 失敗，等每日對帳重送", "error", err)
+// trigger 在匯入已提交之後要求推送。推送由 Mirror 的 goroutine 串行執行，這裡不等它；
+// 失敗只記在 Mirror 的 log，下一次每日對帳重送。
+func (h *Admin) trigger() {
+	if h.pusher != nil {
+		h.pusher.Trigger()
 	}
 }
