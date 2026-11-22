@@ -273,7 +273,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  void _onChatEvent(chat_pb.ChatEvent event) {
+  Future<void> _onChatEvent(chat_pb.ChatEvent event) async {
     if (event.whichEvent() != chat_pb.ChatEvent_Event.message) return;
     final msg = event.message.message;
     // 只通知店家新寄來的訊息：自己發的、可見度改變的都不通知。
@@ -282,8 +282,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       return;
     }
     // 使用者正在這個對話裡就不彈通知（對話 ID 是推播與串流共同的識別）。
-    final gate = ref.read(activeChatGateProvider);
-    if (gate.conversationId == msg.conversationId) return;
+    final viewing = await activeChatCovers(
+      () => ref.read(activeChatGateProvider),
+      ref.read(chatRepositoryProvider),
+      msg.conversationId,
+    );
+    if (viewing || !mounted) return;
 
     // 震動反饋
     HapticFeedback.mediumImpact();

@@ -21,6 +21,7 @@ import '../../seller/data/store_card_display.dart';
 import '../data/chat_display.dart';
 import '../data/chat_realtime.dart';
 import '../data/chat_repository.dart';
+import '../data/latest_request.dart';
 import 'chat_focus_policy.dart';
 import 'widgets/chat_list_widgets.dart';
 
@@ -54,6 +55,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   List<pb.Conversation> _conversations = const [];
   StreamSubscription<pb.ChatEvent>? _eventSub;
   Timer? _refreshDebounce;
+  final _latestRefresh = LatestRequest();
   // keepAlive provider，於 initState（widget 存活期）capture 一次；dispose() 改用這個實例呼叫。
   late final ChatRealtime _realtime;
 
@@ -127,10 +129,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       });
     }
     try {
-      final convs = await ref
-          .read(chatRepositoryProvider)
-          .listAllConversations();
-      if (!mounted) return;
+      final result = await _latestRefresh.run(
+        ref.read(chatRepositoryProvider).listAllConversations,
+      );
+      if (!mounted || result.superseded) return;
+      final convs = result.value!;
       setState(() {
         _conversations = convs;
         _loading = false;

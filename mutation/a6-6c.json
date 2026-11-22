@@ -386,6 +386,96 @@
    "new": "    default:\n      return '';\n  }\n}\n\n/// 對話列表",
    "test": "test/features/chat/chat_display_test.dart 訊息文字：文字、已隱藏、已抹除、不認得的種類取共用文案目錄，圖片回 null",
    "why": "不認得的訊息種類顯示成空白"
+  },
+  {
+   "id": "load-older-queues-concurrent-calls",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "    if (_loadingOlder) return Future.value(state.hasMoreOlder);\n",
+   "new": "",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 載入更舊同時被叫很多次：只讀一頁，不排隊",
+   "why": "往上捲時每次捲動都排一次載入更舊"
+  },
+  {
+   "id": "own-send-advances-past-hole",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      if (hole) {",
+   "new": "      if (false) {",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 自己送的訊息 seq 跳過別人的訊息：先補洞，游標不越過空洞",
+   "why": "自己的訊息跳過別人的訊息時不補洞，游標被推過空洞"
+  },
+  {
+   "id": "old-updated-event-becomes-first-message",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "    if (state.messages.isNotEmpty && m.seq < state.messages.first.seq) return;\n",
+   "new": "",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 比已載入視窗更舊的 updated 事件不放進來，載入更舊仍連續",
+   "why": "比視窗更舊的事件變成第一則，載入更舊跳過中間"
+  },
+  {
+   "id": "events-during-load-dropped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      _missedWhileLoading = true;\n",
+   "new": "",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 載入期間收到的事件不丟：載入完成後補一次",
+   "why": "載入期間的事件丟掉，載入完成後不補"
+  },
+  {
+   "id": "mark-read-while-hidden",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "!_viewing || ",
+   "new": "",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 畫面不可見時不自動標記已讀，回到可見才補標記",
+   "why": "App 在背景或路由被蓋住時仍自動標記已讀"
+  },
+  {
+   "id": "realtime-normal-close-before-ready-tight-loop",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "case _End.ended when result.sawReady:",
+   "new": "case _End.ended when true:",
+   "test": "test/features/chat/chat_realtime_test.dart 還沒 Ready 就正常結束：算失敗，以 backoff 重連，不是緊密迴圈",
+   "why": "還沒 Ready 就結束時立即重連，沒有 backoff"
+  },
+  {
+   "id": "realtime-session-reset-keeps-state",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "    _cursors.clear();\n    _unread.add(0);\n",
+   "new": "",
+   "test": "test/features/chat/chat_realtime_test.dart session 換了：清掉 cursors 與未讀數，以空 cursors 重連",
+   "why": "換帳號後留著上一個帳號的 cursors 與未讀數"
+  },
+  {
+   "id": "latest-request-applies-stale",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/latest_request.dart",
+   "old": "superseded: ticket != _issued, value: value",
+   "new": "superseded: false, value: value",
+   "test": "test/features/chat/latest_request_test.dart 較早發出、較晚回來的結果被標為過時，不蓋掉較新的",
+   "why": "較早發出的對話列表重取蓋掉較新的"
+  },
+  {
+   "id": "banner-gate-ignores-store-match",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/active_chat_gate.dart",
+   "old": "if (current.conversationId != null || storeId == null) return false;",
+   "new": "if (storeId == null) return false;",
+   "test": "test/features/chat/active_chat_gate_test.dart 開著別的對話或什麼都沒開：不算",
+   "why": "開著別的對話時也用店家比對而誤抑制"
+  },
+  {
+   "id": "banner-gate-store-never-matches",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/active_chat_gate.dart",
+   "old": "return card?.id == storeId;",
+   "new": "return false;",
+   "test": "test/features/chat/active_chat_gate_test.dart 從店面進來還沒有對話 ID：同一家店的對話也算",
+   "why": "只有店家 ID 的聊天室抑制不到同店的橫幅與推播"
   }
  ]
 }

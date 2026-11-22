@@ -5,17 +5,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/transport.dart'
     show Code, ConnectException, ErrorDetail;
+import 'package:hawkr_buyer/core/session/session_model.dart';
+import 'package:hawkr_buyer/core/session/session_provider.dart';
+import 'package:hawkr_buyer/features/chat/data/chat_realtime.dart';
 import 'package:hawkr_buyer/features/chat/data/chat_repository.dart';
 import 'package:hawkr_buyer/features/chat/data/chat_thread_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'chat_fakes.dart';
 
+class _GuestSession extends Session {
+  @override
+  Future<SessionModel?> build() async => null;
+}
+
 const _byConversation = ChatThreadArg(conversationId: 'c1');
 const _byStore = ChatThreadArg(storeId: '7');
 
 ({ProviderContainer container, FakeChatRepository repo}) _setup({
   ChatThreadArg arg = _byConversation,
+  bool viewing = true,
   void Function(FakeChatRepository repo)? seed,
 }) {
   final repo = FakeChatRepository();
@@ -23,10 +32,14 @@ const _byStore = ChatThreadArg(storeId: '7');
   repo.addMessages('c1', [for (var i = 1; i <= 5; i++) chatMessage('c1', i)]);
   seed?.call(repo);
   final container = ProviderContainer(
-    overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    overrides: [
+      chatRepositoryProvider.overrideWithValue(repo),
+      sessionProvider.overrideWith(_GuestSession.new),
+    ],
   );
   addTearDown(container.dispose);
   container.listen(chatThreadProvider(arg), (_, _) {});
+  container.read(chatThreadProvider(arg).notifier).setViewing(viewing);
   return (container: container, repo: repo);
 }
 
@@ -373,5 +386,116 @@ void main() {
       _state(t.container, _byConversation).loadStatus,
       ChatLoadStatus.loaded,
     );
+  });
+
+  ChatThread notifierOf(ProviderContainer c) =>
+      c.read(chatThreadProvider(_byConversation).notifier);
+
+  test('載入更舊同時被叫很多次：只讀一頁，不排隊', () async {
+    final t = _setup();
+    await settle();
+    final notifier = notifierOf(t.container);
+
+    await Future.wait([
+      notifier.loadOlder(),
+      notifier.loadOlder(),
+      notifier.loadOlder(),
+    ]);
+
+    final befores = [
+      for (final c in t.repo.listCalls)
+        if (c.before != null) c.before,
+    ];
+    expect(befores, [Int64(4)]);
+    expect(_seqs(_state(t.container, _byConversation)), [2, 3, 4, 5]);
+    await notifier.loadOlder();
+    expect(_seqs(_state(t.container, _byConversation)), [1, 2, 3, 4, 5]);
+  });
+
+  test('自己送的訊息 seq 跳過別人的訊息：先補洞，游標不越過空洞', () async {
+    final t = _setup();
+    await settle();
+    t.repo.addMessages('c1', [chatMessage('c1', 6), chatMessage('c1', 7)]);
+
+    await notifierOf(t.container).sendText('我的');
+
+    expect(_seqs(_state(t.container, _byConversation)), [4, 5, 6, 7, 8]);
+    expect(t.repo.listCalls.where((c) => c.after == Int64(5)), isNotEmpty);
+    final rt = t.container.read(chatRealtimeProvider);
+    expect(rt.requestCursors()['c1'], Int64(8));
+  });
+
+  test('補洞失敗：送出回報失敗，訊息與游標都停在洞之前', () async {
+    final t = _setup();
+    await settle();
+    t.repo.addMessages('c1', [chatMessage('c1', 6)]);
+    t.repo.listMessagesError = StateError('offline');
+
+    await expectLater(
+      notifierOf(t.container).sendText('我的'),
+      throwsA(isA<StateError>()),
+    );
+
+    final s = _state(t.container, _byConversation);
+    expect(_seqs(s), [4, 5]);
+    expect(s.pending.single.failed, isTrue);
+    expect(
+      t.container.read(chatRealtimeProvider).requestCursors()['c1'],
+      Int64(5),
+    );
+  });
+
+  test('比已載入視窗更舊的 updated 事件不放進來，載入更舊仍連續', () async {
+    final t = _setup();
+    await settle();
+
+    t.repo.lastStream.add(
+      messageEvent(chatMessage('c1', 1, hidden: true), updated: true),
+    );
+    await settle();
+    expect(_seqs(_state(t.container, _byConversation)), [4, 5]);
+
+    await notifierOf(t.container).loadOlder();
+    expect(_seqs(_state(t.container, _byConversation)), [2, 3, 4, 5]);
+  });
+
+  test('載入期間收到的事件不丟：載入完成後補一次', () async {
+    final hold = Completer<void>();
+    final holdAfter = Completer<void>();
+    final t = _setup(
+      seed: (r) {
+        r.holdConversations = hold;
+        r.holdAfter = holdAfter;
+      },
+    );
+    await settle();
+    t.repo.lastStream.add(messageEvent(chatMessage('c1', 6)));
+    await settle();
+
+    hold.complete();
+    await settle(60);
+    expect(
+      t.repo.listCalls.where((c) => c.after == Int64(5)),
+      isNotEmpty,
+      reason: '載入完成後以 after_seq 補一次',
+    );
+    t.repo.addMessages('c1', [chatMessage('c1', 6)]);
+    holdAfter.complete();
+    await settle(60);
+
+    expect(_seqs(_state(t.container, _byConversation)), [4, 5, 6]);
+  });
+
+  test('畫面不可見時不自動標記已讀，回到可見才補標記', () async {
+    final t = _setup(viewing: false);
+    await settle();
+    t.repo.lastStream.add(messageEvent(chatMessage('c1', 6)));
+    await settle();
+    expect(t.repo.reads, isEmpty);
+
+    notifierOf(t.container).setViewing(true);
+    await settle();
+
+    expect(t.repo.reads.last, ('c1', Int64(6)));
   });
 }

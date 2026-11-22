@@ -144,6 +144,9 @@ class ChatThread extends _$ChatThread {
   StreamSubscription<pb.ChatEvent>? _eventSub;
   Future<void> _tail = Future.value();
   bool _adopting = false;
+  bool _loadingOlder = false;
+  bool _viewing = false;
+  bool _missedWhileLoading = false;
   final _foreignConversations = <String>{};
 
   @override
@@ -231,6 +234,18 @@ class ChatThread extends _$ChatThread {
     );
     ref.read(chatRealtimeProvider).noteSeq(id, state.maxSeq);
     _markReadIfNeeded();
+    if (_missedWhileLoading) {
+      _missedWhileLoading = false;
+      unawaited(_catchUp());
+    }
+  }
+
+  /// 畫面是不是正在給使用者看（App 在前景且這個路由在最上面）。只有這時才自動標記已讀；
+  /// 回到可見時補標記。
+  void setViewing(bool viewing) {
+    if (_viewing == viewing) return;
+    _viewing = viewing;
+    if (viewing) _markReadIfNeeded();
   }
 
   /// 初次載入失敗後的重試。
@@ -246,7 +261,7 @@ class ChatThread extends _$ChatThread {
 
   void _markReadIfNeeded() {
     final id = state.conversationId;
-    if (id == null || state.maxSeq == Int64.ZERO) return;
+    if (!_viewing || id == null || state.maxSeq == Int64.ZERO) return;
     final upto = state.maxSeq;
     unawaited(
       _repo.markRead(id, upto).catchError((Object e) {
@@ -295,18 +310,25 @@ class ChatThread extends _$ChatThread {
       return;
     }
     if (m.conversationId != current) return;
-    if (state.loadStatus != ChatLoadStatus.loaded) return;
-    if (event.updated || state.messages.any((x) => x.seq == m.seq)) {
+    if (state.loadStatus != ChatLoadStatus.loaded) {
+      _missedWhileLoading = true;
+      return;
+    }
+    if (state.messages.any((x) => x.seq == m.seq)) {
       _update((s) => s.copyWith(messages: mergeMessages(s.messages, [m])));
       return;
     }
+    // 比已載入的視窗更舊：不放進來（會變成第一則而讓載入更舊跳過中間），往上捲時由分頁讀到。
+    if (state.messages.isNotEmpty && m.seq < state.messages.first.seq) return;
     if (state.messages.isNotEmpty && m.seq > state.maxSeq + 1) {
       // 序號有缺口：先補洞（補回來的頁含這則訊息）。
       unawaited(_catchUp());
       return;
     }
     _update((s) => s.copyWith(messages: mergeMessages(s.messages, [m])));
-    if (m.sender == pb.ChatParty.CHAT_PARTY_STORE) _markReadIfNeeded();
+    if (m.sender == pb.ChatParty.CHAT_PARTY_STORE && !event.updated) {
+      _markReadIfNeeded();
+    }
   }
 
   /// 開在對話還不存在的串流上，收到某個對話的訊息：確認它是不是這家店的對話，是就載入。
@@ -382,23 +404,28 @@ class ChatThread extends _$ChatThread {
   }
 
   /// 載入更舊的一頁；回傳是否還有更舊的。失敗丟出（不改狀態）。
-  Future<bool> loadOlder() => _serial(() async {
-    final id = state.conversationId;
-    if (id == null || !state.hasMoreOlder || state.messages.isEmpty) {
-      return false;
-    }
-    final page = await _repo.listMessagesBefore(
-      id,
-      beforeSeq: state.messages.first.seq,
-    );
-    _update(
-      (s) => s.copyWith(
-        messages: mergeMessages(s.messages, page.messages),
-        hasMoreOlder: page.hasMore,
-      ),
-    );
-    return state.hasMoreOlder;
-  });
+  Future<bool> loadOlder() {
+    // 已經有一頁在讀就不再排隊：往上捲時捲動事件很密。
+    if (_loadingOlder) return Future.value(state.hasMoreOlder);
+    _loadingOlder = true;
+    return _serial(() async {
+      final id = state.conversationId;
+      if (id == null || !state.hasMoreOlder || state.messages.isEmpty) {
+        return false;
+      }
+      final page = await _repo.listMessagesBefore(
+        id,
+        beforeSeq: state.messages.first.seq,
+      );
+      _update(
+        (s) => s.copyWith(
+          messages: mergeMessages(s.messages, page.messages),
+          hasMoreOlder: page.hasMore,
+        ),
+      );
+      return state.hasMoreOlder;
+    }).whenComplete(() => _loadingOlder = false);
+  }
 
   Future<void> pollPresence() async {
     final id = state.conversationId;
@@ -446,6 +473,14 @@ class ChatThread extends _$ChatThread {
       final sent = id != null
           ? await _repo.sendMessage(id, content)
           : await _repo.sendMessageToStore(arg.storeId!, content);
+      final hole =
+          state.messages.isNotEmpty &&
+          sent.conversationId == state.conversationId &&
+          sent.seq > state.maxSeq + 1;
+      if (hole) {
+        // 自己的訊息跳過了別人的訊息：先從原本的最後一個 seq 補到最新，不把游標推過空洞。
+        await _serial(_fillGap);
+      }
       _update(
         (s) => s.copyWith(
           conversationId: sent.conversationId,
@@ -456,7 +491,7 @@ class ChatThread extends _$ChatThread {
           ],
         ),
       );
-      ref.read(chatRealtimeProvider).noteSeq(sent.conversationId, sent.seq);
+      ref.read(chatRealtimeProvider).noteSeq(sent.conversationId, state.maxSeq);
     } catch (e) {
       final reason = errorReasonOf(e);
       if (reason == ErrorReason.CHAT_BLOCKED ||

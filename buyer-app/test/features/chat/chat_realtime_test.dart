@@ -178,4 +178,49 @@ void main() {
     rt.release();
     expect(rt.currentState, ChatConnectionState.disconnected);
   });
+
+  test('還沒 Ready 就正常結束：算失敗，以 backoff 重連，不是緊密迴圈', () async {
+    final repo = FakeChatRepository();
+    final attempts = <int>[];
+    final rt = ChatRealtime(
+      repo,
+      reconnectDelay: (a) {
+        attempts.add(a);
+        return const Duration(milliseconds: 5);
+      },
+    );
+    addTearDown(rt.dispose);
+
+    rt.acquire();
+    for (var i = 0; i < 3; i++) {
+      await settle();
+      await repo.lastStream.close();
+    }
+    await settle();
+
+    expect(attempts.length, greaterThanOrEqualTo(2));
+    expect(attempts, [for (var i = 0; i < attempts.length; i++) i]);
+  });
+
+  test('session 換了：清掉 cursors 與未讀數，以空 cursors 重連', () async {
+    final repo = FakeChatRepository();
+    final rt = _realtime(repo);
+    addTearDown(rt.dispose);
+    final unread = <int>[];
+    rt.unreadCount.listen(unread.add);
+
+    rt.acquire();
+    await settle();
+    repo.lastStream.add(readyEvent(unread: 4));
+    repo.lastStream.add(messageEvent(chatMessage('a', 3)));
+    await settle();
+
+    rt.resetSession();
+    await settle();
+
+    expect(rt.requestCursors(), isEmpty);
+    expect(unread.last, 0);
+    expect(repo.streams.length, 2);
+    expect(repo.connectCursors.last, isEmpty);
+  });
 }

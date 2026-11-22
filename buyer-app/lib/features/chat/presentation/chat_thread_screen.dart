@@ -191,6 +191,17 @@ class ChatThreadScreen extends HookConsumerWidget {
       showFloatingToast(context, message, isSuccess: false);
     }
 
+    // 只有 App 在前景且這個路由在最上面才自動標記已讀；回到可見時補標記。
+    final lifecycle = useAppLifecycleState();
+    final routeCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    final viewing =
+        routeCurrent &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+    useEffect(() {
+      notifier.setViewing(viewing);
+      return null;
+    }, [viewing]);
+
     // 進入時標記目前的聊天對象，避免橫幅與前景推播重複通知。
     useEffect(() {
       final gate = ref.read(activeChatGateProvider.notifier);

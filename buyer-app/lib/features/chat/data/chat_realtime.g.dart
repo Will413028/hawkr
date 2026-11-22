@@ -48,4 +48,4 @@ final class ChatRealtimeProvider
   }
 }
 
-String _$chatRealtimeHash() => r'89a417eb84c2ad82bc3f66217f9737723609ccc4';
+String _$chatRealtimeHash() => r'94cac1bc9d29ae059080b24389dc97c9fab089a3';

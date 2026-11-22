@@ -8,6 +8,7 @@ import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rxdart/rxdart.dart';
 
+import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import 'chat_repository.dart';
 
@@ -19,6 +20,12 @@ enum ChatConnectionState { disconnected, connecting, connected, reconnecting }
 ChatRealtime chatRealtime(Ref ref) {
   final realtime = ChatRealtime(ref.watch(chatRepositoryProvider));
   ref.onDispose(realtime.dispose);
+  // 換帳號或登出：上一個帳號的 cursors 與未讀數不能留給下一個。
+  ref.listen(sessionProvider, (prev, next) {
+    if ((prev?.value?.userId ?? '') != (next.value?.userId ?? '')) {
+      realtime.resetSession();
+    }
+  });
   return realtime;
 }
 
@@ -95,6 +102,16 @@ class ChatRealtime with WidgetsBindingObserver {
     return {for (final e in entries.skip(start)) e.key: e.value};
   }
 
+  /// session 換了（登入、登出、換帳號）：清掉 cursors 與未讀數，有人在用就以空 cursors 重連。
+  void resetSession() {
+    if (_disposed) return;
+    _cursors.clear();
+    _unread.add(0);
+    if (!isActive) return;
+    _stop();
+    _start();
+  }
+
   void acquire() {
     _refCount++;
     if (_refCount == 1) _start();
@@ -158,9 +175,10 @@ class ChatRealtime with WidgetsBindingObserver {
         case _End.terminal:
           _setState(ChatConnectionState.disconnected);
           return;
-        case _End.ended:
+        case _End.ended when result.sawReady:
           attempt = 0;
           _setState(ChatConnectionState.reconnecting);
+        case _End.ended:
         case _End.failed:
           if (result.sawReady) attempt = 0;
           _setState(ChatConnectionState.reconnecting);

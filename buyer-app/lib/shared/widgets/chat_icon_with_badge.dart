@@ -33,6 +33,7 @@ class ChatIconWithBadge extends ConsumerStatefulWidget {
 class _ChatIconWithBadgeState extends ConsumerState<ChatIconWithBadge> {
   int _unread = 0;
   bool _loading = false;
+  int _epoch = 0;
   StreamSubscription<int>? _unreadSub;
 
   @override
@@ -40,7 +41,21 @@ class _ChatIconWithBadgeState extends ConsumerState<ChatIconWithBadge> {
     super.initState();
     _attach();
     // 訪客登入之後才連：訪客沒有聊天。
-    ref.listenManual(sessionProvider, (_, _) => _attach());
+    ref.listenManual(sessionProvider, (prev, next) {
+      if ((prev?.value?.userId ?? '') != (next.value?.userId ?? '')) {
+        _onSessionChanged();
+      }
+    });
+  }
+
+  void _onSessionChanged() {
+    // 登出或換帳號：上一個帳號的數字不留，換上新帳號時重讀。
+    _epoch++;
+    _loading = false;
+    unawaited(_unreadSub?.cancel());
+    _unreadSub = null;
+    if (mounted) setState(() => _unread = 0);
+    _attach();
   }
 
   bool get _signedIn => hasUsableSession(ref.read(sessionProvider).value);
@@ -60,14 +75,15 @@ class _ChatIconWithBadgeState extends ConsumerState<ChatIconWithBadge> {
     // 訪客沒有聊天：不呼叫（登入後的 service 會把訪客的呼叫當成 session 失效）。
     if (!_signedIn) return;
     _loading = true;
+    final epoch = _epoch;
     try {
       final n = await ref.read(chatRepositoryProvider).getUnreadCount();
-      if (!mounted) return;
+      if (!mounted || epoch != _epoch) return;
       setState(() => _unread = n);
     } catch (_) {
       // 讀取失敗時保留目前的數字；串流連上之後會以 Ready 的值為準。
     } finally {
-      _loading = false;
+      if (epoch == _epoch) _loading = false;
     }
   }
 

@@ -18,6 +18,7 @@ import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/widgets/fcm_debug_overlay.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
 import '../../../chat/data/active_chat_gate.dart';
+import '../../../chat/data/chat_repository.dart';
 import '../../../order/data/after_sale_status_notifier.dart';
 import '../../../order/data/order_status_notifier.dart';
 import '../../presentation/notification_banner.dart';
@@ -197,7 +198,7 @@ class PushNotificationManager {
       if (m.data.containsKey('com.google.firebase.auth')) return;
 
       _recordDebugMessage(m, source: 'onMessage');
-      _handleForegroundMessage(m);
+      unawaited(_handleForegroundMessage(m));
       _inboxController.add(m);
     });
 
@@ -310,7 +311,7 @@ class PushNotificationManager {
   ///
   /// 後端始終在 notification 欄位或 data payload 中提供 title / body，
   /// chat_message 額外 fallback 至 content_preview（向後相容）。
-  void _handleForegroundMessage(RemoteMessage message) {
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
     final data = message.data;
     final type = _notificationType(data);
 
@@ -349,9 +350,14 @@ class PushNotificationManager {
 
       // 使用者已經在這個對話的聊天室裡 → 不再彈前景 banner，避免雙重通知。
       // conversation_id 是 im 模組的對話 ID（與 ChatAppService 的 Conversation.id 同一個）。
-      final gate =
-          _container?.read(activeChatGateProvider) ?? const ActiveChat.empty();
-      if (conversationId.isNotEmpty && gate.conversationId == conversationId) {
+      final container = _container;
+      if (conversationId.isNotEmpty &&
+          container != null &&
+          await activeChatCovers(
+            () => container.read(activeChatGateProvider),
+            container.read(chatRepositoryProvider),
+            conversationId,
+          )) {
         HKLog.logD(
           '[FCM] 跳過 chat_message banner：使用者已在聊天室內 '
           'conversationId=$conversationId',
