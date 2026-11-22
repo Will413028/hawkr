@@ -15,7 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 )
 
-// NewProcessor 組出處理 job 的內容：public 走 PublicProcess；機敏檔案經單體串流上傳（UploadSecure），不經處理 job，
+// NewProcessor 組出處理 job 的內容：public 走 PublicProcess；機敏檔案經單體分段上傳（PutSecureChunk），不經處理 job，
 // 處理 job 遇到 SECURE 列是永久失敗（沒有人該為它排 job）。
 func NewProcessor(store storage.Store) ProcessFunc {
 	return func(ctx context.Context, in ProcessInput) (ProcessResult, error) {

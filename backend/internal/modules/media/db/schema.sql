@@ -22,8 +22,11 @@ CREATE TABLE media.assets (
     size_bytes   BIGINT      NOT NULL,
     state        TEXT        NOT NULL,
     -- 機敏資產的信封加密：包裹 DEK 的 KEK 代號與 wrapped DEK（nonce＋密文＋tag，AAD 是資產 ID 加 kek_id）；公開資產沒有。
+    -- 機敏資產的 object_key 是前綴 secure/<資產 ID>/（不是單一物件），各段的 key 在 media.secure_chunks。
     kek_id       TEXT,
     wrapped_dek  BYTEA,
+    -- 機敏資產的密文是 chunk_count 份獨立的 STREAM 密文（media.secure_chunks 逐段記錄 key）；公開資產沒有。
+    chunk_count  INTEGER,
     created_at   TIMESTAMPTZ NOT NULL,
     updated_at   TIMESTAMPTZ NOT NULL,
     CONSTRAINT assets_object_key_key UNIQUE (object_key),
@@ -33,6 +36,7 @@ CREATE TABLE media.assets (
     CONSTRAINT assets_size_check CHECK (size_bytes >= 0),
     CONSTRAINT assets_kek_id_check CHECK ((visibility = 'SECURE') = (kek_id IS NOT NULL)),
     CONSTRAINT assets_wrapped_dek_check CHECK ((visibility = 'SECURE') = (wrapped_dek IS NOT NULL)),
+    CONSTRAINT assets_chunk_count_check CHECK ((visibility = 'SECURE') = (chunk_count IS NOT NULL) AND (chunk_count IS NULL OR chunk_count > 0)),
     CONSTRAINT assets_object_key_prefix_check CHECK (
         (visibility = 'PUBLIC' AND object_key LIKE 'public/%') OR (visibility = 'SECURE' AND object_key LIKE 'secure/%')
     )
@@ -42,8 +46,9 @@ CREATE INDEX assets_deleting ON media.assets (id) WHERE state = 'DELETING';
 
 -- 暫存上傳：token 與暫存列一對一（B1-D2），只存 token 的雜湊，不存明文。
 -- 狀態機（每個轉換都是條件式 UPDATE，WHERE state=<預期>）：
---   PENDING → UPLOADED → READY | REJECTED → CONFIRMED（secure 的上傳沒有 PENDING：以 UPLOADED 建列，見 internal/upload/secure_upload.go）
---   PENDING、READY、REJECTED 且過期，或 UPLOADED 且過期超過寬限（處理 job 卡住）→ DELETING → DELETED（GC）
+--   PENDING → UPLOADED → READY | REJECTED → CONFIRMED
+--   secure 的分段上傳：UPLOADING（逐段推進 next_index）→ READY（最後一段，同一個 transaction 建資產列）| REJECTED（第 0 段辨認不出）→ CONFIRMED，見 internal/upload/secure_upload.go
+--   PENDING、UPLOADING、READY、REJECTED 且過期，或 UPLOADED 且過期超過寬限（處理 job 卡住）→ DELETING → DELETED（GC）
 -- final_key 在 PENDING → UPLOADED 時產生並記下，處理 job 重試寫同一個 key；asset_id 在 READY 時才有（READY 之前資產列不存在）。
 CREATE TABLE media.staged_uploads (
     id                    UUID        PRIMARY KEY,
@@ -52,15 +57,23 @@ CREATE TABLE media.staged_uploads (
     uploader_admin        BOOLEAN     NOT NULL,
     visibility            TEXT        NOT NULL,
     declared_size         BIGINT      NOT NULL,
-    declared_content_type TEXT        NOT NULL,
+    -- public：宣告的型別；secure：第 0 段依 magic bytes 辨認後才有，之前是 NULL（不用空字串或假值佔位）。
+    declared_content_type TEXT,
     -- 宣告的內容 MD5，標準 base64（預簽 PUT 的 Content-MD5）；只有 public 走預簽，secure 是 NULL。
     declared_md5          TEXT,
     state                 TEXT        NOT NULL,
     reject_reason         TEXT,
-    -- 預簽直傳的暫存 key；secure 經單體串流上傳，沒有暫存物件，是 NULL。
+    -- 預簽直傳的暫存 key；secure 經單體分段上傳，沒有暫存物件，是 NULL。
     tmp_key               TEXT,
     final_key             TEXT,
     asset_id              UUID,
+    -- secure 的分段上傳：預配的資產 ID（最後一段推進時才建資產列，所以不是 FK）、段總數、下一個要收的段序號、
+    -- 包好的 DEK 與 kek_id（資產列建立時從這裡搬過去）；public 全是 NULL。
+    planned_asset_id      UUID,
+    chunk_count           INTEGER,
+    next_index            INTEGER,
+    kek_id                TEXT,
+    wrapped_dek           BYTEA,
     expires_at            TIMESTAMPTZ NOT NULL,
     created_at            TIMESTAMPTZ NOT NULL,
     updated_at            TIMESTAMPTZ NOT NULL,
@@ -72,12 +85,29 @@ CREATE TABLE media.staged_uploads (
     CONSTRAINT staged_uploads_uploader_check CHECK (uploader_id > 0),
     CONSTRAINT staged_uploads_visibility_check CHECK (visibility IN ('PUBLIC', 'SECURE')),
     CONSTRAINT staged_uploads_declared_size_check CHECK (declared_size > 0),
-    CONSTRAINT staged_uploads_declared_content_type_check CHECK (declared_content_type <> ''),
+    CONSTRAINT staged_uploads_declared_content_type_check CHECK (
+        (declared_content_type IS NULL OR declared_content_type <> '')
+        AND (visibility = 'SECURE' OR declared_content_type IS NOT NULL)
+        AND (state NOT IN ('READY', 'CONFIRMED') OR declared_content_type IS NOT NULL)
+    ),
+    CONSTRAINT staged_uploads_planned_asset_id_key UNIQUE (planned_asset_id),
+    CONSTRAINT staged_uploads_chunks_check CHECK (
+        (visibility = 'SECURE') = (planned_asset_id IS NOT NULL)
+        AND (visibility = 'SECURE') = (chunk_count IS NOT NULL)
+        AND (visibility = 'SECURE') = (next_index IS NOT NULL)
+        AND (visibility = 'SECURE') = (kek_id IS NOT NULL)
+        AND (visibility = 'SECURE') = (wrapped_dek IS NOT NULL)
+        AND (chunk_count IS NULL OR chunk_count > 0)
+        AND (next_index IS NULL OR (next_index >= 0 AND next_index <= chunk_count))
+    ),
+    CONSTRAINT staged_uploads_ready_chunks_check CHECK (
+        visibility <> 'SECURE' OR state NOT IN ('READY', 'CONFIRMED') OR next_index = chunk_count
+    ),
     CONSTRAINT staged_uploads_declared_md5_check CHECK (declared_md5 IS NULL OR declared_md5 <> ''),
     CONSTRAINT staged_uploads_tmp_key_check CHECK ((visibility = 'PUBLIC') = (tmp_key IS NOT NULL)),
     CONSTRAINT staged_uploads_md5_visibility_check CHECK ((visibility = 'PUBLIC') = (declared_md5 IS NOT NULL)),
     CONSTRAINT staged_uploads_state_check CHECK (
-        state IN ('PENDING', 'UPLOADED', 'READY', 'REJECTED', 'CONFIRMED', 'DELETING', 'DELETED')
+        state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED', 'CONFIRMED', 'DELETING', 'DELETED')
     ),
     CONSTRAINT staged_uploads_reject_reason_check CHECK (
         reject_reason IS NULL OR reject_reason IN (
@@ -98,6 +128,20 @@ CREATE TABLE media.staged_uploads (
     )
 );
 -- GC 只掃還沒確認的過期列。
-CREATE INDEX staged_uploads_gc ON media.staged_uploads (expires_at) WHERE state IN ('PENDING', 'READY', 'REJECTED');
+CREATE INDEX staged_uploads_gc ON media.staged_uploads (expires_at) WHERE state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED');
 -- 實體刪除只掃 DELETING。
 CREATE INDEX staged_uploads_deleting ON media.staged_uploads (id) WHERE state = 'DELETING';
+-- 金鑰輪替只掃還在上傳中的機敏暫存列。
+CREATE INDEX staged_uploads_uploading_rewrap ON media.staged_uploads (id) WHERE state = 'UPLOADING';
+
+-- 機敏資產的各段：每段是推進成功那次請求寫的物件（B1-D17）。asset_id 是預配的資產 ID，上傳中資產列還不存在，所以不設 FK；
+-- 每次嘗試寫新 key（secure/<資產 ID>/<段序號>/<嘗試 uuid>），輸給並行請求的嘗試沒有列，它的物件由輸家自己刪、或由 GC 依前綴清掉。
+CREATE TABLE media.secure_chunks (
+    asset_id   UUID    NOT NULL,
+    idx        INTEGER NOT NULL,
+    object_key TEXT    NOT NULL,
+    PRIMARY KEY (asset_id, idx),
+    CONSTRAINT secure_chunks_object_key_key UNIQUE (object_key),
+    CONSTRAINT secure_chunks_idx_check CHECK (idx >= 0),
+    CONSTRAINT secure_chunks_object_key_check CHECK (object_key LIKE 'secure/%')
+);

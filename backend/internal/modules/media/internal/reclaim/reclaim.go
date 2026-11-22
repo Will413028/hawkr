@@ -2,7 +2,7 @@
 //
 // 每一列都走三段（單體規則 5）：transaction 內標為 DELETING 並提交 → transaction 外刪物件（不存在視為成功）→
 // 另一個 transaction 標為 DELETED。刪物件失敗時列留在 DELETING，下一輪從頭再試，所以不會有「列已標刪、物件還在卻沒人收」，
-// 也不會有指著不存在物件的有效列（資產先離開 ACTIVE 才刪物件）。GC 只會標記過期、未確認的暫存（PENDING、READY、REJECTED，以及過期超過 model.StuckUploadGrace 仍停在 UPLOADED 的列）；
+// 也不會有指著不存在物件的有效列（資產先離開 ACTIVE 才刪物件）。GC 只會標記過期、未確認的暫存（PENDING、UPLOADING、READY、REJECTED，以及過期超過 model.StuckUploadGrace 仍停在 UPLOADED 的列）；
 // 已確認的資產只由擁有者的 MarkDeleted 刪除。
 package reclaim
 
@@ -190,12 +190,42 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 	return total, errors.Join(errs...)
 }
 
+// deleteSecureObjects 刪機敏資產的所有段物件：secure_chunks 記錄的 key，加上前綴 secure/<資產 ID>/ 下列得出的所有物件
+// （沒推進成功的孤兒嘗試、輸家沒刪掉的物件）。不存在視為成功；任何一個失敗就回錯誤，列留在 DELETING 下一輪重試。
+func (s *Service) deleteSecureObjects(ctx context.Context, assetID uuid.UUID) error {
+	chunks, err := s.q(ctx).ListSecureChunks(ctx, assetID)
+	if err != nil {
+		return fmt.Errorf("media：列出資產 %s 的段：%w", assetID, err)
+	}
+	listed, err := s.d.Store.List(ctx, storage.SecurePrefix(assetID))
+	if err != nil {
+		return fmt.Errorf("media：列出資產 %s 的物件：%w", assetID, err)
+	}
+	keys := slices.Clone(listed)
+	for _, c := range chunks {
+		keys = append(keys, c.ObjectKey)
+	}
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	for _, k := range keys {
+		if err := s.d.Store.Delete(ctx, k); err != nil {
+			return fmt.Errorf("media：刪除資產 %s 的物件 %s：%w", assetID, k, err)
+		}
+	}
+	return nil
+}
+
 func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsRow) error {
+	if r.PlannedAssetID != nil {
+		if err := s.deleteSecureObjects(ctx, *r.PlannedAssetID); err != nil {
+			return fmt.Errorf("media：刪除暫存 %s 的機敏物件：%w", r.ID, err)
+		}
+	}
 	var keys []string
 	if r.TmpKey != nil {
 		keys = append(keys, *r.TmpKey)
 	}
-	if r.FinalKey != nil {
+	if r.FinalKey != nil && r.PlannedAssetID == nil {
 		keys = append(keys, *r.FinalKey)
 	}
 	for _, k := range keys {
@@ -212,7 +242,12 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 }
 
 func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow) error {
-	if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {
+	if model.Visibility(r.Visibility) == model.VisibilitySecure {
+		// 機敏資產的 object_key 是前綴，不是單一物件。
+		if err := s.deleteSecureObjects(ctx, r.ID); err != nil {
+			return err
+		}
+	} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {
 		return fmt.Errorf("media：刪除資產 %s 的物件：%w", r.ID, err)
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {

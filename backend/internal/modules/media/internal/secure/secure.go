@@ -1,9 +1,13 @@
 // Package secure 是機敏檔案的信封加密：內容用 STREAM 分塊 AEAD（AES-256-GCM）加密，每檔一把隨機 DEK，DEK 再以 KEK 包裹存在資產列。
 // 只用標準庫。格式與理由見 ADR 2026-11-22-media-secure-stream-aead.md 與 B1-2c2 的設計。
 //
-// 密文：header（magic 4 位元組、版本 1、段大小 uint32 big-endian、nonce 前綴 7 位元組）後接連續的段；每段是明文（最後一段可短、可空）
-// 的 AES-256-GCM 密文加 16 位元組 tag。nonce ＝ 前綴＋big-endian uint32 段序號＋1 位元組末段旗標，每段的 AAD 是整個 header。
-// 序號與末段旗標都進 nonce，所以段被對調、截斷在段邊界、尾端多出資料都會讓 tag 驗證失敗。
+// 密文格式 v2（B1-D17，不保留 v1 解碼）：一份資產由 count 個獨立的「上傳段」組成，每個上傳段是一份獨立的 STREAM 密文：
+// header（magic 4 位元組、版本 2、AEAD 段大小 uint32 big-endian、這個上傳段自己的隨機 nonce 前綴 7 位元組）後接連續的 AEAD 段；
+// 每個 AEAD 段是明文（最後一段可短）的 AES-256-GCM 密文加 16 位元組 tag。nonce ＝ 前綴＋big-endian uint32 段序號＋1 位元組末段旗標。
+// 每個 AEAD 段的 AAD ＝ header ＋資產 ID（16 位元組）＋上傳段序號（uint32）＋上傳段總數（uint32）。
+// 所以上傳段被對調、刪掉、換成別的資產的上傳段、少了最後一個上傳段都讓 tag 驗證失敗；每次嘗試用新的 nonce 前綴，同一把 DEK 下 nonce 不重用；
+// 上傳段內部的 AEAD 段序號與末段旗標進 nonce，所以段內對調、截斷在段邊界、尾端多出資料同樣失敗。
+// 同一份資產的所有上傳段共用一把 DEK。
 package secure
 
 import (
@@ -15,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"uuid"
 )
 
 const (
@@ -30,7 +35,7 @@ const (
 	KeySize = 32
 
 	noncePrefixSize = 7
-	version         = 1
+	version         = 2
 )
 
 var magic = [4]byte{'H', 'S', 'E', 'C'}
@@ -68,11 +73,34 @@ func segmentNonce(prefix []byte, seq uint32, last bool) []byte {
 	return n
 }
 
-// Encrypt 從 src 讀明文、把密文寫到 dst，回傳明文位元組數。記憶體只佔一段加一個位元組的預讀。
-func Encrypt(dst io.Writer, src io.Reader, dek []byte) (int64, error) {
+// Chunk 指出一個上傳段：它屬於哪份資產、第幾段、資產共幾段；三者都進每個 AEAD 段的 AAD。
+type Chunk struct {
+	Asset uuid.UUID
+	Index uint32
+	Count uint32
+}
+
+func (c Chunk) valid() bool { return c.Count > 0 && c.Index < c.Count }
+
+// aad 是 header ＋資產 ID ＋段序號 ＋段總數。
+func (c Chunk) aad(header []byte) []byte {
+	out := make([]byte, 0, len(header)+16+8)
+	out = append(out, header...)
+	out = append(out, c.Asset[:]...)
+	out = binary.BigEndian.AppendUint32(out, c.Index)
+	out = binary.BigEndian.AppendUint32(out, c.Count)
+	return out
+}
+
+// EncryptChunk 從 src 讀一個上傳段的明文、把密文寫到 dst，回傳明文位元組數。每次呼叫產生新的 nonce 前綴。
+// 記憶體只佔一個 AEAD 段加一個位元組的預讀。
+func EncryptChunk(dst io.Writer, src io.Reader, dek []byte, c Chunk) (int64, error) {
 	aead, err := newGCM(dek)
 	if err != nil {
 		return 0, err
+	}
+	if !c.valid() {
+		return 0, errors.New("secure：上傳段序號或總數不合法")
 	}
 	header := make([]byte, HeaderSize)
 	copy(header, magic[:])
@@ -84,6 +112,7 @@ func Encrypt(dst io.Writer, src io.Reader, dek []byte) (int64, error) {
 	if _, err := dst.Write(header); err != nil {
 		return 0, err
 	}
+	aad := c.aad(header)
 	br := bufio.NewReaderSize(src, SegmentSize+1)
 	buf := make([]byte, SegmentSize)
 	out := make([]byte, 0, SegmentSize+TagSize)
@@ -106,7 +135,7 @@ func Encrypt(dst io.Writer, src io.Reader, dek []byte) (int64, error) {
 				return total, perr
 			}
 		}
-		out = aead.Seal(out[:0], segmentNonce(header[9:], uint32(seq), last), buf[:n], header)
+		out = aead.Seal(out[:0], segmentNonce(header[9:], uint32(seq), last), buf[:n], aad)
 		if _, err := dst.Write(out); err != nil {
 			return total, err
 		}
@@ -122,6 +151,7 @@ type Reader struct {
 	aead    cipher.AEAD
 	br      *bufio.Reader
 	header  []byte
+	aad     []byte
 	segSize int
 	seq     uint64
 	ct      []byte
@@ -131,11 +161,15 @@ type Reader struct {
 	err     error
 }
 
-// NewReader 讀並檢查 header，回傳解密的 Reader；header 不合法（magic、版本、段大小）回 ErrCorrupt。
-func NewReader(src io.Reader, dek []byte) (*Reader, error) {
+// NewChunkReader 讀並檢查一個上傳段的 header，回傳解密的 Reader；header 不合法（magic、版本、段大小）回 ErrCorrupt。
+// c 必須是這個上傳段寫入時的資產、序號與總數，否則第一個 AEAD 段就驗證失敗。
+func NewChunkReader(src io.Reader, dek []byte, c Chunk) (*Reader, error) {
 	aead, err := newGCM(dek)
 	if err != nil {
 		return nil, err
+	}
+	if !c.valid() {
+		return nil, ErrCorrupt
 	}
 	header := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(src, header); err != nil {
@@ -149,7 +183,7 @@ func NewReader(src io.Reader, dek []byte) (*Reader, error) {
 		return nil, ErrCorrupt
 	}
 	return &Reader{
-		aead: aead, br: bufio.NewReaderSize(src, int(seg)+TagSize+1), header: header, segSize: int(seg),
+		aead: aead, br: bufio.NewReaderSize(src, int(seg)+TagSize+1), header: header, aad: c.aad(header), segSize: int(seg),
 		ct: make([]byte, int(seg)+TagSize), plain: make([]byte, 0, int(seg)),
 	}, nil
 }
@@ -191,7 +225,7 @@ func (r *Reader) nextSegment() error {
 	if n < TagSize {
 		return ErrCorrupt
 	}
-	pt, err := r.aead.Open(r.plain[:0], segmentNonce(r.header[9:], uint32(r.seq), last), r.ct[:n], r.header)
+	pt, err := r.aead.Open(r.plain[:0], segmentNonce(r.header[9:], uint32(r.seq), last), r.ct[:n], r.aad)
 	if err != nil {
 		return ErrCorrupt
 	}

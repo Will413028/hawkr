@@ -59,6 +59,8 @@ type spyStore struct {
 	// puts 記錄每個 Put 收到的位元組（含失敗的），deleted 記錄每個 Delete 的 key。
 	puts    map[string][]byte
 	deleted []string
+	// afterPut 在 Put 成功之後、回傳之前呼叫（讓測試在「物件已寫、尚未推進」的空檔插入並行請求）。
+	afterPut func(key string)
 }
 
 func newSpyStore() *spyStore {
@@ -108,7 +110,27 @@ func (s *spyStore) Put(ctx context.Context, in storage.PutInput) error {
 		return failPut
 	}
 	in.Body = bytes.NewReader(data)
-	return s.Fake.Put(ctx, in)
+	if err := s.Fake.Put(ctx, in); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	hook := s.afterPut
+	s.mu.Unlock()
+	if hook != nil {
+		hook(in.Key)
+	}
+	return nil
+}
+
+func (s *spyStore) setAfterPut(f func(key string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.afterPut = f
+}
+
+func (s *spyStore) List(ctx context.Context, prefix string) ([]string, error) {
+	s.note(ctx, "List")
+	return s.Fake.List(ctx, prefix)
 }
 
 func (s *spyStore) Delete(ctx context.Context, key string) error {

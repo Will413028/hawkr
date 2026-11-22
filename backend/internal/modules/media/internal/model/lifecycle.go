@@ -25,9 +25,9 @@ const (
 // 否則 GC 可能回收還在處理的列（lifecycle_grace_test.go 斷言這個不等式）。
 const StuckUploadGrace = 3 * time.Hour
 
-// 單次上傳的大小上限（位元組），整個模組只有這一處定義：BeginUpload 拒絕宣告超過的 public 上傳，處理 job 也不讀超過的物件；UploadSecure 以 MaxSecureUploadSize 為讀取上限。
+// 單次上傳的大小上限（位元組），整個模組只有這一處定義：BeginUpload 拒絕宣告超過的 public 上傳，處理 job 也不讀超過的物件；BeginSecureUpload 拒絕宣告超過 MaxSecureUploadSize 的機敏上傳，各段再以實際讀到的位元組數核對。
 // 值取自 Java media-service 的 `hawkr.media.upload.max-image-size-bytes`（application.yml:117，一般圖片 10MB）
-// 與 `max-secure-size-bytes`（application.yml:118，機敏檔案 100MB），Java 在 MediaUploadValidator.java:59-63 以宣告大小套用，Go 版的機敏上傳不收宣告，改以實際讀到的位元組數套用。
+// 與 `max-secure-size-bytes`（application.yml:118，機敏檔案 100MB），Java 在 MediaUploadValidator.java:59-63 以宣告大小套用，Go 版的機敏上傳以宣告的總大小算出段總數，每段再以實際讀到的位元組數核對。
 const (
 	MaxPublicUploadSize int64 = 10 << 20
 	MaxSecureUploadSize int64 = 100 << 20
@@ -59,13 +59,18 @@ const (
 // 滿了就等名額（受 ctx 約束），不回錯誤。
 const PublicPutConcurrency = 2
 
-// 機敏串流上傳的資源界限，與大小上限同在 model：每個進行中的 UploadSecure 佔一個最大約 MaxSecureUploadSize 的密文暫存檔與一條連線，
-// 所以同時進行的數量有上限（磁碟預算約 4 x 100 MiB），client 上傳（UploadSecure）滿了立即回 ResourceExhausted、不排隊，伺服器內部的 PutSecure 滿了等名額（受 ctx 約束）；寫入物件儲存的時限也明確。
-const (
-	SecureUploadConcurrency = 4
-)
+// SecureChunkSize 是機敏上傳每一段的明文大小，整個後端唯一的定義（B1-D17）：由 BeginSecureUpload 回給 client，client 不寫死。
+// 4 MiB 在約 512 kbit/s 上行下約 66 秒完成，低於 Vercel 外部 rewrite 的 120 秒；它是 secure.SegmentSize 的倍數（secure 的測試斷言）。
+// 除最後一段外每段剛好這個大小，最後一段是 1 到這個大小的餘數。
+const SecureChunkSize = 4 << 20
 
-// 直接寫入（UploadSecure、PutSecure、PutPublic）的時限：DirectPutTimeout 是寫入物件儲存的時間上限；
+// SecureUploadConcurrency 是同時處理中的機敏段數（PutSecureChunk 與 PutSecure 內部切的段共用），整個模組只有這一處定義。
+// 沒有本機暫存檔、沒有整檔緩衝：一段在途佔記憶體約 SecureChunkSize 的密文緩衝（含每 64 KiB 段的 16 位元組 tag 與 header，約 4.1 MiB）
+// 加一個 secure.SegmentSize 的明文與密文緩衝與讀取預讀（約 0.2 MiB），取 4.5 MiB 估算；16 段在途約 72 MiB。
+// client 上傳（PutSecureChunk）滿了立即回 ResourceExhausted、不排隊，伺服器內部的 PutSecure 滿了等名額（受 ctx 約束）。
+const SecureUploadConcurrency = 16
+
+// 寫入物件儲存的時限（機敏的每一段、PutPublic）：DirectPutTimeout 是寫入物件儲存的時間上限；
 // DirectAbortTimeout 是失敗收尾（轉 REJECTED 與刪物件）的時間上限，收尾不受 ctx 取消影響，所以必須自己有時限，否則儲存卡住時永久佔一個名額。
 const (
 	DirectPutTimeout   = 5 * time.Minute
@@ -94,6 +99,8 @@ type UploadState string
 const (
 	// StatePending：已發預簽網址，client 還沒回報完成。
 	StatePending UploadState = "PENDING"
+	// StateUploading：機敏分段上傳進行中，next_index 記下一個要收的段序號。
+	StateUploading UploadState = "UPLOADING"
 	// StateUploaded：client 回報完成，處理 job 進行中。
 	StateUploaded UploadState = "UPLOADED"
 	// StateReady：處理完成、資產列已建立，等擁有者確認。

@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 )
@@ -259,5 +261,41 @@ func TestFake(t *testing.T) {
 	}
 	if err := f.Delete(ctx, "a"); err != nil || len(f.Keys()) != 0 {
 		t.Fatalf("delete: %v %v", err, f.Keys())
+	}
+}
+
+func TestSecureChunkKeys(t *testing.T) {
+	asset := uuid.New()
+	if got, want := SecurePrefix(asset), "secure/"+asset.String()+"/"; got != want {
+		t.Fatalf("SecurePrefix = %q，預期 %q", got, want)
+	}
+	seen := map[string]bool{}
+	for index := range 3 {
+		for range 20 {
+			k := NewSecureChunkKey(asset, index)
+			rest, ok := strings.CutPrefix(k, SecurePrefix(asset))
+			idx, attempt, cut := strings.Cut(rest, "/")
+			if !ok || !cut || idx != string(rune('0'+index)) || !uuidV4.MatchString(attempt) || seen[k] {
+				t.Fatalf("key %q（段 %d）", k, index)
+			}
+			seen[k] = true
+		}
+	}
+}
+
+func TestFakeList(t *testing.T) {
+	ctx := context.Background()
+	f := NewFake()
+	for _, k := range []string{"secure/a/1/x", "secure/a/0/y", "secure/b/0/z", "public/q"} {
+		if err := f.Put(ctx, PutInput{Key: k, Body: strings.NewReader("x"), Size: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := f.List(ctx, "secure/a/")
+	if err != nil || !slices.Equal(got, []string{"secure/a/0/y", "secure/a/1/x"}) {
+		t.Fatalf("List = %v, %v", got, err)
+	}
+	if none, err := f.List(ctx, "secure/none/"); err != nil || none == nil || len(none) != 0 {
+		t.Fatalf("沒有符合的應回空 slice：%v %v", none, err)
 	}
 }

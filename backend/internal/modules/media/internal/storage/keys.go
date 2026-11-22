@@ -3,6 +3,9 @@ package storage
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"strconv"
+	"strings"
+	"uuid"
 )
 
 // Prefix 是 object key 的第一段。
@@ -27,4 +30,14 @@ func NewKey(p Prefix) string {
 	var h [32]byte
 	hex.Encode(h[:], b[:])
 	return string(p) + "/" + string(h[0:8]) + "-" + string(h[8:12]) + "-" + string(h[12:16]) + "-" + string(h[16:20]) + "-" + string(h[20:32])
+}
+
+// SecurePrefix 回傳機敏資產所有段物件共用的前綴 `secure/<資產 ID>/`；資產列的 object_key 就是它，GC 與實體刪除依它列出物件。
+func SecurePrefix(assetID uuid.UUID) string {
+	return string(PrefixSecure) + "/" + assetID.String() + "/"
+}
+
+// NewSecureChunkKey 回傳 `secure/<資產 ID>/<段序號>/<嘗試 uuid v4>`：每次嘗試寫新的 key，不同嘗試不會互相覆蓋。
+func NewSecureChunkKey(assetID uuid.UUID, index int) string {
+	return SecurePrefix(assetID) + strconv.Itoa(index) + "/" + strings.TrimPrefix(NewKey(PrefixSecure), string(PrefixSecure)+"/")
 }

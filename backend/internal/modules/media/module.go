@@ -40,10 +40,14 @@ type (
 	UploadState = model.UploadState
 	// RejectReason 是暫存上傳被拒絕的原因代碼。
 	RejectReason = model.RejectReason
-	// BeginInput 是 BeginUpload 的宣告（只給 public；機敏檔案走 UploadSecure）。
+	// BeginInput 是 BeginUpload 的宣告（只給 public；機敏檔案走 BeginSecureUpload 與 PutSecureChunk）。
 	BeginInput = upload.BeginInput
-	// SecureUploadResult 是 UploadSecure 的結果：token、辨認出的型別、明文大小與期限；資產 ID 不回給上傳者。
+	// SecureUploadResult 是機敏上傳完成的結果（PutSecure）：token、辨認出的型別、明文大小與期限；資產 ID 不回給上傳者。
 	SecureUploadResult = upload.SecureResult
+	// SecureBeginResult 是 BeginSecureUpload 的結果：token、段大小、段總數與期限。
+	SecureBeginResult = upload.SecureBeginResult
+	// SecureChunkResult 是 PutSecureChunk 推進一段的結果：下一個要送的序號、是否完成。
+	SecureChunkResult = upload.SecureChunkResult
 	// PutPublicResult 是 PutPublic 的結果：token、重新編碼後的型別與大小、期限。
 	PutPublicResult = upload.PublicPutResult
 	// Keyring 是機敏資產的 KEK 金鑰環，由組裝點以 ParseKeyring 建立。
@@ -71,6 +75,7 @@ const (
 	VisibilitySecure = model.VisibilitySecure
 
 	UploadPending   = model.StatePending
+	UploadUploading = model.StateUploading
 	UploadUploaded  = model.StateUploaded
 	UploadReady     = model.StateReady
 	UploadRejected  = model.StateRejected
@@ -96,8 +101,10 @@ const (
 	// ProcessMaxAttempts 是處理 job 的重試上限。
 	ProcessMaxAttempts = upload.MaxAttempts
 
-	// MaxSecureUploadSize 是單次機敏上傳的明文大小上限；SecureUploadConcurrency 與 SecureUploadTimeout 是直接寫入的資源界限。
+	// MaxSecureUploadSize 是單次機敏上傳的明文大小上限；SecureChunkSize 是每段的大小（整個後端唯一的定義，由 BeginSecureUpload 回給 client）；
+	// SecureUploadConcurrency 是同時處理中的段數，SecureUploadTimeout 是寫入一段的時限。
 	MaxSecureUploadSize     = model.MaxSecureUploadSize
+	SecureChunkSize         = model.SecureChunkSize
 	SecureUploadConcurrency = model.SecureUploadConcurrency
 	SecureUploadTimeout     = model.DirectPutTimeout
 )
@@ -112,7 +119,7 @@ func Queues() map[string]int { return map[string]int{ProcessQueue: ProcessQueueW
 var (
 	// ErrInTransaction：會碰物件儲存的呼叫，ctx 卻帶著 DB transaction。
 	ErrInTransaction = model.ErrInTransaction
-	// ErrNoKeyring：模組沒有 KEK 金鑰環，UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 拒絕執行且不寫任何物件。
+	// ErrNoKeyring：模組沒有 KEK 金鑰環，BeginSecureUpload、PutSecureChunk、PutSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 拒絕執行且不寫任何物件。
 	ErrNoKeyring = model.ErrNoKeyring
 	// ErrNoTransaction：Confirm、MarkDeleted 必須在擁有者的 transaction 內呼叫。
 	ErrNoTransaction = model.ErrNoTransaction
@@ -134,7 +141,7 @@ type Deps struct {
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
 	Logger *slog.Logger
-	// Keyring 是 KEK 金鑰環；nil 時 UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 回 ErrNoKeyring、不寫任何物件。
+	// Keyring 是 KEK 金鑰環；nil 時 BeginSecureUpload、PutSecureChunk、PutSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 回 ErrNoKeyring、不寫任何物件。
 	Keyring *Keyring
 }
 
@@ -165,14 +172,23 @@ func (m *Module) BeginUpload(ctx context.Context, uploader Uploader, in BeginInp
 	return m.upload.Begin(ctx, uploader, in)
 }
 
-// UploadSecure 在請求內辨認 PDF 或圖片、邊讀邊加密（STREAM 分塊 AEAD、每檔隨機 DEK 以 KEK 包裹）寫入 secure/，成功後建資產列與 READY 的暫存列並回 token。
-// 大小與型別都不收宣告：超過 MaxSecureUploadSize、空內容與辨認不出的型別回 InvalidInput 且不寫任何物件；同時進行超過
-// SecureUploadConcurrency 立即回 ResourceExhausted。沒有 keyring 回 ErrNoKeyring。不得在 transaction 內呼叫。
-func (m *Module) UploadSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
-	return m.upload.UploadSecure(ctx, uploader, body)
+// BeginSecureUpload 開一個機敏分段上傳會話（B1-D17）：size 是明文總位元組數，在 1 到 MaxSecureUploadSize 之間，否則 InvalidInput。
+// 回傳 token、段大小（SecureChunkSize，client 不寫死）與段總數；client 依序從第 0 段送。不寫任何物件。沒有 keyring 回 ErrNoKeyring。
+// 不得在 transaction 內呼叫。
+func (m *Module) BeginSecureUpload(ctx context.Context, uploader Uploader, size int64) (SecureBeginResult, error) {
+	return m.upload.BeginSecureUpload(ctx, uploader, size)
 }
 
-// PutSecure 是模組內部的機敏直接寫入：出貨單等由伺服器產生的 PDF 或圖片走這裡，管線與 UploadSecure 相同（magic bytes 辨認、STREAM 加密、不寫明文）。
+// PutSecureChunk 收機敏上傳的一段（body 恰好 length 位元組）：只收上傳者本人（非本人與不存在同一個 NotFound）、未過期、UPLOADING 的會話。
+// index 不等於下一段回 FailedPrecondition，metadata `next_index` 是下一個要送的序號（client 依它續傳）；length 與實際讀到的位元組數必須等於該段應有的長度，
+// 否則 InvalidInput；第 0 段依 magic bytes 辨認 PDF 或圖片，辨認不出會話轉 REJECTED 並回 InvalidInput、不寫物件。每段獨立加密後寫成新 key 的物件，
+// 最後一段推進時建資產列並轉 READY（之後擁有者憑 token Confirm）。同時處理中的段超過 SecureUploadConcurrency 立即回 ResourceExhausted。
+// 不得在 transaction 內呼叫。
+func (m *Module) PutSecureChunk(ctx context.Context, uploader Uploader, token string, index int, body io.Reader, length int64) (SecureChunkResult, error) {
+	return m.upload.PutSecureChunk(ctx, uploader, token, index, body, length)
+}
+
+// PutSecure 是模組內部的機敏直接寫入：出貨單等由伺服器產生的 PDF 或圖片走這裡，同一個分段密文格式（讀完 body 定下段總數，依 SecureChunkSize 切段依序推進；magic bytes 辨認、加密、不寫明文），body 以實際位元組數套用 MaxSecureUploadSize 上限。
 // 回傳暫存 token；擁有者在自己的 transaction 內以 Uploader 為 uploader 呼叫 Confirm，未確認的由 GC 回收。不得在 transaction 內呼叫。
 // 滿了等名額（受 ctx 約束，ctx 結束回 ctx 的錯誤），不回 ResourceExhausted。
 func (m *Module) PutSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {

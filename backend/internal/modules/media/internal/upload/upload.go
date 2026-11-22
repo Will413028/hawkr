@@ -49,7 +49,7 @@ type Deps struct {
 // Service 是暫存上傳的服務。
 type Service struct {
 	d Deps
-	// secureSlots 限制同時進行的 UploadSecure 與 PutSecure（model.SecureUploadConcurrency）。
+	// secureSlots 限制同時處理中的機敏段（PutSecureChunk 與 PutSecure 內部切的段，model.SecureUploadConcurrency）。
 	secureSlots chan struct{}
 	// publicSlots 限制同時在請求內解碼的 PutPublic（model.PublicPutConcurrency）。
 	publicSlots chan struct{}
@@ -75,7 +75,7 @@ func New(d Deps) *Service {
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// BeginInput 是 BeginUpload 的宣告；預簽 PUT 的簽章綁這些值。預簽直傳只給 public，機敏檔案走 UploadSecure。
+// BeginInput 是 BeginUpload 的宣告；預簽 PUT 的簽章綁這些值。預簽直傳只給 public，機敏檔案走 BeginSecureUpload 與 PutSecureChunk。
 type BeginInput struct {
 	Size        int64
 	ContentType string
@@ -310,7 +310,7 @@ func notConfirmable(ctx context.Context, row store.MediaStagedUpload, now time.T
 			return apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 		}
 		return apperr.FailedPrecondition("%s", text.MediaUploadProcessing(loc(ctx)))
-	case model.StatePending, model.StateUploaded, model.StateConfirmed:
+	case model.StatePending, model.StateUploading, model.StateUploaded, model.StateConfirmed:
 		return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))
 	}
 	return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))

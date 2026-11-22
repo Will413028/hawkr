@@ -167,6 +167,25 @@ func (s *S3) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// List 實作 Store：ListObjectsV2 依 continuation token 分頁取完。
+func (s *S3) List(ctx context.Context, prefix string) ([]string, error) {
+	if prefix == "" {
+		return nil, errors.New("storage: empty prefix")
+	}
+	keys := []string{}
+	pager := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{Bucket: aws.String(s.bucket), Prefix: aws.String(prefix)})
+	for pager.HasMorePages() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("storage: list: %w", err)
+		}
+		for _, o := range page.Contents {
+			keys = append(keys, aws.ToString(o.Key))
+		}
+	}
+	return keys, nil
+}
+
 func remainingLen(r io.ReadSeeker) (int64, error) {
 	cur, err := r.Seek(0, io.SeekCurrent)
 	if err != nil {

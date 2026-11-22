@@ -6,6 +6,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -53,5 +55,47 @@ func TestCapReader_FailsOncePastTheLimit(t *testing.T) {
 	}
 	if got := apperr.KindOf(secureReadErr(errTooLarge)); got != apperr.KindInvalidInput {
 		t.Fatalf("超過上限的分類 %v", got)
+	}
+}
+
+func TestSecureChunkSizeIsAMultipleOfTheAEADSegmentAndFitsTheUploadCeiling(t *testing.T) {
+	if model.SecureChunkSize%secure.SegmentSize != 0 {
+		t.Fatalf("SecureChunkSize %d 不是 secure.SegmentSize %d 的倍數", model.SecureChunkSize, secure.SegmentSize)
+	}
+	if model.SecureChunkSize != 4<<20 || model.MaxSecureUploadSize%model.SecureChunkSize != 0 {
+		t.Fatalf("SecureChunkSize=%d MaxSecureUploadSize=%d", model.SecureChunkSize, model.MaxSecureUploadSize)
+	}
+}
+
+func TestSecureChunkCountAndLength(t *testing.T) {
+	const c = model.SecureChunkSize
+	for _, tc := range []struct {
+		size    int64
+		count   int
+		lengths []int64
+	}{
+		{1, 1, []int64{1}},
+		{c, 1, []int64{c}},
+		{c + 1, 2, []int64{c, 1}},
+		{2*c + 5, 3, []int64{c, c, 5}},
+		{model.MaxSecureUploadSize, 25, nil},
+	} {
+		if got := secureChunkCount(tc.size); got != tc.count {
+			t.Errorf("size=%d：段數 %d，預期 %d", tc.size, got, tc.count)
+		}
+		var total int64
+		for i := range tc.count {
+			l := secureChunkLength(tc.size, tc.count, i)
+			if l < 1 || l > c || (i < tc.count-1 && l != c) {
+				t.Errorf("size=%d 第 %d 段長度 %d", tc.size, i, l)
+			}
+			if len(tc.lengths) > 0 && l != tc.lengths[i] {
+				t.Errorf("size=%d 第 %d 段長度 %d，預期 %d", tc.size, i, l, tc.lengths[i])
+			}
+			total += l
+		}
+		if total != tc.size {
+			t.Errorf("size=%d：各段加起來 %d", tc.size, total)
+		}
 	}
 }

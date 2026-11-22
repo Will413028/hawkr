@@ -19,8 +19,15 @@ type MediaAsset struct {
 	State       string
 	KekID       *string
 	WrappedDek  []byte
+	ChunkCount  *int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type MediaSecureChunk struct {
+	AssetID   uuid.UUID
+	Idx       int32
+	ObjectKey string
 }
 
 type MediaStagedUpload struct {
@@ -30,13 +37,18 @@ type MediaStagedUpload struct {
 	UploaderAdmin       bool
 	Visibility          string
 	DeclaredSize        int64
-	DeclaredContentType string
+	DeclaredContentType *string
 	DeclaredMd5         *string
 	State               string
 	RejectReason        *string
 	TmpKey              *string
 	FinalKey            *string
 	AssetID             *uuid.UUID
+	PlannedAssetID      *uuid.UUID
+	ChunkCount          *int32
+	NextIndex           *int32
+	KekID               *string
+	WrappedDek          []byte
 	ExpiresAt           time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time

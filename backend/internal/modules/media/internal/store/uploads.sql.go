@@ -12,12 +12,40 @@ import (
 	"uuid"
 )
 
+const advanceSecureUpload = `-- name: AdvanceSecureUpload :execrows
+UPDATE media.staged_uploads
+SET next_index = next_index + 1, declared_content_type = COALESCE(declared_content_type, $1::text), updated_at = $2
+WHERE id = $3 AND state = 'UPLOADING' AND next_index = $4::integer AND expires_at > $2
+`
+
+type AdvanceSecureUploadParams struct {
+	ContentType *string
+	Now         time.Time
+	ID          uuid.UUID
+	ChunkIndex  int32
+}
+
+// 推進一段：只有 next_index 等於這段的序號、仍在 UPLOADING 且未過期的會話才推進（輸給並行的同一段、過期或已被拒就 0 列）。
+// 第 0 段同時記下辨認出的型別。
+func (q *Queries) AdvanceSecureUpload(ctx context.Context, arg AdvanceSecureUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, advanceSecureUpload,
+		arg.ContentType,
+		arg.Now,
+		arg.ID,
+		arg.ChunkIndex,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimExpiredUploads = `-- name: ClaimExpiredUploads :many
 UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = $1
 WHERE id IN (
     SELECT u.id FROM media.staged_uploads AS u
-    WHERE (u.state IN ('PENDING', 'READY', 'REJECTED') AND u.expires_at <= $1)
+    WHERE (u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)
        OR (u.state = 'UPLOADED' AND u.expires_at <= $2)
     ORDER BY u.expires_at, u.id
     LIMIT $3
@@ -36,7 +64,7 @@ type ClaimExpiredUploadsRow struct {
 	AssetID *uuid.UUID
 }
 
-// GC 階段一：過期且未確認（PENDING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
+// GC 階段一：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
 // 轉 DELETING 並回傳，隨 transaction 提交；物件由 transaction 外刪。
 // 條件只在子查詢寫一次，FOR UPDATE 在等到鎖之後會重新檢查它，所以和 MarkUploadConfirmed 同時發生時只有一方成功。
 func (q *Queries) ClaimExpiredUploads(ctx context.Context, arg ClaimExpiredUploadsParams) ([]ClaimExpiredUploadsRow, error) {
@@ -59,8 +87,24 @@ func (q *Queries) ClaimExpiredUploads(ctx context.Context, arg ClaimExpiredUploa
 	return items, nil
 }
 
+const getSecureChunk = `-- name: GetSecureChunk :one
+SELECT asset_id, idx, object_key FROM media.secure_chunks WHERE asset_id = $1 AND idx = $2
+`
+
+type GetSecureChunkParams struct {
+	AssetID uuid.UUID
+	Idx     int32
+}
+
+func (q *Queries) GetSecureChunk(ctx context.Context, arg GetSecureChunkParams) (MediaSecureChunk, error) {
+	row := q.db.QueryRow(ctx, getSecureChunk, arg.AssetID, arg.Idx)
+	var i MediaSecureChunk
+	err := row.Scan(&i.AssetID, &i.Idx, &i.ObjectKey)
+	return i, err
+}
+
 const getUpload = `-- name: GetUpload :one
-SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, expires_at, created_at, updated_at FROM media.staged_uploads WHERE id = $1
+SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE id = $1
 `
 
 func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUpload, error) {
@@ -80,6 +124,11 @@ func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUploa
 		&i.TmpKey,
 		&i.FinalKey,
 		&i.AssetID,
+		&i.PlannedAssetID,
+		&i.ChunkCount,
+		&i.NextIndex,
+		&i.KekID,
+		&i.WrappedDek,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -88,7 +137,7 @@ func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUploa
 }
 
 const getUploadByTokenHash = `-- name: GetUploadByTokenHash :one
-SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, expires_at, created_at, updated_at FROM media.staged_uploads WHERE token_hash = $1
+SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE token_hash = $1
 `
 
 func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (MediaStagedUpload, error) {
@@ -108,6 +157,11 @@ func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (M
 		&i.TmpKey,
 		&i.FinalKey,
 		&i.AssetID,
+		&i.PlannedAssetID,
+		&i.ChunkCount,
+		&i.NextIndex,
+		&i.KekID,
+		&i.WrappedDek,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -115,29 +169,48 @@ func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (M
 	return i, err
 }
 
+const insertSecureChunk = `-- name: InsertSecureChunk :exec
+INSERT INTO media.secure_chunks (asset_id, idx, object_key)
+VALUES ($1, $2, $3)
+`
+
+type InsertSecureChunkParams struct {
+	AssetID   uuid.UUID
+	Idx       int32
+	ObjectKey string
+}
+
+func (q *Queries) InsertSecureChunk(ctx context.Context, arg InsertSecureChunkParams) error {
+	_, err := q.db.Exec(ctx, insertSecureChunk, arg.AssetID, arg.Idx, arg.ObjectKey)
+	return err
+}
+
 const insertSecureUpload = `-- name: InsertSecureUpload :exec
 INSERT INTO media.staged_uploads (
-    id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type,
-    state, final_key, expires_at, created_at, updated_at)
+    id, token_hash, uploader_id, uploader_admin, visibility, declared_size,
+    state, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
 VALUES (
-    $1, $2, $3, $4, 'SECURE',
-    $5, $6,
-    'UPLOADED', $7, $8, $9, $9)
+    $1, $2, $3, $4, 'SECURE', $5,
+    'UPLOADING', $6::uuid, $7::integer, 0, $8::text, $9,
+    $10, $11, $11)
 `
 
 type InsertSecureUploadParams struct {
-	ID                  uuid.UUID
-	TokenHash           []byte
-	UploaderID          int64
-	UploaderAdmin       bool
-	DeclaredSize        int64
-	DeclaredContentType string
-	FinalKey            *string
-	ExpiresAt           time.Time
-	Now                 time.Time
+	ID             uuid.UUID
+	TokenHash      []byte
+	UploaderID     int64
+	UploaderAdmin  bool
+	DeclaredSize   int64
+	PlannedAssetID uuid.UUID
+	ChunkCount     int32
+	KekID          string
+	WrappedDek     []byte
+	ExpiresAt      time.Time
+	Now            time.Time
 }
 
-// 機敏串流上傳：以 UPLOADED 建列（沒有預簽，tmp_key 與 declared_md5 是 NULL），正式 key 同時記下。
+// 機敏分段上傳：以 UPLOADING 建列（沒有預簽，tmp_key、declared_md5、declared_content_type 與 final_key 是 NULL），
+// 預配資產 ID、段總數、next_index 0 與包好的 DEK。
 func (q *Queries) InsertSecureUpload(ctx context.Context, arg InsertSecureUploadParams) error {
 	_, err := q.db.Exec(ctx, insertSecureUpload,
 		arg.ID,
@@ -145,8 +218,10 @@ func (q *Queries) InsertSecureUpload(ctx context.Context, arg InsertSecureUpload
 		arg.UploaderID,
 		arg.UploaderAdmin,
 		arg.DeclaredSize,
-		arg.DeclaredContentType,
-		arg.FinalKey,
+		arg.PlannedAssetID,
+		arg.ChunkCount,
+		arg.KekID,
+		arg.WrappedDek,
 		arg.ExpiresAt,
 		arg.Now,
 	)
@@ -159,7 +234,7 @@ INSERT INTO media.staged_uploads (
     state, tmp_key, expires_at, created_at, updated_at)
 VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8,
+    $6, $7::text, $8,
     'PENDING', $9, $10, $11, $11)
 `
 
@@ -195,7 +270,7 @@ func (q *Queries) InsertUpload(ctx context.Context, arg InsertUploadParams) erro
 }
 
 const listDeletingUploads = `-- name: ListDeletingUploads :many
-SELECT id, tmp_key, final_key, asset_id FROM media.staged_uploads
+SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
 WHERE state = 'DELETING' AND id > $1
 ORDER BY id
 LIMIT $2
@@ -207,10 +282,11 @@ type ListDeletingUploadsParams struct {
 }
 
 type ListDeletingUploadsRow struct {
-	ID       uuid.UUID
-	TmpKey   *string
-	FinalKey *string
-	AssetID  *uuid.UUID
+	ID             uuid.UUID
+	TmpKey         *string
+	FinalKey       *string
+	AssetID        *uuid.UUID
+	PlannedAssetID *uuid.UUID
 }
 
 func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploadsParams) ([]ListDeletingUploadsRow, error) {
@@ -227,6 +303,7 @@ func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploa
 			&i.TmpKey,
 			&i.FinalKey,
 			&i.AssetID,
+			&i.PlannedAssetID,
 		); err != nil {
 			return nil, err
 		}
@@ -236,6 +313,102 @@ func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploa
 		return nil, err
 	}
 	return items, nil
+}
+
+const listSecureChunks = `-- name: ListSecureChunks :many
+SELECT idx, object_key FROM media.secure_chunks WHERE asset_id = $1 ORDER BY idx
+`
+
+type ListSecureChunksRow struct {
+	Idx       int32
+	ObjectKey string
+}
+
+func (q *Queries) ListSecureChunks(ctx context.Context, assetID uuid.UUID) ([]ListSecureChunksRow, error) {
+	rows, err := q.db.Query(ctx, listSecureChunks, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSecureChunksRow{}
+	for rows.Next() {
+		var i ListSecureChunksRow
+		if err := rows.Scan(&i.Idx, &i.ObjectKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUploadsToRewrap = `-- name: ListUploadsToRewrap :many
+SELECT id, planned_asset_id, kek_id, wrapped_dek FROM media.staged_uploads
+WHERE state = 'UPLOADING' AND kek_id <> $1 AND id > $2
+ORDER BY id
+LIMIT $3
+`
+
+type ListUploadsToRewrapParams struct {
+	PrimaryKekID *string
+	AfterID      uuid.UUID
+	MaxRows      int32
+}
+
+type ListUploadsToRewrapRow struct {
+	ID             uuid.UUID
+	PlannedAssetID *uuid.UUID
+	KekID          *string
+	WrappedDek     []byte
+}
+
+// 換 KEK 後重新包裹用：還在上傳中、kek_id 不是 primary 的機敏暫存列（資產列建立前，DEK 只在這裡）。
+func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewrapParams) ([]ListUploadsToRewrapRow, error) {
+	rows, err := q.db.Query(ctx, listUploadsToRewrap, arg.PrimaryKekID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUploadsToRewrapRow{}
+	for rows.Next() {
+		var i ListUploadsToRewrapRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlannedAssetID,
+			&i.KekID,
+			&i.WrappedDek,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markSecureUploadReady = `-- name: MarkSecureUploadReady :execrows
+UPDATE media.staged_uploads
+SET state = 'READY', asset_id = planned_asset_id, final_key = $1, updated_at = $2
+WHERE id = $3 AND state = 'UPLOADING' AND next_index = chunk_count
+`
+
+type MarkSecureUploadReadyParams struct {
+	FinalKey *string
+	Now      time.Time
+	ID       uuid.UUID
+}
+
+// 最後一段推進後（同一個 transaction，資產列已建）：UPLOADING → READY，記資產與前綴。
+func (q *Queries) MarkSecureUploadReady(ctx context.Context, arg MarkSecureUploadReadyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markSecureUploadReady, arg.FinalKey, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markUploadConfirmed = `-- name: MarkUploadConfirmed :one
@@ -333,6 +506,55 @@ type MarkUploadUploadedParams struct {
 // PENDING → UPLOADED；列已過期就不轉。
 func (q *Queries) MarkUploadUploaded(ctx context.Context, arg MarkUploadUploadedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markUploadUploaded, arg.FinalKey, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rejectSecureUploadAtFirstChunk = `-- name: RejectSecureUploadAtFirstChunk :execrows
+UPDATE media.staged_uploads
+SET state = 'REJECTED', reject_reason = $1, updated_at = $2
+WHERE id = $3 AND state = 'UPLOADING' AND next_index = 0
+`
+
+type RejectSecureUploadAtFirstChunkParams struct {
+	Reason *string
+	Now    time.Time
+	ID     uuid.UUID
+}
+
+// 第 0 段辨認不出：只在還沒收任何段（next_index = 0）的 UPLOADING 會話轉 REJECTED。
+func (q *Queries) RejectSecureUploadAtFirstChunk(ctx context.Context, arg RejectSecureUploadAtFirstChunkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rejectSecureUploadAtFirstChunk, arg.Reason, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rewrapUpload = `-- name: RewrapUpload :execrows
+UPDATE media.staged_uploads SET kek_id = $1, wrapped_dek = $2, updated_at = $3
+WHERE id = $4 AND state = 'UPLOADING' AND kek_id = $5
+`
+
+type RewrapUploadParams struct {
+	NewKekID      *string
+	NewWrappedDek []byte
+	Now           time.Time
+	ID            uuid.UUID
+	OldKekID      *string
+}
+
+// 與 RewrapAsset 同理：kek_id 仍是取出時的舊值且還在 UPLOADING 才更新；最後一段的推進會鎖同一列，所以搬到資產列的一定是當時最新的值。
+func (q *Queries) RewrapUpload(ctx context.Context, arg RewrapUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rewrapUpload,
+		arg.NewKekID,
+		arg.NewWrappedDek,
+		arg.Now,
+		arg.ID,
+		arg.OldKekID,
+	)
 	if err != nil {
 		return 0, err
 	}

@@ -61,7 +61,7 @@ func secureServiceWith(t *testing.T, wrap func(*storage.Fake) storage.Store) (*S
 // 最後的 transaction 回錯誤、其實已經提交：abortDirect 看到列是 READY，照成功回傳，而且不刪物件。
 func TestAbortDirect_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testing.T) {
 	svc, d, st := secureService(t)
-	res, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello")))
+	res, err := svc.PutPublic(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader(tinyPNG(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestAbortDirect_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testin
 // 列已經被 GC 標為 DELETING（輸給 GC）：回 FailedPrecondition「已過期」，不刪物件（物件的主人是 GC）。
 func TestAbortDirect_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T) {
 	svc, d, st := secureService(t)
-	if _, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello"))); err != nil {
+	if _, err := svc.PutPublic(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader(tinyPNG(t))); err != nil {
 		t.Fatal(err)
 	}
 	var id uuid.UUID
@@ -137,29 +137,37 @@ func (h *hookStore) Delete(ctx context.Context, key string) error {
 	return h.Fake.Delete(ctx, key)
 }
 
-// 收尾的 Delete 在 WithoutCancel 之後仍帶 deadline，儲存卡住時不會永久佔住名額；ctx 已取消也照樣收尾。
-func TestUploadSecure_AbortDeleteRunsWithADeadlineEvenWhenTheRequestIsCancelled(t *testing.T) {
+// 寫物件失敗時刪自己這次物件的 Delete 在 WithoutCancel 之後仍帶 deadline，儲存卡住時不會永久佔住名額；ctx 已取消也照樣收尾。
+// 失敗的這一段不動會話：仍 UPLOADING、next_index 不變，client 可以重送同一段。
+func TestPutSecureChunk_PutFailureCleanupRunsWithADeadlineEvenWhenTheRequestIsCancelled(t *testing.T) {
 	var hs *hookStore
 	svc, d, _ := secureServiceWith(t, func(f *storage.Fake) storage.Store {
 		hs = &hookStore{Fake: f, putErr: errors.New("r2 掛了")}
 		return hs
 	})
+	data := []byte("%PDF-1.7\nhello")
+	b, err := svc.BeginSecureUpload(t.Context(), model.Uploader{ID: 1001}, int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	hs.onPut = cancel // 暫存列建好之後、Put 時 request 才被取消
-	if _, err := svc.UploadSecure(ctx, model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello"))); err == nil {
+	if _, err := svc.PutSecureChunk(ctx, model.Uploader{ID: 1001}, b.Token, 0, bytes.NewReader(data), int64(len(data))); err == nil {
 		t.Fatal("預期 Put 失敗的錯誤")
 	}
 	if hs.deleteCalls != 1 || !hs.deleteHasDL {
 		t.Fatalf("Delete 呼叫 %d 次、ctx 有 deadline=%v", hs.deleteCalls, hs.deleteHasDL)
 	}
 	var state string
-	if err := d.Pool().QueryRow(t.Context(), `SELECT state FROM media.staged_uploads`).Scan(&state); err != nil || state != "REJECTED" {
-		t.Fatalf("state=%s err=%v", state, err)
+	var next int
+	if err := d.Pool().QueryRow(t.Context(), `SELECT state, next_index FROM media.staged_uploads`).Scan(&state, &next); err != nil || state != "UPLOADING" || next != 0 {
+		t.Fatalf("state=%s next_index=%d err=%v", state, next, err)
 	}
 }
 
-// Put 之後暫存列被 GC 轉成 DELETING，最後的 transaction 的 MarkUploadReady 影響 0 列：UploadSecure 回「已過期」，沒有資產列，物件留給 GC。
-func TestUploadSecure_LastTransactionLosesToGCReturnsExpiredAndLeavesNoAsset(t *testing.T) {
+// Put 之後暫存列被 GC 轉成 DELETING，推進影響 0 列：這一段回「已過期」，沒有資產列與段記錄，自己剛寫的物件被刪（物件不歸 GC，
+// 因為它還沒記進 secure_chunks）。
+func TestPutSecureChunk_LosingToGCReturnsExpiredAndDeletesItsOwnObject(t *testing.T) {
 	var hs *hookStore
 	var d *db.DB
 	svc, d2, st := secureServiceWith(t, func(f *storage.Fake) storage.Store {
@@ -172,15 +180,20 @@ func TestUploadSecure_LastTransactionLosesToGCReturnsExpiredAndLeavesNoAsset(t *
 		return hs
 	})
 	d = d2
-	_, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello")))
+	data := []byte("%PDF-1.7\nhello")
+	b, err := svc.BeginSecureUpload(t.Context(), model.Uploader{ID: 1001}, int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.PutSecureChunk(t.Context(), model.Uploader{ID: 1001}, b.Token, 0, bytes.NewReader(data), int64(len(data)))
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition || errors.Is(err, errLost) {
 		t.Fatalf("err = %v，預期 FailedPrecondition 且不外漏 errLost", err)
 	}
-	var assets int
-	if err := d.Pool().QueryRow(t.Context(), `SELECT count(*) FROM media.assets`).Scan(&assets); err != nil || assets != 0 {
-		t.Fatalf("資產列 %d err=%v，預期 0", assets, err)
+	var assets, chunks int
+	if err := d.Pool().QueryRow(t.Context(), `SELECT (SELECT count(*) FROM media.assets), (SELECT count(*) FROM media.secure_chunks)`).Scan(&assets, &chunks); err != nil || assets != 0 || chunks != 0 {
+		t.Fatalf("資產列 %d、段記錄 %d err=%v，預期都是 0", assets, chunks, err)
 	}
-	if hs.deleteCalls != 0 || len(st.Keys()) != 1 {
-		t.Fatalf("輸給 GC 時不該刪物件：Delete %d 次、物件 %v", hs.deleteCalls, st.Keys())
+	if hs.deleteCalls != 1 || len(st.Keys()) != 0 {
+		t.Fatalf("輸給 GC 時應刪掉自己的物件：Delete %d 次、剩下物件 %v", hs.deleteCalls, st.Keys())
 	}
 }

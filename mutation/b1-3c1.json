@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "aad-no-chunk-index",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/secure/secure.go",
+   "old": "\tout = binary.BigEndian.AppendUint32(out, c.Index)\n",
+   "new": "",
+   "test": "internal/modules/media/internal/secure ^TestChunks_SwappedChunksFailToDecrypt$",
+   "why": "AAD 拿掉上傳段序號：對調的兩段仍驗證通過，被換位置的段讀得出明文"
+  },
+  {
+   "id": "aad-no-chunk-count",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/secure/secure.go",
+   "old": "\tout = binary.BigEndian.AppendUint32(out, c.Count)\n",
+   "new": "",
+   "test": "internal/modules/media/internal/secure ^TestChunks_DroppingTheLastChunkChangesTheCountAndFails$",
+   "why": "AAD 拿掉上傳段總數：少了最後一段（總數改小）或總數被改大仍驗證通過，截斷不會被發現"
+  },
+  {
+   "id": "first-chunk-no-magic-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\t\tif err != nil {\n\t\t\treturn SecureChunkResult{}, s.rejectFirstChunk(ctx, row.ID, err)",
+   "new": "\t\tif false && err != nil {\n\t\t\treturn SecureChunkResult{}, s.rejectFirstChunk(ctx, row.ID, err)",
+   "test": "internal/modules/media ^TestSecureUpload_FirstChunkNotPDFOrImageRejectsSessionAndWritesNoObject$",
+   "why": "拿掉第 0 段的 magic-byte 檢查：宣告 PDF 實為任意位元組的內容不再被拒，會話不轉 REJECTED 且物件被寫入"
+  },
+  {
+   "id": "chunk-no-length-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tif length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(expected)",
+   "new": "\tif false && length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(expected)",
+   "test": "internal/modules/media ^TestSecureUpload_ChunkLengthMismatchIsRejectedWithoutWrites$",
+   "why": "拿掉段長度檢查：宣告的 length 與該段應有長度不符仍被收下"
+  },
+  {
+   "id": "advance-no-next-index-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "WHERE id = $3 AND state = 'UPLOADING' AND next_index = $4::integer AND expires_at > $2",
+   "new": "WHERE id = $3 AND state = 'UPLOADING' AND $4::integer IS NOT NULL AND expires_at > $2",
+   "test": "internal/modules/media ^TestAdvanceSecureUpload_SkippedIndexAdvancesNothing$",
+   "why": "條件式推進拿掉 next_index 條件：跳號的段也能推進會話"
+  },
+  {
+   "id": "lost-chunk-keeps-its-object",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n\t\ts.deleteChunkObject(ctx, row.ID, key)",
+   "new": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n\t\t_ = key",
+   "test": "internal/modules/media ^TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject$",
+   "why": "推進失敗時不刪自己的物件：並行輸給對手的那一段留下沒人記錄的孤兒物件"
+  },
+  {
+   "id": "rewrap-skips-uploading-sessions",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\t\t\tn, err := s.rewrapUpload(ctx, r, primary)",
+   "new": "\t\t\tn, err := 0, error(nil)\n\t\t\t_ = r",
+   "test": "internal/modules/media ^TestRewrapDEKs_UploadingSessionIsRewrappedAndCompletesWithOnlyTheNewKek$",
+   "why": "RewrapDEKs 不掃 UPLOADING 暫存列：輪替後只留新 KEK，上傳中的會話解不開 DEK"
+  }
+ ]
+}

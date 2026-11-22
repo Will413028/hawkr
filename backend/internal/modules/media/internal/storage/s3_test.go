@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -145,5 +146,40 @@ func TestS3PutRejectsLengthMismatchBeforeSending(t *testing.T) {
 	}
 	if pos, _ := seekable.Seek(0, io.SeekCurrent); pos != 2 {
 		t.Fatalf("seekable body position moved to %d", pos)
+	}
+}
+
+func TestS3ListFollowsContinuationTokensAndSendsThePrefix(t *testing.T) {
+	var prefixes []string
+	s, f := newFakeS3(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		prefixes = append(prefixes, q.Get("prefix"))
+		w.Header().Set("Content-Type", "application/xml")
+		if q.Get("continuation-token") == "" {
+			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>t1</NextContinuationToken>`+
+				`<Contents><Key>secure/a/0/x</Key></Contents><Contents><Key>secure/a/1/y</Key></Contents></ListBucketResult>`)
+			return
+		}
+		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>secure/a/2/z</Key></Contents></ListBucketResult>`)
+	})
+	got, err := s.List(context.Background(), "secure/a/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"secure/a/0/x", "secure/a/1/y", "secure/a/2/z"}; !slices.Equal(got, want) {
+		t.Fatalf("List = %v，預期 %v", got, want)
+	}
+	if f.requests.Load() != 2 || !slices.Equal(prefixes, []string{"secure/a/", "secure/a/"}) {
+		t.Fatalf("請求 %d 次、prefix %v", f.requests.Load(), prefixes)
+	}
+}
+
+func TestS3ListRejectsEmptyPrefixAndSurfacesErrors(t *testing.T) {
+	s, f := newFakeS3(t, s3Error("NoSuchBucket"))
+	if _, err := s.List(context.Background(), ""); err == nil || f.requests.Load() != 0 {
+		t.Fatalf("空前綴應在送出前被拒：err=%v 請求 %d 次", err, f.requests.Load())
+	}
+	if _, err := s.List(context.Background(), "secure/a/"); err == nil {
+		t.Fatal("NoSuchBucket 被吞掉")
 	}
 }

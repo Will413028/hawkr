@@ -79,9 +79,12 @@ func (s *Service) Process(ctx context.Context, id uuid.UUID, attempt, maxAttempt
 	if model.UploadState(row.State) != model.StateUploaded || row.FinalKey == nil {
 		return nil
 	}
+	if row.DeclaredContentType == nil {
+		return fmt.Errorf("media：暫存上傳 %s 沒有宣告的型別", row.ID)
+	}
 	pin := ProcessInput{
 		UploadID: row.ID, Visibility: model.Visibility(row.Visibility), FinalKey: *row.FinalKey,
-		DeclaredSize: row.DeclaredSize, DeclaredContentType: row.DeclaredContentType,
+		DeclaredSize: row.DeclaredSize, DeclaredContentType: *row.DeclaredContentType,
 	}
 	if row.TmpKey != nil {
 		pin.TmpKey = *row.TmpKey
@@ -168,7 +171,7 @@ func (s *Service) lost(ctx context.Context, row store.MediaStagedUpload) error {
 			return nil
 		case model.StateUploaded:
 			uploaded = true
-		case model.StatePending, model.StateRejected, model.StateDeleting, model.StateDeleted:
+		case model.StatePending, model.StateUploading, model.StateRejected, model.StateDeleting, model.StateDeleted:
 		}
 	}
 	if err := s.d.Store.Delete(ctx, *row.FinalKey); err != nil {

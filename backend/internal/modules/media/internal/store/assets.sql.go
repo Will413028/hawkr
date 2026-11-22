@@ -51,7 +51,7 @@ func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUpl
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, created_at, updated_at FROM media.assets WHERE id = $1
+SELECT id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at FROM media.assets WHERE id = $1
 `
 
 func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error) {
@@ -66,6 +66,7 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error
 		&i.State,
 		&i.KekID,
 		&i.WrappedDek,
+		&i.ChunkCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -101,6 +102,27 @@ func (q *Queries) InsertAsset(ctx context.Context, arg InsertAssetParams) error 
 		arg.WrappedDek,
 		arg.Now,
 	)
+	return err
+}
+
+const insertSecureAssetFromUpload = `-- name: InsertSecureAssetFromUpload :exec
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+SELECT u.planned_asset_id, 'SECURE', $1, u.declared_content_type, u.declared_size, 'STAGED', u.kek_id, u.wrapped_dek, u.chunk_count,
+    $2, $2
+FROM media.staged_uploads AS u
+WHERE u.id = $3 AND u.state = 'UPLOADING' AND u.next_index = u.chunk_count
+`
+
+type InsertSecureAssetFromUploadParams struct {
+	ObjectKey string
+	Now       time.Time
+	UploadID  uuid.UUID
+}
+
+// 最後一段推進後建機敏資產列：預配 ID、型別、大小、段總數、kek_id 與包好的 DEK 都從（已被這個 transaction 鎖住的）暫存列搬過來，
+// 所以搬到的一定是當時最新的 DEK 包裹；物件位置是前綴 secure/<資產 ID>/。
+func (q *Queries) InsertSecureAssetFromUpload(ctx context.Context, arg InsertSecureAssetFromUploadParams) error {
+	_, err := q.db.Exec(ctx, insertSecureAssetFromUpload, arg.ObjectKey, arg.Now, arg.UploadID)
 	return err
 }
 
@@ -145,7 +167,7 @@ func (q *Queries) ListAssetsToRewrap(ctx context.Context, arg ListAssetsToRewrap
 }
 
 const listDeletingAssets = `-- name: ListDeletingAssets :many
-SELECT id, object_key FROM media.assets
+SELECT id, object_key, visibility FROM media.assets
 WHERE state = 'DELETING' AND id > $1
 ORDER BY id
 LIMIT $2
@@ -157,8 +179,9 @@ type ListDeletingAssetsParams struct {
 }
 
 type ListDeletingAssetsRow struct {
-	ID        uuid.UUID
-	ObjectKey string
+	ID         uuid.UUID
+	ObjectKey  string
+	Visibility string
 }
 
 func (q *Queries) ListDeletingAssets(ctx context.Context, arg ListDeletingAssetsParams) ([]ListDeletingAssetsRow, error) {
@@ -170,7 +193,7 @@ func (q *Queries) ListDeletingAssets(ctx context.Context, arg ListDeletingAssets
 	items := []ListDeletingAssetsRow{}
 	for rows.Next() {
 		var i ListDeletingAssetsRow
-		if err := rows.Scan(&i.ID, &i.ObjectKey); err != nil {
+		if err := rows.Scan(&i.ID, &i.ObjectKey, &i.Visibility); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

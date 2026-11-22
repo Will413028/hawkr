@@ -37,6 +37,8 @@ type Store interface {
 	Put(ctx context.Context, in PutInput) error
 	// Delete 刪除物件；物件不存在視為成功。
 	Delete(ctx context.Context, key string) error
+	// List 回傳 key 以 prefix 開頭的所有物件 key（遞增排序，分頁在 adapter 內處理完）。沒有符合的回空 slice。
+	List(ctx context.Context, prefix string) ([]string, error)
 }
 
 // PresignPutInput 是預簽 PUT 的參數。

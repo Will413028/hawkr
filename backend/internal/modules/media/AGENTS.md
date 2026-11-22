@@ -10,7 +10,7 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 
 ## 發布的讀取介面
 
-無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`UploadSecure`、`PutSecure`、`PutPublic`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與引用同步 `media.Sync*`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
+無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`BeginSecureUpload`、`PutSecureChunk`、`PutSecure`、`PutPublic`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與引用同步 `media.Sync*`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
 
 ## 模組內部結構
 
@@ -18,7 +18,7 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 - 依賴 libvips（`vipsgen`）：CI 裝 `libvips-dev`，本機 `brew install vips`。新增直接依賴先經同意。
 - 組裝點（`cmd/hawkr`）提供 `ObjectStore`（`MEDIA_STORAGE`，缺設定啟動失敗，不退回 fake）、`media.ParseKeyring(MEDIA_KEKS)`，並把 `media.Queues()` 經 `workerQueues` 併入 worker（queue 名重複啟動失敗）；模組不讀環境。
 - 依賴圖唯一來源：`internal/arch/modules.go` 的 `InternalDependencies`。
-- 內部直接寫入（B1-D14）：`PutSecure`（出貨單 PDF 與圖片，同 `UploadSecure` 管線）、`PutPublic`（只收圖片，同步重新編碼）建 `READY` 暫存並回 token，擁有者在自己的 transaction 內 `Confirm`，呼叫時 `Uploader` 帶操作者；沒確認的由 GC 回收。呼叫方是伺服器內部，名額滿了等（受 ctx 約束）不回 ResourceExhausted：`PutSecure` 共用機敏名額，`PutPublic` 的解碼受 `model.PublicPutConcurrency` 約束。不新增資產狀態與身分型別。
+- 內部直接寫入（B1-D14）：`PutSecure`（出貨單 PDF 與圖片，同一個分段密文格式：讀完 body 定下段總數、依 `SecureChunkSize` 切段依序推進）、`PutPublic`（只收圖片，同步重新編碼）建 `READY` 暫存並回 token，擁有者在自己的 transaction 內 `Confirm`，呼叫時 `Uploader` 帶操作者；沒確認的由 GC 回收。呼叫方是伺服器內部，名額滿了等（受 ctx 約束）不回 ResourceExhausted：`PutSecure` 共用機敏名額，`PutPublic` 的解碼受 `model.PublicPutConcurrency` 約束。不新增資產狀態與身分型別。
 
 ## 不變量
 
@@ -28,7 +28,8 @@ schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING
 - GC 只刪過期未確認的暫存（含超過 `StuckUploadGrace` 仍 `UPLOADED` 的）與其物件；先標 `DELETING` 並提交，transaction 外刪物件，再標 `DELETED`，失敗留著重試；已確認資產只由 `MarkDeleted` 刪。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`。
 - 期限與上限只在 `internal/model` 定義一次（`UploadTTL`、`PresignTTL`、`StuckUploadGrace`、`Max*Size`、`MaxImagePixels`、`MaxAnimatedPixels`、`MaxImageDimension`）。守門：`TestStuckUploadGraceOutlastsEveryProcessAttempt`。
 - `public/` 的圖片一律經 libvips 重新編碼（JPEG、PNG、WebP、GIF；sRGB、已套用方向、無 metadata）；辨認不出、無法解碼、超過上限永久拒絕；`image.Limits` 非正回 `ErrInvalidLimits`。守門：`TestFakeImageIsRejected`、`TestHeightOverDimensionLimitIsRejectedFromTheHeader`、`TestNonPositiveLimitsAreRejected`。
-- 機敏檔只以密文落地：`UploadSecure` 依 magic bytes 辨認、以實際讀到的位元組套用上限、STREAM 加密到暫存檔再 `Put`，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestUploadSecure_NoPlaintextInAnyPutOrStoredObject`（CI）。直接寫入同規則：`TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm`（CI）、`TestPreparePublic_RejectsNonImagesAsInvalidInput`。
+- 機敏檔只以密文落地：`PutSecureChunk` 逐段（`model.SecureChunkSize`）收，第 0 段依 magic bytes 辨認，每段核對長度、在記憶體加密後寫成新 key 的物件，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestSecureUpload_NoPlaintextInAnyPutOrStoredObject`（CI）。
+- 機敏資產讀到的每一段都是推進成功那次請求寫的物件（B1-D17）：條件式推進，輸家刪自己的物件；密文 v2 的 AAD 綁資產、段序號、段總數；`object_key` 是前綴，各段在 `secure_chunks`，列數不等於 `chunk_count` 回 `secure.ErrCorrupt`。守門：`TestChunks_SwappedChunksFailToDecrypt`、`TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject`（CI）。
 
 ## 不負責
 

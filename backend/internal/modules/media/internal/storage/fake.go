@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -100,4 +101,18 @@ func (f *Fake) Keys() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// List 實作 Store。
+func (f *Fake) List(_ context.Context, prefix string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := []string{}
+	for k := range f.objects {
+		if strings.HasPrefix(k, prefix) {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
 }

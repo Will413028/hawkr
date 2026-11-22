@@ -40,7 +40,7 @@ func TestStoredCodesMatchSchemaChecks(t *testing.T) {
 		{"staged_uploads_visibility_check", []string{string(model.VisibilityPublic), string(model.VisibilitySecure)}},
 		{"assets_state_check", []string{string(model.AssetStaged), string(model.AssetActive), string(model.AssetDeleting), string(model.AssetDeleted)}},
 		{"staged_uploads_state_check", []string{
-			string(model.StatePending), string(model.StateUploaded), string(model.StateReady), string(model.StateRejected),
+			string(model.StatePending), string(model.StateUploading), string(model.StateUploaded), string(model.StateReady), string(model.StateRejected),
 			string(model.StateConfirmed), string(model.StateDeleting), string(model.StateDeleted),
 		}},
 	}

@@ -62,7 +62,7 @@ func publicErr(err error) error {
 }
 
 // PutPublic 在請求內驗證並重新編碼圖片，寫入 public/，成功後建資產列（STAGED）與 READY 的暫存列並回 token，之後由擁有者在自己的 transaction 內 Confirm。
-// 順序與失敗收斂同 UploadSecure（commitDirect）：被拒的輸入不寫任何物件也不建列；失敗留下的列與物件由 GC 回收。
+// 順序與失敗收斂見 commitDirect：被拒的輸入不寫任何物件也不建列；失敗留下的列與物件由 GC 回收。
 // 暫存列的 tmp_key 是從未寫入的保留 key，declared_md5 是寫入物件（重新編碼後內容）的 MD5，為了滿足 public 列的欄位約束。不得在 transaction 內呼叫。
 func (s *Service) PutPublic(ctx context.Context, uploader model.Uploader, body io.Reader) (PublicPutResult, error) {
 	if err := model.RequireNoTx(ctx); err != nil {

@@ -12,9 +12,11 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
@@ -328,6 +330,30 @@ func TestGarageStore(t *testing.T) {
 		}
 		if err := s.Delete(ctx, key); err != nil {
 			t.Fatalf("delete of missing key: %v", err)
+		}
+	})
+
+	// Garage 支援依前綴列出：機敏資產的 GC 靠它找出沒推進成功的孤兒嘗試（B1-3c1 的停止條件）。
+	t.Run("list_by_prefix", func(t *testing.T) {
+		asset := uuid.New()
+		other := uuid.New()
+		want := []string{NewSecureChunkKey(asset, 0), NewSecureChunkKey(asset, 0), NewSecureChunkKey(asset, 1), NewSecureChunkKey(asset, 10)}
+		for _, k := range append(slices.Clone(want), NewSecureChunkKey(other, 0)) {
+			if err := s.Put(ctx, PutInput{Key: k, Body: bytes.NewReader([]byte("x")), Size: 1}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := s.List(ctx, SecurePrefix(asset))
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Fatalf("List = %v，預期 %v", got, want)
+		}
+		none, err := s.List(ctx, SecurePrefix(uuid.New()))
+		if err != nil || len(none) != 0 {
+			t.Fatalf("沒有符合的前綴：%v %v", none, err)
 		}
 	})
 }

@@ -4,6 +4,15 @@ VALUES (
     sqlc.arg(id), sqlc.arg(visibility), sqlc.arg(object_key), sqlc.arg(content_type), sqlc.arg(size_bytes),
     'STAGED', sqlc.narg(kek_id), sqlc.narg(wrapped_dek), sqlc.arg(now), sqlc.arg(now));
 
+-- name: InsertSecureAssetFromUpload :exec
+-- 最後一段推進後建機敏資產列：預配 ID、型別、大小、段總數、kek_id 與包好的 DEK 都從（已被這個 transaction 鎖住的）暫存列搬過來，
+-- 所以搬到的一定是當時最新的 DEK 包裹；物件位置是前綴 secure/<資產 ID>/。
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+SELECT u.planned_asset_id, 'SECURE', sqlc.arg(object_key), u.declared_content_type, u.declared_size, 'STAGED', u.kek_id, u.wrapped_dek, u.chunk_count,
+    sqlc.arg(now), sqlc.arg(now)
+FROM media.staged_uploads AS u
+WHERE u.id = sqlc.arg(upload_id) AND u.state = 'UPLOADING' AND u.next_index = u.chunk_count;
+
 -- name: GetAsset :one
 SELECT * FROM media.assets WHERE id = sqlc.arg(id);
 
@@ -24,7 +33,7 @@ UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)
 WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND state = 'STAGED';
 
 -- name: ListDeletingAssets :many
-SELECT id, object_key FROM media.assets
+SELECT id, object_key, visibility FROM media.assets
 WHERE state = 'DELETING' AND id > sqlc.arg(after_id)
 ORDER BY id
 LIMIT sqlc.arg(max_rows);

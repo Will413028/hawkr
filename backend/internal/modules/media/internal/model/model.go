@@ -8,7 +8,7 @@ import (
 // ErrNotSecure 表示 ReadSecure 的資產不是機敏資產（media 回 400）：呼叫方把它當成設定或資料的錯誤，不是「找不到」。
 var ErrNotSecure = errors.New("media：不是機敏資產")
 
-// ErrNoKeyring 表示模組沒有 KEK 金鑰環：UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 拒絕執行，也不寫任何物件（沒有主密鑰就不寫）。
+// ErrNoKeyring 表示模組沒有 KEK 金鑰環：BeginSecureUpload、PutSecureChunk、PutSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 拒絕執行，也不寫任何物件（沒有主密鑰就不寫）。
 var ErrNoKeyring = errors.New("media：沒有設定 KEK，不能處理機敏資產")
 
 // ErrStagedTokenRejected 表示 media 拒絕了轉正的 staged token（無效、過期、不屬於上傳者）；見 media.ErrStagedTokenRejected。

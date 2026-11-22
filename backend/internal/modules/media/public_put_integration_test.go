@@ -129,7 +129,7 @@ func TestPutSecure_UnrecognizedContentIsRejected(t *testing.T) {
 	f := setup(t)
 	_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader([]byte("just some text")))
 	wantKind(t, err, apperr.KindInvalidInput)
-	noWrites(t, f)
+	noObjects(t, f)
 }
 
 func TestPutSecure_OtherUploaderCannotConfirm(t *testing.T) {
@@ -149,10 +149,12 @@ func holdSecureSlots(t *testing.T, f *fixture) (release func(), wait func()) {
 	var wg sync.WaitGroup
 	for range media.SecureUploadConcurrency {
 		wg.Add(1)
+		prefix := pdfOf(10)
+		b := beginSecure(t, f, owner, len(prefix))
 		go func() {
 			defer wg.Done()
-			if _, err := f.m.UploadSecure(t.Context(), owner, &gate{prefix: pdfOf(10), started: started, release: rel}); err != nil {
-				t.Errorf("佔著名額的上傳應該成功：%v", err)
+			if _, err := f.m.PutSecureChunk(t.Context(), owner, b.Token, 0, &gate{prefix: prefix, started: started, release: rel}, int64(len(prefix))); err != nil {
+				t.Errorf("佔著名額的段應該成功：%v", err)
 			}
 		}()
 	}

@@ -22,10 +22,18 @@ func newDEK(t *testing.T) []byte {
 	return dek
 }
 
+// single 是只有一個上傳段的資產（序號 0、總數 1）。
+var single = secure.Chunk{Asset: uuid.UUID{1}, Index: 0, Count: 1}
+
 func seal(t *testing.T, dek, plain []byte) []byte {
 	t.Helper()
+	return sealChunk(t, dek, plain, single)
+}
+
+func sealChunk(t *testing.T, dek, plain []byte, c secure.Chunk) []byte {
+	t.Helper()
 	var buf bytes.Buffer
-	n, err := secure.Encrypt(&buf, bytes.NewReader(plain), dek)
+	n, err := secure.EncryptChunk(&buf, bytes.NewReader(plain), dek, c)
 	if err != nil {
 		t.Fatalf("Encrypt：%v", err)
 	}
@@ -37,7 +45,11 @@ func seal(t *testing.T, dek, plain []byte) []byte {
 
 // open 解密並回傳「已交出的明文」與錯誤；測試要檢查被竄改的段沒有交出任何位元組。
 func open(dek, ct []byte) ([]byte, error) {
-	r, err := secure.NewReader(bytes.NewReader(ct), dek)
+	return openChunk(dek, ct, single)
+}
+
+func openChunk(dek, ct []byte, c secure.Chunk) ([]byte, error) {
+	r, err := secure.NewChunkReader(bytes.NewReader(ct), dek, c)
 	if err != nil {
 		return nil, err
 	}
@@ -150,11 +162,12 @@ func headerWith(version byte, segSize uint32) []byte {
 func TestDecrypt_RejectsBadHeaderParameters(t *testing.T) {
 	dek := newDEK(t)
 	for name, h := range map[string][]byte{
-		"unknown-version": headerWith(2, uint32(secure.SegmentSize)),
-		"zero-segment":    headerWith(1, 0),
-		"huge-segment":    headerWith(1, uint32(secure.MaxSegmentSize)+1),
+		"v1-is-not-decoded": headerWith(1, uint32(secure.SegmentSize)),
+		"unknown-version":   headerWith(3, uint32(secure.SegmentSize)),
+		"zero-segment":      headerWith(2, 0),
+		"huge-segment":      headerWith(2, uint32(secure.MaxSegmentSize)+1),
 	} {
-		if _, err := secure.NewReader(bytes.NewReader(append(h, make([]byte, 64)...)), dek); err == nil {
+		if _, err := secure.NewChunkReader(bytes.NewReader(append(h, make([]byte, 64)...)), dek, single); err == nil {
 			t.Errorf("%s：header 沒有被拒絕", name)
 		}
 	}
@@ -162,7 +175,7 @@ func TestDecrypt_RejectsBadHeaderParameters(t *testing.T) {
 
 func TestEncrypt_SourceErrorIsReturned(t *testing.T) {
 	boom := errors.New("boom")
-	_, err := secure.Encrypt(io.Discard, io.MultiReader(strings.NewReader("abc"), errReader{boom}), newDEK(t))
+	_, err := secure.EncryptChunk(io.Discard, io.MultiReader(strings.NewReader("abc"), errReader{boom}), newDEK(t), single)
 	if !errors.Is(err, boom) {
 		t.Fatalf("err=%v", err)
 	}
@@ -250,5 +263,77 @@ func TestKeyring_UnwrapWithAnotherKeyOfSameID(t *testing.T) {
 	kid, wrapped, _ := a.Wrap(id, newDEK(t))
 	if _, err := b.Unwrap(id, kid, wrapped); err == nil {
 		t.Fatal("不同金鑰解得開")
+	}
+}
+
+// threeChunks 是同一份資產的三個上傳段（共用一把 DEK），回傳各段的明文與密文。
+func threeChunks(t *testing.T, dek []byte, asset uuid.UUID) (plain, ct [3][]byte) {
+	t.Helper()
+	for i := range 3 {
+		plain[i] = randBytes(secure.SegmentSize + 10*i + 1)
+		ct[i] = sealChunk(t, dek, plain[i], secure.Chunk{Asset: asset, Index: uint32(i), Count: 3})
+	}
+	return plain, ct
+}
+
+func TestChunks_RoundTripEachBoundToItsPosition(t *testing.T) {
+	dek, asset := newDEK(t), uuid.New()
+	plain, ct := threeChunks(t, dek, asset)
+	for i := range 3 {
+		got, err := openChunk(dek, ct[i], secure.Chunk{Asset: asset, Index: uint32(i), Count: 3})
+		if err != nil || !bytes.Equal(got, plain[i]) {
+			t.Fatalf("上傳段 %d 來回失敗：%v", i, err)
+		}
+	}
+}
+
+func TestChunks_SwappedChunksFailToDecrypt(t *testing.T) {
+	dek, asset := newDEK(t), uuid.New()
+	_, ct := threeChunks(t, dek, asset)
+	at := func(i int) secure.Chunk { return secure.Chunk{Asset: asset, Index: uint32(i), Count: 3} }
+	if got, err := openChunk(dek, ct[1], at(0)); err == nil || len(got) != 0 {
+		t.Fatalf("把第 1 段當第 0 段讀應失敗且不交出明文：err=%v 交出 %d 位元組", err, len(got))
+	}
+	if got, err := openChunk(dek, ct[0], at(2)); err == nil || len(got) != 0 {
+		t.Fatalf("把第 0 段當第 2 段讀應失敗且不交出明文：err=%v 交出 %d 位元組", err, len(got))
+	}
+}
+
+func TestChunks_DroppingTheLastChunkChangesTheCountAndFails(t *testing.T) {
+	dek, asset := newDEK(t), uuid.New()
+	_, ct := threeChunks(t, dek, asset)
+	for i := range 2 {
+		if got, err := openChunk(dek, ct[i], secure.Chunk{Asset: asset, Index: uint32(i), Count: 2}); err == nil || len(got) != 0 {
+			t.Fatalf("少了最後一段（總數 2）時第 %d 段應失敗：err=%v", i, err)
+		}
+	}
+	if _, err := openChunk(dek, ct[0], secure.Chunk{Asset: asset, Index: 0, Count: 4}); err == nil {
+		t.Fatal("總數被放大時應失敗")
+	}
+}
+
+func TestChunks_AnotherAssetsChunkFailsToDecrypt(t *testing.T) {
+	dek := newDEK(t)
+	a, b := uuid.New(), uuid.New()
+	ctA := sealChunk(t, dek, randBytes(100), secure.Chunk{Asset: a, Index: 0, Count: 1})
+	if got, err := openChunk(dek, ctA, secure.Chunk{Asset: b, Index: 0, Count: 1}); err == nil || len(got) != 0 {
+		t.Fatalf("別的資產的上傳段應失敗：err=%v", err)
+	}
+}
+
+func TestChunks_EachAttemptUsesAFreshNoncePrefix(t *testing.T) {
+	dek := newDEK(t)
+	plain := randBytes(100)
+	a, b := seal(t, dek, plain), seal(t, dek, plain)
+	if bytes.Equal(a[secure.HeaderSize-7:secure.HeaderSize], b[secure.HeaderSize-7:secure.HeaderSize]) {
+		t.Fatal("同一個位置兩次嘗試的 nonce 前綴相同")
+	}
+}
+
+func TestEncryptChunk_RejectsInvalidPosition(t *testing.T) {
+	for _, c := range []secure.Chunk{{Index: 0, Count: 0}, {Index: 3, Count: 3}} {
+		if _, err := secure.EncryptChunk(io.Discard, strings.NewReader("x"), newDEK(t), c); err == nil {
+			t.Errorf("%+v 應被拒絕", c)
+		}
 	}
 }
