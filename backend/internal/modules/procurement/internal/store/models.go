@@ -46,6 +46,7 @@ type ProcurementAgentRunEvent struct {
 type ProcurementAgentRunInput struct {
 	RunID        uuid.UUID
 	BuyerMessage string
+	OptionID     *string
 	Locale       string
 	CreatedAt    time.Time
 }

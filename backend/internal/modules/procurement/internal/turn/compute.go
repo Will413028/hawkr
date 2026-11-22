@@ -99,7 +99,12 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 			pending = buildCard(res.BuyerTerm, ms)
 		}
 	}
+	return finish(l, prior, patch, next, rejected, pending), nil
+}
 
+// finish 是 decide 套用完 patch、決定好要不要出卡之後的共同尾段：挑問題、選 act、渲染文字、決定需求狀態。
+// pending 非 nil 時這一輪停在品項消歧（回答中斷的 run 也走這裡，不重新解析）。
+func finish(l uitext.Locale, prior priorState, patch slots.Patch, next slots.Set, rejected []slots.Rejection, pending *pendingCard) decision {
 	missing := next.MissingRequired()
 	var q *planner.Question
 	capExhausted := false
@@ -140,7 +145,7 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 		d.interrupt = &p
 	}
 	d.status = nextStatus(prior.requestOf, prior.current, next, next.Ready())
-	return d, nil
+	return d
 }
 
 // confirmed 是一個能被 Apply 收下當品項解析的命中，與收下後的欄位組。

@@ -103,6 +103,7 @@ var trimmedColumns = []trimmedColumn{
 	{table: "procurement.seller_response_versions", column: "terms_note", constraint: "seller_response_versions_terms_check"},
 	{table: "procurement.seller_response_versions", column: "deviation_disclosure", constraint: "seller_response_versions_deviation_check"},
 	{table: "procurement.agent_run_inputs", column: "buyer_message", constraint: "agent_run_inputs_message_check"},
+	{table: "procurement.agent_run_inputs", column: "option_id", constraint: "agent_run_inputs_option_check"},
 }
 
 // 「頭尾沒有空白的文字」在整個單體只有 platform/trimtext 一個定義（DB 的 CHECK 與寫入端的 Trim 同一個集合）。對 migration 套用後

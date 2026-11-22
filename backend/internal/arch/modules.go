@@ -107,9 +107,10 @@ var InternalDependencies = map[string]InternalGraph{
 		"run":       {"store"},                                          // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
 		"search":    {"candidate", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
 		"slots":     {"model"},                                          // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
+		"snapshot":  {"model", "run", "store", "turn"},                  // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）
 		"store":     {},
 		"text":      {},                                                                            // 模組句子（ADR 2026-10-17 多語系）
-		"turn":      {"extract", "model", "planner", "reply", "resolver", "run", "slots", "store"}, // TURN run 的 executor：抽取、套用、解析品項、規劃、單一 transaction 提交（A9-3b-2c）
+		"turn":      {"extract", "model", "planner", "reply", "resolver", "run", "slots", "store"}, // TURN 與 CLARIFICATION_RESUME 的 executor 與 ResumeRun 的 use case：抽取、套用、解析品項、規劃、單一 transaction 提交（A9-3b-2c、A9-3b-2e）
 	}},
 	"moderation": {Packages: map[string][]string{
 		"handle":    {"model", "snapshot", "store", "text", "view"},

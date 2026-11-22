@@ -8,7 +8,8 @@ ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 SELECT * FROM procurement.agent_runs WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: InsertRunInput :exec
-INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, locale, created_at) VALUES (@run_id, @buyer_message, @locale, @now);
+-- 回答選項的 run 帶 option_id、buyer_message 為空字串；文字回答與一般訊息相反（CHECK agent_run_inputs_answer_check）。
+INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, option_id, locale, created_at) VALUES (@run_id, @buyer_message, sqlc.narg('option_id'), @locale, @now);
 
 -- name: GetRunInput :one
 SELECT i.* FROM procurement.agent_run_inputs i

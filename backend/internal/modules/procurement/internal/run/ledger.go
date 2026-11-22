@@ -32,9 +32,11 @@ const (
 	FailureModelUnavailable = "MODEL_UNAVAILABLE"
 	// FailureItemCategoryUnavailable 是候選搜尋發現已確認的品項分類不再是末層（A9-D29(7)）。
 	FailureItemCategoryUnavailable = "ITEM_CATEGORY_UNAVAILABLE"
-	notifyChannel                  = "procurement_run"
-	protoStatusPrefix              = "RUN_STATUS_"
-	protoFailureReasonPrefx        = "RUN_FAILURE_REASON_"
+	// FailureAnswerRejected 是回答中斷的 run 在解析品項時答案被拒（A9-D26(4)、A9-D30(1)）：中斷仍是 PENDING，沒有還原任何東西。
+	FailureAnswerRejected   = "ANSWER_REJECTED"
+	notifyChannel           = "procurement_run"
+	protoStatusPrefix       = "RUN_STATUS_"
+	protoFailureReasonPrefx = "RUN_FAILURE_REASON_"
 )
 
 // Run 的類型（與 schema 的 CHECK 相同）。只有 TURN 扣額度。
@@ -155,6 +157,12 @@ func (l Ledger) commitTransition(ctx context.Context, runID uuid.UUID, to, failu
 		return nil
 	})
 	return out, err
+}
+
+// LockAskingOf 是 lockAskingOf 的對外入口：回答 run 的 executor 在自己的 commit transaction 一開始、鎖自己的 run 之前呼叫它，
+// 才符合全域鎖順序（提問的 run、中斷、回答的 run）；不是回答 run 時只讀不鎖。
+func (l Ledger) LockAskingOf(ctx context.Context, runID uuid.UUID) error {
+	return l.lockAskingOf(ctx, runID)
 }
 
 // lockAskingOf 在 run 是回答 run 時先鎖提問的 run 與被回答的中斷：全域鎖順序是提問的 run、中斷、回答的 run，
@@ -307,7 +315,7 @@ func ptr[T any](v T) *T { return &v }
 
 func knownFailureReason(r string) bool {
 	switch r {
-	case FailureWorkerLost, FailureSearchFailed, FailureTurnPipelineErr, FailureModelUnavailable, FailureItemCategoryUnavailable:
+	case FailureWorkerLost, FailureSearchFailed, FailureTurnPipelineErr, FailureModelUnavailable, FailureItemCategoryUnavailable, FailureAnswerRejected:
 		return true
 	}
 	return false

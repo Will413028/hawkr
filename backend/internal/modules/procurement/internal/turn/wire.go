@@ -56,7 +56,8 @@ type blockJSON struct {
 	Text string `json:"text"`
 }
 
-type optionJSON struct {
+// OptionJSON 是 QuestionOption 的 proto JSON。
+type OptionJSON struct {
 	OptionID string `json:"optionId"`
 	Label    string `json:"label"`
 }
@@ -65,8 +66,8 @@ type optionJSON struct {
 type QuestionJSON struct {
 	SlotKey       string       `json:"slotKey"`
 	Prompt        string       `json:"prompt"`
-	Options       []optionJSON `json:"options,omitempty"`
-	UnitOptions   []optionJSON `json:"unitOptions,omitempty"`
+	Options       []OptionJSON `json:"options,omitempty"`
+	UnitOptions   []OptionJSON `json:"unitOptions,omitempty"`
 	AllowFreeText bool         `json:"allowFreeText,omitempty"`
 	CanSkip       bool         `json:"canSkip,omitempty"`
 }
@@ -119,10 +120,10 @@ func questionWire(q *reply.RenderedQuestion) *QuestionJSON {
 	if q == nil {
 		return nil
 	}
-	conv := func(in []reply.RenderedOption) []optionJSON {
-		var out []optionJSON
+	conv := func(in []reply.RenderedOption) []OptionJSON {
+		var out []OptionJSON
 		for _, o := range in {
-			out = append(out, optionJSON{OptionID: o.ID, Label: o.Label})
+			out = append(out, OptionJSON{OptionID: o.ID, Label: o.Label})
 		}
 		return out
 	}

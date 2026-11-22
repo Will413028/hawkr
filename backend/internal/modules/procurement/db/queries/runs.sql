@@ -158,3 +158,17 @@ SELECT created_at FROM procurement.agent_runs
 WHERE buyer_id = @buyer_id AND created_at > @since::timestamptz
 ORDER BY created_at DESC
 LIMIT @max_rows::int;
+
+-- name: ListRunsByRequest :many
+-- 目前需求的 run，新到舊（UUIDv7 的 id 依時間遞增，同時間戳用 id 定序），最多 @max_rows 筆；讀取模型 GetRuntimeSnapshot.runs 用。
+SELECT * FROM procurement.agent_runs
+WHERE request_id = @request_id AND buyer_id = @buyer_id
+ORDER BY created_at DESC, id DESC
+LIMIT @max_rows::int;
+
+-- name: GetInProgressRunForRequest :one
+-- 需求目前進行中（QUEUED、RUNNING、CANCEL_REQUESTED）的 run；同一需求同時最多一個（A9-D24(6)），多筆時取最新的。
+SELECT * FROM procurement.agent_runs
+WHERE request_id = @request_id AND buyer_id = @buyer_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+ORDER BY created_at DESC, id DESC
+LIMIT 1;

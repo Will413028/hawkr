@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。A9-3a 建好 23 張業務表，無 handler、job、relay：
+schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。23 張業務表：
 
 - 需求：`requests`、`request_revisions`、`conversations`、`turns`。
 - 候選：`candidate_sets`、`candidates`。
@@ -16,7 +16,7 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 - 賣家回價與接受：`seller_responses`、`seller_response_versions`、`_drafts`、`buyer_shortlist_entries`、`buyer_quote_acceptances`。
 - run：`agent_runs`、`_inputs`、`_events`、`_interrupts`。額度：`usage`。
 
-無 outbox、`*_commands`、預約表、`controller_kind`、`candidate_leads`、lane 與 prospect。讀取模型：無。
+無 outbox、`*_commands`、預約表、`controller_kind`、`candidate_leads`、lane 與 prospect。讀取模型：`snapshot`。
 
 ## 發布的讀取介面
 
@@ -25,7 +25,7 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選、翻頁收集；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN executor，不變量見 `internal/turn/AGENTS.md`）、`search`（CANDIDATE_SEARCH executor 與 `StartCandidateSearch`，規格見 `backend/docs/modules/procurement.md` §4）。
+- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選、翻頁收集；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN 與回答中斷的 executor、`ResumeRun`，不變量見 `internal/turn/AGENTS.md`）、`search`（CANDIDATE_SEARCH executor 與 `StartCandidateSearch`，§4）、`snapshot`（`GetRuntimeSnapshot` 讀取模型）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -33,17 +33,17 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 - 模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。
 - 候選沒有店名快照，只收 OPEN（seller 判定可公開曝光）的店，名稱讀取時由 StoreCard 組裝（S9：`candidate.KeepOpen`、`TestCandidatesHaveNoStoreNameColumns`）。
 - 買家回應的候選型別 `model.Candidate` 沒有自由文字（A9-D8、AD7：`TestCandidateCarriesNoFreeText`）。
-- 買家的用詞不被同義詞覆寫：原詞有命中分類就不查同義詞（AD3）；人工同義詞在 `internal/resolver/synonyms.json`，空表起步。
+- 買家的用詞不被同義詞覆寫：原詞有命中分類就不查同義詞（AD3）；人工同義詞在 `internal/resolver/synonyms.json`。
 - 「現行 revision」只有 `request_revisions_active` 一種表示法；requests 與 acceptances 的轉移用條件式 UPDATE，不設 version。
 - 接受單的 live 鎖只擋 `state = 'ACTIVE'`；建單重試用盡轉 `ORDER_FAILED` 解除鎖（S6，A9-D19 修訂）。
 - 建立型方法的冪等鍵放在被建立的實體上；rename、delete、withdraw、decline 是目標狀態的方法，不建收據（S4，逐支判定見 CARRYOVER）。
 - `BuyerDeleted` 同 transaction：買家資料刪除，已發布的需求與賣家看得到的紀錄保留、`buyer_id` 設 NULL（S10：`retention.OnBuyerDeleted`）。
 - 頭尾不得有空白的文字欄登記在 `cmd/hawkr` 的 `trimmedColumns`；新增文字欄一併登記。
 - run 事件在 run 結束 7 天後由週期 job 清除並推進 `min_available_seq`；cursor 過舊回 `REPLAY_CURSOR_EXPIRED`，超前回 `REPLAY_CURSOR_AHEAD`。interrupt 不到期；只有 TURN 扣額度。
-- run 狀態只經 `Ledger.Transition`（`UPDATE … WHERE status IN (允許來源)`，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態後回 `run.ErrRunTerminal`，executor 收到就停止；串流只有結尾事件 `finished`。
-- 每個 run 一個 River job（建 run 的同交易排入，id 存 `agent_runs.job_id`，`MaxAttempts` 1、Timeout 2 分；`RescueStuckJobsAfter` 3 分），不重驅。
-- job 死了的 run 由 `run.Reconciler`（每分鐘，逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已死收斂到 CANCELLED（不退額度）；關機或逾時取消 job 標 `WORKER_LOST` 並退額度；等待輸入的 run 可直接取消（無 job、不退額度、中斷轉 CANCELLED），同對話新一輪自動取消它（A9-D23）；買家取消不退額度（A9-D6）。`WatchRun` 共用一條 LISTEN 連線，每程序最多 500 條訂閱。
-- 中斷回答成功才解決（A9-D26）：回答 run 成功或寫新中斷的同交易，中斷 RESOLVED、提問的 run SUCCEEDED；失敗或取消不還原；每需求最多一筆 PENDING；不用 adksession。
+- run 狀態只經 `Ledger.Transition`（條件式 UPDATE，邊表在 `run/transition.go`，終態吸收），事件只在非終態寫入，終態後回 `run.ErrRunTerminal`，executor 收到就停止；串流只有結尾事件 `finished`。
+- 每個 run 一個 River job（建 run 的同交易排入，id 存 `agent_runs.job_id`，`MaxAttempts` 1、Timeout 2 分；`RescueStuckJobsAfter` 3 分）。
+- job 死了的 run 由 `run.Reconciler`（逐列交易）標失敗：job discarded 或不存在標 `WORKER_LOST` 並退額度，job 已完成而 run 未終態標 executor 的失敗原因並退額度，CANCEL_REQUESTED 且 job 已死收斂到 CANCELLED（不退額度）；關機或逾時取消 job 同標 `WORKER_LOST`；等待輸入的 run 可直接取消（無 job、不退額度、中斷轉 CANCELLED），同對話新一輪自動取消它（A9-D23）；買家取消不退額度（A9-D6）。`WatchRun` 共用一條 LISTEN 連線。
+- 中斷回答成功才解決（A9-D26、A9-D30）：回答 run 成功或寫新中斷的同交易，中斷 RESOLVED、提問的 run SUCCEEDED；失敗（答案被拒是 `ANSWER_REJECTED`）或取消不還原；每需求最多一筆 PENDING；回答 run 的鎖順序是提問的 run、中斷、自己（`Ledger.LockAskingOf`）；`agent_run_inputs` 的訊息與 `option_id` 恰一個。
 - 配額是一列計數器加條件 UPDATE（`ConsumeUsage`），沒有預約表（A9-D9）。
 
 ## 不負責

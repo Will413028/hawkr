@@ -290,6 +290,46 @@ func (q *Queries) GetLatestPricePreviewForRevision(ctx context.Context, arg GetL
 	return i, err
 }
 
+const getLatestPublicationByRequest = `-- name: GetLatestPublicationByRequest :one
+SELECT p.id, p.version, p.published_at, a.confirmed_rfq_snapshot_id,
+    (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
+    (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count
+FROM procurement.rfq_publications p
+JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id
+WHERE p.request_id = $1 AND p.buyer_id = $2
+ORDER BY p.published_at DESC, p.id DESC
+LIMIT 1
+`
+
+type GetLatestPublicationByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+type GetLatestPublicationByRequestRow struct {
+	ID                     uuid.UUID
+	Version                int32
+	PublishedAt            time.Time
+	ConfirmedRfqSnapshotID uuid.UUID
+	RecipientCount         int32
+	QueuedCount            int32
+}
+
+// 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLatestPublicationByRequestParams) (GetLatestPublicationByRequestRow, error) {
+	row := q.db.QueryRow(ctx, getLatestPublicationByRequest, arg.RequestID, arg.BuyerID)
+	var i GetLatestPublicationByRequestRow
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.PublishedAt,
+		&i.ConfirmedRfqSnapshotID,
+		&i.RecipientCount,
+		&i.QueuedCount,
+	)
+	return i, err
+}
+
 const getLiveAcceptance = `-- name: GetLiveAcceptance :one
 SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
 `

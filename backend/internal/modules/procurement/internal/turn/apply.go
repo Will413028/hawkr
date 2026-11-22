@@ -48,28 +48,38 @@ type Outcome struct {
 	Reason     InvalidReason
 	Resolution *slots.Resolution
 	Next       *InterruptPayload
+	// card 是 Next 對應的完整卡（含 planner 的問題），回答的 executor 用它接著規劃這一輪。
+	card *pendingCard
+}
+
+// CheckAnswer 是回答的形狀檢查（A9-D30(1)）：不讀分類樹，ResumeRun 在送出時同步用它，executor 的 ApplyAnswer 再用一次；回空字串表示形狀合法。
+// 檢查：中斷的階段認得、option_id 與 free_text 恰一個、文字不是只有空白、選項在 payload 的卡上。
+func CheckAnswer(p InterruptPayload, a Answer) InvalidReason {
+	if p.Stage != StageGroup && p.Stage != StageItem && p.Stage != StageDescribe {
+		return InvalidUnknownStage
+	}
+	text := trimtext.Trim(a.FreeText)
+	switch {
+	case a.OptionID != "" && text != "":
+		return InvalidNeedExactlyOne
+	case a.OptionID == "" && a.FreeText == "":
+		return InvalidNeedExactlyOne
+	case a.OptionID == "" && text == "":
+		return InvalidBlankText
+	case a.OptionID != "" && !onCard(p, a.OptionID):
+		return InvalidOptionNotOnCard
+	}
+	return ""
 }
 
 // ApplyAnswer 把買家的回答套到中斷 payload：純函式，唯一的 I/O 是 resolver 讀分類樹（A9-D28(1)）。
 // 不信任 client：選項只認 payload 卡上的，分類 ID 由 payload 的候選決定。
 func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, p InterruptPayload, a Answer) (Outcome, error) {
-	if p.Stage != StageGroup && p.Stage != StageItem && p.Stage != StageDescribe {
-		return invalid(InvalidUnknownStage), nil
-	}
-	text := trimtext.Trim(a.FreeText)
-	switch {
-	case a.OptionID != "" && text != "":
-		return invalid(InvalidNeedExactlyOne), nil
-	case a.OptionID == "" && a.FreeText == "":
-		return invalid(InvalidNeedExactlyOne), nil
-	case a.OptionID == "" && text == "":
-		return invalid(InvalidBlankText), nil
+	if r := CheckAnswer(p, a); r != "" {
+		return invalid(r), nil
 	}
 	if a.OptionID == "" {
-		return applyText(ctx, rs, l, now, p, text)
-	}
-	if !onCard(p, a.OptionID) {
-		return invalid(InvalidOptionNotOnCard), nil
+		return applyText(ctx, rs, l, now, p, trimtext.Trim(a.FreeText))
 	}
 	if a.OptionID == planner.ItemOtherOptionID {
 		return interrupt(l, describeCard(p.Query)), nil
@@ -177,7 +187,7 @@ func resolvedOutcome(r slots.Resolution) Outcome {
 func interrupt(l uitext.Locale, c *pendingCard) Outcome {
 	p := c.payload
 	p.Question = *questionWire(reply.Question(l, c.card))
-	return Outcome{Kind: OutcomeInterrupt, Next: &p}
+	return Outcome{Kind: OutcomeInterrupt, Next: &p, card: &pendingCard{payload: p, card: c.card}}
 }
 
 func onCard(p InterruptPayload, id string) bool {

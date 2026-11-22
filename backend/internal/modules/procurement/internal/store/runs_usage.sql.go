@@ -79,7 +79,7 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 }
 
 const getRunInput = `-- name: GetRunInput :one
-SELECT i.run_id, i.buyer_message, i.locale, i.created_at FROM procurement.agent_run_inputs i
+SELECT i.run_id, i.buyer_message, i.option_id, i.locale, i.created_at FROM procurement.agent_run_inputs i
 JOIN procurement.agent_runs r ON r.id = i.run_id
 WHERE i.run_id = $1 AND r.buyer_id = $2
 `
@@ -95,6 +95,7 @@ func (q *Queries) GetRunInput(ctx context.Context, arg GetRunInputParams) (Procu
 	err := row.Scan(
 		&i.RunID,
 		&i.BuyerMessage,
+		&i.OptionID,
 		&i.Locale,
 		&i.CreatedAt,
 	)
@@ -157,20 +158,23 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, er
 }
 
 const insertRunInput = `-- name: InsertRunInput :exec
-INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, locale, created_at) VALUES ($1, $2, $3, $4)
+INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, option_id, locale, created_at) VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertRunInputParams struct {
 	RunID        uuid.UUID
 	BuyerMessage string
+	OptionID     *string
 	Locale       string
 	Now          time.Time
 }
 
+// 回答選項的 run 帶 option_id、buyer_message 為空字串；文字回答與一般訊息相反（CHECK agent_run_inputs_answer_check）。
 func (q *Queries) InsertRunInput(ctx context.Context, arg InsertRunInputParams) error {
 	_, err := q.db.Exec(ctx, insertRunInput,
 		arg.RunID,
 		arg.BuyerMessage,
+		arg.OptionID,
 		arg.Locale,
 		arg.Now,
 	)

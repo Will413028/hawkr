@@ -73,6 +73,8 @@ type SubmitInput struct {
 	RunType         string
 	ClientRequestID uuid.UUID
 	Message         string
+	// OptionID 只給 CLARIFICATION_RESUME 的選項回答：與 Message 恰一個非空（agent_run_inputs 的 CHECK）。
+	OptionID string
 	// Locale 是送出時的請求語系，存進 run 輸入，executor 用它渲染伺服器句子（背景 job 沒有請求 ctx）。
 	Locale uitext.Locale
 	// CheckRequest 只給 CANDIDATE_SEARCH：在買家的送出鎖與重送檢查之後、上限檢查（含同需求的進行中 run）之前呼叫，驗證需求屬於買家且狀態允許（NOT_FOUND、FAILED_PRECONDITION），
@@ -261,7 +263,11 @@ func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, in
 		if err != nil {
 			return err
 		}
-		if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: in.Message, Locale: code, Now: now}); err != nil {
+		var optionID *string
+		if in.OptionID != "" {
+			optionID = &in.OptionID
+		}
+		if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: in.Message, OptionID: optionID, Locale: code, Now: now}); err != nil {
 			return fmt.Errorf("run：寫入輸入：%w", err)
 		}
 	}

@@ -24,6 +24,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// turns.source 的值（與 schema 的 CHECK 相同）。
+const (
+	sourceLLMExtract = "LLM_EXTRACT"
+	sourceAnswer     = "ANSWER"
+)
+
 // SlotExtractor 把買家的訊息抽成 patch（*extract.Extractor 滿足它）。
 type SlotExtractor interface {
 	Extract(ctx context.Context, message string, known slots.Set) (slots.Patch, error)
@@ -47,9 +53,13 @@ type ids struct {
 }
 
 type loaded struct {
-	run            store.ProcurementAgentRun
-	buyerID        *int64
-	message        string
+	run     store.ProcurementAgentRun
+	buyerID *int64
+	message string
+	// optionID 是回答中斷的 run 選的選項（message 與它恰一個非空）；TURN 沒有。
+	optionID string
+	// source 是這一輪寫進 turns.source 的來源；空字串是 LLM_EXTRACT。
+	source         string
 	locale         uitext.Locale
 	conversationID uuid.UUID
 	prior          priorState
@@ -106,6 +116,9 @@ func (e Executor) load(ctx context.Context, r store.ProcurementAgentRun) (loaded
 		return loaded{}, err
 	}
 	ld.message = in.BuyerMessage
+	if in.OptionID != nil {
+		ld.optionID = *in.OptionID
+	}
 
 	if ld.request, err = q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: r.RequestID, BuyerID: ld.buyerID}); err != nil {
 		return loaded{}, fmt.Errorf("turn：讀取需求：%w", err)
@@ -185,7 +198,15 @@ func (e Executor) commit(ctx context.Context, ld loaded, d decision, now time.Ti
 		return fmt.Errorf("turn：組 recorded_this_turn：%w", err)
 	}
 
+	source := ld.source
+	if source == "" {
+		source = sourceLLMExtract
+	}
 	return e.DB.InTx(ctx, func(ctx context.Context) error {
+		// 回答 run 的鎖順序是提問的 run、中斷、回答的 run（ledger 的 lockAskingOf）；之後寫轉換時的 lockAskingOf 才不會反過來等。
+		if err := e.Ledger.LockAskingOf(ctx, ld.run.ID); err != nil {
+			return err
+		}
 		q := store.New(e.DB.Conn(ctx))
 		cur, err := q.LockRun(ctx, ld.run.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -227,7 +248,7 @@ func (e Executor) commit(ctx context.Context, ld loaded, d decision, now time.Ti
 		}
 		n, err = q.InsertTurn(ctx, store.InsertTurnParams{
 			ID: id.turn, RequestID: id.request, ConversationID: id.conversation, BuyerID: ld.run.BuyerID, ResultRevisionID: id.revision,
-			Source: "LLM_EXTRACT", BuyerMessage: ld.message, AssistantReply: d.replyText, Steps: []byte("[]"), RecordedThisTurn: recorded,
+			Source: source, BuyerMessage: ld.message, AssistantReply: d.replyText, Steps: []byte("[]"), RecordedThisTurn: recorded,
 			OptionalStreak: streak32, SkippedSlots: skipped, ClientRequestID: ld.run.ClientRequestID, Now: now,
 		})
 		if err != nil {

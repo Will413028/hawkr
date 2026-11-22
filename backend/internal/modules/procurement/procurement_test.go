@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -111,12 +112,12 @@ func TestNewWiresTheSearchExecutorWithoutAnLLMAndRejectsEachMissingSearchDepende
 	searchOnly := procurement.New(newDeps(func(d *procurement.Deps) {
 		d.Taxonomy, d.Sellers, d.Search = noTaxonomy{}, &fakeSellers{}, fakeSearch{}
 	}))
-	if got := searchOnly.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeCandidateSearch {
-		t.Errorf("只給搜尋相依：executors = %v，要只登記 CANDIDATE_SEARCH", got)
+	if got := searchOnly.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeCandidateSearch, run.RunTypeResume}) {
+		t.Errorf("只給搜尋相依：executors = %v，要登記 CANDIDATE_SEARCH 與 CLARIFICATION_RESUME", got)
 	}
 	turnOnly := procurement.New(newDeps(func(d *procurement.Deps) { d.LLM, d.Taxonomy = disabled, noTaxonomy{} }))
-	if got := turnOnly.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeTurn {
-		t.Errorf("只給 TURN 相依：executors = %v，要只登記 TURN", got)
+	if got := turnOnly.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeResume, run.RunTypeTurn}) {
+		t.Errorf("只給 TURN 相依：executors = %v，要登記 CLARIFICATION_RESUME 與 TURN", got)
 	}
 	for name, c := range map[string]struct {
 		fn   func(*procurement.Deps)
@@ -145,8 +146,8 @@ func TestNewRegistersTheSearchExecutorAndRejectsPartialWiring(t *testing.T) {
 	full := procurement.New(newDeps(func(d *procurement.Deps) {
 		d.LLM, d.Taxonomy, d.Sellers, d.Search = disabled, noTaxonomy{}, &fakeSellers{}, fakeSearch{}
 	}))
-	if got := full.ExecutorTypes(); len(got) != 2 || got[0] != run.RunTypeCandidateSearch || got[1] != run.RunTypeTurn {
-		t.Errorf("executors = %v，要登記 CANDIDATE_SEARCH 與 TURN", got)
+	if got := full.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeCandidateSearch, run.RunTypeResume, run.RunTypeTurn}) {
+		t.Errorf("executors = %v，要登記 CANDIDATE_SEARCH、CLARIFICATION_RESUME 與 TURN", got)
 	}
 	for name, fn := range map[string]func(*procurement.Deps){
 		"沒有 Sellers":  func(d *procurement.Deps) { d.LLM, d.Taxonomy, d.Search = disabled, noTaxonomy{}, fakeSearch{} },
@@ -226,8 +227,8 @@ func TestNewRegistersTheTurnExecutorOnlyWithLLMAndTaxonomy(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	disabled := llm.New(llm.Procurement, llm.Config{}, log)
 	with := procurement.New(newDeps(func(d *procurement.Deps) { d.LLM, d.Taxonomy = disabled, noTaxonomy{} }))
-	if got := with.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeTurn {
-		t.Errorf("executors = %v，要登記 TURN", got)
+	if got := with.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeResume, run.RunTypeTurn}) {
+		t.Errorf("executors = %v，要登記 CLARIFICATION_RESUME 與 TURN", got)
 	}
 	without := procurement.New(newDeps(func(*procurement.Deps) {}))
 	if got := without.ExecutorTypes(); len(got) != 0 {
@@ -237,16 +238,30 @@ func TestNewRegistersTheTurnExecutorOnlyWithLLMAndTaxonomy(t *testing.T) {
 		d.LLM, d.Taxonomy = disabled, noTaxonomy{}
 		d.Executors = map[string]procurement.Executor{run.RunTypeTurn: nil}
 	}))
-	if got := custom.ExecutorTypes(); len(got) != 1 {
+	if got := custom.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeResume, run.RunTypeTurn}) {
 		t.Errorf("呼叫端給的 TURN 項目要保留：%v", got)
 	}
 }
 
-func TestNewPanicsWhenOnlyOneOfLLMAndTaxonomyIsGiven(t *testing.T) {
+// 回答中斷不呼叫模型：只給分類樹就登記 CLARIFICATION_RESUME 的 executor，呼叫端給的項目保留；少了它，worker 領到回答 run 會把它標失敗。
+func TestNewRegistersTheResumeExecutorWithTaxonomyAlone(t *testing.T) {
+	only := procurement.New(newDeps(func(d *procurement.Deps) { d.Taxonomy = noTaxonomy{} }))
+	if got := only.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeResume}) {
+		t.Errorf("只給 Taxonomy：executors = %v，要只登記 CLARIFICATION_RESUME", got)
+	}
+	custom := procurement.New(newDeps(func(d *procurement.Deps) {
+		d.Taxonomy = noTaxonomy{}
+		d.Executors = map[string]procurement.Executor{run.RunTypeResume: nil}
+	}))
+	if got := custom.ExecutorTypes(); !slices.Equal(got, []string{run.RunTypeResume}) {
+		t.Errorf("呼叫端給的 CLARIFICATION_RESUME 項目要保留：%v", got)
+	}
+}
+
+func TestNewPanicsWhenLLMIsGivenWithoutTaxonomy(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	for name, fn := range map[string]func(*procurement.Deps){
-		"只有 LLM":      func(d *procurement.Deps) { d.LLM = llm.New(llm.Procurement, llm.Config{}, log) },
-		"只有 Taxonomy": func(d *procurement.Deps) { d.Taxonomy = noTaxonomy{} },
+		"只有 LLM": func(d *procurement.Deps) { d.LLM = llm.New(llm.Procurement, llm.Config{}, log) },
 	} {
 		func() {
 			defer func() {

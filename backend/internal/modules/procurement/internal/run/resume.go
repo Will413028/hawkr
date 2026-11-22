@@ -18,8 +18,10 @@ type ResumeInput struct {
 	BuyerID         int64
 	InterruptID     uuid.UUID
 	ClientRequestID uuid.UUID
-	Message         string
-	Locale          uitext.Locale
+	// Message 是文字回答（已去頭尾空白），OptionID 是選項回答；恰一個非空，由呼叫端（Module.ResumeRun）檢查。
+	Message  string
+	OptionID string
+	Locale   uitext.Locale
 }
 
 // Resume 回答買家自己的 PENDING 中斷，回傳回答 run 的 ID。同一個 transaction：鎖提問的 run、建回答 run（CLARIFICATION_RESUME，interrupt_id 指向被回答的中斷，不扣額度）、
@@ -74,7 +76,7 @@ func (s Submitter) Resume(ctx context.Context, in ResumeInput) (uuid.UUID, error
 		}); err != nil {
 			return err
 		}
-		return s.start(ctx, q, answerID, SubmitInput{RunType: RunTypeResume, Message: in.Message, Locale: in.Locale, ConversationID: asking.ConversationID}, now)
+		return s.start(ctx, q, answerID, SubmitInput{RunType: RunTypeResume, Message: in.Message, OptionID: in.OptionID, Locale: in.Locale, ConversationID: asking.ConversationID}, now)
 	})
 	if err != nil {
 		return uuid.UUID{}, err
@@ -90,8 +92,15 @@ func replayResume(ctx context.Context, q *store.Queries, r store.ProcurementAgen
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("run：讀取重送的輸入：%w", err)
 	}
-	if input.BuyerMessage != in.Message {
+	if input.BuyerMessage != in.Message || !sameOption(input.OptionID, in.OptionID) {
 		return uuid.UUID{}, errReplayMismatch()
 	}
 	return r.ID, nil
+}
+
+func sameOption(stored *string, option string) bool {
+	if stored == nil {
+		return option == ""
+	}
+	return *stored == option
 }

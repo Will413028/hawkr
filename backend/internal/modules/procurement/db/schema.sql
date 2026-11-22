@@ -435,7 +435,7 @@ CREATE TABLE procurement.agent_runs (
     CONSTRAINT agent_runs_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT agent_runs_type_check CHECK (run_type IN ('TURN', 'CANDIDATE_SEARCH', 'CLARIFICATION_RESUME', 'PUBLICATION')),
     CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
-    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'MODEL_UNAVAILABLE', 'ITEM_CATEGORY_UNAVAILABLE')),
+    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'MODEL_UNAVAILABLE', 'ITEM_CATEGORY_UNAVAILABLE', 'ANSWER_REJECTED')),
     CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1),
     CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL)),
     CONSTRAINT agent_runs_quota_check CHECK ((run_type = 'TURN') = (quota_period_start IS NOT NULL))
@@ -448,14 +448,17 @@ CREATE INDEX agent_runs_buyer_created ON procurement.agent_runs (buyer_id, creat
 CREATE INDEX agent_runs_buyer_active ON procurement.agent_runs (buyer_id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WHERE completed_at IS NOT NULL AND min_available_seq <= last_event_seq;
 
--- run 的輸入（買家原文，具名文字欄）。沒有 retention_class（只有一個字面值、沒有讀取者）。
+-- run 的輸入（買家原文，具名文字欄）。回答中斷的 run 要嘛帶選項（option_id，buyer_message 為空字串）要嘛帶文字（option_id 為 NULL），恰一個（A9-D30）。沒有 retention_class（只有一個字面值、沒有讀取者）。
 CREATE TABLE procurement.agent_run_inputs (
     run_id UUID PRIMARY KEY REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     buyer_message TEXT NOT NULL,
+    option_id TEXT,
     locale TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT agent_run_inputs_locale_check CHECK (locale IN ('ZH_TW', 'EN')),
-    CONSTRAINT agent_run_inputs_message_check CHECK (char_length(buyer_message) >= 1 AND char_length(buyer_message) <= 2000 AND buyer_message !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
+    CONSTRAINT agent_run_inputs_message_check CHECK (char_length(buyer_message) <= 2000 AND buyer_message !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT agent_run_inputs_option_check CHECK (option_id IS NULL OR (char_length(option_id) >= 1 AND char_length(option_id) <= 200 AND option_id !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
+    CONSTRAINT agent_run_inputs_answer_check CHECK ((option_id IS NULL) = (char_length(buyer_message) >= 1))
 );
 
 -- run 事件：(run_id, seq) 識別；payload 是 proto JSON（WatchRunResponse 的 oneof），形狀靠 proto 規則演進（S3），沒有 schema_version。run 結束 7 天後由週期 job 清除並把 min_available_seq 推到 last_event_seq + 1（A9-D20 R1）。

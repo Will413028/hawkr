@@ -12,14 +12,17 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/extract"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -106,6 +109,8 @@ type Module struct {
 	canceller  run.Canceller
 	hub        *run.Hub
 	searcher   search.Starter
+	resumer    turn.Resumer
+	snapshots  snapshot.Reader
 }
 
 // New 建立模組。
@@ -129,26 +134,26 @@ func New(d Deps) *Module {
 		purger:     run.Purger{DB: d.DB, Ledger: ledger},
 	}
 	m.searcher = search.Starter{Submitter: m.submitter}
+	m.resumer = turn.Resumer{Submitter: m.submitter}
+	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
 	return m
 }
 
-// executors 在呼叫端給的登記之外補上 TURN 與 CANDIDATE_SEARCH 的 executor。
-// TURN 需要 LLM 與 Taxonomy；CANDIDATE_SEARCH 只需要 Search、Sellers 與 Taxonomy，不依賴 LLM。缺依賴是組裝錯誤，panic 訊息指名缺的欄位。
+// executors 在呼叫端給的登記之外補上 TURN、CANDIDATE_SEARCH 與 CLARIFICATION_RESUME 的 executor。
+// TURN 需要 LLM 與 Taxonomy；CANDIDATE_SEARCH 只需要 Search、Sellers 與 Taxonomy，不依賴 LLM；CLARIFICATION_RESUME 只需要 Taxonomy（回答不呼叫模型）。缺依賴是組裝錯誤，panic 訊息指名缺的欄位。
 func executors(d Deps, ledger run.Ledger) map[string]Executor {
 	hasLLM := d.LLM.LLM() != nil
 	switch {
 	case hasLLM && d.Taxonomy == nil:
 		panic("procurement.New：Deps.LLM 要與 Deps.Taxonomy 一起給")
-	case d.Taxonomy != nil && !hasLLM && d.Search == nil:
-		panic("procurement.New：Deps.Taxonomy 要與 Deps.LLM（TURN）或 Deps.Search（CANDIDATE_SEARCH）一起給")
 	case d.Search != nil && d.Sellers == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Sellers 一起給")
 	case d.Search != nil && d.Taxonomy == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Taxonomy 一起給")
-	case !hasLLM && d.Search == nil:
+	case d.Taxonomy == nil:
 		return d.Executors
 	}
-	out := make(map[string]Executor, len(d.Executors)+2)
+	out := make(map[string]Executor, len(d.Executors)+3)
 	for k, v := range d.Executors {
 		out[k] = v
 	}
@@ -165,6 +170,9 @@ func executors(d Deps, ledger run.Ledger) map[string]Executor {
 			DB: d.DB, Ledger: ledger, Extractor: extract.New(d.LLM.LLM(), d.LLM.Name(), shape),
 			Resolver: rs, Now: d.Now, Logger: d.Logger,
 		}
+	}
+	if _, ok := out[run.RunTypeResume]; !ok {
+		out[run.RunTypeResume] = turn.AnswerExecutor{DB: d.DB, Ledger: ledger, Resolver: rs, Now: d.Now, Logger: d.Logger}
 	}
 	if _, ok := out[run.RunTypeCandidateSearch]; !ok && d.Search != nil {
 		out[run.RunTypeCandidateSearch] = search.Executor{
@@ -245,4 +253,36 @@ type CandidateSearchStarted = search.Started
 // 重送同一個 client_request_id 回第一次的 run 與候選集（內容不同回 INVALID_ARGUMENT）。
 func (m *Module) StartCandidateSearch(ctx context.Context, in StartCandidateSearchInput) (CandidateSearchStarted, error) {
 	return m.searcher.Start(ctx, in)
+}
+
+// ResumeRunInput 是回答一個中斷的輸入：OptionID 與 FreeText 恰一個（ClarificationResponse）。
+type ResumeRunInput = turn.ResumeInput
+
+// ResumeRunResult 是 ResumeRun 的結果：回答 run 的 ID 與它當下的狀態；結果由 WatchRun 取得，不在這裡回（A9-D30(2)）。
+type ResumeRunResult = turn.Resumed
+
+// ResumeRun 回答買家自己的中斷，排入回答 run 後立即回傳（A9-D26、A9-D30）。不是這位買家的中斷回 NOT_FOUND；
+// 回答形狀不合（OptionID 與 FreeText 不是恰一個、文字只有空白或超過 2000 字元、選項不在卡上）回 INVALID_ARGUMENT 並指出欄位；
+// 中斷已回答回 FAILED_PRECONDITION／APPROVAL_ALREADY_RESOLVED；中斷已取消或 run 不在等待輸入回 RUN_NOT_ACTIVE；同需求已有進行中的 run 回 PROCUREMENT_RUN_IN_PROGRESS；
+// 買家上限回 RESOURCE_EXHAUSTED；不扣額度。重送同一個 ClientRequestID 回同一個回答 run。答案在解析品項時被拒，回答 run 以 ANSWER_REJECTED 失敗，中斷維持 PENDING。
+func (m *Module) ResumeRun(ctx context.Context, in ResumeRunInput) (ResumeRunResult, error) {
+	return m.resumer.Resume(ctx, in)
+}
+
+// RuntimeSnapshot 是 GetRuntimeSnapshot 的讀取模型，以及它的元素型別。
+type (
+	RuntimeSnapshot     = model.RuntimeSnapshot
+	ConversationMessage = model.ConversationMessage
+	RecordedField       = model.RecordedField
+	RunSummary          = model.RunSummary
+	OpenConfirmation    = model.OpenConfirmation
+	ClarifyQuestion     = model.ClarifyQuestion
+	QuestionOption      = model.QuestionOption
+	PublishedRfq        = model.PublishedRfq
+)
+
+// GetRuntimeSnapshot 回傳買家自己的對話的快照：訊息、目前需求的 run（新到舊最多 20 筆）、進行中的 run、待回答的中斷（含處理中）與最新的發布結果，在同一份快照內讀齊。
+// 對話不存在、已刪除或屬於別的買家回 NOT_FOUND。ctx 不可已在 transaction 內。
+func (m *Module) GetRuntimeSnapshot(ctx context.Context, buyerID int64, conversationID uuid.UUID) (RuntimeSnapshot, error) {
+	return m.snapshots.Get(ctx, buyerID, conversationID)
 }

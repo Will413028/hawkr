@@ -97,6 +97,47 @@ func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams
 	return i, err
 }
 
+const getInProgressRunForRequest = `-- name: GetInProgressRunForRequest :one
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+WHERE request_id = $1 AND buyer_id = $2 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+type GetInProgressRunForRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 需求目前進行中（QUEUED、RUNNING、CANCEL_REQUESTED）的 run；同一需求同時最多一個（A9-D24(6)），多筆時取最新的。
+func (q *Queries) GetInProgressRunForRequest(ctx context.Context, arg GetInProgressRunForRequestParams) (ProcurementAgentRun, error) {
+	row := q.db.QueryRow(ctx, getInProgressRunForRequest, arg.RequestID, arg.BuyerID)
+	var i ProcurementAgentRun
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.ConversationID,
+		&i.InterruptID,
+		&i.CandidateSetID,
+		&i.PublicationID,
+		&i.RunType,
+		&i.Status,
+		&i.FailureReason,
+		&i.ResultRevisionID,
+		&i.LastEventSeq,
+		&i.MinAvailableSeq,
+		&i.ClientRequestID,
+		&i.JobID,
+		&i.QuotaPeriodStart,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getInterrupt = `-- name: GetInterrupt :one
 SELECT id, run_id, request_id, interrupt_kind, status, payload, facts_as_of, created_at, closed_at FROM procurement.agent_run_interrupts WHERE id = $1
 `
@@ -420,6 +461,61 @@ func (q *Queries) ListRunEventsAfter(ctx context.Context, arg ListRunEventsAfter
 			&i.Payload,
 			&i.OccurredAt,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsByRequest = `-- name: ListRunsByRequest :many
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+WHERE request_id = $1 AND buyer_id = $2
+ORDER BY created_at DESC, id DESC
+LIMIT $3::int
+`
+
+type ListRunsByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+	MaxRows   int32
+}
+
+// 目前需求的 run，新到舊（UUIDv7 的 id 依時間遞增，同時間戳用 id 定序），最多 @max_rows 筆；讀取模型 GetRuntimeSnapshot.runs 用。
+func (q *Queries) ListRunsByRequest(ctx context.Context, arg ListRunsByRequestParams) ([]ProcurementAgentRun, error) {
+	rows, err := q.db.Query(ctx, listRunsByRequest, arg.RequestID, arg.BuyerID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProcurementAgentRun{}
+	for rows.Next() {
+		var i ProcurementAgentRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.BuyerID,
+			&i.RequestID,
+			&i.ConversationID,
+			&i.InterruptID,
+			&i.CandidateSetID,
+			&i.PublicationID,
+			&i.RunType,
+			&i.Status,
+			&i.FailureReason,
+			&i.ResultRevisionID,
+			&i.LastEventSeq,
+			&i.MinAvailableSeq,
+			&i.ClientRequestID,
+			&i.JobID,
+			&i.QuotaPeriodStart,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
