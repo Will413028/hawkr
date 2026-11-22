@@ -1,0 +1,292 @@
+{
+ "mutants": [
+  {
+   "id": "chat-watchdog-2x",
+   "stack": "website",
+   "file": "website/lib/chat/stream.ts",
+   "old": "if (hb > 0) idleMs = hb * 2;",
+   "new": "if (hb > 0) idleMs = hb * 20;",
+   "test": "lib/chat/__tests__/stream.unit.test.ts treats a silent connection as dead",
+   "why": "心跳看門狗不再是兩倍心跳間隔"
+  },
+  {
+   "id": "chat-unauth-reconnects",
+   "stack": "website",
+   "file": "website/lib/chat/stream.ts",
+   "old": "code === Code.Unauthenticated ||",
+   "new": "code === Code.Unauthenticated && false ||",
+   "test": "lib/chat/__tests__/stream.unit.test.ts unauthenticated ends the stream",
+   "why": "unauthenticated 不再終止串流（會重連）"
+  },
+  {
+   "id": "chat-cursor-backwards",
+   "stack": "website",
+   "file": "website/lib/chat/stream.ts",
+   "old": "if (seq > (this.cursors.get(conversationId) ?? 0)) {",
+   "new": "if (true) {",
+   "test": "lib/chat/__tests__/stream.unit.test.ts noteSeq only moves a cursor forward",
+   "why": "cursor 可以倒退"
+  },
+  {
+   "id": "chat-no-resume-wait",
+   "stack": "website",
+   "file": "website/lib/chat/stream.ts",
+   "old": "if (failures >= MAX_ATTEMPTS) {",
+   "new": "if (failures >= MAX_ATTEMPTS + 100) {",
+   "test": "lib/chat/__tests__/stream.unit.test.ts stops retrying after",
+   "why": "連續失敗不再停下等 resume"
+  },
+  {
+   "id": "chat-end-before-ready-instant",
+   "stack": "website",
+   "file": "website/lib/chat/stream.ts",
+   "old": "if (outcome.kind === \"normal\" && outcome.gotReady) {",
+   "new": "if (outcome.kind === \"normal\") {",
+   "test": "lib/chat/__tests__/stream.unit.test.ts a stream that ends before Ready",
+   "why": "沒收到 Ready 就結束被當成壽命到期而立刻重連"
+  },
+  {
+   "id": "chat-gap-off-by-one",
+   "stack": "website",
+   "file": "website/lib/chat/timeline.ts",
+   "old": "return incomingSeq > last + 1 ? last : null;",
+   "new": "return incomingSeq >= last + 1 ? last : null;",
+   "test": "lib/chat/__tests__/timeline.unit.test.ts gapAfter / lastSeq",
+   "why": "連續的下一則也被當成缺口"
+  },
+  {
+   "id": "chat-optimistic-first",
+   "stack": "website",
+   "file": "website/lib/chat/timeline.ts",
+   "old": "if (a.seq !== null) return -1;",
+   "new": "if (a.seq !== null) return 1;",
+   "test": "lib/chat/__tests__/timeline.unit.test.ts compareMessages",
+   "why": "樂觀訊息排到已落地訊息前面"
+  },
+  {
+   "id": "chat-latest-not-reversed",
+   "stack": "website",
+   "file": "website/lib/chat/repo.ts",
+   "old": ".map(messageFromProto).reverse(),",
+   "new": ".map(messageFromProto),",
+   "test": "lib/chat/__tests__/repo.unit.test.ts returns the latest page oldest-first",
+   "why": "最新一頁沒有反轉成由舊到新"
+  },
+  {
+   "id": "chat-send-always-new-conversation",
+   "stack": "website",
+   "file": "website/lib/chat/repo.ts",
+   "old": "if (target.conversationId) {",
+   "new": "if (false) {",
+   "test": "lib/chat/__tests__/repo.unit.test.ts sends request_id with text to an existing conversation",
+   "why": "有對話 ID 仍走開新對話的 RPC"
+  },
+  {
+   "id": "chat-conv-paging-stops",
+   "stack": "website",
+   "file": "website/lib/chat/repo.ts",
+   "old": "if (!pageToken) break;",
+   "new": "",
+   "test": "lib/chat/__tests__/repo.unit.test.ts follows next_page_token",
+   "why": "列表翻頁沒有在 token 空時停止"
+  },
+  {
+   "id": "chat-list-error-swallowed",
+   "stack": "website",
+   "file": "website/lib/hooks/useChat.ts",
+   "old": "error: query.error ? errorText(query.error, defaults) : null,",
+   "new": "error: null,",
+   "test": "lib/hooks/useChat.unit.test.ts a failed conversation list read sets error",
+   "why": "對話列表讀取失敗被當成空列表"
+  },
+  {
+   "id": "chat-no-gap-fill",
+   "stack": "website",
+   "file": "website/lib/hooks/useChat.ts",
+   "old": "if (gap !== null) void fillGap(conversationId, gap).catch(() => {});",
+   "new": "",
+   "test": "lib/hooks/useChat.unit.test.ts fills a seq gap",
+   "why": "seq 缺口不再補"
+  },
+  {
+   "id": "chat-no-rollback",
+   "stack": "website",
+   "file": "website/lib/hooks/useChat.ts",
+   "old": "messages: d.messages.filter((m) => m.id !== optimistic.id),",
+   "new": "messages: d.messages,",
+   "test": "lib/hooks/useChat.unit.test.ts rolls the optimistic message back",
+   "why": "送出失敗不撤回樂觀訊息"
+  },
+  {
+   "id": "chat-erased-preview",
+   "stack": "website",
+   "file": "website/lib/chat/map.ts",
+   "old": "if (p.erased) return ut(chatPreviewErased());",
+   "new": "",
+   "test": "lib/chat/__tests__/map.unit.test.ts previewText",
+   "why": "已抹除的預覽不顯示目錄文字"
+  },
+  {
+   "id": "chat-uuid-version",
+   "stack": "website",
+   "file": "website/lib/chat/request-id.ts",
+   "old": "bytes[6] = (bytes[6] & 0x0f) | 0x40;",
+   "new": "bytes[6] = bytes[6];",
+   "test": "lib/chat/__tests__/request-id.unit.test.ts still produces a valid UUIDv4",
+   "why": "備援的 request_id 不是合法 UUIDv4"
+  },
+  {
+   "id": "chat-stream-has-timeout",
+   "stack": "website",
+   "file": "website/lib/connect/transport.ts",
+   "old": "\t\t\tbaseUrl: connectBaseUrl(isBrowser),\n\t\t\tfetch: authedFetch(isBrowser, opts.cookie),\n",
+   "new": "\t\t\tbaseUrl: connectBaseUrl(isBrowser),\n\t\t\tdefaultTimeoutMs: getEnv().apiTimeoutMs,\n\t\t\tfetch: authedFetch(isBrowser, opts.cookie),\n",
+   "test": "lib/connect/__tests__/stream-transport.unit.test.ts has no default timeout",
+   "why": "串流 transport 有了預設逾時"
+  },
+  {
+   "id": "chat-markread-not-background",
+   "stack": "website",
+   "file": "website/lib/connect/transport.ts",
+   "old": "\tprocedureKey(ChatAppService, ChatAppService.method.markConversationRead),\n",
+   "new": "",
+   "test": "lib/connect/__tests__/stream-transport.unit.test.ts marking a conversation read",
+   "why": "自動已讀對停權帳號不再靜默"
+  },
+  {
+   "id": "crm-descending-dropped",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "descending: params.descending ?? false,",
+   "new": "descending: false,",
+   "test": "lib/seller/crm.unit.test.ts maps the filters, sort and paging",
+   "why": "排序方向不送出"
+  },
+  {
+   "id": "crm-tag-filter-dropped",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "tagId: params.tagId || undefined,",
+   "new": "tagId: undefined,",
+   "test": "lib/seller/crm.unit.test.ts maps the filters, sort and paging",
+   "why": "標籤篩選不送出"
+  },
+  {
+   "id": "crm-bulk-stops-after-first-page",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "pageToken = page.nextPageToken;",
+   "new": "pageToken = \"\";",
+   "test": "lib/seller/crm.unit.test.ts follows next_page_token",
+   "why": "全選分群只讀第一頁"
+  },
+  {
+   "id": "crm-update-mask-wrong",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "updateMask: fieldMask(CustomerSchema, [\"type\"]),",
+   "new": "updateMask: fieldMask(CustomerSchema, [\"buyer_id\"]),",
+   "test": "lib/seller/crm.unit.test.ts updateCustomerType sends",
+   "why": "分類更新的 update_mask 不是 type"
+  },
+  {
+   "id": "crm-tag-rename-mask-wrong",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "updateMask: fieldMask(TagSchema, [\"name\"]),",
+   "new": "updateMask: fieldMask(TagSchema, [\"id\"]),",
+   "test": "lib/seller/crm.unit.test.ts renameTag sends",
+   "why": "標籤改名的 update_mask 不是 name"
+  },
+  {
+   "id": "customers-hook-no-next-page",
+   "stack": "website",
+   "file": "website/lib/hooks/useSellerCustomers.ts",
+   "old": "getNextPageParam: (last) => last.nextPageToken || undefined,",
+   "new": "getNextPageParam: () => undefined,",
+   "test": "lib/hooks/useSellerCustomers.unit.test.ts passes filters, sort",
+   "why": "列表不再用 page_token 往後載入"
+  },
+  {
+   "id": "customers-hook-error-swallowed",
+   "stack": "website",
+   "file": "website/lib/hooks/useSellerCustomers.ts",
+   "old": "error: query.error ? errorText(query.error, defaults) : null,",
+   "new": "error: null,",
+   "test": "lib/hooks/useSellerCustomers.unit.test.ts distinguishes a read failure",
+   "why": "讀取失敗不回報，和空列表分不出來"
+  },
+  {
+   "id": "tags-hook-error-swallowed",
+   "stack": "website",
+   "file": "website/lib/hooks/useSellerTags.ts",
+   "old": "error: query.error ? errorText(query.error, defaults) : null,",
+   "new": "error: null,",
+   "test": "lib/hooks/useSellerTags.unit.test.ts reports a read failure",
+   "why": "標籤池讀取失敗被當成空池"
+  },
+  {
+   "id": "picker-bulk-first-page-only",
+   "stack": "website",
+   "file": "website/features/seller-center/coupons/CouponBuyerPicker.tsx",
+   "old": "selectRows(await listAllCustomers(storeId, currentParams));",
+   "new": "selectRows(list);",
+   "test": "features/seller-center/coupons/CouponBuyerPicker.unit.test.ts selects the whole filter",
+   "why": "全選此分群只選已載入的列"
+  },
+  {
+   "id": "picker-error-as-empty",
+   "stack": "website",
+   "file": "website/features/seller-center/coupons/CouponBuyerPicker.tsx",
+   "old": "error ? null : (",
+   "new": "false ? null : (",
+   "test": "features/seller-center/coupons/CouponBuyerPicker.unit.test.ts shows the failure, not the empty state",
+   "why": "讀取失敗時顯示成沒有客戶"
+  },
+  {
+   "id": "picker-load-more-token",
+   "stack": "website",
+   "file": "website/features/seller-center/coupons/CouponBuyerPicker.tsx",
+   "old": "pageToken: nextPageToken,",
+   "new": "pageToken: \"\",",
+   "test": "features/seller-center/coupons/CouponBuyerPicker.unit.test.ts loads the next page",
+   "why": "載入更多沒帶 page_token"
+  },
+  {
+   "id": "reviews-stats-distribution",
+   "stack": "website",
+   "file": "website/lib/reviews/repo.ts",
+   "old": "wire.distribution.find((d) => d.rating === star)",
+   "new": "wire.distribution.find((d) => d.rating !== star)",
+   "test": "lib/reviews/repo.unit.test.ts takes count, average and distribution from the server",
+   "why": "stats come from the server distribution, mapped per star"
+  },
+  {
+   "id": "reviews-page-walk-end",
+   "stack": "website",
+   "file": "website/lib/reviews/repo.ts",
+   "old": "if (skipped.nextPageToken === \"\") return",
+   "new": "if (skipped.nextPageToken === \"never\") return",
+   "test": "lib/reviews/repo.unit.test.ts a page beyond the end is an empty page",
+   "why": "a page past the end is an empty page, not an error"
+  },
+  {
+   "id": "reviews-client-failed",
+   "stack": "website",
+   "file": "website/features/sellers/reviews/ReviewsClient.tsx",
+   "old": "if (active) setFailed(true);",
+   "new": "if (active) setFailed(false);",
+   "test": "features/sellers/reviews/ReviewsClient.unit.test.ts shows the error state, not an empty list",
+   "why": "page 2+ read failure must not render as an empty list"
+  },
+  {
+   "id": "reviews-reply-map",
+   "stack": "website",
+   "file": "website/lib/reviews/repo.ts",
+   "old": "content: wire.reply.content,",
+   "new": "content: \"\",",
+   "test": "lib/reviews/repo.unit.test.ts maps reply and image templates",
+   "why": "seller reply content is carried from the wire"
+  }
+ ]
+}
