@@ -48,23 +48,28 @@ var (
 
 // garageExec 在容器內執行 garage CLI 並回傳合併輸出；結束碼非 0 視為錯誤。
 func garageExec(ctx context.Context, c testcontainers.Container, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	code, r, err := c.Exec(ctx, append([]string{"/garage"}, args...), tcexec.Multiplexed())
 	if err != nil {
 		return "", err
 	}
-	out, _ := io.ReadAll(r)
+	out, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("garage %s: read output: %w", strings.Join(args, " "), err)
+	}
 	if code != 0 {
 		return string(out), fmt.Errorf("garage %s: exit %d", strings.Join(args, " "), code)
 	}
 	return string(out), nil
 }
 
-// retryGarage 重試到成功：節點剛啟動時 RPC 與 layout 還沒就緒。
-func retryGarage(ctx context.Context, t *testing.T, c testcontainers.Container, args ...string) string {
+// waitGarageReady 只重試唯讀的就緒探測：節點剛啟動時 RPC 還沒就緒；之後的每個變更指令只執行一次。
+func waitGarageReady(ctx context.Context, t *testing.T, c testcontainers.Container) string {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)
 	for {
-		out, err := garageExec(ctx, c, args...)
+		out, err := garageExec(ctx, c, "node", "id", "-q")
 		if err == nil {
 			return out
 		}
@@ -73,6 +78,16 @@ func retryGarage(ctx context.Context, t *testing.T, c testcontainers.Container, 
 		}
 		time.Sleep(time.Second)
 	}
+}
+
+// mustGarage 執行一次 garage 指令，失敗即中止。
+func mustGarage(ctx context.Context, t *testing.T, c testcontainers.Container, args ...string) string {
+	t.Helper()
+	out, err := garageExec(ctx, c, args...)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	return out
 }
 
 // startGarage 起單節點 Garage、初始化 layout、key 與 bucket，回傳經 s3compat 設定建構的 adapter 與 endpoint。
@@ -97,29 +112,29 @@ func startGarage(t *testing.T) (*S3, string) {
 	}
 	testcontainers.CleanupContainer(t, c)
 
-	nodeOut := retryGarage(ctx, t, c, "node", "id", "-q")
+	nodeOut := waitGarageReady(ctx, t, c)
 	node := garageNodeRe.FindString(nodeOut)
 	if node == "" {
 		t.Fatalf("node id not found in output: %q", nodeOut)
 	}
-	retryGarage(ctx, t, c, "layout", "assign", "-z", "dc1", "-c", "1G", node)
-	retryGarage(ctx, t, c, "layout", "apply", "--version", "1")
+	mustGarage(ctx, t, c, "layout", "assign", "-z", "dc1", "-c", "1G", node)
+	mustGarage(ctx, t, c, "layout", "apply", "--version", "1")
 
-	keyOut := retryGarage(ctx, t, c, "key", "create", garageKey)
+	keyOut := mustGarage(ctx, t, c, "key", "create", garageKey)
 	id := garageKeyIDRe.FindStringSubmatch(keyOut)
 	if id == nil {
 		t.Fatalf("key id not found in key create output")
 	}
 	secret := garageSecretRe.FindStringSubmatch(keyOut)
 	if secret == nil {
-		infoOut := retryGarage(ctx, t, c, "key", "info", "--show-secret", garageKey)
+		infoOut := mustGarage(ctx, t, c, "key", "info", "--show-secret", garageKey)
 		secret = garageSecretRe.FindStringSubmatch(infoOut)
 	}
 	if secret == nil {
 		t.Fatal("secret key not found in garage output")
 	}
-	retryGarage(ctx, t, c, "bucket", "create", garageBucket)
-	retryGarage(ctx, t, c, "bucket", "allow", "--read", "--write", "--owner", garageBucket, "--key", garageKey)
+	mustGarage(ctx, t, c, "bucket", "create", garageBucket)
+	mustGarage(ctx, t, c, "bucket", "allow", "--read", "--write", "--owner", garageBucket, "--key", garageKey)
 
 	endpoint, err := c.PortEndpoint(ctx, "3900/tcp", "http")
 	if err != nil {
@@ -150,6 +165,7 @@ func md5B64(b []byte) string {
 
 // sendPresigned 以純 net/http 送出預簽 PUT：header 取自簽發結果，可用 override 覆蓋個別 header；
 // Content-Length 由 body 長度決定（Go 不允許用 header 設定）。回傳 HTTP 狀態碼。
+// override 的值為空字串時刪除該 header。
 func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[string]string) int {
 	t.Helper()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPut, p.URL, bytes.NewReader(body))
@@ -163,9 +179,13 @@ func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[strin
 		req.Header.Set(k, v)
 	}
 	for k, v := range override {
+		if v == "" {
+			req.Header.Del(k)
+			continue
+		}
 		req.Header.Set(k, v)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
 		t.Fatalf("send presigned put: %v", err)
 	}
@@ -206,10 +226,10 @@ func requireAbsent(t *testing.T, s *S3, key string) {
 	}
 }
 
-func requireRejected(t *testing.T, status int) {
+func requireStatus(t *testing.T, got, want int) {
 	t.Helper()
-	if status < 400 || status >= 500 {
-		t.Fatalf("want 4xx rejection, got HTTP %d", status)
+	if got != want {
+		t.Fatalf("want HTTP %d, got %d", want, got)
 	}
 }
 
@@ -242,7 +262,7 @@ func TestGarageStore(t *testing.T) {
 		actual := []byte("a body that is longer than the signed size")
 		// Content-MD5 對應實際送出的內容，只有長度與簽章不符。
 		p := presign(t, s, key, signed, "text/plain", md5B64(actual))
-		requireRejected(t, sendPresigned(t, p, actual, nil))
+		requireStatus(t, sendPresigned(t, p, actual, nil), http.StatusForbidden)
 		requireAbsent(t, s, key)
 	})
 
@@ -250,28 +270,33 @@ func TestGarageStore(t *testing.T) {
 		key := NewKey(PrefixTmp)
 		body := []byte("<html>not an image</html>")
 		p := presign(t, s, key, body, "image/png", md5B64(body))
-		requireRejected(t, sendPresigned(t, p, body, map[string]string{"Content-Type": "text/html"}))
+		requireStatus(t, sendPresigned(t, p, body, map[string]string{"Content-Type": "text/html"}), http.StatusForbidden)
 		requireAbsent(t, s, key)
 	})
 
-	t.Run("existing_key", func(t *testing.T) {
+	t.Run("md5_binding_override_rejected", func(t *testing.T) {
 		key := NewKey(PrefixTmp)
-		first := []byte("first writer wins")
-		second := []byte("second writer loses")
-		if st := sendPresigned(t, presign(t, s, key, first, "text/plain", md5B64(first)), first, nil); st != http.StatusOK {
-			t.Fatalf("first put: want 200, got %d", st)
-		}
-		requireRejected(t, sendPresigned(t, presign(t, s, key, second, "text/plain", md5B64(second)), second, nil))
-		if got := readAll(t, s, key); !bytes.Equal(got, first) {
-			t.Fatalf("object changed: got %q want %q", got, first)
-		}
+		signedBody := []byte("signed body AAAA")
+		other := []byte("other  body BBBB")
+		p := presign(t, s, key, signedBody, "text/plain", md5B64(signedBody))
+		requireStatus(t, sendPresigned(t, p, other, map[string]string{"Content-MD5": md5B64(other)}), http.StatusForbidden)
+		requireAbsent(t, s, key)
 	})
 
-	t.Run("wrong_content_md5", func(t *testing.T) {
+	t.Run("md5_binding_removed_rejected", func(t *testing.T) {
+		key := NewKey(PrefixTmp)
+		signedBody := []byte("signed body AAAA")
+		other := []byte("other  body BBBB")
+		p := presign(t, s, key, signedBody, "text/plain", md5B64(signedBody))
+		requireStatus(t, sendPresigned(t, p, other, map[string]string{"Content-MD5": ""}), http.StatusForbidden)
+		requireAbsent(t, s, key)
+	})
+
+	t.Run("digest_check_wrong_content_md5", func(t *testing.T) {
 		key := NewKey(PrefixTmp)
 		body := []byte("content whose digest is lied about")
 		p := presign(t, s, key, body, "text/plain", md5B64([]byte("something else")))
-		requireRejected(t, sendPresigned(t, p, body, nil))
+		requireStatus(t, sendPresigned(t, p, body, nil), http.StatusBadRequest)
 		requireAbsent(t, s, key)
 	})
 
