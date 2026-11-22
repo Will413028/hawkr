@@ -1,6 +1,9 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import {
+	CustomerSort,
+	CustomerType,
+} from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -19,74 +22,50 @@ import {
 import { useSellerTags } from "@/lib/hooks/useSellerTags";
 import { fetchOrders } from "@/lib/orders/repo";
 import {
-	fetchCustomerTags,
+	customerTypeClass,
+	customerTypeLabel,
 	type SellerCustomer,
-	type SellerCustomerType,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
 import CustomerDetailDrawer from "./CustomerDetailDrawer";
-import {
-	type SellerCustomersSort,
-	useSellerCustomersUiStore,
-} from "./customersUiStore";
+import { useSellerCustomersUiStore } from "./customersUiStore";
 
 function formatTime(ts?: number): string {
 	return formatTaipeiDate(ts) || "—";
 }
 
-const TYPE_TABS: Array<{ value: "" | SellerCustomerType; label: string }> = [
-	{ value: "", label: "全部" },
-	{ value: "vip", label: "VIP" },
-	{ value: "blocklist", label: "黑名單" },
+const TYPE_TABS: Array<{ value: CustomerType; label: string }> = [
+	{ value: CustomerType.UNSPECIFIED, label: "全部" },
+	{ value: CustomerType.VIP, label: "VIP" },
 ];
 
-const SORT_OPTIONS: Array<{
-	value: "totalSpent" | "orderCount" | "last_order_at";
-	label: string;
-}> = [
-	{ value: "totalSpent", label: "依消費金額" },
-	{ value: "orderCount", label: "依訂單數" },
-	{ value: "last_order_at", label: "依最近購買" },
+const SORT_OPTIONS: Array<{ value: CustomerSort; label: string }> = [
+	{ value: CustomerSort.TOTAL_SPENT, label: "依消費金額" },
+	{ value: CustomerSort.ORDER_COUNT, label: "依訂單數" },
+	{ value: CustomerSort.FIRST_ORDER_TIME, label: "依首購時間" },
 ];
-
-const TYPE_BADGE: Partial<Record<SellerCustomerType, string>> = {
-	vip: "VIP",
-	blocklist: "黑名單",
-};
 
 function customerRowKey(customer: SellerCustomer): string {
 	return customer.id;
 }
 
-function customerTypeLabel(customerType?: SellerCustomerType): string {
-	return (customerType && TYPE_BADGE[customerType]) || "一般";
-}
-
 export default function CustomersClient() {
-	const searchParams = useSearchParams();
 	const openChat = useChatDrawerStore((state) => state.openChat);
-	// Seeded from `?q=` so deep-links (e.g. a buyer name clicked in the orders
-	// table) land pre-filtered on that customer.
-	const initialQuery = searchParams?.get("q")?.trim() ?? "";
-	const search = useSellerCustomersUiStore((state) => state.search);
-	const setSearch = useSellerCustomersUiStore((state) => state.setSearch);
-	// Server-driven segmentation (matches the app): classification tab, tag
-	// filter, and sort key. Changing any of these refetches.
+	// Server-driven segmentation: classification tab, single tag filter, and
+	// sort key. Changing any of these refetches from the first page.
 	const customerType = useSellerCustomersUiStore((state) => state.customerType);
 	const setCustomerType = useSellerCustomersUiStore(
 		(state) => state.setCustomerType,
 	);
 	const tagId = useSellerCustomersUiStore((state) => state.tagId);
 	const setTagId = useSellerCustomersUiStore((state) => state.setTagId);
-	const sortBy = useSellerCustomersUiStore((state) => state.sortBy);
-	const setSortBy = useSellerCustomersUiStore((state) => state.setSortBy);
+	const sort = useSellerCustomersUiStore((state) => state.sort);
+	const setSort = useSellerCustomersUiStore((state) => state.setSort);
 	// Tag pool powers the filter chips; shared with the tag editor's suggestions.
-	const tagPool = useSellerTags();
-	const [tagsByCustomerId, setTagsByCustomerId] = React.useState<
-		Record<string, string[]>
-	>({});
+	const { tags: tagPool, error: tagPoolError } = useSellerTags();
 	const [lastPurchaseByCustomerId, setLastPurchaseByCustomerId] =
 		React.useState<Record<string, number>>({});
+	const requestedPurchaseIds = React.useRef(new Set<string>());
 	// Drawer state — clicking a row opens the detail in a right-side Sheet so
 	// the seller stays on the list and can flick between customers. The full
 	// `/customers/[id]` route remains the deep-link / refresh fallback.
@@ -101,63 +80,34 @@ export default function CustomersClient() {
 	// refetches the list (its own cache entry — other consumers use other sizes).
 	const params = React.useMemo(
 		() => ({
-			pageSize: 50,
-			keyword: initialQuery || undefined,
-			customerType: customerType || undefined,
+			type:
+				customerType === CustomerType.UNSPECIFIED ? undefined : customerType,
 			tagId: tagId ?? undefined,
-			sortBy: sortBy === "last_order_at" ? undefined : sortBy,
+			sort,
+			descending: true,
 		}),
-		[initialQuery, customerType, tagId, sortBy],
+		[customerType, tagId, sort],
 	);
-	const { data: baseCustomers, loading, error } = useSellerCustomers(params);
+	const {
+		data: items,
+		loading,
+		error,
+		hasMore,
+		loadingMore,
+		loadMore,
+	} = useSellerCustomers(params);
 	const invalidateCustomers = useInvalidateSellerCustomers();
+	const rows = React.useMemo(() => items ?? [], [items]);
 
+	// N-row enrichment fan-out for the last-purchase date (CRM has no such field;
+	// the store order list filtered by buyer does). Only rows not yet requested are
+	// fetched, so loading another page does not re-fire the earlier rows.
 	React.useEffect(() => {
-		if (initialQuery) setSearch(initialQuery);
-	}, [initialQuery, setSearch]);
-
-	// Two N-row enrichment fan-outs patch gaps the CRM list endpoint leaves: the
-	// authoritative per-buyer tags and the last-purchase date. Both key off the
-	// query result reference, so an intentional refetch (mount / filter change /
-	// post-mutation invalidate) re-runs them. ponytail: structural sharing keeps
-	// the reference stable across content-identical refetches, so this fires at
-	// most once per real list change — not per render.
-	React.useEffect(() => {
-		const rows = baseCustomers ?? [];
-		if (rows.length === 0) {
-			setTagsByCustomerId({});
-			return;
-		}
-		let alive = true;
+		const fresh = rows.filter((c) => !requestedPurchaseIds.current.has(c.id));
+		if (fresh.length === 0) return;
+		for (const c of fresh) requestedPurchaseIds.current.add(c.id);
 		Promise.allSettled(
-			rows.map(async (c) => {
-				const tags = await fetchCustomerTags(c.id);
-				return [c.id, tags.map((tag) => tag.name)] as const;
-			}),
-		).then((results) => {
-			if (!alive) return;
-			const next: Record<string, string[]> = {};
-			for (const result of results) {
-				if (result.status !== "fulfilled") continue;
-				const [id, tags] = result.value;
-				next[id] = tags;
-			}
-			setTagsByCustomerId(next);
-		});
-		return () => {
-			alive = false;
-		};
-	}, [baseCustomers]);
-
-	React.useEffect(() => {
-		const rows = baseCustomers ?? [];
-		if (rows.length === 0) {
-			setLastPurchaseByCustomerId({});
-			return;
-		}
-		let alive = true;
-		Promise.allSettled(
-			rows.map(async (c) => {
+			fresh.map(async (c) => {
 				const res = await fetchOrders({
 					view: "seller",
 					buyerId: String(c.id),
@@ -170,77 +120,39 @@ export default function CustomersClient() {
 				return [c.id, latest] as const;
 			}),
 		).then((results) => {
-			if (!alive) return;
 			const next: Record<string, number> = {};
-			for (const result of results) {
-				if (result.status !== "fulfilled") continue;
+			for (const [i, result] of results.entries()) {
+				if (result.status !== "fulfilled") {
+					// 失敗的列下次還要再試。
+					requestedPurchaseIds.current.delete(fresh[i].id);
+					continue;
+				}
 				const [id, latest] = result.value;
 				if (latest > 0) next[id] = latest;
 			}
-			setLastPurchaseByCustomerId(next);
+			setLastPurchaseByCustomerId((prev) => ({ ...prev, ...next }));
 		});
-		return () => {
-			alive = false;
-		};
-	}, [baseCustomers]);
-
-	// Base list + the per-row tag fan-out, merged for render. Derived (not state)
-	// so a fresh query result never flashes an empty table before enrichment.
-	const items = React.useMemo(() => {
-		const rows = baseCustomers ?? [];
-		return rows.map((c) => {
-			const tags = tagsByCustomerId[c.id];
-			return tags ? { ...c, tags } : c;
-		});
-	}, [baseCustomers, tagsByCustomerId]);
+	}, [rows]);
 
 	const closeDrawer = React.useCallback(() => {
 		setActiveCustomerId(null);
 	}, [setActiveCustomerId]);
 
-	const visible = React.useMemo(() => {
-		const q = search.trim().toLowerCase();
-		const filtered = !q
-			? items
-			: items.filter(
-					(c) =>
-						c.name?.toLowerCase().includes(q) ||
-						c.phone?.toLowerCase().includes(q),
-				);
-		if (sortBy !== "last_order_at") return filtered;
-		return [...filtered].sort(
-			(a, b) =>
-				(lastPurchaseByCustomerId[b.id] ?? 0) -
-				(lastPurchaseByCustomerId[a.id] ?? 0),
-		);
-	}, [items, lastPurchaseByCustomerId, search, sortBy]);
-
-	const totalSpend = items.reduce(
-		(sum, c) => sum + Number(c.totalSpent ?? 0),
-		0,
-	);
-	const repeatBuyers = items.filter((c) => (c.orderCount ?? 0) >= 2).length;
+	const totalSpend = rows.reduce((sum, c) => sum + c.totalSpent, 0);
+	const repeatBuyers = rows.filter((c) => c.orderCount >= 2).length;
 	const activeCustomer =
 		activeCustomerId === null
 			? null
-			: (items.find((customer) => customer.id === activeCustomerId) ?? null);
+			: (rows.find((customer) => customer.id === activeCustomerId) ?? null);
 
 	return (
 		<SellerPageShell
 			className="seller-customers"
 			title="客戶管理"
-			subtitle={`總共 ${items.length} 位客戶`}
-			actions={
-				<div className="seller-orders__search">
-					<AppIcon name="search" />
-					<input
-						type="search"
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						placeholder="搜尋客戶姓名或電話…"
-						aria-label="搜尋客戶"
-					/>
-				</div>
+			subtitle={
+				hasMore
+					? `已載入 ${rows.length} 位客戶，還有更多`
+					: `總共 ${rows.length} 位客戶`
 			}
 		>
 			<section
@@ -253,7 +165,10 @@ export default function CustomersClient() {
 					<span className="seller-inventory__stat-icon is-primary">
 						<AppIcon name="users" />
 					</span>
-					<strong>{items.length.toLocaleString()}</strong>
+					<strong>
+						{rows.length.toLocaleString()}
+						{hasMore ? "+" : ""}
+					</strong>
 					<small>累積客戶</small>
 				</div>
 				<div className="seller-inventory__stat">
@@ -297,8 +212,8 @@ export default function CustomersClient() {
 				<label className="seller-customers__sort">
 					<span className="visually-hidden">排序方式</span>
 					<select
-						value={sortBy}
-						onChange={(e) => setSortBy(e.target.value as SellerCustomersSort)}
+						value={sort}
+						onChange={(e) => setSort(Number(e.target.value) as CustomerSort)}
 					>
 						{SORT_OPTIONS.map((opt) => (
 							<option key={opt.value} value={opt.value}>
@@ -332,7 +247,13 @@ export default function CustomersClient() {
 				</fieldset>
 			)}
 
-			{error && (
+			{tagPoolError && (
+				<p className="seller-customers__error" role="alert">
+					{tagPoolError}
+				</p>
+			)}
+
+			{error && items !== null && (
 				<p className="seller-customers__error" role="alert">
 					{error}
 				</p>
@@ -341,7 +262,7 @@ export default function CustomersClient() {
 			<div
 				className={[
 					"seller-card seller-customers__card",
-					visible.length > 0 ? "seller-mobile-disclosure-desktop" : "",
+					rows.length > 0 ? "seller-mobile-disclosure-desktop" : "",
 				]
 					.filter(Boolean)
 					.join(" ")}
@@ -362,20 +283,22 @@ export default function CustomersClient() {
 							</tr>
 						</thead>
 						<tbody>
-							{loading && items.length === 0 ? (
+							{loading && rows.length === 0 ? (
 								<SellerCustomersSkeletonRows rows={5} />
-							) : visible.length === 0 ? (
+							) : error && items === null ? (
 								<tr>
 									<td colSpan={6} className="seller-orders__empty">
-										<SellerEmptyState
-											variant="customers"
-											searchQuery={search}
-											seamless
-										/>
+										{error}
+									</td>
+								</tr>
+							) : rows.length === 0 ? (
+								<tr>
+									<td colSpan={6} className="seller-orders__empty">
+										<SellerEmptyState variant="customers" seamless />
 									</td>
 								</tr>
 							) : (
-								visible.map((c) => (
+								rows.map((c) => (
 									<tr key={c.id}>
 										<td data-label="客戶">
 											<button
@@ -394,15 +317,14 @@ export default function CustomersClient() {
 												<div>
 													<strong>
 														{c.name || "未命名客戶"}
-														{c.customerType && TYPE_BADGE[c.customerType] && (
+														{c.customerType === CustomerType.VIP && (
 															<span
-																className={`seller-customers__badge is-${c.customerType}`}
+																className={`seller-customers__badge ${customerTypeClass(c.customerType)}`}
 															>
-																{TYPE_BADGE[c.customerType]}
+																{customerTypeLabel(c.customerType)}
 															</span>
 														)}
 													</strong>
-													{c.phone && <small>{c.phone}</small>}
 												</div>
 											</button>
 										</td>
@@ -410,11 +332,11 @@ export default function CustomersClient() {
 											className="seller-customers__tags-cell"
 											data-label="標籤"
 										>
-											{c.tags && c.tags.length > 0 ? (
+											{c.tags.length > 0 ? (
 												<div className="seller-customers__tags seller-customers__tags--table">
 													{c.tags.slice(0, 4).map((t) => (
-														<span key={t} className="seller-customers__tag">
-															{t}
+														<span key={t.id} className="seller-customers__tag">
+															{t.name}
 														</span>
 													))}
 													{c.tags.length > 4 ? (
@@ -430,13 +352,13 @@ export default function CustomersClient() {
 											)}
 										</td>
 										<td className="is-center" data-label="訂單">
-											{c.orderCount ?? 0} 筆
+											{c.orderCount} 筆
 										</td>
 										<td
 											className="is-right seller-orders__amount"
 											data-label="累計消費"
 										>
-											NT$ {Number(c.totalSpent ?? 0).toLocaleString()}
+											NT$ {c.totalSpent.toLocaleString()}
 										</td>
 										<td
 											className="is-center seller-orders__shipping"
@@ -463,12 +385,12 @@ export default function CustomersClient() {
 				</ScrollableTableRegion>
 			</div>
 
-			{visible.length > 0 ? (
+			{rows.length > 0 ? (
 				<SellerMobileDisclosureList
-					items={visible}
+					items={rows}
 					getKey={customerRowKey}
 					ariaLabel="客戶清單"
-					resetKey={JSON.stringify([search, customerType, tagId, sortBy])}
+					resetKey={JSON.stringify([customerType, tagId, sort])}
 					getSummary={(customer) => ({
 						label: `客戶：${customer.name || "未命名客戶"}`,
 						leading: (
@@ -483,25 +405,20 @@ export default function CustomersClient() {
 							/>
 						),
 						title: customer.name || "未命名客戶",
-						meta: `${(customer.orderCount ?? 0).toLocaleString()} 筆`,
+						meta: `${customer.orderCount.toLocaleString()} 筆`,
 						status: customerTypeLabel(customer.customerType),
 					})}
 					renderDetails={(customer) => (
 						<>
 							<div className="seller-mobile-disclosure__body">
-								{customer.phone || (customer.tags?.length ?? 0) > 0 ? (
+								{customer.tags.length > 0 ? (
 									<div className="seller-mobile-disclosure__facts">
-										{customer.phone ? (
-											<span className="seller-mobile-disclosure__fact">
-												電話 {customer.phone}
-											</span>
-										) : null}
-										{customer.tags?.map((tag) => (
+										{customer.tags.map((tag) => (
 											<span
-												key={tag}
+												key={tag.id}
 												className="seller-mobile-disclosure__fact"
 											>
-												{tag}
+												{tag.name}
 											</span>
 										))}
 									</div>
@@ -513,9 +430,7 @@ export default function CustomersClient() {
 								)}
 								<div className="seller-mobile-disclosure__detail-row">
 									<span>累計消費</span>
-									<strong>
-										NT$ {Number(customer.totalSpent ?? 0).toLocaleString()}
-									</strong>
+									<strong>NT$ {customer.totalSpent.toLocaleString()}</strong>
 								</div>
 								<div className="seller-mobile-disclosure__detail-row">
 									<span>最近購買</span>
@@ -548,6 +463,17 @@ export default function CustomersClient() {
 						</>
 					)}
 				/>
+			) : null}
+
+			{hasMore ? (
+				<button
+					type="button"
+					className="seller-orders__action seller-orders__action--secondary"
+					onClick={() => void loadMore()}
+					disabled={loadingMore}
+				>
+					{loadingMore ? "載入中…" : "載入更多"}
+				</button>
 			) : null}
 
 			<CustomerDetailDrawer

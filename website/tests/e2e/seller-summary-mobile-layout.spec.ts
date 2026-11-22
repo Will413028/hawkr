@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
+	fulfillConnect,
 	type MockStore,
 	mockMyDashboard,
 	mockMyKyc,
@@ -17,16 +18,20 @@ const SELLER_STORE: MockStore = {
 	storeName: "手機版型測試商店",
 };
 
+// CrmAppService 的客戶（protobuf JSON：int64 是字串、enum 是名稱）。
 const CUSTOMER = {
-	id: 1,
 	buyerId: CUSTOMER_ID,
-	nickname: "版型測試客戶",
-	phone: "0912345678",
+	display: { nickname: "版型測試客戶" },
+	type: "CUSTOMER_TYPE_NORMAL",
+	totalSpent: "1280",
 	orderCount: 3,
-	totalSpent: 1280,
-	customerType: "normal",
 	tags: [],
 };
+
+const crmMethod = (method: string) =>
+	new RegExp(
+		`/api/connect/hawkr\\.crm\\.v1alpha1\\.CrmAppService/${method}(?:\\?|$)`,
+	);
 
 const SUMMARY_SURFACES = [
 	{
@@ -109,43 +114,14 @@ async function prepareSellerFixtures(
 			}),
 		});
 	});
-	await page.route("**/api/v1/app/sellers/me/customers?**", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				code: 0,
-				data: { list: [CUSTOMER], total: 1, page: 1 },
-			}),
-		}),
+	await page.route(crmMethod("ListCustomers"), (route) =>
+		fulfillConnect(route, { customers: [CUSTOMER], nextPageToken: "" }),
 	);
-	await page.route(
-		`**/api/v1/app/sellers/me/customers/${CUSTOMER_ID}`,
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: { ...CUSTOMER, couponCount: 2 },
-				}),
-			}),
+	await page.route(crmMethod("GetCustomer"), (route) =>
+		fulfillConnect(route, { customer: CUSTOMER }),
 	);
-	await page.route(
-		`**/api/v1/app/sellers/me/customers/${CUSTOMER_ID}/tags`,
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: [] }),
-			}),
-	);
-	await page.route("**/api/v1/app/sellers/me/tags", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: [] }),
-		}),
+	await page.route(crmMethod("ListTags"), (route) =>
+		fulfillConnect(route, { tags: [] }),
 	);
 	await page.route("**/api/v1/app/orders?**", (route) =>
 		route.fulfill({

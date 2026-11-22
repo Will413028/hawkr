@@ -76,9 +76,9 @@ test("list-like async controls retain per-action pending identity", () => {
 		"adding a tag must not unmount the initiating suggestion while pending",
 	);
 	assert.ok(
-		tagEditor.indexOf("if (tag.id) await removeCustomerTag") <
+		tagEditor.indexOf("await removeCustomerTag") <
 			tagEditor.indexOf(
-				"setTags((prev) => prev.filter",
+				"applyCustomer(customer)",
 				tagEditor.indexOf("const remove"),
 			),
 		"removing a tag keeps its initiating Button mounted until the request settles",

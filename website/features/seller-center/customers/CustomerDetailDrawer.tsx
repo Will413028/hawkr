@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "@/components/shared/Drawer";
-import type { SellerCustomer } from "@/lib/seller/repo";
+import type { SellerCustomer } from "@/lib/seller/crm";
 import CustomerDetailPanel from "./CustomerDetailPanel";
 
 interface Props {

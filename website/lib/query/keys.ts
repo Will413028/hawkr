@@ -370,8 +370,8 @@ export const queryKeys = {
 		// matches and refetches the whole family after a mutation.
 		products: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["seller", ...idPrefix(id), "products", params ?? {}] as const,
-		// CRM customer list (`/app/sellers/me/customers`). Params-driven
-		// (page/keyword/customerType/tagId/sort), so — like `products` — each
+		// CRM customer list (`CrmAppService.ListCustomers`). Params-driven
+		// (store/type/tagId/sort), so — like `products` — each
 		// variant keeps its own cache entry; invalidating with no params (`{}`)
 		// partial-matches and refetches the whole family after a mutation.
 		customers: (id: QueryIdentity, params?: Record<string, unknown>) =>
@@ -386,7 +386,7 @@ export const queryKeys = {
 		// contains the customer's order history.
 		customerLookup: (id: QueryIdentity, buyerId: string | number) =>
 			["seller", ...idPrefix(id), "customer-lookups", String(buyerId)] as const,
-		// The seller's tag pool (`/app/sellers/me/tags`) — filter chips + tag-
+		// The seller's tag pool (`CrmAppService.ListTags`) — filter chips + tag-
 		// editor suggestions share one entry (both mount with the drawer open).
 		tags: (id: QueryIdentity) => ["seller", ...idPrefix(id), "tags"] as const,
 		// The seller's own coupons / posts lists — single consumer each, optimistic

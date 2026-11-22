@@ -1,18 +1,18 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { fetchOrders } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
-import {
-	fetchSellerCustomerDetail,
-	type SellerCustomerDetail,
-} from "@/lib/seller/repo";
+import { getCustomer, type SellerCustomer } from "@/lib/seller/crm";
+import { useCrmStoreId } from "./useCrmStoreId";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 interface CustomerDetailData {
-	detail: SellerCustomerDetail | null;
+	detail: SellerCustomer;
 	orders: Order[];
 	orderTotal: number;
 }
@@ -27,9 +27,9 @@ interface UseCustomerDetailResult {
  * One CRM customer's detail + purchase history, keyed by buyerId. The body
  * ({@link CustomerDetailPanel}) renders both as a full page and inside the
  * customer-list drawer, so keying by buyerId lets a seller flick between
- * customers — and reopen one — without refetching. Purchase history comes from
- * the proven seller orders pipeline filtered by buyer; the CRM
- * `/customers/{id}/orders` sub-endpoint returns empty. After a classification /
+ * customers — and reopen one — without refetching. The customer is `GetCustomer`;
+ * purchase history comes from the store order list filtered by buyer (CRM exposes no
+ * orders, A6-D23 W6). After a classification /
  * tag mutation, invalidate via {@link useInvalidateCustomerDetail} so the panel
  * reflects it on the next open.
  */
@@ -38,11 +38,13 @@ export function useCustomerDetail(
 	options?: { enabled?: boolean },
 ): UseCustomerDetailResult {
 	const identity = useQueryIdentity();
+	const { storeId, loading: storeLoading } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
 	const query = useQuery({
 		queryKey: queryKeys.seller.customer(identity, buyerId),
 		queryFn: async (): Promise<CustomerDetailData> => {
 			const [detail, orders] = await Promise.all([
-				fetchSellerCustomerDetail(buyerId),
+				getCustomer(storeId as string, String(buyerId)),
 				fetchOrders({
 					view: "seller",
 					buyerId: String(buyerId),
@@ -53,6 +55,7 @@ export function useCustomerDetail(
 		},
 		enabled:
 			Boolean(buyerId) &&
+			Boolean(storeId) &&
 			identity.activeRole === "seller" &&
 			(options?.enabled ?? true),
 		staleTime: 30_000,
@@ -61,8 +64,8 @@ export function useCustomerDetail(
 		// `data` (not `error || !data`): a failed background refetch keeps the
 		// last-good detail rather than blanking the panel.
 		data: query.data ?? null,
-		loading: query.isLoading,
-		error: query.error instanceof Error ? query.error.message : null,
+		loading: storeLoading || query.isLoading,
+		error: query.error ? errorText(query.error, defaults) : null,
 	};
 }
 

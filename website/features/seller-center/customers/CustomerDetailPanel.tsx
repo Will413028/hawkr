@@ -1,5 +1,7 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
+import { CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -8,32 +10,30 @@ import Link from "@/components/shared/Link";
 import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import Button from "@/components/ui/Button";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
+import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
 import {
 	useCustomerDetail,
 	useInvalidateCustomerDetail,
 } from "@/lib/hooks/useCustomerDetail";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { STATUS_LABEL } from "@/lib/orders/types";
 import {
+	customerTypeClass,
+	customerTypeLabel,
 	type SellerCustomer,
-	type SellerCustomerType,
 	updateCustomerType,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
 import CustomerTagEditor from "./CustomerTagEditor";
 
-const CLASS_OPTIONS: Array<{
-	value: SellerCustomerType;
-	label: string;
-	loadingLabel: string;
-}> = [
-	{ value: "normal", label: "一般", loadingLabel: "設為一般客戶中…" },
-	{ value: "vip", label: "VIP", loadingLabel: "設為 VIP 客戶中…" },
-	{ value: "blocklist", label: "黑名單", loadingLabel: "加入黑名單中…" },
+const CLASS_OPTIONS: Array<{ value: CustomerType; loadingLabel: string }> = [
+	{ value: CustomerType.NORMAL, loadingLabel: "設為一般客戶中…" },
+	{ value: CustomerType.VIP, loadingLabel: "設為 VIP 客戶中…" },
 ];
 
 /**
- * VIP / 黑名單 / 一般 三態切換 — `PATCH …/customers/{id}` with `customer_type`.
- * Optimistic; rolls back on failure. Mirrors the app's customer classification.
+ * VIP / 一般 切換 — `UpdateCustomer`（update_mask 只有 `type`）。
+ * Optimistic; rolls back on failure and shows the server's text.
  */
 function CustomerClassControl({
 	buyerId,
@@ -41,12 +41,16 @@ function CustomerClassControl({
 	onChanged,
 }: {
 	buyerId: string | number;
-	initial: SellerCustomerType;
+	initial: CustomerType;
 	onChanged?: () => void;
 }) {
-	const [value, setValue] = React.useState<SellerCustomerType>(initial);
-	const [pendingType, setPendingType] =
-		React.useState<SellerCustomerType | null>(null);
+	const { storeId } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
+	const [value, setValue] = React.useState<CustomerType>(initial);
+	const [pendingType, setPendingType] = React.useState<CustomerType | null>(
+		null,
+	);
+	const [error, setError] = React.useState<string | null>(null);
 
 	// Keep in sync when the detail load resolves a different class than the
 	// optimistic summary the drawer opened with.
@@ -54,16 +58,18 @@ function CustomerClassControl({
 		setValue(initial);
 	}, [initial]);
 
-	const pick = async (next: SellerCustomerType) => {
-		if (next === value || pendingType !== null) return;
+	const pick = async (next: CustomerType) => {
+		if (next === value || pendingType !== null || !storeId) return;
 		const prev = value;
 		setValue(next);
 		setPendingType(next);
+		setError(null);
 		try {
-			await updateCustomerType(buyerId, next);
+			await updateCustomerType(storeId, String(buyerId), next);
 			onChanged?.();
-		} catch {
+		} catch (e) {
 			setValue(prev);
+			setError(errorText(e, defaults));
 		} finally {
 			setPendingType(null);
 		}
@@ -79,18 +85,23 @@ function CustomerClassControl({
 					variant="light"
 					color="default"
 					size="sm"
-					className={`seller-customer-detail__class-btn h-auto px-[10px] py-[3px] is-${opt.value}${
+					className={`seller-customer-detail__class-btn h-auto px-[10px] py-[3px] ${customerTypeClass(opt.value)}${
 						value === opt.value ? " is-active" : ""
 					}`}
 					aria-pressed={value === opt.value}
 					onClick={() => void pick(opt.value)}
-					disabled={pendingType !== null}
+					disabled={pendingType !== null || !storeId}
 					isLoading={pendingType === opt.value}
 					loadingLabel={opt.loadingLabel}
 				>
-					{opt.label}
+					{customerTypeLabel(opt.value)}
 				</Button>
 			))}
+			{error && (
+				<p className="seller-customers__error" role="alert">
+					{error}
+				</p>
+			)}
 		</fieldset>
 	);
 }
@@ -136,10 +147,10 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 	// is populated immediately on open.
 	const name = detail?.name || summary?.name || "客戶";
 	const avatar = detail?.avatar ?? summary?.avatar;
-	const phone = detail?.phone ?? summary?.phone;
 	const totalSpent = Number(detail?.totalSpent ?? summary?.totalSpent ?? 0);
 	const orderCount = detail?.orderCount ?? summary?.orderCount ?? orderTotal;
-	const classType = detail?.customerType ?? summary?.customerType ?? "normal";
+	const classType =
+		detail?.customerType ?? summary?.customerType ?? CustomerType.NORMAL;
 
 	return (
 		<div className="seller-customer-detail__panel">
@@ -190,11 +201,6 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 							onChanged={handleMutate}
 						/>
 					</div>
-					<div className="seller-customer-detail__meta">
-						{phone && <span>{phone}</span>}
-						{detail?.email && <span>{detail.email}</span>}
-						{detail?.address && <span>{detail.address}</span>}
-					</div>
 					<CustomerTagEditor
 						buyerId={buyerId}
 						initialTags={detail?.tags ?? summary?.tags}
@@ -223,13 +229,6 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 					<strong>NT$ {Math.round(totalSpent).toLocaleString()}</strong>
 					<small>累計消費</small>
 				</div>
-				<div className="seller-inventory__stat">
-					<span className="seller-inventory__stat-icon is-secondary">
-						<AppIcon name="ticket" />
-					</span>
-					<strong>{(detail?.couponCount ?? 0).toLocaleString()}</strong>
-					<small>持有優惠券</small>
-				</div>
 			</section>
 
 			<div className="seller-card seller-customers__card">
@@ -252,6 +251,12 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 								<tr>
 									<td colSpan={4} className="seller-orders__empty">
 										載入中…
+									</td>
+								</tr>
+							) : error && data === null ? (
+								<tr>
+									<td colSpan={4} className="seller-orders__empty">
+										{error}
 									</td>
 								</tr>
 							) : orders.length === 0 ? (

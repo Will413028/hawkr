@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/Input";
 import { useHydrationSafeClientRender } from "@/lib/hooks/useHydrationSafeClientRender";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
+import type { SellerCustomer } from "@/lib/seller/crm";
 import {
 	createSellerCoupon,
 	fetchSellerCoupon,
 	type SellerCoupon,
 	type SellerCouponKind,
 	type SellerCouponTarget,
-	type SellerCustomer,
 } from "@/lib/seller/repo";
 import CouponBuyerPicker from "./CouponBuyerPicker";
 import CouponRulesButton from "./CouponRulesButton";

@@ -92,7 +92,7 @@ export const SELLER_FEATURE_OVERVIEW: readonly SellerFeatureOverviewGroup[] = [
 		features: [
 			"依姓名或電話搜尋顧客",
 			"依消費金額、訂單數與最近購買時間排序",
-			"分類為一般顧客、VIP 或黑名單，並使用自訂標籤篩選",
+			"分類為一般顧客或 VIP，並使用自訂標籤篩選",
 			"查看累計訂單、累計消費與實際購買紀錄",
 		],
 	},
