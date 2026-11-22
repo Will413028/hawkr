@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	searchPageSize = 50
+	// SearchPageSize 是搜尋每頁的筆數；回傳少於它就是最後一頁。
+	SearchPageSize = 50
 	// listedStatus 是商品狀態碼的「已上架」。
 	listedStatus = "4004"
 	// salesSort 是 ProductSort 的銷量排序。
@@ -27,7 +28,7 @@ type SearchHit struct {
 	MinPrice, MaxPrice int64
 }
 
-// SearchQuery 是一次上架商品搜尋：分類 ID 與關鍵字二擇一，依銷量排序，Page 從 1 起、每頁 searchPageSize 筆。
+// SearchQuery 是一次上架商品搜尋：分類 ID 與關鍵字二擇一，依銷量排序，Page 從 1 起、每頁 SearchPageSize 筆。
 type SearchQuery struct {
 	CategoryID int64
 	Keyword    string
@@ -46,7 +47,7 @@ func (c *Client) SearchProducts(ctx context.Context, q SearchQuery) ([]SearchHit
 	req := &productpb.GetProductListRequest{
 		Keyword:  keyword,
 		Page:     strconv.Itoa(q.Page),
-		PageSize: strconv.Itoa(searchPageSize),
+		PageSize: strconv.Itoa(SearchPageSize),
 		Sort:     salesSort,
 		Status:   listedStatus,
 	}
@@ -62,8 +63,8 @@ func (c *Client) SearchProducts(ctx context.Context, q SearchQuery) ([]SearchHit
 	if resp.Msg.GetCode() != 0 {
 		return nil, fmt.Errorf("productservice：GetProductList code=%d", resp.Msg.GetCode())
 	}
-	if len(resp.Msg.GetProducts()) > searchPageSize {
-		return nil, fmt.Errorf("productservice：GetProductList 回傳超過 %d 筆", searchPageSize)
+	if len(resp.Msg.GetProducts()) > SearchPageSize {
+		return nil, fmt.Errorf("productservice：GetProductList 回傳超過 %d 筆", SearchPageSize)
 	}
 	out := make([]SearchHit, 0, len(resp.Msg.GetProducts()))
 	for _, item := range resp.Msg.GetProducts() {

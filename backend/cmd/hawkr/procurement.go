@@ -9,6 +9,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -28,8 +29,26 @@ func newProcurement(d *db.DB, jobs procurement.JobQueue, log *slog.Logger) *proc
 }
 
 // newProcurementWorker 組出會執行 run 的採購模組（worker 角色）：登記 TURN 的 executor，模型是採購用的 llm 角色，分類樹經舊 product-service 轉接。
-func newProcurementWorker(d *db.DB, jobs procurement.JobQueue, model llm.Model, categories *categoryservice.Client, log *slog.Logger) *procurement.Module {
-	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log, Jobs: jobs, LLM: model, Taxonomy: taxonomy{categories}})
+func newProcurementWorker(d *db.DB, jobs procurement.JobQueue, model llm.Model, categories *categoryservice.Client, products *productservice.Client, sellers procurement.SellerStores, log *slog.Logger) *procurement.Module {
+	return procurement.New(procurement.Deps{
+		DB: d, Now: time.Now, Logger: log, Jobs: jobs, LLM: model, Taxonomy: taxonomy{categories},
+		Sellers: sellers, Search: productSearch{products},
+	})
+}
+
+// productSearch 把舊 product-service 的商品搜尋轉成候選搜尋的 port；一頁不滿 searchPageSize 筆就是最後一頁。catalog 搬進單體時整段刪除。
+type productSearch struct{ client *productservice.Client }
+
+func (p productSearch) Page(ctx context.Context, q procurement.SearchQuery, page int) (procurement.SearchPage, error) {
+	hits, err := p.client.SearchProducts(ctx, productservice.SearchQuery{CategoryID: q.CategoryID, Keyword: q.Keyword, Page: page})
+	if err != nil {
+		return procurement.SearchPage{}, err
+	}
+	out := procurement.SearchPage{Hits: make([]procurement.SearchHit, 0, len(hits)), Last: len(hits) < productservice.SearchPageSize}
+	for _, h := range hits {
+		out.Hits = append(out.Hits, procurement.SearchHit{ProductID: h.ID, StoreID: h.StoreID})
+	}
+	return out, nil
 }
 
 // taxonomy 把舊 category 服務的分類樹（巢狀）轉成 resolver 讀的扁平節點；catalog 搬進單體時整段刪除。

@@ -2,6 +2,7 @@ package procurement_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -17,8 +18,25 @@ import (
 )
 
 type fakeSellers struct {
-	calls     [][]int64
-	exposable map[int64]bool
+	calls        [][]int64
+	exposable    map[int64]bool
+	blocking     map[int64]bool
+	blockCalls   [][]int64
+	blockErrorOn int
+}
+
+func (f *fakeSellers) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64) (map[int64]bool, error) {
+	f.blockCalls = append(f.blockCalls, append([]int64(nil), ids...))
+	if f.blockErrorOn > 0 && len(f.blockCalls) == f.blockErrorOn {
+		return nil, errors.New("boom")
+	}
+	out := map[int64]bool{}
+	for _, id := range ids {
+		if f.blocking[id] {
+			out[id] = true
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeSellers) ExposableStores(_ context.Context, ids []int64) ([]seller.ExposableStore, error) {
@@ -53,6 +71,61 @@ func TestOpenStoresBatchesBySellerLimit(t *testing.T) {
 	}
 	if _, ok := got[1]; !ok || len(got) != 2 {
 		t.Fatalf("got = %v", got)
+	}
+}
+
+// 封鎖查詢同樣依 seller 的批次上限分批，結果合併；任一批失敗整個失敗（fail-closed）。
+func TestBlockedStoresBatchesBySellerLimitAndFailsClosed(t *testing.T) {
+	last := int64(seller.MaxBatchSize) + 1
+	fake := &fakeSellers{blocking: map[int64]bool{2: true, last: true}}
+	ids := make([]int64, 0, seller.MaxBatchSize+2)
+	for i := range seller.MaxBatchSize + 2 {
+		ids = append(ids, int64(i+1))
+	}
+	got, err := procurement.NewBlockedStores(fake).StoreIDsBlockingBuyer(context.Background(), 5, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.blockCalls) != 2 || len(fake.blockCalls[0]) > seller.MaxBatchSize {
+		t.Fatalf("分批 = %d 批", len(fake.blockCalls))
+	}
+	if _, ok := got[2]; !ok || len(got) != 2 {
+		t.Fatalf("got = %v", got)
+	}
+	failing := &fakeSellers{blockErrorOn: 2}
+	if got, err := procurement.NewBlockedStores(failing).StoreIDsBlockingBuyer(context.Background(), 5, ids); err == nil || got != nil {
+		t.Fatalf("第二批失敗要整個失敗：%v %v", got, err)
+	}
+}
+
+type fakeSearch struct{}
+
+func (fakeSearch) Page(context.Context, procurement.SearchQuery, int) (procurement.SearchPage, error) {
+	return procurement.SearchPage{Last: true}, nil
+}
+
+// CANDIDATE_SEARCH 的 executor 由 New 在給了搜尋、seller 與分類樹時登記；給了搜尋卻缺其他依賴是組裝錯誤。
+func TestNewRegistersTheSearchExecutorAndRejectsPartialWiring(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	disabled := llm.New(llm.Procurement, llm.Config{}, log)
+	full := procurement.New(newDeps(func(d *procurement.Deps) {
+		d.LLM, d.Taxonomy, d.Sellers, d.Search = disabled, noTaxonomy{}, &fakeSellers{}, fakeSearch{}
+	}))
+	if got := full.ExecutorTypes(); len(got) != 2 || got[0] != run.RunTypeCandidateSearch || got[1] != run.RunTypeTurn {
+		t.Errorf("executors = %v，要登記 CANDIDATE_SEARCH 與 TURN", got)
+	}
+	for name, fn := range map[string]func(*procurement.Deps){
+		"沒有 Sellers":  func(d *procurement.Deps) { d.LLM, d.Taxonomy, d.Search = disabled, noTaxonomy{}, fakeSearch{} },
+		"沒有 Taxonomy": func(d *procurement.Deps) { d.Sellers, d.Search = &fakeSellers{}, fakeSearch{} },
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s：要 panic", name)
+				}
+			}()
+			procurement.New(newDeps(fn))
+		}()
 	}
 }
 

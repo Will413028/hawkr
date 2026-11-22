@@ -74,10 +74,13 @@ type SubmitInput struct {
 	ClientRequestID uuid.UUID
 	Message         string
 	// Locale 是送出時的請求語系，存進 run 輸入，executor 用它渲染伺服器句子（背景 job 沒有請求 ctx）。
-	Locale      uitext.Locale
-	QuotaLimit  int32
-	PeriodStart time.Time
-	PeriodEnd   time.Time
+	Locale uitext.Locale
+	// PrepareCandidateSet 只給 CANDIDATE_SEARCH：在買家的送出鎖與重送檢查之後、檢查上限之前呼叫，驗證前置並在同一個 transaction 建候選集，
+	// 回傳它的 ID，run 的 candidate_set_id 指向它。重送回第一次的 run，不會呼叫它。
+	PrepareCandidateSet func(ctx context.Context, q *store.Queries) (uuid.UUID, error)
+	QuotaLimit          int32
+	PeriodStart         time.Time
+	PeriodEnd           time.Time
 }
 
 // Submitter 是送出路徑：同一個 transaction 內冪等建 run、檢查買家上限、TURN 扣一次額度、寫輸入與第一個事件、排入 job 並記下 job id。
@@ -108,6 +111,10 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 			return fmt.Errorf("run：讀取重送的 run：%w", err)
 		}
 		now := s.Ledger.Now()
+		candidateSetID, err := s.prepareCandidateSet(ctx, q, in)
+		if err != nil {
+			return err
+		}
 		if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {
 			return err
 		}
@@ -116,7 +123,7 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 			quotaStart = &in.PeriodStart
 		}
 		if _, err := s.insertRun(ctx, q, store.InsertRunParams{
-			ID: id, BuyerID: in.BuyerID, RequestID: in.RequestID, ConversationID: in.ConversationID,
+			ID: id, BuyerID: in.BuyerID, RequestID: in.RequestID, ConversationID: in.ConversationID, CandidateSetID: candidateSetID,
 			RunType: in.RunType, ClientRequestID: in.ClientRequestID, QuotaPeriodStart: quotaStart, Now: now,
 		}); err != nil {
 			return err
@@ -143,6 +150,21 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 		return uuid.UUID{}, err
 	}
 	return id, nil
+}
+
+// prepareCandidateSet 呼叫 PrepareCandidateSet；只有 CANDIDATE_SEARCH 用它，而且 CANDIDATE_SEARCH 一定要給（run 沒有候選集就沒有搜尋的依據）。
+func (s Submitter) prepareCandidateSet(ctx context.Context, q *store.Queries, in SubmitInput) (*uuid.UUID, error) {
+	if (in.RunType == RunTypeCandidateSearch) != (in.PrepareCandidateSet != nil) {
+		return nil, fmt.Errorf("run：%s 的送出與 PrepareCandidateSet 不相符（只有 CANDIDATE_SEARCH 給，而且一定要給）", in.RunType)
+	}
+	if in.PrepareCandidateSet == nil {
+		return nil, nil
+	}
+	id, err := in.PrepareCandidateSet(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // insertRun 建 run 列；買家的鎖之下 (buyer, client_request_id) 不會衝突，回 0 列代表不變量被破壞。

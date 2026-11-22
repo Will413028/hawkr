@@ -480,7 +480,7 @@ func runWorker(ctx context.Context) error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	contentModule.AddWorkers(workers)
-	procurementModule := newProcurementWorker(d, jc, llm.New(llm.Procurement, llmConfig, log), categories, log)
+	procurementModule := newProcurementWorker(d, jc, llm.New(llm.Procurement, llmConfig, log), categories, products, sellerModule, log)
 	addProcurementWorkers(workers, procurementModule)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)

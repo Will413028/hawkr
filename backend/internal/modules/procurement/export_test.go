@@ -9,6 +9,9 @@ import (
 // NewOpenStores 讓測試驗證 seller.ExposableStores 轉成 candidate.OpenStores 的分批與對照。
 func NewOpenStores(s SellerStores) candidate.OpenStores { return openStores{sellers: s} }
 
+// NewBlockedStores 讓測試驗證 seller.StoresBlockingBuyer 轉成 candidate.BlockedStores 的分批與對照。
+func NewBlockedStores(s SellerStores) candidate.BlockedStores { return blockingStores{sellers: s} }
+
 // ExecutorTypes 讓測試驗證 New 登記了哪些 run 類型的 executor。
 func (m *Module) ExecutorTypes() []string {
 	var out []string

@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -43,9 +44,10 @@ const Schema = "procurement"
 // BuyerDeleted 是 buyer 關閉買家時同 transaction 發布的事件（本模組的訂閱者見 Module.OnBuyerDeleted）。
 type BuyerDeleted = buyer.BuyerDeleted
 
-// SellerStores 是候選搜尋確認店家是否營業中要用的 seller 方法（*seller.Module 滿足它）。
+// SellerStores 是候選搜尋過濾店家要用的 seller 方法：確認營業中、排除封鎖這位買家的店（*seller.Module 滿足它）。
 type SellerStores interface {
 	ExposableStores(ctx context.Context, storeIDs []int64) ([]seller.ExposableStore, error)
+	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
@@ -53,8 +55,10 @@ type Deps struct {
 	DB     *db.DB
 	Now    func() time.Time
 	Logger *slog.Logger
-	// Sellers 是候選搜尋確認店家營業中的 seller 方法；A9-3b 掛上候選搜尋時才有呼叫者。
+	// Sellers 是候選搜尋過濾店家的 seller 方法；與 Search、Taxonomy 一起給才登記 CANDIDATE_SEARCH 的 executor。
 	Sellers SellerStores
+	// Search 是商品搜尋（分類 ID 或關鍵字，依銷量一頁一頁取），catalog 搬進單體前由 cmd/hawkr 以 internal/legacy 的 product 轉接。
+	Search ProductSearcher
 	// Jobs 排入與取消 run 的 River job（*jobs.Client 滿足它）；送出與取消路徑需要，只跑 worker 的程序可以不給。
 	Jobs JobQueue
 	// Executors 依 run 類型登記執行者（run.RunTypeTurn 等）；沒有登記的類型，worker 領到時把 run 標為該類型的 pipeline 失敗。
@@ -67,6 +71,18 @@ type Deps struct {
 	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
 	Limits run.Limits
 }
+
+// ProductSearcher 是候選搜尋的商品搜尋 port；SearchQuery、SearchPage、SearchHit 是它的輸入與輸出。
+type ProductSearcher = candidate.Searcher
+
+type (
+	// SearchQuery 是搜尋的輸入：分類 ID 與關鍵字二擇一。
+	SearchQuery = candidate.Query
+	// SearchPage 是依序的一頁命中，Last 表示後面沒有更多頁。
+	SearchPage = candidate.Page
+	// SearchHit 是命中的一件上架商品（商品 ID 與店 ID）。
+	SearchHit = candidate.Hit
+)
 
 // TaxonomyReader 讀平台的啟用分類樹（扁平節點，根的 ParentID 為 0）。
 type TaxonomyReader = resolver.TaxonomyReader
@@ -89,6 +105,7 @@ type Module struct {
 	submitter  run.Submitter
 	canceller  run.Canceller
 	hub        *run.Hub
+	searcher   search.Starter
 }
 
 // New 建立模組。
@@ -102,7 +119,7 @@ func New(d Deps) *Module {
 		panic("procurement.New：Deps.Logger 必填")
 	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
-	return &Module{
+	m := &Module{
 		dispatcher: run.Dispatcher{DB: d.DB, Ledger: ledger, Executors: executors(d, ledger), Logger: d.Logger},
 		submitter:  run.Submitter{DB: d.DB, Ledger: ledger, Jobs: d.Jobs, Limits: d.Limits},
 		canceller:  run.Canceller{DB: d.DB, Ledger: ledger, Jobs: d.Jobs},
@@ -111,34 +128,49 @@ func New(d Deps) *Module {
 		reconciler: run.Reconciler{DB: d.DB, Ledger: ledger, Logger: d.Logger},
 		purger:     run.Purger{DB: d.DB, Ledger: ledger},
 	}
+	m.searcher = search.Starter{Submitter: m.submitter}
+	return m
 }
 
-// executors 在呼叫端給的登記之外補上 TURN 的 executor：LLM 與 Taxonomy 都給才登記，只給其中一個是組裝錯誤。
+// executors 在呼叫端給的登記之外補上 TURN 與 CANDIDATE_SEARCH 的 executor。
+// TURN：LLM 與 Taxonomy 都給才登記，只給其中一個是組裝錯誤。CANDIDATE_SEARCH：給了 Search 就要有 Taxonomy 與 Sellers（分類檢查與店家過濾）。
 func executors(d Deps, ledger run.Ledger) map[string]Executor {
 	hasLLM := d.LLM.LLM() != nil
 	if hasLLM != (d.Taxonomy != nil) {
 		panic("procurement.New：Deps.LLM 與 Deps.Taxonomy 要一起給")
 	}
-	if !hasLLM {
+	if d.Search != nil && d.Sellers == nil {
+		panic("procurement.New：Deps.Search 要與 Deps.Sellers 一起給")
+	}
+	if d.Search != nil && d.Taxonomy == nil {
+		panic("procurement.New：Deps.Search 要與 Deps.Taxonomy 一起給")
+	}
+	if !hasLLM && d.Search == nil {
 		return d.Executors
 	}
-	out := make(map[string]Executor, len(d.Executors)+1)
+	out := make(map[string]Executor, len(d.Executors)+2)
 	for k, v := range d.Executors {
 		out[k] = v
 	}
-	if _, ok := out[run.RunTypeTurn]; ok {
-		return out
-	}
-	shape := extract.ShapeSchema // 停用的模型沒有 provider：呼叫一律回 ErrDisabled，形狀無關
-	if d.LLM.Enabled() {
-		var err error
-		if shape, err = extract.ShapeFor(d.LLM.Provider()); err != nil {
-			panic(fmt.Sprintf("procurement.New：%v", err))
+	rs := resolver.New(d.Taxonomy, resolver.EmbeddedSynonyms(), d.Now)
+	if _, ok := out[run.RunTypeTurn]; !ok && hasLLM {
+		shape := extract.ShapeSchema // 停用的模型沒有 provider：呼叫一律回 ErrDisabled，形狀無關
+		if d.LLM.Enabled() {
+			var err error
+			if shape, err = extract.ShapeFor(d.LLM.Provider()); err != nil {
+				panic(fmt.Sprintf("procurement.New：%v", err))
+			}
+		}
+		out[run.RunTypeTurn] = turn.Executor{
+			DB: d.DB, Ledger: ledger, Extractor: extract.New(d.LLM.LLM(), d.LLM.Name(), shape),
+			Resolver: rs, Now: d.Now, Logger: d.Logger,
 		}
 	}
-	out[run.RunTypeTurn] = turn.Executor{
-		DB: d.DB, Ledger: ledger, Extractor: extract.New(d.LLM.LLM(), d.LLM.Name(), shape),
-		Resolver: resolver.New(d.Taxonomy, resolver.EmbeddedSynonyms(), d.Now), Now: d.Now, Logger: d.Logger,
+	if _, ok := out[run.RunTypeCandidateSearch]; !ok && d.Search != nil {
+		out[run.RunTypeCandidateSearch] = search.Executor{
+			DB: d.DB, Ledger: ledger, Searcher: d.Search, Open: openStores{d.Sellers}, Blocks: blockingStores{d.Sellers},
+			Resolver: rs, Now: d.Now, Logger: d.Logger,
+		}
 	}
 	return out
 }
@@ -178,4 +210,39 @@ func (o openStores) OpenStoreIDs(ctx context.Context, storeIDs []int64) (map[int
 		}
 	}
 	return out, nil
+}
+
+// blockingStores 把 seller.StoresBlockingBuyer 轉成 candidate.BlockedStores，依 seller 的批次上限分批；任一批失敗整個失敗（fail-closed）。
+type blockingStores struct{ sellers SellerStores }
+
+var _ candidate.BlockedStores = blockingStores{}
+
+func (b blockingStores) StoreIDsBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]struct{}, error) {
+	out := make(map[int64]struct{})
+	for start := 0; start < len(storeIDs); start += seller.MaxBatchSize {
+		end := min(start+seller.MaxBatchSize, len(storeIDs))
+		blocked, err := b.sellers.StoresBlockingBuyer(ctx, buyerID, storeIDs[start:end])
+		if err != nil {
+			return nil, fmt.Errorf("procurement：讀封鎖這位買家的店家：%w", err)
+		}
+		for id, isBlocked := range blocked {
+			if isBlocked {
+				out[id] = struct{}{}
+			}
+		}
+	}
+	return out, nil
+}
+
+// StartCandidateSearchInput 是開始候選搜尋的輸入：ClientRequestID 是冪等鍵（以 run 的 (buyer, client_request_id) 為準）。
+type StartCandidateSearchInput = search.StartInput
+
+// CandidateSearchStarted 是開始搜尋的結果：run、候選集與 run 當下的狀態（QUEUED 等）。
+type CandidateSearchStarted = search.Started
+
+// StartCandidateSearch 開始一次候選搜尋（A9-D29）：不扣額度、不改需求狀態；成功的搜尋才把需求轉 MATCHING。
+// 需求不屬於買家回 NOT_FOUND；需求不在 REQUIREMENT_READY 或 MATCHING 回 REQUIREMENT_NOT_READY；同需求已有進行中的 run 回 PROCUREMENT_RUN_IN_PROGRESS。
+// 重送同一個 client_request_id 回第一次的 run 與候選集（內容不同回 INVALID_ARGUMENT）。
+func (m *Module) StartCandidateSearch(ctx context.Context, in StartCandidateSearchInput) (CandidateSearchStarted, error) {
+	return m.searcher.Start(ctx, in)
 }

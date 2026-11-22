@@ -97,15 +97,16 @@ var InternalDependencies = map[string]InternalGraph{
 		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},
 	"procurement": {Packages: map[string][]string{
-		"candidate": {"model"}, // 候選只收 OPEN 的店、買家與 LLM 兩種候選型別的分界（A9-D8、S9）
+		"candidate": {},        // 候選搜尋：翻頁收集、只收 OPEN 且沒封鎖這位買家的店（S9、A9-D29）
 		"extract":   {"slots"}, // 一次模型呼叫把買家訊息抽成欄位 patch，呼叫內重試一次（A9-3b-2c、A9-D28(2)）
 		"model":     {},
-		"planner":   {"model", "slots"},                    // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
-		"reply":     {"model", "planner", "slots", "text"}, // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
-		"resolver":  {},                                    // 品項用詞對分類樹，人工同義詞（A9-D7）
-		"retention": {"store"},                             // 買家關閉後刪除與匿名（S10）
-		"run":       {"store"},                             // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
-		"slots":     {"model"},                             // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
+		"planner":   {"model", "slots"},                                 // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
+		"reply":     {"model", "planner", "slots", "text"},              // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
+		"resolver":  {},                                                 // 品項用詞對分類樹，人工同義詞（A9-D7）
+		"retention": {"store"},                                          // 買家關閉後刪除與匿名（S10）
+		"run":       {"store"},                                          // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
+		"search":    {"candidate", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
+		"slots":     {"model"},                                          // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
 		"store":     {},
 		"text":      {},                                                                            // 模組句子（ADR 2026-10-17 多語系）
 		"turn":      {"extract", "model", "planner", "reply", "resolver", "run", "slots", "store"}, // TURN run 的 executor：抽取、套用、解析品項、規劃、單一 transaction 提交（A9-3b-2c）
