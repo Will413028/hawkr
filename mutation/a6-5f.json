@@ -50,7 +50,7 @@
    "stack": "go",
    "file": "backend/internal/httpapi/chat/app.go",
    "old": "GetStoreConversationByBuyerResponse{Conversation: items[0]}",
-   "new": "GetStoreConversationByBuyerResponse{}",
+   "new": "GetStoreConversationByBuyerResponse{Conversation: func() *pb.Conversation { _ = items; return nil }()}",
    "test": "internal/httpapi/chat ^TestGetStoreConversationByBuyerDerivesTheStoreFromTheCallerAndAssemblesTheBuyer$",
    "why": "The handler returns an empty response instead of the assembled conversation."
   },
