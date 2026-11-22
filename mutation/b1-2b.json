@@ -4,7 +4,7 @@
    "id": "gc-claims-confirmed",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "WHERE (u.state IN ('PENDING', 'READY', 'REJECTED') AND u.expires_at <= $1)",
+   "old": "WHERE (u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)",
    "new": "WHERE (u.expires_at <= $1)",
    "test": "internal/modules/media ^TestGC_NeverDeletesConfirmedAssets$",
    "why": "GC no longer restricts itself to unconfirmed rows, so an expired confirmed upload is claimed for deletion"
@@ -49,8 +49,8 @@
    "id": "delete-failure-still-marks-deleted",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
-   "old": "\tif err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\treturn fmt.Errorf(\"media：刪除資產 %s 的物件：%w\", r.ID, err)\n\t}",
-   "new": "\tif err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\ts.d.Logger.WarnContext(ctx, \"delete failed\", \"error\", err)\n\t}",
+   "old": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\treturn fmt.Errorf(\"media：刪除資產 %s 的物件：%w\", r.ID, err)\n\t}",
+   "new": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\ts.d.Logger.WarnContext(ctx, \"delete failed\", \"error\", err)\n\t}",
    "test": "internal/modules/media ^TestDeleteJob_StorageFailureKeepsRowRetryable$",
    "why": "a failed object delete is swallowed and the asset is marked DELETED while its object still exists"
   },
@@ -157,8 +157,8 @@
    "id": "lost-keeps-object-unless-uploaded",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/process.go",
-   "old": "\t\tcase model.StatePending, model.StateRejected, model.StateDeleting, model.StateDeleted:\n",
-   "new": "\t\tcase model.StatePending, model.StateRejected, model.StateDeleting, model.StateDeleted:\n\t\t\treturn nil\n",
+   "old": "\t\tcase model.StatePending, model.StateUploading, model.StateRejected, model.StateDeleting, model.StateDeleted:\n",
+   "new": "\t\tcase model.StatePending, model.StateUploading, model.StateRejected, model.StateDeleting, model.StateDeleted:\n\t\t\treturn nil\n",
    "test": "internal/modules/media ^TestProcess_LostToGCLeavesNoOrphanObject$",
    "why": "a late processing job that lost to GC no longer deletes the final object it wrote when the row is not UPLOADED, leaving an orphan"
   }

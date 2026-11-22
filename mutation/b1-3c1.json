@@ -31,8 +31,8 @@
    "id": "chunk-no-length-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
-   "old": "\tif length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(expected)",
-   "new": "\tif false && length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(expected)",
+   "old": "\tif length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(ctx, expected)",
+   "new": "\tif false && length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(ctx, expected)",
    "test": "internal/modules/media ^TestSecureUpload_ChunkLengthMismatchIsRejectedWithoutWrites$",
    "why": "拿掉段長度檢查：宣告的 length 與該段應有長度不符仍被收下"
   },

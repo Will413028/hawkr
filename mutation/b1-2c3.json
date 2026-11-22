@@ -94,8 +94,8 @@
    "id": "put-secure-skips-encryption",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
-   "old": "plainSize, err := secure.Encrypt(tmp, br, dek)",
-   "new": "_ = dek\n\tplainSize, err := io.Copy(tmp, br)",
+   "old": "plainSize, err := secure.EncryptChunk(&cipherText, br, dek, secure.Chunk{Asset: *row.PlannedAssetID, Index: u32(index), Count: u32(count)})",
+   "new": "_ = dek\n\tplainSize, err := io.Copy(&cipherText, br)",
    "test": "internal/modules/media ^TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm$",
    "why": "the direct secure write stores the plaintext instead of the envelope-encrypted object"
   },
@@ -148,8 +148,8 @@
    "id": "put-secure-fails-fast",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
-   "old": "return s.uploadSecure(ctx, uploader, body, true)",
-   "new": "return s.uploadSecure(ctx, uploader, body, false)",
+   "old": "last, err = s.putChunk(ctx, uploader, begin.Token, i, io.LimitReader(src, n), n, true)",
+   "new": "last, err = s.putChunk(ctx, uploader, begin.Token, i, io.LimitReader(src, n), n, false)",
    "test": "internal/modules/media ^TestPutSecure_WaitsForASlotInsteadOfFailingFast$",
    "why": "PutSecure returns ResourceExhausted to a server caller instead of waiting for a slot"
   },
