@@ -130,19 +130,19 @@
    "id": "m15",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/search/executor.go",
-   "old": "_, leaf, err = e.Resolver.LeafFresh(ctx, q.CategoryID)",
-   "new": "_, leaf, err = e.Resolver.Leaf(ctx, q.CategoryID)",
-   "test": "internal/modules/procurement/internal/search ^TestFindSearchesWhenTheCachedTreeSaysNotLeafButTheFreshTreeStillHasIt$",
-   "why": "分類失效不以新鮮的樹重新確認：過期快取的否定答案誤清買家確認的分類"
+   "old": "_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, notBefore)",
+   "new": "_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, time.Time{})",
+   "test": "internal/modules/procurement/internal/search ^TestFindSearchesWhenTheTreeConfirmsALeafAndPassesTheRevisionTimeAsTheLowerBound$",
+   "why": "分類檢查不帶時間下限：剛建立的分類在較舊的快取樹上被誤判"
   },
   {
    "id": "m16",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/resolver/resolver.go",
-   "old": "if r.tree != nil && now.Sub(r.loadedAt) < TreeTTL {",
-   "new": "if r.tree != nil {",
-   "test": "internal/modules/procurement/internal/resolver ^TestLeafFreshReloadsAnExpiredTreeBeforeAnswering$",
-   "why": "LeafFresh 不看 TTL：過期的樹仍被當成新鮮"
+   "old": "now.Sub(r.loadedAt) < TreeTTL && !r.readStart.Before(notBefore)",
+   "new": "!r.readStart.Before(notBefore)",
+   "test": "internal/modules/procurement/internal/resolver ^TestLeafAsOfReloadsAnExpiredTreeEvenWhenTheCachedAnswerIsPositive$",
+   "why": "LeafAsOf 不看 TTL：過期的樹仍被當成新鮮"
   },
   {
    "id": "m17",
@@ -161,6 +161,51 @@
    "new": "candidateSetID, err := s.prepareCandidateSet(ctx, q, in)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}",
    "test": "internal/modules/procurement/internal/run ^TestCandidateSearchChecksInProgressRunBeforePreparingTheCandidateSet$",
    "why": "先建候選集再檢查進行中的 run：對即將被取代的版本建候選集"
+  },
+  {
+   "id": "m19",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "e.find(ctx, r.BuyerID, q, ld.revision.CreatedAt)",
+   "new": "e.find(ctx, r.BuyerID, q, time.Time{})",
+   "test": "internal/modules/procurement/internal/search ^TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification$",
+   "why": "Execute 不以候選集所指版本的建立時間當下限"
+  },
+  {
+   "id": "m20",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/resolver/resolver.go",
+   "old": "TreeTTL && !r.readStart.Before(notBefore)",
+   "new": "TreeTTL",
+   "test": "internal/modules/procurement/internal/resolver ^TestLeafAsOfReloadsATreeLoadedBeforeNotBeforeAndSeesTheNewLeaf$",
+   "why": "LeafAsOf 不看 notBefore：TTL 內但早於分類建立的樹被當成新鮮"
+  },
+  {
+   "id": "m21",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if err := s.checkRequest(ctx, q, in); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkRequest(ctx, q, in); err != nil {\n\t\t\treturn err\n\t\t}",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchOnSomeoneElsesRequestIsNotFoundEvenWhileItHasARunInProgress$",
+   "why": "擁有者檢查在上限檢查之後：別人的需求回 PROCUREMENT_RUN_IN_PROGRESS"
+  },
+  {
+   "id": "m22",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/resume.go",
+   "old": "if r.RunType != RunTypeResume || r.InterruptID == nil || *r.InterruptID != in.InterruptID {",
+   "new": "if r.InterruptID == nil || *r.InterruptID != in.InterruptID {",
+   "test": "internal/modules/procurement/internal/run ^TestResumeReplayWithACandidateSearchRunsClientRequestIDIsInvalidInputNotAnInternalError$",
+   "why": "Resume 重送不比對 run 類型：候選搜尋的 client_request_id 先讀輸入，ErrNoRows 變內部錯誤"
+  },
+  {
+   "id": "m23",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "FOR UPDATE OF v",
+   "new": "",
+   "test": "internal/modules/procurement/internal/search ^TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidates$",
+   "why": "拿掉現行版本列的 FOR UPDATE：搜尋提交不等版本取代，以舊版本寫入候選"
   }
  ]
 }

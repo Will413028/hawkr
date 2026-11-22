@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // StartInput 是開始一次候選搜尋的輸入。
@@ -20,7 +19,6 @@ type StartInput struct {
 	BuyerID         int64
 	RequestID       uuid.UUID
 	ClientRequestID uuid.UUID
-	Locale          uitext.Locale
 }
 
 // Started 是開始搜尋的結果：run 與它的候選集（兩個不同的 ID）以及 run 當下的狀態。
@@ -40,7 +38,7 @@ type Starter struct {
 // 同需求已有進行中的 run 或買家的上限，依 run.Submitter。同一個 client_request_id 重送回第一次的 run 與它的候選集。
 func (s Starter) Start(ctx context.Context, in StartInput) (Started, error) {
 	runID, err := s.Submitter.Submit(ctx, run.SubmitInput{
-		BuyerID: in.BuyerID, RequestID: in.RequestID, RunType: run.RunTypeCandidateSearch, ClientRequestID: in.ClientRequestID, Locale: in.Locale,
+		BuyerID: in.BuyerID, RequestID: in.RequestID, RunType: run.RunTypeCandidateSearch, ClientRequestID: in.ClientRequestID,
 		PrepareCandidateSet: func(ctx context.Context, q *store.Queries) (uuid.UUID, error) {
 			return s.prepare(ctx, q, in)
 		},
@@ -58,19 +56,25 @@ func (s Starter) Start(ctx context.Context, in StartInput) (Started, error) {
 	return Started{RunID: r.ID, CandidateSetID: *r.CandidateSetID, Status: r.Status}, nil
 }
 
-// prepare 在買家的送出鎖之內驗證需求並建候選集，候選集指向需求當下的現行版本。
-func (s Starter) prepare(ctx context.Context, q *store.Queries, in StartInput) (uuid.UUID, error) {
+// check 在買家的送出鎖之內、上限檢查之前驗證需求屬於買家且狀態允許搜尋。
+func (s Starter) check(ctx context.Context, q *store.Queries, in StartInput) error {
 	buyer := in.BuyerID
 	req, err := q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: in.RequestID, BuyerID: &buyer})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.UUID{}, apperr.NotFound("找不到這個需求")
+		return apperr.NotFound("找不到這個需求")
 	}
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("search：讀取需求：%w", err)
+		return fmt.Errorf("search：讀取需求：%w", err)
 	}
 	if !slices.Contains(searchable, req.Status) {
-		return uuid.UUID{}, notReady()
+		return notReady()
 	}
+	return nil
+}
+
+// prepare 在上限檢查之後讀需求的現行版本並建候選集，候選集指向需求當下的現行版本。
+func (s Starter) prepare(ctx context.Context, q *store.Queries, in StartInput) (uuid.UUID, error) {
+	buyer := in.BuyerID
 	rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: in.RequestID, BuyerID: &buyer})
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("search：讀取現行版本：%w", err)

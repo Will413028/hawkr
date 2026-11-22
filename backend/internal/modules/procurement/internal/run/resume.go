@@ -83,12 +83,15 @@ func (s Submitter) Resume(ctx context.Context, in ResumeInput) (uuid.UUID, error
 }
 
 func replayResume(ctx context.Context, q *store.Queries, r store.ProcurementAgentRun, in ResumeInput) (uuid.UUID, error) {
+	if r.RunType != RunTypeResume || r.InterruptID == nil || *r.InterruptID != in.InterruptID {
+		return uuid.UUID{}, errReplayMismatch()
+	}
 	input, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: r.ID, BuyerID: in.BuyerID})
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("run：讀取重送的輸入：%w", err)
 	}
-	if r.RunType != RunTypeResume || r.InterruptID == nil || *r.InterruptID != in.InterruptID || input.BuyerMessage != in.Message {
-		return uuid.UUID{}, apperr.InvalidInputOn([]string{"client_request_id"}, "同一個 client_request_id 的內容不同")
+	if input.BuyerMessage != in.Message {
+		return uuid.UUID{}, errReplayMismatch()
 	}
 	return r.ID, nil
 }

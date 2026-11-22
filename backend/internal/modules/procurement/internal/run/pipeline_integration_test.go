@@ -33,6 +33,13 @@ func searchInput(buyer int64, request uuid.UUID) run.SubmitInput {
 	in := input(buyer, request, 5)
 	in.RunType = run.RunTypeCandidateSearch
 	in.Message = ""
+	in.CheckRequest = func(ctx context.Context, q *store.Queries) error {
+		_, err := q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: request, BuyerID: &buyer})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("找不到這個需求")
+		}
+		return err
+	}
 	in.PrepareCandidateSet = func(ctx context.Context, q *store.Queries) (uuid.UUID, error) {
 		rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: request, BuyerID: &buyer})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -753,5 +760,33 @@ func TestCandidateSearchChecksInProgressRunBeforePreparingTheCandidateSet(t *tes
 	}
 	if n := count(ctx, t, d, `SELECT count(*) FROM procurement.candidate_sets WHERE request_id = $1`, req); n != 0 {
 		t.Fatalf("被擋下的送出不得留下候選集：%d", n)
+	}
+}
+
+func TestCandidateSearchOnSomeoneElsesRequestIsNotFoundEvenWhileItHasARunInProgress(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, wide())
+	req := seedRequest(ctx, t, d, 1)
+	if _, err := s.Submit(ctx, input(1, req, 5)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Submit(ctx, searchInput(2, req)); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("err = %v，別人的需求要 NOT_FOUND，不洩漏進行中的 run", err)
+	}
+}
+
+func TestResumeReplayWithACandidateSearchRunsClientRequestIDIsInvalidInputNotAnInternalError(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	s := submitter(d, &recordingJobs{}, wide())
+	in := searchInput(1, seedRequest(ctx, t, d, 1))
+	if _, err := s.Submit(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	r := resumeInput(uuid.NewV7(), "L")
+	r.ClientRequestID = in.ClientRequestID
+	if _, err := s.Resume(ctx, r); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("err = %v，要 INVALID_ARGUMENT", err)
 	}
 }

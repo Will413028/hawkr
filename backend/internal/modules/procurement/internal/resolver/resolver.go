@@ -129,6 +129,8 @@ type Resolver struct {
 	tree     *index
 	loading  *treeLoad
 	loadedAt time.Time
+	// readStart 是目前快取樹開始讀取的時間；樹的內容不會比它更舊。
+	readStart time.Time
 	// retryAfter 之前不發起新的讀取；lastErr 是造成它的錯誤。
 	retryAfter time.Time
 	lastErr    error
@@ -194,10 +196,10 @@ func (r *Resolver) Leaf(ctx context.Context, categoryID int64) (Match, bool, err
 	return leafIn(idx, categoryID)
 }
 
-// LeafFresh 與 Leaf 相同，但答案一定來自 TTL 之內讀到的分類樹：快取過期（或沒有）時同步等一次讀取，失敗（含退避期間）回錯誤，不退回舊樹。
-// 給「答案為否會觸發破壞性動作」的呼叫端用；Leaf 的 stale-while-revalidate 語意不變。
-func (r *Resolver) LeafFresh(ctx context.Context, categoryID int64) (Match, bool, error) {
-	idx, err := r.freshIndex(ctx)
+// LeafAsOf 與 Leaf 相同，但答案一定來自「開始讀取的時間不早於 notBefore」且仍在 TTL 之內的分類樹：快取樹較舊或已過期時同步等一次讀取，
+// 失敗（含退避期間）回錯誤，不退回舊樹。給「答案會決定破壞性動作」或「必須看得到某個時間點之前建立的分類」的呼叫端用；Leaf 的 stale-while-revalidate 語意不變。
+func (r *Resolver) LeafAsOf(ctx context.Context, categoryID int64, notBefore time.Time) (Match, bool, error) {
+	idx, err := r.indexAsOf(ctx, notBefore)
 	if err != nil {
 		return Match{}, false, err
 	}
@@ -212,43 +214,49 @@ func leafIn(idx *index, categoryID int64) (Match, bool, error) {
 	return idx.match(n, ViaExact), true, nil
 }
 
-// freshIndex 回傳 TTL 之內讀到的分類樹；過期時等一次讀取（與其他呼叫共用進行中的讀取），讀取失敗或在退避期間回錯誤。
-func (r *Resolver) freshIndex(ctx context.Context) (*index, error) {
-	r.mu.Lock()
-	now := r.now()
-	if r.tree != nil && now.Sub(r.loadedAt) < TreeTTL {
-		idx := r.tree
-		r.mu.Unlock()
-		return idx, nil
-	}
-	l := r.loading
-	if l == nil {
-		if now.Before(r.retryAfter) {
-			err := r.lastErr
+// indexAsOf 回傳開始讀取的時間不早於 notBefore、且在 TTL 之內的分類樹；否則等一次讀取（與其他呼叫共用進行中的讀取，但共用的讀取若早於 notBefore 開始就再等下一次），
+// 讀取失敗或在退避期間回錯誤。
+func (r *Resolver) indexAsOf(ctx context.Context, notBefore time.Time) (*index, error) {
+	for {
+		r.mu.Lock()
+		now := r.now()
+		if r.tree != nil && now.Sub(r.loadedAt) < TreeTTL && !r.readStart.Before(notBefore) {
+			idx := r.tree
 			r.mu.Unlock()
-			return nil, fmt.Errorf("resolver：讀分類樹：%w", err)
+			return idx, nil
 		}
-		l = r.startLoadLocked(ctx)
+		l := r.loading
+		if l == nil {
+			if now.Before(r.retryAfter) {
+				err := r.lastErr
+				r.mu.Unlock()
+				return nil, fmt.Errorf("resolver：讀分類樹：%w", err)
+			}
+			l = r.startLoadLocked(ctx)
+		}
+		r.mu.Unlock()
+		select {
+		case <-l.done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if l.err != nil {
+			return nil, fmt.Errorf("resolver：讀分類樹：%w", l.err)
+		}
+		if !l.started.Before(notBefore) {
+			r.mu.Lock()
+			idx := r.tree
+			r.mu.Unlock()
+			return idx, nil
+		}
 	}
-	r.mu.Unlock()
-	select {
-	case <-l.done:
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-	if l.err != nil {
-		return nil, fmt.Errorf("resolver：讀分類樹：%w", l.err)
-	}
-	r.mu.Lock()
-	idx := r.tree
-	r.mu.Unlock()
-	return idx, nil
 }
 
 // treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。
 type treeLoad struct {
-	done chan struct{}
-	err  error
+	done    chan struct{}
+	err     error
+	started time.Time
 }
 
 // index 回傳可用的分類樹（stale-while-revalidate）：
@@ -296,7 +304,7 @@ func (r *Resolver) index(ctx context.Context) (*index, error) {
 }
 
 func (r *Resolver) startLoadLocked(ctx context.Context) *treeLoad {
-	l := &treeLoad{done: make(chan struct{})}
+	l := &treeLoad{done: make(chan struct{}), started: r.now()}
 	r.loading = l
 	go r.load(context.WithoutCancel(ctx), l)
 	return l
@@ -325,6 +333,7 @@ func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 	if err == nil {
 		r.tree = idx
 		r.loadedAt = now
+		r.readStart = l.started
 		r.retryAfter = time.Time{}
 		r.lastErr = nil
 	} else {

@@ -30,11 +30,10 @@ const (
 // searchable 是可以開始或完成搜尋的需求狀態。
 var searchable = []string{statusRequirementReady, statusMatching}
 
-// LeafChecker 以分類 ID 查現行分類樹：節點存在而且是末層才回 true（*resolver.Resolver 滿足它）。
+// LeafChecker 以分類 ID 查分類樹：節點存在而且是末層才回 true（*resolver.Resolver 滿足它）。
+// 答案來自開始讀取不早於 notBefore 且在 TTL 之內的分類樹；拿不到這樣的樹回錯誤。破壞性的決定（清買家確認的分類）只能依它。
 type LeafChecker interface {
-	Leaf(ctx context.Context, categoryID int64) (resolver.Match, bool, error)
-	// LeafFresh 與 Leaf 相同，但答案一定來自新鮮的分類樹；拿不到新鮮的樹回錯誤。破壞性的決定（清買家確認的分類）只能依它。
-	LeafFresh(ctx context.Context, categoryID int64) (resolver.Match, bool, error)
+	LeafAsOf(ctx context.Context, categoryID int64, notBefore time.Time) (resolver.Match, bool, error)
 }
 
 // ErrRevisionChanged 表示提交時需求的現行版本已不是搜尋當時的版本：結果不寫，run 以 SEARCH_FAILED 收斂，需求狀態不動。
@@ -71,7 +70,7 @@ func (e Executor) Execute(ctx context.Context, r store.ProcurementAgentRun) erro
 	if err != nil {
 		return err
 	}
-	f, err := e.find(ctx, r.BuyerID, q)
+	f, err := e.find(ctx, r.BuyerID, q, ld.revision.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -87,14 +86,11 @@ type found struct {
 	categoryGone bool
 }
 
-// find 在 transaction 外做分類確認與搜尋。快取的分類樹回「不是末層」時不直接下結論，以新鮮的樹重新確認（LeafFresh）：
-// 過期快取的否定答案若直接清掉買家確認的分類，會誤清；拿不到新鮮的樹就回錯誤（run 收斂 SEARCH_FAILED，不清解析）。
-func (e Executor) find(ctx context.Context, buyerID int64, q candidate.Query) (found, error) {
+// find 在 transaction 外做分類確認與搜尋。分類一律以「不早於候選集所指版本建立時間（notBefore）」的新鮮分類樹確認：
+// 快取的樹可能早於分類的建立，過期或較舊的否定答案若直接清掉買家確認的分類會誤清，肯定答案也不能信任過期很久的快取；拿不到這樣的樹就回錯誤（run 收斂 SEARCH_FAILED，不清解析）。
+func (e Executor) find(ctx context.Context, buyerID int64, q candidate.Query, notBefore time.Time) (found, error) {
 	if q.CategoryID > 0 {
-		_, leaf, err := e.Resolver.Leaf(ctx, q.CategoryID)
-		if err == nil && !leaf {
-			_, leaf, err = e.Resolver.LeafFresh(ctx, q.CategoryID)
-		}
+		_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, notBefore)
 		if err != nil {
 			return found{}, ctxOr(ctx, fmt.Errorf("search：查分類 %d：%w", q.CategoryID, err))
 		}

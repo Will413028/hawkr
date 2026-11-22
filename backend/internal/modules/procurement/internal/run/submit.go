@@ -75,8 +75,10 @@ type SubmitInput struct {
 	Message         string
 	// Locale 是送出時的請求語系，存進 run 輸入，executor 用它渲染伺服器句子（背景 job 沒有請求 ctx）。
 	Locale uitext.Locale
-	// PrepareCandidateSet 只給 CANDIDATE_SEARCH：在買家的送出鎖、重送檢查與上限檢查（含同需求的進行中 run）之後呼叫，驗證前置並在同一個 transaction 建候選集，
-	// 回傳它的 ID，run 的 candidate_set_id 指向它。重送回第一次的 run，不會呼叫它。
+	// CheckRequest 只給 CANDIDATE_SEARCH：在買家的送出鎖與重送檢查之後、上限檢查（含同需求的進行中 run）之前呼叫，驗證需求屬於買家且狀態允許（NOT_FOUND、FAILED_PRECONDITION），
+	// 讓別人的需求不會因為對方有進行中的 run 而洩漏它的存在。重送回第一次的 run，不會呼叫它。
+	CheckRequest func(ctx context.Context, q *store.Queries) error
+	// PrepareCandidateSet 只給 CANDIDATE_SEARCH：在上限檢查之後呼叫，讀現行版本並在同一個 transaction 建候選集，回傳它的 ID，run 的 candidate_set_id 指向它。重送回第一次的 run，不會呼叫它。
 	PrepareCandidateSet func(ctx context.Context, q *store.Queries) (uuid.UUID, error)
 	QuotaLimit          int32
 	PeriodStart         time.Time
@@ -111,6 +113,9 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 			return fmt.Errorf("run：讀取重送的 run：%w", err)
 		}
 		now := s.Ledger.Now()
+		if err := s.checkRequest(ctx, q, in); err != nil {
+			return err
+		}
 		if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {
 			return err
 		}
@@ -152,11 +157,20 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 	return id, nil
 }
 
-// prepareCandidateSet 呼叫 PrepareCandidateSet；只有 CANDIDATE_SEARCH 用它，而且 CANDIDATE_SEARCH 一定要給（run 沒有候選集就沒有搜尋的依據）。
-func (s Submitter) prepareCandidateSet(ctx context.Context, q *store.Queries, in SubmitInput) (*uuid.UUID, error) {
-	if (in.RunType == RunTypeCandidateSearch) != (in.PrepareCandidateSet != nil) {
-		return nil, fmt.Errorf("run：%s 的送出與 PrepareCandidateSet 不相符（只有 CANDIDATE_SEARCH 給，而且一定要給）", in.RunType)
+// checkRequest 呼叫 CheckRequest；只有 CANDIDATE_SEARCH 用它，而且一定要給，與 PrepareCandidateSet 成對。
+func (s Submitter) checkRequest(ctx context.Context, q *store.Queries, in SubmitInput) error {
+	search := in.RunType == RunTypeCandidateSearch
+	if search != (in.CheckRequest != nil) || search != (in.PrepareCandidateSet != nil) {
+		return fmt.Errorf("run：%s 的送出與 CheckRequest、PrepareCandidateSet 不相符（只有 CANDIDATE_SEARCH 給，而且兩個都要給）", in.RunType)
 	}
+	if in.CheckRequest == nil {
+		return nil
+	}
+	return in.CheckRequest(ctx, q)
+}
+
+// prepareCandidateSet 呼叫 PrepareCandidateSet；成對檢查已在 checkRequest 做過（run 沒有候選集就沒有搜尋的依據）。
+func (s Submitter) prepareCandidateSet(ctx context.Context, q *store.Queries, in SubmitInput) (*uuid.UUID, error) {
 	if in.PrepareCandidateSet == nil {
 		return nil, nil
 	}

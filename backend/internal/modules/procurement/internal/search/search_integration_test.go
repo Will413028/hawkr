@@ -26,7 +26,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var pg *testdb.Server
@@ -57,12 +56,12 @@ type fakes struct {
 	blocked  map[int64]struct{}
 	blockErr error
 	notLeaf  bool
-	// staleNotLeaf：快取的分類樹回「不是末層」，新鮮的樹仍有它；leafErr、freshErr 是兩種讀取的失敗；onLeaf 在分類檢查時呼叫。
-	staleNotLeaf bool
-	leafErr      error
-	freshErr     error
-	onLeaf       func()
-	onPage       func()
+	// leafErr 是分類樹讀取的失敗；onLeaf 在分類檢查時呼叫。
+	leafErr error
+	onLeaf  func()
+	onPage  func()
+	// notBefore 是最近一次分類檢查收到的時間下限。
+	notBefore time.Time
 }
 
 func (f *fakes) noTx() {
@@ -117,21 +116,14 @@ func (f *fakes) StoreIDsBlockingBuyer(_ context.Context, _ int64, ids []int64) (
 	return out, nil
 }
 
-func (f *fakes) Leaf(context.Context, int64) (resolver.Match, bool, error) {
+func (f *fakes) LeafAsOf(_ context.Context, _ int64, notBefore time.Time) (resolver.Match, bool, error) {
 	f.noTx()
+	f.notBefore = notBefore
 	if f.onLeaf != nil {
 		f.onLeaf()
 	}
 	if f.leafErr != nil {
 		return resolver.Match{}, false, f.leafErr
-	}
-	return resolver.Match{}, !f.notLeaf && !f.staleNotLeaf, nil
-}
-
-func (f *fakes) LeafFresh(context.Context, int64) (resolver.Match, bool, error) {
-	f.noTx()
-	if f.freshErr != nil {
-		return resolver.Match{}, false, f.freshErr
 	}
 	return resolver.Match{}, !f.notLeaf, nil
 }
@@ -189,7 +181,7 @@ func (f *fixture) starter() search.Starter {
 }
 
 func (f *fixture) start(cid uuid.UUID) (search.Started, error) {
-	return f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: f.request, ClientRequestID: cid, Locale: uitext.ZhTW})
+	return f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: f.request, ClientRequestID: cid})
 }
 
 func (f *fixture) mustStart() search.Started {
@@ -386,6 +378,63 @@ func TestStaleRevisionFailsTheRunWithoutCandidatesOrStatusChange(t *testing.T) {
 	}
 }
 
+func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidates(t *testing.T) {
+	f := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
+	f.fakes.pages = map[int]candidate.Page{1: hits(1, 2)}
+	s := f.mustStart()
+	held, release, replaced := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	f.fakes.onPage = func() {
+		go func() {
+			replaced <- f.d.InTx(context.Background(), func(ctx context.Context) error {
+				q := store.New(f.d.Conn(ctx))
+				b := buyer
+				if _, err := q.SupersedeActiveRevision(ctx, store.SupersedeActiveRevisionParams{RequestID: f.request, BuyerID: &b}); err != nil {
+					return err
+				}
+				item := "小白菜"
+				if _, err := q.InsertRevision(ctx, store.InsertRevisionParams{ID: uuid.NewV7(), RevisionNo: 2, ParentRevisionID: &f.rev, Item: &item, Now: now, RequestID: f.request, BuyerID: &b}); err != nil {
+					return err
+				}
+				close(held)
+				<-release
+				return nil
+			})
+		}()
+		<-held
+	}
+	dispatched := make(chan error, 1)
+	go func() { dispatched <- f.dispatch(s.RunID) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FOR UPDATE OF v%'`) == 0 {
+		select {
+		case err := <-dispatched:
+			t.Fatalf("搜尋提交沒有等版本列的鎖就結束了：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("逾時：搜尋提交沒有卡在版本列的鎖上")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+	if err := <-replaced; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-dispatched; err != nil {
+		t.Fatal(err)
+	}
+	r := f.run(s.RunID)
+	if r.Status != run.StatusFailed || r.FailureReason == nil || *r.FailureReason != run.FailureSearchFailed {
+		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
+	}
+	if n := len(f.candidates(s.CandidateSetID)); n != 0 {
+		t.Errorf("candidates = %d，對方提交後版本已變，不得寫候選", n)
+	}
+	if got := f.status(); got != "REQUIREMENT_READY" {
+		t.Errorf("status = %s", got)
+	}
+}
+
 func TestCancelRequestedBeforeCommitRollsEverythingBack(t *testing.T) {
 	f := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
 	f.fakes.pages = map[int]candidate.Page{1: hits(1)}
@@ -411,8 +460,12 @@ func TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification(t *test
 	f.fakes.notLeaf = true
 	f.fakes.pages = map[int]candidate.Page{1: hits(1)}
 	s := f.mustStart()
+	wantNotBefore := f.activeRevision().CreatedAt
 	if err := f.dispatch(s.RunID); err != nil {
 		t.Fatal(err)
+	}
+	if !f.fakes.notBefore.Equal(wantNotBefore) {
+		t.Errorf("分類檢查的時間下限 = %v，要是候選集所指版本的建立時間 %v", f.fakes.notBefore, wantNotBefore)
 	}
 	r := f.run(s.RunID)
 	if r.Status != run.StatusFailed || r.FailureReason == nil || *r.FailureReason != run.FailureItemCategoryUnavailable {
@@ -449,26 +502,9 @@ func (f *fixture) activeRevision() store.ProcurementRequestRevision {
 	return a
 }
 
-func TestStaleCachedNegativeIsConfirmedByAFreshTreeAndSearchProceeds(t *testing.T) {
-	f := newFixture(t, "MATCHING", "CATEGORY_CONFIRMED")
-	f.fakes.staleNotLeaf = true
-	f.fakes.pages = map[int]candidate.Page{1: hits(1)}
-	s := f.mustStart()
-	if err := f.dispatch(s.RunID); err != nil {
-		t.Fatal(err)
-	}
-	if r := f.run(s.RunID); r.Status != run.StatusSucceeded {
-		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
-	}
-	if a := f.activeRevision(); a.ID != f.rev || a.ItemResolutionKind == nil {
-		t.Errorf("新鮮的樹仍有該末層，不得清買家確認的分類：%+v", a)
-	}
-}
-
 func TestUnreadableTaxonomyFailsTheRunWithoutClearingTheResolution(t *testing.T) {
 	for name, set := range map[string]func(*fakes){
-		"leaf read fails": func(f *fakes) { f.leafErr = errors.New("catalog down") },
-		"no fresh tree":   func(f *fakes) { f.notLeaf, f.freshErr = true, errors.New("catalog down") },
+		"tree read fails": func(f *fakes) { f.leafErr = errors.New("catalog down") },
 	} {
 		f := newFixture(t, "MATCHING", "CATEGORY_CONFIRMED")
 		set(f.fakes)
@@ -516,7 +552,7 @@ func TestStartPreconditions(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM procurement.candidate_sets`) + f.count(`SELECT count(*) FROM procurement.agent_runs`); n != 0 {
 		t.Errorf("被擋下的 Start 不留列：%d", n)
 	}
-	_, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: 999, RequestID: f.request, ClientRequestID: uuid.NewV7(), Locale: uitext.ZhTW})
+	_, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: 999, RequestID: f.request, ClientRequestID: uuid.NewV7()})
 	if apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("他人的需求要 NOT_FOUND：%v", err)
 	}
@@ -574,7 +610,7 @@ func TestStartReplayReturnsTheSameRunAndCandidateSet(t *testing.T) {
 	other := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
 	_, err = other.start(cid)
 	must(t, err)
-	if _, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: other.request, ClientRequestID: cid, Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: other.request, ClientRequestID: cid}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("同一個 client_request_id 不同需求要 INVALID_ARGUMENT：%v", err)
 	}
 }
