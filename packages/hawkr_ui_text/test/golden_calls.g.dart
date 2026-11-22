@@ -210,6 +210,8 @@ int _n(String enumName, Object? name) => _enumNumber['$enumName.$name']!;
 /// 呼叫 fn 對應的生成函式；null 表示「沒有文字」。
 String? goldenText(String fn, String value, Map<String, Object?> params, UiLocale l) {
   switch (fn) {
+    case 'admin.moderation.CaseReport.outcome_unset':
+      return adminModerationCaseReportOutcomeUnset(l);
     case 'buyer.Gender':
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n('hawkr.buyer.v1alpha1.Gender', value))!.uiText(l);
     case 'buyer.Profile.gender_unset':

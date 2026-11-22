@@ -5,6 +5,17 @@ package uitext
 
 import "strconv"
 
+// AdminModerationCaseReportOutcomeUnset 是 admin.moderation.CaseReport.outcome_unset 的文案。
+func (t Text) AdminModerationCaseReportOutcomeUnset() string {
+	if t.staff {
+		return "處理中"
+	}
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
+}
+
 // BuyerGender 是 buyer.Gender 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) BuyerGender(v string) (string, bool) {
@@ -192,9 +203,6 @@ func (t Text) CommonUnknown() string {
 
 // ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
 func (t Text) ModerationCommunityReportOutcomeUnset() string {
-	if t.staff {
-		return "處理中"
-	}
 	if t.Locale() == EN {
 		return "Under review"
 	}

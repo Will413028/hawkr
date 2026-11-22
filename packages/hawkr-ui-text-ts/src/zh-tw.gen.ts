@@ -7,6 +7,7 @@ type Values = Readonly<Record<string, string | number>>;
 type Formatter = (v: Values) => string;
 
 const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
+	"admin.moderation.CaseReport.outcome_unset": () => "審核中",
 	"buyer.Gender.GENDER_MALE": () => "男性",
 	"buyer.Gender.GENDER_FEMALE": () => "女性",
 	"buyer.Gender.GENDER_OTHER": () => "其他",
@@ -241,7 +242,7 @@ return "生效中";
 };
 
 const STAFF: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
-	"moderation.CommunityReport.outcome_unset": () => "處理中",
+	"admin.moderation.CaseReport.outcome_unset": () => "處理中",
 	"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": () => "認定違規",
 	"moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "認定不違規",
 	"moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": () => "貼文",

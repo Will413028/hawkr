@@ -40,10 +40,19 @@
    "id": "admin-unset-outcome-unknown",
    "stack": "admin",
    "file": "admin/src/app/admin/moderation/moderation-text.ts",
-   "old": "? moderationCommunityReportOutcomeUnset()",
+   "old": "? adminModerationCaseReportOutcomeUnset()",
    "new": "? undefined",
    "test": "tests/moderation-case-detail-page.test.ts 案件與全部檢舉，舊到新",
    "why": "An unset outcome shows the unknown text instead of the processing text in the staff case page."
+  },
+  {
+   "id": "buyer-community-unset-no-text",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/report_view_parts.dart",
+   "old": "    : moderationCommunityReportOutcomeUnset(locale);",
+   "new": "    : null;",
+   "test": "test/features/moderation/my_reports_screen_test.dart 店家檢舉項目與社群項目並列，沒有結果時顯示審核中",
+   "why": "An unset community outcome renders no status text instead of the under-review text in buyer-app."
   }
  ]
 }

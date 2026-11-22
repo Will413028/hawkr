@@ -10,7 +10,7 @@ import {
 	ReportTargetKind,
 } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import {
-	moderationCommunityReportOutcomeUnset,
+	adminModerationCaseReportOutcomeUnset,
 	moderationReportOutcome,
 	moderationReportTargetKind,
 } from "@hawkr/ui-text/keys";
@@ -90,7 +90,7 @@ export function caseActionText(action: CaseAction): string {
 export function reportOutcomeText(outcome: ReportOutcome | undefined): string {
 	return staffTextOrUnknown(
 		outcome === undefined
-			? moderationCommunityReportOutcomeUnset()
+			? adminModerationCaseReportOutcomeUnset()
 			: moderationReportOutcome(outcome),
 	);
 }

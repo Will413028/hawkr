@@ -1,4 +1,7 @@
 [
+  {"key":"admin.moderation.CaseReport.outcome_unset","fn":"admin.moderation.CaseReport.outcome_unset","audience":"default","locale":"zh-TW","want":"審核中"},
+  {"key":"admin.moderation.CaseReport.outcome_unset","fn":"admin.moderation.CaseReport.outcome_unset","audience":"default","locale":"en","want":"Under review"},
+  {"key":"admin.moderation.CaseReport.outcome_unset","fn":"admin.moderation.CaseReport.outcome_unset","audience":"staff","locale":"zh-TW","want":"處理中"},
   {"key":"buyer.Gender.GENDER_MALE","fn":"buyer.Gender","value":"GENDER_MALE","audience":"default","locale":"zh-TW","want":"男性"},
   {"key":"buyer.Gender.GENDER_MALE","fn":"buyer.Gender","value":"GENDER_MALE","audience":"default","locale":"en","want":"Male"},
   {"key":"buyer.Gender.GENDER_FEMALE","fn":"buyer.Gender","value":"GENDER_FEMALE","audience":"default","locale":"zh-TW","want":"女性"},
@@ -89,7 +92,6 @@
   {"key":"common.unknown","fn":"common.unknown","audience":"default","locale":"en","want":"未知"},
   {"key":"moderation.CommunityReport.outcome_unset","fn":"moderation.CommunityReport.outcome_unset","audience":"default","locale":"zh-TW","want":"審核中"},
   {"key":"moderation.CommunityReport.outcome_unset","fn":"moderation.CommunityReport.outcome_unset","audience":"default","locale":"en","want":"Under review"},
-  {"key":"moderation.CommunityReport.outcome_unset","fn":"moderation.CommunityReport.outcome_unset","audience":"staff","locale":"zh-TW","want":"處理中"},
   {"key":"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION","fn":"moderation.ReportOutcome","value":"REPORT_OUTCOME_VIOLATION","audience":"default","locale":"zh-TW","want":"已處理（違規）"},
   {"key":"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION","fn":"moderation.ReportOutcome","value":"REPORT_OUTCOME_VIOLATION","audience":"default","locale":"en","want":"Resolved (violation)"},
   {"key":"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION","fn":"moderation.ReportOutcome","value":"REPORT_OUTCOME_VIOLATION","audience":"staff","locale":"zh-TW","want":"認定違規"},

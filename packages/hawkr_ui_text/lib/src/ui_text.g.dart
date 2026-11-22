@@ -573,6 +573,14 @@ extension SocialCommentStateUiText on hawkr_social_v1alpha1_social.CommentState 
   String? placeholder(UiLocale l) => _socialCommentStatePlaceholder(l, value);
 }
 
+/// admin.moderation.CaseReport.outcome_unset
+String adminModerationCaseReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
+};
+}
+
 /// buyer.Profile.gender_unset
 String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {

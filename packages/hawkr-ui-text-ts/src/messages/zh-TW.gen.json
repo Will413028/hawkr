@@ -1,4 +1,11 @@
 {
+  "admin": {
+    "moderation": {
+      "CaseReport": {
+        "outcome_unset": "審核中"
+      }
+    }
+  },
   "buyer": {
     "Gender": {
       "GENDER_FEMALE": "女性",

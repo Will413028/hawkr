@@ -1,5 +1,8 @@
 {
   "default": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "Under review"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "Female"
     },

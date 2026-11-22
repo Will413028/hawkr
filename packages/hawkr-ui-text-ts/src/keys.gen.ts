@@ -13,6 +13,7 @@ import type { UiMessage } from "./message";
 export type { DefaultErrorText, UiMessage } from "./message";
 
 export type UiTextKey =
+	| "admin.moderation.CaseReport.outcome_unset"
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
@@ -224,6 +225,11 @@ export const SELLER_MEASURE_REQUEST_KIND_NAME: Readonly<Record<number, string>> 
 	1: "MEASURE_REQUEST_KIND_APPEAL",
 	2: "MEASURE_REQUEST_KIND_REMEDIATION",
 };
+
+/** admin.moderation.CaseReport.outcome_unset */
+export function adminModerationCaseReportOutcomeUnset(): UiMessage {
+	return { key: "admin.moderation.CaseReport.outcome_unset" };
+}
 
 const BUYER_GENDER: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "buyer.Gender.GENDER_MALE",
