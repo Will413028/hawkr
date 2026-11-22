@@ -148,16 +148,62 @@ def split_selector(selector: str) -> tuple[str, str]:
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
+SHELL_SYNTAX = re.compile(r"[;&|<>$`()\\\n]")
+ENV_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SCRIPT_BINARY = {"admin": "node", "website": "vitest"}
+
+
+def check_script_shape(app: str, argv: list[str]) -> str | None:
+    """runner 要在 script 後面接自己的參數，所以 script 必須是單純的 argv；回傳問題描述。"""
+    if ENV_PREFIX.match(argv[0]):
+        return "不得以 VAR=value 開頭"
+    if argv[0] != SCRIPT_BINARY[app]:
+        return f"必須以 {SCRIPT_BINARY[app]} 開頭"
+    if app == "admin":
+        if argv[-1] != "--test":
+            return "最後一個參數必須是 --test（runner 的 --test-name-pattern 與檔案接在後面）"
+        return None
+    if "run" not in argv:
+        return "必須含 run"
+    rest = argv[argv.index("run") + 1:]
+    seen_unit = False
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--project":
+            if i + 1 >= len(rest) or rest[i + 1] != "unit":
+                return "--project 必須是 unit"
+            seen_unit = True
+            i += 2
+            continue
+        if not rest[i].startswith("-"):
+            return f"run 之後不得有位置參數 {rest[i]!r}（runner 自己接測試檔）"
+        i += 1
+    if not seen_unit:
+        return "必須含 --project unit"
+    return None
+
+
 def package_script(repo: Path, app: str, name: str) -> list[str]:
     """`<app>/package.json` 的 script 拆成 argv；測試的載入方式只在那裡寫一次。"""
     path = repo / app / "package.json"
     try:
         script = json.loads(path.read_text(encoding="utf-8"))["scripts"][name]
-        argv = shlex.split(script)
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise ManifestError(f"{path} 讀不到 script {name!r}：{e}") from e
+    where = f"{path} 的 script {name!r}"
+    if not isinstance(script, str):
+        raise ManifestError(f"{where} 必須是字串")
+    if SHELL_SYNTAX.search(script):
+        raise ManifestError(f"{where} 含 shell 運算子或展開（runner 以 argv 執行，不經 shell）：{script}")
+    try:
+        argv = shlex.split(script)
+    except ValueError as e:
+        raise ManifestError(f"{where} 無法拆成 argv：{e}") from e
     if not argv:
-        raise ManifestError(f"{path} 的 script {name!r} 是空的")
+        raise ManifestError(f"{where} 是空的")
+    problem = check_script_shape(app, argv)
+    if problem:
+        raise ManifestError(f"{where} {problem}：{script}")
     return argv
 
 
@@ -183,7 +229,7 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
         argv.append(head)
         return Command(argv, repo / "admin", env, stack)
     if stack == "website":
-        argv = ["pnpm", "exec", *package_script(repo, "website", "test"), head]
+        argv = ["pnpm", "exec", *package_script(repo, "website", "test:file"), head]
         if rest:
             argv += ["-t", rest]
         return Command(argv, repo / "website", env, stack)
@@ -359,7 +405,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.validate:
             bad = 0
             for m in mutants:
-                problem = check_mutant(m)
+                problem = check_mutant(m, REPO)
+                if problem is None and m.stack in SCRIPT_BINARY:
+                    try:
+                        build_command(m.stack, m.test, REPO)
+                    except ManifestError as e:
+                        problem = str(e)
                 print(f"{'FAIL' if problem else 'ok'}: {m.id}" + (f"  {problem}" if problem else ""))
                 bad += bool(problem)
             return 1 if bad else 0

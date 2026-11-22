@@ -274,29 +274,78 @@ class CommandTest(unittest.TestCase):
         self.assertIsNone(run.build_check_command("admin", "tests/x.test.ts", "admin/a.ts", repo))
         self.assertEqual(run.test_file("admin", "tests/x.test.ts", repo), repo / "admin" / "tests/x.test.ts")
 
-    def test_commands_follow_package_scripts(self):
+    def fake_repo(self, admin=None, website=None):
         repo = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, repo)
-        for app, scripts in (("admin", {"test:file": "node --import ./x.mjs --test"}),
-                             ("website", {"test": "vitest run --project other"})):
+        for app, scripts in (("admin", {"test:file": "node --import ./x.mjs --test"} if admin is None else admin),
+                             ("website", {"test:file": "vitest run --project unit"} if website is None else website)):
             (repo / app).mkdir()
             (repo / app / "package.json").write_text(json.dumps({"scripts": scripts}), encoding="utf-8")
+        return repo
+
+    def test_commands_follow_package_scripts(self):
+        repo = self.fake_repo(website={"test:file": "vitest run --reporter=dot --project unit"})
         self.assertEqual(run.build_command("admin", "t.ts n", repo).argv,
                          ["node", "--import", "./x.mjs", "--test", "--test-name-pattern", "n", "t.ts"])
         self.assertEqual(run.build_command("website", "t.ts n", repo).argv,
-                         ["pnpm", "exec", "vitest", "run", "--project", "other", "t.ts", "-t", "n"])
+                         ["pnpm", "exec", "vitest", "run", "--reporter=dot", "--project", "unit", "t.ts", "-t", "n"])
         (repo / "admin" / "package.json").write_text("{}", encoding="utf-8")
         with self.assertRaises(run.ManifestError):
             run.build_command("admin", "t.ts", repo)
 
+    def test_invalid_scripts_are_manifest_errors(self):
+        bad = {
+            "admin": [7, ["node"], "", "FOO=1 node --test", "NODE_ENV=test node --test", "node --test && echo x",
+                      "node --test; echo", "node --test | cat", "node --test > out", "node $X --test",
+                      "pnpm run test:file --test", "tsx --test", "node --test tests/a.test.ts", "node --test 'unterminated"],
+            "website": [7, "", "CI=1 vitest run --project unit", "vitest run --project unit && true",
+                        "pnpm run test:file", "node vitest run --project unit", "vitest --project unit",
+                        "vitest run --project browser", "vitest run", "vitest run --project unit tests/a.test.ts",
+                        "vitest run --project", "vitest run --project unit | cat"],
+        }
+        for app, scripts in bad.items():
+            for script in scripts:
+                repo = self.fake_repo(**{app: {"test:file": script}})
+                with self.subTest(app=app, script=script):
+                    with self.assertRaises(run.ManifestError) as cm:
+                        run.build_command(app, "t.ts", repo)
+                    self.assertIn(f"{app}/package.json", str(cm.exception))
+                    self.assertIn("test:file", str(cm.exception))
+
+    def test_validate_fails_when_package_script_invalid(self):
+        repo = self.fake_repo(admin={"test:file": "FOO=1 node --test"})
+        with mock.patch.object(run, "REPO", repo):
+            (repo / "admin" / "tests").mkdir()
+            (repo / "admin" / "tests" / "a.test.ts").write_text("t", encoding="utf-8")
+            (repo / "admin" / "a.ts").write_text("let a = 1\n", encoding="utf-8")
+            m = repo / "m.json"
+            m.write_text(json.dumps({"mutants": [{"id": "x", "stack": "admin", "file": "admin/a.ts",
+                                                  "old": "a = 1", "new": "a = 2", "test": "tests/a.test.ts n", "why": "w"}]}), encoding="utf-8")
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
+                self.assertEqual(run.main(["--validate", str(m)]), 1, err.getvalue())
+            self.assertIn("FAIL: x", out.getvalue())
+            (repo / "admin" / "package.json").write_text(
+                json.dumps({"scripts": {"test:file": "node --test"}}), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(run.main(["--validate", str(m)]), 0)
+
     def test_real_package_scripts_drive_runner(self):
         repo = run.REPO
-        admin = json.loads((repo / "admin" / "package.json").read_text(encoding="utf-8"))["scripts"]
-        website = json.loads((repo / "website" / "package.json").read_text(encoding="utf-8"))["scripts"]
-        self.assertEqual(run.build_command("admin", "tests/x.test.ts", repo).argv[:-1], admin["test:file"].split())
-        self.assertIn("pnpm run test:file", admin["test"])
-        self.assertEqual(run.build_command("website", "a.test.ts", repo).argv,
-                         ["pnpm", "exec", *website["test"].split(), "a.test.ts"])
+        admin = run.package_script(repo, "admin", "test:file")
+        website = run.package_script(repo, "website", "test:file")
+        self.assertEqual(admin[0], "node")
+        self.assertEqual(admin[-1], "--test")
+        self.assertEqual(website[0], "vitest")
+        self.assertEqual(website[website.index("--project") + 1], "unit")
+        self.assertEqual(run.build_command("admin", "tests/x.test.ts my case", repo).argv,
+                         [*admin, "--test-name-pattern", "my case", "tests/x.test.ts"])
+        self.assertEqual(run.build_command("website", "a.test.ts my case", repo).argv,
+                         ["pnpm", "exec", *website, "a.test.ts", "-t", "my case"])
+        scripts = {a: json.loads((repo / a / "package.json").read_text(encoding="utf-8"))["scripts"]
+                   for a in ("admin", "website")}
+        self.assertEqual(scripts["website"]["test"], "pnpm run test:file")
+        self.assertTrue(scripts["admin"]["test"].startswith("pnpm run test:file "))
 
     def test_admin_build_error(self):
         self.assertTrue(run.has_build_error("admin", "x.ts:2:18: ERROR: Unexpected \";\"\n  name: 'TransformError'"))
