@@ -68,22 +68,26 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
-// replyStore 由評價所屬的店推導回覆的店家：評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied；評價讀不到或不存在回 not_found。
+// replyStore 由評價所屬的店推導回覆的店家（讀取不套公開述詞）：評價不存在回 not_found；呼叫者不是那間店的店主（包含沒有店）時，
+// 評價公開可讀回 permission_denied，不公開（隱藏、作者停用）回 not_found，不洩漏存在性；店主一律交給模組，不能回覆的由模組回 REVIEW_NOT_REPLYABLE。
 // 賣家能力與店家一致的檢查仍在模組。
 func (h *App) replyStore(ctx context.Context, reviewID uuid.UUID) (seller.Store, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
 		return seller.Store{}, err
 	}
-	r, err := h.reads.GetReview(ctx, reviewID, 0)
+	ref, err := h.reads.ReviewStore(ctx, reviewID)
 	if err != nil {
 		return seller.Store{}, err
 	}
-	st, err := h.stores.Store(ctx, r.StoreID)
+	st, err := h.stores.Store(ctx, ref.StoreID)
 	if err != nil {
 		return seller.Store{}, err
 	}
 	if st.AccountID != p.ID {
+		if !ref.Public {
+			return seller.Store{}, apperr.NotFound("找不到這則評價")
+		}
 		return seller.Store{}, apperr.PermissionDenied("不是你的店的評價")
 	}
 	return st, nil

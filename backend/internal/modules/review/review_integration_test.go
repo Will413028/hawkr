@@ -613,3 +613,32 @@ func TestListMyReviewsFiltersByOrderItem(t *testing.T) {
 		t.Fatalf("不帶篩選回全部（新到舊）：%v", ids(all))
 	}
 }
+
+// ReviewStore 不套公開可讀述詞：隱藏與作者刪帳中的評價仍回所屬的店（Public 為 false），不存在才是 NotFound。
+func TestReviewStoreIgnoresVisibilityAndReportsIt(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	got := must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || !got.Public {
+		t.Fatalf("公開的評價：%+v", got)
+	}
+	hide(t, f, r.ID)
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("隱藏的評價仍回店家、Public=false：%+v", got)
+	}
+	r2 := f.submit(t, f.newBuyer(t), storeID, 700, 1, "差")
+	if err := f.buyers.BeginDeletion(ctx, r2.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r2.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("作者刪帳中的評價仍回店家、Public=false：%+v", got)
+	}
+	if _, err := f.module.ReviewStore(ctx, uuid.UUID{}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("不存在：%v", err)
+	}
+}

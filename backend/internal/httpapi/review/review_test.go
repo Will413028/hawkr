@@ -44,6 +44,7 @@ type fakeReads struct {
 	after  *review.Cursor
 	size   int32
 	gotID  uuid.UUID
+	hidden bool
 }
 
 func (f *fakeReads) rec(op string, id, viewer int64, filter review.Filter, after *review.Cursor, size int32) (review.Page, error) {
@@ -73,6 +74,16 @@ func (f *fakeReads) GetReview(_ context.Context, id uuid.UUID, viewer int64) (re
 	f.calls = append(f.calls, "GetReview")
 	f.gotID, f.viewer = id, viewer
 	return f.one, f.err
+}
+
+// ReviewStore 以 one 的 StoreID 與 hidden 回傳；err 設了就回錯。
+func (f *fakeReads) ReviewStore(_ context.Context, id uuid.UUID) (review.ReviewStore, error) {
+	f.calls = append(f.calls, "ReviewStore")
+	f.gotID = id
+	if f.err != nil {
+		return review.ReviewStore{}, f.err
+	}
+	return review.ReviewStore{StoreID: f.one.StoreID, Public: !f.hidden}, nil
 }
 
 func (f *fakeReads) StoreStats(_ context.Context, storeID int64) (review.StoreStats, error) {
@@ -487,7 +498,7 @@ func TestReplyReviewOfAMissingOrUnreadableReviewIsNotFoundAndNeverReachesTheModu
 	}
 }
 
-func TestReplyReviewReadsTheReviewWithoutAViewerSoTheStoreIsDerivedFromIt(t *testing.T) {
+func TestReplyReviewReadsTheReviewStoreWithoutThePublicPredicateSoTheStoreIsDerivedFromIt(t *testing.T) {
 	e := newEnv(t, nil)
 	r := sampleReview(1)
 	r.StoreID = 55
@@ -496,8 +507,30 @@ func TestReplyReviewReadsTheReviewWithoutAViewerSoTheStoreIsDerivedFromIt(t *tes
 	if _, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"})); err != nil {
 		t.Fatal(err)
 	}
-	if e.writes.reply.Store.StoreID != 55 || e.reads.viewer != 0 {
-		t.Fatalf("店家取自評價所屬店：%+v viewer=%d", e.writes.reply, e.reads.viewer)
+	if e.writes.reply.Store.StoreID != 55 || slices.Contains(e.reads.calls, "GetReview") {
+		t.Fatalf("店家取自評價所屬店，不經公開讀取：%+v calls=%v", e.writes.reply, e.reads.calls)
+	}
+}
+
+func TestReplyReviewOfAHiddenReviewByTheOwnerReachesTheModuleAndGetsNotReplyable(t *testing.T) {
+	e := newEnv(t, ownStore())
+	e.reads.one = sampleReview(1)
+	e.reads.hidden = true
+	e.writes.err = withReason(apperr.FailedPrecondition("不能回覆"), review.ReasonNotReplyable)
+	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
+	if codeOf(err) != connect.CodeFailedPrecondition || reasonOf(err) != "REVIEW_NOT_REPLYABLE" || len(e.writes.calls) != 1 {
+		t.Fatalf("店主回覆被隱藏的評價：%v %q calls=%v", codeOf(err), reasonOf(err), e.writes.calls)
+	}
+}
+
+func TestReplyReviewOfAHiddenReviewByANonOwnerIsNotFoundAndNeverReachesTheModule(t *testing.T) {
+	e := newEnv(t, &seller.Store{StoreID: 12, AccountID: callerAccount})
+	e.reads.one = sampleReview(1)
+	e.reads.hidden = true
+	e.app.stores = fakeStores{own: e.app.stores.(fakeStores).own, byID: map[int64]seller.Store{callerStoreID: {StoreID: callerStoreID, AccountID: 99}}}
+	_, err := e.app.ReplyReview(signedIn(), connect.NewRequest(&pb.ReplyReviewRequest{ReviewId: (uuid.UUID{1}).String(), Content: "x"}))
+	if codeOf(err) != connect.CodeNotFound || len(e.writes.calls) != 0 {
+		t.Fatalf("非店主回覆不公開的評價不洩漏存在性：%v calls=%v", err, e.writes.calls)
 	}
 }
 

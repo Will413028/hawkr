@@ -45,6 +45,14 @@ SELECT r.*, EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND
 FROM review.reviews AS r
 WHERE r.id = sqlc.arg(id);
 
+-- name: GetReviewStore :one
+-- 回覆的店家推導用：不過濾可見性，回評價所屬的店與它現在是否公開可讀（述詞與 testdata/public_predicate.sql 同一段）。
+SELECT r.store_id,
+  (NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
+   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id))::boolean AS public
+FROM review.reviews AS r
+WHERE r.id = sqlc.arg(id);
+
 -- name: LockReview :one
 -- 隱藏與還原先鎖評價列（只鎖自己的列）。
 SELECT * FROM review.reviews WHERE id = sqlc.arg(id) FOR NO KEY UPDATE;

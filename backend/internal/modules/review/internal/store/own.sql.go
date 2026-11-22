@@ -72,6 +72,27 @@ func (q *Queries) GetReviewForDiagnosis(ctx context.Context, id uuid.UUID) (GetR
 	return i, err
 }
 
+const getReviewStore = `-- name: GetReviewStore :one
+SELECT r.store_id,
+  (NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
+   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id))::boolean AS public
+FROM review.reviews AS r
+WHERE r.id = $1
+`
+
+type GetReviewStoreRow struct {
+	StoreID int64
+	Public  bool
+}
+
+// 回覆的店家推導用：不過濾可見性，回評價所屬的店與它現在是否公開可讀（述詞與 testdata/public_predicate.sql 同一段）。
+func (q *Queries) GetReviewStore(ctx context.Context, id uuid.UUID) (GetReviewStoreRow, error) {
+	row := q.db.QueryRow(ctx, getReviewStore, id)
+	var i GetReviewStoreRow
+	err := row.Scan(&i.StoreID, &i.Public)
+	return i, err
+}
+
 const insertReview = `-- name: InsertReview :one
 
 INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at)

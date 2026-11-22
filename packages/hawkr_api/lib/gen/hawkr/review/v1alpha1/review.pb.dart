@@ -1769,8 +1769,8 @@ class ReviewAppServiceApi {
       _client.invoke<GetReviewResponse>(
           ctx, 'ReviewAppService', 'GetReview', request, GetReviewResponse());
 
-  /// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在或呼叫者讀不到回 not_found，
-  /// 評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied，評價此刻不能回覆（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
+  /// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在回 not_found。呼叫者不是那間店的店主（包含沒有店）時：評價公開可讀回 permission_denied，
+  /// 評價不公開（被隱藏、作者已離開）回 not_found，不洩漏存在性。店主回覆此刻不能回覆的評價（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
   $async.Future<ReplyReviewResponse> replyReview(
           $pb.ClientContext? ctx, ReplyReviewRequest request) =>
       _client.invoke<ReplyReviewResponse>(ctx, 'ReviewAppService',

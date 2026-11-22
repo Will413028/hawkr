@@ -121,9 +121,9 @@
    "id": "review-reply-store-from-current-store",
    "stack": "go",
    "file": "backend/internal/httpapi/review/app.go",
-   "old": "st, err := h.stores.Store(ctx, r.StoreID)",
-   "new": "st, err := h.stores.CurrentStore(ctx, p.ID)",
-   "test": "internal/httpapi/review ^TestReplyReviewReadsTheReviewWithoutAViewerSoTheStoreIsDerivedFromIt$",
+   "old": "st, err := h.stores.Store(ctx, ref.StoreID)",
+   "new": "_ = ref\n\tst, err := h.stores.CurrentStore(ctx, p.ID)",
+   "test": "internal/httpapi/review ^TestReplyReviewReadsTheReviewStoreWithoutThePublicPredicateSoTheStoreIsDerivedFromIt$",
    "why": "ReplyReview derives the store from the caller's current store instead of the review's store, so an account without a store gets not_found instead of permission_denied and a multi-store owner replies as the wrong store."
   },
   {
@@ -131,7 +131,7 @@
    "stack": "go",
    "file": "backend/internal/httpapi/review/app.go",
    "old": "if st.AccountID != p.ID {",
-   "new": "if false {",
+   "new": "_ = p\n\tif false {",
    "test": "internal/httpapi/review ^TestReplyReviewByAnAccountWithoutAStoreIsPermissionDeniedBecauseTheReviewIsPublic$",
    "why": "Any signed-in account can reach the module with another owner's store."
   }

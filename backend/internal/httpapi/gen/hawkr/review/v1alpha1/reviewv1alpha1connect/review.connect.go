@@ -212,8 +212,8 @@ func (UnimplementedReviewPublicServiceHandler) GetStoreReviewStats(context.Conte
 type ReviewAppServiceClient interface {
 	// GetReview 讀一則公開可讀的評價，套用觀看者的封鎖；其他一律回 not_found，不區分原因。
 	GetReview(context.Context, *connect.Request[v1alpha1.GetReviewRequest]) (*connect.Response[v1alpha1.GetReviewResponse], error)
-	// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在或呼叫者讀不到回 not_found，
-	// 評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied，評價此刻不能回覆（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
+	// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在回 not_found。呼叫者不是那間店的店主（包含沒有店）時：評價公開可讀回 permission_denied，
+	// 評價不公開（被隱藏、作者已離開）回 not_found，不洩漏存在性。店主回覆此刻不能回覆的評價（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
 	ReplyReview(context.Context, *connect.Request[v1alpha1.ReplyReviewRequest]) (*connect.Response[v1alpha1.ReplyReviewResponse], error)
 	// CreateReview 以呼叫者的買家身分對一個已完成的訂單項目寫評價。商品、規格、價格與商品圖取自訂單項目。訂單不是呼叫者的或不存在回 not_found；
 	// 同一個訂單項目已有評價（可能已被平台隱藏而不在 ListMyReviews 的結果中）回 already_exists 與 REVIEW_ALREADY_EXISTS，client 顯示「已評價」；訂單還不能評價回 failed_precondition 與 ORDER_NOT_REVIEWABLE；
@@ -314,8 +314,8 @@ func (c *reviewAppServiceClient) ListOwnStoreReviews(ctx context.Context, req *c
 type ReviewAppServiceHandler interface {
 	// GetReview 讀一則公開可讀的評價，套用觀看者的封鎖；其他一律回 not_found，不區分原因。
 	GetReview(context.Context, *connect.Request[v1alpha1.GetReviewRequest]) (*connect.Response[v1alpha1.GetReviewResponse], error)
-	// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在或呼叫者讀不到回 not_found，
-	// 評價公開可讀，所以呼叫者不是那間店的店主（包含沒有店）回 permission_denied，評價此刻不能回覆（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
+	// ReplyReview 回覆一則評價，已有回覆時覆蓋；店家由評價所屬的店推導，請求不帶 store_id。需要賣家能力 CAP_MARKETING。評價不存在回 not_found。呼叫者不是那間店的店主（包含沒有店）時：評價公開可讀回 permission_denied，
+	// 評價不公開（被隱藏、作者已離開）回 not_found，不洩漏存在性。店主回覆此刻不能回覆的評價（被隱藏、作者已離開、回覆被下架）回 failed_precondition 與 REVIEW_NOT_REPLYABLE。
 	ReplyReview(context.Context, *connect.Request[v1alpha1.ReplyReviewRequest]) (*connect.Response[v1alpha1.ReplyReviewResponse], error)
 	// CreateReview 以呼叫者的買家身分對一個已完成的訂單項目寫評價。商品、規格、價格與商品圖取自訂單項目。訂單不是呼叫者的或不存在回 not_found；
 	// 同一個訂單項目已有評價（可能已被平台隱藏而不在 ListMyReviews 的結果中）回 already_exists 與 REVIEW_ALREADY_EXISTS，client 顯示「已評價」；訂單還不能評價回 failed_precondition 與 ORDER_NOT_REVIEWABLE；

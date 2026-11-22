@@ -231,6 +231,18 @@ func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.Relay
 	return model.RelayReview{Review: rows.Review(r, rows.Images(imgs)[id]), Public: public}, nil
 }
 
+// ReviewStore 回評價所屬的店與現在是否公開可讀（不套公開可讀述詞）；不存在是 NotFound。
+func (s *Service) ReviewStore(ctx context.Context, id uuid.UUID) (model.ReviewStore, error) {
+	row, err := s.q(ctx).GetReviewStore(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ReviewStore{}, apperr.NotFound("%s", text.ReviewNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ReviewStore{}, err
+	}
+	return model.ReviewStore{StoreID: row.StoreID, Public: row.Public}, nil
+}
+
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。
 func (s *Service) ProductStats(ctx context.Context, productID int64) (model.ProductStats, error) {
 	r, err := s.q(ctx).ProductStats(ctx, productID)
