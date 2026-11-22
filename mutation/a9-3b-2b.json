@@ -86,7 +86,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
    "old": "stopProcurementHub := startProcurementHub(ctx, procurementModule, log)",
-   "new": "stopProcurementHub := func() {}",
+   "new": "stopProcurementHub := func() { _ = procurementModule }",
    "test": "cmd/hawkr ^TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot$",
    "why": "TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot 守住的行為被改掉：`stopProcurementHub := startProcurementHub(ctx, procurementMo` → `stopProcurementHub := func() {}`"
   },
