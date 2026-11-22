@@ -127,24 +127,6 @@
    "why": "自動標題不再只在 title_source = AUTO 時更新：買家改過的標題被覆寫"
   },
   {
-   "id": "s1",
-   "stack": "go",
-   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
-   "old": "slots.Unit, slots.DeliveryCity, slots.DeliveryDate}\n",
-   "new": "slots.Unit, slots.DeliveryDate}\n",
-   "test": "internal/modules/procurement/internal/turn ^TestMatchingRegressesOnlyWhenASearchFieldChanges$",
-   "why": "搜尋欄位集合拿掉縣市：MATCHING 時改縣市不再退回"
-  },
-  {
-   "id": "s1b",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
-   "old": "slots.Unit, slots.DeliveryCity, slots.DeliveryDate}\n",
-   "new": "slots.Unit, slots.DeliveryDate}\n",
-   "test": "internal/modules/procurement/internal/turn ^TestMatchingRegressesWhenASearchFieldChangesAndStaysOtherwise$",
-   "why": "搜尋欄位集合拿掉縣市：MATCHING 時改縣市不再退回（寫入 DB 的狀態）"
-  },
-  {
    "id": "d1",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/planner/question.go",

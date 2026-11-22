@@ -194,9 +194,9 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/resume.go",
    "old": "if r.RunType != RunTypeResume || r.InterruptID == nil || *r.InterruptID != in.InterruptID {",
-   "new": "if r.InterruptID == nil || *r.InterruptID != in.InterruptID {",
+   "new": "if false {",
    "test": "internal/modules/procurement/internal/run ^TestResumeReplayWithACandidateSearchRunsClientRequestIDIsInvalidInputNotAnInternalError$",
-   "why": "Resume 重送不比對 run 類型：候選搜尋的 client_request_id 先讀輸入，ErrNoRows 變內部錯誤"
+   "why": "Resume 重送不做前置比對：候選搜尋 run 去讀輸入，ErrNoRows 變內部錯誤"
   },
   {
    "id": "m23",

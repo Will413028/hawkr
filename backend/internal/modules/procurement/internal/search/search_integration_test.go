@@ -62,12 +62,14 @@ type fakes struct {
 	onPage  func()
 	// notBefore 是最近一次分類檢查收到的時間下限。
 	notBefore time.Time
+	// heldPIDs 是測試刻意持有的阻擋連線，noTx 不把它們算成外部呼叫時開著的 transaction。
+	heldPIDs []int32
 }
 
 func (f *fakes) noTx() {
 	f.t.Helper()
 	var n int
-	if err := f.d.Pool().QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state LIKE 'idle in transaction%'`).Scan(&n); err != nil {
+	if err := f.d.Pool().QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state LIKE 'idle in transaction%' AND NOT (pid = ANY($1::int[]))`, f.heldPIDs).Scan(&n); err != nil {
 		f.t.Fatal(err)
 	}
 	if n != 0 {
@@ -387,6 +389,11 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 		go func() {
 			replaced <- f.d.InTx(context.Background(), func(ctx context.Context) error {
 				q := store.New(f.d.Conn(ctx))
+				var pid int32
+				if err := f.d.Conn(ctx).QueryRow(ctx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+					return err
+				}
+				f.fakes.heldPIDs = append(f.fakes.heldPIDs, pid)
 				b := buyer
 				if _, err := q.SupersedeActiveRevision(ctx, store.SupersedeActiveRevisionParams{RequestID: f.request, BuyerID: &b}); err != nil {
 					return err

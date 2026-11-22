@@ -25,7 +25,7 @@ schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選、翻頁收集；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN executor，不變量見 `internal/turn/AGENTS.md`）、`search`（CANDIDATE_SEARCH executor 與 `StartCandidateSearch`，規格見 `docs/modules/procurement.md` §4）。
+- `internal/model` 放對外型別；`internal/store` 是 sqlc 的查詢套件（repository 一律 `store.New(db.Conn(ctx))`）；`internal/resolver` 把用詞對到分類樹；`internal/candidate` 決定誰能成為候選、翻頁收集；`internal/retention` 處理買家關閉；`internal/run` 是 run 帳本（送出與配額、受守衛的狀態轉換與事件、取消、對帳、保留期清除、共用 LISTEN）；`slots`（欄位驗證，原因是代碼）、`planner`（問題與 act 優先序）、`reply` 加 `text`（代碼換語系文字，無 LLM 敘述）、`extract`、`turn`（TURN executor，不變量見 `internal/turn/AGENTS.md`）、`search`（CANDIDATE_SEARCH executor 與 `StartCandidateSearch`，規格見 `backend/docs/modules/procurement.md` §4）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量

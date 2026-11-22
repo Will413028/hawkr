@@ -106,11 +106,11 @@ func TestEmptyExtractionIsSuccess(t *testing.T) {
 
 func TestMalformedThenValidRetriesExactlyOnce(t *testing.T) {
 	for name, bad := range map[string]step{
-		"壞 JSON":        text(`{"item":`),
-		"不是物件":          text(`null`),
-		"型別不合":          text(`{"quantity":"很多"}`),
-		"沒有文字":          {resp: &adkmodel.LLMResponse{Content: &genai.Content{}}},
-		"沒有 content":    {resp: &adkmodel.LLMResponse{}},
+		"壞 JSON":     text(`{"item":`),
+		"不是物件":       text(`null`),
+		"型別不合":       text(`{"quantity":"很多"}`),
+		"沒有文字":       {resp: &adkmodel.LLMResponse{Content: &genai.Content{}}},
+		"沒有 content": {resp: &adkmodel.LLMResponse{}},
 	} {
 		f := &fakeLLM{steps: []step{bad, text(`{"item":"蘋果"}`)}}
 		p, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
