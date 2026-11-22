@@ -29,7 +29,7 @@ import type { Message as Message$1 } from "@bufbuild/protobuf";
  * Describes the file hawkr/chat/v1alpha1/chat.proto.
  */
 export const file_hawkr_chat_v1alpha1_chat: GenFile = /*@__PURE__*/
-  fileDesc("Ch5oYXdrci9jaGF0L3YxYWxwaGExL2NoYXQucHJvdG8SE2hhd2tyLmNoYXQudjFhbHBoYTEi5wIKB01lc3NhZ2USDwoCaWQYASABKAlCA+BBCBIcCg9jb252ZXJzYXRpb25faWQYAiABKAlCA+BBAxIQCgNzZXEYAyABKANCA+BBAxIzCgZzZW5kZXIYBCABKA4yHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRQYXJ0eUID4EEDEjMKBGtpbmQYBSABKA4yIC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VLaW5kQgPgQQMSFgoEdGV4dBgGIAEoCUID4EEDSACIAQESMAoFaW1hZ2UYByABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxITCgZoaWRkZW4YCCABKAhCA+BBAxITCgZlcmFzZWQYCSABKAhCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IHCgVfdGV4dCK+AQoHUHJldmlldxIzCgRraW5kGAEgASgOMiAuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlS2luZEID4EEDEhYKBHRleHQYAiABKAlCA+BBA0gAiAEBEhMKBmhpZGRlbhgDIAEoCEID4EEDEhMKBmVyYXNlZBgEIAEoCEID4EEDEjMKBnNlbmRlchgFIAEoDjIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdFBhcnR5QgPgQQNCBwoFX3RleHQihgEKCUNoYXRCdXllchIPCgJpZBgBIAEoCUID4EEIEhYKBG5hbWUYAiABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgDIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDEhQKB2RlbGV0ZWQYBCABKAhCA+BBA0IHCgVfbmFtZSKwAgoMQ29udmVyc2F0aW9uEg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSMgoFYnV5ZXIYAyABKAsyHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRCdXllckID4EEDEhkKDHVucmVhZF9jb3VudBgEIAEoA0ID4EEDEjoKEWxhc3RfbWVzc2FnZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjIKB3ByZXZpZXcYBiABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLlByZXZpZXdCA+BBAxIaCg1wZWVyX3JlYWRfc2VxGAcgASgDQgPgQQMiTgoOTWVzc2FnZUNvbnRlbnQSDgoEdGV4dBgBIAEoCUgAEiEKEmltYWdlX3N0YWdlZF90b2tlbhgCIAEoCUID4EEESABCCQoHY29udGVudCJBChhMaXN0Q29udmVyc2F0aW9uc1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkibgoZTGlzdENvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkYKHUxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInMKHkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIpQBChNMaXN0TWVzc2FnZXNSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhEKCXBhZ2Vfc2l6ZRgCIAEoBRIXCgpiZWZvcmVfc2VxGAMgASgDSACIAQESFgoJYWZ0ZXJfc2VxGAQgASgDSAGIAQFCDQoLX2JlZm9yZV9zZXFCDAoKX2FmdGVyX3NlcSJvChRMaXN0TWVzc2FnZXNSZXNwb25zZRIuCghtZXNzYWdlcxgBIAMoCzIcLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZRIQCghoYXNfbW9yZRgCIAEoCBIVCg1wZWVyX3JlYWRfc2VxGAMgASgDIo4BChJTZW5kTWVzc2FnZVJlcXVlc3QSHAoPY29udmVyc2F0aW9uX2lkGAEgASgJQgPgQQISHwoKcmVxdWVzdF9pZBgCIAEoCUIL4EEC4ozP1wgCCAESOQoHY29udGVudBgDIAEoCzIjLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUNvbnRlbnRCA+BBAiJEChNTZW5kTWVzc2FnZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9CdXllclJlcXVlc3QSFQoIYnV5ZXJfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9CdXllclJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UiUgobTWFya0NvbnZlcnNhdGlvblJlYWRSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhUKCHVwdG9fc2VxGAIgASgDQgPgQQIiHgocTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZSIUChJNYXJrQWxsUmVhZFJlcXVlc3QiFQoTTWFya0FsbFJlYWRSZXNwb25zZSIZChdNYXJrQWxsU3RvcmVSZWFkUmVxdWVzdCIaChhNYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2UiFwoVR2V0VW5yZWFkQ291bnRSZXF1ZXN0Ii4KFkdldFVucmVhZENvdW50UmVzcG9uc2USFAoMdW5yZWFkX2NvdW50GAEgASgDIhwKGkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0IjMKG0dldFN0b3JlVW5yZWFkQ291bnRSZXNwb25zZRIUCgx1bnJlYWRfY291bnQYASABKAMiPwoUQ29udmVyc2F0aW9uUHJlc2VuY2USFwoPY29udmVyc2F0aW9uX2lkGAEgASgJEg4KBm9ubGluZRgCIAEoCCIzChJHZXRQcmVzZW5jZVJlcXVlc3QSHQoQY29udmVyc2F0aW9uX2lkcxgBIAMoCUID4EECIlMKE0dldFByZXNlbmNlUmVzcG9uc2USPAoJcHJlc2VuY2VzGAEgAygLMikuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb25QcmVzZW5jZSI4ChdHZXRTdG9yZVByZXNlbmNlUmVxdWVzdBIdChBjb252ZXJzYXRpb25faWRzGAEgAygJQgPgQQIiWAoYR2V0U3RvcmVQcmVzZW5jZVJlc3BvbnNlEjwKCXByZXNlbmNlcxgBIAMoCzIpLmhhd2tyLmNoYXQudjFhbHBoYTEuQ29udmVyc2F0aW9uUHJlc2VuY2UijQEKE1N0cmVhbUV2ZW50c1JlcXVlc3QSRgoHY3Vyc29ycxgBIAMoCzI1Lmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVxdWVzdC5DdXJzb3JzRW50cnkaLgoMQ3Vyc29yc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoAzoCOAEilwEKGFN0cmVhbVN0b3JlRXZlbnRzUmVxdWVzdBJLCgdjdXJzb3JzGAEgAygLMjouaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW50c1JlcXVlc3QuQ3Vyc29yc0VudHJ5Gi4KDEN1cnNvcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAM6AjgBIkUKFFN0cmVhbUV2ZW50c1Jlc3BvbnNlEi0KBWV2ZW50GAEgASgLMh4uaGF3a3IuY2hhdC52MWFscGhhMS5DaGF0RXZlbnQiSgoZU3RyZWFtU3RvcmVFdmVudHNSZXNwb25zZRItCgVldmVudBgBIAEoCzIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdEV2ZW50IsUCCglDaGF0RXZlbnQSKwoFcmVhZHkYASABKAsyGi5oYXdrci5jaGF0LnYxYWxwaGExLlJlYWR5SAASNAoHbWVzc2FnZRgCIAEoCzIhLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUV2ZW50SAASNAoGdW5yZWFkGAMgASgLMiIuaGF3a3IuY2hhdC52MWFscGhhMS5VbnJlYWRDaGFuZ2VkSAASMgoJcGVlcl9yZWFkGAQgASgLMh0uaGF3a3IuY2hhdC52MWFscGhhMS5QZWVyUmVhZEgAEi0KBnJlc3luYxgFIAEoCzIbLmhhd2tyLmNoYXQudjFhbHBoYTEuUmVzeW5jSAASMwoJaGVhcnRiZWF0GAYgASgLMh4uaGF3a3IuY2hhdC52MWFscGhhMS5IZWFydGJlYXRIAEIHCgVldmVudCKFAQoFUmVhZHkSFAoMdW5yZWFkX2NvdW50GAEgASgDEjUKEmhlYXJ0YmVhdF9pbnRlcnZhbBgCIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIvCgxtYXhfbGlmZXRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24iTgoMTWVzc2FnZUV2ZW50Ei0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2USDwoHdXBkYXRlZBgCIAEoCCIlCg1VbnJlYWRDaGFuZ2VkEhQKDHVucmVhZF9jb3VudBgBIAEoAyI6CghQZWVyUmVhZBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSFQoNcGVlcl9yZWFkX3NlcRgCIAEoAyI7CgZSZXN5bmMSGQoPY29udmVyc2F0aW9uX2lkGAEgASgJSAASDQoDYWxsGAIgASgISABCBwoFc2NvcGUiCwoJSGVhcnRiZWF0KloKC01lc3NhZ2VLaW5kEhwKGE1FU1NBR0VfS0lORF9VTlNQRUNJRklFRBAAEhUKEU1FU1NBR0VfS0lORF9URVhUEAESFgoSTUVTU0FHRV9LSU5EX0lNQUdFEAIqUwoJQ2hhdFBhcnR5EhoKFkNIQVRfUEFSVFlfVU5TUEVDSUZJRUQQABIUChBDSEFUX1BBUlRZX0JVWUVSEAESFAoQQ0hBVF9QQVJUWV9TVE9SRRACMsUNCg5DaGF0QXBwU2VydmljZRJ3ChFMaXN0Q29udmVyc2F0aW9ucxItLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdENvbnZlcnNhdGlvbnNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0Q29udmVyc2F0aW9uc1Jlc3BvbnNlIgOQAgEShgEKFkxpc3RTdG9yZUNvbnZlcnNhdGlvbnMSMi5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GjMuaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0U3RvcmVDb252ZXJzYXRpb25zUmVzcG9uc2UiA5ACARJoCgxMaXN0TWVzc2FnZXMSKC5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1JlcXVlc3QaKS5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1Jlc3BvbnNlIgOQAgESYAoLU2VuZE1lc3NhZ2USJy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlUmVxdWVzdBooLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VSZXNwb25zZRJ1ChJTZW5kTWVzc2FnZVRvU3RvcmUSLi5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QaLy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEnUKElNlbmRNZXNzYWdlVG9CdXllchIuLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVxdWVzdBovLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVzcG9uc2USewoUTWFya0NvbnZlcnNhdGlvblJlYWQSMC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtDb252ZXJzYXRpb25SZWFkUmVxdWVzdBoxLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZRJgCgtNYXJrQWxsUmVhZBInLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0FsbFJlYWRSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsUmVhZFJlc3BvbnNlEm8KEE1hcmtBbGxTdG9yZVJlYWQSLC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtBbGxTdG9yZVJlYWRSZXF1ZXN0Gi0uaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2USbgoOR2V0VW5yZWFkQ291bnQSKi5oYXdrci5jaGF0LnYxYWxwaGExLkdldFVucmVhZENvdW50UmVxdWVzdBorLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0VW5yZWFkQ291bnRSZXNwb25zZSIDkAIBEn0KE0dldFN0b3JlVW5yZWFkQ291bnQSLy5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0GjAuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRTdG9yZVVucmVhZENvdW50UmVzcG9uc2UiA5ACARJlCgtHZXRQcmVzZW5jZRInLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0UHJlc2VuY2VSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5HZXRQcmVzZW5jZVJlc3BvbnNlIgOQAgESdAoQR2V0U3RvcmVQcmVzZW5jZRIsLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVQcmVzZW5jZVJlcXVlc3QaLS5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlUHJlc2VuY2VSZXNwb25zZSIDkAIBEmUKDFN0cmVhbUV2ZW50cxIoLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVxdWVzdBopLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVzcG9uc2UwARJ0ChFTdHJlYW1TdG9yZUV2ZW50cxItLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtU3RvcmVFdmVudHNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW50c1Jlc3BvbnNlMAFiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_duration, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
+  fileDesc("Ch5oYXdrci9jaGF0L3YxYWxwaGExL2NoYXQucHJvdG8SE2hhd2tyLmNoYXQudjFhbHBoYTEi5wIKB01lc3NhZ2USDwoCaWQYASABKAlCA+BBCBIcCg9jb252ZXJzYXRpb25faWQYAiABKAlCA+BBAxIQCgNzZXEYAyABKANCA+BBAxIzCgZzZW5kZXIYBCABKA4yHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRQYXJ0eUID4EEDEjMKBGtpbmQYBSABKA4yIC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VLaW5kQgPgQQMSFgoEdGV4dBgGIAEoCUID4EEDSACIAQESMAoFaW1hZ2UYByABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxITCgZoaWRkZW4YCCABKAhCA+BBAxITCgZlcmFzZWQYCSABKAhCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IHCgVfdGV4dCK+AQoHUHJldmlldxIzCgRraW5kGAEgASgOMiAuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlS2luZEID4EEDEhYKBHRleHQYAiABKAlCA+BBA0gAiAEBEhMKBmhpZGRlbhgDIAEoCEID4EEDEhMKBmVyYXNlZBgEIAEoCEID4EEDEjMKBnNlbmRlchgFIAEoDjIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdFBhcnR5QgPgQQNCBwoFX3RleHQihgEKCUNoYXRCdXllchIPCgJpZBgBIAEoCUID4EEIEhYKBG5hbWUYAiABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgDIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDEhQKB2RlbGV0ZWQYBCABKAhCA+BBA0IHCgVfbmFtZSKwAgoMQ29udmVyc2F0aW9uEg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSMgoFYnV5ZXIYAyABKAsyHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRCdXllckID4EEDEhkKDHVucmVhZF9jb3VudBgEIAEoA0ID4EEDEjoKEWxhc3RfbWVzc2FnZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjIKB3ByZXZpZXcYBiABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLlByZXZpZXdCA+BBAxIaCg1wZWVyX3JlYWRfc2VxGAcgASgDQgPgQQMiTgoOTWVzc2FnZUNvbnRlbnQSDgoEdGV4dBgBIAEoCUgAEiEKEmltYWdlX3N0YWdlZF90b2tlbhgCIAEoCUID4EEESABCCQoHY29udGVudCJBChhMaXN0Q29udmVyc2F0aW9uc1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkibgoZTGlzdENvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkYKHUxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInMKHkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjsKIkdldFN0b3JlQ29udmVyc2F0aW9uQnlCdXllclJlcXVlc3QSFQoIYnV5ZXJfaWQYASABKAlCA+BBAiJeCiNHZXRTdG9yZUNvbnZlcnNhdGlvbkJ5QnV5ZXJSZXNwb25zZRI3Cgxjb252ZXJzYXRpb24YASABKAsyIS5oYXdrci5jaGF0LnYxYWxwaGExLkNvbnZlcnNhdGlvbiKUAQoTTGlzdE1lc3NhZ2VzUmVxdWVzdBIcCg9jb252ZXJzYXRpb25faWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSFwoKYmVmb3JlX3NlcRgDIAEoA0gAiAEBEhYKCWFmdGVyX3NlcRgEIAEoA0gBiAEBQg0KC19iZWZvcmVfc2VxQgwKCl9hZnRlcl9zZXEibwoUTGlzdE1lc3NhZ2VzUmVzcG9uc2USLgoIbWVzc2FnZXMYASADKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2USEAoIaGFzX21vcmUYAiABKAgSFQoNcGVlcl9yZWFkX3NlcRgDIAEoAyKOAQoSU2VuZE1lc3NhZ2VSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEh8KCnJlcXVlc3RfaWQYAiABKAlCC+BBAuKMz9cIAggBEjkKB2NvbnRlbnQYAyABKAsyIy5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VDb250ZW50QgPgQQIiRAoTU2VuZE1lc3NhZ2VSZXNwb25zZRItCgdtZXNzYWdlGAEgASgLMhwuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlIo4BChlTZW5kTWVzc2FnZVRvU3RvcmVSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQISHwoKcmVxdWVzdF9pZBgCIAEoCUIL4EEC4ozP1wgCCAESOQoHY29udGVudBgDIAEoCzIjLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUNvbnRlbnRCA+BBAiJLChpTZW5kTWVzc2FnZVRvU3RvcmVSZXNwb25zZRItCgdtZXNzYWdlGAEgASgLMhwuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlIo4BChlTZW5kTWVzc2FnZVRvQnV5ZXJSZXF1ZXN0EhUKCGJ1eWVyX2lkGAEgASgJQgPgQQISHwoKcmVxdWVzdF9pZBgCIAEoCUIL4EEC4ozP1wgCCAESOQoHY29udGVudBgDIAEoCzIjLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUNvbnRlbnRCA+BBAiJLChpTZW5kTWVzc2FnZVRvQnV5ZXJSZXNwb25zZRItCgdtZXNzYWdlGAEgASgLMhwuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlIlIKG01hcmtDb252ZXJzYXRpb25SZWFkUmVxdWVzdBIcCg9jb252ZXJzYXRpb25faWQYASABKAlCA+BBAhIVCgh1cHRvX3NlcRgCIAEoA0ID4EECIh4KHE1hcmtDb252ZXJzYXRpb25SZWFkUmVzcG9uc2UiFAoSTWFya0FsbFJlYWRSZXF1ZXN0IhUKE01hcmtBbGxSZWFkUmVzcG9uc2UiGQoXTWFya0FsbFN0b3JlUmVhZFJlcXVlc3QiGgoYTWFya0FsbFN0b3JlUmVhZFJlc3BvbnNlIhcKFUdldFVucmVhZENvdW50UmVxdWVzdCIuChZHZXRVbnJlYWRDb3VudFJlc3BvbnNlEhQKDHVucmVhZF9jb3VudBgBIAEoAyIcChpHZXRTdG9yZVVucmVhZENvdW50UmVxdWVzdCIzChtHZXRTdG9yZVVucmVhZENvdW50UmVzcG9uc2USFAoMdW5yZWFkX2NvdW50GAEgASgDIj8KFENvbnZlcnNhdGlvblByZXNlbmNlEhcKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCRIOCgZvbmxpbmUYAiABKAgiMwoSR2V0UHJlc2VuY2VSZXF1ZXN0Eh0KEGNvbnZlcnNhdGlvbl9pZHMYASADKAlCA+BBAiJTChNHZXRQcmVzZW5jZVJlc3BvbnNlEjwKCXByZXNlbmNlcxgBIAMoCzIpLmhhd2tyLmNoYXQudjFhbHBoYTEuQ29udmVyc2F0aW9uUHJlc2VuY2UiOAoXR2V0U3RvcmVQcmVzZW5jZVJlcXVlc3QSHQoQY29udmVyc2F0aW9uX2lkcxgBIAMoCUID4EECIlgKGEdldFN0b3JlUHJlc2VuY2VSZXNwb25zZRI8CglwcmVzZW5jZXMYASADKAsyKS5oYXdrci5jaGF0LnYxYWxwaGExLkNvbnZlcnNhdGlvblByZXNlbmNlIo0BChNTdHJlYW1FdmVudHNSZXF1ZXN0EkYKB2N1cnNvcnMYASADKAsyNS5oYXdrci5jaGF0LnYxYWxwaGExLlN0cmVhbUV2ZW50c1JlcXVlc3QuQ3Vyc29yc0VudHJ5Gi4KDEN1cnNvcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAM6AjgBIpcBChhTdHJlYW1TdG9yZUV2ZW50c1JlcXVlc3QSSwoHY3Vyc29ycxgBIAMoCzI6Lmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtU3RvcmVFdmVudHNSZXF1ZXN0LkN1cnNvcnNFbnRyeRouCgxDdXJzb3JzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgDOgI4ASJFChRTdHJlYW1FdmVudHNSZXNwb25zZRItCgVldmVudBgBIAEoCzIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdEV2ZW50IkoKGVN0cmVhbVN0b3JlRXZlbnRzUmVzcG9uc2USLQoFZXZlbnQYASABKAsyHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRFdmVudCLFAgoJQ2hhdEV2ZW50EisKBXJlYWR5GAEgASgLMhouaGF3a3IuY2hhdC52MWFscGhhMS5SZWFkeUgAEjQKB21lc3NhZ2UYAiABKAsyIS5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VFdmVudEgAEjQKBnVucmVhZBgDIAEoCzIiLmhhd2tyLmNoYXQudjFhbHBoYTEuVW5yZWFkQ2hhbmdlZEgAEjIKCXBlZXJfcmVhZBgEIAEoCzIdLmhhd2tyLmNoYXQudjFhbHBoYTEuUGVlclJlYWRIABItCgZyZXN5bmMYBSABKAsyGy5oYXdrci5jaGF0LnYxYWxwaGExLlJlc3luY0gAEjMKCWhlYXJ0YmVhdBgGIAEoCzIeLmhhd2tyLmNoYXQudjFhbHBoYTEuSGVhcnRiZWF0SABCBwoFZXZlbnQihQEKBVJlYWR5EhQKDHVucmVhZF9jb3VudBgBIAEoAxI1ChJoZWFydGJlYXRfaW50ZXJ2YWwYAiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMbWF4X2xpZmV0aW1lGAMgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uIk4KDE1lc3NhZ2VFdmVudBItCgdtZXNzYWdlGAEgASgLMhwuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlEg8KB3VwZGF0ZWQYAiABKAgiJQoNVW5yZWFkQ2hhbmdlZBIUCgx1bnJlYWRfY291bnQYASABKAMiOgoIUGVlclJlYWQSFwoPY29udmVyc2F0aW9uX2lkGAEgASgJEhUKDXBlZXJfcmVhZF9zZXEYAiABKAMiOwoGUmVzeW5jEhkKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUgAEg0KA2FsbBgCIAEoCEgAQgcKBXNjb3BlIgsKCUhlYXJ0YmVhdCpaCgtNZXNzYWdlS2luZBIcChhNRVNTQUdFX0tJTkRfVU5TUEVDSUZJRUQQABIVChFNRVNTQUdFX0tJTkRfVEVYVBABEhYKEk1FU1NBR0VfS0lORF9JTUFHRRACKlMKCUNoYXRQYXJ0eRIaChZDSEFUX1BBUlRZX1VOU1BFQ0lGSUVEEAASFAoQQ0hBVF9QQVJUWV9CVVlFUhABEhQKEENIQVRfUEFSVFlfU1RPUkUQAjLdDgoOQ2hhdEFwcFNlcnZpY2USdwoRTGlzdENvbnZlcnNhdGlvbnMSLS5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RDb252ZXJzYXRpb25zUmVxdWVzdBouLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdENvbnZlcnNhdGlvbnNSZXNwb25zZSIDkAIBEoYBChZMaXN0U3RvcmVDb252ZXJzYXRpb25zEjIuaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0U3RvcmVDb252ZXJzYXRpb25zUmVxdWVzdBozLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdFN0b3JlQ29udmVyc2F0aW9uc1Jlc3BvbnNlIgOQAgESlQEKG0dldFN0b3JlQ29udmVyc2F0aW9uQnlCdXllchI3Lmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVDb252ZXJzYXRpb25CeUJ1eWVyUmVxdWVzdBo4Lmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVDb252ZXJzYXRpb25CeUJ1eWVyUmVzcG9uc2UiA5ACARJoCgxMaXN0TWVzc2FnZXMSKC5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1JlcXVlc3QaKS5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1Jlc3BvbnNlIgOQAgESYAoLU2VuZE1lc3NhZ2USJy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlUmVxdWVzdBooLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VSZXNwb25zZRJ1ChJTZW5kTWVzc2FnZVRvU3RvcmUSLi5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QaLy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEnUKElNlbmRNZXNzYWdlVG9CdXllchIuLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVxdWVzdBovLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVzcG9uc2USewoUTWFya0NvbnZlcnNhdGlvblJlYWQSMC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtDb252ZXJzYXRpb25SZWFkUmVxdWVzdBoxLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZRJgCgtNYXJrQWxsUmVhZBInLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0FsbFJlYWRSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsUmVhZFJlc3BvbnNlEm8KEE1hcmtBbGxTdG9yZVJlYWQSLC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtBbGxTdG9yZVJlYWRSZXF1ZXN0Gi0uaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2USbgoOR2V0VW5yZWFkQ291bnQSKi5oYXdrci5jaGF0LnYxYWxwaGExLkdldFVucmVhZENvdW50UmVxdWVzdBorLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0VW5yZWFkQ291bnRSZXNwb25zZSIDkAIBEn0KE0dldFN0b3JlVW5yZWFkQ291bnQSLy5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0GjAuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRTdG9yZVVucmVhZENvdW50UmVzcG9uc2UiA5ACARJlCgtHZXRQcmVzZW5jZRInLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0UHJlc2VuY2VSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5HZXRQcmVzZW5jZVJlc3BvbnNlIgOQAgESdAoQR2V0U3RvcmVQcmVzZW5jZRIsLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVQcmVzZW5jZVJlcXVlc3QaLS5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlUHJlc2VuY2VSZXNwb25zZSIDkAIBEmUKDFN0cmVhbUV2ZW50cxIoLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVxdWVzdBopLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVzcG9uc2UwARJ0ChFTdHJlYW1TdG9yZUV2ZW50cxItLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtU3RvcmVFdmVudHNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW50c1Jlc3BvbnNlMAFiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_duration, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
 
 /**
  * Message 是一則訊息。隱藏或抹除的訊息是墓碑：hidden 或 erased 為真，沒有 text 與 image。
@@ -369,6 +369,40 @@ export const ListStoreConversationsResponseSchema: GenMessage<ListStoreConversat
   messageDesc(file_hawkr_chat_v1alpha1_chat, 8);
 
 /**
+ * @generated from message hawkr.chat.v1alpha1.GetStoreConversationByBuyerRequest
+ */
+export type GetStoreConversationByBuyerRequest = Message$1<"hawkr.chat.v1alpha1.GetStoreConversationByBuyerRequest"> & {
+  /**
+   * @generated from field: string buyer_id = 1;
+   */
+  buyerId: string;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.GetStoreConversationByBuyerRequest.
+ * Use `create(GetStoreConversationByBuyerRequestSchema)` to create a new message.
+ */
+export const GetStoreConversationByBuyerRequestSchema: GenMessage<GetStoreConversationByBuyerRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 9);
+
+/**
+ * @generated from message hawkr.chat.v1alpha1.GetStoreConversationByBuyerResponse
+ */
+export type GetStoreConversationByBuyerResponse = Message$1<"hawkr.chat.v1alpha1.GetStoreConversationByBuyerResponse"> & {
+  /**
+   * @generated from field: hawkr.chat.v1alpha1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.GetStoreConversationByBuyerResponse.
+ * Use `create(GetStoreConversationByBuyerResponseSchema)` to create a new message.
+ */
+export const GetStoreConversationByBuyerResponseSchema: GenMessage<GetStoreConversationByBuyerResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 10);
+
+/**
  * @generated from message hawkr.chat.v1alpha1.ListMessagesRequest
  */
 export type ListMessagesRequest = Message$1<"hawkr.chat.v1alpha1.ListMessagesRequest"> & {
@@ -404,7 +438,7 @@ export type ListMessagesRequest = Message$1<"hawkr.chat.v1alpha1.ListMessagesReq
  * Use `create(ListMessagesRequestSchema)` to create a new message.
  */
 export const ListMessagesRequestSchema: GenMessage<ListMessagesRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 9);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 11);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.ListMessagesResponse
@@ -435,7 +469,7 @@ export type ListMessagesResponse = Message$1<"hawkr.chat.v1alpha1.ListMessagesRe
  * Use `create(ListMessagesResponseSchema)` to create a new message.
  */
 export const ListMessagesResponseSchema: GenMessage<ListMessagesResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 10);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 12);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageRequest
@@ -464,7 +498,7 @@ export type SendMessageRequest = Message$1<"hawkr.chat.v1alpha1.SendMessageReque
  * Use `create(SendMessageRequestSchema)` to create a new message.
  */
 export const SendMessageRequestSchema: GenMessage<SendMessageRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 11);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 13);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageResponse
@@ -481,7 +515,7 @@ export type SendMessageResponse = Message$1<"hawkr.chat.v1alpha1.SendMessageResp
  * Use `create(SendMessageResponseSchema)` to create a new message.
  */
 export const SendMessageResponseSchema: GenMessage<SendMessageResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 12);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 14);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageToStoreRequest
@@ -510,7 +544,7 @@ export type SendMessageToStoreRequest = Message$1<"hawkr.chat.v1alpha1.SendMessa
  * Use `create(SendMessageToStoreRequestSchema)` to create a new message.
  */
 export const SendMessageToStoreRequestSchema: GenMessage<SendMessageToStoreRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 13);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 15);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageToStoreResponse
@@ -527,7 +561,7 @@ export type SendMessageToStoreResponse = Message$1<"hawkr.chat.v1alpha1.SendMess
  * Use `create(SendMessageToStoreResponseSchema)` to create a new message.
  */
 export const SendMessageToStoreResponseSchema: GenMessage<SendMessageToStoreResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 14);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 16);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageToBuyerRequest
@@ -556,7 +590,7 @@ export type SendMessageToBuyerRequest = Message$1<"hawkr.chat.v1alpha1.SendMessa
  * Use `create(SendMessageToBuyerRequestSchema)` to create a new message.
  */
 export const SendMessageToBuyerRequestSchema: GenMessage<SendMessageToBuyerRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 15);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 17);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.SendMessageToBuyerResponse
@@ -573,7 +607,7 @@ export type SendMessageToBuyerResponse = Message$1<"hawkr.chat.v1alpha1.SendMess
  * Use `create(SendMessageToBuyerResponseSchema)` to create a new message.
  */
 export const SendMessageToBuyerResponseSchema: GenMessage<SendMessageToBuyerResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 16);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 18);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkConversationReadRequest
@@ -597,7 +631,7 @@ export type MarkConversationReadRequest = Message$1<"hawkr.chat.v1alpha1.MarkCon
  * Use `create(MarkConversationReadRequestSchema)` to create a new message.
  */
 export const MarkConversationReadRequestSchema: GenMessage<MarkConversationReadRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 17);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 19);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkConversationReadResponse
@@ -610,7 +644,7 @@ export type MarkConversationReadResponse = Message$1<"hawkr.chat.v1alpha1.MarkCo
  * Use `create(MarkConversationReadResponseSchema)` to create a new message.
  */
 export const MarkConversationReadResponseSchema: GenMessage<MarkConversationReadResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 18);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 20);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkAllReadRequest
@@ -623,7 +657,7 @@ export type MarkAllReadRequest = Message$1<"hawkr.chat.v1alpha1.MarkAllReadReque
  * Use `create(MarkAllReadRequestSchema)` to create a new message.
  */
 export const MarkAllReadRequestSchema: GenMessage<MarkAllReadRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 19);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 21);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkAllReadResponse
@@ -636,7 +670,7 @@ export type MarkAllReadResponse = Message$1<"hawkr.chat.v1alpha1.MarkAllReadResp
  * Use `create(MarkAllReadResponseSchema)` to create a new message.
  */
 export const MarkAllReadResponseSchema: GenMessage<MarkAllReadResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 20);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 22);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkAllStoreReadRequest
@@ -649,7 +683,7 @@ export type MarkAllStoreReadRequest = Message$1<"hawkr.chat.v1alpha1.MarkAllStor
  * Use `create(MarkAllStoreReadRequestSchema)` to create a new message.
  */
 export const MarkAllStoreReadRequestSchema: GenMessage<MarkAllStoreReadRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 21);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 23);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.MarkAllStoreReadResponse
@@ -662,7 +696,7 @@ export type MarkAllStoreReadResponse = Message$1<"hawkr.chat.v1alpha1.MarkAllSto
  * Use `create(MarkAllStoreReadResponseSchema)` to create a new message.
  */
 export const MarkAllStoreReadResponseSchema: GenMessage<MarkAllStoreReadResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 22);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 24);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetUnreadCountRequest
@@ -675,7 +709,7 @@ export type GetUnreadCountRequest = Message$1<"hawkr.chat.v1alpha1.GetUnreadCoun
  * Use `create(GetUnreadCountRequestSchema)` to create a new message.
  */
 export const GetUnreadCountRequestSchema: GenMessage<GetUnreadCountRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 23);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 25);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetUnreadCountResponse
@@ -692,7 +726,7 @@ export type GetUnreadCountResponse = Message$1<"hawkr.chat.v1alpha1.GetUnreadCou
  * Use `create(GetUnreadCountResponseSchema)` to create a new message.
  */
 export const GetUnreadCountResponseSchema: GenMessage<GetUnreadCountResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 24);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 26);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetStoreUnreadCountRequest
@@ -705,7 +739,7 @@ export type GetStoreUnreadCountRequest = Message$1<"hawkr.chat.v1alpha1.GetStore
  * Use `create(GetStoreUnreadCountRequestSchema)` to create a new message.
  */
 export const GetStoreUnreadCountRequestSchema: GenMessage<GetStoreUnreadCountRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 25);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 27);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetStoreUnreadCountResponse
@@ -722,7 +756,7 @@ export type GetStoreUnreadCountResponse = Message$1<"hawkr.chat.v1alpha1.GetStor
  * Use `create(GetStoreUnreadCountResponseSchema)` to create a new message.
  */
 export const GetStoreUnreadCountResponseSchema: GenMessage<GetStoreUnreadCountResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 26);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 28);
 
 /**
  * ConversationPresence 是一個對話的對方是否在線。
@@ -746,7 +780,7 @@ export type ConversationPresence = Message$1<"hawkr.chat.v1alpha1.ConversationPr
  * Use `create(ConversationPresenceSchema)` to create a new message.
  */
 export const ConversationPresenceSchema: GenMessage<ConversationPresence> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 27);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 29);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetPresenceRequest
@@ -765,7 +799,7 @@ export type GetPresenceRequest = Message$1<"hawkr.chat.v1alpha1.GetPresenceReque
  * Use `create(GetPresenceRequestSchema)` to create a new message.
  */
 export const GetPresenceRequestSchema: GenMessage<GetPresenceRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 28);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 30);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetPresenceResponse
@@ -784,7 +818,7 @@ export type GetPresenceResponse = Message$1<"hawkr.chat.v1alpha1.GetPresenceResp
  * Use `create(GetPresenceResponseSchema)` to create a new message.
  */
 export const GetPresenceResponseSchema: GenMessage<GetPresenceResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 29);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 31);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetStorePresenceRequest
@@ -803,7 +837,7 @@ export type GetStorePresenceRequest = Message$1<"hawkr.chat.v1alpha1.GetStorePre
  * Use `create(GetStorePresenceRequestSchema)` to create a new message.
  */
 export const GetStorePresenceRequestSchema: GenMessage<GetStorePresenceRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 30);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 32);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.GetStorePresenceResponse
@@ -822,7 +856,7 @@ export type GetStorePresenceResponse = Message$1<"hawkr.chat.v1alpha1.GetStorePr
  * Use `create(GetStorePresenceResponseSchema)` to create a new message.
  */
 export const GetStorePresenceResponseSchema: GenMessage<GetStorePresenceResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 31);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 33);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.StreamEventsRequest
@@ -841,7 +875,7 @@ export type StreamEventsRequest = Message$1<"hawkr.chat.v1alpha1.StreamEventsReq
  * Use `create(StreamEventsRequestSchema)` to create a new message.
  */
 export const StreamEventsRequestSchema: GenMessage<StreamEventsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 32);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 34);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.StreamStoreEventsRequest
@@ -860,7 +894,7 @@ export type StreamStoreEventsRequest = Message$1<"hawkr.chat.v1alpha1.StreamStor
  * Use `create(StreamStoreEventsRequestSchema)` to create a new message.
  */
 export const StreamStoreEventsRequestSchema: GenMessage<StreamStoreEventsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 33);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 35);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.StreamEventsResponse
@@ -877,7 +911,7 @@ export type StreamEventsResponse = Message$1<"hawkr.chat.v1alpha1.StreamEventsRe
  * Use `create(StreamEventsResponseSchema)` to create a new message.
  */
 export const StreamEventsResponseSchema: GenMessage<StreamEventsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 34);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 36);
 
 /**
  * @generated from message hawkr.chat.v1alpha1.StreamStoreEventsResponse
@@ -894,7 +928,7 @@ export type StreamStoreEventsResponse = Message$1<"hawkr.chat.v1alpha1.StreamSto
  * Use `create(StreamStoreEventsResponseSchema)` to create a new message.
  */
 export const StreamStoreEventsResponseSchema: GenMessage<StreamStoreEventsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 35);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 37);
 
 /**
  * ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
@@ -949,7 +983,7 @@ export type ChatEvent = Message$1<"hawkr.chat.v1alpha1.ChatEvent"> & {
  * Use `create(ChatEventSchema)` to create a new message.
  */
 export const ChatEventSchema: GenMessage<ChatEvent> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 36);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 38);
 
 /**
  * Ready 是補洞完成後的第一個 frame。
@@ -984,7 +1018,7 @@ export type Ready = Message$1<"hawkr.chat.v1alpha1.Ready"> & {
  * Use `create(ReadySchema)` to create a new message.
  */
 export const ReadySchema: GenMessage<Ready> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 37);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 39);
 
 /**
  * MessageEvent 是新訊息，或同 seq 的可見度改變。
@@ -1010,7 +1044,7 @@ export type MessageEvent = Message$1<"hawkr.chat.v1alpha1.MessageEvent"> & {
  * Use `create(MessageEventSchema)` to create a new message.
  */
 export const MessageEventSchema: GenMessage<MessageEvent> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 38);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 40);
 
 /**
  * UnreadChanged 是呼叫者這一方的總未讀訊息數。
@@ -1029,7 +1063,7 @@ export type UnreadChanged = Message$1<"hawkr.chat.v1alpha1.UnreadChanged"> & {
  * Use `create(UnreadChangedSchema)` to create a new message.
  */
 export const UnreadChangedSchema: GenMessage<UnreadChanged> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 39);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 41);
 
 /**
  * PeerRead 是對方在一個對話的已讀游標前進。
@@ -1055,7 +1089,7 @@ export type PeerRead = Message$1<"hawkr.chat.v1alpha1.PeerRead"> & {
  * Use `create(PeerReadSchema)` to create a new message.
  */
 export const PeerReadSchema: GenMessage<PeerRead> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 40);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 42);
 
 /**
  * Resync 要求 client 重新取列表與缺口。
@@ -1090,7 +1124,7 @@ export type Resync = Message$1<"hawkr.chat.v1alpha1.Resync"> & {
  * Use `create(ResyncSchema)` to create a new message.
  */
 export const ResyncSchema: GenMessage<Resync> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 41);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 43);
 
 /**
  * Heartbeat 是串流閒置時的保活 frame，沒有內容。
@@ -1105,7 +1139,7 @@ export type Heartbeat = Message$1<"hawkr.chat.v1alpha1.Heartbeat"> & {
  * Use `create(HeartbeatSchema)` to create a new message.
  */
 export const HeartbeatSchema: GenMessage<Heartbeat> = /*@__PURE__*/
-  messageDesc(file_hawkr_chat_v1alpha1_chat, 42);
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 44);
 
 /**
  * MessageKind 是訊息的種類。client 遇到 UNSPECIFIED 或不認得的值，顯示成「不支援的訊息」，不當成錯誤。
@@ -1196,6 +1230,17 @@ export const ChatAppService: GenService<{
     methodKind: "unary";
     input: typeof ListStoreConversationsRequestSchema;
     output: typeof ListStoreConversationsResponseSchema;
+  },
+  /**
+   * GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+   * 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+   *
+   * @generated from rpc hawkr.chat.v1alpha1.ChatAppService.GetStoreConversationByBuyer
+   */
+  getStoreConversationByBuyer: {
+    methodKind: "unary";
+    input: typeof GetStoreConversationByBuyerRequestSchema;
+    output: typeof GetStoreConversationByBuyerResponseSchema;
   },
   /**
    * ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；

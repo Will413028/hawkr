@@ -30,12 +30,13 @@ const buyerOnlyReason = "只有買家身分能做的動作（店家有對應的�
 // 由對話歸屬推導身分的方法（ListMessages、SendMessage、MarkConversationRead）兩種身分都可能：宣告店家身分時需要的能力，買家身分不適用。
 var declarations = map[string]declaration{
 	// 店家身分：讀取、已讀、未讀、在線狀態與即時事件流要 CapChatRead（im.Party.Authorize），送出要 CapChatSend（送出的守門 G2；店家寄件人同時要 CapChatRead）。
-	chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure: requires(seller.CapChatRead),
-	chatv1alpha1connect.ChatAppServiceMarkAllStoreReadProcedure:       requires(seller.CapChatRead),
-	chatv1alpha1connect.ChatAppServiceGetStoreUnreadCountProcedure:    requires(seller.CapChatRead),
-	chatv1alpha1connect.ChatAppServiceGetStorePresenceProcedure:       requires(seller.CapChatRead),
-	chatv1alpha1connect.ChatAppServiceStreamStoreEventsProcedure:      requires(seller.CapChatRead),
-	chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:     requires(seller.CapChatSend),
+	chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure:      requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceGetStoreConversationByBuyerProcedure: requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceMarkAllStoreReadProcedure:            requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceGetStoreUnreadCountProcedure:         requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceGetStorePresenceProcedure:            requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceStreamStoreEventsProcedure:           requires(seller.CapChatRead),
+	chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:          requires(seller.CapChatSend),
 
 	// 由對話歸屬推導：店家方動作時的能力（買家方不適用）。
 	chatv1alpha1connect.ChatAppServiceListMessagesProcedure:         requires(seller.CapChatRead),

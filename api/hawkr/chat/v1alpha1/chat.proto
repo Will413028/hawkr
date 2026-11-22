@@ -31,6 +31,12 @@ service ChatAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  // GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+  // 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+  rpc GetStoreConversationByBuyer(GetStoreConversationByBuyerRequest) returns (GetStoreConversationByBuyerResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   // ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
   // after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
   // 呼叫者不是對話的任一方，與對話不存在一律回 not_found，不區分原因。已隱藏或已抹除的訊息是墓碑，不帶內容。
@@ -193,6 +199,14 @@ message ListStoreConversationsRequest {
 message ListStoreConversationsResponse {
   repeated Conversation conversations = 1;
   string next_page_token = 2;
+}
+
+message GetStoreConversationByBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStoreConversationByBuyerResponse {
+  Conversation conversation = 1;
 }
 
 message ListMessagesRequest {

@@ -25,6 +25,9 @@ abstract class ChatAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $4.ListConversationsRequest request);
   $async.Future<$4.ListStoreConversationsResponse> listStoreConversations(
       $pb.ServerContext ctx, $4.ListStoreConversationsRequest request);
+  $async.Future<$4.GetStoreConversationByBuyerResponse>
+      getStoreConversationByBuyer(
+          $pb.ServerContext ctx, $4.GetStoreConversationByBuyerRequest request);
   $async.Future<$4.ListMessagesResponse> listMessages(
       $pb.ServerContext ctx, $4.ListMessagesRequest request);
   $async.Future<$4.SendMessageResponse> sendMessage(
@@ -58,6 +61,8 @@ abstract class ChatAppServiceBase extends $pb.GeneratedService {
         return $4.ListConversationsRequest();
       case 'ListStoreConversations':
         return $4.ListStoreConversationsRequest();
+      case 'GetStoreConversationByBuyer':
+        return $4.GetStoreConversationByBuyerRequest();
       case 'ListMessages':
         return $4.ListMessagesRequest();
       case 'SendMessage':
@@ -97,6 +102,9 @@ abstract class ChatAppServiceBase extends $pb.GeneratedService {
       case 'ListStoreConversations':
         return listStoreConversations(
             ctx, request as $4.ListStoreConversationsRequest);
+      case 'GetStoreConversationByBuyer':
+        return getStoreConversationByBuyer(
+            ctx, request as $4.GetStoreConversationByBuyerRequest);
       case 'ListMessages':
         return listMessages(ctx, request as $4.ListMessagesRequest);
       case 'SendMessage':
