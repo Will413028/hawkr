@@ -184,7 +184,7 @@
    "id": "alpha-unknown-format-guessed",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "\treturn 0, fmt.Errorf(\"unsupported alpha band format %d\", a.BandFormat())",
+   "old": "\treturn 0, fmt.Errorf(\"%w: unsupported alpha band format %d\", ErrProcessing, a.BandFormat())",
    "new": "\treturn 65535, nil",
    "test": "internal/modules/media/internal/image ^TestAlphaOpaqueRejectsUnknownBandFormat$",
    "why": "an unknown alpha band format is silently treated as 16-bit"
