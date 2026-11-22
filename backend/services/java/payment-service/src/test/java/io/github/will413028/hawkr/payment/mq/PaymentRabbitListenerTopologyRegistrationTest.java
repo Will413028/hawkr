@@ -31,13 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>repo 既有的機制是 {@code scripts/mq-consumer-registration-check.py}，但它<b>只掃 Go</b>
  * （該檔自述「Go 端認得的 queue 名」，三個抽取器全是 Go 語法形狀）。
  * 10 檔 §10.7 逐字：「⚠️ 登記 gate 只掃 Go；<b>Java 漏登記無任何 CI 攔得住</b>，review 必人工查」。
- * 本測試就是 shipping-service 這一塊的那道 gate。
+ * 本測試就是 payment-service 這一塊的那道 gate。
  *
  * <h2>觀測窗與它擋不住的東西（誠實標明邊界）</h2>
  * <ul>
  *   <li>✅ 擋得住：本 service 新增 {@code @RabbitListener} 而忘了加 topology 條目</li>
  *   <li>❌ 擋不住：<b>其他 Java service</b> 的漏登記（各自需要一份；本測試的 scan 範圍是
- *       {@code io.github.will413028.hawkr.shipping}）</li>
+ *       {@code io.github.will413028.hawkr.payment}）</li>
  *   <li>❌ 擋不住：queue 名以<b>執行期</b>字串組出來的 listener
  *       （{@code @RabbitListener} 的 {@code queues} 是編譯期常數才讀得到）</li>
  *   <li>❌ 擋不住：binding 的 routing key 對不對——只驗 queue 名存在</li>
@@ -97,7 +97,7 @@ class PaymentRabbitListenerTopologyRegistrationTest {
             //    ⚠️ 這個 bug 的可怕之處在於它**兩個方向都會錯**：
             //      * 要找的 queue 排在截斷點之後 ⇒ 誤報「未登記」（假紅）
             //      * 要找的 queue 排在截斷點之前 ⇒ 照樣通過，而**後面那些根本沒被檢查**（假綠）
-            //    本檔的對照組（找得到既有的 shipping.payuni.webhook 嗎）是唯一擋住它的東西
+            //    本檔的對照組（找得到既有的 payment.payuni.webhook 嗎）是唯一擋住它的東西
             //    ——它在 Batch A 新增 topology 註解的當下就讓整支測試宣告「結論不可信」。
             //    🔴 那正是對照組存在的理由：**擋不住錯誤，但擋得住「錯誤被當成結論」**。
             if (line.startsWith("#")) {

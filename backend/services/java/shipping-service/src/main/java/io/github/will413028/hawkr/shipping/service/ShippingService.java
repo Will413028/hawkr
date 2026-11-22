@@ -49,7 +49,6 @@ import io.github.will413028.hawkr.shipping.provider.capability.DispatchCapabilit
 import io.github.will413028.hawkr.shipping.provider.capability.LabelCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.ReturnCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.TrackCapability;
-import io.github.will413028.hawkr.shipping.service.dto.LogisticsCostIncurredPayload;
 import io.github.will413028.hawkr.shipping.service.dto.ShipmentPhotoPayload;
 import io.github.will413028.hawkr.shipping.service.dto.ShippingEventPayload;
 import org.springframework.stereotype.Service;
@@ -2115,92 +2114,9 @@ public class ShippingService {
             eventPublisher.publishShipmentStatusChanged(payload);
         }
 
-        // 🔴 provider 成本事實（70 §7.1／§3.1.1）。放在這裡而不是各 publish 分支裡，
-        //    因為它的觸發條件與「發哪一條物流事件」正交——四種情形（送達／取件後取消／
-        //    買家無法投遞／返程 leg）會落在不同分支，逐分支加等於保證漏掉其中幾條。
-        publishCostIncurredIfLegEnded(entity, toStatus);
-
         log.info("ShippingService.statusUpdate.success",
                 "狀態更新: " + fromStatus.label() + " → " + toStatus.label(),
                 "shipmentNo", entity.getShipmentNo());
-    }
-    /**
-     * provider 這條 leg 結束時，發一次 {@code logistics.cost.incurred}（70 §7.1）。
-     *
-     * <h3>🔴 觸發條件是兩個連言，缺一都會發錯</h3>
-     * <ol>
-     *   <li>{@code provider_delivery_ref} 非空——沒有 provider leg ＝ 沒有 provider cost
-     *       incurred（70 §3.1.2 逐字）。超商／宅配今天不會有這個值 ⇒ 天然不觸發。</li>
-     *   <li>狀態進入 <b>terminal</b>（{@code ShippingStatusRules.isTerminal}）——此時這條 leg
-     *       不會再產生新成本，金額才算確定。</li>
-     * </ol>
-     *
-     * <h3>為什麼 terminal 就覆蓋得了 70 §3.1.1 的四種情形</h3>
-     * 實查 {@code UberStatusMapper} 的映射，Uber 的三個終局<b>全部</b>收斂到 terminal：
-     * <pre>
-     *   delivered → PICKED_UP(11)                    情形 1 正常送達
-     *   canceled  → CANCELLED(41)                    情形 2 賣家可歸責的取消
-     *   returned  → ABNORMAL(33) → 同次續推 41        情形 3 買家可歸責的無法投遞
-     * </pre>
-     * 情形 4（返程 leg）有<b>自己的 {@code provider_delivery_ref}</b> ⇒ 天然是另一條 leg，
-     * 走同一段邏輯、發自己的事件（70 §3.1.1 情形 4、§3.1.2）。
-     *
-     * <p>⚠️ <b>不是「送達完成才發」</b>——那個舊說法會漏掉情形 2／3／4，
-     * 也就是「provider 已經收了錢、我方卻沒有任何應收紀錄」的那幾類。
-     *
-     * <h3>冪等</h3>
-     * 本方法在 CAS {@code rows == 1} 之後才被呼叫 ⇒ <b>每次真正的狀態轉移只發一次</b>。
-     * 終態無出邊，所以一條 leg 最多發一次。
-     * ⚠️ 即使如此，<b>最終保證仍在 consumer 側的 DB 唯一性</b>
-     * （{@code uq_logrecv_delivery_ref}）——MQ 是至少一次投遞，producer 端的「只發一次」
-     * 擋不住重投。
-     *
-     * <h3>🔴 取不到成本時不發，而不是發 0</h3>
-     * {@code CostCapability} 回 empty 代表「本 provider 這條管道沒有成本事實」。
-     * 發 0 會讓賣家應收變成 0 且沒有任何訊號；不發則由月結對帳補回（70 §6.1）。
-     */
-    private void publishCostIncurredIfLegEnded(ShipmentEntity entity, ShippingStatus toStatus) {
-        if (!ShippingStatusRules.isTerminal(toStatus)) {
-            return;
-        }
-        String providerDeliveryRef = entity.getUberDeliveryId();
-        if (providerDeliveryRef == null || providerDeliveryRef.isBlank()) {
-            // 沒有 provider leg ⇒ 沒有 provider cost incurred。超商／宅配走這裡。
-            return;
-        }
-        try {
-            Optional<Long> incurred = fulfillmentProviders.find(entity.getShippingMethod())
-                    .flatMap(adapter -> adapter.cost(FulfillmentContext.forShipment(entity)))
-                    .flatMap(capability -> capability.incurredCost(entity));
-            if (incurred.isEmpty()) {
-                log.info("ShippingService.costIncurred.skipped",
-                        "provider 未提供這條 leg 的成本事實，改由月結對帳補回: providerDeliveryRef="
-                                + providerDeliveryRef,
-                        "shipmentNo", entity.getShipmentNo());
-                return;
-            }
-            eventPublisher.publishLogisticsCostIncurred(new LogisticsCostIncurredPayload(
-                    UUID.randomUUID().toString(),
-                    MqConstants.EVENT_TYPE_LOGISTICS_COST_INCURRED,
-                    "v1",
-                    DateTimeUtils.nowUtc().toString() + "Z",
-                    null,
-                    null,
-                    entity.getShippingMethod(),
-                    providerDeliveryRef,
-                    String.valueOf(entity.getStoreId()),
-                    entity.getOrderNo(),
-                    entity.getId() == null ? null : String.valueOf(entity.getId()),
-                    String.valueOf(incurred.get())));
-        } catch (ShippingBusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            // 🔴 取成本的過程失敗不得讓狀態轉移本身失敗——狀態已經 commit 了。
-            //    但必須留下可查的訊號，否則這筆成本會無聲消失。
-            log.error("ShippingService.costIncurred.error",
-                    "取得 provider 成本失敗，這筆成本事實未發出（靠月結對帳補回）: "
-                            + e.getMessage());
-        }
     }
 
 

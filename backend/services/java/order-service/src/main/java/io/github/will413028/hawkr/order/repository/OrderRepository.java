@@ -310,37 +310,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     );
 
     /**
-     * 履約責任判定 financially final ＝ {@code BUYER_CAUSED} ⇒ {@code SHIPPING_ABNORMAL(35)}
-     * → {@code DELIVERY_FAILED_NO_REFUND(54)}（03 §2.1「唯一入邊、執行者與下游讀者」）。
-     *
-     * <p>🔴 <b>為什麼要一支專屬 CAS，不能沿用 {@link #updateStatusIfMatchAny}</b>：
-     * 那支的 allowed-from 清單由 {@code OrderShippingProgress.allowedFromFor} 產生，
-     * 而 {@code 54} <b>刻意不在</b> 它的 {@code RANK} 表內（03 §2.1 逐字：{@code 54}
-     * 不由物流貨態驅動，<b>不得</b>把它加進任何一列的 allowed-from）
-     * ⇒ {@code allowedFromFor("54")} 回<b>空清單</b> ⇒ {@code <foreach>} 展開成
-     * {@code status IN ()} ⇒ <b>SQL 語法錯誤</b>。
-     * ⚠️ 那不是「擋下來了」而是<b>整個交易炸掉</b>，而交易裡還有撥款任務那一列。
-     *
-     * <p>🔴 <b>唯一入邊 {@code 35 → 54} 寫死在述詞裡</b>，不接受呼叫端指定 allowed-from：
-     * 嚴禁自 {@code 40}／{@code 50}／{@code 70}／{@code 80} 進入（那些是已送達或已結案語意，
-     * 不是配送失敗）。{@code 54} 是 immutable financial terminal（無出邊、不可逆），
-     * 而同一個交易還會建 {@code grant_payment_tasks} ⇒ 入邊放寬一格，錢就從錯的地方流出去。
-     *
-     * @return 影響行數；{@code 0} ＝ 訂單不在 {@code 35}（重送或競態）。
-     *         🔴 呼叫端<b>不得</b>把 {@code 0} 逕行當成「已處理」就 ACK——必須驗證既有終態
-     *         （03 §5.7.3：已是 {@code 54} ⇒ 確認撥款任務存在；其他狀態 ⇒ 建案件且不得靜默 ACK）
-     */
-    @Update("""
-        UPDATE orders SET status = #{newStatus}, updated_at = NOW()
-        WHERE order_no = #{orderNo} AND status = #{expectedOldStatus}
-        """)
-    int markDeliveryFailedNoRefund(
-            @Param("orderNo") String orderNo,
-            @Param("expectedOldStatus") String expectedOldStatus,
-            @Param("newStatus") String newStatus
-    );
-
-    /**
      * 條件式狀態更新（多種合法舊狀態）：僅當當前狀態在允許清單內時才更新
      * 用於退款等可從多種狀態轉換的場景
      */

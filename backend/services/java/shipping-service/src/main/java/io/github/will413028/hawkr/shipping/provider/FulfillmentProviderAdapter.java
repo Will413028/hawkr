@@ -2,7 +2,6 @@ package io.github.will413028.hawkr.shipping.provider;
 
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.shipping.provider.capability.CancelCapability;
-import io.github.will413028.hawkr.shipping.provider.capability.CostCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.CreateCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.DispatchCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.InboundCapability;
@@ -98,19 +97,6 @@ public interface FulfillmentProviderAdapter {
 
     /** 門市地圖（買家選店）。只有超商軸有。 */
     Optional<StoreLocatorCapability> storeLocator(FulfillmentContext ctx);
-
-    /**
-     * provider 成本（這條 leg 已發生多少物流成本）。
-     *
-     * <p>🔴 <b>它是 {@code logistics.cost.incurred} 得以 provider-neutral 的原因</b>：
-     * 事件契約與觸發條件都不分 provider（70 §7.1／§3.1.1），而「成本怎麼取得」必然分
-     * ——有的 provider 在報價時就給、有的只在月結帳單給。差異收斂在各自的 adapter 裡，
-     * producer 不得改用 {@code if (provider == …)} 分支。
-     *
-     * <p>⚠️ 不透過 API 提供成本的 provider 回 {@link Optional#empty()}，
-     * 🔴 <b>不是回 0</b>——0 是合法金額，會讓賣家應收變成 0 而沒有訊號。
-     */
-    Optional<CostCapability> cost(FulfillmentContext ctx);
 
     /**
      * 本波尚未搬移實作、但 provider <b>確實具備</b>的 capability 名稱集合。
