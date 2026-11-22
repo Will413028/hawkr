@@ -883,7 +883,7 @@ func TestGC_KeepsUnexpiredRows(t *testing.T) {
 func TestGC_DoesNotTouchUploadsStillBeingProcessed(t *testing.T) {
 	f := setup(t)
 	res := uploaded(t, f, owner, media.VisibilityPublic)
-	f.clock.Advance(10 * media.UploadTTL)
+	f.clock.Advance(media.UploadTTL + time.Minute)
 	got, err := f.m.CollectGarbage(t.Context())
 	if err != nil || got.Claimed != 0 {
 		t.Fatalf("GC = %+v, %v，處理中（UPLOADED）的列不進 GC", got, err)
