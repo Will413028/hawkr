@@ -82,6 +82,12 @@ const (
 	// ChatAppServiceGetStorePresenceProcedure is the fully-qualified name of the ChatAppService's
 	// GetStorePresence RPC.
 	ChatAppServiceGetStorePresenceProcedure = "/hawkr.chat.v1alpha1.ChatAppService/GetStorePresence"
+	// ChatAppServiceStreamEventsProcedure is the fully-qualified name of the ChatAppService's
+	// StreamEvents RPC.
+	ChatAppServiceStreamEventsProcedure = "/hawkr.chat.v1alpha1.ChatAppService/StreamEvents"
+	// ChatAppServiceStreamStoreEventsProcedure is the fully-qualified name of the ChatAppService's
+	// StreamStoreEvents RPC.
+	ChatAppServiceStreamStoreEventsProcedure = "/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents"
 )
 
 // ChatAppServiceClient is a client for the hawkr.chat.v1alpha1.ChatAppService service.
@@ -117,6 +123,15 @@ type ChatAppServiceClient interface {
 	GetPresence(context.Context, *connect.Request[v1alpha1.GetPresenceRequest]) (*connect.Response[v1alpha1.GetPresenceResponse], error)
 	// GetStorePresence 同 GetPresence，對象是呼叫者此刻的店的對話。
 	GetStorePresence(context.Context, *connect.Request[v1alpha1.GetStorePresenceRequest]) (*connect.Response[v1alpha1.GetStorePresenceResponse], error)
+	// StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+	// 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+	// 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+	// 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+	// 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+	StreamEvents(context.Context, *connect.Request[v1alpha1.StreamEventsRequest]) (*connect.ServerStreamForClient[v1alpha1.StreamEventsResponse], error)
+	// StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+	// 以 failed_precondition 與 STORE_CLOSED 結束。
+	StreamStoreEvents(context.Context, *connect.Request[v1alpha1.StreamStoreEventsRequest]) (*connect.ServerStreamForClient[v1alpha1.StreamStoreEventsResponse], error)
 }
 
 // NewChatAppServiceClient constructs a client for the hawkr.chat.v1alpha1.ChatAppService service.
@@ -215,6 +230,18 @@ func NewChatAppServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		streamEvents: connect.NewClient[v1alpha1.StreamEventsRequest, v1alpha1.StreamEventsResponse](
+			httpClient,
+			baseURL+ChatAppServiceStreamEventsProcedure,
+			connect.WithSchema(chatAppServiceMethods.ByName("StreamEvents")),
+			connect.WithClientOptions(opts...),
+		),
+		streamStoreEvents: connect.NewClient[v1alpha1.StreamStoreEventsRequest, v1alpha1.StreamStoreEventsResponse](
+			httpClient,
+			baseURL+ChatAppServiceStreamStoreEventsProcedure,
+			connect.WithSchema(chatAppServiceMethods.ByName("StreamStoreEvents")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -233,6 +260,8 @@ type chatAppServiceClient struct {
 	getStoreUnreadCount    *connect.Client[v1alpha1.GetStoreUnreadCountRequest, v1alpha1.GetStoreUnreadCountResponse]
 	getPresence            *connect.Client[v1alpha1.GetPresenceRequest, v1alpha1.GetPresenceResponse]
 	getStorePresence       *connect.Client[v1alpha1.GetStorePresenceRequest, v1alpha1.GetStorePresenceResponse]
+	streamEvents           *connect.Client[v1alpha1.StreamEventsRequest, v1alpha1.StreamEventsResponse]
+	streamStoreEvents      *connect.Client[v1alpha1.StreamStoreEventsRequest, v1alpha1.StreamStoreEventsResponse]
 }
 
 // ListConversations calls hawkr.chat.v1alpha1.ChatAppService.ListConversations.
@@ -300,6 +329,16 @@ func (c *chatAppServiceClient) GetStorePresence(ctx context.Context, req *connec
 	return c.getStorePresence.CallUnary(ctx, req)
 }
 
+// StreamEvents calls hawkr.chat.v1alpha1.ChatAppService.StreamEvents.
+func (c *chatAppServiceClient) StreamEvents(ctx context.Context, req *connect.Request[v1alpha1.StreamEventsRequest]) (*connect.ServerStreamForClient[v1alpha1.StreamEventsResponse], error) {
+	return c.streamEvents.CallServerStream(ctx, req)
+}
+
+// StreamStoreEvents calls hawkr.chat.v1alpha1.ChatAppService.StreamStoreEvents.
+func (c *chatAppServiceClient) StreamStoreEvents(ctx context.Context, req *connect.Request[v1alpha1.StreamStoreEventsRequest]) (*connect.ServerStreamForClient[v1alpha1.StreamStoreEventsResponse], error) {
+	return c.streamStoreEvents.CallServerStream(ctx, req)
+}
+
 // ChatAppServiceHandler is an implementation of the hawkr.chat.v1alpha1.ChatAppService service.
 type ChatAppServiceHandler interface {
 	// ListConversations 列出呼叫者（買家）的對話，最近有訊息的在前（最後訊息時間，相同時以 ID 排序）。不因封鎖隱藏對話，不回總數。
@@ -333,6 +372,15 @@ type ChatAppServiceHandler interface {
 	GetPresence(context.Context, *connect.Request[v1alpha1.GetPresenceRequest]) (*connect.Response[v1alpha1.GetPresenceResponse], error)
 	// GetStorePresence 同 GetPresence，對象是呼叫者此刻的店的對話。
 	GetStorePresence(context.Context, *connect.Request[v1alpha1.GetStorePresenceRequest]) (*connect.Response[v1alpha1.GetStorePresenceResponse], error)
+	// StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+	// 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+	// 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+	// 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+	// 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+	StreamEvents(context.Context, *connect.Request[v1alpha1.StreamEventsRequest], *connect.ServerStream[v1alpha1.StreamEventsResponse]) error
+	// StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+	// 以 failed_precondition 與 STORE_CLOSED 結束。
+	StreamStoreEvents(context.Context, *connect.Request[v1alpha1.StreamStoreEventsRequest], *connect.ServerStream[v1alpha1.StreamStoreEventsResponse]) error
 }
 
 // NewChatAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -427,6 +475,18 @@ func NewChatAppServiceHandler(svc ChatAppServiceHandler, opts ...connect.Handler
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatAppServiceStreamEventsHandler := connect.NewServerStreamHandler(
+		ChatAppServiceStreamEventsProcedure,
+		svc.StreamEvents,
+		connect.WithSchema(chatAppServiceMethods.ByName("StreamEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatAppServiceStreamStoreEventsHandler := connect.NewServerStreamHandler(
+		ChatAppServiceStreamStoreEventsProcedure,
+		svc.StreamStoreEvents,
+		connect.WithSchema(chatAppServiceMethods.ByName("StreamStoreEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.chat.v1alpha1.ChatAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatAppServiceListConversationsProcedure:
@@ -455,6 +515,10 @@ func NewChatAppServiceHandler(svc ChatAppServiceHandler, opts ...connect.Handler
 			chatAppServiceGetPresenceHandler.ServeHTTP(w, r)
 		case ChatAppServiceGetStorePresenceProcedure:
 			chatAppServiceGetStorePresenceHandler.ServeHTTP(w, r)
+		case ChatAppServiceStreamEventsProcedure:
+			chatAppServiceStreamEventsHandler.ServeHTTP(w, r)
+		case ChatAppServiceStreamStoreEventsProcedure:
+			chatAppServiceStreamStoreEventsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -514,4 +578,12 @@ func (UnimplementedChatAppServiceHandler) GetPresence(context.Context, *connect.
 
 func (UnimplementedChatAppServiceHandler) GetStorePresence(context.Context, *connect.Request[v1alpha1.GetStorePresenceRequest]) (*connect.Response[v1alpha1.GetStorePresenceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.chat.v1alpha1.ChatAppService.GetStorePresence is not implemented"))
+}
+
+func (UnimplementedChatAppServiceHandler) StreamEvents(context.Context, *connect.Request[v1alpha1.StreamEventsRequest], *connect.ServerStream[v1alpha1.StreamEventsResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.chat.v1alpha1.ChatAppService.StreamEvents is not implemented"))
+}
+
+func (UnimplementedChatAppServiceHandler) StreamStoreEvents(context.Context, *connect.Request[v1alpha1.StreamStoreEventsRequest], *connect.ServerStream[v1alpha1.StreamStoreEventsResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.chat.v1alpha1.ChatAppService.StreamStoreEvents is not implemented"))
 }

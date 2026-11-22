@@ -23,6 +23,13 @@ type App struct {
 	stores Stores
 	images rpc.Images
 	log    *slog.Logger
+	// streams 與 auth 給串流用：訂閱即時事件，與每 RecheckEvery 重新驗證 session。
+	streams Streams
+	auth    Reauthenticator
+	// stream 是串流傳輸的常數、時鐘與抖動來源；正式組裝用預設值，測試注入假的。
+	stream streamConfig
+	clock  streamClock
+	jitter func() float64
 	// reasonOf 取出模組錯誤帶的業務原因；正式組裝是 im.ReasonOf，測試換成固定的原因（模組的原因型別不能在模組外建構）。
 	reasonOf func(error) im.Reason
 }
@@ -30,15 +37,19 @@ type App struct {
 var _ chatv1alpha1connect.ChatAppServiceHandler = (*App)(nil)
 
 // NewApp 建立登入者的聊天 handler。能力宣告表（declarations）與 ChatAppService 的方法對不上時回錯誤，不能啟動。
-func NewApp(reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
-	return newApp(declarations, reads, writes, buyers, stores, images, log)
+func NewApp(reads Reads, writes Writes, streams Streams, auth Reauthenticator, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
+	return newApp(declarations, reads, writes, streams, auth, buyers, stores, images, log)
 }
 
 // newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
-func newApp(table map[string]declaration, reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
+func newApp(table map[string]declaration, reads Reads, writes Writes, streams Streams, auth Reauthenticator, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
 		return nil, fmt.Errorf("httpapi/chat：需要 logger")
+	case streams == nil:
+		return nil, fmt.Errorf("httpapi/chat：需要 Streams")
+	case auth == nil:
+		return nil, fmt.Errorf("httpapi/chat：需要 Reauthenticator")
 	case buyers == nil:
 		return nil, fmt.Errorf("httpapi/chat：需要 Buyers")
 	case stores == nil:
@@ -47,7 +58,10 @@ func newApp(table map[string]declaration, reads Reads, writes Writes, buyers Buy
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{reads: reads, writes: writes, buyers: buyers, stores: stores, images: images, log: log, reasonOf: im.ReasonOf}, nil
+	return &App{
+		reads: reads, writes: writes, streams: streams, auth: auth, buyers: buyers, stores: stores, images: images, log: log, reasonOf: im.ReasonOf,
+		stream: defaultStreamConfig(), clock: realClock(), jitter: randFloat,
+	}, nil
 }
 
 func (h *App) ListConversations(ctx context.Context, req *connect.Request[pb.ListConversationsRequest]) (*connect.Response[pb.ListConversationsResponse], error) {

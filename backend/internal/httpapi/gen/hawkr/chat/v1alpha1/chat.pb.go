@@ -22,6 +22,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -1876,11 +1877,675 @@ func (x *GetStorePresenceResponse) GetPresences() []*ConversationPresence {
 	return nil
 }
 
+type StreamEventsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// conversation_id 到 client 已有的最後一個 seq；最多 50 個，key 必須是對話 ID。
+	Cursors       map[string]int64 `protobuf:"bytes,1,rep,name=cursors,proto3" json:"cursors,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamEventsRequest) Reset() {
+	*x = StreamEventsRequest{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamEventsRequest) ProtoMessage() {}
+
+func (x *StreamEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamEventsRequest.ProtoReflect.Descriptor instead.
+func (*StreamEventsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *StreamEventsRequest) GetCursors() map[string]int64 {
+	if x != nil {
+		return x.Cursors
+	}
+	return nil
+}
+
+type StreamStoreEventsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 同 StreamEventsRequest.cursors。
+	Cursors       map[string]int64 `protobuf:"bytes,1,rep,name=cursors,proto3" json:"cursors,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamStoreEventsRequest) Reset() {
+	*x = StreamStoreEventsRequest{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamStoreEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamStoreEventsRequest) ProtoMessage() {}
+
+func (x *StreamStoreEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamStoreEventsRequest.ProtoReflect.Descriptor instead.
+func (*StreamStoreEventsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *StreamStoreEventsRequest) GetCursors() map[string]int64 {
+	if x != nil {
+		return x.Cursors
+	}
+	return nil
+}
+
+type StreamEventsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Event         *ChatEvent             `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamEventsResponse) Reset() {
+	*x = StreamEventsResponse{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamEventsResponse) ProtoMessage() {}
+
+func (x *StreamEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamEventsResponse.ProtoReflect.Descriptor instead.
+func (*StreamEventsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *StreamEventsResponse) GetEvent() *ChatEvent {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+type StreamStoreEventsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Event         *ChatEvent             `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamStoreEventsResponse) Reset() {
+	*x = StreamStoreEventsResponse{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamStoreEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamStoreEventsResponse) ProtoMessage() {}
+
+func (x *StreamStoreEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamStoreEventsResponse.ProtoReflect.Descriptor instead.
+func (*StreamStoreEventsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *StreamStoreEventsResponse) GetEvent() *ChatEvent {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+// ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
+type ChatEvent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*ChatEvent_Ready
+	//	*ChatEvent_Message
+	//	*ChatEvent_Unread
+	//	*ChatEvent_PeerRead
+	//	*ChatEvent_Resync
+	//	*ChatEvent_Heartbeat
+	Event         isChatEvent_Event `protobuf_oneof:"event"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatEvent) Reset() {
+	*x = ChatEvent{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatEvent) ProtoMessage() {}
+
+func (x *ChatEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatEvent.ProtoReflect.Descriptor instead.
+func (*ChatEvent) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ChatEvent) GetEvent() isChatEvent_Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetReady() *Ready {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_Ready); ok {
+			return x.Ready
+		}
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetMessage() *MessageEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_Message); ok {
+			return x.Message
+		}
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetUnread() *UnreadChanged {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_Unread); ok {
+			return x.Unread
+		}
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetPeerRead() *PeerRead {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_PeerRead); ok {
+			return x.PeerRead
+		}
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetResync() *Resync {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_Resync); ok {
+			return x.Resync
+		}
+	}
+	return nil
+}
+
+func (x *ChatEvent) GetHeartbeat() *Heartbeat {
+	if x != nil {
+		if x, ok := x.Event.(*ChatEvent_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
+type isChatEvent_Event interface {
+	isChatEvent_Event()
+}
+
+type ChatEvent_Ready struct {
+	Ready *Ready `protobuf:"bytes,1,opt,name=ready,proto3,oneof"`
+}
+
+type ChatEvent_Message struct {
+	Message *MessageEvent `protobuf:"bytes,2,opt,name=message,proto3,oneof"`
+}
+
+type ChatEvent_Unread struct {
+	Unread *UnreadChanged `protobuf:"bytes,3,opt,name=unread,proto3,oneof"`
+}
+
+type ChatEvent_PeerRead struct {
+	PeerRead *PeerRead `protobuf:"bytes,4,opt,name=peer_read,json=peerRead,proto3,oneof"`
+}
+
+type ChatEvent_Resync struct {
+	Resync *Resync `protobuf:"bytes,5,opt,name=resync,proto3,oneof"`
+}
+
+type ChatEvent_Heartbeat struct {
+	Heartbeat *Heartbeat `protobuf:"bytes,6,opt,name=heartbeat,proto3,oneof"`
+}
+
+func (*ChatEvent_Ready) isChatEvent_Event() {}
+
+func (*ChatEvent_Message) isChatEvent_Event() {}
+
+func (*ChatEvent_Unread) isChatEvent_Event() {}
+
+func (*ChatEvent_PeerRead) isChatEvent_Event() {}
+
+func (*ChatEvent_Resync) isChatEvent_Event() {}
+
+func (*ChatEvent_Heartbeat) isChatEvent_Event() {}
+
+// Ready 是補洞完成後的第一個 frame。
+type Ready struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 呼叫者這一方的總未讀訊息數。
+	UnreadCount int64 `protobuf:"varint,1,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	// 閒置時 Heartbeat 的間隔；client 超過它的兩倍沒收到任何 frame 就當連線已斷並重連。
+	HeartbeatInterval *durationpb.Duration `protobuf:"bytes,2,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeat_interval,omitempty"`
+	// 串流的最長壽命（含抖動，已是這一條的實際值）；到期正常結束。
+	MaxLifetime   *durationpb.Duration `protobuf:"bytes,3,opt,name=max_lifetime,json=maxLifetime,proto3" json:"max_lifetime,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Ready) Reset() {
+	*x = Ready{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Ready) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Ready) ProtoMessage() {}
+
+func (x *Ready) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Ready.ProtoReflect.Descriptor instead.
+func (*Ready) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *Ready) GetUnreadCount() int64 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
+func (x *Ready) GetHeartbeatInterval() *durationpb.Duration {
+	if x != nil {
+		return x.HeartbeatInterval
+	}
+	return nil
+}
+
+func (x *Ready) GetMaxLifetime() *durationpb.Duration {
+	if x != nil {
+		return x.MaxLifetime
+	}
+	return nil
+}
+
+// MessageEvent 是新訊息，或同 seq 的可見度改變。
+type MessageEvent struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Message *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// 為真表示這是同一個 seq 的可見度改變（變成墓碑或還原），client 以 seq 取代手上的那則。
+	Updated       bool `protobuf:"varint,2,opt,name=updated,proto3" json:"updated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageEvent) Reset() {
+	*x = MessageEvent{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageEvent) ProtoMessage() {}
+
+func (x *MessageEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageEvent.ProtoReflect.Descriptor instead.
+func (*MessageEvent) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *MessageEvent) GetMessage() *Message {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+func (x *MessageEvent) GetUpdated() bool {
+	if x != nil {
+		return x.Updated
+	}
+	return false
+}
+
+// UnreadChanged 是呼叫者這一方的總未讀訊息數。
+type UnreadChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UnreadCount   int64                  `protobuf:"varint,1,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreadChanged) Reset() {
+	*x = UnreadChanged{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreadChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreadChanged) ProtoMessage() {}
+
+func (x *UnreadChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreadChanged.ProtoReflect.Descriptor instead.
+func (*UnreadChanged) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *UnreadChanged) GetUnreadCount() int64 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
+// PeerRead 是對方在一個對話的已讀游標前進。
+type PeerRead struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	// seq 不大於它的訊息，對方已讀。
+	PeerReadSeq   int64 `protobuf:"varint,2,opt,name=peer_read_seq,json=peerReadSeq,proto3" json:"peer_read_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PeerRead) Reset() {
+	*x = PeerRead{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PeerRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PeerRead) ProtoMessage() {}
+
+func (x *PeerRead) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PeerRead.ProtoReflect.Descriptor instead.
+func (*PeerRead) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *PeerRead) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *PeerRead) GetPeerReadSeq() int64 {
+	if x != nil {
+		return x.PeerReadSeq
+	}
+	return 0
+}
+
+// Resync 要求 client 重新取列表與缺口。
+type Resync struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Scope:
+	//
+	//	*Resync_ConversationId
+	//	*Resync_All
+	Scope         isResync_Scope `protobuf_oneof:"scope"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Resync) Reset() {
+	*x = Resync{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Resync) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Resync) ProtoMessage() {}
+
+func (x *Resync) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Resync.ProtoReflect.Descriptor instead.
+func (*Resync) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *Resync) GetScope() isResync_Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *Resync) GetConversationId() string {
+	if x != nil {
+		if x, ok := x.Scope.(*Resync_ConversationId); ok {
+			return x.ConversationId
+		}
+	}
+	return ""
+}
+
+func (x *Resync) GetAll() bool {
+	if x != nil {
+		if x, ok := x.Scope.(*Resync_All); ok {
+			return x.All
+		}
+	}
+	return false
+}
+
+type isResync_Scope interface {
+	isResync_Scope()
+}
+
+type Resync_ConversationId struct {
+	// 只有這個對話。
+	ConversationId string `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3,oneof"`
+}
+
+type Resync_All struct {
+	// 全部對話。
+	All bool `protobuf:"varint,2,opt,name=all,proto3,oneof"`
+}
+
+func (*Resync_ConversationId) isResync_Scope() {}
+
+func (*Resync_All) isResync_Scope() {}
+
+// Heartbeat 是串流閒置時的保活 frame，沒有內容。
+type Heartbeat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Heartbeat) Reset() {
+	*x = Heartbeat{}
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Heartbeat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Heartbeat) ProtoMessage() {}
+
+func (x *Heartbeat) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_chat_v1alpha1_chat_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
+func (*Heartbeat) Descriptor() ([]byte, []int) {
+	return file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP(), []int{42}
+}
+
 var File_hawkr_chat_v1alpha1_chat_proto protoreflect.FileDescriptor
 
 const file_hawkr_chat_v1alpha1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x1ehawkr/chat/v1alpha1/chat.proto\x12\x13hawkr.chat.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"\xb7\x03\n" +
+	"\x1ehawkr/chat/v1alpha1/chat.proto\x12\x13hawkr.chat.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"\xb7\x03\n" +
 	"\aMessage\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12,\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x0econversationId\x12\x15\n" +
@@ -1992,7 +2657,46 @@ const file_hawkr_chat_v1alpha1_chat_proto_rawDesc = "" +
 	"\x17GetStorePresenceRequest\x12.\n" +
 	"\x10conversation_ids\x18\x01 \x03(\tB\x03\xe0A\x02R\x0fconversationIds\"c\n" +
 	"\x18GetStorePresenceResponse\x12G\n" +
-	"\tpresences\x18\x01 \x03(\v2).hawkr.chat.v1alpha1.ConversationPresenceR\tpresences*Z\n" +
+	"\tpresences\x18\x01 \x03(\v2).hawkr.chat.v1alpha1.ConversationPresenceR\tpresences\"\xa2\x01\n" +
+	"\x13StreamEventsRequest\x12O\n" +
+	"\acursors\x18\x01 \x03(\v25.hawkr.chat.v1alpha1.StreamEventsRequest.CursorsEntryR\acursors\x1a:\n" +
+	"\fCursorsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xac\x01\n" +
+	"\x18StreamStoreEventsRequest\x12T\n" +
+	"\acursors\x18\x01 \x03(\v2:.hawkr.chat.v1alpha1.StreamStoreEventsRequest.CursorsEntryR\acursors\x1a:\n" +
+	"\fCursorsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"L\n" +
+	"\x14StreamEventsResponse\x124\n" +
+	"\x05event\x18\x01 \x01(\v2\x1e.hawkr.chat.v1alpha1.ChatEventR\x05event\"Q\n" +
+	"\x19StreamStoreEventsResponse\x124\n" +
+	"\x05event\x18\x01 \x01(\v2\x1e.hawkr.chat.v1alpha1.ChatEventR\x05event\"\xfa\x02\n" +
+	"\tChatEvent\x122\n" +
+	"\x05ready\x18\x01 \x01(\v2\x1a.hawkr.chat.v1alpha1.ReadyH\x00R\x05ready\x12=\n" +
+	"\amessage\x18\x02 \x01(\v2!.hawkr.chat.v1alpha1.MessageEventH\x00R\amessage\x12<\n" +
+	"\x06unread\x18\x03 \x01(\v2\".hawkr.chat.v1alpha1.UnreadChangedH\x00R\x06unread\x12<\n" +
+	"\tpeer_read\x18\x04 \x01(\v2\x1d.hawkr.chat.v1alpha1.PeerReadH\x00R\bpeerRead\x125\n" +
+	"\x06resync\x18\x05 \x01(\v2\x1b.hawkr.chat.v1alpha1.ResyncH\x00R\x06resync\x12>\n" +
+	"\theartbeat\x18\x06 \x01(\v2\x1e.hawkr.chat.v1alpha1.HeartbeatH\x00R\theartbeatB\a\n" +
+	"\x05event\"\xb2\x01\n" +
+	"\x05Ready\x12!\n" +
+	"\funread_count\x18\x01 \x01(\x03R\vunreadCount\x12H\n" +
+	"\x12heartbeat_interval\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x11heartbeatInterval\x12<\n" +
+	"\fmax_lifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\vmaxLifetime\"`\n" +
+	"\fMessageEvent\x126\n" +
+	"\amessage\x18\x01 \x01(\v2\x1c.hawkr.chat.v1alpha1.MessageR\amessage\x12\x18\n" +
+	"\aupdated\x18\x02 \x01(\bR\aupdated\"2\n" +
+	"\rUnreadChanged\x12!\n" +
+	"\funread_count\x18\x01 \x01(\x03R\vunreadCount\"W\n" +
+	"\bPeerRead\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\"\n" +
+	"\rpeer_read_seq\x18\x02 \x01(\x03R\vpeerReadSeq\"P\n" +
+	"\x06Resync\x12)\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tH\x00R\x0econversationId\x12\x12\n" +
+	"\x03all\x18\x02 \x01(\bH\x00R\x03allB\a\n" +
+	"\x05scope\"\v\n" +
+	"\tHeartbeat*Z\n" +
 	"\vMessageKind\x12\x1c\n" +
 	"\x18MESSAGE_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11MESSAGE_KIND_TEXT\x10\x01\x12\x16\n" +
@@ -2000,7 +2704,7 @@ const file_hawkr_chat_v1alpha1_chat_proto_rawDesc = "" +
 	"\tChatParty\x12\x1a\n" +
 	"\x16CHAT_PARTY_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10CHAT_PARTY_BUYER\x10\x01\x12\x14\n" +
-	"\x10CHAT_PARTY_STORE\x10\x022\xe8\v\n" +
+	"\x10CHAT_PARTY_STORE\x10\x022\xc5\r\n" +
 	"\x0eChatAppService\x12w\n" +
 	"\x11ListConversations\x12-.hawkr.chat.v1alpha1.ListConversationsRequest\x1a..hawkr.chat.v1alpha1.ListConversationsResponse\"\x03\x90\x02\x01\x12\x86\x01\n" +
 	"\x16ListStoreConversations\x122.hawkr.chat.v1alpha1.ListStoreConversationsRequest\x1a3.hawkr.chat.v1alpha1.ListStoreConversationsResponse\"\x03\x90\x02\x01\x12h\n" +
@@ -2014,7 +2718,9 @@ const file_hawkr_chat_v1alpha1_chat_proto_rawDesc = "" +
 	"\x0eGetUnreadCount\x12*.hawkr.chat.v1alpha1.GetUnreadCountRequest\x1a+.hawkr.chat.v1alpha1.GetUnreadCountResponse\"\x03\x90\x02\x01\x12}\n" +
 	"\x13GetStoreUnreadCount\x12/.hawkr.chat.v1alpha1.GetStoreUnreadCountRequest\x1a0.hawkr.chat.v1alpha1.GetStoreUnreadCountResponse\"\x03\x90\x02\x01\x12e\n" +
 	"\vGetPresence\x12'.hawkr.chat.v1alpha1.GetPresenceRequest\x1a(.hawkr.chat.v1alpha1.GetPresenceResponse\"\x03\x90\x02\x01\x12t\n" +
-	"\x10GetStorePresence\x12,.hawkr.chat.v1alpha1.GetStorePresenceRequest\x1a-.hawkr.chat.v1alpha1.GetStorePresenceResponse\"\x03\x90\x02\x01B\xed\x01\n" +
+	"\x10GetStorePresence\x12,.hawkr.chat.v1alpha1.GetStorePresenceRequest\x1a-.hawkr.chat.v1alpha1.GetStorePresenceResponse\"\x03\x90\x02\x01\x12e\n" +
+	"\fStreamEvents\x12(.hawkr.chat.v1alpha1.StreamEventsRequest\x1a).hawkr.chat.v1alpha1.StreamEventsResponse0\x01\x12t\n" +
+	"\x11StreamStoreEvents\x12-.hawkr.chat.v1alpha1.StreamStoreEventsRequest\x1a..hawkr.chat.v1alpha1.StreamStoreEventsResponse0\x01B\xed\x01\n" +
 	"\x17com.hawkr.chat.v1alpha1B\tChatProtoP\x01ZYgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1;chatv1alpha1\xa2\x02\x03HCX\xaa\x02\x13Hawkr.Chat.V1alpha1\xca\x02\x13Hawkr\\Chat\\V1alpha1\xe2\x02\x1fHawkr\\Chat\\V1alpha1\\GPBMetadata\xea\x02\x15Hawkr::Chat::V1alpha1b\x06proto3"
 
 var (
@@ -2030,7 +2736,7 @@ func file_hawkr_chat_v1alpha1_chat_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_chat_v1alpha1_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_chat_v1alpha1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_hawkr_chat_v1alpha1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_hawkr_chat_v1alpha1_chat_proto_goTypes = []any{
 	(MessageKind)(0),                       // 0: hawkr.chat.v1alpha1.MessageKind
 	(ChatParty)(0),                         // 1: hawkr.chat.v1alpha1.ChatParty
@@ -2066,21 +2772,35 @@ var file_hawkr_chat_v1alpha1_chat_proto_goTypes = []any{
 	(*GetPresenceResponse)(nil),            // 31: hawkr.chat.v1alpha1.GetPresenceResponse
 	(*GetStorePresenceRequest)(nil),        // 32: hawkr.chat.v1alpha1.GetStorePresenceRequest
 	(*GetStorePresenceResponse)(nil),       // 33: hawkr.chat.v1alpha1.GetStorePresenceResponse
-	(*v1alpha1.Image)(nil),                 // 34: hawkr.common.v1alpha1.Image
-	(*timestamppb.Timestamp)(nil),          // 35: google.protobuf.Timestamp
-	(*v1alpha1.StoreCard)(nil),             // 36: hawkr.common.v1alpha1.StoreCard
+	(*StreamEventsRequest)(nil),            // 34: hawkr.chat.v1alpha1.StreamEventsRequest
+	(*StreamStoreEventsRequest)(nil),       // 35: hawkr.chat.v1alpha1.StreamStoreEventsRequest
+	(*StreamEventsResponse)(nil),           // 36: hawkr.chat.v1alpha1.StreamEventsResponse
+	(*StreamStoreEventsResponse)(nil),      // 37: hawkr.chat.v1alpha1.StreamStoreEventsResponse
+	(*ChatEvent)(nil),                      // 38: hawkr.chat.v1alpha1.ChatEvent
+	(*Ready)(nil),                          // 39: hawkr.chat.v1alpha1.Ready
+	(*MessageEvent)(nil),                   // 40: hawkr.chat.v1alpha1.MessageEvent
+	(*UnreadChanged)(nil),                  // 41: hawkr.chat.v1alpha1.UnreadChanged
+	(*PeerRead)(nil),                       // 42: hawkr.chat.v1alpha1.PeerRead
+	(*Resync)(nil),                         // 43: hawkr.chat.v1alpha1.Resync
+	(*Heartbeat)(nil),                      // 44: hawkr.chat.v1alpha1.Heartbeat
+	nil,                                    // 45: hawkr.chat.v1alpha1.StreamEventsRequest.CursorsEntry
+	nil,                                    // 46: hawkr.chat.v1alpha1.StreamStoreEventsRequest.CursorsEntry
+	(*v1alpha1.Image)(nil),                 // 47: hawkr.common.v1alpha1.Image
+	(*timestamppb.Timestamp)(nil),          // 48: google.protobuf.Timestamp
+	(*v1alpha1.StoreCard)(nil),             // 49: hawkr.common.v1alpha1.StoreCard
+	(*durationpb.Duration)(nil),            // 50: google.protobuf.Duration
 }
 var file_hawkr_chat_v1alpha1_chat_proto_depIdxs = []int32{
 	1,  // 0: hawkr.chat.v1alpha1.Message.sender:type_name -> hawkr.chat.v1alpha1.ChatParty
 	0,  // 1: hawkr.chat.v1alpha1.Message.kind:type_name -> hawkr.chat.v1alpha1.MessageKind
-	34, // 2: hawkr.chat.v1alpha1.Message.image:type_name -> hawkr.common.v1alpha1.Image
-	35, // 3: hawkr.chat.v1alpha1.Message.create_time:type_name -> google.protobuf.Timestamp
+	47, // 2: hawkr.chat.v1alpha1.Message.image:type_name -> hawkr.common.v1alpha1.Image
+	48, // 3: hawkr.chat.v1alpha1.Message.create_time:type_name -> google.protobuf.Timestamp
 	0,  // 4: hawkr.chat.v1alpha1.Preview.kind:type_name -> hawkr.chat.v1alpha1.MessageKind
 	1,  // 5: hawkr.chat.v1alpha1.Preview.sender:type_name -> hawkr.chat.v1alpha1.ChatParty
-	34, // 6: hawkr.chat.v1alpha1.ChatBuyer.avatar:type_name -> hawkr.common.v1alpha1.Image
-	36, // 7: hawkr.chat.v1alpha1.Conversation.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	47, // 6: hawkr.chat.v1alpha1.ChatBuyer.avatar:type_name -> hawkr.common.v1alpha1.Image
+	49, // 7: hawkr.chat.v1alpha1.Conversation.store:type_name -> hawkr.common.v1alpha1.StoreCard
 	4,  // 8: hawkr.chat.v1alpha1.Conversation.buyer:type_name -> hawkr.chat.v1alpha1.ChatBuyer
-	35, // 9: hawkr.chat.v1alpha1.Conversation.last_message_time:type_name -> google.protobuf.Timestamp
+	48, // 9: hawkr.chat.v1alpha1.Conversation.last_message_time:type_name -> google.protobuf.Timestamp
 	3,  // 10: hawkr.chat.v1alpha1.Conversation.preview:type_name -> hawkr.chat.v1alpha1.Preview
 	5,  // 11: hawkr.chat.v1alpha1.ListConversationsResponse.conversations:type_name -> hawkr.chat.v1alpha1.Conversation
 	5,  // 12: hawkr.chat.v1alpha1.ListStoreConversationsResponse.conversations:type_name -> hawkr.chat.v1alpha1.Conversation
@@ -2093,37 +2813,54 @@ var file_hawkr_chat_v1alpha1_chat_proto_depIdxs = []int32{
 	2,  // 19: hawkr.chat.v1alpha1.SendMessageToBuyerResponse.message:type_name -> hawkr.chat.v1alpha1.Message
 	29, // 20: hawkr.chat.v1alpha1.GetPresenceResponse.presences:type_name -> hawkr.chat.v1alpha1.ConversationPresence
 	29, // 21: hawkr.chat.v1alpha1.GetStorePresenceResponse.presences:type_name -> hawkr.chat.v1alpha1.ConversationPresence
-	7,  // 22: hawkr.chat.v1alpha1.ChatAppService.ListConversations:input_type -> hawkr.chat.v1alpha1.ListConversationsRequest
-	9,  // 23: hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations:input_type -> hawkr.chat.v1alpha1.ListStoreConversationsRequest
-	11, // 24: hawkr.chat.v1alpha1.ChatAppService.ListMessages:input_type -> hawkr.chat.v1alpha1.ListMessagesRequest
-	13, // 25: hawkr.chat.v1alpha1.ChatAppService.SendMessage:input_type -> hawkr.chat.v1alpha1.SendMessageRequest
-	15, // 26: hawkr.chat.v1alpha1.ChatAppService.SendMessageToStore:input_type -> hawkr.chat.v1alpha1.SendMessageToStoreRequest
-	17, // 27: hawkr.chat.v1alpha1.ChatAppService.SendMessageToBuyer:input_type -> hawkr.chat.v1alpha1.SendMessageToBuyerRequest
-	19, // 28: hawkr.chat.v1alpha1.ChatAppService.MarkConversationRead:input_type -> hawkr.chat.v1alpha1.MarkConversationReadRequest
-	21, // 29: hawkr.chat.v1alpha1.ChatAppService.MarkAllRead:input_type -> hawkr.chat.v1alpha1.MarkAllReadRequest
-	23, // 30: hawkr.chat.v1alpha1.ChatAppService.MarkAllStoreRead:input_type -> hawkr.chat.v1alpha1.MarkAllStoreReadRequest
-	25, // 31: hawkr.chat.v1alpha1.ChatAppService.GetUnreadCount:input_type -> hawkr.chat.v1alpha1.GetUnreadCountRequest
-	27, // 32: hawkr.chat.v1alpha1.ChatAppService.GetStoreUnreadCount:input_type -> hawkr.chat.v1alpha1.GetStoreUnreadCountRequest
-	30, // 33: hawkr.chat.v1alpha1.ChatAppService.GetPresence:input_type -> hawkr.chat.v1alpha1.GetPresenceRequest
-	32, // 34: hawkr.chat.v1alpha1.ChatAppService.GetStorePresence:input_type -> hawkr.chat.v1alpha1.GetStorePresenceRequest
-	8,  // 35: hawkr.chat.v1alpha1.ChatAppService.ListConversations:output_type -> hawkr.chat.v1alpha1.ListConversationsResponse
-	10, // 36: hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations:output_type -> hawkr.chat.v1alpha1.ListStoreConversationsResponse
-	12, // 37: hawkr.chat.v1alpha1.ChatAppService.ListMessages:output_type -> hawkr.chat.v1alpha1.ListMessagesResponse
-	14, // 38: hawkr.chat.v1alpha1.ChatAppService.SendMessage:output_type -> hawkr.chat.v1alpha1.SendMessageResponse
-	16, // 39: hawkr.chat.v1alpha1.ChatAppService.SendMessageToStore:output_type -> hawkr.chat.v1alpha1.SendMessageToStoreResponse
-	18, // 40: hawkr.chat.v1alpha1.ChatAppService.SendMessageToBuyer:output_type -> hawkr.chat.v1alpha1.SendMessageToBuyerResponse
-	20, // 41: hawkr.chat.v1alpha1.ChatAppService.MarkConversationRead:output_type -> hawkr.chat.v1alpha1.MarkConversationReadResponse
-	22, // 42: hawkr.chat.v1alpha1.ChatAppService.MarkAllRead:output_type -> hawkr.chat.v1alpha1.MarkAllReadResponse
-	24, // 43: hawkr.chat.v1alpha1.ChatAppService.MarkAllStoreRead:output_type -> hawkr.chat.v1alpha1.MarkAllStoreReadResponse
-	26, // 44: hawkr.chat.v1alpha1.ChatAppService.GetUnreadCount:output_type -> hawkr.chat.v1alpha1.GetUnreadCountResponse
-	28, // 45: hawkr.chat.v1alpha1.ChatAppService.GetStoreUnreadCount:output_type -> hawkr.chat.v1alpha1.GetStoreUnreadCountResponse
-	31, // 46: hawkr.chat.v1alpha1.ChatAppService.GetPresence:output_type -> hawkr.chat.v1alpha1.GetPresenceResponse
-	33, // 47: hawkr.chat.v1alpha1.ChatAppService.GetStorePresence:output_type -> hawkr.chat.v1alpha1.GetStorePresenceResponse
-	35, // [35:48] is the sub-list for method output_type
-	22, // [22:35] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	45, // 22: hawkr.chat.v1alpha1.StreamEventsRequest.cursors:type_name -> hawkr.chat.v1alpha1.StreamEventsRequest.CursorsEntry
+	46, // 23: hawkr.chat.v1alpha1.StreamStoreEventsRequest.cursors:type_name -> hawkr.chat.v1alpha1.StreamStoreEventsRequest.CursorsEntry
+	38, // 24: hawkr.chat.v1alpha1.StreamEventsResponse.event:type_name -> hawkr.chat.v1alpha1.ChatEvent
+	38, // 25: hawkr.chat.v1alpha1.StreamStoreEventsResponse.event:type_name -> hawkr.chat.v1alpha1.ChatEvent
+	39, // 26: hawkr.chat.v1alpha1.ChatEvent.ready:type_name -> hawkr.chat.v1alpha1.Ready
+	40, // 27: hawkr.chat.v1alpha1.ChatEvent.message:type_name -> hawkr.chat.v1alpha1.MessageEvent
+	41, // 28: hawkr.chat.v1alpha1.ChatEvent.unread:type_name -> hawkr.chat.v1alpha1.UnreadChanged
+	42, // 29: hawkr.chat.v1alpha1.ChatEvent.peer_read:type_name -> hawkr.chat.v1alpha1.PeerRead
+	43, // 30: hawkr.chat.v1alpha1.ChatEvent.resync:type_name -> hawkr.chat.v1alpha1.Resync
+	44, // 31: hawkr.chat.v1alpha1.ChatEvent.heartbeat:type_name -> hawkr.chat.v1alpha1.Heartbeat
+	50, // 32: hawkr.chat.v1alpha1.Ready.heartbeat_interval:type_name -> google.protobuf.Duration
+	50, // 33: hawkr.chat.v1alpha1.Ready.max_lifetime:type_name -> google.protobuf.Duration
+	2,  // 34: hawkr.chat.v1alpha1.MessageEvent.message:type_name -> hawkr.chat.v1alpha1.Message
+	7,  // 35: hawkr.chat.v1alpha1.ChatAppService.ListConversations:input_type -> hawkr.chat.v1alpha1.ListConversationsRequest
+	9,  // 36: hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations:input_type -> hawkr.chat.v1alpha1.ListStoreConversationsRequest
+	11, // 37: hawkr.chat.v1alpha1.ChatAppService.ListMessages:input_type -> hawkr.chat.v1alpha1.ListMessagesRequest
+	13, // 38: hawkr.chat.v1alpha1.ChatAppService.SendMessage:input_type -> hawkr.chat.v1alpha1.SendMessageRequest
+	15, // 39: hawkr.chat.v1alpha1.ChatAppService.SendMessageToStore:input_type -> hawkr.chat.v1alpha1.SendMessageToStoreRequest
+	17, // 40: hawkr.chat.v1alpha1.ChatAppService.SendMessageToBuyer:input_type -> hawkr.chat.v1alpha1.SendMessageToBuyerRequest
+	19, // 41: hawkr.chat.v1alpha1.ChatAppService.MarkConversationRead:input_type -> hawkr.chat.v1alpha1.MarkConversationReadRequest
+	21, // 42: hawkr.chat.v1alpha1.ChatAppService.MarkAllRead:input_type -> hawkr.chat.v1alpha1.MarkAllReadRequest
+	23, // 43: hawkr.chat.v1alpha1.ChatAppService.MarkAllStoreRead:input_type -> hawkr.chat.v1alpha1.MarkAllStoreReadRequest
+	25, // 44: hawkr.chat.v1alpha1.ChatAppService.GetUnreadCount:input_type -> hawkr.chat.v1alpha1.GetUnreadCountRequest
+	27, // 45: hawkr.chat.v1alpha1.ChatAppService.GetStoreUnreadCount:input_type -> hawkr.chat.v1alpha1.GetStoreUnreadCountRequest
+	30, // 46: hawkr.chat.v1alpha1.ChatAppService.GetPresence:input_type -> hawkr.chat.v1alpha1.GetPresenceRequest
+	32, // 47: hawkr.chat.v1alpha1.ChatAppService.GetStorePresence:input_type -> hawkr.chat.v1alpha1.GetStorePresenceRequest
+	34, // 48: hawkr.chat.v1alpha1.ChatAppService.StreamEvents:input_type -> hawkr.chat.v1alpha1.StreamEventsRequest
+	35, // 49: hawkr.chat.v1alpha1.ChatAppService.StreamStoreEvents:input_type -> hawkr.chat.v1alpha1.StreamStoreEventsRequest
+	8,  // 50: hawkr.chat.v1alpha1.ChatAppService.ListConversations:output_type -> hawkr.chat.v1alpha1.ListConversationsResponse
+	10, // 51: hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations:output_type -> hawkr.chat.v1alpha1.ListStoreConversationsResponse
+	12, // 52: hawkr.chat.v1alpha1.ChatAppService.ListMessages:output_type -> hawkr.chat.v1alpha1.ListMessagesResponse
+	14, // 53: hawkr.chat.v1alpha1.ChatAppService.SendMessage:output_type -> hawkr.chat.v1alpha1.SendMessageResponse
+	16, // 54: hawkr.chat.v1alpha1.ChatAppService.SendMessageToStore:output_type -> hawkr.chat.v1alpha1.SendMessageToStoreResponse
+	18, // 55: hawkr.chat.v1alpha1.ChatAppService.SendMessageToBuyer:output_type -> hawkr.chat.v1alpha1.SendMessageToBuyerResponse
+	20, // 56: hawkr.chat.v1alpha1.ChatAppService.MarkConversationRead:output_type -> hawkr.chat.v1alpha1.MarkConversationReadResponse
+	22, // 57: hawkr.chat.v1alpha1.ChatAppService.MarkAllRead:output_type -> hawkr.chat.v1alpha1.MarkAllReadResponse
+	24, // 58: hawkr.chat.v1alpha1.ChatAppService.MarkAllStoreRead:output_type -> hawkr.chat.v1alpha1.MarkAllStoreReadResponse
+	26, // 59: hawkr.chat.v1alpha1.ChatAppService.GetUnreadCount:output_type -> hawkr.chat.v1alpha1.GetUnreadCountResponse
+	28, // 60: hawkr.chat.v1alpha1.ChatAppService.GetStoreUnreadCount:output_type -> hawkr.chat.v1alpha1.GetStoreUnreadCountResponse
+	31, // 61: hawkr.chat.v1alpha1.ChatAppService.GetPresence:output_type -> hawkr.chat.v1alpha1.GetPresenceResponse
+	33, // 62: hawkr.chat.v1alpha1.ChatAppService.GetStorePresence:output_type -> hawkr.chat.v1alpha1.GetStorePresenceResponse
+	36, // 63: hawkr.chat.v1alpha1.ChatAppService.StreamEvents:output_type -> hawkr.chat.v1alpha1.StreamEventsResponse
+	37, // 64: hawkr.chat.v1alpha1.ChatAppService.StreamStoreEvents:output_type -> hawkr.chat.v1alpha1.StreamStoreEventsResponse
+	50, // [50:65] is the sub-list for method output_type
+	35, // [35:50] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_chat_v1alpha1_chat_proto_init() }
@@ -2139,13 +2876,25 @@ func file_hawkr_chat_v1alpha1_chat_proto_init() {
 		(*MessageContent_ImageStagedToken)(nil),
 	}
 	file_hawkr_chat_v1alpha1_chat_proto_msgTypes[9].OneofWrappers = []any{}
+	file_hawkr_chat_v1alpha1_chat_proto_msgTypes[36].OneofWrappers = []any{
+		(*ChatEvent_Ready)(nil),
+		(*ChatEvent_Message)(nil),
+		(*ChatEvent_Unread)(nil),
+		(*ChatEvent_PeerRead)(nil),
+		(*ChatEvent_Resync)(nil),
+		(*ChatEvent_Heartbeat)(nil),
+	}
+	file_hawkr_chat_v1alpha1_chat_proto_msgTypes[41].OneofWrappers = []any{
+		(*Resync_ConversationId)(nil),
+		(*Resync_All)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_chat_v1alpha1_chat_proto_rawDesc), len(file_hawkr_chat_v1alpha1_chat_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   32,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

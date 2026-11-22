@@ -2,7 +2,7 @@
 
 ## 職責
 
-買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。以及即時通道（LISTEN/NOTIFY、訂閱、在線狀態）。給 httpapi、moderation（呼叫 `Hide`／`Restore`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`、`step-2b-design.md`；對外入口是 `httpapi/chat`（unary；串流與 `Run` 之後接）；`cmd/hawkr` 只接刪帳與退場的訂閱者與 worker。
+買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。以及即時通道（LISTEN/NOTIFY、訂閱、在線狀態）。給 httpapi、moderation（呼叫 `Hide`／`Restore`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`、`step-2b-design.md`；對外入口是 `httpapi/chat`（unary 與串流）；`cmd/hawkr` 接刪帳與退場的訂閱者與 worker，serve 以 `serveWithRun` 跑 `Run`（worker 不跑）。
 
 ## 擁有的資料
 
@@ -34,7 +34,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 - LISTEN 連線必須是直連或 session 模式的 Postgres，不能經 transaction pooling：`Deps.ListenConnConfig` 指向專用連線，nil 時以主連線池的設定另開，不從池借；不在執行期偵測。
 - Hub 的 `partyKey` 含 kind；扇出只合併待處理訊號、永不阻塞，超過上限回 `Resync`。每個 Party 的全域並行串流上限在 `Subscribe` 的 transaction 內以 advisory lock 數 `presence_streams`，寫入失敗讓 `Subscribe` 失敗。
 - `presence_streams.expires_at` 與 `conversations.last_message_at` 只由資料庫時鐘產生與比較（查詢參數沒有時間型別）。在線狀態沒有最後上線時間，以共有對話授權，任一方向封鎖回離線。
-- 串流只讀：停權與封鎖不結束串流，只有關店由 `Subscription.Revalidate` 結束；傳輸 helper 不在模組（見「不負責」）。
+- 串流只讀：停權與封鎖不結束串流，只有關店由 `Subscription.Revalidate` 結束。
 
 ## 不負責
 

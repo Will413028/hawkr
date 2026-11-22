@@ -15,6 +15,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
+    as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $1;
 
@@ -799,6 +801,297 @@ final $typed_data.Uint8List getStorePresenceResponseDescriptor =
         'ChhHZXRTdG9yZVByZXNlbmNlUmVzcG9uc2USRwoJcHJlc2VuY2VzGAEgAygLMikuaGF3a3IuY2'
         'hhdC52MWFscGhhMS5Db252ZXJzYXRpb25QcmVzZW5jZVIJcHJlc2VuY2Vz');
 
+@$core.Deprecated('Use streamEventsRequestDescriptor instead')
+const StreamEventsRequest$json = {
+  '1': 'StreamEventsRequest',
+  '2': [
+    {
+      '1': 'cursors',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.StreamEventsRequest.CursorsEntry',
+      '10': 'cursors'
+    },
+  ],
+  '3': [StreamEventsRequest_CursorsEntry$json],
+};
+
+@$core.Deprecated('Use streamEventsRequestDescriptor instead')
+const StreamEventsRequest_CursorsEntry$json = {
+  '1': 'CursorsEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 3, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `StreamEventsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamEventsRequestDescriptor = $convert.base64Decode(
+    'ChNTdHJlYW1FdmVudHNSZXF1ZXN0Ek8KB2N1cnNvcnMYASADKAsyNS5oYXdrci5jaGF0LnYxYW'
+    'xwaGExLlN0cmVhbUV2ZW50c1JlcXVlc3QuQ3Vyc29yc0VudHJ5UgdjdXJzb3JzGjoKDEN1cnNv'
+    'cnNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoA1IFdmFsdWU6AjgB');
+
+@$core.Deprecated('Use streamStoreEventsRequestDescriptor instead')
+const StreamStoreEventsRequest$json = {
+  '1': 'StreamStoreEventsRequest',
+  '2': [
+    {
+      '1': 'cursors',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.StreamStoreEventsRequest.CursorsEntry',
+      '10': 'cursors'
+    },
+  ],
+  '3': [StreamStoreEventsRequest_CursorsEntry$json],
+};
+
+@$core.Deprecated('Use streamStoreEventsRequestDescriptor instead')
+const StreamStoreEventsRequest_CursorsEntry$json = {
+  '1': 'CursorsEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 3, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `StreamStoreEventsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamStoreEventsRequestDescriptor = $convert.base64Decode(
+    'ChhTdHJlYW1TdG9yZUV2ZW50c1JlcXVlc3QSVAoHY3Vyc29ycxgBIAMoCzI6Lmhhd2tyLmNoYX'
+    'QudjFhbHBoYTEuU3RyZWFtU3RvcmVFdmVudHNSZXF1ZXN0LkN1cnNvcnNFbnRyeVIHY3Vyc29y'
+    'cxo6CgxDdXJzb3JzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKANSBXZhbH'
+    'VlOgI4AQ==');
+
+@$core.Deprecated('Use streamEventsResponseDescriptor instead')
+const StreamEventsResponse$json = {
+  '1': 'StreamEventsResponse',
+  '2': [
+    {
+      '1': 'event',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.ChatEvent',
+      '10': 'event'
+    },
+  ],
+};
+
+/// Descriptor for `StreamEventsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamEventsResponseDescriptor = $convert.base64Decode(
+    'ChRTdHJlYW1FdmVudHNSZXNwb25zZRI0CgVldmVudBgBIAEoCzIeLmhhd2tyLmNoYXQudjFhbH'
+    'BoYTEuQ2hhdEV2ZW50UgVldmVudA==');
+
+@$core.Deprecated('Use streamStoreEventsResponseDescriptor instead')
+const StreamStoreEventsResponse$json = {
+  '1': 'StreamStoreEventsResponse',
+  '2': [
+    {
+      '1': 'event',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.ChatEvent',
+      '10': 'event'
+    },
+  ],
+};
+
+/// Descriptor for `StreamStoreEventsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamStoreEventsResponseDescriptor =
+    $convert.base64Decode(
+        'ChlTdHJlYW1TdG9yZUV2ZW50c1Jlc3BvbnNlEjQKBWV2ZW50GAEgASgLMh4uaGF3a3IuY2hhdC'
+        '52MWFscGhhMS5DaGF0RXZlbnRSBWV2ZW50');
+
+@$core.Deprecated('Use chatEventDescriptor instead')
+const ChatEvent$json = {
+  '1': 'ChatEvent',
+  '2': [
+    {
+      '1': 'ready',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.Ready',
+      '9': 0,
+      '10': 'ready'
+    },
+    {
+      '1': 'message',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.MessageEvent',
+      '9': 0,
+      '10': 'message'
+    },
+    {
+      '1': 'unread',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.UnreadChanged',
+      '9': 0,
+      '10': 'unread'
+    },
+    {
+      '1': 'peer_read',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.PeerRead',
+      '9': 0,
+      '10': 'peerRead'
+    },
+    {
+      '1': 'resync',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.Resync',
+      '9': 0,
+      '10': 'resync'
+    },
+    {
+      '1': 'heartbeat',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.Heartbeat',
+      '9': 0,
+      '10': 'heartbeat'
+    },
+  ],
+  '8': [
+    {'1': 'event'},
+  ],
+};
+
+/// Descriptor for `ChatEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List chatEventDescriptor = $convert.base64Decode(
+    'CglDaGF0RXZlbnQSMgoFcmVhZHkYASABKAsyGi5oYXdrci5jaGF0LnYxYWxwaGExLlJlYWR5SA'
+    'BSBXJlYWR5Ej0KB21lc3NhZ2UYAiABKAsyIS5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VF'
+    'dmVudEgAUgdtZXNzYWdlEjwKBnVucmVhZBgDIAEoCzIiLmhhd2tyLmNoYXQudjFhbHBoYTEuVW'
+    '5yZWFkQ2hhbmdlZEgAUgZ1bnJlYWQSPAoJcGVlcl9yZWFkGAQgASgLMh0uaGF3a3IuY2hhdC52'
+    'MWFscGhhMS5QZWVyUmVhZEgAUghwZWVyUmVhZBI1CgZyZXN5bmMYBSABKAsyGy5oYXdrci5jaG'
+    'F0LnYxYWxwaGExLlJlc3luY0gAUgZyZXN5bmMSPgoJaGVhcnRiZWF0GAYgASgLMh4uaGF3a3Iu'
+    'Y2hhdC52MWFscGhhMS5IZWFydGJlYXRIAFIJaGVhcnRiZWF0QgcKBWV2ZW50');
+
+@$core.Deprecated('Use readyDescriptor instead')
+const Ready$json = {
+  '1': 'Ready',
+  '2': [
+    {'1': 'unread_count', '3': 1, '4': 1, '5': 3, '10': 'unreadCount'},
+    {
+      '1': 'heartbeat_interval',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Duration',
+      '10': 'heartbeatInterval'
+    },
+    {
+      '1': 'max_lifetime',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Duration',
+      '10': 'maxLifetime'
+    },
+  ],
+};
+
+/// Descriptor for `Ready`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List readyDescriptor = $convert.base64Decode(
+    'CgVSZWFkeRIhCgx1bnJlYWRfY291bnQYASABKANSC3VucmVhZENvdW50EkgKEmhlYXJ0YmVhdF'
+    '9pbnRlcnZhbBgCIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvblIRaGVhcnRiZWF0SW50'
+    'ZXJ2YWwSPAoMbWF4X2xpZmV0aW1lGAMgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uUg'
+    'ttYXhMaWZldGltZQ==');
+
+@$core.Deprecated('Use messageEventDescriptor instead')
+const MessageEvent$json = {
+  '1': 'MessageEvent',
+  '2': [
+    {
+      '1': 'message',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.chat.v1alpha1.Message',
+      '10': 'message'
+    },
+    {'1': 'updated', '3': 2, '4': 1, '5': 8, '10': 'updated'},
+  ],
+};
+
+/// Descriptor for `MessageEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List messageEventDescriptor = $convert.base64Decode(
+    'CgxNZXNzYWdlRXZlbnQSNgoHbWVzc2FnZRgBIAEoCzIcLmhhd2tyLmNoYXQudjFhbHBoYTEuTW'
+    'Vzc2FnZVIHbWVzc2FnZRIYCgd1cGRhdGVkGAIgASgIUgd1cGRhdGVk');
+
+@$core.Deprecated('Use unreadChangedDescriptor instead')
+const UnreadChanged$json = {
+  '1': 'UnreadChanged',
+  '2': [
+    {'1': 'unread_count', '3': 1, '4': 1, '5': 3, '10': 'unreadCount'},
+  ],
+};
+
+/// Descriptor for `UnreadChanged`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unreadChangedDescriptor = $convert.base64Decode(
+    'Cg1VbnJlYWRDaGFuZ2VkEiEKDHVucmVhZF9jb3VudBgBIAEoA1ILdW5yZWFkQ291bnQ=');
+
+@$core.Deprecated('Use peerReadDescriptor instead')
+const PeerRead$json = {
+  '1': 'PeerRead',
+  '2': [
+    {'1': 'conversation_id', '3': 1, '4': 1, '5': 9, '10': 'conversationId'},
+    {'1': 'peer_read_seq', '3': 2, '4': 1, '5': 3, '10': 'peerReadSeq'},
+  ],
+};
+
+/// Descriptor for `PeerRead`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List peerReadDescriptor = $convert.base64Decode(
+    'CghQZWVyUmVhZBInCg9jb252ZXJzYXRpb25faWQYASABKAlSDmNvbnZlcnNhdGlvbklkEiIKDX'
+    'BlZXJfcmVhZF9zZXEYAiABKANSC3BlZXJSZWFkU2Vx');
+
+@$core.Deprecated('Use resyncDescriptor instead')
+const Resync$json = {
+  '1': 'Resync',
+  '2': [
+    {
+      '1': 'conversation_id',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'conversationId'
+    },
+    {'1': 'all', '3': 2, '4': 1, '5': 8, '9': 0, '10': 'all'},
+  ],
+  '8': [
+    {'1': 'scope'},
+  ],
+};
+
+/// Descriptor for `Resync`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List resyncDescriptor = $convert.base64Decode(
+    'CgZSZXN5bmMSKQoPY29udmVyc2F0aW9uX2lkGAEgASgJSABSDmNvbnZlcnNhdGlvbklkEhIKA2'
+    'FsbBgCIAEoCEgAUgNhbGxCBwoFc2NvcGU=');
+
+@$core.Deprecated('Use heartbeatDescriptor instead')
+const Heartbeat$json = {
+  '1': 'Heartbeat',
+};
+
+/// Descriptor for `Heartbeat`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List heartbeatDescriptor =
+    $convert.base64Decode('CglIZWFydGJlYXQ=');
+
 const $core.Map<$core.String, $core.dynamic> ChatAppServiceBase$json = {
   '1': 'ChatAppService',
   '2': [
@@ -874,6 +1167,18 @@ const $core.Map<$core.String, $core.dynamic> ChatAppServiceBase$json = {
       '3': '.hawkr.chat.v1alpha1.GetStorePresenceResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'StreamEvents',
+      '2': '.hawkr.chat.v1alpha1.StreamEventsRequest',
+      '3': '.hawkr.chat.v1alpha1.StreamEventsResponse',
+      '6': true
+    },
+    {
+      '1': 'StreamStoreEvents',
+      '2': '.hawkr.chat.v1alpha1.StreamStoreEventsRequest',
+      '3': '.hawkr.chat.v1alpha1.StreamStoreEventsResponse',
+      '6': true
+    },
   ],
 };
 
@@ -929,6 +1234,24 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.chat.v1alpha1.GetStorePresenceRequest': GetStorePresenceRequest$json,
   '.hawkr.chat.v1alpha1.GetStorePresenceResponse':
       GetStorePresenceResponse$json,
+  '.hawkr.chat.v1alpha1.StreamEventsRequest': StreamEventsRequest$json,
+  '.hawkr.chat.v1alpha1.StreamEventsRequest.CursorsEntry':
+      StreamEventsRequest_CursorsEntry$json,
+  '.hawkr.chat.v1alpha1.StreamEventsResponse': StreamEventsResponse$json,
+  '.hawkr.chat.v1alpha1.ChatEvent': ChatEvent$json,
+  '.hawkr.chat.v1alpha1.Ready': Ready$json,
+  '.google.protobuf.Duration': $3.Duration$json,
+  '.hawkr.chat.v1alpha1.MessageEvent': MessageEvent$json,
+  '.hawkr.chat.v1alpha1.UnreadChanged': UnreadChanged$json,
+  '.hawkr.chat.v1alpha1.PeerRead': PeerRead$json,
+  '.hawkr.chat.v1alpha1.Resync': Resync$json,
+  '.hawkr.chat.v1alpha1.Heartbeat': Heartbeat$json,
+  '.hawkr.chat.v1alpha1.StreamStoreEventsRequest':
+      StreamStoreEventsRequest$json,
+  '.hawkr.chat.v1alpha1.StreamStoreEventsRequest.CursorsEntry':
+      StreamStoreEventsRequest_CursorsEntry$json,
+  '.hawkr.chat.v1alpha1.StreamStoreEventsResponse':
+      StreamStoreEventsResponse$json,
 };
 
 /// Descriptor for `ChatAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -960,4 +1283,8 @@ final $typed_data.Uint8List chatAppServiceDescriptor = $convert.base64Decode(
     'UHJlc2VuY2VSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5HZXRQcmVzZW5jZVJlc3Bvbn'
     'NlIgOQAgESdAoQR2V0U3RvcmVQcmVzZW5jZRIsLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3Rv'
     'cmVQcmVzZW5jZVJlcXVlc3QaLS5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlUHJlc2VuY2'
-    'VSZXNwb25zZSIDkAIB');
+    'VSZXNwb25zZSIDkAIBEmUKDFN0cmVhbUV2ZW50cxIoLmhhd2tyLmNoYXQudjFhbHBoYTEuU3Ry'
+    'ZWFtRXZlbnRzUmVxdWVzdBopLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVzcG'
+    '9uc2UwARJ0ChFTdHJlYW1TdG9yZUV2ZW50cxItLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFt'
+    'U3RvcmVFdmVudHNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW'
+    '50c1Jlc3BvbnNlMAE=');

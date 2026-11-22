@@ -128,9 +128,14 @@ func (h *App) buyerParty(ctx context.Context) (im.Party, error) {
 	if err != nil {
 		return im.Party{}, err
 	}
-	id, err := h.buyers.CurrentBuyerID(ctx, p.ID)
+	return h.buyerPartyOf(ctx, p.ID)
+}
+
+// buyerPartyOf 讀帳號現任的買家身分（串流重新驗證時帳號來自重新驗證的 session，不來自 ctx）。
+func (h *App) buyerPartyOf(ctx context.Context, accountID int64) (im.Party, error) {
+	id, err := h.buyers.CurrentBuyerID(ctx, accountID)
 	if err != nil {
-		return im.Party{}, rpc.BuyerInvariant(p.ID, err)
+		return im.Party{}, rpc.BuyerInvariant(accountID, err)
 	}
 	return im.Party{Kind: im.PartyBuyer, BuyerID: id}, nil
 }
@@ -141,7 +146,11 @@ func (h *App) storeParty(ctx context.Context) (im.Party, error) {
 	if err != nil {
 		return im.Party{}, err
 	}
-	st, err := h.stores.CurrentStore(ctx, p.ID)
+	return h.storePartyOf(ctx, p.ID)
+}
+
+func (h *App) storePartyOf(ctx context.Context, accountID int64) (im.Party, error) {
+	st, err := h.stores.CurrentStore(ctx, accountID)
 	if err != nil {
 		return im.Party{}, err
 	}

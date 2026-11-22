@@ -227,7 +227,7 @@ func newEnv(t *testing.T, store *seller.Store) *env {
 	t.Helper()
 	e := &env{reads: &fakeReads{parties: im.ConversationParties{BuyerID: callerBuyer, StoreID: otherStoreID}}, writes: &fakeWrites{}, buyers: &fakeBuyers{}, stores: &fakeStores{own: store}}
 	var err error
-	if e.app, err = NewApp(e.reads, e.writes, e.buyers, e.stores, images(t), slog.New(slog.DiscardHandler)); err != nil {
+	if e.app, err = NewApp(e.reads, e.writes, &fakeStreams{}, &fakeAuth{}, e.buyers, e.stores, images(t), slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
 	e.app.reasonOf = testReasonOf
@@ -262,7 +262,7 @@ func assertStoreParty(t *testing.T, p im.Party) {
 	}
 }
 
-// 13 支方法逐一：成功路徑，並斷言傳給模組的 Party 種類與 ID（買家版取自買家身分、店家版取自 seller.CurrentStore、對話方法取自歸屬推導）。
+// 13 支 unary 方法逐一：成功路徑，並斷言傳給模組的 Party 種類與 ID（買家版取自買家身分、店家版取自 seller.CurrentStore、對話方法取自歸屬推導）。
 func TestEveryMethodSucceedsAndPassesTheDerivedPartyToTheModule(t *testing.T) {
 	ctx := signedIn()
 	cid := convID.String()
@@ -821,7 +821,7 @@ func TestConversationPageTokenRoundTripsAndIsBoundToProcedureAndIdentity(t *test
 	}
 	other := newEnv(t, ownStore())
 	other.buyers = &fakeBuyers{}
-	app, err := NewApp(other.reads, other.writes, otherBuyerStub{}, other.stores, images(t), slog.New(slog.DiscardHandler))
+	app, err := NewApp(other.reads, other.writes, &fakeStreams{}, &fakeAuth{}, otherBuyerStub{}, other.stores, images(t), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -922,7 +922,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 	if err := checkDeclarations(declarations, svc); err != nil {
 		t.Fatal(err)
 	}
-	if svc.Methods().Len() != 13 || len(declarations) != 13 {
+	if svc.Methods().Len() != 15 || len(declarations) != 15 {
 		t.Fatalf("方法 %d、宣告 %d", svc.Methods().Len(), len(declarations))
 	}
 	for procedure := range declarations {
@@ -935,7 +935,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 		if err := checkDeclarations(short, svc); err == nil {
 			t.Errorf("缺 %s 的宣告卻通過了檢查", procedure)
 		}
-		if _, err := newApp(short, &fakeReads{}, &fakeWrites{}, &fakeBuyers{}, &fakeStores{}, images(t), slog.New(slog.DiscardHandler)); err == nil {
+		if _, err := newApp(short, &fakeReads{}, &fakeWrites{}, &fakeStreams{}, &fakeAuth{}, &fakeBuyers{}, &fakeStores{}, images(t), slog.New(slog.DiscardHandler)); err == nil {
 			t.Errorf("缺 %s 的宣告表要不能啟動", procedure)
 		}
 	}
@@ -966,7 +966,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 func TestDeclaredCapabilitiesMatchWhatTheModuleChecks(t *testing.T) {
 	want := map[string]seller.Capability{
 		"ListStoreConversations": seller.CapChatRead, "MarkAllStoreRead": seller.CapChatRead, "GetStoreUnreadCount": seller.CapChatRead,
-		"GetStorePresence": seller.CapChatRead, "ListMessages": seller.CapChatRead, "MarkConversationRead": seller.CapChatRead,
+		"GetStorePresence": seller.CapChatRead, "StreamStoreEvents": seller.CapChatRead, "ListMessages": seller.CapChatRead, "MarkConversationRead": seller.CapChatRead,
 		"SendMessageToBuyer": seller.CapChatSend, "SendMessage": seller.CapChatSend,
 	}
 	for procedure, d := range declarations {
@@ -983,13 +983,19 @@ func TestDeclaredCapabilitiesMatchWhatTheModuleChecks(t *testing.T) {
 
 func TestConstructorsRequireTheirDependencies(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
-	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeBuyers{}, &fakeStores{}, images(t), nil); err == nil {
+	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeStreams{}, &fakeAuth{}, &fakeBuyers{}, &fakeStores{}, images(t), nil); err == nil {
 		t.Error("需要 logger")
 	}
-	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, nil, &fakeStores{}, images(t), log); err == nil {
+	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeStreams{}, &fakeAuth{}, nil, &fakeStores{}, images(t), log); err == nil {
 		t.Error("需要 Buyers")
 	}
-	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeBuyers{}, nil, images(t), log); err == nil {
+	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeStreams{}, &fakeAuth{}, &fakeBuyers{}, nil, images(t), log); err == nil {
 		t.Error("需要 Stores")
+	}
+	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, nil, &fakeAuth{}, &fakeBuyers{}, &fakeStores{}, images(t), log); err == nil {
+		t.Error("需要 Streams")
+	}
+	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeStreams{}, nil, &fakeBuyers{}, &fakeStores{}, images(t), log); err == nil {
+		t.Error("需要 Reauthenticator")
 	}
 }

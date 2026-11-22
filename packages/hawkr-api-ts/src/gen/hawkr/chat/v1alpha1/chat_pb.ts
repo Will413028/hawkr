@@ -17,8 +17,8 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
 import { file_google_api_field_info } from "../../../google/api/field_info_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Image } from "../../common/v1alpha1/image_pb";
 import { file_hawkr_common_v1alpha1_image } from "../../common/v1alpha1/image_pb";
 import type { StoreCard } from "../../common/v1alpha1/store_card_pb";
@@ -29,7 +29,7 @@ import type { Message as Message$1 } from "@bufbuild/protobuf";
  * Describes the file hawkr/chat/v1alpha1/chat.proto.
  */
 export const file_hawkr_chat_v1alpha1_chat: GenFile = /*@__PURE__*/
-  fileDesc("Ch5oYXdrci9jaGF0L3YxYWxwaGExL2NoYXQucHJvdG8SE2hhd2tyLmNoYXQudjFhbHBoYTEi5wIKB01lc3NhZ2USDwoCaWQYASABKAlCA+BBCBIcCg9jb252ZXJzYXRpb25faWQYAiABKAlCA+BBAxIQCgNzZXEYAyABKANCA+BBAxIzCgZzZW5kZXIYBCABKA4yHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRQYXJ0eUID4EEDEjMKBGtpbmQYBSABKA4yIC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VLaW5kQgPgQQMSFgoEdGV4dBgGIAEoCUID4EEDSACIAQESMAoFaW1hZ2UYByABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxITCgZoaWRkZW4YCCABKAhCA+BBAxITCgZlcmFzZWQYCSABKAhCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IHCgVfdGV4dCK+AQoHUHJldmlldxIzCgRraW5kGAEgASgOMiAuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlS2luZEID4EEDEhYKBHRleHQYAiABKAlCA+BBA0gAiAEBEhMKBmhpZGRlbhgDIAEoCEID4EEDEhMKBmVyYXNlZBgEIAEoCEID4EEDEjMKBnNlbmRlchgFIAEoDjIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdFBhcnR5QgPgQQNCBwoFX3RleHQihgEKCUNoYXRCdXllchIPCgJpZBgBIAEoCUID4EEIEhYKBG5hbWUYAiABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgDIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDEhQKB2RlbGV0ZWQYBCABKAhCA+BBA0IHCgVfbmFtZSKwAgoMQ29udmVyc2F0aW9uEg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSMgoFYnV5ZXIYAyABKAsyHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRCdXllckID4EEDEhkKDHVucmVhZF9jb3VudBgEIAEoA0ID4EEDEjoKEWxhc3RfbWVzc2FnZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjIKB3ByZXZpZXcYBiABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLlByZXZpZXdCA+BBAxIaCg1wZWVyX3JlYWRfc2VxGAcgASgDQgPgQQMiTgoOTWVzc2FnZUNvbnRlbnQSDgoEdGV4dBgBIAEoCUgAEiEKEmltYWdlX3N0YWdlZF90b2tlbhgCIAEoCUID4EEESABCCQoHY29udGVudCJBChhMaXN0Q29udmVyc2F0aW9uc1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkibgoZTGlzdENvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkYKHUxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInMKHkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIpQBChNMaXN0TWVzc2FnZXNSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhEKCXBhZ2Vfc2l6ZRgCIAEoBRIXCgpiZWZvcmVfc2VxGAMgASgDSACIAQESFgoJYWZ0ZXJfc2VxGAQgASgDSAGIAQFCDQoLX2JlZm9yZV9zZXFCDAoKX2FmdGVyX3NlcSJvChRMaXN0TWVzc2FnZXNSZXNwb25zZRIuCghtZXNzYWdlcxgBIAMoCzIcLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZRIQCghoYXNfbW9yZRgCIAEoCBIVCg1wZWVyX3JlYWRfc2VxGAMgASgDIo4BChJTZW5kTWVzc2FnZVJlcXVlc3QSHAoPY29udmVyc2F0aW9uX2lkGAEgASgJQgPgQQISHwoKcmVxdWVzdF9pZBgCIAEoCUIL4EEC4ozP1wgCCAESOQoHY29udGVudBgDIAEoCzIjLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUNvbnRlbnRCA+BBAiJEChNTZW5kTWVzc2FnZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9CdXllclJlcXVlc3QSFQoIYnV5ZXJfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9CdXllclJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UiUgobTWFya0NvbnZlcnNhdGlvblJlYWRSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhUKCHVwdG9fc2VxGAIgASgDQgPgQQIiHgocTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZSIUChJNYXJrQWxsUmVhZFJlcXVlc3QiFQoTTWFya0FsbFJlYWRSZXNwb25zZSIZChdNYXJrQWxsU3RvcmVSZWFkUmVxdWVzdCIaChhNYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2UiFwoVR2V0VW5yZWFkQ291bnRSZXF1ZXN0Ii4KFkdldFVucmVhZENvdW50UmVzcG9uc2USFAoMdW5yZWFkX2NvdW50GAEgASgDIhwKGkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0IjMKG0dldFN0b3JlVW5yZWFkQ291bnRSZXNwb25zZRIUCgx1bnJlYWRfY291bnQYASABKAMiPwoUQ29udmVyc2F0aW9uUHJlc2VuY2USFwoPY29udmVyc2F0aW9uX2lkGAEgASgJEg4KBm9ubGluZRgCIAEoCCIzChJHZXRQcmVzZW5jZVJlcXVlc3QSHQoQY29udmVyc2F0aW9uX2lkcxgBIAMoCUID4EECIlMKE0dldFByZXNlbmNlUmVzcG9uc2USPAoJcHJlc2VuY2VzGAEgAygLMikuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb25QcmVzZW5jZSI4ChdHZXRTdG9yZVByZXNlbmNlUmVxdWVzdBIdChBjb252ZXJzYXRpb25faWRzGAEgAygJQgPgQQIiWAoYR2V0U3RvcmVQcmVzZW5jZVJlc3BvbnNlEjwKCXByZXNlbmNlcxgBIAMoCzIpLmhhd2tyLmNoYXQudjFhbHBoYTEuQ29udmVyc2F0aW9uUHJlc2VuY2UqWgoLTWVzc2FnZUtpbmQSHAoYTUVTU0FHRV9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRTUVTU0FHRV9LSU5EX1RFWFQQARIWChJNRVNTQUdFX0tJTkRfSU1BR0UQAipTCglDaGF0UGFydHkSGgoWQ0hBVF9QQVJUWV9VTlNQRUNJRklFRBAAEhQKEENIQVRfUEFSVFlfQlVZRVIQARIUChBDSEFUX1BBUlRZX1NUT1JFEAIy6AsKDkNoYXRBcHBTZXJ2aWNlEncKEUxpc3RDb252ZXJzYXRpb25zEi0uaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0Q29udmVyc2F0aW9uc1JlcXVlc3QaLi5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RDb252ZXJzYXRpb25zUmVzcG9uc2UiA5ACARKGAQoWTGlzdFN0b3JlQ29udmVyc2F0aW9ucxIyLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdFN0b3JlQ29udmVyc2F0aW9uc1JlcXVlc3QaMy5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXNwb25zZSIDkAIBEmgKDExpc3RNZXNzYWdlcxIoLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdE1lc3NhZ2VzUmVxdWVzdBopLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdE1lc3NhZ2VzUmVzcG9uc2UiA5ACARJgCgtTZW5kTWVzc2FnZRInLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5TZW5kTWVzc2FnZVJlc3BvbnNlEnUKElNlbmRNZXNzYWdlVG9TdG9yZRIuLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb1N0b3JlUmVxdWVzdBovLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb1N0b3JlUmVzcG9uc2USdQoSU2VuZE1lc3NhZ2VUb0J1eWVyEi4uaGF3a3IuY2hhdC52MWFscGhhMS5TZW5kTWVzc2FnZVRvQnV5ZXJSZXF1ZXN0Gi8uaGF3a3IuY2hhdC52MWFscGhhMS5TZW5kTWVzc2FnZVRvQnV5ZXJSZXNwb25zZRJ7ChRNYXJrQ29udmVyc2F0aW9uUmVhZBIwLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0NvbnZlcnNhdGlvblJlYWRSZXF1ZXN0GjEuaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQ29udmVyc2F0aW9uUmVhZFJlc3BvbnNlEmAKC01hcmtBbGxSZWFkEicuaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsUmVhZFJlcXVlc3QaKC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtBbGxSZWFkUmVzcG9uc2USbwoQTWFya0FsbFN0b3JlUmVhZBIsLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0FsbFN0b3JlUmVhZFJlcXVlc3QaLS5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtBbGxTdG9yZVJlYWRSZXNwb25zZRJuCg5HZXRVbnJlYWRDb3VudBIqLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0VW5yZWFkQ291bnRSZXF1ZXN0GisuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRVbnJlYWRDb3VudFJlc3BvbnNlIgOQAgESfQoTR2V0U3RvcmVVbnJlYWRDb3VudBIvLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVVbnJlYWRDb3VudFJlcXVlc3QaMC5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlVW5yZWFkQ291bnRSZXNwb25zZSIDkAIBEmUKC0dldFByZXNlbmNlEicuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRQcmVzZW5jZVJlcXVlc3QaKC5oYXdrci5jaGF0LnYxYWxwaGExLkdldFByZXNlbmNlUmVzcG9uc2UiA5ACARJ0ChBHZXRTdG9yZVByZXNlbmNlEiwuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRTdG9yZVByZXNlbmNlUmVxdWVzdBotLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVQcmVzZW5jZVJlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
+  fileDesc("Ch5oYXdrci9jaGF0L3YxYWxwaGExL2NoYXQucHJvdG8SE2hhd2tyLmNoYXQudjFhbHBoYTEi5wIKB01lc3NhZ2USDwoCaWQYASABKAlCA+BBCBIcCg9jb252ZXJzYXRpb25faWQYAiABKAlCA+BBAxIQCgNzZXEYAyABKANCA+BBAxIzCgZzZW5kZXIYBCABKA4yHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRQYXJ0eUID4EEDEjMKBGtpbmQYBSABKA4yIC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2VLaW5kQgPgQQMSFgoEdGV4dBgGIAEoCUID4EEDSACIAQESMAoFaW1hZ2UYByABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxITCgZoaWRkZW4YCCABKAhCA+BBAxITCgZlcmFzZWQYCSABKAhCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IHCgVfdGV4dCK+AQoHUHJldmlldxIzCgRraW5kGAEgASgOMiAuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlS2luZEID4EEDEhYKBHRleHQYAiABKAlCA+BBA0gAiAEBEhMKBmhpZGRlbhgDIAEoCEID4EEDEhMKBmVyYXNlZBgEIAEoCEID4EEDEjMKBnNlbmRlchgFIAEoDjIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdFBhcnR5QgPgQQNCBwoFX3RleHQihgEKCUNoYXRCdXllchIPCgJpZBgBIAEoCUID4EEIEhYKBG5hbWUYAiABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgDIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDEhQKB2RlbGV0ZWQYBCABKAhCA+BBA0IHCgVfbmFtZSKwAgoMQ29udmVyc2F0aW9uEg8KAmlkGAEgASgJQgPgQQgSNAoFc3RvcmUYAiABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3RvcmVDYXJkQgPgQQMSMgoFYnV5ZXIYAyABKAsyHi5oYXdrci5jaGF0LnYxYWxwaGExLkNoYXRCdXllckID4EEDEhkKDHVucmVhZF9jb3VudBgEIAEoA0ID4EEDEjoKEWxhc3RfbWVzc2FnZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjIKB3ByZXZpZXcYBiABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLlByZXZpZXdCA+BBAxIaCg1wZWVyX3JlYWRfc2VxGAcgASgDQgPgQQMiTgoOTWVzc2FnZUNvbnRlbnQSDgoEdGV4dBgBIAEoCUgAEiEKEmltYWdlX3N0YWdlZF90b2tlbhgCIAEoCUID4EEESABCCQoHY29udGVudCJBChhMaXN0Q29udmVyc2F0aW9uc1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkibgoZTGlzdENvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkYKHUxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInMKHkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXNwb25zZRI4Cg1jb252ZXJzYXRpb25zGAEgAygLMiEuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIpQBChNMaXN0TWVzc2FnZXNSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhEKCXBhZ2Vfc2l6ZRgCIAEoBRIXCgpiZWZvcmVfc2VxGAMgASgDSACIAQESFgoJYWZ0ZXJfc2VxGAQgASgDSAGIAQFCDQoLX2JlZm9yZV9zZXFCDAoKX2FmdGVyX3NlcSJvChRMaXN0TWVzc2FnZXNSZXNwb25zZRIuCghtZXNzYWdlcxgBIAMoCzIcLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZRIQCghoYXNfbW9yZRgCIAEoCBIVCg1wZWVyX3JlYWRfc2VxGAMgASgDIo4BChJTZW5kTWVzc2FnZVJlcXVlc3QSHAoPY29udmVyc2F0aW9uX2lkGAEgASgJQgPgQQISHwoKcmVxdWVzdF9pZBgCIAEoCUIL4EEC4ozP1wgCCAESOQoHY29udGVudBgDIAEoCzIjLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUNvbnRlbnRCA+BBAiJEChNTZW5kTWVzc2FnZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UijgEKGVNlbmRNZXNzYWdlVG9CdXllclJlcXVlc3QSFQoIYnV5ZXJfaWQYASABKAlCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIARI5Cgdjb250ZW50GAMgASgLMiMuaGF3a3IuY2hhdC52MWFscGhhMS5NZXNzYWdlQ29udGVudEID4EECIksKGlNlbmRNZXNzYWdlVG9CdXllclJlc3BvbnNlEi0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2UiUgobTWFya0NvbnZlcnNhdGlvblJlYWRSZXF1ZXN0EhwKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCUID4EECEhUKCHVwdG9fc2VxGAIgASgDQgPgQQIiHgocTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZSIUChJNYXJrQWxsUmVhZFJlcXVlc3QiFQoTTWFya0FsbFJlYWRSZXNwb25zZSIZChdNYXJrQWxsU3RvcmVSZWFkUmVxdWVzdCIaChhNYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2UiFwoVR2V0VW5yZWFkQ291bnRSZXF1ZXN0Ii4KFkdldFVucmVhZENvdW50UmVzcG9uc2USFAoMdW5yZWFkX2NvdW50GAEgASgDIhwKGkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0IjMKG0dldFN0b3JlVW5yZWFkQ291bnRSZXNwb25zZRIUCgx1bnJlYWRfY291bnQYASABKAMiPwoUQ29udmVyc2F0aW9uUHJlc2VuY2USFwoPY29udmVyc2F0aW9uX2lkGAEgASgJEg4KBm9ubGluZRgCIAEoCCIzChJHZXRQcmVzZW5jZVJlcXVlc3QSHQoQY29udmVyc2F0aW9uX2lkcxgBIAMoCUID4EECIlMKE0dldFByZXNlbmNlUmVzcG9uc2USPAoJcHJlc2VuY2VzGAEgAygLMikuaGF3a3IuY2hhdC52MWFscGhhMS5Db252ZXJzYXRpb25QcmVzZW5jZSI4ChdHZXRTdG9yZVByZXNlbmNlUmVxdWVzdBIdChBjb252ZXJzYXRpb25faWRzGAEgAygJQgPgQQIiWAoYR2V0U3RvcmVQcmVzZW5jZVJlc3BvbnNlEjwKCXByZXNlbmNlcxgBIAMoCzIpLmhhd2tyLmNoYXQudjFhbHBoYTEuQ29udmVyc2F0aW9uUHJlc2VuY2UijQEKE1N0cmVhbUV2ZW50c1JlcXVlc3QSRgoHY3Vyc29ycxgBIAMoCzI1Lmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVxdWVzdC5DdXJzb3JzRW50cnkaLgoMQ3Vyc29yc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoAzoCOAEilwEKGFN0cmVhbVN0b3JlRXZlbnRzUmVxdWVzdBJLCgdjdXJzb3JzGAEgAygLMjouaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW50c1JlcXVlc3QuQ3Vyc29yc0VudHJ5Gi4KDEN1cnNvcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAM6AjgBIkUKFFN0cmVhbUV2ZW50c1Jlc3BvbnNlEi0KBWV2ZW50GAEgASgLMh4uaGF3a3IuY2hhdC52MWFscGhhMS5DaGF0RXZlbnQiSgoZU3RyZWFtU3RvcmVFdmVudHNSZXNwb25zZRItCgVldmVudBgBIAEoCzIeLmhhd2tyLmNoYXQudjFhbHBoYTEuQ2hhdEV2ZW50IsUCCglDaGF0RXZlbnQSKwoFcmVhZHkYASABKAsyGi5oYXdrci5jaGF0LnYxYWxwaGExLlJlYWR5SAASNAoHbWVzc2FnZRgCIAEoCzIhLmhhd2tyLmNoYXQudjFhbHBoYTEuTWVzc2FnZUV2ZW50SAASNAoGdW5yZWFkGAMgASgLMiIuaGF3a3IuY2hhdC52MWFscGhhMS5VbnJlYWRDaGFuZ2VkSAASMgoJcGVlcl9yZWFkGAQgASgLMh0uaGF3a3IuY2hhdC52MWFscGhhMS5QZWVyUmVhZEgAEi0KBnJlc3luYxgFIAEoCzIbLmhhd2tyLmNoYXQudjFhbHBoYTEuUmVzeW5jSAASMwoJaGVhcnRiZWF0GAYgASgLMh4uaGF3a3IuY2hhdC52MWFscGhhMS5IZWFydGJlYXRIAEIHCgVldmVudCKFAQoFUmVhZHkSFAoMdW5yZWFkX2NvdW50GAEgASgDEjUKEmhlYXJ0YmVhdF9pbnRlcnZhbBgCIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIvCgxtYXhfbGlmZXRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24iTgoMTWVzc2FnZUV2ZW50Ei0KB21lc3NhZ2UYASABKAsyHC5oYXdrci5jaGF0LnYxYWxwaGExLk1lc3NhZ2USDwoHdXBkYXRlZBgCIAEoCCIlCg1VbnJlYWRDaGFuZ2VkEhQKDHVucmVhZF9jb3VudBgBIAEoAyI6CghQZWVyUmVhZBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSFQoNcGVlcl9yZWFkX3NlcRgCIAEoAyI7CgZSZXN5bmMSGQoPY29udmVyc2F0aW9uX2lkGAEgASgJSAASDQoDYWxsGAIgASgISABCBwoFc2NvcGUiCwoJSGVhcnRiZWF0KloKC01lc3NhZ2VLaW5kEhwKGE1FU1NBR0VfS0lORF9VTlNQRUNJRklFRBAAEhUKEU1FU1NBR0VfS0lORF9URVhUEAESFgoSTUVTU0FHRV9LSU5EX0lNQUdFEAIqUwoJQ2hhdFBhcnR5EhoKFkNIQVRfUEFSVFlfVU5TUEVDSUZJRUQQABIUChBDSEFUX1BBUlRZX0JVWUVSEAESFAoQQ0hBVF9QQVJUWV9TVE9SRRACMsUNCg5DaGF0QXBwU2VydmljZRJ3ChFMaXN0Q29udmVyc2F0aW9ucxItLmhhd2tyLmNoYXQudjFhbHBoYTEuTGlzdENvbnZlcnNhdGlvbnNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0Q29udmVyc2F0aW9uc1Jlc3BvbnNlIgOQAgEShgEKFkxpc3RTdG9yZUNvbnZlcnNhdGlvbnMSMi5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RTdG9yZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GjMuaGF3a3IuY2hhdC52MWFscGhhMS5MaXN0U3RvcmVDb252ZXJzYXRpb25zUmVzcG9uc2UiA5ACARJoCgxMaXN0TWVzc2FnZXMSKC5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1JlcXVlc3QaKS5oYXdrci5jaGF0LnYxYWxwaGExLkxpc3RNZXNzYWdlc1Jlc3BvbnNlIgOQAgESYAoLU2VuZE1lc3NhZ2USJy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlUmVxdWVzdBooLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VSZXNwb25zZRJ1ChJTZW5kTWVzc2FnZVRvU3RvcmUSLi5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlcXVlc3QaLy5oYXdrci5jaGF0LnYxYWxwaGExLlNlbmRNZXNzYWdlVG9TdG9yZVJlc3BvbnNlEnUKElNlbmRNZXNzYWdlVG9CdXllchIuLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVxdWVzdBovLmhhd2tyLmNoYXQudjFhbHBoYTEuU2VuZE1lc3NhZ2VUb0J1eWVyUmVzcG9uc2USewoUTWFya0NvbnZlcnNhdGlvblJlYWQSMC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtDb252ZXJzYXRpb25SZWFkUmVxdWVzdBoxLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0NvbnZlcnNhdGlvblJlYWRSZXNwb25zZRJgCgtNYXJrQWxsUmVhZBInLmhhd2tyLmNoYXQudjFhbHBoYTEuTWFya0FsbFJlYWRSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsUmVhZFJlc3BvbnNlEm8KEE1hcmtBbGxTdG9yZVJlYWQSLC5oYXdrci5jaGF0LnYxYWxwaGExLk1hcmtBbGxTdG9yZVJlYWRSZXF1ZXN0Gi0uaGF3a3IuY2hhdC52MWFscGhhMS5NYXJrQWxsU3RvcmVSZWFkUmVzcG9uc2USbgoOR2V0VW5yZWFkQ291bnQSKi5oYXdrci5jaGF0LnYxYWxwaGExLkdldFVucmVhZENvdW50UmVxdWVzdBorLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0VW5yZWFkQ291bnRSZXNwb25zZSIDkAIBEn0KE0dldFN0b3JlVW5yZWFkQ291bnQSLy5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlVW5yZWFkQ291bnRSZXF1ZXN0GjAuaGF3a3IuY2hhdC52MWFscGhhMS5HZXRTdG9yZVVucmVhZENvdW50UmVzcG9uc2UiA5ACARJlCgtHZXRQcmVzZW5jZRInLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0UHJlc2VuY2VSZXF1ZXN0GiguaGF3a3IuY2hhdC52MWFscGhhMS5HZXRQcmVzZW5jZVJlc3BvbnNlIgOQAgESdAoQR2V0U3RvcmVQcmVzZW5jZRIsLmhhd2tyLmNoYXQudjFhbHBoYTEuR2V0U3RvcmVQcmVzZW5jZVJlcXVlc3QaLS5oYXdrci5jaGF0LnYxYWxwaGExLkdldFN0b3JlUHJlc2VuY2VSZXNwb25zZSIDkAIBEmUKDFN0cmVhbUV2ZW50cxIoLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVxdWVzdBopLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtRXZlbnRzUmVzcG9uc2UwARJ0ChFTdHJlYW1TdG9yZUV2ZW50cxItLmhhd2tyLmNoYXQudjFhbHBoYTEuU3RyZWFtU3RvcmVFdmVudHNSZXF1ZXN0Gi4uaGF3a3IuY2hhdC52MWFscGhhMS5TdHJlYW1TdG9yZUV2ZW50c1Jlc3BvbnNlMAFiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_duration, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_store_card]);
 
 /**
  * Message 是一則訊息。隱藏或抹除的訊息是墓碑：hidden 或 erased 為真，沒有 text 與 image。
@@ -825,6 +825,289 @@ export const GetStorePresenceResponseSchema: GenMessage<GetStorePresenceResponse
   messageDesc(file_hawkr_chat_v1alpha1_chat, 31);
 
 /**
+ * @generated from message hawkr.chat.v1alpha1.StreamEventsRequest
+ */
+export type StreamEventsRequest = Message$1<"hawkr.chat.v1alpha1.StreamEventsRequest"> & {
+  /**
+   * conversation_id 到 client 已有的最後一個 seq；最多 50 個，key 必須是對話 ID。
+   *
+   * @generated from field: map<string, int64> cursors = 1;
+   */
+  cursors: { [key: string]: bigint };
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.StreamEventsRequest.
+ * Use `create(StreamEventsRequestSchema)` to create a new message.
+ */
+export const StreamEventsRequestSchema: GenMessage<StreamEventsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 32);
+
+/**
+ * @generated from message hawkr.chat.v1alpha1.StreamStoreEventsRequest
+ */
+export type StreamStoreEventsRequest = Message$1<"hawkr.chat.v1alpha1.StreamStoreEventsRequest"> & {
+  /**
+   * 同 StreamEventsRequest.cursors。
+   *
+   * @generated from field: map<string, int64> cursors = 1;
+   */
+  cursors: { [key: string]: bigint };
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.StreamStoreEventsRequest.
+ * Use `create(StreamStoreEventsRequestSchema)` to create a new message.
+ */
+export const StreamStoreEventsRequestSchema: GenMessage<StreamStoreEventsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 33);
+
+/**
+ * @generated from message hawkr.chat.v1alpha1.StreamEventsResponse
+ */
+export type StreamEventsResponse = Message$1<"hawkr.chat.v1alpha1.StreamEventsResponse"> & {
+  /**
+   * @generated from field: hawkr.chat.v1alpha1.ChatEvent event = 1;
+   */
+  event?: ChatEvent | undefined;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.StreamEventsResponse.
+ * Use `create(StreamEventsResponseSchema)` to create a new message.
+ */
+export const StreamEventsResponseSchema: GenMessage<StreamEventsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 34);
+
+/**
+ * @generated from message hawkr.chat.v1alpha1.StreamStoreEventsResponse
+ */
+export type StreamStoreEventsResponse = Message$1<"hawkr.chat.v1alpha1.StreamStoreEventsResponse"> & {
+  /**
+   * @generated from field: hawkr.chat.v1alpha1.ChatEvent event = 1;
+   */
+  event?: ChatEvent | undefined;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.StreamStoreEventsResponse.
+ * Use `create(StreamStoreEventsResponseSchema)` to create a new message.
+ */
+export const StreamStoreEventsResponseSchema: GenMessage<StreamStoreEventsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 35);
+
+/**
+ * ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
+ *
+ * @generated from message hawkr.chat.v1alpha1.ChatEvent
+ */
+export type ChatEvent = Message$1<"hawkr.chat.v1alpha1.ChatEvent"> & {
+  /**
+   * @generated from oneof hawkr.chat.v1alpha1.ChatEvent.event
+   */
+  event: {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.Ready ready = 1;
+     */
+    value: Ready;
+    case: "ready";
+  } | {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.MessageEvent message = 2;
+     */
+    value: MessageEvent;
+    case: "message";
+  } | {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.UnreadChanged unread = 3;
+     */
+    value: UnreadChanged;
+    case: "unread";
+  } | {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.PeerRead peer_read = 4;
+     */
+    value: PeerRead;
+    case: "peerRead";
+  } | {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.Resync resync = 5;
+     */
+    value: Resync;
+    case: "resync";
+  } | {
+    /**
+     * @generated from field: hawkr.chat.v1alpha1.Heartbeat heartbeat = 6;
+     */
+    value: Heartbeat;
+    case: "heartbeat";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.ChatEvent.
+ * Use `create(ChatEventSchema)` to create a new message.
+ */
+export const ChatEventSchema: GenMessage<ChatEvent> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 36);
+
+/**
+ * Ready 是補洞完成後的第一個 frame。
+ *
+ * @generated from message hawkr.chat.v1alpha1.Ready
+ */
+export type Ready = Message$1<"hawkr.chat.v1alpha1.Ready"> & {
+  /**
+   * 呼叫者這一方的總未讀訊息數。
+   *
+   * @generated from field: int64 unread_count = 1;
+   */
+  unreadCount: bigint;
+
+  /**
+   * 閒置時 Heartbeat 的間隔；client 超過它的兩倍沒收到任何 frame 就當連線已斷並重連。
+   *
+   * @generated from field: google.protobuf.Duration heartbeat_interval = 2;
+   */
+  heartbeatInterval?: Duration | undefined;
+
+  /**
+   * 串流的最長壽命（含抖動，已是這一條的實際值）；到期正常結束。
+   *
+   * @generated from field: google.protobuf.Duration max_lifetime = 3;
+   */
+  maxLifetime?: Duration | undefined;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.Ready.
+ * Use `create(ReadySchema)` to create a new message.
+ */
+export const ReadySchema: GenMessage<Ready> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 37);
+
+/**
+ * MessageEvent 是新訊息，或同 seq 的可見度改變。
+ *
+ * @generated from message hawkr.chat.v1alpha1.MessageEvent
+ */
+export type MessageEvent = Message$1<"hawkr.chat.v1alpha1.MessageEvent"> & {
+  /**
+   * @generated from field: hawkr.chat.v1alpha1.Message message = 1;
+   */
+  message?: Message | undefined;
+
+  /**
+   * 為真表示這是同一個 seq 的可見度改變（變成墓碑或還原），client 以 seq 取代手上的那則。
+   *
+   * @generated from field: bool updated = 2;
+   */
+  updated: boolean;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.MessageEvent.
+ * Use `create(MessageEventSchema)` to create a new message.
+ */
+export const MessageEventSchema: GenMessage<MessageEvent> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 38);
+
+/**
+ * UnreadChanged 是呼叫者這一方的總未讀訊息數。
+ *
+ * @generated from message hawkr.chat.v1alpha1.UnreadChanged
+ */
+export type UnreadChanged = Message$1<"hawkr.chat.v1alpha1.UnreadChanged"> & {
+  /**
+   * @generated from field: int64 unread_count = 1;
+   */
+  unreadCount: bigint;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.UnreadChanged.
+ * Use `create(UnreadChangedSchema)` to create a new message.
+ */
+export const UnreadChangedSchema: GenMessage<UnreadChanged> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 39);
+
+/**
+ * PeerRead 是對方在一個對話的已讀游標前進。
+ *
+ * @generated from message hawkr.chat.v1alpha1.PeerRead
+ */
+export type PeerRead = Message$1<"hawkr.chat.v1alpha1.PeerRead"> & {
+  /**
+   * @generated from field: string conversation_id = 1;
+   */
+  conversationId: string;
+
+  /**
+   * seq 不大於它的訊息，對方已讀。
+   *
+   * @generated from field: int64 peer_read_seq = 2;
+   */
+  peerReadSeq: bigint;
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.PeerRead.
+ * Use `create(PeerReadSchema)` to create a new message.
+ */
+export const PeerReadSchema: GenMessage<PeerRead> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 40);
+
+/**
+ * Resync 要求 client 重新取列表與缺口。
+ *
+ * @generated from message hawkr.chat.v1alpha1.Resync
+ */
+export type Resync = Message$1<"hawkr.chat.v1alpha1.Resync"> & {
+  /**
+   * @generated from oneof hawkr.chat.v1alpha1.Resync.scope
+   */
+  scope: {
+    /**
+     * 只有這個對話。
+     *
+     * @generated from field: string conversation_id = 1;
+     */
+    value: string;
+    case: "conversationId";
+  } | {
+    /**
+     * 全部對話。
+     *
+     * @generated from field: bool all = 2;
+     */
+    value: boolean;
+    case: "all";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.Resync.
+ * Use `create(ResyncSchema)` to create a new message.
+ */
+export const ResyncSchema: GenMessage<Resync> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 41);
+
+/**
+ * Heartbeat 是串流閒置時的保活 frame，沒有內容。
+ *
+ * @generated from message hawkr.chat.v1alpha1.Heartbeat
+ */
+export type Heartbeat = Message$1<"hawkr.chat.v1alpha1.Heartbeat"> & {
+};
+
+/**
+ * Describes the message hawkr.chat.v1alpha1.Heartbeat.
+ * Use `create(HeartbeatSchema)` to create a new message.
+ */
+export const HeartbeatSchema: GenMessage<Heartbeat> = /*@__PURE__*/
+  messageDesc(file_hawkr_chat_v1alpha1_chat, 42);
+
+/**
  * MessageKind 是訊息的種類。client 遇到 UNSPECIFIED 或不認得的值，顯示成「不支援的訊息」，不當成錯誤。
  *
  * @generated from enum hawkr.chat.v1alpha1.MessageKind
@@ -1028,6 +1311,31 @@ export const ChatAppService: GenService<{
     methodKind: "unary";
     input: typeof GetStorePresenceRequestSchema;
     output: typeof GetStorePresenceResponseSchema;
+  },
+  /**
+   * StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+   * 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+   * 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+   * 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+   * 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+   *
+   * @generated from rpc hawkr.chat.v1alpha1.ChatAppService.StreamEvents
+   */
+  streamEvents: {
+    methodKind: "server_streaming";
+    input: typeof StreamEventsRequestSchema;
+    output: typeof StreamEventsResponseSchema;
+  },
+  /**
+   * StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+   * 以 failed_precondition 與 STORE_CLOSED 結束。
+   *
+   * @generated from rpc hawkr.chat.v1alpha1.ChatAppService.StreamStoreEvents
+   */
+  streamStoreEvents: {
+    methodKind: "server_streaming";
+    input: typeof StreamStoreEventsRequestSchema;
+    output: typeof StreamStoreEventsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_chat_v1alpha1_chat, 0);

@@ -197,6 +197,87 @@
    "new": "",
    "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
    "why": "A httpapi.Deps literal in the module template omits the required IM field, which must fail the literals guard."
+  },
+  {
+   "id": "chat-stream-guard-never-rechecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\t\terr := s.Guard(ctx)\n",
+   "new": "\t\t\tvar err error\n",
+   "test": "internal/httpapi/chat ^TestStreamRechecksEveryIntervalNotOnlyAtTheStart$",
+   "why": "The stream never calls Guard on the recheck tick, so a revoked session or closed store keeps the stream open until its lifetime ends."
+  },
+  {
+   "id": "chat-stream-lifetime-without-jitter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "cfg.LifetimeJitter*(2*s.Jitter()-1)",
+   "new": "0*cfg.LifetimeJitter*(2*s.Jitter()-1)",
+   "test": "internal/httpapi/chat ^TestStreamLifetimeCarriesPerStreamJitterFromTheInjectedSource$",
+   "why": "Every stream gets exactly MaxLifetime, so streams opened together reconnect together."
+  },
+  {
+   "id": "chat-stream-no-write-deadline",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "if err := s.SetWriteDeadline(s.Clock.Now().Add(cfg.WriteTimeout)); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/httpapi/chat ^TestStreamSetsTheWriteDeadlineBeforeEveryFrame$",
+   "why": "Frames are written without a per-write deadline, so a client that stops reading holds the connection forever."
+  },
+  {
+   "id": "chat-stream-guard-failures-never-reset",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\t\t\tfailures = 0\n",
+   "new": "\t\t\t\tfailures += 0\n",
+   "test": "internal/httpapi/chat ^TestStreamTransientGuardFailureCounterResetsAfterASuccess$",
+   "why": "Transient recheck failures accumulate across successes, so three scattered blips end a healthy stream."
+  },
+  {
+   "id": "chat-stream-guard-failure-threshold-one",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "failures >= cfg.MaxGuardFailures",
+   "new": "failures >= 1",
+   "test": "internal/httpapi/chat ^TestStreamTransientGuardFailureCounterResetsAfterASuccess$",
+   "why": "A single transient recheck failure ends the stream instead of three consecutive ones."
+  },
+  {
+   "id": "chat-stream-lost-eligibility-as-unavailable",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "return apperr.FailedPrecondition(\"店家已停業，無法再收到聊天事件\").WithReason(apperr.ReasonStoreClosed), true",
+   "new": "return apperr.WithCause(apperr.Unavailable(\"x\"), err), true",
+   "test": "internal/httpapi/chat ^TestStreamMapsModuleEndReasons$",
+   "why": "A closed store ends the stream as unavailable, so the client keeps reconnecting instead of learning the store is closed."
+  },
+  {
+   "id": "chat-stream-handler-never-closes-subscription",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/stream.go",
+   "old": "\t\tstop()\n\t\ts.Close()\n",
+   "new": "\t\tstop()\n",
+   "test": "internal/httpapi/chat ^TestStreamHandlerClosesTheSubscriptionWhenTheClientGoesAway$",
+   "why": "The handler returns without closing the subscription, leaking the presence slot until its TTL."
+  },
+  {
+   "id": "chat-stream-store-subscribes-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\th.storeParty, h.storePartyOf)",
+   "new": "\t\th.buyerParty, h.buyerPartyOf)",
+   "test": "internal/httpapi/chat ^TestStreamEventsSubscribesAsTheDerivedParty$",
+   "why": "StreamStoreEvents subscribes with the buyer identity, so a store would receive the buyer's events."
+  },
+  {
+   "id": "chat-serve-without-im-run",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "return serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})",
+   "new": "return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})",
+   "test": "cmd/hawkr ^TestServeRunsTheIMLiveChannelAndWorkerDoesNot$",
+   "why": "The serve path never starts im's LISTEN connection, so streams open but never receive an event."
   }
  ]
 }

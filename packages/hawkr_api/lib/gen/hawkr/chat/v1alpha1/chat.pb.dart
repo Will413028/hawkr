@@ -15,6 +15,8 @@ import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
+import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
+    as $3;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $1;
 
@@ -2382,6 +2384,842 @@ class GetStorePresenceResponse extends $pb.GeneratedMessage {
   $pb.PbList<ConversationPresence> get presences => $_getList(0);
 }
 
+class StreamEventsRequest extends $pb.GeneratedMessage {
+  factory StreamEventsRequest({
+    $core.Iterable<$core.MapEntry<$core.String, $fixnum.Int64>>? cursors,
+  }) {
+    final result = StreamEventsRequest._();
+    if (cursors != null) result.cursors.addEntries(cursors);
+    return result;
+  }
+
+  StreamEventsRequest._();
+
+  factory StreamEventsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamEventsRequest()..mergeFromBuffer(data, registry);
+  factory StreamEventsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamEventsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamEventsRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: StreamEventsRequest.$_createMessage)
+    ..m<$core.String, $fixnum.Int64>(1, _omitFieldNames ? '' : 'cursors',
+        entryClassName: 'StreamEventsRequest.CursorsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.O6,
+        packageName: const $pb.PackageName('hawkr.chat.v1alpha1'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamEventsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamEventsRequest copyWith(void Function(StreamEventsRequest) updates) =>
+      super.copyWith((message) => updates(message as StreamEventsRequest))
+          as StreamEventsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use StreamEventsRequest() / StreamEventsRequest.new instead')
+  static StreamEventsRequest create() => StreamEventsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => StreamEventsRequest._();
+  @$core.override
+  StreamEventsRequest createEmptyInstance() => StreamEventsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static StreamEventsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamEventsRequest>(
+          StreamEventsRequest.$_createMessage);
+  static StreamEventsRequest? _defaultInstance;
+
+  /// conversation_id 到 client 已有的最後一個 seq；最多 50 個，key 必須是對話 ID。
+  @$pb.TagNumber(1)
+  $pb.PbMap<$core.String, $fixnum.Int64> get cursors => $_getMap(0);
+}
+
+class StreamStoreEventsRequest extends $pb.GeneratedMessage {
+  factory StreamStoreEventsRequest({
+    $core.Iterable<$core.MapEntry<$core.String, $fixnum.Int64>>? cursors,
+  }) {
+    final result = StreamStoreEventsRequest._();
+    if (cursors != null) result.cursors.addEntries(cursors);
+    return result;
+  }
+
+  StreamStoreEventsRequest._();
+
+  factory StreamStoreEventsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamStoreEventsRequest()..mergeFromBuffer(data, registry);
+  factory StreamStoreEventsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamStoreEventsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamStoreEventsRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: StreamStoreEventsRequest.$_createMessage)
+    ..m<$core.String, $fixnum.Int64>(1, _omitFieldNames ? '' : 'cursors',
+        entryClassName: 'StreamStoreEventsRequest.CursorsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.O6,
+        packageName: const $pb.PackageName('hawkr.chat.v1alpha1'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamStoreEventsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamStoreEventsRequest copyWith(
+          void Function(StreamStoreEventsRequest) updates) =>
+      super.copyWith((message) => updates(message as StreamStoreEventsRequest))
+          as StreamStoreEventsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use StreamStoreEventsRequest() / StreamStoreEventsRequest.new instead')
+  static StreamStoreEventsRequest create() => StreamStoreEventsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => StreamStoreEventsRequest._();
+  @$core.override
+  StreamStoreEventsRequest createEmptyInstance() =>
+      StreamStoreEventsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static StreamStoreEventsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamStoreEventsRequest>(
+          StreamStoreEventsRequest.$_createMessage);
+  static StreamStoreEventsRequest? _defaultInstance;
+
+  /// 同 StreamEventsRequest.cursors。
+  @$pb.TagNumber(1)
+  $pb.PbMap<$core.String, $fixnum.Int64> get cursors => $_getMap(0);
+}
+
+class StreamEventsResponse extends $pb.GeneratedMessage {
+  factory StreamEventsResponse({
+    ChatEvent? event,
+  }) {
+    final result = StreamEventsResponse._();
+    if (event != null) result.event = event;
+    return result;
+  }
+
+  StreamEventsResponse._();
+
+  factory StreamEventsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamEventsResponse()..mergeFromBuffer(data, registry);
+  factory StreamEventsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamEventsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamEventsResponse',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: StreamEventsResponse.$_createMessage)
+    ..aOM<ChatEvent>(1, _omitFieldNames ? '' : 'event',
+        subBuilder: ChatEvent.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamEventsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamEventsResponse copyWith(void Function(StreamEventsResponse) updates) =>
+      super.copyWith((message) => updates(message as StreamEventsResponse))
+          as StreamEventsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use StreamEventsResponse() / StreamEventsResponse.new instead')
+  static StreamEventsResponse create() => StreamEventsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => StreamEventsResponse._();
+  @$core.override
+  StreamEventsResponse createEmptyInstance() => StreamEventsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static StreamEventsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamEventsResponse>(
+          StreamEventsResponse.$_createMessage);
+  static StreamEventsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ChatEvent get event => $_getN(0);
+  @$pb.TagNumber(1)
+  set event(ChatEvent value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEvent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEvent() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ChatEvent ensureEvent() => $_ensure(0);
+}
+
+class StreamStoreEventsResponse extends $pb.GeneratedMessage {
+  factory StreamStoreEventsResponse({
+    ChatEvent? event,
+  }) {
+    final result = StreamStoreEventsResponse._();
+    if (event != null) result.event = event;
+    return result;
+  }
+
+  StreamStoreEventsResponse._();
+
+  factory StreamStoreEventsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamStoreEventsResponse()..mergeFromBuffer(data, registry);
+  factory StreamStoreEventsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StreamStoreEventsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamStoreEventsResponse',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: StreamStoreEventsResponse.$_createMessage)
+    ..aOM<ChatEvent>(1, _omitFieldNames ? '' : 'event',
+        subBuilder: ChatEvent.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamStoreEventsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamStoreEventsResponse copyWith(
+          void Function(StreamStoreEventsResponse) updates) =>
+      super.copyWith((message) => updates(message as StreamStoreEventsResponse))
+          as StreamStoreEventsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use StreamStoreEventsResponse() / StreamStoreEventsResponse.new instead')
+  static StreamStoreEventsResponse create() => StreamStoreEventsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      StreamStoreEventsResponse._();
+  @$core.override
+  StreamStoreEventsResponse createEmptyInstance() =>
+      StreamStoreEventsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static StreamStoreEventsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamStoreEventsResponse>(
+          StreamStoreEventsResponse.$_createMessage);
+  static StreamStoreEventsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ChatEvent get event => $_getN(0);
+  @$pb.TagNumber(1)
+  set event(ChatEvent value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEvent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEvent() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ChatEvent ensureEvent() => $_ensure(0);
+}
+
+enum ChatEvent_Event {
+  ready,
+  message,
+  unread,
+  peerRead,
+  resync,
+  heartbeat,
+  notSet
+}
+
+/// ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
+class ChatEvent extends $pb.GeneratedMessage {
+  factory ChatEvent({
+    Ready? ready,
+    MessageEvent? message,
+    UnreadChanged? unread,
+    PeerRead? peerRead,
+    Resync? resync,
+    Heartbeat? heartbeat,
+  }) {
+    final result = ChatEvent._();
+    if (ready != null) result.ready = ready;
+    if (message != null) result.message = message;
+    if (unread != null) result.unread = unread;
+    if (peerRead != null) result.peerRead = peerRead;
+    if (resync != null) result.resync = resync;
+    if (heartbeat != null) result.heartbeat = heartbeat;
+    return result;
+  }
+
+  ChatEvent._();
+
+  factory ChatEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChatEvent()..mergeFromBuffer(data, registry);
+  factory ChatEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ChatEvent()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, ChatEvent_Event> _ChatEvent_EventByTag = {
+    1: ChatEvent_Event.ready,
+    2: ChatEvent_Event.message,
+    3: ChatEvent_Event.unread,
+    4: ChatEvent_Event.peerRead,
+    5: ChatEvent_Event.resync,
+    6: ChatEvent_Event.heartbeat,
+    0: ChatEvent_Event.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChatEvent',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: ChatEvent.$_createMessage)
+    ..oo(0, [1, 2, 3, 4, 5, 6])
+    ..aOM<Ready>(1, _omitFieldNames ? '' : 'ready',
+        subBuilder: Ready.$_createMessage)
+    ..aOM<MessageEvent>(2, _omitFieldNames ? '' : 'message',
+        subBuilder: MessageEvent.$_createMessage)
+    ..aOM<UnreadChanged>(3, _omitFieldNames ? '' : 'unread',
+        subBuilder: UnreadChanged.$_createMessage)
+    ..aOM<PeerRead>(4, _omitFieldNames ? '' : 'peerRead',
+        subBuilder: PeerRead.$_createMessage)
+    ..aOM<Resync>(5, _omitFieldNames ? '' : 'resync',
+        subBuilder: Resync.$_createMessage)
+    ..aOM<Heartbeat>(6, _omitFieldNames ? '' : 'heartbeat',
+        subBuilder: Heartbeat.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChatEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChatEvent copyWith(void Function(ChatEvent) updates) =>
+      super.copyWith((message) => updates(message as ChatEvent)) as ChatEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ChatEvent() / ChatEvent.new instead')
+  static ChatEvent create() => ChatEvent._();
+  static $pb.GeneratedMessage $_createMessage() => ChatEvent._();
+  @$core.override
+  ChatEvent createEmptyInstance() => ChatEvent._();
+  @$core.pragma('dart2js:noInline')
+  static ChatEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ChatEvent>(ChatEvent.$_createMessage);
+  static ChatEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  ChatEvent_Event whichEvent() => _ChatEvent_EventByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  void clearEvent() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  Ready get ready => $_getN(0);
+  @$pb.TagNumber(1)
+  set ready(Ready value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearReady() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Ready ensureReady() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  MessageEvent get message => $_getN(1);
+  @$pb.TagNumber(2)
+  set message(MessageEvent value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => $_clearField(2);
+  @$pb.TagNumber(2)
+  MessageEvent ensureMessage() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  UnreadChanged get unread => $_getN(2);
+  @$pb.TagNumber(3)
+  set unread(UnreadChanged value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUnread() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUnread() => $_clearField(3);
+  @$pb.TagNumber(3)
+  UnreadChanged ensureUnread() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  PeerRead get peerRead => $_getN(3);
+  @$pb.TagNumber(4)
+  set peerRead(PeerRead value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPeerRead() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPeerRead() => $_clearField(4);
+  @$pb.TagNumber(4)
+  PeerRead ensurePeerRead() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  Resync get resync => $_getN(4);
+  @$pb.TagNumber(5)
+  set resync(Resync value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasResync() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearResync() => $_clearField(5);
+  @$pb.TagNumber(5)
+  Resync ensureResync() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  Heartbeat get heartbeat => $_getN(5);
+  @$pb.TagNumber(6)
+  set heartbeat(Heartbeat value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasHeartbeat() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearHeartbeat() => $_clearField(6);
+  @$pb.TagNumber(6)
+  Heartbeat ensureHeartbeat() => $_ensure(5);
+}
+
+/// Ready 是補洞完成後的第一個 frame。
+class Ready extends $pb.GeneratedMessage {
+  factory Ready({
+    $fixnum.Int64? unreadCount,
+    $3.Duration? heartbeatInterval,
+    $3.Duration? maxLifetime,
+  }) {
+    final result = Ready._();
+    if (unreadCount != null) result.unreadCount = unreadCount;
+    if (heartbeatInterval != null) result.heartbeatInterval = heartbeatInterval;
+    if (maxLifetime != null) result.maxLifetime = maxLifetime;
+    return result;
+  }
+
+  Ready._();
+
+  factory Ready.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Ready()..mergeFromBuffer(data, registry);
+  factory Ready.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Ready()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Ready',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: Ready.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'unreadCount')
+    ..aOM<$3.Duration>(2, _omitFieldNames ? '' : 'heartbeatInterval',
+        subBuilder: $3.Duration.$_createMessage)
+    ..aOM<$3.Duration>(3, _omitFieldNames ? '' : 'maxLifetime',
+        subBuilder: $3.Duration.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Ready clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Ready copyWith(void Function(Ready) updates) =>
+      super.copyWith((message) => updates(message as Ready)) as Ready;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Ready() / Ready.new instead')
+  static Ready create() => Ready._();
+  static $pb.GeneratedMessage $_createMessage() => Ready._();
+  @$core.override
+  Ready createEmptyInstance() => Ready._();
+  @$core.pragma('dart2js:noInline')
+  static Ready getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Ready>(Ready.$_createMessage);
+  static Ready? _defaultInstance;
+
+  /// 呼叫者這一方的總未讀訊息數。
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get unreadCount => $_getI64(0);
+  @$pb.TagNumber(1)
+  set unreadCount($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUnreadCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUnreadCount() => $_clearField(1);
+
+  /// 閒置時 Heartbeat 的間隔；client 超過它的兩倍沒收到任何 frame 就當連線已斷並重連。
+  @$pb.TagNumber(2)
+  $3.Duration get heartbeatInterval => $_getN(1);
+  @$pb.TagNumber(2)
+  set heartbeatInterval($3.Duration value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasHeartbeatInterval() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHeartbeatInterval() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $3.Duration ensureHeartbeatInterval() => $_ensure(1);
+
+  /// 串流的最長壽命（含抖動，已是這一條的實際值）；到期正常結束。
+  @$pb.TagNumber(3)
+  $3.Duration get maxLifetime => $_getN(2);
+  @$pb.TagNumber(3)
+  set maxLifetime($3.Duration value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMaxLifetime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMaxLifetime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $3.Duration ensureMaxLifetime() => $_ensure(2);
+}
+
+/// MessageEvent 是新訊息，或同 seq 的可見度改變。
+class MessageEvent extends $pb.GeneratedMessage {
+  factory MessageEvent({
+    Message? message,
+    $core.bool? updated,
+  }) {
+    final result = MessageEvent._();
+    if (message != null) result.message = message;
+    if (updated != null) result.updated = updated;
+    return result;
+  }
+
+  MessageEvent._();
+
+  factory MessageEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MessageEvent()..mergeFromBuffer(data, registry);
+  factory MessageEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MessageEvent()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MessageEvent',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: MessageEvent.$_createMessage)
+    ..aOM<Message>(1, _omitFieldNames ? '' : 'message',
+        subBuilder: Message.$_createMessage)
+    ..aOB(2, _omitFieldNames ? '' : 'updated')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MessageEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MessageEvent copyWith(void Function(MessageEvent) updates) =>
+      super.copyWith((message) => updates(message as MessageEvent))
+          as MessageEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use MessageEvent() / MessageEvent.new instead')
+  static MessageEvent create() => MessageEvent._();
+  static $pb.GeneratedMessage $_createMessage() => MessageEvent._();
+  @$core.override
+  MessageEvent createEmptyInstance() => MessageEvent._();
+  @$core.pragma('dart2js:noInline')
+  static MessageEvent getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MessageEvent>(
+          MessageEvent.$_createMessage);
+  static MessageEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Message get message => $_getN(0);
+  @$pb.TagNumber(1)
+  set message(Message value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMessage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMessage() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Message ensureMessage() => $_ensure(0);
+
+  /// 為真表示這是同一個 seq 的可見度改變（變成墓碑或還原），client 以 seq 取代手上的那則。
+  @$pb.TagNumber(2)
+  $core.bool get updated => $_getBF(1);
+  @$pb.TagNumber(2)
+  set updated($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUpdated() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUpdated() => $_clearField(2);
+}
+
+/// UnreadChanged 是呼叫者這一方的總未讀訊息數。
+class UnreadChanged extends $pb.GeneratedMessage {
+  factory UnreadChanged({
+    $fixnum.Int64? unreadCount,
+  }) {
+    final result = UnreadChanged._();
+    if (unreadCount != null) result.unreadCount = unreadCount;
+    return result;
+  }
+
+  UnreadChanged._();
+
+  factory UnreadChanged.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnreadChanged()..mergeFromBuffer(data, registry);
+  factory UnreadChanged.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnreadChanged()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnreadChanged',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: UnreadChanged.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'unreadCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnreadChanged clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnreadChanged copyWith(void Function(UnreadChanged) updates) =>
+      super.copyWith((message) => updates(message as UnreadChanged))
+          as UnreadChanged;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnreadChanged() / UnreadChanged.new instead')
+  static UnreadChanged create() => UnreadChanged._();
+  static $pb.GeneratedMessage $_createMessage() => UnreadChanged._();
+  @$core.override
+  UnreadChanged createEmptyInstance() => UnreadChanged._();
+  @$core.pragma('dart2js:noInline')
+  static UnreadChanged getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UnreadChanged>(
+          UnreadChanged.$_createMessage);
+  static UnreadChanged? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get unreadCount => $_getI64(0);
+  @$pb.TagNumber(1)
+  set unreadCount($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUnreadCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUnreadCount() => $_clearField(1);
+}
+
+/// PeerRead 是對方在一個對話的已讀游標前進。
+class PeerRead extends $pb.GeneratedMessage {
+  factory PeerRead({
+    $core.String? conversationId,
+    $fixnum.Int64? peerReadSeq,
+  }) {
+    final result = PeerRead._();
+    if (conversationId != null) result.conversationId = conversationId;
+    if (peerReadSeq != null) result.peerReadSeq = peerReadSeq;
+    return result;
+  }
+
+  PeerRead._();
+
+  factory PeerRead.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PeerRead()..mergeFromBuffer(data, registry);
+  factory PeerRead.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PeerRead()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PeerRead',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: PeerRead.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'conversationId')
+    ..aInt64(2, _omitFieldNames ? '' : 'peerReadSeq')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PeerRead clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PeerRead copyWith(void Function(PeerRead) updates) =>
+      super.copyWith((message) => updates(message as PeerRead)) as PeerRead;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PeerRead() / PeerRead.new instead')
+  static PeerRead create() => PeerRead._();
+  static $pb.GeneratedMessage $_createMessage() => PeerRead._();
+  @$core.override
+  PeerRead createEmptyInstance() => PeerRead._();
+  @$core.pragma('dart2js:noInline')
+  static PeerRead getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PeerRead>(PeerRead.$_createMessage);
+  static PeerRead? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get conversationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set conversationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConversationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConversationId() => $_clearField(1);
+
+  /// seq 不大於它的訊息，對方已讀。
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get peerReadSeq => $_getI64(1);
+  @$pb.TagNumber(2)
+  set peerReadSeq($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPeerReadSeq() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPeerReadSeq() => $_clearField(2);
+}
+
+enum Resync_Scope { conversationId, all, notSet }
+
+/// Resync 要求 client 重新取列表與缺口。
+class Resync extends $pb.GeneratedMessage {
+  factory Resync({
+    $core.String? conversationId,
+    $core.bool? all,
+  }) {
+    final result = Resync._();
+    if (conversationId != null) result.conversationId = conversationId;
+    if (all != null) result.all = all;
+    return result;
+  }
+
+  Resync._();
+
+  factory Resync.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Resync()..mergeFromBuffer(data, registry);
+  factory Resync.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Resync()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, Resync_Scope> _Resync_ScopeByTag = {
+    1: Resync_Scope.conversationId,
+    2: Resync_Scope.all,
+    0: Resync_Scope.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Resync',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: Resync.$_createMessage)
+    ..oo(0, [1, 2])
+    ..aOS(1, _omitFieldNames ? '' : 'conversationId')
+    ..aOB(2, _omitFieldNames ? '' : 'all')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Resync clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Resync copyWith(void Function(Resync) updates) =>
+      super.copyWith((message) => updates(message as Resync)) as Resync;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Resync() / Resync.new instead')
+  static Resync create() => Resync._();
+  static $pb.GeneratedMessage $_createMessage() => Resync._();
+  @$core.override
+  Resync createEmptyInstance() => Resync._();
+  @$core.pragma('dart2js:noInline')
+  static Resync getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Resync>(Resync.$_createMessage);
+  static Resync? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  Resync_Scope whichScope() => _Resync_ScopeByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  void clearScope() => $_clearField($_whichOneof(0));
+
+  /// 只有這個對話。
+  @$pb.TagNumber(1)
+  $core.String get conversationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set conversationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConversationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConversationId() => $_clearField(1);
+
+  /// 全部對話。
+  @$pb.TagNumber(2)
+  $core.bool get all => $_getBF(1);
+  @$pb.TagNumber(2)
+  set all($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAll() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAll() => $_clearField(2);
+}
+
+/// Heartbeat 是串流閒置時的保活 frame，沒有內容。
+class Heartbeat extends $pb.GeneratedMessage {
+  factory Heartbeat() => Heartbeat._();
+
+  Heartbeat._();
+
+  factory Heartbeat.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Heartbeat()..mergeFromBuffer(data, registry);
+  factory Heartbeat.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Heartbeat()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Heartbeat',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'hawkr.chat.v1alpha1'),
+      createEmptyInstance: Heartbeat.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Heartbeat clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Heartbeat copyWith(void Function(Heartbeat) updates) =>
+      super.copyWith((message) => updates(message as Heartbeat)) as Heartbeat;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Heartbeat() / Heartbeat.new instead')
+  static Heartbeat create() => Heartbeat._();
+  static $pb.GeneratedMessage $_createMessage() => Heartbeat._();
+  @$core.override
+  Heartbeat createEmptyInstance() => Heartbeat._();
+  @$core.pragma('dart2js:noInline')
+  static Heartbeat getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Heartbeat>(Heartbeat.$_createMessage);
+  static Heartbeat? _defaultInstance;
+}
+
 /// ChatAppService 是登入者的聊天。
 class ChatAppServiceApi {
   final $pb.RpcClient _client;
@@ -2470,6 +3308,23 @@ class ChatAppServiceApi {
           $pb.ClientContext? ctx, GetStorePresenceRequest request) =>
       _client.invoke<GetStorePresenceResponse>(ctx, 'ChatAppService',
           'GetStorePresence', request, GetStorePresenceResponse());
+
+  /// StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+  /// 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+  /// 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+  /// 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+  /// 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+  $async.Future<StreamEventsResponse> streamEvents(
+          $pb.ClientContext? ctx, StreamEventsRequest request) =>
+      _client.invoke<StreamEventsResponse>(ctx, 'ChatAppService',
+          'StreamEvents', request, StreamEventsResponse());
+
+  /// StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+  /// 以 failed_precondition 與 STORE_CLOSED 結束。
+  $async.Future<StreamStoreEventsResponse> streamStoreEvents(
+          $pb.ClientContext? ctx, StreamStoreEventsRequest request) =>
+      _client.invoke<StreamStoreEventsResponse>(ctx, 'ChatAppService',
+          'StreamStoreEvents', request, StreamStoreEventsResponse());
 }
 
 const $core.bool _omitFieldNames =

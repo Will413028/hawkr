@@ -341,11 +341,12 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(reviewv1alpha1connect.NewReviewAppServiceHandler(reviewApp, opts...))
-	chatApp, err := httpchat.NewApp(deps.IM, deps.IM, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	chatApp, err := httpchat.NewApp(deps.IM, deps.IM, httpchat.ModuleStreams(deps.IM), deps.Identity, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
 	if err != nil {
 		return nil, err
 	}
-	add(chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...))
+	chatPath, chatHandler := chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...)
+	add(chatPath, httpchat.WithStreamWriter(chatHandler))
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)

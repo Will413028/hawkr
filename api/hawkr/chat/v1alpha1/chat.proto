@@ -14,6 +14,7 @@ package hawkr.chat.v1alpha1;
 
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -77,6 +78,17 @@ service ChatAppService {
   rpc GetStorePresence(GetStorePresenceRequest) returns (GetStorePresenceResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  // StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+  // 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+  // 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+  // 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+  // 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+
+  // StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+  // 以 failed_precondition 與 STORE_CLOSED 結束。
+  rpc StreamStoreEvents(StreamStoreEventsRequest) returns (stream StreamStoreEventsResponse);
 }
 
 // MessageKind 是訊息的種類。client 遇到 UNSPECIFIED 或不認得的值，顯示成「不支援的訊息」，不當成錯誤。
@@ -296,3 +308,75 @@ message GetStorePresenceResponse {
   // 每個請求的對話一項。
   repeated ConversationPresence presences = 1;
 }
+
+message StreamEventsRequest {
+  // conversation_id 到 client 已有的最後一個 seq；最多 50 個，key 必須是對話 ID。
+  map<string, int64> cursors = 1;
+}
+
+message StreamStoreEventsRequest {
+  // 同 StreamEventsRequest.cursors。
+  map<string, int64> cursors = 1;
+}
+
+message StreamEventsResponse {
+  ChatEvent event = 1;
+}
+
+message StreamStoreEventsResponse {
+  ChatEvent event = 1;
+}
+
+// ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
+message ChatEvent {
+  oneof event {
+    Ready ready = 1;
+    MessageEvent message = 2;
+    UnreadChanged unread = 3;
+    PeerRead peer_read = 4;
+    Resync resync = 5;
+    Heartbeat heartbeat = 6;
+  }
+}
+
+// Ready 是補洞完成後的第一個 frame。
+message Ready {
+  // 呼叫者這一方的總未讀訊息數。
+  int64 unread_count = 1;
+  // 閒置時 Heartbeat 的間隔；client 超過它的兩倍沒收到任何 frame 就當連線已斷並重連。
+  google.protobuf.Duration heartbeat_interval = 2;
+  // 串流的最長壽命（含抖動，已是這一條的實際值）；到期正常結束。
+  google.protobuf.Duration max_lifetime = 3;
+}
+
+// MessageEvent 是新訊息，或同 seq 的可見度改變。
+message MessageEvent {
+  Message message = 1;
+  // 為真表示這是同一個 seq 的可見度改變（變成墓碑或還原），client 以 seq 取代手上的那則。
+  bool updated = 2;
+}
+
+// UnreadChanged 是呼叫者這一方的總未讀訊息數。
+message UnreadChanged {
+  int64 unread_count = 1;
+}
+
+// PeerRead 是對方在一個對話的已讀游標前進。
+message PeerRead {
+  string conversation_id = 1;
+  // seq 不大於它的訊息，對方已讀。
+  int64 peer_read_seq = 2;
+}
+
+// Resync 要求 client 重新取列表與缺口。
+message Resync {
+  oneof scope {
+    // 只有這個對話。
+    string conversation_id = 1;
+    // 全部對話。
+    bool all = 2;
+  }
+}
+
+// Heartbeat 是串流閒置時的保活 frame，沒有內容。
+message Heartbeat {}

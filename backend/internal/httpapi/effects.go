@@ -148,6 +148,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreUnreadCount":    EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/GetPresence":            EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/GetStorePresence":       EffectRead,
+	// 串流只讀：停權的帳號可讀，停權不結束串流（A6-D16 W4）。
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":      EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents": EffectRead,
 
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,

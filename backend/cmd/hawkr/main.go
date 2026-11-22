@@ -342,7 +342,9 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
-	return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
+	// Run 的連線是專用的（Deps.ListenConnConfig 為 nil：以主連線池的設定另開），所以 DATABASE_URL 必須是直連或 session 模式的 Postgres，不能經 transaction pooling。
+	return serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 }
 
 // calendarMirrorInterval 是行事曆推給 invoice-service 的對帳間隔。
@@ -542,6 +544,30 @@ func newServer(h http.Handler) *http.Server {
 	srv.Protocols.SetHTTP1(true)
 	srv.Protocols.SetUnencryptedHTTP2(true)
 	return srv
+}
+
+// serveWithRun 在 serveAll 之外跑一個與 server 同生命週期的背景元件（im 的即時通道）：ctx 結束時兩邊一起收尾；
+// run 在 ctx 沒結束時返回（含 nil）都是失敗，會讓 server 停止並讓 serve 回錯誤（process 退出，由平台重啟），不靜默吞掉。
+func serveWithRun(ctx context.Context, run func(context.Context) error, servers ...listening) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	runDone := make(chan error, 1)
+	go func() {
+		err := run(ctx)
+		switch {
+		case ctx.Err() != nil && (err == nil || errors.Is(err, context.Canceled)):
+			err = nil
+		case err == nil:
+			err = errors.New("背景元件在 ctx 結束前返回")
+		}
+		if err != nil {
+			cancel()
+		}
+		runDone <- err
+	}()
+	serveErr := serveAll(ctx, servers...)
+	cancel()
+	return errors.Join(serveErr, <-runDone)
 }
 
 // listening 是一個在 listener 上服務的 server。
