@@ -275,7 +275,10 @@ test("撤銷隱藏：可撤銷的案件有按鈕", async () => {
 
 test("撤銷隱藏：處置不是隱藏的案件沒有按鈕", async () => {
 	await open(setup(() => closedHide({ action: CaseAction.WARN })).transport);
-	assert.equal(buttonByText("撤銷隱藏"), undefined);
+	assert.ok(
+		buttonByText("撤銷隱藏") === undefined,
+		"reverse button must not be rendered",
+	);
 });
 
 test("撤銷隱藏：空白原因不送出，送出帶案件 ID 與原因", async () => {
@@ -341,7 +344,10 @@ test("撤銷隱藏：FAILED_PRECONDITION 顯示伺服器文字、重讀案件，
 		"重讀後案件已撤銷，對話框關閉",
 	);
 	assert.ok(bodyText().includes("伺服器說：這個案件不能撤銷"));
-	assert.equal(buttonByText("撤銷隱藏"), undefined);
+	assert.ok(
+		buttonByText("撤銷隱藏") === undefined,
+		"reverse button must not be rendered",
+	);
 });
 
 test("撤銷隱藏：FAILED_PRECONDITION 但案件仍可撤銷時，在對話框內顯示伺服器文字", async () => {
@@ -393,7 +399,10 @@ test("已撤銷：顯示撤銷資訊，沒有撤銷按鈕", async () => {
 		}),
 	);
 	await open(transport);
-	assert.equal(buttonByText("撤銷隱藏"), undefined);
+	assert.ok(
+		buttonByText("撤銷隱藏") === undefined,
+		"reverse button must not be rendered",
+	);
 	const text = bodyText();
 	assert.ok(text.includes("admin-7"));
 	assert.ok(text.includes("申訴成立"));
