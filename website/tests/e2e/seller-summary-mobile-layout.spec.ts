@@ -59,7 +59,7 @@ const SUMMARY_SURFACES = [
 		name: "客戶管理",
 		path: "/seller-center/customers",
 		selector: ".seller-customers__stats.seller-summary-rail",
-		count: 3,
+		count: 1,
 		compactOnPhone: false,
 	},
 ] as const;
@@ -794,7 +794,7 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 			".seller-customer-detail__panel .seller-summary-rail",
 		);
 		await expect(drawerRail).toBeVisible();
-		await expect(drawerRail.locator(":scope > *")).toHaveCount(3);
+		await expect(drawerRail.locator(":scope > *")).toHaveCount(2);
 		const drawerGeometry = await railGeometry(drawerRail);
 		expect(
 			Math.max(...drawerGeometry.cardWidths) -

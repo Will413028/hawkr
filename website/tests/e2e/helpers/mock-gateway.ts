@@ -1081,9 +1081,31 @@ async function mockBuyerDefaults(page: Page, accountId: string) {
 		["ListFavorites", { favorites: [], nextPageToken: "", totalSize: 0 }],
 		["ListFollows", { follows: [], nextPageToken: "", totalSize: 0 }],
 		["ListVisits", { visits: [], nextPageToken: "" }],
+		["ListBlockedStores", { blockedStores: [], nextPageToken: "" }],
+		["ListBlockedBuyers", { blockedBuyers: [], nextPageToken: "" }],
 	];
 	for (const [method, body] of empty) {
 		await page.route(buyerMethod(method), (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+}
+
+/** CrmAppService 的 Connect 方法（`/api/connect/hawkr.crm.v1alpha1.CrmAppService/{Method}`）。 */
+function crmMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.crm\\.v1alpha1\\.CrmAppService/${method}(?:\\?|$)`,
+	);
+}
+
+/** CRM 的預設回應（空客戶、空標籤）：賣家中心的客戶頁與聊天側欄讀它，沒 mock 會落到 502。 */
+async function mockCrmDefaults(page: Page): Promise<void> {
+	const empty: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+		["ListCustomers", { customers: [], nextPageToken: "" }],
+		["ListTags", { tags: [] }],
+	];
+	for (const [method, body] of empty) {
+		await page.route(crmMethod(method), (route) => {
 			void fulfillConnect(route, body);
 		});
 	}
@@ -1232,8 +1254,29 @@ export async function mockChatConversations(
 }
 
 /**
- * chat 的預設回應：沒有對話、沒有訊息、未讀 0、對方離線；即時串流回 not_found（終止、不重連、不發登入失效），
- * 所以 e2e 不會留著一條開著的長連線，頁面照常載入。
+ * 伺服器串流以 HTTP 200 開始，錯誤放在最後的 end-stream 訊框（flag 0x02，4 位元組長度，JSON 內容）。
+ * 用它回終止碼，客戶端照樣收到 Connect 錯誤，但瀏覽器不會記 4xx 的網路失敗與 console.error。
+ */
+function fulfillConnectStreamError(
+	route: Route,
+	code: string,
+	message: string,
+): Promise<void> {
+	const payload = Buffer.from(JSON.stringify({ error: { code, message } }));
+	const frame = Buffer.alloc(5 + payload.length);
+	frame.writeUInt8(0x02, 0);
+	frame.writeUInt32BE(payload.length, 1);
+	payload.copy(frame, 5);
+	return route.fulfill({
+		status: 200,
+		contentType: "application/connect+json",
+		body: frame,
+	});
+}
+
+/**
+ * chat 的預設回應：沒有對話、沒有訊息、未讀 0、對方離線；即時串流以 end-stream 訊框回 not_found
+ * （終止、不重連、不發登入失效），所以 e2e 不會留著一條開著的長連線，頁面照常載入。
  */
 async function mockChatDefaults(page: Page): Promise<void> {
 	const empty: Array<[string, unknown]> = [
@@ -1255,7 +1298,11 @@ async function mockChatDefaults(page: Page): Promise<void> {
 	}
 	for (const method of ["StreamEvents", "StreamStoreEvents"]) {
 		await page.route(chatMethod(method), (route) => {
-			void fulfillConnectError(route, "not_found", "mock: no chat stream");
+			void fulfillConnectStreamError(
+				route,
+				"not_found",
+				"mock: no chat stream",
+			);
 		});
 	}
 }
@@ -1333,6 +1380,7 @@ export async function setupGatewayMocks(
 	await mockSocialDefaults(page);
 	await mockReviewDefaults(page);
 	await mockChatDefaults(page);
+	await mockCrmDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
