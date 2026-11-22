@@ -107,6 +107,15 @@
    "new": "Orders: buyerOrders{orders}, CRM: nil}",
    "test": "cmd/hawkr ^TestBuyerPortsVIPComesFromTheCRMModule$",
    "why": "會員卡的 VIP 狀態不再讀 crm 模組"
+  },
+  {
+   "id": "gateway-chat-route-resurrected",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/router/routes.go",
+   "old": "\tregisterAIRoutes(app, admin, h)\n",
+   "new": "\tapp.GET(\"/chat/unread\", func(c *gin.Context) {})\n\tregisterAIRoutes(app, admin, h)\n",
+   "test": "internal/router ^TestEveryRouteIsInOpenAPISpec$",
+   "why": "gateway 又註冊一條 /app/chat 路由：聊天已在單體，清單沒有這條，路由與清單對照必須失敗"
   }
  ]
 }

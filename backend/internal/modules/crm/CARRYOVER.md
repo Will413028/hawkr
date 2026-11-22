@@ -48,7 +48,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 - 儲存的代碼（`customer_type`、清除 job 的 `party_kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
 - 沒有 `blocklist`；沒有客戶列表的關鍵字搜尋；詳情沒有電話、Email、地址、優惠券數。
 - 退款不建客戶列；同一單號的第二個 `order.completed`（換了 `event_id`）不重複累加。
-- `legacy/crmservice` 已在 A6-6e 刪除（`httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`）；`services/crm-service` 目錄與 compose 項目不動，隨後續退場步驟刪除。
+- `legacy/crmservice` 已在 A6-6e 刪除（`httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`）；`services/crm-service` 目錄、compose 項目、`api/proto/crm` 與 `pkg/proto/crm` 已在 A6-6e 刪除。
 
 ## A6-3c 停用身分改由擁有者守門的沿用盤點
 

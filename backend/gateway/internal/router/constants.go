@@ -519,16 +519,6 @@ const (
 // ==================== 聊天相關 ====================
 
 const (
-	ChatPath                 = "/chat"
-	ChatWS                   = "/ws"
-	ChatWSTicket             = "/ws-ticket"
-	ChatMessages             = "/messages"
-	ChatHistory              = "/history/:targetId"
-	ChatConversations        = "/conversations"
-	ChatUnread               = "/unread"
-	ChatReadReceipts         = "/messages"
-	ChatConversationReceipts = "/conversations/:targetId"
-	ChatAllReceipts          = "/conversations"
 
 	// Service names
 	ServiceProduct    = "product"

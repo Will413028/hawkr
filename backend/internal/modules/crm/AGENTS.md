@@ -17,7 +17,7 @@ schema `crm`（`db/schema.sql`）：`customers`（主鍵 `(store_id, buyer_id)`�
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與訂閱者。
 - `internal/write`（分類與標籤）、`internal/read`（列表、詳情、標籤、VIP）、`internal/project`（投影：`net.go` 是純函式，`project.go` 是 transaction）、`internal/purge`（刪帳與退場的訂閱者邏輯、清除 job 與保底掃描）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。依賴 buyer、seller 只為訂閱 `BuyerDeleted`、`StoreRetired`；暱稱由 httpapi 經 `buyer.BatchDisplay` 補。
-- 消費事件的 consumer 在 `internal/legacy/crmconsumer`（只在測試啟用）。
+- 消費事件的 consumer 在 `internal/legacy/crmconsumer`（已接進 `cmd/hawkr` 的 worker，A6-6e）。
 
 ## 不變量
 

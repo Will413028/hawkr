@@ -32,7 +32,6 @@ func defaultDelegation() DelegationConfig {
 func TestConfig_ValidateDelegationBudgets(t *testing.T) {
 	base := func() *Config {
 		return &Config{
-			JWTSecret:    "my-secret",
 			MediaBaseURL: "https://test-media.example.com",
 			Delegation:   defaultDelegation(),
 		}

@@ -14,11 +14,9 @@ type Config struct {
 	Port        string
 	DebugPort   string
 	MetricsPort string
-	// JWTSecret 只用來簽聊天 WebSocket 的 HMAC ticket（middleware.SignChatWSTicket）：認證在單體，gateway 不驗 JWT。
-	JWTSecret string
-	TLSCert   string
-	TLSKey    string
-	GinMode   string
+	TLSCert     string
+	TLSKey      string
+	GinMode     string
 	// MediaBaseURL 是媒體資產顯示 URL 的域名唯一來源（49 號設計書 §8.5）。
 	// Gateway 用它把微服務回傳的 objectKey 組成對外顯示 URL（pkg/mediaurl.BuildURL）。
 	//
@@ -80,9 +78,6 @@ type Config struct {
 
 	// Docs 的環境變數：DOCS_USERNAME、DOCS_PASSWORD、DOCS_SIGN_KEY。
 	Docs DocsConfig
-
-	IMChatStreamJWTSecret     string
-	IMChatStreamJWTSecretPrev string
 }
 
 // DelegationConfig holds the Gateway's per-hop gRPC deadlines for delegated
@@ -138,7 +133,6 @@ func Load() (*Config, error) {
 		Port:         pkgconfig.GetEnvOrDefault("PORT", "9900"),
 		DebugPort:    pkgconfig.GetEnvOrDefault("DEBUG_PORT", "9901"),
 		MetricsPort:  pkgconfig.GetEnvOrDefault("METRICS_PORT", "9902"),
-		JWTSecret:    os.Getenv("JWT_SECRET"),
 		TLSCert:      os.Getenv("TLS_CERT_PATH"),
 		TLSKey:       os.Getenv("TLS_KEY_PATH"),
 		GinMode:      os.Getenv("GIN_MODE"),
@@ -201,8 +195,6 @@ func Load() (*Config, error) {
 			Password: os.Getenv("DOCS_PASSWORD"),
 			SignKey:  os.Getenv("DOCS_SIGN_KEY"),
 		},
-		IMChatStreamJWTSecret:     os.Getenv("IM_CHAT_STREAM_JWT_SECRET"),
-		IMChatStreamJWTSecretPrev: os.Getenv("IM_CHAT_STREAM_JWT_SECRET_PREV"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -228,9 +220,6 @@ func splitCSV(v string) []string {
 
 // Validate checks required configuration fields.
 func (c *Config) Validate() error {
-	if c.JWTSecret == "" {
-		return fmt.Errorf("JWT_SECRET environment variable is not set")
-	}
 	// MEDIA_BASE_URL 無預設域名，缺值即 fail-fast（backend#2283）：dev 一律 test-media、
 	// prod 一律 media，不做新舊相容也不猜域名——漏設就啟動失敗，不允許靜默吐出死連結。
 	if c.MediaBaseURL == "" {

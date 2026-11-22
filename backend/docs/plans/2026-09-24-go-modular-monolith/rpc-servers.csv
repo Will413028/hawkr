@@ -220,20 +220,20 @@ CouponService,AdminGrantCompensationCoupon,coupon-service,
 CouponService,AdminVoidInstance,coupon-service,
 CouponService,AdminUpdateSellerQuota,coupon-service,
 CouponService,GrantSellerCompensationCoupon,coupon-service,
-CrmService,GetCustomerList,crm-service,
-CrmService,GetCustomerStats,crm-service,
-CrmService,UpdateCustomerStatus,crm-service,
-CrmService,CreateTag,crm-service,
-CrmService,ListTags,crm-service,
-CrmService,UpdateTag,crm-service,
-CrmService,DeleteTag,crm-service,
-CrmService,AddCustomerTags,crm-service,
-CrmService,RemoveCustomerTag,crm-service,
-CrmService,GetCustomerTags,crm-service,
+CrmService,GetCustomerList,crm-service,api: CrmAppService.ListCustomers
+CrmService,GetCustomerStats,crm-service,api: CrmAppService.GetCustomer
+CrmService,UpdateCustomerStatus,crm-service,api: CrmAppService.UpdateCustomer
+CrmService,CreateTag,crm-service,api: CrmAppService.CreateTag
+CrmService,ListTags,crm-service,api: CrmAppService.ListTags
+CrmService,UpdateTag,crm-service,api: CrmAppService.UpdateTag
+CrmService,DeleteTag,crm-service,api: CrmAppService.DeleteTag
+CrmService,AddCustomerTags,crm-service,api: CrmAppService.AddCustomerTags
+CrmService,RemoveCustomerTag,crm-service,api: CrmAppService.RemoveCustomerTag
+CrmService,GetCustomerTags,crm-service,api: CrmAppService.GetCustomer（標籤隨客戶回傳）
 CrmService,GetSellerStats,crm-service,removed: 唯一的呼叫方是 gateway 的賣家儀表板，已刪除（A3b 步驟 10c）；legacy 的實作已刪
 CrmService,GetSellerDashboardGrowth,crm-service,removed: 同上
-CrmService,SearchCustomersByTags,crm-service,
-CrmService,GetBuyerVipStatuses,crm-service,
+CrmService,SearchCustomersByTags,crm-service,removed: 唯一呼叫方是 gateway 的標籤搜尋，A6-D18 W5 拿掉客戶列表的搜尋
+CrmService,GetBuyerVipStatuses,crm-service,api: crm.VIPStatuses（單體內呼叫，取代 legacy/crmservice）
 DelegationService,Preflight,account-service,api: identity.DelegationPreflight；gateway、social 經 internal/legacy/delegationservice
 DelegationService,CreateSession,account-service,api: identity.StartDelegation；gateway、social 經 internal/legacy/delegationservice
 DelegationService,RedeemHandoff,account-service,api: identity.RedeemDelegationHandoff；gateway、social 經 internal/legacy/delegationservice
@@ -257,19 +257,19 @@ DelegationService,RevokeDelegationAuthorization,account-service,api: identity.Re
 DelegationService,ListDelegationAuthorizationHistory,account-service,api: identity.DelegationAuthorizationHistory；gateway、social 經 internal/legacy/delegationservice
 FulfillmentResponsibilityService,ProposeResponsibilityResolutionForAdmin,payment-service,
 FulfillmentResponsibilityService,ReviewResponsibilityResolutionForAdmin,payment-service,
-IMService,SendMessage,im-service,
-IMService,BroadcastMessage,im-service,
-IMService,IsUserOnline,im-service,
-IMService,GetConnectionStats,im-service,
-IMService,DisconnectUser,im-service,
-IMService,GetUnreadCount,im-service,
-IMService,GetChatHistory,im-service,
-IMService,GetConversations,im-service,
-IMService,MarkMessagesRead,im-service,
-IMService,MarkConversationRead,im-service,
-IMService,MarkAllRead,im-service,
-IMService,HideMessage,im-service,
-IMService,ChatStream,im-service,
+IMService,SendMessage,im-service,api: ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer
+IMService,BroadcastMessage,im-service,removed: 沒有呼叫方（gateway 與 Java 都不呼叫），單體不提供廣播
+IMService,IsUserOnline,im-service,api: ChatAppService.GetPresence、GetStorePresence
+IMService,GetConnectionStats,im-service,removed: 沒有呼叫方；連線數由單體的 metrics 觀測
+IMService,DisconnectUser,im-service,removed: 沒有呼叫方；帳號刪除由 im.erase_party 清除資料，串流在驗證失效時結束
+IMService,GetUnreadCount,im-service,api: ChatAppService.GetUnreadCount、GetStoreUnreadCount
+IMService,GetChatHistory,im-service,api: ChatAppService.ListMessages
+IMService,GetConversations,im-service,api: ChatAppService.ListConversations、ListStoreConversations
+IMService,MarkMessagesRead,im-service,removed: 已讀以對話為單位（MarkConversationRead），不逐則標記
+IMService,MarkConversationRead,im-service,api: ChatAppService.MarkConversationRead
+IMService,MarkAllRead,im-service,api: ChatAppService.MarkAllRead、MarkAllStoreRead
+IMService,HideMessage,im-service,removed: 沒有呼叫方；訊息的檢舉與封鎖走 moderation 以參照處理（A6-D24）
+IMService,ChatStream,im-service,api: ChatAppService.StreamEvents、StreamStoreEvents
 InvoiceService,ListBuyerInvoiceProfiles,invoice-service,
 InvoiceService,CreateBuyerInvoiceProfile,invoice-service,
 InvoiceService,UpdateBuyerInvoiceProfile,invoice-service,
@@ -534,15 +534,15 @@ ProductService,BatchCheckSellerProductNames,product-service,removed: 商品匯�
 ProductService,ValidateProductDraft,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,GetProductsBriefInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 RecommendationService,PersonalizedRecommend,ai-service,
-ReviewService,GetProductReviews,review-service,
-ReviewService,GetReview,review-service,
-ReviewService,ReplyReview,review-service,
-ReviewService,SubmitOrderReview,review-service,
-ReviewService,ListMyOrderReviews,review-service,
-ReviewService,GetSellerOrderReviews,review-service,
-ReviewService,GetSellerOrderReviewStats,review-service,
-ReviewService,ListStoreRatingStats,review-service,
-ReviewService,HideReview,review-service,
+ReviewService,GetProductReviews,review-service,api: ReviewPublicService.ListProductReviews
+ReviewService,GetReview,review-service,api: ReviewAppService.GetReview
+ReviewService,ReplyReview,review-service,api: ReviewAppService.ReplyReview
+ReviewService,SubmitOrderReview,review-service,api: ReviewAppService.CreateReview
+ReviewService,ListMyOrderReviews,review-service,api: ReviewAppService.ListMyReviews
+ReviewService,GetSellerOrderReviews,review-service,api: ReviewAppService.ListOwnStoreReviews、ReviewPublicService.ListStoreReviews
+ReviewService,GetSellerOrderReviewStats,review-service,api: ReviewPublicService.GetStoreReviewStats
+ReviewService,ListStoreRatingStats,review-service,api: review.StoreRatingStats（單體內呼叫，discovery 與 seller 讀店家評分）
+ReviewService,HideReview,review-service,removed: 評價的隱藏改走 moderation 的處理結果（review 訂閱，不另開 RPC）
 SellerService,GetSeller,seller-service,
 SellerService,ResolveSellerAccountID,seller-service,
 SellerService,GetCurrentStoreID,seller-service,

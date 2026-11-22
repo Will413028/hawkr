@@ -70,7 +70,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerBuyerRoutes(public, app, h)
 	registerCouponRoutes(app, admin, h)
 	registerAfterSalesRoutes(app, r, h)
-	registerChatRoutes(app, h)
 	registerAdminNonManagedRoutes(app, admin, h)
 	registerAIRoutes(app, admin, h)
 	registerProcurementQuoteRoutes(app, h)

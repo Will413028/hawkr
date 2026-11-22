@@ -8,8 +8,7 @@
 // （wire 型別都還是 string）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
 // 是店家時送店家的 account_id。
 //
-// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。只有單體的 im 送出的訊息才發 im.MessageSent；舊 im-service 的聊天路由
-// 還在（buyer-app 聊天尚未改接），它的訊息由它自己發 chat.message.sent，兩邊的訊息不重疊。notification 搬進單體後刪除。
+// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。舊 im-service 已刪除，所有聊天訊息都由單體的 im 送出。notification 搬進單體後刪除。
 package imrelay
 
 import (
@@ -107,7 +106,7 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[MessageSentArgs]{work: w.messageSent})
 }
 
-// chatMessageSent 是舊 ChatMessageSentEvent（im-service/internal/usecase/message.go）：十個欄位全是 string，沒有 BaseEvent 外殼。
+// chatMessageSent 是 chat.message.sent 的 wire 形狀（沿用舊 im-service 的 ChatMessageSentEvent）：十個欄位全是 string，沒有 BaseEvent 外殼。
 type chatMessageSent struct {
 	MessageID      string `json:"message_id"`
 	ConversationID string `json:"conversation_id"`

@@ -7,13 +7,10 @@ import (
 	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	cartpb "github.com/Will413028/hawkr/go-pkg/proto/cart"
 	couponpb "github.com/Will413028/hawkr/go-pkg/proto/coupon"
-	crmpb "github.com/Will413028/hawkr/go-pkg/proto/crm"
-	impb "github.com/Will413028/hawkr/go-pkg/proto/im"
 	notificationpb "github.com/Will413028/hawkr/go-pkg/proto/notification"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	reviewpb "github.com/Will413028/hawkr/go-pkg/proto/review"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"google.golang.org/grpc"
@@ -98,13 +95,6 @@ func NewAIProcurementClientForTest(c aipb.AIProcurementServiceClient) *AIProcure
 	return &AIProcurementClient{client: c}
 }
 
-// ==================== CRM ====================
-
-// NewCrmClientForTest creates a CrmClient with the given mock proto client.
-func NewCrmClientForTest(c crmpb.CrmServiceClient) *CrmClient {
-	return &CrmClient{client: c}
-}
-
 // ==================== Coupon ====================
 
 // NewCouponClientForTest creates a CouponClient with the given mock proto client.
@@ -161,13 +151,6 @@ func NewProductClientForTest(c productpb.ProductServiceClient) *ProductClient {
 	return &ProductClient{client: c}
 }
 
-// ==================== IM ====================
-
-// NewIMClientForTest creates an IMClient with the given mock proto client.
-func NewIMClientForTest(c impb.IMServiceClient) *IMClient {
-	return &IMClient{client: c}
-}
-
 // ==================== Notification ====================
 
 // NewNotificationClientForTest creates a NotificationClient with the given mock proto client.
@@ -183,16 +166,6 @@ func NewAftersalesClientForTest(c aftersalespb.AfterSalesServiceClient) *Aftersa
 }
 
 // ==================== Review ====================
-
-// NewReviewClientForTest creates a ReviewServiceClient with the given mock proto client.
-func NewReviewClientForTest(c reviewpb.ReviewServiceClient) *ReviewServiceClient {
-	return &ReviewServiceClient{client: c}
-}
-
-// NewOrderReviewClientForTest creates an OrderReviewServiceClient with the given mock proto client.
-func NewOrderReviewClientForTest(c reviewpb.ReviewServiceClient) *OrderReviewServiceClient {
-	return &OrderReviewServiceClient{client: c}
-}
 
 // ==================== Shipping ====================
 

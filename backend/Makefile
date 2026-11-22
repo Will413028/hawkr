@@ -5,11 +5,8 @@
 GO_SERVICES := \
 	gateway \
 	services/ai-service \
-	services/crm-service \
-	services/im-service \
 	services/invoice-service \
 	services/notification-service \
-	services/review-service \
 	services/seller-service
 
 # Go services with their own Atlas-managed DB (all GO_SERVICES except gateway, which has none)
