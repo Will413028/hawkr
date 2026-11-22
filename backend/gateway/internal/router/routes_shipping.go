@@ -73,14 +73,6 @@ func registerShippingRoutes(app *gin.RouterGroup, admin *gin.RouterGroup, h *han
 		storePickups.DELETE(StorePickupID, h.DeleteBuyerStorePickup)
 	}
 
-	// Admin — 假日管理
-	holidays := admin.Group(HolidaysPath)
-	{
-		holidays.POST(HolidaysImport, h.ImportHolidays)
-		holidays.POST(HolidaysImportContent, h.ImportHolidaysFromContent)
-		holidays.GET(HolidaysCoverage, h.GetHolidayCoverage)
-	}
-
 	// Admin — 異常查詢（§29 Admin 異常訂單管理）
 	// admin group 已含 JWTAuth + requireAdmin
 	// §5.21 Admin 配送異常監控（static path，必須在 /shipments/:id 之前註冊）
