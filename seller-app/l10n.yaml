@@ -1,5 +1,5 @@
 # gen-l10n 設定（ADR 2026-10-17-multi-locale-architecture D2）：zh 是模板（gen-l10n 要求有不帶地區的後備檔；解析後的語系仍是 zh_Hant_TW），生成檔進版控（lib/l10n/gen），
-# Flutter 3.47 起不再有 synthetic package（`synthetic-package` 旗標已無效）；漂移由 `fvm flutter gen-l10n` 後 `git diff --exit-code lib/l10n` 檢查。
+# Flutter 3.47 起不再有 synthetic package（`synthetic-package` 旗標已無效）；漂移由 `fvm flutter gen-l10n` 後 `git status --porcelain -- lib/l10n` 必須為空檢查（含 untracked）。
 arb-dir: lib/l10n
 template-arb-file: app_zh.arb
 output-localization-file: app_localizations.dart
