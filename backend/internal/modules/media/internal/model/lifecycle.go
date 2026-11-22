@@ -1,0 +1,141 @@
+package model
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
+)
+
+// UploadTTL 是暫存上傳的存活時間，從 BeginUpload 起算：PENDING、UPLOADED、READY 都在這個期限內，過了就不能完成、不能確認，
+// 之後由 GC 回收。整個模組只有這一處定義。
+const UploadTTL = time.Hour
+
+// ProcessMaxAttempts 是處理 job 的重試上限，ProcessTimeout 是一次處理的時間上限，ProcessMaxBackoff 是兩次嘗試之間退避的保守上界
+// （River 預設退避是嘗試次數的四次方秒，上限遠小於此）。
+const (
+	ProcessMaxAttempts = 5
+	ProcessTimeout     = 5 * time.Minute
+	ProcessMaxBackoff  = 15 * time.Minute
+)
+
+// StuckUploadGrace 是停在 UPLOADED 的列過期後、GC 才回收它之前的寬限：必須大於處理 job 所有嘗試加退避的總長，
+// 否則 GC 可能回收還在處理的列（lifecycle_grace_test.go 斷言這個不等式）。
+const StuckUploadGrace = 3 * time.Hour
+
+// PresignTTL 是預簽 PUT 網址的有效期；不得超過 UploadTTL（網址比暫存列活得久沒有意義）。
+const PresignTTL = 15 * time.Minute
+
+// Visibility 是資產的可見性。值存在資料庫（CHECK），與 schema.sql 一致。
+type Visibility string
+
+const (
+	// VisibilityPublic 的物件在 public/，由 image gateway 提供。
+	VisibilityPublic Visibility = "PUBLIC"
+	// VisibilitySecure 的物件在 secure/，只以密文存放。
+	VisibilitySecure Visibility = "SECURE"
+)
+
+// Valid 回報 v 是不是已知的可見性。
+func (v Visibility) Valid() bool { return v == VisibilityPublic || v == VisibilitySecure }
+
+// UploadState 是暫存上傳的狀態。轉換圖見 db/schema.sql 的 staged_uploads。
+type UploadState string
+
+const (
+	// StatePending：已發預簽網址，client 還沒回報完成。
+	StatePending UploadState = "PENDING"
+	// StateUploaded：client 回報完成，處理 job 進行中。
+	StateUploaded UploadState = "UPLOADED"
+	// StateReady：處理完成、資產列已建立，等擁有者確認。
+	StateReady UploadState = "READY"
+	// StateRejected：處理被拒絕，原因見 RejectReason。
+	StateRejected UploadState = "REJECTED"
+	// StateConfirmed：擁有者已在自己的 transaction 內確認。
+	StateConfirmed UploadState = "CONFIRMED"
+	// StateDeleting：GC 已標記，物件尚未刪掉。
+	StateDeleting UploadState = "DELETING"
+	// StateDeleted：GC 完成。
+	StateDeleted UploadState = "DELETED"
+)
+
+// AssetState 是資產的狀態。
+type AssetState string
+
+const (
+	// AssetStaged：處理完成、尚未確認。
+	AssetStaged AssetState = "STAGED"
+	// AssetActive：已確認，只由擁有者的 MarkDeleted 刪除。
+	AssetActive AssetState = "ACTIVE"
+	// AssetDeleting：已標記刪除，物件尚未刪掉。
+	AssetDeleting AssetState = "DELETING"
+	// AssetDeleted：物件已刪。
+	AssetDeleted AssetState = "DELETED"
+)
+
+// RejectReason 是暫存上傳被拒絕的原因代碼。
+type RejectReason string
+
+const (
+	RejectUnrecognizedFormat RejectReason = "UNRECOGNIZED_FORMAT"
+	RejectSizeMismatch       RejectReason = "SIZE_MISMATCH"
+	RejectChecksumMismatch   RejectReason = "CHECKSUM_MISMATCH"
+	// RejectProcessingFailed：暫時失敗重試用盡。
+	RejectProcessingFailed RejectReason = "PROCESSING_FAILED"
+	// RejectExpired：處理完成時列已過期。
+	RejectExpired RejectReason = "EXPIRED"
+)
+
+// Valid 回報 r 是不是已知的拒絕原因。
+func (r RejectReason) Valid() bool {
+	switch r {
+	case RejectUnrecognizedFormat, RejectSizeMismatch, RejectChecksumMismatch, RejectProcessingFailed, RejectExpired:
+		return true
+	}
+	return false
+}
+
+// PermanentError 是處理的永久失敗：重試不會變好，暫存列立即標為 REJECTED 並記 Reason。其他錯誤都視為暫時失敗。
+type PermanentError struct {
+	Reason RejectReason
+	Err    error
+}
+
+func (e *PermanentError) Error() string {
+	if e.Err == nil {
+		return fmt.Sprintf("media：處理被拒絕（%s）", e.Reason)
+	}
+	return fmt.Sprintf("media：處理被拒絕（%s）：%v", e.Reason, e.Err)
+}
+
+func (e *PermanentError) Unwrap() error { return e.Err }
+
+// Permanent 回傳帶原因的永久失敗。
+func Permanent(reason RejectReason, err error) error {
+	return &PermanentError{Reason: reason, Err: err}
+}
+
+// ErrInTransaction 是呼叫會碰物件儲存的函式時，ctx 帶著 DB transaction：單體規則 5，R2 不在 transaction 內呼叫。
+var ErrInTransaction = errors.New("media：不得在 DB transaction 內呼叫物件儲存")
+
+// ErrNoTransaction 是呼叫必須與擁有者業務列同一個 transaction 的函式時，ctx 沒有 transaction。
+var ErrNoTransaction = errors.New("media：必須在擁有者的 transaction 內呼叫")
+
+// RequireNoTx 在 ctx 帶著 transaction 時回 ErrInTransaction。每個會呼叫物件儲存的函式第一步呼叫它；
+// 這些函式本身也不收 transaction 參數，兩者合起來守單體規則 5。
+func RequireNoTx(ctx context.Context) error {
+	if _, ok := db.TxFrom(ctx); ok {
+		return ErrInTransaction
+	}
+	return nil
+}
+
+// RequireTx 在 ctx 沒有 transaction 時回 ErrNoTransaction。
+func RequireTx(ctx context.Context) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return ErrNoTransaction
+	}
+	return nil
+}

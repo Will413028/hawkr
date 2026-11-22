@@ -6,11 +6,11 @@
 
 ## 擁有的資料
 
-無 schema，也沒有 use case 子領域；資產與引用資料在 Java media-service。登記在 `cmd/hawkr/modules.go` 的 `apiOnly`，不在 `modules()`。讀取模型：無。
+schema `media`（`db/schema.sql`）：`assets`（資產，不含業務類型）、`staged_uploads`（暫存上傳，token 只存雜湊）；登記在 `cmd/hawkr/modules.go` 的 `modules()`。舊的 `Media` interface 仍由 Java media-service 實作，資料在 Java（遷移期間並存）。子領域：`internal/upload`（Begin、Complete、Confirm、Get、處理 job）、`internal/reclaim`（MarkDeleted、GC、實體刪除）。讀取模型：無。
 
 ## 發布的讀取介面
 
-無。沒有 schema，所以沒有 `pub_*`。對外是 Go 公開 API：`Media` interface（`Finalize`、`Link`、`Unlink`、`ReadSecure`）與引用同步（`media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`），形狀見 `backend/docs/modules/media.md` §1。
+無，沒有 `pub_*`。對外是 Go 公開 API：`Media` interface（`Finalize`、`Link`、`Unlink`、`ReadSecure`）與引用同步（`media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`），形狀見 `backend/docs/modules/media.md` §1。
 
 ## 模組內部結構
 
@@ -29,6 +29,8 @@
 - 引用只由擁有者的同步 job 寫入；業務列指著的資產在 GC 寬限（7 天）內會有引用。守門：`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtAsset`（buyer）、`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtBannerImages`（content）、`TestNextRetryNeverWaitsPastTheGCGrace`。規格：§5。
 - 重試用盡或 job 遺失由保底掃描補排；落後超過 24 小時記 error log。守門：`TestSweepRecoversALostEnqueueWithRealRiver`（content）。規格：§5。
 - `CheckFinalizeArgs` 的封閉集合等於 `ref_type.go` 的常數。守門：`TestRefTypesMatchTheGeneratedConstants`。規格：§6。
+- 確認前的公開性：`READY` 的公開物件已在 `public/<uuid v4>`，image-gateway 會提供它；網址不可猜、只回給上傳者本人，所以確認前只有上傳者讀得到。Confirm 只接受 `READY`、未過期、上傳者相符的暫存，重入只回這筆暫存記的資產。守門：`TestConfirm_RejectsNonUploader`、`TestConfirm_ReentryReturnsSameAsset`、`TestConfirm_OnlyReturnsItsOwnAsset`。規格見遷移計畫。
+- GC 刪除範圍：只標記過期且未確認（`PENDING`、`READY`、`REJECTED`，以及過期超過 `model.StuckUploadGrace` 仍停在 `UPLOADED` 的列）的暫存列，連同它的 `tmp/` 物件、暫存列記的正式 key 與資產列一起刪；刪不存在的物件視為成功；已確認的資產只由擁有者的 `MarkDeleted` 刪除；每列先標 `DELETING` 並提交、transaction 外刪物件、再標 `DELETED`，刪失敗留在 `DELETING` 重試。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`、`TestDeleteJob_StorageFailureKeepsRowRetryable`、`TestGC_ReclaimsStuckUploadedAfterGrace`、`TestGC_KeepsUploadedWithinGrace`。規格：同上。
 
 ## 不負責
 

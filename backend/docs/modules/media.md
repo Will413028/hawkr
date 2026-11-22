@@ -4,7 +4,7 @@
 
 ## 1. 範圍與公開介面
 
-- 實作是 `internal/legacy/mediaservice`：以 gRPC client 呼叫 Java 的 media-service，在 `cmd/hawkr` 接線。模組沒有自己的 schema 與 use case 子領域，登記在 `cmd/hawkr/modules.go` 的 `apiOnly`，不在 `modules()`。
+- 暫存上傳與資產生命週期已在 Go 實作（`internal/modules/media`，自己的 `media` schema 與 migration），登記在 `cmd/hawkr/modules.go` 的 `modules()`，不在 `apiOnly`。下面的 `Media` interface 與 `internal/legacy/mediaservice`（以 gRPC 呼叫 Java 的 media-service，在 `cmd/hawkr` 接線）仍是擁有者模組目前使用的轉正路徑。
 - 根套件以型別別名公開 `internal/model` 的 `Uploader`、`Ref`、`Asset`、`SecureAsset` 與 `Media` interface，並公開 `ErrNotSecure`、`ErrStagedTokenRejected`。
 - 引用同步的演算法在 `internal/refsync`，由 `media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`、`media.SyncInsertOpts` 與 `Sync*` 型別公開。
 - 測試用的記憶體內 `Fake`（`media.NewFake`）在 `fake.go`：模擬 `UNIQUE(asset, ref_type, ref_id)` 加 ON CONFLICT DO NOTHING、精確 Unlink，並能讓逾時之後才生效的 RPC 延後執行。
@@ -59,5 +59,5 @@
 
 ## 7. 已知限制
 
-- 實作是 Java 的 media-service；沒有 Go 端的 schema，資產與引用資料都在 Java 那一側。
+- 轉正路徑目前仍是 Java 的 media-service：擁有者模組的資產與引用資料在 Java 那一側，Go 端的 `media` schema 只有暫存上傳與資產生命週期。
 - Java 沒有條件式刪除：第二次解除之後才在遠端生效的逾時 `LinkImages`（遲到超過約 15 秒），會留下一份退場資產的引用。方向是漏、不會誤刪，資產永遠不被 GC。

@@ -9,6 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -27,6 +28,7 @@ func modules() []migrate.Module {
 	return []migrate.Module{
 		{Name: "content", Dir: content.Migrations()},
 		{Name: "identity", Dir: identity.Migrations()},
+		{Name: "media", Dir: media.Migrations()},
 		{Name: "delegation", Dir: delegation.Migrations()},
 		{Name: "buyer", Dir: buyer.Migrations()},
 		{Name: "accountdeletion", Dir: accountdeletion.Migrations()},
@@ -52,9 +54,7 @@ func migrations() []migrate.Module { return append(platformData(), modules()...)
 
 // apiOnly 是只有公開 API、實作還在舊服務的模組：由 internal/legacy 的暫時實作在組裝點
 // 接線，沒有自己的 schema。實作搬進單體時，從這裡移到 modules()。
-var apiOnly = []string{
-	"media", // 遷移計畫 B1 改寫之前，實作是 Java 的 media-service
-}
+var apiOnly = []string{}
 
 // withoutData 是已在單體裡、但沒有自己資料的模組：不建 schema、沒有 migration（backend/AGENTS.md 規則 6），
 // sqlc 只讀依賴表允許的 pub.sql。第一次要存自己的資料時，建 schema 與 migration，從這裡移到 modules()。
