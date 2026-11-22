@@ -53,13 +53,24 @@ const (
 	ProcessQueueWorkers = 2
 )
 
+// PublicPutConcurrency 是同時在請求內解碼的 PutPublic 數量，整個模組只有這一處定義。
+// PutPublic 與處理 job 在同一個 process 內用同一組 libvips 解碼，所以每個 process 同時解碼的上限是
+// ProcessQueueWorkers + PublicPutConcurrency 張，記憶體預算是這個數乘上像素上限；PutPublic 的呼叫方是伺服器內部，
+// 滿了就等名額（受 ctx 約束），不回錯誤。
+const PublicPutConcurrency = 2
+
 // 機敏串流上傳的資源界限，與大小上限同在 model：每個進行中的 UploadSecure 佔一個最大約 MaxSecureUploadSize 的密文暫存檔與一條連線，
-// 所以同時進行的數量有上限（磁碟預算約 4 x 100 MiB），滿了立即回 ResourceExhausted、不排隊；寫入物件儲存的時限也明確。
+// 所以同時進行的數量有上限（磁碟預算約 4 x 100 MiB），client 上傳（UploadSecure）滿了立即回 ResourceExhausted、不排隊，伺服器內部的 PutSecure 滿了等名額（受 ctx 約束）；寫入物件儲存的時限也明確。
 const (
 	SecureUploadConcurrency = 4
-	SecureUploadTimeout     = 5 * time.Minute
-	// SecureAbortTimeout 是上傳失敗收尾（轉 REJECTED 與刪物件）的時間上限；收尾不受 ctx 取消影響，所以必須自己有時限，否則儲存卡住時永久佔一個名額。
-	SecureAbortTimeout = 30 * time.Second
+	SecureUploadTimeout     = DirectPutTimeout
+)
+
+// 直接寫入（UploadSecure、PutSecure、PutPublic）的時限：DirectPutTimeout 是寫入物件儲存的時間上限；
+// DirectAbortTimeout 是失敗收尾（轉 REJECTED 與刪物件）的時間上限，收尾不受 ctx 取消影響，所以必須自己有時限，否則儲存卡住時永久佔一個名額。
+const (
+	DirectPutTimeout   = 5 * time.Minute
+	DirectAbortTimeout = 30 * time.Second
 )
 
 // PresignTTL 是預簽 PUT 網址的有效期；不得超過 UploadTTL（網址比暫存列活得久沒有意義）。

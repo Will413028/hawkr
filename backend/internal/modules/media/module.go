@@ -170,14 +170,15 @@ func (m *Module) UploadSecure(ctx context.Context, uploader Uploader, body io.Re
 	return m.upload.UploadSecure(ctx, uploader, body)
 }
 
-// PutSecure 是模組內部的機敏直接寫入（B1-D14）：出貨單等由伺服器產生的 PDF 或圖片走這裡，管線與 UploadSecure 相同（magic bytes 辨認、STREAM 加密、不寫明文）。
-// 回傳暫存 token；擁有者在自己的 transaction 內以 Uploader 為 uploader 呼叫 Confirm，未確認的由 GC 回收。不得在 transaction 內呼叫；目前沒有呼叫方（B1-D7）。
+// PutSecure 是模組內部的機敏直接寫入：出貨單等由伺服器產生的 PDF 或圖片走這裡，管線與 UploadSecure 相同（magic bytes 辨認、STREAM 加密、不寫明文）。
+// 回傳暫存 token；擁有者在自己的 transaction 內以 Uploader 為 uploader 呼叫 Confirm，未確認的由 GC 回收。不得在 transaction 內呼叫。
+// 滿了等名額（受 ctx 約束，ctx 結束回 ctx 的錯誤），不回 ResourceExhausted。
 func (m *Module) PutSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
-	return m.upload.UploadSecure(ctx, uploader, body)
+	return m.upload.PutSecure(ctx, uploader, body)
 }
 
-// PutPublic 是模組內部的公開圖片直接寫入（B1-D14）：只收 JPEG、PNG、WebP、GIF，規則與公開上傳相同（重新編碼、去 metadata、大小與像素上限），同步處理後寫入 public/ 並回傳立即可 Confirm 的 token。
-// PDF 與辨認不出的內容回 InvalidInput，不寫物件也不建列。不得在 transaction 內呼叫；目前沒有呼叫方（B1-D7）。
+// PutPublic 是模組內部的公開圖片直接寫入：只收 JPEG、PNG、WebP、GIF，規則與公開上傳相同（重新編碼、去 metadata、大小與像素上限），同步處理後寫入 public/ 並回傳立即可 Confirm 的 token。
+// PDF 與辨認不出的內容回 InvalidInput，不寫物件也不建列。不得在 transaction 內呼叫；解碼的同時進行數量有上限，滿了等名額（受 ctx 約束）。
 func (m *Module) PutPublic(ctx context.Context, uploader Uploader, body io.Reader) (PutPublicResult, error) {
 	return m.upload.PutPublic(ctx, uploader, body)
 }

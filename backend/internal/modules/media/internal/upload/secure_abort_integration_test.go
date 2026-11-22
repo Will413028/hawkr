@@ -59,7 +59,7 @@ func secureServiceWith(t *testing.T, wrap func(*storage.Fake) storage.Store) (*S
 }
 
 // 最後的 transaction 回錯誤、其實已經提交：abortDirect 看到列是 READY，照成功回傳，而且不刪物件。
-func TestAbortSecure_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testing.T) {
+func TestAbortDirect_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testing.T) {
 	svc, d, st := secureService(t)
 	res, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello")))
 	if err != nil {
@@ -83,7 +83,7 @@ func TestAbortSecure_CommittedDespiteErrorReturnsSuccessAndKeepsObject(t *testin
 }
 
 // 列已經被 GC 標為 DELETING（輸給 GC）：回 FailedPrecondition「已過期」，不刪物件（物件的主人是 GC）。
-func TestAbortSecure_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T) {
+func TestAbortDirect_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T) {
 	svc, d, st := secureService(t)
 	if _, err := svc.UploadSecure(t.Context(), model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello"))); err != nil {
 		t.Fatal(err)

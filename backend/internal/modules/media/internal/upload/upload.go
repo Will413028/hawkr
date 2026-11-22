@@ -45,8 +45,10 @@ type Deps struct {
 // Service 是暫存上傳的服務。
 type Service struct {
 	d Deps
-	// secureSlots 限制同時進行的 UploadSecure（model.SecureUploadConcurrency）。
+	// secureSlots 限制同時進行的 UploadSecure 與 PutSecure（model.SecureUploadConcurrency）。
 	secureSlots chan struct{}
+	// publicSlots 限制同時在請求內解碼的 PutPublic（model.PublicPutConcurrency）。
+	publicSlots chan struct{}
 }
 
 // New 建立服務；必要的依賴缺少時 panic（組裝錯誤，啟動就該失敗）。
@@ -60,7 +62,11 @@ func New(d Deps) *Service {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	return &Service{d: d, secureSlots: make(chan struct{}, model.SecureUploadConcurrency)}
+	return &Service{
+		d:           d,
+		secureSlots: make(chan struct{}, model.SecureUploadConcurrency),
+		publicSlots: make(chan struct{}, model.PublicPutConcurrency),
+	}
 }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
@@ -297,4 +303,24 @@ func (s *Service) assetOf(ctx context.Context, row store.MediaStagedUpload, requ
 		return ConfirmedAsset{}, apperr.FailedPrecondition("這筆上傳的資產已不可用")
 	}
 	return ConfirmedAsset{ID: a.ID, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
+}
+
+// acquire 取一個名額並回傳放回的函式。wait 為 false 時滿了立即回 ResourceExhausted（client 上傳：有人可以稍後重試）；
+// 為 true 時等到有名額，ctx 結束就回 ctx 的錯誤（伺服器內部呼叫：沒有人能重試）。
+func acquire(ctx context.Context, slots chan struct{}, wait bool, busy error) (func(), error) {
+	release := func() { <-slots }
+	if !wait {
+		select {
+		case slots <- struct{}{}:
+			return release, nil
+		default:
+			return nil, busy
+		}
+	}
+	select {
+	case slots <- struct{}{}:
+		return release, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }

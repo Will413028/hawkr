@@ -47,6 +47,9 @@ var ErrUnrecognized = errors.New("image: unrecognized format")
 // ErrMalformed 表示辨認得出格式但無法解碼；呼叫方必須拒絕，不可退回原檔。
 var ErrMalformed = errors.New("image: malformed data")
 
+// ErrProcessing 表示輸入以外的永久失敗：管線遇到本不該出現的狀態（例如無法判斷的 alpha 格式），重試不會變好，也不是輸入的格式問題。
+var ErrProcessing = errors.New("image: processing failed")
+
 // ErrTooLarge 表示像素數超過 model 定義的上限；在解碼像素之前就回傳。
 var ErrTooLarge = errors.New("image: pixel count over limit")
 
@@ -110,8 +113,9 @@ func (l Limits) validate() error {
 
 // Sanitize 先檢查 Limits，再辨認格式、讀標頭檢查像素上限與單邊上限，接著完整解碼、套用方向（靜態圖）、轉 sRGB、
 // 判斷有無透明、丟掉全部 metadata 後重新編碼。
-// Limits 有非正的欄位回 ErrInvalidLimits；辨認不出（含 APNG）回 ErrUnrecognized；輸入的載入、標頭或像素解碼失敗、
-// 無法判斷 alpha 的像素格式回 ErrMalformed；超過像素或單邊上限回 ErrTooLarge；
+// Limits 有非正的欄位回 ErrInvalidLimits；辨認不出（含 APNG）回 ErrUnrecognized；輸入的載入、標頭或像素解碼失敗回 ErrMalformed；
+// 超過像素或單邊上限回 ErrTooLarge；
+// 無法判斷 alpha 的像素格式與沒有動態編碼器的格式回 ErrProcessing（永久、非輸入問題）；
 // 轉色、套用方向與編碼的失敗是輸入以外的原因，回一般錯誤（呼叫方當暫時失敗重試）。
 // ctx 在載入前與每個耗時步驟之間檢查，取消回 ctx 的錯誤；libvips 的單一運算跑起來後 vipsgen 沒有中止的介面，不可取消。
 func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
@@ -296,15 +300,15 @@ func hasTransparency(img *vips.Image) (bool, error) {
 	return m < opaque, nil
 }
 
-// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回 ErrMalformed，不猜值。
-// 四個載入器只產生 8 或 16 位元，轉 sRGB 之後更只剩 8 位元，所以正常輸入到不了這個分支；萬一到了是永久拒絕，不讓它重試到用盡。
+// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回 ErrProcessing，不猜值。
+// 四個載入器只產生 8 或 16 位元，轉 sRGB 之後更只剩 8 位元，所以正常輸入到不了這個分支；萬一到了是永久拒絕，不讓它重試到用盡，也不說成使用者的圖片格式不對。
 func alphaOpaque(a *vips.Image) (float64, error) {
 	if f := a.BandFormat(); f == vips.BandFormatUchar {
 		return 255, nil
 	} else if f == vips.BandFormatUshort {
 		return 65535, nil
 	}
-	return 0, fmt.Errorf("%w: unsupported alpha band format %d", ErrMalformed, a.BandFormat())
+	return 0, fmt.Errorf("%w: unsupported alpha band format %d", ErrProcessing, a.BandFormat())
 }
 
 func (s stages) encodeStill(img *vips.Image) (Result, error) {
@@ -345,7 +349,7 @@ func (s stages) encodeAnimated(img *vips.Image, f Format) (Result, error) {
 		return Result{}, err
 	}
 	if f != GIF && f != WebP {
-		return Result{}, fmt.Errorf("%w: %s has no animated encoder", ErrMalformed, f)
+		return Result{}, fmt.Errorf("%w: %s has no animated encoder", ErrProcessing, f)
 	}
 	var out []byte
 	err := s.step(stageEncode, func() (err error) {

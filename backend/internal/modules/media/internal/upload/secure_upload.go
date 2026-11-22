@@ -35,7 +35,7 @@ const (
 	secureBusyRetryAfter = 5 * time.Second
 )
 
-var errTooLarge = errors.New("media：機敏上傳超過大小上限")
+var errTooLarge = errors.New("media：上傳超過大小上限")
 
 // capReader 在讀超過 max 個位元組時回錯誤：大小不收宣告，上限以實際讀到的位元組數套用。
 type capReader struct {
@@ -76,6 +76,15 @@ func sniffSecure(head []byte) (string, error) {
 // 轉成功才刪物件；轉換 0 列且重讀是 READY（commit 其實成功）就照成功回 token。行程中斷留下的 UPLOADED 列與物件由 GC 在過期加寬限後回收。
 // 不得在 transaction 內呼叫。
 func (s *Service) UploadSecure(ctx context.Context, uploader model.Uploader, body io.Reader) (SecureResult, error) {
+	return s.uploadSecure(ctx, uploader, body, false)
+}
+
+// PutSecure 與 UploadSecure 同一條管線；差別只在名額滿時等待（受 ctx 約束）而不是回 ResourceExhausted，因為呼叫方是沒有人可以重試的伺服器內部。
+func (s *Service) PutSecure(ctx context.Context, uploader model.Uploader, body io.Reader) (SecureResult, error) {
+	return s.uploadSecure(ctx, uploader, body, true)
+}
+
+func (s *Service) uploadSecure(ctx context.Context, uploader model.Uploader, body io.Reader, wait bool) (SecureResult, error) {
 	if err := model.RequireNoTx(ctx); err != nil {
 		return SecureResult{}, err
 	}
@@ -85,12 +94,11 @@ func (s *Service) UploadSecure(ctx context.Context, uploader model.Uploader, bod
 	if uploader.ID <= 0 {
 		return SecureResult{}, apperr.InvalidInputOn([]string{"uploader"}, "上傳者不合法")
 	}
-	select {
-	case s.secureSlots <- struct{}{}:
-		defer func() { <-s.secureSlots }()
-	default:
-		return SecureResult{}, apperr.ResourceExhausted(secureBusyRetryAfter, "同時進行的機敏上傳太多，請稍後再試")
+	release, err := acquire(ctx, s.secureSlots, wait, apperr.ResourceExhausted(secureBusyRetryAfter, "同時進行的機敏上傳太多，請稍後再試"))
+	if err != nil {
+		return SecureResult{}, err
 	}
+	defer release()
 
 	br := bufio.NewReaderSize(&capReader{r: body, max: model.MaxSecureUploadSize}, sniffBytes*8)
 	head, err := br.Peek(sniffBytes)
@@ -161,7 +169,7 @@ func (s *Service) UploadSecure(ctx context.Context, uploader model.Uploader, bod
 // commitDirect 是直接寫入（UploadSecure、PutPublic）的後半段：暫存列已以 UPLOADED 與 final_key 建好；transaction 外 Put，
 // 再以一個 transaction 建資產列並把暫存列轉 READY。任何一步失敗都走 abortDirect 收斂；最後的 transaction 其實已提交時視為成功。
 func (s *Service) commitDirect(ctx context.Context, uploadID uuid.UUID, asset store.InsertAssetParams, body io.Reader, size int64, objectType string) error {
-	putCtx, cancel := context.WithTimeout(ctx, model.SecureUploadTimeout)
+	putCtx, cancel := context.WithTimeout(ctx, model.DirectPutTimeout)
 	defer cancel()
 	if err := s.d.Store.Put(putCtx, storage.PutInput{Key: asset.ObjectKey, Body: body, Size: size, ContentType: objectType}); err != nil {
 		return s.abortDirect(ctx, uploadID, asset.ObjectKey, fmt.Errorf("media：寫入物件：%w", err))
@@ -198,10 +206,10 @@ func secureReadErr(err error) error {
 
 // abortDirect 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳 nil，
 // 重讀是 DELETING 或 DELETED（輸給 GC）回 FailedPrecondition「已過期」。內部的 errLost 不外漏。
-// 不受 ctx 取消影響：client 斷線時列與物件仍要收尾，但整段收尾有 model.SecureAbortTimeout 的時限。
+// 不受 ctx 取消影響：client 斷線時列與物件仍要收尾，但整段收尾有 model.DirectAbortTimeout 的時限。
 // 轉換本身失敗時什麼都不刪，列與物件留給 GC 在過期加寬限後回收。
 func (s *Service) abortDirect(ctx context.Context, uploadID uuid.UUID, finalKey string, cause error) error {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.SecureAbortTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
 	if errors.Is(cause, errLost) {
 		cause = errors.New("media：直接上傳的暫存列已被別處轉走，沒有完成")

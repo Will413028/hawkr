@@ -357,7 +357,7 @@ func TestContentTypes(t *testing.T) {
 }
 
 func isPermanentImageErr(err error) bool {
-	return errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge)
+	return errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge) || errors.Is(err, image.ErrProcessing)
 }
 
 func TestNonInputFailuresAreNotInputErrors(t *testing.T) {
@@ -629,8 +629,8 @@ func TestAlphaOpaqueRejectsUnknownBandFormat(t *testing.T) {
 	if err := img.Cast(vips.BandFormatFloat, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := image.AlphaOpaque(img); !errors.Is(err, image.ErrMalformed) {
-		t.Fatalf("err = %v，預期永久的 ErrMalformed", err)
+	if _, err := image.AlphaOpaque(img); !errors.Is(err, image.ErrProcessing) || errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期永久的 ErrProcessing，且不是 ErrMalformed", err)
 	}
 }
 
