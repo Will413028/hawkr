@@ -36,6 +36,7 @@ const hideTarget = "00000000-0000-7000-8000-000000000001"
 var sellerEpoch = time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
 
 var trimmedColumns = []trimmedColumn{
+	{table: "bizcalendar.days", column: "note", constraint: "days_note_check"},
 	{table: "identity.admin_role_events", column: "reason", constraint: "admin_role_events_reason_check"},
 	{table: "identity.account_suspensions", column: "reason_text", constraint: "account_suspensions_reason_text_check"},
 	{table: "identity.account_suspensions", column: "source_ref", constraint: "account_suspensions_source_ref_check"},

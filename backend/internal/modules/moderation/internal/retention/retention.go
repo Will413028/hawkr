@@ -1,6 +1,6 @@
 // Package retention 是檢舉資料的保留期（A7-D20、A7-D21）：結案滿 model.SnapshotRetention 之後由排程 job 刪除內容快照（釋放快照在 media 的圖片引用）並清除檢舉的說明文字與冪等紀錄（request_hash 是說明的雜湊）；
-// 檢舉人刪帳時（買家的刪除事件，同 transaction）清掉他全部檢舉的說明、冪等紀錄與每日計數列。檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列
-// （含 reporter_buyer_id，假名鍵）留著。進行中的案件（沒有結案時間）的快照與說明不清。
+// 檢舉人刪帳時（買家的刪除事件）或店家退場時（seller.StoreRetired），同 transaction 清掉他（該店）全部檢舉的說明、冪等紀錄與每日計數列。檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列
+// （含 reporter_buyer_id、reporter_store_id，業務鍵）留著。進行中的案件（沒有結案時間）的快照與說明不清。
 package retention
 
 import (
@@ -18,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -130,6 +131,22 @@ func (s *Service) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerDel
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（沒有開啟中的訂單時買家直接關閉，只發這個事件）。
 func (s *Service) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
 	return s.clearReporter(ctx, e.BuyerID, e.AccountID)
+}
+
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：清掉該店以檢舉人身分送出的全部檢舉的說明、冪等紀錄與每日計數列（店家額度與買家分開計）；
+// 檢舉列與 reporter_store_id 留著。冪等。
+func (s *Service) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
+	q := store.New(s.d.DB.Conn(ctx))
+	if _, err := q.ClearStoreReporterDescriptions(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：清除店家檢舉人 %d 的說明：%w", e.StoreID, err)
+	}
+	if _, err := q.DeleteStoreReporterRequests(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：刪除店家檢舉人 %d 的冪等紀錄：%w", e.StoreID, err)
+	}
+	if _, err := q.DeleteStoreReporterDailyCount(ctx, &e.StoreID); err != nil {
+		return fmt.Errorf("moderation：刪除店家檢舉人 %d 的每日計數：%w", e.StoreID, err)
+	}
+	return nil
 }
 
 func (s *Service) clearReporter(ctx context.Context, buyerID, accountID int64) error {

@@ -175,6 +175,17 @@ WHERE report_id IN (
 -- name: DeleteReporterDailyCount :execrows
 DELETE FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = sqlc.arg(reporter_buyer_id);
 
+-- name: ClearStoreReporterDescriptions :execrows
+-- 店家退場：清掉該店以檢舉人身分送出的全部檢舉的說明；檢舉列與 reporter_store_id（業務鍵）留著。
+UPDATE moderation.reports SET description = NULL WHERE reporter_store_id = sqlc.arg(reporter_store_id) AND description IS NOT NULL;
+
+-- name: DeleteStoreReporterRequests :execrows
+-- 店家退場：刪掉該店的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
+DELETE FROM moderation.report_requests WHERE reporter_store_id = sqlc.arg(reporter_store_id);
+
+-- name: DeleteStoreReporterDailyCount :execrows
+DELETE FROM moderation.reporter_daily_counts WHERE reporter_store_id = sqlc.arg(reporter_store_id);
+
 -- name: SnapshotContent :one
 SELECT content FROM moderation.case_snapshots WHERE id = sqlc.arg(id);
 

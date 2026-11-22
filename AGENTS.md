@@ -27,12 +27,13 @@
 | `brand/` | 作品集改名後的品牌素材（`brand/hawkr/`：logo 的 SVG 與用法） | 無 |
 | `docs/` | ADR、共通規範、跨專案計畫；分界與路徑寫法見 `docs/README.md` | `.github/workflows/repo-hygiene.yml` |
 | `scripts/` | 跨專案的檢查 | `.github/workflows/repo-hygiene.yml` |
-| 根目錄供應鏈設定 | `SECURITY.md`、`.github/dependabot.yml`、`.github/zizmor.yml`、`.gitleaks.toml` 與 `.gitleaks-baseline.json`、`osv-scanner.toml`、`scripts/govulncheck-allowlist.json` | `.github/workflows/supply-chain.yml`（govulncheck、OSV-Scanner、gitleaks、zizmor） |
+| `mutation/` | mutation 驗收清單，格式見其 `README.md` | `.github/workflows/mutation.yml` |
+| 根目錄供應鏈設定 | `SECURITY.md`、`.github/dependabot.yml`、`.github/zizmor.yml`、`.gitleaks.toml` 與 `.gitleaks-baseline.json`、`osv-scanner.toml`、`scripts/govulncheck-allowlist.json` | `.github/workflows/supply-chain.yml` |
 
 
-- `packages/hawkr-*-ts` 只發佈 TS 原始碼：消費端以 `transpilePackages` 編譯，用 subpath exports，不做 barrel（集中匯出的 `index.ts`）。
+- `packages/hawkr-*-ts` 只發佈 TS 原始碼：消費端以 `transpilePackages` 編譯，用 subpath exports，不做 barrel。
 - 所有 CI 都在根目錄的 `.github/workflows/`；子專案不放 `.github/`。公司時期的部署與維運 workflow 不在現行範圍。
-- 工具版本：Go 看 `backend/.go-version`；Node 看根目錄 `.nvmrc`（website、admin、api-contract 的 CI 都讀它）；pnpm 看根目錄 `package.json` 的 `packageManager`，website 與 admin 是同一個 pnpm workspace，在根目錄 `pnpm install`（一份 `pnpm-lock.yaml`，兩個 app 共用的依賴版本在根目錄 `pnpm-workspace.yaml` 的 `catalog`），之後的指令在各 app 目錄執行；Flutter 看各 App 與 `packages/` 各套件的 `.fvmrc`；buf 看 `api/.buf-version`。
+- 工具版本：Go 看 `backend/.go-version`；Node 看根目錄 `.nvmrc`；pnpm 看根目錄 `package.json` 的 `packageManager`，website 與 admin 是同一個 pnpm workspace，在根目錄 `pnpm install`（共用依賴版本在 `pnpm-workspace.yaml` 的 `catalog`），之後的指令在各 app 目錄執行；Flutter 看各 App 與 `packages/` 各套件的 `.fvmrc`；buf 看 `api/.buf-version`。
 
 ## 跨專案契約
 
@@ -58,7 +59,7 @@
 - **使用者面文字**：買家與賣家介面是 zh-TW／en，admin 只有 zh-TW；語系的選擇、文字資源與伺服器文字見 ADR `docs/adr/2026-10-17-multi-locale-architecture.md`，用語以 `docs/共通規範/使用者面用語術語表.md` 為準。
 - **依賴與供應鏈**：已知漏洞的修復期限自發現日起算：critical 7 天、high 30 天、medium 90 天、low 在下一次相關更新時；暫不修的放進基準（`osv-scanner.toml` 的 `IgnoredVulns`、`scripts/govulncheck-allowlist.json`），每筆寫理由與期限，期限到了 CI 會失敗。agent 不自行新增或升級依賴：先列出套件名稱與版本，核對該版本存在、發佈滿兩週，經同意才改；`uses:` 一律釘完整 40 碼 SHA 並在行尾註明版本。僅 agentfile-lint（Will 自有的檢查工具）的 tag 免「發佈滿兩週」與逐版同意；其餘依賴（含 agentfile-lint 自己的傳遞依賴與其 CI 引用的 Action）照原規則；引用仍須釘完整 SHA 並註明版本。
 - **Git**：分支模型（branch model）是日常工作推 `dev`；`main` 只經 `dev`→`main` 的 PR 以 merge commit 合併，不直接推（ruleset 擋）。commit 使用 Conventional Commits，例如 `feat(backend): …`，只提交本次範圍的檔案，不用 `git add -A`。push 依使用者授權。
-- **驗證**：完成前跑與 CI 相同的檢查並看結果；看 CI 時看每個 job 自己的結論，不只看 run 的整體狀態。沒有驗證到的部分明確說出來。
+- **驗證**：完成前跑與 CI 相同的檢查並看結果；看 CI 時看每個 job 自己的結論，不只看 run 的整體狀態。沒有驗證到的部分明確說出來。mutation 驗收寫進 `mutation/`，由 `mutation` CI job 跑。
 
 - **推之前**：累積多個 commit 才推時，依各 workflow 的 `paths` 把觸發到的檢查全跑，不只跑單體。根目錄 pre-commit 會 stash 未暫存的改動、commit 後還原：背景測試還在讀工作區時不要 commit。
 - **註解**：不寫敘事型註解（日期、issue 編號、改動經過）；理由放 commit、PR 或設計文件。保留介面說明與他人既有註解。

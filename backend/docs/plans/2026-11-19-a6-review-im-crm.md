@@ -179,10 +179,22 @@
 - 範圍：`TargetKind` 加 REVIEW、CHAT_MESSAGE（proto、Go、CHECK migration）；快照形狀（聊天含前後文，A6-D3）；隱藏與還原經 review、im API 同 tx；作者為店家時走 seller 措施（A7-D5′）；依賴表 moderation 加 review、im；`reviewqueue` 分支不變（來源仍是 moderation）。
 - 驗收：檢舉→隱藏→還原的 integration；鎖序測試；mutation：還原時不清隱藏紀錄、隱藏時不更新對話預覽（ID1），測試各要失敗。
 
+### A6-4d 店家退場清店家檢舉人資料（被擋於：A6-D22；不擋 A6-5）
+
+- 範圍：moderation 訂閱 `seller.StoreRetired`（同 transaction，沿用買家刪帳訂閱者的模式），清該店全部店家檢舉的說明、冪等紀錄（request_hash）與 `reporter_daily_counts` 的店家列；檢舉列留著。CARRYOVER 第 29 列補店家路徑。
+- 消費端：`rg -n "StoreRetired" backend/internal`。
+- 驗收：integration 測試證明退場後三者清空、檢舉列仍在、重送事件冪等；mutation（CI）：拿掉計數列的清除，測試要失敗。
+
 ### A6-5 對外 API（被擋於：A6-1～4）
 
-- Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `lookup`、`meta`、`orders`、`coupons` 改由擁有者的方法提供。
-- 必做方法清單：`interface-inventory.md` §1 的 34 支扣掉去向為「刪除」的 8 支，逐支對到 Connect 方法；派工附上整張表。
+拆四個子步驟，各自一個 session：
+- **5a** 契約設計書 `2026-11-19-a6-review-im-crm/step-5-design.md`：34 支逐支對到 Connect 方法（扣刪除 8 支）、`ReportTarget` 參照形狀（含店家檢舉人的 `CHAT_MESSAGE` 入口）、訊息種類 enum、卡片訊息的伺服器參照（A6-D14 W6）、串流 helper（心跳、壽命、寫入期限、session 重驗，A6-D16 W4）、CRM 的 lookup／meta／orders／coupons 由哪個擁有者提供；取捨列成 W 題交 Will，開工 design-review。
+- **5b** `ReviewService` 與評價檢舉（5a 已決）。
+- **5c** `ChatService`（含 streaming helper、接 `cmd/hawkr`）與聊天檢舉（5a 已決）。
+- **5d** `SellerCrmService` 與擁有者方法、CD8 驗收（5a 已決）；完成前 design-review 涵蓋 5b–5d。
+
+- Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `meta` 由 `GetCustomer` 取代，`lookup`、`coupons` 刪除，`orders` 走店家訂單列表（A6-D18 W3、A6-D23）。
+- 必做方法清單：設計書 `step-5-design.md` §1 的 34 列去向表（對外 25 支舊方法 → 24 個 Connect 方法，加 W1 的店家版方法）；派工附上整張表。
 - 驗收：`buf lint`；handler 測試涵蓋清單的每個方法；生成檔無 drift；mutation：拿掉檢舉參照的擁有者檢查，測試要失敗。
 - CD8 驗收：`SellerCrmService` 回應欄位測試證明永不回 phone、email；mutation：把聯絡欄位加回回應，測試要失敗（A6-3 設計書 §11.2）。
 
@@ -227,6 +239,8 @@
 | A6-D19 | 停用身分的事實與守門只在擁有者：buyer 加「未關閉」、seller 加「未退場」的共享列鎖（`FOR KEY SHARE`）與狀態 `pub_*`，獨占端沿用既有的 `LockForDeletion`、`RetireDueStores`；review、im、crm 刪自己的 `inactive_*` 複本與 advisory lock，讀取改 join 擁有者 `pub_*`；抹除 job 留在各模組；social 保留複本（存旗標，規則 2 例外）；不做平台框架。簡報 `2026-11-19-a6-review-im-crm/step-3c-brief.md`（Will 2026-11-21） | A6-3c、A6-4 |
 | A6-D20 | A6-3c 設計書 §10 W1–W7：W1 (a′) 不存在的 ID 當已停用並跳過；NotFound 時查 pub 分辨，已關閉／已退場記 info、不存在記 error（修訂 Will 2026-11-21）；W2 (a) 新增 `pub_closed_buyers()`；W3 (a) `LockActive`／`LockBuyerShared` 降為 `FOR KEY SHARE`；W4 (b) 業務寫入降為 `FOR NO KEY UPDATE`、只有轉移保留 `FOR UPDATE`；W5 (a) 不加索引、門檻寫進 CARRYOVER；W6 (b) sweep 唯一性 helper 本步收齊全部 14 處；W7 (b) 整合測試替身斷言 legacy RPC 不在 tx 內（Will 2026-11-21） | A6-3c1 |
 | A6-D21 | A6-4 設計書 §W：W1 (a) moderation 新增 `ReverseHide`，案件維持結案，另記還原欄位與稽核紀錄，同 tx 呼叫 review／im／social 的 `Restore`；W2 (a) 店家寫的聊天訊息與評價回覆照 A7-D5′ 走 seller 內容下架，新增 `CHAT_MESSAGE`、`REVIEW_REPLY` 對象，im 讀取 join `seller.pub_content_takedowns()`；W3 (a) 檢舉人改為買家或店家二選一，只有 `CHAT_MESSAGE` 接受店家檢舉；W4 (a) `GetCase` 回應加依種類分開的快照欄位，快照 struct 改依種類分開，後台頁面在 A6-6（Will 2026-11-21） | A6-4 |
+| A6-D22 | 店家退場（`seller.StoreRetired`）時比照買家刪帳：同 transaction 訂閱者清該店以店家檢舉人身分送出的檢舉說明、冪等紀錄與每日計數列，檢舉列與檢舉人鍵保留（Will 2026-11-21） | A6-4d |
+| A6-D23 | A6-5a 設計書 W1–W4：W1 (g) 聊天依集合分買家版與店家版方法，店家由呼叫者此刻的店推導；W2 (c) 店家檢舉身分由訊息歸屬推導；W3 (a) 卡片延到 B8；W4 (a) 送出帶 `request_id` 去重；W5 (a) 刪 CRM `lookup`，優惠券從客戶名單選；W6 (a) CRM 不暴露訂單，改用店家訂單列表加買家篩選（Will 2026-11-21） | A6-5c、A6-5d、A6-6 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -262,3 +276,4 @@
 | A6-4a 設計 | 完成（2026-11-21）：設計書 `step-4-design.md`，W1–W4 已決（A6-D21） | 開工 design-review 1 輪：findings 7 (blocking 2)，fixed 5、recorded 0、raised 2（W2／W3，Will 已決）、rejected 0 | 第 2 輪未派：改動只有 `MessageForReport` 加入呼叫方 tx，由規則 3 與先例 `seller/governance.go:600` 定案；無程式、無測試（設計步驟） |
 | A6-4b 評價與聊天對象、快照、ReverseHide | 完成（2026-11-21，PR #420）：`TargetKind` 加 REVIEW、CHAT_MESSAGE；`review.ReviewForReport`、`im.MessageForReport`；快照依種類分開、`GetCase` 帶 snapshot oneof；HIDE 經 review／im 同 tx；`ReverseHide`（案件維持 CLOSED、`reversed_*`＋adminaudit 含 `restored`，只還原本案件 `source_ref` 的隱藏，內容已清除仍記錄）與權限 `moderation.cases.reverse`；admin 對象選單加兩值。與設計書不同處：還原依 `source_ref`（改寫 §2）、聊天 HIDE 測試直接建案件（店家作者 HIDE 待 4c） | 本機 build、vet（含 integration tag）、`go test ./...`、`make lint-monolith`、sqlc／connect／uitext 無 drift（主 session 重跑）；CI PR #420 在 585fc2a4 全部 job 綠，含 integration；mutation CI run 44875013657（17／19 killed）＋44875872312、44877005095 補測試後 #18、#19 killed，共 19 個全 KILLED；審查：`/code-review` 1 輪 findings 7 (blocking 0)：fixed 5、recorded 1（F4 聊天前後文含檢舉人訊息的保留，觸發：上線前隱私審查）、rejected 1（F3 舊扁平快照，未上線不相容）；diff 審查第 2 輪 findings 5 (blocking 0)：fixed 5 | `NOTIFY` 次數未斷言（im 自身測試涵蓋）；抹除前後文的墓碑只間接覆蓋；完成前 design-review 依計畫在 4c 涵蓋 4b＋4c |
 | A6-4c 店家內容下架與店家檢舉人 | 完成（2026-11-21，PR #421）：`contentkind` 加 CHAT_MESSAGE、REVIEW_REPLY；seller `measure_contents` CHECK 與快照連結規則；`pub_content_takedowns()` 只回 ENFORCED；im 讀取與 review 回覆遮蔽 join 它，`ReplyToReview` 在下架生效時拒絕；im／review 的 `OnMeasureCreated`／`OnMeasureRevoked` 核對歸屬；moderation TAKEDOWN 用於 CHAT_MESSAGE（店家作者）與新對象 REVIEW_REPLY，同 tx 建 seller 措施；`reports`／`report_requests`／`reporter_daily_counts` 加 `reporter_store_id` 與恰好一欄 CHECK，店家只能檢舉 CHAT_MESSAGE、額度各 20；admin `CaseReport` 檢舉人 oneof、處置選單對齊 `AllowedOn`。Will 2026-11-21 決定見 `step-4c-design.md` §6 | 本機 build、vet（含 integration tag）、`go test ./internal/... ./cmd/...`、`make lint-monolith`、各生成無 drift（主 session 重跑）；CI PR #421 在 567257bd 全部 job 綠，含 integration 與 lockorder 併發測試（鎖序 seller → im/review → moderation 已證明）；mutation CI run 44909500419＋44910476574：12 個（#4 拆 schema 與 Go 兩個）全 KILLED；審查：design-review（完成前，涵蓋 4b＋4c）findings 4 (blocking 0)；`/code-review` findings 9 (blocking 0)；合併去重 13：fixed 11、recorded 2（店家退場不清店家檢舉人資料，觸發 A6-5 開工前由 Will 決定；檢舉人 exclusive arc 取捨）、raised 0、rejected 0；第 2 輪 diff 審查 NO DEFECTS FOUND | EXPLAIN 未跑（`measure_contents_one_enforced` 的使用是推論）；admin `pnpm build` 未在本機跑（CI admin job 綠）；舊微服務檢舉路徑未逐項對照（design-review 標為覆蓋缺口，舊服務在 A6-7 刪除） |
+| A6-4d 店家退場清店家檢舉人資料 | 完成（2026-11-21，PR #423）：`Retention.OnStoreRetired`（同 transaction 清店家檢舉人的說明、冪等紀錄與每日計數列，檢舉列留著）、`reports` 店家檢舉人 partial index、送出先取檢舉人擁有者守門（`seller.LockNotRetired`／`buyer.LockNotClosed`）、檢舉人專用的找不到文字、`cmd/hawkr` 接線與 AST 測試 | 本機 build、vet（含 integration tag）、unit、`make lint-monolith`、`make sqlc`；CI PR #423 全部 job 通過（含 integration）；mutation CI run 44920513102 共 7 個全 KILLED（店家守門、買家守門、兩處接線、三條清除 SQL）；審查：`/code-review` 2 輪，findings 11 (blocking 0)，fixed 11 | 送出與退場同時發生的競態沒有測試（只測退場後再送）；index 無行為 mutation；`TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock` 的刪帳端用不存在的帳號，刪帳回 NotFound 就通過，沒走到真正的刪除流程【推，既有，未改】 |

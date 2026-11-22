@@ -212,6 +212,11 @@ func (r *Retention) OnBuyerDeletionRequested(ctx context.Context, e buyer.BuyerD
 	return r.svc.OnBuyerDeletionRequested(ctx, e)
 }
 
+// OnStoreRetired 是店家退場時同 transaction 的訂閱者：清掉該店以檢舉人身分送出全部檢舉的說明、冪等紀錄與每日計數列，檢舉列與 reporter_store_id 留著（A6-D22）。
+func (r *Retention) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
+	return r.svc.OnStoreRetired(ctx, e)
+}
+
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者：同 OnBuyerDeletionRequested（冪等）。
 func (r *Retention) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
 	return r.svc.OnBuyerDeleted(ctx, e)

@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 )
 
 func TestRunRejectsUnknownSubcommand(t *testing.T) {
@@ -56,7 +57,7 @@ func TestServeAnswersUntilContextEnds(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	ready := func(context.Context) error { return nil }
-	h, err := httpapi.NewHandler(httpapi.Deps{Assistant: &assistant.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}})
+	h, err := httpapi.NewHandler(httpapi.Deps{Assistant: &assistant.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}})
 	if err != nil {
 		t.Fatal(err)
 	}

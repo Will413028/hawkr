@@ -128,6 +128,10 @@ export const UPDATE_MY_STORE_URL = sellerMethod("UpdateMyStore");
 export const GET_MY_DASHBOARD_URL = sellerMethod("GetMyDashboard");
 export const LIST_MY_MEASURES_URL = sellerMethod("ListMyMeasures");
 export const LIST_MY_INQUIRIES_URL = sellerMethod("ListMyInquiries");
+export const LIST_MY_REPORTS_URL =
+	/\/api\/connect\/hawkr\.moderation\.v1alpha1\.ModerationAppService\/ListMyReports(?:\?|$)/;
+export const GET_MY_REPORT_URL =
+	/\/api\/connect\/hawkr\.seller\.v1alpha1\.SellerReportAppService\/GetMyReport(?:\?|$)/;
 export const LIST_BLOCKED_BUYERS_URL = sellerMethod("ListBlockedBuyers");
 export const GET_MY_STORE_OPENING_URL = sellerMethod("GetMyStoreOpening");
 
@@ -1234,6 +1238,24 @@ export async function setupGatewayMocks(
 	// 2b''. 平台詢問（ListMyInquiries，賣家導覽的待回覆徽章）：預設空。
 	await page.route(LIST_MY_INQUIRIES_URL, (route) => {
 		void fulfillConnect(route, {});
+	});
+
+	// 2f. 我的檢舉：列表預設空；單筆預設一筆有效的店家檢舉（無 outcome，顯示審核中）。個別 spec 較晚註冊的 mock 會蓋過。
+	await page.route(LIST_MY_REPORTS_URL, (route) => {
+		void fulfillConnect(route, {});
+	});
+	await page.route(GET_MY_REPORT_URL, (route) => {
+		void fulfillConnect(route, {
+			report: {
+				id: "route-report-1",
+				storeId: "route-store-1",
+				category: "POLICY_CATEGORY_FRAUD",
+				description: "路由測試檢舉內容",
+				createTime: "2026-01-01T00:00:00Z",
+			},
+			supplements: [],
+			evidence: [],
+		});
 	});
 
 	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。

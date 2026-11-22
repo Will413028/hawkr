@@ -309,7 +309,8 @@ test.describe("authenticated protected static route smoke", {
 		// procurement assistant, not a protected page of its own.
 		// 58 號電子發票買家面：B09 買家發票中心 ＋1 —— /account/invoices。
 		// B05（/account/invoices/[documentId]）是動態路由，登記在 dynamic-route-catalog。
-		expect(ROUTES_BY_ROLE.buyer).toHaveLength(23);
+		// 我的檢舉 ＋1 —— /account/reports；詳情 /account/reports/[id] 是動態路由，登記在 dynamic-route-catalog。
+		expect(ROUTES_BY_ROLE.buyer).toHaveLength(24);
 		// 58 號電子發票賣家面：
 		//   第一波（S01／S02／S06）＋3 —— /seller-center/invoices、.../tax-status、
 		//     .../documents
@@ -325,13 +326,13 @@ test.describe("authenticated protected static route smoke", {
 		// ⇒ 新增一個 page.tsx 就會讓它們對不上。改的時候先對帳增減量，
 		// 不要為了讓測試變綠而直接抄失敗訊息的數字。
 		// 賣家工作區 33 條（含封鎖買家頁 /seller-center/blocked-buyers、店面預覽四個分頁），不含措施頁；措施與申覆列表 /seller/measures、平台詢問列表 /seller/inquiries 是帳號層級
-		// （登入即可、不分工作區），各單獨一條（ACCOUNT_ROUTES）。買家 23 ＋ 賣家 33 ＋ 帳號 2，
-		// 三類合計 58。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
+		// （登入即可、不分工作區），各單獨一條（ACCOUNT_ROUTES）。買家 24 ＋ 賣家 33 ＋ 帳號 2，
+		// 三類合計 59。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
 		// 是動態路由，登記在 dynamic-route-catalog。
 		expect(ROUTES_BY_ROLE.seller).toHaveLength(33);
 		expect(ROUTES_BY_ROLE.seller).not.toContain("/seller-center/measures");
 		expect(ACCOUNT_ROUTES).toEqual(["/seller/inquiries", "/seller/measures"]);
-		expect(PROTECTED_STATIC_ROUTES).toHaveLength(58);
+		expect(PROTECTED_STATIC_ROUTES).toHaveLength(59);
 		expect(ROUTES_BY_ROLE.buyer).not.toContain("/account/find-sellers");
 		expect(ROUTES_BY_ROLE.buyer).toContain(
 			"/account/messages/assistant/procurement",

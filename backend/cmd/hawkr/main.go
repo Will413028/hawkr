@@ -55,6 +55,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -299,6 +301,7 @@ func runServe(ctx context.Context) error {
 		Buyer:           buyerModule,
 		Seller:          sellerModule,
 		Payment:         payments,
+		BizCalendar:     bizcalendar.New(d, adminaudit.New(d, time.Now)),
 		Discovery:       discoveryModule,
 		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
 		Stats:           stats,

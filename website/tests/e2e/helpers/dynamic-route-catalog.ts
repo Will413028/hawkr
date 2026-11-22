@@ -158,6 +158,11 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		fixture: "protected-placeholder",
 	},
 	{
+		pattern: "/account/reports/[id]",
+		access: "buyer",
+		fixture: "protected-placeholder",
+	},
+	{
 		pattern: "/account/wallet/[sellerId]",
 		access: "buyer",
 		fixture: "protected-placeholder",

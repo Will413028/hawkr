@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
@@ -258,6 +259,68 @@ func TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports(t *te
 	}
 }
 
+// A6-D22 店家退場：同 transaction 清掉該店作為檢舉人的說明、冪等紀錄與每日計數列；檢舉列與 reporter_store_id 留著，買家檢舉人與別的店家的資料不動；重送事件是 no-op。
+func TestStoreRetirementClearsStoreReporterDataButKeepsTheReports(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID, storeAccount := f.exposableStore(t)
+	otherStore, _ := f.exposableStore(t)
+	b, _ := f.newBuyer(t)
+	_, ids := f.seedChat(t, b, storeID, 4, 0)
+	_, otherIDs := f.seedChat(t, b, otherStore, 4, 0)
+	mineRID, otherRID, buyerRID := uuid.New(), uuid.New(), uuid.New()
+	// 店家檢舉買家寄的單數訊息；買家只能檢舉店家寄的雙數訊息（檢舉自己的內容回 InvalidInput）。
+	target, otherTarget := Target{Kind: TargetChatMessage, ContentID: ids[1]}, Target{Kind: TargetChatMessage, ContentID: otherIDs[1]}
+	buyerTarget := Target{Kind: TargetChatMessage, ContentID: ids[2]}
+	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: storeID, Target: target, Category: policy.Harassment, Description: "店家的說明", RequestID: &mineRID}))
+	theirs := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: otherStore, Target: otherTarget, Category: policy.Harassment, Description: "別的店家的說明", RequestID: &otherRID}))
+	buyerReport := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: b, Target: buyerTarget, Category: policy.Harassment, Description: "買家的說明", RequestID: &buyerRID}))
+	if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID); n != 1 {
+		t.Fatalf("送出之後店家有一筆冪等紀錄：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1", storeID); n != 1 {
+		t.Fatalf("送出之後店家有每日計數列：%d", n)
+	}
+	retire := func() {
+		t.Helper()
+		err := f.db.InTx(ctx, func(ctx context.Context) error {
+			return events.Publish(ctx, f.bus, seller.StoreRetired{OccurredAt: f.clock(), EventID: uuid.NewV7(), StoreID: storeID, AccountID: storeAccount})
+		})
+		if err != nil {
+			t.Fatalf("發 StoreRetired：%v", err)
+		}
+	}
+	check := func(round string) {
+		t.Helper()
+		if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND reporter_store_id = $2 AND description IS NULL", mine.Report.ID, storeID); n != 1 {
+			t.Fatalf("%s：店家的說明要清掉，檢舉列與 reporter_store_id 留著", round)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID); n != 0 {
+			t.Fatalf("%s：店家的冪等紀錄要刪：%d", round, n)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1", storeID); n != 0 {
+			t.Fatalf("%s：店家的每日計數列要刪：%d", round, n)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND description = '別的店家的說明'", theirs.Report.ID); n != 1 {
+			t.Fatalf("%s：別的店家的說明不能動", round)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.reports WHERE id = $1 AND reporter_buyer_id = $2 AND description = '買家的說明'", buyerReport.Report.ID, b); n != 1 {
+			t.Fatalf("%s：買家檢舉人的說明不能動", round)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1 OR reporter_store_id = $2", b, otherStore); n != 2 {
+			t.Fatalf("%s：買家與別的店家的冪等紀錄不能動：%d", round, n)
+		}
+		if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1 OR reporter_store_id = $2", b, otherStore); n != 2 {
+			t.Fatalf("%s：買家與別的店家的每日計數列不能動：%d", round, n)
+		}
+	}
+	retire()
+	check("退場")
+	retire()
+	check("重送事件")
+}
+
 // A7-D21：冪等紀錄（request_hash 是說明的雜湊）跟說明同一天清（結案滿 184 天）；進行中案件的不清。
 func TestReportRequestsArePurgedWithTheDescriptions(t *testing.T) {
 	t.Parallel()
@@ -336,5 +399,77 @@ func TestTakedownOfDeletedStoreContentVerifiesAgainstTheSnapshotAndStillCreatesT
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.finding_moderation_reports"); n != 1 {
 		t.Fatalf("認定引用的來源檢舉 %d 筆，預期 1", n)
+	}
+}
+
+// A6-D22 退場的店不能再以檢舉人身分送出：店在營運中先送出一筆進行中的檢舉，關店退場後換新的 request_id 送同一個對象，走的是凍結之前的「併入進行中案件」
+// （recordRequest）路徑，這條路不經過 CapChatRead，只有 report.attempt 開頭的 LockNotRetired 擋得住，回 NotFound，不新增冪等紀錄也不加每日計數；同一個 request_id 重送也一樣被擋。
+// mutation：拿掉 report.lockReporter 的店家分支 → 退場後的送出成功，斷言失敗。
+func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID, storeAccount := f.exposableStoreOnIdentityAccount(t)
+	b, _ := f.newBuyer(t)
+	_, ids := f.seedChat(t, b, storeID, 4, 0)
+	target := Target{Kind: TargetChatMessage, ContentID: ids[1]}
+	firstRID, secondRID := uuid.New(), uuid.New()
+	in := SubmitInput{ReporterStoreID: storeID, Target: target, Category: policy.Harassment, Description: "退場前的說明", RequestID: &firstRID}
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, in))
+	if _, err := f.seller.CloseCurrent(ctx, storeAccount); err != nil {
+		t.Fatalf("關店：%v", err)
+	}
+	f.exec(t, `UPDATE seller.stores SET retired_at = $2, description = NULL, prize = NULL, website_url = NULL,
+		logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID, f.clock())
+	counts := func() (reports, requests, submitted int) {
+		reports = f.count(t, "SELECT count(*) FROM moderation.reports WHERE reporter_store_id = $1", storeID)
+		requests = f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID)
+		submitted = f.count(t, "SELECT coalesce(sum(submitted), 0) FROM moderation.reporter_daily_counts WHERE reporter_store_id = $1", storeID)
+		return
+	}
+	wantReports, wantRequests, wantSubmitted := counts()
+	if wantReports != 1 || wantRequests != 1 || wantSubmitted != 1 {
+		t.Fatalf("退場前各有一筆：%d %d %d", wantReports, wantRequests, wantSubmitted)
+	}
+	for name, rid := range map[string]uuid.UUID{"新的 request_id（併入進行中案件）": secondRID, "同一個 request_id（重送）": firstRID} {
+		in.RequestID = &rid
+		_, err := f.module.SubmitReport(ctx, in)
+		if kindOf(err) != apperr.KindNotFound {
+			t.Fatalf("%s：已退場的店送出要 NotFound：%v", name, err)
+		}
+		if r, q, s := counts(); r != wantReports || q != wantRequests || s != wantSubmitted {
+			t.Fatalf("%s：不能新增檢舉、冪等紀錄與每日計數：%d %d %d", name, r, q, s)
+		}
+	}
+}
+
+// 買家檢舉人沒有凍結前的擋：關閉（帳號刪除完成）的買家換新的 request_id 送同一個對象，走併入進行中案件的 recordRequest 路徑，只有 LockNotClosed 擋得住。
+// mutation：拿掉 report.lockReporter 的買家分支 → 關閉後的送出成功，斷言失敗。
+func TestClosedBuyerCannotSubmitAsReporter(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	ctx := context.Background()
+	reporter, _ := f.newBuyer(t)
+	firstRID, secondRID := uuid.New(), uuid.New()
+	in := SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Spam, Description: "關閉前的說明", RequestID: &firstRID}
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, in))
+	must(t, f.buyer.BeginDeletion(ctx, reporter))
+	must(t, f.buyer.CloseForDeletion(ctx, reporter))
+	counts := func() (requests, submitted int) {
+		requests = f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_buyer_id = $1", reporter)
+		submitted = f.count(t, "SELECT coalesce(sum(submitted), 0) FROM moderation.reporter_daily_counts WHERE reporter_buyer_id = $1", reporter)
+		return
+	}
+	wantRequests, wantSubmitted := counts()
+	for name, rid := range map[string]uuid.UUID{"新的 request_id（併入進行中案件）": secondRID, "同一個 request_id（重送）": firstRID} {
+		in.RequestID = &rid
+		_, err := f.module.SubmitReport(ctx, in)
+		if kindOf(err) != apperr.KindNotFound {
+			t.Fatalf("%s：已關閉的買家送出要 NotFound：%v", name, err)
+		}
+		if q, s := counts(); q != wantRequests || s != wantSubmitted {
+			t.Fatalf("%s：不能新增冪等紀錄與每日計數：%d %d", name, q, s)
+		}
 	}
 }

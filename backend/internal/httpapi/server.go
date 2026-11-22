@@ -24,11 +24,13 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
 	httpassistant "github.com/Will413028/hawkr/backend/internal/httpapi/assistant"
+	httpbizcalendar "github.com/Will413028/hawkr/backend/internal/httpapi/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
+	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -65,6 +67,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 )
 
 // Deps 是 handler 需要的外部依賴，全部在組裝點提供。
@@ -90,6 +93,8 @@ type Deps struct {
 	Seller   *seller.Module
 	// Payment 是收款帳戶（payment 模組）：賣家的收款帳戶 RPC（seller 確認擁有者之後呼叫）、PaymentAdminService 與收款 webhook。
 	Payment *payment.Module
+	// BizCalendar 是工作日行事曆（platform/bizcalendar）：BizCalendarAdminService 的匯入與涵蓋查詢。
+	BizCalendar *bizcalendar.Store
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
@@ -159,6 +164,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Payment == nil {
 		return nil, fmt.Errorf("httpapi：PaymentAdminService 與收款 webhook 需要 Payment")
+	}
+	if deps.BizCalendar == nil {
+		return nil, fmt.Errorf("httpapi：BizCalendarAdminService 需要 BizCalendar")
 	}
 	if deps.Social == nil {
 		return nil, fmt.Errorf("httpapi：SellerGovernanceAdminService 需要 Social")
@@ -381,6 +389,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
 	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
+	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、

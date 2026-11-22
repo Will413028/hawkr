@@ -234,3 +234,18 @@ test("the same normalized location is counted only once", () => {
 		true,
 	);
 });
+
+test("my reports routes keep a static list path and mask the report id", () => {
+	assert.equal(
+		privacySafeRoutePathname("/account/reports"),
+		"/account/reports",
+	);
+	assert.equal(
+		privacySafeRoutePathname("/account/reports/8438563840634"),
+		"/account/reports/:id",
+	);
+	assert.equal(
+		privacySafeRoutePathname("/en/account/reports/8438563840634"),
+		"/en/account/reports/:id",
+	);
+});

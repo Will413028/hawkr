@@ -50,6 +50,12 @@ export const queryKeys = {
 			["buyer", ...idPrefix(id), "profile"] as const,
 		addresses: (id: QueryIdentity) =>
 			["buyer", ...idPrefix(id), "addresses"] as const,
+		// 我的檢舉（moderation `ListMyReports`）與單筆店家檢舉（seller `GetMyReport`）。單筆是 string slot，
+		// 與列表同在 `myReports` 前綴下，補充失敗時一次 invalidate 兩者。
+		myReports: (id: QueryIdentity) =>
+			["buyer", ...idPrefix(id), "my-reports"] as const,
+		myReport: (id: QueryIdentity, reportId: string) =>
+			["buyer", ...idPrefix(id), "my-reports", reportId] as const,
 		coupons: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["buyer", ...idPrefix(id), "coupons", params ?? {}] as const,
 		availableCoupons: (id: QueryIdentity, params?: Record<string, unknown>) =>

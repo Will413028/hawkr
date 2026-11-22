@@ -14,6 +14,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -233,7 +234,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 }
 
 // platformDirs 是 platformData 每個 schema 的套件目錄（相對於 backend/）。
-var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox", adminaudit.Schema: "internal/platform/adminaudit"}
+var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox", adminaudit.Schema: "internal/platform/adminaudit", bizcalendar.Schema: "internal/platform/bizcalendar"}
 
 // sourceDir 是 schema 的原始碼目錄（相對於 backend/）：platform 的在 platformDirs，模組的是 internal/modules/<名稱>。
 func sourceDir(name string) string {

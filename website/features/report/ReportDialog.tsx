@@ -1,22 +1,26 @@
 "use client";
 
-import { Code } from "@connectrpc/connect";
-import { fieldMessage, submitError } from "@hawkr/api/connect/submit";
+import { fieldMessage } from "@hawkr/api/connect/submit";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
-import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
+import { trimGoSpace } from "@hawkr/api/text/server-text";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Input, Select, Textarea } from "@/components/ui";
+import { Input, Select } from "@/components/ui";
 import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import AfterSalePhotoUploader, {
-	type StagedPhoto,
-} from "@/features/after-sales/components/AfterSalePhotoUploader";
+import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
+import { queryKeys } from "@/lib/query/keys";
 import { createReport } from "./api";
 import {
+	DescriptionField,
+	EvidenceField,
+	submitFailureView,
+	useEvidenceUploads,
+} from "./ReportFormParts";
+import {
 	DESCRIPTION_MAX,
-	EVIDENCE_MAX,
 	ORDER_NO_MAX,
 	type ReportFormError,
 	reportCategoryOptions,
@@ -52,30 +56,27 @@ export default function ReportDialog({
 }: ReportDialogProps) {
 	const t = useTranslations("report");
 	const ut = useUiText();
+	const queryClient = useQueryClient();
+	const identity = useQueryIdentity();
 	const defaults = useDefaultErrorText();
 	const categories = React.useMemo(() => reportCategoryOptions(ut), [ut]);
 	const [category, setCategory] = React.useState<string>("");
 	const [description, setDescription] = React.useState("");
 	const [orderNo, setOrderNo] = React.useState("");
-	const [photos, setPhotos] = React.useState<StagedPhoto[]>([]);
-	const [uploading, setUploading] = React.useState(false);
+	const evidence = useEvidenceUploads(open);
+	const { uploading } = evidence;
 	const [busy, setBusy] = React.useState(false);
 	const [showErrors, setShowErrors] = React.useState(false);
 	const [serverFields, setServerFields] = React.useState<
 		Record<string, string>
 	>({});
 	const [outcome, setOutcome] = React.useState<Outcome>({ kind: "idle" });
-	const countId = React.useId();
-	const generation = React.useRef(0);
-	const uploadGeneration = React.useRef(0);
 
 	React.useEffect(() => {
-		generation.current += 1;
 		if (!open) return;
 		setCategory("");
 		setDescription("");
 		setOrderNo("");
-		setPhotos([]);
 		setShowErrors(false);
 		setServerFields({});
 		setOutcome({ kind: "idle" });
@@ -119,31 +120,19 @@ export default function ReportDialog({
 				description: trimGoSpace(description),
 				productId: product?.id,
 				orderNo: trimGoSpace(orderNo),
-				evidenceStagedTokens: photos.map((p) => p.token),
+				evidenceStagedTokens: evidence.tokens,
+			});
+			void queryClient.invalidateQueries({
+				queryKey: queryKeys.buyer.myReports(identity),
 			});
 			setOutcome({
 				kind: "done",
 				message: reportSuccessText(response, t("received")),
 			});
 		} catch (e) {
-			const failure = submitError(e, defaults);
-			if (failure.kind === "fields") setServerFields(failure.fields);
-			const unmatched =
-				failure.kind === "fields" &&
-				!Object.keys(failure.fields).some((k) => RENDERED_FIELDS.has(k));
-			setOutcome({
-				kind: "error",
-				message:
-					failure.kind === "fields"
-						? unmatched
-							? Object.values(failure.fields).join("；") ||
-								failure.message ||
-								defaults(Code.InvalidArgument)
-							: (failure.message ?? "")
-						: failure.kind === "message"
-							? failure.message
-							: defaults(Code.Internal),
-			});
+			const failure = submitFailureView(e, defaults, RENDERED_FIELDS);
+			setServerFields(failure.fields);
+			setOutcome({ kind: "error", message: failure.message });
 		} finally {
 			setBusy(false);
 		}
@@ -230,31 +219,16 @@ export default function ReportDialog({
 							</option>
 						))}
 					</Select>
-					<div className="grid gap-1">
-						<Textarea
-							label={t("description")}
-							variant="bordered"
-							size="lg"
-							isRequired
-							value={description}
-							onChange={(e) => {
-								setDescription(e.target.value);
-								clearServerField("description");
-							}}
-							placeholder={t("descriptionPlaceholder")}
-							minRows={4}
-							aria-describedby={countId}
-							disabled={busy}
-							isInvalid={fieldError("description", "description") !== undefined}
-							errorMessage={fieldError("description", "description")}
-						/>
-						<span
-							id={countId}
-							className="text-right text-xs text-hk-muted tabular-nums"
-						>
-							{goTrimmedRuneCount(description)}/{DESCRIPTION_MAX}
-						</span>
-					</div>
+					<DescriptionField
+						value={description}
+						onChange={(next) => {
+							setDescription(next);
+							clearServerField("description");
+						}}
+						placeholder={t("descriptionPlaceholder")}
+						disabled={busy}
+						error={fieldError("description", "description")}
+					/>
 					<Input
 						variant="bordered"
 						size="lg"
@@ -268,28 +242,12 @@ export default function ReportDialog({
 						isInvalid={fieldError("orderNo", "order_no") !== undefined}
 						errorMessage={fieldError("orderNo", "order_no")}
 					/>
-					<AfterSalePhotoUploader
-						value={photos}
-						onChange={(next) => {
-							if (uploadGeneration.current !== generation.current) return;
-							setPhotos(next);
-							clearServerField("evidence_staged_tokens");
-						}}
-						max={EVIDENCE_MAX}
+					<EvidenceField
+						evidence={evidence}
 						disabled={busy}
-						label={t("evidence")}
-						hint={t("evidenceHint", { max: EVIDENCE_MAX })}
-						onUploadingChange={(v) => {
-							if (v) uploadGeneration.current = generation.current;
-							setUploading(v);
-						}}
 						error={fieldMessage(serverFields, "evidence_staged_tokens")}
+						onChanged={() => clearServerField("evidence_staged_tokens")}
 					/>
-					{uploading ? (
-						<p className="m-0 text-xs text-hk-muted" role="status">
-							{t("uploadingWait")}
-						</p>
-					) : null}
 					{outcome.kind === "error" && outcome.message ? (
 						<p
 							className="m-0 text-sm font-semibold text-danger-700"

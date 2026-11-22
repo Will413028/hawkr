@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+// bizcalendar 給後台的 API：平台的工作日行事曆（假日資料）。資料來源是人事行政總處的政府機關辦公日曆表逐日 CSV，一年一份；
+// 匯入的年份才算涵蓋，沒有匯入的年份平台不替任何人猜哪一天是工作天。
+package hawkr.admin.bizcalendar.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/type/date.proto";
+
+// BizCalendarAdminService 只有管理員能呼叫。
+service BizCalendarAdminService {
+  // ImportHolidayCalendar 匯入一年的辦公日曆表並整年取代該年原有的資料（同一個交易；已匯入的年份重匯就是更正）。
+  // csv_content 是辦公日曆表 CSV 的全文：UTF-8（可帶 BOM），表頭 `西元日期,星期,是否放假,備註`，日期 `YYYYMMDD`，
+  // 是否放假只有 `0`（上班）與 `2`（放假）。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
+  // 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
+  // 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
+  rpc ImportHolidayCalendar(ImportHolidayCalendarRequest) returns (ImportHolidayCalendarResponse);
+
+  // GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空、last_covered_date 不設。不分頁：
+  // 一年一列，筆數是已匯入的年數。
+  rpc GetHolidayCalendarCoverage(GetHolidayCalendarCoverageRequest) returns (GetHolidayCalendarCoverageResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message ImportHolidayCalendarRequest {
+  // 要匯入的西元年（1 到 9999）。CSV 每一列的年份都必須等於它，避免選錯年或傳錯檔而覆寫別年的資料。
+  int32 year = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // 辦公日曆表 CSV 的全文。
+  string csv_content = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ImportHolidayCalendarResponse {
+  // 匯入後該年的涵蓋狀態。
+  HolidayCalendarYear year = 1;
+
+  // 被取代的該年原有天數；第一次匯入該年時為 0。
+  int32 replaced_day_count = 2;
+}
+
+message GetHolidayCalendarCoverageRequest {}
+
+message GetHolidayCalendarCoverageResponse {
+  // 已匯入的年份，依年份由小到大。
+  repeated HolidayCalendarYear years = 1;
+
+  // 已匯入的最後一年的 12 月 31 日。年份之間可能有缺：各年是否涵蓋看 years。沒有任何年份時不設。
+  google.type.Date last_covered_date = 2;
+}
+
+// HolidayCalendarYear 是一個已匯入的年份。
+message HolidayCalendarYear {
+  // 西元年。
+  int32 year = 1;
+
+  // 該年的天數（365 或 366）。
+  int32 day_count = 2;
+
+  // 該年放假的天數（是否放假為 2 的列：週末、國定假日與補假）。
+  int32 holiday_count = 3;
+}

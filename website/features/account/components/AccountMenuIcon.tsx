@@ -21,7 +21,8 @@ export type AccountMenuIconName =
 	| "profile"
 	| "addresses"
 	| "invoiceProfiles"
-	| "findSellers";
+	| "findSellers"
+	| "reports";
 
 interface AccountMenuIconProps {
 	name: AccountMenuIconName;
@@ -41,6 +42,7 @@ const ACCOUNT_MENU_ICONS: Record<AccountMenuIconName, AppIconName> = {
 	addresses: "location",
 	invoiceProfiles: "document",
 	findSellers: "sparkle",
+	reports: "flag",
 };
 
 export default function AccountMenuIcon({
