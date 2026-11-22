@@ -5,7 +5,7 @@ package media_test
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // 測試用的 Content-MD5
 	"encoding/base64"
 	"errors"
 	stdimage "image"

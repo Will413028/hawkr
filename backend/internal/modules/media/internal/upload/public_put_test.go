@@ -69,7 +69,7 @@ func TestPublicErr_ClassifiesInputProblemsAndPipelineFailures(t *testing.T) {
 	if got == nil || apperr.KindOf(got) == apperr.KindInvalidInput || !errors.Is(got, image.ErrProcessing) {
 		t.Fatalf("err = %v，管線自己的失敗不該說成輸入不合法", got)
 	}
-	if boom := errors.New("boom"); publicErr(boom) != boom {
+	if boom := errors.New("boom"); !errors.Is(publicErr(boom), boom) {
 		t.Fatal("其他錯誤應原樣回傳")
 	}
 }
