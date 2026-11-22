@@ -39,6 +39,9 @@ type Starter struct {
 func (s Starter) Start(ctx context.Context, in StartInput) (Started, error) {
 	runID, err := s.Submitter.Submit(ctx, run.SubmitInput{
 		BuyerID: in.BuyerID, RequestID: in.RequestID, RunType: run.RunTypeCandidateSearch, ClientRequestID: in.ClientRequestID,
+		CheckRequest: func(ctx context.Context, q *store.Queries) error {
+			return s.check(ctx, q, in)
+		},
 		PrepareCandidateSet: func(ctx context.Context, q *store.Queries) (uuid.UUID, error) {
 			return s.prepare(ctx, q, in)
 		},
