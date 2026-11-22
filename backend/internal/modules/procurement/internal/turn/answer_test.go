@@ -44,12 +44,11 @@ func TestCheckShapeReportsFieldViolationsWithoutAReason(t *testing.T) {
 		in     ResumeInput
 		fields []string
 	}{
-		"both set":                 {ResumeInput{OptionID: "category-2", FreeText: "x"}, []string{"OptionID", "FreeText"}},
-		"neither set":              {ResumeInput{}, []string{"OptionID", "FreeText"}},
-		"blank text":               {ResumeInput{FreeText: "  "}, []string{"FreeText"}},
-		"option not on it":         {ResumeInput{OptionID: "category-999"}, []string{"OptionID"}},
-		"text too long":            {ResumeInput{FreeText: long}, []string{"FreeText"}},
-		"option beside blank text": {ResumeInput{OptionID: "category-2", FreeText: " "}, []string{"OptionID", "FreeText"}},
+		"both set":         {ResumeInput{OptionID: "category-2", FreeText: "x"}, []string{"OptionID", "FreeText"}},
+		"neither set":      {ResumeInput{}, []string{"OptionID", "FreeText"}},
+		"blank text":       {ResumeInput{FreeText: "  "}, []string{"FreeText"}},
+		"option not on it": {ResumeInput{OptionID: "category-999"}, []string{"OptionID"}},
+		"text too long":    {ResumeInput{FreeText: long}, []string{"FreeText"}},
 	} {
 		err := checkShape(item, tc.in)
 		var ae *apperr.Error
@@ -70,6 +69,7 @@ func TestCheckShapeReportsFieldViolationsWithoutAReason(t *testing.T) {
 	}
 	for name, in := range map[string]ResumeInput{
 		"option":            {OptionID: "category-2"},
+		"option and blank":  {OptionID: "category-2", FreeText: " "},
 		"text":              {FreeText: "蘋果乾"},
 		"text at the limit": {FreeText: strings.Repeat("字", MaxFreeTextRunes)},
 	} {
@@ -116,7 +116,6 @@ func TestDecideAnswerInvalidFailsAsAnswerRejected(t *testing.T) {
 	for name, out := range map[string]Outcome{
 		"invalid":            invalid(InvalidResolutionReject),
 		"interrupt w/o card": {Kind: OutcomeInterrupt},
-		"zero outcome":       {},
 	} {
 		_, err := decideAnswer(uitext.ZhTW, now, priorState{}, out)
 		var f *run.FailureError
@@ -129,6 +128,14 @@ func TestDecideAnswerInvalidFailsAsAnswerRejected(t *testing.T) {
 		if !errors.As(err, &f) || f.Reason != run.FailureAnswerRejected {
 			t.Errorf("%s：要 ANSWER_REJECTED，得到 %v", name, err)
 		}
+	}
+}
+
+func TestDecideAnswerUnknownOutcomeIsAPlainError(t *testing.T) {
+	_, err := decideAnswer(uitext.ZhTW, now, priorState{}, Outcome{})
+	var f *run.FailureError
+	if err == nil || errors.As(err, &f) {
+		t.Errorf("零值結果要是一般錯誤（不是 ANSWER_REJECTED）：%v", err)
 	}
 }
 

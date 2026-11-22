@@ -182,7 +182,7 @@ func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestore
 func (f *fixture) waitForLockWaiter(ctx context.Context) {
 	f.t.Helper()
 	for {
-		if f.count(`SELECT count(*) FROM pg_locks WHERE NOT granted`) > 0 {
+		if f.count(`SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE NOT l.granted AND a.datname = current_database()`) > 0 {
 			return
 		}
 		select {

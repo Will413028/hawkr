@@ -67,7 +67,7 @@ func (a AnswerExecutor) Execute(ctx context.Context, r store.ProcurementAgentRun
 	return e.commit(ctx, ld, d, now)
 }
 
-// decideAnswer 把 ApplyAnswer 的結果接成這一輪的 decision：解析成功時只帶品項解析的 patch，再問時沿用新卡；答案無效是 ANSWER_REJECTED。
+// decideAnswer 把 ApplyAnswer 的結果接成這一輪的 decision：解析成功時只帶品項解析的 patch，再問時沿用新卡；只有 OutcomeInvalid 是 ANSWER_REJECTED，其他結果是一般錯誤。
 func decideAnswer(l uitext.Locale, now time.Time, prior priorState, out Outcome) (decision, error) {
 	switch out.Kind {
 	case OutcomeResolved:
@@ -83,8 +83,9 @@ func decideAnswer(l uitext.Locale, now time.Time, prior priorState, out Outcome)
 		}
 		return finish(l, prior, slots.Patch{}, prior.current, nil, out.card), nil
 	case OutcomeInvalid:
+		return decision{}, &run.FailureError{Reason: run.FailureAnswerRejected, Err: fmt.Errorf("turn：答案被拒：%s", out.Reason)}
 	}
-	return decision{}, &run.FailureError{Reason: run.FailureAnswerRejected, Err: fmt.Errorf("turn：答案被拒：%s", out.Reason)}
+	return decision{}, fmt.Errorf("turn：未知的回答結果：%d", out.Kind)
 }
 
 // answerText 是對話裡顯示的買家回答：選項是卡上的標籤，文字是去頭尾空白後的原文。

@@ -37,13 +37,31 @@
    "why": "拿掉「選項在卡上」的檢查：client 可以送卡外的選項"
   },
   {
-   "id": "shape-both-raw",
+   "id": "shape-state-first",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/turn/resume.go",
-   "old": "if in.OptionID != \"\" && in.FreeText != \"\" {",
-   "new": "if false {",
+   "old": "if irq.Status == \"PENDING\" {",
+   "new": "if true {",
+   "test": "internal/modules/procurement ^TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput$",
+   "why": "已回答的中斷也先做形狀檢查：卡外選項回 INVALID_ARGUMENT 而不是 APPROVAL_ALREADY_RESOLVED"
+  },
+  {
+   "id": "shape-option-blank-text",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "text := trimtext.Trim(a.FreeText)",
+   "new": "text := a.FreeText",
    "test": "internal/modules/procurement/internal/turn ^TestCheckShapeReportsFieldViolationsWithoutAReason$",
-   "why": "選項加空白文字被當成只給選項（FreeText 非空就是「給了」）"
+   "why": "CheckAnswer 不先去空白：選項加空白文字被當成兩個都給"
+  },
+  {
+   "id": "decide-unknown-outcome",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/answer.go",
+   "old": "return decision{}, fmt.Errorf(\"turn：未知的回答結果：%d\", out.Kind)",
+   "new": "return decision{}, &run.FailureError{Reason: run.FailureAnswerRejected, Err: errors.New(\"x\")}",
+   "test": "internal/modules/procurement/internal/turn ^TestDecideAnswerUnknownOutcomeIsAPlainError$",
+   "why": "零值或未知結果也當成 ANSWER_REJECTED"
   },
   {
    "id": "shape-too-long",

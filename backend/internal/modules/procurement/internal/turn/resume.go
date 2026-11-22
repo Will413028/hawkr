@@ -47,8 +47,8 @@ const (
 	fieldFreeText = "FreeText"
 )
 
-// Resume 回答買家自己的中斷。不是這位買家的中斷回 NOT_FOUND；回答形狀不合回 INVALID_ARGUMENT 並指出欄位（option_id 與 free_text 恰一個、文字不是只有空白且不超過 2000 字元、選項在待回答的卡上），
-// 沒有新增 ErrorReason；其餘（已回答、不在等待、同需求進行中、上限、重送）依 run.Submitter.Resume。
+// Resume 回答買家自己的中斷。不是這位買家的中斷回 NOT_FOUND；中斷不在 PENDING（已回答、已取消）不看回答形狀，一律交給 run.Submitter.Resume（重送回原回答 run，否則 APPROVAL_ALREADY_RESOLVED／RUN_NOT_ACTIVE），同一個中斷不論輸入都得到同一個代碼；
+// PENDING 時回答形狀不合回 INVALID_ARGUMENT 並指出欄位（以 CheckAnswer 為準：free_text 先去頭尾空白，option_id 與非空白文字恰一個，只有空白的文字加選項算只答選項，選項在待回答的卡上；另加不超過 2000 字元），沒有新增 ErrorReason；其餘（同需求進行中、上限）依 run.Submitter.Resume。
 func (r Resumer) Resume(ctx context.Context, in ResumeInput) (Resumed, error) {
 	q := store.New(r.Submitter.DB.Conn(ctx))
 	irq, err := q.GetInterruptForBuyer(ctx, store.GetInterruptForBuyerParams{ID: in.InterruptID, BuyerID: in.BuyerID})
@@ -58,12 +58,14 @@ func (r Resumer) Resume(ctx context.Context, in ResumeInput) (Resumed, error) {
 	if err != nil {
 		return Resumed{}, fmt.Errorf("turn：讀取中斷：%w", err)
 	}
-	var p InterruptPayload
-	if err := json.Unmarshal(irq.Payload, &p); err != nil {
-		return Resumed{}, fmt.Errorf("turn：解析中斷 payload：%w", err)
-	}
-	if err := checkShape(p, in); err != nil {
-		return Resumed{}, err
+	if irq.Status == "PENDING" {
+		var p InterruptPayload
+		if err := json.Unmarshal(irq.Payload, &p); err != nil {
+			return Resumed{}, fmt.Errorf("turn：解析中斷 payload：%w", err)
+		}
+		if err := checkShape(p, in); err != nil {
+			return Resumed{}, err
+		}
 	}
 	id, err := r.Submitter.Resume(ctx, run.ResumeInput{
 		BuyerID: in.BuyerID, InterruptID: in.InterruptID, ClientRequestID: in.ClientRequestID,
@@ -83,9 +85,6 @@ func (r Resumer) Resume(ctx context.Context, in ResumeInput) (Resumed, error) {
 func checkShape(p InterruptPayload, in ResumeInput) error {
 	if utf8.RuneCountInString(trimtext.Trim(in.FreeText)) > MaxFreeTextRunes {
 		return apperr.InvalidInputOn([]string{fieldFreeText}, "回答的文字不能超過 %d 個字元", MaxFreeTextRunes)
-	}
-	if in.OptionID != "" && in.FreeText != "" {
-		return apperr.InvalidInputOn([]string{fieldOptionID, fieldFreeText}, "選項與文字只能回答其中一個")
 	}
 	switch CheckAnswer(p, Answer{OptionID: in.OptionID, FreeText: in.FreeText}) {
 	case "":

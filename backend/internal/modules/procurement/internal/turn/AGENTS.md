@@ -19,4 +19,4 @@ TURN 與 CLARIFICATION_RESUME 類型 run 的 executor（A9-D24(2)、A9-D28、A9-
 - `turn_result` 與中斷 payload 的線格式是手工 proto JSON（`wire.go`）：`testdata/*.golden.json` 釘住產生器輸出，`internal/httpapi/procurement_wire_test.go` 以 protojson 解析同一批檔案；刻意改格式用 `UPDATE_GOLDEN=1`。
 - `TurnResult.quota`、`steps`、`evidence_refs` 不填；`agent_runs.result_revision_id` 不寫（3b-2e 決定留或刪）。
 - 回答中斷（`AnswerExecutor`，不呼叫模型、不扣額度）：`ApplyAnswer` 的結果經 `finish`（與 `decide` 共用的尾段）接成同一種 `decision`，`commit` 寫 `source = ANSWER` 的新版本與輪次（買家訊息是選項標籤或去空白的原文），提交點同交易解決中斷與提問的 run；`OutcomeInvalid` 是 `run.FailureError{ANSWER_REJECTED}`，中斷維持 PENDING、不還原。
-- `ResumeRun`（`Resumer`）同步做 `CheckAnswer` 形狀檢查（A9-D30(1)）：`OptionID`／`FreeText` 恰一個、文字去空白後非空且不超過 2000 字元、選項在卡上，不合回 INVALID_ARGUMENT 附欄位違規、不建 run；分類解析留給 executor。
+- `ResumeRun`（`Resumer`）同步做 `CheckAnswer` 形狀檢查（A9-D30(1)）：非 PENDING 先交給 run.Submitter.Resume；PENDING 以 `CheckAnswer` 為準（文字先去空白，選項與非空白文字恰一個，選項在卡上）加不超過 2000 字元，不合回 INVALID_ARGUMENT 附欄位違規、不建 run；分類解析留給 executor。

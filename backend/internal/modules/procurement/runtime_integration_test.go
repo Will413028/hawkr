@@ -254,6 +254,39 @@ func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) { // A9-D30(
 	}
 }
 
+func TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput(t *testing.T) { // A9-D30(1)
+	ctx := context.Background()
+	m, d := runtimeModule(t)
+	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
+	irq := ask(ctx, t, d, c)
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_run_interrupts SET status = 'RESOLVED', closed_at = now() WHERE id = $1`, irq); err != nil {
+		t.Fatal(err)
+	}
+	for name, in := range map[string]ResumeRunInput{
+		"卡外選項": {OptionID: "category-999"},
+		"都沒給":  {},
+		"卡上選項": {OptionID: "category-21"},
+	} {
+		in.BuyerID, in.InterruptID, in.ClientRequestID, in.Locale = 7, irq, id(), uitext.ZhTW
+		_, err := m.ResumeRun(ctx, in)
+		var ae *apperr.Error
+		if !errors.As(err, &ae) || ae.Reason != apperr.ReasonApprovalAlreadyResolved {
+			t.Errorf("%s：%v，要 APPROVAL_ALREADY_RESOLVED", name, err)
+		}
+	}
+}
+
+func TestResumeRunTreatsAnOptionBesideBlankTextAsOptionOnly(t *testing.T) { // A9-D30(1)
+	ctx := context.Background()
+	m, d := runtimeModule(t)
+	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
+	irq := ask(ctx, t, d, c)
+	got, err := m.ResumeRun(ctx, ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", FreeText: " ", Locale: uitext.ZhTW})
+	if err != nil || got.Status != "QUEUED" {
+		t.Errorf("選項加空白文字算只答選項：%+v %v", got, err)
+	}
+}
+
 func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A9-D30(2)
 	ctx := context.Background()
 	m, d := runtimeModule(t)
