@@ -28,6 +28,7 @@ import (
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpcrm "github.com/Will413028/hawkr/backend/internal/httpapi/crm"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
@@ -42,6 +43,7 @@ import (
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1/chatv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1/crmv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
@@ -59,6 +61,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -104,6 +107,8 @@ type Deps struct {
 	Review *review.Module
 	// IM 是買家與店家之間的聊天（ChatAppService）。
 	IM *im.Module
+	// CRM 是店家的客戶與標籤（CrmAppService）。
+	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
@@ -187,6 +192,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Identity == nil {
 		return nil, fmt.Errorf("httpapi：ChatAppService 串流的重新驗證需要 Identity")
+	}
+	if deps.CRM == nil {
+		return nil, fmt.Errorf("httpapi：CrmAppService 需要 CRM")
 	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
@@ -348,6 +356,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	chatPath, chatHandler := chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...)
 	add(chatPath, httpchat.WithStreamWriter(chatHandler))
+	crmApp, err := httpcrm.NewApp(deps.CRM, deps.CRM, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(crmv1alpha1connect.NewCrmAppServiceHandler(crmApp, opts...))
 	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
 	if err != nil {
 		return nil, err

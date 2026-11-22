@@ -1,0 +1,175 @@
+{
+ "mutants": [
+  {
+   "id": "crm-customer-contact-field-present",
+   "stack": "go",
+   "file": "backend/internal/httpapi/gen/hawkr/crm/v1alpha1/crm.pb.go",
+   "old": "\"\\x04tags\\x18\\a \\x03(\\v2\\x17.hawkr.crm.v1alpha1.TagB\\x03\\xe0A\\x03R\\x04tags\\\"\\xb3\\x02\\n\"",
+   "new": "\"\\x04mail\\x18\\a \\x03(\\v2\\x17.hawkr.crm.v1alpha1.TagB\\x03\\xe0A\\x03R\\x04mail\\\"\\xb3\\x02\\n\"",
+   "test": "internal/httpapi/crm ^TestCustomerAndEveryCrmResponseCarryNoContactFields$",
+   "why": "The Customer descriptor carries a contact-like field name (a same-length stand-in for adding phone back to the proto, because the runner does not regenerate code), so the CD8 descriptor walk must fail."
+  },
+  {
+   "id": "crm-store-ownership-check-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\tif st.StoreID != storeID {",
+   "new": "\tif st.StoreID != storeID && false {",
+   "test": "internal/httpapi/crm ^TestEveryMethodRequiresMarketingForTheCallersOwnStoreAndTouchesNothingOtherwise$",
+   "why": "A caller can act on a store that is not theirs: the store_id ownership check is gone."
+  },
+  {
+   "id": "crm-capability-not-marketing",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "h.stores.ActingStore(ctx, p.ID, declarations[procedure])",
+   "new": "h.stores.ActingStore(ctx, p.ID, seller.CapStorefrontWrite)",
+   "test": "internal/httpapi/crm ^TestEveryMethodRequiresMarketingForTheCallersOwnStoreAndTouchesNothingOtherwise$",
+   "why": "The seller capability checked for CRM is not the declared CAP_MARKETING."
+  },
+  {
+   "id": "crm-update-customer-mask-unchecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\tif !slices.Equal(paths, []string{\"type\"}) {",
+   "new": "\tif !slices.Equal(paths, []string{\"type\"}) && false {",
+   "test": "internal/httpapi/crm ^TestUpdateCustomerRejectsAnyMaskThatIsNotType$",
+   "why": "UpdateCustomer accepts a mask that does not list type, so a mask on a read-only field passes as a valid update."
+  },
+  {
+   "id": "crm-update-customer-ignores-requested-type",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "rpc.EnumFromProto[crm.CustomerType](c.GetType())",
+   "new": "crm.TypeVIP",
+   "test": "internal/httpapi/crm ^TestUpdateCustomerSetsOnlyTheType$",
+   "why": "UpdateCustomer always writes VIP instead of the requested type."
+  },
+  {
+   "id": "crm-update-tag-mask-unchecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\tif !slices.Equal(paths, []string{\"name\"}) {",
+   "new": "\tif !slices.Equal(paths, []string{\"name\"}) && false {",
+   "test": "internal/httpapi/crm ^TestUpdateTagRejectsMasksOtherThanNameAndMapsErrors$",
+   "why": "UpdateTag accepts a mask that does not list name."
+  },
+  {
+   "id": "crm-list-tag-filter-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "in.TagID, tagKey = &id, id.String()",
+   "new": "in.TagID, tagKey = nil, id.String()",
+   "test": "internal/httpapi/crm ^TestListCustomersPassesFilterSortAndPaging$",
+   "why": "The single-tag filter is parsed but never passed to the module."
+  },
+  {
+   "id": "crm-list-type-filter-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "in.Type, typeKey = &t, string(t)",
+   "new": "in.Type, typeKey = nil, string(t)",
+   "test": "internal/httpapi/crm ^TestListCustomersPassesFilterSortAndPaging$",
+   "why": "The type filter is parsed but never passed to the module."
+  },
+  {
+   "id": "crm-list-unspecified-type-accepted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\t\tif !t.Valid() {",
+   "new": "\t\tif false {",
+   "test": "internal/httpapi/crm ^TestListCustomersRejectsBadFilters$",
+   "why": "An explicit UNSPECIFIED or unknown type filter is passed to the module as if it were valid."
+  },
+  {
+   "id": "crm-list-order-count-sorts-by-total-spent",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\tcase pb.CustomerSort_CUSTOMER_SORT_ORDER_COUNT:\n\t\treturn crm.SortOrderCount, nil",
+   "new": "\tcase pb.CustomerSort_CUSTOMER_SORT_ORDER_COUNT:\n\t\treturn crm.SortTotalSpent, nil",
+   "test": "internal/httpapi/crm ^TestListCustomersPassesFilterSortAndPaging$",
+   "why": "Sorting by order count sorts by total spent."
+  },
+  {
+   "id": "crm-list-descending-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "Desc: msg.GetDescending()",
+   "new": "Desc: false",
+   "test": "internal/httpapi/crm ^TestListCustomersPassesFilterSortAndPaging$",
+   "why": "The descending flag is not passed to the module."
+  },
+  {
+   "id": "crm-page-token-scope-without-sort",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "strconv.Itoa(int(in.Sort))",
+   "new": "strconv.Itoa(0)",
+   "test": "internal/httpapi/crm ^TestListCustomersPageTokenRoundTripsAndOnlyFitsTheSameStoreFilterAndSort$",
+   "why": "A page token from one sort order is accepted for another, which would skip or repeat customers."
+  },
+  {
+   "id": "crm-page-token-scope-without-direction",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "strconv.FormatBool(in.Desc))",
+   "new": "strconv.FormatBool(false))",
+   "test": "internal/httpapi/crm ^TestListCustomersPageTokenRoundTripsAndOnlyFitsTheSameStoreFilterAndSort$",
+   "why": "A page token from an ascending list is accepted for a descending one."
+  },
+  {
+   "id": "crm-list-next-token-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "NextPageToken: nextToken(scope, page.Next)",
+   "new": "NextPageToken: \"\"",
+   "test": "internal/httpapi/crm ^TestListCustomersPageTokenRoundTripsAndOnlyFitsTheSameStoreFilterAndSort$",
+   "why": "The list never returns a next page token."
+  },
+  {
+   "id": "crm-display-missing-buyer-not-deleted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "Deleted: d.BuyerID == 0 || d.Deleted",
+   "new": "Deleted: d.Deleted",
+   "test": "internal/httpapi/crm ^TestListCustomersMapsEveryFieldAndTheDisplayFromBuyer$",
+   "why": "A customer whose buyer buyer did not return is shown as a live buyer with no name instead of deleted."
+  },
+  {
+   "id": "crm-tag-name-taken-reason-wrong",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "crm.ReasonTagNameTaken: apperr.ReasonCrmTagNameTaken,",
+   "new": "crm.ReasonTagNameTaken: apperr.ReasonCrmTagLimit,",
+   "test": "internal/httpapi/crm ^TestCreateTagMapsTheResultTheNameFieldAndBothReasons$",
+   "why": "A duplicate tag name is reported with the limit reason, so the client shows the wrong guidance."
+  },
+  {
+   "id": "crm-add-tags-names-path-wrong",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "rpc.FieldPaths{\"Names[]\": \"tag_names[]\"}",
+   "new": "rpc.FieldPaths{\"Names[]\": \"tag_names\"}",
+   "test": "internal/httpapi/crm ^TestAddCustomerTagsPassesTheNamesReturnsTheCustomerAndMapsErrors$",
+   "why": "A bad tag name is reported on the whole list instead of the offending element."
+  },
+  {
+   "id": "crm-declaration-row-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/declaration.go",
+   "old": "\tcrmv1alpha1connect.CrmAppServiceDeleteTagProcedure:         seller.CapMarketing,\n",
+   "new": "",
+   "test": "internal/httpapi/crm ^TestEveryMethodIsCoveredByTheCallTable$",
+   "why": "DeleteTag loses its capability declaration, so the handler cannot start."
+  },
+  {
+   "id": "crm-deps-literal-missing-crm",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main_test.go",
+   "old": "CRM: &crm.Module{}, ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "An httpapi.Deps literal drops the required CRM field and the AST guard must fail."
+  }
+ ]
+}

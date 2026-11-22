@@ -135,6 +135,17 @@ var customerEffects = map[string]Effect{
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
 
+	// CrmAppService
+	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateCustomer":    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/CreateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/ListTags":          EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/DeleteTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/AddCustomerTags":   EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/RemoveCustomerTag": EffectWrite,
+
 	// ChatAppService
 	"/hawkr.chat.v1alpha1.ChatAppService/ListConversations":      EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/ListStoreConversations": EffectRead,
