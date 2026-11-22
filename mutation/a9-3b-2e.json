@@ -193,8 +193,8 @@
    "id": "option-stored",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/submit.go",
-   "old": "OptionID: optionID,",
-   "new": "OptionID: nil,",
+   "old": "optionID = &in.OptionID",
+   "new": "optionID = nil",
    "test": "internal/modules/procurement/internal/run ^TestResumeStoresTheOptionAndReplaysOnlyTheSameAnswer$",
    "why": "選項回答的 option_id 沒寫進輸入"
   },

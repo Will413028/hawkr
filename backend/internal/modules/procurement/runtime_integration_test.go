@@ -146,7 +146,7 @@ func TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty(t *testing.T) 
 	ids := []uuid.UUID{c.run}
 	for i := 1; i <= 24; i++ {
 		rid := id()
-		if n, err := q.InsertRun(ctx, store.InsertRunParams{ID: rid, BuyerID: 7, RequestID: c.request, ConversationID: &c.conversation, RunType: "TURN", ClientRequestID: id(), Now: epoch.Add(time.Duration(i) * time.Second)}); err != nil || n != 1 {
+		if n, err := q.InsertRun(ctx, store.InsertRunParams{ID: rid, BuyerID: 7, RequestID: c.request, ConversationID: &c.conversation, RunType: "TURN", ClientRequestID: id(), QuotaPeriodStart: &epoch, Now: epoch.Add(time.Duration(i) * time.Second)}); err != nil || n != 1 {
 			t.Fatal(n, err)
 		}
 		ids = append(ids, rid)
