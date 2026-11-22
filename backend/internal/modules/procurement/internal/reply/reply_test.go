@@ -239,6 +239,10 @@ func TestCorrectionCarriesTheNextStep(t *testing.T) {
 	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "找到幾個相符的品項，麻煩選一下你要的是哪一個：" {
 		t.Errorf("disambiguation: %v", got)
 	}
+	got = Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient, Question: disamb}, Args{Missing: []model.SlotKey{slots.DeliveryCity, slots.Unit}})
+	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "找到幾個相符的品項，麻煩選一下你要的是哪一個：" {
+		t.Errorf("disambiguation outranks missing required fields: %v", got)
+	}
 	got = Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient}, Args{Missing: []model.SlotKey{slots.DeliveryCity, slots.Unit}})
 	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "還想請你補充：配送城市、單位" {
 		t.Errorf("missing required: %v", got)

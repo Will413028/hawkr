@@ -13,10 +13,10 @@
    "id": "m2",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/executor.go",
-   "old": "_, err = e.Ledger.Transition(ctx, ld.run.ID, run.StatusSucceeded, \"\")\n\t\treturn err",
-   "new": "_, _ = e.Ledger.Transition(ctx, ld.run.ID, run.StatusSucceeded, \"\")\n\t\treturn nil",
+   "old": "return &run.InvalidTransitionError{From: cur.Status, To: run.StatusSucceeded}",
+   "new": "return nil",
    "test": "internal/modules/procurement/internal/turn ^TestCancelLandingBeforeTheCommitRollsEverythingBack$",
-   "why": "終態轉換失敗不再讓整個 transaction 回滾：取消搶在提交前時版本與輪次照樣寫入"
+   "why": "提交前的狀態守門（取消已搶在前面，run 為 CANCEL_REQUESTED）不再回錯：空 transaction 提交、run 停在 CANCEL_REQUESTED 而不是收斂到 CANCELLED。原 mutant（吞掉 SUCCEEDED 轉換錯誤）等價：守門先擋下，且該錯誤在 Postgres 本來就會讓 tx 中止"
   },
   {
    "id": "m3",
@@ -68,9 +68,9 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/settle.go",
    "old": "if r.QuotaPeriodStart == nil {",
-   "new": "if false {",
+   "new": "if true {",
    "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
-   "why": "失敗不再退額度（與 a9-3b-2b p2 同一個守門）"
+   "why": "失敗不再退額度（TURN 失敗的 run 有額度期間，退款整段被跳過；與 a9-3b-2b p2 同一個守門）"
   },
   {
    "id": "m10a",
