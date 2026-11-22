@@ -78,7 +78,7 @@
    "file": "website/scripts/check-hardcoded-han.ts",
    "old": "if (baseline !== null) {\n\t\t\treturn {\n\t\t\t\tcode: 1,\n\t\t\t\tlines: [\"拒絕 --init",
    "new": "if (baseline === undefined) {\n\t\t\treturn {\n\t\t\t\tcode: 1,\n\t\t\t\tlines: [\"拒絕 --init",
-   "test": "scripts/check-hardcoded-han.unit.test.ts --init 在 baseline 已存在時拒絕且不寫檔",
+   "test": "scripts/check-hardcoded-han.unit.test.ts init 模式：baseline 已存在時拒絕且不寫檔",
    "why": "--init 守門拿掉：baseline 已存在時還能重建，等於繞過 ratchet"
   },
   {

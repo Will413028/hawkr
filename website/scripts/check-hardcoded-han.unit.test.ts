@@ -179,22 +179,22 @@ describe("run（--update）", () => {
 	});
 });
 
-describe("--init 與 baseline 不存在", () => {
+describe("init 模式與 baseline 不存在", () => {
 	const cur = src({ "lib/a.ts": 'export const a = "中";' });
 
-	it("--init 在 baseline 不存在時建立", () => {
+	it("init 模式：baseline 不存在時建立", () => {
 		const r = run(cur, null, "init");
 		expect(r.code).toBe(0);
 		expect(JSON.parse(r.write ?? "")).toEqual(cur);
 	});
 
-	it("--init 在 baseline 已存在時拒絕且不寫檔", () => {
+	it("init 模式：baseline 已存在時拒絕且不寫檔", () => {
 		const r = run(cur, cur, "init");
 		expect(r.code).toBe(1);
 		expect(r.write).toBeUndefined();
 	});
 
-	it("--update 與檢查在 baseline 不存在時失敗", () => {
+	it("update 與檢查模式：baseline 不存在時失敗", () => {
 		for (const mode of ["update", "check"] as const) {
 			const r = run(cur, null, mode);
 			expect(r.code).toBe(1);
