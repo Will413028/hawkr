@@ -286,20 +286,20 @@ const RatingCount$json = {
   '1': 'RatingCount',
   '2': [
     {'1': 'rating', '3': 1, '4': 1, '5': 5, '10': 'rating'},
-    {'1': 'count', '3': 2, '4': 1, '5': 3, '10': 'count'},
+    {'1': 'count', '3': 2, '4': 1, '5': 5, '10': 'count'},
   ],
 };
 
 /// Descriptor for `RatingCount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List ratingCountDescriptor = $convert.base64Decode(
-    'CgtSYXRpbmdDb3VudBIWCgZyYXRpbmcYASABKAVSBnJhdGluZxIUCgVjb3VudBgCIAEoA1IFY2'
+    'CgtSYXRpbmdDb3VudBIWCgZyYXRpbmcYASABKAVSBnJhdGluZxIUCgVjb3VudBgCIAEoBVIFY2'
     '91bnQ=');
 
 @$core.Deprecated('Use getStoreReviewStatsResponseDescriptor instead')
 const GetStoreReviewStatsResponse$json = {
   '1': 'GetStoreReviewStatsResponse',
   '2': [
-    {'1': 'count', '3': 1, '4': 1, '5': 3, '10': 'count'},
+    {'1': 'count', '3': 1, '4': 1, '5': 5, '10': 'count'},
     {'1': 'average', '3': 2, '4': 1, '5': 1, '10': 'average'},
     {
       '1': 'distribution',
@@ -315,9 +315,47 @@ const GetStoreReviewStatsResponse$json = {
 /// Descriptor for `GetStoreReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getStoreReviewStatsResponseDescriptor =
     $convert.base64Decode(
-        'ChtHZXRTdG9yZVJldmlld1N0YXRzUmVzcG9uc2USFAoFY291bnQYASABKANSBWNvdW50EhgKB2'
+        'ChtHZXRTdG9yZVJldmlld1N0YXRzUmVzcG9uc2USFAoFY291bnQYASABKAVSBWNvdW50EhgKB2'
         'F2ZXJhZ2UYAiABKAFSB2F2ZXJhZ2USRgoMZGlzdHJpYnV0aW9uGAMgAygLMiIuaGF3a3IucmV2'
         'aWV3LnYxYWxwaGExLlJhdGluZ0NvdW50UgxkaXN0cmlidXRpb24=');
+
+@$core.Deprecated('Use getProductReviewStatsRequestDescriptor instead')
+const GetProductReviewStatsRequest$json = {
+  '1': 'GetProductReviewStatsRequest',
+  '2': [
+    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+  ],
+};
+
+/// Descriptor for `GetProductReviewStatsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getProductReviewStatsRequestDescriptor =
+    $convert.base64Decode(
+        'ChxHZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXF1ZXN0EiIKCnByb2R1Y3RfaWQYASABKAlCA+BBAl'
+        'IJcHJvZHVjdElk');
+
+@$core.Deprecated('Use getProductReviewStatsResponseDescriptor instead')
+const GetProductReviewStatsResponse$json = {
+  '1': 'GetProductReviewStatsResponse',
+  '2': [
+    {'1': 'count', '3': 1, '4': 1, '5': 5, '10': 'count'},
+    {'1': 'average', '3': 2, '4': 1, '5': 1, '10': 'average'},
+    {
+      '1': 'distribution',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.review.v1alpha1.RatingCount',
+      '10': 'distribution'
+    },
+  ],
+};
+
+/// Descriptor for `GetProductReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getProductReviewStatsResponseDescriptor =
+    $convert.base64Decode(
+        'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
+        'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
+        'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbg==');
 
 @$core.Deprecated('Use getReviewRequestDescriptor instead')
 const GetReviewRequest$json = {
@@ -552,6 +590,12 @@ const $core.Map<$core.String, $core.dynamic> ReviewPublicServiceBase$json = {
       '3': '.hawkr.review.v1alpha1.GetStoreReviewStatsResponse',
       '4': {'34': 1},
     },
+    {
+      '1': 'GetProductReviewStats',
+      '2': '.hawkr.review.v1alpha1.GetProductReviewStatsRequest',
+      '3': '.hawkr.review.v1alpha1.GetProductReviewStatsResponse',
+      '4': {'34': 1},
+    },
   ],
 };
 
@@ -576,6 +620,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.review.v1alpha1.GetStoreReviewStatsResponse':
       GetStoreReviewStatsResponse$json,
   '.hawkr.review.v1alpha1.RatingCount': RatingCount$json,
+  '.hawkr.review.v1alpha1.GetProductReviewStatsRequest':
+      GetProductReviewStatsRequest$json,
+  '.hawkr.review.v1alpha1.GetProductReviewStatsResponse':
+      GetProductReviewStatsResponse$json,
 };
 
 /// Descriptor for `ReviewPublicService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -587,7 +635,9 @@ final $typed_data.Uint8List reviewPublicServiceDescriptor = $convert.base64Decod
     'd2tyLnJldmlldy52MWFscGhhMS5MaXN0U3RvcmVSZXZpZXdzUmVzcG9uc2UiA5ACARKBAQoTR2'
     'V0U3RvcmVSZXZpZXdTdGF0cxIxLmhhd2tyLnJldmlldy52MWFscGhhMS5HZXRTdG9yZVJldmll'
     'd1N0YXRzUmVxdWVzdBoyLmhhd2tyLnJldmlldy52MWFscGhhMS5HZXRTdG9yZVJldmlld1N0YX'
-    'RzUmVzcG9uc2UiA5ACAQ==');
+    'RzUmVzcG9uc2UiA5ACARKHAQoVR2V0UHJvZHVjdFJldmlld1N0YXRzEjMuaGF3a3IucmV2aWV3'
+    'LnYxYWxwaGExLkdldFByb2R1Y3RSZXZpZXdTdGF0c1JlcXVlc3QaNC5oYXdrci5yZXZpZXcudj'
+    'FhbHBoYTEuR2V0UHJvZHVjdFJldmlld1N0YXRzUmVzcG9uc2UiA5ACAQ==');
 
 const $core.Map<$core.String, $core.dynamic> ReviewAppServiceBase$json = {
   '1': 'ReviewAppService',

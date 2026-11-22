@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"log/slog"
+	"math"
 
 	"connectrpc.com/connect"
 
@@ -93,9 +94,30 @@ func (h *Public) GetStoreReviewStats(ctx context.Context, req *connect.Request[p
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	out := &pb.GetStoreReviewStatsResponse{Count: s.Count, Average: s.Average}
-	for i, n := range s.Distribution {
-		out.Distribution = append(out.Distribution, &pb.RatingCount{Rating: int32(i + 1), Count: n})
+	return connect.NewResponse(&pb.GetStoreReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}), nil
+}
+
+// statCount 把評價數轉成 int32；一個商品或店家的評價數遠小於 int32 上限（API 設計規範第四節：有界計數用 int32）。
+func statCount(n int64) int32 {
+	return int32(min(n, math.MaxInt32)) //nolint:gosec // clamped above
+}
+
+func ratingCounts(d [5]int64) []*pb.RatingCount {
+	out := make([]*pb.RatingCount, 0, len(d))
+	for i, n := range d {
+		out = append(out, &pb.RatingCount{Rating: int32(i + 1), Count: statCount(n)})
 	}
-	return connect.NewResponse(out), nil
+	return out
+}
+
+func (h *Public) GetProductReviewStats(ctx context.Context, req *connect.Request[pb.GetProductReviewStatsRequest]) (*connect.Response[pb.GetProductReviewStatsResponse], error) {
+	productID, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.reads.ProductStats(ctx, productID)
+	if err != nil {
+		return nil, h.failure(err)
+	}
+	return connect.NewResponse(&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}), nil
 }

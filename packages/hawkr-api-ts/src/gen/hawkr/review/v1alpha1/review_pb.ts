@@ -2,7 +2,7 @@
 // @generated from file hawkr/review/v1alpha1/review.proto (package hawkr.review.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// review 模組給前台的 API：商品與店家的公開評價與店家評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
+// review 模組給前台的 API：商品與店家的公開評價與商品、店家的評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
 // 店家回覆與讀自己店的評價）。
 //
 // ID 是不透明的字串（評價是 UUID，商品與店家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -24,7 +24,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/review/v1alpha1/review.proto.
  */
 export const file_hawkr_review_v1alpha1_review: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9yZXZpZXcvdjFhbHBoYTEvcmV2aWV3LnByb3RvEhVoYXdrci5yZXZpZXcudjFhbHBoYTEiYgoMUmV2aWV3QXV0aG9yEhYKBG5hbWUYASABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgCIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDQgcKBV9uYW1lIlgKC1Jldmlld1JlcGx5EhQKB2NvbnRlbnQYASABKAlCA+BBAxIzCgpyZXBseV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIpwECgZSZXZpZXcSDwoCaWQYASABKAlCA+BBCBIXCgpwcm9kdWN0X2lkGAIgASgJQgPgQQMSFQoIc3RvcmVfaWQYAyABKAlCA+BBAxITCgZyYXRpbmcYBCABKAVCA+BBAxIUCgdjb250ZW50GAUgASgJQgPgQQMSMQoGaW1hZ2VzGAYgAygLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQMSFQoIc2t1X25hbWUYByABKAlCA+BBAxI1CgppdGVtX2ltYWdlGAggASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQMSEgoFcHJpY2UYCSABKANCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI7CgVyZXBseRgLIAEoCzIiLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXZpZXdSZXBseUID4EEDSACIAQESOAoGYXV0aG9yGAwgASgLMiMuaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlld0F1dGhvckID4EEDEhoKCG9yZGVyX25vGA0gASgJQgPgQQNIAYgBARIfCg1vcmRlcl9pdGVtX2lkGA4gASgJQgPgQQNIAogBAUIICgZfcmVwbHlCCwoJX29yZGVyX25vQhAKDl9vcmRlcl9pdGVtX2lkIpABChlMaXN0UHJvZHVjdFJldmlld3NSZXF1ZXN0EhcKCnByb2R1Y3RfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRITCgZyYXRpbmcYBCABKAVIAIgBARITCgt3aXRoX2ltYWdlcxgFIAEoCEIJCgdfcmF0aW5nImUKGkxpc3RQcm9kdWN0UmV2aWV3c1Jlc3BvbnNlEi4KB3Jldmlld3MYASADKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSKMAQoXTGlzdFN0b3JlUmV2aWV3c1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRITCgZyYXRpbmcYBCABKAVIAIgBARITCgt3aXRoX2ltYWdlcxgFIAEoCEIJCgdfcmF0aW5nImMKGExpc3RTdG9yZVJldmlld3NSZXNwb25zZRIuCgdyZXZpZXdzGAEgAygLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiMwoaR2V0U3RvcmVSZXZpZXdTdGF0c1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIsCgtSYXRpbmdDb3VudBIOCgZyYXRpbmcYASABKAUSDQoFY291bnQYAiABKAMidwobR2V0U3RvcmVSZXZpZXdTdGF0c1Jlc3BvbnNlEg0KBWNvdW50GAEgASgDEg8KB2F2ZXJhZ2UYAiABKAESOAoMZGlzdHJpYnV0aW9uGAMgAygLMiIuaGF3a3IucmV2aWV3LnYxYWxwaGExLlJhdGluZ0NvdW50IioKEEdldFJldmlld1JlcXVlc3QSFgoJcmV2aWV3X2lkGAEgASgJQgPgQQIiQgoRR2V0UmV2aWV3UmVzcG9uc2USLQoGcmV2aWV3GAEgASgLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldyJCChJSZXBseVJldmlld1JlcXVlc3QSFgoJcmV2aWV3X2lkGAEgASgJQgPgQQISFAoHY29udGVudBgCIAEoCUID4EECIkQKE1JlcGx5UmV2aWV3UmVzcG9uc2USLQoGcmV2aWV3GAEgASgLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldyKQAQoTQ3JlYXRlUmV2aWV3UmVxdWVzdBIVCghvcmRlcl9ubxgBIAEoCUID4EECEhoKDW9yZGVyX2l0ZW1faWQYAiABKAlCA+BBAhITCgZyYXRpbmcYAyABKAVCA+BBAhIPCgdjb250ZW50GAQgASgJEiAKE2ltYWdlX3N0YWdlZF90b2tlbnMYBSADKAlCA+BBBCJFChRDcmVhdGVSZXZpZXdSZXNwb25zZRItCgZyZXZpZXcYASABKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3ImsKFExpc3RNeVJldmlld3NSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhoKDW9yZGVyX2l0ZW1faWQYAyABKAlIAIgBAUIQCg5fb3JkZXJfaXRlbV9pZCJgChVMaXN0TXlSZXZpZXdzUmVzcG9uc2USLgoHcmV2aWV3cxgBIAMoCzIdLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXZpZXcSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIngKGkxpc3RPd25TdG9yZVJldmlld3NSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhMKBnJhdGluZxgDIAEoBUgAiAEBEhMKC3dpdGhfaW1hZ2VzGAQgASgIQgkKB19yYXRpbmciZgobTGlzdE93blN0b3JlUmV2aWV3c1Jlc3BvbnNlEi4KB3Jldmlld3MYASADKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCTKTAwoTUmV2aWV3UHVibGljU2VydmljZRJ+ChJMaXN0UHJvZHVjdFJldmlld3MSMC5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFByb2R1Y3RSZXZpZXdzUmVxdWVzdBoxLmhhd2tyLnJldmlldy52MWFscGhhMS5MaXN0UHJvZHVjdFJldmlld3NSZXNwb25zZSIDkAIBEngKEExpc3RTdG9yZVJldmlld3MSLi5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFN0b3JlUmV2aWV3c1JlcXVlc3QaLy5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFN0b3JlUmV2aWV3c1Jlc3BvbnNlIgOQAgESgQEKE0dldFN0b3JlUmV2aWV3U3RhdHMSMS5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0U3RvcmVSZXZpZXdTdGF0c1JlcXVlc3QaMi5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0U3RvcmVSZXZpZXdTdGF0c1Jlc3BvbnNlIgOQAgEywAQKEFJldmlld0FwcFNlcnZpY2USYwoJR2V0UmV2aWV3EicuaGF3a3IucmV2aWV3LnYxYWxwaGExLkdldFJldmlld1JlcXVlc3QaKC5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0UmV2aWV3UmVzcG9uc2UiA5ACARJpCgtSZXBseVJldmlldxIpLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXBseVJldmlld1JlcXVlc3QaKi5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmVwbHlSZXZpZXdSZXNwb25zZSIDkAICEmcKDENyZWF0ZVJldmlldxIqLmhhd2tyLnJldmlldy52MWFscGhhMS5DcmVhdGVSZXZpZXdSZXF1ZXN0GisuaGF3a3IucmV2aWV3LnYxYWxwaGExLkNyZWF0ZVJldmlld1Jlc3BvbnNlEm8KDUxpc3RNeVJldmlld3MSKy5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE15UmV2aWV3c1JlcXVlc3QaLC5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE15UmV2aWV3c1Jlc3BvbnNlIgOQAgESgQEKE0xpc3RPd25TdG9yZVJldmlld3MSMS5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE93blN0b3JlUmV2aWV3c1JlcXVlc3QaMi5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE93blN0b3JlUmV2aWV3c1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image]);
+  fileDesc("CiJoYXdrci9yZXZpZXcvdjFhbHBoYTEvcmV2aWV3LnByb3RvEhVoYXdrci5yZXZpZXcudjFhbHBoYTEiYgoMUmV2aWV3QXV0aG9yEhYKBG5hbWUYASABKAlCA+BBA0gAiAEBEjEKBmF2YXRhchgCIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDQgcKBV9uYW1lIlgKC1Jldmlld1JlcGx5EhQKB2NvbnRlbnQYASABKAlCA+BBAxIzCgpyZXBseV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIpwECgZSZXZpZXcSDwoCaWQYASABKAlCA+BBCBIXCgpwcm9kdWN0X2lkGAIgASgJQgPgQQMSFQoIc3RvcmVfaWQYAyABKAlCA+BBAxITCgZyYXRpbmcYBCABKAVCA+BBAxIUCgdjb250ZW50GAUgASgJQgPgQQMSMQoGaW1hZ2VzGAYgAygLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQMSFQoIc2t1X25hbWUYByABKAlCA+BBAxI1CgppdGVtX2ltYWdlGAggASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQMSEgoFcHJpY2UYCSABKANCA+BBAxI0CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI7CgVyZXBseRgLIAEoCzIiLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXZpZXdSZXBseUID4EEDSACIAQESOAoGYXV0aG9yGAwgASgLMiMuaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlld0F1dGhvckID4EEDEhoKCG9yZGVyX25vGA0gASgJQgPgQQNIAYgBARIfCg1vcmRlcl9pdGVtX2lkGA4gASgJQgPgQQNIAogBAUIICgZfcmVwbHlCCwoJX29yZGVyX25vQhAKDl9vcmRlcl9pdGVtX2lkIpABChlMaXN0UHJvZHVjdFJldmlld3NSZXF1ZXN0EhcKCnByb2R1Y3RfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRITCgZyYXRpbmcYBCABKAVIAIgBARITCgt3aXRoX2ltYWdlcxgFIAEoCEIJCgdfcmF0aW5nImUKGkxpc3RQcm9kdWN0UmV2aWV3c1Jlc3BvbnNlEi4KB3Jldmlld3MYASADKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSKMAQoXTGlzdFN0b3JlUmV2aWV3c1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRITCgZyYXRpbmcYBCABKAVIAIgBARITCgt3aXRoX2ltYWdlcxgFIAEoCEIJCgdfcmF0aW5nImMKGExpc3RTdG9yZVJldmlld3NSZXNwb25zZRIuCgdyZXZpZXdzGAEgAygLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiMwoaR2V0U3RvcmVSZXZpZXdTdGF0c1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIsCgtSYXRpbmdDb3VudBIOCgZyYXRpbmcYASABKAUSDQoFY291bnQYAiABKAUidwobR2V0U3RvcmVSZXZpZXdTdGF0c1Jlc3BvbnNlEg0KBWNvdW50GAEgASgFEg8KB2F2ZXJhZ2UYAiABKAESOAoMZGlzdHJpYnV0aW9uGAMgAygLMiIuaGF3a3IucmV2aWV3LnYxYWxwaGExLlJhdGluZ0NvdW50IjcKHEdldFByb2R1Y3RSZXZpZXdTdGF0c1JlcXVlc3QSFwoKcHJvZHVjdF9pZBgBIAEoCUID4EECInkKHUdldFByb2R1Y3RSZXZpZXdTdGF0c1Jlc3BvbnNlEg0KBWNvdW50GAEgASgFEg8KB2F2ZXJhZ2UYAiABKAESOAoMZGlzdHJpYnV0aW9uGAMgAygLMiIuaGF3a3IucmV2aWV3LnYxYWxwaGExLlJhdGluZ0NvdW50IioKEEdldFJldmlld1JlcXVlc3QSFgoJcmV2aWV3X2lkGAEgASgJQgPgQQIiQgoRR2V0UmV2aWV3UmVzcG9uc2USLQoGcmV2aWV3GAEgASgLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldyJCChJSZXBseVJldmlld1JlcXVlc3QSFgoJcmV2aWV3X2lkGAEgASgJQgPgQQISFAoHY29udGVudBgCIAEoCUID4EECIkQKE1JlcGx5UmV2aWV3UmVzcG9uc2USLQoGcmV2aWV3GAEgASgLMh0uaGF3a3IucmV2aWV3LnYxYWxwaGExLlJldmlldyKQAQoTQ3JlYXRlUmV2aWV3UmVxdWVzdBIVCghvcmRlcl9ubxgBIAEoCUID4EECEhoKDW9yZGVyX2l0ZW1faWQYAiABKAlCA+BBAhITCgZyYXRpbmcYAyABKAVCA+BBAhIPCgdjb250ZW50GAQgASgJEiAKE2ltYWdlX3N0YWdlZF90b2tlbnMYBSADKAlCA+BBBCJFChRDcmVhdGVSZXZpZXdSZXNwb25zZRItCgZyZXZpZXcYASABKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3ImsKFExpc3RNeVJldmlld3NSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhoKDW9yZGVyX2l0ZW1faWQYAyABKAlIAIgBAUIQCg5fb3JkZXJfaXRlbV9pZCJgChVMaXN0TXlSZXZpZXdzUmVzcG9uc2USLgoHcmV2aWV3cxgBIAMoCzIdLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXZpZXcSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIngKGkxpc3RPd25TdG9yZVJldmlld3NSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhMKBnJhdGluZxgDIAEoBUgAiAEBEhMKC3dpdGhfaW1hZ2VzGAQgASgIQgkKB19yYXRpbmciZgobTGlzdE93blN0b3JlUmV2aWV3c1Jlc3BvbnNlEi4KB3Jldmlld3MYASADKAsyHS5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmV2aWV3EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCTKdBAoTUmV2aWV3UHVibGljU2VydmljZRJ+ChJMaXN0UHJvZHVjdFJldmlld3MSMC5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFByb2R1Y3RSZXZpZXdzUmVxdWVzdBoxLmhhd2tyLnJldmlldy52MWFscGhhMS5MaXN0UHJvZHVjdFJldmlld3NSZXNwb25zZSIDkAIBEngKEExpc3RTdG9yZVJldmlld3MSLi5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFN0b3JlUmV2aWV3c1JlcXVlc3QaLy5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdFN0b3JlUmV2aWV3c1Jlc3BvbnNlIgOQAgESgQEKE0dldFN0b3JlUmV2aWV3U3RhdHMSMS5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0U3RvcmVSZXZpZXdTdGF0c1JlcXVlc3QaMi5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0U3RvcmVSZXZpZXdTdGF0c1Jlc3BvbnNlIgOQAgEShwEKFUdldFByb2R1Y3RSZXZpZXdTdGF0cxIzLmhhd2tyLnJldmlldy52MWFscGhhMS5HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXF1ZXN0GjQuaGF3a3IucmV2aWV3LnYxYWxwaGExLkdldFByb2R1Y3RSZXZpZXdTdGF0c1Jlc3BvbnNlIgOQAgEywAQKEFJldmlld0FwcFNlcnZpY2USYwoJR2V0UmV2aWV3EicuaGF3a3IucmV2aWV3LnYxYWxwaGExLkdldFJldmlld1JlcXVlc3QaKC5oYXdrci5yZXZpZXcudjFhbHBoYTEuR2V0UmV2aWV3UmVzcG9uc2UiA5ACARJpCgtSZXBseVJldmlldxIpLmhhd2tyLnJldmlldy52MWFscGhhMS5SZXBseVJldmlld1JlcXVlc3QaKi5oYXdrci5yZXZpZXcudjFhbHBoYTEuUmVwbHlSZXZpZXdSZXNwb25zZSIDkAICEmcKDENyZWF0ZVJldmlldxIqLmhhd2tyLnJldmlldy52MWFscGhhMS5DcmVhdGVSZXZpZXdSZXF1ZXN0GisuaGF3a3IucmV2aWV3LnYxYWxwaGExLkNyZWF0ZVJldmlld1Jlc3BvbnNlEm8KDUxpc3RNeVJldmlld3MSKy5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE15UmV2aWV3c1JlcXVlc3QaLC5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE15UmV2aWV3c1Jlc3BvbnNlIgOQAgESgQEKE0xpc3RPd25TdG9yZVJldmlld3MSMS5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE93blN0b3JlUmV2aWV3c1JlcXVlc3QaMi5oYXdrci5yZXZpZXcudjFhbHBoYTEuTGlzdE93blN0b3JlUmV2aWV3c1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image]);
 
 /**
  * ReviewAuthor 是評價的作者，名稱與頭像在讀取時由 buyer 補。
@@ -339,9 +339,9 @@ export type RatingCount = Message<"hawkr.review.v1alpha1.RatingCount"> & {
   rating: number;
 
   /**
-   * @generated from field: int64 count = 2;
+   * @generated from field: int32 count = 2;
    */
-  count: bigint;
+  count: number;
 };
 
 /**
@@ -358,9 +358,9 @@ export type GetStoreReviewStatsResponse = Message<"hawkr.review.v1alpha1.GetStor
   /**
    * 公開可讀的評價數。
    *
-   * @generated from field: int64 count = 1;
+   * @generated from field: int32 count = 1;
    */
-  count: bigint;
+  count: number;
 
   /**
    * 平均星等，四捨五入到小數第二位；沒有評價是 0。
@@ -385,6 +385,56 @@ export const GetStoreReviewStatsResponseSchema: GenMessage<GetStoreReviewStatsRe
   messageDesc(file_hawkr_review_v1alpha1_review, 9);
 
 /**
+ * @generated from message hawkr.review.v1alpha1.GetProductReviewStatsRequest
+ */
+export type GetProductReviewStatsRequest = Message<"hawkr.review.v1alpha1.GetProductReviewStatsRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+};
+
+/**
+ * Describes the message hawkr.review.v1alpha1.GetProductReviewStatsRequest.
+ * Use `create(GetProductReviewStatsRequestSchema)` to create a new message.
+ */
+export const GetProductReviewStatsRequestSchema: GenMessage<GetProductReviewStatsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_review_v1alpha1_review, 10);
+
+/**
+ * @generated from message hawkr.review.v1alpha1.GetProductReviewStatsResponse
+ */
+export type GetProductReviewStatsResponse = Message<"hawkr.review.v1alpha1.GetProductReviewStatsResponse"> & {
+  /**
+   * 公開可讀的評價數。
+   *
+   * @generated from field: int32 count = 1;
+   */
+  count: number;
+
+  /**
+   * 平均星等，四捨五入到小數第二位；沒有評價是 0。
+   *
+   * @generated from field: double average = 2;
+   */
+  average: number;
+
+  /**
+   * 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
+   *
+   * @generated from field: repeated hawkr.review.v1alpha1.RatingCount distribution = 3;
+   */
+  distribution: RatingCount[];
+};
+
+/**
+ * Describes the message hawkr.review.v1alpha1.GetProductReviewStatsResponse.
+ * Use `create(GetProductReviewStatsResponseSchema)` to create a new message.
+ */
+export const GetProductReviewStatsResponseSchema: GenMessage<GetProductReviewStatsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_review_v1alpha1_review, 11);
+
+/**
  * @generated from message hawkr.review.v1alpha1.GetReviewRequest
  */
 export type GetReviewRequest = Message<"hawkr.review.v1alpha1.GetReviewRequest"> & {
@@ -399,7 +449,7 @@ export type GetReviewRequest = Message<"hawkr.review.v1alpha1.GetReviewRequest">
  * Use `create(GetReviewRequestSchema)` to create a new message.
  */
 export const GetReviewRequestSchema: GenMessage<GetReviewRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 10);
+  messageDesc(file_hawkr_review_v1alpha1_review, 12);
 
 /**
  * @generated from message hawkr.review.v1alpha1.GetReviewResponse
@@ -416,7 +466,7 @@ export type GetReviewResponse = Message<"hawkr.review.v1alpha1.GetReviewResponse
  * Use `create(GetReviewResponseSchema)` to create a new message.
  */
 export const GetReviewResponseSchema: GenMessage<GetReviewResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 11);
+  messageDesc(file_hawkr_review_v1alpha1_review, 13);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ReplyReviewRequest
@@ -440,7 +490,7 @@ export type ReplyReviewRequest = Message<"hawkr.review.v1alpha1.ReplyReviewReque
  * Use `create(ReplyReviewRequestSchema)` to create a new message.
  */
 export const ReplyReviewRequestSchema: GenMessage<ReplyReviewRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 12);
+  messageDesc(file_hawkr_review_v1alpha1_review, 14);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ReplyReviewResponse
@@ -457,7 +507,7 @@ export type ReplyReviewResponse = Message<"hawkr.review.v1alpha1.ReplyReviewResp
  * Use `create(ReplyReviewResponseSchema)` to create a new message.
  */
 export const ReplyReviewResponseSchema: GenMessage<ReplyReviewResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 13);
+  messageDesc(file_hawkr_review_v1alpha1_review, 15);
 
 /**
  * @generated from message hawkr.review.v1alpha1.CreateReviewRequest
@@ -504,7 +554,7 @@ export type CreateReviewRequest = Message<"hawkr.review.v1alpha1.CreateReviewReq
  * Use `create(CreateReviewRequestSchema)` to create a new message.
  */
 export const CreateReviewRequestSchema: GenMessage<CreateReviewRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 14);
+  messageDesc(file_hawkr_review_v1alpha1_review, 16);
 
 /**
  * @generated from message hawkr.review.v1alpha1.CreateReviewResponse
@@ -521,7 +571,7 @@ export type CreateReviewResponse = Message<"hawkr.review.v1alpha1.CreateReviewRe
  * Use `create(CreateReviewResponseSchema)` to create a new message.
  */
 export const CreateReviewResponseSchema: GenMessage<CreateReviewResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 15);
+  messageDesc(file_hawkr_review_v1alpha1_review, 17);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ListMyReviewsRequest
@@ -552,7 +602,7 @@ export type ListMyReviewsRequest = Message<"hawkr.review.v1alpha1.ListMyReviewsR
  * Use `create(ListMyReviewsRequestSchema)` to create a new message.
  */
 export const ListMyReviewsRequestSchema: GenMessage<ListMyReviewsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 16);
+  messageDesc(file_hawkr_review_v1alpha1_review, 18);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ListMyReviewsResponse
@@ -574,7 +624,7 @@ export type ListMyReviewsResponse = Message<"hawkr.review.v1alpha1.ListMyReviews
  * Use `create(ListMyReviewsResponseSchema)` to create a new message.
  */
 export const ListMyReviewsResponseSchema: GenMessage<ListMyReviewsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 17);
+  messageDesc(file_hawkr_review_v1alpha1_review, 19);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
@@ -612,7 +662,7 @@ export type ListOwnStoreReviewsRequest = Message<"hawkr.review.v1alpha1.ListOwnS
  * Use `create(ListOwnStoreReviewsRequestSchema)` to create a new message.
  */
 export const ListOwnStoreReviewsRequestSchema: GenMessage<ListOwnStoreReviewsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 18);
+  messageDesc(file_hawkr_review_v1alpha1_review, 20);
 
 /**
  * @generated from message hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
@@ -634,7 +684,7 @@ export type ListOwnStoreReviewsResponse = Message<"hawkr.review.v1alpha1.ListOwn
  * Use `create(ListOwnStoreReviewsResponseSchema)` to create a new message.
  */
 export const ListOwnStoreReviewsResponseSchema: GenMessage<ListOwnStoreReviewsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_review_v1alpha1_review, 19);
+  messageDesc(file_hawkr_review_v1alpha1_review, 21);
 
 /**
  * ReviewPublicService 是任何人都能讀的評價與統計，不需要登入。
@@ -673,6 +723,17 @@ export const ReviewPublicService: GenService<{
     methodKind: "unary";
     input: typeof GetStoreReviewStatsRequestSchema;
     output: typeof GetStoreReviewStatsResponseSchema;
+  },
+  /**
+   * GetProductReviewStats 是商品的評價統計：公開可讀的評價數與平均（與 ListProductReviews 同一個公開述詞：沒有未還原的平台隱藏、作者仍在營運中）。
+   * 統計不依觀看者過濾，不套封鎖。商品沒有評價（或商品不存在）是 count 0、average 0，不是 not_found。
+   *
+   * @generated from rpc hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats
+   */
+  getProductReviewStats: {
+    methodKind: "unary";
+    input: typeof GetProductReviewStatsRequestSchema;
+    output: typeof GetProductReviewStatsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_review_v1alpha1_review, 0);

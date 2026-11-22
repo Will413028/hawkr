@@ -35,6 +35,7 @@ type fakeReads struct {
 	page   review.Page
 	one    review.Review
 	stats  review.StoreStats
+	pstats review.ProductStats
 	err    error
 	calls  []string
 	viewer int64
@@ -90,6 +91,12 @@ func (f *fakeReads) StoreStats(_ context.Context, storeID int64) (review.StoreSt
 	f.calls = append(f.calls, "StoreStats")
 	f.id = storeID
 	return f.stats, f.err
+}
+
+func (f *fakeReads) ProductStats(_ context.Context, productID int64) (review.ProductStats, error) {
+	f.calls = append(f.calls, "ProductStats")
+	f.id = productID
+	return f.pstats, f.err
 }
 
 // fakeWrites 記下寫入的輸入。
@@ -406,12 +413,60 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 		t.Fatalf("統計：%v id=%d", m, e.reads.id)
 	}
 	for i, b := range m.GetDistribution() {
-		if b.GetRating() != int32(i+1) || b.GetCount() != e.reads.stats.Distribution[i] {
+		if b.GetRating() != int32(i+1) || int64(b.GetCount()) != e.reads.stats.Distribution[i] {
 			t.Errorf("第 %d 項：%v", i, b)
 		}
 	}
 	if e.buyers.calls != 0 {
 		t.Error("統計不依觀看者，不查作者顯示資料")
+	}
+}
+
+func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *testing.T) {
+	e := newEnv(t, nil)
+	e.reads.pstats = review.ProductStats{Count: 7, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
+	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "21"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Msg.GetCount() != 7 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
+		t.Fatalf("統計：%v id=%d", resp.Msg, e.reads.id)
+	}
+	if d := resp.Msg.GetDistribution(); len(d) != 5 {
+		t.Fatalf("要有 1 到 5 星各一項：%v", d)
+	} else {
+		for i, b := range d {
+			if b.GetRating() != int32(i+1) || int64(b.GetCount()) != e.reads.pstats.Distribution[i] {
+				t.Errorf("第 %d 項：%v", i, b)
+			}
+		}
+	}
+	if e.buyers.calls != 0 || e.reads.viewer != 0 {
+		t.Error("統計不依觀看者")
+	}
+}
+
+func TestGetProductReviewStatsWithNoReviewsIsZeroNotAnError(t *testing.T) {
+	e := newEnv(t, nil)
+	resp, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "999"}))
+	if err != nil || resp.Msg.GetCount() != 0 || resp.Msg.GetAverage() != 0 {
+		t.Fatalf("%v %v", resp, err)
+	}
+}
+
+func TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure(t *testing.T) {
+	e := newEnv(t, nil)
+	for _, bad := range []string{"", "x", "0", "-3"} {
+		if _, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: bad})); codeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("商品 %q：%v", bad, err)
+		}
+	}
+	if len(e.reads.calls) != 0 {
+		t.Errorf("格式錯誤的 ID 不能到模組：%v", e.reads.calls)
+	}
+	e.reads.err = errors.New("db down")
+	if _, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "5"})); err == nil {
+		t.Fatal("模組失敗要回錯誤，不能回 0")
 	}
 }
 

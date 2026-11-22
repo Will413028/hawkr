@@ -246,7 +246,10 @@ func (s *Service) ReviewStore(ctx context.Context, id uuid.UUID) (model.ReviewSt
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。
 func (s *Service) ProductStats(ctx context.Context, productID int64) (model.ProductStats, error) {
 	r, err := s.q(ctx).ProductStats(ctx, productID)
-	return model.ProductStats{Count: r.TotalCount, Average: r.AvgRating}, err
+	return model.ProductStats{
+		Count: r.TotalCount, Average: r.AvgRating,
+		Distribution: [5]int64{r.Rating1Count, r.Rating2Count, r.Rating3Count, r.Rating4Count, r.Rating5Count},
+	}, err
 }
 
 // StoreStats 是店家的評價統計（含各星等的數量）。

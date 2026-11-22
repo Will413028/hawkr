@@ -109,8 +109,8 @@ func TestReviewReplyTakedownHidesOnlyTheReply(t *testing.T) {
 	if got.Reply != nil || got.Content != "普通" {
 		t.Fatalf("只遮回覆：%+v", got)
 	}
-	if st := mustV[review.ProductStats](t)(f.review.ProductStats(ctx, r.ProductID)); st.Count != 1 {
-		t.Fatalf("評價照常計入：%+v", st)
+	if st := mustV[review.ProductStats](t)(f.review.ProductStats(ctx, r.ProductID)); st.Count != 1 || st.Average != 3 || st.Distribution != [5]int64{0, 0, 1, 0, 0} {
+		t.Fatalf("回覆下架不影響評價數、平均與分佈：評價照常計入：%+v", st)
 	}
 	if _, err := f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: Target{Kind: TargetReviewReply, ContentID: r.ID}, Category: policy.Harassment}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("已下架的回覆不能再檢舉：%v", err)

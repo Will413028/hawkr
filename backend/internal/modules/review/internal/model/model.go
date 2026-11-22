@@ -215,10 +215,11 @@ type Hide struct {
 	Created    bool
 }
 
-// ProductStats 是商品的評價統計（只算公開可讀的評價）。
+// ProductStats 是商品的評價統計（只算公開可讀的評價）；Distribution[i] 是 (i+1) 星的評價數。
 type ProductStats struct {
-	Count   int64
-	Average float64
+	Count        int64
+	Average      float64
+	Distribution [5]int64
 }
 
 // StoreStats 是店家的評價統計；Distribution[i] 是 (i+1) 星的評價數。

@@ -124,9 +124,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
 
 	// ReviewPublicService：公開的 service 對停權的帳號一律以訪客執行，宣告仍標示方法的性質。
-	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":  EffectRead,
-	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":    EffectRead,
-	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats": EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":    EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":      EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats":   EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats": EffectRead,
 
 	// ReviewAppService
 	"/hawkr.review.v1alpha1.ReviewAppService/GetReview":           EffectRead,

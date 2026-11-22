@@ -642,3 +642,32 @@ func TestReviewStoreIgnoresVisibilityAndReportsIt(t *testing.T) {
 		t.Fatalf("不存在：%v", err)
 	}
 }
+
+// 商品統計與公開列表同一個述詞：隱藏、作者刪帳中的評價不計，其他商品的評價不混入，沒有評價是 0。
+func TestProductStatsExcludeWhatThePublicListExcludes(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	store := f.exposableStore(t)
+	f.submit(t, f.newBuyer(t), store, 710, 5, "")
+	f.submit(t, f.newBuyer(t), store, 710, 4, "")
+	hidden := f.submit(t, f.newBuyer(t), store, 710, 1, "")
+	leaving := f.submit(t, f.newBuyer(t), store, 710, 2, "")
+	f.submit(t, f.newBuyer(t), store, 711, 1, "")
+	hide(t, f, hidden.ID)
+	if err := f.buyers.BeginDeletion(ctx, leaving.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 710))
+	if st.Count != 2 || st.Average != 4.5 || st.Distribution != [5]int64{0, 0, 0, 1, 1} {
+		t.Fatalf("只計公開可讀的兩則（分佈同一個述詞）：%+v", st)
+	}
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 710, 0, review.Filter{}, nil, 50))
+	if int64(len(page.Reviews)) != st.Count {
+		t.Fatalf("統計與公開列表不一致：%d vs %d", len(page.Reviews), st.Count)
+	}
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 712)); none.Count != 0 || none.Average != 0 || none.Distribution != [5]int64{} {
+		t.Fatalf("沒有評價是 0：%+v", none)
+	}
+}
