@@ -313,6 +313,28 @@ func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A
 	}
 }
 
+func TestResumeRunResendAfterTheAnswerRunSucceededReplaysTheOriginalRun(t *testing.T) { // A9-D30(1)
+	ctx := context.Background()
+	m, d := runtimeModule(t)
+	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
+	irq := ask(ctx, t, d, c)
+	in := ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", Locale: uitext.ZhTW}
+	first, err := m.ResumeRun(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'SUCCEEDED', completed_at = $2 WHERE id = $1`, first.RunID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_run_interrupts SET status = 'RESOLVED', closed_at = $2 WHERE id = $1`, irq, epoch); err != nil {
+		t.Fatal(err)
+	}
+	again, err := m.ResumeRun(ctx, in)
+	if err != nil || again.RunID != first.RunID {
+		t.Errorf("中斷已 RESOLVED 後重送同一個請求要回原回答 run，不是 APPROVAL_ALREADY_RESOLVED：%+v %v", again, err)
+	}
+}
+
 func must[T any](v T, err error) T {
 	if err != nil {
 		panic(err)

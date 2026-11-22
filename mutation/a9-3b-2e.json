@@ -38,7 +38,7 @@
   },
   {
    "id": "shape-state-first",
-   "stack": "go",
+   "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/resume.go",
    "old": "if irq.Status == \"PENDING\" {",
    "new": "if true {",
