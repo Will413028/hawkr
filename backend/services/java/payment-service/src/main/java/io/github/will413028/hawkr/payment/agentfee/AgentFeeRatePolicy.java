@@ -24,8 +24,7 @@ import org.springframework.stereotype.Component;
  * <b>Enablement Blocker 不是 Implementation Blocker</b>：schema／狀態機／對帳／residual
  * 機制全部可以先做完，缺的只是「可以自動送出」這個開關。
  *
- * <p>⚠️ 本類<b>不</b>決定開關要不要打開——那是同服務內 logistics 模組的
- * {@code SETTLEMENT_AUTO_COLLECTION_ENABLED}。本類只保證：**沒配置就算不出金額**。
+ * <p>⚠️ 本類<b>不</b>決定開關要不要打開——那是呼叫端的開關。本類只保證：**沒配置就算不出金額**。
  */
 @Component
 @ConfigurationProperties(prefix = "hawkr.payment.agent-fee.rate")

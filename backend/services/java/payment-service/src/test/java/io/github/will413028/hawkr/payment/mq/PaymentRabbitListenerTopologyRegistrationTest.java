@@ -1,4 +1,4 @@
-package io.github.will413028.hawkr.payment.logistics.mq;
+package io.github.will413028.hawkr.payment.mq;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,22 +73,6 @@ class PaymentRabbitListenerTopologyRegistrationTest {
                 "🔴 下列 queue 有 @RabbitListener 但沒有登記進 infra/mq/topology/topology.yaml："
                         + missing + "。passive declare 下這不會讓服務啟動失敗，"
                         + "而是讓該筆訂閱靜默失效（10 檔 §10.7）。");
-    }
-
-    @Test
-    @DisplayName("🔴 durable join 的兩條 queue 已登記（本波新增，單獨釘住）")
-    void joinQueuesAreRegistered() throws IOException {
-        // 這兩條是 70 §3.1.4 durable join 的兩個入口。任一條漏登記的症狀都不是
-        // 啟動失敗，而是**那一側的事實永遠進不來** ⇒ 應收永遠建不出來，
-        // 而每一步都「照規則成功」、沒有任何錯誤訊號。
-        for (String q : new String[] {
-                "payment.fulfillment.responsibility_finalized",   // 責任側
-                "payment.logistics.cost_incurred"}) {             // 成本側
-            assertTrue(topologyQueueNames().contains(q),
-                    q + " 未登記 topology ⇒ consumer 上線即靜默失效（passive declare）");
-            assertTrue(listenerQueueNames().contains(q),
-                    q + " 沒有任何 @RabbitListener 掛在上面 ⇒ 登記了卻沒有人消費");
-        }
     }
 
     /**

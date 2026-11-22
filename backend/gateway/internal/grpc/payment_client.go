@@ -15,15 +15,6 @@ import (
 type PaymentClient struct {
 	conn   *grpc.ClientConn
 	client pb.PaymentServiceClient
-	// responsibility 是 FulfillmentResponsibilityService（責任判定 maker-checker）的
-	// stub。與 client 共用同一條連線——同一個 .proto、同一個 payment-service、同一個
-	// port，獨立 service name 只是為了讓授權與寫入邊界分得開。
-	//
-	// ⚠️ 它是**欄位**而不是像 logisticsFinance() 那樣現建：那條軸的守衛（decision 值域、
-	// 雙人制）需要「不合法輸入時下游零呼叫」的陰性斷言，而現建 stub 的寫法讓 handler
-	// 測試無法注入替身。未經 NewPaymentClient 建立的 client 上它是 nil ⇒ 呼叫即 panic，
-	// 那是正確的 fail-loud：比對著一條 nil 連線靜默送出請求好。
-	responsibility pb.FulfillmentResponsibilityServiceClient
 }
 
 // NewPaymentClient 建立新的 Payment gRPC 客戶端
@@ -40,9 +31,8 @@ func NewPaymentClient() (*PaymentClient, error) {
 	zap.S().Infof("Connected to payment gRPC service at %s", target)
 
 	return &PaymentClient{
-		conn:           conn,
-		client:         pb.NewPaymentServiceClient(conn),
-		responsibility: pb.NewFulfillmentResponsibilityServiceClient(conn),
+		conn:   conn,
+		client: pb.NewPaymentServiceClient(conn),
 	}, nil
 }
 

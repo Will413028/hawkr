@@ -234,40 +234,6 @@ const (
 	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
 )
 
-// ==================== 物流財務 ====================
-
-const (
-	// 賣家面：物流財務（V9 的九張表；提示詞 W6-3「Logistics Finance」十一個維度）。
-	SellerLogisticsFinancePath     = "/logistics_finance"
-	SellerLogisticsReceivablesPath = "/logistics_finance/receivables"
-	SellerLogisticsLedgerPath      = "/logistics_finance/ledger"
-)
-
-const (
-	// Admin 面：物流財務維運（應收、收款、對帳、調整）。
-	AdminLogisticsReceivablesPath    = "/logistics/receivables"
-	AdminLogisticsReceivableDetail   = "/logistics/receivables/:receivable_no"
-	AdminLogisticsCollectionsPath    = "/logistics/collections"
-	AdminLogisticsAdjustmentsPath    = "/logistics/adjustments"
-	AdminProviderStatementsPath      = "/logistics/provider_statements"
-	AdminProviderStatementDetail     = "/logistics/provider_statements/:statement_no"
-	AdminLogisticsExceptionCasesPath = "/logistics/exception_cases"
-
-	// Admin 面：單一例外案件詳情與責任判定 maker-checker（65）。
-	//
-	// 🔴 以 case_no 定位而不是 case_id：case_no 是對外業務單號（uq_exc_no），ADM 佇列與
-	// 稽核紀錄引用的都是它；case_id 是 TSID 內部主鍵。形狀與
-	// /logistics/receivables/:receivable_no 的既有慣例一致。
-	//
-	// 🔴 覆核端點是 resolutions 底下的**子資源** approvals 而不是
-	// `/resolutions/:resolution_id/review`（動詞）：一次覆核就是對那張提案新增一筆
-	// 批核紀錄，資源化之後後續波次要加「第二關覆核」只是同一個 collection 再加一筆，
-	// 不必再開一支動詞端點（API 設計規範的 Action 形狀留給真的無法資源化者）。
-	AdminLogisticsExceptionCaseDetail     = "/logistics/exception_cases/:case_no"
-	AdminLogisticsCaseResolutionsPath     = "/logistics/exception_cases/:case_no/resolutions"
-	AdminLogisticsCaseResolutionApprovals = "/logistics/exception_cases/:case_no/resolutions/:resolution_id/approvals"
-)
-
 // ==================== Admin Payment（§29）====================
 
 const (
