@@ -13,7 +13,7 @@ part 'moderation_repository.g.dart';
 ModerationRepository moderationRepository(Ref ref) =>
     ModerationRepository(ref.watch(moderationAppClientProvider));
 
-/// 社群檢舉（`ModerationAppService`）。聊天的檢舉在 `LegacyReportRepository`。
+/// 檢舉（`ModerationAppService`）：社群內容、評價與聊天訊息。
 class ModerationRepository {
   ModerationRepository(this._moderation);
 

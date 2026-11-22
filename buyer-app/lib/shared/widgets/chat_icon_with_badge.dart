@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../../features/chat/data/chat_realtime.dart';
 import '../../features/chat/data/chat_repository.dart';
+import '../../core/session/session_provider.dart';
 import '../utils/require_login.dart';
 import '../widgets/hk_icon.dart';
 import 'notification_count_badge.dart';
@@ -32,37 +34,38 @@ class _ChatIconWithBadgeState extends ConsumerState<ChatIconWithBadge> {
   int _unread = 0;
   bool _loading = false;
   StreamSubscription<int>? _unreadSub;
-  StreamSubscription<ChatConnectionState>? _stateSub;
 
   @override
   void initState() {
     super.initState();
+    _attach();
+    // 訪客登入之後才連：訪客沒有聊天。
+    ref.listenManual(sessionProvider, (_, _) => _attach());
+  }
+
+  bool get _signedIn => hasUsableSession(ref.read(sessionProvider).value);
+
+  void _attach() {
+    if (_unreadSub != null || !_signedIn) return;
     _load();
-    // 後端推送的權威未讀數:一律 SET(取代每則訊息 REST refetch)
-    _unreadSub = ref.read(chatRepositoryProvider).onUnreadCountChange.listen((
-      n,
-    ) {
+    // 串流的 Ready 與 Unread 事件帶總未讀數（權威值，一律 SET）；串流重連後的 Ready 也補上斷線期間漏掉的變化。
+    _unreadSub = ref.read(chatRealtimeProvider).unreadCount.listen((n) {
       if (!mounted) return;
       setState(() => _unread = n);
-    });
-    // 重連 resync:補抓斷線期間漏掉的 unread_changed
-    _stateSub = ref.read(chatRepositoryProvider).connectionStateStream.listen((
-      s,
-    ) {
-      if (s == ChatConnectionState.connected && mounted) _load();
     });
   }
 
   Future<void> _load() async {
     if (_loading) return;
+    // 訪客沒有聊天：不呼叫（登入後的 service 會把訪客的呼叫當成 session 失效）。
+    if (!_signedIn) return;
     _loading = true;
     try {
       final n = await ref.read(chatRepositoryProvider).getUnreadCount();
       if (!mounted) return;
       setState(() => _unread = n);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _unread = 0);
+      // 讀取失敗時保留目前的數字；串流連上之後會以 Ready 的值為準。
     } finally {
       _loading = false;
     }
@@ -71,7 +74,6 @@ class _ChatIconWithBadgeState extends ConsumerState<ChatIconWithBadge> {
   @override
   void dispose() {
     _unreadSub?.cancel();
-    _stateSub?.cancel();
     super.dispose();
   }
 

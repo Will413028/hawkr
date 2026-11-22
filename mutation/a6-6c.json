@@ -37,24 +37,6 @@
    "why": "查我的評價不帶訂單項目，回到別的項目的評價"
   },
   {
-   "id": "chat-report-moved-off-legacy",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/moderation/data/legacy_report_repository.dart",
-   "old": "'/app/reports'",
-   "new": "'/app/reports-x'",
-   "test": "test/features/moderation/report_flows_test.dart 聊天訊息：POST /app/reports，不呼叫 ModerationAppService",
-   "why": "聊天檢舉離開舊路徑"
-  },
-  {
-   "id": "chat-block-moved-off-legacy",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/moderation/presentation/block_confirm_dialog.dart",
-   "old": "await ref.read(blockRepositoryProvider).blockUser(userId);",
-   "new": "await ref.read(socialBlockerProvider).block(const StoreBlockTarget('x'));",
-   "test": "test/features/moderation/block_flows_test.dart 聊天與評價的對象仍走舊 REST，不呼叫 BuyerAppService",
-   "why": "聊天封鎖改送新路徑"
-  },
-  {
    "id": "review-card-count-shown-on-load-failure",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
@@ -224,6 +206,186 @@
    "new": "? ''",
    "test": "test/features/moderation/blocked_users_screen_test.dart 已刪除的買家顯示「已刪除帳號」，仍可解除封鎖",
    "why": "已刪除買家沒有顯示名稱"
+  },
+  {
+   "id": "chat-report-sends-chat-message-kind",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/report_target.dart",
+   "old": ": this(ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE, id);",
+   "new": ": this(ReportTargetKind.REPORT_TARGET_KIND_POST, id);",
+   "test": "test/features/moderation/report_flows_test.dart REPORT_TARGET_KIND_CHAT_MESSAGE：送出對象種類、原因與 UUIDv4 的 request_id",
+   "why": "聊天訊息檢舉送成貼文種類"
+  },
+  {
+   "id": "chat-block-sends-comment-reference",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/blocking_repository.dart",
+   "old": "buyer.BlockAuthorRequest(messageId: messageId)",
+   "new": "buyer.BlockAuthorRequest(commentId: messageId)",
+   "test": "test/features/moderation/block_flows_test.dart 聊天訊息：BlockAuthor 只送訊息 ID，確認說明同封鎖店家",
+   "why": "聊天封鎖把訊息 ID 當成留言 ID 送出"
+  },
+  {
+   "id": "chat-mark-read-not-background",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/core/networking/suspension_signal.dart",
+   "old": "  '/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead',\n",
+   "new": "",
+   "test": "test/core/networking/suspension_test.dart 對話自動已讀（MarkConversationRead）收到 ACCOUNT_SUSPENDED：靜默",
+   "why": "自動已讀被停權時跳出提示"
+  },
+  {
+   "id": "realtime-cursors-unbounded",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "final start = math.max(0, entries.length - ChatRepository.maxCursors);",
+   "new": "final start = 0;",
+   "test": "test/features/chat/chat_realtime_test.dart cursors 最多 50 個，留最近更新的",
+   "why": "cursors 超過 50 個，伺服器回 invalid_argument"
+  },
+  {
+   "id": "realtime-transient-error-terminal",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "              finish(\n                code == Code.unauthenticated || code == Code.invalidArgument\n                    ? _End.terminal\n                    : _End.failed,\n              );\n            },",
+   "new": "              finish(_End.terminal);\n            },",
+   "test": "test/features/chat/chat_realtime_test.dart 暫時性的結束（unavailable、resource_exhausted、一般錯誤）持續重連，不永久停止",
+   "why": "暫時性的串流錯誤永久停止重連"
+  },
+  {
+   "id": "realtime-normal-end-stops",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "onDone: () => finish(_End.ended),",
+   "new": "onDone: () => finish(_End.terminal),",
+   "test": "test/features/chat/chat_realtime_test.dart 伺服器到 max_lifetime 正常結束：立即以最新 cursors 重連",
+   "why": "串流活到最長壽命正常結束後不再重連"
+  },
+  {
+   "id": "realtime-no-liveness-check",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "liveness = Timer(window, () => finish(_End.failed));",
+   "new": "liveness = Timer(window, () {});",
+   "test": "test/features/chat/chat_realtime_test.dart 超過 heartbeat 兩倍沒有任何 frame：當成斷線重連",
+   "why": "半開連線沒有 frame 也不重連"
+  },
+  {
+   "id": "realtime-unread-not-wired",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_realtime.dart",
+   "old": "_unread.add(event.unread.unreadCount.toInt());",
+   "new": "{}",
+   "test": "test/features/chat/chat_realtime_test.dart Ready 後是 connected，總未讀進 unreadCount，Unread 事件更新它",
+   "why": "串流的未讀數不進未讀數量的串流"
+  },
+  {
+   "id": "gap-fill-one-page-only",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "if (!page.hasMore || page.messages.isEmpty) break;",
+   "new": "break;",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 斷線補洞：序號跳號時以 after_seq 讀完所有頁",
+   "why": "補洞只讀第一頁"
+  },
+  {
+   "id": "gap-fill-error-swallowed",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      await _serial(_fillGap);\n    } catch (e) {\n      _update((s) => s.copyWith(syncError: e));",
+   "new": "      await _serial(_fillGap);\n    } catch (e) {\n      HKLog.logD('$e');",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 補洞失敗：錯誤留在 syncError，不吞掉；下一次重新整理成功就清掉",
+   "why": "補洞失敗被吞掉，畫面看不到錯誤"
+  },
+  {
+   "id": "ready-does-not-catch-up",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      case pb.ChatEvent_Event.ready:\n        unawaited(_catchUp());",
+   "new": "      case pb.ChatEvent_Event.ready:\n        break;",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 串流重連的 Ready 觸發補洞",
+   "why": "重連後不補斷線期間的訊息"
+  },
+  {
+   "id": "refresh-collapses-loaded-pages",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "final bySeq = {for (final m in messages) m.seq: m};",
+   "new": "final bySeq = <Int64, pb.Message>{};",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 重新整理不丟掉已載入的舊頁，只補到最新",
+   "why": "重新整理丟掉已載入的舊訊息"
+  },
+  {
+   "id": "load-older-uses-newest-cursor",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "beforeSeq: state.messages.first.seq,",
+   "new": "beforeSeq: state.messages.last.seq,",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 載入更舊：以目前最小的 seq 當 before_seq，載完 hasMore 變 false",
+   "why": "載入更舊用最新的 seq 當游標"
+  },
+  {
+   "id": "first-incoming-message-dropped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "unawaited(_adopt(m.conversationId));",
+   "new": "{}",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 對話還不存在時開的聊天室：店家先寄來的第一則訊息不會被丟掉",
+   "why": "對話還不存在時收到的第一則訊息被丟掉"
+  },
+  {
+   "id": "foreign-conversation-adopted",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "if (c.id == conversationId && _matches(c)) {",
+   "new": "if (c.id == conversationId) {",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 別家店的對話事件不會被當成這個聊天室的",
+   "why": "別家店的訊息被收進這個聊天室"
+  },
+  {
+   "id": "retry-uses-new-request-id",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "return _send(p.content, previewUrl: p.previewUrl);",
+   "new": "return _send(OutgoingContent.text(p.content.text ?? ''), previewUrl: p.previewUrl);",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 送出失敗：保留為失敗的待送，重試用同一個 request_id，伺服器只寫一則",
+   "why": "重試換新的 request_id，伺服器寫兩則"
+  },
+  {
+   "id": "failed-send-not-marked",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "p.requestId == content.requestId ? p.copyWith(failed: true) : p,",
+   "new": "p,",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 送出失敗：保留為失敗的待送，重試用同一個 request_id，伺服器只寫一則",
+   "why": "送出失敗的訊息沒有標成失敗"
+  },
+  {
+   "id": "blocked-send-not-read-only",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "reason == ErrorReason.CHAT_BLOCKED ||",
+   "new": "false ||",
+   "test": "test/features/chat/chat_thread_notifier_test.dart 對方封鎖或已刪除（CHAT_BLOCKED、RECEIVER_DELETED）：輸入框改唯讀，顯示伺服器的說明",
+   "why": "被封鎖時輸入框仍可輸入"
+  },
+  {
+   "id": "hidden-message-shows-content",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_display.dart",
+   "old": "if (m.hidden) return chatPreviewHidden(l);",
+   "new": "if (m.hidden) return m.text;",
+   "test": "test/features/chat/chat_display_test.dart 訊息文字：文字、已隱藏、已抹除、不認得的種類取共用文案目錄，圖片回 null",
+   "why": "已隱藏的訊息顯示成空白而不是共用文案"
+  },
+  {
+   "id": "unsupported-kind-blank",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/chat/data/chat_display.dart",
+   "old": "    default:\n      return chatMessageUnsupportedKind(l);\n  }\n}\n\n/// 對話列表",
+   "new": "    default:\n      return '';\n  }\n}\n\n/// 對話列表",
+   "test": "test/features/chat/chat_display_test.dart 訊息文字：文字、已隱藏、已抹除、不認得的種類取共用文案目錄，圖片回 null",
+   "why": "不認得的訊息種類顯示成空白"
   }
  ]
 }

@@ -11,7 +11,7 @@ part 'blocking_repository.g.dart';
 BlockingRepository blockingRepository(Ref ref) =>
     BlockingRepository(ref.watch(buyerAppClientProvider));
 
-/// 社群的封鎖與封鎖名單（`BuyerAppService`）。聊天的封鎖仍在 `BlockRepository`（舊 REST）。
+/// 社群的封鎖與封鎖名單（`BuyerAppService`）。聊天訊息的作者（店家）也從這裡封鎖。
 class BlockingRepository {
   BlockingRepository(this._buyer);
 
@@ -28,6 +28,10 @@ class BlockingRepository {
       case CommentAuthorBlockTarget(:final commentId):
         await _buyer.blockAuthor(
           buyer.BlockAuthorRequest(commentId: commentId),
+        );
+      case ChatMessageBlockTarget(:final messageId):
+        await _buyer.blockAuthor(
+          buyer.BlockAuthorRequest(messageId: messageId),
         );
       case ForumAuthorBlockTarget(:final entryId):
         await _buyer.blockAuthor(

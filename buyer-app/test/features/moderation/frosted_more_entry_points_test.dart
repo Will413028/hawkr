@@ -12,7 +12,6 @@ import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
 import 'package:hawkr_buyer/features/moderation/data/block_target.dart';
-import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
 import '../review/review_fakes.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/block_confirm_dialog.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
@@ -180,7 +179,7 @@ void main() {
             final report = tester.widget<ReportSheetWidget>(
               find.byType(ReportSheetWidget),
             );
-            final reportTarget = report.target as SocialReportTarget;
+            final reportTarget = report.target;
             if (surface == '商品評價') {
               // 評價的檢舉只送參照：種類與評價 ID。
               expect(reportTarget.id, 'review-12');

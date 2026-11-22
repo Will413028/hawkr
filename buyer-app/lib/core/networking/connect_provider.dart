@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
@@ -106,6 +107,11 @@ SellerReportAppServiceClient sellerReportAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ModerationAppServiceClient moderationAppClient(Ref ref) =>
     ModerationAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
+@Riverpod(keepAlive: true)
+ChatAppServiceClient chatAppClient(Ref ref) =>
+    ChatAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
 @Riverpod(keepAlive: true)

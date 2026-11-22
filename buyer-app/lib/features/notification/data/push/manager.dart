@@ -346,29 +346,15 @@ class PushNotificationManager {
     // 並在 body 為空時 fallback 至 content_preview
     if (type == 'chat_message' || type == 'CHAT_MESSAGE') {
       final conversationId = data['conversation_id']?.toString() ?? '';
-      final senderId = _firstNonEmpty(data, [
-        'sender_id',
-        'senderId',
-        'from_user_id',
-        'fromUserId',
-        'from_id',
-        'fromId',
-      ]);
 
-      // 使用者已經在跟這個人的聊天室裡 → 不再彈前景 banner，避免雙重通知。
-      // senderId 與 conversationId 任一比對到就跳過：merchantId / senderId 可能
-      // 因 namespace 不同對不上，conversationId 是 server 端唯一 ID 比對最穩。
+      // 使用者已經在這個對話的聊天室裡 → 不再彈前景 banner，避免雙重通知。
+      // conversation_id 是 im 模組的對話 ID（與 ChatAppService 的 Conversation.id 同一個）。
       final gate =
           _container?.read(activeChatGateProvider) ?? const ActiveChat.empty();
-      final matchesPeer = senderId.isNotEmpty && gate.peerId == senderId;
-      final matchesConv =
-          conversationId.isNotEmpty &&
-          gate.conversationId != null &&
-          gate.conversationId == conversationId;
-      if (matchesPeer || matchesConv) {
+      if (conversationId.isNotEmpty && gate.conversationId == conversationId) {
         HKLog.logD(
           '[FCM] 跳過 chat_message banner：使用者已在聊天室內 '
-          'senderId=$senderId conversationId=$conversationId',
+          'conversationId=$conversationId',
         );
         return;
       }

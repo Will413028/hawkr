@@ -281,8 +281,8 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return ChatThreadScreen(
-            merchantId: extra['merchantId'] as String? ?? '',
-            merchantName: extra['merchantName'] as String?,
+            storeId: extra['merchantId'] as String?,
+            storeName: extra['merchantName'] as String?,
             conversationId: extra['conversationId'] as String?,
           );
         },

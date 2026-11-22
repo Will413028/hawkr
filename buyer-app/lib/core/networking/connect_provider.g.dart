@@ -619,6 +619,58 @@ final class ModerationAppClientProvider
 String _$moderationAppClientHash() =>
     r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
 
+/// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
+
+@ProviderFor(chatAppClient)
+final chatAppClientProvider = ChatAppClientProvider._();
+
+/// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
+
+final class ChatAppClientProvider
+    extends
+        $FunctionalProvider<
+          ChatAppServiceClient,
+          ChatAppServiceClient,
+          ChatAppServiceClient
+        >
+    with $Provider<ChatAppServiceClient> {
+  /// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
+  ChatAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatAppServiceClient create(Ref ref) {
+    return chatAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatAppServiceClient>(value),
+    );
+  }
+}
+
+String _$chatAppClientHash() => r'82a8a1be2af41db22b2bd53d0758cc34b233d64d';
+
 /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
 
 @ProviderFor(reviewPublicClient)

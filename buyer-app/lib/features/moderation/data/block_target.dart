@@ -9,11 +9,7 @@ const blockStoreConfirmText = '封鎖後，您將看不到這家店的貼文與�
 /// C7b：封鎖買家的確認說明。
 const blockBuyerConfirmText = '封鎖後，您與對方將看不到彼此的留言與評價。可隨時在「封鎖名單」解除。';
 
-/// 聊天入口的封鎖說明（舊 REST，A6 前保留）。
-const legacyBlockConfirmText = '封鎖後對方將無法傳送訊息給您，您也無法傳送訊息給對方。可隨時在「封鎖名單」解除。';
-
-/// 封鎖的對象。社群的對象（[SocialBlockTarget]）走 `BuyerAppService`；聊天的對象（[LegacyBlockTarget]）
-/// 仍走舊 REST（A6 前的允許殘留）。兩者以型別分開，呼叫端不用字串判斷走哪條。
+/// 封鎖的對象，一律走 `BuyerAppService`，只送參照。
 sealed class BlockTarget {
   const BlockTarget();
 
@@ -91,14 +87,20 @@ final class ForumAuthorBlockTarget extends SocialBlockTarget {
       : blockBuyerConfirmText;
 }
 
-/// 聊天入口：以舊系統的使用者編號封鎖（舊 `POST /app/blocks/{userId}`）。
-final class LegacyBlockTarget extends BlockTarget {
-  const LegacyBlockTarget(this.userId);
+/// 封鎖一則聊天訊息所屬對話的店家（`BlockAuthor` 的 `message_id`）；訊息已隱藏或抹除仍可當參照。
+final class ChatMessageBlockTarget extends SocialBlockTarget {
+  const ChatMessageBlockTarget(this.messageId, {this.storeId});
 
-  final String userId;
+  final String messageId;
+
+  /// 對話的店家 ID（讀得到時），封鎖成功後據以移除該店已載入的貼文。
+  final String? storeId;
 
   @override
-  String get confirmText => legacyBlockConfirmText;
+  String? get blockedStoreId => storeId;
+
+  @override
+  String get confirmText => blockStoreConfirmText;
 }
 
 BlockedPartyKind? _partyOf(pb.Actor author) => switch (author.kind) {

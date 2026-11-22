@@ -16,7 +16,6 @@ import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
 import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
-import 'package:hawkr_buyer/features/moderation/data/report_target_type.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -54,7 +53,7 @@ class _LegacyAdapter implements HttpClientAdapter {
 Future<_LegacyAdapter> _pump(
   WidgetTester tester,
   FakeModeration moderation,
-  ReportTarget target,
+  SocialReportTarget target,
 ) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
@@ -123,6 +122,10 @@ void main() {
       (
         const SocialReportTarget.review('r1'),
         ReportTargetKind.REPORT_TARGET_KIND_REVIEW,
+      ),
+      (
+        const SocialReportTarget.chatMessage('m1'),
+        ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE,
       ),
     ]) {
       testWidgets('${kind.name}：送出對象種類、原因與 UUIDv4 的 request_id', (
@@ -342,33 +345,6 @@ void main() {
       await _submit(tester);
 
       expect(find.text('服務暫時不可用'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 3));
-    });
-  });
-
-  group('聊天仍走舊 REST', () {
-    testWidgets('聊天訊息：POST /app/reports，不呼叫 ModerationAppService', (
-      tester,
-    ) async {
-      final moderation = FakeModeration();
-      final legacy = await _pump(
-        tester,
-        moderation,
-        const LegacyReportTarget(ReportTargetType.chatMessage, 'm1'),
-      );
-
-      await _choose(tester, ReportReasonCode.harassment.label);
-      await _submit(tester);
-
-      final request = legacy.requests.single;
-      expect(request.method, 'POST');
-      expect(request.path, '/app/reports');
-      expect(request.data, {
-        'targetType': 'CHAT_MESSAGE',
-        'targetId': 'm1',
-        'reasonCode': 'HARASSMENT',
-      });
-      expect(moderation.submitted, isEmpty);
       await tester.pump(const Duration(seconds: 3));
     });
   });
