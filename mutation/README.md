@@ -28,12 +28,12 @@ mutation 不在開發機跑（機器共用，Go integration 需要資料庫容�
 | `go-integration` | `<相對 backend 的套件目錄> <regex>` | `go test -count=1 -vet=off -tags integration ./<套件>/ -run '<regex>'`（`backend`，`GOWORK=off`） |
 | `go` | 同上 | 同上但不帶 integration tag |
 | `go:<模組目錄>`、`go-integration:<模組目錄>` | 同上，套件目錄改為相對該模組 | 同上，工作目錄改為 `<模組目錄>`（相對 repo 根目錄，例如 `backend/services/invoice-service`，`GOWORK=off`）；目錄必須存在且有 `go.mod`（`--validate` 檢查） |
-| `website` | `<相對 website 的測試檔> [測試名稱]` | `pnpm exec <website/package.json 的 test:file script> <檔> -t '<名稱>'`（`website`；`test:file` 目前是 `vitest run --project unit`，`pnpm test` 也呼叫它。script 必須以 `vitest` 開頭、含 `run` 與 `--project unit`、之後沒有位置參數） |
-| `admin` | `<相對 admin 的測試檔> [測試名稱]` | `<admin/package.json 的 test:file script> [--test-name-pattern '<名稱>'] <檔>`（`admin`；`test:file` 目前是 `node --import tsx --import ./tests/setup/env.mjs --test`，`pnpm test` 也呼叫它，runner 讀 script 後直接以 node 執行；script 必須以 `node` 開頭、最後一個參數是 `--test`）。`--test-name-pattern` 必須在檔案之前，放後面 node 會忽略並整檔照跑 |
+| `website` | `<相對 website 的測試檔> [測試名稱]` | `pnpm exec <website/package.json 的 test:file script> <檔> -t '<名稱>'`（`website`；`test:file` 目前是 `vitest run --project unit`，`pnpm test` 也呼叫它。script 必須恰為 `vitest run --project unit`（或 `--project=unit`），前後不得有其他 token） |
+| `admin` | `<相對 admin 的測試檔> [測試名稱]` | `<admin/package.json 的 test:file script> [--test-name-pattern '<名稱>'] <檔>`（`admin`；`test:file` 目前是 `node --import tsx --import ./tests/setup/env.mjs --test`，`pnpm test` 也呼叫它，runner 讀 script 後直接以 node 執行；script 必須恰為 `node`、零或多組 `--import <specifier>`、`--test`，specifier 不得以 `-` 開頭或含 glob、shell 字元、空白）。`--test-name-pattern` 必須在檔案之前，放後面 node 會忽略並整檔照跑 |
 | `flutter:buyer-app`、`flutter:seller-app`（只接受這兩個） | `<相對該 App 的測試檔> [測試名稱]` | `bash scripts/ci-flutter-test.sh --no-pub <檔> --plain-name '<名稱>'`（該 App 目錄） |
 
 - Go 的 regex 要錨定（`^TestX$`，子測試 `^TestX$/^sub$`）：前綴比對可能讓被擋下的 mutant 被誤判。
-- admin 與 website 的 `test:file` script 必須是單純的 argv：不得含 `&&`、`;`、`|`、重導向、`$` 展開或 `VAR=value` 前綴，不是字串或不符上述形狀都是清單錯誤（`--validate` 會在改動 package.json 的 PR 就擋下）。
+- admin 與 website 的 `test:file` script 必須是單純的 argv：不得含 `&&`、`;`、`|`、重導向、`$` 展開或 `VAR=value` 前綴，不是字串或不完全符合上述文法都是清單錯誤；文法刻意嚴格，兩支 script 要新增旗標時必須同步修改 runner 的文法（`--validate` 會在改動 package.json 的 PR 就擋下）。
 - admin 的名稱是 regex，沒對到任何測試時 node 仍以 0 結束（只顯示檔案層級通過），結果是 `SURVIVED` 而不是錯誤，所以名稱要打對、並唯一對到預期變紅的測試。
 - website 一律只跑 `unit` project（vitest 設定的另一個 project 是 browser）；測試名稱是 `-t` 的子字串或 regex，要唯一對到預期變紅的測試。
 - 每個 mutant 先在未改動的樹上跑一次同樣的測試作基準，基準不過就是 `BASELINE-FAILED`（紅的測試證明不了什麼）。

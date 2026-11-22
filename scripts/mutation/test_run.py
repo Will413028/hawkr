@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import os
+import shlex
 import shutil
 import sys
 import tempfile
@@ -284,29 +285,47 @@ class CommandTest(unittest.TestCase):
         return repo
 
     def test_commands_follow_package_scripts(self):
-        repo = self.fake_repo(website={"test:file": "vitest run --reporter=dot --project unit"})
+        repo = self.fake_repo(website={"test:file": "vitest run --project=unit"})
         self.assertEqual(run.build_command("admin", "t.ts n", repo).argv,
                          ["node", "--import", "./x.mjs", "--test", "--test-name-pattern", "n", "t.ts"])
         self.assertEqual(run.build_command("website", "t.ts n", repo).argv,
-                         ["pnpm", "exec", "vitest", "run", "--reporter=dot", "--project", "unit", "t.ts", "-t", "n"])
+                         ["pnpm", "exec", "vitest", "run", "--project=unit", "t.ts", "-t", "n"])
         (repo / "admin" / "package.json").write_text("{}", encoding="utf-8")
         with self.assertRaises(run.ManifestError):
             run.build_command("admin", "t.ts", repo)
 
-    def test_invalid_scripts_are_manifest_errors(self):
-        bad = {
+    def test_script_grammar(self):
+        accept = {
+            "admin": ["node --test", "node --import tsx --test", "node --import tsx --import ./tests/setup/env.mjs --test",
+                      "node --import 'a-b/c.mjs' --test"],
+            "website": ["vitest run --project unit", "vitest run --project=unit"],
+        }
+        reject = {
             "admin": [7, ["node"], "", "FOO=1 node --test", "NODE_ENV=test node --test", "node --test && echo x",
                       "node --test; echo", "node --test | cat", "node --test > out", "node $X --test",
-                      "pnpm run test:file --test", "tsx --test", "node --test tests/a.test.ts", "node --test 'unterminated"],
+                      "pnpm run test:file --test", "tsx --test", "node --test tests/a.test.ts", "node --test 'unterminated",
+                      "node tests/a.test.ts --test", "node --import ./setup/*.mjs --test", "node --import --test",
+                      "node --import tsx", "node --import -x --test", "node --import tsx --require y --test",
+                      "node --import tsx --test --test", "node --import './a b.mjs' --test", "node --import ~/x.mjs --test",
+                      "node --import ./a{b,c}.mjs --test", "node --import ./a?.mjs --test", "node --import tsx extra --test",
+                      "node --import tsx --test --experimental-x"],
             "website": [7, "", "CI=1 vitest run --project unit", "vitest run --project unit && true",
                         "pnpm run test:file", "node vitest run --project unit", "vitest --project unit",
                         "vitest run --project browser", "vitest run", "vitest run --project unit tests/a.test.ts",
-                        "vitest run --project", "vitest run --project unit | cat"],
+                        "vitest run --project", "vitest run --project unit | cat", "vitest run --project unit --project=browser",
+                        "vitest run --project unit --project browser", "vitest run --project unit --", "vitest run --project unit --reporter=dot",
+                        "vitest run --reporter=dot --project unit", "vitest run --project=browser", "vitest run --project=unit extra",
+                        "pnpm exec vitest run --project unit", "vitest run --project  unit --"],
         }
-        for app, scripts in bad.items():
+        for app, scripts in accept.items():
             for script in scripts:
                 repo = self.fake_repo(**{app: {"test:file": script}})
-                with self.subTest(app=app, script=script):
+                with self.subTest(app=app, accept=script):
+                    self.assertEqual(run.package_script(repo, app, "test:file"), shlex.split(script))
+        for app, scripts in reject.items():
+            for script in scripts:
+                repo = self.fake_repo(**{app: {"test:file": script}})
+                with self.subTest(app=app, reject=script):
                     with self.assertRaises(run.ManifestError) as cm:
                         run.build_command(app, "t.ts", repo)
                     self.assertIn(f"{app}/package.json", str(cm.exception))
@@ -334,10 +353,13 @@ class CommandTest(unittest.TestCase):
         repo = run.REPO
         admin = run.package_script(repo, "admin", "test:file")
         website = run.package_script(repo, "website", "test:file")
-        self.assertEqual(admin[0], "node")
-        self.assertEqual(admin[-1], "--test")
-        self.assertEqual(website[0], "vitest")
-        self.assertEqual(website[website.index("--project") + 1], "unit")
+        self.assertEqual(admin, ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test"])
+        self.assertEqual(website, ["vitest", "run", "--project", "unit"])
+        self.assertEqual(run.build_command("admin", "a.test.ts N", repo).argv,
+                         ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test",
+                          "--test-name-pattern", "N", "a.test.ts"])
+        self.assertEqual(run.build_command("website", "a.test.ts N", repo).argv,
+                         ["pnpm", "exec", "vitest", "run", "--project", "unit", "a.test.ts", "-t", "N"])
         self.assertEqual(run.build_command("admin", "tests/x.test.ts my case", repo).argv,
                          [*admin, "--test-name-pattern", "my case", "tests/x.test.ts"])
         self.assertEqual(run.build_command("website", "a.test.ts my case", repo).argv,
