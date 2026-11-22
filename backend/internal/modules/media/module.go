@@ -84,6 +84,8 @@ const (
 	RejectProcessingFailed   = model.RejectProcessingFailed
 	RejectExpired            = model.RejectExpired
 
+	// MaxPublicUploadSize 是單次公開圖片上傳宣告大小的上限（位元組），整個後端唯一的定義；BeginUpload 檢查它，handler 與 client 不另寫數字。
+	MaxPublicUploadSize = model.MaxPublicUploadSize
 	// UploadTTL 是暫存上傳從 BeginUpload 起算的存活時間，整個模組唯一的定義。
 	UploadTTL = model.UploadTTL
 	// StuckUploadGrace 是卡在 UPLOADED 的暫存列過期後、GC 回收它之前的寬限。

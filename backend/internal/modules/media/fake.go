@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -207,3 +208,6 @@ func (f *Fake) ReadSecure(ctx context.Context, objectKey string, ref Ref) (Secur
 	}
 	return a, nil
 }
+
+// NewMemoryStore 回傳空的記憶體 ObjectStore，只給 Go 測試接線（例如 httpapi 的整合測試）；正式啟動不會建構它。
+func NewMemoryStore() ObjectStore { return storage.NewFake() }

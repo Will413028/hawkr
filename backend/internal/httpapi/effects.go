@@ -94,6 +94,11 @@ var customerEffects = map[string]Effect{
 	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":  EffectWrite,
 	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports": EffectRead,
 
+	// MediaAppService：上傳是寫入（停權的帳號不能開始新的上傳）；讀處理狀態停權的帳號也可以。
+	"/hawkr.media.v1alpha1.MediaAppService/BeginUpload":    EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/CompleteUpload": EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/GetUpload":      EffectRead,
+
 	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/LikePost":              EffectWrite,
