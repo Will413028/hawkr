@@ -22,10 +22,8 @@ const (
 	govDailyHourUTC   = 16
 	govDailyMinuteUTC = 0
 
-	// 啟動補跑的重試（2026-09-04）。pod 剛起的那幾秒打不出去（NetworkPolicy 規則
-	// 對新 pod 有套用延遲），補跑一次就放棄的話鏡像會空到隔天。
-	// 5 × 30s ＝ 2.5 分鐘，涵蓋一般 rolling 的窗口；再不行就是真的壞了，
-	// 那時 InvoiceBusinessDayMirrorEmpty 會在 30 分鐘後叫。
+	// 啟動補跑的重試。pod 剛起的那幾秒 DB 連線可能還沒就緒，補跑一次就放棄的話
+	// 當日的掃描會缺到隔天。5 × 30s ＝ 2.5 分鐘，涵蓋一般 rolling 的窗口。
 	govCatchUpAttempts = 5
 	govCatchUpInterval = 30 * time.Second
 )

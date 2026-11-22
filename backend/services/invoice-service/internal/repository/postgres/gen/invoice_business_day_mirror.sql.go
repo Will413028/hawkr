@@ -19,14 +19,14 @@ DELETE FROM invoice_business_day_mirror
 // invoice_business_day_mirror｜台灣國定假日唯讀鏡像
 // SSOT：設計書 58 號 §5.1.14
 //
-// 這張表**不是行事曆的 owner，是本地快取**（owner ＝ shipping-service 的 holidays 表）。
-// 每日由 INV.gov 呼叫 SHIP GetHolidaysInternal(from_date, to_date) 同步「今天 −30 天 ～ +400 天」，
-// **同一交易內整段 DELETE + INSERT**，失敗即整段不覆蓋（§5.2.3 第 12 組，本身即原子）。
-// 禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。
+// 這張表**不是行事曆的 owner，是本地快取**（owner ＝ 單體的 platform/bizcalendar）。
+// 單體在每次匯入成功後與每天一次的對帳呼叫 ReplaceBusinessDayMirror，帶入涵蓋區間與區間內的假日；
+// **同一交易內整段 DELETE + INSERT 並覆蓋涵蓋區間**，失敗即整段不覆蓋（本身即原子）。
+// 禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。這支推送隨 A5 搬遷刪除。
 //
 // 要鏡像而不是每次現打：K01 建案是買家的**同步 HTTP 路徑**，invoice_complaints.sla_due_at 是
-// NOT NULL、必須當場算出來 ⇒ 掛在 shipping-service 的可用性上，shipping 一抖買家就送不出申訴。
-// 同步連續失敗 ⇒ 鏡像變舊 ⇒ 未涵蓋日期一律視為假日（偏晚）＋ invoice_business_calendar_stale 告警。
+// NOT NULL、必須當場算出來 ⇒ 不能掛在單體的可用性上。
+// 推送連續失敗 ⇒ 鏡像變舊 ⇒ 未涵蓋日期一律視為假日（偏晚）＋ invoice_business_calendar_stale 告警。
 // 整段覆蓋的前半。必須與 InsertBusinessDay 在同一交易內。
 func (q *Queries) DeleteAllBusinessDays(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAllBusinessDays)
@@ -36,16 +36,22 @@ func (q *Queries) DeleteAllBusinessDays(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-const getBusinessDayMirrorSyncedAt = `-- name: GetBusinessDayMirrorSyncedAt :one
-SELECT synced_at FROM invoice_business_day_mirror ORDER BY synced_at DESC LIMIT 1
+const getBusinessDayCoverage = `-- name: GetBusinessDayCoverage :one
+SELECT covered_from, covered_to, synced_at FROM invoice_business_day_coverage
 `
 
-// 鏡像新鮮度（invoice_business_calendar_stale 告警的資料面）。空表回 pgx.ErrNoRows。
-func (q *Queries) GetBusinessDayMirrorSyncedAt(ctx context.Context) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, getBusinessDayMirrorSyncedAt)
-	var synced_at pgtype.Timestamptz
-	err := row.Scan(&synced_at)
-	return synced_at, err
+type GetBusinessDayCoverageRow struct {
+	CoveredFrom pgtype.Date        `db:"covered_from" json:"covered_from"`
+	CoveredTo   pgtype.Date        `db:"covered_to" json:"covered_to"`
+	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+}
+
+// 鏡像的涵蓋區間與新鮮度（invoice_business_calendar_stale 告警的資料面）。從未推送過回 pgx.ErrNoRows。
+func (q *Queries) GetBusinessDayCoverage(ctx context.Context) (GetBusinessDayCoverageRow, error) {
+	row := q.db.QueryRow(ctx, getBusinessDayCoverage)
+	var i GetBusinessDayCoverageRow
+	err := row.Scan(&i.CoveredFrom, &i.CoveredTo, &i.SyncedAt)
+	return i, err
 }
 
 const insertBusinessDay = `-- name: InsertBusinessDay :exec
@@ -58,7 +64,7 @@ type InsertBusinessDayParams struct {
 	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
 }
 
-// 整段覆蓋的後半。同一批的每一列 synced_at 相同（欄位註解逐字要求）。
+// 整段覆蓋的後半。同一批的每一列 synced_at 相同。
 func (q *Queries) InsertBusinessDay(ctx context.Context, arg InsertBusinessDayParams) error {
 	_, err := q.db.Exec(ctx, insertBusinessDay, arg.HolidayDate, arg.SyncedAt)
 	return err
@@ -94,4 +100,25 @@ func (q *Queries) ListBusinessDayHolidays(ctx context.Context, arg ListBusinessD
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertBusinessDayCoverage = `-- name: UpsertBusinessDayCoverage :exec
+INSERT INTO invoice_business_day_coverage (singleton, covered_from, covered_to, synced_at)
+VALUES (true, $1, $2, $3)
+ON CONFLICT (singleton) DO UPDATE
+SET covered_from = EXCLUDED.covered_from,
+    covered_to = EXCLUDED.covered_to,
+    synced_at = EXCLUDED.synced_at
+`
+
+type UpsertBusinessDayCoverageParams struct {
+	CoveredFrom pgtype.Date        `db:"covered_from" json:"covered_from"`
+	CoveredTo   pgtype.Date        `db:"covered_to" json:"covered_to"`
+	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+}
+
+// 覆蓋涵蓋區間與推送時間。必須與 DeleteAllBusinessDays、InsertBusinessDay 在同一交易內。
+func (q *Queries) UpsertBusinessDayCoverage(ctx context.Context, arg UpsertBusinessDayCoverageParams) error {
+	_, err := q.db.Exec(ctx, upsertBusinessDayCoverage, arg.CoveredFrom, arg.CoveredTo, arg.SyncedAt)
+	return err
 }

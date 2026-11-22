@@ -632,25 +632,68 @@ func TestIntegration_Inbox_ReturnedIDCanAdvanceRowToProcessed(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ⑥ 行事曆鏡像為空時回 nil 而不是錯誤
+// ⑥ 行事曆鏡像：從未推送過回 nil；涵蓋區間逐日存取；覆蓋後仍是單列
 // ---------------------------------------------------------------------------
 
-func TestIntegration_BusinessDay_EmptyMirrorReturnsNil(t *testing.T) {
+func TestIntegration_BusinessDay_NeverPushedReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
 	repo := NewBusinessDayRepository(pool)
 
-	// 自己造出「空鏡像」這個前置狀態，而不是「非空就 skip」——後者在 migration
+	// 自己造出「從未推送」這個前置狀態，而不是「非空就 skip」——後者在 migration
 	// 哪天加了 seed 之後會靜默不執行，而測試報告仍然是綠的。
-	if _, err := pool.Exec(ctx, `TRUNCATE invoice_business_day_mirror`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE invoice_business_day_mirror, invoice_business_day_coverage`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
-	got, err := repo.SyncedAt(ctx)
+	got, err := repo.Coverage(ctx)
 	if err != nil {
-		t.Fatalf("空表不該回錯誤：%v", err)
+		t.Fatalf("沒有涵蓋區間不該回錯誤：%v", err)
 	}
 	if got != nil {
-		t.Fatalf("空表應回 nil，實得 %v", *got)
+		t.Fatalf("從未推送應回 nil，實得 %+v", *got)
+	}
+}
+
+func TestIntegration_BusinessDay_CoverageRoundTripAndOverwrite(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	repo := NewBusinessDayRepository(pool)
+	if _, err := pool.Exec(ctx, `TRUNCATE invoice_business_day_mirror, invoice_business_day_coverage`); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
+
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
+	synced := time.Date(2026, 11, 22, 4, 0, 0, 0, time.UTC)
+	if err := repo.SetCoverage(ctx, day(10, 23), day(12, 31), synced); err != nil {
+		t.Fatalf("SetCoverage: %v", err)
+	}
+	if err := repo.Insert(ctx, day(12, 25), synced); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	got, err := repo.Coverage(ctx)
+	if err != nil || got == nil {
+		t.Fatalf("Coverage: %v %v", got, err)
+	}
+	if got.From.Format("2006-01-02") != "2026-10-23" || got.To.Format("2006-01-02") != "2026-12-31" || !got.SyncedAt.Equal(synced) {
+		t.Fatalf("涵蓋區間沒有原樣存取：%+v", *got)
+	}
+
+	// 再覆蓋一次：仍然只有一列，值是新的。
+	if err := repo.SetCoverage(ctx, day(11, 1), day(11, 30), synced.Add(time.Hour)); err != nil {
+		t.Fatalf("SetCoverage 覆蓋: %v", err)
+	}
+	var n int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM invoice_business_day_coverage`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("涵蓋區間應恆為單列，n=%d err=%v", n, err)
+	}
+	got, _ = repo.Coverage(ctx)
+	if got.From.Format("2006-01-02") != "2026-11-01" || got.To.Format("2006-01-02") != "2026-11-30" {
+		t.Fatalf("覆蓋後的區間不對：%+v", *got)
+	}
+
+	// 區間顛倒由 CHECK 擋下，而不是只靠 usecase。
+	if err := repo.SetCoverage(ctx, day(12, 1), day(11, 1), synced); err == nil {
+		t.Fatal("covered_from > covered_to 必須被 CHECK 擋下")
 	}
 }
 

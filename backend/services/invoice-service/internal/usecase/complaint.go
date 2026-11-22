@@ -484,11 +484,11 @@ func loadBusinessCalendar(ctx context.Context, repo domain.BusinessDayRepository
 	if err != nil {
 		return domain.BusinessCalendar{}, err
 	}
-	syncedAt, err := repo.SyncedAt(ctx)
+	coverage, err := repo.Coverage(ctx)
 	if err != nil {
 		return domain.BusinessCalendar{}, err
 	}
-	return domain.NewBusinessCalendar(holidays, syncedAt), nil
+	return domain.NewBusinessCalendar(holidays, coverage), nil
 }
 
 // viewOf 補上時間軸與工作天倒數。

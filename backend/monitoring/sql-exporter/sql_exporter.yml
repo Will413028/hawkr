@@ -838,7 +838,7 @@ collectors:
           - age
         query: |
           SELECT COALESCE(EXTRACT(EPOCH FROM (now() - MAX(synced_at))), -1)::float8 AS age
-          FROM invoice_business_day_mirror
+          FROM invoice_business_day_coverage
 
       - metric_name: invoice_correction_stuck_rows
         type: gauge

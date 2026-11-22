@@ -195,21 +195,31 @@ func (r *BusinessDayRepository) ListHolidays(ctx context.Context, from, to time.
 	return out, nil
 }
 
-// SyncedAt 回鏡像最後一次同步的時間；鏡像為空時回 nil。
+// SetCoverage 覆蓋涵蓋區間與推送時間；必須與 DeleteAll、Insert 在同一個交易內。
+func (r *BusinessDayRepository) SetCoverage(ctx context.Context, from, to, syncedAt time.Time) error {
+	return r.q(ctx).UpsertBusinessDayCoverage(ctx, gen.UpsertBusinessDayCoverageParams{
+		CoveredFrom: dateParam(from),
+		CoveredTo:   dateParam(to),
+		SyncedAt:    ts(syncedAt),
+	})
+}
+
+// Coverage 回鏡像的涵蓋區間與最近一次推送的時間；從未推送過回 nil。
 //
 // 回 nil 而不是零值：呼叫端必須把它當「今天算不出工作天」處理，不得當成「沒有假日」——
 // 後者會把 3 工作天 SLA 算成 3 自然日，誤判賣家違規。
-func (r *BusinessDayRepository) SyncedAt(ctx context.Context) (*time.Time, error) {
-	v, err := r.q(ctx).GetBusinessDayMirrorSyncedAt(ctx)
+func (r *BusinessDayRepository) Coverage(ctx context.Context) (*domain.BusinessDayCoverage, error) {
+	row, err := r.q(ctx).GetBusinessDayCoverage(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil // 空表，不是錯誤
+		return nil, nil // 從未推送，不是錯誤
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !v.Valid {
+	from := pgxutil.DateValue(row.CoveredFrom)
+	to := pgxutil.DateValue(row.CoveredTo)
+	if from == nil || to == nil || !row.SyncedAt.Valid {
 		return nil, nil
 	}
-	t := v.Time
-	return &t, nil
+	return &domain.BusinessDayCoverage{From: *from, To: *to, SyncedAt: row.SyncedAt.Time}, nil
 }

@@ -45,6 +45,7 @@ var Module = fx.Module("usecase",
 	fx.Provide(newHealthCheck),
 	fx.Provide(newRecheck),
 	fx.Provide(newGovernance),
+	fx.Provide(newBusinessCalendarMirror),
 	fx.Provide(newPDF),
 	fx.Provide(NewQuery),
 	// DocumentFile 是 §6.1.4 的 PDF 授權下載（端點 10／70 的中介資料 ＋ 三條
@@ -300,9 +301,7 @@ func newRecheck(
 // counter 與 profiles 是兩個不同的 repository：M20 數的是 operation，
 // C4 改的是 seller_tax_profiles。
 //
-// businessDays／holidays／tx 是行事曆鏡像的每日同步（§5.1.14；#3089 第 17 項）：
-// 鏡像的兩個寫入方法在 2026-09-04 之前**零呼叫端**，於是那張表自建立以來一列都沒有
-// ⇒ 每一筆申訴的 SLA 都退到 14 自然日的硬上限，而退化是靜默的。
+// 行事曆鏡像不在這裡：它由單體推送（ReplaceBusinessDayMirror，見 BusinessCalendarMirror）。
 //
 // inbox／outboxRows 是 §5.4.6 的兩張保留期清理表（#3261 ①②）：兩者的 SQL、adapter
 // 與設計書規範都齊備，而在 2026-09-08 之前**沒有任何東西呼叫它們** —— inbox 的
@@ -311,14 +310,11 @@ func newGovernance(
 	profiles domain.SellerTaxProfileRepository,
 	ops domain.OperationRepository,
 	obs GovernanceObserver,
-	businessDays domain.BusinessDayRepository,
-	holidays HolidaySource,
 	inbox domain.InboxRepository,
 	outboxRows domain.OutboxRepository,
-	tx database.TxManager,
 	log *zap.Logger,
 ) *Governance {
-	return NewGovernance(profiles, ops, obs, businessDays, holidays, tx, log, time.Now).
+	return NewGovernance(profiles, ops, obs, log, time.Now).
 		WithRetention(inbox, outboxRows)
 }
 
@@ -416,4 +412,13 @@ func newAllowance(
 ) *Allowance {
 	return NewAllowance(tx, docs, ops, adjustments, accounts, issuers, audit, outbox, provider,
 		cfg, appCfg.Governance.AllowanceB2CSplitTax, log)
+}
+
+// newBusinessCalendarMirror 建行事曆鏡像的整段覆蓋 usecase（§5.1.14，單體推送）。
+func newBusinessCalendarMirror(
+	businessDays domain.BusinessDayRepository,
+	tx database.TxManager,
+	log *zap.Logger,
+) *BusinessCalendarMirror {
+	return NewBusinessCalendarMirror(businessDays, tx, log, time.Now)
 }

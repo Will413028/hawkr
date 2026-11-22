@@ -71,9 +71,6 @@ var Module = fx.Module("client",
 	fx.Provide(fx.Annotate(newPaymentClient, fx.As(new(invoicemq.PaymentFactsClient)))),
 	// SHIP peer：S06／A12 的出貨狀態欄（#3019）。binding 在提供端，同上。
 	fx.Provide(fx.Annotate(newShippingClient, fx.As(new(invoicegrpc.ShipmentStatusResolver)))),
-	// 同一個 *shipping.Client 也是行事曆鏡像的來源（INV.gov 每日整段覆蓋，
-	// §5.1.14；#3089 第 17 項）。binding 在提供端，同上。
-	fx.Provide(fx.Annotate(newShippingClient, fx.As(new(usecase.HolidaySource)))),
 	// BUY peer：申訴畫面的「是誰提的」欄（#3017 後半）。binding 在提供端，同上。
 	fx.Provide(fx.Annotate(newBuyerClient, fx.As(new(invoicegrpc.BuyerNameResolver)))),
 )

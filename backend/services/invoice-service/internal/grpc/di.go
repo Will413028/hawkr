@@ -6,6 +6,7 @@ package grpc
 
 import (
 	pb "github.com/Will413028/hawkr/go-pkg/proto/invoice"
+	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 	"go.uber.org/fx"
 	grpclib "google.golang.org/grpc"
 )
@@ -18,7 +19,7 @@ import (
 // 驗得到 handler 在圖上，驗不到它有沒有被註冊進 server；後者的攔截點是本檔的 Invoke 本身。
 var Module = fx.Module("grpc",
 	fx.Provide(NewInvoiceServer),
-	fx.Invoke(func(server *grpclib.Server, handler *InvoiceServer) {
-		pb.RegisterInvoiceServiceServer(server, handler)
+	fx.Invoke(func(server *grpclib.Server, handler *InvoiceServer, calendar *usecase.BusinessCalendarMirror) {
+		pb.RegisterInvoiceServiceServer(server, handler.WithCalendarMirror(calendar))
 	}),
 )

@@ -62,7 +62,16 @@ func (cBizDays) Insert(context.Context, time.Time, time.Time) error { return nil
 func (f cBizDays) ListHolidays(context.Context, time.Time, time.Time) ([]time.Time, error) {
 	return f.holidays, nil
 }
-func (f cBizDays) SyncedAt(context.Context) (*time.Time, error) { return f.synced, nil }
+func (f cBizDays) SetCoverage(context.Context, time.Time, time.Time, time.Time) error { return nil }
+
+// Coverage 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
+func (f cBizDays) Coverage(context.Context) (*domain.BusinessDayCoverage, error) {
+	if f.synced == nil {
+		return nil, nil
+	}
+	base := *f.synced
+	return &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
+}
 
 type cComplaints struct {
 	domain.ComplaintRepository

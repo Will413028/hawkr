@@ -75,7 +75,9 @@ type InvoiceServer struct {
 	// evidenceMeta 只服務稅籍佐證清單的中介資料（#3031）。可以是 nil：
 	// 取不到時退回「只有檔案路徑」，那正是修這件事之前的畫面。
 	evidenceMeta EvidenceMetadataResolver
-	log          *zap.Logger
+	// calendar 是單體推送行事曆鏡像的入口（WithCalendarMirror）；nil 時該 RPC 回 Unavailable。
+	calendar *usecase.BusinessCalendarMirror
+	log      *zap.Logger
 }
 
 // NewInvoiceServer 組出 gRPC handler。
