@@ -95,14 +95,14 @@ func CommunityReporterSelectable() []Category {
 }
 
 // ReporterSelectable 說明店家治理的檢舉人可不可以選這個類別。
-func (c Category) ReporterSelectable() bool { return slices.Contains(ReporterSelectable(), c) }
+func (c Category) ReporterSelectable() bool { return slices.Contains(acceptedSellerCreateReportRequestCategory, c) }
 
 // Assessable 說明店家治理的平台判定與認定可不可以用這個類別。
 func (c Category) Assessable() bool { return c != Other && c.valid() }
 
 // CommunityReporterSelectable 說明社群檢舉入口的檢舉人可不可以選這個類別。
 func (c Category) CommunityReporterSelectable() bool {
-	return slices.Contains(CommunityReporterSelectable(), c)
+	return slices.Contains(acceptedModerationSubmitReportRequestCategory, c)
 }
 
 // CommunityAssessable 說明社群內容的隱藏與警告可不可以用這個類別。

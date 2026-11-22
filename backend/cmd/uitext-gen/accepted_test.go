@@ -12,6 +12,34 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
+// acceptedDefinitionFiles 是 PolicyCategory 與 accepted_policy_categories 擴充欄位的定義檔。
+func acceptedDefinitionFiles() (policy, ext *descriptorpb.FileDescriptorProto) {
+	policy = &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("hawkr/common/v1alpha1/policy_category.proto"),
+		Package: proto.String("hawkr.common.v1alpha1"),
+		Syntax:  proto.String("proto3"),
+		EnumType: []*descriptorpb.EnumDescriptorProto{
+			enumProto("PolicyCategory", "POLICY_CATEGORY_", "FOOD_SAFETY", "SPAM", "OTHER"),
+		},
+	}
+	ext = &descriptorpb.FileDescriptorProto{
+		Name:       proto.String("hawkr/common/v1alpha1/accepted_values.proto"),
+		Package:    proto.String("hawkr.common.v1alpha1"),
+		Syntax:     proto.String("proto3"),
+		Dependency: []string{"google/protobuf/descriptor.proto", "hawkr/common/v1alpha1/policy_category.proto"},
+		Extension: []*descriptorpb.FieldDescriptorProto{{
+			Name:     proto.String("accepted_policy_categories"),
+			Number:   proto.Int32(50001),
+			Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+			Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
+			TypeName: proto.String(".hawkr.common.v1alpha1.PolicyCategory"),
+			Extendee: proto.String(".google.protobuf.FieldOptions"),
+			JsonName: proto.String("acceptedPolicyCategories"),
+		}},
+	}
+	return policy, ext
+}
+
 // acceptedImage 造一個 image：PolicyCategory、accepted_policy_categories 的擴充欄位，以及一個欄位掛了 numbers 的請求訊息。
 // 選項直接寫成 unknown fields（和 buf image 讀進來、沒有編譯進型別的情況相同）；packed 是 repeated enum 在 proto3 的預設編碼。
 func acceptedImage(numbers []int32, packed bool) *descriptorpb.FileDescriptorSet {
@@ -32,29 +60,7 @@ func acceptedImage(numbers []int32, packed bool) *descriptorpb.FileDescriptorSet
 	opts := &descriptorpb.FieldOptions{}
 	opts.ProtoReflect().SetUnknown(protoreflect.RawFields(raw))
 
-	policy := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("hawkr/common/v1alpha1/policy_category.proto"),
-		Package: proto.String("hawkr.common.v1alpha1"),
-		Syntax:  proto.String("proto3"),
-		EnumType: []*descriptorpb.EnumDescriptorProto{
-			enumProto("PolicyCategory", "POLICY_CATEGORY_", "FOOD_SAFETY", "SPAM", "OTHER"),
-		},
-	}
-	ext := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("hawkr/common/v1alpha1/accepted_values.proto"),
-		Package:    proto.String("hawkr.common.v1alpha1"),
-		Syntax:     proto.String("proto3"),
-		Dependency: []string{"google/protobuf/descriptor.proto", "hawkr/common/v1alpha1/policy_category.proto"},
-		Extension: []*descriptorpb.FieldDescriptorProto{{
-			Name:     proto.String("accepted_policy_categories"),
-			Number:   proto.Int32(50001),
-			Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-			Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
-			TypeName: proto.String(".hawkr.common.v1alpha1.PolicyCategory"),
-			Extendee: proto.String(".google.protobuf.FieldOptions"),
-			JsonName: proto.String("acceptedPolicyCategories"),
-		}},
-	}
+	policy, ext := acceptedDefinitionFiles()
 	f := field("category", 1, descriptorpb.FieldDescriptorProto_TYPE_ENUM, ".hawkr.common.v1alpha1.PolicyCategory", false)
 	f.Options = opts
 	req := &descriptorpb.FileDescriptorProto{
@@ -117,14 +123,32 @@ func TestAcceptedFieldsRejectsBadLists(t *testing.T) {
 	}
 }
 
-func TestAcceptedFieldsAbsentExtensionIsEmpty(t *testing.T) {
-	s, err := LoadSchema(fixtureImage())
+func TestAcceptedFieldsAbsentExtensionIsError(t *testing.T) {
+	img := fixtureImage(func(fds *descriptorpb.FileDescriptorSet) {
+		for _, f := range fds.File {
+			if f.GetName() == "hawkr/common/v1alpha1/accepted_values.proto" {
+				f.Extension = nil
+			}
+		}
+	})
+	s, err := LoadSchema(img)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.AcceptedFields()
-	if err != nil || len(got) != 0 {
-		t.Fatalf("沒有 option 定義的 image：got %v，err %v", got, err)
+	if got, err := s.AcceptedFields(); err == nil {
+		t.Fatalf("沒有 option 定義的 image 應該報錯，got %v", got)
+	}
+}
+
+func TestAcceptedFieldsRejectsUnknownPackage(t *testing.T) {
+	img := acceptedImage([]int32{1}, true)
+	s, err := LoadSchema(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(s.pkgShort, "hawkr.fx.v1alpha1")
+	if got, err := s.AcceptedFields(); err == nil {
+		t.Fatalf("欄位在生成器不認得的 package 應該報錯，got %v", got)
 	}
 }
 

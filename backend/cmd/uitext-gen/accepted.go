@@ -30,8 +30,7 @@ type AcceptedField struct {
 func (s *Schema) AcceptedFields() ([]*AcceptedField, error) {
 	d, err := s.files.FindDescriptorByName(acceptedOption)
 	if err != nil {
-		// image 沒有這個 option 的定義，也就沒有任何欄位用它。
-		return nil, nil //nolint:nilerr // 沒有定義就沒有用到
+		return nil, fmt.Errorf("image 沒有 %s 的定義：生成的清單會是空的", acceptedOption)
 	}
 	xd, ok := d.(protoreflect.ExtensionDescriptor)
 	if !ok || !xd.IsList() || xd.Enum() == nil || xd.Enum().FullName() != "hawkr.common.v1alpha1.PolicyCategory" {
@@ -44,8 +43,8 @@ func (s *Schema) AcceptedFields() ([]*AcceptedField, error) {
 	}
 	var out []*AcceptedField
 	var errs errList
-	var walk func(fd protoreflect.FileDescriptor, ms protoreflect.MessageDescriptors)
-	walk = func(fd protoreflect.FileDescriptor, ms protoreflect.MessageDescriptors) {
+	var walk func(fd protoreflect.FileDescriptor, ms protoreflect.MessageDescriptors, known bool)
+	walk = func(fd protoreflect.FileDescriptor, ms protoreflect.MessageDescriptors, known bool) {
 		for i := range ms.Len() {
 			m := ms.Get(i)
 			fs := m.Fields()
@@ -68,18 +67,21 @@ func (s *Schema) AcceptedFields() ([]*AcceptedField, error) {
 				if !opts.ProtoReflect().Has(xt.TypeDescriptor()) {
 					continue
 				}
+				if !known {
+					errs.addf("%s：欄位掛了 %s，但 package %s 不在生成器認得的範圍", f.FullName(), acceptedOption, fd.Package())
+					continue
+				}
 				af := s.acceptedField(f, opts.ProtoReflect().Get(xt.TypeDescriptor()).List(), &errs)
 				if af != nil {
 					out = append(out, af)
 				}
 			}
-			walk(fd, m.Messages())
+			walk(fd, m.Messages(), known)
 		}
 	}
 	s.files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-		if _, ok := s.pkgShort[string(fd.Package())]; ok {
-			walk(fd, fd.Messages())
-		}
+		_, known := s.pkgShort[string(fd.Package())]
+		walk(fd, fd.Messages(), known)
 		return true
 	})
 	if err := errs.err(); err != nil {

@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
-/// 各入口只接受自己的子集：檢舉入口的子集列在請求欄位的 accepted_policy_categories，認定的子集見各值的說明。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家檢舉入口不接受它們，社群檢舉入口接受其中的部分（以各自的 accepted_policy_categories 為準）；認定與案件類別都可以用。
+/// 各入口只接受自己的子集：檢舉入口的子集列在請求欄位的 accepted_policy_categories，認定的子集見各值的說明。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家檢舉入口不接受它們，社群檢舉入口接受這四個與部分店家治理的值（各入口以自己請求欄位的 accepted_policy_categories 為準）；認定與案件類別都可以用。
 class PolicyCategory extends $pb.ProtobufEnum {
   static const PolicyCategory POLICY_CATEGORY_UNSPECIFIED =
       PolicyCategory._(0, _omitEnumNames ? '' : 'POLICY_CATEGORY_UNSPECIFIED');
