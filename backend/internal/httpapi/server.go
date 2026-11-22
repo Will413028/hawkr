@@ -92,6 +92,8 @@ type Deps struct {
 	Payment *payment.Module
 	// BizCalendar 是工作日行事曆（platform/bizcalendar）：BizCalendarAdminService 的匯入與涵蓋查詢。
 	BizCalendar *bizcalendar.Store
+	// BizCalendarMirror 是匯入成功後的推送（遷移期給 invoice-service）；nil 時不推。
+	BizCalendarMirror httpbizcalendar.Pusher
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
@@ -381,7 +383,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
 	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
-	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar), opts...))
+	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(bizCalendarAdmin(deps), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
 	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
@@ -497,4 +499,13 @@ func (s sellerStoreNames) StoreNames(ctx context.Context, storeIDs []int64) (map
 		}
 	}
 	return out, nil
+}
+
+// bizCalendarAdmin 組出 BizCalendarAdminService 的 handler；有推送對象時匯入成功後推送。
+func bizCalendarAdmin(deps Deps) *httpbizcalendar.Admin {
+	a := httpbizcalendar.NewAdmin(deps.BizCalendar)
+	if deps.BizCalendarMirror != nil {
+		a.WithMirror(deps.BizCalendarMirror, deps.Logger)
+	}
+	return a
 }
