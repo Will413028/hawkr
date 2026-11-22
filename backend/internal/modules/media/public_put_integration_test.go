@@ -162,14 +162,36 @@ func holdSecureSlots(t *testing.T, f *fixture) (release func(), wait func()) {
 	return func() { close(rel) }, wg.Wait
 }
 
+// waitSignalCtx 在有人開始等 ctx.Done()（名額等待分支）時發出訊號。
+type waitSignalCtx struct {
+	context.Context
+	waiting chan struct{}
+}
+
+func (c *waitSignalCtx) Done() <-chan struct{} {
+	select {
+	case c.waiting <- struct{}{}:
+	default:
+	}
+	return c.Context.Done()
+}
+
 func TestPutSecure_WaitsForASlotInsteadOfFailingFast(t *testing.T) {
 	f := setup(t)
 	release, wait := holdSecureSlots(t, f)
+	waiting := &waitSignalCtx{Context: t.Context(), waiting: make(chan struct{}, 1)}
 	done := make(chan error, 1)
 	go func() {
-		_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(pdfOf(10)))
+		_, err := f.m.PutSecure(waiting, owner, bytes.NewReader(pdfOf(10)))
 		done <- err
 	}()
+	select {
+	case <-waiting.waiting:
+	case err := <-done:
+		release()
+		wait()
+		t.Fatalf("名額全滿時 PutSecure 不該回傳：%v", err)
+	}
 	release()
 	wait()
 	if err := <-done; err != nil {

@@ -94,10 +94,10 @@ const (
 	// ProcessMaxAttempts 是處理 job 的重試上限。
 	ProcessMaxAttempts = upload.MaxAttempts
 
-	// MaxSecureUploadSize 是單次機敏上傳的明文大小上限；SecureUploadConcurrency 與 SecureUploadTimeout 是 UploadSecure 的資源界限。
+	// MaxSecureUploadSize 是單次機敏上傳的明文大小上限；SecureUploadConcurrency 與 SecureUploadTimeout 是直接寫入的資源界限。
 	MaxSecureUploadSize     = model.MaxSecureUploadSize
 	SecureUploadConcurrency = model.SecureUploadConcurrency
-	SecureUploadTimeout     = model.SecureUploadTimeout
+	SecureUploadTimeout     = model.DirectPutTimeout
 )
 
 // ParseKeyring 讀出 KEK 金鑰環：單一字串、逗號分隔的 `<kek_id>:<標準 base64 的 32 位元組>`，第一把用來寫入、全部都能讀。

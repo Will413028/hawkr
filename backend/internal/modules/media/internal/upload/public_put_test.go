@@ -10,10 +10,16 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
+
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/image"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 func tinyPNG(t *testing.T) []byte {
@@ -97,19 +103,43 @@ func TestPreparePublic_WaitsForADecodeSlotAndReturnsTheCtxErrorWhenCancelled(t *
 		t.Fatalf("err = %v，預期 ctx 的錯誤，不是立即失敗", err)
 	}
 
+	waiting := &waitSignalCtx{Context: t.Context(), waiting: make(chan struct{}, 1)}
 	done := make(chan error, 1)
 	go func() {
-		_, err := s.preparePublic(t.Context(), bytes.NewReader(tinyPNG(t)))
+		_, err := s.preparePublic(waiting, bytes.NewReader(tinyPNG(t)))
 		done <- err
 	}()
+	select {
+	case <-waiting.waiting:
+	case err := <-done:
+		t.Fatalf("名額全滿時 preparePublic 不該回傳：%v", err)
+	}
 	<-s.publicSlots
 	if err := <-done; err != nil {
 		t.Fatalf("放回名額後應該成功：%v", err)
 	}
 }
 
+// waitSignalCtx 在有人開始等 ctx.Done()（acquire 的等待分支）時發出訊號。
+type waitSignalCtx struct {
+	context.Context
+	waiting chan struct{}
+}
+
+func (c *waitSignalCtx) Done() <-chan struct{} {
+	select {
+	case c.waiting <- struct{}{}:
+	default:
+	}
+	return c.Context.Done()
+}
+
 func TestPreparePublic_DecodesNoMoreThanTheSlotBound(t *testing.T) {
-	s := newSlots()
+	s := New(Deps{
+		DB: &db.DB{}, Jobs: struct{ jobs.Enqueuer }{}, Store: struct{ storage.Store }{},
+		Process: func(context.Context, ProcessInput) (ProcessResult, error) { return ProcessResult{}, nil },
+		NewID:   uuid.New, Now: time.Now,
+	})
 	if cap(s.publicSlots) != model.PublicPutConcurrency {
 		t.Fatalf("名額 = %d，預期 %d", cap(s.publicSlots), model.PublicPutConcurrency)
 	}

@@ -63,7 +63,6 @@ const PublicPutConcurrency = 2
 // 所以同時進行的數量有上限（磁碟預算約 4 x 100 MiB），client 上傳（UploadSecure）滿了立即回 ResourceExhausted、不排隊，伺服器內部的 PutSecure 滿了等名額（受 ctx 約束）；寫入物件儲存的時限也明確。
 const (
 	SecureUploadConcurrency = 4
-	SecureUploadTimeout     = DirectPutTimeout
 )
 
 // 直接寫入（UploadSecure、PutSecure、PutPublic）的時限：DirectPutTimeout 是寫入物件儲存的時間上限；
@@ -132,7 +131,7 @@ const (
 	// 對 client 而言都是「上傳的位元組不是宣告的那份」；不另設原因碼，原因碼在 B1-3 成為對外契約）。
 	RejectSizeMismatch     RejectReason = "SIZE_MISMATCH"
 	RejectChecksumMismatch RejectReason = "CHECKSUM_MISMATCH"
-	// RejectProcessingFailed：暫時失敗重試用盡。
+	// RejectProcessingFailed：暫時失敗重試用盡，或管線自己的永久失敗（image.ErrProcessing）。
 	RejectProcessingFailed RejectReason = "PROCESSING_FAILED"
 	// RejectExpired：處理完成時列已過期。
 	RejectExpired RejectReason = "EXPIRED"
