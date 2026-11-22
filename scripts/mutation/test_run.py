@@ -418,5 +418,45 @@ class BuildCheckOutcomeTest(Base):
         self.assertEqual(self.outcome("FAIL"), run.BUILD_FAILED)
 
 
+class AtlasSumTest(Base):
+    def migration_dir(self):
+        d = self.repo / "db" / "migrations"
+        d.mkdir(parents=True)
+        (d / "20260101000000_a.sql").write_text("CREATE TABLE t (x int NOT NULL);\n", encoding="utf-8")
+        (d / "20260102000000_b.sql").write_text("ALTER TABLE t ADD COLUMN y int;\n", encoding="utf-8")
+        (d / "atlas.sum").write_text(run.atlas_sum(d), encoding="utf-8")
+        return d
+
+    def test_reproduces_committed_sums(self):
+        dirs = sorted(run.REPO.glob("backend/**/db/migrations"))
+        dirs = [d for d in dirs if (d / "atlas.sum").is_file()]
+        self.assertGreater(len(dirs), 0)
+        for d in dirs:
+            self.assertEqual(run.atlas_sum(d), (d / "atlas.sum").read_text(encoding="utf-8"), str(d))
+
+    def test_mutated_migration_gets_valid_sum_and_restores(self):
+        d = self.migration_dir()
+        before = {p.name: p.read_bytes() for p in d.iterdir()}
+        check = (
+            "import sys,pathlib;d=pathlib.Path(sys.argv[1]);sys.path.insert(0,sys.argv[2]);import run;"
+            "s=(d/'atlas.sum').read_text();"
+            "sys.exit(1 if 'x int)' in (d/'20260101000000_a.sql').read_text() and s==run.atlas_sum(d) and s!=sys.argv[3] else 0)"
+        )
+        m = self.mutant(file="db/migrations/20260101000000_a.sql", old="x int NOT NULL", new="x int")
+        cmd = lambda *a: run.Command([sys.executable, "-c", check, str(d), str(Path(run.__file__).parent), before["atlas.sum"].decode()], self.repo, dict(os.environ))
+        self.assertEqual(run.run_mutant(m, self.repo, cmd, run.run_test), run.KILLED)
+        self.assertEqual({p.name: p.read_bytes() for p in d.iterdir()}, before)
+
+    def test_non_migration_file_leaves_no_sum_side_effects(self):
+        d = self.migration_dir()
+        (d / "note.txt").write_text("alpha beta\n", encoding="utf-8")
+        before = (d / "atlas.sum").read_bytes()
+        check = "import sys;sys.exit(1 if open(sys.argv[1]).read()!=sys.argv[2] else 0)"
+        cmd = lambda *a: run.Command([sys.executable, "-c", check, str(d / "atlas.sum"), before.decode()], self.repo, dict(os.environ))
+        m = self.mutant(file="db/migrations/note.txt", old="beta", new="MUTATED")
+        self.assertEqual(run.run_mutant(m, self.repo, cmd, run.run_test), run.SURVIVED)
+        self.assertEqual((d / "atlas.sum").read_bytes(), before)
+
+
 if __name__ == "__main__":
     unittest.main()

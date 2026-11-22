@@ -1,0 +1,13 @@
+{
+ "mutants": [
+  {
+   "id": "report-reporter-buyer-id-accepts-null",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/db/migrations/20261121014310_seller_reports_buyer_only.sql",
+   "old": ", ALTER COLUMN \"reporter_buyer_id\" SET NOT NULL",
+   "new": "",
+   "test": "internal/modules/seller ^TestReportSchemaConstraints$",
+   "why": "reports.reporter_buyer_id is no longer NOT NULL, and the CHECK (reporter_buyer_id > 0) lets NULL through, so an anonymous report is accepted again."
+  }
+ ]
+}

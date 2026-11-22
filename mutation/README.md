@@ -52,6 +52,8 @@ mutation 不在開發機跑（機器共用，Go integration 需要資料庫容�
 
 mutant 套用後先檢查還能建置：Go 跑 `go test -c -o /dev/null [-tags integration] ./<套件>/`；Flutter 只對 App 目錄內的檔案跑 `dart analyze --no-fatal-warnings <檔>`（只有 error 算失敗），`packages/` 下的檔案跳過這步，靠測試載入階段的錯誤判斷。建置檢查本身真的失敗才是 `BUILD-FAILED`，逾時是 `TIMEOUT`，無法啟動是 `ERROR`。website 與 admin 沒有便宜的逐 mutant 編譯，改看測試輸出。admin（tsx／esbuild）失敗且含 `TransformError`、`Transform failed` 或 `SyntaxError` 同樣是 `BUILD-FAILED`。website 看 vitest 輸出：失敗且含 `Transform failed`、`SyntaxError` 或 `Failed to parse source` 才是 `BUILD-FAILED`；Flutter 輸出含 `Compilation failed` 或編譯器的 `<檔>:<行>:<欄>: Error:` 行同理。其他沒有這些標記的失敗（含沒有測試摘要）算測試擋下（`KILLED`）。Go 測試帶 `-vet=off`（vet 失敗不該被算成 KILLED，建置仍由 `go test -c` 檢查），`-timeout` 設成 20 分鐘，比 runner 的 15 分鐘長；Flutter 用 `ci-flutter-test.sh` 預設的逐測試逾時。
 
+mutant 的目標是 `*.sql` 檔，且同目錄有 `atlas.sum` 時，套用後 runner 會依 Atlas 的演算法重算並改寫該 `atlas.sum`（逐檔累加的 SHA-256，第一行是總雜湊），還原時一併還原。必要條件：整合測試建庫前先驗證 `atlas.sum`，不重算的話改 migration 的 mutant 一律先死在 checksum 檢查，migration 定義的約束（NOT NULL、CHECK、索引）就沒辦法被 mutation 驗證。這條規則只看「同目錄有 `atlas.sum`」，不針對特定清單。
+
 每個選取的 mutant 都 `KILLED` 才算通過；摘要也寫進 job summary。
 
 ## 新增一份清單

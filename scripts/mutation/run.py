@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -303,6 +305,25 @@ def run_test(cmd: Command) -> str:
     return "FAIL"
 
 
+def atlas_sum(directory: Path) -> str:
+    """Atlas 的 atlas.sum 內容：逐檔累加的 SHA-256，第一行是「檔名＋逐檔雜湊」的總雜湊。"""
+    names = sorted(p.name for p in directory.iterdir() if p.is_file() and p.suffix == ".sql")
+    running = hashlib.sha256()
+    hashes = []
+    for name in names:
+        body = (directory / name).read_bytes()
+        running.update(name.encode("utf-8"))
+        running.update(body)
+        hashes.append(base64.b64encode(running.copy().digest()).decode("ascii"))
+    total = hashlib.sha256()
+    for name, h in zip(names, hashes):
+        total.update(name.encode("utf-8"))
+        total.update(h.encode("ascii"))
+    lines = [f"h1:{base64.b64encode(total.digest()).decode('ascii')}"]
+    lines += [f"{name} h1:{h}" for name, h in zip(names, hashes)]
+    return "\n".join(lines) + "\n"
+
+
 def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> str:
     if not inside(repo, repo / m.file):
         print(f"    檔案在 repo 之外：{m.file}")
@@ -317,8 +338,13 @@ def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> st
     if count != 1:
         print(f"    old 出現 {count} 次（必須剛好 1 次）")
         return APPLY_FAILED
+    mutated = original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8")
+    sum_path = path.parent / "atlas.sum"
+    sum_original = sum_path.read_bytes() if path.suffix == ".sql" and sum_path.is_file() else None
     try:
-        path.write_bytes(original.decode("utf-8").replace(m.old, m.new, 1).encode("utf-8"))
+        path.write_bytes(mutated)
+        if sum_original is not None:
+            sum_path.write_text(atlas_sum(path.parent), encoding="utf-8")
         build = build_builder(m.stack, m.test, m.file, repo) if build_builder else None
         if build is not None:
             built = runner(build)
@@ -329,6 +355,8 @@ def run_mutant(m: Mutant, repo: Path, builder, runner, build_builder=None) -> st
         outcome = runner(cmd)
     finally:
         path.write_bytes(original)
+        if sum_original is not None:
+            sum_path.write_bytes(sum_original)
     if outcome == TIMEOUT:
         return TIMEOUT
     if outcome == BUILD_ERROR:
