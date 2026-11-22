@@ -198,7 +198,9 @@
 - 驗收：`buf lint`；handler 測試涵蓋清單的每個方法；生成檔無 drift；mutation：拿掉檢舉參照的擁有者檢查，測試要失敗。
 - CD8 驗收：`SellerCrmService` 回應欄位測試證明永不回 phone、email；mutation：把聯絡欄位加回回應，測試要失敗（A6-3 設計書 §11.2）。
 
-### A6-6 client（被擋於：A6-5；Q1 的缺口在這裡結束）
+### A6-6 client（被擋於：見下；Q1 的缺口在這裡結束）
+
+- 被擋於（Will 2026-11-22 改）：6b admin、6c buyer-app 只用評價與聊天，被 5b、5c 擋（已完成），可與 5d 並行；6a website、6d seller-app、6e gateway 用到或刪除 CRM，被 5d 擋。並行時後合併的分支重跑 `@hawkr/api`、`packages/hawkr_api` 生成，不手解生成檔衝突。
 
 拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`、刪除 `internal/legacy/crmservice`（A6-D18），把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
 
