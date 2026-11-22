@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "deps-literal-integration-test-payment-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyer/buyer_integration_test.go",
+   "old": "Payment: &payment.Module{}, ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "An integration test's httpapi.Deps literal omits the required Payment, which only CI's integration run would otherwise catch at runtime."
+  },
+  {
+   "id": "deps-literal-template-stats-dropped",
+   "stack": "go",
+   "file": "backend/cmd/new-module/templates/characterization/monolith_integration_test.go.tmpl",
+   "old": "Stats: ch.Stats(t), ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "The new-module characterization template omits the required Stats in its httpapi.Deps literal, so every generated module would fail at runtime."
+  }
+ ]
+}
