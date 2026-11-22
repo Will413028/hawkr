@@ -581,6 +581,42 @@ func TestDimensionOverJPEGLimitIsRejectedFromTheHeader(t *testing.T) {
 	}
 }
 
+func TestHeightOverDimensionLimitIsRejectedFromTheHeader(t *testing.T) {
+	_, err := sanitize(hugeHeaderPNG(10, 65501))
+	if !errors.Is(err, image.ErrTooLarge) {
+		t.Fatalf("err = %v，預期 ErrTooLarge", err)
+	}
+}
+
+func TestWidthOverDimensionLimitIsRejectedFromTheHeaderWithoutPixelData(t *testing.T) {
+	_, err := sanitize(hugeHeaderPNG(65501, 10))
+	if !errors.Is(err, image.ErrTooLarge) {
+		t.Fatalf("err = %v，預期 ErrTooLarge", err)
+	}
+}
+
+func TestDimensionLimitAllowsTheLimitItself(t *testing.T) {
+	for name, d := range map[string][]byte{"width": hugeHeaderPNG(65500, 10), "height": hugeHeaderPNG(10, 65500)} {
+		if _, err := sanitize(d); errors.Is(err, image.ErrTooLarge) {
+			t.Fatalf("%s：剛好等於單邊上限不該被擋：%v", name, err)
+		}
+	}
+}
+
+func TestNonPositiveLimitsAreRejected(t *testing.T) {
+	png := pngBytes(t, solid(4, 4, color.NRGBA{1, 2, 3, 255}))
+	for name, lim := range map[string]image.Limits{
+		"zero":      {},
+		"frame":     {FramePixels: 0, AnimatedPixels: 1, MaxDimension: 1},
+		"animated":  {FramePixels: 1, AnimatedPixels: -1, MaxDimension: 1},
+		"dimension": {FramePixels: 1, AnimatedPixels: 1, MaxDimension: 0},
+	} {
+		if _, err := image.Sanitize(context.Background(), png, lim); !errors.Is(err, image.ErrInvalidLimits) {
+			t.Fatalf("%s：err = %v，預期 ErrInvalidLimits", name, err)
+		}
+	}
+}
+
 func TestAlphaOpaqueRejectsUnknownBandFormat(t *testing.T) {
 	img, err := vips.NewPngloadBuffer(pngBytes(t, solid(4, 4, color.NRGBA{1, 2, 3, 255})), nil)
 	if err != nil {
@@ -593,8 +629,8 @@ func TestAlphaOpaqueRejectsUnknownBandFormat(t *testing.T) {
 	if err := img.Cast(vips.BandFormatFloat, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := image.AlphaOpaque(img); err == nil || isPermanentImageErr(err) {
-		t.Fatalf("err = %v，預期暫時性錯誤", err)
+	if _, err := image.AlphaOpaque(img); !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期永久的 ErrMalformed", err)
 	}
 }
 

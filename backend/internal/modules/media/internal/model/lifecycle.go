@@ -39,7 +39,9 @@ const (
 const (
 	MaxImagePixels    int64 = 40_000_000
 	MaxAnimatedPixels int64 = 50_000_000
-	// MaxImageDimension 是單邊像素上限：JPEG 編碼器在任一邊超過 65500 時一律失敗，在標頭就拒絕，不讓它變成重試到用盡的暫時失敗。
+	// MaxImageDimension 是單邊像素上限，對所有輸出格式一律套用（輸出格式要解碼並判斷透明後才知道，標頭階段無從分流）：
+	// JPEG 編碼器在任一邊超過 65500 時一律失敗，在標頭就拒絕，不讓它變成重試到用盡的暫時失敗。
+	// 代價是 PNG 與 GIF 的單邊也不得超過 65500；這種長寬比（像素總量仍在上限內）不是產品要的圖，所以不分格式放寬。
 	MaxImageDimension = 65500
 )
 

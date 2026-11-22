@@ -88,7 +88,7 @@ type Result struct {
 	Format Format
 }
 
-// Limits 是解碼前的像素上限，值由呼叫方從 model 的單一定義傳入。
+// Limits 是解碼前的像素上限，值由呼叫方從 model 的單一定義傳入；三個欄位都必須為正，否則 Sanitize 回錯誤、不處理任何輸入。
 type Limits struct {
 	// FramePixels 是單一影格的像素上限。
 	FramePixels int64
@@ -98,8 +98,20 @@ type Limits struct {
 	MaxDimension int
 }
 
-// Sanitize 先辨認格式、讀標頭檢查像素上限，再解碼、套用方向、轉 sRGB、丟掉全部 metadata 後重新編碼。
-// 辨認不出（含 APNG）回 ErrUnrecognized，輸入的載入、標頭或像素解碼失敗回 ErrMalformed，超過像素上限回 ErrTooLarge；
+// ErrInvalidLimits 表示 Limits 有非正的欄位：零值會讓每個輸入都被當成超過上限，那是設定錯誤，不是輸入的問題。
+var ErrInvalidLimits = errors.New("image: limits must be positive")
+
+func (l Limits) validate() error {
+	if l.FramePixels <= 0 || l.AnimatedPixels <= 0 || l.MaxDimension <= 0 {
+		return fmt.Errorf("%w: frame=%d animated=%d dimension=%d", ErrInvalidLimits, l.FramePixels, l.AnimatedPixels, l.MaxDimension)
+	}
+	return nil
+}
+
+// Sanitize 先檢查 Limits，再辨認格式、讀標頭檢查像素上限與單邊上限，接著完整解碼、套用方向（靜態圖）、轉 sRGB、
+// 判斷有無透明、丟掉全部 metadata 後重新編碼。
+// Limits 有非正的欄位回 ErrInvalidLimits；辨認不出（含 APNG）回 ErrUnrecognized；輸入的載入、標頭或像素解碼失敗、
+// 無法判斷 alpha 的像素格式回 ErrMalformed；超過像素或單邊上限回 ErrTooLarge；
 // 轉色、套用方向與編碼的失敗是輸入以外的原因，回一般錯誤（呼叫方當暫時失敗重試）。
 // ctx 在載入前與每個耗時步驟之間檢查，取消回 ctx 的錯誤；libvips 的單一運算跑起來後 vipsgen 沒有中止的介面，不可取消。
 func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
@@ -108,6 +120,9 @@ func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
 
 // sanitize 的 fail 只給測試用：在指定階段（stageColour、stageAutorot、stageAlpha、stageFlatten、stageEncode）注入失敗。
 func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string) error) (Result, error) {
+	if err := lim.validate(); err != nil {
+		return Result{}, err
+	}
 	if err := live(ctx); err != nil {
 		return Result{}, err
 	}
@@ -281,14 +296,15 @@ func hasTransparency(img *vips.Image) (bool, error) {
 	return m < opaque, nil
 }
 
-// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回錯誤，不猜值。
+// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回 ErrMalformed，不猜值。
+// 四個載入器只產生 8 或 16 位元，轉 sRGB 之後更只剩 8 位元，所以正常輸入到不了這個分支；萬一到了是永久拒絕，不讓它重試到用盡。
 func alphaOpaque(a *vips.Image) (float64, error) {
 	if f := a.BandFormat(); f == vips.BandFormatUchar {
 		return 255, nil
 	} else if f == vips.BandFormatUshort {
 		return 65535, nil
 	}
-	return 0, fmt.Errorf("unsupported alpha band format %d", a.BandFormat())
+	return 0, fmt.Errorf("%w: unsupported alpha band format %d", ErrMalformed, a.BandFormat())
 }
 
 func (s stages) encodeStill(img *vips.Image) (Result, error) {

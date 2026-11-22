@@ -2,42 +2,40 @@
 
 ## 職責
 
-圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。實作還是 Java 的 media-service（Java media-service 的規格見設計書 08）。行為規格的唯一來源是 `backend/docs/modules/media.md`。
+公開圖片與機敏檔案的上傳、處理、確認、刪除與回收，機敏資產的串流上傳與讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。規格：`backend/docs/modules/media.md`；步驟與決策：`backend/docs/plans/2026-11-21-b1-media.md`；沿用盤點：`CARRYOVER.md`。
 
 ## 擁有的資料
 
-schema `media`（`db/schema.sql`）：`assets`（資產，不含業務類型）、`staged_uploads`（暫存上傳，token 只存雜湊）；登記在 `cmd/hawkr/modules.go` 的 `modules()`。舊的 `Media` interface 仍由 Java media-service 實作，資料在 Java（遷移期間並存）。子領域：`internal/upload`（Begin、Complete、Confirm、Get、處理 job，以及機敏的 UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs）、`internal/secure`（STREAM 分塊 AEAD 與 DEK 包裹，只用標準庫）、`internal/reclaim`（MarkDeleted、GC、實體刪除）。讀取模型：無。
+schema `media`（`db/schema.sql`）：`assets`（`STAGED → ACTIVE → DELETING → DELETED`）、`staged_uploads`（token 只存 SHA-256；`PENDING → UPLOADED → READY｜REJECTED → CONFIRMED`，GC 走 `DELETING → DELETED`）；登記在 `cmd/hawkr/modules.go`。子領域：`internal/upload`（上傳、處理 job、機敏上傳與讀取）、`internal/image`（libvips 重新編碼）、`internal/secure`（STREAM AEAD、DEK 包裹、KEK 金鑰環）、`internal/storage`（`Store` port、R2 與 S3 相容 adapter、`Fake`）、`internal/reclaim`（`MarkDeleted`、GC、實體刪除）、`internal/model`（狀態、上限、期限的唯一定義）。讀取模型：無。
 
 ## 發布的讀取介面
 
-無，沒有 `pub_*`。對外是 Go 公開 API：`Media` interface（`Finalize`、`Link`、`Unlink`、`ReadSecure`）與引用同步（`media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`），形狀見 `backend/docs/modules/media.md` §1。
+無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`UploadSecure`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與引用同步 `media.Sync*`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
 
 ## 模組內部結構
 
-- 根套件以型別別名公開 `internal/model` 的 `Uploader`、`Ref`、`Asset`、`SecureAsset` 與 `Media`；`internal/refsync` 是引用同步的演算法，由 `media.Sync*` 公開；`fake.go` 是測試用的記憶體內 `media.NewFake`。
-- `internal/storage` 是物件儲存：`Store` port、S3 adapter（`r2`、`s3compat`，aws-sdk-go-v2）與只給測試用的 `Fake`。
-- `Media` 由 `internal/legacy/mediaservice` 呼叫 media-service 的 gRPC client 實作，在 `cmd/hawkr` 接線。
-- `ref_type.go` 由 CodeMeta 生成（`generate.sh --go-media`），不得手改。
-- 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加子領域時同步修改圖。
+- 根套件以別名公開 `internal/model`；`fake.go` 是記憶體內 `media.NewFake`；`ref_type.go` 由 CodeMeta 生成，不得手改。
+- 依賴 libvips（`vipsgen`）：CI 裝 `libvips-dev`，本機 `brew install vips`。新增直接依賴先經同意。
+- 組裝點（`cmd/hawkr`）提供 `ObjectStore`（`MEDIA_STORAGE`，缺設定啟動失敗，不退回 fake）、`media.ParseKeyring(MEDIA_KEKS)`，並把 `media.Queues()` 經 `workerQueues` 併入 worker（queue 名重複啟動失敗）；模組不讀環境。
+- 依賴圖唯一來源：`internal/arch/modules.go` 的 `InternalDependencies`。
+- `PutPublic`、`PutSecure` 尚未實作：公開 PDF 與「公開只收圖片」衝突，直傳資產的狀態與確認方式計畫未定（B1-2c3）。
 
 ## 不變量
 
-- 轉正的上傳者由呼叫方傳入，media 不自己反查登入者；Finalize 不建立引用。守門：`TestFinalizeSignsCarriesTheUploaderAndCreatesNoReference`、`TestFinalizeCallerBugsAreCaughtLocally`。規格：`backend/docs/modules/media.md` §2。
-- Unlink 只解除精確列出的資產，沒有「保留名單以外全刪」。守門：`TestLinkAndUnlinkAreSignedWithoutAnAccountAndCarryExactAssets`、`TestSyncNeverUnlinksAnythingButRetiredAssets`（seller）。規格：§3。
-- `Media` 的四個呼叫都在 DB transaction 之外。守門：無（只有規格）。規格：§3。
-- ReadSecure 要 `object_key`、`ref_type`、`ref_id` 全等才讀得到，非機敏資產回 `ErrNotSecure`；呼叫方先授權並記稽核。守門：`TestReadSecureSendsTheTripleAndSeparatesNotSecureFromNotFound`。規格：§4。
-- 引用只由擁有者的同步 job 寫入；業務列指著的資產在 GC 寬限（7 天）內會有引用。守門：`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtAsset`（buyer）、`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtBannerImages`（content）、`TestNextRetryNeverWaitsPastTheGCGrace`。規格：§5。
-- 重試用盡或 job 遺失由保底掃描補排；落後超過 24 小時記 error log。守門：`TestSweepRecoversALostEnqueueWithRealRiver`（content）。規格：§5。
-- `CheckFinalizeArgs` 的封閉集合等於 `ref_type.go` 的常數。守門：`TestRefTypesMatchTheGeneratedConstants`。規格：§6。
-- 確認前的公開性：`READY` 的公開物件已在 `public/<uuid v4>`，image-gateway 會提供它；網址不可猜、只回給上傳者本人，所以確認前只有上傳者讀得到。Confirm 只接受 `READY`、未過期、上傳者相符的暫存，重入只回這筆暫存記的資產。守門：`TestConfirm_RejectsNonUploader`、`TestConfirm_ReentryReturnsSameAsset`、`TestConfirm_OnlyReturnsItsOwnAsset`。規格見遷移計畫。
-- GC 刪除範圍：只標記過期且未確認（`PENDING`、`READY`、`REJECTED`，以及過期超過 `model.StuckUploadGrace` 仍停在 `UPLOADED` 的列）的暫存列，連同它的 `tmp/` 物件（機敏列沒有，`tmp_key` 是 NULL 就不呼叫儲存）、暫存列記的正式 key 與資產列一起刪；刪不存在的物件視為成功；已確認的資產只由擁有者的 `MarkDeleted` 刪除；每列先標 `DELETING` 並提交、transaction 外刪物件、再標 `DELETED`，刪失敗留在 `DELETING` 重試。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`、`TestDeleteJob_StorageFailureKeepsRowRetryable`、`TestGC_ReclaimsStuckUploadedAfterGrace`、`TestGC_KeepsUploadedWithinGrace`。規格：同上。
+- 引用只由擁有者的同步 job 寫入；Unlink 只解除精確列出的資產；Finalize 不建立引用。守門：`TestSyncNeverUnlinksAnythingButRetiredAssets`（seller）、`TestFinalizeSignsCarriesTheUploaderAndCreatesNoReference`。規格：§2、§3、§5。
+- ReadSecure 要 `object_key`、`ref_type`、`ref_id` 全等，非機敏回 `ErrNotSecure`；呼叫方先授權並記稽核。守門：`TestReadSecureSendsTheTripleAndSeparatesNotSecureFromNotFound`。
+- `READY` 的公開物件已在 `public/<uuid v4>`，網址不可猜且只回給上傳者；Confirm 只接受 `READY`、未過期、上傳者相符，重入回同一資產。守門：`TestConfirm_RejectsNonUploader`、`TestConfirm_ReentryReturnsSameAsset`。
+- GC 只刪過期未確認的暫存（含超過 `StuckUploadGrace` 仍 `UPLOADED` 的）與其物件；先標 `DELETING` 並提交，transaction 外刪物件，再標 `DELETED`，失敗留著重試；已確認資產只由 `MarkDeleted` 刪。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`。
+- 期限與上限只在 `internal/model` 定義一次（`UploadTTL`、`PresignTTL`、`StuckUploadGrace`、`Max*Size`、`MaxImagePixels`、`MaxAnimatedPixels`、`MaxImageDimension`）。守門：`TestStuckUploadGraceOutlastsEveryProcessAttempt`。
+- `public/` 的圖片一律經 libvips 重新編碼（JPEG、PNG、WebP、GIF；sRGB、已套用方向、無 metadata）；辨認不出、無法解碼、超過上限永久拒絕；`image.Limits` 非正回 `ErrInvalidLimits`。守門：`TestFakeImageIsRejected`、`TestHeightOverDimensionLimitIsRejectedFromTheHeader`、`TestNonPositiveLimitsAreRejected`。
+- 機敏檔只以密文落地：`UploadSecure` 依 magic bytes 辨認、以實際讀到的位元組套用上限、STREAM 加密到暫存檔再 `Put`，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestUploadSecure_NoPlaintextInAnyPutOrStoredObject`（CI）。
 
 ## 不負責
 
-- 業務列、asset ID 欄位與每個 ref 的同步 job、版本與退場表：由擁有媒體的模組（buyer、seller、content）各自擁有，各用自己的 schema。
-- 機敏下載的授權與存取紀錄：擁有者的端點負責（路徑與傳輸規則見〈API 設計規範（Connect）〉「檔案回應」）。
-- 儲存層與圖片讀取出口：Java media-service 與 49 號設計書。寫入 `public/` 的圖片不得帶 EXIF（含 GPS）等 metadata，這個不變量來自 Java `ImageMetadataStripper`（49 號設計書 §8.1）；Go 版以 libvips 重新編碼達成（`internal/image`，ADR `2026-11-22-media-public-image-reencode.md`），不逐位元組剝除。
+- 業務列、asset ID 欄位與各 ref 的同步 job：由 buyer、seller、content 擁有。
+- 機敏下載的授權與存取紀錄：擁有者的端點負責。
+- 圖片讀取出口（image gateway、CDN）；public 圖片無 EXIF 由 `internal/image` 達成（ADR `2026-11-22-media-public-image-reencode.md`）。
 
 ## 決策紀錄
 
-決策與沿用盤點見 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-10-03-media-references-owner-side.md`（引用由擁有者端的同步 job 單一寫入，終點是 media 不認識業務；文末修訂：機敏下載由擁有者端點代理）、`docs/adr/2026-09-24-go-modular-monolith.md`（D2）。
+沿用盤點見 `CARRYOVER.md`。ADR：`docs/adr/2026-10-03-media-references-owner-side.md`、`2026-11-22-media-secure-stream-aead.md`、`2026-11-22-media-upload-channels.md`、`2026-11-22-media-public-image-reencode.md`、`2026-09-24-go-modular-monolith.md`（D2）。
