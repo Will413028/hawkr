@@ -9,6 +9,7 @@ import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import { ScrollableTableRegion } from "@/components/shared/ScrollableTableRegion";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
+import Button from "@/components/ui/Button";
 import {
 	SellerCustomersSkeletonRows,
 	SellerEmptyState,
@@ -466,14 +467,16 @@ export default function CustomersClient() {
 			) : null}
 
 			{hasMore ? (
-				<button
+				<Button
 					type="button"
-					className="seller-orders__action seller-orders__action--secondary"
+					variant="bordered"
+					color="default"
 					onClick={() => void loadMore()}
-					disabled={loadingMore}
+					isLoading={loadingMore}
+					loadingLabel="載入中…"
 				>
-					{loadingMore ? "載入中…" : "載入更多"}
-				</button>
+					載入更多
+				</Button>
 			) : null}
 
 			<CustomerDetailDrawer
