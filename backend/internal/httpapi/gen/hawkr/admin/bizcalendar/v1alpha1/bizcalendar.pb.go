@@ -134,6 +134,185 @@ func (x *ImportHolidayCalendarResponse) GetReplacedDayCount() int32 {
 	return 0
 }
 
+type PreviewHolidayCalendarRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要預覽的西元年（1 到 9999），規則和 ImportHolidayCalendarRequest.year 相同。
+	Year int32 `protobuf:"varint,1,opt,name=year,proto3" json:"year,omitempty"`
+	// 辦公日曆表 CSV 的全文。
+	CsvContent    string `protobuf:"bytes,2,opt,name=csv_content,json=csvContent,proto3" json:"csv_content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewHolidayCalendarRequest) Reset() {
+	*x = PreviewHolidayCalendarRequest{}
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewHolidayCalendarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewHolidayCalendarRequest) ProtoMessage() {}
+
+func (x *PreviewHolidayCalendarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewHolidayCalendarRequest.ProtoReflect.Descriptor instead.
+func (*PreviewHolidayCalendarRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PreviewHolidayCalendarRequest) GetYear() int32 {
+	if x != nil {
+		return x.Year
+	}
+	return 0
+}
+
+func (x *PreviewHolidayCalendarRequest) GetCsvContent() string {
+	if x != nil {
+		return x.CsvContent
+	}
+	return ""
+}
+
+type PreviewHolidayCalendarResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 匯入後該年的涵蓋狀態（year、天數、放假天數）。
+	Year *HolidayCalendarYear `protobuf:"bytes,1,opt,name=year,proto3" json:"year,omitempty"`
+	// 該年的第一天與最後一天。
+	FirstDate *date.Date `protobuf:"bytes,2,opt,name=first_date,json=firstDate,proto3" json:"first_date,omitempty"`
+	LastDate  *date.Date `protobuf:"bytes,3,opt,name=last_date,json=lastDate,proto3" json:"last_date,omitempty"`
+	// 該年所有放假的日子，依日期由小到大；筆數至多 366。
+	Holidays      []*HolidayCalendarHoliday `protobuf:"bytes,4,rep,name=holidays,proto3" json:"holidays,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewHolidayCalendarResponse) Reset() {
+	*x = PreviewHolidayCalendarResponse{}
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewHolidayCalendarResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewHolidayCalendarResponse) ProtoMessage() {}
+
+func (x *PreviewHolidayCalendarResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewHolidayCalendarResponse.ProtoReflect.Descriptor instead.
+func (*PreviewHolidayCalendarResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PreviewHolidayCalendarResponse) GetYear() *HolidayCalendarYear {
+	if x != nil {
+		return x.Year
+	}
+	return nil
+}
+
+func (x *PreviewHolidayCalendarResponse) GetFirstDate() *date.Date {
+	if x != nil {
+		return x.FirstDate
+	}
+	return nil
+}
+
+func (x *PreviewHolidayCalendarResponse) GetLastDate() *date.Date {
+	if x != nil {
+		return x.LastDate
+	}
+	return nil
+}
+
+func (x *PreviewHolidayCalendarResponse) GetHolidays() []*HolidayCalendarHoliday {
+	if x != nil {
+		return x.Holidays
+	}
+	return nil
+}
+
+// HolidayCalendarHoliday 是檔案裡一個放假的日子。
+type HolidayCalendarHoliday struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Date  *date.Date             `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"`
+	// 備註（已去頭尾空白），可以是空字串。
+	Note          string `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HolidayCalendarHoliday) Reset() {
+	*x = HolidayCalendarHoliday{}
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HolidayCalendarHoliday) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HolidayCalendarHoliday) ProtoMessage() {}
+
+func (x *HolidayCalendarHoliday) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HolidayCalendarHoliday.ProtoReflect.Descriptor instead.
+func (*HolidayCalendarHoliday) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *HolidayCalendarHoliday) GetDate() *date.Date {
+	if x != nil {
+		return x.Date
+	}
+	return nil
+}
+
+func (x *HolidayCalendarHoliday) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 type GetHolidayCalendarCoverageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -142,7 +321,7 @@ type GetHolidayCalendarCoverageRequest struct {
 
 func (x *GetHolidayCalendarCoverageRequest) Reset() {
 	*x = GetHolidayCalendarCoverageRequest{}
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[2]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +333,7 @@ func (x *GetHolidayCalendarCoverageRequest) String() string {
 func (*GetHolidayCalendarCoverageRequest) ProtoMessage() {}
 
 func (x *GetHolidayCalendarCoverageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[2]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +346,7 @@ func (x *GetHolidayCalendarCoverageRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetHolidayCalendarCoverageRequest.ProtoReflect.Descriptor instead.
 func (*GetHolidayCalendarCoverageRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{2}
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{5}
 }
 
 type GetHolidayCalendarCoverageResponse struct {
@@ -183,7 +362,7 @@ type GetHolidayCalendarCoverageResponse struct {
 
 func (x *GetHolidayCalendarCoverageResponse) Reset() {
 	*x = GetHolidayCalendarCoverageResponse{}
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[3]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +374,7 @@ func (x *GetHolidayCalendarCoverageResponse) String() string {
 func (*GetHolidayCalendarCoverageResponse) ProtoMessage() {}
 
 func (x *GetHolidayCalendarCoverageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[3]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +387,7 @@ func (x *GetHolidayCalendarCoverageResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetHolidayCalendarCoverageResponse.ProtoReflect.Descriptor instead.
 func (*GetHolidayCalendarCoverageResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{3}
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetHolidayCalendarCoverageResponse) GetYears() []*HolidayCalendarYear {
@@ -240,7 +419,7 @@ type HolidayCalendarYear struct {
 
 func (x *HolidayCalendarYear) Reset() {
 	*x = HolidayCalendarYear{}
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[4]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +431,7 @@ func (x *HolidayCalendarYear) String() string {
 func (*HolidayCalendarYear) ProtoMessage() {}
 
 func (x *HolidayCalendarYear) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[4]
+	mi := &file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +444,7 @@ func (x *HolidayCalendarYear) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HolidayCalendarYear.ProtoReflect.Descriptor instead.
 func (*HolidayCalendarYear) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{4}
+	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HolidayCalendarYear) GetYear() int32 {
@@ -300,7 +479,20 @@ const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc = "" +
 	"csvContent\"\x98\x01\n" +
 	"\x1dImportHolidayCalendarResponse\x12I\n" +
 	"\x04year\x18\x01 \x01(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x04year\x12,\n" +
-	"\x12replaced_day_count\x18\x02 \x01(\x05R\x10replacedDayCount\"#\n" +
+	"\x12replaced_day_count\x18\x02 \x01(\x05R\x10replacedDayCount\"^\n" +
+	"\x1dPreviewHolidayCalendarRequest\x12\x17\n" +
+	"\x04year\x18\x01 \x01(\x05B\x03\xe0A\x02R\x04year\x12$\n" +
+	"\vcsv_content\x18\x02 \x01(\tB\x03\xe0A\x02R\n" +
+	"csvContent\"\xa3\x02\n" +
+	"\x1ePreviewHolidayCalendarResponse\x12I\n" +
+	"\x04year\x18\x01 \x01(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x04year\x120\n" +
+	"\n" +
+	"first_date\x18\x02 \x01(\v2\x11.google.type.DateR\tfirstDate\x12.\n" +
+	"\tlast_date\x18\x03 \x01(\v2\x11.google.type.DateR\blastDate\x12T\n" +
+	"\bholidays\x18\x04 \x03(\v28.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHolidayR\bholidays\"S\n" +
+	"\x16HolidayCalendarHoliday\x12%\n" +
+	"\x04date\x18\x01 \x01(\v2\x11.google.type.DateR\x04date\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"#\n" +
 	"!GetHolidayCalendarCoverageRequest\"\xad\x01\n" +
 	"\"GetHolidayCalendarCoverageResponse\x12K\n" +
 	"\x05years\x18\x01 \x03(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x05years\x12:\n" +
@@ -308,9 +500,10 @@ const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc = "" +
 	"\x13HolidayCalendarYear\x12\x12\n" +
 	"\x04year\x18\x01 \x01(\x05R\x04year\x12\x1b\n" +
 	"\tday_count\x18\x02 \x01(\x05R\bdayCount\x12#\n" +
-	"\rholiday_count\x18\x03 \x01(\x05R\fholidayCount2\xe3\x02\n" +
+	"\rholiday_count\x18\x03 \x01(\x05R\fholidayCount2\x86\x04\n" +
 	"\x17BizCalendarAdminService\x12\x98\x01\n" +
-	"\x15ImportHolidayCalendar\x12>.hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest\x1a?.hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse\x12\xac\x01\n" +
+	"\x15ImportHolidayCalendar\x12>.hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest\x1a?.hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse\x12\xa0\x01\n" +
+	"\x16PreviewHolidayCalendar\x12?.hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest\x1a@.hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse\"\x03\x90\x02\x02\x12\xac\x01\n" +
 	"\x1aGetHolidayCalendarCoverage\x12C.hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest\x1aD.hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse\"\x03\x90\x02\x01B\xca\x02\n" +
 	"$com.hawkr.admin.bizcalendar.v1alpha1B\x10BizcalendarProtoP\x01Zmgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1;bizcalendarv1alpha1\xa2\x02\x03HAB\xaa\x02 Hawkr.Admin.Bizcalendar.V1alpha1\xca\x02 Hawkr\\Admin\\Bizcalendar\\V1alpha1\xe2\x02,Hawkr\\Admin\\Bizcalendar\\V1alpha1\\GPBMetadata\xea\x02#Hawkr::Admin::Bizcalendar::V1alpha1b\x06proto3"
 
@@ -326,28 +519,38 @@ func file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescGZIP() []byt
 	return file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDescData
 }
 
-var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_goTypes = []any{
 	(*ImportHolidayCalendarRequest)(nil),       // 0: hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
 	(*ImportHolidayCalendarResponse)(nil),      // 1: hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse
-	(*GetHolidayCalendarCoverageRequest)(nil),  // 2: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
-	(*GetHolidayCalendarCoverageResponse)(nil), // 3: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse
-	(*HolidayCalendarYear)(nil),                // 4: hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
-	(*date.Date)(nil),                          // 5: google.type.Date
+	(*PreviewHolidayCalendarRequest)(nil),      // 2: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest
+	(*PreviewHolidayCalendarResponse)(nil),     // 3: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse
+	(*HolidayCalendarHoliday)(nil),             // 4: hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday
+	(*GetHolidayCalendarCoverageRequest)(nil),  // 5: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
+	(*GetHolidayCalendarCoverageResponse)(nil), // 6: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse
+	(*HolidayCalendarYear)(nil),                // 7: hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
+	(*date.Date)(nil),                          // 8: google.type.Date
 }
 var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_depIdxs = []int32{
-	4, // 0: hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse.year:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
-	4, // 1: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.years:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
-	5, // 2: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.covered_through:type_name -> google.type.Date
-	0, // 3: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:input_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
-	2, // 4: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage:input_type -> hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
-	1, // 5: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:output_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse
-	3, // 6: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage:output_type -> hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	7,  // 0: hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse.year:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
+	7,  // 1: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse.year:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
+	8,  // 2: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse.first_date:type_name -> google.type.Date
+	8,  // 3: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse.last_date:type_name -> google.type.Date
+	4,  // 4: hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse.holidays:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday
+	8,  // 5: hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday.date:type_name -> google.type.Date
+	7,  // 6: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.years:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
+	8,  // 7: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.covered_through:type_name -> google.type.Date
+	0,  // 8: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:input_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
+	2,  // 9: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.PreviewHolidayCalendar:input_type -> hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest
+	5,  // 10: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage:input_type -> hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
+	1,  // 11: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:output_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse
+	3,  // 12: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.PreviewHolidayCalendar:output_type -> hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse
+	6,  // 13: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage:output_type -> hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_init() }
@@ -361,7 +564,7 @@ func file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc), len(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

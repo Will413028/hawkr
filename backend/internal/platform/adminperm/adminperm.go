@@ -23,6 +23,7 @@ func Roles() []Role { return []Role{RoleOwner} }
 
 const (
 	BizcalendarHolidayCalendarsImport      Permission = "bizcalendar.holiday_calendars.import"
+	BizcalendarHolidayCalendarsPreview     Permission = "bizcalendar.holiday_calendars.preview"
 	BizcalendarHolidayCalendarCoveragesGet Permission = "bizcalendar.holiday_calendar_coverages.get"
 	BuyerBuyerStatsGet                     Permission = "buyer.buyer_stats.get"
 	BuyerMembershipPlansList               Permission = "buyer.membership_plans.list"
@@ -119,7 +120,7 @@ const (
 // Catalog 回傳目錄裡的全部權限。
 func Catalog() []Permission {
 	return []Permission{
-		BizcalendarHolidayCalendarsImport, BizcalendarHolidayCalendarCoveragesGet,
+		BizcalendarHolidayCalendarsImport, BizcalendarHolidayCalendarsPreview, BizcalendarHolidayCalendarCoveragesGet,
 		BuyerBuyerStatsGet, BuyerMembershipPlansList, BuyerMembershipPlansUpdate,
 		ContentBannersList, ContentBannersGet, ContentBannersCreate, ContentBannersUpdate, ContentBannersDelete,
 		ContentAppVersionGatesList, ContentAppVersionGatesCreate, ContentAppVersionGatesUpdate,

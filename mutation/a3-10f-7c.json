@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "preview-ignores-parse-error",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "\tif err != nil {\n\t\treturn nil, err\n\t}\n\tslices.SortFunc",
+   "new": "\t_ = err\n\tslices.SortFunc",
+   "test": "internal/httpapi/bizcalendar ^TestPreviewRejectsWhatImportRejectsWithTheSameMessage$",
+   "why": "A file the shared parser rejects is no longer rejected by Preview, so an invalid file previews without the line-numbered error."
+  },
+  {
+   "id": "preview-parses-fixed-year",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "bizcalendar.ParseOfficeCalendar(int(req.Msg.GetYear()), req.Msg.GetCsvContent())",
+   "new": "bizcalendar.ParseOfficeCalendar(2026, req.Msg.GetCsvContent())",
+   "test": "internal/httpapi/bizcalendar ^TestPreviewRejectsWhatImportRejectsWithTheSameMessage$",
+   "why": "Preview parses against a fixed year instead of the requested one, so a file for another year previews OK."
+  },
+  {
+   "id": "preview-calls-import",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "if _, err := rpc.RequireAdmin(ctx); err != nil {",
+   "new": "if _, err := h.src.Import(ctx, adminaudit.Actor{}, int(req.Msg.GetYear()), req.Msg.GetCsvContent()); err != nil {",
+   "test": "internal/httpapi/bizcalendar ^TestPreviewMapsTheParsedYearWithoutCallingTheSource$",
+   "why": "Preview writes through Import (and its audit record) instead of only parsing."
+  },
+  {
+   "id": "preview-holiday-count-doubled",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "out.Year.HolidayCount++",
+   "new": "out.Year.HolidayCount += 2",
+   "test": "internal/httpapi/bizcalendar ^TestPreviewMapsTheParsedYearWithoutCallingTheSource$",
+   "why": "The previewed holiday count no longer matches the holidays in the file."
+  }
+ ]
+}

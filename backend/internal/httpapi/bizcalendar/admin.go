@@ -1,8 +1,9 @@
-// Package bizcalendar 是 BizCalendarAdminService 的 handler：工作日行事曆（platform/bizcalendar）的匯入與涵蓋狀態。
+// Package bizcalendar 是 BizCalendarAdminService 的 handler：工作日行事曆（platform/bizcalendar）的匯入、預覽與涵蓋狀態。
 package bizcalendar
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -48,6 +49,34 @@ func (h *Admin) ImportHolidayCalendar(ctx context.Context, req *connect.Request[
 		Year:             &adminpb.HolidayCalendarYear{Year: req.Msg.GetYear(), DayCount: int32(res.DayCount), HolidayCount: int32(res.HolidayCount)}, //nolint:gosec // 一年最多 366 天
 		ReplacedDayCount: int32(res.ReplacedDayCount),                                                                                                 //nolint:gosec // 同上
 	}), nil
+}
+
+// PreviewHolidayCalendar 以匯入用的解析（bizcalendar.ParseOfficeCalendar）預覽一年的辦公日曆表；不寫資料也不寫後台紀錄。
+func (h *Admin) PreviewHolidayCalendar(ctx context.Context, req *connect.Request[adminpb.PreviewHolidayCalendarRequest]) (*connect.Response[adminpb.PreviewHolidayCalendarResponse], error) {
+	if _, err := rpc.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	days, err := bizcalendar.ParseOfficeCalendar(int(req.Msg.GetYear()), req.Msg.GetCsvContent())
+	if err != nil {
+		return nil, err
+	}
+	slices.SortFunc(days, func(a, b bizcalendar.Day) int { return a.Date.Compare(b.Date) })
+	out := &adminpb.PreviewHolidayCalendarResponse{
+		Year:      &adminpb.HolidayCalendarYear{Year: req.Msg.GetYear(), DayCount: int32(len(days))}, //nolint:gosec // 一年最多 366 天
+		FirstDate: protoDate(days[0].Date),
+		LastDate:  protoDate(days[len(days)-1].Date),
+	}
+	for _, d := range days {
+		if d.Holiday {
+			out.Year.HolidayCount++
+			out.Holidays = append(out.Holidays, &adminpb.HolidayCalendarHoliday{Date: protoDate(d.Date), Note: d.Note})
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
+func protoDate(t time.Time) *date.Date {
+	return &date.Date{Year: int32(t.Year()), Month: int32(t.Month()), Day: int32(t.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
 }
 
 // GetHolidayCalendarCoverage 讀已匯入的年份。

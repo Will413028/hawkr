@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -193,5 +194,68 @@ func TestCoverageOfAnEmptyCalendarHasNoCoveredThrough(t *testing.T) {
 	msg := coverage(t, cal)
 	if len(msg.GetYears()) != 0 || msg.GetCoveredThrough() != nil {
 		t.Fatalf("resp=%v", msg)
+	}
+}
+
+func TestPreviewMapsTheParsedYearWithoutCallingTheSource(t *testing.T) {
+	f := &fakeSource{}
+	c := newEnv(t, f)
+	content := fixture(t, "115.csv")
+	resp, err := c.PreviewHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.PreviewHolidayCalendarRequest{Year: 2026, CsvContent: content}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.actor != (adminaudit.Actor{}) || f.year != 0 {
+		t.Errorf("預覽不得呼叫匯入：actor=%+v year=%d", f.actor, f.year)
+	}
+	days, err := bizcalendar.ParseOfficeCalendar(2026, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, d := range days {
+		if d.Holiday {
+			want = append(want, d.Date.Format(time.DateOnly)+"|"+d.Note)
+		}
+	}
+	m := resp.Msg
+	if y := m.GetYear(); y.GetYear() != 2026 || y.GetDayCount() != 365 || int(y.GetHolidayCount()) != len(want) {
+		t.Errorf("year = %v，預期放假 %d 天", y, len(want))
+	}
+	if d := m.GetFirstDate(); d.GetYear() != 2026 || d.GetMonth() != 1 || d.GetDay() != 1 {
+		t.Errorf("first_date = %v", d)
+	}
+	if d := m.GetLastDate(); d.GetYear() != 2026 || d.GetMonth() != 12 || d.GetDay() != 31 {
+		t.Errorf("last_date = %v", d)
+	}
+	var got []string
+	for _, h := range m.GetHolidays() {
+		d := h.GetDate()
+		got = append(got, time.Date(int(d.GetYear()), time.Month(d.GetMonth()), int(d.GetDay()), 0, 0, 0, 0, time.UTC).Format(time.DateOnly)+"|"+h.GetNote())
+	}
+	if !slices.Equal(got, want) || !slices.IsSorted(got) {
+		t.Errorf("holidays = %v，預期 %v", got, want)
+	}
+}
+
+func TestPreviewRejectsWhatImportRejectsWithTheSameMessage(t *testing.T) {
+	c := newEnv(t, &fakeSource{})
+	for name, tc := range map[string]struct {
+		year int32
+		csv  string
+	}{
+		"壞內容":    {2026, "bad"},
+		"年份不符":   {2027, fixture(t, "115.csv")},
+		"年份超出範圍": {0, fixture(t, "115.csv")},
+	} {
+		_, importErr := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: tc.year, CsvContent: tc.csv}))
+		_, previewErr := c.PreviewHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.PreviewHolidayCalendarRequest{Year: tc.year, CsvContent: tc.csv}))
+		if connect.CodeOf(previewErr) != connect.CodeInvalidArgument {
+			t.Fatalf("%s：code = %v", name, connect.CodeOf(previewErr))
+		}
+		var pe, ie *connect.Error
+		if !errors.As(previewErr, &pe) || !errors.As(importErr, &ie) || pe.Message() != ie.Message() {
+			t.Errorf("%s：預覽 %v 與匯入 %v 的訊息不同", name, previewErr, importErr)
+		}
 	}
 }

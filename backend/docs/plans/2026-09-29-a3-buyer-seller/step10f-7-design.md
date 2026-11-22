@@ -69,7 +69,7 @@ D1 的依據：ADR `docs/adr/2026-10-18-seller-governance-consolidated.md` 第 5
 
 ### B#9 預覽（D2）
 
-新增 `Preview` RPC（唯讀，不寫稽核），呼叫與匯入相同的解析函式，回應帶預覽面板現有欄位需要的資料；admin 刪掉 `holiday-calendar.ts` 的解析。
+新增 `PreviewHolidayCalendar` RPC（唯讀，不寫稽核，請求同匯入），呼叫與匯入相同的解析函式；回應帶該年的天數與放假天數、第一天與最後一天、全部放假日（依日期、含備註）。admin 先選年份（今年前 1 年到後 2 年）再預覽，刪掉 `holiday-calendar.ts` 的解析，下拉不再有各年列數、移除「檔案總解析列數」。
 
 ### B#10 CSV 解析
 

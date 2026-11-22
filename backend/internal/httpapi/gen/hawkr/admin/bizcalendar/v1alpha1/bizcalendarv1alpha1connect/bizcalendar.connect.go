@@ -38,6 +38,9 @@ const (
 	// BizCalendarAdminServiceImportHolidayCalendarProcedure is the fully-qualified name of the
 	// BizCalendarAdminService's ImportHolidayCalendar RPC.
 	BizCalendarAdminServiceImportHolidayCalendarProcedure = "/hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService/ImportHolidayCalendar"
+	// BizCalendarAdminServicePreviewHolidayCalendarProcedure is the fully-qualified name of the
+	// BizCalendarAdminService's PreviewHolidayCalendar RPC.
+	BizCalendarAdminServicePreviewHolidayCalendarProcedure = "/hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService/PreviewHolidayCalendar"
 	// BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure is the fully-qualified name of the
 	// BizCalendarAdminService's GetHolidayCalendarCoverage RPC.
 	BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure = "/hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService/GetHolidayCalendarCoverage"
@@ -52,6 +55,10 @@ type BizCalendarAdminServiceClient interface {
 	// 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	ImportHolidayCalendar(context.Context, *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error)
+	// PreviewHolidayCalendar 以和 ImportHolidayCalendar 相同的解析與檢查預覽一份辦公日曆表，不寫入任何資料也不寫後台紀錄。
+	// 請求與大小上限和匯入相同；檔案不合時回 invalid_argument，訊息和匯入的一樣（指出第幾行）。請求帶整份檔案、可能超過網址長度上限，
+	// 所以標 IDEMPOTENT、以 POST 呼叫（API 規範第八節）。
+	PreviewHolidayCalendar(context.Context, *connect.Request[v1alpha1.PreviewHolidayCalendarRequest]) (*connect.Response[v1alpha1.PreviewHolidayCalendarResponse], error)
 	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
 	// 一年一列，筆數是已匯入的年數。
 	GetHolidayCalendarCoverage(context.Context, *connect.Request[v1alpha1.GetHolidayCalendarCoverageRequest]) (*connect.Response[v1alpha1.GetHolidayCalendarCoverageResponse], error)
@@ -75,6 +82,13 @@ func NewBizCalendarAdminServiceClient(httpClient connect.HTTPClient, baseURL str
 			connect.WithSchema(bizCalendarAdminServiceMethods.ByName("ImportHolidayCalendar")),
 			connect.WithClientOptions(opts...),
 		),
+		previewHolidayCalendar: connect.NewClient[v1alpha1.PreviewHolidayCalendarRequest, v1alpha1.PreviewHolidayCalendarResponse](
+			httpClient,
+			baseURL+BizCalendarAdminServicePreviewHolidayCalendarProcedure,
+			connect.WithSchema(bizCalendarAdminServiceMethods.ByName("PreviewHolidayCalendar")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
 		getHolidayCalendarCoverage: connect.NewClient[v1alpha1.GetHolidayCalendarCoverageRequest, v1alpha1.GetHolidayCalendarCoverageResponse](
 			httpClient,
 			baseURL+BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure,
@@ -88,6 +102,7 @@ func NewBizCalendarAdminServiceClient(httpClient connect.HTTPClient, baseURL str
 // bizCalendarAdminServiceClient implements BizCalendarAdminServiceClient.
 type bizCalendarAdminServiceClient struct {
 	importHolidayCalendar      *connect.Client[v1alpha1.ImportHolidayCalendarRequest, v1alpha1.ImportHolidayCalendarResponse]
+	previewHolidayCalendar     *connect.Client[v1alpha1.PreviewHolidayCalendarRequest, v1alpha1.PreviewHolidayCalendarResponse]
 	getHolidayCalendarCoverage *connect.Client[v1alpha1.GetHolidayCalendarCoverageRequest, v1alpha1.GetHolidayCalendarCoverageResponse]
 }
 
@@ -95,6 +110,12 @@ type bizCalendarAdminServiceClient struct {
 // hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar.
 func (c *bizCalendarAdminServiceClient) ImportHolidayCalendar(ctx context.Context, req *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error) {
 	return c.importHolidayCalendar.CallUnary(ctx, req)
+}
+
+// PreviewHolidayCalendar calls
+// hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.PreviewHolidayCalendar.
+func (c *bizCalendarAdminServiceClient) PreviewHolidayCalendar(ctx context.Context, req *connect.Request[v1alpha1.PreviewHolidayCalendarRequest]) (*connect.Response[v1alpha1.PreviewHolidayCalendarResponse], error) {
+	return c.previewHolidayCalendar.CallUnary(ctx, req)
 }
 
 // GetHolidayCalendarCoverage calls
@@ -112,6 +133,10 @@ type BizCalendarAdminServiceHandler interface {
 	// 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	ImportHolidayCalendar(context.Context, *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error)
+	// PreviewHolidayCalendar 以和 ImportHolidayCalendar 相同的解析與檢查預覽一份辦公日曆表，不寫入任何資料也不寫後台紀錄。
+	// 請求與大小上限和匯入相同；檔案不合時回 invalid_argument，訊息和匯入的一樣（指出第幾行）。請求帶整份檔案、可能超過網址長度上限，
+	// 所以標 IDEMPOTENT、以 POST 呼叫（API 規範第八節）。
+	PreviewHolidayCalendar(context.Context, *connect.Request[v1alpha1.PreviewHolidayCalendarRequest]) (*connect.Response[v1alpha1.PreviewHolidayCalendarResponse], error)
 	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
 	// 一年一列，筆數是已匯入的年數。
 	GetHolidayCalendarCoverage(context.Context, *connect.Request[v1alpha1.GetHolidayCalendarCoverageRequest]) (*connect.Response[v1alpha1.GetHolidayCalendarCoverageResponse], error)
@@ -130,6 +155,13 @@ func NewBizCalendarAdminServiceHandler(svc BizCalendarAdminServiceHandler, opts 
 		connect.WithSchema(bizCalendarAdminServiceMethods.ByName("ImportHolidayCalendar")),
 		connect.WithHandlerOptions(opts...),
 	)
+	bizCalendarAdminServicePreviewHolidayCalendarHandler := connect.NewUnaryHandler(
+		BizCalendarAdminServicePreviewHolidayCalendarProcedure,
+		svc.PreviewHolidayCalendar,
+		connect.WithSchema(bizCalendarAdminServiceMethods.ByName("PreviewHolidayCalendar")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
 	bizCalendarAdminServiceGetHolidayCalendarCoverageHandler := connect.NewUnaryHandler(
 		BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure,
 		svc.GetHolidayCalendarCoverage,
@@ -141,6 +173,8 @@ func NewBizCalendarAdminServiceHandler(svc BizCalendarAdminServiceHandler, opts 
 		switch r.URL.Path {
 		case BizCalendarAdminServiceImportHolidayCalendarProcedure:
 			bizCalendarAdminServiceImportHolidayCalendarHandler.ServeHTTP(w, r)
+		case BizCalendarAdminServicePreviewHolidayCalendarProcedure:
+			bizCalendarAdminServicePreviewHolidayCalendarHandler.ServeHTTP(w, r)
 		case BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure:
 			bizCalendarAdminServiceGetHolidayCalendarCoverageHandler.ServeHTTP(w, r)
 		default:
@@ -154,6 +188,10 @@ type UnimplementedBizCalendarAdminServiceHandler struct{}
 
 func (UnimplementedBizCalendarAdminServiceHandler) ImportHolidayCalendar(context.Context, *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar is not implemented"))
+}
+
+func (UnimplementedBizCalendarAdminServiceHandler) PreviewHolidayCalendar(context.Context, *connect.Request[v1alpha1.PreviewHolidayCalendarRequest]) (*connect.Response[v1alpha1.PreviewHolidayCalendarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.PreviewHolidayCalendar is not implemented"))
 }
 
 func (UnimplementedBizCalendarAdminServiceHandler) GetHolidayCalendarCoverage(context.Context, *connect.Request[v1alpha1.GetHolidayCalendarCoverageRequest]) (*connect.Response[v1alpha1.GetHolidayCalendarCoverageResponse], error) {

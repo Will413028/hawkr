@@ -16,6 +16,13 @@ service BizCalendarAdminService {
   // 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
   rpc ImportHolidayCalendar(ImportHolidayCalendarRequest) returns (ImportHolidayCalendarResponse);
 
+  // PreviewHolidayCalendar 以和 ImportHolidayCalendar 相同的解析與檢查預覽一份辦公日曆表，不寫入任何資料也不寫後台紀錄。
+  // 請求與大小上限和匯入相同；檔案不合時回 invalid_argument，訊息和匯入的一樣（指出第幾行）。請求帶整份檔案、可能超過網址長度上限，
+  // 所以標 IDEMPOTENT、以 POST 呼叫（API 規範第八節）。
+  rpc PreviewHolidayCalendar(PreviewHolidayCalendarRequest) returns (PreviewHolidayCalendarResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
   // GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
   // 一年一列，筆數是已匯入的年數。
   rpc GetHolidayCalendarCoverage(GetHolidayCalendarCoverageRequest) returns (GetHolidayCalendarCoverageResponse) {
@@ -37,6 +44,34 @@ message ImportHolidayCalendarResponse {
 
   // 被取代的該年原有天數；第一次匯入該年時為 0。
   int32 replaced_day_count = 2;
+}
+
+message PreviewHolidayCalendarRequest {
+  // 要預覽的西元年（1 到 9999），規則和 ImportHolidayCalendarRequest.year 相同。
+  int32 year = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // 辦公日曆表 CSV 的全文。
+  string csv_content = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PreviewHolidayCalendarResponse {
+  // 匯入後該年的涵蓋狀態（year、天數、放假天數）。
+  HolidayCalendarYear year = 1;
+
+  // 該年的第一天與最後一天。
+  google.type.Date first_date = 2;
+  google.type.Date last_date = 3;
+
+  // 該年所有放假的日子，依日期由小到大；筆數至多 366。
+  repeated HolidayCalendarHoliday holidays = 4;
+}
+
+// HolidayCalendarHoliday 是檔案裡一個放假的日子。
+message HolidayCalendarHoliday {
+  google.type.Date date = 1;
+
+  // 備註（已去頭尾空白），可以是空字串。
+  string note = 2;
 }
 
 message GetHolidayCalendarCoverageRequest {}

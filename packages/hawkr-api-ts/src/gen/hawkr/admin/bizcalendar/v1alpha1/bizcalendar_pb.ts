@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/bizcalendar/v1alpha1/bizcalendar.proto.
  */
 export const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar: GenFile = /*@__PURE__*/
-  fileDesc("CjJoYXdrci9hZG1pbi9iaXpjYWxlbmRhci92MWFscGhhMS9iaXpjYWxlbmRhci5wcm90bxIgaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEiSwocSW1wb3J0SG9saWRheUNhbGVuZGFyUmVxdWVzdBIRCgR5ZWFyGAEgASgFQgPgQQISGAoLY3N2X2NvbnRlbnQYAiABKAlCA+BBAiKAAQodSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USQwoEeWVhchgBIAEoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISGgoScmVwbGFjZWRfZGF5X2NvdW50GAIgASgFIiMKIUdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVxdWVzdCKWAQoiR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZRJECgV5ZWFycxgBIAMoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISKgoPY292ZXJlZF90aHJvdWdoGAIgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZSJNChNIb2xpZGF5Q2FsZW5kYXJZZWFyEgwKBHllYXIYASABKAUSEQoJZGF5X2NvdW50GAIgASgFEhUKDWhvbGlkYXlfY291bnQYAyABKAUy4wIKF0JpekNhbGVuZGFyQWRtaW5TZXJ2aWNlEpgBChVJbXBvcnRIb2xpZGF5Q2FsZW5kYXISPi5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5JbXBvcnRIb2xpZGF5Q2FsZW5kYXJSZXF1ZXN0Gj8uaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USrAEKGkdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlEkMuaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXF1ZXN0GkQuaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_type_date]);
+  fileDesc("CjJoYXdrci9hZG1pbi9iaXpjYWxlbmRhci92MWFscGhhMS9iaXpjYWxlbmRhci5wcm90bxIgaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEiSwocSW1wb3J0SG9saWRheUNhbGVuZGFyUmVxdWVzdBIRCgR5ZWFyGAEgASgFQgPgQQISGAoLY3N2X2NvbnRlbnQYAiABKAlCA+BBAiKAAQodSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USQwoEeWVhchgBIAEoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISGgoScmVwbGFjZWRfZGF5X2NvdW50GAIgASgFIkwKHVByZXZpZXdIb2xpZGF5Q2FsZW5kYXJSZXF1ZXN0EhEKBHllYXIYASABKAVCA+BBAhIYCgtjc3ZfY29udGVudBgCIAEoCUID4EECIv4BCh5QcmV2aWV3SG9saWRheUNhbGVuZGFyUmVzcG9uc2USQwoEeWVhchgBIAEoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISJQoKZmlyc3RfZGF0ZRgCIAEoCzIRLmdvb2dsZS50eXBlLkRhdGUSJAoJbGFzdF9kYXRlGAMgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZRJKCghob2xpZGF5cxgEIAMoCzI4Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhckhvbGlkYXkiRwoWSG9saWRheUNhbGVuZGFySG9saWRheRIfCgRkYXRlGAEgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZRIMCgRub3RlGAIgASgJIiMKIUdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVxdWVzdCKWAQoiR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZRJECgV5ZWFycxgBIAMoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISKgoPY292ZXJlZF90aHJvdWdoGAIgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZSJNChNIb2xpZGF5Q2FsZW5kYXJZZWFyEgwKBHllYXIYASABKAUSEQoJZGF5X2NvdW50GAIgASgFEhUKDWhvbGlkYXlfY291bnQYAyABKAUyhgQKF0JpekNhbGVuZGFyQWRtaW5TZXJ2aWNlEpgBChVJbXBvcnRIb2xpZGF5Q2FsZW5kYXISPi5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5JbXBvcnRIb2xpZGF5Q2FsZW5kYXJSZXF1ZXN0Gj8uaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USoAEKFlByZXZpZXdIb2xpZGF5Q2FsZW5kYXISPy5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5QcmV2aWV3SG9saWRheUNhbGVuZGFyUmVxdWVzdBpALmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLlByZXZpZXdIb2xpZGF5Q2FsZW5kYXJSZXNwb25zZSIDkAICEqwBChpHZXRIb2xpZGF5Q2FsZW5kYXJDb3ZlcmFnZRJDLmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVxdWVzdBpELmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_api_field_behavior, file_google_type_date]);
 
 /**
  * @generated from message hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
@@ -71,6 +71,96 @@ export const ImportHolidayCalendarResponseSchema: GenMessage<ImportHolidayCalend
   messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 1);
 
 /**
+ * @generated from message hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest
+ */
+export type PreviewHolidayCalendarRequest = Message<"hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest"> & {
+  /**
+   * 要預覽的西元年（1 到 9999），規則和 ImportHolidayCalendarRequest.year 相同。
+   *
+   * @generated from field: int32 year = 1;
+   */
+  year: number;
+
+  /**
+   * 辦公日曆表 CSV 的全文。
+   *
+   * @generated from field: string csv_content = 2;
+   */
+  csvContent: string;
+};
+
+/**
+ * Describes the message hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarRequest.
+ * Use `create(PreviewHolidayCalendarRequestSchema)` to create a new message.
+ */
+export const PreviewHolidayCalendarRequestSchema: GenMessage<PreviewHolidayCalendarRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 2);
+
+/**
+ * @generated from message hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse
+ */
+export type PreviewHolidayCalendarResponse = Message<"hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse"> & {
+  /**
+   * 匯入後該年的涵蓋狀態（year、天數、放假天數）。
+   *
+   * @generated from field: hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear year = 1;
+   */
+  year?: HolidayCalendarYear | undefined;
+
+  /**
+   * 該年的第一天與最後一天。
+   *
+   * @generated from field: google.type.Date first_date = 2;
+   */
+  firstDate?: Date | undefined;
+
+  /**
+   * @generated from field: google.type.Date last_date = 3;
+   */
+  lastDate?: Date | undefined;
+
+  /**
+   * 該年所有放假的日子，依日期由小到大；筆數至多 366。
+   *
+   * @generated from field: repeated hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday holidays = 4;
+   */
+  holidays: HolidayCalendarHoliday[];
+};
+
+/**
+ * Describes the message hawkr.admin.bizcalendar.v1alpha1.PreviewHolidayCalendarResponse.
+ * Use `create(PreviewHolidayCalendarResponseSchema)` to create a new message.
+ */
+export const PreviewHolidayCalendarResponseSchema: GenMessage<PreviewHolidayCalendarResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 3);
+
+/**
+ * HolidayCalendarHoliday 是檔案裡一個放假的日子。
+ *
+ * @generated from message hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday
+ */
+export type HolidayCalendarHoliday = Message<"hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday"> & {
+  /**
+   * @generated from field: google.type.Date date = 1;
+   */
+  date?: Date | undefined;
+
+  /**
+   * 備註（已去頭尾空白），可以是空字串。
+   *
+   * @generated from field: string note = 2;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarHoliday.
+ * Use `create(HolidayCalendarHolidaySchema)` to create a new message.
+ */
+export const HolidayCalendarHolidaySchema: GenMessage<HolidayCalendarHoliday> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 4);
+
+/**
  * @generated from message hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
  */
 export type GetHolidayCalendarCoverageRequest = Message<"hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest"> & {
@@ -81,7 +171,7 @@ export type GetHolidayCalendarCoverageRequest = Message<"hawkr.admin.bizcalendar
  * Use `create(GetHolidayCalendarCoverageRequestSchema)` to create a new message.
  */
 export const GetHolidayCalendarCoverageRequestSchema: GenMessage<GetHolidayCalendarCoverageRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 2);
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 5);
 
 /**
  * @generated from message hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse
@@ -108,7 +198,7 @@ export type GetHolidayCalendarCoverageResponse = Message<"hawkr.admin.bizcalenda
  * Use `create(GetHolidayCalendarCoverageResponseSchema)` to create a new message.
  */
 export const GetHolidayCalendarCoverageResponseSchema: GenMessage<GetHolidayCalendarCoverageResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 3);
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 6);
 
 /**
  * HolidayCalendarYear 是一個已匯入的年份。
@@ -143,7 +233,7 @@ export type HolidayCalendarYear = Message<"hawkr.admin.bizcalendar.v1alpha1.Holi
  * Use `create(HolidayCalendarYearSchema)` to create a new message.
  */
 export const HolidayCalendarYearSchema: GenMessage<HolidayCalendarYear> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 4);
+  messageDesc(file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar, 7);
 
 /**
  * BizCalendarAdminService 只有管理員能呼叫。
@@ -164,6 +254,18 @@ export const BizCalendarAdminService: GenService<{
     methodKind: "unary";
     input: typeof ImportHolidayCalendarRequestSchema;
     output: typeof ImportHolidayCalendarResponseSchema;
+  },
+  /**
+   * PreviewHolidayCalendar 以和 ImportHolidayCalendar 相同的解析與檢查預覽一份辦公日曆表，不寫入任何資料也不寫後台紀錄。
+   * 請求與大小上限和匯入相同；檔案不合時回 invalid_argument，訊息和匯入的一樣（指出第幾行）。請求帶整份檔案、可能超過網址長度上限，
+   * 所以標 IDEMPOTENT、以 POST 呼叫（API 規範第八節）。
+   *
+   * @generated from rpc hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.PreviewHolidayCalendar
+   */
+  previewHolidayCalendar: {
+    methodKind: "unary";
+    input: typeof PreviewHolidayCalendarRequestSchema;
+    output: typeof PreviewHolidayCalendarResponseSchema;
   },
   /**
    * GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：

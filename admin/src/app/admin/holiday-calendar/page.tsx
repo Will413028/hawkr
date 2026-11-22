@@ -11,13 +11,8 @@ import "@/styles/pages/HolidayCalendar.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 import {
 	buildImportRequest,
-	buildPreview,
-	type CalendarPreview,
-	type CalendarRow,
 	coverageBadge,
 	coverageDaysLeft,
-	parseCalendarCsv,
-	yearRowsOf,
 } from "./holiday-calendar";
 
 const IMPORT_FAILED_TEXT = "匯入失敗，請重試。";
@@ -29,15 +24,24 @@ interface ImportResult {
 	replacedDayCount: number;
 }
 
+const YEARS_BEFORE = 1;
+const YEARS_AFTER = 2;
+
+/** 可選的匯入年份：台北今年的前 1 年到後 2 年。 */
+function yearOptions(thisYear: number): number[] {
+	return Array.from(
+		{ length: YEARS_BEFORE + YEARS_AFTER + 1 },
+		(_, i) => thisYear - YEARS_BEFORE + i,
+	);
+}
+
 export default function HolidayCalendarPage() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// 上傳 / 解析狀態
 	const [fileName, setFileName] = useState("");
 	const [csvText, setCsvText] = useState("");
-	const [rows, setRows] = useState<CalendarRow[]>([]);
-	const [preview, setPreview] = useState<CalendarPreview | null>(null);
-	const [declaredYear, setDeclaredYear] = useState(""); // 宣告 / 辨識年份（字串）
+	const [declaredYear, setDeclaredYear] = useState(""); // 匯入年份（字串）
 	const [parseError, setParseError] = useState("");
 	const [dragging, setDragging] = useState(false);
 
@@ -76,36 +80,31 @@ export default function HolidayCalendarPage() {
 	const resetUpload = () => {
 		setFileName("");
 		setCsvText("");
-		setRows([]);
-		setPreview(null);
 		setDeclaredYear("");
 		setParseError("");
 		if (fileInputRef.current) fileInputRef.current.value = "";
 	};
 
-	// 讀檔 → 本地解析 → 建立預覽 + 預設宣告年份（取筆數最多的年份）
+	const thisYear = Number(formatIsoDate(new Date()).slice(0, 4));
+	const years = yearOptions(thisYear);
+
+	// 預設年份：已涵蓋的最後一年的下一年（在可選範圍內），否則今年
+	const defaultYear = () => {
+		const next = coverage?.coveredThrough
+			? coverage.coveredThrough.year + 1
+			: thisYear;
+		return String(years.includes(next) ? next : thisYear);
+	};
+
+	// 讀檔 → 以選定年份交給伺服器預覽
 	const handleFile = (file: File) => {
 		setParseError("");
 		setImportResult(null);
 		const reader = new FileReader();
 		reader.onload = () => {
-			const text = String(reader.result ?? "");
-			const parsedRows = parseCalendarCsv(text);
-			if (parsedRows.length === 0) {
-				setFileName(file.name);
-				setCsvText("");
-				setRows([]);
-				setPreview(null);
-				setDeclaredYear("");
-				setParseError("CSV 無有效資料，請確認為人事行政總處辦公日曆表格式。");
-				return;
-			}
-			const built = buildPreview(parsedRows);
 			setFileName(file.name);
-			setCsvText(text);
-			setRows(parsedRows);
-			setPreview(built);
-			setDeclaredYear(String(built.yearCounts[0].year));
+			setCsvText(String(reader.result ?? ""));
+			setDeclaredYear(defaultYear());
 		};
 		reader.onerror = () => setParseError("讀取檔案失敗，請重試。");
 		reader.readAsText(file);
@@ -118,14 +117,22 @@ export default function HolidayCalendarPage() {
 		if (file) handleFile(file);
 	};
 
-	// 宣告年份的列（資料量小，不必記憶化）
 	const yearNum = declaredYear ? Number(declaredYear) : Number.NaN;
-	const yearRows = preview ? yearRowsOf(rows, yearNum) : [];
-	const writeCount = yearRows.length;
-	const holidayRows = yearRows.filter((r) => r.holiday);
+	const hasFile = csvText !== "";
+	const previewQuery = useQuery(
+		BizCalendarAdminService.method.previewHolidayCalendar,
+		hasFile ? buildImportRequest(declaredYear, csvText) : undefined,
+		{ enabled: hasFile, retry: false },
+	);
+	const previewing = hasFile && previewQuery.isFetching;
+	const previewError = hasFile && !previewing ? previewQuery.error : null;
+	const previewData = hasFile && !previewing ? previewQuery.data : undefined;
+	const previewReady = previewData !== undefined;
+	const writeCount = previewData?.year?.dayCount ?? 0;
+	const holidays = previewData?.holidays ?? [];
 	const dateRange =
-		yearRows.length > 0
-			? `${yearRows[0].iso} ~ ${yearRows[yearRows.length - 1].iso}`
+		previewData?.firstDate && previewData.lastDate
+			? `${formatDate(previewData.firstDate)} ~ ${formatDate(previewData.lastDate)}`
 			: "-";
 
 	// 該宣告年份於覆蓋現況中的現有天數（= 將取代的天數）
@@ -134,7 +141,7 @@ export default function HolidayCalendarPage() {
 
 	// 「確認匯入」：先讀最新覆蓋現況取得現有天數，再開二次確認 dialog
 	const handleRequestImport = async () => {
-		if (!preview || !declaredYear || writeCount === 0) return;
+		if (!previewReady || !declaredYear || writeCount === 0) return;
 		importMutation.reset();
 		await coverageQuery.refetch();
 		setShowConfirm(true);
@@ -178,7 +185,7 @@ export default function HolidayCalendarPage() {
 					支援行政院人事行政總處辦公日曆表逐日
 					CSV（表頭「西元日期,星期,是否放假,備註」，日期 yyyymmdd，是否放假為 0
 					或
-					2，須涵蓋整年每一天）。系統會先本地解析預覽，確認後才覆寫該年度假日資料。
+					2，須涵蓋整年每一天）。系統會先檢查並預覽，確認後才覆寫該年度假日資料。
 				</p>
 
 				{/* 隱藏檔案輸入 + dashed dropzone（reuse ai-styles 視覺） */}
@@ -213,67 +220,79 @@ export default function HolidayCalendarPage() {
 					<div className="hcal-dropzone-hint">僅接受 .csv 檔</div>
 				</button>
 
-				{parseError && (
+				{(parseError || previewError) && (
 					<div className="hcal-parse-error">
 						<MaterialSymbol name="error" />
-						{parseError}
+						{parseError || (previewError ? errorMessage(previewError) : "")}
 					</div>
 				)}
 
-				{/* 本地解析預覽 */}
-				{preview && (
+				{/* 伺服器預覽 */}
+				{hasFile && (
 					<div className="hcal-preview">
 						<div className="hcal-year-field">
-							<label htmlFor="hcal-year">辨識 / 宣告年份</label>
+							<label htmlFor="hcal-year">匯入年份</label>
 							<select
 								id="hcal-year"
 								className="hcal-year-select"
 								value={declaredYear}
 								onChange={(e) => setDeclaredYear(e.target.value)}
 							>
-								{preview.yearCounts.map((yc) => (
-									<option key={yc.year} value={String(yc.year)}>
-										{yc.year} 年（{yc.count} 列）
+								{years.map((y) => (
+									<option key={y} value={String(y)}>
+										{y} 年
 									</option>
 								))}
 							</select>
 						</div>
 
-						<div className="hcal-preview-grid">
-							<div className="hcal-preview-item">
-								<span className="hcal-preview-label">檔案總解析列數</span>
-								<span className="hcal-preview-value">{preview.totalRows}</span>
-							</div>
-							<div className="hcal-preview-item">
-								<span className="hcal-preview-label">
-									{declaredYear} 年將寫入（天）
-								</span>
-								<span className="hcal-preview-value accent">{writeCount}</span>
-							</div>
-							<div className="hcal-preview-item">
-								<span className="hcal-preview-label">日期範圍</span>
-								<span
-									className="hcal-preview-value"
-									style={{ fontSize: "14px", fontWeight: 500 }}
-								>
-									{dateRange}
-								</span>
-							</div>
-						</div>
+						{previewing && (
+							<output className="hcal-empty">
+								<MaterialSymbol name="progress_activity" />
+								檢查並預覽中...
+							</output>
+						)}
 
-						{holidayRows.length > 0 && (
+						{previewReady && (
 							<>
-								<div className="hcal-sample-title">
-									放假樣本（前 {Math.min(5, holidayRows.length)} 天）
+								<div className="hcal-preview-grid">
+									<div className="hcal-preview-item">
+										<span className="hcal-preview-label">
+											{declaredYear} 年將寫入（天）
+										</span>
+										<span className="hcal-preview-value accent">
+											{writeCount}
+										</span>
+									</div>
+									<div className="hcal-preview-item">
+										<span className="hcal-preview-label">日期範圍</span>
+										<span
+											className="hcal-preview-value"
+											style={{ fontSize: "14px", fontWeight: 500 }}
+										>
+											{dateRange}
+										</span>
+									</div>
 								</div>
-								<div className="hcal-sample-list">
-									{holidayRows.slice(0, 5).map((r) => (
-										<div className="hcal-sample-item" key={r.iso}>
-											<span className="hcal-sample-date">{r.iso}</span>
-											<span>{r.note}</span>
+
+								{holidays.length > 0 && (
+									<>
+										<div className="hcal-sample-title">
+											放假樣本（前 {Math.min(5, holidays.length)} 天）
 										</div>
-									))}
-								</div>
+										<div className="hcal-sample-list">
+											{holidays.slice(0, 5).map((h) => {
+												const iso = h.date ? formatDate(h.date) : "";
+												return (
+													<div className="hcal-sample-item" key={iso}>
+														<span className="hcal-sample-date">{iso}</span>
+														<span>{h.note}</span>
+													</div>
+												);
+											})}
+										</div>
+									</>
+								)}
 							</>
 						)}
 
@@ -281,7 +300,7 @@ export default function HolidayCalendarPage() {
 							<Button
 								variant="primary"
 								onClick={handleRequestImport}
-								disabled={writeCount === 0}
+								disabled={!previewReady || writeCount === 0}
 								icon={<MaterialSymbol name="event_available" />}
 							>
 								匯入 {declaredYear} 年假日
@@ -374,7 +393,7 @@ export default function HolidayCalendarPage() {
 			</div>
 
 			{/* ==================== 二次確認對話框（reuse merchants modal + a11y）==================== */}
-			{showConfirm && preview && (
+			{showConfirm && previewReady && (
 				<Dialog
 					title={
 						<span
