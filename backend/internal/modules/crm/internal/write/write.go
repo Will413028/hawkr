@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -30,6 +31,8 @@ type Buyers interface {
 // Stores 是寫入的店家守門（seller 公開 API）：transaction 內以 FOR KEY SHARE 確認店家尚未退場，已退場與不存在回 NotFound。
 type Stores interface {
 	LockNotRetired(ctx context.Context, storeID int64) error
+	// Store 讀店家此刻的狀態（含停權的推導），給 authorize 在 transaction 內檢查賣家能力。
+	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
 
 // Deps 是寫入路徑的依賴。
@@ -74,7 +77,17 @@ func (s *Service) lockStore(ctx context.Context, storeID int64, notFound func(co
 		}
 		return err
 	}
-	return nil
+	return s.authorize(ctx, storeID)
+}
+
+// authorize 在店家列已鎖住的 transaction 內讀店家此刻的狀態並檢查 RequiredCapability：鎖住之後才讀，所以在檢查與寫入之間提交的停權會被看到
+// （停權的 fail-closed）。已關閉回 NotFound，停權回 PermissionDenied（SELLER_SUSPENDED），其他前置條件沒有滿足回 FailedPrecondition。
+func (s *Service) authorize(ctx context.Context, storeID int64) error {
+	st, err := s.d.Stores.Store(ctx, storeID)
+	if err != nil {
+		return err
+	}
+	return seller.Authorize(st, model.RequiredCapability)
 }
 
 // lockCustomerParties 是客戶層寫入的守門：依序（買家先於店家，鎖序規則 4）取買家與店家列的 FOR KEY SHARE，已停用或不存在對應客戶 NotFound。
@@ -101,29 +114,58 @@ func NormalizeTagName(ctx context.Context, name string) (string, error) {
 	return n, nil
 }
 
-// SetCustomerType 設定店家對買家的分類。分類值不在值域回 InvalidInput；店家沒有這位客戶（0 列）回 NotFound。
-func (s *Service) SetCustomerType(ctx context.Context, storeID, buyerID int64, t model.CustomerType) error {
+// customerOf 組出寫入當下的客戶：列（RETURNING 或同 transaction 的讀取）加上同 transaction 讀到的標籤。
+func customerOf(ctx context.Context, q *store.Queries, storeID, buyerID int64, typ string, spent int64, orders int32, first time.Time) (model.Customer, error) {
+	c := model.Customer{StoreID: storeID, BuyerID: buyerID, Type: model.CustomerType(typ), TotalSpent: spent, OrderCount: orders, FirstOrderAt: first, Tags: []model.Tag{}}
+	tags, err := q.ListCustomerTags(ctx, store.ListCustomerTagsParams{StoreID: storeID, BuyerIds: []int64{buyerID}})
+	if err != nil {
+		return model.Customer{}, err
+	}
+	for _, t := range tags {
+		c.Tags = append(c.Tags, model.Tag{ID: t.ID, Name: t.Name})
+	}
+	return c, nil
+}
+
+// loadCustomer 在 transaction 內讀客戶（寫入之後、提交之前），沒有這位客戶回 NotFound。
+func loadCustomer(ctx context.Context, q *store.Queries, storeID, buyerID int64) (model.Customer, error) {
+	r, err := q.GetCustomer(ctx, store.GetCustomerParams{StoreID: storeID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Customer{}, customerNotFound(ctx)
+	}
+	if err != nil {
+		return model.Customer{}, err
+	}
+	return customerOf(ctx, q, storeID, buyerID, r.CustomerType, r.TotalSpent, r.OrderCount, r.FirstOrderAt)
+}
+
+// SetCustomerType 設定店家對買家的分類，回傳寫入當下的客戶。分類值不在值域回 InvalidInput；店家沒有這位客戶（沒有列）回 NotFound。
+func (s *Service) SetCustomerType(ctx context.Context, storeID, buyerID int64, t model.CustomerType) (model.Customer, error) {
 	if err := checkIDs(storeID, buyerID); err != nil {
-		return err
+		return model.Customer{}, err
 	}
 	if !t.Valid() {
-		return apperr.InvalidInputOn([]string{"CustomerType"}, "%s", text.CrmCustomerTypeInvalid(uitext.LocaleFrom(ctx)))
+		return model.Customer{}, apperr.InvalidInputOn([]string{"CustomerType"}, "%s", text.CrmCustomerTypeInvalid(uitext.LocaleFrom(ctx)))
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	var out model.Customer
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
 			return err
 		}
-		n, err := s.q(ctx).SetCustomerType(ctx, store.SetCustomerTypeParams{
+		q := s.q(ctx)
+		r, err := q.SetCustomerType(ctx, store.SetCustomerTypeParams{
 			CustomerType: string(t), Now: s.d.Now().UTC(), StoreID: storeID, BuyerID: buyerID,
 		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return customerNotFound(ctx)
+		}
 		if err != nil {
 			return err
 		}
-		if n == 0 {
-			return customerNotFound(ctx)
-		}
-		return nil
+		out, err = customerOf(ctx, q, storeID, buyerID, r.CustomerType, r.TotalSpent, r.OrderCount, r.FirstOrderAt)
+		return err
 	})
+	return out, err
 }
 
 // CreateTag 建立標籤。名稱撞同店的標籤回 AlreadyExists；超過每店上限回 FailedPrecondition；店家已退場（守門 LockNotRetired 回 NotFound）回 NotFound（標籤不存在）。
@@ -173,15 +215,16 @@ func (s *Service) checkStoreCap(ctx context.Context, q *store.Queries, storeID i
 	return nil
 }
 
-// RenameTag 改標籤名稱。標籤不存在（或屬於別家店）回 NotFound，撞同店的別個標籤回 AlreadyExists。
-func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) error {
+// RenameTag 改標籤名稱，回傳寫入當下的標籤。標籤不存在（或屬於別家店）回 NotFound，撞同店的別個標籤回 AlreadyExists。
+func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) (model.Tag, error) {
 	if storeID <= 0 {
-		return fmt.Errorf("crm：店家 %d 不是正整數", storeID)
+		return model.Tag{}, fmt.Errorf("crm：店家 %d 不是正整數", storeID)
 	}
 	n, err := NormalizeTagName(ctx, name)
 	if err != nil {
-		return err
+		return model.Tag{}, err
 	}
+	var out model.Tag
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := s.lockStore(ctx, storeID, tagNotFound); err != nil {
@@ -190,21 +233,22 @@ func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID,
 		if err := q.LockStoreTags(ctx, storeID); err != nil {
 			return err
 		}
-		rows, err := q.RenameTag(ctx, store.RenameTagParams{Name: n, Now: s.d.Now().UTC(), StoreID: storeID, ID: tagID})
+		r, err := q.RenameTag(ctx, store.RenameTagParams{Name: n, Now: s.d.Now().UTC(), StoreID: storeID, ID: tagID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return tagNotFound(ctx)
+		}
 		if err != nil {
 			return err
 		}
-		if rows == 0 {
-			return tagNotFound(ctx)
-		}
+		out = model.Tag{ID: r.ID, Name: r.Name}
 		return nil
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "tags_store_name_key" {
 		// 唯一鍵違反使 transaction 失敗，InTx 已 rollback；這裡只翻譯錯誤，不在同一個 transaction 繼續下 SQL。
-		return nameTaken(ctx)
+		return model.Tag{}, nameTaken(ctx)
 	}
-	return err
+	return out, err
 }
 
 // DeleteTag 刪標籤；客戶身上的關聯由 FK cascade 刪除。標籤不存在回 NotFound。
@@ -234,12 +278,12 @@ func (s *Service) DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID)
 // AddCustomerTags 替客戶貼上一批標籤（名稱不存在的先建立）。整批是一個 transaction：任何一步失敗，整批都沒有寫入，並回傳那個錯誤。
 // 客戶不存在回 NotFound；names 為空或超過 MaxTagsPerCall、名稱不合法回 InvalidInput；超過每店或每位客戶的上限回 FailedPrecondition。
 // 已貼過的標籤略過（冪等）。
-func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) error {
+func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) (model.Customer, error) {
 	if err := checkIDs(storeID, buyerID); err != nil {
-		return err
+		return model.Customer{}, err
 	}
 	if len(names) == 0 || len(names) > model.MaxTagsPerCall {
-		return apperr.InvalidInputOn([]string{"Names"}, "%s", text.CrmTagNamesInvalid(uitext.LocaleFrom(ctx), text.CrmTagNamesInvalidArgs{Max: model.MaxTagsPerCall}))
+		return model.Customer{}, apperr.InvalidInputOn([]string{"Names"}, "%s", text.CrmTagNamesInvalid(uitext.LocaleFrom(ctx), text.CrmTagNamesInvalidArgs{Max: model.MaxTagsPerCall}))
 	}
 	uniq := make([]string, 0, len(names))
 	for i, raw := range names {
@@ -247,15 +291,16 @@ func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, n
 		if err != nil {
 			var e *apperr.Error
 			if errors.As(err, &e) {
-				return apperr.InvalidInputOn([]string{apperr.IndexedField("Names", i)}, "%s", e.Message)
+				return model.Customer{}, apperr.InvalidInputOn([]string{apperr.IndexedField("Names", i)}, "%s", e.Message)
 			}
-			return err
+			return model.Customer{}, err
 		}
 		if !slices.Contains(uniq, n) {
 			uniq = append(uniq, n)
 		}
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	var out model.Customer
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		// 先取守門（買家、店家），再鎖客戶列（沒有列 = 不是客戶，在 FK 之前就回 NotFound），再鎖店家的標籤建立；全模組都是這個順序。
 		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
@@ -315,21 +360,32 @@ func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, n
 			}
 			tagIDs = append(tagIDs, id)
 		}
-		_, err = q.InsertCustomerTags(ctx, store.InsertCustomerTagsParams{StoreID: storeID, BuyerID: buyerID, TagIds: tagIDs, Now: now})
+		if _, err = q.InsertCustomerTags(ctx, store.InsertCustomerTagsParams{StoreID: storeID, BuyerID: buyerID, TagIds: tagIDs, Now: now}); err != nil {
+			return err
+		}
+		out, err = loadCustomer(ctx, q, storeID, buyerID)
 		return err
 	})
+	return out, err
 }
 
-// RemoveCustomerTag 移除客戶身上的一個標籤。冪等：沒有這個關聯不是錯誤（移除後的狀態與呼叫者要的一致）。
-func (s *Service) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) error {
+// RemoveCustomerTag 移除客戶身上的一個標籤，回傳移除之後（同 transaction）的客戶。冪等：沒有這個關聯不是錯誤（移除後的狀態與呼叫者要的一致）。
+func (s *Service) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) (model.Customer, error) {
 	if err := checkIDs(storeID, buyerID); err != nil {
-		return err
+		return model.Customer{}, err
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	var out model.Customer
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
 			return err
 		}
-		_, err := s.q(ctx).DeleteCustomerTag(ctx, store.DeleteCustomerTagParams{StoreID: storeID, BuyerID: buyerID, TagID: tagID})
+		q := s.q(ctx)
+		if _, err := q.DeleteCustomerTag(ctx, store.DeleteCustomerTagParams{StoreID: storeID, BuyerID: buyerID, TagID: tagID}); err != nil {
+			return err
+		}
+		var err error
+		out, err = loadCustomer(ctx, q, storeID, buyerID)
 		return err
 	})
+	return out, err
 }

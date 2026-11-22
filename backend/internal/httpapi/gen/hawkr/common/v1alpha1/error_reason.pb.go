@@ -110,6 +110,12 @@ const (
 	// 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
 	// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
 	ErrorReason_RECEIVER_DELETED ErrorReason = 22
+	// 同店已有同名標籤（搭配 already_exists）：標籤名稱在一家店內不能重複。client 顯示 LocalizedMessage，留在輸入框讓店家改名。
+	// CrmAppService.CreateTag、UpdateTag。
+	ErrorReason_CRM_TAG_NAME_TAKEN ErrorReason = 23
+	// 標籤數量已達上限（搭配 failed_precondition）：每家店最多 200 個標籤、每位客戶最多 20 個標籤。client 顯示 LocalizedMessage，不再提供新增入口。
+	// CrmAppService.CreateTag、AddCustomerTags。
+	ErrorReason_CRM_TAG_LIMIT ErrorReason = 24
 )
 
 // Enum value maps for ErrorReason.
@@ -138,6 +144,8 @@ var (
 		20: "STORE_CLOSED",
 		21: "CHAT_BLOCKED",
 		22: "RECEIVER_DELETED",
+		23: "CRM_TAG_NAME_TAKEN",
+		24: "CRM_TAG_LIMIT",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -163,6 +171,8 @@ var (
 		"STORE_CLOSED":               20,
 		"CHAT_BLOCKED":               21,
 		"RECEIVER_DELETED":           22,
+		"CRM_TAG_NAME_TAKEN":         23,
+		"CRM_TAG_LIMIT":              24,
 	}
 )
 
@@ -197,7 +207,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xe3\x04\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x8e\x05\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -222,7 +232,9 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x18SELF_MESSAGE_NOT_ALLOWED\x10\x13\x12\x10\n" +
 	"\fSTORE_CLOSED\x10\x14\x12\x10\n" +
 	"\fCHAT_BLOCKED\x10\x15\x12\x14\n" +
-	"\x10RECEIVER_DELETED\x10\x16B\x82\x02\n" +
+	"\x10RECEIVER_DELETED\x10\x16\x12\x16\n" +
+	"\x12CRM_TAG_NAME_TAKEN\x10\x17\x12\x11\n" +
+	"\rCRM_TAG_LIMIT\x10\x18B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

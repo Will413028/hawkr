@@ -147,6 +147,16 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason RECEIVER_DELETED =
       ErrorReason._(22, _omitEnumNames ? '' : 'RECEIVER_DELETED');
 
+  /// 同店已有同名標籤（搭配 already_exists）：標籤名稱在一家店內不能重複。client 顯示 LocalizedMessage，留在輸入框讓店家改名。
+  /// CrmAppService.CreateTag、UpdateTag。
+  static const ErrorReason CRM_TAG_NAME_TAKEN =
+      ErrorReason._(23, _omitEnumNames ? '' : 'CRM_TAG_NAME_TAKEN');
+
+  /// 標籤數量已達上限（搭配 failed_precondition）：每家店最多 200 個標籤、每位客戶最多 20 個標籤。client 顯示 LocalizedMessage，不再提供新增入口。
+  /// CrmAppService.CreateTag、AddCustomerTags。
+  static const ErrorReason CRM_TAG_LIMIT =
+      ErrorReason._(24, _omitEnumNames ? '' : 'CRM_TAG_LIMIT');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -171,10 +181,12 @@ class ErrorReason extends $pb.ProtobufEnum {
     STORE_CLOSED,
     CHAT_BLOCKED,
     RECEIVER_DELETED,
+    CRM_TAG_NAME_TAKEN,
+    CRM_TAG_LIMIT,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 22);
+      $pb.ProtobufEnum.$_initByValueList(values, 24);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
