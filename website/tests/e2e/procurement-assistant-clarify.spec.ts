@@ -368,7 +368,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-
 		// B-244 Ask 3/5 設計核心：REQUIREMENT_READY 之後 question 仍可非
 		// null——pickNextSlot 可以繼續問選填欄位，同時「開始搜尋候選」CTA
 		// 也已可見，兩者不再互斥。
@@ -538,7 +537,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await page
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
 
 		// 必填已齊備、question 是選填欄位 quantity（無 options，純自由輸入型——
 		// 6 個選填欄位裡的多數屬此類，正是「fieldset gate 只認 options.length」
