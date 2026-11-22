@@ -493,7 +493,7 @@ func TestReadSecure_NotFoundAfterOwnerDeletes(t *testing.T) {
 	f := setup(t)
 	res := uploadSecure(t, f, owner, pdfOf(10))
 	a := confirmSecure(t, f, owner, res.Token)
-	if err := f.m.MarkDeleted(t.Context(), []uuid.UUID{a.ID}); err != nil {
+	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
 	_, err := f.m.ReadSecure(t.Context(), a.ID)
@@ -659,6 +659,7 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	f.store.puts = map[string][]byte{} // 之後任何 Put（含重寫同一個 key）都會留下紀錄
 	n, err := rotated.RewrapDEKs(t.Context())
 	if err != nil || n != 1 {
 		t.Fatalf("RewrapDEKs = %d, %v，預期只更新舊資產 1 筆", n, err)
@@ -691,10 +692,8 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	if _, onlyOld := f.m.ReadSecure(t.Context(), old.ID); onlyOld == nil {
 		t.Fatal("舊 KEK 不該再解得開 k2 包裹的 DEK")
 	}
-	for key := range f.store.puts {
-		if key == oldKey {
-			t.Fatal("RewrapDEKs 寫了儲存")
-		}
+	if len(f.store.puts) != 0 {
+		t.Fatalf("RewrapDEKs 寫了儲存：%d 個 key", len(f.store.puts))
 	}
 }
 
@@ -734,7 +733,7 @@ func TestRewrapAsset_StaleOldKekIDUpdatesNothingAndKeepsTheWrappedDEK(t *testing
 func TestRewrapDEKs_SkipsDeletedAndReportsUnknownKek(t *testing.T) {
 	f := setup(t)
 	deleted := confirmSecure(t, f, owner, uploadSecure(t, f, owner, pdfOf(20)).Token)
-	if err := f.m.MarkDeleted(t.Context(), []uuid.UUID{deleted.ID}); err != nil {
+	if err := markDeletedInTx(f, deleted.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {

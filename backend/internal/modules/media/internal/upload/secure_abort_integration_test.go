@@ -110,12 +110,16 @@ func TestAbortSecure_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T
 type hookStore struct {
 	*storage.Fake
 	afterPut    func()
+	onPut       func()
 	putErr      error
 	deleteCalls int
 	deleteHasDL bool
 }
 
 func (h *hookStore) Put(ctx context.Context, in storage.PutInput) error {
+	if h.onPut != nil {
+		h.onPut()
+	}
 	if h.putErr != nil {
 		return h.putErr
 	}
@@ -142,7 +146,7 @@ func TestUploadSecure_AbortDeleteRunsWithADeadlineEvenWhenTheRequestIsCancelled(
 		return hs
 	})
 	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+	hs.onPut = cancel // 暫存列建好之後、Put 時 request 才被取消
 	if _, err := svc.UploadSecure(ctx, model.Uploader{ID: 1001}, bytes.NewReader([]byte("%PDF-1.7\nhello"))); err == nil {
 		t.Fatal("預期 Put 失敗的錯誤")
 	}
