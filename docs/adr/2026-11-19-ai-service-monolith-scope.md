@@ -48,7 +48,11 @@ ai-service 有 59 支 RPC、40 張表、約 37k 行，其中採購約 24k 行；
 | E3 | 每個採購 run 一個 River job（同交易插入、MaxAttempts 1）；狀態只經單一守衛轉換函式，終態吸收；reconciler 依 job 狀態收斂（job 消失→失敗退額度）（A9-D22） | 自寫 sweeper 依 QUEUED 10 分、RUNNING 5 分逾時判定（A9-D21 原案）：逾時是猜測存活，和 executor 形成兩個不協調的終態寫入者；River 已記錄 job 的真實狀態，並由 rescuer 處理卡住的 job（[River maintenance services](https://riverqueue.com/docs/maintenance-services)），與業務列同交易排入（[transactional enqueueing](https://riverqueue.com/docs/transactional-enqueueing)） |
 | E4 | 只有 TURN 扣額度；不搬 LLM narrator 與 realizer，使用者面文字走模板與 ui-text；每買家 2 個進行中、每分鐘 10 次、同需求 1 個進行中（A9-D24） | 每種 run 都扣：候選搜尋與回答提問是同一輪的延續，扣兩次等於懲罰回答；搬 narrator：多一次 LLM 呼叫只為改寫文字，且違反「只由契約值決定的文字放共用文案目錄」 |
 | E5 | 中斷「回答成功才解決」：提問的 run 停在 WAITING_FOR_INPUT；回答開普通 run 指向中斷；回答 run 成功（或自己再提問）的同一交易內，中斷轉 RESOLVED、提問 run 轉 SUCCEEDED；回答失敗或取消不做任何還原。取代 A9-D24(7) 的「子 run 失敗時重新開放」（A9-D26） | 回答時就解決、失敗再重開（3b-2b 初版）：要讓已結束的 run 破例改回等待，違反終態吸收，且取消路徑另需規則；同一個 run 內接續（OpenAI Assistants `requires_action`）：牴觸 E3 的每 run 一個 job。業界基準是 LangGraph 的 interrupt／resume（[docs](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/)）：checkpoint 只在 resume 成功時前進 |
+| E6 | 品項消歧以一層為主：一張卡列最多 5 個末層品項並標上所屬大類路徑，加「其他，自行描述」，買家可打字以新字詞重新解析（仍經 resolver）；命中超過 5 個且跨大類時才先問大類。進行中的選擇只放中斷 payload，確認後 revision 存分類 ID（`item_resolution_category_id`，買家自述時為 NULL）。取代 A9-D25(3) 的固定兩層（A9-D28） | 固定兩層（大類→品項）：只命中一個大類時多問一步，選錯大類要退回；電商賣家後台的建議分類直接列末層加路徑，舊實作的 `facetAsksAtGroup` 也只在必要時問大類；只存名稱：名稱不是識別碼，候選搜尋與詢價無法以分類對應 |
+| E7 | 模型沒有給出可用答案時 run 失敗並退額度，不降級；呼叫內最多重試一次（逾時、429、5xx、格式錯誤，總預算 70 秒，低於 job 的 2 分）；空抽取是成功；新增失敗原因 `MODEL_UNAVAILABLE`（可稍後重送），其餘為 `TURN_PIPELINE_ERROR`；刪除 degraded 相關欄位（A9-D28） | 降級成功（舊實作）：每輪扣額度，降級等於收費卻沒有新資訊；不重試：一次短暫 429 就失敗；只用一個原因碼：`RunFinished.localized_message` 刪除後 client 只能依原因碼選文字 |
+| E8 | 對話自動標題由欄位組成（`品項｜縣市`，40 rune），`title_source='AUTO'` 時每輪更新，買家改名後不覆寫；品項未知時留空，由 client 經 ui-text 顯示預設字樣（A9-D28） | LLM 生成標題：每輪多一次呼叫的成本、延遲與失敗路徑，結果不可預測；第一則訊息截斷：常是寒暄且帶買家原文 |
+| E9 | 需求在 MATCHING 時，新 revision 改到影響候選搜尋的欄位（集合常數，3b-2c 先列品項 resolution、數量、單位、縣市、交期，3b-2d 依搜尋輸入修正同一常數）就退回 REQUIREMENT_READY、舊候選集過期；否則維持 MATCHING（A9-D28） | 齊全就維持 MATCHING：候選集指向舊需求；任何修改都退回：不影響搜尋的修改也要重找 |
 
-取捨：E1、E2 用進程記憶體換掉資料表，代價是多進程部署時要重做（觸發：單體改多副本）；E3 把存活判斷交給 River，代價是依賴它的 job 保留與 rescue 行為；E5 讓「處理中」要由「中斷 PENDING＋有進行中回答 run」推導，不是一個欄位。
+取捨：E1、E2 用進程記憶體換掉資料表，代價是多進程部署時要重做（觸發：單體改多副本）；E3 把存活判斷交給 River，代價是依賴它的 job 保留與 rescue 行為；E6 的門檻 5 依對話設計慣例訂、未經資料驗證（觸發：上線前召回 eval 的選錯率）；E5 讓「處理中」要由「中斷 PENDING＋有進行中回答 run」推導，不是一個欄位。
 
 撤銷條件：單體改成多副本（E1、E2 的記憶體狀態要改成共享儲存）；採購流程改成需要分支與回溯的多步驟 agent（D5 修訂要重評 ADK 圖）。
