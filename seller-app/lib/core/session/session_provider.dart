@@ -6,7 +6,8 @@ import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_auth/restore_scheduler.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../features/chat/data/chat_repository.dart';
+import '../../features/chat/data/chat_session.dart';
+import '../../features/order/data/order_status_notifier.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/notification/data/push/manager.dart';
 import 'store_refresh_signal.dart';
@@ -78,7 +79,6 @@ class Session extends _$Session {
 
       _applyRestriction(account.restriction);
       state = session;
-      _syncToStaticServices();
       await ref.read(postLoginSideEffectsProvider).onSessionRestored();
 
       HKLog.logD('[SessionNotifier] Session restored from GetSession');
@@ -107,7 +107,6 @@ class Session extends _$Session {
         if (!ref.mounted || !_restore.isCurrent(generation)) return;
         _applyRestriction(account.restriction);
         state = SessionModel(accountId: account.accountId, isLoggedIn: true);
-        _syncToStaticServices();
         await ref.read(postLoginSideEffectsProvider).onSessionRestored();
       },
       isDenied: (error) => error is AuthRequestException && !error.isTransient,
@@ -138,7 +137,6 @@ class Session extends _$Session {
     final session = SessionModel(accountId: accountId, isLoggedIn: true);
 
     state = session;
-    _syncToStaticServices();
     ref.read(postLoginSideEffectsProvider).onLogin();
 
     HKLog.logD('[SessionNotifier] Logged in: accountId=$accountId');
@@ -222,11 +220,10 @@ class Session extends _$Session {
       state = const SessionModel();
       ref.read(accountRestrictionStateProvider.notifier).clear();
 
-      // 停止 polling
-      ref.read(chatRepositoryProvider).stopPolling();
+      // 停止聊天串流與訂單輪詢
+      ref.read(chatSessionProvider).stop();
+      OrderStatusNotifier.instance.stopListening();
       await AuthStorage.logout();
-      // 同步非敏感識別狀態；token 由中央 dioProvider 即時讀 session，不做 static fan-out。
-      _syncToStaticServices();
 
       HKLog.logD('[SessionNotifier] Logged out');
     } finally {
@@ -251,13 +248,6 @@ class Session extends _$Session {
     } catch (e) {
       HKLog.logW('[SessionNotifier] sign-out failed: $e');
     }
-  }
-
-  /// 同步不含 secret 的 legacy singleton 狀態。
-  void _syncToStaticServices() {
-    // Gateway auth 由 dioProvider 即時讀 sessionProvider；這裡只保留需要的
-    // non-secret identity，以及 chat legacy singleton 的中央 Dio dependency。
-    ref.read(chatRepositoryProvider).useHttpClient(ref.read(dioProvider));
   }
 }
 

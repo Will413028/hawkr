@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -356,7 +357,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
               TextButton(
                 key: const ValueKey('seller-product-reviews-retry'),
                 onPressed: _loadReviews,
-                child: const Text('重新載入'),
+                child: const HkButtonLabel('重新載入'),
               ),
             ],
           ),
@@ -393,7 +394,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             return TextButton(
               key: const ValueKey('seller-product-reviews-load-more'),
               onPressed: _loadingMore ? null : _loadMore,
-              child: const Text('載入更多'),
+              child: const HkButtonLabel('載入更多'),
             );
           }
           return Align(

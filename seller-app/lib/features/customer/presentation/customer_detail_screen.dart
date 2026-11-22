@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
@@ -239,7 +240,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
                       ),
                       TextButton(
                         onPressed: loadDetail,
-                        child: const Text('重試'),
+                        child: const HkButtonLabel('重試'),
                       ),
                     ],
                   ),
