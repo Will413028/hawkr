@@ -59,6 +59,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       # Go 版本以 .go-version 為準（go-base image 也吃它），不用某個 module 的 go.mod。
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version

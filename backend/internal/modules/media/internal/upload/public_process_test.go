@@ -6,6 +6,9 @@ import (
 	"crypto/md5" //nolint:gosec // 測試用的 Content-MD5
 	"encoding/base64"
 	"errors"
+	stdimage "image"
+	"image/color"
+	"image/gif"
 	"io"
 	"testing"
 
@@ -14,7 +17,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/upload"
 )
 
-var tinyGIF = []byte("GIF89a\x01\x00\x01\x00\x00\x00\x00;")
+// tinyGIF 是 1x1、不透明的單格 GIF。
+var tinyGIF = func() []byte {
+	var b bytes.Buffer
+	img := stdimage.NewPaletted(stdimage.Rect(0, 0, 1, 1), color.Palette{color.Black, color.White})
+	if err := gif.Encode(&b, img, nil); err != nil {
+		panic(err)
+	}
+	return b.Bytes()
+}()
 
 func md5b64(b []byte) string {
 	s := md5.Sum(b) //nolint:gosec // 同上
@@ -43,7 +54,7 @@ func wantPermanent(t *testing.T, err error, reason model.RejectReason) {
 	}
 }
 
-func TestPublicProcess_WritesStrippedObjectWithRealTypeAndSize(t *testing.T) {
+func TestPublicProcess_WritesReencodedObjectWithRealTypeAndSize(t *testing.T) {
 	s := storage.NewFake()
 	putTmp(t, s, tinyGIF)
 	in := input(tinyGIF)
@@ -53,7 +64,7 @@ func TestPublicProcess_WritesStrippedObjectWithRealTypeAndSize(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := s.Head(context.Background(), "public/b")
-	if err != nil || res.ContentType != "image/gif" || info.ContentType != "image/gif" || res.SizeBytes != info.Size {
+	if err != nil || res.ContentType != "image/jpeg" || info.ContentType != "image/jpeg" || res.SizeBytes != info.Size {
 		t.Fatalf("res=%+v info=%+v err=%v", res, info, err)
 	}
 }

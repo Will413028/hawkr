@@ -1,13 +1,58 @@
 {
  "mutants": [
   {
-   "id": "no-format-detection-before-strip",
+   "id": "no-format-allowlist",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "\tf, err := Detect(d)\n\tif err != nil {\n\t\treturn nil, \"\", err\n\t}\n",
+   "old": "\tf, err := Detect(d)\n\tif err != nil {\n\t\treturn Result{}, err\n\t}\n",
    "new": "\tf, _ := Detect(d)\n\tvar err error\n",
    "test": "internal/modules/media/internal/image ^TestFakeImageIsRejected$",
-   "why": "Strip no longer fails on an unrecognised payload, so a fake image is not rejected before stripping"
+   "why": "an unrecognised payload is no longer rejected by the magic-byte allowlist before decoding"
+  },
+  {
+   "id": "no-pixel-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if frame > lim.FramePixels {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestPixelCapIsRejectedFromTheHeader$",
+   "why": "a header declaring more than the pixel cap is not rejected before decoding"
+  },
+  {
+   "id": "no-animated-pixel-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if pages > 1 && frame*int64(pages) > lim.AnimatedPixels {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestAnimatedFramePixelCapIsRejected$",
+   "why": "an animation whose frames x pixels exceeds the cap is accepted"
+  },
+  {
+   "id": "jpeg-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepNone}",
+   "new": "JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepAll}",
+   "test": "internal/modules/media/internal/image ^TestSanitizeStripsAllMetadataAndAppliesOrientation$",
+   "why": "re-encoded JPEG keeps EXIF, GPS and ICC metadata"
+  },
+  {
+   "id": "no-autorotate",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if err := img.Autorot(nil); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/media/internal/image ^TestSanitizeStripsAllMetadataAndAppliesOrientation$",
+   "why": "pixels are not rotated by EXIF orientation although the orientation tag is dropped"
+  },
+  {
+   "id": "no-icc-transform",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if img.HasICCProfile() {\n\t\tif err := img.IccTransform",
+   "new": "if false && img.HasICCProfile() {\n\t\tif err := img.IccTransform",
+   "test": "internal/modules/media/internal/image ^TestSanitizeConvertsWideGamutToSRGB$",
+   "why": "a wide-gamut image keeps its raw P3 pixel values while the profile is dropped"
   },
   {
    "id": "process-skips-md5-check",
@@ -31,46 +76,10 @@
    "id": "process-writes-original-bytes",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/public_process.go",
-   "old": "Body: bytes.NewReader(out), Size: int64(len(out)),",
+   "old": "Body: bytes.NewReader(res.Data), Size: int64(len(res.Data)),",
    "new": "Body: bytes.NewReader(data), Size: int64(len(data)),",
-   "test": "internal/modules/media ^TestPublicProcess_StripsGPSKeepsOrientationAndCanBeConfirmed$",
+   "test": "internal/modules/media ^TestPublicProcess_StripsGPSAppliesOrientationAndCanBeConfirmed$",
    "why": "public/ receives the original bytes, so GPS metadata is published"
-  },
-  {
-   "id": "jpeg-drops-orientation",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/jpeg.go",
-   "old": "orientation = orientationOfTIFF(d, p+6, n-6)",
-   "new": "_ = orientationOfTIFF(d, p+6, n-6)",
-   "test": "internal/modules/media/internal/image ^TestJPEGKeepsOnlyOrientation$",
-   "why": "the JPEG orientation is no longer carried into the minimal EXIF segment"
-  },
-  {
-   "id": "jpeg-keeps-unknown-app-segments",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/jpeg.go",
-   "old": "default:\n\t\t\t\tkeep = false",
-   "new": "default:\n\t\t\t\tkeep = true",
-   "test": "internal/modules/media/internal/image ^TestJPEGIsStrippedLosslessly$",
-   "why": "unknown APPn segments (XMP, IPTC) are kept instead of dropped"
-  },
-  {
-   "id": "jpeg-keeps-unknown-length-markers",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/jpeg.go",
-   "old": "\tcase m >= 0xC0 && m <= 0xCF:\n\t\treturn m != 0xC8\n",
-   "new": "\tcase m >= 0xC0 && m <= 0xCF:\n\t\treturn true\n\tcase m == 0xF0:\n\t\treturn true\n",
-   "test": "internal/modules/media/internal/image ^TestJPEGDropsUnknownLengthMarkers$",
-   "why": "JPG (0xC8) and JPGn (0xF0) markers pass through the whitelist with their payload"
-  },
-  {
-   "id": "jpeg-keeps-reserved-markers",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/jpeg.go",
-   "old": "\tcase m == 0xDA, m == 0xDB, m == 0xDC, m == 0xDD, m == 0xDF:\n\t\treturn true\n\t}\n\treturn false",
-   "new": "\tcase m == 0xDA, m == 0xDB, m == 0xDC, m == 0xDD, m == 0xDF:\n\t\treturn true\n\t}\n\treturn m != 0xFE",
-   "test": "internal/modules/media/internal/image ^TestJPEGDropsUnknownLengthMarkers$",
-   "why": "any marker other than COM is allowed, so reserved 0x02-0xBF and JPGn segments are published"
   },
   {
    "id": "upload-size-cap-removed",
@@ -89,51 +98,6 @@
    "new": "if false && in.Size > model.MaxUploadSize(in.Visibility) {",
    "test": "internal/modules/media/internal/upload ^TestValidateRejectsSizeAboveModuleLimit$",
    "why": "BeginUpload accepts a declared size above the module limit"
-  },
-  {
-   "id": "webp-keeps-anmf-whole",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/webp.go",
-   "old": "c, err := rebuildANMF(d, int(dataStart), int(length))\n\t\t\tif err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n",
-   "new": "c := append([]byte(nil), d[i:end]...)\n\t\t\t_, _ = rebuildANMF(d, int(dataStart), int(length))\n",
-   "test": "internal/modules/media/internal/image ^TestWebPAnimationFrameKeepsOnlyImageSubchunks$",
-   "why": "animation frames are copied whole, carrying non-image sub-chunks such as XMP and EXIF"
-  },
-  {
-   "id": "jfif-keeps-thumbnail",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/jpeg.go",
-   "old": "rewritten = append(rewritten, 0, 0)",
-   "new": "rewritten = append(rewritten, 0, 0)\n\t\t\t\t\trewritten = append(rewritten[:0:0], d[i:end]...)",
-   "test": "internal/modules/media/internal/image ^TestJPEGJFIFThumbnailIsDropped$",
-   "why": "the JFIF segment is kept as is, including the embedded thumbnail"
-  },
-  {
-   "id": "gif-keeps-all-loop-subblocks",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/gif.go",
-   "old": "out.Write([]byte{0x03, 0x01, d[i+16], d[i+17], 0x00})",
-   "new": "out.Write([]byte{0x03, 0x01, d[i+16], d[i+17]})\n\t\t\t\tout.Write(d[i+18 : end])",
-   "test": "internal/modules/media/internal/image ^TestGIFExtensionsAreCanonicalised$",
-   "why": "extra sub-blocks after the animation loop count are published"
-  },
-  {
-   "id": "gif-drops-plain-text",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/gif.go",
-   "old": "case 0x01: // plain text：顯示的文字內容，不是 metadata，整段保留\n\t\t\t\tout.Write(d[start:end])",
-   "new": "case 0x01:\n\t\t\t\t_ = start",
-   "test": "internal/modules/media/internal/image ^TestGIFKeepsPlainTextExtension$",
-   "why": "the Plain Text Extension, which is rendered content, is dropped"
-  },
-  {
-   "id": "webp-simple-drops-orientation",
-   "stack": "go",
-   "file": "backend/internal/modules/media/internal/image/webp.go",
-   "old": "if !hasVP8X && orientation > 1 {",
-   "new": "if false && !hasVP8X && orientation > 1 {",
-   "test": "internal/modules/media/internal/image ^TestSimpleWebPKeepsOrientationViaSynthesizedVP8X$",
-   "why": "a simple WebP with EXIF orientation loses it"
   }
  ]
 }

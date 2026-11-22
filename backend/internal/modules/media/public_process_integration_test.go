@@ -32,7 +32,7 @@ func realModule(f *fixture) {
 func jpegWithGPS(t *testing.T) []byte {
 	t.Helper()
 	var plain bytes.Buffer
-	if err := jpeg.Encode(&plain, stdimage.NewRGBA(stdimage.Rect(0, 0, 8, 8)), nil); err != nil {
+	if err := jpeg.Encode(&plain, stdimage.NewRGBA(stdimage.Rect(0, 0, 8, 4)), nil); err != nil {
 		t.Fatal(err)
 	}
 	marker := append([]byte(geoMarker), 0)
@@ -115,7 +115,7 @@ func TestPublicProcess_MD5MismatchIsRejectedAndCannotBeConfirmed(t *testing.T) {
 	wantRejected(t, f, res, media.RejectChecksumMismatch)
 }
 
-func TestPublicProcess_StripsGPSKeepsOrientationAndCanBeConfirmed(t *testing.T) {
+func TestPublicProcess_StripsGPSAppliesOrientationAndCanBeConfirmed(t *testing.T) {
 	f := setup(t)
 	realModule(f)
 	img := jpegWithGPS(t)
@@ -139,19 +139,15 @@ func TestPublicProcess_StripsGPSKeepsOrientationAndCanBeConfirmed(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Contains(out, []byte(geoMarker)) || bytes.Contains(out, []byte("GPS")) {
-		t.Fatal("public/ 的物件仍含 GPS")
+	if bytes.Contains(out, []byte(geoMarker)) || bytes.Contains(out, []byte("GPS")) || bytes.Contains(out, []byte("Exif")) {
+		t.Fatal("public/ 的物件仍含 GPS 或 EXIF")
 	}
-	at := bytes.Index(out, []byte("Exif\x00\x00"))
-	if at < 0 || bytes.Count(out, []byte("Exif\x00\x00")) != 1 {
-		t.Fatal("方向 6 要保留成一個最小 EXIF")
-	}
-	// 最小 TIFF：Orientation 值在 TIFF 位移 19。
-	if out[at+6+19] != 6 {
-		t.Fatalf("方向 = %d，預期 6", out[at+6+19])
-	}
-	if _, err := jpeg.Decode(bytes.NewReader(out)); err != nil {
+	dec, err := jpeg.Decode(bytes.NewReader(out))
+	if err != nil {
 		t.Fatalf("輸出不可解碼：%v", err)
+	}
+	if b := dec.Bounds(); b.Dx() != 4 || b.Dy() != 8 {
+		t.Fatalf("輸出尺寸 %dx%d，預期方向 6 旋正後的 4x8", b.Dx(), b.Dy())
 	}
 	var size int64
 	var ct string

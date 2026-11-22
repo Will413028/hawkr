@@ -33,6 +33,14 @@ const (
 	MaxSecureUploadSize int64 = 100 << 20
 )
 
+// 公開圖片解碼前的像素上限，整個模組只有這一處定義；處理 job 讀標頭後先比對，超過就拒絕、不解碼。
+// MaxImagePixels 是單一影格的像素數（4000 萬，約 7000x5700）；MaxAnimatedPixels 是動態圖「影格數 x 每格像素」的總量（5000 萬）。
+// 理由見 CARRYOVER.md 的上限一列。
+const (
+	MaxImagePixels    int64 = 40_000_000
+	MaxAnimatedPixels int64 = 50_000_000
+)
+
 // MaxUploadSize 回傳 v 可見性的單次上傳大小上限；未知的可見性回 0。
 func MaxUploadSize(v Visibility) int64 {
 	switch v {

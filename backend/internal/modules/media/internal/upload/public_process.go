@@ -28,8 +28,8 @@ func NewProcessor(store storage.Store, secure ProcessFunc) ProcessFunc {
 	}
 }
 
-// PublicProcess 讀 tmp 物件，驗實際大小與 MD5 等於宣告，辨認格式、剝除 metadata，寫到 in.FinalKey。
-// 大小、MD5 不符與辨認不出（含結構壞掉）是永久失敗；儲存錯誤原樣回傳，由 River 重試。
+// PublicProcess 讀 tmp 物件，驗實際大小與 MD5 等於宣告，辨認格式、重新編碼（去 metadata、轉 sRGB、套用方向），寫到 in.FinalKey。
+// 大小、MD5 不符與辨認不出（含無法解碼、超過像素上限）是永久失敗；儲存錯誤原樣回傳，由 River 重試。
 // 宣告大小超過 model.MaxPublicUploadSize 的直接拒絕；記憶體以宣告大小為上限：多讀一個位元組就能判斷「比宣告大」，不必把任意大的物件讀完。
 func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (ProcessResult, error) {
 	if in.DeclaredSize > model.MaxPublicUploadSize {
@@ -61,16 +61,16 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 	if subtle.ConstantTimeCompare(sum[:], want) != 1 {
 		return ProcessResult{}, model.Permanent(model.RejectChecksumMismatch, errors.New("MD5 與宣告不符"))
 	}
-	out, format, err := image.Strip(data)
+	res, err := image.Sanitize(data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels})
 	if err != nil {
-		if errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) {
+		if errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge) {
 			return ProcessResult{}, model.Permanent(model.RejectUnrecognizedFormat, err)
 		}
 		return ProcessResult{}, err
 	}
-	ct := format.ContentType()
-	if err := store.Put(ctx, storage.PutInput{Key: in.FinalKey, Body: bytes.NewReader(out), Size: int64(len(out)), ContentType: ct}); err != nil {
+	ct := res.Format.ContentType()
+	if err := store.Put(ctx, storage.PutInput{Key: in.FinalKey, Body: bytes.NewReader(res.Data), Size: int64(len(res.Data)), ContentType: ct}); err != nil {
 		return ProcessResult{}, err
 	}
-	return ProcessResult{SizeBytes: int64(len(out)), ContentType: ct}, nil
+	return ProcessResult{SizeBytes: int64(len(res.Data)), ContentType: ct}, nil
 }

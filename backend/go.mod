@@ -6,6 +6,7 @@ require (
 	connectrpc.com/connect v1.21.1
 	github.com/aws/aws-sdk-go-v2 v1.47.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.9
+	github.com/cshum/vipsgen v1.3.11
 	github.com/go-jet/jet/v2 v2.16.1
 	github.com/go-jose/go-jose/v4 v4.1.8
 	github.com/jackc/pgx/v5 v5.12.0

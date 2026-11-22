@@ -6,7 +6,9 @@
 
 ```bash
 # macOS
-brew install postgresql atlas helm kubectl sqlc
+brew install postgresql atlas helm kubectl sqlc vips
+# 單體的 media 模組以 cgo 連 libvips；Ubuntu 是 apt-get install libvips-dev。
+# macOS 的 libarchive 是 keg-only，pkg-config 找不到時：export PKG_CONFIG_PATH="$(brew --prefix libarchive)/lib/pkgconfig"
 
 # 安裝 k3s（Linux VM，需 root）
 cd k8s && bash scripts/install-k3s-master.sh

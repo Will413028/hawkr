@@ -122,6 +122,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        if: matrix.kind == 'go'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.kind == 'go'
         with:
