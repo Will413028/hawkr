@@ -81,13 +81,7 @@ test("formatTaipeiDateTime 只是加後綴，值與 formatDateTime 一致", () =
  *     —— 那是「你剛才重新整理的時刻」，本機時間才是對的
  * 新增豁免必須在這裡登記並附理由；沒有理由的一律修成走 lib/format。
  */
-const TZ_RATCHET_EXEMPT = new Set([
-	"src/app/admin/page.tsx",
-	// `new Date(y, mo-1, d)` 建構後用同一組 local getter 反查，確認 2026/13/40 這類
-	// 非法值沒有被 Date 進位吃掉。建構與讀取在同一個時區系統內，**輸出與時區無關**
-	// ——它根本不產生給人看的時間字串。
-	"src/app/admin/holiday-calendar/page.tsx",
-]);
+const TZ_RATCHET_EXEMPT = new Set(["src/app/admin/page.tsx"]);
 
 test("ADM 不得自己組時間字串（一律走 lib/format 的台北釘死版）", async () => {
 	const roots = ["src/app", "src/features", "src/components", "src/lib"];
