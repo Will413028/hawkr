@@ -72,6 +72,21 @@ jobs:
         run: |
           flutter pub get
           dart run tool/check_enum_text.dart "../../${APP}/lib"
+      - name: Guard hardcoded Han literals (ratchet)
+        id: han_ratchet
+        continue-on-error: true
+        working-directory: packages/hawkr_ui_text
+        env:
+          APP: ${{ inputs.app }}
+        run: |
+          flutter pub get
+          dart run tool/check_hardcoded_han.dart --baseline "../../${APP}/tool/han_baseline.json" "../../${APP}/lib"
+      - name: Verify gen-l10n output is committed
+        id: gen_l10n
+        continue-on-error: true
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n
       - name: Upload dead-code report
         if: always()
         continue-on-error: true
@@ -88,13 +103,17 @@ jobs:
           steps.analyze.outcome == 'failure' ||
           steps.custom_lint.outcome == 'failure' ||
           steps.hygiene.outcome == 'failure' ||
-          steps.enum_text.outcome == 'failure'
+          steps.enum_text.outcome == 'failure' ||
+          steps.han_ratchet.outcome == 'failure' ||
+          steps.gen_l10n.outcome == 'failure'
         env:
           FORMAT: ${{ steps.format.outcome }}
           ANALYZE: ${{ steps.analyze.outcome }}
           CUSTOM_LINT: ${{ steps.custom_lint.outcome }}
           HYGIENE: ${{ steps.hygiene.outcome }}
           ENUM_TEXT: ${{ steps.enum_text.outcome }}
+          HAN_RATCHET: ${{ steps.han_ratchet.outcome }}
+          GEN_L10N: ${{ steps.gen_l10n.outcome }}
         run: |
           echo "One or more static checks failed:"
           echo "  format:      $FORMAT"
@@ -102,6 +121,8 @@ jobs:
           echo "  custom_lint: $CUSTOM_LINT"
           echo "  hygiene:     $HYGIENE"
           echo "  enum_text:   $ENUM_TEXT"
+          echo "  han_ratchet: $HAN_RATCHET"
+          echo "  gen_l10n:    $GEN_L10N"
           exit 1
 
   tests:
