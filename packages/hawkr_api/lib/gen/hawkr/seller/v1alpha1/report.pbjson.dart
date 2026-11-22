@@ -132,11 +132,12 @@ const CreateReportRequest$json = {
 
 /// Descriptor for `CreateReportRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createReportRequestDescriptor = $convert.base64Decode(
-    'ChNDcmVhdGVSZXBvcnRSZXF1ZXN0Eh4KCHN0b3JlX2lkGAEgASgJQgPgQQJSB3N0b3JlSWQSRg'
+    'ChNDcmVhdGVSZXBvcnRSZXF1ZXN0Eh4KCHN0b3JlX2lkGAEgASgJQgPgQQJSB3N0b3JlSWQSVg'
     'oIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlC'
-    'A+BBAlIIY2F0ZWdvcnkSJQoLZGVzY3JpcHRpb24YAyABKAlCA+BBAlILZGVzY3JpcHRpb24SHQ'
-    'oKcHJvZHVjdF9pZBgEIAEoCVIJcHJvZHVjdElkEhkKCG9yZGVyX25vGAUgASgJUgdvcmRlck5v'
-    'EjQKFmV2aWRlbmNlX3N0YWdlZF90b2tlbnMYBiADKAlSFGV2aWRlbmNlU3RhZ2VkVG9rZW5z');
+    'E+BBAoq1GAwBAgMEBQYHCAkKCw1SCGNhdGVnb3J5EiUKC2Rlc2NyaXB0aW9uGAMgASgJQgPgQQ'
+    'JSC2Rlc2NyaXB0aW9uEh0KCnByb2R1Y3RfaWQYBCABKAlSCXByb2R1Y3RJZBIZCghvcmRlcl9u'
+    'bxgFIAEoCVIHb3JkZXJObxI0ChZldmlkZW5jZV9zdGFnZWRfdG9rZW5zGAYgAygJUhRldmlkZW'
+    '5jZVN0YWdlZFRva2Vucw==');
 
 @$core.Deprecated('Use createReportResponseDescriptor instead')
 const CreateReportResponse$json = {
@@ -217,6 +218,22 @@ const GetMyReportResponse$json = {
       '6': '.hawkr.seller.v1alpha1.ReportEvidence',
       '10': 'evidence'
     },
+    {
+      '1': 'can_supplement',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'canSupplement'
+    },
+    {
+      '1': 'supplement_max',
+      '3': 5,
+      '4': 1,
+      '5': 5,
+      '8': {},
+      '10': 'supplementMax'
+    },
   ],
 };
 
@@ -226,7 +243,8 @@ final $typed_data.Uint8List getMyReportResponseDescriptor = $convert.base64Decod
     'FscGhhMS5TdG9yZVJlcG9ydFIGcmVwb3J0EkkKC3N1cHBsZW1lbnRzGAIgAygLMicuaGF3a3Iu'
     'c2VsbGVyLnYxYWxwaGExLlJlcG9ydFN1cHBsZW1lbnRSC3N1cHBsZW1lbnRzEkEKCGV2aWRlbm'
     'NlGAMgAygLMiUuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcG9ydEV2aWRlbmNlUghldmlkZW5j'
-    'ZQ==');
+    'ZRIqCg5jYW5fc3VwcGxlbWVudBgEIAEoCEID4EEDUg1jYW5TdXBwbGVtZW50EioKDnN1cHBsZW'
+    '1lbnRfbWF4GAUgASgFQgPgQQNSDXN1cHBsZW1lbnRNYXg=');
 
 @$core.Deprecated('Use reportSupplementDescriptor instead')
 const ReportSupplement$json = {
@@ -322,6 +340,22 @@ const AddReportSupplementResponse$json = {
       '6': '.hawkr.seller.v1alpha1.ReportEvidence',
       '10': 'evidence'
     },
+    {
+      '1': 'can_supplement',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'canSupplement'
+    },
+    {
+      '1': 'supplement_max',
+      '3': 5,
+      '4': 1,
+      '5': 5,
+      '8': {},
+      '10': 'supplementMax'
+    },
   ],
 };
 
@@ -331,7 +365,8 @@ final $typed_data.Uint8List addReportSupplementResponseDescriptor = $convert.bas
     'VsbGVyLnYxYWxwaGExLlN0b3JlUmVwb3J0UgZyZXBvcnQSSQoLc3VwcGxlbWVudHMYAiADKAsy'
     'Jy5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVwb3J0U3VwcGxlbWVudFILc3VwcGxlbWVudHMSQQ'
     'oIZXZpZGVuY2UYAyADKAsyJS5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVwb3J0RXZpZGVuY2VS'
-    'CGV2aWRlbmNl');
+    'CGV2aWRlbmNlEioKDmNhbl9zdXBwbGVtZW50GAQgASgIQgPgQQNSDWNhblN1cHBsZW1lbnQSKg'
+    'oOc3VwcGxlbWVudF9tYXgYBSABKAVCA+BBA1INc3VwcGxlbWVudE1heA==');
 
 const $core.Map<$core.String, $core.dynamic> SellerReportAppServiceBase$json = {
   '1': 'SellerReportAppService',

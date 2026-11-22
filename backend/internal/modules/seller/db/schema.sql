@@ -230,7 +230,7 @@ CREATE TABLE seller.reports (
     version               BIGINT NOT NULL DEFAULT 1,
     created_at            TIMESTAMPTZ NOT NULL,
     updated_at            TIMESTAMPTZ NOT NULL,
-    -- 政策分類（platform/policy）中檢舉人可以選的值：全部除了 PLATFORM_ABUSE。
+    -- 政策分類（platform/policy）中店家檢舉人可以選的值（ReporterSelectable，由 CreateReportRequest.category 的 accepted_policy_categories 生成）：不含 PLATFORM_ABUSE 與社群類別。
     CONSTRAINT reports_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
         'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'OTHER'

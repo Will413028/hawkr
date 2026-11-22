@@ -14,6 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -26,6 +27,8 @@ type fixture struct {
 	db    *db.DB
 	store *bizcalendar.Store
 	audit *adminaudit.Log
+	bus   *events.Bus
+	seen  *[]bizcalendar.CalendarImported
 }
 
 func setup(t *testing.T) *fixture {
@@ -35,7 +38,13 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: bizcalendar.Schema, Dir: bizcalendar.Migrations()},
 	))
 	log := adminaudit.New(d, func() time.Time { return time.Date(2026, 11, 22, 4, 0, 0, 0, time.UTC) })
-	return &fixture{db: d, store: bizcalendar.New(d, log), audit: log}
+	bus := events.NewBus()
+	seen := &[]bizcalendar.CalendarImported{}
+	events.Subscribe(bus, func(_ context.Context, e bizcalendar.CalendarImported) error {
+		*seen = append(*seen, e)
+		return nil
+	})
+	return &fixture{db: d, store: bizcalendar.New(d, log, bus), audit: log, bus: bus, seen: seen}
 }
 
 func fixtureCSV(t *testing.T, name string) string {
@@ -135,8 +144,8 @@ func TestImportingAnotherYearKeepsTheFirst(t *testing.T) {
 	if got := cal.Years(); len(got) != 2 || got[0] != 2026 || got[1] != 2027 {
 		t.Fatalf("years = %v", got)
 	}
-	if last, ok := cal.LastCoveredDate(); !ok || !last.Equal(time.Date(2027, 12, 31, 0, 0, 0, 0, time.UTC)) {
-		t.Fatalf("last = %v", last)
+	if through, ok := cal.CoveredThrough(time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)); !ok || !through.Equal(time.Date(2027, 12, 31, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("through = %v", through)
 	}
 	if _, ok := cal.AddBusinessDays(time.Date(2027, 12, 30, 0, 0, 0, 0, time.UTC), 1); ok {
 		t.Error("數到 2028 要算不出來")
@@ -193,15 +202,67 @@ func TestEmptyStoreCoversNothing(t *testing.T) {
 	}
 }
 
-// DB 的 CHECK 是後備：年份與日期不一致、備註頭尾有空白都寫不進去。
-func TestSchemaRejectsInconsistentRows(t *testing.T) {
+// DB 的 CHECK 是後備：備註頭尾有空白寫不進去。年份範圍由解析檢查，資料表沒有 year 欄。
+func TestSchemaRejectsPaddedNote(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO bizcalendar.days (day, holiday, year) VALUES ('2026-01-01', true, 2027)`); err == nil {
-		t.Error("year 與 day 不一致要被擋下")
-	}
-	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO bizcalendar.days (day, holiday, note, year) VALUES ('2026-01-01', true, ' x', 2026)`); err == nil {
+	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO bizcalendar.days (day, holiday, note) VALUES ('2026-01-01', true, ' x')`); err == nil {
 		t.Error("note 頭有空白要被擋下")
+	}
+}
+
+func TestImportPublishesCalendarImported(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	if _, err := f.store.Import(ctx, admin, 2026, fixtureCSV(t, "115.csv")); err != nil {
+		t.Fatal(err)
+	}
+	if len(*f.seen) != 1 || (*f.seen)[0].Year != 2026 {
+		t.Fatalf("events = %+v", *f.seen)
+	}
+	if _, err := f.store.Import(ctx, admin, 2026, "bad"); err == nil {
+		t.Fatal("要被拒絕")
+	}
+	if len(*f.seen) != 1 {
+		t.Fatalf("解析失敗不得發布事件：%+v", *f.seen)
+	}
+}
+
+func TestImportRollsBackWhenASubscriberFails(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	events.Subscribe(f.bus, func(context.Context, bizcalendar.CalendarImported) error { return errors.New("boom") })
+	if _, err := f.store.Import(ctx, admin, 2026, fixtureCSV(t, "115.csv")); err == nil {
+		t.Fatal("訂閱者失敗時匯入要失敗")
+	}
+	cal, err := f.store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cal.Years()) != 0 {
+		t.Fatalf("匯入要整個回滾：%v", cal.Years())
+	}
+}
+
+// 表沒有 year 欄、檢查與索引：年份範圍由解析檢查。
+func TestSchemaHasNoYearColumn(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	var columns, constraints, indexes int
+	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema = 'bizcalendar' AND table_name = 'days' AND column_name = 'year'`).Scan(&columns); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM pg_constraint WHERE conname IN ('days_year_check', 'days_year_day_check')`).Scan(&constraints); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE schemaname = 'bizcalendar' AND indexname = 'days_by_year'`).Scan(&indexes); err != nil {
+		t.Fatal(err)
+	}
+	if columns != 0 || constraints != 0 || indexes != 0 {
+		t.Fatalf("year 欄 %d、檢查 %d、索引 %d 都應為 0", columns, constraints, indexes)
 	}
 }

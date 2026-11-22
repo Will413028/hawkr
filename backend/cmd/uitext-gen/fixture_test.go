@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -96,7 +97,10 @@ func fixtureImage(opts ...func(*descriptorpb.FileDescriptorSet)) *descriptorpb.F
 		EnumType: []*descriptorpb.EnumDescriptorProto{enumProto("ErrorReason", "", "BOOM")},
 	}
 	// ErrorReason 的零值名稱是 UNSPECIFIED（沒有前綴），enumProto 已處理。
-	fds := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{fx, adminRoot, adminFx, common}}
+	policy, ext := acceptedDefinitionFiles()
+	fds := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{
+		fx, protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto), adminRoot, adminFx, common, policy, ext,
+	}}
 	for _, o := range opts {
 		o(fds)
 	}

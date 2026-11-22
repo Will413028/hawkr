@@ -31,6 +31,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/legacy/accountservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/bizcalendarrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerserver"
@@ -146,8 +147,6 @@ func runServe(ctx context.Context) error {
 	crmAddr := e.String("CRM_SERVICE_ADDR")
 	// 店家評價統計（店面頁、推薦排行）：review 還在舊服務（遷移計畫 A6）。
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
-	// 工作日行事曆由單體擁有，推給還在舊服務的 invoice-service 當鏡像（遷移計畫 10f-4b；A5 搬進單體後刪除）。
-	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	// 直接呼叫單體的 web 的 origin（CSRF 與 gateway 的 WebSocket 比對；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
 	// CDN 帶的 client IP header）。
 	origins := e.List("CORS_ALLOWED_ORIGINS")
@@ -204,26 +203,10 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	invoices, err := invoiceservice.New(invoiceAddr, internalSecret)
-	if err != nil {
-		return err
-	}
-	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now))
-	calendarMirror := bizcalendar.NewMirror(calendar, invoices, time.Now, log)
-	// 啟動時與每天對帳一次：匯入後的推送失敗、invoice 重開、窗口隨日期前進都靠它補齊；ctx 取消時結束，離開前等它收尾。
-	mirrorCtx, stopMirror := context.WithCancel(ctx)
-	mirrorDone := make(chan struct{})
-	go func() {
-		defer close(mirrorDone)
-		calendarMirror.Run(mirrorCtx, calendarMirrorInterval)
-	}()
-	defer func() {
-		stopMirror()
-		<-mirrorDone
-	}()
+	bus := events.NewBus()
+	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
 	// 刪除帳號、確認代行的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted、
 	// delegation.operation.completed），由 worker 送出。
-	bus := events.NewBus()
 	enqueueLegacy := func(ctx context.Context, a rabbitmq.PublishArgs) error {
 		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
 	}
@@ -260,6 +243,7 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)
@@ -300,31 +284,30 @@ func runServe(ctx context.Context) error {
 			Now:    time.Now,
 			Logger: log,
 		}),
-		Identity:          id,
-		WebLogin:          webLogin,
-		AppLogin:          appLogin,
-		Buyer:             buyerModule,
-		Seller:            sellerModule,
-		Payment:           payments,
-		BizCalendar:       calendar,
-		BizCalendarMirror: calendarMirror,
-		Discovery:         discoveryModule,
-		ReviewQueue:       reviewqueue.New(reviewqueue.Deps{DB: d}),
-		Stats:             stats,
-		DashboardOrders:   sellerDashboardOrders{orders},
-		SocialProducts:    socialCards{products},
-		BuyerPorts:        httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
-		Deletion:          deletion,
-		Delegation:        del,
-		Images:            images,
-		WebOrigin:         web,
-		Origins:           origins,
-		OriginAuth:        originAuth,
-		ClientIP:          clientIP,
-		Legacy:            gateway,
-		LegacyPrefixes:    gatewayproxy.Prefixes,
-		Now:               time.Now,
-		Logger:            log,
+		Identity:        id,
+		WebLogin:        webLogin,
+		AppLogin:        appLogin,
+		Buyer:           buyerModule,
+		Seller:          sellerModule,
+		Payment:         payments,
+		BizCalendar:     calendar,
+		Discovery:       discoveryModule,
+		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
+		Stats:           stats,
+		DashboardOrders: sellerDashboardOrders{orders},
+		SocialProducts:  socialCards{products},
+		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crm},
+		Deletion:        deletion,
+		Delegation:      del,
+		Images:          images,
+		WebOrigin:       web,
+		Origins:         origins,
+		OriginAuth:      originAuth,
+		ClientIP:        clientIP,
+		Legacy:          gateway,
+		LegacyPrefixes:  gatewayproxy.Prefixes,
+		Now:             time.Now,
+		Logger:          log,
 	})
 	if err != nil {
 		return err
@@ -347,9 +330,6 @@ func runServe(ctx context.Context) error {
 	return serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 }
 
-// calendarMirrorInterval 是行事曆推給 invoice-service 的對帳間隔。
-const calendarMirrorInterval = 24 * time.Hour
-
 // workerConcurrency 是 default queue 同時執行的 job 上限。
 const workerConcurrency = 10
 
@@ -366,6 +346,8 @@ func runWorker(ctx context.Context) error {
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
+	// 工作日行事曆推給還在舊服務的 invoice-service 當鏡像（bizcalendarrelay；A5 搬進單體後刪除）。
+	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
 	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	log := newLogger()
@@ -404,6 +386,10 @@ func runWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	invoices, err := invoiceservice.New(invoiceAddr, internalSecret)
+	if err != nil {
+		return err
+	}
 
 	jc, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -411,6 +397,7 @@ func runWorker(ctx context.Context) error {
 	}
 	bus := events.NewBus()
 	subscribeBuyerEvents(bus, jc)
+	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
 	id := newIdentity(d, bus, idc, log)
 	med, err := mediaservice.New(mediaCfg)
 	if err != nil {
@@ -480,6 +467,7 @@ func runWorker(ctx context.Context) error {
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
 	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
+	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)
 	periodic = append(periodic, sellerModule.PeriodicJobs()...)
@@ -491,6 +479,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
+	periodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)
 	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
 	if err != nil {
 		return err

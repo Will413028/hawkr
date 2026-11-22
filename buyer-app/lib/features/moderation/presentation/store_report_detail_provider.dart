@@ -20,6 +20,8 @@ class StoreReportDetail extends _$StoreReportDetail {
         report: response.report,
         supplements: response.supplements,
         evidence: response.evidence,
+        canSupplement: response.canSupplement,
+        supplementMax: response.supplementMax,
       ),
     );
   }

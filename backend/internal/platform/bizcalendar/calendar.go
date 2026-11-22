@@ -83,12 +83,17 @@ func (c *Calendar) Coverage() []YearCoverage {
 	return out
 }
 
-// LastCoveredDate 回傳最後一個已涵蓋年份的 12 月 31 日；沒有涵蓋任何年份時 ok 為 false。年份之間可能有缺，各年是否涵蓋看 Covers。
-func (c *Calendar) LastCoveredDate() (time.Time, bool) {
-	if len(c.years) == 0 {
+// CoveredThrough 回傳從 from 的台北日曆日起連續涵蓋到的最後一天（以 UTC 午夜的日曆日表示）：from 所在的年份沒有涵蓋時 ok 為 false，
+// 否則是從該年起連續已涵蓋的最後一年的 12 月 31 日。中間缺一年時停在缺口之前。
+func (c *Calendar) CoveredThrough(from time.Time) (time.Time, bool) {
+	year := twtime.Day(from).Year()
+	if !c.Covers(year) {
 		return time.Time{}, false
 	}
-	return time.Date(c.years[len(c.years)-1], time.December, 31, 0, 0, 0, 0, time.UTC), true
+	for c.Covers(year + 1) {
+		year++
+	}
+	return time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC), true
 }
 
 // IsBusinessDay 回報 t 所在的台北日曆日是不是工作天。那一天的年份沒有涵蓋時 ok 為 false。

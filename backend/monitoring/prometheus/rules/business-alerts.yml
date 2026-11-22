@@ -476,7 +476,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：發票服務的工作日行事曆鏡像是空的"
-          description: "env={{ $labels.env }}：`invoice_business_day_coverage` 沒有列 ⇒ invoice-service 從未收到單體推送的行事曆，`BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① 單體的 log：「行事曆窗口內沒有已匯入的資料，不推送給 invoice-service」warning 代表今天所在的年份尚未匯入（到後台匯入該年度辦公日曆）；「行事曆推送給 invoice-service 失敗」error 代表呼叫失敗 ② 單體的 `INVOICE_SERVICE_ADDR` 與內部密鑰是否指向可連的 invoice-service ③ invoice-service 的 `ReplaceBusinessDayMirror` RPC 錯誤 log（`invoice.calendar.replace_failed`、`invoice.calendar.replace.failed`）。修好之後不必手動補資料，單體每日對帳與每次匯入都會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT，涵蓋區間與假日只來自單體的推送。"
+          description: "env={{ $labels.env }}：`invoice_business_day_coverage` 沒有列 ⇒ invoice-service 從未收到單體推送的行事曆，`BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① **worker 行程**的 log（推送由 worker 的 River job 執行，不在單體 serve 行程）：「行事曆窗口內沒有已匯入的資料，不推送給 invoice-service」warning 代表今天所在的年份尚未匯入（到後台匯入該年度辦公日曆）；「行事曆推送給 invoice-service 失敗」error 代表呼叫失敗 ② worker 的 `INVOICE_SERVICE_ADDR` 與內部密鑰是否指向可連的 invoice-service ③ invoice-service 的 `ReplaceBusinessDayMirror` RPC 錯誤 log（`invoice.calendar.replace_failed`、`invoice.calendar.replace.failed`）。修好之後不必手動補資料，單體每日對帳與每次匯入都會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT，涵蓋區間與假日只來自單體的推送。"
 
       - alert: InvoiceBusinessDayMirrorStale
         expr: min by (env) (invoice_business_day_mirror_age_seconds) > 172800
@@ -486,7 +486,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：工作日行事曆鏡像已 {{ $value | humanizeDuration }} 沒有更新"
-          description: "env={{ $labels.env }}：單體每日對帳推送一次，超過 48 小時沒更新代表**連續兩天推送失敗或沒有推送**。鏡像還在（推送失敗時 invoice-service 保留舊值），但 `invoice_business_day_coverage` 的涵蓋區間不會往後延伸，區間外的日期一律被當成假日。查：單體 log 的「行事曆推送給 invoice-service 失敗」error、`INVOICE_SERVICE_ADDR` 設定，以及「行事曆窗口內沒有已匯入的資料」warning（今天所在的年份尚未匯入時單體什麼都不推）。"
+          description: "env={{ $labels.env }}：單體的 worker 每日對帳推送一次，超過 48 小時沒更新代表**連續兩天推送失敗或沒有推送**。鏡像還在（推送失敗時 invoice-service 保留舊值），但 `invoice_business_day_coverage` 的涵蓋區間不會往後延伸，區間外的日期一律被當成假日。查：worker 行程 log 的「行事曆推送給 invoice-service 失敗」error（job 失敗最多重試 10 次後放棄，隔天對帳 job 再排入）、worker 的 `INVOICE_SERVICE_ADDR` 設定，以及「行事曆窗口內沒有已匯入的資料」warning（今天所在的年份尚未匯入時 worker 什麼都不推）。"
 
       - alert: InvoiceInboxStranded
         expr: sum by (env, event_type, status) (invoice_inbox_stranded_rows) > 0

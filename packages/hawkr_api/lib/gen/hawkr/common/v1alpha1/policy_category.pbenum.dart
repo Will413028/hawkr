@@ -15,82 +15,82 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
-/// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家治理的檢舉人選不到它們，社群檢舉入口的檢舉人可選的子集是 SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER；認定與案件類別都可以用。
+/// 各入口只接受自己的子集：檢舉入口的子集列在請求欄位的 accepted_policy_categories，認定的子集見各值的說明。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE、SEXUAL_CONTENT）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；店家檢舉入口不接受它們，社群檢舉入口接受這四個與部分店家治理的值（各入口以自己請求欄位的 accepted_policy_categories 為準）；認定與案件類別都可以用。
 class PolicyCategory extends $pb.ProtobufEnum {
   static const PolicyCategory POLICY_CATEGORY_UNSPECIFIED =
       PolicyCategory._(0, _omitEnumNames ? '' : 'POLICY_CATEGORY_UNSPECIFIED');
 
-  /// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
+  /// 有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_FOOD_SAFETY =
       PolicyCategory._(1, _omitEnumNames ? '' : 'POLICY_CATEGORY_FOOD_SAFETY');
 
-  /// 違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。
+  /// 違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_PROHIBITED_GOODS =
       PolicyCategory._(
           2, _omitEnumNames ? '' : 'POLICY_CATEGORY_PROHIBITED_GOODS');
 
-  /// 依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。
+  /// 依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_UNLICENSED_SALE =
       PolicyCategory._(
           3, _omitEnumNames ? '' : 'POLICY_CATEGORY_UNLICENSED_SALE');
 
-  /// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
+  /// 虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_MISLEADING_INFO =
       PolicyCategory._(
           4, _omitEnumNames ? '' : 'POLICY_CATEGORY_MISLEADING_INFO');
 
-  /// 不實的認證、檢驗或標章（第十六條第 2 款的一種）。入口：檢舉人、平台判定與認定。
+  /// 不實的認證、檢驗或標章（第十六條第 2 款的一種）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_FAKE_CERTIFICATION =
       PolicyCategory._(
           5, _omitEnumNames ? '' : 'POLICY_CATEGORY_FAKE_CERTIFICATION');
 
-  /// 冒用他人商標或外觀的商品本身（第十六條第 1 款）。入口：檢舉人、平台判定與認定。
+  /// 冒用他人商標或外觀的商品本身（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_COUNTERFEIT =
       PolicyCategory._(6, _omitEnumNames ? '' : 'POLICY_CATEGORY_COUNTERFEIT');
 
-  /// 侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。入口：檢舉人、平台判定與認定。
+  /// 侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_IP_INFRINGEMENT =
       PolicyCategory._(
           7, _omitEnumNames ? '' : 'POLICY_CATEGORY_IP_INFRINGEMENT');
 
-  /// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。
+  /// 偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_FRAUD =
       PolicyCategory._(8, _omitEnumNames ? '' : 'POLICY_CATEGORY_FRAUD');
 
-  /// 引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。入口：檢舉人、平台判定與認定。
+  /// 引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_OFF_PLATFORM_TRADE =
       PolicyCategory._(
           9, _omitEnumNames ? '' : 'POLICY_CATEGORY_OFF_PLATFORM_TRADE');
 
-  /// 未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。入口：檢舉人、平台判定與認定。
+  /// 未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_PRIVACY =
       PolicyCategory._(10, _omitEnumNames ? '' : 'POLICY_CATEGORY_PRIVACY');
 
-  /// 冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。入口：檢舉人、平台判定與認定。
+  /// 冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_IMPERSONATION = PolicyCategory._(
       11, _omitEnumNames ? '' : 'POLICY_CATEGORY_IMPERSONATION');
 
-  /// 干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。入口：只有平台判定與認定。
+  /// 干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。
   static const PolicyCategory POLICY_CATEGORY_PLATFORM_ABUSE = PolicyCategory._(
       12, _omitEnumNames ? '' : 'POLICY_CATEGORY_PLATFORM_ABUSE');
 
-  /// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。
+  /// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定不能用。
   static const PolicyCategory POLICY_CATEGORY_OTHER =
       PolicyCategory._(13, _omitEnumNames ? '' : 'POLICY_CATEGORY_OTHER');
 
-  /// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_SPAM =
       PolicyCategory._(14, _omitEnumNames ? '' : 'POLICY_CATEGORY_SPAM');
 
-  /// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_HARASSMENT =
       PolicyCategory._(15, _omitEnumNames ? '' : 'POLICY_CATEGORY_HARASSMENT');
 
-  /// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_HATE =
       PolicyCategory._(16, _omitEnumNames ? '' : 'POLICY_CATEGORY_HATE');
 
-  /// 社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。
+  /// 社群內容中的色情、裸露或性暴力內容（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。
   static const PolicyCategory POLICY_CATEGORY_SEXUAL_CONTENT = PolicyCategory._(
       17, _omitEnumNames ? '' : 'POLICY_CATEGORY_SEXUAL_CONTENT');
 

@@ -152,10 +152,27 @@ func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store
 		return model.SubmitReportResult{}, err
 	}
 	report := toReport(row)
+	count, err := q.SupplementCount(ctx, locked.ID)
+	if err != nil {
+		return model.SubmitReportResult{}, err
+	}
+	report.SupplementCount = int(count)
 	return model.SubmitReportResult{ReportID: locked.ID, Supplemented: true, Report: &report, Notice: text.ReportDuplicateSupplemented(uitext.LocaleFrom(ctx))}, nil
 }
 
-// appendSupplement 是補充的唯一寫入路徑（去重併入與檢舉人主動補充共用）：通報已鎖住且沒有結果；合計最多 MaxSupplements 則，已達上限時回 failed_precondition。
+// supplementBlockError 是 model.SupplementBlockOf 的結果對應的 failed_precondition；可以補充時回 nil。
+func supplementBlockError(ctx context.Context, b model.SupplementBlock) error {
+	switch b {
+	case model.SupplementBlockedByOutcome:
+		return apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
+	case model.SupplementBlockedByLimit:
+		return apperr.FailedPrecondition("%s", text.ReportSupplementLimit(uitext.LocaleFrom(ctx), text.ReportSupplementLimitArgs{Max: model.MaxSupplements}).Text)
+	case model.SupplementAllowed:
+	}
+	return nil
+}
+
+// appendSupplement 是補充的唯一寫入路徑（去重併入與檢舉人主動補充共用）：通報已鎖住；有結果或合計已達 MaxSupplements 則時回 failed_precondition（model.SupplementBlockOf）。
 // 寫入補充與佐證、讓通報的版本前進（讀到舊版本的分案、設定結果與移動要重讀才看得到補充；不鎖、不改案件的版本），並在同一個 transaction 發帶 SupplementID 的 ReportReceived。
 func (s *Service) appendSupplement(ctx context.Context, q *store.Queries, locked store.SellerReport, description string, evidence []model.Evidence, now time.Time) error {
 	count, err := q.SupplementCount(ctx, locked.ID)
@@ -166,9 +183,9 @@ func (s *Service) appendSupplement(ctx context.Context, q *store.Queries, locked
 		EventID: uuid.NewV7(), OccurredAt: now, ReportID: locked.ID, StoreID: locked.StoreID, ReporterBuyerID: locked.ReporterBuyerID,
 		Category: policy.Category(locked.Category),
 	}
-	if int(count) >= model.MaxSupplements {
-		// 已轉正的佐證沒有引用，由 media 的 GC 回收（沿用撞到重複時的先例）。
-		return apperr.FailedPrecondition("%s", text.ReportSupplementLimit(uitext.LocaleFrom(ctx), text.ReportSupplementLimitArgs{Max: model.MaxSupplements}).Text)
+	// 已轉正的佐證沒有引用，由 media 的 GC 回收（沿用撞到重複時的先例）。
+	if err := supplementBlockError(ctx, model.SupplementBlockOf(locked.Outcome != nil, int(count))); err != nil {
+		return err
 	}
 	supplementID := uuid.NewV7()
 	// 第幾則補充 = 已有的則數 + 1（通報已鎖住，所以不會撞；DB 的 seq 1..10 與每筆通報內唯一是保底）。
@@ -215,8 +232,13 @@ func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput
 	if err != nil {
 		return model.Report{}, err
 	}
-	if owned.Outcome != nil {
-		return model.Report{}, apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
+	// 佐證轉正之前先擋下（有結果或已達上限）；寫入時鎖住之後在 appendSupplement 再判斷一次。
+	count, err := store.New(s.d.DB.Conn(ctx)).SupplementCount(ctx, in.ReportID)
+	if err != nil {
+		return model.Report{}, err
+	}
+	if err := supplementBlockError(ctx, model.SupplementBlockOf(owned.Outcome != nil, int(count))); err != nil {
+		return model.Report{}, err
 	}
 	now := s.now()
 	evidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)
@@ -232,9 +254,6 @@ func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput
 		}
 		if err != nil {
 			return err
-		}
-		if locked.Outcome != nil {
-			return apperr.FailedPrecondition("%s", text.ReportSupplementClosed(uitext.LocaleFrom(ctx)).Text)
 		}
 		if err := s.appendSupplement(ctx, q, locked, description, evidence, now); err != nil {
 			return err
@@ -280,6 +299,7 @@ func loadBuyerReport(ctx context.Context, q *store.Queries, reportID uuid.UUID) 
 	if err := loadReportDetail(ctx, q, []uuid.UUID{reportID}, reports); err != nil {
 		return model.Report{}, err
 	}
+	reports[0].SupplementCount = len(reports[0].Supplements)
 	return reports[0], nil
 }
 
@@ -407,16 +427,34 @@ func (s *Service) BuyerReports(ctx context.Context, in model.BuyerReportListInpu
 	if in.After != nil {
 		params.AfterCreatedAt, params.AfterID = &in.After.CreatedAt, &in.After.ID
 	}
-	rows, err := store.New(s.d.DB.Conn(ctx)).BuyerReports(ctx, params)
+	q := store.New(s.d.DB.Conn(ctx))
+	rows, err := q.BuyerReports(ctx, params)
 	if err != nil {
 		return model.ReportPage{}, err
 	}
+	more := len(rows) > int(size)
+	if more {
+		rows = rows[:size]
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	counts, err := q.SupplementCounts(ctx, ids)
+	if err != nil {
+		return model.ReportPage{}, err
+	}
+	byReport := make(map[uuid.UUID]int, len(counts))
+	for _, c := range counts {
+		byReport[c.ReportID] = int(c.SupplementCount)
+	}
 	page := model.ReportPage{Items: make([]model.Report, 0, len(rows))}
 	for _, row := range rows {
-		page.Items = append(page.Items, toReport(row))
+		r := toReport(row)
+		r.SupplementCount = byReport[row.ID]
+		page.Items = append(page.Items, r)
 	}
-	if len(page.Items) > int(size) {
-		page.Items = page.Items[:size]
+	if more {
 		last := page.Items[size-1]
 		page.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}

@@ -50,6 +50,7 @@ social-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 錯誤用 CodeMeta 錯誤碼與字串訊息 | 舊契約 | 不成立：新 API 用 `apperr` 的 kind 與 `ErrorReason` | 結構化錯誤 | 改：`apperr`（InvalidInput、NotFound、FailedPrecondition、ResourceExhausted、VersionConflict）；伺服器句子在模組 `internal/text`（檢舉人受眾 zh-TW、en；管理員受眾只有 zh-TW），語系取自 context，`TestModerationApperrCallsCarryNoSentenceLiterals` 守門 |
 | 列表分頁 page／pageSize 加 `COUNT(*)`（M20） | client 顯示總頁數 | 不成立 | AIP-158 keyset | 後台待辦在 A7-1e、案件列表（`Cases`）在 A7-2f-4 用 keyset |
 | 每日 20 筆在入口限流（M24） | 防濫用 | 上限是業務規則，在模組內強制；入口另有一般限流 | 業務上限在資料層原子強制 | 改：上限在模組內單一 upsert 強制，入口限流不負責 |
+| 我的檢舉清單由 moderation 的 `MyReports` 單獨提供（只有社群檢舉） | 檢舉人只有一種檢舉 | 不成立：店家檢舉（seller）上線後，買家的檢舉有兩個來源，兩個模組不互相依賴 | API composition：組裝層在讀取時合併多個來源的分頁（業界的 BFF／聚合層做法） | 改：合併在 `internal/httpapi/moderation` 的 `ListMyReports`（排序、雙游標與取完的判定見 `backend/docs/modules/moderation.md` §8）；兩個模組各自只回自己的 keyset 頁，沒有模組知道另一邊；`MyReportItem` 的共用欄位對店家檢舉出現兩次是接受的代價（`step10f-3-design.md` H1b） |
 
 ## 與 social-service 的差異
 

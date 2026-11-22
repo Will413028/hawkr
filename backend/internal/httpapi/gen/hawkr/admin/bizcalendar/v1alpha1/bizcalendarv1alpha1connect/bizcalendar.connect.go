@@ -48,11 +48,11 @@ const (
 type BizCalendarAdminServiceClient interface {
 	// ImportHolidayCalendar 匯入一年的辦公日曆表並整年取代該年原有的資料（同一個交易；已匯入的年份重匯就是更正）。
 	// csv_content 是辦公日曆表 CSV 的全文：UTF-8（可帶 BOM），表頭 `西元日期,星期,是否放假,備註`，日期 `YYYYMMDD`，
-	// 是否放假只有 `0`（上班）與 `2`（放假）。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
+	// 是否放假只有 `0`（上班）與 `2`（放假）；欄位可以加引號（備註含逗號時需要），空行略過。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
 	// 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	ImportHolidayCalendar(context.Context, *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error)
-	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空、last_covered_date 不設。不分頁：
+	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
 	// 一年一列，筆數是已匯入的年數。
 	GetHolidayCalendarCoverage(context.Context, *connect.Request[v1alpha1.GetHolidayCalendarCoverageRequest]) (*connect.Response[v1alpha1.GetHolidayCalendarCoverageResponse], error)
 }
@@ -108,11 +108,11 @@ func (c *bizCalendarAdminServiceClient) GetHolidayCalendarCoverage(ctx context.C
 type BizCalendarAdminServiceHandler interface {
 	// ImportHolidayCalendar 匯入一年的辦公日曆表並整年取代該年原有的資料（同一個交易；已匯入的年份重匯就是更正）。
 	// csv_content 是辦公日曆表 CSV 的全文：UTF-8（可帶 BOM），表頭 `西元日期,星期,是否放假,備註`，日期 `YYYYMMDD`，
-	// 是否放假只有 `0`（上班）與 `2`（放假）。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
+	// 是否放假只有 `0`（上班）與 `2`（放假）；欄位可以加引號（備註含逗號時需要），空行略過。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
 	// 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
 	// 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
 	ImportHolidayCalendar(context.Context, *connect.Request[v1alpha1.ImportHolidayCalendarRequest]) (*connect.Response[v1alpha1.ImportHolidayCalendarResponse], error)
-	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空、last_covered_date 不設。不分頁：
+	// GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
 	// 一年一列，筆數是已匯入的年數。
 	GetHolidayCalendarCoverage(context.Context, *connect.Request[v1alpha1.GetHolidayCalendarCoverageRequest]) (*connect.Response[v1alpha1.GetHolidayCalendarCoverageResponse], error)
 }

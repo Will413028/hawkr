@@ -65,10 +65,13 @@ export function buildImportRequest(declaredYear: string, csvContent: string) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * 距耗盡天數：最後涵蓋日與今天（台北日期，呼叫端傳入）的天數差；沒有涵蓋或已過期回 -1。
+ * 距耗盡天數：伺服器回報的 covered_through（從今天起連續涵蓋的最後一天）與今天（台北日期，呼叫端傳入）的天數差；沒有涵蓋（空字串）或已過期回 -1。
  */
-export function coverageDaysLeft(lastCovered: string, today: string): number {
-	const last = parseDate(lastCovered);
+export function coverageDaysLeft(
+	coveredThrough: string,
+	today: string,
+): number {
+	const last = parseDate(coveredThrough);
 	const now = parseDate(today);
 	if (!last || !now) return -1;
 	const diff = Math.round(

@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -38,7 +39,7 @@ func TestEveryAuditedBizcalendarProcedureWritesOneRecordForTheCaller(t *testing.
 		migrate.Module{Name: bizcalendar.Schema, Dir: bizcalendar.Migrations()},
 	))
 	audit := adminaudit.New(d, func() time.Time { return time.Date(2026, 11, 22, 4, 0, 0, 0, time.UTC) })
-	path, handler := bizcalendarv1alpha1connect.NewBizCalendarAdminServiceHandler(NewAdmin(bizcalendar.New(d, audit)), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
+	path, handler := bizcalendarv1alpha1connect.NewBizCalendarAdminServiceHandler(NewAdmin(bizcalendar.New(d, audit, events.NewBus()), func() time.Time { return time.Date(2026, 11, 22, 4, 0, 0, 0, time.UTC) }), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 77})))

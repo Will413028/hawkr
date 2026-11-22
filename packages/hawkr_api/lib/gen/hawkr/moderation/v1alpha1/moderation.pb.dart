@@ -168,7 +168,7 @@ class SubmitReportRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   ReportTarget ensureTarget() => $_ensure(0);
 
-  /// 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
+  /// 檢舉原因：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
   @$pb.TagNumber(2)
   $2.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)

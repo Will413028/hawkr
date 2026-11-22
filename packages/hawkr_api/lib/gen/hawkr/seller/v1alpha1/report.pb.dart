@@ -283,7 +283,7 @@ class CreateReportRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearStoreId() => $_clearField(1);
 
-  /// 檢舉的類別：政策分類中檢舉人可選的值，除了 PLATFORM_ABUSE（只給平台判定與認定）；UNSPECIFIED 與 PLATFORM_ABUSE 回 invalid_argument。
+  /// 檢舉的類別：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
   @$pb.TagNumber(2)
   $2.PolicyCategory get category => $_getN(1);
   @$pb.TagNumber(2)
@@ -484,11 +484,15 @@ class GetMyReportResponse extends $pb.GeneratedMessage {
     StoreReport? report,
     $core.Iterable<ReportSupplement>? supplements,
     $core.Iterable<ReportEvidence>? evidence,
+    $core.bool? canSupplement,
+    $core.int? supplementMax,
   }) {
     final result = GetMyReportResponse._();
     if (report != null) result.report = report;
     if (supplements != null) result.supplements.addAll(supplements);
     if (evidence != null) result.evidence.addAll(evidence);
+    if (canSupplement != null) result.canSupplement = canSupplement;
+    if (supplementMax != null) result.supplementMax = supplementMax;
     return result;
   }
 
@@ -512,6 +516,8 @@ class GetMyReportResponse extends $pb.GeneratedMessage {
         subBuilder: ReportSupplement.$_createMessage)
     ..pPM<ReportEvidence>(3, _omitFieldNames ? '' : 'evidence',
         subBuilder: ReportEvidence.$_createMessage)
+    ..aOB(4, _omitFieldNames ? '' : 'canSupplement')
+    ..aI(5, _omitFieldNames ? '' : 'supplementMax')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -555,6 +561,26 @@ class GetMyReportResponse extends $pb.GeneratedMessage {
   /// 原檢舉與全部補充的佐證，依送出的順序。
   @$pb.TagNumber(3)
   $pb.PbList<ReportEvidence> get evidence => $_getList(2);
+
+  /// 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+  @$pb.TagNumber(4)
+  $core.bool get canSupplement => $_getBF(3);
+  @$pb.TagNumber(4)
+  set canSupplement($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCanSupplement() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCanSupplement() => $_clearField(4);
+
+  /// 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+  @$pb.TagNumber(5)
+  $core.int get supplementMax => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set supplementMax($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSupplementMax() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSupplementMax() => $_clearField(5);
 }
 
 /// ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
@@ -802,11 +828,15 @@ class AddReportSupplementResponse extends $pb.GeneratedMessage {
     StoreReport? report,
     $core.Iterable<ReportSupplement>? supplements,
     $core.Iterable<ReportEvidence>? evidence,
+    $core.bool? canSupplement,
+    $core.int? supplementMax,
   }) {
     final result = AddReportSupplementResponse._();
     if (report != null) result.report = report;
     if (supplements != null) result.supplements.addAll(supplements);
     if (evidence != null) result.evidence.addAll(evidence);
+    if (canSupplement != null) result.canSupplement = canSupplement;
+    if (supplementMax != null) result.supplementMax = supplementMax;
     return result;
   }
 
@@ -830,6 +860,8 @@ class AddReportSupplementResponse extends $pb.GeneratedMessage {
         subBuilder: ReportSupplement.$_createMessage)
     ..pPM<ReportEvidence>(3, _omitFieldNames ? '' : 'evidence',
         subBuilder: ReportEvidence.$_createMessage)
+    ..aOB(4, _omitFieldNames ? '' : 'canSupplement')
+    ..aI(5, _omitFieldNames ? '' : 'supplementMax')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -877,6 +909,26 @@ class AddReportSupplementResponse extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(3)
   $pb.PbList<ReportEvidence> get evidence => $_getList(2);
+
+  /// 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+  @$pb.TagNumber(4)
+  $core.bool get canSupplement => $_getBF(3);
+  @$pb.TagNumber(4)
+  set canSupplement($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCanSupplement() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCanSupplement() => $_clearField(4);
+
+  /// 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+  @$pb.TagNumber(5)
+  $core.int get supplementMax => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set supplementMax($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSupplementMax() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSupplementMax() => $_clearField(5);
 }
 
 /// SellerReportAppService 是登入的買家的檢舉。

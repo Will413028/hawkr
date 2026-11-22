@@ -3,24 +3,9 @@ import { commonPolicyCategory } from "@hawkr/ui-text/keys";
 import { staffTextOrUnknown } from "@/lib/ui-text";
 
 // 政策分類（common.PolicyCategory，step10e-reports-brief R10）在 admin 的子集與顯示文字。子集由伺服器驗證（backend 的
-// internal/platform/policy），這裡的常數只決定下拉選項的內容與順序；第二個 client 要用子集（10f 的檢舉表單）時，改成 proto 的
-// custom option 由 uitext-gen 生成三端常數（設計 step10e-3ca-design C3），這份常數就隨之刪除。順序同契約的數字（UNSPECIFIED 不是有效值）。
-
-/** 店家治理的檢舉人可選的類別（ReporterSelectable）：全部除了 PLATFORM_ABUSE 與社群內容的類別。待分案的通報（還沒有平台判定類別，生效的類別就是檢舉人選的）的類別篩選用它。 */
-export const REPORTER_CATEGORIES: readonly PolicyCategory[] = [
-	PolicyCategory.FOOD_SAFETY,
-	PolicyCategory.PROHIBITED_GOODS,
-	PolicyCategory.UNLICENSED_SALE,
-	PolicyCategory.MISLEADING_INFO,
-	PolicyCategory.FAKE_CERTIFICATION,
-	PolicyCategory.COUNTERFEIT,
-	PolicyCategory.IP_INFRINGEMENT,
-	PolicyCategory.FRAUD,
-	PolicyCategory.OFF_PLATFORM_TRADE,
-	PolicyCategory.PRIVACY,
-	PolicyCategory.IMPERSONATION,
-	PolicyCategory.OTHER,
-];
+// internal/platform/policy），這裡的常數只決定下拉選項的內容與順序；只有 admin 一個 client 用的子集留在這裡，
+// 多個 client 共用的子集（檢舉人可選的類別）是請求欄位的 accepted_policy_categories，由 uitext-gen 生成（`@hawkr/ui-text/accepted`）。
+// 順序同契約的數字（UNSPECIFIED 不是有效值）。
 
 /**
  * 店家治理的平台判定類別與認定可用的類別：全部除了 OTHER 與社群內容的類別（OTHER 只給檢舉人選，理由要指到條款）。伺服器的 `Assessable` 另外收社群內容的

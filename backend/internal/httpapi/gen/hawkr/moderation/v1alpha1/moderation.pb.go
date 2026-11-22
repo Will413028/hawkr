@@ -212,7 +212,7 @@ func (x *ReportTarget) GetId() string {
 type SubmitReportRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Target *ReportTarget          `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	// 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
+	// 檢舉原因：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
 	Category v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 選填的說明，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
@@ -726,13 +726,13 @@ var File_hawkr_moderation_v1alpha1_moderation_proto protoreflect.FileDescriptor
 
 const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\"i\n" +
+	"*hawkr/moderation/v1alpha1/moderation.proto\x12\x19hawkr.moderation.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+hawkr/common/v1alpha1/accepted_values.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\"hawkr/seller/v1alpha1/report.proto\"i\n" +
 	"\fReportTarget\x12D\n" +
 	"\x04kind\x18\x01 \x01(\x0e2+.hawkr.moderation.v1alpha1.ReportTargetKindB\x03\xe0A\x02R\x04kind\x12\x13\n" +
-	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\"\xee\x01\n" +
+	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\"\xfa\x01\n" +
 	"\x13SubmitReportRequest\x12D\n" +
-	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x02R\x06target\x12F\n" +
-	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\bcategory\x12 \n" +
+	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetB\x03\xe0A\x02R\x06target\x12R\n" +
+	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x0f\xe0A\x02\x8a\xb5\x18\b\x0e\x0f\x10\x11\x04\x01\b\rR\bcategory\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12'\n" +
 	"\n" +
 	"request_id\x18\x04 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\"p\n" +

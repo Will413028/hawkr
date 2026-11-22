@@ -86,7 +86,7 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
 
   List<_ReasonOption> _options(UiLocale locale) => switch (widget.target) {
     SocialReportTarget() => [
-      for (final category in communityReportCategories)
+      for (final category in moderationSubmitReportRequestCategory)
         _socialOption(category, locale),
     ],
     LegacyReportTarget(:final type) => [

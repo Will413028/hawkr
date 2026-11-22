@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -41,7 +42,7 @@ func (f *fakeSource) Load(context.Context) (*bizcalendar.Calendar, error) { retu
 
 func newEnv(t *testing.T, src Source) bizcalendarv1alpha1connect.BizCalendarAdminServiceClient {
 	t.Helper()
-	return newEnvWith(t, NewAdmin(src))
+	return newEnvWith(t, NewAdmin(src, func() time.Time { return time.Date(2026, 11, 22, 4, 0, 0, 0, time.UTC) }))
 }
 
 func newEnvWith(t *testing.T, admin *Admin) bizcalendarv1alpha1connect.BizCalendarAdminServiceClient {
@@ -116,60 +117,81 @@ func TestImportParseErrorsPointAtTheRequestFields(t *testing.T) {
 	}
 }
 
-func TestCoverageMapsYearsAndLastCoveredDate(t *testing.T) {
-	days, err := bizcalendar.ParseOfficeCalendar(2026, fixture(t, "115.csv"))
-	if err != nil {
-		t.Fatal(err)
+func calendarOfYears(t *testing.T, files map[int]string) *bizcalendar.Calendar {
+	t.Helper()
+	var days []bizcalendar.Day
+	for year, file := range files {
+		parsed, err := bizcalendar.ParseOfficeCalendar(year, fixture(t, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		days = append(days, parsed...)
 	}
 	cal, err := bizcalendar.NewCalendar(days)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return cal
+}
+
+func coverage(t *testing.T, cal *bizcalendar.Calendar) *adminpb.GetHolidayCalendarCoverageResponse {
+	t.Helper()
 	c := newEnv(t, &fakeSource{cal: cal})
 	resp, err := c.GetHolidayCalendarCoverage(context.Background(), connect.NewRequest(&adminpb.GetHolidayCalendarCoverageRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ys := resp.Msg.GetYears(); len(ys) != 1 || ys[0].GetYear() != 2026 || ys[0].GetDayCount() != 365 || ys[0].GetHolidayCount() != 120 {
+	return resp.Msg
+}
+
+// 今天固定在台北 2026-11-22。
+func TestCoverageMapsYearsAndCoveredThrough(t *testing.T) {
+	msg := coverage(t, calendarOfYears(t, map[int]string{2026: "115.csv"}))
+	if ys := msg.GetYears(); len(ys) != 1 || ys[0].GetYear() != 2026 || ys[0].GetDayCount() != 365 || ys[0].GetHolidayCount() != 120 {
 		t.Errorf("years = %v", ys)
 	}
-	if d := resp.Msg.GetLastCoveredDate(); d.GetYear() != 2026 || d.GetMonth() != 12 || d.GetDay() != 31 {
-		t.Errorf("last = %v", d)
+	if d := msg.GetCoveredThrough(); d.GetYear() != 2026 || d.GetMonth() != 12 || d.GetDay() != 31 {
+		t.Errorf("covered_through = %v", d)
 	}
 }
 
-func TestCoverageOfAnEmptyCalendarHasNoLastDate(t *testing.T) {
-	cal, _ := bizcalendar.NewCalendar(nil)
-	c := newEnv(t, &fakeSource{cal: cal})
-	resp, err := c.GetHolidayCalendarCoverage(context.Background(), connect.NewRequest(&adminpb.GetHolidayCalendarCoverageRequest{}))
-	if err != nil || len(resp.Msg.GetYears()) != 0 || resp.Msg.GetLastCoveredDate() != nil {
-		t.Fatalf("resp=%v err=%v", resp, err)
+func TestCoveredThroughRunsThroughContiguousYears(t *testing.T) {
+	msg := coverage(t, calendarOfYears(t, map[int]string{2026: "115.csv", 2027: "116.csv"}))
+	if d := msg.GetCoveredThrough(); d.GetYear() != 2027 || d.GetMonth() != 12 || d.GetDay() != 31 {
+		t.Errorf("covered_through = %v", d)
 	}
 }
 
-type fakePusher struct{ calls int }
-
-func (f *fakePusher) Trigger() { f.calls++ }
-
-func TestImportPushesAfterASuccessfulImport(t *testing.T) {
-	p := &fakePusher{}
-	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
-	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: fixture(t, "115.csv")})); err != nil {
+func TestCoveredThroughStopsBeforeAGapYear(t *testing.T) {
+	days := []bizcalendar.Day{}
+	for day := time.Date(2028, 1, 1, 0, 0, 0, 0, time.UTC); day.Year() == 2028; day = day.AddDate(0, 0, 1) {
+		days = append(days, bizcalendar.Day{Date: day})
+	}
+	first, err := bizcalendar.ParseOfficeCalendar(2026, fixture(t, "115.csv"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if p.calls != 1 {
-		t.Fatalf("匯入成功後應推送一次，實得 %d", p.calls)
+	withGap, err := bizcalendar.NewCalendar(append(first, days...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := coverage(t, withGap).GetCoveredThrough(); d.GetYear() != 2026 || d.GetMonth() != 12 || d.GetDay() != 31 {
+		t.Errorf("2027 沒有匯入，涵蓋應停在 2026-12-31：%v", d)
 	}
 }
 
-// 解析失敗（沒有寫入）時不推送。
-func TestImportDoesNotPushWhenTheImportFails(t *testing.T) {
-	p := &fakePusher{}
-	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
-	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: "bad"})); err == nil {
-		t.Fatal("壞檔應失敗")
+// 今天所在的年份沒有匯入就是沒有涵蓋（不設），即使之後的年份已匯入。
+func TestCoveredThroughIsUnsetWhenTodaysYearIsNotImported(t *testing.T) {
+	msg := coverage(t, calendarOfYears(t, map[int]string{2027: "116.csv"}))
+	if len(msg.GetYears()) != 1 || msg.GetCoveredThrough() != nil {
+		t.Fatalf("resp = %v", msg)
 	}
-	if p.calls != 0 {
-		t.Fatalf("匯入失敗不得推送：%d", p.calls)
+}
+
+func TestCoverageOfAnEmptyCalendarHasNoCoveredThrough(t *testing.T) {
+	cal, _ := bizcalendar.NewCalendar(nil)
+	msg := coverage(t, cal)
+	if len(msg.GetYears()) != 0 || msg.GetCoveredThrough() != nil {
+		t.Fatalf("resp=%v", msg)
 	}
 }

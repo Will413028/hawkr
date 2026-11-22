@@ -59,6 +59,14 @@ func TestReporterSupplementUsesTheSamePathAsTheDedupeSupplement(t *testing.T) {
 	if !dedupe.Supplemented {
 		t.Fatalf("dedupe=%+v", dedupe)
 	}
+	if dedupe.Report == nil || dedupe.Report.SupplementCount != 2 || dedupe.Report.CanSupplement() != true {
+		t.Fatalf("Submit 併入後回傳的通報要帶補充數：%+v", dedupe.Report)
+	}
+	listed, err := f.module.BuyerReports(ctx, BuyerReportListInput{BuyerID: reporterBuyer, PageSize: 10})
+	must(t, err)
+	if len(listed.Items) != 1 || listed.Items[0].SupplementCount != 2 {
+		t.Fatalf("清單的每筆通報要帶補充數：%+v", listed.Items)
+	}
 	detail, err := f.module.BuyerReport(ctx, reporterBuyer, original.ReportID)
 	must(t, err)
 	if len(detail.Supplements) != 2 || detail.Supplements[0].Description != "主動補充" || detail.Supplements[1].Description != "去重併入" {

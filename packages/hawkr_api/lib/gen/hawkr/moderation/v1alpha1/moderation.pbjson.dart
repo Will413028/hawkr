@@ -113,10 +113,10 @@ const SubmitReportRequest$json = {
 /// Descriptor for `SubmitReportRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List submitReportRequestDescriptor = $convert.base64Decode(
     'ChNTdWJtaXRSZXBvcnRSZXF1ZXN0EkQKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb2'
-    '4udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQJSBnRhcmdldBJGCghjYXRlZ29yeRgCIAEoDjIl'
-    'Lmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECUghjYXRlZ29yeRIgCg'
-    'tkZXNjcmlwdGlvbhgDIAEoCVILZGVzY3JpcHRpb24SJwoKcmVxdWVzdF9pZBgEIAEoCUII4ozP'
-    '1wgCCAFSCXJlcXVlc3RJZA==');
+    '4udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQJSBnRhcmdldBJSCghjYXRlZ29yeRgCIAEoDjIl'
+    'Lmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUIP4EECirUYCA4PEBEEAQgNUg'
+    'hjYXRlZ29yeRIgCgtkZXNjcmlwdGlvbhgDIAEoCVILZGVzY3JpcHRpb24SJwoKcmVxdWVzdF9p'
+    'ZBgEIAEoCUII4ozP1wgCCAFSCXJlcXVlc3RJZA==');
 
 @$core.Deprecated('Use submitReportResponseDescriptor instead')
 const SubmitReportResponse$json = {

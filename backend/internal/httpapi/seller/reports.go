@@ -159,7 +159,9 @@ func (h *Reports) GetMyReport(ctx context.Context, req *connect.Request[pb.GetMy
 		return nil, err
 	}
 	report, supplements, evidence := toReportDetail(r)
-	return connect.NewResponse(&pb.GetMyReportResponse{Report: report, Supplements: supplements, Evidence: evidence}), nil
+	return connect.NewResponse(&pb.GetMyReportResponse{
+		Report: report, Supplements: supplements, Evidence: evidence, CanSupplement: r.CanSupplement(), SupplementMax: model.MaxSupplements,
+	}), nil
 }
 
 var addSupplementPaths = rpc.FieldPaths{"Description": "description", "EvidenceTokens[]": "evidence_staged_tokens[]"}
@@ -185,7 +187,9 @@ func (h *Reports) AddReportSupplement(ctx context.Context, req *connect.Request[
 		return nil, rpc.WithFieldPaths(err, addSupplementPaths)
 	}
 	report, supplements, evidence := toReportDetail(r)
-	return connect.NewResponse(&pb.AddReportSupplementResponse{Report: report, Supplements: supplements, Evidence: evidence}), nil
+	return connect.NewResponse(&pb.AddReportSupplementResponse{
+		Report: report, Supplements: supplements, Evidence: evidence, CanSupplement: r.CanSupplement(), SupplementMax: model.MaxSupplements,
+	}), nil
 }
 
 // toReportDetail 是一筆讀到補充與佐證的通報的契約形狀。

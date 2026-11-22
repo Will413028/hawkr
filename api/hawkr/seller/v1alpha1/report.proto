@@ -6,6 +6,7 @@ syntax = "proto3";
 // （後台稱「通報」與「案件」，檢舉人看到的是這裡的「檢舉」與結果）。
 package hawkr.seller.v1alpha1;
 
+import "hawkr/common/v1alpha1/accepted_values.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
@@ -73,8 +74,22 @@ message StoreReport {
 message CreateReportRequest {
   // 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
   string store_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 檢舉的類別：政策分類中檢舉人可選的值，除了 PLATFORM_ABUSE（只給平台判定與認定）；UNSPECIFIED 與 PLATFORM_ABUSE 回 invalid_argument。
-  hawkr.common.v1alpha1.PolicyCategory category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 檢舉的類別：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory category = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_FOOD_SAFETY,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_PROHIBITED_GOODS,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_UNLICENSED_SALE,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_MISLEADING_INFO,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_FAKE_CERTIFICATION,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_COUNTERFEIT,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_IP_INFRINGEMENT,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_FRAUD,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_OFF_PLATFORM_TRADE,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_PRIVACY,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_IMPERSONATION,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_OTHER
+  ];
   // 檢舉內容，最多 2000 字。
   string description = 3 [(google.api.field_behavior) = REQUIRED];
   // 相關的商品 id，最多 64 字；可以不填。
@@ -105,6 +120,10 @@ message GetMyReportResponse {
   repeated ReportSupplement supplements = 2;
   // 原檢舉與全部補充的佐證，依送出的順序。
   repeated ReportEvidence evidence = 3;
+  // 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+  bool can_supplement = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+  int32 supplement_max = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
@@ -136,4 +155,8 @@ message AddReportSupplementResponse {
   StoreReport report = 1;
   repeated ReportSupplement supplements = 2;
   repeated ReportEvidence evidence = 3;
+  // 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+  bool can_supplement = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+  int32 supplement_max = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

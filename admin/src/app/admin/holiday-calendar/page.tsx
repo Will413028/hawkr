@@ -147,10 +147,12 @@ export default function HolidayCalendarPage() {
 
 	const badge = coverage
 		? coverageBadge(
-				coverageDaysLeft(
-					formatDate(coverage.lastCoveredDate),
-					formatIsoDate(new Date()),
-				),
+				coverage.coveredThrough
+					? coverageDaysLeft(
+							formatDate(coverage.coveredThrough),
+							formatIsoDate(new Date()),
+						)
+					: -1,
 			)
 		: null;
 

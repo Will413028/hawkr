@@ -76,7 +76,7 @@ const renderDialog = (onClose: () => void) =>
 	render(wrap(dialogEl(true, onClose)));
 function fillValid() {
 	fireEvent.change(screen.getByLabelText(/類別/), {
-		target: { value: String(PolicyCategory.SPAM) },
+		target: { value: String(PolicyCategory.FRAUD) },
 	});
 	fireEvent.change(screen.getByLabelText(/說明/), { target: { value: "x" } });
 }
@@ -131,7 +131,7 @@ describe("ReportDialog", () => {
 		);
 		expect(screen.getByText("檢舉商品：蘋果")).toBeTruthy();
 		fireEvent.change(screen.getByLabelText(/類別/), {
-			target: { value: String(PolicyCategory.SPAM) },
+			target: { value: String(PolicyCategory.FRAUD) },
 		});
 		fireEvent.change(screen.getByLabelText(/說明/), {
 			target: { value: "內容" },
@@ -144,7 +144,7 @@ describe("ReportDialog", () => {
 			expect.objectContaining({
 				storeId: "s1",
 				productId: "p1",
-				category: PolicyCategory.SPAM,
+				category: PolicyCategory.FRAUD,
 				description: "內容",
 				evidenceStagedTokens: [],
 			}),
@@ -177,7 +177,7 @@ describe("ReportDialog", () => {
 			),
 		);
 		fireEvent.change(screen.getByLabelText(/類別/), {
-			target: { value: String(PolicyCategory.SPAM) },
+			target: { value: String(PolicyCategory.FRAUD) },
 		});
 		fireEvent.change(screen.getByLabelText(/說明/), { target: { value: "x" } });
 		fireEvent.click(screen.getByRole("button", { name: "送出檢舉" }));
