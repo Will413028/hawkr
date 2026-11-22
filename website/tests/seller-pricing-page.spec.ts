@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { captureHydrationDiagnostics } from "./e2e/helpers/hydration-diagnostics";
 
 const PUBLIC_SECTIONS = [
 	"sp-hero",
@@ -83,6 +84,7 @@ type FaqNavigationGeometry = {
 
 function watchRuntimeErrors(page: Page) {
 	const errors: string[] = [];
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (error) => {
 		errors.push(`pageerror: ${error.message}`);
 	});

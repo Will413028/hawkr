@@ -9,6 +9,7 @@ import {
 	DYNAMIC_ROUTE_CATALOG,
 	type DynamicRouteAccess,
 } from "./helpers/dynamic-route-catalog";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import {
 	fulfillConnect,
 	type MockStore,
@@ -1051,6 +1052,7 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		}
 	};
 
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (error) => {
 		issues.push(`pageerror: ${error.message}`);
 	});

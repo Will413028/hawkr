@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import { isGetSessionUrl } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { gotoStreamed } from "./helpers/streamed-navigation";
@@ -94,6 +95,7 @@ function isExpectedHttpError(
 
 function attachHealthMonitors(page: Page): HealthIssue[] {
 	const issues: HealthIssue[] = [];
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (err) => {
 		issues.push({ kind: "pageerror", detail: err.stack ?? err.message });
 	});
@@ -534,6 +536,7 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 		page,
 	}) => {
 		const pageErrors: string[] = [];
+		captureHydrationDiagnostics(page);
 		page.on("pageerror", (error) => {
 			pageErrors.push(error.stack ?? error.message);
 		});
