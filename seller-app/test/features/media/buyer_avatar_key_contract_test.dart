@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:hawkr_seller/features/chat/data/chat_model.dart';
 import 'package:hawkr_seller/features/order/data/after_sale_model.dart';
 import 'package:hawkr_seller/features/order/data/order_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,9 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// | fixture | 來源 |
 /// |---|---|
-/// | [_wsChatFrame] | WS `/app/chat/ws` 的 `type=chat` frame |
 /// | [_buyersMe] | `GET /app/buyers/me` 的 `data` |
-/// | [_conversationItem] | `GET /app/chat/conversations` 的 `conversations[]` |
 /// | [_sellerOrderRecord] | `GET /app/orders?view=seller` 的 `records[]` |
 /// | [_publicProductReview] | `GET /public/products/{id}/reviews` 的 `records[]` |
 /// | [_postCommentRead] | `GET /public/posts/{id}/comments` 的 `records[]` |
@@ -45,23 +42,6 @@ const String _avatarKey =
 const String _avatarUrl =
     'https://test-media.example.com/i/original/$_avatarKey';
 
-/// WS `/app/chat/ws` 的 `type=chat` frame（逐字）。
-/// 注意：**沒有** `senderAvatar`，也沒有 `avatarUrl`——WS 不經 Gateway 組 URL
-/// （49 §6.7 S4），只帶裸 objectKey。
-const Map<String, dynamic> _wsChatFrame = {
-  'roomId': 'b2001_s9',
-  'type': 'chat',
-  'content': 'P4-seller WS 契約驗證訊息',
-  'from': '2001',
-  'to': '9',
-  'messageId': '7490625959463587764',
-  'seqId': '4',
-  'timestamp': 1785904397836,
-  'msgType': 1,
-  'senderName': '王小明',
-  'avatarKey': _avatarKey,
-};
-
 /// `GET /app/buyers/me` 的 `data`（逐字）。整支端點於本批改成 camelCase DTO。
 const Map<String, dynamic> _buyersMe = {
   'id': '2001',
@@ -78,22 +58,6 @@ const Map<String, dynamic> _buyersMe = {
   'gender': 'male',
   'createdAt': '2026-07-13T17:33:45Z',
   'updatedAt': '2026-08-05T04:10:43Z',
-};
-
-/// `GET /app/chat/conversations` 的單筆 `conversations[]`（逐字）。
-const Map<String, dynamic> _conversationItem = {
-  'avatarKey': _avatarKey,
-  'avatarUrl': _avatarUrl,
-  'lastMessage': 'P4-seller WS 契約驗證訊息',
-  'lastMessageTime': '2026-08-05T04:33:17Z',
-  'lastMessageType': 'text',
-  'logoKey': '',
-  'logoUrl': '',
-  'storeCode': '',
-  'storeName': '',
-  'targetNickname': '王小明',
-  'targetUserId': '2001',
-  'unreadCount': '1',
 };
 
 /// `GET /app/orders?view=seller` 的單筆 `records[]`（逐字，`items` 略）。
@@ -198,31 +162,6 @@ const Map<String, dynamic> _afterSaleCase = {
 };
 
 void main() {
-  group('WS 聊天訊息（唯一頭像來源）', () {
-    test('讀 avatarKey', () {
-      final m = ChatMessage.fromJson(Map<String, dynamic>.from(_wsChatFrame));
-      expect(m.senderAvatar, _avatarKey);
-      // WS 只帶 key，不帶顯示 URL（49 §6.7 S4）。
-      expect(_wsChatFrame.containsKey('avatarUrl'), isFalse);
-    });
-
-    test('舊名 senderAvatar 已不再被讀（只給舊名 → 解析為空）', () {
-      final m = ChatMessage.fromJson({
-        'id': '1',
-        'from': '2001',
-        'to': '9',
-        'content': 'hi',
-        'type': 'text',
-        'timestamp': 1785904397836,
-        'senderAvatar': _avatarKey,
-        'sender_avatar': _avatarKey,
-        'senderAvatarUrl': _avatarUrl,
-        'avatarUrl': _avatarUrl,
-      });
-      expect(m.senderAvatar, isNull);
-    });
-  });
-
   group('賣家訂單卡片的買家頭像', () {
     test('讀 avatarUrl（顯示 URL，非裸 key）', () {
       final o = OrderSummary.fromJson(
@@ -285,9 +224,7 @@ void main() {
       'object_key',
     ];
     const fixtures = <String, Map<String, dynamic>>{
-      'ws chat frame': _wsChatFrame,
       'GET /app/buyers/me': _buyersMe,
-      'GET /app/chat/conversations': _conversationItem,
       'GET /app/orders?view=seller': _sellerOrderRecord,
       'GET /public/products/{id}/reviews': _publicProductReview,
       'GET /public/posts/{id}/comments': _postCommentRead,
@@ -309,7 +246,7 @@ void main() {
   });
 
   group('lib/ 內不得殘留已退役的頭像 wire key', () {
-    // 讀取點散落在 widget 私有函式裡（chat_list_screen `_resolveItem`、
+    // 讀取點散落在 widget 私有函式裡（
     // page_home_feed `_CommentVM.fromRaw`、page_echo_tab、comments_bottom_sheet、
     // product_reviews_screen），無法從測試直接呼叫。這裡改用來源掃描把它們一起
     // 釘住：把任何一處改回舊名，這條就轉紅。
