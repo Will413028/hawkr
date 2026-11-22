@@ -213,12 +213,13 @@ var InternalDependencies = map[string]InternalGraph{
 	},
 	"media": {
 		Packages: map[string][]string{
+			"image":   {},
 			"model":   {},
 			"reclaim": {"model", "storage", "store"},
 			"refsync": {"model"},
 			"storage": {},
 			"store":   {},
-			"upload":  {"model", "storage", "store"},
+			"upload":  {"image", "model", "storage", "store"},
 		},
 	},
 	"accountsuspension": {
