@@ -1,1 +1,1 @@
-/* en 尚未發佈（published locales 只有 zh-TW）：缺的 key 退回 Info.plist 的預設值；英文內容在發佈門檻前補。 */
+/* 沒有列出的 key 退回 Info.plist 的預設值。 */
