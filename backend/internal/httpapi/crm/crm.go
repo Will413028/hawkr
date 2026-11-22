@@ -424,15 +424,11 @@ func (h *App) customerKey(ctx context.Context, rawStoreID, rawBuyerID, buyerFiel
 	return storeID, buyerID, nil
 }
 
-// customer 把模組回的一位客戶組成回應。客戶的買家已刪除（buyer.BatchDisplay 沒有他或標示已刪除）回與客戶不存在相同的 not_found
-// （契約：這家店沒有這位客戶回 not_found）；列表仍以 display.deleted 呈現。
+// customer 把模組回的一位客戶組成回應。客戶的可見性（買家已關閉、店家已退場）由模組在寫入或讀取之前判斷並回 not_found，這裡只做顯示資料的對應。
 func (h *App) customer(ctx context.Context, c crm.Customer) (*pb.Customer, error) {
 	out, err := h.toCustomers(ctx, []crm.Customer{c})
 	if err != nil {
 		return nil, err
-	}
-	if out[0].GetDisplay().GetDeleted() {
-		return nil, h.failure(crm.CustomerNotFound(ctx), noFieldPaths)
 	}
 	return out[0], nil
 }

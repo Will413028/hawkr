@@ -181,15 +181,6 @@
    "why": "ListTags reads a suspended store without checking the seller capability."
   },
   {
-   "id": "crm-single-customer-deleted-buyer-returned",
-   "stack": "go",
-   "file": "backend/internal/httpapi/crm/crm.go",
-   "old": "\tif out[0].GetDisplay().GetDeleted() {",
-   "new": "\tif false && out[0].GetDisplay().GetDeleted() {",
-   "test": "internal/httpapi/crm ^TestSingleCustomerResponsesReturnTheMissingCustomerErrorWhenTheBuyerIsDeleted$",
-   "why": "GetCustomer and the write responses return a customer whose buyer is deleted instead of the not_found promised for a missing customer."
-  },
-  {
    "id": "crm-page-size-negative-accepted",
    "stack": "go",
    "file": "backend/internal/httpapi/crm/crm.go",
@@ -224,6 +215,33 @@
    "new": "\"hawkr.crm.v1alpha1.GetCustomerResponse\":       {\"customer\", \"buyer_cellphone\"},",
    "test": "internal/httpapi/crm ^TestCustomerAndEveryCrmResponseCarryNoContactFields$",
    "why": "The whitelist input for GetCustomerResponse no longer matches the real descriptor, so the CD8 assertion on the walked descriptor must report the mismatch."
+  },
+  {
+   "id": "crm-write-lock-not-closed-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/crm/internal/write/write.go",
+   "old": "\tif err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {",
+   "new": "\tif err := error(nil); err != nil {",
+   "test": "internal/modules/crm ^TestInactiveBuyerIsInvisibleAndReadOnlyToSellers$",
+   "why": "The module no longer checks the buyer's visibility before writing, so a write to a deleted buyer's customer commits (or fails later) instead of returning not_found with nothing written."
+  },
+  {
+   "id": "crm-read-store-not-found-swallowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/crm/internal/read/read.go",
+   "old": "\t\treturn notFound(ctx)\n\t}\n\treturn err",
+   "new": "\t\treturn nil\n\t}\n\treturn err",
+   "test": "internal/modules/crm ^TestInactiveStoreIsInvisibleAndReadOnlyToSellers$",
+   "why": "Reads on a closed or retired store return an empty result instead of the NotFound that writes return."
+  },
+  {
+   "id": "crm-handler-maps-deleted-display-to-not-found",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/crm.go",
+   "old": "\t\treturn nil, err\n\t}\n\treturn out[0], nil",
+   "new": "\t\treturn nil, err\n\t}\n\tif out[0].GetDisplay().GetDeleted() {\n\t\treturn nil, h.failure(crm.CustomerNotFound(ctx), noFieldPaths)\n\t}\n\treturn out[0], nil",
+   "test": "internal/httpapi/crm ^TestDeletedDisplayOnlyMapsToDisplayDeleted$",
+   "why": "The handler judges visibility again after the module committed the write; visibility belongs to the module."
   }
  ]
 }

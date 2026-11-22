@@ -39,6 +39,10 @@ func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
+	tags, err := f.m.ListTags(ctx, storeA)
+	if err != nil || len(tags) != 1 {
+		t.Fatalf("tags=%v err=%v", tags, err)
+	}
 	f.markInactive("BUYER", buyer1)
 
 	t.Run("ListCustomers", func(t *testing.T) {
@@ -63,6 +67,12 @@ func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 			t.Fatal("被拒的寫入改了資料")
 		}
 	})
+	t.Run("RemoveCustomerTag", func(t *testing.T) {
+		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, storeA, buyer1, tags[0].ID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		if n := f.scalar("SELECT count(*) FROM crm.customer_tags WHERE store_id = $1 AND buyer_id = $2", storeA, buyer1); n != 1 {
+			t.Fatalf("被拒的移除改了資料：%d 筆關聯", n)
+		}
+	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
 		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if got := f.tagNames(storeA); len(got) != 1 {
@@ -85,19 +95,16 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	f.markInactive("STORE", storeB)
 
 	t.Run("ListCustomers", func(t *testing.T) {
-		page, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB, Sort: crm.SortTotalSpent})
-		if err != nil || len(page.Customers) != 0 {
-			t.Fatalf("page=%+v err=%v，預期空", page.Customers, err)
-		}
+		_, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB, Sort: crm.SortTotalSpent})
+		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("GetCustomer", func(t *testing.T) {
 		_, err := f.m.GetCustomer(ctx, storeB, buyer1)
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("ListTags", func(t *testing.T) {
-		if got := f.tagNames(storeB); len(got) != 0 {
-			t.Fatalf("標籤 %v，預期空", got)
-		}
+		_, err := f.m.ListTags(ctx, storeB)
+		wantKind(t, err, apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("VIPStatuses", func(t *testing.T) {
 		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeB})

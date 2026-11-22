@@ -652,33 +652,40 @@ func TestUpdateCustomerSetsOnlyTheType(t *testing.T) {
 	}
 }
 
-// 契約：客戶的買家已刪除（buyer.BatchDisplay 沒有他或標示已刪除）時，單一客戶的回應與「這家店沒有這位客戶」是同一個 not_found（列表仍以 display.deleted 呈現）。
-func TestSingleCustomerResponsesReturnTheMissingCustomerErrorWhenTheBuyerIsDeleted(t *testing.T) {
-	wantCode, wantMsg := codeOf(crm.CustomerNotFound(context.Background())), rpc.ConnectError(context.Background(), crm.CustomerNotFound(context.Background())).Message()
-	for name, displays := range map[string][]buyer.Display{
-		"標示已刪除":         {{BuyerID: 70, Deleted: true}},
-		"buyer 沒有回這個買家": nil,
-	} {
-		for procedure := range calls(newEnv(t), "11") {
-			switch procedure {
-			case crmv1alpha1connect.CrmAppServiceGetCustomerProcedure, crmv1alpha1connect.CrmAppServiceUpdateCustomerProcedure,
-				crmv1alpha1connect.CrmAppServiceAddCustomerTagsProcedure, crmv1alpha1connect.CrmAppServiceRemoveCustomerTagProcedure:
-			default:
-				continue
-			}
-			t.Run(name+procedure, func(t *testing.T) {
-				e := newEnv(t)
-				seeded(e)
-				e.buyers.displays = displays
-				err := calls(e, "11")[procedure](signedIn())
-				if err == nil || codeOf(err) != connect.CodeNotFound || wantCode != connect.CodeNotFound {
-					t.Fatalf("code = %v（%v），預期 not_found", codeOf(err), err)
-				}
-				if got := rpc.ConnectError(context.Background(), err).Message(); got != wantMsg {
-					t.Errorf("訊息 %q，預期與客戶不存在相同的 %q", got, wantMsg)
-				}
-			})
+// 契約：客戶的可見性由模組判斷（寫入前、讀取前回 not_found）；handler 把模組的 not_found 原樣對應，不依 buyer.BatchDisplay 另外判斷。
+func TestSingleCustomerResponsesPassTheModulesNotFoundThrough(t *testing.T) {
+	notFound := func() error { return crm.CustomerNotFound(context.Background()) }
+	wantCode, wantMsg := codeOf(notFound()), rpc.ConnectError(context.Background(), notFound()).Message()
+	for procedure := range calls(newEnv(t), "11") {
+		switch procedure {
+		case crmv1alpha1connect.CrmAppServiceGetCustomerProcedure, crmv1alpha1connect.CrmAppServiceUpdateCustomerProcedure,
+			crmv1alpha1connect.CrmAppServiceAddCustomerTagsProcedure, crmv1alpha1connect.CrmAppServiceRemoveCustomerTagProcedure:
+		default:
+			continue
 		}
+		t.Run(procedure, func(t *testing.T) {
+			e := newEnv(t)
+			seeded(e)
+			e.reads.err, e.writes.err = notFound(), notFound()
+			err := calls(e, "11")[procedure](signedIn())
+			if err == nil || codeOf(err) != connect.CodeNotFound || wantCode != connect.CodeNotFound {
+				t.Fatalf("code = %v（%v），預期 not_found", codeOf(err), err)
+			}
+			if got := rpc.ConnectError(context.Background(), err).Message(); got != wantMsg {
+				t.Errorf("訊息 %q，預期 %q", got, wantMsg)
+			}
+		})
+	}
+}
+
+// 模組回了客戶（可見性已由模組判斷）時，buyer 標示已刪除只影響 display.deleted，不改變回應成功與否。
+func TestDeletedDisplayOnlyMapsToDisplayDeleted(t *testing.T) {
+	e := newEnv(t)
+	seeded(e)
+	e.buyers.displays = []buyer.Display{{BuyerID: 70, Deleted: true}}
+	res, err := e.app.GetCustomer(signedIn(), connect.NewRequest(&pb.GetCustomerRequest{StoreId: "11", BuyerId: "70"}))
+	if err != nil || !res.Msg.GetCustomer().GetDisplay().GetDeleted() {
+		t.Fatalf("res=%v err=%v，預期成功且 display.deleted", res, err)
 	}
 }
 
