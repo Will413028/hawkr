@@ -2,8 +2,6 @@ package adksession
 
 import (
 	"context"
-	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,10 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-var schemaPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
-
-// queries 是四張 ADK 表的 SQL。表放在呼叫的模組自己的 schema（sessions、events、app_states、user_states），
-// schema 名稱在建構時驗過格式後才代入 SQL，不接受執行期的任意輸入。
+// queries 是四張 ADK 表的 SQL。表在 schema assistant（sessions、events、app_states、user_states），schema 名稱寫死在 SQL 裡。
 type queries struct {
 	insertSession  string
 	getSession     string
@@ -28,54 +23,50 @@ type queries struct {
 	conn           func(context.Context) db.DBTX
 }
 
-func newQueries(schema string, conn func(context.Context) db.DBTX) (*queries, error) {
-	if !schemaPattern.MatchString(schema) {
-		return nil, fmt.Errorf("adksession：schema 名稱 %q 不合法", schema)
-	}
-	f := func(s string) string { return fmt.Sprintf(s, schema) }
+func newQueries(conn func(context.Context) db.DBTX) *queries {
 	return &queries{
 		conn: conn,
-		insertSession: f(`INSERT INTO %[1]s.sessions (app_name, user_id, id, state, created_at, updated_at)
+		insertSession: `INSERT INTO assistant.sessions (app_name, user_id, id, state, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $5)
-ON CONFLICT (app_name, user_id, id) DO NOTHING`),
-		getSession: f(`SELECT s.app_name, s.user_id, s.id, s.state, s.updated_at,
+ON CONFLICT (app_name, user_id, id) DO NOTHING`,
+		getSession: `SELECT s.app_name, s.user_id, s.id, s.state, s.updated_at,
        COALESCE(a.state, '{}'::jsonb)::jsonb AS app_state,
        COALESCE(u.state, '{}'::jsonb)::jsonb AS user_state
-FROM %[1]s.sessions s
-LEFT JOIN %[1]s.app_states a ON a.app_name = s.app_name
-LEFT JOIN %[1]s.user_states u ON u.app_name = s.app_name AND u.user_id = s.user_id
-WHERE s.app_name = $1 AND s.user_id = $2 AND s.id = $3`),
-		listSessions: f(`SELECT s.app_name, s.user_id, s.id, s.state, s.updated_at,
+FROM assistant.sessions s
+LEFT JOIN assistant.app_states a ON a.app_name = s.app_name
+LEFT JOIN assistant.user_states u ON u.app_name = s.app_name AND u.user_id = s.user_id
+WHERE s.app_name = $1 AND s.user_id = $2 AND s.id = $3`,
+		listSessions: `SELECT s.app_name, s.user_id, s.id, s.state, s.updated_at,
        COALESCE(a.state, '{}'::jsonb)::jsonb AS app_state,
        COALESCE(u.state, '{}'::jsonb)::jsonb AS user_state
-FROM %[1]s.sessions s
-LEFT JOIN %[1]s.app_states a ON a.app_name = s.app_name
-LEFT JOIN %[1]s.user_states u ON u.app_name = s.app_name AND u.user_id = s.user_id
+FROM assistant.sessions s
+LEFT JOIN assistant.app_states a ON a.app_name = s.app_name
+LEFT JOIN assistant.user_states u ON u.app_name = s.app_name AND u.user_id = s.user_id
 WHERE s.app_name = $1 AND ($2::text = '' OR s.user_id = $2::text)
-ORDER BY s.created_at, s.user_id, s.id`),
-		deleteSession: f(`DELETE FROM %[1]s.sessions WHERE app_name = $1 AND user_id = $2 AND id = $3`),
-		touchSession: f(`UPDATE %[1]s.sessions
+ORDER BY s.created_at, s.user_id, s.id`,
+		deleteSession: `DELETE FROM assistant.sessions WHERE app_name = $1 AND user_id = $2 AND id = $3`,
+		touchSession: `UPDATE assistant.sessions
 SET state = state || $4::jsonb, updated_at = $5
 WHERE app_name = $1 AND user_id = $2 AND id = $3
-RETURNING id`),
-		insertEvent: f(`INSERT INTO %[1]s.events (app_name, user_id, session_id, id, timestamp, event)
+RETURNING id`,
+		insertEvent: `INSERT INTO assistant.events (app_name, user_id, session_id, id, timestamp, event)
 VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (app_name, user_id, session_id, id) DO NOTHING`),
-		listEvents: f(`SELECT id, timestamp, event
-FROM %[1]s.events
+ON CONFLICT (app_name, user_id, session_id, id) DO NOTHING`,
+		listEvents: `SELECT id, timestamp, event
+FROM assistant.events
 WHERE app_name = $1 AND user_id = $2 AND session_id = $3
   AND ($4::timestamptz IS NULL OR timestamp >= $4::timestamptz)
 ORDER BY timestamp DESC, seq DESC
-LIMIT $5::int`),
-		mergeAppState: f(`INSERT INTO %[1]s.app_states (app_name, state, updated_at)
+LIMIT $5::int`,
+		mergeAppState: `INSERT INTO assistant.app_states (app_name, state, updated_at)
 VALUES ($1, $2::jsonb, $3)
 ON CONFLICT (app_name) DO UPDATE
-SET state = %[1]s.app_states.state || EXCLUDED.state, updated_at = EXCLUDED.updated_at`),
-		mergeUserState: f(`INSERT INTO %[1]s.user_states (app_name, user_id, state, updated_at)
+SET state = assistant.app_states.state || EXCLUDED.state, updated_at = EXCLUDED.updated_at`,
+		mergeUserState: `INSERT INTO assistant.user_states (app_name, user_id, state, updated_at)
 VALUES ($1, $2, $3::jsonb, $4)
 ON CONFLICT (app_name, user_id) DO UPDATE
-SET state = %[1]s.user_states.state || EXCLUDED.state, updated_at = EXCLUDED.updated_at`),
-	}, nil
+SET state = assistant.user_states.state || EXCLUDED.state, updated_at = EXCLUDED.updated_at`,
+	}
 }
 
 type sessionRow struct {

@@ -17,7 +17,7 @@ schema `assistant`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/feature` 是第一個子領域，實作時改成業務名稱；本模組沒有 sqlc 查詢（沒有 `internal/store`）；ADK 的 `session.Service` 由 `internal/platform/adksession` 以 pgx 實作，schema 傳 `assistant`，四張表在本模組的 `db/schema.sql`（A9-D19 S7）。
+- `internal/model` 放對外型別；`internal/feature` 是第一個子領域，實作時改成業務名稱；本模組沒有 sqlc 查詢（沒有 `internal/store`）；ADK 的 `session.Service` 由 `internal/adksession` 以 pgx 實作（A9-D27），schema 寫死 `assistant`，四張表在本模組的 `db/schema.sql`。
 - `internal/history`：最近一次對話的歷史（只讀）。
 - `internal/buyeragent`：ADK agent 與 3 支 tool，為每一輪建構；`OrderReader` port 由 `cmd/hawkr` 以訂單服務 client 實作。`internal/turn`：輪次執行器、每輪事件緩衝、同對話單一輪次。`internal/text`：模組句子（`make uitext`，zh-TW、en）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
@@ -28,7 +28,7 @@ schema `assistant`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `
 
 - session 的寫入都在 `db.InTx` 內，transaction 內不呼叫 LLM（規則 5）。state delta 以 SQL 的 jsonb `||` 合併，不讀出再寫回；鎖順序 session 列、app 列、user 列，詳見 `backend/docs/modules/assistant.md` §2。
 - session 的寫入（`Create`、`AppendEvent`）必須在最上層呼叫；在外層 transaction 內回 `ErrInOuterTx`。
-- `platform/adksession` 的驗收是 ADK 的 `RunServiceTests`（`session_integration_test.go`，CI 的 Postgres）；`AppendEvent` 寫入內容由純函式 `encodeAppend` 算出，`temp:` 剝除有本機單元測試守。
+- `internal/adksession` 的驗收是 ADK 的 `RunServiceTests`（`session_integration_test.go`，CI 的 Postgres）；`AppendEvent` 寫入內容由純函式 `encodeAppend` 算出，`temp:` 剝除有本機單元測試守。
 - 輪次執行器不開 transaction、不接受 transaction 內的 ctx（`ErrOuterTx`）；LLM 只經 `Deps.LLM`（`internal/platform/llm` 建構）。
 - 同一個對話同時只有一輪（A9-D14）：佔用在終止事件寫入之前釋放，所以釋放路徑（結束、錯誤、panic、逾時、取消）都要先 release 再發終止事件。
 - tool 的身分範圍：session state 的 `buyer_id` 必須等於這一輪的買家；新增 tool 一律用 `newTool`（它先驗範圍），在 callback 與 tool 裡用 `ctx.State()`，不用 `ctx.Session().State()`。

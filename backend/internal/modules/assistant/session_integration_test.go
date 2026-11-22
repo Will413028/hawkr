@@ -14,7 +14,7 @@ import (
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/session/sessiontestsuite"
 
-	"github.com/Will413028/hawkr/backend/internal/platform/adksession"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/adksession"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -34,7 +34,7 @@ func TestADKServiceConformance(t *testing.T) {
 	sessiontestsuite.RunServiceTests(t, sessiontestsuite.SuiteOptions{
 		SupportsUserProvidedSessionID: true,
 		ProvidesServerAssignedEventID: false,
-	}, func(t *testing.T) session.Service { return adksession.New(newDB(t), "assistant") })
+	}, func(t *testing.T) session.Service { return adksession.New(newDB(t)) })
 }
 
 const app = "hawkr_ai"
@@ -66,7 +66,7 @@ func stateOf(sess session.Session) map[string]any {
 }
 
 func TestLiveSessionReflectsAppendedEventAndTempStaysInMemoryOnly(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	ev := &session.Event{Author: "user", InvocationID: "inv", Timestamp: time.Date(2026, 1, 2, 3, 4, 5, 6789, time.UTC),
@@ -98,7 +98,7 @@ func TestLiveSessionReflectsAppendedEventAndTempStaysInMemoryOnly(t *testing.T) 
 }
 
 func TestDuplicateCreateKeepsOriginalAndDoesNotWriteSharedState(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	ctx := context.Background()
 	first, err := s.Create(ctx, &session.CreateRequest{AppName: app, UserID: "u1", SessionID: "s1", State: map[string]any{"k": "orig", "app:a": "1"}})
 	if err != nil {
@@ -120,7 +120,7 @@ func TestDuplicateCreateKeepsOriginalAndDoesNotWriteSharedState(t *testing.T) {
 // Create、AppendEvent 在提交後才更新 live session，外層 transaction 之後 rollback 會讓記憶體分岔，所以在外層 transaction 內一律拒絕。
 func TestCreateAndAppendRefuseToRunInsideOuterTx(t *testing.T) {
 	d := newDB(t)
-	s := adksession.New(d, "assistant")
+	s := adksession.New(d)
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	err := d.InTx(ctx, func(ctx context.Context) error {
@@ -144,7 +144,7 @@ func TestCreateAndAppendRefuseToRunInsideOuterTx(t *testing.T) {
 // 若 Get 拆成兩個沒有快照的語句，這裡會成功而不是回 ErrSnapshotInTx。
 func TestGetReadsInOneSnapshot(t *testing.T) {
 	d := newDB(t)
-	s := adksession.New(d, "assistant")
+	s := adksession.New(d)
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	err := d.InTx(ctx, func(ctx context.Context) error {
@@ -160,7 +160,7 @@ func TestGetReadsInOneSnapshot(t *testing.T) {
 }
 
 func TestEventsWithEqualTimestampKeepInsertionOrder(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	ts := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -180,7 +180,7 @@ func TestEventsWithEqualTimestampKeepInsertionOrder(t *testing.T) {
 }
 
 func TestFailedAppendRollsBackStateDelta(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	ok := &session.Event{ID: "e1", Author: "user", InvocationID: "i"}
@@ -203,7 +203,7 @@ func TestFailedAppendRollsBackStateDelta(t *testing.T) {
 }
 
 func TestAppendToAnotherUsersSessionIsNotFound(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	sess := mustCreate(t, s, "u1", nil)
 	other := foreignSession{appName: app, userID: "u2", id: sess.ID()}
 	err := s.AppendEvent(context.Background(), other, &session.Event{ID: "e", Author: "user", InvocationID: "i"})
@@ -217,7 +217,7 @@ func TestAppendToAnotherUsersSessionIsNotFound(t *testing.T) {
 
 func TestDeleteCascadesEventsAndOnlyOwnSession(t *testing.T) {
 	d := newDB(t)
-	s := adksession.New(d, "assistant")
+	s := adksession.New(d)
 	ctx := context.Background()
 	a := mustCreate(t, s, "u1", nil)
 	b := mustCreate(t, s, "u1", nil)
@@ -239,7 +239,7 @@ func TestDeleteCascadesEventsAndOnlyOwnSession(t *testing.T) {
 }
 
 func TestConcurrentAppendsKeepEveryStateKey(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	ctx := context.Background()
 	sess := mustCreate(t, s, "u1", nil)
 	const n = 8
@@ -275,7 +275,7 @@ func TestConcurrentAppendsKeepEveryStateKey(t *testing.T) {
 }
 
 func TestListEmptyUserIDListsAllUsersWithTheirOwnUserState(t *testing.T) {
-	s := adksession.New(newDB(t), "assistant")
+	s := adksession.New(newDB(t))
 	mustCreate(t, s, "u1", map[string]any{"user:name": "a"})
 	mustCreate(t, s, "u2", map[string]any{"user:name": "b"})
 	r, err := s.List(context.Background(), &session.ListRequest{AppName: app})

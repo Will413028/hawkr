@@ -1,9 +1,9 @@
 // Package adksession 以 pgx 實作 ADK v2 的 session.Service（A9-D5、A9-D19 S7）。
 //
-// 四張表（sessions、events、app_states、user_states）由呼叫的模組在自己的 schema 建（形狀見 assistant 的 db/schema.sql），
-// New 收 schema 名稱；本套件不擁有任何表。
+// 四張表（sessions、events、app_states、user_states）在 assistant 的 schema（形狀見 assistant 的 db/schema.sql），
+// 本套件不擁有任何表，只服務 assistant 模組。
 //
-// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（各模組的 session_integration_test.go，在 CI 的 Postgres 上跑）。
+// 驗收是 ADK 公開的 session/sessiontestsuite.RunServiceTests（assistant 的 session_integration_test.go，在 CI 的 Postgres 上跑）。
 // 寫入都在 db.InTx 內，transaction 內沒有任何外部 provider 呼叫（backend/AGENTS.md 規則 5）。
 package adksession
 
@@ -31,14 +31,9 @@ type Service struct {
 
 var _ session.Service = (*Service)(nil)
 
-// New 建立 session service；schema 是呼叫的模組放四張 ADK 表的 schema（小寫字母、數字、底線）。
-// schema 不合法是程式錯誤（寫死在模組的組裝處），所以直接 panic。
-func New(d *db.DB, schema string) *Service {
-	q, err := newQueries(schema, d.Conn)
-	if err != nil {
-		panic(err)
-	}
-	return &Service{db: d, q: q}
+// New 建立 session service。
+func New(d *db.DB) *Service {
+	return &Service{db: d, q: newQueries(d.Conn)}
 }
 
 // ErrInOuterTx 是在已有 transaction 的 ctx 上呼叫 Create 或 AppendEvent 時回傳的錯誤：這兩個方法在提交後才更新

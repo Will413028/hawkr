@@ -11,7 +11,7 @@
 
 ## 2. Session 儲存（A9-D5）
 
-`internal/platform/adksession`（A9-D19 S7 由本模組抽出，procurement 共用，各模組建自己 schema 的四張表）以 pgx 實作 ADK v2 的 `session.Service`；不改 ADK 原始碼，GORM 不進單體。資料在 schema `assistant` 的四張表（`db/schema.sql`）。
+`internal/modules/assistant/internal/adksession`（A9-D27：原在 `internal/platform`，採購不用 ADK session，搬回本模組；schema 寫死 `assistant`）以 pgx 實作 ADK v2 的 `session.Service`；不改 ADK 原始碼，GORM 不進單體。資料在 schema `assistant` 的四張表（`db/schema.sql`）。
 
 | 語意 | 行為 |
 |---|---|
