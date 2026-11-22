@@ -196,6 +196,6 @@
 - 聯絡方式的保留規則（結果設定後 30 天且不早於建立後 90 天、絕對上限 365 天）與清除 job（`seller.erase_report_contacts`）刪除：不再收集聯絡方式，就沒有要清的欄位，保留上限的決定（2026-10-18）隨欄位消失。
 - 契約：後台 `Report.contact`（9）、`contact_erase_time`（10）、`discarded_submission_count`（24）與 `ReportSupplement.matched_by`（5）改為 reserved，`ReporterContact`、`SupplementMatch` 刪除；`reporter_buyer_id` 一定有值。`ReportReceived` 不再帶確認信地址與 `Discarded`，`ReporterBuyerID` 為必有。
 - 資料：系統從未上線，migration 先刪既有的匿名通報與依附它的補充、移動紀錄、認定來源與佐證讀取紀錄，再收緊約束。
-- 理由（計畫 10f-2 G2）：一般電商的基準（Shopee、momo、Amazon）是登入才能檢舉；匿名入口的理由是食安法，範圍縮減已刪掉轉報義務。匿名入口一併刪除它的聯絡方式保留、清除 job 與每 IP 額度。10f-5 的權利人通報不預先保留這些欄位（它的儲存在 10f-5 決定簡報裡定）。
+- 理由（計畫 10f-2 G2）：一般電商的基準（Shopee、momo、Amazon）是登入才能檢舉；匿名入口的理由是食安法，範圍縮減已刪掉轉報義務。匿名入口一併刪除它的聯絡方式保留、清除 job 與每 IP 額度。10f-5 的權利人通報不預先保留這些欄位；10f-5 已取消（Will 2026-11-22，`backend/docs/plans/2026-09-29-a3-buyer-seller/step10f-5-brief.md`），沒有權利人通報的儲存。
 
 本檔修訂已超過 3 段，下一次修訂時改寫成整合版。
