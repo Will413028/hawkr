@@ -10,6 +10,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -147,6 +148,19 @@ def split_selector(selector: str) -> tuple[str, str]:
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
+def package_script(repo: Path, app: str, name: str) -> list[str]:
+    """`<app>/package.json` 的 script 拆成 argv；測試的載入方式只在那裡寫一次。"""
+    path = repo / app / "package.json"
+    try:
+        script = json.loads(path.read_text(encoding="utf-8"))["scripts"][name]
+        argv = shlex.split(script)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise ManifestError(f"{path} 讀不到 script {name!r}：{e}") from e
+    if not argv:
+        raise ManifestError(f"{path} 的 script {name!r} 是空的")
+    return argv
+
+
 def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     head, rest = split_selector(selector)
     env = dict(os.environ)
@@ -163,13 +177,13 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
         return Command(argv, repo / moddir, env, stack)
     if stack == "admin":
         # node:test 的旗標要放在測試檔之前，放在後面會被忽略（整個檔案照跑）。
-        argv = ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test"]
+        argv = package_script(repo, "admin", "test:file")
         if rest:
             argv += ["--test-name-pattern", rest]
         argv.append(head)
         return Command(argv, repo / "admin", env, stack)
     if stack == "website":
-        argv = ["pnpm", "exec", "vitest", "run", "--project", "unit", head]
+        argv = ["pnpm", "exec", *package_script(repo, "website", "test"), head]
         if rest:
             argv += ["-t", rest]
         return Command(argv, repo / "website", env, stack)

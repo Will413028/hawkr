@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -224,9 +225,9 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(c.argv, ["go", "test", "-count=1", "-vet=off", "-timeout", t, "-tags", "integration", "./internal/x/", "-run", "^TestA$"])
         self.assertEqual((c.cwd, c.env["GOWORK"]), (repo / "backend", "off"))
         self.assertNotIn("integration", run.build_command("go", "p ^T$", repo).argv)
-        w = run.build_command("website", "a/b.test.ts some name", repo)
+        w = run.build_command("website", "a/b.test.ts some name", run.REPO)
         self.assertEqual(w.argv[-2:], ["-t", "some name"])
-        self.assertEqual(run.build_command("website", "a.ts", repo).argv[-1], "a.ts")
+        self.assertEqual(run.build_command("website", "a.ts", run.REPO).argv[-1], "a.ts")
         f = run.build_command("flutter:buyer-app", "test/a_test.dart my case", repo)
         self.assertEqual(f.cwd, repo / "buyer-app")
         self.assertEqual(f.argv[-2:], ["--plain-name", "my case"])
@@ -263,14 +264,39 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(run.test_file("go", "p ^T$", repo), repo / "backend" / "p")
 
     def test_admin_commands(self):
-        repo = Path("/r")
+        repo = run.REPO
+        base = run.package_script(repo, "admin", "test:file")
         a = run.build_command("admin", "tests/x.test.ts my case", repo)
         self.assertEqual(a.cwd, repo / "admin")
-        self.assertEqual(a.argv, ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test",
-                                  "--test-name-pattern", "my case", "tests/x.test.ts"])
-        self.assertEqual(run.build_command("admin", "tests/x.test.ts", repo).argv[-2:], ["--test", "tests/x.test.ts"])
+        self.assertEqual(a.argv, base + ["--test-name-pattern", "my case", "tests/x.test.ts"])
+        self.assertEqual(run.build_command("admin", "tests/x.test.ts", repo).argv, base + ["tests/x.test.ts"])
+        self.assertEqual(base[-1], "--test")
         self.assertIsNone(run.build_check_command("admin", "tests/x.test.ts", "admin/a.ts", repo))
         self.assertEqual(run.test_file("admin", "tests/x.test.ts", repo), repo / "admin" / "tests/x.test.ts")
+
+    def test_commands_follow_package_scripts(self):
+        repo = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, repo)
+        for app, scripts in (("admin", {"test:file": "node --import ./x.mjs --test"}),
+                             ("website", {"test": "vitest run --project other"})):
+            (repo / app).mkdir()
+            (repo / app / "package.json").write_text(json.dumps({"scripts": scripts}), encoding="utf-8")
+        self.assertEqual(run.build_command("admin", "t.ts n", repo).argv,
+                         ["node", "--import", "./x.mjs", "--test", "--test-name-pattern", "n", "t.ts"])
+        self.assertEqual(run.build_command("website", "t.ts n", repo).argv,
+                         ["pnpm", "exec", "vitest", "run", "--project", "other", "t.ts", "-t", "n"])
+        (repo / "admin" / "package.json").write_text("{}", encoding="utf-8")
+        with self.assertRaises(run.ManifestError):
+            run.build_command("admin", "t.ts", repo)
+
+    def test_real_package_scripts_drive_runner(self):
+        repo = run.REPO
+        admin = json.loads((repo / "admin" / "package.json").read_text(encoding="utf-8"))["scripts"]
+        website = json.loads((repo / "website" / "package.json").read_text(encoding="utf-8"))["scripts"]
+        self.assertEqual(run.build_command("admin", "tests/x.test.ts", repo).argv[:-1], admin["test:file"].split())
+        self.assertIn("pnpm run test:file", admin["test"])
+        self.assertEqual(run.build_command("website", "a.test.ts", repo).argv,
+                         ["pnpm", "exec", *website["test"].split(), "a.test.ts"])
 
     def test_admin_build_error(self):
         self.assertTrue(run.has_build_error("admin", "x.ts:2:18: ERROR: Unexpected \";\"\n  name: 'TransformError'"))

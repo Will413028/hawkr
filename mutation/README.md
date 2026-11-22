@@ -28,8 +28,8 @@ mutation 不在開發機跑（機器共用，Go integration 需要資料庫容�
 | `go-integration` | `<相對 backend 的套件目錄> <regex>` | `go test -count=1 -vet=off -tags integration ./<套件>/ -run '<regex>'`（`backend`，`GOWORK=off`） |
 | `go` | 同上 | 同上但不帶 integration tag |
 | `go:<模組目錄>`、`go-integration:<模組目錄>` | 同上，套件目錄改為相對該模組 | 同上，工作目錄改為 `<模組目錄>`（相對 repo 根目錄，例如 `backend/services/invoice-service`，`GOWORK=off`）；目錄必須存在且有 `go.mod`（`--validate` 檢查） |
-| `website` | `<相對 website 的測試檔> [測試名稱]` | `pnpm exec vitest run --project unit <檔> -t '<名稱>'`（`website`） |
-| `admin` | `<相對 admin 的測試檔> [測試名稱]` | `node --import tsx --import ./tests/setup/env.mjs --test [--test-name-pattern '<名稱>'] <檔>`（`admin`，與 `admin/package.json` 的 `test` 同一組載入）。`--test-name-pattern` 必須在檔案之前，放後面 node 會忽略並整檔照跑 |
+| `website` | `<相對 website 的測試檔> [測試名稱]` | `pnpm exec <website/package.json 的 test script> <檔> -t '<名稱>'`（`website`；指令取自該 script，目前是 `vitest run --project unit`） |
+| `admin` | `<相對 admin 的測試檔> [測試名稱]` | `<admin/package.json 的 test:file script> [--test-name-pattern '<名稱>'] <檔>`（`admin`；`test:file` 目前是 `node --import tsx --import ./tests/setup/env.mjs --test`，`pnpm test` 也呼叫它，runner 讀 script 後直接以 node 執行）。`--test-name-pattern` 必須在檔案之前，放後面 node 會忽略並整檔照跑 |
 | `flutter:buyer-app`、`flutter:seller-app`（只接受這兩個） | `<相對該 App 的測試檔> [測試名稱]` | `bash scripts/ci-flutter-test.sh --no-pub <檔> --plain-name '<名稱>'`（該 App 目錄） |
 
 - Go 的 regex 要錨定（`^TestX$`，子測試 `^TestX$/^sub$`）：前綴比對可能讓被擋下的 mutant 被誤判。
