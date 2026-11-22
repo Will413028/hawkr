@@ -3,29 +3,29 @@
   {
    "id": "supplement-button-always",
    "stack": "website",
-   "file": "website/features/report/report-logic.ts",
-   "old": "return (\n\t\tdetail.report !== undefined &&\n\t\tdetail.report.outcome === undefined &&\n\t\tdetail.supplements.length < MAX_SUPPLEMENTS\n\t);",
-   "new": "return true;",
+   "file": "website/features/account/screens/reports/StoreReportDetailClient.tsx",
+   "old": "{detail.canSupplement ? (",
+   "new": "{true ? (",
    "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
-   "why": "補充入口永遠顯示（有結果、滿 10 則仍顯示）"
+   "why": "補充入口永遠顯示（有結果、滿上限仍顯示）"
   },
   {
-   "id": "supplement-limit-dropped",
+   "id": "supplement-max-hardcoded",
    "stack": "website",
-   "file": "website/features/report/report-logic.ts",
-   "old": " &&\n\t\tdetail.supplements.length < MAX_SUPPLEMENTS",
-   "new": "",
-   "test": "features/report/my-reports.unit.test.ts hides the supplement button at 10 supplements",
-   "why": "補充滿 10 則仍顯示補充入口"
+   "file": "website/features/account/screens/reports/StoreReportDetailClient.tsx",
+   "old": "max: detail.supplementMax,",
+   "new": "max: 10,",
+   "test": "features/report/my-reports.unit.test.ts takes the heading's maximum from supplement_max, not a client constant",
+   "why": "補充說明標題的上限不取自伺服器的 supplement_max"
   },
   {
-   "id": "supplement-shown-with-outcome",
+   "id": "supplement-response-can-flag-ignored",
    "stack": "website",
-   "file": "website/features/report/report-logic.ts",
-   "old": "detail.report.outcome === undefined &&",
-   "new": "true &&",
-   "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
-   "why": "已有結果仍顯示補充入口"
+   "file": "website/features/report/hooks.ts",
+   "old": "canSupplement: latest.canSupplement,",
+   "new": "canSupplement: true,",
+   "test": "features/report/my-reports.unit.test.ts uses can_supplement and supplement_max of the AddReportSupplement response afterwards",
+   "why": "補充成功後的狀態不採用回應的 can_supplement"
   },
   {
    "id": "success-sentence-tail-removed",

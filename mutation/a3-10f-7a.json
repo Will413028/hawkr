@@ -1,0 +1,166 @@
+{
+ "mutants": [
+  {
+   "id": "go-store-list-gains-spam",
+   "stack": "go",
+   "file": "backend/internal/platform/policy/accepted_gen.go",
+   "old": "var acceptedSellerCreateReportRequestCategory = []Category{\n\tCategory(\"FOOD_SAFETY\"),",
+   "new": "var acceptedSellerCreateReportRequestCategory = []Category{\n\tCategory(\"SPAM\"),\n\tCategory(\"FOOD_SAFETY\"),",
+   "test": "internal/platform/policy ^TestReporterSelectableIsExplicit$",
+   "why": "A community category (SPAM) is added to the store-report list source."
+  },
+  {
+   "id": "go-community-list-loses-hate",
+   "stack": "go",
+   "file": "backend/internal/platform/policy/accepted_gen.go",
+   "old": "\tCategory(\"HATE\"),\n",
+   "new": "",
+   "test": "internal/platform/policy ^TestCommunityReporterSelectableIsExplicit$",
+   "why": "HATE is dropped from the community-report list source."
+  },
+  {
+   "id": "website-store-list-gains-spam",
+   "stack": "website",
+   "file": "packages/hawkr-ui-text-ts/src/accepted.gen.ts",
+   "old": "export const SELLER_CREATE_REPORT_REQUEST_CATEGORY: readonly PolicyCategory[] = [\n",
+   "new": "export const SELLER_CREATE_REPORT_REQUEST_CATEGORY: readonly PolicyCategory[] = [\n\tPolicyCategory.SPAM,\n",
+   "test": "features/report/report-logic.unit.test.ts excludes the 4 community categories, PLATFORM_ABUSE and UNSPECIFIED",
+   "why": "SPAM is added to the store-report category list consumed by the website."
+  },
+  {
+   "id": "website-validate-accepts-any-category",
+   "stack": "website",
+   "file": "website/features/report/report-logic.ts",
+   "old": "draft.category === undefined || !SELECTABLE.has(draft.category)",
+   "new": "draft.category === undefined",
+   "test": "features/report/report-logic.unit.test.ts rejects every community category as a store-report category",
+   "why": "The draft check stops rejecting categories outside the accepted list."
+  },
+  {
+   "id": "admin-awaiting-list-gains-spam",
+   "stack": "admin",
+   "file": "packages/hawkr-ui-text-ts/src/accepted.gen.ts",
+   "old": "export const SELLER_CREATE_REPORT_REQUEST_CATEGORY: readonly PolicyCategory[] = [\n",
+   "new": "export const SELLER_CREATE_REPORT_REQUEST_CATEGORY: readonly PolicyCategory[] = [\n\tPolicyCategory.SPAM,\n",
+   "test": "tests/policy-category.test.ts 檢舉人可選的類別（生成的 accepted 常數）：全部除了 PLATFORM_ABUSE 與社群類別（12 個，含 OTHER）",
+   "why": "SPAM is added to the reporter-selectable list the admin triage filter uses."
+  },
+  {
+   "id": "buyer-store-list-gains-spam",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/lib/src/accepted.g.dart",
+   "old": "const List<hawkr_common_v1alpha1_policy_category.PolicyCategory> sellerCreateReportRequestCategory = <hawkr_common_v1alpha1_policy_category.PolicyCategory>[\n",
+   "new": "const List<hawkr_common_v1alpha1_policy_category.PolicyCategory> sellerCreateReportRequestCategory = <hawkr_common_v1alpha1_policy_category.PolicyCategory>[\n  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_SPAM,\n",
+   "test": "test/features/moderation/store_report_test.dart 社群的四個類別不在店家檢舉的清單與畫面選項",
+   "why": "SPAM is added to the store-report category list consumed by buyer-app."
+  },
+  {
+   "id": "buyer-community-list-loses-hate",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/lib/src/accepted.g.dart",
+   "old": "  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_HATE,\n",
+   "new": "",
+   "test": "test/features/moderation/store_report_test.dart 社群的四個類別不在店家檢舉的清單與畫面選項",
+   "why": "HATE is dropped from the community-report category list consumed by buyer-app."
+  },
+  {
+   "id": "can-supplement-always-true-model",
+   "stack": "go",
+   "file": "backend/internal/modules/seller/internal/model/report_case.go",
+   "old": "func (r Report) CanSupplement() bool { return r.SupplementBlock() == SupplementAllowed }",
+   "new": "func (r Report) CanSupplement() bool { return true }",
+   "test": "internal/modules/seller/internal/model ^TestSupplementBlockOfIsTheOnlyRule$",
+   "why": "CanSupplement no longer follows the shared rule and is always true."
+  },
+  {
+   "id": "can-supplement-always-true-flags-test",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/model/report_case.go",
+   "old": "func (r Report) CanSupplement() bool { return r.SupplementBlock() == SupplementAllowed }",
+   "new": "func (r Report) CanSupplement() bool { return true }",
+   "test": "internal/modules/seller ^TestCanFlagsMatchWhetherTheActionSucceeds$",
+   "why": "The can flag says true where AddReportSupplement is blocked (outcome or limit)."
+  },
+  {
+   "id": "supplement-limit-off-by-one",
+   "stack": "go",
+   "file": "backend/internal/modules/seller/internal/model/report_case.go",
+   "old": "\tcase supplementCount >= MaxSupplements:",
+   "new": "\tcase supplementCount > MaxSupplements:",
+   "test": "internal/modules/seller/internal/model ^TestSupplementBlockOfIsTheOnlyRule$",
+   "why": "The supplement limit allows one more than MaxSupplements."
+  },
+  {
+   "id": "handler-get-can-supplement-true",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/reports.go",
+   "old": "pb.GetMyReportResponse{\n\t\tReport: report, Supplements: supplements, Evidence: evidence, CanSupplement: r.CanSupplement(),",
+   "new": "pb.GetMyReportResponse{\n\t\tReport: report, Supplements: supplements, Evidence: evidence, CanSupplement: true,",
+   "test": "internal/httpapi/seller ^TestReportResponsesCarryCanSupplementAndTheMax$",
+   "why": "GetMyReport reports can_supplement true regardless of the module's answer."
+  },
+  {
+   "id": "handler-add-can-supplement-true",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/reports.go",
+   "old": "pb.AddReportSupplementResponse{\n\t\tReport: report, Supplements: supplements, Evidence: evidence, CanSupplement: r.CanSupplement(),",
+   "new": "pb.AddReportSupplementResponse{\n\t\tReport: report, Supplements: supplements, Evidence: evidence, CanSupplement: true,",
+   "test": "internal/httpapi/seller ^TestReportResponsesCarryCanSupplementAndTheMax$",
+   "why": "AddReportSupplement reports can_supplement true regardless of the module's answer."
+  },
+  {
+   "id": "website-detail-ignores-can-supplement",
+   "stack": "website",
+   "file": "website/features/account/screens/reports/StoreReportDetailClient.tsx",
+   "old": "{detail.canSupplement ? (",
+   "new": "{detail.canSupplement || true ? (",
+   "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
+   "why": "The detail screen shows the supplement button even when can_supplement is false."
+  },
+  {
+   "id": "website-adopt-drops-can-supplement",
+   "stack": "website",
+   "file": "website/features/report/hooks.ts",
+   "old": "canSupplement: latest.canSupplement,",
+   "new": "canSupplement: true,",
+   "test": "features/report/my-reports.unit.test.ts uses can_supplement and supplement_max of the AddReportSupplement response afterwards",
+   "why": "After a supplement the state ignores the response's can_supplement."
+  },
+  {
+   "id": "website-adopt-drops-supplement-max",
+   "stack": "website",
+   "file": "website/features/report/hooks.ts",
+   "old": "supplementMax: latest.supplementMax,",
+   "new": "supplementMax: 10,",
+   "test": "features/report/my-reports.unit.test.ts uses can_supplement and supplement_max of the AddReportSupplement response afterwards",
+   "why": "After a supplement the state ignores the response's supplement_max."
+  },
+  {
+   "id": "buyer-detail-ignores-can-supplement",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/store_report_detail_screen.dart",
+   "old": "        if (d.canSupplement)\n",
+   "new": "        if (d.canSupplement || true)\n",
+   "test": "test/features/moderation/store_report_detail_test.dart 詳情：有結果時隱藏補充按鈕並顯示平台說明",
+   "why": "The detail screen shows the supplement button even when can_supplement is false."
+  },
+  {
+   "id": "buyer-apply-supplement-drops-can-supplement",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/store_report_detail_provider.dart",
+   "old": "canSupplement: response.canSupplement,",
+   "new": "canSupplement: true,",
+   "test": "test/features/moderation/store_report_detail_test.dart 補充成功後以回應的 can_supplement 與 supplement_max 取代狀態",
+   "why": "After a supplement the state ignores the response's can_supplement."
+  },
+  {
+   "id": "buyer-apply-supplement-drops-supplement-max",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/store_report_detail_provider.dart",
+   "old": "supplementMax: response.supplementMax,",
+   "new": "supplementMax: 10,",
+   "test": "test/features/moderation/store_report_detail_test.dart 補充成功後以回應的 can_supplement 與 supplement_max 取代狀態",
+   "why": "After a supplement the state ignores the response's supplement_max."
+  }
+ ]
+}
