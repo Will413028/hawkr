@@ -772,9 +772,11 @@ type GetProductReviewStatsResponse struct {
 	// 平均星等，四捨五入到小數第二位；沒有評價是 0。
 	Average float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
 	// 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
-	Distribution  []*RatingCount `protobuf:"bytes,3,rep,name=distribution,proto3" json:"distribution,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Distribution []*RatingCount `protobuf:"bytes,3,rep,name=distribution,proto3" json:"distribution,omitempty"`
+	// 公開可讀且帶圖的評價數（與 ListProductReviews 的 with_images 篩選同一個條件）。
+	WithImagesCount int32 `protobuf:"varint,4,opt,name=with_images_count,json=withImagesCount,proto3" json:"with_images_count,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetProductReviewStatsResponse) Reset() {
@@ -826,6 +828,13 @@ func (x *GetProductReviewStatsResponse) GetDistribution() []*RatingCount {
 		return x.Distribution
 	}
 	return nil
+}
+
+func (x *GetProductReviewStatsResponse) GetWithImagesCount() int32 {
+	if x != nil {
+		return x.WithImagesCount
+	}
+	return 0
 }
 
 type GetReviewRequest struct {
@@ -1446,11 +1455,12 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"B\n" +
 	"\x1cGetProductReviewStatsRequest\x12\"\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x97\x01\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\xc3\x01\n" +
 	"\x1dGetProductReviewStatsResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x18\n" +
 	"\aaverage\x18\x02 \x01(\x01R\aaverage\x12F\n" +
-	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"4\n" +
+	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\x12*\n" +
+	"\x11with_images_count\x18\x04 \x01(\x05R\x0fwithImagesCount\"4\n" +
 	"\x10GetReviewRequest\x12 \n" +
 	"\treview_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breviewId\"J\n" +
 	"\x11GetReviewResponse\x125\n" +

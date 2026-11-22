@@ -1052,11 +1052,13 @@ class GetProductReviewStatsResponse extends $pb.GeneratedMessage {
     $core.int? count,
     $core.double? average,
     $core.Iterable<RatingCount>? distribution,
+    $core.int? withImagesCount,
   }) {
     final result = GetProductReviewStatsResponse._();
     if (count != null) result.count = count;
     if (average != null) result.average = average;
     if (distribution != null) result.distribution.addAll(distribution);
+    if (withImagesCount != null) result.withImagesCount = withImagesCount;
     return result;
   }
 
@@ -1078,6 +1080,7 @@ class GetProductReviewStatsResponse extends $pb.GeneratedMessage {
     ..aD(2, _omitFieldNames ? '' : 'average')
     ..pPM<RatingCount>(3, _omitFieldNames ? '' : 'distribution',
         subBuilder: RatingCount.$_createMessage)
+    ..aI(4, _omitFieldNames ? '' : 'withImagesCount')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1131,6 +1134,16 @@ class GetProductReviewStatsResponse extends $pb.GeneratedMessage {
   /// 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
   @$pb.TagNumber(3)
   $pb.PbList<RatingCount> get distribution => $_getList(2);
+
+  /// 公開可讀且帶圖的評價數（與 ListProductReviews 的 with_images 篩選同一個條件）。
+  @$pb.TagNumber(4)
+  $core.int get withImagesCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set withImagesCount($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasWithImagesCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearWithImagesCount() => $_clearField(4);
 }
 
 class GetReviewRequest extends $pb.GeneratedMessage {

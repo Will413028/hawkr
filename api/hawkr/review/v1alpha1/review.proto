@@ -175,6 +175,8 @@ message GetProductReviewStatsResponse {
   double average = 2;
   // 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
   repeated RatingCount distribution = 3;
+  // 公開可讀且帶圖的評價數（與 ListProductReviews 的 with_images 篩選同一個條件）。
+  int32 with_images_count = 4;
 }
 
 message GetReviewRequest {

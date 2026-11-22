@@ -119,5 +119,5 @@ func (h *Public) GetProductReviewStats(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	return connect.NewResponse(&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}), nil
+	return connect.NewResponse(&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), WithImagesCount: statCount(s.WithImagesCount), Average: s.Average, Distribution: ratingCounts(s.Distribution)}), nil
 }

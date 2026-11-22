@@ -424,12 +424,12 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 
 func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *testing.T) {
 	e := newEnv(t, nil)
-	e.reads.pstats = review.ProductStats{Count: 7, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
+	e.reads.pstats = review.ProductStats{Count: 7, WithImagesCount: 3, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
 	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "21"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Msg.GetCount() != 7 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
+	if resp.Msg.GetCount() != 7 || resp.Msg.GetWithImagesCount() != 3 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
 		t.Fatalf("統計：%v id=%d", resp.Msg, e.reads.id)
 	}
 	if d := resp.Msg.GetDistribution(); len(d) != 5 {

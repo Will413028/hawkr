@@ -347,15 +347,16 @@ const GetProductReviewStatsResponse$json = {
       '6': '.hawkr.review.v1alpha1.RatingCount',
       '10': 'distribution'
     },
+    {'1': 'with_images_count', '3': 4, '4': 1, '5': 5, '10': 'withImagesCount'},
   ],
 };
 
 /// Descriptor for `GetProductReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List getProductReviewStatsResponseDescriptor =
-    $convert.base64Decode(
-        'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
-        'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
-        'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbg==');
+final $typed_data.Uint8List getProductReviewStatsResponseDescriptor = $convert.base64Decode(
+    'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
+    'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
+    'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbhIqChF3aXRoX2ltYWdlc1'
+    '9jb3VudBgEIAEoBVIPd2l0aEltYWdlc0NvdW50');
 
 @$core.Deprecated('Use getReviewRequestDescriptor instead')
 const GetReviewRequest$json = {
