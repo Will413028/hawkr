@@ -174,10 +174,11 @@ type GetHolidayCalendarCoverageResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 已匯入的年份，依年份由小到大。
 	Years []*HolidayCalendarYear `protobuf:"bytes,1,rep,name=years,proto3" json:"years,omitempty"`
-	// 已匯入的最後一年的 12 月 31 日。年份之間可能有缺：各年是否涵蓋看 years。沒有任何年份時不設。
-	LastCoveredDate *date.Date `protobuf:"bytes,2,opt,name=last_covered_date,json=lastCoveredDate,proto3" json:"last_covered_date,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// 從今天（台北日）起連續涵蓋的最後一天：今天所在年份起、連續已匯入的最後一年的 12 月 31 日，中間缺一年時停在缺口之前。
+	// 今天所在的年份沒有匯入時不設（沒有涵蓋，不是 0 天）。
+	CoveredThrough *date.Date `protobuf:"bytes,2,opt,name=covered_through,json=coveredThrough,proto3" json:"covered_through,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetHolidayCalendarCoverageResponse) Reset() {
@@ -217,9 +218,9 @@ func (x *GetHolidayCalendarCoverageResponse) GetYears() []*HolidayCalendarYear {
 	return nil
 }
 
-func (x *GetHolidayCalendarCoverageResponse) GetLastCoveredDate() *date.Date {
+func (x *GetHolidayCalendarCoverageResponse) GetCoveredThrough() *date.Date {
 	if x != nil {
-		return x.LastCoveredDate
+		return x.CoveredThrough
 	}
 	return nil
 }
@@ -300,10 +301,10 @@ const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_rawDesc = "" +
 	"\x1dImportHolidayCalendarResponse\x12I\n" +
 	"\x04year\x18\x01 \x01(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x04year\x12,\n" +
 	"\x12replaced_day_count\x18\x02 \x01(\x05R\x10replacedDayCount\"#\n" +
-	"!GetHolidayCalendarCoverageRequest\"\xb0\x01\n" +
+	"!GetHolidayCalendarCoverageRequest\"\xad\x01\n" +
 	"\"GetHolidayCalendarCoverageResponse\x12K\n" +
-	"\x05years\x18\x01 \x03(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x05years\x12=\n" +
-	"\x11last_covered_date\x18\x02 \x01(\v2\x11.google.type.DateR\x0flastCoveredDate\"k\n" +
+	"\x05years\x18\x01 \x03(\v25.hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYearR\x05years\x12:\n" +
+	"\x0fcovered_through\x18\x02 \x01(\v2\x11.google.type.DateR\x0ecoveredThrough\"k\n" +
 	"\x13HolidayCalendarYear\x12\x12\n" +
 	"\x04year\x18\x01 \x01(\x05R\x04year\x12\x1b\n" +
 	"\tday_count\x18\x02 \x01(\x05R\bdayCount\x12#\n" +
@@ -337,7 +338,7 @@ var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_goTypes = []any{
 var file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar_proto_depIdxs = []int32{
 	4, // 0: hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse.year:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
 	4, // 1: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.years:type_name -> hawkr.admin.bizcalendar.v1alpha1.HolidayCalendarYear
-	5, // 2: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.last_covered_date:type_name -> google.type.Date
+	5, // 2: hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageResponse.covered_through:type_name -> google.type.Date
 	0, // 3: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:input_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
 	2, // 4: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage:input_type -> hawkr.admin.bizcalendar.v1alpha1.GetHolidayCalendarCoverageRequest
 	1, // 5: hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.ImportHolidayCalendar:output_type -> hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarResponse

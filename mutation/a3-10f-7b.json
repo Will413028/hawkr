@@ -1,0 +1,112 @@
+{
+ "mutants": [
+  {
+   "id": "periodic-no-run-on-start",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "RunOnStart: true",
+   "new": "RunOnStart: false",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "The reconciliation push no longer runs at worker start, so a restarted invoice-service waits up to a day for its mirror."
+  },
+  {
+   "id": "periodic-interval-hourly",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "const reconcileInterval = 24 * time.Hour",
+   "new": "const reconcileInterval = time.Hour",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "The reconciliation interval changes away from the daily push the monitoring alerts assume."
+  },
+  {
+   "id": "coverage-ignores-clock",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "cal.CoveredThrough(h.now())",
+   "new": "cal.CoveredThrough(time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC))",
+   "test": "internal/httpapi/bizcalendar ^TestCoverageMapsYearsAndCoveredThrough$",
+   "why": "covered_through is computed from a fixed day instead of the injected clock."
+  },
+  {
+   "id": "covered-through-set-when-uncovered",
+   "stack": "go",
+   "file": "backend/internal/httpapi/bizcalendar/admin.go",
+   "old": "if through, ok := cal.CoveredThrough(h.now()); ok {",
+   "new": "if through, _ := cal.CoveredThrough(h.now()); true {",
+   "test": "internal/httpapi/bizcalendar ^TestCoveredThroughIsUnsetWhenTodaysYearIsNotImported$",
+   "why": "An unset covered_through (today's year not imported) is returned as a real date."
+  },
+  {
+   "id": "covered-through-start-year-uncovered",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tif !c.Covers(year) {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "new": "\tif false {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "test": "internal/platform/bizcalendar ^TestCoveredThrough$",
+   "why": "A start day in an unimported year is reported as covered."
+  },
+  {
+   "id": "import-publishes-no-event",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "\t\treturn events.Publish(ctx, s.bus, CalendarImported{Year: year})",
+   "new": "\t\treturn nil",
+   "test": "internal/platform/bizcalendar ^TestImportPublishesCalendarImported$",
+   "why": "Import commits without publishing the calendar-imported event, so no push is enqueued."
+  },
+  {
+   "id": "import-swallows-subscriber-failure",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "\t\treturn events.Publish(ctx, s.bus, CalendarImported{Year: year})",
+   "new": "\t\t_ = events.Publish(ctx, s.bus, CalendarImported{Year: year})\n\t\treturn nil",
+   "test": "internal/platform/bizcalendar ^TestImportRollsBackWhenASubscriberFails$",
+   "why": "A failing subscriber no longer rolls the import back."
+  },
+  {
+   "id": "upsert-writes-removed-year-column",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/bizcalendar/bizcalendar.go",
+   "old": "INSERT INTO bizcalendar.days (day, holiday, note)\nSELECT t.day, t.holiday, t.note FROM",
+   "new": "INSERT INTO bizcalendar.days (day, holiday, note, year)\nSELECT t.day, t.holiday, t.note, 2026 FROM",
+   "test": "internal/platform/bizcalendar ^TestImportWritesTheWholeYearAndAnAuditRecord$",
+   "why": "The upsert writes the dropped year column, proving the migration removed it."
+  },
+  {
+   "id": "parse-accepts-wrong-field-count",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tr.FieldsPerRecord = fieldsPerRecord\n",
+   "new": "\tr.FieldsPerRecord = -1\n",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄數過多$",
+   "why": "Rows with a wrong number of fields are accepted."
+  },
+  {
+   "id": "parse-lazy-quotes",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tr.FieldsPerRecord = fieldsPerRecord\n",
+   "new": "\tr.FieldsPerRecord = fieldsPerRecord\n\tr.LazyQuotes = true\n",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄位中間的引號$",
+   "why": "A bare quote inside a field is accepted instead of rejected."
+  },
+  {
+   "id": "parse-line-number-from-row-count",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\t\tn, _ := r.FieldPos(0)",
+   "new": "\t\tn := len(out) + 2",
+   "test": "internal/platform/bizcalendar ^TestParseReportsTheRealLineAfterAMultiLineQuotedField$",
+   "why": "Error line numbers count records instead of file lines, so a quoted multi-line field shifts them."
+  },
+  {
+   "id": "parse-header-unchecked",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tif strings.Join(header, \",\") != officeCalendarHeader {",
+   "new": "\tif false && strings.Join(header, \",\") != officeCalendarHeader {",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭不符$",
+   "why": "A file with a different header is accepted."
+  }
+ ]
+}

@@ -3,92 +3,92 @@
   {
    "id": "push-to-ignores-imported-years",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tto = windowEnd\n\tif runEnd := time.Date(last, time.December, 31, 0, 0, 0, 0, time.UTC); runEnd.Before(to) {\n\t\tto = runEnd\n\t}",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tto = windowEnd\n\tif through.Before(to) {\n\t\tto = through\n\t}",
    "new": "\tto = windowEnd",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The pushed coverage always runs to the window end instead of the intersection with the imported years, so a never-imported year is declared covered."
   },
   {
    "id": "push-skips-year-gap",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tfor cal.Covers(last + 1) {",
-   "new": "\tfor last < 2100 {",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchStopsAtTheFirstGap$",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tfor c.Covers(year + 1) {",
+   "new": "\tfor year < 2100 {",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchStopsAtTheFirstGap$",
    "why": "The window extends across a missing year instead of stopping at the first gap, so the gap year is declared covered."
   },
   {
    "id": "push-start-year-uncovered-still-pushed",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tif !cal.Covers(today.Year()) {",
-   "new": "\tif !cal.Covers(today.Year()) && false {",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tif !covered {",
+   "new": "\tif !covered && false {",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "A window whose today's year was never imported is still pushed."
   },
   {
    "id": "push-window-past-29",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "mirrorPastDays   = 30",
-   "new": "mirrorPastDays   = 29",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "pastDays   = 30",
+   "new": "pastDays   = 29",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The pushed window starts 29 days back instead of 30, one day narrower than invoice's own window."
   },
   {
    "id": "push-window-future-399",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "mirrorFutureDays = 400",
-   "new": "mirrorFutureDays = 399",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "futureDays = 400",
+   "new": "futureDays = 399",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The pushed window ends 399 days ahead instead of 400."
   },
   {
    "id": "import-does-not-push",
    "stack": "go",
-   "file": "backend/internal/httpapi/bizcalendar/admin.go",
-   "old": "\th.trigger()\n\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
-   "new": "\treturn connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{",
-   "test": "internal/httpapi/bizcalendar ^TestImportPushesAfterASuccessfulImport$",
-   "why": "A successful import no longer pushes the calendar to invoice-service."
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\t\treturn q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "\t\treturn nil",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedEnqueuesOnePush$",
+   "why": "A calendar import no longer enqueues the push to invoice-service."
   },
   {
-   "id": "import-pushes-after-failed-import",
+   "id": "import-ignores-enqueue-failure",
    "stack": "go",
-   "file": "backend/internal/httpapi/bizcalendar/admin.go",
-   "old": "\tres, err := h.src.Import(ctx, adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, int(req.Msg.GetYear()), req.Msg.GetCsvContent())\n\tif err != nil {\n\t\treturn nil, err\n\t}",
-   "new": "\tres, err := h.src.Import(ctx, adminaudit.Actor{AdminID: admin, Action: req.Spec().Procedure}, int(req.Msg.GetYear()), req.Msg.GetCsvContent())\n\tif err != nil {\n\t\th.trigger()\n\t\treturn nil, err\n\t}",
-   "test": "internal/httpapi/bizcalendar ^TestImportDoesNotPushWhenTheImportFails$",
-   "why": "A failed import still triggers a push."
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\t\treturn q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "\t\t_ = q.Enqueue(ctx, PushArgs{}, nil)\n\t\treturn nil",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedReturnsEnqueueError$",
+   "why": "A failed enqueue is swallowed, so the import commits without a push job."
   },
   {
    "id": "push-run-start-ignores-first-year",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
    "old": "runStart.After(from)",
    "new": "false",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The start is always the window start, so a window start in a never-imported year is declared covered."
   },
   {
-   "id": "trigger-blocks",
+   "id": "push-job-not-unique",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\tselect {\n\tcase m.trigger <- struct{}{}:\n\tdefault:\n\t}",
-   "new": "\tm.trigger <- struct{}{}",
-   "test": "internal/platform/bizcalendar ^TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests$",
-   "why": "Trigger blocks when a request is already pending instead of coalescing."
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "func (PushArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(0) }",
+   "new": "func (PushArgs) InsertOpts() river.InsertOpts { return river.InsertOpts{} }",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsAreUniqueWhileUnfinished$",
+   "why": "Repeated imports pile up identical push jobs instead of merging."
   },
   {
-   "id": "run-ignores-trigger",
+   "id": "push-ignores-client-error",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
-   "old": "\t\tcase <-m.trigger:\n\t\t\tm.pushLogged(ctx)\n",
-   "new": "\t\tcase <-m.trigger:\n",
-   "test": "internal/platform/bizcalendar ^TestMirrorTriggerSerializesPushesAndCoalescesPendingRequests$",
-   "why": "A trigger is consumed without pushing."
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\treturn err\n\t}",
+   "new": "\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\treturn nil\n\t}",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushReturnsClientErrorSoRiverRetries$",
+   "why": "A failed push is reported as success, so River never retries it."
   },
   {
    "id": "mirror-accepts-bad-holiday-date",
@@ -147,10 +147,10 @@
   {
    "id": "push-never-extends-back-over-imported-years",
    "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/mirror.go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
    "old": "\tfor cal.Covers(first - 1) {",
    "new": "\tfor false {",
-   "test": "internal/platform/bizcalendar ^TestMirrorBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The imported run is never extended backwards, so a window start in an earlier imported year is clipped to January 1 of today's year."
   },
   {
@@ -188,6 +188,15 @@
    "new": "\t\t_ = committed",
    "test": "database ^TestWithTx_RollsBackOn(PanicAndRepanics|Goexit)$",
    "why": "A panic or runtime.Goexit inside fn (t.Fatalf) leaves the transaction open and its pool connection held forever."
+  },
+  {
+   "id": "covered-through-start-year-uncovered",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tif !c.Covers(year) {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "new": "\tif false {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
+   "test": "internal/platform/bizcalendar ^TestCoveredThrough$",
+   "why": "A start day in an unimported year is reported as covered."
   }
  ]
 }

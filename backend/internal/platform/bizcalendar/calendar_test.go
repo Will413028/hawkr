@@ -163,12 +163,6 @@ func TestCoverageAndHolidays(t *testing.T) {
 	if len(cov) != 3 || cov[0] != (YearCoverage{2026, 365, 120}) || cov[1] != (YearCoverage{2027, 365, 121}) {
 		t.Fatalf("Coverage = %+v", cov)
 	}
-	if last, ok := c.LastCoveredDate(); !ok || !last.Equal(d("2030-12-31")) {
-		t.Fatalf("LastCoveredDate = %v %v", last, ok)
-	}
-	if _, ok := (&Calendar{}).LastCoveredDate(); ok {
-		t.Fatal("空行事曆沒有最後涵蓋日")
-	}
 	got := c.HolidaysBetween(d("2026-12-30"), d("2027-01-04"))
 	want := []string{"2027-01-01", "2027-01-02", "2027-01-03"}
 	if len(got) != len(want) {
@@ -194,5 +188,50 @@ func TestNewCalendarRejectsInconsistentRows(t *testing.T) {
 	}
 	if c, err := NewCalendar(nil); err != nil || len(c.Years()) != 0 {
 		t.Errorf("空：%v", err)
+	}
+}
+
+// 期望值全部硬寫日期。
+func TestCoveredThrough(t *testing.T) {
+	c := testCalendar(t) // 2026、2027、2030
+	tests := []struct {
+		name string
+		from string
+		want string // 空字串 = 不涵蓋
+	}{
+		{"first year runs through the contiguous second", "2026-11-22", "2027-12-31"},
+		{"last year of the run", "2027-06-01", "2027-12-31"},
+		{"stops before the gap", "2026-01-01", "2027-12-31"},
+		{"isolated year", "2030-03-01", "2030-12-31"},
+		{"year in the gap", "2028-06-01", ""},
+		{"before every imported year", "2025-12-31", ""},
+		{"after every imported year", "2031-01-01", ""},
+	}
+	for _, tc := range tests {
+		got, ok := c.CoveredThrough(d(tc.from))
+		if tc.want == "" {
+			if ok || !got.IsZero() {
+				t.Errorf("%s：CoveredThrough(%s) = %v, %v；要不涵蓋", tc.name, tc.from, got, ok)
+			}
+			continue
+		}
+		if !ok || got.Format(time.DateOnly) != tc.want {
+			t.Errorf("%s：CoveredThrough(%s) = %v, %v；要 %s", tc.name, tc.from, got, ok, tc.want)
+		}
+	}
+	if _, ok := (&Calendar{}).CoveredThrough(d("2026-11-22")); ok {
+		t.Fatal("空行事曆沒有涵蓋")
+	}
+}
+
+func TestCoveredThroughUsesTheTaipeiDay(t *testing.T) {
+	c := testCalendar(t)
+	// 2026-12-31 17:00 UTC 是台北 2027-01-01：以台北日算，2027 年涵蓋到 2027-12-31，仍是 2027-12-31；
+	// 2029-12-31 17:00 UTC 是台北 2030-01-01，落在 2030 年涵蓋的區段。
+	if got, ok := c.CoveredThrough(time.Date(2029, 12, 31, 17, 0, 0, 0, time.UTC)); !ok || got.Format(time.DateOnly) != "2030-12-31" {
+		t.Fatalf("got %v %v", got, ok)
+	}
+	if _, ok := c.CoveredThrough(time.Date(2029, 12, 31, 15, 0, 0, 0, time.UTC)); ok {
+		t.Fatal("台北 2029-12-31 的年份沒有涵蓋")
 	}
 }

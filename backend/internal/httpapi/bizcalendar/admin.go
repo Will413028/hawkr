@@ -3,6 +3,7 @@ package bizcalendar
 
 import (
 	"context"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/type/date"
@@ -20,27 +21,17 @@ type Source interface {
 	Load(ctx context.Context) (*bizcalendar.Calendar, error)
 }
 
-// Pusher 要求把目前的行事曆推給 invoice-service（*bizcalendar.Mirror）；Trigger 不等待推送完成。
-type Pusher interface {
-	Trigger()
-}
-
 // Admin 實作 BizCalendarAdminService。授權（只有管理員、各方法的權限）由 rpc 的 interceptor 與 adminauth 的宣告表檢查。
 type Admin struct {
-	src    Source
-	pusher Pusher
+	src Source
+	now func() time.Time
 }
 
 var _ bizcalendarv1alpha1connect.BizCalendarAdminServiceHandler = (*Admin)(nil)
 
-// NewAdmin 建立後台的 handler。
-func NewAdmin(src Source) *Admin { return &Admin{src: src} }
-
-// WithMirror 讓每次匯入成功後把行事曆推給 invoice-service。推送放在這一層而不在 platform 的 Import 裡：Import 的 transaction 只管資料與後台紀錄，
-// 對舊服務的呼叫是遷移期的組裝，隨 A5 一起刪掉時不碰 platform。
-func (h *Admin) WithMirror(p Pusher) *Admin {
-	h.pusher = p
-	return h
+// NewAdmin 建立後台的 handler；now 是「今天」的來源（涵蓋狀態從今天的台北日算起）。
+func NewAdmin(src Source, now func() time.Time) *Admin {
+	return &Admin{src: src, now: now}
 }
 
 // ImportHolidayCalendar 匯入一年的辦公日曆表；操作的管理員從 ctx 取、動作是 procedure 名稱，後台紀錄與資料在 platform 的同一個 transaction。
@@ -53,7 +44,6 @@ func (h *Admin) ImportHolidayCalendar(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	h.trigger()
 	return connect.NewResponse(&adminpb.ImportHolidayCalendarResponse{
 		Year:             &adminpb.HolidayCalendarYear{Year: req.Msg.GetYear(), DayCount: int32(res.DayCount), HolidayCount: int32(res.HolidayCount)}, //nolint:gosec // 一年最多 366 天
 		ReplacedDayCount: int32(res.ReplacedDayCount),                                                                                                 //nolint:gosec // 同上
@@ -70,16 +60,8 @@ func (h *Admin) GetHolidayCalendarCoverage(ctx context.Context, _ *connect.Reque
 	for _, y := range cal.Coverage() {
 		out.Years = append(out.Years, &adminpb.HolidayCalendarYear{Year: int32(y.Year), DayCount: int32(y.DayCount), HolidayCount: int32(y.HolidayCount)}) //nolint:gosec // 年份在 1..9999、天數至多 366
 	}
-	if last, ok := cal.LastCoveredDate(); ok {
-		out.LastCoveredDate = &date.Date{Year: int32(last.Year()), Month: int32(last.Month()), Day: int32(last.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
+	if through, ok := cal.CoveredThrough(h.now()); ok {
+		out.CoveredThrough = &date.Date{Year: int32(through.Year()), Month: int32(through.Month()), Day: int32(through.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
 	}
 	return connect.NewResponse(out), nil
-}
-
-// trigger 在匯入已提交之後要求推送。推送由 Mirror 的 goroutine 串行執行，這裡不等它；
-// 失敗只記在 Mirror 的 log，下一次每日對帳重送。
-func (h *Admin) trigger() {
-	if h.pusher != nil {
-		h.pusher.Trigger()
-	}
 }

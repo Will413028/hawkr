@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/bizcalendar/v1alpha1/bizcalendar.proto.
  */
 export const file_hawkr_admin_bizcalendar_v1alpha1_bizcalendar: GenFile = /*@__PURE__*/
-  fileDesc("CjJoYXdrci9hZG1pbi9iaXpjYWxlbmRhci92MWFscGhhMS9iaXpjYWxlbmRhci5wcm90bxIgaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEiSwocSW1wb3J0SG9saWRheUNhbGVuZGFyUmVxdWVzdBIRCgR5ZWFyGAEgASgFQgPgQQISGAoLY3N2X2NvbnRlbnQYAiABKAlCA+BBAiKAAQodSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USQwoEeWVhchgBIAEoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISGgoScmVwbGFjZWRfZGF5X2NvdW50GAIgASgFIiMKIUdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVxdWVzdCKYAQoiR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZRJECgV5ZWFycxgBIAMoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISLAoRbGFzdF9jb3ZlcmVkX2RhdGUYAiABKAsyES5nb29nbGUudHlwZS5EYXRlIk0KE0hvbGlkYXlDYWxlbmRhclllYXISDAoEeWVhchgBIAEoBRIRCglkYXlfY291bnQYAiABKAUSFQoNaG9saWRheV9jb3VudBgDIAEoBTLjAgoXQml6Q2FsZW5kYXJBZG1pblNlcnZpY2USmAEKFUltcG9ydEhvbGlkYXlDYWxlbmRhchI+Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkltcG9ydEhvbGlkYXlDYWxlbmRhclJlcXVlc3QaPy5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5JbXBvcnRIb2xpZGF5Q2FsZW5kYXJSZXNwb25zZRKsAQoaR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2USQy5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5HZXRIb2xpZGF5Q2FsZW5kYXJDb3ZlcmFnZVJlcXVlc3QaRC5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5HZXRIb2xpZGF5Q2FsZW5kYXJDb3ZlcmFnZVJlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_api_field_behavior, file_google_type_date]);
+  fileDesc("CjJoYXdrci9hZG1pbi9iaXpjYWxlbmRhci92MWFscGhhMS9iaXpjYWxlbmRhci5wcm90bxIgaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEiSwocSW1wb3J0SG9saWRheUNhbGVuZGFyUmVxdWVzdBIRCgR5ZWFyGAEgASgFQgPgQQISGAoLY3N2X2NvbnRlbnQYAiABKAlCA+BBAiKAAQodSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USQwoEeWVhchgBIAEoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISGgoScmVwbGFjZWRfZGF5X2NvdW50GAIgASgFIiMKIUdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlUmVxdWVzdCKWAQoiR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZRJECgV5ZWFycxgBIAMoCzI1Lmhhd2tyLmFkbWluLmJpemNhbGVuZGFyLnYxYWxwaGExLkhvbGlkYXlDYWxlbmRhclllYXISKgoPY292ZXJlZF90aHJvdWdoGAIgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZSJNChNIb2xpZGF5Q2FsZW5kYXJZZWFyEgwKBHllYXIYASABKAUSEQoJZGF5X2NvdW50GAIgASgFEhUKDWhvbGlkYXlfY291bnQYAyABKAUy4wIKF0JpekNhbGVuZGFyQWRtaW5TZXJ2aWNlEpgBChVJbXBvcnRIb2xpZGF5Q2FsZW5kYXISPi5oYXdrci5hZG1pbi5iaXpjYWxlbmRhci52MWFscGhhMS5JbXBvcnRIb2xpZGF5Q2FsZW5kYXJSZXF1ZXN0Gj8uaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuSW1wb3J0SG9saWRheUNhbGVuZGFyUmVzcG9uc2USrAEKGkdldEhvbGlkYXlDYWxlbmRhckNvdmVyYWdlEkMuaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXF1ZXN0GkQuaGF3a3IuYWRtaW4uYml6Y2FsZW5kYXIudjFhbHBoYTEuR2V0SG9saWRheUNhbGVuZGFyQ292ZXJhZ2VSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_type_date]);
 
 /**
  * @generated from message hawkr.admin.bizcalendar.v1alpha1.ImportHolidayCalendarRequest
@@ -95,11 +95,12 @@ export type GetHolidayCalendarCoverageResponse = Message<"hawkr.admin.bizcalenda
   years: HolidayCalendarYear[];
 
   /**
-   * 已匯入的最後一年的 12 月 31 日。年份之間可能有缺：各年是否涵蓋看 years。沒有任何年份時不設。
+   * 從今天（台北日）起連續涵蓋的最後一天：今天所在年份起、連續已匯入的最後一年的 12 月 31 日，中間缺一年時停在缺口之前。
+   * 今天所在的年份沒有匯入時不設（沒有涵蓋，不是 0 天）。
    *
-   * @generated from field: google.type.Date last_covered_date = 2;
+   * @generated from field: google.type.Date covered_through = 2;
    */
-  lastCoveredDate?: Date | undefined;
+  coveredThrough?: Date | undefined;
 };
 
 /**
@@ -153,7 +154,7 @@ export const BizCalendarAdminService: GenService<{
   /**
    * ImportHolidayCalendar 匯入一年的辦公日曆表並整年取代該年原有的資料（同一個交易；已匯入的年份重匯就是更正）。
    * csv_content 是辦公日曆表 CSV 的全文：UTF-8（可帶 BOM），表頭 `西元日期,星期,是否放假,備註`，日期 `YYYYMMDD`，
-   * 是否放假只有 `0`（上班）與 `2`（放假）。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
+   * 是否放假只有 `0`（上班）與 `2`（放假）；欄位可以加引號（備註含逗號時需要），空行略過。檔案必須涵蓋該年每一天各一次（365 或 366 列），每列的年份都等於 year，
    * 任何一列不合就整份拒絕並回 invalid_argument（訊息指出第幾行），不會寫入部分資料。
    * 同一個交易寫一筆後台紀錄（platform admin audit log，動作是這支 RPC 的程序名）。
    *
@@ -165,7 +166,7 @@ export const BizCalendarAdminService: GenService<{
     output: typeof ImportHolidayCalendarResponseSchema;
   },
   /**
-   * GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空、last_covered_date 不設。不分頁：
+   * GetHolidayCalendarCoverage 讀目前已匯入的年份與每年的天數、放假天數。沒有匯入過任何年份時 years 為空；今天（台北日）所在的年份沒有匯入時 covered_through 不設。不分頁：
    * 一年一列，筆數是已匯入的年數。
    *
    * @generated from rpc hawkr.admin.bizcalendar.v1alpha1.BizCalendarAdminService.GetHolidayCalendarCoverage
