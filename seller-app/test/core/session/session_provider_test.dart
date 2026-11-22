@@ -7,7 +7,10 @@ import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
-import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:hawkr_seller/features/chat/data/chat_session.dart';
+import 'package:hawkr_seller/features/chat/data/chat_stream_client.dart';
+import '../../features/chat/support/chat_fakes.dart';
 import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
@@ -65,7 +68,7 @@ void main() {
     });
 
     ProviderContainer containerWith(
-      _CountingChatRepository chat, {
+      _CountingChatSession chat, {
       FakeAuthSession? auth,
       List<String>? events,
     }) {
@@ -77,7 +80,7 @@ void main() {
           myStoreRepositoryProvider.overrideWithValue(
             FakeMyStoreServer().repository,
           ),
-          chatRepositoryProvider.overrideWithValue(chat),
+          chatSessionProvider.overrideWithValue(chat),
           postLoginSideEffectsProvider.overrideWithValue(
             const NoopPostLoginSideEffects(),
           ),
@@ -95,7 +98,7 @@ void main() {
     }
 
     test('並行的第二次 logout 直接返回，登出副作用只執行一次', () async {
-      final chat = _CountingChatRepository();
+      final chat = _CountingChatSession();
       final container = containerWith(chat);
       final notifier = container.read(sessionProvider.notifier);
       await notifier.login(accountId: 'acc-1');
@@ -105,25 +108,25 @@ void main() {
       final second = notifier.logout();
       await Future.wait([first, second]);
 
-      expect(chat.stopPollingCalls, 1);
+      expect(chat.stopCalls, 1);
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
     });
 
     test('登出流程中被重入觸發的 logout 不會遞迴，副作用仍只執行一次', () async {
-      final chat = _CountingChatRepository();
+      final chat = _CountingChatSession();
       final container = containerWith(chat);
       final notifier = container.read(sessionProvider.notifier);
       // 模擬 401 interceptor：在第一輪登出的副作用執行途中再次呼叫 logout。
       // 上限 5 次只是避免守衛失效時測試無限跑，斷言仍是「恰好一次」。
-      chat.onStopPolling = () {
-        if (chat.stopPollingCalls < 5) unawaited(notifier.logout());
+      chat.onStop = () {
+        if (chat.stopCalls < 5) unawaited(notifier.logout());
       };
       await notifier.login(accountId: 'acc-1');
 
       await notifier.logout();
       await Future<void>.delayed(Duration.zero);
 
-      expect(chat.stopPollingCalls, 1);
+      expect(chat.stopCalls, 1);
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
     });
 
@@ -143,7 +146,7 @@ void main() {
       addTearDown(
         () => PushNotificationManager.instance.seedLifecycleStateForTest(),
       );
-      final container = containerWith(_CountingChatRepository());
+      final container = containerWith(_CountingChatSession());
 
       // 沒有 login()：session 沒有登入，等同「state 已被清空後再被觸發」。
       await container.read(sessionProvider.notifier).logout();
@@ -166,7 +169,7 @@ void main() {
         () => PushNotificationManager.instance.seedLifecycleStateForTest(),
       );
       final container = containerWith(
-        _CountingChatRepository(),
+        _CountingChatSession(),
         auth: FakeAuthSession(signedIn: true, calls: events),
         events: events,
       );
@@ -181,7 +184,7 @@ void main() {
 
     test('登出時登出 session token，再清除本機', () async {
       final auth = FakeAuthSession(signedIn: true);
-      final container = containerWith(_CountingChatRepository(), auth: auth);
+      final container = containerWith(_CountingChatSession(), auth: auth);
       final notifier = container.read(sessionProvider.notifier);
 
       await notifier.login(accountId: 'acc-1');
@@ -192,7 +195,7 @@ void main() {
     });
 
     test('登出後可以再次登入並正常登出（旗標有復位）', () async {
-      final chat = _CountingChatRepository();
+      final chat = _CountingChatSession();
       final container = containerWith(chat);
       final notifier = container.read(sessionProvider.notifier);
 
@@ -201,7 +204,7 @@ void main() {
       await notifier.login(accountId: 'acc-2');
       await notifier.logout();
 
-      expect(chat.stopPollingCalls, 2);
+      expect(chat.stopCalls, 2);
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
     });
 
@@ -209,7 +212,7 @@ void main() {
     /// 帳號（含刪店重開店，該流程本身就是強制 logout+重新 login）會讓
     /// 下一位使用者看到上一位的修圖動作名稱/次數/時間。
     test('登出流程一併清除 AI 修圖歷史（#115）', () async {
-      final container = containerWith(_CountingChatRepository());
+      final container = containerWith(_CountingChatSession());
       final historyService = container.read(aiEditHistoryLocalServiceProvider);
       await historyService.save([
         AiEditHistoryEntry(
@@ -259,7 +262,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           myStoreRepositoryProvider.overrideWithValue(server.repository),
-          chatRepositoryProvider.overrideWithValue(_CountingChatRepository()),
+          chatSessionProvider.overrideWithValue(_CountingChatSession()),
           postLoginSideEffectsProvider.overrideWithValue(
             const NoopPostLoginSideEffects(),
           ),
@@ -325,25 +328,23 @@ class _RecordingDeviceGateway implements DeviceRegistrationGateway {
   }
 }
 
-/// 只用來計次的 [ChatRepository]：`stopPolling` 是 logout 唯一可觀測、且
-/// 每次登出必經一次的副作用。
-class _CountingChatRepository extends ChatRepository {
-  _CountingChatRepository() : super(Dio());
+/// 只用來計次的 [ChatSession]：`stop` 是 logout 唯一可觀測、且每次登出必經一次的副作用。
+class _CountingChatSession extends ChatSession {
+  _CountingChatSession()
+    : super(
+        FakeChatRepository(),
+        () => UiLocale.zhTW,
+        client: ChatStreamClient(open: (_) => const Stream.empty()),
+      );
 
-  int stopPollingCalls = 0;
-  void Function()? onStopPolling;
+  int stopCalls = 0;
+  void Function()? onStop;
 
   @override
-  void stopPolling() {
-    stopPollingCalls++;
-    onStopPolling?.call();
+  void stop() {
+    stopCalls++;
+    onStop?.call();
   }
-
-  @override
-  void startPolling({Duration interval = const Duration(seconds: 1)}) {}
-
-  @override
-  void useHttpClient(Dio dio) {}
 }
 
 class _OkAdapter implements HttpClientAdapter {

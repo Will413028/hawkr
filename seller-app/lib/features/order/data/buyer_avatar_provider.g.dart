@@ -62,7 +62,7 @@ final class BuyerAvatarProvider
   }
 }
 
-String _$buyerAvatarHash() => r'3a3927568e9b31cb89dfed2f7cba7129634bd933';
+String _$buyerAvatarHash() => r'5549a48ca3e94989cf4e1922da43f13de578b3af';
 
 /// 根據 buyerId 取得買家頭像 URL（帶快取）。
 

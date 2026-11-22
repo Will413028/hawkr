@@ -1,327 +1,295 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/features/chat/data/chat_model.dart';
 import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
+import 'package:hawkr_seller/features/chat/data/chat_session.dart';
+import 'package:hawkr_seller/features/chat/data/chat_stream_client.dart';
 import 'package:hawkr_seller/features/chat/data/chat_thread_notifier.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
-// Minimal fake ChatRepository — no WS, no network.
-// Real ChatRepository constructor requires Dio; we pass a throwaway real Dio
-// (never used — every network method is overridden below) and override
-// chatRepositoryProvider in each container.
-class _FakeRepo extends ChatRepository {
-  _FakeRepo.withMessages(this.initialMessages)
-    : super(Dio(BaseOptions(baseUrl: 'http://localhost')));
+import 'support/chat_fakes.dart';
 
-  final List<ChatMessage> initialMessages;
-  Map<String, String>? lastSentExtra;
-  Completer<Map<String, dynamic>?>? pendingSend;
-
-  final StreamController<ChatMessage> _msgCtrl =
-      StreamController<ChatMessage>.broadcast();
-  final StreamController<ChatConnectionState> _stateCtrl =
-      StreamController<ChatConnectionState>.broadcast();
-
-  @override
-  Stream<ChatMessage> get onMessage => _msgCtrl.stream;
-  @override
-  Stream<ChatConnectionState> get connectionStateStream => _stateCtrl.stream;
-
-  @override
-  Future<ChatHistoryResult> getHistoryWithParticipants({
-    required String participantId,
-    int? beforeId,
-    int pageSize = 50,
-    String? conversationId,
-  }) async => ChatHistoryResult(messages: initialMessages, participants: []);
-
-  @override
-  Future<List<ChatMessage>> getHistory({
-    required String participantId,
-    int? beforeId,
-    int pageSize = 50,
-    String? conversationId,
-  }) async => [];
-
-  @override
-  Future<Map<String, dynamic>?> sendMessage({
-    required String receiverId,
-    required String messageContent,
-    String messageType = 'text',
-    Map<String, String>? extra,
-  }) async {
-    lastSentExtra = extra;
-    if (pendingSend != null) return pendingSend!.future;
-    return {
-      'data': {'messageId': 'real_123', 'timestamp': 0},
-    };
+class _Harness {
+  _Harness(this.repo) {
+    client = ChatStreamClient(
+      open: (cursors) {
+        opens.add(Map.of(cursors));
+        final c = StreamController<pb.ChatEvent>();
+        streams.add(c);
+        return c.stream;
+      },
+    );
+    session = ChatSession(repo, () => UiLocale.zhTW, client: client);
+    container = ProviderContainer(
+      overrides: [
+        chatRepositoryProvider.overrideWithValue(repo),
+        chatSessionProvider.overrideWithValue(session),
+      ],
+    );
+    container.listen(chatThreadProvider(arg), (_, _) {});
   }
 
-  @override
-  Future<bool> markAllMessagesRead({required String participantId}) async =>
-      true;
-  @override
-  Future<bool> markConversationAsRead(String conversationId) async => true;
-  @override
-  void sendReadReceipt({required String receiverId}) {}
-  @override
-  Future<void> connectForChat() async {}
-  @override
-  Future<void> disconnectFromChat() async {}
+  final FakeChatRepository repo;
+  late final ChatStreamClient client;
+  late final ChatSession session;
+  late final ProviderContainer container;
+  final opens = <Map<String, int>>[];
+  final streams = <StreamController<pb.ChatEvent>>[];
+  final arg = const ChatThreadArg(peerId: 'b1');
 
-  void pushMessage(ChatMessage msg) => _msgCtrl.add(msg);
-  void pushState(ChatConnectionState s) => _stateCtrl.add(s);
+  ChatThread get notifier => container.read(chatThreadProvider(arg).notifier);
+  AsyncValue<ChatThreadData> get state =>
+      container.read(chatThreadProvider(arg));
+
+  Future<void> start() async {
+    session.start();
+    await Future<void>.delayed(Duration.zero);
+    streams.last.add(readyFrame());
+    await Future<void>.delayed(Duration.zero);
+  }
+
+  Future<void> pump() => Future<void>.delayed(Duration.zero);
 }
 
-ChatMessage _msg(String id, {String sender = 'buyer1', int seqId = 0}) =>
-    ChatMessage(
-      id: id,
-      senderId: sender,
-      receiverId: 'seller1',
-      messageContent: 'hello',
-      messageType: 'text',
-      timestamp: DateTime(2024),
-      seqId: seqId,
-    );
-
-ProviderContainer _makeContainer(_FakeRepo repo) => ProviderContainer(
-  overrides: [chatRepositoryProvider.overrideWithValue(repo)],
-);
+ChatConversation _conv({String id = 'c1', String buyer = 'b1'}) =>
+    ChatConversation.fromProto(protoConversation(id, buyer, name: '小明'));
 
 void main() {
-  for (final failure in [false, true]) {
-    test(
-      'send ${failure ? 'failure' : 'success'} after thread disposal is safe',
-      () async {
-        final repo = _FakeRepo.withMessages([]);
-        final container = _makeContainer(repo);
-        const arg = ChatThreadArg(peerId: 'buyer1');
-        final listener = container.listen(chatThreadProvider(arg), (_, _) {});
-        await container.read(chatThreadProvider(arg).future);
-        repo.pendingSend = Completer<Map<String, dynamic>?>();
-        final pending = container
-            .read(chatThreadProvider(arg).notifier)
-            .send(content: '離頁前送出');
-        listener.close();
-        container.dispose();
-        if (failure) {
-          final expectation = expectLater(pending, throwsA(isA<StateError>()));
-          repo.pendingSend!.completeError(StateError('offline'));
-          await expectation;
-        } else {
-          repo.pendingSend!.complete({
-            'data': {'messageId': 'real_123'},
-          });
-          await pending;
-        }
-      },
-    );
-  }
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('ChatThreadArg equality', () {
-    test('same peerId + conversationId are equal', () {
-      const a = ChatThreadArg(peerId: '1', conversationId: 'c1');
-      const b = ChatThreadArg(peerId: '1', conversationId: 'c1');
-      expect(a, equals(b));
-      expect(a.hashCode, equals(b.hashCode));
-    });
-    test('different conversationId are not equal', () {
-      const a = ChatThreadArg(peerId: '1', conversationId: 'c1');
-      const b = ChatThreadArg(peerId: '1', conversationId: 'c2');
-      expect(a, isNot(equals(b)));
-    });
+  late FakeChatRepository repo;
+  setUp(() {
+    repo = FakeChatRepository()
+      ..conversations = [_conv()]
+      ..history = [clientMessage(1), clientMessage(2, store: true)];
   });
 
-  group('ChatThread initial load', () {
-    test(
-      'build() returns sorted messages from getHistoryWithParticipants',
-      () async {
-        final m1 = _msg('1').copyWith(timestamp: DateTime(2024, 1, 1));
-        final m2 = _msg('2').copyWith(timestamp: DateTime(2024, 1, 2));
-        final repo = _FakeRepo.withMessages([m2, m1]); // reversed
-        final c = _makeContainer(repo);
-        addTearDown(c.dispose);
-        const arg = ChatThreadArg(peerId: 'buyer1');
-        final state = await c.read(chatThreadProvider(arg).future);
-        expect(state.first.id, '1'); // sorted asc
-        expect(state.last.id, '2');
-      },
-    );
+  test(
+    'resolves the conversation by buyer id and loads history oldest first',
+    () async {
+      final h = _Harness(repo);
+      await h.start();
+      final d = await h.container.read(chatThreadProvider(h.arg).future);
+      expect(d.conversationId, 'c1');
+      expect(d.messages.map((m) => m.seq), [1, 2]);
+      expect(d.buyer?.name, '小明');
+      expect(h.client.cursors['c1'], 2);
+    },
+  );
+
+  test('opens by buyer through the by-buyer lookup, not a list scan', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    expect(repo.findCalls, 1);
   });
 
-  group('applyIncoming dedup', () {
-    test('duplicate by id is ignored', () async {
-      final repo = _FakeRepo.withMessages([_msg('a')]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      notifier.applyIncoming(_msg('a')); // duplicate id
-      expect(c.read(chatThreadProvider(arg)).value?.length, 1);
-    });
+  test(
+    'no conversation yet: empty thread, first send uses SendMessageToBuyer',
+    () async {
+      repo.conversations = [];
+      final h = _Harness(repo);
+      await h.start();
+      final d = await h.container.read(chatThreadProvider(h.arg).future);
+      expect(d.conversationId, isNull);
+      expect(d.messages, isEmpty);
+      await h.notifier.sendText('hi');
+      expect(repo.sends.single.buyerId, 'b1');
+      expect(repo.sends.single.convId, isNull);
+      expect(h.state.value!.conversationId, 'new-conv');
+      expect(h.state.value!.messages.single.sendState, ChatSendState.sent);
+    },
+  );
 
-    test('new id is appended', () async {
-      final repo = _FakeRepo.withMessages([_msg('a')]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      notifier.applyIncoming(_msg('b'));
-      expect(c.read(chatThreadProvider(arg)).value?.length, 2);
-      expect(c.read(chatThreadProvider(arg)).value?.last.id, 'b');
-    });
+  test('read failure is an error, not an empty thread', () async {
+    repo.conversations = [_conv()];
+    repo.listOlderError = ConnectException(Code.unavailable, 'down');
+    final h = _Harness(repo);
+    await h.start();
+    await expectLater(
+      h.container.read(chatThreadProvider(h.arg).future),
+      throwsA(isA<ConnectException>()),
+    );
+    expect(h.state.hasError, isTrue);
+  });
 
-    test('seqId fallback dedup when id is empty', () async {
-      final repo = _FakeRepo.withMessages([]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      final noId = ChatMessage(
-        id: '',
-        senderId: 'buyer1',
-        receiverId: 'seller1',
-        messageContent: 'x',
-        messageType: 'text',
-        timestamp: DateTime(2024),
-        seqId: 5,
+  test(
+    'stream message with updated=true replaces the same seq with a tombstone',
+    () async {
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      h.streams.last.add(
+        messageFrame(protoMessage(1, hidden: true), updated: true),
       );
-      notifier.applyIncoming(noId);
-      notifier.applyIncoming(noId); // second call: same (seqId, senderId) → dup
-      expect(c.read(chatThreadProvider(arg)).value?.length, 1);
-    });
+      await h.pump();
+      final msgs = h.state.value!.messages;
+      expect(msgs, hasLength(2));
+      expect(msgs.first.hidden, isTrue);
+      expect(msgs.first.text, isNull);
+    },
+  );
 
-    test('empty control frame is skipped', () async {
-      final repo = _FakeRepo.withMessages([]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      final control = ChatMessage(
-        id: 'ctrl1',
-        senderId: 'buyer1',
-        receiverId: 'seller1',
-        messageContent: '',
-        messageType: 'read_receipt',
-        timestamp: DateTime(2024),
+  test(
+    'new peer message is appended and marks the conversation read',
+    () async {
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      repo.marks.clear();
+      h.streams.last.add(messageFrame(protoMessage(3)));
+      await h.pump();
+      expect(h.state.value!.messages.map((m) => m.seq), [1, 2, 3]);
+      expect(repo.marks, contains(('c1', 3)));
+    },
+  );
+
+  test('a seq gap triggers a fill after the last known seq', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.afterResult = [clientMessage(3), clientMessage(4)];
+    h.streams.last.add(messageFrame(protoMessage(5)));
+    await h.pump();
+    await h.pump();
+    expect(repo.afterCalls, isNotEmpty);
+    expect(repo.afterCalls.first, ('c1', 2));
+    expect(h.state.value!.messages.map((m) => m.seq), [1, 2, 3, 4, 5]);
+  });
+
+  test(
+    'resync for this conversation fills the gap; for another one it does not',
+    () async {
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      h.streams.last.add(
+        pb.ChatEvent(resync: pb.Resync(conversationId: 'other')),
       );
-      notifier.applyIncoming(control);
-      expect(c.read(chatThreadProvider(arg)).value?.isEmpty, true);
-    });
-  });
+      await h.pump();
+      expect(repo.afterCalls, isEmpty);
+      repo.afterResult = [clientMessage(3)];
+      h.streams.last.add(pb.ChatEvent(resync: pb.Resync(all: true)));
+      await h.pump();
+      await h.pump();
+      expect(repo.afterCalls.single, ('c1', 2));
+      expect(h.state.value!.messages.map((m) => m.seq), [1, 2, 3]);
+    },
+  );
 
-  group('loadOlder', () {
-    test('returns false when no more history', () async {
-      final repo = _FakeRepo.withMessages([]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      // hasMoreOlderHistory starts false when initial page < 50
-      final result = await c.read(chatThreadProvider(arg).notifier).loadOlder();
-      expect(result, false);
-    });
-  });
-
-  group('send optimistic', () {
-    test('adds temp message then confirms with real id', () async {
-      final repo = _FakeRepo.withMessages([]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      final sendFuture = notifier.send(content: 'hi');
-      // During send: temp message present
-      final duringState = c.read(chatThreadProvider(arg)).value ?? [];
-      expect(duringState.any((m) => m.id.startsWith('temp_')), true);
-      await sendFuture;
-      // After send: temp replaced with real id
-      final afterState = c.read(chatThreadProvider(arg)).value ?? [];
-      expect(afterState.any((m) => m.id.startsWith('temp_')), false);
-      expect(afterState.any((m) => m.id == 'real_123'), true);
-    });
-
-    test('send() 把 extra 透傳給 repository.sendMessage', () async {
-      final repo = _FakeRepo.withMessages([]);
-      final container = _makeContainer(repo);
-      addTearDown(container.dispose);
-
-      const arg = ChatThreadArg(peerId: 'seller1', conversationId: 'c1');
-      await container
-          .read(chatThreadProvider(arg).notifier)
-          .send(
-            content: '{"messageType":"product"}',
-            messageType: 'product',
-            extra: {'preview': '傳送了一張商品卡片'},
-          );
-
-      expect(repo.lastSentExtra, {'preview': '傳送了一張商品卡片'});
-    });
-  });
-
-  group('_getReceiver conversationId fallback (push-tap path)', () {
-    test(
-      'send resolves buyer from conversationId when participants empty',
-      () async {
-        // peerId '' + participants [] → _resolvedPeerId can't resolve.
-        // conversationId '123_m456' → buyer is the non-'m' part '123'.
-        final repo = _FakeRepo.withMessages([]);
-        final c = _makeContainer(repo);
-        addTearDown(c.dispose);
-        const arg = ChatThreadArg(peerId: '', conversationId: '123_m456');
-        await c.read(chatThreadProvider(arg).future);
-        final notifier = c.read(chatThreadProvider(arg).notifier);
-        final sendFuture = notifier.send(content: 'hi');
-        // Optimistic bubble carries the resolved receiver (not empty).
-        final during = c.read(chatThreadProvider(arg)).value ?? [];
-        expect(during.length, 1);
-        expect(during.last.receiverId, '123');
-        await sendFuture;
-        // receiverId preserved through confirmOptimistic.
-        final after = c.read(chatThreadProvider(arg)).value ?? [];
-        expect(after.single.receiverId, '123');
-      },
+  test('peer read event advances the read cursor', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    h.streams.last.add(
+      pb.ChatEvent(
+        peerRead: pb.PeerRead(conversationId: 'c1', peerReadSeq: i64(2)),
+      ),
     );
-
-    test(
-      'send throws StateError and inserts no bubble when receiver unresolved',
-      () async {
-        // peerId '' + conversationId '' + participants [] → no receiver.
-        final repo = _FakeRepo.withMessages([]);
-        final c = _makeContainer(repo);
-        addTearDown(c.dispose);
-        const arg = ChatThreadArg(peerId: '', conversationId: '');
-        await c.read(chatThreadProvider(arg).future);
-        final notifier = c.read(chatThreadProvider(arg).notifier);
-        await expectLater(
-          () => notifier.send(content: 'x'),
-          throwsA(isA<StateError>()),
-        );
-        // No ghost optimistic bubble inserted.
-        expect(c.read(chatThreadProvider(arg)).value?.isEmpty, true);
-      },
-    );
+    await h.pump();
+    expect(h.state.value!.peerReadSeq, 2);
   });
 
-  group('markMyMessagesRead', () {
-    test('flips my unread messages to read', () async {
-      final myMsg = _msg('m1', sender: 'seller1').copyWith(read: false);
-      final repo = _FakeRepo.withMessages([myMsg]);
-      final c = _makeContainer(repo);
-      addTearDown(c.dispose);
-      const arg = ChatThreadArg(peerId: 'buyer1');
-      await c.read(chatThreadProvider(arg).future);
-      final notifier = c.read(chatThreadProvider(arg).notifier);
-      notifier.markMyMessagesRead();
-      final msgs = c.read(chatThreadProvider(arg)).value ?? [];
-      expect(msgs.first.read, true);
-    });
+  test(
+    'send failure keeps the message as failed and retry reuses the request id',
+    () async {
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      repo.sendError = ConnectException(Code.unavailable, 'down');
+      await expectLater(
+        h.notifier.sendText('hello'),
+        throwsA(isA<ConnectException>()),
+      );
+      final failed = h.state.value!.messages.last;
+      expect(failed.sendState, ChatSendState.failed);
+      final rid = failed.requestId!;
+      repo.sendError = null;
+      await h.notifier.retry(rid);
+      expect(repo.sends.map((s) => s.requestId), [rid, rid]);
+      expect(h.state.value!.messages.where((m) => m.isPending), isEmpty);
+      expect(h.state.value!.messages.last.fromStore, isTrue);
+    },
+  );
+
+  test('separate sends use different request ids', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    await h.notifier.sendText('a');
+    await h.notifier.sendText('b');
+    expect(repo.sends[0].requestId, isNot(repo.sends[1].requestId));
+    expect(repo.sends[0].requestId, matches(RegExp(r'^[0-9a-f-]{36}$')));
   });
+
+  test('markRead pushes the cursor to the last peer message seq', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    await h.pump();
+    expect(repo.marks, contains(('c1', 1)));
+  });
+
+  test('loadOlder asks for seq below the oldest and prepends', () async {
+    repo.history = [clientMessage(5), clientMessage(6)];
+    repo.hasMore = true;
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.history = [clientMessage(3), clientMessage(4), clientMessage(5)];
+    repo.hasMore = false;
+    expect(await h.notifier.loadOlder(), isTrue);
+    expect(repo.beforeCalls.last, 5);
+    expect(h.state.value!.messages.map((m) => m.seq), [3, 4, 5, 6]);
+    expect(h.state.value!.hasMoreOlder, isFalse);
+  });
+
+  test('a thread opened before the conversation exists adopts the first '
+      'incoming message of its buyer', () async {
+    repo.conversations = [];
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.conversations = [_conv(id: 'c7')];
+    h.streams.last.add(messageFrame(protoMessage(1, conv: 'c7')));
+    await h.pump();
+    await h.pump();
+    final d = h.state.value!;
+    expect(d.conversationId, 'c7');
+    expect(d.messages.map((m) => m.seq), [1]);
+    expect(d.buyer?.name, '小明');
+  });
+
+  test('a message of another buyer is not adopted', () async {
+    repo.conversations = [];
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.conversations = [_conv(id: 'c8', buyer: 'other')];
+    h.streams.last.add(messageFrame(protoMessage(1, conv: 'c8')));
+    await h.pump();
+    await h.pump();
+    expect(h.state.value!.conversationId, isNull);
+    expect(h.state.value!.messages, isEmpty);
+  });
+
+  test(
+    "a message of a conversation other than the buyer's is not adopted",
+    () async {
+      repo.conversations = [];
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      repo.conversations = [_conv(id: 'c9')];
+      h.streams.last.add(messageFrame(protoMessage(1, conv: 'c-elsewhere')));
+      await h.pump();
+      await h.pump();
+      expect(h.state.value!.conversationId, isNull);
+      expect(h.state.value!.messages, isEmpty);
+    },
+  );
 }

@@ -3,14 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 
-import '../../../../core/exceptions/app_exception.dart';
 import '../../../../core/l10n/ui_locale.dart';
 import '../../../../shared/utils/floating_toast.dart';
 import '../../../../shared/widgets/app_confirm_dialog.dart';
-import '../../data/block_repository.dart';
 import '../../data/store_block_repository.dart';
 import '../../data/store_block_rules.dart';
-import '../report_block_error_dispatch.dart';
 
 /// 封鎖確認彈窗；[message] 由呼叫端決定（聊天用 [chatBlockConfirmMessage]，留言與討論區用 [storeBlockConfirmMessage]）。
 Future<bool> showBlockConfirmDialog(
@@ -77,32 +74,28 @@ Future<void> blockBuyerWithConfirm(
   }
 }
 
-/// 聊天室的封鎖：確認後呼叫舊 REST `blockUser`（A6 殘留，只供聊天使用）；留言與討論區用 [blockBuyerWithConfirm]。
-Future<void> blockUserWithConfirm(
+/// 聊天室的封鎖：確認後以訊息 ID 呼叫 `BlockBuyer`（封鎖該則訊息所屬對話的買家）；訊息已隱藏或抹除仍可當參照。
+Future<void> blockBuyerByMessageWithConfirm(
   BuildContext context,
   WidgetRef ref, {
-  required String userId,
-  required String userName,
+  required String messageId,
+  required String buyerName,
 }) async {
+  final name = blockTargetName(buyerName);
   final confirmed = await showBlockConfirmDialog(
     context,
-    targetName: userName,
+    targetName: name,
     message: chatBlockConfirmMessage,
   );
-  if (!confirmed) return;
-  if (!context.mounted) return;
+  if (!confirmed || !context.mounted) return;
+  final repo = ref.read(storeBlockRepositoryProvider);
+  final defaults = ref.read(defaultErrorTextProvider);
   try {
-    await ref.read(blockRepositoryProvider).blockUser(userId);
+    await repo.blockByMessage(messageId);
     if (!context.mounted) return;
-    FloatingToast.success(context, '已封鎖「$userName」');
-  } catch (e) {
+    FloatingToast.success(context, '已封鎖「$name」');
+  } on Exception catch (e) {
     if (!context.mounted) return;
-    final handled = handleReportBlockApiError(context, e);
-    if (!handled) {
-      FloatingToast.error(
-        context,
-        e is AppException ? e.message : '封鎖失敗，請稍後再試',
-      );
-    }
+    FloatingToast.error(context, errorText(e, defaults: defaults));
   }
 }

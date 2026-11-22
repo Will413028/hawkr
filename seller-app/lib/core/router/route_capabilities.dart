@@ -40,7 +40,7 @@ final Map<String, SellerCapability?> routeCapabilities = {
   CustomerRoutes.customers: _marketing,
   CustomerRoutes.subscribers: _marketing,
   CustomerRoutes.detail: _marketing,
-  CustomerRoutes.spendingHistory: _marketing,
+  CustomerRoutes.orders: _marketing,
   CustomerRoutes.orderDetail: _orderFulfill,
 
   OrderRoutes.details: _orderFulfill,

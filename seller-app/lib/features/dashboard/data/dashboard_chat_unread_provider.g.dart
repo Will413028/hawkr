@@ -8,26 +8,20 @@ part of 'dashboard_chat_unread_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 儀表板聊天未讀數 Provider
-///
-/// 呼叫 ChatRepository.getUnreadCount() 取得未讀訊息數量。
-/// 由 DashboardScreen 在 FCM 事件觸發時 invalidate。
+/// 儀表板聊天未讀數：`GetStoreUnreadCount`。讀取失敗時丟出錯誤（儀表板的徽章把錯誤當成沒有數字，不當成 0）。
+/// 事件串流的 Ready 與 UnreadChanged 帶來新的總數時重讀，徽章不必等使用者重新整理。
 
 @ProviderFor(dashboardChatUnread)
 final dashboardChatUnreadProvider = DashboardChatUnreadProvider._();
 
-/// 儀表板聊天未讀數 Provider
-///
-/// 呼叫 ChatRepository.getUnreadCount() 取得未讀訊息數量。
-/// 由 DashboardScreen 在 FCM 事件觸發時 invalidate。
+/// 儀表板聊天未讀數：`GetStoreUnreadCount`。讀取失敗時丟出錯誤（儀表板的徽章把錯誤當成沒有數字，不當成 0）。
+/// 事件串流的 Ready 與 UnreadChanged 帶來新的總數時重讀，徽章不必等使用者重新整理。
 
 final class DashboardChatUnreadProvider
     extends $FunctionalProvider<AsyncValue<int>, int, FutureOr<int>>
     with $FutureModifier<int>, $FutureProvider<int> {
-  /// 儀表板聊天未讀數 Provider
-  ///
-  /// 呼叫 ChatRepository.getUnreadCount() 取得未讀訊息數量。
-  /// 由 DashboardScreen 在 FCM 事件觸發時 invalidate。
+  /// 儀表板聊天未讀數：`GetStoreUnreadCount`。讀取失敗時丟出錯誤（儀表板的徽章把錯誤當成沒有數字，不當成 0）。
+  /// 事件串流的 Ready 與 UnreadChanged 帶來新的總數時重讀，徽章不必等使用者重新整理。
   DashboardChatUnreadProvider._()
     : super(
         from: null,
@@ -54,4 +48,4 @@ final class DashboardChatUnreadProvider
 }
 
 String _$dashboardChatUnreadHash() =>
-    r'bc0ffa749209a7db30c959c6358af4a2f6f961b2';
+    r'774a44731621183a3368f34fd9385a1d77526988';

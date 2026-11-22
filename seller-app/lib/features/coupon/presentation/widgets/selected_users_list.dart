@@ -42,7 +42,6 @@ class CouponSelectedUsersList extends StatelessWidget {
           final index = entry.key;
           final user = entry.value;
           final id = user[idKey] ?? user['id'] ?? '';
-          final phone = user['phone'] ?? '';
           final name = user['name'] ?? '會員';
           final avatarUrl = user['avatarUrl'] ?? '';
           return Container(
@@ -80,13 +79,10 @@ class CouponSelectedUsersList extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (id.isNotEmpty || phone.isNotEmpty) ...[
+                      if (id.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          [
-                            if (id.isNotEmpty) 'ID $id',
-                            if (phone.isNotEmpty) phone,
-                          ].join(' · '),
+                          'ID $id',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
