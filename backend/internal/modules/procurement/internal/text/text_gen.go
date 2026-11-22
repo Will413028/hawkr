@@ -9,6 +9,92 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// ConfirmBudgetArgs 是 ConfirmBudget 的參數。
+type ConfirmBudgetArgs struct {
+	Budget int
+}
+
+// ConfirmBudget 是模組句子 confirm.budget；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmBudget(l uitext.Locale, a ConfirmBudgetArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they can meet a unit price of NT$" + strconv.Itoa(a.Budget), Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認能否符合 " + strconv.Itoa(a.Budget) + " 元的單價", Locale: uitext.ZhTW}
+}
+
+// ConfirmBudgetUnitArgs 是 ConfirmBudgetUnit 的參數。
+type ConfirmBudgetUnitArgs struct {
+	Budget int
+	Unit   string
+}
+
+// ConfirmBudgetUnit 是模組句子 confirm.budget_unit；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmBudgetUnit(l uitext.Locale, a ConfirmBudgetUnitArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they can meet a unit price of NT$" + strconv.Itoa(a.Budget) + " per " + a.Unit, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認能否符合 " + strconv.Itoa(a.Budget) + " 元／" + a.Unit + " 的單價", Locale: uitext.ZhTW}
+}
+
+// ConfirmDeliveryCityArgs 是 ConfirmDeliveryCity 的參數。
+type ConfirmDeliveryCityArgs struct {
+	City string
+}
+
+// ConfirmDeliveryCity 是模組句子 confirm.delivery_city；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmDeliveryCity(l uitext.Locale, a ConfirmDeliveryCityArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they deliver to " + a.City, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認是否配送至" + a.City, Locale: uitext.ZhTW}
+}
+
+// ConfirmDeliveryDateArgs 是 ConfirmDeliveryDate 的參數。
+type ConfirmDeliveryDateArgs struct {
+	Date string
+}
+
+// ConfirmDeliveryDate 是模組句子 confirm.delivery_date；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmDeliveryDate(l uitext.Locale, a ConfirmDeliveryDateArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they can deliver by " + a.Date, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認能否於 " + a.Date + " 前到貨", Locale: uitext.ZhTW}
+}
+
+// ConfirmQuantityArgs 是 ConfirmQuantity 的參數。
+type ConfirmQuantityArgs struct {
+	Quantity int
+}
+
+// ConfirmQuantity 是模組句子 confirm.quantity；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmQuantity(l uitext.Locale, a ConfirmQuantityArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they can supply " + strconv.Itoa(a.Quantity), Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認是否備有 " + strconv.Itoa(a.Quantity) + " 的供應量", Locale: uitext.ZhTW}
+}
+
+// ConfirmQuantityUnitArgs 是 ConfirmQuantityUnit 的參數。
+type ConfirmQuantityUnitArgs struct {
+	Quantity int
+	Unit     string
+}
+
+// ConfirmQuantityUnit 是模組句子 confirm.quantity_unit；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ConfirmQuantityUnit(l uitext.Locale, a ConfirmQuantityUnitArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Ask the seller whether they can supply " + strconv.Itoa(a.Quantity) + " " + a.Unit, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "需向賣家確認是否備有 " + strconv.Itoa(a.Quantity) + " " + a.Unit + " 的供應量", Locale: uitext.ZhTW}
+}
+
 // FactPairArgs 是 FactPair 的參數。
 type FactPairArgs struct {
 	Content string

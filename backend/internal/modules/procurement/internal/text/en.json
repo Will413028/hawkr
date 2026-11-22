@@ -1,5 +1,23 @@
 {
   "default": {
+    "confirm.budget": {
+      "message": "Ask the seller whether they can meet a unit price of NT${budget}"
+    },
+    "confirm.budget_unit": {
+      "message": "Ask the seller whether they can meet a unit price of NT${budget} per {unit}"
+    },
+    "confirm.delivery_city": {
+      "message": "Ask the seller whether they deliver to {city}"
+    },
+    "confirm.delivery_date": {
+      "message": "Ask the seller whether they can deliver by {date}"
+    },
+    "confirm.quantity": {
+      "message": "Ask the seller whether they can supply {quantity}"
+    },
+    "confirm.quantity_unit": {
+      "message": "Ask the seller whether they can supply {quantity} {unit}"
+    },
     "fact.pair": {
       "message": "{label}: {content}"
     },

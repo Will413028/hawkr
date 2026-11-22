@@ -49,15 +49,3 @@ func TestCandidateCarriesNoFreeText(t *testing.T) {
 		t.Fatal("沒走到任何 string 欄位，檢查範圍不對")
 	}
 }
-
-// LLMCandidate 才有研究摘要；ForBuyer 轉成買家看得到的型別時不帶它。
-func TestForBuyerDropsTheResearchSummary(t *testing.T) {
-	c := LLMCandidate{Candidate: Candidate{StoreID: 7, Score: 3}, ResearchSummary: "只給 LLM"}
-	got := c.ForBuyer()
-	if got.StoreID != 7 || got.Score != 3 {
-		t.Fatalf("ForBuyer = %+v", got)
-	}
-	if _, ok := reflect.TypeOf(got).FieldByName("ResearchSummary"); ok {
-		t.Fatal("買家型別不得有 ResearchSummary")
-	}
-}

@@ -23,23 +23,14 @@ type UnverifiableFact struct {
 }
 
 // Candidate 是買家回應裡的候選賣家（A9-D8、AD7）：只有結構化欄位。店名由呼叫端以 StoreID 讀 StoreCard 組裝，不存快照（A9-D19 S9）。
+// 事實不入庫：MatchedFacts、UnverifiableFacts 讀取時由需求的現行版本組出（A9-D29(3)），FactsAsOf 是這次搜尋完成的時間。
 // 這個型別不得出現研究摘要、定位等自由文字；TestCandidateCarriesNoFreeText 以反射守住，唯一的例外是下面兩個伺服器產生的欄位。
 type Candidate struct {
 	ID                uuid.UUID
 	StoreID           int64
-	Score             int
+	Rank              int
 	MatchedFacts      []MatchedFact
 	UnverifiableFacts []UnverifiableFact
 	FactsAsOf         time.Time
 	Selected          bool
 }
-
-// LLMCandidate 是給 LLM 看的候選：在買家看得到的欄位之外多了研究摘要等自由文字（A9-D8：自由文字只給 LLM）。
-// 它不得被序列化進買家回應；轉成買家回應只經 ForBuyer。
-type LLMCandidate struct {
-	Candidate
-	ResearchSummary string
-}
-
-// ForBuyer 回傳買家看得到的部分，丟掉所有自由文字。
-func (c LLMCandidate) ForBuyer() Candidate { return c.Candidate }

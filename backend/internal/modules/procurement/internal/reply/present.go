@@ -1,10 +1,13 @@
 package reply
 
 import (
+	"time"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -176,4 +179,38 @@ func optionLabel(l uitext.Locale, o planner.Option) string {
 		return o.Value
 	}
 	return o.Value
+}
+
+// CandidateFacts 由需求的現行版本組出候選的事實（讀取時組，不入庫，A9-D29(3)）：有品項就是符合「品項」；
+// 預算、數量、縣市、交期有值的各是一項需向賣家確認的事。兩個回傳值都是非 nil 的 slice。
+func CandidateFacts(l uitext.Locale, s slots.Set) ([]model.MatchedFact, []model.UnverifiableFact) {
+	matched := []model.MatchedFact{}
+	if s.Item != nil && trimtext.Trim(*s.Item) != "" {
+		matched = append(matched, model.MatchedFact{SlotKey: slots.Item, Label: SlotLabel(l, slots.Item)})
+	}
+	unverifiable := []model.UnverifiableFact{}
+	add := func(key model.SlotKey, reason string) {
+		unverifiable = append(unverifiable, model.UnverifiableFact{SlotKey: key, Reason: reason})
+	}
+	if s.BudgetPerUnit != nil {
+		if s.Unit != nil {
+			add(slots.BudgetPerUnit, text.ConfirmBudgetUnit(l, text.ConfirmBudgetUnitArgs{Budget: int(*s.BudgetPerUnit), Unit: unitLabel(l, *s.Unit)}).Text)
+		} else {
+			add(slots.BudgetPerUnit, text.ConfirmBudget(l, text.ConfirmBudgetArgs{Budget: int(*s.BudgetPerUnit)}).Text)
+		}
+	}
+	if s.Quantity != nil {
+		if s.Unit != nil {
+			add(slots.Quantity, text.ConfirmQuantityUnit(l, text.ConfirmQuantityUnitArgs{Quantity: int(*s.Quantity), Unit: unitLabel(l, *s.Unit)}).Text)
+		} else {
+			add(slots.Quantity, text.ConfirmQuantity(l, text.ConfirmQuantityArgs{Quantity: int(*s.Quantity)}).Text)
+		}
+	}
+	if s.DeliveryCity != nil {
+		add(slots.DeliveryCity, text.ConfirmDeliveryCity(l, text.ConfirmDeliveryCityArgs{City: *s.DeliveryCity}).Text)
+	}
+	if s.DeliveryDate != nil {
+		add(slots.DeliveryDate, text.ConfirmDeliveryDate(l, text.ConfirmDeliveryDateArgs{Date: s.DeliveryDate.Format(time.DateOnly)}).Text)
+	}
+	return matched, unverifiable
 }

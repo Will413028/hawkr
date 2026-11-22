@@ -1,5 +1,65 @@
 {
   "default": {
+    "confirm.budget": {
+      "message": "需向賣家確認能否符合 {budget} 元的單價",
+      "params": {
+        "budget": {
+          "type": "integer"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了單價預算、沒填單位。"
+    },
+    "confirm.budget_unit": {
+      "message": "需向賣家確認能否符合 {budget} 元／{unit} 的單價",
+      "params": {
+        "budget": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了單價預算與單位。"
+    },
+    "confirm.delivery_city": {
+      "message": "需向賣家確認是否配送至{city}",
+      "params": {
+        "city": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：配送縣市。"
+    },
+    "confirm.delivery_date": {
+      "message": "需向賣家確認能否於 {date} 前到貨",
+      "params": {
+        "date": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：到貨日期（YYYY-MM-DD）。"
+    },
+    "confirm.quantity": {
+      "message": "需向賣家確認是否備有 {quantity} 的供應量",
+      "params": {
+        "quantity": {
+          "type": "integer"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了數量、沒填單位。"
+    },
+    "confirm.quantity_unit": {
+      "message": "需向賣家確認是否備有 {quantity} {unit} 的供應量",
+      "params": {
+        "quantity": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了數量與單位。"
+    },
     "fact.pair": {
       "message": "{label}：{content}",
       "params": {
