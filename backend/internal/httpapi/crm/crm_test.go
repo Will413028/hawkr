@@ -12,7 +12,10 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1"
@@ -76,12 +79,15 @@ type fakeWrites struct {
 	name    string
 	names   []string
 	created crm.Tag
+	// customer 與 renamed 是寫入回傳的列（模組在寫入當下回傳）。
+	customer crm.Customer
+	renamed  crm.Tag
 }
 
-func (f *fakeWrites) SetCustomerType(_ context.Context, storeID, buyerID int64, t crm.CustomerType) error {
+func (f *fakeWrites) SetCustomerType(_ context.Context, storeID, buyerID int64, t crm.CustomerType) (crm.Customer, error) {
 	f.calls = append(f.calls, "SetCustomerType")
 	f.storeID, f.buyerID, f.typ = storeID, buyerID, t
-	return f.err
+	return f.customer, f.err
 }
 
 func (f *fakeWrites) CreateTag(_ context.Context, storeID int64, name string) (crm.Tag, error) {
@@ -90,10 +96,10 @@ func (f *fakeWrites) CreateTag(_ context.Context, storeID int64, name string) (c
 	return f.created, f.err
 }
 
-func (f *fakeWrites) RenameTag(_ context.Context, storeID int64, id uuid.UUID, name string) error {
+func (f *fakeWrites) RenameTag(_ context.Context, storeID int64, id uuid.UUID, name string) (crm.Tag, error) {
 	f.calls = append(f.calls, "RenameTag")
 	f.storeID, f.tagID, f.name = storeID, id, name
-	return f.err
+	return f.renamed, f.err
 }
 
 func (f *fakeWrites) DeleteTag(_ context.Context, storeID int64, id uuid.UUID) error {
@@ -102,16 +108,16 @@ func (f *fakeWrites) DeleteTag(_ context.Context, storeID int64, id uuid.UUID) e
 	return f.err
 }
 
-func (f *fakeWrites) AddCustomerTags(_ context.Context, storeID, buyerID int64, names []string) error {
+func (f *fakeWrites) AddCustomerTags(_ context.Context, storeID, buyerID int64, names []string) (crm.Customer, error) {
 	f.calls = append(f.calls, "AddCustomerTags")
 	f.storeID, f.buyerID, f.names = storeID, buyerID, slices.Clone(names)
-	return f.err
+	return f.customer, f.err
 }
 
-func (f *fakeWrites) RemoveCustomerTag(_ context.Context, storeID, buyerID int64, id uuid.UUID) error {
+func (f *fakeWrites) RemoveCustomerTag(_ context.Context, storeID, buyerID int64, id uuid.UUID) (crm.Customer, error) {
 	f.calls = append(f.calls, "RemoveCustomerTag")
 	f.storeID, f.buyerID, f.tagID = storeID, buyerID, id
-	return f.err
+	return f.customer, f.err
 }
 
 type fakeBuyers struct {
@@ -124,22 +130,13 @@ func (f *fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Displ
 	return f.displays, nil
 }
 
-// fakeStores 是 seller.ActingStore 的替身：記下被問的能力；own 為 nil 是沒有店，err 非 nil 是能力被擋（停權等）。
+// fakeStores 是 seller.CurrentStore 的替身：own 為 nil 是沒有店。賣家能力不在 handler 檢查，所以它不回能力的拒絕。
 type fakeStores struct {
-	own  *seller.Store
-	err  error
-	caps []seller.Capability
+	own *seller.Store
 }
 
-func (f *fakeStores) ActingStore(_ context.Context, accountID int64, c seller.Capability) (seller.Store, error) {
-	f.caps = append(f.caps, c)
-	if accountID != callerAccount {
-		return seller.Store{}, apperr.NotFound("no store")
-	}
-	if f.err != nil {
-		return seller.Store{}, f.err
-	}
-	if f.own == nil {
+func (f *fakeStores) CurrentStore(_ context.Context, accountID int64) (seller.Store, error) {
+	if accountID != callerAccount || f.own == nil {
 		return seller.Store{}, apperr.NotFound("no store")
 	}
 	return *f.own, nil
@@ -279,9 +276,13 @@ func calls(e *env, storeID string) map[string]func(context.Context) error {
 }
 
 func seeded(e *env) {
+	nick := "阿美"
+	e.buyers.displays = []buyer.Display{{BuyerID: 70, DisplayName: &nick}}
 	e.reads.customer = sampleCustomer(70)
 	e.reads.tags = []crm.Tag{{ID: tagA, Name: "改名"}}
 	e.writes.created = crm.Tag{ID: fresh, Name: "新標籤"}
+	e.writes.customer = sampleCustomer(70)
+	e.writes.renamed = crm.Tag{ID: tagA, Name: "改名"}
 }
 
 func TestEveryMethodIsCoveredByTheCallTable(t *testing.T) {
@@ -299,16 +300,13 @@ func TestEveryMethodIsCoveredByTheCallTable(t *testing.T) {
 	}
 }
 
-func TestEveryMethodRequiresMarketingForTheCallersOwnStoreAndTouchesNothingOtherwise(t *testing.T) {
+func TestEveryMethodRequiresTheCallersOwnStoreAndTouchesNothingOtherwise(t *testing.T) {
 	for procedure := range calls(newEnv(t), "11") {
 		t.Run(procedure, func(t *testing.T) {
 			e := newEnv(t)
 			seeded(e)
 			if err := calls(e, "11")[procedure](signedIn()); err != nil {
 				t.Fatalf("自己的店：%v", err)
-			}
-			if !slices.Equal(e.stores.caps, []seller.Capability{seller.CapMarketing}) {
-				t.Errorf("要以 CapMarketing 檢查身分：%v", e.stores.caps)
 			}
 
 			cases := []struct {
@@ -320,10 +318,10 @@ func TestEveryMethodRequiresMarketingForTheCallersOwnStoreAndTouchesNothingOther
 			}{
 				{"別人的店", "12", signedIn(), nil, connect.CodePermissionDenied},
 				{"沒有店", "11", signedIn(), func(e *env) { e.stores.own = nil }, connect.CodeNotFound},
-				{"停權或前置條件沒滿足", "11", signedIn(), func(e *env) { e.stores.err = apperr.PermissionDenied("suspended") }, connect.CodePermissionDenied},
 				{"管理員", "11", asAdmin(), nil, connect.CodePermissionDenied},
 				{"店家 ID 不是數字", "abc", signedIn(), nil, connect.CodeInvalidArgument},
 				{"沒有店家 ID", "", signedIn(), nil, connect.CodeInvalidArgument},
+				{"格式錯誤先於身分檢查", "abc", asAdmin(), nil, connect.CodeInvalidArgument},
 			}
 			for _, c := range cases {
 				t.Run(c.name, func(t *testing.T) {
@@ -340,6 +338,103 @@ func TestEveryMethodRequiresMarketingForTheCallersOwnStoreAndTouchesNothingOther
 						t.Errorf("被擋下的請求不得碰模組：reads=%v writes=%v", e.reads.calls, e.writes.calls)
 					}
 				})
+			}
+		})
+	}
+}
+
+// 賣家能力由模組檢查（ADR 2026-09-29 的修訂）：handler 對停權的店照樣把請求交給模組，並原樣回報模組的拒絕。
+// 停權與前置條件沒滿足是兩種拒絕，各自的狀態碼與原因分開斷言。
+func TestSellerCapabilityRejectionsComeFromTheModuleAndKeepTheirReasons(t *testing.T) {
+	ready := seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true}
+	suspended := seller.Authorize(seller.Store{StoreID: callerStoreID, Conditions: ready}, crm.RequiredCapability)
+	pending := seller.Authorize(seller.Store{StoreID: callerStoreID, Sanctions: seller.NoSanctions(), Conditions: seller.Conditions{Derived: true, Active: true}}, crm.RequiredCapability)
+	for _, c := range []struct {
+		name   string
+		err    error
+		code   connect.Code
+		reason string
+	}{
+		{"停權", suspended, connect.CodePermissionDenied, "SELLER_SUSPENDED"},
+		{"前置條件沒滿足", pending, connect.CodeFailedPrecondition, "SELLER_REQUIREMENT_MISSING"},
+	} {
+		if c.err == nil {
+			t.Fatalf("%s：seller.Authorize 沒有拒絕", c.name)
+		}
+		for procedure := range calls(newEnv(t), "11") {
+			t.Run(c.name+procedure, func(t *testing.T) {
+				e := newEnv(t)
+				seeded(e)
+				e.reads.err, e.writes.err = c.err, c.err
+				err := calls(e, "11")[procedure](signedIn())
+				if reason, _ := detailsOf(err); err == nil || codeOf(err) != c.code || reason != c.reason {
+					t.Fatalf("code = %v reason = %q（%v），預期 %v %q", codeOf(err), reason, err, c.code, c.reason)
+				}
+				if len(e.reads.calls)+len(e.writes.calls) != 1 {
+					t.Errorf("請求要交給模組檢查：reads=%v writes=%v", e.reads.calls, e.writes.calls)
+				}
+			})
+		}
+	}
+}
+
+// 每個方法的欄位格式檢查都先於身分檢查：管理員（會被 permission_denied 擋）帶壞掉的欄位，拿到的是 invalid_argument，模組沒有被碰。
+func TestFieldFormatIsCheckedBeforeIdentityInEveryMethod(t *testing.T) {
+	bad := map[string]func(*env) error{
+		"ListCustomers 負的 page_size": func(e *env) error {
+			_, err := e.app.ListCustomers(asAdmin(), connect.NewRequest(&pb.ListCustomersRequest{StoreId: "11", PageSize: -1}))
+			return err
+		},
+		"ListCustomers 不認得的排序": func(e *env) error {
+			_, err := e.app.ListCustomers(asAdmin(), connect.NewRequest(&pb.ListCustomersRequest{StoreId: "11", Sort: pb.CustomerSort(99)}))
+			return err
+		},
+		"GetCustomer 買家 ID": func(e *env) error {
+			_, err := e.app.GetCustomer(asAdmin(), connect.NewRequest(&pb.GetCustomerRequest{StoreId: "11", BuyerId: "x"}))
+			return err
+		},
+		"UpdateCustomer 沒有 customer": func(e *env) error {
+			_, err := e.app.UpdateCustomer(asAdmin(), connect.NewRequest(&pb.UpdateCustomerRequest{StoreId: "11", UpdateMask: mask("type")}))
+			return err
+		},
+		"UpdateCustomer mask 沒有 type": func(e *env) error {
+			_, err := e.app.UpdateCustomer(asAdmin(), connect.NewRequest(&pb.UpdateCustomerRequest{StoreId: "11", Customer: &pb.Customer{BuyerId: "70"}, UpdateMask: mask("display")}))
+			return err
+		},
+		"UpdateTag 沒有 tag": func(e *env) error {
+			_, err := e.app.UpdateTag(asAdmin(), connect.NewRequest(&pb.UpdateTagRequest{StoreId: "11", UpdateMask: mask("name")}))
+			return err
+		},
+		"UpdateTag mask 沒有 name": func(e *env) error {
+			_, err := e.app.UpdateTag(asAdmin(), connect.NewRequest(&pb.UpdateTagRequest{StoreId: "11", Tag: &pb.Tag{Id: tagA.String()}, UpdateMask: mask("id")}))
+			return err
+		},
+		"DeleteTag 標籤 ID": func(e *env) error {
+			_, err := e.app.DeleteTag(asAdmin(), connect.NewRequest(&pb.DeleteTagRequest{StoreId: "11", TagId: "x"}))
+			return err
+		},
+		"AddCustomerTags 買家 ID": func(e *env) error {
+			_, err := e.app.AddCustomerTags(asAdmin(), connect.NewRequest(&pb.AddCustomerTagsRequest{StoreId: "11", BuyerId: "x"}))
+			return err
+		},
+		"RemoveCustomerTag 標籤 ID": func(e *env) error {
+			_, err := e.app.RemoveCustomerTag(asAdmin(), connect.NewRequest(&pb.RemoveCustomerTagRequest{StoreId: "11", BuyerId: "70", TagId: "x"}))
+			return err
+		},
+		"RemoveCustomerTag 買家 ID": func(e *env) error {
+			_, err := e.app.RemoveCustomerTag(asAdmin(), connect.NewRequest(&pb.RemoveCustomerTagRequest{StoreId: "11", BuyerId: "x", TagId: tagA.String()}))
+			return err
+		},
+	}
+	for name, call := range bad {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			err := call(e)
+			if err == nil || codeOf(err) != connect.CodeInvalidArgument {
+				t.Fatalf("code = %v（%v），預期 invalid_argument", codeOf(err), err)
+			}
+			if len(e.reads.calls)+len(e.writes.calls) != 0 {
+				t.Errorf("不得碰模組：reads=%v writes=%v", e.reads.calls, e.writes.calls)
 			}
 		})
 	}
@@ -368,6 +463,9 @@ func TestStartupFailsWhenTheDeclarationTableDoesNotMatchTheService(t *testing.T)
 	}
 	if _, err := newApp(bad, e.reads, e.writes, e.buyers, e.stores, images(t), slog.New(slog.DiscardHandler)); err == nil {
 		t.Error("不存在的能力不能啟動")
+	}
+	if crm.RequiredCapability != seller.CapMarketing {
+		t.Errorf("模組檢查的能力 %q 不是 CapMarketing", crm.RequiredCapability)
 	}
 	for _, c := range declarations {
 		if c != seller.CapMarketing {
@@ -453,10 +551,16 @@ func TestListCustomersRejectsBadFilters(t *testing.T) {
 		"不認得的分類":               {StoreId: "11", Type: &unknownType},
 		"標籤 ID 不是 UUID":        {StoreId: "11", TagId: &badTag},
 		"不認得的排序":               {StoreId: "11", Sort: pb.CustomerSort(99)},
+		"負的 page_size":         {StoreId: "11", PageSize: -1},
 	} {
 		_, err := e.app.ListCustomers(signedIn(), connect.NewRequest(req))
 		if err == nil || codeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s：%v", name, err)
+		}
+		if name == "負的 page_size" {
+			if _, fields := detailsOf(err); !slices.Equal(fields, []string{"page_size"}) {
+				t.Errorf("page_size 的欄位路徑：%v", fields)
+			}
 		}
 	}
 	if len(e.reads.calls) != 0 {
@@ -535,8 +639,46 @@ func TestUpdateCustomerSetsOnlyTheType(t *testing.T) {
 	if !slices.Equal(e.writes.calls, []string{"SetCustomerType"}) || e.writes.storeID != 11 || e.writes.buyerID != 70 || e.writes.typ != crm.TypeNormal {
 		t.Errorf("寫入：%v %+v", e.writes.calls, e.writes)
 	}
-	if resp.Msg.GetCustomer().GetBuyerId() != "70" || !slices.Equal(e.reads.calls, []string{"GetCustomer"}) {
-		t.Errorf("回應要是寫入後讀回的客戶：%v %v", resp.Msg.GetCustomer(), e.reads.calls)
+	if resp.Msg.GetCustomer().GetBuyerId() != "70" || len(e.reads.calls) != 0 {
+		t.Errorf("回應要是寫入回傳的客戶、不在 commit 之後另外讀：%v %v", resp.Msg.GetCustomer(), e.reads.calls)
+	}
+	for _, m := range []*fieldmaskpb.FieldMask{mask("*"), mask("type", "display")} {
+		e.writes.calls, e.writes.typ = nil, ""
+		req.UpdateMask = m
+		req.Customer.Type = pb.CustomerType_CUSTOMER_TYPE_VIP
+		if _, err := e.app.UpdateCustomer(signedIn(), connect.NewRequest(req)); err != nil || e.writes.typ != crm.TypeVIP {
+			t.Errorf("mask %v：typ=%q err=%v", m.GetPaths(), e.writes.typ, err)
+		}
+	}
+}
+
+// 契約：客戶的買家已刪除（buyer.BatchDisplay 沒有他或標示已刪除）時，單一客戶的回應與「這家店沒有這位客戶」是同一個 not_found（列表仍以 display.deleted 呈現）。
+func TestSingleCustomerResponsesReturnTheMissingCustomerErrorWhenTheBuyerIsDeleted(t *testing.T) {
+	wantCode, wantMsg := codeOf(crm.CustomerNotFound(context.Background())), rpc.ConnectError(context.Background(), crm.CustomerNotFound(context.Background())).Message()
+	for name, displays := range map[string][]buyer.Display{
+		"標示已刪除":         {{BuyerID: 70, Deleted: true}},
+		"buyer 沒有回這個買家": nil,
+	} {
+		for procedure := range calls(newEnv(t), "11") {
+			switch procedure {
+			case crmv1alpha1connect.CrmAppServiceGetCustomerProcedure, crmv1alpha1connect.CrmAppServiceUpdateCustomerProcedure,
+				crmv1alpha1connect.CrmAppServiceAddCustomerTagsProcedure, crmv1alpha1connect.CrmAppServiceRemoveCustomerTagProcedure:
+			default:
+				continue
+			}
+			t.Run(name+procedure, func(t *testing.T) {
+				e := newEnv(t)
+				seeded(e)
+				e.buyers.displays = displays
+				err := calls(e, "11")[procedure](signedIn())
+				if err == nil || codeOf(err) != connect.CodeNotFound || wantCode != connect.CodeNotFound {
+					t.Fatalf("code = %v（%v），預期 not_found", codeOf(err), err)
+				}
+				if got := rpc.ConnectError(context.Background(), err).Message(); got != wantMsg {
+					t.Errorf("訊息 %q，預期與客戶不存在相同的 %q", got, wantMsg)
+				}
+			})
+		}
 	}
 }
 
@@ -639,9 +781,9 @@ func TestListTagsReturnsTheStoresTags(t *testing.T) {
 	}
 }
 
-func TestUpdateTagRenamesAndReturnsTheStoredName(t *testing.T) {
+func TestUpdateTagRenamesAndReturnsTheWrittenTag(t *testing.T) {
 	e := newEnv(t)
-	e.reads.tags = []crm.Tag{{ID: tagB, Name: "別的"}, {ID: tagA, Name: "改名"}}
+	e.writes.renamed = crm.Tag{ID: tagA, Name: "改名"}
 	resp, err := e.app.UpdateTag(signedIn(), connect.NewRequest(&pb.UpdateTagRequest{
 		StoreId: "11", Tag: &pb.Tag{Id: tagA.String(), Name: "  改名  "}, UpdateMask: mask("name"),
 	}))
@@ -652,14 +794,10 @@ func TestUpdateTagRenamesAndReturnsTheStoredName(t *testing.T) {
 		t.Errorf("寫入：%+v", e.writes)
 	}
 	if resp.Msg.GetTag().GetId() != tagA.String() || resp.Msg.GetTag().GetName() != "改名" {
-		t.Errorf("回應要是儲存的名稱：%v", resp.Msg.GetTag())
+		t.Errorf("回應要是寫入回傳的標籤：%v", resp.Msg.GetTag())
 	}
-
-	e.reads.tags = []crm.Tag{{ID: tagB, Name: "別的"}}
-	if _, err := e.app.UpdateTag(signedIn(), connect.NewRequest(&pb.UpdateTagRequest{
-		StoreId: "11", Tag: &pb.Tag{Id: tagA.String(), Name: "x"}, UpdateMask: mask("name"),
-	})); codeOf(err) != connect.CodeNotFound {
-		t.Errorf("改名後標籤被並發刪除：%v", err)
+	if len(e.reads.calls) != 0 {
+		t.Errorf("不在 commit 之後另外讀：%v", e.reads.calls)
 	}
 }
 
@@ -724,8 +862,8 @@ func TestAddCustomerTagsPassesTheNamesReturnsTheCustomerAndMapsErrors(t *testing
 	if e.writes.storeID != 11 || e.writes.buyerID != 70 || !slices.Equal(e.writes.names, []string{"常客", "批發"}) {
 		t.Errorf("寫入：%+v", e.writes)
 	}
-	if len(resp.Msg.GetCustomer().GetTags()) != 2 || !slices.Equal(e.reads.calls, []string{"GetCustomer"}) {
-		t.Errorf("回應要是貼完之後讀回的客戶：%v %v", resp.Msg.GetCustomer(), e.reads.calls)
+	if len(resp.Msg.GetCustomer().GetTags()) != 2 || len(e.reads.calls) != 0 {
+		t.Errorf("回應要是寫入回傳的客戶、不在 commit 之後另外讀：%v %v", resp.Msg.GetCustomer(), e.reads.calls)
 	}
 
 	e.writes.err = withReason(apperr.FailedPrecondition("limit"), crm.ReasonTagLimit)
@@ -754,7 +892,7 @@ func TestRemoveCustomerTagPassesIdsReturnsTheCustomerAndMapsErrors(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.writes.storeID != 11 || e.writes.buyerID != 70 || e.writes.tagID != tagB || resp.Msg.GetCustomer().GetBuyerId() != "70" {
+	if e.writes.storeID != 11 || e.writes.buyerID != 70 || e.writes.tagID != tagB || resp.Msg.GetCustomer().GetBuyerId() != "70" || len(e.reads.calls) != 0 {
 		t.Errorf("寫入：%+v 回應：%v", e.writes, resp.Msg.GetCustomer())
 	}
 	if _, err = e.app.RemoveCustomerTag(signedIn(), connect.NewRequest(&pb.RemoveCustomerTagRequest{StoreId: "11", BuyerId: "70", TagId: "x"})); codeOf(err) != connect.CodeInvalidArgument {
@@ -807,47 +945,102 @@ func fieldNames(md protoreflect.MessageDescriptor) []string {
 	return out
 }
 
-func walk(t *testing.T, md protoreflect.MessageDescriptor, path string, seen map[protoreflect.FullName]bool) {
-	t.Helper()
+// responseFields 是 CRM 回應走訪會碰到的每個訊息的欄位白名單（CD8）：新增欄位（任何名字）要先確認不是個資，再改這份白名單；
+// 名稱檢查（contactLike）只是第二道，抓不到 cellphone 這類不在詞表的名字，白名單抓得到。
+var responseFields = map[protoreflect.FullName][]string{
+	"hawkr.crm.v1alpha1.ListCustomersResponse":     {"customers", "next_page_token"},
+	"hawkr.crm.v1alpha1.GetCustomerResponse":       {"customer"},
+	"hawkr.crm.v1alpha1.UpdateCustomerResponse":    {"customer"},
+	"hawkr.crm.v1alpha1.CreateTagResponse":         {"tag"},
+	"hawkr.crm.v1alpha1.ListTagsResponse":          {"tags"},
+	"hawkr.crm.v1alpha1.UpdateTagResponse":         {"tag"},
+	"hawkr.crm.v1alpha1.DeleteTagResponse":         {},
+	"hawkr.crm.v1alpha1.AddCustomerTagsResponse":   {"customer"},
+	"hawkr.crm.v1alpha1.RemoveCustomerTagResponse": {"customer"},
+	"hawkr.crm.v1alpha1.Customer":                  {"buyer_id", "display", "type", "total_spent", "order_count", "first_order_time", "tags"},
+	"hawkr.crm.v1alpha1.CustomerDisplay":           {"nickname", "avatar", "deleted"},
+	"hawkr.crm.v1alpha1.Tag":                       {"id", "name"},
+	"hawkr.common.v1alpha1.Image":                  {"uri_template"},
+	"google.protobuf.Timestamp":                    {"seconds", "nanos"},
+}
+
+// walk 遞迴走訪 md 的每個欄位型別，回報：不在白名單的訊息、欄位與白名單不同的訊息、聯絡資料類的欄位名。
+func walk(md protoreflect.MessageDescriptor, path string, allowed map[protoreflect.FullName][]string, seen map[protoreflect.FullName]bool) []string {
 	if seen[md.FullName()] {
-		return
+		return nil
 	}
 	seen[md.FullName()] = true
+	var problems []string
+	want, ok := allowed[md.FullName()]
+	switch {
+	case !ok:
+		problems = append(problems, path+"："+string(md.FullName())+" 不在欄位白名單（CD8：新的回應訊息要先確認沒有個資）")
+	case !slices.Equal(fieldNames(md), want):
+		problems = append(problems, path+"："+string(md.FullName())+" 的欄位是 "+strings.Join(fieldNames(md), ",")+"，白名單是 "+strings.Join(want, ",")+"（新增欄位要先確認不是個資，再改白名單）")
+	}
 	for i := range md.Fields().Len() {
 		fd := md.Fields().Get(i)
 		if contactLike(fd.Name()) {
-			t.Errorf("%s.%s 是聯絡資料類的欄位名（CD8：CRM 不回電話、Email、地址）", path, fd.Name())
+			problems = append(problems, path+"."+string(fd.Name())+" 是聯絡資料類的欄位名（CD8：CRM 不回電話、Email、地址）")
 		}
 		if fd.Message() != nil {
-			walk(t, fd.Message(), path+"."+string(fd.Name()), seen)
+			problems = append(problems, walk(fd.Message(), path+"."+string(fd.Name()), allowed, seen)...)
 		}
 	}
+	return problems
 }
 
 func TestCustomerAndEveryCrmResponseCarryNoContactFields(t *testing.T) {
-	file := pb.File_hawkr_crm_v1alpha1_crm_proto
 	svc := serviceDescriptor()
 	seen := map[protoreflect.FullName]bool{}
 	for i := range svc.Methods().Len() {
 		out := svc.Methods().Get(i).Output()
-		walk(t, out, string(out.Name()), seen)
-	}
-	walk(t, file.Messages().ByName("Customer"), "Customer", seen)
-	if !seen["hawkr.crm.v1alpha1.Customer"] || !seen["hawkr.crm.v1alpha1.CustomerDisplay"] || !seen["hawkr.crm.v1alpha1.Tag"] {
-		t.Fatalf("遞迴沒有走到 Customer、CustomerDisplay、Tag：%v", seen)
-	}
-
-	for _, tc := range []struct {
-		name string
-		want []string
-	}{
-		{"Customer", []string{"buyer_id", "display", "type", "total_spent", "order_count", "first_order_time", "tags"}},
-		{"CustomerDisplay", []string{"nickname", "avatar", "deleted"}},
-		{"Tag", []string{"id", "name"}},
-	} {
-		if got := fieldNames(file.Messages().ByName(protoreflect.Name(tc.name))); !slices.Equal(got, tc.want) {
-			t.Errorf("%s 的欄位是 %v，白名單是 %v（新增欄位要先確認不是個資，再改這份白名單）", tc.name, got, tc.want)
+		for _, p := range walk(out, string(out.Name()), responseFields, seen) {
+			t.Error(p)
 		}
+	}
+	for _, name := range []protoreflect.FullName{"hawkr.crm.v1alpha1.Customer", "hawkr.crm.v1alpha1.CustomerDisplay", "hawkr.crm.v1alpha1.Tag", "hawkr.common.v1alpha1.Image"} {
+		if !seen[name] {
+			t.Errorf("遞迴沒有走到 %s：%v", name, seen)
+		}
+	}
+	for name := range responseFields {
+		if !seen[name] {
+			t.Errorf("白名單裡的 %s 沒有被走訪到（白名單過期）", name)
+		}
+	}
+}
+
+// 走訪本身的自我測試，用只在測試裡建立的 descriptor：一個回應訊息多了 buyer_cellphone（不在 contactTokens 的詞表裡），只有白名單抓得到。
+func TestTheWalkFlagsAnUnlistedContactFieldThatTheNameTokensMiss(t *testing.T) {
+	str := descriptorpb.FieldDescriptorProto_TYPE_STRING
+	opt := descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
+	fd, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
+		Name: proto.String("walk_selftest.proto"), Package: proto.String("selftest"), Syntax: proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{
+			Name: proto.String("GetThing"),
+			Field: []*descriptorpb.FieldDescriptorProto{
+				{Name: proto.String("customer"), Number: proto.Int32(1), Type: &str, Label: &opt},
+				{Name: proto.String("buyer_cellphone"), Number: proto.Int32(2), Type: &str, Label: &opt},
+			},
+		}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md := fd.Messages().ByName("GetThing")
+	if contactLike("buyer_cellphone") {
+		t.Fatal("前提：cellphone 不在詞表裡，名稱檢查抓不到")
+	}
+	got := walk(md, "GetThing", map[protoreflect.FullName][]string{"selftest.GetThing": {"customer"}}, map[protoreflect.FullName]bool{})
+	if len(got) != 1 || !strings.Contains(got[0], "buyer_cellphone") {
+		t.Errorf("白名單要抓到多出來的 buyer_cellphone：%v", got)
+	}
+	if got := walk(md, "GetThing", map[protoreflect.FullName][]string{"selftest.GetThing": {"customer", "buyer_cellphone"}}, map[protoreflect.FullName]bool{}); len(got) != 0 {
+		t.Errorf("白名單列了就不報：%v", got)
+	}
+	if got := walk(md, "GetThing", map[protoreflect.FullName][]string{}, map[protoreflect.FullName]bool{}); len(got) == 0 {
+		t.Error("不在白名單的訊息要報")
 	}
 }
 

@@ -15,10 +15,11 @@ INSERT INTO crm.tags (id, store_id, name, created_at, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(store_id), sqlc.arg(name), sqlc.arg(now), sqlc.arg(now))
 ON CONFLICT (store_id, name) DO NOTHING;
 
--- name: RenameTag :execrows
--- 撞名會是 UNIQUE 違反（呼叫者轉成 AlreadyExists，transaction 隨即結束）；0 列表示標籤不存在（或屬於別家店）。
+-- name: RenameTag :one
+-- 撞名會是 UNIQUE 違反（呼叫者轉成 AlreadyExists，transaction 隨即結束）；ErrNoRows 表示標籤不存在（或屬於別家店）；回傳寫入當下的列。
 UPDATE crm.tags SET name = sqlc.arg(name), updated_at = sqlc.arg(now)
-WHERE store_id = sqlc.arg(store_id) AND id = sqlc.arg(id);
+WHERE store_id = sqlc.arg(store_id) AND id = sqlc.arg(id)
+RETURNING id, name;
 
 -- name: DeleteTag :execrows
 -- 關聯由 customer_tags 的 FK cascade 刪除。

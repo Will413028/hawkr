@@ -52,6 +52,9 @@ type Deps struct {
 }
 
 // Buyers 與 Stores 是 crm 用到的 buyer、seller 公開 API（守門，必須在 transaction 內呼叫）。
+// RequiredCapability 是店家經營客戶與標籤需要的賣家能力；模組的寫入在 transaction 內、讀取在查詢前檢查，handler 不檢查。
+const RequiredCapability = model.RequiredCapability
+
 type (
 	Buyers = write.Buyers
 	Stores = write.Stores
@@ -107,6 +110,9 @@ var (
 // ErasePartyArgs 是清除 job 的參數（job 種類 crm.erase_party）。
 type ErasePartyArgs = purge.ErasePartyArgs
 
+// CustomerNotFound 是「這家店沒有這位客戶」的錯誤，與 GetCustomer 對不存在的客戶回的相同；httpapi 在客戶的買家已刪除時回它。
+func CustomerNotFound(ctx context.Context) error { return write.CustomerNotFound(ctx) }
+
 // ReasonOf 回傳 err 帶的 crm 業務原因；沒有時是空字串。
 func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
@@ -128,7 +134,7 @@ func New(d Deps) *Module {
 	}
 	return &Module{
 		write:   write.New(write.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, NewID: d.NewID, Now: d.Now}),
-		read:    read.New(read.Deps{DB: d.DB}),
+		read:    read.New(read.Deps{DB: d.DB, Stores: d.Stores}),
 		project: project.New(project.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, Now: d.Now, Logger: d.Logger}),
 		purge:   purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Logger: d.Logger}),
 	}
@@ -154,8 +160,8 @@ func (m *Module) VIPStatuses(ctx context.Context, buyerID int64, storeIDs []int6
 	return m.read.VIPStatuses(ctx, buyerID, storeIDs)
 }
 
-// SetCustomerType 設定分類；分類值不合法回 InvalidInput，店家沒有這位客戶回 NotFound。
-func (m *Module) SetCustomerType(ctx context.Context, storeID, buyerID int64, t CustomerType) error {
+// SetCustomerType 設定分類並回傳寫入當下的客戶；分類值不合法回 InvalidInput，店家沒有這位客戶回 NotFound。
+func (m *Module) SetCustomerType(ctx context.Context, storeID, buyerID int64, t CustomerType) (Customer, error) {
 	return m.write.SetCustomerType(ctx, storeID, buyerID, t)
 }
 
@@ -164,8 +170,8 @@ func (m *Module) CreateTag(ctx context.Context, storeID int64, name string) (Tag
 	return m.write.CreateTag(ctx, storeID, name)
 }
 
-// RenameTag 改標籤名稱。
-func (m *Module) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) error {
+// RenameTag 改標籤名稱並回傳寫入當下的標籤。
+func (m *Module) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) (Tag, error) {
 	return m.write.RenameTag(ctx, storeID, tagID, name)
 }
 
@@ -174,13 +180,13 @@ func (m *Module) DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID) 
 	return m.write.DeleteTag(ctx, storeID, tagID)
 }
 
-// AddCustomerTags 替客戶貼上一批標籤（不存在的先建立）；整批原子：任何一步失敗，整批都沒有寫入。
-func (m *Module) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) error {
+// AddCustomerTags 替客戶貼上一批標籤（不存在的先建立）並回傳貼完之後的客戶；整批原子：任何一步失敗，整批都沒有寫入。
+func (m *Module) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) (Customer, error) {
 	return m.write.AddCustomerTags(ctx, storeID, buyerID, names)
 }
 
-// RemoveCustomerTag 移除客戶身上的一個標籤（冪等）。
-func (m *Module) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) error {
+// RemoveCustomerTag 移除客戶身上的一個標籤（冪等）並回傳移除之後的客戶。
+func (m *Module) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) (Customer, error) {
 	return m.write.RemoveCustomerTag(ctx, storeID, buyerID, tagID)
 }
 

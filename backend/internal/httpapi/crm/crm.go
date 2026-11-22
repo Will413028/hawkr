@@ -1,4 +1,4 @@
-// Package crm 是 crm 模組的 Connect handler：店家的客戶與標籤（hawkr.crm.v1alpha1.CrmAppService）。這裡只做欄位的轉換、店家身分與能力的檢查
+// Package crm 是 crm 模組的 Connect handler：店家的客戶與標籤（hawkr.crm.v1alpha1.CrmAppService）。這裡只做欄位的轉換、店家身分的推導
 // 與顯示資料的組裝（暱稱與頭像來自 buyer、圖片網址由 rpc.Images 組成），規則在 internal/modules/crm。
 package crm
 
@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1"
@@ -33,12 +34,12 @@ type Reads interface {
 
 // Writes 是客戶與標籤的寫入來源（*crm.Module）。
 type Writes interface {
-	SetCustomerType(ctx context.Context, storeID, buyerID int64, t crm.CustomerType) error
+	SetCustomerType(ctx context.Context, storeID, buyerID int64, t crm.CustomerType) (crm.Customer, error)
 	CreateTag(ctx context.Context, storeID int64, name string) (crm.Tag, error)
-	RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) error
+	RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) (crm.Tag, error)
 	DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID) error
-	AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) error
-	RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) error
+	AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) (crm.Customer, error)
+	RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) (crm.Customer, error)
 }
 
 // Buyers 是客戶顯示資料的來源（*buyer.Module）。
@@ -46,9 +47,9 @@ type Buyers interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]buyer.Display, error)
 }
 
-// Stores 是呼叫者目前的店與賣家能力的來源（*seller.Module）。
+// Stores 是呼叫者目前的店的來源（*seller.Module）；賣家能力由 crm 模組檢查，不在這裡。
 type Stores interface {
-	ActingStore(ctx context.Context, accountID int64, c seller.Capability) (seller.Store, error)
+	CurrentStore(ctx context.Context, accountID int64) (seller.Store, error)
 }
 
 // App 實作 CrmAppService。
@@ -88,25 +89,22 @@ func newApp(table map[string]seller.Capability, reads Reads, writes Writes, buye
 	return &App{reads: reads, writes: writes, buyers: buyers, stores: stores, images: images, log: log, reasonOf: crm.ReasonOf}, nil
 }
 
-// authorize 檢查呼叫者是 store_id 這家店的店主、並具備 procedure 宣告的賣家能力，回傳店家 ID。沒有登入由 interceptor 擋，管理員回 permission_denied；
-// 呼叫者沒有店回 not_found，停權與前置條件沒有滿足由 seller.ActingStore 回報；店不是呼叫者的回 permission_denied（店家 ID 是公開的，不需要反列舉）。
-func (h *App) authorize(ctx context.Context, procedure, rawStoreID string) (int64, error) {
-	storeID, err := rpc.ParseID("store_id", rawStoreID)
-	if err != nil {
-		return 0, err
-	}
+// ownStore 檢查呼叫者是 storeID 這家店的店主（店家由 seller.CurrentStore 推導）。沒有登入由 interceptor 擋，管理員回 permission_denied；呼叫者沒有店回 not_found，
+// 店不是呼叫者的回 permission_denied（店家 ID 是公開的，不需要反列舉）。賣家能力（停權、前置條件）不在這裡檢查：由 crm 模組在寫入的 transaction 內、
+// 讀取之前檢查（ADR 2026-09-29 的修訂），宣告見 declarations。欄位格式的檢查先於它。
+func (h *App) ownStore(ctx context.Context, storeID int64) error {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	st, err := h.stores.ActingStore(ctx, p.ID, declarations[procedure])
+	st, err := h.stores.CurrentStore(ctx, p.ID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if st.StoreID != storeID {
-		return 0, apperr.PermissionDenied("不是你的店")
+		return apperr.PermissionDenied("不是你的店")
 	}
-	return storeID, nil
+	return nil
 }
 
 // reasons 是模組的業務原因對到契約的 ErrorReason（apperr.Reason）：只有 client 會依它分支的才對應，找不到類不帶原因。
@@ -173,14 +171,33 @@ func sortOf(s pb.CustomerSort) (crm.SortBy, error) {
 	return 0, rpc.RequiredField("sort", "sort 不是已知的排序欄位")
 }
 
+// pageSize 檢查 page_size：負數回 invalid_argument（API 設計規範 §page_size），0 與超過上限由模組套預設與上限。
+func pageSize(n int32) (int32, error) {
+	if n < 0 {
+		return 0, rpc.RequiredField("page_size", "page_size 不能是負數")
+	}
+	return n, nil
+}
+
+// lists 回報 update_mask 是否列了 field（或 "*"，所有可修改的欄位）。
+func lists(mask *fieldmaskpb.FieldMask, field string) bool {
+	return slices.ContainsFunc(mask.GetPaths(), func(p string) bool { return p == field || p == "*" })
+}
+
+// 每個方法的順序：欄位格式檢查（含 store_id）→ 店家身分（ownStore）→ 模組呼叫（能力由模組檢查）。
+
 func (h *App) ListCustomers(ctx context.Context, req *connect.Request[pb.ListCustomersRequest]) (*connect.Response[pb.ListCustomersResponse], error) {
 	msg := req.Msg
 	const procedure = crmv1alpha1connect.CrmAppServiceListCustomersProcedure
-	storeID, err := h.authorize(ctx, procedure, msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
-	in := crm.CustomerListInput{StoreID: storeID, Desc: msg.GetDescending(), Size: msg.GetPageSize()}
+	size, err := pageSize(msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	in := crm.CustomerListInput{StoreID: storeID, Desc: msg.GetDescending(), Size: size}
 	typeKey, tagKey := "", ""
 	if msg.Type != nil {
 		t := rpc.EnumFromProto[crm.CustomerType](msg.GetType())
@@ -203,6 +220,9 @@ func (h *App) ListCustomers(ctx context.Context, req *connect.Request[pb.ListCus
 	if in.After, err = decodeCursor(scope, msg.GetPageToken()); err != nil {
 		return nil, err
 	}
+	if err := h.ownStore(ctx, storeID); err != nil {
+		return nil, err
+	}
 	page, err := h.reads.ListCustomers(ctx, in)
 	if err != nil {
 		return nil, h.failure(err, listPaths)
@@ -215,20 +235,24 @@ func (h *App) ListCustomers(ctx context.Context, req *connect.Request[pb.ListCus
 }
 
 func (h *App) GetCustomer(ctx context.Context, req *connect.Request[pb.GetCustomerRequest]) (*connect.Response[pb.GetCustomerResponse], error) {
-	storeID, buyerID, err := h.customerKey(ctx, crmv1alpha1connect.CrmAppServiceGetCustomerProcedure, req.Msg.GetStoreId(), req.Msg.GetBuyerId(), "buyer_id")
+	storeID, buyerID, err := h.customerKey(ctx, req.Msg.GetStoreId(), req.Msg.GetBuyerId(), "buyer_id")
 	if err != nil {
 		return nil, err
 	}
-	c, err := h.customer(ctx, storeID, buyerID)
+	c, err := h.reads.GetCustomer(ctx, storeID, buyerID)
+	if err != nil {
+		return nil, h.failure(err, noFieldPaths)
+	}
+	out, err := h.customer(ctx, c)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.GetCustomerResponse{Customer: c}), nil
+	return connect.NewResponse(&pb.GetCustomerResponse{Customer: out}), nil
 }
 
 func (h *App) UpdateCustomer(ctx context.Context, req *connect.Request[pb.UpdateCustomerRequest]) (*connect.Response[pb.UpdateCustomerResponse], error) {
 	msg := req.Msg
-	storeID, err := h.authorize(ctx, crmv1alpha1connect.CrmAppServiceUpdateCustomerProcedure, msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
@@ -240,17 +264,22 @@ func (h *App) UpdateCustomer(ctx context.Context, req *connect.Request[pb.Update
 	if err != nil {
 		return nil, err
 	}
-	paths, err := rpc.WritableFields(c, msg.GetUpdateMask())
-	if err != nil {
-		return nil, err
-	}
-	if !slices.Equal(paths, []string{"type"}) {
+	// 客戶沒有 INPUT_ONLY 或遮蔽的欄位，用規範的第一種做法：ApplyUpdateMask 檢查路徑並把 mask 選到的欄位套上去（唯一可修改的是 type）。
+	if !lists(msg.GetUpdateMask(), "type") {
 		return nil, rpc.RequiredField("update_mask", "update_mask 必須列 type（分類是唯一可以修改的欄位）")
 	}
-	if err := h.writes.SetCustomerType(ctx, storeID, buyerID, rpc.EnumFromProto[crm.CustomerType](c.GetType())); err != nil {
+	merged := &pb.Customer{}
+	if err := rpc.ApplyUpdateMask(merged, c, msg.GetUpdateMask()); err != nil {
+		return nil, err
+	}
+	if err := h.ownStore(ctx, storeID); err != nil {
+		return nil, err
+	}
+	written, err := h.writes.SetCustomerType(ctx, storeID, buyerID, rpc.EnumFromProto[crm.CustomerType](merged.GetType()))
+	if err != nil {
 		return nil, h.failure(err, updatePaths)
 	}
-	out, err := h.customer(ctx, storeID, buyerID)
+	out, err := h.customer(ctx, written)
 	if err != nil {
 		return nil, err
 	}
@@ -258,8 +287,11 @@ func (h *App) UpdateCustomer(ctx context.Context, req *connect.Request[pb.Update
 }
 
 func (h *App) CreateTag(ctx context.Context, req *connect.Request[pb.CreateTagRequest]) (*connect.Response[pb.CreateTagResponse], error) {
-	storeID, err := h.authorize(ctx, crmv1alpha1connect.CrmAppServiceCreateTagProcedure, req.Msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {
+		return nil, err
+	}
+	if err := h.ownStore(ctx, storeID); err != nil {
 		return nil, err
 	}
 	t, err := h.writes.CreateTag(ctx, storeID, req.Msg.GetName())
@@ -270,8 +302,11 @@ func (h *App) CreateTag(ctx context.Context, req *connect.Request[pb.CreateTagRe
 }
 
 func (h *App) ListTags(ctx context.Context, req *connect.Request[pb.ListTagsRequest]) (*connect.Response[pb.ListTagsResponse], error) {
-	storeID, err := h.authorize(ctx, crmv1alpha1connect.CrmAppServiceListTagsProcedure, req.Msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {
+		return nil, err
+	}
+	if err := h.ownStore(ctx, storeID); err != nil {
 		return nil, err
 	}
 	tags, err := h.reads.ListTags(ctx, storeID)
@@ -283,7 +318,7 @@ func (h *App) ListTags(ctx context.Context, req *connect.Request[pb.ListTagsRequ
 
 func (h *App) UpdateTag(ctx context.Context, req *connect.Request[pb.UpdateTagRequest]) (*connect.Response[pb.UpdateTagResponse], error) {
 	msg := req.Msg
-	storeID, err := h.authorize(ctx, crmv1alpha1connect.CrmAppServiceUpdateTagProcedure, msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
@@ -295,34 +330,33 @@ func (h *App) UpdateTag(ctx context.Context, req *connect.Request[pb.UpdateTagRe
 	if err != nil {
 		return nil, err
 	}
-	paths, err := rpc.WritableFields(t, msg.GetUpdateMask())
-	if err != nil {
-		return nil, err
-	}
-	if !slices.Equal(paths, []string{"name"}) {
+	if !lists(msg.GetUpdateMask(), "name") {
 		return nil, rpc.RequiredField("update_mask", "update_mask 必須列 name（名稱是唯一可以修改的欄位）")
 	}
-	if err := h.writes.RenameTag(ctx, storeID, id, t.GetName()); err != nil {
+	merged := &pb.Tag{}
+	if err := rpc.ApplyUpdateMask(merged, t, msg.GetUpdateMask()); err != nil {
+		return nil, err
+	}
+	if err := h.ownStore(ctx, storeID); err != nil {
+		return nil, err
+	}
+	written, err := h.writes.RenameTag(ctx, storeID, id, merged.GetName())
+	if err != nil {
 		return nil, h.failure(err, renamePaths)
 	}
-	tags, err := h.reads.ListTags(ctx, storeID)
-	if err != nil {
-		return nil, h.failure(err, noFieldPaths)
-	}
-	i := slices.IndexFunc(tags, func(x crm.Tag) bool { return x.ID == id })
-	if i < 0 {
-		return nil, apperr.NotFound("找不到這個標籤")
-	}
-	return connect.NewResponse(&pb.UpdateTagResponse{Tag: toTag(tags[i])}), nil
+	return connect.NewResponse(&pb.UpdateTagResponse{Tag: toTag(written)}), nil
 }
 
 func (h *App) DeleteTag(ctx context.Context, req *connect.Request[pb.DeleteTagRequest]) (*connect.Response[pb.DeleteTagResponse], error) {
-	storeID, err := h.authorize(ctx, crmv1alpha1connect.CrmAppServiceDeleteTagProcedure, req.Msg.GetStoreId())
+	storeID, err := rpc.ParseID("store_id", req.Msg.GetStoreId())
 	if err != nil {
 		return nil, err
 	}
 	id, err := rpc.ParseUUID("tag_id", req.Msg.GetTagId())
 	if err != nil {
+		return nil, err
+	}
+	if err := h.ownStore(ctx, storeID); err != nil {
 		return nil, err
 	}
 	if err := h.writes.DeleteTag(ctx, storeID, id); err != nil {
@@ -333,14 +367,15 @@ func (h *App) DeleteTag(ctx context.Context, req *connect.Request[pb.DeleteTagRe
 
 func (h *App) AddCustomerTags(ctx context.Context, req *connect.Request[pb.AddCustomerTagsRequest]) (*connect.Response[pb.AddCustomerTagsResponse], error) {
 	msg := req.Msg
-	storeID, buyerID, err := h.customerKey(ctx, crmv1alpha1connect.CrmAppServiceAddCustomerTagsProcedure, msg.GetStoreId(), msg.GetBuyerId(), "buyer_id")
+	storeID, buyerID, err := h.customerKey(ctx, msg.GetStoreId(), msg.GetBuyerId(), "buyer_id")
 	if err != nil {
 		return nil, err
 	}
-	if err := h.writes.AddCustomerTags(ctx, storeID, buyerID, msg.GetTagNames()); err != nil {
+	written, err := h.writes.AddCustomerTags(ctx, storeID, buyerID, msg.GetTagNames())
+	if err != nil {
 		return nil, h.failure(err, addTagsPaths)
 	}
-	c, err := h.customer(ctx, storeID, buyerID)
+	c, err := h.customer(ctx, written)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +384,11 @@ func (h *App) AddCustomerTags(ctx context.Context, req *connect.Request[pb.AddCu
 
 func (h *App) RemoveCustomerTag(ctx context.Context, req *connect.Request[pb.RemoveCustomerTagRequest]) (*connect.Response[pb.RemoveCustomerTagResponse], error) {
 	msg := req.Msg
-	storeID, buyerID, err := h.customerKey(ctx, crmv1alpha1connect.CrmAppServiceRemoveCustomerTagProcedure, msg.GetStoreId(), msg.GetBuyerId(), "buyer_id")
+	storeID, err := rpc.ParseID("store_id", msg.GetStoreId())
+	if err != nil {
+		return nil, err
+	}
+	buyerID, err := rpc.ParseID("buyer_id", msg.GetBuyerId())
 	if err != nil {
 		return nil, err
 	}
@@ -357,36 +396,43 @@ func (h *App) RemoveCustomerTag(ctx context.Context, req *connect.Request[pb.Rem
 	if err != nil {
 		return nil, err
 	}
-	if err := h.writes.RemoveCustomerTag(ctx, storeID, buyerID, tagID); err != nil {
+	if err := h.ownStore(ctx, storeID); err != nil {
+		return nil, err
+	}
+	written, err := h.writes.RemoveCustomerTag(ctx, storeID, buyerID, tagID)
+	if err != nil {
 		return nil, h.failure(err, noFieldPaths)
 	}
-	c, err := h.customer(ctx, storeID, buyerID)
+	c, err := h.customer(ctx, written)
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.RemoveCustomerTagResponse{Customer: c}), nil
 }
 
-// customerKey 檢查店家身分與能力並解析買家 ID；欄位格式錯誤先於身分檢查，不查任何資料。
-func (h *App) customerKey(ctx context.Context, procedure, rawStoreID, rawBuyerID, buyerField string) (storeID, buyerID int64, err error) {
+// customerKey 解析 store_id 與買家 ID（欄位格式先於身分檢查），再檢查店家身分。
+func (h *App) customerKey(ctx context.Context, rawStoreID, rawBuyerID, buyerField string) (storeID, buyerID int64, err error) {
+	if storeID, err = rpc.ParseID("store_id", rawStoreID); err != nil {
+		return 0, 0, err
+	}
 	if buyerID, err = rpc.ParseID(buyerField, rawBuyerID); err != nil {
 		return 0, 0, err
 	}
-	if storeID, err = h.authorize(ctx, procedure, rawStoreID); err != nil {
+	if err := h.ownStore(ctx, storeID); err != nil {
 		return 0, 0, err
 	}
 	return storeID, buyerID, nil
 }
 
-// customer 讀一位客戶並組成回應；這家店沒有這位客戶回 not_found。
-func (h *App) customer(ctx context.Context, storeID, buyerID int64) (*pb.Customer, error) {
-	c, err := h.reads.GetCustomer(ctx, storeID, buyerID)
-	if err != nil {
-		return nil, h.failure(err, noFieldPaths)
-	}
+// customer 把模組回的一位客戶組成回應。客戶的買家已刪除（buyer.BatchDisplay 沒有他或標示已刪除）回與客戶不存在相同的 not_found
+// （契約：這家店沒有這位客戶回 not_found）；列表仍以 display.deleted 呈現。
+func (h *App) customer(ctx context.Context, c crm.Customer) (*pb.Customer, error) {
 	out, err := h.toCustomers(ctx, []crm.Customer{c})
 	if err != nil {
 		return nil, err
+	}
+	if out[0].GetDisplay().GetDeleted() {
+		return nil, h.failure(crm.CustomerNotFound(ctx), noFieldPaths)
 	}
 	return out[0], nil
 }

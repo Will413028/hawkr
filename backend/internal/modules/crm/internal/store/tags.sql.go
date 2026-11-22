@@ -288,9 +288,10 @@ func (q *Queries) LockStoreTags(ctx context.Context, storeID int64) error {
 	return err
 }
 
-const renameTag = `-- name: RenameTag :execrows
+const renameTag = `-- name: RenameTag :one
 UPDATE crm.tags SET name = $1, updated_at = $2
 WHERE store_id = $3 AND id = $4
+RETURNING id, name
 `
 
 type RenameTagParams struct {
@@ -300,16 +301,20 @@ type RenameTagParams struct {
 	ID      uuid.UUID
 }
 
-// 撞名會是 UNIQUE 違反（呼叫者轉成 AlreadyExists，transaction 隨即結束）；0 列表示標籤不存在（或屬於別家店）。
-func (q *Queries) RenameTag(ctx context.Context, arg RenameTagParams) (int64, error) {
-	result, err := q.db.Exec(ctx, renameTag,
+type RenameTagRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// 撞名會是 UNIQUE 違反（呼叫者轉成 AlreadyExists，transaction 隨即結束）；ErrNoRows 表示標籤不存在（或屬於別家店）；回傳寫入當下的列。
+func (q *Queries) RenameTag(ctx context.Context, arg RenameTagParams) (RenameTagRow, error) {
+	row := q.db.QueryRow(ctx, renameTag,
 		arg.Name,
 		arg.Now,
 		arg.StoreID,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var i RenameTagRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }

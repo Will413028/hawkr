@@ -98,12 +98,13 @@ WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
   AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id);
 
--- name: SetCustomerType :execrows
--- inactive 的買家或店家 0 列（呼叫者回 NotFound）。
+-- name: SetCustomerType :one
+-- inactive 的買家或店家沒有列（ErrNoRows，呼叫者回 NotFound）；回傳寫入當下的列。
 UPDATE crm.customers AS c SET customer_type = sqlc.arg(customer_type), updated_at = sqlc.arg(now)
 WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id)
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
-  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id);
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+RETURNING c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at;
 
 -- name: ListVIPStores :many
 -- 買家在這些店裡是 vip 的店（主鍵點查；沒有客戶列的店不回）。
