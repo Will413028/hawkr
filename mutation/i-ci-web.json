@@ -31,10 +31,10 @@
    "id": "update-allows-per-literal-increase",
    "stack": "website",
    "file": "website/scripts/check-hardcoded-han.ts",
-   "old": "increases.length === 0 &&\n\t\t\tsum(cur)",
-   "new": "sum(cur)",
-   "test": "scripts/check-hardcoded-han.unit.test.ts 總數不增加但某字面值的全域次數增加也拒絕",
-   "why": "--update 拿掉每個字面值的全域次數守門：總數不變時換成新句也放行"
+   "old": "return { ok: increases.length === 0, increases };",
+   "new": "return { ok: true, increases };",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 新檔帶新句子或複製既有句子（全域增加）拒絕",
+   "why": "--update 拿掉每個字面值的全域次數守門：新檔帶新句子或複製既有句子也放行"
   },
   {
    "id": "update-increase-needs-two",
@@ -73,15 +73,6 @@
    "why": "代行工作區不再排除"
   },
   {
-   "id": "update-new-file-needs-no-old-file",
-   "stack": "website",
-   "file": "website/scripts/check-hardcoded-han.ts",
-   "old": "if (from === undefined) unmatchedNewFiles.push(file);",
-   "new": "if (from === undefined && false) unmatchedNewFiles.push(file);",
-   "test": "scripts/check-hardcoded-han.unit.test.ts 既有檔刪掉的字面值塞進新檔被拒並列出新檔",
-   "why": "--update 的新檔不再要求對應已消失的舊檔：把既有檔的字面值搬進新檔也放行"
-  },
-  {
    "id": "init-allowed-when-baseline-exists",
    "stack": "website",
    "file": "website/scripts/check-hardcoded-han.ts",
@@ -89,6 +80,42 @@
    "new": "if (baseline === undefined) {\n\t\t\treturn {\n\t\t\t\tcode: 1,\n\t\t\t\tlines: [\"拒絕 --init",
    "test": "scripts/check-hardcoded-han.unit.test.ts --init 在 baseline 已存在時拒絕且不寫檔",
    "why": "--init 守門拿掉：baseline 已存在時還能重建，等於繞過 ratchet"
+  },
+  {
+   "id": "unknown-arg-accepted",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "return { error: `未知參數 ${first}` };",
+   "new": "return { mode: \"check\" };",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 未知參數、--init 與 --update 同時、缺路徑都報錯",
+   "why": "未知參數被當成檢查模式：打錯 --update 也綠"
+  },
+  {
+   "id": "init-with-update-accepted",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (second !== undefined)\n\t\t\treturn {",
+   "new": "if (second !== undefined && false)\n\t\t\treturn {",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 未知參數、--init 與 --update 同時、缺路徑都報錯",
+   "why": "--init 與 --update 同時出現不報錯"
+  },
+  {
+   "id": "against-never-fails",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (increases.length > 0) {\n\t\treturn {\n\t\t\tcode: 1,\n\t\t\tlines: [\n\t\t\t\t\"baseline 不得",
+   "new": "if (increases.length < 0) {\n\t\treturn {\n\t\t\tcode: 1,\n\t\t\tlines: [\n\t\t\t\t\"baseline 不得",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 任一字面值全域次數變大（含新句子、次數加一）失敗",
+   "why": "--check-baseline-against 的比較拿掉：baseline 在 PR 中變大也綠"
+  },
+  {
+   "id": "global-increase-gte",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (to > from) increases.push",
+   "new": "if (to >= from) increases.push",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 相同、減少、檔案之間搬移都通過",
+   "why": "全域次數比較放寬成 >=：沒變也算增加，--check-baseline-against 與 --update 對相同內容誤報"
   }
  ]
 }

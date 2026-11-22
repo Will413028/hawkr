@@ -7,12 +7,13 @@
  * baseline（`hardcoded-han-baseline.json`）逐筆記「檔案 → 字面值內容 → 次數」，不記行號。
  * - 檢查：某檔某字面值的次數超過 baseline（含 baseline 沒有的新檔、新字面值）就失敗；
  *   次數少於 baseline 也失敗，要求執行 `--update` 收緊，所以 baseline 只會跟著變少（betterer 的做法）。
- * - `--update`：重寫 baseline，只在「總筆數不增加、每個字面值的全域總次數不增加，且新檔是已消失舊檔的改名或搬移」時允許。
+ * - `--update`：重寫 baseline，只在「每個字面值內容的全域總次數都不增加」時允許（新檔、拆檔、改名、抽元件都適用）。
+ * - `--check-baseline-against <path>`：目前 baseline 對另一份 baseline（merge-base 的版本），任一字面值的全域總次數變大就失敗。
  * 用 TypeScript AST，不用 regex。
  *
  * - `--init`：第一次建立 baseline；baseline 已存在時拒絕。`--update` 與檢查在 baseline 不存在時失敗。
  *
- * 用法：tsx scripts/check-hardcoded-han.ts [--init | --update]
+ * 用法：tsx scripts/check-hardcoded-han.ts [--init | --update | --check-baseline-against <path>]
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -150,20 +151,11 @@ function globalTotals(c: Counts): Map<string, number> {
 	return m;
 }
 
-/**
- * `--update` 的放行條件：
- * 1. 總筆數不增加，且每個字面值的全域總次數不增加；
- * 2. baseline 沒有的檔（新檔）只有在「某個 baseline 有、現在已不存在的舊檔，其字面值多重集合包含新檔的全部字面值」時才放行
- *    （改名或搬移）；每個舊檔只能被一個新檔對應。
- */
-export function canUpdate(
+/** 每個字面值內容的全域總次數（檔案之間搬移不改變它）。 */
+export function globalIncreases(
 	current: Counts,
 	baseline: Counts,
-): {
-	ok: boolean;
-	increases: { literal: string; from: number; to: number }[];
-	unmatchedNewFiles: string[];
-} {
+): { literal: string; from: number; to: number }[] {
 	const cur = globalTotals(current);
 	const base = globalTotals(baseline);
 	const increases: { literal: string; from: number; to: number }[] = [];
@@ -171,32 +163,36 @@ export function canUpdate(
 		const from = base.get(literal) ?? 0;
 		if (to > from) increases.push({ literal, from, to });
 	}
-	const sum = (m: Map<string, number>): number =>
-		[...m.values()].reduce((a, b) => a + b, 0);
-	const goneFiles = Object.keys(baseline)
-		.filter((f) => !(f in current))
-		.sort(cmp);
-	const used = new Set<string>();
-	const unmatchedNewFiles: string[] = [];
-	for (const file of Object.keys(current)
-		.filter((f) => !(f in baseline))
-		.sort(cmp)) {
-		const lits = Object.entries(current[file] ?? {});
-		const from = goneFiles.find(
-			(g) =>
-				!used.has(g) && lits.every(([l, n]) => (baseline[g]?.[l] ?? 0) >= n),
-		);
-		if (from === undefined) unmatchedNewFiles.push(file);
-		else used.add(from);
+	return increases;
+}
+
+/** `--update` 的放行條件：每個字面值內容的全域總次數都不增加（新檔、拆檔、改名、抽元件都適用）。 */
+export function canUpdate(
+	current: Counts,
+	baseline: Counts,
+): { ok: boolean; increases: { literal: string; from: number; to: number }[] } {
+	const increases = globalIncreases(current, baseline);
+	return { ok: increases.length === 0, increases };
+}
+
+/** 目前 baseline 對另一份（merge-base 的）baseline：任一字面值的全域總次數變大就失敗。 */
+export function runBaselineAgainst(
+	current: Counts,
+	previous: Counts,
+): RunResult {
+	const increases = globalIncreases(current, previous);
+	if (increases.length > 0) {
+		return {
+			code: 1,
+			lines: [
+				"baseline 不得在 PR 中變大：下列字面值的全域總次數比 merge-base 的 baseline 多：",
+				...increases.map(
+					(i) => `  ${JSON.stringify(i.literal)}（${i.from} → ${i.to}）`,
+				),
+			],
+		};
 	}
-	return {
-		ok:
-			increases.length === 0 &&
-			sum(cur) <= sum(base) &&
-			unmatchedNewFiles.length === 0,
-		increases,
-		unmatchedNewFiles,
-	};
+	return { code: 0, lines: ["baseline 沒有比 merge-base 的版本變大。"] };
 }
 
 export function serializeBaseline(c: Counts): string {
@@ -285,17 +281,14 @@ export function run(
 		};
 	}
 	if (mode === "update") {
-		const { ok, increases, unmatchedNewFiles } = canUpdate(current, baseline);
+		const { ok, increases } = canUpdate(current, baseline);
 		if (!ok) {
 			return {
 				code: 1,
 				lines: [
-					"拒絕 --update：硬寫中文的總筆數、某個字面值的總次數增加了，或出現不是改名或搬移的新檔。",
+					"拒絕 --update：某個字面值的全域總次數增加了。",
 					...increases.map(
 						(i) => `  ${JSON.stringify(i.literal)}（${i.from} → ${i.to}）`,
-					),
-					...unmatchedNewFiles.map(
-						(f) => `  新檔 ${f}：沒有字面值完全涵蓋它的已消失舊檔`,
 					),
 					"新文字放進 messages（next-intl），不要新增硬寫中文。",
 				],
@@ -339,12 +332,51 @@ export function run(
 const WEBSITE_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BASELINE = join(WEBSITE_ROOT, "scripts/hardcoded-han-baseline.json");
 
+export type Parsed =
+	| { mode: Mode }
+	| { mode: "against"; path: string }
+	| { error: string };
+
+export function parseArgs(argv: readonly string[]): Parsed {
+	const [first, second, ...rest] = argv;
+	if (first === undefined) return { mode: "check" };
+	if (first === "--check-baseline-against") {
+		if (second === undefined || second.startsWith("--") || rest.length > 0)
+			return { error: "--check-baseline-against 需要一個路徑且不接其他參數" };
+		return { mode: "against", path: second };
+	}
+	if (first === "--init" || first === "--update") {
+		if (second !== undefined)
+			return {
+				error:
+					second === "--init" || second === "--update"
+						? "--init 與 --update 不能同時使用"
+						: `未知參數 ${second}`,
+			};
+		return { mode: first === "--init" ? "init" : "update" };
+	}
+	return { error: `未知參數 ${first}` };
+}
+
 export function main(argv: readonly string[]): number {
-	const mode: Mode = argv.includes("--init")
-		? "init"
-		: argv.includes("--update")
-			? "update"
-			: "check";
+	const parsed = parseArgs(argv);
+	if ("error" in parsed) {
+		console.error(parsed.error);
+		return 2;
+	}
+	if (parsed.mode === "against") {
+		if (!existsSync(BASELINE)) {
+			console.error("找不到目前的 baseline。");
+			return 1;
+		}
+		const r = runBaselineAgainst(
+			JSON.parse(readFileSync(BASELINE, "utf8")) as Counts,
+			JSON.parse(readFileSync(parsed.path, "utf8")) as Counts,
+		);
+		for (const l of r.lines) console[r.code === 0 ? "log" : "error"](l);
+		return r.code;
+	}
+	const mode = parsed.mode;
 	const current = scanRoot(WEBSITE_ROOT);
 	const baseline: Counts | null = existsSync(BASELINE)
 		? (JSON.parse(readFileSync(BASELINE, "utf8")) as Counts)

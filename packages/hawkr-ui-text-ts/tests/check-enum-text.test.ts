@@ -593,6 +593,39 @@ describe("規則 E：next-intl 查詢", () => {
 		).toEqual([]);
 	});
 
+	it("namespace import 的 I.useTranslations/getTranslations/createTranslator 命中；其他來源或遮蔽不命中", () => {
+		const body = `export function f(k: E) {
+	const t = I.useTranslations("a");
+	return k === E.WARNING ? t("w") : "";
+}`;
+		for (const [fn, mod] of [
+			["useTranslations", "next-intl"],
+			["getTranslations", "next-intl/server"],
+			["createTranslator", "next-intl"],
+		] as const)
+			expect(
+				scan(
+					body.replace("useTranslations", fn),
+					`${PRE} import * as I from "${mod}";`,
+				),
+			).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body
+					.replace('I.useTranslations("a")', 'await I.getTranslations("a")')
+					.replace("function f", "async function f"),
+				`${PRE} import * as I from "next-intl/server";`,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(scan(body, `${PRE} import * as I from "other-lib";`)).toEqual([]);
+		expect(
+			scan(
+				body.replace("(k: E)", "(k: E, I: any)"),
+				`${PRE} import * as I from "next-intl";`,
+			),
+		).toEqual([]);
+	});
+
 	it("非 translator 的 t、非受管 enum、遮蔽的 t 不算", () => {
 		expect(
 			scan(

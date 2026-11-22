@@ -283,8 +283,19 @@ export function scanSource(
 	const importedConsts = new Set<string>();
 	// 從 next-intl 匯入的 translator 工廠的區域名稱（含 `as` 別名）；其他來源的同名函式不算。
 	const translatorFactories = new Set<string>();
+	// `import * as I from "next-intl"` 的命名空間名稱。
+	const translatorNamespaces = new Set<string>();
 	for (const stmt of sf.statements) {
 		if (
+			ts.isImportDeclaration(stmt) &&
+			ts.isStringLiteral(stmt.moduleSpecifier) &&
+			(stmt.moduleSpecifier.text === "next-intl" ||
+				stmt.moduleSpecifier.text === "next-intl/server") &&
+			stmt.importClause?.namedBindings &&
+			ts.isNamespaceImport(stmt.importClause.namedBindings)
+		) {
+			translatorNamespaces.add(stmt.importClause.namedBindings.name.text);
+		} else if (
 			ts.isImportDeclaration(stmt) &&
 			ts.isStringLiteral(stmt.moduleSpecifier) &&
 			(stmt.moduleSpecifier.text === "next-intl" ||
@@ -471,11 +482,20 @@ export function scanSource(
 	const isTranslatorFactoryCall = (e: ts.Expression): boolean => {
 		let x = stripWrappers(e);
 		while (ts.isAwaitExpression(x)) x = stripWrappers(x.expression);
+		if (!ts.isCallExpression(x)) return false;
+		const callee = stripWrappers(x.expression);
+		if (ts.isIdentifier(callee))
+			return (
+				translatorFactories.has(callee.text) && lookupVar(callee) === undefined
+			);
 		return (
-			ts.isCallExpression(x) &&
-			ts.isIdentifier(x.expression) &&
-			translatorFactories.has(x.expression.text) &&
-			lookupVar(x.expression) === undefined
+			ts.isPropertyAccessExpression(callee) &&
+			ts.isIdentifier(callee.expression) &&
+			translatorNamespaces.has(callee.expression.text) &&
+			lookupVar(callee.expression) === undefined &&
+			["useTranslations", "getTranslations", "createTranslator"].includes(
+				callee.name.text,
+			)
 		);
 	};
 

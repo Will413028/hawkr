@@ -6,7 +6,9 @@ import {
 	collectHanLiterals,
 	compare,
 	isExcluded,
+	parseArgs,
 	run,
+	runBaselineAgainst,
 } from "./check-hardcoded-han";
 
 const PH = "$" + "{}";
@@ -129,37 +131,44 @@ describe("run（--update）", () => {
 		expect(r.lines.join("\n")).toContain("新");
 	});
 
-	it("改名放行：舊檔消失、新檔字面值是舊檔的子集", () => {
-		const cur = src({ "lib/renamed.ts": 'export const a = ["中", "文"];' });
-		expect(canUpdate(cur, base).ok).toBe(true);
-		const cur2 = src({ "lib/renamed.ts": 'export const a = ["中"];' });
-		expect(canUpdate(cur2, base).ok).toBe(true);
+	it("改名、拆檔、抽元件（原檔仍在）、交叉改名都放行", () => {
+		expect(
+			canUpdate(
+				src({ "lib/renamed.ts": 'export const a = ["中", "文"];' }),
+				base,
+			).ok,
+		).toBe(true);
+		const split = src({
+			"lib/a.ts": 'export const a = ["中"];',
+			"lib/b.ts": 'export const b = "文";',
+		});
+		expect(canUpdate(split, base).ok).toBe(true);
+		const two: Counts = src({
+			"lib/a.ts": 'export const a = "甲";',
+			"lib/b.ts": 'export const b = "乙";',
+		});
+		const swapped = src({
+			"lib/a.ts": 'export const a = "乙";',
+			"lib/b.ts": 'export const b = "甲";',
+		});
+		expect(canUpdate(swapped, two).ok).toBe(true);
+		expect(run(split, base, "update").code).toBe(0);
 	});
 
-	it("既有檔刪掉的字面值塞進新檔被拒並列出新檔", () => {
-		const two: Counts = src({
+	it("新檔帶新句子或複製既有句子（全域增加）拒絕", () => {
+		const withNew = src({
 			"lib/a.ts": 'export const a = ["中", "文"];',
-			"lib/keep.ts": 'export const k = "留";',
+			"lib/new.ts": 'export const n = "新";',
 		});
-		const cur = src({
-			"lib/a.ts": 'export const a = ["中"];',
-			"lib/keep.ts": 'export const k = "留";',
+		expect(canUpdate(withNew, base).ok).toBe(false);
+		const copied = src({
+			"lib/a.ts": 'export const a = ["中", "文"];',
 			"lib/new.ts": 'export const n = "文";',
 		});
-		const r = canUpdate(cur, two);
-		expect(r.ok).toBe(false);
-		expect(r.unmatchedNewFiles).toEqual(["lib/new.ts"]);
-		const out = run(cur, two, "update");
-		expect(out.code).toBe(1);
-		expect(out.lines.join("\n")).toContain("lib/new.ts");
-	});
-
-	it("兩個新檔不能共用同一個舊檔", () => {
-		const cur = src({
-			"lib/x.ts": 'export const a = "中";',
-			"lib/y.ts": 'export const a = "文";',
-		});
-		expect(canUpdate(cur, base).unmatchedNewFiles).toHaveLength(1);
+		const r = run(copied, base, "update");
+		expect(r.code).toBe(1);
+		expect(r.write).toBeUndefined();
+		expect(r.lines.join("\n")).toContain("文");
 	});
 
 	it("總數不增加但某字面值的全域次數增加也拒絕", () => {
@@ -223,5 +232,62 @@ describe("compare", () => {
 	it("次數相同沒有差異", () => {
 		const c = src({ "lib/a.ts": 'export const a = "中";' });
 		expect(compare(c, c)).toEqual({ over: [], under: [] });
+	});
+});
+
+describe("parseArgs", () => {
+	it("合法組合", () => {
+		expect(parseArgs([])).toEqual({ mode: "check" });
+		expect(parseArgs(["--init"])).toEqual({ mode: "init" });
+		expect(parseArgs(["--update"])).toEqual({ mode: "update" });
+		expect(parseArgs(["--check-baseline-against", "x.json"])).toEqual({
+			mode: "against",
+			path: "x.json",
+		});
+	});
+
+	it("未知參數、--init 與 --update 同時、缺路徑都報錯", () => {
+		for (const argv of [
+			["--bogus"],
+			["--update", "--bogus"],
+			["--init", "--update"],
+			["--update", "--init"],
+			["--check-baseline-against"],
+			["--check-baseline-against", "--update"],
+		])
+			expect(parseArgs(argv), argv.join(" ")).toHaveProperty("error");
+	});
+});
+
+describe("runBaselineAgainst", () => {
+	const prev: Counts = src({ "lib/a.ts": 'export const a = ["中", "文"];' });
+
+	it("相同、減少、檔案之間搬移都通過", () => {
+		expect(runBaselineAgainst(prev, prev).code).toBe(0);
+		expect(
+			runBaselineAgainst(src({ "lib/a.ts": 'export const a = "中";' }), prev)
+				.code,
+		).toBe(0);
+		expect(
+			runBaselineAgainst(
+				src({ "lib/b.ts": 'export const a = ["中", "文"];' }),
+				prev,
+			).code,
+		).toBe(0);
+	});
+
+	it("任一字面值全域次數變大（含新句子、次數加一）失敗", () => {
+		const added = runBaselineAgainst(
+			src({ "lib/a.ts": 'export const a = ["中", "文", "新"];' }),
+			prev,
+		);
+		expect(added.code).toBe(1);
+		expect(added.lines.join("\n")).toContain("新");
+		expect(
+			runBaselineAgainst(
+				src({ "lib/a.ts": 'export const a = ["中", "中", "文"];' }),
+				prev,
+			).code,
+		).toBe(1);
 	});
 });
