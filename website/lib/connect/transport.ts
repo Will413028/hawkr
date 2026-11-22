@@ -10,6 +10,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { classifyError, factsFromError } from "@hawkr/api/connect/errors";
 import { retryInterceptor } from "@hawkr/api/connect/retry";
 import { BuyerAppService } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
+import { ChatAppService } from "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb";
 import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
 import {
 	AUTH_EXPIRED_EVENT,
@@ -199,6 +200,27 @@ export function authedTransport(opts: TransportOptions = {}): Transport {
 }
 
 /**
+ * 長連線（server streaming）專用的 transport：與 authedTransport 相同的語系、上報、登入失效與停權處理，
+ * 但沒有 `defaultTimeoutMs`（串流的壽命由伺服器的 `max_lifetime` 決定，逾時會把正常的串流切斷），
+ * 也沒有重試 interceptor（重連由串流 client 以最後的 seq 自己做，不能由 transport 重送整個請求）。
+ */
+export function streamTransport(opts: TransportOptions = {}): Transport {
+	const isBrowser = typeof window !== "undefined";
+	return delegatedGuard(
+		createConnectTransport({
+			baseUrl: connectBaseUrl(isBrowser),
+			fetch: authedFetch(isBrowser, opts.cookie),
+			interceptors: [
+				languageInterceptor(opts),
+				reportInterceptor(sentryCapture("authed")),
+				authExpiredInterceptor(),
+				suspensionInterceptor(),
+			],
+		}),
+	);
+}
+
+/**
  * connect-query 的 TransportProvider 只有一個 transport：依 service 分派——*AppService 走 authedTransport，
  * 其他走 publicTransport。授權跟著 service 走（〈API 設計規範（Connect）〉§二），帶不帶憑證也跟著它。
  */
@@ -296,6 +318,7 @@ const procedureKey = (service: DescService, method: DescMethod) =>
  */
 export const BACKGROUND_WRITE_METHODS: ReadonlySet<string> = new Set([
 	procedureKey(BuyerAppService, BuyerAppService.method.recordVisit),
+	procedureKey(ChatAppService, ChatAppService.method.markConversationRead),
 ]);
 
 /**

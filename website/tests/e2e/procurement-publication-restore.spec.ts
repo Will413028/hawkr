@@ -51,20 +51,6 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		for (const path of [
-			"**/api/v1/app/chat/conversations",
-			"**/api/v1/app/chat/unread",
-			"**/api/v1/app/chat/ws-ticket",
-		]) {
-			await page.route(path, (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: { records: [], unread: 0 } }),
-				}),
-			);
-		}
-
 		// ⛔ 這兩個端點在這條路徑上一次都不該被呼叫：買家只是重整看成果，
 		// 不是要重跑搜尋，也不是要再發布一次。
 		await page.route(

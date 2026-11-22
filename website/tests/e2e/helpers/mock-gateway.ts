@@ -1081,9 +1081,31 @@ async function mockBuyerDefaults(page: Page, accountId: string) {
 		["ListFavorites", { favorites: [], nextPageToken: "", totalSize: 0 }],
 		["ListFollows", { follows: [], nextPageToken: "", totalSize: 0 }],
 		["ListVisits", { visits: [], nextPageToken: "" }],
+		["ListBlockedStores", { blockedStores: [], nextPageToken: "" }],
+		["ListBlockedBuyers", { blockedBuyers: [], nextPageToken: "" }],
 	];
 	for (const [method, body] of empty) {
 		await page.route(buyerMethod(method), (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+}
+
+/** CrmAppService 的 Connect 方法（`/api/connect/hawkr.crm.v1alpha1.CrmAppService/{Method}`）。 */
+function crmMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.crm\\.v1alpha1\\.CrmAppService/${method}(?:\\?|$)`,
+	);
+}
+
+/** CRM 的預設回應（空客戶、空標籤）：賣家中心的客戶頁與聊天側欄讀它，沒 mock 會落到 502。 */
+async function mockCrmDefaults(page: Page): Promise<void> {
+	const empty: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+		["ListCustomers", { customers: [], nextPageToken: "" }],
+		["ListTags", { tags: [] }],
+	];
+	for (const [method, body] of empty) {
+		await page.route(crmMethod(method), (route) => {
 			void fulfillConnect(route, body);
 		});
 	}
@@ -1160,6 +1182,131 @@ export interface GatewayMockState {
  * social 的預設回應（空）：導覽列選單與賣家頁會讀貼文與熱門標籤，沒 mock 的 Connect 呼叫會落到打不通的 API
  * 變成 502（頁面健康檢查的同源 >=400）。個別 spec 較晚註冊的 mock 會蓋過這裡。
  */
+async function mockReviewDefaults(page: Page): Promise<void> {
+	const empty: Array<[string, unknown]> = [
+		["ReviewAppService/ListMyReviews", { reviews: [], nextPageToken: "" }],
+		["ReviewPublicService/ListProductReviews", { reviews: [] }],
+		["ReviewPublicService/ListStoreReviews", { reviews: [] }],
+		[
+			"ReviewPublicService/GetProductReviewStats",
+			{ count: 0, average: 0, distribution: [] },
+		],
+		[
+			"ReviewPublicService/GetStoreReviewStats",
+			{ count: 0, average: 0, distribution: [] },
+		],
+	];
+	for (const [method, body] of empty) {
+		await page.route(
+			new RegExp(`/api/connect/hawkr\\.review\\.v1alpha1\\.${method}(?:\\?|$)`),
+			(route) => {
+				void fulfillConnect(route, body);
+			},
+		);
+	}
+}
+
+/** ChatAppService 的 Connect 方法（`/api/connect/hawkr.chat.v1alpha1.ChatAppService/{Method}`）。 */
+function chatMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.chat\\.v1alpha1\\.ChatAppService/${method}(?:\\?|$)`,
+	);
+}
+
+/** 對話列表的一列（Connect JSON：int64 是字串）。`peer` 在買家方是店家、在店家方是買家。 */
+export interface MockChatConversation {
+	id: string;
+	peerId: string;
+	peerName: string;
+	unreadCount?: number;
+	lastText?: string;
+}
+
+/**
+ * 註冊對話列表（買家方 `ListConversations`、店家方 `ListStoreConversations`）。
+ * 在 `setupGatewayMocks` 之後呼叫：後註冊的 route 優先，會蓋掉預設的空列表。
+ */
+export async function mockChatConversations(
+	page: Page,
+	side: "buyer" | "store",
+	rows: readonly MockChatConversation[],
+): Promise<void> {
+	const conversations = rows.map((r) => ({
+		id: r.id,
+		...(side === "buyer"
+			? { store: { id: r.peerId, name: r.peerName } }
+			: { buyer: { id: r.peerId, name: r.peerName } }),
+		unreadCount: String(r.unreadCount ?? 0),
+		lastMessageTime: "2026-09-05T00:00:00Z",
+		...(r.lastText
+			? { preview: { kind: "MESSAGE_KIND_TEXT", text: r.lastText } }
+			: {}),
+		peerReadSeq: "0",
+	}));
+	await page.route(
+		chatMethod(
+			side === "buyer" ? "ListConversations" : "ListStoreConversations",
+		),
+		(route) => {
+			void fulfillConnect(route, { conversations, nextPageToken: "" });
+		},
+	);
+}
+
+/**
+ * 伺服器串流以 HTTP 200 開始，錯誤放在最後的 end-stream 訊框（flag 0x02，4 位元組長度，JSON 內容）。
+ * 用它回終止碼，客戶端照樣收到 Connect 錯誤，但瀏覽器不會記 4xx 的網路失敗與 console.error。
+ */
+function fulfillConnectStreamError(
+	route: Route,
+	code: string,
+	message: string,
+): Promise<void> {
+	const payload = Buffer.from(JSON.stringify({ error: { code, message } }));
+	const frame = Buffer.alloc(5 + payload.length);
+	frame.writeUInt8(0x02, 0);
+	frame.writeUInt32BE(payload.length, 1);
+	payload.copy(frame, 5);
+	return route.fulfill({
+		status: 200,
+		contentType: "application/connect+json",
+		body: frame,
+	});
+}
+
+/**
+ * chat 的預設回應：沒有對話、沒有訊息、未讀 0、對方離線；即時串流以 end-stream 訊框回 not_found
+ * （終止、不重連、不發登入失效），所以 e2e 不會留著一條開著的長連線，頁面照常載入。
+ */
+async function mockChatDefaults(page: Page): Promise<void> {
+	const empty: Array<[string, unknown]> = [
+		["ListConversations", { conversations: [], nextPageToken: "" }],
+		["ListStoreConversations", { conversations: [], nextPageToken: "" }],
+		["ListMessages", { messages: [], hasMore: false, peerReadSeq: "0" }],
+		["GetUnreadCount", { unreadCount: "0" }],
+		["GetStoreUnreadCount", { unreadCount: "0" }],
+		["GetPresence", { presences: [] }],
+		["GetStorePresence", { presences: [] }],
+		["MarkConversationRead", {}],
+		["MarkAllRead", {}],
+		["MarkAllStoreRead", {}],
+	];
+	for (const [method, body] of empty) {
+		await page.route(chatMethod(method), (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+	for (const method of ["StreamEvents", "StreamStoreEvents"]) {
+		await page.route(chatMethod(method), (route) => {
+			void fulfillConnectStreamError(
+				route,
+				"not_found",
+				"mock: no chat stream",
+			);
+		});
+	}
+}
+
 async function mockSocialDefaults(page: Page): Promise<void> {
 	const empty: Array<[RegExp, unknown]> = [
 		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
@@ -1231,6 +1378,9 @@ export async function setupGatewayMocks(
 	await mockStoreCards(page);
 	await mockMyDashboard(page, {});
 	await mockSocialDefaults(page);
+	await mockReviewDefaults(page);
+	await mockChatDefaults(page);
+	await mockCrmDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);

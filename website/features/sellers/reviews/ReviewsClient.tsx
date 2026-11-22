@@ -3,9 +3,10 @@
 import * as React from "react";
 import Pagination from "@/components/shared/Pagination";
 import Button from "@/components/ui/Button";
-import { fetchSellerReviews } from "@/lib/api/index";
 import { useUrlPageParam } from "@/lib/hooks/useUrlPageParam";
+import { fetchStoreReviewsAtPage } from "@/lib/reviews/repo";
 import ReviewList, { type SellerReviewItem } from "./ReviewList";
+import { sellerReviewItem } from "./reviewItem";
 
 interface ReviewsClientProps {
 	sellerId: string;
@@ -16,8 +17,6 @@ interface ReviewsClientProps {
 	initialTotalPages: number;
 	/** 包住分頁的外殼；賣家預覽用它標出邊界放行的翻頁區。 */
 	paginationWrapper?: (pagination: React.ReactNode) => React.ReactNode;
-	/** 嚴格模式（賣家預覽）：翻頁讀取失敗要顯示錯誤，不當成空清單；公開店面不傳。 */
-	strict?: boolean;
 }
 
 export default function ReviewsClient({
@@ -26,7 +25,6 @@ export default function ReviewsClient({
 	initialReviews,
 	initialTotalPages,
 	paginationWrapper,
-	strict = false,
 }: ReviewsClientProps) {
 	// The first page is the ISR/SEO body already in the server HTML; later pages
 	// are fetched client-side (below). `useUrlPageParam` reads `?page` WITHOUT
@@ -50,32 +48,26 @@ export default function ReviewsClient({
 			return;
 		}
 		let active = true;
+		const ac = new AbortController();
 		setPending(true);
 		setFailed(false);
-		fetchSellerReviews(sellerId, currentPage, strict)
+		// 讀取失敗一律顯示錯誤與重試，不當成沒有評價；總頁數沿用伺服器端依統計算出的值。
+		fetchStoreReviewsAtPage(sellerId, currentPage, { signal: ac.signal })
 			.then((data) => {
 				if (!active) return;
-				setReviews((data.records as SellerReviewItem[]) ?? []);
-				if (data.totalPages) setTotalPages(data.totalPages);
+				setReviews(data.reviews.map(sellerReviewItem));
 			})
 			.catch(() => {
-				// Public path keeps whatever is on screen; strict mode surfaces it.
-				if (active && strict) setFailed(true);
+				if (active) setFailed(true);
 			})
 			.finally(() => {
 				if (active) setPending(false);
 			});
 		return () => {
 			active = false;
+			ac.abort();
 		};
-	}, [
-		sellerId,
-		currentPage,
-		initialReviews,
-		initialTotalPages,
-		strict,
-		reloadKey,
-	]);
+	}, [sellerId, currentPage, initialReviews, initialTotalPages, reloadKey]);
 
 	const retryButton = (
 		<Button
@@ -103,9 +95,7 @@ export default function ReviewsClient({
 						<p className="seller-profile__error" role="alert">
 							評價暫時載入不到，請稍後再試。
 						</p>
-						{strict
-							? (paginationWrapper ?? ((node) => node))(retryButton)
-							: null}
+						{(paginationWrapper ?? ((node) => node))(retryButton)}
 					</div>
 				) : (
 					<ReviewList reviews={reviews} busy={pending} />

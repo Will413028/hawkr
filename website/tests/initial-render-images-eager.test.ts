@@ -122,7 +122,7 @@ test("buyer list, cart, checkout, and order media never waits for scroll", () =>
 		],
 		[
 			"features/account/screens/reviews/ReviewedList.tsx",
-			"src={resolveCdnUrl(r.productImageKey)}",
+			'src={resolveCdnUrl(r.productImageUrl ?? "")}',
 		],
 		[
 			"features/account/screens/reviews/ReviewedList.tsx",

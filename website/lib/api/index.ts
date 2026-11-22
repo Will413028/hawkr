@@ -256,59 +256,6 @@ export async function fetchSellerProducts(
 	};
 }
 
-// Two failure policies by caller (mirrors fetchSellerProducts):
-//  - strict (via getCachedSellerReviews): softFailNotFound — a 404 seller yields a
-//    cacheable empty list, a 5xx / network error throws so the cache keeps its prior
-//    stale page instead of caching an outage-time empty list.
-//  - client (default): softFail — 404 / 5xx / timeout all resolve to an empty list so
-//    a transient backend never throws into the client pagination path.
-export async function fetchSellerReviews(id: string, page = 1, strict = false) {
-	if (!isSellerAccountId(id)) return emptyRecords();
-	const { data: d } = await apiClient.public.get<LooseJson>(
-		`/sellers/${id}/reviews`,
-		{
-			query: { page: String(page), page_size: "10" },
-			credentials: "omit",
-			...(strict ? { softFailNotFound: true } : { softFail: true }),
-		},
-	);
-	if (!d) return emptyRecords();
-	return {
-		// Backend returns the flat pair avatarKey/avatarUrl (see
-		// PublicSellerReviewItem), while ReviewList reads `avatar` — so this
-		// mapping is what makes buyer avatars resolve at all. §231: read the bare
-		// objectKey; Avatar/buildImageUrl compose the URL.
-		// Attached review photos arrive as imageKeys (+ the derived imageUrls
-		// twin, which we don't read); ReviewList reads `images`, so without this
-		// mapping they never rendered.
-		records: (d.records || d.items || []).map((r: LooseJson) => ({
-			...r,
-			avatar: r.avatarKey,
-			images: stringArray(r.imageKeys),
-		})),
-		total: d.total || 0,
-		totalPages: d.totalPages || Math.ceil((d.total || 0) / 10),
-	};
-}
-
-// strict (via getCachedSellerReviewStats): 5xx throws so the shared
-// use cache entry keeps stale; 404 stays a cacheable null. That wrapper is
-// the sole server caller and owns the cache window (seller:<id> tag + SELLER_PROFILE
-// TTL), so there is no inner next:{revalidate} here — a nested SWR layer would
-// re-cache stale stats for an extra cycle. Client callers (default) soften all —
-// e.g. a bare client read degrades to rating 0.
-export async function fetchSellerReviewStats(id: string, strict = false) {
-	if (!isSellerAccountId(id)) return null;
-	const { data } = await apiClient.public.get<LooseJson>(
-		`/sellers/${id}/reviews/stats`,
-		{
-			credentials: "omit",
-			...(strict ? { softFailNotFound: true } : { softFail: true }),
-		},
-	);
-	return data ?? null;
-}
-
 export async function fetchProduct(sellerId: string, productId: string) {
 	void sellerId;
 	return fetchPublicProduct(productId);

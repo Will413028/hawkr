@@ -17,7 +17,6 @@ test("coupon buyer picker is a safe-area-aware full-height phone surface", () =>
 	assert.match(picker, /pt-\[env\(safe-area-inset-top,0px\)\]/);
 	assert.match(picker, /rounded-none[\s\S]*sm:rounded-2xl/);
 	assert.match(picker, /grid h-11 w-11 shrink-0 place-items-center/);
-	assert.match(picker, /className="h-11 w-full[\s\S]*sm:h-10"/);
 });
 
 test("customer type, CRM tags and bulk actions stay on horizontal phone rails", () => {

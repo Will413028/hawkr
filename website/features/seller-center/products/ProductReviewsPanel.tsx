@@ -1,19 +1,27 @@
 "use client";
 
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { errorText } from "@hawkr/api/connect/errors";
+import {
+	useInfiniteQuery,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { type KeyboardEvent, useState } from "react";
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/ui/Button";
 import { Stars } from "@/components/ui/Stars";
 import { formatTaipeiDate } from "@/lib/date/taipei";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { queryKeys } from "@/lib/query/keys";
 import {
-	fetchProductReviews,
+	fetchProductReviewStats,
+	fetchProductReviewsPage,
 	type Review,
 	replyReview,
 } from "@/lib/reviews/repo";
+import { reviewerName } from "@/lib/reviews/reviewer-name";
 
 const PAGE_SIZE = 10;
 
@@ -40,6 +48,7 @@ function SellerReplyBlock({
 	productId: string;
 }) {
 	const queryClient = useQueryClient();
+	const defaultErrors = useDefaultErrorText();
 	const existing = review.reply?.content?.trim() ?? "";
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(existing);
@@ -63,8 +72,8 @@ function SellerReplyBlock({
 				queryKey: queryKeys.products.reviews(productId),
 			});
 			setEditing(false);
-		} catch {
-			setError("回覆送出失敗，請再試一次");
+		} catch (e) {
+			setError(errorText(e, defaultErrors));
 		} finally {
 			setSubmitting(false);
 		}
@@ -195,20 +204,26 @@ export default function ProductReviewsPanel({
 	productId: string;
 	productImage?: string;
 }) {
+	const ut = useUiText();
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.products.reviews(productId),
 		queryFn: ({ pageParam }) =>
-			fetchProductReviews(productId, { page: pageParam, pageSize: PAGE_SIZE }),
-		initialPageParam: 1,
-		getNextPageParam: (lastPage) => {
-			const loaded = lastPage.page * lastPage.pageSize;
-			return loaded < lastPage.total ? lastPage.page + 1 : undefined;
-		},
+			fetchProductReviewsPage(productId, {
+				pageToken: pageParam,
+				pageSize: PAGE_SIZE,
+			}),
+		initialPageParam: "",
+		getNextPageParam: (lastPage) => lastPage.nextPageToken || undefined,
+	});
+	// 評價總數只取自統計 RPC，不加總已載入的頁。
+	const statsQuery = useQuery({
+		queryKey: [...queryKeys.products.reviews(productId), "stats"],
+		queryFn: () => fetchProductReviewStats(productId),
 	});
 
 	const pages = query.data?.pages ?? [];
 	const reviews = pages.flatMap((p) => p.reviews);
-	const total = pages[0]?.total ?? 0;
+	const total = statsQuery.data?.totalCount;
 
 	if (query.isLoading) {
 		return (
@@ -218,7 +233,7 @@ export default function ProductReviewsPanel({
 		);
 	}
 
-	if (query.isError) {
+	if (query.isError || statsQuery.isError) {
 		return (
 			<div className="flex flex-col items-center gap-[var(--space-3)] py-[var(--space-8)]">
 				<p className="text-[length:var(--text-sm)] text-[var(--color-gray-mid)]">
@@ -230,7 +245,10 @@ export default function ProductReviewsPanel({
 					size="sm"
 					isLoading={query.isFetching}
 					loadingLabel="重新載入評論中…"
-					onClick={() => query.refetch()}
+					onClick={() => {
+						void query.refetch();
+						void statsQuery.refetch();
+					}}
 				>
 					重試
 				</Button>
@@ -253,7 +271,7 @@ export default function ProductReviewsPanel({
 					/>
 				) : null}
 				<span className="text-[length:var(--text-sm)] text-[color:var(--text-body)]">
-					共 <strong className="tabular-nums">{total}</strong> 則買家評論
+					共 <strong className="tabular-nums">{total ?? "—"}</strong> 則買家評論
 				</span>
 			</header>
 
@@ -263,7 +281,7 @@ export default function ProductReviewsPanel({
 				</p>
 			) : (
 				reviews.map((review, index) => {
-					const photos = review.imageKeys.filter(
+					const photos = review.imageUrls.filter(
 						(src) => typeof src === "string" && src.trim().length > 0,
 					);
 					return (
@@ -273,16 +291,16 @@ export default function ProductReviewsPanel({
 						>
 							<div className="mb-[var(--space-2)] flex items-center gap-[var(--space-3)]">
 								<Avatar
-									src={review.avatarKey}
-									name={review.username}
-									alt={review.username}
+									src={review.avatarUrl}
+									name={reviewerName(ut, review.username)}
+									alt={reviewerName(ut, review.username)}
 									entity="buyer"
 									className="h-9 w-9 shrink-0 rounded-full object-cover"
 									fallbackClassName="h-9 w-9 shrink-0 rounded-full object-cover"
 								/>
 								<div className="flex min-w-0 flex-1 flex-col gap-[2px]">
 									<span className="truncate text-[length:var(--text-sm)] font-bold text-[color:var(--text-heading)]">
-										{review.username}
+										{reviewerName(ut, review.username)}
 									</span>
 									<div className="flex gap-[1px]">
 										<Stars count={review.rating} size={14} />

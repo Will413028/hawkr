@@ -1,5 +1,10 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
+import {
+	CustomerSort,
+	CustomerType,
+} from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import { parseAsString, useQueryState } from "nuqs";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -12,16 +17,20 @@ import {
 	SellerTableSkeletonRows,
 } from "@/features/seller-center";
 import { SellerMobileDisclosureList } from "@/features/seller-center/components/SellerMobileDisclosureList";
+import { peerName, previewText } from "@/lib/chat/map";
 import { formatTaipeiDate, formatTaipeiMonthDayTime } from "@/lib/date/taipei";
 import { useConversations } from "@/lib/hooks/useChat";
+import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { fetchOrders } from "@/lib/orders/repo";
 import {
 	type CustomerTag,
-	fetchSellerCustomers,
-	fetchSellerTags,
+	customerTypeClass,
+	customerTypeText,
+	listAllCustomers,
+	listTags,
 	type SellerCustomer,
-	type SellerCustomerType,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
 import CustomerDetailDrawer from "../customers/CustomerDetailDrawer";
 
@@ -40,8 +49,7 @@ interface MessageWorkbenchRow {
 	customer?: SellerCustomer;
 	name: string;
 	avatar?: string;
-	phone?: string;
-	customerType: SellerCustomerType;
+	customerType: CustomerType;
 	tags: string[];
 	orderCount: number;
 	totalSpent: number;
@@ -49,19 +57,14 @@ interface MessageWorkbenchRow {
 	lastOrderNo: string;
 	lastAmount: number;
 	lastMessage: string;
-	lastMessageType?: string;
 	lastMessageAt: number;
 	unreadCount: number;
 }
 
-const CUSTOMER_TYPE_TABS: Array<{
-	value: "" | SellerCustomerType;
-	label: string;
-}> = [
-	{ value: "", label: "全部客戶" },
-	{ value: "normal", label: "一般" },
-	{ value: "vip", label: "VIP" },
-	{ value: "blocklist", label: "黑名單" },
+const CUSTOMER_TYPE_TABS: CustomerType[] = [
+	CustomerType.UNSPECIFIED,
+	CustomerType.NORMAL,
+	CustomerType.VIP,
 ];
 
 const RANGE_OPTIONS: Array<{ value: QuickRange; label: string }> = [
@@ -72,11 +75,6 @@ const RANGE_OPTIONS: Array<{ value: QuickRange; label: string }> = [
 	{ value: "30d", label: "近 30 天" },
 	{ value: "custom", label: "自訂" },
 ];
-
-const TYPE_BADGE: Partial<Record<SellerCustomerType, string>> = {
-	vip: "VIP",
-	blocklist: "黑名單",
-};
 
 function coerceTimeMs(raw: unknown): number {
 	if (raw == null || raw === "") return 0;
@@ -146,10 +144,10 @@ function rowToCustomerSummary(row: MessageWorkbenchRow): SellerCustomer | null {
 			id: row.targetId,
 			name: row.name,
 			avatar: row.avatar,
-			phone: row.phone,
+			deleted: false,
 			orderCount: row.orderCount,
 			totalSpent: row.totalSpent,
-			tags: row.tags,
+			tags: [],
 			customerType: row.customerType,
 		}
 	);
@@ -171,6 +169,7 @@ function purchaseAmountLabel(row: MessageWorkbenchRow): string {
 
 export default function SellerMessagesWorkspaceClient() {
 	const conversations = useConversations();
+	const ut = useUiText();
 	const [customers, setCustomers] = React.useState<SellerCustomer[]>([]);
 	const [tags, setTags] = React.useState<CustomerTag[]>([]);
 	const [purchaseByBuyer, setPurchaseByBuyer] = React.useState<
@@ -187,9 +186,11 @@ export default function SellerMessagesWorkspaceClient() {
 	const [refreshingAll, setRefreshingAll] = React.useState(false);
 	const refreshAllPromiseRef = React.useRef<Promise<void> | null>(null);
 	const [query, setQuery] = React.useState("");
-	const [customerType, setCustomerType] = React.useState<
-		"" | SellerCustomerType
-	>("");
+	const [customerType, setCustomerType] = React.useState<CustomerType>(
+		CustomerType.UNSPECIFIED,
+	);
+	const { storeId } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
 	const [tagId, setTagId] = React.useState<string | null>(null);
 	const [messageState, setMessageState] =
 		React.useState<MessageStateFilter>("all");
@@ -216,16 +217,18 @@ export default function SellerMessagesWorkspaceClient() {
 			setCustomersLoading(true);
 			setCustomersError(null);
 			try {
+				if (!storeId) return;
 				const [customerRows, tagRows] = await Promise.all([
-					fetchSellerCustomers({ pageSize: 200, sortBy: "total_spent" }),
-					fetchSellerTags().catch(() => []),
+					listAllCustomers(storeId, {
+						sort: CustomerSort.TOTAL_SPENT,
+						descending: true,
+					}),
+					listTags(storeId),
 				]);
 				setCustomers(customerRows);
 				setTags(tagRows);
 			} catch (error) {
-				setCustomersError(
-					error instanceof Error ? error.message : "載入客戶失敗",
-				);
+				setCustomersError(errorText(error, defaults));
 			} finally {
 				setCustomersLoading(false);
 			}
@@ -237,7 +240,7 @@ export default function SellerMessagesWorkspaceClient() {
 			}
 		});
 		return pending;
-	}, []);
+	}, [storeId, defaults]);
 
 	React.useEffect(() => {
 		void loadCustomers();
@@ -332,24 +335,22 @@ export default function SellerMessagesWorkspaceClient() {
 				customer,
 				name:
 					customer?.name ||
-					conversation.targetNickname ||
+					peerName(ut, conversation) ||
 					`客戶 #${conversation.targetUserId}`,
 				avatar: customer?.avatar || conversation.targetAvatar,
-				phone: customer?.phone,
-				customerType: customer?.customerType ?? "normal",
-				tags: customer?.tags ?? [],
+				customerType: customer?.customerType ?? CustomerType.NORMAL,
+				tags: customer?.tags.map((tag) => tag.name) ?? [],
 				orderCount: Math.max(customerOrderCount, purchaseOrderCount),
 				totalSpent: Number(customer?.totalSpent ?? 0),
 				lastOrderAt: purchase?.lastOrderAt ?? 0,
 				lastOrderNo: purchase?.lastOrderNo ?? "",
 				lastAmount: purchase?.lastAmount ?? 0,
-				lastMessage: conversation.lastMessage,
-				lastMessageType: conversation.lastMessageType,
-				lastMessageAt: coerceTimeMs(conversation.lastMessageTime),
+				lastMessage: previewText(ut, conversation.preview),
+				lastMessageAt: coerceTimeMs(conversation.lastMessageTimeMs),
 				unreadCount: conversation.unreadCount,
 			};
 		});
-	}, [conversations.items, customerById, purchaseByBuyer]);
+	}, [conversations.items, customerById, purchaseByBuyer, ut]);
 
 	const dateRange = React.useMemo(
 		() => resolveRange(range, customStart, customEnd),
@@ -362,7 +363,11 @@ export default function SellerMessagesWorkspaceClient() {
 		return rows
 			.filter((row) => {
 				if (messageState === "unread" && row.unreadCount <= 0) return false;
-				if (customerType && row.customerType !== customerType) return false;
+				if (
+					customerType !== CustomerType.UNSPECIFIED &&
+					row.customerType !== customerType
+				)
+					return false;
 				if (tagId) {
 					if (!selectedTagName) return false;
 					if (!row.tags.includes(selectedTagName)) return false;
@@ -370,7 +375,6 @@ export default function SellerMessagesWorkspaceClient() {
 				if (q) {
 					const haystack = [
 						row.name,
-						row.phone,
 						row.lastMessage,
 						row.lastOrderNo,
 						...row.tags,
@@ -398,14 +402,14 @@ export default function SellerMessagesWorkspaceClient() {
 	const error = conversations.error || customersError;
 	const hasFilters =
 		query.trim() ||
-		customerType ||
+		customerType !== CustomerType.UNSPECIFIED ||
 		tagId !== null ||
 		messageState !== "all" ||
 		range !== "all";
 
 	const resetFilters = () => {
 		setQuery("");
-		setCustomerType("");
+		setCustomerType(CustomerType.UNSPECIFIED);
 		setTagId(null);
 		setMessageState("all");
 		setRange("all");
@@ -516,13 +520,15 @@ export default function SellerMessagesWorkspaceClient() {
 							<div className="seller-messages__chip-row">
 								{CUSTOMER_TYPE_TABS.map((tab) => (
 									<button
-										key={tab.value || "all"}
+										key={tab}
 										type="button"
-										className={`seller-orders__chip${customerType === tab.value ? " is-selected" : ""}`}
-										aria-pressed={customerType === tab.value}
-										onClick={() => setCustomerType(tab.value)}
+										className={`seller-orders__chip${customerType === tab ? " is-selected" : ""}`}
+										aria-pressed={customerType === tab}
+										onClick={() => setCustomerType(tab)}
 									>
-										{tab.label}
+										{tab === CustomerType.UNSPECIFIED
+											? "全部客戶"
+											: customerTypeText(ut, tab)}
 									</button>
 								))}
 							</div>
@@ -734,13 +740,8 @@ export default function SellerMessagesWorkspaceClient() {
 										<span>最新訊息</span>
 										<strong>{row.lastMessage || "—"}</strong>
 									</div>
-									{row.phone || row.tags.length > 0 || row.lastOrderNo ? (
+									{row.tags.length > 0 || row.lastOrderNo ? (
 										<div className="seller-mobile-disclosure__facts">
-											{row.phone ? (
-												<span className="seller-mobile-disclosure__fact">
-													電話 {row.phone}
-												</span>
-											) : null}
 											{row.tags.map((tag) => (
 												<span
 													key={tag}
@@ -820,7 +821,11 @@ function MessageRow({
 	onOpenChat: () => void;
 	onOpenCustomer: () => void;
 }) {
-	const typeBadge = TYPE_BADGE[row.customerType];
+	const ut = useUiText();
+	const typeBadge =
+		row.customerType === CustomerType.VIP
+			? customerTypeText(ut, row.customerType)
+			: null;
 	return (
 		<tr className="seller-orders__row seller-messages__row">
 			<td data-label="客戶名稱">
@@ -844,13 +849,12 @@ function MessageRow({
 							{row.name}
 							{typeBadge ? (
 								<span
-									className={`seller-customers__badge is-${row.customerType}`}
+									className={`seller-customers__badge ${customerTypeClass(row.customerType)}`}
 								>
 									{typeBadge}
 								</span>
 							) : null}
 						</strong>
-						{row.phone ? <small>{row.phone}</small> : null}
 						{row.tags.length > 0 ? (
 							<div className="seller-messages__tags">
 								{row.tags.slice(0, 3).map((tag) => (

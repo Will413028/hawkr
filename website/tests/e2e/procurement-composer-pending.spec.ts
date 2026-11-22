@@ -52,29 +52,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		// Messages shell fixtures——形狀照 procurement-assistant-clarify.spec.ts，
-		// 那支的 setup 是 CI 上驗證過走得到 live workspace 的那一份。
-		await page.route("**/api/v1/app/chat/conversations", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: { records: [] } }),
-			}),
-		);
-		await page.route("**/api/v1/app/chat/unread", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: { unread: 0 } }),
-			}),
-		);
-		await page.route("**/api/v1/app/chat/ws-ticket", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
 		await page.route(
 			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
 			(route) =>
@@ -169,20 +146,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 		await page
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		for (const path of [
-			"**/api/v1/app/chat/conversations",
-			"**/api/v1/app/chat/unread",
-			"**/api/v1/app/chat/ws-ticket",
-		]) {
-			await page.route(path, (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: { records: [], unread: 0 } }),
-				}),
-			);
-		}
 
 		// 深連結還原：transcript 給 requestId，snapshot 給需求狀態。
 		await page.route(

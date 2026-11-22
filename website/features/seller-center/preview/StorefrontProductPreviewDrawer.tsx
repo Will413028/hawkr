@@ -8,7 +8,11 @@ import ProductSellerIntro from "@/features/product/components/ProductSellerIntro
 import { deriveDetailLayoutProps } from "@/features/product/deriveDetailLayoutProps";
 import ProductDetailLayout from "@/features/product/ProductDetailLayout";
 import { fetchSellerProductEdit } from "@/lib/products/seller-repo";
-import { fetchProductReviews } from "@/lib/reviews/repo";
+import {
+	fetchProductReviewStats,
+	fetchProductReviewsPage,
+	type Review,
+} from "@/lib/reviews/repo";
 import type { PublicStoreView } from "@/lib/seller/public-store";
 import {
 	previewDetailProduct,
@@ -22,9 +26,7 @@ interface StorefrontProductPreviewDrawerProps {
 	onClose: () => void;
 }
 
-type ProductReviewsResult = Awaited<
-	ReturnType<typeof fetchProductReviews>
-> | null;
+type ProductReviewsResult = { reviews: Review[]; total: number } | null;
 
 interface LoadedProductPreview {
 	detail: NonNullable<Awaited<ReturnType<typeof fetchSellerProductEdit>>>;
@@ -116,10 +118,15 @@ export default function StorefrontProductPreviewDrawer({
 					setLoadState({ status: "unavailable" });
 					return;
 				}
-				const reviewsResult = await fetchProductReviews(productId, {
-					page: 1,
-					pageSize: 6,
-				}).catch(() => null);
+				// 評價讀取失敗讓整個預覽進錯誤狀態（有重試），不當成沒有評價。
+				const [reviewPage, reviewStats] = await Promise.all([
+					fetchProductReviewsPage(productId, { pageSize: 6 }),
+					fetchProductReviewStats(productId),
+				]);
+				const reviewsResult = {
+					reviews: reviewPage.reviews,
+					total: reviewStats.totalCount,
+				};
 				if (!active) return;
 				setLoadState({
 					status: "ready",

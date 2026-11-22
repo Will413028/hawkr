@@ -1,80 +1,49 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { errorText } from "@hawkr/api/connect/errors";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { ApiClientError } from "@/lib/api/client";
 import { accountQueryFn } from "@/lib/auth/account-query";
-import { useAuth } from "@/lib/auth/context";
 import { useAccountStatus } from "@/lib/auth/use-account-status";
-import { resolveChatViewerId } from "@/lib/chat/chatIdentity";
 import {
-	fetchChatHistory,
-	fetchConversations,
+	fetchPresence,
+	listConversations,
+	listLatestMessages,
+	listMessagesAfter,
 	markConversationRead,
-	sendMessage as sendMessageHttp,
+	sendMessage as sendMessageRpc,
 } from "@/lib/chat/repo";
+import { newRequestId } from "@/lib/chat/request-id";
+import type { ChatStreamEvent } from "@/lib/chat/stream";
 import {
+	gapAfter,
+	lastSeq,
 	reconcileOptimistic,
-	sortTimeline,
-	upsertMessage,
+	upsertServerMessage,
 } from "@/lib/chat/timeline";
 import type {
 	ChatMessage,
+	ChatSide,
 	ConnectionState,
 	Conversation,
 } from "@/lib/chat/types";
 import { useChatUnread } from "@/lib/chat/unread-context";
-import { chatWorkspaceRole } from "@/lib/chat/workspace";
-import { getChatSocket } from "@/lib/chat/ws";
+import { useChatStream } from "@/lib/chat/useChatStream";
+import { chatSideOf, chatWorkspaceRole } from "@/lib/chat/workspace";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { usePathname } from "@/lib/intl/navigation";
 import { uploadImageFile } from "@/lib/media/upload";
 import { queryKeys } from "@/lib/query/keys";
-import { storeIdOf } from "@/lib/seller/store";
-import { useProfile } from "./useAccount";
 import { useQueryIdentity } from "./useQueryIdentity";
-import { useSellerSelf } from "./useSellerSelf";
 
-/** IM 的 presence 以數字區分角色（買家 1、賣家 2，im-service 的 wire）；與帳號的角色集合無關。 */
-const CHAT_PEER_ROLE = { buyer: 1, seller: 2 } as const;
-
-/**
- * Native `fetch()` raises a generic `TypeError: Failed to fetch` on
- * network errors (offline / CORS / DNS) — that string would surface
- * raw to the buyer if we just took `e.message`. Translate the common
- * network-failure shapes into a friendly Chinese line; otherwise keep
- * the original message (backend-supplied errors usually read fine
- * already).
- */
-function friendlyChatError(e: unknown, fallback: string): string {
-	const raw = e instanceof Error ? e.message : "";
-	if (
-		raw === "Failed to fetch" ||
-		raw === "Load failed" ||
-		raw.toLowerCase().includes("network")
-	) {
-		return "連線失敗，請再次嘗試";
-	}
-	return raw || fallback;
+/** 目前頁面所在工作區對應的對話方（賣家中心是店家方）。 */
+export function useChatSide(): ChatSide {
+	const pathname = usePathname() || "";
+	return chatSideOf(chatWorkspaceRole(pathname));
 }
 
-function friendlyChatErrorOrNull(e: unknown, fallback: string): string | null {
-	return e ? friendlyChatError(e, fallback) : null;
-}
-
-/** Client-generated nonce for the optimistic message id (clientMsgId). Guarded
- *  because `crypto.randomUUID` is secure-context-only — it's `undefined` on a
- *  plain-http LAN dev origin (phone hitting `http://192.168.x.x`), where a raw
- *  call would throw and silently drop the send. Mirrors the guards in
- *  lib/hooks/useSocial.ts and lib/products/seller-repo.ts. */
-function clientMsgId(): string {
-	if (
-		typeof crypto !== "undefined" &&
-		typeof crypto.randomUUID === "function"
-	) {
-		return crypto.randomUUID();
-	}
-	return `cmid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
+/** 對方在線狀態的重新查詢間隔。 */
+export const PRESENCE_REFETCH_MS = 30_000;
 
 /* ===== Conversation list ===== */
 
@@ -82,32 +51,34 @@ export function useConversations({
 	subscribeToSocket = true,
 }: {
 	/**
-	 * Only the persistent inbox layout owns live conversation-list refreshes.
-	 * ThreadClient also reads this query to resolve peer identity, but subscribing
-	 * there would register a second socket listener for the same inbound message.
+	 * 只有常駐的收件匣 layout 負責即時更新對話列表；ThreadClient 也讀同一個 query 來解析對方，
+	 * 但不再多訂一份串流事件。
 	 */
 	subscribeToSocket?: boolean;
 } = {}) {
+	const side = useChatSide();
 	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
-	const queryKey = queryKeys.chat.conversations(queryIdentity);
+	const defaults = useDefaultErrorText();
+	const queryKey = queryKeys.chat.conversations(queryIdentity, { side });
 	const shouldFetch = status === "signedIn";
 	const query = useQuery({
 		queryKey,
-		placeholderData: [] as Conversation[],
-		queryFn: accountQueryFn(status, () => fetchConversations({ pageSize: 50 })),
+		queryFn: accountQueryFn(status, () => listConversations(side)),
 	});
 
-	// Soft refresh on inbound message
-	React.useEffect(() => {
-		if (!shouldFetch || !subscribeToSocket) return;
-		const sock = getChatSocket();
-		const unsub = sock.onMessage(() => {
-			void queryClient.invalidateQueries({ queryKey });
-		});
-		return unsub;
-	}, [shouldFetch, subscribeToSocket, queryClient, queryKey]);
+	// 第一個 ready 是剛連上（列表剛讀過）；之後每次 ready 是斷線後重連，斷線期間的事件收不到，要重讀。
+	const readySeenRef = React.useRef(false);
+	useChatStream(side, shouldFetch && subscribeToSocket, (e) => {
+		if (e.type === "ready") {
+			if (!readySeenRef.current) {
+				readySeenRef.current = true;
+				return;
+			}
+		}
+		void queryClient.invalidateQueries({ queryKey });
+	});
 
 	const items = React.useMemo(
 		() => (shouldFetch && query.data) || [],
@@ -116,11 +87,9 @@ export function useConversations({
 
 	return {
 		items,
-		loading:
-			status === "unknown" ||
-			query.isLoading ||
-			(query.isFetching && query.isPlaceholderData),
-		error: friendlyChatErrorOrNull(query.error, "載入會話失敗"),
+		/** 讀取失敗與「沒有對話」分開：失敗時 `error` 有值，`items` 不能當成空清單的證據。 */
+		loading: status === "unknown" || query.isPending,
+		error: query.error ? errorText(query.error, defaults) : null,
 		refresh: async () => {
 			await query.refetch();
 		},
@@ -129,300 +98,326 @@ export function useConversations({
 
 /* ===== Chat thread ===== */
 
+export interface ThreadData {
+	messages: ChatMessage[];
+	peerReadSeq: number;
+}
+
+const EMPTY_THREAD: ThreadData = { messages: [], peerReadSeq: 0 };
+
 interface UseChatThreadResult {
+	/** seq 由小到大，樂觀訊息在最後。 */
 	messages: ChatMessage[];
 	loading: boolean;
 	error: string | null;
 	connectionState: ConnectionState;
-	peerTyping: boolean;
-	/** Peer's live presence: `true` online, `false` offline, `null` unknown. */
+	/** 對方此刻是否在線；`null` 是還不知道。 */
 	peerOnline: boolean | null;
-	/** Peer's last-seen timestamp (ms epoch); 0 when never reported. */
-	peerLastSeen: number;
-	send: (content: string, type?: string) => Promise<void>;
-	/** Upload an image file and send it as an `image` message. */
+	/** 對方已讀到的 seq（我送出的訊息 seq 不大於它就是已讀）。 */
+	peerReadSeq: number;
+	/** 我是對話的哪一方。 */
+	side: ChatSide;
+	send: (text: string) => Promise<void>;
+	/** 上傳圖片並以圖片訊息送出。 */
 	sendImage: (file: File) => Promise<void>;
-	notifyTyping: (typing: boolean) => void;
 	refresh: () => Promise<void>;
-	/** The viewer's own chat wire id (resolved buyer_id / store_id), for
-	 *  "is this message mine" checks. `""` until the profile fetch resolves.
-	 *  Exposed so consumers compare against the SAME value this hook filters
-	 *  and stamps optimistic sends with, instead of re-deriving it. */
-	myId: string;
 }
 
 /**
- * Manages a single conversation: lifts WebSocket connection (ref-counted by
- * the singleton), pulls REST history, fans WS messages into local state with
- * dedup, and exposes an async `send()` that posts via HTTP for persistence.
+ * 管理一個對話：讀最新一頁訊息、訂閱共用串流（新訊息、可見度改變、對方已讀、Resync）、
+ * 以 seq 偵測缺口並用 `after_seq` 補，送出用 `request_id` 去重。
+ * `targetId` 是對方的 ID（買家方是店家 ID）；對話不存在（還沒聊過）時沒有訊息，第一則訊息送出時才開對話。
  */
 export function useChatThread(
 	targetId: string | undefined,
 ): UseChatThreadResult {
-	const pathname = usePathname() || "";
-	const localRole = chatWorkspaceRole(pathname);
-	const { activeRole } = useAuth();
+	const side = useChatSide();
 	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
-	const { refresh: refreshChatUnread } = useChatUnread();
 	const queryClient = useQueryClient();
-	// Chat wire ids are CURRENT-stint surrogates (buyer_id / store_id), never the
-	// raw session accountId — see lib/chat/chatIdentity.ts. This is the single
-	// derivation point: `myId` gates the inbound WS filter below, stamps
-	// optimistic sends, and is handed to consumers via the return value.
-	const isSeller = activeRole === "seller";
-	const { profile: buyerProfile } = useProfile({ enabled: !isSeller });
-	const { data: sellerSelf } = useSellerSelf();
-	const myId = resolveChatViewerId({
-		isSeller,
-		storeId: storeIdOf(sellerSelf),
-		buyerId: buyerProfile?.id,
-	});
-	const [connectionState, setConnState] =
-		React.useState<ConnectionState>("disconnected");
-	const [peerTyping, setPeerTyping] = React.useState(false);
-	const [peerOnline, setPeerOnline] = React.useState<boolean | null>(null);
-	const [peerLastSeen, setPeerLastSeen] = React.useState(0);
+	const defaults = useDefaultErrorText();
+	const { refresh: refreshChatUnread } = useChatUnread();
 	const [sendError, setSendError] = React.useState<string | null>(null);
-	const typingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	// The peer holds the opposite role to the local user: a buyer chats with
-	// a seller (role 2) and vice-versa (role 1). Presence subscription is
-	// keyed by this role server-side.
-	const peerRole =
-		localRole === "seller" ? CHAT_PEER_ROLE.buyer : CHAT_PEER_ROLE.seller;
-	const threadKey = React.useMemo(
-		() => queryKeys.chat.thread(queryIdentity, targetId ?? ""),
-		[queryIdentity, targetId],
+	const conversations = useConversations({ subscribeToSocket: false });
+	const conversation: Conversation | undefined = conversations.items.find(
+		(c) => c.targetUserId === targetId,
 	);
-	const threadQuery = useQuery({
-		queryKey: threadKey,
-		enabled: Boolean(targetId),
-		placeholderData: [] as ChatMessage[],
-		queryFn: accountQueryFn(status, async () => {
-			if (!targetId) return [];
-			const messages = await fetchChatHistory({ targetId, pageSize: 50 }).catch(
-				(error) => {
-					if (error instanceof ApiClientError && error.status === 404) {
-						return [] as ChatMessage[];
-					}
-					throw error;
-				},
-			);
-			return sortTimeline(messages);
-		}),
+	const conversationId = conversation?.id;
+	const conversationsKey = queryKeys.chat.conversations(queryIdentity, {
+		side,
 	});
-	const messages = React.useMemo(
-		() => threadQuery.data ?? [],
-		[threadQuery.data],
+	const threadKey = React.useMemo(
+		() => queryKeys.chat.thread(queryIdentity, targetId ?? "", { side }),
+		[queryIdentity, targetId, side],
 	);
 
-	// Mark read when the thread is opened. Independent of history loading: a
-	// failed history fetch must not leave the unread badge stuck, and the
-	// backend mark-read does not depend on the history response.
-	React.useEffect(() => {
-		if (!targetId) return;
-		markConversationRead(targetId).then(refreshChatUnread, () => {});
-	}, [targetId, refreshChatUnread]);
+	const threadQuery = useQuery({
+		queryKey: [...threadKey, conversationId ?? ""],
+		queryFn: targetId
+			? accountQueryFn(status, async (): Promise<ThreadData> => {
+					if (!conversationId) return EMPTY_THREAD;
+					const page = await listLatestMessages(conversationId);
+					return { messages: page.messages, peerReadSeq: page.peerReadSeq };
+				})
+			: skipToken,
+	});
+	const dataKey = React.useMemo(
+		() => [...threadKey, conversationId ?? ""] as const,
+		[threadKey, conversationId],
+	);
+	const data = threadQuery.data ?? EMPTY_THREAD;
 
-	// WebSocket lifecycle: connect on mount, listen, disconnect on unmount.
-	React.useEffect(() => {
-		if (!targetId) return;
-		// Presence is unknown until the server reports it for this peer.
-		setPeerOnline(null);
-		setPeerLastSeen(0);
-		const sock = getChatSocket();
-		sock.connect();
-		const unsubState = sock.onState(setConnState);
-		const unsubPresence = sock.onPresence((ev) => {
-			if (String(ev.peerId) !== String(targetId)) return;
-			setPeerOnline(ev.online);
-			if (ev.lastSeenAtMs) setPeerLastSeen(ev.lastSeenAtMs);
-		});
-		const unsubMsg = sock.onMessage((m) => {
-			// Only inject messages tied to this thread.
-			const involved =
-				(m.senderId === targetId && m.receiverId === myId) ||
-				(m.senderId === myId && m.receiverId === targetId);
-			if (!involved) return;
-			// Insert by seqId (not append): a sync replay after reconnect can deliver
-			// older messages out of order, and the echo of our own send upgrades the
-			// optimistic bubble with its authoritative seqId.
-			queryClient.setQueryData<ChatMessage[]>(threadKey, (current) =>
-				upsertMessage(current, m),
+	const patch = React.useCallback(
+		(fn: (d: ThreadData) => ThreadData) => {
+			queryClient.setQueryData<ThreadData>(dataKey, (cur) =>
+				fn(cur ?? EMPTY_THREAD),
 			);
-			if (m.senderId === targetId) {
-				// Active-thread auto-mark-read: the inbound message lands in the
-				// open thread, so mark it read. The backend then pushes an
-				// authoritative unread_changed (badge SETs from it); this refresh
-				// is a defensive resync in case that event is missed.
-				markConversationRead(targetId).then(refreshChatUnread, () => {});
+		},
+		[queryClient, dataKey],
+	);
+
+	const dataRef = React.useRef(data);
+	dataRef.current = data;
+
+	const fillGap = React.useCallback(
+		async (convId: string, afterSeq: number) => {
+			let after = afterSeq;
+			try {
+				for (;;) {
+					const page = await listMessagesAfter(convId, after);
+					patch((d) => ({
+						messages: page.messages.reduce(
+							(acc, m) => upsertServerMessage(acc, m),
+							d.messages,
+						),
+						peerReadSeq: Math.max(d.peerReadSeq, page.peerReadSeq),
+					}));
+					if (!page.hasMore) return;
+					const next = lastSeq(page.messages);
+					// 還有下一頁卻沒有往前走：不再轉圈，交給整段重讀。
+					if (next <= after) throw new Error("gap fill made no progress");
+					after = next;
+				}
+			} catch {
+				void queryClient.invalidateQueries({ queryKey: dataKey });
 			}
-		});
-		const unsubTyping = sock.onTyping(({ from, typing }) => {
-			if (from !== targetId) return;
-			setPeerTyping(typing);
-			if (typing) {
-				if (typingTimer.current) clearTimeout(typingTimer.current);
-				typingTimer.current = setTimeout(() => setPeerTyping(false), 4_000);
+		},
+		[patch, queryClient, dataKey],
+	);
+
+	const onStreamEvent = React.useCallback(
+		(e: ChatStreamEvent) => {
+			if (!targetId) return;
+			if (e.type === "message") {
+				const m = e.message;
+				if (!conversationId) {
+					// 還沒有對話的聊天室收到訊息：可能是新對話，重讀列表。
+					void queryClient.invalidateQueries({ queryKey: conversationsKey });
+					return;
+				}
+				if (m.conversationId !== conversationId) return;
+				const cur = dataRef.current.messages;
+				const gap = m.seq !== null && !e.updated ? gapAfter(cur, m.seq) : null;
+				patch((d) => ({ ...d, messages: upsertServerMessage(d.messages, m) }));
+				if (gap !== null) void fillGap(conversationId, gap);
+			} else if (e.type === "peerRead") {
+				if (e.conversationId !== conversationId) return;
+				patch((d) => ({
+					...d,
+					peerReadSeq: Math.max(d.peerReadSeq, e.peerReadSeq),
+				}));
+			} else if (e.type === "resync") {
+				if (e.conversationId && e.conversationId !== conversationId) return;
+				void queryClient.invalidateQueries({ queryKey: threadKey });
+				void queryClient.invalidateQueries({ queryKey: conversationsKey });
 			}
-		});
+		},
+		[
+			targetId,
+			conversationId,
+			patch,
+			fillGap,
+			queryClient,
+			conversationsKey,
+			threadKey,
+		],
+	);
+	const { state: connectionState, stream } = useChatStream(
+		side,
+		status === "signedIn" && Boolean(targetId),
+		onStreamEvent,
+	);
 
-		return () => {
-			unsubState();
-			unsubPresence();
-			unsubMsg();
-			unsubTyping();
-			// Don't disconnect singleton — other tabs/components may share it.
-		};
-	}, [targetId, myId, refreshChatUnread, queryClient, threadKey]);
-
-	// Presence subscription must ride a live socket — `send()` no-ops until the
-	// handshake completes. Re-subscribe whenever the connection (re)establishes
-	// so the header recovers after a reconnect, and tell the server to stop
-	// pushing this peer's status when we leave the thread.
+	// 重連用的 cursor：這個對話手上最後的 seq。
+	const seqHere = lastSeq(data.messages);
 	React.useEffect(() => {
-		if (!targetId || connectionState !== "connected") return;
-		const sock = getChatSocket();
-		sock.subscribePresence(targetId, peerRole);
-		return () => {
-			sock.unsubscribePresence(targetId, peerRole);
-		};
-	}, [targetId, peerRole, connectionState]);
+		if (stream && conversationId && seqHere > 0) {
+			stream.noteSeq(conversationId, seqHere);
+		}
+	}, [stream, conversationId, seqHere]);
 
-	// After a *re*connect, refetch the thread to pick up anything missed while the
-	// socket was offline. At 1:1 chat scale a full REST refetch is simpler and more
-	// robust than incremental seq-based gap-fill (and the latest 50 cover any gap).
-	// Skips the first connect — mount already loaded fresh history.
-	const hasConnectedRef = React.useRef(false);
+	// 已讀：對方有新訊息落在開著的聊天室時，把已讀游標推到最後一則。
+	const peerLastSeq = React.useMemo(() => {
+		let max = 0;
+		for (const m of data.messages) {
+			if (m.sender !== side && m.seq !== null && m.seq > max) max = m.seq;
+		}
+		return max;
+	}, [data.messages, side]);
+	const markedRef = React.useRef<{ id: string; seq: number } | null>(null);
 	React.useEffect(() => {
-		if (connectionState !== "connected") return;
-		if (!hasConnectedRef.current) {
-			hasConnectedRef.current = true;
+		if (!conversationId || peerLastSeq === 0) return;
+		const marked = markedRef.current;
+		if (marked && marked.id === conversationId && marked.seq >= peerLastSeq) {
 			return;
 		}
-		if (!targetId) return;
-		void queryClient.invalidateQueries({ queryKey: threadKey });
-	}, [connectionState, targetId, threadKey, queryClient]);
+		markedRef.current = { id: conversationId, seq: peerLastSeq };
+		markConversationRead(conversationId, seqHere).then(
+			refreshChatUnread,
+			() => {},
+		);
+	}, [conversationId, peerLastSeq, seqHere, refreshChatUnread]);
 
-	const send = React.useCallback(
-		async (content: string, type: string = "text") => {
-			if (!targetId || !content.trim()) return;
-			const optimistic: ChatMessage = {
-				// clientMsgId nonce as the optimistic id — never `tmp_${Date.now()}`
-				// (two sends in the same ms would collide). Doubles as the dedup key
-				// the future server-side dedup (P2) will key on.
-				id: clientMsgId(),
-				senderId: myId,
-				receiverId: targetId,
-				content,
-				type,
-				timestamp: Date.now(),
-				read: false,
-			};
+	const presenceQuery = useQuery({
+		queryKey: [...threadKey, "presence", conversationId ?? ""],
+		queryFn: conversationId
+			? accountQueryFn(status, () => fetchPresence(side, [conversationId]))
+			: skipToken,
+		refetchInterval: PRESENCE_REFETCH_MS,
+	});
+	const peerOnline =
+		conversationId && presenceQuery.data
+			? (presenceQuery.data.get(conversationId) ?? null)
+			: null;
+
+	const finishSend = React.useCallback(
+		(optimisticId: string, server: ChatMessage) => {
+			patch((d) => ({
+				...d,
+				messages: reconcileOptimistic(d.messages, optimisticId, server),
+			}));
+			if (!conversationId) {
+				// 第一則訊息開了新對話：之後的讀取與串流都以對話 ID 為準。
+				void queryClient.invalidateQueries({ queryKey: conversationsKey });
+			}
+		},
+		[patch, conversationId, queryClient, conversationsKey],
+	);
+
+	const dispatchSend = React.useCallback(
+		async (
+			optimistic: ChatMessage,
+			content: Parameters<typeof sendMessageRpc>[1],
+		) => {
+			if (!targetId) return;
 			setSendError(null);
-			// Cancel in-flight thread refetches so a late history GET can't drop
-			// the optimistic message we're about to append.
-			await queryClient.cancelQueries({ queryKey: threadKey });
-			queryClient.setQueryData<ChatMessage[]>(threadKey, (current) =>
-				upsertMessage(current, optimistic),
-			);
+			// 取消進行中的讀取，免得晚到的歷史把樂觀訊息洗掉。
+			// 還沒有資料時不取消：取消會讓第一次讀取被丟掉、畫面永遠沒有歷史；改成送出後重讀。
+			const hadData = queryClient.getQueryData(dataKey) !== undefined;
+			if (hadData) await queryClient.cancelQueries({ queryKey: dataKey });
+			patch((d) => ({
+				...d,
+				messages: upsertServerMessage(d.messages, optimistic),
+			}));
 			try {
-				const result = await sendMessageHttp({
-					toUserId: targetId,
+				const server = await sendMessageRpc(
+					{ side, conversationId, peerId: targetId },
 					content,
-					type,
-				});
-				queryClient.setQueryData<ChatMessage[]>(threadKey, (current) =>
-					reconcileOptimistic(current, optimistic.id, {
-						id: result.messageId,
-						timestamp: result.timestamp,
-						seqId: result.seqId,
-					}),
+					optimistic.id,
 				);
+				finishSend(optimistic.id, server);
+				if (!hadData) void queryClient.invalidateQueries({ queryKey: dataKey });
 			} catch (e) {
-				queryClient.setQueryData<ChatMessage[]>(threadKey, (current = []) =>
-					current.filter((m) => m.id !== optimistic.id),
-				);
-				setSendError(friendlyChatError(e, "傳送失敗"));
+				patch((d) => ({
+					...d,
+					messages: d.messages.filter((m) => m.id !== optimistic.id),
+				}));
+				setSendError(errorText(e, defaults));
 				throw e;
 			}
 		},
-		[targetId, myId, queryClient, threadKey],
+		[
+			targetId,
+			side,
+			conversationId,
+			queryClient,
+			dataKey,
+			patch,
+			finishSend,
+			defaults,
+		],
 	);
 
-	// Mirrors the APP's chat image flow (chat_room_screen `onImagePick`):
-	// upload → show the preview optimistically → POST the staged token as an
-	// `image` message → swap the temporary preview URL for the permanent CDN
-	// URL the server echoes back (the tmp object is deleted on finalize).
+	const send = React.useCallback(
+		async (text: string) => {
+			const trimmed = text.trim();
+			if (!targetId || !trimmed) return;
+			const requestId = newRequestId();
+			await dispatchSend(
+				{
+					id: requestId,
+					conversationId: conversationId ?? "",
+					seq: null,
+					sender: side,
+					kind: "text",
+					text: trimmed,
+					hidden: false,
+					erased: false,
+					timeMs: Date.now(),
+				},
+				{ kind: "text", text: trimmed },
+			);
+		},
+		[targetId, conversationId, side, dispatchSend],
+	);
+
 	const sendImage = React.useCallback(
 		async (file: File) => {
 			if (!targetId) return;
-			const { previewUrl, stagedToken } = await uploadImageFile(file);
-			const optimistic: ChatMessage = {
-				id: clientMsgId(),
-				senderId: myId,
-				receiverId: targetId,
-				content: previewUrl,
-				type: "image",
-				timestamp: Date.now(),
-				read: false,
-			};
-			setSendError(null);
-			// Cancel in-flight thread refetches so a late history GET can't drop
-			// the optimistic image we're about to append.
-			await queryClient.cancelQueries({ queryKey: threadKey });
-			queryClient.setQueryData<ChatMessage[]>(threadKey, (current) =>
-				upsertMessage(current, optimistic),
-			);
+			let uploaded: Awaited<ReturnType<typeof uploadImageFile>>;
 			try {
-				const result = await sendMessageHttp({
-					toUserId: targetId,
-					content: stagedToken,
-					type: "image",
-				});
-				queryClient.setQueryData<ChatMessage[]>(threadKey, (current) =>
-					reconcileOptimistic(current, optimistic.id, {
-						id: result.messageId,
-						timestamp: result.timestamp,
-						content: result.content,
-						seqId: result.seqId,
-					}),
-				);
+				uploaded = await uploadImageFile(file);
 			} catch (e) {
-				queryClient.setQueryData<ChatMessage[]>(threadKey, (current = []) =>
-					current.filter((m) => m.id !== optimistic.id),
-				);
-				setSendError(friendlyChatError(e, "圖片傳送失敗"));
+				setSendError(errorText(e, defaults));
 				throw e;
 			}
+			await dispatchSend(
+				{
+					id: newRequestId(),
+					conversationId: conversationId ?? "",
+					seq: null,
+					sender: side,
+					kind: "image",
+					imageUrl: uploaded.previewUrl,
+					hidden: false,
+					erased: false,
+					timeMs: Date.now(),
+				},
+				{ kind: "image", stagedToken: uploaded.stagedToken },
+			);
 		},
-		[targetId, myId, queryClient, threadKey],
+		[targetId, conversationId, side, dispatchSend, defaults],
 	);
 
-	const notifyTyping = React.useCallback(
-		(typing: boolean) => {
-			if (!targetId) return;
-			getChatSocket().sendTypingIndicator(targetId, typing);
-		},
-		[targetId],
-	);
+	const loadError = conversations.error
+		? conversations.error
+		: threadQuery.error
+			? errorText(threadQuery.error, defaults)
+			: null;
 
 	return {
-		messages,
-		loading: threadQuery.isLoading,
-		error:
-			sendError ?? friendlyChatErrorOrNull(threadQuery.error, "載入訊息失敗"),
+		messages: data.messages,
+		loading: conversations.loading || threadQuery.isPending,
+		error: sendError ?? loadError,
 		connectionState,
-		peerTyping,
 		peerOnline,
-		peerLastSeen,
+		peerReadSeq: data.peerReadSeq,
+		side,
 		send,
 		sendImage,
-		notifyTyping,
 		refresh: async () => {
 			await threadQuery.refetch();
 		},
-		myId,
 	};
 }

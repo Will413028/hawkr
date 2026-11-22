@@ -1,5 +1,6 @@
 import { getCachedProductReviews } from "@/lib/api/cached";
 import ProductReviewsSection from "./components/ProductReviewsSection";
+import ProductReviewsUnavailable from "./components/ProductReviewsUnavailable";
 import { mapLiveReviews } from "./deriveDetailLayoutProps";
 
 /**
@@ -13,9 +14,13 @@ export default async function ReviewsAsync({
 }: {
 	productId: string;
 }) {
-	const reviewsResult = await getCachedProductReviews(productId, 1, 6).catch(
-		() => null,
+	// 讀取失敗不顯示成「還沒有評價」，也不讓整段消失：顯示讀取失敗與重試。
+	const reviewsResult = await getCachedProductReviews(productId, 6).catch(
+		() => undefined,
 	);
+	if (reviewsResult === undefined) return <ProductReviewsUnavailable />;
 	const { reviews, total } = mapLiveReviews(reviewsResult);
-	return <ProductReviewsSection reviews={reviews} reviewTotal={total} />;
+	return (
+		<ProductReviewsSection reviews={reviews} reviewTotal={total} reportable />
+	);
 }

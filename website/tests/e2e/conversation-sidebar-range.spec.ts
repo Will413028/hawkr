@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+	mockChatConversations,
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
@@ -40,30 +41,15 @@ async function setupInbox(page: Page): Promise<void> {
 			url: `http://localhost:${process.env.PLAYWRIGHT_PORT || "3000"}`,
 		},
 	]);
-	await page.route("**/chat/conversations*", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				code: 0,
-				data: {
-					records: PEERS.map((nickname, index) => ({
-						targetUserId: 1000 + index,
-						targetNickname: nickname,
-						lastMessage: "感謝您的詢問，最新報價已更新。",
-						lastMessageTime: Date.now() - index * 3_600_000,
-						unreadCount: 0,
-					})),
-				},
-			}),
-		}),
-	);
-	await page.route("**/chat/unread*", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: { unread: 0 } }),
-		}),
+	await mockChatConversations(
+		page,
+		"buyer",
+		PEERS.map((peerName, index) => ({
+			id: String(500 + index),
+			peerId: String(1000 + index),
+			peerName,
+			lastText: "感謝您的詢問，最新報價已更新。",
+		})),
 	);
 	await page.goto("/account/messages");
 }
