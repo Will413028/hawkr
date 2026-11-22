@@ -141,11 +141,11 @@ func (s *Service) ListOwnStoreReviews(ctx context.Context, storeID int64, f mode
 	return s.ListStoreReviews(ctx, storeID, 0, f, after, size)
 }
 
-// ListMyReviews 是作者本人的評價歷史：被隱藏的不給作者（舊行為）。
-func (s *Service) ListMyReviews(ctx context.Context, buyerID int64, after *model.Cursor, size int32) (model.Page, error) {
+// ListMyReviews 是作者本人的評價歷史：被隱藏的不給作者（舊行為）；orderItemID 大於 0 時只列那個訂單項目的評價。
+func (s *Service) ListMyReviews(ctx context.Context, buyerID, orderItemID int64, after *model.Cursor, size int32) (model.Page, error) {
 	size = pageSize(size)
 	at, id := cursorParams(after)
-	list, err := s.q(ctx).ListMyReviews(ctx, store.ListMyReviewsParams{BuyerID: buyerID, AfterCreatedAt: at, AfterID: id, PageSize: size + 1})
+	list, err := s.q(ctx).ListMyReviews(ctx, store.ListMyReviewsParams{BuyerID: buyerID, OrderItemID: orderItemID, AfterCreatedAt: at, AfterID: id, PageSize: size + 1})
 	if err != nil {
 		return model.Page{}, err
 	}
@@ -229,6 +229,18 @@ func (s *Service) ReviewForRelay(ctx context.Context, id uuid.UUID) (model.Relay
 		return model.RelayReview{}, err
 	}
 	return model.RelayReview{Review: rows.Review(r, rows.Images(imgs)[id]), Public: public}, nil
+}
+
+// ReviewStore 回評價所屬的店與現在是否公開可讀（不套公開可讀述詞）；不存在是 NotFound。
+func (s *Service) ReviewStore(ctx context.Context, id uuid.UUID) (model.ReviewStore, error) {
+	row, err := s.q(ctx).GetReviewStore(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ReviewStore{}, apperr.NotFound("%s", text.ReviewNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ReviewStore{}, err
+	}
+	return model.ReviewStore{StoreID: row.StoreID, Public: row.Public}, nil
 }
 
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。

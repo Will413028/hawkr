@@ -1,0 +1,139 @@
+{
+ "mutants": [
+  {
+   "id": "review-ref-store-read-error-ignored",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\t\tr, err := s.Reviews.GetReview(ctx, id, 0)\n\t\tif err != nil {\n\t\t\treturn social.ContentAuthor{}, err\n\t\t}\n",
+   "new": "\t\tr, err := s.Reviews.GetReview(ctx, id, 0)\n\t\t_ = err\n",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAnUnreadableReviewIsNotFound$",
+   "why": "The review-reference resolver for a store caller ignores a not-found read and returns a found author, so an unreadable review would be blockable."
+  },
+  {
+   "id": "review-ref-buyer-viewer-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "r, err := s.Reviews.GetReview(ctx, id, c.BuyerID)",
+   "new": "r, err := s.Reviews.GetReview(ctx, id, 0)",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAReviewForABuyerIsTheReplyingStoreReadAsTheViewer$",
+   "why": "The buyer-side review reference is read as an anonymous viewer, so the buyer's own blocks no longer decide whether the review is visible to them."
+  },
+  {
+   "id": "review-ref-reply-requirement-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\tif r.Reply == nil {\n\t\treturn social.ContentAuthor{}, nil\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAReviewWithoutAVisibleReplyHasNoStoreToBlock$",
+   "why": "A buyer can block the store of a review that has no visible reply, so a taken-down or missing reply no longer hides the store."
+  },
+  {
+   "id": "review-reply-capability-declaration-changed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/declaration.go",
+   "old": "requires(seller.CapMarketing),",
+   "new": "requires(seller.CapContentContract),",
+   "test": "internal/httpapi/review ^TestReplyReviewIsCheckedAgainstTheModulesMarketingCapability$",
+   "why": "ReplyReview is declared with a shrinking capability, so a suspended store would be declared as allowed to reply."
+  },
+  {
+   "id": "review-reply-store-not-the-callers",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/app.go",
+   "old": "review.ReplyInput{Store: st, ReviewID: id,",
+   "new": "review.ReplyInput{Store: seller.Store{StoreID: st.StoreID + 1}, ReviewID: id,",
+   "test": "internal/httpapi/review ^TestReplyReviewActsAsTheCallersCurrentStoreAndReturnsTheStoreView$",
+   "why": "ReplyReview acts as a store other than the caller's current store."
+  },
+  {
+   "id": "review-own-store-any-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/app.go",
+   "old": "h.reads.ListOwnStoreReviews(ctx, st.StoreID, f, after, msg.GetPageSize())",
+   "new": "h.reads.ListOwnStoreReviews(ctx, st.StoreID+1, f, after, msg.GetPageSize())",
+   "test": "internal/httpapi/review ^TestListOwnStoreReviewsDerivesTheStoreFromTheCallerAndDoesNotApplyAViewer$",
+   "why": "ListOwnStoreReviews reads another store than the one derived from the caller."
+  },
+  {
+   "id": "review-public-store-list-viewer-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "h.reads.ListStoreReviews(ctx, storeID, viewer, f, after, msg.GetPageSize())",
+   "new": "h.reads.ListStoreReviews(ctx, storeID, viewer*0, f, after, msg.GetPageSize())",
+   "test": "internal/httpapi/review ^TestListStoreReviewsPassesTheViewerBuyerSoTheModuleAppliesBlocks$",
+   "why": "The public store review list always reads as an anonymous viewer, so the viewer's blocks stop filtering it."
+  },
+  {
+   "id": "review-public-product-list-viewer-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "h.reads.ListProductReviews(ctx, productID, viewer, f, after, msg.GetPageSize())",
+   "new": "h.reads.ListProductReviews(ctx, productID, viewer*0, f, after, msg.GetPageSize())",
+   "test": "internal/httpapi/review ^TestListProductReviewsReadsAsTheViewerAndPassesFilterAndPaging$",
+   "why": "The public product review list always reads as an anonymous viewer, so the viewer's blocks stop filtering it."
+  },
+  {
+   "id": "review-error-reason-window-expired-remapped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/review.go",
+   "old": "apperr.ReasonReviewWindowExpired,",
+   "new": "apperr.ReasonReviewNotReplyable,",
+   "test": "internal/httpapi/review ^TestEveryModuleReasonTheClientBranchesOnIsMappedToAContractReason$",
+   "why": "The expired-review-window reason is reported to the client as REVIEW_NOT_REPLYABLE."
+  },
+  {
+   "id": "review-error-reason-not-attached",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/review.go",
+   "old": "ae.Reason = r",
+   "new": "_ = r",
+   "test": "internal/httpapi/review ^TestCreateReviewMapsModuleReasonsToTheContractReasons$",
+   "why": "The module reason is never attached to the error, so the client gets no ErrorReason."
+  },
+  {
+   "id": "report-review-owner-visibility-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "\t\treturn snapshot.Content{}, contentNotFound(ctx, err)\n\t}\n\tif err := s.notSelf(ctx, in, social.Actor{Kind: social.ActorBuyer, ID: r.BuyerID}); err != nil {",
+   "new": "\t\t_ = err\n\t}\n\tif err := s.notSelf(ctx, in, social.Actor{Kind: social.ActorBuyer, ID: r.BuyerID}); err != nil {",
+   "test": "internal/modules/moderation ^TestReportAuthorizationForChatAndReview$",
+   "why": "Reporting a review proceeds even when the review owner module says the reporter cannot read it, so unreadable or unknown reviews can be reported."
+  },
+  {
+   "id": "report-review-viewer-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {\n\tr, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, in.ReporterBuyerID)",
+   "new": "func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {\n\tr, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, 0)",
+   "test": "internal/modules/moderation ^TestReportAuthorizationForChatAndReview$",
+   "why": "The review report reads the review as an anonymous viewer, so the reporter's own blocks no longer hide a review from them."
+  },
+  {
+   "id": "review-my-list-order-item-filter-always-true",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/own.sql.go",
+   "old": "AND ($2::bigint = 0 OR r.order_item_id = $2::bigint)",
+   "new": "AND ($2::bigint = 0 OR r.order_item_id = r.order_item_id)",
+   "test": "internal/modules/review ^TestListMyReviewsFiltersByOrderItem$",
+   "why": "The order_item_id predicate of ListMyReviews always holds, so a filtered call returns every review of the buyer."
+  },
+  {
+   "id": "review-reply-store-from-current-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/app.go",
+   "old": "st, err := h.stores.Store(ctx, ref.StoreID)",
+   "new": "_ = ref\n\tst, err := h.stores.CurrentStore(ctx, p.ID)",
+   "test": "internal/httpapi/review ^TestReplyReviewReadsTheReviewStoreWithoutThePublicPredicateSoTheStoreIsDerivedFromIt$",
+   "why": "ReplyReview derives the store from the caller's current store instead of the review's store, so an account without a store gets not_found instead of permission_denied and a multi-store owner replies as the wrong store."
+  },
+  {
+   "id": "review-reply-owner-check-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/app.go",
+   "old": "if st.AccountID != p.ID {",
+   "new": "_ = p\n\tif false {",
+   "test": "internal/httpapi/review ^TestReplyReviewByAnAccountWithoutAStoreIsPermissionDeniedBecauseTheReviewIsPublic$",
+   "why": "Any signed-in account can reach the module with another owner's store."
+  }
+ ]
+}

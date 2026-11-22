@@ -2,7 +2,7 @@
 
 ## 職責
 
-訂單項目的買家評價：提交（訂單資格與快照取自訂單）、店家回覆、平台隱藏與還原、公開與作者與店家的讀取、評價統計。給 httpapi（A6-5）、moderation（A6-4，呼叫 `Hide`／`Restore`）、discovery 與 seller 的店家評分（`StoreRatingStats`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-1-design.md`；沒有對外入口（A6-5 才加）；`cmd/hawkr` 只接刪帳訂閱者與 worker。
+訂單項目的買家評價：提交（訂單資格與快照取自訂單）、店家回覆、平台隱藏與還原、公開與作者與店家的讀取、評價統計。給 httpapi/review、httpapi/blocks（`GetReview` 解析 review_id 封鎖參照）、moderation（A6-4，呼叫 `Hide`／`Restore`）、discovery 與 seller 的店家評分（`StoreRatingStats`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-1-design.md`；對外入口在 `httpapi/review`（Connect：ReviewPublicService、ReviewAppService）；`cmd/hawkr` 只接刪帳訂閱者與 worker。
 
 ## 擁有的資料
 
@@ -35,7 +35,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 
 ## 不負責
 
-買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；換掉 `legacy/reviewservice`（A6-6e，A6-D11）；`legacy/reviewrelay` 只在測試啟用，A6-6e 才接進 `cmd/hawkr`；Connect 與 handler（A6-5）；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
+買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；換掉 `legacy/reviewservice`（A6-6e，A6-D11）；`legacy/reviewrelay` 只在測試啟用，A6-6e 才接進 `cmd/hawkr`；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
 
 ## 決策紀錄
 

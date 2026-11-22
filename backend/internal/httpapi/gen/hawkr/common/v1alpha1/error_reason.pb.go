@@ -85,6 +85,19 @@ const (
 	// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
 	// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
 	ErrorReason_CONTENT_TAKEDOWN_ACTIVE ErrorReason = 14
+	// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+	// 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+	// ReviewAppService.CreateReview。
+	ErrorReason_REVIEW_ALREADY_EXISTS ErrorReason = 15
+	// 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+	// ReviewAppService.CreateReview。
+	ErrorReason_ORDER_NOT_REVIEWABLE ErrorReason = 16
+	// 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+	// ReviewAppService.CreateReview。
+	ErrorReason_REVIEW_WINDOW_EXPIRED ErrorReason = 17
+	// 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+	// ReviewAppService.ReplyReview。
+	ErrorReason_REVIEW_NOT_REPLYABLE ErrorReason = 18
 )
 
 // Enum value maps for ErrorReason.
@@ -105,6 +118,10 @@ var (
 		12: "REAUTHENTICATION_REQUIRED",
 		13: "CONTACT_EMAIL_REQUIRED",
 		14: "CONTENT_TAKEDOWN_ACTIVE",
+		15: "REVIEW_ALREADY_EXISTS",
+		16: "ORDER_NOT_REVIEWABLE",
+		17: "REVIEW_WINDOW_EXPIRED",
+		18: "REVIEW_NOT_REPLYABLE",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -122,6 +139,10 @@ var (
 		"REAUTHENTICATION_REQUIRED":  12,
 		"CONTACT_EMAIL_REQUIRED":     13,
 		"CONTENT_TAKEDOWN_ACTIVE":    14,
+		"REVIEW_ALREADY_EXISTS":      15,
+		"ORDER_NOT_REVIEWABLE":       16,
+		"REVIEW_WINDOW_EXPIRED":      17,
+		"REVIEW_NOT_REPLYABLE":       18,
 	}
 )
 
@@ -156,7 +177,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa1\x03\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x8b\x04\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -173,7 +194,11 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x17IDENTITY_ALREADY_LINKED\x10\v\x12\x1d\n" +
 	"\x19REAUTHENTICATION_REQUIRED\x10\f\x12\x1a\n" +
 	"\x16CONTACT_EMAIL_REQUIRED\x10\r\x12\x1b\n" +
-	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0eB\x82\x02\n" +
+	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0e\x12\x19\n" +
+	"\x15REVIEW_ALREADY_EXISTS\x10\x0f\x12\x18\n" +
+	"\x14ORDER_NOT_REVIEWABLE\x10\x10\x12\x19\n" +
+	"\x15REVIEW_WINDOW_EXPIRED\x10\x11\x12\x18\n" +
+	"\x14REVIEW_NOT_REPLYABLE\x10\x12B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (
