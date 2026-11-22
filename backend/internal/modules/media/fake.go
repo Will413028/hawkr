@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -209,5 +210,20 @@ func (f *Fake) ReadSecure(ctx context.Context, objectKey string, ref Ref) (Secur
 	return a, nil
 }
 
-// NewMemoryStore 回傳空的記憶體 ObjectStore，只給 Go 測試接線（例如 httpapi 的整合測試）；正式啟動不會建構它。
-func NewMemoryStore() ObjectStore { return storage.NewFake() }
+// MemoryStore 是記憶體的 ObjectStore（預簽網址不可連線），只給 Go 測試接線；它計算發出的預簽次數。正式啟動不會建構它。
+type MemoryStore struct {
+	ObjectStore
+	presigns atomic.Int64
+}
+
+// NewMemoryStore 回傳空的 MemoryStore。
+func NewMemoryStore() *MemoryStore { return &MemoryStore{ObjectStore: storage.NewFake()} }
+
+// PresignPut 實作 ObjectStore。
+func (s *MemoryStore) PresignPut(ctx context.Context, in storage.PresignPutInput) (storage.PresignedPut, error) {
+	s.presigns.Add(1)
+	return s.ObjectStore.PresignPut(ctx, in)
+}
+
+// Presigns 回傳已發出的預簽網址數。
+func (s *MemoryStore) Presigns() int { return int(s.presigns.Load()) }

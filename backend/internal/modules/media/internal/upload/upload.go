@@ -19,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/image"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
@@ -125,6 +126,15 @@ func wellFormed(token string) bool {
 	return len(token) == base64.RawURLEncoding.EncodedLen(tokenBytes) && !strings.ContainsAny(token, "+/=")
 }
 
+func allowedContentType(ct string) bool {
+	for _, f := range []image.Format{image.JPEG, image.PNG, image.WebP, image.GIF} {
+		if f.ContentType() == ct {
+			return true
+		}
+	}
+	return false
+}
+
 func validate(in BeginInput) error {
 	if in.Size <= 0 {
 		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小必須大於零")
@@ -134,6 +144,9 @@ func validate(in BeginInput) error {
 	}
 	if in.ContentType == "" || len(in.ContentType) > maxContentTypeLen || strings.ContainsAny(in.ContentType, "\r\n\x00") {
 		return apperr.InvalidInputOn([]string{"content_type"}, "上傳的型別不合法")
+	}
+	if !allowedContentType(in.ContentType) {
+		return apperr.InvalidInputOn([]string{"content_type"}, "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF")
 	}
 	sum, err := base64.StdEncoding.DecodeString(in.MD5)
 	if err != nil || len(sum) != 16 {

@@ -7,6 +7,7 @@ package media
 
 import (
 	"context"
+	"strings"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -31,8 +32,15 @@ type App struct {
 
 var _ mediav1alpha1connect.MediaAppServiceHandler = (*App)(nil)
 
-// NewApp 建立 handler；uploads 為 nil 時（組裝點還沒接上 media 模組）每個方法回 unavailable。
-func NewApp(uploads Uploads) *App { return &App{uploads: uploads} }
+// NewApp 建立 handler；m 為 nil 時每個方法回 unavailable。
+func NewApp(m *media.Module) *App {
+	if m == nil {
+		return &App{}
+	}
+	return newApp(m)
+}
+
+func newApp(uploads Uploads) *App { return &App{uploads: uploads} }
 
 func (h *App) uploader(ctx context.Context) (media.Uploader, Uploads, error) {
 	p, err := rpc.RequireAccount(ctx)
@@ -54,10 +62,16 @@ func (h *App) BeginUpload(ctx context.Context, req *connect.Request[pb.BeginUplo
 	if err != nil {
 		return nil, err
 	}
+	headers := make(map[string]string, len(res.Headers))
+	for k, v := range res.Headers {
+		if !strings.EqualFold(k, "Content-Length") {
+			headers[k] = v
+		}
+	}
 	return connect.NewResponse(&pb.BeginUploadResponse{
 		StagedToken:   res.Token,
 		UploadUrl:     res.URL,
-		UploadHeaders: res.Headers,
+		UploadHeaders: headers,
 		ExpireTime:    timestamppb.New(res.ExpiresAt),
 	}), nil
 }

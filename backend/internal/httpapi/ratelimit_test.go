@@ -11,6 +11,7 @@ import (
 	"time"
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	mediaconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
@@ -194,5 +195,16 @@ func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
 	}
 	if rec.Code != http.StatusTooManyRequests || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
 		t.Fatalf("429 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
+	}
+}
+
+func TestBeginUploadHasALowerTierThanTheDefault(t *testing.T) {
+	t.Parallel()
+	got := tierOf(mediaconnect.MediaAppServiceBeginUploadProcedure)
+	if got != tierBeginUpload || got.visitor >= tierDefault.visitor {
+		t.Errorf("BeginUpload 的級別 = %v，預期比 tierDefault 低的 tierBeginUpload", got)
+	}
+	if got := tierOf(mediaconnect.MediaAppServiceGetUploadProcedure); got != tierDefault {
+		t.Errorf("GetUpload 的級別 = %v，預期 tierDefault", got)
 	}
 }

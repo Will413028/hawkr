@@ -58,6 +58,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
@@ -93,8 +94,8 @@ type Deps struct {
 	Social *social.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
-	// Media 是公開圖片的暫存上傳（MediaAppService）；nil 時方法回 unavailable（組裝點接上 Go 的 media 模組之前，上傳還在舊的 media-service）。
-	Media httpmedia.Uploads
+	// Media 是公開圖片的暫存上傳（MediaAppService）；nil 時每個方法回 unavailable。
+	Media *media.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。
 	Stats *httpseller.StatsSource

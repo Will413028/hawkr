@@ -59,9 +59,9 @@ type env struct {
 }
 
 // newEnv 掛上真的 Connect handler 與 rpc 的 interceptor；header X-Test-Account 非空時以帳號 7 登入，X-Test-Admin 非空時以管理員登入。
-func newEnv(t *testing.T, uploads Uploads) *env {
+func newEnv(t *testing.T, app *App) *env {
 	t.Helper()
-	path, handler := mediav1alpha1connect.NewMediaAppServiceHandler(NewApp(uploads), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(io.Discard, nil)))))
+	path, handler := mediav1alpha1connect.NewMediaAppServiceHandler(app, connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(io.Discard, nil)))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch {
@@ -93,7 +93,7 @@ const token = "x"
 
 func TestMediaAppRequiresALogin(t *testing.T) {
 	f := &fakeUploads{}
-	e := newEnv(t, f)
+	e := newEnv(t, newApp(f))
 	methods := pb.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaAppService").Methods()
 	if methods.Len() != 3 {
 		t.Fatalf("MediaAppService 有 %d 支方法，預期 3", methods.Len())
@@ -121,7 +121,7 @@ func TestMediaAppRequiresALogin(t *testing.T) {
 
 func TestOnlyAnAccountCanCall(t *testing.T) {
 	f := &fakeUploads{}
-	e := newEnv(t, f)
+	e := newEnv(t, newApp(f))
 	ctx := t.Context()
 	_, err1 := e.client.BeginUpload(ctx, asAdmin(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "x"}))
 	_, err2 := e.client.CompleteUpload(ctx, asAdmin(&pb.CompleteUploadRequest{StagedToken: token}))
@@ -138,8 +138,8 @@ func TestOnlyAnAccountCanCall(t *testing.T) {
 
 func TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
-	f := &fakeUploads{beginRes: media.BeginResult{ID: uuid.New(), Token: "tok", URL: "https://s.example/tmp/a", Headers: map[string]string{"Content-Type": "image/png", "Content-MD5": "m"}, ExpiresAt: exp}}
-	e := newEnv(t, f)
+	f := &fakeUploads{beginRes: media.BeginResult{ID: uuid.New(), Token: "tok", URL: "https://s.example/tmp/a", Headers: map[string]string{"Content-Type": "image/png", "Content-MD5": "m", "Content-Length": "10"}, ExpiresAt: exp}}
+	e := newEnv(t, newApp(f))
 	resp, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: 1234, ContentType: "image/png", Md5: "m"}))
 	if err != nil {
 		t.Fatal(err)
@@ -150,6 +150,11 @@ func TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload(t *testing.T) 
 	m := resp.Msg
 	if m.GetStagedToken() != "tok" || m.GetUploadUrl() != "https://s.example/tmp/a" || m.GetUploadHeaders()["Content-MD5"] != "m" || m.GetUploadHeaders()["Content-Type"] != "image/png" || !m.GetExpireTime().AsTime().Equal(exp) {
 		t.Fatalf("回應：%v", m)
+	}
+	for k := range m.GetUploadHeaders() {
+		if strings.EqualFold(k, "Content-Length") {
+			t.Fatalf("upload_headers 不該含 Content-Length：%v", m.GetUploadHeaders())
+		}
 	}
 }
 
@@ -163,7 +168,7 @@ func TestModuleErrorsAreMapped(t *testing.T) {
 		"FailedPrecondition": {apperr.FailedPrecondition("這筆上傳已過期"), connect.CodeFailedPrecondition},
 	}
 	for name, c := range cases {
-		e := newEnv(t, &fakeUploads{err: c.err})
+		e := newEnv(t, newApp(&fakeUploads{err: c.err}))
 		ctx := t.Context()
 		_, err1 := e.client.BeginUpload(ctx, signedIn(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "m"}))
 		_, err2 := e.client.CompleteUpload(ctx, signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
@@ -190,7 +195,7 @@ func TestModuleErrorsAreMapped(t *testing.T) {
 }
 
 func TestExpiredCompleteIsFailedPreconditionNotNotFound(t *testing.T) {
-	e := newEnv(t, &fakeUploads{err: apperr.FailedPrecondition("這筆上傳已過期")})
+	e := newEnv(t, newApp(&fakeUploads{err: apperr.FailedPrecondition("這筆上傳已過期")}))
 	_, err := e.client.CompleteUpload(t.Context(), signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("過期：%v", err)
@@ -200,7 +205,7 @@ func TestExpiredCompleteIsFailedPreconditionNotNotFound(t *testing.T) {
 func TestGetUploadReportsRejectionAsStateAndReasonNotAnError(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
 	f := &fakeUploads{status: media.UploadStatus{State: media.UploadRejected, RejectReason: media.RejectUnrecognizedFormat, ExpiresAt: exp}}
-	e := newEnv(t, f)
+	e := newEnv(t, newApp(f))
 	resp, err := e.client.GetUpload(t.Context(), signedIn(&pb.GetUploadRequest{StagedToken: "tok"}))
 	if err != nil {
 		t.Fatal(err)
@@ -227,23 +232,32 @@ func TestEnumsMatchTheModuleValues(t *testing.T) {
 }
 
 func TestWithoutAModuleEveryMethodIsUnavailable(t *testing.T) {
-	e := newEnv(t, nil)
-	_, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "m"}))
-	if connect.CodeOf(err) != connect.CodeUnavailable {
-		t.Fatalf("沒有接上模組：%v", err)
+	e := newEnv(t, NewApp((*media.Module)(nil)))
+	ctx := t.Context()
+	_, err1 := e.client.BeginUpload(ctx, signedIn(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "m"}))
+	_, err2 := e.client.CompleteUpload(ctx, signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
+	_, err3 := e.client.GetUpload(ctx, signedIn(&pb.GetUploadRequest{StagedToken: token}))
+	for i, err := range []error{err1, err2, err3} {
+		if connect.CodeOf(err) != connect.CodeUnavailable {
+			t.Errorf("方法 %d：沒有接上模組回 %v，預期 unavailable", i, err)
+		}
 	}
 }
 
 // 超過上限的宣告由模組的大小檢查擋下：真的模組（驗證在碰資料庫與儲存之前），不發網址、不寫列。
 func TestBeginUploadOverTheLimitIsInvalidArgumentAndIssuesNoURL(t *testing.T) {
-	m := media.New(media.Deps{DB: &db.DB{}, Jobs: noJobs{}, Store: media.NewMemoryStore(), NewID: uuid.NewV7, Now: time.Now})
-	e := newEnv(t, m)
+	store := media.NewMemoryStore()
+	m := media.New(media.Deps{DB: &db.DB{}, Jobs: noJobs{}, Store: store, NewID: uuid.NewV7, Now: time.Now})
+	e := newEnv(t, NewApp(m))
 	resp, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: media.MaxPublicUploadSize + 1, ContentType: "image/png", Md5: "1B2M2Y8AsgTpgAmY7PhCfg=="}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("超過上限：%v", err)
 	}
 	if resp != nil {
 		t.Fatalf("不該有回應：%v", resp)
+	}
+	if store.Presigns() != 0 {
+		t.Fatalf("超過上限仍發了 %d 次預簽網址", store.Presigns())
 	}
 	var bad *errdetails.BadRequest
 	var ce *connect.Error

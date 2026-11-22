@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	mediaconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -38,6 +39,10 @@ var (
 	tierPostView = rateTier{name: "post-view", visitor: 120, ssr: 2400, ci: 60}
 )
 
+// tierBeginUpload 是 MediaAppService.BeginUpload 的額度：每次都發預簽網址並寫一筆暫存列，額度同 tierProductView（以帳號計；一次發文或換頭像
+// 只用一次，批次上傳的使用者也在額度內）。
+var tierBeginUpload = rateTier{name: "begin-upload", visitor: 120}
+
 // tierAppLogin 是 App 原生登入的兩個公開 procedure（IssueAppLoginNonce、ExchangeIdToken）的額度，兩者共用同一個計數器，以來源 IP 計數（沒有登入的
 // 請求；帶有效 session 重新驗證的以帳號計）。一次登入是兩個請求，每分鐘 30 個（約 15 次登入），與 web 的 tierAuth 同一個保守的預設，擋灌 nonce 與
 // 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
@@ -47,6 +52,7 @@ var tierAppLogin = rateTier{name: "app-login", visitor: 30}
 var procedureTiers = map[string]rateTier{
 	sellerconnect.SellerPublicServiceRecordProductViewProcedure:      tierProductView,
 	socialconnect.SocialPublicServiceRecordPostViewProcedure:         tierPostView,
+	mediaconnect.MediaAppServiceBeginUploadProcedure:                 tierBeginUpload,
 	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: tierAppLogin,
 	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    tierAppLogin,
 }

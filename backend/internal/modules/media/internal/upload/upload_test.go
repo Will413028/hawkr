@@ -68,3 +68,20 @@ func TestValidateRejectsSizeAboveModuleLimit(t *testing.T) {
 		t.Errorf("超過上限的分類 %v，預期 invalid_input", got)
 	}
 }
+
+func TestCreateUpload_AcceptsAllowedImage(t *testing.T) {
+	for _, ct := range []string{"image/jpeg", "image/png", "image/webp", "image/gif"} {
+		if err := validate(BeginInput{Size: 10, ContentType: ct, MD5: validMD5}); err != nil {
+			t.Errorf("%s 被拒：%v", ct, err)
+		}
+	}
+}
+
+func TestCreateUpload_RejectsUnknownMime(t *testing.T) {
+	for _, ct := range []string{"image/heic", "application/pdf", "text/html", "image/svg+xml", "IMAGE/PNG"} {
+		err := validate(BeginInput{Size: 10, ContentType: ct, MD5: validMD5})
+		if apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v，預期 invalid_input", ct, err)
+		}
+	}
+}
