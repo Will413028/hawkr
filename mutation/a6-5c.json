@@ -93,8 +93,8 @@
   {
    "id": "chat-ownership-neither-side-allowed-as-buyer",
    "stack": "go",
-   "file": "backend/internal/httpapi/chat/chat.go",
-   "old": "\t}\n\treturn im.Party{}, conversationNotFound()\n}",
+   "file": "backend/internal/httpapi/rpc/chatparty.go",
+   "old": "\t}\n\treturn im.Party{}, ErrNotChatParty\n}",
    "new": "\t}\n\treturn im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, nil\n}",
    "test": "internal/httpapi/chat ^TestOwnershipDerivationNeitherSideAndMissingConversationAreIndistinguishable$",
    "why": "A caller who is neither side of the conversation is let through as the buyer instead of getting the same not_found as a missing conversation."
@@ -278,6 +278,69 @@
    "new": "return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})",
    "test": "cmd/hawkr ^TestServeRunsTheIMLiveChannelAndWorkerDoesNot$",
    "why": "The serve path never starts im's LISTEN connection, so streams open but never receive an event."
+  },
+  {
+   "id": "report-chat-neither-side-submitted-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "\tcase errors.Is(err, rpc.ErrNotChatParty):\n\t\treturn moderation.SubmitInput{}, chatMessageNotFound()",
+   "new": "\tcase errors.Is(err, rpc.ErrNotChatParty):\n\t\treturn moderation.SubmitInput{ReporterBuyerID: buyerID}, nil",
+   "test": "internal/httpapi/moderation ^TestChatReportByANonPartyIsNotFoundLikeAMissingMessageAndNeverReachesTheModule$",
+   "why": "A caller who is neither side of the reported chat message is submitted as the buyer instead of getting the same not_found as a missing message."
+  },
+  {
+   "id": "report-chat-store-side-filled-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "return moderation.SubmitInput{ReporterStoreID: party.Store.StoreID}, nil",
+   "new": "return moderation.SubmitInput{ReporterBuyerID: party.Store.StoreID}, nil",
+   "test": "internal/httpapi/moderation ^TestChatReportFromTheStoreSideUsesTheCurrentStoreNotTheBuyer$",
+   "why": "The store side of a chat report is sent to the module as a buyer reporter with the store's ID."
+  },
+  {
+   "id": "block-message-buyer-skips-party-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\tif parties.BuyerID != c.BuyerID {",
+   "new": "\tif false && parties.BuyerID != c.BuyerID {",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageTheCallerIsNotPartyToIsNotFoundLikeAMissingOne$",
+   "why": "A buyer can block the store of any conversation by naming one of its messages, without being the buyer of that conversation."
+  },
+  {
+   "id": "block-message-store-skips-party-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "\t\tif parties.StoreID != c.Store.StoreID {",
+   "new": "\t\tif false && parties.StoreID != c.Store.StoreID {",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageTheCallerIsNotPartyToIsNotFoundLikeAMissingOne$",
+   "why": "A store can block the buyer of any conversation by naming one of its messages, without being the store of that conversation."
+  },
+  {
+   "id": "block-message-store-caller-blocks-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/blocks/blocks.go",
+   "old": "Author: social.Actor{Kind: social.ActorBuyer, ID: parties.BuyerID}",
+   "new": "Author: social.Actor{Kind: social.ActorStore, ID: parties.StoreID}",
+   "test": "internal/httpapi/blocks ^TestResolveAuthorOfAMessageIsTheCounterpartOfTheCaller$",
+   "why": "The store-side message reference resolves to the caller's own store instead of the conversation's buyer."
+  },
+  {
+   "id": "store-reports-handler-reads-another-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "h.reports.MyStoreReports(ctx, store.StoreID, after, size)",
+   "new": "h.reports.MyStoreReports(ctx, store.StoreID+1, after, size)",
+   "test": "internal/httpapi/moderation ^TestListMyStoreReportsReadsTheCurrentStoresReportsOnly$",
+   "why": "ListMyStoreReports reads a different store's reports than the caller's current store."
+  },
+  {
+   "id": "store-reports-query-drops-reporter-store-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/store/moderation.sql.go",
+   "old": "WHERE r.reporter_store_id = $1\n  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)",
+   "new": "WHERE $1::bigint IS NOT NULL\n  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)",
+   "test": "internal/modules/moderation ^TestMyStoreReportsListsOnlyTheStoresOwnReportsPaged$",
+   "why": "The store reporter list stops filtering on reporter_store_id, so other stores' and buyers' reports appear."
   }
  ]
 }

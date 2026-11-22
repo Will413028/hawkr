@@ -347,14 +347,18 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	chatPath, chatHandler := chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...)
 	add(chatPath, httpchat.WithStreamWriter(chatHandler))
-	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
+	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(moderationv1alpha1connect.NewModerationAppServiceHandler(moderationApp, opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {
 		return nil, err
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
-	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err

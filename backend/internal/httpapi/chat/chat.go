@@ -184,18 +184,17 @@ func (h *App) partyOf(ctx context.Context, conversationID uuid.UUID) (im.Party, 
 		}
 		return im.Party{}, err
 	}
-	isBuyer := parties.BuyerID == buyerID
-	isStore := store != nil && parties.StoreID == store.StoreID
+	party, err := rpc.ChatPartyOf(buyerID, store, parties)
 	switch {
-	case isBuyer && isStore:
+	case errors.Is(err, rpc.ErrBothChatParties):
 		h.log.Error("聊天對話的兩方是同一個帳號（不變量被破壞）", "accountID", acct.ID, "conversationID", conversationID.String())
 		return im.Party{}, fmt.Errorf("對話 %s 的買家方與店家方都是帳號 %d（不變量被破壞）", conversationID, acct.ID)
-	case isBuyer:
-		return im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, nil
-	case isStore:
-		return im.Party{Kind: im.PartyStore, Store: store}, nil
+	case errors.Is(err, rpc.ErrNotChatParty):
+		return im.Party{}, conversationNotFound()
+	case err != nil:
+		return im.Party{}, err
 	}
-	return im.Party{}, conversationNotFound()
+	return party, nil
 }
 
 // toMessage 把訊息轉成回應。隱藏與抹除的訊息是墓碑，不帶內容（模組已保證，這裡不依賴它：墓碑一律不讀 Text 與 Image）。

@@ -25,6 +25,8 @@ abstract class ModerationAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $3.SubmitReportRequest request);
   $async.Future<$3.ListMyReportsResponse> listMyReports(
       $pb.ServerContext ctx, $3.ListMyReportsRequest request);
+  $async.Future<$3.ListMyStoreReportsResponse> listMyStoreReports(
+      $pb.ServerContext ctx, $3.ListMyStoreReportsRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -32,6 +34,8 @@ abstract class ModerationAppServiceBase extends $pb.GeneratedService {
         return $3.SubmitReportRequest();
       case 'ListMyReports':
         return $3.ListMyReportsRequest();
+      case 'ListMyStoreReports':
+        return $3.ListMyStoreReportsRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -44,6 +48,8 @@ abstract class ModerationAppServiceBase extends $pb.GeneratedService {
         return submitReport(ctx, request as $3.SubmitReportRequest);
       case 'ListMyReports':
         return listMyReports(ctx, request as $3.ListMyReportsRequest);
+      case 'ListMyStoreReports':
+        return listMyStoreReports(ctx, request as $3.ListMyStoreReportsRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

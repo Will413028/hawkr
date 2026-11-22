@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，以及讀自己送出過的檢舉（ModerationAppService）。
+// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，聊天訊息所屬對話的任一方（買家或店家）檢舉該則訊息，以及讀自己送出過的檢舉（ModerationAppService）。
 //
 // 檢舉送出後只回檢舉 ID 與收件時間，案件（管理員處理的單位）不對外；檢舉的結果由所屬案件的決定推導，不另存逐筆結果。
 // ID 是不透明的字串（貼文、留言、討論區留言與檢舉是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -13,9 +13,11 @@ import "google/protobuf/timestamp.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/seller/v1alpha1/report.proto";
 
-// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
+// ModerationAppService 是登入的買家檢舉與讀自己的檢舉；對聊天訊息的檢舉，檢舉人是買家或店家：由訊息所屬的對話推導呼叫者是哪一方（店家由呼叫者此刻的店推導，請求不帶身分）。
+// 管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 service ModerationAppService {
-  // SubmitReport 送出一筆檢舉。對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
+  // SubmitReport 送出一筆檢舉。檢舉人是買家；對象是聊天訊息時，呼叫者是該訊息所屬對話的任一方（買家，或呼叫者此刻的店）都可以送，不是對話的一方回 not_found，與訊息不存在相同。
+  // 對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
   // 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
   // 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
   rpc SubmitReport(SubmitReportRequest) returns (SubmitReportResponse);
@@ -24,6 +26,12 @@ service ModerationAppService {
   // 每筆帶共用欄位與依種類的 subject：社群檢舉帶對象與結果（處理中、違規、不違規），店家檢舉帶 SellerReportAppService 的 StoreReport
   // （含結果與結果說明；補充與佐證由 GetMyReport 讀）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫。
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMyStoreReports 列出呼叫者此刻的店以店家身分送出的檢舉（對象只有聊天訊息），新到舊（建立時間，再依 id 新到舊）；請求不帶 store_id。
+  // 每筆的 subject 是 community（對象與結果）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫；沒有店回 not_found，店家退場後沒有此刻的店，所以讀不到。
+  rpc ListMyStoreReports(ListMyStoreReportsRequest) returns (ListMyStoreReportsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -85,6 +93,17 @@ message ListMyReportsRequest {
 }
 
 message ListMyReportsResponse {
+  repeated MyReportItem reports = 1;
+  string next_page_token = 2;
+}
+
+message ListMyStoreReportsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMyStoreReportsResponse {
   repeated MyReportItem reports = 1;
   string next_page_token = 2;
 }

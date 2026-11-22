@@ -3202,6 +3202,7 @@ type BlockAuthorRequest struct {
 	//	*BlockAuthorRequest_CommentId
 	//	*BlockAuthorRequest_ForumEntryId
 	//	*BlockAuthorRequest_ReviewId
+	//	*BlockAuthorRequest_MessageId
 	Source        isBlockAuthorRequest_Source `protobuf_oneof:"source"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3271,6 +3272,15 @@ func (x *BlockAuthorRequest) GetReviewId() string {
 	return ""
 }
 
+func (x *BlockAuthorRequest) GetMessageId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockAuthorRequest_MessageId); ok {
+			return x.MessageId
+		}
+	}
+	return ""
+}
+
 type isBlockAuthorRequest_Source interface {
 	isBlockAuthorRequest_Source()
 }
@@ -3290,11 +3300,18 @@ type BlockAuthorRequest_ReviewId struct {
 	ReviewId string `protobuf:"bytes,3,opt,name=review_id,json=reviewId,proto3,oneof"`
 }
 
+type BlockAuthorRequest_MessageId struct {
+	// 聊天訊息 ID：封鎖這則訊息所屬對話的店家（呼叫者要是該對話的買家；不是回 not_found，與訊息不存在相同）。訊息已隱藏或抹除仍可當參照。
+	MessageId string `protobuf:"bytes,4,opt,name=message_id,json=messageId,proto3,oneof"`
+}
+
 func (*BlockAuthorRequest_CommentId) isBlockAuthorRequest_Source() {}
 
 func (*BlockAuthorRequest_ForumEntryId) isBlockAuthorRequest_Source() {}
 
 func (*BlockAuthorRequest_ReviewId) isBlockAuthorRequest_Source() {}
+
+func (*BlockAuthorRequest_MessageId) isBlockAuthorRequest_Source() {}
 
 type BlockAuthorResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -4167,12 +4184,14 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x19UnsubscribeRestockRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1c\n" +
-	"\x1aUnsubscribeRestockResponse\"\x86\x01\n" +
+	"\x1aUnsubscribeRestockResponse\"\xa7\x01\n" +
 	"\x12BlockAuthorRequest\x12\x1f\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\tH\x00R\tcommentId\x12&\n" +
 	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryId\x12\x1d\n" +
-	"\treview_id\x18\x03 \x01(\tH\x00R\breviewIdB\b\n" +
+	"\treview_id\x18\x03 \x01(\tH\x00R\breviewId\x12\x1f\n" +
+	"\n" +
+	"message_id\x18\x04 \x01(\tH\x00R\tmessageIdB\b\n" +
 	"\x06source\"/\n" +
 	"\x13BlockAuthorResponse\x12\x18\n" +
 	"\achanged\x18\x01 \x01(\bR\achanged\"3\n" +
@@ -4484,6 +4503,7 @@ func file_hawkr_buyer_v1alpha1_buyer_proto_init() {
 		(*BlockAuthorRequest_CommentId)(nil),
 		(*BlockAuthorRequest_ForumEntryId)(nil),
 		(*BlockAuthorRequest_ReviewId)(nil),
+		(*BlockAuthorRequest_MessageId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

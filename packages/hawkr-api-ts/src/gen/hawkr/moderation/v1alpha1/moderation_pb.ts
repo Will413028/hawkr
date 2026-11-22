@@ -2,7 +2,7 @@
 // @generated from file hawkr/moderation/v1alpha1/moderation.proto (package hawkr.moderation.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，以及讀自己送出過的檢舉（ModerationAppService）。
+// moderation 模組給前台的 API：登入的買家檢舉社群內容（貼文、留言、討論區留言）或其他買家，聊天訊息所屬對話的任一方（買家或店家）檢舉該則訊息，以及讀自己送出過的檢舉（ModerationAppService）。
 //
 // 檢舉送出後只回檢舉 ID 與收件時間，案件（管理員處理的單位）不對外；檢舉的結果由所屬案件的決定推導，不另存逐筆結果。
 // ID 是不透明的字串（貼文、留言、討論區留言與檢舉是 UUID，買家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -24,7 +24,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/moderation/v1alpha1/moderation.proto.
  */
 export const file_hawkr_moderation_v1alpha1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SGWhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEiXwoMUmVwb3J0VGFyZ2V0Ej4KBGtpbmQYASABKA4yKy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEtpbmRCA+BBAhIPCgJpZBgCIAEoCUID4EECIsQBChNTdWJtaXRSZXBvcnRSZXF1ZXN0EjwKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQISPAoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAhITCgtkZXNjcmlwdGlvbhgDIAEoCRIcCgpyZXF1ZXN0X2lkGAQgASgJQgjijM/XCAIIASJaChRTdWJtaXRSZXBvcnRSZXNwb25zZRIRCglyZXBvcnRfaWQYASABKAkSLwoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj0KFExpc3RNeVJlcG9ydHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImoKFUxpc3RNeVJlcG9ydHNSZXNwb25zZRI4CgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5NeVJlcG9ydEl0ZW0SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIuICCgxNeVJlcG9ydEl0ZW0SCgoCaWQYASABKAkSNwoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnkSEwoLZGVzY3JpcHRpb24YAyABKAkSLwoLY3JlYXRlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjUKDHJlc29sdmVfdGltZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARI/Cgljb21tdW5pdHkYBiABKAsyKi5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkNvbW11bml0eVJlcG9ydEgAEjMKBXN0b3JlGAcgASgLMiIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN0b3JlUmVwb3J0SABCCQoHc3ViamVjdEIPCg1fcmVzb2x2ZV90aW1lIoUBCg9Db21tdW5pdHlSZXBvcnQSNwoGdGFyZ2V0GAEgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5SZXBvcnRUYXJnZXQSOQoHb3V0Y29tZRgCIAEoDjIoLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0T3V0Y29tZSqeAgoQUmVwb3J0VGFyZ2V0S2luZBIiCh5SRVBPUlRfVEFSR0VUX0tJTkRfVU5TUEVDSUZJRUQQABIbChdSRVBPUlRfVEFSR0VUX0tJTkRfUE9TVBABEh4KGlJFUE9SVF9UQVJHRVRfS0lORF9DT01NRU5UEAISIgoeUkVQT1JUX1RBUkdFVF9LSU5EX0ZPUlVNX0VOVFJZEAMSHAoYUkVQT1JUX1RBUkdFVF9LSU5EX0JVWUVSEAQSHQoZUkVQT1JUX1RBUkdFVF9LSU5EX1JFVklFVxAFEiMKH1JFUE9SVF9UQVJHRVRfS0lORF9DSEFUX01FU1NBR0UQBhIjCh9SRVBPUlRfVEFSR0VUX0tJTkRfUkVWSUVXX1JFUExZEAcqigEKDVJlcG9ydE91dGNvbWUSHgoaUkVQT1JUX09VVENPTUVfVU5TUEVDSUZJRUQQABIaChZSRVBPUlRfT1VUQ09NRV9QRU5ESU5HEAESHAoYUkVQT1JUX09VVENPTUVfVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAMygAIKFE1vZGVyYXRpb25BcHBTZXJ2aWNlEm8KDFN1Ym1pdFJlcG9ydBIuLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuU3VibWl0UmVwb3J0UmVxdWVzdBovLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuU3VibWl0UmVwb3J0UmVzcG9uc2USdwoNTGlzdE15UmVwb3J0cxIvLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuTGlzdE15UmVwb3J0c1JlcXVlc3QaMC5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_seller_v1alpha1_report]);
+  fileDesc("CipoYXdrci9tb2RlcmF0aW9uL3YxYWxwaGExL21vZGVyYXRpb24ucHJvdG8SGWhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEiXwoMUmVwb3J0VGFyZ2V0Ej4KBGtpbmQYASABKA4yKy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydFRhcmdldEtpbmRCA+BBAhIPCgJpZBgCIAEoCUID4EECIsQBChNTdWJtaXRSZXBvcnRSZXF1ZXN0EjwKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQISPAoIY2F0ZWdvcnkYAiABKA4yJS5oYXdrci5jb21tb24udjFhbHBoYTEuUG9saWN5Q2F0ZWdvcnlCA+BBAhITCgtkZXNjcmlwdGlvbhgDIAEoCRIcCgpyZXF1ZXN0X2lkGAQgASgJQgjijM/XCAIIASJaChRTdWJtaXRSZXBvcnRSZXNwb25zZRIRCglyZXBvcnRfaWQYASABKAkSLwoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj0KFExpc3RNeVJlcG9ydHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImoKFUxpc3RNeVJlcG9ydHNSZXNwb25zZRI4CgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5NeVJlcG9ydEl0ZW0SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkIKGUxpc3RNeVN0b3JlUmVwb3J0c1JlcXVlc3QSEQoJcGFnZV9zaXplGAEgASgFEhIKCnBhZ2VfdG9rZW4YAiABKAkibwoaTGlzdE15U3RvcmVSZXBvcnRzUmVzcG9uc2USOAoHcmVwb3J0cxgBIAMoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuTXlSZXBvcnRJdGVtEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSLiAgoMTXlSZXBvcnRJdGVtEgoKAmlkGAEgASgJEjcKCGNhdGVnb3J5GAIgASgOMiUuaGF3a3IuY29tbW9uLnYxYWxwaGExLlBvbGljeUNhdGVnb3J5EhMKC2Rlc2NyaXB0aW9uGAMgASgJEi8KC2NyZWF0ZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgxyZXNvbHZlX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESPwoJY29tbXVuaXR5GAYgASgLMiouaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5Db21tdW5pdHlSZXBvcnRIABIzCgVzdG9yZRgHIAEoCzIiLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdG9yZVJlcG9ydEgAQgkKB3N1YmplY3RCDwoNX3Jlc29sdmVfdGltZSKFAQoPQ29tbXVuaXR5UmVwb3J0EjcKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb24udjFhbHBoYTEuUmVwb3J0VGFyZ2V0EjkKB291dGNvbWUYAiABKA4yKC5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlJlcG9ydE91dGNvbWUqngIKEFJlcG9ydFRhcmdldEtpbmQSIgoeUkVQT1JUX1RBUkdFVF9LSU5EX1VOU1BFQ0lGSUVEEAASGwoXUkVQT1JUX1RBUkdFVF9LSU5EX1BPU1QQARIeChpSRVBPUlRfVEFSR0VUX0tJTkRfQ09NTUVOVBACEiIKHlJFUE9SVF9UQVJHRVRfS0lORF9GT1JVTV9FTlRSWRADEhwKGFJFUE9SVF9UQVJHRVRfS0lORF9CVVlFUhAEEh0KGVJFUE9SVF9UQVJHRVRfS0lORF9SRVZJRVcQBRIjCh9SRVBPUlRfVEFSR0VUX0tJTkRfQ0hBVF9NRVNTQUdFEAYSIwofUkVQT1JUX1RBUkdFVF9LSU5EX1JFVklFV19SRVBMWRAHKooBCg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASGgoWUkVQT1JUX09VVENPTUVfUEVORElORxABEhwKGFJFUE9SVF9PVVRDT01FX1ZJT0xBVElPThACEh8KG1JFUE9SVF9PVVRDT01FX05PX1ZJT0xBVElPThADMokDChRNb2RlcmF0aW9uQXBwU2VydmljZRJvCgxTdWJtaXRSZXBvcnQSLi5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlcXVlc3QaLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlc3BvbnNlEncKDUxpc3RNeVJlcG9ydHMSLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXF1ZXN0GjAuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACARKGAQoSTGlzdE15U3RvcmVSZXBvcnRzEjQuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXF1ZXN0GjUuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_policy_category, file_hawkr_seller_v1alpha1_report]);
 
 /**
  * ReportTarget 是被檢舉的對象。
@@ -161,6 +161,52 @@ export const ListMyReportsResponseSchema: GenMessage<ListMyReportsResponse> = /*
   messageDesc(file_hawkr_moderation_v1alpha1_moderation, 4);
 
 /**
+ * @generated from message hawkr.moderation.v1alpha1.ListMyStoreReportsRequest
+ */
+export type ListMyStoreReportsRequest = Message<"hawkr.moderation.v1alpha1.ListMyStoreReportsRequest"> & {
+  /**
+   * 預設 20，上限 50。
+   *
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.moderation.v1alpha1.ListMyStoreReportsRequest.
+ * Use `create(ListMyStoreReportsRequestSchema)` to create a new message.
+ */
+export const ListMyStoreReportsRequestSchema: GenMessage<ListMyStoreReportsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 5);
+
+/**
+ * @generated from message hawkr.moderation.v1alpha1.ListMyStoreReportsResponse
+ */
+export type ListMyStoreReportsResponse = Message<"hawkr.moderation.v1alpha1.ListMyStoreReportsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.moderation.v1alpha1.MyReportItem reports = 1;
+   */
+  reports: MyReportItem[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.moderation.v1alpha1.ListMyStoreReportsResponse.
+ * Use `create(ListMyStoreReportsResponseSchema)` to create a new message.
+ */
+export const ListMyStoreReportsResponseSchema: GenMessage<ListMyStoreReportsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 6);
+
+/**
  * MyReportItem 是呼叫者送出的一筆檢舉：共用欄位加依種類的 subject。
  *
  * @generated from message hawkr.moderation.v1alpha1.MyReportItem
@@ -218,7 +264,7 @@ export type MyReportItem = Message<"hawkr.moderation.v1alpha1.MyReportItem"> & {
  * Use `create(MyReportItemSchema)` to create a new message.
  */
 export const MyReportItemSchema: GenMessage<MyReportItem> = /*@__PURE__*/
-  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 5);
+  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 7);
 
 /**
  * CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
@@ -242,7 +288,7 @@ export type CommunityReport = Message<"hawkr.moderation.v1alpha1.CommunityReport
  * Use `create(CommunityReportSchema)` to create a new message.
  */
 export const CommunityReportSchema: GenMessage<CommunityReport> = /*@__PURE__*/
-  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 6);
+  messageDesc(file_hawkr_moderation_v1alpha1_moderation, 8);
 
 /**
  * ReportTargetKind 是檢舉對象的種類。
@@ -345,13 +391,15 @@ export const ReportOutcomeSchema: GenEnum<ReportOutcome> = /*@__PURE__*/
   enumDesc(file_hawkr_moderation_v1alpha1_moderation, 1);
 
 /**
- * ModerationAppService 是登入的買家檢舉與讀自己的檢舉；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
+ * ModerationAppService 是登入的買家檢舉與讀自己的檢舉；對聊天訊息的檢舉，檢舉人是買家或店家：由訊息所屬的對話推導呼叫者是哪一方（店家由呼叫者此刻的店推導，請求不帶身分）。
+ * 管理員等非顧客帳號的身分不能呼叫（permission_denied）。
  *
  * @generated from service hawkr.moderation.v1alpha1.ModerationAppService
  */
 export const ModerationAppService: GenService<{
   /**
-   * SubmitReport 送出一筆檢舉。對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
+   * SubmitReport 送出一筆檢舉。檢舉人是買家；對象是聊天訊息時，呼叫者是該訊息所屬對話的任一方（買家，或呼叫者此刻的店）都可以送，不是對話的一方回 not_found，與訊息不存在相同。
+   * 對象不存在、已刪除或不是公開可讀回 not_found；檢舉自己的內容或自己回 invalid_argument；每位檢舉人每個台北日最多新增 20 筆，
    * 超過回 resource_exhausted。同一位檢舉人對同一個對象在案件進行中時再送，回原本那一筆（不吃額度）；案件結案後再送是新的檢舉。
    * 帶 request_id 時，同一個 request_id 重送一律回第一次的結果，不看案件現在的狀態；內容不同回 invalid_argument。
    *
@@ -373,6 +421,17 @@ export const ModerationAppService: GenService<{
     methodKind: "unary";
     input: typeof ListMyReportsRequestSchema;
     output: typeof ListMyReportsResponseSchema;
+  },
+  /**
+   * ListMyStoreReports 列出呼叫者此刻的店以店家身分送出的檢舉（對象只有聊天訊息），新到舊（建立時間，再依 id 新到舊）；請求不帶 store_id。
+   * 每筆的 subject 是 community（對象與結果）。page_token 不透明，換了查詢就不能沿用。停權的帳號也可以呼叫；沒有店回 not_found，店家退場後沒有此刻的店，所以讀不到。
+   *
+   * @generated from rpc hawkr.moderation.v1alpha1.ModerationAppService.ListMyStoreReports
+   */
+  listMyStoreReports: {
+    methodKind: "unary";
+    input: typeof ListMyStoreReportsRequestSchema;
+    output: typeof ListMyStoreReportsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_moderation_v1alpha1_moderation, 0);

@@ -14,6 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -80,6 +81,17 @@ func (f *fakeReviews) GetReview(_ context.Context, _ uuid.UUID, viewer int64) (r
 	return f.r, f.err
 }
 
+type fakeMessages struct {
+	parties im.ConversationParties
+	err     error
+	gotID   uuid.UUID
+}
+
+func (f *fakeMessages) MessageParties(_ context.Context, id uuid.UUID) (im.ConversationParties, error) {
+	f.gotID = id
+	return f.parties, f.err
+}
+
 type accountsOf map[int64]int64
 
 func (a accountsOf) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {
@@ -106,6 +118,7 @@ type blockEnv struct {
 	m       *blockFake
 	authors *fakeAuthors
 	reviews *fakeReviews
+	msgs    *fakeMessages
 	ctx     context.Context
 }
 
@@ -114,7 +127,8 @@ func newBlockEnv(t *testing.T, cards ...seller.StoreCard) *blockEnv {
 	m := &blockFake{fakeModule: fakeModule{profile: model.Profile{BuyerID: callerBuyerID, AccountID: 1}}}
 	authors := &fakeAuthors{}
 	reviews := &fakeReviews{err: apperr.NotFound("no review")}
-	src := blocks.Sources{Authors: authors, Reviews: reviews, Identities: blocks.Identities{
+	msgs := &fakeMessages{err: apperr.NotFound("no message")}
+	src := blocks.Sources{Authors: authors, Reviews: reviews, Messages: msgs, Identities: blocks.Identities{
 		Buyers: accountsOf{callerBuyerID: 1, 6: 2},
 		Stores: storesOf{10: 1, 20: 2},
 	}}
@@ -124,7 +138,7 @@ func newBlockEnv(t *testing.T, cards ...seller.StoreCard) *blockEnv {
 	}
 	h := mustAppWith(t, m, images, Ports{Stores: fakeStores{cards: cards}}, src)
 	ctx := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 1})
-	return &blockEnv{h: h, m: m, authors: authors, reviews: reviews, ctx: ctx}
+	return &blockEnv{h: h, m: m, authors: authors, reviews: reviews, msgs: msgs, ctx: ctx}
 }
 
 func card(id int64, status seller.CardStatus) seller.StoreCard {
@@ -350,5 +364,62 @@ func TestBlockAuthorByAReviewRepliedByTheCallersOwnStoreIsRejected(t *testing.T)
 	_, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(reviewRef()))
 	if apperr.KindOf(err) != apperr.KindInvalidInput || len(e.m.blockedStores) != 0 {
 		t.Fatalf("從評價封鎖自己的店要 invalid_argument、不寫入：%v %+v", err, e.m.blockedStores)
+	}
+}
+
+func messageRef() *pb.BlockAuthorRequest {
+	return &pb.BlockAuthorRequest{Source: &pb.BlockAuthorRequest_MessageId{MessageId: uuid.UUID{9}.String()}}
+}
+
+func TestBlockAuthorByMessageBlocksTheConversationsStoreForTheBuyerSide(t *testing.T) {
+	e := newBlockEnv(t, card(20, seller.CardOpen))
+	e.m.changed = true
+	e.msgs.err = nil
+	e.msgs.parties = im.ConversationParties{BuyerID: callerBuyerID, StoreID: 20}
+	resp, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(messageRef()))
+	if err != nil || !resp.Msg.GetChanged() {
+		t.Fatalf("%v %v", resp, err)
+	}
+	if len(e.m.blockedStores) != 1 || e.m.blockedStores[0] != [2]int64{callerBuyerID, 20} || len(e.m.blockedBuyers) != 0 {
+		t.Fatalf("要以呼叫者的買家身分封鎖對話的店 20：%+v %+v", e.m.blockedBuyers, e.m.blockedStores)
+	}
+	if e.msgs.gotID != (uuid.UUID{9}) || e.authors.got != (social.Caller{}) || e.reviews.gotViewer != 0 {
+		t.Fatalf("訊息參照只問 im：%v social %+v", e.msgs.gotID, e.authors.got)
+	}
+}
+
+func TestBlockAuthorByMessageOfAConversationTheCallerIsNotInIsNotFoundLikeAMissingMessage(t *testing.T) {
+	e := newBlockEnv(t, card(20, seller.CardOpen))
+	e.msgs.err = nil
+	e.msgs.parties = im.ConversationParties{BuyerID: 6, StoreID: 20}
+	_, notParty := e.h.BlockAuthor(e.ctx, connect.NewRequest(messageRef()))
+	e.msgs.err = apperr.NotFound("no message")
+	_, missing := e.h.BlockAuthor(e.ctx, connect.NewRequest(messageRef()))
+	if apperr.KindOf(notParty) != apperr.KindNotFound || apperr.KindOf(missing) != apperr.KindNotFound {
+		t.Fatalf("非對話方 %v；不存在 %v", notParty, missing)
+	}
+	if notParty.Error() != missing.Error() {
+		t.Fatalf("兩種 not_found 的訊息不同會洩漏訊息存在：%q vs %q", notParty, missing)
+	}
+	if len(e.m.blockedBuyers)+len(e.m.blockedStores) != 0 {
+		t.Fatal("被拒絕的請求不能寫入")
+	}
+}
+
+func TestBlockAuthorByMessageRejectsTheCallersOwnStoreConversation(t *testing.T) {
+	e := newBlockEnv(t, card(10, seller.CardOpen))
+	e.msgs.err = nil
+	e.msgs.parties = im.ConversationParties{BuyerID: callerBuyerID, StoreID: 10}
+	_, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(messageRef()))
+	if apperr.KindOf(err) != apperr.KindInvalidInput || len(e.m.blockedStores) != 0 {
+		t.Fatalf("封鎖自己的店要 invalid_argument、不寫入：%v %+v", err, e.m.blockedStores)
+	}
+}
+
+func TestBlockAuthorByMessageRejectsAMalformedMessageID(t *testing.T) {
+	e := newBlockEnv(t)
+	_, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(&pb.BlockAuthorRequest{Source: &pb.BlockAuthorRequest_MessageId{MessageId: "x"}}))
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("message_id 格式錯誤：%v", err)
 	}
 }

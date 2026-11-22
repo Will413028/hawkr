@@ -91,8 +91,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
 
 	// ModerationAppService：檢舉是寫入（停權的帳號不能送出）；讀自己的檢舉停權的帳號也可以。
-	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":  EffectWrite,
-	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports": EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":       EffectWrite,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports":      EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyStoreReports": EffectRead,
 
 	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,

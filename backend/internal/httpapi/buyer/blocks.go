@@ -26,14 +26,14 @@ type blockModule interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]model.Display, error)
 }
 
-// BlockAuthor 封鎖一則內容的作者：參照由擁有它的模組（social 的留言與討論區留言、review 的評價）以呼叫者的觀看規則解析（讀不到是 not_found），作者是買家走買家封鎖，是店家走店家封鎖；
-// 評價的作者是它的回覆店家。
+// BlockAuthor 封鎖一則內容的作者：參照由擁有它的模組（social 的留言與討論區留言、review 的評價、im 的聊天訊息）以呼叫者的觀看規則解析（讀不到是 not_found），作者是買家走買家封鎖，是店家走店家封鎖；
+// 評價的作者是它的回覆店家；聊天訊息的對象是對話的店家。
 func (h *App) BlockAuthor(ctx context.Context, req *connect.Request[pb.BlockAuthorRequest]) (*connect.Response[pb.BlockAuthorResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId(), ReviewID: req.Msg.GetReviewId()}
+	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId(), ReviewID: req.Msg.GetReviewId(), MessageID: req.Msg.GetMessageId()}
 	author, err := h.blocking.ResolveAuthor(ctx, social.Caller{BuyerID: buyerID}, ref)
 	if err != nil {
 		return nil, err

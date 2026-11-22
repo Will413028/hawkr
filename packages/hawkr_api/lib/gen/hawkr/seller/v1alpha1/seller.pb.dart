@@ -8237,18 +8237,26 @@ class RecordProductViewResponse extends $pb.GeneratedMessage {
   static RecordProductViewResponse? _defaultInstance;
 }
 
-enum BlockBuyerRequest_Source { commentId, forumEntryId, reviewId, notSet }
+enum BlockBuyerRequest_Source {
+  commentId,
+  forumEntryId,
+  reviewId,
+  messageId,
+  notSet
+}
 
 class BlockBuyerRequest extends $pb.GeneratedMessage {
   factory BlockBuyerRequest({
     $core.String? commentId,
     $core.String? forumEntryId,
     $core.String? reviewId,
+    $core.String? messageId,
   }) {
     final result = BlockBuyerRequest._();
     if (commentId != null) result.commentId = commentId;
     if (forumEntryId != null) result.forumEntryId = forumEntryId;
     if (reviewId != null) result.reviewId = reviewId;
+    if (messageId != null) result.messageId = messageId;
     return result;
   }
 
@@ -8266,6 +8274,7 @@ class BlockBuyerRequest extends $pb.GeneratedMessage {
     1: BlockBuyerRequest_Source.commentId,
     2: BlockBuyerRequest_Source.forumEntryId,
     3: BlockBuyerRequest_Source.reviewId,
+    4: BlockBuyerRequest_Source.messageId,
     0: BlockBuyerRequest_Source.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -8273,10 +8282,11 @@ class BlockBuyerRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BlockBuyerRequest.$_createMessage)
-    ..oo(0, [1, 2, 3])
+    ..oo(0, [1, 2, 3, 4])
     ..aOS(1, _omitFieldNames ? '' : 'commentId')
     ..aOS(2, _omitFieldNames ? '' : 'forumEntryId')
     ..aOS(3, _omitFieldNames ? '' : 'reviewId')
+    ..aOS(4, _omitFieldNames ? '' : 'messageId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8304,11 +8314,13 @@ class BlockBuyerRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
   BlockBuyerRequest_Source whichSource() =>
       _BlockBuyerRequest_SourceByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
   void clearSource() => $_clearField($_whichOneof(0));
 
   /// 留言 ID。
@@ -8340,6 +8352,16 @@ class BlockBuyerRequest extends $pb.GeneratedMessage {
   $core.bool hasReviewId() => $_has(2);
   @$pb.TagNumber(3)
   void clearReviewId() => $_clearField(3);
+
+  /// 聊天訊息 ID：封鎖這則訊息所屬對話的買家（呼叫者此刻的店要是該對話的店家；不是回 not_found，與訊息不存在相同）。訊息已隱藏或抹除仍可當參照。
+  @$pb.TagNumber(4)
+  $core.String get messageId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set messageId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMessageId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMessageId() => $_clearField(4);
 }
 
 class BlockBuyerResponse extends $pb.GeneratedMessage {

@@ -1,6 +1,6 @@
 // Package blocks 是封鎖入口共用的 handler 規則（A7-2e，A7-D23 O4）：跨身分的「同一個人」規則、從內容參照解析被封鎖的作者，與名單的顯示資料。
 // buyer 與 seller 模組互不依賴，模組的 API 擋不了「買家封鎖自己的店」「店家封鎖店主本人的買家身分」，所以規則放在依賴兩邊的這一層。
-// 參照有兩個擁有者（social 的留言與討論區留言、review 的評價），所以這個套件是編排解析器：依參照種類問擁有模組取得作者，封鎖仍寫在發起者的模組（buyer、seller）。
+// 參照有三個擁有者（social 的留言與討論區留言、review 的評價、im 的聊天訊息），所以這個套件是編排解析器：依參照種類問擁有模組取得作者，封鎖仍寫在發起者的模組（buyer、seller）。
 package blocks
 
 import (
@@ -9,6 +9,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -59,30 +60,37 @@ type Reviews interface {
 	GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (review.Review, error)
 }
 
-// Sources 是封鎖入口的 handler 規則的來源（buyer 與 seller 的 App 各收一份）：依參照種類問擁有模組取得作者（social、review），
+// Messages 是從聊天訊息參照取得對話雙方的來源（*im.Module）：不套可見性，隱藏與抹除的訊息照樣回歸屬。
+type Messages interface {
+	MessageParties(ctx context.Context, messageID uuid.UUID) (im.ConversationParties, error)
+}
+
+// Sources 是封鎖入口的 handler 規則的來源（buyer 與 seller 的 App 各收一份）：依參照種類問擁有模組取得作者（social、review、im），
 // 與跨身分規則的身分來源。封鎖本身仍寫在發起者的模組，這裡只解析「封鎖誰」。
 type Sources struct {
 	Authors    Authors
 	Reviews    Reviews
+	Messages   Messages
 	Identities Identities
 }
 
-// Complete 回報所有來源都有：社群內容作者解析（Authors）、評價作者解析（Reviews）與跨身分規則的買家、店家身分來源（Identities.Buyers、Identities.Stores）
+// Complete 回報所有來源都有：社群內容作者解析（Authors）、評價作者解析（Reviews）、聊天訊息歸屬解析（Messages）與跨身分規則的買家、店家身分來源（Identities.Buyers、Identities.Stores）
 // （組裝點漏接時 NewApp 回錯誤，不讓請求才 nil panic）。
 func (s Sources) Complete() bool {
-	return s.Authors != nil && s.Reviews != nil && s.Identities.Buyers != nil && s.Identities.Stores != nil
+	return s.Authors != nil && s.Reviews != nil && s.Messages != nil && s.Identities.Buyers != nil && s.Identities.Stores != nil
 }
 
-// Ref 是請求裡的內容參照：留言、討論區留言或評價，恰好設一個。
+// Ref 是請求裡的內容參照：留言、討論區留言、評價或聊天訊息，恰好設一個。
 type Ref struct {
 	CommentID    string
 	ForumEntryID string
 	ReviewID     string
+	MessageID    string
 }
 
 func (r Ref) set() int {
 	n := 0
-	for _, v := range []string{r.CommentID, r.ForumEntryID, r.ReviewID} {
+	for _, v := range []string{r.CommentID, r.ForumEntryID, r.ReviewID, r.MessageID} {
 		if v != "" {
 			n++
 		}
@@ -105,16 +113,19 @@ func (r Ref) socialTarget() (social.Target, error) {
 func (s Sources) ResolveAuthor(ctx context.Context, c social.Caller, ref Ref) (social.ContentAuthor, error) {
 	switch ref.set() {
 	case 0:
-		return social.ContentAuthor{}, rpc.RequiredField("source", "必須設 comment_id、forum_entry_id 或 review_id")
+		return social.ContentAuthor{}, rpc.RequiredField("source", "必須設 comment_id、forum_entry_id、review_id 或 message_id")
 	case 1:
 	default:
-		return social.ContentAuthor{}, rpc.RequiredField("source", "comment_id、forum_entry_id 與 review_id 只能設一個")
+		return social.ContentAuthor{}, rpc.RequiredField("source", "comment_id、forum_entry_id、review_id 與 message_id 只能設一個")
 	}
 	var got social.ContentAuthor
 	var err error
-	if ref.ReviewID != "" {
+	switch {
+	case ref.ReviewID != "":
 		got, err = s.reviewAuthor(ctx, c, ref.ReviewID)
-	} else {
+	case ref.MessageID != "":
+		got, err = s.messageAuthor(ctx, c, ref.MessageID)
+	default:
 		var t social.Target
 		if t, err = ref.socialTarget(); err != nil {
 			return social.ContentAuthor{}, err
@@ -152,6 +163,32 @@ func (s Sources) reviewAuthor(ctx context.Context, c social.Caller, rawID string
 		return social.ContentAuthor{}, nil
 	}
 	return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorStore, ID: r.StoreID}, StoreID: r.StoreID}, nil
+}
+
+// messageAuthor 解析聊天訊息參照的對象：封鎖的是聊天的對方（買家封鎖店家、店家封鎖買家），與訊息是誰寄的無關，隱藏與抹除的訊息照樣可以當參照。
+// 呼叫者不是該對話的一方與訊息不存在是同一個 not_found，不洩漏訊息或對話存在。
+func (s Sources) messageAuthor(ctx context.Context, c social.Caller, rawID string) (social.ContentAuthor, error) {
+	id, err := rpc.ParseUUID("message_id", rawID)
+	if err != nil {
+		return social.ContentAuthor{}, err
+	}
+	parties, err := s.Messages.MessageParties(ctx, id)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return social.ContentAuthor{}, nil
+		}
+		return social.ContentAuthor{}, err
+	}
+	if c.Store != nil {
+		if parties.StoreID != c.Store.StoreID {
+			return social.ContentAuthor{}, nil
+		}
+		return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorBuyer, ID: parties.BuyerID}, StoreID: parties.StoreID}, nil
+	}
+	if parties.BuyerID != c.BuyerID {
+		return social.ContentAuthor{}, nil
+	}
+	return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorStore, ID: parties.StoreID}, StoreID: parties.StoreID}, nil
 }
 
 // BuyerView 是名單裡一位買家的顯示資料：Deleted 為真時沒有名稱與頭像。
