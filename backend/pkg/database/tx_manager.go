@@ -16,6 +16,7 @@ type TxManager interface {
 	// WithTx executes the given function within a transaction.
 	// If the function returns an error, the transaction is rolled back.
 	// If the function returns nil, the transaction is committed.
+	// If the function panics or calls runtime.Goexit, the transaction is rolled back and the panic propagates.
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 

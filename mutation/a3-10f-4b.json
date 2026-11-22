@@ -186,7 +186,7 @@
    "file": "backend/pkg/database/tx_manager.go",
    "old": "\t\tif !committed {\n\t\t\t_ = tx.Rollback(context.WithoutCancel(ctx))\n\t\t}",
    "new": "\t\t_ = committed",
-   "test": "database ^TestWithTx_Rolls",
+   "test": "database ^TestWithTx_RollsBackOn(PanicAndRepanics|Goexit)$",
    "why": "A panic or runtime.Goexit inside fn (t.Fatalf) leaves the transaction open and its pool connection held forever."
   }
  ]
