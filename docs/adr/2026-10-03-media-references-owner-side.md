@@ -74,3 +74,17 @@
 **脈絡**：8f 的後台 KYC 證件檢視採 just-in-time 存取：擁有者授權、綁定用途、限時、每次讀取都留紀錄（業界基準：CloudTrail S3 data events 逐物件記錄讀取、GCP Access Transparency、Azure PIM）。簽章網址在到期前可以重複取用，只留得下簽發紀錄，不是讀取紀錄；R2 上的機敏檔又是 media 自己加密的密文，簽章網址拿到的是密文。
 
 **決策**：機敏下載由擁有者的端點授權、先記存取紀錄再代理內容。擁有者呼叫 `media.Media.ReadSecure`；B1 只把這個 port 後面的 adapter 從 Java 的 `ServerReadSecureAsset` 換成單體內的 media，端點、授權與存取紀錄不變。端點的路徑與傳輸規則在〈API 設計規範（Connect）〉「檔案回應」。
+
+## 修訂：終點的確認、刪除與用途（2026-11-22，Will 2026-11-21 決定）
+
+本節修訂上方終點的三處，並撤銷過渡段；原決策段保留歷史。決定在計畫 `backend/docs/plans/2026-11-21-b1-media.md` 的 B1-D1、B1-D3、B1-D8、B1-D9。
+
+**脈絡**：B1 把 media 搬進單體後，media 與七個擁有者模組在同一個 Postgres、同一個 process。上方「外部呼叫不在 transaction 內」的繼承約束，理由是遠端 Java 會逾時、佔住連線池；對單體內的 media 呼叫不再成立（R2 呼叫仍在 transaction 外，由 media 自己的 job 做）。
+
+**決策**：
+
+- 確認（B1-D1）：擁有者在自己的 transaction 內呼叫 `Confirm`（transaction 由 ctx 帶入），業務列與確認同時成立或同時回滾，就是上方基準 1。另一個選項「transaction 外先確認、後寫業務列」被否決：確認了卻沒掛上的資產沒人回收，因為 GC 只刪未確認的暫存。
+- 刪除（B1-D9）：擁有者在 transaction 內呼叫 `MarkDeleted`，media 自己的 job 在 transaction 外刪 R2 物件。取代上方的「擁有者以 outbox 發出刪除指令」：同一個 Postgres 沒有指令遺失的窗口，media 不必認識事件；outbox 的好處（media 可以獨立部署）在單體內沒有對應的計畫。
+- 用途（B1-D3）：資產只有 `visibility`（public／secure），object key 不含用途。取代上方的「用途與可見性」：用途已經在擁有者的表裡；media 持有封閉的用途列舉會把業務清單放回 media，自由字串用途只服務 key 前綴與觀測，沒有程式依它決定行為（計畫附件 `spike.md` (b)(d)）。
+- 資產 ID 用 UUID v7（B1-D8），依 ADR `2026-09-25-row-identity-by-data-kind.md`；擁有者的 asset ID 欄位隨 B1-5 改型別。
+- 過渡段的機制（`media_ref_sync`、`retired_assets`、`media_sync`／`media_sweep` job、`internal/refsync`）在 B1-5 刪除；上傳通道與機敏檔格式見 ADR `2026-11-22-media-upload-channels.md`、`2026-11-22-media-secure-stream-aead.md`，Java 呼叫端的切換見 `2026-11-22-media-cutover-without-legacy-path.md`。
