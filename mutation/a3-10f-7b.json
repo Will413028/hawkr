@@ -185,7 +185,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/bizcalendar_events.go",
    "old": "\tevents.Subscribe(bus, bizcalendarrelay.OnCalendarImported(queue))\n",
-   "new": "\t_, _ = bus, queue\n",
+   "new": "\t_, _ = bus, bizcalendarrelay.OnCalendarImported(queue)\n",
    "test": "cmd/hawkr ^TestBizCalendarRelaySubscribesTheImportHandler$",
    "why": "subscribeBizCalendarRelay subscribes nothing."
   },
@@ -204,7 +204,7 @@
    "file": "backend/internal/platform/bizcalendar/parse.go",
    "old": "line, _ := r.FieldPos(0)\n\t\treturn nil, bad(line, \"表頭必須是 %s\", officeCalendarHeader)",
    "new": "return nil, bad(1, \"表頭必須是 %s\", officeCalendarHeader)",
-   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭前有空行$",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭不符且前有空行$",
    "why": "A header mismatch always reports line 1 even after blank lines."
   },
   {

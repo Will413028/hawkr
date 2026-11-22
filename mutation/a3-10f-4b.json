@@ -5,7 +5,7 @@
    "stack": "go",
    "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
    "old": "\tto = windowEnd\n\tif through.Before(to) {\n\t\tto = through\n\t}",
-   "new": "\tto = windowEnd",
+   "new": "\tto = windowEnd\n\t_ = through",
    "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
    "why": "The pushed coverage always runs to the window end instead of the intersection with the imported years, so a never-imported year is declared covered."
   },
