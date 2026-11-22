@@ -79,7 +79,7 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 }
 
 const getRunInput = `-- name: GetRunInput :one
-SELECT i.run_id, i.buyer_message, i.created_at FROM procurement.agent_run_inputs i
+SELECT i.run_id, i.buyer_message, i.locale, i.created_at FROM procurement.agent_run_inputs i
 JOIN procurement.agent_runs r ON r.id = i.run_id
 WHERE i.run_id = $1 AND r.buyer_id = $2
 `
@@ -92,7 +92,12 @@ type GetRunInputParams struct {
 func (q *Queries) GetRunInput(ctx context.Context, arg GetRunInputParams) (ProcurementAgentRunInput, error) {
 	row := q.db.QueryRow(ctx, getRunInput, arg.RunID, arg.BuyerID)
 	var i ProcurementAgentRunInput
-	err := row.Scan(&i.RunID, &i.BuyerMessage, &i.CreatedAt)
+	err := row.Scan(
+		&i.RunID,
+		&i.BuyerMessage,
+		&i.Locale,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -150,17 +155,23 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, er
 }
 
 const insertRunInput = `-- name: InsertRunInput :exec
-INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, created_at) VALUES ($1, $2, $3)
+INSERT INTO procurement.agent_run_inputs (run_id, buyer_message, locale, created_at) VALUES ($1, $2, $3, $4)
 `
 
 type InsertRunInputParams struct {
 	RunID        uuid.UUID
 	BuyerMessage string
+	Locale       string
 	Now          time.Time
 }
 
 func (q *Queries) InsertRunInput(ctx context.Context, arg InsertRunInputParams) error {
-	_, err := q.db.Exec(ctx, insertRunInput, arg.RunID, arg.BuyerMessage, arg.Now)
+	_, err := q.db.Exec(ctx, insertRunInput,
+		arg.RunID,
+		arg.BuyerMessage,
+		arg.Locale,
+		arg.Now,
+	)
 	return err
 }
 

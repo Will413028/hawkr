@@ -130,3 +130,15 @@ WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER';
 UPDATE procurement.buyer_quote_acceptances
 SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_failure_reason = @reason, updated_at = @now
 WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER';
+
+-- name: GetLatestPricePreviewForRevision :one
+-- 該版本最新、尚未過期的價格預覽；沒有回 ErrNoRows。
+SELECT * FROM procurement.price_previews
+WHERE request_id = @request_id AND request_revision_id = @request_revision_id AND buyer_id = @buyer_id AND expires_at > @now
+ORDER BY created_at DESC, id DESC LIMIT 1;
+
+-- name: GetLatestConfirmedSnapshotByRequest :one
+-- 需求最新的確認快照（不論對應哪一版）；沒有回 ErrNoRows。
+SELECT * FROM procurement.confirmed_rfq_snapshots
+WHERE request_id = @request_id AND buyer_id = @buyer_id
+ORDER BY created_at DESC, id DESC LIMIT 1;

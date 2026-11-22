@@ -666,7 +666,7 @@ func TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition(t *testing.T)
 			d := newDB(t)
 			req := seedRequest(ctx, t, d, 1)
 			id := seedRun(ctx, t, d, req, 1, run.StatusCancelRequested, nil)
-			_, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: id, Payload: []byte(`{}`), TurnResultEvent: event})
+			_, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: id, Payload: []byte(`{}`), TurnResultEvent: event})
 			var inv *run.InvalidTransitionError
 			if !errors.As(err, &inv) || inv.From != run.StatusCancelRequested || inv.To != run.StatusWaitingForInput {
 				t.Fatalf("err = %v，要 InvalidTransitionError", err)

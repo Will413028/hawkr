@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var allStatuses = []string{
@@ -259,18 +260,21 @@ func TestSettleOutcomeDistinguishesBuyerCancelShutdownAndPipelineFailure(t *test
 	lost := outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
 	cases := []struct {
 		name, status, runType string
-		ctxErr                error
+		ctxErr, execErr       error
 		want                  outcome
 	}{
-		{"買家取消", StatusCancelRequested, "TURN", context.Canceled, outcome{action: actionCancel}},
-		{"買家取消且 ctx 沒取消", StatusCancelRequested, "TURN", nil, outcome{action: actionCancel}},
-		{"關機", StatusRunning, "TURN", context.Canceled, lost},
-		{"逾時", StatusRunning, RunTypeCandidateSearch, context.DeadlineExceeded, lost},
-		{"一般失敗：搜尋", StatusRunning, RunTypeCandidateSearch, nil, outcome{action: actionFail, reason: FailureSearchFailed, refund: true}},
-		{"一般失敗：輪次", StatusRunning, "TURN", nil, outcome{action: actionFail, reason: FailureTurnPipelineErr, refund: true}},
+		{"買家取消", StatusCancelRequested, "TURN", context.Canceled, nil, outcome{action: actionCancel}},
+		{"買家取消且 ctx 沒取消", StatusCancelRequested, "TURN", nil, nil, outcome{action: actionCancel}},
+		{"關機", StatusRunning, "TURN", context.Canceled, nil, lost},
+		{"逾時", StatusRunning, RunTypeCandidateSearch, context.DeadlineExceeded, nil, lost},
+		{"一般失敗：搜尋", StatusRunning, RunTypeCandidateSearch, nil, nil, outcome{action: actionFail, reason: FailureSearchFailed, refund: true}},
+		{"一般失敗：輪次", StatusRunning, "TURN", nil, nil, outcome{action: actionFail, reason: FailureTurnPipelineErr, refund: true}},
+		{"模型不可用：輪次", StatusRunning, "TURN", nil, &FailureError{Reason: FailureModelUnavailable, Err: errors.New("x")}, outcome{action: actionFail, reason: FailureModelUnavailable, refund: true}},
+		{"未知原因退回 pipeline 失敗", StatusRunning, "TURN", nil, &FailureError{Reason: "NOPE", Err: errors.New("x")}, outcome{action: actionFail, reason: FailureTurnPipelineErr, refund: true}},
+		{"關機優先於分類", StatusRunning, "TURN", context.Canceled, &FailureError{Reason: FailureModelUnavailable, Err: errors.New("x")}, lost},
 	}
 	for _, c := range cases {
-		if got := settleOutcome(c.status, c.runType, c.ctxErr); got != c.want {
+		if got := settleOutcome(c.status, c.runType, c.ctxErr, c.execErr); got != c.want {
 			t.Errorf("%s：settleOutcome = %+v，要 %+v", c.name, got, c.want)
 		}
 	}
@@ -377,5 +381,23 @@ func TestPublicTransitionSourcesExcludeTheAnswerCommitEdge(t *testing.T) {
 	}
 	if from := publicFrom(StatusCancelled); !slices.Contains(from, StatusWaitingForInput) {
 		t.Fatalf("CANCELLED 的公開來源 = %v，要含 WAITING_FOR_INPUT", from)
+	}
+}
+
+func TestLocaleCodeRoundTripsAndRejectsUnsupportedLocales(t *testing.T) {
+	for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN} {
+		code, err := LocaleCode(l)
+		if err != nil {
+			t.Fatalf("LocaleCode(%q)：%v", l, err)
+		}
+		if got, err := LocaleOf(code); err != nil || got != l {
+			t.Errorf("LocaleOf(%q) = %q, %v，要 %q", code, got, err, l)
+		}
+	}
+	if _, err := LocaleCode(""); err == nil {
+		t.Error("空語系不得被接受")
+	}
+	if _, err := LocaleOf("zh-TW"); err == nil {
+		t.Error("未知代碼不得被接受")
 	}
 }

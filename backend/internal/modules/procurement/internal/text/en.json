@@ -108,12 +108,6 @@
     "reply.correction.updated": {
       "message": "Updated: {facts}"
     },
-    "reply.degraded.context": {
-      "message": "Your current request is kept. You can keep adding details or try again later."
-    },
-    "reply.degraded.warning": {
-      "message": "Understanding your request is temporarily unavailable."
-    },
     "reply.price_preview.context": {
       "message": "A market reference price is available."
     },

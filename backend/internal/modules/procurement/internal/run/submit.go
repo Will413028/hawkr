@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // RunArgs 是執行一個 run 的 job：每個 run 恰好一個 job，在建立 run 的同一個 transaction 排入，job id 存在 run 上。
@@ -72,9 +73,11 @@ type SubmitInput struct {
 	RunType         string
 	ClientRequestID uuid.UUID
 	Message         string
-	QuotaLimit      int32
-	PeriodStart     time.Time
-	PeriodEnd       time.Time
+	// Locale 是送出時的請求語系，存進 run 輸入，executor 用它渲染伺服器句子（背景 job 沒有請求 ctx）。
+	Locale      uitext.Locale
+	QuotaLimit  int32
+	PeriodStart time.Time
+	PeriodEnd   time.Time
 }
 
 // Submitter 是送出路徑：同一個 transaction 內冪等建 run、檢查買家上限、TURN 扣一次額度、寫輸入與第一個事件、排入 job 並記下 job id。
@@ -134,7 +137,7 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 				return err
 			}
 		}
-		return s.start(ctx, q, id, in.Message, in.ConversationID, now)
+		return s.start(ctx, q, id, in.Message, in.Locale, in.ConversationID, now)
 	})
 	if err != nil {
 		return uuid.UUID{}, err
@@ -184,9 +187,41 @@ func (s Submitter) checkLimits(ctx context.Context, q *store.Queries, buyerID in
 	return nil
 }
 
+// 語系在資料表裡存代碼（UPPER_SNAKE）：zh-TW 是 ZH_TW，en 是 EN。
+const (
+	localeCodeZhTW = "ZH_TW"
+	localeCodeEN   = "EN"
+)
+
+// LocaleCode 把語系轉成儲存的代碼；不支援的語系回錯誤，不往下傳空值。
+func LocaleCode(l uitext.Locale) (string, error) {
+	switch l {
+	case uitext.ZhTW:
+		return localeCodeZhTW, nil
+	case uitext.EN:
+		return localeCodeEN, nil
+	}
+	return "", fmt.Errorf("run：不支援的語系 %q", l)
+}
+
+// LocaleOf 把儲存的語系代碼轉回語系；未知代碼回錯誤。
+func LocaleOf(code string) (uitext.Locale, error) {
+	switch code {
+	case localeCodeZhTW:
+		return uitext.ZhTW, nil
+	case localeCodeEN:
+		return uitext.EN, nil
+	}
+	return "", fmt.Errorf("run：未知的語系代碼 %q", code)
+}
+
 // start 寫輸入與 run_accepted 事件、排入 job 並記下 job id。
-func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, message string, conversationID *uuid.UUID, now time.Time) error {
-	if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: message, Now: now}); err != nil {
+func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, message string, locale uitext.Locale, conversationID *uuid.UUID, now time.Time) error {
+	code, err := LocaleCode(locale)
+	if err != nil {
+		return err
+	}
+	if err := q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: id, BuyerMessage: message, Locale: code, Now: now}); err != nil {
 		return fmt.Errorf("run：寫入輸入：%w", err)
 	}
 	accepted, err := acceptedPayload(id, conversationID)

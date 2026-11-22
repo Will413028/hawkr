@@ -15,11 +15,11 @@ WHERE id = @id AND buyer_id = @buyer_id AND status = @from_status;
 -- 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
 INSERT INTO procurement.request_revisions (
     id, request_id, revision_no, parent_revision_id, status,
-    item, item_resolution_kind, item_resolution_label, quantity, unit, packaging,
+    item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging,
     budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at)
 SELECT
     @id, r.id, @revision_no, @parent_revision_id, 'ACTIVE',
-    @item, @item_resolution_kind, @item_resolution_label, @quantity, @unit, @packaging,
+    @item, @item_resolution_kind, @item_resolution_label, @item_resolution_category_id, @quantity, @unit, @packaging,
     @budget_per_unit, @delivery_city, @delivery_date, @exact_match_required, @now
 FROM procurement.requests r
 WHERE r.id = @request_id AND r.buyer_id = @buyer_id;
@@ -93,3 +93,12 @@ SELECT * FROM procurement.turns WHERE buyer_id = @buyer_id AND client_request_id
 
 -- name: ListTurnsByRequest :many
 SELECT * FROM procurement.turns WHERE request_id = @request_id AND buyer_id = @buyer_id ORDER BY created_at, id;
+
+-- name: GetLatestTurnByRequest :one
+-- 上一輪的選填進度（optional_streak、skipped_slots）從這裡讀；沒有輪次回 ErrNoRows（新需求）。
+SELECT * FROM procurement.turns WHERE request_id = @request_id AND buyer_id = @buyer_id ORDER BY created_at DESC, id DESC LIMIT 1;
+
+-- name: SetConversationAutoTitle :exec
+-- 自動標題只在買家沒改過標題（title_source = 'AUTO'）時更新；買家改名之後不覆寫。
+UPDATE procurement.conversations SET title = @title, updated_at = @now
+WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL AND title_source = 'AUTO';

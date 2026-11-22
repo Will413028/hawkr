@@ -219,6 +219,77 @@ func (q *Queries) GetConfirmedSnapshotByClientRequest(ctx context.Context, arg G
 	return i, err
 }
 
+const getLatestConfirmedSnapshotByRequest = `-- name: GetLatestConfirmedSnapshotByRequest :one
+SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots
+WHERE request_id = $1 AND buyer_id = $2
+ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type GetLatestConfirmedSnapshotByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+}
+
+// 需求最新的確認快照（不論對應哪一版）；沒有回 ErrNoRows。
+func (q *Queries) GetLatestConfirmedSnapshotByRequest(ctx context.Context, arg GetLatestConfirmedSnapshotByRequestParams) (ProcurementConfirmedRfqSnapshot, error) {
+	row := q.db.QueryRow(ctx, getLatestConfirmedSnapshotByRequest, arg.RequestID, arg.BuyerID)
+	var i ProcurementConfirmedRfqSnapshot
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.PricePreviewID,
+		&i.BuyerNote,
+		&i.ClientRequestID,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getLatestPricePreviewForRevision = `-- name: GetLatestPricePreviewForRevision :one
+SELECT id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit, total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at FROM procurement.price_previews
+WHERE request_id = $1 AND request_revision_id = $2 AND buyer_id = $3 AND expires_at > $4
+ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type GetLatestPricePreviewForRevisionParams struct {
+	RequestID         uuid.UUID
+	RequestRevisionID uuid.UUID
+	BuyerID           *int64
+	Now               time.Time
+}
+
+// 該版本最新、尚未過期的價格預覽；沒有回 ErrNoRows。
+func (q *Queries) GetLatestPricePreviewForRevision(ctx context.Context, arg GetLatestPricePreviewForRevisionParams) (ProcurementPricePreview, error) {
+	row := q.db.QueryRow(ctx, getLatestPricePreviewForRevision,
+		arg.RequestID,
+		arg.RequestRevisionID,
+		arg.BuyerID,
+		arg.Now,
+	)
+	var i ProcurementPricePreview
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BasisQuantity,
+		&i.BasisUnit,
+		&i.TotalLowerAmount,
+		&i.TotalUpperAmount,
+		&i.TotalQuantity,
+		&i.TotalUnit,
+		&i.ClientRequestID,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getLiveAcceptance = `-- name: GetLiveAcceptance :one
 SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
 `

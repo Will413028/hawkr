@@ -59,13 +59,13 @@ func (d Dispatcher) Run(ctx context.Context, args RunArgs) error {
 	executor, ok := d.Executors[run.RunType]
 	if !ok {
 		d.logger().ErrorContext(ctx, "procurement：這個 run 類型沒有登記執行者，標為失敗", "run_id", run.ID.String(), "run_type", run.RunType)
-		return d.settleFailure(context.WithoutCancel(ctx), run, nil)
+		return d.settleFailure(context.WithoutCancel(ctx), run, nil, nil)
 	}
 	execErr := executor.Execute(ctx, run)
 	if execErr == nil || errors.Is(execErr, ErrRunTerminal) {
 		return nil
 	}
-	return d.settleFailure(context.WithoutCancel(ctx), run, ctx.Err())
+	return d.settleFailure(context.WithoutCancel(ctx), run, ctx.Err(), execErr)
 }
 
 // claimResult 把領取（轉 RUNNING）的結果分類：領到了、不該執行（已被領走、已終結、已被刪除）或真正的錯誤。
@@ -83,19 +83,37 @@ func claimResult(err error) (claimed bool, ret error) {
 
 // settleOutcome 決定 executor 失敗後 run 怎麼收斂：已要求取消的收斂到 CANCELLED（不退額度）；
 // job 的 ctx 被關機或 Timeout 取消（不是買家取消）是 WORKER_LOST；其餘是該 run 類型的 pipeline 失敗。失敗都退額度。
-func settleOutcome(status, runType string, jobCtxErr error) outcome {
+func settleOutcome(status, runType string, jobCtxErr, execErr error) outcome {
 	switch {
 	case status == StatusCancelRequested:
 		return outcome{action: actionCancel}
 	case jobCtxErr != nil:
 		return outcome{action: actionFail, reason: FailureWorkerLost, refund: true}
 	default:
-		return outcome{action: actionFail, reason: failureFor(runType), refund: true}
+		return outcome{action: actionFail, reason: failureReasonOf(execErr, runType), refund: true}
 	}
 }
 
+// FailureError 是 executor 回傳的可分類失敗：Reason 是 run 的失敗原因（Failure* 常數），Dispatcher 依它收斂。
+// 沒有包成它的錯誤是該 run 類型的 pipeline 失敗。
+type FailureError struct {
+	Reason string
+	Err    error
+}
+
+func (e *FailureError) Error() string { return fmt.Sprintf("run：%s：%v", e.Reason, e.Err) }
+func (e *FailureError) Unwrap() error { return e.Err }
+
+func failureReasonOf(execErr error, runType string) string {
+	var f *FailureError
+	if errors.As(execErr, &f) && knownFailureReason(f.Reason) {
+		return f.Reason
+	}
+	return failureFor(runType)
+}
+
 // settleFailure 在 executor 失敗後收斂 run；已在終態或已被刪除什麼都不做。
-func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun, jobCtxErr error) error {
+func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun, jobCtxErr, execErr error) error {
 	return d.DB.InTx(ctx, func(ctx context.Context) error {
 		cur, err := d.Ledger.lockRun(ctx, run.ID)
 		if apperr.KindOf(err) == apperr.KindNotFound {
@@ -104,7 +122,7 @@ func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgen
 		if err != nil {
 			return err
 		}
-		err = d.Ledger.converge(ctx, run.ID, settleOutcome(cur.Status, run.RunType, jobCtxErr))
+		err = d.Ledger.converge(ctx, run.ID, settleOutcome(cur.Status, run.RunType, jobCtxErr, execErr))
 		if errors.Is(err, ErrRunTerminal) {
 			return nil
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 func wide() run.Limits { return run.Limits{MaxActiveRuns: 100, MaxSubmitsPerMinute: 100} }
@@ -240,7 +241,7 @@ func waitingParent(ctx context.Context, t *testing.T, d *db.DB, s run.Submitter,
 	if _, err := l.Transition(ctx, id, run.StatusRunning, ""); err != nil {
 		t.Fatal(err)
 	}
-	irq, err := l.Interrupt(ctx, run.InterruptInput{RunID: id, Payload: []byte(`{"question":"尺寸？"}`), TurnResultEvent: []byte(`{"turn_result":{}}`)})
+	irq, err := l.Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: id, Payload: []byte(`{"question":"尺寸？"}`), TurnResultEvent: []byte(`{"turn_result":{}}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +270,7 @@ func TestInterruptWritesEventInterruptAndWaitingStateTogether(t *testing.T) {
 	if _, ok, _ := l.OpenInterruptForRun(ctx, 2, id); ok {
 		t.Fatal("別的買家看不到")
 	}
-	if _, err := l.Interrupt(ctx, run.InterruptInput{RunID: id, Payload: []byte(`{}`)}); err == nil {
+	if _, err := l.Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: id, Payload: []byte(`{}`)}); err == nil {
 		t.Fatal("不在 RUNNING 的 run 不能再寫中斷")
 	}
 	if n := count(ctx, t, d, `SELECT count(*) FROM procurement.agent_run_interrupts WHERE run_id = $1`, id); n != 1 {
@@ -292,7 +293,7 @@ func pendingInterrupts(ctx context.Context, t *testing.T, d *db.DB, req uuid.UUI
 }
 
 func resumeInput(irq uuid.UUID, message string) run.ResumeInput {
-	return run.ResumeInput{BuyerID: 1, InterruptID: irq, ClientRequestID: uuid.NewV7(), Message: message}
+	return run.ResumeInput{BuyerID: 1, InterruptID: irq, ClientRequestID: uuid.NewV7(), Message: message, Locale: uitext.ZhTW}
 }
 
 func start(ctx context.Context, t *testing.T, d *db.DB, id uuid.UUID) {
@@ -328,7 +329,7 @@ func TestSupersededWaitingRunCancelsItsInterruptAndFreesThePendingSlot(t *testin
 		t.Fatalf("被取代的 run 的中斷要轉 CANCELLED 並放掉 PENDING 的名額：%s", st)
 	}
 	start(ctx, t, d, nextID)
-	newIrq, err := l.Interrupt(ctx, run.InterruptInput{RunID: nextID, Payload: []byte(`{"question":"顏色？"}`)})
+	newIrq, err := l.Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: nextID, Payload: []byte(`{"question":"顏色？"}`)})
 	if err != nil || pendingInterrupts(ctx, t, d, req) != 1 || interruptStatus(ctx, t, d, newIrq) != "PENDING" {
 		t.Fatalf("取代的那一輪可以提出新的問題：%v", err)
 	}
@@ -398,7 +399,7 @@ func TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse(t *testing.T) {
 	if _, kind := reasonOf(errOf(s.Resume(ctx, bad))); kind != apperr.KindInvalidInput {
 		t.Fatalf("同一個 client_request_id 內容不同要 INVALID_ARGUMENT：%v", kind)
 	}
-	if _, err := s.Resume(ctx, run.ResumeInput{BuyerID: 2, InterruptID: irq, ClientRequestID: uuid.NewV7(), Message: "x"}); apperr.KindOf(err) != apperr.KindNotFound {
+	if _, err := s.Resume(ctx, run.ResumeInput{BuyerID: 2, InterruptID: irq, ClientRequestID: uuid.NewV7(), Message: "x", Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別的買家的中斷要 NOT_FOUND：%v", err)
 	}
 }
@@ -520,7 +521,7 @@ func TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePend
 	}
 	start(ctx, t, d, answer)
 	l := ledger(d, now)
-	next, err := l.Interrupt(ctx, run.InterruptInput{RunID: answer, Payload: []byte(`{"question":"顏色？"}`), TurnResultEvent: []byte(`{"turn_result":{}}`)})
+	next, err := l.Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: answer, Payload: []byte(`{"question":"顏色？"}`), TurnResultEvent: []byte(`{"turn_result":{}}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +575,7 @@ func TestAtMostOnePendingInterruptPerRequest(t *testing.T) {
 	s := submitter(d, &recordingJobs{}, wide())
 	_, _, req := waitingParent(ctx, t, d, s, 1)
 	other := seedRun(ctx, t, d, req, 1, run.StatusRunning, nil)
-	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: other, Payload: []byte(`{}`)}); err == nil {
+	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: other, Payload: []byte(`{}`)}); err == nil {
 		t.Fatal("同一個需求已有 PENDING 中斷，第二筆要被唯一索引擋下")
 	}
 	if runOf(ctx, t, d, other).Status != run.StatusRunning || pendingInterrupts(ctx, t, d, req) != 1 {
@@ -622,7 +623,7 @@ func TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation(t
 		t.Fatal("同一個需求的新一輪要取代等待中的 run 並取消它的 PENDING 中斷，不論對話")
 	}
 	start(ctx, t, d, nextID)
-	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: nextID, Payload: []byte(`{}`)}); err != nil {
+	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{ID: uuid.NewV7(), RunID: nextID, Payload: []byte(`{}`)}); err != nil {
 		t.Fatalf("取代之後新的一輪可以提出新問題：%v", err)
 	}
 }

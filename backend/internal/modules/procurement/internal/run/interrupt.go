@@ -16,17 +16,22 @@ import (
 // InterruptInput 是 run 停下來等買家回答的寫入。Payload 是中斷內容（JSON 物件），也是接續的唯一狀態；
 // TurnResultEvent 非空時以 turn_result 事件寫進串流（與狀態轉換同 transaction，client 看得到等待就讀得到它）。
 type InterruptInput struct {
-	RunID           uuid.UUID
+	RunID uuid.UUID
+	// ID 是呼叫端預先產生的中斷 ID：turn_result 事件裡的 interrupt.interrupt_id 要等於它，所以事件在呼叫前就得知道它。
+	ID              uuid.UUID
 	Payload         []byte
 	FactsAsOf       *time.Time
 	TurnResultEvent []byte
 }
 
-// Interrupt 在同一個 transaction 內寫 turn_result 事件、把 run 轉 WAITING_FOR_INPUT 並新增 PENDING 的 CLARIFICATION 中斷，回傳中斷 ID。
+// Interrupt 在同一個 transaction 內寫 turn_result 事件、把 run 轉 WAITING_FOR_INPUT 並新增 PENDING 的 CLARIFICATION 中斷（ID 是 in.ID），回傳中斷 ID。
 // run 是回答別的中斷的 run 時，轉換同時是回答的提交點（被回答的中斷轉 RESOLVED、提問的 run 轉 SUCCEEDED），之後才寫新中斷，所以新中斷是該需求唯一的 PENDING。
 // run 不在 RUNNING 回 *InvalidTransitionError，終態回 ErrRunTerminal（executor 停止），被回答的中斷已不在等待回答回 ErrInterruptNotPending；同一個需求已有別的 PENDING 中斷由唯一索引擋下。
 func (l Ledger) Interrupt(ctx context.Context, in InterruptInput) (uuid.UUID, error) {
-	id := uuid.NewV7()
+	id := in.ID
+	if id == (uuid.UUID{}) {
+		return uuid.UUID{}, fmt.Errorf("run：中斷 ID 必填")
+	}
 	err := l.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := l.lockAskingOf(ctx, in.RunID); err != nil {
 			return err

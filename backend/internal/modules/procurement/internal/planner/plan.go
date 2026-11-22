@@ -14,7 +14,6 @@ const (
 	AckAndAskOptional           Act = "ACK_AND_ASK_OPTIONAL"
 	CorrectionApplied           Act = "CORRECTION_APPLIED"
 	InputRejected               Act = "INPUT_REJECTED"
-	ExtractionDegraded          Act = "EXTRACTION_DEGRADED"
 	RequestBasicsReady          Act = "REQUEST_BASICS_READY"
 	PricePreviewAvailable       Act = "PRICE_PREVIEW_AVAILABLE"
 	RfqReconfirmRequired        Act = "RFQ_RECONFIRM_REQUIRED"
@@ -24,7 +23,7 @@ const (
 
 // All 是所有 act，供測試窮舉。
 var All = []Act{
-	AckAndAskRequired, AckAndAskOptional, CorrectionApplied, InputRejected, ExtractionDegraded,
+	AckAndAskRequired, AckAndAskOptional, CorrectionApplied, InputRejected,
 	RequestBasicsReady, PricePreviewAvailable, RfqReconfirmRequired, PublicationApprovalRequired,
 	ItemNeedsDisambiguation,
 }
@@ -49,7 +48,6 @@ const MaxSalientFacts = 2
 type Input struct {
 	Current, Next slots.Set
 	Rejected      []slots.Rejection
-	Degraded      bool
 	Recorded      []slots.Recorded
 	// Question 是這一輪算出的下一題，沒有時 nil；品項消歧中時是 BuildItemDisambiguation 的結果。
 	Question              *Question
@@ -73,7 +71,7 @@ type Plan struct {
 	Skipped        []model.SlotKey
 }
 
-// Decide 選出這一輪的 act。優先序：降級、有欄位被拒、更正已有的欄位、品項消歧、必填未齊、詢價快照過期、快照已確認待核准、
+// Decide 選出這一輪的 act。優先序：有欄位被拒、更正已有的欄位、品項消歧、必填未齊、詢價快照過期、快照已確認待核准、
 // 還有選填問題、有價格參考、需求齊備。被截斷但值有保留的欄位只是調整提示，不算被拒。
 // 更正的欄位排在 Salient 最前面，而且一定全數帶入（其餘事實補到 MaxSalientFacts 為止），敘述才說得出改了什麼。
 func Decide(in Input) Plan {
@@ -97,8 +95,6 @@ func Decide(in Input) Plan {
 func selectAct(in Input, rejected, corrected bool) Act {
 	ready := len(in.Next.MissingRequired()) == 0
 	switch {
-	case in.Degraded:
-		return ExtractionDegraded
 	case rejected:
 		return InputRejected
 	case corrected:

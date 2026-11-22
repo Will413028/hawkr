@@ -57,8 +57,10 @@ const (
 
 // Resolution 是品項原話被判定成什麼。
 type Resolution struct {
-	Kind  ItemResolutionKind
-	Label string
+	Kind ItemResolutionKind
+	// CategoryID 是 CategoryConfirmed 的平台分類 ID；BuyerDescribed 沒有分類，必為 0（與 request_revisions 的 CHECK 一致）。
+	CategoryID int64
+	Label      string
 }
 
 // Set 是一個需求版本的內容；指標欄位 nil 表示買家還沒填；ExactMatchRequired 的 nil 是系統預設（見 ExactMatch）。DeliveryDate 是 UTC 午夜表示的日曆日。
@@ -227,7 +229,7 @@ func boundedText(raw string, reject func(model.SlotKey, Reason), key model.SlotK
 }
 
 func validResolution(r Resolution, reject func(model.SlotKey, Reason)) (Resolution, bool) {
-	if r.Kind != CategoryConfirmed && r.Kind != BuyerDescribed {
+	if r.Kind != CategoryConfirmed && r.Kind != BuyerDescribed || (r.Kind == CategoryConfirmed) != (r.CategoryID > 0) {
 		reject(ItemResolution, ReasonResolutionUnknownKind)
 		return Resolution{}, false
 	}
@@ -240,7 +242,7 @@ func validResolution(r Resolution, reject func(model.SlotKey, Reason)) (Resoluti
 	if !ok {
 		return Resolution{}, false
 	}
-	return Resolution{Kind: r.Kind, Label: label}, true
+	return Resolution{Kind: r.Kind, CategoryID: r.CategoryID, Label: label}, true
 }
 
 // ExactMatch 是生效的「只找完全相符」：買家沒設過（nil）時是系統預設 true；放寬必須是買家明確同意的動作。

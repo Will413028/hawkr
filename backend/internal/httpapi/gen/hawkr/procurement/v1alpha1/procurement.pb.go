@@ -406,6 +406,8 @@ const (
 	RunFailureReason_RUN_FAILURE_REASON_SEARCH_FAILED RunFailureReason = 2
 	// 一輪釐清的處理流程中途出錯。
 	RunFailureReason_RUN_FAILURE_REASON_TURN_PIPELINE_ERROR RunFailureReason = 3
+	// 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
+	RunFailureReason_RUN_FAILURE_REASON_MODEL_UNAVAILABLE RunFailureReason = 5
 )
 
 // Enum value maps for RunFailureReason.
@@ -415,12 +417,14 @@ var (
 		1: "RUN_FAILURE_REASON_WORKER_LOST",
 		2: "RUN_FAILURE_REASON_SEARCH_FAILED",
 		3: "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR",
+		5: "RUN_FAILURE_REASON_MODEL_UNAVAILABLE",
 	}
 	RunFailureReason_value = map[string]int32{
 		"RUN_FAILURE_REASON_UNSPECIFIED":         0,
 		"RUN_FAILURE_REASON_WORKER_LOST":         1,
 		"RUN_FAILURE_REASON_SEARCH_FAILED":       2,
 		"RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": 3,
+		"RUN_FAILURE_REASON_MODEL_UNAVAILABLE":   5,
 	}
 )
 
@@ -2060,11 +2064,8 @@ type TurnResult struct {
 	Rejected         []*RejectedField       `protobuf:"bytes,5,rep,name=rejected,proto3" json:"rejected,omitempty"`
 	MissingRequired  []SlotKey              `protobuf:"varint,6,rep,packed,name=missing_required,json=missingRequired,proto3,enum=hawkr.procurement.v1alpha1.SlotKey" json:"missing_required,omitempty"`
 	RecordedThisTurn []*RecordedField       `protobuf:"bytes,7,rep,name=recorded_this_turn,json=recordedThisTurn,proto3" json:"recorded_this_turn,omitempty"`
-	Degraded         bool                   `protobuf:"varint,8,opt,name=degraded,proto3" json:"degraded,omitempty"`
-	// 降級的原因，有界的代碼；degraded 為 false 時是空字串。
-	DegradedReason string  `protobuf:"bytes,9,opt,name=degraded_reason,json=degradedReason,proto3" json:"degraded_reason,omitempty"`
-	Reply          string  `protobuf:"bytes,10,opt,name=reply,proto3" json:"reply,omitempty"`
-	Steps          []*Step `protobuf:"bytes,11,rep,name=steps,proto3" json:"steps,omitempty"`
+	Reply            string                 `protobuf:"bytes,10,opt,name=reply,proto3" json:"reply,omitempty"`
+	Steps            []*Step                `protobuf:"bytes,11,rep,name=steps,proto3" json:"steps,omitempty"`
 	// 待買家回答的問題；沒有時不設。
 	Question     *ClarifyQuestion       `protobuf:"bytes,12,opt,name=question,proto3" json:"question,omitempty"`
 	Blocks       []*Block               `protobuf:"bytes,13,rep,name=blocks,proto3" json:"blocks,omitempty"`
@@ -2157,20 +2158,6 @@ func (x *TurnResult) GetRecordedThisTurn() []*RecordedField {
 		return x.RecordedThisTurn
 	}
 	return nil
-}
-
-func (x *TurnResult) GetDegraded() bool {
-	if x != nil {
-		return x.Degraded
-	}
-	return false
-}
-
-func (x *TurnResult) GetDegradedReason() string {
-	if x != nil {
-		return x.DegradedReason
-	}
-	return ""
 }
 
 func (x *TurnResult) GetReply() string {
@@ -8473,7 +8460,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\tremaining\x18\x02 \x01(\x05R\tremaining\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\x129\n" +
 	"\n" +
-	"reset_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tresetTime\"\xb9\b\n" +
+	"reset_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tresetTime\"\x9b\b\n" +
 	"\n" +
 	"TurnResult\x12\x1d\n" +
 	"\n" +
@@ -8484,9 +8471,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x05slots\x18\x04 \x01(\v2!.hawkr.procurement.v1alpha1.SlotsR\x05slots\x12E\n" +
 	"\brejected\x18\x05 \x03(\v2).hawkr.procurement.v1alpha1.RejectedFieldR\brejected\x12N\n" +
 	"\x10missing_required\x18\x06 \x03(\x0e2#.hawkr.procurement.v1alpha1.SlotKeyR\x0fmissingRequired\x12W\n" +
-	"\x12recorded_this_turn\x18\a \x03(\v2).hawkr.procurement.v1alpha1.RecordedFieldR\x10recordedThisTurn\x12\x1a\n" +
-	"\bdegraded\x18\b \x01(\bR\bdegraded\x12'\n" +
-	"\x0fdegraded_reason\x18\t \x01(\tR\x0edegradedReason\x12\x14\n" +
+	"\x12recorded_this_turn\x18\a \x03(\v2).hawkr.procurement.v1alpha1.RecordedFieldR\x10recordedThisTurn\x12\x14\n" +
 	"\x05reply\x18\n" +
 	" \x01(\tR\x05reply\x126\n" +
 	"\x05steps\x18\v \x03(\v2 .hawkr.procurement.v1alpha1.StepR\x05steps\x12G\n" +
@@ -8502,7 +8487,8 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\tinterrupt\x18\x13 \x01(\v2%.hawkr.procurement.v1alpha1.InterruptH\x00R\tinterrupt\x88\x01\x01\x12?\n" +
 	"\x05quota\x18\x14 \x01(\v2).hawkr.procurement.v1alpha1.QuotaSnapshotR\x05quotaB\f\n" +
 	"\n" +
-	"_interrupt\"\xdf\x01\n" +
+	"_interruptJ\x04\b\b\x10\tJ\x04\b\t\x10\n" +
+	"R\bdegradedR\x0fdegraded_reason\"\xdf\x01\n" +
 	"\n" +
 	"RunSummary\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12>\n" +
@@ -9080,12 +9066,13 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x1bRUN_STATUS_CANCEL_REQUESTED\x10\x04\x12\x18\n" +
 	"\x14RUN_STATUS_SUCCEEDED\x10\x05\x12\x15\n" +
 	"\x11RUN_STATUS_FAILED\x10\x06\x12\x18\n" +
-	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xce\x01\n" +
+	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xf8\x01\n" +
 	"\x10RunFailureReason\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_WORKER_LOST\x10\x01\x12$\n" +
 	" RUN_FAILURE_REASON_SEARCH_FAILED\x10\x02\x12*\n" +
-	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
+	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\x12(\n" +
+	"$RUN_FAILURE_REASON_MODEL_UNAVAILABLE\x10\x05\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
 	"\n" +
 	"StepStatus\x12\x1b\n" +
 	"\x17STEP_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +

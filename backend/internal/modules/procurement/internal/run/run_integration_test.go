@@ -24,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var pg *testdb.Server
@@ -88,7 +89,7 @@ func seedRequest(ctx context.Context, t *testing.T, d *db.DB, buyer int64) uuid.
 
 func input(buyer int64, request uuid.UUID, limit int32) run.SubmitInput {
 	return run.SubmitInput{
-		BuyerID: buyer, RequestID: request, RunType: "TURN", ClientRequestID: uuid.NewV7(), Message: "我要三件外套",
+		BuyerID: buyer, RequestID: request, RunType: "TURN", ClientRequestID: uuid.NewV7(), Message: "我要三件外套", Locale: uitext.ZhTW,
 		QuotaLimit: limit, PeriodStart: now, PeriodEnd: now.AddDate(0, 1, 0),
 	}
 }

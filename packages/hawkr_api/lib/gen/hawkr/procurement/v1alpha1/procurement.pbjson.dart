@@ -155,6 +155,7 @@ const RunFailureReason$json = {
     {'1': 'RUN_FAILURE_REASON_WORKER_LOST', '2': 1},
     {'1': 'RUN_FAILURE_REASON_SEARCH_FAILED', '2': 2},
     {'1': 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR', '2': 3},
+    {'1': 'RUN_FAILURE_REASON_MODEL_UNAVAILABLE', '2': 5},
   ],
   '4': [
     {'1': 4, '2': 4},
@@ -167,7 +168,8 @@ final $typed_data.Uint8List runFailureReasonDescriptor = $convert.base64Decode(
     'ChBSdW5GYWlsdXJlUmVhc29uEiIKHlJVTl9GQUlMVVJFX1JFQVNPTl9VTlNQRUNJRklFRBAAEi'
     'IKHlJVTl9GQUlMVVJFX1JFQVNPTl9XT1JLRVJfTE9TVBABEiQKIFJVTl9GQUlMVVJFX1JFQVNP'
     'Tl9TRUFSQ0hfRkFJTEVEEAISKgomUlVOX0ZBSUxVUkVfUkVBU09OX1RVUk5fUElQRUxJTkVfRV'
-    'JST1IQAyIECAQQBCoaUlVOX0ZBSUxVUkVfUkVBU09OX0VYUElSRUQ=');
+    'JST1IQAxIoCiRSVU5fRkFJTFVSRV9SRUFTT05fTU9ERUxfVU5BVkFJTEFCTEUQBSIECAQQBCoa'
+    'UlVOX0ZBSUxVUkVfUkVBU09OX0VYUElSRUQ=');
 
 @$core.Deprecated('Use stepStatusDescriptor instead')
 const StepStatus$json = {
@@ -843,8 +845,6 @@ const TurnResult$json = {
       '6': '.hawkr.procurement.v1alpha1.RecordedField',
       '10': 'recordedThisTurn'
     },
-    {'1': 'degraded', '3': 8, '4': 1, '5': 8, '10': 'degraded'},
-    {'1': 'degraded_reason', '3': 9, '4': 1, '5': 9, '10': 'degradedReason'},
     {'1': 'reply', '3': 10, '4': 1, '5': 9, '10': 'reply'},
     {
       '1': 'steps',
@@ -912,6 +912,11 @@ const TurnResult$json = {
   '8': [
     {'1': '_interrupt'},
   ],
+  '9': [
+    {'1': 8, '2': 9},
+    {'1': 9, '2': 10},
+  ],
+  '10': ['degraded', 'degraded_reason'],
 };
 
 /// Descriptor for `TurnResult`. Decode as a `google.protobuf.DescriptorProto`.
@@ -923,19 +928,18 @@ final $typed_data.Uint8List turnResultDescriptor = $convert.base64Decode(
     'UmVqZWN0ZWRGaWVsZFIIcmVqZWN0ZWQSTgoQbWlzc2luZ19yZXF1aXJlZBgGIAMoDjIjLmhhd2'
     'tyLnByb2N1cmVtZW50LnYxYWxwaGExLlNsb3RLZXlSD21pc3NpbmdSZXF1aXJlZBJXChJyZWNv'
     'cmRlZF90aGlzX3R1cm4YByADKAsyKS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SZWNvcm'
-    'RlZEZpZWxkUhByZWNvcmRlZFRoaXNUdXJuEhoKCGRlZ3JhZGVkGAggASgIUghkZWdyYWRlZBIn'
-    'Cg9kZWdyYWRlZF9yZWFzb24YCSABKAlSDmRlZ3JhZGVkUmVhc29uEhQKBXJlcGx5GAogASgJUg'
-    'VyZXBseRI2CgVzdGVwcxgLIAMoCzIgLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlN0ZXBS'
-    'BXN0ZXBzEkcKCHF1ZXN0aW9uGAwgASgLMisuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQ2'
-    'xhcmlmeVF1ZXN0aW9uUghxdWVzdGlvbhI5CgZibG9ja3MYDSADKAsyIS5oYXdrci5wcm9jdXJl'
-    'bWVudC52MWFscGhhMS5CbG9ja1IGYmxvY2tzEiMKDXRleHRfZmFsbGJhY2sYDiABKAlSDHRleH'
-    'RGYWxsYmFjaxJMCg1ldmlkZW5jZV9yZWZzGA8gAygLMicuaGF3a3IucHJvY3VyZW1lbnQudjFh'
-    'bHBoYTEuRXZpZGVuY2VSZWZSDGV2aWRlbmNlUmVmcxIdCgptZXNzYWdlX2lkGBAgASgJUgltZX'
-    'NzYWdlSWQSQAoLY3JlYXRlX3RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1w'
-    'QgPgQQNSCmNyZWF0ZVRpbWUSFQoGcnVuX2lkGBIgASgJUgVydW5JZBJICglpbnRlcnJ1cHQYEy'
-    'ABKAsyJS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5JbnRlcnJ1cHRIAFIJaW50ZXJydXB0'
-    'iAEBEj8KBXF1b3RhGBQgASgLMikuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUXVvdGFTbm'
-    'Fwc2hvdFIFcXVvdGFCDAoKX2ludGVycnVwdA==');
+    'RlZEZpZWxkUhByZWNvcmRlZFRoaXNUdXJuEhQKBXJlcGx5GAogASgJUgVyZXBseRI2CgVzdGVw'
+    'cxgLIAMoCzIgLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlN0ZXBSBXN0ZXBzEkcKCHF1ZX'
+    'N0aW9uGAwgASgLMisuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQ2xhcmlmeVF1ZXN0aW9u'
+    'UghxdWVzdGlvbhI5CgZibG9ja3MYDSADKAsyIS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS'
+    '5CbG9ja1IGYmxvY2tzEiMKDXRleHRfZmFsbGJhY2sYDiABKAlSDHRleHRGYWxsYmFjaxJMCg1l'
+    'dmlkZW5jZV9yZWZzGA8gAygLMicuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuRXZpZGVuY2'
+    'VSZWZSDGV2aWRlbmNlUmVmcxIdCgptZXNzYWdlX2lkGBAgASgJUgltZXNzYWdlSWQSQAoLY3Jl'
+    'YXRlX3RpbWUYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZWF0ZV'
+    'RpbWUSFQoGcnVuX2lkGBIgASgJUgVydW5JZBJICglpbnRlcnJ1cHQYEyABKAsyJS5oYXdrci5w'
+    'cm9jdXJlbWVudC52MWFscGhhMS5JbnRlcnJ1cHRIAFIJaW50ZXJydXB0iAEBEj8KBXF1b3RhGB'
+    'QgASgLMikuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUXVvdGFTbmFwc2hvdFIFcXVvdGFC'
+    'DAoKX2ludGVycnVwdEoECAgQCUoECAkQClIIZGVncmFkZWRSD2RlZ3JhZGVkX3JlYXNvbg==');
 
 @$core.Deprecated('Use runSummaryDescriptor instead')
 const RunSummary$json = {

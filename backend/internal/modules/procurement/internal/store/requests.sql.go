@@ -13,7 +13,7 @@ import (
 )
 
 const getActiveRevision = `-- name: GetActiveRevision :one
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1 AND v.status = 'ACTIVE'
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1 AND v.status = 'ACTIVE'
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
 `
 
@@ -34,6 +34,7 @@ func (q *Queries) GetActiveRevision(ctx context.Context, arg GetActiveRevisionPa
 		&i.Item,
 		&i.ItemResolutionKind,
 		&i.ItemResolutionLabel,
+		&i.ItemResolutionCategoryID,
 		&i.Quantity,
 		&i.Unit,
 		&i.Packaging,
@@ -72,6 +73,38 @@ func (q *Queries) GetConversationForBuyer(ctx context.Context, arg GetConversati
 	return i, err
 }
 
+const getLatestTurnByRequest = `-- name: GetLatestTurnByRequest :one
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type GetLatestTurnByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 上一輪的選填進度（optional_streak、skipped_slots）從這裡讀；沒有輪次回 ErrNoRows（新需求）。
+func (q *Queries) GetLatestTurnByRequest(ctx context.Context, arg GetLatestTurnByRequestParams) (ProcurementTurn, error) {
+	row := q.db.QueryRow(ctx, getLatestTurnByRequest, arg.RequestID, arg.BuyerID)
+	var i ProcurementTurn
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.ConversationID,
+		&i.BuyerID,
+		&i.ResultRevisionID,
+		&i.Source,
+		&i.BuyerMessage,
+		&i.AssistantReply,
+		&i.Steps,
+		&i.RecordedThisTurn,
+		&i.OptionalStreak,
+		&i.SkippedSlots,
+		&i.ClientRequestID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getRequestForBuyer = `-- name: GetRequestForBuyer :one
 SELECT id, buyer_id, status, created_at, updated_at FROM procurement.requests WHERE id = $1 AND buyer_id = $2
 `
@@ -96,7 +129,7 @@ func (q *Queries) GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyer
 }
 
 const getRevision = `-- name: GetRevision :one
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.id = $1 AND v.request_id = $2
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.id = $1 AND v.request_id = $2
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $3)
 `
 
@@ -118,6 +151,7 @@ func (q *Queries) GetRevision(ctx context.Context, arg GetRevisionParams) (Procu
 		&i.Item,
 		&i.ItemResolutionKind,
 		&i.ItemResolutionLabel,
+		&i.ItemResolutionCategoryID,
 		&i.Quantity,
 		&i.Unit,
 		&i.Packaging,
@@ -202,33 +236,34 @@ func (q *Queries) InsertRequest(ctx context.Context, arg InsertRequestParams) er
 const insertRevision = `-- name: InsertRevision :execrows
 INSERT INTO procurement.request_revisions (
     id, request_id, revision_no, parent_revision_id, status,
-    item, item_resolution_kind, item_resolution_label, quantity, unit, packaging,
+    item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging,
     budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at)
 SELECT
     $1, r.id, $2, $3, 'ACTIVE',
-    $4, $5, $6, $7, $8, $9,
-    $10, $11, $12, $13, $14
+    $4, $5, $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15
 FROM procurement.requests r
-WHERE r.id = $15 AND r.buyer_id = $16
+WHERE r.id = $16 AND r.buyer_id = $17
 `
 
 type InsertRevisionParams struct {
-	ID                  uuid.UUID
-	RevisionNo          int32
-	ParentRevisionID    *uuid.UUID
-	Item                *string
-	ItemResolutionKind  *string
-	ItemResolutionLabel *string
-	Quantity            *int32
-	Unit                *string
-	Packaging           *string
-	BudgetPerUnit       *int64
-	DeliveryCity        *string
-	DeliveryDate        *time.Time
-	ExactMatchRequired  *bool
-	Now                 time.Time
-	RequestID           uuid.UUID
-	BuyerID             *int64
+	ID                       uuid.UUID
+	RevisionNo               int32
+	ParentRevisionID         *uuid.UUID
+	Item                     *string
+	ItemResolutionKind       *string
+	ItemResolutionLabel      *string
+	ItemResolutionCategoryID *int64
+	Quantity                 *int32
+	Unit                     *string
+	Packaging                *string
+	BudgetPerUnit            *int64
+	DeliveryCity             *string
+	DeliveryDate             *time.Time
+	ExactMatchRequired       *bool
+	Now                      time.Time
+	RequestID                uuid.UUID
+	BuyerID                  *int64
 }
 
 // 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
@@ -240,6 +275,7 @@ func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) 
 		arg.Item,
 		arg.ItemResolutionKind,
 		arg.ItemResolutionLabel,
+		arg.ItemResolutionCategoryID,
 		arg.Quantity,
 		arg.Unit,
 		arg.Packaging,
@@ -351,7 +387,7 @@ func (q *Queries) ListConversations(ctx context.Context, arg ListConversationsPa
 }
 
 const listRevisions = `-- name: ListRevisions :many
-SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1
+SELECT id, request_id, revision_no, parent_revision_id, status, item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging, budget_per_unit, delivery_city, delivery_date, exact_match_required, created_at FROM procurement.request_revisions v WHERE v.request_id = $1
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = $2)
 ORDER BY revision_no
 `
@@ -379,6 +415,7 @@ func (q *Queries) ListRevisions(ctx context.Context, arg ListRevisionsParams) ([
 			&i.Item,
 			&i.ItemResolutionKind,
 			&i.ItemResolutionLabel,
+			&i.ItemResolutionCategoryID,
 			&i.Quantity,
 			&i.Unit,
 			&i.Packaging,
@@ -487,6 +524,29 @@ func (q *Queries) RenameConversation(ctx context.Context, arg RenameConversation
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setConversationAutoTitle = `-- name: SetConversationAutoTitle :exec
+UPDATE procurement.conversations SET title = $1, updated_at = $2
+WHERE id = $3 AND buyer_id = $4 AND deleted_at IS NULL AND title_source = 'AUTO'
+`
+
+type SetConversationAutoTitleParams struct {
+	Title   string
+	Now     time.Time
+	ID      uuid.UUID
+	BuyerID int64
+}
+
+// 自動標題只在買家沒改過標題（title_source = 'AUTO'）時更新；買家改名之後不覆寫。
+func (q *Queries) SetConversationAutoTitle(ctx context.Context, arg SetConversationAutoTitleParams) error {
+	_, err := q.db.Exec(ctx, setConversationAutoTitle,
+		arg.Title,
+		arg.Now,
+		arg.ID,
+		arg.BuyerID,
+	)
+	return err
 }
 
 const setConversationPreview = `-- name: SetConversationPreview :exec

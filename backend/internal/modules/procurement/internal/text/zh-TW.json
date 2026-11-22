@@ -197,14 +197,6 @@
       },
       "description": "買家更正已有欄位時的確認句，facts 以分隔詞連接。"
     },
-    "reply.degraded.context": {
-      "message": "已保留你目前的需求內容，可以繼續補充或稍後再試。",
-      "description": "需求解析降級時的補充說明。"
-    },
-    "reply.degraded.warning": {
-      "message": "需求解析暫時無法使用。",
-      "description": "需求解析降級時的警示句。"
-    },
     "reply.price_preview.context": {
       "message": "已經有市場參考價可以看了。",
       "description": "已有價格參考時的說明。"

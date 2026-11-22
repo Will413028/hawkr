@@ -37,6 +37,7 @@ CREATE TABLE procurement.request_revisions (
     item TEXT,
     item_resolution_kind TEXT,
     item_resolution_label TEXT,
+    item_resolution_category_id BIGINT,
     quantity INT,
     unit TEXT,
     packaging TEXT,
@@ -50,6 +51,10 @@ CREATE TABLE procurement.request_revisions (
     CONSTRAINT request_revisions_resolution_check CHECK (
         (item_resolution_kind IS NULL) = (item_resolution_label IS NULL)
         AND (item_resolution_kind IS NULL OR item_resolution_kind IN ('CATEGORY_CONFIRMED', 'BUYER_DESCRIBED'))
+    ),
+    CONSTRAINT request_revisions_resolution_category_check CHECK (
+        (item_resolution_category_id IS NOT NULL) = (item_resolution_kind IS NOT DISTINCT FROM 'CATEGORY_CONFIRMED')
+        AND (item_resolution_category_id IS NULL OR item_resolution_category_id > 0)
     ),
     CONSTRAINT request_revisions_item_check CHECK (char_length(item) >= 1 AND char_length(item) <= 200 AND item !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT request_revisions_resolution_label_check CHECK (char_length(item_resolution_label) >= 1 AND char_length(item_resolution_label) <= 200 AND item_resolution_label !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
@@ -438,7 +443,7 @@ CREATE TABLE procurement.agent_runs (
     CONSTRAINT agent_runs_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT agent_runs_type_check CHECK (run_type IN ('TURN', 'CANDIDATE_SEARCH', 'CLARIFICATION_RESUME', 'PUBLICATION')),
     CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
-    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR')),
+    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'MODEL_UNAVAILABLE')),
     CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1),
     CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL)),
     CONSTRAINT agent_runs_quota_check CHECK ((run_type = 'TURN') = (quota_period_start IS NOT NULL))
@@ -455,7 +460,9 @@ CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WH
 CREATE TABLE procurement.agent_run_inputs (
     run_id UUID PRIMARY KEY REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     buyer_message TEXT NOT NULL,
+    locale TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT agent_run_inputs_locale_check CHECK (locale IN ('ZH_TW', 'EN')),
     CONSTRAINT agent_run_inputs_message_check CHECK (char_length(buyer_message) >= 1 AND char_length(buyer_message) <= 2000 AND buyer_message !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 

@@ -278,15 +278,21 @@ class RunFailureReason extends $pb.ProtobufEnum {
       RunFailureReason._(
           3, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR');
 
+  /// 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
+  static const RunFailureReason RUN_FAILURE_REASON_MODEL_UNAVAILABLE =
+      RunFailureReason._(
+          5, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_MODEL_UNAVAILABLE');
+
   static const $core.List<RunFailureReason> values = <RunFailureReason>[
     RUN_FAILURE_REASON_UNSPECIFIED,
     RUN_FAILURE_REASON_WORKER_LOST,
     RUN_FAILURE_REASON_SEARCH_FAILED,
     RUN_FAILURE_REASON_TURN_PIPELINE_ERROR,
+    RUN_FAILURE_REASON_MODEL_UNAVAILABLE,
   ];
 
   static final $core.List<RunFailureReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static RunFailureReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

@@ -246,6 +246,8 @@ enum RunFailureReason {
   RUN_FAILURE_REASON_SEARCH_FAILED = 2;
   // 一輪釐清的處理流程中途出錯。
   RUN_FAILURE_REASON_TURN_PIPELINE_ERROR = 3;
+  // 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
+  RUN_FAILURE_REASON_MODEL_UNAVAILABLE = 5;
   reserved 4;
   reserved "RUN_FAILURE_REASON_EXPIRED";
 }
@@ -497,9 +499,8 @@ message TurnResult {
   repeated RejectedField rejected = 5;
   repeated SlotKey missing_required = 6;
   repeated RecordedField recorded_this_turn = 7;
-  bool degraded = 8;
-  // 降級的原因，有界的代碼；degraded 為 false 時是空字串。
-  string degraded_reason = 9;
+  reserved 8, 9;
+  reserved "degraded", "degraded_reason";
   string reply = 10;
   repeated Step steps = 11;
   // 待買家回答的問題；沒有時不設。

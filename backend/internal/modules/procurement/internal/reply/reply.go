@@ -39,7 +39,7 @@ type Args struct {
 // Render 依 act 選模板組出段落。act 是封閉集合，沒有「找不到模板」的退路：每個 act 都有測試窮舉。
 func Render(l uitext.Locale, p planner.Plan, a Args) []Block {
 	blocks := render(l, p, a)
-	if len(p.Adjusted) > 0 && p.Act != planner.ExtractionDegraded {
+	if len(p.Adjusted) > 0 {
 		items := make([]string, 0, len(p.Adjusted))
 		for _, r := range p.Adjusted {
 			items = append(items, pair(l, SlotLabel(l, r.Key), RejectionReason(l, r)))
@@ -84,11 +84,6 @@ func render(l uitext.Locale, p planner.Plan, a Args) []Block {
 		return []Block{
 			{Warning, text.ReplyRejectedWarning(l, text.ReplyRejectedWarningArgs{Items: join(l, items)}).Text},
 			{NextStep, text.ReplyRejectedNext(l).Text},
-		}
-	case planner.ExtractionDegraded:
-		return []Block{
-			{Warning, text.ReplyDegradedWarning(l).Text},
-			{Context, text.ReplyDegradedContext(l).Text},
 		}
 	case planner.RequestBasicsReady:
 		return []Block{

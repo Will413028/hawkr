@@ -94,7 +94,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 		}
 		return err
 	}())
-	must("InsertRunInput", q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: c.run, BuyerMessage: "我要三件外套", Now: epoch}))
+	must("InsertRunInput", q.InsertRunInput(ctx, store.InsertRunInputParams{RunID: c.run, BuyerMessage: "我要三件外套", Locale: "ZH_TW", Now: epoch}))
 	if _, err := q.ConsumeUsage(ctx, store.ConsumeUsageParams{BuyerID: buyerID, PeriodStart: epoch, Now: epoch, QuotaLimit: 5}); err != nil {
 		t.Fatalf("ConsumeUsage：%v", err)
 	}

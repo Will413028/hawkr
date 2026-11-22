@@ -29,6 +29,7 @@ const (
 	FailureWorkerLost       = "WORKER_LOST"
 	FailureSearchFailed     = "SEARCH_FAILED"
 	FailureTurnPipelineErr  = "TURN_PIPELINE_ERROR"
+	FailureModelUnavailable = "MODEL_UNAVAILABLE"
 	notifyChannel           = "procurement_run"
 	protoStatusPrefix       = "RUN_STATUS_"
 	protoFailureReasonPrefx = "RUN_FAILURE_REASON_"
@@ -284,7 +285,7 @@ func checkTarget(to, failureReason string) error {
 		return fmt.Errorf("run：%q 不是可轉入的狀態", to)
 	}
 	switch {
-	case to == StatusFailed && failureReason != FailureWorkerLost && failureReason != FailureSearchFailed && failureReason != FailureTurnPipelineErr:
+	case to == StatusFailed && !knownFailureReason(failureReason):
 		return fmt.Errorf("run：FAILED 需要失敗原因，收到 %q", failureReason)
 	case to != StatusFailed && failureReason != "":
 		return fmt.Errorf("run：%s 不帶失敗原因", to)
@@ -301,3 +302,11 @@ func finishedPayload(status, failureReason string) ([]byte, error) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func knownFailureReason(r string) bool {
+	switch r {
+	case FailureWorkerLost, FailureSearchFailed, FailureTurnPipelineErr, FailureModelUnavailable:
+		return true
+	}
+	return false
+}

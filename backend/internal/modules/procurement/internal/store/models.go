@@ -46,6 +46,7 @@ type ProcurementAgentRunEvent struct {
 type ProcurementAgentRunInput struct {
 	RunID        uuid.UUID
 	BuyerMessage string
+	Locale       string
 	CreatedAt    time.Time
 }
 
@@ -171,22 +172,23 @@ type ProcurementRequest struct {
 }
 
 type ProcurementRequestRevision struct {
-	ID                  uuid.UUID
-	RequestID           uuid.UUID
-	RevisionNo          int32
-	ParentRevisionID    *uuid.UUID
-	Status              string
-	Item                *string
-	ItemResolutionKind  *string
-	ItemResolutionLabel *string
-	Quantity            *int32
-	Unit                *string
-	Packaging           *string
-	BudgetPerUnit       *int64
-	DeliveryCity        *string
-	DeliveryDate        *time.Time
-	ExactMatchRequired  *bool
-	CreatedAt           time.Time
+	ID                       uuid.UUID
+	RequestID                uuid.UUID
+	RevisionNo               int32
+	ParentRevisionID         *uuid.UUID
+	Status                   string
+	Item                     *string
+	ItemResolutionKind       *string
+	ItemResolutionLabel      *string
+	ItemResolutionCategoryID *int64
+	Quantity                 *int32
+	Unit                     *string
+	Packaging                *string
+	BudgetPerUnit            *int64
+	DeliveryCity             *string
+	DeliveryDate             *time.Time
+	ExactMatchRequired       *bool
+	CreatedAt                time.Time
 }
 
 type ProcurementRfqPublication struct {

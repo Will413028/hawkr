@@ -10,6 +10,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // ResumeInput 是回答一個中斷的輸入。
@@ -18,6 +19,7 @@ type ResumeInput struct {
 	InterruptID     uuid.UUID
 	ClientRequestID uuid.UUID
 	Message         string
+	Locale          uitext.Locale
 }
 
 // Resume 回答買家自己的 PENDING 中斷，回傳回答 run 的 ID。同一個 transaction：鎖提問的 run、建回答 run（CLARIFICATION_RESUME，interrupt_id 指向被回答的中斷，不扣額度）、
@@ -72,7 +74,7 @@ func (s Submitter) Resume(ctx context.Context, in ResumeInput) (uuid.UUID, error
 		}); err != nil {
 			return err
 		}
-		return s.start(ctx, q, answerID, in.Message, asking.ConversationID, now)
+		return s.start(ctx, q, answerID, in.Message, in.Locale, asking.ConversationID, now)
 	})
 	if err != nil {
 		return uuid.UUID{}, err

@@ -1160,8 +1160,6 @@ class TurnResult extends $pb.GeneratedMessage {
     $core.Iterable<RejectedField>? rejected,
     $core.Iterable<SlotKey>? missingRequired,
     $core.Iterable<RecordedField>? recordedThisTurn,
-    $core.bool? degraded,
-    $core.String? degradedReason,
     $core.String? reply,
     $core.Iterable<Step>? steps,
     ClarifyQuestion? question,
@@ -1183,8 +1181,6 @@ class TurnResult extends $pb.GeneratedMessage {
     if (missingRequired != null) result.missingRequired.addAll(missingRequired);
     if (recordedThisTurn != null)
       result.recordedThisTurn.addAll(recordedThisTurn);
-    if (degraded != null) result.degraded = degraded;
-    if (degradedReason != null) result.degradedReason = degradedReason;
     if (reply != null) result.reply = reply;
     if (steps != null) result.steps.addAll(steps);
     if (question != null) result.question = question;
@@ -1227,8 +1223,6 @@ class TurnResult extends $pb.GeneratedMessage {
         defaultEnumValue: SlotKey.SLOT_KEY_UNSPECIFIED)
     ..pPM<RecordedField>(7, _omitFieldNames ? '' : 'recordedThisTurn',
         subBuilder: RecordedField.$_createMessage)
-    ..aOB(8, _omitFieldNames ? '' : 'degraded')
-    ..aOS(9, _omitFieldNames ? '' : 'degradedReason')
     ..aOS(10, _omitFieldNames ? '' : 'reply')
     ..pPM<Step>(11, _omitFieldNames ? '' : 'steps',
         subBuilder: Step.$_createMessage)
@@ -1316,115 +1310,96 @@ class TurnResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   $pb.PbList<RecordedField> get recordedThisTurn => $_getList(6);
 
-  @$pb.TagNumber(8)
-  $core.bool get degraded => $_getBF(7);
-  @$pb.TagNumber(8)
-  set degraded($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasDegraded() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearDegraded() => $_clearField(8);
-
-  /// 降級的原因，有界的代碼；degraded 為 false 時是空字串。
-  @$pb.TagNumber(9)
-  $core.String get degradedReason => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set degradedReason($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasDegradedReason() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearDegradedReason() => $_clearField(9);
-
   @$pb.TagNumber(10)
-  $core.String get reply => $_getSZ(9);
+  $core.String get reply => $_getSZ(7);
   @$pb.TagNumber(10)
-  set reply($core.String value) => $_setString(9, value);
+  set reply($core.String value) => $_setString(7, value);
   @$pb.TagNumber(10)
-  $core.bool hasReply() => $_has(9);
+  $core.bool hasReply() => $_has(7);
   @$pb.TagNumber(10)
   void clearReply() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $pb.PbList<Step> get steps => $_getList(10);
+  $pb.PbList<Step> get steps => $_getList(8);
 
   /// 待買家回答的問題；沒有時不設。
   @$pb.TagNumber(12)
-  ClarifyQuestion get question => $_getN(11);
+  ClarifyQuestion get question => $_getN(9);
   @$pb.TagNumber(12)
   set question(ClarifyQuestion value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasQuestion() => $_has(11);
+  $core.bool hasQuestion() => $_has(9);
   @$pb.TagNumber(12)
   void clearQuestion() => $_clearField(12);
   @$pb.TagNumber(12)
-  ClarifyQuestion ensureQuestion() => $_ensure(11);
+  ClarifyQuestion ensureQuestion() => $_ensure(9);
 
   @$pb.TagNumber(13)
-  $pb.PbList<Block> get blocks => $_getList(12);
+  $pb.PbList<Block> get blocks => $_getList(10);
 
   @$pb.TagNumber(14)
-  $core.String get textFallback => $_getSZ(13);
+  $core.String get textFallback => $_getSZ(11);
   @$pb.TagNumber(14)
-  set textFallback($core.String value) => $_setString(13, value);
+  set textFallback($core.String value) => $_setString(11, value);
   @$pb.TagNumber(14)
-  $core.bool hasTextFallback() => $_has(13);
+  $core.bool hasTextFallback() => $_has(11);
   @$pb.TagNumber(14)
   void clearTextFallback() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $pb.PbList<EvidenceRef> get evidenceRefs => $_getList(14);
+  $pb.PbList<EvidenceRef> get evidenceRefs => $_getList(12);
 
   @$pb.TagNumber(16)
-  $core.String get messageId => $_getSZ(15);
+  $core.String get messageId => $_getSZ(13);
   @$pb.TagNumber(16)
-  set messageId($core.String value) => $_setString(15, value);
+  set messageId($core.String value) => $_setString(13, value);
   @$pb.TagNumber(16)
-  $core.bool hasMessageId() => $_has(15);
+  $core.bool hasMessageId() => $_has(13);
   @$pb.TagNumber(16)
   void clearMessageId() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $1.Timestamp get createTime => $_getN(16);
+  $1.Timestamp get createTime => $_getN(14);
   @$pb.TagNumber(17)
   set createTime($1.Timestamp value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasCreateTime() => $_has(16);
+  $core.bool hasCreateTime() => $_has(14);
   @$pb.TagNumber(17)
   void clearCreateTime() => $_clearField(17);
   @$pb.TagNumber(17)
-  $1.Timestamp ensureCreateTime() => $_ensure(16);
+  $1.Timestamp ensureCreateTime() => $_ensure(14);
 
   @$pb.TagNumber(18)
-  $core.String get runId => $_getSZ(17);
+  $core.String get runId => $_getSZ(15);
   @$pb.TagNumber(18)
-  set runId($core.String value) => $_setString(17, value);
+  set runId($core.String value) => $_setString(15, value);
   @$pb.TagNumber(18)
-  $core.bool hasRunId() => $_has(17);
+  $core.bool hasRunId() => $_has(15);
   @$pb.TagNumber(18)
   void clearRunId() => $_clearField(18);
 
   /// 這一輪停在等待輸入時設定；client 不把它當成串流中斷。
   @$pb.TagNumber(19)
-  Interrupt get interrupt => $_getN(18);
+  Interrupt get interrupt => $_getN(16);
   @$pb.TagNumber(19)
   set interrupt(Interrupt value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasInterrupt() => $_has(18);
+  $core.bool hasInterrupt() => $_has(16);
   @$pb.TagNumber(19)
   void clearInterrupt() => $_clearField(19);
   @$pb.TagNumber(19)
-  Interrupt ensureInterrupt() => $_ensure(18);
+  Interrupt ensureInterrupt() => $_ensure(16);
 
   @$pb.TagNumber(20)
-  QuotaSnapshot get quota => $_getN(19);
+  QuotaSnapshot get quota => $_getN(17);
   @$pb.TagNumber(20)
   set quota(QuotaSnapshot value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasQuota() => $_has(19);
+  $core.bool hasQuota() => $_has(17);
   @$pb.TagNumber(20)
   void clearQuota() => $_clearField(20);
   @$pb.TagNumber(20)
-  QuotaSnapshot ensureQuota() => $_ensure(19);
+  QuotaSnapshot ensureQuota() => $_ensure(17);
 }
 
 class RunSummary extends $pb.GeneratedMessage {

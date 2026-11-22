@@ -384,24 +384,6 @@ func ReplyCorrectionUpdated(l uitext.Locale, a ReplyCorrectionUpdatedArgs) uitex
 	return uitext.Message{Text: "已經幫你更新：" + a.Facts, Locale: uitext.ZhTW}
 }
 
-// ReplyDegradedContext 是模組句子 reply.degraded.context；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyDegradedContext(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Your current request is kept. You can keep adding details or try again later.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "已保留你目前的需求內容，可以繼續補充或稍後再試。", Locale: uitext.ZhTW}
-}
-
-// ReplyDegradedWarning 是模組句子 reply.degraded.warning；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyDegradedWarning(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Understanding your request is temporarily unavailable.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "需求解析暫時無法使用。", Locale: uitext.ZhTW}
-}
-
 // ReplyPricePreviewContext 是模組句子 reply.price_preview.context；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplyPricePreviewContext(l uitext.Locale) uitext.Message {
 	switch l {

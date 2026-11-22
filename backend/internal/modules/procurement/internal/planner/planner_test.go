@@ -195,7 +195,6 @@ func TestDecideParity(t *testing.T) {
 		want Act
 	}{
 		{"missing required", Input{Next: slots.Set{Item: &apple}}, AckAndAskRequired},
-		{"degraded beats everything", Input{Degraded: true, Rejected: []slots.Rejection{{Key: slots.Item}}}, ExtractionDegraded},
 		{"rejected beats correction", Input{
 			Rejected: []slots.Rejection{{Key: slots.Item}}, Current: slots.Set{Item: &apple}, Next: ready(), Recorded: rec(slots.Item, "蘋果")}, InputRejected},
 		{"correction of an existing field", Input{
