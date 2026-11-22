@@ -163,7 +163,7 @@ func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) 
 	return b, nil
 }
 
-// 中斷 payload 的階段。wave 1 只有一層（ITEM）；GROUP 與 DESCRIBE 留給 wave 2（A9-D28(1)）。
+// 中斷 payload 的階段。
 const (
 	StageItem = "ITEM"
 )

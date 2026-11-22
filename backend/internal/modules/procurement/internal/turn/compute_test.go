@@ -323,3 +323,20 @@ func TestClassifyExtractErr(t *testing.T) {
 		t.Errorf("ctx 已結束要原樣回 ctx 的錯誤：%v", err)
 	}
 }
+
+func TestRejectedSingleMatchResolutionFallsBackToTheDisambiguationCard(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(5, "", "水果 > 蘋果")}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
+	if d.interrupt == nil || d.next.Resolution != nil || d.patch.Resolution != nil {
+		t.Fatalf("interrupt = %+v, resolution = %+v, patch resolution = %+v，被拒的解析要退回消歧卡", d.interrupt, d.next.Resolution, d.patch.Resolution)
+	}
+	if d.plan.Act != planner.ItemNeedsDisambiguation || d.status != statusClarifying {
+		t.Errorf("act = %v, status = %q", d.plan.Act, d.status)
+	}
+}
+
+func TestNotReadyWhileTheItemHasNoResolution(t *testing.T) {
+	if got := nextStatus(statusClarifying, slots.Set{}, slots.Set{Item: sp("蘋果"), Unit: sp("KG"), DeliveryCity: sp("臺北市")}, false); got != statusClarifying {
+		t.Errorf("status = %q", got)
+	}
+}

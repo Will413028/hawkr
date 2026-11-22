@@ -111,7 +111,6 @@ func TestMalformedThenValidRetriesExactlyOnce(t *testing.T) {
 		"型別不合":          text(`{"quantity":"很多"}`),
 		"沒有文字":          {resp: &adkmodel.LLMResponse{Content: &genai.Content{}}},
 		"沒有 content":    {resp: &adkmodel.LLMResponse{}},
-		"回應帶 ErrorCode": {resp: &adkmodel.LLMResponse{ErrorCode: "X"}},
 	} {
 		f := &fakeLLM{steps: []step{bad, text(`{"item":"蘋果"}`)}}
 		p, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
@@ -230,5 +229,16 @@ func TestShapeFor(t *testing.T) {
 	}
 	if _, err := ShapeFor("other"); err == nil {
 		t.Error("不認得的 provider 要回錯誤")
+	}
+}
+
+func TestErrorCodeResponseIsNotRetriedAndNotUnavailable(t *testing.T) {
+	for _, code := range []string{"SAFETY", "PROHIBITED_CONTENT", "RECITATION", "MAX_TOKENS", "content_filter"} {
+		f := &fakeLLM{steps: []step{{resp: &adkmodel.LLMResponse{ErrorCode: code}}, text(`{"item":"蘋果"}`)}}
+		_, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
+		var ee *Error
+		if !errors.As(err, &ee) || ee.Unavailable || f.calls.Load() != 1 {
+			t.Errorf("%s：err = %v, calls = %d，要一次失敗、不重試、不算服務不可用", code, err, f.calls.Load())
+		}
 	}
 }

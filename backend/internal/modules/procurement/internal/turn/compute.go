@@ -28,7 +28,6 @@ const (
 )
 
 // searchAffectingFields 是改了就讓已有的候選搜尋結果失效的欄位（A9-D28(4)、ADR E9）。
-// 3b-2d 實作候選搜尋時依搜尋實際用到的輸入修正這個集合。
 var searchAffectingFields = []model.SlotKey{slots.ItemResolution, slots.Quantity, slots.Unit, slots.DeliveryCity, slots.DeliveryDate}
 
 // 自動標題與預覽的長度（以 rune 計，A9-D28(3)）。
@@ -80,8 +79,10 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 
 	var resolved *slots.Resolution
 	var pending *pendingCard
+	var res resolver.Resolution
 	if next.Item != nil && (!equalStr(prior.current.Item, next.Item) || next.Resolution == nil) {
-		res, err := rs.Resolve(ctx, *next.Item)
+		var err error
+		res, err = rs.Resolve(ctx, *next.Item)
 		if err != nil {
 			return decision{}, fmt.Errorf("turn：解析品項：%w", err)
 		}
@@ -96,7 +97,13 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 	}
 	if resolved != nil {
 		patch.Resolution = resolved
-		next, _ = next.Apply(slots.Patch{Resolution: resolved}, now)
+		applied, rej := next.Apply(slots.Patch{Resolution: resolved}, now)
+		if len(rej) > 0 || applied.Resolution == nil {
+			patch.Resolution = nil
+			pending = disambiguationPayload(res)
+		} else {
+			next = applied
+		}
 	}
 
 	missing := next.MissingRequired()
@@ -138,7 +145,7 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 		p.Question = *questionWire(d.question)
 		d.interrupt = &p
 	}
-	d.status = nextStatus(prior.requestOf, prior.current, next, len(missing) == 0 && pending == nil)
+	d.status = nextStatus(prior.requestOf, prior.current, next, len(missing) == 0 && pending == nil && (next.Item == nil || next.Resolution != nil))
 	return d, nil
 }
 

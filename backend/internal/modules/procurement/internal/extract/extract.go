@@ -152,7 +152,7 @@ func (e *Extractor) attempt(parent, budget context.Context, req *adkmodel.LLMReq
 		return slots.Patch{}, classify(parent, ctx, callErr)
 	}
 	if resp != nil && resp.ErrorCode != "" {
-		return slots.Patch{}, &attemptErr{err: fmt.Errorf("模型回應帶錯誤 %s：%s", resp.ErrorCode, resp.ErrorMessage), retryable: true, unavailable: true}
+		return slots.Patch{}, &attemptErr{err: fmt.Errorf("模型回應帶錯誤 %s：%s", resp.ErrorCode, resp.ErrorMessage)}
 	}
 	patch, err := e.parse(resp)
 	if err != nil {

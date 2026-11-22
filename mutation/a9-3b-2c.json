@@ -152,6 +152,33 @@
    "new": "cands = cands[:len(cands)]",
    "test": "internal/modules/procurement/internal/planner ^TestItemDisambiguationCapsAtFiveAndLabelsWithThePath$",
    "why": "消歧卡的上限 5 改成不限"
+  },
+  {
+   "id": "f1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "resp.ErrorMessage)}",
+   "new": "resp.ErrorMessage), retryable: true, unavailable: true}",
+   "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
+   "why": "帶 ErrorCode 的回應（安全過濾等）改成可重試且算服務不可用"
+  },
+  {
+   "id": "f2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "if len(rej) > 0 || applied.Resolution == nil {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/turn ^TestRejectedSingleMatchResolutionFallsBackToTheDisambiguationCard$",
+   "why": "單一命中的解析被 Apply 拒絕後照舊往下走：沒有消歧卡也沒有解析"
+  },
+  {
+   "id": "f3",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/planner/plan.go",
+   "old": "\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:",
+   "new": "\tcase rejected && false:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:",
+   "test": "internal/modules/procurement/internal/planner ^TestDecideParity$",
+   "why": "品項消歧不再排在被拒之前：執行器已中斷但文字不問問題"
   }
  ]
 }
