@@ -58,7 +58,7 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 	}
 	text := trimtext.Trim(a.FreeText)
 	switch {
-	case a.OptionID != "" && a.FreeText != "":
+	case a.OptionID != "" && text != "":
 		return invalid(InvalidNeedExactlyOne), nil
 	case a.OptionID == "" && a.FreeText == "":
 		return invalid(InvalidNeedExactlyOne), nil
@@ -81,11 +81,18 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 	if p.Stage == StageGroup {
 		return applyGroup(ctx, rs, l, now, p, c)
 	}
-	hits := usable(p.Query, []resolver.Match{{CategoryID: c.CategoryID, Name: c.Label, Path: c.Path}}, now)
-	if len(hits) == 0 {
-		return invalid(InvalidResolutionReject), nil
+	// 卡是當時算的：確認前以現在的分類樹再查一次，已消失的分類不確認，改用現在的命中重新出卡。
+	res, err := rs.Resolve(ctx, p.Query)
+	if err != nil {
+		return Outcome{}, fmt.Errorf("turn：解析品項：%w", err)
 	}
-	return resolvedOutcome(*hits[0].set.Resolution), nil
+	current := usable(p.Query, res.Matches, now)
+	for _, h := range current {
+		if h.match.CategoryID == c.CategoryID {
+			return resolvedOutcome(*h.set.Resolution), nil
+		}
+	}
+	return interrupt(l, buildCard(p.Query, matchesOf(current))), nil
 }
 
 // applyGroup：買家選了大類。只在該大類底下找與原詞相符的末層命中；沒有就列該大類的末層。不直接以大類當結果。
@@ -96,7 +103,7 @@ func applyGroup(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time
 	}
 	var inGroup []resolver.Match
 	for _, m := range res.Matches {
-		if m.RootID == group.CategoryID && m.Leaf {
+		if m.RootID == group.CategoryID && m.CategoryID != group.CategoryID && m.Leaf {
 			inGroup = append(inGroup, m)
 		}
 	}
@@ -146,7 +153,9 @@ func decideMatches(l uitext.Locale, query string, ms []confirmed) Outcome {
 
 func invalid(r InvalidReason) Outcome { return Outcome{Kind: OutcomeInvalid, Reason: r} }
 
-func resolvedOutcome(r slots.Resolution) Outcome { return Outcome{Kind: OutcomeResolved, Resolution: &r} }
+func resolvedOutcome(r slots.Resolution) Outcome {
+	return Outcome{Kind: OutcomeResolved, Resolution: &r}
+}
 
 // interrupt 把卡渲染成送出語系的文字並放進 payload。
 func interrupt(l uitext.Locale, c *pendingCard) Outcome {

@@ -138,10 +138,10 @@ func TestAmbiguousItemPausesWithAOneLevelCardCappedAtFive(t *testing.T) {
 
 func TestNoMatchPausesWithTheDescribeOnlyCard(t *testing.T) {
 	d := decideOK(t, &fakeResolver{}, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("神秘水果")})
-	if d.interrupt == nil || len(d.interrupt.Candidates) != 0 {
+	if d.interrupt == nil || len(d.interrupt.Candidates) != 0 || d.interrupt.Stage != StageDescribe {
 		t.Fatalf("interrupt = %+v", d.interrupt)
 	}
-	if q := d.interrupt.Question; len(q.Options) != 1 || q.Options[0].OptionID != planner.ItemOtherOptionID || !q.AllowFreeText {
+	if q := d.interrupt.Question; len(q.Options) != 0 || !q.AllowFreeText {
 		t.Errorf("question = %+v", q)
 	}
 }

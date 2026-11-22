@@ -296,6 +296,33 @@
    "new": "if false {",
    "test": "internal/modules/procurement/internal/turn ^TestApplyFreeText$",
    "why": "DESCRIBE 階段 0 命中改成再出 DESCRIBE 卡：不再以 BUYER_DESCRIBED 解析"
+  },
+  {
+   "id": "fix1-f1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "\tms = leavesOnly(ms)\n\tif len(ms) == 0 {\n\t\treturn describeCard(query)\n\t}\n",
+   "new": "\tms = leavesOnly(ms)\n",
+   "test": "internal/modules/procurement/internal/turn ^TestZeroMatchesAsksDescribeNotEmptyItemCard$",
+   "why": "零命中不再回 DESCRIBE 卡：出空的 ITEM 卡，ITEM 打字查無結果會再問一次相同的描述卡"
+  },
+  {
+   "id": "fix1-f2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "for _, m := range leavesOnly(ms) {",
+   "new": "for _, m := range ms {",
+   "test": "internal/modules/procurement/internal/turn ^TestNonLeafMatchesNeverConfirmOrCount$",
+   "why": "confirmable 不再排除非末層：大類或中間層節點可被確認為品項"
+  },
+  {
+   "id": "fix1-f3",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": " && m.CategoryID != group.CategoryID && m.Leaf {",
+   "test": "internal/modules/procurement/internal/turn ^TestChildlessRootGroupPickDoesNotConfirmTheGroup$",
+   "why": "無子節點的大類（RootID 等於自己、Leaf 為真）被選時可確認大類自己",
+   "new": " && m.Leaf {"
   }
  ]
 }

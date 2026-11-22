@@ -13,6 +13,10 @@ type pendingCard struct {
 // buildCard 是「依命中出卡」的唯一規則（A9-D28(1)）：命中多於 MaxItemOptions 個而且分散在兩個以上大類時先問大類（GROUP，依各大類的最佳命中排序）；
 // 其餘列末層品項（ITEM，照 resolver 的排序，最多 MaxItemOptions 個，同一大類超過也只取前幾個）。呼叫端給的命中已排除無效的。
 func buildCard(query string, ms []resolver.Match) *pendingCard {
+	ms = leavesOnly(ms)
+	if len(ms) == 0 {
+		return describeCard(query)
+	}
 	if len(ms) > planner.MaxItemOptions {
 		if groups := groupsOf(ms); len(groups) >= 2 {
 			return cardOf(StageGroup, query, groups, planner.BuildGroupDisambiguation(groups))
@@ -23,6 +27,17 @@ func buildCard(query string, ms []resolver.Match) *pendingCard {
 		cands = append(cands, planner.ItemCandidate{CategoryID: m.CategoryID, Label: m.Name, Path: m.Path})
 	}
 	return cardOf(StageItem, query, cands, planner.BuildItemDisambiguation(cands))
+}
+
+// leavesOnly 只留末層命中：大類與中間層節點不能被確認，也不計入出卡的門檻與分組。
+func leavesOnly(ms []resolver.Match) []resolver.Match {
+	var out []resolver.Match
+	for _, m := range ms {
+		if m.Leaf {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // describeCard 是自由描述卡：沒有選項。

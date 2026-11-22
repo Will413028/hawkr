@@ -151,7 +151,7 @@ type confirmed struct {
 // 無效的命中不會出現在消歧卡上，也不會讓解析在 Apply 裡被默默丟掉。被截斷但保留的標籤是調整，不是被拒。
 func confirmable(next slots.Set, ms []resolver.Match, now time.Time) []confirmed {
 	var out []confirmed
-	for _, m := range ms {
+	for _, m := range leavesOnly(ms) {
 		r := slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: m.CategoryID, Label: m.Name}
 		if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); applied.Resolution != nil {
 			out = append(out, confirmed{match: m, set: applied})

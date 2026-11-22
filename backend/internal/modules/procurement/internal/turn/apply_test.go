@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/reply"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -180,7 +181,8 @@ func itemPayload(t *testing.T) InterruptPayload {
 }
 
 func TestApplyItemChoice(t *testing.T) {
-	o := apply(t, &fakeResolver{}, itemPayload(t), Answer{OptionID: "category-2"})
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2"})
 	if o.Kind != OutcomeResolved || o.Resolution.Kind != slots.CategoryConfirmed || o.Resolution.CategoryID != 2 || o.Resolution.Label != "蘋果乾" {
 		t.Fatalf("%+v", o)
 	}
@@ -334,5 +336,74 @@ func TestNewCardsRenderInBothLocales(t *testing.T) {
 	e := buildPayload(buildCard("蘋果", spread(6, "水果", "加工品")), uitext.EN).Question.Prompt
 	if z == e {
 		t.Fatal("zh-TW 與 en 的大類問句要不同")
+	}
+}
+
+func TestZeroMatchesAsksDescribeNotEmptyItemCard(t *testing.T) {
+	for name, ms := range map[string][]resolver.Match{"none": nil, "only non-leaf": {nonLeaf(match(7, "水果", "水果"))}} {
+		p := cardFromMatches(ms)
+		if p.Stage != StageDescribe || len(p.Candidates) != 0 {
+			t.Fatalf("%s：要 DESCRIBE：%+v", name, p)
+		}
+	}
+	rs := &fakeResolver{}
+	o := apply(t, rs, itemPayload(t), Answer{FreeText: "查無此物"})
+	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageDescribe {
+		t.Fatalf("ITEM 打字查無結果進 DESCRIBE：%+v", o)
+	}
+}
+
+func nonLeaf(m resolver.Match) resolver.Match { m.Leaf = false; return m }
+
+func TestNonLeafMatchesNeverConfirmOrCount(t *testing.T) {
+	// 6 個命中裡 2 個是非末層：只剩 4 個末層，不到 GROUP 門檻。
+	ms := spread(4, "水果", "加工品")
+	ms = append(ms, nonLeaf(match(900, "x", "水果")), nonLeaf(match(901, "y", "加工品")))
+	if p := cardFromMatches(ms); p.Stage != StageItem || len(p.Candidates) != 4 {
+		t.Fatalf("非末層不計數：%+v", p)
+	}
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{nonLeaf(match(900, "x", "水果")), match(100, "品0", "水果 > 品0")}}}
+	o := apply(t, rs, *interrupt(uitext.ZhTW, describeCard("蘋果")).Next, Answer{FreeText: "蘋果"})
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 {
+		t.Fatalf("非末層不能確認：%+v", o)
+	}
+}
+
+func TestChildlessRootGroupPickDoesNotConfirmTheGroup(t *testing.T) {
+	root := match(5000, "孤兒", "孤兒")
+	root.RootID = 5000
+	leaf := match(100, "品0", "孤兒 > 品0")
+	leaf.RootID = 5000
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root, leaf}}, leaves: map[int64][]resolver.Match{5000: nil}}
+	p := InterruptPayload{Stage: StageGroup, Query: "蘋果", Candidates: []PayloadCandidate{{CategoryID: 5000, Label: "孤兒", Path: "孤兒"}}}
+	p.Question = *questionWire(reply.Question(uitext.ZhTW, planner.BuildGroupDisambiguation([]planner.ItemCandidate{{CategoryID: 5000, Label: "孤兒", Path: "孤兒"}})))
+	o := apply(t, rs, p, Answer{OptionID: "category-5000"})
+	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == 5000 {
+		t.Fatalf("不能確認大類自己：%+v", o)
+	}
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 {
+		t.Fatalf("要確認末層 100：%+v", o)
+	}
+}
+
+func TestItemPickRechecksCurrentTaxonomy(t *testing.T) {
+	// category-2 已不在現行分類樹：不確認，用現在的命中重新出卡。
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(3, "蘋果醋", "加工品 > 蘋果醋")}}}
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2"})
+	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 2 {
+		t.Fatalf("要重新出卡：%+v", o)
+	}
+	for _, c := range o.Next.Candidates {
+		if c.CategoryID == 2 {
+			t.Fatalf("不能再列已消失的分類：%+v", o.Next.Candidates)
+		}
+	}
+}
+
+func TestOptionWithWhitespaceOnlyTextIsAnOptionAnswer(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2", FreeText: "  \t"})
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 2 {
+		t.Fatalf("%+v", o)
 	}
 }
