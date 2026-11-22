@@ -236,30 +236,30 @@
   },
   {
    "id": "p27b",
-   "stack": "go-integration",
+   "stack": "go",
    "file": "backend/internal/modules/procurement/internal/run/cancel.go",
    "old": "r, err := c.Ledger.lockRun(ctx, runID)",
    "new": "r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)",
-   "test": "internal/modules/procurement/internal/run ^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/^cancel_answer$",
-   "why": "TestAnswerCommitRacingWithEveryLockingPath.../cancel_answer (integration) 守住的行為被改掉：`r, err := c.Ledger.lockRun(ctx, runID)` → `r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)`"
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../cancel_answer (integration) 守住的行為被改掉：`r, err := c.Ledger.lockRun(ctx, runID)` → `r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
   },
   {
    "id": "p28",
-   "stack": "go-integration",
+   "stack": "go",
    "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
    "old": "cur, err := d.Ledger.lockRun(ctx, run.ID)",
    "new": "cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)",
-   "test": "internal/modules/procurement/internal/run ^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/^settle_failure$",
-   "why": "TestAnswerCommitRacingWithEveryLockingPath.../settle_failure (integration) 守住的行為被改掉：`cur, err := d.Ledger.lockRun(ctx, run.ID)` → `cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)`"
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../settle_failure (integration) 守住的行為被改掉：`cur, err := d.Ledger.lockRun(ctx, run.ID)` → `cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
   },
   {
    "id": "p29",
-   "stack": "go-integration",
+   "stack": "go",
    "file": "backend/internal/modules/procurement/internal/run/reconcile.go",
    "old": "if err := r.Ledger.lockAskingOf(ctx, id); err != nil {",
    "new": "if err := error(nil); err != nil {",
-   "test": "internal/modules/procurement/internal/run ^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/^reconcile$",
-   "why": "TestAnswerCommitRacingWithEveryLockingPath.../reconcile (integration) 守住的行為被改掉：`if err := r.Ledger.lockAskingOf(ctx, id); err != nil {` → `if err := error(nil); err != nil {`"
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../reconcile (integration) 守住的行為被改掉：`if err := r.Ledger.lockAskingOf(ctx, id); err != nil {` → `if err := error(nil); err != nil {`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
   },
   {
    "id": "p29b",
