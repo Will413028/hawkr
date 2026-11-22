@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -72,16 +73,34 @@ func (c *fakeClock) NewTimer(d time.Duration) streamTimer {
 
 func (c *fakeClock) clock() streamClock { return streamClock{Now: c.Now, NewTimer: c.NewTimer} }
 
+// waitFor 在持有 c.mu 時等到 ready 為真。runStream 已返回（stopped）或超過安全上限都讓測試失敗，不讓任何 mutant 造成永遠等待。
+func (c *fakeClock) waitFor(ready func() bool, what string) {
+	timedOut := false
+	guard := time.AfterFunc(5*time.Second, func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		timedOut = true
+		c.cond.Broadcast()
+	})
+	defer guard.Stop()
+	for !ready() {
+		if c.stopped {
+			c.t.Fatalf("runStream 提早結束，%s", what)
+		}
+		if timedOut {
+			c.t.Fatalf("等待逾時：%s", what)
+		}
+		c.cond.Wait()
+	}
+}
+
 // fire 等到名為 name 的計時器（以最初的時長辨識）至少被武裝過 arms 次，再讓它到期。
 func (c *fakeClock) fire(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for c.timers[name] == nil || c.timers[name].arms < arms || !c.timers[name].armed {
-		if c.stopped {
-			c.t.Fatalf("runStream 提早結束，計時器 %v 不會再被武裝（第 %d 次）", name, arms)
-		}
-		c.cond.Wait()
-	}
+	c.waitFor(func() bool {
+		return c.timers[name] != nil && c.timers[name].arms >= arms && c.timers[name].armed
+	}, fmt.Sprintf("計時器 %v 不會再被武裝（第 %d 次）", name, arms))
 	t := c.timers[name]
 	t.armed = false
 	c.now = c.now.Add(t.d)
@@ -92,12 +111,9 @@ func (c *fakeClock) fire(name time.Duration, arms int) {
 func (c *fakeClock) await(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for c.timers[name] == nil || c.timers[name].arms < arms {
-		if c.stopped {
-			c.t.Fatalf("runStream 提早結束，計時器 %v 不會再被武裝（第 %d 次）", name, arms)
-		}
-		c.cond.Wait()
-	}
+	c.waitFor(func() bool {
+		return c.timers[name] != nil && c.timers[name].arms >= arms
+	}, fmt.Sprintf("計時器 %v 不會再被武裝（第 %d 次）", name, arms))
 }
 
 // fakeSource 是測試的拉取來源：Next 阻塞到測試推進一個結果，ctx 取消時返回並記下自己已退出。

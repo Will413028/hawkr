@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // funcBody 回傳 main.go 裡名為 name 的函式本體。
@@ -100,34 +101,69 @@ func TestServeWithRunEndsRunWhenTheContextEnds(t *testing.T) {
 	<-ended
 }
 
-// server 自己失敗（不是 ctx 結束）時，Shutdown 開始前 run 的 ctx 已被取消。
+// failingListener 在 fail 關閉後讓 Accept 回錯誤，模擬 server 自己失敗。
+type failingListener struct {
+	net.Listener
+	fail chan struct{}
+}
+
+func (l failingListener) Accept() (net.Conn, error) {
+	<-l.fail
+	return nil, errors.New("accept 失敗")
+}
+
+// server 自己失敗（不是 ctx 結束）時，要先取消 run 的 ctx 再 Shutdown：另一個 server 上有一個只等 run 的 ctx 結束才返回的進行中請求，
+// 順序正確時 Shutdown 立刻收尾；順序顛倒時 Shutdown 等不到請求結束，serve 在安全上限內回不來。
 func TestServeWithRunCancelsRunBeforeShutdownWhenAServerFails(t *testing.T) {
-	failing := listenOnce(t)
-	if err := failing.ln.Close(); err != nil {
-		t.Fatal(err)
-	}
-	runCtx := make(chan context.Context, 1)
+	base := listenOnce(t)
+	failing := listening{failingListener{base.ln, make(chan struct{})}, base.srv}
+	fail := failing.ln.(failingListener).fail
+
+	var runCtx context.Context
 	started := make(chan struct{})
 	run := func(ctx context.Context) error {
-		runCtx <- ctx
+		runCtx = ctx
 		close(started)
 		<-ctx.Done()
 		return ctx.Err()
 	}
-	cancelledAtShutdown := make(chan bool, 1)
-	healthy := listenOnce(t)
-	healthy.srv.RegisterOnShutdown(func() {
+
+	inFlight := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {
+		close(inFlight)
 		select {
-		case cancelledAtShutdown <- (<-runCtx).Err() != nil:
-		default:
+		case <-runCtx.Done():
+		case <-t.Context().Done():
 		}
 	})
+	healthy := listenOnce(t)
+	healthy.srv.Handler = mux
+
 	done := make(chan error, 1)
 	go func() { done <- serveWithRun(t.Context(), run, failing, healthy) }()
-	if err := <-done; err == nil {
-		t.Fatal("server 失敗要讓 serve 回錯誤")
+	<-started
+	go func() {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+healthy.ln.Addr().String()+"/", nil)
+		if err != nil {
+			return
+		}
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	select {
+	case <-inFlight:
+	case <-time.After(5 * time.Second):
+		t.Fatal("進行中的請求沒有抵達 handler")
 	}
-	if !<-cancelledAtShutdown {
-		t.Fatal("Shutdown 開始時 run 的 ctx 還沒被取消")
+	close(fail)
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("server 失敗要讓 serve 回錯誤")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve 沒有在安全上限內返回：Shutdown 開始前 run 的 ctx 沒被取消，進行中的請求等不到結束")
 	}
 }

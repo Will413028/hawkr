@@ -51,8 +51,8 @@
    "file": "backend/internal/modules/im/internal/write/send.go",
    "old": "\t\t\treturn errRetry\n",
    "new": "\t\t\treturn nil\n",
-   "test": "internal/modules/im ^TestConcurrentSameRequestIDWritesOnce$",
-   "why": "A request_id conflict no longer rolls the transaction back: the loser commits its allocated seq and returns an empty message, so the loser's response differs from the winner's and last_seq runs ahead of the stored messages (race-dependent: needs the concurrent duplicates to collide)."
+   "test": "internal/modules/im ^TestConflictingRequestIDRollsBackTheAllocatedSeqAndReturnsTheWinner$",
+   "why": "A request_id conflict no longer rolls the transaction back: the loser commits its allocated seq and returns an empty message, so the loser's response differs from the winner's and last_seq runs ahead of the stored messages."
   },
   {
    "id": "im-conversation-parties-swapped",
@@ -350,6 +350,15 @@
    "new": "\t\t\tif false && nested {\n",
    "test": "internal/modules/im/internal/write ^TestRetrySendRetriesOnlyOutsideAnOuterTransaction$",
    "why": "A Send joined to an outer transaction retries after a request_id conflict, running more SQL in a transaction the conflict did not roll back and leaving a seq gap."
+  },
+  {
+   "id": "im-send-never-detects-outer-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t_, nested := db.TxFrom(ctx)\n",
+   "new": "\t_, nested := db.TxFrom(ctx)\n\tnested = false\n",
+   "test": "internal/modules/im ^TestConflictingRequestIDInsideAnOuterTransactionFailsInsteadOfRetrying$",
+   "why": "Send stops recognising an outer transaction, so a request_id conflict inside one is retried in a transaction the conflict did not roll back and leaves a seq gap."
   },
   {
    "id": "im-send-replay-ignores-hidden",

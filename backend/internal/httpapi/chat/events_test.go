@@ -123,7 +123,9 @@ func newStreamEnv(t *testing.T, store *seller.Store) *streamEnv {
 		mux.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: callerAccount})))
 	}))
 	t.Cleanup(srv.Close)
-	se.client = chatv1alpha1connect.NewChatAppServiceClient(srv.Client(), srv.URL)
+	hc := *srv.Client()
+	hc.Timeout = 5 * time.Second // 只防測試卡死：任何讓串流沒有回應的 mutant 都在這裡變成失敗
+	se.client = chatv1alpha1connect.NewChatAppServiceClient(&hc, srv.URL)
 	return se
 }
 

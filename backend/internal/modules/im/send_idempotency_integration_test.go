@@ -249,3 +249,69 @@ func TestResendOfAHiddenOrErasedMessageReturnsATombstone(t *testing.T) {
 		t.Fatalf("抹除後重送要回同一則的墓碑：%+v %v", got, err)
 	}
 }
+
+// plantRival 讓下一次 Send 在持有守門鎖之後、寫訊息之前，有另一條連線先寫入同一個 (對話, 寄件方, request_id) 並 commit，
+// 使這次 Send 的 InsertMessage 確定撞到唯一鍵（不靠並行的時序）。回傳被塞進去的那則的 ID。
+func (f *fixture) plantRival(t *testing.T, rid uuid.UUID, text string) uuid.UUID {
+	t.Helper()
+	planted := uuid.NewV4()
+	var once sync.Once
+	f.stores.afterLock = func() {
+		once.Do(func() {
+			_, err := f.db.Pool().Exec(context.Background(), `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, created_at)
+				SELECT $1, id, 1000, 'BUYER', $2, 'TEXT', $3, now() FROM im.conversations`, planted, rid, text)
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	t.Cleanup(func() { f.stores.afterLock = nil })
+	return planted
+}
+
+// 撞到 request_id 唯一鍵的 Send 要把整個 transaction 回滾（連同已配發的 seq）再重讀第一則：回的是對方寫入的那則，last_seq 不超前、沒有多出的訊息。
+func TestConflictingRequestIDRollsBackTheAllocatedSeqAndReturnsTheWinner(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	if _, err := f.sendWith(t, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "先建立對話"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewV4()
+	planted := f.plantRival(t, rid, "同一則")
+	got, err := f.sendWith(t, im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "同一則"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != planted || got.Seq != 1000 || got.Text == nil || *got.Text != "同一則" {
+		t.Fatalf("要回先寫入的那則：%+v", got)
+	}
+	if n := f.scalar(t, "SELECT last_seq FROM im.conversations"); n != 1 {
+		t.Fatalf("last_seq = %d：撞鍵的 Send 配發的 seq 要隨回滾消失", n)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 2 {
+		t.Fatalf("訊息數 = %d", n)
+	}
+}
+
+// Send 加入外層 transaction 時撞到同一個 request_id 不重試而是失敗，讓呼叫方整個回滾；不在外層 transaction 內才重試成功（上一個測試）。
+func TestConflictingRequestIDInsideAnOuterTransactionFailsInsteadOfRetrying(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	if _, err := f.sendWith(t, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "先建立對話"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewV4()
+	f.plantRival(t, rid, "同一則")
+	var got im.Message
+	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
+		var err error
+		got, err = f.m.Send(ctx, im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "同一則"})
+		return err
+	})
+	if err == nil {
+		t.Fatalf("外層 transaction 內撞到 request_id 要失敗，卻成功回了 %+v", got)
+	}
+	if n := f.scalar(t, "SELECT last_seq FROM im.conversations"); n != 1 {
+		t.Fatalf("last_seq = %d：外層回滾後不得留下空洞", n)
+	}
+}
