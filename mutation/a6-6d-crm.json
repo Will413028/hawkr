@@ -67,8 +67,8 @@
    "id": "crm-load-more-failure-replaces-list",
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/customer/presentation/customer_controller.dart",
-   "old": "      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));",
-   "new": "      state = AsyncError(e, StackTrace.current);",
+   "old": "          nextPageToken: page.nextPageToken,\n          loadingMore: false,\n        ),\n      );\n    } catch (e) {\n      if (!ref.mounted) return;\n      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));",
+   "new": "          nextPageToken: page.nextPageToken,\n          loadingMore: false,\n        ),\n      );\n    } catch (e) {\n      if (!ref.mounted) return;\n      state = AsyncError(e, StackTrace.current);",
    "test": "test/features/customer/customer_management_screen_test.dart a load-more failure keeps loaded customers and offers retry",
    "why": "A failed next page throws away the customers already loaded."
   },

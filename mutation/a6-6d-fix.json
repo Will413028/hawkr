@@ -24,7 +24,7 @@
    "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
    "old": "          found.id != m.conversationId ||\n",
    "new": "          false ||\n",
-   "test": "test/features/chat/chat_thread_notifier_test.dart a message of another buyer is not adopted",
+   "test": "test/features/chat/chat_thread_notifier_test.dart a message of a conversation other than the buyer's is not adopted",
    "why": "A message of any conversation is adopted by a thread that has none."
   },
   {
@@ -32,7 +32,7 @@
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
    "old": "        unawaited(_adoptConversation(message));",
-   "new": "        break;",
+   "new": "        // dropped",
    "test": "test/features/chat/chat_thread_notifier_test.dart a thread opened before the conversation exists adopts the first incoming message of its buyer",
    "why": "The first incoming message is dropped when the thread has no conversation yet."
   },

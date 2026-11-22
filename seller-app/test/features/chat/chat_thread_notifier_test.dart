@@ -276,4 +276,20 @@ void main() {
     expect(h.state.value!.conversationId, isNull);
     expect(h.state.value!.messages, isEmpty);
   });
+
+  test(
+    "a message of a conversation other than the buyer's is not adopted",
+    () async {
+      repo.conversations = [];
+      final h = _Harness(repo);
+      await h.start();
+      await h.container.read(chatThreadProvider(h.arg).future);
+      repo.conversations = [_conv(id: 'c9')];
+      h.streams.last.add(messageFrame(protoMessage(1, conv: 'c-elsewhere')));
+      await h.pump();
+      await h.pump();
+      expect(h.state.value!.conversationId, isNull);
+      expect(h.state.value!.messages, isEmpty);
+    },
+  );
 }
