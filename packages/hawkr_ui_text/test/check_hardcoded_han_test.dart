@@ -96,6 +96,13 @@ String e(int n) => '共 \$n 件，\${n + 1} 筆';
       expect(runWith([]), 1);
     });
 
+    test('同檔只增加不減少失敗', () {
+      write('a.dart', "const a = '中';");
+      runWith(['--init']);
+      write('a.dart', "const a = '中'; const b = '中';");
+      expect(runWith([]), 1);
+    });
+
     test('新檔含漢字失敗；新檔沒有漢字通過', () {
       write('a.dart', "const a = '中';");
       runWith(['--init']);
