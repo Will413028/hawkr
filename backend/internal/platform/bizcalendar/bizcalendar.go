@@ -69,7 +69,7 @@ const (
 	// 輸入已依 day 升序（importColumns），兩個 transaction 取列鎖的順序一致，不會死結。xmax <> 0 是被取代的既有列。
 	upsertSQL = `WITH up AS (
 INSERT INTO bizcalendar.days (day, holiday, note, year)
-SELECT t.day, t.holiday, t.note, $4::smallint FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note)
+SELECT t.day, t.holiday, t.note, $4::smallint FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note) ORDER BY t.day
 ON CONFLICT (day) DO UPDATE SET holiday = EXCLUDED.holiday, note = EXCLUDED.note
 RETURNING (xmax <> 0) AS replaced)
 SELECT count(*) FILTER (WHERE replaced) FROM up`
