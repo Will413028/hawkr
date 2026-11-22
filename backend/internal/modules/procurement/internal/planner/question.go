@@ -203,28 +203,38 @@ func filled(s slots.Set, key model.SlotKey) bool {
 	return false
 }
 
-// ItemCandidate 是品項消歧要買家選的一個分類。
+// MaxItemOptions 是品項消歧卡最多列出的末層品項數（A9-D28(1)）；多的截掉，由買家用「其他」或打字縮小。
+const MaxItemOptions = 5
+
+// ItemCandidate 是品項消歧要買家選的一個末層分類。Label 是分類名稱（確認後存成 resolution label）；Path 是從大類到它的路徑，
+// 非空時是選項顯示的文字（買家靠大類分辨同名品項）。
 type ItemCandidate struct {
 	CategoryID int64
 	Label      string
+	Path       string
 }
 
 // ItemOptionID 是候選的選項 ID；回答時用同一個規則比對買家送回來的 ID。
 func ItemOptionID(c ItemCandidate) string { return "category-" + strconv.FormatInt(c.CategoryID, 10) }
 
-// BuildItemDisambiguation 把候選分類組成品項消歧問題卡。只能從白名單挑或選「其他」，不接受自由輸入取代選擇；不可跳過，
-// 品項身份未定時無法計價也無法詢價。沒有候選時只剩「自行描述品項」。
+// BuildItemDisambiguation 把候選分類（呼叫端依 resolver 的排序給）組成品項消歧問題卡：最多 MaxItemOptions 個，加固定的「其他，自行描述」；
+// 開放自由輸入（打字是用新字詞重新解析，不是選擇結果）；不可跳過，品項身份未定時無法計價也無法詢價。沒有候選時只剩「自行描述品項」。
 func BuildItemDisambiguation(cands []ItemCandidate) *Question {
+	cands = cands[:min(len(cands), MaxItemOptions)]
 	opts := make([]Option, 0, len(cands)+1)
 	for _, c := range cands {
-		opts = append(opts, Option{ID: ItemOptionID(c), Value: c.Label, Kind: OptionValue})
+		value := c.Path
+		if value == "" {
+			value = c.Label
+		}
+		opts = append(opts, Option{ID: ItemOptionID(c), Value: value, Kind: OptionValue})
 	}
 	if len(cands) == 0 {
 		opts = append(opts, Option{ID: ItemOtherOptionID, Value: "OTHER", Kind: OptionDescribe})
-		return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemDescribe, Options: opts}
+		return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemDescribe, Options: opts, AllowFreeText: true}
 	}
 	opts = append(opts, Option{ID: ItemOtherOptionID, Value: "OTHER", Kind: OptionOther})
-	return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemChoices, Options: opts}
+	return &Question{Slot: slots.ItemDisambiguation, Prompt: PromptItemChoices, Options: opts, AllowFreeText: true}
 }
 
 func copyOptions(in []Option) []Option {

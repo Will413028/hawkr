@@ -11,7 +11,7 @@
 ## 2. run 帳本與串流（A9-3b）
 
 - 送出（`run.Submitter`）在同一個 transaction：以 `(buyer_id, client_request_id)` 冪等建 run（重送回第一次的 run，內容不同回 INVALID_ARGUMENT，不再扣額度）、`ConsumeUsage` 扣一次額度（用完回 RESOURCE_EXHAUSTED／`AGENT_MONTHLY_QUOTA_EXCEEDED`，run 一併回滾）、寫輸入與 `run_accepted` 事件、排入 River job（`MaxAttempts` 1）。只有 TURN 的送出取代同一個需求（`request_id`）裡等待輸入的 run（A9-D23(2)）：它們轉 CANCELLED（不退額度）、PENDING 中斷轉 CANCELLED，進行中的回答 run 一併要求取消；其他 run 類型不動它們。所有會鎖回答 run 的路徑（回答提交、取消、取代、`settleFailure`、reconciler）依同一個鎖順序：提問的 run、中斷、回答的 run。額度的上限與期間由呼叫端依買家方案給。
-- worker（`run.Dispatcher`）領走 QUEUED（條件式 UPDATE）、呼叫 `Executor`（LLM 與 provider 呼叫在 transaction 外）；執行失敗標 FAILED 並退回額度：job 的 ctx 被關機或 Timeout 取消（不是買家取消）是 `WORKER_LOST`，其餘候選搜尋 `SEARCH_FAILED`、其他 `TURN_PIPELINE_ERROR`；已要求取消的收斂到 CANCELLED。已終結或已被刪除（BuyerDeleted）的 run 再派一次不動作。送出時同一個對話裡等待輸入的舊 run 在同一個 transaction 轉 CANCELLED（不退額度，A9-D23）。
+- worker（`run.Dispatcher`）領走 QUEUED（條件式 UPDATE）、呼叫 `Executor`（LLM 與 provider 呼叫在 transaction 外）；執行失敗標 FAILED 並退回額度：job 的 ctx 被關機或 Timeout 取消（不是買家取消）是 `WORKER_LOST`，其餘候選搜尋 `SEARCH_FAILED`、其他 `TURN_PIPELINE_ERROR`（executor 回 `run.FailureError` 時用它帶的原因，例如 TURN 的 `MODEL_UNAVAILABLE`）；已要求取消的收斂到 CANCELLED。已終結或已被刪除（BuyerDeleted）的 run 再派一次不動作。送出時同一個對話裡等待輸入的舊 run 在同一個 transaction 轉 CANCELLED（不退額度，A9-D23）。
 - 事件：序號由 run 列配發，run 是否還活著由 River job 的狀態決定，不看 `updated_at`；狀態轉終態與 `finished` 事件在同一個 transaction，所以看得到終態就讀得到結尾。串流只有一個結尾事件 `finished`（帶狀態，失敗時帶失敗原因；成功、失敗、取消都以它收尾），送出後結束；串流中途 run 被刪除回 NOT_FOUND。每條最長 `Window`（100 秒）。cursor 是事件序號的十進位字串。
 - 保留：run 結束 7 天後（`RetentionPeriod`）由每小時的週期 job 刪事件並把 `min_available_seq` 推到 `last_event_seq + 1`。需要的第一筆事件（cursor + 1）小於 `min_available_seq` 回 `REPLAY_CURSOR_EXPIRED`（含從頭開始但事件已清掉）；cursor 大於 `last_event_seq` 回 `REPLAY_CURSOR_AHEAD`。
 - 狀態轉換：唯一的守衛函式（公開入口 `Ledger.Transition`，`Ledger.Interrupt` 與回答的提交點共用同一個內部轉換），允許的邊 QUEUED→RUNNING、CANCEL_REQUESTED、FAILED；RUNNING→WAITING_FOR_INPUT、SUCCEEDED、FAILED、CANCEL_REQUESTED；CANCEL_REQUESTED→CANCELLED、FAILED；WAITING_FOR_INPUT→SUCCEEDED（只由回答的提交點寫）、CANCELLED（沒有逾時，interrupt 不設到期）；其餘是終態，終態吸收，之後的事件寫入回 `ErrRunTerminal`。公開的 `Transition` 拒絕轉入 WAITING_FOR_INPUT（只能經 `Interrupt`，要同時有中斷）與 WAITING_FOR_INPUT→SUCCEEDED（只在回答的提交點，要同時解決中斷）。
@@ -24,3 +24,12 @@
 - 中斷（`Ledger.Interrupt`）：同一個 transaction 寫 `turn_result` 事件（可省）、把 RUNNING 的 run 轉 WAITING_FOR_INPUT（回答 run 在此提交所答的中斷）、再新增 PENDING 的 CLARIFICATION 中斷（payload 是接續的唯一狀態）。`agent_run_interrupts.request_id` 加部分唯一索引，每個需求最多一筆 PENDING。狀態 PENDING／RESOLVED（回答成功）／CANCELLED（提問的 run 被取消或被同需求的新一輪 TURN 取代，同交易轉，不佔索引；正在回答它的 run 在同交易要求取消，同 CancelRun 的路徑：CANCEL_REQUESTED 並取消 job，job 已死直接 CANCELLED）；`closed_at` 是離開 PENDING 的時間。讀取只認 WAITING_FOR_INPUT 的 run 的 PENDING 中斷（`OpenInterruptForRun`、`OpenInterruptForRequest`），並回 `Processing`：有回答它的 run 在 QUEUED、RUNNING 或 CANCEL_REQUESTED 時為真（讀取模型呈現「處理中」，否則「等回答」）。
 - 執行者登記：`Dispatcher.Executors` 依 run 類型登記；領到沒有登記執行者的類型，記 log 並依該類型的 pipeline 失敗收斂（TURN 退額度，其餘不退），不留在 RUNNING 等 reconciler。接線：`cmd/hawkr` 的 `addProcurementWorkers`（worker 角色）登記執行 run 的 worker、reconciler 與清除；`startProcurementHub`（serve 角色）啟動共用 LISTEN；兩個角色的 `newProcurement` 都給 job client。
 - BuyerDeleted：先刪 `agent_runs WHERE buyer_id`（輸入、事件、interrupt 隨 CASCADE），再把其他表的 `buyer_id` 設 NULL；`agent_runs.buyer_id` 維持 NOT NULL，`publication_id` 為 `ON DELETE SET NULL`。
+
+## 3. TURN 執行（A9-3b-2c）
+
+- executor（`internal/turn`）由 `procurement.New` 在給了 `Deps.LLM` 與 `Deps.Taxonomy` 時登記（只給其中一個 panic；`Executors` 已有 TURN 的項目則保留）。worker 角色的 `cmd/hawkr` 給採購用的 `llm.Procurement` 與經 `internal/legacy/categoryservice` 轉接的分類樹；serve 角色不執行 run，不給。
+- 一輪：一次模型呼叫（`internal/extract`：Gemini 走 response schema、DeepSeek 走強制 tool call；買家訊息截 2000 rune；單次 30 秒、含退避總預算 70 秒，呼叫內最多重試一次，只對逾時、429、5xx、格式錯誤；4xx 與停用不重試；抽取結果不做簡轉繁）→ 套用欄位 → 品項變更或未解析時查分類樹 → 規劃與渲染 → 單一 transaction 提交。模型沒有給出可用答案（含重試用盡）一律失敗並退額度：逾時、429、5xx 用盡是 `MODEL_UNAVAILABLE`，其餘 `TURN_PIPELINE_ERROR`；空抽取是成功。沒有降級。
+- 提交：新版本（`request_revisions`，品項解析存 `item_resolution_category_id`，BUYER_DESCRIBED 為 NULL）、`turns`、需求狀態、對話預覽與自動標題（`品項｜縣市`，40 rune，只在 `title_source = 'AUTO'` 時寫）、`turn_result` 事件與 run 的終態轉換同一個 transaction；等待輸入時改寫中斷（`InterruptInput.ID` 由呼叫端預先產生，事件內的 `interrupt.interrupt_id` 等於它）。
+- 需求狀態：依齊全與否在 CLARIFYING 與 REQUIREMENT_READY 之間；需求在 MATCHING 時，只有搜尋用到的欄位（品項解析、數量、單位、縣市、交期）改了才退回，其餘維持 MATCHING。
+- 語系：送出時存進 `agent_run_inputs.locale`（`ZH_TW`／`EN`），executor 用它渲染伺服器句子。
+- 事件：TURN 只有 `run_accepted`、一個 `turn_result`、`finished`；不發 step 與 activity。

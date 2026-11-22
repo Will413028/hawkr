@@ -34,6 +34,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerserver"
+	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/crmservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/delegationservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
@@ -367,6 +368,7 @@ func runWorker(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -393,6 +395,11 @@ func runWorker(ctx context.Context) error {
 		return err
 	}
 	reviews, err := reviewservice.New(reviewAddr, internalSecret)
+	if err != nil {
+		return err
+	}
+	// 品項解析讀的分類樹在舊 product-service（catalog 搬進單體前）。
+	categories, err := categoryservice.New(productAddr, internalSecret)
 	if err != nil {
 		return err
 	}
@@ -458,7 +465,7 @@ func runWorker(ctx context.Context) error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	contentModule.AddWorkers(workers)
-	procurementModule := newProcurement(d, jc, log)
+	procurementModule := newProcurementWorker(d, jc, llm.New(llm.Procurement, llmConfig, log), categories, log)
 	addProcurementWorkers(workers, procurementModule)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)

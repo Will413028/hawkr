@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
 type fakeSellers struct {
@@ -99,5 +100,54 @@ func TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers(t *testing.T) {
 	}
 	if !registered[run.PurgeArgs](w) {
 		t.Error("沒有登記事件清除")
+	}
+}
+
+type noTaxonomy struct{}
+
+func (noTaxonomy) CategoryTree(context.Context) ([]procurement.TaxonomyNode, error) { return nil, nil }
+
+func newDeps(extra func(*procurement.Deps)) procurement.Deps {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	d := procurement.Deps{DB: new(db.DB), Now: time.Now, Logger: log}
+	extra(&d)
+	return d
+}
+
+// TURN 的 executor 由 New 在給了 LLM 與分類樹時登記；少了它，worker 領到 TURN 會把 run 標失敗。
+func TestNewRegistersTheTurnExecutorOnlyWithLLMAndTaxonomy(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	disabled := llm.New(llm.Procurement, llm.Config{}, log)
+	with := procurement.New(newDeps(func(d *procurement.Deps) { d.LLM, d.Taxonomy = disabled, noTaxonomy{} }))
+	if got := with.ExecutorTypes(); len(got) != 1 || got[0] != run.RunTypeTurn {
+		t.Errorf("executors = %v，要登記 TURN", got)
+	}
+	without := procurement.New(newDeps(func(*procurement.Deps) {}))
+	if got := without.ExecutorTypes(); len(got) != 0 {
+		t.Errorf("沒有 LLM 與分類樹不該登記：%v", got)
+	}
+	custom := procurement.New(newDeps(func(d *procurement.Deps) {
+		d.LLM, d.Taxonomy = disabled, noTaxonomy{}
+		d.Executors = map[string]procurement.Executor{run.RunTypeTurn: nil}
+	}))
+	if got := custom.ExecutorTypes(); len(got) != 1 {
+		t.Errorf("呼叫端給的 TURN 項目要保留：%v", got)
+	}
+}
+
+func TestNewPanicsWhenOnlyOneOfLLMAndTaxonomyIsGiven(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	for name, fn := range map[string]func(*procurement.Deps){
+		"只有 LLM":      func(d *procurement.Deps) { d.LLM = llm.New(llm.Procurement, llm.Config{}, log) },
+		"只有 Taxonomy": func(d *procurement.Deps) { d.Taxonomy = noTaxonomy{} },
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s：要 panic", name)
+				}
+			}()
+			procurement.New(newDeps(fn))
+		}()
 	}
 }

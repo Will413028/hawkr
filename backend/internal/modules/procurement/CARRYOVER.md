@@ -21,7 +21,7 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 兩支 outbox（`pkg/outbox` Scheduler 加 claim lease CAS）（M11）：rfq publication、order provisioning | 要可靠地外送 MQ、gRPC | 否：單體規則 4、5：tx 內 `events.Publish` 加 `jobs.Enqueue`（River），provider 在 tx 外由 worker 呼叫 | River job 帶冪等鍵，重試與退避由 River 管 | 兩支 outbox 改 River job；`procurement.events` exchange 的舊形狀在 notification 搬完之前由 relay 維持（前例 `legacy/sellerrelay`、`socialrelay`；A9-D11；Q8） |
 | 用 gRPC client 取別的服務資料（M12）：6 個 client | 資料在別的服務 | 部分：buyer、seller、media 已在單體；ordering、catalog 還在 Java | 模組公開 API；未搬的走 `internal/legacy/*` | buyer、seller、media 換成模組 API；ordering、catalog 經 `internal/legacy` 補 client，模組只依賴 port，不等 B8（A9-D11；Q3） |
 | 生成檔 `category_alias_gen.go`（M14）：851 筆別名，由 LLM 從農產分類樹生成 | 分類樹穩定、別名準 | 否：針對農產 L2 分類（id 4–222）；seed 分類樹是 id 4–33 的小樹，分類 ID 不對得上【量】 | 召回用 embedding 或搜尋索引加人工 synonym；別名表隨分類樹資料化 | A9-D7：刪別名層，分類樹加人工同義詞召回。A9-3a 已實作 `internal/resolver`：原詞有命中就不查同義詞（AD3，`TestSynonymNeverOverridesTheBuyersOwnTerm`），`synonyms.json` 空表起步；離線 gate（`category_alias_gate_test.go`）的設計留 |
-| 簡繁轉換 `opencc`（M16）：LLM 抽取結果強制轉繁體 | LLM 輸出語域不穩 | 成立（2026-08-15 實測案例） | 同 | 保留，併入採購 |
+| 簡繁轉換 `opencc`（M16）：LLM 抽取結果強制轉繁體 | LLM 輸出語域不穩 | 成立（2026-08-15 實測案例） | 同 | 不搬（A9-D28(5)）：抽取結果不做簡轉繁，不新增依賴 |
 | fx 組裝、`pkglogger`（zap）、`syncutil.SafeGo`（M17） | 單進程 DI | 否：單體 composition root 手動接線 | 同單體規則 | 全改成 `cmd/hawkr` 接線；`go-pkg/{identity,tsid,outbox,mq,errors/bizcode,grpcclient}` 換成單體的 `platform` 對應 |
 | bizcode 數字碼加 CodeMeta（M18）：例如 `9703` | 舊 REST 契約 | 否：新契約用 `ErrorReason` | `api/` 的 `ErrorReason` 加 Go 型別 | 全部轉 `ErrorReason`；`procurement_error_reason_registry_test.go` 已有註冊表概念，可沿用【量】（隨 A9-3b、3c 的 handler） |
 | 雙軌欄位 `controller_kind`（DURABLE、GRAPH）（M19） | 兩條執行路徑並存 | 否：`ClaimAndDispatchTurn` 已刪，欄位成了單值 | 不留 | 刪欄位或固定 `GRAPH`（AD12） |
@@ -63,7 +63,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 
 1. 連續選填計數與跳過的欄位：`turns.optional_streak`、`turns.skipped_slots`（具名欄位，CHECK 限選填欄位），每輪寫入（`InsertTurn`）；`planner.Input` 帶上一輪的值，`planner.Plan` 回這一輪要存的值。讀上一輪、寫這一輪的接線在 3b-2c 的 turn 用例。
 2. 縣市：見上表。
-3. 品項消歧的兩層選擇（舊 `CropSelection` 的 GROUP、ITEM、DESCRIBE 與 `queryText`、父分類）：留給 3b-2c，3b-2a 不做；新的 `resolver` 回扁平的符合清單，`Resolution` 不存分類 ID，目前只搬單層消歧問題卡（有候選與無候選兩種）。3b-2c 開工時要決定狀態放哪、`ItemDisambiguation` 問題卡是否分階段。
+3. 品項消歧：已由 A9-D28(1) 取代（一層為主，狀態只在中斷 payload，確認後存 `item_resolution_category_id`）；wave 1 的實作與 stage 欄位見 `internal/turn/AGENTS.md`。
 4. `REQUEST_BASICS_READY`：見上表。
 5. `RejectedField.reason`：proto 加列舉 `RejectionReason`（`REJECTION_REASON_*`，UNSPECIFIED=0），client 依值查共用文案目錄（`procurement.RejectionReason.*`）；敘述段落裡帶上限數字的原因句仍在模組 `internal/text`（`reject.*`）。
 6. `ExactMatchRequired`：見上表。

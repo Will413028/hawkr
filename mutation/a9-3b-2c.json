@@ -1,0 +1,157 @@
+{
+ "mutants": [
+  {
+   "id": "m1",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+   "old": "id := in.ID",
+   "new": "id := uuid.NewV7()",
+   "test": "internal/modules/procurement/internal/turn ^TestAmbiguousItemInterruptsWithMatchingInterruptID$",
+   "why": "中斷改成在 Ledger 內重新產生 ID：turn_result 事件裡的 interrupt.interruptId 不再等於中斷列的 ID"
+  },
+  {
+   "id": "m2",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "_, err = e.Ledger.Transition(ctx, ld.run.ID, run.StatusSucceeded, \"\")\n\t\treturn err",
+   "new": "_, _ = e.Ledger.Transition(ctx, ld.run.ID, run.StatusSucceeded, \"\")\n\t\treturn nil",
+   "test": "internal/modules/procurement/internal/turn ^TestCancelLandingBeforeTheCommitRollsEverythingBack$",
+   "why": "終態轉換失敗不再讓整個 transaction 回滾：取消搶在提交前時版本與輪次照樣寫入"
+  },
+  {
+   "id": "m3",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "return classifyExtractErr(ctx, err)",
+   "new": "patch = slots.Patch{}",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "模型失敗改成降級（空 patch 續行）：run 不再失敗退額度"
+  },
+  {
+   "id": "m3b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "return classifyExtractErr(ctx, err)",
+   "new": "patch = slots.Patch{}",
+   "test": "internal/modules/procurement/internal/turn ^TestDisabledModelFailsWithPipelineErrorAndRefunds$",
+   "why": "模型停用（ErrDisabled）改成降級續行：run 不再失敗退額度"
+  },
+  {
+   "id": "m4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevSkipped = prior.prevTurn.skipped",
+   "new": "prevSkipped = nil",
+   "test": "internal/modules/procurement/internal/turn ^TestOptionalProgressIsReadFromThePreviousTurnAndPlannedForThisOne$",
+   "why": "不帶上一輪買家跳過的欄位"
+  },
+  {
+   "id": "m5",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevStreak = prior.prevTurn.optionalStreak",
+   "new": "prevStreak = 0",
+   "test": "internal/modules/procurement/internal/turn ^TestOptionalProgressIsReadFromThePreviousTurnAndPlannedForThisOne$",
+   "why": "連續選填計數不接上一輪"
+  },
+  {
+   "id": "m5b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevStreak = prior.prevTurn.optionalStreak",
+   "new": "prevStreak = 0",
+   "test": "internal/modules/procurement/internal/turn ^TestSecondTurnSupersedesCarriesProgressAndChainsRevisions$",
+   "why": "寫進 turns.optional_streak 的計數不接上一輪"
+  },
+  {
+   "id": "m6",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/settle.go",
+   "old": "if r.QuotaPeriodStart == nil {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "失敗不再退額度（與 a9-3b-2b p2 同一個守門）"
+  },
+  {
+   "id": "m10a",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "if !ae.retryable || budget.Err() != nil {",
+   "new": "if budget.Err() != nil {",
+   "test": "internal/modules/procurement/internal/extract ^TestNonRetryableErrorsAreNotRetried$",
+   "why": "不可重試的錯誤（4xx、停用）也重試"
+  },
+  {
+   "id": "m10b",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "if !ae.retryable || budget.Err() != nil {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/extract ^TestMalformedThenValidRetriesExactlyOnce$",
+   "why": "可重試的錯誤也不重試"
+  },
+  {
+   "id": "m11",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "out[run.RunTypeTurn] = turn.Executor{",
+   "new": "_ = turn.Executor{",
+   "test": "internal/modules/procurement ^TestNewRegistersTheTurnExecutorOnlyWithLLMAndTaxonomy$",
+   "why": "New 不再登記 TURN 的 executor"
+  },
+  {
+   "id": "u1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "Reason: run.FailureModelUnavailable, Err: err}",
+   "new": "Reason: run.FailureTurnPipelineErr, Err: err}",
+   "test": "internal/modules/procurement/internal/turn ^TestClassifyExtractErr$",
+   "why": "服務不可用不再分類為 MODEL_UNAVAILABLE"
+  },
+  {
+   "id": "u1b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "Reason: run.FailureModelUnavailable, Err: err}",
+   "new": "Reason: run.FailureTurnPipelineErr, Err: err}",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "服務不可用的 run 以 TURN_PIPELINE_ERROR 收尾"
+  },
+  {
+   "id": "t1",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": " AND title_source = 'AUTO'",
+   "new": "",
+   "test": "internal/modules/procurement/internal/turn ^TestAutoTitleUpdatesOnlyWhileAutoAndStaysEmptyWithoutAnItem$",
+   "why": "自動標題不再只在 title_source = AUTO 時更新：買家改過的標題被覆寫"
+  },
+  {
+   "id": "s1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "slots.Unit, slots.DeliveryCity, slots.DeliveryDate}\n",
+   "new": "slots.Unit, slots.DeliveryDate}\n",
+   "test": "internal/modules/procurement/internal/turn ^TestMatchingRegressesOnlyWhenASearchFieldChanges$",
+   "why": "搜尋欄位集合拿掉縣市：MATCHING 時改縣市不再退回"
+  },
+  {
+   "id": "s1b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "slots.Unit, slots.DeliveryCity, slots.DeliveryDate}\n",
+   "new": "slots.Unit, slots.DeliveryDate}\n",
+   "test": "internal/modules/procurement/internal/turn ^TestMatchingRegressesWhenASearchFieldChangesAndStaysOtherwise$",
+   "why": "搜尋欄位集合拿掉縣市：MATCHING 時改縣市不再退回（寫入 DB 的狀態）"
+  },
+  {
+   "id": "d1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/planner/question.go",
+   "old": "cands = cands[:min(len(cands), MaxItemOptions)]",
+   "new": "cands = cands[:len(cands)]",
+   "test": "internal/modules/procurement/internal/planner ^TestItemDisambiguationCapsAtFiveAndLabelsWithThePath$",
+   "why": "消歧卡的上限 5 改成不限"
+  }
+ ]
+}

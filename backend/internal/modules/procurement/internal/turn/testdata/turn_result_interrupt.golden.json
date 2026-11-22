@@ -1,0 +1,71 @@
+{
+  "turn_result": {
+    "requestId": "0192a000-0000-7000-8000-000000000001",
+    "conversationId": "0192a000-0000-7000-8000-000000000002",
+    "revisionId": "0192a000-0000-7000-8000-000000000003",
+    "slots": {
+      "item": "蘋果",
+      "quantity": 5
+    },
+    "rejected": [
+      {
+        "key": "SLOT_KEY_DELIVERY_DATE",
+        "reason": "REJECTION_REASON_DATE_PAST"
+      }
+    ],
+    "missingRequired": [
+      "SLOT_KEY_DELIVERY_CITY",
+      "SLOT_KEY_UNIT"
+    ],
+    "recordedThisTurn": [
+      {
+        "key": "SLOT_KEY_ITEM",
+        "label": "品項",
+        "value": "蘋果"
+      },
+      {
+        "key": "SLOT_KEY_QUANTITY",
+        "label": "數量",
+        "value": "5"
+      }
+    ],
+    "reply": "有幾個內容我沒辦法直接採用：到貨日期：到貨日不可早於今天 麻煩再確認一下。",
+    "question": {
+      "slotKey": "SLOT_KEY_ITEM_DISAMBIGUATION",
+      "prompt": "找到幾個相符的品項，麻煩選一下你要的是哪一個：",
+      "options": [
+        {
+          "optionId": "category-1",
+          "label": "水果 \u003e 蘋果"
+        },
+        {
+          "optionId": "category-2",
+          "label": "加工品 \u003e 蘋果"
+        },
+        {
+          "optionId": "item-other",
+          "label": "其他（自己輸入）"
+        }
+      ],
+      "allowFreeText": true
+    },
+    "blocks": [
+      {
+        "kind": "BLOCK_KIND_WARNING",
+        "text": "有幾個內容我沒辦法直接採用：到貨日期：到貨日不可早於今天"
+      },
+      {
+        "kind": "BLOCK_KIND_NEXT_STEP",
+        "text": "麻煩再確認一下。"
+      }
+    ],
+    "textFallback": "有幾個內容我沒辦法直接採用：到貨日期：到貨日不可早於今天 麻煩再確認一下。",
+    "messageId": "0192a000-0000-7000-8000-000000000004",
+    "createTime": "2026-11-22T03:00:00Z",
+    "runId": "0192a000-0000-7000-8000-000000000005",
+    "interrupt": {
+      "interruptId": "0192a000-0000-7000-8000-000000000006",
+      "kind": "INTERRUPT_KIND_CLARIFICATION"
+    }
+  }
+}

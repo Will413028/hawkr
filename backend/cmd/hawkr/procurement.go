@@ -8,9 +8,11 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
 // subscribeProcurement 讓買家關閉在同一個 transaction 刪除買家的採購資料、匿名保留賣家看得到的紀錄（A9-D19 S10；單體規則 4 的原子狀態變更）。
@@ -20,9 +22,33 @@ func subscribeProcurement(bus *events.Bus, d *db.DB, log *slog.Logger) {
 }
 
 // newProcurement 組出採購模組；jobs 是送出與取消 run 的 River client（只訂閱事件的呼叫端給 nil）。
-// 執行 run 的 Executor 依 run 類型登記在 Executors，現在沒有登記：領到 run 的 worker 把它標為該類型的 pipeline 失敗並退額度。
+// 沒有 LLM 與分類樹時不登記 TURN 的 executor（serve 角色不執行 run）：領到 run 的 worker 把它標為該類型的 pipeline 失敗並退額度。
 func newProcurement(d *db.DB, jobs procurement.JobQueue, log *slog.Logger) *procurement.Module {
 	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log, Jobs: jobs})
+}
+
+// newProcurementWorker 組出會執行 run 的採購模組（worker 角色）：登記 TURN 的 executor，模型是採購用的 llm 角色，分類樹經舊 product-service 轉接。
+func newProcurementWorker(d *db.DB, jobs procurement.JobQueue, model llm.Model, categories *categoryservice.Client, log *slog.Logger) *procurement.Module {
+	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log, Jobs: jobs, LLM: model, Taxonomy: taxonomy{categories}})
+}
+
+// taxonomy 把舊 category 服務的分類樹（巢狀）轉成 resolver 讀的扁平節點；catalog 搬進單體時整段刪除。
+type taxonomy struct{ client *categoryservice.Client }
+
+func (t taxonomy) CategoryTree(ctx context.Context) ([]procurement.TaxonomyNode, error) {
+	tree, err := t.client.CategoryTree(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return flattenTaxonomy(nil, tree), nil
+}
+
+func flattenTaxonomy(out []procurement.TaxonomyNode, nodes []categoryservice.Node) []procurement.TaxonomyNode {
+	for _, n := range nodes {
+		out = append(out, procurement.TaxonomyNode{ID: n.ID, ParentID: n.ParentID, Name: n.Name})
+		out = flattenTaxonomy(out, n.Children)
+	}
+	return out
 }
 
 // addProcurementWorkers 登記採購 run 的執行 worker、reconciler 與事件清除。

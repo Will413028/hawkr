@@ -129,7 +129,7 @@ func TestProcurementModuleIsBuiltWithTheJobClientInBothRoles(t *testing.T) {
 			if !ok {
 				return true
 			}
-			if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "newProcurement" && len(call.Args) == 3 {
+			if id, ok := call.Fun.(*ast.Ident); ok && (id.Name == "newProcurement" || id.Name == "newProcurementWorker") && len(call.Args) >= 3 {
 				if a, ok := call.Args[1].(*ast.Ident); ok && a.Name == "jc" {
 					withJobs = true
 				}

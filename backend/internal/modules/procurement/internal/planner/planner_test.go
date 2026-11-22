@@ -136,7 +136,7 @@ func TestCanSkip(t *testing.T) {
 func TestItemDisambiguation(t *testing.T) {
 	t.Run("candidates plus the other option", func(t *testing.T) {
 		q := BuildItemDisambiguation([]ItemCandidate{{CategoryID: 18, Label: "有機小白菜"}})
-		if q.Slot != slots.ItemDisambiguation || q.AllowFreeText || q.CanSkip || q.Prompt != PromptItemChoices || len(q.Options) != 2 {
+		if q.Slot != slots.ItemDisambiguation || !q.AllowFreeText || q.CanSkip || q.Prompt != PromptItemChoices || len(q.Options) != 2 {
 			t.Fatalf("got %+v", q)
 		}
 		if q.Options[0].ID != "category-18" || q.Options[0].Value != "有機小白菜" || q.Options[0].Kind != OptionValue {
@@ -151,10 +151,30 @@ func TestItemDisambiguation(t *testing.T) {
 		if len(q.Options) != 1 || q.Options[0].ID != ItemOtherOptionID || q.Options[0].Kind != OptionDescribe {
 			t.Fatalf("options = %+v", q.Options)
 		}
-		if q.Prompt != PromptItemDescribe || q.AllowFreeText || q.CanSkip {
+		if q.Prompt != PromptItemDescribe || !q.AllowFreeText || q.CanSkip {
 			t.Errorf("got %+v", q)
 		}
 	})
+}
+
+func TestItemDisambiguationCapsAtFiveAndLabelsWithThePath(t *testing.T) {
+	var cands []ItemCandidate
+	for i := int64(1); i <= 8; i++ {
+		cands = append(cands, ItemCandidate{CategoryID: i, Label: "品項", Path: "大類 > 品項"})
+	}
+	q := BuildItemDisambiguation(cands)
+	if len(q.Options) != MaxItemOptions+1 {
+		t.Fatalf("options = %d，要 %d 個品項加「其他」", len(q.Options), MaxItemOptions+1)
+	}
+	if q.Options[0].Value != "大類 > 品項" || q.Options[0].ID != "category-1" || q.Options[MaxItemOptions-1].ID != "category-5" {
+		t.Errorf("options = %+v：要帶路徑、依給定順序截前 5 個", q.Options)
+	}
+	if last := q.Options[MaxItemOptions]; last.ID != ItemOtherOptionID || last.Kind != OptionOther {
+		t.Errorf("last = %+v", last)
+	}
+	if !q.AllowFreeText || q.CanSkip {
+		t.Errorf("要開放自由輸入、不可跳過：%+v", q)
+	}
 }
 
 func TestNextOptionalStreakParity(t *testing.T) {
