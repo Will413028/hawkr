@@ -7,6 +7,7 @@ import 'package:hawkr_seller/features/customer/data/customer_model.dart';
 import 'package:hawkr_seller/features/customer/data/customer_repository.dart';
 import 'package:hawkr_seller/features/customer/presentation/customer_controller.dart';
 import 'package:hawkr_seller/features/customer/presentation/customer_management_screen.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -146,6 +147,52 @@ void main() {
       find.byKey(const ValueKey('seller-customers-error-state')),
       findsNothing,
     );
+  });
+
+  test(
+    'sort labels come from the catalog; UNSPECIFIED reads as first order',
+    () {
+      expect(
+        customerSortLabel(
+          CustomerSort.CUSTOMER_SORT_ORDER_COUNT,
+          UiLocale.zhTW,
+        ),
+        '訂單數',
+      );
+      expect(
+        customerSortLabel(
+          CustomerSort.CUSTOMER_SORT_TOTAL_SPENT,
+          UiLocale.zhTW,
+        ),
+        '消費金額',
+      );
+      expect(
+        customerSortLabel(
+          CustomerSort.CUSTOMER_SORT_UNSPECIFIED,
+          UiLocale.zhTW,
+        ),
+        '首購時間',
+      );
+    },
+  );
+
+  test('a deleted customer shows the catalog deleted name', () {
+    const c = Customer(id: 'b1', deleted: true, name: '舊暱稱');
+    expect(
+      c.displayName(UiLocale.zhTW),
+      buyerProfileDeletedName(UiLocale.zhTW),
+    );
+  });
+
+  testWidgets('the default sort label is the order count', (tester) async {
+    final repo = _MockRepo();
+    _stubList(
+      repo,
+      (_) async => const CustomerPage(customers: [], nextPageToken: ''),
+    );
+    await _pump(tester, repo);
+    expect(find.text('訂單數'), findsOneWidget);
+    expect(find.text('消費次數'), findsNothing);
   });
 
   testWidgets(

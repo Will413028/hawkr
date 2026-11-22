@@ -36,7 +36,7 @@ final class ChatConversationsProvider
   ChatConversations create() => ChatConversations();
 }
 
-String _$chatConversationsHash() => r'fb611afda0e45023ed1932c5aee03d241ea7943e';
+String _$chatConversationsHash() => r'3751f57dce4786f7fe4ee33a1e97b827d1b9cfd3';
 
 /// 店家的對話列表。讀取失敗是 [AsyncError]，與「沒有對話」（空的 items）分開。
 

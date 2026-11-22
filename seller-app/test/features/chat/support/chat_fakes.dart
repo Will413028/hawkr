@@ -101,17 +101,12 @@ class FakeChatRepository extends ChatRepository {
   }
 
   @override
-  Future<ChatConversation?> findConversation({
-    String? buyerId,
-    String? conversationId,
-  }) async {
+  Future<ChatConversation?> getConversationByBuyer(String buyerId) async {
     findCalls++;
     final err = listConversationsError;
     if (err != null) throw err;
     for (final c in conversations) {
-      if (buyerId != null ? c.buyer.id == buyerId : c.id == conversationId) {
-        return c;
-      }
+      if (c.buyer.id == buyerId) return c;
     }
     return null;
   }

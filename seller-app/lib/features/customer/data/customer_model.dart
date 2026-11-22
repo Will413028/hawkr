@@ -1,8 +1,7 @@
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:hawkr_api/images.dart';
-
-import '../../../shared/models/buyer_card_info.dart';
 
 /// 店家的標籤（`crm.Tag`）；[id] 是不透明字串。
 class CustomerTag {
@@ -70,9 +69,9 @@ class Customer {
 
   bool get isVip => type == CustomerType.CUSTOMER_TYPE_VIP;
 
-  /// 顯示名稱：已刪除的買家顯示 [deletedBuyerLabel]，沒有暱稱時用「買家」。
-  String get displayName => deleted
-      ? deletedBuyerLabel
+  /// 顯示名稱：已刪除的買家用目錄的 `buyer.Profile.deleted_name`，沒有暱稱時用「買家」。
+  String displayName(UiLocale l) => deleted
+      ? buyerProfileDeletedName(l)
       : name.isNotEmpty
       ? name
       : '買家';

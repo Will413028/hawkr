@@ -118,14 +118,14 @@ class ChatThread extends _$ChatThread {
     if (arg.peerId.isEmpty && (arg.conversationId ?? '').isEmpty) {
       throw ArgumentError('chat thread needs a peerId or a conversationId');
     }
-    // 契約沒有依買家讀對話的方法：先看列表載入時記下的，沒有再逐頁找。
+    // 先看列表載入時記下的，沒有再依買家向伺服器取；只有對話 ID 又沒記下時，買家資料留空。
     var conv = _session.conversationFor(
       conversationId: arg.conversationId,
       buyerId: arg.peerId,
     );
-    conv ??= (arg.conversationId ?? '').isNotEmpty
-        ? await _repo.findConversation(conversationId: arg.conversationId)
-        : await _repo.findConversation(buyerId: arg.peerId);
+    if (conv == null && arg.peerId.isNotEmpty) {
+      conv = await _repo.getConversationByBuyer(arg.peerId);
+    }
     final convId = conv?.id ?? arg.conversationId;
     if (convId == null || convId.isEmpty) {
       return const ChatThreadData(
@@ -191,7 +191,7 @@ class ChatThread extends _$ChatThread {
     if (_adopting || arg.peerId.isEmpty) return;
     _adopting = true;
     try {
-      final found = await _repo.findConversation(buyerId: arg.peerId);
+      final found = await _repo.getConversationByBuyer(arg.peerId);
       final cur = state.value;
       if (!ref.mounted ||
           found == null ||

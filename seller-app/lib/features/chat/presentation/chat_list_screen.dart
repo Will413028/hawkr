@@ -11,7 +11,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import '../../../core/l10n/ui_locale.dart';
-import '../../../shared/models/buyer_card_info.dart';
 import '../data/chat_conversations_notifier.dart';
 import '../data/chat_model.dart';
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
@@ -686,7 +685,7 @@ class _ChatItem {
   factory _ChatItem.fromConversation(ChatConversation c, UiLocale locale) {
     final name = c.buyer.name;
     return _ChatItem(
-      title: c.buyer.deleted ? deletedBuyerLabel : (name ?? '顧客'),
+      title: c.buyer.deleted ? buyerProfileDeletedName(locale) : (name ?? '顧客'),
       subtitle: previewText(c.preview, locale),
       date: c.lastMessageTime == null ? '' : formatTimeAgo(c.lastMessageTime!),
       unreadCount: c.unreadCount,

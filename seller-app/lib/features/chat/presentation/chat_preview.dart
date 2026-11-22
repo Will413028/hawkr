@@ -17,7 +17,7 @@ String formatTimeAgo(DateTime dt) {
   return '${dt.year}/${dt.month}/${dt.day}';
 }
 
-/// 對話列表預覽的文字：墓碑與圖片用目錄的句子，文字訊息用內容；伺服器沒有帶預覽，或種類不認得時是空字串。
+/// 對話列表預覽的文字：墓碑與圖片用目錄的句子，文字訊息用內容；伺服器沒有帶預覽時是空字串，種類不認得（含 UNSPECIFIED）時用目錄的「不支援的訊息」。
 String previewText(ChatPreview? p, UiLocale locale) {
   if (p == null) return '';
   if (p.erased) return chatPreviewErased(locale);
@@ -25,7 +25,7 @@ String previewText(ChatPreview? p, UiLocale locale) {
   return switch (p.kind) {
     pb.MessageKind.MESSAGE_KIND_IMAGE => chatPreviewImage(locale),
     pb.MessageKind.MESSAGE_KIND_TEXT => p.text ?? '',
-    _ => '',
+    _ => chatMessageUnsupportedKind(locale),
   };
 }
 

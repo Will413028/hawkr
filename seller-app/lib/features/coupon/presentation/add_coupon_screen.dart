@@ -222,7 +222,8 @@ class AddCouponScreen extends HookConsumerWidget {
       if (picked == null || picked.isEmpty || !context.mounted) return;
       selectedUsers.value = [
         ...selectedUsers.value,
-        for (final c in picked) {'name': c.displayName, 'id': c.id},
+        for (final c in picked)
+          {'name': c.displayName(context.uiLocale), 'id': c.id},
       ];
     }
 

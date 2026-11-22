@@ -1,5 +1,6 @@
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -25,12 +26,20 @@ import '../data/customer_model.dart';
 import 'customer_controller.dart';
 import 'customer_load_more_footer.dart';
 
-/// 排序選項的標籤與對應的契約排序（`CustomerSort` 不在共用文案目錄，標籤是這個畫面的控制項文字）。
-const customerSortOptions = <({String label, CustomerSort sort})>[
-  (label: '消費次數', sort: CustomerSort.CUSTOMER_SORT_ORDER_COUNT),
-  (label: '消費金額', sort: CustomerSort.CUSTOMER_SORT_TOTAL_SPENT),
-  (label: '首購時間', sort: CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME),
+/// 排序選項（契約的 `CustomerSort`）；標籤取自共用文案目錄。
+const customerSortOptions = <CustomerSort>[
+  CustomerSort.CUSTOMER_SORT_ORDER_COUNT,
+  CustomerSort.CUSTOMER_SORT_TOTAL_SPENT,
+  CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME,
 ];
+
+/// 排序的標籤：UNSPECIFIED 依契約等同首購時間，先正規化再查目錄。
+String customerSortLabel(CustomerSort sort, UiLocale l) {
+  final s = sort == CustomerSort.CUSTOMER_SORT_UNSPECIFIED
+      ? CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME
+      : sort;
+  return s.uiText(l) ?? commonUnknown(l);
+}
 
 class CustomerManagementScreen extends ConsumerWidget {
   const CustomerManagementScreen({super.key});
@@ -40,12 +49,8 @@ class CustomerManagementScreen extends ConsumerWidget {
     final filter = ref.watch(customerFilterProvider);
     final filterNotifier = ref.read(customerFilterProvider.notifier);
     final asyncCustomers = ref.watch(customerListProvider);
-    final sortLabel = customerSortOptions
-        .firstWhere(
-          (o) => o.sort == filter.sort,
-          orElse: () => customerSortOptions.first,
-        )
-        .label;
+    final locale = context.uiLocale;
+    final sortLabel = customerSortLabel(filter.sort, locale);
 
     return Scaffold(
       backgroundColor: AppColors.surfacePage,
@@ -69,9 +74,9 @@ class CustomerManagementScreen extends ConsumerWidget {
               sortLabel: sortLabel,
               onSortSelected: (label) {
                 final option = customerSortOptions.firstWhere(
-                  (o) => o.label == label,
+                  (o) => customerSortLabel(o, locale) == label,
                 );
-                filterNotifier.setSort(option.sort);
+                filterNotifier.setSort(option);
               },
             ),
             _CustomerTabBar(
@@ -173,7 +178,10 @@ class _CustomerControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sort = AppDropdown(
-      items: [for (final o in customerSortOptions) o.label],
+      items: [
+        for (final o in customerSortOptions)
+          customerSortLabel(o, context.uiLocale),
+      ],
       selectedItem: sortLabel,
       onSelected: onSortSelected,
       showSearch: false,
@@ -233,7 +241,12 @@ class _CustomerTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tabs = <({String label, CustomerType? type})>[
       (label: '全部顧客', type: null),
-      (label: 'VIP', type: CustomerType.CUSTOMER_TYPE_VIP),
+      (
+        label:
+            CustomerType.CUSTOMER_TYPE_VIP.uiText(context.uiLocale) ??
+            commonUnknown(context.uiLocale),
+        type: CustomerType.CUSTOMER_TYPE_VIP,
+      ),
     ];
     final selectedIndex = tabs.indexWhere((tab) => tab.type == selectedType);
     return Padding(
@@ -269,7 +282,7 @@ class _CustomerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return HkContentCard(
       onTap: onTap,
-      semanticLabel: '查看顧客 ${customer.displayName}',
+      semanticLabel: '查看顧客 ${customer.displayName(context.uiLocale)}',
       padding: const EdgeInsets.symmetric(
         horizontal: HkSpace.lg,
         vertical: HkSpace.md,
@@ -352,7 +365,7 @@ class _CustomerCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        customer.displayName,
+                        customer.displayName(context.uiLocale),
                         style: TextStyle(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w700,

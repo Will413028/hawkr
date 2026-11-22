@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
@@ -8,7 +7,6 @@ import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_seller/features/review/data/review_repository.dart';
 
 import '../../support/connect_errors.dart';
-import '../../support/default_error_text.dart';
 
 ReviewRepository _repo(FakeTransportBuilder t) {
   final transport = t.build();
@@ -113,46 +111,5 @@ void main() {
     expect(found?.id, 'b');
     expect(tokens, ['', 't2']);
     expect(await repo.findOwnStoreReviewByOrderItems({'none'}), isNull);
-  });
-
-  test(
-    'ReplyReview sends review_id and content and returns the reply',
-    () async {
-      final requests = <pb.ReplyReviewRequest>[];
-      final repo = _repo(
-        FakeTransportBuilder().unary(ReviewAppService.replyReview, (r, _) {
-          requests.add(r);
-          return pb.ReplyReviewResponse(
-            review: pb.Review(
-              id: r.reviewId,
-              reply: pb.ReviewReply(content: r.content),
-            ),
-          );
-        }),
-      );
-      final out = await repo.replyReview('r9', '謝謝');
-      expect(requests.single.reviewId, 'r9');
-      expect(requests.single.content, '謝謝');
-      expect(out.reply?.content, '謝謝');
-    },
-  );
-
-  test('ReplyReview errors surface the server sentence', () async {
-    final repo = _repo(
-      FakeTransportBuilder().unary(
-        ReviewAppService.replyReview,
-        (r, _) => throw reasonError(
-          Code.failedPrecondition,
-          'REVIEW_NOT_REPLYABLE',
-          message: '這則評價目前無法回覆',
-        ),
-      ),
-    );
-    try {
-      await repo.replyReview('r', 'x');
-      fail('should throw');
-    } catch (e) {
-      expect(errorText(e, defaults: zhDefaultErrorText), '這則評價目前無法回覆');
-    }
   });
 }

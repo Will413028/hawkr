@@ -1,3 +1,4 @@
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -48,9 +49,9 @@ class BlockedBuyerItem {
     return other.buyerId.compareTo(buyerId);
   }
 
-  /// 顯示名稱：已刪除的買家顯示 [deletedBuyerLabel]，沒有名稱時用「買家」。
-  String get displayLabel => deleted
-      ? deletedBuyerLabel
+  /// 顯示名稱：已刪除的買家用目錄的 `buyer.Profile.deleted_name`，沒有名稱時用「買家」。
+  String displayLabel(UiLocale l) => deleted
+      ? buyerProfileDeletedName(l)
       : name.isNotEmpty
       ? name
       : '買家';

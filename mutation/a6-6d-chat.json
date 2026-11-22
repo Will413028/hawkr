@@ -134,15 +134,6 @@
    "new": "afterSeq: _zero + afterSeq,",
    "test": "test/features/chat/chat_repository_test.dart listAfter pages with after_seq",
    "why": "補洞分頁不再往後推 after_seq"
-  },
-  {
-   "id": "find-conversation-by-buyer",
-   "stack": "flutter:seller-app",
-   "file": "seller-app/lib/features/chat/data/chat_repository.dart",
-   "old": "if (buyerId != null ? c.buyer.id == buyerId : c.id == conversationId) {",
-   "new": "if (c.id == conversationId) {",
-   "test": "test/features/chat/chat_repository_test.dart findConversation pages through the list",
-   "why": "依買家 ID 找對話不再比對買家"
   }
  ]
 }

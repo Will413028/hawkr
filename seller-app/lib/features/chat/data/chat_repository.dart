@@ -2,6 +2,8 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+
 import '../../../core/networking/connect_provider.dart';
 import 'chat_model.dart';
 
@@ -38,23 +40,17 @@ class ChatRepository {
     );
   }
 
-  /// 找一個對話：以買家 ID 或對話 ID 比對；沒有時是 null。契約沒有依買家或 ID 讀單一對話的方法，所以逐頁翻對話列表。
-  Future<ChatConversation?> findConversation({
-    String? buyerId,
-    String? conversationId,
-  }) async {
-    assert((buyerId == null) != (conversationId == null));
-    var token = '';
-    do {
-      final page = await listConversations(pageToken: token);
-      for (final c in page.items) {
-        if (buyerId != null ? c.buyer.id == buyerId : c.id == conversationId) {
-          return c;
-        }
-      }
-      token = page.nextPageToken;
-    } while (token.isNotEmpty);
-    return null;
+  /// 依買家取對話（一對買家與店家只有一個）；還沒有對話（not_found）時是 null，其他錯誤原樣丟出。
+  Future<ChatConversation?> getConversationByBuyer(String buyerId) async {
+    try {
+      final res = await _chat.getStoreConversationByBuyer(
+        pb.GetStoreConversationByBuyerRequest(buyerId: buyerId),
+      );
+      return ChatConversation.fromProto(res.conversation);
+    } on Object catch (e) {
+      if (ConnectException.from(e).code == Code.notFound) return null;
+      rethrow;
+    }
   }
 
   /// 往舊的方向載入：[beforeSeq] 不給是從最新開始；回傳依 seq 由小到大。
@@ -147,10 +143,6 @@ class ChatRepository {
         uptoSeq: _zero + uptoSeq,
       ),
     );
-  }
-
-  Future<void> markAllRead() async {
-    await _chat.markAllStoreRead(pb.MarkAllStoreReadRequest());
   }
 
   Future<int> unreadCount() async {

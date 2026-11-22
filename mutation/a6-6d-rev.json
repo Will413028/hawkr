@@ -28,15 +28,6 @@
    "why": "The lookup never advances past the first page."
   },
   {
-   "id": "reply-content-dropped",
-   "stack": "flutter:seller-app",
-   "file": "seller-app/lib/features/review/data/review_repository.dart",
-   "old": "pb.ReplyReviewRequest(reviewId: reviewId, content: content)",
-   "new": "pb.ReplyReviewRequest(reviewId: reviewId)",
-   "test": "test/features/review/review_repository_test.dart ReplyReview sends review_id and content",
-   "why": "The reply text is not sent."
-  },
-  {
    "id": "report-wrong-kind",
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/report/data/moderation_repository.dart",

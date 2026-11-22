@@ -43,16 +43,20 @@ void main() {
       );
     });
 
-    test('no preview or an unknown kind is empty, never raw payload', () {
-      expect(previewText(null, UiLocale.zhTW), '');
-      expect(
-        previewText(
-          _p(kind: pb.MessageKind.MESSAGE_KIND_UNSPECIFIED, text: '{"a":1}'),
-          UiLocale.zhTW,
-        ),
-        '',
-      );
-    });
+    test(
+      'no preview is empty; an unknown kind shows the catalog sentence, never raw payload',
+      () {
+        expect(previewText(null, UiLocale.zhTW), '');
+        expect(
+          previewText(
+            _p(kind: pb.MessageKind.MESSAGE_KIND_UNSPECIFIED, text: '{"a":1}'),
+            UiLocale.zhTW,
+          ),
+          chatMessageUnsupportedKind(UiLocale.zhTW),
+        );
+        expect(chatMessageUnsupportedKind(UiLocale.zhTW), '不支援的訊息');
+      },
+    );
   });
 
   group('tombstoneText', () {

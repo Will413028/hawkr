@@ -9,6 +9,7 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -137,7 +138,7 @@ class ChatThreadScreen extends HookConsumerWidget {
     }, [lastCount]);
 
     final peerName = (data?.buyer?.deleted ?? false)
-        ? '已刪除帳號'
+        ? buyerProfileDeletedName(locale)
         : (data?.buyer?.name ?? (title.isNotEmpty ? title : '顧客'));
     final peerAvatar = data?.buyer?.avatarUri;
 
@@ -255,7 +256,14 @@ class ChatThreadScreen extends HookConsumerWidget {
           ),
         );
       } else {
-        content = const SizedBox.shrink();
+        content = Text(
+          chatMessageUnsupportedKind(locale),
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontStyle: FontStyle.italic,
+            color: mine ? AppIconColors.onBrand : AppColors.textSecondary,
+          ),
+        );
       }
       final read = mine && m.seq > 0 && m.seq <= (data?.peerReadSeq ?? 0);
       return Padding(

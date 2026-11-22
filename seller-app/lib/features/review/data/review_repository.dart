@@ -178,12 +178,4 @@ class ReviewRepository {
     }
     return null;
   }
-
-  /// 回覆評價（已有回覆時覆蓋）。失敗的文字由呼叫端用 `errorText` 顯示伺服器的句子。
-  Future<ReviewItem> replyReview(String reviewId, String content) async {
-    final res = await _app.replyReview(
-      pb.ReplyReviewRequest(reviewId: reviewId, content: content),
-    );
-    return ReviewItem.fromProto(res.review);
-  }
 }

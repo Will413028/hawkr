@@ -3,6 +3,7 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
 
 import 'support/chat_fakes.dart';
@@ -97,26 +98,48 @@ void main() {
     expect(page.messages.map((m) => m.seq), [3, 4, 5]);
   });
 
-  test('findConversation pages through the list until it matches', () async {
-    var call = 0;
+  test(
+    'getConversationByBuyer sends buyer_id and maps the conversation',
+    () async {
+      final seen = <String>[];
+      final repo = _repo(
+        FakeTransportBuilder().unary(
+          ChatAppService.getStoreConversationByBuyer,
+          (req, _) async {
+            seen.add(req.buyerId);
+            return pb.GetStoreConversationByBuyerResponse(
+              conversation: protoConversation('c2', 'b2'),
+            );
+          },
+        ),
+      );
+      final c = await repo.getConversationByBuyer('b2');
+      expect(seen, ['b2']);
+      expect(c?.id, 'c2');
+      expect(c?.buyer.id, 'b2');
+    },
+  );
+
+  test('getConversationByBuyer maps not_found to null', () async {
     final repo = _repo(
-      FakeTransportBuilder().unary(ChatAppService.listStoreConversations, (
-        req,
-        _,
-      ) async {
-        call++;
-        return call == 1
-            ? pb.ListStoreConversationsResponse(
-                conversations: [protoConversation('c1', 'b1')],
-                nextPageToken: 't2',
-              )
-            : pb.ListStoreConversationsResponse(
-                conversations: [protoConversation('c2', 'b2')],
-              );
-      }),
+      FakeTransportBuilder().unary(
+        ChatAppService.getStoreConversationByBuyer,
+        (req, _) async => throw ConnectException(Code.notFound, 'none'),
+      ),
     );
-    expect((await repo.findConversation(buyerId: 'b2'))?.id, 'c2');
-    call = 0;
-    expect(await repo.findConversation(buyerId: 'none'), isNull);
+    expect(await repo.getConversationByBuyer('b9'), isNull);
+  });
+
+  test('getConversationByBuyer rethrows other errors', () async {
+    final repo = _repo(
+      FakeTransportBuilder().unary(
+        ChatAppService.getStoreConversationByBuyer,
+        (req, _) async => throw ConnectException(Code.unavailable, 'down'),
+      ),
+    );
+    await expectLater(
+      repo.getConversationByBuyer('b1'),
+      throwsA(isA<ConnectException>()),
+    );
   });
 }

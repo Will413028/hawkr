@@ -81,6 +81,13 @@ void main() {
     },
   );
 
+  test('opens by buyer through the by-buyer lookup, not a list scan', () async {
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    expect(repo.findCalls, 1);
+  });
+
   test(
     'no conversation yet: empty thread, first send uses SendMessageToBuyer',
     () async {

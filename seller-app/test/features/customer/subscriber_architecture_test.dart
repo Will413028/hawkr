@@ -13,6 +13,7 @@ import 'package:hawkr_seller/features/customer/data/subscriber_remote_service.da
 import 'package:hawkr_seller/features/customer/data/subscriber_repository.dart';
 import 'package:hawkr_seller/features/customer/presentation/subscriber_list_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 void main() {
@@ -60,7 +61,7 @@ void main() {
       expect(page.nextPageToken, 'cursor-2');
       final [named, deleted] = page.subscribers;
       expect(named.buyerId, '1');
-      expect(named.displayName, '陳小農');
+      expect(named.displayName(UiLocale.zhTW), '陳小農');
       expect(named.avatarUrl, 'https://media.example.com/i/avatar/a.png');
       expect(named.deleted, isFalse);
       expect(deleted.buyerId, '2');
@@ -92,7 +93,7 @@ void main() {
           .read(subscriberListControllerProvider.notifier)
           .resolveCustomer('42');
 
-      expect(value.subscribers.single.displayName, '測試買家');
+      expect(value.subscribers.single.displayName(UiLocale.zhTW), '測試買家');
       expect(customer?.id, 'customer-42');
       expect(repository.resolvedAccountIds, ['42']);
       expect(

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import 'chat_model.dart';
 import 'chat_repository.dart';
 import 'chat_session.dart';
@@ -136,18 +135,5 @@ class ChatConversations extends _$ChatConversations {
         latest.copyWith(loadingMore: false, loadMoreFailed: true),
       );
     }
-  }
-
-  /// 把全部對話標成已讀，列表上的未讀數歸零。
-  Future<void> markAllRead() async {
-    await ref.read(chatRepositoryProvider).markAllRead();
-    final cur = state.value;
-    if (!ref.mounted || cur == null) return;
-    state = AsyncData(
-      cur.copyWith(
-        items: [for (final c in cur.items) c.copyWith(unreadCount: 0)],
-      ),
-    );
-    ref.invalidate(dashboardChatUnreadProvider);
   }
 }

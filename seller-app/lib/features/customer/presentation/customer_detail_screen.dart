@@ -107,7 +107,10 @@ class CustomerDetailScreen extends HookConsumerWidget {
     void openOrders() {
       context.push(
         '/customer/orders',
-        extra: {'customerName': c.displayName, 'customerId': customer.id},
+        extra: {
+          'customerName': c.displayName(context.uiLocale),
+          'customerId': customer.id,
+        },
       );
     }
 
@@ -199,7 +202,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
       child: Scaffold(
         backgroundColor: AppColors.bgPrimary,
         appBar: HkGlassAppBar(
-          title: Text(c.displayName),
+          title: Text(c.displayName(context.uiLocale)),
           subtitle: '顧客 360',
           onBackPressed: popWithResult,
           actions: [
@@ -207,7 +210,10 @@ class CustomerDetailScreen extends HookConsumerWidget {
               tooltip: '聯絡顧客',
               onPressed: () => context.push(
                 '/chat/thread',
-                extra: {'title': c.displayName, 'participantId': c.id},
+                extra: {
+                  'title': c.displayName(context.uiLocale),
+                  'participantId': c.id,
+                },
               ),
               icon: const HkIcon(
                 HkIconName.chat,
@@ -322,7 +328,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
         ),
         SizedBox(height: 12.h),
         Text(
-          customer.displayName,
+          customer.displayName(context.uiLocale),
           style: TextStyle(
             fontSize: 20.sp,
             fontWeight: FontWeight.w700,

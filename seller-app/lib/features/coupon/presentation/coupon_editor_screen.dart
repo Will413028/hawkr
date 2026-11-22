@@ -300,7 +300,7 @@ class CouponEditorScreen extends HookConsumerWidget {
         ...selectedUsers.value,
         for (final c in picked)
           {
-            'name': c.displayName,
+            'name': c.displayName(context.uiLocale),
             'accountId': c.id,
             'avatarUrl': c.avatarUrl ?? '',
           },

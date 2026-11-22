@@ -105,7 +105,7 @@ class _CustomerPickerSheetState extends ConsumerState<_CustomerPickerSheet> {
                   CheckboxListTile(
                     key: ValueKey('coupon-picker-${c.id}'),
                     value: _selected.containsKey(c.id),
-                    title: Text(c.displayName),
+                    title: Text(c.displayName(context.uiLocale)),
                     subtitle: Text('ID ${c.id}'),
                     onChanged: (v) => setState(() {
                       if (v == true) {
