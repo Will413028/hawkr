@@ -19,7 +19,8 @@
 ///   同區塊之後的敘述）、`case`（switch 敘述與運算式；樣式裡任何位置的 `E.M` 或 `== E.M`，加 `when`）、`key`（map 的 key
 ///   對應的值）、`pair`（同一個 record、引數列、list、字串 key 的 map 裡與 `E.M` 並列的其他成員；不進入巢狀函式）。
 ///   條件裡的識別字若是用到之前宣告的 `final`／`const`，初始值是比較或 `cond ? x : null`，就代入（別名，一層一層）。
-/// - 產生文字：區域裡有含漢字的字串，或引用作用域可見的 `final`／`const`，其初始值是含漢字的字串：同檔的（頂層或函式內）
+/// - 產生文字：區域裡有 App 自己的 ARB 查詢（`AppLocalizations.of(context).x`、`context.l10n.x`、`context.l10n.x(arg)`，或
+///   指到這種初始值的 `final`／`const` 別名後的成員存取與呼叫）；有含漢字的字串，或引用作用域可見的 `final`／`const`，其初始值是含漢字的字串：同檔的（頂層或函式內）
 ///   或 import 自同一個 client 目錄樹內另一個檔、該檔頂層的；同檔 record 或 map 常數的成員（`text.key`、`text['key']`）
 ///   值含漢字也算。不分是 return、賦值、widget 參數還是 `throw`。參數、`var` 會遮住同名的常數。
 ///
@@ -31,8 +32,8 @@
 /// 第二個 client 對只有一個 client 用的 enum，以條件形式寫出值的說法（跨端檢查只比對對照表，看不到條件形式）。
 /// 這些由 code review 把關；會發佈 en 的介面另有字面值 ratchet（I-CI）。
 /// 觸發：dot shorthand（`.M`）要 Dart 3.10 才能寫，任一 Dart 專案的 SDK 下限提到 3.10 以上時，以成員名
-/// （buf 強制 `ENUM_VALUE_PREFIX`，成員名對得回唯一的 enum）支援；「產生文字」要加進 ARB 查詢（計畫 I-app-0），
-/// 與 I-app-0 同一刀。
+/// （buf 強制 `ENUM_VALUE_PREFIX`，成員名對得回唯一的 enum）支援。ARB 查詢已在 I-app-0 加進「產生文字」；
+/// 型別是 `AppLocalizations` 的參數（`Widget f(AppLocalizations l10n)`）不認得（只做語法分析，參數一律視為遮蔽）。
 ///
 /// 用法（在 packages/hawkr_ui_text）：`dart run tool/check_enum_text.dart [--report <file>] <dir>...`
 library;
@@ -354,7 +355,31 @@ class _TextFinder extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitPropertyAccess(PropertyAccess node) {
+    final target = node.target;
+    if (target != null && scan.isArbAccessor(target)) {
+      found = true;
+      return;
+    }
+    super.visitPropertyAccess(node);
+  }
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    final target = node.target;
+    if (target != null && scan.isArbAccessor(target)) {
+      found = true;
+      return;
+    }
+    super.visitMethodInvocation(node);
+  }
+
+  @override
   void visitPrefixedIdentifier(PrefixedIdentifier node) {
+    if (scan.isArbAccessor(node.prefix)) {
+      found = true;
+      return;
+    }
     if (scan.isObjectConstText(node.prefix, node.identifier.name)) {
       found = true;
       return;
@@ -478,6 +503,28 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
     final v = _lookup(id);
     if (v != null) return !v.shadow && _isHanStringInit(v.init);
     return importedConsts.contains(id.name);
+  }
+
+  /// App 自己的 ARB 查詢（gen-l10n 生成的 `AppLocalizations`）：`AppLocalizations.of(x)`、`x.l10n`（可帶 `!`），或指到這種初始值
+  /// 的 `final`／`const`（`final l10n = context.l10n;`）。後面接成員存取或呼叫就是產生文字（I-app-0）。
+  bool isArbAccessor(Expression e) {
+    final cur = _strip(e);
+    if (cur is PostfixExpression && cur.operator.type == TokenType.BANG) {
+      return isArbAccessor(cur.operand);
+    }
+    if (cur is MethodInvocation) {
+      final target = cur.target;
+      return cur.methodName.name == 'of' &&
+          target is SimpleIdentifier &&
+          target.name == 'AppLocalizations';
+    }
+    if (cur is PrefixedIdentifier) return cur.identifier.name == 'l10n';
+    if (cur is PropertyAccess) return cur.propertyName.name == 'l10n';
+    if (cur is SimpleIdentifier) {
+      final v = _lookup(cur);
+      return v != null && !v.shadow && v.init != null && isArbAccessor(v.init!);
+    }
+    return false;
   }
 
   /// `TEXT.key`（record 常數的欄位）、`TEXT['key']`（map 常數的字串 key）：同檔的物件常數，
