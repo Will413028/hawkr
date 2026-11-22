@@ -582,13 +582,17 @@ func TestAutoTitleUpdatesOnlyWhileAutoAndStaysEmptyWithoutAnItem(t *testing.T) {
 	}
 }
 
-func TestMatchingRegressesWhenASearchFieldChangesAndStaysOtherwise(t *testing.T) {
+func TestMatchingRegressesOnlyWhenTheItemResolutionChanges(t *testing.T) {
 	ctx := context.Background()
 	for name, c := range map[string]struct {
 		patch string
 		want  string
 	}{
-		"改縣市": {`{"delivery_city":"高雄"}`, "REQUIREMENT_READY"},
+		"改品項": {`{"item":"蘋果"}`, "CLARIFYING"},
+		"改縣市": {`{"delivery_city":"高雄"}`, "MATCHING"},
+		"改數量": {`{"quantity":21}`, "MATCHING"},
+		"改單位": {`{"unit":"CATTY"}`, "MATCHING"},
+		"改交期": {`{"delivery_date":"2099-01-01"}`, "MATCHING"},
 		"改包裝": {`{"packaging":"箱"}`, "MATCHING"},
 	} {
 		f := newFixture(t)

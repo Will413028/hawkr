@@ -228,10 +228,10 @@ func TestMatchingRegressesOnlyWhenASearchFieldChanges(t *testing.T) {
 		{"品項解析", func(s *slots.Set) {
 			s.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 6, Label: "香蕉"}
 		}, statusRequirementReady},
-		{"數量", func(s *slots.Set) { v := int32(11); s.Quantity = &v }, statusRequirementReady},
-		{"單位", func(s *slots.Set) { s.Unit = sp("CATTY") }, statusRequirementReady},
-		{"縣市", func(s *slots.Set) { s.DeliveryCity = sp("高雄市") }, statusRequirementReady},
-		{"交期", func(s *slots.Set) { d := d0.AddDate(0, 0, 1); s.DeliveryDate = &d }, statusRequirementReady},
+		{"數量", func(s *slots.Set) { v := int32(11); s.Quantity = &v }, statusMatching},
+		{"單位", func(s *slots.Set) { s.Unit = sp("CATTY") }, statusMatching},
+		{"縣市", func(s *slots.Set) { s.DeliveryCity = sp("高雄市") }, statusMatching},
+		{"交期", func(s *slots.Set) { d := d0.AddDate(0, 0, 1); s.DeliveryDate = &d }, statusMatching},
 	}
 	for _, c := range cases {
 		next := base
@@ -244,7 +244,7 @@ func TestMatchingRegressesOnlyWhenASearchFieldChanges(t *testing.T) {
 		t.Errorf("搜尋欄位沒改就維持 MATCHING（%s）", got)
 	}
 	next := base
-	next.DeliveryCity = sp("高雄市")
+	next.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 6, Label: "香蕉"}
 	if got := nextStatus(statusMatching, base, next, false); got != statusClarifying {
 		t.Errorf("退回時依齊全與否：未齊全是 CLARIFYING（%s）", got)
 	}

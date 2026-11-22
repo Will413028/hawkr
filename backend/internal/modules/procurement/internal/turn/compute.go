@@ -31,8 +31,8 @@ const (
 	statusMatching         = "MATCHING"
 )
 
-// searchAffectingFields 是改了就讓已有的候選搜尋結果失效的欄位（A9-D28(4)、ADR E9）。
-var searchAffectingFields = []model.SlotKey{slots.ItemResolution, slots.Quantity, slots.Unit, slots.DeliveryCity, slots.DeliveryDate}
+// searchAffectingFields 是 MATCHING 時改了就退回的欄位：候選搜尋只用品項解析當輸入（A9-D29(2)）。
+var searchAffectingFields = []model.SlotKey{slots.ItemResolution}
 
 // 自動標題與預覽的長度（以 rune 計，A9-D28(3)）。
 const (
@@ -199,14 +199,6 @@ func fieldDiffers(k model.SlotKey, a, b slots.Set) bool {
 	switch k {
 	case slots.ItemResolution:
 		return !sameContent(slots.Set{Resolution: a.Resolution}, slots.Set{Resolution: b.Resolution})
-	case slots.Quantity:
-		return !sameContent(slots.Set{Quantity: a.Quantity}, slots.Set{Quantity: b.Quantity})
-	case slots.Unit:
-		return !sameContent(slots.Set{Unit: a.Unit}, slots.Set{Unit: b.Unit})
-	case slots.DeliveryCity:
-		return !sameContent(slots.Set{DeliveryCity: a.DeliveryCity}, slots.Set{DeliveryCity: b.DeliveryCity})
-	case slots.DeliveryDate:
-		return !sameContent(slots.Set{DeliveryDate: a.DeliveryDate}, slots.Set{DeliveryDate: b.DeliveryDate})
 	}
 	return false
 }
