@@ -223,7 +223,7 @@ class ChatThreadScreen extends HookConsumerWidget {
         content = Text(
           tomb,
           style: TextStyle(
-            fontSize: 15.sp,
+            fontSize: 16.sp,
             fontStyle: FontStyle.italic,
             color: mine ? AppIconColors.onBrand : AppColors.textSecondary,
           ),
@@ -249,7 +249,7 @@ class ChatThreadScreen extends HookConsumerWidget {
         content = Text(
           m.text ?? '',
           style: TextStyle(
-            fontSize: 15.sp,
+            fontSize: 16.sp,
             height: 1.4,
             color: mine ? AppIconColors.onBrand : AppColors.textPrimary,
           ),

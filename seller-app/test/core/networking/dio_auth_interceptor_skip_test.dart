@@ -153,7 +153,7 @@ void main() {
     final (container, dio, adapter, auth) = await buildContainer();
 
     await dio.get<dynamic>(
-      '/api/v1/app/chat/unread',
+      '/api/v1/app/notifications/unread-count',
       options: Options(validateStatus: (_) => true),
     );
 
@@ -166,7 +166,7 @@ void main() {
     final (container, dio, adapter, _) = await buildContainer();
 
     await expectLater(
-      dio.get<dynamic>('/api/v1/app/chat/unread'),
+      dio.get<dynamic>('/api/v1/app/notifications/unread-count'),
       throwsA(isA<DioException>()),
     );
 
@@ -179,7 +179,7 @@ void main() {
     auth.tokenError = const SocketException('offline');
 
     await expectLater(
-      dio.get<dynamic>('/api/v1/app/chat/unread'),
+      dio.get<dynamic>('/api/v1/app/notifications/unread-count'),
       throwsA(
         isA<DioException>().having(
           (e) => e.type,

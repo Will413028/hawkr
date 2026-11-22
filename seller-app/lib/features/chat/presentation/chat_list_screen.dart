@@ -5,7 +5,6 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,6 +17,7 @@ import '../data/chat_model.dart';
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import '../../../config/image_config.dart';
 import '../../../shared/widgets/hk_async_state_panel.dart';
+import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
@@ -125,7 +125,7 @@ class ChatListScreen extends HookConsumerWidget {
                   return data.loadMoreFailed
                       ? TextButton(
                           onPressed: notifier.loadMore,
-                          child: const Text('載入更多失敗，點此重試'),
+                          child: const HkButtonLabel('載入更多失敗，點此重試'),
                         )
                       : const Padding(
                           padding: EdgeInsets.all(HkSpace.md),
