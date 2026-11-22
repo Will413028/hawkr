@@ -22,6 +22,9 @@ import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/buyer_avatar_widget.dart';
 import '../../../shared/widgets/step_indicator.dart';
 import 'order_status_presentation.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/l10n/ui_locale.dart';
+import '../../review/data/review_repository.dart';
 
 class SharedOrderDetailScreen extends HookConsumerWidget {
   const SharedOrderDetailScreen({
@@ -121,7 +124,7 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
 
     // 訂單評分（買家評論這筆訂單後可見）
     // 優先從 detail API 自帶欄位讀；沒回的話會在 _OrderRatingCard 內部
-    // fallback 到 GET /app/sellers/me/reviews 反查（B-145 完成前的解法）。
+    // fallback 到 ListOwnStoreReviews 反查（B-145 完成前的解法）。
     final orderRating = _parseRating(
       raw?['rating'] ?? raw?['reviewRating'] ?? raw?['review']?['rating'],
     );
@@ -1473,8 +1476,8 @@ String _itemLineTotal(OrderItem item) {
 //
 // 資料來源優先順序：
 // 1. caller 傳入 fallbackRating > 0 → 用 detail API 自帶（B-145 之後生效）
-// 2. fallback：呼叫 OrderRepository.findReviewByOrderItemIds 反查
-//    /app/sellers/me/reviews，依 order_item_id 比對找出對應 review
+// 2. fallback：呼叫 ReviewRepository.findOwnStoreReviewByOrderItems 在自己店的評價
+//    （ReviewAppService.ListOwnStoreReviews）依 order_item_id 比對找出對應 review
 // ─────────────────────────────────────────────────────────────────
 
 class _OrderRatingCard extends ConsumerStatefulWidget {
@@ -1517,36 +1520,17 @@ class _OrderRatingCardState extends ConsumerState<_OrderRatingCard> {
         images: const <String>[],
       );
     }
-    // Fallback：反查 sellers/me/reviews
-    try {
-      if (widget.orderItemIds.isEmpty) return null;
-      final review = await ref
-          .read(orderRepositoryProvider)
-          .findReviewByOrderItemIds(widget.orderItemIds);
-      if (review == null) return null;
-      final r = review['rating'];
-      int rating = 0;
-      if (r is int) {
-        rating = r.clamp(0, 5);
-      } else if (r is num) {
-        rating = r.round().clamp(0, 5);
-      } else if (r is String) {
-        final n = num.tryParse(r);
-        if (n != null) rating = n.round().clamp(0, 5);
-      }
-      final content = (review['content'] ?? '').toString().trim();
-      final imagesRaw = review['imageUrls'];
-      final images = <String>[];
-      if (imagesRaw is List) {
-        for (final item in imagesRaw) {
-          final url = item?.toString().trim() ?? '';
-          if (url.isNotEmpty) images.add(url);
-        }
-      }
-      return (rating: rating, content: content, images: images);
-    } catch (_) {
-      return null;
-    }
+    // Fallback：在自己店的評價裡依訂單項目 ID 找。讀取失敗丟出例外，與「買家還沒評價」（null）分開。
+    if (widget.orderItemIds.isEmpty) return null;
+    final review = await ref
+        .read(reviewRepositoryProvider)
+        .findOwnStoreReviewByOrderItems(widget.orderItemIds);
+    if (review == null) return null;
+    return (
+      rating: review.rating.clamp(0, 5),
+      content: review.content.trim(),
+      images: review.imageUrls,
+    );
   }
 
   @override
@@ -1556,6 +1540,19 @@ class _OrderRatingCardState extends ConsumerState<_OrderRatingCard> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const SizedBox.shrink();
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: EdgeInsets.only(top: 16.h),
+            child: Text(
+              errorText(
+                snapshot.error!,
+                defaults: ref.read(defaultErrorTextProvider),
+              ),
+              key: const ValueKey('order-rating-card-error'),
+              style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary),
+            ),
+          );
         }
         final data = snapshot.data;
         if (data == null || data.rating <= 0) {

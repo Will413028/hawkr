@@ -9,6 +9,9 @@ import 'package:hawkr_seller/features/report/data/store_block_repository.dart';
 import 'package:hawkr_seller/features/report/presentation/block_list_screen.dart';
 
 class _Repo implements StoreBlockRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+
   int tokenCalls = 0;
   bool failToken = true;
   Completer<BlockedBuyersPage>? hang;

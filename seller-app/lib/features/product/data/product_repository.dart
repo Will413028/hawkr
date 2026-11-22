@@ -130,28 +130,6 @@ class ProductRepository with ApiRequestHelper {
     return apiGet('/api/v1/app/products/$productId/skus');
   }
 
-  // ── 評論 ─────────────────────────────────────────────
-
-  /// `GET /public/products/{id}/reviews`
-  ///
-  /// Page-trap envelope（backend#2216 C8）：`records` / `stats` / `total` /
-  /// `page` / `pageSize` 全部收在 `data` 之下，三個數值欄一併字串化。這裡只取
-  /// `records`；日後若要讀數值欄，一律 `int.tryParse`，不可 `as int`。
-  Future<List<Map<String, dynamic>>> getSellerProductReviewsPublic(
-    String sellerId,
-    dynamic skuId,
-  ) async {
-    final result = await apiGet('/api/v1/public/products/$skuId/reviews');
-    final data = result['data'];
-    if (data is Map) {
-      final records = data['records'];
-      if (records is List) {
-        return records.whereType<Map<String, dynamic>>().toList();
-      }
-    }
-    return [];
-  }
-
   // ── 配送計算 ──────────────────────────────────────────
 
   /// 取得賣家可用的配送方式（含 onboarding 狀態）
@@ -253,24 +231,6 @@ class ProductRepository with ApiRequestHelper {
       '/api/v1/app/categories',
       body: {'name': name, 'parentId': parentId.toString(), 'icon_url': ?icon},
     );
-  }
-
-  // ── 評分 & 評論 ──────────────────────────────────────
-
-  Future<Map<String, dynamic>> getPublicProductRatingSummary(
-    dynamic productId,
-  ) {
-    return apiGet('/api/v1/public/products/$productId/rating');
-  }
-
-  /// 與 [getSellerProductReviewsPublic] 同一支端點、同一份解析，
-  /// 只是給商品預覽頁的另一個入口。**直接委派**，避免兩份 envelope 解析各自
-  /// 漂移（C8 之前它們就是複製貼上的兩份，端點改形狀時得記得改兩處）。
-  Future<List<Map<String, dynamic>>> listPublicProductReviews(
-    String sellerId,
-    dynamic skuId,
-  ) {
-    return getSellerProductReviewsPublic(sellerId, skuId);
   }
 
   Future<List<Map<String, dynamic>>> getSellerProductGrades(

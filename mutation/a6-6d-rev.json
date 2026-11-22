@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "stats-count-zero",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/review/data/review_repository.dart",
+   "old": "ReviewStats.fromProto(res.count, res.average",
+   "new": "ReviewStats.fromProto(0, res.average",
+   "test": "test/features/review/review_repository_test.dart product stats come from GetProductReviewStats",
+   "why": "Stats count no longer comes from the stats RPC."
+  },
+  {
+   "id": "images-filter-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/review/data/review_repository.dart",
+   "old": "        withImages: withImages,\n",
+   "new": "        withImages: false,\n",
+   "test": "test/features/review/review_repository_test.dart product stats come from GetProductReviewStats",
+   "why": "The with_images filter is not sent to the server."
+  },
+  {
+   "id": "own-review-page-token-lost",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/review/data/review_repository.dart",
+   "old": "      token = page.nextPageToken;",
+   "new": "      token = '';",
+   "test": "test/features/review/review_repository_test.dart own store review lookup pages",
+   "why": "The lookup never advances past the first page."
+  },
+  {
+   "id": "reply-content-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/review/data/review_repository.dart",
+   "old": "pb.ReplyReviewRequest(reviewId: reviewId, content: content)",
+   "new": "pb.ReplyReviewRequest(reviewId: reviewId)",
+   "test": "test/features/review/review_repository_test.dart ReplyReview sends review_id and content",
+   "why": "The reply text is not sent."
+  },
+  {
+   "id": "report-wrong-kind",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/report/data/moderation_repository.dart",
+   "old": "REPORT_TARGET_KIND_CHAT_MESSAGE",
+   "new": "REPORT_TARGET_KIND_REVIEW",
+   "test": "test/features/report/moderation_repository_test.dart chat message report carries kind",
+   "why": "The report targets a review instead of the chat message."
+  },
+  {
+   "id": "report-request-id-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/report/data/moderation_repository.dart",
+   "old": "        requestId: requestId,\n",
+   "new": "",
+   "test": "test/features/report/moderation_repository_test.dart chat message report carries kind",
+   "why": "The retry-safe request_id is not sent."
+  },
+  {
+   "id": "block-by-message-wrong-source",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/report/data/store_block_repository.dart",
+   "old": "pb.BlockBuyerRequest(messageId: messageId)",
+   "new": "pb.BlockBuyerRequest(reviewId: messageId)",
+   "test": "test/features/report/moderation_repository_test.dart block by message and by review",
+   "why": "Blocking from a chat message sends a review reference."
+  }
+ ]
+}

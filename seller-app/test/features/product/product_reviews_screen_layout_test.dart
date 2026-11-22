@@ -1,33 +1,41 @@
 import 'package:hawkr_seller/core/theme/app_colors.dart';
-import 'package:hawkr_seller/features/product/data/product_repository.dart';
+import 'package:hawkr_seller/features/review/data/review_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_reviews_screen.dart';
 import 'package:hawkr_seller/shared/widgets/hk_choice_chip.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class _FakeProductRepository extends ProductRepository {
-  _FakeProductRepository() : super(Dio());
+class _FakeReviewRepository implements ReviewRepository {
+  @override
+  Future<ReviewPage> listProductReviews(
+    String productId, {
+    String pageToken = '',
+    int? rating,
+    bool withImages = false,
+  }) async => ReviewPage(
+    reviews: [
+      ReviewItem(
+        id: 'review-1',
+        productId: productId,
+        rating: 5,
+        content: '水果新鮮，包裝也很完整。',
+        imageUrls: const [],
+        authorName: '陳**',
+        authorAvatarUrl: '',
+        createTime: DateTime.utc(2026, 7, 19, 8),
+      ),
+    ],
+    nextPageToken: '',
+  );
 
   @override
-  Future<List<Map<String, dynamic>>> getSellerProductReviewsPublic(
-    String sellerId,
-    dynamic skuId,
-  ) async {
-    return [
-      {
-        'reviewId': 'review-1',
-        'buyerId': 'buyer-1234',
-        'username': '陳**',
-        'rating': 5,
-        'content': '水果新鮮，包裝也很完整。',
-        'createdAt': '2026-07-19T08:00:00Z',
-        'images': const [],
-      },
-    ];
-  }
+  Future<ReviewStats> productStats(String productId) async =>
+      ReviewStats.fromProto(1, 5, const []);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
 void main() {
@@ -42,7 +50,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          productRepositoryProvider.overrideWithValue(_FakeProductRepository()),
+          reviewRepositoryProvider.overrideWithValue(_FakeReviewRepository()),
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
