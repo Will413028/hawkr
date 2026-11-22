@@ -95,7 +95,9 @@ func CommunityReporterSelectable() []Category {
 }
 
 // ReporterSelectable 說明店家治理的檢舉人可不可以選這個類別。
-func (c Category) ReporterSelectable() bool { return slices.Contains(acceptedSellerCreateReportRequestCategory, c) }
+func (c Category) ReporterSelectable() bool {
+	return slices.Contains(acceptedSellerCreateReportRequestCategory, c)
+}
 
 // Assessable 說明店家治理的平台判定與認定可不可以用這個類別。
 func (c Category) Assessable() bool { return c != Other && c.valid() }
