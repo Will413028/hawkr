@@ -59,9 +59,6 @@ func checkIDs(storeID, buyerID int64) error {
 	return nil
 }
 
-// CustomerNotFound 是「這家店沒有這位客戶」的錯誤（本地化訊息與 CUSTOMER_NOT_FOUND 原因）：入口在客戶的買家已不在時回同一個。
-func CustomerNotFound(ctx context.Context) error { return customerNotFound(ctx) }
-
 func customerNotFound(ctx context.Context) error {
 	return model.WithReason(apperr.NotFound("%s", text.CrmCustomerNotFound(uitext.LocaleFrom(ctx))), model.ReasonCustomerNotFound)
 }

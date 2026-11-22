@@ -71,5 +71,4 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 |---|---|---|
 | handler 在寫入提交後以 `BatchDisplay.deleted` 判斷客戶不可見 | 可見性由擁有資料的模組在寫入前判斷 | 不成立；刪除 handler 檢查。寫入路徑的 `lockCustomerParties` 以 `buyer.LockNotClosed`（與 `pub_closed_buyers` 同一事實）在寫入前回 NotFound，`BatchDisplay` 只做顯示對應；`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers` 驗證 NotFound 且什麼都沒寫 |
 | 讀取在店家關閉或不存在時回空頁或略過檢查，寫入回 NotFound | 讀寫同一個結論 | 改：讀取也回 NotFound（客戶層 `CUSTOMER_NOT_FOUND`，`ListTags` 為 `TAG_NOT_FOUND`）；`TestInactiveStoreIsInvisibleAndReadOnlyToSellers` 期望同步改 |
-
-D1（停權時收縮類方法放行）待 Will 決定：`CapContentContract` 的定義只含內容動作，沒有適用 CRM 資料的收縮類能力，目前 9 個方法維持 `CapMarketing`。
+| 停權時依 ADR D3 把收縮類方法與必要讀取放行（social 的 `CapContentContract`） | CRM 資料從不公開，停權的店家沒有東西需要收回 | 不適用（Will 2026-11-22）；九個方法全是 `CapMarketing`，停權整體被擋；ADR 修訂記一行；`TestDeclarationsMatchTheModuleChecks` 守宣告與模組一致，`TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads` 守模組九個方法都擋 |

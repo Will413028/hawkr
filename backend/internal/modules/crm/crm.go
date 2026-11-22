@@ -110,9 +110,6 @@ var (
 // ErasePartyArgs 是清除 job 的參數（job 種類 crm.erase_party）。
 type ErasePartyArgs = purge.ErasePartyArgs
 
-// CustomerNotFound 是「這家店沒有這位客戶」的錯誤，與 GetCustomer 對不存在的客戶回的相同；httpapi 測試用它對照模組回的錯誤。
-func CustomerNotFound(ctx context.Context) error { return write.CustomerNotFound(ctx) }
-
 // ReasonOf 回傳 err 帶的 crm 業務原因；沒有時是空字串。
 func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 

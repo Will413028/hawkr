@@ -242,6 +242,15 @@
    "new": "\t\treturn nil, err\n\t}\n\tif out[0].GetDisplay().GetDeleted() {\n\t\treturn nil, h.failure(crm.CustomerNotFound(ctx), noFieldPaths)\n\t}\n\treturn out[0], nil",
    "test": "internal/httpapi/crm ^TestDeletedDisplayOnlyMapsToDisplayDeleted$",
    "why": "The handler judges visibility again after the module committed the write; visibility belongs to the module."
+  },
+  {
+   "id": "crm-declaration-content-contract",
+   "stack": "go",
+   "file": "backend/internal/httpapi/crm/declaration.go",
+   "old": "\tcrmv1alpha1connect.CrmAppServiceDeleteTagProcedure:         crm.RequiredCapability,",
+   "new": "\tcrmv1alpha1connect.CrmAppServiceDeleteTagProcedure:         seller.CapContentContract,",
+   "test": "internal/httpapi/crm ^TestDeclarationsMatchTheModuleChecks$",
+   "why": "DeleteTag is declared with a suspension-tolerant capability while the module blocks it under suspension; the declarations and module checks drift apart."
   }
  ]
 }

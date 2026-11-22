@@ -474,6 +474,30 @@ func TestStartupFailsWhenTheDeclarationTableDoesNotMatchTheService(t *testing.T)
 	}
 }
 
+// 宣告表與模組的檢查一致（對照 social 的 TestOwnerDeclarationsMatchTheModuleChecks）：模組對每個方法都檢查 crm.RequiredCapability
+// （integration 的 TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads 斷言九個方法在停權時全被擋）。這裡由每個方法宣告的能力推導「停權時擋或放」，
+// 並要求九個方法全是「擋」且關閉的店也擋；宣告改成放行停權的能力（例如 CapContentContract）而模組沒跟著改，這裡就會失敗。
+func TestDeclarationsMatchTheModuleChecks(t *testing.T) {
+	suspended := seller.Store{StoreID: callerStoreID, Conditions: seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true}}
+	closed := seller.Store{StoreID: callerStoreID, Sanctions: seller.NoSanctions(), Conditions: seller.Conditions{Derived: true}}
+	for procedure := range calls(newEnv(t), "11") {
+		declared, ok := declarations[procedure]
+		if !ok {
+			t.Errorf("%s 沒有宣告", procedure)
+			continue
+		}
+		if declared != crm.RequiredCapability {
+			t.Errorf("%s 宣告 %q，模組檢查 %q", procedure, declared, crm.RequiredCapability)
+		}
+		if err := seller.Authorize(suspended, declared); err == nil {
+			t.Errorf("%s：宣告的 %q 在停權時放行，但模組在停權時擋下全部方法（ADR 2026-09-29 的 CRM 分類）", procedure, declared)
+		}
+		if err := seller.Authorize(closed, declared); err == nil {
+			t.Errorf("%s：關閉的店家必須被擋", procedure)
+		}
+	}
+}
+
 func TestListCustomersMapsEveryFieldAndTheDisplayFromBuyer(t *testing.T) {
 	e := newEnv(t)
 	name, avatar := "阿美", "avatars/70.jpg"
@@ -654,7 +678,7 @@ func TestUpdateCustomerSetsOnlyTheType(t *testing.T) {
 
 // 契約：客戶的可見性由模組判斷（寫入前、讀取前回 not_found）；handler 把模組的 not_found 原樣對應，不依 buyer.BatchDisplay 另外判斷。
 func TestSingleCustomerResponsesPassTheModulesNotFoundThrough(t *testing.T) {
-	notFound := func() error { return crm.CustomerNotFound(context.Background()) }
+	notFound := func() error { return apperr.NotFound("%s", "這家店沒有這位客戶") }
 	wantCode, wantMsg := codeOf(notFound()), rpc.ConnectError(context.Background(), notFound()).Message()
 	for procedure := range calls(newEnv(t), "11") {
 		switch procedure {
