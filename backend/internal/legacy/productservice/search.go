@@ -16,29 +16,46 @@ const (
 	searchPageSize = 50
 	// listedStatus 是商品狀態碼的「已上架」。
 	listedStatus = "4004"
+	// salesSort 是 ProductSort 的銷量排序。
+	salesSort = "SALES"
 )
 
-// SearchHit 是關鍵字搜尋結果的一筆上架商品。
+// SearchHit 是搜尋結果的一筆上架商品。
 type SearchHit struct {
 	ID, StoreID        int64
 	Name, ImageKey     string
 	MinPrice, MaxPrice int64
 }
 
-// SearchProducts 以關鍵字搜尋上架商品，只取第一頁（最多 50 筆），不分頁。
-func (c *Client) SearchProducts(ctx context.Context, keyword string) ([]SearchHit, error) {
-	keyword = strings.TrimSpace(keyword)
-	if keyword == "" {
-		return nil, fmt.Errorf("productservice：SearchProducts 缺少關鍵字")
+// SearchQuery 是一次上架商品搜尋：分類 ID 與關鍵字二擇一，依銷量排序，Page 從 1 起、每頁 searchPageSize 筆。
+type SearchQuery struct {
+	CategoryID int64
+	Keyword    string
+	Page       int
+}
+
+// SearchProducts 搜尋上架商品的一頁（最多 50 筆，銷量高的在前）。
+func (c *Client) SearchProducts(ctx context.Context, q SearchQuery) ([]SearchHit, error) {
+	keyword := strings.TrimSpace(q.Keyword)
+	if (q.CategoryID > 0) == (keyword != "") || q.CategoryID < 0 {
+		return nil, fmt.Errorf("productservice：SearchProducts 要分類 ID 或關鍵字其中一個")
+	}
+	if q.Page < 1 {
+		return nil, fmt.Errorf("productservice：SearchProducts 頁碼 %d 小於 1", q.Page)
+	}
+	req := &productpb.GetProductListRequest{
+		Keyword:  keyword,
+		Page:     strconv.Itoa(q.Page),
+		PageSize: strconv.Itoa(searchPageSize),
+		Sort:     salesSort,
+		Status:   listedStatus,
+	}
+	if q.CategoryID > 0 {
+		req.CategoryId = []string{strconv.FormatInt(q.CategoryID, 10)}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	resp, err := c.rpc.GetProductList(ctx, connect.NewRequest(&productpb.GetProductListRequest{
-		Keyword:  keyword,
-		Page:     "1",
-		PageSize: strconv.Itoa(searchPageSize),
-		Status:   listedStatus,
-	}))
+	resp, err := c.rpc.GetProductList(ctx, connect.NewRequest(req))
 	if err != nil {
 		return nil, fmt.Errorf("productservice：GetProductList：%w", err)
 	}
