@@ -12,11 +12,11 @@
     "buyer.Gender.GENDER_OTHER": {
       "message": "Other"
     },
+    "buyer.Profile.deleted_name": {
+      "message": "Deleted account"
+    },
     "buyer.Profile.gender_unset": {
       "message": "Not set"
-    },
-    "chat.ChatBuyer.deleted_name": {
-      "message": "Deleted account"
     },
     "chat.Message.unsupported_kind": {
       "message": "Unsupported message"

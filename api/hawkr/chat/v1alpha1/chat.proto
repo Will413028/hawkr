@@ -148,18 +148,18 @@ message Preview {
 // ChatBuyer 是店家的對話裡的買家：名稱與頭像在讀取時由 buyer 補；帳號已刪除時 deleted 為真，沒有名稱與頭像。
 message ChatBuyer {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 買家的暱稱；沒有設定或已刪除時不設。
+  // 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
   optional string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   hawkr.common.v1alpha1.Image avatar = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   bool deleted = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
 message Conversation {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 對方的店家卡片；只有買家版有。店家從沒公開過時不設（同 StoreCard 的可見性規則），client 顯示「店家」。
   hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 對方的買家；只有店家版有。
+  // 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
   ChatBuyer buyer = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 呼叫者這一方的未讀訊息數。
   int64 unread_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];

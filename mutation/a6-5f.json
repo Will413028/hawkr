@@ -41,9 +41,9 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/im/internal/read/read.go",
    "old": "\tif p.Kind != model.PartyStore {\n\t\treturn model.Conversation{}, apperr.NotFound(",
-   "new": "\tif false {\n\t\treturn model.Conversation{}, apperr.NotFound(",
+   "new": "\tif p.Kind != model.PartyStore {\n\t\treturn model.Conversation{}, apperr.PermissionDenied(",
    "test": "internal/modules/im ^TestStoreConversationByBuyerIsScopedToTheCallersStore$",
-   "why": "Get-by-buyer no longer rejects a buyer-side party."
+   "why": "A buyer-side party is rejected with permission_denied instead of the indistinguishable not_found."
   },
   {
    "id": "conversation-by-buyer-handler-drops-conversation",
@@ -80,6 +80,15 @@
    "new": "err != nil || id < 0",
    "test": "internal/handler ^TestGetMyOrders_SellerView_InvalidBuyerIDIs400AndNeverReachesOrderService$",
    "why": "buyer_id=0 is accepted and downstream treats it as no filter."
+  },
+  {
+   "id": "review-is-mine-ignores-the-viewer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/review.go",
+   "old": "IsMine:     viewer > 0 && r.BuyerID == viewer,",
+   "new": "IsMine:     r.BuyerID > 0,",
+   "test": "internal/httpapi/review ^TestPublicReviewListsMarkOnlyTheSignedInAuthorsOwnReviewsAsMine$",
+   "why": "is_mine becomes true for every review, including other buyers' reviews and anonymous viewers."
   }
  ]
 }

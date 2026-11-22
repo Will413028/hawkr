@@ -160,7 +160,7 @@ export type ChatBuyer = Message$1<"hawkr.chat.v1alpha1.ChatBuyer"> & {
   id: string;
 
   /**
-   * 買家的暱稱；沒有設定或已刪除時不設。
+   * 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
    *
    * @generated from field: optional string name = 2;
    */
@@ -185,7 +185,7 @@ export const ChatBuyerSchema: GenMessage<ChatBuyer> = /*@__PURE__*/
   messageDesc(file_hawkr_chat_v1alpha1_chat, 2);
 
 /**
- * Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+ * Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
  *
  * @generated from message hawkr.chat.v1alpha1.Conversation
  */
@@ -203,7 +203,7 @@ export type Conversation = Message$1<"hawkr.chat.v1alpha1.Conversation"> & {
   store?: StoreCard | undefined;
 
   /**
-   * 對方的買家；只有店家版有。
+   * 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
    *
    * @generated from field: hawkr.chat.v1alpha1.ChatBuyer buyer = 3;
    */

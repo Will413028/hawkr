@@ -52,7 +52,7 @@ func (h *Public) ListProductReviews(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	return respond(ctx, h.presenter, page, scope, false, func(r []*pb.Review, token string) *pb.ListProductReviewsResponse {
+	return respond(ctx, h.presenter, page, scope, false, viewer, func(r []*pb.Review, token string) *pb.ListProductReviewsResponse {
 		return &pb.ListProductReviewsResponse{Reviews: r, NextPageToken: token}
 	})
 }
@@ -80,7 +80,7 @@ func (h *Public) ListStoreReviews(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	return respond(ctx, h.presenter, page, scope, false, func(r []*pb.Review, token string) *pb.ListStoreReviewsResponse {
+	return respond(ctx, h.presenter, page, scope, false, viewer, func(r []*pb.Review, token string) *pb.ListStoreReviewsResponse {
 		return &pb.ListStoreReviewsResponse{Reviews: r, NextPageToken: token}
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -856,7 +857,7 @@ func TestStoreConversationByBuyerIsScopedToTheCallersStore(t *testing.T) {
 		t.Fatalf("對話：%+v", c)
 	}
 	page, err := f.m.ListConversations(ctx, f.storeParty(t, s1), nil, 10)
-	if err != nil || len(page.Items) != 1 || page.Items[0] != c {
+	if err != nil || len(page.Items) != 1 || !reflect.DeepEqual(page.Items[0], c) {
 		t.Fatalf("與列表同形：%+v %v", page, err)
 	}
 	for name, call := range map[string]func() error{

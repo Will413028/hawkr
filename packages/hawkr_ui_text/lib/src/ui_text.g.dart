@@ -88,7 +88,7 @@ return switch ((l, value)) {
 (UiLocale.en, 1) => 'First order date',
 (UiLocale.zhTW, 2) => '消費金額',
 (UiLocale.en, 2) => 'Total spent',
-(UiLocale.zhTW, 3) => '消費次數',
+(UiLocale.zhTW, 3) => '訂單數',
 (UiLocale.en, 3) => 'Order count',
 _ => null,
 };
@@ -613,19 +613,19 @@ UiLocale.en => 'Under review',
 };
 }
 
+/// buyer.Profile.deleted_name
+String buyerProfileDeletedName(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '已刪除帳號',
+UiLocale.en => 'Deleted account',
+};
+}
+
 /// buyer.Profile.gender_unset
 String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '尚未設定',
 UiLocale.en => 'Not set',
-};
-}
-
-/// chat.ChatBuyer.deleted_name
-String chatChatBuyerDeletedName(UiLocale l) {
-return switch (l) {
-UiLocale.zhTW => '已刪除帳號',
-UiLocale.en => 'Deleted account',
 };
 }
 

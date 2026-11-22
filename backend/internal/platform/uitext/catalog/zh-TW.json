@@ -16,13 +16,13 @@
       "message": "其他",
       "description": "Gender 是買家自填的性別。（值 GENDER_OTHER）"
     },
+    "buyer.Profile.deleted_name": {
+      "message": "已刪除帳號",
+      "description": "已刪除帳號的買家顯示的名稱（已刪除的買家沒有名稱與頭像）；店家的對話（ChatBuyer.deleted）、客戶卡片與買家的封鎖名單共用這個詞。"
+    },
     "buyer.Profile.gender_unset": {
       "message": "尚未設定",
       "description": "買家沒有填性別時，性別欄位顯示的文字；也是選單裡清除性別的那一項。"
-    },
-    "chat.ChatBuyer.deleted_name": {
-      "message": "已刪除帳號",
-      "description": "店家的對話裡，買家的 deleted 為真時顯示的名稱（已刪除的買家沒有名稱與頭像）。"
     },
     "chat.Message.unsupported_kind": {
       "message": "不支援的訊息",
@@ -193,7 +193,7 @@
       "description": "首筆完成訂單的時間。"
     },
     "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": {
-      "message": "消費次數",
+      "message": "訂單數",
       "description": "CustomerSort 是客戶列表的排序欄位。（值 CUSTOMER_SORT_ORDER_COUNT）"
     },
     "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": {

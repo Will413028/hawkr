@@ -13,13 +13,11 @@
       "GENDER_OTHER": "其他"
     },
     "Profile": {
+      "deleted_name": "已刪除帳號",
       "gender_unset": "尚未設定"
     }
   },
   "chat": {
-    "ChatBuyer": {
-      "deleted_name": "已刪除帳號"
-    },
     "Message": {
       "unsupported_kind": "不支援的訊息"
     },
@@ -79,7 +77,7 @@
   "crm": {
     "CustomerSort": {
       "CUSTOMER_SORT_FIRST_ORDER_TIME": "首購時間",
-      "CUSTOMER_SORT_ORDER_COUNT": "消費次數",
+      "CUSTOMER_SORT_ORDER_COUNT": "訂單數",
       "CUSTOMER_SORT_TOTAL_SPENT": "消費金額"
     },
     "CustomerType": {

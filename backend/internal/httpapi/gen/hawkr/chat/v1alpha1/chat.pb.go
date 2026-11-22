@@ -345,7 +345,7 @@ func (x *Preview) GetSender() ChatParty {
 type ChatBuyer struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// 買家的暱稱；沒有設定或已刪除時不設。
+	// 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
 	Name          *string         `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	Avatar        *v1alpha1.Image `protobuf:"bytes,3,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	Deleted       bool            `protobuf:"varint,4,opt,name=deleted,proto3" json:"deleted,omitempty"`
@@ -411,13 +411,13 @@ func (x *ChatBuyer) GetDeleted() bool {
 	return false
 }
 
-// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
 type Conversation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// 對方的店家卡片；只有買家版有。店家從沒公開過時不設（同 StoreCard 的可見性規則），client 顯示「店家」。
 	Store *v1alpha1.StoreCard `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
-	// 對方的買家；只有店家版有。
+	// 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
 	Buyer *ChatBuyer `protobuf:"bytes,3,opt,name=buyer,proto3" json:"buyer,omitempty"`
 	// 呼叫者這一方的未讀訊息數。
 	UnreadCount     int64                  `protobuf:"varint,4,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`

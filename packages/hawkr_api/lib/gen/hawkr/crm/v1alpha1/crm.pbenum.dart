@@ -39,7 +39,7 @@ class CustomerType extends $pb.ProtobufEnum {
 
 /// CustomerSort 是客戶列表的排序欄位。
 class CustomerSort extends $pb.ProtobufEnum {
-  /// 同 CUSTOMER_SORT_FIRST_ORDER_TIME。
+  /// 同 CUSTOMER_SORT_FIRST_ORDER_TIME；client 先把 UNSPECIFIED 換成 FIRST_ORDER_TIME 再查文案目錄的標籤，目錄不為它另設標籤。
   static const CustomerSort CUSTOMER_SORT_UNSPECIFIED =
       CustomerSort._(0, _omitEnumNames ? '' : 'CUSTOMER_SORT_UNSPECIFIED');
 

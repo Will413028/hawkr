@@ -188,6 +188,7 @@ class Review extends $pb.GeneratedMessage {
     ReviewAuthor? author,
     $core.String? orderNo,
     $core.String? orderItemId,
+    $core.bool? isMine,
   }) {
     final result = Review._();
     if (id != null) result.id = id;
@@ -204,6 +205,7 @@ class Review extends $pb.GeneratedMessage {
     if (author != null) result.author = author;
     if (orderNo != null) result.orderNo = orderNo;
     if (orderItemId != null) result.orderItemId = orderItemId;
+    if (isMine != null) result.isMine = isMine;
     return result;
   }
 
@@ -240,6 +242,7 @@ class Review extends $pb.GeneratedMessage {
         subBuilder: ReviewAuthor.$_createMessage)
     ..aOS(13, _omitFieldNames ? '' : 'orderNo')
     ..aOS(14, _omitFieldNames ? '' : 'orderItemId')
+    ..aOB(15, _omitFieldNames ? '' : 'isMine')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -398,6 +401,16 @@ class Review extends $pb.GeneratedMessage {
   $core.bool hasOrderItemId() => $_has(13);
   @$pb.TagNumber(14)
   void clearOrderItemId() => $_clearField(14);
+
+  /// 這則評價是不是觀看者（登入的買家）自己寫的；訪客與店家的視圖是 false。依觀看者而定，所以帶憑證的公開讀取已是 private, no-store（見檔頭）。
+  @$pb.TagNumber(15)
+  $core.bool get isMine => $_getBF(14);
+  @$pb.TagNumber(15)
+  set isMine($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasIsMine() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearIsMine() => $_clearField(15);
 }
 
 class ListProductReviewsRequest extends $pb.GeneratedMessage {
@@ -1135,7 +1148,7 @@ class GetProductReviewStatsResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $pb.PbList<RatingCount> get distribution => $_getList(2);
 
-  /// 公開可讀且帶圖的評價數（與 ListProductReviews 的 with_images 篩選同一個條件）。
+  /// 公開可讀且帶圖的評價數；同 count 不依觀看者過濾、不套封鎖，所以可以多於帶 with_images 的列表（列表套觀看者的封鎖）。
   @$pb.TagNumber(4)
   $core.int get withImagesCount => $_getIZ(3);
   @$pb.TagNumber(4)

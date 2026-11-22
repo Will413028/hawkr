@@ -123,12 +123,19 @@ func (h *App) GetStoreConversationByBuyer(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, err
 	}
+	// 契約承諾不區分原因：沒有店、店家關閉、買家不存在、沒有對話都是同一個 not_found（同 code、訊息與 details）。
 	p, err := h.storeParty(ctx)
 	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil, conversationNotFound()
+		}
 		return nil, err
 	}
 	c, err := h.reads.StoreConversationByBuyer(ctx, p, buyerID)
 	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil, conversationNotFound()
+		}
 		return nil, h.failure(err, nil)
 	}
 	items, err := h.storeConversations(ctx, []im.Conversation{c})

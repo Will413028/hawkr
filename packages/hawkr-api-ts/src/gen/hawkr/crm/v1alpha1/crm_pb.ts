@@ -589,7 +589,7 @@ export const CustomerTypeSchema: GenEnum<CustomerType> = /*@__PURE__*/
  */
 export enum CustomerSort {
   /**
-   * 同 CUSTOMER_SORT_FIRST_ORDER_TIME。
+   * 同 CUSTOMER_SORT_FIRST_ORDER_TIME；client 先把 UNSPECIFIED 換成 FIRST_ORDER_TIME 再查文案目錄的標籤，目錄不為它另設標籤。
    *
    * @generated from enum value: CUSTOMER_SORT_UNSPECIFIED = 0;
    */

@@ -41,10 +41,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.AdminModerationCaseReportOutcomeUnset(), true
 	case "buyer.Gender":
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
+	case "buyer.Profile.deleted_name":
+		return t.BuyerProfileDeletedName(), true
 	case "buyer.Profile.gender_unset":
 		return t.BuyerProfileGenderUnset(), true
-	case "chat.ChatBuyer.deleted_name":
-		return t.ChatChatBuyerDeletedName(), true
 	case "chat.Message.unsupported_kind":
 		return t.ChatMessageUnsupportedKind(), true
 	case "chat.Preview.erased":

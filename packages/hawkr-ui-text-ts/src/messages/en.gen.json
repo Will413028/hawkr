@@ -13,13 +13,11 @@
       "GENDER_OTHER": "Other"
     },
     "Profile": {
+      "deleted_name": "Deleted account",
       "gender_unset": "Not set"
     }
   },
   "chat": {
-    "ChatBuyer": {
-      "deleted_name": "Deleted account"
-    },
     "Message": {
       "unsupported_kind": "Unsupported message"
     },

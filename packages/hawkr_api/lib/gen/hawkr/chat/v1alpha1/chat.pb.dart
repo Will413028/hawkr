@@ -381,7 +381,7 @@ class ChatBuyer extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  /// 買家的暱稱；沒有設定或已刪除時不設。
+  /// 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
   @$pb.TagNumber(2)
   $core.String get name => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -412,7 +412,7 @@ class ChatBuyer extends $pb.GeneratedMessage {
   void clearDeleted() => $_clearField(4);
 }
 
-/// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+/// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
 class Conversation extends $pb.GeneratedMessage {
   factory Conversation({
     $core.String? id,
@@ -504,7 +504,7 @@ class Conversation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $2.StoreCard ensureStore() => $_ensure(1);
 
-  /// 對方的買家；只有店家版有。
+  /// 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
   @$pb.TagNumber(3)
   ChatBuyer get buyer => $_getN(2);
   @$pb.TagNumber(3)

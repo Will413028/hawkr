@@ -222,10 +222,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return adminModerationCaseReportOutcomeUnset(l);
     case 'buyer.Gender':
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n('hawkr.buyer.v1alpha1.Gender', value))!.uiText(l);
+    case 'buyer.Profile.deleted_name':
+      return buyerProfileDeletedName(l);
     case 'buyer.Profile.gender_unset':
       return buyerProfileGenderUnset(l);
-    case 'chat.ChatBuyer.deleted_name':
-      return chatChatBuyerDeletedName(l);
     case 'chat.Message.unsupported_kind':
       return chatMessageUnsupportedKind(l);
     case 'chat.Preview.erased':

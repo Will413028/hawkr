@@ -18,8 +18,8 @@ export type UiTextKey =
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
+	| "buyer.Profile.deleted_name"
 	| "buyer.Profile.gender_unset"
-	| "chat.ChatBuyer.deleted_name"
 	| "chat.Message.unsupported_kind"
 	| "chat.Preview.erased"
 	| "chat.Preview.hidden"
@@ -258,14 +258,14 @@ export function buyerGender(v: Gender): UiMessage | undefined {
 	return { key };
 }
 
+/** buyer.Profile.deleted_name */
+export function buyerProfileDeletedName(): UiMessage {
+	return { key: "buyer.Profile.deleted_name" };
+}
+
 /** buyer.Profile.gender_unset */
 export function buyerProfileGenderUnset(): UiMessage {
 	return { key: "buyer.Profile.gender_unset" };
-}
-
-/** chat.ChatBuyer.deleted_name */
-export function chatChatBuyerDeletedName(): UiMessage {
-	return { key: "chat.ChatBuyer.deleted_name" };
 }
 
 /** chat.Message.unsupported_kind */

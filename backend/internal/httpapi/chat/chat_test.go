@@ -1086,4 +1086,19 @@ func TestGetStoreConversationByBuyerValidatesTheBuyerIDAndMapsModuleNotFound(t *
 	if _, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"})); codeOf(err) != connect.CodeNotFound {
 		t.Errorf("沒有對話：%v", err)
 	}
+	req := func(e *env) error {
+		_, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"}))
+		return err
+	}
+	noStore := newEnv(t, nil)
+	closed := newEnv(t, ownStore())
+	closed.reads.err = apperr.NotFound("店家已關閉的模組句")
+	missing := newEnv(t, ownStore())
+	missing.reads.err = apperr.NotFound("另一句")
+	want := req(missing)
+	for name, err := range map[string]error{"沒有店": req(noStore), "店家關閉": req(closed)} {
+		if codeOf(err) != connect.CodeNotFound || err.Error() != want.Error() || reasonOf(err) != reasonOf(want) {
+			t.Errorf("%s 必須與沒有對話相同：%v vs %v", name, err, want)
+		}
+	}
 }

@@ -40,20 +40,20 @@ func (t Text) BuyerGender(v string) (string, bool) {
 	return "", false
 }
 
+// BuyerProfileDeletedName 是 buyer.Profile.deleted_name 的文案。
+func (t Text) BuyerProfileDeletedName() string {
+	if t.Locale() == EN {
+		return "Deleted account"
+	}
+	return "已刪除帳號"
+}
+
 // BuyerProfileGenderUnset 是 buyer.Profile.gender_unset 的文案。
 func (t Text) BuyerProfileGenderUnset() string {
 	if t.Locale() == EN {
 		return "Not set"
 	}
 	return "尚未設定"
-}
-
-// ChatChatBuyerDeletedName 是 chat.ChatBuyer.deleted_name 的文案。
-func (t Text) ChatChatBuyerDeletedName() string {
-	if t.Locale() == EN {
-		return "Deleted account"
-	}
-	return "已刪除帳號"
 }
 
 // ChatMessageUnsupportedKind 是 chat.Message.unsupported_kind 的文案。
@@ -236,7 +236,7 @@ func (t Text) CrmCustomerSort(v string) (string, bool) {
 	case "TOTAL_SPENT":
 		return "消費金額", true
 	case "ORDER_COUNT":
-		return "消費次數", true
+		return "訂單數", true
 	}
 	return "", false
 }

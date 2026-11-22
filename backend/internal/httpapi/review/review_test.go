@@ -892,3 +892,27 @@ func TestExplicitRatingOutsideOneToFiveIsInvalidArgumentOnTheRatingField(t *test
 		t.Errorf("不合法的星等不能到模組：%v", e.reads.calls)
 	}
 }
+
+func TestPublicReviewListsMarkOnlyTheSignedInAuthorsOwnReviewsAsMine(t *testing.T) {
+	e := newEnv(t, nil)
+	mine, other := sampleReview(1), sampleReview(2)
+	mine.BuyerID, other.BuyerID = callerBuyer, callerBuyer+1
+	e.reads.page = review.Page{Reviews: []review.Review{mine, other}}
+	flags := func(ctx context.Context) []bool {
+		p, err := e.public.ListProductReviews(ctx, connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := e.public.ListStoreReviews(ctx, connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "11"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return []bool{p.Msg.Reviews[0].IsMine, p.Msg.Reviews[1].IsMine, s.Msg.Reviews[0].IsMine, s.Msg.Reviews[1].IsMine}
+	}
+	if got := flags(signedIn()); !slices.Equal(got, []bool{true, false, true, false}) {
+		t.Errorf("登入的作者：%v", got)
+	}
+	if got := flags(context.Background()); !slices.Equal(got, []bool{false, false, false, false}) {
+		t.Errorf("訪客：%v", got)
+	}
+}
