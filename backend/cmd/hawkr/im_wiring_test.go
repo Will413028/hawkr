@@ -99,3 +99,35 @@ func TestServeWithRunEndsRunWhenTheContextEnds(t *testing.T) {
 	}
 	<-ended
 }
+
+// server 自己失敗（不是 ctx 結束）時，Shutdown 開始前 run 的 ctx 已被取消。
+func TestServeWithRunCancelsRunBeforeShutdownWhenAServerFails(t *testing.T) {
+	failing := listenOnce(t)
+	if err := failing.ln.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runCtx := make(chan context.Context, 1)
+	started := make(chan struct{})
+	run := func(ctx context.Context) error {
+		runCtx <- ctx
+		close(started)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	cancelledAtShutdown := make(chan bool, 1)
+	healthy := listenOnce(t)
+	healthy.srv.RegisterOnShutdown(func() {
+		select {
+		case cancelledAtShutdown <- (<-runCtx).Err() != nil:
+		default:
+		}
+	})
+	done := make(chan error, 1)
+	go func() { done <- serveWithRun(t.Context(), run, failing, healthy) }()
+	if err := <-done; err == nil {
+		t.Fatal("server 失敗要讓 serve 回錯誤")
+	}
+	if !<-cancelledAtShutdown {
+		t.Fatal("Shutdown 開始時 run 的 ctx 還沒被取消")
+	}
+}

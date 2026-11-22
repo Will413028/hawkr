@@ -546,7 +546,8 @@ func newServer(h http.Handler) *http.Server {
 	return srv
 }
 
-// serveWithRun 在 serveAll 之外跑一個與 server 同生命週期的背景元件（im 的即時通道）：ctx 結束時兩邊一起收尾；
+// serveWithRun 在 serveAll 之外跑一個與 server 同生命週期的背景元件（im 的即時通道）：任何一方（ctx 結束、server 失敗、run 失敗）觸發收尾時，先取消 run 的 ctx 再 Shutdown，
+// 讓開著的串流以 run 的收尾結束，而不是讓 Shutdown 等滿逾時；
 // run 在 ctx 沒結束時返回（含 nil）都是失敗，會讓 server 停止並讓 serve 回錯誤（process 退出，由平台重啟），不靜默吞掉。
 func serveWithRun(ctx context.Context, run func(context.Context) error, servers ...listening) error {
 	ctx, cancel := context.WithCancel(ctx)
@@ -565,7 +566,7 @@ func serveWithRun(ctx context.Context, run func(context.Context) error, servers 
 		}
 		runDone <- err
 	}()
-	serveErr := serveAll(ctx, servers...)
+	serveErr := serveAllThen(ctx, cancel, servers...)
 	cancel()
 	return errors.Join(serveErr, <-runDone)
 }
@@ -579,6 +580,11 @@ type listening struct {
 // serveAll 讓每個 server 在自己的 listener 上服務，直到 ctx 結束或其中一個失敗；之後全部停止接新連線，並等
 // 進行中的請求收尾。
 func serveAll(ctx context.Context, servers ...listening) error {
+	return serveAllThen(ctx, nil, servers...)
+}
+
+// serveAllThen 同 serveAll；beforeShutdown 非 nil 時，在觸發收尾之後、Shutdown 之前呼叫一次。
+func serveAllThen(ctx context.Context, beforeShutdown func(), servers ...listening) error {
 	errc := make(chan error, len(servers))
 	for _, s := range servers {
 		go func() { errc <- s.srv.Serve(s.ln) }()
@@ -587,6 +593,9 @@ func serveAll(ctx context.Context, servers ...listening) error {
 	select {
 	case first = <-errc:
 	case <-ctx.Done():
+	}
+	if beforeShutdown != nil {
+		beforeShutdown()
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
