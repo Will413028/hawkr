@@ -229,7 +229,7 @@ describe("ChatEventStream", () => {
 		["resource_exhausted", Code.ResourceExhausted],
 		["failed_precondition (STORE_CLOSED)", Code.FailedPrecondition],
 		["not_found", Code.NotFound],
-		["invalid_argument", Code.InvalidArgument],
+		["permission_denied", Code.PermissionDenied],
 	])("%s ends the stream without reconnecting", async (_name, code) => {
 		const h = harness([
 			// biome-ignore lint/correctness/useYield: ends or fails before the first frame
@@ -243,6 +243,34 @@ describe("ChatEventStream", () => {
 		expect(h.stream.lastEnd).toBe("terminal");
 		expect(h.stream.state).toBe("disconnected");
 		expect(h.live()).toHaveLength(0);
+	});
+
+	it("keeps only the 50 most recent cursors and reconnects on invalid_argument instead of ending", async () => {
+		const h = harness([
+			// biome-ignore lint/correctness/useYield: ends or fails before the first frame
+			async function* () {
+				throw new ConnectError("too many cursors", Code.InvalidArgument);
+			},
+			async function* () {
+				yield ready();
+				await new Promise(() => {});
+			},
+		]);
+		for (let i = 1; i <= 60; i++) h.stream.noteSeq(`c${i}`, i);
+		h.stream.noteSeq("c1", 99); // 最舊的對話又有動靜，應留下
+		h.stream.start();
+		await h.flush();
+		expect(Object.keys(h.opens[0])).toHaveLength(50);
+		expect(h.opens[0].c1).toBe(BigInt(99));
+		expect(h.opens[0].c11).toBeUndefined();
+		expect(h.opens[0].c60).toBe(BigInt(60));
+		expect(h.stream.lastEnd).not.toBe("terminal");
+		h.live()
+			.find((t) => t.ms === 500)
+			?.fn();
+		await h.flush();
+		expect(h.opens).toHaveLength(2);
+		h.stream.stop();
 	});
 
 	it("treats a silent connection as dead after twice the heartbeat interval and reconnects", async () => {

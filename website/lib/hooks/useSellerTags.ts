@@ -24,7 +24,7 @@ interface UseSellerTagsResult {
  */
 export function useSellerTags(): UseSellerTagsResult {
 	const identity = useQueryIdentity();
-	const { storeId } = useCrmStoreId();
+	const { storeId, error: storeError } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
 	const query = useQuery({
 		queryKey: queryKeys.seller.tags(identity),
@@ -32,11 +32,12 @@ export function useSellerTags(): UseSellerTagsResult {
 		enabled: identity.activeRole === "seller" && Boolean(storeId),
 		staleTime: 60_000,
 	});
+	const failure = storeError ?? query.error;
 	return useMemo(
 		() => ({
 			tags: query.data ?? NO_TAGS,
-			error: query.error ? errorText(query.error, defaults) : null,
+			error: failure ? errorText(failure, defaults) : null,
 		}),
-		[query.data, query.error, defaults],
+		[query.data, failure, defaults],
 	);
 }

@@ -21,6 +21,7 @@ import {
 	type Review,
 	replyReview,
 } from "@/lib/reviews/repo";
+import { reviewerName } from "@/lib/reviews/reviewer-name";
 
 const PAGE_SIZE = 10;
 
@@ -290,15 +291,15 @@ export default function ProductReviewsPanel({
 							<div className="mb-[var(--space-2)] flex items-center gap-[var(--space-3)]">
 								<Avatar
 									src={review.avatarUrl}
-									name={review.username ?? "匿名"}
-									alt={review.username ?? "匿名"}
+									name={reviewerName(review.username)}
+									alt={reviewerName(review.username)}
 									entity="buyer"
 									className="h-9 w-9 shrink-0 rounded-full object-cover"
 									fallbackClassName="h-9 w-9 shrink-0 rounded-full object-cover"
 								/>
 								<div className="flex min-w-0 flex-1 flex-col gap-[2px]">
 									<span className="truncate text-[length:var(--text-sm)] font-bold text-[color:var(--text-heading)]">
-										{review.username ?? "匿名"}
+										{reviewerName(review.username)}
 									</span>
 									<div className="flex gap-[1px]">
 										<Stars count={review.rating} size={14} />

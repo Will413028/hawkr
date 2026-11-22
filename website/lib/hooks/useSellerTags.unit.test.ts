@@ -15,9 +15,14 @@ vi.mock("@/lib/auth/context", () => ({
 vi.mock("@/lib/seller/crm", () => ({
 	listTags: mocks.listTags,
 }));
-vi.mock("./useCrmStoreId", () => ({
-	useCrmStoreId: () => ({ storeId: "9", loading: false }),
+const store = vi.hoisted(() => ({
+	value: { storeId: "9", loading: false, error: null } as {
+		storeId: string | undefined;
+		loading: boolean;
+		error: Error | null;
+	},
 }));
+vi.mock("./useCrmStoreId", () => ({ useCrmStoreId: () => store.value }));
 vi.mock("@/lib/i18n/ui-text", () => ({
 	useDefaultErrorText: () => (code: Code) => `default-${code}`,
 }));
@@ -43,6 +48,21 @@ function wrapperIn(zone: boolean) {
 				: children,
 		);
 }
+
+describe("useSellerTags store failure", () => {
+	it("reports a store read failure as an error", async () => {
+		store.value = {
+			storeId: undefined,
+			loading: false,
+			error: new ConnectError("x", Code.Unavailable),
+		};
+		const { result } = renderHook(() => useSellerTags(), {
+			wrapper: wrapperIn(true),
+		});
+		expect(result.current.error).toBe(`default-${Code.Unavailable}`);
+		store.value = { storeId: "9", loading: false, error: null };
+	});
+});
 
 describe("useSellerTags gate", () => {
 	it("runs on the first render inside the seller zone although the root answer is stale", async () => {

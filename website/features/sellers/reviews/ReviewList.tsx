@@ -1,8 +1,10 @@
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
+import ReportActionMenu from "@/features/report/ReportActionMenu";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { parseRating } from "@/lib/products/rating";
+import { reviewerName } from "@/lib/reviews/reviewer-name";
 import { formatReviewDate } from "./formatReviewDate";
 
 const STAR_PATH =
@@ -132,15 +134,15 @@ export default function ReviewList({
 						<div className="flex items-center gap-[var(--space-3)] mb-[var(--space-3)]">
 							<Avatar
 								src={review.avatar}
-								name={review.author || review.userName}
-								alt={review.author || review.userName}
+								name={reviewerName(review.author || review.userName)}
+								alt={reviewerName(review.author || review.userName)}
 								entity="buyer"
 								className="w-10 h-10 shrink-0 rounded-full object-cover"
 								fallbackClassName="w-10 h-10 shrink-0 rounded-full object-cover"
 							/>
 							<div className="flex-1 flex flex-col gap-[2px] min-w-0">
 								<span className="text-[color:var(--text-heading)] text-[length:var(--text-sm)] font-bold">
-									{review.author || review.userName}
+									{reviewerName(review.author || review.userName)}
 								</span>
 								<div className="flex gap-[1px] text-[var(--accent-warm)]">
 									<StarsSvg
@@ -154,6 +156,11 @@ export default function ReviewList({
 							<span className="shrink-0 text-[var(--color-gray-mid)] text-[length:var(--text-xs)]">
 								{review.date || formatReviewDate(review.createdAt)}
 							</span>
+							{review.id ? (
+								<ReportActionMenu
+									target={{ kind: "review", id: String(review.id) }}
+								/>
+							) : null}
 						</div>
 						<p className="mb-[var(--space-3)] text-[color:var(--text-body)] text-[length:var(--text-sm)] leading-relaxed">
 							{review.text || review.content}

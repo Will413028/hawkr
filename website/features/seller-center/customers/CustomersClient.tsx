@@ -139,8 +139,6 @@ export default function CustomersClient() {
 		setActiveCustomerId(null);
 	}, [setActiveCustomerId]);
 
-	const totalSpend = rows.reduce((sum, c) => sum + c.totalSpent, 0);
-	const repeatBuyers = rows.filter((c) => c.orderCount >= 2).length;
 	const activeCustomer =
 		activeCustomerId === null
 			? null
@@ -171,20 +169,6 @@ export default function CustomersClient() {
 						{hasMore ? "+" : ""}
 					</strong>
 					<small>累積客戶</small>
-				</div>
-				<div className="seller-inventory__stat">
-					<span className="seller-inventory__stat-icon is-secondary">
-						<AppIcon name="check" />
-					</span>
-					<strong>{repeatBuyers.toLocaleString()}</strong>
-					<small>回購客戶（≥ 2 筆）</small>
-				</div>
-				<div className="seller-inventory__stat">
-					<span className="seller-inventory__stat-icon is-info">
-						<AppIcon name="coin" />
-					</span>
-					<strong>NT$ {Math.round(totalSpend).toLocaleString()}</strong>
-					<small>客戶累積消費</small>
 				</div>
 			</section>
 

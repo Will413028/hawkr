@@ -68,8 +68,15 @@ export function useConversations({
 		queryFn: accountQueryFn(status, () => listConversations(side)),
 	});
 
+	// 第一個 ready 是剛連上（列表剛讀過）；之後每次 ready 是斷線後重連，斷線期間的事件收不到，要重讀。
+	const readySeenRef = React.useRef(false);
 	useChatStream(side, shouldFetch && subscribeToSocket, (e) => {
-		if (e.type === "ready") return;
+		if (e.type === "ready") {
+			if (!readySeenRef.current) {
+				readySeenRef.current = true;
+				return;
+			}
+		}
 		void queryClient.invalidateQueries({ queryKey });
 	});
 
@@ -175,16 +182,28 @@ export function useChatThread(
 
 	const fillGap = React.useCallback(
 		async (convId: string, afterSeq: number) => {
-			const page = await listMessagesAfter(convId, afterSeq);
-			patch((d) => ({
-				messages: page.messages.reduce(
-					(acc, m) => upsertServerMessage(acc, m),
-					d.messages,
-				),
-				peerReadSeq: Math.max(d.peerReadSeq, page.peerReadSeq),
-			}));
+			let after = afterSeq;
+			try {
+				for (;;) {
+					const page = await listMessagesAfter(convId, after);
+					patch((d) => ({
+						messages: page.messages.reduce(
+							(acc, m) => upsertServerMessage(acc, m),
+							d.messages,
+						),
+						peerReadSeq: Math.max(d.peerReadSeq, page.peerReadSeq),
+					}));
+					if (!page.hasMore) return;
+					const next = lastSeq(page.messages);
+					// 還有下一頁卻沒有往前走：不再轉圈，交給整段重讀。
+					if (next <= after) throw new Error("gap fill made no progress");
+					after = next;
+				}
+			} catch {
+				void queryClient.invalidateQueries({ queryKey: dataKey });
+			}
 		},
-		[patch],
+		[patch, queryClient, dataKey],
 	);
 
 	const onStreamEvent = React.useCallback(
@@ -201,7 +220,7 @@ export function useChatThread(
 				const cur = dataRef.current.messages;
 				const gap = m.seq !== null && !e.updated ? gapAfter(cur, m.seq) : null;
 				patch((d) => ({ ...d, messages: upsertServerMessage(d.messages, m) }));
-				if (gap !== null) void fillGap(conversationId, gap).catch(() => {});
+				if (gap !== null) void fillGap(conversationId, gap);
 			} else if (e.type === "peerRead") {
 				if (e.conversationId !== conversationId) return;
 				patch((d) => ({
@@ -294,7 +313,9 @@ export function useChatThread(
 			if (!targetId) return;
 			setSendError(null);
 			// 取消進行中的讀取，免得晚到的歷史把樂觀訊息洗掉。
-			await queryClient.cancelQueries({ queryKey: dataKey });
+			// 還沒有資料時不取消：取消會讓第一次讀取被丟掉、畫面永遠沒有歷史；改成送出後重讀。
+			const hadData = queryClient.getQueryData(dataKey) !== undefined;
+			if (hadData) await queryClient.cancelQueries({ queryKey: dataKey });
 			patch((d) => ({
 				...d,
 				messages: upsertServerMessage(d.messages, optimistic),
@@ -306,6 +327,7 @@ export function useChatThread(
 					optimistic.id,
 				);
 				finishSend(optimistic.id, server);
+				if (!hadData) void queryClient.invalidateQueries({ queryKey: dataKey });
 			} catch (e) {
 				patch((d) => ({
 					...d,

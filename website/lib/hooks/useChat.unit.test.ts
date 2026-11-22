@@ -174,6 +174,42 @@ describe("useChatThread stream handling", () => {
 		expect(repo.listMessagesAfter).toHaveBeenCalledWith("c1", 2);
 	});
 
+	it("keeps filling while the server says hasMore", async () => {
+		repo.listMessagesAfter
+			.mockResolvedValueOnce({
+				messages: [msg(3), msg(4)],
+				hasMore: true,
+				peerReadSeq: 0,
+			})
+			.mockResolvedValueOnce({
+				messages: [msg(5), msg(6)],
+				hasMore: false,
+				peerReadSeq: 0,
+			});
+		const { result } = await openThread();
+		act(() =>
+			stream.handler?.({ type: "message", message: msg(7), updated: false }),
+		);
+		await waitFor(() =>
+			expect(result.current.messages.map((m) => m.seq)).toEqual([
+				1, 2, 3, 4, 5, 6, 7,
+			]),
+		);
+		expect(repo.listMessagesAfter.mock.calls.map((c) => c[1])).toEqual([2, 4]);
+	});
+
+	it("rereads the thread when a gap fill fails instead of swallowing it", async () => {
+		repo.listMessagesAfter.mockRejectedValue(
+			new ConnectError("x", Code.Unavailable),
+		);
+		await openThread();
+		repo.listLatestMessages.mockClear();
+		act(() =>
+			stream.handler?.({ type: "message", message: msg(5), updated: false }),
+		);
+		await waitFor(() => expect(repo.listLatestMessages).toHaveBeenCalled());
+	});
+
 	it("replaces the message in place when the server marks a visibility change", async () => {
 		const { result } = await openThread();
 		act(() =>
@@ -223,7 +259,85 @@ describe("useChatThread stream handling", () => {
 	});
 });
 
+describe("conversation list reconnect", () => {
+	it("invalidates the list on every ready after the first, not on the first", async () => {
+		repo.listConversations.mockResolvedValue([conv]);
+		const { result } = renderHook(() => useConversations(), {
+			wrapper: wrapper(),
+		});
+		await waitFor(() => expect(result.current.loading).toBe(false));
+		repo.listConversations.mockClear();
+		act(() => stream.handler?.({ type: "ready", unreadCount: 0 }));
+		await new Promise((r) => setTimeout(r, 20));
+		expect(repo.listConversations).not.toHaveBeenCalled();
+		act(() => stream.handler?.({ type: "ready", unreadCount: 0 }));
+		await waitFor(() =>
+			expect(repo.listConversations).toHaveBeenCalledTimes(1),
+		);
+	});
+});
+
 describe("useChatThread send", () => {
+	it("does not cancel the first read when sending before history arrived, and rereads after", async () => {
+		repo.listConversations.mockResolvedValue([conv]);
+		let resolveHistory: (v: unknown) => void = () => {};
+		repo.listLatestMessages.mockReturnValueOnce(
+			new Promise((r) => (resolveHistory = r)),
+		);
+		repo.sendMessage.mockResolvedValue(msg(3, { id: "srv", sender: "buyer" }));
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+		});
+		const cancel = vi.spyOn(client, "cancelQueries");
+		const { result } = renderHook(() => useChatThread("9"), {
+			wrapper: ({ children }: { children: React.ReactNode }) =>
+				React.createElement(QueryClientProvider, { client }, children),
+		});
+		await waitFor(() => expect(repo.listLatestMessages).toHaveBeenCalled());
+		repo.listLatestMessages.mockResolvedValue({
+			messages: [msg(1), msg(2), msg(3, { id: "srv", sender: "buyer" })],
+			hasMore: false,
+			peerReadSeq: 0,
+		});
+		await act(async () => {
+			await result.current.send("hi");
+		});
+		expect(cancel).not.toHaveBeenCalled();
+		await act(async () => {
+			resolveHistory({
+				messages: [msg(1), msg(2)],
+				hasMore: false,
+				peerReadSeq: 0,
+			});
+		});
+		await waitFor(() =>
+			expect(result.current.messages.map((m) => m.seq)).toEqual([1, 2, 3]),
+		);
+	});
+
+	it("cancels an in-flight read when history already exists", async () => {
+		repo.listConversations.mockResolvedValue([conv]);
+		repo.listLatestMessages.mockResolvedValue({
+			messages: [msg(1)],
+			hasMore: false,
+			peerReadSeq: 0,
+		});
+		repo.sendMessage.mockResolvedValue(msg(2, { id: "srv", sender: "buyer" }));
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+		});
+		const cancel = vi.spyOn(client, "cancelQueries");
+		const { result } = renderHook(() => useChatThread("9"), {
+			wrapper: ({ children }: { children: React.ReactNode }) =>
+				React.createElement(QueryClientProvider, { client }, children),
+		});
+		await waitFor(() => expect(result.current.messages).toHaveLength(1));
+		await act(async () => {
+			await result.current.send("hi");
+		});
+		expect(cancel).toHaveBeenCalledTimes(1);
+	});
+
 	it("sends with a UUID request_id that is also the optimistic id, then swaps in the server message", async () => {
 		repo.listConversations.mockResolvedValue([conv]);
 		repo.listLatestMessages.mockResolvedValue({

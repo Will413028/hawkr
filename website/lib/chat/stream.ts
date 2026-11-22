@@ -8,7 +8,9 @@
  * - `unavailable`（與網路錯誤）：full-jitter backoff 重連，連續失敗 `MAX_ATTEMPTS` 次後停下，等 focus／online／
  *   visibility 的 `resume()`。
  * - `unauthenticated`、`not_found`、`resource_exhausted`、`failed_precondition`（含 STORE_CLOSED）、
- *   `invalid_argument`：不重連（登入失效由 transport 發 AUTH_EXPIRED_EVENT）。
+ *   `permission_denied`：不重連（登入失效由 transport 發 AUTH_EXPIRED_EVENT）。
+ * - `invalid_argument` 照一般失敗 backoff 重連，不當終止：cursors 超過伺服器上限會回這個 code，
+ *   終止會讓聊天永遠斷線；cursors 本身也限在最近 `MAX_CURSORS` 個對話。
  */
 
 import type { Duration } from "@bufbuild/protobuf/wkt";
@@ -31,6 +33,8 @@ export const MAX_ATTEMPTS = 5;
 export const BACKOFF_CAP_MS = 16_000;
 /** 收到 `Ready` 之前，等第一個 frame 的上限。 */
 export const READY_TIMEOUT_MS = 30_000;
+/** `cursors` 的對話數上限（chat.proto）：超過的伺服器回 invalid_argument。只送最近有動靜的這麼多個。 */
+export const MAX_CURSORS = 50;
 
 export type OpenStream = (
 	cursors: Record<string, bigint>,
@@ -56,7 +60,6 @@ function isTerminal(code: Code): boolean {
 		code === Code.NotFound ||
 		code === Code.ResourceExhausted ||
 		code === Code.FailedPrecondition ||
-		code === Code.InvalidArgument ||
 		code === Code.PermissionDenied
 	);
 }
@@ -101,7 +104,14 @@ export class ChatEventStream {
 	/** 記下一個對話手上最後的 seq（只前進）；重連時當 cursors 送。 */
 	noteSeq(conversationId: string, seq: number): void {
 		if (seq > (this.cursors.get(conversationId) ?? 0)) {
+			// 先刪再放，Map 的插入順序就是「最近有動靜」的順序。
+			this.cursors.delete(conversationId);
 			this.cursors.set(conversationId, seq);
+			while (this.cursors.size > MAX_CURSORS) {
+				const oldest = this.cursors.keys().next().value;
+				if (oldest === undefined) break;
+				this.cursors.delete(oldest);
+			}
 		}
 	}
 

@@ -104,6 +104,11 @@ export default function ReviewedList() {
 					);
 				})}
 			</ul>
+			{error != null ? (
+				<p className="text-danger text-sm text-center m-0" role="alert">
+					載入更多評價失敗，請稍後再試。
+				</p>
+			) : null}
 			{hasMore ? (
 				<div className="flex justify-center">
 					<Button
@@ -114,7 +119,7 @@ export default function ReviewedList() {
 						isLoading={loadingMore}
 						loadingLabel="載入評論中…"
 					>
-						載更多
+						{error != null ? "重試" : "載更多"}
 					</Button>
 				</div>
 			) : null}

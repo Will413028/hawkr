@@ -10,6 +10,7 @@ import UploadLoadingIndicator from "@/components/shared/UploadLoadingIndicator";
 import Button from "@/components/ui/Button";
 import { ImageCropDialog } from "@/components/ui/ImageCropDialog";
 import ChatContextPanel from "@/features/messages/components/ChatContextPanel";
+import ChatMessageActions from "@/features/messages/components/ChatMessageActions";
 import ChatPeerAvatar from "@/features/messages/components/ChatPeerAvatar";
 import SendButton from "@/features/messages/components/SendButton";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -375,6 +376,16 @@ export default function ThreadClient({
 												<p>{body.text}</p>
 											)}
 											{clock ? <small>{clock}</small> : null}
+											{!mine && m.seq !== null ? (
+												<ChatMessageActions
+													side={side}
+													messageId={m.id}
+													peerName={
+														peerNickname || (isSeller ? "客戶" : "賣家")
+													}
+													onBlocked={() => void conversations.refresh()}
+												/>
+											) : null}
 											{read ? (
 												<AppIcon
 													name="show"

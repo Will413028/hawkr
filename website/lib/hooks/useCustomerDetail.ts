@@ -38,7 +38,7 @@ export function useCustomerDetail(
 	options?: { enabled?: boolean },
 ): UseCustomerDetailResult {
 	const identity = useQueryIdentity();
-	const { storeId, loading: storeLoading } = useCrmStoreId();
+	const { storeId, loading: storeLoading, error: storeError } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
 	const query = useQuery({
 		queryKey: queryKeys.seller.customer(identity, buyerId),
@@ -60,12 +60,13 @@ export function useCustomerDetail(
 			(options?.enabled ?? true),
 		staleTime: 30_000,
 	});
+	const failure = storeError ?? query.error;
 	return {
 		// `data` (not `error || !data`): a failed background refetch keeps the
 		// last-good detail rather than blanking the panel.
 		data: query.data ?? null,
 		loading: storeLoading || query.isLoading,
-		error: query.error ? errorText(query.error, defaults) : null,
+		error: failure ? errorText(failure, defaults) : null,
 	};
 }
 

@@ -217,13 +217,13 @@ export function mapLiveReviews(
 	const total = reviewsResult?.total ?? 0;
 	const reviews: ProductReview[] = (reviewsResult?.reviews ?? []).map((rv) => ({
 		id: rv.id,
-		author: rv.username ?? "匿名",
+		author: rv.username,
 		avatar: rv.avatarUrl ?? "",
 		rating: rv.rating,
 		text: rv.content,
 		photos: rv.imageUrls,
 		created_at: rv.createdAt,
-		// #374：這個字串在 server component（ReviewsAsync）算完才序列化下傳，
+		// 這個字串在 server component（ReviewsAsync）算完才序列化下傳，
 		// 固定台北偏移才是正確日期。
 		date: formatTaipeiDate(rv.createdAt),
 	}));

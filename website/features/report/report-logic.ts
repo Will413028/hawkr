@@ -1,4 +1,4 @@
-import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
+import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { CommunityReport } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type {
 	CreateReportResponse,
@@ -6,7 +6,10 @@ import type {
 	StoreReport,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import { goTrimmedRuneCount } from "@hawkr/api/text/server-text";
-import { SELLER_CREATE_REPORT_REQUEST_CATEGORY } from "@hawkr/ui-text/accepted";
+import {
+	MODERATION_SUBMIT_REPORT_REQUEST_CATEGORY,
+	SELLER_CREATE_REPORT_REQUEST_CATEGORY,
+} from "@hawkr/ui-text/accepted";
 import type { UiMessage } from "@hawkr/ui-text/format";
 import {
 	commonPolicyCategory,
@@ -119,4 +122,43 @@ export function validateSupplementDescription(
 	if (length === 0) return "descriptionRequired";
 	if (length > DESCRIPTION_MAX) return "descriptionTooLong";
 	return undefined;
+}
+
+/** 評價與聊天訊息檢舉的說明上限（`SubmitReportRequest.description`，修剪後以字元計）。 */
+export const COMMUNITY_DESCRIPTION_MAX = 500;
+
+/** 評價與聊天訊息檢舉可選的類別：`SubmitReportRequest.category` 的 accepted_policy_categories；標籤取自共用文案目錄。 */
+export function communityReportCategoryOptions(ut: UiText): CategoryOption[] {
+	const options: CategoryOption[] = [];
+	for (const value of MODERATION_SUBMIT_REPORT_REQUEST_CATEGORY) {
+		const label = optionalText(ut, commonPolicyCategory(value));
+		if (label !== undefined) options.push({ value, label });
+	}
+	return options;
+}
+
+/** 選了「其他」才要說明；說明有填就不能超過上限（規則同伺服器：修剪與以字元計長）。 */
+export function validateCommunityReport(draft: {
+	category: PolicyCategory | undefined;
+	description: string;
+}): Partial<
+	Record<
+		"category" | "description",
+		"categoryRequired" | "descriptionRequired" | "descriptionTooLong"
+	>
+> {
+	const errors: ReturnType<typeof validateCommunityReport> = {};
+	if (
+		draft.category === undefined ||
+		!MODERATION_SUBMIT_REPORT_REQUEST_CATEGORY.includes(draft.category)
+	) {
+		errors.category = "categoryRequired";
+	}
+	const length = goTrimmedRuneCount(draft.description);
+	if (length > COMMUNITY_DESCRIPTION_MAX) {
+		errors.description = "descriptionTooLong";
+	} else if (draft.category === PolicyCategory.OTHER && length === 0) {
+		errors.description = "descriptionRequired";
+	}
+	return errors;
 }

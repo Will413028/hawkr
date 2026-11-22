@@ -10,13 +10,20 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ listCustomers: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+	listCustomers: vi.fn(),
+	store: {
+		storeId: "9" as string | undefined,
+		loading: false,
+		error: null as Error | null,
+	},
+}));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({ status: "unavailable", identity: null, activeRole: null }),
 }));
 vi.mock("@/lib/seller/crm", () => ({ listCustomers: mocks.listCustomers }));
 vi.mock("./useCrmStoreId", () => ({
-	useCrmStoreId: () => ({ storeId: "9", loading: false }),
+	useCrmStoreId: () => mocks.store,
 }));
 vi.mock("@/lib/i18n/ui-text", () => ({
 	useDefaultErrorText: () => (code: Code) => `default-${code}`,
@@ -45,6 +52,21 @@ const row = (id: string) => ({ id, name: id, tags: [] });
 describe("useSellerCustomers", () => {
 	beforeEach(() => {
 		mocks.listCustomers.mockReset();
+		mocks.store.storeId = "9";
+		mocks.store.error = null;
+	});
+
+	it("surfaces a store read failure as an error instead of an empty list", async () => {
+		mocks.store.storeId = undefined;
+		mocks.store.error = new ConnectError("x", Code.Unavailable);
+		const { result } = renderHook(() => useSellerCustomers({}), {
+			wrapper: Wrapper,
+		});
+		await waitFor(() =>
+			expect(result.current.error).toBe(`default-${Code.Unavailable}`),
+		);
+		expect(result.current.data).toBeNull();
+		expect(mocks.listCustomers).not.toHaveBeenCalled();
 	});
 
 	it("passes filters, sort and the store id, and pages with the page token", async () => {

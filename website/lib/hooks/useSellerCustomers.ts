@@ -41,7 +41,7 @@ export function useSellerCustomers(
 	params: UseSellerCustomersParams = {},
 ): UseSellerCustomersResult {
 	const identity = useQueryIdentity();
-	const { storeId, loading: storeLoading } = useCrmStoreId();
+	const { storeId, loading: storeLoading, error: storeError } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.seller.customers(identity, { storeId, ...params }),
@@ -58,6 +58,7 @@ export function useSellerCustomers(
 		() => query.data?.pages.flatMap((page) => page.customers) ?? null,
 		[query.data],
 	);
+	const failure = storeError ?? query.error;
 	return {
 		data,
 		loading: storeLoading || query.isLoading,
@@ -66,7 +67,7 @@ export function useSellerCustomers(
 		loadMore: async () => {
 			await query.fetchNextPage();
 		},
-		error: query.error ? errorText(query.error, defaults) : null,
+		error: failure ? errorText(failure, defaults) : null,
 		refresh: async () => {
 			await query.refetch();
 		},

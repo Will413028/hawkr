@@ -78,6 +78,7 @@ export default function NotificationToastBridge() {
 	const chatSide = chatSideOf(activeRole);
 	const seenMessagesRef = React.useRef(new Set<string>());
 	const peersRef = React.useRef(new Map<string, Conversation>());
+	const lookupRef = React.useRef<Promise<void> | null>(null);
 	const onChatEvent = React.useCallback(
 		(e: ChatStreamEvent) => {
 			if (e.type !== "message" || e.updated) return;
@@ -108,13 +109,19 @@ export default function NotificationToastBridge() {
 				let peer = peersRef.current.get(m.conversationId);
 				if (!peer) {
 					// 串流的訊息只帶對話 ID：連結要對方的 ID，從對話列表取。
-					try {
-						for (const c of await listConversations(chatSide)) {
-							peersRef.current.set(c.id, c);
+					// 同時來一串訊息時共用同一次讀取，不為每則各打一次。
+					lookupRef.current ??= (async () => {
+						try {
+							for (const c of await listConversations(chatSide)) {
+								peersRef.current.set(c.id, c);
+							}
+						} catch {
+							// 讀不到對話列表：通知仍顯示，連結退到收件匣。
+						} finally {
+							lookupRef.current = null;
 						}
-					} catch {
-						// 讀不到對話列表：通知仍顯示，連結退到收件匣。
-					}
+					})();
+					await lookupRef.current;
 					peer = peersRef.current.get(m.conversationId);
 				}
 				show({

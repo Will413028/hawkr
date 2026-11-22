@@ -5,7 +5,7 @@ import type { SellerReviewItem } from "./ReviewList";
 export function sellerReviewItem(review: Review): SellerReviewItem {
 	return {
 		id: review.id,
-		author: review.username ?? "匿名",
+		author: review.username,
 		avatar: review.avatarUrl,
 		rating: review.rating,
 		createdAt: review.createdAt,
