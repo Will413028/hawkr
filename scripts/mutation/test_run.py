@@ -227,7 +227,7 @@ class CommandTest(unittest.TestCase):
         self.assertEqual((c.cwd, c.env["GOWORK"]), (repo / "backend", "off"))
         self.assertNotIn("integration", run.build_command("go", "p ^T$", repo).argv)
         w = run.build_command("website", "a/b.test.ts some name", run.REPO)
-        self.assertEqual(w.argv[-2:], ["-t", "some name"])
+        self.assertEqual(w.argv[-1:], ["-t=some name"])
         self.assertEqual(run.build_command("website", "a.ts", run.REPO).argv[-1], "a.ts")
         f = run.build_command("flutter:buyer-app", "test/a_test.dart my case", repo)
         self.assertEqual(f.cwd, repo / "buyer-app")
@@ -289,7 +289,7 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(run.build_command("admin", "t.ts n", repo).argv,
                          ["node", "--import", "./x.mjs", "--test", "--test-name-pattern", "n", "t.ts"])
         self.assertEqual(run.build_command("website", "t.ts n", repo).argv,
-                         ["pnpm", "exec", "vitest", "run", "--project=unit", "t.ts", "-t", "n"])
+                         ["pnpm", "exec", "vitest", "run", "--project=unit", "t.ts", "-t=n"])
         (repo / "admin" / "package.json").write_text("{}", encoding="utf-8")
         with self.assertRaises(run.ManifestError):
             run.build_command("admin", "t.ts", repo)
@@ -359,11 +359,11 @@ class CommandTest(unittest.TestCase):
                          ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test",
                           "--test-name-pattern", "N", "a.test.ts"])
         self.assertEqual(run.build_command("website", "a.test.ts N", repo).argv,
-                         ["pnpm", "exec", "vitest", "run", "--project", "unit", "a.test.ts", "-t", "N"])
+                         ["pnpm", "exec", "vitest", "run", "--project", "unit", "a.test.ts", "-t=N"])
         self.assertEqual(run.build_command("admin", "tests/x.test.ts my case", repo).argv,
                          [*admin, "--test-name-pattern", "my case", "tests/x.test.ts"])
         self.assertEqual(run.build_command("website", "a.test.ts my case", repo).argv,
-                         ["pnpm", "exec", *website, "a.test.ts", "-t", "my case"])
+                         ["pnpm", "exec", *website, "a.test.ts", "-t=my case"])
         scripts = {a: json.loads((repo / a / "package.json").read_text(encoding="utf-8"))["scripts"]
                    for a in ("admin", "website")}
         self.assertEqual(scripts["website"]["test"], "pnpm run test:file")
