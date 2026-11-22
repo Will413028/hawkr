@@ -400,8 +400,8 @@
    "id": "reviewed-list-error-not-shown",
    "stack": "website",
    "file": "website/features/account/screens/reviews/ReviewedList.tsx",
-   "old": "載入更多評價失敗，請稍後再試。",
-   "new": "載入評價失敗，請稍後再試。",
+   "old": "{t(\"loadMoreFailed\")}",
+   "new": "{t(\"retry\")}",
    "test": "features/account/screens/reviews/ReviewedList.unit.test.ts shows an inline error",
    "why": "下一頁失敗的訊息被換掉"
   },
@@ -409,7 +409,7 @@
    "id": "reviewed-list-no-retry-label",
    "stack": "website",
    "file": "website/features/account/screens/reviews/ReviewedList.tsx",
-   "old": "{error != null ? \"重試\" : \"載更多\"}",
+   "old": "{error != null ? t(\"retry\") : \"載更多\"}",
    "new": "{\"載更多\"}",
    "test": "features/account/screens/reviews/ReviewedList.unit.test.ts shows an inline error",
    "why": "下一頁失敗沒有重試鈕"
@@ -472,7 +472,7 @@
    "id": "report-other-needs-description",
    "stack": "website",
    "file": "website/features/report/report-logic.ts",
-   "old": "draft.category === PolicyCategory.OTHER && length === 0",
+   "old": "communityDescriptionRequired(draft.category) && length === 0",
    "new": "false && length === 0",
    "test": "features/report/community-report.unit.test.ts needs a category; description is required only for OTHER",
    "why": "選「其他」不用說明"

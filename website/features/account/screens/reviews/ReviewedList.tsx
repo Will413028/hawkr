@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
@@ -11,6 +12,7 @@ import { resolveCdnUrl } from "@/lib/media/cdn";
 
 /** "已評價" tab — reviews the buyer has already written (view-only). */
 export default function ReviewedList() {
+	const t = useTranslations("account.reviews");
 	const { reviews, loading, loadingMore, error, hasMore, loadMore } =
 		useMyReviews();
 
@@ -106,7 +108,7 @@ export default function ReviewedList() {
 			</ul>
 			{error != null ? (
 				<p className="text-danger text-sm text-center m-0" role="alert">
-					載入更多評價失敗，請稍後再試。
+					{t("loadMoreFailed")}
 				</p>
 			) : null}
 			{hasMore ? (
@@ -119,7 +121,7 @@ export default function ReviewedList() {
 						isLoading={loadingMore}
 						loadingLabel="載入評論中…"
 					>
-						{error != null ? "重試" : "載更多"}
+						{error != null ? t("retry") : "載更多"}
 					</Button>
 				</div>
 			) : null}

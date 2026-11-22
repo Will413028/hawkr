@@ -5,6 +5,7 @@ import {
 	CustomerSort,
 	CustomerType,
 } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -86,6 +87,7 @@ export default function CouponBuyerPicker({
 	const { storeId } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
 	const ut = useUiText();
+	const t = useTranslations("sellerCenter.customers");
 	const [customerType, setCustomerType] = React.useState<CustomerType>(
 		CustomerType.UNSPECIFIED,
 	);
@@ -113,6 +115,7 @@ export default function CouponBuyerPicker({
 	]
 		.filter(Boolean)
 		.join(" · ");
+	const filterText = t("filter", { label: activeFilterLabel });
 
 	const currentParams = React.useMemo<Omit<ListCustomersParams, "pageToken">>(
 		() => ({
@@ -346,9 +349,9 @@ export default function CouponBuyerPicker({
 					>
 						<span
 							className="max-w-[72vw] shrink-0 truncate whitespace-nowrap text-xs text-hk-muted sm:min-w-[180px] sm:max-w-none sm:flex-1"
-							title={`目前篩選：${activeFilterLabel || "全部客戶"}`}
+							title={filterText}
 						>
-							目前篩選：{activeFilterLabel || "全部客戶"}
+							{filterText}
 						</span>
 						<Button
 							type="button"
@@ -361,7 +364,7 @@ export default function CouponBuyerPicker({
 							loadingLabel="套用分群買家中…"
 							className="h-11 min-h-11 shrink-0 whitespace-nowrap sm:h-8 sm:min-h-8"
 						>
-							全選此分群
+							{t("selectSegment")}
 						</Button>
 						<Button
 							type="button"
@@ -482,10 +485,10 @@ export default function CouponBuyerPicker({
 							onClick={() => void loadMore()}
 							disabled={loadingMore}
 							isLoading={loadingMore}
-							loadingLabel="載入更多客戶中…"
+							loadingLabel={t("loadingMoreCustomers")}
 							className="mx-3 my-2 shrink-0"
 						>
-							載入更多
+							{t("loadMore")}
 						</Button>
 					) : null}
 				</div>

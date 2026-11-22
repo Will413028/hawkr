@@ -1,7 +1,6 @@
 "use client";
 
 import { errorText } from "@hawkr/api/connect/errors";
-import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -16,6 +15,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { type CommunityReportTarget, submitCommunityReport } from "./api";
 import {
 	COMMUNITY_DESCRIPTION_MAX,
+	communityDescriptionRequired,
 	communityReportCategoryOptions,
 	validateCommunityReport,
 } from "./report-logic";
@@ -125,7 +125,7 @@ export default function CommunityReportDialog({
 					{ max: COMMUNITY_DESCRIPTION_MAX },
 				);
 	const done = outcome.kind === "done";
-	const descriptionRequired = selected?.value === PolicyCategory.OTHER;
+	const descriptionRequired = communityDescriptionRequired(selected?.value);
 
 	return (
 		<Dialog

@@ -24,7 +24,13 @@
 		}
 	},
 	"navigation": {},
-	"product": {},
+	"product": {
+		"reviewsUnavailable": {
+			"title": "Product reviews",
+			"body": "Reviews could not be loaded right now. Please try again later.",
+			"reload": "Reload"
+		}
+	},
 	"seller": {
 		"notFound": "Seller not found",
 		"messagesTitle": "{name}'s messages",
@@ -119,6 +125,31 @@
 			"category": "Category",
 			"reason": "Explanation",
 			"note": "While suspended you can browse, but you cannot place orders, comment, like, follow or edit your data."
+		},
+		"menu": {
+			"blocked": "Blocked list"
+		},
+		"blocked": {
+			"title": "Blocked list",
+			"loading": "Loading...",
+			"retry": "Retry",
+			"viewMore": "View more",
+			"unblock": "Unblock",
+			"cancel": "Cancel",
+			"emptyTitle": "No blocked users",
+			"emptyDescription": "Stores and buyers you block will appear here.",
+			"stores": "Stores",
+			"buyers": "Buyers",
+			"unblockTitle": "Unblock \"{name}\"?",
+			"unblockBody": "After unblocking, your posts, forums and messages will be visible to each other again."
+		},
+		"reviews": {
+			"loadMoreFailed": "Could not load more reviews. Please try again later.",
+			"retry": "Retry"
+		},
+		"messages": {
+			"peerCustomer": "Customer",
+			"peerSeller": "Seller"
 		}
 	},
 	"feed": {
@@ -183,5 +214,24 @@
 		"supplementPlaceholder": "Add what led to the report and what happened",
 		"supplementSubmit": "Submit details",
 		"supplementReceived": "Additional details received"
+	},
+	"sellerCenter": {
+		"customers": {
+			"loading": "Loading…",
+			"loadMore": "Load more",
+			"loadingMoreCustomers": "Loading more customers…",
+			"filter": "Current filter: {label}",
+			"selectSegment": "Select this segment",
+			"updatingCategory": "Updating category…",
+			"loaded": "{count} customers loaded, more available"
+		}
+	},
+	"content": {
+		"faqVipQuestion": "How do I mark a customer as VIP?",
+		"faqVipAnswer": "Open Customer Management, select a customer to open the details, and use the category buttons at the top to set Regular or VIP.",
+		"faqVipStepPick": "Use the category buttons at the top to choose Regular / VIP.",
+		"guideCustomerFilter": "Switch between All and VIP, and filter or sort by tag.",
+		"guideCustomerClass": "Use Customer Category to set Regular or VIP.",
+		"overviewCustomerClass": "Classify customers as Regular or VIP and filter by custom tags"
 	}
 }

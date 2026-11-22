@@ -4,6 +4,7 @@ import {
 	CustomerSort,
 	CustomerType,
 } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -55,6 +56,7 @@ function customerRowKey(customer: SellerCustomer): string {
 
 export default function CustomersClient() {
 	const ut = useUiText();
+	const t = useTranslations("sellerCenter.customers");
 	const openChat = useChatDrawerStore((state) => state.openChat);
 	// Server-driven segmentation: classification tab, single tag filter, and
 	// sort key. Changing any of these refetches from the first page.
@@ -154,7 +156,7 @@ export default function CustomersClient() {
 			title="客戶管理"
 			subtitle={
 				hasMore
-					? `已載入 ${rows.length} 位客戶，還有更多`
+					? t("loaded", { count: rows.length })
 					: `總共 ${rows.length} 位客戶`
 			}
 		>
@@ -461,9 +463,9 @@ export default function CustomersClient() {
 					color="default"
 					onClick={() => void loadMore()}
 					isLoading={loadingMore}
-					loadingLabel="載入中…"
+					loadingLabel={t("loading")}
 				>
-					載入更多
+					{t("loadMore")}
 				</Button>
 			) : null}
 

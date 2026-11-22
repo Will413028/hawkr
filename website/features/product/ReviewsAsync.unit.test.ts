@@ -15,6 +15,7 @@ vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => ({ refresh: mocks.refresh }),
 }));
 
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import ProductReviewsUnavailable from "./components/ProductReviewsUnavailable";
 import ReviewsAsync from "./ReviewsAsync";
 
@@ -32,7 +33,13 @@ describe("ReviewsAsync read failure", () => {
 	});
 
 	it("the unavailable block offers a retry that refreshes the route", () => {
-		render(React.createElement(ProductReviewsUnavailable));
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(ProductReviewsUnavailable),
+			),
+		);
 		expect(screen.getByRole("alert").textContent).toContain("無法載入");
 		fireEvent.click(screen.getByRole("button", { name: "重新載入" }));
 		expect(mocks.refresh).toHaveBeenCalledTimes(1);

@@ -15,6 +15,7 @@ import {
 	useMutation,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
 import EmptyStatePanel from "@/components/shared/EmptyStatePanel";
@@ -101,6 +102,7 @@ function Section<T>({
 	rowErrors: Record<string, string>;
 	onUnblock: (row: Row) => void;
 }) {
+	const t = useTranslations("account.blocked");
 	const defaults = useDefaultErrorText();
 	const rows = (query.data?.pages.flatMap((p) => p.items) ?? []).map(toRow);
 	const noteOf = (row: Row) =>
@@ -125,7 +127,7 @@ function Section<T>({
 						size="sm"
 						onClick={() => void query.refetch()}
 					>
-						重試
+						{t("retry")}
 					</Button>
 				</div>
 			) : (
@@ -158,7 +160,7 @@ function Section<T>({
 									size="sm"
 									onClick={() => onUnblock(row)}
 								>
-									解除封鎖
+									{t("unblock")}
 								</Button>
 							</div>
 							{rowErrors[row.id] ? (
@@ -187,7 +189,7 @@ function Section<T>({
 						disabled={query.isFetchingNextPage}
 						onClick={() => void query.fetchNextPage()}
 					>
-						查看更多
+						{t("viewMore")}
 					</Button>
 				</div>
 			) : null}
@@ -197,6 +199,7 @@ function Section<T>({
 
 /** 封鎖名單頁（`/account/blocked`）：買家封鎖的店家與買家兩段，各自分頁，可解除封鎖。與 buyer-app 的封鎖名單對等。 */
 export default function BlockedListClient() {
+	const t = useTranslations("account.blocked");
 	const defaults = useDefaultErrorText();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
@@ -287,28 +290,28 @@ export default function BlockedListClient() {
 	};
 
 	return (
-		<SellerPageShell title="封鎖名單">
+		<SellerPageShell title={t("title")}>
 			{bothPending ? (
-				<p className="text-sm text-foreground-soft">載入中...</p>
+				<p className="text-sm text-foreground-soft">{t("loading")}</p>
 			) : bothFailed ? (
 				<div className="flex flex-col items-start gap-2">
 					<p className="m-0 text-sm font-semibold text-danger-700" role="alert">
 						{errorText(stores.error, defaults)}
 					</p>
 					<Button variant="bordered" color="default" onClick={retryAll}>
-						重試
+						{t("retry")}
 					</Button>
 				</div>
 			) : empty ? (
 				<EmptyStatePanel
 					icon="search"
-					title="尚無封鎖的使用者"
-					description="你封鎖的店家與買家會顯示在這裡。"
+					title={t("emptyTitle")}
+					description={t("emptyDescription")}
 				/>
 			) : (
 				<div className="flex flex-col gap-[var(--hkui-space-6)]">
 					<Section
-						title="店家"
+						title={t("stores")}
 						testId="blocked-stores"
 						query={stores}
 						toRow={storeRow}
@@ -316,7 +319,7 @@ export default function BlockedListClient() {
 						onUnblock={(row) => setConfirming({ kind: "store", row })}
 					/>
 					<Section
-						title="買家"
+						title={t("buyers")}
 						testId="blocked-buyers"
 						query={buyers}
 						toRow={buyerRow}
@@ -331,7 +334,9 @@ export default function BlockedListClient() {
 					if (!unblock.isPending) setConfirming(null);
 				}}
 				size="sm"
-				title={confirming ? `解除封鎖「${confirming.row.name}」？` : ""}
+				title={
+					confirming ? t("unblockTitle", { name: confirming.row.name }) : ""
+				}
 				footer={
 					<div className="flex w-full justify-end gap-2">
 						<Button
@@ -340,19 +345,19 @@ export default function BlockedListClient() {
 							onClick={() => setConfirming(null)}
 							disabled={unblock.isPending}
 						>
-							取消
+							{t("cancel")}
 						</Button>
 						<Button
 							onClick={() => void confirmUnblock()}
 							disabled={unblock.isPending}
 						>
-							解除封鎖
+							{t("unblock")}
 						</Button>
 					</div>
 				}
 			>
 				<p className="text-sm text-[var(--hkui-default-700)]">
-					解除後，你與對方的貼文、討論區與訊息將恢復互通。
+					{t("unblockBody")}
 				</p>
 			</Dialog>
 		</SellerPageShell>

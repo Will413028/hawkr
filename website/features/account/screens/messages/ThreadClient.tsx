@@ -7,6 +7,7 @@ import {
 	chatPreviewHidden,
 } from "@hawkr/ui-text/keys";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Link from "@/components/shared/Link";
@@ -155,6 +156,7 @@ export default function ThreadClient({
 		sendImage,
 	} = useChatThread(targetId);
 	const ut = useUiText();
+	const tMessages = useTranslations("account.messages");
 	const headStatus = resolveHeadStatus(connectionState, peerOnline);
 	// Expectation-management line above the composer (the Airbnb
 	// "typical response time" slot). Sending goes over HTTP POST, so a
@@ -387,7 +389,8 @@ export default function ThreadClient({
 													side={side}
 													messageId={m.id}
 													peerName={
-														peerNickname || (isSeller ? "客戶" : "賣家")
+														peerNickname ||
+														tMessages(isSeller ? "peerCustomer" : "peerSeller")
 													}
 													onBlocked={() => void conversations.refresh()}
 												/>

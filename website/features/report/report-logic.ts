@@ -137,6 +137,13 @@ export function communityReportCategoryOptions(ut: UiText): CategoryOption[] {
 	return options;
 }
 
+/** 社群檢舉選了這個類別時，說明必填。 */
+export function communityDescriptionRequired(
+	category: PolicyCategory | undefined,
+): boolean {
+	return category === PolicyCategory.OTHER;
+}
+
 /** 選了「其他」才要說明；說明有填就不能超過上限（規則同伺服器：修剪與以字元計長）。 */
 export function validateCommunityReport(draft: {
 	category: PolicyCategory | undefined;
@@ -157,7 +164,7 @@ export function validateCommunityReport(draft: {
 	const length = goTrimmedRuneCount(draft.description);
 	if (length > COMMUNITY_DESCRIPTION_MAX) {
 		errors.description = "descriptionTooLong";
-	} else if (draft.category === PolicyCategory.OTHER && length === 0) {
+	} else if (communityDescriptionRequired(draft.category) && length === 0) {
 		errors.description = "descriptionRequired";
 	}
 	return errors;

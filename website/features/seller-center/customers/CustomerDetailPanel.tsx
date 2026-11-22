@@ -2,6 +2,7 @@
 
 import { errorText } from "@hawkr/api/connect/errors";
 import { CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -44,6 +45,7 @@ function CustomerClassControl({
 	const { storeId } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
 	const ut = useUiText();
+	const t = useTranslations("sellerCenter.customers");
 	const [value, setValue] = React.useState<CustomerType>(initial);
 	const [pendingType, setPendingType] = React.useState<CustomerType | null>(
 		null,
@@ -90,7 +92,7 @@ function CustomerClassControl({
 					onClick={() => void pick(opt)}
 					disabled={pendingType !== null || !storeId}
 					isLoading={pendingType === opt}
-					loadingLabel="更新分類中…"
+					loadingLabel={t("updatingCategory")}
 				>
 					{customerTypeText(ut, opt)}
 				</Button>

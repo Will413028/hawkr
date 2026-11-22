@@ -42,6 +42,7 @@ vi.mock("@/lib/browser/body-scroll-lock", () => ({
 vi.mock("@/components/shared/Avatar", () => ({ default: () => null }));
 vi.mock("@/components/shared/AppIcon", () => ({ default: () => null }));
 
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import CouponBuyerPicker from "./CouponBuyerPicker";
 
 const customer = (id: string) => ({
@@ -56,12 +57,16 @@ const customer = (id: string) => ({
 
 function open(onConfirm = vi.fn()) {
 	render(
-		createElement(CouponBuyerPicker, {
-			open: true,
-			initialSelected: [],
-			onConfirm,
-			onClose: () => {},
-		}),
+		createElement(
+			IntlTestWrapper,
+			null,
+			createElement(CouponBuyerPicker, {
+				open: true,
+				initialSelected: [],
+				onConfirm,
+				onClose: () => {},
+			}),
+		),
 	);
 	return onConfirm;
 }

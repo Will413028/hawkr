@@ -21,6 +21,7 @@ vi.mock("@/features/account/components/AccountEmptyIcon", () => ({
 	AccountEmptyStateIcon: () => null,
 }));
 
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import ReviewedList from "./ReviewedList";
 
 const review = {
@@ -46,7 +47,13 @@ describe("ReviewedList next page failure", () => {
 			error: new Error("x"),
 			hasMore: true,
 		};
-		render(React.createElement(ReviewedList));
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(ReviewedList),
+			),
+		);
 		expect(screen.getByRole("alert").textContent).toContain("載入更多評價失敗");
 		fireEvent.click(screen.getByRole("button", { name: "重試" }));
 		expect(state.loadMore).toHaveBeenCalledTimes(1);
@@ -60,7 +67,13 @@ describe("ReviewedList next page failure", () => {
 			error: null,
 			hasMore: true,
 		};
-		render(React.createElement(ReviewedList));
+		render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(ReviewedList),
+			),
+		);
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(screen.getByRole("button", { name: "載更多" })).toBeTruthy();
 	});

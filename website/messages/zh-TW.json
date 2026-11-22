@@ -24,7 +24,13 @@
 		}
 	},
 	"navigation": {},
-	"product": {},
+	"product": {
+		"reviewsUnavailable": {
+			"title": "商品評價",
+			"body": "評價暫時無法載入，請稍後再試。",
+			"reload": "重新載入"
+		}
+	},
 	"seller": {
 		"notFound": "找不到賣家",
 		"messagesTitle": "{name} 的留言",
@@ -119,6 +125,31 @@
 			"category": "類別",
 			"reason": "說明",
 			"note": "停權期間可以瀏覽，無法下單、留言、按讚、追蹤或修改資料。"
+		},
+		"menu": {
+			"blocked": "封鎖名單"
+		},
+		"blocked": {
+			"title": "封鎖名單",
+			"loading": "載入中...",
+			"retry": "重試",
+			"viewMore": "查看更多",
+			"unblock": "解除封鎖",
+			"cancel": "取消",
+			"emptyTitle": "尚無封鎖的使用者",
+			"emptyDescription": "你封鎖的店家與買家會顯示在這裡。",
+			"stores": "店家",
+			"buyers": "買家",
+			"unblockTitle": "解除封鎖「{name}」？",
+			"unblockBody": "解除後，你與對方的貼文、討論區與訊息將恢復互通。"
+		},
+		"reviews": {
+			"loadMoreFailed": "載入更多評價失敗，請稍後再試。",
+			"retry": "重試"
+		},
+		"messages": {
+			"peerCustomer": "客戶",
+			"peerSeller": "賣家"
 		}
 	},
 	"feed": {
@@ -183,5 +214,24 @@
 		"supplementPlaceholder": "請補充檢舉的原因與經過",
 		"supplementSubmit": "送出補充說明",
 		"supplementReceived": "已收到補充說明"
+	},
+	"sellerCenter": {
+		"customers": {
+			"loading": "載入中…",
+			"loadMore": "載入更多",
+			"loadingMoreCustomers": "載入更多客戶中…",
+			"filter": "目前篩選：{label}",
+			"selectSegment": "全選此分群",
+			"updatingCategory": "更新分類中…",
+			"loaded": "已載入 {count} 位客戶，還有更多"
+		}
+	},
+	"content": {
+		"faqVipQuestion": "如何將客戶設為VIP？",
+		"faqVipAnswer": "進入「客戶管理」點選客戶開啟詳情，使用上方分類按鈕即可設定為一般或VIP。",
+		"faqVipStepPick": "使用上方分類按鈕選擇一般／VIP。",
+		"guideCustomerFilter": "用「全部」「VIP」切換類型，並可以依標籤篩選與排序。",
+		"guideCustomerClass": "用「客戶分類」設定「一般」或「VIP」。",
+		"overviewCustomerClass": "分類為一般顧客或 VIP，並使用自訂標籤篩選"
 	}
 }

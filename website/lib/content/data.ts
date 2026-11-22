@@ -1,3 +1,4 @@
+import zhTW from "../../messages/zh-TW.json";
 export interface FaqItem {
 	q: string;
 	a: string;
@@ -424,12 +425,12 @@ export const faqCategories: FaqCategory[] = [
 				a: "在「顧客管理」>「訂閱者」中可查看關注您店舖的用戶列表。",
 			},
 			{
-				q: "如何將客戶設為VIP？",
-				a: "進入「客戶管理」點選客戶開啟詳情，使用上方分類按鈕即可設定為一般或VIP。",
+				q: zhTW.content.faqVipQuestion,
+				a: zhTW.content.faqVipAnswer,
 				steps: [
 					"進入「客戶管理」。",
 					"點選客戶開啟詳情。",
-					"使用上方分類按鈕選擇一般／VIP。",
+					zhTW.content.faqVipStepPick,
 				],
 			},
 			{

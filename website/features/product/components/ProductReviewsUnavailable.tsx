@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Button from "@/components/ui/Button";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { PRODUCT_REVIEW_TITLE_CLASS } from "./productReviewsLayout";
@@ -9,15 +10,16 @@ import { PRODUCT_REVIEW_TITLE_CLASS } from "./productReviewsLayout";
  * 重試重新跑伺服器端的評價讀取（`router.refresh()`）。
  */
 export default function ProductReviewsUnavailable() {
+	const t = useTranslations("product.reviewsUnavailable");
 	const router = useObservedRouter("product_reviews_unavailable");
 	return (
 		<div className="mb-8" id="product-reviews">
-			<h2 className={`${PRODUCT_REVIEW_TITLE_CLASS} mb-4`}>商品評價</h2>
+			<h2 className={`${PRODUCT_REVIEW_TITLE_CLASS} mb-4`}>{t("title")}</h2>
 			<p className="text-danger text-sm m-0 mb-3" role="alert">
-				評價暫時無法載入，請稍後再試。
+				{t("body")}
 			</p>
 			<Button type="button" variant="bordered" onClick={() => router.refresh()}>
-				重新載入
+				{t("reload")}
 			</Button>
 		</div>
 	);

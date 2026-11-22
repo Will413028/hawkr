@@ -132,7 +132,7 @@ export async function listAllCustomers(
 }
 
 function required(customer: Customer | undefined, rpc: string): Customer {
-	if (!customer) throw new Error(`${rpc} 的回應沒有客戶`);
+	if (!customer) throw new Error(`${rpc} response has no customer`);
 	return customer;
 }
 
@@ -174,7 +174,7 @@ export async function createTag(
 	client: () => CrmClient = crmAppClient,
 ): Promise<CustomerTag> {
 	const res = await client().createTag({ storeId, name });
-	if (!res.tag) throw new Error("CreateTag 的回應沒有標籤");
+	if (!res.tag) throw new Error("CreateTag response has no tag");
 	return customerTagFrom(res.tag);
 }
 
@@ -189,7 +189,7 @@ export async function renameTag(
 		tag: { id: tagId, name },
 		updateMask: fieldMask(TagSchema, ["name"]),
 	});
-	if (!res.tag) throw new Error("UpdateTag 的回應沒有標籤");
+	if (!res.tag) throw new Error("UpdateTag response has no tag");
 	return customerTagFrom(res.tag);
 }
 

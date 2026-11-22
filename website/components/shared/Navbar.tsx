@@ -31,7 +31,10 @@ import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useDisclosureMenu } from "@/components/shared/useDisclosureMenu";
 import Button from "@/components/ui/Button";
 import AccountMenuIcon from "@/features/account/components/AccountMenuIcon";
-import { BUYER_MENU_ITEMS as buyerMenuItems } from "@/features/account/menu";
+import {
+	BUYER_MENU_ITEMS as buyerMenuItems,
+	buyerMenuLabel,
+} from "@/features/account/menu";
 import HomeCompactSearch from "@/features/home/components/HomeCompactSearch";
 import { resolveAuthRailMode } from "@/lib/auth/auth-rail";
 import { useAuth } from "@/lib/auth/context";
@@ -248,6 +251,7 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 	}, [onSignOut]);
 
 	const tCommon = useTranslations("common");
+	const tMenu = useTranslations("account.menu");
 	const displayName = identity?.nickname || tCommon("memberFallback");
 	const avatar = identity?.avatarKey;
 
@@ -311,7 +315,7 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 										name={item.icon}
 										className="site-nav-user__menu-icon"
 									/>
-									{item.label}
+									{buyerMenuLabel(item, tMenu)}
 								</Link>
 							</li>
 						))}
