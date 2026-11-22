@@ -514,6 +514,89 @@ export const e = (k: E) => (k === E.WARNING ? OUT : "");
 	});
 });
 
+describe("規則 E：next-intl 查詢", () => {
+	const useT = `import { useTranslations } from "next-intl"; import { getTranslations } from "next-intl/server";`;
+	const pre = `${PRE} ${useT}`;
+
+	it("t(…)、t.rich／markup／raw、await getTranslations、直接呼叫工廠都算", () => {
+		expect(
+			scan(
+				`export function f(k: E) {
+	const t = useTranslations("a");
+	return k === E.WARNING ? t("w") : "";
+}`,
+				pre,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		for (const call of ['t.rich("w")', 't.markup("w")', 't.raw("w")']) {
+			expect(
+				scan(
+					`export function f(k: E) {
+	const t = useTranslations("a");
+	if (k === E.WARNING) { return ${call}; }
+	return null;
+}`,
+					pre,
+				),
+			).toEqual(["if:WARNING@3"]);
+		}
+		expect(
+			scan(
+				`export async function f(k: E) {
+	const t = await getTranslations("a");
+	switch (k) { case E.WARNING: return t("w"); }
+}`,
+				pre,
+			),
+		).toEqual(["case:WARNING@3"]);
+		expect(
+			scan(
+				`export function f(k: E) {
+	return k === E.WARNING ? useTranslations("a")("w") : "";
+}`,
+				pre,
+			),
+		).toEqual(["ternary:WARNING@2"]);
+	});
+
+	it("非 translator 的 t、非受管 enum、遮蔽的 t 不算", () => {
+		expect(
+			scan(
+				`const t = (s: string) => s;
+export function f(k: E) { return k === E.WARNING ? t("w") : ""; }`,
+				pre,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				`export function f(k: E, t: (s: string) => string) {
+	return k === E.WARNING ? t("w") : "";
+}
+const t = useTranslations("a");`,
+				pre,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				`export function f(k: E) {
+	const t = useTranslations("a");
+	return [1].map((t: (s: string) => string) => (k === E.WARNING ? t("w") : ""));
+}`,
+				pre,
+			),
+		).toEqual([]);
+		expect(single).toBeDefined();
+		const e = single;
+		if (!e?.tsModule || !e.tsName) return;
+		const hits = scanSource(
+			"a.ts",
+			`import { ${e.tsName} as S } from "${e.tsModule}"; ${useT} export function f(k: S) { const t = useTranslations("a"); return k === S.X ? t("w") : ""; }`,
+			manifest,
+		);
+		expect(forbidden(hits, manifest)).toEqual([]);
+	});
+});
+
 describe("manifest 與回報", () => {
 	it("單端 enum：任何形式都不失敗；只有對應表（case、key、pair）進 report", () => {
 		expect(single).toBeDefined();

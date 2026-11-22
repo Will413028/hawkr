@@ -32,8 +32,9 @@
  * class 靜態欄位的常數；第二個 client 對只有一個 client 用的 enum，以條件形式寫出值的說法（跨端檢查只比對對照表，
  * 看不到條件形式）。這些由 code review 把關；會發佈 en 的介面另有字面值 ratchet（I-CI），admin 不在 I-CI 內，
  * 所以 admin 的這些殘餘只靠 code review。
- * 觸發（計畫 I-CI、I-app-0）：「產生文字」要加進 client 資源的查詢（next-intl 的 `t("…")`、`useTranslations`；
- * App 的 ARB）。website 的部分與 I-CI 的 website 那一刀同一刀，因為從那時起新文字一律放進 messages；App 的部分與 I-app-0 同一刀。
+ * 產生文字也包含 next-intl 的查詢：`t(…)`、`t.rich|markup|raw(…)`，t 是 `useTranslations(…)`／`getTranslations(…)`（可 await）
+ * 初始化的 const（作用域規則同上，參數同名遮住）；直接呼叫 `useTranslations(…)(…)` 也算。
+ * 觸發（計畫 I-app-0）：App 的 ARB 查詢要加進「產生文字」，與 I-app-0 同一刀。
  *
  * 用法：tsx tools/check-enum-text.ts [--report <file>] <dir>...
  */
@@ -444,6 +445,37 @@ export function scanSource(
 		);
 	};
 
+	/** 初始值是 `useTranslations(…)`／`getTranslations(…)`（可包 `await`、括號）。 */
+	const isTranslatorFactoryCall = (e: ts.Expression): boolean => {
+		let x = stripWrappers(e);
+		while (ts.isAwaitExpression(x)) x = stripWrappers(x.expression);
+		return (
+			ts.isCallExpression(x) &&
+			ts.isIdentifier(x.expression) &&
+			(x.expression.text === "useTranslations" ||
+				x.expression.text === "getTranslations")
+		);
+	};
+
+	/** next-intl 的查詢：`t(…)`、`t.rich|markup|raw(…)`，t 是 translator 工廠初始化的 const；或直接呼叫工廠的回傳值。 */
+	const isTranslatorCall = (n: ts.Node): boolean => {
+		if (!ts.isCallExpression(n)) return false;
+		let callee = stripWrappers(n.expression);
+		if (
+			ts.isPropertyAccessExpression(callee) &&
+			["rich", "markup", "raw"].includes(callee.name.text)
+		) {
+			callee = stripWrappers(callee.expression);
+		}
+		if (ts.isIdentifier(callee)) {
+			const v = lookupVar(callee);
+			return (
+				!!v && v !== "shadow" && !!v.init && isTranslatorFactoryCall(v.init)
+			);
+		}
+		return isTranslatorFactoryCall(callee);
+	};
+
 	/** 區域裡產生文字（K4）。shallow：不進入巢狀函式本體（pair 用）。 */
 	const hasText = (node: ts.Node | undefined, shallow = false): boolean => {
 		if (!node) return false;
@@ -453,6 +485,7 @@ export function scanSource(
 			if (shallow && isFunctionLike(n)) return;
 			if (
 				isHanLiteral(n) ||
+				isTranslatorCall(n) ||
 				(ts.isIdentifier(n) && isReference(n) && isHanConst(n)) ||
 				isObjectConstText(n)
 			) {
