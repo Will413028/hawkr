@@ -62,6 +62,33 @@
    "new": "BuyerID: r.StoreID, StoreID: r.BuyerID}, nil\n}\n\n// MessageParties 回傳",
    "test": "internal/modules/im ^TestPartiesReadsOwnershipOnly$",
    "why": "ConversationParties returns the buyer and store the wrong way round."
+  },
+  {
+   "id": "im-presence-authorization-predicate-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/store/presence.sql.go",
+   "old": "  AND (($1::text = 'BUYER' AND c.buyer_id = $3::bigint)",
+   "new": "  AND (true OR ($1::text = 'BUYER' AND c.buyer_id = $3::bigint)",
+   "test": "internal/modules/im ^TestPresenceStoreCallerAndBatch$",
+   "why": "Presence stops restricting the batch to conversations owned by the caller, so another party's conversation is answered instead of failing the whole request with NotFound."
+  },
+  {
+   "id": "im-presence-store-caller-skips-buyers-blocked-by-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/read/read.go",
+   "old": "blocked, err = s.d.Stores.BuyersBlockedByStore(ctx, p.Store.StoreID, distinct(rs, func(r store.PresenceForPartyRow) int64 { return r.BuyerID }))",
+   "new": "blocked, err = map[int64]bool{}, nil",
+   "test": "internal/modules/im ^TestPresenceStoreCallerAndBatch$",
+   "why": "A store caller no longer asks seller which buyers it blocks, so a blocked buyer still shows online."
+  },
+  {
+   "id": "seller-buyers-blocked-by-store-drops-store-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/store/store_blocks.sql.go",
+   "old": "WHERE store_id = $1 AND buyer_id = ANY($2::bigint[])\nORDER BY buyer_id",
+   "new": "WHERE $1::bigint > 0 AND buyer_id = ANY($2::bigint[])\nORDER BY buyer_id",
+   "test": "internal/modules/seller ^TestBuyersBlockedByStoreReturnsOnlyThisStoresBlocks$",
+   "why": "The batch query stops filtering by store, so buyers blocked by another store are reported as blocked by this one."
   }
  ]
 }

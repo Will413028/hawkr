@@ -36,6 +36,13 @@ FROM seller.store_blocks
 WHERE buyer_id = $1 AND store_id = ANY($2::bigint[])
 ORDER BY store_id;
 
+-- name: BuyersBlockedByStore :many
+-- 輸入的買家中被指定店家封鎖的 buyer_id。
+SELECT buyer_id
+FROM seller.store_blocks
+WHERE store_id = $1 AND buyer_id = ANY($2::bigint[])
+ORDER BY buyer_id;
+
 -- name: ClearStoreBlocksAgainstBuyer :exec
 -- 買家刪帳：刪除各店對這位買家的封鎖。
 DELETE

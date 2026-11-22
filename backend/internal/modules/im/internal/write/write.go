@@ -42,6 +42,9 @@ type Buyers interface {
 type Stores interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 	StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
+	// StoresBlockingBuyer 與 BuyersBlockedByStore 是 Presence 的批次查詢（回傳的 map 只含封鎖的一方）。
+	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
+	BuyersBlockedByStore(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error)
 	// LockNotRetired 在 transaction 內以 FOR KEY SHARE 確認店家尚未退場；已退場與不存在回 NotFound。
 	LockNotRetired(ctx context.Context, storeID int64) error
 }

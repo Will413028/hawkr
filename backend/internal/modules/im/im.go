@@ -169,7 +169,7 @@ func New(d Deps) *Module {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	rd := read.New(read.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores})
+	rd := read.New(read.Deps{DB: d.DB, Stores: d.Stores})
 	lc := d.Live
 	if lc.NewID == nil {
 		lc.NewID = d.NewID

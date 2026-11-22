@@ -45,7 +45,13 @@ func (imTestStores) Store(_ context.Context, id int64) (seller.Store, error) {
 	}, nil
 }
 func (imTestStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
-func (imTestStores) LockNotRetired(context.Context, int64) error                  { return nil }
+func (imTestStores) StoresBlockingBuyer(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+func (imTestStores) BuyersBlockedByStore(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+func (imTestStores) LockNotRetired(context.Context, int64) error { return nil }
 
 type imNoOrders struct{}
 

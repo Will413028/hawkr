@@ -124,6 +124,25 @@ func (s *Service) Blocking(ctx context.Context, buyerID int64, storeIDs []int64)
 	return result, nil
 }
 
+// BlockedBuyers 批次：buyerIDs（最多 model.MaxBatchSize 個）中被店家封鎖的買家，回傳的 map 只含被封鎖的買家。
+func (s *Service) BlockedBuyers(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error) {
+	if err := model.Positive(storeID); err != nil {
+		return nil, err
+	}
+	if err := model.BatchIDs(buyerIDs); err != nil {
+		return nil, err
+	}
+	ids, err := store.New(s.d.DB.Conn(ctx)).BuyersBlockedByStore(ctx, store.BuyersBlockedByStoreParams{StoreID: storeID, Column2: buyerIDs})
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		result[id] = true
+	}
+	return result, nil
+}
+
 // ClearAgainstBuyer 刪掉各店對這位買家的封鎖（買家刪帳）；必須在刪帳的 transaction 內呼叫。
 func (s *Service) ClearAgainstBuyer(ctx context.Context, buyerID int64) error {
 	if err := model.Positive(buyerID); err != nil {

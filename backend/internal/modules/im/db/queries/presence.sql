@@ -27,11 +27,23 @@ ON CONFLICT (stream_id) DO UPDATE SET expires_at = EXCLUDED.expires_at;
 -- name: DeletePresenceStreams :exec
 DELETE FROM im.presence_streams WHERE stream_id = ANY(sqlc.arg(ids)::uuid[]);
 
--- name: IsPartyOnline :one
-SELECT EXISTS (
-    SELECT 1 FROM im.presence_streams
-    WHERE kind = sqlc.arg(kind) AND party_id = sqlc.arg(party_id) AND expires_at > now()
-);
+-- name: PresenceForParty :many
+-- 一次處理整批對話的在線狀態：只回呼叫者這一方的對話（授權的述詞；缺列由呼叫端判成 NotFound），對方是否已關閉或退場、買家是否封鎖了店、
+-- 對方是否有未過期的串流。對方的 kind 由呼叫者的 kind 決定；時間只用資料庫的 now()。店家封鎖買家在 seller，由呼叫端另查。
+SELECT c.id, c.buyer_id, c.store_id,
+       (CASE WHEN sqlc.arg(kind)::text = 'BUYER'
+             THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+             ELSE EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+        END)::boolean AS peer_inactive,
+       EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS bs WHERE bs.blocker_buyer_id = c.buyer_id AND bs.store_id = c.store_id)::boolean AS buyer_blocks_store,
+       EXISTS (SELECT 1 FROM im.presence_streams AS ps
+               WHERE ps.kind = CASE WHEN sqlc.arg(kind)::text = 'BUYER' THEN 'STORE' ELSE 'BUYER' END
+                 AND ps.party_id = CASE WHEN sqlc.arg(kind)::text = 'BUYER' THEN c.store_id ELSE c.buyer_id END
+                 AND ps.expires_at > now())::boolean AS peer_online
+FROM im.conversations AS c
+WHERE c.id = ANY(sqlc.arg(ids)::uuid[])
+  AND ((sqlc.arg(kind)::text = 'BUYER' AND c.buyer_id = sqlc.arg(party_id)::bigint)
+    OR (sqlc.arg(kind)::text = 'STORE' AND c.store_id = sqlc.arg(party_id)::bigint));
 
 -- name: SweepPresenceStreams :execrows
 DELETE FROM im.presence_streams WHERE expires_at < now() - interval '10 minutes';

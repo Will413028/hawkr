@@ -517,11 +517,18 @@ func TestPresence(t *testing.T) {
 		t.Fatal("未過期要在線")
 	}
 	// 封鎖（任一方向）與封鎖查詢失敗。
-	f.buyers.blocking = true
+	if _, err := f.buyers.owner.BlockStore(ctx, b1, s1); err != nil {
+		t.Fatal(err)
+	}
 	if online() {
 		t.Fatal("買家封鎖店家要離線")
 	}
-	f.buyers.blocking = false
+	if _, err := f.buyers.owner.UnblockStore(ctx, b1, s1); err != nil {
+		t.Fatal(err)
+	}
+	if !online() {
+		t.Fatal("解除封鎖後要在線")
+	}
 	f.stores.block = true
 	if online() {
 		t.Fatal("店家封鎖買家要離線")
@@ -532,11 +539,6 @@ func TestPresence(t *testing.T) {
 		t.Fatal("封鎖查詢失敗要回錯誤，不放行")
 	}
 	f.stores.blockErr = nil
-	f.buyers.blockErr = errRollback
-	if _, err := f.m.Presence(ctx, buyerP, []uuid.UUID{conv}); err == nil {
-		t.Fatal("封鎖查詢失敗要回錯誤，不放行")
-	}
-	f.buyers.blockErr = nil
 	// 非共有對話。
 	if _, err := f.m.Presence(ctx, f.buyerParty(b2), []uuid.UUID{conv}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("非共有對話要 NotFound：%v", err)
@@ -559,6 +561,66 @@ func TestPresence(t *testing.T) {
 	over := make([]uuid.UUID, im.MaxPresenceConversations+1)
 	if _, err := f.m.Presence(ctx, buyerP, over); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("超過上限要 InvalidInput：%v", err)
+	}
+}
+
+// 店家呼叫：對方是買家；店家封鎖買家（BuyersBlockedByStore）、買家封鎖店家、封鎖查詢失敗；一次多個對話、順序對應輸入、含別人的對話整個 NotFound。
+func TestPresenceStoreCallerAndBatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	m := f.newModule(im.LiveConfig{})
+	f.run(t, m)
+	c1 := f.say(t, f.buyerParty(b1), s1, "hi").ConversationID
+	c2 := f.say(t, f.buyerParty(b2), s1, "hi").ConversationID
+	other := f.say(t, f.buyerParty(b1), s2, "hi").ConversationID
+	storeP := f.storeParty(t, s1)
+	states := func(ids ...uuid.UUID) []bool {
+		st, err := f.m.Presence(ctx, storeP, ids)
+		if err != nil || len(st) != len(ids) {
+			t.Fatalf("Presence：%+v %v", st, err)
+		}
+		out := make([]bool, len(st))
+		for i, x := range st {
+			if x.ConversationID != ids[i] {
+				t.Fatalf("順序要對應輸入：%+v", st)
+			}
+			out[i] = x.Online
+		}
+		return out
+	}
+	sub := f.subscribe(t, m, f.buyerParty(b1), nil)
+	defer sub.Close()
+	if got := states(c2, c1, c1); got[0] || !got[1] || !got[2] {
+		t.Fatalf("只有 b1 開了串流，重複的 ID 各回一筆：%v", got)
+	}
+	f.stores.block = true
+	if got := states(c1, c2); got[0] || got[1] {
+		t.Fatalf("店家封鎖買家，買家對店家顯示離線：%v", got)
+	}
+	f.stores.blockErr = errRollback
+	if _, err := f.m.Presence(ctx, storeP, []uuid.UUID{c1}); err == nil {
+		t.Fatal("店家端的封鎖查詢失敗要回錯誤，不放行")
+	}
+	f.stores.blockErr = nil
+	f.stores.block = false
+	if got := states(c1); !got[0] {
+		t.Fatalf("沒有封鎖要在線：%v", got)
+	}
+	if _, err := f.buyers.owner.BlockStore(ctx, b1, s1); err != nil {
+		t.Fatal(err)
+	}
+	if got := states(c1, c2); got[0] || got[1] {
+		t.Fatalf("買家封鎖店家，店家看買家離線：%v", got)
+	}
+	if st, err := f.m.Presence(ctx, storeP, nil); err != nil || len(st) != 0 {
+		t.Fatalf("空清單：%+v %v", st, err)
+	}
+	if _, err := f.m.Presence(ctx, storeP, []uuid.UUID{c1, other}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("含一個不是自己的對話時整個請求要 NotFound：%v", err)
+	}
+	if _, err := f.m.Presence(ctx, storeP, []uuid.UUID{c1, uuid.New()}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("含不存在的對話時整個請求要 NotFound：%v", err)
 	}
 }
 

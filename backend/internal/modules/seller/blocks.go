@@ -48,6 +48,12 @@ func (m *Module) StoresBlockingBuyer(ctx context.Context, buyerID int64, storeID
 	return m.block.Blocking(ctx, buyerID, storeIDs)
 }
 
+// BuyersBlockedByStore 批次：buyerIDs（最多 MaxBatchSize 個）中被店家封鎖的買家，回傳的 map 只含被封鎖的買家。與 StoresBlockingBuyer
+// 對稱，給 im 的在線狀態使用；加入呼叫方的 transaction。
+func (m *Module) BuyersBlockedByStore(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error) {
+	return m.block.BlockedBuyers(ctx, storeID, buyerIDs)
+}
+
 // ClearBlocksAgainstBuyer 刪掉各店對這位買家的封鎖。只由 accountdeletion 在買家刪帳的 transaction 內呼叫（鎖順序：帳號列、買家列、店家列之後，
 // 買家的刪除事件派發之前）。
 func (m *Module) ClearBlocksAgainstBuyer(ctx context.Context, buyerID int64) error {

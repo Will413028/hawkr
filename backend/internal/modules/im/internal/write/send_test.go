@@ -67,6 +67,14 @@ func (f *fakeStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 	return f.blocks, f.blocksErr
 }
 
+func (f *fakeStores) StoresBlockingBuyer(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+
+func (f *fakeStores) BuyersBlockedByStore(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+
 type fakeOrders struct {
 	open  bool
 	err   error

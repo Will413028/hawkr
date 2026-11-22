@@ -25,6 +25,12 @@ import (
 type noStoreBlocks struct{}
 
 func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+func (noStoreBlocks) StoresBlockingBuyer(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+func (noStoreBlocks) BuyersBlockedByStore(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
 
 type noReviewOrders struct{}
 
