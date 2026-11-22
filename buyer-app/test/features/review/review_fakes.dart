@@ -29,7 +29,11 @@ class FakeReviewPublic {
     this.error,
     this.stats,
     this.statsError,
+    this.failTokens = const {},
   });
+
+  /// 這些 page_token 的 `ListProductReviews` 以 Unavailable 失敗。
+  Set<String> failTokens;
 
   /// `GetProductReviewStats` 的回應；沒給時依 [pages] 的評價算出，只供沒有關心統計的測試。
   pb.GetProductReviewStatsResponse? stats;
@@ -70,6 +74,9 @@ class FakeReviewPublic {
         .unary(ReviewPublicService.listProductReviews, (req, _) async {
           requests.add(req);
           if (error != null) throw error!;
+          if (failTokens.contains(req.pageToken)) {
+            throw ConnectException(Code.unavailable, 'down');
+          }
           final i = req.pageToken.isEmpty
               ? 0
               : int.parse(req.pageToken.substring('page-'.length));

@@ -177,6 +177,115 @@ void main() {
     );
   });
 
+  testWidgets('選星等與有圖片篩選時，由伺服器篩選並從第一頁重讀', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        [reviewRecord('r1', rating: 5)],
+      ],
+    );
+    await _pumpScreen(tester, fake);
+    expect(fake.requests.single.hasRating(), isFalse);
+    expect(fake.requests.single.withImages, isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('product-review-filter-4星')));
+    await tester.pumpAndSettle();
+    expect(fake.requests.last.rating, 4);
+    expect(fake.requests.last.withImages, isFalse);
+    expect(fake.requests.last.pageToken, '');
+
+    final imageChip = find.byKey(const ValueKey('product-review-filter-有圖片'));
+    await tester.ensureVisible(imageChip);
+    await tester.pumpAndSettle();
+    await tester.tap(imageChip);
+    await tester.pumpAndSettle();
+    expect(fake.requests.last.hasRating(), isFalse);
+    expect(fake.requests.last.withImages, isTrue);
+    expect(fake.requests.length, 3);
+    expect(fake.statsRequests.length, 1);
+  });
+
+  testWidgets('依 next_page_token 載入更多，超過 10 頁也不截斷', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        for (var i = 0; i < 12; i++) [reviewRecord('r$i', content: '內容$i')],
+      ],
+    );
+    await _pumpScreen(tester, fake);
+
+    final more = find.byKey(const ValueKey('product-reviews-more'));
+    var taps = 0;
+    while (true) {
+      await tester.scrollUntilVisible(
+        more,
+        300,
+        scrollable: find.byType(Scrollable).first,
+        continuous: true,
+      );
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      taps++;
+      if (fake.requests.length == 12 || taps > 20) break;
+    }
+
+    expect(taps, 11);
+    expect(fake.requests.map((r) => r.pageToken), [
+      '',
+      for (var i = 1; i < 12; i++) 'page-$i',
+    ]);
+    await tester.scrollUntilVisible(
+      find.text('內容11'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('內容11'), findsOneWidget);
+  });
+
+  testWidgets('下一頁失敗保留已載入的評價並可再試', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        [reviewRecord('r0', content: '第一頁')],
+        [reviewRecord('r1', content: '第二頁')],
+      ],
+      failTokens: {'page-1'},
+    );
+    await _pumpScreen(tester, fake);
+
+    final more = find.byKey(const ValueKey('product-reviews-more'));
+    await tester.scrollUntilVisible(
+      more,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+
+    expect(find.text('第一頁'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('product-reviews-load-failure')),
+      findsNothing,
+    );
+    expect(more, findsOneWidget);
+
+    fake.failTokens = {};
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      more,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.text('第二頁', skipOffstage: false), findsOneWidget);
+    expect(fake.requests.map((r) => r.pageToken), ['', 'page-1', 'page-1']);
+  });
+
   testWidgets('沒有評價是空狀態，不是失敗', (tester) async {
     await tester.pumpWidget(
       ProviderScope(

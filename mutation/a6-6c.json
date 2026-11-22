@@ -13,28 +13,10 @@
    "id": "review-read-failure-shown-as-empty",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
-   "old": "_loadError = e;",
-   "new": "_loadError = null;",
+   "old": "_nextPageToken = '';\n          _loadError = e;",
+   "new": "_nextPageToken = '';\n          _loadError = null;",
    "test": "test/features/review/product_reviews_screen_layout_test.dart 讀取失敗顯示失敗與重試，不顯示成沒有評價；重試成功後顯示評價",
    "why": "評價讀取失敗時畫面退回空清單，和沒有評價分不出來"
-  },
-  {
-   "id": "review-pagination-stops-after-first-page",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/review/data/review_repository.dart",
-   "old": "if (token.isEmpty) break;",
-   "new": "break;",
-   "test": "test/features/review/review_repository_test.dart 讀到沒有下一頁為止，依序合併",
-   "why": "只讀第一頁，之後的評價遺失"
-  },
-  {
-   "id": "review-repository-swallows-read-failure",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/review/data/review_repository.dart",
-   "old": "      final response = await listProductReviews(productId, pageToken: token);\n      reviews.addAll(response.reviews);",
-   "new": "      final response = await listProductReviews(\n        productId,\n        pageToken: token,\n      ).catchError((_) => pb.ListProductReviewsResponse());\n      reviews.addAll(response.reviews);",
-   "test": "test/features/review/review_repository_test.dart 讀取失敗丟出錯誤，不回空清單",
-   "why": "讀取失敗被吞成空清單"
   },
   {
    "id": "create-review-drops-image-tokens",
@@ -143,6 +125,60 @@
    "new": "    final response = await _public\n        .getProductReviewStats(\n          pb.GetProductReviewStatsRequest(productId: productId),\n        )\n        .catchError((_) => pb.GetProductReviewStatsResponse());",
    "test": "test/features/review/review_repository_test.dart 讀取失敗丟出錯誤，不回 0",
    "why": "統計讀取失敗被吞成 0"
+  },
+  {
+   "id": "review-rating-filter-not-sent",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "      rating: rating,\n      withImages",
+   "new": "      rating: null,\n      withImages",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 選星等與有圖片篩選時，由伺服器篩選並從第一頁重讀",
+   "why": "選了星等但請求不帶 rating，伺服器回全部評價"
+  },
+  {
+   "id": "review-with-images-filter-not-sent",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "      withImages: withImages,\n",
+   "new": "      withImages: false,\n",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 選星等與有圖片篩選時，由伺服器篩選並從第一頁重讀",
+   "why": "選了有圖片但請求不帶 with_images"
+  },
+  {
+   "id": "review-rating-filter-derived-null",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "int? get _ratingFilter => int.tryParse(_selectedFilter.replaceAll('星', ''));",
+   "new": "int? get _ratingFilter => null;",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 選星等與有圖片篩選時，由伺服器篩選並從第一頁重讀",
+   "why": "畫面從選中的篩選算不出星等，永遠不篩星等"
+  },
+  {
+   "id": "review-page-token-ignored",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "      pageToken: pageToken,\n",
+   "new": "      pageToken: '',\n",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 依 next_page_token 載入更多，超過 10 頁也不截斷",
+   "why": "載入更多一律讀第一頁，token 被忽略"
+  },
+  {
+   "id": "review-load-more-footer-removed",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "itemCount: reviews.length + (_nextPageToken.isNotEmpty ? 1 : 0),",
+   "new": "itemCount: reviews.length,",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 依 next_page_token 載入更多，超過 10 頁也不截斷",
+   "why": "有下一頁也沒有載入更多入口，評價停在第一頁"
+  },
+  {
+   "id": "review-next-page-failure-wipes-items",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "setState(() => _loadingMore = false);\n        showFloatingToast(",
+   "new": "setState(() {\n          _loadingMore = false;\n          _reviews = [];\n        });\n        showFloatingToast(",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 下一頁失敗保留已載入的評價並可再試",
+   "why": "下一頁讀取失敗清掉已載入的評價"
   }
  ]
 }

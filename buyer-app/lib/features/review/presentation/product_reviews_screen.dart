@@ -17,12 +17,14 @@ import '../../review/data/review_repository.dart';
 import '../../../config/image_config.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/app_cached_image.dart';
+import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/hk_choice_chip.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../moderation/presentation/paged_section_widgets.dart';
 import 'widgets/review_image_gallery.dart';
 
 /// 商品評論詳細頁面
@@ -48,6 +50,10 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   bool _isLoading = true;
   Object? _loadError;
   String _selectedFilter = '全部';
+  String _nextPageToken = '';
+  bool _loadingMore = false;
+  bool _listLoading = false;
+  int _epoch = 0;
 
   // 統計數據
   int _totalCount = 0;
@@ -60,20 +66,43 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     _loadReviews();
   }
 
+  /// 目前篩選送給伺服器的星等；「全部」與「有圖片」不篩星等。
+  int? get _ratingFilter => int.tryParse(_selectedFilter.replaceAll('星', ''));
+
+  bool get _imagesFilter => _selectedFilter == '有圖片';
+
+  Future<({List<pb.Review> items, String nextPageToken})> _fetchPage(
+    String pageToken,
+  ) async {
+    final response = await ref
+        .read(reviewRepositoryProvider)
+        .listProductReviews(
+          widget.skuId,
+          pageToken: pageToken,
+          rating: _ratingFilter,
+          withImages: _imagesFilter,
+        );
+    return (items: response.reviews, nextPageToken: response.nextPageToken);
+  }
+
+  /// 第一次讀取與重試：統計與第一頁一起讀，任一失敗都顯示失敗與重試。
   Future<void> _loadReviews() async {
+    final epoch = ++_epoch;
     setState(() {
       _isLoading = true;
       _loadError = null;
     });
     try {
       final repo = ref.read(reviewRepositoryProvider);
-      final (list, stats) = await (
-        repo.listAllProductReviews(widget.skuId),
+      final (page, stats) = await (
+        _fetchPage(''),
         repo.getProductReviewStats(widget.skuId),
       ).wait;
-      if (mounted) {
+      if (mounted && epoch == _epoch) {
         setState(() {
-          _reviews = list;
+          _reviews = page.items;
+          _nextPageToken = page.nextPageToken;
+          _loadingMore = false;
           _totalCount = stats.count;
           _avgRating = stats.average;
           _ratingDistribution = stats.distribution;
@@ -82,9 +111,10 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       }
     } catch (e) {
       HKLog.logE('[ProductReviewsScreen] Error: $e');
-      if (mounted) {
+      if (mounted && epoch == _epoch) {
         setState(() {
           _reviews = [];
+          _nextPageToken = '';
           _loadError = e;
           _isLoading = false;
         });
@@ -92,19 +122,62 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     }
   }
 
-  List<pb.Review> get _filteredReviews {
-    if (_selectedFilter == '全部') {
-      return _reviews;
-    } else if (_selectedFilter == '有圖片') {
-      return _reviews.where((r) => r.images.isNotEmpty).toList();
-    } else {
-      // 星等篩選 (例如 "5星")
-      final starCount = int.tryParse(_selectedFilter.replaceAll('星', ''));
-      if (starCount != null) {
-        return _reviews.where((r) => r.rating == starCount).toList();
+  /// 換篩選：只重讀第一頁，統計不變。失敗走和第一次讀取相同的失敗與重試。
+  Future<void> _selectFilter(String filter) async {
+    if (filter == _selectedFilter) return;
+    final epoch = ++_epoch;
+    setState(() {
+      _selectedFilter = filter;
+      _listLoading = true;
+      _loadingMore = false;
+      _reviews = [];
+      _nextPageToken = '';
+    });
+    try {
+      final page = await _fetchPage('');
+      if (mounted && epoch == _epoch) {
+        setState(() {
+          _reviews = page.items;
+          _nextPageToken = page.nextPageToken;
+          _listLoading = false;
+        });
+      }
+    } catch (e) {
+      HKLog.logE('[ProductReviewsScreen] Error: $e');
+      if (mounted && epoch == _epoch) {
+        setState(() {
+          _loadError = e;
+          _listLoading = false;
+        });
       }
     }
-    return _reviews;
+  }
+
+  /// 下一頁接在後面；失敗保留已載入的評價並提示，可再按一次。
+  Future<void> _loadMore() async {
+    if (_nextPageToken.isEmpty || _loadingMore) return;
+    final epoch = _epoch;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await _fetchPage(_nextPageToken);
+      if (mounted && epoch == _epoch) {
+        setState(() {
+          _reviews = [..._reviews, ...page.items];
+          _nextPageToken = page.nextPageToken;
+          _loadingMore = false;
+        });
+      }
+    } catch (e) {
+      HKLog.logE('[ProductReviewsScreen] Error: $e');
+      if (mounted && epoch == _epoch) {
+        setState(() => _loadingMore = false);
+        showFloatingToast(
+          context,
+          errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+          isSuccess: false,
+        );
+      }
+    }
   }
 
   @override
@@ -277,14 +350,14 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 
   Widget _buildFilterButtons() {
-    final filters = <(String, int)>[
+    final filters = <(String, int?)>[
       ('全部', _totalCount),
       ('5星', _ratingDistribution[5] ?? 0),
       ('4星', _ratingDistribution[4] ?? 0),
       ('3星', _ratingDistribution[3] ?? 0),
       ('2星', _ratingDistribution[2] ?? 0),
       ('1星', _ratingDistribution[1] ?? 0),
-      ('有圖片', _getImageReviewCount()),
+      ('有圖片', null),
     ];
     return Column(
       key: const ValueKey('product-reviews-filter-section'),
@@ -300,11 +373,11 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 if (index > 0) const SizedBox(width: HkSpace.sm),
                 HkChoiceChip(
                   key: ValueKey('product-review-filter-${filters[index].$1}'),
-                  label: '${filters[index].$1} (${filters[index].$2})',
+                  label: filters[index].$2 == null
+                      ? filters[index].$1
+                      : '${filters[index].$1} (${filters[index].$2})',
                   selected: _selectedFilter == filters[index].$1,
-                  onTap: () {
-                    setState(() => _selectedFilter = filters[index].$1);
-                  },
+                  onTap: () => _selectFilter(filters[index].$1),
                 ),
               ],
             ],
@@ -314,12 +387,12 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     );
   }
 
-  int _getImageReviewCount() {
-    return _reviews.where((r) => r.images.isNotEmpty).length;
-  }
-
   Widget _buildReviewListHeading() {
-    final reviews = _filteredReviews;
+    final count = _imagesFilter
+        ? null
+        : (_ratingFilter == null
+              ? _totalCount
+              : (_ratingDistribution[_ratingFilter] ?? 0));
     return Row(
       children: [
         Expanded(
@@ -329,13 +402,26 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             style: AppTypography.sectionTitle,
           ),
         ),
-        Text('${reviews.length} 則', style: AppTypography.metaMuted),
+        if (count != null) Text('$count 則', style: AppTypography.metaMuted),
       ],
     );
   }
 
   Widget _buildReviewsSliver(double gutter) {
-    final reviews = _filteredReviews;
+    final reviews = _reviews;
+
+    if (_listLoading) {
+      return const SliverPadding(
+        padding: EdgeInsets.symmetric(vertical: HkSpace.xxl),
+        sliver: SliverToBoxAdapter(
+          child: Center(
+            child: CircularProgressIndicator(
+              key: ValueKey('product-reviews-list-loading'),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (reviews.isEmpty) {
       return SliverPadding(
@@ -360,8 +446,15 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(gutter, HkSpace.md, gutter, 0),
       sliver: SliverList.builder(
-        itemCount: reviews.length,
+        itemCount: reviews.length + (_nextPageToken.isNotEmpty ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index == reviews.length) {
+            return PagedLoadMoreFooter(
+              moreKey: const ValueKey('product-reviews-more'),
+              loading: _loadingMore,
+              onMore: _loadMore,
+            );
+          }
           return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(

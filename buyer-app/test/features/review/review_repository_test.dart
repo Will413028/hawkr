@@ -8,35 +8,31 @@ import 'package:hawkr_buyer/features/review/data/review_repository.dart';
 import 'review_fakes.dart';
 
 void main() {
-  group('listAllProductReviews', () {
-    test('讀到沒有下一頁為止，依序合併', () async {
+  group('listProductReviews', () {
+    test('星等與有圖片篩選與 page_token 送給伺服器', () async {
       final fake = FakeReviewPublic(
         pages: [
-          [reviewRecord('a'), reviewRecord('b')],
-          [reviewRecord('c')],
-        ],
-      );
-      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
-
-      final reviews = await repo.listAllProductReviews('55');
-
-      expect([for (final r in reviews) r.id], ['a', 'b', 'c']);
-      expect(fake.requests.map((r) => r.productId), everyElement('55'));
-      expect(fake.requests.map((r) => r.pageToken), ['', 'page-1']);
-    });
-
-    test('一頁可以是空的但還有下一頁，結束只看 next_page_token', () async {
-      final fake = FakeReviewPublic(
-        pages: [
-          [],
           [reviewRecord('a')],
+          [reviewRecord('b')],
         ],
       );
       final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
-      final reviews = await repo.listAllProductReviews('55');
+      final first = await repo.listProductReviews('55', rating: 4);
+      await repo.listProductReviews(
+        '55',
+        pageToken: first.nextPageToken,
+        withImages: true,
+      );
 
-      expect(reviews.single.id, 'a');
+      expect(fake.requests[0].productId, '55');
+      expect(fake.requests[0].hasRating(), isTrue);
+      expect(fake.requests[0].rating, 4);
+      expect(fake.requests[0].withImages, isFalse);
+      expect(fake.requests[0].pageToken, '');
+      expect(fake.requests[1].hasRating(), isFalse);
+      expect(fake.requests[1].withImages, isTrue);
+      expect(fake.requests[1].pageToken, 'page-1');
     });
 
     test('讀取失敗丟出錯誤，不回空清單', () async {
@@ -46,18 +42,9 @@ void main() {
       final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
       await expectLater(
-        repo.listAllProductReviews('55'),
+        repo.listProductReviews('55'),
         throwsA(isA<ConnectException>()),
       );
-    });
-
-    test('沒有評價是空清單，不是錯誤', () async {
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        FakeReviewApp().client(),
-      );
-
-      expect(await repo.listAllProductReviews('55'), isEmpty);
     });
   });
 
