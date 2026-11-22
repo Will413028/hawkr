@@ -413,7 +413,7 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 		t.Fatalf("統計：%v id=%d", m, e.reads.id)
 	}
 	for i, b := range m.GetDistribution() {
-		if b.GetRating() != int32(i+1) || b.GetCount() != e.reads.stats.Distribution[i] {
+		if b.GetRating() != int32(i+1) || int64(b.GetCount()) != e.reads.stats.Distribution[i] {
 			t.Errorf("第 %d 項：%v", i, b)
 		}
 	}
@@ -424,13 +424,22 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 
 func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *testing.T) {
 	e := newEnv(t, nil)
-	e.reads.pstats = review.ProductStats{Count: 7, Average: 4.14}
+	e.reads.pstats = review.ProductStats{Count: 7, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
 	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "21"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp.Msg.GetCount() != 7 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
 		t.Fatalf("統計：%v id=%d", resp.Msg, e.reads.id)
+	}
+	if d := resp.Msg.GetDistribution(); len(d) != 5 {
+		t.Fatalf("要有 1 到 5 星各一項：%v", d)
+	} else {
+		for i, b := range d {
+			if b.GetRating() != int32(i+1) || int64(b.GetCount()) != e.reads.pstats.Distribution[i] {
+				t.Errorf("第 %d 項：%v", i, b)
+			}
+		}
 	}
 	if e.buyers.calls != 0 || e.reads.viewer != 0 {
 		t.Error("統計不依觀看者")

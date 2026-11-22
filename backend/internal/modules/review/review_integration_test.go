@@ -660,14 +660,14 @@ func TestProductStatsExcludeWhatThePublicListExcludes(t *testing.T) {
 	}
 
 	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 710))
-	if st.Count != 2 || st.Average != 4.5 {
-		t.Fatalf("只計公開可讀的兩則：%+v", st)
+	if st.Count != 2 || st.Average != 4.5 || st.Distribution != [5]int64{0, 0, 0, 1, 1} {
+		t.Fatalf("只計公開可讀的兩則（分佈同一個述詞）：%+v", st)
 	}
 	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 710, 0, review.Filter{}, nil, 50))
 	if int64(len(page.Reviews)) != st.Count {
 		t.Fatalf("統計與公開列表不一致：%d vs %d", len(page.Reviews), st.Count)
 	}
-	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 712)); none.Count != 0 || none.Average != 0 {
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 712)); none.Count != 0 || none.Average != 0 || none.Distribution != [5]int64{} {
 		t.Fatalf("沒有評價是 0：%+v", none)
 	}
 }

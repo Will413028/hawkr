@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// review 模組給前台的 API：商品與店家的公開評價與店家評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
+// review 模組給前台的 API：商品與店家的公開評價與商品、店家的評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
 // 店家回覆與讀自己店的評價）。
 //
 // ID 是不透明的字串（評價是 UUID，商品與店家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -152,12 +152,12 @@ message GetStoreReviewStatsRequest {
 message RatingCount {
   // 1 到 5。
   int32 rating = 1;
-  int64 count = 2;
+  int32 count = 2;
 }
 
 message GetStoreReviewStatsResponse {
   // 公開可讀的評價數。
-  int64 count = 1;
+  int32 count = 1;
   // 平均星等，四捨五入到小數第二位；沒有評價是 0。
   double average = 2;
   // 1 到 5 星各一項，沒有評價的星等是 0。
@@ -170,9 +170,11 @@ message GetProductReviewStatsRequest {
 
 message GetProductReviewStatsResponse {
   // 公開可讀的評價數。
-  int64 count = 1;
+  int32 count = 1;
   // 平均星等，四捨五入到小數第二位；沒有評價是 0。
   double average = 2;
+  // 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
+  repeated RatingCount distribution = 3;
 }
 
 message GetReviewRequest {

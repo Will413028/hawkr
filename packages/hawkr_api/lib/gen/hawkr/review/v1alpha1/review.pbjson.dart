@@ -286,20 +286,20 @@ const RatingCount$json = {
   '1': 'RatingCount',
   '2': [
     {'1': 'rating', '3': 1, '4': 1, '5': 5, '10': 'rating'},
-    {'1': 'count', '3': 2, '4': 1, '5': 3, '10': 'count'},
+    {'1': 'count', '3': 2, '4': 1, '5': 5, '10': 'count'},
   ],
 };
 
 /// Descriptor for `RatingCount`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List ratingCountDescriptor = $convert.base64Decode(
-    'CgtSYXRpbmdDb3VudBIWCgZyYXRpbmcYASABKAVSBnJhdGluZxIUCgVjb3VudBgCIAEoA1IFY2'
+    'CgtSYXRpbmdDb3VudBIWCgZyYXRpbmcYASABKAVSBnJhdGluZxIUCgVjb3VudBgCIAEoBVIFY2'
     '91bnQ=');
 
 @$core.Deprecated('Use getStoreReviewStatsResponseDescriptor instead')
 const GetStoreReviewStatsResponse$json = {
   '1': 'GetStoreReviewStatsResponse',
   '2': [
-    {'1': 'count', '3': 1, '4': 1, '5': 3, '10': 'count'},
+    {'1': 'count', '3': 1, '4': 1, '5': 5, '10': 'count'},
     {'1': 'average', '3': 2, '4': 1, '5': 1, '10': 'average'},
     {
       '1': 'distribution',
@@ -315,7 +315,7 @@ const GetStoreReviewStatsResponse$json = {
 /// Descriptor for `GetStoreReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getStoreReviewStatsResponseDescriptor =
     $convert.base64Decode(
-        'ChtHZXRTdG9yZVJldmlld1N0YXRzUmVzcG9uc2USFAoFY291bnQYASABKANSBWNvdW50EhgKB2'
+        'ChtHZXRTdG9yZVJldmlld1N0YXRzUmVzcG9uc2USFAoFY291bnQYASABKAVSBWNvdW50EhgKB2'
         'F2ZXJhZ2UYAiABKAFSB2F2ZXJhZ2USRgoMZGlzdHJpYnV0aW9uGAMgAygLMiIuaGF3a3IucmV2'
         'aWV3LnYxYWxwaGExLlJhdGluZ0NvdW50UgxkaXN0cmlidXRpb24=');
 
@@ -337,16 +337,25 @@ final $typed_data.Uint8List getProductReviewStatsRequestDescriptor =
 const GetProductReviewStatsResponse$json = {
   '1': 'GetProductReviewStatsResponse',
   '2': [
-    {'1': 'count', '3': 1, '4': 1, '5': 3, '10': 'count'},
+    {'1': 'count', '3': 1, '4': 1, '5': 5, '10': 'count'},
     {'1': 'average', '3': 2, '4': 1, '5': 1, '10': 'average'},
+    {
+      '1': 'distribution',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.review.v1alpha1.RatingCount',
+      '10': 'distribution'
+    },
   ],
 };
 
 /// Descriptor for `GetProductReviewStatsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getProductReviewStatsResponseDescriptor =
     $convert.base64Decode(
-        'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoA1IFY291bnQSGA'
-        'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZQ==');
+        'Ch1HZXRQcm9kdWN0UmV2aWV3U3RhdHNSZXNwb25zZRIUCgVjb3VudBgBIAEoBVIFY291bnQSGA'
+        'oHYXZlcmFnZRgCIAEoAVIHYXZlcmFnZRJGCgxkaXN0cmlidXRpb24YAyADKAsyIi5oYXdrci5y'
+        'ZXZpZXcudjFhbHBoYTEuUmF0aW5nQ291bnRSDGRpc3RyaWJ1dGlvbg==');
 
 @$core.Deprecated('Use getReviewRequestDescriptor instead')
 const GetReviewRequest$json = {

@@ -2,7 +2,7 @@
 //
 // Source: hawkr/review/v1alpha1/review.proto
 
-// review 模組給前台的 API：商品與店家的公開評價與店家評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
+// review 模組給前台的 API：商品與店家的公開評價與商品、店家的評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
 // 店家回覆與讀自己店的評價）。
 //
 // ID 是不透明的字串（評價是 UUID，商品與店家是過渡期的十進位整數字串），client 不解析、不轉數字

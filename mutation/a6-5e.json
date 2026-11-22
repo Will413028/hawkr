@@ -31,8 +31,8 @@
    "id": "product-stats-average-dropped",
    "stack": "go-integration",
    "file": "backend/internal/modules/review/internal/read/read.go",
-   "old": "model.ProductStats{Count: r.TotalCount, Average: r.AvgRating}",
-   "new": "model.ProductStats{Count: r.TotalCount}",
+   "old": "model.ProductStats{\n\t\tCount: r.TotalCount, Average: r.AvgRating,",
+   "new": "model.ProductStats{\n\t\tCount: r.TotalCount,",
    "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
    "why": "The module returns the count but no average."
   },
@@ -40,8 +40,8 @@
    "id": "handler-product-stats-average-dropped",
    "stack": "go",
    "file": "backend/internal/httpapi/review/public.go",
-   "old": "&pb.GetProductReviewStatsResponse{Count: s.Count, Average: s.Average}",
-   "new": "&pb.GetProductReviewStatsResponse{Count: s.Count}",
+   "old": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}",
+   "new": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Distribution: ratingCounts(s.Distribution)}",
    "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
    "why": "The handler drops the average from the response."
   },
@@ -62,6 +62,42 @@
    "new": "productID, _ := rpc.ParseID(\"product_id\", req.Msg.GetProductId())\n\tvar err error\n\ts, err := h.reads.ProductStats",
    "test": "internal/httpapi/review ^TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure$",
    "why": "A malformed product id reaches the module."
+  },
+  {
+   "id": "product-stats-distribution-1-star-ignores-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "new": "    (SELECT COUNT(*) FROM review.reviews AS x WHERE x.product_id = $1 AND x.rating = 1)::bigint AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The 1-star bucket counts the platform-hidden review that the public list omits."
+  },
+  {
+   "id": "product-stats-distribution-2-star-ignores-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "    COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,\n    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "new": "    (SELECT COUNT(*) FROM review.reviews AS x WHERE x.product_id = $1 AND x.rating = 2)::bigint AS rating_2_count,\n    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The 2-star bucket counts the review whose author is leaving, which the public list omits."
+  },
+  {
+   "id": "product-stats-distribution-buckets-swapped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/read/read.go",
+   "old": "Distribution: [5]int64{r.Rating1Count, r.Rating2Count, r.Rating3Count, r.Rating4Count, r.Rating5Count},\n\t}, err\n}\n\n// StoreStats",
+   "new": "Distribution: [5]int64{r.Rating5Count, r.Rating4Count, r.Rating3Count, r.Rating2Count, r.Rating1Count},\n\t}, err\n}\n\n// StoreStats",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The product distribution is returned in reverse star order."
+  },
+  {
+   "id": "handler-product-stats-drops-distribution",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}",
+   "new": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average}",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
+   "why": "The handler omits the distribution from the product response."
   }
  ]
 }

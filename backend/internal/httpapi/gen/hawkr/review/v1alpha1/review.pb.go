@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: hawkr/review/v1alpha1/review.proto
 
-// review 模組給前台的 API：商品與店家的公開評價與店家評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
+// review 模組給前台的 API：商品與店家的公開評價與商品、店家的評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
 // 店家回覆與讀自己店的評價）。
 //
 // ID 是不透明的字串（評價是 UUID，商品與店家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -609,7 +609,7 @@ type RatingCount struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 1 到 5。
 	Rating        int32 `protobuf:"varint,1,opt,name=rating,proto3" json:"rating,omitempty"`
-	Count         int64 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	Count         int32 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -651,7 +651,7 @@ func (x *RatingCount) GetRating() int32 {
 	return 0
 }
 
-func (x *RatingCount) GetCount() int64 {
+func (x *RatingCount) GetCount() int32 {
 	if x != nil {
 		return x.Count
 	}
@@ -661,7 +661,7 @@ func (x *RatingCount) GetCount() int64 {
 type GetStoreReviewStatsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 公開可讀的評價數。
-	Count int64 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	Count int32 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
 	// 平均星等，四捨五入到小數第二位；沒有評價是 0。
 	Average float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
 	// 1 到 5 星各一項，沒有評價的星等是 0。
@@ -700,7 +700,7 @@ func (*GetStoreReviewStatsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GetStoreReviewStatsResponse) GetCount() int64 {
+func (x *GetStoreReviewStatsResponse) GetCount() int32 {
 	if x != nil {
 		return x.Count
 	}
@@ -768,9 +768,11 @@ func (x *GetProductReviewStatsRequest) GetProductId() string {
 type GetProductReviewStatsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 公開可讀的評價數。
-	Count int64 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	Count int32 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
 	// 平均星等，四捨五入到小數第二位；沒有評價是 0。
-	Average       float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
+	Average float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
+	// 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
+	Distribution  []*RatingCount `protobuf:"bytes,3,rep,name=distribution,proto3" json:"distribution,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -805,7 +807,7 @@ func (*GetProductReviewStatsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *GetProductReviewStatsResponse) GetCount() int64 {
+func (x *GetProductReviewStatsResponse) GetCount() int32 {
 	if x != nil {
 		return x.Count
 	}
@@ -817,6 +819,13 @@ func (x *GetProductReviewStatsResponse) GetAverage() float64 {
 		return x.Average
 	}
 	return 0
+}
+
+func (x *GetProductReviewStatsResponse) GetDistribution() []*RatingCount {
+	if x != nil {
+		return x.Distribution
+	}
+	return nil
 }
 
 type GetReviewRequest struct {
@@ -1430,17 +1439,18 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\";\n" +
 	"\vRatingCount\x12\x16\n" +
 	"\x06rating\x18\x01 \x01(\x05R\x06rating\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x03R\x05count\"\x95\x01\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\"\x95\x01\n" +
 	"\x1bGetStoreReviewStatsResponse\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\x03R\x05count\x12\x18\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x18\n" +
 	"\aaverage\x18\x02 \x01(\x01R\aaverage\x12F\n" +
 	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"B\n" +
 	"\x1cGetProductReviewStatsRequest\x12\"\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"O\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x97\x01\n" +
 	"\x1dGetProductReviewStatsResponse\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\x03R\x05count\x12\x18\n" +
-	"\aaverage\x18\x02 \x01(\x01R\aaverage\"4\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x18\n" +
+	"\aaverage\x18\x02 \x01(\x01R\aaverage\x12F\n" +
+	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"4\n" +
 	"\x10GetReviewRequest\x12 \n" +
 	"\treview_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breviewId\"J\n" +
 	"\x11GetReviewResponse\x125\n" +
@@ -1541,34 +1551,35 @@ var file_hawkr_review_v1alpha1_review_proto_depIdxs = []int32{
 	2,  // 7: hawkr.review.v1alpha1.ListProductReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
 	2,  // 8: hawkr.review.v1alpha1.ListStoreReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
 	8,  // 9: hawkr.review.v1alpha1.GetStoreReviewStatsResponse.distribution:type_name -> hawkr.review.v1alpha1.RatingCount
-	2,  // 10: hawkr.review.v1alpha1.GetReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
-	2,  // 11: hawkr.review.v1alpha1.ReplyReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
-	2,  // 12: hawkr.review.v1alpha1.CreateReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
-	2,  // 13: hawkr.review.v1alpha1.ListMyReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
-	2,  // 14: hawkr.review.v1alpha1.ListOwnStoreReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
-	3,  // 15: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:input_type -> hawkr.review.v1alpha1.ListProductReviewsRequest
-	5,  // 16: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:input_type -> hawkr.review.v1alpha1.ListStoreReviewsRequest
-	7,  // 17: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:input_type -> hawkr.review.v1alpha1.GetStoreReviewStatsRequest
-	10, // 18: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:input_type -> hawkr.review.v1alpha1.GetProductReviewStatsRequest
-	12, // 19: hawkr.review.v1alpha1.ReviewAppService.GetReview:input_type -> hawkr.review.v1alpha1.GetReviewRequest
-	14, // 20: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:input_type -> hawkr.review.v1alpha1.ReplyReviewRequest
-	16, // 21: hawkr.review.v1alpha1.ReviewAppService.CreateReview:input_type -> hawkr.review.v1alpha1.CreateReviewRequest
-	18, // 22: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:input_type -> hawkr.review.v1alpha1.ListMyReviewsRequest
-	20, // 23: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:input_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
-	4,  // 24: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:output_type -> hawkr.review.v1alpha1.ListProductReviewsResponse
-	6,  // 25: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:output_type -> hawkr.review.v1alpha1.ListStoreReviewsResponse
-	9,  // 26: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:output_type -> hawkr.review.v1alpha1.GetStoreReviewStatsResponse
-	11, // 27: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:output_type -> hawkr.review.v1alpha1.GetProductReviewStatsResponse
-	13, // 28: hawkr.review.v1alpha1.ReviewAppService.GetReview:output_type -> hawkr.review.v1alpha1.GetReviewResponse
-	15, // 29: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:output_type -> hawkr.review.v1alpha1.ReplyReviewResponse
-	17, // 30: hawkr.review.v1alpha1.ReviewAppService.CreateReview:output_type -> hawkr.review.v1alpha1.CreateReviewResponse
-	19, // 31: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:output_type -> hawkr.review.v1alpha1.ListMyReviewsResponse
-	21, // 32: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:output_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
-	24, // [24:33] is the sub-list for method output_type
-	15, // [15:24] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	8,  // 10: hawkr.review.v1alpha1.GetProductReviewStatsResponse.distribution:type_name -> hawkr.review.v1alpha1.RatingCount
+	2,  // 11: hawkr.review.v1alpha1.GetReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
+	2,  // 12: hawkr.review.v1alpha1.ReplyReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
+	2,  // 13: hawkr.review.v1alpha1.CreateReviewResponse.review:type_name -> hawkr.review.v1alpha1.Review
+	2,  // 14: hawkr.review.v1alpha1.ListMyReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
+	2,  // 15: hawkr.review.v1alpha1.ListOwnStoreReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
+	3,  // 16: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:input_type -> hawkr.review.v1alpha1.ListProductReviewsRequest
+	5,  // 17: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:input_type -> hawkr.review.v1alpha1.ListStoreReviewsRequest
+	7,  // 18: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:input_type -> hawkr.review.v1alpha1.GetStoreReviewStatsRequest
+	10, // 19: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:input_type -> hawkr.review.v1alpha1.GetProductReviewStatsRequest
+	12, // 20: hawkr.review.v1alpha1.ReviewAppService.GetReview:input_type -> hawkr.review.v1alpha1.GetReviewRequest
+	14, // 21: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:input_type -> hawkr.review.v1alpha1.ReplyReviewRequest
+	16, // 22: hawkr.review.v1alpha1.ReviewAppService.CreateReview:input_type -> hawkr.review.v1alpha1.CreateReviewRequest
+	18, // 23: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:input_type -> hawkr.review.v1alpha1.ListMyReviewsRequest
+	20, // 24: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:input_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
+	4,  // 25: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:output_type -> hawkr.review.v1alpha1.ListProductReviewsResponse
+	6,  // 26: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:output_type -> hawkr.review.v1alpha1.ListStoreReviewsResponse
+	9,  // 27: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:output_type -> hawkr.review.v1alpha1.GetStoreReviewStatsResponse
+	11, // 28: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:output_type -> hawkr.review.v1alpha1.GetProductReviewStatsResponse
+	13, // 29: hawkr.review.v1alpha1.ReviewAppService.GetReview:output_type -> hawkr.review.v1alpha1.GetReviewResponse
+	15, // 30: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:output_type -> hawkr.review.v1alpha1.ReplyReviewResponse
+	17, // 31: hawkr.review.v1alpha1.ReviewAppService.CreateReview:output_type -> hawkr.review.v1alpha1.CreateReviewResponse
+	19, // 32: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:output_type -> hawkr.review.v1alpha1.ListMyReviewsResponse
+	21, // 33: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:output_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
+	25, // [25:34] is the sub-list for method output_type
+	16, // [16:25] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_review_v1alpha1_review_proto_init() }
