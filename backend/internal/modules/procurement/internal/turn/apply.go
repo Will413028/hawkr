@@ -119,7 +119,7 @@ func applyGroup(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time
 	}
 	var inGroup []resolver.Match
 	for _, m := range res.Matches {
-		if m.RootID == group.CategoryID && m.CategoryID != group.CategoryID && m.Leaf {
+		if m.RootID == group.CategoryID && m.Leaf {
 			inGroup = append(inGroup, m)
 		}
 	}
