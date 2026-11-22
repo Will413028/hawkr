@@ -76,8 +76,8 @@
    "id": "review-card-count-shown-on-load-failure",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
-   "old": "_loadError != null ? '商品評價' : '商品評價 ($reviewCount)'",
-   "new": "'商品評價 ($reviewCount)'",
+   "old": "_loadError != null || statsCount == null\n        ?",
+   "new": "statsCount == null\n        ?",
    "test": "test/features/product/product_review_preview_card_test.dart 讀取失敗時標題不顯示 (0)",
    "why": "讀取失敗仍顯示商品評價 (0)"
   },
@@ -85,8 +85,8 @@
    "id": "review-card-stale-response-applied",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
-   "old": "          .listProductReviews(sid);\n      if (mounted && (widget.skuId ?? '').trim() == sid) {",
-   "new": "          .listProductReviews(sid);\n      if (mounted) {",
+   "old": "      final statsCount = await statsFuture;\n      if (mounted && (widget.skuId ?? '').trim() == sid) {",
+   "new": "      final statsCount = await statsFuture;\n      if (mounted) {",
    "test": "test/features/product/product_review_preview_card_test.dart skuId 換掉後重新載入，舊 sku 較晚回來的回應不覆蓋",
    "why": "舊 sku 較晚回來的評價覆蓋新 sku 的"
   },
@@ -107,6 +107,42 @@
    "new": "",
    "test": "test/features/review/review_repository_test.dart 沒查到任何評價且有項目失敗時丟出失敗",
    "why": "全部失敗時當成沒有評價"
+  },
+  {
+   "id": "review-header-count-from-first-page",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
+   "old": ": '商品評價 ($statsCount)';",
+   "new": ": '商品評價 ($reviewCount)';",
+   "test": "test/features/product/product_review_preview_card_test.dart 標題的評價數取自統計，不是第一頁的筆數",
+   "why": "商品頁標題數量取第一頁長度，超過 100 則時顯示 100"
+  },
+  {
+   "id": "review-stats-failure-shown-as-zero",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
+   "old": "          return null;\n        });",
+   "new": "          return 0;\n        });",
+   "test": "test/features/product/product_review_preview_card_test.dart 統計讀取失敗時標題不顯示數字，評價預覽仍在",
+   "why": "統計讀取失敗被當成 0 則評價"
+  },
+  {
+   "id": "review-screen-total-from-loaded-list",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "_totalCount = stats.count;",
+   "new": "_totalCount = list.length;",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 總數與星等分布取自統計，超過 100 則時不是已載入的筆數",
+   "why": "評價頁總數取已載入清單長度"
+  },
+  {
+   "id": "review-screen-stats-failure-ignored",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "    final response = await _public.getProductReviewStats(\n      pb.GetProductReviewStatsRequest(productId: productId),\n    );",
+   "new": "    final response = await _public\n        .getProductReviewStats(\n          pb.GetProductReviewStatsRequest(productId: productId),\n        )\n        .catchError((_) => pb.GetProductReviewStatsResponse());",
+   "test": "test/features/review/review_repository_test.dart 讀取失敗丟出錯誤，不回 0",
+   "why": "統計讀取失敗被吞成 0"
   }
  ]
 }

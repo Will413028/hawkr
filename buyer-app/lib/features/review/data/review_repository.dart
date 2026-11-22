@@ -1,10 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
-import '../../../core/networking/dio_provider.dart';
 
 part 'review_repository.g.dart';
 
@@ -12,14 +10,10 @@ part 'review_repository.g.dart';
 ReviewRepository reviewRepository(Ref ref) => ReviewRepository(
   ref.watch(reviewPublicClientProvider),
   ref.watch(reviewAppClientProvider),
-  ref.watch(dioProvider),
 );
 
-/// 商品評價的數量與平均分（商品卡片用）。
-typedef ProductRatingStats = ({int count, double average});
-
-/// 商品評價的統計：由畫面讀到的評價算出。
-typedef ProductReviewSummary = ({
+/// 商品評價的統計，由 `GetProductReviewStats` 回傳，client 不分頁加總。[distribution] 是 5 到 1 星各自的筆數。
+typedef ProductReviewStats = ({
   int count,
   double average,
   Map<int, int> distribution,
@@ -28,7 +22,7 @@ typedef ProductReviewSummary = ({
 /// 評價（`ReviewPublicService`、`ReviewAppService`）。讀取失敗一律丟出，不回空清單：呼叫端要把
 /// 「讀取失敗」和「沒有評價」分開呈現。
 class ReviewRepository {
-  ReviewRepository(this._public, this._app, this._dio);
+  ReviewRepository(this._public, this._app);
 
   /// 每頁筆數（API 預設 20，上限 100）。
   static const pageSize = 100;
@@ -38,7 +32,6 @@ class ReviewRepository {
 
   final ReviewPublicServiceClient _public;
   final ReviewAppServiceClient _app;
-  final Dio _dio;
 
   /// 商品的公開評價一頁；[pageToken] 空字串是第一頁，回應的 `nextPageToken` 空字串表示沒有下一頁。
   Future<pb.ListProductReviewsResponse> listProductReviews(
@@ -53,7 +46,7 @@ class ReviewRepository {
     ),
   );
 
-  /// 商品的公開評價，依序讀到沒有下一頁或 [maxPages] 頁。有觀看者封鎖過濾時一頁可以少於 [pageSize]，
+  /// 商品的公開評價，只供清單顯示與篩選，數量與平均分不由它算。依序讀到沒有下一頁或 [maxPages] 頁。有觀看者封鎖過濾時一頁可以少於 [pageSize]，
   /// 所以結束只看 `nextPageToken`。
   Future<List<pb.Review>> listAllProductReviews(String productId) async {
     final reviews = <pb.Review>[];
@@ -67,36 +60,21 @@ class ReviewRepository {
     return reviews;
   }
 
-  /// 商品評價的數量與平均分，商品卡片缺這兩個值時補用；讀舊 gateway 的
-  /// `GET /public/products/{id}/reviews` 的 `stats` 區塊，client 不分頁加總。失敗丟出。
-  Future<ProductRatingStats> productRatingStats(String productId) async {
-    final resp = await _dio.get<Map<String, dynamic>>(
-      '/public/products/$productId/reviews',
-      queryParameters: const {'page': 1, 'size': 1},
+  /// 商品評價的數量、平均分與各星等筆數，來自伺服器的 `GetProductReviewStats`。失敗丟出，
+  /// 呼叫端不可把失敗當成 0 則評價。
+  Future<ProductReviewStats> getProductReviewStats(String productId) async {
+    final response = await _public.getProductReviewStats(
+      pb.GetProductReviewStatsRequest(productId: productId),
     );
-    final data = resp.data?['data'];
-    final stats = data is Map ? data['stats'] : resp.data?['stats'];
-    if (stats is! Map) return (count: 0, average: 0.0);
-    final count = (stats['totalCount'] as num?)?.toInt() ?? 0;
-    final raw = (stats['averageRating'] as num?)?.toDouble() ?? 0.0;
-    final average = raw > 5 && raw <= 50 ? raw / 10 : raw;
-    return (count: count, average: average.clamp(0.0, 5.0));
-  }
-
-  static ProductReviewSummary summarize(List<pb.Review> reviews) {
     final distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-    var sum = 0;
-    var count = 0;
-    for (final review in reviews) {
-      final rating = review.rating;
-      if (rating < 1 || rating > 5) continue;
-      sum += rating;
-      count++;
-      distribution[rating] = distribution[rating]! + 1;
+    for (final bucket in response.distribution) {
+      if (distribution.containsKey(bucket.rating)) {
+        distribution[bucket.rating] = bucket.count;
+      }
     }
     return (
-      count: count,
-      average: count == 0 ? 0.0 : sum / count,
+      count: response.count,
+      average: response.average,
       distribution: distribution,
     );
   }

@@ -24,7 +24,20 @@ pb.Review reviewRecord(
 
 /// `ReviewPublicService` 的 fake。商品評價以頁給：第 n 頁的 token 是 `page-n`，最後一頁沒有 next token。
 class FakeReviewPublic {
-  FakeReviewPublic({this.pages = const [[]], this.error});
+  FakeReviewPublic({
+    this.pages = const [[]],
+    this.error,
+    this.stats,
+    this.statsError,
+  });
+
+  /// `GetProductReviewStats` 的回應；沒給時依 [pages] 的評價算出，只供沒有關心統計的測試。
+  pb.GetProductReviewStatsResponse? stats;
+
+  /// 設了之後 `GetProductReviewStats` 以它失敗。
+  ConnectException? statsError;
+
+  final List<pb.GetProductReviewStatsRequest> statsRequests = [];
 
   List<List<pb.Review>> pages;
 
@@ -34,20 +47,38 @@ class FakeReviewPublic {
   final List<pb.ListProductReviewsRequest> requests = [];
 
   ReviewPublicServiceClient client() => ReviewPublicServiceClient(
-    FakeTransportBuilder().unary(ReviewPublicService.listProductReviews, (
-      req,
-      _,
-    ) async {
-      requests.add(req);
-      if (error != null) throw error!;
-      final i = req.pageToken.isEmpty
-          ? 0
-          : int.parse(req.pageToken.substring('page-'.length));
-      return pb.ListProductReviewsResponse(
-        reviews: pages[i],
-        nextPageToken: i + 1 < pages.length ? 'page-${i + 1}' : '',
-      );
-    }).build(),
+    FakeTransportBuilder()
+        .unary(ReviewPublicService.getProductReviewStats, (req, _) async {
+          statsRequests.add(req);
+          if (statsError != null) throw statsError!;
+          if (stats != null) return stats!;
+          final all = pages.expand((p) => p).toList();
+          return pb.GetProductReviewStatsResponse(
+            count: all.length,
+            average: all.isEmpty
+                ? 0
+                : all.fold<int>(0, (a, r) => a + r.rating) / all.length,
+            distribution: [
+              for (var star = 5; star >= 1; star--)
+                pb.RatingCount(
+                  rating: star,
+                  count: all.where((r) => r.rating == star).length,
+                ),
+            ],
+          );
+        })
+        .unary(ReviewPublicService.listProductReviews, (req, _) async {
+          requests.add(req);
+          if (error != null) throw error!;
+          final i = req.pageToken.isEmpty
+              ? 0
+              : int.parse(req.pageToken.substring('page-'.length));
+          return pb.ListProductReviewsResponse(
+            reviews: pages[i],
+            nextPageToken: i + 1 < pages.length ? 'page-${i + 1}' : '',
+          );
+        })
+        .build(),
   );
 }
 

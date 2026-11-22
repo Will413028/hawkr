@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/networking/error_reason.dart';
 import 'package:hawkr_buyer/features/review/data/review_repository.dart';
@@ -16,11 +16,7 @@ void main() {
           [reviewRecord('c')],
         ],
       );
-      final repo = ReviewRepository(
-        fake.client(),
-        FakeReviewApp().client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
       final reviews = await repo.listAllProductReviews('55');
 
@@ -36,11 +32,7 @@ void main() {
           [reviewRecord('a')],
         ],
       );
-      final repo = ReviewRepository(
-        fake.client(),
-        FakeReviewApp().client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
       final reviews = await repo.listAllProductReviews('55');
 
@@ -51,11 +43,7 @@ void main() {
       final fake = FakeReviewPublic(
         error: ConnectException(Code.unavailable, 'down'),
       );
-      final repo = ReviewRepository(
-        fake.client(),
-        FakeReviewApp().client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
       await expectLater(
         repo.listAllProductReviews('55'),
@@ -67,24 +55,45 @@ void main() {
       final repo = ReviewRepository(
         FakeReviewPublic().client(),
         FakeReviewApp().client(),
-        Dio(),
       );
 
       expect(await repo.listAllProductReviews('55'), isEmpty);
     });
   });
 
-  test('summarize 算數量、平均與各星等', () {
-    final summary = ReviewRepository.summarize([
-      reviewRecord('a', rating: 5),
-      reviewRecord('b', rating: 4),
-      reviewRecord('c', rating: 4),
-    ]);
+  group('getProductReviewStats', () {
+    test('取伺服器的數量、平均與各星等，缺的星等補 0', () async {
+      final fake = FakeReviewPublic(
+        stats: pb.GetProductReviewStatsResponse(
+          count: 230,
+          average: 4.5,
+          distribution: [
+            pb.RatingCount(rating: 5, count: 200),
+            pb.RatingCount(rating: 1, count: 30),
+          ],
+        ),
+      );
+      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
 
-    expect(summary.count, 3);
-    expect(summary.average, closeTo(13 / 3, 1e-9));
-    expect(summary.distribution, {5: 1, 4: 2, 3: 0, 2: 0, 1: 0});
-    expect(ReviewRepository.summarize([]).average, 0);
+      final stats = await repo.getProductReviewStats('55');
+
+      expect(stats.count, 230);
+      expect(stats.average, 4.5);
+      expect(stats.distribution, {5: 200, 4: 0, 3: 0, 2: 0, 1: 30});
+      expect(fake.statsRequests.single.productId, '55');
+    });
+
+    test('讀取失敗丟出錯誤，不回 0', () async {
+      final fake = FakeReviewPublic(
+        statsError: ConnectException(Code.unavailable, 'down'),
+      );
+      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
+
+      await expectLater(
+        repo.getProductReviewStats('55'),
+        throwsA(isA<ConnectException>()),
+      );
+    });
   });
 
   group('我的評價', () {
@@ -95,11 +104,7 @@ void main() {
           reviewRecord('r2', orderItemId: '11'),
         ],
       );
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        app.client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
 
       final found = await repo.findMyReviewForOrderItems(['9', '11']);
 
@@ -112,11 +117,7 @@ void main() {
         mine: [reviewRecord('r2', orderItemId: '11')],
         failOrderItemIds: {'9'},
       );
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        app.client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
 
       final found = await repo.findMyReviewForOrderItems(['9', '11']);
 
@@ -125,11 +126,7 @@ void main() {
 
     test('沒查到任何評價且有項目失敗時丟出失敗', () async {
       final app = FakeReviewApp(failOrderItemIds: {'9'});
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        app.client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
 
       await expectLater(
         repo.findMyReviewForOrderItems(['9', '11']),
@@ -141,7 +138,6 @@ void main() {
       final repo = ReviewRepository(
         FakeReviewPublic().client(),
         FakeReviewApp().client(),
-        Dio(),
       );
 
       expect(await repo.findMyReviewForOrderItems(['9']), isNull);
@@ -151,11 +147,7 @@ void main() {
   group('createReview', () {
     test('送訂單編號、訂單項目 ID（字串）、星等、內文與圖片 token', () async {
       final app = FakeReviewApp();
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        app.client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
 
       final review = await repo.createReview(
         orderNo: 'SO-1',
@@ -181,11 +173,7 @@ void main() {
           ErrorReason.REVIEW_ALREADY_EXISTS,
         ),
       );
-      final repo = ReviewRepository(
-        FakeReviewPublic().client(),
-        app.client(),
-        Dio(),
-      );
+      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
 
       Object? caught;
       try {

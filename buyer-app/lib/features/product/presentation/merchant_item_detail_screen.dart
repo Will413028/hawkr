@@ -2186,6 +2186,9 @@ class ProductReviewPreviewCard extends ConsumerStatefulWidget {
 class ProductReviewPreviewCardState
     extends ConsumerState<ProductReviewPreviewCard> {
   List<pb_review.Review>? _reviewsList;
+
+  /// 標題的評價數，來自 `GetProductReviewStats`；讀不到時為 null，標題不顯示數字。
+  int? _statsCount;
   bool _isLoading = true;
   Object? _loadError;
 
@@ -2202,6 +2205,7 @@ class ProductReviewPreviewCardState
         oldWidget.skuId != widget.skuId) {
       setState(() {
         _reviewsList = null;
+        _statsCount = null;
         _loadError = null;
         _isLoading = true;
       });
@@ -2223,13 +2227,21 @@ class ProductReviewPreviewCardState
       }
       return;
     }
+    final repo = ref.read(reviewRepositoryProvider);
+    final statsFuture = repo
+        .getProductReviewStats(sid)
+        .then<int?>((stats) => stats.count)
+        .catchError((Object e) {
+          HKLog.logE('[ProductReviewCard] Error loading review stats: $e');
+          return null;
+        });
     try {
-      final response = await ref
-          .read(reviewRepositoryProvider)
-          .listProductReviews(sid);
+      final response = await repo.listProductReviews(sid);
+      final statsCount = await statsFuture;
       if (mounted && (widget.skuId ?? '').trim() == sid) {
         setState(() {
           _reviewsList = response.reviews;
+          _statsCount = statsCount;
           _loadError = null;
           _isLoading = false;
         });
@@ -2239,6 +2251,7 @@ class ProductReviewPreviewCardState
       if (mounted && (widget.skuId ?? '').trim() == sid) {
         setState(() {
           _reviewsList = null;
+          _statsCount = null;
           _loadError = e;
           _isLoading = false;
         });
@@ -2280,7 +2293,10 @@ class ProductReviewPreviewCardState
 
     final reviews = _reviewsList ?? [];
     final reviewCount = reviews.length;
-    final reviewTitle = _loadError != null ? '商品評價' : '商品評價 ($reviewCount)';
+    final statsCount = _statsCount;
+    final reviewTitle = _loadError != null || statsCount == null
+        ? '商品評價'
+        : '商品評價 ($statsCount)';
 
     // 只顯示前2筆評論預覽
     final displayReviews = reviews.take(2).toList();

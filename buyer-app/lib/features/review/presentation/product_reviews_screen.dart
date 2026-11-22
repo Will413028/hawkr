@@ -66,16 +66,17 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       _loadError = null;
     });
     try {
-      final list = await ref
-          .read(reviewRepositoryProvider)
-          .listAllProductReviews(widget.skuId);
-      final summary = ReviewRepository.summarize(list);
+      final repo = ref.read(reviewRepositoryProvider);
+      final (list, stats) = await (
+        repo.listAllProductReviews(widget.skuId),
+        repo.getProductReviewStats(widget.skuId),
+      ).wait;
       if (mounted) {
         setState(() {
           _reviews = list;
-          _totalCount = list.length;
-          _avgRating = summary.average;
-          _ratingDistribution = summary.distribution;
+          _totalCount = stats.count;
+          _avgRating = stats.average;
+          _ratingDistribution = stats.distribution;
           _isLoading = false;
         });
       }
