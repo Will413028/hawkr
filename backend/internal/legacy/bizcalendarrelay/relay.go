@@ -23,7 +23,7 @@ import (
 )
 
 // 推送給 invoice-service 的窗口：今天往前 30 天到往後 400 天（台北日）。窗口常數只由這裡擁有：invoice-service 只儲存收到的涵蓋區間，
-// 不再有自己的窗口。
+// 窗口不在它那邊。
 const (
 	pastDays   = 30
 	futureDays = 400

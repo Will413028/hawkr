@@ -213,6 +213,9 @@ func TestOnCalendarImportedEnqueuesOnePush(t *testing.T) {
 	if len(q.args) != 1 || !reflect.DeepEqual(q.args[0], PushArgs{}) {
 		t.Fatalf("args = %+v", q.args)
 	}
+	if len(q.opts) != 1 || q.opts[0] != nil {
+		t.Fatalf("opts = %+v，要是 nil：套用 PushArgs.InsertOpts（MaxAttempts 10、不去重）", q.opts)
+	}
 }
 
 // 排入失敗要回傳錯誤：匯入的 transaction 因此回滾，不會留下沒有推送的匯入。
@@ -309,7 +312,11 @@ func TestPeriodicConfiguration(t *testing.T) {
 	if opts := periodicOpts(); !opts.RunOnStart || opts.ID != "legacy.bizcalendar_push" {
 		t.Fatalf("opts = %+v", opts)
 	}
-	if args, _ := periodicArgs(); !reflect.DeepEqual(args, PushArgs{}) {
+	args, insertOpts := periodicArgs()
+	if !reflect.DeepEqual(args, PushArgs{}) {
 		t.Fatalf("args = %+v", args)
+	}
+	if insertOpts != nil {
+		t.Fatalf("insert opts = %+v，要是 nil：套用 PushArgs.InsertOpts（MaxAttempts 10、不去重）", insertOpts)
 	}
 }

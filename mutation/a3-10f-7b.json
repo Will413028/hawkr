@@ -195,7 +195,7 @@
    "file": "backend/internal/platform/bizcalendar/parse.go",
    "old": "return bad(line, \"引號格式不正確\")",
    "new": "return bad(pe.Line, \"引號格式不正確\")",
-   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄位中間的引號$|^引號沒有結尾$",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^引號沒有結尾$",
    "why": "A quote error reports the last line read instead of the line where the record starts."
   },
   {
@@ -224,6 +224,42 @@
    "new": "strings.ContainsRune(f, 'x') && false",
    "test": "internal/platform/bizcalendar ^TestParseRejects$/^備註含 NUL$",
    "why": "A NUL in a field passes parsing and fails later at upsert."
+  },
+  {
+   "id": "wiring-worker-built-not-registered",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tbizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)\n",
+   "new": "\t_ = bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log)\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The worker is built but never registered, so push jobs are never executed."
+  },
+  {
+   "id": "wiring-worker-periodic-discarded",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "new": "\t_ = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The reconciliation job list is built but never reaches the River worker, so the daily push is not scheduled."
+  },
+  {
+   "id": "enqueue-insert-opts-override",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "return q.Enqueue(ctx, PushArgs{}, &river.InsertOpts{MaxAttempts: 1})",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedEnqueuesOnePush$",
+   "why": "An explicit insert option overrides PushArgs.InsertOpts, so the import push no longer gets its bounded retry attempts."
+  },
+  {
+   "id": "periodic-insert-opts-override",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return PushArgs{}, nil }",
+   "new": "return PushArgs{}, &river.InsertOpts{MaxAttempts: 1} }",
+   "test": "internal/legacy/bizcalendarrelay ^TestPeriodicConfiguration$",
+   "why": "An explicit insert option overrides PushArgs.InsertOpts for the reconciliation push."
   }
  ]
 }
