@@ -3,6 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
 const hook = vi.hoisted(() => ({
 	customers: {} as Record<string, unknown>,
@@ -83,7 +84,13 @@ describe("CustomersClient summary", () => {
 			loadingMore: false,
 			loadMore: async () => {},
 		};
-		const { container } = render(React.createElement(CustomersClient));
+		const { container } = render(
+			React.createElement(
+				IntlTestWrapper,
+				null,
+				React.createElement(CustomersClient),
+			),
+		);
 		expect(container.textContent).toContain("2+");
 		expect(screen.queryByText("客戶累積消費")).toBeNull();
 		expect(screen.queryByText(/回購客戶/)).toBeNull();

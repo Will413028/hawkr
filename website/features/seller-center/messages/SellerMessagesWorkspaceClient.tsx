@@ -17,7 +17,7 @@ import {
 	SellerTableSkeletonRows,
 } from "@/features/seller-center";
 import { SellerMobileDisclosureList } from "@/features/seller-center/components/SellerMobileDisclosureList";
-import { previewText } from "@/lib/chat/map";
+import { peerName, previewText } from "@/lib/chat/map";
 import { formatTaipeiDate, formatTaipeiMonthDayTime } from "@/lib/date/taipei";
 import { useConversations } from "@/lib/hooks/useChat";
 import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
@@ -26,7 +26,7 @@ import { fetchOrders } from "@/lib/orders/repo";
 import {
 	type CustomerTag,
 	customerTypeClass,
-	customerTypeLabel,
+	customerTypeText,
 	listAllCustomers,
 	listTags,
 	type SellerCustomer,
@@ -61,13 +61,10 @@ interface MessageWorkbenchRow {
 	unreadCount: number;
 }
 
-const CUSTOMER_TYPE_TABS: Array<{
-	value: CustomerType;
-	label: string;
-}> = [
-	{ value: CustomerType.UNSPECIFIED, label: "全部客戶" },
-	{ value: CustomerType.NORMAL, label: customerTypeLabel(CustomerType.NORMAL) },
-	{ value: CustomerType.VIP, label: customerTypeLabel(CustomerType.VIP) },
+const CUSTOMER_TYPE_TABS: CustomerType[] = [
+	CustomerType.UNSPECIFIED,
+	CustomerType.NORMAL,
+	CustomerType.VIP,
 ];
 
 const RANGE_OPTIONS: Array<{ value: QuickRange; label: string }> = [
@@ -338,7 +335,7 @@ export default function SellerMessagesWorkspaceClient() {
 				customer,
 				name:
 					customer?.name ||
-					conversation.targetNickname ||
+					peerName(ut, conversation) ||
 					`客戶 #${conversation.targetUserId}`,
 				avatar: customer?.avatar || conversation.targetAvatar,
 				customerType: customer?.customerType ?? CustomerType.NORMAL,
@@ -523,13 +520,15 @@ export default function SellerMessagesWorkspaceClient() {
 							<div className="seller-messages__chip-row">
 								{CUSTOMER_TYPE_TABS.map((tab) => (
 									<button
-										key={tab.value}
+										key={tab}
 										type="button"
-										className={`seller-orders__chip${customerType === tab.value ? " is-selected" : ""}`}
-										aria-pressed={customerType === tab.value}
-										onClick={() => setCustomerType(tab.value)}
+										className={`seller-orders__chip${customerType === tab ? " is-selected" : ""}`}
+										aria-pressed={customerType === tab}
+										onClick={() => setCustomerType(tab)}
 									>
-										{tab.label}
+										{tab === CustomerType.UNSPECIFIED
+											? "全部客戶"
+											: customerTypeText(ut, tab)}
 									</button>
 								))}
 							</div>
@@ -822,9 +821,10 @@ function MessageRow({
 	onOpenChat: () => void;
 	onOpenCustomer: () => void;
 }) {
+	const ut = useUiText();
 	const typeBadge =
 		row.customerType === CustomerType.VIP
-			? customerTypeLabel(row.customerType)
+			? customerTypeText(ut, row.customerType)
 			: null;
 	return (
 		<tr className="seller-orders__row seller-messages__row">

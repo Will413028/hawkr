@@ -8,6 +8,7 @@ import type {
 	BlockedStore,
 } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import { StoreCardSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import { buyerProfileDeletedName } from "@hawkr/ui-text/keys";
 import {
 	type InfiniteData,
 	useInfiniteQuery,
@@ -31,13 +32,11 @@ import {
 } from "@/lib/buyer/blocklist";
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
-import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { imageUri } from "@/lib/media/image";
 import { queryKeys } from "@/lib/query/keys";
 import { storeCardView } from "@/lib/seller/storeCardView";
 import { useStoreCardText } from "@/lib/seller/useStoreCardViews";
-
-const DELETED_ACCOUNT_LABEL = "已刪除的帳號";
 
 interface Row {
 	id: string;
@@ -202,6 +201,7 @@ export default function BlockedListClient() {
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const storeCardText = useStoreCardText();
+	const ut = useUiText();
 	const storesKey = queryKeys.buyer.blockedStores(identity);
 	const buyersKey = queryKeys.buyer.blockedBuyers(identity);
 	const stores = useSection<BlockedStore>(storesKey, listBlockedStores);
@@ -264,7 +264,7 @@ export default function BlockedListClient() {
 		const gone = b.deleted || name === "";
 		return {
 			id: b.buyerId,
-			name: gone ? DELETED_ACCOUNT_LABEL : name,
+			name: gone ? ut(buyerProfileDeletedName()) : name,
 			avatarUrl: !gone ? imageUri(b.avatar, "avatar") : undefined,
 			blockedAt: isoOf(b.createTime),
 		};

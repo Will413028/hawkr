@@ -40,6 +40,8 @@ export interface Conversation {
 	targetUserId: string;
 	/** 對方的名稱；沒有名稱或買家已刪除時是空字串。 */
 	targetNickname: string;
+	/** 對方是已刪除的買家：名稱由呈現層取共用文案目錄（{@link peerName}）。 */
+	targetDeleted?: boolean;
 	/** 對方是買家時的頭像。 */
 	targetAvatar?: string;
 	/** 對方是店家時的 logo。 */

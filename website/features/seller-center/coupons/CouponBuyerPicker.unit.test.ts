@@ -27,9 +27,14 @@ vi.mock("@/lib/hooks/useCrmStoreId", () => ({
 vi.mock("@/lib/hooks/useSellerTags", () => ({
 	useSellerTags: () => ({ tags: [{ id: "t1", name: "回購" }], error: null }),
 }));
-vi.mock("@/lib/i18n/ui-text", () => {
+vi.mock("@/lib/i18n/ui-text", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/i18n/ui-text")>();
 	const defaults = (code: Code) => `default-${code}`;
-	return { useDefaultErrorText: () => defaults };
+	return {
+		...actual,
+		useDefaultErrorText: () => defaults,
+		useUiText: () => actual.uiTextFor("zh-TW"),
+	};
 });
 vi.mock("@/lib/browser/body-scroll-lock", () => ({
 	acquireBodyScrollLock: () => () => {},

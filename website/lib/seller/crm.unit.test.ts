@@ -18,16 +18,19 @@ import {
 	type UpdateTagRequest,
 } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import { describe, expect, it } from "vitest";
+import { uiTextFor } from "@/lib/i18n/ui-text";
 import {
 	addCustomerTags,
 	createTag,
+	customerSortText,
 	customerTypeClass,
-	customerTypeLabel,
+	customerTypeText,
 	deleteTag,
 	getCustomer,
 	listAllCustomers,
 	listCustomers,
 	listTags,
+	normalizeCustomerSort,
 	removeCustomerTag,
 	renameTag,
 	updateCustomerType,
@@ -269,9 +272,21 @@ describe("customer and tag mutations", () => {
 });
 
 describe("customer type presentation", () => {
-	it("labels VIP and falls back to normal", () => {
-		expect(customerTypeLabel(CustomerType.VIP)).toBe("VIP");
-		expect(customerTypeLabel(CustomerType.NORMAL)).toBe("一般");
+	it("takes the labels from the catalog and shows unknown for unspecified", () => {
+		const ut = uiTextFor("zh-TW");
+		expect(customerTypeText(ut, CustomerType.VIP)).toBe("VIP");
+		expect(customerTypeText(ut, CustomerType.NORMAL)).toBe("一般客戶");
+		expect(customerTypeText(ut, CustomerType.UNSPECIFIED)).toBe(
+			ut({ key: "common.unknown" }),
+		);
+		expect(customerSortText(ut, CustomerSort.ORDER_COUNT)).toBe("訂單數");
+		expect(customerSortText(ut, CustomerSort.UNSPECIFIED)).toBe("首購時間");
+		expect(normalizeCustomerSort(CustomerSort.UNSPECIFIED)).toBe(
+			CustomerSort.FIRST_ORDER_TIME,
+		);
+		expect(normalizeCustomerSort(CustomerSort.TOTAL_SPENT)).toBe(
+			CustomerSort.TOTAL_SPENT,
+		);
 		expect(customerTypeClass(CustomerType.VIP)).toBe("is-vip");
 	});
 });

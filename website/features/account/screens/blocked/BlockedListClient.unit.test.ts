@@ -123,7 +123,7 @@ describe("BlockedListClient", () => {
 		render();
 		expect(await screen.findByText("好店")).toBeTruthy();
 		expect(screen.getByText("小明")).toBeTruthy();
-		expect(screen.getByText("已刪除的帳號")).toBeTruthy();
+		expect(screen.getByText("已刪除帳號")).toBeTruthy();
 		expect(screen.getAllByText("2026/11/01").length).toBe(3);
 		expect(
 			within(screen.getByTestId("blocked-stores")).getByText("好店"),

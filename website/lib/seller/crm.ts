@@ -14,7 +14,13 @@ import {
 	TagSchema,
 } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import { fieldMask } from "@hawkr/api/proto/field-mask";
+import {
+	commonUnknown,
+	crmCustomerSort,
+	crmCustomerType,
+} from "@hawkr/ui-text/keys";
 import { crmAppClient } from "../connect/crm";
+import { optionalText, type UiText } from "../i18n/ui-text";
 import { imageUri } from "../media/image";
 
 type CrmClient = ReturnType<typeof crmAppClient>;
@@ -217,9 +223,24 @@ export async function removeCustomerTag(
 	return sellerCustomerFrom(required(res.customer, "RemoveCustomerTag"));
 }
 
-/** 客戶分類的顯示文字（只有一般與 VIP；單端的 enum，條件形式）。 */
-export function customerTypeLabel(type: CustomerType): string {
-	return type === CustomerType.VIP ? "VIP" : "一般";
+/** 客戶分類的顯示文字（共用文案目錄）；UNSPECIFIED 與不認得的值顯示「未知」。 */
+export function customerTypeText(ut: UiText, type: CustomerType): string {
+	return optionalText(ut, crmCustomerType(type)) ?? ut(commonUnknown());
+}
+
+/** 排序鍵的正規化：UNSPECIFIED 是伺服器預設的首購時間。 */
+export function normalizeCustomerSort(sort: CustomerSort): CustomerSort {
+	return sort === CustomerSort.UNSPECIFIED
+		? CustomerSort.FIRST_ORDER_TIME
+		: sort;
+}
+
+/** 排序鍵的顯示文字（共用文案目錄），先經 {@link normalizeCustomerSort}。 */
+export function customerSortText(ut: UiText, sort: CustomerSort): string {
+	return (
+		optionalText(ut, crmCustomerSort(normalizeCustomerSort(sort))) ??
+		ut(commonUnknown())
+	);
 }
 
 /** 客戶分類的 CSS 修飾 class（`is-vip` / `is-normal`）。 */

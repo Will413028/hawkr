@@ -8,6 +8,8 @@ import {
 	type Preview as ProtoPreview,
 } from "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb";
 import {
+	buyerProfileDeletedName,
+	chatMessageUnsupportedKind,
 	chatPreviewErased,
 	chatPreviewHidden,
 	chatPreviewImage,
@@ -89,13 +91,14 @@ export function conversationFromProto(
 		...base,
 		targetUserId: c.buyer?.id ?? "",
 		targetNickname: buyerName(c.buyer),
+		targetDeleted: c.buyer?.deleted || undefined,
 		targetAvatar: imageUri(c.buyer?.avatar, "avatar"),
 	};
 }
 
 /**
  * 對話列表與通知上的預覽文字：文字取伺服器給的預覽，其餘取共用文案目錄；
- * 不支援的種類沒有文字（空字串），不自己寫句子。
+ * 不支援的種類取目錄的「不支援的訊息」，不自己寫句子。
  */
 export function previewText(ut: UiText, p: ChatPreview | undefined): string {
 	if (!p) return "";
@@ -103,5 +106,14 @@ export function previewText(ut: UiText, p: ChatPreview | undefined): string {
 	if (p.hidden) return ut(chatPreviewHidden());
 	if (p.kind === "image") return ut(chatPreviewImage());
 	if (p.kind === "text") return p.text ?? "";
-	return "";
+	return ut(chatMessageUnsupportedKind());
+}
+
+/** 對話對方的名稱：已刪除的買家取共用文案目錄，沒有名稱時是空字串。 */
+export function peerName(
+	ut: UiText,
+	c: Pick<Conversation, "targetNickname" | "targetDeleted">,
+): string {
+	if (c.targetNickname) return c.targetNickname;
+	return c.targetDeleted ? ut(buyerProfileDeletedName()) : "";
 }

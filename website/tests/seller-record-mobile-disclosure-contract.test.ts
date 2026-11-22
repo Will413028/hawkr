@@ -51,7 +51,7 @@ test("customer summaries expose order count and classification before details", 
 	);
 	assert.match(
 		customers,
-		/status: customerTypeLabel\(customer\.customerType\)/,
+		/status: customerTypeText\(ut, customer\.customerType\)/,
 	);
 	assert.match(customers, /customer\.tags\.map/);
 	assert.match(customers, /<span>累計消費<\/span>/);

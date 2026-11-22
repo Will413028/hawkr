@@ -6,7 +6,12 @@ import {
 	MessageSchema,
 } from "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb";
 import { describe, expect, it } from "vitest";
-import { conversationFromProto, messageFromProto, previewText } from "../map";
+import {
+	conversationFromProto,
+	messageFromProto,
+	peerName,
+	previewText,
+} from "../map";
 
 const ut = (m: { key: string }) => `[${m.key}]`;
 
@@ -26,7 +31,7 @@ describe("previewText", () => {
 			"hello",
 		);
 	});
-	it("has no text for an unsupported kind or no preview, and never invents a sentence", () => {
+	it("uses the catalog for an unsupported kind and has no text without a preview", () => {
 		expect(
 			previewText(ut, {
 				kind: "unsupported",
@@ -34,7 +39,7 @@ describe("previewText", () => {
 				hidden: false,
 				erased: false,
 			}),
-		).toBe("");
+		).toBe("[chat.Message.unsupported_kind]");
 		expect(previewText(ut, undefined)).toBe("");
 	});
 });
@@ -93,6 +98,11 @@ describe("conversationFromProto", () => {
 			id: "c",
 			buyer: { id: "5", name: "Old", deleted: true },
 		});
-		expect(conversationFromProto(c, "store").targetNickname).toBe("");
+		const conv = conversationFromProto(c, "store");
+		expect(conv.targetNickname).toBe("");
+		expect(conv.targetDeleted).toBe(true);
+		expect(peerName(ut, conv)).toBe("[buyer.Profile.deleted_name]");
+		expect(peerName(ut, { targetNickname: "Bob" })).toBe("Bob");
+		expect(peerName(ut, { targetNickname: "" })).toBe("");
 	});
 });

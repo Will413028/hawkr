@@ -12,9 +12,9 @@ import Button from "@/components/ui/Button";
 import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
 import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
 import { useSellerTags } from "@/lib/hooks/useSellerTags";
-import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import {
-	customerTypeLabel,
+	customerTypeText,
 	type ListCustomersParams,
 	listAllCustomers,
 	listCustomers,
@@ -33,13 +33,10 @@ interface Props {
 }
 
 const PAGE_SIZE = 50;
-const CUSTOMER_TYPE_OPTIONS: Array<{
-	value: CustomerType;
-	label: string;
-}> = [
-	{ value: CustomerType.UNSPECIFIED, label: "全部客戶" },
-	{ value: CustomerType.VIP, label: customerTypeLabel(CustomerType.VIP) },
-	{ value: CustomerType.NORMAL, label: customerTypeLabel(CustomerType.NORMAL) },
+const CUSTOMER_TYPE_OPTIONS: CustomerType[] = [
+	CustomerType.UNSPECIFIED,
+	CustomerType.VIP,
+	CustomerType.NORMAL,
 ];
 
 function fallbackCustomer(id: string): SellerCustomer {
@@ -88,6 +85,7 @@ export default function CouponBuyerPicker({
 }: Props) {
 	const { storeId } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
+	const ut = useUiText();
 	const [customerType, setCustomerType] = React.useState<CustomerType>(
 		CustomerType.UNSPECIFIED,
 	);
@@ -110,7 +108,7 @@ export default function CouponBuyerPicker({
 	const activeFilterLabel = [
 		customerType === CustomerType.UNSPECIFIED
 			? "全部客戶"
-			: customerTypeLabel(customerType),
+			: customerTypeText(ut, customerType),
 		activeTag ? `#${activeTag.name}` : null,
 	]
 		.filter(Boolean)
@@ -289,16 +287,18 @@ export default function CouponBuyerPicker({
 							className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible"
 						>
 							{CUSTOMER_TYPE_OPTIONS.map((opt) => {
-								const active = customerType === opt.value;
+								const active = customerType === opt;
 								return (
 									<button
-										key={opt.value}
+										key={opt}
 										type="button"
 										className={`h-11 shrink-0 whitespace-nowrap px-3 rounded-full border text-xs font-semibold cursor-pointer transition-colors sm:h-8 ${active ? "bg-hk-primary text-white border-hk-primary dark:bg-hk-ink-200 dark:text-hk-ink-900" : "bg-hk-surface-card text-hk-muted border-hk-border-soft hover:border-hk-primary/50 hover:text-hk-primary"}`}
 										aria-pressed={active}
-										onClick={() => setCustomerType(opt.value)}
+										onClick={() => setCustomerType(opt)}
 									>
-										{opt.label}
+										{opt === CustomerType.UNSPECIFIED
+											? "全部客戶"
+											: customerTypeText(ut, opt)}
 									</button>
 								);
 							})}
@@ -444,7 +444,7 @@ export default function CouponBuyerPicker({
 											</strong>
 											{c.customerType === CustomerType.VIP && (
 												<span className="shrink-0 rounded-full bg-hk-primary/10 text-hk-accent-on-tint px-2 py-0.5 text-[0.6875rem] font-bold dark:bg-hk-ink-200/18 dark:text-hk-ink-200">
-													{customerTypeLabel(c.customerType)}
+													{customerTypeText(ut, c.customerType)}
 												</span>
 											)}
 										</span>

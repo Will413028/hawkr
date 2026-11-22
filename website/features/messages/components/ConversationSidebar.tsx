@@ -8,7 +8,7 @@ import HawkrAgentConversationMarble from "@/features/procurement-assistant/Hawkr
 import HawkrAgentMark from "@/features/procurement-assistant/HawkrAgentMark";
 import type { HawkrAgentCategoryId } from "@/lib/animation/hawkr-agent-season";
 import { conversationRangeLabel } from "@/lib/chat/list-range";
-import { previewText } from "@/lib/chat/map";
+import { peerName, previewText } from "@/lib/chat/map";
 import type { Conversation } from "@/lib/chat/types";
 import { formatTaipeiShortDate } from "@/lib/date/taipei";
 import { useUiText } from "@/lib/i18n/ui-text";
@@ -308,7 +308,7 @@ export default function ConversationSidebar({
 				return false;
 			if (!q) return true;
 			return (
-				item.targetNickname.toLowerCase().includes(q) ||
+				peerName(ut, item).toLowerCase().includes(q) ||
 				item.targetUserId.includes(q) ||
 				previewText(ut, item.preview).toLowerCase().includes(q)
 			);
@@ -834,7 +834,7 @@ export default function ConversationSidebar({
 										href={`${threadHrefBase}/${id}`}
 										className="chat-sidebar__item"
 										aria-current={active ? "page" : undefined}
-										title={collapsed ? item.targetNickname : undefined}
+										title={collapsed ? peerName(ut, item) : undefined}
 									>
 										<Avatar
 											src={
@@ -842,8 +842,8 @@ export default function ConversationSidebar({
 													? item.logo_url
 													: item.targetAvatar
 											}
-											alt={item.targetNickname}
-											name={item.targetNickname}
+											alt={peerName(ut, item)}
+											name={peerName(ut, item)}
 											entity={peerKind}
 											className="chat-sidebar__avatar"
 											fallbackClassName="chat-sidebar__avatar--fallback"
@@ -851,7 +851,7 @@ export default function ConversationSidebar({
 										/>
 										<span className="chat-sidebar__main">
 											<span className="chat-sidebar__item-head">
-												<strong>{item.targetNickname}</strong>
+												<strong>{peerName(ut, item)}</strong>
 												<small>{formatTime(item.lastMessageTimeMs)}</small>
 											</span>
 											<span className="chat-sidebar__preview">

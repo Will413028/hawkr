@@ -218,6 +218,7 @@ export function mapLiveReviews(
 	const reviews: ProductReview[] = (reviewsResult?.reviews ?? []).map((rv) => ({
 		id: rv.id,
 		author: rv.username,
+		isMine: rv.isMine,
 		avatar: rv.avatarUrl ?? "",
 		rating: rv.rating,
 		text: rv.content,

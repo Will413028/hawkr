@@ -14,5 +14,6 @@ export function sellerReviewItem(review: Review): SellerReviewItem {
 		skuName: review.skuName,
 		productImageUrl: review.productImageUrl,
 		productId: review.productId,
+		isMine: review.isMine,
 	};
 }

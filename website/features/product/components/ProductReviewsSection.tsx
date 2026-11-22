@@ -1,8 +1,11 @@
+"use client";
+
 import AnchorLink from "@/components/shared/AnchorLink";
 import Avatar from "@/components/shared/Avatar";
 import { Stars } from "@/components/ui/Stars";
 import type { ProductReview } from "@/features/product/ProductDetailLayout";
 import ReportActionMenu from "@/features/report/ReportActionMenu";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { ossImageUrl } from "@/lib/media/cdn";
 import { parseRating } from "@/lib/products/rating";
 import { reviewerName } from "@/lib/reviews/reviewer-name";
@@ -39,6 +42,7 @@ export default function ProductReviewsSection({
 	/** 公開商品頁才給檢舉入口；賣家預覽與其他內嵌用法不給。 */
 	reportable?: boolean;
 }) {
+	const ut = useUiText();
 	return (
 		<div className="mb-8" id="product-reviews">
 			<div className="flex items-center justify-between mb-4">
@@ -85,15 +89,15 @@ export default function ProductReviewsSection({
 							<div className="flex items-center gap-3 mb-3">
 								<Avatar
 									src={textOrEmpty(review.avatar)}
-									name={reviewerName(review.author)}
-									alt={reviewerName(review.author)}
+									name={reviewerName(ut, review.author)}
+									alt={reviewerName(ut, review.author)}
 									entity="buyer"
 									loading="eager"
 									className="w-11 h-11 rounded-full object-cover"
 								/>
 								<div className="flex-1 flex flex-col gap-0.5">
 									<span className="text-[0.9375rem] font-semibold text-hk-heading">
-										{reviewerName(review.author)}
+										{reviewerName(ut, review.author)}
 									</span>
 									<span className="text-xs text-hk-body">
 										{textOrEmpty(review.date ?? review.createdAt)}
@@ -105,7 +109,9 @@ export default function ProductReviewsSection({
 										size={14}
 									/>
 								</div>
-								{reportable && textOrNumber(review.id ?? review.reviewId) ? (
+								{reportable &&
+								!review.isMine &&
+								textOrNumber(review.id ?? review.reviewId) ? (
 									<ReportActionMenu
 										target={{
 											kind: "review",

@@ -21,10 +21,13 @@ import {
 	useSellerCustomers,
 } from "@/lib/hooks/useSellerCustomers";
 import { useSellerTags } from "@/lib/hooks/useSellerTags";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { fetchOrders } from "@/lib/orders/repo";
 import {
+	customerSortText,
 	customerTypeClass,
-	customerTypeLabel,
+	customerTypeText,
+	normalizeCustomerSort,
 	type SellerCustomer,
 } from "@/lib/seller/crm";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
@@ -40,10 +43,10 @@ const TYPE_TABS: Array<{ value: CustomerType; label: string }> = [
 	{ value: CustomerType.VIP, label: "VIP" },
 ];
 
-const SORT_OPTIONS: Array<{ value: CustomerSort; label: string }> = [
-	{ value: CustomerSort.TOTAL_SPENT, label: "依消費金額" },
-	{ value: CustomerSort.ORDER_COUNT, label: "依訂單數" },
-	{ value: CustomerSort.FIRST_ORDER_TIME, label: "依首購時間" },
+const SORT_OPTIONS: CustomerSort[] = [
+	CustomerSort.TOTAL_SPENT,
+	CustomerSort.ORDER_COUNT,
+	CustomerSort.FIRST_ORDER_TIME,
 ];
 
 function customerRowKey(customer: SellerCustomer): string {
@@ -51,6 +54,7 @@ function customerRowKey(customer: SellerCustomer): string {
 }
 
 export default function CustomersClient() {
+	const ut = useUiText();
 	const openChat = useChatDrawerStore((state) => state.openChat);
 	// Server-driven segmentation: classification tab, single tag filter, and
 	// sort key. Changing any of these refetches from the first page.
@@ -197,12 +201,12 @@ export default function CustomersClient() {
 				<label className="seller-customers__sort">
 					<span className="visually-hidden">排序方式</span>
 					<select
-						value={sort}
+						value={normalizeCustomerSort(sort)}
 						onChange={(e) => setSort(Number(e.target.value) as CustomerSort)}
 					>
 						{SORT_OPTIONS.map((opt) => (
-							<option key={opt.value} value={opt.value}>
-								{opt.label}
+							<option key={opt} value={opt}>
+								{customerSortText(ut, opt)}
 							</option>
 						))}
 					</select>
@@ -306,7 +310,7 @@ export default function CustomersClient() {
 															<span
 																className={`seller-customers__badge ${customerTypeClass(c.customerType)}`}
 															>
-																{customerTypeLabel(c.customerType)}
+																{customerTypeText(ut, c.customerType)}
 															</span>
 														)}
 													</strong>
@@ -391,7 +395,7 @@ export default function CustomersClient() {
 						),
 						title: customer.name || "未命名客戶",
 						meta: `${customer.orderCount.toLocaleString()} 筆`,
-						status: customerTypeLabel(customer.customerType),
+						status: customerTypeText(ut, customer.customerType),
 					})}
 					renderDetails={(customer) => (
 						<>

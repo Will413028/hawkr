@@ -1,7 +1,11 @@
 "use client";
 
 import "@/styles/features/messages.css";
-import { chatPreviewErased, chatPreviewHidden } from "@hawkr/ui-text/keys";
+import {
+	chatMessageUnsupportedKind,
+	chatPreviewErased,
+	chatPreviewHidden,
+} from "@hawkr/ui-text/keys";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -13,6 +17,7 @@ import ChatContextPanel from "@/features/messages/components/ChatContextPanel";
 import ChatMessageActions from "@/features/messages/components/ChatMessageActions";
 import ChatPeerAvatar from "@/features/messages/components/ChatPeerAvatar";
 import SendButton from "@/features/messages/components/SendButton";
+import { peerName } from "@/lib/chat/map";
 import type { ChatMessage } from "@/lib/chat/types";
 import { chatWorkspaceRole } from "@/lib/chat/workspace";
 import { formatTaipeiTime } from "@/lib/date/taipei";
@@ -99,20 +104,19 @@ function formatDateSeparator(ts: number): string {
 }
 
 /**
- * 一則訊息的內文：文字、圖片，或沒有內容的墓碑（被平台隱藏、寄件方已刪除或退場，文字取自共用文案目錄）。
- * 不支援的種類沒有可顯示的內容，回 null（這一列不畫）。
+ * 一則訊息的內文：文字、圖片，或沒有內容的墓碑（被平台隱藏、寄件方已刪除或退場、種類不支援，文字取自共用文案目錄）。
  */
 type BubbleBody =
 	| { kind: "text"; text: string }
 	| { kind: "image"; url: string }
 	| { kind: "tombstone"; text: string };
 
-function bubbleBody(m: ChatMessage, ut: UiText): BubbleBody | null {
+function bubbleBody(m: ChatMessage, ut: UiText): BubbleBody {
 	if (m.erased) return { kind: "tombstone", text: ut(chatPreviewErased()) };
 	if (m.hidden) return { kind: "tombstone", text: ut(chatPreviewHidden()) };
 	if (m.kind === "image") return { kind: "image", url: m.imageUrl ?? "" };
 	if (m.kind === "text") return { kind: "text", text: m.text ?? "" };
-	return null;
+	return { kind: "tombstone", text: ut(chatMessageUnsupportedKind()) };
 }
 
 export default function ThreadClient({
@@ -187,7 +191,10 @@ export default function ThreadClient({
 	const peerView = peerViews.get(String(targetId));
 
 	const peerNickname =
-		activeConversation?.targetNickname || peerView?.name || hintedName || "";
+		(activeConversation ? peerName(ut, activeConversation) : "") ||
+		peerView?.name ||
+		hintedName ||
+		"";
 	const peerAvatar = isSeller
 		? activeConversation?.targetAvatar || hintedAvatar || ""
 		: activeConversation?.logo_url || peerView?.logoUrl || "";
@@ -344,7 +351,6 @@ export default function ThreadClient({
 						<ul className="thread-page__list">
 							{messages.map((m, i) => {
 								const body = bubbleBody(m, ut);
-								if (!body) return null;
 								const mine = m.sender === side;
 								const read = mine && m.seq !== null && m.seq <= peerReadSeq;
 								const clock = formatClock(m.timeMs);

@@ -15,21 +15,18 @@ import {
 	useCustomerDetail,
 	useInvalidateCustomerDetail,
 } from "@/lib/hooks/useCustomerDetail";
-import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { STATUS_LABEL } from "@/lib/orders/types";
 import {
 	customerTypeClass,
-	customerTypeLabel,
+	customerTypeText,
 	type SellerCustomer,
 	updateCustomerType,
 } from "@/lib/seller/crm";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
 import CustomerTagEditor from "./CustomerTagEditor";
 
-const CLASS_OPTIONS: Array<{ value: CustomerType; loadingLabel: string }> = [
-	{ value: CustomerType.NORMAL, loadingLabel: "設為一般客戶中…" },
-	{ value: CustomerType.VIP, loadingLabel: "設為 VIP 客戶中…" },
-];
+const CLASS_OPTIONS: CustomerType[] = [CustomerType.NORMAL, CustomerType.VIP];
 
 /**
  * VIP / 一般 切換 — `UpdateCustomer`（update_mask 只有 `type`）。
@@ -46,6 +43,7 @@ function CustomerClassControl({
 }) {
 	const { storeId } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
+	const ut = useUiText();
 	const [value, setValue] = React.useState<CustomerType>(initial);
 	const [pendingType, setPendingType] = React.useState<CustomerType | null>(
 		null,
@@ -80,21 +78,21 @@ function CustomerClassControl({
 			<legend className="visually-hidden">客戶分類</legend>
 			{CLASS_OPTIONS.map((opt) => (
 				<Button
-					key={opt.value}
+					key={opt}
 					type="button"
 					variant="light"
 					color="default"
 					size="sm"
-					className={`seller-customer-detail__class-btn h-auto px-[10px] py-[3px] ${customerTypeClass(opt.value)}${
-						value === opt.value ? " is-active" : ""
+					className={`seller-customer-detail__class-btn h-auto px-[10px] py-[3px] ${customerTypeClass(opt)}${
+						value === opt ? " is-active" : ""
 					}`}
-					aria-pressed={value === opt.value}
-					onClick={() => void pick(opt.value)}
+					aria-pressed={value === opt}
+					onClick={() => void pick(opt)}
 					disabled={pendingType !== null || !storeId}
-					isLoading={pendingType === opt.value}
-					loadingLabel={opt.loadingLabel}
+					isLoading={pendingType === opt}
+					loadingLabel="更新分類中…"
 				>
-					{customerTypeLabel(opt.value)}
+					{customerTypeText(ut, opt)}
 				</Button>
 			))}
 			{error && (

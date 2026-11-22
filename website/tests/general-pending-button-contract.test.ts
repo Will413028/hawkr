@@ -46,8 +46,8 @@ test("list-like async controls retain per-action pending identity", () => {
 	const customerDetail = source(
 		"features/seller-center/customers/CustomerDetailPanel.tsx",
 	);
-	assert.match(customerDetail, /isLoading=\{pendingType === opt\.value\}/);
-	assert.match(customerDetail, /loadingLabel=\{opt\.loadingLabel\}/);
+	assert.match(customerDetail, /isLoading=\{pendingType === opt\}/);
+	assert.match(customerDetail, /loadingLabel="更新分類中…"/);
 
 	const tagEditor = source(
 		"features/seller-center/customers/CustomerTagEditor.tsx",

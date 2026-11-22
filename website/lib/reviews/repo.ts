@@ -38,6 +38,8 @@ export interface Review {
 	createdAt: number;
 	orderNo?: string;
 	orderItemId?: string;
+	/** 這則評價是目前登入者寫的（`Review.is_mine`）。 */
+	isMine: boolean;
 }
 
 /** 評價統計：數量、平均分與星等分佈（`GetProductReviewStats`、`GetStoreReviewStats`）。 */
@@ -96,6 +98,7 @@ export function reviewFromWire(wire: WireReview): Review {
 		createdAt: wire.createTime ? secondsOf(wire.createTime) : 0,
 		orderNo: wire.orderNo || undefined,
 		orderItemId: wire.orderItemId || undefined,
+		isMine: wire.isMine,
 	};
 }
 

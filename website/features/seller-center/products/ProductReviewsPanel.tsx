@@ -12,7 +12,7 @@ import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/ui/Button";
 import { Stars } from "@/components/ui/Stars";
 import { formatTaipeiDate } from "@/lib/date/taipei";
-import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -204,6 +204,7 @@ export default function ProductReviewsPanel({
 	productId: string;
 	productImage?: string;
 }) {
+	const ut = useUiText();
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.products.reviews(productId),
 		queryFn: ({ pageParam }) =>
@@ -291,15 +292,15 @@ export default function ProductReviewsPanel({
 							<div className="mb-[var(--space-2)] flex items-center gap-[var(--space-3)]">
 								<Avatar
 									src={review.avatarUrl}
-									name={reviewerName(review.username)}
-									alt={reviewerName(review.username)}
+									name={reviewerName(ut, review.username)}
+									alt={reviewerName(ut, review.username)}
 									entity="buyer"
 									className="h-9 w-9 shrink-0 rounded-full object-cover"
 									fallbackClassName="h-9 w-9 shrink-0 rounded-full object-cover"
 								/>
 								<div className="flex min-w-0 flex-1 flex-col gap-[2px]">
 									<span className="truncate text-[length:var(--text-sm)] font-bold text-[color:var(--text-heading)]">
-										{reviewerName(review.username)}
+										{reviewerName(ut, review.username)}
 									</span>
 									<div className="flex gap-[1px]">
 										<Stars count={review.rating} size={14} />

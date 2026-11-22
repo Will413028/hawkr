@@ -427,8 +427,8 @@
    "id": "reviewer-name-trim-dropped",
    "stack": "website",
    "file": "website/lib/reviews/reviewer-name.ts",
-   "old": "return name?.trim() || ANONYMOUS_REVIEWER;",
-   "new": "return name ?? ANONYMOUS_REVIEWER;",
+   "old": "return name?.trim() || ut(reviewReviewAuthorAnonymousName());",
+   "new": "return name ?? ut(reviewReviewAuthorAnonymousName());",
    "test": "lib/reviews/reviewer-name.unit.test.ts renders the fallback in one view-level function",
    "why": "空白名字不走匿名"
   },
@@ -571,7 +571,7 @@
    "id": "blocklist-deleted-buyer-name",
    "stack": "website",
    "file": "website/features/account/screens/blocked/BlockedListClient.tsx",
-   "old": "gone ? DELETED_ACCOUNT_LABEL : name",
+   "old": "gone ? ut(buyerProfileDeletedName()) : name",
    "new": "gone ? name : name",
    "test": "features/account/screens/blocked/BlockedListClient.unit.test.ts lists blocked stores and buyers",
    "why": "已刪除買家顯示空名稱"
@@ -602,6 +602,60 @@
    "new": "pageSize: 100,\n\t\tpageToken,\n\t});\n\treturn {\n\t\t// 沒有店家",
    "test": "features/account/screens/blocked/BlockedListClient.unit.test.ts lists blocked stores and buyers",
    "why": "店家一頁筆數偏離 20"
+  },
+  {
+   "id": "reviewer-anonymous-blank",
+   "stack": "website",
+   "file": "website/lib/reviews/reviewer-name.ts",
+   "old": "name?.trim() || ut(reviewReviewAuthorAnonymousName())",
+   "new": "name?.trim() || \"\"",
+   "test": "lib/reviews/reviewer-name.unit.test.ts renders the fallback",
+   "why": "匿名評價者不再顯示目錄文字"
+  },
+  {
+   "id": "review-is-mine-dropped",
+   "stack": "website",
+   "file": "website/lib/reviews/repo.ts",
+   "old": "isMine: wire.isMine,",
+   "new": "isMine: false,",
+   "test": "lib/reviews/reviewer-name.unit.test.ts carries is_mine",
+   "why": "is_mine 沒有從 wire 帶進評價"
+  },
+  {
+   "id": "review-report-on-own",
+   "stack": "website",
+   "file": "website/features/product/components/ProductReviewsSection.tsx",
+   "old": "\t\t\t\t\t\t\t\t{reportable &&\n\t\t\t\t\t\t\t\t!review.isMine &&\n",
+   "new": "\t\t\t\t\t\t\t\t{reportable &&\n",
+   "test": "features/product/components/ProductReviewsSection.unit.test.ts hides the report action",
+   "why": "自己的評價也顯示檢舉"
+  },
+  {
+   "id": "crm-sort-unspecified-unnormalized",
+   "stack": "website",
+   "file": "website/lib/seller/crm.ts",
+   "old": "? CustomerSort.FIRST_ORDER_TIME",
+   "new": "? CustomerSort.UNSPECIFIED",
+   "test": "lib/seller/crm.unit.test.ts takes the labels",
+   "why": "UNSPECIFIED 不再正規化成首購時間"
+  },
+  {
+   "id": "chat-unsupported-preview-empty",
+   "stack": "website",
+   "file": "website/lib/chat/map.ts",
+   "old": "return ut(chatMessageUnsupportedKind());",
+   "new": "return \"\";",
+   "test": "lib/chat/__tests__/map.unit.test.ts uses the catalog for an unsupported kind",
+   "why": "不支援種類的預覽沒有文字"
+  },
+  {
+   "id": "chat-deleted-peer-name-empty",
+   "stack": "website",
+   "file": "website/lib/chat/map.ts",
+   "old": "return c.targetDeleted ? ut(buyerProfileDeletedName()) : \"\";",
+   "new": "return \"\";",
+   "test": "lib/chat/__tests__/map.unit.test.ts gives a deleted buyer no name",
+   "why": "已刪除買家的對話名稱沒有目錄文字"
   }
  ]
 }
