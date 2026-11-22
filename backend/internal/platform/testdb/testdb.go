@@ -21,6 +21,9 @@
 // PID 與啟動時間），同一次 go test 的各套件行程找到同一個 container；最後一個行程結束後由
 // Ryuk 刪除。Ryuk 被停用（TESTCONTAINERS_RYUK_DISABLED）時沒有人能在最後收掉共用的
 // container，改成每個行程自己起、自己關。
+//
+// CI 的 integration 步驟把 TESTCONTAINERS_RYUK_RECONNECTION_TIMEOUT 設成 15m：-race 編譯大型
+// package 時行程之間可能空窗超過 Ryuk 預設的 10 秒，Ryuk 會提早刪掉共用的 container。
 package testdb
 
 import (
