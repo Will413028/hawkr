@@ -35,7 +35,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 
 ## 不負責
 
-買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；換掉 `legacy/reviewservice`（A6-6e，A6-D11）；`legacy/reviewrelay` 只在測試啟用，A6-6e 才接進 `cmd/hawkr`；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
+買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；隱藏的決定與審核（moderation，A6-4）；（`legacy/reviewservice` 已換成本模組的 `StoreRatingStats` 並刪除，`legacy/reviewrelay` 已接進 `cmd/hawkr`：A6-6e）；退款後評價的排除（接受到 ordering 搬遷，A6-D7）。
 
 ## 決策紀錄
 

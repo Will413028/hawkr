@@ -7,25 +7,14 @@ import (
 
 func TestConfig_Validate(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
-		cfg := &Config{JWTSecret: "my-secret", MediaBaseURL: "https://test-media.example.com"}
+		cfg := &Config{MediaBaseURL: "https://test-media.example.com"}
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("expected nil, got %v", err)
 		}
 	})
 
-	t.Run("missing JWTSecret", func(t *testing.T) {
-		cfg := &Config{}
-		err := cfg.Validate()
-		if err == nil {
-			t.Fatal("expected error for missing JWTSecret")
-		}
-		if !strings.Contains(err.Error(), "JWT_SECRET") {
-			t.Errorf("error should mention JWT_SECRET: %v", err)
-		}
-	})
-
 	t.Run("missing MediaBaseURL", func(t *testing.T) {
-		cfg := &Config{JWTSecret: "my-secret"}
+		cfg := &Config{}
 		err := cfg.Validate()
 		if err == nil {
 			t.Fatal("expected error for missing MEDIA_BASE_URL")
@@ -37,7 +26,7 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConfig_LoadDefaults(t *testing.T) {
-	// Load() calls Validate() which requires JWT_SECRET.
+	// Load() calls Validate().
 	// We test defaults by constructing a Config directly and checking zero-value fields.
 	cfg := &Config{
 		Env:         "development",
@@ -65,7 +54,6 @@ func TestConfig_LoadDefaults(t *testing.T) {
 // 一個已退役的舊 OSS 網域，DNS 一撤就靜默吐死連結；回退任何一個
 // 域名都是猜，所以直接讓它起不來。
 func TestConfig_LoadMediaBaseURLRequired(t *testing.T) {
-	t.Setenv("JWT_SECRET", "test-secret")
 	t.Setenv("MEDIA_BASE_URL", "")
 	if _, err := Load(); err == nil {
 		t.Fatal("expected Load() to fail when MEDIA_BASE_URL is unset, got nil error")
@@ -75,7 +63,6 @@ func TestConfig_LoadMediaBaseURLRequired(t *testing.T) {
 }
 
 func TestConfig_LoadMediaBaseURLOverride(t *testing.T) {
-	t.Setenv("JWT_SECRET", "test-secret")
 	t.Setenv("MEDIA_BASE_URL", "https://media.example.com")
 	cfg, err := Load()
 	if err != nil {
@@ -83,21 +70,6 @@ func TestConfig_LoadMediaBaseURLOverride(t *testing.T) {
 	}
 	if cfg.MediaBaseURL != "https://media.example.com" {
 		t.Errorf("expected MediaBaseURL override, got %s", cfg.MediaBaseURL)
-	}
-}
-
-func TestConfig_LoadsDedicatedIMChatStreamKeys(t *testing.T) {
-	t.Setenv("JWT_SECRET", "test-secret")
-	t.Setenv("MEDIA_BASE_URL", "https://test-media.example.com")
-	t.Setenv("IM_CHAT_STREAM_JWT_SECRET", "01234567890123456789012345678901")
-	t.Setenv("IM_CHAT_STREAM_JWT_SECRET_PREV", "abcdefghijklmnopqrstuvwxyz123456")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
-	}
-	if cfg.IMChatStreamJWTSecret == "" || cfg.IMChatStreamJWTSecretPrev == "" {
-		t.Fatal("dedicated IM ChatStream keys were not loaded")
 	}
 }
 

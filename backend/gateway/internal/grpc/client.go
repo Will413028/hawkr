@@ -3,7 +3,6 @@ package grpc
 import (
 	"github.com/Will413028/hawkr/go-pkg/config"
 	"github.com/Will413028/hawkr/go-pkg/middleware/grpc/interceptor"
-	"github.com/Will413028/hawkr/go-pkg/serviceauth"
 	"google.golang.org/grpc"
 )
 
@@ -27,25 +26,7 @@ func getEnvOrDefault(key, defaultVal string) string {
 // transport errors only. EnvelopeGuard runs in an outer layer, translating business errors
 // (resp.Code != 0) into gRPC errors — keeping those out of the breaker's failure counts.
 func DefaultDialOpts() []grpc.DialOption {
-	return dialOpts(nil)
-}
-
-// IMDialOpts returns the standard Gateway client options plus the dedicated
-// service credential for IM's long-lived ChatStream. The method filter inside
-// the interceptor keeps the credential off every other IM RPC.
-func IMDialOpts(signer *serviceauth.Signer) []grpc.DialOption {
-	if signer == nil {
-		return DefaultDialOpts()
-	}
-	return dialOpts(signer.StreamClientInterceptor(serviceauth.ChatStreamMethod))
-}
-
-func dialOpts(streamAuth grpc.StreamClientInterceptor) []grpc.DialOption {
-	streamInterceptors := []grpc.StreamClientInterceptor{AuthMetadataStreamInterceptor()}
-	if streamAuth != nil {
-		streamInterceptors = append(streamInterceptors, streamAuth)
-	}
-	streamInterceptors = append(streamInterceptors, CircuitBreakerStreamInterceptor())
+	streamInterceptors := []grpc.StreamClientInterceptor{AuthMetadataStreamInterceptor(), CircuitBreakerStreamInterceptor()}
 	return []grpc.DialOption{
 		grpc.WithStatsHandler(interceptor.OTelClientStatsHandler()),
 		grpc.WithChainUnaryInterceptor(

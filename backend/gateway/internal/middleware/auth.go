@@ -35,7 +35,7 @@ const (
 	headerSellerCapabilities = "X-Seller-Capabilities"
 )
 
-// rdbHolder 是 Redis client：聊天 WebSocket 的一次性 ticket（ChatWSAuth）與限流共用。
+// rdbHolder 是 Redis client：限流共用。
 // 在 Redis 初始化後由 SetRedisClient 注入；atomic.Pointer 讓讀取不需要鎖。
 var rdbHolder atomic.Pointer[redis.Client]
 

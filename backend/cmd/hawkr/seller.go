@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -67,8 +66,8 @@ func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identit
 	})
 }
 
-// legacySellerRatings 以舊的 review-service 實作 legacy SellerService 的評價統計 port（sellerserver.Ratings）。
-type legacySellerRatings struct{ client *reviewservice.Client }
+// legacySellerRatings 以 review 模組實作 legacy SellerService 的評價統計 port（sellerserver.Ratings）。
+type legacySellerRatings struct{ client storeRatings }
 
 func (r legacySellerRatings) StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]sellerserver.RatingStats, error) {
 	return ratingStats[sellerserver.RatingStats](ctx, r.client, storeIDs)

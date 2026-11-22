@@ -104,19 +104,11 @@ const (
 
 	QueueInvoiceOrderCancelled = "invoice.order.cancelled"
 
-	QueueIMAccountDeleted = "im.account.deleted"
-
-	QueueIMBuyerDeleted = "im.buyer.deleted"
-
-	QueueIMSellerDeleted = "im.seller.deleted"
-
 	QueueNotificationAccountDeleted = "notification.account.deleted"
 
 	QueueNotificationBuyerDeleted = "notification.buyer.deleted"
 
 	QueueNotificationSellerDeleted = "notification.seller.deleted"
-
-	QueueIMSellerSuspended = "im.seller.suspended"
 
 	QueueSellerAccountDeleted = "seller.account.deleted"
 )

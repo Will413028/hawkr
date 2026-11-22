@@ -152,7 +152,7 @@ func (m *Module) ListTags(ctx context.Context, storeID int64) ([]Tag, error) {
 	return m.read.ListTags(ctx, storeID)
 }
 
-// VIPStatuses 回傳買家在各店是否是 VIP（每個請求的店家一筆）；取代 legacy/crmservice.VIPStatuses。
+// VIPStatuses 回傳買家在各店是否是 VIP（每個請求的店家一筆）。
 func (m *Module) VIPStatuses(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error) {
 	return m.read.VIPStatuses(ctx, buyerID, storeIDs)
 }
@@ -217,7 +217,7 @@ func (m *Module) ErasePartyData(ctx context.Context, kind string, id int64) erro
 // SweepErase 補排已關閉的買家與已退場的店家中仍有資料的身分的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepErase(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（清除與其保底掃描）。由 cmd/hawkr 接上（A6-6e）。
+// AddWorkers 登記 River worker（清除與其保底掃描）。由 cmd/hawkr 的 worker 接上。
 func (m *Module) AddWorkers(workers *river.Workers) { purge.AddWorkers(workers, m.purge) }
 
 // PeriodicJobs 回傳保底掃描的排程。

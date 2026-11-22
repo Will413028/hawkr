@@ -10,11 +10,11 @@ groups:
       - alert: RevalidateAllFailing
         expr: |
           sum by (environment) (
-            count_over_time({service_name=~"review-service|seller-service|product-service|order-service"} |= "revalidate.send.error" [15m])
+            count_over_time({service_name=~"seller-service|product-service|order-service"} |= "revalidate.send.error" [15m])
           ) > 0
           unless
           sum by (environment) (
-            count_over_time({service_name=~"review-service|seller-service|product-service|order-service"} |= "revalidate.send.success" [15m])
+            count_over_time({service_name=~"seller-service|product-service|order-service"} |= "revalidate.send.success" [15m])
           ) > 0
         for: 5m
         labels:

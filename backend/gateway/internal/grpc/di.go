@@ -16,18 +16,14 @@ var Module = fx.Module("grpc",
 	fx.Provide(NewPaymentClient),
 	fx.Provide(NewMediaClient),
 	fx.Provide(NewCartClient),
-	fx.Provide(NewIMClient),
 	fx.Provide(NewNotificationClient),
 	fx.Provide(NewShippingClient),
 	fx.Provide(NewCouponClient),
-	fx.Provide(NewCrmClient),
 	fx.Provide(newAIServiceConn),
 	fx.Provide(NewAIClient),
 	fx.Provide(NewAIAssistantClient),
 	fx.Provide(NewAIProcurementClient),
 	fx.Provide(NewCategoryClient),
-	fx.Provide(NewReviewServiceClient),
-	fx.Provide(NewOrderReviewServiceClient),
 	fx.Provide(NewAftersalesClient),
 	fx.Provide(NewInvoiceServiceClient),
 	fx.Invoke(registerLifecycle),
@@ -43,15 +39,11 @@ type clientClosers struct {
 	Payment       *PaymentClient
 	Media         *MediaClient
 	Cart          *CartClient
-	IM            *IMClient
 	Notification  *NotificationClient
 	Shipping      *ShippingClient
 	Coupon        *CouponClient
-	Crm           *CrmClient
 	AIServiceConn *aiServiceConn
 	Category      *CategoryClient
-	Review        *ReviewServiceClient
-	OrderReview   *OrderReviewServiceClient
 	Aftersales    *AftersalesClient
 	Invoice       *InvoiceServiceClient
 }
@@ -62,10 +54,10 @@ func registerLifecycle(lc fx.Lifecycle, l *zap.Logger, c clientClosers) {
 			l.Info("Closing gRPC client connections")
 			closers := []interface{ Close() error }{
 				c.Account, c.Seller, c.Buyer, c.Product, c.Order,
-				c.Payment, c.Media, c.Cart, c.IM,
+				c.Payment, c.Media, c.Cart,
 				c.Notification, c.Shipping,
-				c.Coupon, c.Crm, c.AIServiceConn, c.Category, c.Review,
-				c.OrderReview, c.Aftersales,
+				c.Coupon, c.AIServiceConn, c.Category,
+				c.Aftersales,
 				c.Invoice,
 			}
 			for _, cl := range closers {

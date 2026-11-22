@@ -45,35 +45,6 @@ func TestAvatarDTOs_OutwardJSONKeyIsFlatAvatarKey(t *testing.T) {
 			BuyerAvatarKey: key, BuyerAvatarUrl: url,
 			SellerAvatarKey: "public/user_avatar/1/logo.png", SellerAvatarUrl: url,
 		}, []string{`"logoKey"`, `"logoUrl"`}},
-		{"ReviewListItem", ReviewListItem{
-			UserAvatarKey: key, UserAvatar: url,
-			ImageKeys: []string{"public/review/1.png"}, Images: []string{url},
-		}, []string{`"imageKeys"`, `"imageUrls"`}},
-		{"ReviewDetail", ReviewDetail{
-			UserAvatarKey: key, UserAvatar: url,
-		}, nil},
-		{"PublicSellerReviewItem", PublicSellerReviewItem{
-			UserAvatarKey: key, UserAvatar: url,
-			ItemImageKey: "public/product/1.png", ItemImageURL: url,
-		}, []string{`"productImageKey"`, `"productImageUrl"`}},
-		{"OrderReviewRecord", OrderReviewRecord{
-			BuyerAvatarKey: key, BuyerAvatar: url,
-			ItemImageKey: "public/product/1.png", ItemImageURL: url,
-		}, []string{`"productImageKey"`, `"productImageUrl"`}},
-		// seller_crm 收斂前就已經是 avatarKey/avatarUrl；一併納入
-		// 才能證明「全平台同一個名字」，而不是只證明「我改過的那幾個」。
-		{"BuyerLookupResponse", BuyerLookupResponse{
-			AvatarKey: key, AvatarURL: url,
-		}, nil},
-		{"crmCustomerListItem", crmCustomerListItem{
-			AvatarKey: key, AvatarURL: url,
-		}, nil},
-		{"crmCustomerDetail", crmCustomerDetail{
-			AvatarKey: key, AvatarURL: url,
-		}, nil},
-		{"MatchedCustomerResp", MatchedCustomerResp{
-			AvatarKey: key, AvatarURL: url,
-		}, nil},
 	}
 
 	// 收斂掉的舊名一個都不准回來。

@@ -17,7 +17,6 @@ func TestAuthMetadataStreamInterceptor_ForwardsContext(t *testing.T) {
 	// from a different code path than the auth-middleware ones).
 	ctx := WithAuthContext(context.Background(), 12345, "seller")
 	ctx = WithTraceContext(ctx, "trace-abc", "req-def")
-	ctx = WithSellerSuspension(ctx, "4602")
 	ctx = WithBuyerID(ctx, identity.BuyerID(999))
 	ctx = WithStoreID(ctx, identity.StoreID(777))
 
@@ -36,7 +35,6 @@ func TestAuthMetadataStreamInterceptor_ForwardsContext(t *testing.T) {
 	assertMDValue(t, gotMD, "x-account-type", "seller")
 	assertMDValue(t, gotMD, "x-trace-id", "trace-abc")
 	assertMDValue(t, gotMD, "x-request-id", "req-def")
-	assertMDValue(t, gotMD, "x-seller-suspended", "4602")
 	assertMDValue(t, gotMD, "x-buyer-id", "999")
 	assertMDValue(t, gotMD, "x-store-id", "777")
 }
