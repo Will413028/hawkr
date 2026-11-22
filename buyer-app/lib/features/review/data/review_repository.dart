@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
+import '../../../core/networking/dio_provider.dart';
 
 part 'review_repository.g.dart';
 
@@ -10,9 +12,13 @@ part 'review_repository.g.dart';
 ReviewRepository reviewRepository(Ref ref) => ReviewRepository(
   ref.watch(reviewPublicClientProvider),
   ref.watch(reviewAppClientProvider),
+  ref.watch(dioProvider),
 );
 
-/// 商品評價的統計：由讀到的評價算出。
+/// 商品評價的數量與平均分（商品卡片用）。
+typedef ProductRatingStats = ({int count, double average});
+
+/// 商品評價的統計：由畫面讀到的評價算出。
 typedef ProductReviewSummary = ({
   int count,
   double average,
@@ -22,7 +28,7 @@ typedef ProductReviewSummary = ({
 /// 評價（`ReviewPublicService`、`ReviewAppService`）。讀取失敗一律丟出，不回空清單：呼叫端要把
 /// 「讀取失敗」和「沒有評價」分開呈現。
 class ReviewRepository {
-  ReviewRepository(this._public, this._app);
+  ReviewRepository(this._public, this._app, this._dio);
 
   /// 每頁筆數（API 預設 20，上限 100）。
   static const pageSize = 100;
@@ -32,6 +38,7 @@ class ReviewRepository {
 
   final ReviewPublicServiceClient _public;
   final ReviewAppServiceClient _app;
+  final Dio _dio;
 
   /// 商品的公開評價一頁；[pageToken] 空字串是第一頁，回應的 `nextPageToken` 空字串表示沒有下一頁。
   Future<pb.ListProductReviewsResponse> listProductReviews(
@@ -60,9 +67,22 @@ class ReviewRepository {
     return reviews;
   }
 
-  /// 商品評價的數量、平均與各星等的數量，由 [listAllProductReviews] 的結果算出（契約沒有商品層級的統計）。
-  Future<ProductReviewSummary> productReviewSummary(String productId) async =>
-      summarize(await listAllProductReviews(productId));
+  /// 商品評價的數量與平均分，商品卡片缺這兩個值時補用。這是唯一的接縫：契約還沒有商品層級的統計，
+  /// 目前沿用舊 gateway 的 `GET /public/products/{id}/reviews` 的 `stats` 區塊（A6-5e 的伺服器方法完成後，
+  /// A6-6c2 改讀新方法並刪除這裡的舊呼叫；client 不分頁加總）。失敗丟出。
+  Future<ProductRatingStats> productRatingStats(String productId) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/public/products/$productId/reviews',
+      queryParameters: const {'page': 1, 'size': 1},
+    );
+    final data = resp.data?['data'];
+    final stats = data is Map ? data['stats'] : resp.data?['stats'];
+    if (stats is! Map) return (count: 0, average: 0.0);
+    final count = (stats['totalCount'] as num?)?.toInt() ?? 0;
+    final raw = (stats['averageRating'] as num?)?.toDouble() ?? 0.0;
+    final average = raw > 5 && raw <= 50 ? raw / 10 : raw;
+    return (count: count, average: average.clamp(0.0, 5.0));
+  }
 
   static ProductReviewSummary summarize(List<pb.Review> reviews) {
     final distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};

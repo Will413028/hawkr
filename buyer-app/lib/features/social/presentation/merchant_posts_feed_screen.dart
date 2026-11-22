@@ -599,7 +599,7 @@ class _PostPage extends HookConsumerWidget {
                               if (!context.mounted) return;
                               await showReportBlockActionSheet(
                                 context,
-                                reportTarget: ReportTarget.post(
+                                reportTarget: SocialReportTarget.post(
                                   post.id.toString(),
                                 ),
                                 blockTarget: sellerId.isNotEmpty

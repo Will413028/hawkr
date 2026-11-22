@@ -13,7 +13,7 @@ part 'moderation_repository.g.dart';
 ModerationRepository moderationRepository(Ref ref) =>
     ModerationRepository(ref.watch(moderationAppClientProvider));
 
-/// 檢舉（`ModerationAppService`）：社群內容、評價與聊天訊息。
+/// 社群檢舉（`ModerationAppService`）。聊天與評價的檢舉在 `LegacyReportRepository`。
 class ModerationRepository {
   ModerationRepository(this._moderation);
 
@@ -24,7 +24,7 @@ class ModerationRepository {
 
   /// 送出檢舉，回檢舉 ID。同一個 [requestId] 重送回第一次的結果，所以同一次送出嘗試的重試要帶同一個值。
   Future<String> submitReport({
-    required ReportTarget target,
+    required SocialReportTarget target,
     required PolicyCategory category,
     required String description,
     required String requestId,

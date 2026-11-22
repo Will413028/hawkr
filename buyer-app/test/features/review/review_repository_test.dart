@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
@@ -15,7 +16,11 @@ void main() {
           [reviewRecord('c')],
         ],
       );
-      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
+      final repo = ReviewRepository(
+        fake.client(),
+        FakeReviewApp().client(),
+        Dio(),
+      );
 
       final reviews = await repo.listAllProductReviews('55');
 
@@ -31,7 +36,11 @@ void main() {
           [reviewRecord('a')],
         ],
       );
-      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
+      final repo = ReviewRepository(
+        fake.client(),
+        FakeReviewApp().client(),
+        Dio(),
+      );
 
       final reviews = await repo.listAllProductReviews('55');
 
@@ -42,7 +51,11 @@ void main() {
       final fake = FakeReviewPublic(
         error: ConnectException(Code.unavailable, 'down'),
       );
-      final repo = ReviewRepository(fake.client(), FakeReviewApp().client());
+      final repo = ReviewRepository(
+        fake.client(),
+        FakeReviewApp().client(),
+        Dio(),
+      );
 
       await expectLater(
         repo.listAllProductReviews('55'),
@@ -54,6 +67,7 @@ void main() {
       final repo = ReviewRepository(
         FakeReviewPublic().client(),
         FakeReviewApp().client(),
+        Dio(),
       );
 
       expect(await repo.listAllProductReviews('55'), isEmpty);
@@ -81,7 +95,11 @@ void main() {
           reviewRecord('r2', orderItemId: '11'),
         ],
       );
-      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
+      final repo = ReviewRepository(
+        FakeReviewPublic().client(),
+        app.client(),
+        Dio(),
+      );
 
       final found = await repo.findMyReviewForOrderItems(['9', '11']);
 
@@ -93,6 +111,7 @@ void main() {
       final repo = ReviewRepository(
         FakeReviewPublic().client(),
         FakeReviewApp().client(),
+        Dio(),
       );
 
       expect(await repo.findMyReviewForOrderItems(['9']), isNull);
@@ -102,7 +121,11 @@ void main() {
   group('createReview', () {
     test('送訂單編號、訂單項目 ID（字串）、星等、內文與圖片 token', () async {
       final app = FakeReviewApp();
-      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
+      final repo = ReviewRepository(
+        FakeReviewPublic().client(),
+        app.client(),
+        Dio(),
+      );
 
       final review = await repo.createReview(
         orderNo: 'SO-1',
@@ -128,7 +151,11 @@ void main() {
           ErrorReason.REVIEW_ALREADY_EXISTS,
         ),
       );
-      final repo = ReviewRepository(FakeReviewPublic().client(), app.client());
+      final repo = ReviewRepository(
+        FakeReviewPublic().client(),
+        app.client(),
+        Dio(),
+      );
 
       Object? caught;
       try {

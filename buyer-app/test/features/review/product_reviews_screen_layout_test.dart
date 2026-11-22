@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
@@ -23,6 +25,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          dioProvider.overrideWithValue(Dio()),
           reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
           reviewPublicClientProvider.overrideWithValue(
             FakeReviewPublic(
@@ -82,6 +85,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          dioProvider.overrideWithValue(Dio()),
           reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
           reviewPublicClientProvider.overrideWithValue(fake.client()),
           defaultErrorTextProvider.overrideWithValue((_) => '服務暫時不可用'),
@@ -127,6 +131,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          dioProvider.overrideWithValue(Dio()),
           reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
           reviewPublicClientProvider.overrideWithValue(
             FakeReviewPublic().client(),

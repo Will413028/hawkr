@@ -2453,7 +2453,7 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
                         if (!mounted) return;
                         await showReportBlockActionSheet(
                           context,
-                          reportTarget: ReportTarget.review(reviewId),
+                          reportTarget: SocialReportTarget.review(reviewId),
                         );
                       },
                       icon: AppIcons.moreHoriz,

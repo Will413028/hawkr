@@ -204,7 +204,7 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
         orderNo: widget.orderSn,
         orderItemId: orderItemId,
         rating: rating,
-        content: content.isNotEmpty ? content : '好評',
+        content: content,
         stagedTokens: stagedTokens,
       );
 

@@ -10,24 +10,6 @@
    "why": "檢舉評價時不帶評價 ID，只剩種類"
   },
   {
-   "id": "report-chat-message-kind-dropped",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/moderation/data/moderation_repository.dart",
-   "old": "pb.ReportTarget(kind: target.kind, id: target.id)",
-   "new": "pb.ReportTarget(id: target.id)",
-   "test": "test/features/moderation/report_flows_test.dart REPORT_TARGET_KIND_CHAT_MESSAGE：送出對象種類、原因與 UUIDv4 的 request_id",
-   "why": "檢舉聊天訊息時不帶對象種類"
-  },
-  {
-   "id": "block-message-reference-dropped",
-   "stack": "flutter:buyer-app",
-   "file": "buyer-app/lib/features/moderation/data/blocking_repository.dart",
-   "old": "buyer.BlockAuthorRequest(messageId: messageId)",
-   "new": "buyer.BlockAuthorRequest()",
-   "test": "test/features/moderation/block_flows_test.dart 聊天訊息的對象送 BlockAuthor.message_id，不走舊 REST",
-   "why": "從聊天封鎖不帶訊息參照，伺服器無從推導店家"
-  },
-  {
    "id": "review-read-failure-shown-as-empty",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
@@ -71,6 +53,24 @@
    "new": "pb.ListMyReviewsRequest(pageSize: 1)",
    "test": "test/features/review/review_repository_test.dart 依訂單項目查詢，送 order_item_id",
    "why": "查我的評價不帶訂單項目，回到別的項目的評價"
+  },
+  {
+   "id": "chat-report-moved-off-legacy",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/legacy_report_repository.dart",
+   "old": "'/app/reports'",
+   "new": "'/app/reports-x'",
+   "test": "test/features/moderation/report_flows_test.dart 聊天訊息：POST /app/reports，不呼叫 ModerationAppService",
+   "why": "聊天檢舉離開舊路徑"
+  },
+  {
+   "id": "chat-block-moved-off-legacy",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/block_confirm_dialog.dart",
+   "old": "await ref.read(blockRepositoryProvider).blockUser(userId);",
+   "new": "await ref.read(socialBlockerProvider).block(const StoreBlockTarget('x'));",
+   "test": "test/features/moderation/block_flows_test.dart 聊天與評價的對象仍走舊 REST，不呼叫 BuyerAppService",
+   "why": "聊天封鎖改送新路徑"
   }
  ]
 }

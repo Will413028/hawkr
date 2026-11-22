@@ -421,7 +421,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     try {
       final summary = await ref
           .read(reviewRepositoryProvider)
-          .productReviewSummary(productId);
+          .productRatingStats(productId);
       if (!hasReviewCount) item['reviewCount'] = summary.count;
       if (!hasRating) item['rating'] = summary.average;
     } catch (_) {

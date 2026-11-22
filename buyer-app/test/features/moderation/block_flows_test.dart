@@ -138,7 +138,7 @@ Widget _opener(BlockTarget? target, {bool Function()? onBlocked}) => Builder(
     onPressed: () async {
       final blocked = await showReportBlockActionSheet(
         context,
-        reportTarget: const ReportTarget.post('101'),
+        reportTarget: const SocialReportTarget.post('101'),
         blockTarget: target,
         blockUserLabel: '對方',
       );
@@ -188,22 +188,19 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
-    testWidgets('聊天訊息的對象送 BlockAuthor.message_id，不走舊 REST', (tester) async {
+    testWidgets('聊天與評價的對象仍走舊 REST，不呼叫 BuyerAppService', (tester) async {
       final h = _Harness();
-      await h.pump(
-        tester,
-        _opener(const MessageBlockTarget('m-42', storeId: '7')),
-      );
+      await h.pump(tester, _opener(const LegacyBlockTarget('42')));
 
       await _confirmBlock(tester);
-      expect(find.text(blockStoreConfirmText), findsOneWidget);
+      expect(find.text(legacyBlockConfirmText), findsOneWidget);
       await tester.tap(find.text('封鎖'));
       await tester.pumpAndSettle();
 
-      expect(h.app.authorBlocks.single.messageId, 'm-42');
-      expect(h.app.authorBlocks.single.whichSource(), isNotNull);
+      expect(h.legacy.requests.single.method, 'POST');
+      expect(h.legacy.requests.single.path, '/app/blocks/42');
       expect(h.app.storeBlocks, isEmpty);
-      expect(h.legacy.requests, isEmpty);
+      expect(h.app.authorBlocks, isEmpty);
       await tester.pump(const Duration(seconds: 3));
     });
 

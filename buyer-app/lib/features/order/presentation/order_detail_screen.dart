@@ -2351,9 +2351,8 @@ String _paymentMethodText(String value) =>
 //  Card 4.6: 商品評價（買家評價過此訂單後顯示自己的評分 + 評論）
 //
 //  資料來源優先順序：
-//   1. order.reviewRating > 0 → 直接用 Order 自帶（B-145 後端補欄位後生效）
-//   2. fallback：呼叫 ReviewRepository.findReviewByOrderNo 反查 /app/me/reviews
-//      （現況解法 — 後端 detail API 暫時還沒回 review 欄位）
+//   1. order.reviewRating > 0 → 直接用 Order 自帶
+//   2. fallback：呼叫 ReviewRepository.findMyReviewForOrderItems 以訂單項目反查我的評價
 // ═══════════════════════════════════════════════════════════════
 
 class _OrderReviewCard extends ConsumerStatefulWidget {

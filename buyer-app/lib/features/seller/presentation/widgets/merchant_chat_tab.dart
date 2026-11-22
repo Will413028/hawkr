@@ -224,7 +224,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     if (!mounted) return;
     final blocked = await showReportBlockActionSheet(
       context,
-      reportTarget: ReportTarget.forumEntry(node.entry.id),
+      reportTarget: SocialReportTarget.forumEntry(node.entry.id),
       blockTarget: blockTargetForForumEntry(node.entry),
       blockUserLabel: node.userName,
       blockActionLabel: '封鎖此人',

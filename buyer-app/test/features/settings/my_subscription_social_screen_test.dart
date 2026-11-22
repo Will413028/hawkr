@@ -71,13 +71,9 @@ void main() {
     when(
       () => _visitRepository.batchCheckFavorites(any()),
     ).thenAnswer((_) async => {88});
-    when(() => _reviewRepository.productReviewSummary(any())).thenAnswer(
-      (_) async => (
-        count: 18,
-        average: 4.8,
-        distribution: <int, int>{5: 15, 4: 3, 3: 0, 2: 0, 1: 0},
-      ),
-    );
+    when(
+      () => _reviewRepository.productRatingStats(any()),
+    ).thenAnswer((_) async => (count: 18, average: 4.8));
   });
 
   test('saved product cards request a 4:3 image from the CDN', () {
