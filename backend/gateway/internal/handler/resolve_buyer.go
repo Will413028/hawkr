@@ -54,3 +54,17 @@ func (h *Holder) resolveOptionalBuyerFilterQuery(c *gin.Context, rawIDStr string
 	}
 	return strconv.FormatInt(int64(buyerID), 10), true
 }
+
+// parseSellerViewBuyerFilter 解析賣家視角訂單列表的 buyer_id：值是 CRM 回的買家代理鍵（Customer.buyer_id），不是帳號代碼，
+// 直接當篩選值，不經 CurrentBuyerID。必須是正整數（"0" 會被下游當成未篩選）；範圍永遠被呼叫者此刻的店限定，別店的買家查無結果。
+func parseSellerViewBuyerFilter(c *gin.Context, rawIDStr string) (string, bool) {
+	if rawIDStr == "" {
+		return "", true
+	}
+	id, err := strconv.ParseInt(rawIDStr, 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "invalid buyer_id")
+		return "", false
+	}
+	return strconv.FormatInt(id, 10), true
+}

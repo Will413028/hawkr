@@ -89,7 +89,8 @@ SELECT
     COUNT(*) FILTER (WHERE r.rating = 4)::bigint       AS rating_4_count,
     COUNT(*) FILTER (WHERE r.rating = 3)::bigint       AS rating_3_count,
     COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,
-    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count
+    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count,
+    COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM review.review_images AS ri WHERE ri.review_id = r.id))::bigint AS with_images_count
 FROM review.reviews AS r
 WHERE r.product_id = sqlc.arg(product_id)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)

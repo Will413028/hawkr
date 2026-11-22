@@ -118,6 +118,33 @@ func (h *App) ListStoreConversations(ctx context.Context, req *connect.Request[p
 	return connect.NewResponse(&pb.ListStoreConversationsResponse{Conversations: items, NextPageToken: nextToken(scope, page.Next)}), nil
 }
 
+func (h *App) GetStoreConversationByBuyer(ctx context.Context, req *connect.Request[pb.GetStoreConversationByBuyerRequest]) (*connect.Response[pb.GetStoreConversationByBuyerResponse], error) {
+	buyerID, err := rpc.ParseID("buyer_id", req.Msg.GetBuyerId())
+	if err != nil {
+		return nil, err
+	}
+	// 契約承諾不區分原因：沒有店、店家關閉、買家不存在、沒有對話都是同一個 not_found（同 code、訊息與 details）。
+	p, err := h.storeParty(ctx)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil, conversationNotFound()
+		}
+		return nil, err
+	}
+	c, err := h.reads.StoreConversationByBuyer(ctx, p, buyerID)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return nil, conversationNotFound()
+		}
+		return nil, h.failure(err, nil)
+	}
+	items, err := h.storeConversations(ctx, []im.Conversation{c})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.GetStoreConversationByBuyerResponse{Conversation: items[0]}), nil
+}
+
 func (h *App) ListMessages(ctx context.Context, req *connect.Request[pb.ListMessagesRequest]) (*connect.Response[pb.ListMessagesResponse], error) {
 	msg := req.Msg
 	id, err := rpc.ParseUUID("conversation_id", msg.GetConversationId())
