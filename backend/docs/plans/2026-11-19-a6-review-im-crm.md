@@ -190,7 +190,7 @@
 拆四個子步驟，各自一個 session：
 - **5a** 契約設計書 `2026-11-19-a6-review-im-crm/step-5-design.md`：34 支逐支對到 Connect 方法（扣刪除 8 支）、`ReportTarget` 參照形狀（含店家檢舉人的 `CHAT_MESSAGE` 入口）、訊息種類 enum、卡片訊息的伺服器參照（A6-D14 W6）、串流 helper（心跳、壽命、寫入期限、session 重驗，A6-D16 W4）、CRM 的 lookup／meta／orders／coupons 由哪個擁有者提供；取捨列成 W 題交 Will，開工 design-review。
 - **5b** `ReviewService` 與評價檢舉（5a 已決）。完成（PR #425）。
-- **5c** `ChatService`（含 streaming helper、接 `cmd/hawkr`）與聊天檢舉（5a 已決）。
+- **5c** `ChatService`（含 streaming helper、接 `cmd/hawkr`）與聊天檢舉（5a 已決）。開工第一件：在 `internal/httpapi` 加一支 unit 測試，以 AST 找出 repo 內所有 `httpapi.Deps{...}` 組合字面值（含 `*_integration_test.go` 與 `cmd/new-module` 範本），斷言 `NewHandler` 必填的依賴欄位都有設；mutation：刪掉任一處的 `Review:`，測試要失敗。理由：5b 加必填 `Review` 後漏了 9 個 integration 測試與 1 個範本，執行期才報錯，CI 連續三輪失敗（Will 2026-11-22）。
 - **5d** `SellerCrmService` 與擁有者方法、CD8 驗收（5a 已決）；完成前 design-review 涵蓋 5b–5d。
 
 - Connect：`ReviewService`、`ChatService`（含 streaming）、`SellerCrmService`；檢舉送參照（`ReportTarget` 帶評價或訊息 ID）；封鎖入口沿用 buyer、seller 的既有方法；訊息種類 enum 與文案目錄；CRM 的 `meta` 由 `GetCustomer` 取代，`lookup`、`coupons` 刪除，`orders` 走店家訂單列表（A6-D18 W3、A6-D23）。
