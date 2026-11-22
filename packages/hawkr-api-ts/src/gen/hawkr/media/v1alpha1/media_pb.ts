@@ -28,14 +28,14 @@ export const file_hawkr_media_v1alpha1_media: GenFile = /*@__PURE__*/
  */
 export type BeginUploadRequest = Message<"hawkr.media.v1alpha1.BeginUploadRequest"> & {
   /**
-   * 檔案的位元組數；必須大於零且不超過伺服器的上限。
+   * 檔案的位元組數；必須大於零且不超過伺服器的上限，超過回 invalid_argument 指向 size，訊息是在地化文字。
    *
    * @generated from field: int64 size = 1;
    */
   size: bigint;
 
   /**
-   * 檔案的 MIME 型別，例如 image/jpeg；伺服器依內容辨認，宣告的型別只用來簽網址。
+   * 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif；伺服器依內容辨認，宣告的型別只用來簽網址。
    *
    * @generated from field: string content_type = 2;
    */
@@ -75,7 +75,8 @@ export type BeginUploadResponse = Message<"hawkr.media.v1alpha1.BeginUploadRespo
   uploadUrl: string;
 
   /**
-   * PUT 時必須原樣帶上的請求標頭（已簽入網址的值）；少帶、改值或多帶簽章以外的內容被物件儲存拒收。
+   * PUT 時必須原樣帶上的請求標頭（已簽入網址的值）；少帶、改值或多帶簽章以外的內容被物件儲存拒收。不含 Content-Length（瀏覽器不允許腳本設定）：
+   * 請求本文必須恰好是 BeginUploadRequest.size 位元組，由傳輸層帶 Content-Length；長度不符被物件儲存拒收。
    *
    * @generated from field: map<string, string> upload_headers = 3;
    */
@@ -306,7 +307,8 @@ export const RejectReasonSchema: GenEnum<RejectReason> = /*@__PURE__*/
 export const MediaAppService: GenService<{
   /**
    * BeginUpload 宣告要上傳的檔案，回傳預簽的 PUT 網址、client 必須原樣帶上的標頭與 staged token。
-   * 宣告的大小必須大於零且不超過伺服器的上限，型別不可為空；否則回 invalid_argument 且不發網址。
+   * 回 invalid_argument 且不發網址的情況：size 不大於零或超過伺服器的上限（訊息是在地化文字，說明上限）；content_type 不是 image/jpeg、
+   * image/png、image/webp、image/gif 之一（HEIC 等由 client 先轉換）；md5 不是 16 位元組的標準 base64。
    * 每次呼叫建立新的一筆暫存；網址與 staged token 只在這個回應出現一次，沒有用到的暫存由伺服器回收。
    *
    * @generated from rpc hawkr.media.v1alpha1.MediaAppService.BeginUpload

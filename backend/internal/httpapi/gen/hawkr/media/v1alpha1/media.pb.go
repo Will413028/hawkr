@@ -169,9 +169,9 @@ func (RejectReason) EnumDescriptor() ([]byte, []int) {
 
 type BeginUploadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 檔案的位元組數；必須大於零且不超過伺服器的上限。
+	// 檔案的位元組數；必須大於零且不超過伺服器的上限，超過回 invalid_argument 指向 size，訊息是在地化文字。
 	Size int64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
-	// 檔案的 MIME 型別，例如 image/jpeg；伺服器依內容辨認，宣告的型別只用來簽網址。
+	// 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif；伺服器依內容辨認，宣告的型別只用來簽網址。
 	ContentType string `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
 	// 檔案內容 MD5 的標準 base64（16 位元組）；簽進網址，內容不符時物件儲存拒收。
 	Md5           string `protobuf:"bytes,3,opt,name=md5,proto3" json:"md5,omitempty"`
@@ -236,7 +236,8 @@ type BeginUploadResponse struct {
 	StagedToken string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`
 	// 預簽的 PUT 網址。
 	UploadUrl string `protobuf:"bytes,2,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`
-	// PUT 時必須原樣帶上的請求標頭（已簽入網址的值）；少帶、改值或多帶簽章以外的內容被物件儲存拒收。
+	// PUT 時必須原樣帶上的請求標頭（已簽入網址的值）；少帶、改值或多帶簽章以外的內容被物件儲存拒收。不含 Content-Length（瀏覽器不允許腳本設定）：
+	// 請求本文必須恰好是 BeginUploadRequest.size 位元組，由傳輸層帶 Content-Length；長度不符被物件儲存拒收。
 	UploadHeaders map[string]string `protobuf:"bytes,3,rep,name=upload_headers,json=uploadHeaders,proto3" json:"upload_headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// 暫存的到期時間；過了之後 staged token 不能再用。預簽網址的有效期短於它。
 	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`

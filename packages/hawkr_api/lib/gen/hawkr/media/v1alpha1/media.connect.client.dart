@@ -10,7 +10,8 @@ import "media.connect.spec.dart" as specs;
 /// MediaAppService 是登入的買家與賣家上傳公開圖片；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 extension type MediaAppServiceClient (connect.Transport _transport) {
   /// BeginUpload 宣告要上傳的檔案，回傳預簽的 PUT 網址、client 必須原樣帶上的標頭與 staged token。
-  /// 宣告的大小必須大於零且不超過伺服器的上限，型別不可為空；否則回 invalid_argument 且不發網址。
+  /// 回 invalid_argument 且不發網址的情況：size 不大於零或超過伺服器的上限（訊息是在地化文字，說明上限）；content_type 不是 image/jpeg、
+  /// image/png、image/webp、image/gif 之一（HEIC 等由 client 先轉換）；md5 不是 16 位元組的標準 base64。
   /// 每次呼叫建立新的一筆暫存；網址與 staged token 只在這個回應出現一次，沒有用到的暫存由伺服器回收。
   Future<hawkrmediav1alpha1media.BeginUploadResponse> beginUpload(
     hawkrmediav1alpha1media.BeginUploadRequest input, {
