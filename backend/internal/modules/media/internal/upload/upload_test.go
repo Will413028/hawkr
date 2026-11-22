@@ -12,7 +12,7 @@ import (
 const validMD5 = "1B2M2Y8AsgTpgAmY7PhCfg==" // 空內容的 MD5
 
 func TestValidate(t *testing.T) {
-	ok := BeginInput{Visibility: model.VisibilityPublic, Size: 10, ContentType: "image/png", MD5: validMD5}
+	ok := BeginInput{Size: 10, ContentType: "image/png", MD5: validMD5}
 	if err := validate(ok); err != nil {
 		t.Fatalf("合法的宣告被拒：%v", err)
 	}
@@ -20,7 +20,6 @@ func TestValidate(t *testing.T) {
 		name string
 		mut  func(*BeginInput)
 	}{
-		{"未知的可見性", func(in *BeginInput) { in.Visibility = "PRIVATE" }},
 		{"零大小", func(in *BeginInput) { in.Size = 0 }},
 		{"負大小", func(in *BeginInput) { in.Size = -1 }},
 		{"空型別", func(in *BeginInput) { in.ContentType = "" }},
@@ -59,15 +58,13 @@ func TestTokenIsOpaqueRandomAndHashedToFixedWidth(t *testing.T) {
 }
 
 func TestValidateRejectsSizeAboveModuleLimit(t *testing.T) {
-	for _, v := range []model.Visibility{model.VisibilityPublic, model.VisibilitySecure} {
-		limit := model.MaxUploadSize(v)
-		in := BeginInput{Visibility: v, Size: limit, ContentType: "image/png", MD5: validMD5}
-		if err := validate(in); err != nil {
-			t.Fatalf("%s：剛好等於上限的宣告被拒：%v", v, err)
-		}
-		in.Size = limit + 1
-		if got := apperr.KindOf(validate(in)); got != apperr.KindInvalidInput {
-			t.Errorf("%s：超過上限的分類 %v，預期 invalid_input", v, got)
-		}
+	limit := model.MaxPublicUploadSize
+	in := BeginInput{Size: limit, ContentType: "image/png", MD5: validMD5}
+	if err := validate(in); err != nil {
+		t.Fatalf("剛好等於上限的宣告被拒：%v", err)
+	}
+	in.Size = limit + 1
+	if got := apperr.KindOf(validate(in)); got != apperr.KindInvalidInput {
+		t.Errorf("超過上限的分類 %v，預期 invalid_input", got)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -37,10 +38,16 @@ type Deps struct {
 	NewID   func() uuid.UUID
 	Now     func() time.Time
 	Logger  *slog.Logger
+	// Keyring 是機敏資產的 KEK 金鑰環；nil 時機敏上傳、讀取與重新包裹回 model.ErrNoKeyring。
+	Keyring *secure.Keyring
 }
 
 // Service 是暫存上傳的服務。
-type Service struct{ d Deps }
+type Service struct {
+	d Deps
+	// secureSlots 限制同時進行的 UploadSecure（model.SecureUploadConcurrency）。
+	secureSlots chan struct{}
+}
 
 // New 建立服務；必要的依賴缺少時 panic（組裝錯誤，啟動就該失敗）。
 func New(d Deps) *Service {
@@ -53,14 +60,13 @@ func New(d Deps) *Service {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	return &Service{d: d}
+	return &Service{d: d, secureSlots: make(chan struct{}, model.SecureUploadConcurrency)}
 }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// BeginInput 是 BeginUpload 的宣告；預簽 PUT 的簽章綁這些值。
+// BeginInput 是 BeginUpload 的宣告；預簽 PUT 的簽章綁這些值。預簽直傳只給 public，機敏檔案走 UploadSecure。
 type BeginInput struct {
-	Visibility  model.Visibility
 	Size        int64
 	ContentType string
 	// MD5 是內容 MD5 的標準 base64。
@@ -114,14 +120,11 @@ func wellFormed(token string) bool {
 }
 
 func validate(in BeginInput) error {
-	if !in.Visibility.Valid() {
-		return apperr.InvalidInputOn([]string{"visibility"}, "上傳的可見性不合法")
-	}
 	if in.Size <= 0 {
 		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小必須大於零")
 	}
-	if in.Size > model.MaxUploadSize(in.Visibility) {
-		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小超過上限 %d 位元組", model.MaxUploadSize(in.Visibility))
+	if in.Size > model.MaxPublicUploadSize {
+		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小超過上限 %d 位元組", model.MaxPublicUploadSize)
 	}
 	if in.ContentType == "" || len(in.ContentType) > maxContentTypeLen || strings.ContainsAny(in.ContentType, "\r\n\x00") {
 		return apperr.InvalidInputOn([]string{"content_type"}, "上傳的型別不合法")
@@ -153,13 +156,6 @@ func (s *Service) own(ctx context.Context, uploader model.Uploader, token string
 	return row, nil
 }
 
-func prefixOf(v model.Visibility) storage.Prefix {
-	if v == model.VisibilitySecure {
-		return storage.PrefixSecure
-	}
-	return storage.PrefixPublic
-}
-
 // Begin 建立暫存列並回傳預簽 PUT 與不透明 token。先簽網址、後寫列：寫列失敗時沒有網址外流。不得在 transaction 內呼叫。
 func (s *Service) Begin(ctx context.Context, uploader model.Uploader, in BeginInput) (BeginResult, error) {
 	if err := model.RequireNoTx(ctx); err != nil {
@@ -182,8 +178,8 @@ func (s *Service) Begin(ctx context.Context, uploader model.Uploader, in BeginIn
 	expiresAt := now.Add(model.UploadTTL)
 	err = s.q(ctx).InsertUpload(ctx, store.InsertUploadParams{
 		ID: id, TokenHash: hashToken(token), UploaderID: uploader.ID, UploaderAdmin: uploader.Admin,
-		Visibility: string(in.Visibility), DeclaredSize: in.Size, DeclaredContentType: in.ContentType, DeclaredMd5: in.MD5,
-		TmpKey: tmpKey, ExpiresAt: expiresAt, Now: now,
+		Visibility: string(model.VisibilityPublic), DeclaredSize: in.Size, DeclaredContentType: in.ContentType, DeclaredMd5: &in.MD5,
+		TmpKey: &tmpKey, ExpiresAt: expiresAt, Now: now,
 	})
 	if err != nil {
 		return BeginResult{}, fmt.Errorf("media：建立暫存上傳：%w", err)
@@ -191,7 +187,7 @@ func (s *Service) Begin(ctx context.Context, uploader model.Uploader, in BeginIn
 	return BeginResult{ID: id, Token: token, URL: presigned.URL, Headers: presigned.Headers, ExpiresAt: expiresAt}, nil
 }
 
-// Complete 驗上傳者，把 PENDING 轉 UPLOADED、記下正式 key，並在同一個 transaction 排處理 job。重入（已經 UPLOADED 或更後面）
+// Complete 驗上傳者，把 PENDING（只有 public 會有）轉 UPLOADED、記下正式 key，並在同一個 transaction 排處理 job。重入（已經 UPLOADED 或更後面）
 // 直接成功，不重複排 job。列已過期回 FailedPrecondition。
 func (s *Service) Complete(ctx context.Context, uploader model.Uploader, token string) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -200,7 +196,7 @@ func (s *Service) Complete(ctx context.Context, uploader model.Uploader, token s
 			return err
 		}
 		now := s.d.Now()
-		finalKey := storage.NewKey(prefixOf(model.Visibility(row.Visibility)))
+		finalKey := storage.NewKey(storage.PrefixPublic)
 		n, err := s.q(ctx).MarkUploadUploaded(ctx, store.MarkUploadUploadedParams{ID: row.ID, FinalKey: &finalKey, Now: now})
 		if err != nil {
 			return fmt.Errorf("media：標記已上傳：%w", err)

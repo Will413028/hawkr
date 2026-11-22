@@ -15,16 +15,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 )
 
-// NewProcessor 組出處理 job 的內容：public 走 PublicProcess；secure 交給 secure（之後提供），沒給時回暫時失敗。
-func NewProcessor(store storage.Store, secure ProcessFunc) ProcessFunc {
+// NewProcessor 組出處理 job 的內容：public 走 PublicProcess；機敏檔案經單體串流上傳（UploadSecure），不經處理 job，
+// 處理 job 遇到 SECURE 列是永久失敗（沒有人該為它排 job）。
+func NewProcessor(store storage.Store) ProcessFunc {
 	return func(ctx context.Context, in ProcessInput) (ProcessResult, error) {
-		if in.Visibility == model.VisibilityPublic {
-			return PublicProcess(ctx, store, in)
+		if in.Visibility != model.VisibilityPublic {
+			return ProcessResult{}, model.Permanent(model.RejectProcessingFailed,
+				errors.New("機敏上傳不經處理 job"))
 		}
-		if secure == nil {
-			return ProcessResult{}, errors.New("media/upload：機敏資產的處理尚未接線")
-		}
-		return secure(ctx, in)
+		return PublicProcess(ctx, store, in)
 	}
 }
 

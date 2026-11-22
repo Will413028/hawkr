@@ -26,12 +26,10 @@ type ProcessInput struct {
 	DeclaredMD5         string
 }
 
-// ProcessResult 是處理寫出的正式物件：資產列的 size、型別與（機敏資產的）主密鑰代號取自這裡，不取宣告值。
+// ProcessResult 是處理寫出的正式物件：資產列的 size 與型別取自這裡，不取宣告值。
 type ProcessResult struct {
 	SizeBytes   int64
 	ContentType string
-	// KeyID 只有機敏資產有。
-	KeyID string
 }
 
 // ProcessFunc 讀暫存物件、驗證、剝除或加密後寫入 in.FinalKey。永久失敗回 model.Permanent，其餘錯誤視為暫時失敗由 River 重試。
@@ -81,10 +79,17 @@ func (s *Service) Process(ctx context.Context, id uuid.UUID, attempt, maxAttempt
 	if model.UploadState(row.State) != model.StateUploaded || row.FinalKey == nil {
 		return nil
 	}
-	res, err := s.d.Process(ctx, ProcessInput{
-		UploadID: row.ID, Visibility: model.Visibility(row.Visibility), TmpKey: row.TmpKey, FinalKey: *row.FinalKey,
-		DeclaredSize: row.DeclaredSize, DeclaredContentType: row.DeclaredContentType, DeclaredMD5: row.DeclaredMd5,
-	})
+	pin := ProcessInput{
+		UploadID: row.ID, Visibility: model.Visibility(row.Visibility), FinalKey: *row.FinalKey,
+		DeclaredSize: row.DeclaredSize, DeclaredContentType: row.DeclaredContentType,
+	}
+	if row.TmpKey != nil {
+		pin.TmpKey = *row.TmpKey
+	}
+	if row.DeclaredMd5 != nil {
+		pin.DeclaredMD5 = *row.DeclaredMd5
+	}
+	res, err := s.d.Process(ctx, pin)
 	if err == nil {
 		if res.ContentType == "" || res.SizeBytes < 0 {
 			s.d.Logger.ErrorContext(ctx, "media：處理函式回傳不合法的結果，標記拒絕", "upload_id", row.ID)
@@ -112,15 +117,11 @@ var errLost = errors.New("media：暫存列已不是 UPLOADED 或已過期")
 // finish 以一個 transaction 建資產列並把暫存列轉 READY；輸給對方時依列的現況收尾。
 func (s *Service) finish(ctx context.Context, row store.MediaStagedUpload, res ProcessResult) error {
 	assetID := s.d.NewID()
-	var keyID *string
-	if res.KeyID != "" {
-		keyID = &res.KeyID
-	}
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		now := s.d.Now()
 		q := s.q(ctx)
 		if err := q.InsertAsset(ctx, store.InsertAssetParams{
-			ID: assetID, Visibility: row.Visibility, ObjectKey: *row.FinalKey, ContentType: res.ContentType, SizeBytes: res.SizeBytes, KeyID: keyID, Now: now,
+			ID: assetID, Visibility: row.Visibility, ObjectKey: *row.FinalKey, ContentType: res.ContentType, SizeBytes: res.SizeBytes, Now: now,
 		}); err != nil {
 			return fmt.Errorf("media：建立資產：%w", err)
 		}
@@ -136,7 +137,10 @@ func (s *Service) finish(ctx context.Context, row store.MediaStagedUpload, res P
 	switch {
 	case err == nil:
 		// 提交之後才刪暫存物件；刪失敗由 bucket 對 tmp/ 的 lifecycle 兜底（CONFIRMED 的列不進 GC）。
-		if err := s.d.Store.Delete(ctx, row.TmpKey); err != nil {
+		if row.TmpKey == nil {
+			return nil
+		}
+		if err := s.d.Store.Delete(ctx, *row.TmpKey); err != nil {
 			s.d.Logger.WarnContext(ctx, "media：刪除暫存物件失敗，留給 bucket lifecycle", "upload_id", row.ID, "error", err)
 		}
 		return nil

@@ -51,7 +51,7 @@ func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUpl
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, visibility, object_key, content_type, size_bytes, state, key_id, created_at, updated_at FROM media.assets WHERE id = $1
+SELECT id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, created_at, updated_at FROM media.assets WHERE id = $1
 `
 
 func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error) {
@@ -64,7 +64,8 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error
 		&i.ContentType,
 		&i.SizeBytes,
 		&i.State,
-		&i.KeyID,
+		&i.KekID,
+		&i.WrappedDek,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -72,10 +73,10 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error
 }
 
 const insertAsset = `-- name: InsertAsset :exec
-INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, key_id, created_at, updated_at)
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, created_at, updated_at)
 VALUES (
     $1, $2, $3, $4, $5,
-    'STAGED', $6, $7, $7)
+    'STAGED', $6, $7, $8, $8)
 `
 
 type InsertAssetParams struct {
@@ -84,7 +85,8 @@ type InsertAssetParams struct {
 	ObjectKey   string
 	ContentType string
 	SizeBytes   int64
-	KeyID       *string
+	KekID       *string
+	WrappedDek  []byte
 	Now         time.Time
 }
 
@@ -95,10 +97,51 @@ func (q *Queries) InsertAsset(ctx context.Context, arg InsertAssetParams) error 
 		arg.ObjectKey,
 		arg.ContentType,
 		arg.SizeBytes,
-		arg.KeyID,
+		arg.KekID,
+		arg.WrappedDek,
 		arg.Now,
 	)
 	return err
+}
+
+const listAssetsToRewrap = `-- name: ListAssetsToRewrap :many
+SELECT id, kek_id, wrapped_dek FROM media.assets
+WHERE visibility = 'SECURE' AND state <> 'DELETED' AND kek_id <> $1 AND id > $2
+ORDER BY id
+LIMIT $3
+`
+
+type ListAssetsToRewrapParams struct {
+	PrimaryKekID *string
+	AfterID      uuid.UUID
+	MaxRows      int32
+}
+
+type ListAssetsToRewrapRow struct {
+	ID         uuid.UUID
+	KekID      *string
+	WrappedDek []byte
+}
+
+// 換 KEK 後重新包裹用：keyset 分頁取 kek_id 不是 primary 的機敏資產（DELETED 除外，物件已刪、不需要再讀）。
+func (q *Queries) ListAssetsToRewrap(ctx context.Context, arg ListAssetsToRewrapParams) ([]ListAssetsToRewrapRow, error) {
+	rows, err := q.db.Query(ctx, listAssetsToRewrap, arg.PrimaryKekID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssetsToRewrapRow{}
+	for rows.Next() {
+		var i ListAssetsToRewrapRow
+		if err := rows.Scan(&i.ID, &i.KekID, &i.WrappedDek); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDeletingAssets = `-- name: ListDeletingAssets :many
@@ -186,4 +229,32 @@ func (q *Queries) MarkAssetsDeleting(ctx context.Context, arg MarkAssetsDeleting
 		return nil, err
 	}
 	return items, nil
+}
+
+const rewrapAsset = `-- name: RewrapAsset :execrows
+UPDATE media.assets SET kek_id = $1, wrapped_dek = $2, updated_at = $3
+WHERE id = $4 AND kek_id = $5
+`
+
+type RewrapAssetParams struct {
+	NewKekID      *string
+	NewWrappedDek []byte
+	Now           time.Time
+	ID            uuid.UUID
+	OldKekID      *string
+}
+
+// 只在列上的 kek_id 仍是取出時的舊值才更新：兩個 RewrapDEKs 同時跑、或擁有者並行讀取時只有一方生效，輸的視為已處理。
+func (q *Queries) RewrapAsset(ctx context.Context, arg RewrapAssetParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rewrapAsset,
+		arg.NewKekID,
+		arg.NewWrappedDek,
+		arg.Now,
+		arg.ID,
+		arg.OldKekID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

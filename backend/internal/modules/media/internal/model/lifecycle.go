@@ -25,9 +25,9 @@ const (
 // 否則 GC 可能回收還在處理的列（lifecycle_grace_test.go 斷言這個不等式）。
 const StuckUploadGrace = 3 * time.Hour
 
-// 單次上傳的大小上限（位元組），整個模組只有這一處定義：BeginUpload 拒絕宣告超過的上傳，處理 job 也不讀超過的物件。
+// 單次上傳的大小上限（位元組），整個模組只有這一處定義：BeginUpload 拒絕宣告超過的 public 上傳，處理 job 也不讀超過的物件；UploadSecure 以 MaxSecureUploadSize 為讀取上限。
 // 值取自 Java media-service 的 `hawkr.media.upload.max-image-size-bytes`（application.yml:117，一般圖片 10MB）
-// 與 `max-secure-size-bytes`（application.yml:118，機敏檔案 100MB），Java 在 MediaUploadValidator.java:59-63 以宣告大小套用。
+// 與 `max-secure-size-bytes`（application.yml:118，機敏檔案 100MB），Java 在 MediaUploadValidator.java:59-63 以宣告大小套用，Go 版的機敏上傳不收宣告，改以實際讀到的位元組數套用。
 const (
 	MaxPublicUploadSize int64 = 10 << 20
 	MaxSecureUploadSize int64 = 100 << 20
@@ -51,16 +51,12 @@ const (
 	ProcessQueueWorkers = 2
 )
 
-// MaxUploadSize 回傳 v 可見性的單次上傳大小上限；未知的可見性回 0。
-func MaxUploadSize(v Visibility) int64 {
-	switch v {
-	case VisibilityPublic:
-		return MaxPublicUploadSize
-	case VisibilitySecure:
-		return MaxSecureUploadSize
-	}
-	return 0
-}
+// 機敏串流上傳的資源界限，與大小上限同在 model：每個進行中的 UploadSecure 佔一個最大約 MaxSecureUploadSize 的密文暫存檔與一條連線，
+// 所以同時進行的數量有上限（磁碟預算約 4 x 100 MiB），滿了立即回 ResourceExhausted、不排隊；寫入物件儲存的時限也明確。
+const (
+	SecureUploadConcurrency = 4
+	SecureUploadTimeout     = 5 * time.Minute
+)
 
 // PresignTTL 是預簽 PUT 網址的有效期；不得超過 UploadTTL（網址比暫存列活得久沒有意義）。
 const PresignTTL = 15 * time.Minute

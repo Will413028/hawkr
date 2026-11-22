@@ -59,7 +59,7 @@ func md5b64(b []byte) string {
 func processReal(t *testing.T, f *fixture, declaredSize int64, declaredMD5 string, actual []byte) media.BeginResult {
 	t.Helper()
 	res, err := f.m.BeginUpload(t.Context(), owner, media.BeginInput{
-		Visibility: media.VisibilityPublic, Size: declaredSize, ContentType: "image/jpeg", MD5: declaredMD5,
+		Size: declaredSize, ContentType: "image/jpeg", MD5: declaredMD5,
 	})
 	if err != nil {
 		t.Fatalf("BeginUpload：%v", err)

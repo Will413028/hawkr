@@ -1,0 +1,58 @@
+{
+  "mutants": [
+    {
+      "id": "secure-skips-segment-tag",
+      "stack": "go",
+      "file": "backend/internal/modules/media/internal/secure/secure.go",
+      "old": "\tif err != nil {\n\t\treturn ErrCorrupt\n\t}\n\tr.seq++",
+      "new": "\tif false && err != nil {\n\t\treturn ErrCorrupt\n\t}\n\tr.seq++",
+      "test": "internal/modules/media/internal/secure ^TestDecrypt_RejectsTamperingAndDeliversNothingFromBadSegment$",
+      "why": "a segment whose GCM tag fails is no longer rejected, so tampered or truncated ciphertext is read as if valid"
+    },
+    {
+      "id": "secure-no-magic-byte-check",
+      "stack": "go",
+      "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+      "old": "if len(head) >= 5 && string(head[:5]) == \"%PDF-\" {",
+      "new": "if true {",
+      "test": "internal/modules/media/internal/upload ^TestSniffSecure_AllowsOnlyPDFAndImages$",
+      "why": "any payload is accepted as a PDF, so fake PDFs and HEIC are no longer rejected by the magic-byte allowlist"
+    },
+    {
+      "id": "secure-no-size-cap",
+      "stack": "go",
+      "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+      "old": "if c.n > c.max {",
+      "new": "if false {",
+      "test": "internal/modules/media/internal/upload ^TestCapReader_FailsOncePastTheLimit$",
+      "why": "the streamed body is no longer capped at MaxSecureUploadSize"
+    },
+    {
+      "id": "wrap-without-aad",
+      "stack": "go",
+      "file": "backend/internal/modules/media/internal/secure/keyring.go",
+      "old": "return append(assetID[:], kekID...)",
+      "new": "return nil",
+      "test": "internal/modules/media/internal/secure ^TestKeyring_UnwrapFailures$",
+      "why": "the wrapped DEK is no longer bound to the asset ID and kek_id, so one row's wrapped DEK unwraps under another asset"
+    },
+    {
+      "id": "rewrap-ignores-kek-id-condition",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+      "old": "AND kek_id <> $1 AND",
+      "new": "AND $1 <> '' AND",
+      "test": "internal/modules/media ^TestRewrapDEKs_AfterRotationOldKekCanBeDropped$",
+      "why": "RewrapDEKs also re-wraps assets already wrapped by the primary KEK"
+    },
+    {
+      "id": "staged-secure-read-skips-uploader-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/upload/upload.go",
+      "old": "if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {",
+      "new": "if false {",
+      "test": "internal/modules/media ^TestReadStagedSecure_OnlyTheUploaderCanPreviewBeforeConfirm$",
+      "why": "ReadStagedSecure no longer compares the caller with the uploader, so anyone holding the token can preview the file"
+    }
+  ]
+}

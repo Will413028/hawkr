@@ -55,10 +55,14 @@ type spyStore struct {
 	mu         sync.Mutex
 	inTx       []string
 	failDelete map[string]error
+	failPut    error
+	// puts 記錄每個 Put 收到的位元組（含失敗的），deleted 記錄每個 Delete 的 key。
+	puts    map[string][]byte
+	deleted []string
 }
 
 func newSpyStore() *spyStore {
-	return &spyStore{Fake: storage.NewFake(), failDelete: map[string]error{}}
+	return &spyStore{Fake: storage.NewFake(), failDelete: map[string]error{}, puts: map[string][]byte{}}
 }
 
 func (s *spyStore) note(ctx context.Context, op string) {
@@ -92,12 +96,25 @@ func (s *spyStore) Head(ctx context.Context, key string) (storage.ObjectInfo, er
 
 func (s *spyStore) Put(ctx context.Context, in storage.PutInput) error {
 	s.note(ctx, "Put")
+	data, err := io.ReadAll(in.Body)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.puts[in.Key] = data
+	failPut := s.failPut
+	s.mu.Unlock()
+	if failPut != nil {
+		return failPut
+	}
+	in.Body = bytes.NewReader(data)
 	return s.Fake.Put(ctx, in)
 }
 
 func (s *spyStore) Delete(ctx context.Context, key string) error {
 	s.note(ctx, "Delete")
 	s.mu.Lock()
+	s.deleted = append(s.deleted, key)
 	err := s.failDelete[key]
 	s.mu.Unlock()
 	if err != nil {
@@ -122,6 +139,7 @@ func (s *spyStore) has(key string) bool {
 }
 
 type fixture struct {
+	keyring *media.Keyring
 	t       *testing.T
 	d       *db.DB
 	jobs    *jobs.Client
@@ -146,6 +164,7 @@ func setup(t *testing.T) *fixture {
 	}
 	f := &fixture{t: t, d: d, jobs: jc, store: newSpyStore(), clock: newClock()}
 	f.process = f.copyProcess
+	f.keyring = mustKeyring(t, kek("k1", 1))
 	f.m = f.module(f.clock)
 	return f
 }
@@ -157,7 +176,7 @@ func (f *fixture) module(c *clock) *media.Module {
 		Process: func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
 			return f.process(ctx, in)
 		},
-		NewID: uuid.NewV7, Now: c.Now,
+		NewID: uuid.NewV7, Now: c.Now, Keyring: f.keyring,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 }
@@ -179,11 +198,7 @@ func (f *fixture) copyProcess(ctx context.Context, in media.ProcessInput) (media
 	if err := f.store.Put(ctx, storage.PutInput{Key: in.FinalKey, Body: bytes.NewReader(data), Size: int64(len(data)), ContentType: in.DeclaredContentType}); err != nil {
 		return media.ProcessResult{}, err
 	}
-	res := media.ProcessResult{SizeBytes: int64(len(data)), ContentType: in.DeclaredContentType}
-	if in.Visibility == media.VisibilitySecure {
-		res.KeyID = "k1"
-	}
-	return res, nil
+	return media.ProcessResult{SizeBytes: int64(len(data)), ContentType: in.DeclaredContentType}, nil
 }
 
 var payload = []byte("fake image bytes")
@@ -191,10 +206,10 @@ var payload = []byte("fake image bytes")
 // declaredMD5 是任意 16 位元組的 base64：fake 儲存與處理函式不驗 MD5（驗證在 storage 的 S3 測試）。
 var declaredMD5 = base64.StdEncoding.EncodeToString(make([]byte, 16))
 
-func begin(t *testing.T, f *fixture, who media.Uploader, v media.Visibility) media.BeginResult {
+func begin(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	t.Helper()
 	res, err := f.m.BeginUpload(t.Context(), who, media.BeginInput{
-		Visibility: v, Size: int64(len(payload)), ContentType: "image/png", MD5: declaredMD5,
+		Size: int64(len(payload)), ContentType: "image/png", MD5: declaredMD5,
 	})
 	if err != nil {
 		t.Fatalf("BeginUpload：%v", err)
@@ -222,18 +237,18 @@ func complete(t *testing.T, f *fixture, who media.Uploader, res media.BeginResul
 }
 
 // uploaded 做到 UPLOADED（處理 job 還沒跑）。
-func uploaded(t *testing.T, f *fixture, who media.Uploader, v media.Visibility) media.BeginResult {
+func uploaded(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	t.Helper()
-	res := begin(t, f, who, v)
+	res := begin(t, f, who)
 	clientUpload(t, f, res)
 	complete(t, f, who, res)
 	return res
 }
 
 // ready 做到 READY：處理 job 成功。
-func ready(t *testing.T, f *fixture, who media.Uploader, v media.Visibility) media.BeginResult {
+func ready(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	t.Helper()
-	res := uploaded(t, f, who, v)
+	res := uploaded(t, f, who)
 	if err := f.m.ProcessUpload(t.Context(), res.ID, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatalf("ProcessUpload：%v", err)
 	}
@@ -336,7 +351,7 @@ func assetIDOf(t *testing.T, f *fixture, id uuid.UUID) uuid.UUID {
 
 func TestBeginUpload_StoresOnlyTheTokenHashAndPresignsUnderTmp(t *testing.T) {
 	f := setup(t)
-	res := begin(t, f, owner, media.VisibilityPublic)
+	res := begin(t, f, owner)
 	if !strings.HasPrefix(tmpKeyOf(res), "tmp/") || res.Headers["Content-MD5"] == "" {
 		t.Fatalf("預簽結果不對：%+v", res)
 	}
@@ -355,7 +370,7 @@ func TestBeginUpload_StoresOnlyTheTokenHashAndPresignsUnderTmp(t *testing.T) {
 
 func TestCompleteUpload_EnqueuesTheProcessJobInTheSameTransaction(t *testing.T) {
 	f := setup(t)
-	res := begin(t, f, owner, media.VisibilityPublic)
+	res := begin(t, f, owner)
 	errBusiness := errors.New("business row failed")
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		if err := f.m.CompleteUpload(ctx, owner, res.Token); err != nil {
@@ -384,7 +399,7 @@ func TestCompleteUpload_EnqueuesTheProcessJobInTheSameTransaction(t *testing.T) 
 
 func TestCompleteUpload_RejectsNonUploader(t *testing.T) {
 	f := setup(t)
-	res := begin(t, f, owner, media.VisibilityPublic)
+	res := begin(t, f, owner)
 	wantKind(t, f.m.CompleteUpload(t.Context(), other, res.Token), apperr.KindNotFound)
 	wantKind(t, f.m.CompleteUpload(t.Context(), media.Uploader{ID: owner.ID, Admin: true}, res.Token), apperr.KindNotFound)
 	if got := uploadState(t, f, res.ID); got != "PENDING" {
@@ -394,7 +409,7 @@ func TestCompleteUpload_RejectsNonUploader(t *testing.T) {
 
 func TestStagedToken_ExpiredRejected(t *testing.T) {
 	f := setup(t)
-	res := begin(t, f, owner, media.VisibilityPublic)
+	res := begin(t, f, owner)
 	f.clock.Advance(media.UploadTTL)
 	wantKind(t, f.m.CompleteUpload(t.Context(), owner, res.Token), apperr.KindFailedPrecondition)
 	if got := uploadState(t, f, res.ID); got != "PENDING" {
@@ -404,7 +419,7 @@ func TestStagedToken_ExpiredRejected(t *testing.T) {
 
 func TestBeginUpload_RejectsInvalidDeclarations(t *testing.T) {
 	f := setup(t)
-	_, err := f.m.BeginUpload(t.Context(), owner, media.BeginInput{Visibility: media.VisibilityPublic, Size: 0, ContentType: "image/png", MD5: "x"})
+	_, err := f.m.BeginUpload(t.Context(), owner, media.BeginInput{Size: 0, ContentType: "image/png", MD5: "x"})
 	wantKind(t, err, apperr.KindInvalidInput)
 	_, err = f.m.BeginUpload(t.Context(), media.Uploader{}, media.BeginInput{})
 	wantKind(t, err, apperr.KindInvalidInput)
@@ -414,7 +429,7 @@ func TestBeginUpload_RejectsInvalidDeclarations(t *testing.T) {
 
 func TestProcess_SuccessCreatesTheAssetAndDeletesTheTmpObjectAfterCommit(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	tmp, final, asset := uploadKeys(t, f, res.ID)
 	if got := uploadState(t, f, res.ID); got != "READY" || asset == nil || final == nil {
 		t.Fatalf("state=%s asset=%v final=%v", got, asset, final)
@@ -432,7 +447,7 @@ func TestProcess_SuccessCreatesTheAssetAndDeletesTheTmpObjectAfterCommit(t *test
 
 func TestProcess_IgnoresRowsThatAreNotUploaded(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	if err := f.m.ProcessUpload(t.Context(), res.ID, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +464,7 @@ func TestProcess_PermanentFailureRejectsImmediately(t *testing.T) {
 	f.process = func(context.Context, media.ProcessInput) (media.ProcessResult, error) {
 		return media.ProcessResult{}, media.Permanent(media.RejectUnrecognizedFormat, errors.New("not an image"))
 	}
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	if err := f.m.ProcessUpload(t.Context(), res.ID, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatalf("永久失敗不該要求重試：%v", err)
 	}
@@ -469,7 +484,7 @@ func TestProcess_TransientFailureRetriesThenRejects(t *testing.T) {
 	f.process = func(context.Context, media.ProcessInput) (media.ProcessResult, error) {
 		return media.ProcessResult{}, errors.New("r2 unavailable")
 	}
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	for attempt := 1; attempt < media.ProcessMaxAttempts; attempt++ {
 		if err := f.m.ProcessUpload(t.Context(), res.ID, attempt, media.ProcessMaxAttempts); err == nil {
 			t.Fatalf("第 %d 次暫時失敗應該回錯誤讓 River 重試", attempt)
@@ -489,7 +504,7 @@ func TestProcess_TransientFailureRetriesThenRejects(t *testing.T) {
 
 func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	_, final, _ := uploadKeys(t, f, res.ID)
 	f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
 		out, err := f.copyProcess(ctx, in)
@@ -518,24 +533,11 @@ func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 	}
 }
 
-func TestProcess_SecureAssetRecordsTheKeyID(t *testing.T) {
-	f := setup(t)
-	res := ready(t, f, owner, media.VisibilitySecure)
-	var keyID *string
-	var key string
-	if err := f.d.Pool().QueryRow(t.Context(), `SELECT key_id, object_key FROM media.assets WHERE id = $1`, assetIDOf(t, f, res.ID)).Scan(&keyID, &key); err != nil {
-		t.Fatal(err)
-	}
-	if keyID == nil || *keyID != "k1" || !strings.HasPrefix(key, "secure/") {
-		t.Fatalf("key_id=%v object_key=%s", keyID, key)
-	}
-}
-
 // ==================== Confirm ====================
 
 func TestConfirm_Success(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	a, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -550,7 +552,7 @@ func TestConfirm_Success(t *testing.T) {
 
 func TestConfirm_RollsBackWithTheBusinessRow(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	errBusiness := errors.New("business row failed")
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		if _, err := f.m.Confirm(ctx, owner, res.Token); err != nil {
@@ -574,7 +576,7 @@ func TestConfirm_RollsBackWithTheBusinessRow(t *testing.T) {
 
 func TestConfirm_ReentryReturnsSameAsset(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	first, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -587,7 +589,7 @@ func TestConfirm_ReentryReturnsSameAsset(t *testing.T) {
 
 func TestConfirm_ReentryAfterMarkDeletedIsRejected(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	a, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -601,8 +603,8 @@ func TestConfirm_ReentryAfterMarkDeletedIsRejected(t *testing.T) {
 
 func TestConfirm_OnlyReturnsItsOwnAsset(t *testing.T) {
 	f := setup(t)
-	a := ready(t, f, owner, media.VisibilityPublic)
-	b := ready(t, f, owner, media.VisibilityPublic) // 同一個上傳者、較新的資產
+	a := ready(t, f, owner)
+	b := ready(t, f, owner) // 同一個上傳者、較新的資產
 	gotA, err := confirmInTx(f, owner, a.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -622,7 +624,7 @@ func TestConfirm_OnlyReturnsItsOwnAsset(t *testing.T) {
 
 func TestConfirm_RejectsNonUploader(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	_, err := confirmInTx(f, other, res.Token)
 	wantKind(t, err, apperr.KindNotFound)
 	_, err = confirmInTx(f, media.Uploader{ID: owner.ID, Admin: true}, res.Token)
@@ -634,10 +636,10 @@ func TestConfirm_RejectsNonUploader(t *testing.T) {
 
 func TestConfirm_RejectsStagingNotYetReady(t *testing.T) {
 	f := setup(t)
-	pending := begin(t, f, owner, media.VisibilityPublic)
+	pending := begin(t, f, owner)
 	_, err := confirmInTx(f, owner, pending.Token)
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	up := uploaded(t, f, owner, media.VisibilityPublic)
+	up := uploaded(t, f, owner)
 	_, err = confirmInTx(f, owner, up.Token)
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	if uploadState(t, f, pending.ID) != "PENDING" || uploadState(t, f, up.ID) != "UPLOADED" {
@@ -647,7 +649,7 @@ func TestConfirm_RejectsStagingNotYetReady(t *testing.T) {
 
 func TestConfirm_RejectsExpiredStaging(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	f.clock.Advance(media.UploadTTL)
 	_, err := confirmInTx(f, owner, res.Token)
 	wantKind(t, err, apperr.KindFailedPrecondition)
@@ -666,7 +668,7 @@ func TestConfirm_UnknownTokenNotFound(t *testing.T) {
 
 func TestConfirm_RequiresTheOwnersTransaction(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	_, err := f.m.Confirm(t.Context(), owner, res.Token)
 	if !errors.Is(err, media.ErrNoTransaction) {
 		t.Fatalf("err = %v，預期 ErrNoTransaction", err)
@@ -684,7 +686,7 @@ func TestConfirmAndGC_ConcurrentOnlyOneSucceeds(t *testing.T) {
 	after.Advance(media.UploadTTL + time.Minute) // 已過期
 	confirmer, collector := f.module(before), f.module(after)
 	for i := range 12 {
-		res := ready(t, f, owner, media.VisibilityPublic)
+		res := ready(t, f, owner)
 		_, final, asset := uploadKeys(t, f, res.ID)
 		var wg sync.WaitGroup
 		start := make(chan struct{})
@@ -732,7 +734,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 	confirmer, collector := f.module(before), f.module(after)
 
 	t.Run("GC commits first, Confirm is refused", func(t *testing.T) {
-		res := ready(t, f, owner, media.VisibilityPublic)
+		res := ready(t, f, owner)
 		_, final, asset := uploadKeys(t, f, res.ID)
 		if got, err := collector.CollectGarbage(t.Context()); err != nil || got.Claimed < 1 {
 			t.Fatalf("GC = %+v, %v", got, err)
@@ -748,7 +750,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 	})
 
 	t.Run("GC runs while Confirm holds the row lock, Confirm wins", func(t *testing.T) {
-		res := ready(t, f, owner, media.VisibilityPublic)
+		res := ready(t, f, owner)
 		_, final, asset := uploadKeys(t, f, res.ID)
 		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 			if _, err := confirmer.Confirm(ctx, owner, res.Token); err != nil {
@@ -771,7 +773,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 
 func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 	f := setup(t)
-	res := begin(t, f, owner, media.VisibilityPublic)
+	res := begin(t, f, owner)
 	st, err := f.m.GetUpload(t.Context(), owner, res.Token)
 	if err != nil || st.State != media.UploadPending || st.RejectReason != "" || !st.ExpiresAt.Equal(res.ExpiresAt) {
 		t.Fatalf("PENDING：%+v, %v", st, err)
@@ -801,7 +803,7 @@ func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 
 func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	a, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -822,9 +824,9 @@ func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 
 func TestGC_DeletesExpiredUnconfirmedRowsWithTheirObjects(t *testing.T) {
 	f := setup(t)
-	pending := begin(t, f, owner, media.VisibilityPublic)
+	pending := begin(t, f, owner)
 	clientUpload(t, f, pending) // PENDING：只有 tmp 物件
-	rdy := ready(t, f, owner, media.VisibilityPublic)
+	rdy := ready(t, f, owner)
 	rdyAsset := assetIDOf(t, f, rdy.ID)
 	_, rdyFinal, _ := uploadKeys(t, f, rdy.ID)
 	f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
@@ -834,7 +836,7 @@ func TestGC_DeletesExpiredUnconfirmedRowsWithTheirObjects(t *testing.T) {
 		}
 		return media.ProcessResult{}, media.Permanent(media.RejectChecksumMismatch, errors.New("md5"))
 	}
-	rej := uploaded(t, f, owner, media.VisibilityPublic)
+	rej := uploaded(t, f, owner)
 	if err := f.m.ProcessUpload(t.Context(), rej.ID, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatal(err)
 	}
@@ -869,7 +871,7 @@ func TestGC_DeletesExpiredUnconfirmedRowsWithTheirObjects(t *testing.T) {
 
 func TestGC_KeepsUnexpiredRows(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	f.clock.Advance(media.UploadTTL - time.Second)
 	got, err := f.m.CollectGarbage(t.Context())
 	if err != nil || got.Claimed != 0 {
@@ -882,7 +884,7 @@ func TestGC_KeepsUnexpiredRows(t *testing.T) {
 
 func TestGC_DoesNotTouchUploadsStillBeingProcessed(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	f.clock.Advance(media.UploadTTL + time.Minute)
 	got, err := f.m.CollectGarbage(t.Context())
 	if err != nil || got.Claimed != 0 {
@@ -895,7 +897,7 @@ func TestGC_DoesNotTouchUploadsStillBeingProcessed(t *testing.T) {
 
 func TestGC_ReclaimsStuckUploadedAfterGrace(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	tmp, final, _ := uploadKeys(t, f, res.ID)
 	if err := f.store.Fake.Put(t.Context(), storage.PutInput{Key: *final, Body: bytes.NewReader(payload), Size: int64(len(payload)), ContentType: "image/png"}); err != nil {
 		t.Fatal(err)
@@ -912,7 +914,7 @@ func TestGC_ReclaimsStuckUploadedAfterGrace(t *testing.T) {
 
 func TestGC_KeepsUploadedWithinGrace(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	f.clock.Advance(media.UploadTTL + media.StuckUploadGrace - time.Minute)
 	got, err := f.m.CollectGarbage(t.Context())
 	if err != nil || got.Claimed != 0 || uploadState(t, f, res.ID) != "UPLOADED" {
@@ -925,7 +927,7 @@ func TestProcess_InvalidResultRejectsImmediately(t *testing.T) {
 	f.process = func(context.Context, media.ProcessInput) (media.ProcessResult, error) {
 		return media.ProcessResult{}, nil
 	}
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	if err := f.m.ProcessUpload(t.Context(), res.ID, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatal(err)
 	}
@@ -943,7 +945,7 @@ func TestProcess_ShutdownOnLastAttemptDoesNotReject(t *testing.T) {
 		cancel()
 		return media.ProcessResult{}, ctx.Err()
 	}
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	if err := f.m.ProcessUpload(ctx, res.ID, media.ProcessMaxAttempts, media.ProcessMaxAttempts); err == nil {
 		t.Fatal("關機中斷應該回錯誤讓 River 重試")
 	}
@@ -956,7 +958,7 @@ func TestProcess_ShutdownOnLastAttemptDoesNotReject(t *testing.T) {
 
 func confirmed(t *testing.T, f *fixture) (media.ConfirmedAsset, string) {
 	t.Helper()
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	a, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
@@ -972,7 +974,7 @@ func markDeletedInTx(f *fixture, ids ...uuid.UUID) error {
 func TestMarkDeleted_MarksOnlyConfirmedAssetsAndEnqueuesTheDeleteJob(t *testing.T) {
 	f := setup(t)
 	a, _ := confirmed(t, f)
-	staged := ready(t, f, owner, media.VisibilityPublic)
+	staged := ready(t, f, owner)
 	stagedAsset := assetIDOf(t, f, staged.ID)
 	if err := markDeletedInTx(f, a.ID, a.ID, stagedAsset, uuid.New()); err != nil { // 重複、未確認、不存在的 ID 都忽略
 		t.Fatal(err)
@@ -1060,7 +1062,7 @@ func TestDeleteJob_StorageFailureKeepsRowRetryable(t *testing.T) {
 
 func TestGC_StorageFailureKeepsRowRetryableAndNeverPointsAtAMissingObject(t *testing.T) {
 	f := setup(t)
-	res := ready(t, f, owner, media.VisibilityPublic)
+	res := ready(t, f, owner)
 	assetID := assetIDOf(t, f, res.ID)
 	_, final, _ := uploadKeys(t, f, res.ID)
 	f.store.setDeleteFailure(*final, errors.New("r2 unavailable"))
@@ -1119,7 +1121,7 @@ func TestStorageIsNeverCalledInsideATransaction(t *testing.T) {
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	begin(t, f, owner, media.VisibilityPublic)
+	begin(t, f, owner)
 	f.clock.Advance(media.UploadTTL)
 	if _, err := f.m.CollectGarbage(t.Context()); err != nil {
 		t.Fatal(err)
@@ -1131,10 +1133,10 @@ func TestStorageIsNeverCalledInsideATransaction(t *testing.T) {
 
 func TestStorageEntryPointsRefuseAContextWithATransaction(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	calls := map[string]func(ctx context.Context) error{
 		"BeginUpload": func(ctx context.Context) error {
-			_, err := f.m.BeginUpload(ctx, owner, media.BeginInput{Visibility: media.VisibilityPublic, Size: 1, ContentType: "image/png", MD5: base64.StdEncoding.EncodeToString(make([]byte, 16))})
+			_, err := f.m.BeginUpload(ctx, owner, media.BeginInput{Size: 1, ContentType: "image/png", MD5: base64.StdEncoding.EncodeToString(make([]byte, 16))})
 			return err
 		},
 		"ProcessUpload":  func(ctx context.Context) error { return f.m.ProcessUpload(ctx, res.ID, 1, media.ProcessMaxAttempts) },
@@ -1159,7 +1161,7 @@ func TestProcess_LostToGCLeavesNoOrphanObject(t *testing.T) {
 	for _, state := range []string{"DELETING", "DELETED"} {
 		t.Run(state, func(t *testing.T) {
 			f := setup(t)
-			res := uploaded(t, f, owner, media.VisibilityPublic)
+			res := uploaded(t, f, owner)
 			_, final, _ := uploadKeys(t, f, res.ID)
 			f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
 				out, err := f.copyProcess(ctx, in)
@@ -1186,7 +1188,7 @@ func TestProcess_LostToGCLeavesNoOrphanObject(t *testing.T) {
 
 func TestProcess_LostDeleteFailureOutsideUploadedRetries(t *testing.T) {
 	f := setup(t)
-	res := uploaded(t, f, owner, media.VisibilityPublic)
+	res := uploaded(t, f, owner)
 	_, final, _ := uploadKeys(t, f, res.ID)
 	f.store.setDeleteFailure(*final, errors.New("boom"))
 	f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {

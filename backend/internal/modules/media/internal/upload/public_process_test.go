@@ -137,14 +137,11 @@ func TestPublicProcess_MissingTmpObjectIsPermanent(t *testing.T) {
 	wantPermanent(t, err, model.RejectSizeMismatch)
 }
 
-func TestNewProcessor_SecureWithoutImplementationIsTransient(t *testing.T) {
+func TestNewProcessor_SecureRowIsPermanentFailure(t *testing.T) {
 	in := input(tinyGIF)
 	in.Visibility = model.VisibilitySecure
-	_, err := upload.NewProcessor(storage.NewFake(), nil)(context.Background(), in)
-	var p *model.PermanentError
-	if err == nil || errors.As(err, &p) {
-		t.Fatalf("err = %v，預期暫時失敗", err)
-	}
+	_, err := upload.NewProcessor(storage.NewFake())(context.Background(), in)
+	wantPermanent(t, err, model.RejectProcessingFailed)
 }
 
 type countingStore struct {

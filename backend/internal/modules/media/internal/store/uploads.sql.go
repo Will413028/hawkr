@@ -115,6 +115,44 @@ func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (M
 	return i, err
 }
 
+const insertSecureUpload = `-- name: InsertSecureUpload :exec
+INSERT INTO media.staged_uploads (
+    id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type,
+    state, final_key, expires_at, created_at, updated_at)
+VALUES (
+    $1, $2, $3, $4, 'SECURE',
+    $5, $6,
+    'UPLOADED', $7, $8, $9, $9)
+`
+
+type InsertSecureUploadParams struct {
+	ID                  uuid.UUID
+	TokenHash           []byte
+	UploaderID          int64
+	UploaderAdmin       bool
+	DeclaredSize        int64
+	DeclaredContentType string
+	FinalKey            *string
+	ExpiresAt           time.Time
+	Now                 time.Time
+}
+
+// 機敏串流上傳：以 UPLOADED 建列（沒有預簽，tmp_key 與 declared_md5 是 NULL），正式 key 同時記下。
+func (q *Queries) InsertSecureUpload(ctx context.Context, arg InsertSecureUploadParams) error {
+	_, err := q.db.Exec(ctx, insertSecureUpload,
+		arg.ID,
+		arg.TokenHash,
+		arg.UploaderID,
+		arg.UploaderAdmin,
+		arg.DeclaredSize,
+		arg.DeclaredContentType,
+		arg.FinalKey,
+		arg.ExpiresAt,
+		arg.Now,
+	)
+	return err
+}
+
 const insertUpload = `-- name: InsertUpload :exec
 INSERT INTO media.staged_uploads (
     id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5,
@@ -133,8 +171,8 @@ type InsertUploadParams struct {
 	Visibility          string
 	DeclaredSize        int64
 	DeclaredContentType string
-	DeclaredMd5         string
-	TmpKey              string
+	DeclaredMd5         *string
+	TmpKey              *string
 	ExpiresAt           time.Time
 	Now                 time.Time
 }
@@ -170,7 +208,7 @@ type ListDeletingUploadsParams struct {
 
 type ListDeletingUploadsRow struct {
 	ID       uuid.UUID
-	TmpKey   string
+	TmpKey   *string
 	FinalKey *string
 	AssetID  *uuid.UUID
 }

@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"embed"
+	"io"
 	"io/fs"
 	"log/slog"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/reclaim"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/upload"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -38,8 +40,12 @@ type (
 	UploadState = model.UploadState
 	// RejectReason 是暫存上傳被拒絕的原因代碼。
 	RejectReason = model.RejectReason
-	// BeginInput 是 BeginUpload 的宣告。
+	// BeginInput 是 BeginUpload 的宣告（只給 public；機敏檔案走 UploadSecure）。
 	BeginInput = upload.BeginInput
+	// SecureUploadResult 是 UploadSecure 的結果：token、辨認出的型別、明文大小與期限；資產 ID 不回給上傳者。
+	SecureUploadResult = upload.SecureResult
+	// Keyring 是機敏資產的 KEK 金鑰環，由組裝點以 ParseKeyring 建立。
+	Keyring = secure.Keyring
 	// BeginResult 是 BeginUpload 的結果：預簽 PUT 與只出現一次的 token。
 	BeginResult = upload.BeginResult
 	// UploadStatus 是 GetUpload 的結果。
@@ -85,7 +91,16 @@ const (
 	ProcessQueueWorkers = model.ProcessQueueWorkers
 	// ProcessMaxAttempts 是處理 job 的重試上限。
 	ProcessMaxAttempts = upload.MaxAttempts
+
+	// MaxSecureUploadSize 是單次機敏上傳的明文大小上限；SecureUploadConcurrency 與 SecureUploadTimeout 是 UploadSecure 的資源界限。
+	MaxSecureUploadSize     = model.MaxSecureUploadSize
+	SecureUploadConcurrency = model.SecureUploadConcurrency
+	SecureUploadTimeout     = model.SecureUploadTimeout
 )
+
+// ParseKeyring 讀出 KEK 金鑰環：單一字串、逗號分隔的 `<kek_id>:<標準 base64 的 32 位元組>`，第一把用來寫入、全部都能讀。
+// 空字串、格式錯、長度不對或 id 重複回錯誤；組裝點（環境變數 MEDIA_KEKS，B1-5 接線）遇到錯誤要讓啟動失敗。
+func ParseKeyring(s string) (*Keyring, error) { return secure.ParseKeyring(s) }
 
 // Queues 回傳 worker 角色必須設定的 River queue 與併發上限，組裝點以它建 queue 設定。
 func Queues() map[string]int { return map[string]int{ProcessQueue: ProcessQueueWorkers} }
@@ -93,6 +108,8 @@ func Queues() map[string]int { return map[string]int{ProcessQueue: ProcessQueueW
 var (
 	// ErrInTransaction：會碰物件儲存的呼叫，ctx 卻帶著 DB transaction。
 	ErrInTransaction = model.ErrInTransaction
+	// ErrNoKeyring：模組沒有 KEK 金鑰環，UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 拒絕執行且不寫任何物件。
+	ErrNoKeyring = model.ErrNoKeyring
 	// ErrNoTransaction：Confirm、MarkDeleted 必須在擁有者的 transaction 內呼叫。
 	ErrNoTransaction = model.ErrNoTransaction
 )
@@ -106,13 +123,15 @@ type Deps struct {
 	Jobs jobs.Enqueuer
 	// Store 是物件儲存。
 	Store ObjectStore
-	// Process 是處理 job 的內容；沒給時 public 用內建的圖片處理（辨認、剝除 metadata），secure 尚未接線時回暫時失敗。
+	// Process 是處理 job 的內容；沒給時 public 用內建的圖片處理（辨認、剝除 metadata），遇到 SECURE 列是永久失敗（機敏上傳不經處理 job）。
 	Process ProcessFunc
 	// NewID 產生資產與暫存列的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
 	Logger *slog.Logger
+	// Keyring 是 KEK 金鑰環；nil 時 UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs 回 ErrNoKeyring、不寫任何物件。
+	Keyring *Keyring
 }
 
 // Module 是 media 的暫存上傳與資產生命週期。
@@ -127,7 +146,7 @@ func New(d Deps) *Module {
 		d.Logger = slog.Default()
 	}
 	if d.Process == nil && d.Store != nil {
-		d.Process = upload.NewProcessor(d.Store, nil)
+		d.Process = upload.NewProcessor(d.Store)
 	}
 	return &Module{
 		upload: upload.New(upload.Deps{
@@ -141,6 +160,27 @@ func New(d Deps) *Module {
 func (m *Module) BeginUpload(ctx context.Context, uploader Uploader, in BeginInput) (BeginResult, error) {
 	return m.upload.Begin(ctx, uploader, in)
 }
+
+// UploadSecure 在請求內辨認 PDF 或圖片、邊讀邊加密（STREAM 分塊 AEAD、每檔隨機 DEK 以 KEK 包裹）寫入 secure/，成功後建資產列與 READY 的暫存列並回 token。
+// 大小與型別都不收宣告：超過 MaxSecureUploadSize、空內容與辨認不出的型別回 InvalidInput 且不寫任何物件；同時進行超過
+// SecureUploadConcurrency 立即回 ResourceExhausted。沒有 keyring 回 ErrNoKeyring。不得在 transaction 內呼叫。
+func (m *Module) UploadSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
+	return m.upload.UploadSecure(ctx, uploader, body)
+}
+
+// ReadSecure 讀機敏資產的明文（只讀 SECURE 且 ACTIVE；公開資產回 ErrNotSecure，其餘 NotFound）；授權由擁有者先做。
+// 一段的 tag 驗過才交出那一段的明文，呼叫方負責關閉。不得在 transaction 內呼叫。
+func (m *Module) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+	return m.upload.ReadSecure(ctx, assetID)
+}
+
+// ReadStagedSecure 是確認前的預覽：只有上傳者本人讀得到自己 READY、未過期的機敏暫存。不得在 transaction 內呼叫。
+func (m *Module) ReadStagedSecure(ctx context.Context, uploader Uploader, token string) (io.ReadCloser, error) {
+	return m.upload.ReadStagedSecure(ctx, uploader, token)
+}
+
+// RewrapDEKs 把不是 primary KEK 包裹的機敏資產的 DEK 重新包裹，回傳更新筆數；可重跑，不碰物件儲存。
+func (m *Module) RewrapDEKs(ctx context.Context) (int, error) { return m.upload.RewrapDEKs(ctx) }
 
 // CompleteUpload 驗上傳者、標記已上傳並在同一個 transaction 排處理 job；重入成功。
 func (m *Module) CompleteUpload(ctx context.Context, uploader Uploader, token string) error {

@@ -94,8 +94,8 @@
    "id": "begin-upload-size-cap-removed",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
-   "old": "if in.Size > model.MaxUploadSize(in.Visibility) {",
-   "new": "if false && in.Size > model.MaxUploadSize(in.Visibility) {",
+   "old": "if in.Size > model.MaxPublicUploadSize {",
+   "new": "if false && in.Size > model.MaxPublicUploadSize {",
    "test": "internal/modules/media/internal/upload ^TestValidateRejectsSizeAboveModuleLimit$",
    "why": "BeginUpload accepts a declared size above the module limit"
   },

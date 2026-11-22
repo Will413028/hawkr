@@ -17,7 +17,8 @@ type MediaAsset struct {
 	ContentType string
 	SizeBytes   int64
 	State       string
-	KeyID       *string
+	KekID       *string
+	WrappedDek  []byte
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -30,10 +31,10 @@ type MediaStagedUpload struct {
 	Visibility          string
 	DeclaredSize        int64
 	DeclaredContentType string
-	DeclaredMd5         string
+	DeclaredMd5         *string
 	State               string
 	RejectReason        *string
-	TmpKey              string
+	TmpKey              *string
 	FinalKey            *string
 	AssetID             *uuid.UUID
 	ExpiresAt           time.Time

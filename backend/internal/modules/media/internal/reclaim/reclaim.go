@@ -191,7 +191,10 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 }
 
 func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsRow) error {
-	keys := []string{r.TmpKey}
+	var keys []string
+	if r.TmpKey != nil {
+		keys = append(keys, *r.TmpKey)
+	}
 	if r.FinalKey != nil {
 		keys = append(keys, *r.FinalKey)
 	}

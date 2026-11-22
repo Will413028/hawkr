@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `media`（`db/schema.sql`）：`assets`（資產，不含業務類型）、`staged_uploads`（暫存上傳，token 只存雜湊）；登記在 `cmd/hawkr/modules.go` 的 `modules()`。舊的 `Media` interface 仍由 Java media-service 實作，資料在 Java（遷移期間並存）。子領域：`internal/upload`（Begin、Complete、Confirm、Get、處理 job）、`internal/reclaim`（MarkDeleted、GC、實體刪除）。讀取模型：無。
+schema `media`（`db/schema.sql`）：`assets`（資產，不含業務類型）、`staged_uploads`（暫存上傳，token 只存雜湊）；登記在 `cmd/hawkr/modules.go` 的 `modules()`。舊的 `Media` interface 仍由 Java media-service 實作，資料在 Java（遷移期間並存）。子領域：`internal/upload`（Begin、Complete、Confirm、Get、處理 job，以及機敏的 UploadSecure、ReadSecure、ReadStagedSecure、RewrapDEKs）、`internal/secure`（STREAM 分塊 AEAD 與 DEK 包裹，只用標準庫）、`internal/reclaim`（MarkDeleted、GC、實體刪除）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -30,7 +30,7 @@ schema `media`（`db/schema.sql`）：`assets`（資產，不含業務類型）�
 - 重試用盡或 job 遺失由保底掃描補排；落後超過 24 小時記 error log。守門：`TestSweepRecoversALostEnqueueWithRealRiver`（content）。規格：§5。
 - `CheckFinalizeArgs` 的封閉集合等於 `ref_type.go` 的常數。守門：`TestRefTypesMatchTheGeneratedConstants`。規格：§6。
 - 確認前的公開性：`READY` 的公開物件已在 `public/<uuid v4>`，image-gateway 會提供它；網址不可猜、只回給上傳者本人，所以確認前只有上傳者讀得到。Confirm 只接受 `READY`、未過期、上傳者相符的暫存，重入只回這筆暫存記的資產。守門：`TestConfirm_RejectsNonUploader`、`TestConfirm_ReentryReturnsSameAsset`、`TestConfirm_OnlyReturnsItsOwnAsset`。規格見遷移計畫。
-- GC 刪除範圍：只標記過期且未確認（`PENDING`、`READY`、`REJECTED`，以及過期超過 `model.StuckUploadGrace` 仍停在 `UPLOADED` 的列）的暫存列，連同它的 `tmp/` 物件、暫存列記的正式 key 與資產列一起刪；刪不存在的物件視為成功；已確認的資產只由擁有者的 `MarkDeleted` 刪除；每列先標 `DELETING` 並提交、transaction 外刪物件、再標 `DELETED`，刪失敗留在 `DELETING` 重試。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`、`TestDeleteJob_StorageFailureKeepsRowRetryable`、`TestGC_ReclaimsStuckUploadedAfterGrace`、`TestGC_KeepsUploadedWithinGrace`。規格：同上。
+- GC 刪除範圍：只標記過期且未確認（`PENDING`、`READY`、`REJECTED`，以及過期超過 `model.StuckUploadGrace` 仍停在 `UPLOADED` 的列）的暫存列，連同它的 `tmp/` 物件（機敏列沒有，`tmp_key` 是 NULL 就不呼叫儲存）、暫存列記的正式 key 與資產列一起刪；刪不存在的物件視為成功；已確認的資產只由擁有者的 `MarkDeleted` 刪除；每列先標 `DELETING` 並提交、transaction 外刪物件、再標 `DELETED`，刪失敗留在 `DELETING` 重試。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`、`TestDeleteJob_StorageFailureKeepsRowRetryable`、`TestGC_ReclaimsStuckUploadedAfterGrace`、`TestGC_KeepsUploadedWithinGrace`。規格：同上。
 
 ## 不負責
 

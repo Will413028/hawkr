@@ -21,8 +21,9 @@ CREATE TABLE media.assets (
     content_type TEXT        NOT NULL,
     size_bytes   BIGINT      NOT NULL,
     state        TEXT        NOT NULL,
-    -- 機敏資產加密用的主密鑰代號；公開資產沒有。
-    key_id       TEXT,
+    -- 機敏資產的信封加密：包裹 DEK 的 KEK 代號與 wrapped DEK（nonce＋密文＋tag，AAD 是資產 ID 加 kek_id）；公開資產沒有。
+    kek_id       TEXT,
+    wrapped_dek  BYTEA,
     created_at   TIMESTAMPTZ NOT NULL,
     updated_at   TIMESTAMPTZ NOT NULL,
     CONSTRAINT assets_object_key_key UNIQUE (object_key),
@@ -30,7 +31,8 @@ CREATE TABLE media.assets (
     CONSTRAINT assets_state_check CHECK (state IN ('STAGED', 'ACTIVE', 'DELETING', 'DELETED')),
     CONSTRAINT assets_content_type_check CHECK (content_type <> ''),
     CONSTRAINT assets_size_check CHECK (size_bytes >= 0),
-    CONSTRAINT assets_key_id_check CHECK ((visibility = 'SECURE') = (key_id IS NOT NULL)),
+    CONSTRAINT assets_kek_id_check CHECK ((visibility = 'SECURE') = (kek_id IS NOT NULL)),
+    CONSTRAINT assets_wrapped_dek_check CHECK ((visibility = 'SECURE') = (wrapped_dek IS NOT NULL)),
     CONSTRAINT assets_object_key_prefix_check CHECK (
         (visibility = 'PUBLIC' AND object_key LIKE 'public/%') OR (visibility = 'SECURE' AND object_key LIKE 'secure/%')
     )
@@ -40,7 +42,7 @@ CREATE INDEX assets_deleting ON media.assets (id) WHERE state = 'DELETING';
 
 -- 暫存上傳：token 與暫存列一對一（B1-D2），只存 token 的雜湊，不存明文。
 -- 狀態機（每個轉換都是條件式 UPDATE，WHERE state=<預期>）：
---   PENDING → UPLOADED → READY | REJECTED → CONFIRMED
+--   PENDING → UPLOADED → READY | REJECTED → CONFIRMED（secure 的上傳沒有 PENDING：以 UPLOADED 建列，見 internal/upload/secure_upload.go）
 --   PENDING、READY、REJECTED 且過期，或 UPLOADED 且過期超過寬限（處理 job 卡住）→ DELETING → DELETED（GC）
 -- final_key 在 PENDING → UPLOADED 時產生並記下，處理 job 重試寫同一個 key；asset_id 在 READY 時才有（READY 之前資產列不存在）。
 CREATE TABLE media.staged_uploads (
@@ -51,11 +53,12 @@ CREATE TABLE media.staged_uploads (
     visibility            TEXT        NOT NULL,
     declared_size         BIGINT      NOT NULL,
     declared_content_type TEXT        NOT NULL,
-    -- 宣告的內容 MD5，標準 base64（預簽 PUT 的 Content-MD5）。
-    declared_md5          TEXT        NOT NULL,
+    -- 宣告的內容 MD5，標準 base64（預簽 PUT 的 Content-MD5）；只有 public 走預簽，secure 是 NULL。
+    declared_md5          TEXT,
     state                 TEXT        NOT NULL,
     reject_reason         TEXT,
-    tmp_key               TEXT        NOT NULL,
+    -- 預簽直傳的暫存 key；secure 經單體串流上傳，沒有暫存物件，是 NULL。
+    tmp_key               TEXT,
     final_key             TEXT,
     asset_id              UUID,
     expires_at            TIMESTAMPTZ NOT NULL,
@@ -70,7 +73,9 @@ CREATE TABLE media.staged_uploads (
     CONSTRAINT staged_uploads_visibility_check CHECK (visibility IN ('PUBLIC', 'SECURE')),
     CONSTRAINT staged_uploads_declared_size_check CHECK (declared_size > 0),
     CONSTRAINT staged_uploads_declared_content_type_check CHECK (declared_content_type <> ''),
-    CONSTRAINT staged_uploads_declared_md5_check CHECK (declared_md5 <> ''),
+    CONSTRAINT staged_uploads_declared_md5_check CHECK (declared_md5 IS NULL OR declared_md5 <> ''),
+    CONSTRAINT staged_uploads_tmp_key_check CHECK ((visibility = 'PUBLIC') = (tmp_key IS NOT NULL)),
+    CONSTRAINT staged_uploads_md5_visibility_check CHECK ((visibility = 'PUBLIC') = (declared_md5 IS NOT NULL)),
     CONSTRAINT staged_uploads_state_check CHECK (
         state IN ('PENDING', 'UPLOADED', 'READY', 'REJECTED', 'CONFIRMED', 'DELETING', 'DELETED')
     ),

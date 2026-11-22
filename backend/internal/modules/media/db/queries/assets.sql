@@ -1,8 +1,8 @@
 -- name: InsertAsset :exec
-INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, key_id, created_at, updated_at)
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, created_at, updated_at)
 VALUES (
     sqlc.arg(id), sqlc.arg(visibility), sqlc.arg(object_key), sqlc.arg(content_type), sqlc.arg(size_bytes),
-    'STAGED', sqlc.narg(key_id), sqlc.arg(now), sqlc.arg(now));
+    'STAGED', sqlc.narg(kek_id), sqlc.narg(wrapped_dek), sqlc.arg(now), sqlc.arg(now));
 
 -- name: GetAsset :one
 SELECT * FROM media.assets WHERE id = sqlc.arg(id);
@@ -32,3 +32,15 @@ LIMIT sqlc.arg(max_rows);
 -- name: MarkAssetDeleted :execrows
 UPDATE media.assets SET state = 'DELETED', updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND state = 'DELETING';
+
+-- name: ListAssetsToRewrap :many
+-- 換 KEK 後重新包裹用：keyset 分頁取 kek_id 不是 primary 的機敏資產（DELETED 除外，物件已刪、不需要再讀）。
+SELECT id, kek_id, wrapped_dek FROM media.assets
+WHERE visibility = 'SECURE' AND state <> 'DELETED' AND kek_id <> sqlc.arg(primary_kek_id) AND id > sqlc.arg(after_id)
+ORDER BY id
+LIMIT sqlc.arg(max_rows);
+
+-- name: RewrapAsset :execrows
+-- 只在列上的 kek_id 仍是取出時的舊值才更新：兩個 RewrapDEKs 同時跑、或擁有者並行讀取時只有一方生效，輸的視為已處理。
+UPDATE media.assets SET kek_id = sqlc.arg(new_kek_id), wrapped_dek = sqlc.arg(new_wrapped_dek), updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND kek_id = sqlc.arg(old_kek_id);

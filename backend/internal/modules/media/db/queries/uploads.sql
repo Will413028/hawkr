@@ -7,6 +7,16 @@ VALUES (
     sqlc.arg(declared_size), sqlc.arg(declared_content_type), sqlc.arg(declared_md5),
     'PENDING', sqlc.arg(tmp_key), sqlc.arg(expires_at), sqlc.arg(now), sqlc.arg(now));
 
+-- name: InsertSecureUpload :exec
+-- 機敏串流上傳：以 UPLOADED 建列（沒有預簽，tmp_key 與 declared_md5 是 NULL），正式 key 同時記下。
+INSERT INTO media.staged_uploads (
+    id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type,
+    state, final_key, expires_at, created_at, updated_at)
+VALUES (
+    sqlc.arg(id), sqlc.arg(token_hash), sqlc.arg(uploader_id), sqlc.arg(uploader_admin), 'SECURE',
+    sqlc.arg(declared_size), sqlc.arg(declared_content_type),
+    'UPLOADED', sqlc.arg(final_key), sqlc.arg(expires_at), sqlc.arg(now), sqlc.arg(now));
+
 -- name: GetUploadByTokenHash :one
 SELECT * FROM media.staged_uploads WHERE token_hash = sqlc.arg(token_hash);
 
