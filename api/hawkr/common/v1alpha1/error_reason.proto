@@ -89,4 +89,10 @@ enum ErrorReason {
   // 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
   // ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
   RECEIVER_DELETED = 22;
+  // 同店已有同名標籤（搭配 already_exists）：標籤名稱在一家店內不能重複。client 顯示 LocalizedMessage，留在輸入框讓店家改名。
+  // CrmAppService.CreateTag、UpdateTag。
+  CRM_TAG_NAME_TAKEN = 23;
+  // 標籤數量已達上限（搭配 failed_precondition）：每家店最多 200 個標籤、每位客戶最多 20 個標籤。client 顯示 LocalizedMessage，不再提供新增入口。
+  // CrmAppService.CreateTag、AddCustomerTags。
+  CRM_TAG_LIMIT = 24;
 }

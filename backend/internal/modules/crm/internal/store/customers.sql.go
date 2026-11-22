@@ -493,11 +493,12 @@ func (q *Queries) ListVIPStores(ctx context.Context, arg ListVIPStoresParams) ([
 	return items, nil
 }
 
-const setCustomerType = `-- name: SetCustomerType :execrows
+const setCustomerType = `-- name: SetCustomerType :one
 UPDATE crm.customers AS c SET customer_type = $1, updated_at = $2
 WHERE c.store_id = $3 AND c.buyer_id = $4
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
   AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+RETURNING c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 `
 
 type SetCustomerTypeParams struct {
@@ -507,16 +508,31 @@ type SetCustomerTypeParams struct {
 	BuyerID      int64
 }
 
-// inactive 的買家或店家 0 列（呼叫者回 NotFound）。
-func (q *Queries) SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setCustomerType,
+type SetCustomerTypeRow struct {
+	StoreID      int64
+	BuyerID      int64
+	CustomerType string
+	TotalSpent   int64
+	OrderCount   int32
+	FirstOrderAt time.Time
+}
+
+// inactive 的買家或店家沒有列（ErrNoRows，呼叫者回 NotFound）；回傳寫入當下的列。
+func (q *Queries) SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) (SetCustomerTypeRow, error) {
+	row := q.db.QueryRow(ctx, setCustomerType,
 		arg.CustomerType,
 		arg.Now,
 		arg.StoreID,
 		arg.BuyerID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var i SetCustomerTypeRow
+	err := row.Scan(
+		&i.StoreID,
+		&i.BuyerID,
+		&i.CustomerType,
+		&i.TotalSpent,
+		&i.OrderCount,
+		&i.FirstOrderAt,
+	)
+	return i, err
 }

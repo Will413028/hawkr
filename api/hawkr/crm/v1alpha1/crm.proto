@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+// crm 模組給店家的 API：店家的客戶（分類、消費統計）與標籤。CRM 是店家對買家的客戶管理，資源只屬於店家，所以每個方法都帶 store_id（資源的上層），
+// 呼叫者必須是這家店的店主並具備賣家能力 CAP_MARKETING；不是自己的店回 permission_denied，沒有店或帳號不是賣家回 not_found，停權回 permission_denied 與 SELLER_SUSPENDED。
+//
+// 客戶資料永遠不含電話、Email、地址：暱稱與頭像在讀取時由 buyer 補（買家已刪除時只有 deleted）。沒有關鍵字搜尋，客戶用分類、單一標籤與排序找；
+// 店家看某位買家的訂單用店家訂單列表加買家篩選，不經這個 service。
+//
+// ID 是不透明的字串（買家與店家是過渡期的十進位整數字串，標籤是 UUID），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。
+package hawkr.crm.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+
+// CrmAppService 是店家的客戶與標籤。
+service CrmAppService {
+  // ListCustomers 列出店家的客戶。type 只列這個分類，tag_id 只列貼了這個標籤的客戶（單一標籤），都不設是全部；明確送出 type 卻是 CUSTOMER_TYPE_UNSPECIFIED 回 invalid_argument。
+  // sort 預設（CUSTOMER_SORT_UNSPECIFIED）是 CUSTOMER_SORT_FIRST_ORDER_TIME，descending 為真時大的在前（預設小的在前）；同值以買家 ID 排序，分頁穩定。
+  // 不回總數，結束只看 next_page_token；page_token 只能用在同一家店與同一組篩選與排序。tag_id 不是這家店的標籤時結果是空的一頁。
+  rpc ListCustomers(ListCustomersRequest) returns (ListCustomersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetCustomer 讀一位客戶與他的標籤。客戶只在首筆完成訂單時建立；這家店沒有這位客戶（包含買家已刪除）回 not_found。
+  rpc GetCustomer(GetCustomerRequest) returns (GetCustomerResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateCustomer 修改客戶的分類（update_mask 只能列 type；值 NORMAL 或 VIP，UNSPECIFIED 回 invalid_argument）。update_mask 沒有列 type 回 invalid_argument。
+  // 這家店沒有這位客戶回 not_found。
+  rpc UpdateCustomer(UpdateCustomerRequest) returns (UpdateCustomerResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // CreateTag 建立標籤，名稱去掉前後空白後 1 到 50 個字元。同店已有同名標籤回 already_exists 與 CRM_TAG_NAME_TAKEN；每家店最多 200 個標籤，超過回 failed_precondition 與 CRM_TAG_LIMIT。
+  rpc CreateTag(CreateTagRequest) returns (CreateTagResponse);
+
+  // ListTags 列出店家全部的標籤，名稱升序，不分頁（每家店最多 200 個）。
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateTag 改標籤名稱（update_mask 只能列 name，沒有列 name 回 invalid_argument）。撞名回 already_exists 與 CRM_TAG_NAME_TAKEN；標籤不存在回 not_found。
+  rpc UpdateTag(UpdateTagRequest) returns (UpdateTagResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeleteTag 刪標籤，它在客戶身上的關聯一併刪除。標籤不存在回 not_found。
+  rpc DeleteTag(DeleteTagRequest) returns (DeleteTagResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // AddCustomerTags 替客戶貼上一批標籤，名稱不存在的先建立，已貼的不重複；一次 1 到 20 個名稱。整批原子：任何一步失敗都沒有寫入。每位客戶最多 20 個標籤、每家店最多 200 個標籤，
+  // 超過回 failed_precondition 與 CRM_TAG_LIMIT。這家店沒有這位客戶回 not_found。回傳貼完之後的客戶。
+  rpc AddCustomerTags(AddCustomerTagsRequest) returns (AddCustomerTagsResponse);
+
+  // RemoveCustomerTag 移除客戶身上的一個標籤，客戶本來就沒有這個標籤時也成功。這家店沒有這位客戶回 not_found。回傳移除之後的客戶。
+  rpc RemoveCustomerTag(RemoveCustomerTagRequest) returns (RemoveCustomerTagResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// CustomerType 是店家對買家的分類。
+enum CustomerType {
+  CUSTOMER_TYPE_UNSPECIFIED = 0;
+  CUSTOMER_TYPE_NORMAL = 1;
+  CUSTOMER_TYPE_VIP = 2;
+}
+
+// CustomerSort 是客戶列表的排序欄位。
+enum CustomerSort {
+  // 同 CUSTOMER_SORT_FIRST_ORDER_TIME；client 先把 UNSPECIFIED 換成 FIRST_ORDER_TIME 再查文案目錄的標籤，目錄不為它另設標籤。
+  CUSTOMER_SORT_UNSPECIFIED = 0;
+  // 首筆完成訂單的時間。
+  CUSTOMER_SORT_FIRST_ORDER_TIME = 1;
+  CUSTOMER_SORT_TOTAL_SPENT = 2;
+  CUSTOMER_SORT_ORDER_COUNT = 3;
+}
+
+// Tag 是店家的標籤。
+message Tag {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 名稱，去掉前後空白後 1 到 50 個字元；UpdateTag 唯一可以修改的欄位。
+  string name = 2;
+}
+
+// CustomerDisplay 是客戶的顯示資料，在讀取時由 buyer 補；不含任何聯絡方式。
+message CustomerDisplay {
+  // 買家的暱稱；沒有設定或買家已刪除時不設。
+  optional string nickname = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家的頭像；沒有設定或買家已刪除時不設。
+  hawkr.common.v1alpha1.Image avatar = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家帳號已刪除。
+  bool deleted = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Customer 是店家的一位客戶。只有這些欄位：沒有電話、Email、地址。
+message Customer {
+  string buyer_id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  CustomerDisplay display = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 分類；UpdateCustomer 唯一可以修改的欄位。
+  CustomerType type = 3;
+  // 完成訂單的累計實付淨額，新台幣元（退款已扣，不為負）。
+  int64 total_spent = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 完成的訂單數；退款不扣。
+  int32 order_count = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 成為客戶的時間（首筆完成訂單）。
+  google.protobuf.Timestamp first_order_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 貼在客戶身上的標籤，名稱升序。
+  repeated Tag tags = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListCustomersRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  optional CustomerType type = 2;
+  // 只列貼了這個標籤的客戶；標籤的 ID。
+  optional string tag_id = 3;
+  CustomerSort sort = 4;
+  // 為真時大的在前。
+  bool descending = 5;
+  // 預設 20，上限 100。
+  int32 page_size = 6;
+  string page_token = 7;
+}
+
+message ListCustomersResponse {
+  repeated Customer customers = 1;
+  string next_page_token = 2;
+}
+
+message GetCustomerRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string buyer_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetCustomerResponse {
+  Customer customer = 1;
+}
+
+message UpdateCustomerRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 只有 buyer_id 與 type 有作用。
+  Customer customer = 2 [(google.api.field_behavior) = REQUIRED];
+  // 只能列 type。
+  google.protobuf.FieldMask update_mask = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateCustomerResponse {
+  Customer customer = 1;
+}
+
+message CreateTagRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateTagResponse {
+  Tag tag = 1;
+}
+
+message ListTagsRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListTagsResponse {
+  repeated Tag tags = 1;
+}
+
+message UpdateTagRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 只有 id 與 name 有作用。
+  Tag tag = 2 [(google.api.field_behavior) = REQUIRED];
+  // 只能列 name。
+  google.protobuf.FieldMask update_mask = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateTagResponse {
+  Tag tag = 1;
+}
+
+message DeleteTagRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string tag_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DeleteTagResponse {}
+
+message AddCustomerTagsRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string buyer_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 標籤名稱，1 到 20 個。
+  repeated string tag_names = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message AddCustomerTagsResponse {
+  Customer customer = 1;
+}
+
+message RemoveCustomerTagRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string buyer_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string tag_id = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RemoveCustomerTagResponse {
+  Customer customer = 1;
+}

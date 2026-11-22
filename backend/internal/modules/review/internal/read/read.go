@@ -247,7 +247,7 @@ func (s *Service) ReviewStore(ctx context.Context, id uuid.UUID) (model.ReviewSt
 func (s *Service) ProductStats(ctx context.Context, productID int64) (model.ProductStats, error) {
 	r, err := s.q(ctx).ProductStats(ctx, productID)
 	return model.ProductStats{
-		Count: r.TotalCount, Average: r.AvgRating,
+		Count: r.TotalCount, Average: r.AvgRating, WithImagesCount: r.WithImagesCount,
 		Distribution: [5]int64{r.Rating1Count, r.Rating2Count, r.Rating3Count, r.Rating4Count, r.Rating5Count},
 	}, err
 }

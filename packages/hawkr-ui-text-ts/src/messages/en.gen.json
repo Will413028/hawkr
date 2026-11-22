@@ -13,10 +13,14 @@
       "GENDER_OTHER": "Other"
     },
     "Profile": {
+      "deleted_name": "Deleted account",
       "gender_unset": "Not set"
     }
   },
   "chat": {
+    "Message": {
+      "unsupported_kind": "Unsupported message"
+    },
     "Preview": {
       "erased": "This message has been removed",
       "hidden": "This message has been hidden",
@@ -70,6 +74,17 @@
     },
     "unknown": "未知"
   },
+  "crm": {
+    "CustomerSort": {
+      "CUSTOMER_SORT_FIRST_ORDER_TIME": "First order date",
+      "CUSTOMER_SORT_ORDER_COUNT": "Order count",
+      "CUSTOMER_SORT_TOTAL_SPENT": "Total spent"
+    },
+    "CustomerType": {
+      "CUSTOMER_TYPE_NORMAL": "Regular customer",
+      "CUSTOMER_TYPE_VIP": "VIP"
+    }
+  },
   "moderation": {
     "CommunityReport": {
       "outcome_unset": "Under review"
@@ -99,6 +114,18 @@
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "Embedded on platform",
       "REQUIREMENT_COLLECTION_PROVIDER": "Provider-hosted"
+    }
+  },
+  "review": {
+    "Review": {
+      "rating_label_1": "Very dissatisfied",
+      "rating_label_2": "Dissatisfied",
+      "rating_label_3": "Okay",
+      "rating_label_4": "Satisfied",
+      "rating_label_5": "Very satisfied"
+    },
+    "ReviewAuthor": {
+      "anonymous_name": "Anonymous member"
     }
   },
   "seller": {

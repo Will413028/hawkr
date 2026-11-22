@@ -6,8 +6,12 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
+
+// RequiredCapability 是 crm 的店家寫入與讀取需要的賣家能力（行銷經營：停權時被擋）。能力宣告表（httpapi/crm）引用它，檢查只在模組裡。
+const RequiredCapability = seller.CapMarketing
 
 const (
 	// MaxTagNameRunes 是標籤名稱的長度上限，以字元（rune）計；DB 的 tags_name_check 同值。

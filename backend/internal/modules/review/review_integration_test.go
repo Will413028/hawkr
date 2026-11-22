@@ -671,3 +671,39 @@ func TestProductStatsExcludeWhatThePublicListExcludes(t *testing.T) {
 		t.Fatalf("沒有評價是 0：%+v", none)
 	}
 }
+
+// 商品統計的附圖筆數與公開列表的 with_images 篩選同一個條件：隱藏、作者刪帳中的附圖評價不計，其他商品的不混入，沒有附圖是 0。
+func TestProductStatsWithImagesCountMatchesTheWithImagesFilter(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	store := f.exposableStore(t)
+	submitImg := func(product int64, token string) review.Review {
+		b := f.newBuyer(t)
+		it := f.order(b, store, product)
+		return must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 4, StagedTokens: []string{token}}))
+	}
+	submitImg(730, "i1")
+	submitImg(730, "i2")
+	hidden := submitImg(730, "i3")
+	leaving := submitImg(730, "i4")
+	submitImg(731, "i5")
+	f.submit(t, f.newBuyer(t), store, 730, 5, "")
+	f.submit(t, f.newBuyer(t), store, 732, 5, "")
+	hide(t, f, hidden.ID)
+	if err := f.buyers.BeginDeletion(ctx, leaving.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 730))
+	if st.Count != 3 || st.WithImagesCount != 2 {
+		t.Fatalf("公開可讀 3 則、其中附圖 2 則：%+v", st)
+	}
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 730, 0, review.Filter{WithImages: true}, nil, 50))
+	if int64(len(page.Reviews)) != st.WithImagesCount {
+		t.Fatalf("附圖筆數與 with_images 列表不一致：%d vs %d", len(page.Reviews), st.WithImagesCount)
+	}
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 732)); none.Count != 1 || none.WithImagesCount != 0 {
+		t.Fatalf("沒有附圖是 0：%+v", none)
+	}
+}

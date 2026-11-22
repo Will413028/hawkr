@@ -424,12 +424,12 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 
 func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *testing.T) {
 	e := newEnv(t, nil)
-	e.reads.pstats = review.ProductStats{Count: 7, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
+	e.reads.pstats = review.ProductStats{Count: 7, WithImagesCount: 3, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
 	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "21"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Msg.GetCount() != 7 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
+	if resp.Msg.GetCount() != 7 || resp.Msg.GetWithImagesCount() != 3 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
 		t.Fatalf("統計：%v id=%d", resp.Msg, e.reads.id)
 	}
 	if d := resp.Msg.GetDistribution(); len(d) != 5 {
@@ -890,5 +890,29 @@ func TestExplicitRatingOutsideOneToFiveIsInvalidArgumentOnTheRatingField(t *test
 	}
 	if len(e.reads.calls) != 0 {
 		t.Errorf("不合法的星等不能到模組：%v", e.reads.calls)
+	}
+}
+
+func TestPublicReviewListsMarkOnlyTheSignedInAuthorsOwnReviewsAsMine(t *testing.T) {
+	e := newEnv(t, nil)
+	mine, other := sampleReview(1), sampleReview(2)
+	mine.BuyerID, other.BuyerID = callerBuyer, callerBuyer+1
+	e.reads.page = review.Page{Reviews: []review.Review{mine, other}}
+	flags := func(ctx context.Context) []bool {
+		p, err := e.public.ListProductReviews(ctx, connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := e.public.ListStoreReviews(ctx, connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "11"}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return []bool{p.Msg.Reviews[0].IsMine, p.Msg.Reviews[1].IsMine, s.Msg.Reviews[0].IsMine, s.Msg.Reviews[1].IsMine}
+	}
+	if got := flags(signedIn()); !slices.Equal(got, []bool{true, false, true, false}) {
+		t.Errorf("登入的作者：%v", got)
+	}
+	if got := flags(context.Background()); !slices.Equal(got, []bool{false, false, false, false}) {
+		t.Errorf("訪客：%v", got)
 	}
 }
