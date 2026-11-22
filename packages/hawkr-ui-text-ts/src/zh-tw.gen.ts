@@ -51,7 +51,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"common.error.UNIMPLEMENTED": () => "功能暫不支援",
 	"common.error.UNKNOWN": () => "系統錯誤",
 	"common.unknown": () => "未知",
-	"moderation.ReportOutcome.REPORT_OUTCOME_PENDING": () => "審核中",
+	"moderation.CommunityReport.outcome_unset": () => "審核中",
 	"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": () => "已處理（違規）",
 	"moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "已處理（不違規）",
 	"moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": () => "貼文",
@@ -241,7 +241,7 @@ return "生效中";
 };
 
 const STAFF: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
-	"moderation.ReportOutcome.REPORT_OUTCOME_PENDING": () => "處理中",
+	"moderation.CommunityReport.outcome_unset": () => "處理中",
 	"moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": () => "認定違規",
 	"moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": () => "認定不違規",
 	"moderation.ReportTargetKind.REPORT_TARGET_KIND_POST": () => "貼文",

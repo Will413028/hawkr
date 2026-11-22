@@ -100,13 +100,11 @@ func (ReportTargetKind) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_moderation_v1alpha1_moderation_proto_rawDescGZIP(), []int{0}
 }
 
-// ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。
+// ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。案件還在處理中時，使用它的 optional 欄位不設值；UNSPECIFIED 不帶意義，伺服器不回。
 type ReportOutcome int32
 
 const (
 	ReportOutcome_REPORT_OUTCOME_UNSPECIFIED ReportOutcome = 0
-	// 案件還在處理中。
-	ReportOutcome_REPORT_OUTCOME_PENDING ReportOutcome = 1
 	// 案件認定違規。
 	ReportOutcome_REPORT_OUTCOME_VIOLATION ReportOutcome = 2
 	// 案件認定不違規。
@@ -117,13 +115,11 @@ const (
 var (
 	ReportOutcome_name = map[int32]string{
 		0: "REPORT_OUTCOME_UNSPECIFIED",
-		1: "REPORT_OUTCOME_PENDING",
 		2: "REPORT_OUTCOME_VIOLATION",
 		3: "REPORT_OUTCOME_NO_VIOLATION",
 	}
 	ReportOutcome_value = map[string]int32{
 		"REPORT_OUTCOME_UNSPECIFIED":  0,
-		"REPORT_OUTCOME_PENDING":      1,
 		"REPORT_OUTCOME_VIOLATION":    2,
 		"REPORT_OUTCOME_NO_VIOLATION": 3,
 	}
@@ -671,9 +667,10 @@ func (*MyReportItem_Store) isMyReportItem_Subject() {}
 
 // CommunityReport 是社群內容或買家的檢舉：對象與由案件的決定推導的結果。
 type CommunityReport struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Target        *ReportTarget          `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	Outcome       ReportOutcome          `protobuf:"varint,2,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Target *ReportTarget          `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	// 案件還在處理中時不設值。
+	Outcome       *ReportOutcome `protobuf:"varint,2,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome,oneof" json:"outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -716,8 +713,8 @@ func (x *CommunityReport) GetTarget() *ReportTarget {
 }
 
 func (x *CommunityReport) GetOutcome() ReportOutcome {
-	if x != nil {
-		return x.Outcome
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
 	}
 	return ReportOutcome_REPORT_OUTCOME_UNSPECIFIED
 }
@@ -764,10 +761,12 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\tcommunity\x18\x06 \x01(\v2*.hawkr.moderation.v1alpha1.CommunityReportH\x00R\tcommunity\x12:\n" +
 	"\x05store\x18\a \x01(\v2\".hawkr.seller.v1alpha1.StoreReportH\x00R\x05storeB\t\n" +
 	"\asubjectB\x0f\n" +
-	"\r_resolve_time\"\x96\x01\n" +
+	"\r_resolve_time\"\xa7\x01\n" +
 	"\x0fCommunityReport\x12?\n" +
-	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12B\n" +
-	"\aoutcome\x18\x02 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome*\x9e\x02\n" +
+	"\x06target\x18\x01 \x01(\v2'.hawkr.moderation.v1alpha1.ReportTargetR\x06target\x12G\n" +
+	"\aoutcome\x18\x02 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeH\x00R\aoutcome\x88\x01\x01B\n" +
+	"\n" +
+	"\b_outcome*\x9e\x02\n" +
 	"\x10ReportTargetKind\x12\"\n" +
 	"\x1eREPORT_TARGET_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REPORT_TARGET_KIND_POST\x10\x01\x12\x1e\n" +
@@ -776,12 +775,11 @@ const file_hawkr_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x18REPORT_TARGET_KIND_BUYER\x10\x04\x12\x1d\n" +
 	"\x19REPORT_TARGET_KIND_REVIEW\x10\x05\x12#\n" +
 	"\x1fREPORT_TARGET_KIND_CHAT_MESSAGE\x10\x06\x12#\n" +
-	"\x1fREPORT_TARGET_KIND_REVIEW_REPLY\x10\a*\x8a\x01\n" +
+	"\x1fREPORT_TARGET_KIND_REVIEW_REPLY\x10\a*\x8c\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
-	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16REPORT_OUTCOME_PENDING\x10\x01\x12\x1c\n" +
+	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18REPORT_OUTCOME_VIOLATION\x10\x02\x12\x1f\n" +
-	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x032\x89\x03\n" +
+	"\x1bREPORT_OUTCOME_NO_VIOLATION\x10\x03\"\x04\b\x01\x10\x01*\x16REPORT_OUTCOME_PENDING2\x89\x03\n" +
 	"\x14ModerationAppService\x12o\n" +
 	"\fSubmitReport\x12..hawkr.moderation.v1alpha1.SubmitReportRequest\x1a/.hawkr.moderation.v1alpha1.SubmitReportResponse\x12w\n" +
 	"\rListMyReports\x12/.hawkr.moderation.v1alpha1.ListMyReportsRequest\x1a0.hawkr.moderation.v1alpha1.ListMyReportsResponse\"\x03\x90\x02\x01\x12\x86\x01\n" +
@@ -854,6 +852,7 @@ func file_hawkr_moderation_v1alpha1_moderation_proto_init() {
 		(*MyReportItem_Community)(nil),
 		(*MyReportItem_Store)(nil),
 	}
+	file_hawkr_moderation_v1alpha1_moderation_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

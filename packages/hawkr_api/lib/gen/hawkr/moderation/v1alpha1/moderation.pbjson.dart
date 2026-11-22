@@ -49,17 +49,20 @@ const ReportOutcome$json = {
   '1': 'ReportOutcome',
   '2': [
     {'1': 'REPORT_OUTCOME_UNSPECIFIED', '2': 0},
-    {'1': 'REPORT_OUTCOME_PENDING', '2': 1},
     {'1': 'REPORT_OUTCOME_VIOLATION', '2': 2},
     {'1': 'REPORT_OUTCOME_NO_VIOLATION', '2': 3},
   ],
+  '4': [
+    {'1': 1, '2': 1},
+  ],
+  '5': ['REPORT_OUTCOME_PENDING'],
 };
 
 /// Descriptor for `ReportOutcome`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List reportOutcomeDescriptor = $convert.base64Decode(
-    'Cg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASGgoWUkVQT1'
-    'JUX09VVENPTUVfUEVORElORxABEhwKGFJFUE9SVF9PVVRDT01FX1ZJT0xBVElPThACEh8KG1JF'
-    'UE9SVF9PVVRDT01FX05PX1ZJT0xBVElPThAD');
+    'Cg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASHAoYUkVQT1'
+    'JUX09VVENPTUVfVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAMi'
+    'BAgBEAEqFlJFUE9SVF9PVVRDT01FX1BFTkRJTkc=');
 
 @$core.Deprecated('Use reportTargetDescriptor instead')
 const ReportTarget$json = {
@@ -300,16 +303,22 @@ const CommunityReport$json = {
       '4': 1,
       '5': 14,
       '6': '.hawkr.moderation.v1alpha1.ReportOutcome',
-      '10': 'outcome'
+      '9': 0,
+      '10': 'outcome',
+      '17': true
     },
+  ],
+  '8': [
+    {'1': '_outcome'},
   ],
 };
 
 /// Descriptor for `CommunityReport`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List communityReportDescriptor = $convert.base64Decode(
     'Cg9Db21tdW5pdHlSZXBvcnQSPwoGdGFyZ2V0GAEgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MW'
-    'FscGhhMS5SZXBvcnRUYXJnZXRSBnRhcmdldBJCCgdvdXRjb21lGAIgASgOMiguaGF3a3IubW9k'
-    'ZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lUgdvdXRjb21l');
+    'FscGhhMS5SZXBvcnRUYXJnZXRSBnRhcmdldBJHCgdvdXRjb21lGAIgASgOMiguaGF3a3IubW9k'
+    'ZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lSABSB291dGNvbWWIAQFCCgoIX291dGNvbW'
+    'U=');
 
 const $core.Map<$core.String, $core.dynamic> ModerationAppServiceBase$json = {
   '1': 'ModerationAppService',

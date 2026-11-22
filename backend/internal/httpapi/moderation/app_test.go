@@ -243,7 +243,7 @@ func TestListMyReportsMapsCommunityItemsAndPages(t *testing.T) {
 	r := &fakeReports{page: moderation.ReportPage{
 		Items: []moderation.ReportItem{
 			{Report: moderation.Report{ID: id1, Category: policy.Spam, Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomeViolation}, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: target}, ClosedAt: &closed},
-			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at.Add(-time.Minute), Outcome: moderation.OutcomePending}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
+			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at.Add(-time.Minute), Outcome: moderation.OutcomeNone}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
 		},
 		Next: &moderation.ReportCursor{CreatedAt: at.Add(-time.Minute), ID: id2},
 	}}
@@ -262,7 +262,7 @@ func TestListMyReportsMapsCommunityItemsAndPages(t *testing.T) {
 		!a.GetCreateTime().AsTime().Equal(at) || !a.GetResolveTime().AsTime().Equal(closed) || a.GetStore() != nil {
 		t.Fatalf("第一筆：%v", a)
 	}
-	if b.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetCommunity().GetTarget().GetId() != "9" || b.GetCommunity().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || b.ResolveTime != nil {
+	if b.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetCommunity().GetTarget().GetId() != "9" || b.GetCommunity().Outcome != nil || b.ResolveTime != nil {
 		t.Fatalf("第二筆：%v", b)
 	}
 	if r.gotBuyer != 7 || r.gotSize != 5 || resp.Msg.GetNextPageToken() == "" {

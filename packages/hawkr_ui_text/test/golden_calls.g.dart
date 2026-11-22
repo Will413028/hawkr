@@ -42,7 +42,6 @@ const _enumNumber = <String, int>{
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED': 2,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION': 3,
-	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_PENDING': 1,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION': 2,
 	'hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_BUYER': 4,
@@ -231,6 +230,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'moderation.CommunityReport.outcome_unset':
+      return moderationCommunityReportOutcomeUnset(l);
     case 'moderation.ReportOutcome':
       return hawkr_moderation_v1alpha1_moderation.ReportOutcome.valueOf(_n('hawkr.moderation.v1alpha1.ReportOutcome', value))!.uiText(l);
     case 'moderation.ReportTargetKind':

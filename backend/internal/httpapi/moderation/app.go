@@ -283,6 +283,15 @@ func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyR
 	return connect.NewResponse(out), nil
 }
 
+// outcomePB 把檢舉的結果轉成契約：還沒有結果（案件進行中）不設值。
+func outcomePB(o moderation.Outcome) *pb.ReportOutcome {
+	if o == moderation.OutcomeNone {
+		return nil
+	}
+	v := rpc.EnumToProto[pb.ReportOutcome](o)
+	return &v
+}
+
 func communityItemPB(it moderation.ReportItem) *pb.MyReportItem {
 	item := &pb.MyReportItem{
 		Id:          it.Report.ID.String(),
@@ -291,7 +300,7 @@ func communityItemPB(it moderation.ReportItem) *pb.MyReportItem {
 		CreateTime:  timestamppb.New(it.Report.CreatedAt),
 		Subject: &pb.MyReportItem_Community{Community: &pb.CommunityReport{
 			Target:  targetPB(it.Target),
-			Outcome: rpc.EnumToProto[pb.ReportOutcome](it.Report.Outcome),
+			Outcome: outcomePB(it.Report.Outcome),
 		}},
 	}
 	if it.ClosedAt != nil {

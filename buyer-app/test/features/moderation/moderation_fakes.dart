@@ -122,7 +122,7 @@ mod.MyReportItem reportRecord(
   String id, {
   ReportTargetKind kind = ReportTargetKind.REPORT_TARGET_KIND_POST,
   PolicyCategory category = PolicyCategory.POLICY_CATEGORY_SPAM,
-  ReportOutcome outcome = ReportOutcome.REPORT_OUTCOME_PENDING,
+  ReportOutcome? outcome,
   String description = '',
 }) => mod.MyReportItem(
   id: id,

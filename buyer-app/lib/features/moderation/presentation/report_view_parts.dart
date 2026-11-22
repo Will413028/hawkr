@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pb.dart'
+    as mod;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pb.dart' as seller;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
@@ -13,6 +15,14 @@ String? storeReportOutcomeText(seller.StoreReport report, UiLocale locale) =>
     report.hasOutcome()
     ? report.outcome.uiText(locale)
     : sellerStoreReportOutcomeUnset(locale);
+
+/// 社群檢舉的結果文字：沒設結果是「審核中」，設了照目錄；目錄沒有文字的值回 null。
+String? communityReportOutcomeText(
+  mod.CommunityReport report,
+  UiLocale locale,
+) => report.hasOutcome()
+    ? report.outcome.uiText(locale)
+    : moderationCommunityReportOutcomeUnset(locale);
 
 String formatReportTime(DateTime time) {
   final local = time.toLocal();

@@ -64,9 +64,11 @@
     "unknown": "未知"
   },
   "moderation": {
+    "CommunityReport": {
+      "outcome_unset": "審核中"
+    },
     "ReportOutcome": {
       "REPORT_OUTCOME_NO_VIOLATION": "已處理（不違規）",
-      "REPORT_OUTCOME_PENDING": "審核中",
       "REPORT_OUTCOME_VIOLATION": "已處理（違規）"
     },
     "ReportTargetKind": {

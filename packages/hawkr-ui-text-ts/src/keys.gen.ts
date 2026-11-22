@@ -57,8 +57,8 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
-	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE"
@@ -332,8 +332,12 @@ export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
 }
 
+/** moderation.CommunityReport.outcome_unset */
+export function moderationCommunityReportOutcomeUnset(): UiMessage {
+	return { key: "moderation.CommunityReport.outcome_unset" };
+}
+
 const MODERATION_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "moderation.ReportOutcome.REPORT_OUTCOME_PENDING",
 	2: "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION",
 	3: "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
 };

@@ -10,6 +10,7 @@ import {
 	ReportTargetKind,
 } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import {
+	moderationCommunityReportOutcomeUnset,
 	moderationReportOutcome,
 	moderationReportTargetKind,
 } from "@hawkr/ui-text/keys";
@@ -86,8 +87,12 @@ export function caseActionText(action: CaseAction): string {
 	return textOf(ACTION_TEXT, action);
 }
 
-export function reportOutcomeText(outcome: ReportOutcome): string {
-	return staffTextOrUnknown(moderationReportOutcome(outcome));
+export function reportOutcomeText(outcome: ReportOutcome | undefined): string {
+	return staffTextOrUnknown(
+		outcome === undefined
+			? moderationCommunityReportOutcomeUnset()
+			: moderationReportOutcome(outcome),
+	);
 }
 
 /** 這種對象可以用的處置（與伺服器的 `Action.AllowedOn` 一致）；作者是買家或店家由伺服器向 social 核對。 */

@@ -135,19 +135,19 @@ func (a Action) CategoryAllowed(c policy.Category) bool {
 type Outcome string
 
 const (
-	// OutcomePending 案件進行中。
-	OutcomePending Outcome = "PENDING"
+	// OutcomeNone 案件進行中，還沒有結果。
+	OutcomeNone Outcome = ""
 	// OutcomeViolation 案件認定違規。
 	OutcomeViolation Outcome = "VIOLATION"
 	// OutcomeNoViolation 案件認定不違規。
 	OutcomeNoViolation Outcome = "NO_VIOLATION"
 )
 
-// OutcomeOf 由案件的決定推導檢舉的結果：decision 為 nil 是進行中。
+// OutcomeOf 由案件的決定推導檢舉的結果：decision 為 nil 是進行中（OutcomeNone）。
 func OutcomeOf(decision *string) Outcome {
 	switch {
 	case decision == nil:
-		return OutcomePending
+		return OutcomeNone
 	case Decision(*decision) == DecisionViolation:
 		return OutcomeViolation
 	default:

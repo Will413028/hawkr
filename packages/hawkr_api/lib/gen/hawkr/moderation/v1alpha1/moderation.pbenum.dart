@@ -64,14 +64,10 @@ class ReportTargetKind extends $pb.ProtobufEnum {
   const ReportTargetKind._(super.value, super.name);
 }
 
-/// ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。
+/// ReportOutcome 是一筆檢舉的結果，由所屬案件的決定推導。案件還在處理中時，使用它的 optional 欄位不設值；UNSPECIFIED 不帶意義，伺服器不回。
 class ReportOutcome extends $pb.ProtobufEnum {
   static const ReportOutcome REPORT_OUTCOME_UNSPECIFIED =
       ReportOutcome._(0, _omitEnumNames ? '' : 'REPORT_OUTCOME_UNSPECIFIED');
-
-  /// 案件還在處理中。
-  static const ReportOutcome REPORT_OUTCOME_PENDING =
-      ReportOutcome._(1, _omitEnumNames ? '' : 'REPORT_OUTCOME_PENDING');
 
   /// 案件認定違規。
   static const ReportOutcome REPORT_OUTCOME_VIOLATION =
@@ -83,7 +79,6 @@ class ReportOutcome extends $pb.ProtobufEnum {
 
   static const $core.List<ReportOutcome> values = <ReportOutcome>[
     REPORT_OUTCOME_UNSPECIFIED,
-    REPORT_OUTCOME_PENDING,
     REPORT_OUTCOME_VIOLATION,
     REPORT_OUTCOME_NO_VIOLATION,
   ];

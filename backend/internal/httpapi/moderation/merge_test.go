@@ -109,7 +109,7 @@ var base = time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 // community 與 store 是以「第幾分鐘前」與序號建立的資料；序號大的 id 大（同時間 id 新到舊 = 序號大的在前）。
 func community(minutesAgo int, n byte) moderation.ReportItem {
 	return moderation.ReportItem{
-		Report: moderation.Report{ID: idOf(n), Category: policy.Spam, CreatedAt: base.Add(-time.Duration(minutesAgo) * time.Minute), Outcome: moderation.OutcomePending},
+		Report: moderation.Report{ID: idOf(n), Category: policy.Spam, CreatedAt: base.Add(-time.Duration(minutesAgo) * time.Minute), Outcome: moderation.OutcomeNone},
 		Target: moderation.Target{Kind: moderation.TargetPost, ContentID: idOf(n)},
 	}
 }
@@ -323,7 +323,7 @@ func TestOutcomeAndTargetEnumsMatchTheModules(t *testing.T) {
 	if m := rpc.EnumMismatches[pb.ReportTargetKind]([]moderation.TargetKind{moderation.TargetPost, moderation.TargetComment, moderation.TargetForumEntry, moderation.TargetBuyer, moderation.TargetReview, moderation.TargetChatMessage, moderation.TargetReviewReply}); len(m) != 0 {
 		t.Fatalf("ReportTargetKind：%v", m)
 	}
-	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomePending, moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {
+	if m := rpc.EnumMismatches[pb.ReportOutcome]([]moderation.Outcome{moderation.OutcomeViolation, moderation.OutcomeNoViolation}); len(m) != 0 {
 		t.Fatalf("ReportOutcome：%v", m)
 	}
 }

@@ -15,10 +15,7 @@ import {
 import { SellerGovernanceAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { MeasureSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
-import {
-	ReportOutcome,
-	ReportTargetKind,
-} from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
+import { ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import {
 	MeasureKind,
 	MeasureState,
@@ -71,7 +68,6 @@ const reports = [
 		reporter: { case: "reporterBuyerId", value: "b-2" },
 		category: PolicyCategory.SPAM,
 		description: "新的檢舉",
-		outcome: ReportOutcome.PENDING,
 		createTime: timestampFromMs(T0 + 2000),
 	}),
 	create(CaseReportSchema, {
@@ -79,7 +75,6 @@ const reports = [
 		reporter: { case: "reporterStoreId", value: "7" },
 		category: PolicyCategory.HATE,
 		description: "舊的檢舉",
-		outcome: ReportOutcome.PENDING,
 		createTime: timestampFromMs(T0 + 1000),
 	}),
 ];
@@ -136,6 +131,7 @@ test("案件與全部檢舉，舊到新", async () => {
 	const text = bodyText();
 	assert.ok(text.includes("留言") && text.includes("comment-1"));
 	assert.ok(text.indexOf("舊的檢舉") < text.indexOf("新的檢舉"));
+	assert.equal(text.split("處理中").length - 1, 2);
 	assert.ok(
 		text.includes("檢舉人（買家）b-2") && text.includes("檢舉人（店家）7"),
 	);

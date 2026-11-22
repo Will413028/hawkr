@@ -45,11 +45,11 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "moderation.CommunityReport.outcome_unset": {
+      "message": "Under review"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "Resolved (no violation)"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "Under review"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "Resolved (violation)"
