@@ -247,7 +247,7 @@ func TestImportRollsBackWhenASubscriberFails(t *testing.T) {
 	}
 }
 
-// year 欄與它的檢查、索引已移除：年份範圍由解析檢查，沒有任何讀者。
+// 表沒有 year 欄、檢查與索引：年份範圍由解析檢查。
 func TestSchemaHasNoYearColumn(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

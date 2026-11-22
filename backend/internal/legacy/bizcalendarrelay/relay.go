@@ -1,16 +1,18 @@
-// Package bizcalendarrelay 把平台的工作日行事曆推給還在舊服務的 invoice-service（遷移計畫 10f-7 的 B#1、B#2）。資料的擁有者是
+// Package bizcalendarrelay 把平台的工作日行事曆推給還在舊服務的 invoice-service。資料的擁有者是
 // platform/bizcalendar，invoice 的鏡像只是快取：後台匯入成功時 OnCalendarImported 在匯入的 transaction 內排入推送的 job，另有每 24 小時的
 // 對帳 job（啟動時也跑一次）補齊推送失敗、invoice 重開與窗口隨日期前進的差異。推送由 worker 在 transaction 外呼叫 invoice-service。
 //
 // 推送的區間是窗口（今天前 30 天到後 400 天，台北日）與「包含今天的連續已匯入年份」的交集，連同區間內的放假日；今天所在的年份沒有匯入就
-// 什麼都不推（對方保留舊鏡像）並記 warning，不是錯誤。每次都在送出前才讀行事曆，所以較晚讀到的資料不會被較早讀到的覆蓋。
+// 什麼都不推（對方保留舊鏡像）並記 warning，不是錯誤。推送成功後會重讀行事曆，內容與剛推的不同就再推（最多 pushRounds 輪，仍不收斂則回傳錯誤讓 River 重試），所以推送期間發生的匯入、或兩個 job 交錯時較舊的資料最後送達，都會收斂到最新的行事曆。
 //
 // 隨 A5（invoice 搬進單體）刪除，同時刪 platform/bizcalendar 的 CalendarImported 事件型別與 worker 的 invoice client 接線。
 package bizcalendarrelay
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/riverqueue/river"
@@ -41,12 +43,18 @@ type Loader interface {
 	Load(ctx context.Context) (*bizcalendar.Calendar, error)
 }
 
-// PushArgs 是一次推送。沒有參數：推送的內容永遠是執行當下的行事曆，所以尚未結束的同類 job 合併成一個。
+// pushRounds 是一次 Push 內「推送後重讀並比對」最多重推的次數。
+const pushRounds = 3
+
+// pushMaxAttempts 讓失敗的 job 在一天內放棄（River 預設的退避是第 n 次失敗後等 n^4 秒，10 次的累計約 4.3 小時），之後由每天的對帳 job 重新排入。
+const pushMaxAttempts = 10
+
+// PushArgs 是一次推送。沒有參數：推送的內容永遠是執行當下的行事曆；不設唯一鍵，匯入隨時可以排入新的推送，由 Push 收斂。
 type PushArgs struct{}
 
 func (PushArgs) Kind() string { return "legacy.bizcalendar_push" }
 
-func (PushArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(0) }
+func (PushArgs) InsertOpts() river.InsertOpts { return river.InsertOpts{MaxAttempts: pushMaxAttempts} }
 
 // OnCalendarImported 在匯入的 transaction 內排入推送：排入失敗時匯入一起回滾。
 func OnCalendarImported(q jobs.Enqueuer) func(context.Context, bizcalendar.CalendarImported) error {
@@ -109,29 +117,64 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &pushWorker{w: w})
 }
 
-// PeriodicJobs 是每 24 小時（啟動時也跑一次）的對帳推送。
-func PeriodicJobs() []*river.PeriodicJob {
-	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(reconcileInterval),
-		func() (river.JobArgs, *river.InsertOpts) { return PushArgs{}, nil },
-		&river.PeriodicJobOpts{ID: "legacy.bizcalendar_push", RunOnStart: true},
-	)}
+// periodicID 是對帳 job 的週期 ID。
+const periodicID = "legacy.bizcalendar_push"
+
+func periodicSchedule() river.PeriodicSchedule { return river.PeriodicInterval(reconcileInterval) }
+
+func periodicArgs() (river.JobArgs, *river.InsertOpts) { return PushArgs{}, nil }
+
+func periodicOpts() *river.PeriodicJobOpts {
+	return &river.PeriodicJobOpts{ID: periodicID, RunOnStart: true}
 }
 
-// Push 讀出目前的行事曆並推送一次。窗口內沒有涵蓋時什麼都不推並記 warning，不是錯誤。冪等：同一份資料重推結果相同。
+// PeriodicJobs 是每 24 小時（啟動時也跑一次）的對帳推送。
+func PeriodicJobs() []*river.PeriodicJob {
+	return []*river.PeriodicJob{river.NewPeriodicJob(periodicSchedule(), periodicArgs, periodicOpts())}
+}
+
+// payload 是一次推送的內容。
+type payload struct {
+	from, to time.Time
+	holidays []time.Time
+}
+
+func (p payload) equal(o payload) bool {
+	return p.from.Equal(o.from) && p.to.Equal(o.to) && slices.EqualFunc(p.holidays, o.holidays, time.Time.Equal)
+}
+
+// Push 讀出目前的行事曆並推送；成功後重讀，內容變了就再推，直到穩定。窗口內沒有涵蓋時什麼都不推並記 warning，不是錯誤。冪等：同一份資料重推結果相同。
 func (w *Worker) Push(ctx context.Context) error {
-	cal, err := w.store.Load(ctx)
+	err := w.converge(ctx)
 	if err != nil {
-		return err
+		w.log.Error("行事曆推送給 invoice-service 失敗", "error", err)
 	}
-	from, to, holidays, ok := Batch(cal, w.now())
-	if !ok {
-		w.log.Warn("行事曆窗口內沒有已匯入的資料，不推送給 invoice-service", "window_start", from.Format(time.DateOnly))
-		return nil
+	return err
+}
+
+func (w *Worker) converge(ctx context.Context) error {
+	var last *payload
+	for round := 0; ; round++ {
+		cal, err := w.store.Load(ctx)
+		if err != nil {
+			return err
+		}
+		from, to, holidays, ok := Batch(cal, w.now())
+		if !ok {
+			w.log.Warn("行事曆窗口內沒有已匯入的資料，不推送給 invoice-service", "window_start", from.Format(time.DateOnly))
+			return nil
+		}
+		cur := payload{from, to, holidays}
+		if last != nil && last.equal(cur) {
+			return nil
+		}
+		if round == pushRounds {
+			return fmt.Errorf("行事曆在 %d 輪推送內沒有穩定", pushRounds)
+		}
+		if err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {
+			return err
+		}
+		w.log.Info("行事曆已推送給 invoice-service", "from", from.Format(time.DateOnly), "to", to.Format(time.DateOnly), "holidays", len(holidays))
+		last = &cur
 	}
-	if err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {
-		return err
-	}
-	w.log.Info("行事曆已推送給 invoice-service", "from", from.Format(time.DateOnly), "to", to.Format(time.DateOnly), "holidays", len(holidays))
-	return nil
 }

@@ -122,13 +122,13 @@ func TestParseRejects(t *testing.T) {
 				return "20260103,六,2"
 			}
 			return l
-		}), "CSVContent", "第 4 行：應有 4 欄"},
+		}), "CSVContent", "第 4 行：應有 4 欄，實際 3 欄"},
 		{"欄數過多", 2026, csvOf(2026, func(d, l string) string {
 			if d == "20260103" {
 				return "20260103,六,2,a,b"
 			}
 			return l
-		}), "CSVContent", "第 4 行：應有 4 欄"},
+		}), "CSVContent", "第 4 行：應有 4 欄，實際 5 欄"},
 		{"日期不是 8 位", 2026, csvOf(2026, func(d, l string) string {
 			if d == "20260103" {
 				return "2026/1/3,六,2,"
@@ -172,10 +172,14 @@ func TestParseRejects(t *testing.T) {
 			}
 			return l
 		}), "CSVContent", "缺 2026-01-01"},
-		{"欄數不足", 2026, lineOf("20260103,?,2"), "CSVContent", "第 4 行：應有 4 欄"},
-		{"欄數過多", 2026, lineOf("20260103,?,2,,x"), "CSVContent", "第 4 行：應有 4 欄"},
-		{"引號沒有結尾", 2026, lineOf(`20260103,?,2,"abc`), "CSVContent", "引號格式不正確"},
+		{"欄數不足", 2026, lineOf("20260103,?,2"), "CSVContent", "第 4 行：應有 4 欄，實際 3 欄"},
+		{"欄數過多", 2026, lineOf("20260103,?,2,,x"), "CSVContent", "第 4 行：應有 4 欄，實際 5 欄"},
+		{"引號沒有結尾", 2026, lineOf(`20260103,?,2,"abc`), "CSVContent", "第 4 行：引號格式不正確"},
 		{"欄位中間的引號", 2026, lineOf(`20260103,?,2,a"b`), "CSVContent", "第 4 行：引號格式不正確"},
+		{"表頭前有空行", 2026, "\n\n西元日期,星期,是否放假\n", "CSVContent", "第 3 行：表頭必須是"},
+		{"表頭不符且前有空行", 2026, "\n\ndate,weekday,flag,note\n", "CSVContent", "第 3 行：表頭必須是"},
+		{"備註含 NUL", 2026, lineOf("20260103,?,2,a\x00b"), "CSVContent", "第 4 行：欄位不得包含 NUL 字元"},
+		{"日期欄含 NUL", 2026, lineOf("2026\x00103,?,2,"), "CSVContent", "第 4 行：欄位不得包含 NUL 字元"},
 		{"只有空行", 2026, "\n\n", "CSVContent", "CSV 內容是空的"},
 		{"表頭欄數不對", 2026, "西元日期,星期,是否放假\n", "CSVContent", "第 1 行：表頭必須是"},
 		{"年份太小", 0, full, "Year", "年份必須在"},

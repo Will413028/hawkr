@@ -107,6 +107,123 @@
    "new": "\tif false && strings.Join(header, \",\") != officeCalendarHeader {",
    "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭不符$",
    "why": "A file with a different header is accepted."
+  },
+  {
+   "id": "push-unique-again",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "return river.InsertOpts{MaxAttempts: pushMaxAttempts}",
+   "new": "return river.InsertOpts{MaxAttempts: pushMaxAttempts, UniqueOpts: river.UniqueOpts{ByArgs: true}}",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsHaveNoUniquenessAndBoundedAttempts$",
+   "why": "An import enqueued while a push runs is merged away again."
+  },
+  {
+   "id": "push-max-attempts-default",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "const pushMaxAttempts = 10",
+   "new": "const pushMaxAttempts = 25",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsHaveNoUniquenessAndBoundedAttempts$",
+   "why": "A failing push job retries for days instead of being dropped within a day."
+  },
+  {
+   "id": "push-no-reload-compare",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "if last != nil && last.equal(cur) {",
+   "new": "if last != nil {",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushRepushesWhenTheCalendarChangedDuringThePush$",
+   "why": "The push never compares with the reloaded calendar, so a change during the push is not pushed again."
+  },
+  {
+   "id": "push-never-gives-up",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "if round == pushRounds {",
+   "new": "if round == pushRounds+100 {",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushFailsWhenTheCalendarNeverStabilises$",
+   "why": "An unstable calendar is pushed forever instead of failing for River to retry."
+  },
+  {
+   "id": "push-failure-not-logged",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "w.log.Error(\"行事曆推送給 invoice-service 失敗\", \"error\", err)",
+   "new": "_ = err",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushLogsTheFailureSentenceTheAlertSearchesFor$",
+   "why": "The failure sentence the alert runbook searches for is no longer logged."
+  },
+  {
+   "id": "wiring-serve-subscribe-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tsubscribeBizCalendarRelay(bus, jc)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "Imports no longer enqueue a push to invoice-service."
+  },
+  {
+   "id": "wiring-worker-add-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tbizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)\n",
+   "new": "\t_, _ = calendar, invoices\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "No worker handles the push jobs, so they pile up unexecuted."
+  },
+  {
+   "id": "wiring-worker-periodic-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestBizCalendarRelayIsWiredIntoServeAndWorker$",
+   "why": "The daily reconciliation push is no longer scheduled."
+  },
+  {
+   "id": "subscribe-handler-removed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/bizcalendar_events.go",
+   "old": "\tevents.Subscribe(bus, bizcalendarrelay.OnCalendarImported(queue))\n",
+   "new": "\t_, _ = bus, queue\n",
+   "test": "cmd/hawkr ^TestBizCalendarRelaySubscribesTheImportHandler$",
+   "why": "subscribeBizCalendarRelay subscribes nothing."
+  },
+  {
+   "id": "parse-quote-error-last-line",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "return bad(line, \"引號格式不正確\")",
+   "new": "return bad(pe.Line, \"引號格式不正確\")",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄位中間的引號$|^引號沒有結尾$",
+   "why": "A quote error reports the last line read instead of the line where the record starts."
+  },
+  {
+   "id": "parse-header-line-fixed-1",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "line, _ := r.FieldPos(0)\n\t\treturn nil, bad(line, \"表頭必須是 %s\", officeCalendarHeader)",
+   "new": "return nil, bad(1, \"表頭必須是 %s\", officeCalendarHeader)",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^表頭前有空行$",
+   "why": "A header mismatch always reports line 1 even after blank lines."
+  },
+  {
+   "id": "parse-field-count-detail-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\"應有 %d 欄，實際 %d 欄\", fieldsPerRecord, len(record)",
+   "new": "\"應有 %d 欄\", fieldsPerRecord",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^欄數不足$",
+   "why": "The field-count error no longer says the actual count."
+  },
+  {
+   "id": "parse-nul-accepted",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "strings.ContainsRune(f, 0)",
+   "new": "strings.ContainsRune(f, 'x') && false",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^備註含 NUL$",
+   "why": "A NUL in a field passes parsing and fails later at upsert."
   }
  ]
 }

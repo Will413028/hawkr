@@ -1,11 +1,13 @@
 package bizcalendarrelay
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -221,11 +223,76 @@ func TestOnCalendarImportedReturnsEnqueueError(t *testing.T) {
 	}
 }
 
-// 重複匯入不堆疊相同的推送：尚未結束的同類 job 以參數為唯一鍵合併。
-func TestPushArgsAreUniqueWhileUnfinished(t *testing.T) {
+// 不設唯一鍵：執行中的 job 已讀了舊行事曆，此時排入的新推送不能被合併掉。失敗的 job 在一天內放棄，由每天的對帳重新排入。
+func TestPushArgsHaveNoUniquenessAndBoundedAttempts(t *testing.T) {
 	opts := PushArgs{}.InsertOpts()
-	if !opts.UniqueOpts.ByArgs || len(opts.UniqueOpts.ByState) == 0 {
-		t.Fatalf("opts = %+v", opts)
+	if opts.UniqueOpts.ByArgs || opts.UniqueOpts.ByPeriod != 0 || len(opts.UniqueOpts.ByState) != 0 {
+		t.Fatalf("unique opts = %+v", opts.UniqueOpts)
+	}
+	if opts.MaxAttempts != 10 {
+		t.Fatalf("MaxAttempts = %d", opts.MaxAttempts)
+	}
+}
+
+// seqLoader 依序回傳行事曆；用完後一直回傳最後一個。
+type seqLoader struct {
+	cals []*bizcalendar.Calendar
+	n    int
+}
+
+func (l *seqLoader) Load(context.Context) (*bizcalendar.Calendar, error) {
+	c := l.cals[min(l.n, len(l.cals)-1)]
+	l.n++
+	return c, nil
+}
+
+func TestPushRepushesWhenTheCalendarChangedDuringThePush(t *testing.T) {
+	c := &fakeClient{}
+	now := at("2026-11-22")
+	l := &seqLoader{cals: []*bizcalendar.Calendar{calendarOf(t, 2026), calendarOf(t, 2026, 2027)}}
+	w := NewWorker(l, c, func() time.Time { return now }, slog.New(slog.DiscardHandler))
+	if err := w.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.calls) != 2 || c.calls[0].to != "2026-12-31" || c.calls[1].to != "2027-12-27" {
+		t.Fatalf("calls = %+v", c.calls)
+	}
+}
+
+func TestPushWithAnUnchangedCalendarCallsTheClientOnce(t *testing.T) {
+	c := &fakeClient{}
+	if err := newTestWorker(calendarOf(t, 2026), c).Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.calls) != 1 {
+		t.Fatalf("calls = %+v", c.calls)
+	}
+}
+
+// 每次讀到的都不同：有限輪後回傳錯誤，讓 River 重試。
+func TestPushFailsWhenTheCalendarNeverStabilises(t *testing.T) {
+	c := &fakeClient{}
+	now := at("2026-11-22")
+	a, b := calendarOf(t, 2026), calendarOf(t, 2026, 2027)
+	l := &seqLoader{cals: []*bizcalendar.Calendar{a, b, a, b, a, b}}
+	w := NewWorker(l, c, func() time.Time { return now }, slog.New(slog.DiscardHandler))
+	if err := w.Push(context.Background()); err == nil {
+		t.Fatal("要回傳錯誤")
+	}
+	if len(c.calls) != 3 {
+		t.Fatalf("推送次數 = %d，要 3", len(c.calls))
+	}
+}
+
+func TestPushLogsTheFailureSentenceTheAlertSearchesFor(t *testing.T) {
+	var buf bytes.Buffer
+	now := at("2026-11-22")
+	w := NewWorker(fakeLoader{calendarOf(t, 2026)}, &fakeClient{err: errors.New("boom")}, func() time.Time { return now }, slog.New(slog.NewTextHandler(&buf, nil)))
+	if err := w.Push(context.Background()); err == nil {
+		t.Fatal("要回傳錯誤")
+	}
+	if !strings.Contains(buf.String(), "level=ERROR") || !strings.Contains(buf.String(), "行事曆推送給 invoice-service 失敗") {
+		t.Fatalf("log = %s", buf.String())
 	}
 }
 
@@ -234,14 +301,15 @@ func TestPeriodicConfiguration(t *testing.T) {
 	if len(periodicJobs) != 1 {
 		t.Fatalf("periodic jobs=%d", len(periodicJobs))
 	}
-	// River 不提供設定讀取 API；只讀 reflection 固定重啟與間隔，不修改其內部值。
-	configuration := reflect.ValueOf(periodicJobs[0]).Elem()
-	options := configuration.FieldByName("opts").Elem()
-	if !options.FieldByName("RunOnStart").Bool() || options.FieldByName("ID").String() != "legacy.bizcalendar_push" {
-		t.Fatalf("id=%q runOnStart=%v", options.FieldByName("ID").String(), options.FieldByName("RunOnStart").Bool())
+	// River 沒有公開 PeriodicJob 的設定；這裡驗證建構時用的排程、選項與參數。
+	t0 := at("2026-11-22")
+	if next := periodicSchedule().Next(t0); !next.Equal(t0.Add(24 * time.Hour)) {
+		t.Fatalf("next = %s", next)
 	}
-	schedule := configuration.FieldByName("scheduleFunc").Elem().Elem()
-	if interval := time.Duration(schedule.FieldByName("interval").Int()); interval != 24*time.Hour {
-		t.Fatalf("interval=%s", interval)
+	if opts := periodicOpts(); !opts.RunOnStart || opts.ID != "legacy.bizcalendar_push" {
+		t.Fatalf("opts = %+v", opts)
+	}
+	if args, _ := periodicArgs(); !reflect.DeepEqual(args, PushArgs{}) {
+		t.Fatalf("args = %+v", args)
 	}
 }

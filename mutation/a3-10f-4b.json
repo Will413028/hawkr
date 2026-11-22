@@ -73,20 +73,11 @@
    "why": "The start is always the window start, so a window start in a never-imported year is declared covered."
   },
   {
-   "id": "push-job-not-unique",
-   "stack": "go",
-   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
-   "old": "func (PushArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(0) }",
-   "new": "func (PushArgs) InsertOpts() river.InsertOpts { return river.InsertOpts{} }",
-   "test": "internal/legacy/bizcalendarrelay ^TestPushArgsAreUniqueWhileUnfinished$",
-   "why": "Repeated imports pile up identical push jobs instead of merging."
-  },
-  {
    "id": "push-ignores-client-error",
    "stack": "go",
    "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
-   "old": "\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\treturn err\n\t}",
-   "new": "\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\treturn nil\n\t}",
+   "old": "\t\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\t\treturn nil\n\t\t}",
    "test": "internal/legacy/bizcalendarrelay ^TestPushReturnsClientErrorSoRiverRetries$",
    "why": "A failed push is reported as success, so River never retries it."
   },
@@ -188,15 +179,6 @@
    "new": "\t\t_ = committed",
    "test": "database ^TestWithTx_RollsBackOn(PanicAndRepanics|Goexit)$",
    "why": "A panic or runtime.Goexit inside fn (t.Fatalf) leaves the transaction open and its pool connection held forever."
-  },
-  {
-   "id": "covered-through-start-year-uncovered",
-   "stack": "go",
-   "file": "backend/internal/platform/bizcalendar/calendar.go",
-   "old": "\tif !c.Covers(year) {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
-   "new": "\tif false {\n\t\treturn time.Time{}, false\n\t}\n\tfor c.Covers(year + 1) {",
-   "test": "internal/platform/bizcalendar ^TestCoveredThrough$",
-   "why": "A start day in an unimported year is reported as covered."
   }
  ]
 }

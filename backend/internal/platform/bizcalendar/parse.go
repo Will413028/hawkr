@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,10 +46,11 @@ func ParseOfficeCalendar(year int, content string) ([]Day, error) {
 		return nil, apperr.InvalidInputOn([]string{"CSVContent"}, "CSV 內容是空的")
 	}
 	if err != nil {
-		return nil, readError(err, bad, true)
+		return nil, readError(err, header, bad, true)
 	}
 	if strings.Join(header, ",") != officeCalendarHeader {
-		return nil, bad(1, "表頭必須是 %s", officeCalendarHeader)
+		line, _ := r.FieldPos(0)
+		return nil, bad(line, "表頭必須是 %s", officeCalendarHeader)
 	}
 	out := make([]Day, 0, daysInYear(year))
 	seen := make(map[int64]int, daysInYear(year))
@@ -58,9 +60,12 @@ func ParseOfficeCalendar(year int, content string) ([]Day, error) {
 			break
 		}
 		if err != nil {
-			return nil, readError(err, bad, false)
+			return nil, readError(err, cols, bad, false)
 		}
 		n, _ := r.FieldPos(0)
+		if slices.ContainsFunc(cols, func(f string) bool { return strings.ContainsRune(f, 0) }) {
+			return nil, bad(n, "欄位不得包含 NUL 字元")
+		}
 		date, err := parseCompactDate(cols[0])
 		if err != nil {
 			return nil, bad(n, "日期 %q 不是 YYYYMMDD 的有效日期", cols[0])
@@ -91,7 +96,7 @@ func ParseOfficeCalendar(year int, content string) ([]Day, error) {
 }
 
 // readError 把 csv.Reader 的錯誤換成繁體中文的訊息；表頭列（isHeader）欄數不對視為表頭不合。
-func readError(err error, bad func(int, string, ...any) error, isHeader bool) error {
+func readError(err error, record []string, bad func(int, string, ...any) error, isHeader bool) error {
 	var pe *csv.ParseError
 	if !errors.As(err, &pe) {
 		return apperr.InvalidInputOn([]string{"CSVContent"}, "CSV 內容無法讀取")
@@ -101,9 +106,9 @@ func readError(err error, bad func(int, string, ...any) error, isHeader bool) er
 	case errors.Is(err, csv.ErrFieldCount) && isHeader:
 		return bad(line, "表頭必須是 %s", officeCalendarHeader)
 	case errors.Is(err, csv.ErrFieldCount):
-		return bad(line, "應有 %d 欄", fieldsPerRecord)
+		return bad(line, "應有 %d 欄，實際 %d 欄", fieldsPerRecord, len(record))
 	default:
-		return bad(pe.Line, "引號格式不正確")
+		return bad(line, "引號格式不正確")
 	}
 }
 
