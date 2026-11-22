@@ -10,6 +10,8 @@ import (
 	"errors"
 	stdimage "image"
 	"image/png"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
@@ -164,18 +166,34 @@ func holdSecureSlots(t *testing.T, f *fixture) (release func(), wait func()) {
 	return func() { close(rel) }, wg.Wait
 }
 
-// waitSignalCtx 在有人開始等 ctx.Done()（名額等待分支）時發出訊號。
+// waitSignalCtx 在名額等待分支（upload.acquire）開始等 ctx.Done() 時發出訊號；資料庫呼叫也會讀 Done()，不算，所以只認呼叫堆疊裡有 acquire 的那次。
 type waitSignalCtx struct {
 	context.Context
 	waiting chan struct{}
 }
 
 func (c *waitSignalCtx) Done() <-chan struct{} {
-	select {
-	case c.waiting <- struct{}{}:
-	default:
+	if calledFromAcquire() {
+		select {
+		case c.waiting <- struct{}{}:
+		default:
+		}
 	}
 	return c.Context.Done()
+}
+
+func calledFromAcquire() bool {
+	pcs := make([]uintptr, 32)
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
+	for {
+		fr, more := frames.Next()
+		if strings.HasSuffix(fr.Function, "upload.acquire") {
+			return true
+		}
+		if !more {
+			return false
+		}
+	}
 }
 
 func TestPutSecure_WaitsForASlotInsteadOfFailingFast(t *testing.T) {

@@ -951,8 +951,14 @@ func TestReadSecure_SwappedDroppedForeignOrRecountedChunksFailToRead(t *testing.
 			}
 		},
 		"swapped-chunk-rows": func(t *testing.T, f *fixture, a media.ConfirmedAsset) {
-			if _, err := f.d.Pool().Exec(t.Context(), `UPDATE media.secure_chunks SET idx = CASE idx WHEN 0 THEN 1 WHEN 1 THEN 0 ELSE idx END WHERE asset_id = $1`, a.ID); err != nil {
-				t.Fatal(err)
+			for _, q := range []string{
+				`UPDATE media.secure_chunks SET idx = 1000 WHERE asset_id = $1 AND idx = 0`,
+				`UPDATE media.secure_chunks SET idx = 0 WHERE asset_id = $1 AND idx = 1`,
+				`UPDATE media.secure_chunks SET idx = 1 WHERE asset_id = $1 AND idx = 1000`,
+			} {
+				if _, err := f.d.Pool().Exec(t.Context(), q, a.ID); err != nil {
+					t.Fatal(err)
+				}
 			}
 		},
 		"dropped-last-chunk-row": func(t *testing.T, f *fixture, a media.ConfirmedAsset) {
@@ -980,7 +986,14 @@ func TestReadSecure_SwappedDroppedForeignOrRecountedChunksFailToRead(t *testing.
 		},
 		"foreign-asset-chunk": func(t *testing.T, f *fixture, a media.ConfirmedAsset) {
 			other := confirmSecure(t, f, owner, uploadSecure(t, f, owner, threeChunkData()).Token)
-			foreign := chunkKeys(t, f, other.ID)[1]
+			rc, err := f.store.Get(t.Context(), chunkKeys(t, f, other.ID)[1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			foreign := "secure/" + a.ID.String() + "/1/" + uuid.NewString()
+			if err := f.store.Fake.Put(t.Context(), putInput(foreign, readAll(t, rc))); err != nil {
+				t.Fatal(err)
+			}
 			if _, err := f.d.Pool().Exec(t.Context(), `UPDATE media.secure_chunks SET object_key = $1 WHERE asset_id = $2 AND idx = 1`, foreign, a.ID); err != nil {
 				t.Fatal(err)
 			}
