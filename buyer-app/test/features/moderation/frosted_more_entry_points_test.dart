@@ -12,8 +12,7 @@ import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
 import 'package:hawkr_buyer/features/moderation/data/block_target.dart';
-import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
-import 'package:hawkr_buyer/features/moderation/data/report_target_type.dart';
+import '../review/review_fakes.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/block_confirm_dialog.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
@@ -57,18 +56,6 @@ class _Adapter implements HttpClientAdapter {
   ) async {
     if (options.method != 'GET') mutations.add(options);
     final Object data = switch (options.path) {
-      '/public/products/55/reviews' => {
-        'records': [
-          {
-            'reviewId': 'review-12',
-            'buyerId': 'buyer-9',
-            'username': '測試顧客',
-            'content': '這是評價內容',
-            'rating': 5,
-            'createdAt': '2026-09-10T08:00:00Z',
-          },
-        ],
-      },
       '/public/products/55' => {'id': '55', 'skus': <Object>[]},
       _ => <String, Object>{},
     };
@@ -104,6 +91,19 @@ void main() {
             overrides: [
               dioProvider.overrideWithValue(dio),
               socialPublicClientProvider.overrideWithValue(_social().client()),
+              reviewPublicClientProvider.overrideWithValue(
+                FakeReviewPublic(
+                  pages: [
+                    [
+                      reviewRecord(
+                        'review-12',
+                        content: '這是評價內容',
+                        authorName: '測試顧客',
+                      ),
+                    ],
+                  ],
+                ).client(),
+              ),
               connectAuthTransportProvider.overrideWith(
                 (_) => FakeTransportBuilder().build(),
               ),
@@ -181,14 +181,13 @@ void main() {
             );
             final reportTarget = report.target;
             if (surface == '商品評價') {
-              // 評價的檢舉留在舊 REST（A6 前的允許殘留）。
-              expect(reportTarget, isA<LegacyReportTarget>());
-              reportTarget as LegacyReportTarget;
+              // 評價的檢舉只送參照：種類與評價 ID。
               expect(reportTarget.id, 'review-12');
-              expect(reportTarget.type, ReportTargetType.review);
+              expect(
+                reportTarget.kind,
+                ReportTargetKind.REPORT_TARGET_KIND_REVIEW,
+              );
             } else {
-              expect(reportTarget, isA<SocialReportTarget>());
-              reportTarget as SocialReportTarget;
               expect(reportTarget.id, '101');
               expect(
                 reportTarget.kind,
@@ -199,23 +198,25 @@ void main() {
             await tester.pumpAndSettle();
             await tester.tap(more);
             await tester.pumpAndSettle();
-            await tester.tap(find.text('封鎖此使用者'));
-            await tester.pumpAndSettle();
-            final block = tester.widget<BlockConfirmDialog>(
-              find.byType(BlockConfirmDialog),
-            );
-            final blockTarget = block.target;
             if (surface == '商品評價') {
-              expect(blockTarget, isA<LegacyBlockTarget>());
-              expect((blockTarget as LegacyBlockTarget).userId, 'buyer-9');
+              // 契約只能封鎖評價的回覆店家，不能封鎖寫評價的買家，所以評價入口沒有封鎖選項。
+              expect(find.text('封鎖此使用者'), findsNothing);
+              await tester.tapAt(const Offset(10, 10));
+              await tester.pumpAndSettle();
             } else {
+              await tester.tap(find.text('封鎖此使用者'));
+              await tester.pumpAndSettle();
+              final block = tester.widget<BlockConfirmDialog>(
+                find.byType(BlockConfirmDialog),
+              );
+              final blockTarget = block.target;
               expect(blockTarget, isA<StoreBlockTarget>());
               expect((blockTarget as StoreBlockTarget).storeId, '7');
               expect(blockTarget.confirmText, blockStoreConfirmText);
+              await tester.tap(find.text('取消'));
+              await tester.pumpAndSettle();
+              expect(find.byType(BlockConfirmDialog), findsNothing);
             }
-            await tester.tap(find.text('取消'));
-            await tester.pumpAndSettle();
-            expect(find.byType(BlockConfirmDialog), findsNothing);
           }
           expect(adapter.mutations.length, mutationsBefore);
           expect(tester.takeException(), isNull);

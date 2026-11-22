@@ -41,7 +41,7 @@ final class ActiveChatGateProvider
   }
 }
 
-String _$activeChatGateHash() => r'2d85541725233c5dbb2167c9da7f2fa267877f2a';
+String _$activeChatGateHash() => r'4f35dfbcb658bea603474908278430d71c3dee48';
 
 abstract class _$ActiveChatGate extends $Notifier<ActiveChat> {
   ActiveChat build();

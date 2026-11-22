@@ -8,13 +8,11 @@ import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
-import '../data/block_repository.dart';
 import '../data/block_target.dart';
 import '../data/social_blocker.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
-/// 封鎖確認彈窗。說明文字與送到哪條 API 都由 [target] 的型別決定：社群對象送 `BuyerAppService`，
-/// 聊天與評價（[LegacyBlockTarget]）送舊 REST。
+/// 封鎖確認彈窗。說明文字由 [target] 的型別決定，一律送 `BuyerAppService`。
 /// 使用：`await showBlockConfirmDialog(context, target: const StoreBlockTarget('7'), userLabel: '好店')`
 class BlockConfirmDialog extends ConsumerStatefulWidget {
   const BlockConfirmDialog({
@@ -23,7 +21,7 @@ class BlockConfirmDialog extends ConsumerStatefulWidget {
     required this.userLabel,
   });
 
-  final BlockTarget target;
+  final SocialBlockTarget target;
   final String userLabel;
 
   @override
@@ -36,12 +34,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
   Future<void> _confirmBlock() async {
     setState(() => _submitting = true);
     try {
-      switch (widget.target) {
-        case final SocialBlockTarget target:
-          await ref.read(socialBlockerProvider).block(target);
-        case LegacyBlockTarget(:final userId):
-          await ref.read(blockRepositoryProvider).blockUser(userId);
-      }
+      await ref.read(socialBlockerProvider).block(widget.target);
       if (!mounted) return;
       Navigator.of(context).pop(true);
       showFloatingToast(context, '已封鎖「${widget.userLabel}」', isSuccess: true);
@@ -52,9 +45,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
       if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
-        widget.target is SocialBlockTarget
-            ? errorText(e, defaults: ref.read(defaultErrorTextProvider))
-            : e.toString().replaceAll('Exception: ', ''),
+        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
         isSuccess: false,
       );
     }
@@ -118,7 +109,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
 /// 顯示封鎖確認彈窗。回傳 true 表示已成功封鎖。
 Future<bool?> showBlockConfirmDialog(
   BuildContext context, {
-  required BlockTarget target,
+  required SocialBlockTarget target,
   required String userLabel,
 }) {
   return showDialog<bool>(

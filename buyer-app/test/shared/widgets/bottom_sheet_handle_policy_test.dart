@@ -6,8 +6,6 @@ void main() {
   const auditedPolicies = <String, List<bool>>{
     'lib/shared/widgets/share_bottom_sheet.dart': [true],
     'lib/shared/widgets/text_size_settings_sheet.dart': [false],
-    'lib/shared/widgets/chat_product_picker_sheet.dart': [false],
-    'lib/shared/widgets/chat_order_picker_sheet.dart': [false],
     'lib/shared/widgets/fcm_debug_overlay.dart': [false],
     'lib/features/home/presentation/home_screen.dart': [false],
     'lib/features/home/presentation/home_widget/product_add_to_cart_sheet.dart':
@@ -67,7 +65,7 @@ void main() {
     );
   });
 
-  test('21 個 bottom sheet 入口只顯示一個已盤點的拖曳把手', () {
+  test('19 個 bottom sheet 入口只顯示一個已盤點的拖曳把手', () {
     var auditedCallCount = 0;
     for (final entry in auditedPolicies.entries) {
       final source = File(entry.key).readAsStringSync();
@@ -75,7 +73,7 @@ void main() {
       auditedCallCount += actual.length;
       expect(actual, entry.value, reason: '拖曳把手分類錯誤：${entry.key}');
     }
-    expect(auditedCallCount, 21);
+    expect(auditedCallCount, 19);
   });
 }
 
