@@ -7,6 +7,8 @@ package image
 
 import (
 	"bytes"
+	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
@@ -51,6 +53,9 @@ var ErrTooLarge = errors.New("image: pixel count over limit")
 // jpegQuality 是靜態不透明圖輸出 JPEG 的品質。
 const jpegQuality = 90
 
+// webpQuality 是動態 WebP 輸出的品質。
+const webpQuality = 90
+
 var startOnce sync.Once
 
 // startVips 只初始化一次 libvips，可被並行的處理 job 同時呼叫。
@@ -92,11 +97,24 @@ type Limits struct {
 }
 
 // Sanitize 先辨認格式、讀標頭檢查像素上限，再解碼、套用方向、轉 sRGB、丟掉全部 metadata 後重新編碼。
-// 辨認不出回 ErrUnrecognized，無法解碼回 ErrMalformed，超過像素上限回 ErrTooLarge。
-func Sanitize(d []byte, lim Limits) (Result, error) {
+// 辨認不出（含 APNG）回 ErrUnrecognized，輸入的載入、標頭或像素解碼失敗回 ErrMalformed，超過像素上限回 ErrTooLarge；
+// 轉色、套用方向與編碼的失敗是輸入以外的原因，回一般錯誤（呼叫方當暫時失敗重試）。
+// ctx 在載入前與每個耗時步驟之間檢查，取消回 ctx 的錯誤；libvips 的單一運算跑起來後 vipsgen 沒有中止的介面，不可取消。
+func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
+	return sanitize(ctx, d, lim, nil)
+}
+
+// sanitize 的 fail 只給測試用：在指定階段（stageColour、stageAutorot、stageEncode）注入失敗。
+func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string) error) (Result, error) {
+	if err := live(ctx); err != nil {
+		return Result{}, err
+	}
 	f, err := Detect(d)
 	if err != nil {
 		return Result{}, err
+	}
+	if f == PNG && isAPNG(d) {
+		return Result{}, fmt.Errorf("%w: animated PNG", ErrUnrecognized)
 	}
 	startVips()
 	img, err := load(d, f)
@@ -110,10 +128,78 @@ func Sanitize(d []byte, lim Limits) (Result, error) {
 	if err := checkPixels(img.Width(), pageHeight(img, pages), pages, lim); err != nil {
 		return Result{}, err
 	}
-	if animated {
-		return encodeAnimated(img, f)
+	if err := live(ctx); err != nil {
+		return Result{}, err
 	}
-	return encodeStill(img)
+	// 標頭通過上限後才解碼全部像素；之後的失敗都不再是輸入的問題。
+	if _, err := img.Avg(); err != nil {
+		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+	}
+	if err := live(ctx); err != nil {
+		return Result{}, err
+	}
+	s := stages{ctx: ctx, fail: fail}
+	if animated {
+		return s.encodeAnimated(img, f)
+	}
+	return s.encodeStill(img)
+}
+
+func live(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("image: %w", err)
+	}
+	return nil
+}
+
+const (
+	stageColour  = "colour"
+	stageAutorot = "autorot"
+	stageEncode  = "encode"
+)
+
+type stages struct {
+	ctx  context.Context
+	fail func(stage string) error
+}
+
+// step 先檢查 ctx，再（測試注入時）回注入的失敗，否則執行 fn；失敗一律是一般錯誤。
+func (s stages) step(stage string, fn func() error) error {
+	if err := live(s.ctx); err != nil {
+		return err
+	}
+	var err error
+	if s.fail != nil {
+		err = s.fail(stage)
+	}
+	if err == nil {
+		err = fn()
+	}
+	if err != nil {
+		return fmt.Errorf("image: %s: %w", stage, err)
+	}
+	return nil
+}
+
+// isAPNG 在 IDAT 之前找 acTL 區段；libvips 只讀 APNG 的第一格，放行會靜默丟掉動畫。
+func isAPNG(d []byte) bool {
+	p := 8
+	for p+8 <= len(d) {
+		n := int(binary.BigEndian.Uint32(d[p:]))
+		typ := string(d[p+4 : p+8])
+		switch typ {
+		case "acTL":
+			return true
+		case "IDAT", "IEND":
+			return false
+		}
+		next := p + 12 + n
+		if n < 0 || next <= p || next > len(d) {
+			return false
+		}
+		p = next
+	}
+	return false
 }
 
 func load(d []byte, f Format) (*vips.Image, error) {
@@ -153,53 +239,96 @@ func checkPixels(w, h, pages int, lim Limits) error {
 }
 
 // toSRGB 把像素轉成 sRGB：有內嵌 ICC 描述檔就依它轉換，之後（含沒有描述檔的灰階、CMYK、16 位元）統一轉成 sRGB 色彩空間。
-func toSRGB(img *vips.Image) error {
-	if img.HasICCProfile() {
-		if err := img.IccTransform("srgb", &vips.IccTransformOptions{Embedded: true}); err != nil {
-			return err
+func (s stages) toSRGB(img *vips.Image) error {
+	return s.step(stageColour, func() error {
+		if img.HasICCProfile() {
+			if err := img.IccTransform("srgb", &vips.IccTransformOptions{Embedded: true}); err != nil {
+				return err
+			}
 		}
-	}
-	return img.Colourspace(vips.InterpretationSrgb, nil)
+		return img.Colourspace(vips.InterpretationSrgb, nil)
+	})
 }
 
-func encodeStill(img *vips.Image) (Result, error) {
-	if err := img.Autorot(nil); err != nil {
-		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+// hasTransparency 回報影像是否有任何不完全不透明的像素；有 alpha 通道但全部不透明不算。
+func hasTransparency(img *vips.Image) (bool, error) {
+	if !img.HasAlpha() {
+		return false, nil
 	}
-	if err := toSRGB(img); err != nil {
-		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+	a, err := img.Copy(nil)
+	if err != nil {
+		return false, err
+	}
+	defer a.Close()
+	if err := a.ExtractBand(a.Bands()-1, nil); err != nil {
+		return false, err
+	}
+	m, err := a.Min(nil)
+	if err != nil {
+		return false, err
+	}
+	return m < alphaOpaque(a), nil
+}
+
+// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）。
+func alphaOpaque(a *vips.Image) float64 {
+	if a.BandFormat() == vips.BandFormatUchar {
+		return 255
+	}
+	return 65535
+}
+
+func (s stages) encodeStill(img *vips.Image) (Result, error) {
+	if err := s.step(stageAutorot, func() error { return img.Autorot(nil) }); err != nil {
+		return Result{}, err
+	}
+	if err := s.toSRGB(img); err != nil {
+		return Result{}, err
+	}
+	var transparent bool
+	if err := s.step(stageColour, func() (err error) { transparent, err = hasTransparency(img); return }); err != nil {
+		return Result{}, err
+	}
+	if transparent {
+		var out []byte
+		err := s.step(stageEncode, func() (err error) {
+			out, err = img.PngsaveBuffer(&vips.PngsaveBufferOptions{Keep: vips.KeepNone, Compression: 6})
+			return
+		})
+		return Result{Data: out, Format: PNG}, err
 	}
 	if img.HasAlpha() {
-		out, err := img.PngsaveBuffer(&vips.PngsaveBufferOptions{Keep: vips.KeepNone, Compression: 6})
-		if err != nil {
-			return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+		if err := s.step(stageColour, func() error { return img.Flatten(nil) }); err != nil {
+			return Result{}, err
 		}
-		return Result{Data: out, Format: PNG}, nil
 	}
-	out, err := img.JpegsaveBuffer(&vips.JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepNone})
-	if err != nil {
-		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
-	}
-	return Result{Data: out, Format: JPEG}, nil
+	var out []byte
+	err := s.step(stageEncode, func() (err error) {
+		out, err = img.JpegsaveBuffer(&vips.JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepNone})
+		return
+	})
+	return Result{Data: out, Format: JPEG}, err
 }
 
 // encodeAnimated 保留影格與延遲；不套用方向（動態 GIF 與 WebP 的各影格疊成一張高圖，旋轉會打亂影格）。
-func encodeAnimated(img *vips.Image, f Format) (Result, error) {
-	if err := toSRGB(img); err != nil {
-		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+func (s stages) encodeAnimated(img *vips.Image, f Format) (Result, error) {
+	if err := s.toSRGB(img); err != nil {
+		return Result{}, err
 	}
-	var out []byte
-	var err error
-	switch f {
-	case GIF:
-		out, err = img.GifsaveBuffer(&vips.GifsaveBufferOptions{Keep: vips.KeepNone})
-	case WebP:
-		out, err = img.WebpsaveBuffer(&vips.WebpsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepNone})
-	case JPEG, PNG:
+	if f != GIF && f != WebP {
 		return Result{}, fmt.Errorf("%w: %s has no animated encoder", ErrMalformed, f)
 	}
+	var out []byte
+	err := s.step(stageEncode, func() (err error) {
+		if f == GIF {
+			out, err = img.GifsaveBuffer(&vips.GifsaveBufferOptions{Keep: vips.KeepNone})
+		} else {
+			out, err = img.WebpsaveBuffer(&vips.WebpsaveBufferOptions{Q: webpQuality, Keep: vips.KeepNone})
+		}
+		return
+	})
 	if err != nil {
-		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
+		return Result{}, err
 	}
 	return Result{Data: out, Format: f}, nil
 }

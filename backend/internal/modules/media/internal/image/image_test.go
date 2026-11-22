@@ -2,6 +2,7 @@ package image_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
@@ -24,7 +25,7 @@ const gpsMarker = "GPS-25.0330N-121.5654E-SERIAL-A1B2C3"
 var testLimits = image.Limits{FramePixels: 1_000_000, AnimatedPixels: 1_500_000}
 
 func sanitize(d []byte) (image.Result, error) {
-	return image.Sanitize(d, testLimits)
+	return image.Sanitize(context.Background(), d, testLimits)
 }
 
 func solid(w, h int, c color.NRGBA) *stdimage.NRGBA {
@@ -109,13 +110,13 @@ func wantNoMetadata(t *testing.T, img *vips.Image, raw []byte) {
 	}
 	for _, f := range img.GetFields() {
 		l := strings.ToLower(f)
-		for _, bad := range []string{"exif", "xmp", "icc", "iptc", "orientation", "gps"} {
+		for _, bad := range []string{"exif", "xmp", "icc", "iptc", "orientation", "gps", "comment"} {
 			if strings.Contains(l, bad) {
 				t.Errorf("輸出仍有 metadata 欄位 %q", f)
 			}
 		}
 	}
-	if bytes.Contains(raw, []byte(gpsMarker)) || bytes.Contains(raw, []byte("Exif\x00\x00")) {
+	if bytes.Contains(raw, []byte(gpsMarker)) || bytes.Contains(raw, []byte("Exif\x00\x00")) || bytes.Contains(raw, []byte("XMP Data")) {
 		t.Error("輸出位元組仍含 GPS 或 EXIF")
 	}
 }
@@ -351,5 +352,219 @@ func TestContentTypes(t *testing.T) {
 		if f.ContentType() != want {
 			t.Errorf("%s -> %q", f, f.ContentType())
 		}
+	}
+}
+
+func isPermanentImageErr(err error) bool {
+	return errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge)
+}
+
+func TestNonInputFailuresAreNotInputErrors(t *testing.T) {
+	src := pngBytes(t, solid(8, 8, color.NRGBA{10, 200, 30, 255}))
+	boom := errors.New("boom")
+	for _, stage := range []string{image.StageAutorot, image.StageColour, image.StageEncode} {
+		t.Run(stage, func(t *testing.T) {
+			_, err := image.SanitizeFailing(context.Background(), src, testLimits, stage, boom)
+			if err == nil || !errors.Is(err, boom) {
+				t.Fatalf("err = %v，預期包著注入的錯誤", err)
+			}
+			if isPermanentImageErr(err) {
+				t.Fatalf("%s 階段的失敗被分類成輸入錯誤（永久失敗）：%v", stage, err)
+			}
+		})
+	}
+}
+
+func TestAnimatedEncodeFailureIsNotAnInputError(t *testing.T) {
+	boom := errors.New("boom")
+	_, err := image.SanitizeFailing(context.Background(), gifFrames(t, 16, 16, 3), testLimits, image.StageEncode, boom)
+	if !errors.Is(err, boom) || isPermanentImageErr(err) {
+		t.Fatalf("err = %v，預期一般錯誤", err)
+	}
+}
+
+func TestTruncatedPixelDataIsMalformed(t *testing.T) {
+	src := pngBytes(t, solid(64, 64, color.NRGBA{1, 2, 3, 255}))
+	_, err := sanitize(src[:len(src)-40])
+	if !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期 ErrMalformed", err)
+	}
+}
+
+func TestCancelledContextReturnsContextErrorBeforeWork(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := image.Sanitize(ctx, pngBytes(t, solid(8, 8, color.NRGBA{1, 2, 3, 255})), testLimits)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v，預期 context.Canceled", err)
+	}
+	if isPermanentImageErr(err) {
+		t.Fatalf("取消被分類成永久失敗：%v", err)
+	}
+}
+
+func TestOpaqueAlphaChannelBecomesJPEG(t *testing.T) {
+	res, err := sanitize(pngBytes(t, solid(8, 8, color.NRGBA{10, 200, 30, 255})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Format != image.JPEG {
+		t.Fatalf("format = %s，預期 jpeg（有 alpha 通道但全部不透明）", res.Format)
+	}
+	if load(t, res.Data, image.JPEG).HasAlpha() {
+		t.Fatal("輸出仍有 alpha 通道")
+	}
+}
+
+func TestPartlyTransparentPNGStaysPNG(t *testing.T) {
+	img := solid(8, 8, color.NRGBA{10, 200, 30, 255})
+	img.SetNRGBA(3, 3, color.NRGBA{10, 200, 30, 0})
+	res, err := sanitize(pngBytes(t, img))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Format != image.PNG {
+		t.Fatalf("format = %s，預期 png（有一個透明像素）", res.Format)
+	}
+}
+
+func pngChunk(typ string, data []byte) []byte {
+	var b bytes.Buffer
+	_ = binary.Write(&b, binary.BigEndian, uint32(len(data)))
+	b.WriteString(typ)
+	b.Write(data)
+	_ = binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(append([]byte(typ), data...)))
+	return b.Bytes()
+}
+
+// insertPNGChunks 把區段插在 IHDR 之後（IDAT 之前）。
+func insertPNGChunks(src []byte, chunks ...[]byte) []byte {
+	const ihdrEnd = 8 + 12 + 13
+	out := append([]byte{}, src[:ihdrEnd]...)
+	for _, c := range chunks {
+		out = append(out, c...)
+	}
+	return append(out, src[ihdrEnd:]...)
+}
+
+func TestAPNGIsRejectedAsUnrecognized(t *testing.T) {
+	src := pngBytes(t, solid(8, 8, color.NRGBA{1, 2, 3, 255}))
+	actl := pngChunk("acTL", []byte{0, 0, 0, 2, 0, 0, 0, 0})
+	_, err := sanitize(insertPNGChunks(src, actl))
+	if !errors.Is(err, image.ErrUnrecognized) {
+		t.Fatalf("err = %v，預期 ErrUnrecognized", err)
+	}
+	if _, err := sanitize(src); err != nil {
+		t.Fatalf("一般 PNG 不該被擋：%v", err)
+	}
+}
+
+func TestTransparentPNGOutputCarriesNoMetadata(t *testing.T) {
+	img := solid(8, 8, color.NRGBA{10, 200, 30, 128})
+	exif := exifWithGPS(1)[6:]
+	xmp := append([]byte("XML:com.adobe.xmp\x00\x00\x00\x00\x00"), []byte("<x:xmpmeta>"+gpsMarker+"</x:xmpmeta>")...)
+	src := insertPNGChunks(pngBytes(t, img), pngChunk("eXIf", exif), pngChunk("iTXt", xmp))
+	if !bytes.Contains(src, []byte(gpsMarker)) {
+		t.Fatal("fixture 沒有 GPS 標記")
+	}
+	res, err := sanitize(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Format != image.PNG {
+		t.Fatalf("format = %s，預期 png", res.Format)
+	}
+	wantNoMetadata(t, load(t, res.Data, image.PNG), res.Data)
+}
+
+// withGIFExtensions 在全域色盤之後插入一個註解與一個 XMP application 延伸區塊。
+func withGIFExtensions(t *testing.T, g []byte) []byte {
+	t.Helper()
+	p := 13
+	if g[10]&0x80 != 0 {
+		p += 3 << ((g[10] & 7) + 1)
+	}
+	comment := append([]byte{0x21, 0xFE, byte(len(gpsMarker))}, []byte(gpsMarker)...)
+	comment = append(comment, 0)
+	xmp := append([]byte{0x21, 0xFF, 11}, []byte("XMP DataXMP")...)
+	xmp = append(xmp, byte(len(gpsMarker)))
+	xmp = append(xmp, []byte(gpsMarker)...)
+	xmp = append(xmp, 0)
+	out := append([]byte{}, g[:p]...)
+	out = append(out, comment...)
+	out = append(out, xmp...)
+	return append(out, g[p:]...)
+}
+
+func TestAnimatedGIFOutputCarriesNoMetadata(t *testing.T) {
+	src := withGIFExtensions(t, gifFrames(t, 16, 16, 3))
+	res, err := sanitize(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Format != image.GIF || load(t, res.Data, image.GIF).Pages() != 3 {
+		t.Fatalf("格式或影格數不對：%s", res.Format)
+	}
+	wantNoMetadata(t, load(t, res.Data, image.GIF), res.Data)
+}
+
+// withWebPMetadata 在動態 WebP 加上 EXIF 與 XMP 區段（設 VP8X 旗標並更新 RIFF 長度）。
+func withWebPMetadata(t *testing.T, w []byte) []byte {
+	t.Helper()
+	if string(w[12:16]) != "VP8X" {
+		t.Fatal("fixture 不是 VP8X")
+	}
+	chunk := func(typ string, data []byte) []byte {
+		out := append([]byte(typ), 0, 0, 0, 0)
+		binary.LittleEndian.PutUint32(out[4:], uint32(len(data)))
+		out = append(out, data...)
+		if len(data)%2 == 1 {
+			out = append(out, 0)
+		}
+		return out
+	}
+	out := append([]byte{}, w...)
+	out[20] |= 0x08 | 0x04
+	out = append(out, chunk("EXIF", exifWithGPS(1)[6:])...)
+	out = append(out, chunk("XMP ", []byte("<x:xmpmeta>"+gpsMarker+"</x:xmpmeta>"))...)
+	binary.LittleEndian.PutUint32(out[4:], uint32(len(out)-8))
+	return out
+}
+
+func TestAnimatedWebPOutputCarriesNoMetadata(t *testing.T) {
+	g := load(t, gifFrames(t, 16, 16, 3), image.GIF)
+	plain, err := g.WebpsaveBuffer(&vips.WebpsaveBufferOptions{Q: 90})
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := withWebPMetadata(t, plain)
+	if !bytes.Contains(src, []byte(gpsMarker)) {
+		t.Fatal("fixture 沒有 GPS 標記")
+	}
+	res, err := sanitize(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Format != image.WebP || load(t, res.Data, image.WebP).Pages() != 3 {
+		t.Fatalf("格式或影格數不對：%s", res.Format)
+	}
+	wantNoMetadata(t, load(t, res.Data, image.WebP), res.Data)
+}
+
+// libvips 能解碼、但不在允許清單內的格式必須在辨認階段就被拒絕：回 ErrUnrecognized，且不是解碼失敗的 ErrMalformed。
+func TestDecodableButDisallowedFormatIsUnrecognized(t *testing.T) {
+	src := load(t, pngBytes(t, solid(8, 8, color.NRGBA{1, 2, 3, 255})), image.PNG)
+	tiff, err := src.TiffsaveBuffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back, err := vips.NewTiffloadBuffer(tiff, nil); err != nil {
+		t.Fatalf("fixture 應能被 libvips 解碼：%v", err)
+	} else {
+		back.Close()
+	}
+	_, err = sanitize(tiff)
+	if !errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期只有 ErrUnrecognized", err)
 	}
 }

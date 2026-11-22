@@ -80,6 +80,9 @@ const (
 	UploadTTL = model.UploadTTL
 	// StuckUploadGrace 是卡在 UPLOADED 的暫存列過期後、GC 回收它之前的寬限。
 	StuckUploadGrace = model.StuckUploadGrace
+	// ProcessQueue 與 ProcessQueueWorkers 是處理 job 專用的 River queue 與它的併發上限，worker 角色必須設定這個 queue。
+	ProcessQueue        = model.ProcessQueue
+	ProcessQueueWorkers = model.ProcessQueueWorkers
 	// ProcessMaxAttempts 是處理 job 的重試上限。
 	ProcessMaxAttempts = upload.MaxAttempts
 )

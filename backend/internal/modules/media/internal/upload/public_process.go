@@ -61,7 +61,7 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 	if subtle.ConstantTimeCompare(sum[:], want) != 1 {
 		return ProcessResult{}, model.Permanent(model.RejectChecksumMismatch, errors.New("MD5 與宣告不符"))
 	}
-	res, err := image.Sanitize(data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels})
+	res, err := image.Sanitize(ctx, data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels})
 	if err != nil {
 		if errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge) {
 			return ProcessResult{}, model.Permanent(model.RejectUnrecognizedFormat, err)

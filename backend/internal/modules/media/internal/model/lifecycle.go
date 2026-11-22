@@ -41,6 +41,14 @@ const (
 	MaxAnimatedPixels int64 = 50_000_000
 )
 
+// ProcessQueue 是處理 job 專用的 River queue，ProcessQueueWorkers 是它同時執行的 job 數，整個模組只有這一處定義。
+// 解碼的記憶體上限是「每個 job」的像素上限；queue 的併發乘上像素上限才是每個 process 的記憶體預算（見 CARRYOVER.md 的上限一列），
+// 所以不與其他 job 共用 default queue 的併發。
+const (
+	ProcessQueue        = "media_process"
+	ProcessQueueWorkers = 2
+)
+
 // MaxUploadSize 回傳 v 可見性的單次上傳大小上限；未知的可見性回 0。
 func MaxUploadSize(v Visibility) int64 {
 	switch v {

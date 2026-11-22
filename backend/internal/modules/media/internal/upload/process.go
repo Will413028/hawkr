@@ -53,7 +53,11 @@ type ProcessArgs struct {
 func (ProcessArgs) Kind() string { return "media.process_upload" }
 
 // InsertOpts 讓同一筆暫存還沒結束的處理 job 合併。
-func (ProcessArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(MaxAttempts) }
+func (ProcessArgs) InsertOpts() river.InsertOpts {
+	opts := jobs.UniqueByArgs(MaxAttempts)
+	opts.Queue = model.ProcessQueue
+	return opts
+}
 
 func (s *Service) enqueueProcess(ctx context.Context, id uuid.UUID) error {
 	opts := ProcessArgs{}.InsertOpts()

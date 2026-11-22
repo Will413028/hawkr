@@ -168,3 +168,24 @@ func TestPublicProcess_RefusesDeclaredSizeAboveLimitWithoutReading(t *testing.T)
 		t.Fatal("超過上限的宣告不該讀物件")
 	}
 }
+
+func TestPublicProcess_CancelledContextIsTemporary(t *testing.T) {
+	s := storage.NewFake()
+	putTmp(t, s, tinyGIF)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := upload.PublicProcess(ctx, s, input(tinyGIF))
+	var p *model.PermanentError
+	if !errors.Is(err, context.Canceled) || errors.As(err, &p) {
+		t.Fatalf("err = %v，預期 context.Canceled 的暫時失敗", err)
+	}
+}
+
+func TestProcessJobRunsOnItsOwnQueue(t *testing.T) {
+	if got := (upload.ProcessArgs{}).InsertOpts().Queue; got != model.ProcessQueue {
+		t.Fatalf("queue = %q，預期 %q", got, model.ProcessQueue)
+	}
+	if model.ProcessQueue == "default" || model.ProcessQueueWorkers != 2 {
+		t.Fatalf("queue %q workers %d", model.ProcessQueue, model.ProcessQueueWorkers)
+	}
+}

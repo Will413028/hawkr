@@ -4,9 +4,9 @@
    "id": "no-format-allowlist",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "\tf, err := Detect(d)\n\tif err != nil {\n\t\treturn Result{}, err\n\t}\n",
-   "new": "\tf, _ := Detect(d)\n\tvar err error\n",
-   "test": "internal/modules/media/internal/image ^TestFakeImageIsRejected$",
+   "old": "\tf, err := Detect(d)\n\tif err != nil {\n\t\treturn Result{}, err\n\t}\n\tif f == PNG",
+   "new": "\tf, _ := Detect(d)\n\tvar err error\n\tif f == PNG",
+   "test": "internal/modules/media/internal/image ^TestDecodableButDisallowedFormatIsUnrecognized$",
    "why": "an unrecognised payload is no longer rejected by the magic-byte allowlist before decoding"
   },
   {
@@ -40,8 +40,8 @@
    "id": "no-autorotate",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "if err := img.Autorot(nil); err != nil {",
-   "new": "if err := error(nil); err != nil {",
+   "old": "return img.Autorot(nil)",
+   "new": "return error(nil)",
    "test": "internal/modules/media/internal/image ^TestSanitizeStripsAllMetadataAndAppliesOrientation$",
    "why": "pixels are not rotated by EXIF orientation although the orientation tag is dropped"
   },
@@ -49,8 +49,8 @@
    "id": "no-icc-transform",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/image/image.go",
-   "old": "if img.HasICCProfile() {\n\t\tif err := img.IccTransform",
-   "new": "if false && img.HasICCProfile() {\n\t\tif err := img.IccTransform",
+   "old": "if img.HasICCProfile() {\n\t\t\tif err := img.IccTransform",
+   "new": "if false && img.HasICCProfile() {\n\t\t\tif err := img.IccTransform",
    "test": "internal/modules/media/internal/image ^TestSanitizeConvertsWideGamutToSRGB$",
    "why": "a wide-gamut image keeps its raw P3 pixel values while the profile is dropped"
   },
@@ -98,6 +98,78 @@
    "new": "if false && in.Size > model.MaxUploadSize(in.Visibility) {",
    "test": "internal/modules/media/internal/upload ^TestValidateRejectsSizeAboveModuleLimit$",
    "why": "BeginUpload accepts a declared size above the module limit"
+  },
+  {
+   "id": "encode-failure-is-permanent",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\tif err != nil {\n\t\treturn fmt.Errorf(\"image: %s: %w\", stage, err)",
+   "new": "\tif err != nil {\n\t\terr = fmt.Errorf(\"%w: %w\", ErrMalformed, err)\n\t\treturn fmt.Errorf(\"image: %s: %w\", stage, err)",
+   "test": "internal/modules/media/internal/image ^TestNonInputFailuresAreNotInputErrors$",
+   "why": "a colour, autorotate or encode failure is classified as a malformed input and rejected permanently instead of retried"
+  },
+  {
+   "id": "decode-failure-not-checked-up-front",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if _, err := img.Avg(); err != nil {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestTruncatedPixelDataIsMalformed$",
+   "why": "truncated pixel data surfaces later as a retryable encode error instead of a permanent malformed input"
+  },
+  {
+   "id": "no-apng-check",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if f == PNG && isAPNG(d) {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestAPNGIsRejectedAsUnrecognized$",
+   "why": "an animated PNG passes as a still image and silently loses its animation"
+  },
+  {
+   "id": "context-ignored",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if err := ctx.Err(); err != nil {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestCancelledContextReturnsContextErrorBeforeWork$",
+   "why": "a cancelled context no longer stops the sanitizer"
+  },
+  {
+   "id": "opaque-alpha-stays-png",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "return m < alphaOpaque(a), nil",
+   "new": "return true, nil",
+   "test": "internal/modules/media/internal/image ^TestOpaqueAlphaChannelBecomesJPEG$",
+   "why": "an opaque image with an alpha band is emitted as a larger PNG instead of JPEG"
+  },
+  {
+   "id": "png-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "PngsaveBufferOptions{Keep: vips.KeepNone",
+   "new": "PngsaveBufferOptions{Keep: vips.KeepAll",
+   "test": "internal/modules/media/internal/image ^TestTransparentPNGOutputCarriesNoMetadata$",
+   "why": "re-encoded transparent PNG keeps EXIF and XMP"
+  },
+  {
+   "id": "webp-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "WebpsaveBufferOptions{Q: webpQuality, Keep: vips.KeepNone",
+   "new": "WebpsaveBufferOptions{Q: webpQuality, Keep: vips.KeepAll",
+   "test": "internal/modules/media/internal/image ^TestAnimatedWebPOutputCarriesNoMetadata$",
+   "why": "re-encoded animated WebP keeps EXIF and XMP"
+  },
+  {
+   "id": "process-queue-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "opts.Queue = model.ProcessQueue",
+   "new": "opts.Queue = \"\"",
+   "test": "internal/modules/media/internal/upload ^TestProcessJobRunsOnItsOwnQueue$",
+   "why": "the process job falls back to the shared default queue and its concurrency"
   }
  ]
 }

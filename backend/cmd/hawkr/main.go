@@ -53,6 +53,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -460,7 +461,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
-	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
+	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency, media.ProcessQueue: media.ProcessQueueWorkers}, periodic)
 	if err != nil {
 		return err
 	}
