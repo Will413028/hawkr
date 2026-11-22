@@ -31,6 +31,9 @@ import '../../../core/analytics/analytics_providers.dart';
 import '../../../core/analytics/purchase_dedup.dart';
 import '../../../core/payment/pay_token_service.dart';
 import '../data/order_status_notifier.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart'
+    as pb_review;
+import '../../review/data/review_display.dart';
 import '../../review/data/review_repository.dart';
 import '../../../config/image_config.dart';
 import '../../../shared/widgets/oss_image.dart';
@@ -2388,7 +2391,7 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
       if (orderItemIds.isEmpty) return null;
       final review = await ref
           .read(reviewRepositoryProvider)
-          .findReviewByOrderItemIds(orderItemIds);
+          .findMyReviewForOrderItems(orderItemIds);
       if (review == null) {
         // API 沒撈到但 Order 有 reviewRating（極少見），用 Order 自帶
         if (widget.order.reviewRating > 0) {
@@ -2400,7 +2403,7 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
         }
         return null;
       }
-      return _ReviewData.fromReviewMap(review);
+      return _ReviewData.fromReview(review);
     } catch (_) {
       // API 失敗時，如果 Order 自帶 rating 仍可顯示部分資料
       if (widget.order.reviewRating > 0) {
@@ -2508,7 +2511,7 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
   }
 }
 
-/// 評價卡片資料來源整合（Order 自帶 + /app/me/reviews API fallback）
+/// 評價卡片資料來源整合（`ReviewAppService.ListMyReviews`，失敗時用 Order 自帶的值）
 class _ReviewData {
   const _ReviewData({
     required this.rating,
@@ -2520,31 +2523,9 @@ class _ReviewData {
   final String content;
   final List<String> images;
 
-  factory _ReviewData.fromReviewMap(Map<String, dynamic> review) {
-    // rating 後端可能回 int / num / String（"4" / "4.0"）
-    final r = review['rating'];
-    int rating = 0;
-    if (r is int) {
-      rating = r.clamp(0, 5);
-    } else if (r is num) {
-      rating = r.round().clamp(0, 5);
-    } else if (r is String) {
-      final n = num.tryParse(r);
-      if (n != null) rating = n.round().clamp(0, 5);
-    }
-
-    final content = (review['content'] ?? '').toString().trim();
-
-    // gateway `OrderReviewResponse`：imageKeys ＋ imageUrls 成對（49 §6.1）。
-    final imagesRaw = review['imageUrls'];
-    final images = <String>[];
-    if (imagesRaw is List) {
-      for (final item in imagesRaw) {
-        final url = item?.toString().trim() ?? '';
-        if (url.isNotEmpty) images.add(url);
-      }
-    }
-
-    return _ReviewData(rating: rating, content: content, images: images);
-  }
+  factory _ReviewData.fromReview(pb_review.Review review) => _ReviewData(
+    rating: review.rating.clamp(0, 5),
+    content: review.content.trim(),
+    images: review.imageUrls,
+  );
 }

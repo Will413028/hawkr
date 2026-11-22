@@ -619,6 +619,111 @@ final class ModerationAppClientProvider
 String _$moderationAppClientHash() =>
     r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
 
+/// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
+
+@ProviderFor(reviewPublicClient)
+final reviewPublicClientProvider = ReviewPublicClientProvider._();
+
+/// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
+
+final class ReviewPublicClientProvider
+    extends
+        $FunctionalProvider<
+          ReviewPublicServiceClient,
+          ReviewPublicServiceClient,
+          ReviewPublicServiceClient
+        >
+    with $Provider<ReviewPublicServiceClient> {
+  /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
+  ReviewPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'reviewPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$reviewPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ReviewPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ReviewPublicServiceClient create(Ref ref) {
+    return reviewPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReviewPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReviewPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$reviewPublicClientHash() =>
+    r'b60aeb1270379a004543c9afb489d5d7174e238a';
+
+/// 買家的評價（`ReviewAppService`）：寫評價與讀自己寫的評價。
+
+@ProviderFor(reviewAppClient)
+final reviewAppClientProvider = ReviewAppClientProvider._();
+
+/// 買家的評價（`ReviewAppService`）：寫評價與讀自己寫的評價。
+
+final class ReviewAppClientProvider
+    extends
+        $FunctionalProvider<
+          ReviewAppServiceClient,
+          ReviewAppServiceClient,
+          ReviewAppServiceClient
+        >
+    with $Provider<ReviewAppServiceClient> {
+  /// 買家的評價（`ReviewAppService`）：寫評價與讀自己寫的評價。
+  ReviewAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'reviewAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$reviewAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ReviewAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ReviewAppServiceClient create(Ref ref) {
+    return reviewAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReviewAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReviewAppServiceClient>(value),
+    );
+  }
+}
+
+String _$reviewAppClientHash() => r'5c6ea7ec43ab70c2468579cb4edc2c769fa49289';
+
 @ProviderFor(discoveryPublicClient)
 final discoveryPublicClientProvider = DiscoveryPublicClientProvider._();
 

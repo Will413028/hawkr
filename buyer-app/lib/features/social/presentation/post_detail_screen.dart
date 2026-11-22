@@ -220,7 +220,7 @@ class PostDetailScreen extends HookConsumerWidget {
           if (!context.mounted) return;
           await showReportBlockActionSheet(
             context,
-            reportTarget: SocialReportTarget.post(postId.toString()),
+            reportTarget: ReportTarget.post(postId.toString()),
             blockTarget: sellerId.isNotEmpty
                 ? StoreBlockTarget(sellerId, originPostId: postId)
                 : null,

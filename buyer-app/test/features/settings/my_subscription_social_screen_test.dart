@@ -71,14 +71,12 @@ void main() {
     when(
       () => _visitRepository.batchCheckFavorites(any()),
     ).thenAnswer((_) async => {88});
-    when(
-      () => _reviewRepository.getMerchantProductReviewSummary(any()),
-    ).thenAnswer(
-      (_) async => <String, dynamic>{
-        'hasTotal': true,
-        'total': 18,
-        'rating': 4.8,
-      },
+    when(() => _reviewRepository.productReviewSummary(any())).thenAnswer(
+      (_) async => (
+        count: 18,
+        average: 4.8,
+        distribution: <int, int>{5: 15, 4: 3, 3: 0, 2: 0, 1: 0},
+      ),
     );
   });
 

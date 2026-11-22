@@ -196,7 +196,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     if (!mounted) return;
     final blocked = await showReportBlockActionSheet(
       context,
-      reportTarget: SocialReportTarget.comment(comment.id),
+      reportTarget: ReportTarget.comment(comment.id),
       blockTarget: blockTargetForComment(comment),
       blockUserLabel: author,
       blockActionLabel: '封鎖此人',

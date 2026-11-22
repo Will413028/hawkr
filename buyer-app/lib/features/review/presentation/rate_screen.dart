@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
@@ -15,14 +18,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 class RateScreen extends HookConsumerWidget {
-  const RateScreen({
-    super.key,
-    required this.skuId,
-    required this.orderItemId,
-    this.orderNo = '',
-  });
-  final int skuId;
-  final int orderItemId;
+  const RateScreen({super.key, required this.orderItemId, this.orderNo = ''});
+  final String orderItemId;
   final String orderNo;
 
   @override
@@ -179,7 +176,6 @@ class RateScreen extends HookConsumerWidget {
                             .submit(
                               orderNo: orderNo,
                               orderItemId: orderItemId,
-                              skuId: skuId,
                               rating: rating.value,
                               content: contentCtrl.text.trim(),
                             );
@@ -197,9 +193,13 @@ class RateScreen extends HookConsumerWidget {
                           final err = ref.read(addReviewControllerProvider);
                           err.whenOrNull(
                             error: (e, _) {
+                              if (isAccountSuspendedError(e)) return;
                               showFloatingToast(
                                 context,
-                                e.toString(),
+                                errorText(
+                                  e,
+                                  defaults: ref.read(defaultErrorTextProvider),
+                                ),
                                 isSuccess: false,
                               );
                             },

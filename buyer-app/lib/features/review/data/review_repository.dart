@@ -1,282 +1,124 @@
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:hawkr_buyer/shared/utils/hk_log.dart';
-import '../../../core/networking/dio_provider.dart';
-import '../../../core/exceptions/app_exception.dart';
-import 'review_model.dart';
+
+import '../../../core/networking/connect_provider.dart';
 
 part 'review_repository.g.dart';
 
 @riverpod
-ReviewRepository reviewRepository(Ref ref) =>
-    ReviewRepository(ref.watch(dioProvider));
+ReviewRepository reviewRepository(Ref ref) => ReviewRepository(
+  ref.watch(reviewPublicClientProvider),
+  ref.watch(reviewAppClientProvider),
+);
 
+/// 商品評價的統計：由讀到的評價算出。
+typedef ProductReviewSummary = ({
+  int count,
+  double average,
+  Map<int, int> distribution,
+});
+
+/// 評價（`ReviewPublicService`、`ReviewAppService`）。讀取失敗一律丟出，不回空清單：呼叫端要把
+/// 「讀取失敗」和「沒有評價」分開呈現。
 class ReviewRepository {
-  final Dio _dio;
-  ReviewRepository(this._dio);
+  ReviewRepository(this._public, this._app);
 
-  int _parseIntValue(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value.toString()) ?? 0;
-  }
+  /// 每頁筆數（API 預設 20，上限 100）。
+  static const pageSize = 100;
 
-  double _parseRatingValue(dynamic value) {
-    if (value == null) return 0;
-    final raw = value is num
-        ? value.toDouble()
-        : double.tryParse(value.toString());
-    if (raw == null || raw <= 0) return 0;
-    final rating = raw > 5 && raw <= 50 ? raw / 10 : raw;
-    return rating.clamp(0, 5).toDouble();
-  }
+  /// 讀一個商品的評價最多讀幾頁；超過時只回前面的，避免單一商品拖住畫面。
+  static const maxPages = 10;
 
-  List<Map<String, dynamic>> _extractReviewRecords(dynamic data) {
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+  final ReviewPublicServiceClient _public;
+  final ReviewAppServiceClient _app;
+
+  /// 商品的公開評價一頁；[pageToken] 空字串是第一頁，回應的 `nextPageToken` 空字串表示沒有下一頁。
+  Future<pb.ListProductReviewsResponse> listProductReviews(
+    String productId, {
+    String pageToken = '',
+    int? pageSize,
+  }) => _public.listProductReviews(
+    pb.ListProductReviewsRequest(
+      productId: productId,
+      pageSize: pageSize ?? ReviewRepository.pageSize,
+      pageToken: pageToken,
+    ),
+  );
+
+  /// 商品的公開評價，依序讀到沒有下一頁或 [maxPages] 頁。有觀看者封鎖過濾時一頁可以少於 [pageSize]，
+  /// 所以結束只看 `nextPageToken`。
+  Future<List<pb.Review>> listAllProductReviews(String productId) async {
+    final reviews = <pb.Review>[];
+    var token = '';
+    for (var page = 0; page < maxPages; page++) {
+      final response = await listProductReviews(productId, pageToken: token);
+      reviews.addAll(response.reviews);
+      token = response.nextPageToken;
+      if (token.isEmpty) break;
     }
-    if (data is Map) {
-      for (final k in ['data', 'rows', 'list', 'items', 'reviews']) {
-        final v = data[k];
-        if (v is List) {
-          return v
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-        if (v is Map) {
-          final records = v['records'];
-          if (records is List) {
-            return records
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-          }
-        }
-      }
-    }
-    return [];
+    return reviews;
   }
 
-  Future<List<Review>> getProductReviews(int skuId) async {
-    try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/public/products/$skuId/reviews',
-      );
-      final body = resp.data!;
-      if (body['code'] != 0) {
-        throw ServerException((body['message'] ?? '請求失敗').toString());
-      }
-      final data = body['data'];
-      final list = (data is Map ? data['records'] : data) as List? ?? [];
-      return list
-          .map((e) => Review.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      throw const NetworkException();
+  /// 商品評價的數量、平均與各星等的數量，由 [listAllProductReviews] 的結果算出（契約沒有商品層級的統計）。
+  Future<ProductReviewSummary> productReviewSummary(String productId) async =>
+      summarize(await listAllProductReviews(productId));
+
+  static ProductReviewSummary summarize(List<pb.Review> reviews) {
+    final distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+    var sum = 0;
+    var count = 0;
+    for (final review in reviews) {
+      final rating = review.rating;
+      if (rating < 1 || rating > 5) continue;
+      sum += rating;
+      count++;
+      distribution[rating] = distribution[rating]! + 1;
     }
+    return (
+      count: count,
+      average: count == 0 ? 0.0 : sum / count,
+      distribution: distribution,
+    );
   }
 
-  /// Public merchant product reviews (used by merchant_item_detail_screen and product_reviews_screen).
-  Future<List<Map<String, dynamic>>> getMerchantProductReviews(
-    String skuId,
+  /// 這個訂單項目我可見的評價；沒有（沒寫過，或被平台隱藏）回 null。
+  Future<pb.Review?> findMyReviewForOrderItem(String orderItemId) async {
+    final response = await _app.listMyReviews(
+      pb.ListMyReviewsRequest(pageSize: 1, orderItemId: orderItemId),
+    );
+    return response.reviews.isEmpty ? null : response.reviews.first;
+  }
+
+  /// 這些訂單項目裡第一個有我可見評價的那則；都沒有回 null。
+  Future<pb.Review?> findMyReviewForOrderItems(
+    Iterable<String> orderItemIds,
   ) async {
-    try {
-      final resp = await _dio.get<dynamic>('/public/products/$skuId/reviews');
-      return _extractReviewRecords(resp.data);
-    } on DioException {
-      // fall through
-    }
-    return [];
-  }
-
-  Future<Map<String, dynamic>> getMerchantProductReviewSummary(
-    String skuId,
-  ) async {
-    try {
-      final resp = await _dio.get<dynamic>(
-        '/public/products/$skuId/reviews',
-        queryParameters: const {'page': 1, 'size': 1},
-      );
-      final data = resp.data;
-      if (data is! Map) {
-        final records = _extractReviewRecords(data);
-        return {'hasTotal': false, 'total': records.length, 'rating': 0.0};
-      }
-
-      final inner = data['data'];
-      final stats = data['stats'] is Map
-          ? data['stats'] as Map
-          : (inner is Map && inner['stats'] is Map
-                ? inner['stats'] as Map
-                : null);
-      // GET /public/products/{id}/reviews 的 data.stats 是 ReviewStatsBlock：
-      // totalCount / averageRating / rating{1..5}Count / withImagesCount。
-      // 它已無 omitempty，零評論商品也照樣吐 0（不再是 undefined），所以
-      // `stats.totalCount` 存在與否就是「有沒有 stats 區塊」的唯一判準。
-      final totalSource =
-          data['total'] ??
-          (inner is Map ? inner['total'] : null) ??
-          stats?['totalCount'];
-      final total = _parseIntValue(totalSource);
-      final records = _extractReviewRecords(data);
-
-      final rating = stats != null
-          ? _parseRatingValue(stats['averageRating'])
-          : 0.0;
-
-      return {
-        'hasTotal': totalSource != null,
-        'total': totalSource != null ? total : records.length,
-        'rating': rating,
-      };
-    } on DioException {
-      return {'hasTotal': false, 'total': 0, 'rating': 0.0};
-    }
-  }
-
-  /// Post a review for a merchant product.
-  Future<bool> postMerchantProductReview({
-    required String merchantId,
-    required String skuId,
-    required int rating,
-    String? content,
-    int? memberId,
-  }) async {
-    final safeRating = rating.clamp(1, 5);
-    final body = <String, dynamic>{'rating': safeRating};
-    if (content != null && content.trim().isNotEmpty) {
-      body['content'] = content.trim();
-    }
-    if (memberId != null && memberId > 0) body['memberId'] = memberId;
-    try {
-      final resp = await _dio.post<dynamic>('/app/reviews', data: body);
-      final status = resp.statusCode ?? 0;
-      return status >= 200 && status < 300;
-    } on DioException {
-      return false;
-    }
-  }
-
-  /// GET /app/me/reviews — 我的評論歷史
-  Future<List<Map<String, dynamic>>> getMyReviews({
-    int page = 1,
-    int size = 20,
-  }) async {
-    try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/app/me/reviews',
-        queryParameters: {'page': page, 'size': size},
-      );
-      final body = resp.data!;
-      if (body['code'] != 0) {
-        throw ServerException((body['message'] ?? '請求失敗').toString());
-      }
-      final data = body['data'];
-      final list =
-          (data is Map ? (data['records'] ?? data['list']) : data) as List? ??
-          [];
-      return list
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      throw const NetworkException();
-    }
-  }
-
-  /// 反查訂單的買家評論（B-145 完成前的 fallback）。
-  ///
-  /// /app/me/reviews API 的 review entity 沒有 `orderNo` 欄位，只有
-  /// `orderItemId`，因此 caller 必須傳入該訂單所有 OrderItem 的 id 集合，
-  /// 此處比對 review.orderItemId 找出對應評論（同一訂單可能有多個 item，
-  /// 各自有獨立 review，回傳第一筆命中的）。
-  ///
-  /// 內部分頁掃 [getMyReviews]（最多 [maxPages] 頁）。
-  ///
-  /// 後端在 GET /app/orders/{orderNo} 加 review 欄位後（B-145），
-  /// 訂單詳情可直接從 Order.reviewRating / reviewContent 取，
-  /// 不再需要這個反查 API call。
-  Future<Map<String, dynamic>?> findReviewByOrderItemIds(
-    Set<String> orderItemIds, {
-    int maxPages = 5,
-    int pageSize = 50,
-  }) async {
-    if (orderItemIds.isEmpty) return null;
-    for (var page = 1; page <= maxPages; page++) {
-      final reviews = await getMyReviews(page: page, size: pageSize);
-      for (final review in reviews) {
-        final id = (review['orderItemId'] ?? '').toString().trim();
-        if (id.isNotEmpty && orderItemIds.contains(id)) {
-          return review;
-        }
-      }
-      // 沒滿一頁 = 沒有更多資料，提早停止
-      if (reviews.length < pageSize) break;
+    for (final id in orderItemIds) {
+      final review = await findMyReviewForOrderItem(id);
+      if (review != null) return review;
     }
     return null;
   }
 
-  Future<Review> addReview({
+  /// 對一個已完成的訂單項目寫評價。[stagedTokens] 是圖片上傳完成後拿到的 token，最多 4 個。
+  /// 已評價回 `REVIEW_ALREADY_EXISTS`、超過期限回 `REVIEW_WINDOW_EXPIRED`，由呼叫端依 `errorReasonOf` 處理。
+  Future<pb.Review> createReview({
     required String orderNo,
-    required int orderItemId,
-    required int skuId,
+    required String orderItemId,
     required int rating,
     required String content,
-    List<String>? stagedTokens,
+    List<String> stagedTokens = const [],
   }) async {
-    try {
-      // SubmitOrderItemReviewRequest：orderNo / orderItemId / productId /
-      // skuName / rating / content / stagedTokens / productImageUrl。
-      // 這裡曾多送一個 `sku_id` —— 後端從來沒有這個欄位（舊名是 product_id），
-      // Go 的 json binding 直接忽略它，所以它從第一天起就是空轉。已移除。
-      final params = {
-        'orderNo': orderNo,
-        'orderItemId': orderItemId.toString(),
-        'rating': rating,
-        'content': content,
-        if (stagedTokens != null) 'stagedTokens': stagedTokens,
-      };
-      final resp = await _dio.post<Map<String, dynamic>>(
-        '/app/reviews',
-        data: params,
-      );
-
-      final body = resp.data;
-      HKLog.logD(
-        '[ReviewRepository.addReview] status=${resp.statusCode}',
-        body,
-      );
-
-      final code = body?['code'];
-
-      // HTTP 409 或 body code 409 → 已評論過
-      if (resp.statusCode == 409 || code == 409) {
-        throw const ServerException('此商品已評論過');
-      }
-
-      // body code 0 → 成功。
-      // ⚠️ 這裡曾經是 `resp.statusCode == 201 || code == 0`：提交評論原本回 HTTP 201，
-      // backend#2198 已改回 200（envelope 走 response.OK，業務結果一律看 code 不看
-      // HTTP status）。201 那一項自此恆為 false，留著只會讓人以為 HTTP status 也是
-      // 成功判準。真正接得住的一直是 `code == 0`。
-      if (code == 0) {
-        return Review(id: 0, skuId: skuId, rating: rating, content: content);
-      }
-
-      throw ServerException((body?['message'] ?? '評論失敗').toString());
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      if (e.response?.statusCode == 409) {
-        throw const ServerException('此商品已評論過');
-      }
-      throw const NetworkException();
-    }
+    final response = await _app.createReview(
+      pb.CreateReviewRequest(
+        orderNo: orderNo,
+        orderItemId: orderItemId,
+        rating: rating,
+        content: content,
+        imageStagedTokens: stagedTokens,
+      ),
+    );
+    return response.review;
   }
 }

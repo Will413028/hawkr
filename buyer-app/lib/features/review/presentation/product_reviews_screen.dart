@@ -7,12 +7,17 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
+
+import '../../../core/l10n/ui_locale.dart';
+import '../../review/data/review_display.dart';
 import '../../review/data/review_repository.dart';
 import '../../../config/image_config.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/app_cached_image.dart';
 import '../../../shared/widgets/common_top_bar.dart';
-import '../../../shared/utils/avatar_wire.dart';
+import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/hk_choice_chip.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
@@ -38,33 +43,15 @@ class ProductReviewsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
-  List<Map<String, dynamic>> _reviews = [];
+  List<pb.Review> _reviews = [];
   bool _isLoading = true;
+  Object? _loadError;
   String _selectedFilter = '全部';
 
   // 統計數據
   int _totalCount = 0;
   double _avgRating = 0.0;
   Map<int, int> _ratingDistribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-
-  static String? _reviewImageSource(dynamic value) {
-    if (value is String) {
-      final source = value.trim();
-      return source.isEmpty ? null : source;
-    }
-
-    if (value is Map) {
-      // 49 §6.1 成對契約：優先裸 key。ReviewListItem.imageKeys/imageUrls 目前是
-      // 字串陣列，Map 形式僅供未來擴充。
-      const keys = ['imageKey', 'imageUrl'];
-      for (final key in keys) {
-        final source = value[key]?.toString().trim() ?? '';
-        if (source.isNotEmpty) return source;
-      }
-    }
-
-    return null;
-  }
 
   @override
   void initState() {
@@ -73,44 +60,21 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 
   Future<void> _loadReviews() async {
-    setState(() => _isLoading = true);
-    HKLog.logD('[ProductReviewsScreen] ===== LOADING REVIEWS =====');
-    HKLog.logD(
-      '[ProductReviewsScreen] merchantId="${widget.merchantId}", skuId="${widget.skuId}"',
-    );
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final list = await ref
           .read(reviewRepositoryProvider)
-          .getMerchantProductReviews(widget.skuId);
-      HKLog.logD('[ProductReviewsScreen] API returned ${list.length} reviews');
-
-      // /public/products/{id}/reviews 已經是指定商品的 review，不需要再過濾
-      // （回傳欄位僅 reviewId/buyerId/username/avatarKey/avatarUrl/rating/content/createdAt/images，
-      //  沒有 merchantId / skuId，舊版濾掉是因為前端條件寫死要求這些欄位存在）
-      final filteredList = list;
-
-      // 計算統計數據
-      int count = 0;
-      double sum = 0.0;
-      final Map<int, int> dist = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-
-      for (final review in filteredList) {
-        final r = review['rating'] ?? review['score'] ?? review['stars'] ?? 0;
-        final v = (r is num) ? r.toDouble() : double.tryParse('$r') ?? 0.0;
-        if (v > 0) {
-          sum += v;
-          count++;
-          final k = v.round().clamp(1, 5);
-          dist[k] = (dist[k] ?? 0) + 1;
-        }
-      }
-
+          .listAllProductReviews(widget.skuId);
+      final summary = ReviewRepository.summarize(list);
       if (mounted) {
         setState(() {
-          _reviews = filteredList;
-          _totalCount = filteredList.length;
-          _avgRating = count > 0 ? sum / count : 0.0;
-          _ratingDistribution = dist;
+          _reviews = list;
+          _totalCount = list.length;
+          _avgRating = summary.average;
+          _ratingDistribution = summary.distribution;
           _isLoading = false;
         });
       }
@@ -119,50 +83,26 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       if (mounted) {
         setState(() {
           _reviews = [];
+          _loadError = e;
           _isLoading = false;
         });
       }
     }
   }
 
-  List<Map<String, dynamic>> get _filteredReviews {
+  List<pb.Review> get _filteredReviews {
     if (_selectedFilter == '全部') {
       return _reviews;
     } else if (_selectedFilter == '有圖片') {
-      return _reviews.where((r) {
-        final images = r['imageKeys'] ?? r['imageUrls'] ?? [];
-        return images is List &&
-            images.any((image) => _reviewImageSource(image) != null);
-      }).toList();
+      return _reviews.where((r) => r.images.isNotEmpty).toList();
     } else {
       // 星等篩選 (例如 "5星")
       final starCount = int.tryParse(_selectedFilter.replaceAll('星', ''));
       if (starCount != null) {
-        return _reviews.where((r) {
-          final rating = r['rating'] ?? 0;
-          final v = (rating is num)
-              ? rating.round()
-              : int.tryParse('$rating') ?? 0;
-          return v == starCount;
-        }).toList();
+        return _reviews.where((r) => r.rating == starCount).toList();
       }
     }
     return _reviews;
-  }
-
-  String _formatDate(dynamic dateValue) {
-    if (dateValue == null) return '';
-    try {
-      DateTime date;
-      if (dateValue is String) {
-        date = DateTime.parse(dateValue);
-      } else {
-        return '';
-      }
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return '';
-    }
   }
 
   @override
@@ -172,6 +112,8 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       appBar: buildCommonTitleAppBar(context, title: '商品評價', showBack: true),
       body: _isLoading
           ? const TruckLoadingOverlay()
+          : _loadError != null
+          ? _buildLoadFailure(_loadError!)
           : ColoredBox(
               key: const ValueKey('product-reviews-background'),
               color: AppColors.bgPrimary,
@@ -209,6 +151,32 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 },
               ),
             ),
+    );
+  }
+
+  /// 讀取失敗：顯示錯誤文字與重試，不當成「沒有評價」。
+  Widget _buildLoadFailure(Object error) {
+    return Center(
+      key: const ValueKey('product-reviews-load-failure'),
+      child: Padding(
+        padding: const EdgeInsets.all(HkSpace.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              errorText(error, defaults: ref.read(defaultErrorTextProvider)),
+              textAlign: TextAlign.center,
+              style: AppTypography.body,
+            ),
+            const SizedBox(height: HkSpace.md),
+            TextButton(
+              key: const ValueKey('product-reviews-retry'),
+              onPressed: _loadReviews,
+              child: const HkButtonLabel('重試'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -345,11 +313,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 
   int _getImageReviewCount() {
-    return _reviews.where((r) {
-      final images = r['imageKeys'] ?? r['imageUrls'] ?? [];
-      return images is List &&
-          images.any((image) => _reviewImageSource(image) != null);
-    }).length;
+    return _reviews.where((r) => r.images.isNotEmpty).length;
   }
 
   Widget _buildReviewListHeading() {
@@ -453,33 +417,16 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     );
   }
 
-  Widget _buildReviewItem(Map<String, dynamic> review) {
-    final buyerId = (review['buyerId'] ?? '').toString().trim();
-    final content = (review['content'] ?? '').toString();
-    final dateStr = _formatDate(review['createdAt']);
-    final rating = int.tryParse('${review['rating'] ?? ''}')?.clamp(0, 5) ?? 0;
-
-    final username = (review['username'] ?? '').toString().trim();
-    // 49 §6.1 成對契約：SSOT 是 avatarKey（裸 objectKey），顯示端由
-    // AppCachedImage 的 scene 走 buildImageUrl 組 avatar preset URL。
-    final userAvatar = resolveAvatarKey(review) ?? '';
-
-    final displayName = username.isNotEmpty
-        ? username
-        : (buyerId.length >= 4
-              ? '會員 ${buyerId.substring(buyerId.length - 4)}'
-              : (buyerId.isNotEmpty ? '會員 $buyerId' : '匿名會員'));
-
-    final images = review['imageKeys'] ?? review['imageUrls'];
-    final imageList = (images is List)
-        ? images
-              .map(_reviewImageSource)
-              .whereType<String>()
-              .toList(growable: false)
-        : <String>[];
-
-    final reviewKey =
-        (review['reviewId'] ?? review['id'] ?? '$buyerId-$dateStr').toString();
+  Widget _buildReviewItem(pb.Review review) {
+    final content = review.content;
+    final dateStr = review.createDateText;
+    final rating = review.rating.clamp(0, 5);
+    final userAvatar = review.authorAvatarUrl;
+    final displayName = review.authorName.isNotEmpty
+        ? review.authorName
+        : '匿名會員';
+    final imageList = review.imageUrls;
+    final reviewKey = review.id;
     return HkFrostedCardSurface(
       key: ValueKey('product-review-card-$reviewKey'),
       child: Padding(

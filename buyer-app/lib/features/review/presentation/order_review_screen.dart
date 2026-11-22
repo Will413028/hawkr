@@ -10,7 +10,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hawkr_buyer/shared/utils/hk_log.dart';
 
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart';
+
 import '../../../config/image_config.dart';
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/error_reason.dart';
+import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
@@ -190,18 +196,16 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
 
       // 提交評價
       final item = _items[index];
-      final orderItemId = _toInt(item['id'] ?? item['orderItemId']);
-      final skuId = _toInt(item['skuId']);
+      final orderItemId = (item['id'] ?? item['orderItemId'] ?? '').toString();
       final content = _contentCtrls[index]?.text.trim() ?? '';
 
       final reviewRepo = ref.read(reviewRepositoryProvider);
-      await reviewRepo.addReview(
+      await reviewRepo.createReview(
         orderNo: widget.orderSn,
         orderItemId: orderItemId,
-        skuId: skuId,
         rating: rating,
         content: content.isNotEmpty ? content : '好評',
-        stagedTokens: stagedTokens.isNotEmpty ? stagedTokens : null,
+        stagedTokens: stagedTokens,
       );
 
       if (mounted) {
@@ -217,30 +221,22 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     } catch (e) {
       HKLog.logD('[OrderReviewScreen]', e);
       if (!mounted) return;
-      final msg = e.toString().toLowerCase();
-      // 已評論過 → 標記為已提交，停留在當前頁面
-      if (msg.contains('already reviewed') ||
-          msg.contains('already_reviewed') ||
-          msg.contains('duplicate')) {
-        showCommonSnackBar(context, '此商品已評論過');
+      // 已評價：標記為已提交，不當成失敗。
+      if (errorReasonOf(e) == ErrorReason.REVIEW_ALREADY_EXISTS) {
+        showCommonSnackBar(
+          context,
+          errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+        );
         setState(() => _submitted[index] = true);
         return;
       }
       setState(() => _submitted[index] = false);
-      if (msg.contains('已評論') || msg.contains('409')) {
-        showCommonSnackBar(context, '此商品已評論過');
-      } else if (msg.contains('410') || msg.contains('expired')) {
-        showCommonSnackBar(context, '評價期限已過，無法提交評價');
-      } else {
-        showCommonSnackBar(context, '評價已提交');
-      }
+      if (isAccountSuspendedError(e)) return;
+      showCommonSnackBar(
+        context,
+        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+      );
     }
-  }
-
-  int _toInt(dynamic v) {
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return int.tryParse(v?.toString() ?? '') ?? 0;
   }
 
   @override

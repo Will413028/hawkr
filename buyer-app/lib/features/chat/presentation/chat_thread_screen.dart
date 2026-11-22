@@ -30,7 +30,6 @@ import '../data/active_chat_gate.dart'; // activeChatGateProvider
 import 'chat_preview.dart';
 import '../../moderation/data/block_target.dart';
 import '../../moderation/data/report_target.dart';
-import '../../moderation/data/report_target_type.dart';
 import '../../moderation/presentation/report_sheet.dart';
 import '../../moderation/presentation/block_confirm_dialog.dart';
 import 'chat_focus_policy.dart';
@@ -936,10 +935,7 @@ class ChatThreadScreen extends HookConsumerWidget {
                     Navigator.pop(ctx);
                     showReportSheet(
                       context,
-                      target: LegacyReportTarget(
-                        ReportTargetType.chatMessage,
-                        m.id,
-                      ),
+                      target: ReportTarget.chatMessage(m.id),
                     );
                   },
                 ),
@@ -954,7 +950,7 @@ class ChatThreadScreen extends HookConsumerWidget {
                     Navigator.pop(ctx);
                     showBlockConfirmDialog(
                       context,
-                      target: LegacyBlockTarget(merchantId),
+                      target: MessageBlockTarget(m.id, storeId: merchantId),
                       userLabel: merchantNameState.value ?? '此使用者',
                     );
                   },

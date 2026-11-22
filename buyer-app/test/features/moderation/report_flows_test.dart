@@ -16,7 +16,6 @@ import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
 import 'package:hawkr_buyer/features/moderation/data/report_target.dart';
-import 'package:hawkr_buyer/features/moderation/data/report_target_type.dart';
 import 'package:hawkr_buyer/features/moderation/presentation/report_sheet.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -106,19 +105,24 @@ Future<void> _submit(WidgetTester tester) async {
 void main() {
   if (!F.isInitialized) F.init(Flavor.dev);
 
-  group('社群對象走 SubmitReport', () {
+  group('所有對象走 SubmitReport，只送種類與 ID', () {
     for (final (target, kind) in [
+      (const ReportTarget.post('p1'), ReportTargetKind.REPORT_TARGET_KIND_POST),
       (
-        const SocialReportTarget.post('p1'),
-        ReportTargetKind.REPORT_TARGET_KIND_POST,
-      ),
-      (
-        const SocialReportTarget.comment('c1'),
+        const ReportTarget.comment('c1'),
         ReportTargetKind.REPORT_TARGET_KIND_COMMENT,
       ),
       (
-        const SocialReportTarget.forumEntry('e1'),
+        const ReportTarget.forumEntry('e1'),
         ReportTargetKind.REPORT_TARGET_KIND_FORUM_ENTRY,
+      ),
+      (
+        const ReportTarget.review('r1'),
+        ReportTargetKind.REPORT_TARGET_KIND_REVIEW,
+      ),
+      (
+        const ReportTarget.chatMessage('m1'),
+        ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE,
       ),
     ]) {
       testWidgets('${kind.name}：送出對象種類、原因與 UUIDv4 的 request_id', (
@@ -143,11 +147,7 @@ void main() {
     }
 
     testWidgets('只列社群檢舉人可選的八個原因', (tester) async {
-      await _pump(
-        tester,
-        FakeModeration(),
-        const SocialReportTarget.post('p1'),
-      );
+      await _pump(tester, FakeModeration(), const ReportTarget.post('p1'));
 
       for (final label in [
         '垃圾訊息',
@@ -176,7 +176,7 @@ void main() {
 
     testWidgets('同一次嘗試失敗後重試，帶同一個 request_id', (tester) async {
       final moderation = FakeModeration(failFirst: 1);
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
@@ -196,7 +196,7 @@ void main() {
 
     testWidgets('失敗後改了原因就是新的嘗試，換新的 request_id', (tester) async {
       final moderation = FakeModeration(failFirst: 1);
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
@@ -218,7 +218,7 @@ void main() {
 
     testWidgets('重新開啟檢舉面板是新的嘗試', (tester) async {
       final moderation = FakeModeration();
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
       await tester.pump(const Duration(seconds: 3));
@@ -238,7 +238,7 @@ void main() {
 
     testWidgets('「其他」要填說明才能送出，說明去除首尾空白', (tester) async {
       final moderation = FakeModeration();
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '其他（請說明）');
       final submit = find.byKey(const ValueKey('report-submit'));
@@ -257,7 +257,7 @@ void main() {
   group('社群檢舉的送出細節', () {
     testWidgets('切離「其他」之後不送說明', (tester) async {
       final moderation = FakeModeration();
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '其他（請說明）');
       await tester.enterText(find.byType(TextField), '亂發廣告');
@@ -273,7 +273,7 @@ void main() {
 
     testWidgets('說明可寫到 500 字（契約上限），不是 200', (tester) async {
       final moderation = FakeModeration();
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '其他（請說明）');
       await tester.enterText(find.byType(TextField), '字' * 600);
@@ -286,7 +286,7 @@ void main() {
 
     testWidgets('說明的計數與上限以 rune 計，emoji ZWJ 序列不被拆開', (tester) async {
       final moderation = FakeModeration();
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
       const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
 
       await _choose(tester, '其他（請說明）');
@@ -318,7 +318,7 @@ void main() {
           ],
         ),
       );
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
@@ -332,61 +332,13 @@ void main() {
       final moderation = FakeModeration(
         submitError: ConnectException(Code.unavailable, 'offline'),
       );
-      await _pump(tester, moderation, const SocialReportTarget.post('p1'));
+      await _pump(tester, moderation, const ReportTarget.post('p1'));
 
       await _choose(tester, '垃圾訊息');
       await _submit(tester);
 
       expect(find.text('服務暫時不可用'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
-    });
-  });
-
-  group('聊天與評價仍走舊 REST', () {
-    testWidgets('聊天訊息：POST /app/reports，不呼叫 ModerationAppService', (
-      tester,
-    ) async {
-      final moderation = FakeModeration();
-      final legacy = await _pump(
-        tester,
-        moderation,
-        const LegacyReportTarget(ReportTargetType.chatMessage, 'm1'),
-      );
-
-      await _choose(tester, ReportReasonCode.harassment.label);
-      await _submit(tester);
-
-      final request = legacy.requests.single;
-      expect(request.method, 'POST');
-      expect(request.path, '/app/reports');
-      expect(request.data, {
-        'targetType': 'CHAT_MESSAGE',
-        'targetId': 'm1',
-        'reasonCode': 'HARASSMENT',
-      });
-      expect(moderation.submitted, isEmpty);
-      await tester.pump(const Duration(seconds: 3));
-    });
-
-    testWidgets('評價：原因清單是舊的八種', (tester) async {
-      await _pump(
-        tester,
-        FakeModeration(),
-        const LegacyReportTarget(ReportTargetType.review, 'r1'),
-      );
-
-      for (final reason in ReportReasonCode.values) {
-        expect(
-          find.text(
-            reason == ReportReasonCode.other
-                ? '${reason.label}（請說明）'
-                : reason.label,
-            skipOffstage: false,
-          ),
-          findsOneWidget,
-          reason: reason.label,
-        );
-      }
     });
   });
 }

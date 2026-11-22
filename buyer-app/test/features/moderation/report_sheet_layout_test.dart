@@ -25,7 +25,7 @@ void main() {
                   builder: (context) => TextButton(
                     onPressed: () => showReportSheet(
                       context,
-                      target: const SocialReportTarget.post('post-1'),
+                      target: const ReportTarget.post('post-1'),
                     ),
                     child: const Text('開啟檢舉'),
                   ),

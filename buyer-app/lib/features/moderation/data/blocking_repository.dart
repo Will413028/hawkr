@@ -11,7 +11,7 @@ part 'blocking_repository.g.dart';
 BlockingRepository blockingRepository(Ref ref) =>
     BlockingRepository(ref.watch(buyerAppClientProvider));
 
-/// 社群的封鎖與封鎖名單（`BuyerAppService`）。聊天與評價的封鎖仍在 `BlockRepository`（舊 REST）。
+/// 封鎖與封鎖名單（`BuyerAppService`）。
 class BlockingRepository {
   BlockingRepository(this._buyer);
 
@@ -21,7 +21,7 @@ class BlockingRepository {
   final BuyerAppServiceClient _buyer;
 
   /// 封鎖；已經封鎖時也成功。
-  Future<void> block(SocialBlockTarget target) async {
+  Future<void> block(BlockTarget target) async {
     switch (target) {
       case StoreBlockTarget(:final storeId):
         await _buyer.blockStore(buyer.BlockStoreRequest(storeId: storeId));
@@ -32,6 +32,10 @@ class BlockingRepository {
       case ForumAuthorBlockTarget(:final entryId):
         await _buyer.blockAuthor(
           buyer.BlockAuthorRequest(forumEntryId: entryId),
+        );
+      case MessageBlockTarget(:final messageId):
+        await _buyer.blockAuthor(
+          buyer.BlockAuthorRequest(messageId: messageId),
         );
     }
   }

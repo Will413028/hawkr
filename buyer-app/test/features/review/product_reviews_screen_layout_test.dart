@@ -1,33 +1,15 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
-import 'package:hawkr_buyer/features/review/data/review_repository.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/features/review/presentation/product_reviews_screen.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_choice_chip.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class _FakeReviewRepository extends ReviewRepository {
-  _FakeReviewRepository() : super(Dio());
-
-  @override
-  Future<List<Map<String, dynamic>>> getMerchantProductReviews(
-    String skuId,
-  ) async {
-    return [
-      {
-        'reviewId': 'review-1',
-        'buyerId': 'buyer-1234',
-        'username': '陳**',
-        'rating': 5,
-        'content': '水果新鮮，包裝也很完整。',
-        'createdAt': '2026-07-19T08:00:00Z',
-        'images': const [],
-      },
-    ];
-  }
-}
+import 'review_fakes.dart';
 
 void main() {
   testWidgets('review page uses adaptive slivers and complete rating filters', (
@@ -41,7 +23,20 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          reviewRepositoryProvider.overrideWithValue(_FakeReviewRepository()),
+          reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
+          reviewPublicClientProvider.overrideWithValue(
+            FakeReviewPublic(
+              pages: [
+                [
+                  reviewRecord(
+                    'review-1',
+                    content: '水果新鮮，包裝也很完整。',
+                    authorName: '陳**',
+                  ),
+                ],
+              ],
+            ).client(),
+          ),
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
@@ -75,5 +70,91 @@ void main() {
     expect(find.text('顧客回饋'), findsOneWidget);
     expect(find.text('水果新鮮，包裝也很完整。'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('讀取失敗顯示失敗與重試，不顯示成沒有評價；重試成功後顯示評價', (tester) async {
+    final fake = FakeReviewPublic(
+      pages: [
+        [reviewRecord('review-1', content: '好吃', authorName: '陳**')],
+      ],
+      error: ConnectException(Code.internal, 'boom'),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
+          reviewPublicClientProvider.overrideWithValue(fake.client()),
+          defaultErrorTextProvider.overrideWithValue((_) => '服務暫時不可用'),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, __) => const MaterialApp(
+            home: ProductReviewsScreen(
+              merchantId: 'merchant-1',
+              skuId: 'sku-1',
+              productName: '範例',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('product-reviews-load-failure')),
+      findsOneWidget,
+    );
+    expect(find.text('服務暫時不可用'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('product-reviews-empty-state')),
+      findsNothing,
+    );
+
+    fake.error = null;
+    await tester.tap(find.byKey(const ValueKey('product-reviews-retry')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('product-reviews-load-failure')),
+      findsNothing,
+    );
+    expect(find.text('好吃'), findsOneWidget);
+  });
+
+  testWidgets('沒有評價是空狀態，不是失敗', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          reviewAppClientProvider.overrideWithValue(FakeReviewApp().client()),
+          reviewPublicClientProvider.overrideWithValue(
+            FakeReviewPublic().client(),
+          ),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, __) => const MaterialApp(
+            home: ProductReviewsScreen(
+              merchantId: 'merchant-1',
+              skuId: 'sku-1',
+              productName: '範例',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('product-reviews-load-failure')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('product-reviews-empty-state')),
+      findsOneWidget,
+    );
   });
 }

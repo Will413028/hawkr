@@ -1,0 +1,76 @@
+{
+ "mutants": [
+  {
+   "id": "report-sends-no-reference",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/moderation_repository.dart",
+   "old": "pb.ReportTarget(kind: target.kind, id: target.id)",
+   "new": "pb.ReportTarget(kind: target.kind, id: '')",
+   "test": "test/features/moderation/report_flows_test.dart REPORT_TARGET_KIND_REVIEW：送出對象種類、原因與 UUIDv4 的 request_id",
+   "why": "檢舉評價時不帶評價 ID，只剩種類"
+  },
+  {
+   "id": "report-chat-message-kind-dropped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/moderation_repository.dart",
+   "old": "pb.ReportTarget(kind: target.kind, id: target.id)",
+   "new": "pb.ReportTarget(id: target.id)",
+   "test": "test/features/moderation/report_flows_test.dart REPORT_TARGET_KIND_CHAT_MESSAGE：送出對象種類、原因與 UUIDv4 的 request_id",
+   "why": "檢舉聊天訊息時不帶對象種類"
+  },
+  {
+   "id": "block-message-reference-dropped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/data/blocking_repository.dart",
+   "old": "buyer.BlockAuthorRequest(messageId: messageId)",
+   "new": "buyer.BlockAuthorRequest()",
+   "test": "test/features/moderation/block_flows_test.dart 聊天訊息的對象送 BlockAuthor.message_id，不走舊 REST",
+   "why": "從聊天封鎖不帶訊息參照，伺服器無從推導店家"
+  },
+  {
+   "id": "review-read-failure-shown-as-empty",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/presentation/product_reviews_screen.dart",
+   "old": "_loadError = e;",
+   "new": "_loadError = null;",
+   "test": "test/features/review/product_reviews_screen_layout_test.dart 讀取失敗顯示失敗與重試，不顯示成沒有評價；重試成功後顯示評價",
+   "why": "評價讀取失敗時畫面退回空清單，和沒有評價分不出來"
+  },
+  {
+   "id": "review-pagination-stops-after-first-page",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "if (token.isEmpty) break;",
+   "new": "break;",
+   "test": "test/features/review/review_repository_test.dart 讀到沒有下一頁為止，依序合併",
+   "why": "只讀第一頁，之後的評價遺失"
+  },
+  {
+   "id": "review-repository-swallows-read-failure",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "      final response = await listProductReviews(productId, pageToken: token);\n      reviews.addAll(response.reviews);",
+   "new": "      final response = await listProductReviews(\n        productId,\n        pageToken: token,\n      ).catchError((_) => pb.ListProductReviewsResponse());\n      reviews.addAll(response.reviews);",
+   "test": "test/features/review/review_repository_test.dart 讀取失敗丟出錯誤，不回空清單",
+   "why": "讀取失敗被吞成空清單"
+  },
+  {
+   "id": "create-review-drops-image-tokens",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "        imageStagedTokens: stagedTokens,\n",
+   "new": "",
+   "test": "test/features/review/review_repository_test.dart 送訂單編號、訂單項目 ID（字串）、星等、內文與圖片 token",
+   "why": "評價的附圖 token 沒送出"
+  },
+  {
+   "id": "my-review-lookup-ignores-order-item",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "pb.ListMyReviewsRequest(pageSize: 1, orderItemId: orderItemId)",
+   "new": "pb.ListMyReviewsRequest(pageSize: 1)",
+   "test": "test/features/review/review_repository_test.dart 依訂單項目查詢，送 order_item_id",
+   "why": "查我的評價不帶訂單項目，回到別的項目的評價"
+  }
+ ]
+}

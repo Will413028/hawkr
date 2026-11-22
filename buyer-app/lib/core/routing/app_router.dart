@@ -409,8 +409,7 @@ GoRouter appRouter(Ref ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return RateScreen(
-            skuId: extra['skuId'] as int? ?? 0,
-            orderItemId: extra['orderItemId'] as int? ?? 0,
+            orderItemId: (extra['orderItemId'] ?? '').toString(),
             orderNo: (extra['orderNo'] ?? '').toString(),
           );
         },

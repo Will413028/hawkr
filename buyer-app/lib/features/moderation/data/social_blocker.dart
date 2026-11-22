@@ -16,7 +16,7 @@ class SocialBlocker {
 
   final Ref _ref;
 
-  Future<void> block(SocialBlockTarget target) async {
+  Future<void> block(BlockTarget target) async {
     await _ref.read(blockingRepositoryProvider).block(target);
     final storeId = target.blockedStoreId;
     if (storeId == null) return;

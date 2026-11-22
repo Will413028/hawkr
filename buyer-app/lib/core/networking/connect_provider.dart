@@ -5,6 +5,7 @@ import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
@@ -105,6 +106,16 @@ SellerReportAppServiceClient sellerReportAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ModerationAppServiceClient moderationAppClient(Ref ref) =>
     ModerationAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
+@Riverpod(keepAlive: true)
+ReviewPublicServiceClient reviewPublicClient(Ref ref) =>
+    ReviewPublicServiceClient(ref.watch(connectOptionalAuthTransportProvider));
+
+/// 買家的評價（`ReviewAppService`）：寫評價與讀自己寫的評價。
+@Riverpod(keepAlive: true)
+ReviewAppServiceClient reviewAppClient(Ref ref) =>
+    ReviewAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 @Riverpod(keepAlive: true)
 DiscoveryPublicServiceClient discoveryPublicClient(Ref ref) =>

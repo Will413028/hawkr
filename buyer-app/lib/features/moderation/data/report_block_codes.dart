@@ -1,3 +1,4 @@
+/// 聊天送訊息的舊 REST 業務碼轉文字，隨聊天搬到 Connect 時刪除（`ErrorReason` 取代）。
 /// 檢舉／封鎖相關的後端業務碼（bizcode，走 gateway 統一回應 envelope 的 `code` 欄位）。
 class ReportBlockCode {
   const ReportBlockCode._();
