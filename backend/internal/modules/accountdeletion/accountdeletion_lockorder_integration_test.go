@@ -191,8 +191,8 @@ func TestDeletionLocksBuyerAndSellerBeforeImRows(t *testing.T) {
 				VALUES ($1, $2, $3, 1, 1, now(), now())`, convID, buyerID, s.StoreID); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
-				VALUES ($1, $2, 1, 'BUYER', 'TEXT', 'hi', now())`, uuid.NewV7(), convID); err != nil {
+			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
+				VALUES ($1, $2, 1, 'BUYER', 'TEXT', 'hi', now(), gen_random_uuid())`, uuid.NewV7(), convID); err != nil {
 				t.Fatal(err)
 			}
 			f.orders.mu.Lock()

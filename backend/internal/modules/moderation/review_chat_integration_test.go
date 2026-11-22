@@ -71,11 +71,11 @@ func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int
 		}
 		at := base.Add(time.Duration(seq) * time.Second)
 		if seq == int64(imageSeq) {
-			f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, image_asset_id, image_object_key, created_at)
-				VALUES ($1, $2, $3, $4, 'IMAGE', 'ctx-asset', 'chat/ctx.jpg', $5)`, id, conv, seq, kind, at)
+			f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, image_asset_id, image_object_key, created_at, request_id)
+				VALUES ($1, $2, $3, $4, 'IMAGE', 'ctx-asset', 'chat/ctx.jpg', $5, gen_random_uuid())`, id, conv, seq, kind, at)
 			continue
 		}
-		f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at) VALUES ($1, $2, $3, $4, 'TEXT', $5, $6)`,
+		f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id) VALUES ($1, $2, $3, $4, 'TEXT', $5, $6, gen_random_uuid())`,
 			id, conv, seq, kind, fmt.Sprintf("m%d", seq), at)
 	}
 	return conv, ids

@@ -526,10 +526,10 @@ func TestEraseJobBatchesAndIsRerunnable(t *testing.T) {
 	f.say(t, f.buyerParty(b1), s1, "seed")
 	conv := f.conversation(t, b1, s1)
 	// 直接寫 450 則買家訊息與 10 則店家訊息：超過兩批（每批 200）。
-	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
-		SELECT uuidv7(), $1, 1 + g, 'BUYER', 'TEXT', 'bulk ' || g, now() FROM generate_series(1, 450) AS g`, conv)
-	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
-		SELECT uuidv7(), $1, 451 + g, 'STORE', 'TEXT', 'store ' || g, now() FROM generate_series(1, 10) AS g`, conv)
+	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
+		SELECT uuidv7(), $1, 1 + g, 'BUYER', 'TEXT', 'bulk ' || g, now(), gen_random_uuid() FROM generate_series(1, 450) AS g`, conv)
+	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
+		SELECT uuidv7(), $1, 451 + g, 'STORE', 'TEXT', 'store ' || g, now(), gen_random_uuid() FROM generate_series(1, 10) AS g`, conv)
 	f.exec(t, "UPDATE im.conversations SET last_seq = 461, buyer_last_read_seq = 461")
 	f.buyerDeleted(t, b1)
 	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
@@ -589,8 +589,8 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', now(), now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
 	f.exec(t, `INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, last_message_at, created_at)
 		SELECT gen_random_uuid(), g, 1, 1, now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
-	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at)
-		SELECT gen_random_uuid(), c.id, 1, 'BUYER', 'TEXT', 'x', now() FROM im.conversations AS c`)
+	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
+		SELECT gen_random_uuid(), c.id, 1, 'BUYER', 'TEXT', 'x', now(), gen_random_uuid() FROM im.conversations AS c`)
 	seen := func() map[int64]int {
 		f.jobs.mu.Lock()
 		defer f.jobs.mu.Unlock()
