@@ -89,6 +89,114 @@
    "new": "WHERE $1::bigint > 0 AND buyer_id = ANY($2::bigint[])\nORDER BY buyer_id",
    "test": "internal/modules/seller ^TestBuyersBlockedByStoreReturnsOnlyThisStoresBlocks$",
    "why": "The batch query stops filtering by store, so buyers blocked by another store are reported as blocked by this one."
+  },
+  {
+   "id": "chat-ownership-neither-side-allowed-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\t}\n\treturn im.Party{}, conversationNotFound()\n}",
+   "new": "\t}\n\treturn im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, nil\n}",
+   "test": "internal/httpapi/chat ^TestOwnershipDerivationNeitherSideAndMissingConversationAreIndistinguishable$",
+   "why": "A caller who is neither side of the conversation is let through as the buyer instead of getting the same not_found as a missing conversation."
+  },
+  {
+   "id": "chat-store-list-derives-buyer-identity",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "\tp, err := h.storeParty(ctx)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tscope := rpc.PageScope(chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure",
+   "new": "\tp, err := h.buyerParty(ctx)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tscope := rpc.PageScope(chatv1alpha1connect.ChatAppServiceListStoreConversationsProcedure",
+   "test": "internal/httpapi/chat ^TestEveryMethodSucceedsAndPassesTheDerivedPartyToTheModule$/^ListStoreConversations$",
+   "why": "The store-side conversation list acts as the caller's buyer identity instead of the current store."
+  },
+  {
+   "id": "chat-send-to-buyer-acts-as-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "if in.Sender, err = h.storeParty(ctx); err != nil {",
+   "new": "if in.Sender, err = h.buyerParty(ctx); err != nil {",
+   "test": "internal/httpapi/chat ^TestEveryMethodSucceedsAndPassesTheDerivedPartyToTheModule$/^SendMessageToBuyer$",
+   "why": "SendMessageToBuyer sends as the buyer identity rather than the current store."
+  },
+  {
+   "id": "chat-send-request-id-not-passed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "in := im.SendInput{RequestID: *rid}",
+   "new": "in := im.SendInput{}",
+   "test": "internal/httpapi/chat ^TestSendMessagePassesRequestIDAndContentToTheModule$",
+   "why": "The request_id is validated but never handed to the module, so a resend is no longer idempotent."
+  },
+  {
+   "id": "chat-tombstone-message-keeps-content",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tif m.Hidden || m.Erased {\n\t\treturn out, nil\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestMessagesNeverLeakObjectKeysAccountIDsOrTombstoneContent$",
+   "why": "A hidden or erased message carries its text and image again when the module returns content for it."
+  },
+  {
+   "id": "chat-tombstone-preview-keeps-text",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "if !p.Hidden && !p.Erased && p.Text != nil {",
+   "new": "if p.Text != nil {",
+   "test": "internal/httpapi/chat ^TestPreviewIsStructuredAndTombstonePreviewsCarryNoText$",
+   "why": "A hidden or erased last message still shows its text in the conversation preview."
+  },
+  {
+   "id": "chat-store-closed-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tim.ReasonStoreClosed:           apperr.ReasonStoreClosed,\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestSendMessageMapsModuleReasonsToTheContractReasons$/^停業$",
+   "why": "A closed-store rejection loses its STORE_CLOSED reason, so the client cannot turn the input read-only."
+  },
+  {
+   "id": "chat-receiver-deleted-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/chat.go",
+   "old": "\tim.ReasonReceiverDeleted:       apperr.ReasonReceiverDeleted,\n",
+   "new": "",
+   "test": "internal/httpapi/chat ^TestSendMessageMapsModuleReasonsToTheContractReasons$/^對方已刪除$",
+   "why": "A deleted-receiver rejection loses its RECEIVER_DELETED reason."
+  },
+  {
+   "id": "chat-page-token-scope-without-identity",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "rpc.PageScope(chatv1alpha1connect.ChatAppServiceListConversationsProcedure, p.BuyerID)",
+   "new": "rpc.PageScope(chatv1alpha1connect.ChatAppServiceListConversationsProcedure, 0)",
+   "test": "internal/httpapi/chat ^TestConversationPageTokenRoundTripsAndIsBoundToProcedureAndIdentity$",
+   "why": "The conversation page token is no longer bound to the caller, so a token from another buyer is accepted."
+  },
+  {
+   "id": "chat-before-and-after-seq-both-allowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "if msg.BeforeSeq != nil && msg.AfterSeq != nil {",
+   "new": "if msg.BeforeSeq != nil && msg.AfterSeq != nil && false {",
+   "test": "internal/httpapi/chat ^TestListMessagesBeforeAndAfterSeqAreMutuallyExclusiveAndRouteToTheRightModuleCall$",
+   "why": "before_seq and after_seq are accepted together instead of invalid_argument."
+  },
+  {
+   "id": "chat-send-to-buyer-capability-declaration-changed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/declaration.go",
+   "old": "chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:     requires(seller.CapChatSend),",
+   "new": "chatv1alpha1connect.ChatAppServiceSendMessageToBuyerProcedure:     requires(seller.CapChatRead),",
+   "test": "internal/httpapi/chat ^TestDeclaredCapabilitiesMatchWhatTheModuleChecks$",
+   "why": "The declared capability for the store sending a message no longer matches the capability the module checks."
+  },
+  {
+   "id": "deps-literal-template-im-dropped",
+   "stack": "go",
+   "file": "backend/cmd/new-module/templates/characterization/monolith_integration_test.go.tmpl",
+   "old": "IM: &im.Module{}, ",
+   "new": "",
+   "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
+   "why": "A httpapi.Deps literal in the module template omits the required IM field, which must fail the literals guard."
   }
  ]
 }

@@ -38,6 +38,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -204,7 +205,7 @@ func setup(t *testing.T) *fixture {
 	}
 	kycMAC := sealtest.MAC(t)
 	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: noMedia{}, Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
-	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}

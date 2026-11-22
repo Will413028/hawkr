@@ -2,7 +2,7 @@
 
 ## 職責
 
-買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。以及即時通道（LISTEN/NOTIFY、訂閱、在線狀態）。給 httpapi、moderation（呼叫 `Hide`／`Restore`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`、`step-2b-design.md`；沒有對外入口；`cmd/hawkr` 只接刪帳與退場的訂閱者與 worker（`Run` 與串流 handler 之後接）。
+買家與店家之間的一對一聊天：對話、訊息（文字與圖片）、送出與守門、已讀與未讀、訊息隱藏的資料、刪帳與退場的抹除。以及即時通道（LISTEN/NOTIFY、訂閱、在線狀態）。給 httpapi、moderation（呼叫 `Hide`／`Restore`）使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-2a-design.md`、`step-2b-design.md`；對外入口是 `httpapi/chat`（unary；串流與 `Run` 之後接）；`cmd/hawkr` 只接刪帳與退場的訂閱者與 worker。
 
 ## 擁有的資料
 
@@ -38,7 +38,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 
 ## 不負責
 
-停權時強制斷線；串流傳輸 helper（heartbeat、最長壽命、寫入 deadline、重驗節奏）；Connect 與 handler、對外錯誤原因的 proto；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；換掉舊 im-service 與接上 `legacy/imrelay`（relay 只在測試啟用）。
+停權時強制斷線；串流傳輸 helper（heartbeat、最長壽命、寫入 deadline、重驗節奏）；Connect handler 與對外契約；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；換掉舊 im-service 與接上 `legacy/imrelay`（relay 只在測試啟用）。
 
 ## 決策紀錄
 

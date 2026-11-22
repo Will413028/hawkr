@@ -289,6 +289,7 @@ func runServe(ctx context.Context) error {
 		Ready:      d.Ping,
 		Social:     socialModule,
 		Review:     reviewModule,
+		IM:         imModule,
 		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,
