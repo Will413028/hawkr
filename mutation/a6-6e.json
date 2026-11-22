@@ -14,7 +14,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
    "old": "\treviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)\n",
-   "new": "",
+   "new": "\tvar _ *reviewrelay.Worker\n",
    "test": "cmd/hawkr ^TestWorkerRunsTheRelaysAndTheCRMConsumer$",
    "why": "worker 沒登記 reviewrelay 的 job worker：事件排了 job 但沒人執行"
   },
@@ -32,7 +32,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
    "old": "\timrelay.NewWorker(imModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)\n",
-   "new": "",
+   "new": "\tvar _ *imrelay.Worker\n",
    "test": "cmd/hawkr ^TestWorkerRunsTheRelaysAndTheCRMConsumer$",
    "why": "worker 沒登記 imrelay 的 job worker"
   },
@@ -86,7 +86,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/discovery.go",
    "old": "\t\tout[id] = T(s)\n",
-   "new": "\t\tout[id] = T{}\n",
+   "new": "\t\t_ = s\n\t\tout[id] = T{}\n",
    "test": "cmd/hawkr ^TestRatingStatsConvertsToTheConsumersOwnType$",
    "why": "評分的筆數與平均沒有帶過去"
   },
