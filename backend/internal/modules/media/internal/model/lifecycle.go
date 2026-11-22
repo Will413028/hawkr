@@ -56,6 +56,8 @@ const (
 const (
 	SecureUploadConcurrency = 4
 	SecureUploadTimeout     = 5 * time.Minute
+	// SecureAbortTimeout 是上傳失敗收尾（轉 REJECTED 與刪物件）的時間上限；收尾不受 ctx 取消影響，所以必須自己有時限，否則儲存卡住時永久佔一個名額。
+	SecureAbortTimeout = 30 * time.Second
 )
 
 // PresignTTL 是預簽 PUT 網址的有效期；不得超過 UploadTTL（網址比暫存列活得久沒有意義）。

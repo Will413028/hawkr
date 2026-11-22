@@ -53,6 +53,24 @@
       "new": "if false {",
       "test": "internal/modules/media ^TestReadStagedSecure_OnlyTheUploaderCanPreviewBeforeConfirm$",
       "why": "ReadStagedSecure no longer compares the caller with the uploader, so anyone holding the token can preview the file"
+    },
+    {
+      "id": "rewrap-asset-ignores-old-kek-id",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+      "old": "WHERE id = $4 AND kek_id = $5\n",
+      "new": "WHERE id = $4 AND $5::text <> ''\n",
+      "test": "internal/modules/media ^TestRewrapAsset_StaleOldKekIDUpdatesNothingAndKeepsTheWrappedDEK$",
+      "why": "the RewrapAsset UPDATE no longer requires the kek_id it listed, so a concurrent or stale run overwrites a wrapped_dek another run already replaced"
+    },
+    {
+      "id": "new-drops-keyring",
+      "stack": "go",
+      "file": "backend/internal/modules/media/module.go",
+      "old": "Logger: d.Logger, Keyring: d.Keyring,\n",
+      "new": "Logger: d.Logger,\n",
+      "test": "internal/modules/media ^TestNew_PassesTheKeyringToTheUploadService$",
+      "why": "the assembly point's keyring never reaches the upload service, so the four secure methods keep returning ErrNoKeyring"
     }
   ]
 }

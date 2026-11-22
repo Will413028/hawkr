@@ -5,6 +5,7 @@ package media_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -62,10 +64,11 @@ func uploadSecure(t *testing.T, f *fixture, who media.Uploader, data []byte) med
 	return res
 }
 
-// secureID 取得 token 對應的暫存列與資產 ID（資產 ID 不回給上傳者，測試直接查表）。
-func secureRow(t *testing.T, f *fixture) (uploadID, assetID uuid.UUID) {
+// secureRow 取得 token 對應的暫存列與資產 ID（資產 ID 不回給上傳者，測試直接以 token_hash 查表，不靠排序）。
+func secureRow(t *testing.T, f *fixture, token string) (uploadID, assetID uuid.UUID) {
 	t.Helper()
-	if err := f.d.Pool().QueryRow(t.Context(), `SELECT id, asset_id FROM media.staged_uploads WHERE visibility = 'SECURE' ORDER BY id DESC LIMIT 1`).Scan(&uploadID, &assetID); err != nil {
+	h := sha256.Sum256([]byte(token))
+	if err := f.d.Pool().QueryRow(t.Context(), `SELECT id, asset_id FROM media.staged_uploads WHERE token_hash = $1`, h[:]).Scan(&uploadID, &assetID); err != nil {
 		t.Fatal(err)
 	}
 	return uploadID, assetID
@@ -119,7 +122,7 @@ func TestUploadSecure_RecordsKekIDAndWrappedDEK(t *testing.T) {
 	if res.Token == "" || res.ContentType != "application/pdf" || res.SizeBytes != int64(len(data)) || !res.ExpiresAt.Equal(f.clock.Now().Add(media.UploadTTL)) {
 		t.Fatalf("結果 %+v", res)
 	}
-	uploadID, assetID := secureRow(t, f)
+	uploadID, assetID := secureRow(t, f, res.Token)
 	var kekID *string
 	var wrapped []byte
 	var key, state, ct string
@@ -310,8 +313,8 @@ func TestUploadSecure_NoPlaintextInAnyPutOrStoredObject(t *testing.T) {
 func TestUploadSecure_CiphertextOverheadIsOutsideTheRecordedPlainSize(t *testing.T) {
 	f := setup(t)
 	data := pdfOf(70_000) // 兩段
-	uploadSecure(t, f, owner, data)
-	_, assetID := secureRow(t, f)
+	res := uploadSecure(t, f, owner, data)
+	_, assetID := secureRow(t, f, res.Token)
 	info, err := f.store.Head(t.Context(), objectKeyOf(t, f, assetID))
 	if err != nil {
 		t.Fatal(err)
@@ -330,7 +333,7 @@ func TestUploadSecure_CiphertextOverheadIsOutsideTheRecordedPlainSize(t *testing
 func TestUploadSecure_ObjectTypeIsOctetStreamWhileAssetKeepsRecognisedType(t *testing.T) {
 	f := setup(t)
 	res := uploadSecure(t, f, owner, pngMagic)
-	_, assetID := secureRow(t, f)
+	_, assetID := secureRow(t, f, res.Token)
 	info, err := f.store.Head(t.Context(), objectKeyOf(t, f, assetID))
 	if err != nil {
 		t.Fatal(err)
@@ -478,8 +481,8 @@ func TestReadSecure_ReturnsPlaintextForAssetAcrossSegments(t *testing.T) {
 
 func TestReadSecure_NotReadableWhileStagedAndNotFoundForUnknown(t *testing.T) {
 	f := setup(t)
-	uploadSecure(t, f, owner, pdfOf(10))
-	_, assetID := secureRow(t, f)
+	res := uploadSecure(t, f, owner, pdfOf(10))
+	_, assetID := secureRow(t, f, res.Token)
 	_, err := f.m.ReadSecure(t.Context(), assetID)
 	wantKind(t, err, apperr.KindNotFound)
 	_, err = f.m.ReadSecure(t.Context(), uuid.New())
@@ -650,12 +653,11 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, freshAsset := secureRow(t, f)
+	_, freshAsset := secureRow(t, f, fresh.Token)
 	var freshWrapped []byte
 	if err := f.d.Pool().QueryRow(t.Context(), `SELECT wrapped_dek FROM media.assets WHERE id = $1`, freshAsset).Scan(&freshWrapped); err != nil {
 		t.Fatal(err)
 	}
-	_ = fresh
 
 	n, err := rotated.RewrapDEKs(t.Context())
 	if err != nil || n != 1 {
@@ -693,6 +695,39 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 		if key == oldKey {
 			t.Fatal("RewrapDEKs 寫了儲存")
 		}
+	}
+}
+
+// 列出之後、更新之前列上的 kek_id 已被別方改掉：帶舊 kek_id 的更新影響 0 列，wrapped_dek 不被覆寫，資產仍可讀。
+func TestRewrapAsset_StaleOldKekIDUpdatesNothingAndKeepsTheWrappedDEK(t *testing.T) {
+	f := setup(t)
+	res := uploadSecure(t, f, owner, pdfOf(1000))
+	asset := confirmSecure(t, f, owner, res.Token)
+	var before []byte
+	if err := f.d.Pool().QueryRow(t.Context(), `SELECT wrapped_dek FROM media.assets WHERE id = $1`, asset.ID).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	stale, primary := "k0", "k2"
+	n, err := store.New(f.d.Conn(t.Context())).RewrapAsset(t.Context(), store.RewrapAssetParams{
+		ID: asset.ID, OldKekID: &stale, NewKekID: &primary, NewWrappedDek: []byte("overwritten"), Now: f.clock.Now(),
+	})
+	if err != nil || n != 0 {
+		t.Fatalf("RewrapAsset = %d, %v，預期帶過期 kek_id 影響 0 列", n, err)
+	}
+	var after []byte
+	var kekID string
+	if err := f.d.Pool().QueryRow(t.Context(), `SELECT wrapped_dek, kek_id FROM media.assets WHERE id = $1`, asset.ID).Scan(&after, &kekID); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) || kekID != "k1" {
+		t.Fatalf("wrapped_dek 或 kek_id 被覆寫：kek_id=%s", kekID)
+	}
+	rc, err := f.m.ReadSecure(t.Context(), asset.ID)
+	if err != nil {
+		t.Fatalf("資產不再可讀：%v", err)
+	}
+	if got := readAll(t, rc); !bytes.Equal(got, pdfOf(1000)) {
+		t.Fatal("內容不同")
 	}
 }
 

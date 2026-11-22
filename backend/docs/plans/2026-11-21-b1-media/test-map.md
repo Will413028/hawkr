@@ -26,16 +26,16 @@
 | 6 | `controller/SecureMediaControllerTest.java:326` | `secureDownload_usesAttachmentDisposition_andRfc5987EncodesCjkFilename` | — | `secure_download` 端點刪除（盤點 §1.2 #3、B1-D6）；Disposition 與 Content-Length 行為由擁有者代理端點的測試承接（B1-5，seller 的 KYC 與治理佐證讀取） |
 | 7 | `controller/SecureMediaControllerTest.java:380` | `secureDownload_filenameFromWritePathCannotBreakQuotedString` | — | `secure_download` 端點刪除；檔名不得截斷 quoted-string 的規則由 `AssetFilename` 的搬移測試（列 148–169）與擁有者代理端點測試（B1-5）承接 |
 | 8 | `controller/SecureMediaControllerTest.java:416` | `secureDownload_setsContentLengthFromActualR2ObjectSize_notStaleSizeBytes` | — | `secure_download` 端點刪除；Content-Length 取實際大小的規則同列 4，由擁有者代理端點測試承接（B1-5） |
-| 9 | `grpc/ServerReadSecureAssetTest.java:185` | `returnsBytesWhenTripleMatches` | B1-2：`TestReadSecure_ReturnsPlaintextForAsset`（以資產 ID 讀，行程內呼叫；授權留在擁有者） | — |
+| 9 | `grpc/ServerReadSecureAssetTest.java:185` | `returnsBytesWhenTripleMatches` | B1-2：`TestReadSecure_ReturnsPlaintextForAssetAcrossSegments`（以資產 ID 讀，行程內呼叫；授權留在擁有者） | — |
 | 10 | `grpc/ServerReadSecureAssetTest.java:200` | `filenamePrefersOriginalOverObjectKeyTail` | B1-2：`TestAssetDisplayName_OriginalFilenameWins`（顯示檔名優先取原始檔名） | — |
 | 11 | `grpc/ServerReadSecureAssetTest.java:220` | `filenameFallbackStripsAttemptSuffixForLegacyRows` | — | 回退到 object key 尾段並剝 `.attempt-` 後綴只服務舊列；正式 key 不含 `.attempt-`（缺陷 5.15）也不含呼叫端檔名（5.16），上線前沒有舊列 |
-| 12 | `grpc/ServerReadSecureAssetTest.java:243` | `decryptsEncryptedObject` | B1-2：`TestReadSecure_DecryptsStoredObject`（B1-D4 的分塊 AEAD 往返） | — |
+| 12 | `grpc/ServerReadSecureAssetTest.java:243` | `decryptsEncryptedObject` | B1-2：`TestRoundTrip_SegmentBoundaries`（B1-D4 的分塊 AEAD 往返；整合面的往返在 `TestReadSecure_ReturnsPlaintextForAssetAcrossSegments`） | — |
 | 13 | `grpc/ServerReadSecureAssetTest.java:264` | `mismatchedRefIdIsIndistinguishableFromMissing` | — | 三元組（ref_type、ref_id、asset_id）隨 `asset_reference` 消失；「非擁有者不可讀」由擁有者授權測試守（B1-5） |
 | 14 | `grpc/ServerReadSecureAssetTest.java:283` | `mismatchedRefTypeIsIndistinguishableFromMissing` | — | 同列 13：ref_type 隨 `asset_reference` 消失 |
 | 15 | `grpc/ServerReadSecureAssetTest.java:295` | `rejectsNonInternalCallers` | — | gRPC 內部閘門（`x-internal-service`）隨 gRPC 介面消失，Go 的 `ReadSecure` 是行程內呼叫，沒有外部呼叫者 |
 | 16 | `grpc/ServerReadSecureAssetTest.java:308` | `rejectsEmptyTripleFields` | — | 三元組欄位隨 `asset_reference` 消失；`ReadSecure` 只收資產 ID，空 ID 由 `TestReadSecure_UnknownAssetNotFound`（列 9 同檔）涵蓋 |
 | 17 | `grpc/ServerReadSecureAssetTest.java:322` | `rejectsNonSecureAsset` | B1-2：`TestReadSecure_RejectsPublicAsset`（公開資產不可走機敏讀取） | — |
-| 18 | `grpc/ServerReadSecureAssetTest.java:334` | `rejectsTruncatedRead` | B1-2：`TestReadSecure_TruncatedCiphertextFailsBeforeAnyPlaintext`（B1-D4：竄改或截斷在送出明文前失敗） | — |
+| 18 | `grpc/ServerReadSecureAssetTest.java:334` | `rejectsTruncatedRead` | B1-2：`TestReadSecure_TamperedTruncatedOrTaglessCiphertextFailsBeforeAnyPlaintext`（B1-D4：竄改或截斷在送出明文前失敗） | — |
 | 19 | `grpc/ServerReadSecureAssetTest.java:350` | `referenceStubOnlyAcceptsExactTriple` | — | 三元組 stub 的測試替身隨 `asset_reference` 消失 |
 | 20 | `repository/MediaAssetGcExclusionTest.java:31` | `selectOrphanedAssetsExcludesStatutoryRefTypes` | — | 孤兒資產 GC 與 `ref_type` 法定排除清單（7120、7111）一起消失：GC 不再刪已確認資產；「發票與證件不呼叫刪除」由擁有者側測試守（B1-5） |
 | 21 | `repository/MediaAssetGcExclusionTest.java:42` | `claimAssetForGcExcludesStatutoryRefTypes` | — | 同列 20：`claimAssetForGc` 隨孤兒資產 GC 刪除 |
@@ -112,13 +112,13 @@
 | 92 | `service/MediaUploadValidatorTest.java:91` | `finalizedRejectsActualMimeNotWhitelisted` | B1-2：`TestConfirm_RejectsActualMimeNotAllowed` | — |
 | 93 | `service/MediaUploadValidatorTest.java:99` | `finalizedRejectsMimeMismatch` | B1-2：`TestConfirm_RejectsMimeMismatch` | — |
 | 94 | `service/MediaUploadValidatorTest.java:107` | `finalizedPasses` | B1-2：`TestConfirm_ValidObjectPasses` | — |
-| 95 | `service/MediaUploadValidatorTest.java:115` | `finalizedSecurePassesWithGcmTagOverhead` | B1-2：`TestConfirmSecure_PassesWithCipherOverhead`（密文開銷依 B1-D4 的格式改寫） | — |
-| 96 | `service/MediaUploadValidatorTest.java:127` | `finalizedSecureRejectsWhenMissingGcmTag` | B1-2：`TestConfirmSecure_RejectsMissingAuthTag`（依 B1-D4 的格式改寫） | — |
-| 97 | `service/MediaUploadValidatorTest.java:135` | `finalizedSecureSkipsContentTypeCheck` | B1-2：`TestConfirmSecure_SkipsContentTypeCheck`（機敏物件的實際型別一律是 octet-stream） | — |
+| 95 | `service/MediaUploadValidatorTest.java:115` | `finalizedSecurePassesWithGcmTagOverhead` | B1-2：`TestUploadSecure_CiphertextOverheadIsOutsideTheRecordedPlainSize`（密文開銷依 B1-D4 的格式改寫：資產記明文大小，物件大小是明文加 header 與每段 tag） | — |
+| 96 | `service/MediaUploadValidatorTest.java:127` | `finalizedSecureRejectsWhenMissingGcmTag` | B1-2：`TestReadSecure_TamperedTruncatedOrTaglessCiphertextFailsBeforeAnyPlaintext`（形狀改變：不再在確認時比大小，缺 tag 改成讀取時驗證失敗，與竄改、截斷同一個測試） | — |
+| 97 | `service/MediaUploadValidatorTest.java:135` | `finalizedSecureSkipsContentTypeCheck` | B1-2：`TestUploadSecure_ObjectTypeIsOctetStreamWhileAssetKeepsRecognisedType`（形狀改變：不再有確認時的型別檢查，改斷言機敏物件的實際型別一律是 octet-stream、資產列記辨認出的型別） | — |
 | 98 | `service/ServerUploadSecureEncryptionTest.java:112` | `uploadsCiphertextNotPlaintext` | B1-2：`TestPutSecure_StoresCiphertextNotPlaintext` | — |
 | 99 | `service/ServerUploadSecureEncryptionTest.java:139` | `roundTripsThroughTheRealCipher` | B1-2：`TestPutSecure_RoundTripsThroughReadSecure` | — |
 | 100 | `service/ServerUploadSecureEncryptionTest.java:169` | `legacyPlaintextAssetsStayReadable` | — | 舊明文機敏資產只存在於 Java 的歷史資料；系統未上線、開發資料不搬（計畫前提「不搬資料」），Go 沒有明文機敏資產要讀 |
-| 101 | `service/ServerUploadSecureEncryptionTest.java:199` | `refusesToWritePlaintextWhenMasterKeyMissing` | B1-2：`TestPutSecure_RefusesWhenMasterKeyMissing`（無主密鑰拒寫） | — |
+| 101 | `service/ServerUploadSecureEncryptionTest.java:199` | `refusesToWritePlaintextWhenMasterKeyMissing` | B1-2：`TestUploadSecure_RefusesWhenKeyringMissing`（無金鑰環拒寫） | — |
 | 102 | `service/StagedTokenServiceTest.java:41` | `missingSecretFailsClosed` | B1-2：`TestStagedToken_MissingSecretFailsClosed`（缺 secret 啟動即失敗） | — |
 | 103 | `service/StagedTokenServiceTest.java:48` | `missingSecretWithAllowEphemeralUsesEphemeralKey` | — | ephemeral key 是 Java 的本機後門（`TOKEN_ALLOW_EPHEMERAL`）；Go 缺 secret 一律啟動失敗（列 102），不提供隨機金鑰的退路 |
 | 104 | `service/StagedTokenServiceTest.java:65` | `explicitSecretRoundTrip` | B1-2：`TestStagedToken_RoundTrip`（格式依 B1-D2） | — |

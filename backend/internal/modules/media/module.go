@@ -150,7 +150,7 @@ func New(d Deps) *Module {
 	}
 	return &Module{
 		upload: upload.New(upload.Deps{
-			DB: d.DB, Jobs: d.Jobs, Store: d.Store, Process: d.Process, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
+			DB: d.DB, Jobs: d.Jobs, Store: d.Store, Process: d.Process, NewID: d.NewID, Now: d.Now, Logger: d.Logger, Keyring: d.Keyring,
 		}),
 		reclaim: reclaim.New(reclaim.Deps{DB: d.DB, Jobs: d.Jobs, Store: d.Store, Now: d.Now, Logger: d.Logger}),
 	}

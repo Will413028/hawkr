@@ -90,6 +90,9 @@ func (s *Service) ReadStagedSecure(ctx context.Context, uploader model.Uploader,
 		return nil, apperr.FailedPrecondition("這筆上傳現在不能預覽")
 	}
 	a, err := s.q(ctx).GetAsset(ctx, *row.AssetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.NotFound("找不到這個資產")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("media：讀取資產：%w", err)
 	}

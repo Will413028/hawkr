@@ -186,10 +186,16 @@ func secureReadErr(err error) error {
 	return fmt.Errorf("media：讀取機敏上傳：%w", err)
 }
 
-// abortSecure 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳。
-// 不受 ctx 取消影響：client 斷線時列與物件仍要收尾。轉換本身失敗時什麼都不刪，列與物件留給 GC 在過期加寬限後回收。
+// abortSecure 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳，
+// 重讀是 DELETING 或 DELETED（輸給 GC）回 FailedPrecondition「已過期」。內部的 errLost 不外漏。
+// 不受 ctx 取消影響：client 斷線時列與物件仍要收尾，但整段收尾有 model.SecureAbortTimeout 的時限。
+// 轉換本身失敗時什麼都不刪，列與物件留給 GC 在過期加寬限後回收。
 func (s *Service) abortSecure(ctx context.Context, uploadID uuid.UUID, finalKey string, ok SecureResult, cause error) (SecureResult, error) {
-	ctx = context.WithoutCancel(ctx)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.SecureAbortTimeout)
+	defer cancel()
+	if errors.Is(cause, errLost) {
+		cause = errors.New("media：機敏上傳的暫存列已被別處轉走，沒有完成")
+	}
 	reason := string(model.RejectProcessingFailed)
 	n, err := s.q(ctx).MarkUploadRejected(ctx, store.MarkUploadRejectedParams{ID: uploadID, Reason: &reason, Now: s.d.Now()})
 	if err != nil {
@@ -203,8 +209,15 @@ func (s *Service) abortSecure(ctx context.Context, uploadID uuid.UUID, finalKey 
 		return SecureResult{}, cause
 	}
 	cur, err := s.q(ctx).GetUpload(ctx, uploadID)
-	if err == nil && model.UploadState(cur.State) == model.StateReady {
+	if err != nil {
+		return SecureResult{}, fmt.Errorf("media：機敏上傳失敗後重讀暫存列：%w（原因：%w）", err, cause)
+	}
+	state := model.UploadState(cur.State)
+	if state == model.StateReady {
 		return ok, nil
+	}
+	if state == model.StateDeleting || state == model.StateDeleted {
+		return SecureResult{}, apperr.FailedPrecondition("這筆上傳已過期")
 	}
 	return SecureResult{}, cause
 }
