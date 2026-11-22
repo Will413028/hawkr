@@ -3,6 +3,7 @@ import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
@@ -18,6 +19,8 @@ export type UiTextKey =
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
 	| "buyer.Profile.gender_unset"
+	| "chat.ChatBuyer.deleted_name"
+	| "chat.Message.unsupported_kind"
 	| "chat.Preview.erased"
 	| "chat.Preview.hidden"
 	| "chat.Preview.image"
@@ -58,6 +61,11 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME"
+	| "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT"
+	| "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT"
+	| "crm.CustomerType.CUSTOMER_TYPE_NORMAL"
+	| "crm.CustomerType.CUSTOMER_TYPE_VIP"
 	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
@@ -75,6 +83,12 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
+	| "review.Review.rating_label_1"
+	| "review.Review.rating_label_2"
+	| "review.Review.rating_label_3"
+	| "review.Review.rating_label_4"
+	| "review.Review.rating_label_5"
+	| "review.ReviewAuthor.anonymous_name"
 	| "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
@@ -249,6 +263,16 @@ export function buyerProfileGenderUnset(): UiMessage {
 	return { key: "buyer.Profile.gender_unset" };
 }
 
+/** chat.ChatBuyer.deleted_name */
+export function chatChatBuyerDeletedName(): UiMessage {
+	return { key: "chat.ChatBuyer.deleted_name" };
+}
+
+/** chat.Message.unsupported_kind */
+export function chatMessageUnsupportedKind(): UiMessage {
+	return { key: "chat.Message.unsupported_kind" };
+}
+
 /** chat.Preview.erased */
 export function chatPreviewErased(): UiMessage {
 	return { key: "chat.Preview.erased" };
@@ -338,6 +362,31 @@ export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
 }
 
+const CRM_CUSTOMER_SORT: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME",
+	2: "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT",
+	3: "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT",
+};
+
+/** crm.CustomerSort 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function crmCustomerSort(v: CustomerSort): UiMessage | undefined {
+	const key = CRM_CUSTOMER_SORT[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const CRM_CUSTOMER_TYPE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "crm.CustomerType.CUSTOMER_TYPE_NORMAL",
+	2: "crm.CustomerType.CUSTOMER_TYPE_VIP",
+};
+
+/** crm.CustomerType 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function crmCustomerType(v: CustomerType): UiMessage | undefined {
+	const key = CRM_CUSTOMER_TYPE[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 /** moderation.CommunityReport.outcome_unset */
 export function moderationCommunityReportOutcomeUnset(): UiMessage {
 	return { key: "moderation.CommunityReport.outcome_unset" };
@@ -397,6 +446,36 @@ export function paymentRequirementCollection(v: RequirementCollection): UiMessag
 	const key = PAYMENT_REQUIREMENT_COLLECTION[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+/** review.Review.rating_label_1 */
+export function reviewReviewRatingLabel1(): UiMessage {
+	return { key: "review.Review.rating_label_1" };
+}
+
+/** review.Review.rating_label_2 */
+export function reviewReviewRatingLabel2(): UiMessage {
+	return { key: "review.Review.rating_label_2" };
+}
+
+/** review.Review.rating_label_3 */
+export function reviewReviewRatingLabel3(): UiMessage {
+	return { key: "review.Review.rating_label_3" };
+}
+
+/** review.Review.rating_label_4 */
+export function reviewReviewRatingLabel4(): UiMessage {
+	return { key: "review.Review.rating_label_4" };
+}
+
+/** review.Review.rating_label_5 */
+export function reviewReviewRatingLabel5(): UiMessage {
+	return { key: "review.Review.rating_label_5" };
+}
+
+/** review.ReviewAuthor.anonymous_name */
+export function reviewReviewAuthorAnonymousName(): UiMessage {
+	return { key: "review.ReviewAuthor.anonymous_name" };
 }
 
 const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {

@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
@@ -79,6 +80,37 @@ _ => null,
 extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreCardStatus {
   /// common.StoreCardStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
+}
+
+String? _crmCustomerSort(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '首購時間',
+(UiLocale.en, 1) => 'First order date',
+(UiLocale.zhTW, 2) => '消費金額',
+(UiLocale.en, 2) => 'Total spent',
+(UiLocale.zhTW, 3) => '消費次數',
+(UiLocale.en, 3) => 'Order count',
+_ => null,
+};
+}
+
+extension CrmCustomerSortUiText on hawkr_crm_v1alpha1_crm.CustomerSort {
+  /// crm.CustomerSort 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _crmCustomerSort(l, value);
+}
+
+String? _crmCustomerType(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '一般客戶',
+(UiLocale.en, 1) => 'Regular customer',
+(UiLocale.zhTW || UiLocale.en, 2) => 'VIP',
+_ => null,
+};
+}
+
+extension CrmCustomerTypeUiText on hawkr_crm_v1alpha1_crm.CustomerType {
+  /// crm.CustomerType 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _crmCustomerType(l, value);
 }
 
 String? _moderationReportOutcome(UiLocale l, int value) {
@@ -589,6 +621,22 @@ UiLocale.en => 'Not set',
 };
 }
 
+/// chat.ChatBuyer.deleted_name
+String chatChatBuyerDeletedName(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '已刪除帳號',
+UiLocale.en => 'Deleted account',
+};
+}
+
+/// chat.Message.unsupported_kind
+String chatMessageUnsupportedKind(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '不支援的訊息',
+UiLocale.en => 'Unsupported message',
+};
+}
+
 /// chat.Preview.erased
 String chatPreviewErased(UiLocale l) {
 return switch (l) {
@@ -651,6 +699,54 @@ String moderationCommunityReportOutcomeUnset(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '審核中',
 UiLocale.en => 'Under review',
+};
+}
+
+/// review.Review.rating_label_1
+String reviewReviewRatingLabel1(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '非常不滿意',
+UiLocale.en => 'Very dissatisfied',
+};
+}
+
+/// review.Review.rating_label_2
+String reviewReviewRatingLabel2(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '不滿意',
+UiLocale.en => 'Dissatisfied',
+};
+}
+
+/// review.Review.rating_label_3
+String reviewReviewRatingLabel3(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '一般',
+UiLocale.en => 'Okay',
+};
+}
+
+/// review.Review.rating_label_4
+String reviewReviewRatingLabel4(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '滿意',
+UiLocale.en => 'Satisfied',
+};
+}
+
+/// review.Review.rating_label_5
+String reviewReviewRatingLabel5(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '非常滿意',
+UiLocale.en => 'Very satisfied',
+};
+}
+
+/// review.ReviewAuthor.anonymous_name
+String reviewReviewAuthorAnonymousName(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '匿名會員',
+UiLocale.en => 'Anonymous member',
 };
 }
 

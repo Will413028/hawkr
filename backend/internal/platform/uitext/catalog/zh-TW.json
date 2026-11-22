@@ -20,6 +20,14 @@
       "message": "尚未設定",
       "description": "買家沒有填性別時，性別欄位顯示的文字；也是選單裡清除性別的那一項。"
     },
+    "chat.ChatBuyer.deleted_name": {
+      "message": "已刪除帳號",
+      "description": "店家的對話裡，買家的 deleted 為真時顯示的名稱（已刪除的買家沒有名稱與頭像）。"
+    },
+    "chat.Message.unsupported_kind": {
+      "message": "不支援的訊息",
+      "description": "訊息的 kind 是 UNSPECIFIED 或 client 不認得的值時，取代內容顯示的文字（MessageKind 的約定：顯示成「不支援的訊息」，不當成錯誤）。"
+    },
     "chat.Preview.erased": {
       "message": "此訊息已被移除",
       "description": "對話列表預覽：最後一則訊息的內容已抹除（erased 為真，寄件方帳號已刪除或店家已退場）。"
@@ -180,6 +188,26 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME": {
+      "message": "首購時間",
+      "description": "首筆完成訂單的時間。"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": {
+      "message": "消費次數",
+      "description": "CustomerSort 是客戶列表的排序欄位。（值 CUSTOMER_SORT_ORDER_COUNT）"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": {
+      "message": "消費金額",
+      "description": "CustomerSort 是客戶列表的排序欄位。（值 CUSTOMER_SORT_TOTAL_SPENT）"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_NORMAL": {
+      "message": "一般客戶",
+      "description": "CustomerType 是店家對買家的分類。（值 CUSTOMER_TYPE_NORMAL）"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_VIP": {
+      "message": "VIP",
+      "description": "CustomerType 是店家對買家的分類。（值 CUSTOMER_TYPE_VIP）"
+    },
     "moderation.CommunityReport.outcome_unset": {
       "message": "審核中",
       "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
@@ -247,6 +275,30 @@
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "金流商收件（託管頁面）",
       "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
+    },
+    "review.Review.rating_label_1": {
+      "message": "非常不滿意",
+      "description": "評價的星等 1（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_2": {
+      "message": "不滿意",
+      "description": "評價的星等 2（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_3": {
+      "message": "一般",
+      "description": "評價的星等 3（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_4": {
+      "message": "滿意",
+      "description": "評價的星等 4（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_5": {
+      "message": "非常滿意",
+      "description": "評價的星等 5（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.ReviewAuthor.anonymous_name": {
+      "message": "匿名會員",
+      "description": "評價作者沒有設定暱稱（name 未設）時顯示的名稱。"
     },
     "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE": {
       "message": "聊天訊息",

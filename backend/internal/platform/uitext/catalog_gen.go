@@ -48,6 +48,22 @@ func (t Text) BuyerProfileGenderUnset() string {
 	return "尚未設定"
 }
 
+// ChatChatBuyerDeletedName 是 chat.ChatBuyer.deleted_name 的文案。
+func (t Text) ChatChatBuyerDeletedName() string {
+	if t.Locale() == EN {
+		return "Deleted account"
+	}
+	return "已刪除帳號"
+}
+
+// ChatMessageUnsupportedKind 是 chat.Message.unsupported_kind 的文案。
+func (t Text) ChatMessageUnsupportedKind() string {
+	if t.Locale() == EN {
+		return "Unsupported message"
+	}
+	return "不支援的訊息"
+}
+
 // ChatPreviewErased 是 chat.Preview.erased 的文案。
 func (t Text) ChatPreviewErased() string {
 	if t.Locale() == EN {
@@ -201,6 +217,50 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// CrmCustomerSort 是 crm.CustomerSort 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) CrmCustomerSort(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "FIRST_ORDER_TIME":
+			return "First order date", true
+		case "TOTAL_SPENT":
+			return "Total spent", true
+		case "ORDER_COUNT":
+			return "Order count", true
+		}
+	}
+	switch v {
+	case "FIRST_ORDER_TIME":
+		return "首購時間", true
+	case "TOTAL_SPENT":
+		return "消費金額", true
+	case "ORDER_COUNT":
+		return "消費次數", true
+	}
+	return "", false
+}
+
+// CrmCustomerType 是 crm.CustomerType 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) CrmCustomerType(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NORMAL":
+			return "Regular customer", true
+		case "VIP":
+			return "VIP", true
+		}
+	}
+	switch v {
+	case "NORMAL":
+		return "一般客戶", true
+	case "VIP":
+		return "VIP", true
+	}
+	return "", false
+}
+
 // ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
 func (t Text) ModerationCommunityReportOutcomeUnset() string {
 	if t.Locale() == EN {
@@ -347,6 +407,54 @@ func (t Text) PaymentRequirementCollection(v string) (string, bool) {
 		return "平台收件（內嵌元件）", true
 	}
 	return "", false
+}
+
+// ReviewReviewRatingLabel1 是 review.Review.rating_label_1 的文案。
+func (t Text) ReviewReviewRatingLabel1() string {
+	if t.Locale() == EN {
+		return "Very dissatisfied"
+	}
+	return "非常不滿意"
+}
+
+// ReviewReviewRatingLabel2 是 review.Review.rating_label_2 的文案。
+func (t Text) ReviewReviewRatingLabel2() string {
+	if t.Locale() == EN {
+		return "Dissatisfied"
+	}
+	return "不滿意"
+}
+
+// ReviewReviewRatingLabel3 是 review.Review.rating_label_3 的文案。
+func (t Text) ReviewReviewRatingLabel3() string {
+	if t.Locale() == EN {
+		return "Okay"
+	}
+	return "一般"
+}
+
+// ReviewReviewRatingLabel4 是 review.Review.rating_label_4 的文案。
+func (t Text) ReviewReviewRatingLabel4() string {
+	if t.Locale() == EN {
+		return "Satisfied"
+	}
+	return "滿意"
+}
+
+// ReviewReviewRatingLabel5 是 review.Review.rating_label_5 的文案。
+func (t Text) ReviewReviewRatingLabel5() string {
+	if t.Locale() == EN {
+		return "Very satisfied"
+	}
+	return "非常滿意"
+}
+
+// ReviewReviewAuthorAnonymousName 是 review.ReviewAuthor.anonymous_name 的文案。
+func (t Text) ReviewReviewAuthorAnonymousName() string {
+	if t.Locale() == EN {
+		return "Anonymous member"
+	}
+	return "匿名會員"
 }
 
 // SellerContentKind 是 seller.ContentKind 的文案。
