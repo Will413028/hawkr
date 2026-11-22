@@ -7,7 +7,7 @@ import ReviewedList from "./ReviewedList";
 
 /**
  * "我的評價" — two tabs: 待評價 (completed orders awaiting a review) and
- * 已評價 (reviews the buyer has written, GET /app/me/reviews). Tabs unmount
+ * 已評價 (reviews the buyer has written, ReviewAppService.ListMyReviews). Tabs unmount
  * the inactive panel, so the 已評價 list only fetches once opened.
  */
 export default function ReviewsClient() {
