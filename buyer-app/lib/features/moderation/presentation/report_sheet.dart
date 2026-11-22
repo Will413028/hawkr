@@ -25,7 +25,7 @@ import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 /// 檢舉說明的上限（`moderation.proto` SubmitReportRequest.description，以 rune 計）。
 const _descriptionMaxRunes = 500;
 
-/// 一個檢舉原因選項：社群對象帶 [category]，聊天與評價（舊 REST）帶 [legacy]。
+/// 一個檢舉原因選項：社群對象帶 [category]，聊天（舊 REST）帶 [legacy]。
 class _ReasonOption {
   const _ReasonOption({
     required this.label,
@@ -56,7 +56,7 @@ class _SubmitAttempt {
 }
 
 /// 通用檢舉底部彈窗。社群內容（貼文、留言、討論區留言）送 `ModerationAppService`，
-/// 聊天與評價送舊 `/app/reports`；用哪一條由 [target] 的型別決定。
+/// 聊天送舊 `/app/reports`；用哪一條由 [target] 的型別決定。
 /// 使用：`await showReportSheet(context, target: const SocialReportTarget.post('123'))`
 class ReportSheetWidget extends ConsumerStatefulWidget {
   const ReportSheetWidget({super.key, required this.target});

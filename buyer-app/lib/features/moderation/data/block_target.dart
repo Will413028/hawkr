@@ -9,10 +9,10 @@ const blockStoreConfirmText = '封鎖後，您將看不到這家店的貼文與�
 /// C7b：封鎖買家的確認說明。
 const blockBuyerConfirmText = '封鎖後，您與對方將看不到彼此的留言與評價。可隨時在「封鎖名單」解除。';
 
-/// 聊天與評價入口的封鎖說明（舊 REST，A6 前保留）。
+/// 聊天入口的封鎖說明（舊 REST，A6 前保留）。
 const legacyBlockConfirmText = '封鎖後對方將無法傳送訊息給您，您也無法傳送訊息給對方。可隨時在「封鎖名單」解除。';
 
-/// 封鎖的對象。社群的對象（[SocialBlockTarget]）走 `BuyerAppService`；聊天與評價的對象（[LegacyBlockTarget]）
+/// 封鎖的對象。社群的對象（[SocialBlockTarget]）走 `BuyerAppService`；聊天的對象（[LegacyBlockTarget]）
 /// 仍走舊 REST（A6 前的允許殘留）。兩者以型別分開，呼叫端不用字串判斷走哪條。
 sealed class BlockTarget {
   const BlockTarget();
@@ -91,7 +91,7 @@ final class ForumAuthorBlockTarget extends SocialBlockTarget {
       : blockBuyerConfirmText;
 }
 
-/// 聊天與評價入口：以舊系統的使用者編號封鎖（舊 `POST /app/blocks/{userId}`）。
+/// 聊天入口：以舊系統的使用者編號封鎖（舊 `POST /app/blocks/{userId}`）。
 final class LegacyBlockTarget extends BlockTarget {
   const LegacyBlockTarget(this.userId);
 

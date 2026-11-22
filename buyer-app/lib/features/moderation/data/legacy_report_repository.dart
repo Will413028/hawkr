@@ -10,7 +10,7 @@ part 'legacy_report_repository.g.dart';
 LegacyReportRepository legacyReportRepository(Ref ref) =>
     LegacyReportRepository(ref.watch(dioProvider));
 
-/// 聊天訊息與評價的檢舉（舊 `POST /app/reports`）。A6 搬進 moderation 前的允許殘留；
+/// 聊天訊息的檢舉（舊 `POST /app/reports`）。A6 搬進 moderation 前的允許殘留；
 /// 社群內容的檢舉在 `ModerationRepository`。
 class LegacyReportRepository {
   final Dio _dio;

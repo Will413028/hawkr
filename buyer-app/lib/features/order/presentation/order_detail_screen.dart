@@ -31,9 +31,10 @@ import '../../../core/analytics/analytics_providers.dart';
 import '../../../core/analytics/purchase_dedup.dart';
 import '../../../core/payment/pay_token_service.dart';
 import '../data/order_status_notifier.dart';
+import 'package:hawkr_api/images.dart' as pb_image;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart'
     as pb_review;
-import '../../review/data/review_display.dart';
+import '../../../shared/widgets/app_cached_image.dart';
 import '../../review/data/review_repository.dart';
 import '../../../config/image_config.dart';
 import '../../../shared/widgets/oss_image.dart';
@@ -2482,14 +2483,14 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
                           : data.images.length,
                       separatorBuilder: (_, __) => SizedBox(width: 8.w),
                       itemBuilder: (context, index) {
-                        final url = data.images[index];
+                        final image = data.images[index];
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(12.r),
                           child: SizedBox(
                             width: 80.w,
                             height: 80.w,
-                            child: OssImage(
-                              imageSource: url,
+                            child: AppCachedImage.api(
+                              image: image,
                               scene: ImageScene.reviewPhoto,
                               width: 80.w,
                               height: 80.w,
@@ -2520,11 +2521,11 @@ class _ReviewData {
 
   final int rating;
   final String content;
-  final List<String> images;
+  final List<pb_image.Image> images;
 
   factory _ReviewData.fromReview(pb_review.Review review) => _ReviewData(
     rating: review.rating.clamp(0, 5),
     content: review.content.trim(),
-    images: review.imageUrls,
+    images: review.images,
   );
 }

@@ -107,6 +107,36 @@ void main() {
       expect(app.myRequests.map((r) => r.orderItemId), ['9', '11']);
     });
 
+    test('有項目失敗但其他項目查到評價時回查到的那則', () async {
+      final app = FakeReviewApp(
+        mine: [reviewRecord('r2', orderItemId: '11')],
+        failOrderItemIds: {'9'},
+      );
+      final repo = ReviewRepository(
+        FakeReviewPublic().client(),
+        app.client(),
+        Dio(),
+      );
+
+      final found = await repo.findMyReviewForOrderItems(['9', '11']);
+
+      expect(found?.id, 'r2');
+    });
+
+    test('沒查到任何評價且有項目失敗時丟出失敗', () async {
+      final app = FakeReviewApp(failOrderItemIds: {'9'});
+      final repo = ReviewRepository(
+        FakeReviewPublic().client(),
+        app.client(),
+        Dio(),
+      );
+
+      await expectLater(
+        repo.findMyReviewForOrderItems(['9', '11']),
+        throwsA(isA<ConnectException>()),
+      );
+    });
+
     test('都沒有回 null', () async {
       final repo = ReviewRepository(
         FakeReviewPublic().client(),

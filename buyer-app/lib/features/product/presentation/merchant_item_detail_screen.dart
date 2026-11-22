@@ -820,7 +820,7 @@ class _MerchantItemDetailScreenState
                     blocks: _productDescriptionBlocks,
                   ),
                   const _ProductDetailSectionDivider(),
-                  _ProductReviewCardNew(
+                  ProductReviewPreviewCard(
                     merchantId: _resolvedMerchantId.isNotEmpty
                         ? _resolvedMerchantId
                         : widget.merchantId,
@@ -2167,18 +2167,24 @@ class _MerchantInfoCardNew extends StatelessWidget {
 }
 
 /// 商品評論卡片
-class _ProductReviewCardNew extends ConsumerStatefulWidget {
-  const _ProductReviewCardNew({this.merchantId, this.skuId, this.productName});
+class ProductReviewPreviewCard extends ConsumerStatefulWidget {
+  const ProductReviewPreviewCard({
+    super.key,
+    this.merchantId,
+    this.skuId,
+    this.productName,
+  });
   final String? merchantId;
   final String? skuId;
   final String? productName;
 
   @override
-  ConsumerState<_ProductReviewCardNew> createState() =>
-      _ProductReviewCardNewState();
+  ConsumerState<ProductReviewPreviewCard> createState() =>
+      ProductReviewPreviewCardState();
 }
 
-class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
+class ProductReviewPreviewCardState
+    extends ConsumerState<ProductReviewPreviewCard> {
   List<pb_review.Review>? _reviewsList;
   bool _isLoading = true;
   Object? _loadError;
@@ -2190,10 +2196,15 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
   }
 
   @override
-  void didUpdateWidget(covariant _ProductReviewCardNew oldWidget) {
+  void didUpdateWidget(covariant ProductReviewPreviewCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.merchantId != widget.merchantId ||
         oldWidget.skuId != widget.skuId) {
+      setState(() {
+        _reviewsList = null;
+        _loadError = null;
+        _isLoading = true;
+      });
       _loadReviews();
     }
   }
@@ -2216,7 +2227,7 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
       final response = await ref
           .read(reviewRepositoryProvider)
           .listProductReviews(sid);
-      if (mounted) {
+      if (mounted && (widget.skuId ?? '').trim() == sid) {
         setState(() {
           _reviewsList = response.reviews;
           _loadError = null;
@@ -2225,7 +2236,7 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
       }
     } catch (e) {
       HKLog.logE('[ProductReviewCard] Error loading reviews: $e');
-      if (mounted) {
+      if (mounted && (widget.skuId ?? '').trim() == sid) {
         setState(() {
           _reviewsList = null;
           _loadError = e;
@@ -2269,6 +2280,7 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
 
     final reviews = _reviewsList ?? [];
     final reviewCount = reviews.length;
+    final reviewTitle = _loadError != null ? '商品評價' : '商品評價 ($reviewCount)';
 
     // 只顯示前2筆評論預覽
     final displayReviews = reviews.take(2).toList();
@@ -2286,7 +2298,7 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
             children: [
               Expanded(
                 child: Text(
-                  '商品評價 ($reviewCount)',
+                  reviewTitle,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -2359,8 +2371,10 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
     pb_review.Review review, {
     bool showDivider = true,
   }) {
-    final displayName = review.authorName.isNotEmpty ? review.authorName : '匿名';
-    final avatarUrl = review.authorAvatarUrl;
+    final displayName = review.authorName.isNotEmpty
+        ? review.authorName
+        : anonymousReviewerName;
+    final avatar = review.authorAvatar;
     final dateStr = review.createDateText;
     final reviewId = review.id;
     final rating = review.rating;
@@ -2391,9 +2405,9 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
                       child: SizedBox(
                         width: 24.w,
                         height: 24.h,
-                        child: avatarUrl.isNotEmpty
-                            ? AppCachedImage(
-                                imageUrl: avatarUrl,
+                        child: avatar != null
+                            ? AppCachedImage.api(
+                                image: avatar,
                                 width: 24.w,
                                 height: 24.h,
                                 fit: BoxFit.cover,
@@ -2497,11 +2511,11 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
                 itemCount: review.images.length,
                 separatorBuilder: (_, __) => SizedBox(width: 6.w),
                 itemBuilder: (_, i) {
-                  final imgUrl = review.imageUrls[i];
+                  final image = review.images[i];
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(6.r),
-                    child: AppCachedImage(
-                      imageUrl: imgUrl,
+                    child: AppCachedImage.api(
+                      image: image,
                       width: 60.w,
                       height: 60.w,
                       fit: BoxFit.cover,

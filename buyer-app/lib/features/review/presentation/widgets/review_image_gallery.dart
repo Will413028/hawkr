@@ -11,17 +11,18 @@ import '../../../../shared/icons/app_icon_colors.dart';
 import '../../../../shared/icons/app_icons.dart';
 import '../../../../shared/widgets/app_cached_image.dart';
 import '../../../../shared/widgets/hk_frosted_card_surface.dart';
+import 'package:hawkr_api/images.dart' as api;
 
 typedef ReviewImageBuilder =
-    Widget Function(BuildContext context, String source, BoxFit fit);
+    Widget Function(BuildContext context, api.Image image, BoxFit fit);
 
 Widget _defaultReviewImageBuilder(
   BuildContext context,
-  String source,
+  api.Image image,
   BoxFit fit,
 ) {
-  return AppCachedImage(
-    imageUrl: source,
+  return AppCachedImage.api(
+    image: image,
     scene: fit == BoxFit.cover ? ImageScene.reviewPhoto : ImageScene.fullscreen,
     fit: fit,
   );
@@ -29,7 +30,7 @@ Widget _defaultReviewImageBuilder(
 
 Future<void> showReviewImageViewer(
   BuildContext context, {
-  required List<String> images,
+  required List<api.Image> images,
   int initialIndex = 0,
   ReviewImageBuilder imageBuilder = _defaultReviewImageBuilder,
 }) {
@@ -70,7 +71,7 @@ class ReviewImageGallery extends StatelessWidget {
     this.imageBuilder = _defaultReviewImageBuilder,
   });
 
-  final List<String> images;
+  final List<api.Image> images;
   final ReviewImageBuilder imageBuilder;
 
   @override
@@ -154,7 +155,7 @@ class ReviewImageViewerDialog extends StatefulWidget {
     this.imageBuilder = _defaultReviewImageBuilder,
   }) : assert(images.length > 0);
 
-  final List<String> images;
+  final List<api.Image> images;
   final int initialIndex;
   final ReviewImageBuilder imageBuilder;
 

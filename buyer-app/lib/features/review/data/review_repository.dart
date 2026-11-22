@@ -67,9 +67,8 @@ class ReviewRepository {
     return reviews;
   }
 
-  /// 商品評價的數量與平均分，商品卡片缺這兩個值時補用。這是唯一的接縫：契約還沒有商品層級的統計，
-  /// 目前沿用舊 gateway 的 `GET /public/products/{id}/reviews` 的 `stats` 區塊（A6-5e 的伺服器方法完成後，
-  /// A6-6c2 改讀新方法並刪除這裡的舊呼叫；client 不分頁加總）。失敗丟出。
+  /// 商品評價的數量與平均分，商品卡片缺這兩個值時補用；讀舊 gateway 的
+  /// `GET /public/products/{id}/reviews` 的 `stats` 區塊，client 不分頁加總。失敗丟出。
   Future<ProductRatingStats> productRatingStats(String productId) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/public/products/$productId/reviews',
@@ -110,15 +109,39 @@ class ReviewRepository {
     return response.reviews.isEmpty ? null : response.reviews.first;
   }
 
-  /// 這些訂單項目裡第一個有我可見評價的那則；都沒有回 null。
+  /// 這些訂單項目裡依傳入順序第一個有我可見評價的那則；都沒有回 null。各項目並行查詢，
+  /// 有項目失敗但其他項目查到評價時回查到的那則，沒查到任何評價且有失敗時丟出第一個失敗。
   Future<pb.Review?> findMyReviewForOrderItems(
     Iterable<String> orderItemIds,
   ) async {
-    for (final id in orderItemIds) {
-      final review = await findMyReviewForOrderItem(id);
-      if (review != null) return review;
+    final results = await Future.wait([
+      for (final id in orderItemIds) _findOrError(id),
+    ]);
+    Object? firstError;
+    StackTrace? firstStack;
+    for (final result in results) {
+      if (result.review != null) return result.review;
+      if (result.error != null && firstError == null) {
+        firstError = result.error;
+        firstStack = result.stack;
+      }
     }
+    if (firstError != null) Error.throwWithStackTrace(firstError, firstStack!);
     return null;
+  }
+
+  Future<({pb.Review? review, Object? error, StackTrace? stack})> _findOrError(
+    String orderItemId,
+  ) async {
+    try {
+      return (
+        review: await findMyReviewForOrderItem(orderItemId),
+        error: null,
+        stack: null,
+      );
+    } catch (e, s) {
+      return (review: null, error: e, stack: s);
+    }
   }
 
   /// 對一個已完成的訂單項目寫評價。[stagedTokens] 是圖片上傳完成後拿到的 token，最多 4 個。

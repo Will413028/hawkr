@@ -9,12 +9,12 @@ part 'block_repository.g.dart';
 BlockRepository blockRepository(Ref ref) =>
     BlockRepository(ref.watch(dioProvider));
 
-/// 聊天與評價入口的封鎖（舊 REST，A6 搬進 buyer 模組前的允許殘留）。社群的封鎖與封鎖名單在 `BlockingRepository`。
+/// 聊天入口的封鎖（舊 REST，A6 搬進 buyer 模組前的允許殘留）。社群的封鎖與封鎖名單在 `BlockingRepository`。
 class BlockRepository {
   final Dio _dio;
   BlockRepository(this._dio);
 
-  /// POST /app/blocks/{userId} — 封鎖使用者（只給聊天與評價入口）
+  /// POST /app/blocks/{userId} — 封鎖使用者（只給聊天入口）
   Future<void> blockUser(String userId) async {
     try {
       final resp = await _dio.post<Map<String, dynamic>>('/app/blocks/$userId');

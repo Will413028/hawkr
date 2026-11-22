@@ -11,7 +11,7 @@ part 'blocking_repository.g.dart';
 BlockingRepository blockingRepository(Ref ref) =>
     BlockingRepository(ref.watch(buyerAppClientProvider));
 
-/// 社群的封鎖與封鎖名單（`BuyerAppService`）。聊天與評價的封鎖仍在 `BlockRepository`（舊 REST）。
+/// 社群的封鎖與封鎖名單（`BuyerAppService`）。聊天的封鎖仍在 `BlockRepository`（舊 REST）。
 class BlockingRepository {
   BlockingRepository(this._buyer);
 

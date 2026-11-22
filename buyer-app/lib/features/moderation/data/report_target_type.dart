@@ -1,7 +1,7 @@
 import 'package:hawkr_buyer/core/codemeta/code_meta.dart';
 
 /// 檢舉相關碼表的值域一律取自生成的 CodeMeta（`core/codemeta/code_meta.dart`），
-/// 本檔是聊天與評價入口（舊 `/app/reports`，A6 前的允許殘留）用的對照；社群檢舉的原因與對象見 `report_target.dart`。
+/// 本檔是聊天入口（舊 `/app/reports`，A6 前的允許殘留）用的對照；社群檢舉的原因與對象見 `report_target.dart`。
 /// 本檔只放「哪些選項適用於哪種對象」與「畫面上要寫什麼字」這兩類呈現層規則。
 ///
 /// 重新 export 是為了讓既有呼叫端不必同時 import 兩個檔——同時 import

@@ -53,7 +53,14 @@ class FakeReviewPublic {
 
 /// `ReviewAppService` 的 fake：我的評價依 `order_item_id` 篩選，寫評價記下請求。
 class FakeReviewApp {
-  FakeReviewApp({this.mine = const [], this.createError});
+  FakeReviewApp({
+    this.mine = const [],
+    this.createError,
+    this.failOrderItemIds = const {},
+  });
+
+  /// 這些訂單項目的 `ListMyReviews` 以 Unavailable 失敗。
+  Set<String> failOrderItemIds;
 
   List<pb.Review> mine;
   ConnectException? createError;
@@ -77,6 +84,9 @@ class FakeReviewApp {
         })
         .unary(ReviewAppService.listMyReviews, (req, _) async {
           myRequests.add(req);
+          if (failOrderItemIds.contains(req.orderItemId)) {
+            throw ConnectException(Code.unavailable, 'down');
+          }
           return pb.ListMyReviewsResponse(
             reviews: [
               for (final r in mine)

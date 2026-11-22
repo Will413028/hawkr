@@ -1,9 +1,11 @@
+import 'package:hawkr_api/images.dart' as api;
 import 'package:hawkr_buyer/features/review/presentation/widgets/review_image_gallery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Widget imageBuilder(BuildContext context, String source, BoxFit fit) {
+  Widget imageBuilder(BuildContext context, api.Image image, BoxFit fit) {
+    final source = image.uriTemplate;
     return ColoredBox(
       key: ValueKey('test-image-$source-${fit.name}'),
       color: source == 'first' ? Colors.red : Colors.blue,
@@ -24,7 +26,10 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: ReviewImageGallery(
-            images: const ['first', 'second'],
+            images: [
+              api.Image(uriTemplate: 'first'),
+              api.Image(uriTemplate: 'second'),
+            ],
             imageBuilder: imageBuilder,
           ),
         ),
@@ -73,7 +78,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: ReviewImageGallery(
-            images: const ['first'],
+            images: [api.Image(uriTemplate: 'first')],
             imageBuilder: imageBuilder,
           ),
         ),
@@ -100,7 +105,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: ReviewImageGallery(
-              images: const ['first'],
+              images: [api.Image(uriTemplate: 'first')],
               imageBuilder: imageBuilder,
             ),
           ),

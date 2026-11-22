@@ -71,6 +71,42 @@
    "new": "await ref.read(socialBlockerProvider).block(const StoreBlockTarget('x'));",
    "test": "test/features/moderation/block_flows_test.dart 聊天與評價的對象仍走舊 REST，不呼叫 BuyerAppService",
    "why": "聊天封鎖改送新路徑"
+  },
+  {
+   "id": "review-card-count-shown-on-load-failure",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
+   "old": "_loadError != null ? '商品評價' : '商品評價 ($reviewCount)'",
+   "new": "'商品評價 ($reviewCount)'",
+   "test": "test/features/product/product_review_preview_card_test.dart 讀取失敗時標題不顯示 (0)",
+   "why": "讀取失敗仍顯示商品評價 (0)"
+  },
+  {
+   "id": "review-card-stale-response-applied",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
+   "old": "          .listProductReviews(sid);\n      if (mounted && (widget.skuId ?? '').trim() == sid) {",
+   "new": "          .listProductReviews(sid);\n      if (mounted) {",
+   "test": "test/features/product/product_review_preview_card_test.dart skuId 換掉後重新載入，舊 sku 較晚回來的回應不覆蓋",
+   "why": "舊 sku 較晚回來的評價覆蓋新 sku 的"
+  },
+  {
+   "id": "review-order-items-error-hides-found",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "if (result.review != null) return result.review;",
+   "new": "if (result.error != null) Error.throwWithStackTrace(result.error!, result.stack!);\n      if (result.review != null) return result.review;",
+   "test": "test/features/review/review_repository_test.dart 有項目失敗但其他項目查到評價時回查到的那則",
+   "why": "單一項目失敗讓其他項目已查到的評價被隱藏"
+  },
+  {
+   "id": "review-order-items-error-swallowed",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/review/data/review_repository.dart",
+   "old": "if (firstError != null) Error.throwWithStackTrace(firstError, firstStack!);",
+   "new": "",
+   "test": "test/features/review/review_repository_test.dart 沒查到任何評價且有項目失敗時丟出失敗",
+   "why": "全部失敗時當成沒有評價"
   }
  ]
 }

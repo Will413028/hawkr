@@ -14,7 +14,7 @@ import '../data/social_blocker.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 封鎖確認彈窗。說明文字與送到哪條 API 都由 [target] 的型別決定：社群對象送 `BuyerAppService`，
-/// 聊天與評價（[LegacyBlockTarget]）送舊 REST。
+/// 聊天（[LegacyBlockTarget]）送舊 REST。
 /// 使用：`await showBlockConfirmDialog(context, target: const StoreBlockTarget('7'), userLabel: '好店')`
 class BlockConfirmDialog extends ConsumerStatefulWidget {
   const BlockConfirmDialog({

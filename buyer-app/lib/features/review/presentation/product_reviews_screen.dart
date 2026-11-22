@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/images.dart' as api;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 
 import '../../../core/l10n/ui_locale.dart';
@@ -375,16 +376,14 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     );
   }
 
-  Widget _buildUserAvatar(String url) {
-    if (url.isNotEmpty) {
+  Widget _buildUserAvatar(api.Image? avatar) {
+    if (avatar != null) {
       return ClipOval(
         child: SizedBox(
           width: 40,
           height: 40,
-          child: AppCachedImage(
-            imageUrl: url,
-            // 49 號成對契約：avatarKey 為裸 objectKey，scene 令其走
-            // buildImageUrl dual-mode（avatar preset）。
+          child: AppCachedImage.api(
+            image: avatar,
             scene: ImageScene.avatarSmall,
             fit: BoxFit.cover,
             errorWidget: _defaultAvatar(),
@@ -421,11 +420,11 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     final content = review.content;
     final dateStr = review.createDateText;
     final rating = review.rating.clamp(0, 5);
-    final userAvatar = review.authorAvatarUrl;
+    final userAvatar = review.authorAvatar;
     final displayName = review.authorName.isNotEmpty
         ? review.authorName
-        : '匿名會員';
-    final imageList = review.imageUrls;
+        : anonymousReviewerName;
+    final imageList = review.images;
     final reviewKey = review.id;
     return HkFrostedCardSurface(
       key: ValueKey('product-review-card-$reviewKey'),
