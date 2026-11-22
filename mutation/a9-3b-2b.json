@@ -212,7 +212,7 @@
    "stack": "go-integration",
    "file": "backend/internal/platform/jobs/jobs.go",
    "old": "\tif errors.Is(err, river.ErrNotFound) {\n",
-   "new": "\tif false {\n",
+   "new": "\tif errors.Is(err, river.ErrNotFound) && false {\n",
    "test": "internal/platform/jobs ^TestCancelJobReportsAMissingJobRowAsNotFound$",
    "why": "TestCancelJobReportsAMissingJobRowAsNotFound (integration) 守住的行為被改掉：`if errors.Is(err, river.ErrNotFound) {` → `if false {`"
   },
@@ -302,7 +302,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/cancel.go",
    "old": "\tif !found {\n",
-   "new": "\tif false {\n",
+   "new": "\tif !found && false {\n",
    "test": "internal/modules/procurement/internal/run ^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$",
    "why": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler (integration) 守住的行為被改掉：`if !found {` → `if false {`"
   },

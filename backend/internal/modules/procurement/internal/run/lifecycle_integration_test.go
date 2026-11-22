@@ -348,8 +348,17 @@ func TestCancelRequestsCancellationAndCancelsTheJobInOneTransaction(t *testing.T
 	if used(ctx, t, d, 1) != 1 {
 		t.Fatal("買家取消不退額度")
 	}
-	if out, err := c.Cancel(ctx, 1, id); err != nil || out.Disposition != run.DispositionRequested || len(jobs.cancels) != 1 {
-		t.Fatalf("重複取消要冪等且不再取消 job：%+v %v %v", out, err, jobs.cancels)
+	events := eventCount(ctx, t, d, id)
+	if out, err := c.Cancel(ctx, 1, id); err != nil || out.Disposition != run.DispositionRequested || out.Status != run.StatusCancelRequested {
+		t.Fatalf("重複取消要冪等：%+v %v", out, err)
+	}
+	for _, cancelled := range jobs.cancels {
+		if cancelled != *runOf(ctx, t, d, id).JobID {
+			t.Fatalf("重複取消只能碰這個 run 的 job：%v", jobs.cancels)
+		}
+	}
+	if r := runOf(ctx, t, d, id); r.Status != run.StatusCancelRequested || eventCount(ctx, t, d, id) != events || used(ctx, t, d, 1) != 1 {
+		t.Fatalf("重複取消不得再轉換、寫事件或退額度：%s", r.Status)
 	}
 	if _, err := c.Cancel(ctx, 2, id); err == nil || apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別人的 run 要 NOT_FOUND：%v", err)
@@ -550,15 +559,16 @@ func seedConversationRun(ctx context.Context, t *testing.T, d *db.DB, req uuid.U
 	return id
 }
 
-func TestSubmitCancelsTheWaitingRunOfTheSameConversationOnly(t *testing.T) {
+func TestSubmitCancelsTheWaitingTurnRunOfTheSameRequestOnly(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)
 	req := seedRequest(ctx, t, d, 1)
 	conv := seedConversation(ctx, t, d, 1, req)
-	other := seedConversation(ctx, t, d, 1, seedRequest(ctx, t, d, 1))
+	otherReq := seedRequest(ctx, t, d, 1)
+	otherConv := seedConversation(ctx, t, d, 1, otherReq)
 	waiting := seedConversationRun(ctx, t, d, req, 1, conv, run.StatusWaitingForInput)
-	elsewhere := seedConversationRun(ctx, t, d, req, 1, other, run.StatusWaitingForInput)
-	running := seedConversationRun(ctx, t, d, seedRequest(ctx, t, d, 1), 1, conv, run.StatusRunning)
+	elsewhere := seedConversationRun(ctx, t, d, otherReq, 1, otherConv, run.StatusWaitingForInput)
+	otherRunning := seedConversationRun(ctx, t, d, seedRequest(ctx, t, d, 1), 1, conv, run.StatusRunning)
 	in := input(1, req, 5)
 	in.ConversationID = &conv
 	s := run.Submitter{DB: d, Ledger: ledger(d, now), Jobs: &recordingJobs{}}
@@ -567,10 +577,10 @@ func TestSubmitCancelsTheWaitingRunOfTheSameConversationOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r := runOf(ctx, t, d, waiting); r.Status != run.StatusCancelled || r.FailureReason != nil || lastEventType(ctx, t, d, waiting) != run.EventFinished {
-		t.Fatalf("同對話等待輸入的 run 要自動取消：%s", r.Status)
+		t.Fatalf("同需求等待輸入的 run 要自動取消：%s", r.Status)
 	}
-	if runOf(ctx, t, d, elsewhere).Status != run.StatusWaitingForInput || runOf(ctx, t, d, running).Status != run.StatusRunning || runOf(ctx, t, d, id).Status != run.StatusQueued {
-		t.Fatal("其他對話與進行中的 run 不得被動")
+	if runOf(ctx, t, d, elsewhere).Status != run.StatusWaitingForInput || runOf(ctx, t, d, otherRunning).Status != run.StatusRunning || runOf(ctx, t, d, id).Status != run.StatusQueued {
+		t.Fatal("其他需求與進行中的 run 不得被動")
 	}
 	if used(ctx, t, d, 1) != 1 {
 		t.Fatal("自動取消不退額度，新的一輪扣一次")

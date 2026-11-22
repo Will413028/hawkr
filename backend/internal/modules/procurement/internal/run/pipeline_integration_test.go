@@ -573,11 +573,7 @@ func TestAtMostOnePendingInterruptPerRequest(t *testing.T) {
 	d := newDB(t)
 	s := submitter(d, &recordingJobs{}, wide())
 	_, _, req := waitingParent(ctx, t, d, s, 1)
-	other, err := s.Submit(ctx, input(1, req, 100))
-	if err != nil {
-		t.Fatal(err)
-	}
-	start(ctx, t, d, other)
+	other := seedRun(ctx, t, d, req, 1, run.StatusRunning, nil)
 	if _, err := ledger(d, now).Interrupt(ctx, run.InterruptInput{RunID: other, Payload: []byte(`{}`)}); err == nil {
 		t.Fatal("同一個需求已有 PENDING 中斷，第二筆要被唯一索引擋下")
 	}
