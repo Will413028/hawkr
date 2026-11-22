@@ -23,7 +23,7 @@ func TestSniffSecure_AllowsOnlyPDFAndImages(t *testing.T) {
 		"webp": {[]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), "image/webp"},
 	}
 	for name, c := range allowed {
-		got, err := sniffSecure(c.head)
+		got, err := sniffSecure(t.Context(), c.head)
 		if err != nil || got != c.want {
 			t.Errorf("%s：得到 %q, %v，預期 %q", name, got, err, c.want)
 		}
@@ -37,7 +37,7 @@ func TestSniffSecure_AllowsOnlyPDFAndImages(t *testing.T) {
 		"pdf-inside": []byte("xx%PDF-1.7"),
 	}
 	for name, head := range rejected {
-		if _, err := sniffSecure(head); apperr.KindOf(err) != apperr.KindInvalidInput {
+		if _, err := sniffSecure(t.Context(), head); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：err = %v，預期 invalid_input", name, err)
 		}
 	}
@@ -52,9 +52,6 @@ func TestCapReader_FailsOncePastTheLimit(t *testing.T) {
 	over := &capReader{r: bytes.NewReader(make([]byte, max+1)), max: max}
 	if _, err := io.Copy(io.Discard, over); !errors.Is(err, errTooLarge) {
 		t.Fatalf("超過上限一個位元組：err = %v", err)
-	}
-	if got := apperr.KindOf(secureReadErr(errTooLarge)); got != apperr.KindInvalidInput {
-		t.Fatalf("超過上限的分類 %v", got)
 	}
 }
 

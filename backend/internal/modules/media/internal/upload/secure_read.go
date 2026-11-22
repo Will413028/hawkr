@@ -116,14 +116,17 @@ func (r *chunkedReader) Read(p []byte) (int, error) {
 
 // Close 關掉目前開著的物件。
 func (r *chunkedReader) Close() error {
+	r.err = errClosed
 	if r.rc == nil {
+		r.cur = nil
 		return nil
 	}
 	err := r.rc.Close()
 	r.cur, r.rc = nil, nil
-	r.err = errors.New("media：機敏讀取已關閉")
 	return err
 }
+
+var errClosed = errors.New("media：機敏讀取已關閉")
 
 // ReadSecure 讀機敏資產的明文：只讀 SECURE 且 ACTIVE 的資產，由擁有者先授權。公開資產回 model.ErrNotSecure，其餘（不存在、STAGED、
 // 已刪除）NotFound。不得在 transaction 內呼叫。
@@ -190,16 +193,26 @@ func (s *Service) RewrapDEKs(ctx context.Context) (int, error) {
 		return 0, model.ErrNoKeyring
 	}
 	primary := s.d.Keyring.PrimaryID()
+	// 先掃 UPLOADING 暫存列再掃資產：最後一段在兩者之間提交的會話已變成資產，會被後面的資產迴圈接到；反過來會漏掉它。
+	uploads, uploadErr := s.rewrapUploads(ctx, primary)
+	if s.afterRewrapUploads != nil {
+		s.afterRewrapUploads(ctx)
+	}
+	assets, assetErr := s.rewrapAssets(ctx, primary)
+	return uploads + assets, errors.Join(uploadErr, assetErr)
+}
+
+func (s *Service) rewrapUploads(ctx context.Context, primary string) (int, error) {
 	var errs []error
 	total := 0
 	after := uuid.UUID{}
 	for {
-		rows, err := s.q(ctx).ListAssetsToRewrap(ctx, store.ListAssetsToRewrapParams{PrimaryKekID: &primary, AfterID: after, MaxRows: rewrapBatch})
+		rows, err := s.q(ctx).ListUploadsToRewrap(ctx, store.ListUploadsToRewrapParams{PrimaryKekID: &primary, AfterID: after, MaxRows: rewrapBatch})
 		if err != nil {
-			return total, errors.Join(append(errs, fmt.Errorf("media：列出待重新包裹的資產：%w", err))...)
+			return total, errors.Join(append(errs, fmt.Errorf("media：列出待重新包裹的上傳中暫存：%w", err))...)
 		}
 		for _, r := range rows {
-			n, err := s.rewrapOne(ctx, r, primary)
+			n, err := s.rewrapUpload(ctx, r, primary)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -211,14 +224,20 @@ func (s *Service) RewrapDEKs(ctx context.Context) (int, error) {
 		}
 		after = rows[len(rows)-1].ID
 	}
-	after = uuid.UUID{}
+	return total, errors.Join(errs...)
+}
+
+func (s *Service) rewrapAssets(ctx context.Context, primary string) (int, error) {
+	var errs []error
+	total := 0
+	after := uuid.UUID{}
 	for {
-		rows, err := s.q(ctx).ListUploadsToRewrap(ctx, store.ListUploadsToRewrapParams{PrimaryKekID: &primary, AfterID: after, MaxRows: rewrapBatch})
+		rows, err := s.q(ctx).ListAssetsToRewrap(ctx, store.ListAssetsToRewrapParams{PrimaryKekID: &primary, AfterID: after, MaxRows: rewrapBatch})
 		if err != nil {
-			return total, errors.Join(append(errs, fmt.Errorf("media：列出待重新包裹的上傳中暫存：%w", err))...)
+			return total, errors.Join(append(errs, fmt.Errorf("media：列出待重新包裹的資產：%w", err))...)
 		}
 		for _, r := range rows {
-			n, err := s.rewrapUpload(ctx, r, primary)
+			n, err := s.rewrapOne(ctx, r, primary)
 			if err != nil {
 				errs = append(errs, err)
 				continue

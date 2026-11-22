@@ -53,6 +53,8 @@ type Service struct {
 	secureSlots chan struct{}
 	// publicSlots 限制同時在請求內解碼的 PutPublic（model.PublicPutConcurrency）。
 	publicSlots chan struct{}
+	// afterRewrapUploads 只給測試：RewrapDEKs 掃完 UPLOADING 暫存列、掃資產之前呼叫，用來在兩階段之間完成一次上傳。
+	afterRewrapUploads func(context.Context)
 }
 
 // New 建立服務；必要的依賴缺少時 panic（組裝錯誤，啟動就該失敗）。

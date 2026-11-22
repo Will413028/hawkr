@@ -87,6 +87,16 @@ func (q *Queries) ClaimExpiredUploads(ctx context.Context, arg ClaimExpiredUploa
 	return items, nil
 }
 
+const deleteSecureChunks = `-- name: DeleteSecureChunks :exec
+DELETE FROM media.secure_chunks WHERE asset_id = $1
+`
+
+// 回收：資產（或暫存列預配的資產）標為 DELETED 的同一個 transaction 刪掉它的段記錄；物件已在 transaction 外刪完。
+func (q *Queries) DeleteSecureChunks(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSecureChunks, assetID)
+	return err
+}
+
 const getSecureChunk = `-- name: GetSecureChunk :one
 SELECT asset_id, idx, object_key FROM media.secure_chunks WHERE asset_id = $1 AND idx = $2
 `

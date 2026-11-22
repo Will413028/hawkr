@@ -65,7 +65,7 @@ const PublicPutConcurrency = 2
 const SecureChunkSize = 4 << 20
 
 // SecureUploadConcurrency 是同時處理中的機敏段數（PutSecureChunk 與 PutSecure 內部切的段共用），整個模組只有這一處定義。
-// 沒有本機暫存檔、沒有整檔緩衝：一段在途佔記憶體約 SecureChunkSize 的密文緩衝（含每 64 KiB 段的 16 位元組 tag 與 header，約 4.1 MiB）
+// 沒有本機暫存檔、沒有整檔緩衝（PutSecure 也是邊讀邊切段，同一時間只緩衝一段）：一段在途佔記憶體約 SecureChunkSize 的密文緩衝（含每 64 KiB 段的 16 位元組 tag 與 header，約 4.1 MiB）
 // 加一個 secure.SegmentSize 的明文與密文緩衝與讀取預讀（約 0.2 MiB），取 4.5 MiB 估算；16 段在途約 72 MiB。
 // client 上傳（PutSecureChunk）滿了立即回 ResourceExhausted、不排隊，伺服器內部的 PutSecure 滿了等名額（受 ctx 約束）。
 const SecureUploadConcurrency = 16

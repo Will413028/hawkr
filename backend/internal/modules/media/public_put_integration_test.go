@@ -94,7 +94,7 @@ func TestPutPublic_RefusedInsideATransaction(t *testing.T) {
 func TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm(t *testing.T) {
 	f := setup(t)
 	data := pdfOf(5000)
-	res, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(data))
+	res, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		t.Fatalf("PutSecure：%v", err)
 	}
@@ -127,14 +127,14 @@ func TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm(t *testing.T) {
 
 func TestPutSecure_UnrecognizedContentIsRejected(t *testing.T) {
 	f := setup(t)
-	_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader([]byte("just some text")))
+	_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader([]byte("just some text")), 14)
 	wantKind(t, err, apperr.KindInvalidInput)
 	noObjects(t, f)
 }
 
 func TestPutSecure_OtherUploaderCannotConfirm(t *testing.T) {
 	f := setup(t)
-	res, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(pdfOf(100)))
+	res, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(pdfOf(100)), int64(len(pdfOf(100))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestPutSecure_WaitsForASlotInsteadOfFailingFast(t *testing.T) {
 	waiting := &waitSignalCtx{Context: t.Context(), waiting: make(chan struct{}, 1)}
 	done := make(chan error, 1)
 	go func() {
-		_, err := f.m.PutSecure(waiting, owner, bytes.NewReader(pdfOf(10)))
+		_, err := f.m.PutSecure(waiting, owner, bytes.NewReader(pdfOf(10)), int64(len(pdfOf(10))))
 		done <- err
 	}()
 	select {
@@ -206,7 +206,7 @@ func TestPutSecure_FullSlotsReturnTheCtxErrorWhenCancelled(t *testing.T) {
 	release, wait := holdSecureSlots(t, f)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, err := f.m.PutSecure(ctx, owner, bytes.NewReader(pdfOf(10)))
+	_, err := f.m.PutSecure(ctx, owner, bytes.NewReader(pdfOf(10)), int64(len(pdfOf(10))))
 	release()
 	wait()
 	if !errors.Is(err, context.Canceled) {

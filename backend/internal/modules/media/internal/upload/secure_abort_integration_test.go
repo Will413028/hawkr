@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
@@ -196,4 +197,113 @@ func TestPutSecureChunk_LosingToGCReturnsExpiredAndDeletesItsOwnObject(t *testin
 	if hs.deleteCalls != 1 || len(st.Keys()) != 0 {
 		t.Fatalf("輸給 GC 時應刪掉自己的物件：Delete %d 次、剩下物件 %v", hs.deleteCalls, st.Keys())
 	}
+}
+
+// countingBody 記下 body 被讀走的位元組數。
+type countingBody struct {
+	r io.Reader
+	n atomic.Int64
+}
+
+func (c *countingBody) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n.Add(int64(n))
+	return n, err
+}
+
+// PutSecure 不整檔緩衝：寫第一段的物件時，body 只被讀走第一段的位元組。
+func TestPutSecure_BuffersOneChunkAtATimeNotTheWholeBody(t *testing.T) {
+	var hs *hookStore
+	svc, _, _ := secureServiceWith(t, func(f *storage.Fake) storage.Store {
+		hs = &hookStore{Fake: f}
+		return hs
+	})
+	data := make([]byte, 2*model.SecureChunkSize+1)
+	copy(data, "%PDF-1.7\n")
+	body := &countingBody{r: bytes.NewReader(data)}
+	var atFirstPut int64 = -1
+	hs.onPut = func() {
+		if atFirstPut < 0 {
+			atFirstPut = body.n.Load()
+		}
+	}
+	if _, err := svc.PutSecure(t.Context(), model.Uploader{ID: 1001}, body, int64(len(data))); err != nil {
+		t.Fatal(err)
+	}
+	if atFirstPut != model.SecureChunkSize {
+		t.Fatalf("寫第一段時 body 已被讀走 %d 位元組，預期剛好 %d", atFirstPut, model.SecureChunkSize)
+	}
+}
+
+// 推進的錯誤不是 errLost（commit 結果不明）時，不刪自己的物件，留給前綴 GC；errLost 才刪。
+func TestSettleLostChunk_OnlyARollbackDeletesTheObject(t *testing.T) {
+	svc, d, st := secureService(t)
+	data := []byte("%PDF-1.7\nhello")
+	b, err := svc.BeginSecureUpload(t.Context(), model.Uploader{ID: 1001}, int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = b
+	var id uuid.UUID
+	if err := d.Pool().QueryRow(t.Context(), `SELECT id FROM media.staged_uploads`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	row, err := svc.q(t.Context()).GetUpload(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := storage.NewSecureChunkKey(*row.PlannedAssetID, 0)
+	put := func() {
+		if err := st.Put(t.Context(), storage.PutInput{Key: key, Body: bytes.NewReader([]byte("c")), Size: 1, ContentType: "application/octet-stream"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put()
+	unknown := errors.New("commit：連線中斷")
+	if err := svc.settleLostChunk(t.Context(), row, 0, key, unknown); !errors.Is(err, unknown) {
+		t.Fatalf("err = %v，預期原樣回傳不明的錯誤", err)
+	}
+	if _, err := st.Head(t.Context(), key); err != nil {
+		t.Fatalf("commit 結果不明時物件被刪了：%v", err)
+	}
+	if err := svc.settleLostChunk(t.Context(), row, 0, key, errLost); err == nil {
+		t.Fatal("errLost 且會話仍開著，預期仍回錯誤")
+	}
+	if _, err := st.Head(t.Context(), key); err == nil {
+		t.Fatal("確定 rollback 時物件應被刪掉")
+	}
+}
+
+// RewrapDEKs 掃完上傳中的會話、掃資產之前，另一個還用舊主金鑰的行程完成了一次上傳：新資產仍要被這次重新包裹接到。
+func TestRewrapDEKs_AssetCompletedBetweenThePhasesIsStillRewrapped(t *testing.T) {
+	svc, d, st := secureService(t)
+	ring2, err := secure.ParseKeyring("k2:AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=,k1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := svc.d
+	deps.Keyring = ring2
+	rotated := New(deps)
+	data := []byte("%PDF-1.7\nhello")
+	rotated.afterRewrapUploads = func(ctx context.Context) {
+		b, err := svc.BeginSecureUpload(ctx, model.Uploader{ID: 1002}, int64(len(data)))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if _, err := svc.PutSecureChunk(ctx, model.Uploader{ID: 1002}, b.Token, 0, bytes.NewReader(data), int64(len(data))); err != nil {
+			t.Error(err)
+		}
+	}
+	if _, err := rotated.RewrapDEKs(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	var total, stale int
+	if err := d.Pool().QueryRow(t.Context(), `SELECT count(*), count(*) FILTER (WHERE kek_id <> 'k2') FROM media.assets`).Scan(&total, &stale); err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || stale != 0 {
+		t.Fatalf("資產 %d 筆、仍是舊 kek_id 的 %d 筆", total, stale)
+	}
+	_ = st
 }

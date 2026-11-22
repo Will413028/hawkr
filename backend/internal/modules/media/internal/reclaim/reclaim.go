@@ -237,6 +237,11 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 		if _, err := s.q(ctx).MarkUploadDeleted(ctx, store.MarkUploadDeletedParams{ID: r.ID, Now: s.d.Now()}); err != nil {
 			return fmt.Errorf("media：標記暫存已刪：%w", err)
 		}
+		if r.PlannedAssetID != nil {
+			if err := s.q(ctx).DeleteSecureChunks(ctx, *r.PlannedAssetID); err != nil {
+				return fmt.Errorf("media：刪除暫存 %s 的段記錄：%w", r.ID, err)
+			}
+		}
 		return nil
 	})
 }
@@ -253,6 +258,11 @@ func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if _, err := s.q(ctx).MarkAssetDeleted(ctx, store.MarkAssetDeletedParams{ID: r.ID, Now: s.d.Now()}); err != nil {
 			return fmt.Errorf("media：標記資產已刪：%w", err)
+		}
+		if model.Visibility(r.Visibility) == model.VisibilitySecure {
+			if err := s.q(ctx).DeleteSecureChunks(ctx, r.ID); err != nil {
+				return fmt.Errorf("media：刪除資產 %s 的段記錄：%w", r.ID, err)
+			}
 		}
 		return nil
 	})

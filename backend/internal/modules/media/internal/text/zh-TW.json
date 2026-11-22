@@ -4,6 +4,54 @@
       "message": "這筆上傳的資產已不可用",
       "description": "資產不是 ACTIVE（例如已被擁有者刪除）。"
     },
+    "media.secure_busy": {
+      "message": "同時處理的機敏上傳太多，請稍後再試",
+      "description": "機敏上傳的同時處理名額已滿。"
+    },
+    "media.secure_chunk_index_mismatch": {
+      "message": "段序號不符，下一段是 {next}",
+      "params": {
+        "next": {
+          "type": "integer"
+        }
+      },
+      "description": "送來的段序號不是會話的下一段。"
+    },
+    "media.secure_chunk_length_mismatch": {
+      "message": "這一段必須剛好 {expected} 位元組",
+      "params": {
+        "expected": {
+          "type": "integer"
+        }
+      },
+      "description": "這一段的長度與依總大小算出的長度不符。"
+    },
+    "media.secure_content_empty": {
+      "message": "上傳的內容是空的",
+      "description": "機敏上傳第一段沒有內容。"
+    },
+    "media.secure_content_unsupported": {
+      "message": "機敏上傳只接受 PDF 與 JPEG、PNG、WebP、GIF 圖片",
+      "description": "第一段依 magic bytes 辨認不出 PDF 或支援的圖片。"
+    },
+    "media.secure_size_mismatch": {
+      "message": "上傳的位元組數與宣告的 {size} 位元組不符",
+      "params": {
+        "size": {
+          "type": "integer"
+        }
+      },
+      "description": "伺服器內部直接寫入時，實際位元組數與宣告的大小不同。"
+    },
+    "media.secure_size_out_of_range": {
+      "message": "機敏上傳的大小必須在 1 到 {max} 位元組之間",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "宣告的總大小不在 1 到機敏上傳上限之間。"
+    },
     "media.upload_content_type_unsupported": {
       "message": "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF",
       "description": "宣告的內容型別不在圖片白名單內，或格式不合法。"

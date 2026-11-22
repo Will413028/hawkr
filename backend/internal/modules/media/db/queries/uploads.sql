@@ -44,6 +44,10 @@ VALUES (sqlc.arg(asset_id), sqlc.arg(idx), sqlc.arg(object_key));
 -- name: GetSecureChunk :one
 SELECT * FROM media.secure_chunks WHERE asset_id = sqlc.arg(asset_id) AND idx = sqlc.arg(idx);
 
+-- name: DeleteSecureChunks :exec
+-- 回收：資產（或暫存列預配的資產）標為 DELETED 的同一個 transaction 刪掉它的段記錄；物件已在 transaction 外刪完。
+DELETE FROM media.secure_chunks WHERE asset_id = sqlc.arg(asset_id);
+
 -- name: ListSecureChunks :many
 SELECT idx, object_key FROM media.secure_chunks WHERE asset_id = sqlc.arg(asset_id) ORDER BY idx;
 

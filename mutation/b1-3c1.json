@@ -49,8 +49,8 @@
    "id": "lost-chunk-keeps-its-object",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
-   "old": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n\t\ts.deleteChunkObject(ctx, row.ID, key)",
-   "new": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n\t\t_ = key",
+   "old": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n\t\ts.deleteChunkObject(ctx, row.ID, key)",
+   "new": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n\t\t_ = key",
    "test": "internal/modules/media ^TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject$",
    "why": "推進失敗時不刪自己的物件：並行輸給對手的那一段留下沒人記錄的孤兒物件"
   },
@@ -62,6 +62,60 @@
    "new": "\t\t\tn, err := 0, error(nil)\n\t\t\t_ = r",
    "test": "internal/modules/media ^TestRewrapDEKs_UploadingSessionIsRewrappedAndCompletesWithOnlyTheNewKek$",
    "why": "RewrapDEKs 不掃 UPLOADING 暫存列：輪替後只留新 KEK，上傳中的會話解不開 DEK"
+  },
+  {
+   "id": "rewrap-assets-before-uploading-sessions",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\tuploads, uploadErr := s.rewrapUploads(ctx, primary)\n\tif s.afterRewrapUploads != nil {\n\t\ts.afterRewrapUploads(ctx)\n\t}\n\tassets, assetErr := s.rewrapAssets(ctx, primary)\n",
+   "new": "\tassets, assetErr := s.rewrapAssets(ctx, primary)\n\tif s.afterRewrapUploads != nil {\n\t\ts.afterRewrapUploads(ctx)\n\t}\n\tuploads, uploadErr := s.rewrapUploads(ctx, primary)\n",
+   "test": "internal/modules/media/internal/upload ^TestRewrapDEKs_AssetCompletedBetweenThePhasesIsStillRewrapped$",
+   "why": "先掃資產再掃上傳中的會話：兩者之間完成的上傳成為舊 kek_id 的資產，沒有被重新包裹"
+  },
+  {
+   "id": "put-secure-buffers-the-whole-body",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tsrc := &exactReader{r: body}\n",
+   "new": "\tall, _ := io.ReadAll(body)\n\tsrc := &exactReader{r: bytes.NewReader(all)}\n\tbody = bytes.NewReader(nil)\n",
+   "test": "internal/modules/media/internal/upload ^TestPutSecure_BuffersOneChunkAtATimeNotTheWholeBody$",
+   "why": "PutSecure 先把整個 body 讀進記憶體再切段：寫第一段時 body 已被讀完"
+  },
+  {
+   "id": "unknown-commit-outcome-deletes-the-object",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n",
+   "new": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n",
+   "test": "internal/modules/media/internal/upload ^TestSettleLostChunk_OnlyARollbackDeletesTheObject$",
+   "why": "commit 結果不明也刪自己的物件：提交其實成功時會刪掉已記錄的段"
+  },
+  {
+   "id": "asset-delete-keeps-secure-chunk-rows",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "s.q(ctx).DeleteSecureChunks(ctx, r.ID)",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestDeleteAssets_RemovesTheSecureChunkRowsOfADeletedAsset$",
+   "why": "資產標為 DELETED 時不刪 secure_chunks 列：段記錄永遠留著"
+  },
+  {
+   "id": "upload-delete-keeps-secure-chunk-rows",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "s.q(ctx).DeleteSecureChunks(ctx, *r.PlannedAssetID)",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestCollectGarbage_RemovesTheSecureChunkRowsOfAnExpiredSession$",
+   "why": "暫存列標為 DELETED 時不刪 secure_chunks 列：過期會話的段記錄永遠留著"
+  },
+  {
+   "id": "close-at-boundary-keeps-reading",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\tr.err = errClosed\n\tif r.rc == nil {\n\t\tr.cur = nil\n\t\treturn nil\n\t}\n\terr := r.rc.Close()\n\tr.cur, r.rc = nil, nil\n\treturn err",
+   "new": "\tif r.rc == nil {\n\t\treturn nil\n\t}\n\tr.err = errClosed\n\terr := r.rc.Close()\n\tr.cur, r.rc = nil, nil\n\treturn err",
+   "test": "internal/modules/media/internal/upload ^TestChunkedReader_CloseAtASegmentBoundaryStopsLaterReads$",
+   "why": "段邊界 Close 不設錯誤：之後的 Read 仍開下一段的物件"
   }
  ]
 }

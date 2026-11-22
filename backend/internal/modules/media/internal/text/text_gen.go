@@ -18,6 +18,89 @@ func MediaAssetUnavailable(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "這筆上傳的資產已不可用", Locale: uitext.ZhTW}
 }
 
+// MediaSecureBusy 是模組句子 media.secure_busy；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureBusy(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Too many secure uploads are being processed; please try again shortly", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "同時處理的機敏上傳太多，請稍後再試", Locale: uitext.ZhTW}
+}
+
+// MediaSecureChunkIndexMismatchArgs 是 MediaSecureChunkIndexMismatch 的參數。
+type MediaSecureChunkIndexMismatchArgs struct {
+	Next int
+}
+
+// MediaSecureChunkIndexMismatch 是模組句子 media.secure_chunk_index_mismatch；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureChunkIndexMismatch(l uitext.Locale, a MediaSecureChunkIndexMismatchArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Chunk index mismatch; the next chunk is " + strconv.Itoa(a.Next), Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "段序號不符，下一段是 " + strconv.Itoa(a.Next), Locale: uitext.ZhTW}
+}
+
+// MediaSecureChunkLengthMismatchArgs 是 MediaSecureChunkLengthMismatch 的參數。
+type MediaSecureChunkLengthMismatchArgs struct {
+	Expected int
+}
+
+// MediaSecureChunkLengthMismatch 是模組句子 media.secure_chunk_length_mismatch；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureChunkLengthMismatch(l uitext.Locale, a MediaSecureChunkLengthMismatchArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This chunk must be exactly " + strconv.Itoa(a.Expected) + " bytes", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這一段必須剛好 " + strconv.Itoa(a.Expected) + " 位元組", Locale: uitext.ZhTW}
+}
+
+// MediaSecureContentEmpty 是模組句子 media.secure_content_empty；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureContentEmpty(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The uploaded content is empty", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上傳的內容是空的", Locale: uitext.ZhTW}
+}
+
+// MediaSecureContentUnsupported 是模組句子 media.secure_content_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureContentUnsupported(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Secure uploads accept only PDF and JPEG, PNG, WebP or GIF images", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "機敏上傳只接受 PDF 與 JPEG、PNG、WebP、GIF 圖片", Locale: uitext.ZhTW}
+}
+
+// MediaSecureSizeMismatchArgs 是 MediaSecureSizeMismatch 的參數。
+type MediaSecureSizeMismatchArgs struct {
+	Size int
+}
+
+// MediaSecureSizeMismatch 是模組句子 media.secure_size_mismatch；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureSizeMismatch(l uitext.Locale, a MediaSecureSizeMismatchArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The uploaded byte count does not match the declared " + strconv.Itoa(a.Size) + " bytes", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上傳的位元組數與宣告的 " + strconv.Itoa(a.Size) + " 位元組不符", Locale: uitext.ZhTW}
+}
+
+// MediaSecureSizeOutOfRangeArgs 是 MediaSecureSizeOutOfRange 的參數。
+type MediaSecureSizeOutOfRangeArgs struct {
+	Max int
+}
+
+// MediaSecureSizeOutOfRange 是模組句子 media.secure_size_out_of_range；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecureSizeOutOfRange(l uitext.Locale, a MediaSecureSizeOutOfRangeArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The secure upload size must be between 1 and " + strconv.Itoa(a.Max) + " bytes", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "機敏上傳的大小必須在 1 到 " + strconv.Itoa(a.Max) + " 位元組之間", Locale: uitext.ZhTW}
+}
+
 // MediaUploadContentTypeUnsupported 是模組句子 media.upload_content_type_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func MediaUploadContentTypeUnsupported(l uitext.Locale) uitext.Message {
 	switch l {

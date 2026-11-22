@@ -359,14 +359,21 @@ func TestSecureUpload_LaterChunksAreNotSniffed(t *testing.T) {
 	uploadSecure(t, f, owner, threeChunkData())
 }
 
-func TestSecureUpload_PutSecureRejectsEmptyAndOversizeBodyWithoutWrites(t *testing.T) {
+func TestSecureUpload_PutSecureRejectsBadSizeAndSizeMismatch(t *testing.T) {
 	f := setup(t)
-	_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(nil))
-	wantKind(t, err, apperr.KindInvalidInput)
-	_, err = f.m.PutSecure(t.Context(), owner, &endless{prefix: []byte("%PDF-1.7\n")})
-	wantKind(t, err, apperr.KindInvalidInput)
+	pdf := pdfOf(100)
+	for name, size := range map[string]int64{"zero": 0, "negative": -1, "over-ceiling": media.MaxSecureUploadSize + 1} {
+		_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(pdf), size)
+		if apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：err = %v", name, err)
+		}
+	}
 	noWrites(t, f)
 	noObjects(t, f)
+	_, err := f.m.PutSecure(t.Context(), owner, bytes.NewReader(pdf), int64(len(pdf))+50)
+	wantKind(t, err, apperr.KindInvalidInput)
+	_, err = f.m.PutSecure(t.Context(), owner, &endless{prefix: []byte("%PDF-1.7\n")}, int64(len(pdf)))
+	wantKind(t, err, apperr.KindInvalidInput)
 }
 
 // endless 產生以 prefix 開頭、永遠讀不完的內容。
@@ -752,7 +759,7 @@ func TestSecureUpload_RefusesWhenKeyringMissing(t *testing.T) {
 	if _, err := m.PutSecureChunk(ctx, owner, "x", 0, bytes.NewReader(pdfOf(10)), 10); !errors.Is(err, media.ErrNoKeyring) {
 		t.Fatalf("PutSecureChunk err = %v", err)
 	}
-	if _, err := m.PutSecure(ctx, owner, bytes.NewReader(pdfOf(10))); !errors.Is(err, media.ErrNoKeyring) {
+	if _, err := m.PutSecure(ctx, owner, bytes.NewReader(pdfOf(10)), int64(len(pdfOf(10)))); !errors.Is(err, media.ErrNoKeyring) {
 		t.Fatalf("PutSecure err = %v", err)
 	}
 	if _, err := m.ReadSecure(ctx, uuid.New()); !errors.Is(err, media.ErrNoKeyring) {
@@ -1247,4 +1254,52 @@ func TestParseKeyring_StartupFailsOnBadConfig(t *testing.T) {
 
 func putInput(key string, data []byte) storage.PutInput {
 	return storage.PutInput{Key: key, Body: bytes.NewReader(data), Size: int64(len(data))}
+}
+
+func secureChunkRows(t *testing.T, f *fixture) int {
+	t.Helper()
+	var n int
+	if err := f.d.Pool().QueryRow(t.Context(), `SELECT count(*) FROM media.secure_chunks`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// 資產被擁有者刪除、標為 DELETED 之後，它的 secure_chunks 列也沒了。
+func TestDeleteAssets_RemovesTheSecureChunkRowsOfADeletedAsset(t *testing.T) {
+	f := setup(t)
+	res := uploadSecure(t, f, owner, threeChunkData())
+	a := confirmSecure(t, f, owner, res.Token)
+	if got := secureChunkRows(t, f); got != 3 {
+		t.Fatalf("前置：段記錄 %d", got)
+	}
+	if err := markDeletedInTx(f, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := secureChunkRows(t, f); got != 0 {
+		t.Fatalf("資產刪除後剩下 %d 筆段記錄", got)
+	}
+}
+
+// 過期的上傳中會話被 GC 回收後，它已推進的段記錄也沒了。
+func TestCollectGarbage_RemovesTheSecureChunkRowsOfAnExpiredSession(t *testing.T) {
+	f := setup(t)
+	data := threeChunkData()
+	b := beginSecure(t, f, owner, len(data))
+	if _, err := putChunk(f, owner, b.Token, 0, data[:b.ChunkSize]); err != nil {
+		t.Fatal(err)
+	}
+	if got := secureChunkRows(t, f); got != 1 {
+		t.Fatalf("前置：段記錄 %d", got)
+	}
+	f.clock.Advance(media.UploadTTL + time.Second)
+	if _, err := f.m.CollectGarbage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := secureChunkRows(t, f); got != 0 {
+		t.Fatalf("會話回收後剩下 %d 筆段記錄", got)
+	}
 }

@@ -188,11 +188,11 @@ func (m *Module) PutSecureChunk(ctx context.Context, uploader Uploader, token st
 	return m.upload.PutSecureChunk(ctx, uploader, token, index, body, length)
 }
 
-// PutSecure 是模組內部的機敏直接寫入：出貨單等由伺服器產生的 PDF 或圖片走這裡，同一個分段密文格式（讀完 body 定下段總數，依 SecureChunkSize 切段依序推進；magic bytes 辨認、加密、不寫明文），body 以實際位元組數套用 MaxSecureUploadSize 上限。
+// PutSecure 是模組內部的機敏直接寫入：出貨單等由伺服器產生的 PDF 或圖片走這裡，同一個分段密文格式（呼叫方宣告總大小 size，1 到 MaxSecureUploadSize，定下段總數；邊讀邊依 SecureChunkSize 切段依序推進，同一時間只緩衝一段；magic bytes 辨認、加密、不寫明文）。實際讀到的位元組數與 size 不符回 InvalidInput。
 // 回傳暫存 token；擁有者在自己的 transaction 內以 Uploader 為 uploader 呼叫 Confirm，未確認的由 GC 回收。不得在 transaction 內呼叫。
 // 滿了等名額（受 ctx 約束，ctx 結束回 ctx 的錯誤），不回 ResourceExhausted。
-func (m *Module) PutSecure(ctx context.Context, uploader Uploader, body io.Reader) (SecureUploadResult, error) {
-	return m.upload.PutSecure(ctx, uploader, body)
+func (m *Module) PutSecure(ctx context.Context, uploader Uploader, body io.Reader, size int64) (SecureUploadResult, error) {
+	return m.upload.PutSecure(ctx, uploader, body, size)
 }
 
 // PutPublic 是模組內部的公開圖片直接寫入：只收 JPEG、PNG、WebP、GIF，規則與公開上傳相同（重新編碼、去 metadata、大小與像素上限），同步處理後寫入 public/ 並回傳立即可 Confirm 的 token。

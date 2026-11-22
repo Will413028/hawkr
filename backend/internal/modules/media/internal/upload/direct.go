@@ -10,6 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -74,7 +75,7 @@ func (s *Service) abortDirect(ctx context.Context, uploadID uuid.UUID, finalKey 
 		return nil
 	}
 	if state == model.StateDeleting || state == model.StateDeleted {
-		return apperr.FailedPrecondition("這筆上傳已過期")
+		return apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 	}
 	return cause
 }

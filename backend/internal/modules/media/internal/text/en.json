@@ -3,6 +3,27 @@
     "media.asset_unavailable": {
       "message": "The asset of this upload is no longer available"
     },
+    "media.secure_busy": {
+      "message": "Too many secure uploads are being processed; please try again shortly"
+    },
+    "media.secure_chunk_index_mismatch": {
+      "message": "Chunk index mismatch; the next chunk is {next}"
+    },
+    "media.secure_chunk_length_mismatch": {
+      "message": "This chunk must be exactly {expected} bytes"
+    },
+    "media.secure_content_empty": {
+      "message": "The uploaded content is empty"
+    },
+    "media.secure_content_unsupported": {
+      "message": "Secure uploads accept only PDF and JPEG, PNG, WebP or GIF images"
+    },
+    "media.secure_size_mismatch": {
+      "message": "The uploaded byte count does not match the declared {size} bytes"
+    },
+    "media.secure_size_out_of_range": {
+      "message": "The secure upload size must be between 1 and {max} bytes"
+    },
     "media.upload_content_type_unsupported": {
       "message": "Unsupported image type; only JPEG, PNG, WebP and GIF are accepted"
     },
