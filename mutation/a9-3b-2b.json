@@ -58,7 +58,7 @@
    "id": "p7",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
-   "old": "return d.settleFailure(context.WithoutCancel(ctx), run, nil)",
+   "old": "return d.settleFailure(context.WithoutCancel(ctx), run, nil, nil)",
    "new": "return nil",
    "test": "internal/modules/procurement/internal/run ^TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure$",
    "why": "TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure (integration) 守住的行為被改掉：`return d.settleFailure(context.WithoutCancel(ctx), run, nil)` → `return nil`"
@@ -103,8 +103,8 @@
    "id": "p12",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/run/resume.go",
-   "old": "\t\treturn s.start(ctx, q, answerID, in.Message, asking.ConversationID, now)",
-   "new": "\t\tif _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptParams{ID: irq.ID, Now: &now}); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.start(ctx, q, answerID, in.Message, asking.ConversationID, now)",
+   "old": "\t\treturn s.start(ctx, q, answerID, in.Message, in.Locale, asking.ConversationID, now)",
+   "new": "\t\tif _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptParams{ID: irq.ID, Now: &now}); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.start(ctx, q, answerID, in.Message, in.Locale, asking.ConversationID, now)",
    "test": "internal/modules/procurement/internal/run ^TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse$",
    "why": "TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse (integration) 守住的行為被改掉：`return s.start(ctx, q, answerID, in.Message, asking.Conversa` → `if _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptP`"
   },

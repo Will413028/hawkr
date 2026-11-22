@@ -28,7 +28,7 @@
 ## 3. TURN 執行（A9-3b-2c）
 
 - executor（`internal/turn`）由 `procurement.New` 在給了 `Deps.LLM` 與 `Deps.Taxonomy` 時登記（只給其中一個 panic；`Executors` 已有 TURN 的項目則保留）。worker 角色的 `cmd/hawkr` 給採購用的 `llm.Procurement` 與經 `internal/legacy/categoryservice` 轉接的分類樹；serve 角色不執行 run，不給。
-- 一輪：一次模型呼叫（`internal/extract`：Gemini 走 response schema、DeepSeek 走強制 tool call；買家訊息截 2000 rune；單次 30 秒、含退避總預算 70 秒，呼叫內最多重試一次，只對逾時、429、5xx、格式錯誤；4xx 與停用不重試；抽取結果不做簡轉繁）→ 套用欄位 → 品項變更或未解析時查分類樹 → 規劃與渲染 → 單一 transaction 提交。模型沒有給出可用答案（含重試用盡）一律失敗並退額度：逾時、429、5xx 用盡是 `MODEL_UNAVAILABLE`，其餘 `TURN_PIPELINE_ERROR`；空抽取是成功。沒有降級。
+- 一輪：一次模型呼叫（`internal/extract`：Gemini 走 response schema、DeepSeek 走強制 tool call；買家訊息截 2000 rune；單次 30 秒、含退避總預算 70 秒，呼叫內最多重試一次，只對逾時、429、5xx、連線層錯誤、格式錯誤與 ErrorCode 為 OTHER／MALFORMED_FUNCTION_CALL（輸出不明或壞掉）；4xx、停用與安全類 ErrorCode（SAFETY、PROHIBITED_CONTENT、RECITATION、BLOCKLIST、SPII、MAX_TOKENS、content_filter）不重試；抽取結果不做簡轉繁）→ 套用欄位 → 品項變更或未解析時查分類樹 → 規劃與渲染 → 單一 transaction 提交。模型沒有給出可用答案（含重試用盡）一律失敗並退額度：逾時、429、5xx 用盡是 `MODEL_UNAVAILABLE`，其餘（含帶 ErrorCode 的回應用盡後）`TURN_PIPELINE_ERROR`；空抽取是成功。沒有降級。
 - 提交：新版本（`request_revisions`，品項解析存 `item_resolution_category_id`，BUYER_DESCRIBED 為 NULL）、`turns`、需求狀態、對話預覽與自動標題（`品項｜縣市`，40 rune，只在 `title_source = 'AUTO'` 時寫）、`turn_result` 事件與 run 的終態轉換同一個 transaction；等待輸入時改寫中斷（`InterruptInput.ID` 由呼叫端預先產生，事件內的 `interrupt.interrupt_id` 等於它）。
 - 需求狀態：依齊全與否在 CLARIFYING 與 REQUIREMENT_READY 之間；需求在 MATCHING 時，只有搜尋用到的欄位（品項解析、數量、單位、縣市、交期）改了才退回，其餘維持 MATCHING。
 - 語系：送出時存進 `agent_run_inputs.locale`（`ZH_TW`／`EN`），executor 用它渲染伺服器句子。

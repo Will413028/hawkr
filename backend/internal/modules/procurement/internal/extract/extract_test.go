@@ -233,12 +233,27 @@ func TestShapeFor(t *testing.T) {
 }
 
 func TestErrorCodeResponseIsNotRetriedAndNotUnavailable(t *testing.T) {
-	for _, code := range []string{"SAFETY", "PROHIBITED_CONTENT", "RECITATION", "MAX_TOKENS", "content_filter"} {
+	for _, code := range []string{"SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST", "SPII", "MAX_TOKENS", "content_filter"} {
 		f := &fakeLLM{steps: []step{{resp: &adkmodel.LLMResponse{ErrorCode: code}}, text(`{"item":"蘋果"}`)}}
 		_, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
 		var ee *Error
 		if !errors.As(err, &ee) || ee.Unavailable || f.calls.Load() != 1 {
 			t.Errorf("%s：err = %v, calls = %d，要一次失敗、不重試、不算服務不可用", code, err, f.calls.Load())
+		}
+	}
+}
+
+func TestUnclearOutputErrorCodesRetryOnceAndAreNotUnavailable(t *testing.T) {
+	for _, code := range []string{"OTHER", "MALFORMED_FUNCTION_CALL"} {
+		ok := &fakeLLM{steps: []step{{resp: &adkmodel.LLMResponse{ErrorCode: code}}, text(`{"item":"蘋果"}`)}}
+		if _, err := newTest(ok, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{}); err != nil || ok.calls.Load() != 2 {
+			t.Errorf("%s：err = %v, calls = %d，要重試一次後成功", code, err, ok.calls.Load())
+		}
+		bad := &fakeLLM{steps: []step{{resp: &adkmodel.LLMResponse{ErrorCode: code}}, {resp: &adkmodel.LLMResponse{ErrorCode: code}}}}
+		_, err := newTest(bad, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
+		var ee *Error
+		if !errors.As(err, &ee) || ee.Unavailable || bad.calls.Load() != 2 {
+			t.Errorf("%s：err = %v, calls = %d，用盡後要失敗且不算服務不可用", code, err, bad.calls.Load())
 		}
 	}
 }

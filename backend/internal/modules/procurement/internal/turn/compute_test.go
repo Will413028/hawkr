@@ -324,19 +324,75 @@ func TestClassifyExtractErr(t *testing.T) {
 	}
 }
 
-func TestRejectedSingleMatchResolutionFallsBackToTheDisambiguationCard(t *testing.T) {
-	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(5, "", "水果 > 蘋果")}}}
-	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
-	if d.interrupt == nil || d.next.Resolution != nil || d.patch.Resolution != nil {
-		t.Fatalf("interrupt = %+v, resolution = %+v, patch resolution = %+v，被拒的解析要退回消歧卡", d.interrupt, d.next.Resolution, d.patch.Resolution)
+func TestSingleMatchWithAnInvalidLabelIsTreatedAsNoMatch(t *testing.T) {
+	for name, m := range map[string]resolver.Match{
+		"blank label":    match(5, "  ", "水果 > 蘋果"),
+		"zero id":        match(0, "蘋果", "水果 > 蘋果"),
+		"negative id":    match(-3, "蘋果", "水果 > 蘋果"),
+		"empty label":    match(5, "", "水果 > 蘋果"),
+		"whitespace tab": match(5, "\t", "水果 > 蘋果"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{m}}}
+			d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
+			if d.interrupt == nil || len(d.interrupt.Candidates) != 0 || d.next.Resolution != nil || d.patch.Resolution != nil {
+				t.Fatalf("interrupt = %+v, resolution = %+v, patch resolution = %+v，無效的單一命中要走零候選的描述卡", d.interrupt, d.next.Resolution, d.patch.Resolution)
+			}
+			if d.plan.Act != planner.ItemNeedsDisambiguation || d.status != statusClarifying || d.plan.Question.Prompt != planner.PromptItemDescribe {
+				t.Errorf("act = %v, status = %q, prompt = %v", d.plan.Act, d.status, d.plan.Question.Prompt)
+			}
+		})
 	}
-	if d.plan.Act != planner.ItemNeedsDisambiguation || d.status != statusClarifying {
-		t.Errorf("act = %v, status = %q", d.plan.Act, d.status)
+}
+
+func TestInvalidCandidatesNeverAppearOnTheCard(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{
+		match(1, "蘋果", "水果 > 蘋果"), match(2, " ", "水果 > 空白"), match(0, "壞 ID", "水果 > 壞"), match(3, "蘋果乾", "加工品 > 蘋果乾"),
+	}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
+	if d.interrupt == nil || len(d.interrupt.Candidates) != 2 || d.interrupt.Candidates[0].CategoryID != 1 || d.interrupt.Candidates[1].CategoryID != 3 {
+		t.Fatalf("interrupt = %+v，卡上只該有有效的兩個命中", d.interrupt)
+	}
+	if got := len(d.interrupt.Question.Options); got != 3 {
+		t.Errorf("options = %d，要 2 個品項加「其他」", got)
+	}
+}
+
+func TestInvalidMatchLeavingOneValidStillConfirmsIt(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "", "水果 > 空白")}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
+	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != 1 {
+		t.Fatalf("interrupt = %+v, resolution = %+v，剩一個有效命中就是單一命中", d.interrupt, d.next.Resolution)
+	}
+}
+
+func TestTruncatedLabelIsAnAdjustmentNotARejection(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(7, strings.Repeat("果", slots.MaxTextLen+10), "水果 > 長")}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
+	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != 7 || len([]rune(d.next.Resolution.Label)) > slots.MaxTextLen {
+		t.Fatalf("interrupt = %+v, resolution = %+v，被截斷但保留的標籤仍是確認的分類", d.interrupt, d.next.Resolution)
 	}
 }
 
 func TestNotReadyWhileTheItemHasNoResolution(t *testing.T) {
-	if got := nextStatus(statusClarifying, slots.Set{}, slots.Set{Item: sp("蘋果"), Unit: sp("KG"), DeliveryCity: sp("臺北市")}, false); got != statusClarifying {
-		t.Errorf("status = %q", got)
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果"), Unit: sp("KG"), DeliveryCity: sp("臺北市")})
+	if len(d.missing) != 0 || d.next.Resolution != nil || d.status != statusClarifying {
+		t.Errorf("missing = %v, resolution = %+v, status = %q：必填齊全但品項未解析，不能進 REQUIREMENT_READY", d.missing, d.next.Resolution, d.status)
+	}
+	if got := decideOK(t, &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "")}}}, priorState{requestOf: statusClarifying},
+		slots.Patch{Item: sp("蘋果"), Unit: sp("KG"), DeliveryCity: sp("臺北市")}); got.status != statusRequirementReady {
+		t.Errorf("已解析且必填齊全 status = %q", got.status)
+	}
+}
+
+func TestRejectedInputWhileDisambiguatingKeepsTheActButAsksTheQuestion(t *testing.T) {
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
+	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果"), DeliveryDate: sp("2020-01-01")})
+	if d.interrupt == nil || d.plan.Act != planner.InputRejected {
+		t.Fatalf("interrupt = %+v, act = %v，被拒要維持 INPUT_REJECTED 且仍中斷", d.interrupt, d.plan.Act)
+	}
+	if !strings.Contains(d.replyText, "沒辦法直接採用") || !strings.Contains(d.replyText, "找到幾個相符的品項") {
+		t.Errorf("replyText = %q，要同時有被拒警告與消歧問句", d.replyText)
 	}
 }

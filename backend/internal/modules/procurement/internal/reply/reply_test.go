@@ -249,6 +249,29 @@ func TestCorrectionCarriesTheNextStep(t *testing.T) {
 	}
 }
 
+func TestRejectedAndCorrectionRepliesEndWithThePendingQuestion(t *testing.T) {
+	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 1, Label: "蘋果"}})
+	rej := Args{Rejected: []slots.Rejection{{Key: slots.DeliveryCity, Reason: slots.ReasonCityUnrecognized}}}
+	got := Render(zh, planner.Plan{Act: planner.InputRejected, Question: disamb}, rej)
+	want := []Block{b(Warning, "有幾個內容我沒辦法直接採用：配送城市：不是可辨識的縣市名稱"), b(NextStep, "找到幾個相符的品項，麻煩選一下你要的是哪一個：")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rejected + disambiguation:\n got %v\nwant %v", got, want)
+	}
+	opt := planner.BuildFor(slots.Packaging, slots.Set{})
+	got = Render(zh, planner.Plan{Act: planner.InputRejected, Question: opt}, rej)
+	if len(got) != 2 || got[1].Text != "麻煩再確認一下。" {
+		t.Errorf("rejected with a non-disambiguation question keeps the generic next step: %v", got)
+	}
+}
+
+func TestCorrectionOptionalQuestionIsTheLastNextStep(t *testing.T) {
+	salient := []slots.Recorded{{Key: slots.Quantity, Value: "50"}}
+	got := Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient, Question: planner.BuildFor(slots.Packaging, slots.Set{})}, Args{})
+	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "包裝上有什麼需求嗎？" {
+		t.Errorf("optional question: %v", got)
+	}
+}
+
 func TestUnitValuesAreLocalized(t *testing.T) {
 	if got := RecordedValue(zh, slots.Recorded{Key: slots.Unit, Value: "CATTY"}); got != "台斤" {
 		t.Errorf("zh recorded unit = %q", got)

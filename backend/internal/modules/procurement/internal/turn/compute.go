@@ -77,32 +77,22 @@ type decision struct {
 func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, prior priorState, patch slots.Patch) (decision, error) {
 	next, rejected := prior.current.Apply(patch, now)
 
-	var resolved *slots.Resolution
 	var pending *pendingCard
-	var res resolver.Resolution
 	if next.Item != nil && (!equalStr(prior.current.Item, next.Item) || next.Resolution == nil) {
-		var err error
-		res, err = rs.Resolve(ctx, *next.Item)
+		res, err := rs.Resolve(ctx, *next.Item)
 		if err != nil {
 			return decision{}, fmt.Errorf("turn：解析品項：%w", err)
 		}
-		switch len(res.Matches) {
-		case 1:
-			m := res.Matches[0]
-			r := slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: m.CategoryID, Label: m.Name}
-			resolved = &r
-		default:
-			pending = disambiguationPayload(res)
-		}
-	}
-	if resolved != nil {
-		patch.Resolution = resolved
-		applied, rej := next.Apply(slots.Patch{Resolution: resolved}, now)
-		if len(rej) > 0 || applied.Resolution == nil {
-			patch.Resolution = nil
-			pending = disambiguationPayload(res)
+		cands := confirmable(next, res.Matches, now)
+		if len(cands) == 1 {
+			next = cands[0].set
+			patch.Resolution = next.Resolution
 		} else {
-			next = applied
+			ms := make([]resolver.Match, 0, len(cands))
+			for _, c := range cands {
+				ms = append(ms, c.match)
+			}
+			pending = disambiguationPayload(res.BuyerTerm, ms)
 		}
 	}
 
@@ -145,7 +135,7 @@ func decide(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, pr
 		p.Question = *questionWire(d.question)
 		d.interrupt = &p
 	}
-	d.status = nextStatus(prior.requestOf, prior.current, next, len(missing) == 0 && pending == nil && (next.Item == nil || next.Resolution != nil))
+	d.status = nextStatus(prior.requestOf, prior.current, next, next.Ready())
 	return d, nil
 }
 
@@ -154,14 +144,33 @@ type pendingCard struct {
 	card    *planner.Question
 }
 
-func disambiguationPayload(res resolver.Resolution) *pendingCard {
-	cands := make([]planner.ItemCandidate, 0, len(res.Matches))
-	for _, m := range res.Matches {
+// confirmed 是一個能被 Apply 收下當品項解析的命中，與收下後的欄位組。
+type confirmed struct {
+	match resolver.Match
+	set   slots.Set
+}
+
+// confirmable 只留下 Apply 真的會收下為解析的命中（標籤空白、分類 ID 不合法的不會）：單一命中、多個命中與零命中的處理都以這個結果為準，
+// 無效的命中不會出現在消歧卡上，也不會讓解析在 Apply 裡被默默丟掉。被截斷但保留的標籤是調整，不是被拒。
+func confirmable(next slots.Set, ms []resolver.Match, now time.Time) []confirmed {
+	var out []confirmed
+	for _, m := range ms {
+		r := slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: m.CategoryID, Label: m.Name}
+		if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); applied.Resolution != nil {
+			out = append(out, confirmed{match: m, set: applied})
+		}
+	}
+	return out
+}
+
+func disambiguationPayload(buyerTerm string, matches []resolver.Match) *pendingCard {
+	cands := make([]planner.ItemCandidate, 0, len(matches))
+	for _, m := range matches {
 		cands = append(cands, planner.ItemCandidate{CategoryID: m.CategoryID, Label: m.Name, Path: m.Path})
 	}
 	card := planner.BuildItemDisambiguation(cands)
 	shown := cands[:min(len(cands), planner.MaxItemOptions)]
-	p := InterruptPayload{Stage: StageItem, Query: res.BuyerTerm, Candidates: make([]PayloadCandidate, 0, len(shown))}
+	p := InterruptPayload{Stage: StageItem, Query: buyerTerm, Candidates: make([]PayloadCandidate, 0, len(shown))}
 	for _, c := range shown {
 		p.Candidates = append(p.Candidates, PayloadCandidate{CategoryID: c.CategoryID, Label: c.Label, Path: c.Path})
 	}

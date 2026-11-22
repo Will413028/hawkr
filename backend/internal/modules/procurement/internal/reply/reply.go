@@ -81,9 +81,13 @@ func render(l uitext.Locale, p planner.Plan, a Args) []Block {
 			}
 			items = append(items, pair(l, SlotLabel(l, r.Key), RejectionReason(l, r)))
 		}
+		next := text.ReplyRejectedNext(l).Text
+		if isItemDisambiguation(p) {
+			next = questionPrompt(l, p)
+		}
 		return []Block{
 			{Warning, text.ReplyRejectedWarning(l, text.ReplyRejectedWarningArgs{Items: join(l, items)}).Text},
-			{NextStep, text.ReplyRejectedNext(l).Text},
+			{NextStep, next},
 		}
 	case planner.RequestBasicsReady:
 		return []Block{
@@ -123,7 +127,7 @@ func TextFallback(blocks []Block) string {
 // nextStep 是更正之後仍待處理的下一步：品項消歧的問題、必填缺項、選填問題，依序取第一個有的。
 func nextStep(l uitext.Locale, p planner.Plan, a Args) string {
 	switch {
-	case p.Question != nil && p.Question.Slot == slots.ItemDisambiguation:
+	case isItemDisambiguation(p):
 		return questionPrompt(l, p)
 	case len(a.Missing) > 0:
 		return text.ReplyAckRequiredMissing(l, text.ReplyAckRequiredMissingArgs{Missing: join(l, slotLabels(l, a.Missing))}).Text
@@ -131,6 +135,11 @@ func nextStep(l uitext.Locale, p planner.Plan, a Args) string {
 		return questionPrompt(l, p)
 	}
 	return ""
+}
+
+// isItemDisambiguation 是這一輪停在品項消歧（執行器已中斷，文字要接上這個問題）。
+func isItemDisambiguation(p planner.Plan) bool {
+	return p.Question != nil && p.Question.Slot == slots.ItemDisambiguation
 }
 
 func slotLabels(l uitext.Locale, keys []model.SlotKey) []string {

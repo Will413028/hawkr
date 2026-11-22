@@ -157,28 +157,73 @@
    "id": "f1",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/extract/extract.go",
-   "old": "resp.ErrorMessage)}",
-   "new": "resp.ErrorMessage), retryable: true, unavailable: true}",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: !nonRetryableCodes[resp.ErrorCode], unavailable: true,",
    "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
-   "why": "帶 ErrorCode 的回應（安全過濾等）改成可重試且算服務不可用"
+   "why": "帶 ErrorCode 的回應改成算服務不可用（MODEL_UNAVAILABLE）"
   },
   {
    "id": "f2",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/turn/compute.go",
-   "old": "if len(rej) > 0 || applied.Resolution == nil {",
-   "new": "if false {",
-   "test": "internal/modules/procurement/internal/turn ^TestRejectedSingleMatchResolutionFallsBackToTheDisambiguationCard$",
-   "why": "單一命中的解析被 Apply 拒絕後照舊往下走：沒有消歧卡也沒有解析"
+   "old": "if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); applied.Resolution != nil {",
+   "new": "if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); true {",
+   "test": "internal/modules/procurement/internal/turn ^TestInvalidCandidatesNeverAppearOnTheCard$",
+   "why": "命中不再先過 Apply 驗證：標籤空白、分類 ID 不合法的候選出現在消歧卡上"
   },
   {
    "id": "f3",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/planner/plan.go",
-   "old": "\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:",
-   "new": "\tcase rejected && false:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:",
+   "old": "\tcase rejected:\n\t\treturn InputRejected\n\tcase corrected:\n\t\treturn CorrectionApplied\n\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n",
+   "new": "\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:\n\t\treturn InputRejected\n\tcase corrected:\n\t\treturn CorrectionApplied\n",
    "test": "internal/modules/procurement/internal/planner ^TestDecideParity$",
-   "why": "品項消歧不再排在被拒之前：執行器已中斷但文字不問問題"
+   "why": "品項消歧改排在被拒與更正之前：被拒或更正的輪次 act 變成 ITEM_NEEDS_DISAMBIGUATION，優先序改變"
+  },
+  {
+   "id": "f4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/slots/slots.go",
+   "old": "len(s.MissingRequired()) == 0 && s.Resolution != nil }",
+   "new": "len(s.MissingRequired()) == 0 }",
+   "test": "internal/modules/procurement/internal/turn ^TestNotReadyWhileTheItemHasNoResolution$",
+   "why": "齊備判斷不再要求品項已有解析：必填齊全但品項還在消歧時進入 REQUIREMENT_READY"
+  },
+  {
+   "id": "f5",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/reply/reply.go",
+   "old": "if isItemDisambiguation(p) {\n\t\t\tnext = questionPrompt(l, p)\n\t\t}",
+   "new": "if false {\n\t\t\tnext = questionPrompt(l, p)\n\t\t}",
+   "test": "internal/modules/procurement/internal/reply ^TestRejectedAndCorrectionRepliesEndWithThePendingQuestion$",
+   "why": "被拒的回覆在消歧中不再接上消歧問句：執行器已中斷但文字沒問問題"
+  },
+  {
+   "id": "f6",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/reply/reply.go",
+   "old": "\tcase isItemDisambiguation(p):\n\t\treturn questionPrompt(l, p)\n\tcase len(a.Missing)",
+   "new": "\tcase len(a.Missing)",
+   "test": "internal/modules/procurement/internal/reply ^TestCorrectionCarriesTheNextStep$",
+   "why": "更正之後的下一步不再優先帶消歧問句"
+  },
+  {
+   "id": "f7",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: false,",
+   "test": "internal/modules/procurement/internal/extract ^TestUnclearOutputErrorCodesRetryOnceAndAreNotUnavailable$",
+   "why": "OTHER 與 MALFORMED_FUNCTION_CALL 不再重試一次"
+  },
+  {
+   "id": "f8",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: true,",
+   "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
+   "why": "安全類 ErrorCode 也重試"
   }
  ]
 }

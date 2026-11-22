@@ -71,8 +71,9 @@ type Plan struct {
 	Skipped        []model.SlotKey
 }
 
-// Decide 選出這一輪的 act。優先序：品項消歧（執行器此時已中斷，文字必須問這個問題）、有欄位被拒、更正已有的欄位、必填未齊、詢價快照過期、快照已確認待核准、
+// Decide 選出這一輪的 act。優先序：有欄位被拒、更正已有的欄位、品項消歧、必填未齊、詢價快照過期、快照已確認待核准、
 // 還有選填問題、有價格參考、需求齊備。被截斷但值有保留的欄位只是調整提示，不算被拒。
+// 品項消歧中（執行器已中斷）時，被拒與更正的回覆由 reply 在警告或更正文字之後接上消歧問句。
 // 更正的欄位排在 Salient 最前面，而且一定全數帶入（其餘事實補到 MaxSalientFacts 為止），敘述才說得出改了什麼。
 func Decide(in Input) Plan {
 	rejected, adjusted := splitRejections(in.Rejected)
@@ -95,12 +96,12 @@ func Decide(in Input) Plan {
 func selectAct(in Input, rejected, corrected bool) Act {
 	ready := len(in.Next.MissingRequired()) == 0
 	switch {
-	case in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:
-		return ItemNeedsDisambiguation
 	case rejected:
 		return InputRejected
 	case corrected:
 		return CorrectionApplied
+	case in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:
+		return ItemNeedsDisambiguation
 	case !ready:
 		return AckAndAskRequired
 	case in.Rfq == RfqStale:

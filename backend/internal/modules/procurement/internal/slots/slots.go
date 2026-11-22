@@ -264,6 +264,9 @@ func (s Set) MissingRequired() []model.SlotKey {
 	return out
 }
 
+// Ready 是需求齊備：必填都有，而且品項已有解析（沒有分類無法搜尋，品項還在等買家消歧時不算齊備）。
+func (s Set) Ready() bool { return len(s.MissingRequired()) == 0 && s.Resolution != nil }
+
 // IsRequired 回傳這個欄位是不是必填。
 func IsRequired(key model.SlotKey) bool {
 	for _, k := range requiredSlots {

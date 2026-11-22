@@ -54,7 +54,9 @@ func ShapeFor(p llm.Provider) (Shape, error) {
 const toolName = "extract_slot_patch"
 
 // Error 是抽取失敗。Unavailable 為真代表模型服務沒有給出可用答案（逾時、429、5xx，重試用盡）；
-// 其餘（4xx、停用、重試後仍格式錯誤）為假。
+// 其餘（4xx、停用、安全過濾等帶 ErrorCode 的拒答、重試後仍格式錯誤或 OTHER／MALFORMED_FUNCTION_CALL）為假。
+// 重試規則：逾時、429、5xx、連線層錯誤、格式錯誤與 ErrorCode 為 OTHER、MALFORMED_FUNCTION_CALL（輸出不明或壞掉）重試一次；
+// 4xx、停用與 nonRetryableCodes 內的 ErrorCode（安全過濾、截斷等，同樣輸入重試只會得到同樣結果）不重試。
 type Error struct {
 	Unavailable bool
 	Err         error
@@ -134,6 +136,13 @@ func (e *Extractor) Extract(ctx context.Context, message string, known slots.Set
 	return slots.Patch{}, &Error{Unavailable: ae.unavailable, Err: ae.err}
 }
 
+// nonRetryableCodes 是重試只會得到同樣結果的模型 ErrorCode（安全過濾、禁止內容、引用、黑名單、敏感個資、截斷）；
+// 不在清單內的 ErrorCode（OTHER、MALFORMED_FUNCTION_CALL 等）視為輸出不明或壞掉，可重試一次。
+var nonRetryableCodes = map[string]bool{
+	"SAFETY": true, "PROHIBITED_CONTENT": true, "RECITATION": true, "BLOCKLIST": true, "SPII": true,
+	"MAX_TOKENS": true, "content_filter": true,
+}
+
 // attemptErr 是一次嘗試的失敗分類。
 type attemptErr struct {
 	err                    error
@@ -152,7 +161,10 @@ func (e *Extractor) attempt(parent, budget context.Context, req *adkmodel.LLMReq
 		return slots.Patch{}, classify(parent, ctx, callErr)
 	}
 	if resp != nil && resp.ErrorCode != "" {
-		return slots.Patch{}, &attemptErr{err: fmt.Errorf("模型回應帶錯誤 %s：%s", resp.ErrorCode, resp.ErrorMessage)}
+		return slots.Patch{}, &attemptErr{
+			err:       fmt.Errorf("模型回應帶錯誤 %s：%s", resp.ErrorCode, resp.ErrorMessage),
+			retryable: !nonRetryableCodes[resp.ErrorCode],
+		}
 	}
 	patch, err := e.parse(resp)
 	if err != nil {
