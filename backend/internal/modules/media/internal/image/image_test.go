@@ -414,3 +414,158 @@ func TestBigEndianOrientationIsRead(t *testing.T) {
 		t.Fatal("大端 TIFF 的方向 5 要保留")
 	}
 }
+
+func gifBodyStart(plain []byte) int {
+	i := 13
+	if flags := plain[10]; flags&0x80 != 0 {
+		i += 3 * (1 << ((flags & 0x07) + 1))
+	}
+	return i
+}
+
+func TestJPEGDropsUnknownLengthMarkers(t *testing.T) {
+	plain := encodeJPEG(t)
+	var junk []byte
+	for _, m := range []byte{0x02, 0x7F, 0xBF, 0xC8, 0xF0, 0xFD} {
+		junk = cat(junk, jpegSegment(m, []byte(gpsMarker)))
+	}
+	in := cat(plain[:2], junk, plain[2:])
+	out := mustStrip(t, in)
+	if contains(out, gpsMarker) {
+		t.Fatal("非解碼必需的標記必須被丟棄")
+	}
+	if !bytes.Equal(out, plain) {
+		t.Fatal("丟掉未知標記後應與原本乾淨的 JPEG 逐位元組相同")
+	}
+}
+
+func TestJPEGJFIFThumbnailIsDropped(t *testing.T) {
+	plain := encodeJPEG(t)
+	if plain[2] == 0xFF && plain[3] == 0xE0 {
+		t.Skip("encoder 已輸出 JFIF")
+	}
+	thumb := []byte(gpsMarker + "0123456789")
+	jfifPayload := cat([]byte("JFIF\x00"), []byte{1, 2, 1, 0, 72, 0, 72, 3, 4}, thumb)
+	in := cat(plain[:2], jpegSegment(0xE0, jfifPayload), plain[2:])
+	out := mustStrip(t, in)
+	if contains(out, gpsMarker) {
+		t.Fatal("JFIF 內嵌縮圖必須被丟棄")
+	}
+	want := cat([]byte{0xFF, 0xD8, 0xFF, 0xE0, 0, 16}, []byte("JFIF\x00"), []byte{1, 2, 1, 0, 72, 0, 72, 0, 0}, plain[2:])
+	if !bytes.Equal(out, want) {
+		t.Fatalf("JFIF 應重寫成 16 位元組、縮圖尺寸為 0：% x", out[:24])
+	}
+}
+
+func TestJPEGShortJFIFIsRejected(t *testing.T) {
+	plain := encodeJPEG(t)
+	in := cat(plain[:2], jpegSegment(0xE0, []byte("JFIF\x00\x01")), plain[2:])
+	if _, _, err := image.Strip(in); !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期 ErrMalformed", err)
+	}
+}
+
+func TestWebPAnimationFrameKeepsOnlyImageSubchunks(t *testing.T) {
+	vp8x := make([]byte, 10)
+	vp8x[0] = 0x02
+	anim := riffChunk("ANIM", make([]byte, 6))
+	hdr := make([]byte, 16)
+	hdr[12] = 5 // duration
+	frameImg := riffChunk("VP8 ", []byte{1, 2, 3})
+	alph := riffChunk("ALPH", []byte{7, 7})
+	frame := riffChunk("ANMF", cat(hdr, riffChunk("XMP ", []byte(gpsMarker)), alph, frameImg, riffChunk("EXIF", []byte(gpsMarker))))
+	out := mustStrip(t, webp(riffChunk("VP8X", vp8x), anim, frame))
+	if contains(out, gpsMarker) || contains(out, "XMP ") || contains(out, "EXIF") {
+		t.Fatal("影格內的非影像子區塊必須被丟棄")
+	}
+	wantFrame := riffChunk("ANMF", cat(hdr, alph, frameImg))
+	if !contains(out, string(wantFrame)) {
+		t.Fatal("ANMF 應只含標頭與 ALPH、VP8，且長度重算")
+	}
+	if got := int(out[4]) | int(out[5])<<8 | int(out[6])<<16; got != len(out)-8 {
+		t.Fatalf("RIFF 大小 %d，預期 %d", got, len(out)-8)
+	}
+}
+
+func TestWebPAnimationFrameWithBrokenSubchunkIsRejected(t *testing.T) {
+	vp8x := make([]byte, 10)
+	frame := riffChunk("ANMF", cat(make([]byte, 16), []byte("VP8 "), le32(99), []byte{1}))
+	if _, _, err := image.Strip(webp(riffChunk("VP8X", vp8x), frame)); !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期 ErrMalformed", err)
+	}
+	if _, _, err := image.Strip(webp(riffChunk("VP8X", vp8x), riffChunk("ANMF", make([]byte, 4)))); !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("過短的 ANMF：err = %v，預期 ErrMalformed", err)
+	}
+}
+
+func TestSimpleWebPKeepsOrientationViaSynthesizedVP8X(t *testing.T) {
+	// VP8 關鍵影格標頭：3 位元組 frame tag、起始碼 9d 01 2a、寬 100、高 50。
+	vp8 := []byte{0, 0, 0, 0x9D, 0x01, 0x2A, 100, 0, 50, 0, 1, 2}
+	out := mustStrip(t, webp(riffChunk("VP8 ", vp8), riffChunk("EXIF", exifTIFF(6))))
+	if string(out[12:16]) != "VP8X" || out[16] != 10 || out[20] != 0x08 {
+		t.Fatalf("要在最前面補 VP8X 並設 EXIF 旗標：% x", out[12:30])
+	}
+	if out[24] != 99 || out[25] != 0 || out[27] != 49 || out[28] != 0 {
+		t.Fatalf("畫布大小應為 100x50（存 w-1、h-1）：% x", out[24:30])
+	}
+	at := bytes.Index(out, []byte("EXIF"))
+	if at <= 0 || orientationAt(t, out, at+8) != 6 {
+		t.Fatal("方向 6 必須保留")
+	}
+	if !contains(out, string(riffChunk("VP8 ", vp8))) {
+		t.Fatal("影像區塊必須逐位元組不變")
+	}
+	if got := int(out[4]) | int(out[5])<<8; got != len(out)-8 {
+		t.Fatalf("RIFF 大小 %d，預期 %d", got, len(out)-8)
+	}
+}
+
+func TestSimpleWebPOrientationWithUnreadableImageHeaderIsRejected(t *testing.T) {
+	if _, _, err := image.Strip(webp(riffChunk("VP8 ", []byte{1, 2, 3}), riffChunk("EXIF", exifTIFF(6)))); !errors.Is(err, image.ErrMalformed) {
+		t.Fatalf("err = %v，預期 ErrMalformed", err)
+	}
+}
+
+func TestGIFExtensionsAreCanonicalised(t *testing.T) {
+	plain := encodeGIF(t)
+	i := gifBodyStart(plain)
+	marker := []byte(gpsMarker)
+	extra := cat([]byte{byte(len(marker))}, marker)
+	gce := cat([]byte{0x21, 0xF9, 4, 0, 5, 0, 0}, extra, []byte{0})
+	netscape := cat([]byte{0x21, 0xFF, 11}, []byte("NETSCAPE2.0"), []byte{3, 1, 7, 0}, extra, []byte{0})
+	in := cat(plain[:i], netscape, gce, plain[i:])
+	out := mustStrip(t, in)
+	if contains(out, gpsMarker) {
+		t.Fatal("保留的擴充內多餘的子區塊必須丟棄")
+	}
+	want := cat(plain[:i],
+		[]byte{0x21, 0xFF, 11}, []byte("NETSCAPE2.0"), []byte{3, 1, 7, 0, 0},
+		[]byte{0x21, 0xF9, 4, 0, 5, 0, 0, 0}, plain[i:])
+	if !bytes.Equal(out, want) {
+		t.Fatal("擴充應重寫成標準大小")
+	}
+}
+
+func TestGIFMalformedExtensionSizesAreRejected(t *testing.T) {
+	plain := encodeGIF(t)
+	i := gifBodyStart(plain)
+	cases := map[string][]byte{
+		"GCE 大小不是 4": {0x21, 0xF9, 5, 0, 0, 0, 0, 0, 0},
+		"迴圈區塊大小不是 3": cat([]byte{0x21, 0xFF, 11}, []byte("NETSCAPE2.0"), []byte{4, 1, 0, 0, 0, 0}),
+	}
+	for name, ext := range cases {
+		if _, _, err := image.Strip(cat(plain[:i], ext, plain[i:])); !errors.Is(err, image.ErrMalformed) {
+			t.Errorf("%s：err = %v，預期 ErrMalformed", name, err)
+		}
+	}
+}
+
+func TestGIFKeepsPlainTextExtension(t *testing.T) {
+	plain := encodeGIF(t)
+	i := gifBodyStart(plain)
+	pt := cat([]byte{0x21, 0x01, 12}, make([]byte, 12), []byte{5}, []byte("hello"), []byte{0})
+	in := cat(plain[:i], pt, plain[i:])
+	if out := mustStrip(t, in); !bytes.Equal(out, in) {
+		t.Fatal("Plain Text 擴充是顯示內容，必須整段保留")
+	}
+}

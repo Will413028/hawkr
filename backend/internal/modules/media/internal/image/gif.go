@@ -53,20 +53,39 @@ func stripGIF(d []byte) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			keep := label == 0xF9 // graphic control
-			if label == 0xFF {
-				if _, err := need(i + 14); err != nil {
-					return nil, err
-				}
-				id := string(d[i+3 : i+14])
-				keep = id == "NETSCAPE2.0" || id == "ANIMEXTS1.0"
-			}
-			if i, err = skipSubBlocks(d, i+2); err != nil {
+			end, err := skipSubBlocks(d, i+2)
+			if err != nil {
 				return nil, err
 			}
-			if keep {
-				out.Write(d[start:i])
+			switch label {
+			case 0xF9: // graphic control：固定 4 位元組，多餘的子區塊丟棄
+				if d[i+2] != 4 {
+					return nil, bad("GIF 圖形控制區塊長度錯誤")
+				}
+				out.Write([]byte{0x21, 0xF9, 0x04})
+				out.Write(d[i+3 : i+7])
+				out.WriteByte(0)
+			case 0x01: // plain text：顯示的文字內容，不是 metadata，整段保留
+				out.Write(d[start:end])
+			case 0xFF: // application：只留動畫迴圈，其餘廠商資料（XMP 等）丟棄
+				if d[i+2] != 11 {
+					break
+				}
+				id := string(d[i+3 : i+14])
+				if id != "NETSCAPE2.0" && id != "ANIMEXTS1.0" {
+					break
+				}
+				if d[i+14] != 3 {
+					return nil, bad("GIF 動畫迴圈區塊長度錯誤")
+				}
+				if d[i+15] != 1 {
+					break
+				}
+				out.Write([]byte{0x21, 0xFF, 0x0B})
+				out.WriteString(id)
+				out.Write([]byte{0x03, 0x01, d[i+16], d[i+17], 0x00})
 			}
+			i = end
 		default:
 			return nil, bad("GIF 區塊標記錯誤")
 		}

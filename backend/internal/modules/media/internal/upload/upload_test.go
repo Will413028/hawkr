@@ -57,3 +57,17 @@ func TestTokenIsOpaqueRandomAndHashedToFixedWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateRejectsSizeAboveModuleLimit(t *testing.T) {
+	for _, v := range []model.Visibility{model.VisibilityPublic, model.VisibilitySecure} {
+		limit := model.MaxUploadSize(v)
+		in := BeginInput{Visibility: v, Size: limit, ContentType: "image/png", MD5: validMD5}
+		if err := validate(in); err != nil {
+			t.Fatalf("%s：剛好等於上限的宣告被拒：%v", v, err)
+		}
+		in.Size = limit + 1
+		if got := apperr.KindOf(validate(in)); got != apperr.KindInvalidInput {
+			t.Errorf("%s：超過上限的分類 %v，預期 invalid_input", v, got)
+		}
+	}
+}

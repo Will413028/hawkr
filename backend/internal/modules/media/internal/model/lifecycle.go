@@ -25,6 +25,25 @@ const (
 // 否則 GC 可能回收還在處理的列（lifecycle_grace_test.go 斷言這個不等式）。
 const StuckUploadGrace = 3 * time.Hour
 
+// 單次上傳的大小上限（位元組），整個模組只有這一處定義：BeginUpload 拒絕宣告超過的上傳，處理 job 也不讀超過的物件。
+// 值取自 Java media-service 的 `hawkr.media.upload.max-image-size-bytes`（application.yml:117，一般圖片 10MB）
+// 與 `max-secure-size-bytes`（application.yml:118，機敏檔案 100MB），Java 在 MediaUploadValidator.java:59-63 以宣告大小套用。
+const (
+	MaxPublicUploadSize int64 = 10 << 20
+	MaxSecureUploadSize int64 = 100 << 20
+)
+
+// MaxUploadSize 回傳 v 可見性的單次上傳大小上限；未知的可見性回 0。
+func MaxUploadSize(v Visibility) int64 {
+	switch v {
+	case VisibilityPublic:
+		return MaxPublicUploadSize
+	case VisibilitySecure:
+		return MaxSecureUploadSize
+	}
+	return 0
+}
+
 // PresignTTL 是預簽 PUT 網址的有效期；不得超過 UploadTTL（網址比暫存列活得久沒有意義）。
 const PresignTTL = 15 * time.Minute
 
@@ -80,8 +99,10 @@ type RejectReason string
 
 const (
 	RejectUnrecognizedFormat RejectReason = "UNRECOGNIZED_FORMAT"
-	RejectSizeMismatch       RejectReason = "SIZE_MISMATCH"
-	RejectChecksumMismatch   RejectReason = "CHECKSUM_MISMATCH"
+	// RejectSizeMismatch：實際大小與宣告不符、宣告或實際超過上限，或 tmp 物件不存在（client 回報完成卻沒有上傳到宣告的內容，
+	// 對 client 而言都是「上傳的位元組不是宣告的那份」；不另設原因碼，原因碼在 B1-3 成為對外契約）。
+	RejectSizeMismatch     RejectReason = "SIZE_MISMATCH"
+	RejectChecksumMismatch RejectReason = "CHECKSUM_MISMATCH"
 	// RejectProcessingFailed：暫時失敗重試用盡。
 	RejectProcessingFailed RejectReason = "PROCESSING_FAILED"
 	// RejectExpired：處理完成時列已過期。

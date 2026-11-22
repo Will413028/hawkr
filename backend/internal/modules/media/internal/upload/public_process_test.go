@@ -135,3 +135,25 @@ func TestNewProcessor_SecureWithoutImplementationIsTransient(t *testing.T) {
 		t.Fatalf("err = %v，預期暫時失敗", err)
 	}
 }
+
+type countingStore struct {
+	storage.Store
+	gets int
+}
+
+func (c *countingStore) Get(ctx context.Context, k string) (io.ReadCloser, error) {
+	c.gets++
+	return c.Store.Get(ctx, k)
+}
+
+func TestPublicProcess_RefusesDeclaredSizeAboveLimitWithoutReading(t *testing.T) {
+	s := &countingStore{Store: storage.NewFake()}
+	putTmp(t, s.Store.(*storage.Fake), tinyGIF)
+	in := input(tinyGIF)
+	in.DeclaredSize = model.MaxPublicUploadSize + 1
+	_, err := upload.PublicProcess(context.Background(), s, in)
+	wantPermanent(t, err, model.RejectSizeMismatch)
+	if s.gets != 0 {
+		t.Fatal("超過上限的宣告不該讀物件")
+	}
+}

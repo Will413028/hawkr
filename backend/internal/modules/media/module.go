@@ -100,7 +100,7 @@ type Deps struct {
 	Jobs jobs.Enqueuer
 	// Store 是物件儲存。
 	Store ObjectStore
-	// Process 是處理 job 的內容；沒給時 public 用內建的圖片處理（辨認、剝除 metadata），secure 在 B1-2c2 接線前回暫時失敗。
+	// Process 是處理 job 的內容；沒給時 public 用內建的圖片處理（辨認、剝除 metadata），secure 尚未接線時回暫時失敗。
 	Process ProcessFunc
 	// NewID 產生資產與暫存列的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID

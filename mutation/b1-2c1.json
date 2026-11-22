@@ -53,6 +53,87 @@
    "new": "default:\n\t\t\t\tkeep = true",
    "test": "internal/modules/media/internal/image ^TestJPEGIsStrippedLosslessly$",
    "why": "unknown APPn segments (XMP, IPTC) are kept instead of dropped"
+  },
+  {
+   "id": "jpeg-keeps-unknown-length-markers",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/jpeg.go",
+   "old": "\tcase m >= 0xC0 && m <= 0xCF:\n\t\treturn m != 0xC8\n",
+   "new": "\tcase m >= 0xC0 && m <= 0xCF:\n\t\treturn true\n\tcase m == 0xF0:\n\t\treturn true\n",
+   "test": "internal/modules/media/internal/image ^TestJPEGDropsUnknownLengthMarkers$",
+   "why": "JPG (0xC8) and JPGn (0xF0) markers pass through the whitelist with their payload"
+  },
+  {
+   "id": "jpeg-keeps-reserved-markers",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/jpeg.go",
+   "old": "\tcase m == 0xDA, m == 0xDB, m == 0xDC, m == 0xDD, m == 0xDF:\n\t\treturn true\n\t}\n\treturn false",
+   "new": "\tcase m == 0xDA, m == 0xDB, m == 0xDC, m == 0xDD, m == 0xDF:\n\t\treturn true\n\t}\n\treturn m != 0xFE",
+   "test": "internal/modules/media/internal/image ^TestJPEGDropsUnknownLengthMarkers$",
+   "why": "any marker other than COM is allowed, so reserved 0x02-0xBF and JPGn segments are published"
+  },
+  {
+   "id": "upload-size-cap-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "if in.DeclaredSize > model.MaxPublicUploadSize {",
+   "new": "if false && in.DeclaredSize > model.MaxPublicUploadSize {",
+   "test": "internal/modules/media/internal/upload ^TestPublicProcess_RefusesDeclaredSizeAboveLimitWithoutReading$",
+   "why": "the public processor reads an object of any declared size into memory"
+  },
+  {
+   "id": "begin-upload-size-cap-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if in.Size > model.MaxUploadSize(in.Visibility) {",
+   "new": "if false && in.Size > model.MaxUploadSize(in.Visibility) {",
+   "test": "internal/modules/media/internal/upload ^TestValidateRejectsSizeAboveModuleLimit$",
+   "why": "BeginUpload accepts a declared size above the module limit"
+  },
+  {
+   "id": "webp-keeps-anmf-whole",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/webp.go",
+   "old": "c, err := rebuildANMF(d, int(dataStart), int(length))\n\t\t\tif err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n",
+   "new": "c := append([]byte(nil), d[i:end]...)\n\t\t\t_, _ = rebuildANMF(d, int(dataStart), int(length))\n",
+   "test": "internal/modules/media/internal/image ^TestWebPAnimationFrameKeepsOnlyImageSubchunks$",
+   "why": "animation frames are copied whole, carrying non-image sub-chunks such as XMP and EXIF"
+  },
+  {
+   "id": "jfif-keeps-thumbnail",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/jpeg.go",
+   "old": "rewritten = append(rewritten, 0, 0)",
+   "new": "rewritten = append(rewritten, 0, 0)\n\t\t\t\t\trewritten = append(rewritten[:0:0], d[i:end]...)",
+   "test": "internal/modules/media/internal/image ^TestJPEGJFIFThumbnailIsDropped$",
+   "why": "the JFIF segment is kept as is, including the embedded thumbnail"
+  },
+  {
+   "id": "gif-keeps-all-loop-subblocks",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/gif.go",
+   "old": "out.Write([]byte{0x03, 0x01, d[i+16], d[i+17], 0x00})",
+   "new": "out.Write([]byte{0x03, 0x01, d[i+16], d[i+17]})\n\t\t\t\tout.Write(d[i+18 : end])",
+   "test": "internal/modules/media/internal/image ^TestGIFExtensionsAreCanonicalised$",
+   "why": "extra sub-blocks after the animation loop count are published"
+  },
+  {
+   "id": "gif-drops-plain-text",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/gif.go",
+   "old": "case 0x01: // plain text：顯示的文字內容，不是 metadata，整段保留\n\t\t\t\tout.Write(d[start:end])",
+   "new": "case 0x01:\n\t\t\t\t_ = start",
+   "test": "internal/modules/media/internal/image ^TestGIFKeepsPlainTextExtension$",
+   "why": "the Plain Text Extension, which is rendered content, is dropped"
+  },
+  {
+   "id": "webp-simple-drops-orientation",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/webp.go",
+   "old": "if !hasVP8X && orientation > 1 {",
+   "new": "if false && !hasVP8X && orientation > 1 {",
+   "test": "internal/modules/media/internal/image ^TestSimpleWebPKeepsOrientationViaSynthesizedVP8X$",
+   "why": "a simple WebP with EXIF orientation loses it"
   }
  ]
 }

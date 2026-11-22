@@ -47,12 +47,21 @@ func stripJPEG(d []byte) ([]byte, error) {
 		if length < 2 || end > len(d) {
 			return nil, bad("JPEG 區段長度錯誤")
 		}
-		keep := true
+		keep := jpegDecodeMarker(m)
+		var rewritten []byte
 		if m >= 0xE0 && m <= 0xEF {
 			p, n := i+4, length-2
 			switch m {
 			case 0xE0:
 				keep = hasPrefixAt(d, p, "JFIF\x00", n)
+				if keep {
+					// 內嵌縮圖是另一張圖，可能帶著原圖的內容：重寫成沒有縮圖的 16 位元組 JFIF。
+					if n < 12 {
+						return nil, bad("JPEG JFIF 長度錯誤")
+					}
+					rewritten = append([]byte{0xFF, 0xE0, 0x00, 0x10}, d[p:p+12]...)
+					rewritten = append(rewritten, 0, 0)
+				}
 			case 0xE2:
 				keep = hasPrefixAt(d, p, "ICC_PROFILE\x00", n)
 			case 0xEE:
@@ -63,11 +72,13 @@ func stripJPEG(d []byte) ([]byte, error) {
 			if m == 0xE1 && hasPrefixAt(d, p, "Exif\x00\x00", n) {
 				orientation = orientationOfTIFF(d, p+6, n-6)
 			}
-		} else if m == 0xFE {
-			keep = false
 		}
 		if keep {
-			segs = append(segs, append([]byte(nil), d[i:end]...))
+			if rewritten != nil {
+				segs = append(segs, rewritten)
+			} else {
+				segs = append(segs, append([]byte(nil), d[i:end]...))
+			}
 		}
 		i = end
 		if m == 0xDA { // 掃描資料：複製到下一個真正的標記
@@ -123,4 +134,16 @@ func writeJPEGExif(out *bytes.Buffer, orientation int) {
 	out.Write([]byte{0xFF, 0xE1, byte(length >> 8 & 0xFF), byte(length & 0xFF)})
 	out.WriteString("Exif\x00\x00")
 	out.Write(tiff)
+}
+
+// jpegDecodeMarker 回報有長度的標記是不是解碼必需的：SOFn（不含 0xC8 JPG）、DHT、DAC、DQT、DRI、SOS、DNL、EXP。
+// APPn 由呼叫方另外依內容白名單判斷，其餘（COM、保留標記、JPGn 等）一律丟棄。
+func jpegDecodeMarker(m int) bool {
+	switch {
+	case m >= 0xC0 && m <= 0xCF:
+		return m != 0xC8
+	case m == 0xDA, m == 0xDB, m == 0xDC, m == 0xDD, m == 0xDF:
+		return true
+	}
+	return false
 }

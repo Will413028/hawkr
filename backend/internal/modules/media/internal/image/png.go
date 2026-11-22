@@ -28,10 +28,7 @@ func stripPNG(d []byte) ([]byte, error) {
 		end := i + 12 + int(length)
 		typ := string(d[i+4 : i+8])
 		if len(chunks) == 0 && typ != "IHDR" {
-			if typ == "eXIf" || !pngKeep[typ] {
-				// Java：第一個區塊必須是 IHDR，不論該區塊會不會被保留。
-				return nil, bad("PNG 缺少 IHDR")
-			}
+			// 第一個區塊必須是 IHDR，不論該區塊會不會被保留。
 			return nil, bad("PNG 缺少 IHDR")
 		}
 		if typ == "eXIf" {

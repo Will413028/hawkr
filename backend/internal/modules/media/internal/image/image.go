@@ -2,7 +2,7 @@
 //
 // 做法是白名單加逐段搬運：不解碼像素、不重新編碼，所以沒有畫質損失；只留解碼與顯示必需的區段，未知的區段一律丟棄。
 // 方向保留時重寫成只含 Orientation 一個欄位的最小 EXIF，原本的 GPS、縮圖、MakerNote 不會被帶過去。
-// 規格來源：Java `ImageMetadataStripper`（遷移計畫 B1-2c1）。
+// 規格來源：Java `ImageMetadataStripper`。
 package image
 
 import (

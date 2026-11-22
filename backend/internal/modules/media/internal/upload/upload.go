@@ -120,6 +120,9 @@ func validate(in BeginInput) error {
 	if in.Size <= 0 {
 		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小必須大於零")
 	}
+	if in.Size > model.MaxUploadSize(in.Visibility) {
+		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小超過上限 %d 位元組", model.MaxUploadSize(in.Visibility))
+	}
 	if in.ContentType == "" || len(in.ContentType) > maxContentTypeLen || strings.ContainsAny(in.ContentType, "\r\n\x00") {
 		return apperr.InvalidInputOn([]string{"content_type"}, "上傳的型別不合法")
 	}
