@@ -93,6 +93,7 @@ const (
 	InvoiceService_ResolveOrderInvoiceModeInternal_FullMethodName    = "/hawkr.invoice.InvoiceService/ResolveOrderInvoiceModeInternal"
 	InvoiceService_ValidateOrderInvoiceInputInternal_FullMethodName  = "/hawkr.invoice.InvoiceService/ValidateOrderInvoiceInputInternal"
 	InvoiceService_GetSellerInvoiceCapabilitySimple_FullMethodName   = "/hawkr.invoice.InvoiceService/GetSellerInvoiceCapabilitySimple"
+	InvoiceService_ReplaceBusinessDayMirror_FullMethodName           = "/hawkr.invoice.InvoiceService/ReplaceBusinessDayMirror"
 )
 
 // InvoiceServiceClient is the client API for InvoiceService service.
@@ -238,6 +239,10 @@ type InvoiceServiceClient interface {
 	ValidateOrderInvoiceInputInternal(ctx context.Context, in *ValidateOrderInvoiceInputInternalRequest, opts ...grpc.CallOption) (*ValidateOrderInvoiceInputInternalResponse, error)
 	// seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
 	GetSellerInvoiceCapabilitySimple(ctx context.Context, in *GetSellerInvoiceCapabilitySimpleRequest, opts ...grpc.CallOption) (*GetSellerInvoiceCapabilitySimpleResponse, error)
+	// 單體（platform/bizcalendar，假日資料的擁有者）推送行事曆鏡像：帶入涵蓋區間與區間內的假日，
+	// 同一交易內整段覆蓋鏡像與涵蓋區間。任何一個日期不合就整批拒絕、不改鏡像。冪等：同一批重送結果相同。
+	// 這支 RPC 與單體的推送隨 A5（invoice 搬進單體）刪除。
+	ReplaceBusinessDayMirror(ctx context.Context, in *ReplaceBusinessDayMirrorRequest, opts ...grpc.CallOption) (*ReplaceBusinessDayMirrorResponse, error)
 }
 
 type invoiceServiceClient struct {
@@ -988,6 +993,16 @@ func (c *invoiceServiceClient) GetSellerInvoiceCapabilitySimple(ctx context.Cont
 	return out, nil
 }
 
+func (c *invoiceServiceClient) ReplaceBusinessDayMirror(ctx context.Context, in *ReplaceBusinessDayMirrorRequest, opts ...grpc.CallOption) (*ReplaceBusinessDayMirrorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplaceBusinessDayMirrorResponse)
+	err := c.cc.Invoke(ctx, InvoiceService_ReplaceBusinessDayMirror_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InvoiceServiceServer is the server API for InvoiceService service.
 // All implementations must embed UnimplementedInvoiceServiceServer
 // for forward compatibility.
@@ -1131,6 +1146,10 @@ type InvoiceServiceServer interface {
 	ValidateOrderInvoiceInputInternal(context.Context, *ValidateOrderInvoiceInputInternalRequest) (*ValidateOrderInvoiceInputInternalResponse, error)
 	// seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
 	GetSellerInvoiceCapabilitySimple(context.Context, *GetSellerInvoiceCapabilitySimpleRequest) (*GetSellerInvoiceCapabilitySimpleResponse, error)
+	// 單體（platform/bizcalendar，假日資料的擁有者）推送行事曆鏡像：帶入涵蓋區間與區間內的假日，
+	// 同一交易內整段覆蓋鏡像與涵蓋區間。任何一個日期不合就整批拒絕、不改鏡像。冪等：同一批重送結果相同。
+	// 這支 RPC 與單體的推送隨 A5（invoice 搬進單體）刪除。
+	ReplaceBusinessDayMirror(context.Context, *ReplaceBusinessDayMirrorRequest) (*ReplaceBusinessDayMirrorResponse, error)
 	mustEmbedUnimplementedInvoiceServiceServer()
 }
 
@@ -1362,6 +1381,9 @@ func (UnimplementedInvoiceServiceServer) ValidateOrderInvoiceInputInternal(conte
 }
 func (UnimplementedInvoiceServiceServer) GetSellerInvoiceCapabilitySimple(context.Context, *GetSellerInvoiceCapabilitySimpleRequest) (*GetSellerInvoiceCapabilitySimpleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSellerInvoiceCapabilitySimple not implemented")
+}
+func (UnimplementedInvoiceServiceServer) ReplaceBusinessDayMirror(context.Context, *ReplaceBusinessDayMirrorRequest) (*ReplaceBusinessDayMirrorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReplaceBusinessDayMirror not implemented")
 }
 func (UnimplementedInvoiceServiceServer) mustEmbedUnimplementedInvoiceServiceServer() {}
 func (UnimplementedInvoiceServiceServer) testEmbeddedByValue()                        {}
@@ -2716,6 +2738,24 @@ func _InvoiceService_GetSellerInvoiceCapabilitySimple_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InvoiceService_ReplaceBusinessDayMirror_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplaceBusinessDayMirrorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvoiceServiceServer).ReplaceBusinessDayMirror(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvoiceService_ReplaceBusinessDayMirror_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvoiceServiceServer).ReplaceBusinessDayMirror(ctx, req.(*ReplaceBusinessDayMirrorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InvoiceService_ServiceDesc is the grpc.ServiceDesc for InvoiceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3018,6 +3058,10 @@ var InvoiceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSellerInvoiceCapabilitySimple",
 			Handler:    _InvoiceService_GetSellerInvoiceCapabilitySimple_Handler,
+		},
+		{
+			MethodName: "ReplaceBusinessDayMirror",
+			Handler:    _InvoiceService_ReplaceBusinessDayMirror_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -16,12 +16,18 @@ type TxManager interface {
 	// WithTx executes the given function within a transaction.
 	// If the function returns an error, the transaction is rolled back.
 	// If the function returns nil, the transaction is committed.
+	// If the function panics or calls runtime.Goexit, the transaction is rolled back and the panic propagates.
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 // pgxTxManager implements TxManager using pgx.
 type pgxTxManager struct {
-	pool *pgxpool.Pool
+	pool txBeginner
+}
+
+// txBeginner is the part of *pgxpool.Pool that WithTx needs.
+type txBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
 // NewTxManager creates a new TxManager with the given connection pool.
@@ -47,15 +53,21 @@ func (m *pgxTxManager) WithTx(ctx context.Context, fn func(ctx context.Context) 
 	// Store transaction in context
 	txCtx := context.WithValue(ctx, txCtxKey{}, tx)
 
-	// Execute the function
+	// Roll back unless Commit was reached, so an error, a panic or a
+	// runtime.Goexit (t.Fatalf) in fn never leaks the pool connection.
+	// The context is detached so a cancelled ctx cannot skip the rollback.
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(context.WithoutCancel(ctx))
+		}
+	}()
+
 	if err := fn(txCtx); err != nil {
-		// Rollback on error, using a context that won't be cancelled
-		rollbackCtx := context.WithoutCancel(ctx)
-		_ = tx.Rollback(rollbackCtx)
 		return err
 	}
 
-	// Commit the transaction
+	committed = true
 	return tx.Commit(ctx)
 }
 

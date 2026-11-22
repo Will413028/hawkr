@@ -22,7 +22,8 @@ TIMEOUT_SECONDS = 15 * 60
 FRAMEWORK_TIMEOUT_SECONDS = TIMEOUT_SECONDS + 5 * 60
 REQUIRED = ("id", "stack", "file", "old", "new", "test", "why")
 FLUTTER_PREFIX = "flutter:"
-FIXED_STACKS = ("go-integration", "go", "website", "flutter:buyer-app", "flutter:seller-app")
+FIXED_STACKS = ("go-integration", "go", "website", "admin", "flutter:buyer-app", "flutter:seller-app")
+GO_MODULE_PREFIXES = ("go-integration:", "go:")
 
 KILLED = "KILLED"
 SURVIVED = "SURVIVED"
@@ -58,8 +59,27 @@ class Command:
     stack: str = ""
 
 
+def go_stack(stack: str) -> tuple[bool, str] | None:
+    """Go 的 stack 解成 (是否 integration, 模組目錄，相對 repo 根目錄)。
+    `go`／`go-integration` 是 backend 單體；`go:<dir>`／`go-integration:<dir>` 是 <dir> 這個獨立模組。"""
+    if stack in ("go", "go-integration"):
+        return stack == "go-integration", "backend"
+    for prefix in GO_MODULE_PREFIXES:
+        if stack.startswith(prefix):
+            return prefix == "go-integration:", stack[len(prefix):]
+    return None
+
+
+def valid_module_dir(d: str) -> bool:
+    parts = d.split("/")
+    return d != "" and not d.startswith("/") and all(x not in ("", ".", "..") for x in parts)
+
+
 def valid_stack(stack: str) -> bool:
-    return stack in FIXED_STACKS
+    if stack in FIXED_STACKS:
+        return True
+    g = go_stack(stack)
+    return g is not None and valid_module_dir(g[1])
 
 
 def inside(repo: Path, path: Path) -> bool:
@@ -67,6 +87,7 @@ def inside(repo: Path, path: Path) -> bool:
 
 
 WEBSITE_BUILD_ERROR = re.compile(r"Transform failed|SyntaxError|Failed to parse source")
+ADMIN_BUILD_ERROR = re.compile(r"TransformError|Transform failed|SyntaxError")
 FLUTTER_BUILD_ERROR = re.compile(r"Compilation failed|^\S+:\d+:\d+: Error: ", re.MULTILINE)
 
 
@@ -75,6 +96,8 @@ def has_build_error(stack: str, output: str) -> bool:
     沒有標記的失敗（含沒有測試摘要）一律當作測試擋下。"""
     if stack == "website":
         return WEBSITE_BUILD_ERROR.search(output) is not None
+    if stack == "admin":
+        return ADMIN_BUILD_ERROR.search(output) is not None
     if stack.startswith(FLUTTER_PREFIX):
         return FLUTTER_BUILD_ERROR.search(output) is not None
     return False
@@ -127,15 +150,24 @@ def split_selector(selector: str) -> tuple[str, str]:
 def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     head, rest = split_selector(selector)
     env = dict(os.environ)
-    if stack in ("go-integration", "go"):
+    g = go_stack(stack)
+    if g is not None:
+        integration, moddir = g
         if not rest:
             raise ManifestError("go 選擇器必須是「<套件> <regex>」")
         argv = ["go", "test", "-count=1", "-vet=off", "-timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s"]
-        if stack == "go-integration":
+        if integration:
             argv += ["-tags", "integration"]
         argv += [f"./{head.strip('/')}/", "-run", rest]
         env["GOWORK"] = "off"
-        return Command(argv, repo / "backend", env, stack)
+        return Command(argv, repo / moddir, env, stack)
+    if stack == "admin":
+        # node:test 的旗標要放在測試檔之前，放在後面會被忽略（整個檔案照跑）。
+        argv = ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test"]
+        if rest:
+            argv += ["--test-name-pattern", rest]
+        argv.append(head)
+        return Command(argv, repo / "admin", env, stack)
     if stack == "website":
         argv = ["pnpm", "exec", "vitest", "run", "--project", "unit", head]
         if rest:
@@ -151,14 +183,16 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
 def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO) -> Command | None:
     """變更後先確認還編譯得過；website 沒有便宜的逐 mutant 編譯，改看測試輸出（ran_no_tests）。"""
     env = dict(os.environ)
-    if stack in ("go-integration", "go"):
+    g = go_stack(stack)
+    if g is not None:
+        integration, moddir = g
         head, _ = split_selector(selector)
         argv = ["go", "test", "-c", "-o", os.devnull]
-        if stack == "go-integration":
+        if integration:
             argv += ["-tags", "integration"]
         argv.append(f"./{head.strip('/')}/")
         env["GOWORK"] = "off"
-        return Command(argv, repo / "backend", env, stack)
+        return Command(argv, repo / moddir, env, stack)
     if stack.startswith(FLUTTER_PREFIX):
         app = stack[len(FLUTTER_PREFIX):]
         if not inside(repo / app, repo / file):
@@ -169,10 +203,13 @@ def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO)
 
 def test_file(stack: str, selector: str, repo: Path = REPO) -> Path:
     head, _ = split_selector(selector)
-    if stack in ("go-integration", "go"):
-        return repo / "backend" / head
+    g = go_stack(stack)
+    if g is not None:
+        return repo / g[1] / head
     if stack == "website":
         return repo / "website" / head
+    if stack == "admin":
+        return repo / "admin" / head
     return repo / stack[len(FLUTTER_PREFIX):] / head
 
 
@@ -186,6 +223,11 @@ def check_mutant(m: Mutant, repo: Path = REPO) -> str | None:
     count = path.read_text(encoding="utf-8").count(m.old)
     if count != 1:
         return f"old 在 {m.file} 出現 {count} 次（必須剛好 1 次）"
+    g = go_stack(m.stack)
+    if g is not None and ":" in m.stack:
+        moddir = repo / g[1]
+        if not inside(repo, moddir) or not (moddir / "go.mod").is_file():
+            return f"Go 模組目錄不存在或沒有 go.mod：{g[1]}"
     target = test_file(m.stack, m.test, repo)
     if not inside(repo, target):
         return f"測試路徑在 repo 之外：{m.test.split()[0]}"

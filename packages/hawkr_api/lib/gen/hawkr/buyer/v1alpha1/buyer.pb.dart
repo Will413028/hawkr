@@ -4191,16 +4191,18 @@ class UnsubscribeRestockResponse extends $pb.GeneratedMessage {
   static UnsubscribeRestockResponse? _defaultInstance;
 }
 
-enum BlockAuthorRequest_Source { commentId, forumEntryId, notSet }
+enum BlockAuthorRequest_Source { commentId, forumEntryId, reviewId, notSet }
 
 class BlockAuthorRequest extends $pb.GeneratedMessage {
   factory BlockAuthorRequest({
     $core.String? commentId,
     $core.String? forumEntryId,
+    $core.String? reviewId,
   }) {
     final result = BlockAuthorRequest._();
     if (commentId != null) result.commentId = commentId;
     if (forumEntryId != null) result.forumEntryId = forumEntryId;
+    if (reviewId != null) result.reviewId = reviewId;
     return result;
   }
 
@@ -4217,6 +4219,7 @@ class BlockAuthorRequest extends $pb.GeneratedMessage {
       _BlockAuthorRequest_SourceByTag = {
     1: BlockAuthorRequest_Source.commentId,
     2: BlockAuthorRequest_Source.forumEntryId,
+    3: BlockAuthorRequest_Source.reviewId,
     0: BlockAuthorRequest_Source.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -4224,9 +4227,10 @@ class BlockAuthorRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: BlockAuthorRequest.$_createMessage)
-    ..oo(0, [1, 2])
+    ..oo(0, [1, 2, 3])
     ..aOS(1, _omitFieldNames ? '' : 'commentId')
     ..aOS(2, _omitFieldNames ? '' : 'forumEntryId')
+    ..aOS(3, _omitFieldNames ? '' : 'reviewId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4253,10 +4257,12 @@ class BlockAuthorRequest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
   BlockAuthorRequest_Source whichSource() =>
       _BlockAuthorRequest_SourceByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
   void clearSource() => $_clearField($_whichOneof(0));
 
   /// 留言 ID。
@@ -4278,6 +4284,16 @@ class BlockAuthorRequest extends $pb.GeneratedMessage {
   $core.bool hasForumEntryId() => $_has(1);
   @$pb.TagNumber(2)
   void clearForumEntryId() => $_clearField(2);
+
+  /// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
+  @$pb.TagNumber(3)
+  $core.String get reviewId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set reviewId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReviewId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReviewId() => $_clearField(3);
 }
 
 class BlockAuthorResponse extends $pb.GeneratedMessage {

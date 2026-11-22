@@ -163,7 +163,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	h, err := httpapi.NewHandler(httpapi.Deps{Assistant: &assistant.Module{},
 		Ready: d.Ping, Identity: id, Seller: sellers, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegationDeps), Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute,
-		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: mod,
+		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: mod,
 		BuyerPorts: httpbuyer.Ports{Stores: sellers},
 	})
 	if err != nil {

@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqjwcKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVQTEFZX0NVUlNPUl9FWFBJUkVEEA8SFwoTUkVQTEFZX0NVUlNPUl9BSEVBRBAQEhkKFVJFUVVJUkVNRU5UX05PVF9SRUFEWRAREhQKEEFQUFJPVkFMX1BFTkRJTkcQEhIdChlBUFBST1ZBTF9BTFJFQURZX1JFU09MVkVEEBMSEgoOUlVOX05PVF9BQ1RJVkUQFBIYChRSRlFfUkVTUE9OU0VfRVhQSVJFRBAVEhgKFFJGUV9SRUNJUElFTlRfQ0xPU0VEEBYSHwobUkZRX0NIRUNLT1VUX0FMUkVBRFlfQUNUSVZFEBcSFwoTUkZRX0FMUkVBRFlfQVdBUkRFRBAYEiAKHEFHRU5UX01PTlRITFlfUVVPVEFfRVhDRUVERUQQGRIYChRJTUFHRV9RVU9UQV9FWENFRURFRBAaEhgKFElNQUdFX1NBRkVUWV9CTE9DS0VEEBsSHAoYSU1BR0VfUkVDSVRBVElPTl9CTE9DS0VEEBwSFgoSSU1BR0VfTk9UX1BST0RVQ0VEEB0SHgoaQVNTSVNUQU5UX1RVUk5fSU5fUFJPR1JFU1MQHhIZChVBU1NJU1RBTlRfVFVSTl9GQUlMRUQQHxIfChtQUk9DVVJFTUVOVF9SVU5fSU5fUFJPR1JFU1MQIGIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEq+QcKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAISGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQAxIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAEEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAFEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAYSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQBxIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCBIVChFBQ0NPVU5UX0hBU19TVE9SRRAJEhUKEUFDQ09VTlRfU1VTUEVOREVEEAoSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQCxIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEAwSGgoWQ09OVEFDVF9FTUFJTF9SRVFVSVJFRBANEhsKF0NPTlRFTlRfVEFLRURPV05fQUNUSVZFEA4SGQoVUkVWSUVXX0FMUkVBRFlfRVhJU1RTEA8SGAoUT1JERVJfTk9UX1JFVklFV0FCTEUQEBIZChVSRVZJRVdfV0lORE9XX0VYUElSRUQQERIYChRSRVZJRVdfTk9UX1JFUExZQUJMRRASEhkKFVJFUExBWV9DVVJTT1JfRVhQSVJFRBATEhcKE1JFUExBWV9DVVJTT1JfQUhFQUQQFBIZChVSRVFVSVJFTUVOVF9OT1RfUkVBRFkQFRIUChBBUFBST1ZBTF9QRU5ESU5HEBYSHQoZQVBQUk9WQUxfQUxSRUFEWV9SRVNPTFZFRBAXEhIKDlJVTl9OT1RfQUNUSVZFEBgSGAoUUkZRX1JFU1BPTlNFX0VYUElSRUQQGRIYChRSRlFfUkVDSVBJRU5UX0NMT1NFRBAaEh8KG1JGUV9DSEVDS09VVF9BTFJFQURZX0FDVElWRRAbEhcKE1JGUV9BTFJFQURZX0FXQVJERUQQHBIgChxBR0VOVF9NT05USExZX1FVT1RBX0VYQ0VFREVEEB0SGAoUSU1BR0VfUVVPVEFfRVhDRUVERUQQHhIYChRJTUFHRV9TQUZFVFlfQkxPQ0tFRBAfEhwKGElNQUdFX1JFQ0lUQVRJT05fQkxPQ0tFRBAgEhYKEklNQUdFX05PVF9QUk9EVUNFRBAhEh4KGkFTU0lTVEFOVF9UVVJOX0lOX1BST0dSRVNTECISGQoVQVNTSVNUQU5UX1RVUk5fRkFJTEVEECMSHwobUFJPQ1VSRU1FTlRfUlVOX0lOX1BST0dSRVNTECRiBnByb3RvMw");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -154,145 +154,178 @@ export enum ErrorReason {
   CONTENT_TAKEDOWN_ACTIVE = 14,
 
   /**
+   * 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+   * 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+   * ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: REVIEW_ALREADY_EXISTS = 15;
+   */
+  REVIEW_ALREADY_EXISTS = 15,
+
+  /**
+   * 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+   * ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: ORDER_NOT_REVIEWABLE = 16;
+   */
+  ORDER_NOT_REVIEWABLE = 16,
+
+  /**
+   * 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+   * ReviewAppService.CreateReview。
+   *
+   * @generated from enum value: REVIEW_WINDOW_EXPIRED = 17;
+   */
+  REVIEW_WINDOW_EXPIRED = 17,
+
+  /**
+   * 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+   * ReviewAppService.ReplyReview。
+   *
+   * @generated from enum value: REVIEW_NOT_REPLYABLE = 18;
+   */
+  REVIEW_NOT_REPLYABLE = 18,
+
+  /**
    * 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
    * client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
    *
-   * @generated from enum value: REPLAY_CURSOR_EXPIRED = 15;
+   * @generated from enum value: REPLAY_CURSOR_EXPIRED = 19;
    */
-  REPLAY_CURSOR_EXPIRED = 15,
+  REPLAY_CURSOR_EXPIRED = 19,
 
   /**
    * 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
    * client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
    *
-   * @generated from enum value: REPLAY_CURSOR_AHEAD = 16;
+   * @generated from enum value: REPLAY_CURSOR_AHEAD = 20;
    */
-  REPLAY_CURSOR_AHEAD = 16,
+  REPLAY_CURSOR_AHEAD = 20,
 
   /**
    * 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
    *
-   * @generated from enum value: REQUIREMENT_NOT_READY = 17;
+   * @generated from enum value: REQUIREMENT_NOT_READY = 21;
    */
-  REQUIREMENT_NOT_READY = 17,
+  REQUIREMENT_NOT_READY = 21,
 
   /**
    * 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
    * 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
    *
-   * @generated from enum value: APPROVAL_PENDING = 18;
+   * @generated from enum value: APPROVAL_PENDING = 22;
    */
-  APPROVAL_PENDING = 18,
+  APPROVAL_PENDING = 22,
 
   /**
    * 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
    *
-   * @generated from enum value: APPROVAL_ALREADY_RESOLVED = 19;
+   * @generated from enum value: APPROVAL_ALREADY_RESOLVED = 23;
    */
-  APPROVAL_ALREADY_RESOLVED = 19,
+  APPROVAL_ALREADY_RESOLVED = 23,
 
   /**
    * run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
    *
-   * @generated from enum value: RUN_NOT_ACTIVE = 20;
+   * @generated from enum value: RUN_NOT_ACTIVE = 24;
    */
-  RUN_NOT_ACTIVE = 20,
+  RUN_NOT_ACTIVE = 24,
 
   /**
    * 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
    *
-   * @generated from enum value: RFQ_RESPONSE_EXPIRED = 21;
+   * @generated from enum value: RFQ_RESPONSE_EXPIRED = 25;
    */
-  RFQ_RESPONSE_EXPIRED = 21,
+  RFQ_RESPONSE_EXPIRED = 25,
 
   /**
    * 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
    * SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
    *
-   * @generated from enum value: RFQ_RECIPIENT_CLOSED = 22;
+   * @generated from enum value: RFQ_RECIPIENT_CLOSED = 26;
    */
-  RFQ_RECIPIENT_CLOSED = 22,
+  RFQ_RECIPIENT_CLOSED = 26,
 
   /**
    * 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
    * client 引導買家去付款，不是叫他重新接受。
    *
-   * @generated from enum value: RFQ_CHECKOUT_ALREADY_ACTIVE = 23;
+   * @generated from enum value: RFQ_CHECKOUT_ALREADY_ACTIVE = 27;
    */
-  RFQ_CHECKOUT_ALREADY_ACTIVE = 23,
+  RFQ_CHECKOUT_ALREADY_ACTIVE = 27,
 
   /**
    * 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
    *
-   * @generated from enum value: RFQ_ALREADY_AWARDED = 24;
+   * @generated from enum value: RFQ_ALREADY_AWARDED = 28;
    */
-  RFQ_ALREADY_AWARDED = 24,
+  RFQ_ALREADY_AWARDED = 28,
 
   /**
    * 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
    * ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
    *
-   * @generated from enum value: AGENT_MONTHLY_QUOTA_EXCEEDED = 25;
+   * @generated from enum value: AGENT_MONTHLY_QUOTA_EXCEEDED = 29;
    */
-  AGENT_MONTHLY_QUOTA_EXCEEDED = 25,
+  AGENT_MONTHLY_QUOTA_EXCEEDED = 29,
 
   /**
    * 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
    * 不提供重試。ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
    * 同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，帶 RetryInfo，稍後可再試。
    *
-   * @generated from enum value: IMAGE_QUOTA_EXCEEDED = 26;
+   * @generated from enum value: IMAGE_QUOTA_EXCEEDED = 30;
    */
-  IMAGE_QUOTA_EXCEEDED = 26,
+  IMAGE_QUOTA_EXCEEDED = 30,
 
   /**
    * 圖片或提示詞被安全性檢查擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
    * client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
    *
-   * @generated from enum value: IMAGE_SAFETY_BLOCKED = 27;
+   * @generated from enum value: IMAGE_SAFETY_BLOCKED = 31;
    */
-  IMAGE_SAFETY_BLOCKED = 27,
+  IMAGE_SAFETY_BLOCKED = 31,
 
   /**
    * 圖片涉及著作權複誦而被擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
    * client 請使用者換一張圖，不自動重試。額度退回。
    *
-   * @generated from enum value: IMAGE_RECITATION_BLOCKED = 28;
+   * @generated from enum value: IMAGE_RECITATION_BLOCKED = 32;
    */
-  IMAGE_RECITATION_BLOCKED = 28,
+  IMAGE_RECITATION_BLOCKED = 32,
 
   /**
    * 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
    * client 可以讓使用者直接重試。額度退回。
    *
-   * @generated from enum value: IMAGE_NOT_PRODUCED = 29;
+   * @generated from enum value: IMAGE_NOT_PRODUCED = 33;
    */
-  IMAGE_NOT_PRODUCED = 29,
+  IMAGE_NOT_PRODUCED = 33,
 
   /**
    * 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
    * 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
    *
-   * @generated from enum value: ASSISTANT_TURN_IN_PROGRESS = 30;
+   * @generated from enum value: ASSISTANT_TURN_IN_PROGRESS = 34;
    */
-  ASSISTANT_TURN_IN_PROGRESS = 30,
+  ASSISTANT_TURN_IN_PROGRESS = 34,
 
   /**
    * 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
    * （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
    * 可以讓使用者重新送出。
    *
-   * @generated from enum value: ASSISTANT_TURN_FAILED = 31;
+   * @generated from enum value: ASSISTANT_TURN_FAILED = 35;
    */
-  ASSISTANT_TURN_FAILED = 31,
+  ASSISTANT_TURN_FAILED = 35,
 
   /**
    * 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
    * （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
    *
-   * @generated from enum value: PROCUREMENT_RUN_IN_PROGRESS = 32;
+   * @generated from enum value: PROCUREMENT_RUN_IN_PROGRESS = 36;
    */
-  PROCUREMENT_RUN_IN_PROGRESS = 32,
+  PROCUREMENT_RUN_IN_PROGRESS = 36,
 }
 
 /**

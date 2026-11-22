@@ -2170,15 +2170,17 @@ type AuditRepository interface {
 	CountAdminAuditLogsForAdmin(ctx context.Context, in AdminAuditLogQuery) (int64, error)
 }
 
-// BusinessDayRepository 是行事曆鏡像（§5.1.14）。整段 DELETE+INSERT 由呼叫端包在
-// 一個交易裡跑——本層不自己 Begin/Commit。
+// BusinessDayRepository 是行事曆鏡像（§5.1.14）。整段覆蓋（DeleteAll、Insert、SetCoverage）
+// 由呼叫端包在一個交易裡跑——本層不自己 Begin/Commit。
 type BusinessDayRepository interface {
 	DeleteAll(ctx context.Context) (int64, error)
 	Insert(ctx context.Context, holidayDate, syncedAt time.Time) error
-	ListHolidays(ctx context.Context, from, to time.Time) ([]time.Time, error)
-	// SyncedAt 回 nil 代表鏡像是空的：呼叫端必須把它當「今天算不出工作天」處理，
+	// SetCoverage 覆蓋涵蓋區間與推送時間（單列 upsert）。
+	SetCoverage(ctx context.Context, from, to, syncedAt time.Time) error
+	// Snapshot 以單一陳述式讀出區間內的假日與涵蓋區間，兩者來自同一份快照（不論是否在交易內）。
+	// 涵蓋區間回 nil 代表鏡像從未被推送過：呼叫端必須把它當「今天算不出工作天」處理，
 	// 不得當成「沒有假日」（invoice_complaints.sla_due_at 是 NOT NULL）。
-	SyncedAt(ctx context.Context) (*time.Time, error)
+	Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *BusinessDayCoverage, error)
 }
 
 // ============================================================================

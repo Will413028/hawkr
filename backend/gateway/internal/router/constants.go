@@ -151,13 +151,9 @@ const (
 	ShippingMethodsPath = "/shipping_methods"
 )
 
-// ==================== 假日管理（/admin/holidays + /app/shipping_business_days）====================
+// ==================== 出貨工作天（/app/shipping_business_days）====================
 
 const (
-	HolidaysPath             = "/holidays"
-	HolidaysImport           = "/import"
-	HolidaysImportContent    = "/import_content"
-	HolidaysCoverage         = "/coverage"
 	ShippingBusinessDaysPath = "/shipping_business_days"
 )
 

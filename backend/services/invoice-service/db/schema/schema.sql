@@ -910,7 +910,22 @@ CREATE TABLE "invoice_business_day_mirror" (
 );
 
 COMMENT ON TABLE invoice_business_day_mirror IS
-  '台灣國定假日唯讀鏡像。owner 是 shipping-service 的 holidays 表；本表每日由 INV.gov 整段覆蓋。禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。';
+  '台灣國定假日唯讀鏡像。owner 是單體的 platform/bizcalendar；本表由單體呼叫 ReplaceBusinessDayMirror 整段覆蓋。禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。';
+
+-- 鏡像的涵蓋區間：單體推送時明確帶入（台北日的閉區間），與假日清單在同一交易內覆蓋。
+-- 只有假日清單無法分辨「兩個假日之間是工作天」與「還沒推到那一段」，所以區間必須另存。
+CREATE TABLE "invoice_business_day_coverage" (
+  "singleton"    boolean NOT NULL DEFAULT true,
+  "covered_from" date NOT NULL,
+  "covered_to"   date NOT NULL,
+  "synced_at"    timestamptz NOT NULL,   -- 最近一次推送的時間（invoice_business_calendar_stale 告警用）
+  CONSTRAINT "invoice_business_day_coverage_pkey" PRIMARY KEY ("singleton"),
+  CONSTRAINT "chk_invbizcov_singleton" CHECK ("singleton"),
+  CONSTRAINT "chk_invbizcov_range" CHECK ("covered_from" <= "covered_to")
+);
+
+COMMENT ON TABLE invoice_business_day_coverage IS
+  '行事曆鏡像的涵蓋區間（單列）。由 ReplaceBusinessDayMirror 與假日清單同一交易覆蓋；沒有列代表鏡像從未被推送過。';
 
 -- ---------------------------------------------------------------------------
 -- §5.1.15 invoice_provider_cutovers｜自動開立切點歷史（端點 46）

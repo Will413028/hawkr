@@ -45,11 +45,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
+	httpreview "github.com/Will413028/hawkr/backend/internal/httpapi/review"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -63,6 +65,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -95,8 +98,12 @@ type Deps struct {
 	Payment *payment.Module
 	// BizCalendar 是工作日行事曆（platform/bizcalendar）：BizCalendarAdminService 的匯入與涵蓋查詢。
 	BizCalendar *bizcalendar.Store
+	// BizCalendarMirror 是匯入成功後的推送（遷移期給 invoice-service）；nil 時不推。
+	BizCalendarMirror httpbizcalendar.Pusher
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
+	// Review 是評價（ReviewPublicService、ReviewAppService）；封鎖入口也用它解析評價參照的作者。
+	Review *review.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
 	// Assistant 是買家助理（AssistantAppService）。
@@ -173,6 +180,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Buyer == nil {
 		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
+	}
+	if deps.Review == nil {
+		return nil, fmt.Errorf("httpapi：ReviewPublicService、ReviewAppService 與封鎖入口的評價參照需要 Review")
 	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
@@ -321,6 +331,16 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
+	reviewPublic, err := httpreview.NewPublic(deps.Review, deps.Buyer, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(reviewv1alpha1connect.NewReviewPublicServiceHandler(reviewPublic, opts...))
+	reviewApp, err := httpreview.NewApp(deps.Review, deps.Review, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(reviewv1alpha1connect.NewReviewAppServiceHandler(reviewApp, opts...))
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
@@ -328,7 +348,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
-	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
@@ -389,7 +409,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
 	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
-	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar), opts...))
+	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(bizCalendarAdmin(deps), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
@@ -506,4 +526,13 @@ func (s sellerStoreNames) StoreNames(ctx context.Context, storeIDs []int64) (map
 		}
 	}
 	return out, nil
+}
+
+// bizCalendarAdmin 組出 BizCalendarAdminService 的 handler；有推送對象時匯入成功後推送。
+func bizCalendarAdmin(deps Deps) *httpbizcalendar.Admin {
+	a := httpbizcalendar.NewAdmin(deps.BizCalendar)
+	if deps.BizCalendarMirror != nil {
+		a.WithMirror(deps.BizCalendarMirror)
+	}
+	return a
 }

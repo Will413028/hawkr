@@ -6,6 +6,9 @@
 // 一天是不是工作天只看是否放假，星期幾不參與，所以補班的週六是工作天。日界是台北（platform/twtime）。
 //
 // Import 把後台紀錄（platform/adminaudit）寫在同一個 transaction 內：紀錄與資料同生同滅。
+//
+// 遷移期（隨 A5 刪除）invoice-service 還有自己的工作日鏡像：Mirror 把窗口（今天 −30 到 +400 天）與已匯入年份的交集（從窗口起日連續）連同區間內的假日
+// 推給它，由後台匯入成功後與每天一次的對帳觸發；推送失敗不影響匯入，資料以這裡為準。
 package bizcalendar
 
 import (

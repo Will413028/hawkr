@@ -72,6 +72,27 @@ func (q *Queries) GetReviewForDiagnosis(ctx context.Context, id uuid.UUID) (GetR
 	return i, err
 }
 
+const getReviewStore = `-- name: GetReviewStore :one
+SELECT r.store_id,
+  (NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
+   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id))::boolean AS public
+FROM review.reviews AS r
+WHERE r.id = $1
+`
+
+type GetReviewStoreRow struct {
+	StoreID int64
+	Public  bool
+}
+
+// 回覆的店家推導用：不過濾可見性，回評價所屬的店與它現在是否公開可讀（述詞與 testdata/public_predicate.sql 同一段）。
+func (q *Queries) GetReviewStore(ctx context.Context, id uuid.UUID) (GetReviewStoreRow, error) {
+	row := q.db.QueryRow(ctx, getReviewStore, id)
+	var i GetReviewStoreRow
+	err := row.Scan(&i.StoreID, &i.Public)
+	return i, err
+}
+
 const insertReview = `-- name: InsertReview :one
 
 INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at)
@@ -158,23 +179,26 @@ func (q *Queries) InsertReviewImage(ctx context.Context, arg InsertReviewImagePa
 const listMyReviews = `-- name: ListMyReviews :many
 SELECT r.id, r.order_no, r.order_item_id, r.buyer_id, r.store_id, r.product_id, r.rating, r.content, r.sku_name, r.item_image_key, r.price, r.created_at, r.reply_content, r.replied_at FROM review.reviews AS r
 WHERE r.buyer_id = $1
+  AND ($2::bigint = 0 OR r.order_item_id = $2::bigint)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
-  AND ($2::timestamptz IS NULL OR (r.created_at, r.id) < ($2::timestamptz, $3::uuid))
+  AND ($3::timestamptz IS NULL OR (r.created_at, r.id) < ($3::timestamptz, $4::uuid))
 ORDER BY r.created_at DESC, r.id DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListMyReviewsParams struct {
 	BuyerID        int64
+	OrderItemID    int64
 	AfterCreatedAt *time.Time
 	AfterID        *uuid.UUID
 	PageSize       int32
 }
 
-// 作者本人：隱藏的評價不給作者（舊行為）。keyset：(created_at, id) 由大到小。
+// 作者本人：隱藏的評價不給作者（舊行為）。order_item_id 大於 0 時只列那個訂單項目的評價（至多一則）。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListMyReviews(ctx context.Context, arg ListMyReviewsParams) ([]ReviewReview, error) {
 	rows, err := q.db.Query(ctx, listMyReviews,
 		arg.BuyerID,
+		arg.OrderItemID,
 		arg.AfterCreatedAt,
 		arg.AfterID,
 		arg.PageSize,

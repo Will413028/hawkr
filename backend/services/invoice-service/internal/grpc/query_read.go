@@ -1427,3 +1427,39 @@ func (s *InvoiceServer) GetSellerInvoiceCapabilitySimple(
 		},
 	}, nil
 }
+
+// ---------------------------------------------------------------------------
+// 內部：行事曆鏡像的整段覆蓋（單體推送，隨 A5 刪除）
+// ---------------------------------------------------------------------------
+
+// WithCalendarMirror 掛上行事曆鏡像的 usecase；用 setter 是因為 NewInvoiceServer 已有 19 個位置參數。
+func (s *InvoiceServer) WithCalendarMirror(m *usecase.BusinessCalendarMirror) *InvoiceServer {
+	s.calendar = m
+	return s
+}
+
+// ReplaceBusinessDayMirror 收單體推送的涵蓋區間與假日，同一交易內整段覆蓋。
+//
+// 內部 RPC ⇒ 過 requireInternalCall（HMAC 簽章由 interceptor 驗）。日期不合整批拒絕回
+// InvalidArgument；交易失敗回 Internal，兩者都保留舊鏡像，單體下次對帳會重送。
+func (s *InvoiceServer) ReplaceBusinessDayMirror(
+	ctx context.Context, req *pb.ReplaceBusinessDayMirrorRequest,
+) (*pb.ReplaceBusinessDayMirrorResponse, error) {
+	if err := requireInternalCall(ctx); err != nil {
+		return nil, err
+	}
+	if s.calendar == nil {
+		return nil, status.Error(codes.Unavailable, "calendar mirror not configured")
+	}
+	n, err := s.calendar.Replace(ctx, req.GetCoveredFrom(), req.GetCoveredTo(), req.GetHolidayDates())
+	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidBusinessDayMirror) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, s.internal(ctx, "invoice.calendar.replace.failed", err)
+	}
+	return &pb.ReplaceBusinessDayMirrorResponse{
+		Code: 0, Message: msgSuccess,
+		Data: &pb.ReplaceBusinessDayMirrorData{HolidayCount: fmtID(int64(n))},
+	}, nil
+}

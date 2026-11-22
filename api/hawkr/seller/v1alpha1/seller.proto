@@ -1510,6 +1510,8 @@ message BlockBuyerRequest {
     string comment_id = 1;
     // 討論區留言 ID。
     string forum_entry_id = 2;
+    // 評價 ID：封鎖寫這則評價的買家（要是呼叫者此刻的店的評價）。
+    string review_id = 3;
   }
 }
 

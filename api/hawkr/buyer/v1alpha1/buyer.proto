@@ -516,6 +516,8 @@ message BlockAuthorRequest {
     string comment_id = 1;
     // 討論區留言 ID。
     string forum_entry_id = 2;
+    // 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
+    string review_id = 3;
   }
 }
 

@@ -92,7 +92,15 @@ type InvoiceAdminAuditLog struct {
 	OccurredAt             pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 }
 
-// 台灣國定假日唯讀鏡像。owner 是 shipping-service 的 holidays 表；本表每日由 INV.gov 整段覆蓋。禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。
+// 行事曆鏡像的涵蓋區間（單列）。由 ReplaceBusinessDayMirror 與假日清單同一交易覆蓋；沒有列代表鏡像從未被推送過。
+type InvoiceBusinessDayCoverage struct {
+	Singleton   bool               `db:"singleton" json:"singleton"`
+	CoveredFrom pgtype.Date        `db:"covered_from" json:"covered_from"`
+	CoveredTo   pgtype.Date        `db:"covered_to" json:"covered_to"`
+	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+}
+
+// 台灣國定假日唯讀鏡像。owner 是單體的 platform/bizcalendar；本表由單體呼叫 ReplaceBusinessDayMirror 整段覆蓋。禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。
 type InvoiceBusinessDayMirror struct {
 	HolidayDate pgtype.Date        `db:"holiday_date" json:"holiday_date"`
 	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`

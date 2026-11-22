@@ -233,6 +233,8 @@ ORDER_SERVICE_ADDR = localhost:9915
 CRM_SERVICE_ADDR = localhost:10030
 # 推薦排行的評分統計（discovery 的 worker）：./dev.sh 的 review-service（10033），A6 搬進單體後刪除
 REVIEW_SERVICE_ADDR = localhost:10033
+# 行事曆鏡像的推送對象（./dev.sh 的 invoice-service gRPC，10041），A5 搬進單體後刪除
+INVOICE_SERVICE_ADDR = localhost:10041
 # 單體替舊服務提供 account-service 的 gRPC（./dev.sh 的舊服務以 host.docker.internal:9941 呼叫）；worker 把事件送到
 # 舊服務訂閱的 RabbitMQ
 LEGACY_GRPC_ADDR = :9941
@@ -253,7 +255,7 @@ MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(M
 	PAYMENT_PROVIDER='$(PAYMENT_PROVIDER)' \
 	RABBITMQ_URL='$(RABBITMQ_URL)' \
 	PRODUCT_SERVICE_ADDR='$(PRODUCT_SERVICE_ADDR)' ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' CRM_SERVICE_ADDR='$(CRM_SERVICE_ADDR)' \
-	REVIEW_SERVICE_ADDR='$(REVIEW_SERVICE_ADDR)'
+	REVIEW_SERVICE_ADDR='$(REVIEW_SERVICE_ADDR)' INVOICE_SERVICE_ADDR='$(INVOICE_SERVICE_ADDR)'
 
 # 起 Postgres、Redis、RabbitMQ、OTel collector，等到 healthcheck 通過
 infra-up:

@@ -41,7 +41,12 @@ func (f *fakeSource) Load(context.Context) (*bizcalendar.Calendar, error) { retu
 
 func newEnv(t *testing.T, src Source) bizcalendarv1alpha1connect.BizCalendarAdminServiceClient {
 	t.Helper()
-	path, handler := bizcalendarv1alpha1connect.NewBizCalendarAdminServiceHandler(NewAdmin(src), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
+	return newEnvWith(t, NewAdmin(src))
+}
+
+func newEnvWith(t *testing.T, admin *Admin) bizcalendarv1alpha1connect.BizCalendarAdminServiceClient {
+	t.Helper()
+	path, handler := bizcalendarv1alpha1connect.NewBizCalendarAdminServiceHandler(admin, connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handler.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 42})))
@@ -139,5 +144,32 @@ func TestCoverageOfAnEmptyCalendarHasNoLastDate(t *testing.T) {
 	resp, err := c.GetHolidayCalendarCoverage(context.Background(), connect.NewRequest(&adminpb.GetHolidayCalendarCoverageRequest{}))
 	if err != nil || len(resp.Msg.GetYears()) != 0 || resp.Msg.GetLastCoveredDate() != nil {
 		t.Fatalf("resp=%v err=%v", resp, err)
+	}
+}
+
+type fakePusher struct{ calls int }
+
+func (f *fakePusher) Trigger() { f.calls++ }
+
+func TestImportPushesAfterASuccessfulImport(t *testing.T) {
+	p := &fakePusher{}
+	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
+	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: fixture(t, "115.csv")})); err != nil {
+		t.Fatal(err)
+	}
+	if p.calls != 1 {
+		t.Fatalf("匯入成功後應推送一次，實得 %d", p.calls)
+	}
+}
+
+// 解析失敗（沒有寫入）時不推送。
+func TestImportDoesNotPushWhenTheImportFails(t *testing.T) {
+	p := &fakePusher{}
+	c := newEnvWith(t, NewAdmin(&fakeSource{}).WithMirror(p))
+	if _, err := c.ImportHolidayCalendar(context.Background(), connect.NewRequest(&adminpb.ImportHolidayCalendarRequest{Year: 2026, CsvContent: "bad"})); err == nil {
+		t.Fatal("壞檔應失敗")
+	}
+	if p.calls != 0 {
+		t.Fatalf("匯入失敗不得推送：%d", p.calls)
 	}
 }

@@ -198,6 +198,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("REVIEW_SERVICE_ADDR", "127.0.0.1:1")
+	t.Setenv("INVOICE_SERVICE_ADDR", "127.0.0.1:1")
 	ctx := context.Background()
 
 	d, err := db.Open(ctx, db.Config{URL: url, ConnectRetryBudget: 5 * time.Second})

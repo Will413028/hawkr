@@ -57,8 +57,6 @@ tags:
   description: 健康檢查：系統健康檢查端點
 - name: History
   description: 瀏覽記錄：瀏覽歷史
-- name: Holiday
-  description: 假日管理
 - name: Infra
   description: 基礎設施
 - name: Invoice
@@ -2546,172 +2544,6 @@ paths:
                     $ref: '#/components/schemas/AdminGrantListResp'
                   message:
                     type: string
-  /api/v1/admin/holidays/coverage:
-    get:
-      operationId: getHolidayCoverage
-      summary: 查詢假日覆蓋現況
-      description: 回傳各年度假日筆數與最大假日日期，以及距耗盡天數（coverageDays，與監測 metric 同源公式；空表回 "-1"），供 admin 判斷是否需補匯入次年假日。
-      tags:
-      - Holiday
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/HolidayCoverageDataResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/holidays/import:
-    post:
-      operationId: importHolidays
-      summary: 匯入假日
-      description: 傳入政府 CSV URL，解析後寫入 DB（先刪除該年份舊資料再匯入）
-      tags:
-      - Holiday
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: CSV URL
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ImportHolidaysReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ImportHolidaysDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/holidays/import_content:
-    post:
-      operationId: importHolidaysFromContent
-      summary: 由 CSV 內容匯入假日（檔案上傳版）
-      description: 前端讀取 CSV 檔成文字後傳入，搭配顯式宣告年份，過濾至該年並先刪除舊資料再匯入。回傳 importedCount / deletedCount 供二次確認。
-      tags:
-      - Holiday
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 宣告年份與 CSV 內容
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ImportHolidaysFromContentReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ImportHolidaysDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/admin/invoices/audit_logs:
     get:
       operationId: listInvoiceAuditLogsForAdmin
@@ -28523,29 +28355,6 @@ components:
         productCount:
           type: string
           description: 引用數量（hashtag.product_count 即時值，字串型別）
-    HolidayCoverageDataResp:
-      type: object
-      properties:
-        coverageDays:
-          type: string
-          description: 距耗盡天數（與監測 metric 同源公式）；空表 "-1"
-        years:
-          type: array
-          description: 各年度覆蓋狀態
-          items:
-            $ref: '#/components/schemas/HolidayYearCoverageResp'
-    HolidayYearCoverageResp:
-      type: object
-      properties:
-        count:
-          type: string
-          description: 該年筆數
-        maxHolidayDate:
-          type: string
-          description: 該年最大假日日期（YYYY-MM-DD）
-        year:
-          type: string
-          description: 年份
     HomeLabelDataResp:
       type: object
       properties:
@@ -28557,35 +28366,6 @@ components:
           description: 託運單 PDF 顯示 URL（Gateway 組）
         shipmentNo:
           type: string
-    ImportHolidaysDataResp:
-      type: object
-      properties:
-        deletedCount:
-          type: string
-        importedCount:
-          type: string
-        year:
-          type: string
-    ImportHolidaysFromContentReq:
-      type: object
-      required:
-      - csvContent
-      - year
-      properties:
-        csvContent:
-          type: string
-          description: 前端 FileReader 讀取的 CSV 全文
-        year:
-          type: string
-          description: 顯式宣告年份（覆寫防護，取代隱式取 CSV 首筆）
-    ImportHolidaysReq:
-      type: object
-      required:
-      - csvUrl
-      properties:
-        csvUrl:
-          type: string
-          description: 政府 CSV 下載 URL
     InlineRunDTO:
       type: object
       properties:

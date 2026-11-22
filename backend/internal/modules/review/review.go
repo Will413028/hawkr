@@ -69,6 +69,7 @@ type Deps struct {
 type (
 	Review         = model.Review
 	RelayReview    = model.RelayReview
+	ReviewStore    = model.ReviewStore
 	ReportedReview = model.ReportedReview
 	Image          = model.Image
 	Reply          = model.Reply
@@ -176,9 +177,9 @@ func (m *Module) ListOwnStoreReviews(ctx context.Context, storeID int64, f Filte
 	return m.read.ListOwnStoreReviews(ctx, storeID, f, after, size)
 }
 
-// ListMyReviews 是作者本人的評價歷史（隱藏的不給作者）。
-func (m *Module) ListMyReviews(ctx context.Context, buyerID int64, after *Cursor, size int32) (Page, error) {
-	return m.read.ListMyReviews(ctx, buyerID, after, size)
+// ListMyReviews 是作者本人的評價歷史（隱藏的不給作者）；orderItemID 大於 0 時只列那個訂單項目的評價。
+func (m *Module) ListMyReviews(ctx context.Context, buyerID, orderItemID int64, after *Cursor, size int32) (Page, error) {
+	return m.read.ListMyReviews(ctx, buyerID, orderItemID, after, size)
 }
 
 // GetReview 是單筆公開讀取：不可讀的與不存在的同為 NotFound。
@@ -239,6 +240,12 @@ func (m *Module) PurgeAuthor(ctx context.Context, buyerID int64) error {
 // ReviewForRelay 讀單則評價的原始列，不套公開可讀述詞（事件的 payload 要這則評價現在的內容），Public 是現在是否公開可讀；已清除的是 NotFound。
 func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (RelayReview, error) {
 	return m.read.ReviewForRelay(ctx, id)
+}
+
+// ReviewStore 回評價所屬的店與它現在是否公開可讀，不套公開可讀述詞（隱藏或作者停用的評價仍回店家）；不存在是 NotFound。
+// 給 httpapi 在回覆前推導店家：店主才進得了 Reply 取得 REVIEW_NOT_REPLYABLE，其他人依 Public 分流，不洩漏不公開評價的存在。
+func (m *Module) ReviewStore(ctx context.Context, id uuid.UUID) (ReviewStore, error) {
+	return m.read.ReviewStore(ctx, id)
 }
 
 // AddWorkers 登記 River worker（媒體引用同步與保底掃描、刪帳清除）。由 cmd/hawkr 接上。

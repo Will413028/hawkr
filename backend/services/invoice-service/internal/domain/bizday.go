@@ -32,28 +32,7 @@ const (
 	// 方向必須偏晚：算偏早 ⇒ 賣家被誤判逾期 ⇒ 違規計數 +1。人事行政總處通常前一年
 	// 8–9 月才公布次年行事曆，缺口是常態不是例外。
 	ComplaintSlaHardCapDays = 14
-
-	// 鏡像的同步窗口（§5.1.14：INV.gov 每日同步「今天 −30 天 ～ +400 天」）。
-	//
-	// 它是「這一天有沒有被涵蓋」的唯一依據：鏡像**只存假日**，兩個假日之間的空白
-	// 既可能是工作天、也可能是「還沒同步到那一段」。少了涵蓋區間就無法分辨這兩者，
-	// 而把後者當成工作天正是上面那條紅字要防的偏早。
-	businessDayMirrorPastDays   = 30
-	businessDayMirrorFutureDays = 400
 )
-
-// BusinessDayMirrorWindow 回同步窗口的台北日閉區間（§5.1.14：今天 −30 ～ +400 天）。
-//
-// 🔴 它與 NewBusinessCalendar 的 coveredFrom／coveredTo **必須用同一組常數**：
-// 同步器寫進去的區間比行事曆宣稱涵蓋的窄一天，那一天就會被當成假日（IsBusinessDay
-// 對未涵蓋日回 false），而沒有任何東西會轉紅。共用常數是唯一擋得住這件事的機制。
-//
-// ⚠️ 測試不得拿本函式的回傳值當期望值——那是自己跟自己對，改壞常數照樣全綠
-// （2026-09-04 實測：把 +400 改成 +399，測試 exit=0）。期望值要硬寫日期。
-func BusinessDayMirrorWindow(now time.Time) (from, to time.Time) {
-	base := taipeiMidnight(now)
-	return base.AddDate(0, 0, -businessDayMirrorPastDays), base.AddDate(0, 0, businessDayMirrorFutureDays)
-}
 
 // BusinessCalendar 是一份台北時區的工作天曆快照。
 //
@@ -67,20 +46,27 @@ type BusinessCalendar struct {
 	covered     bool
 }
 
-// NewBusinessCalendar 由鏡像的假日清單與 max(synced_at) 組出行事曆。
+// BusinessDayCoverage 是單體推送時明確帶入的涵蓋區間（台北日的閉區間）與推送時間。
+type BusinessDayCoverage struct {
+	From     time.Time
+	To       time.Time
+	SyncedAt time.Time
+}
+
+// NewBusinessCalendar 由鏡像的假日清單與儲存的涵蓋區間組出行事曆。
 //
-// syncedAt 為 nil（鏡像空表 ⇒ GetBusinessDayMirrorSyncedAt 回 ErrNoRows）代表零涵蓋。
-func NewBusinessCalendar(holidays []time.Time, syncedAt *time.Time) BusinessCalendar {
+// coverage 為 nil（鏡像從未被推送過）代表零涵蓋。涵蓋區間是推送端依它真正持有資料的年份決定的，
+// 不由推送時間加上固定窗口推得：後者會對沒有資料的年份宣稱已涵蓋而沒有假日，方向偏早。
+func NewBusinessCalendar(holidays []time.Time, coverage *BusinessDayCoverage) BusinessCalendar {
 	c := BusinessCalendar{holidays: make(map[string]struct{}, len(holidays))}
 	for _, h := range holidays {
 		c.holidays[taipeiDayKey(h)] = struct{}{}
 	}
-	if syncedAt == nil {
+	if coverage == nil {
 		return c
 	}
-	base := taipeiMidnight(*syncedAt)
-	c.coveredFrom = base.AddDate(0, 0, -businessDayMirrorPastDays)
-	c.coveredTo = base.AddDate(0, 0, businessDayMirrorFutureDays)
+	c.coveredFrom = taipeiMidnight(coverage.From)
+	c.coveredTo = taipeiMidnight(coverage.To)
 	c.covered = true
 	return c
 }

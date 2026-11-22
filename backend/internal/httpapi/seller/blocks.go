@@ -22,15 +22,15 @@ type blockModule interface {
 	ListBlockedBuyers(context.Context, model.BlockedBuyerListInput) (model.BlockedBuyerPage, error)
 }
 
-// BlockBuyer 以呼叫者店家的身分封鎖一位買家：參照由 social 以店主的讀取規則解析，而且要是這家店自己的內容；作者必須是買家，
+// BlockBuyer 以呼叫者店家的身分封鎖一位買家：參照由擁有它的模組（social、review）以店主的讀取規則解析，而且要是這家店自己的內容；作者必須是買家，
 // 買家要存在而且沒有關閉，再經跨身分規則擋下店主本人的買家身分。
 func (h *App) BlockBuyer(ctx context.Context, req *connect.Request[pb.BlockBuyerRequest]) (*connect.Response[pb.BlockBuyerResponse], error) {
 	current, err := storeFrom(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId()}
-	author, err := blocks.ResolveAuthor(ctx, h.blocking.Authors, social.Caller{Store: &current}, ref)
+	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId(), ReviewID: req.Msg.GetReviewId()}
+	author, err := h.blocking.ResolveAuthor(ctx, social.Caller{Store: &current}, ref)
 	if err != nil {
 		return nil, err
 	}

@@ -177,39 +177,40 @@ func (r *BusinessDayRepository) Insert(ctx context.Context, holidayDate, syncedA
 	})
 }
 
-// ListHolidays 回區間內的假日清單。
-func (r *BusinessDayRepository) ListHolidays(ctx context.Context, from, to time.Time) ([]time.Time, error) {
-	rows, err := r.q(ctx).ListBusinessDayHolidays(ctx, gen.ListBusinessDayHolidaysParams{
+// SetCoverage 覆蓋涵蓋區間與推送時間；必須與 DeleteAll、Insert 在同一個交易內。
+func (r *BusinessDayRepository) SetCoverage(ctx context.Context, from, to, syncedAt time.Time) error {
+	return r.q(ctx).UpsertBusinessDayCoverage(ctx, gen.UpsertBusinessDayCoverageParams{
+		CoveredFrom: dateParam(from),
+		CoveredTo:   dateParam(to),
+		SyncedAt:    ts(syncedAt),
+	})
+}
+
+// Snapshot 以單一陳述式讀出區間內的假日與涵蓋區間（SnapshotBusinessDayMirror）。
+// 單一陳述式在 READ COMMITTED 下也只看到同一份快照，不論 ctx 是否已帶交易。
+//
+// 涵蓋區間回 nil 代表鏡像從未被推送過：呼叫端必須把它當「今天算不出工作天」處理，
+// 不得當成「沒有假日」——後者會把 3 工作天 SLA 算成 3 自然日，誤判賣家違規。
+func (r *BusinessDayRepository) Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	rows, err := r.q(ctx).SnapshotBusinessDayMirror(ctx, gen.SnapshotBusinessDayMirrorParams{
 		FromDate: dateParam(from),
 		ToDate:   dateParam(to),
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	out := make([]time.Time, 0, len(rows))
+	holidays := make([]time.Time, 0, len(rows))
+	var cov *domain.BusinessDayCoverage
 	for _, row := range rows {
 		if d := pgxutil.DateValue(row.HolidayDate); d != nil {
-			out = append(out, *d)
+			holidays = append(holidays, *d)
+		}
+		if cov == nil {
+			cf, ct := pgxutil.DateValue(row.CoveredFrom), pgxutil.DateValue(row.CoveredTo)
+			if cf != nil && ct != nil && row.SyncedAt != nil {
+				cov = &domain.BusinessDayCoverage{From: *cf, To: *ct, SyncedAt: *row.SyncedAt}
+			}
 		}
 	}
-	return out, nil
-}
-
-// SyncedAt 回鏡像最後一次同步的時間；鏡像為空時回 nil。
-//
-// 回 nil 而不是零值：呼叫端必須把它當「今天算不出工作天」處理，不得當成「沒有假日」——
-// 後者會把 3 工作天 SLA 算成 3 自然日，誤判賣家違規。
-func (r *BusinessDayRepository) SyncedAt(ctx context.Context) (*time.Time, error) {
-	v, err := r.q(ctx).GetBusinessDayMirrorSyncedAt(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil // 空表，不是錯誤
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !v.Valid {
-		return nil, nil
-	}
-	t := v.Time
-	return &t, nil
+	return holidays, cov, nil
 }

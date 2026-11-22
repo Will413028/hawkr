@@ -7942,6 +7942,7 @@ type BlockBuyerRequest struct {
 	//
 	//	*BlockBuyerRequest_CommentId
 	//	*BlockBuyerRequest_ForumEntryId
+	//	*BlockBuyerRequest_ReviewId
 	Source        isBlockBuyerRequest_Source `protobuf_oneof:"source"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -8002,6 +8003,15 @@ func (x *BlockBuyerRequest) GetForumEntryId() string {
 	return ""
 }
 
+func (x *BlockBuyerRequest) GetReviewId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockBuyerRequest_ReviewId); ok {
+			return x.ReviewId
+		}
+	}
+	return ""
+}
+
 type isBlockBuyerRequest_Source interface {
 	isBlockBuyerRequest_Source()
 }
@@ -8016,9 +8026,16 @@ type BlockBuyerRequest_ForumEntryId struct {
 	ForumEntryId string `protobuf:"bytes,2,opt,name=forum_entry_id,json=forumEntryId,proto3,oneof"`
 }
 
+type BlockBuyerRequest_ReviewId struct {
+	// 評價 ID：封鎖寫這則評價的買家（要是呼叫者此刻的店的評價）。
+	ReviewId string `protobuf:"bytes,3,opt,name=review_id,json=reviewId,proto3,oneof"`
+}
+
 func (*BlockBuyerRequest_CommentId) isBlockBuyerRequest_Source() {}
 
 func (*BlockBuyerRequest_ForumEntryId) isBlockBuyerRequest_Source() {}
+
+func (*BlockBuyerRequest_ReviewId) isBlockBuyerRequest_Source() {}
 
 type BlockBuyerResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -8742,11 +8759,12 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18RecordProductViewRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1b\n" +
-	"\x19RecordProductViewResponse\"f\n" +
+	"\x19RecordProductViewResponse\"\x85\x01\n" +
 	"\x11BlockBuyerRequest\x12\x1f\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\tH\x00R\tcommentId\x12&\n" +
-	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryIdB\b\n" +
+	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryId\x12\x1d\n" +
+	"\treview_id\x18\x03 \x01(\tH\x00R\breviewIdB\b\n" +
 	"\x06source\".\n" +
 	"\x12BlockBuyerResponse\x12\x18\n" +
 	"\achanged\x18\x01 \x01(\bR\achanged\"5\n" +
@@ -9421,6 +9439,7 @@ func file_hawkr_seller_v1alpha1_seller_proto_init() {
 	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[96].OneofWrappers = []any{
 		(*BlockBuyerRequest_CommentId)(nil),
 		(*BlockBuyerRequest_ForumEntryId)(nil),
+		(*BlockBuyerRequest_ReviewId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

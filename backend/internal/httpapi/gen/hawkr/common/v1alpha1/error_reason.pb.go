@@ -87,57 +87,70 @@ const (
 	// 另一個仍讓內容維持下架。client 顯示 LocalizedMessage 並重新讀取列表（列表會顯示既有的下架）。
 	// AdminSellerService.CreateMeasure 的內容下架；moderation 的 DecideCase TAKEDOWN 遇到時不報錯，改綁定既有措施。
 	ErrorReason_CONTENT_TAKEDOWN_ACTIVE ErrorReason = 14
+	// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+	// 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+	// ReviewAppService.CreateReview。
+	ErrorReason_REVIEW_ALREADY_EXISTS ErrorReason = 15
+	// 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+	// ReviewAppService.CreateReview。
+	ErrorReason_ORDER_NOT_REVIEWABLE ErrorReason = 16
+	// 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+	// ReviewAppService.CreateReview。
+	ErrorReason_REVIEW_WINDOW_EXPIRED ErrorReason = 17
+	// 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+	// ReviewAppService.ReplyReview。
+	ErrorReason_REVIEW_NOT_REPLYABLE ErrorReason = 18
 	// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
 	// client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
-	ErrorReason_REPLAY_CURSOR_EXPIRED ErrorReason = 15
+	ErrorReason_REPLAY_CURSOR_EXPIRED ErrorReason = 19
 	// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
 	// client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
-	ErrorReason_REPLAY_CURSOR_AHEAD ErrorReason = 16
+	ErrorReason_REPLAY_CURSOR_AHEAD ErrorReason = 20
 	// 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
-	ErrorReason_REQUIREMENT_NOT_READY ErrorReason = 17
+	ErrorReason_REQUIREMENT_NOT_READY ErrorReason = 21
 	// 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
 	// 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
-	ErrorReason_APPROVAL_PENDING ErrorReason = 18
+	ErrorReason_APPROVAL_PENDING ErrorReason = 22
 	// 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
-	ErrorReason_APPROVAL_ALREADY_RESOLVED ErrorReason = 19
+	ErrorReason_APPROVAL_ALREADY_RESOLVED ErrorReason = 23
 	// run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
-	ErrorReason_RUN_NOT_ACTIVE ErrorReason = 20
+	ErrorReason_RUN_NOT_ACTIVE ErrorReason = 24
 	// 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
-	ErrorReason_RFQ_RESPONSE_EXPIRED ErrorReason = 21
+	ErrorReason_RFQ_RESPONSE_EXPIRED ErrorReason = 25
 	// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
 	// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
-	ErrorReason_RFQ_RECIPIENT_CLOSED ErrorReason = 22
+	ErrorReason_RFQ_RECIPIENT_CLOSED ErrorReason = 26
 	// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
 	// client 引導買家去付款，不是叫他重新接受。
-	ErrorReason_RFQ_CHECKOUT_ALREADY_ACTIVE ErrorReason = 23
+	ErrorReason_RFQ_CHECKOUT_ALREADY_ACTIVE ErrorReason = 27
 	// 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
-	ErrorReason_RFQ_ALREADY_AWARDED ErrorReason = 24
+	ErrorReason_RFQ_ALREADY_AWARDED ErrorReason = 28
 	// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
 	// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
-	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 25
+	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 29
 	// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
 	// 不提供重試。ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
 	// 同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，帶 RetryInfo，稍後可再試。
-	ErrorReason_IMAGE_QUOTA_EXCEEDED ErrorReason = 26
+	ErrorReason_IMAGE_QUOTA_EXCEEDED ErrorReason = 30
 	// 圖片或提示詞被安全性檢查擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
 	// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
-	ErrorReason_IMAGE_SAFETY_BLOCKED ErrorReason = 27
+	ErrorReason_IMAGE_SAFETY_BLOCKED ErrorReason = 31
 	// 圖片涉及著作權複誦而被擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
 	// client 請使用者換一張圖，不自動重試。額度退回。
-	ErrorReason_IMAGE_RECITATION_BLOCKED ErrorReason = 28
+	ErrorReason_IMAGE_RECITATION_BLOCKED ErrorReason = 32
 	// 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
 	// client 可以讓使用者直接重試。額度退回。
-	ErrorReason_IMAGE_NOT_PRODUCED ErrorReason = 29
+	ErrorReason_IMAGE_NOT_PRODUCED ErrorReason = 33
 	// 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
 	// 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
-	ErrorReason_ASSISTANT_TURN_IN_PROGRESS ErrorReason = 30
+	ErrorReason_ASSISTANT_TURN_IN_PROGRESS ErrorReason = 34
 	// 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
 	// （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
 	// 可以讓使用者重新送出。
-	ErrorReason_ASSISTANT_TURN_FAILED ErrorReason = 31
+	ErrorReason_ASSISTANT_TURN_FAILED ErrorReason = 35
 	// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
 	// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
-	ErrorReason_PROCUREMENT_RUN_IN_PROGRESS ErrorReason = 32
+	ErrorReason_PROCUREMENT_RUN_IN_PROGRESS ErrorReason = 36
 )
 
 // Enum value maps for ErrorReason.
@@ -158,24 +171,28 @@ var (
 		12: "REAUTHENTICATION_REQUIRED",
 		13: "CONTACT_EMAIL_REQUIRED",
 		14: "CONTENT_TAKEDOWN_ACTIVE",
-		15: "REPLAY_CURSOR_EXPIRED",
-		16: "REPLAY_CURSOR_AHEAD",
-		17: "REQUIREMENT_NOT_READY",
-		18: "APPROVAL_PENDING",
-		19: "APPROVAL_ALREADY_RESOLVED",
-		20: "RUN_NOT_ACTIVE",
-		21: "RFQ_RESPONSE_EXPIRED",
-		22: "RFQ_RECIPIENT_CLOSED",
-		23: "RFQ_CHECKOUT_ALREADY_ACTIVE",
-		24: "RFQ_ALREADY_AWARDED",
-		25: "AGENT_MONTHLY_QUOTA_EXCEEDED",
-		26: "IMAGE_QUOTA_EXCEEDED",
-		27: "IMAGE_SAFETY_BLOCKED",
-		28: "IMAGE_RECITATION_BLOCKED",
-		29: "IMAGE_NOT_PRODUCED",
-		30: "ASSISTANT_TURN_IN_PROGRESS",
-		31: "ASSISTANT_TURN_FAILED",
-		32: "PROCUREMENT_RUN_IN_PROGRESS",
+		15: "REVIEW_ALREADY_EXISTS",
+		16: "ORDER_NOT_REVIEWABLE",
+		17: "REVIEW_WINDOW_EXPIRED",
+		18: "REVIEW_NOT_REPLYABLE",
+		19: "REPLAY_CURSOR_EXPIRED",
+		20: "REPLAY_CURSOR_AHEAD",
+		21: "REQUIREMENT_NOT_READY",
+		22: "APPROVAL_PENDING",
+		23: "APPROVAL_ALREADY_RESOLVED",
+		24: "RUN_NOT_ACTIVE",
+		25: "RFQ_RESPONSE_EXPIRED",
+		26: "RFQ_RECIPIENT_CLOSED",
+		27: "RFQ_CHECKOUT_ALREADY_ACTIVE",
+		28: "RFQ_ALREADY_AWARDED",
+		29: "AGENT_MONTHLY_QUOTA_EXCEEDED",
+		30: "IMAGE_QUOTA_EXCEEDED",
+		31: "IMAGE_SAFETY_BLOCKED",
+		32: "IMAGE_RECITATION_BLOCKED",
+		33: "IMAGE_NOT_PRODUCED",
+		34: "ASSISTANT_TURN_IN_PROGRESS",
+		35: "ASSISTANT_TURN_FAILED",
+		36: "PROCUREMENT_RUN_IN_PROGRESS",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -193,24 +210,28 @@ var (
 		"REAUTHENTICATION_REQUIRED":    12,
 		"CONTACT_EMAIL_REQUIRED":       13,
 		"CONTENT_TAKEDOWN_ACTIVE":      14,
-		"REPLAY_CURSOR_EXPIRED":        15,
-		"REPLAY_CURSOR_AHEAD":          16,
-		"REQUIREMENT_NOT_READY":        17,
-		"APPROVAL_PENDING":             18,
-		"APPROVAL_ALREADY_RESOLVED":    19,
-		"RUN_NOT_ACTIVE":               20,
-		"RFQ_RESPONSE_EXPIRED":         21,
-		"RFQ_RECIPIENT_CLOSED":         22,
-		"RFQ_CHECKOUT_ALREADY_ACTIVE":  23,
-		"RFQ_ALREADY_AWARDED":          24,
-		"AGENT_MONTHLY_QUOTA_EXCEEDED": 25,
-		"IMAGE_QUOTA_EXCEEDED":         26,
-		"IMAGE_SAFETY_BLOCKED":         27,
-		"IMAGE_RECITATION_BLOCKED":     28,
-		"IMAGE_NOT_PRODUCED":           29,
-		"ASSISTANT_TURN_IN_PROGRESS":   30,
-		"ASSISTANT_TURN_FAILED":        31,
-		"PROCUREMENT_RUN_IN_PROGRESS":  32,
+		"REVIEW_ALREADY_EXISTS":        15,
+		"ORDER_NOT_REVIEWABLE":         16,
+		"REVIEW_WINDOW_EXPIRED":        17,
+		"REVIEW_NOT_REPLYABLE":         18,
+		"REPLAY_CURSOR_EXPIRED":        19,
+		"REPLAY_CURSOR_AHEAD":          20,
+		"REQUIREMENT_NOT_READY":        21,
+		"APPROVAL_PENDING":             22,
+		"APPROVAL_ALREADY_RESOLVED":    23,
+		"RUN_NOT_ACTIVE":               24,
+		"RFQ_RESPONSE_EXPIRED":         25,
+		"RFQ_RECIPIENT_CLOSED":         26,
+		"RFQ_CHECKOUT_ALREADY_ACTIVE":  27,
+		"RFQ_ALREADY_AWARDED":          28,
+		"AGENT_MONTHLY_QUOTA_EXCEEDED": 29,
+		"IMAGE_QUOTA_EXCEEDED":         30,
+		"IMAGE_SAFETY_BLOCKED":         31,
+		"IMAGE_RECITATION_BLOCKED":     32,
+		"IMAGE_NOT_PRODUCED":           33,
+		"ASSISTANT_TURN_IN_PROGRESS":   34,
+		"ASSISTANT_TURN_FAILED":        35,
+		"PROCUREMENT_RUN_IN_PROGRESS":  36,
 	}
 )
 
@@ -245,7 +266,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x8f\a\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xf9\a\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -263,24 +284,28 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x19REAUTHENTICATION_REQUIRED\x10\f\x12\x1a\n" +
 	"\x16CONTACT_EMAIL_REQUIRED\x10\r\x12\x1b\n" +
 	"\x17CONTENT_TAKEDOWN_ACTIVE\x10\x0e\x12\x19\n" +
-	"\x15REPLAY_CURSOR_EXPIRED\x10\x0f\x12\x17\n" +
-	"\x13REPLAY_CURSOR_AHEAD\x10\x10\x12\x19\n" +
-	"\x15REQUIREMENT_NOT_READY\x10\x11\x12\x14\n" +
-	"\x10APPROVAL_PENDING\x10\x12\x12\x1d\n" +
-	"\x19APPROVAL_ALREADY_RESOLVED\x10\x13\x12\x12\n" +
-	"\x0eRUN_NOT_ACTIVE\x10\x14\x12\x18\n" +
-	"\x14RFQ_RESPONSE_EXPIRED\x10\x15\x12\x18\n" +
-	"\x14RFQ_RECIPIENT_CLOSED\x10\x16\x12\x1f\n" +
-	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10\x17\x12\x17\n" +
-	"\x13RFQ_ALREADY_AWARDED\x10\x18\x12 \n" +
-	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10\x19\x12\x18\n" +
-	"\x14IMAGE_QUOTA_EXCEEDED\x10\x1a\x12\x18\n" +
-	"\x14IMAGE_SAFETY_BLOCKED\x10\x1b\x12\x1c\n" +
-	"\x18IMAGE_RECITATION_BLOCKED\x10\x1c\x12\x16\n" +
-	"\x12IMAGE_NOT_PRODUCED\x10\x1d\x12\x1e\n" +
-	"\x1aASSISTANT_TURN_IN_PROGRESS\x10\x1e\x12\x19\n" +
-	"\x15ASSISTANT_TURN_FAILED\x10\x1f\x12\x1f\n" +
-	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10 B\x82\x02\n" +
+	"\x15REVIEW_ALREADY_EXISTS\x10\x0f\x12\x18\n" +
+	"\x14ORDER_NOT_REVIEWABLE\x10\x10\x12\x19\n" +
+	"\x15REVIEW_WINDOW_EXPIRED\x10\x11\x12\x18\n" +
+	"\x14REVIEW_NOT_REPLYABLE\x10\x12\x12\x19\n" +
+	"\x15REPLAY_CURSOR_EXPIRED\x10\x13\x12\x17\n" +
+	"\x13REPLAY_CURSOR_AHEAD\x10\x14\x12\x19\n" +
+	"\x15REQUIREMENT_NOT_READY\x10\x15\x12\x14\n" +
+	"\x10APPROVAL_PENDING\x10\x16\x12\x1d\n" +
+	"\x19APPROVAL_ALREADY_RESOLVED\x10\x17\x12\x12\n" +
+	"\x0eRUN_NOT_ACTIVE\x10\x18\x12\x18\n" +
+	"\x14RFQ_RESPONSE_EXPIRED\x10\x19\x12\x18\n" +
+	"\x14RFQ_RECIPIENT_CLOSED\x10\x1a\x12\x1f\n" +
+	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10\x1b\x12\x17\n" +
+	"\x13RFQ_ALREADY_AWARDED\x10\x1c\x12 \n" +
+	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10\x1d\x12\x18\n" +
+	"\x14IMAGE_QUOTA_EXCEEDED\x10\x1e\x12\x18\n" +
+	"\x14IMAGE_SAFETY_BLOCKED\x10\x1f\x12\x1c\n" +
+	"\x18IMAGE_RECITATION_BLOCKED\x10 \x12\x16\n" +
+	"\x12IMAGE_NOT_PRODUCED\x10!\x12\x1e\n" +
+	"\x1aASSISTANT_TURN_IN_PROGRESS\x10\"\x12\x19\n" +
+	"\x15ASSISTANT_TURN_FAILED\x10#\x12\x1f\n" +
+	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10$B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (
