@@ -1,0 +1,85 @@
+{
+ "mutants": [
+  {
+   "id": "with-images-count-ignores-image-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM review.review_images AS ri WHERE ri.review_id = r.id))::bigint AS with_images_count",
+   "new": "COUNT(*)::bigint AS with_images_count",
+   "test": "internal/modules/review ^TestProductStatsWithImagesCountMatchesTheWithImagesFilter$",
+   "why": "The with-images count stops requiring an image, so it equals the public count instead of the with_images filter's."
+  },
+  {
+   "id": "with-images-count-ignores-public-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id = $1\n`",
+   "test": "internal/modules/review ^TestProductStatsWithImagesCountMatchesTheWithImagesFilter$",
+   "why": "The product stats drop the public predicate, so hidden and deleting-author reviews with images are counted."
+  },
+  {
+   "id": "with-images-count-not-returned",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "WithImagesCount: statCount(s.WithImagesCount), ",
+   "new": "",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
+   "why": "The handler stops returning the with-images count."
+  },
+  {
+   "id": "conversation-by-buyer-skips-store-ownership",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/store/conversations.sql.go",
+   "old": "WHERE c.store_id = $1 AND c.buyer_id = $2",
+   "new": "WHERE ($1::bigint > 0 OR c.store_id = $1) AND c.buyer_id = $2",
+   "test": "internal/modules/im ^TestStoreConversationByBuyerIsScopedToTheCallersStore$",
+   "why": "Get-by-buyer stops filtering by the caller's store, so another store's conversation with that buyer is returned."
+  },
+  {
+   "id": "conversation-by-buyer-accepts-buyer-party",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/read/read.go",
+   "old": "\tif p.Kind != model.PartyStore {\n\t\treturn model.Conversation{}, apperr.NotFound(",
+   "new": "\tif false {\n\t\treturn model.Conversation{}, apperr.NotFound(",
+   "test": "internal/modules/im ^TestStoreConversationByBuyerIsScopedToTheCallersStore$",
+   "why": "Get-by-buyer no longer rejects a buyer-side party."
+  },
+  {
+   "id": "conversation-by-buyer-handler-drops-conversation",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "GetStoreConversationByBuyerResponse{Conversation: items[0]}",
+   "new": "GetStoreConversationByBuyerResponse{}",
+   "test": "internal/httpapi/chat ^TestGetStoreConversationByBuyerDerivesTheStoreFromTheCallerAndAssemblesTheBuyer$",
+   "why": "The handler returns an empty response instead of the assembled conversation."
+  },
+  {
+   "id": "conversation-by-buyer-declaration-exempt",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/declaration.go",
+   "old": "ChatAppServiceGetStoreConversationByBuyerProcedure: requires(seller.CapChatRead)",
+   "new": "ChatAppServiceGetStoreConversationByBuyerProcedure: exempt(buyerOnlyReason)",
+   "test": "internal/httpapi/chat ^TestDeclaredCapabilitiesMatchWhatTheModuleChecks$",
+   "why": "The store-side method no longer declares the chat-read capability."
+  },
+  {
+   "id": "seller-order-buyer-filter-resolved-as-account",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/order.go",
+   "old": "buyerIDFilter, ok := parseSellerViewBuyerFilter(c, c.DefaultQuery(\"buyer_id\", \"\"))",
+   "new": "buyerIDFilter, ok := h.resolveOptionalBuyerFilterQuery(c, c.DefaultQuery(\"buyer_id\", \"\"))",
+   "test": "internal/handler ^TestGetMyOrders_SellerView_BuyerIDIsTheCRMSurrogateNotAnAccountID$",
+   "why": "The seller view treats buyer_id as an account ID again, so a CRM buyer surrogate is replaced by another buyer."
+  },
+  {
+   "id": "seller-order-buyer-filter-allows-zero",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/resolve_buyer.go",
+   "old": "err != nil || id <= 0",
+   "new": "err != nil || id < 0",
+   "test": "internal/handler ^TestGetMyOrders_SellerView_InvalidBuyerIDIs400AndNeverReachesOrderService$",
+   "why": "buyer_id=0 is accepted and downstream treats it as no filter."
+  }
+ ]
+}
