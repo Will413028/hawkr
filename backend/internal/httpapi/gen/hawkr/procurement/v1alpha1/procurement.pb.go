@@ -410,6 +410,8 @@ const (
 	RunFailureReason_RUN_FAILURE_REASON_MODEL_UNAVAILABLE RunFailureReason = 5
 	// 候選搜尋時，需求已確認的品項分類不再是末層（分類樹改過）。伺服器已清掉品項解析、需求退回釐清；client 請買家重新選品項。
 	RunFailureReason_RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE RunFailureReason = 6
+	// 回答中斷的 run 失敗：答案在解析品項時被拒（例如描述的品項格式不收）。中斷仍待回答、沒有還原，client 請買家重新回答。
+	RunFailureReason_RUN_FAILURE_REASON_ANSWER_REJECTED RunFailureReason = 7
 )
 
 // Enum value maps for RunFailureReason.
@@ -421,6 +423,7 @@ var (
 		3: "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR",
 		5: "RUN_FAILURE_REASON_MODEL_UNAVAILABLE",
 		6: "RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE",
+		7: "RUN_FAILURE_REASON_ANSWER_REJECTED",
 	}
 	RunFailureReason_value = map[string]int32{
 		"RUN_FAILURE_REASON_UNSPECIFIED":               0,
@@ -429,6 +432,7 @@ var (
 		"RUN_FAILURE_REASON_TURN_PIPELINE_ERROR":       3,
 		"RUN_FAILURE_REASON_MODEL_UNAVAILABLE":         5,
 		"RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": 6,
+		"RUN_FAILURE_REASON_ANSWER_REJECTED":           7,
 	}
 )
 
@@ -2323,7 +2327,9 @@ type OpenConfirmation struct {
 	InterruptId string                 `protobuf:"bytes,1,opt,name=interrupt_id,json=interruptId,proto3" json:"interrupt_id,omitempty"`
 	Kind        InterruptKind          `protobuf:"varint,2,opt,name=kind,proto3,enum=hawkr.procurement.v1alpha1.InterruptKind" json:"kind,omitempty"`
 	// 待回答的問題，讓重新載入之後能還原同一個畫面。
-	Question      *ClarifyQuestion `protobuf:"bytes,4,opt,name=question,proto3" json:"question,omitempty"`
+	Question *ClarifyQuestion `protobuf:"bytes,4,opt,name=question,proto3" json:"question,omitempty"`
+	// 這個中斷已有進行中的回答 run（尚未成功或失敗）；client 顯示處理中，並以 active_run_id 訂閱 WatchRun。
+	Processing    bool `protobuf:"varint,5,opt,name=processing,proto3" json:"processing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2377,6 +2383,13 @@ func (x *OpenConfirmation) GetQuestion() *ClarifyQuestion {
 		return x.Question
 	}
 	return nil
+}
+
+func (x *OpenConfirmation) GetProcessing() bool {
+	if x != nil {
+		return x.Processing
+	}
+	return false
 }
 
 // PublishedRfq 是已成立的詢價發布結果。
@@ -7227,8 +7240,8 @@ type ResumeRunResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RunId     string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	RunStatus RunStatus              `protobuf:"varint,2,opt,name=run_status,json=runStatus,proto3,enum=hawkr.procurement.v1alpha1.RunStatus" json:"run_status,omitempty"`
-	// 這一輪接續實際產生的結果；接續的 run 跑完才有值。冪等重送只回現況、不重跑，這時不設，
-	// client 改讀 GetSnapshot。
+	// 不填：ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
+	// 或重新載入時讀 GetRuntimeSnapshot。
 	Result        *TurnResult `protobuf:"bytes,3,opt,name=result,proto3,oneof" json:"result,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -8491,11 +8504,14 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\x0e2%.hawkr.procurement.v1alpha1.RunStatusR\x06status\x12\x1f\n" +
 	"\vlast_cursor\x18\x04 \x01(\tR\n" +
 	"lastCursor\x12\x1a\n" +
-	"\bterminal\x18\x05 \x01(\bR\bterminal\"\xd0\x01\n" +
+	"\bterminal\x18\x05 \x01(\bR\bterminal\"\xf0\x01\n" +
 	"\x10OpenConfirmation\x12!\n" +
 	"\finterrupt_id\x18\x01 \x01(\tR\vinterruptId\x12=\n" +
 	"\x04kind\x18\x02 \x01(\x0e2).hawkr.procurement.v1alpha1.InterruptKindR\x04kind\x12G\n" +
-	"\bquestion\x18\x04 \x01(\v2+.hawkr.procurement.v1alpha1.ClarifyQuestionR\bquestionJ\x04\b\x03\x10\x04R\vexpire_time\"\xc1\x02\n" +
+	"\bquestion\x18\x04 \x01(\v2+.hawkr.procurement.v1alpha1.ClarifyQuestionR\bquestion\x12\x1e\n" +
+	"\n" +
+	"processing\x18\x05 \x01(\bR\n" +
+	"processingJ\x04\b\x03\x10\x04R\vexpire_time\"\xc1\x02\n" +
 	"\fPublishedRfq\x12%\n" +
 	"\x0epublication_id\x18\x01 \x01(\tR\rpublicationId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12=\n" +
@@ -9060,14 +9076,15 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x1bRUN_STATUS_CANCEL_REQUESTED\x10\x04\x12\x18\n" +
 	"\x14RUN_STATUS_SUCCEEDED\x10\x05\x12\x15\n" +
 	"\x11RUN_STATUS_FAILED\x10\x06\x12\x18\n" +
-	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xaa\x02\n" +
+	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xd2\x02\n" +
 	"\x10RunFailureReason\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_WORKER_LOST\x10\x01\x12$\n" +
 	" RUN_FAILURE_REASON_SEARCH_FAILED\x10\x02\x12*\n" +
 	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\x12(\n" +
 	"$RUN_FAILURE_REASON_MODEL_UNAVAILABLE\x10\x05\x120\n" +
-	",RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE\x10\x06\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
+	",RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE\x10\x06\x12&\n" +
+	"\"RUN_FAILURE_REASON_ANSWER_REJECTED\x10\a\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
 	"\n" +
 	"StepStatus\x12\x1b\n" +
 	"\x17STEP_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +

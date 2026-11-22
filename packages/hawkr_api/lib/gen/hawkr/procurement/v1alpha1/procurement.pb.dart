@@ -1514,11 +1514,13 @@ class OpenConfirmation extends $pb.GeneratedMessage {
     $core.String? interruptId,
     InterruptKind? kind,
     ClarifyQuestion? question,
+    $core.bool? processing,
   }) {
     final result = OpenConfirmation._();
     if (interruptId != null) result.interruptId = interruptId;
     if (kind != null) result.kind = kind;
     if (question != null) result.question = question;
+    if (processing != null) result.processing = processing;
     return result;
   }
 
@@ -1541,6 +1543,7 @@ class OpenConfirmation extends $pb.GeneratedMessage {
         enumValues: InterruptKind.values)
     ..aOM<ClarifyQuestion>(4, _omitFieldNames ? '' : 'question',
         subBuilder: ClarifyQuestion.$_createMessage)
+    ..aOB(5, _omitFieldNames ? '' : 'processing')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1594,6 +1597,16 @@ class OpenConfirmation extends $pb.GeneratedMessage {
   void clearQuestion() => $_clearField(4);
   @$pb.TagNumber(4)
   ClarifyQuestion ensureQuestion() => $_ensure(2);
+
+  /// 這個中斷已有進行中的回答 run（尚未成功或失敗）；client 顯示處理中，並以 active_run_id 訂閱 WatchRun。
+  @$pb.TagNumber(5)
+  $core.bool get processing => $_getBF(3);
+  @$pb.TagNumber(5)
+  set processing($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(5)
+  $core.bool hasProcessing() => $_has(3);
+  @$pb.TagNumber(5)
+  void clearProcessing() => $_clearField(5);
 }
 
 /// PublishedRfq 是已成立的詢價發布結果。
@@ -8542,8 +8555,8 @@ class ResumeRunResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearRunStatus() => $_clearField(2);
 
-  /// 這一輪接續實際產生的結果；接續的 run 跑完才有值。冪等重送只回現況、不重跑，這時不設，
-  /// client 改讀 GetSnapshot。
+  /// 不填：ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
+  /// 或重新載入時讀 GetRuntimeSnapshot。
   @$pb.TagNumber(3)
   TurnResult get result => $_getN(2);
   @$pb.TagNumber(3)
@@ -10406,7 +10419,8 @@ class BuyerProcurementAppServiceApi {
       _client.invoke<CancelRunResponse>(ctx, 'BuyerProcurementAppService',
           'CancelRun', request, CancelRunResponse());
 
-  /// ResumeRun 回覆 run 停下來等待的中斷，從中斷處接續。中斷已被回覆回 FAILED_PRECONDITION，
+  /// ResumeRun 回覆 run 停下來等待的中斷，從中斷處接續，排入回答 run 後立即回傳 run_id。回覆格式不合
+  /// （option_id 與 free_text 要恰一個、文字不可只有空白、選項要在待回答的卡上）回 INVALID_ARGUMENT 並帶欄位違規。中斷已被回覆回 FAILED_PRECONDITION，
   /// reason 是 APPROVAL_ALREADY_RESOLVED；run 不在等待輸入的狀態回 FAILED_PRECONDITION，reason 是 RUN_NOT_ACTIVE；
   /// 這個需求已有進行中的 run（包含另一個正在回答的 run）回 FAILED_PRECONDITION，reason 是 PROCUREMENT_RUN_IN_PROGRESS。
   /// 買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）。

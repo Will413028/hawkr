@@ -288,6 +288,11 @@ class RunFailureReason extends $pb.ProtobufEnum {
       RunFailureReason._(6,
           _omitEnumNames ? '' : 'RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE');
 
+  /// 回答中斷的 run 失敗：答案在解析品項時被拒（例如描述的品項格式不收）。中斷仍待回答、沒有還原，client 請買家重新回答。
+  static const RunFailureReason RUN_FAILURE_REASON_ANSWER_REJECTED =
+      RunFailureReason._(
+          7, _omitEnumNames ? '' : 'RUN_FAILURE_REASON_ANSWER_REJECTED');
+
   static const $core.List<RunFailureReason> values = <RunFailureReason>[
     RUN_FAILURE_REASON_UNSPECIFIED,
     RUN_FAILURE_REASON_WORKER_LOST,
@@ -295,10 +300,11 @@ class RunFailureReason extends $pb.ProtobufEnum {
     RUN_FAILURE_REASON_TURN_PIPELINE_ERROR,
     RUN_FAILURE_REASON_MODEL_UNAVAILABLE,
     RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE,
+    RUN_FAILURE_REASON_ANSWER_REJECTED,
   ];
 
   static final $core.List<RunFailureReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 7);
   static RunFailureReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

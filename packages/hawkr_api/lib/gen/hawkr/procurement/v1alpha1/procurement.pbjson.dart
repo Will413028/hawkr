@@ -157,6 +157,7 @@ const RunFailureReason$json = {
     {'1': 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR', '2': 3},
     {'1': 'RUN_FAILURE_REASON_MODEL_UNAVAILABLE', '2': 5},
     {'1': 'RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE', '2': 6},
+    {'1': 'RUN_FAILURE_REASON_ANSWER_REJECTED', '2': 7},
   ],
   '4': [
     {'1': 4, '2': 4},
@@ -170,8 +171,9 @@ final $typed_data.Uint8List runFailureReasonDescriptor = $convert.base64Decode(
     'IKHlJVTl9GQUlMVVJFX1JFQVNPTl9XT1JLRVJfTE9TVBABEiQKIFJVTl9GQUlMVVJFX1JFQVNP'
     'Tl9TRUFSQ0hfRkFJTEVEEAISKgomUlVOX0ZBSUxVUkVfUkVBU09OX1RVUk5fUElQRUxJTkVfRV'
     'JST1IQAxIoCiRSVU5fRkFJTFVSRV9SRUFTT05fTU9ERUxfVU5BVkFJTEFCTEUQBRIwCixSVU5f'
-    'RkFJTFVSRV9SRUFTT05fSVRFTV9DQVRFR09SWV9VTkFWQUlMQUJMRRAGIgQIBBAEKhpSVU5fRk'
-    'FJTFVSRV9SRUFTT05fRVhQSVJFRA==');
+    'RkFJTFVSRV9SRUFTT05fSVRFTV9DQVRFR09SWV9VTkFWQUlMQUJMRRAGEiYKIlJVTl9GQUlMVV'
+    'JFX1JFQVNPTl9BTlNXRVJfUkVKRUNURUQQByIECAQQBCoaUlVOX0ZBSUxVUkVfUkVBU09OX0VY'
+    'UElSRUQ=');
 
 @$core.Deprecated('Use stepStatusDescriptor instead')
 const StepStatus$json = {
@@ -998,6 +1000,7 @@ const OpenConfirmation$json = {
       '6': '.hawkr.procurement.v1alpha1.ClarifyQuestion',
       '10': 'question'
     },
+    {'1': 'processing', '3': 5, '4': 1, '5': 8, '10': 'processing'},
   ],
   '9': [
     {'1': 3, '2': 4},
@@ -1010,7 +1013,8 @@ final $typed_data.Uint8List openConfirmationDescriptor = $convert.base64Decode(
     'ChBPcGVuQ29uZmlybWF0aW9uEiEKDGludGVycnVwdF9pZBgBIAEoCVILaW50ZXJydXB0SWQSPQ'
     'oEa2luZBgCIAEoDjIpLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkludGVycnVwdEtpbmRS'
     'BGtpbmQSRwoIcXVlc3Rpb24YBCABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5DbG'
-    'FyaWZ5UXVlc3Rpb25SCHF1ZXN0aW9uSgQIAxAEUgtleHBpcmVfdGltZQ==');
+    'FyaWZ5UXVlc3Rpb25SCHF1ZXN0aW9uEh4KCnByb2Nlc3NpbmcYBSABKAhSCnByb2Nlc3NpbmdK'
+    'BAgDEARSC2V4cGlyZV90aW1l');
 
 @$core.Deprecated('Use publishedRfqDescriptor instead')
 const PublishedRfq$json = {
